@@ -105,8 +105,6 @@ pub enum LiveIntent {
         file_name: String,
         version_id: String,
     },
-    /// Go back to installing into the current game (from the target bar).
-    UseCurrentTarget,
     /// Open this game and do what a problem's button says (from Home).
     Resolve(String, crate::instance_detail::ProblemAction),
     /// Files dropped on the Library page.
@@ -436,9 +434,6 @@ pub struct LiveModel {
     pub filters: FilterModel,
     /// Which instance Discover installs into.
     pub install_target: Option<String>,
-    /// The target was set by browsing from that game's page, not by the
-    /// current game; Discover says so and offers the way back.
-    pub target_locked: bool,
     /// What the target game already has of the searched kind, by project.
     pub installed: BTreeMap<String, lumilio_core::InstalledProject>,
     pub activity: Vec<ActivityRow>,
@@ -461,7 +456,6 @@ impl Default for LiveModel {
             query: DiscoverQuery::new(ProjectKind::Modpack),
             filters: FilterModel::default(),
             install_target: None,
-            target_locked: false,
             installed: BTreeMap::new(),
             activity: Vec::new(),
             rates: BTreeMap::new(),

@@ -330,21 +330,6 @@ fn on_live_intent(wiring: &Wiring, intent: LiveIntent, window: &mut Window, cx: 
                 },
             );
         }
-        LiveIntent::UseCurrentTarget => {
-            let service = wiring.backend.service.clone();
-            let handle = wiring
-                .backend
-                .spawn(async move { service.current_instance().await });
-            let shell = wiring.shell.clone();
-            let wiring = wiring.clone();
-            cx.spawn(async move |cx| {
-                if let Ok(Some(current)) = handle.await {
-                    let _ = shell.update(cx, |shell, cx| shell.set_install_target(current, cx));
-                    cx.update(|cx| refresh_installed(&wiring, cx));
-                }
-            })
-            .detach();
-        }
         LiveIntent::Resolve(id, action) => open_instance(
             wiring,
             id,
@@ -1488,7 +1473,7 @@ fn instance_intent(
             let wiring = wiring.clone();
             window.defer(cx, move |window, cx| {
                 let _ = shell.update(cx, |shell, cx| {
-                    shell.lock_install_target(target, cx);
+                    shell.set_install_target(target, cx);
                     shell.browse(kind, window, cx)
                 });
                 refresh_installed(&wiring, cx);

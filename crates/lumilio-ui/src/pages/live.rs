@@ -97,7 +97,15 @@ pub struct LiveControls {
     pub version: Entity<SelectState<SearchableVec<String>>>,
     /// How many game versions the version list was last filled with.
     pub versions_shown: usize,
+    /// The Library's ordering and loader filter.
+    pub library_sort: Entity<SelectState<SearchableVec<String>>>,
+    pub library_loader: Entity<SelectState<SearchableVec<String>>>,
+    /// The loader codes behind the loader list's entries after "全部".
+    pub library_loaders: Vec<usize>,
 }
+
+/// The text of the "no loader filter" entry.
+pub const ALL_LOADERS: &str = "全部加载器";
 
 /// The text of the "no version filter" entry.
 pub const ALL_VERSIONS: &str = "全部版本";
@@ -137,6 +145,24 @@ impl LiveControls {
                 .searchable(true)
             }),
             versions_shown: 0,
+            library_sort: cx.new(|cx| {
+                let labels: Vec<String> = SORT_LABELS.iter().map(|s| (*s).to_owned()).collect();
+                SelectState::new(
+                    SearchableVec::new(labels),
+                    Some(IndexPath::default()),
+                    window,
+                    cx,
+                )
+            }),
+            library_loader: cx.new(|cx| {
+                SelectState::new(
+                    SearchableVec::new(vec![ALL_LOADERS.to_owned()]),
+                    Some(IndexPath::default()),
+                    window,
+                    cx,
+                )
+            }),
+            library_loaders: Vec::new(),
         }
     }
 }
@@ -539,38 +565,19 @@ pub fn library(ctx: &LiveCtx) -> impl IntoElement {
         ))
         .children(
             (tab != COLLECTIONS_TAB && ctx.model.library.len() > 1).then(|| {
-                let emit = ctx.emit.clone();
-                let emit_loader = ctx.emit.clone();
-                let codes: Vec<usize> = loaders.iter().map(|loader| loader_code(*loader)).collect();
-                let mut labels: Vec<&'static str> = vec!["全部"];
-                labels.extend(
-                    loaders
-                        .iter()
-                        .map(|loader| crate::live::loader_label(*loader)),
-                );
                 h_flex()
                     .w_full()
-                    .gap_4()
+                    .gap_3()
                     .items_center()
                     .flex_wrap()
-                    .child(kit::segments(
-                        "live-library-sort",
-                        &SORT_LABELS,
-                        sort,
-                        move |index, window, app| {
-                            emit(ViewIntent::Choose(LIBRARY_SORT, index), window, app)
-                        },
+                    .child(toolbar_select(
+                        "排序方式",
+                        &ctx.controls.library_sort,
+                        130.,
+                        colors,
                     ))
                     .children((loaders.len() > 1).then(|| {
-                        kit::segments(
-                            "live-library-loader",
-                            &labels,
-                            loader_choice,
-                            move |index, window, app| {
-                                let code = index.checked_sub(1).map_or(0, |at| codes[at]);
-                                emit_loader(ViewIntent::Choose(LIBRARY_LOADER, code), window, app)
-                            },
-                        )
+                        toolbar_select("加载器", &ctx.controls.library_loader, 150., colors)
                     }))
             }),
         )
@@ -990,57 +997,6 @@ fn sidebar(ctx: &LiveCtx) -> impl IntoElement {
         }))
 }
 
-/// Says which game an install goes into, and for a game whose page Discover
-/// was opened from, the way back to the current game.
-fn target_bar(ctx: &LiveCtx) -> Option<gpui::AnyElement> {
-    let colors = ctx.colors;
-    let kind = ctx.model.query.kind;
-    if kind == ProjectKind::Modpack {
-        return None;
-    }
-    let card = ctx
-        .model
-        .library
-        .iter()
-        .find(|card| Some(&card.id) == ctx.model.install_target.as_ref())?;
-    let what = match kind {
-        ProjectKind::Mod => "Mod",
-        ProjectKind::ResourcePack => "资源包",
-        ProjectKind::Shader => "光影",
-        ProjectKind::Modpack => "整合包",
-    };
-    Some(
-        h_flex()
-            .id("live-discover-target")
-            .debug_selector(|| "live-discover-target".into())
-            .w_full()
-            .items_center()
-            .justify_between()
-            .gap_4()
-            .px_3()
-            .py_2()
-            .rounded(px(6.))
-            .border_1()
-            .border_color(colors.border)
-            .bg(colors.surface)
-            .child(
-                div()
-                    .text_sm()
-                    .text_color(colors.foreground)
-                    .child(format!("正在为「{}」添加{what} · {}", card.name, card.meta)),
-            )
-            .children(ctx.model.target_locked.then(|| {
-                kit::ghost(
-                    "live-discover-target-clear",
-                    "✕ 改为当前游戏",
-                    send(&ctx.handler, LiveIntent::UseCurrentTarget),
-                )
-                .debug_selector(|| "live-discover-target-clear".into())
-            }))
-            .into_any_element(),
-    )
-}
-
 pub fn discover(ctx: &LiveCtx) -> impl IntoElement {
     let colors = ctx.colors;
     let query = &ctx.model.query;
@@ -1094,7 +1050,6 @@ pub fn discover(ctx: &LiveCtx) -> impl IntoElement {
             actions.render(colors),
             colors,
         ))
-        .children(target_bar(ctx))
         .child(kit::toolbar(
             Some(
                 kit::tabs("live-discover-tabs", &DISCOVER_TABS, tab, {

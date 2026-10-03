@@ -34,6 +34,8 @@ use crate::{
     toast::{self, Toast},
 };
 
+type Labels = gpui_component::select::SearchableVec<String>;
+
 gpui::actions!(lumilio, [Quit]);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -244,17 +246,9 @@ impl LauncherShell {
         self.update_live(
             |model| {
                 model.install_target = Some(id);
-                model.target_locked = false;
             },
             cx,
         );
-    }
-
-    /// Installs into this game for now, because Discover was opened from its
-    /// page; the current game is not changed.
-    pub fn lock_install_target(&mut self, id: String, cx: &mut Context<Self>) {
-        self.set_install_target(id, cx);
-        self.update_live(|model| model.target_locked = true, cx);
     }
 
     /// Opens a project's detail in place of the Discover list. It starts as
@@ -873,7 +867,6 @@ impl Render for LauncherShell {
                     read.version.clone(),
                 )
             };
-            type Labels = gpui_component::select::SearchableVec<String>;
             cx.subscribe_in(
                 &sort,
                 window,
@@ -908,7 +901,97 @@ impl Render for LauncherShell {
                 },
             )
             .detach();
+            let (library_sort, library_loader) = {
+                let read = controls.read(cx);
+                (read.library_sort.clone(), read.library_loader.clone())
+            };
+            cx.subscribe_in(
+                &library_sort,
+                window,
+                |this, _, event: &SelectEvent<Labels>, window, cx| {
+                    if let SelectEvent::Confirm(Some(label)) = event
+                        && let Some(at) = pages::live::SORT_LABELS
+                            .iter()
+                            .position(|sort| *sort == label)
+                    {
+                        let intent = ViewIntent::Choose(pages::live::LIBRARY_SORT, at);
+                        this.apply_view_intent(intent, cx);
+                        this.remember_library_view(intent, window, cx);
+                    }
+                },
+            )
+            .detach();
+            cx.subscribe_in(
+                &library_loader,
+                window,
+                |this, _, event: &SelectEvent<Labels>, window, cx| {
+                    let SelectEvent::Confirm(choice) = event;
+                    let code = choice.as_ref().map_or(0, |label| {
+                        this.live
+                            .as_ref()
+                            .map(|model| pages::live::present_loaders(&model.library))
+                            .and_then(|loaders| {
+                                loaders
+                                    .into_iter()
+                                    .find(|loader| crate::live::loader_label(*loader) == label)
+                            })
+                            .map_or(0, pages::live::loader_code)
+                    });
+                    let intent = ViewIntent::Choose(pages::live::LIBRARY_LOADER, code);
+                    this.apply_view_intent(intent, cx);
+                    this.remember_library_view(intent, window, cx);
+                },
+            )
+            .detach();
             self.live_controls = Some(controls);
+        }
+        // The Library's two dropdowns follow what is remembered and what the
+        // library holds.
+        if let (Some(controls), Some(model)) = (&self.live_controls, &self.live) {
+            use gpui_component::IndexPath;
+            use pages::live::{ALL_LOADERS, LIBRARY_LOADER, LIBRARY_SORT, SORT_LABELS};
+            let present = pages::live::present_loaders(&model.library);
+            let codes: Vec<usize> = present
+                .iter()
+                .copied()
+                .map(pages::live::loader_code)
+                .collect();
+            let want_sort = self.view.choice(LIBRARY_SORT, 0).min(SORT_LABELS.len() - 1);
+            let code = self.view.choice(LIBRARY_LOADER, 0);
+            let want_loader = codes.iter().position(|c| *c == code).map_or(0, |at| at + 1);
+            let read = controls.read(cx);
+            let row = |select: &Entity<gpui_component::select::SelectState<Labels>>, cx: &App| {
+                select.read(cx).selected_index(cx).map(|ix| ix.row)
+            };
+            let stale_list = read.library_loaders != codes;
+            let stale_sort = row(&read.library_sort, cx) != Some(want_sort);
+            let stale_loader = stale_list || row(&read.library_loader, cx) != Some(want_loader);
+            if stale_list || stale_sort || stale_loader {
+                controls.update(cx, |controls, cx| {
+                    if stale_list {
+                        let mut items = vec![ALL_LOADERS.to_owned()];
+                        items.extend(
+                            present
+                                .iter()
+                                .map(|loader| crate::live::loader_label(*loader).to_owned()),
+                        );
+                        controls.library_loaders = codes;
+                        controls.library_loader.update(cx, |select, cx| {
+                            select.set_items(Labels::new(items), window, cx)
+                        });
+                    }
+                    if stale_loader {
+                        controls.library_loader.update(cx, |select, cx| {
+                            select.set_selected_index(Some(IndexPath::new(want_loader)), window, cx)
+                        });
+                    }
+                    if stale_sort {
+                        controls.library_sort.update(cx, |select, cx| {
+                            select.set_selected_index(Some(IndexPath::new(want_sort)), window, cx)
+                        });
+                    }
+                });
+            }
         }
         // The version list fills in when the filters arrive.
         if let (Some(controls), Some(model)) = (&self.live_controls, &self.live)
@@ -1674,9 +1757,7 @@ mod tests {
     }
 
     #[gpui::test]
-    fn discover_names_the_target_game_and_a_locked_one_can_go_back_to_the_current(
-        cx: &mut TestAppContext,
-    ) {
+    fn discover_leaves_naming_the_target_game_to_the_corner_chip(cx: &mut TestAppContext) {
         use crate::live::{LiveIntent, library_card};
         use lumilio_core::{InstanceRecord, InstanceSettings, Loader};
 
@@ -1719,29 +1800,16 @@ mod tests {
         });
         cx.run_until_parked();
         assert!(
-            cx.debug_bounds("live-discover-target").is_some(),
-            "the target is named"
-        );
-        assert!(
-            cx.debug_bounds("live-discover-target-clear").is_none(),
-            "the current game needs no way back"
+            cx.debug_bounds("live-discover-target").is_none(),
+            "the corner already names the game; Discover adds no banner"
         );
 
-        shell.update(cx, |shell, cx| shell.lock_install_target("side".into(), cx));
+        shell.update(cx, |shell, cx| shell.set_install_target("side".into(), cx));
         cx.run_until_parked();
-        let clear = cx
-            .debug_bounds("live-discover-target-clear")
-            .expect("a locked target offers the way back");
-        cx.simulate_click(clear.center(), Modifiers::none());
-        assert_eq!(seen.borrow().last(), Some(&LiveIntent::UseCurrentTarget));
-
-        shell.update(cx, |shell, cx| shell.set_install_target("main".into(), cx));
-        cx.run_until_parked();
-        assert!(cx.debug_bounds("live-discover-target-clear").is_none());
         shell.update(cx, |shell, _| {
             assert_eq!(
                 shell.live().unwrap().install_target.as_deref(),
-                Some("main")
+                Some("side")
             );
         });
     }
@@ -1875,6 +1943,109 @@ mod tests {
         let before = seen.borrow().len();
         choose(ViewIntent::Choose(7, 1), cx);
         assert_eq!(seen.borrow().len(), before);
+    }
+
+    #[gpui::test]
+    fn the_library_sorts_and_filters_from_dropdowns_that_follow_what_is_remembered(
+        cx: &mut TestAppContext,
+    ) {
+        use crate::kit::ViewIntent;
+        use crate::live::{LiveIntent, library_card};
+        use crate::pages::live::{LIBRARY_LOADER, LIBRARY_SORT, loader_code};
+        use gpui_component::select::SelectEvent;
+        use lumilio_core::{InstanceRecord, InstanceSettings, Loader};
+
+        cx.update(|cx| {
+            gpui_component::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let seen: Rc<RefCell<Vec<LiveIntent>>> = Rc::default();
+        let sink = seen.clone();
+        let (shell, cx) = cx.add_window_view(|_, cx| {
+            LauncherShell::new(cx).with_live(Rc::new(move |intent, _, _| {
+                sink.borrow_mut().push(intent);
+            }))
+        });
+        let record = |id: &str, loader: Loader| InstanceRecord {
+            id: id.to_owned(),
+            name: id.to_owned(),
+            game_version: "1.21.1".to_owned(),
+            loader,
+            loader_version: None,
+            favorite: false,
+            created_at: 1,
+            last_played: None,
+            play_seconds: 0,
+            installed: false,
+            settings: InstanceSettings::default(),
+        };
+        shell.update(cx, |shell, cx| {
+            shell.show(Route::Library);
+            shell.update_live(
+                |model| {
+                    model.set_library(
+                        vec![
+                            library_card(&record("a", Loader::Fabric), 1),
+                            library_card(&record("b", Loader::Vanilla), 1),
+                        ],
+                        None,
+                    );
+                },
+                cx,
+            );
+        });
+        cx.run_until_parked();
+        let selected = |cx: &mut gpui::VisualTestContext, loader: bool| {
+            shell.read_with(cx, |shell, cx| {
+                let controls = shell.live_controls.as_ref().unwrap().read(cx);
+                let select = if loader {
+                    &controls.library_loader
+                } else {
+                    &controls.library_sort
+                };
+                select.read(cx).selected_index(cx).map(|ix| ix.row)
+            })
+        };
+        assert_eq!(selected(cx, true), Some(0), "every loader to begin with");
+
+        // What the application restores shows up in the dropdowns.
+        shell.update(cx, |shell, cx| {
+            shell.apply_view_intent(
+                ViewIntent::Choose(LIBRARY_LOADER, loader_code(Loader::Fabric)),
+                cx,
+            );
+            shell.apply_view_intent(ViewIntent::Choose(LIBRARY_SORT, 2), cx);
+        });
+        cx.run_until_parked();
+        assert_eq!(selected(cx, true), Some(2), "全部, 原版, Fabric");
+        assert_eq!(selected(cx, false), Some(2));
+        assert!(
+            seen.borrow().is_empty(),
+            "restoring is not a new choice to save"
+        );
+
+        // A choice made in a dropdown is applied and reported.
+        let sort = shell.read_with(cx, |shell, cx| {
+            shell
+                .live_controls
+                .as_ref()
+                .unwrap()
+                .read(cx)
+                .library_sort
+                .clone()
+        });
+        sort.update(cx, |_, cx| {
+            cx.emit(SelectEvent::Confirm(Some("名称".to_owned())))
+        });
+        cx.run_until_parked();
+        assert_eq!(
+            seen.borrow().last(),
+            Some(&LiveIntent::RememberLibraryView {
+                sort: 1,
+                loader: loader_code(Loader::Fabric) as u8
+            })
+        );
+        assert_eq!(selected(cx, false), Some(1));
     }
 
     #[gpui::test]
