@@ -28,14 +28,11 @@ L6  添加离线账户弹窗 · Microsoft 登录弹窗 · 删除确认 · 皮肤
 
 ## 用户路径
 
+已实现的路径由代码里的 `// ia[accounts]` 注释生成，见 [paths/accounts.md](paths/accounts.md)（约定见 ADR 0019）。没做的：
+
 | 操作 | 结果 | 编号 | 状态 |
 |---|---|---|---|
-| 添加离线账户（含自定义 UUID） | 列表新增；UUID 只在添加时可设 | H-ACC-02 | ✅ |
-| 选为当前 | 之后启动使用 | H-ACC-06 | ✅ |
-| 移除 | 警告弹窗；只删身份不删游戏 | H-ACC-08 | ✅ |
-| 复制 UUID | 剪贴板 toast | H-ACC-09 | ✅ |
 | 离线皮肤 | 弹窗：默认（Steve/Alex）/ 本地图片、模型 | H-ACC-11 | ⏸（ADR 0018 提议推迟：需要第三方认证范围和 authlib-injector） |
-| Microsoft 登录 / 刷新 | 见上；失效的登录显示“需要重新登录”，菜单里“刷新登录” | H-ACC-01/07 | ✅（ADR 0013；真实登录需要 Mojang 批准应用注册） |
 | 第三方认证（authlib-injector） | — | H-ACC-03/04/05 | ⏸ |
 
 ## 状态

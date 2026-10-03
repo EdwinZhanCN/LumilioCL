@@ -378,10 +378,17 @@ pub fn claims(markdown: &str) -> Vec<Claim> {
             continue;
         }
         let cells: Vec<&str> = line.trim_matches('|').split('|').map(str::trim).collect();
-        if cells.len() >= 5 && cells.last().is_some_and(|last| last.starts_with('✅')) {
+        // 操作 | … | 状态: the id column is the one before the status, when
+        // the table has one.
+        if cells.len() >= 3 && cells.last().is_some_and(|last| last.starts_with('✅')) {
+            let ids = if cells.len() >= 4 {
+                cells[cells.len() - 2]
+            } else {
+                ""
+            };
             out.push(Claim {
                 action: cells[0].to_owned(),
-                ids: cells[cells.len() - 2].to_owned(),
+                ids: ids.to_owned(),
             });
         }
     }

@@ -131,6 +131,8 @@ pub fn render(
         )
 }
 
+// ia[navigation]: 点地标 | 中段胶囊按钮 | 打开该页并清空“前进” | —
+// ia[activity]: 导航角标 | 中段「动态」地标上的数字 | 运行中的任务数（超过 99 显示 99+） | —
 fn capsule(
     active: Route,
     activity_count: u32,
@@ -218,6 +220,7 @@ fn leading_zone(leading: Leading, colors: ShellColors) -> impl IntoElement {
         .id("navigation-leading")
         .debug_selector(|| "navigation-leading".into())
         .max_w_full()
+        // ia[navigation]: 后退 / 前进 | 左段的两个图标按钮 | 回到上/下一个位置；位置 = 地标页、游戏页、项目详情；标签/筛选/滚动不进历史 | —
         .child(history_button(
             "navigation-back",
             UiIcon::Back,
@@ -298,6 +301,7 @@ fn account_zone(account: CurrentAccount, colors: ShellColors) -> AnyElement {
             .id("navigation-account")
             .debug_selector(|| "navigation-account".into())
             .child(
+                // ia[navigation]: 没有账户时 | 芯片显示“添加账户” | 打开账户页的添加离线账户弹窗 | H-ACC-02
                 Key::new("navigation-account-empty")
                     .label("添加账户")
                     .ghost()
@@ -319,6 +323,7 @@ fn account_zone(account: CurrentAccount, colors: ShellColors) -> AnyElement {
         .id("navigation-account")
         .debug_selector(|| "navigation-account".into())
         .child(
+            // ia[navigation]: 切换账户 | 右段 Popover 列表：头像、名字、类型（离线/Microsoft）；单选；底部“管理账户…” → 账户页 | 之后的启动使用该身份 | H-ACC-06
             Popover::new("navigation-account-popover")
                 .anchor(Anchor::BottomRight)
                 .trigger(trigger)
@@ -419,6 +424,7 @@ fn trailing_zone(current: CurrentInstance, colors: ShellColors) -> AnyElement {
             .id("navigation-instance")
             .debug_selector(|| "navigation-instance".into())
             .child(
+                // ia[navigation]: 没有游戏时点芯片 | 右段文字按钮“还没有游戏” | 打开游戏库 | —
                 Key::new("navigation-instance-empty")
                     .label("还没有游戏")
                     .ghost()
@@ -464,6 +470,7 @@ fn trailing_zone(current: CurrentInstance, colors: ShellColors) -> AnyElement {
         .id("navigation-instance")
         .debug_selector(|| "navigation-instance".into())
         .child(
+            // ia[navigation]: 切换当前游戏 | 右段 Popover 列表：封面、名称、版本 · 加载器；当前项高亮；游戏多时顶部出现搜索 | 之后的“开始游戏”和发现页安装都指向它；已开始的操作不受影响；保存在 settings.json，重启后保持，被删除时回落到剩余第一个 | H-NAV-03
             Popover::new("navigation-instance-popover")
                 .anchor(Anchor::BottomRight)
                 .trigger(trigger)

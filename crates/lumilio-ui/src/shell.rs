@@ -651,6 +651,7 @@ impl LauncherShell {
         cx.notify();
     }
 
+    // ia[navigation]: 后退 / 前进快捷键 | ⌘[ / ⌘]；游戏页、项目详情里 Esc | 同后退 / 前进 | —
     fn handle_shortcut(
         &mut self,
         event: &KeyDownEvent,

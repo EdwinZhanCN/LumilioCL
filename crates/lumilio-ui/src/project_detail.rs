@@ -228,6 +228,7 @@ fn file_of(version: &Version) -> Option<&lumilio_core::VersionFile> {
 }
 
 impl ProjectDetailView {
+    // ia[discover]: 安装整合包 | 详情页主按钮「安装为新游戏」 | 新建游戏，完成后 toast 可“打开” | H-INSTALL-03
     fn install_label(&self, project: &Project) -> String {
         let kind = project.kind;
         match (kind, &self.target) {
@@ -458,6 +459,7 @@ impl ProjectDetailView {
                 let handler = self.handler.clone();
                 let id = version.id.clone();
                 let title = self.title.to_string();
+                // ia[discover]: 另存为文件 | 详情页版本行「另存为…」 | 选位置下载，任何类型，包括整合包文件 | H-DISC-05
                 let save = file_of(version).map(|file| {
                     let (handler, id, title) = (handler.clone(), id.clone(), title.clone());
                     let file_name = file.filename.clone();
@@ -532,6 +534,7 @@ impl ProjectDetailView {
                                     .unwrap_or_default()
                             )),
                     )
+                    // ia[discover]: 安装指定版本 | 详情页版本标签行内「安装」 | 后台任务；与目标游戏不兼容的版本禁用 | H-DISC-03/04
                     .children(installable.then(|| {
                         Key::new(("detail-version-install", index))
                             .label("安装")

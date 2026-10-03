@@ -75,6 +75,7 @@ impl DependencyPrompt {
         window.close_dialog(cx);
     }
 
+    // ia[discover]: 依赖提示 | 安装 Mod 前的弹窗 | 列出目标游戏还缺的必需依赖（默认勾选；没有适合版本的标明且不能勾；「只安装它」跳过）；也列可选依赖（默认不勾）并警告与已装 Mod 不兼容；依赖先装，每个是动态里的一条任务 | H-DISC-03 | 仅 Mod
     pub fn open(form: Entity<Self>, window: &mut Window, cx: &mut App) {
         window.open_dialog(cx, move |dialog, _, cx| {
             let this = form.read(cx);

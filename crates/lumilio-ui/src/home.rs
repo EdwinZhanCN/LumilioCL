@@ -460,6 +460,7 @@ fn render_continue(
     on_hover: Option<HoverHandler>,
     art: ArtButtons,
 ) -> AnyElement {
+    // ia[home]: 继续 | 英雄区主按钮「继续」 | 启动当前游戏，英雄区进入启动时刻；跟随当前游戏（导航右下角芯片） | H-NAV-01
     let button = art_button(
         "home-continue",
         "继续",
@@ -645,6 +646,7 @@ fn render_launching(
                 .items_center()
                 .child(h_flex().gap(px(14.)).children(steps))
                 .child(
+                    // ia[home]: 取消启动 | 启动时刻里的「取消」 | 停止本次启动，回到继续状态 | —
                     art_button(
                         "home-cancel-launch",
                         "取消",
@@ -686,6 +688,7 @@ fn render_playing(
             div()
                 .mt(px(12.))
                 .debug_selector(|| "home-stop-game".into())
+                // ia[home]: 结束游戏 | 游戏运行中的「结束游戏」 | 停止游戏进程 | —
                 .child(art_button(
                     "home-stop-game",
                     "结束游戏",
@@ -741,6 +744,7 @@ fn render_recovery(
             h_flex()
                 .mt(px(12.))
                 .gap_3()
+                // ia[home]: 恢复并继续 | 启动失败后的「恢复并继续」 | 修复后重试启动 | —
                 .child(art_button(
                     "home-recover",
                     "恢复并继续",
@@ -749,6 +753,7 @@ fn render_recovery(
                     art.primary,
                     intent_handler.clone(),
                 ))
+                // ia[home]: 技术详情 | 启动失败后的「技术详情」 | 失败原因弹窗 | —
                 .child(art_button(
                     "home-details",
                     "技术详情",
@@ -765,6 +770,7 @@ fn render_first_use(
     intent_handler: Option<HomeIntentHandler>,
     colors: ShellHomeColors,
 ) -> impl IntoElement {
+    // ia[home]: 空库：导入 | 首次使用的「把原来的游戏带过来」 | 同游戏库的导入其他启动器的游戏 | L-LIB-03
     let primary = page_button(
         "home-import",
         "把原来的游戏带过来",
@@ -773,6 +779,7 @@ fn render_first_use(
         true,
         intent_handler.clone(),
     );
+    // ia[home]: 空库：新建 | 首次使用的「新建」 | 同游戏库的新建游戏 | L-LIB-02
     let secondary = page_button(
         "home-create",
         "新建",
@@ -823,6 +830,7 @@ fn render_attention(
     if rows.is_empty() {
         return None;
     }
+    // ia[home]: 需要留意：解决 | 每个有问题的游戏一行（游戏名 · 最严重的问题 · 另有几个）和一个按钮（安装/修复/更换…/去设置/去添加/查看日志…） | 点后先打开游戏页再执行 | —
     let list = rows.iter().enumerate().map(|(index, row)| {
         let button = row
             .action
@@ -888,6 +896,7 @@ fn render_recent(
     on_open: Option<OpenHandler>,
     colors: ShellHomeColors,
 ) -> impl IntoElement {
+    // ia[home]: 打开最近的游戏 | 最近卡片（手型和悬停描边） | 点卡片进游戏页 | H-INSTANCE-01
     let cards = recent.iter().enumerate().map(|(index, entry)| {
         let open = entry.id.clone().zip(on_open.clone());
         v_flex()

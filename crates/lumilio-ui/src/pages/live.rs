@@ -684,6 +684,7 @@ fn install_control(
 ) -> gpui::AnyElement {
     let colors = ctx.colors;
     let Some(have) = ctx.model.installed.get(&row.project_id) else {
+        // ia[discover]: 安装（最新兼容版本） | 结果行「安装」 | 后台任务，toast“开始安装”，完成 toast；Mod 先过依赖提示 | H-DISC-04
         return kit::action(
             ("live-install", index),
             "安装",
@@ -694,6 +695,7 @@ fn install_control(
         .small()
         .into_any_element();
     };
+    // ia[discover]: 已安装状态 | 结果行「已安装」/「更新」 | 目标游戏已有的（按 Modrinth 识别）显示「已安装」；有更新显示「更新」，点了用新版本替换旧文件；详情页主按钮同样变化 | — | 只认 Modrinth 认得的文件
     match &have.update {
         Some(version) => {
             let intent = LiveIntent::UpdateInstalled {
@@ -725,6 +727,7 @@ fn install_control(
     }
 }
 
+// ia[discover]: 打开项目详情 | 点结果行 | 详情页（进历史） | H-DISC-02
 fn result_row(index: usize, row: &SearchRow, ctx: &LiveCtx) -> impl IntoElement {
     let colors = ctx.colors;
     let open = send(
@@ -859,6 +862,7 @@ fn result_row(index: usize, row: &SearchRow, ctx: &LiveCtx) -> impl IntoElement 
         )
 }
 
+// ia[discover]: 分页 | 列表上方的页码键 | 翻页并回到列表顶部的第一行 | H-DISC-01
 fn pager(ctx: &LiveCtx) -> impl IntoElement {
     let colors = ctx.colors;
     let pages = ctx.model.pages();
@@ -906,6 +910,7 @@ fn pager(ctx: &LiveCtx) -> impl IntoElement {
         }))
 }
 
+// ia[discover]: 筛选 | 右侧丝印编号筛选栏：游戏版本、加载器、类别；清除筛选 | 重新搜索；加载器与类别是带 LED 的选项列表 | H-DISC-01
 fn sidebar(ctx: &LiveCtx) -> impl IntoElement {
     let colors = ctx.colors;
     let query = &ctx.model.query;
@@ -1058,6 +1063,7 @@ pub fn discover(ctx: &LiveCtx) -> impl IntoElement {
         ))
         .child(kit::toolbar(
             Some(
+                // ia[discover]: 分类 | L3 标签：整合包 / Mod / 资源包 / 光影 | 切换搜索的项目类型并重新搜索 | H-DISC-01
                 kit::tabs("live-discover-tabs", &DISCOVER_TABS, tab, {
                     let change = ctx.change.clone();
                     move |index, window, app| {
@@ -1068,6 +1074,7 @@ pub fn discover(ctx: &LiveCtx) -> impl IntoElement {
                 .into_any_element(),
             ),
             Some(
+                // ia[discover]: 搜索 | L3 搜索框（回车确认） | 按关键词搜索 Modrinth | H-DISC-01
                 div()
                     .debug_selector(|| "live-discover-search".into())
                     .child(kit::search_field(&ctx.controls.discover_search, colors))
@@ -1094,6 +1101,7 @@ pub fn discover(ctx: &LiveCtx) -> impl IntoElement {
                                     h_flex()
                                         .gap_3()
                                         .items_center()
+                                        // ia[discover]: 排序 / 显示数量 | L4 两个下拉 | 重新搜索 | H-DISC-01
                                         .child(toolbar_select(
                                             "排序方式",
                                             &ctx.controls.sort,
@@ -1134,6 +1142,7 @@ fn toolbar_select(
 // ── Activity ────────────────────────────────────────────────────────────
 
 /// 「重试」 for a finished task that remembers its input.
+// ia[activity]: 失败重试 | 失败或已取消任务行的「重试」 | 用当时的输入重新发起，作为新任务出现，旧条目保留 | — | 升级前的旧记录没有输入，不显示
 fn retry_button(
     index: usize,
     row: &ActivityRow,
@@ -1151,6 +1160,7 @@ fn retry_button(
 }
 
 /// 「打开」 for a task about a game that is still in the library.
+// ia[activity]: 打开结果 | 完成或失败任务行的「打开」 | 任务关联到仍在游戏库里的游戏时跳到游戏页；整合包安装/导入完成后关联到新建的游戏 | —
 fn open_button(
     index: usize,
     row: &ActivityRow,
@@ -1198,6 +1208,7 @@ fn activity_row(
             h_flex()
                 .gap_3()
                 .items_center()
+                // ia[activity]: 看进度 | 任务行右侧进度条和百分比 | 实时进度；速度和剩余时间在有两次读数后出现（下载按字节，安装/修复按文件个数） | —
                 .child(match row.fraction {
                     Some(fraction) => h_flex()
                         .gap_3()
@@ -1214,6 +1225,7 @@ fn activity_row(
                     None => kit::chip("进行中", None, colors).into_any_element(),
                 })
                 .children(speed_line(row, colors))
+                // ia[activity]: 取消 | 运行中任务行的「取消」 | 任务停止，状态“已取消” | —
                 .children(row.cancel.map(|id| {
                     kit::ghost(
                         ("live-cancel", index),
@@ -1237,6 +1249,7 @@ fn activity_row(
             h_flex()
                 .gap_2()
                 .items_center()
+                // ia[activity]: 技术详情 | 失败任务行的技术详情 | 失败原因弹窗 | —
                 .child(kit::technical(
                     ("live-task-technical", index),
                     message.clone(),
@@ -1306,6 +1319,7 @@ pub fn activity(ctx: &LiveCtx) -> impl IntoElement {
         .into_any_element()
     };
     let actions = kit::PageActions::new("live-activity-actions").secondary(
+        // ia[activity]: 清除已完成 | L2 次要「清除已完成」 | 清空结束的条目；没有结束的条目时禁用 | —
         kit::action(
             "live-clear-finished",
             "清除已完成",
@@ -1329,6 +1343,7 @@ pub fn activity(ctx: &LiveCtx) -> impl IntoElement {
         ))
         .child(kit::toolbar(
             Some(
+                // ia[activity]: 分类筛选 | L3 标签：全部 / 下载 / 安装 / 更新 / 修复 | 按任务类别过滤 | —
                 kit::tabs("live-activity-tabs", &ACTIVITY_TABS, tab, {
                     let emit = ctx.emit.clone();
                     move |index, window, app| emit(ViewIntent::ActivityTab(index), window, app)
@@ -1344,6 +1359,7 @@ pub fn activity(ctx: &LiveCtx) -> impl IntoElement {
 
 fn account_row(index: usize, row: &AccountRow, ctx: &LiveCtx) -> gpui::Div {
     let colors = ctx.colors;
+    // ia[accounts]: 选为当前 | 账户行左侧的单选圆点 | 之后的启动使用该身份 | H-ACC-06
     let select = send(&ctx.handler, LiveIntent::SelectAccount(row.key.clone()));
     let dot = div()
         .flex_none()
@@ -1370,6 +1386,7 @@ fn account_row(index: usize, row: &AccountRow, ctx: &LiveCtx) -> gpui::Div {
             ""
         }
     );
+    // ia[accounts]: 复制 UUID | 账户行 ⋯ 菜单 | 复制到剪贴板，toast“已复制 UUID” | H-ACC-09
     let copy = {
         let handler = ctx.handler.clone();
         let text = row.uuid.clone();
@@ -1384,6 +1401,7 @@ fn account_row(index: usize, row: &AccountRow, ctx: &LiveCtx) -> gpui::Div {
             )
         }
     };
+    // ia[accounts]: 移除 | 账户行 ⋯ 菜单 → 警告弹窗 | 只删身份（Microsoft 账户同时删凭据库里的登录信息），不删游戏和存档；移除当前账户后改用剩下的第一个 | H-ACC-08
     let remove = {
         let handler = ctx.handler.clone();
         let (key, name) = (row.key.clone(), row.name.clone());
@@ -1424,6 +1442,7 @@ fn account_row(index: usize, row: &AccountRow, ctx: &LiveCtx) -> gpui::Div {
     };
     let mut entries = vec![kit::MenuEntry::new("复制 UUID", copy)];
     if row.microsoft {
+        // ia[accounts]: 刷新登录 | Microsoft 账户行 ⋯ 菜单「刷新登录」 | 失效的登录显示“需要重新登录”，刷新后恢复 | H-ACC-07
         entries.push(kit::MenuEntry::new(
             "刷新登录",
             send(&ctx.handler, LiveIntent::RefreshAccount(row.key.clone())),
@@ -1489,6 +1508,7 @@ pub fn accounts(ctx: &LiveCtx) -> impl IntoElement {
         None if model.accounts_loaded => "还没有账户，添加一个才能进游戏".to_owned(),
         None => String::new(),
     };
+    // ia[accounts]: 添加离线账户 | L2 次要「添加离线账户」→ 弹窗（可自定义 UUID） | 列表新增；UUID 只在添加时可设 | H-ACC-02
     let add = kit::action(
         "account-new",
         "添加离线账户",
@@ -1496,6 +1516,7 @@ pub fn accounts(ctx: &LiveCtx) -> impl IntoElement {
         false,
         send(&ctx.handler, LiveIntent::NewAccount),
     );
+    // ia[accounts]: Microsoft 登录 | L2 主要「登录 Microsoft」→ 设备码弹窗 | 登录后出现在列表和导航芯片里，启动用真实的玩家名和令牌 | H-ACC-01 | ADR 0013；真实登录要 Mojang 批准应用注册
     let microsoft = kit::action(
         "account-microsoft",
         "登录 Microsoft",
