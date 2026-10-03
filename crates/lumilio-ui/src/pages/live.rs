@@ -195,6 +195,7 @@ fn card_menu(card: &LibraryCard, ctx: &LiveCtx) -> Vec<kit::MenuEntry> {
         kit::MenuEntry::new(label, send(&ctx.handler, intent))
     };
     let id = || card.id.clone();
+    // ia[library]: 删除游戏 | 卡片 ⋯ 菜单 → 警告弹窗 | 先在库里确认，再打开游戏页执行删除 | L-LIB-06
     let delete = {
         let handler = ctx.handler.clone();
         let (id, name) = (card.id.clone(), card.name.clone());
@@ -210,6 +211,13 @@ fn card_menu(card: &LibraryCard, ctx: &LiveCtx) -> Vec<kit::MenuEntry> {
         })
         .danger()
     };
+    // ia[library]: 菜单：开始游戏 | 卡片 ⋯ 菜单 | 与卡片上的「启动」相同 | H-PLAY-01
+    // ia[library]: 菜单：打开 | 卡片 ⋯ 菜单 | 游戏页（进历史） | H-INSTANCE-01
+    // ia[library]: 设为当前游戏 | 卡片 ⋯ 菜单 | 首页、发现页的安装目标和右下角芯片跟着换 | H-NAV-03
+    // ia[library]: 合集：加入 / 移出 | 卡片 ⋯ 菜单「加入合集…」→ 多选列表 | 勾选即加入或移出，可顺手新建；合集是标签，不移动文件 | ARCH User Collections
+    // ia[library]: 复制游戏 | 卡片 ⋯ 菜单 → 复制弹窗（名称、是否复制存档） | 先打开游戏页再弹窗，之后同游戏页 | L-LIB-05
+    // ia[library]: 在访达中显示 | 卡片 ⋯ 菜单 | 打开游戏目录 | H-INSTANCE-10
+    // ia[library]: 导出整合包 | 卡片 ⋯ 菜单 → 导出弹窗 | 先打开游戏页再弹出导出，之后同游戏页 | L-LIB-08、H-INSTANCE-09
     vec![
         go("开始游戏", LiveIntent::Play(id())),
         go("打开", LiveIntent::OpenInstance(id())),
@@ -239,6 +247,7 @@ fn card(index: usize, card: &LibraryCard, ctx: &LiveCtx) -> impl IntoElement {
             handler(LiveIntent::ToggleFavorite(id.clone()), window, cx);
         }
     };
+    // ia[library]: 打开游戏 | 点卡片 | 游戏页（进历史） | H-INSTANCE-01
     kit::faceplate(("live-card", index), colors)
         .debug_selector(|| format!("live-card-{index}"))
         .on_click(move |_, window, cx| open(window, cx))
@@ -273,6 +282,7 @@ fn card(index: usize, card: &LibraryCard, ctx: &LiveCtx) -> impl IntoElement {
         .child(
             h_flex()
                 .gap_2()
+                // ia[library]: 直接启动 | 卡片按键行里的「启动」 | 首页启动时刻接管；不打开游戏页 | H-PLAY-01
                 .child(
                     kit::action(
                         ("live-play", index),
@@ -287,6 +297,7 @@ fn card(index: usize, card: &LibraryCard, ctx: &LiveCtx) -> impl IntoElement {
                     .small()
                     .debug_selector(move || format!("live-play-{index}")),
                 )
+                // ia[library]: 收藏 / 取消 | 卡片按键行里的星（图标颜色表示状态） | 立即切换；收藏页同步；不打开游戏页 | L-LIB-01
                 .child(
                     Key::new(("live-favorite", index))
                         .icon(Icon::new(if card.favorite {
@@ -347,6 +358,7 @@ fn collections_body(ctx: &LiveCtx, needle: &str) -> gpui::AnyElement {
             .into_iter()
             .filter(|card| needle.is_empty() || card.name.to_lowercase().contains(needle))
             .collect();
+        // ia[library]: 合集：改名 / 删除 | 合集节标题 ⋯ 菜单 | 删除先确认，游戏不受影响 | ARCH User Collections
         let menu = kit::more_menu(
             ("live-collection-more", section),
             vec![
@@ -381,7 +393,7 @@ fn collections_body(ctx: &LiveCtx, needle: &str) -> gpui::AnyElement {
                 .text_sm()
                 .text_color(colors.muted)
                 .child(if collection.members.is_empty() {
-                    "这个合集还是空的，在游戏卡片上点“合集”把游戏放进来"
+                    "这个合集还是空的，在游戏卡片的 ⋯ 菜单里选“加入合集…”"
                 } else {
                     "没有匹配的游戏"
                 })
@@ -469,7 +481,7 @@ pub fn library(ctx: &LiveCtx) -> impl IntoElement {
         } else if ctx.model.library.is_empty() {
             ("还没有游戏", "新建一个，或去发现里装一个整合包")
         } else if tab == 1 && needle.is_empty() {
-            ("还没有收藏", "点卡片上的“收藏”，常玩的游戏会出现在这里")
+            ("还没有收藏", "点卡片上的星标，常玩的游戏会出现在这里")
         } else {
             ("没有匹配的游戏", "换个关键词试试")
         };
@@ -490,6 +502,7 @@ pub fn library(ctx: &LiveCtx) -> impl IntoElement {
 
     let mut actions = kit::PageActions::new("live-library-actions");
     if tab == COLLECTIONS_TAB {
+        // ia[library]: 合集：新建 | 合集标签 L2「新建合集」 | 弹窗取名；名称不重复 | ARCH User Collections
         actions = actions.secondary(
             kit::action(
                 "live-new-collection",
@@ -501,6 +514,7 @@ pub fn library(ctx: &LiveCtx) -> impl IntoElement {
             .debug_selector(|| "live-new-collection".into()),
         );
     } else {
+        // ia[library]: 导入整合包 | L2 次要 → 系统选文件（.mrpack，或 MultiMC/Prism/本启动器备份的 .zip） | 后台导入，进度在动态；完成 toast 并可点“打开” | L-LIB-03、H-INSTALL-04
         actions = actions.secondary(kit::action(
             "live-import",
             "导入整合包",
@@ -509,6 +523,9 @@ pub fn library(ctx: &LiveCtx) -> impl IntoElement {
             send(&ctx.handler, LiveIntent::ImportPack),
         ));
     }
+    // ia[library]: 导入其他启动器的游戏 | L2 ⋯ 菜单 → 选文件夹（MultiMC/Prism 实例、.minecraft）→ 有多个时勾选 | 后台导入，复制玩家文件，原文件不动；CurseForge 格式不支持 | L-LIB-03 | ADR 0016
+    // ia[library]: 从备份恢复 | L2 ⋯ 菜单 → 选备份 .zip | 后台恢复成新游戏，不覆盖已有的 | — | ADR 0015
+    // ia[library]: 打开游戏库文件夹 | L2 ⋯ 菜单 | 在访达中打开所有游戏所在的文件夹 | —
     let actions = actions
         .more(kit::MenuEntry::new(
             "导入其他启动器的游戏…",
@@ -522,6 +539,7 @@ pub fn library(ctx: &LiveCtx) -> impl IntoElement {
             "打开游戏库文件夹",
             send(&ctx.handler, LiveIntent::OpenGamesFolder),
         ))
+        // ia[library]: 新建游戏 | L2 主要 → 新建游戏弹窗 | 创建并（可选）立即安装；成功后打开新游戏页 | L-LIB-02、H-INSTALL-01/02
         .primary(kit::action(
             "live-new",
             "新建游戏",
@@ -547,10 +565,12 @@ pub fn library(ctx: &LiveCtx) -> impl IntoElement {
                 })
                 .into_any_element(),
             ),
+            // ia[library]: 搜索 | L3 搜索框 | 按名称过滤；空结果“没有匹配的游戏” | H-NAV-04
             Some(kit::search_field(&ctx.controls.library_filter, colors)),
         ))
         .children(
             (tab != COLLECTIONS_TAB && ctx.model.library.len() > 1).then(|| {
+                // ia[library]: 排序 / 按加载器筛选 | L4 两个下拉（排序、加载器），与发现页同一种控件 | 记在偏好设置里，下次打开还是这样；库里只有一种加载器时不显示加载器下拉 | H-NAV-04
                 h_flex()
                     .w_full()
                     .gap_3()

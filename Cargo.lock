@@ -4026,6 +4026,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "lumilio-docgen"
+version = "0.1.0"
+dependencies = [
+ "tempfile",
+]
+
+[[package]]
 name = "lumilio-ui"
 version = "0.1.0"
 dependencies = [

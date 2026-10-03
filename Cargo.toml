@@ -2,6 +2,7 @@
 members = [
     "crates/lumilio-app",
     "crates/lumilio-core",
+    "crates/lumilio-docgen",
     "crates/lumilio-ui",
 ]
 resolver = "3"

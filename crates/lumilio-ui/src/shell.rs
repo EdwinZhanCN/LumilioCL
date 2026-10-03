@@ -1041,6 +1041,7 @@ impl Render for LauncherShell {
                     (Route::Discover, Some(slot)) => slot.view.clone().into_any_element(),
                     (Route::Library, _) => {
                         let handler = ctx.handler.clone();
+                        // ia[library]: 拖入整合包 | 把文件拖到页面上 | 同“导入整合包”（.mrpack，或 MultiMC/Prism/本启动器备份的 .zip）；不是的提示一句 | H-INSTALL-04
                         div()
                             .id("live-library-drop")
                             .size_full()
