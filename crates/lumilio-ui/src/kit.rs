@@ -47,6 +47,19 @@ pub fn page(id: &'static str, content: impl IntoElement) -> impl IntoElement {
         )
 }
 
+/// Keeps the wheel inside a list that scrolls within a page. Gpui gives a
+/// wheel event to every scrollable under the pointer, so without this the
+/// page moves along with the list. A list that fits has nothing to scroll and
+/// lets the page have the wheel.
+pub fn keep_wheel<E: gpui::InteractiveElement>(element: E, scroll: &gpui::ScrollHandle) -> E {
+    let scroll = scroll.clone();
+    element.on_scroll_wheel(move |_, _, cx| {
+        if scroll.max_offset().y > px(0.) {
+            cx.stop_propagation();
+        }
+    })
+}
+
 /// Route content enters with a short fade and lift, keyed by what it shows so
 /// a new subject restarts the entrance and an unchanged one does not.
 pub fn entrance(element: impl IntoElement, key: (&'static str, usize)) -> AnyElement {

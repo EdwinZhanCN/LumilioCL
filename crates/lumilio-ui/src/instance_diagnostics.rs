@@ -269,9 +269,10 @@ impl InstanceDetailView {
                     .child(
                         v_flex()
                             .gap_2()
-                            .child(
+                            .child(kit::keep_wheel(
                                 div()
                                     .id("instance-log-lines")
+                                    .debug_selector(|| "instance-log-lines".into())
                                     .w_full()
                                     .max_h(px(360.))
                                     .overflow_y_scroll()
@@ -281,7 +282,8 @@ impl InstanceDetailView {
                                     .children(
                                         matched[start..].iter().map(|line| log_line(line, colors)),
                                     ),
-                            )
+                                &self.log_scroll,
+                            ))
                             .child(
                                 h_flex()
                                     .gap_2()

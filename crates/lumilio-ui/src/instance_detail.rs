@@ -2094,6 +2094,52 @@ mod tests {
         );
     }
 
+    /// Gpui hands a wheel event to every scrollable under the pointer, so a
+    /// log that scrolls inside a page that scrolls moved both at once.
+    #[gpui::test]
+    fn scrolling_the_log_leaves_the_page_where_it_is(cx: &mut TestAppContext) {
+        use gpui::{ScrollDelta, ScrollWheelEvent, TouchPhase, point, px};
+
+        let (view, cx) = rooted(cx, Rc::default());
+        let text: String = (0..300)
+            .map(|n| format!("[{n}] [main/INFO]: line {n}\n"))
+            .collect();
+        view.update(cx, |view, cx| {
+            view.loaded(Ok((record(), LauncherSettings::default())), cx);
+            view.diag_sub = 1;
+            view.select_tab(TAB_DIAGNOSTICS, cx);
+            view.arrived(
+                Arrived::Logs(Ok(lumilio_core::GameLogs {
+                    latest: Some(text),
+                    crashes: Vec::new(),
+                })),
+                cx,
+            );
+        });
+        cx.simulate_resize(gpui::size(px(1080.), px(500.)));
+        cx.run_until_parked();
+
+        let wheel = |cx: &mut gpui::VisualTestContext, at: gpui::Point<gpui::Pixels>| {
+            cx.simulate_event(ScrollWheelEvent {
+                position: at,
+                delta: ScrollDelta::Pixels(point(px(0.), px(-120.))),
+                modifiers: gpui::Modifiers::none(),
+                touch_phase: TouchPhase::Moved,
+            });
+            cx.run_until_parked();
+        };
+        let lines = cx.debug_bounds("instance-log-lines").expect("log lines");
+        let at = point(lines.center().x, lines.top() + px(40.));
+        wheel(cx, at);
+        let after = cx.debug_bounds("instance-log-lines").expect("log lines");
+        assert_eq!(
+            after.origin.y, lines.origin.y,
+            "the page stayed put while the log scrolled"
+        );
+        let scrolled = view.read_with(cx, |view, _| view.log_scroll.offset().y);
+        assert!(scrolled < px(0.), "the log itself scrolled ({scrolled:?})");
+    }
+
     #[gpui::test]
     fn the_log_view_filters_by_level_and_search_and_keeps_stack_traces_with_their_line(
         cx: &mut TestAppContext,
