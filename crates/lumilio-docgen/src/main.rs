@@ -1,11 +1,10 @@
 //! `cargo run -p lumilio-docgen -- ia [--check]` writes (or checks) the
-//! generated IA path tables; `-- compare` lists where the handwritten IA and
-//! the code's annotations disagree.
+//! generated IA path tables (ADR 0019).
 
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use lumilio_docgen::{compare, generate, known_ids, scan, stale, validate, write};
+use lumilio_docgen::{generate, known_ids, scan, stale, validate, write};
 
 fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
@@ -44,23 +43,8 @@ fn main() -> ExitCode {
             );
             ExitCode::SUCCESS
         }
-        Some("compare") => {
-            for (page, difference) in compare(&root, &paths) {
-                if difference.claimed_only.is_empty() && difference.annotated_only.is_empty() {
-                    continue;
-                }
-                println!("== {page}");
-                for row in &difference.claimed_only {
-                    println!("  手写称已实现，代码里没有注解: {row}");
-                }
-                for row in &difference.annotated_only {
-                    println!("  代码有注解，手写表里没有 ✅ 行: {row}");
-                }
-            }
-            ExitCode::SUCCESS
-        }
         _ => {
-            eprintln!("usage: lumilio-docgen ia [--check] | compare");
+            eprintln!("usage: lumilio-docgen ia [--check]");
             ExitCode::FAILURE
         }
     }

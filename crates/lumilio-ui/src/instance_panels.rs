@@ -529,6 +529,7 @@ impl InstanceDetailView {
 
     /// The latest sessions and changes (three each), each with a way to the
     /// whole history. Nothing at all while the history is unread or empty.
+    // ia[instance.overview]: 最近游玩 / 变更 | 概览里的两个只读摘要，各 3 条 | “查看全部”进历史分段 | L-HIST-01
     pub(super) fn recent_block(
         &self,
         colors: ShellColors,
@@ -607,6 +608,7 @@ impl InstanceDetailView {
         )
     }
 
+    // ia[instance.overview]: 解决问题 | 概览「需要留意」里每个问题行的按钮 | 安装/修复/更换版本，或跳到设置·Java、设置·性能、内容、账户、诊断·日志 | L-DIAG-01
     pub(super) fn problems_block(
         &self,
         colors: ShellColors,
@@ -695,6 +697,7 @@ impl InstanceDetailView {
             .game_started_ms
             .filter(|_| running)
             .and_then(|started| playing_world(worlds, started));
+        // ia[instance.worlds]: 导入世界 | L2 次要「导入世界」→ 选 .zip；也可把 .zip 拖进世界页（一次一个） | 识别含 level.dat 的最浅文件夹，解压到 saves，重名自动加序号，不覆盖 | H-WORLD-02
         let import = kit::action(
             "world-import",
             "导入世界",
@@ -752,6 +755,7 @@ impl InstanceDetailView {
                 let too_old = self.record.as_ref().is_some_and(|record| {
                     lumilio_core::quick_play_world_unsupported(&record.game_version)
                 });
+                // ia[instance.worlds]: 进入世界 | 世界行「进入」 | 启动并直达该世界；1.20 以前的版本置灰并说明 | H-PLAY-07、L-PLAY-02
                 let enter = {
                     let folder = folder.clone();
                     let button = kit::ghost(
@@ -788,17 +792,21 @@ impl InstanceDetailView {
                 let menu = kit::more_menu(
                     ("world-more", row),
                     vec![
+                        // ia[instance.worlds]: 复制世界 | 世界行 ⋯ 菜单 | 复制到新文件夹（重名自动加序号）→ toast | H-WORLD-07
                         entry("复制", InstanceIntent::CopyWorld(folder.clone()), true),
+                        // ia[instance.worlds]: 创建备份 | 世界行 ⋯ 菜单 | 仅这个世界的快照 → 历史·快照可见 | H-WORLD-10、L-HIST-01
                         entry(
                             "创建备份",
                             InstanceIntent::BackupWorld(folder.clone()),
                             true,
                         ),
+                        // ia[instance.worlds]: 导出为 .zip | 世界行 ⋯ 菜单 → 选位置 | 后台打包，toast；不含 session.lock | H-WORLD-09
                         entry(
                             "导出为 .zip…",
                             InstanceIntent::ExportWorld(folder.clone()),
                             false,
                         ),
+                        // ia[instance.worlds]: 在访达中显示 | 世界行 ⋯ 菜单 | 打开该世界的目录 | H-WORLD-12
                         entry(
                             "在访达中显示",
                             InstanceIntent::RevealPath(format!("saves/{folder}")),
@@ -811,6 +819,7 @@ impl InstanceDetailView {
                     .gap_1()
                     .items_center()
                     .child(enter)
+                    // ia[instance.worlds]: 删除世界 | 世界行 🗑 → 警告弹窗 | 删除世界文件夹，写历史 | H-WORLD-08
                     .child(self.asking(
                         ("world-delete", row),
                         "删除",
@@ -832,6 +841,7 @@ impl InstanceDetailView {
             .items_center()
             .justify_between()
             .gap_4()
+            // ia[instance.worlds]: 排序 | L4 分段：最近游玩 / 名称 | 视图状态 | H-WORLD-01
             .child(kit::segments(
                 "instance-world-sort",
                 &WORLD_SORTS,
@@ -846,6 +856,7 @@ impl InstanceDetailView {
                     .gap_2()
                     .items_center()
                     .children(self.fields.as_ref().map(|fields| {
+                        // ia[instance.worlds]: 搜索 | L4 搜索框 | 按世界名称或文件夹名过滤 | H-WORLD-01
                         div().w(px(220.)).child(
                             Input::new(&fields.world_search).small().prefix(
                                 Icon::new(UiIcon::Search)
@@ -910,6 +921,8 @@ impl InstanceDetailView {
             .into_any_element()
     }
 
+    // ia[instance.history]: 看变更 | 历史 · 变更分段 | 只读时间线（内容、世界、设置、安装等） | —
+    // ia[instance.history]: 看游玩记录 | 历史 · 游玩记录分段 | 只读；崩溃或没能启动的会话有「查看日志」，跳到诊断·日志，崩溃报告按时间对应（会话开始到结束后 2 分钟内写下、离结束最近的那份），找到就直接打开 | —
     fn events_body(
         &self,
         sessions: bool,
@@ -1011,6 +1024,7 @@ impl InstanceDetailView {
     fn snapshots_body(&self, colors: ShellColors, cx: &mut Context<Self>) -> AnyElement {
         let busy = self.busy;
         let create = h_flex().child(
+            // ia[instance.history]: 创建快照 | 历史 · 快照分段「现在创建快照」→ 弹窗（备注、范围） | 后台创建 → toast | L-HIST-01
             kit::action(
                 "snapshot-create",
                 "现在创建快照",
@@ -1049,12 +1063,14 @@ impl InstanceDetailView {
                         };
                         let trail = h_flex()
                             .gap_1()
+                            // ia[instance.history]: 恢复快照 | 快照行「恢复」→ 警告弹窗“恢复会用快照替换当前的 X，当前状态会先自动存一份” | 后台恢复 → toast；失败自动回到恢复前 | L-HIST-01
                             .child(self.asking(
                                 ("snapshot-restore", row),
                                 "恢复",
                                 Confirm::RestoreSnapshot(snapshot.id.clone()),
                                 cx,
                             ))
+                            // ia[instance.history]: 删除快照 | 快照行「删除」→ 警告弹窗 | 删除快照文件 | L-HIST-01
                             .child(self.asking(
                                 ("snapshot-delete", row),
                                 "删除",

@@ -194,6 +194,7 @@ impl InstanceDetailView {
             .into_any_element()
     }
 
+    // ia[instance.diagnostics]: 看问题、执行修复 | 诊断 · 问题分段 | 每个问题一个操作（与概览相同） | L-DIAG-01
     fn problems_body(&self, colors: ShellColors, cx: &mut Context<Self>) -> AnyElement {
         if let Some(status) = self.status(&self.data.problems, colors, Section::Problems, cx) {
             return status;
@@ -244,6 +245,7 @@ impl InstanceDetailView {
                 .text_color(colors.muted)
                 .child(text)
         };
+        // ia[instance.diagnostics]: 实时日志（游戏运行中） | 诊断 · 日志分段 | 本启动器启动的游戏运行时显示它正在输出的内容（最近 2000 行），自动跟随末尾；游戏结束后改读 latest.log；启动器之外启动的游戏没有实时输出 | H-PLAY-09
         let running = self.live_output.is_some();
         if running {
             // Following the end of the output.
@@ -308,6 +310,7 @@ impl InstanceDetailView {
             .items_center()
             .justify_between()
             .gap_4()
+            // ia[instance.diagnostics]: 按级别筛选 | 日志分段 · 分段 | 视图状态；级别＝该级别及更严重，堆栈行跟随上一行的级别 | H-PLAY-09
             .child(kit::segments(
                 "instance-log-levels",
                 &LEVEL_LABELS,
@@ -322,6 +325,7 @@ impl InstanceDetailView {
                     .gap_2()
                     .items_center()
                     .children(self.fields.as_ref().map(|fields| {
+                        // ia[instance.diagnostics]: 搜索日志 | 日志分段 · 搜索框 | 视图状态 | H-PLAY-09
                         div().w(px(220.)).child(
                             Input::new(&fields.log_search).small().prefix(
                                 Icon::new(UiIcon::Search)
@@ -331,6 +335,7 @@ impl InstanceDetailView {
                         )
                     }))
                     .child(
+                        // ia[instance.diagnostics]: 复制日志 | 日志分段 · 按键「复制」 | 复制当前筛选出的行；没有行时提示 | H-PLAY-09
                         kit::ghost(
                             "instance-log-copy",
                             "复制",
@@ -347,6 +352,7 @@ impl InstanceDetailView {
                         .disabled(!running && logs.latest.is_none()),
                     )
                     .child(
+                        // ia[instance.diagnostics]: 导出日志 | 日志分段 · 按键「导出…」→ 选位置 | 保存最新日志或打开着的崩溃报告；玩家名、UUID、启动器目录、游戏目录、用户主目录都换成占位符 | H-PLAY-09、H-SET-15
                         kit::ghost(
                             "instance-log-export",
                             "导出…",
@@ -426,6 +432,7 @@ impl InstanceDetailView {
                         div()
                             .text_sm()
                             .text_color(colors.foreground)
+                            // ia[instance.diagnostics]: 崩溃原因识别 | 崩溃报告上方的原因卡片 | 原因 + 建议操作（CrashHint） | H-PLAY-10
                             .child(hint_text(*hint)),
                     )
                 }))
@@ -440,6 +447,7 @@ impl InstanceDetailView {
             .w_full()
             .gap_5()
             .child(kit::section(
+                // ia[instance.diagnostics]: 看最新日志 / 崩溃报告 | 日志分段 · 来源选择：最近的日志 / 崩溃报告列表 | 选哪份看哪份；崩溃报告「查看」打开 | H-PLAY-10
                 "最近的日志",
                 colors,
                 v_flex().gap_3().child(controls).child(latest),
@@ -461,6 +469,7 @@ impl InstanceDetailView {
             .into_any_element()
     }
 
+    // ia[instance.diagnostics]: 浏览文件 | 诊断 · 文件分段 | 逐级打开的只读文件夹列表，只在游戏目录内；右上角按名字搜当前文件夹 | H-INSTANCE-10
     fn files_body(&self, colors: ShellColors, cx: &mut Context<Self>) -> AnyElement {
         if let Some(status) = self.status(&self.data.files, colors, Section::Files, cx) {
             return status;
@@ -507,6 +516,7 @@ impl InstanceDetailView {
                             ),
                         )
                     }))
+                    // ia[instance.diagnostics]: 在访达中显示 | 文件分段 · 按键 | 当前文件夹或所选文件 | H-INSTANCE-10
                     .child(kit::ghost(
                         "instance-files-reveal",
                         "在访达中显示",

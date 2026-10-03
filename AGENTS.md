@@ -36,7 +36,9 @@ reference implementation under `3rd-party/` (read-only; authoritative for behavi
 - UI look, motion, and copy follow `docs/design-language.md` (the world steps, the interface flows).
 - Every page's information architecture — layers, components, user-reachable paths and their
   implementation status — lives in `docs/ia/`. Read the page's IA before any UI work; a feature that
-  is not in the IA is not built, and a built feature is reflected there (update its status marker).
+  is not in the IA is not built. A built user path is declared by a one-line comment at its code,
+  `// ia[page]: 操作 | 层 / 组件 | 结果与反馈 | 编号 [| 备注]` (ADR 0019); `cargo run -p lumilio-docgen -- ia`
+  regenerates `docs/ia/paths/`, and `cargo test` fails while it is stale. Never write built paths by hand.
 
 ## Agent memories and skills
 

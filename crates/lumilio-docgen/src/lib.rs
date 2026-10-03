@@ -13,84 +13,69 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// A page whose paths are generated: its key in the comment, the generated
-/// file's title, and the handwritten IA file the comparison reads.
+/// A page whose paths are generated: its key in the comment and the generated
+/// file's title.
 pub struct Page {
     pub key: &'static str,
     pub title: &'static str,
-    pub handwritten: &'static str,
 }
 
 pub const PAGES: &[Page] = &[
     Page {
         key: "navigation",
         title: "全局导航",
-        handwritten: "navigation.md",
     },
     Page {
         key: "home",
         title: "首页",
-        handwritten: "home.md",
     },
     Page {
         key: "library",
         title: "游戏库",
-        handwritten: "library.md",
     },
     Page {
         key: "discover",
         title: "发现",
-        handwritten: "discover.md",
     },
     Page {
         key: "activity",
         title: "动态",
-        handwritten: "activity.md",
     },
     Page {
         key: "accounts",
         title: "账户",
-        handwritten: "accounts.md",
     },
     Page {
         key: "settings",
         title: "设置",
-        handwritten: "settings.md",
     },
     Page {
         key: "instance",
         title: "游戏页（整体）",
-        handwritten: "instance/README.md",
     },
     Page {
         key: "instance.overview",
         title: "游戏页 · 概览",
-        handwritten: "instance/overview.md",
     },
     Page {
         key: "instance.content",
         title: "游戏页 · 内容",
-        handwritten: "instance/content.md",
     },
     Page {
         key: "instance.worlds",
         title: "游戏页 · 世界",
-        handwritten: "instance/worlds.md",
     },
     Page {
         key: "instance.history",
         title: "游戏页 · 历史",
-        handwritten: "instance/history.md",
     },
     Page {
         key: "instance.diagnostics",
         title: "游戏页 · 诊断",
-        handwritten: "instance/diagnostics.md",
     },
     Page {
         key: "instance.settings",
         title: "游戏页 · 设置",
-        handwritten: "instance/settings.md",
     },
 ];
 
@@ -211,10 +196,17 @@ pub fn known_ids(root: &Path) -> BTreeSet<String> {
                     ids.insert(id[..end].to_uppercase());
                 }
             }
-            if let Some(heading) = line.strip_prefix("## L-")
-                && let Some(id) = heading.split_whitespace().next()
-            {
-                ids.insert(format!("L-{id}"));
+            // `## L-LIB-01 — …`, or a numbered one: `## 4. L-OPS-02 — …`.
+            if let Some(heading) = line.strip_prefix("## ") {
+                let heading = heading
+                    .split_once(". ")
+                    .filter(|(number, _)| number.chars().all(|c| c.is_ascii_digit()))
+                    .map_or(heading, |(_, rest)| rest);
+                if heading.starts_with("L-")
+                    && let Some(id) = heading.split_whitespace().next()
+                {
+                    ids.insert(id.to_owned());
+                }
             }
         }
     }
@@ -356,88 +348,6 @@ pub fn stale(root: &Path, files: &BTreeMap<String, String>) -> Vec<String> {
     out
 }
 
-fn normalize(text: &str) -> String {
-    text.chars()
-        .filter(|c| !c.is_whitespace() && !matches!(c, '*' | '`'))
-        .collect()
-}
-
-/// A handwritten row that claims "built".
-#[derive(Debug, Eq, PartialEq)]
-pub struct Claim {
-    pub action: String,
-    pub ids: String,
-}
-
-/// The rows of a handwritten IA file's tables whose last cell starts with ✅.
-pub fn claims(markdown: &str) -> Vec<Claim> {
-    let mut out = Vec::new();
-    for line in markdown.lines() {
-        let line = line.trim();
-        if !line.starts_with('|') {
-            continue;
-        }
-        let cells: Vec<&str> = line.trim_matches('|').split('|').map(str::trim).collect();
-        // 操作 | … | 状态: the id column is the one before the status, when
-        // the table has one.
-        if cells.len() >= 3 && cells.last().is_some_and(|last| last.starts_with('✅')) {
-            let ids = if cells.len() >= 4 {
-                cells[cells.len() - 2]
-            } else {
-                ""
-            };
-            out.push(Claim {
-                action: cells[0].to_owned(),
-                ids: ids.to_owned(),
-            });
-        }
-    }
-    out
-}
-
-/// What the comparison found for one page.
-#[derive(Debug, Default)]
-pub struct Difference {
-    /// Handwritten says built; no annotation with that action.
-    pub claimed_only: Vec<String>,
-    /// Annotated; no handwritten ✅ row with that action.
-    pub annotated_only: Vec<String>,
-}
-
-/// Compares the handwritten ✅ rows of each page with its annotations.
-pub fn compare(root: &Path, paths: &[IaPath]) -> BTreeMap<&'static str, Difference> {
-    let mut out = BTreeMap::new();
-    for page in PAGES {
-        let text =
-            fs::read_to_string(root.join("docs/ia").join(page.handwritten)).unwrap_or_default();
-        let claimed = claims(&text);
-        let annotated: Vec<&IaPath> = paths.iter().filter(|path| path.page == page.key).collect();
-        let mut difference = Difference::default();
-        for claim in &claimed {
-            if !annotated
-                .iter()
-                .any(|path| normalize(&path.action) == normalize(&claim.action))
-            {
-                difference
-                    .claimed_only
-                    .push(format!("{} [{}]", claim.action, claim.ids));
-            }
-        }
-        for path in &annotated {
-            if !claimed
-                .iter()
-                .any(|claim| normalize(&claim.action) == normalize(&path.action))
-            {
-                difference
-                    .annotated_only
-                    .push(format!("{} ({})", path.action, path.file));
-            }
-        }
-        out.insert(page.key, difference);
-    }
-    out
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -514,32 +424,6 @@ mod tests {
             ["library.md"],
             "left over"
         );
-    }
-
-    #[test]
-    fn handwritten_claims_are_the_rows_marked_built() {
-        let text = "| 操作 | 层 | 结果 | 编号 | 状态 |\n|---|---|---|---|---|\n| 搜索 | L3 | 过滤 | H-NAV-04 | ✅ |\n| 固定 | ⋯ | x | — | ⏸ |\n| **新建** | a | b | L-LIB-02 | ✅（备注） |\n";
-        let claimed = claims(text);
-        assert_eq!(claimed.len(), 2);
-        assert_eq!(claimed[1].action, "**新建**");
-        let difference = compare_one(&claimed, &[path("library", "新建", "L-LIB-02")]);
-        assert_eq!(difference.claimed_only, ["搜索 [H-NAV-04]"]);
-        assert!(difference.annotated_only.is_empty());
-    }
-
-    fn compare_one(claimed: &[Claim], annotated: &[IaPath]) -> Difference {
-        let mut difference = Difference::default();
-        for claim in claimed {
-            if !annotated
-                .iter()
-                .any(|p| normalize(&p.action) == normalize(&claim.action))
-            {
-                difference
-                    .claimed_only
-                    .push(format!("{} [{}]", claim.action, claim.ids));
-            }
-        }
-        difference
     }
 
     /// The real repository: annotations are well formed, name flows that exist,
