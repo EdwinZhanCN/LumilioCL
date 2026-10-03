@@ -433,7 +433,12 @@ impl NewGameForm {
         self.other
             .update(cx, |picker, cx| picker.set_disabled(true, cx));
         cx.notify();
-        (self.handler)(NewGameIntent::Create(request), window, cx);
+        // The click is still updating this form; a handler that answers by
+        // updating it again (a change finishes itself) must run after.
+        let handler = self.handler.clone();
+        window.defer(cx, move |window, cx| {
+            handler(NewGameIntent::Create(request), window, cx)
+        });
     }
 
     /// What the loader version row says will be installed, if known.
@@ -795,6 +800,67 @@ mod tests {
         cx.update(|window, cx| window.draw(cx).clear(cx));
         cx.run_until_parked();
         assert!(cx.debug_bounds("dialog-layer").is_none(), "closed");
+    }
+
+    /// The caller's handler runs while the person presses the button, and a
+    /// change that is sent as a write finishes the form from inside it. That
+    /// used to update the form while its own click was still updating it.
+    #[gpui::test]
+    fn a_handler_may_finish_the_form_it_was_called_from(cx: &mut gpui::TestAppContext) {
+        use gpui::Modifiers;
+        cx.update(|cx| {
+            gpui_component::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (_, cx) = cx.add_window_view(|window, cx| {
+            let host = cx.new(|_| Host);
+            gpui_component::Root::new(host, window, cx)
+        });
+        let form = cx.update(|window, cx| {
+            cx.new(|cx| {
+                let weak: gpui::WeakEntity<NewGameForm> = cx.weak_entity();
+                NewGameForm::for_change(
+                    Rc::new(move |intent, _: &mut Window, cx: &mut App| {
+                        if matches!(intent, NewGameIntent::Create(_)) {
+                            let _ = weak.update(cx, |form, cx| form.created(Ok(()), cx));
+                        }
+                    }),
+                    RuntimeChange {
+                        game_version: "26.2".into(),
+                        loader: Loader::Fabric,
+                        loader_version: Some("0.19.5".into()),
+                        snapshot: Rc::new(|_, _| {}),
+                    },
+                    window,
+                    cx,
+                )
+            })
+        });
+        cx.update(|window, cx| NewGameForm::open(form.clone(), window, cx));
+        cx.run_until_parked();
+        form.update(cx, |form, cx| form.game_versions_arrived(Ok(catalog()), cx));
+        cx.run_until_parked();
+        form.update(cx, |form, cx| {
+            form.game
+                .update(cx, |picker, cx| picker.select("26.3".into(), cx))
+        });
+        cx.update(|window, cx| window.draw(cx).clear(cx));
+        form.update(cx, |form, cx| {
+            form.loader_versions_arrived(
+                Loader::Fabric,
+                "26.3",
+                Ok(vec![version("0.19.5", true)]),
+                cx,
+            )
+        });
+        cx.run_until_parked();
+
+        let create = cx.debug_bounds("new-game-create").unwrap();
+        cx.simulate_click(create.center(), Modifiers::none());
+        cx.run_until_parked();
+        form.read_with(cx, |form, _| {
+            assert!(!form.busy, "the handler's own finish reached the form");
+        });
     }
 
     #[gpui::test]
