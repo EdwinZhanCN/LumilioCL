@@ -450,33 +450,36 @@ impl InstanceDetailView {
             )
             .child(
                 v_flex()
-                    .w(px(220.))
+                    .w(px(240.))
                     .flex_none()
                     .min_w_0()
                     .gap(px(2.))
-                    .child(
-                        h_flex()
-                            .gap_2()
-                            .items_center()
-                            .child(
-                                div()
-                                    .text_sm()
-                                    .text_color(colors.foreground)
-                                    .overflow_hidden()
-                                    .text_ellipsis()
-                                    .whitespace_nowrap()
-                                    .child(version),
-                            )
-                            .children(entry.update.as_ref().map(|newest| {
-                                div()
-                                    .text_xs()
-                                    .text_color(colors.primary)
-                                    .whitespace_nowrap()
-                                    .child(format!("→ {}", newest.number))
-                            })),
-                    )
+                    .debug_selector(move || format!("content-version-{index}"))
                     .child(
                         div()
+                            .w_full()
+                            .text_sm()
+                            .text_color(colors.foreground)
+                            .overflow_hidden()
+                            .text_ellipsis()
+                            .whitespace_nowrap()
+                            .child(version),
+                    )
+                    // The newer version gets its own line: beside the current
+                    // one it ran under the Update key.
+                    .children(entry.update.as_ref().map(|newest| {
+                        div()
+                            .w_full()
+                            .text_xs()
+                            .text_color(colors.primary)
+                            .overflow_hidden()
+                            .text_ellipsis()
+                            .whitespace_nowrap()
+                            .child(format!("→ {}", newest.number))
+                    }))
+                    .child(
+                        div()
+                            .w_full()
                             .text_xs()
                             .text_color(colors.muted)
                             .overflow_hidden()
@@ -491,7 +494,10 @@ impl InstanceDetailView {
                     .gap_1()
                     .items_center()
                     .justify_end()
-                    .w(px(176.))
+                    // Sized by its keys, never narrower than the common case, so a
+                    // row with an Update key cannot spill into the version column.
+                    .min_w(px(176.))
+                    .debug_selector(move || format!("content-actions-{index}"))
                     .children(switch_button)
                     .child(toggle)
                     .child(delete)

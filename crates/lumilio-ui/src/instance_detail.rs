@@ -1747,6 +1747,49 @@ mod tests {
         }
     }
 
+    /// A long current version and an even longer newer one share a row with
+    /// the Update key; neither may run underneath it.
+    #[gpui::test]
+    fn long_versions_stay_clear_of_the_update_key(cx: &mut TestAppContext) {
+        let (view, cx) = rooted(cx, Rc::default());
+        let mut fabric = record();
+        fabric.loader = lumilio_core::Loader::Fabric;
+        fabric.game_version = "26.3".into();
+        let newest = known_version("v2", "1.11.7+26.3-fabric-with-a-long-suffix", "26.3");
+        let mut list = listed(vec![item("iris-fabric-1.11.4+mc26.2.jar", true)]);
+        list.entries[0].source = Some(lumilio_core::ContentSource {
+            project_id: "P".into(),
+            slug: "iris".into(),
+            title: "Iris Shaders".into(),
+            author: Some("coderbot".into()),
+            icon_url: None,
+            version_id: "v1".into(),
+            version_number: "1.11.4+26.2-fabric-with-a-long-suffix".into(),
+        });
+        list.entries[0].update = Some(newest);
+        view.update(cx, |view, cx| {
+            view.loaded(Ok((fabric, LauncherSettings::default())), cx);
+            view.select_tab(TAB_CONTENT, cx);
+            view.arrived(Arrived::Content(ProjectKind::Mod, Ok(list)), cx);
+        });
+        cx.run_until_parked();
+        let version = cx
+            .debug_bounds("content-version-0")
+            .expect("version column");
+        let update = cx
+            .debug_bounds("content-switch-version-0")
+            .expect("update key");
+        let actions = cx.debug_bounds("content-actions-0").expect("action column");
+        assert!(
+            update.left() >= actions.left() && update.right() <= actions.right(),
+            "the Update key ({update:?}) sits inside its column ({actions:?})"
+        );
+        assert!(
+            version.right() <= update.left(),
+            "the version column ({version:?}) ends before the Update key ({update:?})"
+        );
+    }
+
     #[gpui::test]
     fn an_identified_file_switches_version_in_a_dialog_and_bulk_acts_on_the_selection(
         cx: &mut TestAppContext,
