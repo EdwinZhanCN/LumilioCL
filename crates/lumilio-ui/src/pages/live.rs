@@ -239,7 +239,6 @@ fn card(index: usize, card: &LibraryCard, ctx: &LiveCtx) -> impl IntoElement {
             handler(LiveIntent::ToggleFavorite(id.clone()), window, cx);
         }
     };
-    let body = colors.body;
     kit::faceplate(("live-card", index), colors)
         .debug_selector(|| format!("live-card-{index}"))
         .on_click(move |_, window, cx| open(window, cx))
@@ -253,48 +252,17 @@ fn card(index: usize, card: &LibraryCard, ctx: &LiveCtx) -> impl IntoElement {
             colors,
         ))
         .child(
-            h_flex()
-                .justify_between()
-                .items_center()
-                .gap(px(8.))
-                .child(
-                    div()
-                        .min_w_0()
-                        .font_family(theme::MONO_FONT)
-                        .text_size(px(10.))
-                        .text_color(colors.muted)
-                        .overflow_hidden()
-                        .text_ellipsis()
-                        .whitespace_nowrap()
-                        .child(card.meta.clone()),
-                )
-                .child(
-                    h_flex()
-                        .id(("live-favorite", index))
-                        .flex_none()
-                        .gap(px(6.))
-                        .items_center()
-                        .px(px(4.))
-                        .py(px(3.))
-                        .rounded(px(3.))
-                        .cursor_pointer()
-                        .debug_selector(|| format!("live-favorite-{index}"))
-                        .tooltip(move |window, cx| {
-                            gpui_component::tooltip::Tooltip::new(favorite_label).build(window, cx)
-                        })
-                        .on_click(favorite)
-                        .child(crate::controls::led(card.favorite, body))
-                        .child(
-                            div()
-                                .text_size(px(10.))
-                                .text_color(if card.favorite {
-                                    colors.foreground
-                                } else {
-                                    colors.muted
-                                })
-                                .child("收藏"),
-                        ),
-                ),
+            h_flex().justify_between().items_center().gap(px(8.)).child(
+                div()
+                    .min_w_0()
+                    .font_family(theme::MONO_FONT)
+                    .text_size(px(10.))
+                    .text_color(colors.muted)
+                    .overflow_hidden()
+                    .text_ellipsis()
+                    .whitespace_nowrap()
+                    .child(card.meta.clone()),
+            ),
         )
         .child(
             div()
@@ -320,9 +288,27 @@ fn card(index: usize, card: &LibraryCard, ctx: &LiveCtx) -> impl IntoElement {
                     .debug_selector(move || format!("live-play-{index}")),
                 )
                 .child(
+                    Key::new(("live-favorite", index))
+                        .icon(Icon::new(if card.favorite {
+                            UiIcon::StarFilled
+                        } else {
+                            UiIcon::Star
+                        }))
+                        .icon_color(if card.favorite {
+                            colors.primary
+                        } else {
+                            colors.muted
+                        })
+                        .white()
+                        .small()
+                        .tooltip(favorite_label)
+                        .on_click(favorite)
+                        .debug_selector(move || format!("live-favorite-{index}")),
+                )
+                .child(
                     div()
                         .debug_selector(move || format!("live-card-more-{index}"))
-                        .child(kit::more_menu(
+                        .child(kit::small_more_menu(
                             ("live-card-more", index),
                             card_menu(card, ctx),
                             colors,

@@ -1516,6 +1516,12 @@ mod tests {
         let star = cx
             .debug_bounds("live-favorite-0")
             .expect("the star is drawn");
+        // Play, star and ⋯ are one row of keys at one height, in that order.
+        let play = cx.debug_bounds("live-play-0").expect("play key");
+        let more = cx.debug_bounds("live-card-more-0").expect("more key");
+        assert_eq!(play.size.height, star.size.height, "play and star");
+        assert_eq!(play.size.height, more.size.height, "play and more");
+        assert!(play.right() <= star.left() && star.right() <= more.left());
         cx.simulate_click(star.center(), Modifiers::none());
         assert_eq!(
             *seen.borrow(),

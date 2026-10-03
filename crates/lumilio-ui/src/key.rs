@@ -125,6 +125,8 @@ pub struct Key {
     size: KeySize,
     label: Option<SharedString>,
     icon: Option<Icon>,
+    /// Overrides the icon's colour, for a key whose icon shows a state.
+    icon_tint: Option<Hsla>,
     children: Vec<AnyElement>,
     disabled: bool,
     loading: bool,
@@ -145,6 +147,7 @@ impl Key {
             size: KeySize::Regular,
             label: None,
             icon: None,
+            icon_tint: None,
             children: Vec::new(),
             disabled: false,
             loading: false,
@@ -162,6 +165,12 @@ impl Key {
 
     pub fn icon(mut self, icon: impl Into<Icon>) -> Self {
         self.icon = Some(icon.into());
+        self
+    }
+
+    /// Draws the icon in this colour instead of the key's text colour.
+    pub fn icon_color(mut self, color: Hsla) -> Self {
+        self.icon_tint = Some(color);
         self
     }
 
@@ -325,10 +334,10 @@ impl RenderOnce for Key {
         let on_click = self.on_click;
         let loading = self.loading;
         let spinner = loading.then(|| Spinner::new().xsmall().color(text));
-        let icon = self
-            .icon
-            .filter(|_| !loading)
-            .map(|icon| icon.size(icon_size).text_color(text));
+        let icon = self.icon.filter(|_| !loading).map(|icon| {
+            icon.size(icon_size)
+                .text_color(self.icon_tint.unwrap_or(text))
+        });
 
         self.base
             .relative()

@@ -150,6 +150,24 @@ pub fn more_menu(
     entries: Vec<MenuEntry>,
     colors: ShellColors,
 ) -> impl IntoElement {
+    more_key(id, entries, colors, crate::key::KeySize::Regular)
+}
+
+/// The ⋯ button at the height of a small key, for a row of small keys.
+pub fn small_more_menu(
+    id: impl Into<gpui::ElementId>,
+    entries: Vec<MenuEntry>,
+    colors: ShellColors,
+) -> impl IntoElement {
+    more_key(id, entries, colors, crate::key::KeySize::Small)
+}
+
+fn more_key(
+    id: impl Into<gpui::ElementId>,
+    entries: Vec<MenuEntry>,
+    colors: ShellColors,
+    size: crate::key::KeySize,
+) -> impl IntoElement {
     let (mut safe, danger): (Vec<_>, Vec<_>) = entries.into_iter().partition(|entry| !entry.danger);
     let split = safe.len();
     safe.extend(danger);
@@ -157,6 +175,7 @@ pub fn more_menu(
     Key::new(id)
         .icon(Icon::new(UiIcon::More))
         .black()
+        .size(size)
         .tooltip("更多")
         .dropdown_menu_with_anchor(gpui::Anchor::TopRight, move |menu, _, _| {
             let mut menu = menu.min_w(px(180.));
