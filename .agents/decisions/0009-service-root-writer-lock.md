@@ -1,6 +1,6 @@
 # 0009 — Service owns the data-root writer lock
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-09-30
 
 ## Context
@@ -17,4 +17,4 @@ The implementation under plan 0015 acquires a nonblocking OS exclusive lock on l
 - Restart tests must close the old service before opening the replacement.
 - This protects cooperating LauncherService users, not arbitrary tools that write files directly. Low-level stores do not independently acquire another root lock.
 - Shared-resource coordination inside one service, process-abort supervision, recovery UI and durable operation journals remain separate work.
-- Status remains proposed for maintainer review; implementation follows the already documented single-writer target and does not imply acceptance of other proposed ADRs.
+- Accepted by the maintainer; this does not imply acceptance of other proposed ADRs.

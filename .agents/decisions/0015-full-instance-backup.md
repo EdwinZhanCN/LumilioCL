@@ -1,6 +1,6 @@
 # 0015 — Full instance backup and restore
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-10-03
 
 ## Context

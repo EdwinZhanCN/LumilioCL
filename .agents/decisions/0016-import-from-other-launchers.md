@@ -1,6 +1,6 @@
 # 0016 — Importing games from other launchers
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-10-03
 
 ## Context

@@ -1,6 +1,6 @@
 # 0014 — Launcher-managed Java runtimes
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-10-03
 
 ## Context

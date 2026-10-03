@@ -1,6 +1,6 @@
 # 0004 — Home hero is a procedural, mechanic-driven pixel carousel
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-09-29
 
 > Numbering note: `crates/lumilio-ui/src/assets.rs` cites ADR 0003, but ADRs

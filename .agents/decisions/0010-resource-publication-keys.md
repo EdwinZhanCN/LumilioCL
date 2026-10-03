@@ -1,6 +1,6 @@
 # 0010 — Resource publication keys
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-09-30
 
 ## Context
@@ -17,4 +17,4 @@ Plan 0015 implements process-wide weakly held async mutexes keyed by canonical t
 - No new dependency or cross-UI state is introduced. Cooperative root ownership remains the cross-process boundary.
 - This is publication writer coordination, not a claim of game resource read leases or crash-recoverable commits. Those remain required follow-ups.
 - Filesystem aliases are resolved through an existing ancestor; caller paths must remain stable while the operation runs. External file writers cannot be made safe by an in-process mutex.
-- Status remains proposed for maintainer review, documenting the already specified keyed-resource target implemented in 0015.
+- Accepted by the maintainer; documents the keyed-resource target implemented in plan 0015.

@@ -1,6 +1,6 @@
 # 0005 — Launch progress is a core contract; Home renders it
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-09-30
 
 ## Context

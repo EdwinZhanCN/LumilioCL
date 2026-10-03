@@ -1,6 +1,6 @@
 # 0017 — Reclaiming unused shared game files
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-10-03
 
 ## Context
