@@ -465,18 +465,6 @@ impl InstanceDetailView {
                             .whitespace_nowrap()
                             .child(version),
                     )
-                    // The newer version gets its own line: beside the current
-                    // one it ran under the Update key.
-                    .children(entry.update.as_ref().map(|newest| {
-                        div()
-                            .w_full()
-                            .text_xs()
-                            .text_color(colors.primary)
-                            .overflow_hidden()
-                            .text_ellipsis()
-                            .whitespace_nowrap()
-                            .child(format!("→ {}", newest.number))
-                    }))
                     .child(
                         div()
                             .w_full()

@@ -1747,15 +1747,16 @@ mod tests {
         }
     }
 
-    /// A long current version and an even longer newer one share a row with
-    /// the Update key; neither may run underneath it.
+    /// A long version shares a row with the Update key and may not run
+    /// underneath it. The newer version is not in the row: the Update key
+    /// opens the dialog that names it.
     #[gpui::test]
-    fn long_versions_stay_clear_of_the_update_key(cx: &mut TestAppContext) {
+    fn a_long_version_stays_clear_of_the_update_key(cx: &mut TestAppContext) {
         let (view, cx) = rooted(cx, Rc::default());
         let mut fabric = record();
         fabric.loader = lumilio_core::Loader::Fabric;
         fabric.game_version = "26.3".into();
-        let newest = known_version("v2", "1.11.7+26.3-fabric-with-a-long-suffix", "26.3");
+        let newest = known_version("v2", "1.11.7+26.3", "26.3");
         let mut list = listed(vec![item("iris-fabric-1.11.4+mc26.2.jar", true)]);
         list.entries[0].source = Some(lumilio_core::ContentSource {
             project_id: "P".into(),
