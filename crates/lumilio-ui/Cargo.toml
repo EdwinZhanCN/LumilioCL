@@ -1,0 +1,18 @@
+[package]
+name = "lumilio-ui"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+gpui.workspace = true
+gpui-component.workspace = true
+image.workspace = true
+lumilio-core.workspace = true
+
+[dev-dependencies]
+gpui = { workspace = true, features = ["test-support"] }
+
+[lints]
+workspace = true

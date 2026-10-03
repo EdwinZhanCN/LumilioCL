@@ -1,0 +1,52 @@
+[workspace]
+members = [
+    "crates/lumilio-app",
+    "crates/lumilio-core",
+    "crates/lumilio-ui",
+]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+publish = false
+rust-version = "1.95"
+
+[workspace.dependencies]
+gpui = { package = "gpui-pre", version = "=0.3.7" }
+gpui-component = "0.7.0"
+gpui-kit = { version = "0.7.0", default-features = false, features = ["component", "assets"] }
+flate2 = "1"
+futures-util = "0.3.34"
+keyring = "4.2"
+image = { version = "0.25", default-features = false }
+lumilio-core = { path = "crates/lumilio-core" }
+lumilio-ui = { path = "crates/lumilio-ui" }
+md-5 = "0.11"
+regex = "1.11"
+reqwest = { version = "0.13.4", features = ["stream"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha1 = "0.11"
+sha2 = "0.11"
+toml = "0.9"
+tokio = { version = "1.53", features = ["fs", "io-util", "macros", "process", "rt-multi-thread", "sync", "time"] }
+tempfile = "3"
+url = "2.5"
+zip = { version = "8.6", default-features = false, features = ["deflate"] }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+dbg_macro = "deny"
+todo = "deny"
+unimplemented = "deny"
+
+# GPUI does layout, text shaping and painting on the CPU every frame; built
+# without optimization it runs about 13x slower (measured: a Discover page of
+# 20 rows costs 76 ms a frame unoptimized, 6 ms optimized). Dependencies are
+# optimized even in dev builds; our own crates stay debuggable and fast to
+# rebuild.
+[profile.dev.package."*"]
+opt-level = 3

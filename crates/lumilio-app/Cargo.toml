@@ -1,0 +1,20 @@
+[package]
+name = "lumilio-app"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+gpui-kit.workspace = true
+lumilio-core.workspace = true
+lumilio-ui.workspace = true
+futures = "0.3"
+reqwest.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true
