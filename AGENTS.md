@@ -34,11 +34,11 @@ reference implementation under `3rd-party/` (read-only; authoritative for behavi
 - Buttons, switches, tabs, segments and tags come from `lumilio-ui` (`key::Key`, `controls`, `kit`), drawn per
   design-language §12; do not reach for gpui-component's `Button`/`Switch`/`TabBar` in pages.
 - UI look, motion, and copy follow `docs/design-language.md` (the world steps, the interface flows).
-- Every page's information architecture — layers, components, user-reachable paths and their
-  implementation status — lives in `docs/ia/`. Read the page's IA before any UI work; a feature that
-  is not in the IA is not built. A built user path is declared by a one-line comment at its code,
-  `// ia[page]: 操作 | 层 / 组件 | 结果与反馈 | 编号 [| 备注]` (ADR 0019); `cargo run -p lumilio-docgen -- ia`
-  regenerates `docs/ia/paths/`, and `cargo test` fails while it is stale. Never write built paths by hand.
+- User paths are not written by hand. A built user path is declared by a one-line comment at its code,
+  `// ia[page]: 操作 | 层 / 组件 | 结果与反馈 | 编号 [| 备注]` (ADR 0019, skill `lumilio-ia-paths`);
+  `cargo run -p lumilio-docgen -- ia` regenerates `docs/ia/paths/` and `cargo test` fails while it is stale.
+  Before UI work read the page's generated paths (`docs/ia/paths/`) and `docs/ia/README.md` (what is not built);
+  a feature in neither is not built and, if it is not in `ARCH.md`, needs an ADR first.
 
 ## Agent memories and skills
 
@@ -52,6 +52,8 @@ running its workflow. Current portable procedures are:
   regression guard can fail;
 - `postmortem` — record escaped failures and link the durable guardrails that
   prevent recurrence;
+- `lumilio-ia-paths` — declare user paths with `// ia[page]:` comments and regenerate
+  `docs/ia/paths/`;
 - `lumilio-motion-design` — apply `docs/design-language.md` to any UI,
   animation, copy, or world-scene change and review it visually.
 
@@ -87,7 +89,8 @@ cargo fmt --check
 - `docs/workflows/README.md` — user journeys, HMCL behavior evidence, target business rules, and acceptance routing
 - `docs/roadmap.md` — phased roadmap and exit criteria
 - `docs/design-language.md` — visual, motion, and copy specification for all UI
-- `docs/ia/` — per-page UI information architecture and shared patterns (version picker, content item, …)
+- `docs/ia/` — generated user paths per page (`paths/`) and the list of what is not built
+- `docs/design-patterns.md` — shared interaction patterns (version picker, content item, …)
 - `.agents/plans/` — execution plans and template
 - `.agents/decisions/` — architecture decision records (ADR) and template
 - `.agents/skills/` — recurring procedures for planning, checks, and tests

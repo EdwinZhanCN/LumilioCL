@@ -1,6 +1,6 @@
 # 0037 — 用户路径表由代码注释生成
 
-- Status: in_progress
+- Status: done
 - Phase: Phase 8 — ARCH 页面接入和视觉验收
 - Author: agent
 
@@ -21,7 +21,7 @@
 - [x] T4: 设置、游戏页（概览/内容/世界/历史/诊断/设置）。
 - [x] T5: 清理：删除 `compare`，AGENTS.md / IA README 写入注解约定。
 
-- [ ] T6: 按页面拆文件：`pages/live.rs`（约 1700 行，游戏库/发现/动态/账户混在一起）→ `pages/{library,discover,activity,accounts}.rs`；`shell.rs`、`instance_*.rs` 视情况。每次拆分前后 `cargo run -p lumilio-docgen -- ia` 的输出必须一致（只有“实现”列的文件名变）。
+- [x] T6（并入计划 0038）: 按页面拆文件：`pages/live.rs`（约 1700 行，游戏库/发现/动态/账户混在一起）→ `pages/{library,discover,activity,accounts}.rs`；`shell.rs`、`instance_*.rs` 视情况。每次拆分前后 `cargo run -p lumilio-docgen -- ia` 的输出必须一致（只有“实现”列的文件名变）。
 
 ## Validation
 
@@ -35,3 +35,5 @@
 - 游戏页（整体、概览、内容、世界、历史、诊断、设置）：约 65 条。对照发现手写和代码不符的两处并已订正文档：页头主按钮文案（手写写“下载并开始 / 开始游戏 / 正在启动…”，代码只有“启动游戏”和运行中的“结束游戏”）；运行时分段里手写有「[下载]」按钮，代码里只有「[修复]」。另有一个手写的流程编号 L-OPS-02 其实存在（带序号的标题），校验器一度误报，已修。
 - 合计 158 条注解，14 页生成表。
 - 生成表按源码顺序排列，不是按用户流程顺序；需要时再加排序注记。
+
+- 手写 IA 页面已全部废除（用户确认）：未做/范围外收成 `docs/ia/README.md` 里的一张表，共享交互模式移到 `docs/design-patterns.md`，流程写成技能 `.agents/skills/lumilio-ia-paths/`；ADR 0019 已接受。页面级的版面草图和对话框规格（新建游戏、导出整合包等）随之删除，仍可在提交 14cc1ff 里找到。

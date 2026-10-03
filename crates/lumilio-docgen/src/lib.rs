@@ -276,7 +276,7 @@ pub fn render(page: &Page, paths: &[&IaPath]) -> String {
         "<!-- 生成文件，不要手改。来源：代码里的 `// ia[...]` 注释；\n     重新生成：cargo run -p lumilio-docgen -- ia。约定见 ADR 0019。 -->\n",
     );
     out.push_str(&format!("# {} · 已实现的用户路径\n\n", page.title));
-    out.push_str("表里每一行都有对应的实现；没做的路径写在同目录手写的页面文档里。\n\n");
+    out.push_str("表里每一行都有对应的实现；没做的、范围外的见 [../README.md](../README.md)。\n\n");
     out.push_str(
         "| 操作 | 层 / 组件 | 结果与反馈 | 编号 | 备注 | 实现 |\n|---|---|---|---|---|---|\n",
     );
@@ -301,6 +301,24 @@ pub fn generate(paths: &[IaPath]) -> BTreeMap<String, String> {
         let rows: Vec<&IaPath> = paths.iter().filter(|path| path.page == page.key).collect();
         if !rows.is_empty() {
             out.insert(format!("{}.md", page.key), render(page, &rows));
+        }
+    }
+    out.insert("README.md".to_owned(), render_index(paths));
+    out
+}
+
+/// The index of the generated pages, with how many paths each holds.
+pub fn render_index(paths: &[IaPath]) -> String {
+    let mut out = String::from(
+        "<!-- 生成文件，不要手改。重新生成：cargo run -p lumilio-docgen -- ia。约定见 ADR 0019。 -->\n# 用户路径索引\n\n每个页面已实现的用户路径；表里每一行都有对应的实现。没做的、范围外的见 [../README.md](../README.md)。\n\n| 页面 | 路径数 |\n|---|---|\n",
+    );
+    for page in PAGES {
+        let count = paths.iter().filter(|path| path.page == page.key).count();
+        if count > 0 {
+            out.push_str(&format!(
+                "| [{}]({}.md) | {count} |\n",
+                page.title, page.key
+            ));
         }
     }
     out

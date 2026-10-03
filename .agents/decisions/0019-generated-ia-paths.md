@@ -1,6 +1,6 @@
 # 0019 — IA user paths are generated from annotated code
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-10-03
 
 ## Context
@@ -9,7 +9,7 @@
 
 ## Decision
 
-A path that is built carries a one-line comment at the code that implements it: `// ia[page]: 操作 | 层 / 组件 | 结果与反馈 | 编号 [| 备注]`. A std-only tool crate, `lumilio-docgen`, scans `crates/*/src`, validates the flow ids against `docs/workflows/`, and writes `docs/ia/paths/<page>.md`. Status is not written by anyone: a path exists in the generated file if and only if its annotation exists, and every generated row means built. Paths that are not built, page purpose, layer sketches and out-of-scope notes stay handwritten. A test in the crate fails when the generated files are stale, so `cargo test` keeps them current.
+A path that is built carries a one-line comment at the code that implements it: `// ia[page]: 操作 | 层 / 组件 | 结果与反馈 | 编号 [| 备注]`. A std-only tool crate, `lumilio-docgen`, scans `crates/*/src`, validates the flow ids against `docs/workflows/`, and writes `docs/ia/paths/<page>.md`. Status is not written by anyone: a path exists in the generated file if and only if its annotation exists, and every generated row means built. Handwritten per-page IA documents are retired: what is not built or out of scope is a short table in `docs/ia/README.md`, shared interaction patterns live in `docs/design-patterns.md`, and layout and look stay in `docs/design-language.md`. A test in the crate fails when the generated files are stale, so `cargo test` keeps them current.
 
 ## Consequences
 
