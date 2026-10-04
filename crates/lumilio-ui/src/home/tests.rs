@@ -132,10 +132,10 @@ fn cancelling_returns_to_continue_and_stray_signals_are_ignored() {
 fn enabled_buttons_show_the_pointer_and_disabled_ones_do_not() {
     let handler: super::HomeIntentHandler = std::rc::Rc::new(|_, _, _| {});
     let pointer = |handler| {
-        super::base_button(
+        super::buttons::base_button(
             "test",
             "继续",
-            super::LocalActionIcon::Continue,
+            super::buttons::LocalActionIcon::Continue,
             HomeIntent::Continue,
             handler,
         )
