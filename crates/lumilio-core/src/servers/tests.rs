@@ -117,19 +117,14 @@ async fn scripted(json: &'static str, echo: bool) -> u16 {
     let port = listener.local_addr().unwrap().port();
     tokio::spawn(async move {
         let (mut stream, _) = listener.accept().await.unwrap();
-        // Handshake packet, then the status request.
-        let mut buffer = [0_u8; 256];
-        let mut seen = 0;
-        while seen < 4 {
-            let n = stream.read(&mut buffer[seen..]).await.unwrap();
-            if n == 0 {
-                return;
-            }
-            seen += n;
-            if buffer[..seen].ends_with(&[0x01, 0x00]) {
-                break;
-            }
-        }
+        // The handshake packet (its length is one byte here), then the
+        // two-byte status request, each read whole so nothing is left over.
+        let mut length = [0_u8; 1];
+        stream.read_exact(&mut length).await.unwrap();
+        let mut handshake = vec![0_u8; usize::from(length[0])];
+        stream.read_exact(&mut handshake).await.unwrap();
+        let mut request = [0_u8; 2];
+        stream.read_exact(&mut request).await.unwrap();
         let mut body = vec![0x00];
         varint(&mut body, json.len());
         body.extend(json.as_bytes());

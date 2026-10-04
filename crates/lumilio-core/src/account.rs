@@ -154,8 +154,21 @@ impl OfflineProfile {
             // Nothing verifies an offline token; the game only needs one.
             access_token: self.id.compact(),
             user_type: "msa".to_owned(),
+            user_properties: "{}".to_owned(),
+            injection: None,
         }
     }
+}
+
+/// The authlib-injector agent a session needs in the game's JVM: the jar and
+/// the server the game should talk to instead of Mojang's.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Injection {
+    pub jar: std::path::PathBuf,
+    /// The API root of the authentication (or skin) server.
+    pub api_root: String,
+    /// The server's metadata document, handed on so the game need not ask.
+    pub prefetched: Option<String>,
 }
 
 /// The identity values substituted into game arguments.
@@ -165,6 +178,9 @@ pub struct AuthSession {
     profile_id: String,
     access_token: String,
     user_type: String,
+    /// The `--userProperties` JSON the server sent with the sign-in.
+    user_properties: String,
+    injection: Option<Injection>,
 }
 
 impl std::fmt::Debug for AuthSession {
@@ -174,6 +190,7 @@ impl std::fmt::Debug for AuthSession {
             .field("player_name", &self.player_name)
             .field("profile_id", &self.profile_id)
             .field("user_type", &self.user_type)
+            .field("injection", &self.injection)
             .finish_non_exhaustive()
     }
 }
@@ -188,7 +205,63 @@ impl AuthSession {
             profile_id: profile_id.compact(),
             access_token: access_token.to_owned(),
             user_type: "msa".to_owned(),
+            user_properties: "{}".to_owned(),
+            injection: None,
         }
+    }
+
+    /// A session from an authlib-injector server: the character the server
+    /// signed in, the server's token, and the agent that points the game at it.
+    /// `user_properties` are the server's `user.properties`.
+    #[must_use]
+    pub fn third_party(
+        player_name: &str,
+        profile_id: ProfileId,
+        access_token: &str,
+        user_properties: &std::collections::BTreeMap<String, String>,
+        injection: Injection,
+    ) -> Self {
+        // `{"name": ["value"]}`: the shape the game's `--userProperties` takes.
+        let properties: std::collections::BTreeMap<_, _> = user_properties
+            .iter()
+            .map(|(name, value)| (name.as_str(), [value.as_str()]))
+            .collect();
+        Self {
+            player_name: player_name.to_owned(),
+            profile_id: profile_id.compact(),
+            access_token: access_token.to_owned(),
+            user_type: "msa".to_owned(),
+            user_properties: serde_json::to_string(&properties).unwrap_or_else(|_| "{}".to_owned()),
+            injection: Some(injection),
+        }
+    }
+
+    /// The same identity with the agent pointed at another server (the
+    /// launcher's own skin server for an offline player).
+    #[must_use]
+    pub fn with_injection(mut self, injection: Injection) -> Self {
+        self.injection = Some(injection);
+        self
+    }
+
+    #[must_use]
+    pub const fn injection(&self) -> Option<&Injection> {
+        self.injection.as_ref()
+    }
+
+    /// The JVM arguments this session adds: the agent, when it has one.
+    #[must_use]
+    pub fn jvm_arguments(&self) -> Vec<String> {
+        self.injection
+            .as_ref()
+            .map(|injection| {
+                crate::injector::jvm_arguments(
+                    &injection.jar,
+                    &injection.api_root,
+                    injection.prefetched.as_deref(),
+                )
+            })
+            .unwrap_or_default()
     }
 
     #[must_use]
@@ -207,7 +280,7 @@ impl AuthSession {
             .with_value("user_type", &self.user_type)
             .with_value("clientid", "")
             .with_value("auth_xuid", "")
-            .with_value("user_properties", "{}")
+            .with_value("user_properties", &self.user_properties)
     }
 }
 
@@ -245,6 +318,35 @@ mod tests {
             Err(ProfileError::InvalidCharacter('玩'))
         );
         assert_eq!(OfflineProfile::new(" Steve_1 ").unwrap().name(), "Steve_1");
+    }
+
+    #[test]
+    fn a_third_party_session_carries_the_agent_and_the_servers_user_properties() {
+        let properties = std::collections::BTreeMap::from([("lang".to_owned(), "zh".to_owned())]);
+        let session = AuthSession::third_party(
+            "Edwin",
+            ProfileId::parse("123e4567e89b12d3a456426614174000").unwrap(),
+            "tok",
+            &properties,
+            Injection {
+                jar: "/data/injector.jar".into(),
+                api_root: "https://skin.example/api/".to_owned(),
+                prefetched: None,
+            },
+        );
+        assert_eq!(
+            session.jvm_arguments()[0],
+            "-javaagent:/data/injector.jar=https://skin.example/api/"
+        );
+        assert_eq!(session.user_properties, r#"{"lang":["zh"]}"#);
+        assert!(!format!("{session:?}").contains("tok"));
+        assert!(
+            OfflineProfile::new("Steve")
+                .unwrap()
+                .session()
+                .jvm_arguments()
+                .is_empty()
+        );
     }
 
     #[test]

@@ -44,6 +44,8 @@ pub struct GameOptions {
     max_memory_mb: Option<u32>,
     min_memory_mb: Option<u32>,
     extra_jvm_arguments: Vec<String>,
+    /// What the signed-in identity adds (the authlib-injector agent).
+    agent_arguments: Vec<String>,
     window: Option<(u32, u32)>,
     fullscreen: bool,
     extra_game_arguments: Vec<String>,
@@ -61,6 +63,7 @@ impl GameOptions {
             max_memory_mb: None,
             min_memory_mb: None,
             extra_jvm_arguments: Vec::new(),
+            agent_arguments: Vec::new(),
             window: None,
             fullscreen: false,
             extra_game_arguments: Vec::new(),
@@ -81,6 +84,13 @@ impl GameOptions {
     #[must_use]
     pub fn with_jvm_arguments(mut self, arguments: impl IntoIterator<Item = String>) -> Self {
         self.extra_jvm_arguments = arguments.into_iter().collect();
+        self
+    }
+
+    /// JVM arguments the identity needs, placed before the user's own.
+    #[must_use]
+    pub fn with_agent_arguments(mut self, arguments: Vec<String>) -> Self {
+        self.agent_arguments = arguments;
         self
     }
 
@@ -168,6 +178,7 @@ pub fn command_line(plan: &LaunchPlan, options: &GameOptions) -> Vec<String> {
             line.push(format!("{prefix}{value}"));
         }
     }
+    line.extend(options.agent_arguments.iter().cloned());
     line.extend(user.iter().cloned());
     line.extend(plan.jvm_arguments().iter().cloned());
     line.push(plan.main_class().to_owned());

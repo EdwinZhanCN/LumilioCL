@@ -32,8 +32,23 @@ impl<T: Transport + Clone> LauncherService<T> {
             .iter()
             .find(|entry| entry.key() == key)
             .map(|entry| entry.kind);
+        let signed_in = self
+            .settings
+            .lock()
+            .await
+            .get()
+            .accounts
+            .iter()
+            .find(|entry| entry.key() == key)
+            .cloned();
         self.settings.lock().await.remove_account(key)?;
-        if removed == Some(AccountKind::Microsoft) {
+        if let Some(entry) = signed_in.filter(|entry| entry.kind == AccountKind::ThirdParty) {
+            self.sign_out_third_party(key, &entry).await;
+        }
+        if matches!(
+            removed,
+            Some(AccountKind::Microsoft | AccountKind::ThirdParty)
+        ) {
             // The account is gone either way; a secret that cannot be deleted
             // is told, not hidden.
             self.credentials.delete(key)?;
@@ -58,6 +73,7 @@ impl<T: Transport + Clone> LauncherService<T> {
                 .map(|profile| profile.session())
                 .map_err(|_| ServiceError::NoAccount),
             AccountKind::Microsoft => self.microsoft_session(entry, false).await,
+            AccountKind::ThirdParty => self.third_party_session(entry, false).await,
         }
     }
 
@@ -188,10 +204,11 @@ impl<T: Transport + Clone> LauncherService<T> {
             .find(|entry| entry.key() == key)
             .cloned()
             .ok_or_else(|| ServiceError::Settings(SettingsError::UnknownAccount(key.to_owned())))?;
-        if entry.kind != AccountKind::Microsoft {
-            return Ok(());
-        }
-        self.microsoft_session(&entry, true).await?;
+        match entry.kind {
+            AccountKind::Offline => return Ok(()),
+            AccountKind::Microsoft => self.microsoft_session(&entry, true).await?,
+            AccountKind::ThirdParty => self.third_party_session(&entry, true).await?,
+        };
         // A good refresh clears an earlier "must sign in again".
         self.settings.lock().await.set_needs_sign_in(key, false)?;
         Ok(())

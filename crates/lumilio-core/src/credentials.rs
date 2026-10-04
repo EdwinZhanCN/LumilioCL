@@ -152,6 +152,40 @@ impl StoredLogin {
     }
 }
 
+/// What is kept for one account signed in on an authlib-injector server.
+#[derive(Clone, Deserialize, Eq, PartialEq, Serialize)]
+pub struct StoredYggdrasil {
+    pub client_token: String,
+    pub access_token: String,
+    /// The server's `user.properties`, passed on to the game.
+    #[serde(default)]
+    pub user_properties: BTreeMap<String, String>,
+}
+
+impl std::fmt::Debug for StoredYggdrasil {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("StoredYggdrasil").finish_non_exhaustive()
+    }
+}
+
+impl StoredYggdrasil {
+    /// Reads the session kept under `key`.
+    pub fn load(store: &dyn CredentialStore, key: &str) -> Result<Option<Self>, AuthError> {
+        match store.get(key)? {
+            None => Ok(None),
+            Some(text) => serde_json::from_str(&text).map(Some).map_err(|_| {
+                AuthError::CredentialStore("the stored sign-in is unreadable".to_owned())
+            }),
+        }
+    }
+
+    pub fn save(&self, store: &dyn CredentialStore, key: &str) -> Result<(), AuthError> {
+        let text = serde_json::to_string(self)
+            .map_err(|error| AuthError::CredentialStore(error.to_string()))?;
+        store.set(key, &text)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -170,6 +204,22 @@ mod tests {
         store.delete("msa:1").unwrap();
         store.delete("msa:1").unwrap();
         assert_eq!(StoredLogin::load(&store, "msa:1").unwrap(), None);
+    }
+
+    #[test]
+    fn a_third_party_session_round_trips_and_hides_its_tokens() {
+        let store = MemoryCredentials::default();
+        let session = StoredYggdrasil {
+            client_token: "client-secret".into(),
+            access_token: "access-secret".into(),
+            user_properties: BTreeMap::from([("lang".into(), "zh".into())]),
+        };
+        session.save(&store, "ali:1@https://s/").unwrap();
+        assert_eq!(
+            StoredYggdrasil::load(&store, "ali:1@https://s/").unwrap(),
+            Some(session.clone())
+        );
+        assert!(!format!("{session:?}").contains("secret"));
     }
 
     #[test]

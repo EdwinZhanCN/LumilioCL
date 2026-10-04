@@ -21,6 +21,7 @@ mod forge_install;
 mod forge_meta;
 mod history;
 mod import_game;
+mod injector;
 mod inspect;
 mod install;
 mod instance;
@@ -55,6 +56,7 @@ mod transfer;
 mod tuning;
 mod updates;
 mod worlds;
+mod yggdrasil;
 
 pub use account::{AuthSession, MAX_PROFILE_NAME, OfflineProfile, ProfileError, ProfileId};
 pub use activity::{
@@ -154,11 +156,11 @@ pub use servers::{PackPolicy, PingError, ServerEntry, ServerError, ServerStatus}
 pub use service::{
     ActivityView, ContentEffect, ContentResult, DependencyNeed, DependencyReport, DiscoverFilters,
     GameLogs, InstalledProject, LauncherService, Library, ProjectDetail, ServiceError,
-    now as unix_now,
+    ThirdPartySignIn, now as unix_now,
 };
 pub use settings::{
-    AccountEntry, AccountKind, LauncherSettings, MAX_MEMORY_MB, MirrorRule, SettingsError,
-    SettingsStore,
+    AccountEntry, AccountKind, AuthServerEntry, LauncherSettings, MAX_MEMORY_MB, MirrorRule,
+    SettingsError, SettingsStore,
 };
 pub use snapshots::{
     RESTORE_LIMIT, SnapshotError, SnapshotInfo, SnapshotScope, create as create_snapshot,
@@ -188,3 +190,4 @@ pub use worlds::{
     WorldError, WorldInfo, copy_name as world_copy_name, delete as delete_world,
     duplicate as duplicate_world, scan as scan_worlds, size as world_size,
 };
+pub use yggdrasil::{AuthServer, LITTLE_SKIN_URL, Profile as CharacterProfile, YggdrasilError};

@@ -6,9 +6,11 @@ publish.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+base64.workspace = true
 flate2.workspace = true
 image.workspace = true
 futures-util.workspace = true
+getrandom.workspace = true
 keyring.workspace = true
 md-5.workspace = true
 regex.workspace = true

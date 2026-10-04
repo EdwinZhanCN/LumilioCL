@@ -59,6 +59,8 @@ pub struct TransportResponse {
     pub(super) status: u16,
     pub(super) content_length: Option<u64>,
     pub(super) body: ByteStream,
+    /// Response headers, names in lower case.
+    pub(super) headers: Vec<(String, String)>,
 }
 
 impl TransportResponse {
@@ -68,7 +70,27 @@ impl TransportResponse {
             status,
             content_length,
             body,
+            headers: Vec::new(),
         }
+    }
+
+    /// The same answer with its headers (names are lower-cased).
+    #[must_use]
+    pub fn with_headers(mut self, headers: Vec<(String, String)>) -> Self {
+        self.headers = headers
+            .into_iter()
+            .map(|(name, value)| (name.to_ascii_lowercase(), value))
+            .collect();
+        self
+    }
+
+    /// A response header by name, if the transport reported it.
+    #[must_use]
+    pub fn header(&self, name: &str) -> Option<&str> {
+        self.headers
+            .iter()
+            .find(|(key, _)| key.eq_ignore_ascii_case(name))
+            .map(|(_, value)| value.as_str())
     }
 
     #[must_use]

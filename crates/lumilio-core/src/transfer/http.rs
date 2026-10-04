@@ -45,16 +45,19 @@ impl HttpTransport {
         })?;
         let status = response.status().as_u16();
         let content_length = response.content_length();
+        let headers = response
+            .headers()
+            .iter()
+            .filter_map(|(name, value)| {
+                Some((name.as_str().to_owned(), value.to_str().ok()?.to_owned()))
+            })
+            .collect();
         let body = response.bytes_stream().map(|chunk| {
             chunk
                 .map(|bytes| bytes.to_vec())
                 .map_err(|error| TransportError::transient(error.to_string()))
         });
-        Ok(TransportResponse::new(
-            status,
-            content_length,
-            Box::pin(body),
-        ))
+        Ok(TransportResponse::new(status, content_length, Box::pin(body)).with_headers(headers))
     }
 }
 

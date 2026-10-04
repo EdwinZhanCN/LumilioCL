@@ -199,6 +199,7 @@ fn account_rows_show_the_selection_and_custom_ids() {
             uuid: Some("00000000000000000000000000000abc".into()),
             kind: lumilio_core::AccountKind::Microsoft,
             needs_sign_in: true,
+            ..AccountEntry::default()
         },
     ];
     settings.selected_account = Some("Alex".into());

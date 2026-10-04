@@ -1,5 +1,6 @@
 use crate::activity::CancellationToken;
 use crate::content::ContentError;
+use crate::injector::InjectorError;
 use crate::instance::StoreError;
 use crate::launcher::LaunchServiceError;
 use crate::microsoft::AuthError;
@@ -9,6 +10,7 @@ use crate::servers::{PingError, ServerError};
 use crate::settings::SettingsError;
 use crate::snapshots::SnapshotError;
 use crate::worlds::WorldError;
+use crate::yggdrasil::YggdrasilError;
 use std::error::Error;
 use std::fmt;
 use std::fmt::{Display, Formatter};
@@ -42,6 +44,12 @@ pub enum ServiceError {
     Server(ServerError),
     Screenshot(ScreenshotError),
     Ping(PingError),
+    /// An authlib-injector server refused or could not be reached.
+    Yggdrasil(YggdrasilError),
+    /// The authlib-injector agent could not be fetched or stored.
+    Injector(InjectorError),
+    /// The sign-in the person is choosing a character for is gone.
+    NoPendingSignIn,
     Export(crate::pack_export::ExportError),
     Snapshot(SnapshotError),
     Io(std::io::Error),
@@ -75,6 +83,9 @@ impl Display for ServiceError {
             Self::Server(error) => write!(f, "{error}"),
             Self::Screenshot(error) => write!(f, "{error}"),
             Self::Ping(error) => write!(f, "{error}"),
+            Self::Yggdrasil(error) => write!(f, "{error}"),
+            Self::Injector(error) => write!(f, "{error}"),
+            Self::NoPendingSignIn => f.write_str("this sign-in is no longer waiting for a choice"),
             Self::Export(error) => write!(f, "{error}"),
             Self::Snapshot(error) => write!(f, "{error}"),
             Self::Io(error) => write!(f, "{error}"),
@@ -105,6 +116,18 @@ impl From<WorldError> for ServiceError {
 impl From<ServerError> for ServiceError {
     fn from(error: ServerError) -> Self {
         Self::Server(error)
+    }
+}
+
+impl From<YggdrasilError> for ServiceError {
+    fn from(error: YggdrasilError) -> Self {
+        Self::Yggdrasil(error)
+    }
+}
+
+impl From<InjectorError> for ServiceError {
+    fn from(error: InjectorError) -> Self {
+        Self::Injector(error)
     }
 }
 

@@ -90,6 +90,12 @@ impl Layout {
         self.profile(instance_id).join("game")
     }
 
+    /// Where the authlib-injector jar is kept.
+    #[must_use]
+    pub fn injector(&self) -> PathBuf {
+        self.root.join("injector")
+    }
+
     /// Small copies of the instance's screenshots, made on demand and safe to
     /// delete: they are rebuilt when missing.
     #[must_use]

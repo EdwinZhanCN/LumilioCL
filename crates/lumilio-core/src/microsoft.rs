@@ -531,4 +531,4 @@ fn xbox_failure(status: u16, body: &[u8]) -> AuthError {
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

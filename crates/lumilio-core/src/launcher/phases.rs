@@ -318,6 +318,7 @@ where
         let mut options = GameOptions::new(java.executable())
             .with_memory(min_memory, max_memory)
             .with_tuning(&tuning)
+            .with_agent_arguments(request.session.jvm_arguments())
             .with_environment(instance_environment.clone());
         // Versions without direct quick play still join a server the old way.
         if let Some(QuickPlay::Server(address)) = &request.quick_play

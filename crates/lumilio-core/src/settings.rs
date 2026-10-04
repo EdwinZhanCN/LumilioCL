@@ -46,6 +46,9 @@ pub enum AccountKind {
     Offline,
     /// Signed in with Microsoft; its secrets are in the system credential store.
     Microsoft,
+    /// Signed in on an authlib-injector server (`server`); its secrets are in
+    /// the system credential store too.
+    ThirdParty,
 }
 
 impl AccountKind {
@@ -69,6 +72,24 @@ pub struct AccountEntry {
     /// The stored sign-in can no longer be refreshed.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub needs_sign_in: bool,
+    /// A third-party account's authentication server: its API root.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub server: Option<String>,
+    /// A third-party account's login name (an email or a user name).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub login: Option<String>,
+}
+
+/// An authentication server the person added (public facts only; LittleSkin
+/// is built in and never listed here).
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub struct AuthServerEntry {
+    /// The API root, ending with `/`.
+    pub url: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub non_email_login: bool,
 }
 
 impl AccountEntry {
@@ -76,8 +97,9 @@ impl AccountEntry {
     /// for an offline account (as always), `msa:<profile id>` for Microsoft.
     #[must_use]
     pub fn key(&self) -> String {
-        match (self.kind, &self.uuid) {
-            (AccountKind::Microsoft, Some(uuid)) => format!("msa:{uuid}"),
+        match (self.kind, &self.uuid, &self.server) {
+            (AccountKind::Microsoft, Some(uuid), _) => format!("msa:{uuid}"),
+            (AccountKind::ThirdParty, Some(uuid), Some(server)) => format!("ali:{uuid}@{server}"),
             _ => self.name.clone(),
         }
     }
@@ -109,6 +131,8 @@ pub struct LauncherSettings {
     /// Try mirrors before the official address.
     pub prefer_mirrors: bool,
     pub accounts: Vec<AccountEntry>,
+    /// Authentication servers added besides the built-in LittleSkin.
+    pub auth_servers: Vec<AuthServerEntry>,
     pub selected_account: Option<String>,
     /// The instance the launcher plays and installs into by default.
     pub current_instance: Option<String>,
@@ -138,6 +162,7 @@ pub enum SettingsError {
     /// Another account already uses this profile id.
     DuplicateUuid(String),
     UnknownAccount(String),
+    UnknownServer(String),
     /// Memory must be 1..=[`MAX_MEMORY_MB`], and minimum ≤ maximum.
     InvalidMemory,
     InvalidMirror,
@@ -154,6 +179,7 @@ impl Display for SettingsError {
             Self::DuplicateAccount(name) => write!(f, "account {name:?} already exists"),
             Self::DuplicateUuid(uuid) => write!(f, "profile id {uuid} is already used"),
             Self::UnknownAccount(name) => write!(f, "no account {name:?}"),
+            Self::UnknownServer(url) => write!(f, "no authentication server {url:?}"),
             Self::InvalidMemory => f.write_str("memory values are out of range"),
             Self::InvalidMirror => f.write_str("mirror prefixes must not be empty"),
             Self::Tuning(error) => write!(f, "{error}"),
@@ -364,11 +390,112 @@ impl SettingsStore {
                     name: name.to_owned(),
                     uuid: Some(compact.clone()),
                     kind: AccountKind::Microsoft,
-                    needs_sign_in: false,
+                    ..AccountEntry::default()
                 });
             }
         }
         let key = format!("msa:{compact}");
+        if next.selected_account.is_none() {
+            next.selected_account = Some(key.clone());
+        }
+        self.save(next)?;
+        Ok(key)
+    }
+
+    /// Remembers an authentication server (or updates what is known of it).
+    /// LittleSkin is built in and needs no entry.
+    pub fn add_auth_server(&mut self, server: AuthServerEntry) -> Result<(), SettingsError> {
+        if server.url == crate::yggdrasil::LITTLE_SKIN_URL {
+            return Ok(());
+        }
+        let mut next = self.settings.clone();
+        match next
+            .auth_servers
+            .iter_mut()
+            .find(|known| known.url == server.url)
+        {
+            Some(known) => *known = server,
+            None => next.auth_servers.push(server),
+        }
+        self.save(next)
+    }
+
+    /// Forgets an authentication server and the accounts signed in on it;
+    /// returns the keys of the removed accounts, whose secrets the caller
+    /// deletes.
+    pub fn remove_auth_server(&mut self, url: &str) -> Result<Vec<String>, SettingsError> {
+        let mut next = self.settings.clone();
+        let before = next.auth_servers.len();
+        next.auth_servers.retain(|server| server.url != url);
+        if next.auth_servers.len() == before {
+            return Err(SettingsError::UnknownServer(url.to_owned()));
+        }
+        let gone: Vec<String> = next
+            .accounts
+            .iter()
+            .filter(|entry| {
+                entry.kind == AccountKind::ThirdParty && entry.server.as_deref() == Some(url)
+            })
+            .map(AccountEntry::key)
+            .collect();
+        next.accounts.retain(|entry| {
+            !(entry.kind == AccountKind::ThirdParty && entry.server.as_deref() == Some(url))
+        });
+        if next
+            .selected_account
+            .as_ref()
+            .is_some_and(|selected| gone.contains(selected))
+        {
+            next.selected_account = next.accounts.first().map(AccountEntry::key);
+        }
+        self.save(next)?;
+        Ok(gone)
+    }
+
+    /// Records a sign-in on an authentication server. The account is found by
+    /// server and profile id, so signing in again updates it. The first
+    /// account becomes the selected one. Returns the account's key.
+    pub fn sign_in_third_party(
+        &mut self,
+        server: &str,
+        profile_id: ProfileId,
+        name: &str,
+        login: &str,
+    ) -> Result<String, SettingsError> {
+        let compact = profile_id.compact();
+        let mut next = self.settings.clone();
+        let existing = next.accounts.iter_mut().find(|entry| {
+            entry.kind == AccountKind::ThirdParty
+                && entry.uuid.as_deref() == Some(compact.as_str())
+                && entry.server.as_deref() == Some(server)
+        });
+        match existing {
+            Some(entry) => {
+                name.clone_into(&mut entry.name);
+                entry.login = Some(login.to_owned());
+                entry.needs_sign_in = false;
+            }
+            None => {
+                // Another account with this id would be indistinguishable to the game.
+                if next
+                    .accounts
+                    .iter()
+                    .filter_map(|entry| entry.profile_id().ok())
+                    .any(|other| other == profile_id)
+                {
+                    return Err(SettingsError::DuplicateUuid(compact));
+                }
+                next.accounts.push(AccountEntry {
+                    name: name.to_owned(),
+                    uuid: Some(compact.clone()),
+                    kind: AccountKind::ThirdParty,
+                    server: Some(server.to_owned()),
+                    login: Some(login.to_owned()),
+                    ..AccountEntry::default()
+                });
+            }
+        }
+        let key = format!("ali:{compact}@{server}");
         if next.selected_account.is_none() {
             next.selected_account = Some(key.clone());
         }

@@ -13,6 +13,7 @@ mod screenshots;
 mod servers;
 mod settings;
 mod snapshots;
+mod third_party;
 mod worlds;
 
 use super::LauncherService;
