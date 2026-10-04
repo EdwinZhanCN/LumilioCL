@@ -14,8 +14,7 @@
 //!
 //! Game files (client jars, loader profiles, libraries, assets) sit in `meta/`
 //! so two instances of one version never install it twice; everything an
-//! instance can change lives in its own profile. Behavior notes:
-//! `docs/behavior/storage.md`.
+//! instance can change lives in its own profile.
 
 use std::path::{Path, PathBuf};
 

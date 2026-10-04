@@ -1,7 +1,6 @@
 //! Gathers everything [`crate::diagnose`] needs for one instance.
 //!
-//! Behavior notes: `docs/behavior/diagnostics.md`. This is assembly, not
-//! policy: the rules live in `diagnostics`.
+//! This is assembly, not policy: the rules live in `diagnostics`.
 
 use std::path::Path;
 

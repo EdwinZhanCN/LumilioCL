@@ -1,8 +1,8 @@
 # LumilioCL
 
 LumilioCL is a new Minecraft launcher built in Rust with GPUI and
-gpui-component. The project uses HMCL only as a read-only behavioral reference;
-the implementation and product architecture are original to LumilioCL.
+gpui-component. HMCL and Modrinth App are its read-only upstream references
+(`3rd-party/`, not committed); code adapted from them keeps its attribution.
 
 ## Workspace
 
@@ -20,8 +20,9 @@ The app opens the data folder and shows the real launcher. If the folder cannot
 be opened (for example another instance holds the lock) it prints the reason and
 exits. Use `LUMILIO_HOME=/tmp/<isolated-folder>` for a disposable data folder.
 
-See [`docs/roadmap.md`](docs/roadmap.md) for status and
-[`.agents/plans/history.md`](.agents/plans/history.md) for what has landed.
+What the launcher can do is generated from the code into
+[`docs/ia/paths/`](docs/ia/paths/README.md); work in flight is in
+[`.agents/plans/`](.agents/plans/README.md).
 
 ### Review hooks
 

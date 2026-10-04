@@ -2,8 +2,7 @@
 //!
 //! It composes the catalog, release, install, repair-scan, Java, and process
 //! pieces and reports everything as [`LaunchUpdate`]s, so a UI only has to
-//! render a [`crate::LaunchSession`]. Behavior notes:
-//! `docs/behavior/launcher-spine.md`.
+//! render a [`crate::LaunchSession`].
 
 mod phases;
 mod progress;

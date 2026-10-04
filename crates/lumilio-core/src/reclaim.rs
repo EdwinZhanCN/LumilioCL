@@ -4,7 +4,7 @@
 //! json and jar), natives extracted per version, libraries, and assets. A
 //! file is *unused* when no game's version needs it. The scan is read-only and
 //! conservative: when anything cannot be classified, nothing it touches is
-//! offered. Behavior notes: `docs/behavior/reclaim.md`.
+//! offered.
 
 use std::collections::BTreeSet;
 use std::error::Error;

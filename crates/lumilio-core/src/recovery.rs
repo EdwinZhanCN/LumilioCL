@@ -1,8 +1,8 @@
 //! What the launcher found and did when it opened its data root.
 //!
-//! Behavior notes: `docs/behavior/recovery.md`. Opening never hides damage:
-//! unreadable originals are kept, and everything the launcher repaired or could
-//! not repair is reported as a [`RecoveryNote`] for Diagnostics to show.
+//! Opening never hides damage: unreadable originals are kept, and everything
+//! the launcher repaired or could not repair is reported as a [`RecoveryNote`]
+//! for Diagnostics to show.
 
 use std::collections::BTreeSet;
 use std::fs;

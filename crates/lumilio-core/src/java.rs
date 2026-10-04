@@ -1,6 +1,4 @@
 //! Java runtime discovery and selection.
-//!
-//! Behavior notes: `docs/behavior/launcher-spine.md`.
 
 use std::collections::BTreeMap;
 use std::fs;

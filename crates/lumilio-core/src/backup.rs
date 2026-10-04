@@ -3,7 +3,7 @@
 //! A backup is a zip: `lumilio-backup.json` describing the game, and the
 //! whole game folder under `game/` (logs and crash reports left out, links
 //! never followed). Restoring builds a new game; it never touches an existing
-//! one. Behavior notes: `docs/behavior/backup.md`.
+//! one.
 
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};

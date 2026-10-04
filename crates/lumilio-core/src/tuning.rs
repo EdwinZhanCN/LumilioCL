@@ -1,8 +1,6 @@
 //! How the game is started, beyond which game it is: window, arguments,
 //! environment and commands. These are the launcher-wide defaults; an
 //! instance can override some of them (Instance.Settings).
-//!
-//! Behavior notes: `docs/behavior/settings.md`.
 
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};

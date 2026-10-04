@@ -1,7 +1,7 @@
 //! Why an instance might not work, and what its logs say.
 //!
-//! Behavior notes: `docs/behavior/diagnostics.md`. [`diagnose`] is a pure
-//! function over gathered [`Facts`]; the log and file helpers do the I/O.
+//! [`diagnose`] is a pure function over gathered [`Facts`]; the log and file
+//! helpers do the I/O.
 
 use std::collections::BTreeMap;
 use std::fs;

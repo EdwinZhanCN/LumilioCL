@@ -1,7 +1,7 @@
 //! What Home shows: Continue, Recent, Needs Attention.
 //!
-//! Behavior notes: `docs/behavior/attention.md`. Pure: it works from instance
-//! records and the problems already diagnosed for each.
+//! Pure: it works from instance records and the problems already diagnosed for
+//! each.
 
 use std::collections::BTreeMap;
 

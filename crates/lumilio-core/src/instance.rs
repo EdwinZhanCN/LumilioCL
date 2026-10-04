@@ -1,9 +1,8 @@
 //! The library of instances a user owns, persisted in `launcher.db` under the
 //! launcher root.
 //!
-//! Behavior notes: `docs/behavior/launcher-spine.md`, `docs/behavior/storage.md`. The store is small and
-//! synchronous; callers on an interactive thread should open and mutate it
-//! from a background task.
+//! The store is small and synchronous; callers on an interactive thread should
+//! open and mutate it from a background task.
 
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};

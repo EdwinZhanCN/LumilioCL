@@ -1,7 +1,7 @@
 # LumilioCL Design Language
 
-This is the living UI/UX specification for LumilioCL. `ARCH.md` decides *what*
-exists; this document decides *how it looks, moves, and speaks*. Every UI or
+This is the living UI/UX specification for LumilioCL: it decides *how* the
+launcher *looks, moves, and speaks*. Every UI or
 motion change follows it through the `lumilio-motion-design` skill
 (`.agents/skills/lumilio-motion-design/SKILL.md`). Changing a rule here is a
 design decision: update this file in the same change and say why.
@@ -161,13 +161,13 @@ layer that has nothing in it; never reorder or merge layers.
    primary has none — never promote an action just to fill the slot. Every
    further action lives in More; destructive items come last in More, in the
    danger colour, and confirm in a dialog.
-3. **Toolbar** — one row: the view tabs (port labels, §12; the `ARCH.md`
-   level) on the leading side and search on the trailing edge (240 px; the placeholder
+3. **Toolbar** — one row: the view tabs (port labels, §12; the page's
+   first level) on the leading side and search on the trailing edge (240 px; the placeholder
    names what is searched). A page without tabs still puts search on the
    trailing edge. Search never gets a row of its own.
 4. **Refinements** (optional) — controls that narrow or order the content
-   without changing what it is: segment keys with LEDs (§12; the `ARCH.md`
-   level below), sort, page size, pager, a filter sidebar.
+   without changing what it is: segment keys with LEDs (§12; the level
+   below the tabs), sort, page size, pager, a filter sidebar.
 5. **Content** — one of:
    - a card grid (Library; instance cards are faceplates, §12);
    - a list block (a panel with hairline rows; row actions are ghost or

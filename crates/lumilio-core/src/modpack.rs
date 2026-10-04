@@ -1,8 +1,8 @@
 //! Importing Modrinth modpacks (`.mrpack`).
 //!
-//! Behavior notes: `docs/behavior/modpack.md`. The format is the public
-//! Modrinth pack format: a zip with `modrinth.index.json`, plus `overrides/`
-//! and `client-overrides/` folders copied into the game directory.
+//! The format is the public Modrinth pack format: a zip with
+//! `modrinth.index.json`, plus `overrides/` and `client-overrides/` folders
+//! copied into the game directory.
 
 use std::collections::BTreeMap;
 use std::error::Error;

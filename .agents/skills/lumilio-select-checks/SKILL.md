@@ -31,7 +31,7 @@ them to manufacture a clean baseline.
 | `crates/lumilio-ui/src/hero/**` | `cargo test -p lumilio-ui hero::`, then review frames from `LUMILIO_HERO_DUMP=<dir> cargo test -p lumilio-ui hero_contact_sheet -- --ignored` | The same four commands; scene changes are visual, so look at the frames before handoff |
 | `crates/lumilio-app/**` | `cargo check -p lumilio-app` | The same four commands |
 | workspace manifests/toolchain | `cargo metadata --no-deps` | The same four commands |
-| `ARCH.md`, `docs/**`, `AGENTS.md`, `.agents/**` | link/path review and `cargo fmt --check` if no code changed | The same four commands, unless the environment cannot yet build the skeleton |
+| `docs/**`, `AGENTS.md`, `.agents/**` | link/path review and `cargo fmt --check` if no code changed | The same four commands, unless the environment cannot yet build the skeleton |
 | `3rd-party/**` | none — the tree is read-only | Do not modify, move, or delete it |
 
 Focused checks are not a substitute for the final loop. Run the four commands

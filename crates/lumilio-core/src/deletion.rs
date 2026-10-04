@@ -1,12 +1,12 @@
 //! Recoverable instance deletion and its startup recovery.
 //!
-//! Behavior notes: `docs/behavior/deletion.md`. Deleting an instance is a
-//! short journaled operation under `state/operations/<id>/`: the record is
-//! written to `delete.json`, the profile folder is moved (a same-volume rename)
-//! into the operation folder, the library commits, and only then are the moved
-//! files removed. A crash or failure at any point leaves enough on disk for
-//! [`recover`] to compare journal, library and folders, then either put the
-//! profile back or finish the cleanup. Nothing is ever replayed blindly.
+//! Deleting an instance is a short journaled operation under
+//! `state/operations/<id>/`: the record is written to `delete.json`, the
+//! profile folder is moved (a same-volume rename) into the operation folder,
+//! the library commits, and only then are the moved files removed. A crash or
+//! failure at any point leaves enough on disk for [`recover`] to compare
+//! journal, library and folders, then either put the profile back or finish the
+//! cleanup. Nothing is ever replayed blindly.
 
 use std::fs;
 use std::io;

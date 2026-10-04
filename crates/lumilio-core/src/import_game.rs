@@ -3,8 +3,7 @@
 //! Two layouts are understood: a MultiMC/Prism instance (`instance.cfg` and
 //! `mmc-pack.json`, game files in `.minecraft` or `minecraft`) and a plain
 //! `.minecraft` folder (the game and loader read from `versions/*/*.json`).
-//! Reading never modifies the source. Behavior notes:
-//! `docs/behavior/import-game.md`.
+//! Reading never modifies the source.
 
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};

@@ -1,11 +1,11 @@
 //! Installing Forge and NeoForge from their official installers.
 //!
-//! Behavior notes: `docs/behavior/loader.md`. An installer jar carries
-//! `version.json` (a release manifest inheriting the vanilla one, used like a
-//! Fabric profile) and `install_profile.json`: libraries the installer tools
-//! need, named data values, and "processors" — small Java programs that turn
-//! the vanilla client into the patched one the loader starts from. This module
-//! reads the installer, prepares those values and runs the client processors.
+//! An installer jar carries `version.json` (a release manifest inheriting the
+//! vanilla one, used like a Fabric profile) and `install_profile.json`:
+//! libraries the installer tools need, named data values, and "processors" —
+//! small Java programs that turn the vanilla client into the patched one the
+//! loader starts from. This module reads the installer, prepares those values
+//! and runs the client processors.
 //!
 //! Adapted from HMCL (`HMCLCore/src/main/java/org/jackhuang/hmcl/download/forge/ForgeNewInstallTask.java`,
 //! `ForgeNewInstallProfile.java` and `neoforge/NeoForgeInstallTask.java`),

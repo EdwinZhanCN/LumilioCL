@@ -1,6 +1,4 @@
 //! Snapshots: zip backups of an instance's worlds and settings.
-//!
-//! Behavior notes: `docs/behavior/snapshots.md`.
 
 use crate::layout::Layout;
 use std::error::Error;

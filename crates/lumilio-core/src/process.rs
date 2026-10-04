@@ -1,8 +1,7 @@
 //! Starting and supervising the game process.
 //!
 //! [`command_line`] turns a [`LaunchPlan`] into the argument vector; [`run`]
-//! spawns it, streams its output, and reports how it ended. Behavior notes:
-//! `docs/behavior/launcher-spine.md`.
+//! spawns it, streams its output, and reports how it ended.
 
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};

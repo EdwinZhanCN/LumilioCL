@@ -1,6 +1,4 @@
 //! Checking installed content for newer versions, and applying them.
-//!
-//! Behavior notes: `docs/behavior/updates.md`.
 
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};

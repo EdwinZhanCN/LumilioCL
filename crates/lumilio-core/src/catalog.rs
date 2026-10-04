@@ -1,8 +1,7 @@
 //! The official Minecraft version catalog.
 //!
 //! The catalog lists every downloadable game version with its kind, release
-//! time, and the address of its release manifest. Behavior notes:
-//! `docs/behavior/launcher-spine.md`.
+//! time, and the address of its release manifest.
 
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};

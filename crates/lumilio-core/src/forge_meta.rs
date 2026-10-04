@@ -1,9 +1,8 @@
 //! Forge and NeoForge version lists: which loader versions exist for a game
 //! version, newest first, and which of them their publishers call stable.
 //!
-//! Behavior notes: `docs/behavior/loader.md`. Installing them is separate
-//! (their installers run processors); this module only answers "what can I
-//! choose".
+//! Installing them is separate (their installers run processors); this module
+//! only answers "what can I choose".
 //!
 //! The NeoForge version → game version rule is adapted from HMCL
 //! (`HMCLCore/src/main/java/org/jackhuang/hmcl/download/neoforge/NeoForgeOfficialVersionList.java`),

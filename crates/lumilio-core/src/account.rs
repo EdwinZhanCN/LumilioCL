@@ -1,7 +1,7 @@
 //! Accounts and the identity a launch presents to the game.
 //!
 //! Only offline profiles exist for now; online sign-in needs its own decision
-//! record. Behavior notes: `docs/behavior/launcher-spine.md`.
+//! record.
 
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};

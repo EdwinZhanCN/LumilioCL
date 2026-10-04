@@ -1,6 +1,4 @@
 //! What the launcher's own folder holds, and the parts that can be cleared.
-//!
-//! Behavior notes: `docs/behavior/storage.md`.
 
 use std::fs;
 use std::io;

@@ -1,7 +1,7 @@
 //! Per-instance history: play sessions and changes.
 //!
-//! Behavior notes: `docs/behavior/history.md`. The log is append-only JSON
-//! lines, so a crash can at worst tear the final line, which reading skips.
+//! The log is append-only JSON lines, so a crash can at worst tear the final
+//! line, which reading skips.
 
 use crate::layout::Layout;
 use std::fs::{self, OpenOptions};

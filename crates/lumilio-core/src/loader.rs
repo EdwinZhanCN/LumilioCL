@@ -1,8 +1,8 @@
 //! Mod loaders: which exist, how to find their versions, and their profiles.
 //!
-//! Behavior notes: `docs/behavior/loader.md`. Fabric and Quilt publish a
-//! "profile" per (game version, loader version): a release manifest that
-//! inherits from the vanilla one and adds libraries and a main class.
+//! Fabric and Quilt publish a "profile" per (game version, loader version): a
+//! release manifest that inherits from the vanilla one and adds libraries and a
+//! main class.
 
 use serde::Deserialize;
 use url::Url;

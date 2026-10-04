@@ -1,9 +1,9 @@
 //! The headless launcher: one object that owns the stores and answers what the
 //! interface asks (library, Home, create, launch, search, install).
 //!
-//! Behavior notes: `docs/behavior/service.md`. Every method is `async` and
-//! `Send`, so any front end can run it on a runtime; nothing here knows about
-//! a window. Locks are never held across a network wait.
+//! Every method is `async` and `Send`, so any front end can run it on a
+//! runtime; nothing here knows about a window. Locks are never held across a
+//! network wait.
 
 mod accounts;
 mod activity;

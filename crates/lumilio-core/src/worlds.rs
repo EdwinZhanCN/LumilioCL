@@ -1,6 +1,4 @@
 //! Saved worlds in an instance.
-//!
-//! Behavior notes: `docs/behavior/worlds.md`.
 
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};

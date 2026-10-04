@@ -1,6 +1,4 @@
 //! What is installed in an instance: mods, resource packs, shaders.
-//!
-//! Behavior notes: `docs/behavior/content.md`.
 
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};

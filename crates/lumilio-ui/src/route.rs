@@ -1,4 +1,4 @@
-//! Global routes that are backed directly by the `ARCH.md` application nodes.
+//! The global routes: the pages the navigation bar reaches directly.
 
 /// The destinations that are always available in the global shell.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]

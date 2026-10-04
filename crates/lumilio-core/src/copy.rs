@@ -1,8 +1,7 @@
 //! Copying an instance's game folder.
 //!
-//! Behavior notes: `docs/behavior/instance-copy.md`. The copy is a set of
-//! independent files: nothing is hard-linked or symlinked back to the source,
-//! so changing one instance can never change the other.
+//! The copy is a set of independent files: nothing is hard-linked or symlinked
+//! back to the source, so changing one instance can never change the other.
 
 use std::fs;
 use std::io;

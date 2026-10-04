@@ -1,7 +1,7 @@
 //! Discover: finding mods, modpacks, resource packs and shaders on Modrinth.
 //!
-//! Behavior notes: `docs/behavior/discover.md`. Search, project, and version
-//! shapes follow Modrinth's public API documentation.
+//! Search, project, and version shapes follow Modrinth's public API
+//! documentation.
 
 mod client;
 mod error;

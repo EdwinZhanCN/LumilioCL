@@ -1,7 +1,6 @@
 //! Staged publication of a new instance's game folder.
 //!
-//! Behavior notes: `docs/behavior/staged-instances.md`. Importing a pack or
-//! copying an instance builds the whole game folder under
+//! Importing a pack or copying an instance builds the whole game folder under
 //! `state/operations/<kind>-<id>/game/` first. Only when it is complete is the
 //! library record created and the folder renamed to `profiles/<id>/game`, so a
 //! failure, a cancel or a crash never leaves a half-made instance behind.

@@ -1,72 +1,21 @@
 # LumilioCL — Agent Work Manual
 
-> This file is the entry point of the agent harness: hard rules, workflow, and commands only.
-> Deep content is disclosed progressively via links — never paste large documents into the conversation.
+LumilioCL is a Minecraft launcher in **Rust + GPUI + gpui-component**. The goal is a good
+launcher; the documents below serve that goal and never outrank it.
 
-## What this project is
+## Invariants
 
-LumilioCL is a Minecraft launcher written in **Rust + GPUI + gpui-component**, architected per `ARCH.md`
-(Home / Library / Discover / Activity / Instance). Domain logic follows behavioral specifications and may adapt HMCL code (ADR 0011); `docs/architecture.md` is the single bridge to the vendored
-reference implementation under `3rd-party/` (read-only; authoritative for behavior comparison and a permitted source of adapted code).
+1. **core does not depend on UI.** `lumilio-core` never depends on gpui / gpui-component. Domain
+   logic stays independently testable. This is the insurance against UI framework churn.
+2. **`3rd-party/` is read-only**: never modify, move or delete anything under it.
+3. **Adapted code keeps its attribution.** Code taken or adapted from upstream carries a comment
+   naming the source path and its license notice (ADR 0011, 0022). Respect files under a
+   different license, never copy Modrinth branding, and adapt to Rust and our crate boundaries
+   instead of porting mechanically.
+4. **Closed verification loop.** Every change passes all four commands below before handoff.
+   Fix failures immediately; "commit now, fix later" is forbidden.
 
-## Invariants (never violated)
-
-1. **Derivation from `3rd-party/` is allowed (ADR 0011)**: the project will be released under AGPL and copying or
-   adapting HMCL code is permitted. Keep attribution (source path and GPL-3.0 notice in a comment), respect files with
-   a different license, and adapt to Rust and the crate boundaries rather than porting Java mechanically.
-2. **`3rd-party/` is read-only**: never modify, move, or delete anything under it.
-3. **ARCH.md is authoritative**: every page, navigation item, and feature must map to a node in `ARCH.md`.
-   Out-of-scope features (e.g. 3D schematic viewer, telemetry) are not built by default; adding one requires an ADR first.
-4. **Plan before executing**: non-trivial changes require writing/updating a plan under `.agents/plans/`
-   (state machine in `.agents/plans/README.md`); architecture-affecting decisions require an ADR under `.agents/decisions/`.
-5. **core does not depend on UI**: `lumilio-core` must never depend on gpui / gpui-component. Domain logic
-   must stay independently testable and reusable — this is the only insurance against UI framework churn.
-6. **Closed verification loop**: every change must pass all four checks below. Fix failures immediately;
-   "commit now, fix later" is forbidden.
-
-## Tech stack & structure
-
-- Rust stable (pinned by `rust-toolchain.toml`), edition 2024.
-- Workspace: `crates/lumilio-core` (domain logic), `crates/lumilio-ui` (GPUI), `crates/lumilio-app` (binary entry).
-  Full mapping: `docs/architecture.md`.
-- File layout: a module does one thing. Past about 800 lines of non-test code, split a file into a directory
-  module (`name/mod.rs` for the public surface and shared types, one file per concern). Unit tests live in
-  `tests.rs` or `tests/<theme>.rs` beside the code (`#[cfg(test)] mod tests;`), not inline. Sibling modules use
-  explicit `use` paths and `pub(super)`; only the real public surface is `pub`, re-exported from `mod.rs` so
-  `lumilio_core::X` / `lumilio_ui::X` paths do not change.
-- Async: core uses tokio; UI bridges via `cx.spawn`/channels. **No blocking I/O on the UI thread.**
-- Before UI work, load the `gpui` and `gpui-component` skills; prefer existing gpui-component components over custom ones.
-- Buttons, switches, tabs, segments and tags come from `lumilio-ui` (`key::Key`, `controls`, `kit`), drawn per
-  design-language §12; do not reach for gpui-component's `Button`/`Switch`/`TabBar` in pages.
-- UI look, motion, and copy follow `docs/design-language.md` (the world steps, the interface flows).
-- User paths are not written by hand. A built user path is declared by a one-line comment at its code,
-  `// ia[page]: 操作 | 层 / 组件 | 结果与反馈 | 编号 [| 备注]` (ADR 0019, skill `lumilio-ia-paths`);
-  `cargo run -p lumilio-docgen -- ia` regenerates `docs/ia/paths/` and `cargo test` fails while it is stale.
-  Before UI work read the page's generated paths (`docs/ia/paths/`) and `docs/ia/README.md` (what is not built);
-  a feature in neither is not built and, if it is not in `ARCH.md`, needs an ADR first.
-
-## Agent memories and skills
-
-Recurring procedures live in `.agents/skills/`; read the relevant skill before
-running its workflow. Current portable procedures are:
-
-- `select-checks` — map a diff to the narrowest local checks, then run the full
-  required verification loop before handoff;
-- `exec-plan` — create and maintain the `.agents/plans/` state machine;
-- `write-a-test` — choose the correct core/UI/app test boundary and prove a
-  regression guard can fail;
-- `postmortem` — record escaped failures and link the durable guardrails that
-  prevent recurrence;
-- `lumilio-ia-paths` — declare user paths with `// ia[page]:` comments and regenerate
-  `docs/ia/paths/`;
-- `lumilio-motion-design` — apply `docs/design-language.md` to any UI,
-  animation, copy, or world-scene change and review it visually.
-
-Project-coupled decisions live in `.agents/decisions/`; escaped failures live
-in `.agents/postmortems/`. Photos-specific procedures such as Go, React,
-Taskfile, Lumen, or browser-E2E workflows are not part of LumilioCL.
-
-## Verification commands (run in this order after every change)
+## Verification commands (in this order)
 
 ```sh
 cargo build
@@ -75,33 +24,69 @@ cargo clippy --all-targets -- -D warnings
 cargo fmt --check
 ```
 
-## Workflow
+## Where the facts are
 
-1. Read this file, then `docs/architecture.md` (mapping tables) and `docs/roadmap.md` (phases) as needed.
-2. At session start, read the current `in_progress` plan if one exists. For non-trivial tasks: create/update `.agents/plans/NNNN-*.md` (proposed → in_progress → done),
-   decomposed into independently verifiable units.
-3. Implement from the mapping tables. When consulting the vendored reference, only look at the files
-   pointed to there, extract **behavior** (inputs/outputs/edge cases), and reimplement in your own words.
-   For user-facing workflows, start at `docs/workflows/README.md`: identify the stable flow ID,
-   scope, state ownership, and acceptance scenarios before implementation. Use the local mapped
-   HMCL source as the behavioral baseline; distinguish current, target, and undecided behavior.
-4. Run the four verification commands; add tests where needed (core logic must have tests).
-5. Wrap up: update the plan status; append an ADR if architecture is affected; log open questions in decisions.
+- **What the launcher does today**: the generated user paths in `docs/ia/paths/`, then the code.
+- **How others do it**: read the upstream source directly.
+  - `3rd-party/modrinth`: Modrinth App. `packages/app-lib` is a Rust launcher backend, the first
+    place to look for how something is built (auth, Java runtimes, instances, modpacks,
+    processes); `packages/daedalus` covers version metadata.
+  - `3rd-party/HMCL`: HMCL (Java). The first place to look for feature breadth, platform quirks
+    and edge cases.
+- **Why things are the way they are**: `.agents/decisions/`. **What is in flight**: `.agents/plans/`.
+  **What is wanted but not planned**: `.agents/plans/backlog.md`.
+- **How the UI looks, moves and speaks**: `docs/design-language.md` and `docs/design-patterns.md`.
 
-## Reference files (progressive disclosure)
+Don't write documents that restate the code or upstream; they go stale (ADR 0021).
 
-- `docs/architecture.md` — target architecture and functional-domain mapping tables (read before implementing)
-- `docs/workflows/README.md` — user journeys, HMCL behavior evidence, target business rules, and acceptance routing
-- `docs/roadmap.md` — phased roadmap and exit criteria
-- `docs/design-language.md` — visual, motion, and copy specification for all UI
-- `docs/ia/` — generated user paths per page (`paths/`) and the list of what is not built
-- `docs/design-patterns.md` — shared interaction patterns (version picker, content item, …)
-- `.agents/plans/` — execution plans and template
-- `.agents/decisions/` — architecture decision records (ADR) and template
-- `.agents/skills/` — recurring procedures for planning, checks, and tests
-- `.agents/postmortems/` — escaped failures and the guardrails that closed them
+## Structure
 
-## Hardening principle
+- Rust stable (pinned by `rust-toolchain.toml`), edition 2024.
+- Dependency direction `lumilio-app → lumilio-ui → lumilio-core`. Core owns launcher state,
+  metadata, downloads, auth and instance operations. UI owns pages and GPUI state. App owns
+  startup, configuration, logging and composition.
+- Async: core uses tokio; UI bridges via `cx.spawn`/channels. **No blocking I/O on the UI thread.**
+- File layout: a module does one thing. Past about 800 lines of non-test code, split a file into a
+  directory module (`name/mod.rs` for the public surface and shared types, one file per concern).
+  Unit tests live in `tests.rs` or `tests/<theme>.rs` beside the code (`#[cfg(test)] mod tests;`),
+  not inline. Sibling modules use explicit `use` paths and `pub(super)`. Only the real public
+  surface is `pub`, re-exported from `mod.rs` so `lumilio_core::X` / `lumilio_ui::X` paths do
+  not change.
 
-Every time the agent makes a mistake, harden the harness — add a rule, a template, a test, or a command —
-instead of only correcting it verbally once.
+## UI
+
+- Before UI work, load the `gpui` and `gpui-component` skills. Prefer existing gpui-component
+  components over custom ones.
+- Buttons, switches, tabs, segments and tags come from `lumilio-ui` (`key::Key`, `controls`,
+  `kit`), drawn per design-language §12. Don't use gpui-component's `Button`/`Switch`/`TabBar`
+  in pages.
+- A built user path is declared by a one-line comment at its code:
+  `// ia[page]: 操作 | 层 / 组件 | 结果与反馈 [| 备注]` (ADR 0019, 0021; skill `lumilio-ia-paths`).
+  `cargo run -p lumilio-docgen -- ia` regenerates `docs/ia/paths/`, and `cargo test` fails
+  while it is stale.
+
+## Plans and decisions
+
+- Multi-step or multi-session work gets a plan in `.agents/plans/<slug>.md`, and the plan
+  exists only while the work is active. When it finishes, condense it into the next decision
+  record if it made a choice worth explaining, and delete it either way (skill
+  `lumilio-exec-plan`). At session start, read the `in_progress` plans.
+- Code cites `ADR NNNN`, never a plan. Older "plan NNNN" citations resolve through
+  `.agents/decisions/plan-history.md`.
+- An ADR records a decision; it is not a permission gate. Nothing needs an ADR before it is built.
+
+## Skills (`.agents/skills/`)
+
+- `lumilio-select-checks`: map a diff to the narrowest checks, then run the full loop.
+- `lumilio-exec-plan`: create, continue and close plans.
+- `lumilio-write-a-test`: choose the core/UI/app test boundary and prove a guard can fail.
+- `lumilio-ia-paths`: declare user paths and regenerate `docs/ia/paths/`.
+- `lumilio-motion-design`: apply the design language to UI, motion, copy or world-scene changes.
+
+Escaped failures are written up in `.agents/postmortems/`.
+
+## Hardening
+
+When a mistake recurs, fix the cause with the cheapest mechanism that stops it: a test, then a
+lint or check, then a skill step. Add a line here only if you can name the real failure it
+prevents. Remove rules that no longer prevent anything.

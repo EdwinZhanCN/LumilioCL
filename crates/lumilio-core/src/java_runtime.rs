@@ -3,7 +3,7 @@
 //! Mojang publishes the runtimes its own launcher uses as a public index:
 //! per platform, per component, a manifest naming every file with its size,
 //! SHA-1 and address. This module reads those documents; the service does the
-//! downloading. Behavior notes: `docs/behavior/java-runtime.md`.
+//! downloading.
 
 use std::collections::BTreeMap;
 use std::error::Error;

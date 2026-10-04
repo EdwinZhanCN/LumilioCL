@@ -1,7 +1,5 @@
 //! The diagnostics bundle: a zip of what a maintainer needs to understand a
 //! problem, with names and paths of the person replaced.
-//!
-//! Behavior notes: `docs/behavior/diagnostics.md`.
 
 use std::fs;
 use std::io::{self, Write};

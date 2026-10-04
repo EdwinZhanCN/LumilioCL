@@ -1,8 +1,7 @@
 //! What the Activity page shows: running tasks and a durable history.
 //!
-//! Behavior notes: `docs/behavior/activity-log.md`. The [`TaskBoard`] holds
-//! running tasks in memory; finishing one appends it to the [`ActivityLog`]
-//! (JSON lines), so history survives restarts.
+//! The [`TaskBoard`] holds running tasks in memory; finishing one appends it to
+//! the [`ActivityLog`] (JSON lines), so history survives restarts.
 
 use std::fs::{self, OpenOptions};
 use std::io::{self, Write};

@@ -2,8 +2,8 @@
 //! each file's SHA-1 is looked up on Modrinth to name its project, author,
 //! icon and version, and to say whether a newer compatible version exists.
 //!
-//! Behavior notes: `docs/behavior/content.md`. Assembly is pure; the service
-//! does the hashing and the requests. Not knowing a source never hides a file.
+//! Assembly is pure; the service does the hashing and the requests. Not knowing
+//! a source never hides a file.
 
 use std::collections::BTreeMap;
 
