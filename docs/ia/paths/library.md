@@ -26,4 +26,4 @@
 | 新建游戏 | L2 主要 → 新建游戏弹窗 | 创建并（可选）立即安装；成功后打开新游戏页 | L-LIB-02、H-INSTALL-01/02 |  | `lumilio-ui/src/pages/live/library.rs` |
 | 搜索 | L3 搜索框 | 按名称过滤；空结果“没有匹配的游戏” | H-NAV-04 |  | `lumilio-ui/src/pages/live/library.rs` |
 | 排序 / 按加载器筛选 | L4 两个下拉（排序、加载器），与发现页同一种控件 | 记在偏好设置里，下次打开还是这样；库里只有一种加载器时不显示加载器下拉 | H-NAV-04 |  | `lumilio-ui/src/pages/live/library.rs` |
-| 拖入整合包 | 把文件拖到页面上 | 同“导入整合包”（.mrpack，或 MultiMC/Prism/本启动器备份的 .zip）；不是的提示一句 | H-INSTALL-04 |  | `lumilio-ui/src/shell.rs` |
+| 拖入整合包 | 把文件拖到页面上 | 同“导入整合包”（.mrpack，或 MultiMC/Prism/本启动器备份的 .zip）；不是的提示一句 | H-INSTALL-04 |  | `lumilio-ui/src/shell/render.rs` |
