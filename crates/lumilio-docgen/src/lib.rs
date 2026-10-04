@@ -430,8 +430,17 @@ mod tests {
     fn only_pages_with_paths_get_a_file_and_stale_files_are_found() {
         let dir = tempfile::tempdir().unwrap();
         let files = generate(&[path("library", "搜索", "H-NAV-04")]);
-        assert_eq!(files.keys().collect::<Vec<_>>(), ["library.md"]);
-        assert_eq!(stale(dir.path(), &files), ["library.md"], "missing");
+        assert_eq!(
+            files.keys().collect::<Vec<_>>(),
+            ["README.md", "library.md"],
+            "an index, and a file only for the page that has paths"
+        );
+        assert!(files["README.md"].contains("[游戏库](library.md) | 1"));
+        assert_eq!(
+            stale(dir.path(), &files),
+            ["README.md", "library.md"],
+            "missing"
+        );
         write(dir.path(), &files).unwrap();
         assert!(stale(dir.path(), &files).is_empty());
         let mut edited = files.clone();
@@ -439,7 +448,7 @@ mod tests {
         assert_eq!(stale(dir.path(), &edited), ["library.md"], "changed");
         assert_eq!(
             stale(dir.path(), &BTreeMap::new()),
-            ["library.md"],
+            ["README.md", "library.md"],
             "left over"
         );
     }

@@ -6,7 +6,7 @@
 
 | 操作 | 层 / 组件 | 结果与反馈 | 编号 | 备注 | 实现 |
 |---|---|---|---|---|---|
-| 浏览并安装 | L4a 主要 → 发现页（类型预选） | 安装完回到本页可见 | L-CONT-01 |  | `lumilio-app/src/live.rs` |
+| 浏览并安装 | L4a 主要 → 发现页（类型预选） | 安装完回到本页可见 | L-CONT-01 |  | `lumilio-app/src/live/instance.rs` |
 | 打开项目页 | 点标题（仅已识别） | 打开该项目的发现页详情（进历史） | H-CONTENT-05 |  | `lumilio-ui/src/instance_content.rs` |
 | 更新单个 | 行内「更新」→ 切换版本弹窗，默认选最新兼容 | 下载 → 校验 → 替换旧文件 → 重扫 → 写历史；停用的保持停用 | H-CONTENT-07 |  | `lumilio-ui/src/instance_content.rs` |
 | 切换版本 | 行内 ⇆ → 版本弹窗（仅已识别的文件） | 下载所选版本 → 校验 → 替换旧文件 → 重扫 → 写历史；停用的保持停用 | H-CONTENT-06/07/08 |  | `lumilio-ui/src/instance_content.rs` |
