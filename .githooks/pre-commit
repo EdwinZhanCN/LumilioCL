@@ -1,0 +1,19 @@
+#!/bin/sh
+# The verification loop from AGENTS.md, in its order. Stops at the first failure.
+# Enable once per clone: git config core.hooksPath .githooks
+
+set -e
+cd "$(git rev-parse --show-toplevel)"
+
+run() {
+    echo "pre-commit: $*"
+    "$@" || {
+        echo "pre-commit: failed: $*" >&2
+        exit 1
+    }
+}
+
+run cargo build
+run cargo test
+run cargo clippy --all-targets -- -D warnings
+run cargo fmt --check

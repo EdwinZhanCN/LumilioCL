@@ -12,10 +12,15 @@ launcher; the documents below serve that goal and never outrank it.
    naming the source path and its license notice (ADR 0011, 0022). Respect files under a
    different license, never copy Modrinth branding, and adapt to Rust and our crate boundaries
    instead of porting mechanically.
-4. **Closed verification loop.** Every change passes all four commands below before handoff.
+4. **Closed verification loop.** Every commit and every handoff passes all four commands below.
    Fix failures immediately; "commit now, fix later" is forbidden.
 
-## Verification commands (in this order)
+## Verification
+
+**While iterating**, run only what the change touches (skill `lumilio-select-checks`), e.g.
+`cargo test -p lumilio-ui --lib project_detail`. Do not run the full loop after every small edit.
+
+**Before a commit or handoff**, run the full loop, in this order:
 
 ```sh
 cargo build
@@ -23,6 +28,10 @@ cargo test
 cargo clippy --all-targets -- -D warnings
 cargo fmt --check
 ```
+
+The `pre-commit` hook runs exactly this loop and stops at the first failure. Enable it once per
+clone: `git config core.hooksPath .githooks`. Green checks do not prove a UI change looks right:
+state what the tests verified and what still needs eyes.
 
 ## Where the facts are
 
@@ -90,3 +99,8 @@ Escaped failures are written up in `.agents/postmortems/`.
 When a mistake recurs, fix the cause with the cheapest mechanism that stops it: a test, then a
 lint or check, then a skill step. Add a line here only if you can name the real failure it
 prevents. Remove rules that no longer prevent anything.
+
+For source-code modifications, prefer the native Edit and Write tools.
+Do not use Python, sed, awk, heredocs, or temporary scripts to modify files
+unless the edit is genuinely a bulk mechanical transformation where a script
+is substantially more efficient.
