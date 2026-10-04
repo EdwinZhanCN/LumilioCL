@@ -1,7 +1,7 @@
 use super::super::{InstanceDetailView, InstanceIntent, Section};
-use super::WORLD_SORTS;
 use super::data::Confirm;
 use super::helpers::{act, act_index, clock};
+use super::{WORLD_SORTS, WORLD_SUBS};
 use crate::assets::UiIcon;
 use crate::kit;
 use crate::theme::ShellColors;
@@ -70,11 +70,34 @@ impl InstanceDetailView {
         }
     }
 
+    /// The 世界 tab: saved worlds or the multiplayer server list.
     pub(in super::super) fn worlds_panel(
         &self,
         colors: ShellColors,
         cx: &mut Context<Self>,
     ) -> AnyElement {
+        let body = if self.worlds_sub == 1 {
+            self.servers_panel(colors, cx)
+        } else {
+            self.worlds_list_panel(colors, cx)
+        };
+        v_flex()
+            .w_full()
+            .gap_3()
+            // ia[instance.worlds]: 切换世界 / 服务器 | L4 分段：世界 / 服务器 | 视图状态；第一次进入服务器时读取列表并检查各服务器状态
+            .child(kit::segments(
+                "instance-worlds-sub",
+                &WORLD_SUBS,
+                self.worlds_sub.min(WORLD_SUBS.len() - 1),
+                act_index(cx, |view, index: usize, window, cx| {
+                    view.open_worlds_sub(index, window, cx)
+                }),
+            ))
+            .child(body)
+            .into_any_element()
+    }
+
+    fn worlds_list_panel(&self, colors: ShellColors, cx: &mut Context<Self>) -> AnyElement {
         if let Some(status) = self.status(&self.data.worlds, colors, Section::Worlds, cx) {
             return status;
         }

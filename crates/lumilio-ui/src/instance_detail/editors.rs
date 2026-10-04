@@ -20,6 +20,7 @@ pub enum Editor {
     Memory,
     Copy,
     Snapshot,
+    Server,
 }
 
 pub const MIN_MEMORY_HELP: &str =
@@ -27,6 +28,8 @@ pub const MIN_MEMORY_HELP: &str =
 pub const MAX_MEMORY_HELP: &str =
     "游戏最多能用的内存（-Xmx）。留空则跟随启动器默认；默认也没有时由 Java 决定。";
 pub const RENAME_HELP: &str = "改名保留游戏目录、收藏和历史记录。";
+pub const SERVER_ADDRESS_HELP: &str =
+    "主机名或 IP，端口可选（默认 25565），例如 mc.example.com 或 mc.example.com:25570。";
 pub const COPY_HELP: &str = "日志与崩溃报告不会复制；收藏、游玩时间、历史和快照从零开始。";
 
 impl InstanceDetailView {
@@ -44,7 +47,7 @@ impl InstanceDetailView {
             Editor::Rename => 1,
             Editor::Memory => 2,
             Editor::Copy => 4,
-            Editor::Snapshot => 0,
+            Editor::Snapshot | Editor::Server => 0,
         };
         self.ensure_fields(window, cx);
         if editor == Editor::Snapshot {
@@ -114,6 +117,7 @@ impl InstanceDetailView {
             Some(Editor::Memory) => self.submit(true, window, cx),
             Some(Editor::Copy) => self.submit_copy(window, cx),
             Some(Editor::Snapshot) => self.submit_snapshot(window, cx),
+            Some(Editor::Server) => self.submit_server(window, cx),
             None => {}
         }
     }
@@ -179,6 +183,23 @@ impl InstanceDetailView {
                             .text_color(colors.muted)
                             .child("留空则跟随默认，下次启动时生效。"),
                     ),
+            ),
+            Editor::Server => (
+                if this.server_edit.is_some() {
+                    "编辑服务器"
+                } else {
+                    "添加服务器"
+                },
+                "保存",
+                v_flex()
+                    .gap_4()
+                    .child(field("名称", None, "server-name-info", &fields.server_name))
+                    .child(field(
+                        "地址",
+                        Some(SERVER_ADDRESS_HELP),
+                        "server-address-info",
+                        &fields.server_address,
+                    )),
             ),
             Editor::Snapshot => {
                 let weak = view.downgrade();
@@ -261,6 +282,7 @@ impl InstanceDetailView {
             Editor::Memory => "instance-memory-save",
             Editor::Copy => "instance-copy-go",
             Editor::Snapshot => "instance-snapshot-go",
+            Editor::Server => "instance-server-save",
         };
         let save = {
             let view = view.downgrade();

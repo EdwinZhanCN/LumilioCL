@@ -125,7 +125,12 @@ impl InstanceDetailView {
                 let kind = panels::CONTENT_KINDS[self.content_kind.min(2)];
                 self.ensure(Section::Content(kind), window, cx);
             }
-            TAB_WORLDS => self.ensure(Section::Worlds, window, cx),
+            TAB_WORLDS => {
+                self.ensure(Section::Worlds, window, cx);
+                if self.worlds_sub == 1 {
+                    self.ensure(Section::Servers, window, cx);
+                }
+            }
             TAB_DIAGNOSTICS => self.open_diagnostics(window, cx),
             TAB_HISTORY => {
                 let section = if self.history_sub == 2 {
@@ -158,7 +163,67 @@ impl InstanceDetailView {
     /// A section's data arrived. A failure is page state: the section shows
     /// it in place, with its own 技术详情 (§11).
     pub fn arrived(&mut self, arrived: Arrived, cx: &mut Context<Self>) {
+        if matches!(arrived, Arrived::Servers(Ok(_))) {
+            self.ping_servers = true;
+        }
         self.data.store(arrived);
+        cx.notify();
+    }
+
+    /// Shows worlds or servers; the servers are read the first time.
+    pub(super) fn open_worlds_sub(
+        &mut self,
+        sub: usize,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.worlds_sub = sub.min(panels::WORLD_SUBS.len() - 1);
+        if self.worlds_sub == 1 {
+            if self.data.has(Section::Servers) {
+                self.ping_servers = true;
+            } else {
+                self.ensure(Section::Servers, window, cx);
+            }
+        }
+        cx.notify();
+    }
+
+    /// Asks every listed server how it is; the answers come to
+    /// [`InstanceDetailView::server_status_arrived`].
+    pub(super) fn ping_all(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(Ok(servers)) = &self.data.servers else {
+            return;
+        };
+        let mut addresses: Vec<String> = Vec::new();
+        for server in servers {
+            if !addresses.contains(&server.address) {
+                addresses.push(server.address.clone());
+            }
+        }
+        // A list is short, but a pasted file could be long: ask for the first few.
+        addresses.truncate(32);
+        for address in addresses {
+            self.server_status
+                .insert(address.clone(), panels::ServerState::Checking);
+            (self.handler)(InstanceIntent::PingServer(address), window, cx);
+        }
+        cx.notify();
+    }
+
+    /// One server answered (or did not).
+    pub fn server_status_arrived(
+        &mut self,
+        address: String,
+        result: Result<lumilio_core::ServerStatus, String>,
+        cx: &mut Context<Self>,
+    ) {
+        self.server_status.insert(
+            address,
+            match result {
+                Ok(status) => panels::ServerState::Online(status),
+                Err(_) => panels::ServerState::Offline,
+            },
+        );
         cx.notify();
     }
 
@@ -285,6 +350,10 @@ impl InstanceDetailView {
     ) {
         let intent = match what.clone() {
             Confirm::DeleteWorld(folder) => InstanceIntent::DeleteWorld(folder),
+            Confirm::DeleteServer { index, entry } => InstanceIntent::DeleteServer {
+                index,
+                expected: entry,
+            },
             Confirm::DeleteSnapshot(id) => InstanceIntent::DeleteSnapshot(id),
             Confirm::RestoreSnapshot(id) => InstanceIntent::RestoreSnapshot(id),
         };

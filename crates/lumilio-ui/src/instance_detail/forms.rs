@@ -15,6 +15,8 @@ pub(super) struct Fields {
     pub(super) content_search: Entity<InputState>,
     pub(super) snapshot_note: Entity<InputState>,
     pub(super) world_search: Entity<InputState>,
+    pub(super) server_name: Entity<InputState>,
+    pub(super) server_address: Entity<InputState>,
     pub(super) log_search: Entity<InputState>,
     pub(super) file_search: Entity<InputState>,
 }
@@ -114,6 +116,10 @@ impl InstanceDetailView {
                 content_search: cx.new(|cx| InputState::new(window, cx).placeholder("搜索")),
                 snapshot_note: cx.new(|cx| InputState::new(window, cx).placeholder("备注（可空）")),
                 world_search: cx.new(|cx| InputState::new(window, cx).placeholder("搜索世界")),
+                server_name: cx.new(|cx| InputState::new(window, cx).placeholder("服务器名称")),
+                server_address: cx.new(|cx| {
+                    InputState::new(window, cx).placeholder("地址，例如 mc.example.com:25565")
+                }),
                 log_search: cx.new(|cx| InputState::new(window, cx).placeholder("搜索日志")),
                 file_search: cx.new(|cx| InputState::new(window, cx).placeholder("搜索文件")),
             });

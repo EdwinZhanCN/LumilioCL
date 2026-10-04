@@ -1,7 +1,8 @@
 use super::super::Section;
 use super::CONTENT_KINDS;
 use lumilio_core::{
-    ContentList, FileEntry, GameLogs, HistoryRead, Problem, ProjectKind, SnapshotInfo, WorldInfo,
+    ContentList, FileEntry, GameLogs, HistoryRead, Problem, ProjectKind, ServerEntry, ServerStatus,
+    SnapshotInfo, WorldInfo,
 };
 
 pub type Loaded<T> = Option<Result<T, String>>;
@@ -12,6 +13,7 @@ pub type Loaded<T> = Option<Result<T, String>>;
 pub struct Data {
     pub content: [Loaded<ContentList>; 3],
     pub worlds: Loaded<Vec<WorldInfo>>,
+    pub servers: Loaded<Vec<ServerEntry>>,
     pub snapshots: Loaded<Vec<SnapshotInfo>>,
     pub history: Loaded<HistoryRead>,
     pub problems: Loaded<Vec<Problem>>,
@@ -26,6 +28,7 @@ pub struct Data {
 pub enum Arrived {
     Content(ProjectKind, Result<ContentList, String>),
     Worlds(Result<Vec<WorldInfo>, String>),
+    Servers(Result<Vec<ServerEntry>, String>),
     Snapshots(Result<Vec<SnapshotInfo>, String>),
     History(Result<HistoryRead, String>),
     Problems(Result<Vec<Problem>, String>),
@@ -39,6 +42,7 @@ impl Arrived {
         match self {
             Self::Content(kind, _) => Section::Content(*kind),
             Self::Worlds(_) => Section::Worlds,
+            Self::Servers(_) => Section::Servers,
             Self::Snapshots(_) => Section::Snapshots,
             Self::History(_) => Section::History,
             Self::Problems(_) => Section::Problems,
@@ -59,6 +63,7 @@ impl Data {
                 }
             }
             Arrived::Worlds(result) => self.worlds = Some(result),
+            Arrived::Servers(result) => self.servers = Some(result),
             Arrived::Snapshots(result) => self.snapshots = Some(result),
             Arrived::History(result) => self.history = Some(result),
             Arrived::Problems(result) => self.problems = Some(result),
@@ -77,6 +82,7 @@ impl Data {
                 .position(|k| *k == kind)
                 .is_some_and(|index| self.content[index].is_some()),
             Section::Worlds => self.worlds.is_some(),
+            Section::Servers => self.servers.is_some(),
             Section::Snapshots => self.snapshots.is_some(),
             Section::History => self.history.is_some(),
             Section::Problems => self.problems.is_some(),
@@ -87,10 +93,19 @@ impl Data {
     }
 }
 
+/// What is known of a server's state right now.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ServerState {
+    Checking,
+    Online(ServerStatus),
+    Offline,
+}
+
 /// A destructive step waiting for a second click.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Confirm {
     DeleteWorld(String),
+    DeleteServer { index: usize, entry: ServerEntry },
     DeleteSnapshot(String),
     RestoreSnapshot(String),
 }
@@ -116,6 +131,11 @@ impl Confirm {
                     "删除",
                 )
             }
+            Self::DeleteServer { entry, .. } => (
+                format!("删除服务器“{}”？", entry.name),
+                "只从这个游戏的列表里移除，不影响服务器本身；之后可以重新添加。".to_owned(),
+                "删除",
+            ),
             Self::RestoreSnapshot(id) => {
                 let label = snapshots
                     .iter()

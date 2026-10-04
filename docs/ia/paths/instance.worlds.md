@@ -6,6 +6,14 @@
 
 | 操作 | 层 / 组件 | 结果与反馈 | 备注 | 实现 |
 |---|---|---|---|---|
+| 添加服务器 | L2 次要「添加服务器」→ 弹窗（名称、地址） | 追加到服务器列表，游戏里立刻可见；游戏运行时不可改 |  | `lumilio-ui/src/instance_detail/panels/servers.rs` |
+| 刷新状态 | L2 次要「刷新状态」 | 逐个检查服务器：在线人数、延迟、版本和 MOTD；连不上显示“无法连接”（5 秒超时） |  | `lumilio-ui/src/instance_detail/panels/servers.rs` |
+| 进入服务器 | 服务器行「进入」 | 启动并直连该服务器；1.20 以前的版本置灰并说明 |  | `lumilio-ui/src/instance_detail/panels/servers.rs` |
+| 编辑服务器 | 服务器行 ⋯ 菜单 → 弹窗 | 改名称或地址，保留游戏记下的图标等其他信息 |  | `lumilio-ui/src/instance_detail/panels/servers.rs` |
+| 排序服务器 | 服务器行 ⋯ 菜单「上移 / 下移」 | 调整在游戏里的显示顺序 |  | `lumilio-ui/src/instance_detail/panels/servers.rs` |
+| 复制服务器地址 | 服务器行 ⋯ 菜单 | 复制到剪贴板，toast“已复制地址” |  | `lumilio-ui/src/instance_detail/panels/servers.rs` |
+| 删除服务器 | 服务器行 🗑 → 警告弹窗 | 只从列表移除，不影响服务器本身 |  | `lumilio-ui/src/instance_detail/panels/servers.rs` |
+| 切换世界 / 服务器 | L4 分段：世界 / 服务器 | 视图状态；第一次进入服务器时读取列表并检查各服务器状态 |  | `lumilio-ui/src/instance_detail/panels/worlds.rs` |
 | 导入世界 | L2 次要「导入世界」→ 选 .zip；也可把 .zip 拖进世界页（一次一个） | 识别含 level.dat 的最浅文件夹，解压到 saves，重名自动加序号，不覆盖 |  | `lumilio-ui/src/instance_detail/panels/worlds.rs` |
 | 进入世界 | 世界行「进入」 | 启动并直达该世界；1.20 以前的版本置灰并说明 |  | `lumilio-ui/src/instance_detail/panels/worlds.rs` |
 | 复制世界 | 世界行 ⋯ 菜单 | 复制到新文件夹（重名自动加序号）→ toast |  | `lumilio-ui/src/instance_detail/panels/worlds.rs` |

@@ -1,11 +1,12 @@
 use super::panels::ProblemAction;
-use lumilio_core::{InstanceSettings, ProjectKind};
+use lumilio_core::{InstanceSettings, ProjectKind, ServerEntry};
 
 /// A piece of data the sections load on demand.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Section {
     Content(ProjectKind),
     Worlds,
+    Servers,
     Snapshots,
     History,
     Problems,
@@ -61,6 +62,27 @@ pub enum InstanceIntent {
     /// Start the game and go straight into this world (by folder name).
     PlayWorld(String),
     DeleteWorld(String),
+    /// Add a server (`index` is `None`) or replace the one at `index`, which
+    /// must still read `expected`.
+    SaveServer {
+        index: Option<usize>,
+        expected: Option<ServerEntry>,
+        entry: ServerEntry,
+    },
+    DeleteServer {
+        index: usize,
+        expected: ServerEntry,
+    },
+    MoveServer {
+        index: usize,
+        expected: ServerEntry,
+        to: usize,
+    },
+    /// Ask this server how it is; answer with
+    /// [`InstanceDetailView::server_status_arrived`].
+    PingServer(String),
+    /// Start the game and go straight onto this server.
+    PlayServer(String),
     /// Read this crash report; answer with [`InstanceDetailView::crash_arrived`].
     OpenCrash(String),
     /// List this folder of the game directory (`""` is the directory itself);

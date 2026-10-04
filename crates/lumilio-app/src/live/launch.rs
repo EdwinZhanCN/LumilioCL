@@ -21,11 +21,15 @@ pub(super) fn start_launch(wiring: &Wiring, window: gpui_kit::AnyWindowHandle, c
             .backend
             .spawn(async move { service.after_launch_for(&id).await })
     };
-    let world = wiring.state.borrow_mut().next_world.take();
+    let (world, server) = {
+        let mut state = wiring.state.borrow_mut();
+        (state.next_world.take(), state.next_server.take())
+    };
     let handle = wiring.backend.spawn(async move {
-        match world {
-            Some(world) => service.launch_world(&id, &world, tx, cancel).await,
-            None => service.launch(&id, tx, cancel).await,
+        match (world, server) {
+            (Some(world), _) => service.launch_world(&id, &world, tx, cancel).await,
+            (None, Some(address)) => service.launch_server(&id, &address, tx, cancel).await,
+            (None, None) => service.launch(&id, tx, cancel).await,
         }
     });
     let wiring = wiring.clone();

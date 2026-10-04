@@ -1,7 +1,9 @@
-//! A small reader for the game's NBT format (as found in `level.dat`).
+//! A small reader and writer for the game's NBT format (`level.dat`,
+//! `servers.dat`).
 //!
-//! Only reading is needed. Input is bounded: the decompressed size and the
-//! nesting depth are capped so a hostile file cannot exhaust memory or stack.
+//! Input is bounded: the decompressed size and the nesting depth are capped so
+//! a hostile file cannot exhaust memory or stack. Strings use the game's
+//! "modified UTF-8", so text with emoji survives a read and write.
 
 use std::collections::BTreeMap;
 use std::error::Error;
@@ -124,7 +126,7 @@ impl<'a> Reader<'a> {
 
     fn string(&mut self) -> Result<String, NbtError> {
         let length = usize::from(u16::from_be_bytes(self.array()?));
-        Ok(String::from_utf8_lossy(self.take(length)?).into_owned())
+        Ok(decode_modified_utf8(self.take(length)?))
     }
 
     fn payload(&mut self, id: u8, depth: usize) -> Result<Tag, NbtError> {
@@ -183,6 +185,144 @@ impl<'a> Reader<'a> {
             other => return Err(NbtError::BadTag(other)),
         })
     }
+}
+
+/// Decodes Java's modified UTF-8 (NUL as `C0 80`, supplementary characters as
+/// two three-byte surrogates). Malformed bytes become U+FFFD.
+fn decode_modified_utf8(bytes: &[u8]) -> String {
+    if bytes.is_ascii() {
+        // Plain ASCII is identical in both encodings.
+        return String::from_utf8_lossy(bytes).into_owned();
+    }
+    let mut units: Vec<u16> = Vec::with_capacity(bytes.len());
+    let mut at = 0;
+    while at < bytes.len() {
+        let first = bytes[at];
+        let (unit, used) = match first {
+            0x00..=0x7f => (u16::from(first), 1),
+            0xc0..=0xdf if at + 1 < bytes.len() => (
+                u16::from(first & 0x1f) << 6 | u16::from(bytes[at + 1] & 0x3f),
+                2,
+            ),
+            0xe0..=0xef if at + 2 < bytes.len() => (
+                u16::from(first & 0x0f) << 12
+                    | u16::from(bytes[at + 1] & 0x3f) << 6
+                    | u16::from(bytes[at + 2] & 0x3f),
+                3,
+            ),
+            _ => (0xfffd, 1),
+        };
+        units.push(unit);
+        at += used;
+    }
+    String::from_utf16_lossy(&units)
+}
+
+fn encode_modified_utf8(text: &str) -> Vec<u8> {
+    let mut out = Vec::with_capacity(text.len());
+    for unit in text.encode_utf16() {
+        match unit {
+            0x0001..=0x007f => out.push(unit as u8),
+            0x0000 | 0x0080..=0x07ff => {
+                out.push(0xc0 | (unit >> 6) as u8);
+                out.push(0x80 | (unit & 0x3f) as u8);
+            }
+            _ => {
+                out.push(0xe0 | (unit >> 12) as u8);
+                out.push(0x80 | ((unit >> 6) & 0x3f) as u8);
+                out.push(0x80 | (unit & 0x3f) as u8);
+            }
+        }
+    }
+    out
+}
+
+fn write_name(out: &mut Vec<u8>, text: &str) {
+    let bytes = encode_modified_utf8(text);
+    // A name or string longer than the format allows is cut, never wrapped.
+    let length = u16::try_from(bytes.len()).unwrap_or(u16::MAX);
+    out.extend(length.to_be_bytes());
+    out.extend(&bytes[..usize::from(length)]);
+}
+
+fn tag_id(tag: &Tag) -> u8 {
+    match tag {
+        Tag::Byte(_) => 1,
+        Tag::Short(_) => 2,
+        Tag::Int(_) => 3,
+        Tag::Long(_) => 4,
+        Tag::Float(_) => 5,
+        Tag::Double(_) => 6,
+        Tag::ByteArray(_) => 7,
+        Tag::String(_) => 8,
+        Tag::List(_) => 9,
+        Tag::Compound(_) => 10,
+        Tag::IntArray(_) => 11,
+        Tag::LongArray(_) => 12,
+    }
+}
+
+fn write_length(out: &mut Vec<u8>, length: usize) {
+    out.extend(i32::try_from(length).unwrap_or(i32::MAX).to_be_bytes());
+}
+
+fn write_payload(out: &mut Vec<u8>, tag: &Tag) {
+    match tag {
+        Tag::Byte(v) => out.push(*v as u8),
+        Tag::Short(v) => out.extend(v.to_be_bytes()),
+        Tag::Int(v) => out.extend(v.to_be_bytes()),
+        Tag::Long(v) => out.extend(v.to_be_bytes()),
+        Tag::Float(v) => out.extend(v.to_be_bytes()),
+        Tag::Double(v) => out.extend(v.to_be_bytes()),
+        Tag::ByteArray(values) => {
+            write_length(out, values.len());
+            out.extend(values.iter().map(|b| *b as u8));
+        }
+        Tag::String(text) => write_name(out, text),
+        Tag::List(items) => {
+            out.push(items.first().map_or(0, tag_id));
+            write_length(out, items.len());
+            for item in items {
+                write_payload(out, item);
+            }
+        }
+        Tag::Compound(map) => {
+            for (name, child) in map {
+                out.push(tag_id(child));
+                write_name(out, name);
+                write_payload(out, child);
+            }
+            out.push(0);
+        }
+        Tag::IntArray(values) => {
+            write_length(out, values.len());
+            for value in values {
+                out.extend(value.to_be_bytes());
+            }
+        }
+        Tag::LongArray(values) => {
+            write_length(out, values.len());
+            for value in values {
+                out.extend(value.to_be_bytes());
+            }
+        }
+    }
+}
+
+/// Serialises a compound as an uncompressed document with an empty root name,
+/// the form `servers.dat` uses. Anything else yields an empty compound.
+#[must_use]
+pub fn to_bytes(root: &Tag) -> Vec<u8> {
+    let empty = Tag::Compound(BTreeMap::new());
+    let root = if matches!(root, Tag::Compound(_)) {
+        root
+    } else {
+        &empty
+    };
+    let mut out = vec![10];
+    write_name(&mut out, "");
+    write_payload(&mut out, root);
+    out
 }
 
 /// Parses an uncompressed NBT document whose root is a compound. The root's
@@ -323,6 +463,30 @@ mod tests {
         bad.push(99);
         name(&mut bad, "x");
         assert_eq!(parse(&bad), Err(NbtError::BadTag(99)));
+    }
+
+    #[test]
+    fn writing_then_reading_is_lossless() {
+        let mut data = BTreeMap::new();
+        data.insert("name".to_owned(), Tag::String("服务器 🎮 \0".to_owned()));
+        data.insert("hidden".to_owned(), Tag::Byte(1));
+        data.insert("big".to_owned(), Tag::Long(-5));
+        data.insert("ints".to_owned(), Tag::IntArray(vec![1, -2]));
+        let root = Tag::Compound(BTreeMap::from([(
+            "servers".to_owned(),
+            Tag::List(vec![Tag::Compound(data), Tag::Compound(BTreeMap::new())]),
+        )]));
+        assert_eq!(parse(&to_bytes(&root)).unwrap(), root);
+        let empty = Tag::Compound(BTreeMap::from([("servers".to_owned(), Tag::List(vec![]))]));
+        assert_eq!(parse(&to_bytes(&empty)).unwrap(), empty);
+    }
+
+    #[test]
+    fn supplementary_characters_use_the_games_encoding() {
+        // U+1F3AE as a surrogate pair, three bytes each (not four bytes).
+        assert_eq!(encode_modified_utf8("🎮").len(), 6);
+        assert_eq!(decode_modified_utf8(&encode_modified_utf8("🎮")), "🎮");
+        assert_eq!(encode_modified_utf8("\0"), [0xc0, 0x80]);
     }
 
     #[test]

@@ -73,6 +73,15 @@ pub struct InstanceDetailView {
     snapshot_scope: usize,
     /// 世界: index into the sort labels.
     world_sort: usize,
+    /// 世界 tab: 0 worlds, 1 servers.
+    worlds_sub: usize,
+    /// What the last check found out about each server, by address.
+    server_status: std::collections::HashMap<String, panels::ServerState>,
+    /// The servers should be asked how they are on the next render.
+    ping_servers: bool,
+    /// The server the edit dialog is changing (its position and what it read
+    /// when opened); `None` while it adds one.
+    server_edit: Option<(usize, lumilio_core::ServerEntry)>,
     /// 日志: the least serious level shown, as an index of the level labels.
     log_level: usize,
     settings_sub: usize,
@@ -128,6 +137,10 @@ impl InstanceDetailView {
             history_sub: 0,
             diag_sub: 0,
             world_sort: 0,
+            worlds_sub: 0,
+            server_status: std::collections::HashMap::new(),
+            ping_servers: false,
+            server_edit: None,
             snapshot_scope: 0,
             log_level: 0,
             settings_sub: 0,

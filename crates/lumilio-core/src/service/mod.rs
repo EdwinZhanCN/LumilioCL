@@ -22,6 +22,7 @@ mod modpacks;
 mod packs;
 mod portability;
 mod preferences;
+mod servers;
 mod snapshots;
 mod support;
 mod tracking;

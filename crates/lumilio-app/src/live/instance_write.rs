@@ -155,6 +155,35 @@ pub(super) fn write_instance(
                     service.delete_world(&id, &folder).await?;
                     done("世界已删除", vec![Section::Worlds])
                 }
+                InstanceIntent::SaveServer {
+                    index,
+                    expected,
+                    entry,
+                } => {
+                    let name = entry.name.clone();
+                    match (index, expected) {
+                        (Some(index), Some(expected)) => {
+                            service.update_server(&id, index, expected, entry).await?;
+                            done(&format!("已保存「{name}」"), vec![Section::Servers])
+                        }
+                        _ => {
+                            service.add_server(&id, entry).await?;
+                            done(&format!("已添加「{name}」"), vec![Section::Servers])
+                        }
+                    }
+                }
+                InstanceIntent::DeleteServer { index, expected } => {
+                    service.remove_server(&id, index, expected).await?;
+                    done("服务器已删除", vec![Section::Servers])
+                }
+                InstanceIntent::MoveServer {
+                    index,
+                    expected,
+                    to,
+                } => {
+                    service.move_server(&id, index, expected, to).await?;
+                    done("已调整顺序", vec![Section::Servers])
+                }
                 InstanceIntent::CreateSnapshot => {
                     service
                         .create_snapshot(&id, SnapshotScope::Full, "手动快照")

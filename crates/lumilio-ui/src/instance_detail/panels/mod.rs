@@ -8,15 +8,18 @@ mod helpers;
 mod history;
 mod labels;
 mod overview;
+mod servers;
 mod worlds;
 
 #[cfg(test)]
 mod tests;
 
-pub use self::data::{Arrived, Confirm, Data};
+pub use self::data::{Arrived, Confirm, Data, ServerState};
 pub(super) use self::helpers::{act, act_index, clock};
 pub use self::labels::{export_notice, size_label};
 pub use self::overview::{ProblemAction, hint_text, problem_action, problem_text, problem_tone};
+#[cfg(test)]
+pub(super) use self::servers::server_detail;
 
 use lumilio_core::ProjectKind;
 
@@ -29,3 +32,4 @@ pub const CONTENT_KINDS: [ProjectKind; 3] = [
 pub const CONTENT_LABELS: [&str; 3] = ["Mod", "资源包", "光影"];
 pub const HISTORY_LABELS: [&str; 3] = ["变更", "游玩记录", "快照"];
 pub const WORLD_SORTS: [&str; 2] = ["最近游玩", "名称"];
+pub const WORLD_SUBS: [&str; 2] = ["世界", "服务器"];

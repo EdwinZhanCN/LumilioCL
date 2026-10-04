@@ -4,6 +4,7 @@ use crate::instance::StoreError;
 use crate::launcher::LaunchServiceError;
 use crate::microsoft::AuthError;
 use crate::modpack;
+use crate::servers::{PingError, ServerError};
 use crate::settings::SettingsError;
 use crate::snapshots::SnapshotError;
 use crate::worlds::WorldError;
@@ -37,6 +38,8 @@ pub enum ServiceError {
     NoJavaAt(PathBuf),
     Content(ContentError),
     World(WorldError),
+    Server(ServerError),
+    Ping(PingError),
     Export(crate::pack_export::ExportError),
     Snapshot(SnapshotError),
     Io(std::io::Error),
@@ -67,6 +70,8 @@ impl Display for ServiceError {
             Self::Install(message) => write!(f, "install failed: {message}"),
             Self::Content(error) => write!(f, "{error}"),
             Self::World(error) => write!(f, "{error}"),
+            Self::Server(error) => write!(f, "{error}"),
+            Self::Ping(error) => write!(f, "{error}"),
             Self::Export(error) => write!(f, "{error}"),
             Self::Snapshot(error) => write!(f, "{error}"),
             Self::Io(error) => write!(f, "{error}"),
@@ -91,6 +96,18 @@ impl From<crate::pack_export::ExportError> for ServiceError {
 impl From<WorldError> for ServiceError {
     fn from(error: WorldError) -> Self {
         Self::World(error)
+    }
+}
+
+impl From<ServerError> for ServiceError {
+    fn from(error: ServerError) -> Self {
+        Self::Server(error)
+    }
+}
+
+impl From<PingError> for ServiceError {
+    fn from(error: PingError) -> Self {
+        Self::Ping(error)
     }
 }
 

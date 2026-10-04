@@ -31,6 +31,10 @@ impl Render for InstanceDetailView {
         if std::mem::take(&mut self.refresh_worlds) && self.data.has(Section::Worlds) {
             self.request(Section::Worlds, window, cx);
         }
+        if std::mem::take(&mut self.ping_servers) && self.tab == TAB_WORLDS && self.worlds_sub == 1
+        {
+            self.ping_all(window, cx);
+        }
         if std::mem::take(&mut self.refresh_logs) && self.data.has(Section::Logs) {
             self.request(Section::Logs, window, cx);
         }

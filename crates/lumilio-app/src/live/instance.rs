@@ -108,6 +108,11 @@ pub(super) fn instance_intent(
             wiring.state.borrow_mut().next_world = Some(world);
             play(wiring, id.to_owned(), window, cx);
         }
+        InstanceIntent::PlayServer(address) => {
+            wiring.state.borrow_mut().next_server = Some(address);
+            play(wiring, id.to_owned(), window, cx);
+        }
+        InstanceIntent::PingServer(address) => ping_server(wiring, view, address, cx),
         InstanceIntent::Reload => load_instance(wiring, id.to_owned(), view, cx),
         InstanceIntent::OpenCrash(file) => open_crash(wiring, id.to_owned(), view, file, cx),
         InstanceIntent::Load(section) => load_section(wiring, id.to_owned(), view, section, cx),
@@ -335,6 +340,9 @@ pub(super) fn instance_intent(
         | InstanceIntent::ExportPackTo { .. }
         | InstanceIntent::AddWorld(_)
         | InstanceIntent::DeleteWorld(_)
+        | InstanceIntent::SaveServer { .. }
+        | InstanceIntent::DeleteServer { .. }
+        | InstanceIntent::MoveServer { .. }
         | InstanceIntent::InstallJava(_)
         | InstanceIntent::BackupGameTo(_)
         | InstanceIntent::CreateSnapshot
@@ -405,6 +413,12 @@ pub(super) fn load_section(
             Section::Worlds => {
                 Arrived::Worlds(service.worlds(&id).await.map_err(|error| error.to_string()))
             }
+            Section::Servers => Arrived::Servers(
+                service
+                    .servers(&id)
+                    .await
+                    .map_err(|error| error.to_string()),
+            ),
             Section::Snapshots => Arrived::Snapshots(
                 service
                     .snapshots(&id)
@@ -445,6 +459,30 @@ pub(super) fn load_section(
     .detach();
 }
 
+/// Asks one server how it is, off the interface thread.
+fn ping_server(
+    wiring: &Wiring,
+    view: WeakEntity<InstanceDetailView>,
+    address: String,
+    cx: &mut App,
+) {
+    let service = wiring.backend.service.clone();
+    let asked = address.clone();
+    let handle = wiring
+        .backend
+        .spawn(async move { service.server_status(&asked).await });
+    cx.spawn(async move |cx| {
+        let result = match handle.await {
+            Ok(result) => result.map_err(|error| error.to_string()),
+            Err(error) => Err(error.to_string()),
+        };
+        let _ = view.update(cx, |view, cx| {
+            view.server_status_arrived(address, result, cx)
+        });
+    })
+    .detach();
+}
+
 pub(super) fn open_crash(
     wiring: &Wiring,
     id: String,
@@ -471,6 +509,7 @@ pub(super) fn failed_section(section: Section, detail: String) -> Arrived {
     match section {
         Section::Content(kind) => Arrived::Content(kind, Err(detail)),
         Section::Worlds => Arrived::Worlds(Err(detail)),
+        Section::Servers => Arrived::Servers(Err(detail)),
         Section::Snapshots => Arrived::Snapshots(Err(detail)),
         Section::History => Arrived::History(Err(detail)),
         Section::Logs => Arrived::Logs(Err(detail)),

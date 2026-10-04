@@ -15,7 +15,7 @@
 | [游戏页（整体）](instance.md) | 11 |
 | [游戏页 · 概览](instance.overview.md) | 4 |
 | [游戏页 · 内容](instance.content.md) | 16 |
-| [游戏页 · 世界](instance.worlds.md) | 9 |
+| [游戏页 · 世界](instance.worlds.md) | 17 |
 | [游戏页 · 历史](instance.history.md) | 5 |
 | [游戏页 · 诊断](instance.diagnostics.md) | 10 |
 | [游戏页 · 设置](instance.settings.md) | 11 |

@@ -138,6 +138,25 @@ impl<T: Transport + Clone> LauncherService<T> {
             .await
     }
 
+    /// Starts the game and goes straight onto a multiplayer server. The
+    /// instance's own direct-start choice is not changed.
+    pub async fn launch_server(
+        &self,
+        id: &str,
+        address: &str,
+        updates: mpsc::UnboundedSender<LaunchUpdate>,
+        cancel: CancellationToken,
+    ) -> Result<GameExit, ServiceError> {
+        let target = QuickPlay::Server(address.trim().to_owned());
+        if let Some(problem) = crate::tuning::quick_play_problem(&target) {
+            return Err(ServiceError::Store(StoreError::InvalidLaunch(
+                problem.to_owned(),
+            )));
+        }
+        self.launch_with(id, Some(Some(target)), updates, cancel)
+            .await
+    }
+
     pub(super) async fn launch_with(
         &self,
         id: &str,

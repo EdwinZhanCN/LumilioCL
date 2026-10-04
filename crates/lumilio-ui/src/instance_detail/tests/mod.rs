@@ -1,6 +1,7 @@
 mod content;
 mod diagnostics;
 mod history;
+mod servers;
 mod settings;
 mod view;
 mod worlds;
