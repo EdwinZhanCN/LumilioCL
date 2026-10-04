@@ -61,12 +61,12 @@ pub(super) fn about(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
             ),
             colors,
         ),
-        // ia[settings]: 开源许可 | 关于 · 值 | 显示 AGPL-3.0
+        // ia[settings]: 开源许可 | 关于 · 值 | 显示 AGPL-3.0-only
         row(
             "settings-license",
             "开源许可",
             None,
-            "AGPL-3.0",
+            "AGPL-3.0-only",
             None,
             colors,
         ),

@@ -129,7 +129,9 @@ pub fn auth_message(error: &lumilio_core::AuthError) -> String {
 }
 
 /// One sentence about why talking to an authentication server failed. The
-/// words follow HMCL's (`account.failed.*`).
+/// words follow HMCL's `account.failed.*` strings
+/// (`HMCL/src/main/resources/assets/lang/I18N_zh_CN.properties`, Copyright
+/// (C) 2026 huangyuhui and contributors, GPL-3.0-or-later; ADR 0011).
 #[must_use]
 pub fn yggdrasil_message(error: &lumilio_core::YggdrasilError) -> String {
     use lumilio_core::YggdrasilError;

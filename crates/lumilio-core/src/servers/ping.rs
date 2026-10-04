@@ -1,7 +1,7 @@
 //! Asking a server how it is (Server List Ping, protocol 1.7+).
 //!
 //! Adapted from Modrinth App (`packages/app-lib/src/util/server_ping.rs`,
-//! GPL-3.0; ADR 0022): the handshake and status exchange and the limits on
+//! GPL-3.0-only; ADR 0022): the handshake and status exchange and the limits on
 //! lengths a server states. Everything a server sends is untrusted, so every
 //! length is capped before memory is reserved and the whole exchange has a
 //! deadline.

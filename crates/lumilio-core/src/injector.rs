@@ -3,7 +3,8 @@
 //!
 //! HMCL ships the jar inside its package and also carries the downloader
 //! (`HMCLCore/.../auth/authlibinjector/AuthlibInjectorDownloader.java`,
-//! AGPL-3.0; ADR 0011). We fetch it the first time it is needed, from the
+//! Copyright (C) 2020 huangyuhui and contributors, GPL-3.0-or-later; ADR
+//! 0011). We fetch it the first time it is needed, from the
 //! official artifact index through the configured source chain, and only keep
 //! a file whose SHA-256 matches the index and whose manifest says it is
 //! authlib-injector: it runs inside the game, so it is never taken on trust.

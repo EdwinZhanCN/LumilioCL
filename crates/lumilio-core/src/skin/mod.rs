@@ -1,11 +1,12 @@
 //! Skins for offline players, and the little server that hands them to the
 //! game (through authlib-injector) so it shows them.
 //!
-//! The rules are adapted from HMCL
-//! (`HMCLCore/src/main/java/org/jackhuang/hmcl/auth/offline/Skin.java`,
-//! `Texture.java`, `YggdrasilServer.java`; AGPL-3.0, ADR 0011): a skin is a local file, a
-//! LittleSkin profile or a CustomSkinLoader API; the game is pointed at a
-//! Yggdrasil server on this machine that answers for that one player.
+//! The rules are adapted from HMCL (`HMCLCore/.../auth/offline/Skin.java`,
+//! `auth/offline/YggdrasilServer.java` and `auth/yggdrasil/Texture.java`,
+//! Copyright (C) 2020–2021 huangyuhui and contributors, GPL-3.0-or-later; ADR
+//! 0011): a skin is a local file, a LittleSkin profile or a CustomSkinLoader
+//! API; the game is pointed at a Yggdrasil server on this machine that answers
+//! for that one player.
 
 mod server;
 mod signer;

@@ -3,7 +3,8 @@
 //!
 //! The routes and answers are adapted from HMCL
 //! (`HMCLCore/src/main/java/org/jackhuang/hmcl/auth/offline/YggdrasilServer.java`,
-//! AGPL-3.0; ADR 0011). Only what the game asks for is served, only to this
+//! Copyright (C) 2021 huangyuhui and contributors, GPL-3.0-or-later; ADR
+//! 0011). Only what the game asks for is served, only to this
 //! machine, and every request is bounded.
 
 use std::collections::BTreeMap;

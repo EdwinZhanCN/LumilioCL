@@ -1,7 +1,8 @@
 //! Accounts on authlib-injector servers (LittleSkin and others): adding
 //! servers, signing in, keeping the session alive, and the identity a launch
-//! presents. The rules follow HMCL (`YggdrasilAccount`, `AuthlibInjectorAccount`;
-//! ADR 0011); where secrets live is ADR 0020.
+//! presents. The rules follow HMCL (`YggdrasilAccount`, `AuthlibInjectorAccount`
+//! in `HMCLCore/.../auth/`, Copyright (C) 2020 huangyuhui and contributors,
+//! GPL-3.0-or-later; ADR 0011); where secrets live is ADR 0020.
 
 use std::sync::atomic::Ordering;
 

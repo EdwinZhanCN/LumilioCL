@@ -9,7 +9,7 @@
 | 版本 | 关于 · 值 | 显示 LumilioCL 版本号 |  | `lumilio-ui/src/pages/settings/about.rs` |
 | 启动器日志 | 关于 · 按键 | 在访达中显示日志目录 |  | `lumilio-ui/src/pages/settings/about.rs` |
 | 导出诊断包 | 关于 · 按键 | 打包版本、设置摘要、Java 列表和各游戏最近日志；玩家名、UUID、路径脱敏 |  | `lumilio-ui/src/pages/settings/about.rs` |
-| 开源许可 | 关于 · 值 | 显示 AGPL-3.0 |  | `lumilio-ui/src/pages/settings/about.rs` |
+| 开源许可 | 关于 · 值 | 显示 AGPL-3.0-only |  | `lumilio-ui/src/pages/settings/about.rs` |
 | 最小 / 最大内存 | 游戏默认 · 值 + [编辑] 弹窗 | 弹窗说明本机内存与推荐值；恢复默认 = 推荐值 |  | `lumilio-ui/src/pages/settings/game_defaults.rs` |
 | 窗口大小、全屏 | 游戏默认 · 值 + [编辑] 弹窗 | 宽高一起填；全屏 关 / 开 / 不设置 |  | `lumilio-ui/src/pages/settings/game_defaults.rs` |
 | Java 参数 | 游戏默认 · 值 + [编辑] 弹窗 | 每行一项；游戏自己设置了参数时以游戏的为准 |  | `lumilio-ui/src/pages/settings/game_defaults.rs` |

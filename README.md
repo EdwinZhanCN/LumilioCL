@@ -38,3 +38,18 @@ All of these affect only the current run:
 ## Design
 
 UI look, motion, and copy follow [`docs/design-language.md`](docs/design-language.md).
+
+## License
+
+LumilioCL is licensed under the GNU Affero General Public License, version 3 only
+(`AGPL-3.0-only`); see [`LICENSE`](LICENSE).
+
+Some code is adapted from two upstream launchers, and each such file or function names its
+source and license in a comment:
+
+- [HMCL](https://github.com/HMCL-dev/HMCL), GPL-3.0-or-later (ADR 0011).
+- [Modrinth App](https://github.com/modrinth/code), GPL-3.0-only (ADR 0022). Modrinth's branding
+  is not used.
+
+Bundled fonts and icons are listed with their licenses in
+[`crates/lumilio-ui/assets/ATTRIBUTIONS.md`](crates/lumilio-ui/assets/ATTRIBUTIONS.md).

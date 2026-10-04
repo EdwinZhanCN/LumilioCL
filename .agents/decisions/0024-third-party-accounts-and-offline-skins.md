@@ -8,7 +8,7 @@
 ADR 0018 deferred offline skins until third-party authentication was accepted, because both need the
 authlib-injector agent in the game's JVM and offline skins also need a skin server. The maintainer
 wants LittleSkin supported, built in, and asked for HMCL's business logic to be the truth. HMCL
-(`HMCLCore/.../auth/yggdrasil`, `authlibinjector`, `offline`; AGPL-3.0, ADR 0011) is the reference;
+(`HMCLCore/.../auth/yggdrasil`, `authlibinjector`, `offline`; GPL-3.0-or-later, ADR 0011) is the reference;
 Modrinth App has no equivalent.
 
 ## Decision

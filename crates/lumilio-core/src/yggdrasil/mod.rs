@@ -3,7 +3,8 @@
 //! session alive, and tell the character list.
 //!
 //! The rules follow HMCL (`HMCLCore/.../auth/yggdrasil/YggdrasilService.java`,
-//! `YggdrasilAccount.java`, AGPL-3.0; ADR 0011). This module only speaks the
+//! `YggdrasilAccount.java`, Copyright (C) 2020 huangyuhui and contributors,
+//! GPL-3.0-or-later; ADR 0011). This module only speaks the
 //! protocol; where secrets are kept is [`crate::credentials`] (ADR 0020).
 
 use std::collections::BTreeMap;

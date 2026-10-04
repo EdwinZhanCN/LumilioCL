@@ -1,7 +1,8 @@
 //! Finding an authentication server and reading what it says about itself
 //! (`GET <api root>`). Adapted from HMCL
 //! (`HMCLCore/src/main/java/org/jackhuang/hmcl/auth/authlibinjector/AuthlibInjectorServer.java`
-//! and `setting/AuthlibInjectorServerList.java`, AGPL-3.0; ADR 0011).
+//! and `HMCL/.../setting/AuthlibInjectorServerList.java`, Copyright (C)
+//! 2020–2026 huangyuhui and contributors, GPL-3.0-or-later; ADR 0011).
 
 use std::collections::BTreeMap;
 
