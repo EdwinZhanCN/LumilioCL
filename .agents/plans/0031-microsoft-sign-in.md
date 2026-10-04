@@ -6,19 +6,19 @@
 
 ## Goal
 
-在账户页「登录 Microsoft」：设备码流程登录，账户出现在列表和导航芯片里，启动时用真实的玩家名、UUID 和访问令牌，令牌即将过期时自动刷新，刷新令牌失效时标记「需要重新登录」并明确提示。秘密只存在系统凭据库里（ADR 0013）。
+在账户页「登录 Microsoft」：设备码流程登录，账户出现在列表和导航芯片里，启动时用真实的玩家名、UUID 和访问令牌，令牌即将过期时自动刷新，刷新令牌失效时标记「需要重新登录」并明确提示。秘密只存在系统凭据库里（ADR 0020）。
 
 ## Scope
 
-- In scope：ADR 0013；`Transport` 增加带头与表单的请求；core `microsoft` 协议客户端（设备码、轮询、刷新、Xbox/XSTS/Minecraft 登录、拥有检查、档案）与每种失败的分类；凭据库抽象（系统实现 + 内存测试实现，无明文回退）；账户模型增加种类与按 UUID 的键；服务层登录/刷新/移除/启动取令牌；`LaunchRequest` 改为携带 `AuthSession`；UI 登录弹窗与账户页/芯片的 Microsoft 状态；诊断包与日志不含令牌；文档。
+- In scope：ADR 0020；`Transport` 增加带头与表单的请求；core `microsoft` 协议客户端（设备码、轮询、刷新、Xbox/XSTS/Minecraft 登录、拥有检查、档案）与每种失败的分类；凭据库抽象（系统实现 + 内存测试实现，无明文回退）；账户模型增加种类与按 UUID 的键；服务层登录/刷新/移除/启动取令牌；`LaunchRequest` 改为携带 `AuthSession`；UI 登录弹窗与账户页/芯片的 Microsoft 状态；诊断包与日志不含令牌；文档。
 - Out of scope：第三方认证（authlib-injector）、皮肤、「这一次离线玩」的显式选择、家长/年龄限制之外的账户管理。
 
 ## Reference mapping
 
 | LumilioCL | 参考 | 提取 |
 |---|---|---|
-| core microsoft | `docs/workflows/hmcl-reference.md` H-ACC-01/07、H-PLAY-04；FLOW-REF-035/037 | 设备码授权、令牌链、刷新与失败分支（只取行为，用自己的话实现） |
-| 凭据存放 | `docs/app-state.md` §1 | 在线账户秘密进系统凭据库，失败请求登录，不降级写明文 |
+| core microsoft | `3rd-party/HMCL/HMCL/src/main/java/org/jackhuang/hmcl/ui/account/MicrosoftAccountLoginPane.java`、`AccountListItem.java`；`3rd-party/modrinth/packages/app-lib/src/state/minecraft_auth.rs` | 设备码授权、令牌链、刷新与失败分支 |
+| 凭据存放 | ADR 0007「状态的边界」、ADR 0020 | 在线账户秘密进系统凭据库，失败请求登录，不降级写明文 |
 
 ## Tasks
 

@@ -1,4 +1,4 @@
-# 0013 — Microsoft sign-in: device code flow, system credential store, identity by profile id
+# 0020 — Microsoft sign-in: device code flow, system credential store, identity by profile id
 
 - Status: accepted
 - Date: 2026-10-03

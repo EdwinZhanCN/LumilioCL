@@ -1,5 +1,5 @@
 //! Where sign-in secrets live: the operating system credential store, and
-//! nowhere else (ADR 0013). There is no file fallback: when the store is not
+//! nowhere else (ADR 0020). There is no file fallback: when the store is not
 //! usable, signing in fails and says why.
 
 use std::collections::BTreeMap;

@@ -1,6 +1,6 @@
 # 0008 — 用户流程覆盖与待决策边界
 
-- Status: proposed
+- Status: rejected
 - Date: 2026-09-30
 
 ## Context
@@ -27,3 +27,7 @@
 - Positive: 后续计划可定位到可核对的行为与验收，规划不会伪装成实现。
 - Negative / trade-offs: 流程目录需随参考版本和已实现行为维护；静态审计不替代运行验证。
 - Follow-ups: 相关计划引用具体问题与 L/AC 编号，决定后更新或用独立 accepted ADR 取代；首轮只交付文档。
+
+## Rejected
+
+2026-10-03：用户流程文档（`docs/workflows/`）连同 H-/L-/AC- 编号一起删除，见 ADR 0021。

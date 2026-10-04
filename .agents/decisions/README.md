@@ -5,16 +5,21 @@ Append-only: accepted records are never rewritten; supersession happens via a ne
 
 ## When to write an ADR
 
-- New dependency or removal of one.
-- Change in architecture (module boundaries, layering, async model, storage format).
-- Licensing or scope decisions (e.g. adding a feature not in `ARCH.md`).
-- Any constraint the team wants to outlive the current conversation.
+- A finished plan that made a choice someone could later question (ADR 0021):
+  condense it here instead of keeping the plan.
+- A new dependency, or removing one; a change to module boundaries, layering,
+  the async model or a storage format; licensing.
+- Any constraint that should outlive the current conversation.
+
+An ADR records a decision, not permission: nothing needs an ADR *before* it can
+be built.
 
 ## Rules
 
 - Filename: `NNNN-kebab-case-title.md`, numbering starts at `0001`, increments by one.
 - Status: `proposed | accepted | superseded-by-NNNN | rejected`.
-- Context and consequences are written in the team's words — never copy from the vendored reference.
+- Context and consequences are written in the team's words.
+- `plan-history.md` is the one unnumbered record: what plans 0001–0038 delivered.
 
 ## Template
 

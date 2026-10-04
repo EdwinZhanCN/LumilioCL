@@ -1,59 +1,57 @@
-# plans/ — Execution Plans
+# plans/ — Active plans
 
-Every non-trivial change starts with a plan. Plans decompose work into independently verifiable units
-so the agent can execute with a closed loop and a clear definition of done.
+Only work that is in progress or proposed lives here, plus [`backlog.md`](backlog.md)
+for ideas nobody has planned yet. Finished work leaves this folder (ADR 0021).
 
 ## Rules
 
-- Filename: `NNNN-kebab-case-name.md` (e.g. `0001-offline-launch-slice.md`), number incremented per plan.
-- Keep one plan focused on one deliverable; large efforts are split into multiple sequential plans,
-  each mapped to a phase in `docs/roadmap.md`.
-- Status is a single line at the top: `Status: proposed | in_progress | done | abandoned`.
-- Update the status as you go. An `abandoned` plan states why.
-- When a plan is done, tasks that changed architecture expectations are promoted to `docs/architecture.md`
-  or a new ADR by the maintainer.
+- Filename: a slug, `kebab-case-goal.md`. No number: a plan gets a decision number
+  only if it becomes a decision record. The legacy plans `0030-…` and `0031-…`
+  keep their names until they close.
+- Write a plan for work that spans several steps or sessions. A local edit needs none.
+- Status is one line at the top: `proposed | in_progress`.
+- Keep it honest as you go: tick tasks, record what you learned, note open questions.
+- When upstream code informs the work, name the files (e.g.
+  `3rd-party/modrinth/packages/app-lib/src/api/jre.rs`) under **References**.
+
+## When it finishes
+
+1. If it contains a decision someone could later question, condense it into the next
+   `.agents/decisions/NNNN-*.md`: context, decision, consequences, and one line on
+   what shipped. Drop the task list and validation log.
+2. Delete the plan file. A pure refactor or a mechanical change just gets deleted.
+3. If it was abandoned, delete it too. Write a `rejected` decision if the reason
+   would save someone from trying again.
 
 ## Template
 
 ```markdown
-# NNNN — <short goal>
+# <short goal>
 
 - Status: proposed
-- Phase: <roadmap phase>
-- Author: <agent | maintainer>
 
 ## Goal
 
-<One paragraph: what will be true when this plan is done.>
+<One paragraph: what will be true when this is done.>
 
 ## Scope
 
-- In scope: <bullet list>
-- Out of scope: <bullet list — explicit exclusions prevent creep>
+- In: …
+- Out: …
 
-## Reference mapping
+## References
 
-| LumilioCL module | Vendored reference (read-only) | What to extract (behavior only) |
-|---|---|---|
-| <crate::module> | <path under 3rd-party/, via docs/architecture.md> | <inputs/outputs/edge cases> |
+- <upstream files, ADRs>
 
 ## Tasks
 
 - [ ] T1: <verifiable unit>
-- [ ] T2: <verifiable unit>
 
 ## Validation
 
-<Exact commands and acceptance criteria; core logic must have tests.>
+<Commands and acceptance; core logic has tests.>
 
-## Risks / open questions
+## Open questions
 
-- <anything uncertain, to be logged in decisions if unresolved>
+- …
 ```
-
-## After completion
-
-- Mark `Status: done`.
-- Once every task is checked and the Outcome is written, collapse the plan into one row of
-  [`history.md`](history.md) and delete the file. Code comments and docs keep citing "plan NNNN";
-  that row is what they resolve to. Plans with maintainer-only items left stay as files until those close.

@@ -16,4 +16,4 @@ The first independent-process tests covered normal process exit and kill, but di
 
 - [RootLock regression](../../crates/lumilio-core/src/root_lock.rs): retain a descriptor, drop ownership, reacquire, then close the old descriptor and prove the new owner remains exclusive. Removing unlock fails at the intended RootBusy assertion.
 - [Cross-process integration](../../crates/lumilio-core/tests/root_ownership.rs) continues to cover contention, cooperative exit and process death.
-- [Select-checks](../skills/lumilio-select-checks/SKILL.md) requires the full parallel four-step loop; [plan 0015](../plans/history.md) records the escaped failure and restarted loop.
+- [Select-checks](../skills/lumilio-select-checks/SKILL.md) requires the full parallel four-step loop; [plan 0015](../decisions/plan-history.md) records the escaped failure and restarted loop.

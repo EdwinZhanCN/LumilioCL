@@ -1,7 +1,7 @@
 //! Launcher-wide settings and the accounts the user has added.
 //!
-//! Behavior notes: `docs/behavior/settings.md`. Per-instance overrides live on
-//! the instance record; these are the defaults they fall back to.
+//! Per-instance overrides live on the instance record; these are the defaults
+//! they fall back to.
 
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
@@ -54,7 +54,7 @@ impl AccountKind {
     }
 }
 
-/// An account as `settings.json` keeps it: public facts only (ADR 0013).
+/// An account as `settings.json` keeps it: public facts only (ADR 0020).
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AccountEntry {
     /// The profile name: an offline account's identity, and a Microsoft
