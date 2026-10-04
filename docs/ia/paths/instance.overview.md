@@ -8,5 +8,5 @@
 |---|---|---|---|---|---|
 | 改名 | 概览「名称」行 [编辑] → 弹窗 | 改名保留游戏目录、收藏和历史记录 | L-LIB-04 |  | `lumilio-ui/src/instance_detail/overview.rs` |
 | 占用空间 | 概览「占用空间」行 | 后台计算，只算这个游戏自己的文件 | — |  | `lumilio-ui/src/instance_detail/overview.rs` |
-| 最近游玩 / 变更 | 概览里的两个只读摘要，各 3 条 | “查看全部”进历史分段 | L-HIST-01 |  | `lumilio-ui/src/instance_detail/panels.rs` |
-| 解决问题 | 概览「需要留意」里每个问题行的按钮 | 安装/修复/更换版本，或跳到设置·Java、设置·性能、内容、账户、诊断·日志 | L-DIAG-01 |  | `lumilio-ui/src/instance_detail/panels.rs` |
+| 最近游玩 / 变更 | 概览里的两个只读摘要，各 3 条 | “查看全部”进历史分段 | L-HIST-01 |  | `lumilio-ui/src/instance_detail/panels/mod.rs` |
+| 解决问题 | 概览「需要留意」里每个问题行的按钮 | 安装/修复/更换版本，或跳到设置·Java、设置·性能、内容、账户、诊断·日志 | L-DIAG-01 |  | `lumilio-ui/src/instance_detail/panels/mod.rs` |
