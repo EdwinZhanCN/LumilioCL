@@ -1,6 +1,6 @@
 # 插件系统：宿主与前四个核心插件
 
-- Status: proposed
+- Status: in_progress
 
 ## Goal
 
@@ -132,18 +132,18 @@ pub enum Permission {
 
 入口条件：无。
 
-- [ ] T1 新建 `crates/lumilio-plugin-api`：`API_VERSION = 1`；`Manifest`、`Permission`、`SettingField`、`SettingValue`；`Plugin` trait。每个扩展点是一个返回 `Option<&dyn Trait>` 的方法，默认返回 `None`。另有上下文 trait `HostContext`，提供 `setting`、`read_file`、`fetch`（P0 先只实现 `setting`，其余返回「未授权」）。
-- [ ] T2 从 `lumilio-core/src/nbt.rs` 原样拆出 `crates/lumilio-nbt`，core 改为依赖它，行为不变，原有测试跟着搬过去。
-- [ ] T3 core 新增 `plugins` 模块：注册、按 `API_VERSION` 拒绝不兼容的插件、按 `LauncherSettings.plugins` 计算启用状态、按 D2 隔离调用、`Failed` 状态。`LauncherService::open` 增加插件列表参数，app 在 `backend.rs` 里传入；测试里传空列表。
-- [ ] T4 设置持久化：`LauncherSettings.plugins`（D4）；加一个服务方法，用来设置启用状态和设置值。
-- [ ] T5 设置页新增「插件」tab：开关、描述、权限（人话）、失败原因、声明式设置表单（D6），并为它写 `// ia[settings]` 注释。
-- [ ] T6 `crates/lumilio-docgen/tests/plugin_boundaries.rs`（见 D1），并证明它能失败：临时让一个插件依赖 core，看到测试变红后再撤掉。
-- [ ] T7 加一个只在测试里用的假插件（放在 core 的测试里，不进产品），覆盖：启用和停用、panic 被兜住并标为 `Failed`、超时、越权调用被拒绝、`API_VERSION` 不匹配时被拒绝。
+- [x] T1 新建 `crates/lumilio-plugin-api`：`API_VERSION = 1`；`Manifest`、`Permission`、`SettingField`、`SettingValue`；`Plugin` trait。每个扩展点是一个返回 `Option<&dyn Trait>` 的方法，默认返回 `None`。另有上下文 trait `HostContext`，提供 `setting`、`read_file`、`fetch`（P0 先只实现 `setting`，其余返回「未授权」）。
+- [x] T2 从 `lumilio-core/src/nbt.rs` 原样拆出 `crates/lumilio-nbt`，core 改为依赖它，行为不变，原有测试跟着搬过去。
+- [x] T3 core 新增 `plugins` 模块：注册、按 `API_VERSION` 拒绝不兼容的插件、按 `LauncherSettings.plugins` 计算启用状态、按 D2 隔离调用、`Failed` 状态。`LauncherService::open` 增加插件列表参数，app 在 `backend.rs` 里传入；测试里传空列表。
+- [x] T4 设置持久化：`LauncherSettings.plugins`（D4）；加一个服务方法，用来设置启用状态和设置值。
+- [x] T5 设置页新增「插件」tab：开关、描述、权限（人话）、失败原因、声明式设置表单（D6），并为它写 `// ia[settings]` 注释。
+- [x] T6 `crates/lumilio-docgen/tests/plugin_boundaries.rs`（见 D1），并证明它能失败：临时让一个插件依赖 core，看到测试变红后再撤掉。
+- [x] T7 加一个只在测试里用的假插件（放在 core 的测试里，不进产品），覆盖：启用和停用、panic 被兜住并标为 `Failed`、超时、越权调用被拒绝、`API_VERSION` 不匹配时被拒绝。
 
 验收：
 
-- 设置页能看到一个空的插件列表（P0 还没有真插件），四项检查通过。
-- 假插件的测试覆盖了 T7 列出的每一种情况。
+- [x] 设置页能看到一个空的插件列表（P0 还没有真插件），四项检查通过。
+- [x] 假插件的测试覆盖了 T7 列出的每一种情况。
 
 ### P1 崩溃与日志分析器（扩展点：纯数据）
 
@@ -246,4 +246,18 @@ pub enum Permission {
 
 ## 实施记录
 
-（每个阶段做完追加：日期、做了什么、偏离和原因、需要维护者看的地方。）
+### 2026-10-04 — P0 开始
+
+- 当前仓库没有 pre-commit 钩子（提交 b86a446 / ADR 0026）；阶段提交前运行 `just check` 的 build、test、clippy、fmt。
+- 宿主采用 `PluginHost` / `PluginStatus`；默认调用与清单读取超时 5 秒，搜索阶段另设 20 秒。清单也由工作线程读取，避免注册时在界面线程执行插件代码。
+- 从 P0 开始实施；其余两个 in_progress 计划的维护者验收事项保持原状。
+- 按维护者要求引入 Longbridge 最新 `gpui-kit` / `gpui-kit-design-guides` 技能（提交 `4c7f1350331562436df868c55ac33bebc4c6406c`），放入现有 `.agents/skills/`，更新 AGENTS 与项目技能引用。上游指导不改变本项目冻结的插件 API、依赖边界或控件设计。
+- 边界守卫实际在临时插件依赖 core 时因 `forbidden dependency lumilio-core` 失败，撤掉夹具后 2 项测试通过；别名、workspace、开发/构建及 target 依赖也受检查。NBT 产品代码逐字节不变，7 项原测试迁入新 crate；worlds 测试用新 crate 的公开写入函数造样本。
+
+### 2026-10-04 — P0 验收
+
+- 完成 T1–T7。宿主延迟在工作线程上读取清单，拒绝版本不兼容和重复 ID；同步调用由 spawn_blocking、catch_unwind 与 5 秒超时包围。失败状态本次运行粘住；重新启用不绕过失败，重启才恢复。失效的在途返回值按插件自己的设置修订号丢弃。
+- 启用状态、四种字段和恢复默认通过服务保存；单个字段修改合并最新设置，保存失败不发布到宿主，schema 仍为 1。插件 tab 追加为设置索引 5，旧索引不变。空列表、权限人话、技术详情、开关、选择和异步文字/数字弹窗已接入；异步弹窗失败保留草稿，保存时禁止重复提交。
+- 自动验证：13 项插件相关 core 测试（含失败/停用后正常启动游戏）、2 项弹窗测试、设置页真实点击/空列表测试、依赖边界与 attribution 均通过。`just ia` 已生成；最终工作树两次 `just check` 均通过（日志 `/private/tmp/lumilio-plugin-p0-check.log`、`/private/tmp/lumilio-plugin-p0-final-check.log`）。默认忽略的真实网络测试没有在 P0 运行。
+- 原生视觉检查：任务专用数据目录与临时 app bundle，浅色/深色的空插件列表、插件 tab 切换、hover、720×480 最小窗口、减少动效均已观察；原生退出菜单成功关闭进程。P0 尚无产品插件，有插件的设置行仍需后续阶段结合真实插件再次看。
+- 下一步 P1（T8–T12）：迁移五条分析规则并补至少十五条规则；本计划继续保持 in_progress。

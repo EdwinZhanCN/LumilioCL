@@ -31,7 +31,7 @@ impl Backend {
         let service = {
             // The transport builds its HTTP client lazily on this runtime.
             let _guard = runtime.enter();
-            LauncherService::open(root, transport).map_err(|error| error.to_string())?
+            LauncherService::open(root, transport, Vec::new()).map_err(|error| error.to_string())?
         };
         Ok(Self {
             runtime,

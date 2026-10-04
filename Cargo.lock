@@ -4040,6 +4040,8 @@ dependencies = [
  "getrandom 0.3.4",
  "image",
  "keyring",
+ "lumilio-nbt",
+ "lumilio-plugin-api",
  "md-5 0.11.0",
  "regex",
  "reqwest",
@@ -4062,6 +4064,21 @@ name = "lumilio-docgen"
 version = "0.1.0"
 dependencies = [
  "tempfile",
+ "toml 0.9.12+spec-1.1.0",
+]
+
+[[package]]
+name = "lumilio-nbt"
+version = "0.1.0"
+dependencies = [
+ "flate2",
+]
+
+[[package]]
+name = "lumilio-plugin-api"
+version = "0.1.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -4072,6 +4089,7 @@ dependencies = [
  "gpui-pre",
  "image",
  "lumilio-core",
+ "lumilio-plugin-api",
 ]
 
 [[package]]

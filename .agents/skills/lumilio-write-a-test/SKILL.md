@@ -15,7 +15,7 @@ The project boundary is fixed: `lumilio-core` is reusable domain logic,
 | Behavior | Test home | Rule |
 | --- | --- | --- |
 | Pure domain transformation, validation, parsing, or state transition | `crates/lumilio-core` unit tests or its integration tests | No `gpui` or `gpui-component` dependency; test inputs/outputs and edge cases |
-| View model, page state, component interaction, or rendering behavior | `crates/lumilio-ui` | Load the `gpui` and `gpui-component` skills; use existing component/test patterns |
+| View model, page state, component interaction, or rendering behavior | `crates/lumilio-ui` | Load the repo-local `gpui-kit` and `gpui-kit-design-guides` skills; use existing component/test patterns |
 | Startup wiring, command-line behavior, or cross-crate assembly | `crates/lumilio-app` integration/smoke tests | Exercise the shipped entry path rather than a hand-built substitute |
 
 For UI interaction, prefer pure state tests first (e.g. `HomePresentation`

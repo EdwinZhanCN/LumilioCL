@@ -20,6 +20,7 @@ mod library;
 mod maintenance;
 mod modpacks;
 mod packs;
+mod plugins;
 mod portability;
 mod preferences;
 mod screenshots;
@@ -78,6 +79,7 @@ const TOKEN_MARGIN_SECONDS: u64 = 300;
 const CREDENTIAL_PROBE: &str = "lumilio-store-check";
 
 pub struct LauncherService<T> {
+    pub(crate) plugins: crate::plugins::PluginHost,
     layout: Layout,
     transport: T,
     store: Mutex<InstanceStore>,
@@ -116,14 +118,20 @@ pub struct LauncherService<T> {
 
 impl<T: Transport + Clone> LauncherService<T> {
     /// Opens (creating on first use) everything under `root`.
-    pub fn open(root: impl Into<PathBuf>, transport: T) -> Result<Self, ServiceError> {
+    pub fn open(
+        root: impl Into<PathBuf>,
+        transport: T,
+        plugins: Vec<Arc<dyn lumilio_plugin_api::Plugin>>,
+    ) -> Result<Self, ServiceError> {
         let layout = Layout::new(root);
         let root_lock = crate::root_lock::RootLock::acquire(layout.root())?;
         let store = InstanceStore::open(layout.root())?;
         let settings = SettingsStore::open(layout.root())?;
         let log = ActivityLog::open(layout.root());
         let startup = recovery::startup_notes(&layout, &store, &settings, &log);
+        let plugins = crate::plugins::PluginHost::new(plugins, settings.get().plugins.clone());
         Ok(Self {
+            plugins,
             layout,
             transport,
             store: Mutex::new(store),

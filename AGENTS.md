@@ -59,8 +59,11 @@ Don't write documents that restate the code or upstream; they go stale (ADR 0021
 
 ## UI
 
-- Before UI work, load the `gpui` and `gpui-component` skills. Prefer existing gpui-component
-  components over custom ones.
+- Before UI work, load the repo-local [gpui-kit](.agents/skills/gpui-kit/SKILL.md) and
+  [gpui-kit-design-guides](.agents/skills/gpui-kit-design-guides/SKILL.md) skills. Prefer existing
+  gpui-component components over custom ones. Verify APIs against the locked dependency source;
+  the upstream skills follow the latest GPUI Kit. This project's crate boundaries, controls and
+  design language take precedence over upstream examples.
 - Buttons, switches, tabs, segments and tags come from `lumilio-ui` (`key::Key`, `controls`,
   `kit`), drawn per design-language §12. Don't use gpui-component's `Button`/`Switch`/`TabBar`
   in pages.
@@ -81,6 +84,8 @@ Don't write documents that restate the code or upstream; they go stale (ADR 0021
 
 ## Skills (`.agents/skills/`)
 
+- `gpui-kit` and `gpui-kit-design-guides`: GPUI mechanics, component usage and interface guidance,
+  vendored from [Longbridge GPUI Kit](https://github.com/longbridge/gpui-kit/tree/main/skills).
 - `lumilio-select-checks`: map a diff to the narrowest checks, then run the full loop.
 - `lumilio-exec-plan`: create, continue and close plans.
 - `lumilio-write-a-test`: choose the core/UI/app test boundary and prove a guard can fail.

@@ -4,6 +4,8 @@ members = [
     "crates/lumilio-core",
     "crates/lumilio-docgen",
     "crates/lumilio-ui",
+    "crates/lumilio-plugin-api",
+    "crates/lumilio-nbt",
 ]
 resolver = "3"
 
@@ -25,6 +27,8 @@ getrandom = "0.3"
 keyring = "4.2"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 lumilio-core = { path = "crates/lumilio-core" }
+lumilio-plugin-api = { path = "crates/lumilio-plugin-api" }
+lumilio-nbt = { path = "crates/lumilio-nbt" }
 lumilio-ui = { path = "crates/lumilio-ui" }
 md-5 = "0.11"
 regex = "1.11"

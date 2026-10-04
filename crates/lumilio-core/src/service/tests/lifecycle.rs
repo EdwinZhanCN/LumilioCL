@@ -226,7 +226,7 @@ async fn damaged_library_is_kept_reported_and_never_overwritten_by_a_second_fail
     drop(service);
     let database = root.join("launcher.db");
     std::fs::write(&database, b"first damage").unwrap();
-    let service = LauncherService::open(&root, Scripted::default()).unwrap();
+    let service = LauncherService::open(&root, Scripted::default(), Vec::new()).unwrap();
     let [
         RecoveryNote::LibraryRecovered {
             preserved,
@@ -243,7 +243,7 @@ async fn damaged_library_is_kept_reported_and_never_overwritten_by_a_second_fail
     assert!(root.join("profiles").join(&record.id).exists());
     drop(service);
     std::fs::write(&database, b"second damage").unwrap();
-    let service = LauncherService::open(&root, Scripted::default()).unwrap();
+    let service = LauncherService::open(&root, Scripted::default(), Vec::new()).unwrap();
     let [
         RecoveryNote::LibraryRecovered {
             preserved: second, ..
@@ -262,13 +262,13 @@ async fn damaged_library_is_kept_reported_and_never_overwritten_by_a_second_fail
 async fn newer_schema_refuses_to_open_and_leaves_the_file_alone() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path().join("launcher");
-    drop(LauncherService::open(&root, Scripted::default()).unwrap());
+    drop(LauncherService::open(&root, Scripted::default(), Vec::new()).unwrap());
     {
         let db = rusqlite::Connection::open(root.join("launcher.db")).unwrap();
         db.pragma_update(None, "user_version", 99).unwrap();
     }
     let before = std::fs::read(root.join("launcher.db")).unwrap();
-    let refused = LauncherService::open(&root, Scripted::default());
+    let refused = LauncherService::open(&root, Scripted::default(), Vec::new());
     assert!(matches!(
         refused,
         Err(ServiceError::Store(StoreError::NewerSchema(99)))
@@ -277,7 +277,7 @@ async fn newer_schema_refuses_to_open_and_leaves_the_file_alone() {
     assert!(!root.join("launcher.db.broken").exists());
     // The refused open must not keep the root locked.
     assert!(matches!(
-        LauncherService::open(&root, Scripted::default()),
+        LauncherService::open(&root, Scripted::default(), Vec::new()),
         Err(ServiceError::Store(StoreError::NewerSchema(99)))
     ));
 }
@@ -286,7 +286,7 @@ async fn newer_schema_refuses_to_open_and_leaves_the_file_alone() {
 async fn damaged_settings_and_torn_activity_lines_are_reported_with_counts() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path().join("launcher");
-    drop(LauncherService::open(&root, Scripted::default()).unwrap());
+    drop(LauncherService::open(&root, Scripted::default(), Vec::new()).unwrap());
     std::fs::write(root.join("settings.json"), b"{ nope").unwrap();
     let good = FinishedTask {
         category: TaskCategory::Install,
@@ -300,7 +300,7 @@ async fn damaged_settings_and_torn_activity_lines_are_reported_with_counts() {
     let mut lines = serde_json::to_string(&good).unwrap();
     lines.push_str("\n{torn\nnot even json\n");
     std::fs::write(root.join("activity.jsonl"), lines).unwrap();
-    let service = LauncherService::open(&root, Scripted::default()).unwrap();
+    let service = LauncherService::open(&root, Scripted::default(), Vec::new()).unwrap();
     let notes = service.startup_notes();
     assert!(notes.iter().any(|note| matches!(
         note,
@@ -347,7 +347,7 @@ async fn registered_instance_details_survive_rename_and_missing_profile() {
     );
     let root = world.service.layout().root().to_path_buf();
     drop(world.service);
-    let reopened = LauncherService::open(root, world.net.clone()).unwrap();
+    let reopened = LauncherService::open(root, world.net.clone(), Vec::new()).unwrap();
     assert_eq!(reopened.instance(&record.id).await.unwrap(), detail);
     assert!(matches!(
         reopened.instance("missing").await,

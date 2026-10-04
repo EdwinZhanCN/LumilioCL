@@ -338,6 +338,45 @@ pub(super) fn on_live_intent(
             );
         }
         LiveIntent::LoadSettings => load_settings(wiring, cx),
+        LiveIntent::SetPluginEnabled { id, enabled } => {
+            let service = wiring.backend.service.clone();
+            change_setting(
+                wiring,
+                window,
+                async move { service.set_plugin_enabled(&id, enabled).await },
+                "没能保存插件设置",
+                None,
+                |_, _| {},
+                cx,
+            );
+        }
+        LiveIntent::SetPluginValue { id, key, value } => {
+            let service = wiring.backend.service.clone();
+            change_setting(
+                wiring,
+                window,
+                async move { service.set_plugin_value(&id, &key, value).await },
+                "没能保存插件设置",
+                None,
+                |_, _| {},
+                cx,
+            );
+        }
+        LiveIntent::ResetPlugin(id) => {
+            let service = wiring.backend.service.clone();
+            change_setting(
+                wiring,
+                window,
+                async move { service.reset_plugin(&id).await },
+                "没能恢复插件默认值",
+                None,
+                |_, _| {},
+                cx,
+            );
+        }
+        LiveIntent::EditPluginSetting { id, key } => {
+            super::settings::edit_plugin_setting(wiring, id, key, window, cx);
+        }
         LiveIntent::RememberLibraryView { sort, loader } => {
             let preferences = {
                 let mut state = wiring.state.borrow_mut();

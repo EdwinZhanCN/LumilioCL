@@ -19,7 +19,8 @@ async fn the_whole_spine_against_the_real_services() {
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|_| std::env::temp_dir().join("lumilio-live"));
     println!("launcher root: {}", home.display());
-    let service = LauncherService::open(&home, DefaultTransport::new().unwrap()).unwrap();
+    let service =
+        LauncherService::open(&home, DefaultTransport::new().unwrap(), Vec::new()).unwrap();
 
     // Search (Modrinth).
     let page = service
@@ -147,7 +148,8 @@ async fn the_whole_spine_against_the_real_services() {
 async fn a_java_runtime_installs_from_the_real_index_and_runs() {
     let home = std::env::temp_dir().join(format!("lumilio-java-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&home);
-    let service = LauncherService::open(&home, DefaultTransport::new().unwrap()).unwrap();
+    let service =
+        LauncherService::open(&home, DefaultTransport::new().unwrap(), Vec::new()).unwrap();
     let java = service
         .install_java(Some(17), CancellationToken::new())
         .await

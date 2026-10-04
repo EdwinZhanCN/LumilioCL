@@ -61,6 +61,7 @@ fn the_settings_page_shows_each_tab_and_edits_open_a_dialog(cx: &mut TestAppCont
         (2, "settings-java-roots"),
         (3, "settings-data-dir"),
         (4, "settings-version"),
+        (5, "settings-plugin-empty"),
     ];
     for (tab, selector) in tabs {
         shell.update(cx, |shell, cx| {
@@ -72,6 +73,44 @@ fn the_settings_page_shows_each_tab_and_edits_open_a_dialog(cx: &mut TestAppCont
             "{selector} on tab {tab}"
         );
     }
+
+    // The plugin row sends the stable plugin ID, with its requested new state.
+    shell.update(cx, |shell, cx| {
+        shell.update_live(
+            |model| {
+                let view = model.settings.as_mut().unwrap();
+                view.plugins = vec![lumilio_core::PluginInfo {
+                    manifest: lumilio_plugin_api::Manifest {
+                        id: "test.fake".into(),
+                        name: "测试插件".into(),
+                        description: "测试说明".into(),
+                        version: "1".into(),
+                        api: lumilio_plugin_api::API_VERSION,
+                        default_enabled: true,
+                        permissions: Vec::new(),
+                        settings: Vec::new(),
+                    },
+                    state: Default::default(),
+                    status: lumilio_core::PluginStatus::Enabled,
+                }];
+            },
+            cx,
+        );
+    });
+    cx.run_until_parked();
+    let toggle = cx
+        .debug_bounds("test.fake-enabled-cap")
+        .expect("plugin switch");
+    cx.simulate_click(toggle.center(), Modifiers::none());
+    cx.run_until_parked();
+    assert_eq!(
+        seen.borrow().as_slice(),
+        [LiveIntent::SetPluginEnabled {
+            id: "test.fake".into(),
+            enabled: false
+        }]
+    );
+    seen.borrow_mut().clear();
 
     // An edit button opens its dialog; cancelling sends nothing.
     shell.update(cx, |shell, cx| {
