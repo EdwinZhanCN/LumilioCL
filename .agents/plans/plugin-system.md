@@ -4,99 +4,246 @@
 
 ## Goal
 
-启动器有了插件宿主和一套扩展点，并用四个核心插件验证过：崩溃与日志分析器（纯数据）、Litematica 投影（UI 贡献）、Modrinth 内容源（外部服务与网络权限）、Discord Rich Presence（生命周期事件）。每个核心插件都能在设置里开关，关掉后它贡献的东西全部消失，启动链路不受影响。四个都跑通以后，再另开计划做 WASM 社区插件。
+启动器有了插件宿主和一套扩展点，并用四个核心插件验证过：
 
-## 判断标准
+- 崩溃与日志分析器（纯数据）
+- Litematica 投影（UI 贡献）
+- Modrinth 内容源（外部服务与网络权限）
+- Discord Rich Presence（生命周期事件）
 
-做成核心插件，至少要满足一条：不是每个人都需要；依赖的外部服务或格式有自己的节奏；规则会持续增长，适合社区来补。
+每个核心插件都能在「设置 → 插件」里开关，关掉后它贡献的东西全部消失，启动链路不受影响。四个都跑通以后，再另开计划做 WASM 社区插件。
 
-启动链路不做成插件：实例存储、安装下载、Java、账户、启动、锁。插件宿主失败时，游戏照样能启动。
+## 接手须知（每个会话开工前先读这一节）
 
-## Scope
+1. **按阶段顺序做：P0 → P1 → P2 → P3 → P4。** 前一阶段的「验收」全部打勾，并且已经提交，才能开下一阶段。一个阶段可以分几次提交，每次提交都必须通过 pre-commit 钩子里的四项检查。
+2. **「冻结的决定」不能自己改。** 如果实施中发现某条行不通，先停下，在本文件末尾的「实施记录」里写清楚哪里不通、证据是什么、建议怎么改，然后问维护者。不要绕过去，也不要悄悄换一种做法。
+3. **「留给实施者的细节」可以自己定**，定了以后写进「实施记录」。
+4. **出现下面任何一种情况，说明走偏了，先停下：**
+   - 插件 crate 依赖了 `lumilio-core`、`lumilio-ui`、`lumilio-app` 或 gpui。
+   - 为某个插件在 `lumilio-ui` 里写专门的渲染代码。插件的界面只能来自视图树。
+   - 为插件里的某一条规则在 core 里加一个 enum 变体，比如给每种崩溃原因加一个 `ProblemKind`。
+   - 插件自己开网络连接、自己读写任意路径，或者在 UI 线程上执行插件代码。
+   - 开始做 WASM、插件市场、从磁盘加载插件。这些不在本计划里。
+5. 每个阶段做完，在下面的任务上打勾，并在「实施记录」里追加一段：做了什么、踩了什么坑、哪些需要维护者肉眼看。
 
-- In：
-  - `lumilio-plugin-api` crate：清单、权限、扩展点 trait、数据类型，以及声明式视图树的类型。不依赖 gpui，也不依赖 `lumilio-core` 的内部实现。
-  - core 里的插件宿主：注册、启用状态的持久化、权限检查、出错隔离（插件报错或 panic 只停用这个插件）、调用一律走后台任务。
-  - `lumilio-ui`：把视图树渲染成 kit 组件；插件开关和权限说明放在设置页。
-  - 四个核心插件，每个是一个独立的 crate，放在 `crates/plugins/<name>`，只依赖 plugin-api。
-- Out：
-  - WASM 运行时、社区插件的安装与分发、签名与审核。另开计划。
-  - 第三方认证、备份目标这类插件。等事件和权限模型稳定之后再做。
-  - 截图墙、服务器列表：人人都用，直接内置。
+## 判断标准（什么做成插件）
 
-## 核心约束
+做成核心插件，至少要满足一条：
 
-**核心插件只能用社区插件也能拿到的 API。** 如果某个核心插件需要私有接口，就补扩展点，不开后门。
+- 不是每个人都需要。
+- 依赖的外部服务或格式有自己的节奏。
+- 规则会持续增长，适合社区来补。
 
-为了将来能原样搬到 WASM 上，plugin-api 的类型都要可序列化，跨边界不传借用；异步调用采用请求/响应的形式。
+启动链路不做成插件：实例存储、安装下载、Java、账户、启动、锁。截图墙、服务器列表、第三方认证（ADR 0024）已经内置，不改成插件。
 
-## References
+## 冻结的决定
 
-- 崩溃规则：`3rd-party/HMCL/HMCLCore/src/main/java/org/jackhuang/hmcl/game/CrashReportAnalyzer.java`（51 条规则；我们现在只有 `diagnostics::analyze` 的 5 条）。
-- 内容源接口：
-  - `3rd-party/HMCL/HMCLCore/src/main/java/org/jackhuang/hmcl/addon/RemoteAddonRepository.java`
-  - 同目录 `repository/` 下的 `ModrinthRemoteAddonRepository.java`、`CurseForgeRemoteAddonRepository.java`
-  - 现有的 `lumilio-core::discover` 和 ADR 0023
-- Discord：`3rd-party/modrinth/packages/app-lib/src/state/discord.rs`
-- 扩展模型的先例：Zed 的扩展（同样基于 GPUI；WASM + WIT；不开放任意 UI）、Obsidian 的核心插件开关。
-- NBT：现有的 `lumilio-core::nbt`（有长度和嵌套深度上限）。
+### D1 crate 结构与依赖方向
 
-## Tasks
+```text
+lumilio-plugin-api   （新）只依赖 serde；定义清单、权限、扩展点 trait、数据类型、视图树
+lumilio-nbt          （新）从 lumilio-core/src/nbt.rs 原样拆出；只依赖 flate2
+lumilio-core         依赖 plugin-api 和 lumilio-nbt；内含插件宿主 `plugins` 模块
+lumilio-ui           依赖 plugin-api（渲染视图树、设置表单）
+lumilio-app          依赖每个插件 crate，启动时把它们交给宿主
+lumilio-plugin-crash-analyzer / -litematica / -modrinth / -discord
+                     只能依赖 plugin-api、lumilio-nbt 和通用库（serde、serde_json、regex、url……）
+```
+
+- 插件 crate 平铺放在 `crates/lumilio-plugin-<name>/`，**不要**放进 `crates/plugins/` 子目录。原因：docgen（IA）和 `crates/lumilio-docgen/tests/attribution.rs` 只扫描 `crates/*/src`。
+- P0 加一个测试 `crates/lumilio-docgen/tests/plugin_boundaries.rs`：读每个 `crates/lumilio-plugin-*/Cargo.toml` 的依赖，出现 `lumilio-core`、`lumilio-ui`、`lumilio-app` 或任何 `gpui*` 就失败；插件 crate 没有依赖 `lumilio-plugin-api` 也失败。
+
+### D2 插件 API 是同步的，由宿主负责异步
+
+- 插件的所有方法都是普通的同步函数。宿主在 `tokio::task::spawn_blocking` 里调用插件，外面套超时（默认 5 秒，内容源的搜索 20 秒），再用 `std::panic::catch_unwind(AssertUnwindSafe(..))` 兜住 panic。
+- 插件需要网络或文件时，调用宿主通过上下文提供的函数（`ctx.fetch`、`ctx.read_file`）。这些函数在宿主里检查权限，再用 `Handle::block_on` 执行。将来搬到 WASM 上，这些就是宿主函数，语义不变。
+- 插件出错、超时或 panic：这一次调用返回空结果，插件进入 `Failed { message }` 状态，在本次运行期间停用，设置页显示原因。这个状态不写进 `settings.json`，重启后自动恢复。
+
+### D3 清单与权限
+
+```rust
+pub struct Manifest {
+    pub id: String,              // "lumilio.crash-analyzer"：小写、点分，全局唯一
+    pub name: String,            // 设置页显示的中文名
+    pub description: String,     // 一句话
+    pub version: String,
+    pub api: u32,                // 等于 plugin_api::API_VERSION，否则宿主拒绝加载
+    pub default_enabled: bool,
+    pub permissions: Vec<Permission>,
+    pub settings: Vec<SettingField>, // 见 D6
+}
+pub enum Permission {
+    ReadGameFiles { under: String },    // 只读实例游戏目录下的这个子目录，比如 "schematics"
+    Network { hosts: Vec<String> },     // 只能访问这些主机（精确匹配）
+    LaunchEvents,                       // 订阅生命周期事件
+    Native(NativeCapability),           // 只给核心插件；目前只有 DiscordIpc
+}
+```
+
+宿主在每次调用上下文函数时检查权限，越权就返回错误，不 panic。设置页逐条用人话显示权限，比如「读取游戏的 schematics 文件夹」「访问 api.modrinth.com」。
+
+### D4 是否默认启用
+
+- 平时看不见、只在相关时出现、不往外发数据的，默认启用：分析器、Litematica、Modrinth。
+- 往第三方发数据的，默认关闭：Discord。
+- 不做「检测到模组后弹窗提示启用」。由出现条件决定 tab 是否显示（见 D5）。
+- 启用状态存在 `LauncherSettings.plugins: BTreeMap<String, PluginState>`，其中 `PluginState { enabled: Option<bool>, values: BTreeMap<String, SettingValue> }`。`enabled` 为 `None` 时取清单里的默认值。字段加 `#[serde(default)]`，**不升** settings 的 schema 版本，因为这是纯新增的字段。
+
+### D5 视图树只描述内容（P2 实现）
+
+- 组件只描述「这里是什么」，不描述「怎么画」：没有 div、flex、颜色、尺寸、间距。第一版只有这些：
+  - `Section { title, children }`
+  - `List { items }`：每行 `ListItem { id, title, subtitle, value, image, tags, open: Option<ActionId> }`
+  - `Detail { title, subtitle, image, facts: Vec<(String, String)>, children }`
+  - `Table { columns, rows }`
+  - `Empty { title, message }`
+  - `Text { text, tone: Body | Secondary | Mono }`
+  - `Tags(Vec<String>)`
+  - `Image(ImageData)`：RGBA 像素和宽高，由宿主缩放
+  - `Key { id: ActionId, label, kind: Primary | Ghost, destructive: bool }`：`destructive` 的确认弹窗由宿主出
+- 交互采用 Elm 式：插件实现 `fn view(&self, ctx, state: &TabState) -> View` 和 `fn update(&self, ctx, state: TabState, action: ActionId) -> (TabState, Vec<Effect>)`。`TabState` 是一个 `serde_json::Value`，由宿主按「实例 + 插件」保存。插件自己不保存 UI 状态。
+- 插件不能直接动磁盘或系统界面。需要这类操作时，在 `update` 里返回 `Effect`，由宿主替它执行。第一版只有三种：
+  - `RevealGameFile { path }`：在文件夹中显示。`path` 必须落在插件 `ReadGameFiles` 权限允许的目录下。
+  - `SaveAs { suggested_name, bytes }`：宿主弹出保存对话框，用户选了位置才写入。用户的选择本身就是同意，所以不需要额外权限。
+  - `Toast(text)`：显示一条提示。
+- 加一种组件，需要有两个插件都用得上，或者一个核心插件用得上并同时写进 `docs/design-language.md`。不开放绘图原语。
+
+### D6 插件设置用声明式表单
+
+- `SettingField { key, label, help, kind }`，`kind` 只有四种：`Toggle { default }`、`Choice { options, default }`、`Text { default }`、`Number { min, max, default }`。
+- 宿主按 design-language §10 的设置行来画，统一负责持久化、校验和恢复默认。插件通过 `ctx.setting(key)` 读值。设置变了，下一次调用时插件就会读到新值，不另外推送通知。
+
+### D7 IA
+
+- 插件贡献的 UI，`// ia[...]` 注释写在插件 crate 里构建对应视图的地方。页面 key 用 `plugin.<短名>`，比如 `plugin.litematica`，并在 `crates/lumilio-docgen/src/lib.rs` 的 `PAGES` 里加一行。
+- 插件开关、权限、设置表单属于设置页，页面 key 是 `settings`，注释写在 `lumilio-ui`。
+
+## 留给实施者的细节（定了写进实施记录）
+
+- 宿主的具体类型名，比如 `PluginHost`、`PluginStatus`。
+- 超时的具体数值（在 D2 的量级内）。
+- 设置页插件分区的版式（遵守 design-language）。
+- 实例页的插件 tab 排在哪里：要求是内置 tab 的序号和 `LUMILIO_PAGE` 的行为不变。建议排在「截图」之后、「历史」之前，并把 tab 序号改为 `enum`。
+- 每个插件的显示名和描述文案（遵守 design-language 的文案规则）。
+
+## 阶段与任务
 
 ### P0 骨架
 
-- [ ] T1：`lumilio-plugin-api`：插件清单（id、名称、版本、需要的权限）、`Plugin` trait、上下文句柄。
-- [ ] T2：core 宿主：注册表、`settings.json` 里的启用状态、按清单检查权限、隔离出错的插件；附带测试。
-- [ ] T3：设置页的「插件」分区：开关、权限说明、出错状态，以及每个插件的声明式设置表单（设计选择 2）。默认启用状态按设计选择 3。
+入口条件：无。
+
+- [ ] T1 新建 `crates/lumilio-plugin-api`：`API_VERSION = 1`；`Manifest`、`Permission`、`SettingField`、`SettingValue`；`Plugin` trait。每个扩展点是一个返回 `Option<&dyn Trait>` 的方法，默认返回 `None`。另有上下文 trait `HostContext`，提供 `setting`、`read_file`、`fetch`（P0 先只实现 `setting`，其余返回「未授权」）。
+- [ ] T2 从 `lumilio-core/src/nbt.rs` 原样拆出 `crates/lumilio-nbt`，core 改为依赖它，行为不变，原有测试跟着搬过去。
+- [ ] T3 core 新增 `plugins` 模块：注册、按 `API_VERSION` 拒绝不兼容的插件、按 `LauncherSettings.plugins` 计算启用状态、按 D2 隔离调用、`Failed` 状态。`LauncherService::open` 增加插件列表参数，app 在 `backend.rs` 里传入；测试里传空列表。
+- [ ] T4 设置持久化：`LauncherSettings.plugins`（D4）；加一个服务方法，用来设置启用状态和设置值。
+- [ ] T5 设置页新增「插件」tab：开关、描述、权限（人话）、失败原因、声明式设置表单（D6），并为它写 `// ia[settings]` 注释。
+- [ ] T6 `crates/lumilio-docgen/tests/plugin_boundaries.rs`（见 D1），并证明它能失败：临时让一个插件依赖 core，看到测试变红后再撤掉。
+- [ ] T7 加一个只在测试里用的假插件（放在 core 的测试里，不进产品），覆盖：启用和停用、panic 被兜住并标为 `Failed`、超时、越权调用被拒绝、`API_VERSION` 不匹配时被拒绝。
+
+验收：
+
+- 设置页能看到一个空的插件列表（P0 还没有真插件），四项检查通过。
+- 假插件的测试覆盖了 T7 列出的每一种情况。
 
 ### P1 崩溃与日志分析器（扩展点：纯数据）
 
-- [ ] T4：扩展点 `Analyzer`：输入日志或崩溃报告文本、实例概况（加载器、Java、模组列表），输出 `Problem` 列表。
-- [ ] T5：把 `diagnostics::analyze` 的 5 条规则迁到 `crates/plugins/crash-analyzer`，再参考 HMCL 补规则。每条规则配一个样本日志的测试。
-- [ ] T6：Diagnostics → Problems 和首页「需要处理」改为汇总所有已启用的 Analyzer。关掉插件后，这些提示消失。
-- [ ] T7：这个阶段落地后，把扩展点模型和 crate 边界写成决策记录（不等整个计划做完）。
+入口条件：P0 已提交。
+
+- [ ] T8 在 plugin-api 里定义扩展点 `Analyzer`：
+  - 输入 `AnalysisInput { text, source: LatestLog | CrashReport, game: GameFacts }`，其中 `GameFacts` 包括游戏版本、加载器和加载器版本、Java 主版本、`mods: Vec<ModFact { id, version, file }>`。
+  - 输出 `Vec<Finding { rule, severity, title, advice, evidence: Option<String> }>`。`title` 和 `advice` 直接是给人看的中文。
+- [ ] T9 新建 `crates/lumilio-plugin-crash-analyzer`：把 `diagnostics::analyze` 的 5 条规则原样迁过来，测试一起迁。之后参考 `3rd-party/HMCL/HMCLCore/src/main/java/org/jackhuang/hmcl/game/CrashReportAnalyzer.java` 补规则，按常见程度排序，第一批至少补 15 条。每条规则配一段样本日志测试，正反例都要有。从 HMCL 改编的规则按 ADR 0011 注明来源（attribution 测试会检查）。
+- [ ] T10 core：删掉 `CrashHint` 和 `diagnostics::analyze`，`crash_report` 改为返回宿主汇总的 `Vec<PluginFinding { plugin, finding }>`。UI 删掉 `hint_text`，原样显示 `title` 和 `advice`。
+- [ ] T11 问题列表：最近一次游戏崩溃或启动失败时，`problems()` 对最新的崩溃报告（没有报告就用 `latest.log`）跑一遍分析器，每条结果作为 `ProblemKind::Finding(PluginFinding)`。首页「需要处理」显示其中最严重的一条。
+- [ ] T12 停用分析器插件后，崩溃报告页和问题列表里不再出现分析结果，但原有的内置问题（缺 Java、Mod 重复等）照常显示。
+
+验收：
+
+- 原来 5 条规则的行为不变，现有测试迁移后全部通过。
+- 新规则每条都有测试。
+- 停用和启用的效果都有测试覆盖。
+- 维护者要用肉眼看：一个真实的崩溃报告在诊断页上的显示效果。
 
 ### P2 Litematica 投影（扩展点：UI 贡献）
 
-- [ ] T8：在 plugin-api 里定义视图树和 `on_action` 交互（设计选择 1），lumilio-ui 用 kit 组件来渲染。
-- [ ] T9：扩展点「实例页 tab」，带出现条件（比如「实例里装了 Litematica」）和只读文件权限（只能读实例下的 `schematics/`）。
-- [ ] T10：`crates/plugins/litematica`：列出投影（名称、作者、尺寸、方块数），详情页显示材料清单，可以导出成 CSV 或文本。
-- [ ] T11：决定插件 UI 怎么进入生成的 IA，比如插件代码也写 `// ia[...]` 注释，或者按插件单独生成一页。
+入口条件：P1 已提交。
+
+- [ ] T13 在 plugin-api 里定义 `View`、`ActionId`、`TabState`、`Effect`（D5），以及扩展点 `InstanceTab`：
+  - `title()`
+  - `appears(&GameFacts, ctx) -> bool`：出现条件
+  - `view(...)`
+  - `update(...)`
+- [ ] T14 core：宿主保存每个「实例 + 插件」的 `TabState`，并执行插件返回的 `Effect`（`RevealGameFile` 先校验路径）；新增服务方法 `plugin_tabs(instance)`、`plugin_view(instance, plugin)`、`plugin_action(instance, plugin, action)`。实现 `ctx.read_file`：只允许读 `ReadGameFiles.under` 下面的文件，用 `Path::components` 拒绝 `..`、绝对路径和符号链接；单个文件的大小有上限。
+- [ ] T15 lumilio-ui：只写一个通用的视图树渲染器，`View` 的每个组件对应一个 kit 组件；`destructive` 的键由宿主出确认弹窗。实例页接入插件 tab（见「留给实施者的细节」），沿用 UI 发意图 → app 调服务 → 数据回到 UI 的模式，可参考截图墙的提交 `f15b81e` 有哪些接入点。
+- [ ] T16 新建 `crates/lumilio-plugin-litematica`：
+  - 出现条件：实例的 mods 里有 Litematica（按 mod id 判断），或者游戏目录下存在 `schematics/`。
+  - 列表：读取 `schematics/**/*.litematic`，用 `lumilio-nbt` 解析 `Metadata`（Name、Author、Description、EnclosingSize、TotalBlocks、TimeModified），有 `PreviewImageData` 就显示缩略图。
+  - 详情：键值事实，加上材料清单表格（方块 id、数量），按数量降序。材料清单要解码各个 Region 的 `BlockStatePalette` 和 `BlockStates`（位宽 = max(2, ⌈log₂ 调色板长度⌉)，值可以跨越两个 long）。照格式规范自己实现，不要复制 Litematica 的源码（它是 LGPL，没有放进 3rd-party）。
+  - 操作：「在文件夹中显示」（`Effect::RevealGameFile`）和「导出材料清单（CSV）」（`Effect::SaveAs`）。插件不能直接写盘（D5）。
+  - 测试用 `lumilio-nbt` 的写入函数在测试里构造 `.litematic`，不往仓库里提交二进制样本。
+- [ ] T17 IA：按 D7 写 `// ia[plugin.litematica]` 注释，`PAGES` 加一行，重新生成。
+
+验收：
+
+- 装了 Litematica 的实例出现投影 tab，没装的不出现；停用插件后 tab 消失。
+- 损坏或超大的文件只会让这一项显示「读不了」，不影响整个列表。
+- 维护者要用肉眼看：投影列表、详情、材料清单的视觉效果。
 
 ### P3 Modrinth 内容源（扩展点：外部服务）
 
-- [ ] T12：把 core 里写死 Modrinth 的 16 个文件梳理一遍，抽出 `ContentSource`：搜索、项目、版本、文件、依赖、分类与筛选能力。筛选模型和 URL 拼接分开，用 CurseForge 纸面验证（设计选择 4）。
-- [ ] T13：权限里加入「网络：指定域名」，宿主统一走 `fetch`，插件不能自己开连接。
-- [ ] T14：Modrinth 实现迁到 `crates/plugins/modrinth`。整合包安装、更新检查、依赖解析都改为通过 `ContentSource` 调用，前后行为不变，现有测试全部通过。
-- [ ] T15：关掉 Modrinth 以后，发现页显示「没有可用的内容源」，已安装的内容照常可用。
+入口条件：P2 已提交。
+
+- [ ] T18 先做调研再动手，结果写进实施记录：
+  1. 逐个过一遍 core 里提到 Modrinth 的 36 个文件（`grep -rli modrinth crates/lumilio-core/src`），分成三类：**Modrinth API**（要迁进插件）、**`.mrpack` 格式**（`modpack`、`pack_export`，是文件格式，留在 core）、**只是提到这个名字**（不动）。
+  2. 读 `discover/query.rs`，把筛选模型（`Pick`、`Stance` 等）和拼 Modrinth URL 的代码分开。
+  3. 拿 `3rd-party/HMCL/HMCLCore/src/main/java/org/jackhuang/hmcl/addon/RemoteAddonRepository.java` 和同目录 `repository/CurseForgeRemoteAddonRepository.java` 对照草拟的接口，在纸面上走一遍，确认 CurseForge 也能实现它。
+- [ ] T19 在 plugin-api 里定义 `ContentSource`：
+  - 能力声明：支持哪些项目类型、哪些筛选、哪些排序。
+  - 方法：`search`、`project`、`versions`、`version_files`、`dependencies`。
+  - 数据类型由 plugin-api 自己定义，core 负责和现有类型互相转换。
+- [ ] T20 实现 `ctx.fetch`：只允许访问 `Network.hosts` 里列出的主机；底层走 core 现有的 `Transport`（镜像和代理规则保持不变）；响应大小有上限。
+- [ ] T21 把 Modrinth API 的部分迁进 `crates/lumilio-plugin-modrinth`。core 的发现、内容安装、更新检查、整合包安装改为通过宿主调用 `ContentSource`。发现页按内容源的能力声明显示筛选项，ADR 0023 的界面和行为不变。
+- [ ] T22 停用 Modrinth 后：发现页显示「没有可用的内容源」；已安装的内容照常可用；更新检查跳过来源不可用的项，并说明原因。
+
+验收：
+
+- 迁移前后发现页、安装、更新的现有测试全部通过（必要时改为通过宿主注入）。
+- `crates/lumilio-core/tests/live_smoke.rs` 照常能跑。
+- 停用 Modrinth 的效果有测试覆盖。
 
 ### P4 Discord Rich Presence（扩展点：生命周期事件）
 
-- [ ] T16：事件订阅：游戏启动、进入世界、退出、启动失败。事件只能观察，不能阻断启动。
-- [ ] T17：权限里加入「本地能力：Discord IPC」，由宿主提供；这类能力只开放给核心插件。
-- [ ] T18：`crates/plugins/discord`，参考 Modrinth 的 `discord.rs`。Discord 不在运行时安静地跳过，不报错。
+入口条件：P3 已提交。
+
+- [ ] T23 在 plugin-api 里定义扩展点 `LaunchObserver`，事件有两种：
+  - `Started { instance_name, game_version, loader, target: None | World(name) | Server(address) }`
+  - `Exited { outcome, played_seconds }`
+
+  事件在 `service/launch.rs` 里 `launch` / `launch_world` / `launch_server` 确认进程已经起来、以及会话结束写入 `SessionOutcome` 的地方发出。只能观察，不能阻断启动；发事件不能拖慢启动。
+- [ ] T24 宿主提供 `Native(DiscordIpc)` 能力，按 D3 只给核心插件。
+- [ ] T25 新建 `crates/lumilio-plugin-discord`：参考 `3rd-party/modrinth/packages/app-lib/src/state/discord.rs`；如果从那里改编代码，按 ADR 0022 注明来源，许可证是 GPL-3.0-only。设置项：是否显示游戏名、是否显示世界或服务器（D6）。Discord 没有运行时安静地跳过，不报错。默认关闭（D4）。
+- [ ] T26 插件完成后，把整个计划压缩成决策记录（扩展点模型、D1–D7、实际交付），然后删除本文件。
+
+验收：
+
+- 事件的发出时机有测试覆盖：用一个假的观察者，配合现有的启动测试替身。
+- 维护者要实测一次：打开 Discord 并启用插件，进游戏能看到状态，退出后状态消失。
 
 ## Validation
 
-- 每个阶段跑完四项检查。plugin-api 和宿主的逻辑都在 core 侧，有单元测试。
-- 每个插件都要证明两点：启用时它的贡献出现，停用后全部消失；插件 panic 或报错时，只有它自己被停用，启动和其他插件不受影响。
-- 依赖方向检查：插件 crate 只依赖 `lumilio-plugin-api`，不依赖 `lumilio-core` 或 `lumilio-ui`。用测试读 `cargo metadata` 来保证，不靠人记。
-- 维护者肉眼验收：设置里的插件分区、投影 tab、发现页没有内容源时的样子。
+- 每次提交都通过 pre-commit 的四项检查。新逻辑优先写在 core 和插件 crate 里，并有单元测试；UI 只测渲染器的映射和意图流转。
+- 每个插件都要有两类测试：启用时它的贡献出现、停用后全部消失；插件 panic 或超时，只有它自己被停用，启动和其他插件不受影响。
+- `plugin_boundaries.rs` 和 `attribution.rs` 一直保持通过。
+- 需要维护者肉眼验收的地方，在实施记录里逐条列出。
 
-## 已定的设计选择（暂定，落地时写进决策记录）
+## References
 
-1. **视图树只描述内容，不描述布局。** 插件说「这是一个列表，每行有标题、副标题、数值和操作」，宿主决定怎么画、用哪个 kit 组件、间距和动效是多少。所以没有 div、flex、颜色、尺寸这类原语，插件的界面自动符合 design-language，也不会长成第二套 UI 框架。
-   - 第一版组件只取 P2 用得到的：区块（标题 + 内容）、列表（行可以点开详情）、详情（头部 + 键值事实 + 区块）、表格、空状态、文本（正文 / 次要 / 等宽三级）、标签、图片（字节由插件给，缩放由宿主做）、按键（操作，可以标 `destructive`，由宿主负责确认弹窗）。
-   - 交互采用 Elm 式：插件收到 `on_action(id)`，返回新的视图树，由宿主比对后重画。插件不持有 UI 状态，这样搬到 WASM 上也是同一套模型。
-   - 增长规则：加一种组件，需要两个插件都用得上，或者一个核心插件用得上并同时写进 design-language。3D 预览第一版用插件在 CPU 上渲染出的图片代替，不开放绘图原语。
-2. **插件设置用声明式表单，和视图树分开。** 设置有统一的语义：持久化、默认值、校验、恢复默认。这些应该由宿主负责，存在 `settings.json` 里各插件自己的命名空间下，在「设置 → 插件 → 某个插件」里按 design-language §10 的设置行来画。
-   - 字段类型：开关、单选（分段键或下拉）、文本、带范围的数字。路径选择属于权限问题，第一版不给。
-   - 插件通过上下文读取设置值，值变化时会收到通知。不提供「自己画设置页」的出口。
-3. **默认是否启用，看它会不会主动出现、会不会把数据往外送。**
-   - 平时看不见、只在相关时出现，且不往外发数据的：默认启用。崩溃分析器（没发现问题就看不见）、Modrinth（没有它发现页是空的）、Litematica 都属于这类。
-   - 往第三方发数据或影响启动的：默认关闭，由用户主动打开。Discord 属于这类，它会告诉别人你在玩什么。
-   - 「检测到相关模组再出现」靠扩展点自带的出现条件来实现（T9），不弹窗提示用户去启用：提示属于打扰，出现条件不打扰。没有首次运行的插件向导。
-4. **P3 在 ADR 0023 的发现页落地并提交后再开工；P0–P2 和它无关，可以先做。**
-   - P3 的第一步是读落地后的 `discover/query.rs`。它现在把筛选模型（`Pick` / `Stance`）和 Modrinth 的 URL 拼接写在一起，需要拆开：筛选模型留在 core，作为 `ContentSource` 的输入；拼 URL 归 Modrinth 插件。
-   - 内容源要声明自己支持哪些筛选（包含/排除、环境、许可证……），发现页按声明显示筛选项。
-   - 接口定稿前，拿 HMCL 的 `CurseForgeRemoteAddonRepository.java` 纸面走一遍，证明第二个内容源也能实现它，避免做出一个 Modrinth 形状的接口。
+- 崩溃规则：`3rd-party/HMCL/HMCLCore/src/main/java/org/jackhuang/hmcl/game/CrashReportAnalyzer.java`（51 条规则）。
+- 内容源：`3rd-party/HMCL/HMCLCore/src/main/java/org/jackhuang/hmcl/addon/RemoteAddonRepository.java`；同目录 `repository/ModrinthRemoteAddonRepository.java`、`CurseForgeRemoteAddonRepository.java`；现有的 `lumilio-core::discover`；ADR 0023。
+- Discord：`3rd-party/modrinth/packages/app-lib/src/state/discord.rs`。
+- 实例页加 tab 的样板：截图墙的提交 `f15b81e`。
+- 扩展模型的先例：Zed 的扩展（同样基于 GPUI；WASM + WIT；不开放任意 UI）、Obsidian 的核心插件开关。
+
+## 实施记录
+
+（每个阶段做完追加：日期、做了什么、偏离和原因、需要维护者看的地方。）
