@@ -127,7 +127,7 @@ impl<T: Transport + Clone> LauncherService<T> {
 
     /// Every game version the catalog lists, newest first, for choosing one
     /// (IA P-VERSION). Read fresh each time; a failure is reported, never
-    /// replaced by a guess (L-LIB-02).
+    /// replaced by a guess.
     pub async fn game_versions(&self) -> Result<Vec<crate::catalog::CatalogEntry>, ServiceError> {
         let chain = self.chain().await?;
         let catalog = VersionCatalog::fetch(&self.transport, &chain)

@@ -24,7 +24,7 @@ impl InstanceDetailView {
                     .items_center()
                     .justify_between()
                     .child(kit::section_label("内存", colors))
-                    // ia[instance.settings]: 内存 | 设置 · 性能组，「内存」区 [编辑] 弹窗（最小 / 最大） | 留空跟随默认；性能组另有只读的“本机内存 · 推荐最大”一行 | L-SET-01
+                    // ia[instance.settings]: 内存 | 设置 · 性能组，「内存」区 [编辑] 弹窗（最小 / 最大） | 留空跟随默认；性能组另有只读的“本机内存 · 推荐最大”一行
                     .child(self.edit_button("instance-memory-edit", Editor::Memory, cx)),
             )
             .child(kit::list(

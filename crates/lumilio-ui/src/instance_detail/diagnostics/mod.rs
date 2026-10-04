@@ -143,7 +143,7 @@ impl InstanceDetailView {
             .into_any_element()
     }
 
-    // ia[instance.diagnostics]: 看问题、执行修复 | 诊断 · 问题分段 | 每个问题一个操作（与概览相同） | L-DIAG-01
+    // ia[instance.diagnostics]: 看问题、执行修复 | 诊断 · 问题分段 | 每个问题一个操作（与概览相同）
     fn problems_body(&self, colors: ShellColors, cx: &mut Context<Self>) -> AnyElement {
         if let Some(status) = self.status(&self.data.problems, colors, Section::Problems, cx) {
             return status;

@@ -117,7 +117,7 @@ pub(super) fn install_control(
 ) -> gpui::AnyElement {
     let colors = ctx.colors;
     let Some(have) = ctx.model.installed.get(&row.project_id) else {
-        // ia[discover]: 安装（最新兼容版本） | 结果行「安装」 | 后台任务，toast“开始安装”，完成 toast；Mod 先过依赖提示 | H-DISC-04
+        // ia[discover]: 安装（最新兼容版本） | 结果行「安装」 | 后台任务，toast“开始安装”，完成 toast；Mod 先过依赖提示
         return kit::action(
             ("live-install", index),
             "安装",
@@ -128,7 +128,7 @@ pub(super) fn install_control(
         .small()
         .into_any_element();
     };
-    // ia[discover]: 已安装状态 | 结果行「已安装」/「更新」 | 目标游戏已有的（按 Modrinth 识别）显示「已安装」；有更新显示「更新」，点了用新版本替换旧文件；详情页主按钮同样变化 | — | 只认 Modrinth 认得的文件
+    // ia[discover]: 已安装状态 | 结果行「已安装」/「更新」 | 目标游戏已有的（按 Modrinth 识别）显示「已安装」；有更新显示「更新」，点了用新版本替换旧文件；详情页主按钮同样变化 | 只认 Modrinth 认得的文件
     match &have.update {
         Some(version) => {
             let intent = LiveIntent::UpdateInstalled {
@@ -160,7 +160,7 @@ pub(super) fn install_control(
     }
 }
 
-// ia[discover]: 打开项目详情 | 点结果行 | 详情页（进历史） | H-DISC-02
+// ia[discover]: 打开项目详情 | 点结果行 | 详情页（进历史）
 pub(super) fn result_row(index: usize, row: &SearchRow, ctx: &LiveCtx) -> impl IntoElement {
     let colors = ctx.colors;
     let open = send(
@@ -295,7 +295,7 @@ pub(super) fn result_row(index: usize, row: &SearchRow, ctx: &LiveCtx) -> impl I
         )
 }
 
-// ia[discover]: 分页 | 列表上方的页码键 | 翻页并回到列表顶部的第一行 | H-DISC-01
+// ia[discover]: 分页 | 列表上方的页码键 | 翻页并回到列表顶部的第一行
 pub(super) fn pager(ctx: &LiveCtx) -> impl IntoElement {
     let colors = ctx.colors;
     let pages = ctx.model.pages();
@@ -343,7 +343,7 @@ pub(super) fn pager(ctx: &LiveCtx) -> impl IntoElement {
         }))
 }
 
-// ia[discover]: 筛选 | 右侧丝印编号筛选栏：游戏版本、加载器、类别；清除筛选 | 重新搜索；加载器与类别是带 LED 的选项列表 | H-DISC-01
+// ia[discover]: 筛选 | 右侧丝印编号筛选栏：游戏版本、加载器、类别；清除筛选 | 重新搜索；加载器与类别是带 LED 的选项列表
 pub(super) fn sidebar(ctx: &LiveCtx) -> impl IntoElement {
     let colors = ctx.colors;
     let query = &ctx.model.query;
@@ -496,7 +496,7 @@ pub fn discover(ctx: &LiveCtx) -> impl IntoElement {
         ))
         .child(kit::toolbar(
             Some(
-                // ia[discover]: 分类 | L3 标签：整合包 / Mod / 资源包 / 光影 | 切换搜索的项目类型并重新搜索 | H-DISC-01
+                // ia[discover]: 分类 | L3 标签：整合包 / Mod / 资源包 / 光影 | 切换搜索的项目类型并重新搜索
                 kit::tabs("live-discover-tabs", &DISCOVER_TABS, tab, {
                     let change = ctx.change.clone();
                     move |index, window, app| {
@@ -507,7 +507,7 @@ pub fn discover(ctx: &LiveCtx) -> impl IntoElement {
                 .into_any_element(),
             ),
             Some(
-                // ia[discover]: 搜索 | L3 搜索框（回车确认） | 按关键词搜索 Modrinth | H-DISC-01
+                // ia[discover]: 搜索 | L3 搜索框（回车确认） | 按关键词搜索 Modrinth
                 div()
                     .debug_selector(|| "live-discover-search".into())
                     .child(kit::search_field(&ctx.controls.discover_search, colors))
@@ -534,7 +534,7 @@ pub fn discover(ctx: &LiveCtx) -> impl IntoElement {
                                     h_flex()
                                         .gap_3()
                                         .items_center()
-                                        // ia[discover]: 排序 / 显示数量 | L4 两个下拉 | 重新搜索 | H-DISC-01
+                                        // ia[discover]: 排序 / 显示数量 | L4 两个下拉 | 重新搜索
                                         .child(toolbar_select(
                                             "排序方式",
                                             &ctx.controls.sort,

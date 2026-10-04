@@ -1,7 +1,6 @@
-//! The export-modpack dialog (IA `instance/README.md`, L-LIB-08): the pack's
-//! name, version and summary, and which top-level files and folders of the
-//! game go in. It holds no business logic: the answer is an [`ExportSpec`]
-//! the application hands to core.
+//! The export-modpack dialog: the pack's name, version and summary, and which
+//! top-level files and folders of the game go in. It holds no business logic:
+//! the answer is an [`ExportSpec`] the application hands to core.
 
 use std::collections::BTreeMap;
 use std::rc::Rc;

@@ -16,7 +16,7 @@ use std::rc::Rc;
 
 impl InstanceDetailView {
     /// P-BULK: what can be done to every selected file at once.
-    // ia[instance.content]: 批量启用 / 停用 / 删除 | 选中行后出现的批量栏 | 逐项结果；删除先确认 | H-CONTENT-03/04
+    // ia[instance.content]: 批量启用 / 停用 / 删除 | 选中行后出现的批量栏 | 逐项结果；删除先确认
     pub(super) fn bulk_bar(&self, colors: ShellColors, cx: &mut Context<Self>) -> AnyElement {
         let busy = self.busy;
         let kind = CONTENT_KINDS[self.content_index()];

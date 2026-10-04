@@ -14,7 +14,7 @@ impl InstanceDetailView {
             .gap_5()
             .child(kit::list(
                 vec![
-                    // ia[instance.overview]: 改名 | 概览「名称」行 [编辑] → 弹窗 | 改名保留游戏目录、收藏和历史记录 | L-LIB-04
+                    // ia[instance.overview]: 改名 | 概览「名称」行 [编辑] → 弹窗 | 改名保留游戏目录、收藏和历史记录
                     kit::value_row(
                         "overview-name",
                         "名称",
@@ -54,7 +54,7 @@ impl InstanceDetailView {
                         None,
                         colors,
                     ),
-                    // ia[instance.overview]: 占用空间 | 概览「占用空间」行 | 后台计算，只算这个游戏自己的文件 | —
+                    // ia[instance.overview]: 占用空间 | 概览「占用空间」行 | 后台计算，只算这个游戏自己的文件
                     kit::value_row(
                         "overview-size",
                         "占用空间",

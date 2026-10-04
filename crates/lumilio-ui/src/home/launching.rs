@@ -17,7 +17,7 @@ pub(super) fn render_continue(
     on_hover: Option<HoverHandler>,
     art: ArtButtons,
 ) -> AnyElement {
-    // ia[home]: 继续 | 英雄区主按钮「继续」 | 启动当前游戏，英雄区进入启动时刻；跟随当前游戏（导航右下角芯片） | H-NAV-01
+    // ia[home]: 继续 | 英雄区主按钮「继续」 | 启动当前游戏，英雄区进入启动时刻；跟随当前游戏（导航右下角芯片）
     let button = art_button(
         "home-continue",
         "继续",
@@ -203,7 +203,7 @@ pub(super) fn render_launching(
                 .items_center()
                 .child(h_flex().gap(px(14.)).children(steps))
                 .child(
-                    // ia[home]: 取消启动 | 启动时刻里的「取消」 | 停止本次启动，回到继续状态 | —
+                    // ia[home]: 取消启动 | 启动时刻里的「取消」 | 停止本次启动，回到继续状态
                     art_button(
                         "home-cancel-launch",
                         "取消",
@@ -245,7 +245,7 @@ pub(super) fn render_playing(
             div()
                 .mt(px(12.))
                 .debug_selector(|| "home-stop-game".into())
-                // ia[home]: 结束游戏 | 游戏运行中的「结束游戏」 | 停止游戏进程 | —
+                // ia[home]: 结束游戏 | 游戏运行中的「结束游戏」 | 停止游戏进程
                 .child(art_button(
                     "home-stop-game",
                     "结束游戏",

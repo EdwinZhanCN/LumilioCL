@@ -20,7 +20,7 @@ pub(super) fn game_defaults(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
     let total = view.total_memory_mb;
     let recommended = total.map(recommended_memory_mb);
 
-    // ia[settings]: 最小 / 最大内存 | 游戏默认 · 值 + [编辑] 弹窗 | 弹窗说明本机内存与推荐值；恢复默认 = 推荐值 | L-SET-01
+    // ia[settings]: 最小 / 最大内存 | 游戏默认 · 值 + [编辑] 弹窗 | 弹窗说明本机内存与推荐值；恢复默认 = 推荐值
     let memory = row(
         "settings-memory",
         "内存",
@@ -55,7 +55,7 @@ pub(super) fn game_defaults(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
     );
 
     let window_current = launch.clone();
-    // ia[settings]: 窗口大小、全屏 | 游戏默认 · 值 + [编辑] 弹窗 | 宽高一起填；全屏 关 / 开 / 不设置 | L-SET-01
+    // ia[settings]: 窗口大小、全屏 | 游戏默认 · 值 + [编辑] 弹窗 | 宽高一起填；全屏 关 / 开 / 不设置
     let window = row(
         "settings-window",
         "窗口大小与全屏",
@@ -154,7 +154,7 @@ pub(super) fn game_defaults(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
 
     let jvm = {
         let current = launch.clone();
-        // ia[settings]: Java 参数 | 游戏默认 · 值 + [编辑] 弹窗 | 每行一项；游戏自己设置了参数时以游戏的为准 | L-SET-01
+        // ia[settings]: Java 参数 | 游戏默认 · 值 + [编辑] 弹窗 | 每行一项；游戏自己设置了参数时以游戏的为准
         text_row(
             "settings-jvm",
             "settings-jvm-edit",
@@ -170,7 +170,7 @@ pub(super) fn game_defaults(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
     };
     let game = {
         let current = launch.clone();
-        // ia[settings]: 游戏参数 | 游戏默认 · 值 + [编辑] 弹窗 | 每行一项 | L-SET-01
+        // ia[settings]: 游戏参数 | 游戏默认 · 值 + [编辑] 弹窗 | 每行一项
         text_row(
             "settings-game-args",
             "settings-game-args-edit",
@@ -191,7 +191,7 @@ pub(super) fn game_defaults(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
         .collect::<Vec<_>>();
     let environment = {
         let current = launch.clone();
-        // ia[settings]: 环境变量 | 游戏默认 · 值 + [编辑] 弹窗 | 每行 名称=值 | L-SET-01
+        // ia[settings]: 环境变量 | 游戏默认 · 值 + [编辑] 弹窗 | 每行 名称=值
         text_row(
             "settings-env",
             "settings-env-edit",
@@ -207,7 +207,7 @@ pub(super) fn game_defaults(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
     };
 
     let commands_current = launch.clone();
-    // ia[settings]: 启动前 / 包装 / 退出后命令 | 游戏默认 · 值 + [编辑] 弹窗 | 以当前用户权限运行；启动前命令失败取消启动，退出后命令失败只记录 | L-SET-01
+    // ia[settings]: 启动前 / 包装 / 退出后命令 | 游戏默认 · 值 + [编辑] 弹窗 | 以当前用户权限运行；启动前命令失败取消启动，退出后命令失败只记录
     let commands = row(
         "settings-commands",
         "启动前、包装与退出后命令",

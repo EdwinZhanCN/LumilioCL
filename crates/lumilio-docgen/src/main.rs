@@ -4,7 +4,7 @@
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use lumilio_docgen::{generate, known_ids, scan, stale, validate, write};
+use lumilio_docgen::{generate, scan, stale, validate, write};
 
 fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
@@ -14,7 +14,7 @@ fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let root = root();
     let (paths, mut problems) = scan(&root);
-    problems.extend(validate(&paths, &known_ids(&root)));
+    problems.extend(validate(&paths));
     if !problems.is_empty() {
         for problem in &problems {
             eprintln!("{problem}");

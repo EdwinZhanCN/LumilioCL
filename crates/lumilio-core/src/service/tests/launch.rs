@@ -205,7 +205,7 @@ async fn installing_is_separate_cancellable_and_only_success_marks_installed() {
         TaskOutcome::Succeeded
     );
 
-    // Installed once, it launches with the network gone (AC-OFFLINE-01).
+    // Installed once, it launches with the network gone.
     fake_java(&world, "echo \"Setting user: x\"");
     world.net.forget_all();
     let (tx, _rx) = mpsc::unbounded_channel();

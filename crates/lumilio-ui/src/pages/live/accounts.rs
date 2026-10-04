@@ -10,7 +10,7 @@ use gpui_component::{h_flex, v_flex};
 
 pub(super) fn account_row(index: usize, row: &AccountRow, ctx: &LiveCtx) -> gpui::Div {
     let colors = ctx.colors;
-    // ia[accounts]: 选为当前 | 账户行左侧的单选圆点 | 之后的启动使用该身份 | H-ACC-06
+    // ia[accounts]: 选为当前 | 账户行左侧的单选圆点 | 之后的启动使用该身份
     let select = send(&ctx.handler, LiveIntent::SelectAccount(row.key.clone()));
     let dot = div()
         .flex_none()
@@ -37,7 +37,7 @@ pub(super) fn account_row(index: usize, row: &AccountRow, ctx: &LiveCtx) -> gpui
             ""
         }
     );
-    // ia[accounts]: 复制 UUID | 账户行 ⋯ 菜单 | 复制到剪贴板，toast“已复制 UUID” | H-ACC-09
+    // ia[accounts]: 复制 UUID | 账户行 ⋯ 菜单 | 复制到剪贴板，toast“已复制 UUID”
     let copy = {
         let handler = ctx.handler.clone();
         let text = row.uuid.clone();
@@ -52,7 +52,7 @@ pub(super) fn account_row(index: usize, row: &AccountRow, ctx: &LiveCtx) -> gpui
             )
         }
     };
-    // ia[accounts]: 移除 | 账户行 ⋯ 菜单 → 警告弹窗 | 只删身份（Microsoft 账户同时删凭据库里的登录信息），不删游戏和存档；移除当前账户后改用剩下的第一个 | H-ACC-08
+    // ia[accounts]: 移除 | 账户行 ⋯ 菜单 → 警告弹窗 | 只删身份（Microsoft 账户同时删凭据库里的登录信息），不删游戏和存档；移除当前账户后改用剩下的第一个
     let remove = {
         let handler = ctx.handler.clone();
         let (key, name) = (row.key.clone(), row.name.clone());
@@ -93,7 +93,7 @@ pub(super) fn account_row(index: usize, row: &AccountRow, ctx: &LiveCtx) -> gpui
     };
     let mut entries = vec![kit::MenuEntry::new("复制 UUID", copy)];
     if row.microsoft {
-        // ia[accounts]: 刷新登录 | Microsoft 账户行 ⋯ 菜单「刷新登录」 | 失效的登录显示“需要重新登录”，刷新后恢复 | H-ACC-07
+        // ia[accounts]: 刷新登录 | Microsoft 账户行 ⋯ 菜单「刷新登录」 | 失效的登录显示“需要重新登录”，刷新后恢复
         entries.push(kit::MenuEntry::new(
             "刷新登录",
             send(&ctx.handler, LiveIntent::RefreshAccount(row.key.clone())),
@@ -159,7 +159,7 @@ pub fn accounts(ctx: &LiveCtx) -> impl IntoElement {
         None if model.accounts_loaded => "还没有账户，添加一个才能进游戏".to_owned(),
         None => String::new(),
     };
-    // ia[accounts]: 添加离线账户 | L2 次要「添加离线账户」→ 弹窗（可自定义 UUID） | 列表新增；UUID 只在添加时可设 | H-ACC-02
+    // ia[accounts]: 添加离线账户 | L2 次要「添加离线账户」→ 弹窗（可自定义 UUID） | 列表新增；UUID 只在添加时可设
     let add = kit::action(
         "account-new",
         "添加离线账户",
@@ -167,7 +167,7 @@ pub fn accounts(ctx: &LiveCtx) -> impl IntoElement {
         false,
         send(&ctx.handler, LiveIntent::NewAccount),
     );
-    // ia[accounts]: Microsoft 登录 | L2 主要「登录 Microsoft」→ 设备码弹窗 | 登录后出现在列表和导航芯片里，启动用真实的玩家名和令牌 | H-ACC-01 | ADR 0013；真实登录要 Mojang 批准应用注册
+    // ia[accounts]: Microsoft 登录 | L2 主要「登录 Microsoft」→ 设备码弹窗 | 登录后出现在列表和导航芯片里，启动用真实的玩家名和令牌 | ADR 0020；真实登录要 Mojang 批准应用注册
     let microsoft = kit::action(
         "account-microsoft",
         "登录 Microsoft",

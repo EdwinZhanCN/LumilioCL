@@ -43,7 +43,7 @@ impl InstanceDetailView {
         };
         let window_row = {
             let current = own.clone();
-            // ia[instance.settings]: 窗口大小、全屏 | 设置 · 游戏组，值 + [编辑] 弹窗 | 宽高一起填（留空跟随默认）；全屏 关 / 开 / 跟随默认；恢复默认＝移除覆盖 | L-SET-01
+            // ia[instance.settings]: 窗口大小、全屏 | 设置 · 游戏组，值 + [编辑] 弹窗 | 宽高一起填（留空跟随默认）；全屏 关 / 开 / 跟随默认；恢复默认＝移除覆盖
             self.setting_row(
                 "isettings-window",
                 "窗口大小与全屏",
@@ -113,7 +113,7 @@ impl InstanceDetailView {
 
         let after_row = {
             let current = own.clone();
-            // ia[instance.settings]: 进入游戏后 | 设置 · 游戏组，值 + [编辑] 弹窗 | 保持 / 隐藏启动器 / 跟随默认 | L-SET-01
+            // ia[instance.settings]: 进入游戏后 | 设置 · 游戏组，值 + [编辑] 弹窗 | 保持 / 隐藏启动器 / 跟随默认
             self.setting_row(
                 "isettings-after",
                 "进入游戏后",
@@ -155,7 +155,7 @@ impl InstanceDetailView {
 
         let quick_row = {
             let current = own.clone();
-            // ia[instance.settings]: 直接进入（Quick Play） | 设置 · 游戏组，值 + [编辑] 弹窗：类型 + 目标 | 启动后直达世界或服务器；版本不支持单人世界时启动会说明原因；世界页的「进入」用同一个能力 | H-PLAY-07
+            // ia[instance.settings]: 直接进入（Quick Play） | 设置 · 游戏组，值 + [编辑] 弹窗：类型 + 目标 | 启动后直达世界或服务器；版本不支持单人世界时启动会说明原因；世界页的「进入」用同一个能力
             self.setting_row(
                 "isettings-quick",
                 "直接进入",
@@ -225,7 +225,7 @@ impl InstanceDetailView {
                 .into_any_element()
             };
         let rows = vec![
-            // ia[instance.settings]: 更换游戏版本 / 加载器 | 设置 · 运行时，「游戏版本」「加载器」行的 [更换…] → 弹窗（加载器分段 + 版本选择器，起点是游戏现在的组合） | 警告“装好的 Mod 可能不兼容，先建快照” + [先建快照]；与现在相同时不能提交；失败回到旧组合 | L-LIB-07
+            // ia[instance.settings]: 更换游戏版本 / 加载器 | 设置 · 运行时，「游戏版本」「加载器」行的 [更换…] → 弹窗（加载器分段 + 版本选择器，起点是游戏现在的组合） | 警告“装好的 Mod 可能不兼容，先建快照” + [先建快照]；与现在相同时不能提交；失败回到旧组合
             self.setting_row(
                 "isettings-version",
                 "游戏版本",
@@ -253,7 +253,7 @@ impl InstanceDetailView {
                 )),
                 colors,
             ),
-            // ia[instance.settings]: 修复游戏文件 | 设置 · 运行时，「游戏文件」行的 [修复] | 逐个核对游戏文件，缺的或损坏的重新下载；世界、Mod 和设置不会被改动；后台任务 | H-INSTANCE-11
+            // ia[instance.settings]: 修复游戏文件 | 设置 · 运行时，「游戏文件」行的 [修复] | 逐个核对游戏文件，缺的或损坏的重新下载；世界、Mod 和设置不会被改动；后台任务
             self.setting_row(
                 "isettings-files",
                 "游戏文件",
@@ -278,7 +278,7 @@ impl InstanceDetailView {
         let own = record.settings.clone();
         let java_row = {
             let current = own.clone();
-            // ia[instance.settings]: 指定 Java | 设置 · Java 组，值 + [编辑] 弹窗 | 路径留空自动选择；保存时检查路径存在；已发现的 Java 列表在全局设置·Java | L-RUN-01
+            // ia[instance.settings]: 指定 Java | 设置 · Java 组，值 + [编辑] 弹窗 | 路径留空自动选择；保存时检查路径存在；已发现的 Java 列表在全局设置·Java
             self.setting_row(
                 "isettings-java",
                 "Java",
@@ -316,7 +316,7 @@ impl InstanceDetailView {
         let jvm_row = {
             let current = own.clone();
             let default = list_text(&self.defaults.launch.jvm_arguments);
-            // ia[instance.settings]: Java 参数 | 设置 · Java 组，值 + [编辑] 弹窗 | 多行文本，每行一个参数 | L-SET-01
+            // ia[instance.settings]: Java 参数 | 设置 · Java 组，值 + [编辑] 弹窗 | 多行文本，每行一个参数
             self.setting_row(
                 "isettings-jvm",
                 "Java 参数",
@@ -375,7 +375,7 @@ impl InstanceDetailView {
         let args_row = {
             let current = own.clone();
             let default = list_text(&defaults.game_arguments);
-            // ia[instance.settings]: 游戏参数 | 设置 · 高级组，值 + [编辑] 弹窗 | 来源（跟随默认 / 自己设置）+ 多行 | L-SET-01
+            // ia[instance.settings]: 游戏参数 | 设置 · 高级组，值 + [编辑] 弹窗 | 来源（跟随默认 / 自己设置）+ 多行
             self.setting_row(
                 "isettings-game-args",
                 "游戏参数",
@@ -435,7 +435,7 @@ impl InstanceDetailView {
         let env_row = {
             let current = own.clone();
             let default = list_text(&env_lines(&defaults.environment));
-            // ia[instance.settings]: 环境变量 | 设置 · 高级组，值 + [编辑] 弹窗 | 来源 + 每行 名称=值 | L-SET-01
+            // ia[instance.settings]: 环境变量 | 设置 · 高级组，值 + [编辑] 弹窗 | 来源 + 每行 名称=值
             self.setting_row(
                 "isettings-env",
                 "环境变量",
@@ -492,7 +492,7 @@ impl InstanceDetailView {
                 command_text(own.launch.wrapper.as_ref(), defaults.wrapper.as_ref()),
                 command_text(own.launch.post_exit.as_ref(), defaults.post_exit.as_ref()),
             );
-            // ia[instance.settings]: 启动前 / 包装 / 退出后命令 | 设置 · 高级组，值 + [编辑] 弹窗 | 三个输入：留空跟随默认，填 - 表示这个游戏不使用；说明可用变量 | L-SET-01
+            // ia[instance.settings]: 启动前 / 包装 / 退出后命令 | 设置 · 高级组，值 + [编辑] 弹窗 | 三个输入：留空跟随默认，填 - 表示这个游戏不使用；说明可用变量
             self.setting_row(
                 "isettings-commands",
                 "启动前、包装与退出后命令",

@@ -11,7 +11,7 @@ pub(super) fn render_first_use(
     intent_handler: Option<HomeIntentHandler>,
     colors: ShellHomeColors,
 ) -> impl IntoElement {
-    // ia[home]: 空库：导入 | 首次使用的「把原来的游戏带过来」 | 同游戏库的导入其他启动器的游戏 | L-LIB-03
+    // ia[home]: 空库：导入 | 首次使用的「把原来的游戏带过来」 | 同游戏库的导入其他启动器的游戏
     let primary = page_button(
         "home-import",
         "把原来的游戏带过来",
@@ -20,7 +20,7 @@ pub(super) fn render_first_use(
         true,
         intent_handler.clone(),
     );
-    // ia[home]: 空库：新建 | 首次使用的「新建」 | 同游戏库的新建游戏 | L-LIB-02
+    // ia[home]: 空库：新建 | 首次使用的「新建」 | 同游戏库的新建游戏
     let secondary = page_button(
         "home-create",
         "新建",
@@ -71,7 +71,7 @@ pub(super) fn render_attention(
     if rows.is_empty() {
         return None;
     }
-    // ia[home]: 需要留意：解决 | 每个有问题的游戏一行（游戏名 · 最严重的问题 · 另有几个）和一个按钮（安装/修复/更换…/去设置/去添加/查看日志…） | 点后先打开游戏页再执行 | —
+    // ia[home]: 需要留意：解决 | 每个有问题的游戏一行（游戏名 · 最严重的问题 · 另有几个）和一个按钮（安装/修复/更换…/去设置/去添加/查看日志…） | 点后先打开游戏页再执行
     let list = rows.iter().enumerate().map(|(index, row)| {
         let button = row
             .action
@@ -137,7 +137,7 @@ pub(super) fn render_recent(
     on_open: Option<OpenHandler>,
     colors: ShellHomeColors,
 ) -> impl IntoElement {
-    // ia[home]: 打开最近的游戏 | 最近卡片（手型和悬停描边） | 点卡片进游戏页 | H-INSTANCE-01
+    // ia[home]: 打开最近的游戏 | 最近卡片（手型和悬停描边） | 点卡片进游戏页
     let cards = recent.iter().enumerate().map(|(index, entry)| {
         let open = entry.id.clone().zip(on_open.clone());
         v_flex()

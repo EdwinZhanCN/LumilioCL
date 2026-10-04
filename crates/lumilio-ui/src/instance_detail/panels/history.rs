@@ -47,8 +47,8 @@ impl InstanceDetailView {
             .into_any_element()
     }
 
-    // ia[instance.history]: 看变更 | 历史 · 变更分段 | 只读时间线（内容、世界、设置、安装等） | —
-    // ia[instance.history]: 看游玩记录 | 历史 · 游玩记录分段 | 只读；崩溃或没能启动的会话有「查看日志」，跳到诊断·日志，崩溃报告按时间对应（会话开始到结束后 2 分钟内写下、离结束最近的那份），找到就直接打开 | —
+    // ia[instance.history]: 看变更 | 历史 · 变更分段 | 只读时间线（内容、世界、设置、安装等）
+    // ia[instance.history]: 看游玩记录 | 历史 · 游玩记录分段 | 只读；崩溃或没能启动的会话有「查看日志」，跳到诊断·日志，崩溃报告按时间对应（会话开始到结束后 2 分钟内写下、离结束最近的那份），找到就直接打开
     pub(super) fn events_body(
         &self,
         sessions: bool,
@@ -150,7 +150,7 @@ impl InstanceDetailView {
     pub(super) fn snapshots_body(&self, colors: ShellColors, cx: &mut Context<Self>) -> AnyElement {
         let busy = self.busy;
         let create = h_flex().child(
-            // ia[instance.history]: 创建快照 | 历史 · 快照分段「现在创建快照」→ 弹窗（备注、范围） | 后台创建 → toast | L-HIST-01
+            // ia[instance.history]: 创建快照 | 历史 · 快照分段「现在创建快照」→ 弹窗（备注、范围） | 后台创建 → toast
             kit::action(
                 "snapshot-create",
                 "现在创建快照",
@@ -189,14 +189,14 @@ impl InstanceDetailView {
                         };
                         let trail = h_flex()
                             .gap_1()
-                            // ia[instance.history]: 恢复快照 | 快照行「恢复」→ 警告弹窗“恢复会用快照替换当前的 X，当前状态会先自动存一份” | 后台恢复 → toast；失败自动回到恢复前 | L-HIST-01
+                            // ia[instance.history]: 恢复快照 | 快照行「恢复」→ 警告弹窗“恢复会用快照替换当前的 X，当前状态会先自动存一份” | 后台恢复 → toast；失败自动回到恢复前
                             .child(self.asking(
                                 ("snapshot-restore", row),
                                 "恢复",
                                 Confirm::RestoreSnapshot(snapshot.id.clone()),
                                 cx,
                             ))
-                            // ia[instance.history]: 删除快照 | 快照行「删除」→ 警告弹窗 | 删除快照文件 | L-HIST-01
+                            // ia[instance.history]: 删除快照 | 快照行「删除」→ 警告弹窗 | 删除快照文件
                             .child(self.asking(
                                 ("snapshot-delete", row),
                                 "删除",

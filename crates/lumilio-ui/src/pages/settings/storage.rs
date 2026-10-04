@@ -73,7 +73,7 @@ pub(super) fn downloads(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
     let rules_now = view.mirrors.clone();
     let concurrency_now = view.download_concurrency;
 
-    // ia[settings]: 优先使用镜像 | 下载与存储 · 开关 | 先试镜像地址，不通再回到官方地址 | L-SET-01
+    // ia[settings]: 优先使用镜像 | 下载与存储 · 开关 | 先试镜像地址，不通再回到官方地址
     let prefer_row = row(
         "settings-prefer-mirrors",
         "优先使用镜像",
@@ -96,7 +96,7 @@ pub(super) fn downloads(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
         ),
         colors,
     );
-    // ia[settings]: 镜像规则 | 下载与存储 · 值 + [编辑] 弹窗 | 每行 官方前缀 => 镜像前缀 | L-SET-01
+    // ia[settings]: 镜像规则 | 下载与存储 · 值 + [编辑] 弹窗 | 每行 官方前缀 => 镜像前缀
     let rules_row = row(
         "settings-mirrors",
         "镜像规则",
@@ -124,7 +124,7 @@ pub(super) fn downloads(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
         })),
         colors,
     );
-    // ia[settings]: 同时下载数 | 下载与存储 · 值 + [编辑] 弹窗 | 自动 / 1–32 | L-SET-01
+    // ia[settings]: 同时下载数 | 下载与存储 · 值 + [编辑] 弹窗 | 自动 / 1–32
     let concurrency_row = row(
         "settings-concurrency",
         "同时下载数",
@@ -147,7 +147,7 @@ pub(super) fn downloads(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
         })),
         colors,
     );
-    // ia[settings]: 数据目录 | 下载与存储 · 路径 + [在访达中显示] | 不可改（App State） | L-SET-01
+    // ia[settings]: 数据目录 | 下载与存储 · 路径 + [在访达中显示] | 不可改（App State）
     let data_row = row(
         "settings-data-dir",
         "数据目录",
@@ -163,7 +163,7 @@ pub(super) fn downloads(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
         ),
         colors,
     );
-    // ia[settings]: 存储占用 | 下载与存储 · 游戏 / 共享资源 / Java / 缓存 条形图 | 后台计算后显示 | L-SET-01
+    // ia[settings]: 存储占用 | 下载与存储 · 游戏 / 共享资源 / Java / 缓存 条形图 | 后台计算后显示
     let usage = match &view.storage {
         Some(usage) => v_flex()
             .gap_4()
@@ -172,7 +172,7 @@ pub(super) fn downloads(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
             .child(
                 h_flex()
                     .gap_2()
-                    // ia[settings]: 检查没用的游戏文件 | 下载与存储 · 按键「检查没用的游戏文件」 | 只报告能回收多少，确认后才删；游戏在安装/更新时拒绝 | — | ADR 0017
+                    // ia[settings]: 检查没用的游戏文件 | 下载与存储 · 按键「检查没用的游戏文件」 | 只报告能回收多少，确认后才删；游戏在安装/更新时拒绝 | ADR 0017
                     .child(
                         Key::new("settings-reclaim")
                             .label("检查没用的游戏文件")
@@ -186,7 +186,7 @@ pub(super) fn downloads(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
                                 }
                             }),
                     )
-                    // ia[settings]: 清理缓存 | 下载与存储 · 按键「清理缓存」 | 缓存 = 已解压的 natives 与 cache/，下次启动会重建 | L-SET-01
+                    // ia[settings]: 清理缓存 | 下载与存储 · 按键「清理缓存」 | 缓存 = 已解压的 natives 与 cache/，下次启动会重建
                     .child(theme::clickable(
                         Key::new("settings-clear-cache")
                             .label(format!("清理缓存（{}）", bytes_text(usage.cache)))

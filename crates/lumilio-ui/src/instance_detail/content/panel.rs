@@ -12,7 +12,7 @@ use gpui_component::input::{Input, InputEvent, InputState};
 use gpui_component::{Icon, h_flex, v_flex};
 
 impl InstanceDetailView {
-    // ia[instance.content]: 识别来源 | 进入内容标签时自动 | 按 SHA-1 查 Modrinth：图标、项目名、作者、版本、项目链接；离线时照常列出，未识别的没有切换版本键 | H-CONTENT-05 | 识别结果不缓存
+    // ia[instance.content]: 识别来源 | 进入内容标签时自动 | 按 SHA-1 查 Modrinth：图标、项目名、作者、版本、项目链接；离线时照常列出，未识别的没有切换版本键 | 识别结果不缓存
     pub(in super::super) fn content_panel(
         &self,
         colors: ShellColors,
@@ -24,7 +24,7 @@ impl InstanceDetailView {
         let busy = self.busy;
         let view = cx.entity().downgrade();
 
-        // ia[instance.content]: 切换子分类 | L4a 分段：Mod / 资源包 / 光影 | 列表切换；搜索与筛选各分类分别记住 | H-CONTENT-01
+        // ia[instance.content]: 切换子分类 | L4a 分段：Mod / 资源包 / 光影 | 列表切换；搜索与筛选各分类分别记住
         let segments = kit::segments("instance-content-kinds", &CONTENT_LABELS, index, {
             let view = view.clone();
             move |index: usize, window: &mut Window, cx: &mut App| {
@@ -38,7 +38,7 @@ impl InstanceDetailView {
         });
         let add = {
             let handler = self.handler.clone();
-            // ia[instance.content]: 添加本地文件 | L4a 次要「添加文件」→ 选文件（拖入内容页没做） | 冲突逐项报告，不静默覆盖同名异内容的文件 | H-CONTENT-02/09
+            // ia[instance.content]: 添加本地文件 | L4a 次要「添加文件」→ 选文件（拖入内容页没做） | 冲突逐项报告，不静默覆盖同名异内容的文件
             kit::action(
                 "content-add-files",
                 "添加文件",
@@ -126,7 +126,7 @@ impl InstanceDetailView {
                 .iter()
                 .position(|filter| *filter == self.content_filter)
                 .unwrap_or(0);
-            // ia[instance.content]: 筛选 | L4b 分段：全部 / 有更新 / 已停用 / 未识别 | 视图状态 | H-CONTENT-01
+            // ia[instance.content]: 筛选 | L4b 分段：全部 / 有更新 / 已停用 / 未识别 | 视图状态
             let filters = kit::segments("content-filters", &FILTER_LABELS, filter_index, {
                 let view = view.clone();
                 move |index: usize, _: &mut Window, cx: &mut App| {
@@ -139,7 +139,7 @@ impl InstanceDetailView {
             let update_all = (!updates.is_empty()).then(|| {
                 let view = view.clone();
                 let count = updates.len();
-                // ia[instance.content]: 全部更新 | L4b「全部更新（N）」→ 确认弹窗 | 逐项执行，部分成功分别报告；进度在动态 | H-CONTENT-07 | 弹窗内逐项取消勾选没做
+                // ia[instance.content]: 全部更新 | L4b「全部更新（N）」→ 确认弹窗 | 逐项执行，部分成功分别报告；进度在动态 | 弹窗内逐项取消勾选没做
                 let updates = updates.clone();
                 theme::clickable(
                     Key::new("content-update-all")
@@ -158,7 +158,7 @@ impl InstanceDetailView {
                 })
             });
             let refresh = {
-                // ia[instance.content]: 刷新 | L4b ↻ | 重新扫描目录并重新识别 | H-CONTENT-01
+                // ia[instance.content]: 刷新 | L4b ↻ | 重新扫描目录并重新识别
                 let view = view.clone();
                 theme::clickable(
                     Key::new("content-refresh")
@@ -237,7 +237,7 @@ impl InstanceDetailView {
     }
 
     /// Wires the content search field: typing refilters the list.
-    // ia[instance.content]: 搜索 | L4b 搜索框 | 按名称过滤（视图状态） | H-CONTENT-01
+    // ia[instance.content]: 搜索 | L4b 搜索框 | 按名称过滤（视图状态）
     pub(in super::super) fn watch_content_search(
         search: &Entity<InputState>,
         cx: &mut Context<Self>,

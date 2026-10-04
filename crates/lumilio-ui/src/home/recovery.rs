@@ -50,7 +50,7 @@ pub(super) fn render_recovery(
             h_flex()
                 .mt(px(12.))
                 .gap_3()
-                // ia[home]: 恢复并继续 | 启动失败后的「恢复并继续」 | 修复后重试启动 | —
+                // ia[home]: 恢复并继续 | 启动失败后的「恢复并继续」 | 修复后重试启动
                 .child(art_button(
                     "home-recover",
                     "恢复并继续",
@@ -59,7 +59,7 @@ pub(super) fn render_recovery(
                     art.primary,
                     intent_handler.clone(),
                 ))
-                // ia[home]: 技术详情 | 启动失败后的「技术详情」 | 失败原因弹窗 | —
+                // ia[home]: 技术详情 | 启动失败后的「技术详情」 | 失败原因弹窗
                 .child(art_button(
                     "home-details",
                     "技术详情",

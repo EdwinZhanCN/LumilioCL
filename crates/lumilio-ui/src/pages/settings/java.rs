@@ -26,7 +26,7 @@ pub(super) fn java(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
                 .enumerate()
                 .map(|(index, java)| {
                     let enabled = !java.disabled;
-                    // ia[settings]: Java：停用 / 启用 | Java · 列表行开关 | 停用不删除文件，之后不会被自动选中 | L-RUN-01
+                    // ia[settings]: Java：停用 / 启用 | Java · 列表行开关 | 停用不删除文件，之后不会被自动选中
                     let toggle = kit::switch(
                         ("settings-java-switch", index),
                         enabled,
@@ -39,7 +39,7 @@ pub(super) fn java(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
                             },
                         ),
                     );
-                    // ia[settings]: Java：在访达中显示 | Java · 列表行 ⋯ 菜单 | 打开并选中它所在位置 | L-RUN-01
+                    // ia[settings]: Java：在访达中显示 | Java · 列表行 ⋯ 菜单 | 打开并选中它所在位置
                     let more = kit::more_menu(
                         ("settings-java-more", index),
                         vec![kit::MenuEntry::new(
@@ -78,7 +78,7 @@ pub(super) fn java(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
         .map(|root| root.display().to_string())
         .collect();
     let roots_text = roots.join("\n");
-    // ia[settings]: Java：额外搜索目录 | Java · 值 + [编辑] 弹窗 | 每行一个文件夹，检测时也会找这些位置 | L-RUN-01
+    // ia[settings]: Java：额外搜索目录 | Java · 值 + [编辑] 弹窗 | 每行一个文件夹，检测时也会找这些位置
     let roots_row = row(
         "settings-java-roots",
         "额外搜索目录",
@@ -108,12 +108,12 @@ pub(super) fn java(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
     v_flex()
         .w_full()
         .gap_5()
-        // ia[settings]: Java：检测与列表 | Java · 已发现的 Java 列表 | 列出检测到的 Java（版本、发行方、架构、路径）；没有时提示添加 | L-RUN-01
+        // ia[settings]: Java：检测与列表 | Java · 已发现的 Java 列表 | 列出检测到的 Java（版本、发行方、架构、路径）；没有时提示添加
         .child(kit::section("已发现的 Java", colors, list))
         .child(
             h_flex()
                 .gap_2()
-                // ia[settings]: Java：重新检测 | Java · 按键「重新检测」 | 重新读取设置并检测 | L-RUN-01
+                // ia[settings]: Java：重新检测 | Java · 按键「重新检测」 | 重新读取设置并检测
                 .child(kit::action(
                     "settings-java-rescan",
                     "重新检测",
@@ -121,7 +121,7 @@ pub(super) fn java(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
                     false,
                     send(handler, LiveIntent::LoadSettings),
                 ))
-                // ia[settings]: Java：下载推荐的 Java | Java · 按键「下载推荐的 Java」 | 读 Mojang 的运行时索引，装好后出现在列表里；进度在动态 | H-SET-03 | ADR 0014
+                // ia[settings]: Java：下载推荐的 Java | Java · 按键「下载推荐的 Java」 | 读 Mojang 的运行时索引，装好后出现在列表里；进度在动态 | ADR 0014
                 .child(kit::action(
                     "settings-java-install",
                     "下载推荐的 Java",
@@ -129,7 +129,7 @@ pub(super) fn java(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
                     false,
                     send(handler, LiveIntent::InstallJava(None)),
                 ))
-                // ia[settings]: Java：添加 | Java · 按键「添加 Java…」→ 选 java 程序或 JDK 文件夹 | 加入列表 | L-RUN-01
+                // ia[settings]: Java：添加 | Java · 按键「添加 Java…」→ 选 java 程序或 JDK 文件夹 | 加入列表
                 .child(kit::action(
                     "settings-java-add",
                     "添加 Java…",

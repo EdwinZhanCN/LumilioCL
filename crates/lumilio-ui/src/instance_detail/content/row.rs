@@ -45,7 +45,7 @@ impl InstanceDetailView {
                 })
         };
 
-        // ia[instance.content]: 打开项目页 | 点标题（仅已识别） | 打开该项目的发现页详情（进历史） | H-CONTENT-05
+        // ia[instance.content]: 打开项目页 | 点标题（仅已识别） | 打开该项目的发现页详情（进历史）
         let title = {
             let label = div()
                 .text_sm()
@@ -95,8 +95,8 @@ impl InstanceDetailView {
             let entry = entry.clone();
             let view = view.clone();
             let update = entry.update.is_some();
-            // ia[instance.content]: 更新单个 | 行内「更新」→ 切换版本弹窗，默认选最新兼容 | 下载 → 校验 → 替换旧文件 → 重扫 → 写历史；停用的保持停用 | H-CONTENT-07
-            // ia[instance.content]: 切换版本 | 行内 ⇆ → 版本弹窗（仅已识别的文件） | 下载所选版本 → 校验 → 替换旧文件 → 重扫 → 写历史；停用的保持停用 | H-CONTENT-06/07/08
+            // ia[instance.content]: 更新单个 | 行内「更新」→ 切换版本弹窗，默认选最新兼容 | 下载 → 校验 → 替换旧文件 → 重扫 → 写历史；停用的保持停用
+            // ia[instance.content]: 切换版本 | 行内 ⇆ → 版本弹窗（仅已识别的文件） | 下载所选版本 → 校验 → 替换旧文件 → 重扫 → 写历史；停用的保持停用
             let button = if update {
                 Key::new(("content-update", index))
                     .icon(Icon::new(UiIcon::Refresh))
@@ -125,7 +125,7 @@ impl InstanceDetailView {
             let next = !entry.item.enabled;
             div()
                 .debug_selector(move || format!("content-switch-{index}"))
-                // ia[instance.content]: 启用 / 停用 | 行内开关 | 即时生效；游戏运行中拒绝并 toast“游戏运行时不能改” | H-CONTENT-03
+                // ia[instance.content]: 启用 / 停用 | 行内开关 | 即时生效；游戏运行中拒绝并 toast“游戏运行时不能改”
                 .child(
                     crate::controls::Fader::new(
                         ("content-switch", index),
@@ -152,7 +152,7 @@ impl InstanceDetailView {
 
         let delete = {
             let view = view.clone();
-            // ia[instance.content]: 删除 | 行内 🗑 → 警告弹窗 | 删除文件、写历史、toast | H-CONTENT-04
+            // ia[instance.content]: 删除 | 行内 🗑 → 警告弹窗 | 删除文件、写历史、toast
             let name = name.clone();
             theme::clickable(
                 Key::new(("content-delete", index))
@@ -172,7 +172,7 @@ impl InstanceDetailView {
             })
         };
 
-        // ia[instance.content]: 在访达中显示 | 行 ⋯ 菜单 | 打开并选中文件 | H-CONTENT-05
+        // ia[instance.content]: 在访达中显示 | 行 ⋯ 菜单 | 打开并选中文件
         let mut more = vec![{
             let handler = self.handler.clone();
             let name = name.clone();
@@ -190,7 +190,7 @@ impl InstanceDetailView {
         if let Some(source) = &source {
             let link = lumilio_core::project_page_url(kind, &source.slug);
             let view = view.clone();
-            // ia[instance.content]: 复制链接 | 行 ⋯ 菜单（仅已识别） | 复制 Modrinth 项目链接，toast“链接已复制” | H-CONTENT-05
+            // ia[instance.content]: 复制链接 | 行 ⋯ 菜单（仅已识别） | 复制 Modrinth 项目链接，toast“链接已复制”
             more.push(kit::MenuEntry::new("复制链接", move |_, cx| {
                 cx.write_to_clipboard(ClipboardItem::new_string(link.clone()));
                 let _ = view.update(cx, |view, cx| {

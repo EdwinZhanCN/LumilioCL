@@ -9,7 +9,7 @@ use gpui_component::{h_flex, v_flex};
 
 pub const ACTIVITY_TABS: [&str; 5] = ["全部", "下载", "安装", "更新", "修复"];
 /// 「重试」 for a finished task that remembers its input.
-// ia[activity]: 失败重试 | 失败或已取消任务行的「重试」 | 用当时的输入重新发起，作为新任务出现，旧条目保留 | — | 升级前的旧记录没有输入，不显示
+// ia[activity]: 失败重试 | 失败或已取消任务行的「重试」 | 用当时的输入重新发起，作为新任务出现，旧条目保留 | 升级前的旧记录没有输入，不显示
 pub(super) fn retry_button(
     index: usize,
     row: &ActivityRow,
@@ -27,7 +27,7 @@ pub(super) fn retry_button(
 }
 
 /// 「打开」 for a task about a game that is still in the library.
-// ia[activity]: 打开结果 | 完成或失败任务行的「打开」 | 任务关联到仍在游戏库里的游戏时跳到游戏页；整合包安装/导入完成后关联到新建的游戏 | —
+// ia[activity]: 打开结果 | 完成或失败任务行的「打开」 | 任务关联到仍在游戏库里的游戏时跳到游戏页；整合包安装/导入完成后关联到新建的游戏
 pub(super) fn open_button(
     index: usize,
     row: &ActivityRow,
@@ -75,7 +75,7 @@ pub(super) fn activity_row(
             h_flex()
                 .gap_3()
                 .items_center()
-                // ia[activity]: 看进度 | 任务行右侧进度条和百分比 | 实时进度；速度和剩余时间在有两次读数后出现（下载按字节，安装/修复按文件个数） | —
+                // ia[activity]: 看进度 | 任务行右侧进度条和百分比 | 实时进度；速度和剩余时间在有两次读数后出现（下载按字节，安装/修复按文件个数）
                 .child(match row.fraction {
                     Some(fraction) => h_flex()
                         .gap_3()
@@ -92,7 +92,7 @@ pub(super) fn activity_row(
                     None => kit::chip("进行中", None, colors).into_any_element(),
                 })
                 .children(speed_line(row, colors))
-                // ia[activity]: 取消 | 运行中任务行的「取消」 | 任务停止，状态“已取消” | —
+                // ia[activity]: 取消 | 运行中任务行的「取消」 | 任务停止，状态“已取消”
                 .children(row.cancel.map(|id| {
                     kit::ghost(
                         ("live-cancel", index),
@@ -116,7 +116,7 @@ pub(super) fn activity_row(
             h_flex()
                 .gap_2()
                 .items_center()
-                // ia[activity]: 技术详情 | 失败任务行的技术详情 | 失败原因弹窗 | —
+                // ia[activity]: 技术详情 | 失败任务行的技术详情 | 失败原因弹窗
                 .child(kit::technical(
                     ("live-task-technical", index),
                     message.clone(),
@@ -186,7 +186,7 @@ pub fn activity(ctx: &LiveCtx) -> impl IntoElement {
         .into_any_element()
     };
     let actions = kit::PageActions::new("live-activity-actions").secondary(
-        // ia[activity]: 清除已完成 | L2 次要「清除已完成」 | 清空结束的条目；没有结束的条目时禁用 | —
+        // ia[activity]: 清除已完成 | L2 次要「清除已完成」 | 清空结束的条目；没有结束的条目时禁用
         kit::action(
             "live-clear-finished",
             "清除已完成",
@@ -210,7 +210,7 @@ pub fn activity(ctx: &LiveCtx) -> impl IntoElement {
         ))
         .child(kit::toolbar(
             Some(
-                // ia[activity]: 分类筛选 | L3 标签：全部 / 下载 / 安装 / 更新 / 修复 | 按任务类别过滤 | —
+                // ia[activity]: 分类筛选 | L3 标签：全部 / 下载 / 安装 / 更新 / 修复 | 按任务类别过滤
                 kit::tabs("live-activity-tabs", &ACTIVITY_TABS, tab, {
                     let emit = ctx.emit.clone();
                     move |index, window, app| emit(ViewIntent::ActivityTab(index), window, app)

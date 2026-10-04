@@ -12,7 +12,7 @@ use gpui_component::{Icon, h_flex, v_flex};
 use lumilio_core::FileEntry;
 
 impl InstanceDetailView {
-    // ia[instance.diagnostics]: 浏览文件 | 诊断 · 文件分段 | 逐级打开的只读文件夹列表，只在游戏目录内；右上角按名字搜当前文件夹 | H-INSTANCE-10
+    // ia[instance.diagnostics]: 浏览文件 | 诊断 · 文件分段 | 逐级打开的只读文件夹列表，只在游戏目录内；右上角按名字搜当前文件夹
     pub(super) fn files_body(&self, colors: ShellColors, cx: &mut Context<Self>) -> AnyElement {
         if let Some(status) = self.status(&self.data.files, colors, Section::Files, cx) {
             return status;
@@ -59,7 +59,7 @@ impl InstanceDetailView {
                             ),
                         )
                     }))
-                    // ia[instance.diagnostics]: 在访达中显示 | 文件分段 · 按键 | 当前文件夹或所选文件 | H-INSTANCE-10
+                    // ia[instance.diagnostics]: 在访达中显示 | 文件分段 · 按键 | 当前文件夹或所选文件
                     .child(kit::ghost(
                         "instance-files-reveal",
                         "在访达中显示",

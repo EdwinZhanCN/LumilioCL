@@ -9,7 +9,7 @@ pub(super) fn about(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
     let handler = &ctx.handler;
     let log = view.data_dir.join("activity.jsonl");
     let rows = vec![
-        // ia[settings]: 版本 | 关于 · 值 | 显示 LumilioCL 版本号 | L-SET-01
+        // ia[settings]: 版本 | 关于 · 值 | 显示 LumilioCL 版本号
         row(
             "settings-version",
             "版本",
@@ -26,7 +26,7 @@ pub(super) fn about(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
             None,
             colors,
         ),
-        // ia[settings]: 启动器日志 | 关于 · 按键 | 在访达中显示日志目录 | L-SET-01
+        // ia[settings]: 启动器日志 | 关于 · 按键 | 在访达中显示日志目录
         row(
             "settings-logs",
             "启动器日志",
@@ -42,7 +42,7 @@ pub(super) fn about(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
             ),
             colors,
         ),
-        // ia[settings]: 导出诊断包 | 关于 · 按键 | 打包版本、设置摘要、Java 列表和各游戏最近日志；玩家名、UUID、路径脱敏 | L-SET-01
+        // ia[settings]: 导出诊断包 | 关于 · 按键 | 打包版本、设置摘要、Java 列表和各游戏最近日志；玩家名、UUID、路径脱敏
         row(
             "settings-diagnostics",
             "诊断包",
@@ -61,7 +61,7 @@ pub(super) fn about(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
             ),
             colors,
         ),
-        // ia[settings]: 开源许可 | 关于 · 值 | 显示 AGPL-3.0 | L-SET-01
+        // ia[settings]: 开源许可 | 关于 · 值 | 显示 AGPL-3.0
         row(
             "settings-license",
             "开源许可",

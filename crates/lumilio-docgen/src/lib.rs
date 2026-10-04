@@ -2,11 +2,11 @@
 //! (ADR 0019).
 //!
 //! ```text
-//! // ia[library]: 排序 / 按加载器筛选 | L4 两个下拉 | 视图状态，记在偏好设置里 | H-NAV-04
+//! // ia[library]: 排序 / 按加载器筛选 | L4 两个下拉 | 视图状态，记在偏好设置里
 //! ```
 //!
-//! The fields are action, layer / component, result, flow ids and an optional
-//! note, separated by `|`. A path appears in the generated file if and only if
+//! The fields are action, layer / component, result and an optional note,
+//! separated by `|`. A path appears in the generated file if and only if
 //! its comment exists, so every generated row means "built".
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -86,7 +86,6 @@ pub struct IaPath {
     pub action: String,
     pub place: String,
     pub result: String,
-    pub ids: String,
     pub note: Option<String>,
     /// Where it is implemented, relative to `crates/`.
     pub file: String,
@@ -98,9 +97,9 @@ pub fn parse_line(line: &str) -> Option<Result<IaPath, String>> {
     let rest = rest.strip_prefix("ia[")?;
     let (page, rest) = rest.split_once("]:")?;
     let fields: Vec<&str> = rest.split('|').map(str::trim).collect();
-    if !(4..=5).contains(&fields.len()) || fields[..4].iter().any(|field| field.is_empty()) {
+    if !(3..=4).contains(&fields.len()) || fields[..3].iter().any(|field| field.is_empty()) {
         return Some(Err(format!(
-            "ia[{page}] needs 操作 | 层 / 组件 | 结果与反馈 | 编号 [| 备注], got {} field(s)",
+            "ia[{page}] needs 操作 | 层 / 组件 | 结果与反馈 [| 备注], got {} field(s)",
             fields.len()
         )));
     }
@@ -109,9 +108,8 @@ pub fn parse_line(line: &str) -> Option<Result<IaPath, String>> {
         action: fields[0].to_owned(),
         place: fields[1].to_owned(),
         result: fields[2].to_owned(),
-        ids: fields[3].to_owned(),
         note: fields
-            .get(4)
+            .get(3)
             .filter(|note| !note.is_empty())
             .map(|n| (*n).to_owned()),
         file: String::new(),
@@ -177,83 +175,14 @@ pub fn scan(root: &Path) -> (Vec<IaPath>, Vec<String>) {
     (paths, problems)
 }
 
-/// The H- and L- flow ids the workflow documents define.
-pub fn known_ids(root: &Path) -> BTreeSet<String> {
-    let mut ids = BTreeSet::new();
-    let dir = root.join("docs/workflows");
-    let Ok(entries) = fs::read_dir(dir) else {
-        return ids;
-    };
-    for entry in entries.flatten() {
-        let Ok(text) = fs::read_to_string(entry.path()) else {
-            continue;
-        };
-        for line in text.lines() {
-            // `<a id="h-nav-04"></a>H-NAV-04 …` rows and `## L-LIB-01 — …` headings.
-            if let Some(at) = line.find("<a id=\"h-") {
-                let id = &line[at + 7..];
-                if let Some(end) = id.find('"') {
-                    ids.insert(id[..end].to_uppercase());
-                }
-            }
-            // `## L-LIB-01 — …`, or a numbered one: `## 4. L-OPS-02 — …`.
-            if let Some(heading) = line.strip_prefix("## ") {
-                let heading = heading
-                    .split_once(". ")
-                    .filter(|(number, _)| number.chars().all(|c| c.is_ascii_digit()))
-                    .map_or(heading, |(_, rest)| rest);
-                if heading.starts_with("L-")
-                    && let Some(id) = heading.split_whitespace().next()
-                {
-                    ids.insert(id.to_owned());
-                }
-            }
-        }
-    }
-    ids
-}
-
-/// The flow ids a `编号` field names: `H-CONTENT-06/07` is two ids. Anything
-/// else (`—`, `ARCH …`) names none.
-pub fn ids_of(field: &str) -> Vec<String> {
-    let mut out = Vec::new();
-    for part in field.split(['、', ',', '，']) {
-        let part = part.trim();
-        let mut tokens = part.split('/');
-        let Some(first) = tokens.next() else { continue };
-        let is_id = (first.starts_with("H-") || first.starts_with("L-"))
-            && first
-                .rsplit('-')
-                .next()
-                .is_some_and(|n| n.chars().all(|c| c.is_ascii_digit()));
-        if !is_id {
-            continue;
-        }
-        let (stem, _) = first.rsplit_once('-').unwrap_or((first, ""));
-        out.push(first.to_owned());
-        for number in tokens {
-            out.push(format!("{stem}-{number}"));
-        }
-    }
-    out
-}
-
-/// Problems that make a set of annotations wrong: unknown pages, unknown or
-/// misspelt flow ids, the same action written twice on a page.
-pub fn validate(paths: &[IaPath], known: &BTreeSet<String>) -> Vec<String> {
+/// Problems that make a set of annotations wrong: unknown pages and the same
+/// action written twice on a page.
+pub fn validate(paths: &[IaPath]) -> Vec<String> {
     let mut problems = Vec::new();
     let mut seen = BTreeSet::new();
     for path in paths {
         if !PAGES.iter().any(|page| page.key == path.page) {
             problems.push(format!("{}: unknown page ia[{}]", path.file, path.page));
-        }
-        for id in ids_of(&path.ids) {
-            if !known.contains(&id) {
-                problems.push(format!(
-                    "{}: ia[{}] \"{}\" names {id}, which docs/workflows does not define",
-                    path.file, path.page, path.action
-                ));
-            }
         }
         if !seen.insert((path.page.clone(), path.action.clone())) {
             problems.push(format!(
@@ -276,17 +205,14 @@ pub fn render(page: &Page, paths: &[&IaPath]) -> String {
         "<!-- 生成文件，不要手改。来源：代码里的 `// ia[...]` 注释；\n     重新生成：cargo run -p lumilio-docgen -- ia。约定见 ADR 0019。 -->\n",
     );
     out.push_str(&format!("# {} · 已实现的用户路径\n\n", page.title));
-    out.push_str("表里每一行都有对应的实现；没做的、范围外的见 [../README.md](../README.md)。\n\n");
-    out.push_str(
-        "| 操作 | 层 / 组件 | 结果与反馈 | 编号 | 备注 | 实现 |\n|---|---|---|---|---|---|\n",
-    );
+    out.push_str("表里每一行都有对应的实现；没有的就是没做。\n\n");
+    out.push_str("| 操作 | 层 / 组件 | 结果与反馈 | 备注 | 实现 |\n|---|---|---|---|---|\n");
     for path in paths {
         out.push_str(&format!(
-            "| {} | {} | {} | {} | {} | `{}` |\n",
+            "| {} | {} | {} | {} | `{}` |\n",
             cell(&path.action),
             cell(&path.place),
             cell(&path.result),
-            cell(&path.ids),
             cell(path.note.as_deref().unwrap_or("")),
             path.file
         ));
@@ -310,7 +236,7 @@ pub fn generate(paths: &[IaPath]) -> BTreeMap<String, String> {
 /// The index of the generated pages, with how many paths each holds.
 pub fn render_index(paths: &[IaPath]) -> String {
     let mut out = String::from(
-        "<!-- 生成文件，不要手改。重新生成：cargo run -p lumilio-docgen -- ia。约定见 ADR 0019。 -->\n# 用户路径索引\n\n每个页面已实现的用户路径；表里每一行都有对应的实现。没做的、范围外的见 [../README.md](../README.md)。\n\n| 页面 | 路径数 |\n|---|---|\n",
+        "<!-- 生成文件，不要手改。重新生成：cargo run -p lumilio-docgen -- ia。约定见 ADR 0019。 -->\n# 用户路径索引\n\n每个页面已实现的用户路径；表里每一行都有对应的实现，没有的就是没做。\n\n| 页面 | 路径数 |\n|---|---|\n",
     );
     for page in PAGES {
         let count = paths.iter().filter(|path| path.page == page.key).count();
@@ -370,66 +296,52 @@ pub fn stale(root: &Path, files: &BTreeMap<String, String>) -> Vec<String> {
 mod tests {
     use super::*;
 
-    fn path(page: &str, action: &str, ids: &str) -> IaPath {
+    fn path(page: &str, action: &str) -> IaPath {
         IaPath {
             page: page.into(),
             action: action.into(),
             place: "L3".into(),
             result: "ok".into(),
-            ids: ids.into(),
             note: None,
             file: "lumilio-ui/src/a.rs".into(),
         }
     }
 
     #[test]
-    fn an_annotation_has_four_fields_and_an_optional_note() {
-        let line = "    // ia[library]: 搜索 | L3 `Input` | 按名称过滤 | H-NAV-04 | 空结果另说";
+    fn an_annotation_has_three_fields_and_an_optional_note() {
+        let line = "    // ia[library]: 搜索 | L3 `Input` | 按名称过滤 | 空结果另说";
         let parsed = parse_line(line).unwrap().unwrap();
         assert_eq!(parsed.page, "library");
         assert_eq!(parsed.action, "搜索");
-        assert_eq!(parsed.ids, "H-NAV-04");
+        assert_eq!(parsed.result, "按名称过滤");
         assert_eq!(parsed.note.as_deref(), Some("空结果另说"));
         assert!(parse_line("// an ordinary comment").is_none());
-        assert!(parse_line("let x = 1; // ia[library]: a | b | c | d").is_none());
+        assert!(parse_line("let x = 1; // ia[library]: a | b | c").is_none());
+        assert!(parse_line("// ia[library]: only | two").unwrap().is_err());
         assert!(
-            parse_line("// ia[library]: only | three | fields")
+            parse_line("// ia[library]: a | b | c | d | e")
                 .unwrap()
                 .is_err()
         );
-        assert!(parse_line("// ia[library]: a | | c | d").unwrap().is_err());
+        assert!(parse_line("// ia[library]: a | | c").unwrap().is_err());
     }
 
     #[test]
-    fn a_slash_in_an_id_names_several_ids() {
-        assert_eq!(
-            ids_of("H-CONTENT-06/07/08、L-CONT-01"),
-            ["H-CONTENT-06", "H-CONTENT-07", "H-CONTENT-08", "L-CONT-01"]
-        );
-        assert!(ids_of("—").is_empty());
-        assert!(ids_of("ARCH User Collections").is_empty());
-    }
-
-    #[test]
-    fn unknown_pages_unknown_ids_and_repeats_are_problems() {
-        let known: BTreeSet<String> = ["H-NAV-04".to_owned()].into();
-        assert!(validate(&[path("library", "搜索", "H-NAV-04")], &known).is_empty());
-        let problems = validate(
-            &[
-                path("nowhere", "a", "—"),
-                path("library", "b", "H-NAV-99"),
-                path("library", "c", "—"),
-                path("library", "c", "—"),
-            ],
-            &known,
-        );
-        assert_eq!(problems.len(), 3, "{problems:?}");
+    fn unknown_pages_and_repeats_are_problems() {
+        assert!(validate(&[path("library", "搜索")]).is_empty());
+        let problems = validate(&[
+            path("nowhere", "a"),
+            path("library", "b"),
+            path("library", "c"),
+            path("library", "c"),
+        ]);
+        assert_eq!(problems.len(), 2, "{problems:?}");
     }
 
     #[test]
     fn only_pages_with_paths_get_a_file_and_stale_files_are_found() {
         let dir = tempfile::tempdir().unwrap();
-        let files = generate(&[path("library", "搜索", "H-NAV-04")]);
+        let files = generate(&[path("library", "搜索")]);
         assert_eq!(
             files.keys().collect::<Vec<_>>(),
             ["README.md", "library.md"],
@@ -453,14 +365,14 @@ mod tests {
         );
     }
 
-    /// The real repository: annotations are well formed, name flows that exist,
-    /// and the generated files are current. Regenerate with
+    /// The real repository: annotations are well formed and the generated
+    /// files are current. Regenerate with
     /// `cargo run -p lumilio-docgen -- ia`.
     #[test]
     fn the_repositorys_generated_paths_are_current() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let (paths, mut problems) = scan(&root);
-        problems.extend(validate(&paths, &known_ids(&root)));
+        problems.extend(validate(&paths));
         assert!(problems.is_empty(), "{problems:#?}");
         let stale = stale(&root, &generate(&paths));
         assert!(

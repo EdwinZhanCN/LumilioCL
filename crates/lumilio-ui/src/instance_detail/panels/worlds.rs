@@ -88,7 +88,7 @@ impl InstanceDetailView {
             .game_started_ms
             .filter(|_| running)
             .and_then(|started| playing_world(worlds, started));
-        // ia[instance.worlds]: 导入世界 | L2 次要「导入世界」→ 选 .zip；也可把 .zip 拖进世界页（一次一个） | 识别含 level.dat 的最浅文件夹，解压到 saves，重名自动加序号，不覆盖 | H-WORLD-02
+        // ia[instance.worlds]: 导入世界 | L2 次要「导入世界」→ 选 .zip；也可把 .zip 拖进世界页（一次一个） | 识别含 level.dat 的最浅文件夹，解压到 saves，重名自动加序号，不覆盖
         let import = kit::action(
             "world-import",
             "导入世界",
@@ -146,7 +146,7 @@ impl InstanceDetailView {
                 let too_old = self.record.as_ref().is_some_and(|record| {
                     lumilio_core::quick_play_world_unsupported(&record.game_version)
                 });
-                // ia[instance.worlds]: 进入世界 | 世界行「进入」 | 启动并直达该世界；1.20 以前的版本置灰并说明 | H-PLAY-07、L-PLAY-02
+                // ia[instance.worlds]: 进入世界 | 世界行「进入」 | 启动并直达该世界；1.20 以前的版本置灰并说明
                 let enter = {
                     let folder = folder.clone();
                     let button = kit::ghost(
@@ -183,21 +183,21 @@ impl InstanceDetailView {
                 let menu = kit::more_menu(
                     ("world-more", row),
                     vec![
-                        // ia[instance.worlds]: 复制世界 | 世界行 ⋯ 菜单 | 复制到新文件夹（重名自动加序号）→ toast | H-WORLD-07
+                        // ia[instance.worlds]: 复制世界 | 世界行 ⋯ 菜单 | 复制到新文件夹（重名自动加序号）→ toast
                         entry("复制", InstanceIntent::CopyWorld(folder.clone()), true),
-                        // ia[instance.worlds]: 创建备份 | 世界行 ⋯ 菜单 | 仅这个世界的快照 → 历史·快照可见 | H-WORLD-10、L-HIST-01
+                        // ia[instance.worlds]: 创建备份 | 世界行 ⋯ 菜单 | 仅这个世界的快照 → 历史·快照可见
                         entry(
                             "创建备份",
                             InstanceIntent::BackupWorld(folder.clone()),
                             true,
                         ),
-                        // ia[instance.worlds]: 导出为 .zip | 世界行 ⋯ 菜单 → 选位置 | 后台打包，toast；不含 session.lock | H-WORLD-09
+                        // ia[instance.worlds]: 导出为 .zip | 世界行 ⋯ 菜单 → 选位置 | 后台打包，toast；不含 session.lock
                         entry(
                             "导出为 .zip…",
                             InstanceIntent::ExportWorld(folder.clone()),
                             false,
                         ),
-                        // ia[instance.worlds]: 在访达中显示 | 世界行 ⋯ 菜单 | 打开该世界的目录 | H-WORLD-12
+                        // ia[instance.worlds]: 在访达中显示 | 世界行 ⋯ 菜单 | 打开该世界的目录
                         entry(
                             "在访达中显示",
                             InstanceIntent::RevealPath(format!("saves/{folder}")),
@@ -210,7 +210,7 @@ impl InstanceDetailView {
                     .gap_1()
                     .items_center()
                     .child(enter)
-                    // ia[instance.worlds]: 删除世界 | 世界行 🗑 → 警告弹窗 | 删除世界文件夹，写历史 | H-WORLD-08
+                    // ia[instance.worlds]: 删除世界 | 世界行 🗑 → 警告弹窗 | 删除世界文件夹，写历史
                     .child(self.asking(
                         ("world-delete", row),
                         "删除",
@@ -232,7 +232,7 @@ impl InstanceDetailView {
             .items_center()
             .justify_between()
             .gap_4()
-            // ia[instance.worlds]: 排序 | L4 分段：最近游玩 / 名称 | 视图状态 | H-WORLD-01
+            // ia[instance.worlds]: 排序 | L4 分段：最近游玩 / 名称 | 视图状态
             .child(kit::segments(
                 "instance-world-sort",
                 &WORLD_SORTS,
@@ -247,7 +247,7 @@ impl InstanceDetailView {
                     .gap_2()
                     .items_center()
                     .children(self.fields.as_ref().map(|fields| {
-                        // ia[instance.worlds]: 搜索 | L4 搜索框 | 按世界名称或文件夹名过滤 | H-WORLD-01
+                        // ia[instance.worlds]: 搜索 | L4 搜索框 | 按世界名称或文件夹名过滤
                         div().w(px(220.)).child(
                             Input::new(&fields.world_search).small().prefix(
                                 Icon::new(UiIcon::Search)
