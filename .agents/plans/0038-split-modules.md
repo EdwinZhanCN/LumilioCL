@@ -1,6 +1,6 @@
 # 0038 — 三个 crate 按职责拆分模块
 
-- Status: in_progress
+- Status: done
 - Phase: Phase 8 — ARCH 页面接入和视觉验收
 - Author: agent
 
@@ -24,8 +24,8 @@
 
 - [x] T1: `lumilio-app/src/live.rs` → `live/`（mod、dispatch、jobs、library、accounts、new_game、instance、instance_write、settings、launch、discover、tests；3375 行 → 最大 743 行）。
 - [x] T2: `lumilio-ui`：`pages/live`、`shell`、`instance_detail`（含 content/panels/settings/diagnostics）已拆；`live`、`home`、`pages/settings` 也已拆。
-- [~] T3: `lumilio-core`：`service.rs`（约 9000 行）已拆成 `service/`（含 `tests/`）。`install.rs`（1448）、`launcher.rs`（1315）、`transfer.rs`（1274）、`discover.rs`（1167）正文仍超过 900 行，待拆（单元清单已列好，工具已支持多行 impl 头）。
-- [ ] T4: 在 `lumilio-select-checks` 或 AGENTS.md 里写下文件规模和测试放置的约定。
+- [x] T3: `lumilio-core`：`service.rs`（约 9000 行）已拆成 `service/`（含 `tests/`）。`install.rs`（1448）、`launcher.rs`（1315）、`transfer.rs`（1274）、`discover.rs`（1167）以及 `ui/kit.rs` 也已拆。
+- [x] T4: 文件规模和测试放置的约定写进 AGENTS.md「Tech stack & structure」。
 
 ## Validation
 
@@ -34,3 +34,7 @@
 ## Outcome
 
 （逐步追加）
+
+- 拆分用一个临时脚本（不进仓库）完成，按行号指定每个顶层项/impl 方法归属，自动生成各子模块的 `use`，再用编译器诊断清理无用导入。拆分前后测试数量逐个文件核对一致，公共路径靠 `pub use` 保持不变。
+- 过程中踩过的坑：只在“被点名”时才导入会漏掉 trait 的方法调用和格式化字符串里的 `{NAME}`；编译失败时的“未使用导入”不可信，清理要等构建通过；跨层移动要把 `super::` 路径和 `pub(super)` 同步加深一层。
+- 最后一轮把剩下的 install / transfer / launcher / discover / kit 五个文件一起拆完，只跑了一次完整检查。

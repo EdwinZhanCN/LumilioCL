@@ -1,4 +1,22 @@
-use super::*;
+use super::client::ModrinthClient;
+use super::error::DiscoverError;
+use super::intent::{IntentError, install_request};
+use super::kinds::{ProjectKind, SortIndex, browse_page_url};
+use super::project::decode_project;
+use super::search::{
+    Environment, SearchPage, SearchQuery, SideSupport, decode_search, environment,
+};
+use super::tags::{
+    decode_categories, decode_game_versions, decode_owner, decode_project_summaries,
+    decode_team_authors, encoded_list,
+};
+use super::versions::{DependencyKind, ReleaseChannel, Version, decode_versions, pick_version};
+use super::{API_BASE, SITE_BASE};
+use crate::instance::Loader;
+use crate::transfer::Transport;
+use std::path::Path;
+use url::Url;
+
 use crate::transfer::{TransportFuture, TransportResponse};
 use std::collections::BTreeMap;
 

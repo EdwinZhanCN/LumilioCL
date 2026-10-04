@@ -29,6 +29,11 @@ reference implementation under `3rd-party/` (read-only; authoritative for behavi
 - Rust stable (pinned by `rust-toolchain.toml`), edition 2024.
 - Workspace: `crates/lumilio-core` (domain logic), `crates/lumilio-ui` (GPUI), `crates/lumilio-app` (binary entry).
   Full mapping: `docs/architecture.md`.
+- File layout: a module does one thing. Past about 800 lines of non-test code, split a file into a directory
+  module (`name/mod.rs` for the public surface and shared types, one file per concern). Unit tests live in
+  `tests.rs` or `tests/<theme>.rs` beside the code (`#[cfg(test)] mod tests;`), not inline. Sibling modules use
+  explicit `use` paths and `pub(super)`; only the real public surface is `pub`, re-exported from `mod.rs` so
+  `lumilio_core::X` / `lumilio_ui::X` paths do not change.
 - Async: core uses tokio; UI bridges via `cx.spawn`/channels. **No blocking I/O on the UI thread.**
 - Before UI work, load the `gpui` and `gpui-component` skills; prefer existing gpui-component components over custom ones.
 - Buttons, switches, tabs, segments and tags come from `lumilio-ui` (`key::Key`, `controls`, `kit`), drawn per
