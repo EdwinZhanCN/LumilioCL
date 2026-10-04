@@ -17,6 +17,8 @@ pub struct LibraryCard {
     pub world: WorldHint,
     /// When it was made, for ordering.
     pub created: u64,
+    /// The Modrinth modpack it was installed from, if it was.
+    pub source_project: Option<String>,
 }
 
 /// One of the person's collections: a name and the games filed under it.
@@ -95,6 +97,7 @@ pub fn library_card(record: &InstanceRecord, now: u64) -> LibraryCard {
         loader: record.loader,
         world: world_of(&record.id),
         created: record.created_at,
+        source_project: record.source_project.clone(),
     }
 }
 

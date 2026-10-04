@@ -14,6 +14,7 @@ fn record(id: &str, game: &str, loader: Loader, loader_version: Option<&str>) ->
         play_seconds: 0,
         installed: true,
         settings: InstanceSettings::default(),
+        source_project: None,
     }
 }
 

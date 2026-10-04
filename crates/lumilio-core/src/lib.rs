@@ -83,10 +83,11 @@ pub use diagnostics::{
 };
 pub use discover::{
     CategoryTag, DependencyKind, DiscoverError, Environment, GalleryImage, GameVersionTag,
-    IntentError, ModrinthClient, Project, ProjectKind, ProjectLinks, ProjectSummary,
-    ReleaseChannel, SITE_BASE, SearchHit, SearchPage, SearchQuery, SideSupport, SortIndex, Version,
-    VersionFile, browse_page_url, environment, fits as version_fits,
-    install_request as content_install_request, pick_version, project_page_url,
+    IntentError, LoaderTag, ModrinthClient, Pick, Project, ProjectKind, ProjectLinks,
+    ProjectSummary, ReleaseChannel, SITE_BASE, SearchHit, SearchPage, SearchQuery, SideSupport,
+    SortIndex, Stance, Version, VersionFile, VersionGroup, browse_page_url, environment,
+    fits as version_fits, install_request as content_install_request, pick_version,
+    project_page_url, version_groups,
 };
 pub use environment::{
     CompatibilityRule, HostProfile, MachineArchitecture, PlatformFamily, RuleDecision,
@@ -172,9 +173,9 @@ pub use transfer::{
     TransferRequest, Transport, TransportError, TransportFuture, TransportResponse,
 };
 pub use tuning::{
-    AfterLaunch, Appearance, DOWNLOAD_CONCURRENCY, EnvVar, InstanceLaunch, LaunchTuning,
-    MAX_WINDOW_SIDE, MotionPreference, Preferences, QuickPlay, TuningError, quick_play_problem,
-    quick_play_world_unsupported, split_words,
+    AfterLaunch, Appearance, DOWNLOAD_CONCURRENCY, DiscoverPreferences, EnvVar, InstanceLaunch,
+    LaunchTuning, MAX_WINDOW_SIDE, MotionPreference, Preferences, QuickPlay, TuningError,
+    quick_play_problem, quick_play_world_unsupported, split_words,
 };
 pub use updates::{
     ContentUpdate, UpdateError, UpdateReport, apply as apply_update, check as check_updates,

@@ -8,8 +8,10 @@ mod error;
 mod intent;
 mod kinds;
 mod project;
+mod query;
 mod search;
 mod tags;
+mod version_groups;
 mod versions;
 
 #[cfg(test)]
@@ -21,8 +23,10 @@ pub(crate) use self::intent::is_safe_file_name;
 pub use self::intent::{IntentError, install_request};
 pub use self::kinds::{ProjectKind, SortIndex, browse_page_url, project_page_url};
 pub use self::project::{GalleryImage, Project, ProjectLinks};
-pub use self::search::{Environment, SearchHit, SearchPage, SearchQuery, SideSupport, environment};
-pub use self::tags::{CategoryTag, GameVersionTag, ProjectSummary};
+pub use self::query::{Pick, SearchQuery, Stance};
+pub use self::search::{Environment, SearchHit, SearchPage, SideSupport, environment};
+pub use self::tags::{CategoryTag, GameVersionTag, LoaderTag, ProjectSummary};
+pub use self::version_groups::{VersionGroup, version_groups};
 #[cfg(test)]
 pub(crate) use self::versions::decode_versions;
 pub use self::versions::{

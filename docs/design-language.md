@@ -390,9 +390,8 @@ border, a faint inner shade along the top.
 ### Silkscreen
 
 - **Section label**: an orange mono index ("01", on pages with several
-  groups such as Settings; `kit::section_at`), the ink title, then a
-  hairline running to the column's edge and ending in a 7 px bracket tick.
-  Settings groups and other titled groups use it.
+  groups such as Settings; `kit::section_at`) and the ink title, with no
+  rule after it. Settings groups and other titled groups use it.
 - **Captions** are 10 px muted legends under keys (§8 limits their wording).
   They belong only to key groups that act as a control panel, such as Home's
   foreground and the launch controls. A stateful key's caption carries its

@@ -72,10 +72,19 @@ pub fn value_row(
 }
 
 /// Silkscreen for a titled group (design language §12): an optional orange
-/// mono index, the ink title, then a hairline running to the column's edge and
-/// ending in a bracket tick.
+/// mono index and the ink title.
 pub fn section_label(text: impl Into<SharedString>, colors: ShellColors) -> impl IntoElement {
     silk_label(None, text, colors)
+}
+
+/// The numbered silkscreen label alone, for a section whose body the caller
+/// shows or hides (an accordion head).
+pub fn section_head(
+    index: usize,
+    text: impl Into<SharedString>,
+    colors: ShellColors,
+) -> impl IntoElement {
+    silk_label(Some(index), text, colors)
 }
 
 pub(super) fn silk_label(
@@ -100,8 +109,6 @@ pub(super) fn silk_label(
                 .text_color(colors.foreground)
                 .child(text.into()),
         )
-        .child(div().flex_1().h(px(1.)).bg(colors.border))
-        .child(div().w(px(1.)).h(px(7.)).mt(px(6.)).bg(colors.border))
 }
 
 pub fn section(

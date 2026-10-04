@@ -25,6 +25,7 @@ fn record() -> InstanceRecord {
         last_played: None,
         play_seconds: 0,
         installed: false,
+        source_project: None,
         settings: InstanceSettings {
             java_path: Some("/jdk/bin/java".into()),
             jvm_arguments: vec!["-Dx=y".into()],

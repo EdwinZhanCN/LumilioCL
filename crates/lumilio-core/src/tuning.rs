@@ -401,6 +401,21 @@ pub struct Preferences {
     /// 5 Quilt). The launcher only remembers them.
     pub library_sort: u8,
     pub library_loader: u8,
+    pub discover: DiscoverPreferences,
+}
+
+/// What Discover remembers between visits (Modrinth App keeps the same four
+/// things: its advanced exclusions, whether that group is open, the
+/// photosensitivity warning and "hide already installed" on modpacks).
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(default)]
+pub struct DiscoverPreferences {
+    /// Advanced exclusions the person keeps switched on, by option id.
+    pub advanced_exclusions: Vec<String>,
+    pub advanced_open: bool,
+    /// The photosensitivity warning was dismissed for good.
+    pub photosensitivity_warning_dismissed: bool,
+    pub hide_installed_modpacks: bool,
 }
 
 impl Preferences {

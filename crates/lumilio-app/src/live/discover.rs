@@ -5,10 +5,25 @@ use gpui_kit::{App, WeakEntity, Window};
 use lumilio_core::{CancellationToken, ProjectKind, unix_now};
 use lumilio_ui::LauncherShell;
 use lumilio_ui::dependency_prompt::DependencyPrompt;
-use lumilio_ui::live::{DiscoverQuery, FilterModel, SearchStatus, search_rows};
+use lumilio_ui::live::{DiscoverQuery, FilterModel, Provided, SearchStatus, search_rows};
 use lumilio_ui::project_detail::DetailState;
 use lumilio_ui::toast::Toast;
 use std::rc::Rc;
+
+/// What a search needs from the page besides its query.
+#[derive(Default)]
+struct SearchPlan {
+    provided: Provided,
+    filters: FilterModel,
+    /// "Hide already installed" is on.
+    hide: bool,
+    /// The game being browsed for, when there is one.
+    game: Option<String>,
+    /// What the page already knows is installed (packs in the library, or
+    /// the game's content when it was read for this kind).
+    known: Vec<String>,
+    known_is_current: bool,
+}
 
 pub(super) fn search(wiring: &Wiring, query: &DiscoverQuery, cx: &mut App) {
     let seq = {
@@ -16,16 +31,60 @@ pub(super) fn search(wiring: &Wiring, query: &DiscoverQuery, cx: &mut App) {
         state.search_seq += 1;
         state.search_seq
     };
+    // The shell may be in the middle of its own update (it asks for searches
+    // from there), and the plan reads the shell: do that a moment later.
+    let (wiring, query) = (wiring.clone(), query.clone());
+    cx.spawn(async move |cx| cx.update(|cx| run_search(&wiring, &query, seq, cx)))
+        .detach();
+}
+
+fn run_search(wiring: &Wiring, query: &DiscoverQuery, seq: u64, cx: &mut App) {
+    let kind = query.kind;
+    let plan = wiring
+        .shell
+        .read_with(cx, |shell, _| {
+            shell.live().map(|model| SearchPlan {
+                provided: model.provided(),
+                filters: model.filters.clone(),
+                hide: model.hiding_installed(),
+                game: model.browsing_for.clone(),
+                known: model.installed_projects(),
+                known_is_current: kind == ProjectKind::Modpack,
+            })
+        })
+        .ok()
+        .flatten()
+        .unwrap_or_default();
+    let known_is_current = plan.known_is_current
+        || plan.game.as_ref().is_some_and(|game| {
+            wiring.state.borrow().installed_key.as_ref() == Some(&(game.clone(), kind))
+        });
     let service = wiring.backend.service.clone();
     let state = wiring.state.clone();
-    let query = query.to_search();
+    let asked = query.clone();
     job(
         wiring,
         cx,
         false,
         Reload::Nothing,
         None,
-        async move { service.search(&query).await },
+        async move {
+            // Leaving out what is already installed needs the list at the time
+            // of searching; a failure to read it just leaves nothing out.
+            let mut hidden = Vec::new();
+            if plan.hide {
+                hidden = plan.known;
+                if !known_is_current && let Some(game) = &plan.game {
+                    hidden = service
+                        .installed_projects(game, kind)
+                        .await
+                        .map(|found| found.into_keys().collect())
+                        .unwrap_or_default();
+                }
+            }
+            let search = asked.to_search(&plan.provided, &plan.filters, hidden);
+            service.search(&search).await
+        },
         move |shell, result, cx| {
             if state.borrow().search_seq != seq {
                 return;
@@ -34,7 +93,7 @@ pub(super) fn search(wiring: &Wiring, query: &DiscoverQuery, cx: &mut App) {
             shell.update_live(
                 |model| match result {
                     Ok(page) => {
-                        model.results = search_rows(&page, now);
+                        model.results = search_rows(&page, now, &model.query, &model.filters);
                         model.search = SearchStatus::Done {
                             total: page.total_hits,
                         };
@@ -114,6 +173,8 @@ pub(super) fn install(
     let service = wiring.backend.service.clone();
     let cancel = CancellationToken::new();
     if kind == ProjectKind::Modpack {
+        mark_installing(wiring, &slug, true, cx);
+        let slug_done = slug.clone();
         job(
             wiring,
             cx,
@@ -122,6 +183,7 @@ pub(super) fn install(
             Some(Toast::info(format!("开始安装 {title}，进度在动态里"))),
             async move { service.install_modpack(&slug, cancel).await },
             move |shell, result, cx| {
+                mark_installing_in(shell, &slug_done, false, cx);
                 let toast = outcome(
                     result,
                     |record| format!("已安装整合包 {}", record.name),
@@ -246,6 +308,8 @@ pub(super) fn run_install(
 ) {
     let service = wiring.backend.service.clone();
     let state = wiring.state.clone();
+    mark_installing(wiring, &slug, true, cx);
+    let slug_done = slug.clone();
     job(
         wiring,
         cx,
@@ -284,6 +348,7 @@ pub(super) fn run_install(
             (installed, failed)
         },
         move |shell, (result, failed), cx| {
+            mark_installing_in(shell, &slug_done, false, cx);
             state.borrow_mut().installed_key = None;
             let installed = result.is_ok();
             let mut toast = outcome(
@@ -301,6 +366,32 @@ pub(super) fn run_install(
             }
             shell.toast(toast, cx);
         },
+    );
+}
+
+/// Marks a project as being installed (its card says so and cannot be
+/// pressed again) or done.
+fn mark_installing(wiring: &Wiring, slug: &str, on: bool, cx: &mut App) {
+    let _ = wiring
+        .shell
+        .update(cx, |shell, cx| mark_installing_in(shell, slug, on, cx));
+}
+
+fn mark_installing_in(
+    shell: &mut LauncherShell,
+    slug: &str,
+    on: bool,
+    cx: &mut gpui_kit::Context<LauncherShell>,
+) {
+    shell.update_live(
+        |model| {
+            if on {
+                model.installing.insert(slug.to_owned());
+            } else {
+                model.installing.remove(slug);
+            }
+        },
+        cx,
     );
 }
 

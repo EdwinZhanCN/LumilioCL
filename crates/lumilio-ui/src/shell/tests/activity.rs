@@ -30,6 +30,7 @@ fn a_failed_task_offers_retry_and_open_and_a_game_that_is_gone_offers_no_open(
         play_seconds: 0,
         installed: false,
         settings: InstanceSettings::default(),
+        source_project: None,
     };
     let failed = |instance: &str| ActivityRow {
         task: None,

@@ -172,17 +172,14 @@ pub(super) fn instance_intent(
             cx.reveal_path(&path);
         }
         InstanceIntent::OpenProject { kind, slug } => open_project(wiring, kind, slug, window, cx),
-        // ia[discover]: 锁定目标（从游戏页进入） | 游戏页内容标签「浏览 Mod / 资源包 / 光影」 | 安装目标换成那个游戏（右下角芯片显示），类型预选；不改变当前游戏
+        // ia[discover]: 锁定目标（从游戏页进入） | 游戏页内容标签「浏览 Mod / 资源包 / 光影」 | 发现页进入「为这个游戏浏览」：页头写明游戏，类型预选，版本和加载器筛选锁定；安装目标换成那个游戏（右下角芯片显示）；不改变当前游戏
         // ia[instance.content]: 浏览并安装 | L4a 主要 → 发现页（类型预选） | 安装完回到本页可见
         InstanceIntent::BrowseContent(kind) => {
             let shell = wiring.shell.clone();
             let target = id.to_owned();
             let wiring = wiring.clone();
             window.defer(cx, move |window, cx| {
-                let _ = shell.update(cx, |shell, cx| {
-                    shell.set_install_target(target, cx);
-                    shell.browse(kind, window, cx)
-                });
+                let _ = shell.update(cx, |shell, cx| shell.browse_for(target, kind, window, cx));
                 refresh_installed(&wiring, cx);
             });
         }

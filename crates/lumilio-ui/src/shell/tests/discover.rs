@@ -28,6 +28,7 @@ fn discover_leaves_naming_the_target_game_to_the_corner_chip(cx: &mut TestAppCon
         play_seconds: 0,
         installed: false,
         settings: InstanceSettings::default(),
+        source_project: None,
     };
     shell.update(cx, |shell, cx| {
         shell.show(Route::Discover);
@@ -63,7 +64,7 @@ fn discover_leaves_naming_the_target_game_to_the_corner_chip(cx: &mut TestAppCon
 
 #[gpui::test]
 fn a_result_the_target_already_has_shows_installed_or_offers_the_update(cx: &mut TestAppContext) {
-    use crate::live::{LiveIntent, SearchRow, SearchStatus, library_card};
+    use crate::live::{CardTags, DateKind, LiveIntent, SearchRow, SearchStatus, library_card};
     use lumilio_core::{InstalledProject, InstanceRecord, InstanceSettings, Loader};
 
     cx.update(gpui_component::init);
@@ -86,6 +87,7 @@ fn a_result_the_target_already_has_shows_installed_or_offers_the_update(cx: &mut
         play_seconds: 0,
         installed: false,
         settings: InstanceSettings::default(),
+        source_project: None,
     };
     shell.update(cx, |shell, cx| {
         shell.show(Route::Discover);
@@ -102,11 +104,12 @@ fn a_result_the_target_already_has_shows_installed_or_offers_the_update(cx: &mut
                         author: "a".into(),
                         summary: String::new(),
                         environment: None,
-                        categories: Vec::new(),
-                        loaders: Vec::new(),
+                        tags: CardTags::default(),
                         downloads: "1".into(),
                         follows: "1".into(),
-                        updated: String::new(),
+                        date: String::new(),
+                        date_kind: DateKind::Updated,
+                        page_url: String::new(),
                         icon_url: None,
                         seed: n,
                     })
@@ -152,7 +155,7 @@ fn a_result_the_target_already_has_shows_installed_or_offers_the_update(cx: &mut
 
 #[gpui::test]
 fn a_project_opens_in_place_and_back_returns_to_the_same_list(cx: &mut TestAppContext) {
-    use crate::live::{DiscoverChange, LiveIntent, SearchStatus};
+    use crate::live::{DiscoverChange, LiveIntent, PickGroup, SearchStatus};
     use crate::project_detail::DetailState;
     use lumilio_core::ProjectKind;
 
@@ -167,7 +170,10 @@ fn a_project_opens_in_place_and_back_returns_to_the_same_list(cx: &mut TestAppCo
                 model.query = model
                     .query
                     .clone()
-                    .apply(DiscoverChange::ToggleCategory("magic".to_owned()))
+                    .apply(DiscoverChange::Include(
+                        PickGroup::Category,
+                        "magic".to_owned(),
+                    ))
                     .apply(DiscoverChange::Page(3));
                 model.search = SearchStatus::Done { total: 500 };
             },
@@ -207,7 +213,11 @@ fn a_project_opens_in_place_and_back_returns_to_the_same_list(cx: &mut TestAppCo
         assert!(shell.detail_project().is_none());
         let query = &shell.live().unwrap().query;
         assert_eq!(query.page, 3, "the page is where it was");
-        assert_eq!(query.categories, ["magic"], "the filters are still on");
+        assert_eq!(
+            query.categories,
+            [lumilio_core::Pick::include("magic")],
+            "the filters are still on"
+        );
     });
 
     // Forward returns to the same detail view, without asking again.
@@ -235,6 +245,276 @@ fn a_project_opens_in_place_and_back_returns_to_the_same_list(cx: &mut TestAppCo
     shell.read_with(cx, |shell, _| assert!(shell.detail_project().is_none()));
 }
 
+/// Two games and the filter lists, for the interaction tests below.
+fn live_with_games(cx: &mut gpui::VisualTestContext, shell: &gpui::Entity<LauncherShell>) {
+    use crate::live::library_card;
+    use lumilio_core::{
+        CategoryTag, DiscoverFilters, GameVersionTag, InstanceRecord, InstanceSettings, Loader,
+        LoaderTag, ProjectKind,
+    };
+    let record = |id: &str, loader: Loader| InstanceRecord {
+        id: id.to_owned(),
+        name: id.to_owned(),
+        game_version: "1.21.1".to_owned(),
+        loader,
+        loader_version: None,
+        favorite: false,
+        created_at: 1,
+        last_played: None,
+        play_seconds: 0,
+        installed: false,
+        settings: InstanceSettings::default(),
+        source_project: Some(format!("pack-{id}")),
+    };
+    shell.update(cx, |shell, cx| {
+        shell.show(Route::Discover);
+        shell.update_live(
+            |model| {
+                model.set_library(
+                    vec![
+                        library_card(&record("fab", Loader::Fabric), 1),
+                        library_card(&record("van", Loader::Vanilla), 1),
+                    ],
+                    Some("fab".into()),
+                );
+                model.filters = crate::live::FilterModel::from_core(&DiscoverFilters {
+                    categories: vec![CategoryTag {
+                        name: "magic".into(),
+                        header: "categories".into(),
+                        kind: ProjectKind::Mod,
+                    }],
+                    game_versions: vec![GameVersionTag {
+                        version: "1.21.1".into(),
+                        release: true,
+                        snapshot: false,
+                        published: String::new(),
+                    }],
+                    loaders: vec![LoaderTag {
+                        name: "fabric".into(),
+                        project_types: vec!["mod".into(), "modpack".into()],
+                    }],
+                });
+                model.query = crate::live::DiscoverQuery::new(ProjectKind::Mod);
+                model.search = crate::live::SearchStatus::Done { total: 0 };
+            },
+            cx,
+        );
+    });
+    cx.run_until_parked();
+}
+
+#[gpui::test]
+fn browsing_for_a_game_shows_its_header_locks_its_filters_and_trims_the_tabs(
+    cx: &mut TestAppContext,
+) {
+    use crate::live::{DiscoverChange, LiveIntent};
+    use lumilio_core::ProjectKind;
+
+    cx.update(gpui_component::init);
+    let seen: Rc<RefCell<Vec<LiveIntent>>> = Rc::default();
+    let sink = seen.clone();
+    let (shell, cx) = cx.add_window_view(|_, cx| {
+        LauncherShell::new(cx).with_live(Rc::new(move |intent, _, _| {
+            sink.borrow_mut().push(intent);
+        }))
+    });
+    live_with_games(cx, &shell);
+
+    shell.update_in(cx, |shell, window, cx| {
+        shell.browse_for("fab".into(), ProjectKind::Mod, window, cx)
+    });
+    cx.run_until_parked();
+    shell.read_with(cx, |shell, _| {
+        let model = shell.live().unwrap();
+        assert_eq!(model.install_target.as_deref(), Some("fab"));
+        assert_eq!(model.browsing_for.as_deref(), Some("fab"));
+        assert_eq!(model.query.kind, ProjectKind::Mod);
+        assert_eq!(
+            model.discover_kinds().len(),
+            3,
+            "no modpack tab inside a game"
+        );
+    });
+    // The search that went out is locked to the game.
+    let sent = seen.borrow().iter().rev().find_map(|intent| match intent {
+        LiveIntent::Search(query) => Some(query.clone()),
+        _ => None,
+    });
+    assert_eq!(sent.map(|query| query.kind), Some(ProjectKind::Mod));
+    assert!(
+        cx.debug_bounds("live-unlock-version").is_some(),
+        "the version is locked"
+    );
+    assert!(
+        cx.debug_bounds("live-unlock-loader").is_some(),
+        "the loader is locked"
+    );
+
+    // Releasing a lock turns it into the person's own filter.
+    shell.update_in(cx, |shell, window, cx| {
+        shell.change_query(
+            DiscoverChange::Unlock(crate::live::Lock::Loader),
+            window,
+            cx,
+        )
+    });
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("live-unlock-loader").is_none());
+    assert!(cx.debug_bounds("live-sync-loader").is_some());
+
+    // Choosing Discover in the navigation is plain browsing again.
+    shell.update_in(cx, |shell, window, cx| {
+        shell.go_to(Route::Discover, window, cx)
+    });
+    cx.run_until_parked();
+    shell.read_with(cx, |shell, _| {
+        let model = shell.live().unwrap();
+        assert_eq!(model.browsing_for, None);
+        assert_eq!(
+            model.install_target.as_deref(),
+            Some("fab"),
+            "the chip keeps its game"
+        );
+    });
+}
+
+#[gpui::test]
+fn a_vanilla_game_gets_no_mod_tab_and_a_filter_row_asks_for_its_option(cx: &mut TestAppContext) {
+    use crate::live::{LiveIntent, PickGroup};
+    use lumilio_core::{Pick, ProjectKind};
+
+    cx.update(gpui_component::init);
+    let seen: Rc<RefCell<Vec<LiveIntent>>> = Rc::default();
+    let sink = seen.clone();
+    let (shell, cx) = cx.add_window_view(|_, cx| {
+        LauncherShell::new(cx).with_live(Rc::new(move |intent, _, _| {
+            sink.borrow_mut().push(intent);
+        }))
+    });
+    live_with_games(cx, &shell);
+    shell.update_in(cx, |shell, window, cx| {
+        shell.browse_for("van".into(), ProjectKind::ResourcePack, window, cx)
+    });
+    cx.run_until_parked();
+    shell.read_with(cx, |shell, _| {
+        assert_eq!(
+            shell.live().unwrap().discover_kinds(),
+            [ProjectKind::ResourcePack, ProjectKind::Shader]
+        );
+    });
+
+    // Plain browsing of mods: clicking a loader asks for it.
+    shell.update_in(cx, |shell, window, cx| {
+        shell.go_to(Route::Discover, window, cx)
+    });
+    shell.update(cx, |shell, cx| {
+        shell.update_live(
+            |model| model.query = crate::live::DiscoverQuery::new(ProjectKind::Mod),
+            cx,
+        )
+    });
+    cx.run_until_parked();
+    // The loader section starts closed in plain browsing; open it.
+    let head = cx
+        .debug_bounds("live-section-1")
+        .expect("the loader section head");
+    cx.simulate_click(head.center(), Modifiers::none());
+    cx.run_until_parked();
+    let row = cx
+        .debug_bounds("live-pick-loader-fabric")
+        .expect("a loader row");
+    cx.simulate_click(row.center(), Modifiers::none());
+    cx.run_until_parked();
+    let asked = seen.borrow().iter().rev().find_map(|intent| match intent {
+        LiveIntent::Search(query) => Some(query.clone()),
+        _ => None,
+    });
+    assert_eq!(
+        asked.map(|query| query.loaders),
+        Some(vec![Pick::include("fabric")])
+    );
+    let _ = PickGroup::Loader;
+}
+
+#[gpui::test]
+fn hide_installed_is_for_packs_and_the_pack_choice_is_remembered(cx: &mut TestAppContext) {
+    use crate::live::LiveIntent;
+    use lumilio_core::ProjectKind;
+
+    cx.update(gpui_component::init);
+    let seen: Rc<RefCell<Vec<LiveIntent>>> = Rc::default();
+    let sink = seen.clone();
+    let (shell, cx) = cx.add_window_view(|_, cx| {
+        LauncherShell::new(cx).with_live(Rc::new(move |intent, _, _| {
+            sink.borrow_mut().push(intent);
+        }))
+    });
+    live_with_games(cx, &shell);
+    assert!(
+        cx.debug_bounds("live-hide-installed-cap").is_none(),
+        "not offered for plain mod browsing"
+    );
+    shell.update(cx, |shell, cx| {
+        shell.update_live(
+            |model| model.query = crate::live::DiscoverQuery::new(ProjectKind::Modpack),
+            cx,
+        )
+    });
+    cx.run_until_parked();
+    assert!(
+        cx.debug_bounds("live-hide-installed-label").is_some(),
+        "the switch says what it does"
+    );
+    let cap = cx
+        .debug_bounds("live-hide-installed-cap")
+        .expect("offered on the pack tab");
+    cx.simulate_click(cap.center(), Modifiers::none());
+    cx.run_until_parked();
+    shell.read_with(cx, |shell, _| {
+        let model = shell.live().unwrap();
+        assert!(model.discover_prefs.hide_installed_modpacks);
+        assert!(model.hiding_installed());
+    });
+    let remembered = seen.borrow().iter().any(|intent| {
+        matches!(intent, LiveIntent::RememberDiscover(prefs) if prefs.hide_installed_modpacks)
+    });
+    assert!(remembered, "the choice goes to the application to keep");
+}
+
+#[gpui::test]
+fn a_gallery_image_shown_large_is_drawn_by_the_shell_over_everything(cx: &mut TestAppContext) {
+    use crate::live::LiveIntent;
+    use crate::project_detail::DetailState;
+    use lumilio_core::ProjectKind;
+
+    cx.update(gpui_component::init);
+    let (shell, cx) = cx.add_window_view(|_, cx| {
+        LauncherShell::new(cx).with_live(Rc::new(|_: LiveIntent, _, _| {}))
+    });
+    shell.update(cx, |shell, cx| {
+        shell.show(Route::Discover);
+        shell.update_live(|_| {}, cx);
+        shell.open_detail(ProjectKind::Mod, "cool", cx);
+        shell.set_detail_state(
+            "cool",
+            DetailState::Ready(Box::new(crate::project_detail::tests::detail())),
+            cx,
+        );
+    });
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("detail-viewer").is_none());
+    shell.update(cx, |shell, cx| shell.open_gallery_image(0, cx));
+    cx.run_until_parked();
+    assert!(
+        cx.debug_bounds("detail-viewer").is_some(),
+        "the viewer is part of the shell's own layer, above the navigation"
+    );
+    let close = cx.debug_bounds("detail-viewer-close").expect("a close key");
+    cx.simulate_click(close.center(), Modifiers::none());
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("detail-viewer").is_none());
+}
+
 /// Not a check: prints how long the Discover list takes to lay out and
 /// paint, so performance work has a number to move. Run with
 /// `cargo test -p lumilio-ui frame_cost -- --ignored --nocapture`
@@ -258,11 +538,21 @@ fn frame_cost_of_a_full_discover_page(cx: &mut TestAppContext) {
             author: "someone".to_owned(),
             summary: "A long enough summary to wrap onto a second line when the window is narrow, describing the pack.".to_owned(),
             environment: Some(lumilio_core::Environment::ClientAndServer),
-            categories: vec!["adventure".into(), "magic".into(), "technology".into(), "quests".into()],
-            loaders: vec!["fabric".into()],
+            tags: crate::live::CardTags {
+                shown: ["adventure", "magic", "technology", "quests"]
+                    .into_iter()
+                    .map(|name| crate::live::CardTag {
+                        name: name.into(),
+                        loader: false,
+                    })
+                    .collect(),
+                overflow: Vec::new(),
+            },
             downloads: "12.5 万".to_owned(),
             follows: "4886".to_owned(),
-            updated: "3 天前".to_owned(),
+            date: "3 天前".to_owned(),
+            date_kind: crate::live::DateKind::Updated,
+            page_url: String::new(),
             icon_url: Some(format!("https://cdn.example/{n}.png")),
             seed: n,
         })

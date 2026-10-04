@@ -33,7 +33,7 @@ fn version_lists_fold_after_three() {
 use gpui::TestAppContext;
 use lumilio_core::{GalleryImage, ProjectLinks, SideSupport, VersionFile};
 
-fn detail() -> ProjectDetail {
+pub(crate) fn detail() -> ProjectDetail {
     ProjectDetail {
         project: Project {
             id: "P".to_owned(),
@@ -54,10 +54,12 @@ fn detail() -> ProjectDetail {
             links: ProjectLinks::default(),
             gallery: vec![GalleryImage {
                 url: "https://cdn.example/a.png".to_owned(),
+                full_url: "https://cdn.example/a-full.png".to_owned(),
                 title: "A".to_owned(),
                 description: String::new(),
                 featured: true,
                 ordering: 0,
+                created: "2026-01-02T00:00:00Z".to_owned(),
             }],
             icon_url: None,
             game_versions: vec!["1.21".to_owned()],
@@ -105,6 +107,7 @@ fn each_tab_shows_its_own_content_and_versions_install_what_was_chosen(cx: &mut 
                 name: "Pack".to_owned(),
                 game_version: "1.21".to_owned(),
                 loader: Loader::Fabric,
+                from_game: false,
             }),
             cx,
         );
@@ -134,6 +137,128 @@ fn each_tab_shows_its_own_content_and_versions_install_what_was_chosen(cx: &mut 
     cx.run_until_parked();
     assert!(cx.debug_bounds("detail-gallery").is_some(), "gallery tab");
     assert!(cx.debug_bounds("detail-versions").is_none());
+    assert!(cx.debug_bounds("detail-sidebar").is_none(), "no sidebar");
+}
+
+fn mount(
+    cx: &mut TestAppContext,
+    target: Option<InstallTarget>,
+    detail: ProjectDetail,
+) -> (
+    gpui::Entity<ProjectDetailView>,
+    &mut gpui::VisualTestContext,
+    Rc<std::cell::RefCell<Vec<DetailIntent>>>,
+) {
+    cx.update(gpui_component::init);
+    let seen: Rc<std::cell::RefCell<Vec<DetailIntent>>> = Rc::default();
+    let sink = seen.clone();
+    let (view, cx) = cx.add_window_view(|_, _| {
+        ProjectDetailView::new(
+            "cool",
+            "https://modrinth.com/mod/cool",
+            Rc::new(move |intent, _, _| sink.borrow_mut().push(intent)),
+        )
+    });
+    view.update(cx, |view, cx| {
+        view.set_target(target, cx);
+        view.set_state(DetailState::Ready(Box::new(detail)), cx);
+    });
+    cx.run_until_parked();
+    (view, cx, seen)
+}
+
+fn game(from_game: bool) -> Option<InstallTarget> {
+    Some(InstallTarget {
+        name: "Pack".to_owned(),
+        game_version: "1.21".to_owned(),
+        loader: Loader::Fabric,
+        from_game,
+    })
+}
+
+#[test]
+fn filters_admit_a_version_that_passes_every_filter_that_is_on() {
+    let v = detail().versions.remove(0);
+    let mut filters = VersionFilters::default();
+    assert!(filters.admits(&v) && !filters.active());
+    filters.channels = vec![ReleaseChannel::Beta];
+    assert!(!filters.admits(&v));
+    filters.channels = vec![ReleaseChannel::Beta, ReleaseChannel::Release];
+    filters.game_versions = vec!["1.20".to_owned(), "1.21".to_owned()];
+    filters.platforms = vec!["fabric".to_owned()];
+    assert!(filters.admits(&v), "any one of each list is enough");
+    filters.platforms = vec!["forge".to_owned()];
+    assert!(!filters.admits(&v));
+}
+
+#[gpui::test]
+fn the_gallery_tab_only_exists_with_images(cx: &mut TestAppContext) {
+    let mut bare = detail();
+    bare.project.gallery.clear();
+    let (view, cx, _) = mount(cx, None, bare);
+    view.read_with(cx, |view, _| assert_eq!(view.tabs(), ["介绍", "版本"]));
+}
+
+#[gpui::test]
+fn coming_from_a_game_starts_the_versions_filtered_to_it(cx: &mut TestAppContext) {
+    let (view, cx, _) = mount(cx, game(true), detail());
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.filters().game_versions, ["1.21"]);
+        assert_eq!(view.filters().platforms, ["fabric"]);
+    });
+    // The person's own change sticks: clearing does not bring the game back.
+    view.update(cx, |view, cx| {
+        view.filter_versions(|filters| filters.game_versions.clear(), cx)
+    });
+    view.update(cx, |view, cx| view.set_target(game(true), cx));
+    view.read_with(cx, |view, _| {
+        assert!(view.filters().game_versions.is_empty())
+    });
+}
+
+#[gpui::test]
+fn plain_browsing_starts_the_versions_unfiltered(cx: &mut TestAppContext) {
+    let (view, cx, _) = mount(cx, game(false), detail());
+    view.read_with(cx, |view, _| assert!(!view.filters().active()));
+}
+
+#[gpui::test]
+fn an_installed_project_offers_switching_and_the_installed_version_is_marked(
+    cx: &mut TestAppContext,
+) {
+    let mut two = detail();
+    let mut newer = two.versions[0].clone();
+    newer.id = "v2".to_owned();
+    newer.number = "2".to_owned();
+    newer.published = "2026-02-01T00:00:00Z".to_owned();
+    two.versions.insert(0, newer);
+    let (view, cx, seen) = mount(cx, game(false), two);
+    view.update(cx, |view, cx| {
+        let mut have = std::collections::BTreeMap::new();
+        have.insert(
+            "P".to_owned(),
+            lumilio_core::InstalledProject {
+                file_name: "a.jar".to_owned(),
+                version_id: "v1".to_owned(),
+                update: None,
+            },
+        );
+        view.set_installed(have, cx);
+        view.select_tab(1, cx);
+    });
+    cx.run_until_parked();
+    view.update(cx, |view, cx| view.select_tab(0, cx));
+    cx.run_until_parked();
+    // On the description the main button leads to the versions.
+    let main = cx.debug_bounds("detail-install").expect("the main button");
+    cx.simulate_click(main.center(), gpui::Modifiers::none());
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert_eq!(view.tabs()[1], "版本"));
+    assert!(
+        cx.debug_bounds("detail-versions").is_some(),
+        "switch version goes to the list"
+    );
+    assert!(seen.borrow().is_empty(), "nothing was installed by that");
 }
 
 /// Not a check: prints the per-frame cost of a long description.

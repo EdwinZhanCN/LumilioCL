@@ -34,8 +34,10 @@ pub(super) fn apply_saved_preferences(
         let _ = cx.update_window(window, |_, window, cx| {
             apply_preferences(&preferences, window, cx)
         });
-        // The Library comes back ordered and filtered as it was left.
+        // The Library comes back ordered and filtered as it was left, and
+        // Discover keeps its advanced exclusions.
         let _ = wiring.shell.update(cx, |shell, cx| {
+            shell.apply_discover_preferences(preferences.discover.clone(), cx);
             use lumilio_ui::kit::ViewIntent;
             use lumilio_ui::pages::live::{LIBRARY_LOADER, LIBRARY_SORT};
             shell.apply_view_intent(

@@ -1,8 +1,29 @@
-use super::library::{relative_time, seed_of};
-use lumilio_core::{
-    DiscoverFilters, Environment, ProjectKind, SearchHit, SearchPage, SearchQuery, SortIndex,
-    environment,
+mod card;
+mod filters;
+mod query;
+
+#[cfg(test)]
+mod tests;
+
+pub use self::card::{CardTag, CardTags, card_tags};
+pub use self::filters::{
+    AdvancedOption, EPILEPSY_TRIGGERS, FilterModel, Section, advanced_options, default_loaders,
+    is_type_exclusion, section_title, sections,
 };
+pub use self::query::{
+    DiscoverChange, DiscoverQuery, Lock, PickGroup, Provided, Side, visible_kinds,
+};
+
+use super::library::{relative_time, seed_of};
+use lumilio_core::{Environment, ProjectKind, SearchHit, SearchPage, SortIndex};
+
+/// Which date a card shows: when the project came out, or when it last
+/// changed (the first when the list is sorted by newest).
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DateKind {
+    Published,
+    Updated,
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SearchRow {
@@ -14,12 +35,13 @@ pub struct SearchRow {
     pub author: String,
     pub summary: String,
     pub environment: Option<Environment>,
-    /// Category names as Modrinth spells them.
-    pub categories: Vec<String>,
-    pub loaders: Vec<String>,
+    pub tags: CardTags,
     pub downloads: String,
     pub follows: String,
-    pub updated: String,
+    pub date: String,
+    pub date_kind: DateKind,
+    /// The project's public page, for the context menu.
+    pub page_url: String,
     pub icon_url: Option<String>,
     /// Seeds the placeholder cover while (or instead of) the real icon.
     pub seed: u32,
@@ -45,7 +67,21 @@ pub fn count_label(count: u64) -> String {
     }
 }
 
-pub fn search_row(hit: &SearchHit, now: u64) -> SearchRow {
+pub fn search_row(
+    hit: &SearchHit,
+    now: u64,
+    query: &DiscoverQuery,
+    filters: &FilterModel,
+) -> SearchRow {
+    let date_kind = if query.sort == SortIndex::Newest {
+        DateKind::Published
+    } else {
+        DateKind::Updated
+    };
+    let date = match date_kind {
+        DateKind::Published => &hit.published,
+        DateKind::Updated => &hit.updated,
+    };
     SearchRow {
         project_id: hit.project_id.clone(),
         kind: hit.kind,
@@ -53,19 +89,28 @@ pub fn search_row(hit: &SearchHit, now: u64) -> SearchRow {
         title: hit.title.clone(),
         author: hit.author.clone(),
         summary: hit.description.clone(),
-        environment: environment(hit.client_side, hit.server_side),
-        categories: hit.categories.clone(),
-        loaders: hit.loaders.clone(),
+        environment: hit.environment,
+        tags: card_tags(hit, query, filters),
         downloads: count_label(hit.downloads),
         follows: count_label(hit.follows),
-        updated: parse_rfc3339(&hit.updated).map_or_else(String::new, |at| relative_time(at, now)),
+        date: parse_rfc3339(date).map_or_else(String::new, |at| relative_time(at, now)),
+        date_kind,
+        page_url: hit.page_url(),
         icon_url: hit.icon_url.clone(),
         seed: seed_of(&hit.project_id),
     }
 }
 
-pub fn search_rows(page: &SearchPage, now: u64) -> Vec<SearchRow> {
-    page.hits.iter().map(|hit| search_row(hit, now)).collect()
+pub fn search_rows(
+    page: &SearchPage,
+    now: u64,
+    query: &DiscoverQuery,
+    filters: &FilterModel,
+) -> Vec<SearchRow> {
+    page.hits
+        .iter()
+        .map(|hit| search_row(hit, now, query, filters))
+        .collect()
 }
 
 /// Seconds since the epoch for `2026-09-27T10:00:00Z` and the offset/fraction
@@ -98,7 +143,7 @@ pub fn parse_rfc3339(text: &str) -> Option<u64> {
     u64::try_from(days * 86_400 + hour * 3600 + minute * 60 + second).ok()
 }
 
-pub const PAGE_SIZES: [u32; 4] = [10, 20, 50, 100];
+pub const PAGE_SIZES: [u32; 6] = [5, 10, 15, 20, 50, 100];
 
 pub const SORTS: [SortIndex; 5] = [
     SortIndex::Relevance,
@@ -115,115 +160,6 @@ pub const fn sort_label(sort: SortIndex) -> &'static str {
         SortIndex::Follows => "关注数",
         SortIndex::Newest => "最新发布",
         SortIndex::Updated => "最近更新",
-    }
-}
-
-/// What the Discover page is asking for. The page state *is* this value, so a
-/// refresh of the list can never disagree with the controls.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct DiscoverQuery {
-    pub kind: ProjectKind,
-    pub text: String,
-    pub sort: SortIndex,
-    /// Zero-based.
-    pub page: u32,
-    pub page_size: u32,
-    pub game_version: Option<String>,
-    pub categories: Vec<String>,
-    pub loaders: Vec<String>,
-}
-
-/// One change to the query made on the page.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum DiscoverChange {
-    Kind(ProjectKind),
-    Sort(SortIndex),
-    PageSize(u32),
-    Version(Option<String>),
-    ToggleCategory(String),
-    ToggleLoader(String),
-    Page(u32),
-    /// Drop the version, category and loader filters.
-    ClearFilters,
-}
-
-pub(super) fn toggle(list: &mut Vec<String>, name: String) {
-    match list.iter().position(|item| *item == name) {
-        Some(at) => {
-            list.remove(at);
-        }
-        None => list.push(name),
-    }
-}
-
-impl DiscoverQuery {
-    pub fn new(kind: ProjectKind) -> Self {
-        Self {
-            kind,
-            text: String::new(),
-            sort: SortIndex::Relevance,
-            page: 0,
-            page_size: 20,
-            game_version: None,
-            categories: Vec::new(),
-            loaders: Vec::new(),
-        }
-    }
-
-    /// Applies one change. Anything but paging returns to the first page, and
-    /// a different project type forgets its categories and loaders (they do
-    /// not carry over).
-    #[must_use]
-    pub fn apply(mut self, change: DiscoverChange) -> Self {
-        if let DiscoverChange::Page(page) = change {
-            self.page = page;
-            return self;
-        }
-        self.page = 0;
-        match change {
-            DiscoverChange::Kind(kind) => {
-                if kind != self.kind {
-                    self.kind = kind;
-                    self.categories.clear();
-                    self.loaders.clear();
-                }
-            }
-            DiscoverChange::Sort(sort) => self.sort = sort,
-            DiscoverChange::PageSize(size) => self.page_size = size.clamp(1, 100),
-            DiscoverChange::Version(version) => self.game_version = version,
-            DiscoverChange::ToggleCategory(name) => toggle(&mut self.categories, name),
-            DiscoverChange::ToggleLoader(name) => toggle(&mut self.loaders, name),
-            DiscoverChange::ClearFilters => {
-                self.game_version = None;
-                self.categories.clear();
-                self.loaders.clear();
-            }
-            DiscoverChange::Page(_) => {}
-        }
-        self
-    }
-
-    pub fn to_search(&self) -> SearchQuery {
-        SearchQuery {
-            text: self.text.clone(),
-            kind: self.kind,
-            game_version: self.game_version.clone(),
-            loaders: self.loaders.clone(),
-            categories: self.categories.clone(),
-            sort: self.sort,
-            page: self.page,
-            page_size: self.page_size,
-        }
-    }
-
-    /// Whether any filter narrows the results.
-    pub fn filtered(&self) -> bool {
-        self.game_version.is_some() || !self.categories.is_empty() || !self.loaders.is_empty()
-    }
-
-    /// Only mods and modpacks have loaders worth choosing.
-    pub const fn has_loaders(&self) -> bool {
-        matches!(self.kind, ProjectKind::Mod | ProjectKind::Modpack)
     }
 }
 
@@ -263,46 +199,6 @@ pub fn page_items(current: u32, pages: u32) -> Vec<PageItem> {
         previous = Some(page);
     }
     items
-}
-
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct FilterModel {
-    pub loaded: bool,
-    pub error: Option<String>,
-    /// Release versions, newest first.
-    pub versions: Vec<String>,
-    categories: Vec<(ProjectKind, String, String)>,
-}
-
-impl FilterModel {
-    pub fn from_core(filters: &DiscoverFilters) -> Self {
-        Self {
-            loaded: true,
-            error: None,
-            versions: filters
-                .game_versions
-                .iter()
-                .filter(|tag| tag.release)
-                .map(|tag| tag.version.clone())
-                .collect(),
-            categories: filters
-                .categories
-                .iter()
-                .map(|tag| (tag.kind, tag.header.clone(), tag.name.clone()))
-                .collect(),
-        }
-    }
-
-    /// Category names for a project type, in Modrinth's order, without the
-    /// resolution and performance groups that only some types have (they are
-    /// kept: each is a category facet like any other).
-    pub fn categories(&self, kind: ProjectKind) -> Vec<&str> {
-        self.categories
-            .iter()
-            .filter(|(tag_kind, _, _)| *tag_kind == kind)
-            .map(|(_, _, name)| name.as_str())
-            .collect()
-    }
 }
 
 /// The Chinese name of a Modrinth category, loader or feature tag; unknown
@@ -369,6 +265,14 @@ pub fn tag_label(name: &str) -> String {
         "forge" => "Forge",
         "neoforge" => "NeoForge",
         "quilt" => "Quilt",
+        "vanilla" => "原版",
+        "iris" => "Iris",
+        "optifine" => "OptiFine",
+        "liteloader" => "LiteLoader",
+        "babric" => "Babric",
+        "plugin" => "插件",
+        "datapack" => "数据包",
+        "features" => "特性",
         _ => "",
     };
     if !known.is_empty() {
@@ -383,10 +287,11 @@ pub fn tag_label(name: &str) -> String {
 
 pub const fn environment_label(environment: Environment) -> &'static str {
     match environment {
+        Environment::ClientOrServer => "客户端或服务端",
         Environment::ClientAndServer => "客户端和服务端",
         Environment::ClientOnly => "客户端",
         Environment::ServerOnly => "服务端",
+        Environment::SingleplayerOnly => "单人游戏",
+        Environment::DedicatedServerOnly => "专用服务器",
     }
 }
-
-pub const LOADER_CHOICES: [&str; 4] = ["fabric", "forge", "neoforge", "quilt"];

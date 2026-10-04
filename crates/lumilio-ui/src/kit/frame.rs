@@ -103,7 +103,7 @@ pub fn search_field(state: &gpui::Entity<InputState>, colors: ShellColors) -> An
     div()
         .w(SEARCH_WIDTH)
         .child(
-            Input::new(state).small().prefix(
+            Input::new(state).small().cleanable(true).prefix(
                 Icon::new(UiIcon::Search)
                     .size(px(14.))
                     .text_color(colors.muted),

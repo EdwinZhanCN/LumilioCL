@@ -28,6 +28,7 @@ fn live_library_cards_manage_and_explicit_play_is_independent(cx: &mut TestAppCo
         play_seconds: 0,
         installed: false,
         settings: InstanceSettings::default(),
+        source_project: None,
     };
     shell.update(cx, |shell, cx| {
         shell.show(Route::Library);
@@ -104,6 +105,7 @@ fn the_collections_tab_shows_each_collection_and_the_card_menu_does_not_open_the
         play_seconds: 0,
         installed: false,
         settings: InstanceSettings::default(),
+        source_project: None,
     };
     shell.update(cx, |shell, cx| {
         shell.show(Route::Library);
@@ -221,6 +223,7 @@ fn the_library_sorts_and_filters_from_dropdowns_that_follow_what_is_remembered(
         play_seconds: 0,
         installed: false,
         settings: InstanceSettings::default(),
+        source_project: None,
     };
     shell.update(cx, |shell, cx| {
         shell.show(Route::Library);
@@ -338,6 +341,7 @@ fn live_instance_back_keeps_library_filters_and_late_data_is_isolated(cx: &mut T
                     play_seconds: 0,
                     installed: false,
                     settings: InstanceSettings::default(),
+                    source_project: None,
                 },
                 LauncherSettings::default(),
             )),

@@ -168,6 +168,43 @@ fn a_schema_1_library_upgrades_in_place_and_keeps_a_copy() {
 }
 
 #[test]
+fn a_schema_2_library_gains_the_source_column_and_a_modpack_remembers_its_project() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("launcher.db");
+    {
+        let db = Connection::open(&path).unwrap();
+        db.execute_batch(
+            "CREATE TABLE instances (
+                position INTEGER NOT NULL, id TEXT PRIMARY KEY NOT NULL,
+                name TEXT NOT NULL, game_version TEXT NOT NULL, loader TEXT NOT NULL,
+                loader_version TEXT, favorite INTEGER NOT NULL, created_at INTEGER NOT NULL,
+                last_played INTEGER, play_seconds INTEGER NOT NULL, installed INTEGER NOT NULL,
+                java_path TEXT, max_memory_mb INTEGER, min_memory_mb INTEGER,
+                jvm_arguments TEXT NOT NULL, tuning TEXT);
+             CREATE TABLE collections (position INTEGER NOT NULL, name TEXT PRIMARY KEY NOT NULL);
+             CREATE TABLE collection_members (collection TEXT NOT NULL, position INTEGER NOT NULL,
+                instance TEXT NOT NULL, PRIMARY KEY (collection, instance));
+             INSERT INTO instances VALUES (0,'old','Old','1.21.1','fabric','0.16.0',1,5,NULL,90,1,
+                NULL,4096,NULL,'[]',NULL);
+             PRAGMA user_version = 2;",
+        )
+        .unwrap();
+    }
+    let mut store = InstanceStore::open(dir.path()).unwrap();
+    assert_eq!(store.get("old").unwrap().source_project, None);
+    assert!(
+        dir.path().join("launcher.db.v2").is_file(),
+        "a copy of the old file"
+    );
+    store.set_source_project("old", "1KVo5zza").unwrap();
+    let reopened = InstanceStore::open(dir.path()).unwrap();
+    assert_eq!(
+        reopened.get("old").unwrap().source_project.as_deref(),
+        Some("1KVo5zza")
+    );
+}
+
+#[test]
 fn launch_overrides_persist_are_normalized_and_bad_ones_are_refused() {
     use crate::tuning::{AfterLaunch, QuickPlay};
     let dir = tempfile::tempdir().unwrap();

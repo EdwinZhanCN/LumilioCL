@@ -56,9 +56,9 @@ async fn the_whole_spine_against_the_real_services() {
     );
     let filtered = service
         .search(&SearchQuery {
-            game_version: Some(release.version.clone()),
-            loaders: vec!["fabric".to_owned()],
-            categories: vec![optimization.name.clone()],
+            game_versions: vec![release.version.clone()],
+            loaders: vec![lumilio_core::Pick::include("fabric").any_of()],
+            categories: vec![lumilio_core::Pick::include(optimization.name.clone())],
             sort: lumilio_core::SortIndex::Downloads,
             page: 1,
             page_size: 10,

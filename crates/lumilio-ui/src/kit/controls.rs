@@ -65,6 +65,82 @@ pub fn led_option(
         )
 }
 
+/// How a filter option stands: not picked, asked for, or left out.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Stand {
+    Off,
+    Include,
+    Exclude,
+}
+
+/// A filter option that can also be left out (Modrinth's "ban" button): the
+/// row asks for the option, the small ⊘ at its end leaves it out. An option
+/// left out reads in the danger colour behind a ⊘ in place of the LED.
+pub fn filter_row(
+    id: impl Into<gpui::ElementId>,
+    label: impl Into<SharedString>,
+    stand: Stand,
+    can_exclude: bool,
+    colors: ShellColors,
+    on_include: impl Fn(&mut Window, &mut App) + 'static,
+    on_exclude: impl Fn(&mut Window, &mut App) + 'static,
+) -> gpui::Stateful<gpui::Div> {
+    let body = colors.body;
+    let id: gpui::ElementId = id.into();
+    let ban_id = (id.clone(), "exclude");
+    let picked = stand != Stand::Off;
+    h_flex()
+        .id(id)
+        .w_full()
+        .h(px(32.))
+        .gap(px(10.))
+        .items_center()
+        .border_b_1()
+        .border_color(colors.border)
+        .cursor_pointer()
+        .hover(move |row| row.bg(body.panel))
+        .on_click(move |_, window, cx| on_include(window, cx))
+        .child(match stand {
+            Stand::Exclude => Icon::new(UiIcon::Ban)
+                .size(px(14.))
+                .text_color(colors.danger)
+                .into_any_element(),
+            _ => crate::controls::led(stand == Stand::Include, body).into_any_element(),
+        })
+        .child(
+            div()
+                .flex_1()
+                .min_w_0()
+                .truncate()
+                .text_sm()
+                .when(picked, |label| label.font_semibold())
+                .text_color(match stand {
+                    Stand::Include => colors.foreground,
+                    Stand::Exclude => colors.danger,
+                    Stand::Off => colors.muted,
+                })
+                .child(label.into()),
+        )
+        .children(can_exclude.then(|| {
+            div()
+                .id(ban_id)
+                .flex_none()
+                .p(px(4.))
+                .cursor_pointer()
+                .on_click(move |_, window, cx| {
+                    cx.stop_propagation();
+                    on_exclude(window, cx);
+                })
+                .child(Icon::new(UiIcon::Ban).size(px(13.)).text_color(
+                    if stand == Stand::Exclude {
+                        colors.danger
+                    } else {
+                        colors.muted.opacity(0.55)
+                    },
+                ))
+        }))
+}
+
 /// A round identity mark: the name's first letter on a colour taken from the
 /// name, so the same account always looks the same. Stands in for the skin
 /// head until skins exist.

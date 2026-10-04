@@ -3,6 +3,7 @@ use crate::home::{HomeIntent, ShellHomeColors};
 use crate::kit::{Emit, ViewIntent};
 use crate::live::{DiscoverChange, LiveIntent};
 use crate::navigation::Leading;
+use crate::project_detail::ProjectDetailView;
 use crate::route::Route;
 use crate::theme::ShellColors;
 use crate::{home, kit, navigation, pages, placeholders, theme, toast};
@@ -68,7 +69,6 @@ impl Render for LauncherShell {
 
         self.ensure_live_controls(window, cx);
         self.sync_library_dropdowns(window, cx);
-        self.sync_version_list(window, cx);
         let change_callback = cx.listener(|this, change: &DiscoverChange, window, cx| {
             this.change_query(change.clone(), window, cx);
         });
@@ -84,6 +84,12 @@ impl Render for LauncherShell {
                     .read(cx)
                     .value()
                     .to_string();
+                let version_filter = controls
+                    .read(cx)
+                    .version_search
+                    .read(cx)
+                    .value()
+                    .to_string();
                 let ctx = pages::live::LiveCtx {
                     colors,
                     model,
@@ -93,6 +99,7 @@ impl Render for LauncherShell {
                     change: change_handler.clone(),
                     controls: controls.read(cx),
                     filter,
+                    version_filter,
                 };
                 Some(match (self.route, &self.detail) {
                     (Route::Discover, Some(slot)) => slot.view.clone().into_any_element(),
@@ -185,5 +192,11 @@ impl Render for LauncherShell {
                 current_instance,
                 current_account,
             ))
+            // A gallery image shown large covers everything, the navigation too.
+            .children(
+                self.detail
+                    .as_ref()
+                    .and_then(|slot| ProjectDetailView::viewer_overlay(&slot.view, cx)),
+            )
     }
 }

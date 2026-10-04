@@ -5,11 +5,16 @@ use serde::Deserialize;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct GalleryImage {
+    /// A small preview (about 350 px wide).
     pub url: String,
+    /// The original file; the preview when Modrinth gives none.
+    pub full_url: String,
     pub title: String,
     pub description: String,
     pub featured: bool,
     pub ordering: i64,
+    /// RFC 3339, empty when unknown.
+    pub created: String,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -97,12 +102,15 @@ pub(super) struct RawLicense {
 #[derive(Debug, Deserialize)]
 pub(super) struct RawGallery {
     pub(super) url: Option<String>,
+    pub(super) raw_url: Option<String>,
     pub(super) title: Option<String>,
     pub(super) description: Option<String>,
     #[serde(default)]
     pub(super) featured: bool,
     #[serde(default)]
     pub(super) ordering: i64,
+    #[serde(default)]
+    pub(super) created: String,
 }
 
 pub fn decode_project(bytes: &[u8]) -> Result<Project, DiscoverError> {
@@ -160,12 +168,15 @@ pub(super) fn gallery_from_raw(raw: Vec<RawGallery>) -> Vec<GalleryImage> {
     let mut images: Vec<GalleryImage> = raw
         .into_iter()
         .filter_map(|image| {
+            let url = non_empty(image.url)?;
             Some(GalleryImage {
-                url: non_empty(image.url)?,
+                full_url: non_empty(image.raw_url).unwrap_or_else(|| url.clone()),
+                url,
                 title: image.title.unwrap_or_default(),
                 description: image.description.unwrap_or_default(),
                 featured: image.featured,
                 ordering: image.ordering,
+                created: image.created,
             })
         })
         .collect();

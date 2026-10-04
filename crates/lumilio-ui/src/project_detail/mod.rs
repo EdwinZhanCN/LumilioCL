@@ -1,29 +1,27 @@
-//! A project's detail window (Discover): description, versions, gallery, and
-//! a "more" menu. Native, rendered from Modrinth's own data; the public web
-//! page is only a link away.
+//! A project's detail page (Discover): description, versions, gallery, a
+//! sidebar of facts, and a page per version. Native, rendered from Modrinth's
+//! own data; the public web page is only a link away.
+//!
+//! The content follows Modrinth App's project pages
+//! (`apps/app-frontend/src/pages/project/*` and `ProjectSidebar*`,
+//! GPL-3.0-only; ADR 0022).
+
+mod gallery;
+mod header;
+mod versions;
 
 use std::rc::Rc;
 
-use crate::key::Key;
-use gpui::{
-    App, ClipboardItem, Context, Div, IntoElement, ObjectFit, Render, SharedString,
-    StyledImage as _, Window, div, img, prelude::*, px,
-};
-use gpui_component::text::TextView;
-use gpui_component::{
-    ActiveTheme as _, Icon, Sizable as _, StyledExt as _, TITLE_BAR_HEIGHT, h_flex, v_flex,
-};
+use gpui::{App, Context, Div, IntoElement, Render, SharedString, Window, div, prelude::*, px};
+use gpui_component::{ActiveTheme as _, TITLE_BAR_HEIGHT, v_flex};
 use lumilio_core::{
-    Loader, Project, ProjectDetail, ProjectKind, ReleaseChannel, Version, environment, version_fits,
+    GameVersionTag, Loader, Project, ProjectDetail, ProjectKind, ReleaseChannel, Version,
+    version_fits,
 };
 
-use crate::assets::UiIcon;
 use crate::kit;
-use crate::live::{count_label, environment_label, parse_rfc3339, relative_time, tag_label};
-use crate::pages::live::project_icon;
+use crate::live::parse_rfc3339;
 use crate::theme::ShellColors;
-
-pub const TABS: [&str; 3] = ["介绍", "版本", "画廊"];
 
 /// What the window asks the application to do.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -39,7 +37,7 @@ pub enum DetailIntent {
         file_name: String,
         title: String,
     },
-    /// Replace the installed file by this newer version.
+    /// Replace the installed file by this version (newer, or another one).
     Update {
         file_name: String,
         version_id: String,
@@ -56,6 +54,9 @@ pub struct InstallTarget {
     pub name: String,
     pub game_version: String,
     pub loader: Loader,
+    /// Discover was opened from this game's Content tab: the versions list
+    /// starts filtered to it, as in the app.
+    pub from_game: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -63,6 +64,47 @@ pub enum DetailState {
     Loading,
     Failed(String),
     Ready(Box<ProjectDetail>),
+}
+
+/// What the versions list is narrowed to.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct VersionFilters {
+    pub channels: Vec<ReleaseChannel>,
+    pub game_versions: Vec<String>,
+    pub platforms: Vec<String>,
+    /// Zero-based.
+    pub page: usize,
+}
+
+impl VersionFilters {
+    pub fn active(&self) -> bool {
+        !(self.channels.is_empty() && self.game_versions.is_empty() && self.platforms.is_empty())
+    }
+
+    /// Whether a version stays in the list: it passes each filter that is on
+    /// (any one of the chosen channels, game versions, platforms).
+    pub fn admits(&self, version: &Version) -> bool {
+        (self.channels.is_empty() || self.channels.contains(&version.channel))
+            && (self.game_versions.is_empty()
+                || version
+                    .game_versions
+                    .iter()
+                    .any(|have| self.game_versions.contains(have)))
+            && (self.platforms.is_empty()
+                || version
+                    .loaders
+                    .iter()
+                    .any(|have| self.platforms.contains(have)))
+    }
+}
+
+pub(super) fn toggle<T: PartialEq>(list: &mut Vec<T>, item: T) {
+    match list.iter().position(|have| *have == item) {
+        Some(at) => {
+            list.remove(at);
+        }
+        None => list.push(item),
+    }
 }
 
 pub struct ProjectDetailView {
@@ -73,14 +115,23 @@ pub struct ProjectDetailView {
     target: Option<InstallTarget>,
     /// What the target game already has, by project.
     installed: std::collections::BTreeMap<String, lumilio_core::InstalledProject>,
+    /// This project is being installed right now.
+    installing: bool,
     /// Messages waiting for the next render to float up (§11).
     toasts: Vec<crate::toast::Toast>,
     handler: DetailHandler,
-    /// How many versions the list shows before "show more".
-    versions_shown: usize,
+    /// Modrinth's game version list, for showing versions as ranges.
+    game_tags: Vec<GameVersionTag>,
+    filters: VersionFilters,
+    /// The filters were started from the game once; the person's changes stay.
+    prefiltered: bool,
+    /// The gallery image shown large.
+    viewer: Option<usize>,
+    /// The game version picker of the versions list, made on first use.
+    version_picker: Option<versions::Picker>,
 }
 
-const VERSIONS_PAGE: usize = 25;
+pub const VERSIONS_PER_PAGE: usize = 20;
 
 impl ProjectDetailView {
     pub fn new(
@@ -95,9 +146,14 @@ impl ProjectDetailView {
             tab: 0,
             target: None,
             installed: std::collections::BTreeMap::new(),
+            installing: false,
             toasts: Vec::new(),
             handler,
-            versions_shown: VERSIONS_PAGE,
+            game_tags: Vec::new(),
+            filters: VersionFilters::default(),
+            prefiltered: false,
+            viewer: None,
+            version_picker: None,
         }
     }
 
@@ -106,11 +162,31 @@ impl ProjectDetailView {
             self.title = detail.project.title.clone().into();
         }
         self.state = state;
+        self.prefilter();
         cx.notify();
+    }
+
+    /// Starts the versions list from the game Discover was opened for: its
+    /// loader (for mods) and its game version.
+    fn prefilter(&mut self) {
+        let (DetailState::Ready(detail), Some(target)) = (&self.state, &self.target) else {
+            return;
+        };
+        if self.prefiltered || !target.from_game {
+            return;
+        }
+        self.prefiltered = true;
+        self.filters.game_versions = vec![target.game_version.clone()];
+        if detail.project.kind == ProjectKind::Mod
+            && let Some(tag) = loader_name(target.loader)
+        {
+            self.filters.platforms = vec![tag.to_owned()];
+        }
     }
 
     pub fn set_target(&mut self, target: Option<InstallTarget>, cx: &mut Context<Self>) {
         self.target = target;
+        self.prefilter();
         cx.notify();
     }
 
@@ -121,6 +197,20 @@ impl ProjectDetailView {
     ) {
         self.installed = installed;
         cx.notify();
+    }
+
+    pub fn set_installing(&mut self, installing: bool, cx: &mut Context<Self>) {
+        if self.installing != installing {
+            self.installing = installing;
+            cx.notify();
+        }
+    }
+
+    pub fn set_game_tags(&mut self, tags: Vec<GameVersionTag>, cx: &mut Context<Self>) {
+        if self.game_tags != tags {
+            self.game_tags = tags;
+            cx.notify();
+        }
     }
 
     /// Sets the target while building, before there is a window to redraw.
@@ -141,9 +231,49 @@ impl ProjectDetailView {
         &self.state
     }
 
+    pub fn filters(&self) -> &VersionFilters {
+        &self.filters
+    }
+
+    /// The tabs this project has: the gallery only when there is one.
+    pub fn tabs(&self) -> Vec<&'static str> {
+        let mut tabs = vec!["介绍", "版本"];
+        if matches!(&self.state, DetailState::Ready(detail) if !detail.project.gallery.is_empty()) {
+            tabs.push("画廊");
+        }
+        tabs
+    }
+
     pub fn select_tab(&mut self, tab: usize, cx: &mut Context<Self>) {
-        self.tab = tab.min(TABS.len() - 1);
+        self.tab = tab.min(self.tabs().len() - 1);
         cx.notify();
+    }
+
+    /// Shows gallery image `index` large.
+    pub fn open_viewer(&mut self, index: usize, cx: &mut Context<Self>) {
+        self.viewer = Some(index);
+        cx.notify();
+    }
+
+    pub fn filter_versions(
+        &mut self,
+        change: impl FnOnce(&mut VersionFilters),
+        cx: &mut Context<Self>,
+    ) {
+        change(&mut self.filters);
+        self.filters.page = 0;
+        cx.notify();
+    }
+}
+
+/// The name Modrinth uses for a loader in a version's list.
+pub(super) fn loader_name(loader: Loader) -> Option<&'static str> {
+    match loader {
+        Loader::Vanilla => None,
+        Loader::Fabric => Some("fabric"),
+        Loader::Forge => Some("forge"),
+        Loader::NeoForge => Some("neoforge"),
+        Loader::Quilt => Some("quilt"),
     }
 }
 
@@ -228,26 +358,7 @@ fn file_of(version: &Version) -> Option<&lumilio_core::VersionFile> {
 }
 
 impl ProjectDetailView {
-    // ia[discover]: 安装整合包 | 详情页主按钮「安装为新游戏」 | 新建游戏，完成后 toast 可“打开”
-    fn install_label(&self, project: &Project) -> String {
-        let kind = project.kind;
-        match (kind, &self.target) {
-            (_, Some(_))
-                if self
-                    .installed
-                    .get(&project.id)
-                    .is_some_and(|have| have.update.is_some()) =>
-            {
-                "更新".to_owned()
-            }
-            (_, Some(_)) if self.installed.contains_key(&project.id) => "已安装".to_owned(),
-            (ProjectKind::Modpack, _) => "安装为新游戏".to_owned(),
-            (_, Some(target)) => format!("安装到 {}", target.name),
-            (_, None) => "安装".to_owned(),
-        }
-    }
-
-    fn fits_target(&self, project: &Project, version: &Version) -> bool {
+    pub(super) fn fits_target(&self, project: &Project, version: &Version) -> bool {
         match (&self.target, project.kind) {
             (_, ProjectKind::Modpack) | (None, _) => true,
             (Some(target), kind) => {
@@ -256,373 +367,12 @@ impl ProjectDetailView {
         }
     }
 
-    fn header(
-        &self,
-        project: &Project,
-        owner: Option<&str>,
-        colors: ShellColors,
-        cx: &mut Context<Self>,
-    ) -> impl IntoElement {
-        let have = self.installed.get(&project.id).cloned();
-        let install = {
-            let handler = self.handler.clone();
-            let title = self.title.to_string();
-            let have = have.clone();
-            move |window: &mut Window, cx: &mut App| {
-                let intent = match &have {
-                    Some(have) => match &have.update {
-                        Some(version) => DetailIntent::Update {
-                            file_name: have.file_name.clone(),
-                            version_id: version.clone(),
-                            title: title.clone(),
-                        },
-                        None => return,
-                    },
-                    None => DetailIntent::Install {
-                        version_id: None,
-                        title: title.clone(),
-                    },
-                };
-                handler(intent, window, cx);
-            }
-        };
-        let up_to_date =
-            self.target.is_some() && have.as_ref().is_some_and(|have| have.update.is_none());
-        let can_install =
-            (project.kind == ProjectKind::Modpack || self.target.is_some()) && !up_to_date;
-        let environment = environment(project.client_side, project.server_side);
-        let page_url = self.url.to_string();
-        let copied = cx.entity().downgrade();
-
-        let mut actions = kit::PageActions::new("detail-actions")
-            .primary(
-                crate::theme::clickable(
-                    Key::new("detail-install")
-                        .label(self.install_label(project))
-                        .icon(Icon::new(UiIcon::Download))
-                        .primary()
-                        .disabled(!can_install),
-                    can_install,
-                )
-                .on_click(move |_, window, cx| install(window, cx)),
-            )
-            .more(kit::MenuEntry::new("在 Modrinth 中打开", {
-                let url = page_url.clone();
-                move |_, cx| cx.open_url(&url)
-            }))
-            .more(kit::MenuEntry::new("复制链接", move |_, cx| {
-                cx.write_to_clipboard(ClipboardItem::new_string(page_url.clone()));
-                let _ = copied.update(cx, |view, cx| {
-                    view.toast(crate::toast::Toast::success("链接已复制"), cx)
-                });
-            }));
-        for (label, link) in [
-            ("源码", &project.links.source),
-            ("问题反馈", &project.links.issues),
-            ("Wiki", &project.links.wiki),
-            ("Discord", &project.links.discord),
-        ] {
-            if let Some(link) = link.clone() {
-                actions = actions.more(kit::MenuEntry::new(label, move |_, cx| cx.open_url(&link)));
-            }
-        }
-
-        let body = colors.body;
-        let updated =
-            parse_rfc3339(&project.updated).map(|at| relative_time(at, lumilio_core::unix_now()));
-        v_flex()
-            .w_full()
-            .gap_5()
-            .child(
-                h_flex()
-                    .w_full()
-                    .gap_5()
-                    .items_start()
-                    .child(
-                        div()
-                            .flex_none()
-                            .p(px(4.))
-                            .rounded(px(6.))
-                            .border_1()
-                            .border_color(colors.border)
-                            .bg(body.display)
-                            .shadow(crate::theme::display_shadow())
-                            .child(project_icon(
-                                project.icon_url.as_deref(),
-                                crate::live::seed_of(&project.id),
-                                112.,
-                                colors,
-                            )),
-                    )
-                    .child(
-                        v_flex()
-                            .flex_1()
-                            .min_w_0()
-                            .gap(px(8.))
-                            .child(
-                                div()
-                                    .text_size(px(36.))
-                                    .line_height(px(42.))
-                                    .font_weight(gpui::FontWeight::LIGHT)
-                                    .text_color(colors.foreground)
-                                    .child(project.title.clone()),
-                            )
-                            .children(owner.map(|owner| {
-                                div()
-                                    .font_family(crate::theme::MONO_FONT)
-                                    .text_size(px(11.))
-                                    .text_color(colors.muted)
-                                    .child(owner.to_uppercase())
-                            }))
-                            .child(
-                                div()
-                                    .text_sm()
-                                    .text_color(colors.muted)
-                                    .child(project.description.clone()),
-                            )
-                            .child(
-                                h_flex()
-                                    .flex_wrap()
-                                    .gap(px(6.))
-                                    .pt(px(2.))
-                                    .children(
-                                        project.loaders.iter().map(|l| {
-                                            kit::tag(tag_label(l), kit::TagKind::Ink, colors)
-                                        }),
-                                    )
-                                    .children(
-                                        environment.map(|e| pill(environment_label(e), colors)),
-                                    )
-                                    .children(
-                                        project
-                                            .categories
-                                            .iter()
-                                            .map(|c| pill(tag_label(c), colors)),
-                                    ),
-                            ),
-                    )
-                    .children(actions.render(colors)),
-            )
-            // The datasheet strip: an ink rule over a row of labelled values.
-            .child(
-                h_flex()
-                    .w_full()
-                    .flex_wrap()
-                    .gap_y_3()
-                    .py(px(12.))
-                    .border_t_1()
-                    .border_color(colors.foreground)
-                    .child(spec_cell("DL", count_label(project.downloads), colors))
-                    .child(spec_cell("FAV", count_label(project.followers), colors))
-                    .children(updated.map(|updated| spec_cell("UPD", updated, colors)))
-                    .children(
-                        project
-                            .license
-                            .clone()
-                            .map(|license| spec_cell("LICENSE", license, colors)),
-                    ),
-            )
-    }
-
-    fn description(&self, project: &Project, colors: ShellColors) -> gpui::AnyElement {
-        let text = if project.body.trim().is_empty() {
-            project.description.clone()
-        } else {
-            project.body.clone()
-        };
-        div()
-            .w_full()
-            .debug_selector(|| "detail-description".into())
-            .text_color(colors.foreground)
-            .child(TextView::markdown("detail-body", text).selectable(true))
-            .into_any_element()
-    }
-
-    fn versions(
-        &self,
-        detail: &ProjectDetail,
-        colors: ShellColors,
-        cx: &mut Context<Self>,
-    ) -> gpui::AnyElement {
-        if detail.versions.is_empty() {
-            return kit::empty("还没有可用的版本", "", colors).into_any_element();
-        }
-        let project = &detail.project;
-        let installable = project.kind != ProjectKind::Modpack;
-        let rows = detail
-            .versions
-            .iter()
-            .take(self.versions_shown)
-            .enumerate()
-            .map(|(index, version)| {
-                let fits = self.fits_target(project, version);
-                let handler = self.handler.clone();
-                let id = version.id.clone();
-                let title = self.title.to_string();
-                // ia[discover]: 另存为文件 | 详情页版本行「另存为…」 | 选位置下载，任何类型，包括整合包文件
-                let save = file_of(version).map(|file| {
-                    let (handler, id, title) = (handler.clone(), id.clone(), title.clone());
-                    let file_name = file.filename.clone();
-                    Key::new(("detail-version-save", index))
-                        .label("另存为…")
-                        .ghost()
-                        .small()
-                        .debug_selector(move || format!("detail-version-save-{index}"))
-                        .on_click(move |_, window, cx| {
-                            handler(
-                                DetailIntent::SaveAs {
-                                    version_id: id.clone(),
-                                    file_name: file_name.clone(),
-                                    title: title.clone(),
-                                },
-                                window,
-                                cx,
-                            );
-                        })
-                });
-                let file = version
-                    .files
-                    .iter()
-                    .find(|f| f.primary)
-                    .or(version.files.first());
-                h_flex()
-                    .w_full()
-                    .gap_4()
-                    .py(px(12.))
-                    .items_center()
-                    .child(
-                        v_flex()
-                            .flex_1()
-                            .min_w_0()
-                            .gap(px(4.))
-                            .child(
-                                h_flex()
-                                    .gap_2()
-                                    .items_center()
-                                    .child(
-                                        div()
-                                            .font_semibold()
-                                            .text_color(colors.foreground)
-                                            .child(version.name.clone()),
-                                    )
-                                    .child(pill(channel_label(version.channel), colors))
-                                    .children((!fits).then(|| pill("不适用于当前游戏", colors))),
-                            )
-                            .child(div().text_xs().text_color(colors.muted).child(format!(
-                                    "{} · {} · {}",
-                                    version.number,
-                                    versions_label(&version.game_versions),
-                                    version
-                                        .loaders
-                                        .iter()
-                                        .map(|l| tag_label(l))
-                                        .collect::<Vec<_>>()
-                                        .join(" / ")
-                                ))),
-                    )
-                    .child(
-                        v_flex()
-                            .items_end()
-                            .gap(px(2.))
-                            .text_xs()
-                            .text_color(colors.muted)
-                            .child(date_label(&version.published))
-                            .child(format!(
-                                "{} 次下载{}",
-                                count_label(version.downloads),
-                                file.map(|f| format!(" · {}", size_label(f.size)))
-                                    .unwrap_or_default()
-                            )),
-                    )
-                    // ia[discover]: 安装指定版本 | 详情页版本标签行内「安装」 | 后台任务；与目标游戏不兼容的版本禁用
-                    .children(installable.then(|| {
-                        Key::new(("detail-version-install", index))
-                            .label("安装")
-                            .icon(Icon::new(UiIcon::Download))
-                            .white()
-                            .small()
-                            .disabled(!fits || self.target.is_none())
-                            .on_click(move |_, window, cx| {
-                                handler(
-                                    DetailIntent::Install {
-                                        version_id: Some(id.clone()),
-                                        title: title.clone(),
-                                    },
-                                    window,
-                                    cx,
-                                );
-                            })
-                    }))
-                    .children(save)
-            })
-            .collect::<Vec<_>>();
-        let more = (detail.versions.len() > self.versions_shown).then(|| {
-            let view = cx.entity();
-            kit::ghost(
-                "detail-more-versions",
-                "显示更多版本",
-                move |_, cx| {
-                    view.update(cx, |view, cx| {
-                        view.versions_shown += VERSIONS_PAGE;
-                        cx.notify();
-                    });
-                },
-            )
-        });
-        v_flex()
-            .w_full()
-            .gap_3()
-            .debug_selector(|| "detail-versions".into())
-            .child(kit::panel_list(rows, colors))
-            .children(more)
-            .into_any_element()
-    }
-
-    fn gallery(&self, project: &Project, colors: ShellColors) -> gpui::AnyElement {
-        if project.gallery.is_empty() {
-            return kit::empty("这个项目没有画廊", "", colors).into_any_element();
-        }
-        h_flex()
-            .w_full()
-            .flex_wrap()
-            .gap_4()
-            .debug_selector(|| "detail-gallery".into())
-            .children(project.gallery.iter().enumerate().map(|(index, image)| {
-                let link = image.url.clone();
-                v_flex()
-                    .id(("detail-gallery", index))
-                    .w(px(440.))
-                    .gap_2()
-                    .cursor_pointer()
-                    .on_click(move |_, _, cx| cx.open_url(&link))
-                    .child(
-                        div()
-                            .w_full()
-                            .h(px(248.))
-                            .rounded(px(12.))
-                            .overflow_hidden()
-                            .bg(colors.surface_subtle)
-                            .child(
-                                img(image.url.clone())
-                                    .size_full()
-                                    .object_fit(ObjectFit::Cover),
-                            ),
-                    )
-                    .children((!image.title.is_empty()).then(|| {
-                        div()
-                            .text_sm()
-                            .font_medium()
-                            .text_color(colors.foreground)
-                            .child(image.title.clone())
-                    }))
-                    .children((!image.description.is_empty()).then(|| {
-                        div()
-                            .text_xs()
-                            .text_color(colors.muted)
-                            .child(image.description.clone())
-                    }))
-            }))
-            .into_any_element()
+    /// The version of this project the target game has, if it has one.
+    pub(super) fn installed_version(&self, project: &Project) -> Option<&str> {
+        self.target.as_ref()?;
+        self.installed
+            .get(&project.id)
+            .map(|have| have.version_id.as_str())
     }
 }
 
@@ -641,58 +391,81 @@ impl Render for ProjectDetailView {
                 ))
                 .child(kit::technical("detail-technical", message))
                 .into_any_element(),
-            DetailState::Ready(detail) => {
-                let counts = [
-                    String::new(),
-                    format!(" {}", detail.versions.len()),
-                    format!(" {}", detail.project.gallery.len()),
-                ];
-                let labels: Vec<&'static str> = TABS.to_vec();
-                let _ = counts;
-                let content = match self.tab {
-                    0 => self.description(&detail.project, colors),
-                    1 => self.versions(&detail, colors, cx),
-                    _ => self.gallery(&detail.project, colors),
-                };
-                let view = cx.entity();
-                v_flex()
-                    .w_full()
-                    .gap_5()
-                    .child(self.header(&detail.project, detail.owner.as_deref(), colors, cx))
-                    .child(kit::toolbar(
-                        Some(
-                            kit::tabs("detail-tabs", &labels, self.tab, move |index, _, cx| {
-                                view.update(cx, |view, cx| view.select_tab(index, cx));
-                            })
-                            .into_any_element(),
-                        ),
-                        None,
-                    ))
-                    .child(kit::entrance(content, ("detail-body", self.tab)))
-                    .into_any_element()
-            }
+            DetailState::Ready(detail) => self.page(&detail, colors, window, cx),
         };
 
+        div().size_full().relative().child(
+            div()
+                .id("live-detail")
+                .size_full()
+                .overflow_y_scroll()
+                .text_color(colors.foreground)
+                .child(
+                    crate::theme::content_column()
+                        .mx_auto()
+                        .pt(TITLE_BAR_HEIGHT + px(12.))
+                        .pb(crate::theme::BOTTOM_SAFE_AREA)
+                        .gap_4()
+                        .child(
+                            // Going back is the navigation's job (design language §6).
+                            div()
+                                .debug_selector(|| "live-detail-body".into())
+                                .child(body),
+                        ),
+                ),
+        )
+    }
+}
+
+impl ProjectDetailView {
+    /// The loaded page: header, tabs, and beside the tab's content the
+    /// sidebar of facts.
+    fn page(
+        &mut self,
+        detail: &ProjectDetail,
+        colors: ShellColors,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> gpui::AnyElement {
+        let labels = self.tabs();
+        let tab = self.tab.min(labels.len() - 1);
+        let main = match tab {
+            0 => self.description(&detail.project, colors),
+            1 => self.versions(detail, colors, window, cx),
+            _ => self.gallery(&detail.project, colors, cx),
+        };
+        let view = cx.entity();
+        v_flex()
+            .w_full()
+            .gap_5()
+            .child(self.header(&detail.project, detail.owner.as_deref(), colors, cx))
+            .child(kit::toolbar(
+                Some(
+                    kit::tabs("detail-tabs", &labels, tab, move |index, _, cx| {
+                        view.update(cx, |view, cx| view.select_tab(index, cx));
+                    })
+                    .into_any_element(),
+                ),
+                None,
+            ))
+            .child(kit::entrance(main, ("detail-body", tab)))
+            .into_any_element()
+    }
+
+    fn description(&self, project: &Project, colors: ShellColors) -> gpui::AnyElement {
+        let text = if project.body.trim().is_empty() {
+            project.description.clone()
+        } else {
+            project.body.clone()
+        };
         div()
-            .id("live-detail")
-            .size_full()
-            .overflow_y_scroll()
+            .w_full()
+            .debug_selector(|| "detail-description".into())
             .text_color(colors.foreground)
-            .child(
-                crate::theme::content_column()
-                    .mx_auto()
-                    .pt(TITLE_BAR_HEIGHT + px(12.))
-                    .pb(crate::theme::BOTTOM_SAFE_AREA)
-                    .gap_4()
-                    .child(
-                        // Going back is the navigation's job (design language §6).
-                        div()
-                            .debug_selector(|| "live-detail-body".into())
-                            .child(body),
-                    ),
-            )
+            .child(gpui_component::text::TextView::markdown("detail-body", text).selectable(true))
+            .into_any_element()
     }
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

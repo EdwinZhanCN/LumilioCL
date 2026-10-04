@@ -39,6 +39,8 @@ impl LauncherShell {
         self.route = route;
         self.detail = None;
         self.live_instance = None;
+        // Choosing Discover in the navigation is plain browsing, not a game's.
+        self.leave_browse_context(cx);
         self.emit(ShellIntent::Navigate(route), window, cx);
         cx.notify();
     }

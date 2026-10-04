@@ -22,9 +22,11 @@ pub use self::activity::{
     rate_text, recovery_message,
 };
 pub use self::discover::{
-    DiscoverChange, DiscoverQuery, FilterModel, LOADER_CHOICES, PAGE_SIZES, PageItem, SORTS,
-    SearchRow, SearchStatus, count_label, environment_label, page_items, parse_rfc3339, search_row,
-    search_rows, sort_label, tag_label,
+    AdvancedOption, CardTag, CardTags, DateKind, DiscoverChange, DiscoverQuery, EPILEPSY_TRIGGERS,
+    FilterModel, Lock, PAGE_SIZES, PageItem, PickGroup, Provided, SORTS, SearchRow, SearchStatus,
+    Section, Side, advanced_options, card_tags, count_label, default_loaders, environment_label,
+    is_type_exclusion, page_items, parse_rfc3339, search_row, search_rows, section_title, sections,
+    sort_label, tag_label, visible_kinds,
 };
 pub use self::home::home_presentation;
 pub use self::intent::{LiveHandler, LiveIntent};
@@ -52,6 +54,14 @@ pub struct LiveModel {
     pub filters: FilterModel,
     /// Which instance Discover installs into.
     pub install_target: Option<String>,
+    /// The game Discover was opened from (its Content tab): the page then
+    /// browses for that game, with its version and loader locked in. `None`
+    /// is plain browsing, installing into `install_target`.
+    pub browsing_for: Option<String>,
+    /// What Discover remembers between visits.
+    pub discover_prefs: lumilio_core::DiscoverPreferences,
+    /// Projects (by slug) being installed now.
+    pub installing: std::collections::BTreeSet<String>,
     /// What the target game already has of the searched kind, by project.
     pub installed: BTreeMap<String, lumilio_core::InstalledProject>,
     pub activity: Vec<ActivityRow>,
@@ -74,6 +84,9 @@ impl Default for LiveModel {
             query: DiscoverQuery::new(ProjectKind::Modpack),
             filters: FilterModel::default(),
             install_target: None,
+            browsing_for: None,
+            discover_prefs: lumilio_core::DiscoverPreferences::default(),
+            installing: std::collections::BTreeSet::new(),
             installed: BTreeMap::new(),
             activity: Vec::new(),
             rates: BTreeMap::new(),
@@ -145,6 +158,54 @@ impl LiveModel {
             }
             _ => 0,
         }
+    }
+
+    /// The game Discover is browsing for, if it was opened from one.
+    pub fn browsing_game(&self) -> Option<&LibraryCard> {
+        let id = self.browsing_for.as_ref()?;
+        self.library.iter().find(|card| &card.id == id)
+    }
+
+    /// What the game provides to the current search (nothing outside a game).
+    pub fn provided(&self) -> Provided {
+        self.browsing_game().map_or_else(Provided::default, |game| {
+            Provided::for_game(self.query.kind, &game.game_version, game.loader)
+        })
+    }
+
+    /// The kinds the tabs offer right now.
+    pub fn discover_kinds(&self) -> Vec<ProjectKind> {
+        visible_kinds(self.browsing_game().map(|game| game.loader))
+    }
+
+    /// "Hide already installed" exists for packs (against the library) and
+    /// inside a game (against that game).
+    pub fn can_hide_installed(&self) -> bool {
+        self.query.kind == ProjectKind::Modpack || self.browsing_game().is_some()
+    }
+
+    /// Whether "hide already installed" is on for what the page shows: the
+    /// remembered choice on the pack tab, the session's inside a game.
+    pub fn hiding_installed(&self) -> bool {
+        self.can_hide_installed()
+            && if self.query.kind == ProjectKind::Modpack {
+                self.discover_prefs.hide_installed_modpacks
+            } else {
+                self.query.hide_installed
+            }
+    }
+
+    /// The projects "hide already installed" leaves out: the packs the
+    /// library was made from, or what the browsed game already has.
+    pub fn installed_projects(&self) -> Vec<String> {
+        if self.query.kind == ProjectKind::Modpack {
+            return self
+                .library
+                .iter()
+                .filter_map(|card| card.source_project.clone())
+                .collect();
+        }
+        self.installed.keys().cloned().collect()
     }
 
     pub fn active_tasks(&self) -> u32 {

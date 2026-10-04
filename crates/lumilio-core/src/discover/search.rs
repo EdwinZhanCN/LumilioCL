@@ -1,86 +1,6 @@
-use super::API_BASE;
 use super::error::{DiscoverError, decode};
-use super::kinds::{ProjectKind, SortIndex, project_page_url};
+use super::kinds::{ProjectKind, project_page_url};
 use serde::Deserialize;
-use url::Url;
-
-#[derive(Clone, Debug)]
-pub struct SearchQuery {
-    pub text: String,
-    pub kind: ProjectKind,
-    pub game_version: Option<String>,
-    /// Loader names (`fabric`, `forge`, …); any one may match. Only mods and
-    /// modpacks have loaders worth filtering by; other kinds ignore it.
-    pub loaders: Vec<String>,
-    /// Category names; a project must have all of them.
-    pub categories: Vec<String>,
-    pub sort: SortIndex,
-    /// Zero-based.
-    pub page: u32,
-    pub page_size: u32,
-}
-
-impl SearchQuery {
-    #[must_use]
-    pub fn new(kind: ProjectKind) -> Self {
-        Self {
-            text: String::new(),
-            kind,
-            game_version: None,
-            loaders: Vec::new(),
-            categories: Vec::new(),
-            sort: SortIndex::default(),
-            page: 0,
-            page_size: 20,
-        }
-    }
-
-    /// Facet groups; groups are ANDed, each group here holds one clause.
-    pub(super) fn facets(&self) -> Vec<Vec<String>> {
-        let mut facets = vec![vec![format!("project_type:{}", self.kind.protocol_name())]];
-        if let Some(version) = self
-            .game_version
-            .as_deref()
-            .filter(|v| !v.trim().is_empty())
-        {
-            facets.push(vec![format!("versions:{version}")]);
-        }
-        let loaders: Vec<String> = self
-            .loaders
-            .iter()
-            .map(|loader| loader.trim())
-            .filter(|loader| !loader.is_empty())
-            .map(|loader| format!("categories:{loader}"))
-            .collect();
-        if matches!(self.kind, ProjectKind::Mod | ProjectKind::Modpack) && !loaders.is_empty() {
-            facets.push(loaders);
-        }
-        for category in self
-            .categories
-            .iter()
-            .map(|c| c.trim())
-            .filter(|c| !c.is_empty())
-        {
-            facets.push(vec![format!("categories:{category}")]);
-        }
-        facets
-    }
-
-    #[must_use]
-    pub fn url(&self) -> String {
-        let mut url = Url::parse(API_BASE).expect("constant address is valid");
-        url.set_path("/v2/search");
-        let facets = serde_json::to_string(&self.facets()).expect("strings always encode");
-        let page_size = self.page_size.clamp(1, 100);
-        url.query_pairs_mut()
-            .append_pair("query", self.text.trim())
-            .append_pair("facets", &facets)
-            .append_pair("offset", &(self.page.saturating_mul(page_size)).to_string())
-            .append_pair("limit", &page_size.to_string())
-            .append_pair("index", self.sort.protocol_name());
-        url.into()
-    }
-}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SearchHit {
@@ -88,18 +8,24 @@ pub struct SearchHit {
     pub slug: String,
     pub title: String,
     pub description: String,
+    /// The organization when the project belongs to one, else its author.
     pub author: String,
     pub kind: ProjectKind,
     /// Display categories, without the loaders.
     pub categories: Vec<String>,
-    /// Mod loaders the project supports (`fabric`, `forge`, …).
+    /// Every category the project has, without the loaders; what a card folds
+    /// into its overflow tag.
+    pub all_categories: Vec<String>,
+    /// Loaders the project supports (`fabric`, `forge`, …); a modpack's are
+    /// those of the pack, not the pack format.
     pub loaders: Vec<String>,
     pub downloads: u64,
     pub follows: u64,
+    /// RFC 3339 time the project was published.
+    pub published: String,
     /// RFC 3339 time of the last change.
     pub updated: String,
-    pub client_side: SideSupport,
-    pub server_side: SideSupport,
+    pub environment: Option<Environment>,
     pub icon_url: Option<String>,
 }
 
@@ -122,33 +48,51 @@ impl SideSupport {
             _ => Self::Unknown,
         }
     }
-
-    pub(super) const fn runs(self) -> bool {
-        matches!(self, Self::Required | Self::Optional)
-    }
 }
 
-/// Where a project can be used.
+/// Where a project can be used, in the words Modrinth's cards use.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Environment {
+    ClientOrServer,
     ClientAndServer,
     ClientOnly,
     ServerOnly,
+    SingleplayerOnly,
+    DedicatedServerOnly,
 }
 
-/// Summarizes the two side flags. Unknown on both sides says nothing.
+impl Environment {
+    /// Reads the environment value of a v3 project (`client_only`, …).
+    fn from_protocol(name: &str) -> Option<Self> {
+        Some(match name {
+            "client_or_server" | "client_or_server_prefers_both" => Self::ClientOrServer,
+            "client_and_server" => Self::ClientAndServer,
+            "client_only" | "client_only_server_optional" => Self::ClientOnly,
+            "server_only" | "server_only_client_optional" => Self::ServerOnly,
+            "singleplayer_only" => Self::SingleplayerOnly,
+            "dedicated_server_only" => Self::DedicatedServerOnly,
+            _ => return None,
+        })
+    }
+}
+
+/// Summarizes the two side flags (a v2 project). Unknown on either side says
+/// nothing.
 #[must_use]
 pub fn environment(client: SideSupport, server: SideSupport) -> Option<Environment> {
-    match (client.runs(), server.runs()) {
-        (true, true) => Some(Environment::ClientAndServer),
-        (true, false) if server == SideSupport::Unsupported => Some(Environment::ClientOnly),
-        (false, true) if client == SideSupport::Unsupported => Some(Environment::ServerOnly),
+    use SideSupport::{Optional, Required, Unsupported};
+    match (client, server) {
+        (Optional, Optional) => Some(Environment::ClientOrServer),
+        (Required, Required) => Some(Environment::ClientAndServer),
+        (Optional | Required, Optional | Unsupported) => Some(Environment::ClientOnly),
+        (Optional | Unsupported, Optional | Required) => Some(Environment::ServerOnly),
         _ => None,
     }
 }
 
-/// Loader names Modrinth lists next to categories in search results.
-pub(super) const MOD_LOADERS: [&str; 8] = [
+/// Names Modrinth lists next to categories that are loaders, platforms or
+/// shader loaders.
+pub(super) const LOADER_NAMES: [&str; 28] = [
     "fabric",
     "forge",
     "neoforge",
@@ -157,6 +101,26 @@ pub(super) const MOD_LOADERS: [&str; 8] = [
     "rift",
     "modloader",
     "babric",
+    "bta-babric",
+    "legacy-fabric",
+    "nilloader",
+    "ornithe",
+    "java-agent",
+    "paper",
+    "purpur",
+    "spigot",
+    "bukkit",
+    "folia",
+    "sponge",
+    "bungeecord",
+    "velocity",
+    "waterfall",
+    "geyser",
+    "datapack",
+    "iris",
+    "optifine",
+    "canvas",
+    "vanilla",
 ];
 
 impl SearchHit {
@@ -189,29 +153,46 @@ pub(super) struct RawSearch {
     pub(super) total_hits: u64,
 }
 
+#[derive(Debug, Default, Deserialize)]
+pub(super) struct RawFields {
+    #[serde(default)]
+    environment: Vec<String>,
+    #[serde(default)]
+    mrpack_loaders: Vec<String>,
+}
+
 #[derive(Debug, Deserialize)]
 pub(super) struct RawHit {
     pub(super) project_id: Option<String>,
     pub(super) slug: Option<String>,
-    pub(super) title: Option<String>,
+    pub(super) name: Option<String>,
     #[serde(default)]
-    pub(super) description: String,
+    pub(super) summary: String,
     #[serde(default)]
     pub(super) author: String,
-    pub(super) project_type: Option<String>,
+    pub(super) organization: Option<String>,
+    #[serde(default)]
+    pub(super) project_types: Vec<String>,
     #[serde(default)]
     pub(super) categories: Vec<String>,
     #[serde(default)]
     pub(super) display_categories: Vec<String>,
     #[serde(default)]
+    pub(super) loaders: Vec<String>,
+    #[serde(default)]
     pub(super) downloads: u64,
     #[serde(default)]
     pub(super) follows: u64,
     #[serde(default)]
+    pub(super) date_created: String,
+    #[serde(default)]
     pub(super) date_modified: String,
-    pub(super) client_side: Option<String>,
-    pub(super) server_side: Option<String>,
     pub(super) icon_url: Option<String>,
+    pub(super) project_loader_fields: Option<RawFields>,
+}
+
+fn is_loader(name: &str) -> bool {
+    LOADER_NAMES.contains(&name)
 }
 
 /// Decodes a search answer. Hits of an unknown project type or without an id
@@ -222,17 +203,38 @@ pub fn decode_search(bytes: &[u8]) -> Result<SearchPage, DiscoverError> {
         .hits
         .into_iter()
         .filter_map(|hit| {
-            let kind = ProjectKind::from_protocol(hit.project_type.as_deref()?)?;
+            let kind = hit
+                .project_types
+                .iter()
+                .find_map(|name| ProjectKind::from_protocol(name))?;
             let project_id = hit.project_id.filter(|id| !id.is_empty())?;
-            let title = hit.title.filter(|title| !title.is_empty())?;
+            let title = hit.name.filter(|title| !title.is_empty())?;
+            let fields = hit.project_loader_fields.unwrap_or_default();
+            let mut loaders: Vec<String> = Vec::new();
+            for name in &hit.loaders {
+                let named = if name == "mrpack" {
+                    fields.mrpack_loaders.iter()
+                } else {
+                    std::slice::from_ref(name).iter()
+                };
+                for loader in named {
+                    if !loaders.contains(loader) {
+                        loaders.push(loader.clone());
+                    }
+                }
+            }
             let shown = if hit.display_categories.is_empty() {
-                hit.categories
+                &hit.categories
             } else {
-                hit.display_categories
+                &hit.display_categories
             };
-            let (loaders, categories): (Vec<String>, Vec<String>) = shown
-                .into_iter()
-                .partition(|name| MOD_LOADERS.contains(&name.as_str()));
+            let without_loaders = |names: &[String]| -> Vec<String> {
+                names
+                    .iter()
+                    .filter(|name| !is_loader(name))
+                    .cloned()
+                    .collect()
+            };
             Some(SearchHit {
                 slug: hit
                     .slug
@@ -240,16 +242,23 @@ pub fn decode_search(bytes: &[u8]) -> Result<SearchPage, DiscoverError> {
                     .unwrap_or_else(|| project_id.clone()),
                 project_id,
                 title,
-                description: hit.description,
-                author: hit.author,
+                description: hit.summary,
+                author: hit
+                    .organization
+                    .filter(|name| !name.is_empty())
+                    .unwrap_or(hit.author),
                 kind,
-                categories,
+                categories: without_loaders(shown),
+                all_categories: without_loaders(&hit.categories),
                 loaders,
                 downloads: hit.downloads,
                 follows: hit.follows,
+                published: hit.date_created,
                 updated: hit.date_modified,
-                client_side: SideSupport::from_protocol(hit.client_side.as_deref()),
-                server_side: SideSupport::from_protocol(hit.server_side.as_deref()),
+                environment: fields
+                    .environment
+                    .first()
+                    .and_then(|name| Environment::from_protocol(name)),
                 icon_url: hit.icon_url.filter(|url| !url.is_empty()),
             })
         })

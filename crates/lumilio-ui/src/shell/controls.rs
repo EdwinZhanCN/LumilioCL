@@ -2,7 +2,7 @@ use super::{Labels, LauncherShell};
 use crate::kit::ViewIntent;
 use crate::live::{DiscoverChange, PAGE_SIZES, SORTS, sort_label};
 use crate::pages;
-use crate::pages::live::{ALL_VERSIONS, LiveControls};
+use crate::pages::live::LiveControls;
 use gpui::prelude::*;
 use gpui::{App, Context, Entity, Window};
 use gpui_component::input::InputEvent;
@@ -22,8 +22,13 @@ impl LauncherShell {
                 &search,
                 window,
                 |this, _, event: &InputEvent, window, cx| {
-                    if matches!(event, InputEvent::PressEnter { .. }) {
-                        this.submit_search(window, cx);
+                    match event {
+                        InputEvent::PressEnter { .. } => this.submit_search(window, cx),
+                        // The clear button empties the box: search again, as the app does.
+                        InputEvent::Change if this.discover_text_was_cleared(cx) => {
+                            this.submit_search(window, cx)
+                        }
+                        _ => {}
                     }
                 },
             )
@@ -34,12 +39,12 @@ impl LauncherShell {
                 }
             })
             .detach();
-            let (sort, size, version) = {
+            let (sort, size, version_search) = {
                 let read = controls.read(cx);
                 (
                     read.sort.clone(),
                     read.page_size.clone(),
-                    read.version.clone(),
+                    read.version_search.clone(),
                 )
             };
             cx.subscribe_in(
@@ -66,15 +71,11 @@ impl LauncherShell {
                 },
             )
             .detach();
-            cx.subscribe_in(
-                &version,
-                window,
-                |this, _, event: &SelectEvent<Labels>, window, cx| {
-                    let SelectEvent::Confirm(choice) = event;
-                    let version = choice.clone().filter(|text| text != ALL_VERSIONS);
-                    this.change_query(DiscoverChange::Version(version), window, cx);
-                },
-            )
+            cx.subscribe(&version_search, |_, _, event: &InputEvent, cx| {
+                if matches!(event, InputEvent::Change) {
+                    cx.notify();
+                }
+            })
             .detach();
             let (library_sort, library_loader) = {
                 let read = controls.read(cx);
@@ -172,29 +173,6 @@ impl LauncherShell {
                     }
                 });
             }
-        }
-    }
-
-    /// Fills the Discover version list once the filters arrive.
-    pub(super) fn sync_version_list(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        // The version list fills in when the filters arrive.
-        if let (Some(controls), Some(model)) = (&self.live_controls, &self.live)
-            && model.filters.loaded
-            && controls.read(cx).versions_shown != model.filters.versions.len()
-        {
-            let mut items = vec![ALL_VERSIONS.to_owned()];
-            items.extend(model.filters.versions.iter().cloned());
-            let count = model.filters.versions.len();
-            controls.update(cx, |controls, cx| {
-                controls.versions_shown = count;
-                controls.version.update(cx, |select, cx| {
-                    select.set_items(
-                        gpui_component::select::SearchableVec::new(items),
-                        window,
-                        cx,
-                    );
-                });
-            });
         }
     }
 }

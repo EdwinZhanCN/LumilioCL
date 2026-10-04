@@ -12,8 +12,8 @@ mod rows;
 mod tests;
 
 pub use self::controls::{
-    TagKind, action, avatar, chip, ghost, led_option, segments, switch, tabs, tag, tone_ok,
-    tone_warn,
+    Stand, TagKind, action, avatar, chip, filter_row, ghost, led_option, segments, switch, tabs,
+    tag, tone_ok, tone_warn,
 };
 pub use self::faceplate::{
     FACEPLATE_FADE, FACEPLATE_WIDTH, display_window, faceplate, faceplate_cover, faceplate_head,
@@ -22,8 +22,8 @@ pub use self::frame::{SEARCH_WIDTH, entrance, header, keep_wheel, page, search_f
 pub use self::menu::{MenuAction, MenuEntry, PageActions, more_menu, small_more_menu};
 pub use self::meter::{lit_bars, progress};
 pub use self::rows::{
-    empty, info, list, panel_list, row, section, section_at, section_label, setting, surface,
-    technical, value_row,
+    empty, info, list, panel_list, row, section, section_at, section_head, section_label, setting,
+    surface, technical, value_row,
 };
 
 use gpui::{App, Window};

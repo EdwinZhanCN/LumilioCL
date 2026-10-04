@@ -69,6 +69,9 @@ pub enum LiveIntent {
         sort: u8,
         loader: u8,
     },
+    /// Remember what Discover keeps between visits (see
+    /// `Preferences::discover`).
+    RememberDiscover(lumilio_core::DiscoverPreferences),
     /// Measure the shared game files no game uses and offer to remove them.
     CheckReclaimable,
     /// Remove them (after the person confirmed).

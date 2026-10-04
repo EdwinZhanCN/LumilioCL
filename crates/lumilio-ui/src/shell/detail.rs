@@ -1,5 +1,5 @@
 use super::LauncherShell;
-use crate::live::LiveIntent;
+use crate::live::{LiveIntent, LiveModel};
 use crate::project_detail::{
     DetailHandler, DetailIntent, DetailState, InstallTarget, ProjectDetailView,
 };
@@ -19,14 +19,10 @@ pub(super) struct DetailSlot {
 impl LauncherShell {
     /// Chooses the instance play and installs target, everywhere at once.
     pub fn set_install_target(&mut self, id: String, cx: &mut Context<Self>) {
-        let target = self.live.as_ref().and_then(|model| {
-            let card = model.library.iter().find(|card| card.id == id)?;
-            Some(InstallTarget {
-                name: card.name.clone(),
-                game_version: card.game_version.clone(),
-                loader: card.loader,
-            })
-        });
+        let target = self
+            .live
+            .as_ref()
+            .and_then(|model| install_target_of(model, &id));
         if let (Some(slot), Some(target)) = (&self.detail, target) {
             slot.view
                 .update(cx, |view, cx| view.set_target(Some(target), cx));
@@ -89,21 +85,20 @@ impl LauncherShell {
         });
         let url = lumilio_core::project_page_url(kind, slug);
         let target = self.live.as_ref().and_then(|model| {
-            let card = model
-                .library
-                .iter()
-                .find(|card| Some(&card.id) == model.install_target.as_ref())?;
-            Some(InstallTarget {
-                name: card.name.clone(),
-                game_version: card.game_version.clone(),
-                loader: card.loader,
-            })
+            let id = model.install_target.clone()?;
+            install_target_of(model, &id)
         });
+        let tags = self
+            .live
+            .as_ref()
+            .map(|model| model.filters.game_tags().to_vec())
+            .unwrap_or_default();
         let view = cx.new(|_| {
             let mut view = ProjectDetailView::new(slug.to_owned(), url, handler);
             view.set_target_quiet(target);
             view
         });
+        view.update(cx, |view, cx| view.set_game_tags(tags, cx));
         self.visit();
         self.live_instance = None;
         self.detail = Some(DetailSlot {
@@ -113,6 +108,13 @@ impl LauncherShell {
         });
         self.route = Route::Discover;
         cx.notify();
+    }
+
+    /// Shows a gallery image of the open project large.
+    pub fn open_gallery_image(&mut self, index: usize, cx: &mut Context<Self>) {
+        if let Some(slot) = &self.detail {
+            slot.view.update(cx, |view, cx| view.open_viewer(index, cx));
+        }
     }
 
     /// Fills the open detail in, if it is still the one asked for.
@@ -152,4 +154,15 @@ pub(super) const fn detail_title(kind: ProjectKind) -> &'static str {
         ProjectKind::ResourcePack => "资源包详情",
         ProjectKind::Shader => "光影详情",
     }
+}
+
+/// The game installs go into, as the detail page needs to know it.
+fn install_target_of(model: &LiveModel, id: &str) -> Option<InstallTarget> {
+    let card = model.library.iter().find(|card| card.id == id)?;
+    Some(InstallTarget {
+        name: card.name.clone(),
+        game_version: card.game_version.clone(),
+        loader: card.loader,
+        from_game: model.browsing_for.as_deref() == Some(id),
+    })
 }

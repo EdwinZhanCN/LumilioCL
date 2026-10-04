@@ -347,6 +347,20 @@ pub(super) fn on_live_intent(
                     .spawn(async move { service.set_preferences(preferences).await }),
             );
         }
+        LiveIntent::RememberDiscover(discover) => {
+            let preferences = {
+                let mut state = wiring.state.borrow_mut();
+                state.preferences.discover = discover;
+                state.preferences.clone()
+            };
+            // Quiet, like the Library's order: not worth a message when it fails.
+            let service = wiring.backend.service.clone();
+            drop(
+                wiring
+                    .backend
+                    .spawn(async move { service.set_preferences(preferences).await }),
+            );
+        }
         LiveIntent::SetPreferences(preferences) => {
             let service = wiring.backend.service.clone();
             let saved = preferences.clone();

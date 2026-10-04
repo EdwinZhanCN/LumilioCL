@@ -68,6 +68,7 @@ fn record(loader: Loader, installed: bool) -> InstanceRecord {
         play_seconds: 0,
         installed,
         settings: InstanceSettings::default(),
+        source_project: None,
     }
 }
 

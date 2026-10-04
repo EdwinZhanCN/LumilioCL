@@ -11,11 +11,22 @@ pub struct CategoryTag {
     pub kind: ProjectKind,
 }
 
+/// A loader (or shader loader, or platform) and the project types it serves.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LoaderTag {
+    pub name: String,
+    /// Modrinth's own names (`mod`, `plugin`, `datapack`, …), not only ours.
+    pub project_types: Vec<String>,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct GameVersionTag {
     pub version: String,
     /// A full release, as opposed to a snapshot or pre-release.
     pub release: bool,
+    /// A snapshot; what is neither this nor a release is a legacy version
+    /// (alpha, beta, classic).
+    pub snapshot: bool,
     pub published: String,
 }
 
@@ -25,6 +36,13 @@ pub(super) struct RawCategory {
     #[serde(default)]
     pub(super) header: String,
     pub(super) project_type: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub(super) struct RawLoader {
+    pub(super) name: Option<String>,
+    #[serde(default)]
+    pub(super) supported_project_types: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -139,6 +157,19 @@ pub fn decode_categories(bytes: &[u8]) -> Result<Vec<CategoryTag>, DiscoverError
         .collect())
 }
 
+pub fn decode_loaders(bytes: &[u8]) -> Result<Vec<LoaderTag>, DiscoverError> {
+    let raw: Vec<RawLoader> = decode(bytes)?;
+    Ok(raw
+        .into_iter()
+        .filter_map(|tag| {
+            Some(LoaderTag {
+                name: tag.name.filter(|name| !name.is_empty())?,
+                project_types: tag.supported_project_types,
+            })
+        })
+        .collect())
+}
+
 pub fn decode_game_versions(bytes: &[u8]) -> Result<Vec<GameVersionTag>, DiscoverError> {
     let raw: Vec<RawGameVersion> = decode(bytes)?;
     Ok(raw
@@ -147,6 +178,7 @@ pub fn decode_game_versions(bytes: &[u8]) -> Result<Vec<GameVersionTag>, Discove
             Some(GameVersionTag {
                 version: tag.version.filter(|version| !version.is_empty())?,
                 release: tag.version_type == "release",
+                snapshot: tag.version_type == "snapshot",
                 published: tag.date,
             })
         })

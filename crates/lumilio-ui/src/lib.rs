@@ -22,6 +22,7 @@ pub mod microsoft_login;
 pub mod navigation;
 pub mod new_game;
 pub mod pages;
+pub mod photosensitivity;
 pub mod placeholders;
 pub mod platform;
 pub mod project_detail;

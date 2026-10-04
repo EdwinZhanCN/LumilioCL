@@ -4,10 +4,7 @@ use super::activity::{
     ActivityRow, ActivityState, active_row, activity_in_tab, activity_rows, eta_text, next_sample,
     rate_text, recovery_message,
 };
-use super::discover::{
-    DiscoverChange, DiscoverQuery, FilterModel, PageItem, SearchStatus, count_label, page_items,
-    parse_rfc3339, search_row, tag_label,
-};
+use super::discover::{PageItem, SearchStatus, count_label, page_items, parse_rfc3339, tag_label};
 use super::home::home_presentation;
 use super::library::{
     CollectionRow, attention_rows, library_card, library_cards, relative_time, seed_of, world_of,
@@ -15,9 +12,8 @@ use super::library::{
 use super::settings::settings_view;
 use crate::home::HomePresentation;
 use lumilio_core::{
-    ActiveTask, ActivityView, DiscoverFilters, Environment, FinishedTask, HomeSummary,
-    InstanceRecord, LauncherSettings, Loader, ProjectKind, SearchHit, SortIndex, TaskCategory,
-    TaskOutcome,
+    ActiveTask, ActivityView, FinishedTask, HomeSummary, InstanceRecord, LauncherSettings, Loader,
+    TaskCategory, TaskOutcome,
 };
 use std::path::{Path, PathBuf};
 
@@ -36,6 +32,7 @@ fn record(id: &str, favorite: bool, last_played: Option<u64>, created_at: u64) -
         play_seconds: 0,
         installed: false,
         settings: InstanceSettings::default(),
+        source_project: None,
     }
 }
 
@@ -523,86 +520,6 @@ fn the_install_target_survives_refreshes_and_falls_back_when_deleted() {
     assert_eq!(model.install_target, None);
 }
 
-fn query() -> DiscoverQuery {
-    DiscoverQuery::new(ProjectKind::Mod)
-}
-
-#[test]
-fn any_change_but_paging_returns_to_the_first_page() {
-    let mut q = query();
-    q.page = 7;
-    assert_eq!(q.clone().apply(DiscoverChange::Page(8)).page, 8);
-    for change in [
-        DiscoverChange::Sort(SortIndex::Downloads),
-        DiscoverChange::PageSize(50),
-        DiscoverChange::Version(Some("1.21".to_owned())),
-        DiscoverChange::ToggleCategory("magic".to_owned()),
-        DiscoverChange::ToggleLoader("fabric".to_owned()),
-        DiscoverChange::ClearFilters,
-        DiscoverChange::Kind(ProjectKind::Shader),
-    ] {
-        assert_eq!(q.clone().apply(change.clone()).page, 0, "{change:?}");
-    }
-}
-
-#[test]
-fn toggles_add_then_remove_and_a_new_kind_forgets_categories_and_loaders() {
-    let q = query()
-        .apply(DiscoverChange::ToggleCategory("magic".to_owned()))
-        .apply(DiscoverChange::ToggleCategory("technology".to_owned()))
-        .apply(DiscoverChange::ToggleLoader("fabric".to_owned()));
-    assert_eq!(q.categories, ["magic", "technology"]);
-    let q = q.apply(DiscoverChange::ToggleCategory("magic".to_owned()));
-    assert_eq!(q.categories, ["technology"]);
-    assert!(q.filtered());
-
-    let same = q.clone().apply(DiscoverChange::Kind(ProjectKind::Mod));
-    assert_eq!(same.categories, ["technology"], "the same kind keeps them");
-    let q = q
-        .apply(DiscoverChange::Version(Some("1.21.1".to_owned())))
-        .apply(DiscoverChange::Kind(ProjectKind::ResourcePack));
-    assert!(q.categories.is_empty() && q.loaders.is_empty());
-    assert_eq!(
-        q.game_version.as_deref(),
-        Some("1.21.1"),
-        "versions carry over"
-    );
-}
-
-#[test]
-fn clearing_filters_keeps_text_and_sort() {
-    let mut q = query().apply(DiscoverChange::Sort(SortIndex::Follows));
-    q.text = "sodium".to_owned();
-    let q = q
-        .apply(DiscoverChange::ToggleCategory("x".to_owned()))
-        .apply(DiscoverChange::Version(Some("1.0".to_owned())))
-        .apply(DiscoverChange::ClearFilters);
-    assert!(!q.filtered());
-    assert_eq!((q.text.as_str(), q.sort), ("sodium", SortIndex::Follows));
-}
-
-#[test]
-fn the_core_query_carries_everything_and_bounds_the_page_size() {
-    let mut q = query()
-        .apply(DiscoverChange::Version(Some("1.21.1".to_owned())))
-        .apply(DiscoverChange::ToggleLoader("quilt".to_owned()))
-        .apply(DiscoverChange::ToggleCategory("magic".to_owned()))
-        .apply(DiscoverChange::Sort(SortIndex::Updated))
-        .apply(DiscoverChange::PageSize(5000));
-    q.text = "tech".to_owned();
-    let q = q.apply(DiscoverChange::Page(3));
-    let search = q.to_search();
-    assert_eq!(search.page_size, 100);
-    assert_eq!(search.page, 3);
-    assert_eq!(search.loaders, ["quilt"]);
-    assert_eq!(search.categories, ["magic"]);
-    assert_eq!(search.game_version.as_deref(), Some("1.21.1"));
-    assert_eq!(
-        (search.text.as_str(), search.sort),
-        ("tech", SortIndex::Updated)
-    );
-}
-
 fn shown(current: u32, pages: u32) -> String {
     page_items(current, pages)
         .iter()
@@ -662,77 +579,9 @@ fn timestamps_parse_with_fractions_and_offsets() {
 }
 
 #[test]
-fn rows_show_counts_environment_and_a_relative_update() {
-    let hit = SearchHit {
-        project_id: "P".to_owned(),
-        slug: "fo".to_owned(),
-        title: "FO".to_owned(),
-        description: "fast".to_owned(),
-        author: "me".to_owned(),
-        kind: ProjectKind::Modpack,
-        categories: vec!["lightweight".to_owned()],
-        loaders: vec!["fabric".to_owned()],
-        downloads: 17_731_400,
-        follows: 4886,
-        updated: "2026-09-27T10:00:00Z".to_owned(),
-        client_side: lumilio_core::SideSupport::Required,
-        server_side: lumilio_core::SideSupport::Optional,
-        icon_url: Some("https://cdn/x.png".to_owned()),
-    };
-    let now = parse_rfc3339("2026-09-30T10:00:00Z").unwrap();
-    let row = search_row(&hit, now);
-    assert_eq!(row.downloads, "1773.1 万");
-    assert_eq!(row.follows, "4886");
-    assert_eq!(row.updated, "3 天前");
-    assert_eq!(row.environment, Some(Environment::ClientAndServer));
-    assert_eq!(row.icon_url.as_deref(), Some("https://cdn/x.png"));
-    let unknown = SearchHit {
-        updated: String::new(),
-        ..hit
-    };
-    assert_eq!(search_row(&unknown, now).updated, "");
-}
-
-#[test]
 fn tag_labels_are_chinese_when_known_and_readable_when_not() {
     assert_eq!(tag_label("optimization"), "优化");
     assert_eq!(tag_label("fabric"), "Fabric");
     assert_eq!(tag_label("some-new-thing"), "Some new thing");
     assert_eq!(tag_label(""), "");
-}
-
-#[test]
-fn filters_list_only_releases_and_the_kinds_own_categories() {
-    use lumilio_core::{CategoryTag, GameVersionTag};
-    let core = DiscoverFilters {
-        categories: vec![
-            CategoryTag {
-                name: "magic".to_owned(),
-                header: "categories".to_owned(),
-                kind: ProjectKind::Mod,
-            },
-            CategoryTag {
-                name: "bloom".to_owned(),
-                header: "features".to_owned(),
-                kind: ProjectKind::Shader,
-            },
-        ],
-        game_versions: vec![
-            GameVersionTag {
-                version: "26.4-pre1".to_owned(),
-                release: false,
-                published: String::new(),
-            },
-            GameVersionTag {
-                version: "26.3".to_owned(),
-                release: true,
-                published: String::new(),
-            },
-        ],
-    };
-    let model = FilterModel::from_core(&core);
-    assert_eq!(model.versions, ["26.3"]);
-    assert_eq!(model.categories(ProjectKind::Mod), ["magic"]);
-    assert_eq!(model.categories(ProjectKind::Shader), ["bloom"]);
-    assert!(model.categories(ProjectKind::Modpack).is_empty());
 }

@@ -3,9 +3,8 @@ use super::error::DiscoverError;
 use super::intent::{IntentError, install_request};
 use super::kinds::{ProjectKind, SortIndex, browse_page_url};
 use super::project::decode_project;
-use super::search::{
-    Environment, SearchPage, SearchQuery, SideSupport, decode_search, environment,
-};
+use super::query::{Pick, SearchQuery, Stance};
+use super::search::{Environment, SearchPage, SideSupport, decode_search, environment};
 use super::tags::{
     decode_categories, decode_game_versions, decode_owner, decode_project_summaries,
     decode_team_authors, encoded_list,
@@ -127,55 +126,146 @@ fn browse_pages_are_the_plural_listing_of_each_kind() {
     );
 }
 
+fn pairs(query: &SearchQuery) -> BTreeMap<String, String> {
+    Url::parse(&query.url())
+        .unwrap()
+        .query_pairs()
+        .into_owned()
+        .collect()
+}
+
 #[test]
-fn search_url_carries_facets_paging_and_sort() {
+fn search_url_carries_filters_paging_and_sort() {
     let mut query = SearchQuery::new(ProjectKind::Mod);
     query.text = " sodium ".to_owned();
-    query.game_version = Some("1.21.1".to_owned());
-    query.loaders = vec!["fabric".to_owned(), " quilt ".to_owned(), String::new()];
-    query.categories = vec!["optimization".to_owned(), "lightweight".to_owned()];
+    query.game_versions = vec!["1.21.1".to_owned()];
+    query.loaders = vec![
+        Pick::include("fabric"),
+        Pick::include(" quilt "),
+        Pick::include(""),
+    ];
+    query.categories = vec![Pick::include("optimization"), Pick::include("lightweight")];
     query.sort = SortIndex::Downloads;
     query.page = 2;
     query.page_size = 10;
     let url = Url::parse(&query.url()).unwrap();
-    assert_eq!(url.path(), "/v2/search");
-    let pairs: BTreeMap<_, _> = url.query_pairs().into_owned().collect();
+    assert_eq!(url.path(), "/v3/search");
+    let pairs = pairs(&query);
     assert_eq!(pairs["query"], "sodium");
     assert_eq!(pairs["offset"], "20");
     assert_eq!(pairs["limit"], "10");
     assert_eq!(pairs["index"], "downloads");
     assert_eq!(
-        pairs["facets"],
-        r#"[["project_type:mod"],["versions:1.21.1"],["categories:fabric","categories:quilt"],["categories:optimization"],["categories:lightweight"]]"#
+        pairs["new_filters"],
+        "categories = `optimization` AND categories = `lightweight` \
+         AND game_versions = `1.21.1` AND categories IN [`fabric`, ` quilt `] \
+         AND project_types = `mod`"
     );
 }
 
 #[test]
-fn loaders_only_filter_mods_and_modpacks_and_page_size_is_bounded() {
-    let mut query = SearchQuery::new(ProjectKind::Shader);
-    query.loaders = vec!["fabric".to_owned()];
+fn the_first_page_and_empty_text_send_neither_offset_nor_query() {
+    let pairs = pairs(&SearchQuery::new(ProjectKind::Shader));
+    assert!(!pairs.contains_key("offset"));
+    assert!(!pairs.contains_key("query"));
+    assert_eq!(pairs["new_filters"], "project_types = `shader`");
+}
+
+#[test]
+fn loaders_skip_kinds_without_them_and_page_size_is_bounded() {
+    let mut query = SearchQuery::new(ProjectKind::ResourcePack);
+    query.loaders = vec![Pick::include("fabric")];
     query.page_size = 5000;
-    let url = Url::parse(&query.url()).unwrap();
-    let pairs: BTreeMap<_, _> = url.query_pairs().into_owned().collect();
-    assert_eq!(pairs["facets"], r#"[["project_type:shader"]]"#);
-    assert_eq!(pairs["limit"], "100");
+    assert_eq!(query.expression(), "project_types = `resourcepack`");
+    assert_eq!(pairs(&query)["limit"], "100");
+    query.kind = ProjectKind::Shader;
+    assert_eq!(
+        query.expression(),
+        "categories = `fabric` AND project_types = `shader`"
+    );
+}
+
+#[test]
+fn excluded_picks_collect_into_one_not_in_clause() {
+    let mut query = SearchQuery::new(ProjectKind::Mod);
+    query.categories = vec![Pick::exclude("cursed"), Pick::include("magic")];
+    query.loaders = vec![Pick::exclude("forge"), Pick::include("fabric")];
+    query.open_source = Some(Stance::Exclude);
+    query.hidden_projects = vec!["AANobbMI".to_owned(), "P7dR8mSH".to_owned()];
+    query.excluded_disclosures = vec!["epilepsy_triggers".to_owned()];
+    query.excluded_types = vec!["plugin".to_owned(), "datapack".to_owned()];
+    assert_eq!(
+        query.expression(),
+        "categories = `magic` AND categories = `fabric` \
+         AND categories NOT IN [`cursed`, `forge`] AND open_source NOT IN [true] \
+         AND project_id NOT IN [`AANobbMI`, `P7dR8mSH`] \
+         AND disclosure_types NOT IN [`epilepsy_triggers`] \
+         AND project_types = `mod` AND all_project_types NOT IN [`plugin`, `datapack`]"
+    );
+}
+
+#[test]
+fn any_of_categories_match_when_one_does_and_open_source_includes() {
+    let mut query = SearchQuery::new(ProjectKind::ResourcePack);
+    query.categories = vec![
+        Pick::include("16x").any_of(),
+        Pick::include("32x").any_of(),
+        Pick::include("themed"),
+    ];
+    query.open_source = Some(Stance::Include);
+    assert_eq!(
+        query.expression(),
+        "categories = `themed` AND categories IN [`16x`, `32x`] AND open_source = true \
+         AND project_types = `resourcepack`"
+    );
+}
+
+#[test]
+fn environment_asks_for_the_values_that_work_on_that_side() {
+    let mut query = SearchQuery::new(ProjectKind::Mod);
+    query.client = true;
+    assert_eq!(
+        query.expression(),
+        "(environment = `client_only` OR environment = `client_only_server_optional` \
+         OR environment = `client_or_server_prefers_both` OR environment = `client_or_server`) \
+         AND project_types = `mod`"
+    );
+    query.client = false;
+    query.server = true;
+    assert!(
+        query
+            .expression()
+            .contains("environment = `dedicated_server_only`")
+    );
+    query.client = true;
+    assert!(
+        query
+            .expression()
+            .contains("environment = `client_and_server`")
+    );
+    assert!(!query.expression().contains("`dedicated_server_only`"));
+    // Resource packs have no environment to ask about.
+    query.kind = ProjectKind::ResourcePack;
+    assert_eq!(query.expression(), "project_types = `resourcepack`");
 }
 
 #[test]
 fn decodes_hits_and_drops_unusable_ones() {
     let page = decode_search(
         br#"{"total_hits": 45, "hits": [
-            {"project_id":"A","slug":"sodium","title":"Sodium","author":"jelly",
-             "project_type":"mod","categories":["fabric","optimization"],
-             "display_categories":["optimization"],"downloads":9,"icon_url":""},
-            {"project_id":"B","title":"Weird","project_type":"plugin"},
-            {"project_type":"mod","title":"No id"}
+            {"project_id":"A","slug":"sodium","name":"Sodium","author":"jelly",
+             "project_types":["mod"],"categories":["fabric","optimization"],
+             "display_categories":["optimization"],"loaders":["fabric"],
+             "downloads":9,"icon_url":""},
+            {"project_id":"B","name":"Weird","project_types":["plugin"]},
+            {"project_types":["mod"],"name":"No id"}
         ]}"#,
     )
     .unwrap();
     assert_eq!(page.hits.len(), 1);
     let hit = &page.hits[0];
     assert_eq!(hit.categories, ["optimization"]);
+    assert_eq!(hit.loaders, ["fabric"]);
     assert_eq!(hit.icon_url, None);
     assert_eq!(hit.page_url(), "https://modrinth.com/mod/sodium");
     assert_eq!(page.page_count(20), 3);
@@ -343,7 +433,7 @@ async fn the_client_hits_the_documented_endpoints() {
     let mut routes = BTreeMap::new();
     routes.insert(
         query.url().replacen(API_BASE, "http://mock", 1),
-        br#"{"total_hits":1,"hits":[{"project_id":"A","title":"T","project_type":"mod"}]}"#
+        br#"{"total_hits":1,"hits":[{"project_id":"A","name":"T","project_types":["mod"]}]}"#
             .to_vec(),
     );
     routes.insert(
@@ -375,36 +465,33 @@ async fn the_client_hits_the_documented_endpoints() {
 }
 
 #[test]
-fn modpacks_filter_by_loader_too() {
-    let mut query = SearchQuery::new(ProjectKind::Modpack);
-    query.loaders = vec!["neoforge".to_owned()];
-    let url = Url::parse(&query.url()).unwrap();
-    let pairs: BTreeMap<_, _> = url.query_pairs().into_owned().collect();
-    assert_eq!(
-        pairs["facets"],
-        r#"[["project_type:modpack"],["categories:neoforge"]]"#
-    );
-}
-
-#[test]
-fn hits_carry_stats_environment_and_split_loaders_from_categories() {
+fn hits_carry_stats_environment_and_the_packs_own_loaders() {
     let page = decode_search(
         br#"{"total_hits": 1, "hits": [
-            {"project_id":"A","slug":"fo","title":"FO","author":"me","project_type":"modpack",
-             "display_categories":["lightweight","fabric","multiplayer"],
-             "downloads":17731400,"follows":4886,"date_modified":"2026-09-27T10:00:00Z",
-             "client_side":"required","server_side":"optional"}]}"#,
+            {"project_id":"A","slug":"fo","name":"FO","author":"me","organization":"The Team",
+             "project_types":["modpack"],"loaders":["mrpack"],
+             "categories":["fabric","lightweight","multiplayer","optimization"],
+             "display_categories":["lightweight","multiplayer"],
+             "downloads":17731400,"follows":4886,
+             "date_created":"2022-02-10T06:28:19Z","date_modified":"2026-09-27T10:00:00Z",
+             "project_loader_fields":{"environment":["client_only"],"mrpack_loaders":["fabric"]}}]}"#,
     )
     .unwrap();
     let hit = &page.hits[0];
+    assert_eq!(
+        hit.author, "The Team",
+        "an organization stands for its projects"
+    );
     assert_eq!(hit.categories, ["lightweight", "multiplayer"]);
+    assert_eq!(
+        hit.all_categories,
+        ["lightweight", "multiplayer", "optimization"]
+    );
     assert_eq!(hit.loaders, ["fabric"]);
     assert_eq!((hit.downloads, hit.follows), (17_731_400, 4886));
+    assert_eq!(hit.published, "2022-02-10T06:28:19Z");
     assert_eq!(hit.updated, "2026-09-27T10:00:00Z");
-    assert_eq!(
-        environment(hit.client_side, hit.server_side),
-        Some(Environment::ClientAndServer)
-    );
+    assert_eq!(hit.environment, Some(Environment::ClientOnly));
 }
 
 #[test]
@@ -420,7 +507,15 @@ fn environment_reads_the_two_side_flags() {
     );
     assert_eq!(
         environment(Optional, Optional),
+        Some(Environment::ClientOrServer)
+    );
+    assert_eq!(
+        environment(Required, Required),
         Some(Environment::ClientAndServer)
+    );
+    assert_eq!(
+        environment(Required, Optional),
+        Some(Environment::ClientOnly)
     );
     // Not knowing is not the same as not running there.
     assert_eq!(environment(Unknown, Unknown), None);
@@ -440,7 +535,7 @@ fn a_project_decodes_gallery_links_license_and_dates() {
             "gallery":[
               {"url":"https://cdn/b.png","title":"B","featured":false,"ordering":1},
               {"url":"","title":"no address"},
-              {"url":"https://cdn/a.png","title":"A","description":"first","featured":true,"ordering":5},
+              {"url":"https://cdn/a_350.webp","raw_url":"https://cdn/a.png","title":"A","description":"first","featured":true,"ordering":5},
               {"url":"https://cdn/c.png","featured":false,"ordering":0}]}"##,
     )
     .unwrap();
@@ -452,7 +547,16 @@ fn a_project_decodes_gallery_links_license_and_dates() {
     );
     assert_eq!(project.links.issues, None, "an empty address is no link");
     assert_eq!(project.links.wiki, None);
-    let order: Vec<_> = project.gallery.iter().map(|i| i.url.as_str()).collect();
+    // The preview is for the grid, the original for the large view; a missing
+    // original falls back to the preview.
+    assert_eq!(project.gallery[0].url, "https://cdn/a_350.webp");
+    assert_eq!(project.gallery[0].full_url, "https://cdn/a.png");
+    assert_eq!(project.gallery[1].full_url, project.gallery[1].url);
+    let order: Vec<_> = project
+        .gallery
+        .iter()
+        .map(|i| i.full_url.as_str())
+        .collect();
     assert_eq!(
         order,
         [
@@ -498,4 +602,60 @@ fn the_owner_is_the_member_with_the_owner_role() {
     .unwrap();
     assert_eq!(owner.as_deref(), Some("jelly"));
     assert_eq!(decode_owner(b"[]").unwrap(), None);
+}
+
+fn game(version: &str, kind: &str, date: &str) -> super::tags::GameVersionTag {
+    super::tags::GameVersionTag {
+        version: version.to_owned(),
+        release: kind == "release",
+        snapshot: kind == "snapshot",
+        published: date.to_owned(),
+    }
+}
+
+fn labels(groups: &[super::version_groups::VersionGroup]) -> Vec<&str> {
+    groups.iter().map(|group| group.label.as_str()).collect()
+}
+
+#[test]
+fn game_versions_collapse_into_ranges_like_modrinth_app() {
+    use super::version_groups::version_groups;
+    // Newest first, as Modrinth lists them.
+    let all = vec![
+        game("1.21-pre1", "snapshot", "2024-06-01"),
+        game("1.21", "release", "2024-06-13"),
+        game("1.20.6", "release", "2024-04-29"),
+        game("1.20.5", "release", "2024-04-23"),
+        game("1.20.4", "release", "2023-12-07"),
+        game("1.20.2", "release", "2023-09-21"),
+        game("1.20.1", "release", "2023-06-12"),
+        game("1.20", "release", "2023-06-07"),
+        game("b1.8.1", "beta", "2011-09-18"),
+    ];
+    let of = |names: &[&str]| {
+        let owned: Vec<String> = names.iter().map(|name| (*name).to_owned()).collect();
+        version_groups(&owned, &all)
+    };
+    // Every 1.20 patch the game has: "1.20.x"; a gap in the project's own list splits it.
+    assert_eq!(
+        labels(&of(&[
+            "1.20", "1.20.1", "1.20.2", "1.20.4", "1.20.5", "1.20.6"
+        ])),
+        ["1.20.4–1.20.6", "1.20–1.20.2"]
+    );
+    assert_eq!(
+        labels(&of(&[
+            "1.20", "1.20.1", "1.20.2", "1.20.4", "1.20.5", "1.20.6", "1.21"
+        ])),
+        ["1.21", "1.20.4–1.20.6", "1.20–1.20.2"],
+    );
+    assert_eq!(labels(&of(&["1.20.1"])), ["1.20.1"]);
+    // A snapshot newer than the newest supported release is named first.
+    assert_eq!(
+        labels(&of(&["1.21-pre1", "1.20.1"])),
+        ["1.21-pre1", "1.20.1"]
+    );
+    // A project with only a snapshot shows it; legacy versions follow in a range.
+    assert_eq!(labels(&of(&["1.21-pre1"])), ["1.21-pre1"]);
+    assert_eq!(labels(&of(&["1.20.1", "b1.8.1"])), ["1.20.1", "b1.8.1"]);
 }

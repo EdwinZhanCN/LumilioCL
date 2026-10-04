@@ -17,9 +17,10 @@ pub struct LiveControls {
     pub discover_search: Entity<InputState>,
     pub sort: Entity<SelectState<SearchableVec<String>>>,
     pub page_size: Entity<SelectState<SearchableVec<String>>>,
-    pub version: Entity<SelectState<SearchableVec<String>>>,
-    /// How many game versions the version list was last filled with.
-    pub versions_shown: usize,
+    /// The box that narrows the sidebar's version list.
+    pub version_search: Entity<InputState>,
+    /// The version list's scroll, so it keeps the wheel while it can scroll.
+    pub version_scroll: gpui::ScrollHandle,
     /// The Library's ordering and loader filter.
     pub library_sort: Entity<SelectState<SearchableVec<String>>>,
     pub library_loader: Entity<SelectState<SearchableVec<String>>>,
@@ -29,9 +30,6 @@ pub struct LiveControls {
 
 /// The text of the "no loader filter" entry.
 pub const ALL_LOADERS: &str = "全部加载器";
-
-/// The text of the "no version filter" entry.
-pub const ALL_VERSIONS: &str = "全部版本";
 
 impl LiveControls {
     pub fn new(window: &mut Window, cx: &mut gpui::Context<Self>) -> Self {
@@ -58,16 +56,8 @@ impl LiveControls {
                     cx,
                 )
             }),
-            version: cx.new(|cx| {
-                SelectState::new(
-                    SearchableVec::new(vec![ALL_VERSIONS.to_owned()]),
-                    Some(IndexPath::default()),
-                    window,
-                    cx,
-                )
-                .searchable(true)
-            }),
-            versions_shown: 0,
+            version_search: cx.new(|cx| InputState::new(window, cx).placeholder("搜索版本")),
+            version_scroll: gpui::ScrollHandle::new(),
             library_sort: cx.new(|cx| {
                 let labels: Vec<String> = SORT_LABELS.iter().map(|s| (*s).to_owned()).collect();
                 SelectState::new(
@@ -102,6 +92,8 @@ pub struct LiveCtx<'a> {
     pub change: DiscoverChangeHandler,
     pub controls: &'a LiveControls,
     pub filter: String,
+    /// What is typed in the sidebar's version search.
+    pub version_filter: String,
 }
 
 pub(super) fn send(

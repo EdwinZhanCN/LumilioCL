@@ -66,6 +66,7 @@ fn a_deleted_instance_drops_out_of_history_and_the_chip_retargets(cx: &mut TestA
         play_seconds: 0,
         installed: true,
         settings: InstanceSettings::default(),
+        source_project: None,
     };
     shell.update(cx, |shell, cx| {
         shell.show(Route::Library);

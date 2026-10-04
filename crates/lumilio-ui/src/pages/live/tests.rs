@@ -20,6 +20,7 @@ fn card(id: &str, name: &str, loader: lumilio_core::Loader, created: u64) -> Lib
             play_seconds: 0,
             installed: false,
             settings: InstanceSettings::default(),
+            source_project: None,
         },
         10,
     )

@@ -19,7 +19,7 @@ use crate::persist::{self, PersistError, Versioned};
 use crate::tuning::InstanceLaunch;
 
 /// Stored as SQLite's `user_version`; bump with a migration when tables change.
-const SCHEMA_VERSION: u32 = 2;
+const SCHEMA_VERSION: u32 = 3;
 
 /// SQLite integers are signed; timestamps and counters never get near the limit.
 fn int<T: TryInto<i64>>(value: T) -> i64 {
@@ -94,6 +94,10 @@ pub struct InstanceRecord {
     pub installed: bool,
     #[serde(default)]
     pub settings: InstanceSettings,
+    /// The Modrinth project this game was installed from, when it came from a
+    /// modpack there; Discover uses it to hide packs already in the library.
+    #[serde(default)]
+    pub source_project: Option<String>,
 }
 
 impl InstanceRecord {
@@ -289,7 +293,8 @@ impl InstanceStore {
                 max_memory_mb INTEGER,
                 min_memory_mb INTEGER,
                 jvm_arguments TEXT NOT NULL,
-                tuning TEXT
+                tuning TEXT,
+                source_project TEXT
             );
             CREATE TABLE IF NOT EXISTS collections (
                 position INTEGER NOT NULL,
@@ -319,6 +324,22 @@ impl InstanceStore {
                 }
             }
             db.execute_batch("ALTER TABLE instances ADD COLUMN tuning TEXT;")?;
+        }
+        // Schema 3 added `source_project`. An older build would not know the
+        // column, so the version moves with it.
+        let has_source = db
+            .prepare("SELECT 1 FROM pragma_table_info('instances') WHERE name = 'source_project'")?
+            .exists([])?;
+        if !has_source {
+            if version == 2 {
+                let mut backup = path.as_os_str().to_owned();
+                backup.push(".v2");
+                let backup = PathBuf::from(backup);
+                if !backup.exists() {
+                    let _ = fs::copy(path, backup);
+                }
+            }
+            db.execute_batch("ALTER TABLE instances ADD COLUMN source_project TEXT;")?;
         }
         Ok(db)
     }
@@ -356,7 +377,7 @@ impl InstanceStore {
         let mut statement = self.db.prepare(
             "SELECT id, name, game_version, loader, loader_version, favorite, created_at,
                     last_played, play_seconds, installed, java_path, max_memory_mb,
-                    min_memory_mb, jvm_arguments, tuning
+                    min_memory_mb, jvm_arguments, tuning, source_project
              FROM instances ORDER BY position",
         )?;
         let rows = statement.query_map([], |row| {
@@ -385,6 +406,7 @@ impl InstanceStore {
                         .and_then(|text| serde_json::from_str(&text).ok())
                         .unwrap_or_default(),
                 },
+                source_project: row.get(15)?,
             })
         })?;
         for row in rows {
@@ -524,6 +546,7 @@ impl InstanceStore {
             play_seconds: 0,
             installed,
             settings,
+            source_project: None,
         });
         self.save(next)?;
         Ok(self
@@ -543,6 +566,12 @@ impl InstanceStore {
 
     pub fn set_favorite(&mut self, id: &str, favorite: bool) -> Result<(), StoreError> {
         self.edit(id, |record| record.favorite = favorite)
+    }
+
+    pub fn set_source_project(&mut self, id: &str, project: &str) -> Result<(), StoreError> {
+        self.edit(id, |record| {
+            record.source_project = Some(project.to_owned())
+        })
     }
 
     pub fn mark_installed(&mut self, id: &str, installed: bool) -> Result<(), StoreError> {
@@ -784,7 +813,7 @@ impl InstanceStore {
                 )
             };
             transaction.execute(
-                "INSERT INTO instances VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16)",
+                "INSERT INTO instances VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17)",
                 params![
                     int(position),
                     record.id,
@@ -806,6 +835,7 @@ impl InstanceStore {
                     record.settings.min_memory_mb,
                     jvm,
                     tuning,
+                    record.source_project,
                 ],
             )?;
         }

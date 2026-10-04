@@ -79,8 +79,8 @@ selected files above remain governed by the notices in that upstream file.
 ## Lucide (additions)
 
 `heart.svg`, `clock.svg`, `chevron-right.svg`, `external-link.svg`, `ellipsis.svg`,
-`chevrons-up-down.svg`, `chevron-down.svg`, `trash-2.svg`
-under `icons/lucide/` are from [Lucide](https://lucide.dev), ISC license, like
+`chevrons-up-down.svg`, `chevron-down.svg`, `trash-2.svg`, `ban.svg`, `lock.svg`,
+`chevron-up.svg` under `icons/lucide/` are from [Lucide](https://lucide.dev), ISC license, like
 the other Lucide icons listed above.
 
 ## Fonts

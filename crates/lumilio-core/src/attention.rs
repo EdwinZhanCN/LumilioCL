@@ -121,6 +121,7 @@ mod tests {
             play_seconds: 0,
             installed: true,
             settings: InstanceSettings::default(),
+            source_project: None,
         }
     }
 

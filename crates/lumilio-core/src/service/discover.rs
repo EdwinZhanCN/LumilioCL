@@ -26,11 +26,17 @@ impl<T: Transport + Clone> LauncherService<T> {
             return Ok(filters.clone());
         }
         let client = self.modrinth().await?;
-        let (categories, game_versions) = tokio::join!(client.categories(), client.game_versions());
+        let (categories, game_versions, loaders) = tokio::join!(
+            client.categories(),
+            client.game_versions(),
+            client.loaders()
+        );
         let filters = DiscoverFilters {
             categories: categories.map_err(|error| ServiceError::Remote(error.to_string()))?,
             game_versions: game_versions
                 .map_err(|error| ServiceError::Remote(error.to_string()))?,
+            // The loader list only sharpens the choices; the filters work without it.
+            loaders: loaders.unwrap_or_default(),
         };
         *cached = Some(filters.clone());
         Ok(filters)

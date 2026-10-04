@@ -288,6 +288,18 @@ impl<T: Transport + Clone> LauncherService<T> {
         .map_err(ServiceError::from)?;
         let record = self.import_pack_from(task, &pack, cancel).await;
         let _ = tokio::fs::remove_file(&pack).await;
-        record
+        let mut record = record?;
+        // Remembering where it came from is a convenience, not part of the install.
+        let origin = version.project_id.clone();
+        if self
+            .store
+            .lock()
+            .await
+            .set_source_project(&record.id, &origin)
+            .is_ok()
+        {
+            record.source_project = Some(origin);
+        }
+        Ok(record)
     }
 }

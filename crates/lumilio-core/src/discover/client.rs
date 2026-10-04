@@ -2,10 +2,12 @@ use super::API_BASE;
 use super::error::DiscoverError;
 use super::kinds::loader_tag;
 use super::project::{Project, decode_project};
-use super::search::{SearchPage, SearchQuery, decode_search};
+use super::query::SearchQuery;
+use super::search::{SearchPage, decode_search};
 use super::tags::{
-    CategoryTag, GameVersionTag, ProjectSummary, decode_categories, decode_game_versions,
-    decode_owner, decode_project_summaries, decode_team_authors, encoded_list,
+    CategoryTag, GameVersionTag, LoaderTag, ProjectSummary, decode_categories,
+    decode_game_versions, decode_loaders, decode_owner, decode_project_summaries,
+    decode_team_authors, encoded_list,
 };
 use super::versions::{Version, decode_version_map, decode_versions};
 use crate::fetch::{fetch_document, post_document};
@@ -135,6 +137,12 @@ impl<T: Transport> ModrinthClient<T> {
     pub async fn categories(&self) -> Result<Vec<CategoryTag>, DiscoverError> {
         let url = format!("{}/v2/tag/category", self.base);
         decode_categories(&fetch_document(&self.transport, &self.candidates(url)).await?)
+    }
+
+    /// Every loader tag, with the project types it serves.
+    pub async fn loaders(&self) -> Result<Vec<LoaderTag>, DiscoverError> {
+        let url = format!("{}/v2/tag/loader", self.base);
+        decode_loaders(&fetch_document(&self.transport, &self.candidates(url)).await?)
     }
 
     /// Every game version Modrinth knows, newest first as published.
