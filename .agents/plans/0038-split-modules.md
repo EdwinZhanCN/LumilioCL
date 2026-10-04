@@ -23,8 +23,8 @@
 ## Tasks
 
 - [x] T1: `lumilio-app/src/live.rs` → `live/`（mod、dispatch、jobs、library、accounts、new_game、instance、instance_write、settings、launch、discover、tests；3375 行 → 最大 743 行）。
-- [~] T2: `lumilio-ui`：`pages/live`、`shell`、`instance_detail`（含 content/panels/settings/diagnostics）已拆；`live.rs`、`home.rs`、`pages/settings.rs` 待拆。
-- [ ] T3: `lumilio-core`：`service.rs`（约 9000 行）按领域拆成 `service/`，其余超大文件视情况。
+- [x] T2: `lumilio-ui`：`pages/live`、`shell`、`instance_detail`（含 content/panels/settings/diagnostics）已拆；`live`、`home`、`pages/settings` 也已拆。
+- [~] T3: `lumilio-core`：`service.rs`（约 9000 行）已拆成 `service/`（含 `tests/`）。`install.rs`（1448）、`launcher.rs`（1315）、`transfer.rs`（1274）、`discover.rs`（1167）正文仍超过 900 行，待拆（单元清单已列好，工具已支持多行 impl 头）。
 - [ ] T4: 在 `lumilio-select-checks` 或 AGENTS.md 里写下文件规模和测试放置的约定。
 
 ## Validation
