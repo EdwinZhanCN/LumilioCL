@@ -1,0 +1,40 @@
+# Runs `just ci` (the justfile is the single source of truth for checks).
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "**"
+      - "!.agents/**"
+      - "!**/*.md"
+      # Generated from code; a hand edit must still fail the IA test.
+      - "docs/ia/**"
+  pull_request:
+    paths:
+      - "**"
+      - "!.agents/**"
+      - "!**/*.md"
+      - "docs/ia/**"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    # GPUI renders through Metal here; this is the platform the launcher is
+    # developed and reviewed on.
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      # With no argument rustup installs what rust-toolchain.toml pins
+      # (the channel plus clippy and rustfmt).
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just
+      - run: just ci

@@ -44,14 +44,8 @@ internal self-report, a log keyword, or an unverified mock call.
 
 ## Verification
 
-During editing, run the narrowest focused test. Before handoff, always run:
-
-```sh
-cargo build
-cargo test
-cargo clippy --all-targets -- -D warnings
-cargo fmt --check
-```
+During editing, run the narrowest focused test (`just test-pkg <crate> <filter>`).
+Before handoff, run `just check`.
 
 If the workspace is not yet bootstrapped, record the exact missing-artifact
 diagnostic in the active plan instead of inventing a substitute gate.

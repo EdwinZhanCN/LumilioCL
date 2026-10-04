@@ -12,26 +12,21 @@ launcher; the documents below serve that goal and never outrank it.
    naming the source path and its license notice (ADR 0011, 0022). Respect files under a
    different license, never copy Modrinth branding, and adapt to Rust and our crate boundaries
    instead of porting mechanically.
-4. **Closed verification loop.** Every commit and every handoff passes all four commands below.
+4. **Closed verification loop.** A code change is handed off only after `just check` passes.
    Fix failures immediately; "commit now, fix later" is forbidden.
 
 ## Verification
 
-**While iterating**, run only what the change touches (skill `lumilio-select-checks`), e.g.
-`cargo test -p lumilio-ui --lib project_detail`. Do not run the full loop after every small edit.
+The `justfile` is the single source of truth for checks; CI (`.github/workflows/ci.yml`) runs
+`just ci` on every push to `main` and every pull request (ADR 0026). There are no git hooks.
 
-**Before a commit or handoff**, run the full loop, in this order:
+- **While iterating**: only what the change touches (skill `lumilio-select-checks`), e.g.
+  `just test-pkg lumilio-ui project_detail`.
+- **Docs and harness only** (`docs/**`, `.agents/**`, `*.md`): `just docs`, which takes seconds.
+- **Before handing off a code change**: `just check` (build → test → clippy → fmt, in that order).
 
-```sh
-cargo build
-cargo test
-cargo clippy --all-targets -- -D warnings
-cargo fmt --check
-```
-
-The `pre-commit` hook runs exactly this loop and stops at the first failure. Enable it once per
-clone: `git config core.hooksPath .githooks`. Green checks do not prove a UI change looks right:
-state what the tests verified and what still needs eyes.
+Green checks do not prove a UI change looks right: state what the tests verified and what still
+needs eyes.
 
 ## Where the facts are
 
@@ -71,7 +66,7 @@ Don't write documents that restate the code or upstream; they go stale (ADR 0021
   in pages.
 - A built user path is declared by a one-line comment at its code:
   `// ia[page]: 操作 | 层 / 组件 | 结果与反馈 [| 备注]` (ADR 0019, 0021; skill `lumilio-ia-paths`).
-  `cargo run -p lumilio-docgen -- ia` regenerates `docs/ia/paths/`, and `cargo test` fails
+  `just ia` regenerates `docs/ia/paths/`, and `cargo test` fails
   while it is stale.
 
 ## Plans and decisions

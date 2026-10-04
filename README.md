@@ -16,6 +16,9 @@ gpui-component. HMCL and Modrinth App are its read-only upstream references
 cargo run -p lumilio-app
 ```
 
+Checks are [`just`](https://github.com/casey/just) recipes: `just check` runs build, tests,
+clippy and rustfmt, the same as CI; `just` lists the rest.
+
 The app opens the data folder and shows the real launcher. If the folder cannot
 be opened (for example another instance holds the lock) it prints the reason and
 exits. Use `LUMILIO_HOME=/tmp/<isolated-folder>` for a disposable data folder.

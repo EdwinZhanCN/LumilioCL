@@ -44,7 +44,7 @@ Never put one on a handler far from the control: it will outlive the control.
 ## Procedure
 
 1. Change the UI code and add, edit or delete its `// ia[...]` comments in the same change.
-2. Run `cargo run -p lumilio-docgen -- ia`. It validates the comments (known page,
+2. Run `just ia`. It validates the comments (known page,
    no repeated action) and rewrites `docs/ia/paths/`.
 3. Commit the regenerated files with the change. `cargo test` fails with
    `docs/ia/paths is stale` if you forgot.
