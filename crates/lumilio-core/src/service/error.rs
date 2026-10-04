@@ -8,6 +8,7 @@ use crate::modpack;
 use crate::screenshots::ScreenshotError;
 use crate::servers::{PingError, ServerError};
 use crate::settings::SettingsError;
+use crate::skin::SkinError;
 use crate::snapshots::SnapshotError;
 use crate::worlds::WorldError;
 use crate::yggdrasil::YggdrasilError;
@@ -48,6 +49,8 @@ pub enum ServiceError {
     Yggdrasil(YggdrasilError),
     /// The authlib-injector agent could not be fetched or stored.
     Injector(InjectorError),
+    /// A skin could not be used.
+    Skin(SkinError),
     /// The sign-in the person is choosing a character for is gone.
     NoPendingSignIn,
     Export(crate::pack_export::ExportError),
@@ -85,6 +88,7 @@ impl Display for ServiceError {
             Self::Ping(error) => write!(f, "{error}"),
             Self::Yggdrasil(error) => write!(f, "{error}"),
             Self::Injector(error) => write!(f, "{error}"),
+            Self::Skin(error) => write!(f, "{error}"),
             Self::NoPendingSignIn => f.write_str("this sign-in is no longer waiting for a choice"),
             Self::Export(error) => write!(f, "{error}"),
             Self::Snapshot(error) => write!(f, "{error}"),

@@ -10,7 +10,7 @@
 | [游戏库](library.md) | 21 |
 | [发现](discover.md) | 22 |
 | [动态](activity.md) | 8 |
-| [账户](accounts.md) | 6 |
+| [账户](accounts.md) | 9 |
 | [设置](settings.md) | 28 |
 | [游戏页（整体）](instance.md) | 11 |
 | [游戏页 · 概览](instance.overview.md) | 4 |

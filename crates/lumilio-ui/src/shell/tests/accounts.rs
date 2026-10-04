@@ -11,6 +11,9 @@ pub(super) fn account(name: &str, selected: bool) -> crate::live::AccountRow {
         selected,
         custom_id: false,
         microsoft: false,
+        third_party: false,
+        kind_text: "离线账户".into(),
+        skin: None,
         needs_sign_in: false,
     }
 }

@@ -78,6 +78,9 @@ pub struct AccountEntry {
     /// A third-party account's login name (an email or a user name).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub login: Option<String>,
+    /// How an offline account looks in the game; none is the game's default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub skin: Option<crate::skin::SkinChoice>,
 }
 
 /// An authentication server the person added (public facts only; LittleSkin
@@ -501,6 +504,27 @@ impl SettingsStore {
         }
         self.save(next)?;
         Ok(key)
+    }
+
+    /// Sets how an offline account looks; `None` is the game's default skin.
+    /// Only offline accounts have a skin of their own: a signed-in account
+    /// gets its skin from its server.
+    pub fn set_account_skin(
+        &mut self,
+        key: &str,
+        skin: Option<crate::skin::SkinChoice>,
+    ) -> Result<(), SettingsError> {
+        let mut next = self.settings.clone();
+        let entry = next
+            .accounts
+            .iter_mut()
+            .find(|entry| entry.key() == key && entry.kind == AccountKind::Offline)
+            .ok_or_else(|| SettingsError::UnknownAccount(key.to_owned()))?;
+        if entry.skin == skin {
+            return Ok(());
+        }
+        entry.skin = skin;
+        self.save(next)
     }
 
     /// Marks an account as needing (or no longer needing) a new sign-in.

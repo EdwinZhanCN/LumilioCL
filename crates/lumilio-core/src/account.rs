@@ -156,6 +156,8 @@ impl OfflineProfile {
             user_type: "msa".to_owned(),
             user_properties: "{}".to_owned(),
             injection: None,
+            keepalive: None,
+            notes: Vec::new(),
         }
     }
 }
@@ -171,6 +173,32 @@ pub struct Injection {
     pub prefetched: Option<String>,
 }
 
+/// Something that must stay alive as long as the game runs (the launcher's own
+/// skin server): dropped with the last copy of the session.
+#[derive(Clone)]
+pub struct Keepalive(std::sync::Arc<dyn std::any::Any + Send + Sync>);
+
+impl Keepalive {
+    #[must_use]
+    pub fn new(held: impl std::any::Any + Send + Sync) -> Self {
+        Self(std::sync::Arc::new(held))
+    }
+}
+
+impl PartialEq for Keepalive {
+    fn eq(&self, other: &Self) -> bool {
+        std::sync::Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl Eq for Keepalive {}
+
+impl std::fmt::Debug for Keepalive {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str("Keepalive")
+    }
+}
+
 /// The identity values substituted into game arguments.
 #[derive(Clone, Eq, PartialEq)]
 pub struct AuthSession {
@@ -181,6 +209,9 @@ pub struct AuthSession {
     /// The `--userProperties` JSON the server sent with the sign-in.
     user_properties: String,
     injection: Option<Injection>,
+    keepalive: Option<Keepalive>,
+    /// Things worth telling when the game starts (a skin that did not load).
+    notes: Vec<String>,
 }
 
 impl std::fmt::Debug for AuthSession {
@@ -207,6 +238,8 @@ impl AuthSession {
             user_type: "msa".to_owned(),
             user_properties: "{}".to_owned(),
             injection: None,
+            keepalive: None,
+            notes: Vec::new(),
         }
     }
 
@@ -233,6 +266,8 @@ impl AuthSession {
             user_type: "msa".to_owned(),
             user_properties: serde_json::to_string(&properties).unwrap_or_else(|_| "{}".to_owned()),
             injection: Some(injection),
+            keepalive: None,
+            notes: Vec::new(),
         }
     }
 
@@ -242,6 +277,25 @@ impl AuthSession {
     pub fn with_injection(mut self, injection: Injection) -> Self {
         self.injection = Some(injection);
         self
+    }
+
+    /// Keeps `held` alive for as long as this session (or a copy) is.
+    #[must_use]
+    pub fn with_keepalive(mut self, held: Keepalive) -> Self {
+        self.keepalive = Some(held);
+        self
+    }
+
+    #[must_use]
+    pub fn with_notes(mut self, notes: Vec<String>) -> Self {
+        self.notes = notes;
+        self
+    }
+
+    /// What to tell when the game starts.
+    #[must_use]
+    pub fn notes(&self) -> &[String] {
+        &self.notes
     }
 
     #[must_use]

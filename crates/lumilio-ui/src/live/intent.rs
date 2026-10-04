@@ -102,6 +102,12 @@ pub enum LiveIntent {
     NewAccount,
     /// Open the Microsoft sign-in dialog.
     MicrosoftSignIn,
+    /// Open the sign-in dialog for authentication servers (LittleSkin and others).
+    ThirdPartySignIn,
+    /// Open the list of authentication servers.
+    ManageAuthServers,
+    /// Open the skin dialog of this offline account (by key).
+    EditSkin(String),
     /// Refresh this Microsoft account's sign-in now.
     RefreshAccount(String),
     /// Use this account (by key) for later launches.

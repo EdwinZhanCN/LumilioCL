@@ -12,6 +12,7 @@ mod runtime;
 mod screenshots;
 mod servers;
 mod settings;
+mod skins;
 mod snapshots;
 mod third_party;
 mod worlds;

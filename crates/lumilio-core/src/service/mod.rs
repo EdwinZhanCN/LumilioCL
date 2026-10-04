@@ -24,6 +24,7 @@ mod portability;
 mod preferences;
 mod screenshots;
 mod servers;
+mod skins;
 mod snapshots;
 mod support;
 mod third_party;
@@ -105,6 +106,10 @@ pub struct LauncherService<T> {
     client_token_override: Option<String>,
     /// The agent was looked up for a newer build in this run already.
     injector_checked: std::sync::atomic::AtomicBool,
+    /// The key the local skin server signs with, made on first use.
+    skin_signer: tokio::sync::OnceCell<Arc<crate::skin::Signer>>,
+    /// Size of that key (smaller in tests, where generating one is slow).
+    skin_key_bits: usize,
     // Declared last so the stores close before ownership is released.
     _root_lock: crate::root_lock::RootLock,
 }
@@ -136,6 +141,8 @@ impl<T: Transport + Clone> LauncherService<T> {
             next_pending: std::sync::atomic::AtomicU64::new(1),
             client_token_override: None,
             injector_checked: std::sync::atomic::AtomicBool::new(false),
+            skin_signer: tokio::sync::OnceCell::new(),
+            skin_key_bits: crate::skin::KEY_BITS,
             _root_lock: root_lock,
         })
     }

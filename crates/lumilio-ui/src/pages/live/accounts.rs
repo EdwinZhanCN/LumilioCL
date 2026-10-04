@@ -30,12 +30,15 @@ pub(super) fn account_row(index: usize, row: &AccountRow, ctx: &LiveCtx) -> gpui
         });
     let short = row.uuid.split('-').next().unwrap_or_default().to_owned();
     let detail = format!(
-        "离线账户 · {short}{}",
+        "{} · {short}{}{}",
+        row.kind_label(),
         if row.custom_id {
             " · 自定义 UUID"
         } else {
             ""
-        }
+        },
+        row.skin_text()
+            .map_or_else(String::new, |skin| format!(" · {skin}")),
     );
     // ia[accounts]: 复制 UUID | 账户行 ⋯ 菜单 | 复制到剪贴板，toast“已复制 UUID”
     let copy = {
@@ -57,14 +60,14 @@ pub(super) fn account_row(index: usize, row: &AccountRow, ctx: &LiveCtx) -> gpui
         let handler = ctx.handler.clone();
         let (key, name) = (row.key.clone(), row.name.clone());
         let selected = row.selected;
-        let microsoft = row.microsoft;
+        let microsoft = row.signed_in();
         move |window: &mut Window, cx: &mut App| {
             let handler = handler.clone();
             let target = key.clone();
             let title = format!("移除账户“{name}”？");
             let description = match (microsoft, selected) {
                 (true, true) => {
-                    "会忘记这个身份并从系统凭据库删除它的登录信息，不会删除任何游戏或存档。它是当前账户，移除后会改用剩下的第一个。"
+                    "会忘记这个身份并从系统凭据库删除它的登录信息（第三方账户还会通知服务器作废令牌），不会删除任何游戏或存档。它是当前账户，移除后会改用剩下的第一个。"
                 }
                 (true, false) => {
                     "会忘记这个身份并从系统凭据库删除它的登录信息，不会删除任何游戏或存档。"
@@ -92,8 +95,15 @@ pub(super) fn account_row(index: usize, row: &AccountRow, ctx: &LiveCtx) -> gpui
         }
     };
     let mut entries = vec![kit::MenuEntry::new("复制 UUID", copy)];
-    if row.microsoft {
-        // ia[accounts]: 刷新登录 | Microsoft 账户行 ⋯ 菜单「刷新登录」 | 失效的登录显示“需要重新登录”，刷新后恢复
+    if !row.microsoft && !row.third_party {
+        // ia[accounts]: 设置皮肤 | 离线账户行 ⋯ 菜单「皮肤…」→ 弹窗 | 选默认、本地文件、LittleSkin 或自定义皮肤站；游戏里按所选显示（启动时在本机起一个皮肤服务器，需要 authlib-injector）；加载不到时游戏照常启动并在日志里说明 | ADR 0024
+        entries.push(kit::MenuEntry::new(
+            "皮肤…",
+            send(&ctx.handler, LiveIntent::EditSkin(row.key.clone())),
+        ));
+    }
+    if row.signed_in() {
+        // ia[accounts]: 刷新登录 | 已登录账户行 ⋯ 菜单「刷新登录」 | 失效的登录显示“需要重新登录”，刷新后恢复
         entries.push(kit::MenuEntry::new(
             "刷新登录",
             send(&ctx.handler, LiveIntent::RefreshAccount(row.key.clone())),
@@ -151,11 +161,7 @@ pub fn accounts(ctx: &LiveCtx) -> impl IntoElement {
     let colors = ctx.colors;
     let model = ctx.model;
     let subtitle = match model.selected_account() {
-        Some(row) => format!(
-            "当前：{}（{}）",
-            row.name,
-            if row.microsoft { "Microsoft" } else { "离线" }
-        ),
+        Some(row) => format!("当前：{}（{}）", row.name, row.kind_label()),
         None if model.accounts_loaded => "还没有账户，添加一个才能进游戏".to_owned(),
         None => String::new(),
     };
@@ -175,12 +181,14 @@ pub fn accounts(ctx: &LiveCtx) -> impl IntoElement {
         true,
         send(&ctx.handler, LiveIntent::MicrosoftSignIn),
     );
+    // ia[accounts]: 第三方登录 | 页头 ⋯ 菜单「第三方登录…」→ 弹窗 | 选认证服务器（内置 LittleSkin）、输入账号密码；多个角色时选一个；登录后出现在列表里，启动时自动加载 authlib-injector | ADR 0024
+    // ia[accounts]: 管理认证服务器 | 页头 ⋯ 菜单「认证服务器…」→ 弹窗 | 添加（输入地址，先看到名称，http 有警告）、移除（会一并移除该服务器上的账户）；LittleSkin 内置
     let body = if model.accounts.is_empty() {
         v_flex()
             .items_center()
             .child(kit::empty(
                 "还没有账户",
-                "用 Microsoft 登录可以进入正版服务器；离线账户不需要登录，名称就是你在游戏里的名字。",
+                "用 Microsoft 登录可以进入正版服务器；LittleSkin 等第三方认证服务器在右上角 ⋯ 里登录；离线账户不需要登录，名称就是你在游戏里的名字。",
                 colors,
             ))
             .into_any_element()
@@ -205,6 +213,14 @@ pub fn accounts(ctx: &LiveCtx) -> impl IntoElement {
             kit::PageActions::new("accounts-actions")
                 .secondary(add)
                 .primary(microsoft)
+                .more(kit::MenuEntry::new(
+                    "第三方登录…",
+                    send(&ctx.handler, LiveIntent::ThirdPartySignIn),
+                ))
+                .more(kit::MenuEntry::new(
+                    "认证服务器…",
+                    send(&ctx.handler, LiveIntent::ManageAuthServers),
+                ))
                 .render(colors),
             colors,
         ))

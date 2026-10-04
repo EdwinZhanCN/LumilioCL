@@ -16,7 +16,10 @@ mod settings;
 #[cfg(test)]
 mod tests;
 
-pub use self::accounts::{AccountRow, account_failure, account_rows, auth_message};
+pub use self::accounts::{
+    AccountRow, account_failure, account_rows, auth_message, server_name, skin_message,
+    yggdrasil_message,
+};
 pub use self::activity::{
     ACTIVITY_CATEGORIES, ActivityRow, ActivityState, activity_in_tab, activity_rows, eta_text,
     rate_text, recovery_message,

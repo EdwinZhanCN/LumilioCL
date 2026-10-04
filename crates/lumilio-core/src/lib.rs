@@ -49,6 +49,7 @@ mod screenshots;
 mod servers;
 mod service;
 mod settings;
+mod skin;
 mod snapshots;
 mod staged;
 mod storage;
@@ -162,6 +163,7 @@ pub use settings::{
     AccountEntry, AccountKind, AuthServerEntry, LauncherSettings, MAX_MEMORY_MB, MirrorRule,
     SettingsError, SettingsStore,
 };
+pub use skin::{LITTLE_SKIN_CSL, SkinChoice, SkinError, SkinModel};
 pub use snapshots::{
     RESTORE_LIMIT, SnapshotError, SnapshotInfo, SnapshotScope, create as create_snapshot,
     delete as delete_snapshot, directory as snapshot_directory, list as list_snapshots,

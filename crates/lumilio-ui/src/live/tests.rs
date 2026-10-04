@@ -208,6 +208,7 @@ fn account_rows_show_the_selection_and_custom_ids() {
     assert_eq!(rows.len(), 3);
     let microsoft = &rows[2];
     assert!(microsoft.microsoft && microsoft.needs_sign_in && !microsoft.custom_id);
+    assert!(!microsoft.third_party && microsoft.signed_in());
     assert_eq!(microsoft.key, "msa:00000000000000000000000000000abc");
     assert_eq!(microsoft.kind_label(), "Microsoft");
     assert_eq!(rows[0].kind_label(), "离线账户");
@@ -234,6 +235,101 @@ fn the_settings_view_reads_the_saved_values_and_describes_each_java() {
     assert_eq!(view.data_dir, PathBuf::from("/data"));
     assert!(view.java.is_empty() && view.storage.is_none());
     assert_eq!(view.total_memory_mb, Some(16_384));
+}
+
+#[test]
+fn third_party_accounts_show_their_server_and_offline_ones_their_skin() {
+    use lumilio_core::{AccountEntry, AccountKind, AuthServerEntry, LauncherSettings, SkinChoice};
+    let little = lumilio_core::LITTLE_SKIN_URL;
+    let mut settings = LauncherSettings::default();
+    settings.auth_servers = vec![
+        AuthServerEntry {
+            url: "https://auth.example/api/".into(),
+            name: Some("Example Skins".into()),
+            non_email_login: true,
+        },
+        AuthServerEntry {
+            url: "https://noname.example/".into(),
+            name: None,
+            non_email_login: false,
+        },
+    ];
+    let third = |name: &str, id: &str, server: &str| AccountEntry {
+        name: name.into(),
+        uuid: Some(id.into()),
+        kind: AccountKind::ThirdParty,
+        server: Some(server.into()),
+        login: Some("me@example.com".into()),
+        ..AccountEntry::default()
+    };
+    settings.accounts = vec![
+        third("Edwin", "123e4567e89b12d3a456426614174000", little),
+        third(
+            "Wen",
+            "223e4567e89b12d3a456426614174000",
+            "https://auth.example/api/",
+        ),
+        third(
+            "Lost",
+            "323e4567e89b12d3a456426614174000",
+            "https://noname.example/",
+        ),
+        AccountEntry {
+            name: "Steve".into(),
+            skin: Some(SkinChoice::LittleSkin),
+            ..AccountEntry::default()
+        },
+    ];
+    settings.selected_account = Some(format!("ali:123e4567e89b12d3a456426614174000@{little}"));
+    let rows = account_rows(&settings);
+    assert_eq!(rows.len(), 4);
+    assert!(rows[0].third_party && rows[0].signed_in() && rows[0].selected && !rows[0].custom_id);
+    assert_eq!(rows[0].kind_label(), "LittleSkin");
+    assert_eq!(rows[1].kind_label(), "Example Skins");
+    assert_eq!(
+        rows[2].kind_label(),
+        "https://noname.example/",
+        "an unnamed server shows its address"
+    );
+    assert_eq!(rows[3].skin_text(), Some("LittleSkin 皮肤"));
+    assert!(!rows[3].signed_in());
+    assert_eq!(rows[0].skin_text(), None);
+}
+
+#[test]
+fn authentication_failures_are_told_in_words() {
+    use lumilio_core::{ServiceError, SkinError, YggdrasilError};
+    let message = |error: ServiceError| account_failure(&error).0;
+    assert!(message(ServiceError::Yggdrasil(YggdrasilError::InvalidCredentials)).contains("密码"));
+    assert!(
+        message(ServiceError::Yggdrasil(YggdrasilError::Network("x".into())))
+            .contains("无法连接认证服务器")
+    );
+    assert!(message(ServiceError::Yggdrasil(YggdrasilError::NoCharacter)).contains("没有角色"));
+    assert!(
+        message(ServiceError::Yggdrasil(YggdrasilError::Remote {
+            kind: "ForbiddenOperationException".into(),
+            message: Some("Invalid token.".into()),
+        }))
+        .contains("失效")
+    );
+    assert!(
+        message(ServiceError::Yggdrasil(YggdrasilError::Remote {
+            kind: "Other".into(),
+            message: Some("Banned until tomorrow".into()),
+        }))
+        .contains("Banned until tomorrow"),
+        "an unknown refusal keeps the server's own words"
+    );
+    assert!(message(ServiceError::Skin(SkinError::Picture("x".into()))).contains("PNG"));
+    assert!(message(ServiceError::SignInRequired("Edwin".into())).contains("Edwin"));
+    let (_, technical) = account_failure(&ServiceError::Yggdrasil(YggdrasilError::Network(
+        "refused".into(),
+    )));
+    assert!(
+        technical.contains("refused"),
+        "the cause stays behind 技术详情"
+    );
 }
 
 #[test]

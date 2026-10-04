@@ -2,6 +2,7 @@
 
 pub mod accounts;
 pub mod assets;
+pub mod auth_servers;
 pub mod collections;
 pub mod controls;
 pub mod cover;
@@ -30,7 +31,9 @@ pub mod route;
 pub mod settings_dialog;
 pub mod settings_forms;
 pub mod shell;
+pub mod skin_dialog;
 pub mod theme;
+pub mod third_party_login;
 pub mod toast;
 pub mod version_picker;
 

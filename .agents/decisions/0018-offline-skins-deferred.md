@@ -1,6 +1,6 @@
 # 0018 — Offline account skins are deferred
 
-- Status: proposed
+- Status: superseded-by-0024
 - Date: 2026-10-03
 
 ## Context

@@ -68,10 +68,13 @@ impl<T: Transport + Clone> LauncherService<T> {
             .and_then(|key| settings.accounts.iter().find(|entry| entry.key() == key))
             .ok_or(ServiceError::NoAccount)?;
         match entry.kind {
-            AccountKind::Offline => entry
-                .profile()
-                .map(|profile| profile.session())
-                .map_err(|_| ServiceError::NoAccount),
+            AccountKind::Offline => {
+                let profile = entry.profile().map_err(|_| ServiceError::NoAccount)?;
+                match &entry.skin {
+                    None => Ok(profile.session()),
+                    Some(choice) => self.offline_skin_session(&profile, choice).await,
+                }
+            }
             AccountKind::Microsoft => self.microsoft_session(entry, false).await,
             AccountKind::ThirdParty => self.third_party_session(entry, false).await,
         }

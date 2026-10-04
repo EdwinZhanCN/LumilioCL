@@ -362,6 +362,12 @@ where
             }
         }
 
+        for note in request.session.notes() {
+            let _ = updates.send(LaunchUpdate::Log {
+                stream: LogStream::Stderr,
+                text: note.clone(),
+            });
+        }
         signal(LaunchSignal::Phase(LaunchPhase::Starting));
         let line = process::command_line(&launch_plan, &options);
         let (events, mut game_events) = mpsc::unbounded_channel();
