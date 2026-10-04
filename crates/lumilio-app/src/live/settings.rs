@@ -183,6 +183,7 @@ pub(super) fn load_settings(wiring: &Wiring, cx: &mut App) {
         };
         wiring.state.borrow_mut().preferences = settings.preferences.clone();
         let _ = wiring.shell.update(cx, |shell, cx| {
+            shell.plugins_changed(&plugins, cx);
             shell.update_live(
                 |model| {
                     let storage = model.settings.as_ref().and_then(|view| view.storage);

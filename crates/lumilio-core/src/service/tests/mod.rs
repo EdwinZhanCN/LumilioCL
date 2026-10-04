@@ -7,6 +7,7 @@ mod java;
 mod launch;
 mod lifecycle;
 mod packs;
+mod plugin_analysis;
 mod portability;
 mod runtime;
 mod screenshots;

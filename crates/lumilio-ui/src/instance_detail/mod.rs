@@ -24,11 +24,11 @@ use self::forms::Fields;
 use self::panels::{Confirm, Data};
 use crate::toast::Toast;
 use gpui::{App, Entity, Window};
-use lumilio_core::{CrashHint, InstanceRecord, LauncherSettings};
+use lumilio_core::{InstanceRecord, LauncherSettings, PluginFinding};
 use std::rc::Rc;
 
 /// A crash report's text and the causes recognised in it, or why it could not be read.
-type CrashRead = Result<(String, Vec<CrashHint>), String>;
+type CrashRead = Result<(String, Vec<PluginFinding>), String>;
 
 pub const TABS: [&str; 7] = ["概览", "内容", "世界", "截图", "历史", "诊断", "设置"];
 pub const TAB_OVERVIEW: usize = 0;
@@ -124,6 +124,8 @@ pub struct InstanceDetailView {
     live_output: Option<Vec<String>>,
     /// The game just ended: read the log file again on the next render.
     refresh_logs: bool,
+    enabled_plugins: Option<Vec<String>>,
+    refresh_analysis: bool,
     log_scroll: gpui::ScrollHandle,
     /// The crash report being read or shown, and what was read.
     crash: Option<(String, Option<CrashRead>)>,
@@ -177,6 +179,8 @@ impl InstanceDetailView {
             last_worlds_refresh: None,
             live_output: None,
             refresh_logs: false,
+            enabled_plugins: None,
+            refresh_analysis: false,
             log_scroll: gpui::ScrollHandle::new(),
             crash: None,
         }

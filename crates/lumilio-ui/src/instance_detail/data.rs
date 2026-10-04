@@ -172,6 +172,7 @@ impl InstanceDetailView {
         }
         let screenshots = matches!(arrived, Arrived::Screenshots(_));
         self.data.store(arrived);
+        self.filter_plugin_results();
         if screenshots {
             self.reconcile_thumbs();
         }
@@ -291,7 +292,33 @@ impl InstanceDetailView {
         // Only the report last asked for is shown.
         if self.crash.as_ref().map(|crash| &crash.0) == Some(&file) {
             self.crash = Some((file, Some(result)));
+            self.filter_plugin_results();
             cx.notify();
+        }
+    }
+
+    pub fn plugins_changed(&mut self, enabled: Vec<String>, cx: &mut Context<Self>) {
+        if self.enabled_plugins.as_ref() == Some(&enabled) {
+            return;
+        }
+        self.enabled_plugins = Some(enabled);
+        self.filter_plugin_results();
+        self.refresh_analysis = true;
+        cx.notify();
+    }
+
+    fn filter_plugin_results(&mut self) {
+        let Some(enabled) = &self.enabled_plugins else {
+            return;
+        };
+        if let Some(Ok(problems)) = &mut self.data.problems {
+            problems.retain(|problem| match &problem.kind {
+                lumilio_core::ProblemKind::Finding(result) => enabled.contains(&result.plugin),
+                _ => true,
+            });
+        }
+        if let Some((_, Some(Ok((_, findings))))) = &mut self.crash {
+            findings.retain(|finding| enabled.contains(&finding.plugin));
         }
     }
 

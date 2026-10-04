@@ -4024,6 +4024,7 @@ dependencies = [
  "futures",
  "gpui-kit",
  "lumilio-core",
+ "lumilio-plugin-crash-analyzer",
  "lumilio-ui",
  "reqwest",
  "tempfile",
@@ -4079,6 +4080,14 @@ name = "lumilio-plugin-api"
 version = "0.1.0"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "lumilio-plugin-crash-analyzer"
+version = "0.1.0"
+dependencies = [
+ "lumilio-plugin-api",
+ "regex",
 ]
 
 [[package]]

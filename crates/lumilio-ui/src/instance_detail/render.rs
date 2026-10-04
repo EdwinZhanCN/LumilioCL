@@ -45,6 +45,15 @@ impl Render for InstanceDetailView {
         if std::mem::take(&mut self.refresh_logs) && self.data.has(Section::Logs) {
             self.request(Section::Logs, window, cx);
         }
+        if self.refresh_analysis && !self.data.pending.contains(&Section::Problems) {
+            self.refresh_analysis = false;
+            if self.data.has(Section::Problems) {
+                self.request(Section::Problems, window, cx);
+            }
+            if let Some((file, _)) = &self.crash {
+                (self.handler)(InstanceIntent::OpenCrash(file.clone()), window, cx);
+            }
+        }
         if self.record.is_some() && !self.started {
             self.started = true;
             self.ensure(Section::Problems, window, cx);

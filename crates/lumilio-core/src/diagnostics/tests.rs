@@ -243,26 +243,6 @@ fn crash_reports_list_newest_first_and_read_by_name_only() {
 }
 
 #[test]
-fn known_failures_are_recognized_once_each_in_order() {
-    let text = "Exception in thread main java.lang.OutOfMemoryError: Java heap space\n\
-                java.lang.UnsupportedClassVersionError: bad\n\
-                Mixin apply failed x\nMixin apply failed y\n";
-    assert_eq!(
-        analyze(text),
-        [
-            CrashHint::OutOfMemory,
-            CrashHint::JavaTooOld,
-            CrashHint::ModConflict
-        ]
-    );
-    assert!(analyze("all good").is_empty());
-    assert_eq!(
-        analyze("Unrecognized option: -XX:Foo"),
-        [CrashHint::BadJvmOption]
-    );
-}
-
-#[test]
 fn listing_files_is_confined_to_the_game_directory() {
     let dir = tempfile::tempdir().unwrap();
     let game = dir.path().join("game");

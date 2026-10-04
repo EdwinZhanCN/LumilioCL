@@ -1,6 +1,8 @@
 //! Host-owned settings and failure isolation for synchronous plugin code.
 
+mod analysis;
 mod context;
+pub use analysis::PluginFinding;
 #[cfg(test)]
 mod tests;
 

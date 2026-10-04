@@ -41,7 +41,7 @@
 ### D1 crate 结构与依赖方向
 
 ```text
-lumilio-plugin-api   （新）只依赖 serde；定义清单、权限、扩展点 trait、数据类型、视图树
+lumilio-plugin-api   （新）只依赖 serde、serde_json；定义清单、权限、扩展点 trait、数据类型、视图树
 lumilio-nbt          （新）从 lumilio-core/src/nbt.rs 原样拆出；只依赖 flate2
 lumilio-core         依赖 plugin-api 和 lumilio-nbt；内含插件宿主 `plugins` 模块
 lumilio-ui           依赖 plugin-api（渲染视图树、设置表单）
@@ -149,20 +149,20 @@ pub enum Permission {
 
 入口条件：P0 已提交。
 
-- [ ] T8 在 plugin-api 里定义扩展点 `Analyzer`：
+- [x] T8 在 plugin-api 里定义扩展点 `Analyzer`：
   - 输入 `AnalysisInput { text, source: LatestLog | CrashReport, game: GameFacts }`，其中 `GameFacts` 包括游戏版本、加载器和加载器版本、Java 主版本、`mods: Vec<ModFact { id, version, file }>`。
   - 输出 `Vec<Finding { rule, severity, title, advice, evidence: Option<String> }>`。`title` 和 `advice` 直接是给人看的中文。
-- [ ] T9 新建 `crates/lumilio-plugin-crash-analyzer`：把 `diagnostics::analyze` 的 5 条规则原样迁过来，测试一起迁。之后参考 `3rd-party/HMCL/HMCLCore/src/main/java/org/jackhuang/hmcl/game/CrashReportAnalyzer.java` 补规则，按常见程度排序，第一批至少补 15 条。每条规则配一段样本日志测试，正反例都要有。从 HMCL 改编的规则按 ADR 0011 注明来源（attribution 测试会检查）。
-- [ ] T10 core：删掉 `CrashHint` 和 `diagnostics::analyze`，`crash_report` 改为返回宿主汇总的 `Vec<PluginFinding { plugin, finding }>`。UI 删掉 `hint_text`，原样显示 `title` 和 `advice`。
-- [ ] T11 问题列表：最近一次游戏崩溃或启动失败时，`problems()` 对最新的崩溃报告（没有报告就用 `latest.log`）跑一遍分析器，每条结果作为 `ProblemKind::Finding(PluginFinding)`。首页「需要处理」显示其中最严重的一条。
-- [ ] T12 停用分析器插件后，崩溃报告页和问题列表里不再出现分析结果，但原有的内置问题（缺 Java、Mod 重复等）照常显示。
+- [x] T9 新建 `crates/lumilio-plugin-crash-analyzer`：把 `diagnostics::analyze` 的 5 条规则原样迁过来，测试一起迁。之后参考 `3rd-party/HMCL/HMCLCore/src/main/java/org/jackhuang/hmcl/game/CrashReportAnalyzer.java` 补规则，按常见程度排序，第一批至少补 15 条。每条规则配一段样本日志测试，正反例都要有。从 HMCL 改编的规则按 ADR 0011 注明来源（attribution 测试会检查）。
+- [x] T10 core：删掉 `CrashHint` 和 `diagnostics::analyze`，`crash_report` 改为返回宿主汇总的 `Vec<PluginFinding { plugin, finding }>`。UI 删掉 `hint_text`，原样显示 `title` 和 `advice`。
+- [x] T11 问题列表：最近一次游戏崩溃或启动失败时，`problems()` 对最新的崩溃报告（没有报告就用 `latest.log`）跑一遍分析器，每条结果作为 `ProblemKind::Finding(PluginFinding)`。首页「需要处理」显示其中最严重的一条。
+- [x] T12 停用分析器插件后，崩溃报告页和问题列表里不再出现分析结果，但原有的内置问题（缺 Java、Mod 重复等）照常显示。
 
 验收：
 
-- 原来 5 条规则的行为不变，现有测试迁移后全部通过。
-- 新规则每条都有测试。
-- 停用和启用的效果都有测试覆盖。
-- 维护者要用肉眼看：一个真实的崩溃报告在诊断页上的显示效果。
+- [x] 原来 5 条规则的行为不变，现有测试迁移后全部通过。
+- [x] 新规则每条都有测试。
+- [x] 停用和启用的效果都有测试覆盖。
+- [ ] 维护者要用肉眼看：一个真实的崩溃报告在诊断页上的显示效果。
 
 ### P2 Litematica 投影（扩展点：UI 贡献）
 
@@ -261,3 +261,21 @@ pub enum Permission {
 - 自动验证：13 项插件相关 core 测试（含失败/停用后正常启动游戏）、2 项弹窗测试、设置页真实点击/空列表测试、依赖边界与 attribution 均通过。`just ia` 已生成；最终工作树两次 `just check` 均通过（日志 `/private/tmp/lumilio-plugin-p0-check.log`、`/private/tmp/lumilio-plugin-p0-final-check.log`）。默认忽略的真实网络测试没有在 P0 运行。
 - 原生视觉检查：任务专用数据目录与临时 app bundle，浅色/深色的空插件列表、插件 tab 切换、hover、720×480 最小窗口、减少动效均已观察；原生退出菜单成功关闭进程。P0 尚无产品插件，有插件的设置行仍需后续阶段结合真实插件再次看。
 - 下一步 P1（T8–T12）：迁移五条分析规则并补至少十五条规则；本计划继续保持 in_progress。
+
+### 2026-10-04 — P1 实施中
+
+- P0 已提交为 `19ec0fa`。新增同步 Analyzer、AnalysisInput/GameFacts/ModFact/Finding；Severity 由 API 定义，core 重导出，避免插件引用 core。
+- 五条既有匹配条件、顺序与重复匹配去重保持不变，原有测试迁入 crash-analyzer。另参考 HMCL `CrashReportAnalyzer.java` 加入 16 条常见 Mod、配置、运行环境及调试崩溃规则，保留 GPL-3.0-or-later 来源与版权声明；每条有样本正反例。规则顺序保留既有五条在前，新增规则按 Mod/依赖/配置到平台问题排列。
+- 诊断报告、实例问题和首页共用宿主汇总。只在最近会话崩溃/启动失败时自动分析；有报告用最新报告，无报告用 latest.log，文件读不了时保留内置检查。GameFacts 由工作线程读安装元数据与启用的 Mod 元数据，Java 主版本取当前有效选择（不声称知道历史进程的 Java）。
+- 原生界面沿用原因卡片（Interface，无新动效）：直接显示插件中文标题/建议，证据用既有技术详情折叠。缓存实例页与迟到的结果按启用插件 ID 过滤，切换后重读，防止导航返回恢复停用插件的结果。
+- 自动验证已完成：独立分析器 24 项测试、core 分析聚合与服务接线测试、诊断 UI 7 项测试、实际 Backend 注册与启停测试均通过。最终 `just check` 通过（日志 `/private/tmp/lumilio-plugin-p1-final-check.log`）：core 467 passed / 2 ignored，UI 290 passed / 3 ignored，app 9 passed，边界与 attribution 均通过。首轮全量在 Clippy 的多余 `.into()` 上失败，修正后完整重跑通过；真实网络 smoke 测试仍按默认忽略。
+- 原生视觉检查使用明确标注的合成报告和任务临时资料：浅色/深色、720×480 最小窗口、常规放大窗口、原因/建议卡片、证据弹窗、减少动效均已查看。实际开关停用后首页问题计数减少、内置问题保留、报告正文可读但原因卡片消失；重新启用并后退到缓存页后卡片恢复。两份临时 app 已用原生菜单退出。
+- T8–T12 已完成并可提交阶段代码。真实报告的维护者肉眼验收仍待提供报告路径或实际检查结果，未提前勾选；P1 全阶段尚未验收，P2 不开工。
+- 应用 backend 测试移至相邻 `backend/tests.rs` 后完整重跑 `just check` 通过（日志 `/private/tmp/lumilio-plugin-p1-relocated-check.log`），产品行为不变。
+- 维护者提供了实例的 logs 目录，其中只有 17 行 `latest.log`：Iris 缺少 Sodium 导致 Fabric 启动失败，旁边没有 crash-reports。将原始日志复制到任务临时实例的日志与报告测试槽，原生查看问题列表、中文原因/建议、17 行正文和证据弹窗均可读；副本不是实际 crash report，不替代该验收。临时应用已退出，用户资料未修改。维护者要求说明如何生成报告：在成功启动的 Java 版测试世界中按住 F3+C 10 秒，等待其生成 crash-reports，再验收真实报告。
+
+### 2026-10-04 — P2 之前需维护者裁决的冻结决定冲突
+
+- D1 明确规定 plugin-api「只依赖 serde」，D5 同时规定 `TabState` 是 `serde_json::Value`。Rust crate 无法在不依赖 serde_json 的情况下公开使用其 Value 类型；借 core/ui 间接引入又违反 D1 的依赖方向。
+- 建议只在 D1 的 plugin-api 依赖清单中允许 `serde_json`，保留 D5 的 TabState 语义，其余边界不变。暂不修改冻结决定，不开始 T13；待维护者确认，并先完成 P1 的真实报告视觉验收。
+- 维护者随后裁决「允许增加 serde_json」。D1 已据此修订，P2 实施时可为 plugin-api 增加该依赖；其余冻结决定保持原样。P1 的真实报告视觉验收仍待完成。

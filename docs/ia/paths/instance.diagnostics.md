@@ -13,6 +13,6 @@
 | 搜索日志 | 日志分段 · 搜索框 | 视图状态 |  | `lumilio-ui/src/instance_detail/diagnostics/logs.rs` |
 | 复制日志 | 日志分段 · 按键「复制」 | 复制当前筛选出的行；没有行时提示 |  | `lumilio-ui/src/instance_detail/diagnostics/logs.rs` |
 | 导出日志 | 日志分段 · 按键「导出…」→ 选位置 | 保存最新日志或打开着的崩溃报告；玩家名、UUID、启动器目录、游戏目录、用户主目录都换成占位符 |  | `lumilio-ui/src/instance_detail/diagnostics/logs.rs` |
-| 崩溃原因识别 | 崩溃报告上方的原因卡片 | 原因 + 建议操作（CrashHint） |  | `lumilio-ui/src/instance_detail/diagnostics/logs.rs` |
+| 崩溃原因识别 | 崩溃报告上方的原因卡片 | 显示已启用分析器给出的原因、建议与可展开的日志证据；停用后不再显示 |  | `lumilio-ui/src/instance_detail/diagnostics/logs.rs` |
 | 看最新日志 / 崩溃报告 | 日志分段 · 来源选择：最近的日志 / 崩溃报告列表 | 选哪份看哪份；崩溃报告「查看」打开 |  | `lumilio-ui/src/instance_detail/diagnostics/logs.rs` |
 | 看问题、执行修复 | 诊断 · 问题分段 | 每个问题一个操作（与概览相同） |  | `lumilio-ui/src/instance_detail/diagnostics/mod.rs` |

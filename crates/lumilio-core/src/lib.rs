@@ -83,9 +83,9 @@ pub use content::{
 pub use content_sources::{ContentEntry, ContentList, ContentSource};
 pub use credentials::{CredentialStore, MemoryCredentials, StoredLogin, SystemCredentials};
 pub use diagnostics::{
-    CrashHint, CrashReport, Facts, FileEntry, LOW_MEMORY_MB, LogLevel, LogLine, Problem,
-    ProblemKind, Severity, analyze as analyze_crash, diagnose, filter_log, list_crash_reports,
-    list_dir, log_level, log_lines, read_crash_report, read_latest_log,
+    CrashReport, Facts, FileEntry, LOW_MEMORY_MB, LogLevel, LogLine, Problem, ProblemKind,
+    Severity, diagnose, filter_log, list_crash_reports, list_dir, log_level, log_lines,
+    read_crash_report, read_latest_log,
 };
 pub use discover::{
     CategoryTag, DependencyKind, DiscoverError, Environment, GalleryImage, GameVersionTag,
@@ -139,7 +139,7 @@ pub use modpack::{
     plan as plan_modpack, read_index as read_pack_index,
 };
 pub use pack_export::{ExportError, ExportReport, ExportSpec, PackFormat};
-pub use plugins::{PluginHost, PluginInfo, PluginStatus};
+pub use plugins::{PluginFinding, PluginHost, PluginInfo, PluginStatus};
 pub use process::{
     DEFAULT_SETTLE, GameEvent, GameExit, GameOptions, LogStream, ProcessError,
     command_line as game_command_line, run as run_game,

@@ -50,6 +50,10 @@ impl<T> History<T> {
         !self.forward.is_empty()
     }
 
+    pub(crate) fn iter(&self) -> impl Iterator<Item = &T> {
+        self.back.iter().chain(&self.forward)
+    }
+
     /// Forgets every entry `gone` matches, e.g. a deleted instance, so
     /// neither direction can lead to it.
     pub fn forget(&mut self, gone: impl Fn(&T) -> bool) {

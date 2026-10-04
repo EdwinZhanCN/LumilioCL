@@ -340,13 +340,14 @@ pub(super) fn on_live_intent(
         LiveIntent::LoadSettings => load_settings(wiring, cx),
         LiveIntent::SetPluginEnabled { id, enabled } => {
             let service = wiring.backend.service.clone();
+            let changed = wiring.clone();
             change_setting(
                 wiring,
                 window,
                 async move { service.set_plugin_enabled(&id, enabled).await },
                 "没能保存插件设置",
                 None,
-                |_, _| {},
+                move |_, cx| reload(&changed, Reload::All, cx),
                 cx,
             );
         }
@@ -364,13 +365,14 @@ pub(super) fn on_live_intent(
         }
         LiveIntent::ResetPlugin(id) => {
             let service = wiring.backend.service.clone();
+            let changed = wiring.clone();
             change_setting(
                 wiring,
                 window,
                 async move { service.reset_plugin(&id).await },
                 "没能恢复插件默认值",
                 None,
-                |_, _| {},
+                move |_, cx| reload(&changed, Reload::All, cx),
                 cx,
             );
         }

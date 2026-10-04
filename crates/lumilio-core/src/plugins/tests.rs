@@ -2,6 +2,9 @@ use super::*;
 use lumilio_plugin_api::{Permission, SettingField, SettingKind, SettingValue};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+#[path = "tests/analysis.rs"]
+mod analysis;
+
 struct Fake {
     id: &'static str,
     api: u32,

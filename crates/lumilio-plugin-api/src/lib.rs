@@ -7,6 +7,11 @@ use std::fmt::{self, Display, Formatter};
 
 use serde::{Deserialize, Serialize};
 
+mod analysis;
+pub use analysis::{
+    AnalysisInput, AnalysisSource, Analyzer, Finding, GameFacts, ModFact, Severity,
+};
+
 pub const API_VERSION: u32 = 1;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -134,7 +139,6 @@ pub trait HostContext: Send + Sync {
 
 // Extension-point contracts are added with their first implementation, in
 // order: analysis, instance views, content sources, launch observation.
-pub trait Analyzer: Send + Sync {}
 pub trait InstanceTab: Send + Sync {}
 pub trait ContentSource: Send + Sync {}
 pub trait LaunchObserver: Send + Sync {}

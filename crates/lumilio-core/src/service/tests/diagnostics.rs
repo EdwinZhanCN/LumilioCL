@@ -76,7 +76,10 @@ async fn logs_and_crash_reports_are_read_safely_without_the_lease() {
         .await
         .unwrap();
     assert!(text.contains("OutOfMemory"));
-    assert_eq!(hints, vec![crate::diagnostics::CrashHint::OutOfMemory]);
+    assert!(
+        hints.is_empty(),
+        "an empty plugin list has no analysis contribution"
+    );
     assert!(
         world
             .service

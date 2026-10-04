@@ -1,4 +1,4 @@
-use super::super::panels::{act, act_index, clock, hint_text};
+use super::super::panels::{act, act_index, clock, problem_tone};
 use super::super::{InstanceDetailView, InstanceIntent, Section};
 use super::helpers::{LEVEL_LABELS, LOG_LINES_SHOWN, least_level};
 use crate::assets::UiIcon;
@@ -193,7 +193,7 @@ impl InstanceDetailView {
                 )
                 .child(kit::technical("crash-technical", detail.clone()))
                 .into_any_element(),
-            Some(Ok((text, hints))) => v_flex()
+            Some(Ok((text, findings))) => v_flex()
                 .gap_3()
                 .child({
                     let file = file.clone();
@@ -212,14 +212,30 @@ impl InstanceDetailView {
                         .debug_selector(|| "crash-export".into()),
                     )
                 })
-                .children(hints.iter().map(|hint| {
-                    kit::surface(colors).p_3().child(
-                        div()
-                            .text_sm()
-                            .text_color(colors.foreground)
-                            // ia[instance.diagnostics]: 崩溃原因识别 | 崩溃报告上方的原因卡片 | 原因 + 建议操作（CrashHint）
-                            .child(hint_text(*hint)),
-                    )
+                .children(findings.iter().enumerate().map(|(index, result)| {
+                    let finding = &result.finding;
+                    kit::surface(colors)
+                        .p_3()
+                        .child(
+                            v_flex()
+                                .gap_2()
+                                .text_sm()
+                                .text_color(colors.foreground)
+                                // ia[instance.diagnostics]: 崩溃原因识别 | 崩溃报告上方的原因卡片 | 显示已启用分析器给出的原因、建议与可展开的日志证据；停用后不再显示
+                                .child(
+                                    div()
+                                        .text_color(problem_tone(finding.severity, colors))
+                                        .child(finding.title.clone()),
+                                )
+                                .child(div().text_color(colors.muted).child(finding.advice.clone()))
+                                .when_some(finding.evidence.as_ref(), |view, evidence| {
+                                    view.child(kit::technical(
+                                        ("crash-evidence", index),
+                                        evidence.clone(),
+                                    ))
+                                }),
+                        )
+                        .debug_selector(|| format!("crash-finding-{index}"))
                 }))
                 .child(
                     kit::surface(colors)

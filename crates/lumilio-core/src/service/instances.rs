@@ -7,7 +7,6 @@ use crate::catalog::VersionCatalog;
 use crate::deletion::Deletion;
 use crate::diagnostics::Problem;
 use crate::fetch::fetch_document;
-use crate::inspect::inspect_instance;
 use crate::instance::{InstanceRecord, Loader, NewInstance};
 use crate::launcher::LaunchServiceError;
 use crate::loader::LAUNCHABLE_LOADERS;
@@ -65,7 +64,9 @@ impl<T: Transport + Clone> LauncherService<T> {
         recent.sort_by_key(|record| std::cmp::Reverse(record.last_played));
         let mut problems: BTreeMap<String, Vec<Problem>> = BTreeMap::new();
         for record in recent.into_iter().take(DIAGNOSED_LIMIT) {
-            let found = inspect_instance(&self.layout, &settings, &runtimes, record).await;
+            let found = self
+                .inspect_with_plugins(&settings, &runtimes, record)
+                .await;
             problems.insert(record.id.clone(), found);
         }
         let summary = summarize(&instances, &problems, RECENT_LIMIT);

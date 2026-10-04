@@ -9,7 +9,7 @@ use std::io::{self, Read, Seek, SeekFrom};
 use std::path::{Component, Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
-use regex::Regex;
+pub use lumilio_plugin_api::Severity;
 
 use crate::content::{ContentItem, ModMetadata};
 use crate::discover::is_safe_file_name;
@@ -19,13 +19,6 @@ use crate::java::JavaRuntime;
 
 /// Below this maximum heap (MB) the game is likely to run out of memory.
 pub const LOW_MEMORY_MB: u32 = 1024;
-
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub enum Severity {
-    Info,
-    Warning,
-    Error,
-}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ProblemKind {
@@ -52,6 +45,7 @@ pub enum ProblemKind {
         max_mb: u32,
     },
     LastSessionFailed(SessionOutcome),
+    Finding(crate::plugins::PluginFinding),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -319,53 +313,6 @@ pub fn read_crash_report(game_dir: &Path, file_name: &str, max_bytes: u64) -> io
         .take(max_bytes)
         .read_to_end(&mut bytes)?;
     Ok(String::from_utf8_lossy(&bytes).into_owned())
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum CrashHint {
-    /// The JVM ran out of heap.
-    OutOfMemory,
-    /// Classes were built for a newer Java than the one used.
-    JavaTooOld,
-    /// A JVM option was not recognized by this Java.
-    BadJvmOption,
-    /// Mods disagree with each other or with the loader.
-    ModConflict,
-    /// The graphics driver or OpenGL failed.
-    GraphicsFailure,
-}
-
-/// Recognizes well-known failures in a log or crash report. Hints come in a
-/// fixed order and each appears at most once.
-#[must_use]
-pub fn analyze(text: &str) -> Vec<CrashHint> {
-    let rules: [(CrashHint, &str); 5] = [
-        (
-            CrashHint::OutOfMemory,
-            r"java\.lang\.OutOfMemoryError|There is insufficient memory",
-        ),
-        (
-            CrashHint::JavaTooOld,
-            r"UnsupportedClassVersionError|class file version \d+\.\d+|requires running the game with Java \d+",
-        ),
-        (
-            CrashHint::BadJvmOption,
-            r"Unrecognized (VM )?option|Could not create the Java Virtual Machine",
-        ),
-        (
-            CrashHint::ModConflict,
-            r"Mixin apply failed|Incompatible mod set|Mod resolution failed|Duplicate mod",
-        ),
-        (
-            CrashHint::GraphicsFailure,
-            r"GLFW error|OpenGL error|Pixel format not accelerated",
-        ),
-    ];
-    rules
-        .into_iter()
-        .filter(|(_, pattern)| Regex::new(pattern).is_ok_and(|regex| regex.is_match(text)))
-        .map(|(hint, _)| hint)
-        .collect()
 }
 
 // ---- files ---------------------------------------------------------------

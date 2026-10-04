@@ -7,8 +7,7 @@ use gpui::prelude::*;
 use gpui::{AnyElement, Context, Div, Window, div, px};
 use gpui_component::{h_flex, v_flex};
 use lumilio_core::{
-    ChangeKind, CrashHint, HistoryEvent, HistoryRead, Problem, ProblemKind, SessionOutcome,
-    Severity,
+    ChangeKind, HistoryEvent, HistoryRead, Problem, ProblemKind, SessionOutcome, Severity,
 };
 
 /// The newest `count` sessions: (started, seconds, outcome).
@@ -72,7 +71,9 @@ pub fn problem_action(kind: &ProblemKind) -> Option<(ProblemAction, &'static str
             (ProblemAction::Content, "去内容")
         }
         ProblemKind::LowMemory { .. } => (ProblemAction::Settings(3), "去调整"),
-        ProblemKind::LastSessionFailed(_) => (ProblemAction::Logs, "查看日志"),
+        ProblemKind::LastSessionFailed(_) | ProblemKind::Finding(_) => {
+            (ProblemAction::Logs, "查看日志")
+        }
     })
 }
 
@@ -111,16 +112,9 @@ pub fn problem_text(problem: &Problem) -> (String, String) {
             "上一次游玩没有顺利结束".into(),
             outcome_label(*outcome).into(),
         ),
-    }
-}
-
-pub fn hint_text(hint: CrashHint) -> &'static str {
-    match hint {
-        CrashHint::OutOfMemory => "内存不足：试着调高最大内存，或停用一些 Mod",
-        CrashHint::JavaTooOld => "Java 版本太旧：这个游戏需要更新的 Java",
-        CrashHint::BadJvmOption => "有无法识别的 Java 参数：检查「设置」里的附加参数",
-        CrashHint::ModConflict => "Mod 之间有冲突或缺少依赖：可以逐个停用后再试",
-        CrashHint::GraphicsFailure => "显卡或 OpenGL 出错：更新显卡驱动或关闭光影",
+        ProblemKind::Finding(result) => {
+            (result.finding.title.clone(), result.finding.advice.clone())
+        }
     }
 }
 

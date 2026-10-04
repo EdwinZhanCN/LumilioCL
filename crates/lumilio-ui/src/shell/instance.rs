@@ -14,6 +14,10 @@ impl LauncherShell {
         cx: &mut Context<Self>,
     ) -> Entity<InstanceDetailView> {
         let view = cx.new(|cx| InstanceDetailView::new(id, handler(cx.weak_entity())));
+        if let Some(settings) = self.live.as_ref().and_then(|model| model.settings.as_ref()) {
+            let enabled = enabled_plugins(&settings.plugins);
+            view.update(cx, |view, cx| view.plugins_changed(enabled, cx));
+        }
         cx.observe(&view, |_, _, cx| cx.notify()).detach();
         self.visit();
         self.live_instance = Some(view.clone());
@@ -42,6 +46,28 @@ impl LauncherShell {
         self.live_instance.as_ref()
     }
 
+    /// Update retained pages as well as the visible page, so Back cannot
+    /// resurrect contributions from a plugin that was just turned off.
+    pub fn plugins_changed(
+        &mut self,
+        plugins: &[lumilio_core::PluginInfo],
+        cx: &mut Context<Self>,
+    ) {
+        let enabled = enabled_plugins(plugins);
+        let views = self
+            .history
+            .iter()
+            .filter_map(|location| match location {
+                Location::Instance(view) => Some(view.clone()),
+                _ => None,
+            })
+            .chain(self.live_instance.clone())
+            .collect::<Vec<_>>();
+        for view in views {
+            view.update(cx, |view, cx| view.plugins_changed(enabled.clone(), cx));
+        }
+    }
+
     /// Leaves the open instance: back where it came from, or Library.
     pub fn close_live_instance(&mut self, cx: &mut Context<Self>) {
         if self.live_instance.is_some() && !self.go_back(None, cx) {
@@ -68,4 +94,12 @@ impl LauncherShell {
         });
         cx.notify();
     }
+}
+
+fn enabled_plugins(plugins: &[lumilio_core::PluginInfo]) -> Vec<String> {
+    plugins
+        .iter()
+        .filter(|info| info.status == lumilio_core::PluginStatus::Enabled)
+        .map(|info| info.manifest.id.clone())
+        .collect()
 }
