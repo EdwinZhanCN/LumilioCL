@@ -7,6 +7,7 @@ pub enum Section {
     Content(ProjectKind),
     Worlds,
     Servers,
+    Screenshots,
     Snapshots,
     History,
     Problems,
@@ -83,6 +84,12 @@ pub enum InstanceIntent {
     PingServer(String),
     /// Start the game and go straight onto this server.
     PlayServer(String),
+    /// Make this screenshot's thumbnail; answer with
+    /// [`InstanceDetailView::thumbnail_arrived`].
+    Thumbnail(String),
+    /// Put this screenshot on the clipboard as a picture.
+    CopyScreenshot(String),
+    DeleteScreenshot(String),
     /// Read this crash report; answer with [`InstanceDetailView::crash_arrived`].
     OpenCrash(String),
     /// List this folder of the game directory (`""` is the directory itself);

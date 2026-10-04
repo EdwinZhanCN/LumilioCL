@@ -1,8 +1,8 @@
 use super::super::Section;
 use super::CONTENT_KINDS;
 use lumilio_core::{
-    ContentList, FileEntry, GameLogs, HistoryRead, Problem, ProjectKind, ServerEntry, ServerStatus,
-    SnapshotInfo, WorldInfo,
+    ContentList, FileEntry, GameLogs, HistoryRead, Problem, ProjectKind, ScreenshotInfo,
+    ServerEntry, ServerStatus, SnapshotInfo, WorldInfo,
 };
 
 pub type Loaded<T> = Option<Result<T, String>>;
@@ -14,6 +14,7 @@ pub struct Data {
     pub content: [Loaded<ContentList>; 3],
     pub worlds: Loaded<Vec<WorldInfo>>,
     pub servers: Loaded<Vec<ServerEntry>>,
+    pub screenshots: Loaded<Vec<ScreenshotInfo>>,
     pub snapshots: Loaded<Vec<SnapshotInfo>>,
     pub history: Loaded<HistoryRead>,
     pub problems: Loaded<Vec<Problem>>,
@@ -29,6 +30,7 @@ pub enum Arrived {
     Content(ProjectKind, Result<ContentList, String>),
     Worlds(Result<Vec<WorldInfo>, String>),
     Servers(Result<Vec<ServerEntry>, String>),
+    Screenshots(Result<Vec<ScreenshotInfo>, String>),
     Snapshots(Result<Vec<SnapshotInfo>, String>),
     History(Result<HistoryRead, String>),
     Problems(Result<Vec<Problem>, String>),
@@ -43,6 +45,7 @@ impl Arrived {
             Self::Content(kind, _) => Section::Content(*kind),
             Self::Worlds(_) => Section::Worlds,
             Self::Servers(_) => Section::Servers,
+            Self::Screenshots(_) => Section::Screenshots,
             Self::Snapshots(_) => Section::Snapshots,
             Self::History(_) => Section::History,
             Self::Problems(_) => Section::Problems,
@@ -64,6 +67,7 @@ impl Data {
             }
             Arrived::Worlds(result) => self.worlds = Some(result),
             Arrived::Servers(result) => self.servers = Some(result),
+            Arrived::Screenshots(result) => self.screenshots = Some(result),
             Arrived::Snapshots(result) => self.snapshots = Some(result),
             Arrived::History(result) => self.history = Some(result),
             Arrived::Problems(result) => self.problems = Some(result),
@@ -83,6 +87,7 @@ impl Data {
                 .is_some_and(|index| self.content[index].is_some()),
             Section::Worlds => self.worlds.is_some(),
             Section::Servers => self.servers.is_some(),
+            Section::Screenshots => self.screenshots.is_some(),
             Section::Snapshots => self.snapshots.is_some(),
             Section::History => self.history.is_some(),
             Section::Problems => self.problems.is_some(),
@@ -101,11 +106,30 @@ pub enum ServerState {
     Offline,
 }
 
+/// A screenshot's thumbnail: asked for, made, or not makeable.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Thumb {
+    /// Asked for; `modified_ms` is the file's identity it was asked for.
+    Pending(i64),
+    Ready(i64, std::path::PathBuf),
+    Failed(i64),
+}
+
+impl Thumb {
+    #[must_use]
+    pub const fn modified_ms(&self) -> i64 {
+        match self {
+            Self::Pending(at) | Self::Ready(at, _) | Self::Failed(at) => *at,
+        }
+    }
+}
+
 /// A destructive step waiting for a second click.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Confirm {
     DeleteWorld(String),
     DeleteServer { index: usize, entry: ServerEntry },
+    DeleteScreenshot(String),
     DeleteSnapshot(String),
     RestoreSnapshot(String),
 }
@@ -131,6 +155,11 @@ impl Confirm {
                     "删除",
                 )
             }
+            Self::DeleteScreenshot(file) => (
+                format!("删除截图“{file}”？"),
+                "文件会从游戏的 screenshots 文件夹里删除，之后不能找回。".to_owned(),
+                "删除",
+            ),
             Self::DeleteServer { entry, .. } => (
                 format!("删除服务器“{}”？", entry.name),
                 "只从这个游戏的列表里移除，不影响服务器本身；之后可以重新添加。".to_owned(),

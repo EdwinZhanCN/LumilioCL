@@ -44,6 +44,7 @@ mod release;
 mod repair;
 mod resource_lock;
 mod root_lock;
+mod screenshots;
 mod servers;
 mod service;
 mod settings;
@@ -148,6 +149,7 @@ pub use repair::{
     InstallationVerifier, IntegrityIssue, RepairError, RepairExecutor, RepairFinding, RepairPlan,
     RepairReport,
 };
+pub use screenshots::{ScreenshotError, ScreenshotInfo};
 pub use servers::{PackPolicy, PingError, ServerEntry, ServerError, ServerStatus};
 pub use service::{
     ActivityView, ContentEffect, ContentResult, DependencyNeed, DependencyReport, DiscoverFilters,

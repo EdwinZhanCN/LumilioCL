@@ -66,6 +66,10 @@ pub const PAGES: &[Page] = &[
         title: "游戏页 · 世界",
     },
     Page {
+        key: "instance.screenshots",
+        title: "游戏页 · 截图",
+    },
+    Page {
         key: "instance.history",
         title: "游戏页 · 历史",
     },

@@ -31,7 +31,7 @@ Three fields separated by `|`, plus an optional fourth:
 No `|` inside a field. Page keys are the `PAGES` table in
 `crates/lumilio-docgen/src/lib.rs`: `navigation`, `home`, `library`, `discover`,
 `activity`, `accounts`, `settings`, `instance`, `instance.overview`,
-`instance.content`, `instance.worlds`, `instance.history`,
+`instance.content`, `instance.worlds`, `instance.screenshots`, `instance.history`,
 `instance.diagnostics`, `instance.settings`. A new page is a new row there.
 
 ## Where it goes

@@ -9,6 +9,7 @@ mod lifecycle;
 mod packs;
 mod portability;
 mod runtime;
+mod screenshots;
 mod servers;
 mod settings;
 mod snapshots;

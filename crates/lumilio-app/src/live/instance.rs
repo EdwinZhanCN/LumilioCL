@@ -113,6 +113,10 @@ pub(super) fn instance_intent(
             play(wiring, id.to_owned(), window, cx);
         }
         InstanceIntent::PingServer(address) => ping_server(wiring, view, address, cx),
+        InstanceIntent::Thumbnail(file) => make_thumbnail(wiring, id.to_owned(), view, file, cx),
+        InstanceIntent::CopyScreenshot(file) => {
+            copy_screenshot(wiring, id.to_owned(), view, file, cx)
+        }
         InstanceIntent::Reload => load_instance(wiring, id.to_owned(), view, cx),
         InstanceIntent::OpenCrash(file) => open_crash(wiring, id.to_owned(), view, file, cx),
         InstanceIntent::Load(section) => load_section(wiring, id.to_owned(), view, section, cx),
@@ -340,6 +344,7 @@ pub(super) fn instance_intent(
         | InstanceIntent::ExportPackTo { .. }
         | InstanceIntent::AddWorld(_)
         | InstanceIntent::DeleteWorld(_)
+        | InstanceIntent::DeleteScreenshot(_)
         | InstanceIntent::SaveServer { .. }
         | InstanceIntent::DeleteServer { .. }
         | InstanceIntent::MoveServer { .. }
@@ -419,6 +424,12 @@ pub(super) fn load_section(
                     .await
                     .map_err(|error| error.to_string()),
             ),
+            Section::Screenshots => Arrived::Screenshots(
+                service
+                    .screenshots(&id)
+                    .await
+                    .map_err(|error| error.to_string()),
+            ),
             Section::Snapshots => Arrived::Snapshots(
                 service
                     .snapshots(&id)
@@ -455,6 +466,57 @@ pub(super) fn load_section(
             Err(error) => failed_section(section, error.to_string()),
         };
         let _ = view.update(cx, |view, cx| view.arrived(arrived, cx));
+    })
+    .detach();
+}
+
+/// Makes one screenshot's thumbnail off the interface thread.
+fn make_thumbnail(
+    wiring: &Wiring,
+    id: String,
+    view: WeakEntity<InstanceDetailView>,
+    file: String,
+    cx: &mut App,
+) {
+    let service = wiring.backend.service.clone();
+    let asked = file.clone();
+    let handle = wiring
+        .backend
+        .spawn(async move { service.screenshot_thumbnail(&id, &asked).await });
+    cx.spawn(async move |cx| {
+        let result = match handle.await {
+            Ok(result) => result.map_err(|error| error.to_string()),
+            Err(error) => Err(error.to_string()),
+        };
+        let _ = view.update(cx, |view, cx| view.thumbnail_arrived(file, result, cx));
+    })
+    .detach();
+}
+
+/// Puts a screenshot on the clipboard as a picture.
+fn copy_screenshot(
+    wiring: &Wiring,
+    id: String,
+    view: WeakEntity<InstanceDetailView>,
+    file: String,
+    cx: &mut App,
+) {
+    let service = wiring.backend.service.clone();
+    let handle = wiring
+        .backend
+        .spawn(async move { service.screenshot_bytes(&id, &file).await });
+    cx.spawn(async move |cx| {
+        let result = match handle.await {
+            Ok(result) => result.map_err(|error| error.to_string()),
+            Err(error) => Err(error.to_string()),
+        };
+        let _ = view.update(cx, |view, cx| match result {
+            Ok(bytes) => {
+                platform::copy_image(bytes, cx);
+                view.toast(Toast::success("已复制图片"), cx);
+            }
+            Err(detail) => view.toast(Toast::error("没有复制成功").technical(detail), cx),
+        });
     })
     .detach();
 }
@@ -510,6 +572,7 @@ pub(super) fn failed_section(section: Section, detail: String) -> Arrived {
         Section::Content(kind) => Arrived::Content(kind, Err(detail)),
         Section::Worlds => Arrived::Worlds(Err(detail)),
         Section::Servers => Arrived::Servers(Err(detail)),
+        Section::Screenshots => Arrived::Screenshots(Err(detail)),
         Section::Snapshots => Arrived::Snapshots(Err(detail)),
         Section::History => Arrived::History(Err(detail)),
         Section::Logs => Arrived::Logs(Err(detail)),

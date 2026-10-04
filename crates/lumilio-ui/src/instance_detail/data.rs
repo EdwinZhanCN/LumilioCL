@@ -2,7 +2,7 @@ use super::intent::{InstanceIntent, Section};
 use super::panels::{Arrived, Confirm};
 use super::{
     CrashRead, InstanceDetailView, Operated, TAB_CONTENT, TAB_DIAGNOSTICS, TAB_HISTORY,
-    TAB_OVERVIEW, TAB_WORLDS, TABS, panels, settings,
+    TAB_OVERVIEW, TAB_SCREENSHOTS, TAB_WORLDS, TABS, panels, settings,
 };
 use crate::toast::Toast;
 use gpui::{Context, Window};
@@ -131,6 +131,10 @@ impl InstanceDetailView {
                     self.ensure(Section::Servers, window, cx);
                 }
             }
+            TAB_SCREENSHOTS => {
+                self.ensure(Section::Screenshots, window, cx);
+                self.ask_thumbs = true;
+            }
             TAB_DIAGNOSTICS => self.open_diagnostics(window, cx),
             TAB_HISTORY => {
                 let section = if self.history_sub == 2 {
@@ -166,7 +170,11 @@ impl InstanceDetailView {
         if matches!(arrived, Arrived::Servers(Ok(_))) {
             self.ping_servers = true;
         }
+        let screenshots = matches!(arrived, Arrived::Screenshots(_));
         self.data.store(arrived);
+        if screenshots {
+            self.reconcile_thumbs();
+        }
         cx.notify();
     }
 
@@ -270,6 +278,10 @@ impl InstanceDetailView {
             if self.data.has(Section::Worlds) {
                 self.refresh_worlds = true;
             }
+            // The game may have taken pictures.
+            if self.data.has(Section::Screenshots) {
+                self.refresh_screenshots = true;
+            }
         }
         cx.notify();
     }
@@ -350,6 +362,7 @@ impl InstanceDetailView {
     ) {
         let intent = match what.clone() {
             Confirm::DeleteWorld(folder) => InstanceIntent::DeleteWorld(folder),
+            Confirm::DeleteScreenshot(file) => InstanceIntent::DeleteScreenshot(file),
             Confirm::DeleteServer { index, entry } => InstanceIntent::DeleteServer {
                 index,
                 expected: entry,

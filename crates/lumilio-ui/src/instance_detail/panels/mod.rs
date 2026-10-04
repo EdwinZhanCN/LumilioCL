@@ -8,16 +8,18 @@ mod helpers;
 mod history;
 mod labels;
 mod overview;
+mod screenshots;
 mod servers;
 mod worlds;
 
 #[cfg(test)]
 mod tests;
 
-pub use self::data::{Arrived, Confirm, Data, ServerState};
+pub use self::data::{Arrived, Confirm, Data, ServerState, Thumb};
 pub(super) use self::helpers::{act, act_index, clock};
 pub use self::labels::{export_notice, size_label};
 pub use self::overview::{ProblemAction, hint_text, problem_action, problem_text, problem_tone};
+pub(super) use self::screenshots::SHOTS_PAGE;
 #[cfg(test)]
 pub(super) use self::servers::server_detail;
 

@@ -91,6 +91,18 @@ pub fn pick_save_path(
 }
 
 /// Shows a file or folder in the system file manager.
+/// Puts a PNG or JPEG on the clipboard as a picture.
+pub fn copy_image(bytes: Vec<u8>, cx: &App) {
+    let format = if bytes.starts_with(&[0xff, 0xd8]) {
+        gpui::ImageFormat::Jpeg
+    } else {
+        gpui::ImageFormat::Png
+    };
+    cx.write_to_clipboard(gpui::ClipboardItem::new_image(&gpui::Image::from_bytes(
+        format, bytes,
+    )));
+}
+
 pub fn reveal(path: &Path, cx: &App) {
     cx.reveal_path(path);
 }

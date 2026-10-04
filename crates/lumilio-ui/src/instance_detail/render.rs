@@ -1,7 +1,8 @@
 use super::editors::Editor;
 use super::intent::{InstanceIntent, Section};
 use super::{
-    InstanceDetailView, TAB_CONTENT, TAB_DIAGNOSTICS, TAB_HISTORY, TAB_OVERVIEW, TAB_WORLDS, TABS,
+    InstanceDetailView, TAB_CONTENT, TAB_DIAGNOSTICS, TAB_HISTORY, TAB_OVERVIEW, TAB_SCREENSHOTS,
+    TAB_WORLDS, TABS,
 };
 use crate::theme::ShellColors;
 use crate::{kit, live, theme};
@@ -35,6 +36,12 @@ impl Render for InstanceDetailView {
         {
             self.ping_all(window, cx);
         }
+        if std::mem::take(&mut self.refresh_screenshots) && self.data.has(Section::Screenshots) {
+            self.request(Section::Screenshots, window, cx);
+        }
+        if std::mem::take(&mut self.ask_thumbs) && self.tab == TAB_SCREENSHOTS {
+            self.ask_thumbnails(window, cx);
+        }
         if std::mem::take(&mut self.refresh_logs) && self.data.has(Section::Logs) {
             self.request(Section::Logs, window, cx);
         }
@@ -50,6 +57,7 @@ impl Render for InstanceDetailView {
                 TAB_OVERVIEW => self.overview(colors, cx),
                 TAB_CONTENT => self.content_panel(colors, cx),
                 TAB_WORLDS => self.worlds_panel(colors, cx),
+                TAB_SCREENSHOTS => self.screenshots_panel(colors, cx),
                 TAB_HISTORY => self.history_panel(colors, cx),
                 TAB_DIAGNOSTICS => self.diagnostics_panel(colors, cx),
                 _ => self.settings_tab(colors, cx),

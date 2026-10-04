@@ -172,6 +172,10 @@ pub(super) fn write_instance(
                         }
                     }
                 }
+                InstanceIntent::DeleteScreenshot(file) => {
+                    service.delete_screenshot(&id, &file).await?;
+                    done("截图已删除", vec![Section::Screenshots])
+                }
                 InstanceIntent::DeleteServer { index, expected } => {
                     service.remove_server(&id, index, expected).await?;
                     done("服务器已删除", vec![Section::Servers])

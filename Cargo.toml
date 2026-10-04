@@ -20,7 +20,7 @@ gpui-kit = { version = "0.7.0", default-features = false, features = ["component
 flate2 = "1"
 futures-util = "0.3.34"
 keyring = "4.2"
-image = { version = "0.25", default-features = false }
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 lumilio-core = { path = "crates/lumilio-core" }
 lumilio-ui = { path = "crates/lumilio-ui" }
 md-5 = "0.11"

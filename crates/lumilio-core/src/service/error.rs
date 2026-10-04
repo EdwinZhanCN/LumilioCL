@@ -4,6 +4,7 @@ use crate::instance::StoreError;
 use crate::launcher::LaunchServiceError;
 use crate::microsoft::AuthError;
 use crate::modpack;
+use crate::screenshots::ScreenshotError;
 use crate::servers::{PingError, ServerError};
 use crate::settings::SettingsError;
 use crate::snapshots::SnapshotError;
@@ -39,6 +40,7 @@ pub enum ServiceError {
     Content(ContentError),
     World(WorldError),
     Server(ServerError),
+    Screenshot(ScreenshotError),
     Ping(PingError),
     Export(crate::pack_export::ExportError),
     Snapshot(SnapshotError),
@@ -71,6 +73,7 @@ impl Display for ServiceError {
             Self::Content(error) => write!(f, "{error}"),
             Self::World(error) => write!(f, "{error}"),
             Self::Server(error) => write!(f, "{error}"),
+            Self::Screenshot(error) => write!(f, "{error}"),
             Self::Ping(error) => write!(f, "{error}"),
             Self::Export(error) => write!(f, "{error}"),
             Self::Snapshot(error) => write!(f, "{error}"),
@@ -102,6 +105,12 @@ impl From<WorldError> for ServiceError {
 impl From<ServerError> for ServiceError {
     fn from(error: ServerError) -> Self {
         Self::Server(error)
+    }
+}
+
+impl From<ScreenshotError> for ServiceError {
+    fn from(error: ScreenshotError) -> Self {
+        Self::Screenshot(error)
     }
 }
 

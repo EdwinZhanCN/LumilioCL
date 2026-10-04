@@ -90,6 +90,13 @@ impl Layout {
         self.profile(instance_id).join("game")
     }
 
+    /// Small copies of the instance's screenshots, made on demand and safe to
+    /// delete: they are rebuilt when missing.
+    #[must_use]
+    pub fn thumbnails(&self, instance_id: &str) -> PathBuf {
+        self.profile(instance_id).join("thumbnails")
+    }
+
     #[must_use]
     pub fn history(&self, instance_id: &str) -> PathBuf {
         self.profile(instance_id).join("history.jsonl")

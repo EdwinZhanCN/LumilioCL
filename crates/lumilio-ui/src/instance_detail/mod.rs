@@ -30,13 +30,14 @@ use std::rc::Rc;
 /// A crash report's text and the causes recognised in it, or why it could not be read.
 type CrashRead = Result<(String, Vec<CrashHint>), String>;
 
-pub const TABS: [&str; 6] = ["概览", "内容", "世界", "历史", "诊断", "设置"];
+pub const TABS: [&str; 7] = ["概览", "内容", "世界", "截图", "历史", "诊断", "设置"];
 pub const TAB_OVERVIEW: usize = 0;
 pub const TAB_CONTENT: usize = 1;
 pub const TAB_WORLDS: usize = 2;
-pub const TAB_HISTORY: usize = 3;
-pub const TAB_DIAGNOSTICS: usize = 4;
-pub const TAB_SETTINGS: usize = 5;
+pub const TAB_SCREENSHOTS: usize = 3;
+pub const TAB_HISTORY: usize = 4;
+pub const TAB_DIAGNOSTICS: usize = 5;
+pub const TAB_SETTINGS: usize = 6;
 
 /// What a finished write reports back to the view.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -77,6 +78,16 @@ pub struct InstanceDetailView {
     worlds_sub: usize,
     /// What the last check found out about each server, by address.
     server_status: std::collections::HashMap<String, panels::ServerState>,
+    /// 截图: the thumbnails asked for or made, by file name, and how many
+    /// cards are shown (more are added on request).
+    thumbs: std::collections::HashMap<String, panels::Thumb>,
+    shots_shown: usize,
+    /// Thumbnails for the cards shown should be asked for on the next render.
+    ask_thumbs: bool,
+    /// The game stopped: read the screenshots again on the next render.
+    refresh_screenshots: bool,
+    /// The screenshot open in the viewer, by file name.
+    shot_open: Option<String>,
     /// The servers should be asked how they are on the next render.
     ping_servers: bool,
     /// The server the edit dialog is changing (its position and what it read
@@ -140,6 +151,11 @@ impl InstanceDetailView {
             worlds_sub: 0,
             server_status: std::collections::HashMap::new(),
             ping_servers: false,
+            thumbs: std::collections::HashMap::new(),
+            shots_shown: panels::SHOTS_PAGE,
+            ask_thumbs: false,
+            shot_open: None,
+            refresh_screenshots: false,
             server_edit: None,
             snapshot_scope: 0,
             log_level: 0,
