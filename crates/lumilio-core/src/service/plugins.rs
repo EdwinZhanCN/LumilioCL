@@ -1,7 +1,7 @@
 use super::{LauncherService, ServiceError};
-use crate::plugins::PluginInfo;
+use crate::plugins::{PluginEffect, PluginInfo, PluginTab};
 use crate::transfer::Transport;
-use lumilio_plugin_api::{PluginState, SettingValue};
+use lumilio_plugin_api::{ActionId, PluginState, SettingValue, View};
 
 impl<T: Transport + Clone> LauncherService<T> {
     pub async fn set_plugin_enabled(&self, id: &str, enabled: bool) -> Result<(), ServiceError> {
@@ -59,5 +59,47 @@ impl<T: Transport + Clone> LauncherService<T> {
         settings.set_plugin(id.to_owned(), state.clone())?;
         self.plugins.set_state(id.to_owned(), state);
         Ok(())
+    }
+
+    /// The plugin tabs that show for this instance.
+    pub async fn plugin_tabs(&self, instance: &str) -> Result<Vec<PluginTab>, ServiceError> {
+        let record = self.instance(instance).await?;
+        let (_, runtimes) = self.environment().await;
+        let layout = self.layout.clone();
+        let game_dir = self.layout.game(instance);
+        let game = tokio::task::spawn_blocking(move || {
+            super::diagnostics::game_facts(&layout, &record, &runtimes)
+        })
+        .await
+        .map_err(std::io::Error::other)?;
+        Ok(self.plugins.tabs(game_dir, game).await)
+    }
+
+    /// What one plugin's tab shows; `None` if the plugin is off or has failed.
+    pub async fn plugin_view(
+        &self,
+        instance: &str,
+        plugin: &str,
+    ) -> Result<Option<View>, ServiceError> {
+        self.instance(instance).await?;
+        Ok(self
+            .plugins
+            .tab_view(instance, self.layout.game(instance), plugin)
+            .await)
+    }
+
+    /// Runs one action of a plugin's tab; the interface performs the returned
+    /// effects. `None` if the plugin is off or has failed.
+    pub async fn plugin_action(
+        &self,
+        instance: &str,
+        plugin: &str,
+        action: ActionId,
+    ) -> Result<Option<Vec<PluginEffect>>, ServiceError> {
+        self.instance(instance).await?;
+        Ok(self
+            .plugins
+            .tab_action(instance, self.layout.game(instance), plugin, action)
+            .await)
     }
 }

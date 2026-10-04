@@ -4,6 +4,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[path = "tests/analysis.rs"]
 mod analysis;
+#[path = "tests/tabs.rs"]
+mod tabs;
 
 struct Fake {
     id: &'static str,

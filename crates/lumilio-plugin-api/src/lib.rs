@@ -8,9 +8,11 @@ use std::fmt::{self, Display, Formatter};
 use serde::{Deserialize, Serialize};
 
 mod analysis;
+mod view;
 pub use analysis::{
     AnalysisInput, AnalysisSource, Analyzer, Finding, GameFacts, ModFact, Severity,
 };
+pub use view::{ActionId, Effect, ImageData, InstanceTab, KeyKind, ListItem, TabState, Tone, View};
 
 pub const API_VERSION: u32 = 1;
 
@@ -133,13 +135,17 @@ pub struct FetchResponse {
 
 pub trait HostContext: Send + Sync {
     fn setting(&self, key: &str) -> Option<SettingValue>;
+    /// Reads a file below a granted `ReadGameFiles` directory. Paths are
+    /// relative to the game directory.
     fn read_file(&self, path: &str) -> Result<Vec<u8>, PluginError>;
+    /// Lists files (recursively, relative to the game directory) below a
+    /// granted `ReadGameFiles` directory.
+    fn list_files(&self, dir: &str) -> Result<Vec<String>, PluginError>;
     fn fetch(&self, url: &str) -> Result<FetchResponse, PluginError>;
 }
 
 // Extension-point contracts are added with their first implementation, in
 // order: analysis, instance views, content sources, launch observation.
-pub trait InstanceTab: Send + Sync {}
 pub trait ContentSource: Send + Sync {}
 pub trait LaunchObserver: Send + Sync {}
 

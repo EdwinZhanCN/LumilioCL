@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=LumilioCL
+GenericName=Minecraft Launcher
+Comment=Launch and manage Minecraft instances
+Exec=/usr/lib/lumiliocl/lumiliocl
+Icon=app.lumilio.LumilioCL
+StartupWMClass=app.lumilio.LumilioCL
+Terminal=false
+Categories=Game;
+Keywords=minecraft;launcher;modpack;

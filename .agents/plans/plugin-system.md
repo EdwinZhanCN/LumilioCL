@@ -168,20 +168,20 @@ pub enum Permission {
 
 入口条件：P1 已提交。
 
-- [ ] T13 在 plugin-api 里定义 `View`、`ActionId`、`TabState`、`Effect`（D5），以及扩展点 `InstanceTab`：
+- [x] T13 在 plugin-api 里定义 `View`、`ActionId`、`TabState`、`Effect`（D5），以及扩展点 `InstanceTab`：
   - `title()`
   - `appears(&GameFacts, ctx) -> bool`：出现条件
   - `view(...)`
   - `update(...)`
-- [ ] T14 core：宿主保存每个「实例 + 插件」的 `TabState`，并执行插件返回的 `Effect`（`RevealGameFile` 先校验路径）；新增服务方法 `plugin_tabs(instance)`、`plugin_view(instance, plugin)`、`plugin_action(instance, plugin, action)`。实现 `ctx.read_file`：只允许读 `ReadGameFiles.under` 下面的文件，用 `Path::components` 拒绝 `..`、绝对路径和符号链接；单个文件的大小有上限。
-- [ ] T15 lumilio-ui：只写一个通用的视图树渲染器，`View` 的每个组件对应一个 kit 组件；`destructive` 的键由宿主出确认弹窗。实例页接入插件 tab（见「留给实施者的细节」），沿用 UI 发意图 → app 调服务 → 数据回到 UI 的模式，可参考截图墙的提交 `f15b81e` 有哪些接入点。
-- [ ] T16 新建 `crates/lumilio-plugin-litematica`：
+- [x] T14 core：宿主保存每个「实例 + 插件」的 `TabState`，并执行插件返回的 `Effect`（`RevealGameFile` 先校验路径）；新增服务方法 `plugin_tabs(instance)`、`plugin_view(instance, plugin)`、`plugin_action(instance, plugin, action)`。实现 `ctx.read_file`：只允许读 `ReadGameFiles.under` 下面的文件，用 `Path::components` 拒绝 `..`、绝对路径和符号链接；单个文件的大小有上限。
+- [x] T15 lumilio-ui：只写一个通用的视图树渲染器，`View` 的每个组件对应一个 kit 组件；`destructive` 的键由宿主出确认弹窗。实例页接入插件 tab（见「留给实施者的细节」），沿用 UI 发意图 → app 调服务 → 数据回到 UI 的模式，可参考截图墙的提交 `f15b81e` 有哪些接入点。
+- [x] T16 新建 `crates/lumilio-plugin-litematica`：
   - 出现条件：实例的 mods 里有 Litematica（按 mod id 判断），或者游戏目录下存在 `schematics/`。
   - 列表：读取 `schematics/**/*.litematic`，用 `lumilio-nbt` 解析 `Metadata`（Name、Author、Description、EnclosingSize、TotalBlocks、TimeModified），有 `PreviewImageData` 就显示缩略图。
   - 详情：键值事实，加上材料清单表格（方块 id、数量），按数量降序。材料清单要解码各个 Region 的 `BlockStatePalette` 和 `BlockStates`（位宽 = max(2, ⌈log₂ 调色板长度⌉)，值可以跨越两个 long）。照格式规范自己实现，不要复制 Litematica 的源码（它是 LGPL，没有放进 3rd-party）。
   - 操作：「在文件夹中显示」（`Effect::RevealGameFile`）和「导出材料清单（CSV）」（`Effect::SaveAs`）。插件不能直接写盘（D5）。
   - 测试用 `lumilio-nbt` 的写入函数在测试里构造 `.litematic`，不往仓库里提交二进制样本。
-- [ ] T17 IA：按 D7 写 `// ia[plugin.litematica]` 注释，`PAGES` 加一行，重新生成。
+- [x] T17 IA：按 D7 写 `// ia[plugin.litematica]` 注释，`PAGES` 加一行，重新生成。
 
 验收：
 
@@ -285,3 +285,14 @@ pub enum Permission {
 - P1 产品代码已提交为 `78d4071`。维护者生成 `crash-2026-10-04_18.24.41-client.txt`，内容确为 Minecraft/Fabric 的 `Manually triggered debug crash`。
 - 原始报告仅复制到任务临时实例。浅色和深色、720×480 最小窗口均已在原生应用中查看：只出现一条 Info 级调试崩溃原因，中文建议为重新启动，报告正文与证据弹窗均可读。没有把手动崩溃误报为 Java、内存或 Mod 故障。
 - 维护者查看后确认「通过提交 p1，暂时暂停」。最后一项验收已勾选，P1 全阶段完成；提交本次验收记录后暂停目标，不开始 P2。恢复时从 T13 开始，D1 增加 serde_json 的裁决已记录在上。
+
+### 2026-10-04 — P2 实施中（T13–T17 代码完成，待全量检查与肉眼验收）
+
+- 恢复 P2：维护者在 P1 验收后只是暂停，随后再次要求推进本计划。D1 的 serde_json 裁决已落实到 plugin-api。
+- 留给实施者的细节：`HostContext` 增加 `list_files(dir)`（递归列出授权目录下的文件，相对游戏目录；不跟随符号链接，最多 5000 项、深度 8）。Litematica 要枚举 `schematics/**/*.litematic`，只有 `read_file` 做不到；它和 `read_file` 走同一套 `ReadGameFiles` 校验（拒绝 `..`、绝对路径、符号链接，单文件上限 32 MiB），所以没有扩大权限面。
+- 实例页 tab：内置 tab 的常量和 `LUMILIO_PAGE` 行为不变；插件 tab 只存在于「显示位置」里，插在「截图」之后、「历史」之前。`tab` 仍是内置序号，另有 `plugin_open` 记录打开的插件 tab，`select_tab` 会清掉它。`kit::tabs`/`PortTabs` 改为接受 `Into<SharedString>`，原调用点不变。
+- 视图树渲染器只有一份（`instance_detail/plugin_tabs.rs`），每个 `View` 对应 kit 组件；Detail 里的 `Key` 统一排在末尾；RGBA 在渲染时转 BGRA，尺寸与像素数不符的图片直接丢弃。`destructive` 的键先弹确认框再发出动作。`SaveAs` 的文件名只保留最后一段，`RevealGameFile` 必须落在授权目录内且文件存在，否则宿主丢弃该 Effect。
+- 宿主：`PluginHost::{tabs, tab_view, tab_action}`，每个「实例 + 插件」的 `TabState` 由宿主保存；服务方法 `plugin_tabs / plugin_view / plugin_action`。动作执行后，app 逐个执行 Effect，再重新读取视图。
+- Litematica：出现条件为 mods 里有 id `litematica`，或 `schematics/` 下已有文件（插件只能列出文件，所以空文件夹不算）。列表读取有 3 秒预算，超出的文件只显示文件名；单个文件读不了只让那一行写「读不了」。材料清单按格式规范自行实现（位宽 `max(2, ⌈log₂ 调色板长度⌉)`，值可跨两个 long），缺失或越界的调色板索引、过短的 BlockStates 都是错误而不是 panic。CSV 带 UTF-8 BOM。
+- 中途磁盘写满（`target` 188G），删除了可再生的 `target/debug/incremental`（58G）后继续；没有动源码和其他产物。
+- 需要维护者肉眼看：投影列表（缩略图、名称、作者与尺寸、方块数）、详情（事实、材料清单表格）、关闭插件后 tab 消失、导出 CSV 的保存对话框。

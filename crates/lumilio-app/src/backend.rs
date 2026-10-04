@@ -34,7 +34,10 @@ impl Backend {
             LauncherService::open(
                 root,
                 transport,
-                vec![Arc::new(lumilio_plugin_crash_analyzer::CrashAnalyzer)],
+                vec![
+                    Arc::new(lumilio_plugin_crash_analyzer::CrashAnalyzer),
+                    Arc::new(lumilio_plugin_litematica::Litematica),
+                ],
             )
             .map_err(|error| error.to_string())?
         };

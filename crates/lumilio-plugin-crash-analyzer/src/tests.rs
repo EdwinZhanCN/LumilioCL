@@ -9,6 +9,9 @@ impl HostContext for NoIo {
     fn read_file(&self, _: &str) -> Result<Vec<u8>, PluginError> {
         panic!("analysis needs no I/O")
     }
+    fn list_files(&self, _: &str) -> Result<Vec<String>, PluginError> {
+        panic!("analysis needs no I/O")
+    }
     fn fetch(&self, _: &str) -> Result<FetchResponse, PluginError> {
         panic!("analysis needs no network")
     }

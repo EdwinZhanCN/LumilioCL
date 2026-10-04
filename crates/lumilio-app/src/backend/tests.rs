@@ -47,9 +47,10 @@ fn the_shipped_backend_registers_the_crash_analyzer_and_its_switch() {
     let service = backend.service.clone();
     futures_block(backend.spawn(async move {
         let plugins = service.plugins().await;
-        assert_eq!(plugins.len(), 1);
+        assert_eq!(plugins.len(), 2);
         let id = &plugins[0].manifest.id;
         assert_eq!(id, lumilio_plugin_crash_analyzer::ID);
+        assert_eq!(plugins[1].manifest.id, lumilio_plugin_litematica::ID);
         let record = service
             .create_instance("Report", Some("1.0"), lumilio_core::Loader::Vanilla, None)
             .await
@@ -107,4 +108,50 @@ fn futures_block<T>(handle: tokio::task::JoinHandle<T>) -> T {
         }
         rx.recv_timeout(std::time::Duration::from_secs(5)).unwrap();
     }
+}
+
+#[test]
+fn the_litematica_tab_follows_the_schematics_folder_and_its_switch() {
+    let dir = tempfile::tempdir().unwrap();
+    let backend = Backend::open(dir.path().join("root")).unwrap();
+    let service = backend.service.clone();
+    futures_block(backend.spawn(async move {
+        let record = service
+            .create_instance("Builder", Some("1.0"), lumilio_core::Loader::Vanilla, None)
+            .await
+            .unwrap();
+        assert!(service.plugin_tabs(&record.id).await.unwrap().is_empty());
+
+        let folder = service.layout().game(&record.id).join("schematics");
+        tokio::fs::create_dir_all(&folder).await.unwrap();
+        tokio::fs::write(folder.join("broken.litematic"), b"not a schematic")
+            .await
+            .unwrap();
+        let tabs = service.plugin_tabs(&record.id).await.unwrap();
+        assert_eq!(tabs.len(), 1);
+        assert_eq!(tabs[0].plugin, lumilio_plugin_litematica::ID);
+
+        // A broken file is one row that says so; the list still shows.
+        let view = service
+            .plugin_view(&record.id, lumilio_plugin_litematica::ID)
+            .await
+            .unwrap();
+        let Some(lumilio_plugin_api::View::List { items }) = view else {
+            panic!("expected a list");
+        };
+        assert_eq!(items[0].subtitle.as_deref(), Some("读不了"));
+
+        service
+            .set_plugin_enabled(lumilio_plugin_litematica::ID, false)
+            .await
+            .unwrap();
+        assert!(service.plugin_tabs(&record.id).await.unwrap().is_empty());
+        assert!(
+            service
+                .plugin_view(&record.id, lumilio_plugin_litematica::ID)
+                .await
+                .unwrap()
+                .is_none()
+        );
+    }));
 }

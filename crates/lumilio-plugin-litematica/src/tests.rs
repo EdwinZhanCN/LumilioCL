@@ -1,0 +1,315 @@
+use std::collections::BTreeMap;
+use std::io::Write;
+
+use lumilio_nbt::Tag;
+use lumilio_plugin_api::{
+    ActionId, Effect, FetchResponse, GameFacts, HostContext, InstanceTab, ModFact, PluginError,
+    SettingValue, TabState, View,
+};
+
+use crate::format::{self, pack};
+use crate::{FOLDER, Litematica};
+
+struct Files(BTreeMap<String, Vec<u8>>);
+
+impl HostContext for Files {
+    fn setting(&self, _: &str) -> Option<SettingValue> {
+        None
+    }
+    fn read_file(&self, path: &str) -> Result<Vec<u8>, PluginError> {
+        self.0
+            .get(path)
+            .cloned()
+            .ok_or(PluginError::Unavailable("missing".into()))
+    }
+    fn list_files(&self, dir: &str) -> Result<Vec<String>, PluginError> {
+        Ok(self
+            .0
+            .keys()
+            .filter(|path| path.starts_with(&format!("{dir}/")))
+            .cloned()
+            .collect())
+    }
+    fn fetch(&self, _: &str) -> Result<FetchResponse, PluginError> {
+        Err(PluginError::PermissionDenied)
+    }
+}
+
+fn compound(entries: Vec<(&str, Tag)>) -> Tag {
+    Tag::Compound(
+        entries
+            .into_iter()
+            .map(|(k, v)| (k.to_owned(), v))
+            .collect(),
+    )
+}
+
+fn vec3(x: i32, y: i32, z: i32) -> Tag {
+    compound(vec![
+        ("x", Tag::Int(x)),
+        ("y", Tag::Int(y)),
+        ("z", Tag::Int(z)),
+    ])
+}
+
+fn palette(names: &[&str]) -> Tag {
+    Tag::List(
+        names
+            .iter()
+            .map(|name| compound(vec![("Name", Tag::String((*name).into()))]))
+            .collect(),
+    )
+}
+
+fn gzip(data: &[u8]) -> Vec<u8> {
+    let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+    encoder.write_all(data).unwrap();
+    encoder.finish().unwrap()
+}
+
+fn litematic(name: &str, size: (i32, i32, i32), names: &[&str], values: &[u64]) -> Vec<u8> {
+    let bits = if names.len() <= 4 {
+        2
+    } else {
+        usize::BITS - (names.len() - 1).leading_zeros()
+    };
+    let region = compound(vec![
+        ("Size", vec3(size.0, size.1, size.2)),
+        ("BlockStatePalette", palette(names)),
+        ("BlockStates", Tag::LongArray(pack(values, bits))),
+    ]);
+    let root = compound(vec![
+        (
+            "Metadata",
+            compound(vec![
+                ("Name", Tag::String(name.into())),
+                ("Author", Tag::String("Alex".into())),
+                ("EnclosingSize", vec3(size.0, size.1, size.2)),
+                ("TotalBlocks", Tag::Int(values.len() as i32)),
+                ("RegionCount", Tag::Int(1)),
+                ("TimeModified", Tag::Long(1_700_000_000_000)),
+            ]),
+        ),
+        ("Regions", compound(vec![("main", region)])),
+    ]);
+    gzip(&lumilio_nbt::to_bytes(&root))
+}
+
+fn files(entries: Vec<(&str, Vec<u8>)>) -> Files {
+    Files(
+        entries
+            .into_iter()
+            .map(|(name, bytes)| (format!("{FOLDER}/{name}"), bytes))
+            .collect(),
+    )
+}
+
+#[test]
+fn materials_count_every_block_and_skip_air_sorted_by_the_view() {
+    // 2x2x2 = 8 blocks: 3 stone, 4 air, 1 oak log.
+    let bytes = litematic(
+        "House",
+        (2, 2, 2),
+        &["minecraft:air", "minecraft:stone", "minecraft:oak_log"],
+        &[1, 1, 0, 0, 2, 0, 1, 0],
+    );
+    let counts = format::parse(&bytes).unwrap().materials().unwrap();
+    assert_eq!(counts["minecraft:stone"], 3);
+    assert_eq!(counts["minecraft:oak_log"], 1);
+    assert!(!counts.contains_key("minecraft:air"));
+}
+
+#[test]
+fn indices_that_straddle_two_longs_decode() {
+    // 5 palette bits (17 entries) do not divide 64, so values straddle longs.
+    let names: Vec<String> = (0..17).map(|i| format!("minecraft:b{i}")).collect();
+    let names: Vec<&str> = names.iter().map(String::as_str).collect();
+    let values: Vec<u64> = (0..26).map(|i| i % 17).collect();
+    let bytes = litematic("Wide", (26, 1, 1), &names, &values);
+    let counts = format::parse(&bytes).unwrap().materials().unwrap();
+    let total: u64 = counts.values().sum();
+    // b0 is not air here, so every one of the 26 blocks is counted.
+    assert_eq!(total, 26);
+    assert_eq!(counts["minecraft:b16"], 1);
+    assert_eq!(counts["minecraft:b0"], 2);
+}
+
+#[test]
+fn a_palette_index_outside_the_palette_is_an_error_not_a_panic() {
+    let bytes = litematic(
+        "Bad",
+        (1, 1, 2),
+        &["minecraft:air", "minecraft:stone"],
+        &[3, 1],
+    );
+    assert!(format::parse(&bytes).unwrap().materials().is_err());
+}
+
+#[test]
+fn short_block_state_arrays_are_rejected() {
+    let region = compound(vec![
+        ("Size", vec3(100, 100, 100)),
+        ("BlockStatePalette", palette(&["minecraft:stone"])),
+        ("BlockStates", Tag::LongArray(vec![0])),
+    ]);
+    let root = compound(vec![
+        ("Metadata", compound(vec![])),
+        ("Regions", compound(vec![("r", region)])),
+    ]);
+    let parsed = format::parse(&lumilio_nbt::to_bytes(&root)).unwrap();
+    assert!(parsed.materials().is_err());
+}
+
+#[test]
+fn the_list_shows_metadata_and_marks_broken_files_without_failing() {
+    let ctx = files(vec![
+        (
+            "house.litematic",
+            litematic("House", (2, 1, 1), &["minecraft:stone"], &[0, 0]),
+        ),
+        ("broken.litematic", b"not nbt".to_vec()),
+        ("notes.txt", b"ignored".to_vec()),
+    ]);
+    let View::List { items } = Litematica.view(&ctx, &TabState::Null).unwrap() else {
+        panic!("list");
+    };
+    assert_eq!(items.len(), 2);
+    let broken = &items[0];
+    assert_eq!(broken.title, "broken.litematic");
+    assert_eq!(broken.subtitle.as_deref(), Some("读不了"));
+    assert!(broken.open.is_none());
+    let house = &items[1];
+    assert_eq!(house.title, "House");
+    assert_eq!(house.subtitle.as_deref(), Some("Alex · 2×1×1"));
+    assert_eq!(house.value.as_deref(), Some("2 个方块"));
+    assert_eq!(
+        house.open,
+        Some(ActionId::new("open:schematics/house.litematic"))
+    );
+}
+
+#[test]
+fn an_empty_folder_says_so() {
+    let ctx = files(vec![("notes.txt", b"x".to_vec())]);
+    assert!(matches!(
+        Litematica.view(&ctx, &TabState::Null).unwrap(),
+        View::Empty { .. }
+    ));
+}
+
+#[test]
+fn detail_has_facts_a_descending_material_table_and_actions() {
+    let ctx = files(vec![(
+        "house.litematic",
+        litematic(
+            "House",
+            (2, 2, 1),
+            &["minecraft:air", "minecraft:stone", "minecraft:glass"],
+            &[1, 2, 2, 2],
+        ),
+    )]);
+    let (state, effects) = Litematica
+        .update(
+            &ctx,
+            TabState::Null,
+            ActionId::new("open:schematics/house.litematic"),
+        )
+        .unwrap();
+    assert!(effects.is_empty());
+    let View::Detail {
+        title,
+        facts,
+        children,
+        ..
+    } = Litematica.view(&ctx, &state).unwrap()
+    else {
+        panic!("detail");
+    };
+    assert_eq!(title, "House");
+    assert!(facts.contains(&("尺寸".to_owned(), "2 × 2 × 1".to_owned())));
+    assert!(facts.contains(&("修改时间".to_owned(), "2023-11-14 22:13".to_owned())));
+    let View::Section {
+        children: material, ..
+    } = &children[0]
+    else {
+        panic!("materials first");
+    };
+    let View::Table { rows, .. } = &material[0] else {
+        panic!("table");
+    };
+    assert_eq!(
+        rows,
+        &vec![
+            vec!["minecraft:glass".to_owned(), "3".to_owned()],
+            vec!["minecraft:stone".to_owned(), "1".to_owned()],
+        ]
+    );
+}
+
+#[test]
+fn reveal_and_export_become_effects_and_back_closes_the_detail() {
+    let ctx = files(vec![(
+        "house.litematic",
+        litematic("House", (2, 1, 1), &["minecraft:stone"], &[0, 0]),
+    )]);
+    let open = serde_json::json!({"open": "schematics/house.litematic"});
+    let (_, effects) = Litematica
+        .update(&ctx, open.clone(), ActionId::new("reveal"))
+        .unwrap();
+    assert_eq!(
+        effects,
+        vec![Effect::RevealGameFile {
+            path: "schematics/house.litematic".into()
+        }]
+    );
+    let (_, effects) = Litematica
+        .update(&ctx, open.clone(), ActionId::new("export"))
+        .unwrap();
+    let [
+        Effect::SaveAs {
+            suggested_name,
+            bytes,
+        },
+    ] = effects.as_slice()
+    else {
+        panic!("save");
+    };
+    assert_eq!(suggested_name, "house-材料清单.csv");
+    assert_eq!(
+        String::from_utf8(bytes.clone()).unwrap(),
+        "\u{feff}方块,数量\r\nminecraft:stone,2\r\n"
+    );
+    let (state, _) = Litematica
+        .update(&ctx, open, ActionId::new("back"))
+        .unwrap();
+    assert_eq!(state, TabState::Null);
+    assert!(
+        Litematica
+            .update(&ctx, TabState::Null, ActionId::new("open:options.txt"))
+            .is_err()
+    );
+}
+
+#[test]
+fn the_tab_appears_with_the_mod_or_with_existing_schematics() {
+    let empty = files(vec![]);
+    let with_files = files(vec![("a.litematic", Vec::new())]);
+    let mut game = GameFacts::default();
+    assert!(!Litematica.appears(&game, &empty));
+    assert!(Litematica.appears(&game, &with_files));
+    game.mods.push(ModFact {
+        id: "litematica".into(),
+        version: None,
+        file: "litematica.jar".into(),
+    });
+    assert!(Litematica.appears(&game, &empty));
+}
+
+#[test]
+fn dates_are_formatted_in_utc() {
+    assert_eq!(crate::tab::date_for_tests(0), "1970-01-01 00:00");
+    assert_eq!(
+        crate::tab::date_for_tests(1_700_000_000_000),
+        "2023-11-14 22:13"
+    );
+}

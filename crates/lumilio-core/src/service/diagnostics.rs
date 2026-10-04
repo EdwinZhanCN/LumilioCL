@@ -335,7 +335,7 @@ impl<T: Transport + Clone> LauncherService<T> {
 }
 
 /// Runs on a blocking worker. Facts contain no host paths or UI types.
-fn game_facts(
+pub(super) fn game_facts(
     layout: &crate::layout::Layout,
     record: &crate::instance::InstanceRecord,
     runtimes: &[crate::java::JavaRuntime],

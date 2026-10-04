@@ -1,13 +1,17 @@
 //! Host-owned settings and failure isolation for synchronous plugin code.
 
+mod access;
 mod analysis;
 mod context;
+mod tabs;
 pub use analysis::PluginFinding;
+pub use tabs::{PluginEffect, PluginTab};
 #[cfg(test)]
 mod tests;
 
 use std::collections::BTreeMap;
 use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 
@@ -54,6 +58,8 @@ pub struct PluginHost {
     candidates: Vec<Arc<dyn Plugin>>,
     registry: OnceCell<Registry>,
     preferences: RwLock<Preferences>,
+    /// UI state per (instance, plugin); owned by the host, not the plugins.
+    tab_states: Mutex<BTreeMap<(String, String), lumilio_plugin_api::TabState>>,
     timeout: Duration,
 }
 
@@ -67,6 +73,7 @@ impl PluginHost {
                 states,
                 revisions: BTreeMap::new(),
             }),
+            tab_states: Mutex::new(BTreeMap::new()),
             timeout: CALL_TIMEOUT,
         }
     }
@@ -185,6 +192,16 @@ impl PluginHost {
         R: Send + 'static,
         F: FnOnce(&dyn Plugin, &dyn HostContext) -> Result<R, PluginError> + Send + 'static,
     {
+        self.call_in(id, None, call).await
+    }
+
+    /// Like [`Self::call`], with read access to one game directory (within the
+    /// plugin's `ReadGameFiles` grants).
+    pub async fn call_in<R, F>(&self, id: &str, game_dir: Option<PathBuf>, call: F) -> Option<R>
+    where
+        R: Send + 'static,
+        F: FnOnce(&dyn Plugin, &dyn HostContext) -> Result<R, PluginError> + Send + 'static,
+    {
         let entry = self.registry().await.entries.get(id)?.clone();
         let (state, revision) = {
             let preferences = self
@@ -203,7 +220,7 @@ impl PluginHost {
         {
             return None;
         }
-        let context = Context::new(&entry.manifest, &state);
+        let context = Context::new(&entry.manifest, &state, game_dir);
         let plugin = entry.plugin.clone();
         let result = isolated(self.timeout, move || call(plugin.as_ref(), &context)).await;
         match result {

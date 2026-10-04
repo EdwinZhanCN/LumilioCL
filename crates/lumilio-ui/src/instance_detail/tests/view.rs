@@ -30,11 +30,12 @@ fn tabs_load_their_data_once_and_ignore_a_second_request_while_pending(cx: &mut 
     assert_eq!(
         seen.borrow().as_slice(),
         &[
+            InstanceIntent::PluginTabs,
             InstanceIntent::Load(Section::Problems),
             InstanceIntent::Load(Section::Size),
             InstanceIntent::Load(Section::History),
         ],
-        "the overview asks for what it shows, once"
+        "the page asks which plugin tabs show and, for the overview, what it shows, once"
     );
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {

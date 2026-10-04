@@ -4024,7 +4024,9 @@ dependencies = [
  "futures",
  "gpui-kit",
  "lumilio-core",
+ "lumilio-plugin-api",
  "lumilio-plugin-crash-analyzer",
+ "lumilio-plugin-litematica",
  "lumilio-ui",
  "reqwest",
  "tempfile",
@@ -4080,6 +4082,7 @@ name = "lumilio-plugin-api"
 version = "0.1.0"
 dependencies = [
  "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -4088,6 +4091,16 @@ version = "0.1.0"
 dependencies = [
  "lumilio-plugin-api",
  "regex",
+]
+
+[[package]]
+name = "lumilio-plugin-litematica"
+version = "0.1.0"
+dependencies = [
+ "flate2",
+ "lumilio-nbt",
+ "lumilio-plugin-api",
+ "serde_json",
 ]
 
 [[package]]

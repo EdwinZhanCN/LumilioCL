@@ -7,6 +7,7 @@ members = [
     "crates/lumilio-plugin-api",
     "crates/lumilio-nbt",
     "crates/lumilio-plugin-crash-analyzer",
+    "crates/lumilio-plugin-litematica",
 ]
 resolver = "3"
 
@@ -30,6 +31,7 @@ image = { version = "0.25", default-features = false, features = ["jpeg", "png"]
 lumilio-core = { path = "crates/lumilio-core" }
 lumilio-plugin-api = { path = "crates/lumilio-plugin-api" }
 lumilio-plugin-crash-analyzer = { path = "crates/lumilio-plugin-crash-analyzer" }
+lumilio-plugin-litematica = { path = "crates/lumilio-plugin-litematica" }
 lumilio-nbt = { path = "crates/lumilio-nbt" }
 lumilio-ui = { path = "crates/lumilio-ui" }
 md-5 = "0.11"
