@@ -131,7 +131,11 @@ impl<T: Transport + Clone> LauncherService<T> {
         let settings = SettingsStore::open(layout.root())?;
         let log = ActivityLog::open(layout.root());
         let startup = recovery::startup_notes(&layout, &store, &settings, &log);
-        let plugins = crate::plugins::PluginHost::new(plugins, settings.get().plugins.clone());
+        let plugins = crate::plugins::PluginHost::new(plugins, settings.get().plugins.clone())
+            // Invalid hand-edited mirrors must not make plugin initialization
+            // prevent the launcher from opening. Network calls fail locally
+            // until corrected; the rest of the service remains available.
+            .with_network_config(transport.clone(), settings.source_chain().ok());
         Ok(Self {
             plugins,
             layout,

@@ -141,3 +141,75 @@ async fn transports_without_post_support_fail_permanently() {
         .unwrap_err();
     assert!(!error.message().is_empty());
 }
+
+#[tokio::test]
+async fn scoped_http_returns_the_redirect_without_contacting_its_destination() {
+    let origin = TcpListener::bind("127.0.0.1:0").unwrap();
+    let destination = TcpListener::bind("127.0.0.1:0").unwrap();
+    destination.set_nonblocking(true).unwrap();
+    let origin_address = origin.local_addr().unwrap();
+    let destination_address = destination.local_addr().unwrap();
+    let server = std::thread::spawn(move || {
+        let (mut stream, _) = origin.accept().unwrap();
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+            .unwrap();
+        let mut buffer = [0; 4096];
+        let read = stream.read(&mut buffer).unwrap();
+        let response = format!(
+            "HTTP/1.1 302 Found\r\nLocation: http://{destination_address}/secret\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+        );
+        stream.write_all(response.as_bytes()).unwrap();
+        String::from_utf8_lossy(&buffer[..read]).to_ascii_lowercase()
+    });
+    let response = HttpTransport::new()
+        .unwrap()
+        .send_no_redirect(HttpRequest {
+            method: HttpMethod::Get,
+            url: format!("http://{origin_address}/"),
+            headers: Vec::new(),
+            body: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 302);
+    assert_eq!(
+        response.header("location"),
+        Some(format!("http://{destination_address}/secret").as_str())
+    );
+    assert!(
+        server
+            .join()
+            .unwrap()
+            .contains(&format!("user-agent: {}", USER_AGENT.to_ascii_lowercase()))
+    );
+    assert_eq!(
+        destination.accept().unwrap_err().kind(),
+        std::io::ErrorKind::WouldBlock
+    );
+}
+
+#[tokio::test]
+async fn transports_without_scoped_support_fail_closed() {
+    let request = HttpRequest {
+        method: HttpMethod::Get,
+        url: "https://example.test/".into(),
+        headers: Vec::new(),
+        body: None,
+    };
+    assert!(
+        !FileTransport
+            .send_no_redirect(request.clone())
+            .await
+            .unwrap_err()
+            .is_retryable()
+    );
+    let custom = HttpTransport::from_client(reqwest::Client::new());
+    assert!(
+        !custom
+            .send_no_redirect(request)
+            .await
+            .unwrap_err()
+            .is_retryable()
+    );
+}

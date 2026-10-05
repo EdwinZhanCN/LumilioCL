@@ -31,6 +31,17 @@ pub struct HttpRequest {
 pub trait Transport: Send + Sync + 'static {
     fn get<'a>(&'a self, source: &'a str) -> TransportFuture<'a>;
 
+    /// Sends exactly one HTTP hop, without following redirects. The plugin
+    /// host checks each destination. Never fall back to `send` here.
+    fn send_no_redirect<'a>(&'a self, request: HttpRequest) -> TransportFuture<'a> {
+        let _ = request;
+        Box::pin(async {
+            Err(TransportError::permanent(
+                "this transport cannot send requests without redirects",
+            ))
+        })
+    }
+
     /// Sends a request exactly as described and returns the answer whatever
     /// its status. Transports that cannot keep this default, which fails
     /// permanently.

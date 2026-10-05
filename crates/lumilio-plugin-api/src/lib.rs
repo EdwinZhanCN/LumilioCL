@@ -8,10 +8,14 @@ use std::fmt::{self, Display, Formatter};
 use serde::{Deserialize, Serialize};
 
 mod analysis;
+pub mod content;
+mod network;
 mod view;
 pub use analysis::{
     AnalysisInput, AnalysisSource, Analyzer, Finding, GameFacts, ModFact, Severity,
 };
+pub use content::ContentSource;
+pub use network::{FetchMethod, FetchRequest};
 pub use view::{ActionId, Effect, ImageData, InstanceTab, KeyKind, ListItem, TabState, Tone, View};
 
 pub const API_VERSION: u32 = 1;
@@ -142,11 +146,22 @@ pub trait HostContext: Send + Sync {
     /// granted `ReadGameFiles` directory.
     fn list_files(&self, dir: &str) -> Result<Vec<String>, PluginError>;
     fn fetch(&self, url: &str) -> Result<FetchResponse, PluginError>;
+    /// HTTP requests still pass through the host's permissions and transport.
+    /// Existing contexts support a plain GET only until they implement this.
+    fn request(&self, request: FetchRequest) -> Result<FetchResponse, PluginError> {
+        if request.method == FetchMethod::Get
+            && request.headers.is_empty()
+            && request.body.is_none()
+        {
+            self.fetch(&request.url)
+        } else {
+            Err(PluginError::PermissionDenied)
+        }
+    }
 }
 
 // Extension-point contracts are added with their first implementation, in
 // order: analysis, instance views, content sources, launch observation.
-pub trait ContentSource: Send + Sync {}
 pub trait LaunchObserver: Send + Sync {}
 
 pub trait Plugin: Send + Sync + 'static {

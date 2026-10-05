@@ -193,15 +193,15 @@ pub enum Permission {
 
 入口条件：P2 已提交。
 
-- [ ] T18 先做调研再动手，结果写进实施记录：
+- [x] T18 先做调研再动手，结果写进实施记录：
   1. 逐个过一遍 core 里提到 Modrinth 的 36 个文件（`grep -rli modrinth crates/lumilio-core/src`），分成三类：**Modrinth API**（要迁进插件）、**`.mrpack` 格式**（`modpack`、`pack_export`，是文件格式，留在 core）、**只是提到这个名字**（不动）。
   2. 读 `discover/query.rs`，把筛选模型（`Pick`、`Stance` 等）和拼 Modrinth URL 的代码分开。
   3. 拿 `3rd-party/HMCL/HMCLCore/src/main/java/org/jackhuang/hmcl/addon/RemoteAddonRepository.java` 和同目录 `repository/CurseForgeRemoteAddonRepository.java` 对照草拟的接口，在纸面上走一遍，确认 CurseForge 也能实现它。
-- [ ] T19 在 plugin-api 里定义 `ContentSource`：
+- [x] T19 在 plugin-api 里定义 `ContentSource`：
   - 能力声明：支持哪些项目类型、哪些筛选、哪些排序。
   - 方法：`search`、`project`、`versions`、`version_files`、`dependencies`。
   - 数据类型由 plugin-api 自己定义，core 负责和现有类型互相转换。
-- [ ] T20 实现 `ctx.fetch`：只允许访问 `Network.hosts` 里列出的主机；底层走 core 现有的 `Transport`（镜像和代理规则保持不变）；响应大小有上限。
+- [x] T20 实现 `ctx.fetch`：只允许访问 `Network.hosts` 里列出的主机；底层走 core 现有的 `Transport`（镜像和代理规则保持不变）；响应大小有上限。
 - [ ] T21 把 Modrinth API 的部分迁进 `crates/lumilio-plugin-modrinth`。core 的发现、内容安装、更新检查、整合包安装改为通过宿主调用 `ContentSource`。发现页按内容源的能力声明显示筛选项，ADR 0023 的界面和行为不变。
 - [ ] T22 停用 Modrinth 后：发现页显示「没有可用的内容源」；已安装的内容照常可用；更新检查跳过来源不可用的项，并说明原因。
 
@@ -301,3 +301,40 @@ pub enum Permission {
 
 - 维护者用真实的投影文件看过投影 tab，确认「P2 验收成功」。看图后的两条修改已落实：列表标题改为文件名（子文件夹显示为标签，`Metadata.Name` 常是 Litematica 写的默认值 "Unnamed"，移到详情的「投影名称」）；详情的操作按钮排在标题下面，材料清单改成最高 360 px 的滚动容器（表头固定，滚轮留在容器内，做法同诊断日志）。
 - P2 全阶段完成，P3 尚未开始。3D 预览不在本计划范围内，另开 `litematica-3d` 计划；P3 可以与它并行排期。
+
+### 2026-10-04 — P3 调研与基础接口（T18–T20）
+
+- 工作分支 `feat/plugin-content-source`，worktree `.worktrees/plugin-content-source`，基于已验收 P2 的 `c9d41e9`。主分支的后续 3D 工作引用尚未跟踪的 schematic-render crate，本轮不纳入。
+- T18 逐个核对后是 37 个文件（计划中的 36 是旧计数），按主职责分组；混合文件只迁 API 调用：
+  - **API 与接线（23）**：`discover/{client,error,kinds,mod,project,query,search,tags,versions,tests}.rs`；`service/{content,content_install,discover,modpacks,worlds,types}.rs`；`updates.rs`、`updates/tests.rs`、`content_sources.rs`、`lib.rs`；`service/tests/{content,discover,packs}.rs`。`kinds` 的目录映射、`versions` 的兼容选择、`content_sources` 的列表组装仍属 core；`service/modpacks` 的本地导入和 `service/worlds` 的格式导出也仍属 core，只替换其中的远程查询。
+  - **mrpack 格式（7）**：`modpack.rs`、`modpack/tests.rs`、`pack_export.rs`、`pack_export/tests.rs`、`service/packs.rs`、`service/tests/diagnostics.rs`、`service/tests/mod.rs`。格式、可信 CDN、zip 夹具保留；导出前的识别请求在上组的 `service/worlds` 迁移。
+  - **名称 / 来源 / 通用行为（7）**：`content.rs`、`instance.rs`、`servers/ping.rs`、`plugins/tests.rs`、`transfer/mod.rs`、`tuning.rs`、`discover/version_groups.rs`。哈希、实例来源字段、服务端 ping 的 attribution、权限测试、UA、筛选偏好与版本范围展示保留。
+- `discover/query.rs` 的 `Stance`、`Pick`、SearchQuery 字段是用户意图；`expression/url/literal/one_of/none_of/environment_groups` 是 Modrinth v3 协议。基础契约另定义语义查询，T21 才把协议生成迁进插件并做 core 转换，保留 ADR 0023 的 include/exclude、any/all 与高级排除语义。
+- 对照 HMCL 的 `RemoteAddonRepository.java` 和 `repository/CurseForgeRemoteAddonRepository.java`（只研究契约，不复制实现）：项目 ID、版本 ID 都是不透明字符串；CF 的 project/file 路径要求版本引用同时含项目 ID。按类型声明筛选及排序，CF 可声明单个游戏版本、单个分类、单个 loader，而不承诺 Modrinth 的排除/组合/环境等筛选。搜索分页对应 index/pageSize，下载数/创建/更新排序可映射 sortField；files 转版本和文件，relations 转依赖，downloadUrl 缺失则没有可安装文件。识别允许 SHA-1 或 Murmur2 指纹（由宿主算，插件不读任意本地文件）；批量识别/兼容更新、标签及作者摘要也需有契约，避免现有安装/更新/导出功能遗漏。CF 的 X-API-KEY 可通过声明式设置读取并作为请求头交给宿主；本轮不实现 CF。
+- 网络细节：宿主校验插件提交的原始 URL 的精确主机，再应用维护者配置的 SourceChain；镜像是宿主的可信替代，不给插件任意访问镜像的权限。重定向必须逐跳检查，不能依赖 reqwest 默认自动跳转；JSON POST 不镜像重试，保持原 client 的规则。响应与请求体均有大小上限；超时使网络 future 取消，不让已失败的 worker 一直等网络。
+- 本批完成 T18–T20；T21–T22 的产品迁移与界面接线另批推进。
+
+### 2026-10-05 — P3 基础实现与验证
+
+- 实现 `content` 契约与 `SearchQuery::validate`：按项目类型限制排序、筛选数量、排除、any/all 与高级筛选；`VersionRef` 包含项目和版本 ID；文件识别输入是宿主计算的指纹与关联 key，不向插件交出本地路径。数据协议可 serde 往返，plugin-api 没有增加 serde / serde_json 之外的依赖。
+- 宿主提供 `content_sources / call_content / search_content`，能力声明也在 worker 隔离边界内读取；普通调用仍为 5 秒，搜索独立预算 20 秒，网络与该次插件调用共用期限。
+- `ctx.fetch` 保持 GET 接口，新增 `ctx.request(FetchRequest)` 承载 POST、请求头与请求体，兼容旧上下文的默认 GET 实现。请求体上限 1 MiB、请求头合计 16 KiB、响应 32 MiB（同时检查 Content-Length 和流式累计），最多 10 次重定向；拒绝路由/代理/分帧头、URL 凭据、非 HTTP(S) URL，跨 origin 跳转去掉敏感头，拒绝 HTTPS 降级。
+- `Transport::send_no_redirect` 默认拒绝；产品 DefaultTransport 使用相同默认代理/TLS/UA 配置的无自动跳转 HTTP client，由宿主逐跳授权。`HttpTransport::from_client` 的不透明自定义 client 保留原行为，但新的受限请求拒绝执行，防止偷偷丢失其代理配置或绕过重定向检查；此限制有测试。
+- 镜像持久化成功才发布，下一次调用用新快照；手工写坏镜像配置只使插件网络调用返回错误，不阻止服务启动或打开本地库。正在使用旧快照的调用不会被换掉传输路径。
+- 权限守卫已证明会失败：临时跳过原始主机授权检查后，定向测试因 `https://evil.test/` 返回 HTTP 200、预期 PermissionDenied 而变红；已还原检查并重跑。42 项插件相关测试通过，包含启停、panic/超时隔离、搜索预算、网络 future 取消、响应大小、逐跳授权、镜像持久化和配置损坏。原生 HTTP 单跳/UA 与不支持受限请求的 transport 测试也已通过首轮，最终全量将再次覆盖。
+- 环境记录：共享 target 与另一个主工作区构建争锁，两个过滤后的测试进程曾停在 macOS dyld 启动阶段，随后正常退出。为 worktree 建了独立缓存；全量复制 split-DWARF 元数据过慢，停止后改为只克隆依赖库、Cargo fingerprints 和 build 产物。停止的仅是本任务的复制/等待进程，另一项构建未被操作。
+- 两轮完整 `just check` 都通过（日志 `/private/tmp/lumilio-plugin-p3-foundation-check.log`、`/private/tmp/lumilio-plugin-p3-foundation-final-check.log`）：最终 core 496 passed / 2 ignored，UI 296 passed / 3 ignored，app 10 passed，边界与 attribution 均通过；新添 24 项测试。真实网络 live_smoke 的 2 项仍按默认忽略，本批尚未迁移远程 API，不声称完成真实 Modrinth 链路验收。
+- 搜索筛选语义沿用 core 的 Modrinth App 来源，API 模块保留了 `packages/ui/src/utils/search.ts` / GPL-3.0-only / ADR 0022 attribution，补齐注释后已完整重跑检查。本批没有 UI 改动或新的肉眼验收项。T18–T20 已完成；下一批从 T21 迁移 Modrinth 产品调用和 core 类型转换，再做 T22 的停用反馈。P3 尚未验收，P4 不开始。
+
+### 2026-10-05 — T21 独立 Modrinth 插件
+
+- 在同一 worktree 从 `dfacd47` 继续，先交付 T21 的插件实现；T21 整项仍未完成。新增平铺的 `lumilio-plugin-modrinth`，只依赖 plugin-api、serde、serde_json、url，没有网络客户端或文件访问。清单 ID 为 `lumilio.modrinth`，默认启用，只申请 `api.modrinth.com` 网络权限。
+- 将原 `discover/{query,search,project,tags,versions}.rs` 的协议实现抽取到插件，直接输出 plugin-api 的内容契约；原 core 实现暂留供现有产品调用，下批完成适配与切换后删除。没有在 app 注册插件，因此本批不会出现一个尚不能停用旧 API 的设置开关，也没有改变发现页、安装或本地内容行为。
+- 完整实现搜索、项目详情、版本与 changelog、指定版本文件和依赖、筛选选项、SHA-1 识别、兼容更新、项目摘要与团队作者。所有 GET / JSON POST 经 `ctx.request`，HTTP 非 2xx 与必需数据解码失败返回错误；作者与 loader 列表失败保留已有页面 / 选项。识别按宿主 correlation key 返回，合并重复哈希但保留每个 key，忽略远端未请求的哈希，不把空批次发到网络。
+- 搜索继续参考主工作区只读的 `3rd-party/modrinth/packages/ui/src/utils/search.ts`（`newFilters`、`getEnvironmentFilterGroups`、`formatSearchFilterValue`），保留 GPL-3.0-only / ADR 0022 来源声明；版本查询对照 HMCL 的 `repository/ModrinthRemoteAddonRepository.java`。worktree 未初始化第三方子模块，读取的是主工作区副本，没有修改它们。
+- 插件按类型验证能力，不再把不支持的筛选悄悄丢掉。契约中的 loader `any/all` 分别编码为 OR / AND；下一批 core 适配必须把原 core 固定 OR 的 loader 选择归一为 `any = true`，保持 ADR 0023 的现有界面语义。项目 / 版本 ID 按单个 URL path segment 编码，拒绝空值和特殊点段；指定版本返回的项目及版本 ID 必须与引用一致。
+- 27 项独立插件测试覆盖原协议样本与上下文请求，新加宿主测试验证真实插件的贡献、停用后无请求、缺少授权无 I/O，以及 HTTP 429 后本次运行保持 Failed；core 对插件的依赖仅是 dev-dependency。临时去掉项目 ID 校验后，版本文件测试编译成功并因错误项目仍返回文件而失败；校验已还原，27 项测试重跑通过。另增加默认忽略的只读真实 API 契约测试，不下载游戏、不接触用户启动器资料。
+- 验证：27 项插件单元测试、3 项真实插件宿主测试、手动运行的只读真实 API 契约测试全部通过。真实测试在 3.77 秒内读完搜索、项目、带 changelog 的版本、指定版本文件 / 依赖、识别、兼容更新、项目摘要、标签列表，没有下载游戏或修改用户资料；该项默认忽略。最终 `just check` 通过（日志 `/private/tmp/lumilio-plugin-modrinth-source-check.log`）：core 499 passed / 3 ignored、UI 296 passed / 3 ignored、app 10 passed，边界 / attribution、Clippy 和格式检查均通过。原 `live_smoke` 两项仍按默认忽略，不声称已验证产品迁移后的安装 / 启动。
+- 首轮测试夹具编译曾使用 API 不存在的 `Version::required_dependencies` 和 `SourceChain::official`，已分别改为直接筛选依赖和构造 OfficialSource 链；这些编译失败不是回归测试变红的证据。
+- 更新实施记录后 `just docs` 通过（日志 `/private/tmp/lumilio-plugin-modrinth-source-docs.log`）。没有产品界面改动，本批无新的原生视觉验收项；插件清单文案的实际设置行将在 app 注册时一起查看。
+- 下一批从 core 的类型转换与调用适配开始：切换发现 / 内容安装 / 更新 / 整合包查询，删除旧协议实现；缓存结果也必须按插件启用状态过滤，不能用缓存绕过停用。app 注册、原 service / live_smoke 测试注入、能力驱动的筛选和 T22 的反馈一起完成。D2 的 Failed 本次运行粘住，旧过滤器「网络恢复后同一 service 重试成功」测试需要按此冻结行为调整。P3 不验收，P4 不开始。

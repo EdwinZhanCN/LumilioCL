@@ -13,6 +13,8 @@ use url::Url;
 #[derive(Clone, Debug)]
 pub struct HttpTransport {
     pub(super) client: Client,
+    // Same default proxy/TLS/UA settings; the host owns plugin redirects.
+    plugin_client: Option<Client>,
 }
 
 impl HttpTransport {
@@ -21,12 +23,25 @@ impl HttpTransport {
             .user_agent(USER_AGENT)
             .build()
             .map_err(|error| TransportError::permanent(error.to_string()))?;
-        Ok(Self { client })
+        let plugin_client = Client::builder()
+            .user_agent(USER_AGENT)
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            .map_err(|error| TransportError::permanent(error.to_string()))?;
+        Ok(Self {
+            client,
+            plugin_client: Some(plugin_client),
+        })
     }
 
     #[must_use]
     pub const fn from_client(client: Client) -> Self {
-        Self { client }
+        // An opaque supplied client may auto-follow redirects. Fail closed
+        // rather than replace its custom proxy configuration for plugins.
+        Self {
+            client,
+            plugin_client: None,
+        }
     }
 
     #[must_use]
@@ -62,6 +77,24 @@ impl HttpTransport {
 }
 
 impl Transport for HttpTransport {
+    fn send_no_redirect<'a>(&'a self, request: HttpRequest) -> TransportFuture<'a> {
+        Box::pin(async move {
+            let client = self.plugin_client.as_ref().ok_or_else(|| {
+                TransportError::permanent("supplied HTTP client has no scoped request support")
+            })?;
+            let mut builder = match request.method {
+                HttpMethod::Get => client.get(&request.url),
+                HttpMethod::Post => client.post(&request.url),
+            };
+            for (name, value) in &request.headers {
+                builder = builder.header(name, value);
+            }
+            if let Some(body) = request.body {
+                builder = builder.body(body);
+            }
+            Self::respond(builder.send().await)
+        })
+    }
     fn get<'a>(&'a self, source: &'a str) -> TransportFuture<'a> {
         Box::pin(async move { Self::respond(self.client.get(source).send().await) })
     }
@@ -158,6 +191,9 @@ impl DefaultTransport {
 }
 
 impl Transport for DefaultTransport {
+    fn send_no_redirect<'a>(&'a self, request: HttpRequest) -> TransportFuture<'a> {
+        self.http.send_no_redirect(request)
+    }
     fn get<'a>(&'a self, source: &'a str) -> TransportFuture<'a> {
         if Url::parse(source).is_ok_and(|url| url.scheme() == "file") {
             self.file.get(source)

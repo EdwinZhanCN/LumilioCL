@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use lumilio_plugin_api::{
-    FetchResponse, HostContext, Manifest, PluginError, PluginState, SettingValue,
+    FetchRequest, FetchResponse, HostContext, Manifest, PluginError, PluginState, SettingValue,
 };
 
 use super::access;
@@ -11,10 +11,16 @@ pub(super) struct Context {
     values: BTreeMap<String, SettingValue>,
     manifest: Manifest,
     game_dir: Option<PathBuf>,
+    network: Option<super::network::NetworkContext>,
 }
 
 impl Context {
-    pub(super) fn new(manifest: &Manifest, state: &PluginState, game_dir: Option<PathBuf>) -> Self {
+    pub(super) fn new(
+        manifest: &Manifest,
+        state: &PluginState,
+        game_dir: Option<PathBuf>,
+        network: Option<super::network::NetworkContext>,
+    ) -> Self {
         let values = manifest
             .settings
             .iter()
@@ -32,6 +38,7 @@ impl Context {
             values,
             manifest: manifest.clone(),
             game_dir,
+            network,
         }
     }
 }
@@ -54,7 +61,13 @@ impl HostContext for Context {
             .ok_or(PluginError::PermissionDenied)?;
         access::list(game_dir, &self.manifest, dir)
     }
-    fn fetch(&self, _url: &str) -> Result<FetchResponse, PluginError> {
-        Err(PluginError::PermissionDenied)
+    fn fetch(&self, url: &str) -> Result<FetchResponse, PluginError> {
+        self.request(FetchRequest::get(url))
+    }
+    fn request(&self, request: FetchRequest) -> Result<FetchResponse, PluginError> {
+        self.network
+            .as_ref()
+            .ok_or(PluginError::PermissionDenied)?
+            .fetch(&self.manifest, request)
     }
 }
