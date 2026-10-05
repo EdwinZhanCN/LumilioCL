@@ -370,9 +370,13 @@ fn http_and_decode_failures_are_errors_instead_of_empty_success() {
         (200, "broken json"),
     ] {
         let ctx = Context::default().answer("/v2/version_files", status, body);
-        assert!(matches!(
-            Modrinth.identify(&ctx, &[file("f", "aa")]),
-            Err(PluginError::Unavailable(_))
-        ));
+        // An HTTP error status can pass (the host retries it later); an answer
+        // that cannot be read is the plugin's problem.
+        let result = Modrinth.identify(&ctx, &[file("f", "aa")]);
+        if status == 200 {
+            assert!(matches!(result, Err(PluginError::Unavailable(_))));
+        } else {
+            assert!(matches!(result, Err(PluginError::Transient(_))));
+        }
     }
 }
