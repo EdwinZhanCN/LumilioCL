@@ -233,7 +233,7 @@ fn get(ctx: &dyn HostContext, url: String) -> Result<Vec<u8>, PluginError> {
 
 fn response(response: lumilio_plugin_api::FetchResponse) -> Result<Vec<u8>, PluginError> {
     if !(200..300).contains(&response.status) {
-        return Err(PluginError::Unavailable(format!(
+        return Err(PluginError::Transient(format!(
             "Modrinth returned HTTP {}",
             response.status
         )));

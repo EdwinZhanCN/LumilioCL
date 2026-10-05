@@ -105,24 +105,20 @@ async fn modrinth_contributes_via_the_host_and_stops_requests_when_disabled() {
 }
 
 #[tokio::test]
-async fn an_api_error_fails_modrinth_for_this_run_and_discards_future_contributions() {
+async fn an_api_error_fails_that_call_only_and_modrinth_keeps_running() {
     let (host, api) = setup(429);
     assert!(host.search_content(ID, query()).await.is_none());
     let info = host.list().await;
+    assert_eq!(info[0].status, PluginStatus::Enabled);
     assert!(
-        matches!(&info[0].status, PluginStatus::Failed { message } if message.contains("HTTP 429"))
+        host.last_transient_error(ID)
+            .await
+            .is_some_and(|why| why.contains("HTTP 429"))
     );
-    let count = api.requests.lock().unwrap().len();
-    host.set_state(
-        ID.into(),
-        PluginState {
-            enabled: Some(true),
-            ..Default::default()
-        },
-    );
-    assert!(host.content_sources().await.is_empty());
+    // Asking again reaches the API again: a retry can succeed.
+    assert_eq!(host.content_sources().await.len(), 1);
     assert!(host.search_content(ID, query()).await.is_none());
-    assert_eq!(api.requests.lock().unwrap().len(), count);
+    assert_eq!(api.requests.lock().unwrap().len(), 2);
 }
 
 #[tokio::test]

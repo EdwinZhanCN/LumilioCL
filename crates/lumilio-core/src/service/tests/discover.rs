@@ -260,26 +260,16 @@ async fn a_search_goes_through_the_source_and_comes_back_in_launcher_types() {
 }
 
 #[tokio::test]
-async fn a_failed_source_stays_stopped_for_the_run_and_says_why() {
+async fn an_unreachable_source_fails_that_call_and_works_again_when_the_network_is_back() {
     let world = world();
-    assert!(matches!(
-        world.service.discover_filters().await,
-        Err(ServiceError::Remote(_))
-    ));
-    // The network is back, but a stopped plugin stays stopped until restart.
-    answer_filters(&world);
     let error = world.service.discover_filters().await.unwrap_err();
     assert!(
-        matches!(&error, ServiceError::Remote(message) if message.contains("已停止")),
+        matches!(&error, ServiceError::Remote(message) if message.contains("没有回答")),
         "{error}"
     );
-    assert!(matches!(
-        world
-            .service
-            .search(&crate::discover::SearchQuery::new(ProjectKind::Mod))
-            .await,
-        Err(ServiceError::Remote(_))
-    ));
+    // Failures are not remembered: the same service answers once it can.
+    answer_filters(&world);
+    assert!(world.service.discover_filters().await.is_ok());
 }
 
 #[tokio::test]

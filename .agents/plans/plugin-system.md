@@ -349,3 +349,4 @@ pub enum Permission {
 - 按冻结的 D2，内容源一次出错（包括网络错误、HTTP 非 2xx）就进入 Failed，本次运行内保持停止，设置页和发现页会说明原因。旧的「网络恢复后同一 service 重试成功」测试改为「失败后保持停止并说明原因」。这对内容源偏严（一次网络抖动就要重启才能恢复），是否放宽 D2（例如把可恢复的网络错误和插件 bug 区分开）需要维护者裁决，本批没有改动。
 - app 注册 `lumilio-plugin-modrinth`；service 测试和 `live_smoke` 注入它，测试传输加了 `send_no_redirect`。新增覆盖：搜索经内容源并转换类型、停用后各入口返回 NoContentSource 且不发请求、失败后保持停止、能力驱动的筛选分区、加载器其他类型保留、更新检查在内容源停用时失败。
 - 验证：本机只跑了受影响的 core 测试（90 通过、1 忽略），其余按维护者要求交给 GitHub Actions 的 `just ci`。需要肉眼看：发现页筛选栏（Modrinth 下应与之前完全一致）、停用 Modrinth 后的发现页空状态和内容页提示。
+- 维护者裁决放宽 D2（CI 的「失败的下载可以重试」测试暴露：断网后内容源进入 Failed，重试永远不会成功）：新增 `PluginError::Transient`，表示外部世界不配合（连不上、HTTP 非 2xx），只让这一次调用失败，插件保持启用并可重试，原因可由 `last_transient_error` 读到。panic、超时、越权、非法输入、重定向 / 大小超限等仍按 D2 停用到重启。Modrinth 的 HTTP 非 2xx 与 `ctx.request` 的传输错误使用它。上面「内容源一次出错就 Failed」的说明以此为准；旧的「网络恢复后同一 service 重试成功」测试因此保持原有含义。

@@ -146,7 +146,11 @@ impl ContentClient<'_> {
                 DiscoverError::Unavailable(format!("{}已停止：{message}", self.name))
             }
             Some(PluginStatus::Enabled) => {
-                DiscoverError::Unavailable(format!("{}没有回答", self.name))
+                let why = self.host.last_transient_error(&self.plugin).await;
+                DiscoverError::Unavailable(match why {
+                    Some(why) => format!("{}没有回答：{why}", self.name),
+                    None => format!("{}没有回答", self.name),
+                })
             }
             _ => DiscoverError::NoSource,
         }
