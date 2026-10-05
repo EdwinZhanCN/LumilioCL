@@ -39,8 +39,11 @@ pub struct ContentEntry {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ContentList {
     pub entries: Vec<ContentEntry>,
-    /// Modrinth could not be asked: missing sources are unknown, not absent.
+    /// The content source could not be asked: missing sources are unknown,
+    /// not absent.
     pub sources_unavailable: bool,
+    /// Why it could not be asked (no source on, source stopped, no answer).
+    pub source_note: Option<String>,
 }
 
 /// Puts files, identifications, project summaries, authors and newest
@@ -50,7 +53,6 @@ pub fn assemble(
     files: Vec<(ContentItem, Option<String>)>,
     identified: &BTreeMap<String, Version>,
     projects: &[ProjectSummary],
-    authors: &BTreeMap<String, String>,
     latest: &BTreeMap<String, Version>,
 ) -> Vec<ContentEntry> {
     files
@@ -65,10 +67,7 @@ pub fn assemble(
                     project_id: version.project_id.clone(),
                     slug: project.map_or_else(|| version.project_id.clone(), |p| p.slug.clone()),
                     title: project.map(|p| p.title.clone()).unwrap_or_default(),
-                    author: project
-                        .and_then(|p| p.team.as_ref())
-                        .and_then(|team| authors.get(team))
-                        .cloned(),
+                    author: project.and_then(|p| p.author.clone()),
                     icon_url: project.and_then(|p| p.icon_url.clone()),
                     version_id: version.id.clone(),
                     version_number: version.number.clone(),
@@ -153,14 +152,13 @@ mod tests {
             title: "AppleSkin".into(),
             kind: None,
             icon_url: Some("https://x/icon.png".into()),
-            team: Some("t".into()),
+            author: Some("squeek502".into()),
         }];
-        let authors = BTreeMap::from([("t".to_owned(), "squeek502".to_owned())]);
         let latest = BTreeMap::from([
             ("h1".to_owned(), version("v9", "P", "3.0.11", "new")),
             ("h3".to_owned(), version("v8", "Q", "2.0", "newer")),
         ]);
-        let entries = assemble(files, &identified, &projects, &authors, &latest);
+        let entries = assemble(files, &identified, &projects, &latest);
         assert_eq!(entries.len(), 4, "every file stays");
         let apple = entries[0].source.as_ref().unwrap();
         assert_eq!(apple.title, "AppleSkin");
@@ -186,7 +184,7 @@ mod tests {
         let files = vec![(item("a.jar", true), Some("h1".to_owned()))];
         let identified = BTreeMap::from([("h1".to_owned(), version("v1", "P", "1", "h1"))]);
         let latest = BTreeMap::from([("h1".to_owned(), version("v1", "P", "1", "h1"))]);
-        let entries = assemble(files, &identified, &[], &BTreeMap::new(), &latest);
+        let entries = assemble(files, &identified, &[], &latest);
         assert!(entries[0].update.is_none());
     }
 }

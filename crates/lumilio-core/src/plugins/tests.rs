@@ -169,6 +169,24 @@ async fn errors_also_fail_only_the_calling_plugin() {
 }
 
 #[tokio::test]
+async fn a_transient_error_fails_that_call_and_leaves_the_plugin_running() {
+    let host = host();
+    assert_eq!(
+        host.call::<(), _>("test.fake", |_, _| Err(PluginError::Transient(
+            "offline".into()
+        )))
+        .await,
+        None
+    );
+    assert_eq!(host.list().await[0].status, PluginStatus::Enabled);
+    assert_eq!(
+        host.last_transient_error("test.fake").await.as_deref(),
+        Some("offline")
+    );
+    assert_eq!(host.call("test.fake", |_, _| Ok(5)).await, Some(5));
+}
+
+#[tokio::test]
 async fn timeout_discards_late_results_and_stops_future_dispatch() {
     let mut host = host();
     // Register before shortening the test timeout so thread startup does not

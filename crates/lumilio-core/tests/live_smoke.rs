@@ -19,8 +19,13 @@ async fn the_whole_spine_against_the_real_services() {
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|_| std::env::temp_dir().join("lumilio-live"));
     println!("launcher root: {}", home.display());
-    let service =
-        LauncherService::open(&home, DefaultTransport::new().unwrap(), Vec::new()).unwrap();
+    // Content comes from the Modrinth source plugin, as in the app.
+    let service = LauncherService::open(
+        &home,
+        DefaultTransport::new().unwrap(),
+        vec![std::sync::Arc::new(lumilio_plugin_modrinth::Modrinth)],
+    )
+    .unwrap();
 
     // Search (Modrinth).
     let page = service

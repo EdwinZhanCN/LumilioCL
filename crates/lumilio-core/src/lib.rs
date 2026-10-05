@@ -89,12 +89,12 @@ pub use diagnostics::{
     read_crash_report, read_latest_log,
 };
 pub use discover::{
-    CategoryTag, DependencyKind, DiscoverError, Environment, GalleryImage, GameVersionTag,
-    IntentError, LoaderTag, ModrinthClient, Pick, Project, ProjectKind, ProjectLinks,
-    ProjectSummary, ReleaseChannel, SITE_BASE, SearchHit, SearchPage, SearchQuery, SideSupport,
-    SortIndex, Stance, Version, VersionFile, VersionGroup, browse_page_url, environment,
-    fits as version_fits, install_request as content_install_request, pick_version,
-    project_page_url, version_groups,
+    CategoryTag, ContentClient, DependencyKind, DiscoverError, Environment, GalleryImage,
+    GameVersionTag, IntentError, KindAbilities, LoaderTag, Pick, Project, ProjectKind,
+    ProjectLinks, ProjectSummary, ReleaseChannel, SITE_BASE, SearchHit, SearchPage, SearchQuery,
+    SideSupport, SortIndex, SourceFilters, Stance, Version, VersionFile, VersionGroup,
+    browse_page_url, environment, fits as version_fits, install_request as content_install_request,
+    pick_version, project_page_url, version_groups,
 };
 pub use environment::{
     CompatibilityRule, HostProfile, MachineArchitecture, PlatformFamily, RuleDecision,

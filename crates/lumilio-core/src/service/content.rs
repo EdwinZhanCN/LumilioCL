@@ -46,11 +46,10 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// an installed file to (IA P-VERSION-SWITCH).
     pub async fn project_versions(&self, project: &str) -> Result<Vec<Version>, ServiceError> {
         let mut versions = self
-            .modrinth()
+            .content_client()
             .await?
             .versions_with_changelog(project)
-            .await
-            .map_err(|error| ServiceError::Remote(error.to_string()))?;
+            .await?;
         versions.sort_by(|a, b| b.published.cmp(&a.published));
         Ok(versions)
     }
@@ -118,25 +117,27 @@ impl<T: Transport + Clone> LauncherService<T> {
             .filter(|(item, _)| item.enabled)
             .filter_map(|(_, hash)| hash.clone())
             .collect();
-        let unknown = |files| crate::content_sources::ContentList {
+        let unknown = |files, note: String| crate::content_sources::ContentList {
             entries: crate::content_sources::assemble(
                 files,
                 &BTreeMap::new(),
                 &[],
                 &BTreeMap::new(),
-                &BTreeMap::new(),
             ),
             sources_unavailable: true,
+            source_note: Some(note),
         };
-        let Ok(client) = self.modrinth().await else {
-            return Ok(unknown(files));
+        let client = match self.content_client().await {
+            Ok(client) => client,
+            Err(error) => return Ok(unknown(files, error.to_string())),
         };
         let (identified, latest) = tokio::join!(
             client.identify(&hashes),
             client.latest_for(&enabled, record.loader, &record.game_version)
         );
-        let Ok(identified) = identified else {
-            return Ok(unknown(files));
+        let identified = match identified {
+            Ok(identified) => identified,
+            Err(error) => return Ok(unknown(files, error.to_string())),
         };
         let mut project_ids: Vec<String> =
             identified.values().map(|v| v.project_id.clone()).collect();
@@ -147,19 +148,15 @@ impl<T: Transport + Clone> LauncherService<T> {
             .project_summaries(&project_ids)
             .await
             .unwrap_or_default();
-        let mut teams: Vec<String> = projects.iter().filter_map(|p| p.team.clone()).collect();
-        teams.sort();
-        teams.dedup();
-        let authors = client.team_authors(&teams).await.unwrap_or_default();
         Ok(crate::content_sources::ContentList {
             entries: crate::content_sources::assemble(
                 files,
                 &identified,
                 &projects,
-                &authors,
                 &latest.unwrap_or_default(),
             ),
             sources_unavailable: false,
+            source_note: None,
         })
     }
 

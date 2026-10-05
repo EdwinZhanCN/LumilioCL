@@ -102,6 +102,16 @@ impl Transport for Scripted {
         })
     }
 
+    /// Plugin requests are answered like a GET of the same address, whatever
+    /// the method (a POST is answered by what its address says).
+    fn send_no_redirect<'a>(
+        &'a self,
+        request: crate::transfer::HttpRequest,
+    ) -> TransportFuture<'a> {
+        self.sent.lock().unwrap().push(request.clone());
+        Box::pin(async move { self.get(&request.url).await })
+    }
+
     /// A POST is answered like a GET of the same address.
     fn post_json<'a>(&'a self, source: &'a str, _body: Vec<u8>) -> TransportFuture<'a> {
         self.get(source)
@@ -163,7 +173,7 @@ fn world() -> World {
     let net = Scripted::default();
     let root = dir.path().join("launcher");
     let secrets = Arc::new(crate::credentials::MemoryCredentials::default());
-    let service = LauncherService::open(&root, net.clone(), Vec::new())
+    let service = LauncherService::open(&root, net.clone(), stock_plugins())
         .unwrap()
         .with_runtime_roots(vec![root.join("runtimes")])
         .with_credentials(secrets.clone());
@@ -275,7 +285,7 @@ fn reopen_service(
 ) -> (LauncherService<Scripted>, ()) {
     drop(service);
     (
-        LauncherService::open(root, Scripted::default(), Vec::new()).unwrap(),
+        LauncherService::open(root, Scripted::default(), stock_plugins()).unwrap(),
         (),
     )
 }
@@ -286,7 +296,15 @@ fn reopen(world: World, root: &std::path::Path) -> (LauncherService<Scripted>, t
         service, net, _dir, ..
     } = world;
     drop(service);
-    (LauncherService::open(root, net, Vec::new()).unwrap(), _dir)
+    (
+        LauncherService::open(root, net, stock_plugins()).unwrap(),
+        _dir,
+    )
+}
+
+/// What the launcher ships for content: the Modrinth source.
+fn stock_plugins() -> Vec<Arc<dyn lumilio_plugin_api::Plugin>> {
+    vec![Arc::new(lumilio_plugin_modrinth::Modrinth)]
 }
 
 async fn is_installed(world: &World, id: &str) -> bool {

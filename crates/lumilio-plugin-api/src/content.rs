@@ -331,6 +331,10 @@ pub struct CategoryTag {
 pub struct LoaderTag {
     pub name: String,
     pub kinds: Vec<ProjectKind>,
+    /// Source-defined project types outside `ProjectKind` (`plugin`,
+    /// `datapack`); they tell the host which loaders are not for game mods.
+    #[serde(default)]
+    pub other_kinds: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

@@ -44,6 +44,8 @@ struct Entry {
     plugin: Arc<dyn Plugin>,
     manifest: Manifest,
     failure: Mutex<Option<String>>,
+    /// The latest call that failed without stopping the plugin, for saying why.
+    last_transient: Mutex<Option<String>>,
 }
 
 #[derive(Default)]
@@ -64,6 +66,9 @@ pub struct PluginHost {
     preferences: RwLock<Preferences>,
     /// UI state per (instance, plugin); owned by the host, not the plugins.
     tab_states: Mutex<BTreeMap<(String, String), lumilio_plugin_api::TabState>>,
+    /// Plugins that have answered as a content source, so that a stopped one
+    /// can be told apart from there being none.
+    content_ids: Mutex<std::collections::BTreeSet<String>>,
     timeout: Duration,
     network: Option<network::Network>,
 }
@@ -79,6 +84,7 @@ impl PluginHost {
                 revisions: BTreeMap::new(),
             }),
             tab_states: Mutex::new(BTreeMap::new()),
+            content_ids: Mutex::default(),
             timeout: CALL_TIMEOUT,
             network: None,
         }
@@ -131,16 +137,29 @@ impl PluginHost {
                                         plugin: plugin.clone(),
                                         manifest,
                                         failure: Mutex::new(None),
+                                        last_transient: Mutex::new(None),
                                     }),
                                 );
                             }
                         }
-                        Err(message) => registry.rejected.push(message),
+                        Err(fault) => registry.rejected.push(fault.message),
                     }
                 }
                 registry
             })
             .await
+    }
+
+    /// Why the latest call to this plugin failed without stopping it.
+    pub async fn last_transient_error(&self, id: &str) -> Option<String> {
+        self.registry()
+            .await
+            .entries
+            .get(id)?
+            .last_transient
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
     }
 
     pub async fn rejected(&self) -> Vec<String> {
@@ -288,13 +307,20 @@ impl PluginHost {
                 (!failed && preferences.revisions.get(id).copied().unwrap_or(0) == revision)
                     .then_some(value)
             }
-            Err(message) => {
+            Err(fault) if fault.transient => {
+                *entry
+                    .last_transient
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(fault.message);
+                None
+            }
+            Err(fault) => {
                 let mut failure = entry
                     .failure
                     .lock()
                     .unwrap_or_else(std::sync::PoisonError::into_inner);
                 if failure.is_none() {
-                    *failure = Some(message);
+                    *failure = Some(fault.message);
                 }
                 None
             }
@@ -332,7 +358,23 @@ fn validate_manifest(manifest: &Manifest) -> Result<(), &'static str> {
     Ok(())
 }
 
-async fn isolated<R, F>(timeout: Duration, call: F) -> Result<R, String>
+/// Why a call produced nothing. A transient fault (no connection, an HTTP
+/// error status) fails that call only; every other fault stops the plugin.
+struct Fault {
+    message: String,
+    transient: bool,
+}
+
+impl Fault {
+    fn stop(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+            transient: false,
+        }
+    }
+}
+
+async fn isolated<R, F>(timeout: Duration, call: F) -> Result<R, Fault>
 where
     R: Send + 'static,
     F: FnOnce() -> Result<R, PluginError> + Send + 'static,
@@ -340,9 +382,12 @@ where
     let task = tokio::task::spawn_blocking(move || catch_unwind(AssertUnwindSafe(call)));
     match tokio::time::timeout(timeout, task).await {
         Ok(Ok(Ok(Ok(value)))) => Ok(value),
-        Ok(Ok(Ok(Err(error)))) => Err(error.to_string()),
-        Ok(Ok(Err(_))) => Err("plugin panicked".to_owned()),
-        Ok(Err(error)) => Err(format!("plugin worker failed: {error}")),
-        Err(_) => Err("plugin call timed out".to_owned()),
+        Ok(Ok(Ok(Err(error)))) => Err(Fault {
+            transient: matches!(error, PluginError::Transient(_)),
+            message: error.to_string(),
+        }),
+        Ok(Ok(Err(_))) => Err(Fault::stop("plugin panicked")),
+        Ok(Err(error)) => Err(Fault::stop(format!("plugin worker failed: {error}"))),
+        Err(_) => Err(Fault::stop("plugin call timed out")),
     }
 }

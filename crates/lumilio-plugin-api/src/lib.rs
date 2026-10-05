@@ -118,13 +118,19 @@ pub enum PluginError {
     PermissionDenied,
     InvalidInput(String),
     Unavailable(String),
+    /// The outside world did not cooperate (no connection, an HTTP error
+    /// status): this call fails, but the plugin is not at fault and the host
+    /// keeps it running, so a retry can succeed.
+    Transient(String),
 }
 
 impl Display for PluginError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::PermissionDenied => f.write_str("permission denied"),
-            Self::InvalidInput(message) | Self::Unavailable(message) => f.write_str(message),
+            Self::InvalidInput(message) | Self::Unavailable(message) | Self::Transient(message) => {
+                f.write_str(message)
+            }
         }
     }
 }

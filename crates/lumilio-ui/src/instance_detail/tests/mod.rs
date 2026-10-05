@@ -118,6 +118,7 @@ fn listed(items: Vec<lumilio_core::ContentItem>) -> lumilio_core::ContentList {
             })
             .collect(),
         sources_unavailable: false,
+        source_note: None,
     }
 }
 

@@ -7,7 +7,7 @@ use std::path::Path;
 use crate::activity::CancellationToken;
 use crate::content::{self, ContentError};
 use crate::discover::{
-    DiscoverError, IntentError, ModrinthClient, ProjectKind, Version, install_request,
+    ContentClient, DiscoverError, IntentError, ProjectKind, Version, install_request,
 };
 use crate::instance::Loader;
 use crate::transfer::{TransferEngine, TransferError, Transport};
@@ -72,14 +72,15 @@ impl From<TransferError> for UpdateError {
     }
 }
 
-/// Checks the enabled files of one kind against Modrinth.
+/// Checks the enabled files of one kind against the content source.
 ///
 /// Disabled files and folder packs are left out (a disabled file is the user's
 /// decision; a folder has no single hash). A file whose newest compatible
 /// version lists the file's own hash is up to date. Files that cannot be read
-/// are skipped.
-pub async fn check<T: Transport>(
-    client: &ModrinthClient<T>,
+/// are skipped. A source that cannot answer fails the whole check with the
+/// reason; nothing is reported as up to date on its behalf.
+pub async fn check(
+    client: &ContentClient<'_>,
     game_dir: &Path,
     kind: ProjectKind,
     game_version: &str,

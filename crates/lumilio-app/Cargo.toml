@@ -12,6 +12,7 @@ lumilio-core.workspace = true
 lumilio-plugin-api.workspace = true
 lumilio-plugin-crash-analyzer.workspace = true
 lumilio-plugin-litematica.workspace = true
+lumilio-plugin-modrinth.workspace = true
 lumilio-ui.workspace = true
 futures = "0.3"
 reqwest.workspace = true

@@ -2,63 +2,56 @@ use super::LauncherService;
 use super::error::ServiceError;
 use super::types::{DiscoverFilters, ProjectDetail};
 use crate::activity::CancellationToken;
-use crate::discover::{ModrinthClient, ProjectKind, SearchPage, SearchQuery};
+use crate::discover::{ContentClient, ProjectKind, SearchPage, SearchQuery};
 use crate::transfer::Transport;
 
 impl<T: Transport + Clone> LauncherService<T> {
-    pub(super) async fn modrinth(&self) -> Result<ModrinthClient<T>, ServiceError> {
-        Ok(ModrinthClient::new(self.transport.clone()).with_sources(self.chain().await?))
+    /// The enabled content source, asked afresh every time so that turning
+    /// the plugin off takes effect at once, whatever was cached.
+    pub(super) async fn content_client(&self) -> Result<ContentClient<'_>, ServiceError> {
+        Ok(self.plugins.content_client().await?)
     }
 
     pub async fn search(&self, query: &SearchQuery) -> Result<SearchPage, ServiceError> {
-        self.modrinth()
-            .await?
-            .search(query)
-            .await
-            .map_err(|error| ServiceError::Remote(error.to_string()))
+        Ok(self.content_client().await?.search(query).await?)
     }
 
-    /// Categories and game versions for the Discover filters. Fetched once and
-    /// kept for the life of the service; a failure is not remembered.
+    /// Categories, game versions and what the source can filter by, for the
+    /// Discover filters. Fetched once per source and kept for the life of the
+    /// service; a failure is not remembered, and a disabled source gives
+    /// nothing even when its answer is cached.
     pub async fn discover_filters(&self) -> Result<DiscoverFilters, ServiceError> {
+        let client = self.content_client().await?;
         let mut cached = self.filters.lock().await;
-        if let Some(filters) = cached.as_ref() {
+        if let Some((plugin, filters)) = cached.as_ref()
+            && plugin == client.plugin_id()
+        {
             return Ok(filters.clone());
         }
-        let client = self.modrinth().await?;
-        let (categories, game_versions, loaders) = tokio::join!(
-            client.categories(),
-            client.game_versions(),
-            client.loaders()
-        );
+        let found = client.filters().await?;
         let filters = DiscoverFilters {
-            categories: categories.map_err(|error| ServiceError::Remote(error.to_string()))?,
-            game_versions: game_versions
-                .map_err(|error| ServiceError::Remote(error.to_string()))?,
-            // The loader list only sharpens the choices; the filters work without it.
-            loaders: loaders.unwrap_or_default(),
+            source: client.name().to_owned(),
+            abilities: client.abilities(),
+            categories: found.categories,
+            game_versions: found.game_versions,
+            loaders: found.loaders,
         };
-        *cached = Some(filters.clone());
+        *cached = Some((client.plugin_id().to_owned(), filters.clone()));
         Ok(filters)
     }
 
     /// Everything the detail window shows about a project.
     pub async fn project_detail(&self, project: &str) -> Result<ProjectDetail, ServiceError> {
-        let client = self.modrinth().await?;
-        let (details, versions, owner) = tokio::join!(
-            client.project(project),
-            client.versions(project),
-            client.owner(project)
-        );
-        let remote =
-            |error: crate::discover::DiscoverError| ServiceError::Remote(error.to_string());
-        let mut versions = versions.map_err(remote)?;
+        let client = self.content_client().await?;
+        let (details, versions) = tokio::join!(client.project(project), client.versions(project));
+        let (details, owner) = details?;
+        let mut versions = versions?;
         versions.sort_by(|a, b| b.published.cmp(&a.published));
         Ok(ProjectDetail {
-            project: details.map_err(remote)?,
+            project: details,
             versions,
             // The owner is decoration; not knowing it must not hide the page.
-            owner: owner.ok().flatten(),
+            owner,
         })
     }
 

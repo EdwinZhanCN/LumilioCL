@@ -226,12 +226,13 @@ impl InstanceDetailView {
             .child(toolbar)
             .child(list_block)
             .when(list.sources_unavailable, |body| {
-                body.child(
-                    div()
-                        .text_xs()
-                        .text_color(colors.muted)
-                        .child("连不上 Modrinth，来源信息暂时不可用；文件照常可以启停和删除。"),
-                )
+                let reason = list
+                    .source_note
+                    .as_deref()
+                    .map_or_else(String::new, |note| format!("（{note}）"));
+                body.child(div().text_xs().text_color(colors.muted).child(format!(
+                    "来源信息暂时不可用{reason}；文件照常可以启停和删除。"
+                )))
             })
             .into_any_element()
     }

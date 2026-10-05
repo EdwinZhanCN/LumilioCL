@@ -13,6 +13,7 @@
 | 打开项目详情 | 点结果行 | 详情页（进历史） |  | `lumilio-ui/src/pages/live/discover/card.rs` |
 | 结果行右键菜单 | 在 Modrinth 中打开 / 复制链接 | 浏览器打开项目页，或把项目页地址放进剪贴板并提示 |  | `lumilio-ui/src/pages/live/discover/card.rs` |
 | 分页 | 列表上方的页码键 | 翻页并回到列表顶部的第一行 |  | `lumilio-ui/src/pages/live/discover/mod.rs` |
+| 没有内容源 | 搜索结果区整页提示 | 说明没有可用的内容源，指向设置里的插件页；打开内容源后重新搜索 |  | `lumilio-ui/src/pages/live/discover/mod.rs` |
 | 连不上 | 搜索失败的整页提示 | 说明连不上 Modrinth，附技术详情；改任何条件会再试一次 |  | `lumilio-ui/src/pages/live/discover/mod.rs` |
 | 分类 | L3 标签：整合包 / Mod / 资源包 / 光影（游戏页进入时去掉整合包，原版游戏再去掉 Mod） | 切换搜索的项目类型并重新搜索；类型一换，排序回到相关度、搜索词清空 |  | `lumilio-ui/src/pages/live/discover/mod.rs` |
 | 搜索 | L3 搜索框（回车确认，有清除键） | 按关键词搜索 Modrinth |  | `lumilio-ui/src/pages/live/discover/mod.rs` |

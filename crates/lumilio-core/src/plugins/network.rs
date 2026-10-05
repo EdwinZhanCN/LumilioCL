@@ -213,7 +213,7 @@ impl NetworkContext {
                 .transport
                 .send_no_redirect(request.clone())
                 .await
-                .map_err(|error| unavailable(error.to_string()))?;
+                .map_err(|error| PluginError::Transient(error.to_string()))?;
             let status = response.status();
             if matches!(status, 301 | 302 | 303 | 307 | 308) {
                 let location = response
@@ -266,7 +266,7 @@ async fn read_response(response: TransportResponse) -> Result<FetchResponse, Plu
     let mut body = response.into_body();
     let mut bytes = Vec::new();
     while let Some(chunk) = body.next().await {
-        let chunk = chunk.map_err(|error| unavailable(error.to_string()))?;
+        let chunk = chunk.map_err(|error| PluginError::Transient(error.to_string()))?;
         if bytes
             .len()
             .checked_add(chunk.len())

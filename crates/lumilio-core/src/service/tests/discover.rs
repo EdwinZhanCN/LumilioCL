@@ -192,13 +192,7 @@ async fn a_dependency_already_in_the_game_is_not_offered_and_one_without_a_fit_i
     assert!(need[0].version.is_none(), "no version fits this game");
 }
 
-#[tokio::test]
-async fn filters_are_fetched_once_and_failures_are_not_remembered() {
-    let world = world();
-    assert!(matches!(
-        world.service.discover_filters().await,
-        Err(ServiceError::Remote(_))
-    ));
+fn answer_filters(world: &super::World) {
     world.net.answer(
         "/v2/tag/category",
         r#"[{"name":"adventure","project_type":"mod","header":"categories"}]"#,
@@ -207,12 +201,144 @@ async fn filters_are_fetched_once_and_failures_are_not_remembered() {
         "/v2/tag/game_version",
         r#"[{"version":"1.21.1","version_type":"release","date":"2024-08-08T00:00:00Z"}]"#,
     );
+}
+
+#[tokio::test]
+async fn filters_are_fetched_once_and_say_what_the_source_can_do() {
+    let world = world();
+    answer_filters(&world);
     let filters = world.service.discover_filters().await.unwrap();
+    assert_eq!(filters.source, "Modrinth");
     assert_eq!(filters.categories.len(), 1);
     assert_eq!(filters.game_versions[0].version, "1.21.1");
+    let mods = filters
+        .abilities
+        .iter()
+        .find(|ability| ability.kind == ProjectKind::Mod)
+        .unwrap();
+    assert!(mods.loaders && mods.environment && mods.game_versions && mods.categories);
+    let packs = filters
+        .abilities
+        .iter()
+        .find(|ability| ability.kind == ProjectKind::ResourcePack)
+        .unwrap();
+    assert!(!packs.loaders && !packs.environment);
     // Served from memory: the network can vanish.
     world.net.forget_all();
     assert_eq!(world.service.discover_filters().await.unwrap(), filters);
+}
+
+#[tokio::test]
+async fn a_search_goes_through_the_source_and_comes_back_in_launcher_types() {
+    let world = world();
+    world.net.answer(
+        "/v3/search",
+        r#"{"total_hits":41,"hits":[{"project_id":"AANobbMI","slug":"sodium","name":"Sodium",
+            "summary":"Faster","project_types":["mod"],"author":"jellysquid3",
+            "loaders":["fabric"],"categories":["optimization","fabric"],"downloads":9,"follows":3}]}"#,
+    );
+    let mut query = crate::discover::SearchQuery::new(ProjectKind::Mod);
+    query.text = "sodium".into();
+    query.sort = crate::discover::SortIndex::Downloads;
+    query.loaders = vec![crate::discover::Pick::include("fabric")];
+    let page = world.service.search(&query).await.unwrap();
+    assert_eq!(page.total_hits, 41);
+    assert_eq!(page.hits[0].slug, "sodium");
+    assert_eq!(page.hits[0].title, "Sodium");
+    assert_eq!(page.hits[0].kind, ProjectKind::Mod);
+    assert_eq!(page.hits[0].page_url(), "https://modrinth.com/mod/sodium");
+    let sent = world.net.sent.lock().unwrap();
+    let url = &sent.last().unwrap().url;
+    assert!(
+        url.starts_with("https://api.modrinth.com/v3/search?"),
+        "{url}"
+    );
+    assert!(
+        url.contains("index=downloads") && url.contains("query=sodium"),
+        "{url}"
+    );
+}
+
+#[tokio::test]
+async fn an_unreachable_source_fails_that_call_and_works_again_when_the_network_is_back() {
+    let world = world();
+    let error = world.service.discover_filters().await.unwrap_err();
+    assert!(
+        matches!(&error, ServiceError::Remote(message) if message.contains("没有回答")),
+        "{error}"
+    );
+    // Failures are not remembered: the same service answers once it can.
+    answer_filters(&world);
+    assert!(world.service.discover_filters().await.is_ok());
+}
+
+#[tokio::test]
+async fn with_the_source_disabled_nothing_is_served_not_even_from_memory() {
+    let world = world();
+    answer_filters(&world);
+    world.service.discover_filters().await.unwrap();
+    let record = fabric_instance(&world, "1.0").await;
+    world
+        .net
+        .answer("/v2/project/cool/version", two_versions(&world));
+    let asked = world.net.sent.lock().unwrap().len();
+
+    world
+        .service
+        .set_plugin_enabled("lumilio.modrinth", false)
+        .await
+        .unwrap();
+    assert!(matches!(
+        world.service.discover_filters().await,
+        Err(ServiceError::NoContentSource)
+    ));
+    assert!(matches!(
+        world
+            .service
+            .search(&crate::discover::SearchQuery::new(ProjectKind::Mod))
+            .await,
+        Err(ServiceError::NoContentSource)
+    ));
+    assert!(matches!(
+        world.service.project_detail("cool").await,
+        Err(ServiceError::NoContentSource)
+    ));
+    assert!(matches!(
+        world
+            .service
+            .install_content(
+                &record.id,
+                ProjectKind::Mod,
+                "cool",
+                CancellationToken::new()
+            )
+            .await,
+        Err(ServiceError::NoContentSource)
+    ));
+    assert!(matches!(
+        world
+            .service
+            .install_modpack("cool", CancellationToken::new())
+            .await,
+        Err(ServiceError::NoContentSource)
+    ));
+    assert_eq!(world.net.sent.lock().unwrap().len(), asked);
+
+    // Installed content stays usable; only its source labels are unknown.
+    let list = world
+        .service
+        .content_details(&record.id, ProjectKind::Mod)
+        .await
+        .unwrap();
+    assert!(list.sources_unavailable);
+    assert_eq!(list.source_note.as_deref(), Some("没有可用的内容源"));
+
+    world
+        .service
+        .set_plugin_enabled("lumilio.modrinth", true)
+        .await
+        .unwrap();
+    assert!(world.service.discover_filters().await.is_ok());
 }
 
 #[tokio::test]

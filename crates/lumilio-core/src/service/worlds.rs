@@ -163,7 +163,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         }
 
         let sha1s: Vec<String> = hashed.iter().map(|(_, sha1, _, _)| sha1.clone()).collect();
-        let identified = match read_unless_cancelled(&cancel, self.modrinth()).await {
+        let identified = match read_unless_cancelled(&cancel, self.content_client()).await {
             Ok(client) => client.identify(&sha1s).await.ok(),
             Err(ServiceError::Cancelled) => return Err(ServiceError::Cancelled),
             Err(_) => None,

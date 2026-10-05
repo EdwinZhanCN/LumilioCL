@@ -53,6 +53,8 @@ pub enum SearchStatus {
     #[default]
     Idle,
     Searching,
+    /// No content source is turned on (or the one that was has stopped).
+    NoSource,
     Failed(String),
     Done {
         total: u64,
