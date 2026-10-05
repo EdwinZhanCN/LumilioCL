@@ -268,3 +268,58 @@ fn a_long_table_scrolls_inside_a_capped_box_and_the_keys_stay_on_top(cx: &mut Te
     let key = cx.debug_bounds("plugin-key-export").expect("key");
     assert!(key.origin.y < table.origin.y, "the key is above the table");
 }
+
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[gpui::test]
+fn a_model_is_a_card_whose_key_asks_for_a_preview_window(cx: &mut TestAppContext) {
+    let seen: Rc<RefCell<Vec<InstanceIntent>>> = Rc::default();
+    let (view, cx) = open(seen.clone(), cx);
+    cx.update(|window, cx| view.update(cx, |view, cx| view.open_shown(4, window, cx)));
+    view.update(cx, |view, cx| {
+        view.plugin_view_arrived(
+            PLUGIN.into(),
+            shown(View::Detail {
+                title: "房子".into(),
+                subtitle: None,
+                image: None,
+                facts: Vec::new(),
+                children: vec![View::Model {
+                    file: "schematics/house.litematic".into(),
+                }],
+            }),
+            cx,
+        );
+    });
+    cx.run_until_parked();
+    click(cx, "plugin-model-open");
+    assert_eq!(
+        seen.borrow()
+            .iter()
+            .filter(|intent| matches!(intent, InstanceIntent::PluginModel { .. }))
+            .cloned()
+            .collect::<Vec<_>>(),
+        [InstanceIntent::PluginModel {
+            plugin: PLUGIN.into(),
+            file: "schematics/house.litematic".into(),
+        }]
+    );
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+#[gpui::test]
+fn without_a_preview_window_the_card_has_no_key(cx: &mut TestAppContext) {
+    let seen: Rc<RefCell<Vec<InstanceIntent>>> = Rc::default();
+    let (view, cx) = open(seen, cx);
+    cx.update(|window, cx| view.update(cx, |view, cx| view.open_shown(4, window, cx)));
+    view.update(cx, |view, cx| {
+        view.plugin_view_arrived(
+            PLUGIN.into(),
+            shown(View::Model {
+                file: "schematics/house.litematic".into(),
+            }),
+            cx,
+        );
+    });
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("plugin-model-open").is_none());
+}

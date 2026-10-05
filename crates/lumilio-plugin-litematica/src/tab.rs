@@ -159,6 +159,10 @@ fn detail(ctx: &dyn HostContext, path: &str) -> Result<View, PluginError> {
             tone: Tone::Secondary,
         });
     }
+    // ia[plugin.litematica]: 3D 预览 | 详情页的「3D 预览」卡片和键 | 打开单独的预览窗口，用游戏自己的贴图画出整个投影，可旋转缩放；游戏没装时没有贴图；Linux 上没有这个键 | 宿主负责窗口，插件只在视图里写「这里有个模型」
+    children.push(View::Model {
+        file: path.to_owned(),
+    });
     match file.materials() {
         Ok(counts) => {
             let mut rows: Vec<(String, u64)> = counts.into_iter().collect();

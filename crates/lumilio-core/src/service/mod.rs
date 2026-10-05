@@ -18,6 +18,7 @@ mod java;
 mod launch;
 mod library;
 mod maintenance;
+mod models;
 mod modpacks;
 mod packs;
 mod plugins;
@@ -37,6 +38,7 @@ mod worlds;
 mod tests;
 
 pub use self::error::ServiceError;
+pub use self::models::ModelPreview;
 pub use self::third_party::ThirdPartySignIn;
 pub use self::types::{
     ActivityView, ContentEffect, ContentResult, DependencyNeed, DependencyReport, DiscoverFilters,

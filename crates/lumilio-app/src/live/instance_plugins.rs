@@ -6,6 +6,7 @@ use gpui_kit::{App, WeakEntity};
 use lumilio_core::PluginEffect;
 use lumilio_plugin_api::ActionId;
 use lumilio_ui::instance_detail::InstanceDetailView;
+use lumilio_ui::model_preview;
 use lumilio_ui::platform;
 use lumilio_ui::toast::Toast;
 
@@ -45,6 +46,56 @@ pub(super) fn plugin_view(
             Err(error) => Err(error.to_string()),
         };
         let _ = view.update(cx, |view, cx| view.plugin_view_arrived(plugin, result, cx));
+    })
+    .detach();
+}
+
+/// Reads the schematic and builds the pack off the interface thread, then opens
+/// the preview window.
+pub(super) fn plugin_model(
+    wiring: &Wiring,
+    id: String,
+    view: WeakEntity<InstanceDetailView>,
+    plugin: String,
+    file: String,
+    cx: &mut App,
+) {
+    let service = wiring.backend.service.clone();
+    let title = file
+        .rsplit('/')
+        .next()
+        .map(|name| name.strip_suffix(".litematic").unwrap_or(name))
+        .unwrap_or(&file)
+        .to_owned();
+    let handle = wiring
+        .backend
+        .spawn(async move { service.plugin_model(&id, &plugin, &file).await });
+    cx.spawn(async move |cx| {
+        let result = match handle.await {
+            Ok(result) => result.map_err(|error| error.to_string()),
+            Err(error) => Err(error.to_string()),
+        };
+        let opened = match result {
+            Ok(preview) => cx.update(|cx| {
+                model_preview::open(
+                    model_preview::ModelRequest {
+                        title,
+                        schematic: preview.schematic,
+                        pack: preview.pack.map(|pack| model_preview::ModelPack {
+                            id: pack.id,
+                            bytes: pack.bytes,
+                        }),
+                    },
+                    cx,
+                )
+            }),
+            Err(detail) => Err(detail),
+        };
+        if let Err(detail) = opened {
+            let _ = view.update(cx, |view, cx| {
+                view.toast(Toast::error("没能打开 3D 预览").technical(detail), cx);
+            });
+        }
     })
     .detach();
 }

@@ -100,3 +100,12 @@ file sits beside the fonts.
   Copyright (c) 2017 keshikan, Reserved Font Name "DSEG". `OFL-DSEG.txt`.
 
 Chinese text is not bundled; it falls back to the platform's system font.
+
+## Litematica 3D preview viewer
+
+`litematic-viewer/` vendors [schematic-renderer](https://github.com/Schem-at/schematic-renderer)
+1.6.1 (AGPL-3.0-only), [three.js](https://github.com/mrdoob/three.js) 0.184.0 (MIT) and
+[nucleation](https://github.com/Schem-at/Nucleation) 0.2.18 (MIT), unmodified, so the preview opens
+without a network connection (ADR 0027). The license texts are next to the files, and
+`litematic-viewer/README.md` says what is included, what was left out on purpose (Mojang's default
+textures) and how to update.

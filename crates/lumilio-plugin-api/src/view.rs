@@ -91,6 +91,12 @@ pub enum View {
     },
     Tags(Vec<String>),
     Image(ImageData),
+    /// A 3D model of a file under one of the plugin's `ReadGameFiles` grants
+    /// (a path relative to the game directory). The host reads the file and
+    /// decides how and where to show it; the plugin never touches the viewer.
+    Model {
+        file: String,
+    },
     Key {
         id: ActionId,
         label: String,

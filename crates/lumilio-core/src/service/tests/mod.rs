@@ -6,6 +6,7 @@ mod discover;
 mod java;
 mod launch;
 mod lifecycle;
+mod models;
 mod packs;
 mod plugin_analysis;
 mod portability;

@@ -36,6 +36,7 @@ mod loader;
 mod microsoft;
 mod modpack;
 use lumilio_nbt as nbt;
+mod model_assets;
 mod pack_export;
 mod persist;
 mod plugins;
@@ -133,6 +134,7 @@ pub use microsoft::{
     AuthError, DeviceCode, MICROSOFT_CLIENT_ID, MicrosoftClient, MinecraftLogin, OAuthTokens,
     Secret, client_id as microsoft_client_id,
 };
+pub use model_assets::{ModelAssetsError, ResourcePack};
 pub use modpack::{
     ClientSupport, ModpackError, OVERRIDES_LIMIT, PackFile, PackIndex, extract_overrides,
     import as import_modpack, is_trusted_source, parse_index as parse_pack_index,
@@ -159,8 +161,8 @@ pub use screenshots::{ScreenshotError, ScreenshotInfo};
 pub use servers::{PackPolicy, PingError, ServerEntry, ServerError, ServerStatus};
 pub use service::{
     ActivityView, ContentEffect, ContentResult, DependencyNeed, DependencyReport, DiscoverFilters,
-    GameLogs, InstalledProject, LauncherService, Library, ProjectDetail, ServiceError,
-    ThirdPartySignIn, now as unix_now,
+    GameLogs, InstalledProject, LauncherService, Library, ModelPreview, ProjectDetail,
+    ServiceError, ThirdPartySignIn, now as unix_now,
 };
 pub use settings::{
     AccountEntry, AccountKind, AuthServerEntry, LauncherSettings, MAX_MEMORY_MB, MirrorRule,

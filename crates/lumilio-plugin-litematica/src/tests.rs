@@ -232,11 +232,18 @@ fn detail_has_facts_a_descending_material_table_and_actions() {
     assert!(facts.contains(&("投影名称".to_owned(), "House".to_owned())));
     assert!(facts.contains(&("尺寸".to_owned(), "2 × 2 × 1".to_owned())));
     assert!(facts.contains(&("修改时间".to_owned(), "2023-11-14 22:13".to_owned())));
+    assert_eq!(
+        children[0],
+        View::Model {
+            file: "schematics/house.litematic".into()
+        },
+        "the 3D preview comes first, then the materials"
+    );
     let View::Section {
         children: material, ..
-    } = &children[0]
+    } = &children[1]
     else {
-        panic!("materials first");
+        panic!("materials second");
     };
     let View::Table { rows, .. } = &material[0] else {
         panic!("table");

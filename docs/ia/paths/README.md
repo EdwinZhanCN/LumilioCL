@@ -20,4 +20,4 @@
 | [游戏页 · 历史](instance.history.md) | 5 |
 | [游戏页 · 诊断](instance.diagnostics.md) | 10 |
 | [游戏页 · 设置](instance.settings.md) | 11 |
-| [插件 · Litematica 投影](plugin.litematica.md) | 4 |
+| [插件 · Litematica 投影](plugin.litematica.md) | 5 |

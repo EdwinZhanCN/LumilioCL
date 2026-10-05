@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3D 预览</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; height: 100%; background: #202428; overflow: hidden;
+    font: 13px -apple-system, "PingFang SC", "Microsoft YaHei UI", sans-serif; color: #d8dbde; }
+  canvas { width: 100vw; height: 100vh; display: block; outline: none; }
+  #status { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    text-align: center; padding: 24px; pointer-events: none; }
+  #status[hidden] { display: none; }
+  #note { position: fixed; left: 12px; bottom: 10px; color: #9aa0a6; pointer-events: none; }
+  #note[hidden] { display: none; }
+</style>
+<script type="importmap">{"imports":{"three":"/three/three.module.js","nucleation":"/nucleation/nucleation.js"}}</script>
+<canvas id="view" tabindex="0"></canvas>
+<div id="status">正在加载 3D 预览…</div>
+<div id="note" hidden></div>
+<script type="module">
+const status = document.getElementById('status');
+const note = document.getElementById('note');
+const fail = (message) => { status.hidden = false; status.textContent = message; };
+const query = new URLSearchParams(location.search);
+// The pack's name carries the game version and the jar's identity, so a pack
+// stored by the renderer for another version is never taken for this one.
+const pack = query.get('pack');
+try {
+  const { SchematicRenderer } = await import('/sr/schematic-renderer.es.js');
+  let ready;
+  const initialized = new Promise((resolve) => { ready = resolve; });
+  const renderer = new SchematicRenderer(
+    document.getElementById('view'),
+    {},
+    pack ? { [pack]: async () => (await fetch('/pack.zip')).blob() } : {},
+    {
+      enableProgressBar: false,
+      enableDragAndDrop: false,
+      enableGizmos: false,
+      enableInteraction: true,
+      cameraOptions: { enableZoomInOnLoad: true, useTightBounds: true },
+      callbacks: {
+        onRendererInitialized: () => ready(),
+        onSchematicRendered: () => { status.hidden = true; },
+      },
+    },
+  );
+  await initialized;
+  // Packs of other versions stay in the browser storage until removed here.
+  if (pack) {
+    for (const stored of renderer.packs.getAllPacks()) {
+      if (stored.name !== pack) await renderer.packs.removePack(stored.id);
+    }
+  } else {
+    note.textContent = '这个游戏还没有安装，没有可用的贴图';
+    note.hidden = false;
+  }
+  const response = await fetch('/schematic');
+  if (!response.ok) throw new Error('读不到投影文件');
+  await renderer.schematicManager.loadSchematic('build', await response.arrayBuffer());
+} catch (error) {
+  fail('3D 预览出错：' + (error && error.message ? error.message : error));
+}
+</script>
+</html>

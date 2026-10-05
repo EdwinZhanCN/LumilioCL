@@ -102,6 +102,12 @@ pub enum InstanceIntent {
         plugin: String,
         action: lumilio_plugin_api::ActionId,
     },
+    /// Open a 3D preview window of this file (a path the plugin may read); the
+    /// application reads it and opens [`crate::model_preview`].
+    PluginModel {
+        plugin: String,
+        file: String,
+    },
     /// Read this crash report; answer with [`InstanceDetailView::crash_arrived`].
     OpenCrash(String),
     /// List this folder of the game directory (`""` is the directory itself);

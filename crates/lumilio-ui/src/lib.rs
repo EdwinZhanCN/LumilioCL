@@ -20,6 +20,7 @@ pub mod key;
 pub mod kit;
 pub mod live;
 pub mod microsoft_login;
+pub mod model_preview;
 pub mod navigation;
 pub mod new_game;
 pub mod pages;

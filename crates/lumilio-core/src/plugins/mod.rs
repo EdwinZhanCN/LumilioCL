@@ -3,6 +3,7 @@
 mod access;
 mod analysis;
 mod context;
+mod model;
 mod tabs;
 pub use analysis::PluginFinding;
 pub use tabs::{PluginEffect, PluginTab};

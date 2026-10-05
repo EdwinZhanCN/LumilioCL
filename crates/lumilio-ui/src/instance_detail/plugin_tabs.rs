@@ -229,7 +229,8 @@ fn collect_images<'a>(view: &'a View, out: &mut Vec<&'a ImageData>) {
             children.iter().for_each(|child| collect_images(child, out));
         }
         View::Image(image) => out.push(image),
-        View::Table { .. }
+        View::Model { .. }
+        | View::Table { .. }
         | View::Empty { .. }
         | View::Text { .. }
         | View::Tags(_)
@@ -438,6 +439,7 @@ impl Paint<'_> {
                 Some(picture) => picture_box(picture, COVER, colors).into_any_element(),
                 None => div().into_any_element(),
             },
+            View::Model { file } => self.model(file, cx),
             View::Key {
                 id,
                 label,
@@ -461,6 +463,67 @@ impl Paint<'_> {
                     .into_any_element()
             }
         }
+    }
+
+    /// A card with the key that opens the preview window.
+    fn model(&mut self, file: &str, cx: &mut Context<InstanceDetailView>) -> AnyElement {
+        let colors = self.colors;
+        let id = self.id();
+        let (plugin, file) = (self.plugin.to_owned(), file.to_owned());
+        let action: AnyElement = if crate::model_preview::SUPPORTED {
+            let on_click = act(cx, move |view, window, cx| {
+                (view.handler)(
+                    InstanceIntent::PluginModel {
+                        plugin: plugin.clone(),
+                        file: file.clone(),
+                    },
+                    window,
+                    cx,
+                );
+            });
+            Key::new(("plugin-model", id))
+                .label("打开 3D 预览")
+                .primary()
+                .on_click(move |_, window: &mut Window, cx: &mut App| on_click(window, cx))
+                .debug_selector(|| "plugin-model-open".into())
+                .into_any_element()
+        } else {
+            div()
+                .text_xs()
+                .text_color(colors.muted)
+                .child("这个系统上还不能预览 3D")
+                .into_any_element()
+        };
+        kit::surface(colors)
+            .w_full()
+            .p_4()
+            .child(
+                h_flex()
+                    .w_full()
+                    .items_center()
+                    .gap_4()
+                    .child(
+                        v_flex()
+                            .flex_1()
+                            .min_w_0()
+                            .gap(px(2.))
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .font_medium()
+                                    .text_color(colors.foreground)
+                                    .child("3D 预览"),
+                            )
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .text_color(colors.muted)
+                                    .child("用游戏自己的贴图画出整个投影，可以旋转和缩放"),
+                            ),
+                    )
+                    .child(action),
+            )
+            .into_any_element()
     }
 
     fn item(&mut self, item: &ListItem, cx: &mut Context<InstanceDetailView>) -> AnyElement {
