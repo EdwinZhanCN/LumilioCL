@@ -9,6 +9,10 @@ gpui-component. HMCL and Modrinth App are its read-only upstream references
 - `lumilio-core`: UI-independent launcher domain logic.
 - `lumilio-ui`: GPUI views and interaction state.
 - `lumilio-app`: desktop process startup and composition.
+- `lumilio-schematic-render`: GPUI-independent native schematic rendering.
+
+The native rendering dependencies are maintained as editable Rust source forks
+under [`forks/`](forks/README.md), outside the launcher workspace membership.
 
 ## Run locally
 

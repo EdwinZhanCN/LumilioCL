@@ -136,7 +136,7 @@ fn count_region(region: &Tag, counts: &mut BTreeMap<String, u64>) -> Result<(), 
 }
 
 /// max(2, ceil(log2(palette length))).
-pub(crate) fn bit_width(palette: usize) -> u32 {
+fn bit_width(palette: usize) -> u32 {
     let needed = if palette <= 1 {
         0
     } else {
@@ -146,7 +146,7 @@ pub(crate) fn bit_width(palette: usize) -> u32 {
 }
 
 /// The `index`-th packed value; a value may straddle two longs.
-pub(crate) fn unpack(words: &[i64], index: u64, bits: u32) -> u64 {
+fn unpack(words: &[i64], index: u64, bits: u32) -> u64 {
     let start = index * u64::from(bits);
     let word = usize::try_from(start / 64).unwrap_or(usize::MAX);
     let offset = u32::try_from(start % 64).unwrap_or(0);
@@ -157,19 +157,17 @@ pub(crate) fn unpack(words: &[i64], index: u64, bits: u32) -> u64 {
     value & ((1u64 << bits) - 1)
 }
 
-pub(crate) fn is_air(name: &str) -> bool {
+fn is_air(name: &str) -> bool {
     matches!(
         name,
         "minecraft:air" | "minecraft:cave_air" | "minecraft:void_air"
     )
 }
 
-/// Packs palette indices the way a region stores them; a value may straddle
-/// two longs.
-pub(crate) fn pack<T: Copy + Into<u64>>(values: &[T], bits: u32) -> Vec<i64> {
+#[cfg(test)]
+pub(crate) fn pack(values: &[u64], bits: u32) -> Vec<i64> {
     let mut words = vec![0u64; (values.len() as u64 * u64::from(bits)).div_ceil(64) as usize];
     for (index, value) in values.iter().enumerate() {
-        let value: u64 = (*value).into();
         let start = index as u64 * u64::from(bits);
         let (word, offset) = ((start / 64) as usize, (start % 64) as u32);
         words[word] |= value << offset;

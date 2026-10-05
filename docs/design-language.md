@@ -410,6 +410,23 @@ shows:
 Displays follow the progress rules in §3. Home's launch moment and Activity
 use them; nothing else is a display.
 
+### Native model preview
+
+The projection detail embeds the game model in L5, before the material table.
+The viewport fills the content column at a steady 360 logical pixels high;
+the surrounding page scrolls at the 720×480 minimum window size. It renders at
+physical resolution, capped proportionally at 4096 pixels per axis to bound
+GPU readback memory. Its clear colour comes from the current panel token.
+
+The model is game art; its surrounding instructions, focus border, reset key
+and failure messages are Interface. Drag to orbit, wheel to zoom; the wheel
+stays in the viewport. Focus the viewport for arrows and +/−; R, double-click
+or the visible ghost key resets the camera. There is no entrance animation or
+idle clock; animated blocks remain still, including under reduced motion.
+Loading and failure occupy the same viewport. Missing game assets and no GPU
+receive a calm explanation; other errors offer 技术详情. Replaced and released
+frames are explicitly removed from GPUI's image cache (ADR 0028).
+
 ### Tables
 
 Key/value lists (settings groups, launch stages, version lists) are hairline

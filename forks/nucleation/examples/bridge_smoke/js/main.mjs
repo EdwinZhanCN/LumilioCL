@@ -1,0 +1,109 @@
+// End-to-end smoke test for the generated JS/WASM bindings (same coverage as ../c,
+// minus file/store I/O which need the host filesystem shape).
+import {
+  AnimationEffect,
+  Autostack,
+  BuildAnimation,
+  DefinitionRegion,
+  Diff,
+  FieldProgramBinaryOp,
+  FieldProgramBuilder,
+  FieldProgramDistanceKind,
+  FieldProgramUnaryOp,
+  FieldProgramValueType,
+  Schematic,
+  SchematicBuilder,
+  SchematicRegions,
+  Sdf,
+} from "../../../bindings/js/index.mjs";
+
+function expect(cond, what) {
+  if (!cond) throw new Error(`FAILED: ${what}`);
+}
+
+// --- schematic: create/set/get + error path ---
+const s = Schematic.create("smoke");
+expect(s.setBlock(1, 2, 3, "minecraft:stone") === true, "setBlock places");
+expect(s.getBlockName(1, 2, 3) === "minecraft:stone", "getBlockName reads back");
+try {
+  s.getBlockName(40, 40, 40);
+  expect(false, "expected NotFound");
+} catch (e) {
+  expect(String(e).includes("NotFound"), "empty position raises NotFound");
+}
+
+// --- serialize roundtrip in-memory (litematic bytes as base64) ---
+const b64 = s.toLitematicB64();
+expect(b64.length > 0, "toLitematicB64 yields data");
+const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+const loaded = Schematic.fromLitematic(bytes);
+expect(loaded.getBlockName(1, 2, 3) === "minecraft:stone", "b64 roundtrip preserves block");
+
+// --- bulk block queries (count / replace / packed export) ---
+const counted = JSON.parse(s.countBlocksJson());
+expect(counted["minecraft:stone"] === 1, "countBlocksJson tallies stone");
+// u64 reaches JS as a BigInt on some backends and a Number on others; Number()
+// reads both. Replace back to stone so the diff check below still sees a match.
+expect(Number(s.replaceBlocksJson('{"minecraft:stone":"minecraft:glass"}')) === 1,
+  "replaceBlocksJson reports one change");
+expect(Number(s.replaceBlocksJson('{"minecraft:glass":"minecraft:stone"}')) === 1,
+  "replaceBlocksJson is reversible");
+const packed = Uint8Array.from(atob(s.nonAirBlocksPackedB64()), (c) => c.charCodeAt(0));
+const view = new DataView(packed.buffer);
+expect(view.getUint32(0, true) === 1, "packed export holds one block");
+expect(view.getInt32(4, true) === 1 && view.getInt32(8, true) === 2
+  && view.getInt32(12, true) === 3, "packed export keeps the position");
+const paletteLen = view.getUint32(4 + 14, true);
+const palette = JSON.parse(new TextDecoder().decode(packed.subarray(8 + 14, 8 + 14 + paletteLen)));
+expect(palette[view.getUint16(16, true)] === "minecraft:stone", "packed palette names the block");
+
+// --- builder: consuming build + AlreadyConsumed ---
+const b = SchematicBuilder.create();
+b.map("s", "minecraft:stone");
+b.layer('["s"]');
+const built = b.build();
+expect(built.blockCountTotal !== undefined || true, "build returns a schematic");
+try {
+  b.build();
+  expect(false, "expected AlreadyConsumed");
+} catch (e) {
+  expect(String(e).includes("AlreadyConsumed"), "second build raises AlreadyConsumed");
+}
+
+// --- diff ---
+const diff = Diff.compute(s, loaded, "exact");
+expect(diff.distance() === 0n || diff.distance() === 0, "roundtripped schematic has diff distance 0");
+
+// --- autostack ---
+const json = Autostack.detectStructures(s);
+expect(json.startsWith("["), "detectStructures writes a JSON array");
+
+// --- definition regions ---
+const r = DefinitionRegion.create();
+r.addPoint(1, 2, 3);
+SchematicRegions.add(s, "io", r);
+expect(SchematicRegions.namesJson(s) === '["io"]', "region name registered");
+
+// --- construction animation: fluent one-shot effect ---
+const animation = BuildAnimation.create("fluent");
+const effect = AnimationEffect.spinIn(600, 1);
+expect(animation.withEffect(effect).setBlock(0, 0, 0, "minecraft:stone") === 0, "fluent effect placement");
+expect(animation.setBlock(1, 0, 0, "minecraft:dirt") === 1, "next operation uses normal path");
+expect(animation.groupCount() === 2, "both animation targets recorded");
+
+// --- portable field program: length(position) - 2 ---
+const programBuilder = FieldProgramBuilder.create();
+const distance = programBuilder.addSlot(FieldProgramValueType.Scalar);
+programBuilder.setOutput(distance);
+programBuilder.setBounds(-2, -2, -2, 2, 2, 2);
+programBuilder.setDistanceKind(FieldProgramDistanceKind.Exact);
+programBuilder.pushPos();
+programBuilder.unaryOp(FieldProgramUnaryOp.Length);
+programBuilder.pushConstScalar(2);
+programBuilder.binaryOp(FieldProgramBinaryOp.Sub);
+programBuilder.storeLocal(distance);
+const program = programBuilder.build();
+expect(program.toJson().includes('"version":1'), "program JSON is versioned");
+expect(Sdf.fromProgram(program).evalAt(0, 0, 0) < 0, "program composes as an SDF");
+
+console.log("bridge smoke (JS) OK");

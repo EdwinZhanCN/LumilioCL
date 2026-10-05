@@ -1,0 +1,3792 @@
+//! Torches, repeaters and comparators: the components that make redstone *timed*.
+//!
+//! Dust settles instantly (see [`crate::redstone`]). Everything that gives a
+//! contraption its timing lives here, and the timing comes from two things —
+//! **delay** and **tick priority**. Both are taken from Minecraft 26.2's own
+//! compiled code, which ships unobfuscated; see `redstone_components.md` for the
+//! full reading.
+//!
+//! # Verified delays
+//!
+//! | component | delay | source |
+//! |---|---|---|
+//! | repeater | `delay` property (1–4) **× 2** game ticks | `RepeaterBlock.getDelay` |
+//! | comparator | 2 game ticks | `ComparatorBlock` |
+//! | torch | [`TORCH_DELAY`] game ticks | `RedstoneTorchBlock` |
+//!
+//! # Verified priorities, and why they matter more than the delays
+//!
+//! `DiodeBlock.checkTickOnNeighbor` picks one of three:
+//!
+//! - [`TickPriority::ExtremelyHigh`] when `shouldPrioritize` holds — the block
+//!   *behind* the diode is itself a diode facing it. This is "repeater priority",
+//!   and it is what makes chains of repeaters resolve in a stable order.
+//! - [`TickPriority::VeryHigh`] when the diode is currently powered, i.e. about to
+//!   turn **off**.
+//! - [`TickPriority::High`] otherwise, i.e. turning **on**.
+//!
+//! A redstone torch schedules with **no priority argument at all**, so it runs at
+//! [`TickPriority::Normal`] — strictly after every diode in the same tick. That
+//! difference is not cosmetic: it decides which component observes which, and it is
+//! the kind of detail that makes a piston fire one tick early or late.
+//!
+//! # What is *not* verified here
+//!
+//! Comparator priming, repeater locking, and torch burnout are described in
+//! `redstone_components.md` but deliberately **not** implemented, because they are
+//! exactly the behaviours where a plausible reading goes subtly wrong. They need
+//! traces first.
+
+use crate::behaviour::{BlockBehaviour, TickCtx};
+use crate::pos::{Dir, Pos};
+use crate::schedule::TickPriority;
+use crate::state::StateId;
+use crate::world::World;
+
+/// Game ticks between a redstone torch seeing a change and acting on it.
+///
+/// One "redstone tick". `RedstoneTorchBlock` schedules with the plain
+/// `scheduleTick(pos, block, delay)` overload — no priority — so torches always run
+/// at [`TickPriority::Normal`].
+pub const TORCH_DELAY: u64 = 2;
+
+/// How far back burnout detection looks, in game ticks.
+///
+/// `RedstoneTorchBlock.RECENT_TOGGLE_TIMER`, read as the literal `60L` in the
+/// class's bytecode.
+pub const TORCH_BURNOUT_WINDOW: u64 = 60;
+
+/// Turn-offs within [`TORCH_BURNOUT_WINDOW`] before a torch burns out.
+///
+/// `RedstoneTorchBlock.MAX_RECENT_TOGGLES`. javac inlines it, so it was captured
+/// rather than read — and the capture corrected a mistake. Driving a torch with a
+/// 4-tick square wave produced:
+///
+/// ```text
+/// turn-OFF at ticks  3, 11, 19, 27, 35, 43, 51, 59   (8)
+/// turn-ON  at ticks  7, 15, 23, 31, 39, 47, 55       (7)
+/// then nothing, while the driving repeater kept toggling to tick 157
+/// ```
+///
+/// Fifteen state changes but **eight burnouts**: only the transitions to *unlit*
+/// count. An implementation counting every toggle stalls a torch at eight state
+/// changes instead of fifteen — very nearly half the real budget, which would make
+/// any torch-driven clock diverge from the game well before it should.
+pub const MAX_RECENT_TOGGLES: usize = 8;
+
+/// Game ticks a comparator takes to act. Fixed, unlike a repeater's.
+pub const COMPARATOR_DELAY: u64 = 2;
+
+/// Game ticks per unit of a repeater's `delay` property.
+///
+/// The property counts *redstone* ticks (1–4); the scheduler counts game ticks.
+/// Forgetting this factor is a silent doubling or halving of every repeater in a
+/// build.
+pub const REPEATER_TICKS_PER_DELAY: u64 = 2;
+
+/// Which way a diode's signal flows.
+///
+/// Determined empirically from a captured trace rather than assumed: a repeater
+/// with `facing=east` and a redstone block to its **east** scheduled a tick, while
+/// `facing=west` with the same block did not. So the input side is the side the
+/// block's `facing` names.
+///
+/// This is recorded here because it is easy to get backwards, and backwards means
+/// every diode in a build reads the wrong neighbour.
+pub const INPUT_IS_FACING_SIDE: bool = true;
+
+/// A powered/unpowered pair of states for one block configuration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StatePair {
+    /// The state when unpowered.
+    pub off: StateId,
+    /// The state when powered.
+    pub on: StateId,
+}
+
+impl StatePair {
+    /// The state for a given powered flag.
+    pub fn get(&self, powered: bool) -> StateId {
+        if powered {
+            self.on
+        } else {
+            self.off
+        }
+    }
+}
+
+/// Reads whether a position is emitting a redstone signal.
+///
+/// Supplied by the caller so this module stays independent of any particular
+/// power model — the same reasoning that keeps [`crate::state::StateRegistry`] free
+/// of Minecraft's block list.
+pub trait PowerSource: Send + Sync {
+    /// `LeavesBlock.getDistanceAt`: 0 for a log, a leaf's own `distance`, and
+    /// 7 for everything else — the "too far to matter" value.
+    fn leaf_distance(&self, _world: &World, _pos: Pos) -> u8 {
+        7
+    }
+
+    /// Whether `pos` currently emits a signal toward `toward`.
+    ///
+    /// `outs` carries the comparator block-entity outputs, because a
+    /// comparator's emission is its *stored* strength, not its block state.
+    fn is_powered(
+        &self,
+        world: &World,
+        outs: &crate::behaviour::ComparatorOutputs,
+        pos: Pos,
+        toward: Dir,
+    ) -> bool;
+
+    /// The analog (comparator-readable) signal of the block at `pos`, if it has
+    /// one — a container's fullness, principally. `None` means the block has no
+    /// analog output at all, which is different from an empty container's
+    /// `Some(0)`.
+    fn analog_signal(
+        &self,
+        _world: &World,
+        _inventories: &crate::inventory::InventoryMap,
+        _carts: &[crate::minecart::MinecartState],
+        _pos: Pos,
+    ) -> Option<u8> {
+        None
+    }
+
+    /// Whether the block at `pos` conducts strong power — also the block a
+    /// comparator can read a container *through*.
+    fn is_conductor(&self, _world: &World, _pos: Pos) -> bool {
+        false
+    }
+
+    /// The slot count of the container block at `pos`, if it is one.
+    fn container_slots_at(&self, _world: &World, _pos: Pos) -> Option<u32> {
+        None
+    }
+
+    /// The container at `pos` as ordered `(position, slots)` segments: two
+    /// for a double-chest half — vanilla's `CompoundContainer` order, RIGHT
+    /// half first (`ChestBlock.getBlockType`: RIGHT is FIRST) — one for any
+    /// other container, `None` for a non-container. Hoppers, droppers and
+    /// comparators walk segments so a double chest reads and fills as the
+    /// single 54-slot container it is in game.
+    fn container_segments(&self, world: &World, pos: Pos) -> Option<Vec<(Pos, u32)>> {
+        self.container_slots_at(world, pos)
+            .map(|slots| vec![(pos, slots)])
+    }
+
+    /// Whether the block at `pos` is a hopper — the destination-cooldown rule
+    /// applies only to hoppers.
+    fn hopper_at(&self, _world: &World, _pos: Pos) -> bool {
+        false
+    }
+
+    /// An item's max stack size — 64 unless the rules know better. Hopper
+    /// merges and comparator fullness both depend on it (shears stop at 1).
+    /// Whether the block at `pos` offers the sturdy top face a rail's
+    /// `canSurvive` wants. Defaults to `false`: a rule set that never
+    /// registers rails never asks.
+    fn rail_support_at(&self, _world: &World, _pos: Pos) -> bool {
+        false
+    }
+
+    fn max_stack_of(&self, _id: &str) -> u8 {
+        64
+    }
+
+    /// Whether the block at `pos` is a full collision cube — what blocks a
+    /// hopper's suction from above.
+    fn is_solid_at(&self, _world: &World, _pos: Pos) -> bool {
+        false
+    }
+
+    /// Whether the block at `pos` is a diode, for repeater-priority purposes.
+    fn is_diode(&self, world: &World, pos: Pos) -> bool;
+
+    /// Which way the diode at `pos` faces, if it is one.
+    fn diode_facing(&self, world: &World, pos: Pos) -> Option<Dir>;
+
+    /// The signal strength `pos` emits toward `toward`, 0-15.
+    ///
+    /// Defaults to the boolean answer widened to full strength, so a power model
+    /// that only cares about on/off need not implement it. Comparators are the one
+    /// component whose output genuinely depends on the *level*.
+    fn signal_strength(
+        &self,
+        world: &World,
+        outs: &crate::behaviour::ComparatorOutputs,
+        pos: Pos,
+        toward: Dir,
+    ) -> u8 {
+        if self.is_powered(world, outs, pos, toward) {
+            15
+        } else {
+            0
+        }
+    }
+}
+
+/// How a comparator combines its rear and side inputs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ComparatorMode {
+    /// Output the rear signal, unless a side beats it, in which case nothing.
+    Compare,
+    /// Output the rear signal reduced by the strongest side.
+    Subtract,
+}
+
+impl ComparatorMode {
+    /// The output strength for a given rear and side signal.
+    ///
+    /// Every case below was captured from the real game rather than taken from
+    /// documentation:
+    ///
+    /// ```text
+    /// subtract  rear 15, side  0  -> 15   (dust beyond read 15 then 14)
+    /// subtract  rear 15, side 14  ->  1
+    /// compare   rear 15, side 14  -> 15   (side loses, passes through)
+    /// compare   rear 13, side 14  ->  0   (side wins, comparator unpowered)
+    /// ```
+    pub fn output(self, rear: u8, side: u8) -> u8 {
+        match self {
+            ComparatorMode::Compare => {
+                if side > rear {
+                    0
+                } else {
+                    rear
+                }
+            }
+            ComparatorMode::Subtract => rear.saturating_sub(side),
+        }
+    }
+}
+
+/// Shared scheduling logic for repeaters and comparators.
+///
+/// Mirrors `DiodeBlock.checkTickOnNeighbor`: decide whether the output should
+/// change, and if so schedule at the priority the game would choose.
+fn schedule_diode(
+    ctx: &mut TickCtx<'_>,
+    power: &dyn PowerSource,
+    pos: Pos,
+    facing: Dir,
+    powered: bool,
+    delay: u64,
+) {
+    let input_side = if INPUT_IS_FACING_SIDE {
+        facing
+    } else {
+        facing.opposite()
+    };
+    let input = power.is_powered(
+        ctx.world,
+        ctx.comparator_out,
+        pos.offset(input_side),
+        input_side.opposite(),
+    );
+
+    if input == powered {
+        return;
+    }
+
+    // The game refuses to double-schedule a position that already has a tick
+    // pending. Skipping this check silently doubles every delay.
+    if ctx.ticks.will_tick_this_tick(pos) {
+        return;
+    }
+
+    let priority = if should_prioritize(ctx.world, power, pos, facing) {
+        TickPriority::ExtremelyHigh
+    } else if powered {
+        // Turning off outranks turning on.
+        TickPriority::VeryHigh
+    } else {
+        TickPriority::High
+    };
+
+    ctx.schedule(pos, delay, priority);
+}
+
+/// The two horizontal directions perpendicular to `facing`.
+///
+/// Locking is checked on these, and only these — a diode above or below cannot
+/// lock a repeater.
+fn perpendicular(facing: Dir) -> [Dir; 2] {
+    match facing {
+        Dir::North | Dir::South => [Dir::East, Dir::West],
+        Dir::East | Dir::West => [Dir::North, Dir::South],
+        // A vertical facing is not a valid diode orientation; return the horizontal
+        // pair that cannot match rather than panicking mid-tick.
+        Dir::Up | Dir::Down => [Dir::North, Dir::South],
+    }
+}
+
+/// `DiodeBlock.shouldPrioritize`: is the block behind us a diode facing us?
+fn should_prioritize(world: &World, power: &dyn PowerSource, pos: Pos, facing: Dir) -> bool {
+    let behind = pos.offset(facing);
+    if !power.is_diode(world, behind) {
+        return false;
+    }
+    // A diode behind us only prioritises if it is aimed our way.
+    power.diode_facing(world, behind) == Some(facing)
+}
+
+/// A redstone repeater.
+///
+/// One instance is registered per distinct block state, so it knows its own facing,
+/// delay and powered flag without needing to parse a descriptor at tick time.
+pub struct Repeater<P: PowerSource> {
+    /// The `facing` property.
+    pub facing: Dir,
+    /// The `delay` property, 1–4 in redstone ticks.
+    pub delay: u8,
+    /// Whether this state is the powered one.
+    pub powered: bool,
+    /// The powered/unpowered states for this facing and delay.
+    pub states: StatePair,
+    /// This state with `locked` flipped, when it is interned.
+    ///
+    /// `RepeaterBlock.updateShape` recomputes `LOCKED` on every horizontal
+    /// shape update perpendicular to `FACING`, so the property is *derived*,
+    /// not authored — a community build saved mid-cycle carries whatever
+    /// value it had, and vanilla corrects it the moment it is placed.
+    pub locked_twin: Option<StateId>,
+    /// Whether this state is the locked one.
+    pub locked: bool,
+    /// How power is read.
+    pub power: P,
+}
+
+impl<P: PowerSource> Repeater<P> {
+    /// Whether the repeater at `pos` is locked by a diode powering it from the side.
+    ///
+    /// `DiodeBlock.isLocked`: a repeater fed from either side by a *powered* diode
+    /// ignores its input entirely — `checkTickOnNeighbor` returns early, so a locked
+    /// repeater schedules nothing and holds whatever output it had.
+    pub fn locked_at(
+        &self,
+        world: &World,
+        outs: &crate::behaviour::ComparatorOutputs,
+        pos: Pos,
+    ) -> bool {
+        for side in perpendicular(self.facing) {
+            let neighbour = pos.offset(side);
+            if self.power.is_diode(world, neighbour)
+                && self
+                    .power
+                    .is_powered(world, outs, neighbour, side.opposite())
+            {
+                return true;
+            }
+        }
+        false
+    }
+    /// `DiodeBlock.updateNeighborsInFront`: the block this diode outputs into,
+    /// then that block's neighbours except back toward the diode.
+    fn update_neighbours_in_front(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        let target = pos.offset(self.facing.opposite());
+        ctx.notify(target, self.facing);
+        ctx.update_neighbors_except(target, self.facing);
+    }
+
+    /// Delay in game ticks.
+    pub fn delay_ticks(&self) -> u64 {
+        u64::from(self.delay) * REPEATER_TICKS_PER_DELAY
+    }
+}
+
+impl<P: PowerSource> BlockBehaviour for Repeater<P> {
+    /// `DiodeBlock.onPlace` runs `updateNeighborsInFront`: a diode written
+    /// into the world tells the block it points at, and that block's other
+    /// neighbours, straight away. Under `knownShape` placement — where no
+    /// update passes run — this is the only way a build's diodes reach each
+    /// other at all.
+    fn on_placed(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        let target = pos.offset(self.facing.opposite());
+        ctx.notify(target, self.facing);
+        ctx.update_neighbors_except(target, self.facing);
+    }
+
+    /// `RepeaterBlock.updateShape`: a horizontal shape update perpendicular to
+    /// `FACING` recomputes `LOCKED`.
+    fn on_shape_update(&self, ctx: &mut TickCtx<'_>, pos: Pos, from: Dir) {
+        if matches!(from, Dir::Up | Dir::Down)
+            || from == self.facing
+            || from == self.facing.opposite()
+        {
+            return;
+        }
+        let Some(twin) = self.locked_twin else { return };
+        if self.locked_at(ctx.world, ctx.comparator_out, pos) != self.locked {
+            // A shape update writes the state without notifying neighbours.
+            ctx.set_quiet(pos, twin);
+        }
+    }
+
+    fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
+        // A locked repeater schedules nothing: the game returns early before
+        // checkTickOnNeighbor ever considers the input.
+        if self.locked_at(ctx.world, ctx.comparator_out, pos) {
+            return;
+        }
+        let delay = self.delay_ticks();
+        schedule_diode(ctx, &self.power, pos, self.facing, self.powered, delay);
+    }
+
+    /// `DiodeBlock.tick`, whose whole body sits under `if (!isLocked(...))`.
+    ///
+    /// A repeater that is locked when its tick lands does nothing *and does
+    /// not reschedule* — it keeps its output until something unlocks it and
+    /// notifies it afresh. That is why a build placed with a lit comparator
+    /// beside a repeater holds its output for one more cycle: the tick fires
+    /// into a locked repeater and is simply dropped.
+    fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        if self.locked_at(ctx.world, ctx.comparator_out, pos) {
+            return;
+        }
+        let input_side = if INPUT_IS_FACING_SIDE {
+            self.facing
+        } else {
+            self.facing.opposite()
+        };
+        let should_turn_on = self.power.is_powered(
+            ctx.world,
+            ctx.comparator_out,
+            pos.offset(input_side),
+            input_side.opposite(),
+        );
+        // `DiodeBlock.tick` writes with flag **2** — no neighbour updates — and
+        // the notification comes from `onPlace`, which runs on every write and
+        // carries no block-changed guard: `updateNeighborsInFront`, reaching
+        // the block this diode outputs into *and that block's neighbours*.
+        //
+        // Writing with flag 3 instead notifies only the diode's own six, which
+        // stops one block short: a repeater feeding a solid block never tells
+        // the dust on the far side of it, and that dust stays dark.
+        if self.powered && !should_turn_on {
+            ctx.set_shape_only(pos, self.states.get(false));
+            self.update_neighbours_in_front(ctx, pos);
+        } else if !self.powered {
+            // Turning on always happens; if the input has already gone away the
+            // repeater books its own turn-off, which is what stretches a pulse
+            // shorter than the delay out to the full delay.
+            ctx.set_shape_only(pos, self.states.get(true));
+            self.update_neighbours_in_front(ctx, pos);
+            if !should_turn_on {
+                ctx.schedule(
+                    pos,
+                    self.delay_ticks(),
+                    crate::schedule::TickPriority::VeryHigh,
+                );
+            }
+        }
+    }
+
+    fn redstone_power(&self, _world: &World, _pos: Pos, dir: Dir) -> u8 {
+        // A repeater emits only from its output side, at full strength.
+        let output = if INPUT_IS_FACING_SIDE {
+            self.facing.opposite()
+        } else {
+            self.facing
+        };
+        if self.powered && dir == output {
+            15
+        } else {
+            0
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        "repeater"
+    }
+}
+
+/// A redstone torch.
+///
+/// Inverts the block it is attached to, after [`TORCH_DELAY`] game ticks, and always
+/// at [`TickPriority::Normal`] — torches schedule without a priority argument, so
+/// they run strictly after every diode in the same tick.
+pub struct Torch<P: PowerSource> {
+    /// The direction of the block this torch is attached to.
+    pub attached: Dir,
+    /// Whether this state is lit.
+    pub lit: bool,
+    /// Lit/unlit states.
+    pub states: StatePair,
+    /// How power is read.
+    pub power: P,
+}
+
+impl<P: PowerSource> BlockBehaviour for Torch<P> {
+    /// `RedstoneTorchBlock.onPlace` → `notifyNeighbors`: an `updateNeighborsAt`
+    /// centred on each of the torch's six neighbours.
+    ///
+    /// That reaches two blocks out, the same shape as dust's `onPlace`, and it
+    /// is most of what happens during a `knownShape` placement — where no
+    /// update pass runs at all, so a torch that never announced itself leaves
+    /// every neighbouring torch and piston unscheduled. Which torches are
+    /// pending after placement decides which pistons fire on the first tick.
+    fn on_placed(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        for dir in crate::pos::JAVA_DIRECTIONS {
+            ctx.update_neighbors_at(pos.offset(dir));
+        }
+    }
+
+    /// `RedstoneTorchBlock.onPlace` carries no `!oldState.is(block)` guard, so
+    /// it runs again every time the torch merely toggles `lit` — and it is the
+    /// *two-step* notify, not the six-neighbour one the write itself does.
+    ///
+    /// That reach is the point. A torch strongly powers the block above it, and
+    /// a piston resting against *that* block is two steps away: it hears
+    /// nothing from the write, and everything from this.
+    fn on_state_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        for dir in crate::pos::JAVA_DIRECTIONS {
+            ctx.update_neighbors_at(pos.offset(dir));
+        }
+    }
+
+    fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
+        let support = pos.offset(self.attached);
+        let powered = self.power.is_powered(
+            ctx.world,
+            ctx.comparator_out,
+            support,
+            self.attached.opposite(),
+        );
+        // A torch is lit exactly when its support is *not* powered.
+        let pending = ctx.ticks.will_tick_this_tick(pos);
+        // `MC_TICK_TRACE_NOTIFY` covers torches too: whether a torch schedules
+        // depends on the world *at the instant it is notified*, which during a
+        // placement cascade is not the world anyone can see afterwards.
+        if let Some(filter) = std::env::var_os("MC_TICK_TRACE_NOTIFY") {
+            let key = format!("{},{},{}", pos.x, pos.y, pos.z);
+            if filter
+                .to_string_lossy()
+                .split(';')
+                .any(|want| want.trim() == key)
+            {
+                eprintln!(
+                    "        torch ({key}) lit={} powered={powered} pending={pending} support {:?}",
+                    self.lit,
+                    (support.x, support.y, support.z)
+                );
+            }
+        }
+        if self.lit == powered && !pending {
+            ctx.schedule(pos, TORCH_DELAY, TickPriority::Normal);
+        }
+    }
+
+    fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        let support = pos.offset(self.attached);
+        let powered = self.power.is_powered(
+            ctx.world,
+            ctx.comparator_out,
+            support,
+            self.attached.opposite(),
+        );
+        if self.lit != powered {
+            return;
+        }
+        // Burnout: a torch driven too hard stops responding. Without this a
+        // torch-based clock would run forever in simulation and stall in the game,
+        // which is the sort of divergence that invalidates a whole timing result.
+        if ctx.recent_toggles(pos, TORCH_BURNOUT_WINDOW) >= MAX_RECENT_TOGGLES {
+            return;
+        }
+        // Only turning *off* counts toward burnout — confirmed by capture. The
+        // torch is lit exactly when its support is unpowered, so `powered` here
+        // means it is about to go dark.
+        if powered {
+            ctx.record_toggle(pos);
+        }
+        ctx.set(pos, self.states.get(!powered));
+    }
+
+    fn redstone_power(&self, _world: &World, _pos: Pos, dir: Dir) -> u8 {
+        // A lit torch powers every side except the one it is attached to.
+        if self.lit && dir != self.attached {
+            15
+        } else {
+            0
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        "redstone_torch"
+    }
+}
+
+/// A redstone comparator.
+///
+/// Shares `DiodeBlock`'s scheduling with a fixed [`COMPARATOR_DELAY`]. Comparison
+/// and subtraction modes, container reading, and priming are **not** implemented —
+/// see the module docs.
+pub struct Comparator<P: PowerSource> {
+    /// The `facing` property.
+    pub facing: Dir,
+    /// Whether this state is powered.
+    pub powered: bool,
+    /// Compare or subtract.
+    pub mode: ComparatorMode,
+    /// Powered/unpowered states.
+    pub states: StatePair,
+    /// How power is read.
+    pub power: P,
+}
+
+impl<P: PowerSource> Comparator<P> {
+    /// The side this comparator reads its main input from.
+    fn input_side(&self) -> Dir {
+        if INPUT_IS_FACING_SIDE {
+            self.facing
+        } else {
+            self.facing.opposite()
+        }
+    }
+
+    /// The strength this comparator should be emitting.
+    ///
+    /// Rear input comes from [`Comparator::input_side`]; side inputs from the two
+    /// horizontal directions perpendicular to it, matching the game's use of the
+    /// same perpendicular pair that governs repeater locking.
+    ///
+    /// The container path is `ComparatorBlock.getInputSignal`, from bytecode: a
+    /// block with an analog signal directly behind **overrides** the rear
+    /// redstone reading; failing that, when the rear reading is below 15 and
+    /// the block behind is a conductor, the comparator reads a container one
+    /// block further back *through* it.
+    pub fn output_strength(
+        &self,
+        world: &World,
+        outs: &crate::behaviour::ComparatorOutputs,
+        inventories: &crate::inventory::InventoryMap,
+        carts: &[crate::minecart::MinecartState],
+        pos: Pos,
+    ) -> u8 {
+        let back = self.input_side();
+        let rear_pos = pos.offset(back);
+        let redstone = self
+            .power
+            .signal_strength(world, outs, rear_pos, back.opposite());
+        let mut rear = redstone;
+        if let Some(analog) = self
+            .power
+            .analog_signal(world, inventories, carts, rear_pos)
+        {
+            rear = analog;
+        } else if rear < 15 && self.power.is_conductor(world, rear_pos) {
+            if let Some(analog) =
+                self.power
+                    .analog_signal(world, inventories, carts, rear_pos.offset(back))
+            {
+                rear = analog;
+            }
+        }
+        // `MC_TICK_DEBUG_COMPARATOR=1` — every strength evaluation, with the
+        // rear redstone and analog readings split out.
+        if std::env::var_os("MC_TICK_DEBUG_COMPARATOR").is_some() {
+            eprintln!(
+                "[cmp] at {pos:?} rear_pos {rear_pos:?} redstone {redstone} analog {:?} rear {rear}",
+                self.power.analog_signal(world, inventories, carts, rear_pos)
+            );
+        }
+        let side = perpendicular(back)
+            .into_iter()
+            .map(|dir| {
+                self.power
+                    .signal_strength(world, outs, pos.offset(dir), dir.opposite())
+            })
+            .max()
+            .unwrap_or(0);
+        self.mode.output(rear, side)
+    }
+}
+
+impl<P: PowerSource> BlockBehaviour for Comparator<P> {
+    /// `DiodeBlock.onPlace`: see [`Repeater::on_placed`].
+    fn on_placed(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        let target = pos.offset(self.input_side().opposite());
+        ctx.notify(target, self.input_side());
+        ctx.update_neighbors_except(target, self.input_side());
+    }
+
+    /// `ComparatorBlock.checkTickOnNeighbor` — and the source of comparator priming.
+    ///
+    /// A comparator differs from a repeater in two ways, both read from the class:
+    ///
+    /// 1. It schedules when its **output strength** changes, not only when its
+    ///    powered flag would. The comparison is against a value held in a
+    ///    `ComparatorBlockEntity`, because the block state cannot express "on at
+    ///    strength 9". A comparator can therefore sit with a pending tick caused
+    ///    purely by a strength change — *primed* — and resolve later alongside
+    ///    components that never saw a change at all.
+    /// 2. Its priority is `HIGH` when fed by a diode and `NORMAL` otherwise. It
+    ///    never uses the `VERY_HIGH`/`EXTREMELY_HIGH` that a repeater reaches for,
+    ///    so a primed comparator resolves *after* every repeater in the same tick.
+    fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
+        if ctx.ticks.will_tick_this_tick(pos) {
+            return;
+        }
+        let output = self.output_strength(
+            ctx.world,
+            ctx.comparator_out,
+            ctx.inventories,
+            ctx.minecarts,
+            pos,
+        );
+        let stored = ctx.stored_comparator_output(pos);
+        let should_be_on = output > 0;
+
+        if output == stored && should_be_on == self.powered {
+            return;
+        }
+
+        let priority = if should_prioritize(ctx.world, &self.power, pos, self.facing) {
+            TickPriority::High
+        } else {
+            TickPriority::Normal
+        };
+        ctx.schedule(pos, COMPARATOR_DELAY, priority);
+    }
+
+    /// `ComparatorBlock.refreshOutputState`.
+    ///
+    /// The subtle part is what counts as "something happened": vanilla acts
+    /// when the **stored strength** changes (or the mode is `compare`), not
+    /// only when the `powered` flag flips — and it acts by writing the state
+    /// silently (flag 2) and then calling `updateNeighborsInFront` itself.
+    ///
+    /// A comparator placed `powered=true` with a fresh block entity holding 0
+    /// hits exactly that case: it recomputes to its real strength, the flag
+    /// never moves, and only the explicit front update tells the dust. Without
+    /// it a whole branch of the 4x4 vault door stayed dark, its pistons never
+    /// fired, and the opposed pistons on the door's other side won a race they
+    /// lose in the real game.
+    fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        let output = self.output_strength(
+            ctx.world,
+            ctx.comparator_out,
+            ctx.inventories,
+            ctx.minecarts,
+            pos,
+        );
+        let stored = ctx.stored_comparator_output(pos);
+        ctx.store_comparator_output(pos, output);
+        if stored == output && self.mode != ComparatorMode::Compare {
+            return;
+        }
+        let should_be_on = output > 0;
+        if should_be_on != self.powered {
+            // setBlock flag 2: the shape pass still runs, neighbours do not.
+            ctx.set_shape_only(pos, self.states.get(should_be_on));
+        }
+        // updateNeighborsInFront: the block this comparator outputs into, then
+        // that block's neighbours except back toward us.
+        let target = pos.offset(self.input_side().opposite());
+        ctx.notify(target, self.input_side());
+        ctx.update_neighbors_except(target, self.input_side());
+    }
+
+    fn redstone_power(&self, world: &World, pos: Pos, dir: Dir) -> u8 {
+        let output = self.input_side().opposite();
+        if dir == output {
+            // No inventory view reaches this trait method, so a container-fed
+            // comparator's *strength* is not visible here — only its powered
+            // block state is. Nothing consumes analog strength through this
+            // path yet (dust is not integrated); revisit when it is.
+            self.output_strength(world, &Default::default(), &Default::default(), &[], pos)
+        } else {
+            0
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        "comparator"
+    }
+}
+
+/// The cooldown a hopper takes after moving an item, in block-entity ticks.
+///
+/// `HopperBlockEntity.MOVE_ITEM_SPEED` — one transfer per 8 game ticks.
+pub const HOPPER_COOLDOWN: i32 = 8;
+
+/// A hopper's slot count.
+pub const HOPPER_SLOTS: u8 = 5;
+
+/// Ticks between a dispenser's trigger and its dispense.
+///
+/// `DispenserBlock.neighborChanged` schedules with delay 4.
+pub const DISPENSER_DELAY: u64 = 4;
+
+/// The assumed max stack size; see `crate::inventory`'s module docs.
+const MERGE_LIMIT: u8 = 64;
+
+/// A hopper.
+///
+/// Mechanics from `HopperBlockEntity` bytecode, pinned by capture:
+///
+/// - `pushItemsTick` runs every block-entity tick: decrement the cooldown,
+///   stamp `tickedGameTime`, and when off cooldown try to move — **eject
+///   first, then suck**; either success sets the cooldown to 8.
+/// - `ejectItems` moves **one** item from the first occupied slot into the
+///   container the hopper faces (first empty-or-mergeable slot, in slot order).
+/// - `suckInItems` pulls one item from the first occupied slot of the container
+///   above.
+/// - Inserting into a **completely empty hopper** puts that hopper on cooldown
+///   `8 - 1` when it has already ticked this game tick (it is earlier in the
+///   block-entity order), else `8` — `tryMoveInItem`'s `tickedGameTime`
+///   comparison, and the reason hopper order is observable.
+/// - The `enabled` property gates everything; `HopperBlock` keeps it at
+///   `!hasNeighborSignal` (no quasi-connectivity), written silently (flag 2).
+pub struct Hopper<P: PowerSource> {
+    /// The output direction — down, or one of the four horizontals.
+    pub facing: Dir,
+    /// Whether this state is the enabled (unpowered) one.
+    pub enabled: bool,
+    /// Disabled/enabled states (`off` = `enabled=false`).
+    pub states: StatePair,
+    /// How power and containers are read.
+    pub power: P,
+}
+
+impl<P: PowerSource> Hopper<P> {
+    fn is_empty(&self, ctx: &TickCtx<'_>, pos: Pos) -> bool {
+        ctx.inventories
+            .get(&pos)
+            .is_none_or(crate::inventory::Inventory::is_empty)
+    }
+
+    fn is_full(&self, ctx: &TickCtx<'_>, pos: Pos) -> bool {
+        inventory_is_full(ctx, pos, u32::from(HOPPER_SLOTS))
+    }
+
+    /// `ejectItems`: one item from our first occupied slot into the container
+    /// we face — walked as segments, so a double chest fills as one container.
+    fn eject(&self, ctx: &mut TickCtx<'_>, pos: Pos) -> bool {
+        let target = pos.offset(self.facing);
+        let Some(segments) = self.power.container_segments(ctx.world, target) else {
+            // `getAttachedContainer`: no container *block* in front — a
+            // container cart overlapping that cell is the target instead.
+            return self.eject_into_cart(ctx, pos, target);
+        };
+        if segments
+            .iter()
+            .all(|(seg, slots)| inventory_is_full(ctx, *seg, *slots))
+        {
+            return false;
+        }
+        for slot in 0..HOPPER_SLOTS {
+            if let Some((id, count)) = ctx.inventory_slot(pos, slot) {
+                for (seg, seg_slots) in &segments {
+                    if let Some(target_slot) =
+                        insert_one(ctx, &self.power, Some(pos), *seg, *seg_slots, &id)
+                    {
+                        let carried = ctx.take_slot_contents(pos, slot);
+                        let remaining = count - 1;
+                        ctx.set_inventory_slot(pos, slot, (remaining > 0).then(|| (id, remaining)));
+                        ctx.set_slot_contents(*seg, target_slot, carried);
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// `suckInItems`: one item from the first occupied slot of the container
+    /// above us — or, with no container there and no full block capping us,
+    /// vacuum an item entity out of the suck column (the full block above from
+    /// y+11/16 to y+2).
+    fn suck(&self, ctx: &mut TickCtx<'_>, pos: Pos) -> bool {
+        let source = pos.offset(Dir::Up);
+        let Some(segments) = self.power.container_segments(ctx.world, source) else {
+            // `getSourceContainer`: no container block above — a container
+            // cart overlapping the cell above is the source instead, and it
+            // comes before item pickup, which the check point (`y + 1.5`)
+            // reaches even when the cart's box only pokes into the cell.
+            let center = [
+                f64::from(pos.x) + 0.5,
+                f64::from(pos.y) + 1.5,
+                f64::from(pos.z) + 0.5,
+            ];
+            if let Some(cart) = ctx.cart_container_at(center) {
+                return self.suck_from_cart(ctx, pos, cart);
+            }
+            if self.power.is_solid_at(ctx.world, source) {
+                return false; // a full block above blocks suction
+            }
+            return self.suck_entities(ctx, pos);
+        };
+        // Segments in combined order: under a double chest, "the first
+        // occupied slot of the container above" spans both halves.
+        let mut attempted: Option<Pos> = None;
+        for (seg, seg_slots) in &segments {
+            for slot in 0..(*seg_slots).min(255) as u8 {
+                if let Some((id, count)) = ctx.inventory_slot(*seg, slot) {
+                    attempted.get_or_insert(*seg);
+                    if let Some(target_slot) =
+                        insert_one(ctx, &self.power, None, pos, u32::from(HOPPER_SLOTS), &id)
+                    {
+                        let carried = ctx.take_slot_contents(*seg, slot);
+                        let remaining = count - 1;
+                        ctx.set_inventory_slot(
+                            *seg,
+                            slot,
+                            (remaining > 0).then(|| (id, remaining)),
+                        );
+                        ctx.set_slot_contents(pos, target_slot, carried);
+                        return true;
+                    }
+                }
+            }
+        }
+        // `tryTakeInItemFromSlot` on a take nothing fit: the item came out
+        // and went back, and *both* halves ran the container's `setChanged`
+        // — a failed pull still schedules every comparator watching the
+        // source, every tick the hopper is enabled. Lithium's update
+        // collection batches exactly this churn, and its gametest measures
+        // the batching's visible effects.
+        if let Some(seg) = attempted {
+            ctx.poke_container_output(seg);
+        }
+        false
+    }
+
+    /// The cart half of [`Hopper::eject`]: one item from our first occupied
+    /// slot into the container cart overlapping the facing cell.
+    fn eject_into_cart(&self, ctx: &mut TickCtx<'_>, pos: Pos, target: Pos) -> bool {
+        let center = [
+            f64::from(target.x) + 0.5,
+            f64::from(target.y) + 0.5,
+            f64::from(target.z) + 0.5,
+        ];
+        let Some(cart) = ctx.cart_container_at(center) else {
+            return false;
+        };
+        for slot in 0..HOPPER_SLOTS {
+            if let Some((id, count)) = ctx.inventory_slot(pos, slot) {
+                if let Some(target_slot) = cart_insert_one(ctx, &self.power, cart, &id) {
+                    let carried = ctx.take_slot_contents(pos, slot);
+                    let remaining = count - 1;
+                    ctx.set_inventory_slot(pos, slot, (remaining > 0).then(|| (id, remaining)));
+                    ctx.set_cart_slot_contents(cart, target_slot, carried);
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    /// The cart half of [`Hopper::suck`]: one item from the cart's first
+    /// occupied slot, in container order, into us.
+    fn suck_from_cart(&self, ctx: &mut TickCtx<'_>, pos: Pos, cart: usize) -> bool {
+        let slots = ctx.minecarts[cart]
+            .inventory
+            .as_ref()
+            .map_or(0, |inv| inv.slots);
+        for slot in 0..slots.min(255) as u8 {
+            if let Some((id, count)) = ctx.cart_slot(cart, slot) {
+                if let Some(target_slot) =
+                    insert_one(ctx, &self.power, None, pos, u32::from(HOPPER_SLOTS), &id)
+                {
+                    let carried = ctx.take_cart_slot_contents(cart, slot);
+                    let remaining = count - 1;
+                    ctx.set_cart_slot(cart, slot, (remaining > 0).then(|| (id, remaining)));
+                    ctx.set_slot_contents(pos, target_slot, carried);
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    /// `getItemsAtAndAbove` + `addItem(container, itemEntity)`: absorb the
+    /// first intersecting item entity, whole stack when it fits. Vanilla only
+    /// reports success — and takes the cooldown — when the entity was fully
+    /// consumed; a partial absorb modifies both sides and returns false.
+    fn suck_entities(&self, ctx: &mut TickCtx<'_>, pos: Pos) -> bool {
+        let suck_min = [
+            f64::from(pos.x),
+            f64::from(pos.y) + 0.6875,
+            f64::from(pos.z),
+        ];
+        let suck_max = [
+            f64::from(pos.x) + 1.0,
+            f64::from(pos.y) + 2.0,
+            f64::from(pos.z) + 1.0,
+        ];
+        for index in 0..ctx.item_entities.items.len() {
+            let (item_id, count, intersects) = {
+                let entity = &ctx.item_entities.items[index];
+                if entity.removed {
+                    continue;
+                }
+                let (emin, emax) = crate::entity::item_aabb(entity.pos);
+                let intersects = emin[0] < suck_max[0]
+                    && emax[0] > suck_min[0]
+                    && emin[1] < suck_max[1]
+                    && emax[1] > suck_min[1]
+                    && emin[2] < suck_max[2]
+                    && emax[2] > suck_min[2];
+                (entity.item.0.clone(), entity.item.1, intersects)
+            };
+            if !intersects {
+                continue;
+            }
+            let mut absorbed = 0u8;
+            let mut landed_slot = None;
+            while absorbed < count {
+                let Some(slot) = insert_one(
+                    ctx,
+                    &self.power,
+                    None,
+                    pos,
+                    u32::from(HOPPER_SLOTS),
+                    &item_id,
+                ) else {
+                    break;
+                };
+                landed_slot = Some(slot);
+                absorbed += 1;
+            }
+            if absorbed == count {
+                let entity_id = ctx.item_entities.items[index].id;
+                ctx.item_entities.items[index].removed = true;
+                // A contents-carrying item (a dropped shulker box) lands its
+                // slots in the hopper stack it was absorbed into.
+                if let Some(carried) = ctx.item_entities.contents.remove(&entity_id) {
+                    if let Some(slot) = landed_slot {
+                        ctx.set_slot_contents(pos, slot, Some(carried));
+                    }
+                }
+                return true;
+            } else if absorbed > 0 {
+                ctx.item_entities.items[index].item.1 = count - absorbed;
+                return false;
+            }
+        }
+        false
+    }
+}
+
+impl<P: PowerSource> BlockBehaviour for Hopper<P> {
+    /// `HopperBlock.checkPoweredState`: enabled tracks `!hasNeighborSignal`,
+    /// written silently.
+    fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
+        let powered = crate::pos::ALL_DIRS.iter().any(|dir| {
+            self.power.is_powered(
+                ctx.world,
+                ctx.comparator_out,
+                pos.offset(*dir),
+                dir.opposite(),
+            )
+        });
+        let enabled = !powered;
+        if enabled != self.enabled {
+            ctx.set_quiet(pos, self.states.get(enabled));
+        }
+    }
+
+    /// `HopperBlockEntity.pushItemsTick`.
+    fn on_block_entity_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        {
+            let state = ctx.hopper_state.entry(pos).or_default();
+            state.cooldown -= 1;
+            state.ticked_at = ctx.tick as i64;
+            if state.cooldown > 0 {
+                return;
+            }
+            state.cooldown = 0;
+        }
+        if !self.enabled {
+            return;
+        }
+        let mut moved = false;
+        if !self.is_empty(ctx, pos) {
+            moved = self.eject(ctx, pos);
+        }
+        if !self.is_full(ctx, pos) {
+            moved |= self.suck(ctx, pos);
+        }
+        if moved {
+            ctx.hopper_state.entry(pos).or_default().cooldown = HOPPER_COOLDOWN;
+        }
+    }
+
+    fn ticks_as_block_entity(&self) -> bool {
+        true
+    }
+
+    fn name(&self) -> &'static str {
+        "hopper"
+    }
+}
+
+/// Whether every slot of the container at `pos` holds a full stack.
+/// `BaseRailBlock.neighborChanged` → `canSurvive`: every rail needs a rigid
+/// top face under it, and one whose support vanishes is destroyed on the
+/// spot, dropping itself (`destroyBlock(pos, true)`). Returns `true` when the
+/// rail popped — the caller's own update logic is moot then.
+///
+/// Rigid support is read as "sturdy top face, or a hopper": dust's
+/// `canSurviveOn` table covers the full cubes (an observer supports a rail
+/// while conducting nothing), and the hopper's rim is rigid support vanilla
+/// accepts rails on (lithium's storage-cart machine runs a rail over one)
+/// even though dust cannot sit there. The drop lands at
+/// the cell centre with no velocity — vanilla scatters it with world random,
+/// which nothing measured reads.
+pub(crate) fn rail_pops_off<P: PowerSource>(
+    power: &P,
+    ctx: &mut TickCtx<'_>,
+    pos: Pos,
+    item: &'static str,
+) -> bool {
+    let below = pos.offset(Dir::Down);
+    let supported = power.rail_support_at(ctx.world, below)
+        || ctx
+            .states
+            .descriptor(ctx.world.get(below))
+            .is_some_and(|descriptor| descriptor.starts_with("minecraft:hopper"));
+    if supported {
+        return false;
+    }
+    ctx.item_entities.spawn(
+        (item.to_string(), 1),
+        [
+            f64::from(pos.x) + 0.5,
+            f64::from(pos.y) + 0.5,
+            f64::from(pos.z) + 0.5,
+        ],
+        [0.0; 3],
+        10,
+    );
+    ctx.set(pos, StateId::AIR);
+    true
+}
+
+fn inventory_is_full(ctx: &TickCtx<'_>, pos: Pos, slots: u32) -> bool {
+    let Some(inventory) = ctx.inventories.get(&pos) else {
+        return slots == 0;
+    };
+    (0..slots.min(255) as u8).all(|slot| {
+        inventory.slot_blocked(slot)
+            || inventory
+                .stacks
+                .iter()
+                .any(|stack| stack.slot == slot && stack.count >= MERGE_LIMIT)
+    })
+}
+
+/// `HopperBlockEntity.addItem`/`tryMoveInItem`: place one `id` item into the
+/// first slot of `target` that is empty or mergeable, in slot order.
+///
+/// `source_hopper` is the ticking hopper doing the insert, if any — the
+/// destination-cooldown rule needs its `tickedGameTime`.
+fn insert_one<P: PowerSource>(
+    ctx: &mut TickCtx<'_>,
+    power: &P,
+    source_hopper: Option<Pos>,
+    target: Pos,
+    target_slots: u32,
+    id: &str,
+) -> Option<u8> {
+    let target_was_empty = ctx
+        .inventories
+        .get(&target)
+        .is_none_or(crate::inventory::Inventory::is_empty);
+    for slot in 0..target_slots.min(255) as u8 {
+        if ctx
+            .inventories
+            .get(&target)
+            .is_some_and(|inventory| inventory.slot_blocked(slot))
+        {
+            continue;
+        }
+        match ctx.inventory_slot(target, slot) {
+            None => {
+                ctx.set_inventory_slot(target, slot, Some((id.to_string(), 1)));
+                // A previously-empty destination hopper is put on cooldown by
+                // the *inserter*: 7 when it already ticked this game tick,
+                // 8 otherwise.
+                if target_was_empty && power.hopper_at(ctx.world, target) {
+                    let source_ticked = source_hopper
+                        .and_then(|p| ctx.hopper_state.get(&p))
+                        .map(|s| s.ticked_at);
+                    let already_ticked = match source_ticked {
+                        Some(source) => {
+                            ctx.hopper_state.entry(target).or_default().ticked_at >= source
+                        }
+                        None => false,
+                    };
+                    ctx.hopper_state.entry(target).or_default().cooldown =
+                        HOPPER_COOLDOWN - i32::from(already_ticked);
+                }
+                return Some(slot);
+            }
+            Some((existing, count)) if existing == id && count < power.max_stack_of(id) => {
+                ctx.set_inventory_slot(target, slot, Some((existing, count + 1)));
+                return Some(slot);
+            }
+            Some(_) => continue,
+        }
+    }
+    None
+}
+
+/// [`insert_one`], into a container cart: first empty or stackable slot.
+/// No cooldown clause — vanilla's applies to `HopperBlockEntity` only, and a
+/// hopper *minecart* is not one.
+fn cart_insert_one<P: PowerSource>(
+    ctx: &mut TickCtx<'_>,
+    power: &P,
+    cart: usize,
+    id: &str,
+) -> Option<u8> {
+    let slots = ctx.minecarts[cart]
+        .inventory
+        .as_ref()
+        .map_or(0, |inv| inv.slots);
+    for slot in 0..slots.min(255) as u8 {
+        match ctx.cart_slot(cart, slot) {
+            None => {
+                ctx.set_cart_slot(cart, slot, Some((id.to_string(), 1)));
+                return Some(slot);
+            }
+            Some((existing, count)) if existing == id && count < power.max_stack_of(id) => {
+                ctx.set_cart_slot(cart, slot, Some((existing, count + 1)));
+                return Some(slot);
+            }
+            Some(_) => continue,
+        }
+    }
+    None
+}
+
+/// A tripwire string, without its hooks: `TripWireBlock`'s entity side.
+///
+/// `entityInside` powers the wire and schedules a 10-tick recheck; the
+/// recheck holds it powered while anything still touches the string's box
+/// (the bottom half of the cell, unattached) and releases it after. Hook
+/// circuits are not modelled — the corpus reads the wire itself, through an
+/// observer.
+pub struct TripWire {
+    /// Whether this state is powered.
+    pub powered: bool,
+    /// Unpowered/powered states.
+    pub states: StatePair,
+}
+
+impl TripWire {
+    fn occupied(ctx: &TickCtx<'_>, pos: Pos) -> bool {
+        let min = [f64::from(pos.x), f64::from(pos.y), f64::from(pos.z)];
+        let max = [
+            f64::from(pos.x) + 1.0,
+            f64::from(pos.y) + 0.5,
+            f64::from(pos.z) + 1.0,
+        ];
+        let items = ctx
+            .item_entities
+            .items
+            .iter()
+            .filter(|item| !item.removed)
+            .map(|item| crate::entity::item_aabb(item.pos));
+        let others = ctx
+            .item_entities
+            .others
+            .iter()
+            .map(|body| (body.min, body.max));
+        items
+            .chain(others)
+            .any(|(emin, emax)| (0..3).all(|axis| emin[axis] < max[axis] && emax[axis] > min[axis]))
+    }
+}
+
+impl BlockBehaviour for TripWire {
+    fn on_entity_inside(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        if !self.powered {
+            ctx.set(pos, self.states.on);
+            ctx.schedule(pos, 10, TickPriority::Normal);
+        }
+    }
+
+    fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        if !self.powered {
+            return;
+        }
+        if Self::occupied(ctx, pos) {
+            ctx.schedule(pos, 10, TickPriority::Normal);
+        } else {
+            ctx.set(pos, self.states.off);
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        "tripwire"
+    }
+}
+
+/// A plain rail: no redstone behaviour, but it still pops off a vanished
+/// support like every `BaseRailBlock`.
+pub struct PlainRail<P: PowerSource> {
+    /// The world's power rules — solidity, for the support-pop check.
+    pub power: P,
+}
+
+impl<P: PowerSource + 'static> BlockBehaviour for PlainRail<P> {
+    fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
+        rail_pops_off(&self.power, ctx, pos, "minecraft:rail");
+    }
+
+    fn name(&self) -> &'static str {
+        "rail"
+    }
+}
+
+/// A dropper or dispenser.
+///
+/// Trigger mechanics from `DispenserBlock.neighborChanged`: powered is
+/// `hasNeighborSignal(pos) || hasNeighborSignal(pos.above())` — full
+/// quasi-connectivity, no direction skips — and a rising edge schedules a
+/// 4-tick delay while flipping `triggered` silently (flag 2).
+///
+/// Dispensing: a dropper facing a container moves one item into it
+/// (`HopperBlockEntity.addItem` semantics). With no container in front — and
+/// always, for a dispenser — the item leaves the world as an item entity,
+/// which is Milestone B; the engine decrements the slot and the departure is
+/// exactly what container NBT shows.
+///
+/// # Known simplification
+///
+/// Vanilla picks a **random occupied slot** (`getRandomSlot`); the engine
+/// deterministically takes the first occupied slot. Identical whenever at most
+/// one slot is occupied, which conformance structures keep to.
+pub struct Dropper<P: PowerSource> {
+    /// The output direction.
+    pub facing: Dir,
+    /// Whether this state is the triggered one.
+    pub triggered: bool,
+    /// Untriggered/triggered states.
+    pub states: StatePair,
+    /// True for a dispenser (never inserts into containers).
+    pub dispenser: bool,
+    /// How power and containers are read.
+    pub power: P,
+}
+
+impl<P: PowerSource> Dropper<P> {
+    fn has_signal(&self, ctx: &TickCtx<'_>, pos: Pos) -> bool {
+        crate::pos::ALL_DIRS.iter().any(|dir| {
+            self.power.is_powered(
+                ctx.world,
+                ctx.comparator_out,
+                pos.offset(*dir),
+                dir.opposite(),
+            )
+        })
+    }
+}
+
+impl<P: PowerSource> BlockBehaviour for Dropper<P> {
+    fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
+        let powered = self.has_signal(ctx, pos) || self.has_signal(ctx, pos.offset(Dir::Up));
+        if powered && !self.triggered {
+            ctx.schedule(pos, DISPENSER_DELAY, TickPriority::Normal);
+            ctx.set_quiet(pos, self.states.get(true));
+        } else if !powered && self.triggered {
+            ctx.set_quiet(pos, self.states.get(false));
+        }
+    }
+
+    fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        let slots = 9u8;
+        // `DispenserBlockEntity.getRandomSlot`: reservoir-sample the occupied
+        // slots — one `nextInt(n)` per candidate, n counting up from 1. With
+        // no seeded rng the engine keeps its deterministic first-occupied
+        // choice, which the conformance goldens were recorded against (their
+        // dispensers hold one stack, where the two rules agree).
+        let chosen = if ctx.item_entities.rng.is_some() {
+            let occupied: Vec<u8> = (0..slots)
+                .filter(|s| ctx.inventory_slot(pos, *s).is_some())
+                .collect();
+            let rng = ctx.item_entities.rng.as_mut().expect("checked above");
+            let mut chosen = None;
+            for (i, s) in occupied.iter().enumerate() {
+                if rng.next_int(i as i32 + 1) == 0 {
+                    chosen = Some(*s);
+                }
+            }
+            chosen
+        } else {
+            (0..slots).find(|s| ctx.inventory_slot(pos, *s).is_some())
+        };
+        let Some(slot) = chosen else {
+            return; // empty: vanilla just clicks
+        };
+        let Some((id, count)) = ctx.inventory_slot(pos, slot) else {
+            return;
+        };
+        // `ShulkerBoxDispenseBehavior`: a dispenser holding a shulker box
+        // *places* it as a block in front. Facing comes from
+        // `DirectionalPlaceContext`: the dispense direction when the block
+        // below the target is empty, straight up otherwise.
+        if self.dispenser && crate::vanilla::has_dynamic_shape(&id) {
+            let front = pos.offset(self.facing);
+            if ctx.world.get(front) == StateId::AIR {
+                let below_empty = ctx.world.get(front.offset(Dir::Down)) == StateId::AIR;
+                let facing = if below_empty { self.facing } else { Dir::Up };
+                let descriptor = format!("{}[facing={}]", id, dir_name(facing));
+                if let Some(state) = ctx.states.get(&descriptor) {
+                    let carried = ctx.take_slot_contents(pos, slot);
+                    let remaining = count - 1;
+                    ctx.set_inventory_slot(
+                        pos,
+                        slot,
+                        (remaining > 0).then(|| (id.clone(), remaining)),
+                    );
+                    // The placed box keeps the item's slots. Registered before
+                    // the write so the update cascade reads a full container —
+                    // and each stack lands through the *logged* slot setter, so
+                    // the trace records the container coming into existence the
+                    // way a vanilla snapshot diff sees it (net across the tick).
+                    ctx.inventories.insert(
+                        front,
+                        crate::inventory::Inventory {
+                            slots: 27,
+                            stacks: Vec::new(),
+                            blocked_slots: 0,
+                        },
+                    );
+                    for stack in carried.unwrap_or_default() {
+                        ctx.set_inventory_slot(
+                            front,
+                            stack.slot,
+                            Some((stack.id.clone(), stack.count)),
+                        );
+                        if let Some(contents) = stack.contents {
+                            ctx.set_slot_contents(front, stack.slot, Some(contents));
+                        }
+                    }
+                    ctx.set(front, state);
+                }
+                // State never interned: nothing can be placed; the item stays,
+                // exactly as a failed OptionalDispenseItemBehavior keeps it.
+                return;
+            }
+            // Front obstructed: the placement fails and the item stays put.
+            return;
+        }
+        // `ArmorStandItem`'s dispense behaviour: the stand appears at the
+        // front cell's floor centre, facing away — a real entity spawn, the
+        // one non-block thing a dispenser produces that this engine models.
+        // (A splash potion, by contrast, is a thrown projectile; it falls
+        // through to the default eject below and leaves the world, which for
+        // the measured machine — a fire-resistance splash that only cancels
+        // burning, and this engine burns nothing — changes no outcome.)
+        if self.dispenser && id == "minecraft:armor_stand" {
+            let front = pos.offset(self.facing);
+            ctx.item_entities
+                .pending_spawns
+                .push(crate::entity::PendingSpawn::Body {
+                    kind: "minecraft:armor_stand",
+                    pos: [
+                        f64::from(front.x) + 0.5,
+                        f64::from(front.y),
+                        f64::from(front.z) + 0.5,
+                    ],
+                });
+            let remaining = count - 1;
+            ctx.set_inventory_slot(pos, slot, (remaining > 0).then(|| (id.clone(), remaining)));
+            return;
+        }
+        // The bucket family. `DispenseItemBehavior`'s static block registers
+        // `$3` for every filled bucket and `$4` for the empty one; both end in
+        // `consumeWithRemainder`, which is why the two directions are one code
+        // path with the roles swapped. Measured in `bucket_dispense.json` and
+        // `bucket_pickup.json` — see `crate::vanilla::bucket_dispense`.
+        if self.dispenser {
+            match crate::vanilla::bucket_dispense(&id) {
+                Some(crate::vanilla::BucketDispense::Empties { block }) => {
+                    let front = pos.offset(self.facing);
+                    // `SolidBucketItem.emptyContents` gates on `isEmptyBlock`,
+                    // and `BucketItem`'s gate reduces to the same thing for a
+                    // dispenser (no living entity, so no shift, and no hit
+                    // result): strictly air, not "replaceable".
+                    if ctx.world.get(front) == StateId::AIR {
+                        let state = ctx.states.get(block).unwrap_or_else(|| {
+                            panic!(
+                                "dispenser at {pos:?} holds {id}, whose contents are {block}, \
+                                 but that state was never interned — every loader must call \
+                                 `vanilla::dispensable_states` before building the behaviour table"
+                            )
+                        });
+                        // Flags 3: neighbour updates, so the observers watching
+                        // this cell pulse two ticks later
+                        // (`bucket_dispense.json` ticks 13 → 15 → 17).
+                        ctx.set(front, state);
+                        consume_with_remainder(
+                            ctx,
+                            pos,
+                            slot,
+                            &id,
+                            count,
+                            "minecraft:bucket",
+                            self.facing,
+                        );
+                        return;
+                    }
+                    // Not air: `emptyContents` returns false and `$3` falls
+                    // through to the default eject below, keeping nothing.
+                }
+                Some(crate::vanilla::BucketDispense::Fills) => {
+                    let front = pos.offset(self.facing);
+                    let front_descriptor = ctx
+                        .states
+                        .descriptor(ctx.world.get(front))
+                        .unwrap_or_default()
+                        .to_string();
+                    match crate::vanilla::bucket_pickup(&front_descriptor) {
+                        crate::vanilla::BucketPickupOutcome::Yields(item) => {
+                            // Flags 11 — the extra bit over 3 is client-side
+                            // re-render, so server-side this is the same
+                            // neighbour-updating write.
+                            ctx.set(front, StateId::AIR);
+                            consume_with_remainder(ctx, pos, slot, &id, count, item, self.facing);
+                            return;
+                        }
+                        crate::vanilla::BucketPickupOutcome::Unmeasured => panic!(
+                            "dispenser at {pos:?} fires an empty bucket at {front_descriptor}, \
+                             a BucketPickup block whose pickup this engine has not measured — \
+                             capture it before trusting this run"
+                        ),
+                        // Not a pickup at all: eject, which is measured.
+                        crate::vanilla::BucketPickupOutcome::Ejects => {}
+                    }
+                }
+                Some(crate::vanilla::BucketDispense::Unmeasured) => panic!(
+                    "dispenser at {pos:?} holds {id}, whose vanilla dispense behaviour spawns a \
+                     mob as well as placing a block — unmeasured, so this engine refuses it \
+                     rather than ejecting it and reporting a plausible wrong answer"
+                ),
+                None => {}
+            }
+        }
+        if !self.dispenser {
+            let front = pos.offset(self.facing);
+            if let Some(segments) = self.power.container_segments(ctx.world, front) {
+                for (seg, seg_slots) in &segments {
+                    if let Some(target_slot) =
+                        insert_one(ctx, &self.power, None, *seg, *seg_slots, &id)
+                    {
+                        let carried = ctx.take_slot_contents(pos, slot);
+                        let remaining = count - 1;
+                        ctx.set_inventory_slot(
+                            pos,
+                            slot,
+                            (remaining > 0).then(|| (id.clone(), remaining)),
+                        );
+                        ctx.set_slot_contents(*seg, target_slot, carried);
+                        break;
+                    }
+                }
+                // Insert refused (every segment full): the item stays put.
+                return;
+            }
+        }
+        // No container in front: the item is ejected into the world as an item
+        // entity.
+        let carried = ctx.take_slot_contents(pos, slot);
+        let entity = spawn_dispensed_item(ctx, pos, self.facing, &id);
+        if let Some(carried) = carried {
+            ctx.item_entities.contents.insert(entity, carried);
+        }
+        let remaining = count - 1;
+        ctx.set_inventory_slot(pos, slot, (remaining > 0).then(|| (id, remaining)));
+    }
+
+    fn name(&self) -> &'static str {
+        if self.dispenser {
+            "dispenser"
+        } else {
+            "dropper"
+        }
+    }
+}
+
+/// Eject one item out of the dispenser's face as an item entity, returning its
+/// entity id.
+///
+/// `DefaultDispenseItemBehavior.spawnItem`, speed multiplier 6. Position: 0.7
+/// blocks out of the face (0.125 down for vertical facings, 0.15625 for
+/// horizontal). Velocity: speed `0.2 + 0.1 * nextDouble()` along the facing, a
+/// constant upward 0.2 mean, and `triangle(_, 0.0172275 * 6)` noise on every
+/// component. Without a seeded rng the engine uses the distribution means
+/// (speed 0.25, no noise) — what the conformance goldens' tolerance compares
+/// against.
+fn spawn_dispensed_item(ctx: &mut TickCtx<'_>, pos: Pos, facing: Dir, id: &str) -> u32 {
+    let (dx, dy, dz) = facing.delta();
+    let vertical = dy != 0;
+    let x = f64::from(pos.x) + 0.5 + 0.7 * f64::from(dx);
+    let y = f64::from(pos.y) + 0.5 + 0.7 * f64::from(dy) - if vertical { 0.125 } else { 0.15625 };
+    let z = f64::from(pos.z) + 0.5 + 0.7 * f64::from(dz);
+    let vel = if let Some(rng) = ctx.item_entities.rng.as_mut() {
+        let speed = rng.next_double() * 0.1 + 0.2;
+        let dev = 0.0172275 * 6.0;
+        [
+            rng.triangle(f64::from(dx) * speed, dev),
+            rng.triangle(0.2, dev),
+            rng.triangle(f64::from(dz) * speed, dev),
+        ]
+    } else {
+        [f64::from(dx) * 0.25, 0.2, f64::from(dz) * 0.25]
+    };
+    ctx.item_entities
+        .spawn((id.to_string(), 1), [x, y, z], vel, 10)
+}
+
+/// `DefaultDispenseItemBehavior.consumeWithRemainder`: shrink the dispensed
+/// stack by one and put `remainder` where vanilla puts it.
+///
+/// Two cases, both measured in `bucket_pickup.json` tick 13. With the stack down
+/// to nothing the remainder simply *replaces* it in the same slot (lanes z=0 to
+/// z=8: slot 4 goes `1x bucket` → `1x powder_snow_bucket`). With items left
+/// over, `addToInventoryOrDispense` runs `DispenserBlockEntity.insertItem`,
+/// which scans slots in index order for the first that is empty or already
+/// holds the same item — lane z=10 keeps `1x bucket` in slot 4 and the
+/// `powder_snow_bucket` lands in **slot 0**. If nothing takes it, it is ejected.
+fn consume_with_remainder(
+    ctx: &mut TickCtx<'_>,
+    pos: Pos,
+    slot: u8,
+    id: &str,
+    count: u8,
+    remainder: &str,
+    facing: Dir,
+) {
+    let remaining = count - 1;
+    if remaining == 0 {
+        ctx.set_inventory_slot(pos, slot, Some((remainder.to_string(), 1)));
+        return;
+    }
+    ctx.set_inventory_slot(pos, slot, Some((id.to_string(), remaining)));
+    let slots = ctx.inventories.get(&pos).map(|inv| inv.slots).unwrap_or(0);
+    for target in 0..u8::try_from(slots).unwrap_or(u8::MAX) {
+        match ctx.inventory_slot(pos, target) {
+            None => {
+                ctx.set_inventory_slot(pos, target, Some((remainder.to_string(), 1)));
+                return;
+            }
+            Some((existing, held)) if existing == remainder && held < MERGE_LIMIT => {
+                ctx.set_inventory_slot(pos, target, Some((existing, held + 1)));
+                return;
+            }
+            Some(_) => continue,
+        }
+    }
+    // Full: `addToInventoryOrDispense` ejects the remainder instead.
+    spawn_dispensed_item(ctx, pos, facing, remainder);
+}
+
+/// A `facing=` property value.
+fn dir_name(dir: Dir) -> &'static str {
+    match dir {
+        Dir::Down => "down",
+        Dir::Up => "up",
+        Dir::North => "north",
+        Dir::South => "south",
+        Dir::West => "west",
+        Dir::East => "east",
+    }
+}
+
+/// A button.
+///
+/// `ButtonBlock.press`: power on (loudly), schedule `ticksToStayPressed` —
+/// 20 game ticks for stone, 30 for wood (`BlockSetType`) — and unpower when
+/// the tick fires. Powers everything weakly and its attached block strongly.
+pub struct Button<P: PowerSource> {
+    /// Whether this state is pressed.
+    pub powered: bool,
+    /// Unpressed/pressed states.
+    pub states: StatePair,
+    /// 20 for stone, 30 for wood.
+    pub duration: u64,
+    /// The direction from the button to its support block (floor → down,
+    /// ceiling → up, wall → behind the facing).
+    pub attached: Dir,
+    /// How power is read (unused today; kept for parity with siblings).
+    pub power: P,
+}
+
+impl<P: PowerSource> Button<P> {
+    /// `ButtonBlock.updateNeighbours`: `updateNeighborsAt(pos)` **and**
+    /// `updateNeighborsAt(pos.relative(getConnectedDirection(state).getOpposite()))`
+    /// — the second is the support block, and without it a button strongly
+    /// powers its support and nothing on the far side of that block ever hears
+    /// about it. That is the whole difference between a working button and an
+    /// inert one; `LeverBlock` does exactly the same pair.
+    fn update_neighbours(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        ctx.update_neighbors_at(pos);
+        ctx.update_neighbors_at(pos.offset(self.attached));
+    }
+}
+
+impl<P: PowerSource> BlockBehaviour for Button<P> {
+    fn on_used(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        if self.powered {
+            return; // pressing a pressed button does nothing
+        }
+        ctx.set(pos, self.states.get(true));
+        self.update_neighbours(ctx, pos);
+        ctx.schedule(pos, self.duration, TickPriority::Normal);
+    }
+
+    fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        if self.powered {
+            ctx.set(pos, self.states.get(false));
+            self.update_neighbours(ctx, pos);
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        "button"
+    }
+}
+
+/// Ticks a redstone lamp waits before going dark; turning on is immediate.
+pub const LAMP_OFF_DELAY: u64 = 4;
+
+/// A redstone lamp.
+pub struct Lamp<P: PowerSource> {
+    /// Whether this state is lit.
+    pub lit: bool,
+    /// Unlit/lit states.
+    pub states: StatePair,
+    /// How power is read.
+    pub power: P,
+}
+
+impl<P: PowerSource> Lamp<P> {
+    fn has_signal(&self, ctx: &TickCtx<'_>, pos: Pos) -> bool {
+        crate::pos::ALL_DIRS.iter().any(|dir| {
+            self.power.is_powered(
+                ctx.world,
+                ctx.comparator_out,
+                pos.offset(*dir),
+                dir.opposite(),
+            )
+        })
+    }
+}
+
+impl<P: PowerSource> BlockBehaviour for Lamp<P> {
+    /// `RedstoneLampBlock.neighborChanged`: light immediately, dim after a
+    /// 4-tick recheck.
+    fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
+        let signal = self.has_signal(ctx, pos);
+        if signal && !self.lit {
+            ctx.set_quiet(pos, self.states.get(true));
+        } else if !signal && self.lit {
+            ctx.schedule(pos, LAMP_OFF_DELAY, TickPriority::Normal);
+        }
+    }
+
+    fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        if self.lit && !self.has_signal(ctx, pos) {
+            ctx.set_quiet(pos, self.states.get(false));
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        "redstone_lamp"
+    }
+}
+
+/// `minecraft:ice`, for the one thing it does on its own: melt.
+///
+/// `IceBlock.randomTick` melts when the light level clears 11. There is no
+/// light engine here, so eligibility is assumed — gametest platforms are lit
+/// and that is the world this runs; a deliberately dark build would diverge,
+/// and this comment is where that approximation is written down. Melting in
+/// the overworld leaves a water source.
+pub struct Ice {
+    /// `minecraft:water[level=0]`.
+    pub water: StateId,
+}
+
+impl BlockBehaviour for Ice {
+    fn on_random_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        ctx.set(pos, self.water);
+    }
+
+    fn name(&self) -> &'static str {
+        "ice"
+    }
+}
+
+/// An impulse `minecraft:command_block`.
+///
+/// `CommandBlock.neighborChanged`, shape only: on a rising edge of neighbour
+/// signal it schedules a 1-tick delay, and on that tick runs its program —
+/// the [`CommandProgram`](crate::behaviour::CommandProgram) subset resolved
+/// at load. A block whose command is outside that subset (summon, data,
+/// queries) powers on and runs nothing, which is also what an unparseable
+/// command does in game. Chain and repeating blocks are not modelled.
+pub struct CommandBlock<P: PowerSource> {
+    /// How power is read.
+    pub power: P,
+}
+
+impl<P: PowerSource> CommandBlock<P> {
+    fn has_signal(&self, ctx: &TickCtx<'_>, pos: Pos) -> bool {
+        crate::pos::ALL_DIRS.iter().any(|dir| {
+            self.power.is_powered(
+                ctx.world,
+                ctx.comparator_out,
+                pos.offset(*dir),
+                dir.opposite(),
+            )
+        })
+    }
+}
+
+impl<P: PowerSource> BlockBehaviour for CommandBlock<P> {
+    fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
+        let powered = self.has_signal(ctx, pos);
+        let was = ctx.command_powered.insert(pos, powered).unwrap_or(false);
+        if powered && !was {
+            ctx.schedule(pos, 1, TickPriority::Normal);
+        }
+    }
+
+    fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        let Some(program) = ctx.commands.get(&pos).copied() else {
+            return;
+        };
+        match program {
+            crate::behaviour::CommandProgram::SetBlock { offset, state } => {
+                let target = Pos::new(pos.x + offset.0, pos.y + offset.1, pos.z + offset.2);
+                ctx.set(target, state);
+            }
+            crate::behaviour::CommandProgram::Fill { a, b, state } => {
+                for x in a.0.min(b.0)..=a.0.max(b.0) {
+                    for y in a.1.min(b.1)..=a.1.max(b.1) {
+                        for z in a.2.min(b.2)..=a.2.max(b.2) {
+                            ctx.set(Pos::new(pos.x + x, pos.y + y, pos.z + z), state);
+                        }
+                    }
+                }
+            }
+            crate::behaviour::CommandProgram::Summon { kind, offset, fuse } => {
+                // A command block executes at its centre; the spawn queues
+                // and materialises before the next entity pass.
+                let at = [
+                    f64::from(pos.x) + 0.5 + offset[0],
+                    f64::from(pos.y) + 0.5 + offset[1],
+                    f64::from(pos.z) + 0.5 + offset[2],
+                ];
+                let spawn = match kind {
+                    "minecraft:tnt" => crate::entity::PendingSpawn::Tnt {
+                        pos: at,
+                        fuse: fuse.unwrap_or(80),
+                    },
+                    k if k.ends_with("_minecart") || k == "minecraft:minecart" => {
+                        crate::entity::PendingSpawn::Minecart { kind, pos: at }
+                    }
+                    _ => crate::entity::PendingSpawn::Body { kind, pos: at },
+                };
+                ctx.item_entities.pending_spawns.push(spawn);
+            }
+            crate::behaviour::CommandProgram::RetypeNearestItem { radius, item } => {
+                // Nearest live item entity within `radius` of the block
+                // centre; `limit=1` semantics. Distance is euclidean, like
+                // the selector's.
+                let centre = [
+                    f64::from(pos.x) + 0.5,
+                    f64::from(pos.y) + 0.5,
+                    f64::from(pos.z) + 0.5,
+                ];
+                let mut best: Option<(usize, f64)> = None;
+                for (index, entity) in ctx.item_entities.items.iter().enumerate() {
+                    if entity.removed {
+                        continue;
+                    }
+                    let d2 = (entity.pos[0] - centre[0]).powi(2)
+                        + (entity.pos[1] - centre[1]).powi(2)
+                        + (entity.pos[2] - centre[2]).powi(2);
+                    if d2 <= radius * radius && best.is_none_or(|(_, b)| d2 < b) {
+                        best = Some((index, d2));
+                    }
+                }
+                if let Some((index, _)) = best {
+                    ctx.item_entities.items[index].item.0 = item.to_string();
+                }
+            }
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        "command_block"
+    }
+}
+
+/// A gametest `minecraft:test_block` in `accept` mode.
+///
+/// Vanilla's accept block notifies its test instance the moment any neighbour
+/// signal reaches it. A headless engine has no test instance to notify, so
+/// the fact is recorded as a state change instead: the block latches to an
+/// engine-internal `fired=true` variant on its first signal, which lands in
+/// the recorded change log — exactly where a harness can assert on it. It
+/// never unlatches; an accept condition met once is met.
+pub struct TestAccept<P: PowerSource> {
+    /// The `fired=true` variant this latches to.
+    pub fired: StateId,
+    /// How power is read.
+    pub power: P,
+}
+
+impl<P: PowerSource> TestAccept<P> {
+    fn has_signal(&self, ctx: &TickCtx<'_>, pos: Pos) -> bool {
+        crate::pos::ALL_DIRS.iter().any(|dir| {
+            self.power.is_powered(
+                ctx.world,
+                ctx.comparator_out,
+                pos.offset(*dir),
+                dir.opposite(),
+            )
+        })
+    }
+}
+
+impl<P: PowerSource> BlockBehaviour for TestAccept<P> {
+    fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
+        if self.has_signal(ctx, pos) {
+            ctx.set_quiet(pos, self.fired);
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        "test_block"
+    }
+}
+
+/// A trapdoor — any wood variant or iron.
+///
+/// `TrapDoorBlock.neighborChanged`, from bytecode: `hasNeighborSignal` (plain —
+/// no quasi-connectivity), and when the signal differs from `powered`, one
+/// flag-2 write lands `open = powered = signal`. The bytecode's inner
+/// `open != signal` check only gates the sound: whenever `powered` flips, the
+/// final state always has both properties equal to the signal. A hand-opened
+/// unpowered trapdoor is therefore left alone until power actually changes.
+pub struct Trapdoor<P: PowerSource> {
+    /// Whether this state is powered.
+    pub powered: bool,
+    /// Both-false / both-true states for `(open, powered)`.
+    pub states: StatePair,
+    /// How power is read.
+    pub power: P,
+}
+
+impl<P: PowerSource> Trapdoor<P> {
+    fn has_signal(&self, ctx: &TickCtx<'_>, pos: Pos) -> bool {
+        crate::pos::ALL_DIRS.iter().any(|dir| {
+            self.power.is_powered(
+                ctx.world,
+                ctx.comparator_out,
+                pos.offset(*dir),
+                dir.opposite(),
+            )
+        })
+    }
+}
+
+impl<P: PowerSource> BlockBehaviour for Trapdoor<P> {
+    fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
+        let signal = self.has_signal(ctx, pos);
+        if signal != self.powered {
+            ctx.set_quiet(pos, self.states.get(signal));
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        "trapdoor"
+    }
+}
+
+/// A copper bulb — a latch wearing a building block's shape.
+///
+/// `powered` tracks the neighbour signal, but `lit` toggles only on the
+/// *rising* edge of it, so a bulb is a T flip-flop that a comparator reads as
+/// 15 or 0. That is why it cannot be waved through as decoration: a build that
+/// treats one as inert loses a memory cell, and modern doors use them as such.
+///
+/// `CopperBulbBlock.checkAndFlip` writes with flag 3, i.e. it notifies its
+/// neighbours — unlike a door or trapdoor, which write quietly.
+pub struct CopperBulb<P: PowerSource> {
+    /// Whether this state is lit.
+    pub lit: bool,
+    /// Whether this state is powered.
+    pub powered: bool,
+    /// The four `(lit, powered)` states, indexed `lit * 2 + powered`.
+    pub states: [StateId; 4],
+    /// How power is read.
+    pub power: P,
+}
+
+impl<P: PowerSource> CopperBulb<P> {
+    fn check_and_flip(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        let powered = crate::pos::ALL_DIRS.iter().any(|dir| {
+            self.power.is_powered(
+                ctx.world,
+                ctx.comparator_out,
+                pos.offset(*dir),
+                dir.opposite(),
+            )
+        });
+        if powered == self.powered {
+            return;
+        }
+        // Losing power leaves the light where it is; only gaining it toggles.
+        let lit = if powered { !self.lit } else { self.lit };
+        ctx.set(
+            pos,
+            self.states[usize::from(lit) * 2 + usize::from(powered)],
+        );
+    }
+}
+
+impl<P: PowerSource> BlockBehaviour for CopperBulb<P> {
+    fn on_placed(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        self.check_and_flip(ctx, pos);
+    }
+
+    fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
+        self.check_and_flip(ctx, pos);
+    }
+
+    fn name(&self) -> &'static str {
+        "copper_bulb"
+    }
+}
+
+/// A door: two blocks that open and close as one.
+///
+/// `DoorBlock.neighborChanged` reads the signal at **both** halves and unions
+/// them, which is the whole reason this cannot reuse [`Trapdoor`] — a door
+/// powered only at the foot still opens at the head. Each half sees its own
+/// update and recomputes the same union, so no half ever writes the other.
+///
+/// Vanilla additionally ignores an update whose source is another block of the
+/// same door type. That guard only suppresses the open/close sound: a sibling
+/// half changing state does not alter either half's neighbour signal, so the
+/// `powered != self.powered` test below already makes such an update a no-op.
+///
+/// A door is `PushReaction.DESTROY`, captured (`door_push.json`, five lanes at
+/// once): a piston reaching either half **breaks** it rather than carrying it,
+/// and the untouched half breaks too, because a half cannot survive without its
+/// partner. Oak and iron behave identically, a sticky piston therefore has
+/// nothing left to pull back, and a slime array moving both halves together
+/// destroys them just the same. The push-reaction half of that lives in
+/// [`crate::vanilla`]'s `destroyed_by_push`; the partner rule is
+/// [`Door::on_shape_update`] below.
+///
+/// Note that `_trapdoor` does not end with `_door`, so trapdoors are untouched
+/// by either rule — they are movable, which `trapdoor_push.json` pins.
+pub struct Door<P: PowerSource> {
+    /// Whether this state is powered.
+    pub powered: bool,
+    /// Toward the other half: up from a lower half, down from an upper.
+    pub other_half: Dir,
+    /// Both-false / both-true states for `(open, powered)`.
+    pub states: StatePair,
+    /// How power is read.
+    pub power: P,
+    /// Every state that counts as this door's other half — the same door block
+    /// in the opposite `half`. Precomputed so the check is a lookup rather than
+    /// descriptor-string parsing on a hot path.
+    pub partner: std::sync::Arc<[StateId]>,
+}
+
+impl<P: PowerSource> Door<P> {
+    fn signal_at(&self, ctx: &TickCtx<'_>, pos: Pos) -> bool {
+        crate::pos::ALL_DIRS.iter().any(|dir| {
+            self.power.is_powered(
+                ctx.world,
+                ctx.comparator_out,
+                pos.offset(*dir),
+                dir.opposite(),
+            )
+        })
+    }
+}
+
+impl<P: PowerSource> BlockBehaviour for Door<P> {
+    fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
+        let signal = self.signal_at(ctx, pos) || self.signal_at(ctx, pos.offset(self.other_half));
+        if signal != self.powered {
+            ctx.set_quiet(pos, self.states.get(signal));
+        }
+    }
+
+    /// `DoorBlock.updateShape`: an update arriving from where the other half
+    /// should be, finding anything that is not the other half, returns AIR.
+    ///
+    /// This is what makes a piston destroy a *whole* door when it only reaches
+    /// one half — the surviving half hears its partner vanish and goes too.
+    fn on_shape_update(&self, ctx: &mut TickCtx<'_>, pos: Pos, from: Dir) {
+        if from != self.other_half {
+            return;
+        }
+        let neighbour = ctx.world.get(pos.offset(self.other_half));
+        if !self.partner.contains(&neighbour) {
+            ctx.set(pos, StateId::AIR);
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        "door"
+    }
+}
+
+/// Ticks between a pressure plate's presence rechecks.
+pub const PLATE_RECHECK: u64 = 20;
+
+/// A pressure plate. Wooden plates sense every entity — items included, which
+/// is what makes an item-on-plate capture deterministic; stone plates sense
+/// only living entities, so items never trigger them here.
+pub struct PressurePlate<P: PowerSource> {
+    /// Whether this state is pressed.
+    pub powered: bool,
+    /// Unpressed/pressed states.
+    pub states: StatePair,
+    /// Whether items press it (wooden yes, stone no).
+    pub senses_items: bool,
+    /// How power is read (parity).
+    pub power: P,
+}
+
+impl<P: PowerSource> PressurePlate<P> {
+    fn pressed_by_item(&self, ctx: &TickCtx<'_>, pos: Pos) -> bool {
+        // BasePressurePlateBlock.TOUCH_AABB: the plate cell inset by a pixel.
+        let min = [
+            f64::from(pos.x) + 0.0625,
+            f64::from(pos.y),
+            f64::from(pos.z) + 0.0625,
+        ];
+        let max = [
+            f64::from(pos.x) + 0.9375,
+            f64::from(pos.y) + 0.25,
+            f64::from(pos.z) + 0.9375,
+        ];
+        let hit = |emin: [f64; 3], emax: [f64; 3]| {
+            emin[0] < max[0]
+                && emax[0] > min[0]
+                && emin[1] < max[1]
+                && emax[1] > min[1]
+                && emin[2] < max[2]
+                && emax[2] > min[2]
+        };
+        if self.senses_items
+            && ctx.item_entities.items.iter().any(|item| {
+                if item.removed {
+                    return false;
+                }
+                let (emin, emax) = crate::entity::item_aabb(item.pos);
+                hit(emin, emax)
+            })
+        {
+            return true;
+        }
+        // The entity side. Wooden plates (`Sensitivity.EVERYTHING`) press
+        // under any entity; stone (`Sensitivity.MOBS`) under living ones
+        // only — read as "has a measured max health", which admits the mobs
+        // and the armor stand and excludes boats, fireballs and carts.
+        ctx.item_entities.others.iter().any(|body| {
+            let living = crate::entity::mob_health(&body.kind).is_some();
+            (self.senses_items || living) && hit(body.min, body.max)
+        })
+    }
+}
+
+impl<P: PowerSource> BlockBehaviour for PressurePlate<P> {
+    /// `entityInside`: press and start the recheck cadence.
+    fn on_entity_inside(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        if !self.powered && self.pressed_by_item(ctx, pos) {
+            write_plate(ctx, pos, self.states.get(true));
+            ctx.schedule(pos, PLATE_RECHECK, TickPriority::Normal);
+        }
+    }
+
+    /// `tick`: still pressed → check again in 20; empty → release.
+    fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        if !self.powered {
+            return;
+        }
+        if self.pressed_by_item(ctx, pos) {
+            ctx.schedule(pos, PLATE_RECHECK, TickPriority::Normal);
+        } else {
+            write_plate(ctx, pos, self.states.get(false));
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        "pressure_plate"
+    }
+}
+
+/// `BasePressurePlateBlock.checkPressed`'s write, which is **not** a flag-3
+/// `setBlock` — and getting that wrong silently disconnects half of what a plate
+/// can drive.
+///
+/// The bytecode is `Level.setBlock(pos, newState, 2)` followed by
+/// `updateNeighbours(level, pos)`, and `updateNeighbours` is two calls:
+/// `updateNeighborsAt(pos)` **and** `updateNeighborsAt(pos.below())`. The second
+/// one is load bearing for the same reason the detector rail's is (see
+/// [`DetectorRail`]): `getDirectSignal` answers for `Direction.UP` alone, so a
+/// plate *strongly* powers the block it stands on, and anything touching only
+/// that block — not the plate — learns about the change by no other route.
+/// A flag-3 write reaches the plate's own six neighbours and stops there.
+///
+/// Captured in `plate_recheck.json`: dust laid beside a plate's support block
+/// and nowhere near the plate reads 1 under a pressed light weighted plate and
+/// 15 under a pressed oak plate, while the control lane whose support carries
+/// plain stone above it stays dark for the whole run. Before this, the engine
+/// left all three at zero.
+fn write_plate(ctx: &mut TickCtx<'_>, pos: Pos, state: StateId) {
+    ctx.set_shape_only(pos, state);
+    ctx.update_neighbors_at(pos);
+    ctx.update_neighbors_at(pos.offset(crate::pos::Dir::Down));
+}
+
+/// `BasePressurePlateBlock.TOUCH_AABB` moved to a cell: the plate inset by a
+/// pixel on each horizontal side (14/16 wide, from 1/16 to 15/16) and 4/16
+/// tall. Read from `BasePressurePlateBlock`'s static initialiser — the
+/// constants there are literally `14.0, 0.5, 14.0, 14.0, 4.0`.
+fn touch_aabb(pos: Pos) -> ([f64; 3], [f64; 3]) {
+    (
+        [
+            f64::from(pos.x) + 0.0625,
+            f64::from(pos.y),
+            f64::from(pos.z) + 0.0625,
+        ],
+        [
+            f64::from(pos.x) + 0.9375,
+            f64::from(pos.y) + 0.25,
+            f64::from(pos.z) + 0.9375,
+        ],
+    )
+}
+
+/// Ticks between a *weighted* plate's presence rechecks.
+///
+/// `WeightedPressurePlateBlock.getPressedTime()` returns `10`, overriding
+/// `BasePressurePlateBlock`'s `20` — read from the bytecode (`bipush 10`).
+pub const WEIGHTED_PLATE_RECHECK: u64 = 10;
+
+/// A weighted pressure plate: `power` counts the entities standing on it.
+///
+/// `WeightedPressurePlateBlock.getSignalStrength` is
+/// `Mth.ceil(min(count, maxWeight) * 15.0f / maxWeight)` over
+/// `getEntitiesOfClass(Entity.class, TOUCH_AABB.move(pos))` — **every** entity
+/// type counts, items included. Captured in `weighted_plates.json`: a light
+/// plate (`maxWeight` 15) under 1, 3 and 5 items reads 1, 3 and 5; a heavy
+/// plate (`maxWeight` 150) under 1, 3 and 11 items reads 1, 1 and 2.
+pub struct WeightedPlate {
+    /// This state's `power`.
+    pub power: u8,
+    /// `maxWeight`: 15 for the light plate, 150 for the heavy one.
+    pub max_weight: u32,
+    /// `power=0`..`power=15`, indexed by level.
+    pub states: Vec<StateId>,
+}
+
+impl WeightedPlate {
+    /// The signal this plate should be showing right now.
+    fn signal(&self, ctx: &TickCtx<'_>, pos: Pos) -> u8 {
+        let (min, max) = touch_aabb(pos);
+        let mut count: u32 = 0;
+        for item in &ctx.item_entities.items {
+            if item.removed {
+                continue;
+            }
+            let (emin, emax) = crate::entity::item_aabb(item.pos);
+            if emin[0] < max[0]
+                && emax[0] > min[0]
+                && emin[1] < max[1]
+                && emax[1] > min[1]
+                && emin[2] < max[2]
+                && emax[2] > min[2]
+            {
+                count += 1;
+            }
+        }
+        for body in &ctx.item_entities.others {
+            if body.intersects(min, max) {
+                count += 1;
+            }
+        }
+        // Mth.ceil(min(count, maxWeight) * 15.0f / maxWeight), in f32 exactly
+        // as vanilla computes it.
+        let clamped = count.min(self.max_weight);
+        let raw = clamped as f32 * 15.0 / self.max_weight as f32;
+        raw.ceil() as u8
+    }
+
+    fn apply(&self, ctx: &mut TickCtx<'_>, pos: Pos, signal: u8) {
+        if signal == self.power {
+            return;
+        }
+        let Some(&state) = self.states.get(usize::from(signal)) else {
+            return;
+        };
+        write_plate(ctx, pos, state);
+    }
+}
+
+impl BlockBehaviour for WeightedPlate {
+    /// `entityInside`: an unpressed plate notices whatever just arrived and
+    /// starts the recheck cadence.
+    fn on_entity_inside(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        if self.power != 0 {
+            return;
+        }
+        let signal = self.signal(ctx, pos);
+        if signal > 0 {
+            self.apply(ctx, pos, signal);
+            ctx.schedule(pos, WEIGHTED_PLATE_RECHECK, TickPriority::Normal);
+        }
+    }
+
+    /// `tick`: recount. Still occupied → recheck in ten; empty → release.
+    fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        if self.power == 0 {
+            return;
+        }
+        let signal = self.signal(ctx, pos);
+        self.apply(ctx, pos, signal);
+        if signal > 0 {
+            ctx.schedule(pos, WEIGHTED_PLATE_RECHECK, TickPriority::Normal);
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        "weighted_pressure_plate"
+    }
+}
+
+/// Ticks a detector rail waits before rechecking for a cart.
+///
+/// `DetectorRailBlock.checkPressed` ends with `level.scheduleTick(pos, this,
+/// 20)`. Captured in `detector_rail.json`: the rail powers on tick 13 as the
+/// cart arrives and releases on tick 33 — twenty ticks later, *not* when the
+/// cart left.
+pub const DETECTOR_RAIL_RECHECK: u64 = 20;
+
+/// A detector rail.
+///
+/// `checkPressed` selects on `AbstractMinecart.class` only, so no other entity
+/// powers it, and searches `getSearchBB(pos)` — the cell inset by 0.2 on every
+/// side except the bottom: `AABB(x+0.2, y, z+0.2, x+0.8, y+0.8, z+0.8)`, read
+/// from the bytecode's five `0.2d` constants.
+///
+/// It powers like a plate: `getSignal` is 15 in every direction while powered,
+/// and `getDirectSignal` is 15 only for `Direction.UP` — that is, it strongly
+/// powers the block *below* it. Both captured: `detector_rail.json` lights
+/// lamps above, beside and below, and `detector_strong.json` runs dust that
+/// touches only the block under the rail and reads 15 there.
+pub struct DetectorRail<P: PowerSource> {
+    /// Whether this state is powered.
+    pub powered: bool,
+    /// Unpowered/powered states.
+    pub states: StatePair,
+    /// The world's power rules — solidity, for the support-pop check.
+    pub power: P,
+}
+
+impl<P: PowerSource> DetectorRail<P> {
+    fn occupied(&self, ctx: &TickCtx<'_>, pos: Pos) -> bool {
+        let min = [
+            f64::from(pos.x) + 0.2,
+            f64::from(pos.y),
+            f64::from(pos.z) + 0.2,
+        ];
+        let max = [
+            f64::from(pos.x) + 0.8,
+            f64::from(pos.y) + 0.8,
+            f64::from(pos.z) + 0.8,
+        ];
+        ctx.item_entities
+            .others
+            .iter()
+            .any(|body| body.is_minecart && body.intersects(min, max))
+    }
+}
+
+impl<P: PowerSource> DetectorRail<P> {
+    /// `checkPressed`'s write: set the state, then update the neighbours of
+    /// **both** the rail and the block under it.
+    ///
+    /// That second `updateNeighborsAt(pos.below())` is not decoration — it is
+    /// the only thing that tells dust sitting beside the rail's floor to
+    /// re-read it. Because the rail strongly powers only downward, a component
+    /// touching the floor block and not the rail hears about the change by no
+    /// other route. `detector_strong.json` fails without it: the rail flips and
+    /// the dust two cells away stays dark.
+    fn write(&self, ctx: &mut TickCtx<'_>, pos: Pos, powered: bool) {
+        ctx.set(pos, self.states.get(powered));
+        ctx.update_neighbors_at(pos);
+        ctx.update_neighbors_at(pos.offset(crate::pos::Dir::Down));
+    }
+}
+
+impl<P: PowerSource + 'static> BlockBehaviour for DetectorRail<P> {
+    fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
+        rail_pops_off(&self.power, ctx, pos, "minecraft:detector_rail");
+    }
+
+    fn on_entity_inside(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        if !self.powered && self.occupied(ctx, pos) {
+            self.write(ctx, pos, true);
+            ctx.schedule(pos, DETECTOR_RAIL_RECHECK, TickPriority::Normal);
+        }
+    }
+
+    fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        if !self.powered {
+            return;
+        }
+        if self.occupied(ctx, pos) {
+            ctx.schedule(pos, DETECTOR_RAIL_RECHECK, TickPriority::Normal);
+        } else {
+            self.write(ctx, pos, false);
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        "detector_rail"
+    }
+}
+
+/// How many pitches a note block cycles through before wrapping.
+///
+/// `NoteBlock.NOTE` is `IntegerProperty.create("note", 0, 24)`; `cycle` wraps 24
+/// back to 0.
+pub const NOTE_VALUES: u8 = 25;
+
+/// A note block.
+///
+/// Everything here is read from `NoteBlock`'s bytecode and confirmed by capture
+/// (`note_powered.json`, `note_click.json`):
+///
+/// - `neighborChanged` compares `hasNeighborSignal` with the `powered` property
+///   and updates it **synchronously** — no scheduled tick, so the flip lands on
+///   the same tick as the change that caused it.
+/// - The note *plays* via a block event (`level.blockEvent(pos, this, 0, 0)`),
+///   queued only on the rising edge, and only if the instrument can sound —
+///   for the ordinary instruments that means **air above**.
+/// - A right-click (`useWithoutItem`) cycles the `note` property and then plays.
+///   The pitch change is what an adjacent observer sees, which is how a note
+///   block acts as the trigger of a manual contraption.
+pub struct NoteBlock<P: PowerSource> {
+    /// Whether this state is the powered one.
+    pub powered: bool,
+    /// Unpowered/powered states at this pitch.
+    pub states: StatePair,
+    /// The state a click turns this one into: same powered flag, next pitch.
+    pub cycled: StateId,
+    /// This state's `instrument`.
+    pub instrument: &'static str,
+    /// The same state under each instrument this engine knows, for the
+    /// shape-update recomputation.
+    pub instrument_states: Vec<(&'static str, StateId)>,
+    /// How power is read.
+    pub power: P,
+}
+
+impl<P: PowerSource> NoteBlock<P> {
+    /// Vanilla's `Level.hasNeighborSignal`: any of the six neighbours powering us.
+    fn has_neighbor_signal(
+        &self,
+        world: &World,
+        outs: &crate::behaviour::ComparatorOutputs,
+        pos: Pos,
+    ) -> bool {
+        crate::pos::ALL_DIRS.iter().any(|dir| {
+            self.power
+                .is_powered(world, outs, pos.offset(*dir), dir.opposite())
+        })
+    }
+
+    /// Queue the "play a note" block event, if the instrument can sound.
+    ///
+    /// `playNote` refuses when a block sits on top (for instruments that do not
+    /// work above a note block, which is all the ordinary ones). The event has no
+    /// observable effect on the world — it is sound — but it is queued for
+    /// structural fidelity, and [`NoteBlock::on_block_event`] consumes it.
+    fn play(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        if ctx.get(pos.offset(Dir::Up)) == StateId::AIR {
+            ctx.queue_event(pos, 0, 0);
+        }
+    }
+}
+
+impl<P: PowerSource> BlockBehaviour for NoteBlock<P> {
+    /// `NoteBlock.updateShape`: a **vertical** shape update recomputes the
+    /// instrument, which comes from the block above when that instrument
+    /// works above a note block, and otherwise from the block below. Like a
+    /// repeater's `locked`, the property is derived, so a community build
+    /// carries whatever it was saved with until placement corrects it.
+    fn on_shape_update(&self, ctx: &mut TickCtx<'_>, pos: Pos, from: Dir) {
+        if !matches!(from, Dir::Up | Dir::Down) {
+            return;
+        }
+        let below = ctx
+            .states
+            .descriptor(ctx.world.get(pos.offset(Dir::Down)))
+            .unwrap_or("minecraft:air");
+        let wanted = crate::vanilla::instrument_below(below);
+        if wanted == self.instrument {
+            return;
+        }
+        if let Some((_, state)) = self
+            .instrument_states
+            .iter()
+            .find(|(name, _)| *name == wanted)
+        {
+            ctx.set_quiet(pos, *state);
+        }
+    }
+
+    /// `NoteBlock.neighborChanged`: follow the neighbour signal synchronously,
+    /// playing on the rising edge only.
+    fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
+        let signal = self.has_neighbor_signal(ctx.world, ctx.comparator_out, pos);
+        if signal == self.powered {
+            return;
+        }
+        if signal {
+            self.play(ctx, pos);
+        }
+        ctx.set(pos, self.states.get(signal));
+    }
+
+    /// `NoteBlock.useWithoutItem`: cycle the pitch, then play.
+    fn on_used(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        ctx.set(pos, self.cycled);
+        self.play(ctx, pos);
+    }
+
+    /// `NoteBlock.triggerEvent`: the note sounds; nothing in the world changes.
+    fn on_block_event(&self, _ctx: &mut TickCtx<'_>, _pos: Pos, _id: u8, _param: u8) -> bool {
+        true
+    }
+
+    fn name(&self) -> &'static str {
+        "note_block"
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::pos::Bounds;
+    use crate::schedule::{EventQueue, TickQueue};
+    use crate::state::StateRegistry;
+
+    /// A power model where designated states emit in all directions.
+    #[derive(Clone)]
+    struct Sources {
+        powered: Vec<StateId>,
+        diodes: Vec<(StateId, Dir)>,
+    }
+
+    impl PowerSource for Sources {
+        fn is_powered(
+            &self,
+            world: &World,
+            _outs: &crate::behaviour::ComparatorOutputs,
+            pos: Pos,
+            _toward: Dir,
+        ) -> bool {
+            self.powered.contains(&world.get(pos))
+        }
+        fn is_diode(&self, world: &World, pos: Pos) -> bool {
+            let state = world.get(pos);
+            self.diodes.iter().any(|(s, _)| *s == state)
+        }
+        fn diode_facing(&self, world: &World, pos: Pos) -> Option<Dir> {
+            let state = world.get(pos);
+            self.diodes
+                .iter()
+                .find(|(s, _)| *s == state)
+                .map(|(_, d)| *d)
+        }
+    }
+
+    fn ctx_parts() -> (World, TickQueue, EventQueue, StateRegistry) {
+        (
+            World::new(Bounds::new(Pos::new(-4, 0, -4), Pos::new(8, 4, 4))),
+            TickQueue::new(),
+            EventQueue::new(),
+            StateRegistry::new(),
+        )
+    }
+
+    #[test]
+    fn repeater_delay_is_the_property_times_two() {
+        // Verified from RepeaterBlock.getDelay: the property is in redstone ticks,
+        // the scheduler in game ticks.
+        for (property, expected) in [(1u8, 2u64), (2, 4), (3, 6), (4, 8)] {
+            let repeater = Repeater {
+                facing: Dir::East,
+                delay: property,
+                powered: false,
+                states: StatePair {
+                    off: StateId(1),
+                    on: StateId(2),
+                },
+                locked: false,
+                locked_twin: None,
+                power: Sources {
+                    powered: vec![],
+                    diodes: vec![],
+                },
+            };
+            assert_eq!(repeater.delay_ticks(), expected, "delay={property}");
+        }
+    }
+
+    #[test]
+    fn a_repeater_schedules_at_high_when_turning_on() {
+        let (mut world, mut ticks, mut events, states) = ctx_parts();
+        let source = StateId(9);
+        world.set(Pos::new(1, 1, 0), source);
+
+        let repeater = Repeater {
+            facing: Dir::East,
+            delay: 1,
+            powered: false,
+            states: StatePair {
+                off: StateId(1),
+                on: StateId(2),
+            },
+            locked: false,
+            locked_twin: None,
+            power: Sources {
+                powered: vec![source],
+                diodes: vec![],
+            },
+        };
+        let mut ctx = TickCtx {
+            drain: None,
+            behaviours: None,
+            world: &mut world,
+            ticks: &mut ticks,
+            fluids: &mut TickQueue::new(),
+            events: &mut events,
+            states: &states,
+            tick: 0,
+            boundary: false,
+            updates: &mut Vec::new(),
+            moves: &mut Vec::new(),
+            toggles: &mut Vec::new(),
+            comparator_out: &mut Default::default(),
+            inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
+            item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
+            inv_log: None,
+            log: None,
+        };
+        repeater.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::East);
+
+        let due = ticks.drain_due(2);
+        assert_eq!(due.len(), 1, "must schedule");
+        assert_eq!(due[0].priority, TickPriority::High, "turning on is HIGH");
+        assert_eq!(due[0].target, 2, "delay 1 == 2 game ticks");
+    }
+
+    #[test]
+    fn a_powered_repeater_turning_off_schedules_at_very_high() {
+        // Verified ordering: turning off outranks turning on.
+        let (mut world, mut ticks, mut events, states) = ctx_parts();
+        let repeater = Repeater {
+            facing: Dir::East,
+            delay: 1,
+            powered: true,
+            states: StatePair {
+                off: StateId(1),
+                on: StateId(2),
+            },
+            locked: false,
+            locked_twin: None,
+            power: Sources {
+                powered: vec![],
+                diodes: vec![],
+            },
+        };
+        let mut ctx = TickCtx {
+            drain: None,
+            behaviours: None,
+            world: &mut world,
+            ticks: &mut ticks,
+            fluids: &mut TickQueue::new(),
+            events: &mut events,
+            states: &states,
+            tick: 0,
+            boundary: false,
+            updates: &mut Vec::new(),
+            moves: &mut Vec::new(),
+            toggles: &mut Vec::new(),
+            comparator_out: &mut Default::default(),
+            inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
+            item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
+            inv_log: None,
+            log: None,
+        };
+        repeater.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::East);
+
+        let due = ticks.drain_due(2);
+        assert_eq!(due[0].priority, TickPriority::VeryHigh);
+    }
+
+    #[test]
+    fn a_repeater_fed_by_another_diode_jumps_the_queue() {
+        // DiodeBlock.shouldPrioritize -> EXTREMELY_HIGH. This is what makes repeater
+        // chains resolve in a stable order.
+        let (mut world, mut ticks, mut events, states) = ctx_parts();
+        let source = StateId(9);
+        let upstream = StateId(5);
+        world.set(Pos::new(1, 1, 0), upstream);
+
+        let repeater = Repeater {
+            facing: Dir::East,
+            delay: 1,
+            powered: false,
+            states: StatePair {
+                off: StateId(1),
+                on: StateId(2),
+            },
+            locked: false,
+            locked_twin: None,
+            power: Sources {
+                powered: vec![source, upstream],
+                // The upstream diode faces east: the same way we look at it.
+                diodes: vec![(upstream, Dir::East)],
+            },
+        };
+        let mut ctx = TickCtx {
+            drain: None,
+            behaviours: None,
+            world: &mut world,
+            ticks: &mut ticks,
+            fluids: &mut TickQueue::new(),
+            events: &mut events,
+            states: &states,
+            tick: 0,
+            boundary: false,
+            updates: &mut Vec::new(),
+            moves: &mut Vec::new(),
+            toggles: &mut Vec::new(),
+            comparator_out: &mut Default::default(),
+            inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
+            item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
+            inv_log: None,
+            log: None,
+        };
+        repeater.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::East);
+
+        let due = ticks.drain_due(2);
+        assert_eq!(due[0].priority, TickPriority::ExtremelyHigh);
+    }
+
+    #[test]
+    fn a_diode_never_double_schedules() {
+        // The game checks for a pending tick first. Without it every delay doubles.
+        let (mut world, mut ticks, mut events, states) = ctx_parts();
+        let source = StateId(9);
+        world.set(Pos::new(1, 1, 0), source);
+
+        let repeater = Repeater {
+            facing: Dir::East,
+            delay: 2,
+            powered: false,
+            states: StatePair {
+                off: StateId(1),
+                on: StateId(2),
+            },
+            locked: false,
+            locked_twin: None,
+            power: Sources {
+                powered: vec![source],
+                diodes: vec![],
+            },
+        };
+        let pos = Pos::new(0, 1, 0);
+        let mut ctx = TickCtx {
+            drain: None,
+            behaviours: None,
+            world: &mut world,
+            ticks: &mut ticks,
+            fluids: &mut TickQueue::new(),
+            events: &mut events,
+            states: &states,
+            tick: 0,
+            boundary: false,
+            updates: &mut Vec::new(),
+            moves: &mut Vec::new(),
+            toggles: &mut Vec::new(),
+            comparator_out: &mut Default::default(),
+            inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
+            item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
+            inv_log: None,
+            log: None,
+        };
+        repeater.on_neighbor_changed(&mut ctx, pos, Dir::East);
+        repeater.on_neighbor_changed(&mut ctx, pos, Dir::East);
+        repeater.on_neighbor_changed(&mut ctx, pos, Dir::East);
+
+        assert_eq!(ticks.len(), 1, "three notifications, one scheduled tick");
+    }
+
+    #[test]
+    fn a_torch_schedules_at_normal_so_it_runs_after_every_diode() {
+        // RedstoneTorchBlock uses the scheduleTick overload without a priority, so
+        // torches sit at NORMAL while diodes sit at HIGH or above. That ordering
+        // decides which component observes which.
+        let (mut world, mut ticks, mut events, states) = ctx_parts();
+        let source = StateId(9);
+        let support = Pos::new(0, 0, 0);
+        world.set(support, source);
+
+        let torch = Torch {
+            attached: Dir::Down,
+            lit: true,
+            states: StatePair {
+                off: StateId(1),
+                on: StateId(2),
+            },
+            power: Sources {
+                powered: vec![source],
+                diodes: vec![],
+            },
+        };
+        let mut ctx = TickCtx {
+            drain: None,
+            behaviours: None,
+            world: &mut world,
+            ticks: &mut ticks,
+            fluids: &mut TickQueue::new(),
+            events: &mut events,
+            states: &states,
+            tick: 0,
+            boundary: false,
+            updates: &mut Vec::new(),
+            moves: &mut Vec::new(),
+            toggles: &mut Vec::new(),
+            comparator_out: &mut Default::default(),
+            inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
+            item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
+            inv_log: None,
+            log: None,
+        };
+        torch.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::Down);
+
+        let due = ticks.drain_due(TORCH_DELAY);
+        assert_eq!(due.len(), 1);
+        assert_eq!(due[0].priority, TickPriority::Normal);
+        assert_eq!(due[0].target, TORCH_DELAY);
+    }
+
+    #[test]
+    fn a_torch_inverts_its_support() {
+        let (mut world, mut ticks, mut events, states) = ctx_parts();
+        let source = StateId(9);
+        let lit = StateId(2);
+        let unlit = StateId(1);
+        let torch_pos = Pos::new(0, 1, 0);
+        world.set(Pos::new(0, 0, 0), source);
+        world.set(torch_pos, lit);
+
+        let torch = Torch {
+            attached: Dir::Down,
+            lit: true,
+            states: StatePair {
+                off: unlit,
+                on: lit,
+            },
+            power: Sources {
+                powered: vec![source],
+                diodes: vec![],
+            },
+        };
+        let mut ctx = TickCtx {
+            drain: None,
+            behaviours: None,
+            world: &mut world,
+            ticks: &mut ticks,
+            fluids: &mut TickQueue::new(),
+            events: &mut events,
+            states: &states,
+            tick: 0,
+            boundary: false,
+            updates: &mut Vec::new(),
+            moves: &mut Vec::new(),
+            toggles: &mut Vec::new(),
+            comparator_out: &mut Default::default(),
+            inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
+            item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
+            inv_log: None,
+            log: None,
+        };
+        torch.on_scheduled_tick(&mut ctx, torch_pos);
+
+        assert_eq!(
+            world.get(torch_pos),
+            unlit,
+            "powered support unlights the torch"
+        );
+    }
+
+    #[test]
+    fn a_lit_torch_powers_every_side_but_its_support() {
+        let torch = Torch {
+            attached: Dir::Down,
+            lit: true,
+            states: StatePair {
+                off: StateId(1),
+                on: StateId(2),
+            },
+            power: Sources {
+                powered: vec![],
+                diodes: vec![],
+            },
+        };
+        let world = World::new(Bounds::new(Pos::new(0, 0, 0), Pos::new(1, 1, 1)));
+        assert_eq!(torch.redstone_power(&world, Pos::new(0, 1, 0), Dir::Up), 15);
+        assert_eq!(
+            torch.redstone_power(&world, Pos::new(0, 1, 0), Dir::North),
+            15
+        );
+        assert_eq!(
+            torch.redstone_power(&world, Pos::new(0, 1, 0), Dir::Down),
+            0,
+            "never back into its own support"
+        );
+    }
+
+    #[test]
+    fn comparator_delay_is_fixed_at_two() {
+        let (mut world, mut ticks, mut events, states) = ctx_parts();
+        let source = StateId(9);
+        world.set(Pos::new(1, 1, 0), source);
+
+        let comparator = Comparator {
+            facing: Dir::East,
+            powered: false,
+            mode: ComparatorMode::Subtract,
+            states: StatePair {
+                off: StateId(1),
+                on: StateId(2),
+            },
+            power: Sources {
+                powered: vec![source],
+                diodes: vec![],
+            },
+        };
+        let mut ctx = TickCtx {
+            drain: None,
+            behaviours: None,
+            world: &mut world,
+            ticks: &mut ticks,
+            fluids: &mut TickQueue::new(),
+            events: &mut events,
+            states: &states,
+            tick: 0,
+            boundary: false,
+            updates: &mut Vec::new(),
+            moves: &mut Vec::new(),
+            toggles: &mut Vec::new(),
+            comparator_out: &mut Default::default(),
+            inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
+            item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
+            inv_log: None,
+            log: None,
+        };
+        comparator.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::East);
+
+        let due = ticks.drain_due(COMPARATOR_DELAY);
+        assert_eq!(due.len(), 1);
+        assert_eq!(
+            due[0].target, COMPARATOR_DELAY,
+            "always 2, unlike a repeater"
+        );
+    }
+
+    #[test]
+    fn a_repeater_locked_from_the_side_schedules_nothing() {
+        // DiodeBlock.isLocked returns early, before the input is even considered.
+        // A locked repeater that still scheduled would flicker its output whenever
+        // its input moved, which is precisely what locking exists to prevent.
+        let (mut world, mut ticks, mut events, states) = ctx_parts();
+        let source = StateId(9);
+        let side_diode = StateId(5);
+        let pos = Pos::new(0, 1, 0);
+
+        world.set(pos.offset(Dir::East), source); // live input
+        world.set(pos.offset(Dir::North), side_diode); // locking diode on the side
+
+        let repeater = Repeater {
+            facing: Dir::East,
+            delay: 1,
+            powered: false,
+            states: StatePair {
+                off: StateId(1),
+                on: StateId(2),
+            },
+            locked: false,
+            locked_twin: None,
+            power: Sources {
+                powered: vec![source, side_diode],
+                diodes: vec![(side_diode, Dir::South)],
+            },
+        };
+        let mut ctx = TickCtx {
+            drain: None,
+            behaviours: None,
+            world: &mut world,
+            ticks: &mut ticks,
+            fluids: &mut TickQueue::new(),
+            events: &mut events,
+            states: &states,
+            tick: 0,
+            boundary: false,
+            updates: &mut Vec::new(),
+            moves: &mut Vec::new(),
+            toggles: &mut Vec::new(),
+            comparator_out: &mut Default::default(),
+            inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
+            item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
+            inv_log: None,
+            log: None,
+        };
+        repeater.on_neighbor_changed(&mut ctx, pos, Dir::East);
+
+        assert!(ticks.is_empty(), "a locked repeater must schedule nothing");
+    }
+
+    #[test]
+    fn only_a_powered_side_diode_locks() {
+        // An unpowered diode beside a repeater does not lock it.
+        let (mut world, mut ticks, mut events, states) = ctx_parts();
+        let source = StateId(9);
+        let side_diode = StateId(5);
+        let pos = Pos::new(0, 1, 0);
+        world.set(pos.offset(Dir::East), source);
+        world.set(pos.offset(Dir::North), side_diode);
+
+        let repeater = Repeater {
+            facing: Dir::East,
+            delay: 1,
+            powered: false,
+            states: StatePair {
+                off: StateId(1),
+                on: StateId(2),
+            },
+            locked: false,
+            locked_twin: None,
+            power: Sources {
+                powered: vec![source], // side diode present but NOT powered
+                diodes: vec![(side_diode, Dir::South)],
+            },
+        };
+        let mut ctx = TickCtx {
+            drain: None,
+            behaviours: None,
+            world: &mut world,
+            ticks: &mut ticks,
+            fluids: &mut TickQueue::new(),
+            events: &mut events,
+            states: &states,
+            tick: 0,
+            boundary: false,
+            updates: &mut Vec::new(),
+            moves: &mut Vec::new(),
+            toggles: &mut Vec::new(),
+            comparator_out: &mut Default::default(),
+            inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
+            item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
+            inv_log: None,
+            log: None,
+        };
+        repeater.on_neighbor_changed(&mut ctx, pos, Dir::East);
+
+        assert_eq!(ticks.len(), 1, "an unpowered side diode must not lock");
+    }
+
+    #[test]
+    fn a_diode_above_or_below_cannot_lock() {
+        // Locking is checked only on the two horizontal perpendicular sides.
+        assert_eq!(perpendicular(Dir::East), [Dir::North, Dir::South]);
+        assert_eq!(perpendicular(Dir::North), [Dir::East, Dir::West]);
+    }
+
+    #[test]
+    fn subtract_mode_passes_the_rear_signal_when_no_side_input() {
+        // Trace-confirmed: a subtract comparator fed 15 from behind with nothing at
+        // its sides output 15, lighting the dust beyond it at 15 then 14.
+        assert_eq!(ComparatorMode::Subtract.output(15, 0), 15);
+        assert_eq!(ComparatorMode::Subtract.output(9, 0), 9);
+    }
+
+    #[test]
+    fn subtract_mode_reduces_by_the_side_signal() {
+        // Captured: rear 15 against a side dust at 14 lit the output dust at 1.
+        assert_eq!(ComparatorMode::Subtract.output(15, 14), 1);
+        assert_eq!(ComparatorMode::Subtract.output(15, 4), 11);
+        assert_eq!(ComparatorMode::Subtract.output(3, 9), 0, "never below zero");
+    }
+
+    #[test]
+    fn compare_mode_is_all_or_nothing() {
+        // Both captured: rear 15 / side 14 passed 15 through, while rear 13 against
+        // a side of 14 left the comparator unpowered and its output dust at 0.
+        assert_eq!(
+            ComparatorMode::Compare.output(15, 14),
+            15,
+            "side loses, pass through"
+        );
+        assert_eq!(
+            ComparatorMode::Compare.output(13, 14),
+            0,
+            "side wins, output nothing"
+        );
+        assert_eq!(
+            ComparatorMode::Compare.output(15, 15),
+            15,
+            "a tie still passes"
+        );
+    }
+
+    #[test]
+    fn a_comparator_emits_only_from_its_output_side() {
+        let (mut world, _t, _e, _s) = ctx_parts();
+        let source = StateId(9);
+        let pos = Pos::new(0, 1, 0);
+        world.set(pos.offset(Dir::East), source);
+
+        let comparator = Comparator {
+            facing: Dir::East,
+            powered: true,
+            mode: ComparatorMode::Subtract,
+            states: StatePair {
+                off: StateId(1),
+                on: StateId(2),
+            },
+            power: Sources {
+                powered: vec![source],
+                diodes: vec![],
+            },
+        };
+        // Input arrives on the facing side, so output leaves the opposite side.
+        assert_eq!(comparator.redstone_power(&world, pos, Dir::West), 15);
+        assert_eq!(comparator.redstone_power(&world, pos, Dir::East), 0);
+        assert_eq!(comparator.redstone_power(&world, pos, Dir::North), 0);
+    }
+
+    #[test]
+    fn a_torch_burns_out_when_driven_too_hard() {
+        // Without this a torch clock runs forever in simulation and stalls in the
+        // game — a divergence that invalidates any timing result built on it.
+        let (mut world, mut ticks, mut events, states) = ctx_parts();
+        let source = StateId(9);
+        let lit = StateId(2);
+        let unlit = StateId(1);
+        let pos = Pos::new(0, 1, 0);
+        let support = Pos::new(0, 0, 0);
+        world.set(support, source);
+        world.set(pos, lit);
+
+        let mut toggles = Vec::new();
+        let torch = Torch {
+            attached: Dir::Down,
+            lit: true,
+            states: StatePair {
+                off: unlit,
+                on: lit,
+            },
+            power: Sources {
+                powered: vec![source],
+                diodes: vec![],
+            },
+        };
+
+        // Pre-load the history with the maximum allowed toggles inside the window.
+        for t in 0..MAX_RECENT_TOGGLES {
+            toggles.push((pos, t as u64));
+        }
+
+        let mut ctx = TickCtx {
+            drain: None,
+            behaviours: None,
+            world: &mut world,
+            ticks: &mut ticks,
+            fluids: &mut TickQueue::new(),
+            events: &mut events,
+            states: &states,
+            tick: 10,
+            boundary: false,
+            updates: &mut Vec::new(),
+            moves: &mut Vec::new(),
+            toggles: &mut toggles,
+            comparator_out: &mut Default::default(),
+            inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
+            item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
+            inv_log: None,
+            log: None,
+        };
+        torch.on_scheduled_tick(&mut ctx, pos);
+
+        assert_eq!(world.get(pos), lit, "burnt out: the torch must not toggle");
+    }
+
+    #[test]
+    fn a_torch_toggles_normally_below_the_burnout_threshold() {
+        let (mut world, mut ticks, mut events, states) = ctx_parts();
+        let source = StateId(9);
+        let lit = StateId(2);
+        let unlit = StateId(1);
+        let pos = Pos::new(0, 1, 0);
+        world.set(Pos::new(0, 0, 0), source);
+        world.set(pos, lit);
+
+        let mut toggles: Vec<(Pos, u64)> = (0..MAX_RECENT_TOGGLES - 1)
+            .map(|t| (pos, t as u64))
+            .collect();
+        let torch = Torch {
+            attached: Dir::Down,
+            lit: true,
+            states: StatePair {
+                off: unlit,
+                on: lit,
+            },
+            power: Sources {
+                powered: vec![source],
+                diodes: vec![],
+            },
+        };
+        let mut ctx = TickCtx {
+            drain: None,
+            behaviours: None,
+            world: &mut world,
+            ticks: &mut ticks,
+            fluids: &mut TickQueue::new(),
+            events: &mut events,
+            states: &states,
+            tick: 10,
+            boundary: false,
+            updates: &mut Vec::new(),
+            moves: &mut Vec::new(),
+            toggles: &mut toggles,
+            comparator_out: &mut Default::default(),
+            inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
+            item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
+            inv_log: None,
+            log: None,
+        };
+        torch.on_scheduled_tick(&mut ctx, pos);
+
+        assert_eq!(world.get(pos), unlit, "one below the limit still toggles");
+    }
+
+    #[test]
+    fn toggles_outside_the_window_do_not_count_toward_burnout() {
+        // RECENT_TOGGLE_TIMER is 60 ticks, read as the literal 60L in the class.
+        let (mut world, mut ticks, mut events, states) = ctx_parts();
+        let source = StateId(9);
+        let lit = StateId(2);
+        let unlit = StateId(1);
+        let pos = Pos::new(0, 1, 0);
+        world.set(Pos::new(0, 0, 0), source);
+        world.set(pos, lit);
+
+        // Plenty of toggles, but all long expired.
+        let mut toggles: Vec<(Pos, u64)> = (0..MAX_RECENT_TOGGLES * 2)
+            .map(|t| (pos, t as u64))
+            .collect();
+        let torch = Torch {
+            attached: Dir::Down,
+            lit: true,
+            states: StatePair {
+                off: unlit,
+                on: lit,
+            },
+            power: Sources {
+                powered: vec![source],
+                diodes: vec![],
+            },
+        };
+        let mut ctx = TickCtx {
+            drain: None,
+            behaviours: None,
+            world: &mut world,
+            ticks: &mut ticks,
+            fluids: &mut TickQueue::new(),
+            events: &mut events,
+            states: &states,
+            tick: 500,
+            boundary: false,
+            updates: &mut Vec::new(),
+            moves: &mut Vec::new(),
+            toggles: &mut toggles,
+            comparator_out: &mut Default::default(),
+            inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
+            item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
+            inv_log: None,
+            log: None,
+        };
+        torch.on_scheduled_tick(&mut ctx, pos);
+
+        assert_eq!(
+            world.get(pos),
+            unlit,
+            "expired toggles must not burn it out"
+        );
+    }
+
+    /// A power model with per-position strengths, needed to exercise priming.
+    #[derive(Clone)]
+    struct Levels {
+        levels: Vec<(Pos, u8)>,
+        diodes: Vec<(StateId, Dir)>,
+    }
+
+    impl PowerSource for Levels {
+        fn is_powered(
+            &self,
+            world: &World,
+            outs: &crate::behaviour::ComparatorOutputs,
+            pos: Pos,
+            toward: Dir,
+        ) -> bool {
+            self.signal_strength(world, outs, pos, toward) > 0
+        }
+        fn is_diode(&self, world: &World, pos: Pos) -> bool {
+            let s = world.get(pos);
+            self.diodes.iter().any(|(d, _)| *d == s)
+        }
+        fn diode_facing(&self, world: &World, pos: Pos) -> Option<Dir> {
+            let s = world.get(pos);
+            self.diodes.iter().find(|(d, _)| *d == s).map(|(_, f)| *f)
+        }
+        fn signal_strength(
+            &self,
+            _world: &World,
+            _outs: &crate::behaviour::ComparatorOutputs,
+            pos: Pos,
+            _toward: Dir,
+        ) -> u8 {
+            self.levels
+                .iter()
+                .find(|(p, _)| *p == pos)
+                .map(|(_, l)| *l)
+                .unwrap_or(0)
+        }
+    }
+
+    fn primed_comparator(levels: Levels, powered: bool) -> Comparator<Levels> {
+        Comparator {
+            facing: Dir::East,
+            powered,
+            mode: ComparatorMode::Subtract,
+            states: StatePair {
+                off: StateId(1),
+                on: StateId(2),
+            },
+            power: levels,
+        }
+    }
+
+    #[test]
+    fn a_comparator_schedules_on_a_strength_change_alone() {
+        // Priming. The comparator stays on either way — only the *strength* moves,
+        // from a stored 15 to a computed 9. A repeater in the same situation would
+        // do nothing, because its powered flag is unchanged.
+        let (mut world, mut ticks, mut events, states) = ctx_parts();
+        let pos = Pos::new(0, 1, 0);
+        let comparator = primed_comparator(
+            Levels {
+                levels: vec![(pos.offset(Dir::East), 9)],
+                diodes: vec![],
+            },
+            true,
+        );
+
+        let mut stored = std::collections::HashMap::new();
+        stored.insert(pos, 15u8);
+
+        let mut ctx = TickCtx {
+            drain: None,
+            behaviours: None,
+            world: &mut world,
+            ticks: &mut ticks,
+            fluids: &mut TickQueue::new(),
+            events: &mut events,
+            states: &states,
+            tick: 0,
+            boundary: false,
+            updates: &mut Vec::new(),
+            moves: &mut Vec::new(),
+            toggles: &mut Vec::new(),
+            comparator_out: &mut stored,
+            inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
+            item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
+            inv_log: None,
+            log: None,
+        };
+        comparator.on_neighbor_changed(&mut ctx, pos, Dir::East);
+
+        assert_eq!(ticks.len(), 1, "a strength-only change must still schedule");
+    }
+
+    #[test]
+    fn a_comparator_whose_output_is_unchanged_schedules_nothing() {
+        let (mut world, mut ticks, mut events, states) = ctx_parts();
+        let pos = Pos::new(0, 1, 0);
+        let comparator = primed_comparator(
+            Levels {
+                levels: vec![(pos.offset(Dir::East), 15)],
+                diodes: vec![],
+            },
+            true,
+        );
+        let mut stored = std::collections::HashMap::new();
+        stored.insert(pos, 15u8);
+
+        let mut ctx = TickCtx {
+            drain: None,
+            behaviours: None,
+            world: &mut world,
+            ticks: &mut ticks,
+            fluids: &mut TickQueue::new(),
+            events: &mut events,
+            states: &states,
+            tick: 0,
+            boundary: false,
+            updates: &mut Vec::new(),
+            moves: &mut Vec::new(),
+            toggles: &mut Vec::new(),
+            comparator_out: &mut stored,
+            inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
+            item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
+            inv_log: None,
+            log: None,
+        };
+        comparator.on_neighbor_changed(&mut ctx, pos, Dir::East);
+
+        assert!(ticks.is_empty(), "nothing changed, nothing scheduled");
+    }
+
+    #[test]
+    fn a_primed_comparator_resolves_after_every_repeater() {
+        // A comparator only ever schedules at HIGH or NORMAL, never the VERY_HIGH or
+        // EXTREMELY_HIGH a repeater reaches for. So when both fire in one tick the
+        // repeater always goes first — which is what makes priming observable.
+        let (mut world, mut ticks, mut events, states) = ctx_parts();
+        let pos = Pos::new(0, 1, 0);
+        let comparator = primed_comparator(
+            Levels {
+                levels: vec![(pos.offset(Dir::East), 9)],
+                diodes: vec![],
+            },
+            false,
+        );
+        let mut stored = std::collections::HashMap::new();
+
+        let mut ctx = TickCtx {
+            drain: None,
+            behaviours: None,
+            world: &mut world,
+            ticks: &mut ticks,
+            fluids: &mut TickQueue::new(),
+            events: &mut events,
+            states: &states,
+            tick: 0,
+            boundary: false,
+            updates: &mut Vec::new(),
+            moves: &mut Vec::new(),
+            toggles: &mut Vec::new(),
+            comparator_out: &mut stored,
+            inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
+            item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
+            inv_log: None,
+            log: None,
+        };
+        comparator.on_neighbor_changed(&mut ctx, pos, Dir::East);
+
+        let due = ticks.drain_due(COMPARATOR_DELAY);
+        assert_eq!(due[0].priority, TickPriority::Normal, "not fed by a diode");
+        assert!(
+            TickPriority::VeryHigh < TickPriority::Normal,
+            "a repeater turning off outranks it"
+        );
+    }
+
+    #[test]
+    fn a_comparator_fed_by_a_diode_schedules_at_high() {
+        let (mut world, mut ticks, mut events, states) = ctx_parts();
+        let pos = Pos::new(0, 1, 0);
+        let upstream = StateId(5);
+        world.set(pos.offset(Dir::East), upstream);
+
+        let comparator = primed_comparator(
+            Levels {
+                levels: vec![(pos.offset(Dir::East), 9)],
+                diodes: vec![(upstream, Dir::East)],
+            },
+            false,
+        );
+        let mut stored = std::collections::HashMap::new();
+
+        let mut ctx = TickCtx {
+            drain: None,
+            behaviours: None,
+            world: &mut world,
+            ticks: &mut ticks,
+            fluids: &mut TickQueue::new(),
+            events: &mut events,
+            states: &states,
+            tick: 0,
+            boundary: false,
+            updates: &mut Vec::new(),
+            moves: &mut Vec::new(),
+            toggles: &mut Vec::new(),
+            comparator_out: &mut stored,
+            inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
+            item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
+            inv_log: None,
+            log: None,
+        };
+        comparator.on_neighbor_changed(&mut ctx, pos, Dir::East);
+
+        let due = ticks.drain_due(COMPARATOR_DELAY);
+        assert_eq!(
+            due[0].priority,
+            TickPriority::High,
+            "diode-fed comparators prioritise"
+        );
+    }
+
+    #[test]
+    fn diode_priorities_order_correctly_against_each_other() {
+        // The ordering that actually matters when several fire in one tick.
+        assert!(TickPriority::ExtremelyHigh < TickPriority::VeryHigh);
+        assert!(TickPriority::VeryHigh < TickPriority::High);
+        assert!(TickPriority::High < TickPriority::Normal);
+    }
+}
+
+/// Leaves — `LeavesBlock`, for their *scheduling* only.
+///
+/// A shape update makes leaves book a tick to re-check their `distance`, and
+/// that schedule is observable in the game's pending queue even when nothing
+/// comes of it. Every leaf block in this corpus is `persistent=true` with no
+/// logs nearby, so the tick recomputes the same distance and writes nothing —
+/// which is why the tick itself is a no-op here.
+///
+/// Decay is not modelled: non-persistent leaves cut off from wood would
+/// disappear in vanilla and will not here. No fixture depends on it, and a
+/// half-implemented decay would be worse than a named gap.
+pub struct Leaves<P: PowerSource> {
+    /// This state's `distance`.
+    pub distance: u8,
+    /// The same leaf at each distance 1..=7, for the rewrite.
+    pub family: [Option<StateId>; 8],
+    /// How to read a neighbour's distance.
+    pub rules: P,
+}
+
+impl<P: PowerSource> crate::behaviour::BlockBehaviour for Leaves<P> {
+    /// `LeavesBlock.updateShape`: book a re-check unless the changed neighbour
+    /// already accounts for this leaf's distance.
+    ///
+    /// The condition is the game's, verbatim — `distance != 1 || DISTANCE !=
+    /// distance` where `distance` is the *changed neighbour's* distance plus
+    /// one. It declines to schedule in exactly one case: a leaf already at
+    /// distance 1 hearing from a log. There is deliberately no queue guard;
+    /// `LevelChunkTicks` deduplicates pending bookings on its own, and adding
+    /// `willTickThisTick` on top of that drops the booking a leaf makes while
+    /// its own tick is running — which is precisely when a piston has just set
+    /// a log down beside it.
+    fn on_shape_update(&self, ctx: &mut TickCtx<'_>, pos: Pos, from: Dir) {
+        let distance = self
+            .rules
+            .leaf_distance(ctx.world, pos.offset(from))
+            .saturating_add(1);
+        if distance != 1 || self.distance != distance {
+            ctx.schedule(pos, 1, TickPriority::Normal);
+        }
+    }
+
+    /// `LeavesBlock.tick` → `updateDistance`: one more than the nearest
+    /// neighbour's, capped at 7, written **loudly** (flag 3).
+    ///
+    /// It matters more than foliage bookkeeping suggests. A door that carries
+    /// logs past a leaf block changes that leaf's `distance`, and the write
+    /// notifies its neighbours like any other — which is what drives the
+    /// observers watching it. Leaving the tick a no-op cost the 4x4 vault two
+    /// whole steps of its opening sequence.
+    fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        let mut nearest = 7u8;
+        for dir in crate::pos::JAVA_DIRECTIONS {
+            nearest = nearest.min(
+                self.rules
+                    .leaf_distance(ctx.world, pos.offset(dir))
+                    .saturating_add(1),
+            );
+            if nearest == 1 {
+                break;
+            }
+        }
+        if nearest != self.distance {
+            if let Some(state) = self.family.get(nearest as usize).copied().flatten() {
+                ctx.set(pos, state);
+            }
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        "leaves"
+    }
+}
+
+/// A lever — `LeverBlock`.
+///
+/// `useWithoutItem` cycles `powered` (loud write), then additionally updates
+/// the neighbours of the block it is attached to: a powered lever powers
+/// every face weakly and its support block **strongly**, so components on the
+/// far side of that block hear the flip through the extra update wave.
+pub struct Lever {
+    /// Current `powered`.
+    pub powered: bool,
+    /// The unpowered/powered pair.
+    pub states: StatePair,
+    /// The direction from the lever to its support block (floor → down,
+    /// ceiling → up, wall → behind the facing).
+    pub attached: crate::pos::Dir,
+}
+
+impl crate::behaviour::BlockBehaviour for Lever {
+    fn on_used(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        // pull: setBlock (entry 1, via set), then updateNeighbours —
+        // updateNeighborsAt(pos) again and at the support block.
+        ctx.set(
+            pos,
+            if self.powered {
+                self.states.off
+            } else {
+                self.states.on
+            },
+        );
+        ctx.update_neighbors_at(pos);
+        ctx.update_neighbors_at(pos.offset(self.attached));
+    }
+
+    fn name(&self) -> &'static str {
+        "lever"
+    }
+}

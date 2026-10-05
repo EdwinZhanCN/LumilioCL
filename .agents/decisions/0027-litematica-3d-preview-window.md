@@ -1,6 +1,6 @@
 # 0027 — Litematica 3D preview: a separate webview window running schematic-renderer
 
-- Status: accepted
+- Status: superseded-by-0028
 - Date: 2026-10-04
 
 ## Context

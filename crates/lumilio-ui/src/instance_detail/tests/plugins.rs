@@ -269,57 +269,71 @@ fn a_long_table_scrolls_inside_a_capped_box_and_the_keys_stay_on_top(cx: &mut Te
     assert!(key.origin.y < table.origin.y, "the key is above the table");
 }
 
-#[cfg(any(target_os = "macos", target_os = "windows"))]
 #[gpui::test]
-fn a_model_is_a_card_whose_key_asks_for_a_preview_window(cx: &mut TestAppContext) {
+fn a_model_loads_inline_once_and_late_assets_do_not_enter_a_replacement(cx: &mut TestAppContext) {
     let seen: Rc<RefCell<Vec<InstanceIntent>>> = Rc::default();
     let (view, cx) = open(seen.clone(), cx);
     cx.update(|window, cx| view.update(cx, |view, cx| view.open_shown(4, window, cx)));
+    let model = View::Model {
+        file: "schematics/house.litematic".into(),
+    };
     view.update(cx, |view, cx| {
-        view.plugin_view_arrived(
-            PLUGIN.into(),
-            shown(View::Detail {
-                title: "房子".into(),
-                subtitle: None,
-                image: None,
-                facts: Vec::new(),
-                children: vec![View::Model {
-                    file: "schematics/house.litematic".into(),
-                }],
-            }),
-            cx,
-        );
+        view.plugin_view_arrived(PLUGIN.into(), shown(model.clone()), cx)
     });
     cx.run_until_parked();
-    click(cx, "plugin-model-open");
     assert_eq!(
-        seen.borrow()
-            .iter()
-            .filter(|intent| matches!(intent, InstanceIntent::PluginModel { .. }))
-            .cloned()
-            .collect::<Vec<_>>(),
-        [InstanceIntent::PluginModel {
-            plugin: PLUGIN.into(),
-            file: "schematics/house.litematic".into(),
-        }]
+        cx.debug_bounds("model-viewport").unwrap().size.height,
+        gpui::px(360.)
     );
-}
-
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
-#[gpui::test]
-fn without_a_preview_window_the_card_has_no_key(cx: &mut TestAppContext) {
-    let seen: Rc<RefCell<Vec<InstanceIntent>>> = Rc::default();
-    let (view, cx) = open(seen, cx);
-    cx.update(|window, cx| view.update(cx, |view, cx| view.open_shown(4, window, cx)));
+    let requests: Vec<_> = seen
+        .borrow()
+        .iter()
+        .filter_map(|intent| match intent {
+            InstanceIntent::LoadModel {
+                plugin,
+                file,
+                request,
+            } => Some((plugin.clone(), file.clone(), *request)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(requests.len(), 1);
+    assert_eq!(
+        (&requests[0].0, &requests[0].1),
+        (&PLUGIN.to_owned(), &"schematics/house.litematic".to_owned())
+    );
+    let old_id = requests[0].2;
     view.update(cx, |view, cx| {
-        view.plugin_view_arrived(
-            PLUGIN.into(),
-            shown(View::Model {
-                file: "schematics/house.litematic".into(),
-            }),
-            cx,
-        );
+        view.plugin_view_arrived(PLUGIN.into(), shown(model), cx)
     });
     cx.run_until_parked();
-    assert!(cx.debug_bounds("plugin-model-open").is_none());
+    view.update(cx, |view, cx| {
+        view.plugin_model_arrived(old_id, Err("obsolete result".into()), cx)
+    });
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("model-loading").is_some());
+    assert!(cx.debug_bounds("model-error").is_none());
+    let newest = seen
+        .borrow()
+        .iter()
+        .rev()
+        .find_map(|intent| match intent {
+            InstanceIntent::LoadModel { request, .. } => Some(*request),
+            _ => None,
+        })
+        .unwrap();
+    assert_ne!(newest, old_id);
+    view.update(cx, |view, cx| {
+        view.plugin_model_arrived(
+            newest,
+            Ok(lumilio_core::ModelPreview {
+                schematic: Vec::new(),
+                pack: None,
+            }),
+            cx,
+        )
+    });
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("model-error").is_some());
+    assert!(cx.debug_bounds("model-loading").is_none());
 }

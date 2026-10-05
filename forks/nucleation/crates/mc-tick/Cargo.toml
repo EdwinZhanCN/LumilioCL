@@ -1,0 +1,31 @@
+[package]
+name = "mc-tick"
+version = "0.1.0"
+edition = "2021"
+description = "Vanilla-accurate Minecraft tick simulation: deterministic, steppable, checkpointable"
+license = "MIT"
+
+# Dependencies are deliberately near-zero. This crate's reason to exist is a fast
+# edit->test loop, and every dependency added here is paid on every iteration for
+# the life of the project. Adding one is a decision, not a convenience.
+[dependencies]
+blake3 = "1"
+smallvec = "1"
+thiserror = "2"
+
+[dev-dependencies]
+# Corpus expectations are JSON; only the test binary pays for serde.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+mc-tick-trace = { path = "../mc-tick-trace" }
+# The shared scenario harness; a dev-only cycle (mc-test depends on this
+# crate's lib), which cargo permits and publish strips.
+mc-test = { path = "../mc-test" }
+criterion = "0.5.1"
+
+[lints.rust]
+missing_docs = "warn"
+
+[[bench]]
+name = "tick"
+harness = false

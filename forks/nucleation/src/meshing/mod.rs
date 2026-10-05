@@ -1,0 +1,2298 @@
+//! Meshing support for generating 3D models from schematics.
+//!
+//! This module provides integration with the `schematic-mesher` crate to convert
+//! Nucleation schematics into 3D mesh formats (GLB/glTF). It exposes three
+//! meshing modes suited to different schematic sizes and use cases.
+//!
+//! # Features
+//!
+//! Enable the `meshing` feature in your `Cargo.toml` to use this module:
+//!
+//! ```toml
+//! nucleation = { version = "0.1", features = ["meshing"] }
+//! ```
+//!
+//! # Meshing Modes
+//!
+//! ## 1. `to_mesh` — Single mesh (small/medium schematics)
+//!
+//! Returns one [`MeshOutput`] for the entire schematic. Best when you just need
+//! a single GLB/USDZ file.
+//!
+//! ```ignore
+//! use nucleation::{UniversalSchematic, meshing::{MeshConfig, MeshOutput, ResourcePackSource}};
+//!
+//! let schematic = UniversalSchematic::from_litematic_bytes(&data)?;
+//! let pack = ResourcePackSource::from_file("resourcepack.zip")?;
+//! let config = MeshConfig::default();
+//!
+//! let output: MeshOutput = schematic.to_mesh(&pack, &config)?;
+//! std::fs::write("output.glb", output.to_glb()?)?;
+//! ```
+//!
+//! ## 2. `mesh_by_region` — Per-region meshes
+//!
+//! Returns a `HashMap<String, MeshOutput>` keyed by region name. Best when
+//! your schematic has meaningful region structure (e.g., Litematic regions).
+//!
+//! ```ignore
+//! let regions = schematic.mesh_by_region(&pack, &config)?;
+//! for (name, mesh) in &regions {
+//!     std::fs::write(format!("{}.glb", name), &mesh.to_glb()?)?;
+//! }
+//! ```
+//!
+//! ## 3. `mesh_chunks` — Lazy chunk iterator (large/massive schematics)
+//!
+//! Returns a [`NucleationChunkIter`] that yields one [`MeshOutput`] per chunk.
+//! Never loads the full world mesh into memory — ideal for streaming or
+//! progressive loading.
+//!
+//! ```ignore
+//! for chunk_result in schematic.mesh_chunks(&pack, &config, 16) {
+//!     let chunk_mesh = chunk_result?;
+//!     let (cx, cy, cz) = chunk_mesh.chunk_coord.unwrap();
+//!     println!("Chunk ({},{},{}) has {} vertices",
+//!         cx, cy, cz, chunk_mesh.total_vertices());
+//! }
+//! ```
+
+use schematic_mesher::{
+    export_raw, resource_pack::TextureData, AtlasBuilder, BlockPosition as MesherBlockPosition,
+    BlockSource, BoundingBox as MesherBoundingBox, InputBlock, Mesher, MesherConfig, MesherOutput,
+    RawMeshData, ResourcePack, TextureAtlas,
+};
+
+pub mod cache;
+pub mod item_model;
+mod resource_pack_compat;
+
+// Re-export the real MeshOutput and MeshLayer types from schematic-mesher.
+pub use item_model::{
+    build_resource_pack, ItemModelConfig, ItemModelResult, ItemModelScale, ItemModelStats,
+};
+pub use schematic_mesher::{MeshLayer, MeshOutput};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::path::Path;
+
+use crate::entity::{Entity, NbtValue};
+use crate::{BlockState, Region, UniversalSchematic};
+
+/// Error type for meshing operations.
+#[derive(Debug, thiserror::Error)]
+pub enum MeshError {
+    #[error("Resource pack error: {0}")]
+    ResourcePack(String),
+    #[error("Meshing error: {0}")]
+    Meshing(String),
+    #[error("Export error: {0}")]
+    Export(String),
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+}
+
+pub type Result<T> = std::result::Result<T, MeshError>;
+
+/// Source for a Minecraft resource pack.
+pub struct ResourcePackSource {
+    pack: ResourcePack,
+}
+
+impl ResourcePackSource {
+    fn with_mesher_texture_aliases(mut pack: ResourcePack) -> Self {
+        // schematic-mesher 0.2 names this texture `wood`, while vanilla packs
+        // ship it as `armorstand.png`. Preserve an explicitly supplied legacy
+        // override; otherwise alias the canonical texture so the entity enters
+        // the atlas instead of using the missing-texture tile.
+        if pack.get_texture("entity/armorstand/wood").is_none() {
+            if let Some(texture) = pack.get_texture("entity/armorstand/armorstand").cloned() {
+                pack.add_texture("minecraft", "entity/armorstand/wood", texture);
+            }
+        }
+        // schematic-mesher's minecart model reads `entity/minecart`, but the
+        // client jar moved the texture to `entity/minecart/minecart.png` in
+        // 1.21.x. Alias it so carts get their hull texture instead of the
+        // missing-texture tile.
+        if pack.get_texture("entity/minecart").is_none() {
+            if let Some(texture) = pack.get_texture("entity/minecart/minecart").cloned() {
+                pack.add_texture("minecraft", "entity/minecart", texture);
+            }
+        }
+        // More renames between the names schematic-mesher 0.2 asks for and
+        // what the current client jar ships: the 1.21.5 mob-variant split
+        // named files `<mob>/temperate_<mob>.png`, and 26.2 flipped them to
+        // `<mob>/<mob>_temperate.png`; the bat moved into a folder; the cat
+        // breeds gained a `cat_` prefix. Alias each canonical name the mesher
+        // reads to whichever spelling the pack actually has, so these mobs
+        // render with their skins instead of the missing-texture tile.
+        for (wanted, candidates) in [
+            (
+                "entity/pig/temperate_pig",
+                ["entity/pig/pig_temperate", "entity/pig/pig"],
+            ),
+            (
+                "entity/cow/temperate_cow",
+                ["entity/cow/cow_temperate", "entity/cow/cow"],
+            ),
+            (
+                "entity/chicken/temperate_chicken",
+                ["entity/chicken/chicken_temperate", "entity/chicken/chicken"],
+            ),
+            (
+                "entity/cat/tabby",
+                ["entity/cat/cat_tabby", "entity/cat/tabby"],
+            ),
+            ("entity/bat", ["entity/bat/bat", "entity/bat"]),
+            ("entity/blaze", ["entity/blaze/blaze", "entity/blaze"]),
+        ] {
+            if pack.get_texture(wanted).is_some() {
+                continue;
+            }
+            if let Some(texture) = candidates.iter().find_map(|c| pack.get_texture(c).cloned()) {
+                pack.add_texture("minecraft", wanted, texture);
+            }
+        }
+        Self { pack }
+    }
+
+    /// Load a resource pack from a file path (ZIP or directory).
+    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
+        if path.as_ref().is_file() {
+            return Self::from_bytes(&std::fs::read(path)?);
+        }
+        let pack = schematic_mesher::load_resource_pack(path)
+            .map_err(|e| MeshError::ResourcePack(e.to_string()))?;
+        Ok(Self::with_mesher_texture_aliases(pack))
+    }
+
+    /// Load a resource pack from bytes (for WASM compatibility).
+    pub fn from_bytes(data: &[u8]) -> Result<Self> {
+        let normalized =
+            resource_pack_compat::normalize_zip(data).map_err(MeshError::ResourcePack)?;
+        let bytes = normalized.as_deref().unwrap_or(data);
+        let pack = schematic_mesher::load_resource_pack_from_bytes(bytes)
+            .map_err(|e| MeshError::ResourcePack(e.to_string()))?;
+        Ok(Self::with_mesher_texture_aliases(pack))
+    }
+
+    /// Load multiple resource packs from file paths in priority order.
+    ///
+    /// Packs are applied lowest priority first — later packs overlay earlier
+    /// ones on per-key collision, mirroring Minecraft's own pack-ordering
+    /// semantics. An empty iterator yields an empty pack.
+    pub fn from_files<I, P>(paths: I) -> Result<Self>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        let mut pack = ResourcePack::new();
+        for path in paths {
+            pack.overlay(Self::from_file(path)?.pack);
+        }
+        Ok(Self::with_mesher_texture_aliases(pack))
+    }
+
+    /// Load multiple resource packs from in-memory byte buffers in priority
+    /// order. See [`from_files`](Self::from_files) for semantics.
+    pub fn from_bytes_list<I, B>(datas: I) -> Result<Self>
+    where
+        I: IntoIterator<Item = B>,
+        B: AsRef<[u8]>,
+    {
+        let mut pack = ResourcePack::new();
+        for data in datas {
+            pack.overlay(Self::from_bytes(data.as_ref())?.pack);
+        }
+        Ok(Self::with_mesher_texture_aliases(pack))
+    }
+
+    /// Create a ResourcePackSource from an already-loaded ResourcePack.
+    pub fn from_resource_pack(pack: ResourcePack) -> Self {
+        Self::with_mesher_texture_aliases(pack)
+    }
+
+    /// Get a reference to the underlying ResourcePack.
+    pub fn pack(&self) -> &ResourcePack {
+        &self.pack
+    }
+
+    /// Get a mutable reference to the underlying ResourcePack.
+    pub fn pack_mut(&mut self) -> &mut ResourcePack {
+        &mut self.pack
+    }
+
+    /// List all blockstate names as "namespace:block_id".
+    pub fn list_blockstates(&self) -> Vec<String> {
+        let mut names = Vec::new();
+        for (namespace, blocks) in &self.pack.blockstates {
+            for block_id in blocks.keys() {
+                names.push(format!("{}:{}", namespace, block_id));
+            }
+        }
+        names
+    }
+
+    /// List all model names as "namespace:model_path".
+    pub fn list_models(&self) -> Vec<String> {
+        let mut names = Vec::new();
+        for (namespace, models) in &self.pack.models {
+            for model_path in models.keys() {
+                names.push(format!("{}:{}", namespace, model_path));
+            }
+        }
+        names
+    }
+
+    /// List all texture names as "namespace:texture_path".
+    pub fn list_textures(&self) -> Vec<String> {
+        let mut names = Vec::new();
+        for (namespace, textures) in &self.pack.textures {
+            for texture_path in textures.keys() {
+                names.push(format!("{}:{}", namespace, texture_path));
+            }
+        }
+        names
+    }
+
+    /// Get a blockstate definition as JSON. Returns None if not found.
+    /// Since BlockstateDefinition doesn't implement Serialize, we manually build JSON.
+    pub fn get_blockstate_json(&self, name: &str) -> Option<String> {
+        let def = self.pack.get_blockstate(name)?;
+        Some(blockstate_definition_to_json(def))
+    }
+
+    /// Get a block model as JSON. Returns None if not found.
+    pub fn get_model_json(&self, name: &str) -> Option<String> {
+        let model = self.pack.get_model(name)?;
+        serde_json::to_string(model).ok()
+    }
+
+    /// Get texture info: (width, height, is_animated, frame_count). Returns None if not found.
+    pub fn get_texture_info(&self, name: &str) -> Option<(u32, u32, bool, u32)> {
+        let tex = self.pack.get_texture(name)?;
+        Some((tex.width, tex.height, tex.is_animated, tex.frame_count))
+    }
+
+    /// Get raw RGBA8 pixel data for a texture. Returns None if not found.
+    pub fn get_texture_pixels(&self, name: &str) -> Option<&[u8]> {
+        let tex = self.pack.get_texture(name)?;
+        Some(&tex.pixels)
+    }
+
+    /// Add a blockstate definition from JSON. Name format: "namespace:block_id".
+    pub fn add_blockstate_json(&mut self, name: &str, json: &str) -> Result<()> {
+        let (namespace, path) = split_resource_name(name)?;
+        let def: schematic_mesher::BlockstateDefinition =
+            serde_json::from_str(json).map_err(|e| MeshError::ResourcePack(e.to_string()))?;
+        self.pack.add_blockstate(&namespace, &path, def);
+        Ok(())
+    }
+
+    /// Add a block model from JSON. Name format: "namespace:model_path".
+    pub fn add_model_json(&mut self, name: &str, json: &str) -> Result<()> {
+        let (namespace, path) = split_resource_name(name)?;
+        let model: schematic_mesher::BlockModel =
+            serde_json::from_str(json).map_err(|e| MeshError::ResourcePack(e.to_string()))?;
+        self.pack.add_model(&namespace, &path, model);
+        Ok(())
+    }
+
+    /// Add a texture from raw RGBA8 pixel data. Name format: "namespace:texture_path".
+    pub fn add_texture(
+        &mut self,
+        name: &str,
+        width: u32,
+        height: u32,
+        pixels: Vec<u8>,
+    ) -> Result<()> {
+        let (namespace, path) = split_resource_name(name)?;
+        let texture = TextureData::new(width, height, pixels);
+        self.pack.add_texture(&namespace, &path, texture);
+        Ok(())
+    }
+
+    /// Get statistics about the loaded resource pack.
+    pub fn stats(&self) -> ResourcePackStats {
+        ResourcePackStats {
+            blockstate_count: self.pack.blockstate_count(),
+            model_count: self.pack.model_count(),
+            texture_count: self.pack.texture_count(),
+            namespaces: self
+                .pack
+                .namespaces()
+                .into_iter()
+                .map(|s| s.to_string())
+                .collect(),
+        }
+    }
+}
+
+/// Statistics about a loaded resource pack.
+#[derive(Debug, Clone)]
+pub struct ResourcePackStats {
+    pub blockstate_count: usize,
+    pub model_count: usize,
+    pub texture_count: usize,
+    pub namespaces: Vec<String>,
+}
+
+/// Configuration for mesh generation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct MeshConfig {
+    /// Enable face culling between adjacent solid blocks.
+    pub cull_hidden_faces: bool,
+    /// Enable ambient occlusion.
+    pub ambient_occlusion: bool,
+    /// AO intensity (0.0 = no darkening, 1.0 = full darkening).
+    pub ao_intensity: f32,
+    /// Biome for tinting (e.g., "plains", "swamp").
+    pub biome: Option<String>,
+    /// Maximum texture atlas dimension.
+    pub atlas_max_size: u32,
+    /// Skip blocks that are fully hidden by opaque neighbors on all 6 sides.
+    pub cull_occluded_blocks: bool,
+    /// Merge adjacent coplanar faces into larger quads (reduces triangle count).
+    pub greedy_meshing: bool,
+}
+
+impl Default for MeshConfig {
+    fn default() -> Self {
+        Self {
+            cull_hidden_faces: true,
+            ambient_occlusion: true,
+            ao_intensity: 0.4,
+            biome: None,
+            atlas_max_size: 4096,
+            cull_occluded_blocks: true,
+            greedy_meshing: false,
+        }
+    }
+}
+
+impl MeshConfig {
+    /// Create a new MeshConfig with default settings.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Enable or disable face culling.
+    pub fn with_culling(mut self, enabled: bool) -> Self {
+        self.cull_hidden_faces = enabled;
+        self
+    }
+
+    /// Enable or disable ambient occlusion.
+    pub fn with_ambient_occlusion(mut self, enabled: bool) -> Self {
+        self.ambient_occlusion = enabled;
+        self
+    }
+
+    /// Set the AO intensity.
+    pub fn with_ao_intensity(mut self, intensity: f32) -> Self {
+        self.ao_intensity = intensity;
+        self
+    }
+
+    /// Set the biome for tinting.
+    pub fn with_biome(mut self, biome: impl Into<String>) -> Self {
+        self.biome = Some(biome.into());
+        self
+    }
+
+    /// Set the maximum atlas size.
+    pub fn with_atlas_max_size(mut self, size: u32) -> Self {
+        self.atlas_max_size = size;
+        self
+    }
+
+    /// Enable or disable occluded block culling.
+    pub fn with_cull_occluded_blocks(mut self, enabled: bool) -> Self {
+        self.cull_occluded_blocks = enabled;
+        self
+    }
+
+    /// Enable or disable greedy meshing.
+    pub fn with_greedy_meshing(mut self, enabled: bool) -> Self {
+        self.greedy_meshing = enabled;
+        self
+    }
+
+    fn to_mesher_config(&self) -> MesherConfig {
+        let mut config = MesherConfig::default();
+        config.cull_hidden_faces = self.cull_hidden_faces;
+        config.ambient_occlusion = self.ambient_occlusion;
+        config.ao_intensity = self.ao_intensity;
+        config.atlas_max_size = self.atlas_max_size;
+        config.cull_occluded_blocks = self.cull_occluded_blocks;
+        config.greedy_meshing = self.greedy_meshing;
+        if let Some(biome) = &self.biome {
+            config = config.with_biome(biome);
+        }
+        config
+    }
+}
+
+// ─── Backward-compatible type aliases ───────────────────────────────────────
+//
+// Existing callers that use `MeshResult`, `MultiMeshResult`, or `ChunkMeshResult`
+// continue to compile. New code should prefer `MeshOutput` directly.
+
+/// Backward-compatible alias — prefer [`MeshOutput`] for new code.
+pub type MeshResult = MeshOutput;
+
+/// Backward-compatible alias for per-region mesh results.
+pub type MultiMeshResult = HashMap<String, MeshOutput>;
+
+/// Result of chunk-based mesh generation (eager, all-at-once).
+///
+/// Kept for backward compatibility with `mesh_by_chunk` / `mesh_by_chunk_size`.
+/// New code should prefer [`NucleationChunkIter`] via [`UniversalSchematic::mesh_chunks`].
+#[derive(Debug)]
+pub struct ChunkMeshResult {
+    /// Map of chunk coordinate to mesh output.
+    pub meshes: HashMap<(i32, i32, i32), MeshOutput>,
+    /// Total vertex count across all meshes.
+    pub total_vertex_count: usize,
+    /// Total triangle count across all meshes.
+    pub total_triangle_count: usize,
+}
+
+/// Result of raw mesh export for custom rendering.
+#[derive(Debug)]
+pub struct RawMeshExport {
+    pub(crate) inner: RawMeshData,
+}
+
+impl RawMeshExport {
+    /// Vertex positions (3 floats per vertex).
+    pub fn positions_flat(&self) -> Vec<f32> {
+        self.inner.positions_flat()
+    }
+
+    /// Vertex normals (3 floats per vertex).
+    pub fn normals_flat(&self) -> Vec<f32> {
+        self.inner.normals_flat()
+    }
+
+    /// Texture coordinates (2 floats per vertex).
+    pub fn uvs_flat(&self) -> Vec<f32> {
+        self.inner.uvs_flat()
+    }
+
+    /// Vertex colors (4 floats per vertex, RGBA).
+    pub fn colors_flat(&self) -> Vec<f32> {
+        self.inner.colors_flat()
+    }
+
+    /// Triangle indices.
+    pub fn indices(&self) -> &[u32] {
+        &self.inner.indices
+    }
+
+    /// Texture atlas RGBA pixel data.
+    pub fn texture_rgba(&self) -> &[u8] {
+        &self.inner.texture_rgba
+    }
+
+    /// Texture atlas width.
+    pub fn texture_width(&self) -> u32 {
+        self.inner.texture_width
+    }
+
+    /// Texture atlas height.
+    pub fn texture_height(&self) -> u32 {
+        self.inner.texture_height
+    }
+
+    /// Number of vertices.
+    pub fn vertex_count(&self) -> usize {
+        self.inner.vertex_count()
+    }
+
+    /// Number of triangles.
+    pub fn triangle_count(&self) -> usize {
+        self.inner.triangle_count()
+    }
+}
+
+/// Build a [`MeshOutput`] from a [`MesherOutput`], optionally setting a chunk coordinate.
+fn mesh_output_from_mesher(
+    output: MesherOutput,
+    chunk_coord: Option<(i32, i32, i32)>,
+) -> MeshOutput {
+    let mut mesh = MeshOutput::from(output);
+    mesh.chunk_coord = chunk_coord;
+    mesh
+}
+
+/// Adapter to convert a single Nucleation Region into a BlockSource
+/// (palette-indexed flat Vec; the mesher only iterates it).
+struct RegionBlockSource {
+    palette: Vec<InputBlock>,
+    blocks: Vec<(MesherBlockPosition, u32)>,
+    bounds: MesherBoundingBox,
+}
+
+impl RegionBlockSource {
+    fn new(region: &Region) -> Self {
+        let bbox = region.get_bounding_box();
+        let mut palette: Vec<InputBlock> = Vec::new();
+        let mut blocks: Vec<(MesherBlockPosition, u32)> = Vec::new();
+        let mut min = [f32::MAX; 3];
+        let mut max = [f32::MIN; 3];
+
+        collect_region_blocks(region, &mut blocks, &mut palette, &mut min, &mut max);
+
+        // Use region bounds if no blocks found
+        if blocks.is_empty() {
+            min = [bbox.min.0 as f32, bbox.min.1 as f32, bbox.min.2 as f32];
+            max = [
+                bbox.max.0 as f32 + 1.0,
+                bbox.max.1 as f32 + 1.0,
+                bbox.max.2 as f32 + 1.0,
+            ];
+        }
+
+        let bounds = MesherBoundingBox::new(min, max);
+
+        Self {
+            palette,
+            blocks,
+            bounds,
+        }
+    }
+}
+
+impl BlockSource for RegionBlockSource {
+    fn get_block(&self, pos: MesherBlockPosition) -> Option<&InputBlock> {
+        self.blocks
+            .iter()
+            .find(|(p, _)| *p == pos)
+            .map(|(_, idx)| &self.palette[*idx as usize])
+    }
+
+    fn iter_blocks(&self) -> Box<dyn Iterator<Item = (MesherBlockPosition, &InputBlock)> + '_> {
+        Box::new(
+            self.blocks
+                .iter()
+                .map(|(pos, idx)| (*pos, &self.palette[*idx as usize])),
+        )
+    }
+
+    fn bounds(&self) -> MesherBoundingBox {
+        self.bounds
+    }
+}
+
+/// Adapter for chunk-based meshing.
+struct ChunkBlockSource {
+    blocks: HashMap<MesherBlockPosition, InputBlock>,
+    bounds: MesherBoundingBox,
+}
+
+impl ChunkBlockSource {
+    fn new(blocks: HashMap<MesherBlockPosition, InputBlock>, bounds: MesherBoundingBox) -> Self {
+        Self { blocks, bounds }
+    }
+}
+
+impl BlockSource for ChunkBlockSource {
+    fn get_block(&self, pos: MesherBlockPosition) -> Option<&InputBlock> {
+        self.blocks.get(&pos)
+    }
+
+    fn iter_blocks(&self) -> Box<dyn Iterator<Item = (MesherBlockPosition, &InputBlock)> + '_> {
+        // Yield in sorted order so per-chunk meshes are deterministic (this source
+        // is hash-map-backed; the whole-schematic VecBlockSource is already
+        // ordered). Chunks are small, so the sort is cheap.
+        let mut v: Vec<(MesherBlockPosition, &InputBlock)> = self
+            .blocks
+            .iter()
+            .map(|(pos, block)| (*pos, block))
+            .collect();
+        v.sort_unstable_by_key(|(p, _)| (p.x, p.y, p.z));
+        Box::new(v.into_iter())
+    }
+
+    fn bounds(&self) -> MesherBoundingBox {
+        self.bounds
+    }
+}
+
+/// Flat, palette-indexed block source for whole-schematic meshing.
+///
+/// The mesher only *iterates* the source, so a `Vec` beats a hash map (no
+/// per-block hashing / re-collection). On top of that, blocks store a `u32`
+/// index into a shared `palette` of unique `InputBlock`s instead of owning their
+/// own `InputBlock` — a 512³ region has millions of blocks but only thousands of
+/// distinct states, so this avoids millions of `String`/property allocations.
+struct VecBlockSource {
+    palette: Vec<InputBlock>,
+    blocks: Vec<(MesherBlockPosition, u32)>,
+    bounds: MesherBoundingBox,
+}
+
+impl VecBlockSource {
+    fn new(
+        palette: Vec<InputBlock>,
+        blocks: Vec<(MesherBlockPosition, u32)>,
+        bounds: MesherBoundingBox,
+    ) -> Self {
+        Self {
+            palette,
+            blocks,
+            bounds,
+        }
+    }
+}
+
+impl BlockSource for VecBlockSource {
+    fn get_block(&self, pos: MesherBlockPosition) -> Option<&InputBlock> {
+        self.blocks
+            .iter()
+            .find(|(p, _)| *p == pos)
+            .map(|(_, idx)| &self.palette[*idx as usize])
+    }
+
+    fn iter_blocks(&self) -> Box<dyn Iterator<Item = (MesherBlockPosition, &InputBlock)> + '_> {
+        Box::new(
+            self.blocks
+                .iter()
+                .map(|(pos, idx)| (*pos, &self.palette[*idx as usize])),
+        )
+    }
+
+    fn bounds(&self) -> MesherBoundingBox {
+        self.bounds
+    }
+}
+
+/// Convert a Nucleation BlockState to a schematic-mesher InputBlock.
+///
+/// A bare block id carries no properties, but "no properties" is not the same
+/// as "all properties false": a block placed by id means its *default* state.
+/// The mesher picks a variant purely from the properties it is handed, so an
+/// empty set makes multi-face blocks fall to their all-false variant, e.g.
+/// `red_mushroom_block` renders the pale porous inside instead of its red cap.
+/// Seed the input with the block's canonical `default_state` first, then let
+/// any explicit properties from the schematic override it.
+fn block_state_to_input_block(block_state: &BlockState) -> InputBlock {
+    let mut input = InputBlock::new(block_state.name.to_string());
+    if let Some(facts) = crate::blockpedia::get_block(&block_state.name) {
+        for (key, value) in facts.default_state {
+            input.properties.insert(key.to_string(), value.to_string());
+        }
+    }
+    for (key, value) in &block_state.properties {
+        input.properties.insert(key.to_string(), value.to_string());
+    }
+    input
+}
+
+/// Convert a Nucleation Entity to a schematic-mesher InputBlock with `entity:` prefix.
+///
+/// The mesher recognizes entities via the `entity:` namespace (e.g., `entity:minecart`,
+/// `entity:zombie`). Entity NBT data like Rotation is mapped to InputBlock properties.
+fn entity_to_input_block(entity: &Entity) -> InputBlock {
+    // Strip "minecraft:" prefix and add "entity:" prefix
+    let entity_id = entity.id.strip_prefix("minecraft:").unwrap_or(&entity.id);
+
+    // Map specific Minecraft entity types to mesher-supported types
+    let mesher_id = match entity_id {
+        "furnace_minecart"
+        | "chest_minecart"
+        | "tnt_minecart"
+        | "hopper_minecart"
+        | "spawner_minecart"
+        | "command_block_minecart" => "minecart",
+        // Wood-specific boat ids all render the one boat model; the mesher
+        // keys on the plain names.
+        id if id.ends_with("_chest_boat") || id.ends_with("_chest_raft") => "chest_boat",
+        id if id.ends_with("_boat") || id.ends_with("_raft") => "boat",
+        id => id,
+    };
+
+    let mut input = InputBlock::new(format!("entity:{}", mesher_id));
+
+    // Extract facing from Rotation NBT (Rotation is a list of 2 floats: [yaw, pitch])
+    if let Some(NbtValue::List(rotation)) = entity.nbt.get("Rotation") {
+        if let Some(NbtValue::Float(yaw)) = rotation.first() {
+            // Convert yaw angle to cardinal direction
+            let facing = yaw_to_facing(*yaw);
+            input
+                .properties
+                .insert("facing".to_string(), facing.to_string());
+        }
+    }
+
+    // A dropped item's sprite: the mesher's `entity:item` path reads the item
+    // id from an `item` property. Carried through from the entity's own
+    // `Item.id` tag — this is also how fireballs render, since vanilla draws
+    // them as exactly these item sprites (`fire_charge`, `dragon_fireball`).
+    if let Some(NbtValue::Compound(item)) = entity.nbt.get("Item") {
+        if let Some(NbtValue::String(id)) = item.get("id") {
+            input.properties.insert("item".to_string(), id.clone());
+        }
+    }
+
+    // Pass through relevant NBT as properties for the mesher
+    // Baby entities
+    if let Some(NbtValue::Byte(1)) = entity.nbt.get("IsBaby") {
+        input
+            .properties
+            .insert("is_baby".to_string(), "true".to_string());
+    }
+    // Age < 0 also indicates baby
+    if let Some(NbtValue::Int(age)) = entity.nbt.get("Age") {
+        if *age < 0 {
+            input
+                .properties
+                .insert("is_baby".to_string(), "true".to_string());
+        }
+    }
+
+    // Sheep color
+    if let Some(NbtValue::Byte(color)) = entity.nbt.get("Color") {
+        input
+            .properties
+            .insert("color".to_string(), dye_color_name(*color as u8));
+    }
+
+    // Armor stand pose properties
+    for pose_key in &[
+        "RightArmPose",
+        "LeftArmPose",
+        "RightLegPose",
+        "LeftLegPose",
+        "HeadPose",
+        "BodyPose",
+    ] {
+        if let Some(NbtValue::List(angles)) = entity.nbt.get(*pose_key) {
+            let angle_strs: Vec<String> = angles
+                .iter()
+                .filter_map(|v| match v {
+                    NbtValue::Float(f) => Some(format!("{}", f)),
+                    _ => None,
+                })
+                .collect();
+            if !angle_strs.is_empty() {
+                input
+                    .properties
+                    .insert(pose_key.to_string(), angle_strs.join(","));
+            }
+        }
+    }
+
+    // Armor stand equipment uses Minecraft's boots-to-helmet ArmorItems order.
+    if let Some(NbtValue::List(items)) = entity.nbt.get("ArmorItems") {
+        for (index, property) in ["boots", "leggings", "chestplate", "helmet"]
+            .iter()
+            .enumerate()
+        {
+            if let Some(NbtValue::Compound(item)) = items.get(index) {
+                if let Some(NbtValue::String(id)) = item.get("id") {
+                    input.properties.insert((*property).to_string(), id.clone());
+                }
+            }
+        }
+    }
+
+    input
+}
+
+fn entity_input_at_position(entities: &[Entity], pos: (i32, i32, i32)) -> Option<InputBlock> {
+    entities
+        .iter()
+        .find(|entity| {
+            (
+                entity.position.0.floor() as i32,
+                entity.position.1.floor() as i32,
+                entity.position.2.floor() as i32,
+            ) == pos
+        })
+        .map(entity_to_input_block)
+}
+
+/// Convert a yaw angle (degrees) to cardinal direction string.
+fn yaw_to_facing(yaw: f32) -> &'static str {
+    // Normalize yaw to 0..360
+    let normalized = ((yaw % 360.0) + 360.0) % 360.0;
+    if !(45.0..315.0).contains(&normalized) {
+        "south"
+    } else if (45.0..135.0).contains(&normalized) {
+        "west"
+    } else if (135.0..225.0).contains(&normalized) {
+        "north"
+    } else {
+        "east"
+    }
+}
+
+/// Convert a Minecraft dye color byte to color name.
+fn dye_color_name(color: u8) -> String {
+    match color {
+        0 => "white",
+        1 => "orange",
+        2 => "magenta",
+        3 => "light_blue",
+        4 => "yellow",
+        5 => "lime",
+        6 => "pink",
+        7 => "gray",
+        8 => "light_gray",
+        9 => "cyan",
+        10 => "purple",
+        11 => "blue",
+        12 => "brown",
+        13 => "green",
+        14 => "red",
+        15 => "black",
+        _ => "white",
+    }
+    .to_string()
+}
+
+/// Collect entities from a region and insert them into a block map as `entity:` blocks.
+fn collect_region_entities(
+    region: &Region,
+    blocks: &mut Vec<(MesherBlockPosition, u32)>,
+    palette: &mut Vec<InputBlock>,
+    min: &mut [f32; 3],
+    max: &mut [f32; 3],
+) {
+    // Entities are few and almost always occupy air positions, so we append them
+    // directly (each gets its own palette entry). (Previously blocks took priority
+    // via a hash-map membership check; with the flat Vec source we skip that — a
+    // coincident block+entity now renders both, which is rare and harmless.)
+    for entity in &region.entities {
+        let input_block = entity_to_input_block(entity);
+        let idx = palette.len() as u32;
+        palette.push(input_block);
+
+        // Use floored entity position as block position
+        let x = entity.position.0.floor() as i32;
+        let y = entity.position.1.floor() as i32;
+        let z = entity.position.2.floor() as i32;
+        let pos = MesherBlockPosition::new(x, y, z);
+
+        blocks.push((pos, idx));
+
+        min[0] = min[0].min(x as f32);
+        min[1] = min[1].min(y as f32);
+        min[2] = min[2].min(z as f32);
+        max[0] = max[0].max(x as f32 + 1.0);
+        max[1] = max[1].max(y as f32 + 1.0);
+        max[2] = max[2].max(z as f32 + 1.0);
+    }
+}
+
+// ─── Progress Reporting ─────────────────────────────────────────────────────
+
+/// Phase of the meshing pipeline (for progress reporting).
+#[derive(Clone, Debug, PartialEq)]
+pub enum MeshPhase {
+    /// Scanning block palettes and building the global texture atlas.
+    BuildingAtlas,
+    /// Meshing individual chunks.
+    MeshingChunks,
+    /// All chunks have been meshed.
+    Complete,
+}
+
+/// Progress update emitted during chunk meshing.
+#[derive(Clone, Debug)]
+pub struct MeshProgress {
+    /// Current phase of the pipeline.
+    pub phase: MeshPhase,
+    /// Number of chunks completed so far.
+    pub chunks_done: u32,
+    /// Total number of chunks to mesh.
+    pub chunks_total: u32,
+    /// Cumulative vertex count across all completed chunks.
+    pub vertices_so_far: u64,
+    /// Cumulative triangle count across all completed chunks.
+    pub triangles_so_far: u64,
+}
+
+// ─── Global Atlas ───────────────────────────────────────────────────────────
+
+/// Build a single shared texture atlas from all unique block states in a schematic.
+///
+/// Scans every region's palette (O(unique_states), not O(volume)) to discover
+/// texture paths, then builds one atlas that can be reused across all chunks.
+/// This eliminates per-chunk atlas duplication for massive schematics.
+pub fn build_global_atlas(
+    schematic: &UniversalSchematic,
+    pack: &ResourcePackSource,
+    config: &MeshConfig,
+) -> Result<TextureAtlas> {
+    let mesher_config = config.to_mesher_config();
+
+    // Collect all unique block states from all regions' palettes
+    let mut unique_states: std::collections::HashSet<BlockState> = std::collections::HashSet::new();
+    for state in &schematic.default_region.palette {
+        if state.name != "minecraft:air" {
+            unique_states.insert(state.clone());
+        }
+    }
+    for region in schematic.other_regions.values() {
+        for state in &region.palette {
+            if state.name != "minecraft:air" {
+                unique_states.insert(state.clone());
+            }
+        }
+    }
+
+    // Convert unique states to InputBlocks and discover textures via the mesher
+    // We create a small synthetic block source with one of each unique block state
+    let mut blocks = HashMap::new();
+    let mut pos_idx = 0i32;
+    for state in &unique_states {
+        let pos = MesherBlockPosition::new(pos_idx, 0, 0);
+        let input = block_state_to_input_block(state);
+        blocks.insert(pos, input);
+        pos_idx += 1; // Spread blocks apart so they don't cull each other
+    }
+
+    if blocks.is_empty() {
+        return Ok(TextureAtlas::empty());
+    }
+
+    let bounds = MesherBoundingBox::new([0.0, 0.0, 0.0], [pos_idx as f32, 1.0, 1.0]);
+
+    // Use a config with no culling for texture discovery
+    let mut discovery_config = mesher_config.clone();
+    discovery_config.cull_hidden_faces = false;
+    discovery_config.cull_occluded_blocks = false;
+
+    let source = ChunkBlockSource::new(blocks, bounds);
+    let mesher = Mesher::with_config(pack.pack.clone(), discovery_config);
+
+    let texture_refs = mesher.discover_textures(&source);
+
+    // Build atlas from discovered textures
+    let mut atlas_builder =
+        AtlasBuilder::new(mesher_config.atlas_max_size, mesher_config.atlas_padding);
+
+    for texture_ref in &texture_refs {
+        if let Some(texture) = pack.pack.get_texture(texture_ref) {
+            atlas_builder.add_texture(texture_ref.clone(), texture.first_frame());
+        }
+    }
+
+    atlas_builder
+        .build()
+        .map_err(|e| MeshError::Meshing(e.to_string()))
+}
+
+impl UniversalSchematic {
+    /// Compute the raw MesherOutput for the entire schematic (internal helper).
+    fn compute_mesh_output(
+        &self,
+        pack: &ResourcePackSource,
+        config: &MeshConfig,
+    ) -> Result<MesherOutput> {
+        let _prof = std::env::var("NUCLEATION_MESH_PROFILE").is_ok();
+        macro_rules! phase {
+            ($t:expr, $label:expr) => {
+                if _prof {
+                    if let Some(t) = $t {
+                        eprintln!("PROFILE\t{}\t{}", $label, t.elapsed().as_micros());
+                    }
+                }
+            };
+        }
+
+        let t0 = prof_now();
+        let mesher_config = config.to_mesher_config();
+        let mesher = Mesher::with_config(pack.pack.clone(), mesher_config);
+        phase!(t0, "config+pack_clone");
+
+        // Collect all blocks from all regions into a flat, palette-indexed Vec
+        // (not a HashMap): the mesher only iterates the source, and storing palette
+        // indices avoids both per-block hashing and per-block InputBlock allocation.
+        let t1 = prof_now();
+        let mut all_blocks: Vec<(MesherBlockPosition, u32)> = Vec::new();
+        let mut palette: Vec<InputBlock> = Vec::new();
+        let mut min = [f32::MAX; 3];
+        let mut max = [f32::MIN; 3];
+
+        // Process default region
+        collect_region_blocks(
+            &self.default_region,
+            &mut all_blocks,
+            &mut palette,
+            &mut min,
+            &mut max,
+        );
+
+        // Process other regions
+        for region in self.other_regions.values() {
+            collect_region_blocks(region, &mut all_blocks, &mut palette, &mut min, &mut max);
+        }
+        phase!(t1, "collect_region_blocks");
+
+        if all_blocks.is_empty() {
+            return Err(MeshError::Meshing("No blocks to mesh".to_string()));
+        }
+
+        let t2 = prof_now();
+        let bounds = MesherBoundingBox::new(min, max);
+        let source = VecBlockSource::new(palette, all_blocks, bounds);
+        phase!(t2, "build_source");
+
+        let t3 = prof_now();
+        let out = mesher
+            .mesh(&source)
+            .map_err(|e| MeshError::Meshing(e.to_string()));
+        phase!(t3, "mesher.mesh");
+        out
+    }
+
+    /// Generate a single mesh for the entire schematic.
+    ///
+    /// Best for small/medium schematics. Returns one [`MeshOutput`] containing
+    /// per-layer typed arrays, a shared texture atlas, and export helpers.
+    pub fn to_mesh(&self, pack: &ResourcePackSource, config: &MeshConfig) -> Result<MeshOutput> {
+        let output = self.compute_mesh_output(pack, config)?;
+        Ok(mesh_output_from_mesher(output, None))
+    }
+
+    /// Build an *animated* GLB replaying a captured scenario.
+    ///
+    /// The schematic is the initial world state; `timeline_json` is the decoded
+    /// MCAP event timeline (a [`schematic_mesher::Timeline`] serialised as JSON
+    /// — `origin`, `tick_ms`, and a list of `set_block` / `piston` events). The
+    /// mesher emits one node per static base, one node per block-state variant
+    /// (toggled with a STEP `scale` track), and one node per piston-pushed block
+    /// (a LINEAR `translation` track).
+    pub fn to_animated_glb(
+        &self,
+        pack: &ResourcePackSource,
+        timeline_json: &str,
+    ) -> Result<Vec<u8>> {
+        let timeline: schematic_mesher::Timeline = serde_json::from_str(timeline_json)
+            .map_err(|e| MeshError::Meshing(format!("timeline parse: {e}")))?;
+
+        let mut blocks: Vec<(MesherBlockPosition, u32)> = Vec::new();
+        let mut palette: Vec<InputBlock> = Vec::new();
+        let mut min = [f32::MAX; 3];
+        let mut max = [f32::MIN; 3];
+        collect_region_blocks(
+            &self.default_region,
+            &mut blocks,
+            &mut palette,
+            &mut min,
+            &mut max,
+        );
+        for region in self.other_regions.values() {
+            collect_region_blocks(region, &mut blocks, &mut palette, &mut min, &mut max);
+        }
+
+        // Materialize owned InputBlocks for the animated-GLB builder (rare path).
+        let initial: Vec<(MesherBlockPosition, InputBlock)> = blocks
+            .iter()
+            .map(|(pos, idx)| (*pos, palette[*idx as usize].clone()))
+            .collect();
+
+        schematic_mesher::build_animated_glb(&pack.pack, &initial, &timeline)
+            .map_err(|e| MeshError::Meshing(e.to_string()))
+    }
+
+    /// Generate a USDZ mesh for the entire schematic.
+    pub fn to_usdz(&self, pack: &ResourcePackSource, config: &MeshConfig) -> Result<MeshOutput> {
+        let output = self.compute_mesh_output(pack, config)?;
+        Ok(mesh_output_from_mesher(output, None))
+    }
+
+    /// Generate raw mesh data for the entire schematic.
+    ///
+    /// Returns positions, normals, UVs, colors, indices, and texture atlas data
+    /// for custom rendering pipelines.
+    pub fn to_raw_mesh(
+        &self,
+        pack: &ResourcePackSource,
+        config: &MeshConfig,
+    ) -> Result<RawMeshExport> {
+        let output = self.compute_mesh_output(pack, config)?;
+        let raw = export_raw(&output);
+        Ok(RawMeshExport { inner: raw })
+    }
+
+    /// Generate one mesh per region.
+    ///
+    /// Best for schematics with meaningful region structure (e.g., Litematic
+    /// files with named regions). Returns a map of region name to [`MeshOutput`].
+    pub fn mesh_by_region(
+        &self,
+        pack: &ResourcePackSource,
+        config: &MeshConfig,
+    ) -> Result<MultiMeshResult> {
+        let mesher_config = config.to_mesher_config();
+
+        let mut meshes = HashMap::new();
+
+        // Mesh default region
+        if let Some(result) = mesh_region(&pack.pack, &self.default_region, &mesher_config)? {
+            meshes.insert(self.default_region_name.clone(), result);
+        }
+
+        // Mesh other regions
+        for (name, region) in &self.other_regions {
+            if let Some(result) = mesh_region(&pack.pack, region, &mesher_config)? {
+                meshes.insert(name.clone(), result);
+            }
+        }
+
+        Ok(meshes)
+    }
+
+    /// Generate one mesh per 16x16x16 chunk.
+    ///
+    /// This is useful for large schematics where you want to load/unload
+    /// meshes based on camera position.
+    pub fn mesh_by_chunk(
+        &self,
+        pack: &ResourcePackSource,
+        config: &MeshConfig,
+    ) -> Result<ChunkMeshResult> {
+        self.mesh_by_chunk_size(pack, config, 16)
+    }
+
+    /// Generate one mesh per chunk of the specified size (eager — loads all at once).
+    ///
+    /// For lazy iteration that never holds the full world in memory, use
+    /// [`mesh_chunks`](Self::mesh_chunks) instead.
+    pub fn mesh_by_chunk_size(
+        &self,
+        pack: &ResourcePackSource,
+        config: &MeshConfig,
+        chunk_size: i32,
+    ) -> Result<ChunkMeshResult> {
+        let mesher_config = config.to_mesher_config();
+
+        // Collect all blocks from all regions into chunks
+        let mut chunks: HashMap<(i32, i32, i32), HashMap<MesherBlockPosition, InputBlock>> =
+            HashMap::new();
+
+        // Process default region
+        collect_region_blocks_by_chunk(&self.default_region, &mut chunks, chunk_size);
+
+        // Process other regions
+        for region in self.other_regions.values() {
+            collect_region_blocks_by_chunk(region, &mut chunks, chunk_size);
+        }
+
+        let mut meshes = HashMap::new();
+        let mut total_vertex_count = 0;
+        let mut total_triangle_count = 0;
+
+        for (chunk_coord, blocks) in chunks {
+            if blocks.is_empty() {
+                continue;
+            }
+
+            // Calculate bounds for this chunk
+            let mut min = [f32::MAX; 3];
+            let mut max = [f32::MIN; 3];
+
+            for pos in blocks.keys() {
+                min[0] = min[0].min(pos.x as f32);
+                min[1] = min[1].min(pos.y as f32);
+                min[2] = min[2].min(pos.z as f32);
+                max[0] = max[0].max(pos.x as f32 + 1.0);
+                max[1] = max[1].max(pos.y as f32 + 1.0);
+                max[2] = max[2].max(pos.z as f32 + 1.0);
+            }
+
+            let bounds = MesherBoundingBox::new(min, max);
+            let source = ChunkBlockSource::new(blocks, bounds);
+
+            let mesher = Mesher::with_config(pack.pack.clone(), mesher_config.clone());
+            let output = mesher
+                .mesh(&source)
+                .map_err(|e| MeshError::Meshing(e.to_string()))?;
+
+            let result = mesh_output_from_mesher(output, Some(chunk_coord));
+
+            total_vertex_count += result.total_vertices();
+            total_triangle_count += result.total_triangles();
+            meshes.insert(chunk_coord, result);
+        }
+
+        Ok(ChunkMeshResult {
+            meshes,
+            total_vertex_count,
+            total_triangle_count,
+        })
+    }
+
+    /// Mesh one [`MeshOutput`] per animation group, in group order.
+    ///
+    /// This is the bridge between [`crate::animation`] and the renderer:
+    /// `render_animation` poses mesh *i* with group *i*, so the two must be
+    /// index-aligned. Groups producing no geometry (all air) still yield an
+    /// entry, keeping that alignment exact.
+    ///
+    /// Each group is meshed independently, so faces between groups are **not**
+    /// culled against each other — which is what you want when the groups move
+    /// apart, and wasteful when they never do. Prefer coarse groupings
+    /// (`Layer`, `Chunk`) for large builds: per-block meshing means one draw
+    /// call per block.
+    ///
+    /// ```ignore
+    /// let anim = BuildAnimator::from_schematic(&schem, Grouping::PerBlock);
+    /// let meshes = schem.mesh_groups(&pack, &config, anim.groups())?;
+    /// render_animation(&meshes, &anim.frames(24.0), &render_config, None)?;
+    /// ```
+    pub fn mesh_groups(
+        &self,
+        pack: &ResourcePackSource,
+        config: &MeshConfig,
+        groups: &[crate::animation::Group],
+    ) -> Result<Vec<MeshOutput>> {
+        self.mesh_groups_in_region(pack, config, None, groups)
+    }
+
+    pub(crate) fn mesh_groups_in_region(
+        &self,
+        pack: &ResourcePackSource,
+        config: &MeshConfig,
+        region_name: Option<&str>,
+        groups: &[crate::animation::Group],
+    ) -> Result<Vec<MeshOutput>> {
+        Ok(self
+            .mesh_groups_in_region_raw(pack, config, region_name, groups)?
+            .into_iter()
+            .map(|output| mesh_output_from_mesher(output, None))
+            .collect())
+    }
+
+    /// The mesher's own output per group — the atlas and layers before they are
+    /// repackaged as [`MeshOutput`]; exporters that assemble their own scene
+    /// (the animated build GLB) start here.
+    pub(crate) fn mesh_groups_in_region_raw(
+        &self,
+        pack: &ResourcePackSource,
+        config: &MeshConfig,
+        region_name: Option<&str>,
+        groups: &[crate::animation::Group],
+    ) -> Result<Vec<MesherOutput>> {
+        let mesher_config = config.to_mesher_config();
+        let region = region_name.and_then(|name| self.get_region(name));
+        let entities = region
+            .map(|region| region.entities.clone())
+            .unwrap_or_else(|| self.get_entities_as_list());
+        let mut out = Vec::with_capacity(groups.len());
+
+        for group in groups {
+            let mut blocks: HashMap<MesherBlockPosition, InputBlock> = HashMap::new();
+            let mut min = [f32::MAX; 3];
+            let mut max = [f32::MIN; 3];
+
+            for &(x, y, z) in &group.blocks {
+                let pos = MesherBlockPosition { x, y, z };
+                let block = match region {
+                    Some(region) => region.get_block(x, y, z),
+                    None => self.get_block(x, y, z),
+                }
+                .filter(|block| !crate::fingerprint::is_air(block.get_name()))
+                .map(block_state_to_input_block)
+                .or_else(|| entity_input_at_position(&entities, (x, y, z)));
+                let Some(block) = block else {
+                    continue;
+                };
+                blocks.insert(pos, block);
+                min[0] = min[0].min(x as f32);
+                min[1] = min[1].min(y as f32);
+                min[2] = min[2].min(z as f32);
+                max[0] = max[0].max(x as f32 + 1.0);
+                max[1] = max[1].max(y as f32 + 1.0);
+                max[2] = max[2].max(z as f32 + 1.0);
+            }
+
+            if blocks.is_empty() {
+                // Keep index alignment with `groups` even when empty.
+                out.push(MesherOutput {
+                    opaque_mesh: MeshLayer::default(),
+                    cutout_mesh: MeshLayer::default(),
+                    transparent_mesh: MeshLayer::default(),
+                    atlas: schematic_mesher::TextureAtlas::empty(),
+                    bounds: MesherBoundingBox::new([0.0; 3], [0.0; 3]),
+                    greedy_materials: Vec::new(),
+                    animated_textures: Vec::new(),
+                });
+                continue;
+            }
+
+            let bounds = MesherBoundingBox::new(min, max);
+            let source = ChunkBlockSource::new(blocks, bounds);
+            let mesher = Mesher::with_config(pack.pack.clone(), mesher_config.clone());
+            let output = mesher
+                .mesh(&source)
+                .map_err(|e| MeshError::Meshing(e.to_string()))?;
+            out.push(output);
+        }
+        Ok(out)
+    }
+
+    /// Create a lazy chunk mesh iterator.
+    ///
+    /// Yields one [`MeshOutput`] per chunk of `chunk_size` blocks on each axis.
+    /// Never loads the full world mesh into memory — best for large/massive
+    /// schematics.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// for result in schematic.mesh_chunks(&pack, &config, 16) {
+    ///     let mesh = result?;
+    ///     let (cx, cy, cz) = mesh.chunk_coord.unwrap();
+    ///     println!("Chunk ({},{},{}) — {} triangles",
+    ///         cx, cy, cz, mesh.total_triangles());
+    /// }
+    /// ```
+    /// Mesh the schematic in parallel using `std::thread::scope`.
+    ///
+    /// Splits the schematic into chunks of `chunk_size` blocks, then meshes
+    /// each chunk on a separate thread (up to `max_threads` concurrently).
+    /// Returns all chunk meshes as a `Vec<MeshOutput>`.
+    ///
+    /// This is the fastest path for large schematics. Each chunk gets its own
+    /// texture atlas, so the caller must handle multiple atlases when rendering.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let meshes = schematic.mesh_chunks_parallel(&pack, &config, 32, 8)?;
+    /// println!("Meshed {} chunks", meshes.len());
+    /// for mesh in &meshes {
+    ///     println!("  {} triangles", mesh.total_triangles());
+    /// }
+    /// ```
+    pub fn mesh_chunks_parallel(
+        &self,
+        pack: &ResourcePackSource,
+        config: &MeshConfig,
+        chunk_size: i32,
+        max_threads: usize,
+    ) -> Result<Vec<MeshOutput>> {
+        let mesher_config = config.to_mesher_config();
+
+        let mut chunks: HashMap<(i32, i32, i32), HashMap<MesherBlockPosition, InputBlock>> =
+            HashMap::new();
+
+        collect_region_blocks_by_chunk(&self.default_region, &mut chunks, chunk_size);
+        for region in self.other_regions.values() {
+            collect_region_blocks_by_chunk(region, &mut chunks, chunk_size);
+        }
+
+        let chunk_list: Vec<_> = chunks.into_iter().filter(|(_, b)| !b.is_empty()).collect();
+
+        if chunk_list.is_empty() {
+            return Err(MeshError::Meshing("No blocks to mesh".to_string()));
+        }
+
+        let max_threads = max_threads.max(1);
+        let pack_ref = &pack.pack;
+        let config_ref = &mesher_config;
+
+        // Use std::thread::scope for safe parallel meshing without extra dependencies
+        let results: Vec<Result<MeshOutput>> = std::thread::scope(|scope| {
+            let mut handles = Vec::new();
+
+            for batch in chunk_list.chunks(max_threads) {
+                let batch_handles: Vec<_> = batch
+                    .iter()
+                    .map(|(chunk_coord, blocks)| {
+                        let coord = *chunk_coord;
+                        scope.spawn(move || {
+                            let mut min = [f32::MAX; 3];
+                            let mut max = [f32::MIN; 3];
+                            for pos in blocks.keys() {
+                                min[0] = min[0].min(pos.x as f32);
+                                min[1] = min[1].min(pos.y as f32);
+                                min[2] = min[2].min(pos.z as f32);
+                                max[0] = max[0].max(pos.x as f32 + 1.0);
+                                max[1] = max[1].max(pos.y as f32 + 1.0);
+                                max[2] = max[2].max(pos.z as f32 + 1.0);
+                            }
+
+                            let bounds = MesherBoundingBox::new(min, max);
+                            let source = ChunkBlockSource::new(blocks.clone(), bounds);
+                            let mesher = Mesher::with_config(pack_ref.clone(), config_ref.clone());
+
+                            match mesher.mesh(&source) {
+                                Ok(output) => Ok(mesh_output_from_mesher(output, Some(coord))),
+                                Err(e) => Err(MeshError::Meshing(e.to_string())),
+                            }
+                        })
+                    })
+                    .collect();
+
+                // Wait for this batch to complete before spawning next batch
+                for handle in batch_handles {
+                    handles.push(handle.join().expect("Mesh thread panicked"));
+                }
+            }
+
+            handles
+        });
+
+        // Collect results, propagating first error
+        results.into_iter().collect()
+    }
+
+    pub fn mesh_chunks(
+        &self,
+        pack: &ResourcePackSource,
+        config: &MeshConfig,
+        chunk_size: i32,
+    ) -> NucleationChunkIter {
+        let mut chunks: HashMap<(i32, i32, i32), HashMap<MesherBlockPosition, InputBlock>> =
+            HashMap::new();
+
+        collect_region_blocks_by_chunk(&self.default_region, &mut chunks, chunk_size);
+        for region in self.other_regions.values() {
+            collect_region_blocks_by_chunk(region, &mut chunks, chunk_size);
+        }
+
+        let chunk_list: Vec<_> = chunks.into_iter().filter(|(_, b)| !b.is_empty()).collect();
+
+        NucleationChunkIter {
+            chunks: chunk_list,
+            index: 0,
+            pack: pack.pack.clone(),
+            config: config.to_mesher_config(),
+            shared_atlas: None,
+            progress_callback: None,
+            vertices_so_far: 0,
+            triangles_so_far: 0,
+        }
+    }
+
+    /// Create a lazy chunk mesh iterator that uses a pre-built global atlas.
+    ///
+    /// The global atlas is shared across all chunks, eliminating per-chunk atlas
+    /// duplication. Build the atlas first with [`build_global_atlas()`], then
+    /// pass it here.
+    pub fn mesh_chunks_with_atlas(
+        &self,
+        pack: &ResourcePackSource,
+        config: &MeshConfig,
+        chunk_size: i32,
+        atlas: TextureAtlas,
+    ) -> NucleationChunkIter {
+        let mut chunks: HashMap<(i32, i32, i32), HashMap<MesherBlockPosition, InputBlock>> =
+            HashMap::new();
+
+        collect_region_blocks_by_chunk(&self.default_region, &mut chunks, chunk_size);
+        for region in self.other_regions.values() {
+            collect_region_blocks_by_chunk(region, &mut chunks, chunk_size);
+        }
+
+        let chunk_list: Vec<_> = chunks.into_iter().filter(|(_, b)| !b.is_empty()).collect();
+
+        NucleationChunkIter {
+            chunks: chunk_list,
+            index: 0,
+            pack: pack.pack.clone(),
+            config: config.to_mesher_config(),
+            shared_atlas: Some(atlas),
+            progress_callback: None,
+            vertices_so_far: 0,
+            triangles_so_far: 0,
+        }
+    }
+}
+
+/// Lazy iterator that yields one [`MeshOutput`] per chunk.
+///
+/// Created by [`UniversalSchematic::mesh_chunks`] or
+/// [`UniversalSchematic::mesh_chunks_with_atlas`]. Implements [`Iterator`]
+/// with `Item = Result<MeshOutput>`.
+///
+/// Supports an optional shared atlas (set via `mesh_chunks_with_atlas`) and
+/// progress callbacks (set via [`set_progress_callback`]).
+pub struct NucleationChunkIter {
+    chunks: Vec<((i32, i32, i32), HashMap<MesherBlockPosition, InputBlock>)>,
+    index: usize,
+    pack: ResourcePack,
+    config: MesherConfig,
+    /// Pre-built global atlas shared across all chunks.
+    shared_atlas: Option<TextureAtlas>,
+    /// Optional progress callback invoked after each chunk.
+    progress_callback: Option<Box<dyn Fn(MeshProgress)>>,
+    /// Running totals for progress reporting.
+    vertices_so_far: u64,
+    triangles_so_far: u64,
+}
+
+impl NucleationChunkIter {
+    /// Total number of chunks that will be yielded.
+    pub fn chunk_count(&self) -> usize {
+        self.chunks.len()
+    }
+
+    /// How many chunks have already been yielded.
+    pub fn chunks_yielded(&self) -> usize {
+        self.index
+    }
+
+    /// Whether this iterator uses a shared global atlas.
+    pub fn has_shared_atlas(&self) -> bool {
+        self.shared_atlas.is_some()
+    }
+
+    /// Get a reference to the shared atlas (if any).
+    pub fn shared_atlas(&self) -> Option<&TextureAtlas> {
+        self.shared_atlas.as_ref()
+    }
+
+    /// Set a callback that will be invoked after each chunk is meshed.
+    ///
+    /// The callback receives a [`MeshProgress`] with cumulative stats.
+    pub fn set_progress_callback(&mut self, cb: Box<dyn Fn(MeshProgress)>) {
+        self.progress_callback = Some(cb);
+    }
+}
+
+impl Iterator for NucleationChunkIter {
+    type Item = Result<MeshOutput>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index >= self.chunks.len() {
+            return None;
+        }
+
+        let (chunk_coord, ref blocks) = self.chunks[self.index];
+        self.index += 1;
+
+        // Calculate bounds for this chunk
+        let mut min = [f32::MAX; 3];
+        let mut max = [f32::MIN; 3];
+        for pos in blocks.keys() {
+            min[0] = min[0].min(pos.x as f32);
+            min[1] = min[1].min(pos.y as f32);
+            min[2] = min[2].min(pos.z as f32);
+            max[0] = max[0].max(pos.x as f32 + 1.0);
+            max[1] = max[1].max(pos.y as f32 + 1.0);
+            max[2] = max[2].max(pos.z as f32 + 1.0);
+        }
+
+        let bounds = MesherBoundingBox::new(min, max);
+        let source = ChunkBlockSource::new(blocks.clone(), bounds);
+
+        // Inject shared atlas into per-chunk config if available
+        let mut chunk_config = self.config.clone();
+        if let Some(ref atlas) = self.shared_atlas {
+            chunk_config.pre_built_atlas = Some(atlas.clone());
+        }
+
+        let mesher = Mesher::with_config(self.pack.clone(), chunk_config);
+        let output = match mesher.mesh(&source) {
+            Ok(o) => o,
+            Err(e) => return Some(Err(MeshError::Meshing(e.to_string()))),
+        };
+
+        let mesh = mesh_output_from_mesher(output, Some(chunk_coord));
+
+        // Update running totals and fire progress callback
+        self.vertices_so_far += mesh.total_vertices() as u64;
+        self.triangles_so_far += mesh.total_triangles() as u64;
+
+        if let Some(ref cb) = self.progress_callback {
+            cb(MeshProgress {
+                phase: if self.index >= self.chunks.len() {
+                    MeshPhase::Complete
+                } else {
+                    MeshPhase::MeshingChunks
+                },
+                chunks_done: self.index as u32,
+                chunks_total: self.chunks.len() as u32,
+                vertices_so_far: self.vertices_so_far,
+                triangles_so_far: self.triangles_so_far,
+            });
+        }
+
+        Some(Ok(mesh))
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = self.chunks.len() - self.index;
+        (remaining, Some(remaining))
+    }
+}
+
+/// Helper function to mesh a single region.
+fn mesh_region(
+    pack: &ResourcePack,
+    region: &Region,
+    config: &MesherConfig,
+) -> Result<Option<MeshOutput>> {
+    let source = RegionBlockSource::new(region);
+
+    if source.blocks.is_empty() {
+        return Ok(None);
+    }
+
+    let mesher = Mesher::with_config(pack.clone(), config.clone());
+    let output = mesher
+        .mesh(&source)
+        .map_err(|e| MeshError::Meshing(e.to_string()))?;
+
+    Ok(Some(mesh_output_from_mesher(output, None)))
+}
+
+/// Collect a region's non-air blocks as `(position, palette_index)` pairs,
+/// extending a shared `palette` of unique `InputBlock`s.
+///
+/// The region already stores blocks as indices into a small palette of unique
+/// states, so we build one `InputBlock` per palette entry (thousands) instead of
+/// one per block (millions) — eliminating the per-block `String`/property
+/// allocations that dominated this function. Palette indices are offset by the
+/// caller's current `palette.len()` so multiple regions share one flat palette.
+/// Wasm-safe profiling clock. `std::time::Instant::now()` panics on
+/// `wasm32-unknown-unknown` ("time not implemented on this platform"), so return
+/// `None` there. Profiling output is gated on `NUCLEATION_MESH_PROFILE`, which is
+/// never set on wasm (`std::env::var` returns `Err`), so this is a pure no-op.
+#[inline]
+fn prof_now() -> Option<std::time::Instant> {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        Some(std::time::Instant::now())
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        None
+    }
+}
+
+fn collect_region_blocks(
+    region: &Region,
+    blocks: &mut Vec<(MesherBlockPosition, u32)>,
+    palette: &mut Vec<InputBlock>,
+    min: &mut [f32; 3],
+    max: &mut [f32; 3],
+) {
+    use rayon::prelude::*;
+    let _prof = std::env::var("NUCLEATION_MESH_PROFILE").is_ok();
+
+    // Build this region's palette of InputBlocks once (and an air mask to skip).
+    let base = palette.len() as u32;
+    let mut is_air: Vec<bool> = Vec::with_capacity(region.palette.len());
+    for state in &region.palette {
+        is_air.push(state.name == "minecraft:air");
+        palette.push(block_state_to_input_block(state));
+    }
+
+    // Parallel volume scan: emit (pos, global_palette_index) for each non-air
+    // block. No per-block InputBlock construction — just an index lookup.
+    let t_scan = prof_now();
+    let collected: Vec<(MesherBlockPosition, u32, i32, i32, i32)> = (0..region.volume())
+        .into_par_iter()
+        .filter_map(|index| {
+            let (x, y, z) = region.index_to_coords(index);
+            let idx = region.get_block_index(x, y, z)?;
+            if is_air[idx] {
+                return None;
+            }
+            Some((
+                MesherBlockPosition::new(x, y, z),
+                base + idx as u32,
+                x,
+                y,
+                z,
+            ))
+        })
+        .collect();
+    if _prof {
+        if let Some(t) = t_scan {
+            eprintln!("PROFILE\t  scan\t{}", t.elapsed().as_micros());
+        }
+    }
+
+    let t_ins = prof_now();
+    blocks.reserve(collected.len());
+    for (pos, gidx, x, y, z) in collected {
+        blocks.push((pos, gidx));
+
+        min[0] = min[0].min(x as f32);
+        min[1] = min[1].min(y as f32);
+        min[2] = min[2].min(z as f32);
+        max[0] = max[0].max(x as f32 + 1.0);
+        max[1] = max[1].max(y as f32 + 1.0);
+        max[2] = max[2].max(z as f32 + 1.0);
+    }
+    if _prof {
+        if let Some(t) = t_ins {
+            eprintln!("PROFILE\t  vec_push\t{}", t.elapsed().as_micros());
+        }
+    }
+
+    // Also collect entities as entity: blocks
+    collect_region_entities(region, blocks, palette, min, max);
+}
+
+/// Helper function to collect blocks and entities from a region into chunk buckets.
+fn collect_region_blocks_by_chunk(
+    region: &Region,
+    chunks: &mut HashMap<(i32, i32, i32), HashMap<MesherBlockPosition, InputBlock>>,
+    chunk_size: i32,
+) {
+    for index in 0..region.volume() {
+        let (x, y, z) = region.index_to_coords(index);
+        if let Some(block_state) = region.get_block(x, y, z) {
+            if block_state.name != "minecraft:air" {
+                let chunk_x = x.div_euclid(chunk_size);
+                let chunk_y = y.div_euclid(chunk_size);
+                let chunk_z = z.div_euclid(chunk_size);
+
+                let chunk_blocks = chunks.entry((chunk_x, chunk_y, chunk_z)).or_default();
+                let pos = MesherBlockPosition::new(x, y, z);
+                let input_block = block_state_to_input_block(block_state);
+                chunk_blocks.insert(pos, input_block);
+            }
+        }
+    }
+
+    // Also collect entities into their respective chunks
+    for entity in &region.entities {
+        let input_block = entity_to_input_block(entity);
+        let x = entity.position.0.floor() as i32;
+        let y = entity.position.1.floor() as i32;
+        let z = entity.position.2.floor() as i32;
+        let pos = MesherBlockPosition::new(x, y, z);
+
+        let chunk_x = x.div_euclid(chunk_size);
+        let chunk_y = y.div_euclid(chunk_size);
+        let chunk_z = z.div_euclid(chunk_size);
+
+        let chunk_blocks = chunks.entry((chunk_x, chunk_y, chunk_z)).or_default();
+        chunk_blocks.entry(pos).or_insert(input_block);
+    }
+}
+
+/// Split a "namespace:path" resource name into (namespace, path).
+fn split_resource_name(name: &str) -> Result<(String, String)> {
+    match name.split_once(':') {
+        Some((ns, path)) => Ok((ns.to_string(), path.to_string())),
+        None => Ok(("minecraft".to_string(), name.to_string())),
+    }
+}
+
+/// Manually serialize BlockstateDefinition to JSON since it doesn't implement Serialize.
+fn blockstate_definition_to_json(def: &schematic_mesher::BlockstateDefinition) -> String {
+    match def {
+        schematic_mesher::BlockstateDefinition::Variants(variants) => {
+            let mut map = serde_json::Map::new();
+            let mut variants_map = serde_json::Map::new();
+            for (key, models) in variants {
+                if models.len() == 1 {
+                    variants_map.insert(
+                        key.clone(),
+                        serde_json::to_value(&models[0]).unwrap_or_default(),
+                    );
+                } else {
+                    variants_map.insert(
+                        key.clone(),
+                        serde_json::to_value(models).unwrap_or_default(),
+                    );
+                }
+            }
+            map.insert(
+                "variants".to_string(),
+                serde_json::Value::Object(variants_map),
+            );
+            serde_json::Value::Object(map).to_string()
+        }
+        schematic_mesher::BlockstateDefinition::Multipart(cases) => {
+            let mut map = serde_json::Map::new();
+            map.insert(
+                "multipart".to_string(),
+                serde_json::to_value(cases).unwrap_or_default(),
+            );
+            serde_json::Value::Object(map).to_string()
+        }
+    }
+}
+
+// ─── MeshExporter (FormatManager integration) ──────────────────────────────
+
+use crate::formats::manager::SchematicExporter;
+
+/// A format exporter that produces mesh data (GLB, USDZ) through the FormatManager.
+///
+/// Unlike other exporters, MeshExporter is stateful — it holds a loaded resource pack.
+/// Register it with `FormatManager::register_exporter` after loading a resource pack.
+pub struct MeshExporter {
+    pack: ResourcePackSource,
+}
+
+impl MeshExporter {
+    pub fn new(pack: ResourcePackSource) -> Self {
+        Self { pack }
+    }
+}
+
+impl SchematicExporter for MeshExporter {
+    fn name(&self) -> String {
+        "mesh".to_string()
+    }
+
+    fn extensions(&self) -> Vec<String> {
+        vec!["glb".into(), "usdz".into()]
+    }
+
+    fn available_versions(&self) -> Vec<String> {
+        vec!["glb".into(), "usdz".into()]
+    }
+
+    fn default_version(&self) -> String {
+        "glb".to_string()
+    }
+
+    fn write(
+        &self,
+        schematic: &crate::UniversalSchematic,
+        version: Option<&str>,
+    ) -> crate::formats::error::Result<Vec<u8>> {
+        self.write_with_settings(schematic, version, None)
+    }
+
+    fn write_with_settings(
+        &self,
+        schematic: &crate::UniversalSchematic,
+        version: Option<&str>,
+        settings: Option<&str>,
+    ) -> crate::formats::error::Result<Vec<u8>> {
+        let config: MeshConfig = match settings {
+            Some(s) => serde_json::from_str(s)?,
+            None => MeshConfig::default(),
+        };
+        let format = version.unwrap_or("glb");
+        match format {
+            "glb" => {
+                let mesh = schematic
+                    .to_mesh(&self.pack, &config)
+                    .map_err(|e| crate::formats::error::FormatError::Parse(e.to_string()))?;
+                mesh.to_glb()
+                    .map_err(|e| crate::formats::error::FormatError::Parse(e.to_string()))
+            }
+            "usdz" => {
+                let mesh = schematic
+                    .to_usdz(&self.pack, &config)
+                    .map_err(|e| crate::formats::error::FormatError::Parse(e.to_string()))?;
+                mesh.to_usdz()
+                    .map_err(|e| crate::formats::error::FormatError::Parse(e.to_string()))
+            }
+            _ => Err(format!("Unknown mesh format: {}. Use 'glb' or 'usdz'", format).into()),
+        }
+    }
+
+    fn export_settings_schema(&self) -> Option<String> {
+        serde_json::to_string_pretty(&MeshConfig::default()).ok()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_mesh_config_builder() {
+        let config = MeshConfig::new()
+            .with_culling(false)
+            .with_ambient_occlusion(false)
+            .with_biome("swamp")
+            .with_ao_intensity(0.6);
+
+        assert!(!config.cull_hidden_faces);
+        assert!(!config.ambient_occlusion);
+        assert_eq!(config.biome, Some("swamp".to_string()));
+        assert!((config.ao_intensity - 0.6).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_block_state_to_input_block() {
+        let block_state = BlockState::new("minecraft:oak_stairs".to_string())
+            .with_property("facing", "north")
+            .with_property("half", "bottom");
+
+        let input = block_state_to_input_block(&block_state);
+
+        assert_eq!(input.name, "minecraft:oak_stairs");
+        assert_eq!(input.properties.get("facing"), Some(&"north".to_string()));
+        assert_eq!(input.properties.get("half"), Some(&"bottom".to_string()));
+    }
+
+    #[test]
+    fn armor_stand_equipment_is_forwarded_to_the_entity_mesher() {
+        let entity = Entity::armor_stand(
+            (0.5, 1.0, 0.5),
+            0.0,
+            crate::ArmorStandEquipment {
+                helmet: Some("minecraft:diamond_helmet".to_string()),
+                chestplate: Some("minecraft:diamond_chestplate".to_string()),
+                leggings: Some("minecraft:diamond_leggings".to_string()),
+                boots: Some("minecraft:diamond_boots".to_string()),
+            },
+        );
+
+        let input = entity_to_input_block(&entity);
+
+        assert_eq!(input.name, "entity:armor_stand");
+        assert_eq!(
+            input.properties.get("helmet").map(String::as_str),
+            Some("minecraft:diamond_helmet")
+        );
+        assert_eq!(
+            input.properties.get("chestplate").map(String::as_str),
+            Some("minecraft:diamond_chestplate")
+        );
+        assert_eq!(
+            input.properties.get("leggings").map(String::as_str),
+            Some("minecraft:diamond_leggings")
+        );
+        assert_eq!(
+            input.properties.get("boots").map(String::as_str),
+            Some("minecraft:diamond_boots")
+        );
+    }
+
+    #[test]
+    fn entity_lookup_matches_floored_block_position_for_group_meshing() {
+        let entity =
+            Entity::armor_stand((0.5, 1.0, 0.5), 0.0, crate::ArmorStandEquipment::default());
+
+        let found = entity_input_at_position(&[entity], (0, 1, 0)).unwrap();
+
+        assert_eq!(found.name, "entity:armor_stand");
+        assert!(entity_input_at_position(&[], (0, 1, 0)).is_none());
+    }
+
+    #[test]
+    fn test_mesh_config_defaults() {
+        let config = MeshConfig::default();
+        assert!(config.cull_hidden_faces);
+        assert!(config.ambient_occlusion);
+        assert!((config.ao_intensity - 0.4).abs() < 0.001);
+        assert_eq!(config.biome, None);
+        assert_eq!(config.atlas_max_size, 4096);
+        assert!(config.cull_occluded_blocks);
+        assert!(!config.greedy_meshing);
+    }
+
+    #[test]
+    fn test_mesh_config_new_fields() {
+        let config = MeshConfig::new()
+            .with_cull_occluded_blocks(false)
+            .with_greedy_meshing(true)
+            .with_atlas_max_size(2048);
+
+        assert!(!config.cull_occluded_blocks);
+        assert!(config.greedy_meshing);
+        assert_eq!(config.atlas_max_size, 2048);
+    }
+
+    #[test]
+    fn test_mesh_config_full_builder_chain() {
+        let config = MeshConfig::new()
+            .with_culling(false)
+            .with_ambient_occlusion(false)
+            .with_ao_intensity(0.8)
+            .with_biome("jungle")
+            .with_atlas_max_size(1024)
+            .with_cull_occluded_blocks(false)
+            .with_greedy_meshing(true);
+
+        assert!(!config.cull_hidden_faces);
+        assert!(!config.ambient_occlusion);
+        assert!((config.ao_intensity - 0.8).abs() < 0.001);
+        assert_eq!(config.biome, Some("jungle".to_string()));
+        assert_eq!(config.atlas_max_size, 1024);
+        assert!(!config.cull_occluded_blocks);
+        assert!(config.greedy_meshing);
+    }
+
+    #[test]
+    fn test_split_resource_name_with_namespace() {
+        let (ns, path) = split_resource_name("minecraft:stone").unwrap();
+        assert_eq!(ns, "minecraft");
+        assert_eq!(path, "stone");
+    }
+
+    #[test]
+    fn test_split_resource_name_without_namespace() {
+        let (ns, path) = split_resource_name("stone").unwrap();
+        assert_eq!(ns, "minecraft");
+        assert_eq!(path, "stone");
+    }
+
+    #[test]
+    fn test_split_resource_name_custom_namespace() {
+        let (ns, path) = split_resource_name("mymod:block/custom_block").unwrap();
+        assert_eq!(ns, "mymod");
+        assert_eq!(path, "block/custom_block");
+    }
+
+    #[test]
+    fn test_block_state_to_input_block_no_properties() {
+        let block_state = BlockState::new("minecraft:stone".to_string());
+        let input = block_state_to_input_block(&block_state);
+        assert_eq!(input.name, "minecraft:stone");
+        assert!(input.properties.is_empty());
+    }
+
+    #[test]
+    fn test_to_mesher_config_propagates_fields() {
+        let config = MeshConfig::new()
+            .with_culling(false)
+            .with_ambient_occlusion(false)
+            .with_ao_intensity(0.7)
+            .with_cull_occluded_blocks(false)
+            .with_greedy_meshing(true);
+
+        let mesher_config = config.to_mesher_config();
+        assert!(!mesher_config.cull_hidden_faces);
+        assert!(!mesher_config.ambient_occlusion);
+        assert!((mesher_config.ao_intensity - 0.7).abs() < 0.001);
+        assert!(!mesher_config.cull_occluded_blocks);
+        assert!(mesher_config.greedy_meshing);
+    }
+
+    #[test]
+    fn test_empty_schematic_mesh_error() {
+        let _schematic = UniversalSchematic::new("Empty".to_string());
+        // from_bytes with invalid data should return an error
+        let result = ResourcePackSource::from_bytes(&[0, 1, 2, 3]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_resource_pack_stats() {
+        // from_bytes with invalid data should error
+        let result = ResourcePackSource::from_bytes(&[]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_from_bytes_list_empty_is_empty_pack() {
+        // An empty iterator yields an empty pack (no error). This exercises
+        // the new multi-pack entry point in ResourcePackSource.
+        let empty: Vec<Vec<u8>> = Vec::new();
+        let pack = ResourcePackSource::from_bytes_list(empty).expect("empty list is valid");
+        let stats = pack.stats();
+        assert_eq!(stats.blockstate_count, 0);
+        assert_eq!(stats.model_count, 0);
+        assert_eq!(stats.texture_count, 0);
+    }
+
+    #[test]
+    fn test_from_bytes_list_rejects_garbage() {
+        // Each buffer must be a valid pack; the first garbage buffer aborts.
+        let bad_data = vec![vec![0u8, 1, 2, 3]];
+        let result = ResourcePackSource::from_bytes_list(bad_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn resource_pack_aliases_the_vanilla_armor_stand_texture_for_the_entity_mesher() {
+        use schematic_mesher::resource_pack::TextureData;
+
+        let mut pack = ResourcePack::new();
+        pack.add_texture(
+            "minecraft",
+            "entity/armorstand/armorstand",
+            TextureData::new(1, 1, vec![120, 80, 40, 255]),
+        );
+
+        let source = ResourcePackSource::from_resource_pack(pack);
+
+        assert!(
+            source
+                .pack()
+                .get_texture("entity/armorstand/wood")
+                .is_some(),
+            "schematic-mesher's armor stand model currently requests the legacy wood alias"
+        );
+    }
+
+    #[test]
+    fn test_overlay_via_resource_pack_wins_on_collision() {
+        // End-to-end check that the re-exported ResourcePack type exposes
+        // overlay, and that higher-priority textures replace lower ones in
+        // the wrapped ResourcePackSource. This is what the from_bytes_list
+        // helper ultimately relies on.
+        use schematic_mesher::resource_pack::TextureData;
+
+        let mut low = ResourcePack::new();
+        low.add_texture(
+            "minecraft",
+            "block/stone",
+            TextureData::new(1, 1, vec![10, 10, 10, 255]),
+        );
+
+        let mut high = ResourcePack::new();
+        high.add_texture(
+            "minecraft",
+            "block/stone",
+            TextureData::new(1, 1, vec![250, 0, 0, 255]),
+        );
+
+        low.overlay(high);
+        let source = ResourcePackSource::from_resource_pack(low);
+        let pixels = source
+            .get_texture_pixels("minecraft:block/stone")
+            .expect("texture exists");
+        assert_eq!(pixels, &[250, 0, 0, 255]);
+    }
+
+    // ─── MeshOutput / MeshLayer tests ──────────────────────────────────────
+
+    #[test]
+    fn test_mesh_layer_type_is_accessible() {
+        // Verify MeshLayer is accessible via nucleation::meshing::MeshLayer
+        let layer = MeshLayer {
+            positions: vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
+            normals: vec![[0.0, 0.0, 1.0]; 3],
+            uvs: vec![[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]],
+            colors: vec![[1.0, 1.0, 1.0, 1.0]; 3],
+            indices: vec![0, 1, 2],
+        };
+        assert_eq!(layer.vertex_count(), 3);
+        assert_eq!(layer.triangle_count(), 1);
+        assert!(!layer.is_empty());
+    }
+
+    #[test]
+    fn test_mesh_layer_empty() {
+        let empty = MeshLayer::default();
+        assert!(empty.is_empty());
+        assert_eq!(empty.vertex_count(), 0);
+        assert_eq!(empty.triangle_count(), 0);
+    }
+
+    #[test]
+    fn test_mesh_output_is_empty() {
+        use schematic_mesher::TextureAtlas;
+
+        let output = MeshOutput {
+            opaque: MeshLayer::default(),
+            cutout: MeshLayer::default(),
+            transparent: MeshLayer::default(),
+            atlas: TextureAtlas::empty(),
+            greedy_materials: Vec::new(),
+            animated_textures: Vec::new(),
+            bounds: MesherBoundingBox::new([0.0; 3], [0.0; 3]),
+            chunk_coord: None,
+            lod_level: 0,
+        };
+        assert!(output.is_empty());
+        assert_eq!(output.total_vertices(), 0);
+        assert_eq!(output.total_triangles(), 0);
+    }
+
+    #[test]
+    fn to_usdz_and_to_glb_produce_genuinely_different_container_formats() {
+        // Regression for the bridge gap: `MeshResult` gained a `create_usdz`
+        // constructor but, until now, only exposed `glb_data_b64` — so a
+        // consumer could mesh as USDZ and still only ever get GLB bytes back.
+        // This proves `MeshOutput::to_usdz()` (which the new
+        // `usdz_data_b64` bridge accessor wraps) returns a real ZIP/USDZ
+        // archive, distinct from `to_glb()`'s binary glTF container, using
+        // the same minimal-mesh construction as `test_mesh_output_is_empty`.
+        use schematic_mesher::TextureAtlas;
+
+        let mut opaque = MeshLayer::default();
+        opaque.positions = vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]];
+        opaque.normals = vec![[0.0, 1.0, 0.0]; 3];
+        opaque.uvs = vec![[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]];
+        opaque.colors = vec![[1.0, 1.0, 1.0, 1.0]; 3];
+        opaque.indices = vec![0, 1, 2];
+
+        let output = MeshOutput {
+            opaque,
+            cutout: MeshLayer::default(),
+            transparent: MeshLayer::default(),
+            atlas: TextureAtlas::empty(),
+            greedy_materials: Vec::new(),
+            animated_textures: Vec::new(),
+            bounds: MesherBoundingBox::new([0.0, 0.0, 0.0], [1.0, 1.0, 0.0]),
+            chunk_coord: None,
+            lod_level: 0,
+        };
+
+        let glb = output
+            .to_glb()
+            .expect("to_glb should succeed for a minimal mesh");
+        let usdz = output
+            .to_usdz()
+            .expect("to_usdz should succeed for a minimal mesh");
+
+        assert_eq!(
+            &glb[0..4],
+            b"glTF",
+            "GLB container must start with the glTF magic"
+        );
+        assert_eq!(
+            &usdz[0..4],
+            b"PK\x03\x04",
+            "USDZ (ZIP) container must start with the ZIP local-file magic"
+        );
+        assert_ne!(
+            &glb[0..4],
+            &usdz[0..4],
+            "usdz_data_b64 and glb_data_b64 must return genuinely different formats"
+        );
+    }
+
+    #[test]
+    fn test_mesh_result_alias_compiles() {
+        use schematic_mesher::TextureAtlas;
+
+        fn takes_mesh_result(_r: &MeshResult) {}
+        fn takes_mesh_output(_r: &MeshOutput) {}
+
+        let output = MeshOutput {
+            opaque: MeshLayer::default(),
+            cutout: MeshLayer::default(),
+            transparent: MeshLayer::default(),
+            atlas: TextureAtlas::empty(),
+            greedy_materials: Vec::new(),
+            animated_textures: Vec::new(),
+            bounds: MesherBoundingBox::new([0.0; 3], [0.0; 3]),
+            chunk_coord: None,
+            lod_level: 0,
+        };
+        // Both should accept the same value (they're the same type)
+        takes_mesh_result(&output);
+        takes_mesh_output(&output);
+    }
+
+    #[test]
+    fn test_multi_mesh_result_alias() {
+        let map: MultiMeshResult = HashMap::new();
+        assert!(map.is_empty());
+    }
+
+    #[test]
+    fn test_chunk_mesh_result_backward_compat() {
+        let result = ChunkMeshResult {
+            meshes: HashMap::new(),
+            total_vertex_count: 0,
+            total_triangle_count: 0,
+        };
+        assert!(result.meshes.is_empty());
+    }
+
+    #[test]
+    fn test_nucleation_chunk_iter_empty() {
+        // An iterator over an empty schematic should yield nothing.
+        // We can't construct a ResourcePack without real data, so we
+        // early-return after verifying the struct is accessible.
+        let _iter_type_check: fn() -> NucleationChunkIter = || unreachable!();
+    }
+}

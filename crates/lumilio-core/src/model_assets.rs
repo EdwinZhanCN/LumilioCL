@@ -1,13 +1,12 @@
 //! The resource pack the 3D preview draws with, built from the player's own
 //! `client.jar` (ADR 0027). Mojang's assets are never stored by the launcher:
-//! the pack exists only while a preview window is being opened.
+//! the pack exists only while a preview is being loaded (ADR 0028).
 
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 use std::fs::File;
 use std::io::{self, Cursor};
 use std::path::Path;
-use std::time::UNIX_EPOCH;
 
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipArchive, ZipWriter};
@@ -21,9 +20,6 @@ const MAX_BYTES: u64 = 256 * 1024 * 1024;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ResourcePack {
-    /// Names the pack for the viewer: the game version and the jar's identity,
-    /// so a pack stored for another version is never taken for this one.
-    pub id: String,
     pub bytes: Vec<u8>,
 }
 
@@ -69,30 +65,9 @@ fn kept(name: &str) -> bool {
     !name.contains("..") && KEPT.contains(&rest.split('/').next().unwrap_or_default())
 }
 
-/// A name the viewer can take in a URL: letters, digits and `.-_`.
-fn plain(text: &str) -> String {
-    text.chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_') {
-                c
-            } else {
-                '_'
-            }
-        })
-        .collect()
-}
-
 /// Copies the block assets of `jar` into a new stored zip. Blocking: run it on
 /// a worker.
-pub fn build_pack(jar: &Path, game_version: &str) -> Result<ResourcePack, ModelAssetsError> {
-    let meta = std::fs::metadata(jar)?;
-    let modified = meta
-        .modified()
-        .ok()
-        .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
-        .map_or(0, |elapsed| elapsed.as_secs());
-    let id = format!("jar-{}-{:x}-{modified:x}", plain(game_version), meta.len());
-
+pub fn build_pack(jar: &Path) -> Result<ResourcePack, ModelAssetsError> {
     let mut archive = ZipArchive::new(File::open(jar)?)?;
     if archive.len() > MAX_ENTRIES {
         return Err(ModelAssetsError::NotAClient);
@@ -117,7 +92,6 @@ pub fn build_pack(jar: &Path, game_version: &str) -> Result<ResourcePack, ModelA
         return Err(ModelAssetsError::NotAClient);
     }
     Ok(ResourcePack {
-        id,
         bytes: writer.finish()?.into_inner(),
     })
 }

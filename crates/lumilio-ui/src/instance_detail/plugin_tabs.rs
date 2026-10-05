@@ -15,7 +15,9 @@ use crate::kit;
 use crate::kit::TagKind;
 use crate::theme::{self, ShellColors};
 use gpui::prelude::*;
-use gpui::{AnyElement, App, Context, ObjectFit, RenderImage, ScrollHandle, Window, div, img, px};
+use gpui::{
+    AnyElement, App, Context, Entity, ObjectFit, RenderImage, ScrollHandle, Window, div, img, px,
+};
 use gpui_component::{StyledExt as _, WindowExt as _, h_flex, v_flex};
 use lumilio_core::PluginTab;
 use lumilio_plugin_api::{ActionId, ImageData, KeyKind, ListItem, Tone, View};
@@ -31,7 +33,12 @@ const TABLE_MAX_HEIGHT: f32 = 360.;
 /// What a plugin tab currently has to show.
 pub(super) enum PluginPage {
     /// The view, its images and one scroll handle per table, in tree order.
-    Shown(View, Vec<Option<Arc<RenderImage>>>, Vec<ScrollHandle>),
+    Shown(
+        View,
+        Vec<Option<Arc<RenderImage>>>,
+        Vec<ScrollHandle>,
+        Vec<Entity<crate::model_view::ModelView>>,
+    ),
     /// The plugin was switched off or failed while the page was open.
     Unavailable,
     Failed(String),
@@ -68,13 +75,55 @@ impl InstanceDetailView {
                 let scrolls = (0..count_tables(&view))
                     .map(|_| ScrollHandle::new())
                     .collect();
-                PluginPage::Shown(view, rendered, scrolls)
+                let mut files = Vec::new();
+                collect_models(&view, &mut files);
+                let mut models = Vec::new();
+                for file in files {
+                    let (plugin, file, handler) =
+                        (plugin.clone(), file.to_owned(), self.handler.clone());
+                    models.push(cx.new(|cx| {
+                        crate::model_view::ModelView::new(
+                            std::rc::Rc::new(move |request, window, cx| {
+                                handler(
+                                    InstanceIntent::LoadModel {
+                                        plugin: plugin.clone(),
+                                        file: file.clone(),
+                                        request,
+                                    },
+                                    window,
+                                    cx,
+                                );
+                            }),
+                            cx,
+                        )
+                    }));
+                }
+                PluginPage::Shown(view, rendered, scrolls, models)
             }
             Ok(None) => PluginPage::Unavailable,
             Err(detail) => PluginPage::Failed(detail),
         };
         self.plugin_pages.insert(plugin, page);
         cx.notify();
+    }
+
+    /// Late results cannot enter a replacement detail, even for the same file.
+    pub fn plugin_model_arrived(
+        &mut self,
+        request: u64,
+        result: Result<lumilio_core::ModelPreview, String>,
+        cx: &mut Context<Self>,
+    ) {
+        for page in self.plugin_pages.values() {
+            if let PluginPage::Shown(_, _, _, models) = page
+                && let Some(model) = models
+                    .iter()
+                    .find(|model| model.entity_id().as_u64() == request)
+            {
+                model.update(cx, |model, cx| model.assets(result, cx));
+                return;
+            }
+        }
     }
 
     /// Drops tabs and pages of plugins that are no longer enabled.
@@ -168,12 +217,14 @@ impl InstanceDetailView {
                         .child(kit::technical("plugin-technical", detail.clone())),
                 )
                 .into_any_element(),
-            Some(PluginPage::Shown(view, images, scrolls)) => {
+            Some(PluginPage::Shown(view, images, scrolls, models)) => {
                 let mut paint = Paint {
                     plugin,
                     images,
                     scrolls,
+                    models,
                     next_table: 0,
+                    next_model: 0,
                     next_image: 0,
                     next_id: 0,
                     colors,
@@ -238,6 +289,16 @@ fn collect_images<'a>(view: &'a View, out: &mut Vec<&'a ImageData>) {
     }
 }
 
+fn collect_models<'a>(view: &'a View, out: &mut Vec<&'a str>) {
+    match view {
+        View::Model { file } => out.push(file),
+        View::Section { children, .. } | View::Detail { children, .. } => {
+            children.iter().for_each(|child| collect_models(child, out));
+        }
+        _ => {}
+    }
+}
+
 fn count_tables(view: &View) -> usize {
     match view {
         View::Table { .. } => 1,
@@ -266,6 +327,8 @@ struct Paint<'a> {
     plugin: &'a str,
     images: &'a [Option<Arc<RenderImage>>],
     scrolls: &'a [ScrollHandle],
+    models: &'a [Entity<crate::model_view::ModelView>],
+    next_model: usize,
     next_table: usize,
     next_image: usize,
     next_id: usize,
@@ -439,7 +502,14 @@ impl Paint<'_> {
                 Some(picture) => picture_box(picture, COVER, colors).into_any_element(),
                 None => div().into_any_element(),
             },
-            View::Model { file } => self.model(file, cx),
+            View::Model { .. } => {
+                let model = self.models.get(self.next_model);
+                self.next_model += 1;
+                model.map_or_else(
+                    || div().into_any_element(),
+                    |model| model.clone().into_any_element(),
+                )
+            }
             View::Key {
                 id,
                 label,
@@ -463,67 +533,6 @@ impl Paint<'_> {
                     .into_any_element()
             }
         }
-    }
-
-    /// A card with the key that opens the preview window.
-    fn model(&mut self, file: &str, cx: &mut Context<InstanceDetailView>) -> AnyElement {
-        let colors = self.colors;
-        let id = self.id();
-        let (plugin, file) = (self.plugin.to_owned(), file.to_owned());
-        let action: AnyElement = if crate::model_preview::SUPPORTED {
-            let on_click = act(cx, move |view, window, cx| {
-                (view.handler)(
-                    InstanceIntent::PluginModel {
-                        plugin: plugin.clone(),
-                        file: file.clone(),
-                    },
-                    window,
-                    cx,
-                );
-            });
-            Key::new(("plugin-model", id))
-                .label("打开 3D 预览")
-                .primary()
-                .on_click(move |_, window: &mut Window, cx: &mut App| on_click(window, cx))
-                .debug_selector(|| "plugin-model-open".into())
-                .into_any_element()
-        } else {
-            div()
-                .text_xs()
-                .text_color(colors.muted)
-                .child("这个系统上还不能预览 3D")
-                .into_any_element()
-        };
-        kit::surface(colors)
-            .w_full()
-            .p_4()
-            .child(
-                h_flex()
-                    .w_full()
-                    .items_center()
-                    .gap_4()
-                    .child(
-                        v_flex()
-                            .flex_1()
-                            .min_w_0()
-                            .gap(px(2.))
-                            .child(
-                                div()
-                                    .text_sm()
-                                    .font_medium()
-                                    .text_color(colors.foreground)
-                                    .child("3D 预览"),
-                            )
-                            .child(
-                                div()
-                                    .text_xs()
-                                    .text_color(colors.muted)
-                                    .child("用游戏自己的贴图画出整个投影，可以旋转和缩放"),
-                            ),
-                    )
-                    .child(action),
-            )
-            .into_any_element()
     }
 
     fn item(&mut self, item: &ListItem, cx: &mut Context<InstanceDetailView>) -> AnyElement {

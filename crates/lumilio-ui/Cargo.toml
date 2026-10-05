@@ -13,11 +13,8 @@ gpui-component.workspace = true
 image.workspace = true
 lumilio-core.workspace = true
 lumilio-plugin-api.workspace = true
-
-# The preview window is a webview (ADR 0027); gpui-wry supports these two.
-[target.'cfg(any(target_os = "macos", target_os = "windows"))'.dependencies]
-gpui-wry.workspace = true
-wry.workspace = true
+lumilio-schematic-render.workspace = true
+async-channel = "2"
 
 [dev-dependencies]
 gpui = { workspace = true, features = ["test-support"] }

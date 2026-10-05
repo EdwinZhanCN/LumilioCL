@@ -120,9 +120,11 @@ pub(super) fn instance_intent(
         }
         InstanceIntent::PluginTabs => plugin_tabs(wiring, id.to_owned(), view, cx),
         InstanceIntent::PluginView(plugin) => plugin_view(wiring, id.to_owned(), view, plugin, cx),
-        InstanceIntent::PluginModel { plugin, file } => {
-            plugin_model(wiring, id.to_owned(), view, plugin, file, cx)
-        }
+        InstanceIntent::LoadModel {
+            plugin,
+            file,
+            request,
+        } => plugin_model(wiring, id.to_owned(), view, plugin, file, request, cx),
         InstanceIntent::PluginAction { plugin, action } => {
             plugin_action(wiring, id.to_owned(), view, plugin, action, cx)
         }

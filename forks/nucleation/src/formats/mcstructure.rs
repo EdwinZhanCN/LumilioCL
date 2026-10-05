@@ -1,0 +1,600 @@
+use crate::block_entity::BlockEntity;
+use crate::blockpedia::block_entity::{BlockEntityTranslator, NbtValue as BpNbtValue};
+use crate::entity::Entity;
+use crate::formats::error::Result;
+use crate::formats::manager::{SchematicExporter, SchematicImporter};
+use crate::nbt::io::{read_nbt, write_nbt};
+use crate::nbt::{Endian, NbtMap, NbtValue};
+use crate::region::Region;
+use crate::universal_schematic::UniversalSchematic;
+use crate::BlockState;
+use smol_str::SmolStr;
+use std::collections::HashMap;
+use std::io::Cursor;
+
+pub struct McStructureFormat;
+
+impl SchematicImporter for McStructureFormat {
+    fn name(&self) -> String {
+        "mcstructure".to_string()
+    }
+
+    fn detect(&self, data: &[u8]) -> bool {
+        let mut cursor = Cursor::new(data);
+        match read_nbt(&mut cursor, Endian::Little) {
+            Ok(NbtValue::Compound(root)) => {
+                root.get("format_version").is_some()
+                    && root.get("size").is_some()
+                    && root.get("structure").is_some()
+            }
+            _ => false,
+        }
+    }
+
+    fn detect_bounded(&self, data: &[u8], limits: &crate::formats::limits::DecodeLimits) -> bool {
+        from_mcstructure_bounded(data, limits).is_ok()
+    }
+
+    fn read(&self, data: &[u8]) -> Result<UniversalSchematic> {
+        from_mcstructure(data)
+    }
+
+    fn read_bounded(
+        &self,
+        data: &[u8],
+        limits: &crate::formats::limits::DecodeLimits,
+    ) -> Result<UniversalSchematic> {
+        from_mcstructure_bounded(data, limits)
+    }
+}
+
+impl SchematicExporter for McStructureFormat {
+    fn name(&self) -> String {
+        "mcstructure".to_string()
+    }
+
+    fn extensions(&self) -> Vec<String> {
+        vec!["mcstructure".to_string()]
+    }
+
+    fn available_versions(&self) -> Vec<String> {
+        vec!["default".to_string()]
+    }
+
+    fn default_version(&self) -> String {
+        "default".to_string()
+    }
+
+    fn write(&self, schematic: &UniversalSchematic, _version: Option<&str>) -> Result<Vec<u8>> {
+        to_mcstructure(schematic)
+    }
+}
+
+pub fn from_mcstructure(data: &[u8]) -> Result<UniversalSchematic> {
+    from_mcstructure_bounded(data, &crate::formats::limits::DecodeLimits::default())
+}
+
+pub fn from_mcstructure_bounded(
+    data: &[u8],
+    limits: &crate::formats::limits::DecodeLimits,
+) -> Result<UniversalSchematic> {
+    limits.check_input(data)?;
+    let mut cursor = Cursor::new(data);
+    let root_val = crate::nbt::io::read_nbt_with_limits(&mut cursor, Endian::Little, limits.nbt())?;
+    let root = match root_val {
+        NbtValue::Compound(c) => c,
+        _ => return Err("Root is not a compound".into()),
+    };
+
+    let size_list = match root.get("size") {
+        Some(NbtValue::List(l)) => l,
+        _ => return Err("Missing or invalid size".into()),
+    };
+
+    let mut size_iter = size_list.iter();
+    let width = match size_iter.next() {
+        Some(NbtValue::Int(v)) => *v,
+        _ => 0,
+    };
+    let height = match size_iter.next() {
+        Some(NbtValue::Int(v)) => *v,
+        _ => 0,
+    };
+    let length = match size_iter.next() {
+        Some(NbtValue::Int(v)) => *v,
+        _ => 0,
+    };
+    limits.check_dimensions((i64::from(width), i64::from(height), i64::from(length)))?;
+
+    let structure = match root.get("structure") {
+        Some(NbtValue::Compound(c)) => c,
+        _ => return Err("Missing structure compound".into()),
+    };
+
+    // Parse Palette
+    let palette_wrapper = match structure.get("palette") {
+        Some(NbtValue::Compound(c)) => c,
+        _ => return Err("Missing palette".into()),
+    };
+    let default_palette = match palette_wrapper.get("default") {
+        Some(NbtValue::Compound(c)) => c,
+        _ => return Err("Missing default palette".into()),
+    };
+    let block_palette_list = match default_palette.get("block_palette") {
+        Some(NbtValue::List(l)) => l,
+        _ => return Err("Missing block_palette".into()),
+    };
+    if block_palette_list.len() > limits.max_palette_entries {
+        return Err("palette limit exceeded".into());
+    }
+
+    let mut palette: Vec<BlockState> = Vec::new();
+    for tag in block_palette_list.iter() {
+        if let NbtValue::Compound(block_compound) = tag {
+            let name = block_compound
+                .get("name")
+                .and_then(|v| v.as_string())
+                .cloned()
+                .unwrap_or_else(|| "minecraft:air".to_string());
+            let mut properties = Vec::new();
+
+            if let Some(NbtValue::Compound(states)) = block_compound.get("states") {
+                for (key, val) in states.iter() {
+                    let val_str = match val {
+                        NbtValue::Byte(b) => {
+                            if *b == 1 {
+                                "true".to_string()
+                            } else if *b == 0 {
+                                "false".to_string()
+                            } else {
+                                b.to_string()
+                            }
+                        }
+                        NbtValue::Int(i) => i.to_string(),
+                        NbtValue::String(s) => s.clone(),
+                        _ => format!("{:?}", val), // Fallback
+                    };
+                    properties.push((key.into(), val_str.into()));
+                }
+            }
+
+            // Translate Bedrock -> Java using blockpedia
+            // block_pedia expects HashMap<String, String> for Bedrock state lookup.
+            let bp_props: HashMap<String, String> = properties
+                .iter()
+                .map(|(k, v): &(SmolStr, SmolStr)| (k.to_string(), v.to_string()))
+                .collect();
+
+            let translated_state = if let Ok(bp_state) =
+                crate::blockpedia::BlockState::from_bedrock(&name, bp_props)
+            {
+                let translated_props: Vec<(smol_str::SmolStr, smol_str::SmolStr)> = bp_state
+                    .properties()
+                    .iter()
+                    .map(|(k, v)| (k.into(), v.into()))
+                    .collect();
+
+                BlockState {
+                    name: bp_state.id().into(),
+                    properties: translated_props,
+                }
+            } else {
+                BlockState {
+                    name: name.into(),
+                    properties,
+                }
+            };
+
+            palette.push(translated_state);
+        }
+    }
+
+    // Construct Region
+    let mut region = Region::new("Main".to_string(), (0, 0, 0), (width, height, length));
+
+    // Parse Block Indices (Multi-layer support)
+    let block_indices_list = match structure.get("block_indices") {
+        Some(NbtValue::List(l)) => l,
+        _ => return Err("Missing block_indices".into()),
+    };
+
+    for layer in block_indices_list {
+        let indices: Vec<i32> = match layer {
+            NbtValue::List(list) => list
+                .iter()
+                .filter_map(|t| {
+                    if let NbtValue::Int(i) = t {
+                        Some(*i)
+                    } else {
+                        None
+                    }
+                })
+                .collect(),
+            _ => continue,
+        };
+
+        // Set blocks
+        // Indices are ZYX order: X outer, Y middle, Z inner
+        // index = SZ*SY*X + SZ*Y + Z
+        for (i, &palette_idx) in indices.iter().enumerate() {
+            if palette_idx < 0 {
+                continue;
+            } // -1 is void/air-skip
+
+            let i = i as i32;
+            let sz = length;
+            let sy = height;
+
+            if sz == 0 || sy == 0 {
+                continue;
+            }
+
+            let x = i / sz / sy;
+            let y = (i / sz) % sy;
+            let z = i % sz;
+
+            if palette_idx < palette.len() as i32 {
+                let block = palette[palette_idx as usize].clone();
+
+                // Simple merge logic:
+                // If the block is water/lava and we already have a block here,
+                // try to set waterlogged=true instead of overwriting.
+                if (block.name == "minecraft:water" || block.name == "minecraft:flowing_water")
+                    && region.get_block(x, y, z).is_some()
+                {
+                    if let Some(existing_block) = region.get_block(x, y, z) {
+                        if existing_block.name != "minecraft:air" {
+                            let mut updated_block = existing_block.clone();
+                            updated_block.set_property("waterlogged", "true");
+                            region.set_block(x, y, z, &updated_block);
+                            continue;
+                        }
+                    }
+                }
+
+                region.set_block(x, y, z, &block);
+            }
+        }
+    }
+
+    // Block Entities
+    if let Some(NbtValue::Compound(block_position_data)) =
+        default_palette.get("block_position_data")
+    {
+        for (index_str, data) in block_position_data.iter() {
+            if let Ok(index) = index_str.parse::<i32>() {
+                if let NbtValue::Compound(data_compound) = data {
+                    if let Some(NbtValue::Compound(be_data)) =
+                        data_compound.get("block_entity_data")
+                    {
+                        let i = index;
+                        let sz = length;
+                        let sy = height;
+
+                        if sz > 0 && sy > 0 {
+                            let x = i / sz / sy;
+                            let y = (i / sz) % sy;
+                            let z = i % sz;
+
+                            let mut be_nbt = be_data.clone();
+                            be_nbt.insert("x".to_string(), NbtValue::Int(x));
+                            be_nbt.insert("y".to_string(), NbtValue::Int(y));
+                            be_nbt.insert("z".to_string(), NbtValue::Int(z));
+
+                            // Translate NBT using Blockpedia
+                            let bp_nbt = to_bp_nbt(&NbtValue::Compound(be_nbt.clone()));
+                            if let BpNbtValue::Compound(bp_map) = bp_nbt {
+                                let translated_bp_map =
+                                    BlockEntityTranslator::translate_bedrock_to_java(&bp_map);
+                                if let NbtValue::Compound(translated_map) =
+                                    from_bp_nbt(&BpNbtValue::Compound(translated_bp_map))
+                                {
+                                    be_nbt = translated_map;
+                                }
+                            }
+
+                            // Extract ID and Pos for BlockEntity constructor
+                            let id = be_nbt
+                                .get("id")
+                                .and_then(|v| v.as_string())
+                                .cloned()
+                                .unwrap_or_else(|| "unknown".to_string());
+
+                            // Construct BlockEntity manually using our NbtMap
+                            // We need to convert from crate::nbt::NbtMap to whatever BlockEntity uses
+                            // BlockEntity uses crate::nbt::NbtMap! (via re-export in lib.rs -> utils -> nbt)
+
+                            // Note: BlockEntity::from_nbt expects quartz_nbt::NbtCompound.
+                            // We should construct it manually to avoid unnecessary conversions.
+                            let mut be = BlockEntity::new(id, (x, y, z));
+                            be.set_nbt(be_nbt);
+
+                            region.add_block_entity(be);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Entities
+    if let Some(NbtValue::List(entities_list)) = structure.get("entities") {
+        for tag in entities_list.iter() {
+            if let NbtValue::Compound(compound) = tag {
+                // Entity::from_nbt expects quartz_nbt::NbtCompound
+                // We need to convert NbtMap to NbtCompound or update Entity
+                // For now, convert
+                if let Ok(entity) = Entity::from_nbt(&compound.to_quartz_nbt()) {
+                    region.add_entity(entity);
+                }
+            }
+        }
+    }
+
+    region.rebuild_tight_bounds();
+
+    let mut schematic = UniversalSchematic::new("Unnamed".to_string());
+    schematic.add_region(region);
+
+    // Post-fix redstone connectivity
+    schematic.fix_redstone_connectivity();
+
+    limits.validate_schematic(&schematic)?;
+    Ok(schematic)
+}
+
+pub fn to_mcstructure(schematic: &UniversalSchematic) -> Result<Vec<u8>> {
+    let merged_region = schematic.get_merged_region();
+    let compact_region = merged_region.to_compact();
+    let (width, height, length) = compact_region.get_dimensions();
+
+    let mut root = NbtMap::new();
+    root.insert("format_version".to_string(), NbtValue::Int(1));
+
+    let mut size_list = Vec::new();
+    size_list.push(NbtValue::Int(width));
+    size_list.push(NbtValue::Int(height));
+    size_list.push(NbtValue::Int(length));
+    root.insert("size".to_string(), NbtValue::List(size_list));
+
+    let mut origin_list = Vec::new();
+    origin_list.push(NbtValue::Int(0));
+    origin_list.push(NbtValue::Int(0));
+    origin_list.push(NbtValue::Int(0));
+    root.insert(
+        "structure_world_origin".to_string(),
+        NbtValue::List(origin_list),
+    );
+
+    let mut structure = NbtMap::new();
+
+    // Palette
+    let mut palette_compound = NbtMap::new();
+    let mut default_palette = NbtMap::new();
+    let mut block_palette_list = Vec::new();
+    let mut block_position_data = NbtMap::new();
+
+    for block in &compact_region.palette {
+        let mut block_entry = NbtMap::new();
+
+        // Translate Java -> Bedrock using blockpedia.
+        //
+        // IMPORTANT: crate::blockpedia::BlockState::parse expects the full
+        // "name[k=v,k2=v2]" form. Passing only `block.name` strips every
+        // property before translation, so the Bedrock side ends up with
+        // defaults (hopper→facing_direction=0, repeater→delay=1, etc.).
+        // Rebuild the bracketed form here.
+        let full_id = if block.properties.is_empty() {
+            block.name.to_string()
+        } else {
+            let mut parts: Vec<String> = block
+                .properties
+                .iter()
+                .map(|(k, v)| format!("{}={}", k, v))
+                .collect();
+            parts.sort();
+            format!("{}[{}]", block.name, parts.join(","))
+        };
+
+        let (name, properties) =
+            if let Ok(java_bp_state) = crate::blockpedia::BlockState::parse(&full_id) {
+                if let Ok(bedrock_bp_state) = java_bp_state.to_bedrock() {
+                    let bed_props: Vec<(smol_str::SmolStr, smol_str::SmolStr)> = bedrock_bp_state
+                        .properties()
+                        .iter()
+                        .map(|(k, v)| (k.into(), v.into()))
+                        .collect();
+
+                    (bedrock_bp_state.id().to_string(), bed_props)
+                } else {
+                    (block.name.to_string(), block.properties.clone())
+                }
+            } else {
+                (block.name.to_string(), block.properties.clone())
+            };
+
+        block_entry.insert("name".to_string(), NbtValue::String(name));
+
+        let mut states = NbtMap::new();
+        for (k, v) in &properties {
+            // Bedrock structure NBT typing rules:
+            //   - "true"/"false" booleans (`*_bit`, `waterlogged`, etc.) → Byte
+            //   - Integer-valued state ints (`facing_direction`, `age`,
+            //     `redstone_signal`, `power`, `delay`, `layers`,
+            //     `upper_block_bit` even when serialised as int) → Int
+            //   - String enums (`minecraft:facing_direction`,
+            //     `minecraft:cardinal_direction`) → String
+            //
+            // The heuristic below selects the right type for every state
+            // property in the current Geyser mapping table. If a new state
+            // appears that needs a different encoding (e.g. a Short-typed
+            // property), explicit cases can be added before the fallback.
+            let tag = if *v == "true" {
+                NbtValue::Byte(1)
+            } else if *v == "false" {
+                NbtValue::Byte(0)
+            } else if let Ok(i) = v.parse::<i32>() {
+                NbtValue::Int(i)
+            } else {
+                NbtValue::String(v.to_string())
+            };
+            states.insert(k.to_string(), tag);
+        }
+        block_entry.insert("states".to_string(), NbtValue::Compound(states));
+        block_entry.insert("version".to_string(), NbtValue::Int(17959425));
+
+        block_palette_list.push(NbtValue::Compound(block_entry));
+    }
+
+    default_palette.insert(
+        "block_palette".to_string(),
+        NbtValue::List(block_palette_list),
+    );
+
+    // Block Entities Data
+    for ((x, y, z), be) in compact_region.block_entities.iter() {
+        let rel_x = x - compact_region.position.0;
+        let rel_y = y - compact_region.position.1;
+        let rel_z = z - compact_region.position.2;
+
+        if rel_x >= 0
+            && rel_y >= 0
+            && rel_z >= 0
+            && rel_x < width
+            && rel_y < height
+            && rel_z < length
+        {
+            let index = rel_x * (length * height) + rel_y * length + rel_z;
+
+            let mut be_compound = NbtMap::new();
+            // be.to_nbt() returns NbtCompound (quartz). We need NbtMap.
+            let be_data_map = NbtMap::from_quartz_nbt(&be.to_nbt());
+
+            // Translate Java-shaped BE NBT (e.g. `id: "minecraft:hopper"`,
+            // Java item layout) into the Bedrock-shaped equivalent that
+            // mcstructure consumers expect (`id: "Hopper"`, etc.).
+            // Pass through unknown BE ids unchanged.
+            let translated_map = {
+                let mut bp_compound = HashMap::new();
+                for (k, v) in be_data_map.iter() {
+                    bp_compound.insert(k.clone(), to_bp_nbt(v));
+                }
+                let translated = BlockEntityTranslator::translate_java_to_bedrock(&bp_compound);
+                let mut out = NbtMap::new();
+                for (k, v) in translated.iter() {
+                    out.insert(k.clone(), from_bp_nbt(v));
+                }
+                out
+            };
+
+            be_compound.insert(
+                "block_entity_data".to_string(),
+                NbtValue::Compound(translated_map),
+            );
+
+            block_position_data.insert(index.to_string(), NbtValue::Compound(be_compound));
+        }
+    }
+
+    default_palette.insert(
+        "block_position_data".to_string(),
+        NbtValue::Compound(block_position_data),
+    );
+    palette_compound.insert("default".to_string(), NbtValue::Compound(default_palette));
+    structure.insert("palette".to_string(), NbtValue::Compound(palette_compound));
+
+    // Block Indices
+    let mut indices_list = Vec::new();
+    let volume = (width * height * length) as usize;
+
+    for x in 0..width {
+        for y in 0..height {
+            for z in 0..length {
+                let abs_x = x + compact_region.position.0;
+                let abs_y = y + compact_region.position.1;
+                let abs_z = z + compact_region.position.2;
+
+                let palette_idx =
+                    if let Some(idx) = compact_region.get_block_index(abs_x, abs_y, abs_z) {
+                        idx as i32
+                    } else {
+                        -1
+                    };
+                indices_list.push(NbtValue::Int(palette_idx));
+            }
+        }
+    }
+
+    let mut block_indices = Vec::new();
+    block_indices.push(NbtValue::List(indices_list));
+
+    let mut secondary_list = Vec::new();
+    for _ in 0..volume {
+        secondary_list.push(NbtValue::Int(-1));
+    }
+    block_indices.push(NbtValue::List(secondary_list));
+
+    structure.insert("block_indices".to_string(), NbtValue::List(block_indices));
+
+    // Entities
+    let mut entities_list = Vec::new();
+    for entity in &compact_region.entities {
+        if let quartz_nbt::NbtTag::Compound(c) = entity.to_nbt() {
+            entities_list.push(NbtValue::Compound(NbtMap::from_quartz_nbt(&c)));
+        }
+    }
+    structure.insert("entities".to_string(), NbtValue::List(entities_list));
+
+    root.insert("structure".to_string(), NbtValue::Compound(structure));
+
+    let mut cursor = Cursor::new(Vec::new());
+    write_nbt(&mut cursor, &root, "", Endian::Little)?;
+
+    Ok(cursor.into_inner())
+}
+
+fn to_bp_nbt(val: &NbtValue) -> BpNbtValue {
+    match val {
+        NbtValue::Byte(v) => BpNbtValue::Byte(*v),
+        NbtValue::Short(v) => BpNbtValue::Short(*v),
+        NbtValue::Int(v) => BpNbtValue::Int(*v),
+        NbtValue::Long(v) => BpNbtValue::Long(*v),
+        NbtValue::Float(v) => BpNbtValue::Float(*v),
+        NbtValue::Double(v) => BpNbtValue::Double(*v),
+        NbtValue::String(v) => BpNbtValue::String(v.clone()),
+        NbtValue::ByteArray(v) => BpNbtValue::ByteArray(v.clone()),
+        NbtValue::IntArray(v) => BpNbtValue::IntArray(v.clone()),
+        NbtValue::LongArray(v) => BpNbtValue::LongArray(v.clone()),
+        NbtValue::List(v) => BpNbtValue::List(v.iter().map(to_bp_nbt).collect()),
+        NbtValue::Compound(v) => {
+            let mut map = HashMap::new();
+            for (k, val) in v.iter() {
+                map.insert(k.clone(), to_bp_nbt(val));
+            }
+            BpNbtValue::Compound(map)
+        }
+    }
+}
+
+fn from_bp_nbt(val: &BpNbtValue) -> NbtValue {
+    match val {
+        BpNbtValue::Byte(v) => NbtValue::Byte(*v),
+        BpNbtValue::Short(v) => NbtValue::Short(*v),
+        BpNbtValue::Int(v) => NbtValue::Int(*v),
+        BpNbtValue::Long(v) => NbtValue::Long(*v),
+        BpNbtValue::Float(v) => NbtValue::Float(*v),
+        BpNbtValue::Double(v) => NbtValue::Double(*v),
+        BpNbtValue::String(v) => NbtValue::String(v.clone()),
+        BpNbtValue::ByteArray(v) => NbtValue::ByteArray(v.clone()),
+        BpNbtValue::IntArray(v) => NbtValue::IntArray(v.clone()),
+        BpNbtValue::LongArray(v) => NbtValue::LongArray(v.clone()),
+        BpNbtValue::List(v) => NbtValue::List(v.iter().map(from_bp_nbt).collect()),
+        BpNbtValue::Compound(v) => {
+            let mut map = NbtMap::new();
+            for (k, val) in v {
+                map.insert(k.clone(), from_bp_nbt(val));
+            }
+            NbtValue::Compound(map)
+        }
+    }
+}

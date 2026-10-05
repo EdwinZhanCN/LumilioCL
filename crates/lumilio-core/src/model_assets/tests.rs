@@ -42,7 +42,7 @@ fn only_what_a_renderer_draws_blocks_with_is_kept() {
             ("assets/realms/textures/x.png", b"png"),
         ],
     );
-    let pack = build_pack(&path, "1.21.11").unwrap();
+    let pack = build_pack(&path).unwrap();
     assert_eq!(
         names(&pack),
         [
@@ -69,47 +69,18 @@ fn only_what_a_renderer_draws_blocks_with_is_kept() {
 }
 
 #[test]
-fn the_id_names_the_version_and_the_jar_and_is_safe_in_a_url() {
-    let dir = tempfile::tempdir().unwrap();
-    let path = jar(
-        dir.path(),
-        &[("assets/minecraft/textures/block/a.png", b"png")],
-    );
-    let id = build_pack(&path, "26.2 /snap?").unwrap().id;
-    assert!(id.starts_with("jar-26.2__snap_-"), "{id}");
-    assert!(
-        id.chars()
-            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_')),
-        "{id}"
-    );
-    // A different jar for the same version is a different pack.
-    std::fs::write(&path, b"").unwrap();
-    let other = jar(
-        dir.path(),
-        &[
-            ("assets/minecraft/textures/block/a.png", b"png"),
-            ("assets/minecraft/textures/block/b.png", b"png2"),
-        ],
-    );
-    assert_ne!(build_pack(&other, "26.2 /snap?").unwrap().id, id);
-}
-
-#[test]
 fn a_jar_without_textures_or_a_broken_one_is_refused() {
     let dir = tempfile::tempdir().unwrap();
     let no_textures = jar(dir.path(), &[("net/minecraft/Main.class", b"code")]);
     assert!(matches!(
-        build_pack(&no_textures, "1.0"),
+        build_pack(&no_textures),
         Err(ModelAssetsError::NotAClient)
     ));
     let broken = dir.path().join("broken.jar");
     std::fs::write(&broken, b"not a zip").unwrap();
+    assert!(matches!(build_pack(&broken), Err(ModelAssetsError::Zip(_))));
     assert!(matches!(
-        build_pack(&broken, "1.0"),
-        Err(ModelAssetsError::Zip(_))
-    ));
-    assert!(matches!(
-        build_pack(&dir.path().join("missing.jar"), "1.0"),
+        build_pack(&dir.path().join("missing.jar")),
         Err(ModelAssetsError::Io(_))
     ));
 }

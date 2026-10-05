@@ -1,0 +1,287 @@
+pub mod brushes;
+pub mod distance_field;
+pub mod enums;
+pub mod masks;
+pub mod shapes;
+
+pub use brushes::*;
+pub use distance_field::*;
+pub use enums::*;
+pub use masks::*;
+pub use shapes::*;
+
+use crate::universal_schematic::UniversalSchematic;
+
+pub struct BuildingTool<'a> {
+    schematic: &'a mut UniversalSchematic,
+}
+
+impl<'a> BuildingTool<'a> {
+    pub fn new(schematic: &'a mut UniversalSchematic) -> Self {
+        Self { schematic }
+    }
+
+    /// Fill a shape with a brush using generic trait objects (pure Rust API).
+    pub fn fill(&mut self, shape: &impl Shape, brush: &impl Brush) {
+        let (min_x, min_y, min_z, max_x, max_y, max_z) = shape.bounds();
+        self.schematic
+            .ensure_bounds((min_x, min_y, min_z), (max_x, max_y, max_z));
+
+        // Computing a normal can cost a nearest surface query (see
+        // MeshShape); only pay for it when the brush reads the value.
+        let wants_normal = brush.uses_normal();
+        shape.for_each_point(|x, y, z| {
+            let normal = if wants_normal {
+                shape.normal_at(x, y, z)
+            } else {
+                (0.0, 0.0, 0.0)
+            };
+            if let Some(block) = brush.get_block(x, y, z, normal) {
+                self.schematic.set_block(x, y, z, &block);
+            }
+        });
+    }
+
+    /// Fill a ShapeEnum with a BrushEnum, passing parametric `t` to brushes that support it.
+    pub fn fill_enum(&mut self, shape: &ShapeEnum, brush: &BrushEnum) {
+        self.fill_enum_masked(shape, brush, &FillMode::Replace);
+    }
+
+    /// Like [`fill_enum`](Self::fill_enum), but only writes cells `mode`
+    /// allows: [`FillMode::Replace`] overwrites everything,
+    /// [`FillMode::KeepExisting`] only fills air/unset cells, and
+    /// [`FillMode::ReplaceOnly`] only overwrites the listed block ids.
+    pub fn fill_enum_masked(&mut self, shape: &ShapeEnum, brush: &BrushEnum, mode: &FillMode) {
+        let (min_x, min_y, min_z, max_x, max_y, max_z) = shape.bounds();
+        self.schematic
+            .ensure_bounds((min_x, min_y, min_z), (max_x, max_y, max_z));
+
+        let wants_normal = brush.uses_normal();
+        shape.for_each_point(|x, y, z| {
+            if !mode.allows(self.schematic.get_block(x, y, z)) {
+                return;
+            }
+            let normal = if wants_normal {
+                shape.normal_at(x, y, z)
+            } else {
+                (0.0, 0.0, 0.0)
+            };
+            let t = shape.parameter_at(x, y, z);
+            if let Some(block) = brush.get_block_with_parameter(x, y, z, normal, t) {
+                self.schematic.set_block(x, y, z, &block);
+            }
+        });
+    }
+
+    /// Fill an explicitly bounded signed-distance function.
+    ///
+    /// The operation is transactional: callback errors leave the destination
+    /// schematic unchanged. `normal` may return an analytic vector or `None`
+    /// to request a central-difference estimate from `eval`.
+    #[cfg(any(test, not(target_arch = "wasm32")))]
+    pub(crate) fn fill_sdf_function<E, F, N>(
+        &mut self,
+        bounds: (i32, i32, i32, i32, i32, i32),
+        epsilon: f64,
+        mut eval: F,
+        mut normal: N,
+        brush: &BrushEnum,
+    ) -> Result<(), E>
+    where
+        F: FnMut(f64, f64, f64) -> Result<f64, E>,
+        N: FnMut(f64, f64, f64) -> Result<Option<(f64, f64, f64)>, E>,
+    {
+        let (min_x, min_y, min_z, max_x, max_y, max_z) = bounds;
+        let mut staged = self.schematic.clone();
+        staged.ensure_bounds((min_x, min_y, min_z), (max_x, max_y, max_z));
+
+        let wants_normal = brush.uses_normal();
+        for y in min_y..=max_y {
+            for z in min_z..=max_z {
+                for x in min_x..=max_x {
+                    let (fx, fy, fz) = (x as f64 + 0.5, y as f64 + 0.5, z as f64 + 0.5);
+                    if eval(fx, fy, fz)? > 0.0 {
+                        continue;
+                    }
+
+                    let normal = if !wants_normal {
+                        (0.0, 0.0, 0.0)
+                    } else {
+                        let gradient = match normal(fx, fy, fz)? {
+                            Some(value) => value,
+                            None => (
+                                eval(fx + epsilon, fy, fz)? - eval(fx - epsilon, fy, fz)?,
+                                eval(fx, fy + epsilon, fz)? - eval(fx, fy - epsilon, fz)?,
+                                eval(fx, fy, fz + epsilon)? - eval(fx, fy, fz - epsilon)?,
+                            ),
+                        };
+                        let length = (gradient.0 * gradient.0
+                            + gradient.1 * gradient.1
+                            + gradient.2 * gradient.2)
+                            .sqrt();
+                        if length > 1e-12 && length.is_finite() {
+                            (
+                                gradient.0 / length,
+                                gradient.1 / length,
+                                gradient.2 / length,
+                            )
+                        } else {
+                            (0.0, 1.0, 0.0)
+                        }
+                    };
+                    if let Some(block) = brush.get_block_with_parameter(x, y, z, normal, None) {
+                        staged.set_block(x, y, z, &block);
+                    }
+                }
+            }
+        }
+
+        *self.schematic = staged;
+        Ok(())
+    }
+
+    /// Repeat a shape+brush fill at regular offset intervals.
+    /// Creates `count` copies of the shape, each offset by `offset * i` from the original.
+    pub fn rstack(
+        &mut self,
+        shape: &ShapeEnum,
+        brush: &BrushEnum,
+        count: usize,
+        offset: (i32, i32, i32),
+    ) {
+        // Same gate as fill/fill_enum_masked: a normal can cost a nearest
+        // surface query (see MeshShape), so only pay for it when the brush
+        // reads the value. Computed once, not once per copy.
+        let wants_normal = brush.uses_normal();
+        for i in 0..count {
+            let dx = offset.0 * i as i32;
+            let dy = offset.1 * i as i32;
+            let dz = offset.2 * i as i32;
+            let translated = TranslatedShape::new(shape, dx, dy, dz);
+            let (min_x, min_y, min_z, max_x, max_y, max_z) = translated.bounds();
+            self.schematic
+                .ensure_bounds((min_x, min_y, min_z), (max_x, max_y, max_z));
+
+            translated.for_each_point(|x, y, z| {
+                let normal = if wants_normal {
+                    translated.normal_at(x, y, z)
+                } else {
+                    (0.0, 0.0, 0.0)
+                };
+                let t = shape.parameter_at(x - dx, y - dy, z - dz);
+                if let Some(block) = brush.get_block_with_parameter(x, y, z, normal, t) {
+                    self.schematic.set_block(x, y, z, &block);
+                }
+            });
+        }
+    }
+}
+
+/// Internal helper that wraps a ShapeEnum with a translation offset.
+struct TranslatedShape<'a> {
+    inner: &'a ShapeEnum,
+    dx: i32,
+    dy: i32,
+    dz: i32,
+}
+
+impl<'a> TranslatedShape<'a> {
+    fn new(inner: &'a ShapeEnum, dx: i32, dy: i32, dz: i32) -> Self {
+        Self { inner, dx, dy, dz }
+    }
+}
+
+impl Shape for TranslatedShape<'_> {
+    fn contains(&self, x: i32, y: i32, z: i32) -> bool {
+        self.inner.contains(x - self.dx, y - self.dy, z - self.dz)
+    }
+
+    fn points(&self) -> Vec<(i32, i32, i32)> {
+        self.inner
+            .points()
+            .into_iter()
+            .map(|(x, y, z)| (x + self.dx, y + self.dy, z + self.dz))
+            .collect()
+    }
+
+    fn normal_at(&self, x: i32, y: i32, z: i32) -> (f64, f64, f64) {
+        self.inner.normal_at(x - self.dx, y - self.dy, z - self.dz)
+    }
+
+    fn bounds(&self) -> (i32, i32, i32, i32, i32, i32) {
+        let (min_x, min_y, min_z, max_x, max_y, max_z) = self.inner.bounds();
+        (
+            min_x + self.dx,
+            min_y + self.dy,
+            min_z + self.dz,
+            max_x + self.dx,
+            max_y + self.dy,
+            max_z + self.dz,
+        )
+    }
+
+    fn for_each_point<F>(&self, mut f: F)
+    where
+        F: FnMut(i32, i32, i32),
+    {
+        let dx = self.dx;
+        let dy = self.dy;
+        let dz = self.dz;
+        self.inner.for_each_point(|x, y, z| {
+            f(x + dx, y + dy, z + dz);
+        });
+    }
+}
+
+#[cfg(test)]
+mod callback_sdf_tests {
+    use super::{BrushEnum, BuildingTool, SolidBrush};
+    use crate::{BlockState, UniversalSchematic};
+
+    #[test]
+    fn callback_sdf_uses_the_normal_brush_pipeline() {
+        let mut schematic = UniversalSchematic::new("callback".to_string());
+        let brush = BrushEnum::Solid(SolidBrush::new(BlockState::new("minecraft:stone")));
+
+        BuildingTool::new(&mut schematic)
+            .fill_sdf_function(
+                (-2, -2, -2, 2, 2, 2),
+                0.5,
+                |x, y, z| Ok::<_, ()>((x * x + y * y + z * z).sqrt() - 2.0),
+                |_x, _y, _z| Ok::<_, ()>(None),
+                &brush,
+            )
+            .unwrap();
+
+        assert!(schematic.total_blocks() > 0);
+        assert!(schematic.total_blocks() < 125);
+    }
+
+    #[test]
+    fn callback_failure_does_not_partially_mutate_the_schematic() {
+        let mut schematic = UniversalSchematic::new("callback".to_string());
+        schematic.set_block(20, 20, 20, &BlockState::new("minecraft:gold_block"));
+        let brush = BrushEnum::Solid(SolidBrush::new(BlockState::new("minecraft:stone")));
+
+        let result = BuildingTool::new(&mut schematic).fill_sdf_function(
+            (-2, -2, -2, 2, 2, 2),
+            0.5,
+            |x, y, z| {
+                if x > 0.0 && y > 0.0 && z > 0.0 {
+                    Err("callback failed")
+                } else {
+                    Ok(-1.0)
+                }
+            },
+            |_x, _y, _z| Ok(None),
+            &brush,
+        );
+
+        assert_eq!(result, Err("callback failed"));
+        assert_eq!(schematic.total_blocks(), 1);
+        assert_eq!(
+            schematic.get_block(20, 20, 20).unwrap().get_name(),
+            "minecraft:gold_block"
+        );
+    }
+}

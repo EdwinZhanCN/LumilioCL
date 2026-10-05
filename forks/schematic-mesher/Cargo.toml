@@ -1,0 +1,65 @@
+[package]
+name = "schematic-mesher"
+version = "0.2.0"
+edition = "2021"
+license = "AGPL-3.0-only"
+description = "Generate 3D meshes from Minecraft schematics and block data"
+repository = "https://github.com/Schem-at/Schematic-Mesher"
+keywords = ["minecraft", "mesh", "gltf", "voxel", "schematic"]
+categories = ["rendering", "game-development"]
+readme = "README.md"
+authors = ["Nano nano@schem.at"]
+exclude = ["web/", "examples/", "minecraft-src/", "tools/", "todo.md"]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = []
+cli = ["clap"]
+wasm = ["wasm-bindgen", "js-sys", "console_error_panic_hook"]
+
+[[bin]]
+name = "schematic-mesher"
+path = "src/bin/main.rs"
+required-features = ["cli"]
+
+[dependencies]
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+thiserror = "1.0"
+
+# ZIP archive support
+zip = { version = "2.0", default-features = false, features = ["deflate"] }
+
+# Image processing
+image = { version = "0.25", default-features = false, features = ["png"] }
+
+# glTF export
+gltf-json = { version = "1.4", features = ["extras"] }
+
+# Math utilities
+glam = "0.27"
+
+# Fast non-cryptographic hashing for the hot per-block maps (BlockPosition keys).
+rustc-hash = "2"
+
+# CLI (optional)
+clap = { version = "4.5", features = ["derive"], optional = true }
+
+# WASM support (optional)
+wasm-bindgen = { version = "=0.2.99", optional = true }
+js-sys = { version = "=0.3.76", optional = true }
+console_error_panic_hook = { version = "0.1", optional = true }
+
+# Data-parallel meshing (native only — wasm has no threads). The mesher falls
+# back to a sequential loop when this isn't present (see mesher::mesh_blocks_internal).
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+rayon = "1"
+
+[dev-dependencies]
+tempfile = "3.0"
+nucleation = { path = "../nucleation", default-features = false }

@@ -1,0 +1,140 @@
+/* End-to-end smoke test for the generated C bindings, exercising one method from
+ * every unconditionally-compiled bridge module against the real crate. */
+#include <assert.h>
+#include <stdio.h>
+#include <string.h>
+
+#include "Autostack.h"
+#include "AnimationEffect.h"
+#include "BuildAnimation.h"
+#include "DefinitionRegion.h"
+#include "Diff.h"
+#include "FieldProgram.h"
+#include "FieldProgramBinaryOp.h"
+#include "FieldProgramBuilder.h"
+#include "FieldProgramDistanceKind.h"
+#include "FieldProgramUnaryOp.h"
+#include "FieldProgramValueType.h"
+#include "Schematic.h"
+#include "SchematicBuilder.h"
+#include "SchematicRegions.h"
+#include "Store.h"
+#include "Sdf.h"
+
+static DiplomatStringView sv(const char *s) {
+    DiplomatStringView v = {s, strlen(s)};
+    return v;
+}
+
+int main(void) {
+    /* --- schematic: create/set/get + error path --- */
+    Schematic *s = Schematic_create(sv("smoke"));
+    Schematic_set_block_result set_res = Schematic_set_block(s, 1, 2, 3, sv("minecraft:stone"));
+    assert(set_res.is_ok && set_res.ok);
+
+    char buf[4096];
+    DiplomatWrite w = diplomat_simple_write(buf, sizeof(buf));
+    Schematic_get_block_name_result gn = Schematic_get_block_name(s, 1, 2, 3, &w);
+    assert(gn.is_ok);
+    assert(strncmp(buf, "minecraft:stone", w.len) == 0);
+
+    w = diplomat_simple_write(buf, sizeof(buf));
+    Schematic_get_block_name_result miss = Schematic_get_block_name(s, 40, 40, 40, &w);
+    assert(!miss.is_ok && miss.err == NucleationError_NotFound);
+
+    /* --- save/load roundtrip --- */
+    Schematic_save_to_file_result sf = Schematic_save_to_file(s, sv("/tmp/bridge_smoke.litematic"));
+    assert(sf.is_ok);
+    Schematic_load_from_file_result lf = Schematic_load_from_file(sv("/tmp/bridge_smoke.litematic"));
+    assert(lf.is_ok);
+    Schematic *loaded = lf.ok;
+
+    /* --- builder: consuming build + AlreadyConsumed --- */
+    SchematicBuilder *b = SchematicBuilder_create();
+    assert(SchematicBuilder_map(b, sv("s"), sv("minecraft:stone")).is_ok);
+    assert(SchematicBuilder_layer(b, sv("[\"s\"]")).is_ok);
+    SchematicBuilder_build_result br = SchematicBuilder_build(b);
+    assert(br.is_ok);
+    Schematic *built = br.ok;
+    SchematicBuilder_build_result br2 = SchematicBuilder_build(b);
+    assert(!br2.is_ok && br2.err == NucleationError_AlreadyConsumed);
+
+    /* --- diff: distance between original and its saved copy is 0 --- */
+    Diff_compute_result dr = Diff_compute(s, loaded, sv("exact"));
+    assert(dr.is_ok);
+    assert(Diff_distance(dr.ok) == 0);
+    Diff_destroy(dr.ok);
+
+    /* --- autostack: JSON out --- */
+    w = diplomat_simple_write(buf, sizeof(buf));
+    Autostack_detect_structures(s, &w);
+    assert(w.len > 0 && buf[0] == '[');
+
+    /* --- definition regions --- */
+    DefinitionRegion *r = DefinitionRegion_create();
+    DefinitionRegion_add_point(r, 1, 2, 3);
+    SchematicRegions_add_result ar = SchematicRegions_add(s, sv("io"), r);
+    assert(ar.is_ok);
+    w = diplomat_simple_write(buf, sizeof(buf));
+    SchematicRegions_names_json_result nj = SchematicRegions_names_json(s, &w);
+    assert(nj.is_ok);
+    assert(strncmp(buf, "[\"io\"]", w.len) == 0);
+    DefinitionRegion_destroy(r);
+
+    /* --- store: mem:// save/open roundtrip --- */
+    Store_open_result so = Store_open(sv("mem://"));
+    assert(so.is_ok);
+    Store *store = so.ok;
+    Store_save_schematic_result ss = Store_save_schematic(store, s, sv("k1.litematic"), sv(""));
+    assert(ss.is_ok);
+    Store_open_schematic_result os = Store_open_schematic(store, sv("k1.litematic"));
+    assert(os.is_ok);
+    Schematic_destroy(os.ok);
+    Store_destroy(store);
+
+    /* --- construction animation: fluent one-shot effect --- */
+    BuildAnimation *animation = BuildAnimation_create(sv("fluent"));
+    AnimationEffect *effect = AnimationEffect_spin_in(600.0f, 1.0f);
+    BuildAnimation *borrowed = BuildAnimation_with_effect(animation, effect);
+    BuildAnimation_set_block_result animated =
+        BuildAnimation_set_block(borrowed, 0, 0, 0, sv("minecraft:stone"));
+    assert(animated.is_ok && animated.ok == 0);
+    BuildAnimation_set_block_result plain =
+        BuildAnimation_set_block(animation, 1, 0, 0, sv("minecraft:dirt"));
+    assert(plain.is_ok && plain.ok == 1);
+    assert(BuildAnimation_group_count(animation) == 2);
+    AnimationEffect_destroy(effect);
+    BuildAnimation_destroy(animation);
+
+    /* --- portable field program: length(position) - 2 --- */
+    FieldProgramBuilder *program_builder = FieldProgramBuilder_create();
+    FieldProgramBuilder_add_slot_result distance_slot =
+        FieldProgramBuilder_add_slot(program_builder, FieldProgramValueType_Scalar);
+    assert(distance_slot.is_ok);
+    assert(FieldProgramBuilder_set_output(program_builder, distance_slot.ok).is_ok);
+    assert(FieldProgramBuilder_set_bounds(program_builder, -2.0f, -2.0f, -2.0f,
+                                          2.0f, 2.0f, 2.0f).is_ok);
+    assert(FieldProgramBuilder_set_distance_kind(
+        program_builder, FieldProgramDistanceKind_Exact).is_ok);
+    assert(FieldProgramBuilder_push_pos(program_builder).is_ok);
+    assert(FieldProgramBuilder_unary_op(program_builder, FieldProgramUnaryOp_Length).is_ok);
+    assert(FieldProgramBuilder_push_const_scalar(program_builder, 2.0f).is_ok);
+    assert(FieldProgramBuilder_binary_op(program_builder, FieldProgramBinaryOp_Sub).is_ok);
+    assert(FieldProgramBuilder_store_local(program_builder, distance_slot.ok).is_ok);
+    FieldProgramBuilder_build_result program_result = FieldProgramBuilder_build(program_builder);
+    assert(program_result.is_ok);
+    FieldProgram *program = program_result.ok;
+    Sdf *program_sdf = Sdf_from_program(program);
+    assert(Sdf_eval_at(program_sdf, 0.0f, 0.0f, 0.0f) < 0.0f);
+    Sdf_destroy(program_sdf);
+    FieldProgram_destroy(program);
+    FieldProgramBuilder_destroy(program_builder);
+
+    Schematic_destroy(built);
+    Schematic_destroy(loaded);
+    Schematic_destroy(s);
+    remove("/tmp/bridge_smoke.litematic");
+
+    printf("bridge smoke (C) OK\n");
+    return 0;
+}

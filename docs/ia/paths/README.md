@@ -12,7 +12,7 @@
 | [动态](activity.md) | 8 |
 | [账户](accounts.md) | 9 |
 | [设置](settings.md) | 34 |
-| [游戏页（整体）](instance.md) | 13 |
+| [游戏页（整体）](instance.md) | 16 |
 | [游戏页 · 概览](instance.overview.md) | 4 |
 | [游戏页 · 内容](instance.content.md) | 16 |
 | [游戏页 · 世界](instance.worlds.md) | 17 |

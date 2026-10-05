@@ -102,11 +102,12 @@ pub enum InstanceIntent {
         plugin: String,
         action: lumilio_plugin_api::ActionId,
     },
-    /// Open a 3D preview window of this file (a path the plugin may read); the
-    /// application reads it and opens [`crate::model_preview`].
-    PluginModel {
+    /// Read assets for this inline preview. The entity ID keeps late results
+    /// tied to the view that requested them.
+    LoadModel {
         plugin: String,
         file: String,
+        request: u64,
     },
     /// Read this crash report; answer with [`InstanceDetailView::crash_arrived`].
     OpenCrash(String),

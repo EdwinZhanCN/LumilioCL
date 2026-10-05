@@ -1,0 +1,437 @@
+## 0 · Enabling the crate
+
+```toml
+# Cargo.toml of your binary / library
+[dependencies]
+nucleation = { path = "../nucleation", default-features = false, features = ["serde"] }
+#            └──────────────────────┘                      └───────────────┘
+#      local checkout or git URL                 enable optional helpers you need
+```
+
+### Optional feature flags
+
+| Feature      | What it adds                                                 |
+| ------------ | ------------------------------------------------------------ |
+| `python`     | PyO3 bindings (`nucleation::python::nucleation(...)`)        |
+| `wasm`       | `wasm-bindgen` Web-API wrappers (re-exported at crate root). |
+| `ffi`        | C-ABI helpers in `nucleation::ffi`.                          |
+| `meshing`    | 3D mesh generation (GLB, USDZ, raw) via `schematic-mesher`.  |
+| `simulation` | Redstone circuit simulation via MCHPRS integration.          |
+| *no flag*    | Pure-Rust core only.                                         |
+
+---
+
+## 1 · Public re-exports (always available)
+
+| Item                    | Kind       | Why you’d use it                                                                                                                       |
+| ----------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `UniversalSchematic`    | **struct** | The *central* data-structure: holds regions, blocks, entities, NBT, etc.                                                               |
+| `BlockState`            | **struct** | Immutable description of a single block (`name` + `HashMap<String,String>` properties).                                                |
+| `formats::litematic`    | **module** | Low-level encode/decode helpers `to_litematic(&UniversalSchematic) → Vec<u8>`, `from_litematic(&[u8]) → Result<UniversalSchematic,_>`. |
+| `formats::schematic`    | **module** | Same for classic WorldEdit `.schematic` (NBT‐based).                                                                                   |
+| `format_schematic`      | **fn**     | Pretty ASCII dump (fast text preview).                                                                                                 |
+| `format_json_schematic` | **fn**     | JSON dump for logging / debugging.                                                                                                     |
+
+> **Tip:** almost everything else (regions, entities, items, etc.) is reachable *through* `UniversalSchematic` methods, so you rarely import sub-modules directly.
+
+---
+
+## 2 · Zero-to-airship in 30 lines
+
+```rust
+use nucleation::{UniversalSchematic, BlockState, format_schematic};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // 1) create an empty schematic
+    let mut sch = UniversalSchematic::new("Demo".into());
+
+    // 2) place some blocks
+    sch.set_block(0, 0, 0, &BlockState::new("minecraft:stone".into()));
+    sch.set_block_from_string(1, 0, 0,
+        r#"minecraft:barrel[facing=up]{signal=13}"#)?;
+
+    // 3) inspect
+    println!("Blocks placed: {}", sch.total_blocks());
+    println!("{}", format_schematic(&sch));
+
+    // 4) save as .litematic
+    std::fs::write("demo.litematic", nucleation::litematic::to_litematic(&sch)?)?;
+    Ok(())
+}
+```
+
+Key highlights you can call on `sch` (the `UniversalSchematic`):
+
+```rust
+sch.get_block(x,y,z)                  // Option<&BlockState>
+sch.get_block_entity(pos)             // Option<&BlockEntity>
+sch.copy_region(&src, &bounds, dest, &excluded)
+sch.iter_blocks()                     // iterator of (BlockPosition, &BlockState)
+sch.iter_chunks(w,h,l, Some(strategy))// ordered chunk iterator
+sch.get_dimensions()                  // (x,y,z)
+sch.total_blocks(); sch.total_volume();
+```
+
+---
+
+## 3 · When you enable **`wasm`**
+
+```rust
+use nucleation::{SchematicWrapper};   // re-exported by lib.rs when feature=wasm
+```
+
+* Everything from the `wasm` module is surfaced at the crate root, so
+  you can compile the same source for native and Web targets by hiding the import
+  behind `#[cfg(target_arch = "wasm32")]`.
+
+---
+
+## 4 · When you enable **`ffi`**
+
+```rust
+use nucleation::ffi::{schematic_debug_info, print_debug_info};
+```
+
+* These are raw `extern "C"` helpers; the Rust wrapper is only needed if you call
+  back *into* Rust from another Rust crate that links to the C ABI.
+
+---
+
+## 5 · When you enable **`python`**
+
+Nothing special within Rust—the PyO3 glue code lives in
+`nucleation::python` and compiles into a `*.so`/`*.pyd`.
+The Rust side does **not** re-export those symbols to avoid name clashes.
+
+---
+
+## 6 · 3D Mesh Generation (feature = "meshing")
+
+Enable the `meshing` feature to generate 3D meshes from schematics:
+
+```toml
+nucleation = { version = "0.1", features = ["meshing"] }
+```
+
+### Basic mesh generation
+
+```rust
+use nucleation::{UniversalSchematic, meshing::{MeshConfig, ResourcePackSource}};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Load a schematic
+    let data = std::fs::read("build.litematic")?;
+    let schematic = nucleation::litematic::from_litematic(&data)?;
+
+    // Load a resource pack (ZIP or directory)
+    let pack = ResourcePackSource::from_file("resourcepack.zip")?;
+    let stats = pack.stats();
+    println!("Loaded {} blockstates, {} models, {} textures",
+        stats.blockstate_count, stats.model_count, stats.texture_count);
+
+    // Configure meshing
+    let config = MeshConfig::new()
+        .with_culling(true)
+        .with_ambient_occlusion(true)
+        .with_ao_intensity(0.4)
+        .with_cull_occluded_blocks(true)
+        .with_greedy_meshing(true);
+
+    // Generate GLB
+    let result = schematic.to_mesh(&pack, &config)?;
+    std::fs::write("output.glb", &result.glb_data)?;
+    println!("GLB: {} vertices, {} triangles", result.vertex_count, result.triangle_count);
+
+    // Generate USDZ (for Apple AR Quick Look)
+    let usdz = schematic.to_usdz(&pack, &config)?;
+    std::fs::write("output.usdz", &usdz.glb_data)?;
+
+    // Generate raw mesh data (for custom renderers)
+    let raw = schematic.to_raw_mesh(&pack, &config)?;
+    println!("Raw: {} vertices, {} triangles", raw.vertex_count(), raw.triangle_count());
+    let _positions = raw.positions_flat();  // Vec<f32>, 3 per vertex
+    let _normals = raw.normals_flat();      // Vec<f32>, 3 per vertex
+    let _uvs = raw.uvs_flat();             // Vec<f32>, 2 per vertex
+    let _indices = raw.indices();           // &[u32]
+
+    Ok(())
+}
+```
+
+### Per-region and per-chunk meshing
+
+```rust
+// One mesh per region
+let multi = schematic.mesh_by_region(&pack, &config)?;
+for (name, mesh) in &multi.meshes {
+    std::fs::write(format!("{name}.glb"), &mesh.glb_data)?;
+}
+
+// One mesh per 16x16x16 chunk
+let chunks = schematic.mesh_by_chunk(&pack, &config)?;
+for ((cx, cy, cz), mesh) in &chunks.meshes {
+    std::fs::write(format!("chunk_{cx}_{cy}_{cz}.glb"), &mesh.glb_data)?;
+}
+
+// Custom chunk size
+let chunks32 = schematic.mesh_by_chunk_size(&pack, &config, 32)?;
+```
+
+### Querying and modifying resource packs
+
+```rust
+// List all entries
+let blockstates = pack.list_blockstates();  // Vec<String>
+let models = pack.list_models();
+let textures = pack.list_textures();
+
+// Query specific entries
+if let Some(json) = pack.get_blockstate_json("minecraft:stone") {
+    println!("Stone blockstate: {json}");
+}
+if let Some((w, h, animated, frames)) = pack.get_texture_info("minecraft:block/stone") {
+    println!("Texture: {w}x{h}, animated={animated}, frames={frames}");
+}
+
+// Add custom entries
+pack.add_blockstate_json("mymod:custom", &blockstate_json)?;
+pack.add_model_json("mymod:block/custom", &model_json)?;
+pack.add_texture("mymod:block/custom", 16, 16, rgba_pixels)?;
+```
+
+---
+
+## 7 · Design notes & gotchas
+
+* **All mutation is via `&mut UniversalSchematic`**; most helper structs
+  (`Region`, `BlockEntity`, `Entity`, etc.) expose their own methods but are
+  *internal* unless you dive into the modules.
+* **Barrel `{signal=n}` sugar**—`set_block_from_string` auto-generates the correct
+  item stacks so a comparator reads the requested signal.
+* **Deterministic randomness**—chunk loading strategy `"Random"` hashes the
+  schematic name, so the order is stable across runs.
+
+---
+
+## 8 · Definition Regions & Fluent API
+
+Nucleation provides a fluent API for defining logical regions within your schematic. This is useful for marking inputs, outputs, or other significant areas.
+
+### Basic Usage
+
+You can chain methods to define a region's properties:
+
+```rust
+schematic.create_region("my_region".to_string(), (0, 0, 0), (5, 5, 5))
+    .add_bounds((10, 0, 0), (15, 5, 5)) // Add disjoint area
+    .set_color(0xFF0000)                // Set visualization color
+    .with_metadata("type", "input");    // Add custom metadata
+```
+
+### Filtering Blocks (Borrow Checker Patterns)
+
+When filtering a region based on the blocks inside it (e.g., "keep only stone blocks"), you need to access the schematic's block data. In Rust, this creates a borrow checker challenge because the region is owned by the schematic.
+
+**Pattern A: Clone, Modify, Insert**
+Safest approach. Clone the region so you can borrow the schematic immutably while modifying the region.
+
+```rust
+if let Some(region) = schematic.definition_regions.get("layout") {
+    let mut region_clone = region.clone();
+    
+    // Now safe to borrow schematic immutably
+    region_clone.filter_by_block(&schematic, "minecraft:stone");
+    
+    // Update the schematic
+    schematic.definition_regions.insert("stone_only".to_string(), region_clone);
+}
+```
+
+**Pattern B: Build Before Inserting**
+Create the region independently, modify it, and then insert it into the schematic.
+
+```rust
+use nucleation::definition_region::DefinitionRegion;
+
+let mut new_region = DefinitionRegion::from_bounds((0,0,0), (5,5,5));
+new_region.exclude_block(&schematic, "minecraft:air");
+schematic.definition_regions.insert("non_air".to_string(), new_region);
+```
+
+---
+
+## 9 · World & Region Parsing (Anvil / `.mca`)
+
+`nucleation::formats::world` imports whole Minecraft worlds into a
+`UniversalSchematic`, so the full crate API (blocks, diffing, fingerprinting,
+meshing, re-export to any format) applies unchanged. No extra cargo feature is
+required — it's part of the core.
+
+```rust
+use nucleation::formats::world;
+
+// 1. Single region file (r.0.0.mca) — all chunks
+let data = std::fs::read("r.0.0.mca")?;
+let schematic = world::from_mca(&data)?;
+
+// 2. Zipped world folder — reads region/*.mca + entities/*.mca (1.17+)
+let zip = std::fs::read("my_world.zip")?;
+let schematic = world::from_world_zip(&zip)?;
+
+// 3. World save directory on disk (not available on wasm32 targets)
+let schematic = world::from_world_directory(std::path::Path::new("saves/my_world"))?;
+```
+
+Every importer has a `_bounded` variant taking inclusive **block** coordinates
+(`min_x, min_y, min_z, max_x, max_y, max_z`) — use it to carve out just the area
+you need instead of loading the whole world:
+
+```rust
+// Just the 256×256 area around spawn
+let spawn = world::from_world_zip_bounded(&zip, -128, 0, -128, 128, 256, 128)?;
+```
+
+For lower-level access, `nucleation::formats::anvil` exposes the raw MCA parser
+(`McaFile`, `ChunkData`, `ChunkSection`) if you need per-chunk control.
+
+### Exporting back to a world
+
+```rust
+use nucleation::formats::world::{self, WorldExportOptions};
+
+// Zipped, playable world as bytes
+let zip_bytes = world::to_world_zip(&schematic, None)?;
+
+// Raw file map: path (e.g. "region/r.0.0.mca", "level.dat") -> bytes
+let files = world::to_world(&schematic, None)?;
+
+// Write a world folder straight to disk
+world::save_world(&schematic, std::path::Path::new("out_world"), Some(WorldExportOptions {
+    world_name: "Generated".into(),
+    game_mode: 1,                       // 0 Survival, 1 Creative, 2 Adventure, 3 Spectator
+    spawn_position: Some((0, 64, 0)),
+    ..Default::default()                // void_world, data_version, day_time, …
+}))?;
+```
+
+Complete programs: [`examples/convert_world.rs`](convert_world.rs) (world zip →
+litematic + GLB) and [`examples/inspect_world.rs`](inspect_world.rs).
+
+### Streaming (constant memory)
+
+The `world_stream` module processes worlds one chunk at a time — peak memory is
+O(one chunk) for directory/MCA sources and O(one region file) for zip. Corrupt
+chunks surface as per-item `Err` values; the iterator keeps going.
+
+```rust
+use nucleation::formats::world_stream::{WorldSource, WorldSink, diff_worlds};
+
+// Iterate all chunks in a directory
+let src = WorldSource::open_dir("saves/my_world")?;
+for result in src.chunks() {
+    let view = result?;          // Err = corrupt chunk; continue the loop to skip
+    println!("chunk ({}, {}), y {:?}", view.cx(), view.cz(), view.y_range());
+    for (x, y, z, name) in view.blocks() {
+        // full block scan — name is the namespaced block ID
+    }
+}
+
+// Bounded scan: only chunks that intersect the given block-coordinate box
+let src = WorldSource::open_dir("saves/my_world")?;
+for result in src.chunks_bounded(-128, 0, -128, 128, 256, 128) {
+    let view = result?;
+    // bridge a single chunk into a UniversalSchematic for diffing/meshing/export
+    let schem = view.to_schematic();
+}
+
+// Sink round-trip: create a fresh world, write chunks
+let mut sink = WorldSink::create("out_world", None)?;
+let src = WorldSource::open_dir("saves/my_world")?;
+for result in src.chunks() {
+    sink.write_chunk(result?)?;
+}
+sink.finish()?;      // flushes all buffered region files; sink is consumed here
+
+// diff_worlds + patch_chunk replay (mod-ore replay pattern)
+// Correct workflow: copy BEFORE, open_existing the COPY, apply diffs → transforms before→after.
+// chunks_bounded filters on X/Z only (chunks are full-height columns); Y values are accepted
+// for API symmetry with the eager importers but do not exclude chunks.
+use std::fs;
+fs::copy_dir_all("saves/before", "saves/replay")?;  // copy before-world; edit the copy
+let diffs = diff_worlds(
+    &WorldSource::open_dir("saves/before")?,
+    &WorldSource::open_dir("saves/after")?,
+    "exact",          // preset: exact | shape | structural | redstone | redstone_survival
+)?;
+let air = BlockState::new("minecraft:air".to_string());
+let mut sink = WorldSink::open_existing("saves/replay")?;  // patch_chunk requires open_existing
+for cd in diffs {
+    let cd = cd?;
+    // removed+added+changed drive replay; swapped/palette_swaps are analysis-only
+    sink.patch_chunk(cd.cx, cd.cz, |view| {
+        for (pos, _)    in &cd.diff.removed  { view.set_block(pos.0, pos.1, pos.2, &air); }
+        for (pos, b)    in &cd.diff.added    { view.set_block(pos.0, pos.1, pos.2, b); }
+        for (pos, _, b) in &cd.diff.changed  { view.set_block(pos.0, pos.1, pos.2, b); }
+    })?;
+}
+sink.finish()?;
+```
+
+**Semantics:**
+- **Iteration order**: regions in `(rx, rz)` order, chunks within a region in `(cz, cx)` order (`chunk_order_key`).
+- **Per-item errors**: a corrupt chunk yields `Err` for that item; the stream continues. FFI skips corrupt chunks silently.
+- **Memory model**: directory and MCA sources hold at most one chunk at a time; zip sources buffer one region file at a time.
+- **Sink merge**: `open_existing` reads existing region data before writing, so out-of-order chunk writes are safe. `patch_chunk` is only valid on `open_existing`.
+- **`chunks_bounded` Y axis**: selection filters on X/Z chunk columns only; Y values are accepted for API symmetry with the eager bounded importers but do not exclude chunks.
+
+#### Generating worlds from scratch
+
+`WorldChunkView::new(cx, cz)` creates an empty chunk that sections fill on demand;
+each chunk is dropped after `write_chunk`, so peak memory is O(one chunk) regardless
+of world size.
+
+```rust
+use nucleation::formats::world_stream::{WorldChunkView, WorldSink};
+use nucleation::formats::world::WorldExportOptions;
+use nucleation::BlockState;
+
+// WorldExportOptions fields are all optional; void_world defaults to true so
+// Minecraft will not generate terrain around the written chunks.
+let options = WorldExportOptions {
+    spawn_position: Some((0, 64, 0)),
+    ..Default::default()
+};
+let mut sink = WorldSink::create("out_world", Some(options))?;
+
+// Iterate in region-major order (rz → rx → cz → cx) for fastest sequential
+// writes; out-of-order is safe via read-merge but does extra I/O per region.
+for cz in -16..16_i32 {
+    for cx in -16..16_i32 {
+        let mut chunk = WorldChunkView::new(cx, cz);
+        for bx in (cx * 16)..(cx * 16 + 16) {
+            for bz in (cz * 16)..(cz * 16 + 16) {
+                // Trivial height function — replace with your noise/heightmap logic.
+                let h = 60 + ((bx + bz) % 8) as i32;
+                chunk.set_block(bx, h, bz, &BlockState::new("minecraft:grass_block".to_string()));
+                for by in 0..h {
+                    chunk.set_block(bx, by, bz, &BlockState::new("minecraft:stone".to_string()));
+                }
+            }
+        }
+        chunk.set_biome("minecraft:plains");  // optional; call AFTER set_block (lazy section alloc)
+        sink.write_chunk(chunk)?;
+        // `chunk` is dropped here — constant memory across the entire loop.
+    }
+}
+sink.finish()?;  // flushes all region files and writes level.dat
+```
+
+**Semantics (biomes):**
+- `WorldExportOptions::biome` (default `"minecraft:plains"`) is stamped onto any freshly created section that carries no biome data.
+- `chunk.set_biome("minecraft:desert")` overwrites all currently-present sections with a single-entry palette. Call it after `set_block` calls, since sections are allocated lazily.
+- `chunk.biome_palette()` returns the deduped list of biome ids present across all sections.
+- Biome data in chunks you read and re-stream (patch/replay workflows) is preserved verbatim — only sections with no biome data receive the default.
+- Limitation: chunk-level granularity only. Sub-chunk 3D biome editing (4×4×4 cells, caves vs. surface) is future work; existing multi-biome detail in parsed chunks survives untouched as long as you don't call `set_biome` on that chunk.
+
+**Limitations:** lighting is recalculated by Minecraft on first load.
+

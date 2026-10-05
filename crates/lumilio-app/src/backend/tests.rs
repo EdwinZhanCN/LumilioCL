@@ -142,8 +142,8 @@ fn the_litematica_tab_follows_the_schematics_folder_and_its_switch() {
         assert_eq!(items[0].subtitle.as_deref(), Some("读不了"));
 
         // The detail offers a 3D preview of that file, and the host serves it.
-        // A file that is not a schematic fails that preview, not the plugin.
-        assert!(
+        // The host returns raw bytes; the native renderer handles parse errors.
+        assert_eq!(
             service
                 .plugin_model(
                     &record.id,
@@ -151,7 +151,9 @@ fn the_litematica_tab_follows_the_schematics_folder_and_its_switch() {
                     "schematics/broken.litematic",
                 )
                 .await
-                .is_err()
+                .unwrap()
+                .schematic,
+            b"not a schematic"
         );
         assert_eq!(service.plugin_tabs(&record.id).await.unwrap().len(), 1);
         assert!(

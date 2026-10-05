@@ -1,0 +1,499 @@
+[workspace]
+# The root package is implicitly a member. `crates/*` holds components that must
+# stay independent of nucleation itself — most importantly `mc-tick`, whose whole
+# value is that `cargo test -p mc-tick` does not rebuild this 188k-line crate and
+# its 159 dependencies.
+members = ["crates/*"]
+resolver = "2"
+
+[package]
+name = "nucleation"
+version = "0.10.24"
+edition = "2021"
+description = "A high-performance Minecraft schematic parser and utility library"
+authors = ["Nano nano@schem.at"]
+license = "MIT"
+repository = "https://github.com/Schem-at/Nucleation"
+readme = "README.md"
+keywords = ["minecraft", "schematic", "parser", "voxel"]
+categories = ["game-development", "parser-implementations", "wasm"]
+# Explicit allowlist: the repo carries generated bindings, test samples, and
+# packaging trees that ballooned `cargo package` to 448 MB compressed —
+# crates.io rejects anything over 10 MB. Ship the library and world worker sources.
+include = [
+    "src/**",
+    "build.rs",
+    "data/blockpedia/**",
+    "tools/mc-data/**",
+    "examples/segment_world.rs",
+    "Cargo.toml",
+    "README.md",
+    "LICENSE",
+    "RELEASE_NOTES.md",
+]
+
+[lib]
+# staticlib: linked into the Python (nanobind) extension so the wheel is self-contained.
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[features]
+default = ["store-fs", "autostack"]
+# The generated-bindings surface (Diplomat): the single source of truth for every
+# language binding (C/C++/JS/Kotlin/Python/PHP) under bindings/, generated from
+# src/bridge/ by tools/gen-bindings.sh. Replaces the old hand-written ffi/wasm/
+# python/php layers and their parity linters.
+bridge = ["dep:diplomat", "dep:diplomat-runtime", "dep:base64", "autostack"]
+# Everything the full generated surface needs at runtime; used for codegen builds,
+# smoke tests, and release artifacts of the generated bindings.
+bridge-full = [
+    "bridge",
+    "meshing",
+    "simulation",
+    "rendering",
+    "scripting-lua",
+    "scripting-js",
+    "voxelize",
+    "world-segment",
+    "store-ssh",
+    "mc-tick",
+    "routing",
+    "hdl",
+]
+
+# The vanilla-accurate headless tick engine (crates/mc-tick), bridged as
+# TickSimulation. Optional so plain library builds stay unchanged; the crate
+# also stays a dev-dependency for examples/tests, which is fine — the two
+# declarations are independent.
+mc-tick = ["dep:mc-tick", "nucleation-hdl?/mc-tick"]
+
+# Redstone EDA: place-and-route, DRC and STA (crates/nucleation-routing on
+# crates/pnr-core), bridged as a minimal Workspace surface. Dependency
+# direction stays one-way, like mc-tick: the routing crates never see
+# nucleation; the `routing` module converts UniversalSchematic both ways.
+routing = ["dep:nucleation-routing", "dep:pnr-core"]
+
+# HDL -> redstone: compile a combinational BLIF (yosys output) into a
+# dual-rail PLA schematic (crates/nucleation-hdl, the Rust port of the
+# verified redstone-eda/hdl Python pipeline). One-way like mc-tick and
+# routing; the bridge `Hdl` opaque converts the compiled cells into a
+# UniversalSchematic. With `mc-tick` also enabled, the compiler's in-sim
+# verify/bake path lights up (nucleation-hdl?/mc-tick above).
+hdl = ["dep:nucleation-hdl"]
+
+# The `nucleation` CLI lives in crates/nucleation-cli (binary name
+# `nucleation`, run with `cargo run -p nucleation-cli -- ...`). No feature
+# here: the published library carries no CLI dependencies.
+
+# Storage backends (the `store` module). `mem` is always available; the rest
+# are feature-gated so you only pull the deps you enable. Networked backends
+# wrap async SDKs behind an internal `block_on` so the trait stays sync.
+store-fs = []
+store-ssh = []
+store-s3 = ["dep:aws-sdk-s3", "dep:tokio", "dep:futures-util"]
+store-redis = ["dep:redis", "dep:tokio"]
+store-pg = ["dep:tokio-postgres", "dep:tokio"]
+store-callback = []
+# Exposes the backend-agnostic contract suite + testcontainers for integration tests.
+store-testkit = ["dep:testcontainers-modules"]
+serde = []
+# Redstone simulation support
+simulation = [
+    "mchprs_redpiler",
+    "mchprs_redstone",
+    "mchprs_world",
+    "mchprs_blocks",
+]
+# Auto-stack: detect repeating structures + resize them (pure-voxel core)
+autostack = []
+# World segmentation: voxel world -> discrete builds (pure, deterministic core)
+world-segment = ["dep:tar", "dep:zstd"]
+# Mesh voxelization: GLB/OBJ models -> building Shapes + textured schematics
+voxelize = ["dep:gltf", "dep:image"]
+# Meshing support - generate 3D meshes from schematics
+meshing = ["schematic-mesher"]
+# GPU rendering support - render schematics to images
+rendering = ["meshing", "dep:wgpu", "dep:image", "dep:pollster"]
+# Embedded scripting engines
+scripting-lua = ["mlua"]
+scripting-js = ["rquickjs"]
+scripting = ["scripting-lua", "scripting-js"]
+# Data-refresh tooling for the vendored blockpedia module (tools/mc-data/):
+# downloads the MC client jar / textures and regenerates the gzipped data
+# snapshots in data/blockpedia/. Network + image deps live only here so
+# normal builds never pay for them.
+mc-data-refresh = ["dep:image", "dep:reqwest"]
+
+[dependencies]
+serde = { version = "1.0", features = ["derive", "rc"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+quartz_nbt = { version = "0.2.9", features = ["preserve_order"] }
+flate2 = { version = "1.1.2", default-features = false, features = ["zlib-rs"] }
+tar = { version = "0.4", optional = true }
+zstd = { version = "0.13", optional = true }
+log = "0.4.22"
+console = "0.15.8"
+insign = "0.1.1"
+# Vendored blockpedia module (src/blockpedia/) dependencies. The block tables
+# are PHF maps generated by build.rs from data/blockpedia/*.json.gz.
+phf = { version = "0.11", features = ["macros"] }
+palette = "0.7"
+anyhow = "1.0"
+
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+hematite-nbt = "*"
+tracing = "0.1.40"
+thiserror = "1.0.63"
+rayon = "1.10"
+smol_str = { version = "0.2", features = ["serde"] }
+rustc-hash = "2.0"
+
+rand = "0.8.5"
+# getrandom "custom": the Diplomat wasm module has no wasm-bindgen glue, so the "js"
+# entropy source can't be used; lib.rs registers a non-crypto fallback on wasm32
+# (rand here only feeds seeded shuffles and cosmetic jitter, never key material).
+getrandom = { version = "0.2", features = ["custom"] }
+
+# Diplomat bridge dependencies (base64: binary payloads cross DiplomatWrite as base64,
+# since the JS/Kotlin backends decode the write buffer as UTF-8 text)
+diplomat = { version = "0.15.0", optional = true }
+diplomat-runtime = { version = "0.15.1", optional = true }
+base64 = { version = "0.22", optional = true }
+# The headless tick engine, bridged behind the `mc-tick` feature. Dependency
+# direction stays one-way: mc-tick never sees nucleation.
+mc-tick = { path = "crates/mc-tick", version = "0.1.0", optional = true }
+# Redstone EDA, behind the `routing` feature. Same one-way rule as mc-tick.
+nucleation-routing = { path = "crates/nucleation-routing", version = "0.1.0", optional = true }
+# The generic P&R core underneath nucleation-routing. `design.rs` routes bus
+# corridors with its weighted A* / negotiated congestion instead of carrying a
+# second pathfinder; same one-way rule (pnr-core never sees nucleation).
+pnr-core = { path = "crates/pnr-core", version = "0.1.0", optional = true }
+# HDL -> redstone PLA compiler, behind the `hdl` feature. Same one-way rule.
+nucleation-hdl = { path = "crates/nucleation-hdl", version = "0.1.0", optional = true }
+
+# Scripting engine dependencies
+mlua = { version = "0.10", features = ["luajit", "vendored"], optional = true }
+rquickjs = { version = "0.9", features = ["macro", "classes", "properties"], optional = true }
+
+bincode = "1"
+blake3 = "1"
+ron = "0.8"
+rustfft = "6"
+bytemuck = { version = "1.23.1", features = ["derive"] }
+zip = { version = "2", default-features = false, features = ["deflate"] }
+
+# Storage backend dependencies - optional, behind store-* features.
+# Networked backends use async SDKs wrapped with an internal tokio runtime.
+tokio = { version = "1", features = ["rt-multi-thread", "net", "time"], optional = true }
+aws-sdk-s3 = { version = "1", optional = true }
+futures-util = { version = "0.3", optional = true }
+redis = { version = "0.27", features = ["tokio-comp"], optional = true }
+tokio-postgres = { version = "0.7", optional = true }
+# Test-only (behind store-testkit): spin real backends in integration tests.
+testcontainers-modules = { version = "0.11", features = [
+    "minio",
+    "redis",
+    "postgres",
+    "blocking",
+], optional = true }
+
+# Meshing dependencies - optional
+# LumilioCL local fork: use the adjacent mesher, never a second Git or registry copy.
+# Upstream Cargo.toml at 51de345 (MIT; see LICENSE and ../README.md); ADR 0029.
+schematic-mesher = { version = "0.2.0", path = "../schematic-mesher", optional = true }
+
+# Rendering dependencies - optional
+wgpu = { version = "30", optional = true }
+image = { version = "0.24", optional = true }
+pollster = { version = "0.4", optional = true }
+
+# Mesh voxelization (voxelize feature). gltf with default features off: we parse
+# GLB containers ourselves (`Gltf::from_slice` + the `utils` accessor readers)
+# and decode embedded png/jpeg textures with the `image` dep above, so gltf's
+# own `import`/`image` machinery (and its separate image-crate version) stays out
+# of the tree. NOTE: do not enable gltf's "names" feature — it toggles a `name`
+# field onto every gltf-json struct crate-tree-wide and breaks schematic-mesher's
+# struct literals (feature unification).
+gltf = { version = "1.4", default-features = false, features = ["utils", "KHR_materials_transmission", "KHR_materials_emissive_strength"], optional = true }
+
+# Simulation (MCHPRS) dependencies - optional
+# Note: These are git dependencies and will be excluded from crates.io publish
+# Using Nano112's MCHPRS fork with custom IO support and bug fixes
+# Networking is disabled to avoid WASM compatibility issues
+# Rev 18c0c76: branch fix/torch-symmetry-non-cross-wires —
+# preserves coalesced world positions on flush so mirror-image torches
+# both update (in addition to existing custom IO + wire connectivity fixes)
+mchprs_redpiler = { git = "https://github.com/Nano112/MCHPRS.git", rev = "2e62496", optional = true }
+mchprs_redstone = { git = "https://github.com/Nano112/MCHPRS.git", rev = "2e62496", optional = true }
+mchprs_world = { git = "https://github.com/Nano112/MCHPRS.git", rev = "2e62496", optional = true, default-features = false }
+mchprs_blocks = { git = "https://github.com/Nano112/MCHPRS.git", rev = "2e62496", optional = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+# mc-data-refresh tooling only (never in normal builds; see the feature note)
+reqwest = { version = "0.12", features = ["blocking", "json"], optional = true }
+
+[build-dependencies]
+# build.rs gunzips data/blockpedia/*.json.gz and generates the PHF block
+# tables for the vendored blockpedia module.
+anyhow = "1.0"
+serde_json = "1.0"
+flate2 = { version = "1.1.2", default-features = false, features = ["zlib-rs"] }
+
+# Data-refresh tools for the vendored blockpedia module. Run from the repo
+# root; they rewrite data/blockpedia/*.json.gz (see README).
+[[bin]]
+name = "refresh-block-data"
+path = "tools/mc-data/refresh-block-data.rs"
+required-features = ["mc-data-refresh"]
+
+[[bin]]
+name = "fetch-texture-colors"
+path = "tools/mc-data/fetch-texture-colors.rs"
+required-features = ["mc-data-refresh"]
+
+[[bin]]
+name = "download-textures"
+path = "tools/mc-data/download-textures.rs"
+required-features = ["mc-data-refresh"]
+
+[[bin]]
+name = "refresh-bedrock-mappings"
+path = "tools/mc-data/refresh-bedrock-mappings.rs"
+required-features = ["mc-data-refresh"]
+
+[[bin]]
+name = "segment_world"
+path = "examples/segment_world.rs"
+required-features = ["world-segment", "store-fs"]
+
+[dev-dependencies]
+num-complex = "0.4"
+base64 = "0.22"
+# Golden hashes for the voxelize regression fixtures (tests/voxelize_golden.rs).
+sha2 = "0.10"
+ffmpeg-sidecar = "2.4"
+winit = "0.30"
+bincode = "1"
+# Dev-only on purpose: examples that *render* mc-tick simulations. The
+# production dependency direction stays one-way (mc-tick never sees nucleation).
+mc-tick = { path = "crates/mc-tick" }
+mc-tick-trace = { path = "crates/mc-tick-trace" }
+mc-test = { path = "crates/mc-test" }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+criterion = "0.5.1"
+
+[[bench]]
+name = "block_placement"
+harness = false
+
+[[bench]]
+name = "performance_test"
+harness = false
+
+[[bench]]
+name = "region_bench"
+harness = false
+
+[[bench]]
+name = "scripting_bench"
+harness = false
+required-features = ["scripting"]
+
+[[bench]]
+name = "snapshot_bench"
+harness = false
+
+[[bench]]
+name = "fingerprint_bench"
+harness = false
+
+[[bench]]
+name = "voxelize_bench"
+harness = false
+required-features = ["voxelize"]
+
+[[example]]
+name = "wol_extract"
+required-features = ["world-segment"]
+
+[[example]]
+name = "segment_world"
+required-features = ["world-segment", "store-fs"]
+
+[[example]]
+name = "wol_pack"
+
+[[example]]
+name = "airship_fortress"
+required-features = ["voxelize"]
+
+[[example]]
+name = "voxelize_course"
+required-features = ["voxelize"]
+
+# Examples requiring the meshing feature
+[[example]]
+name = "render_schematic"
+required-features = ["rendering"]
+
+[[example]]
+name = "render_simulation"
+required-features = ["rendering"]
+
+[[example]]
+name = "render_smoke"
+required-features = ["rendering"]
+
+[[example]]
+name = "render_animation"
+required-features = ["rendering"]
+
+[[example]]
+name = "render_animation_operations"
+required-features = ["rendering"]
+
+[[example]]
+name = "render_trefoil"
+required-features = ["rendering"]
+
+[[example]]
+name = "bench_mesh_timing"
+required-features = ["meshing"]
+
+[[example]]
+name = "compare_formats"
+required-features = ["meshing"]
+
+[[example]]
+name = "gen_test_nucm"
+required-features = ["meshing"]
+
+[[example]]
+name = "quick_mesh_test"
+required-features = ["meshing"]
+
+[[example]]
+name = "nucm_size_test"
+required-features = ["meshing"]
+
+[[example]]
+name = "convert_world"
+required-features = ["meshing"]
+
+[[example]]
+name = "item_model_test"
+required-features = ["meshing"]
+
+[[example]]
+name = "multi_item_model"
+required-features = ["meshing"]
+
+[[example]]
+name = "entity_mesh_test"
+required-features = ["meshing"]
+
+# README media generators live under examples/readme/<section>/ so the root
+# examples directory stays navigable as the feature showcase grows.
+[[example]]
+name = "readme_setblock"
+path = "examples/readme/animation/set-block.rs"
+required-features = ["rendering"]
+
+[[example]]
+name = "readme_assemble"
+path = "examples/readme/animation/assemble.rs"
+required-features = ["rendering"]
+
+[[example]]
+name = "readme_regions"
+path = "examples/readme/regions/generate.rs"
+required-features = ["rendering"]
+
+[[example]]
+name = "readme_formats"
+path = "examples/readme/formats-and-io/round-trip.rs"
+
+[[example]]
+name = "analyze_schematic_corpus"
+required-features = ["world-segment"]
+
+# Store backends against real services via testcontainers (docker required).
+[[test]]
+name = "store_testcontainers"
+required-features = ["store-s3", "store-redis", "store-pg", "store-testkit"]
+
+[profile.bench]
+debug = true
+
+[profile.release]
+lto = true
+opt-level = 3
+
+# Debug-info budget. This is the single biggest lever on iteration speed here,
+# and it is a disk problem before it is a CPU problem.
+#
+# Measured 2026-08-09 before this stanza existed: target/ was 102 GB, with
+# 774,187 files in target/debug/deps, because every one of the 159
+# dependencies was compiled at `-C debuginfo=2 -C split-debuginfo=unpacked`
+# (the macOS dev default), which leaves a fan of .o object files per crate per
+# feature combination. At that file count a NO-OP `cargo check` spent 31.8s
+# doing nothing but stat-ing fingerprints.
+#
+# Dependencies get no debuginfo — you do not single-step through `naga` or
+# `wgpu`. Our own crates keep line tables, so panics and `RUST_BACKTRACE`
+# still name the file and line; only in-debugger variable inspection is lost.
+# If you genuinely need to step through our code, temporarily run with
+# `RUSTFLAGS="-C debuginfo=2"` rather than editing this.
+[profile.dev]
+debug = "line-tables-only"
+incremental = true
+
+[profile.dev.package."*"]
+debug = 0
+
+# `cargo test` builds under this profile; it inherits dev, so state the same
+# budget explicitly rather than letting a future dev-profile edit change what
+# the test loop costs.
+[profile.test]
+debug = "line-tables-only"
+
+[profile.test.package."*"]
+debug = 0
+
+# Patch for MCHPRS compatibility
+[patch.crates-io]
+hematite-nbt = { git = "https://github.com/StackDoubleFlow/hematite_nbt" }
+
+
+
+[[example]]
+name = "render_simulation_video"
+required-features = ["rendering"]
+
+# The one diagnostic left where there used to be six door-specific ones
+# (door55_sim, door55_doorway, door55_xray, door55_render, world_entity_audit,
+# door_batch_load). It takes a path instead of knowing about a door, and prints
+# exactly the quantities a scenario descriptor can assert, so it is the
+# authoring loop for `tests/scenarios/*.litematic` rather than a parallel one.
+#
+# No required-features on purpose, and that is load-bearing: it reaches the
+# engine through `formats::gametest` + the mc-tick dev-dependency rather than
+# through the bridge, so a bare `cargo test` (which builds every example) can
+# compile it. An example that needed `bridge` and said so only in a comment is
+# what broke the pre-push gate before.
+[[example]]
+name = "scenario_inspect"
+
+# Self-testing builds: each schematic under tests/scenarios/ — any format the
+# FormatManager detects — carries its own scenario. Not a stanza cargo needs —
+# listed so the target is discoverable beside the descriptor-driven `cases`
+# test in crates/mc-tick.
+[[test]]
+name = "embedded_cases"
+
+# Headless proof of concept for the meta-structure overlay: analyse a machine and
+# write it twice, as built and recoloured by role. No app, no browser.
+[[example]]
+name = "meta_overlay_poc"
+required-features = ["bridge", "mc-tick"]

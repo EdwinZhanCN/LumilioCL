@@ -1,0 +1,19 @@
+[package]
+name = "lumilio-schematic-render"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+# Locally maintained native rendering chain; upstream baselines in forks/README.md (ADR 0029).
+nucleation = { path = "../../forks/nucleation", default-features = false, features = ["meshing", "rendering"] }
+pollster = "0.4"
+
+[dev-dependencies]
+image.workspace = true
+zip.workspace = true
+
+[lints]
+workspace = true

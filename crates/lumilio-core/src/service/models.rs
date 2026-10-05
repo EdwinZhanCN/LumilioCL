@@ -1,5 +1,4 @@
-//! What a 3D preview window needs: the schematic a plugin named and a resource
-//! pack from the instance's own game files (ADR 0027).
+//! An inline 3D preview's schematic and its own game's resource pack (ADR 0028).
 
 use super::{LauncherService, ServiceError};
 use crate::model_assets::{ResourcePack, build_pack};
@@ -35,7 +34,7 @@ fn client_jar(
 
 impl<T: Transport + Clone> LauncherService<T> {
     /// The schematic `file` (a path the plugin may read) and the resource pack
-    /// for this instance. A game without a readable jar still previews, bare.
+    /// for this instance. Without a readable jar the UI explains why it cannot preview.
     pub async fn plugin_model(
         &self,
         instance: &str,
@@ -51,7 +50,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         let layout = self.layout.clone();
         let pack = tokio::task::spawn_blocking(move || {
             let jar = client_jar(&layout, &record)?;
-            build_pack(&jar, &record.game_version).ok()
+            build_pack(&jar).ok()
         })
         .await
         .map_err(std::io::Error::other)?;
