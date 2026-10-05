@@ -350,3 +350,8 @@ pub enum Permission {
 - app 注册 `lumilio-plugin-modrinth`；service 测试和 `live_smoke` 注入它，测试传输加了 `send_no_redirect`。新增覆盖：搜索经内容源并转换类型、停用后各入口返回 NoContentSource 且不发请求、失败后保持停止、能力驱动的筛选分区、加载器其他类型保留、更新检查在内容源停用时失败。
 - 验证：本机只跑了受影响的 core 测试（90 通过、1 忽略），其余按维护者要求交给 GitHub Actions 的 `just ci`。需要肉眼看：发现页筛选栏（Modrinth 下应与之前完全一致）、停用 Modrinth 后的发现页空状态和内容页提示。
 - 维护者裁决放宽 D2（CI 的「失败的下载可以重试」测试暴露：断网后内容源进入 Failed，重试永远不会成功）：新增 `PluginError::Transient`，表示外部世界不配合（连不上、HTTP 非 2xx），只让这一次调用失败，插件保持启用并可重试，原因可由 `last_transient_error` 读到。panic、超时、越权、非法输入、重定向 / 大小超限等仍按 D2 停用到重启。Modrinth 的 HTTP 非 2xx 与 `ctx.request` 的传输错误使用它。上面「内容源一次出错就 Failed」的说明以此为准；旧的「网络恢复后同一 service 重试成功」测试因此保持原有含义。
+
+### 2026-10-05 — P3 验收
+
+- 维护者肉眼确认：发现页筛选栏在 Modrinth 下与之前一致；停用 Modrinth 后发现页空状态「没有可用的内容源」、内容页来源提示可见；设置 › 插件中的 Modrinth 行正常。
+- P3 全阶段完成；P4 入口条件（P3 已提交）已满足，但尚未开始。
