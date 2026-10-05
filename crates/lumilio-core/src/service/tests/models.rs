@@ -2,13 +2,56 @@ use super::world;
 use crate::instance::Loader;
 use crate::plugins::PluginHost;
 use crate::service::ServiceError;
-use lumilio_plugin_api::{API_VERSION, Manifest, Permission, Plugin, PluginError};
+use lumilio_plugin_api::{
+    API_VERSION, ActionId, Effect, GameFacts, HostContext, InstanceTab, Manifest, Permission,
+    Plugin, PluginError, TabState, View,
+};
 use std::io::Write;
 use std::sync::Arc;
 
-struct Builder;
+/// A plugin whose `model` can be told to fail or to panic.
+struct Builder {
+    mode: Mode,
+}
+
+#[derive(Clone, Copy)]
+enum Mode {
+    Plain,
+    Error,
+    Panic,
+}
+
+impl InstanceTab for Builder {
+    fn title(&self) -> String {
+        "投影".into()
+    }
+    fn appears(&self, _: &GameFacts, _: &dyn HostContext) -> bool {
+        true
+    }
+    fn view(&self, _: &dyn HostContext, _: &TabState) -> Result<View, PluginError> {
+        Ok(View::Tags(Vec::new()))
+    }
+    fn update(
+        &self,
+        _: &dyn HostContext,
+        state: TabState,
+        _: ActionId,
+    ) -> Result<(TabState, Vec<Effect>), PluginError> {
+        Ok((state, Vec::new()))
+    }
+    fn model(&self, ctx: &dyn HostContext, file: &str) -> Result<Vec<u8>, PluginError> {
+        match self.mode {
+            Mode::Plain => ctx.read_file(file),
+            Mode::Error => Err(PluginError::Unavailable("this file is broken".into())),
+            Mode::Panic => panic!("boom"),
+        }
+    }
+}
 
 impl Plugin for Builder {
+    fn instance_tab(&self) -> Option<&dyn InstanceTab> {
+        Some(self)
+    }
     fn manifest(&self) -> Manifest {
         Manifest {
             id: "test.builder".into(),
@@ -26,8 +69,12 @@ impl Plugin for Builder {
 }
 
 async fn world_with_schematic() -> (super::World, String) {
+    world_with(Mode::Plain).await
+}
+
+async fn world_with(mode: Mode) -> (super::World, String) {
     let mut world = world();
-    world.service.plugins = PluginHost::new(vec![Arc::new(Builder)], Default::default());
+    world.service.plugins = PluginHost::new(vec![Arc::new(Builder { mode })], Default::default());
     let record = world
         .service
         .create_instance("Builder", Some("1.0"), Loader::Vanilla, None)
@@ -138,4 +185,43 @@ async fn files_outside_the_grant_and_switched_off_plugins_are_refused() {
             .await,
         Err(ServiceError::Plugin(PluginError::Unavailable(_)))
     ));
+}
+
+#[tokio::test]
+async fn a_file_the_plugin_cannot_prepare_fails_that_preview_not_the_plugin() {
+    let (world, id) = world_with(Mode::Error).await;
+    let result = world
+        .service
+        .plugin_model(&id, "test.builder", "schematics/house.litematic")
+        .await;
+    assert!(
+        matches!(
+            result,
+            Err(ServiceError::Plugin(PluginError::Unavailable(_)))
+        ),
+        "{result:?}"
+    );
+    // The plugin is still on: its tab shows and the next preview is asked for.
+    assert_eq!(world.service.plugin_tabs(&id).await.unwrap().len(), 1);
+    assert!(
+        world
+            .service
+            .plugin_model(&id, "test.builder", "schematics/house.litematic")
+            .await
+            .is_err()
+    );
+    assert_eq!(world.service.plugin_tabs(&id).await.unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn a_plugin_that_panics_while_preparing_is_switched_off_for_the_run() {
+    let (world, id) = world_with(Mode::Panic).await;
+    assert!(
+        world
+            .service
+            .plugin_model(&id, "test.builder", "schematics/house.litematic")
+            .await
+            .is_err()
+    );
+    assert!(world.service.plugin_tabs(&id).await.unwrap().is_empty());
 }

@@ -39,10 +39,19 @@ try {
       enableDragAndDrop: false,
       enableGizmos: false,
       enableInteraction: true,
-      cameraOptions: { enableZoomInOnLoad: true, useTightBounds: true },
+      // Not zooming in on load: it framed a large schematic from inside it.
+      cameraOptions: { enableZoomInOnLoad: false },
       callbacks: {
         onRendererInitialized: () => ready(),
-        onSchematicRendered: () => { status.hidden = true; },
+        onSchematicRendered: () => {
+          status.hidden = true;
+          // The renderer frames the schematic when it loads, and sometimes does
+          // so before the meshes are ready (the camera ended up inside a large
+          // build). Frame it again once they are.
+          for (const wait of [150, 800]) {
+            setTimeout(() => renderer.cameraManager.focusOnSchematics(), wait);
+          }
+        },
       },
     },
   );

@@ -142,16 +142,18 @@ fn the_litematica_tab_follows_the_schematics_folder_and_its_switch() {
         assert_eq!(items[0].subtitle.as_deref(), Some("读不了"));
 
         // The detail offers a 3D preview of that file, and the host serves it.
-        let preview = service
-            .plugin_model(
-                &record.id,
-                lumilio_plugin_litematica::ID,
-                "schematics/broken.litematic",
-            )
-            .await
-            .unwrap();
-        assert_eq!(preview.schematic, b"not a schematic");
-        assert!(preview.pack.is_none(), "the game is not installed");
+        // A file that is not a schematic fails that preview, not the plugin.
+        assert!(
+            service
+                .plugin_model(
+                    &record.id,
+                    lumilio_plugin_litematica::ID,
+                    "schematics/broken.litematic",
+                )
+                .await
+                .is_err()
+        );
+        assert_eq!(service.plugin_tabs(&record.id).await.unwrap().len(), 1);
         assert!(
             service
                 .plugin_model(&record.id, lumilio_plugin_litematica::ID, "options.txt")

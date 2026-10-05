@@ -34,6 +34,13 @@ scrolling page) is hidden, and it supports macOS and Windows only.
 - The renderer stores packs in the webview's IndexedDB and refuses to work without it, so the
   webview keeps persistent storage. The pack's name carries the game version and the jar's identity,
   and the viewer removes packs stored under other names.
+- The plugin prepares what the viewer is given: `InstanceTab::model` returns the file as it is by
+  default, and an error from it fails that preview, not the plugin. Litematica merges the regions
+  of a schematic into one first, because the renderer mixes up the per-region palettes of a
+  schematic that has several (glass showed as the soul sand with the same index in another
+  region). The host sets a size limit on what comes back.
+- The viewer frames the schematic again after it is rendered: the renderer's own framing on load
+  sometimes ran before the meshes were ready, and the camera ended up inside a large build.
 - Platforms: macOS and Windows. Linux has no preview (the key is hidden there). Windows was not
   tested.
 
@@ -44,6 +51,10 @@ scrolling page) is hidden, and it supports macOS and Windows only.
 - Negative / trade-offs: the preview is not inline; about 25 MB (6 MB compressed) of third-party
   JavaScript and WASM ships and must be updated by hand; a block renamed between game versions
   (`chain` is `iron_chain` now) is missing when the schematic is older than the instance; no Linux.
+- Known limits of the renderer (1.6.1) that we have not worked around: water and lava are drawn
+  as blocks of the level's height without slopes; a double chest is two single chests; soul fire is
+  a cube; signs, shulker boxes, player heads and redstone wire are missing or wrong; a door lies
+  flat. The renderer supports only single chest, trapped chest and ender chest models.
 - Not decided: oldest game version supported (nothing before 1.21.11 was tried), a custom bundle
   that drops what the preview never loads.
 

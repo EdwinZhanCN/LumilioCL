@@ -133,4 +133,11 @@ pub trait InstanceTab: Send + Sync {
         state: TabState,
         action: ActionId,
     ) -> Result<(TabState, Vec<Effect>), PluginError>;
+    /// The bytes a 3D viewer is given for the `file` of a [`View::Model`].
+    /// By default the file as it is; a plugin overrides this to hand over a
+    /// form the viewer copes with. An error here fails this preview only, not
+    /// the plugin.
+    fn model(&self, ctx: &dyn HostContext, file: &str) -> Result<Vec<u8>, PluginError> {
+        ctx.read_file(file)
+    }
 }

@@ -2,6 +2,7 @@
 //! details and material lists. All file access goes through the host.
 
 mod format;
+mod merge;
 mod tab;
 #[cfg(test)]
 mod tests;
@@ -51,6 +52,12 @@ impl InstanceTab for Litematica {
 
     fn view(&self, ctx: &dyn HostContext, state: &TabState) -> Result<View, PluginError> {
         tab::view(ctx, state)
+    }
+
+    /// The viewer is given the schematic with its regions merged into one.
+    fn model(&self, ctx: &dyn HostContext, file: &str) -> Result<Vec<u8>, PluginError> {
+        let bytes = ctx.read_file(file)?;
+        merge::single_region(&bytes).map_err(PluginError::Unavailable)
     }
 
     fn update(
