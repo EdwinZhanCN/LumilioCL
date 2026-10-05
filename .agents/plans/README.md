@@ -6,8 +6,8 @@ for ideas nobody has planned yet. Finished work leaves this folder (ADR 0021).
 ## Rules
 
 - Filename: a slug, `kebab-case-goal.md`. No number: a plan gets a decision number
-  only if it becomes a decision record. The legacy plans `0030-…` and `0031-…`
-  keep their names until they close.
+  only if it becomes a decision record. The legacy plan `0031-…`
+  keeps its name until it closes.
 - Write a plan for work that spans several steps or sessions. A local edit needs none.
 - Status is one line at the top: `proposed | in_progress`.
 - Keep it honest as you go: tick tasks, record what you learned, note open questions.
