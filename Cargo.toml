@@ -8,6 +8,7 @@ members = [
     "crates/lumilio-nbt",
     "crates/lumilio-plugin-crash-analyzer",
     "crates/lumilio-plugin-litematica",
+    "crates/lumilio-plugin-modrinth",
 ]
 resolver = "3"
 
@@ -32,6 +33,7 @@ lumilio-core = { path = "crates/lumilio-core" }
 lumilio-plugin-api = { path = "crates/lumilio-plugin-api" }
 lumilio-plugin-crash-analyzer = { path = "crates/lumilio-plugin-crash-analyzer" }
 lumilio-plugin-litematica = { path = "crates/lumilio-plugin-litematica" }
+lumilio-plugin-modrinth = { path = "crates/lumilio-plugin-modrinth" }
 lumilio-nbt = { path = "crates/lumilio-nbt" }
 lumilio-ui = { path = "crates/lumilio-ui" }
 md-5 = "0.11"

@@ -325,3 +325,16 @@ pub enum Permission {
 - 环境记录：共享 target 与另一个主工作区构建争锁，两个过滤后的测试进程曾停在 macOS dyld 启动阶段，随后正常退出。为 worktree 建了独立缓存；全量复制 split-DWARF 元数据过慢，停止后改为只克隆依赖库、Cargo fingerprints 和 build 产物。停止的仅是本任务的复制/等待进程，另一项构建未被操作。
 - 两轮完整 `just check` 都通过（日志 `/private/tmp/lumilio-plugin-p3-foundation-check.log`、`/private/tmp/lumilio-plugin-p3-foundation-final-check.log`）：最终 core 496 passed / 2 ignored，UI 296 passed / 3 ignored，app 10 passed，边界与 attribution 均通过；新添 24 项测试。真实网络 live_smoke 的 2 项仍按默认忽略，本批尚未迁移远程 API，不声称完成真实 Modrinth 链路验收。
 - 搜索筛选语义沿用 core 的 Modrinth App 来源，API 模块保留了 `packages/ui/src/utils/search.ts` / GPL-3.0-only / ADR 0022 attribution，补齐注释后已完整重跑检查。本批没有 UI 改动或新的肉眼验收项。T18–T20 已完成；下一批从 T21 迁移 Modrinth 产品调用和 core 类型转换，再做 T22 的停用反馈。P3 尚未验收，P4 不开始。
+
+### 2026-10-05 — T21 独立 Modrinth 插件
+
+- 在同一 worktree 从 `dfacd47` 继续，先交付 T21 的插件实现；T21 整项仍未完成。新增平铺的 `lumilio-plugin-modrinth`，只依赖 plugin-api、serde、serde_json、url，没有网络客户端或文件访问。清单 ID 为 `lumilio.modrinth`，默认启用，只申请 `api.modrinth.com` 网络权限。
+- 将原 `discover/{query,search,project,tags,versions}.rs` 的协议实现抽取到插件，直接输出 plugin-api 的内容契约；原 core 实现暂留供现有产品调用，下批完成适配与切换后删除。没有在 app 注册插件，因此本批不会出现一个尚不能停用旧 API 的设置开关，也没有改变发现页、安装或本地内容行为。
+- 完整实现搜索、项目详情、版本与 changelog、指定版本文件和依赖、筛选选项、SHA-1 识别、兼容更新、项目摘要与团队作者。所有 GET / JSON POST 经 `ctx.request`，HTTP 非 2xx 与必需数据解码失败返回错误；作者与 loader 列表失败保留已有页面 / 选项。识别按宿主 correlation key 返回，合并重复哈希但保留每个 key，忽略远端未请求的哈希，不把空批次发到网络。
+- 搜索继续参考主工作区只读的 `3rd-party/modrinth/packages/ui/src/utils/search.ts`（`newFilters`、`getEnvironmentFilterGroups`、`formatSearchFilterValue`），保留 GPL-3.0-only / ADR 0022 来源声明；版本查询对照 HMCL 的 `repository/ModrinthRemoteAddonRepository.java`。worktree 未初始化第三方子模块，读取的是主工作区副本，没有修改它们。
+- 插件按类型验证能力，不再把不支持的筛选悄悄丢掉。契约中的 loader `any/all` 分别编码为 OR / AND；下一批 core 适配必须把原 core 固定 OR 的 loader 选择归一为 `any = true`，保持 ADR 0023 的现有界面语义。项目 / 版本 ID 按单个 URL path segment 编码，拒绝空值和特殊点段；指定版本返回的项目及版本 ID 必须与引用一致。
+- 27 项独立插件测试覆盖原协议样本与上下文请求，新加宿主测试验证真实插件的贡献、停用后无请求、缺少授权无 I/O，以及 HTTP 429 后本次运行保持 Failed；core 对插件的依赖仅是 dev-dependency。临时去掉项目 ID 校验后，版本文件测试编译成功并因错误项目仍返回文件而失败；校验已还原，27 项测试重跑通过。另增加默认忽略的只读真实 API 契约测试，不下载游戏、不接触用户启动器资料。
+- 验证：27 项插件单元测试、3 项真实插件宿主测试、手动运行的只读真实 API 契约测试全部通过。真实测试在 3.77 秒内读完搜索、项目、带 changelog 的版本、指定版本文件 / 依赖、识别、兼容更新、项目摘要、标签列表，没有下载游戏或修改用户资料；该项默认忽略。最终 `just check` 通过（日志 `/private/tmp/lumilio-plugin-modrinth-source-check.log`）：core 499 passed / 3 ignored、UI 296 passed / 3 ignored、app 10 passed，边界 / attribution、Clippy 和格式检查均通过。原 `live_smoke` 两项仍按默认忽略，不声称已验证产品迁移后的安装 / 启动。
+- 首轮测试夹具编译曾使用 API 不存在的 `Version::required_dependencies` 和 `SourceChain::official`，已分别改为直接筛选依赖和构造 OfficialSource 链；这些编译失败不是回归测试变红的证据。
+- 更新实施记录后 `just docs` 通过（日志 `/private/tmp/lumilio-plugin-modrinth-source-docs.log`）。没有产品界面改动，本批无新的原生视觉验收项；插件清单文案的实际设置行将在 app 注册时一起查看。
+- 下一批从 core 的类型转换与调用适配开始：切换发现 / 内容安装 / 更新 / 整合包查询，删除旧协议实现；缓存结果也必须按插件启用状态过滤，不能用缓存绕过停用。app 注册、原 service / live_smoke 测试注入、能力驱动的筛选和 T22 的反馈一起完成。D2 的 Failed 本次运行粘住，旧过滤器「网络恢复后同一 service 重试成功」测试需要按此冻结行为调整。P3 不验收，P4 不开始。

@@ -6,6 +6,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 mod analysis;
 #[path = "tests/content.rs"]
 mod content;
+#[path = "tests/modrinth.rs"]
+mod modrinth;
 #[path = "tests/network.rs"]
 mod network;
 #[path = "tests/tabs.rs"]
