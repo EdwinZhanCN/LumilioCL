@@ -6,6 +6,7 @@
 
 | 操作 | 层 / 组件 | 结果与反馈 | 备注 | 实现 |
 |---|---|---|---|---|
+| 出现「投影」标签 | 游戏页标签栏，在「截图」之后 | 装了 Litematica 或 schematics 文件夹里已有文件时出现；在设置 → 插件里关掉就消失 | 空的 schematics 文件夹不算（插件只能列出文件） | `lumilio-plugin-litematica/src/lib.rs` |
 | 结束游戏 | 本启动器启动的游戏运行时，页头主按钮变「结束游戏」 | 终止进程，会话写入历史 |  | `lumilio-ui/src/instance_detail/actions.rs` |
 | 开始游戏 | 页头主按钮「启动游戏」 | 首页启动时刻接管 |  | `lumilio-ui/src/instance_detail/actions.rs` |
 | 安装游戏文件 | 页头 ⋯ 菜单（游戏还没装好时才有） | 后台任务，动态可见；完成 toast |  | `lumilio-ui/src/instance_detail/actions.rs` |
@@ -17,3 +18,4 @@
 | 完整备份 | 页头 ⋯ 菜单 → 选位置 | 后台打成一个 zip（含存档，不含日志），toast；之后可在游戏库「从备份恢复」 | ADR 0015；运行中禁用 | `lumilio-ui/src/instance_detail/actions.rs` |
 | 导出整合包 | 页头 ⋯ 菜单 → 导出弹窗（格式、勾选文件） | 后台导出，可取消 |  | `lumilio-ui/src/instance_detail/actions.rs` |
 | 删除游戏 | 页头 ⋯ 菜单 → 警告弹窗 | 删除后从历史中移除并后退 |  | `lumilio-ui/src/instance_detail/actions.rs` |
+| 打开插件提供的标签 | 游戏页标签栏里「截图」后面的标签 | 读取并显示插件给的内容；插件被关闭或出错时标签消失，回到内置标签 | 插件只描述内容，版式由启动器统一 | `lumilio-ui/src/instance_detail/plugin_tabs.rs` |

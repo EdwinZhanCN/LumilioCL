@@ -121,6 +121,20 @@ pub enum LiveIntent {
     },
     /// Read the settings, Java list and disk use again.
     LoadSettings,
+    SetPluginEnabled {
+        id: String,
+        enabled: bool,
+    },
+    SetPluginValue {
+        id: String,
+        key: String,
+        value: lumilio_plugin_api::SettingValue,
+    },
+    ResetPlugin(String),
+    EditPluginSetting {
+        id: String,
+        key: String,
+    },
     SetPreferences(Preferences),
     SetLaunchDefaults(LaunchTuning),
     SetMemory {

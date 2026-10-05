@@ -9,6 +9,7 @@ mod accounts;
 mod discover;
 mod dispatch;
 mod instance;
+mod instance_plugins;
 mod instance_write;
 mod jobs;
 mod launch;

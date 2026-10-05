@@ -3,7 +3,7 @@ use lumilio_core::{FileTransport, LauncherService};
 #[test]
 fn production_refuses_a_busy_root_before_creating_a_window() {
     let dir = tempfile::tempdir().unwrap();
-    let _owner = LauncherService::open(dir.path(), FileTransport).unwrap();
+    let _owner = LauncherService::open(dir.path(), FileTransport, Vec::new()).unwrap();
     let database = std::fs::read(dir.path().join("launcher.db")).unwrap();
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_lumilio-app"))
         .env("LUMILIO_PREVIEW", "off")

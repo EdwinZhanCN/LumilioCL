@@ -2,10 +2,11 @@ use super::LauncherService;
 use super::error::ServiceError;
 use super::support::blocking;
 use super::types::{EXPORT_LOG_BYTES, GameLogs, LOG_TAIL_BYTES, REPORT_BYTES};
-use crate::diagnostics::Problem;
+use crate::diagnostics::{Problem, ProblemKind};
 use crate::history::HistoryLog;
 use crate::inspect::inspect_instance;
 use crate::transfer::Transport;
+use lumilio_plugin_api::{AnalysisInput, AnalysisSource, GameFacts, ModFact};
 use std::path::Path;
 
 impl<T: Transport + Clone> LauncherService<T> {
@@ -42,16 +43,26 @@ impl<T: Transport + Clone> LauncherService<T> {
         &self,
         id: &str,
         file_name: &str,
-    ) -> Result<(String, Vec<crate::diagnostics::CrashHint>), ServiceError> {
-        self.instance(id).await?;
+    ) -> Result<(String, Vec<crate::plugins::PluginFinding>), ServiceError> {
+        let record = self.instance(id).await?;
+        let (_, runtimes) = self.environment().await;
+        let layout = self.layout.clone();
         let (game_dir, name) = (self.layout.game(id), file_name.to_owned());
-        let text = tokio::task::spawn_blocking(move || {
-            crate::diagnostics::read_crash_report(&game_dir, &name, REPORT_BYTES)
+        let (text, game) = tokio::task::spawn_blocking(move || {
+            let text = crate::diagnostics::read_crash_report(&game_dir, &name, REPORT_BYTES)?;
+            Ok::<_, std::io::Error>((text, game_facts(&layout, &record, &runtimes)))
         })
         .await
         .map_err(std::io::Error::other)??;
-        let hints = crate::diagnostics::analyze(&text);
-        Ok((text, hints))
+        let findings = self
+            .plugins
+            .analyze(AnalysisInput {
+                text: text.clone(),
+                source: AnalysisSource::CrashReport,
+                game,
+            })
+            .await;
+        Ok((text, findings))
     }
 
     /// How much disk the game's own folder takes (mods, saves, options…),
@@ -82,7 +93,66 @@ impl<T: Transport + Clone> LauncherService<T> {
     pub async fn problems(&self, id: &str) -> Result<Vec<Problem>, ServiceError> {
         let record = self.instance(id).await?;
         let (settings, runtimes) = self.environment().await;
-        Ok(inspect_instance(&self.layout, &settings, &runtimes, &record).await)
+        Ok(self
+            .inspect_with_plugins(&settings, &runtimes, &record)
+            .await)
+    }
+
+    /// Shared by the instance problem list and Home, preserving built-in
+    /// checks even when every analyzer is disabled or broken.
+    pub(super) async fn inspect_with_plugins(
+        &self,
+        settings: &crate::settings::LauncherSettings,
+        runtimes: &[crate::java::JavaRuntime],
+        record: &crate::instance::InstanceRecord,
+    ) -> Vec<Problem> {
+        let mut problems = inspect_instance(&self.layout, settings, runtimes, record).await;
+        if problems
+            .iter()
+            .any(|problem| matches!(problem.kind, ProblemKind::LastSessionFailed(_)))
+        {
+            let (layout, record, runtimes) =
+                (self.layout.clone(), record.clone(), runtimes.to_vec());
+            let input = blocking(move || {
+                let game_dir = layout.launch_directories(&record).game().to_owned();
+                let reports = crate::diagnostics::list_crash_reports(&game_dir)?;
+                let (text, source) = if let Some(report) = reports.first() {
+                    (
+                        Some(crate::diagnostics::read_crash_report(
+                            &game_dir,
+                            &report.file_name,
+                            REPORT_BYTES,
+                        )?),
+                        AnalysisSource::CrashReport,
+                    )
+                } else {
+                    (
+                        crate::diagnostics::read_latest_log(&game_dir, LOG_TAIL_BYTES)?,
+                        AnalysisSource::LatestLog,
+                    )
+                };
+                Ok(text.map(|text| AnalysisInput {
+                    text,
+                    source,
+                    game: game_facts(&layout, &record, &runtimes),
+                }))
+            })
+            .await;
+            if let Ok(Some(input)) = input {
+                problems.extend(
+                    self.plugins
+                        .analyze(input)
+                        .await
+                        .into_iter()
+                        .map(|finding| Problem {
+                            severity: finding.finding.severity,
+                            kind: ProblemKind::Finding(finding),
+                        }),
+                );
+                problems.sort_by_key(|problem| std::cmp::Reverse(problem.severity));
+            }
+        }
+        problems
     }
 
     /// Writes a zip for a bug report to `destination`: versions, settings
@@ -261,5 +331,52 @@ impl<T: Transport + Clone> LauncherService<T> {
             .await
             .map_err(std::io::Error::other)??;
         Ok(())
+    }
+}
+
+/// Runs on a blocking worker. Facts contain no host paths or UI types.
+pub(super) fn game_facts(
+    layout: &crate::layout::Layout,
+    record: &crate::instance::InstanceRecord,
+    runtimes: &[crate::java::JavaRuntime],
+) -> GameFacts {
+    use crate::instance::Loader;
+    let directories = layout.launch_directories(record);
+    let required = record.release_id().and_then(|id| {
+        std::fs::read_to_string(directories.versions().join(&id).join(format!("{id}.json")))
+            .ok()
+            .and_then(|text| crate::release::ReleaseManifest::decode_json(&text).ok())
+            .and_then(|release| release.java_requirement().map(|java| java.major()))
+    });
+    let java_major = crate::java::choose(runtimes, required, record.settings.java_path.as_deref())
+        .map(|java| java.major());
+    let mods = crate::content::scan(directories.game(), crate::discover::ProjectKind::Mod)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|item| item.enabled && !item.is_directory)
+        .filter_map(|item| {
+            let metadata = crate::content::read_mod_metadata(
+                &directories.game().join("mods").join(&item.file_name),
+            )?;
+            Some(ModFact {
+                id: metadata.id,
+                version: metadata.version,
+                file: item.file_name,
+            })
+        })
+        .collect();
+    GameFacts {
+        game_version: record.game_version.clone(),
+        loader: match record.loader {
+            Loader::Vanilla => "vanilla",
+            Loader::Fabric => "fabric",
+            Loader::Forge => "forge",
+            Loader::NeoForge => "neoforge",
+            Loader::Quilt => "quilt",
+        }
+        .into(),
+        loader_version: record.loader_version.clone(),
+        java_major,
+        mods,
     }
 }

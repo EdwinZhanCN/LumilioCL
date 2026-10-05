@@ -4024,6 +4024,9 @@ dependencies = [
  "futures",
  "gpui-kit",
  "lumilio-core",
+ "lumilio-plugin-api",
+ "lumilio-plugin-crash-analyzer",
+ "lumilio-plugin-litematica",
  "lumilio-ui",
  "reqwest",
  "tempfile",
@@ -4040,6 +4043,9 @@ dependencies = [
  "getrandom 0.3.4",
  "image",
  "keyring",
+ "lumilio-nbt",
+ "lumilio-plugin-api",
+ "lumilio-plugin-modrinth",
  "md-5 0.11.0",
  "regex",
  "reqwest",
@@ -4062,6 +4068,50 @@ name = "lumilio-docgen"
 version = "0.1.0"
 dependencies = [
  "tempfile",
+ "toml 0.9.12+spec-1.1.0",
+]
+
+[[package]]
+name = "lumilio-nbt"
+version = "0.1.0"
+dependencies = [
+ "flate2",
+]
+
+[[package]]
+name = "lumilio-plugin-api"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "lumilio-plugin-crash-analyzer"
+version = "0.1.0"
+dependencies = [
+ "lumilio-plugin-api",
+ "regex",
+]
+
+[[package]]
+name = "lumilio-plugin-litematica"
+version = "0.1.0"
+dependencies = [
+ "flate2",
+ "lumilio-nbt",
+ "lumilio-plugin-api",
+ "serde_json",
+]
+
+[[package]]
+name = "lumilio-plugin-modrinth"
+version = "0.1.0"
+dependencies = [
+ "lumilio-plugin-api",
+ "serde",
+ "serde_json",
+ "url",
 ]
 
 [[package]]
@@ -4072,6 +4122,7 @@ dependencies = [
  "gpui-pre",
  "image",
  "lumilio-core",
+ "lumilio-plugin-api",
 ]
 
 [[package]]

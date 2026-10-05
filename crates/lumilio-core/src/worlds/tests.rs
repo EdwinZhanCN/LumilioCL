@@ -1,19 +1,26 @@
 use super::*;
-use crate::nbt::build::*;
+use crate::nbt::{Tag, to_bytes};
+use std::collections::BTreeMap;
 
 fn level(name: &str, played: i64, version: &str, hardcore: i8) -> Vec<u8> {
-    let mut out = Vec::new();
-    compound_start(&mut out, "");
-    compound_start(&mut out, "Data");
-    string(&mut out, "LevelName", name);
-    long(&mut out, "LastPlayed", played);
-    byte(&mut out, "hardcore", hardcore);
-    compound_start(&mut out, "Version");
-    string(&mut out, "Name", version);
-    end(&mut out);
-    end(&mut out);
-    end(&mut out);
-    gzip(&out)
+    let root = Tag::Compound(BTreeMap::from([(
+        "Data".into(),
+        Tag::Compound(BTreeMap::from([
+            ("LevelName".into(), Tag::String(name.into())),
+            ("LastPlayed".into(), Tag::Long(played)),
+            ("hardcore".into(), Tag::Byte(hardcore)),
+            (
+                "Version".into(),
+                Tag::Compound(BTreeMap::from([(
+                    "Name".into(),
+                    Tag::String(version.into()),
+                )])),
+            ),
+        ])),
+    )]));
+    let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+    io::Write::write_all(&mut encoder, &to_bytes(&root)).unwrap();
+    encoder.finish().unwrap()
 }
 
 fn add_world(game: &Path, folder: &str, data: &[u8]) {

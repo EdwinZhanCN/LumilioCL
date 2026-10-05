@@ -9,7 +9,7 @@ fn root_lock_probe() {
     let Some(root) = std::env::var_os("LUMILIO_LOCK_TEST_ROOT") else {
         return;
     };
-    let result = LauncherService::open(root, FileTransport);
+    let result = LauncherService::open(root, FileTransport, Vec::new());
     if std::env::var("LUMILIO_LOCK_TEST_MODE").as_deref() == Ok("busy") {
         assert!(matches!(result, Err(ServiceError::RootBusy(_))));
     } else {
@@ -47,12 +47,13 @@ fn a_root_has_one_writer_and_process_death_releases_ownership() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path().join("root");
     let marker = dir.path().join("held");
-    let first = LauncherService::open(&root, FileTransport).unwrap();
+    let first = LauncherService::open(&root, FileTransport, Vec::new()).unwrap();
     assert!(matches!(
-        LauncherService::open(&root, FileTransport),
+        LauncherService::open(&root, FileTransport, Vec::new()),
         Err(ServiceError::RootBusy(_))
     ));
-    let other = LauncherService::open(dir.path().join("independent"), FileTransport).unwrap();
+    let other =
+        LauncherService::open(dir.path().join("independent"), FileTransport, Vec::new()).unwrap();
     assert!(probe(&root, "busy", &marker).status().unwrap().success());
     drop(other);
     drop(first);
@@ -73,12 +74,12 @@ fn a_root_has_one_writer_and_process_death_releases_ownership() {
         std::thread::sleep(Duration::from_millis(10));
     }
     assert!(matches!(
-        LauncherService::open(&root, FileTransport),
+        LauncherService::open(&root, FileTransport, Vec::new()),
         Err(ServiceError::RootBusy(_))
     ));
     holder.0.kill().unwrap();
     holder.0.wait().unwrap();
-    let reopened = LauncherService::open(&root, FileTransport).unwrap();
+    let reopened = LauncherService::open(&root, FileTransport, Vec::new()).unwrap();
     assert!(root.join("locks/writer.lock").is_file());
     drop(reopened);
 
@@ -98,5 +99,5 @@ fn a_root_has_one_writer_and_process_death_releases_ownership() {
     }
     holder.0.stdin.take().unwrap().write_all(b"exit\n").unwrap();
     assert!(holder.0.wait().unwrap().success());
-    LauncherService::open(&root, FileTransport).unwrap();
+    LauncherService::open(&root, FileTransport, Vec::new()).unwrap();
 }

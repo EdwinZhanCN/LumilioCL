@@ -2,7 +2,7 @@ use super::editors::Editor;
 use super::intent::{InstanceIntent, Section};
 use super::{
     InstanceDetailView, TAB_CONTENT, TAB_DIAGNOSTICS, TAB_HISTORY, TAB_OVERVIEW, TAB_SCREENSHOTS,
-    TAB_WORLDS, TABS,
+    TAB_WORLDS,
 };
 use crate::theme::ShellColors;
 use crate::{kit, live, theme};
@@ -45,14 +45,32 @@ impl Render for InstanceDetailView {
         if std::mem::take(&mut self.refresh_logs) && self.data.has(Section::Logs) {
             self.request(Section::Logs, window, cx);
         }
+        if self.refresh_analysis && !self.data.pending.contains(&Section::Problems) {
+            self.refresh_analysis = false;
+            if self.data.has(Section::Problems) {
+                self.request(Section::Problems, window, cx);
+            }
+            if let Some((file, _)) = &self.crash {
+                (self.handler)(InstanceIntent::OpenCrash(file.clone()), window, cx);
+            }
+        }
+        if std::mem::take(&mut self.refresh_plugin_tabs) && self.record.is_some() {
+            (self.handler)(InstanceIntent::PluginTabs, window, cx);
+            if let Some(plugin) = self.plugin_open.clone() {
+                (self.handler)(InstanceIntent::PluginView(plugin), window, cx);
+            }
+        }
         if self.record.is_some() && !self.started {
             self.started = true;
+            (self.handler)(InstanceIntent::PluginTabs, window, cx);
             self.ensure(Section::Problems, window, cx);
             self.ensure(Section::Size, window, cx);
             self.ensure(Section::History, window, cx);
         }
         let colors = ShellColors::from_theme(cx.theme());
-        let content = if self.record.is_some() {
+        let content = if self.record.is_some() && self.plugin_open.is_some() {
+            self.plugin_panel(colors, cx)
+        } else if self.record.is_some() {
             match self.tab {
                 TAB_OVERVIEW => self.overview(colors, cx),
                 TAB_CONTENT => self.content_panel(colors, cx),
@@ -88,7 +106,10 @@ impl Render for InstanceDetailView {
         } else {
             kit::empty("正在读取游戏…", "", colors).into_any_element()
         };
-        let tabs = cx.listener(|view, index: &usize, window, cx| view.open_tab(*index, window, cx));
+        let tabs =
+            cx.listener(|view, index: &usize, window, cx| view.open_shown(*index, window, cx));
+        let labels = self.tab_labels();
+        let shown = self.shown_tab();
         let content = v_flex()
             .w_full()
             .gap_5()
@@ -105,11 +126,11 @@ impl Render for InstanceDetailView {
             ))
             .child(kit::tabs(
                 "live-instance-tabs",
-                &TABS,
-                self.tab,
+                &labels,
+                shown,
                 move |index, window, cx| tabs(&index, window, cx),
             ))
-            .child(kit::entrance(content, ("live-instance-body", self.tab)));
+            .child(kit::entrance(content, ("live-instance-body", shown)));
         div()
             .id("live-instance")
             .size_full()

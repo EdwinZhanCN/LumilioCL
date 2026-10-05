@@ -9,7 +9,7 @@ description: Use for every LumilioCL change that adds or alters UI, animation,
 # Motion And Interface Design
 
 `docs/design-language.md` is the specification; this skill is the procedure
-that applies it. Load the `gpui` and `gpui-component` skills as well — they
+that applies it. Load the repo-local `gpui-kit` and `gpui-kit-design-guides` skills as well — they
 cover the APIs, this covers the decisions.
 
 ## 1. Classify the change

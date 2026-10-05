@@ -1,0 +1,221 @@
+use super::super::live::LiveCtx;
+use super::rows::send;
+use crate::live::{LiveIntent, SettingsView};
+use crate::{controls::Fader, key::Key, kit};
+use gpui::{AnyElement, IntoElement, SharedString, div, prelude::*};
+use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
+use gpui_component::{Sizable as _, v_flex};
+use lumilio_core::{PluginInfo, PluginStatus};
+use lumilio_plugin_api::{NativeCapability, Permission, SettingField, SettingKind, SettingValue};
+
+pub(super) fn permission_text(permission: &Permission) -> String {
+    match permission {
+        Permission::ReadGameFiles { under } => format!("读取游戏的 {under} 文件夹"),
+        Permission::Network { hosts } => format!("访问 {}", hosts.join("、")),
+        Permission::LaunchEvents => "了解游戏的启动和退出状态".into(),
+        Permission::Native(NativeCapability::DiscordIpc) => "向本机 Discord 显示游戏状态".into(),
+    }
+}
+
+pub(super) fn setting_value(info: &PluginInfo, field: &SettingField) -> SettingValue {
+    info.state
+        .values
+        .get(&field.key)
+        .filter(|value| field.kind.accepts(value))
+        .cloned()
+        .unwrap_or_else(|| field.kind.default_value())
+}
+
+pub(super) fn render(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
+    if view.plugins.is_empty() {
+        return div()
+            .debug_selector(|| "settings-plugin-empty".into())
+            .child(kit::empty(
+                "暂无插件",
+                "核心插件会在这里显示，你可以按需要开关。",
+                ctx.colors,
+            ))
+            .into_any_element();
+    }
+    v_flex()
+        .w_full()
+        .gap_5()
+        .children(view.plugins.iter().map(|info| {
+            let id = info.manifest.id.clone();
+            let enabled = info.state.enabled.unwrap_or(info.manifest.default_enabled);
+            let mut rows = Vec::new();
+            let status = match info.status {
+                PluginStatus::Enabled => "已启用",
+                PluginStatus::Disabled => "已停用",
+                PluginStatus::Failed { .. } => "本次运行已停用，重启后重试",
+            };
+            // ia[settings]: 插件：启用 / 停用 | 插件 · 设置行开关 | 保存开关；停用后贡献消失，运行失败的插件重启后恢复
+            let toggle = Fader::new(
+                SharedString::from(format!("{id}-enabled")),
+                enabled,
+                "启用插件",
+                send(
+                    &ctx.handler,
+                    LiveIntent::SetPluginEnabled {
+                        id: id.clone(),
+                        enabled: !enabled,
+                    },
+                ),
+            );
+            rows.push(
+                kit::value_row(
+                    SharedString::from(format!("{id}-state")),
+                    "启用",
+                    None,
+                    status,
+                    Some(toggle.into_any_element()),
+                    ctx.colors,
+                )
+                .into_any_element(),
+            );
+            // ia[settings]: 插件：查看权限 | 插件 · 权限行 | 逐条显示可读取的游戏文件夹、可访问的主机和其他能力
+            for (index, permission) in info.manifest.permissions.iter().enumerate() {
+                rows.push(
+                    kit::value_row(
+                        SharedString::from(format!("{id}-permission-{index}")),
+                        "权限",
+                        None,
+                        permission_text(permission),
+                        None,
+                        ctx.colors,
+                    )
+                    .into_any_element(),
+                );
+            }
+            if let PluginStatus::Failed { message } = &info.status {
+                // ia[settings]: 插件：查看失败原因 | 插件 · [技术详情] | 显示本次调用失败原因；失败状态不会写入设置
+                rows.push(
+                    kit::value_row(
+                        SharedString::from(format!("{id}-failure")),
+                        "失败原因",
+                        None,
+                        "本次运行暂停了这个插件",
+                        Some(
+                            kit::technical(
+                                SharedString::from(format!("{id}-technical")),
+                                message.clone(),
+                            )
+                            .into_any_element(),
+                        ),
+                        ctx.colors,
+                    )
+                    .into_any_element(),
+                );
+            }
+            for field in &info.manifest.settings {
+                let value = setting_value(info, field);
+                let key = field.key.clone();
+                let control_id = SharedString::from(format!("{id}-{key}-control"));
+                let handler = ctx.handler.clone();
+                let shown = match &value {
+                    SettingValue::Toggle(_) | SettingValue::Choice(_) => String::new(),
+                    SettingValue::Text(text) => text.clone(),
+                    SettingValue::Number(number) => number.to_string(),
+                };
+                // ia[settings]: 插件：更改设置 | 插件 · 声明式设置行 | 开关和选项立即保存；文字与数字在弹窗中校验并保存，失败保留草稿
+                let control = match (&field.kind, value) {
+                    (SettingKind::Toggle { .. }, SettingValue::Toggle(on)) => Fader::new(
+                        control_id,
+                        on,
+                        "启用此设置",
+                        send(
+                            &handler,
+                            LiveIntent::SetPluginValue {
+                                id: id.clone(),
+                                key: key.clone(),
+                                value: SettingValue::Toggle(!on),
+                            },
+                        ),
+                    )
+                    .into_any_element(),
+                    (SettingKind::Choice { options, .. }, SettingValue::Choice(current)) => {
+                        let (id, key, options) = (id.clone(), key.clone(), options.clone());
+                        Key::new(control_id)
+                            .label(current.clone())
+                            .white()
+                            .small()
+                            .dropdown_menu(move |mut menu, _, _| {
+                                for option in &options {
+                                    let intent = LiveIntent::SetPluginValue {
+                                        id: id.clone(),
+                                        key: key.clone(),
+                                        value: SettingValue::Choice(option.clone()),
+                                    };
+                                    let handler = handler.clone();
+                                    menu = menu.item(
+                                        PopupMenuItem::new(option.clone())
+                                            .checked(option == &current)
+                                            .on_click(move |_, window, cx| {
+                                                handler(intent.clone(), window, cx)
+                                            }),
+                                    );
+                                }
+                                menu
+                            })
+                            .into_any_element()
+                    }
+                    _ => kit::ghost(
+                        control_id,
+                        "编辑…",
+                        send(
+                            &handler,
+                            LiveIntent::EditPluginSetting {
+                                id: id.clone(),
+                                key: key.clone(),
+                            },
+                        ),
+                    )
+                    .into_any_element(),
+                };
+                rows.push(
+                    kit::value_row(
+                        SharedString::from(format!("{id}-{key}")),
+                        field.label.clone(),
+                        (!field.help.is_empty()).then(|| field.help.clone().into()),
+                        shown,
+                        Some(control),
+                        ctx.colors,
+                    )
+                    .into_any_element(),
+                );
+            }
+            // ia[settings]: 插件：恢复默认 | 插件 · [恢复默认] | 清除启用状态和设置覆盖，使用清单默认值；本次运行的失败状态保留
+            rows.push(
+                kit::value_row(
+                    SharedString::from(format!("{id}-defaults")),
+                    "默认值",
+                    None,
+                    "",
+                    Some(
+                        kit::ghost(
+                            SharedString::from(format!("{id}-reset")),
+                            "恢复默认",
+                            send(&ctx.handler, LiveIntent::ResetPlugin(id.clone())),
+                        )
+                        .into_any_element(),
+                    ),
+                    ctx.colors,
+                )
+                .into_any_element(),
+            );
+            kit::section(
+                info.manifest.name.clone(),
+                ctx.colors,
+                v_flex()
+                    .gap_3()
+                    .child(
+                        div()
+                            .text_sm()
+                            .text_color(ctx.colors.muted)
+                            .child(info.manifest.description.clone()),
+                    )
+                    .child(kit::list(rows, ctx.colors)),
+            )
+        }))
+        .into_any_element()
+}

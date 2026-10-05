@@ -1,4 +1,5 @@
 use super::discover::open_project;
+use super::instance_plugins::{plugin_action, plugin_tabs, plugin_view};
 use super::instance_write::write_instance;
 use super::jobs::{refresh_installed, reload};
 use super::launch::play;
@@ -116,6 +117,11 @@ pub(super) fn instance_intent(
         InstanceIntent::Thumbnail(file) => make_thumbnail(wiring, id.to_owned(), view, file, cx),
         InstanceIntent::CopyScreenshot(file) => {
             copy_screenshot(wiring, id.to_owned(), view, file, cx)
+        }
+        InstanceIntent::PluginTabs => plugin_tabs(wiring, id.to_owned(), view, cx),
+        InstanceIntent::PluginView(plugin) => plugin_view(wiring, id.to_owned(), view, plugin, cx),
+        InstanceIntent::PluginAction { plugin, action } => {
+            plugin_action(wiring, id.to_owned(), view, plugin, action, cx)
         }
         InstanceIntent::Reload => load_instance(wiring, id.to_owned(), view, cx),
         InstanceIntent::OpenCrash(file) => open_crash(wiring, id.to_owned(), view, file, cx),

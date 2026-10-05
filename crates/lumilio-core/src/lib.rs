@@ -35,9 +35,10 @@ mod layout;
 mod loader;
 mod microsoft;
 mod modpack;
-mod nbt;
+use lumilio_nbt as nbt;
 mod pack_export;
 mod persist;
+mod plugins;
 mod process;
 mod reclaim;
 mod recovery;
@@ -82,9 +83,9 @@ pub use content::{
 pub use content_sources::{ContentEntry, ContentList, ContentSource};
 pub use credentials::{CredentialStore, MemoryCredentials, StoredLogin, SystemCredentials};
 pub use diagnostics::{
-    CrashHint, CrashReport, Facts, FileEntry, LOW_MEMORY_MB, LogLevel, LogLine, Problem,
-    ProblemKind, Severity, analyze as analyze_crash, diagnose, filter_log, list_crash_reports,
-    list_dir, log_level, log_lines, read_crash_report, read_latest_log,
+    CrashReport, Facts, FileEntry, LOW_MEMORY_MB, LogLevel, LogLine, Problem, ProblemKind,
+    Severity, diagnose, filter_log, list_crash_reports, list_dir, log_level, log_lines,
+    read_crash_report, read_latest_log,
 };
 pub use discover::{
     CategoryTag, DependencyKind, DiscoverError, Environment, GalleryImage, GameVersionTag,
@@ -127,6 +128,7 @@ pub use loader::{
     profile_url as loader_profile_url, recommended as recommended_loader,
     versions_url as loader_versions_url,
 };
+pub use lumilio_plugin_api::PluginState;
 pub use microsoft::{
     AuthError, DeviceCode, MICROSOFT_CLIENT_ID, MicrosoftClient, MinecraftLogin, OAuthTokens,
     Secret, client_id as microsoft_client_id,
@@ -137,6 +139,10 @@ pub use modpack::{
     plan as plan_modpack, read_index as read_pack_index,
 };
 pub use pack_export::{ExportError, ExportReport, ExportSpec, PackFormat};
+pub use plugins::{
+    PluginContentSource, PluginEffect, PluginFinding, PluginHost, PluginInfo, PluginStatus,
+    PluginTab,
+};
 pub use process::{
     DEFAULT_SETTLE, GameEvent, GameExit, GameOptions, LogStream, ProcessError,
     command_line as game_command_line, run as run_game,

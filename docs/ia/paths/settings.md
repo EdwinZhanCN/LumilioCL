@@ -27,6 +27,12 @@
 | Java：重新检测 | Java · 按键「重新检测」 | 重新读取设置并检测 |  | `lumilio-ui/src/pages/settings/java.rs` |
 | Java：下载推荐的 Java | Java · 按键「下载推荐的 Java」 | 读 Mojang 的运行时索引，装好后出现在列表里；进度在动态 | ADR 0014 | `lumilio-ui/src/pages/settings/java.rs` |
 | Java：添加 | Java · 按键「添加 Java…」→ 选 java 程序或 JDK 文件夹 | 加入列表 |  | `lumilio-ui/src/pages/settings/java.rs` |
+| 打开插件 | L3 设置 tab「插件」 | 显示核心插件、权限、运行状态和各插件的声明式设置；没有插件时显示空列表 |  | `lumilio-ui/src/pages/settings/mod.rs` |
+| 插件：启用 / 停用 | 插件 · 设置行开关 | 保存开关；停用后贡献消失，运行失败的插件重启后恢复 |  | `lumilio-ui/src/pages/settings/plugins.rs` |
+| 插件：查看权限 | 插件 · 权限行 | 逐条显示可读取的游戏文件夹、可访问的主机和其他能力 |  | `lumilio-ui/src/pages/settings/plugins.rs` |
+| 插件：查看失败原因 | 插件 · [技术详情] | 显示本次调用失败原因；失败状态不会写入设置 |  | `lumilio-ui/src/pages/settings/plugins.rs` |
+| 插件：更改设置 | 插件 · 声明式设置行 | 开关和选项立即保存；文字与数字在弹窗中校验并保存，失败保留草稿 |  | `lumilio-ui/src/pages/settings/plugins.rs` |
+| 插件：恢复默认 | 插件 · [恢复默认] | 清除启用状态和设置覆盖，使用清单默认值；本次运行的失败状态保留 |  | `lumilio-ui/src/pages/settings/plugins.rs` |
 | 优先使用镜像 | 下载与存储 · 开关 | 先试镜像地址，不通再回到官方地址 |  | `lumilio-ui/src/pages/settings/storage.rs` |
 | 镜像规则 | 下载与存储 · 值 + [编辑] 弹窗 | 每行 官方前缀 => 镜像前缀 |  | `lumilio-ui/src/pages/settings/storage.rs` |
 | 同时下载数 | 下载与存储 · 值 + [编辑] 弹窗 | 自动 / 1–32 |  | `lumilio-ui/src/pages/settings/storage.rs` |

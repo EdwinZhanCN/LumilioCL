@@ -90,6 +90,18 @@ pub enum InstanceIntent {
     /// Put this screenshot on the clipboard as a picture.
     CopyScreenshot(String),
     DeleteScreenshot(String),
+    /// Which plugin tabs show for this game; answer with
+    /// [`InstanceDetailView::plugin_tabs_arrived`].
+    PluginTabs,
+    /// What this plugin's tab shows; answer with
+    /// [`InstanceDetailView::plugin_view_arrived`].
+    PluginView(String),
+    /// Run one action of a plugin's tab. The application performs the effects
+    /// the plugin asks for and answers with the tab's new view.
+    PluginAction {
+        plugin: String,
+        action: lumilio_plugin_api::ActionId,
+    },
     /// Read this crash report; answer with [`InstanceDetailView::crash_arrived`].
     OpenCrash(String),
     /// List this folder of the game directory (`""` is the directory itself);

@@ -3,6 +3,7 @@
 //! Per-instance overrides live on the instance record; these are the defaults
 //! they fall back to.
 
+use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 use std::path::{Path, PathBuf};
@@ -126,6 +127,8 @@ impl AccountEntry {
 #[serde(default)]
 pub struct LauncherSettings {
     schema: u32,
+    #[serde(default)]
+    pub plugins: BTreeMap<String, lumilio_plugin_api::PluginState>,
     pub default_max_memory_mb: Option<u32>,
     pub default_min_memory_mb: Option<u32>,
     /// Extra folders searched for Java installations.
@@ -219,6 +222,16 @@ pub struct SettingsStore {
 }
 
 impl SettingsStore {
+    pub fn set_plugin(
+        &mut self,
+        id: String,
+        state: lumilio_plugin_api::PluginState,
+    ) -> Result<(), SettingsError> {
+        let mut next = self.settings.clone();
+        next.plugins.insert(id, state);
+        self.save(next)
+    }
+
     pub fn open(root: impl AsRef<Path>) -> Result<Self, SettingsError> {
         let path = root.as_ref().join(FILE);
         let loaded = persist::load::<LauncherSettings>(&path, SCHEMA_VERSION)?;

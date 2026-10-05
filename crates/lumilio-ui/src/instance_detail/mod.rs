@@ -10,6 +10,7 @@ mod intent;
 mod overview;
 mod panels;
 mod performance;
+mod plugin_tabs;
 mod render;
 mod settings;
 
@@ -24,11 +25,11 @@ use self::forms::Fields;
 use self::panels::{Confirm, Data};
 use crate::toast::Toast;
 use gpui::{App, Entity, Window};
-use lumilio_core::{CrashHint, InstanceRecord, LauncherSettings};
+use lumilio_core::{InstanceRecord, LauncherSettings, PluginFinding};
 use std::rc::Rc;
 
 /// A crash report's text and the causes recognised in it, or why it could not be read.
-type CrashRead = Result<(String, Vec<CrashHint>), String>;
+type CrashRead = Result<(String, Vec<PluginFinding>), String>;
 
 pub const TABS: [&str; 7] = ["概览", "内容", "世界", "截图", "历史", "诊断", "设置"];
 pub const TAB_OVERVIEW: usize = 0;
@@ -124,6 +125,15 @@ pub struct InstanceDetailView {
     live_output: Option<Vec<String>>,
     /// The game just ended: read the log file again on the next render.
     refresh_logs: bool,
+    enabled_plugins: Option<Vec<String>>,
+    refresh_analysis: bool,
+    /// Tabs plugins contribute for this game, the one open (if a plugin tab
+    /// is showing instead of a built-in one), and what each last showed.
+    plugin_tabs: Vec<lumilio_core::PluginTab>,
+    plugin_open: Option<String>,
+    plugin_pages: plugin_tabs::PluginPages,
+    /// Which plugin tabs show should be asked again on the next render.
+    refresh_plugin_tabs: bool,
     log_scroll: gpui::ScrollHandle,
     /// The crash report being read or shown, and what was read.
     crash: Option<(String, Option<CrashRead>)>,
@@ -177,6 +187,12 @@ impl InstanceDetailView {
             last_worlds_refresh: None,
             live_output: None,
             refresh_logs: false,
+            enabled_plugins: None,
+            refresh_analysis: false,
+            plugin_tabs: Vec::new(),
+            plugin_open: None,
+            plugin_pages: std::collections::HashMap::new(),
+            refresh_plugin_tabs: false,
             log_scroll: gpui::ScrollHandle::new(),
             crash: None,
         }

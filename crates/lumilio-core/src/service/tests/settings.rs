@@ -7,6 +7,67 @@ use crate::settings::SettingsError;
 use tokio::sync::mpsc;
 
 #[tokio::test]
+async fn plugin_failure_and_disable_do_not_affect_the_launch_chain() {
+    use lumilio_plugin_api::{API_VERSION, Manifest, Plugin, PluginState};
+    use std::collections::BTreeMap;
+    use std::sync::Arc;
+
+    struct Observer;
+    impl Plugin for Observer {
+        fn manifest(&self) -> Manifest {
+            Manifest {
+                id: "test.observer".into(),
+                name: "测试".into(),
+                description: String::new(),
+                version: "1".into(),
+                api: API_VERSION,
+                default_enabled: true,
+                permissions: Vec::new(),
+                settings: Vec::new(),
+            }
+        }
+    }
+
+    let mut world = world();
+    world.service.plugins = crate::PluginHost::new(vec![Arc::new(Observer)], BTreeMap::new());
+    publish_release(&world);
+    fake_java(&world, ECHO_ARGS);
+    let record = world
+        .service
+        .create_instance("Run", None, Loader::Vanilla, None)
+        .await
+        .unwrap();
+    world
+        .service
+        .plugins
+        .call::<(), _>("test.observer", |_, _| panic!("broken observer"))
+        .await;
+    assert!(matches!(
+        world.service.plugins().await[0].status,
+        crate::PluginStatus::Failed { .. }
+    ));
+    assert_eq!(
+        launch_to_end(&world, &record.id).await.unwrap().code,
+        Some(0)
+    );
+    world
+        .service
+        .set_plugin(
+            "test.observer",
+            PluginState {
+                enabled: Some(false),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        launch_to_end(&world, &record.id).await.unwrap().code,
+        Some(0)
+    );
+}
+
+#[tokio::test]
 async fn instance_memory_overrides_are_validated_and_can_resume_inheritance() {
     let world = world();
     let record = world
@@ -92,7 +153,7 @@ async fn instance_memory_overrides_are_validated_and_can_resume_inheritance() {
     let expected_settings = world.service.settings().await;
     let root = world.service.layout().root().to_path_buf();
     drop(world.service);
-    let reopened = LauncherService::open(root, world.net.clone()).unwrap();
+    let reopened = LauncherService::open(root, world.net.clone(), Vec::new()).unwrap();
     assert_eq!(reopened.library().await, expected_library);
     assert_eq!(reopened.settings().await, expected_settings);
 }

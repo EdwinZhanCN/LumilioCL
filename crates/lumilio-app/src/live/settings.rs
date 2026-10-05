@@ -15,6 +15,74 @@ pub(super) fn apply_preferences(preferences: &Preferences, window: &mut Window, 
     platform::apply_motion(preferences.motion, cx);
 }
 
+pub(super) fn edit_plugin_setting(
+    wiring: &Wiring,
+    id: String,
+    key: String,
+    window: &Window,
+    cx: &mut App,
+) {
+    let service = wiring.backend.service.clone();
+    let lookup_id = id.clone();
+    let lookup_key = key.clone();
+    let lookup = wiring.backend.spawn(async move {
+        let info = service
+            .plugins()
+            .await
+            .into_iter()
+            .find(|info| info.manifest.id == lookup_id)?;
+        let field = info
+            .manifest
+            .settings
+            .iter()
+            .find(|field| field.key == lookup_key)?
+            .clone();
+        let value = info
+            .state
+            .values
+            .get(&lookup_key)
+            .filter(|value| field.kind.accepts(value))
+            .cloned()
+            .unwrap_or_else(|| field.kind.default_value());
+        Some((field, value))
+    });
+    let wiring = wiring.clone();
+    let window = window.window_handle();
+    cx.spawn(async move |cx| {
+        let Ok(Some((field, value))) = lookup.await else {
+            return;
+        };
+        let _ = cx.update_window(window, |_, window, cx| {
+            let save_wiring = wiring.clone();
+            let saved_wiring = wiring.clone();
+            let save = std::rc::Rc::new(move |value| {
+                let service = save_wiring.backend.service.clone();
+                let (id, key) = (id.clone(), key.clone());
+                let task = save_wiring
+                    .backend
+                    .spawn(async move { service.set_plugin_value(&id, &key, value).await });
+                let pending: std::pin::Pin<Box<dyn Future<Output = Result<(), String>>>> =
+                    Box::pin(async move {
+                        match task.await {
+                            Ok(Ok(())) => Ok(()),
+                            _ => Err("没能保存这个设置，请重试。".to_owned()),
+                        }
+                    });
+                pending
+            });
+            lumilio_ui::plugin_setting_dialog::PluginSettingDialog::open(
+                field,
+                value,
+                save,
+                std::rc::Rc::new(move |cx| load_settings(&saved_wiring, cx)),
+                window,
+                cx,
+            );
+        });
+    })
+    .detach();
+}
+
 /// Reads the saved preferences once at start-up and applies them.
 pub(super) fn apply_saved_preferences(
     wiring: &Wiring,
@@ -97,21 +165,32 @@ pub(super) fn load_settings(wiring: &Wiring, cx: &mut App) {
     let service = wiring.backend.service.clone();
     let handle = wiring.backend.spawn(async move {
         let settings = service.settings().await;
+        let plugins = service.plugins().await;
         let java = service.java_installations().await;
         let memory = lumilio_core::total_memory_mb();
-        (settings, java, memory, service.layout().root().to_owned())
+        (
+            settings,
+            plugins,
+            java,
+            memory,
+            service.layout().root().to_owned(),
+        )
     });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let Ok((settings, java, memory, root)) = handle.await else {
+        let Ok((settings, plugins, java, memory, root)) = handle.await else {
             return;
         };
         wiring.state.borrow_mut().preferences = settings.preferences.clone();
         let _ = wiring.shell.update(cx, |shell, cx| {
+            shell.plugins_changed(&plugins, cx);
             shell.update_live(
                 |model| {
                     let storage = model.settings.as_ref().and_then(|view| view.storage);
                     model.settings = Some(settings_view(&settings, &java, storage, &root, memory));
+                    if let Some(view) = &mut model.settings {
+                        view.plugins = plugins;
+                    }
                 },
                 cx,
             );

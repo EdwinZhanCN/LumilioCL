@@ -1,6 +1,7 @@
 mod content;
 mod diagnostics;
 mod history;
+mod plugins;
 mod screenshots;
 mod servers;
 mod settings;
@@ -51,7 +52,13 @@ fn rooted(
         let view = cx.new(|_| {
             InstanceDetailView::new(
                 "survival".into(),
-                Rc::new(move |intent, _, _| seen.borrow_mut().push(intent)),
+                Rc::new(move |intent, _, _| {
+                    // Asking which plugin tabs show happens on every start;
+                    // the plugin tests look at it, the others do not.
+                    if intent != InstanceIntent::PluginTabs {
+                        seen.borrow_mut().push(intent);
+                    }
+                }),
             )
         });
         *keep.borrow_mut() = Some(view.clone());

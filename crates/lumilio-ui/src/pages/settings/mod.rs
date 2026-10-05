@@ -6,6 +6,7 @@ mod about;
 mod game_defaults;
 mod general;
 mod java;
+mod plugins;
 mod rows;
 mod storage;
 mod text;
@@ -27,7 +28,8 @@ use gpui::IntoElement;
 use gpui::prelude::*;
 use gpui_component::v_flex;
 
-pub const TABS: [&str; 5] = ["通用", "游戏默认", "Java", "下载与存储", "关于"];
+// ia[settings]: 打开插件 | L3 设置 tab「插件」 | 显示核心插件、权限、运行状态和各插件的声明式设置；没有插件时显示空列表
+pub const TABS: [&str; 6] = ["通用", "游戏默认", "Java", "下载与存储", "关于", "插件"];
 
 /// The view-state group that remembers the chosen tab.
 pub const TAB_GROUP: u8 = 201;
@@ -47,6 +49,7 @@ pub fn render(ctx: &LiveCtx) -> impl IntoElement {
             1 => game_defaults(view, ctx),
             2 => java(view, ctx),
             3 => downloads(view, ctx),
+            5 => plugins::render(view, ctx),
             _ => about(view, ctx),
         },
     };

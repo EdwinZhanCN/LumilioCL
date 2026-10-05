@@ -81,6 +81,10 @@ pub const PAGES: &[Page] = &[
         key: "instance.settings",
         title: "游戏页 · 设置",
     },
+    Page {
+        key: "plugin.litematica",
+        title: "插件 · Litematica 投影",
+    },
 ];
 
 /// One annotated path.

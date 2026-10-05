@@ -7,6 +7,7 @@ mod java;
 mod launch;
 mod lifecycle;
 mod packs;
+mod plugin_analysis;
 mod portability;
 mod runtime;
 mod screenshots;
@@ -161,7 +162,7 @@ fn world() -> World {
     let net = Scripted::default();
     let root = dir.path().join("launcher");
     let secrets = Arc::new(crate::credentials::MemoryCredentials::default());
-    let service = LauncherService::open(&root, net.clone())
+    let service = LauncherService::open(&root, net.clone(), Vec::new())
         .unwrap()
         .with_runtime_roots(vec![root.join("runtimes")])
         .with_credentials(secrets.clone());
@@ -273,7 +274,7 @@ fn reopen_service(
 ) -> (LauncherService<Scripted>, ()) {
     drop(service);
     (
-        LauncherService::open(root, Scripted::default()).unwrap(),
+        LauncherService::open(root, Scripted::default(), Vec::new()).unwrap(),
         (),
     )
 }
@@ -284,7 +285,7 @@ fn reopen(world: World, root: &std::path::Path) -> (LauncherService<Scripted>, t
         service, net, _dir, ..
     } = world;
     drop(service);
-    (LauncherService::open(root, net).unwrap(), _dir)
+    (LauncherService::open(root, net, Vec::new()).unwrap(), _dir)
 }
 
 async fn is_installed(world: &World, id: &str) -> bool {

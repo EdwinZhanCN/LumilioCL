@@ -15,6 +15,7 @@ pub struct JavaRow {
 /// Everything the Settings page shows.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct SettingsView {
+    pub plugins: Vec<lumilio_core::PluginInfo>,
     pub preferences: Preferences,
     pub launch: LaunchTuning,
     pub min_memory_mb: Option<u32>,
@@ -40,6 +41,7 @@ pub fn settings_view(
     total_memory_mb: Option<u64>,
 ) -> SettingsView {
     SettingsView {
+        plugins: Vec::new(),
         preferences: settings.preferences.clone(),
         launch: settings.launch.clone(),
         min_memory_mb: settings.default_min_memory_mb,

@@ -20,6 +20,7 @@ use std::path::PathBuf;
 
 #[derive(Debug)]
 pub enum ServiceError {
+    Plugin(lumilio_plugin_api::PluginError),
     Store(StoreError),
     Settings(SettingsError),
     /// A network document could not be fetched or understood.
@@ -61,6 +62,7 @@ pub enum ServiceError {
 impl Display for ServiceError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Plugin(error) => write!(f, "plugin: {error}"),
             Self::Store(error) => write!(f, "{error}"),
             Self::Settings(error) => write!(f, "{error}"),
             Self::Remote(message) => write!(f, "could not reach the service: {message}"),

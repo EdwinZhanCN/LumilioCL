@@ -10,9 +10,9 @@ use gpui_component::StyledExt as _;
 use gpui_component::{Icon, h_flex};
 
 /// View tabs as port labels (design language §12).
-pub fn tabs(
+pub fn tabs<S: Clone + Into<SharedString>>(
     id: &'static str,
-    labels: &[&'static str],
+    labels: &[S],
     active: usize,
     on_select: impl Fn(usize, &mut Window, &mut App) + 'static,
 ) -> impl IntoElement {

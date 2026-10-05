@@ -3,9 +3,110 @@ use super::super::panels::Arrived;
 use super::super::{InstanceDetailView, TAB_DIAGNOSTICS, TAB_HISTORY};
 use super::{click, record, rooted};
 use gpui::{Entity, Modifiers, TestAppContext};
-use lumilio_core::{CrashHint, LauncherSettings};
+use lumilio_core::{LauncherSettings, PluginFinding};
 use std::cell::RefCell;
 use std::rc::Rc;
+
+fn finding() -> PluginFinding {
+    PluginFinding {
+        plugin: "test.analyzer".into(),
+        finding: lumilio_plugin_api::Finding {
+            rule: "memory".into(),
+            severity: lumilio_core::Severity::Error,
+            title: "插件提供的标题".into(),
+            advice: "插件提供的建议".into(),
+            evidence: Some("OOM".into()),
+        },
+    }
+}
+
+#[gpui::test]
+fn disabling_a_plugin_removes_cached_and_late_analysis_but_keeps_builtin_problems(
+    cx: &mut TestAppContext,
+) {
+    let (view, cx) = rooted(cx, Rc::default());
+    view.update(cx, |view, cx| {
+        view.loaded(Ok((record(), LauncherSettings::default())), cx);
+        view.plugins_changed(vec!["test.analyzer".into()], cx);
+        view.crash = Some((
+            "crash.txt".into(),
+            Some(Ok(("raw report".into(), vec![finding()]))),
+        ));
+        view.arrived(
+            Arrived::Problems(Ok(vec![
+                lumilio_core::Problem {
+                    severity: lumilio_core::Severity::Error,
+                    kind: lumilio_core::ProblemKind::Finding(finding()),
+                },
+                lumilio_core::Problem {
+                    severity: lumilio_core::Severity::Error,
+                    kind: lumilio_core::ProblemKind::NoJava { required: Some(21) },
+                },
+            ])),
+            cx,
+        );
+        view.plugins_changed(Vec::new(), cx);
+    });
+    view.read_with(cx, |view, _| {
+        assert_eq!(
+            view.data.problems.as_ref().unwrap().as_ref().unwrap().len(),
+            1
+        );
+        let (_, Some(Ok((text, findings)))) = view.crash.as_ref().unwrap() else {
+            panic!()
+        };
+        assert_eq!(text, "raw report");
+        assert!(findings.is_empty());
+    });
+    view.update(cx, |view, cx| {
+        view.crash_arrived(
+            "crash.txt".into(),
+            Ok(("late report".into(), vec![finding()])),
+            cx,
+        );
+        view.arrived(
+            Arrived::Problems(Ok(vec![lumilio_core::Problem {
+                severity: lumilio_core::Severity::Error,
+                kind: lumilio_core::ProblemKind::Finding(finding()),
+            }])),
+            cx,
+        );
+    });
+    view.read_with(cx, |view, _| {
+        assert!(
+            view.data
+                .problems
+                .as_ref()
+                .unwrap()
+                .as_ref()
+                .unwrap()
+                .is_empty()
+        );
+        assert!(matches!(&view.crash, Some((_, Some(Ok((_, findings))))) if findings.is_empty()));
+    });
+    view.update(cx, |view, cx| {
+        view.plugins_changed(vec!["test.analyzer".into()], cx);
+        view.crash_arrived(
+            "crash.txt".into(),
+            Ok(("report".into(), vec![finding()])),
+            cx,
+        );
+        view.diag_sub = 1;
+        view.select_tab(TAB_DIAGNOSTICS, cx);
+        view.arrived(
+            Arrived::Logs(Ok(lumilio_core::GameLogs {
+                latest: None,
+                crashes: Vec::new(),
+            })),
+            cx,
+        );
+    });
+    cx.run_until_parked();
+    assert!(
+        cx.debug_bounds("crash-finding-0").is_some(),
+        "plugin data renders through generic report UI"
+    );
+}
 
 #[gpui::test]
 fn a_crashed_session_leads_to_the_log_and_a_clean_one_does_not(cx: &mut TestAppContext) {
@@ -122,7 +223,7 @@ fn the_log_tab_loads_once_and_shows_only_the_report_last_asked_for(cx: &mut Test
     view.update(cx, |view, cx| {
         view.crash_arrived(
             "crash-1.txt".into(),
-            Ok(("OOM".into(), vec![CrashHint::OutOfMemory])),
+            Ok(("OOM".into(), vec![finding()])),
             cx,
         );
     });
