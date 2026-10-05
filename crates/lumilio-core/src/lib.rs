@@ -139,7 +139,10 @@ pub use modpack::{
     plan as plan_modpack, read_index as read_pack_index,
 };
 pub use pack_export::{ExportError, ExportReport, ExportSpec, PackFormat};
-pub use plugins::{PluginEffect, PluginFinding, PluginHost, PluginInfo, PluginStatus, PluginTab};
+pub use plugins::{
+    PluginContentSource, PluginEffect, PluginFinding, PluginHost, PluginInfo, PluginStatus,
+    PluginTab,
+};
 pub use process::{
     DEFAULT_SETTLE, GameEvent, GameExit, GameOptions, LogStream, ProcessError,
     command_line as game_command_line, run as run_game,

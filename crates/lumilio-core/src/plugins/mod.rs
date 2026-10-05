@@ -2,9 +2,12 @@
 
 mod access;
 mod analysis;
+mod content;
 mod context;
+mod network;
 mod tabs;
 pub use analysis::PluginFinding;
+pub use content::PluginContentSource;
 pub use tabs::{PluginEffect, PluginTab};
 #[cfg(test)]
 mod tests;
@@ -61,6 +64,7 @@ pub struct PluginHost {
     /// UI state per (instance, plugin); owned by the host, not the plugins.
     tab_states: Mutex<BTreeMap<(String, String), lumilio_plugin_api::TabState>>,
     timeout: Duration,
+    network: Option<network::Network>,
 }
 
 impl PluginHost {
@@ -75,6 +79,33 @@ impl PluginHost {
             }),
             tab_states: Mutex::new(BTreeMap::new()),
             timeout: CALL_TIMEOUT,
+            network: None,
+        }
+    }
+
+    /// Supplies the launcher's transport and current mirror rules.
+    #[must_use]
+    pub fn with_network<T: crate::transfer::Transport>(
+        self,
+        transport: T,
+        sources: crate::transfer::SourceChain,
+    ) -> Self {
+        self.with_network_config(transport, Some(sources))
+    }
+
+    pub(crate) fn with_network_config<T: crate::transfer::Transport>(
+        mut self,
+        transport: T,
+        sources: Option<crate::transfer::SourceChain>,
+    ) -> Self {
+        self.network = Some(network::Network::new(Arc::new(transport), sources));
+        self
+    }
+
+    /// Publish mirror changes only after their preferences have been saved.
+    pub(crate) fn set_sources(&self, sources: crate::transfer::SourceChain) {
+        if let Some(network) = &self.network {
+            network.set_sources(sources);
         }
     }
 
@@ -202,6 +233,21 @@ impl PluginHost {
         R: Send + 'static,
         F: FnOnce(&dyn Plugin, &dyn HostContext) -> Result<R, PluginError> + Send + 'static,
     {
+        self.call_in_with_timeout(id, game_dir, self.timeout, call)
+            .await
+    }
+
+    async fn call_in_with_timeout<R, F>(
+        &self,
+        id: &str,
+        game_dir: Option<PathBuf>,
+        timeout: Duration,
+        call: F,
+    ) -> Option<R>
+    where
+        R: Send + 'static,
+        F: FnOnce(&dyn Plugin, &dyn HostContext) -> Result<R, PluginError> + Send + 'static,
+    {
         let entry = self.registry().await.entries.get(id)?.clone();
         let (state, revision) = {
             let preferences = self
@@ -220,9 +266,13 @@ impl PluginHost {
         {
             return None;
         }
-        let context = Context::new(&entry.manifest, &state, game_dir);
+        let network = self
+            .network
+            .as_ref()
+            .map(|network| network.context(timeout));
+        let context = Context::new(&entry.manifest, &state, game_dir, network);
         let plugin = entry.plugin.clone();
-        let result = isolated(self.timeout, move || call(plugin.as_ref(), &context)).await;
+        let result = isolated(timeout, move || call(plugin.as_ref(), &context)).await;
         match result {
             Ok(value) => {
                 let preferences = self

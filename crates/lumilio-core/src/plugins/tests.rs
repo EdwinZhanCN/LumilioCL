@@ -4,6 +4,10 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[path = "tests/analysis.rs"]
 mod analysis;
+#[path = "tests/content.rs"]
+mod content;
+#[path = "tests/network.rs"]
+mod network;
 #[path = "tests/tabs.rs"]
 mod tabs;
 

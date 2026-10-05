@@ -109,7 +109,10 @@ impl<T: Transport + Clone> LauncherService<T> {
         mirrors: Vec<crate::settings::MirrorRule>,
         prefer: bool,
     ) -> Result<(), ServiceError> {
-        Ok(self.settings.lock().await.set_mirrors(mirrors, prefer)?)
+        let mut settings = self.settings.lock().await;
+        settings.set_mirrors(mirrors, prefer)?;
+        self.plugins.set_sources(settings.source_chain()?);
+        Ok(())
     }
 
     pub async fn set_default_memory(
