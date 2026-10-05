@@ -1,0 +1,13 @@
+[package]
+name = "lumilio-plugin-discord"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+lumilio-plugin-api.workspace = true
+
+[lints]
+workspace = true

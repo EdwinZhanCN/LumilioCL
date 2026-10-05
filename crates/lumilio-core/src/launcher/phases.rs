@@ -385,12 +385,14 @@ where
             tokio::select! {
                 result = &mut game => break result.map_err(LaunchServiceError::Process)?,
                 Some(event) = game_events.recv() => {
+                    self.note_spawned(&event);
                     forward_game_event(&event, &mut running, updates);
                 }
             }
         };
         // The process ended; deliver whatever it still had queued.
         while let Ok(event) = game_events.try_recv() {
+            self.note_spawned(&event);
             forward_game_event(&event, &mut running, updates);
         }
 

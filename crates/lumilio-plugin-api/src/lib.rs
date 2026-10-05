@@ -9,12 +9,14 @@ use serde::{Deserialize, Serialize};
 
 mod analysis;
 pub mod content;
+mod launch;
 mod network;
 mod view;
 pub use analysis::{
     AnalysisInput, AnalysisSource, Analyzer, Finding, GameFacts, ModFact, Severity,
 };
 pub use content::ContentSource;
+pub use launch::{DiscordActivity, LaunchEvent, LaunchObserver, LaunchOutcome, LaunchTarget};
 pub use network::{FetchMethod, FetchRequest};
 pub use view::{ActionId, Effect, ImageData, InstanceTab, KeyKind, ListItem, TabState, Tone, View};
 
@@ -144,6 +146,19 @@ pub struct FetchResponse {
 }
 
 pub trait HostContext: Send + Sync {
+    /// Identifies this observed process, including when several games overlap.
+    fn launch_id(&self) -> Option<u64> {
+        None
+    }
+    /// Changes whenever this plugin's saved preferences change.
+    fn settings_revision(&self) -> u64 {
+        0
+    }
+    /// Host-owned Discord IPC. `None` clears this plugin's activity.
+    /// Missing Discord is a successful, quiet skip.
+    fn discord_activity(&self, _activity: Option<DiscordActivity>) -> Result<(), PluginError> {
+        Err(PluginError::PermissionDenied)
+    }
     fn setting(&self, key: &str) -> Option<SettingValue>;
     /// Reads a file below a granted `ReadGameFiles` directory. Paths are
     /// relative to the game directory.
@@ -165,10 +180,6 @@ pub trait HostContext: Send + Sync {
         }
     }
 }
-
-// Extension-point contracts are added with their first implementation, in
-// order: analysis, instance views, content sources, launch observation.
-pub trait LaunchObserver: Send + Sync {}
 
 pub trait Plugin: Send + Sync + 'static {
     fn manifest(&self) -> Manifest;

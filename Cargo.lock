@@ -4309,6 +4309,7 @@ dependencies = [
  "lumilio-core",
  "lumilio-plugin-api",
  "lumilio-plugin-crash-analyzer",
+ "lumilio-plugin-discord",
  "lumilio-plugin-litematica",
  "lumilio-plugin-modrinth",
  "lumilio-ui",
@@ -4329,6 +4330,7 @@ dependencies = [
  "keyring",
  "lumilio-nbt",
  "lumilio-plugin-api",
+ "lumilio-plugin-discord",
  "lumilio-plugin-modrinth",
  "md-5 0.11.0",
  "regex",
@@ -4376,6 +4378,13 @@ version = "0.1.0"
 dependencies = [
  "lumilio-plugin-api",
  "regex",
+]
+
+[[package]]
+name = "lumilio-plugin-discord"
+version = "0.1.0"
+dependencies = [
+ "lumilio-plugin-api",
 ]
 
 [[package]]

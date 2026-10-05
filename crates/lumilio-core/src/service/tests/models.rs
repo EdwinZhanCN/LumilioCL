@@ -27,7 +27,7 @@ impl Plugin for Builder {
 
 async fn world_with_schematic() -> (super::World, String) {
     let mut world = world();
-    world.service.plugins = PluginHost::new(vec![Arc::new(Builder)], Default::default());
+    world.service.plugins = Arc::new(PluginHost::new(vec![Arc::new(Builder)], Default::default()));
     let record = world
         .service
         .create_instance("Builder", Some("1.0"), Loader::Vanilla, None)

@@ -6,6 +6,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 mod analysis;
 #[path = "tests/content.rs"]
 mod content;
+#[path = "tests/launch.rs"]
+mod launch;
 #[path = "tests/modrinth.rs"]
 mod modrinth;
 #[path = "tests/network.rs"]
@@ -385,6 +387,36 @@ async fn the_service_persists_preferences_but_never_runtime_failures() {
     drop(service);
     let service = LauncherService::open(dir.path(), FileTransport, plugins()).unwrap();
     assert_eq!(service.plugins().await[0].status, PluginStatus::Enabled);
+}
+
+#[tokio::test]
+async fn changing_preferences_during_a_panicking_call_does_not_relax_d2() {
+    let host = host();
+    let (started_tx, started_rx) = tokio::sync::oneshot::channel();
+    let (release_tx, release_rx) = std::sync::mpsc::channel();
+    let call = host.call::<(), _>("test.fake", move |_, _| {
+        started_tx.send(()).unwrap();
+        release_rx.recv().unwrap();
+        panic!("the plugin is broken even if its preferences changed");
+    });
+    let disable = async {
+        started_rx.await.unwrap();
+        host.set_state(
+            "test.fake".into(),
+            PluginState {
+                enabled: Some(false),
+                ..Default::default()
+            },
+        );
+        release_tx.send(()).unwrap();
+    };
+    tokio::join!(call, disable);
+    assert!(matches!(
+        host.list().await[0].status,
+        PluginStatus::Failed { .. }
+    ));
+    host.set_state("test.fake".into(), PluginState::default());
+    assert_eq!(host.call("test.fake", |_, _| Ok(42)).await, None);
 }
 
 #[tokio::test]

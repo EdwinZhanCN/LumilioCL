@@ -81,7 +81,7 @@ const TOKEN_MARGIN_SECONDS: u64 = 300;
 const CREDENTIAL_PROBE: &str = "lumilio-store-check";
 
 pub struct LauncherService<T> {
-    pub(crate) plugins: crate::plugins::PluginHost,
+    pub(crate) plugins: Arc<crate::plugins::PluginHost>,
     layout: Layout,
     transport: T,
     store: Mutex<InstanceStore>,
@@ -120,6 +120,8 @@ pub struct LauncherService<T> {
 
 impl<T: Transport + Clone> LauncherService<T> {
     /// Opens (creating on first use) everything under `root`.
+    /// `plugins` are trusted, statically linked core plugins supplied by the
+    /// application. Untrusted registration uses `PluginHost::new` instead.
     pub fn open(
         root: impl Into<PathBuf>,
         transport: T,
@@ -131,13 +133,13 @@ impl<T: Transport + Clone> LauncherService<T> {
         let settings = SettingsStore::open(layout.root())?;
         let log = ActivityLog::open(layout.root());
         let startup = recovery::startup_notes(&layout, &store, &settings, &log);
-        let plugins = crate::plugins::PluginHost::new(plugins, settings.get().plugins.clone())
+        let plugins = crate::plugins::PluginHost::new_core(plugins, settings.get().plugins.clone())
             // Invalid hand-edited mirrors must not make plugin initialization
             // prevent the launcher from opening. Network calls fail locally
             // until corrected; the rest of the service remains available.
             .with_network_config(transport.clone(), settings.source_chain().ok());
         Ok(Self {
-            plugins,
+            plugins: Arc::new(plugins),
             layout,
             transport,
             store: Mutex::new(store),

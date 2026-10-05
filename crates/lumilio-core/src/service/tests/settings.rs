@@ -29,7 +29,10 @@ async fn plugin_failure_and_disable_do_not_affect_the_launch_chain() {
     }
 
     let mut world = world();
-    world.service.plugins = crate::PluginHost::new(vec![Arc::new(Observer)], BTreeMap::new());
+    world.service.plugins = Arc::new(crate::PluginHost::new(
+        vec![Arc::new(Observer)],
+        BTreeMap::new(),
+    ));
     publish_release(&world);
     fake_java(&world, ECHO_ARGS);
     let record = world

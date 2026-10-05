@@ -30,6 +30,7 @@ pub struct Launcher<T> {
     transport: T,
     sources: SourceChain,
     concurrency: usize,
+    spawned: Option<mpsc::UnboundedSender<()>>,
 }
 
 impl<T> Launcher<T>
@@ -43,6 +44,21 @@ where
             transport,
             sources,
             concurrency,
+            spawned: None,
+        }
+    }
+
+    /// Service-level observation starts only after the OS creates a process.
+    pub(crate) fn with_spawned(mut self, sender: mpsc::UnboundedSender<()>) -> Self {
+        self.spawned = Some(sender);
+        self
+    }
+
+    fn note_spawned(&self, event: &crate::process::GameEvent) {
+        if matches!(event, crate::process::GameEvent::Spawned { .. })
+            && let Some(sender) = &self.spawned
+        {
+            let _ = sender.send(());
         }
     }
 
