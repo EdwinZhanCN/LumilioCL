@@ -153,7 +153,7 @@ async fn instance_memory_overrides_are_validated_and_can_resume_inheritance() {
     let expected_settings = world.service.settings().await;
     let root = world.service.layout().root().to_path_buf();
     drop(world.service);
-    let reopened = LauncherService::open(root, world.net.clone(), Vec::new()).unwrap();
+    let reopened = LauncherService::open(root, world.net.clone(), super::stock_plugins()).unwrap();
     assert_eq!(reopened.library().await, expected_library);
     assert_eq!(reopened.settings().await, expected_settings);
 }

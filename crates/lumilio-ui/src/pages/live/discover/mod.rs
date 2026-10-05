@@ -94,6 +94,13 @@ pub fn discover(ctx: &LiveCtx) -> impl IntoElement {
         SearchStatus::Idle | SearchStatus::Searching if ctx.model.results.is_empty() => {
             kit::empty("正在搜索…", "", colors).into_any_element()
         }
+        // ia[discover]: 没有内容源 | 搜索结果区整页提示 | 说明没有可用的内容源，指向设置里的插件页；打开内容源后重新搜索
+        SearchStatus::NoSource => kit::empty(
+            "没有可用的内容源",
+            "在 设置 › 插件 里打开一个内容源（例如 Modrinth）后再来",
+            colors,
+        )
+        .into_any_element(),
         // ia[discover]: 连不上 | 搜索失败的整页提示 | 说明连不上 Modrinth，附技术详情；改任何条件会再试一次
         SearchStatus::Failed(message) => v_flex()
             .items_center()

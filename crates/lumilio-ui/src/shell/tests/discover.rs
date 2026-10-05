@@ -293,6 +293,7 @@ fn live_with_games(cx: &mut gpui::VisualTestContext, shell: &gpui::Entity<Launch
                         name: "fabric".into(),
                         project_types: vec!["mod".into(), "modpack".into()],
                     }],
+                    ..Default::default()
                 });
                 model.query = crate::live::DiscoverQuery::new(ProjectKind::Mod);
                 model.search = crate::live::SearchStatus::Done { total: 0 };

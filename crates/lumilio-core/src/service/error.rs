@@ -25,6 +25,8 @@ pub enum ServiceError {
     Settings(SettingsError),
     /// A network document could not be fetched or understood.
     Remote(String),
+    /// No content source plugin is enabled (or the one that was has stopped).
+    NoContentSource,
     NoSuchInstance(String),
     InstanceBusy(String),
     RootBusy(PathBuf),
@@ -66,6 +68,7 @@ impl Display for ServiceError {
             Self::Store(error) => write!(f, "{error}"),
             Self::Settings(error) => write!(f, "{error}"),
             Self::Remote(message) => write!(f, "could not reach the service: {message}"),
+            Self::NoContentSource => f.write_str("没有可用的内容源"),
             Self::RootBusy(root) => write!(
                 f,
                 "launcher data at {} is already in use; close the other launcher and retry",
@@ -100,6 +103,15 @@ impl Display for ServiceError {
 }
 
 impl Error for ServiceError {}
+
+impl From<crate::discover::DiscoverError> for ServiceError {
+    fn from(error: crate::discover::DiscoverError) -> Self {
+        match error {
+            crate::discover::DiscoverError::NoSource => Self::NoContentSource,
+            other => Self::Remote(other.to_string()),
+        }
+    }
+}
 
 impl From<SnapshotError> for ServiceError {
     fn from(error: SnapshotError) -> Self {

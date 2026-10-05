@@ -5,7 +5,7 @@
 //! each kind has and in what order, which loaders come first, how categories
 //! are grouped and ordered, and the advanced exclusions.
 
-use lumilio_core::{DiscoverFilters, GameVersionTag, LoaderTag, ProjectKind};
+use lumilio_core::{DiscoverFilters, GameVersionTag, KindAbilities, LoaderTag, ProjectKind};
 
 /// The photosensitivity exclusion, which asks for a warning the first time.
 pub const EPILEPSY_TRIGGERS: &str = "epilepsy_triggers";
@@ -112,6 +112,9 @@ pub struct FilterModel {
     tags: Vec<GameVersionTag>,
     categories: Vec<(ProjectKind, String, String)>,
     loaders: Vec<LoaderTag>,
+    /// What the content source can filter by; empty until it has said, which
+    /// offers everything.
+    abilities: Vec<KindAbilities>,
 }
 
 impl FilterModel {
@@ -119,6 +122,7 @@ impl FilterModel {
         Self {
             loaded: true,
             error: None,
+            abilities: filters.abilities.clone(),
             versions: filters
                 .game_versions
                 .iter()
@@ -132,6 +136,34 @@ impl FilterModel {
                 .collect(),
             loaders: filters.loaders.clone(),
         }
+    }
+
+    /// Whether the source can filter this kind by `section`; a source that has
+    /// not said yet offers everything.
+    pub fn offers(&self, kind: ProjectKind, section: &Section) -> bool {
+        if self.abilities.is_empty() {
+            return true;
+        }
+        let Some(ability) = self.abilities.iter().find(|ability| ability.kind == kind) else {
+            return false;
+        };
+        match section {
+            Section::Version => ability.game_versions,
+            Section::Loader => ability.loaders,
+            Section::Environment => ability.environment,
+            Section::License => ability.open_source,
+            Section::Advanced => ability.advanced,
+            Section::Category(_) => ability.categories,
+        }
+    }
+
+    /// Whether the source can leave out what the game already has.
+    pub fn offers_hide_installed(&self, kind: ProjectKind) -> bool {
+        self.abilities.is_empty()
+            || self
+                .abilities
+                .iter()
+                .any(|ability| ability.kind == kind && ability.hide_installed)
     }
 
     /// Modrinth's whole game version list, newest first.
@@ -308,6 +340,7 @@ pub fn sections(kind: ProjectKind, filters: &FilterModel) -> Vec<Section> {
             list.push(Section::License);
             list.push(Section::Version);
             list.push(Section::Advanced);
+            list.retain(|section| filters.offers(kind, section));
             return list;
         }
         ProjectKind::ResourcePack => {
@@ -317,6 +350,7 @@ pub fn sections(kind: ProjectKind, filters: &FilterModel) -> Vec<Section> {
     }
     list.push(Section::License);
     list.push(Section::Advanced);
+    list.retain(|section| filters.offers(kind, section));
     list
 }
 

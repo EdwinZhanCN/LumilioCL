@@ -37,6 +37,7 @@ impl Backend {
                 vec![
                     Arc::new(lumilio_plugin_crash_analyzer::CrashAnalyzer),
                     Arc::new(lumilio_plugin_litematica::Litematica),
+                    Arc::new(lumilio_plugin_modrinth::Modrinth),
                 ],
             )
             .map_err(|error| error.to_string())?

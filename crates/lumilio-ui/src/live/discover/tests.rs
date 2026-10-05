@@ -61,7 +61,49 @@ fn filters() -> FilterModel {
             loader("vanilla", &["shader"]),
             loader("canvas", &["shader"]),
         ],
+        ..Default::default()
     })
+}
+
+#[test]
+fn the_sidebar_offers_only_what_the_source_can_filter_by() {
+    use lumilio_core::{KindAbilities, SortIndex};
+    let every = |kind| KindAbilities {
+        kind,
+        sorts: vec![SortIndex::Relevance],
+        game_versions: true,
+        categories: true,
+        loaders: true,
+        environment: true,
+        open_source: true,
+        hide_installed: true,
+        advanced: true,
+    };
+    let mut model = filters();
+    let before = sections(ProjectKind::Mod, &model);
+    assert!(before.contains(&Section::Loader) && before.contains(&Section::Environment));
+
+    // A source that filters mods by game version only.
+    let mut mods = every(ProjectKind::Mod);
+    (
+        mods.loaders,
+        mods.environment,
+        mods.open_source,
+        mods.advanced,
+    ) = (false, false, false, false);
+    mods.hide_installed = false;
+    let found = lumilio_core::DiscoverFilters {
+        abilities: vec![mods, every(ProjectKind::Shader)],
+        ..Default::default()
+    };
+    model = FilterModel::from_core(&found);
+    assert_eq!(sections(ProjectKind::Mod, &model), [Section::Version]);
+    assert!(!model.offers_hide_installed(ProjectKind::Mod));
+    assert!(model.offers_hide_installed(ProjectKind::Shader));
+    assert!(
+        sections(ProjectKind::ResourcePack, &model).is_empty(),
+        "a kind the source does not serve has no filters"
+    );
 }
 
 #[test]

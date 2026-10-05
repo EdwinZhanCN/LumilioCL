@@ -24,6 +24,10 @@ impl PluginHost {
                 .call_content(&info.manifest.id, |source, _| Ok(source.capabilities()))
                 .await;
             if let Some(capabilities) = capabilities {
+                self.content_ids
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .insert(info.manifest.id.clone());
                 sources.push(PluginContentSource {
                     plugin: info.manifest.id,
                     name: info.manifest.name,
@@ -32,6 +36,25 @@ impl PluginHost {
             }
         }
         sources
+    }
+
+    /// A content source that was answering and has since stopped, with why.
+    /// Only for telling "stopped" from "none"; a disabled source is neither.
+    pub async fn stopped_content_source(&self) -> Option<(String, String)> {
+        let known = self
+            .content_ids
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        self.list()
+            .await
+            .into_iter()
+            .find_map(|info| match info.status {
+                super::PluginStatus::Failed { message } if known.contains(&info.manifest.id) => {
+                    Some((info.manifest.name, message))
+                }
+                _ => None,
+            })
     }
 
     /// Dispatch for project/version/file/dependency/recognition operations.

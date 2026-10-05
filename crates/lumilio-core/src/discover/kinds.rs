@@ -57,18 +57,6 @@ pub enum SortIndex {
     Updated,
 }
 
-impl SortIndex {
-    pub(super) const fn protocol_name(self) -> &'static str {
-        match self {
-            Self::Relevance => "relevance",
-            Self::Downloads => "downloads",
-            Self::Follows => "follows",
-            Self::Newest => "newest",
-            Self::Updated => "updated",
-        }
-    }
-}
-
 /// The public web page of a project — what the webview shows.
 #[must_use]
 pub fn project_page_url(kind: ProjectKind, slug_or_id: &str) -> String {

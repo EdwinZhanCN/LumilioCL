@@ -95,7 +95,7 @@ pub struct LauncherService<T> {
     log: ActivityLog,
     /// Replaces the conventional Java search locations (tests, portable setups).
     runtime_roots: Option<Vec<PathBuf>>,
-    filters: Mutex<Option<DiscoverFilters>>,
+    filters: Mutex<Option<(String, DiscoverFilters)>>,
     /// Where sign-in secrets live; never a file.
     credentials: Arc<dyn CredentialStore>,
     /// One refresh at a time: refresh tokens rotate, so two at once would

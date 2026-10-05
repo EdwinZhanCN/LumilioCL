@@ -2,7 +2,7 @@ use super::jobs::{job, outcome};
 use super::{Reload, Wiring};
 use gpui_kit::AppContext as _;
 use gpui_kit::{App, WeakEntity, Window};
-use lumilio_core::{CancellationToken, ProjectKind, unix_now};
+use lumilio_core::{CancellationToken, ProjectKind, ServiceError, unix_now};
 use lumilio_ui::LauncherShell;
 use lumilio_ui::dependency_prompt::DependencyPrompt;
 use lumilio_ui::live::{DiscoverQuery, FilterModel, Provided, SearchStatus, search_rows};
@@ -98,6 +98,10 @@ fn run_search(wiring: &Wiring, query: &DiscoverQuery, seq: u64, cx: &mut App) {
                             total: page.total_hits,
                         };
                     }
+                    Err(ServiceError::NoContentSource) => {
+                        model.results.clear();
+                        model.search = SearchStatus::NoSource;
+                    }
                     Err(error) => {
                         model.results.clear();
                         model.search = SearchStatus::Failed(error.to_string());
@@ -122,6 +126,8 @@ pub(super) fn load_filters(wiring: &Wiring, cx: &mut App) {
             shell.update_live(
                 |model| match result {
                     Ok(filters) => model.filters = FilterModel::from_core(&filters),
+                    // The page says so where the results go; no failed-filters note.
+                    Err(ServiceError::NoContentSource) => model.filters.loaded = true,
                     Err(error) => {
                         model.filters.loaded = true;
                         model.filters.error = Some(error.to_string());

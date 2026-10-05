@@ -202,8 +202,8 @@ pub enum Permission {
   - 方法：`search`、`project`、`versions`、`version_files`、`dependencies`。
   - 数据类型由 plugin-api 自己定义，core 负责和现有类型互相转换。
 - [x] T20 实现 `ctx.fetch`：只允许访问 `Network.hosts` 里列出的主机；底层走 core 现有的 `Transport`（镜像和代理规则保持不变）；响应大小有上限。
-- [ ] T21 把 Modrinth API 的部分迁进 `crates/lumilio-plugin-modrinth`。core 的发现、内容安装、更新检查、整合包安装改为通过宿主调用 `ContentSource`。发现页按内容源的能力声明显示筛选项，ADR 0023 的界面和行为不变。
-- [ ] T22 停用 Modrinth 后：发现页显示「没有可用的内容源」；已安装的内容照常可用；更新检查跳过来源不可用的项，并说明原因。
+- [x] T21 把 Modrinth API 的部分迁进 `crates/lumilio-plugin-modrinth`。core 的发现、内容安装、更新检查、整合包安装改为通过宿主调用 `ContentSource`。发现页按内容源的能力声明显示筛选项，ADR 0023 的界面和行为不变。
+- [x] T22 停用 Modrinth 后：发现页显示「没有可用的内容源」；已安装的内容照常可用；更新检查跳过来源不可用的项，并说明原因。
 
 验收：
 
@@ -338,3 +338,14 @@ pub enum Permission {
 - 首轮测试夹具编译曾使用 API 不存在的 `Version::required_dependencies` 和 `SourceChain::official`，已分别改为直接筛选依赖和构造 OfficialSource 链；这些编译失败不是回归测试变红的证据。
 - 更新实施记录后 `just docs` 通过（日志 `/private/tmp/lumilio-plugin-modrinth-source-docs.log`）。没有产品界面改动，本批无新的原生视觉验收项；插件清单文案的实际设置行将在 app 注册时一起查看。
 - 下一批从 core 的类型转换与调用适配开始：切换发现 / 内容安装 / 更新 / 整合包查询，删除旧协议实现；缓存结果也必须按插件启用状态过滤，不能用缓存绕过停用。app 注册、原 service / live_smoke 测试注入、能力驱动的筛选和 T22 的反馈一起完成。D2 的 Failed 本次运行粘住，旧过滤器「网络恢复后同一 service 重试成功」测试需要按此冻结行为调整。P3 不验收，P4 不开始。
+
+### 2026-10-05 — T21–T22 core 切换到内容源插件
+
+- core 不再有 Modrinth 协议代码：删除 `ModrinthClient`、搜索 URL / 过滤表达式生成和各类 JSON 解码，只留启动器自己的数据类型（`Project`、`Version`、`SearchQuery` 等）。新增 `discover::{source, convert}`：`PluginHost::content_client()` 取第一个启用的内容源，`ContentClient` 提供与旧客户端同名的方法（搜索、项目、版本、识别、兼容更新、摘要、筛选项），类型在 core 与 plugin-api 之间转换。发现、内容安装、依赖报告、版本切换、整合包安装、内容来源识别、整合包导出的识别都改走它。
+- ADR 0023 的语义保持：已选加载器统一以 `any = true` 交给插件；资源包不带加载器，只有 Mod / 整合包带运行环境；页面大小限制 1–100。排序不被内容源支持时退到它的第一项，避免插件拒绝整个搜索而被停用。`LoaderTag` 加了 `other_kinds`，保留 `plugin`、`datapack` 之类非 `ProjectKind` 的类型，加载器筛选结果不变。
+- `ProjectSummary.team` 改为 `author`，不再有单独的团队查询。项目作者由 `Project.author` 提供。
+- 发现页筛选栏按 `KindAbilities` 显示：内容源不支持的分区（版本、加载器、环境、许可证、高级排除、隐藏已安装）不出现；能力未知时全部显示。
+- T22：停用后搜索、筛选、详情、安装、整合包安装都返回 `ServiceError::NoContentSource`，发现页显示「没有可用的内容源」并指向设置 › 插件；筛选缓存先问内容源再用，停用后不会从缓存返回。已安装内容照常列出，`ContentList.source_note` 写明来源信息问不到的原因（没有内容源、已停止、没有回答），内容页把原因显示出来。`updates::check` 在内容源不可用时整体失败并带原因，不会报告「全部最新」。
+- 按冻结的 D2，内容源一次出错（包括网络错误、HTTP 非 2xx）就进入 Failed，本次运行内保持停止，设置页和发现页会说明原因。旧的「网络恢复后同一 service 重试成功」测试改为「失败后保持停止并说明原因」。这对内容源偏严（一次网络抖动就要重启才能恢复），是否放宽 D2（例如把可恢复的网络错误和插件 bug 区分开）需要维护者裁决，本批没有改动。
+- app 注册 `lumilio-plugin-modrinth`；service 测试和 `live_smoke` 注入它，测试传输加了 `send_no_redirect`。新增覆盖：搜索经内容源并转换类型、停用后各入口返回 NoContentSource 且不发请求、失败后保持停止、能力驱动的筛选分区、加载器其他类型保留、更新检查在内容源停用时失败。
+- 验证：本机只跑了受影响的 core 测试（90 通过、1 忽略），其余按维护者要求交给 GitHub Actions 的 `just ci`。需要肉眼看：发现页筛选栏（Modrinth 下应与之前完全一致）、停用 Modrinth 后的发现页空状态和内容页提示。

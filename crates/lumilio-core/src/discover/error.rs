@@ -1,32 +1,25 @@
-use crate::fetch::FetchError;
-use serde::Deserialize;
 use std::error::Error;
 use std::fmt;
 use std::fmt::{Display, Formatter};
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum DiscoverError {
-    Decode(String),
-    Fetch(FetchError),
+    /// No content source plugin is enabled, or the one that was has stopped.
+    NoSource,
+    /// The source plugin is on but this call did not complete.
+    Unavailable(String),
+    /// The plugin's answer cannot be used with this launcher.
+    Invalid(String),
 }
 
 impl Display for DiscoverError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Decode(message) => write!(f, "unexpected Modrinth answer: {message}"),
-            Self::Fetch(error) => write!(f, "Modrinth unavailable: {error}"),
+            Self::NoSource => f.write_str("没有可用的内容源"),
+            Self::Unavailable(message) => write!(f, "内容源不可用：{message}"),
+            Self::Invalid(message) => write!(f, "内容源的回答无法使用：{message}"),
         }
     }
 }
 
 impl Error for DiscoverError {}
-
-impl From<FetchError> for DiscoverError {
-    fn from(error: FetchError) -> Self {
-        Self::Fetch(error)
-    }
-}
-
-pub(super) fn decode<T: for<'de> Deserialize<'de>>(bytes: &[u8]) -> Result<T, DiscoverError> {
-    serde_json::from_slice(bytes).map_err(|error| DiscoverError::Decode(error.to_string()))
-}

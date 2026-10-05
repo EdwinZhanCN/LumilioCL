@@ -4310,6 +4310,7 @@ dependencies = [
  "lumilio-plugin-api",
  "lumilio-plugin-crash-analyzer",
  "lumilio-plugin-litematica",
+ "lumilio-plugin-modrinth",
  "lumilio-ui",
  "reqwest",
  "tempfile",

@@ -1,6 +1,6 @@
 use crate::activity_log::{ActiveTask, FinishedTask};
 use crate::content::ContentError;
-use crate::discover::{CategoryTag, GameVersionTag, LoaderTag, Project, Version};
+use crate::discover::{CategoryTag, GameVersionTag, KindAbilities, LoaderTag, Project, Version};
 use crate::instance::{Collection, InstanceRecord};
 use std::collections::BTreeSet;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -25,6 +25,10 @@ pub struct ActivityView {
 /// Filter choices for Discover.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct DiscoverFilters {
+    /// The content source these choices belong to.
+    pub source: String,
+    /// What that source can filter and sort by, per kind of project.
+    pub abilities: Vec<KindAbilities>,
     pub categories: Vec<CategoryTag>,
     pub game_versions: Vec<GameVersionTag>,
     /// Empty when Modrinth could not say; the page then falls back to the

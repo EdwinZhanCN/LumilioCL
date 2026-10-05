@@ -64,6 +64,9 @@ pub struct PluginHost {
     preferences: RwLock<Preferences>,
     /// UI state per (instance, plugin); owned by the host, not the plugins.
     tab_states: Mutex<BTreeMap<(String, String), lumilio_plugin_api::TabState>>,
+    /// Plugins that have answered as a content source, so that a stopped one
+    /// can be told apart from there being none.
+    content_ids: Mutex<std::collections::BTreeSet<String>>,
     timeout: Duration,
     network: Option<network::Network>,
 }
@@ -79,6 +82,7 @@ impl PluginHost {
                 revisions: BTreeMap::new(),
             }),
             tab_states: Mutex::new(BTreeMap::new()),
+            content_ids: Mutex::default(),
             timeout: CALL_TIMEOUT,
             network: None,
         }

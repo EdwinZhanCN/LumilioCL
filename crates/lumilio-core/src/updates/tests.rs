@@ -1,25 +1,54 @@
 use super::*;
-use crate::transfer::{FileTransport, TransportFuture, TransportResponse};
+use crate::discover::{ReleaseChannel, VersionFile};
+use crate::plugins::PluginHost;
+use crate::transfer::{
+    FileTransport, HttpRequest, OfficialSource, SourceChain, SourceProvider, TransportFuture,
+    TransportResponse,
+};
+use lumilio_plugin_modrinth::Modrinth;
 use std::fs;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 /// Answers the two update endpoints from canned JSON and records bodies.
+#[derive(Clone)]
 struct Api {
     identify: String,
     update: String,
-    bodies: Mutex<Vec<(String, String)>>,
+    bodies: Arc<Mutex<Vec<(String, String)>>>,
+}
+
+impl Api {
+    fn new(identify: impl Into<String>, update: impl Into<String>) -> Self {
+        Self {
+            identify: identify.into(),
+            update: update.into(),
+            bodies: Arc::default(),
+        }
+    }
+
+    /// The Modrinth source plugin, asking through this transport.
+    fn host(&self) -> PluginHost {
+        PluginHost::new(vec![Arc::new(Modrinth)], Default::default()).with_network(
+            self.clone(),
+            SourceChain::new([Arc::new(OfficialSource) as Arc<dyn SourceProvider>]).unwrap(),
+        )
+    }
+
+    fn bodies(&self) -> Vec<(String, String)> {
+        self.bodies.lock().unwrap().clone()
+    }
 }
 
 impl Transport for Api {
     fn get<'a>(&'a self, _: &'a str) -> TransportFuture<'a> {
         Box::pin(async { Ok(TransportResponse::from_bytes(404, Vec::new())) })
     }
-    fn post_json<'a>(&'a self, source: &'a str, body: Vec<u8>) -> TransportFuture<'a> {
-        self.bodies
-            .lock()
-            .unwrap()
-            .push((source.to_owned(), String::from_utf8(body).unwrap()));
-        let answer = if source.ends_with("/v2/version_files/update") {
+    fn send_no_redirect<'a>(&'a self, request: HttpRequest) -> TransportFuture<'a> {
+        self.bodies.lock().unwrap().push((
+            request.url.clone(),
+            String::from_utf8(request.body.unwrap_or_default()).unwrap(),
+        ));
+        let answer = if request.url.ends_with("/v2/version_files/update") {
             self.update.clone()
         } else {
             self.identify.clone()
@@ -81,12 +110,8 @@ async fn classifies_outdated_current_and_unknown_files() {
         version_json("v2", "outdated-2.jar", "u3", &sha1_of("new")),
         version_json("v9", "current.jar", "u2", &cur)
     );
-    let api = Api {
-        identify,
-        update,
-        bodies: Mutex::default(),
-    };
-    let client = ModrinthClient::new(api);
+    let host = Api::new(identify, update).host();
+    let client = host.content_client().await.unwrap();
     let report = check(&client, &s.game, ProjectKind::Mod, "1.21.1", Loader::Fabric)
         .await
         .unwrap();
@@ -102,16 +127,13 @@ async fn requests_carry_hashes_loader_and_game_version_but_never_disabled_files(
     let s = setup();
     fs::write(s.game.join("mods/a.jar"), "a").unwrap();
     fs::write(s.game.join("mods/b.jar.disabled"), "b").unwrap();
-    let api = Api {
-        identify: "{}".into(),
-        update: "{}".into(),
-        bodies: Mutex::default(),
-    };
-    let client = ModrinthClient::new(api);
+    let api = Api::new("{}", "{}");
+    let host = api.host();
+    let client = host.content_client().await.unwrap();
     check(&client, &s.game, ProjectKind::Mod, "1.21.1", Loader::Fabric)
         .await
         .unwrap();
-    let bodies = client_bodies(&client);
+    let bodies = api.bodies();
     let update_body: serde_json::Value = serde_json::from_str(
         &bodies
             .iter()
@@ -126,24 +148,47 @@ async fn requests_carry_hashes_loader_and_game_version_but_never_disabled_files(
     assert_eq!(update_body["algorithm"], "sha1");
 }
 
-fn client_bodies(client: &ModrinthClient<Api>) -> Vec<(String, String)> {
-    client.transport_for_tests().bodies.lock().unwrap().clone()
-}
-
 #[tokio::test]
 async fn an_empty_folder_makes_no_requests() {
     let s = setup();
-    let api = Api {
-        identify: "{}".into(),
-        update: "{}".into(),
-        bodies: Mutex::default(),
-    };
-    let client = ModrinthClient::new(api);
+    let api = Api::new("{}", "{}");
+    let host = api.host();
+    let client = host.content_client().await.unwrap();
     let report = check(&client, &s.game, ProjectKind::Mod, "1.21.1", Loader::Fabric)
         .await
         .unwrap();
     assert_eq!(report, UpdateReport::default());
-    assert!(client_bodies(&client).is_empty());
+    assert!(api.bodies().is_empty());
+}
+
+#[tokio::test]
+async fn a_stopped_source_fails_the_check_instead_of_reporting_everything_current() {
+    use lumilio_plugin_api::PluginState;
+    let s = setup();
+    fs::write(s.game.join("mods/a.jar"), "a").unwrap();
+    let api = Api::new("{}", "{}");
+    let host = api.host();
+    let client = host.content_client().await.unwrap();
+    host.set_state(
+        lumilio_plugin_modrinth::ID.into(),
+        PluginState {
+            enabled: Some(false),
+            ..Default::default()
+        },
+    );
+    let result = check(&client, &s.game, ProjectKind::Mod, "1.21.1", Loader::Fabric).await;
+    assert!(matches!(
+        result,
+        Err(UpdateError::Discover(DiscoverError::NoSource))
+    ));
+    assert!(
+        api.bodies().is_empty(),
+        "a disabled source gets no requests"
+    );
+    assert!(matches!(
+        host.content_client().await,
+        Err(DiscoverError::NoSource)
+    ));
 }
 
 fn update_for(server: &Path, new_name: &str, new_body: &str, old: &str) -> ContentUpdate {
@@ -151,10 +196,26 @@ fn update_for(server: &Path, new_name: &str, new_body: &str, old: &str) -> Conte
     let url = url::Url::from_file_path(server.join(new_name))
         .unwrap()
         .to_string();
-    let json = version_json("v2", new_name, &url, &sha1_of(new_body));
-    let latest = crate::discover::decode_versions(format!("[{json}]").as_bytes())
-        .unwrap()
-        .remove(0);
+    let latest = Version {
+        id: "v2".to_owned(),
+        project_id: "P".to_owned(),
+        name: String::new(),
+        number: "v2".to_owned(),
+        channel: ReleaseChannel::Release,
+        game_versions: vec!["1.21.1".to_owned()],
+        loaders: vec!["fabric".to_owned()],
+        published: "2024-01-01T00:00:00Z".to_owned(),
+        files: vec![VersionFile {
+            url,
+            filename: new_name.to_owned(),
+            primary: true,
+            size: 3,
+            sha1: Some(sha1_of(new_body)),
+        }],
+        dependencies: Vec::new(),
+        downloads: 0,
+        changelog: String::new(),
+    };
     ContentUpdate {
         kind: ProjectKind::Mod,
         file_name: old.to_owned(),

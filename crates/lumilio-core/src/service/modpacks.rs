@@ -241,12 +241,9 @@ impl<T: Transport + Clone> LauncherService<T> {
         cancel: CancellationToken,
     ) -> Result<InstanceRecord, ServiceError> {
         let chain = read_unless_cancelled(&cancel, self.chain()).await?;
-        let client = read_unless_cancelled(&cancel, self.modrinth()).await?;
+        let client = read_unless_cancelled(&cancel, self.content_client()).await?;
         let versions = read_unless_cancelled(&cancel, async {
-            client
-                .versions(project)
-                .await
-                .map_err(|error| ServiceError::Remote(error.to_string()))
+            client.versions(project).await.map_err(ServiceError::from)
         })
         .await?;
         let version = versions

@@ -8,7 +8,7 @@
 | [全局导航](navigation.md) | 7 |
 | [首页](home.md) | 9 |
 | [游戏库](library.md) | 21 |
-| [发现](discover.md) | 22 |
+| [发现](discover.md) | 23 |
 | [动态](activity.md) | 8 |
 | [账户](accounts.md) | 9 |
 | [设置](settings.md) | 34 |

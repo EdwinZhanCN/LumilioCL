@@ -134,6 +134,12 @@ pub fn decode_loaders(bytes: &[u8]) -> Result<Vec<LoaderTag>, PluginError> {
                     .iter()
                     .filter_map(|name| ProjectKind::from_protocol(name))
                     .collect(),
+                other_kinds: tag
+                    .supported_project_types
+                    .iter()
+                    .filter(|name| ProjectKind::from_protocol(name).is_none())
+                    .cloned()
+                    .collect(),
             })
         })
         .collect())

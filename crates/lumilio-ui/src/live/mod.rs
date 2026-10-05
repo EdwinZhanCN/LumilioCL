@@ -184,7 +184,8 @@ impl LiveModel {
     /// "Hide already installed" exists for packs (against the library) and
     /// inside a game (against that game).
     pub fn can_hide_installed(&self) -> bool {
-        self.query.kind == ProjectKind::Modpack || self.browsing_game().is_some()
+        (self.query.kind == ProjectKind::Modpack || self.browsing_game().is_some())
+            && self.filters.offers_hide_installed(self.query.kind)
     }
 
     /// Whether "hide already installed" is on for what the page shows: the

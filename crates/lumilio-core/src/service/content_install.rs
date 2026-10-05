@@ -52,12 +52,9 @@ impl<T: Transport + Clone> LauncherService<T> {
         cancel: CancellationToken,
     ) -> Result<String, ServiceError> {
         let chain = read_unless_cancelled(&cancel, self.chain()).await?;
-        let client = read_unless_cancelled(&cancel, self.modrinth()).await?;
+        let client = read_unless_cancelled(&cancel, self.content_client()).await?;
         let versions = read_unless_cancelled(&cancel, async {
-            client
-                .versions(project)
-                .await
-                .map_err(|error| ServiceError::Remote(error.to_string()))
+            client.versions(project).await.map_err(ServiceError::from)
         })
         .await?;
         let version = versions
@@ -100,7 +97,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         let list = self.content_details(instance_id, kind).await?;
         if list.sources_unavailable {
             return Err(ServiceError::Remote(
-                "Modrinth could not be asked which files are known".to_owned(),
+                "the content source could not be asked which files are known".to_owned(),
             ));
         }
         Ok(list
@@ -153,10 +150,8 @@ impl<T: Transport + Clone> LauncherService<T> {
             return Ok(DependencyReport::default());
         }
         let record = self.instance(instance_id).await?;
-        let client = self.modrinth().await?;
-        let remote =
-            |error: crate::discover::DiscoverError| ServiceError::Remote(error.to_string());
-        let versions = client.versions(project).await.map_err(remote)?;
+        let client = self.content_client().await?;
+        let versions = client.versions(project).await?;
         let root = match version_id {
             Some(id) => versions
                 .iter()
@@ -213,7 +208,7 @@ impl<T: Transport + Clone> LauncherService<T> {
                     if !have.insert(dependency_project.clone()) {
                         continue;
                     }
-                    let candidates = client.versions(&dependency_project).await.map_err(remote)?;
+                    let candidates = client.versions(&dependency_project).await?;
                     let chosen = resolve(dependency, &candidates);
                     if let Some(chosen) = &chosen {
                         next.push(chosen.clone());
@@ -317,12 +312,9 @@ impl<T: Transport + Clone> LauncherService<T> {
         cancel: CancellationToken,
     ) -> Result<String, ServiceError> {
         let chain = read_unless_cancelled(&cancel, self.chain()).await?;
-        let client = read_unless_cancelled(&cancel, self.modrinth()).await?;
+        let client = read_unless_cancelled(&cancel, self.content_client()).await?;
         let versions = read_unless_cancelled(&cancel, async {
-            client
-                .versions(project)
-                .await
-                .map_err(|error| ServiceError::Remote(error.to_string()))
+            client.versions(project).await.map_err(ServiceError::from)
         })
         .await?;
         let version = match version_id {
@@ -432,12 +424,9 @@ impl<T: Transport + Clone> LauncherService<T> {
         cancel: CancellationToken,
     ) -> Result<String, ServiceError> {
         let chain = read_unless_cancelled(&cancel, self.chain()).await?;
-        let client = read_unless_cancelled(&cancel, self.modrinth()).await?;
+        let client = read_unless_cancelled(&cancel, self.content_client()).await?;
         let versions = read_unless_cancelled(&cancel, async {
-            client
-                .versions(project)
-                .await
-                .map_err(|error| ServiceError::Remote(error.to_string()))
+            client.versions(project).await.map_err(ServiceError::from)
         })
         .await?;
         let version = versions
