@@ -1,6 +1,6 @@
 # Litematica 投影的 3D 预览
 
-- Status: proposed
+- Status: in_progress
 
 ## Goal
 
@@ -66,3 +66,16 @@
 - `Model` 在没有 `client.jar` 时，是占位渲染，还是干脆不显示预览？（V4 后定）
 - webview 的 JS 资源放在 `lumilio-ui/assets/` 里随二进制打包，还是首次使用时下载？倾向打包（离线可用），但 UMD + WASM 体积由 V3 决定。
 - 弹窗叠层不可解时的退路是否可接受，由维护者在 V2 后裁决。
+
+## 实施记录
+
+### 2026-10-04 — V1/V2 结论（只读源码，未运行）
+
+- 来源：`gpui-wry-0.7.0` 的 README 与 `src/lib.rs`（全文 247 行）。
+- V1：维护者已在本机测过能跑，本计划采信；我没有重复。依赖锁定 `gpui-pre =0.3.7`、`lb-wry 0.53.3`，与当前工作区一致。
+- V2（源码结论，非实测）：README 明说「WebView 渲染在 GPUI 窗口之上，webview 范围内的 GPUI 元素都会被盖住」，并建议放进单独窗口或弹出层。实现上它是原生子视图，每帧在 prepaint 里 `set_bounds`，不受 GPUI 的裁剪和层级约束。对实例页意味着：
+  - 页面滚动时，webview 会滚到顶部标题栏、底部导航岛和浮动工具条的上面；
+  - 确认弹窗、toast、菜单都盖不住它；
+  - 唯一的缓解是弹窗时 `hide()`，但滚动穿透导航岛的问题没有简单办法。
+- V6（部分）：README 写明「目前只支持 macOS 和 Windows」，没有 Linux。CI 只跑 macOS（`ci.yml`），所以现状不受影响，但 Linux 将没有 3D 预览，需要降级。
+- 由此提出调整（待维护者裁决）：不把 webview 嵌进会滚动的实例页，而是「打开 3D 预览」时开一个**单独窗口**（`gpui_kit::open_window`），窗口里整片都是 webview。这样没有叠层、滚动、弹窗问题，可以放大、可以自由缩放。`View::Model` 在页面里渲染成一块带「3D 预览」键的占位卡片。代价：预览不在页面内联，且仍然只有 macOS / Windows。
