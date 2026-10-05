@@ -231,3 +231,40 @@ fn turning_the_plugin_off_removes_its_tab_and_leaves_an_open_one(cx: &mut TestAp
     view.update(cx, |view, cx| view.plugin_tabs_arrived(vec![tab()], cx));
     view.update(cx, |view, _| assert_eq!(view.tab_labels().len(), 7));
 }
+
+#[gpui::test]
+fn a_long_table_scrolls_inside_a_capped_box_and_the_keys_stay_on_top(cx: &mut TestAppContext) {
+    let seen: Rc<RefCell<Vec<InstanceIntent>>> = Rc::default();
+    let (view, cx) = open(seen.clone(), cx);
+    cx.update(|window, cx| view.update(cx, |view, cx| view.open_shown(4, window, cx)));
+    view.update(cx, |view, cx| {
+        view.plugin_view_arrived(
+            PLUGIN.into(),
+            shown(View::Detail {
+                title: "大投影".into(),
+                subtitle: None,
+                image: None,
+                facts: Vec::new(),
+                children: vec![
+                    View::Table {
+                        columns: vec!["方块".into(), "数量".into()],
+                        rows: (0..400)
+                            .map(|n| vec![format!("minecraft:block_{n}"), n.to_string()])
+                            .collect(),
+                    },
+                    // Listed after the table, shown before it.
+                    key("export", false),
+                ],
+            }),
+            cx,
+        );
+    });
+    cx.run_until_parked();
+    let table = cx.debug_bounds("plugin-table-0").expect("table");
+    assert!(
+        table.size.height <= gpui::px(360.) + gpui::px(1.),
+        "{table:?}"
+    );
+    let key = cx.debug_bounds("plugin-key-export").expect("key");
+    assert!(key.origin.y < table.origin.y, "the key is above the table");
+}

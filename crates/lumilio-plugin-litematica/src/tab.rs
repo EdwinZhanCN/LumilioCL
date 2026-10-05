@@ -20,6 +20,21 @@ fn file_name(path: &str) -> &str {
     path.rsplit('/').next().unwrap_or(path)
 }
 
+/// The file's name without its extension: what people know a schematic by,
+/// in the game's menus and in their own folders.
+fn stem(path: &str) -> &str {
+    let name = file_name(path);
+    name.get(..name.len().saturating_sub(".litematic".len()))
+        .filter(|_| is_schematic(name))
+        .unwrap_or(name)
+}
+
+/// Folders between `schematics/` and the file, if any.
+fn folder(path: &str) -> Option<String> {
+    let inner = path.strip_prefix(FOLDER)?.trim_start_matches('/');
+    inner.rsplit_once('/').map(|(dir, _)| dir.to_owned())
+}
+
 fn open_path(state: &TabState) -> Option<&str> {
     state.get("open").and_then(serde_json::Value::as_str)
 }
@@ -50,7 +65,8 @@ fn list(ctx: &dyn HostContext) -> Result<View, PluginError> {
     for path in files.iter().take(MAX_ITEMS) {
         let mut item = ListItem {
             id: path.clone(),
-            title: file_name(path).to_owned(),
+            title: stem(path).to_owned(),
+            tags: folder(path).into_iter().collect(),
             ..ListItem::default()
         };
         if started.elapsed() > READ_BUDGET {
@@ -59,9 +75,6 @@ fn list(ctx: &dyn HostContext) -> Result<View, PluginError> {
             match read(ctx, path) {
                 Ok(file) => {
                     let meta = &file.metadata;
-                    if let Some(name) = &meta.name {
-                        item.title.clone_from(name);
-                    }
                     item.subtitle = Some(summary(meta, path));
                     item.value = meta.total_blocks.map(|total| format!("{total} 个方块"));
                     item.image = meta.preview.as_ref().map(|(side, rgba)| ImageData {
@@ -111,7 +124,7 @@ fn detail(ctx: &dyn HostContext, path: &str) -> Result<View, PluginError> {
         Ok(file) => file,
         Err(_) => {
             return Ok(View::Section {
-                title: file_name(path).to_owned(),
+                title: stem(path).to_owned(),
                 children: vec![
                     View::Empty {
                         title: "读不了".into(),
@@ -129,6 +142,7 @@ fn detail(ctx: &dyn HostContext, path: &str) -> Result<View, PluginError> {
             facts.push((label.to_owned(), value));
         }
     };
+    fact("投影名称", meta.name.clone());
     fact("作者", meta.author.clone());
     fact(
         "尺寸",
@@ -190,11 +204,8 @@ fn detail(ctx: &dyn HostContext, path: &str) -> Result<View, PluginError> {
         back,
     ]);
     Ok(View::Detail {
-        title: meta
-            .name
-            .clone()
-            .unwrap_or_else(|| file_name(path).to_owned()),
-        subtitle: None,
+        title: stem(path).to_owned(),
+        subtitle: folder(path),
         image: meta.preview.as_ref().map(|(side, rgba)| ImageData {
             width: *side,
             height: *side,

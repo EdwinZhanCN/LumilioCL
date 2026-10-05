@@ -175,11 +175,14 @@ fn the_list_shows_metadata_and_marks_broken_files_without_failing() {
     };
     assert_eq!(items.len(), 2);
     let broken = &items[0];
-    assert_eq!(broken.title, "broken.litematic");
+    assert_eq!(broken.title, "broken");
     assert_eq!(broken.subtitle.as_deref(), Some("读不了"));
     assert!(broken.open.is_none());
     let house = &items[1];
-    assert_eq!(house.title, "House");
+    assert_eq!(
+        house.title, "house",
+        "the file name, not the schematic's own name"
+    );
     assert_eq!(house.subtitle.as_deref(), Some("Alex · 2×1×1"));
     assert_eq!(house.value.as_deref(), Some("2 个方块"));
     assert_eq!(
@@ -225,7 +228,8 @@ fn detail_has_facts_a_descending_material_table_and_actions() {
     else {
         panic!("detail");
     };
-    assert_eq!(title, "House");
+    assert_eq!(title, "house");
+    assert!(facts.contains(&("投影名称".to_owned(), "House".to_owned())));
     assert!(facts.contains(&("尺寸".to_owned(), "2 × 2 × 1".to_owned())));
     assert!(facts.contains(&("修改时间".to_owned(), "2023-11-14 22:13".to_owned())));
     let View::Section {
@@ -312,4 +316,17 @@ fn dates_are_formatted_in_utc() {
         crate::tab::date_for_tests(1_700_000_000_000),
         "2023-11-14 22:13"
     );
+}
+
+#[test]
+fn subfolders_show_as_a_tag_and_unnamed_schematics_keep_their_file_name() {
+    let ctx = files(vec![(
+        "farms/iron.litematic",
+        litematic("Unnamed", (1, 1, 1), &["minecraft:stone"], &[0]),
+    )]);
+    let View::List { items } = Litematica.view(&ctx, &TabState::Null).unwrap() else {
+        panic!("list");
+    };
+    assert_eq!(items[0].title, "iron");
+    assert_eq!(items[0].tags, ["farms"]);
 }

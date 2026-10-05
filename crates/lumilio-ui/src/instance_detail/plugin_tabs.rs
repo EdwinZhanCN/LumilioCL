@@ -15,7 +15,7 @@ use crate::kit;
 use crate::kit::TagKind;
 use crate::theme::{self, ShellColors};
 use gpui::prelude::*;
-use gpui::{AnyElement, App, Context, ObjectFit, RenderImage, Window, div, img, px};
+use gpui::{AnyElement, App, Context, ObjectFit, RenderImage, ScrollHandle, Window, div, img, px};
 use gpui_component::{StyledExt as _, WindowExt as _, h_flex, v_flex};
 use lumilio_core::PluginTab;
 use lumilio_plugin_api::{ActionId, ImageData, KeyKind, ListItem, Tone, View};
@@ -25,10 +25,13 @@ use lumilio_plugin_api::{ActionId, ImageData, KeyKind, ListItem, Tone, View};
 const PLUGIN_TABS_AT: usize = TAB_SCREENSHOTS + 1;
 const THUMB: f32 = 56.;
 const COVER: f32 = 120.;
+/// A table taller than this scrolls inside the page instead of stretching it.
+const TABLE_MAX_HEIGHT: f32 = 360.;
 
 /// What a plugin tab currently has to show.
 pub(super) enum PluginPage {
-    Shown(View, Vec<Option<Arc<RenderImage>>>),
+    /// The view, its images and one scroll handle per table, in tree order.
+    Shown(View, Vec<Option<Arc<RenderImage>>>, Vec<ScrollHandle>),
     /// The plugin was switched off or failed while the page was open.
     Unavailable,
     Failed(String),
@@ -62,7 +65,10 @@ impl InstanceDetailView {
                     collect_images(&view, &mut images);
                     images.into_iter().map(render_image).collect()
                 };
-                PluginPage::Shown(view, rendered)
+                let scrolls = (0..count_tables(&view))
+                    .map(|_| ScrollHandle::new())
+                    .collect();
+                PluginPage::Shown(view, rendered, scrolls)
             }
             Ok(None) => PluginPage::Unavailable,
             Err(detail) => PluginPage::Failed(detail),
@@ -162,10 +168,12 @@ impl InstanceDetailView {
                         .child(kit::technical("plugin-technical", detail.clone())),
                 )
                 .into_any_element(),
-            Some(PluginPage::Shown(view, images)) => {
+            Some(PluginPage::Shown(view, images, scrolls)) => {
                 let mut paint = Paint {
                     plugin,
                     images,
+                    scrolls,
+                    next_table: 0,
                     next_image: 0,
                     next_id: 0,
                     colors,
@@ -229,6 +237,16 @@ fn collect_images<'a>(view: &'a View, out: &mut Vec<&'a ImageData>) {
     }
 }
 
+fn count_tables(view: &View) -> usize {
+    match view {
+        View::Table { .. } => 1,
+        View::Section { children, .. } | View::Detail { children, .. } => {
+            children.iter().map(count_tables).sum()
+        }
+        _ => 0,
+    }
+}
+
 /// RGBA pixels from a plugin as the BGRA bitmap GPUI uploads; a malformed
 /// image is left out rather than trusted.
 fn render_image(data: &ImageData) -> Option<Arc<RenderImage>> {
@@ -246,6 +264,8 @@ fn render_image(data: &ImageData) -> Option<Arc<RenderImage>> {
 struct Paint<'a> {
     plugin: &'a str,
     images: &'a [Option<Arc<RenderImage>>],
+    scrolls: &'a [ScrollHandle],
+    next_table: usize,
     next_image: usize,
     next_id: usize,
     colors: ShellColors,
@@ -324,15 +344,12 @@ impl Paint<'_> {
                         .into_any_element()
                     })
                     .collect();
-                let mut column = v_flex().w_full().gap_4().child(head);
-                if !rows.is_empty() {
-                    column = column.child(kit::list(rows, colors));
-                }
-                // Keys sit together at the end, whatever order the tree has them.
+                // Keys sit right under the title, whatever order the tree has
+                // them in: a long table must not push them out of reach.
                 let (keys, others): (Vec<&View>, Vec<&View>) = children
                     .iter()
                     .partition(|child| matches!(child, View::Key { .. }));
-                column = column.children(others.into_iter().map(|child| self.view(child, cx)));
+                let mut column = v_flex().w_full().gap_4().child(head);
                 if !keys.is_empty() {
                     column = column.child(
                         h_flex()
@@ -341,6 +358,10 @@ impl Paint<'_> {
                             .children(keys.into_iter().map(|key| self.view(key, cx))),
                     );
                 }
+                if !rows.is_empty() {
+                    column = column.child(kit::list(rows, colors));
+                }
+                column = column.children(others.into_iter().map(|child| self.view(child, cx)));
                 column.into_any_element()
             }
             View::Table { columns, rows } => {
@@ -366,9 +387,30 @@ impl Paint<'_> {
                             .into_any_element()
                         }))
                 };
-                let mut lines = vec![line(columns, true).into_any_element()];
-                lines.extend(rows.iter().map(|row| line(row, false).into_any_element()));
-                kit::list(lines, colors).into_any_element()
+                let table = self.next_table;
+                self.next_table += 1;
+                let scroll = self.scrolls.get(table).cloned().unwrap_or_default();
+                // The head stays put; only the rows scroll, and the wheel
+                // stays with them while they can move (as the game log does).
+                let body = div()
+                    .id(("plugin-table", table))
+                    .debug_selector(move || format!("plugin-table-{table}"))
+                    .w_full()
+                    .max_h(px(TABLE_MAX_HEIGHT))
+                    .overflow_y_scroll()
+                    .track_scroll(&scroll)
+                    .children(rows.iter().map(|row| {
+                        div()
+                            .w_full()
+                            .border_b_1()
+                            .border_color(colors.border)
+                            .child(line(row, false))
+                    }));
+                v_flex()
+                    .w_full()
+                    .child(kit::list(vec![line(columns, true)], colors))
+                    .child(kit::keep_wheel(body, &scroll))
+                    .into_any_element()
             }
             View::Empty { title, message } => {
                 kit::empty(title.clone(), message.clone(), colors).into_any_element()
