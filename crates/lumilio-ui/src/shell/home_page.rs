@@ -2,7 +2,7 @@ use super::{LauncherShell, ShellIntent};
 use crate::home::{HomeIntent, HomePresentation, ShellHomeColors};
 use crate::live::LiveIntent;
 use crate::route::Route;
-use crate::{home, theme};
+use crate::{home, pages, theme};
 use gpui::prelude::*;
 use gpui::{AnyElement, Context, Window, div, px};
 use gpui_component::v_flex;
@@ -84,8 +84,8 @@ impl LauncherShell {
         &self,
         colors: ShellHomeColors,
         home_handler: Option<home::HomeIntentHandler>,
+        live: Option<&pages::live::LiveCtx>,
         window: &Window,
-        _cx: &mut Context<Self>,
     ) -> AnyElement {
         let hero = self.hero.clone();
         let on_continue_hover: home::HoverHandler = Rc::new(move |hovered, _, cx| {
@@ -101,8 +101,9 @@ impl LauncherShell {
         );
         let links = self.home_links();
         let has_attention = !links.attention.is_empty() && self.home.recent_is_instances();
-        let body = (self.home.has_body() || has_attention)
-            .then(|| home::render_body(&self.home, home_handler, &links, colors));
+        let sections = live.and_then(|ctx| pages::live::home_sections(ctx, &self.home));
+        let body = (self.home.has_body() || has_attention || sections.is_some())
+            .then(|| home::render_body(&self.home, home_handler, &links, colors, sections));
 
         div()
             .id("home-scroll")

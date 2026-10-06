@@ -39,21 +39,36 @@ const AFTER_LAUNCH: [&str; 2] = ["保持", "隐藏启动器"];
 const MOTION: [&str; 3] = ["跟随系统", "减少", "完整"];
 const FULLSCREEN: [&str; 3] = ["关", "开", "不设置"];
 
+/// The 插件 tab: its list and its detail scroll on their own.
+const PLUGINS_TAB: usize = 5;
+
+/// The page is an app shell: the header and tabs stay put and only the body
+/// below them scrolls. The 插件 tab owns its scrolling instead (master–detail).
 pub fn render(ctx: &LiveCtx) -> impl IntoElement {
     let colors = ctx.colors;
     let tab = ctx.state.choice(TAB_GROUP, 0).min(TABS.len() - 1);
     let body = match &ctx.model.settings {
-        None => kit::empty("正在读取设置…", "", colors).into_any_element(),
-        Some(view) => match tab {
-            0 => general(view, ctx),
-            1 => game_defaults(view, ctx),
-            2 => java(view, ctx),
-            3 => downloads(view, ctx),
-            5 => plugins::render(view, ctx),
-            _ => about(view, ctx),
-        },
+        None => kit::scroll_body("settings-scroll", kit::empty("正在读取设置…", "", colors))
+            .into_any_element(),
+        Some(view) if tab == PLUGINS_TAB => {
+            kit::pane_body(plugins::render(view, ctx)).into_any_element()
+        }
+        Some(view) => {
+            let content = match tab {
+                0 => general(view, ctx),
+                1 => game_defaults(view, ctx),
+                2 => java(view, ctx),
+                3 => downloads(view, ctx),
+                _ => about(view, ctx),
+            };
+            kit::scroll_body(
+                "settings-scroll",
+                kit::entrance(content, ("settings-body", tab)),
+            )
+            .into_any_element()
+        }
     };
-    v_flex()
+    let head = v_flex()
         .w_full()
         .gap_5()
         .child(kit::header(
@@ -73,6 +88,6 @@ pub fn render(ctx: &LiveCtx) -> impl IntoElement {
                 .into_any_element(),
             ),
             None,
-        ))
-        .child(kit::entrance(body, ("settings-body", tab)))
+        ));
+    kit::fixed_page("live-settings", head, body)
 }

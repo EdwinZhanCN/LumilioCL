@@ -176,6 +176,7 @@ fn home_lists_what_needs_attention_with_one_remedy_and_recent_games_open(cx: &mu
         shell.set_home(
             HomePresentation::Continue {
                 subject: Subject {
+                    id: None,
                     title: "生存".into(),
                     metadata: "1.21.1 · Fabric".into(),
                     world: WorldHint::Underground,
@@ -216,4 +217,145 @@ fn home_lists_what_needs_attention_with_one_remedy_and_recent_games_open(cx: &mu
         seen.borrow().last(),
         Some(&LiveIntent::OpenInstance("sky".into()))
     );
+}
+
+fn game(id: &str) -> lumilio_core::InstanceRecord {
+    lumilio_core::InstanceRecord {
+        id: id.to_owned(),
+        name: id.to_uppercase(),
+        game_version: "1.21.1".to_owned(),
+        loader: lumilio_core::Loader::Fabric,
+        loader_version: None,
+        favorite: false,
+        created_at: 1,
+        last_played: Some(1),
+        play_seconds: 0,
+        installed: true,
+        settings: lumilio_core::InstanceSettings::default(),
+        source_project: None,
+    }
+}
+
+fn places_of(instance: &str) -> crate::live::HomePlaces {
+    use crate::live::{HomePlaces, Place, PlaceTarget};
+    HomePlaces {
+        instance: instance.to_owned(),
+        places: vec![Place {
+            target: PlaceTarget::World("New World".into()),
+            name: "新的世界".into(),
+            detail: "世界 · 上次游玩 昨天".into(),
+        }],
+        play_seconds: 7200,
+        worlds: 1,
+        servers: 0,
+    }
+}
+
+/// Under the world: the continued game's worlds go straight in, its record
+/// sits on a display, and the recent games are the Library's faceplates.
+#[gpui::test]
+fn home_enters_a_world_and_shows_recent_games_as_library_cards(cx: &mut TestAppContext) {
+    use crate::live::{LiveIntent, PlaceTarget, library_card};
+
+    cx.update(gpui_component::init);
+    let seen: Rc<RefCell<Vec<LiveIntent>>> = Rc::default();
+    let sink = seen.clone();
+    let (shell, cx) = cx.add_window_view(|_, cx| {
+        LauncherShell::new(cx).with_live(Rc::new(move |intent, _, _| {
+            sink.borrow_mut().push(intent);
+        }))
+    });
+    let home = HomePresentation::Continue {
+        subject: Subject {
+            id: Some("survival".into()),
+            title: "生存".into(),
+            metadata: "1.21.1 · Fabric".into(),
+            world: WorldHint::Overworld,
+        },
+        recent: vec![RecentEntry {
+            id: Some("sky".into()),
+            title: "空岛".into(),
+            metadata: "昨天".into(),
+        }],
+    };
+    shell.update(cx, |shell, cx| {
+        shell.set_home(home.clone(), cx);
+        shell.update_live(
+            |model| {
+                model.library = vec![
+                    library_card(&game("survival"), 10),
+                    library_card(&game("sky"), 10),
+                ];
+                model.home_places = Some(places_of("survival"));
+            },
+            cx,
+        );
+    });
+    settle(cx);
+
+    assert!(
+        cx.debug_bounds("home-record").is_some(),
+        "the record is drawn"
+    );
+    let enter = cx
+        .debug_bounds("home-place-enter-0")
+        .expect("a world to enter");
+    cx.simulate_click(enter.center(), Modifiers::none());
+    assert_eq!(
+        seen.borrow().last(),
+        Some(&LiveIntent::PlayPlace(
+            "survival".into(),
+            PlaceTarget::World("New World".into())
+        ))
+    );
+    assert!(
+        cx.debug_bounds("live-card-more-0").is_some(),
+        "a recent game is the Library's faceplate"
+    );
+    let card = cx.debug_bounds("home-recent-0").expect("recent card");
+    cx.simulate_click(card.center(), Modifiers::none());
+    assert_eq!(
+        seen.borrow().last(),
+        Some(&LiveIntent::OpenInstance("sky".into()))
+    );
+
+    // While a game is on its way nothing else starts from here.
+    shell.update(cx, |shell, cx| {
+        shell.set_home(home.clone().begin_launch(), cx)
+    });
+    settle(cx);
+    let count = seen.borrow().len();
+    let enter = cx.debug_bounds("home-place-enter-0").expect("still listed");
+    cx.simulate_click(enter.center(), Modifiers::none());
+    assert_eq!(seen.borrow().len(), count, "a disabled key sends nothing");
+
+    // Another game's worlds never sit under this one.
+    shell.update(cx, |shell, cx| {
+        shell.set_home(home.clone(), cx);
+        shell.update_live(|model| model.home_places = Some(places_of("sky")), cx);
+    });
+    settle(cx);
+    assert!(cx.debug_bounds("home-place-enter-0").is_none());
+    assert!(cx.debug_bounds("home-record").is_none());
+
+    // A new game with no worlds yet still shows its record and says where
+    // its worlds will appear.
+    shell.update(cx, |shell, cx| {
+        shell.update_live(
+            |model| {
+                model.home_places = Some(crate::live::HomePlaces {
+                    places: Vec::new(),
+                    play_seconds: 0,
+                    worlds: 0,
+                    servers: 0,
+                    ..places_of("survival")
+                })
+            },
+            cx,
+        );
+    });
+    settle(cx);
+    assert!(cx.debug_bounds("home-places-empty").is_some());
+    assert!(cx.debug_bounds("home-record").is_some());
+    assert!(cx.debug_bounds("home-place-enter-0").is_none());
 }

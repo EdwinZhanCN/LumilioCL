@@ -27,6 +27,42 @@ pub fn page(id: &'static str, content: impl IntoElement) -> impl IntoElement {
         )
 }
 
+/// The app-shell page frame: `head` (header and tabs) stays put and only
+/// `body` moves. The body brings its own scrolling: [`scroll_body`] for a
+/// plain tab, or panes that each scroll for a master–detail tab.
+pub fn fixed_page(
+    id: &'static str,
+    head: impl IntoElement,
+    body: impl IntoElement,
+) -> impl IntoElement {
+    v_flex().id(id).size_full().child(
+        theme::content_column()
+            .mx_auto()
+            .h_full()
+            .min_h_0()
+            .gap_5()
+            .pt(TITLE_BAR_HEIGHT + px(12.))
+            .child(head)
+            .child(body),
+    )
+}
+
+/// The region under a fixed head that scrolls, with room at the end to
+/// clear the floating capsule.
+pub fn scroll_body(id: &'static str, content: impl IntoElement) -> impl IntoElement {
+    div()
+        .id(id)
+        .flex_1()
+        .min_h_0()
+        .overflow_y_scroll()
+        .child(div().w_full().pb(theme::BOTTOM_SAFE_AREA).child(content))
+}
+
+/// The region under a fixed head whose panes scroll on their own.
+pub fn pane_body(content: impl IntoElement) -> impl IntoElement {
+    div().flex_1().min_h_0().overflow_hidden().child(content)
+}
+
 /// Keeps the wheel inside a list that scrolls within a page. Gpui gives a
 /// wheel event to every scrollable under the pointer, so without this the
 /// page moves along with the list. A list that fits has nothing to scroll and

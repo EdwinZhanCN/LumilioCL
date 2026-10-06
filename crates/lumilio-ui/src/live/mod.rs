@@ -31,7 +31,9 @@ pub use self::discover::{
     is_type_exclusion, page_items, parse_rfc3339, search_row, search_rows, section_title, sections,
     sort_label, tag_label, visible_kinds,
 };
-pub use self::home::home_presentation;
+pub use self::home::{
+    HomePlaces, PLACE_SERVERS, PLACE_WORLDS, Place, PlaceTarget, home_places, home_presentation,
+};
 pub use self::intent::{LiveHandler, LiveIntent};
 pub use self::library::{
     CollectionRow, LibraryCard, attention_rows, cover_loader, instance_meta, library_card,
@@ -50,6 +52,8 @@ pub struct LiveModel {
     pub collections: Vec<CollectionRow>,
     /// Games with something wrong, for Home.
     pub attention: Vec<crate::home::AttentionRow>,
+    /// Worlds and servers of the game Home continues, and its record.
+    pub home_places: Option<HomePlaces>,
     pub library_loaded: bool,
     pub results: Vec<SearchRow>,
     pub search: SearchStatus,
@@ -81,6 +85,7 @@ impl Default for LiveModel {
             library: Vec::new(),
             collections: Vec::new(),
             attention: Vec::new(),
+            home_places: None,
             library_loaded: false,
             results: Vec::new(),
             search: SearchStatus::Idle,

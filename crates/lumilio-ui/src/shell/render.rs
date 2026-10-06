@@ -76,8 +76,8 @@ impl Render for LauncherShell {
             Rc::new(move |change, window: &mut Window, app: &mut App| {
                 change_callback(&change, window, app)
             });
-        let live_page = match (&self.live, &self.live_controls, &self.live_handler) {
-            (Some(model), Some(controls), Some(handler)) if self.route != Route::Home => {
+        let live_ctx = match (&self.live, &self.live_controls, &self.live_handler) {
+            (Some(model), Some(controls), Some(handler)) => {
                 let filter = controls
                     .read(cx)
                     .library_filter
@@ -90,7 +90,7 @@ impl Render for LauncherShell {
                     .read(cx)
                     .value()
                     .to_string();
-                let ctx = pages::live::LiveCtx {
+                Some(pages::live::LiveCtx {
                     colors,
                     model,
                     state: &self.view,
@@ -100,8 +100,15 @@ impl Render for LauncherShell {
                     controls: controls.read(cx),
                     filter,
                     version_filter,
-                };
-                Some(match (self.route, &self.detail) {
+                })
+            }
+            _ => None,
+        };
+        let live_page = live_ctx
+            .as_ref()
+            .filter(|_| self.route != Route::Home)
+            .map(|ctx| {
+                match (self.route, &self.detail) {
                     (Route::Discover, Some(slot)) => slot.view.clone().into_any_element(),
                     (Route::Library, _) => {
                         let handler = ctx.handler.clone();
@@ -112,30 +119,27 @@ impl Render for LauncherShell {
                             .on_drop::<gpui::ExternalPaths>(move |paths, window, cx| {
                                 handler(LiveIntent::DropFiles(paths.paths().to_vec()), window, cx)
                             })
-                            .child(kit::page("live-library", pages::live::library(&ctx)))
+                            .child(kit::page("live-library", pages::live::library(ctx)))
                             .into_any_element()
                     }
-                    (Route::Settings, _) => {
-                        kit::page("live-settings", pages::settings::render(&ctx)).into_any_element()
-                    }
+                    // Settings frames itself: its header and tabs stay put.
+                    (Route::Settings, _) => pages::settings::render(ctx).into_any_element(),
                     (Route::Accounts, _) => {
-                        kit::page("live-accounts", pages::live::accounts(&ctx)).into_any_element()
+                        kit::page("live-accounts", pages::live::accounts(ctx)).into_any_element()
                     }
                     (Route::Discover, None) => {
-                        kit::page("live-discover", pages::live::discover(&ctx)).into_any_element()
+                        kit::page("live-discover", pages::live::discover(ctx)).into_any_element()
                     }
-                    _ => kit::page("live-activity", pages::live::activity(&ctx)).into_any_element(),
-                })
-            }
-            _ => None,
-        };
+                    _ => kit::page("live-activity", pages::live::activity(ctx)).into_any_element(),
+                }
+            });
 
         let body = if let Some(view) = &self.live_instance {
             view.clone().into_any_element()
         } else if let Some(page) = live_page {
             page
         } else if self.route == Route::Home {
-            self.render_home(home_colors, home_handler, window, cx)
+            self.render_home(home_colors, home_handler, live_ctx.as_ref(), window)
         } else {
             v_flex()
                 .size_full()

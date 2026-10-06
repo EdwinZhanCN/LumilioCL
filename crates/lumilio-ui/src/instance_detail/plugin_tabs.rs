@@ -16,7 +16,8 @@ use crate::kit::TagKind;
 use crate::theme::{self, ShellColors};
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, App, Context, Entity, ObjectFit, RenderImage, ScrollHandle, Window, div, img, px,
+    AnyElement, App, Context, Entity, ObjectFit, RenderImage, ScrollHandle, SharedString, Window,
+    div, img, px,
 };
 use gpui_component::{StyledExt as _, WindowExt as _, h_flex, v_flex};
 use lumilio_core::PluginTab;
@@ -25,6 +26,8 @@ use lumilio_plugin_api::{ActionId, ImageData, KeyKind, ListItem, Tone, View};
 /// Plugin tabs sit right after the built-in 截图 tab, so built-in positions
 /// never change.
 const PLUGIN_TABS_AT: usize = TAB_SCREENSHOTS + 1;
+/// The one tab that holds every plugin's tab, so the bar keeps its length.
+const PLUGIN_TAB_LABEL: &str = "插件";
 const THUMB: f32 = 56.;
 const COVER: f32 = 120.;
 /// A table taller than this scrolls inside the page instead of stretching it.
@@ -143,14 +146,22 @@ impl InstanceDetailView {
         }
     }
 
-    /// The labels of the tab bar: the built-in tabs with the plugin tabs
-    /// inserted after 截图.
+    /// Whether the tab bar carries the single 插件 tab.
+    fn has_plugin_tab(&self) -> bool {
+        !self.plugin_tabs.is_empty()
+    }
+
+    /// The labels of the tab bar: the built-in tabs, with one 插件 tab after
+    /// 截图 while any plugin contributes one. The plugins themselves live in
+    /// that tab's list, so the bar never grows with them.
     pub(super) fn tab_labels(&self) -> Vec<String> {
         let mut labels: Vec<String> = TABS[..PLUGIN_TABS_AT]
             .iter()
             .map(|label| (*label).to_owned())
             .collect();
-        labels.extend(self.plugin_tabs.iter().map(|tab| tab.title.clone()));
+        if self.has_plugin_tab() {
+            labels.push(PLUGIN_TAB_LABEL.to_owned());
+        }
         labels.extend(
             TABS[PLUGIN_TABS_AT..]
                 .iter()
@@ -161,27 +172,32 @@ impl InstanceDetailView {
 
     /// The position of the open tab in [`Self::tab_labels`].
     pub(super) fn shown_tab(&self) -> usize {
-        let open = self
-            .plugin_open
-            .as_ref()
-            .and_then(|open| self.plugin_tabs.iter().position(|tab| &tab.plugin == open));
-        match open {
-            Some(index) => PLUGIN_TABS_AT + index,
-            None if self.tab < PLUGIN_TABS_AT => self.tab,
-            None => self.tab + self.plugin_tabs.len(),
+        if self.plugin_open.is_some() && self.has_plugin_tab() {
+            return PLUGIN_TABS_AT;
+        }
+        if self.tab < PLUGIN_TABS_AT || !self.has_plugin_tab() {
+            self.tab
+        } else {
+            self.tab + 1
         }
     }
 
-    /// A click on the tab bar, which counts plugin tabs too.
+    /// A click on the tab bar. Selecting 插件 opens its list; which plugin is
+    /// shown is chosen there, not on the bar.
     pub(super) fn open_shown(&mut self, shown: usize, window: &mut Window, cx: &mut Context<Self>) {
-        let count = self.plugin_tabs.len();
-        if (PLUGIN_TABS_AT..PLUGIN_TABS_AT + count).contains(&shown) {
-            let plugin = self.plugin_tabs[shown - PLUGIN_TABS_AT].plugin.clone();
-            self.open_plugin(plugin, window, cx);
-        } else if shown < PLUGIN_TABS_AT {
+        if self.has_plugin_tab() && shown == PLUGIN_TABS_AT {
+            let plugin = self
+                .plugin_open
+                .clone()
+                .filter(|open| self.plugin_tabs.iter().any(|tab| &tab.plugin == open))
+                .or_else(|| self.plugin_tabs.first().map(|tab| tab.plugin.clone()));
+            if let Some(plugin) = plugin {
+                self.open_plugin(plugin, window, cx);
+            }
+        } else if shown < PLUGIN_TABS_AT || !self.has_plugin_tab() {
             self.open_tab(shown, window, cx);
         } else {
-            self.open_tab(shown - count, window, cx);
+            self.open_tab(shown - 1, window, cx);
         }
     }
 
@@ -192,7 +208,7 @@ impl InstanceDetailView {
         cx: &mut Context<Self>,
     ) {
         self.confirm = None;
-        // ia[instance]: 打开插件提供的标签 | 游戏页标签栏里「截图」后面的标签 | 读取并显示插件给的内容；插件被关闭或出错时标签消失，回到内置标签 | 插件只描述内容，版式由启动器统一
+        // ia[instance]: 打开插件标签 | 游戏页「插件」标签内的左侧列表 | 读取并显示插件给的内容；插件被关闭或出错时标签消失，回到内置标签 | 插件只描述内容，版式由启动器统一
         self.plugin_open = Some(plugin.clone());
         (self.handler)(InstanceIntent::PluginView(plugin), window, cx);
         cx.notify();
@@ -202,7 +218,7 @@ impl InstanceDetailView {
         let Some(plugin) = &self.plugin_open else {
             return div().into_any_element();
         };
-        match self.plugin_pages.get(plugin) {
+        let content = match self.plugin_pages.get(plugin) {
             None => kit::empty("正在读取…", "", colors).into_any_element(),
             Some(PluginPage::Unavailable) => {
                 kit::empty("这个标签现在不可用", "插件已关闭，或者出了问题", colors)
@@ -231,7 +247,56 @@ impl InstanceDetailView {
                 };
                 paint.view(view, cx)
             }
-        }
+        };
+        // ia[instance]: 切换插件标签 | 游戏页「插件」标签内的左侧列表 | 右侧显示所选插件的内容
+        let entity = cx.entity().downgrade();
+        let list = kit::keep_wheel(
+            v_flex()
+                .id("instance-plugin-list")
+                .w(px(180.))
+                .flex_none()
+                .h_full()
+                .min_h_0()
+                .overflow_y_scroll()
+                .track_scroll(&self.plugin_list_scroll)
+                .children(self.plugin_tabs.iter().map(|tab| {
+                    let chosen = &tab.plugin == plugin;
+                    let target = tab.plugin.clone();
+                    let entity = entity.clone();
+                    kit::led_option(
+                        SharedString::from(format!("instance-plugin-tab-{}", tab.plugin)),
+                        tab.title.clone(),
+                        chosen,
+                        colors,
+                        move |window, cx| {
+                            let _ = entity.update(cx, |view, cx| {
+                                view.open_plugin(target.clone(), window, cx)
+                            });
+                        },
+                    )
+                })),
+            &self.plugin_list_scroll,
+        )
+        .into_any_element();
+        // The list is pinned; only the pane beside it moves, so it stays in
+        // view however long the plugin's content is.
+        h_flex()
+            .w_full()
+            .h_full()
+            .min_h_0()
+            .gap_4()
+            .child(list)
+            .child(
+                div()
+                    .id("instance-plugin-pane")
+                    .flex_1()
+                    .min_w_0()
+                    .h_full()
+                    .min_h_0()
+                    .overflow_y_scroll()
+                    .child(div().w_full().pb(theme::BOTTOM_SAFE_AREA).child(content)),
+            )
+            .into_any_element()
     }
 
     /// Sends a plugin's action; a destructive one asks first.

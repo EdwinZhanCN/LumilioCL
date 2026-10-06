@@ -89,8 +89,16 @@ the window height (never less than `HERO_MIN_HEIGHT`), and dissolves into the
 page over `HERO_FADE`. Hero copy, Home foreground, and page content share one
 content column (`CONTENT_MAX_WIDTH`, `CONTENT_PADDING_X`), so text over art and
 text on the page line up. Page content below the world uses theme colours and
-compact rows: recent instances as a card row, first use as one line of copy
-with its two actions.
+compact rows: first use is one line of copy with its two actions. For a game,
+top to bottom:
+- what needs attention;
+- **接着玩**: the continued game's latest worlds and first servers, a list
+  block whose rows go straight in (Quick Play), beside its **游戏记录**, a
+  record display (§12);
+- the recent games as the Library's own faceplates, one row.
+
+Below the world is where Home stops being empty for a person with one game,
+so every group there is something to enter, never decoration.
 
 | Home state | Hero | Foreground |
 |---|---|---|
@@ -408,7 +416,10 @@ shows:
 - a bar meter of 4 px bars that light one whole bar at a time.
 
 Displays follow the progress rules in §3. Home's launch moment and Activity
-use them; nothing else is a display.
+use them for progress. The one other display is Home's **游戏记录**: a record,
+not progress, so it has readings (a label in the legend colour over segment
+digits and a mono unit) and no meter, and nothing on it moves. Nothing else is
+a display.
 
 ### Native model preview
 

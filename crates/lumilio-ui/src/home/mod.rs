@@ -18,7 +18,7 @@ pub use self::launching::{
     BAR_SEGMENTS, filled_segments, phase_headline, phase_label, play_minutes,
 };
 pub use self::recovery::recovery_sentence;
-pub use self::render::{ShellHomeColors, render_body, render_overlay};
+pub use self::render::{ShellHomeColors, body_label, render_body, render_overlay};
 
 use crate::hero::{HeroMode, Landmark, Scene};
 use gpui::{App, Window};
@@ -100,6 +100,9 @@ impl WorldHint {
 /// The instance Home is about.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Subject {
+    /// The game it is, when it is a real one; what is listed under the world
+    /// is shown only for this game.
+    pub id: Option<String>,
     pub title: String,
     pub metadata: String,
     pub world: WorldHint,
@@ -276,7 +279,24 @@ impl HomePresentation {
         }
     }
 
-    fn recent(&self) -> &[RecentEntry] {
+    /// The game Home is about, in the states that are about one.
+    pub fn subject(&self) -> Option<&Subject> {
+        match self {
+            Self::Continue { subject, .. }
+            | Self::Launching { subject, .. }
+            | Self::Playing { subject, .. }
+            | Self::Recovery { subject, .. } => Some(subject),
+            _ => None,
+        }
+    }
+
+    /// Whether a game can be started from Home now: not while one is on its
+    /// way or running.
+    pub const fn can_start(&self) -> bool {
+        !matches!(self, Self::Launching { .. } | Self::Playing { .. })
+    }
+
+    pub fn recent(&self) -> &[RecentEntry] {
         match self {
             Self::Continue { recent, .. }
             | Self::Launching { recent, .. }

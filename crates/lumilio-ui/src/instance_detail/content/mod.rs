@@ -17,6 +17,9 @@ mod tests;
 pub use self::model::ContentFilter;
 pub use self::switch::VersionSwitch;
 
+/// The Content tab's filter dropdown (design language §10: Select / dropdown).
+pub use super::Dropdown as FilterSelect;
+
 use std::collections::BTreeSet;
 
 /// The selection, kept per kind: file names.

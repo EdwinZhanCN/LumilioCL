@@ -113,3 +113,16 @@ fn the_meter_lights_whole_bars_and_never_steps_back() {
     assert_eq!(lit_bars(7., 24), 24, "above range clamps");
     assert_eq!(lit_bars(f32::NAN, 24), 0);
 }
+
+#[test]
+fn a_reading_pads_to_its_display_and_never_spills_over() {
+    use super::reading_digits;
+    assert_eq!(reading_digits(7, 3), "007");
+    assert_eq!(reading_digits(128, 4), "0128");
+    assert_eq!(reading_digits(999, 3), "999");
+    assert_eq!(
+        reading_digits(1000, 3),
+        "888",
+        "too large lights every segment"
+    );
+}

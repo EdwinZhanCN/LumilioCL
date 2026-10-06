@@ -25,12 +25,15 @@ pub struct ShellHomeColors {
 }
 
 /// Page content below the world. Uses theme colours only, so it is correct
-/// in light and dark appearance alike.
+/// in light and dark appearance alike. `live` is what the library knows about
+/// the game (its worlds, record and recent cards); without it the recent
+/// entries are drawn plainly.
 pub fn render_body(
     presentation: &HomePresentation,
     intent_handler: Option<HomeIntentHandler>,
     links: &HomeLinks,
     colors: ShellHomeColors,
+    live: Option<AnyElement>,
 ) -> AnyElement {
     match presentation {
         HomePresentation::Loading => div()
@@ -47,10 +50,11 @@ pub fn render_body(
                 links.on_act.clone(),
                 colors,
             ))
-            .children(
-                (!other.recent().is_empty())
-                    .then(|| render_recent(other.recent(), links.on_open.clone(), colors)),
-            )
+            .children(live.or_else(|| {
+                (!other.recent().is_empty()).then(|| {
+                    render_recent(other.recent(), links.on_open.clone(), colors).into_any_element()
+                })
+            }))
             .into_any_element(),
     }
 }
@@ -90,6 +94,15 @@ pub fn render_overlay(
             )
             .into_any_element(),
     )
+}
+
+/// The small heading over each group below the world ("需要留意", "最近").
+pub fn body_label(text: impl Into<SharedString>, muted: Hsla) -> impl IntoElement {
+    div()
+        .text_xs()
+        .font_semibold()
+        .text_color(muted)
+        .child(text.into())
 }
 
 /// Foreground on world art is always light-on-dark, whatever the theme; the

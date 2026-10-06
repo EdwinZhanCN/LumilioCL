@@ -682,3 +682,65 @@ fn tag_labels_are_chinese_when_known_and_readable_when_not() {
     assert_eq!(tag_label("some-new-thing"), "Some new thing");
     assert_eq!(tag_label(""), "");
 }
+
+#[test]
+fn home_places_are_the_latest_readable_worlds_then_the_first_servers() {
+    use super::home::{PLACE_SERVERS, PLACE_WORLDS, PlaceTarget, home_places};
+    use lumilio_core::{PackPolicy, ServerEntry, WorldInfo};
+    let world = |folder: &str, played: Option<i64>, damaged: bool| WorldInfo {
+        folder: folder.to_owned(),
+        name: folder.to_uppercase(),
+        last_played_ms: played,
+        game_version: None,
+        hardcore: folder == "hard",
+        has_icon: false,
+        damaged,
+        lock_touched_ms: None,
+    };
+    let worlds = [
+        world("old", Some(1_000), false),
+        world("never", None, false),
+        world("broken", Some(9_000_000_000), true),
+        world("hard", Some((NOW - 3 * 86_400) as i64 * 1000), false),
+        world("new", Some((NOW - 7200) as i64 * 1000), false),
+    ];
+    let servers: Vec<_> = ["one", "two", "three"]
+        .iter()
+        .map(|name| ServerEntry {
+            name: (*name).to_owned(),
+            address: format!("{name}.example"),
+            packs: PackPolicy::Ask,
+        })
+        .collect();
+    let mut game = record("a", false, None, 1);
+    game.play_seconds = 4000;
+    let places = home_places(&game, &worlds, &servers, NOW);
+    assert_eq!(places.instance, "a");
+    assert_eq!(
+        (places.play_seconds, places.worlds, places.servers),
+        (4000, 5, 3)
+    );
+    let targets: Vec<_> = places.places.iter().map(|place| &place.target).collect();
+    // Newest first, the damaged one skipped, then servers in the player's order.
+    assert_eq!(
+        targets,
+        [
+            &PlaceTarget::World("new".to_owned()),
+            &PlaceTarget::World("hard".to_owned()),
+            &PlaceTarget::World("old".to_owned()),
+            &PlaceTarget::Server("one.example".to_owned()),
+            &PlaceTarget::Server("two.example".to_owned()),
+        ]
+    );
+    assert_eq!(places.places.len(), PLACE_WORLDS + PLACE_SERVERS);
+    assert_eq!(places.places[0].detail, "世界 · 上次游玩 2 小时前");
+    assert_eq!(places.places[1].detail, "世界 · 上次游玩 3 天前 · 极限模式");
+    assert_eq!(places.places[3].detail, "服务器 · one.example");
+
+    // A version that cannot go straight into a world lists nothing to enter,
+    // but keeps its record.
+    game.game_version = "1.19.4".to_owned();
+    let old = home_places(&game, &worlds, &servers, NOW);
+    assert!(old.places.is_empty());
+    assert_eq!(old.worlds, 5);
+}

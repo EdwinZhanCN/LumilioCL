@@ -1,5 +1,5 @@
 use super::buttons::{LocalActionIcon, page_button};
-use super::render::ShellHomeColors;
+use super::render::{ShellHomeColors, body_label};
 use super::{ActHandler, AttentionRow, HomeIntent, HomeIntentHandler, OpenHandler, RecentEntry};
 use crate::key::Key;
 use gpui::prelude::*;
@@ -120,13 +120,7 @@ pub(super) fn render_attention(
     Some(
         v_flex()
             .gap_2()
-            .child(
-                div()
-                    .text_xs()
-                    .font_semibold()
-                    .text_color(colors.muted)
-                    .child("需要留意"),
-            )
+            .child(body_label("需要留意", colors.muted))
             .child(v_flex().w_full().children(list))
             .into_any_element(),
     )
@@ -137,7 +131,8 @@ pub(super) fn render_recent(
     on_open: Option<OpenHandler>,
     colors: ShellHomeColors,
 ) -> impl IntoElement {
-    // ia[home]: 打开最近的游戏 | 最近卡片（手型和悬停描边） | 点卡片进游戏页
+    // Without the library (a Home drawn from a snapshot) the recent games are
+    // plain cards; the live Home uses the Library's faceplates.
     let cards = recent.iter().enumerate().map(|(index, entry)| {
         let open = entry.id.clone().zip(on_open.clone());
         v_flex()
@@ -175,12 +170,6 @@ pub(super) fn render_recent(
 
     v_flex()
         .gap_3()
-        .child(
-            div()
-                .text_xs()
-                .font_semibold()
-                .text_color(colors.muted)
-                .child("最近"),
-        )
+        .child(body_label("最近", colors.muted))
         .child(h_flex().flex_wrap().gap_3().children(cards))
 }

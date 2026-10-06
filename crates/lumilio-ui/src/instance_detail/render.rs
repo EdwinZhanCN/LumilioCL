@@ -68,13 +68,13 @@ impl Render for InstanceDetailView {
             self.ensure(Section::History, window, cx);
         }
         let colors = ShellColors::from_theme(cx.theme());
-        let content = if self.record.is_some() && self.plugin_open.is_some() {
+        let panel = if self.record.is_some() && self.plugin_open.is_some() {
             self.plugin_panel(colors, cx)
         } else if self.record.is_some() {
             match self.tab {
                 TAB_OVERVIEW => self.overview(colors, cx),
-                TAB_CONTENT => self.content_panel(colors, cx),
-                TAB_WORLDS => self.worlds_panel(colors, cx),
+                TAB_CONTENT => self.content_panel(window, colors, cx),
+                TAB_WORLDS => self.worlds_panel(window, colors, cx),
                 TAB_SCREENSHOTS => self.screenshots_panel(colors, cx),
                 TAB_HISTORY => self.history_panel(colors, cx),
                 TAB_DIAGNOSTICS => self.diagnostics_panel(colors, cx),
@@ -110,58 +110,78 @@ impl Render for InstanceDetailView {
             cx.listener(|view, index: &usize, window, cx| view.open_shown(*index, window, cx));
         let labels = self.tab_labels();
         let shown = self.shown_tab();
-        let content = v_flex()
-            .w_full()
-            .gap_5()
-            // Room for the cover above the title; going back is the
-            // navigation's job (design language §6).
-            .child(div().h(px(84.)))
-            .child(kit::header(
-                self.title().to_owned(),
-                self.record
-                    .as_ref()
-                    .map_or_else(String::new, live::instance_meta),
-                self.page_actions(colors, cx),
-                colors,
-            ))
-            .child(kit::tabs(
-                "live-instance-tabs",
-                &labels,
-                shown,
-                move |index, window, cx| tabs(&index, window, cx),
-            ))
-            .child(kit::entrance(content, ("live-instance-body", shown)));
-        div()
-            .id("live-instance")
-            .size_full()
-            .overflow_y_scroll()
-            .child(
-                div()
-                    .relative()
-                    .w_full()
-                    .children(self.record.as_ref().map(|record| {
-                        div()
-                            .absolute()
-                            .top_0()
-                            .left_0()
-                            .w_full()
-                            .h(px(168.))
-                            .child(crate::cover::element(
-                                live::seed_of(&record.id),
-                                live::cover_loader(record.loader),
-                                live::world_of(&record.id),
-                                colors.background,
-                                theme::HERO_FADE,
-                                px(0.),
-                            ))
-                    }))
-                    .child(
-                        theme::content_column()
-                            .mx_auto()
-                            .pt(TITLE_BAR_HEIGHT + px(12.))
-                            .pb(theme::BOTTOM_SAFE_AREA)
-                            .child(content),
-                    ),
-            )
+        // The 插件 tab owns its scroll: its list stays put and only the pane
+        // beside it moves. Every other tab scrolls in the region below the
+        // fixed header and tabs.
+        let body = if self.record.is_some() && self.plugin_open.is_some() {
+            div()
+                .flex_1()
+                .min_h_0()
+                .overflow_hidden()
+                .child(panel)
+                .into_any_element()
+        } else {
+            div()
+                .id("live-instance-scroll")
+                .flex_1()
+                .min_h_0()
+                .overflow_y_scroll()
+                .child(
+                    div()
+                        .w_full()
+                        .pb(theme::BOTTOM_SAFE_AREA)
+                        .child(kit::entrance(panel, ("live-instance-body", shown))),
+                )
+                .into_any_element()
+        };
+        v_flex().id("live-instance").size_full().child(
+            div()
+                .relative()
+                .w_full()
+                .flex_1()
+                .min_h_0()
+                .children(self.record.as_ref().map(|record| {
+                    div()
+                        .absolute()
+                        .top_0()
+                        .left_0()
+                        .w_full()
+                        .h(px(168.))
+                        .child(crate::cover::element(
+                            live::seed_of(&record.id),
+                            live::cover_loader(record.loader),
+                            live::world_of(&record.id),
+                            colors.background,
+                            theme::HERO_FADE,
+                            px(0.),
+                        ))
+                }))
+                .child(
+                    theme::content_column()
+                        .mx_auto()
+                        .h_full()
+                        .min_h_0()
+                        .gap_5()
+                        .pt(TITLE_BAR_HEIGHT + px(12.))
+                        // Room for the cover above the title; going back is
+                        // the navigation's job (design language §6).
+                        .child(div().h(px(84.)))
+                        .child(kit::header(
+                            self.title().to_owned(),
+                            self.record
+                                .as_ref()
+                                .map_or_else(String::new, live::instance_meta),
+                            self.page_actions(colors, cx),
+                            colors,
+                        ))
+                        .child(kit::tabs(
+                            "live-instance-tabs",
+                            &labels,
+                            shown,
+                            move |index, window, cx| tabs(&index, window, cx),
+                        ))
+                        .child(body),
+                ),
+        )
     }
 }

@@ -20,7 +20,7 @@ use gpui_kit::{App, Window};
 use lumilio_core::CancellationToken;
 use lumilio_ui::home::HomeIntent;
 use lumilio_ui::instance_detail::InstanceIntent;
-use lumilio_ui::live::{LiveIntent, account_failure, account_rows};
+use lumilio_ui::live::{LiveIntent, PlaceTarget, account_failure, account_rows};
 use lumilio_ui::platform;
 use lumilio_ui::route::Route;
 use lumilio_ui::shell::ShellIntent;
@@ -512,6 +512,15 @@ pub(super) fn on_live_intent(
                 .update(cx, |shell, cx| shell.toast(Toast::success(notice), cx));
         }
         LiveIntent::Play(id) => play(wiring, id, window, cx),
+        LiveIntent::PlayPlace(id, target) => {
+            let mut state = wiring.state.borrow_mut();
+            match target {
+                PlaceTarget::World(world) => state.next_world = Some(world),
+                PlaceTarget::Server(address) => state.next_server = Some(address),
+            }
+            drop(state);
+            play(wiring, id, window, cx);
+        }
         LiveIntent::Search(query) => search(wiring, &query, cx),
         LiveIntent::LoadFilters => load_filters(wiring, cx),
         LiveIntent::OpenProject { kind, slug } => open_project(wiring, kind, slug, window, cx),

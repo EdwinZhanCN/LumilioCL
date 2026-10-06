@@ -132,11 +132,16 @@ pub(super) fn play(wiring: &Wiring, id: String, window: &mut Window, cx: &mut Ap
     // Deferred: this may be running inside one of the shell's own updates.
     window.defer(cx, move |window, cx| {
         let state = wiring.state.clone();
+        // A world or server asked for with a launch that does not happen must
+        // not carry over to the next one.
+        let forget_target = || {
+            let mut state = state.borrow_mut();
+            state.next_world = None;
+            state.next_server = None;
+        };
         let _ = wiring.shell.update(cx, |shell, cx| {
-            if matches!(
-                shell.home(),
-                HomePresentation::Launching { .. } | HomePresentation::Playing { .. }
-            ) {
+            if !shell.home().can_start() {
+                forget_target();
                 shell.toast(Toast::info("已经有游戏在运行"), cx);
                 return;
             }
@@ -145,12 +150,14 @@ pub(super) fn play(wiring: &Wiring, id: String, window: &mut Window, cx: &mut Ap
                 .and_then(|model| model.library.iter().find(|card| card.id == id))
                 .cloned()
             else {
+                forget_target();
                 return;
             };
-            state.borrow_mut().continue_id = Some(id);
+            state.borrow_mut().continue_id = Some(id.clone());
             shell.set_home(
                 HomePresentation::Continue {
                     subject: Subject {
+                        id: Some(id),
                         title: card.name,
                         metadata: format!("{} · {}", card.meta, card.played),
                         world: card.world,

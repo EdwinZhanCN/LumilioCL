@@ -16,6 +16,8 @@ pub enum LiveIntent {
     OpenInstance(String),
     /// Launch this instance from Home's launch moment.
     Play(String),
+    /// Launch this instance straight into one of its worlds or servers.
+    PlayPlace(String, super::PlaceTarget),
     /// Run this Discover search.
     Search(DiscoverQuery),
     /// Fetch the category and game-version choices.

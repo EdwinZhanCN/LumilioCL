@@ -18,9 +18,12 @@ pub use self::controls::{
 pub use self::faceplate::{
     FACEPLATE_FADE, FACEPLATE_WIDTH, display_window, faceplate, faceplate_cover, faceplate_head,
 };
-pub use self::frame::{SEARCH_WIDTH, entrance, header, keep_wheel, page, search_field, toolbar};
+pub use self::frame::{
+    SEARCH_WIDTH, entrance, fixed_page, header, keep_wheel, page, pane_body, scroll_body,
+    search_field, toolbar,
+};
 pub use self::menu::{MenuAction, MenuEntry, PageActions, more_menu, small_more_menu};
-pub use self::meter::{lit_bars, progress};
+pub use self::meter::{Reading, lit_bars, progress, reading_digits, record};
 pub use self::rows::{
     empty, info, list, panel_list, row, section, section_at, section_head, section_label, setting,
     surface, technical, value_row,

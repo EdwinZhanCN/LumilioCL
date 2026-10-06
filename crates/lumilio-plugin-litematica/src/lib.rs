@@ -43,7 +43,7 @@ impl InstanceTab for Litematica {
     }
 
     /// The game has Litematica, or already has files in `schematics/`.
-    // ia[instance]: 出现「投影」标签 | 游戏页标签栏，在「截图」之后 | 装了 Litematica 或 schematics 文件夹里已有文件时出现；在设置 → 插件里关掉就消失 | 空的 schematics 文件夹不算（插件只能列出文件）
+    // ia[instance]: 出现「投影」标签 | 游戏页「插件」标签内的左侧列表 | 装了 Litematica 或 schematics 文件夹里已有文件时出现；在设置 → 插件里关掉就消失 | 空的 schematics 文件夹不算（插件只能列出文件）
     fn appears(&self, game: &GameFacts, ctx: &dyn HostContext) -> bool {
         game.mods.iter().any(|item| item.id == "litematica")
             || ctx.list_files(FOLDER).is_ok_and(|files| !files.is_empty())

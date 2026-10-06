@@ -4,7 +4,8 @@ use lumilio_core::{CancellationToken, ProjectKind, unix_now};
 use lumilio_ui::LauncherShell;
 use lumilio_ui::home::HomePresentation;
 use lumilio_ui::live::{
-    CollectionRow, account_rows, activity_rows, attention_rows, home_presentation, library_cards,
+    CollectionRow, account_rows, activity_rows, attention_rows, home_places, home_presentation,
+    library_cards,
 };
 use lumilio_ui::toast::Toast;
 use std::future::Future;
@@ -156,6 +157,11 @@ pub(super) fn reload(wiring: &Wiring, what: Reload, cx: &mut App) {
             }
         };
         let hint = current.or(hint);
+        let continued = home
+            .as_ref()
+            .and_then(|(_, id)| id.as_ref())
+            .and_then(|id| records.iter().find(|record| &record.id == id))
+            .cloned();
         let _ = wiring.shell.update(cx, |shell, cx| {
             // A launch in progress, or a failure being explained, keeps Home.
             if let Some((home, _)) = home
@@ -188,6 +194,37 @@ pub(super) fn reload(wiring: &Wiring, what: Reload, cx: &mut App) {
                 },
                 cx,
             );
+        });
+        if let Some(record) = continued {
+            cx.update(|cx| refresh_places(&wiring, record, cx));
+        }
+    })
+    .detach();
+}
+
+/// Reads the worlds and servers of the game Home continues. A game that
+/// cannot be read just lists nothing; an answer for a game Home has moved
+/// away from meanwhile is dropped.
+fn refresh_places(wiring: &Wiring, record: lumilio_core::InstanceRecord, cx: &mut App) {
+    let service = wiring.backend.service.clone();
+    let id = record.id.clone();
+    let handle = wiring.backend.spawn(async move {
+        (
+            service.worlds(&id).await.unwrap_or_default(),
+            service.servers(&id).await.unwrap_or_default(),
+        )
+    });
+    let wiring = wiring.clone();
+    cx.spawn(async move |cx| {
+        let Ok((worlds, servers)) = handle.await else {
+            return;
+        };
+        if wiring.state.borrow().continue_id.as_ref() != Some(&record.id) {
+            return;
+        }
+        let places = home_places(&record, &worlds, &servers, unix_now());
+        let _ = wiring.shell.update(cx, |shell, cx| {
+            shell.update_live(|model| model.home_places = Some(places), cx)
         });
     })
     .detach();

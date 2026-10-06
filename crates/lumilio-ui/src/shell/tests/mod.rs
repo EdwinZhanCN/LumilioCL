@@ -11,6 +11,7 @@ use crate::home::{HomePresentation, RecentEntry, Subject, WorldHint};
 fn continuing() -> HomePresentation {
     HomePresentation::Continue {
         subject: Subject {
+            id: None,
             title: "生存".into(),
             metadata: "1.21.1 · Fabric".into(),
             world: WorldHint::Underground,

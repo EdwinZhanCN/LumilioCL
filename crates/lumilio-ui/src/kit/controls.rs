@@ -54,6 +54,9 @@ pub fn led_option(
         .child(crate::controls::led(chosen, body))
         .child(
             div()
+                .flex_1()
+                .min_w_0()
+                .truncate()
                 .text_sm()
                 .when(chosen, |label| label.font_semibold())
                 .text_color(if chosen {

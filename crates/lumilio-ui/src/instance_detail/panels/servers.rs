@@ -4,7 +4,6 @@ use super::super::editors::Editor;
 use super::super::{InstanceDetailView, InstanceIntent, Section};
 use super::data::{Confirm, ServerState};
 use super::helpers::act;
-use crate::assets::UiIcon;
 use crate::kit;
 use crate::theme::ShellColors;
 use crate::toast::Toast;
@@ -53,46 +52,8 @@ impl InstanceDetailView {
         let running = self.live_output.is_some();
         // While a game runs it owns the file: nothing here can change.
         let busy = self.busy || running;
-        // ia[instance.worlds]: 添加服务器 | L2 次要「添加服务器」→ 弹窗（名称、地址） | 追加到服务器列表，游戏里立刻可见；游戏运行时不可改
-        let add = kit::action(
-            "server-add",
-            "添加服务器",
-            Some(UiIcon::Plus),
-            false,
-            act(cx, |view, window, cx| {
-                view.open_server_editor(None, window, cx)
-            }),
-        )
-        .disabled(busy)
-        .debug_selector(|| "server-add".into());
-        // ia[instance.worlds]: 刷新状态 | L2 次要「刷新状态」 | 逐个检查服务器：在线人数、延迟、版本和 MOTD；连不上显示“无法连接”（5 秒超时）
-        let refresh = kit::action(
-            "server-refresh",
-            "刷新状态",
-            Some(UiIcon::Refresh),
-            false,
-            act(cx, |view, _, cx| {
-                view.ping_servers = true;
-                cx.notify();
-            }),
-        )
-        .debug_selector(|| "server-refresh".into());
-        let controls = h_flex()
-            .w_full()
-            .justify_end()
-            .gap_2()
-            .child(refresh)
-            .child(add);
         if servers.is_empty() {
-            return v_flex()
-                .w_full()
-                .gap_3()
-                .child(controls)
-                .child(kit::empty(
-                    "还没有服务器",
-                    "添加后，游戏的多人游戏列表里就有它",
-                    colors,
-                ))
+            return kit::empty("还没有服务器", "添加后，游戏的多人游戏列表里就有它", colors)
                 .into_any_element();
         }
         let entity = cx.entity().downgrade();
@@ -217,7 +178,6 @@ impl InstanceDetailView {
         v_flex()
             .w_full()
             .gap_3()
-            .child(controls)
             .child(div().text_sm().text_color(colors.muted).child(if running {
                 "游戏正在运行，服务器列表先不能修改；结束游戏后再来。"
             } else {

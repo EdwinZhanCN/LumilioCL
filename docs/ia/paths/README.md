@@ -6,13 +6,13 @@
 | 页面 | 路径数 |
 |---|---|
 | [全局导航](navigation.md) | 7 |
-| [首页](home.md) | 9 |
+| [首页](home.md) | 10 |
 | [游戏库](library.md) | 21 |
 | [发现](discover.md) | 23 |
 | [动态](activity.md) | 8 |
 | [账户](accounts.md) | 9 |
-| [设置](settings.md) | 34 |
-| [游戏页（整体）](instance.md) | 16 |
+| [设置](settings.md) | 35 |
+| [游戏页（整体）](instance.md) | 17 |
 | [游戏页 · 概览](instance.overview.md) | 4 |
 | [游戏页 · 内容](instance.content.md) | 16 |
 | [游戏页 · 世界](instance.worlds.md) | 17 |

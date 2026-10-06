@@ -26,6 +26,9 @@ pub struct LiveControls {
     pub library_loader: Entity<SelectState<SearchableVec<String>>>,
     /// The loader codes behind the loader list's entries after "全部".
     pub library_loaders: Vec<usize>,
+    /// The Settings plugin list's scroll, so it keeps the wheel while it can
+    /// scroll.
+    pub plugin_scroll: gpui::ScrollHandle,
 }
 
 /// The text of the "no loader filter" entry.
@@ -76,6 +79,7 @@ impl LiveControls {
                 )
             }),
             library_loaders: Vec::new(),
+            plugin_scroll: gpui::ScrollHandle::new(),
         }
     }
 }

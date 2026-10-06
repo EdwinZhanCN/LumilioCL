@@ -1,4 +1,4 @@
-use super::super::{InstanceDetailView, InstanceIntent, Section};
+use super::super::{Dropdown, InstanceDetailView, InstanceIntent, Section};
 use super::data::Confirm;
 use super::helpers::{act, act_index, clock};
 use super::{WORLD_SORTS, WORLD_SUBS};
@@ -8,8 +8,10 @@ use crate::theme::ShellColors;
 use crate::toast::Toast;
 use gpui::prelude::*;
 use gpui::{AnyElement, Context, Window, div, px};
+use gpui_component::IndexPath;
 use gpui_component::Sizable as _;
 use gpui_component::input::Input;
+use gpui_component::select::{SearchableVec, Select, SelectEvent, SelectState};
 use gpui_component::{Icon, h_flex, v_flex};
 use lumilio_core::WorldInfo;
 
@@ -72,32 +74,133 @@ impl InstanceDetailView {
 
     /// The 世界 tab: saved worlds or the multiplayer server list.
     pub(in super::super) fn worlds_panel(
-        &self,
+        &mut self,
+        window: &mut Window,
         colors: ShellColors,
         cx: &mut Context<Self>,
     ) -> AnyElement {
+        let sort_select = self.ensure_world_sort_select(window, cx);
+        let running = self.live_output.is_some();
+        // While a game runs the instance is in use: nothing here can change.
+        let busy = self.busy || running;
+        // The selected sub-view's actions sit on the segment row, as on the
+        // Content tab's L4a.
+        let actions: AnyElement = if self.worlds_sub == 1 {
+            // ia[instance.worlds]: 刷新状态 | L4 次要「刷新状态」 | 逐个检查服务器：在线人数、延迟、版本和 MOTD；连不上显示“无法连接”（5 秒超时）
+            let refresh = kit::action(
+                "server-refresh",
+                "刷新状态",
+                Some(UiIcon::Refresh),
+                false,
+                act(cx, |view, _, cx| {
+                    view.ping_servers = true;
+                    cx.notify();
+                }),
+            )
+            .debug_selector(|| "server-refresh".into());
+            // ia[instance.worlds]: 添加服务器 | L4 次要「添加服务器」→ 弹窗（名称、地址） | 追加到服务器列表，游戏里立刻可见；游戏运行时不可改
+            let add = kit::action(
+                "server-add",
+                "添加服务器",
+                Some(UiIcon::Plus),
+                false,
+                act(cx, |view, window, cx| {
+                    view.open_server_editor(None, window, cx)
+                }),
+            )
+            .disabled(busy)
+            .debug_selector(|| "server-add".into());
+            h_flex()
+                .gap_2()
+                .items_center()
+                .child(refresh)
+                .child(add)
+                .into_any_element()
+        } else {
+            // ia[instance.worlds]: 导入世界 | L4 次要「导入世界」→ 选 .zip；也可把 .zip 拖进世界页（一次一个） | 识别含 level.dat 的最浅文件夹，解压到 saves，重名自动加序号，不覆盖
+            kit::action(
+                "world-import",
+                "导入世界",
+                Some(UiIcon::Download),
+                false,
+                act(cx, |view, window, cx| {
+                    (view.handler)(InstanceIntent::ImportWorld, window, cx)
+                }),
+            )
+            .disabled(busy)
+            .debug_selector(|| "world-import".into())
+            .into_any_element()
+        };
         let body = if self.worlds_sub == 1 {
             self.servers_panel(colors, cx)
         } else {
-            self.worlds_list_panel(colors, cx)
+            self.worlds_list_panel(&sort_select, colors, cx)
         };
         v_flex()
             .w_full()
-            .gap_3()
-            // ia[instance.worlds]: 切换世界 / 服务器 | L4 分段：世界 / 服务器 | 视图状态；第一次进入服务器时读取列表并检查各服务器状态
-            .child(kit::segments(
-                "instance-worlds-sub",
-                &WORLD_SUBS,
-                self.worlds_sub.min(WORLD_SUBS.len() - 1),
-                act_index(cx, |view, index: usize, window, cx| {
-                    view.open_worlds_sub(index, window, cx)
-                }),
-            ))
+            .gap_4()
+            .child(
+                h_flex()
+                    .w_full()
+                    .items_center()
+                    .justify_between()
+                    .gap_3()
+                    // ia[instance.worlds]: 切换世界 / 服务器 | L4 分段：世界 / 服务器 | 视图状态；第一次进入服务器时读取列表并检查各服务器状态
+                    .child(kit::segments(
+                        "instance-worlds-sub",
+                        &WORLD_SUBS,
+                        self.worlds_sub.min(WORLD_SUBS.len() - 1),
+                        act_index(cx, |view, index: usize, window, cx| {
+                            view.open_worlds_sub(index, window, cx)
+                        }),
+                    ))
+                    .child(actions),
+            )
             .child(body)
             .into_any_element()
     }
 
-    fn worlds_list_panel(&self, colors: ShellColors, cx: &mut Context<Self>) -> AnyElement {
+    /// The Worlds sort dropdown, created on first use.
+    fn ensure_world_sort_select(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Dropdown {
+        if let Some(select) = &self.world_sort_select {
+            return select.clone();
+        }
+        let labels: Vec<String> = WORLD_SORTS.iter().map(|sort| (*sort).to_owned()).collect();
+        let select = cx.new(|cx| {
+            SelectState::new(
+                SearchableVec::new(labels),
+                Some(IndexPath::default()),
+                window,
+                cx,
+            )
+        });
+        cx.subscribe_in(
+            &select,
+            window,
+            |this, _, event: &SelectEvent<SearchableVec<String>>, _, cx| {
+                if let SelectEvent::Confirm(Some(label)) = event
+                    && let Some(index) = WORLD_SORTS.iter().position(|text| *text == label)
+                {
+                    this.world_sort = index;
+                    cx.notify();
+                }
+            },
+        )
+        .detach();
+        self.world_sort_select = Some(select.clone());
+        select
+    }
+
+    fn worlds_list_panel(
+        &self,
+        sort_select: &Dropdown,
+        colors: ShellColors,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         if let Some(status) = self.status(&self.data.worlds, colors, Section::Worlds, cx) {
             return status;
         }
@@ -111,29 +214,13 @@ impl InstanceDetailView {
             .game_started_ms
             .filter(|_| running)
             .and_then(|started| playing_world(worlds, started));
-        // ia[instance.worlds]: 导入世界 | L2 次要「导入世界」→ 选 .zip；也可把 .zip 拖进世界页（一次一个） | 识别含 level.dat 的最浅文件夹，解压到 saves，重名自动加序号，不覆盖
-        let import = kit::action(
-            "world-import",
-            "导入世界",
-            Some(UiIcon::Download),
-            false,
-            act(cx, |view, window, cx| {
-                (view.handler)(InstanceIntent::ImportWorld, window, cx)
-            }),
-        )
-        .disabled(busy)
-        .debug_selector(|| "world-import".into());
         if worlds.is_empty() {
-            return v_flex()
-                .w_full()
-                .gap_3()
-                .child(h_flex().justify_end().child(import))
-                .child(kit::empty(
-                    "还没有世界",
-                    "进入游戏创建的世界会出现在这里，也可以导入一个 .zip",
-                    colors,
-                ))
-                .into_any_element();
+            return kit::empty(
+                "还没有世界",
+                "进入游戏创建的世界会出现在这里，也可以导入一个 .zip",
+                colors,
+            )
+            .into_any_element();
         }
         let query = self
             .fields
@@ -253,34 +340,19 @@ impl InstanceDetailView {
         let controls = h_flex()
             .w_full()
             .items_center()
-            .justify_between()
-            .gap_4()
-            // ia[instance.worlds]: 排序 | L4 分段：最近游玩 / 名称 | 视图状态
-            .child(kit::segments(
-                "instance-world-sort",
-                &WORLD_SORTS,
-                self.world_sort.min(WORLD_SORTS.len() - 1),
-                act_index(cx, |view, index: usize, _, cx| {
-                    view.world_sort = index;
-                    cx.notify();
-                }),
-            ))
-            .child(
-                h_flex()
-                    .gap_2()
-                    .items_center()
-                    .children(self.fields.as_ref().map(|fields| {
-                        // ia[instance.worlds]: 搜索 | L4 搜索框 | 按世界名称或文件夹名过滤
-                        div().w(px(220.)).child(
-                            Input::new(&fields.world_search).small().prefix(
-                                Icon::new(UiIcon::Search)
-                                    .size(px(14.))
-                                    .text_color(colors.muted),
-                            ),
-                        )
-                    }))
-                    .child(import),
-            );
+            .gap_3()
+            .children(self.fields.as_ref().map(|fields| {
+                // ia[instance.worlds]: 搜索 | L4 搜索框 | 按世界名称或文件夹名过滤
+                div().w(px(220.)).child(
+                    Input::new(&fields.world_search).small().prefix(
+                        Icon::new(UiIcon::Search)
+                            .size(px(14.))
+                            .text_color(colors.muted),
+                    ),
+                )
+            }))
+            // ia[instance.worlds]: 排序 | L4 下拉：最近游玩 / 名称 | 视图状态
+            .child(div().w(px(140.)).child(Select::new(sort_select).small()));
         v_flex()
             .id("instance-worlds-drop")
             .w_full()

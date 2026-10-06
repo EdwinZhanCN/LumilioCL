@@ -11,7 +11,7 @@
 | 识别来源 | 进入内容标签时自动 | 按 SHA-1 查 Modrinth：图标、项目名、作者、版本、项目链接；离线时照常列出，未识别的没有切换版本键 | 识别结果不缓存 | `lumilio-ui/src/instance_detail/content/panel.rs` |
 | 切换子分类 | L4a 分段：Mod / 资源包 / 光影 | 列表切换；搜索与筛选各分类分别记住 |  | `lumilio-ui/src/instance_detail/content/panel.rs` |
 | 添加本地文件 | L4a 次要「添加文件」→ 选文件（拖入内容页没做） | 冲突逐项报告，不静默覆盖同名异内容的文件 |  | `lumilio-ui/src/instance_detail/content/panel.rs` |
-| 筛选 | L4b 分段：全部 / 有更新 / 已停用 / 未识别 | 视图状态 |  | `lumilio-ui/src/instance_detail/content/panel.rs` |
+| 筛选 | L4b 下拉：全部 / 有更新 / 已停用 / 未识别 | 视图状态 |  | `lumilio-ui/src/instance_detail/content/panel.rs` |
 | 全部更新 | L4b「全部更新（N）」→ 确认弹窗 | 逐项执行，部分成功分别报告；进度在动态 | 弹窗内逐项取消勾选没做 | `lumilio-ui/src/instance_detail/content/panel.rs` |
 | 刷新 | L4b ↻ | 重新扫描目录并重新识别 |  | `lumilio-ui/src/instance_detail/content/panel.rs` |
 | 搜索 | L4b 搜索框 | 按名称过滤（视图状态） |  | `lumilio-ui/src/instance_detail/content/panel.rs` |

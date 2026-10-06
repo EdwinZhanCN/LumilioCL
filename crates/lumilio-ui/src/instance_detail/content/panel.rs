@@ -7,14 +7,17 @@ use crate::theme::ShellColors;
 use crate::{kit, theme};
 use gpui::prelude::*;
 use gpui::{AnyElement, App, Context, Entity, Window, div, px};
+use gpui_component::IndexPath;
 use gpui_component::Sizable as _;
 use gpui_component::input::{Input, InputEvent, InputState};
+use gpui_component::select::{SearchableVec, Select, SelectEvent, SelectState};
 use gpui_component::{Icon, h_flex, v_flex};
 
 impl InstanceDetailView {
     // ia[instance.content]: 识别来源 | 进入内容标签时自动 | 按 SHA-1 查 Modrinth：图标、项目名、作者、版本、项目链接；离线时照常列出，未识别的没有切换版本键 | 识别结果不缓存
     pub(in super::super) fn content_panel(
-        &self,
+        &mut self,
+        window: &mut Window,
         colors: ShellColors,
         cx: &mut Context<Self>,
     ) -> AnyElement {
@@ -74,7 +77,8 @@ impl InstanceDetailView {
         ) {
             status
         } else {
-            self.content_body(noun, colors, cx)
+            let filter_select = self.ensure_content_filter_select(window, cx);
+            self.content_body(noun, &filter_select, colors, cx)
         };
 
         v_flex()
@@ -85,9 +89,49 @@ impl InstanceDetailView {
             .into_any_element()
     }
 
+    /// The Content tab's filter dropdown, created on first use (design
+    /// language §10: a Select for picking one value).
+    fn ensure_content_filter_select(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> super::FilterSelect {
+        if let Some(select) = &self.content_filter_select {
+            return select.clone();
+        }
+        let labels: Vec<String> = FILTER_LABELS
+            .iter()
+            .map(|label| (*label).to_owned())
+            .collect();
+        let select = cx.new(|cx| {
+            SelectState::new(
+                SearchableVec::new(labels),
+                Some(IndexPath::default()),
+                window,
+                cx,
+            )
+        });
+        cx.subscribe_in(
+            &select,
+            window,
+            |this, _, event: &SelectEvent<SearchableVec<String>>, _, cx| {
+                if let SelectEvent::Confirm(Some(label)) = event
+                    && let Some(index) = FILTER_LABELS.iter().position(|text| *text == label)
+                {
+                    this.content_filter = FILTERS[index];
+                    cx.notify();
+                }
+            },
+        )
+        .detach();
+        self.content_filter_select = Some(select.clone());
+        select
+    }
+
     pub(super) fn content_body(
         &self,
         noun: &str,
+        filter_select: &super::FilterSelect,
         colors: ShellColors,
         cx: &mut Context<Self>,
     ) -> AnyElement {
@@ -122,20 +166,8 @@ impl InstanceDetailView {
             .collect();
 
         let toolbar = if self.selected.is_empty() {
-            let filter_index = FILTERS
-                .iter()
-                .position(|filter| *filter == self.content_filter)
-                .unwrap_or(0);
-            // ia[instance.content]: 筛选 | L4b 分段：全部 / 有更新 / 已停用 / 未识别 | 视图状态
-            let filters = kit::segments("content-filters", &FILTER_LABELS, filter_index, {
-                let view = view.clone();
-                move |index: usize, _: &mut Window, cx: &mut App| {
-                    let _ = view.update(cx, |view, cx| {
-                        view.content_filter = FILTERS[index.min(3)];
-                        cx.notify();
-                    });
-                }
-            });
+            // ia[instance.content]: 筛选 | L4b 下拉：全部 / 有更新 / 已停用 / 未识别 | 视图状态
+            let filters = div().w(px(140.)).child(Select::new(filter_select).small());
             let update_all = (!updates.is_empty()).then(|| {
                 let view = view.clone();
                 let count = updates.len();

@@ -128,3 +128,93 @@ fn the_settings_page_shows_each_tab_and_edits_open_a_dialog(cx: &mut TestAppCont
     );
     assert!(seen.borrow().is_empty());
 }
+
+/// Settings is an app shell: on the 插件 tab the list and the detail each
+/// scroll on their own, and scrolling one never moves the other or the tabs.
+#[gpui::test]
+fn the_plugin_list_stays_put_while_its_detail_scrolls(cx: &mut TestAppContext) {
+    use crate::kit::ViewIntent;
+    use crate::live::SettingsView;
+    use crate::pages::settings::TAB_GROUP;
+    use gpui::{ScrollDelta, ScrollWheelEvent, TouchPhase, point, px};
+    use lumilio_plugin_api::Permission;
+
+    cx.update(|cx| {
+        gpui_component::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let (shell, cx) =
+        cx.add_window_view(|_, cx| LauncherShell::new(cx).with_live(Rc::new(|_, _, _| {})));
+    cx.simulate_resize(gpui::size(px(1080.), px(600.)));
+    shell.update(cx, |shell, cx| {
+        shell.show(Route::Settings);
+        shell.apply_view_intent(ViewIntent::Choose(TAB_GROUP, 5), cx);
+        shell.update_live(
+            |model| {
+                let plugin = |index: usize| lumilio_core::PluginInfo {
+                    manifest: lumilio_plugin_api::Manifest {
+                        id: format!("test.p{index}"),
+                        name: format!("插件 {index}"),
+                        description: String::new(),
+                        version: "1".into(),
+                        api: lumilio_plugin_api::API_VERSION,
+                        default_enabled: true,
+                        // Long enough that the detail has to scroll.
+                        permissions: (0..40)
+                            .map(|folder| Permission::ReadGameFiles {
+                                under: format!("folder{folder}"),
+                            })
+                            .collect(),
+                        settings: Vec::new(),
+                    },
+                    state: Default::default(),
+                    status: lumilio_core::PluginStatus::Enabled,
+                };
+                model.settings = Some(SettingsView {
+                    plugins: (0..40).map(plugin).collect(),
+                    ..SettingsView::default()
+                });
+            },
+            cx,
+        );
+    });
+    cx.run_until_parked();
+
+    let wheel = |cx: &mut gpui::VisualTestContext, at: gpui::Point<gpui::Pixels>| {
+        cx.simulate_event(ScrollWheelEvent {
+            position: at,
+            delta: ScrollDelta::Pixels(point(px(0.), px(-200.))),
+            modifiers: Modifiers::none(),
+            touch_phase: TouchPhase::Moved,
+        });
+        cx.run_until_parked();
+    };
+    let at = |cx: &mut gpui::VisualTestContext, selector: &'static str| {
+        cx.debug_bounds(selector)
+            .unwrap_or_else(|| panic!("{selector} is drawn"))
+    };
+    let pane = at(cx, "settings-plugin-pane");
+    assert!(
+        pane.bottom() <= px(600.) + px(1.),
+        "the detail is confined to the window ({pane:?})"
+    );
+    let item = at(cx, "settings-plugin-test.p0");
+    let toggle = at(cx, "test.p0-enabled-cap");
+
+    wheel(cx, pane.center());
+    assert_eq!(
+        at(cx, "settings-plugin-test.p0"),
+        item,
+        "the list stays put"
+    );
+    assert!(
+        at(cx, "test.p0-enabled-cap").origin.y < toggle.origin.y - px(10.),
+        "the detail scrolls"
+    );
+
+    wheel(cx, item.center());
+    assert!(
+        at(cx, "settings-plugin-test.p0").origin.y < item.origin.y - px(10.),
+        "the list scrolls on its own"
+    );
+}

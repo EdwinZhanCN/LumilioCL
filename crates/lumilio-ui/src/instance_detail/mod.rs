@@ -31,6 +31,10 @@ use std::rc::Rc;
 /// A crash report's text and the causes recognised in it, or why it could not be read.
 type CrashRead = Result<(String, Vec<PluginFinding>), String>;
 
+/// State of a single-value dropdown (design language §10: Select / dropdown).
+pub type Dropdown =
+    Entity<gpui_component::select::SelectState<gpui_component::select::SearchableVec<String>>>;
+
 pub const TABS: [&str; 7] = ["概览", "内容", "世界", "截图", "历史", "诊断", "设置"];
 pub const TAB_OVERVIEW: usize = 0;
 pub const TAB_CONTENT: usize = 1;
@@ -75,6 +79,8 @@ pub struct InstanceDetailView {
     snapshot_scope: usize,
     /// 世界: index into the sort labels.
     world_sort: usize,
+    /// The world sort's dropdown state, created once the view has a window.
+    world_sort_select: Option<Dropdown>,
     /// 世界 tab: 0 worlds, 1 servers.
     worlds_sub: usize,
     /// What the last check found out about each server, by address.
@@ -109,6 +115,8 @@ pub struct InstanceDetailView {
     /// Content tab: the filter, the selected file names, and the open
     /// switch-version dialog.
     content_filter: content::ContentFilter,
+    /// The filter's dropdown state, created once the view has a window.
+    content_filter_select: Option<content::FilterSelect>,
     selected: content::Selection,
     switch: Option<Entity<content::VersionSwitch>>,
     started: bool,
@@ -135,6 +143,8 @@ pub struct InstanceDetailView {
     /// Which plugin tabs show should be asked again on the next render.
     refresh_plugin_tabs: bool,
     log_scroll: gpui::ScrollHandle,
+    /// The 插件 tab's plugin list scroll (nested in the page's own scroll).
+    plugin_list_scroll: gpui::ScrollHandle,
     /// The crash report being read or shown, and what was read.
     crash: Option<(String, Option<CrashRead>)>,
 }
@@ -158,6 +168,7 @@ impl InstanceDetailView {
             history_sub: 0,
             diag_sub: 0,
             world_sort: 0,
+            world_sort_select: None,
             worlds_sub: 0,
             server_status: std::collections::HashMap::new(),
             ping_servers: false,
@@ -177,6 +188,7 @@ impl InstanceDetailView {
             close_editor: false,
             include_worlds: false,
             content_filter: content::ContentFilter::All,
+            content_filter_select: None,
             selected: content::Selection::new(),
             switch: None,
             started: false,
@@ -194,6 +206,7 @@ impl InstanceDetailView {
             plugin_pages: std::collections::HashMap::new(),
             refresh_plugin_tabs: false,
             log_scroll: gpui::ScrollHandle::new(),
+            plugin_list_scroll: gpui::ScrollHandle::new(),
             crash: None,
         }
     }

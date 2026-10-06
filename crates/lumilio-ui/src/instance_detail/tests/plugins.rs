@@ -65,15 +65,30 @@ fn actions(seen: &Rc<RefCell<Vec<InstanceIntent>>>) -> Vec<String> {
 }
 
 #[gpui::test]
-fn plugin_tabs_sit_after_screenshots_and_built_in_positions_stay(cx: &mut TestAppContext) {
+fn plugins_collapse_into_one_tab_and_built_in_positions_stay(cx: &mut TestAppContext) {
     let seen: Rc<RefCell<Vec<InstanceIntent>>> = Rc::default();
     let (view, cx) = open(seen.clone(), cx);
+    // A second plugin contributes too; the bar still carries one 插件 tab.
+    view.update(cx, |view, cx| {
+        view.plugins_changed(vec![PLUGIN.into(), "other.plugin".into()], cx);
+        view.plugin_tabs_arrived(
+            vec![
+                tab(),
+                PluginTab {
+                    plugin: "other.plugin".into(),
+                    title: "地图".into(),
+                },
+            ],
+            cx,
+        );
+    });
     view.update(cx, |view, _| {
         assert_eq!(
             view.tab_labels(),
             [
-                "概览", "内容", "世界", "截图", "投影", "历史", "诊断", "设置"
-            ]
+                "概览", "内容", "世界", "截图", "插件", "历史", "诊断", "设置"
+            ],
+            "however many plugins contribute, the bar keeps one tab"
         );
         assert_eq!(view.shown_tab(), 0);
     });

@@ -10,6 +10,7 @@ use crate::hero::{HeroMode, Landmark, Scene};
 
 fn subject() -> Subject {
     Subject {
+        id: None,
         title: "我的世界".into(),
         metadata: "1.21 · Fabric".into(),
         world: WorldHint::Nether,
