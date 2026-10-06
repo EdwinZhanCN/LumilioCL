@@ -1,6 +1,6 @@
 use super::discover::DiscoverQuery;
 use gpui::{App, Window};
-use lumilio_core::{LaunchTuning, MirrorRule, Preferences, ProjectKind};
+use lumilio_core::{LaunchTuning, MirrorPreset, MirrorRule, Preferences, ProjectKind};
 use std::path::PathBuf;
 use std::rc::Rc;
 
@@ -144,6 +144,7 @@ pub enum LiveIntent {
         max_mb: Option<u32>,
     },
     SetConcurrency(Option<u32>),
+    AddMirrorPreset(MirrorPreset),
     SetMirrors {
         mirrors: Vec<MirrorRule>,
         prefer: bool,

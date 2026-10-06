@@ -34,6 +34,7 @@ mod launcher;
 mod layout;
 mod loader;
 mod microsoft;
+mod mirror_presets;
 mod modpack;
 use lumilio_nbt as nbt;
 mod model_assets;
@@ -134,6 +135,7 @@ pub use microsoft::{
     AuthError, DeviceCode, MICROSOFT_CLIENT_ID, MicrosoftClient, MinecraftLogin, OAuthTokens,
     Secret, client_id as microsoft_client_id,
 };
+pub use mirror_presets::MirrorPreset;
 pub use model_assets::{ModelAssetsError, ResourcePack};
 pub use modpack::{
     ClientSupport, ModpackError, OVERRIDES_LIMIT, PackFile, PackIndex, extract_overrides,

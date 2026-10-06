@@ -15,7 +15,7 @@ LumilioCL has two visual registers and never mixes them.
 | What | Windows into the game: the Home hero, instance covers, empty-state vignettes, launch loading | Chrome: navigation, buttons, lists, dialogs, text, route changes |
 | Rendering | Procedural pixel art (`lumilio-ui::hero` raster), no bitmaps | The instrument elements in `kit` (§12) over gpui-component, theme tokens |
 | Motion | Discrete, at `WORLD_TICK` (20 ticks/s, the game's own rate); state changes stream in chunk by chunk | Continuous easing and springs from the motion tokens |
-| Framing | Full-bleed; meets the page through a dithered dissolve into the live theme background; never boxed in a hard-cornered card. The one exception is a faceplate's display window (§12) | Instrument shapes: keys and fields 4 px, panels and displays 6 px |
+| Framing | Full-bleed; meets the page through a dithered dissolve into the live theme background; never boxed in a hard-cornered card. The exception is a display window (§12): a faceplate's cover, and the navigation's instance thumbnails | Instrument shapes: keys and fields 4 px, panels and displays 6 px |
 | Appearance | Identical in light and dark; foreground on art is always light-on-dark over the scrim | The body follows the appearance (aluminium / night); keys are objects and keep their colour (§12) |
 | Type | None inside the art | Space Grotesk for Latin and figures, the system font for Chinese, JetBrains Mono for values, DSEG7 only on displays (§13) |
 
@@ -139,7 +139,7 @@ the content column; the landmark capsule stays centred in the window.
 |---|---|---|
 | Leading | ‹ › and the current location's name | Browser-style history of *locations*: a landmark page, an Instance, a project detail. Tabs, filters and scroll position are view state, not history. A direction with nowhere to go is disabled (muted, arrow cursor), never hidden, so the name does not jump. Shortcuts: ⌘[ / ⌘], and Esc goes back from a detail. |
 | Centre | The landmark capsule: Home, Library, Discover, Activity; Accounts and Settings join when their pages exist | Choosing a landmark opens a new location (and clears what was ahead). Icon-only keys; the open landmark sits pressed with its LED lit (§12); tooltip with label and shortcut. Activity carries the running-task badge: a lit LED with a mono count. |
-| Trailing | The current instance: its cover, name and a ⇅ mark | The instance that play and Discover installs target. Clicking opens a popover list to switch (a quick action, §10). Switching never retargets an operation already started. With no instances it reads "还没有游戏" and opens Library. |
+| Trailing | The current instance: its cover, name and a ⇅ mark | The instance that play and Discover installs target. Clicking opens a popover list to switch (a quick action, §10). Switching never retargets an operation already started. With no instances it reads "还没有游戏" and opens Library. The cover sits in a display window (§12), the same one a faceplate uses. |
 
 Location names: a landmark's label; an Instance's own name; a project detail
 by its kind — "整合包详情", "Mod 详情", "资源包详情", "光影详情". Long names
@@ -462,7 +462,8 @@ Instance cards are faceplates:
   each corner.
 - **Top**: the name (20 px light) over the loader label (orange mono).
 - **Display window**: the cover sits in it (3 px radius, no dissolve). This
-  is the one place the world is framed.
+  is the one place the world is framed; the navigation's instance thumbnails
+  (28 px chip, 32 px popover rows) are the same window.
 - **Bottom**: a silkscreen meta line and the favourite LED.
 - Hover turns the border ink.
 

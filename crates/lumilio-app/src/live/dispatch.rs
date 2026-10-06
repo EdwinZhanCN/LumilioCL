@@ -457,6 +457,18 @@ pub(super) fn on_live_intent(
                 cx,
             );
         }
+        LiveIntent::AddMirrorPreset(preset) => {
+            let service = wiring.backend.service.clone();
+            change_setting(
+                wiring,
+                window,
+                async move { service.add_mirror_preset(preset).await },
+                "没能添加镜像预设",
+                None,
+                |_, _| {},
+                cx,
+            );
+        }
         LiveIntent::SetMirrors { mirrors, prefer } => {
             let service = wiring.backend.service.clone();
             change_setting(

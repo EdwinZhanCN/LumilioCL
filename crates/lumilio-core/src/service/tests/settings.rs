@@ -7,6 +7,44 @@ use crate::settings::SettingsError;
 use tokio::sync::mpsc;
 
 #[tokio::test]
+async fn concurrent_mirror_presets_merge_the_latest_saved_rules() {
+    use crate::{MirrorPreset, MirrorRule, SettingsStore};
+    let world = world();
+    let custom = MirrorRule {
+        official_prefix: "https://libraries.minecraft.net/".into(),
+        mirror_prefix: "https://custom.test/".into(),
+    };
+    world
+        .service
+        .set_mirrors(vec![custom.clone()], true)
+        .await
+        .unwrap();
+    let (bmclapi, mcim, maven) = tokio::join!(
+        world.service.add_mirror_preset(MirrorPreset::Bmclapi),
+        world.service.add_mirror_preset(MirrorPreset::Mcim),
+        world.service.add_mirror_preset(MirrorPreset::TencentMaven),
+    );
+    bmclapi.unwrap();
+    mcim.unwrap();
+    maven.unwrap();
+    let saved = world.service.settings().await;
+    assert!(saved.prefer_mirrors);
+    assert_eq!(saved.mirrors[0], custom);
+    for preset in [
+        MirrorPreset::Bmclapi,
+        MirrorPreset::Mcim,
+        MirrorPreset::TencentMaven,
+    ] {
+        assert_eq!(preset.merge(&saved.mirrors), saved.mirrors);
+        world.service.add_mirror_preset(preset).await.unwrap();
+    }
+    assert_eq!(world.service.settings().await.mirrors, saved.mirrors);
+    let reopened = SettingsStore::open(world.service.layout().root()).unwrap();
+    assert_eq!(reopened.get().mirrors, saved.mirrors);
+    assert!(reopened.get().prefer_mirrors);
+}
+
+#[tokio::test]
 async fn plugin_failure_and_disable_do_not_affect_the_launch_chain() {
     use lumilio_plugin_api::{API_VERSION, Manifest, Plugin, PluginState};
     use std::collections::BTreeMap;

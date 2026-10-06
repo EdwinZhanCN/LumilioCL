@@ -115,6 +115,17 @@ impl<T: Transport + Clone> LauncherService<T> {
         Ok(())
     }
 
+    /// Merge against the latest saved settings, so concurrent preset additions
+    /// cannot replace one another with stale UI snapshots.
+    pub async fn add_mirror_preset(&self, preset: crate::MirrorPreset) -> Result<(), ServiceError> {
+        let mut settings = self.settings.lock().await;
+        let mirrors = preset.merge(&settings.get().mirrors);
+        let prefer = settings.get().prefer_mirrors;
+        settings.set_mirrors(mirrors, prefer)?;
+        self.plugins.set_sources(settings.source_chain()?);
+        Ok(())
+    }
+
     pub async fn set_default_memory(
         &self,
         min: Option<u32>,

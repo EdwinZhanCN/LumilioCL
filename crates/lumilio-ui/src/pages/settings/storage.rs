@@ -11,7 +11,7 @@ use gpui::prelude::*;
 use gpui::{AnyElement, IntoElement, div, px};
 use gpui_component::Sizable as _;
 use gpui_component::{h_flex, v_flex};
-use lumilio_core::StorageUsage;
+use lumilio_core::{MirrorPreset, StorageUsage};
 use std::rc::Rc;
 
 pub(super) fn storage_bar(usage: &StorageUsage, colors: ShellColors) -> AnyElement {
@@ -60,6 +60,35 @@ pub(super) fn storage_bar(usage: &StorageUsage, colors: ShellColors) -> AnyEleme
         .into_any_element()
 }
 
+fn preset_row(
+    id: &'static str,
+    label: &'static str,
+    help: &'static str,
+    preset: MirrorPreset,
+    view: &SettingsView,
+    ctx: &LiveCtx,
+) -> gpui::Stateful<gpui::Div> {
+    let merged = preset.merge(&view.mirrors);
+    let added = merged == view.mirrors;
+    row(
+        id,
+        label,
+        Some(help.to_owned()),
+        if added { "已添加" } else { "未添加" },
+        Some(
+            kit::ghost(
+                (id, 0usize),
+                "添加",
+                send(&ctx.handler, LiveIntent::AddMirrorPreset(preset)),
+            )
+            .disabled(added)
+            .debug_selector(move || format!("{id}-add"))
+            .into_any_element(),
+        ),
+        ctx.colors,
+    )
+}
+
 pub(super) fn downloads(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
     let colors = ctx.colors;
     let handler = &ctx.handler;
@@ -72,6 +101,34 @@ pub(super) fn downloads(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
     let mirror_text = mirror_lines.join("\n");
     let rules_now = view.mirrors.clone();
     let concurrency_now = view.download_concurrency;
+
+    // ia[settings]: 添加 BMCLAPI 镜像 | 下载与存储 · 预设行 [添加] | 添加游戏资源、加载器与 authlib-injector 镜像；保留已有规则和优先顺序，完整添加后禁用按钮
+    let bmclapi = preset_row(
+        "settings-bmclapi",
+        "BMCLAPI",
+        "游戏资源、Forge、NeoForge、Fabric 和 authlib-injector。添加后可打开“优先使用镜像”。",
+        MirrorPreset::Bmclapi,
+        view,
+        ctx,
+    );
+    // ia[settings]: 添加 MCIM 镜像 | 下载与存储 · 预设行 [添加] | 添加 Modrinth / CurseForge 镜像；保留已有规则和优先顺序，完整添加后禁用按钮
+    let mcim = preset_row(
+        "settings-mcim",
+        "MCIM",
+        "Modrinth 和 CurseForge 的信息与文件。",
+        MirrorPreset::Mcim,
+        view,
+        ctx,
+    );
+    // ia[settings]: 添加腾讯 Maven 镜像 | 下载与存储 · 预设行 [添加] | 添加 Maven Central 镜像；保留已有规则和优先顺序，完整添加后禁用按钮
+    let maven = preset_row(
+        "settings-tencent-maven",
+        "腾讯 Maven",
+        "Maven Central 上的 Java 依赖。",
+        MirrorPreset::TencentMaven,
+        view,
+        ctx,
+    );
 
     // ia[settings]: 优先使用镜像 | 下载与存储 · 开关 | 先试镜像地址，不通再回到官方地址
     let prefer_row = row(
@@ -215,7 +272,10 @@ pub(super) fn downloads(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
             1,
             "下载",
             colors,
-            kit::list(vec![prefer_row, rules_row, concurrency_row], colors),
+            kit::list(
+                vec![bmclapi, mcim, maven, prefer_row, rules_row, concurrency_row],
+                colors,
+            ),
         ))
         .child(kit::section_at(
             2,

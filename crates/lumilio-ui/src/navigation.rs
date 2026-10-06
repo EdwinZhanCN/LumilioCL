@@ -273,19 +273,20 @@ fn forward_tooltip() -> &'static str {
 }
 
 fn thumb(choice: &InstanceChoice, size: f32, colors: ShellColors) -> impl IntoElement {
+    // The same display window a faceplate's cover sits in (design language
+    // §12): 3 px corners, no dissolve, on the display colour.
     div()
         .relative()
         .flex_none()
         .size(px(size))
-        .rounded(px(8.))
+        .rounded(px(3.))
         .overflow_hidden()
-        .child(crate::cover::element(
+        .bg(colors.body.display)
+        .child(crate::kit::faceplate_cover(
             choice.seed,
             choice.loader,
             choice.world,
-            colors.surface,
-            px(0.),
-            px(8.),
+            colors,
         ))
 }
 

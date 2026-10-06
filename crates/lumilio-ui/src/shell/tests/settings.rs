@@ -74,6 +74,61 @@ fn the_settings_page_shows_each_tab_and_edits_open_a_dialog(cx: &mut TestAppCont
         );
     }
 
+    // Mirror presets send their stable identity; core merges the saved rules.
+    shell.update(cx, |shell, cx| {
+        shell.apply_view_intent(ViewIntent::Choose(TAB_GROUP, 3), cx)
+    });
+    cx.run_until_parked();
+    for (selector, preset) in [
+        ("settings-bmclapi-add", lumilio_core::MirrorPreset::Bmclapi),
+        ("settings-mcim-add", lumilio_core::MirrorPreset::Mcim),
+        (
+            "settings-tencent-maven-add",
+            lumilio_core::MirrorPreset::TencentMaven,
+        ),
+    ] {
+        let before = shell.read_with(cx, |shell, _| {
+            shell
+                .live
+                .as_ref()
+                .unwrap()
+                .settings
+                .as_ref()
+                .unwrap()
+                .mirrors
+                .clone()
+        });
+        let button = cx.debug_bounds(selector).expect("preset add button");
+        cx.simulate_click(button.center(), Modifiers::none());
+        cx.run_until_parked();
+        let expected = preset.merge(&before);
+        assert_eq!(
+            seen.borrow().as_slice(),
+            [LiveIntent::AddMirrorPreset(preset)]
+        );
+        seen.borrow_mut().clear();
+        shell.update(cx, |shell, cx| {
+            shell.update_live(
+                |model| {
+                    model.settings.as_mut().unwrap().mirrors = expected;
+                },
+                cx,
+            )
+        });
+        cx.run_until_parked();
+        let button = cx.debug_bounds(selector).unwrap();
+        cx.simulate_click(button.center(), Modifiers::none());
+        cx.run_until_parked();
+        assert!(
+            seen.borrow().is_empty(),
+            "added presets cannot be submitted twice"
+        );
+    }
+    shell.update(cx, |shell, cx| {
+        shell.apply_view_intent(ViewIntent::Choose(TAB_GROUP, 5), cx)
+    });
+    cx.run_until_parked();
+
     // The plugin row sends the stable plugin ID, with its requested new state.
     shell.update(cx, |shell, cx| {
         shell.update_live(

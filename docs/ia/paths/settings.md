@@ -34,6 +34,9 @@
 | 插件：查看失败原因 | 插件详情 · [技术详情] | 显示本次调用失败原因；失败状态不会写入设置 |  | `lumilio-ui/src/pages/settings/plugins.rs` |
 | 插件：更改设置 | 插件详情 · 声明式设置行 | 开关和选项立即保存；文字与数字在弹窗中校验并保存，失败保留草稿 |  | `lumilio-ui/src/pages/settings/plugins.rs` |
 | 插件：恢复默认 | 插件详情 · [恢复默认] | 清除启用状态和设置覆盖，使用清单默认值；本次运行的失败状态保留 |  | `lumilio-ui/src/pages/settings/plugins.rs` |
+| 添加 BMCLAPI 镜像 | 下载与存储 · 预设行 [添加] | 添加游戏资源、加载器与 authlib-injector 镜像；保留已有规则和优先顺序，完整添加后禁用按钮 |  | `lumilio-ui/src/pages/settings/storage.rs` |
+| 添加 MCIM 镜像 | 下载与存储 · 预设行 [添加] | 添加 Modrinth / CurseForge 镜像；保留已有规则和优先顺序，完整添加后禁用按钮 |  | `lumilio-ui/src/pages/settings/storage.rs` |
+| 添加腾讯 Maven 镜像 | 下载与存储 · 预设行 [添加] | 添加 Maven Central 镜像；保留已有规则和优先顺序，完整添加后禁用按钮 |  | `lumilio-ui/src/pages/settings/storage.rs` |
 | 优先使用镜像 | 下载与存储 · 开关 | 先试镜像地址，不通再回到官方地址 |  | `lumilio-ui/src/pages/settings/storage.rs` |
 | 镜像规则 | 下载与存储 · 值 + [编辑] 弹窗 | 每行 官方前缀 => 镜像前缀 |  | `lumilio-ui/src/pages/settings/storage.rs` |
 | 同时下载数 | 下载与存储 · 值 + [编辑] 弹窗 | 自动 / 1–32 |  | `lumilio-ui/src/pages/settings/storage.rs` |
