@@ -1,6 +1,6 @@
 # LumilioCL 打包约定
 
-范围：gpui-kit 应用在 macOS / Windows / Linux 上的图标与发布产物。这里只写不变量和关键接口，具体脚本由 `cargo xtask` 实现。
+范围：gpui-kit 应用在 macOS / Windows / Linux 上的图标与发布产物。这里只写不变量和关键接口，具体脚本由 `cargo xtask` 实现（`crates/lumilio-xtask`，`just package`）；发布流程是 `.github/workflows/release.yml`，决策见 ADR 0032。
 
 ## 0. 身份（全平台唯一，发布后不可改）
 
@@ -9,7 +9,7 @@
   - macOS：`CFBundleIdentifier`
   - GPUI：`cx.set_app_identity(APP_ID, "LumilioCL")`
   - Linux：`WindowOptions.app_id`、`.desktop` 文件名、`Icon=`、`StartupWMClass=`、hicolor 图标文件名
-- Windows 安装器的 `AppId` 另取一个稳定值，之后永远不改。
+- Windows 安装器的 `AppId` 另取一个稳定值，之后永远不改：`{6927ECC0-2947-4CDB-8209-9B6142815660}`，写在 `crates/lumilio-xtask/packaging/LumilioCL.iss`，xtask 的测试守着它。
 - 版本号只有一个来源，就是 `Cargo.toml` 的 `version`。以下字段都从它派生：Info.plist 的 `CFBundleShortVersionString` 和 `CFBundleVersion`、Inno 的 `AppVersion`、deb 的 `Version`、exe 的 VERSIONINFO（winresource 会自动读取）。
 - 开发构建使用 `APP_ID.dev`，避免和正式版共用设置、通知和图标缓存。
 
@@ -19,7 +19,7 @@
 - 唯一事实来源是 `src/` 下的 SVG。
 - 生成物包括 `windows/LumilioCL.ico` 和 `linux/hicolor/**`。规则是：改 SVG，运行 `python3 gen_icons.py [APP_ID]`，然后提交。不要手改生成物。CI 不运行生成器。
 - 16 / 20 / 24 / 32 px 各有像素对齐母版（`tile-{N}.svg`），其他尺寸从大母版渲染。
-- macOS 的源是 `AppIcon.icon`，是 Icon Composer 文档，提交进仓库。它用 `src/macos/AppIcon-layers/` 手动导入一次生成：
+- macOS 的源是 `macos/AppIcon.icon`，是 Icon Composer 文档，提交进仓库。它由 `src/macos/AppIcon-layers/` 的图层组成（`Assets/` 里是副本），按下列设置写成；改图层后在 Icon Composer 里打开它更新：
   - 背景：Fill = Solid `#E4E3DE`；Dark 外观下为 `#1F1F1D`。
   - 分组：每个 SVG 一组，按文件名序号由下到上，总共不超过 4 组。
   - Dark 外观：`1-keys` 改为 `#E4E3DE`，`0-slots` 改为 `#3B3A37`，`2-light` 不变。
@@ -51,19 +51,7 @@
 
 ## 3. Windows
 
-- MSVC 工具链加 Windows SDK（需要 `rc.exe`）。`build.rs`：
-  ```rust
-  fn main() {
-      if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
-          println!("cargo:rerun-if-changed=assets/icons/windows/LumilioCL.ico");
-          let mut res = winresource::WindowsResource::new();
-          res.set_icon("assets/icons/windows/LumilioCL.ico");
-          res.set("FileDescription", "LumilioCL");
-          res.set("ProductName", "LumilioCL");
-          res.compile().expect("embed Windows resources");
-      }
-  }
-  ```
+- MSVC 工具链加 Windows SDK（需要 `rc.exe`）。`crates/lumilio-app/build.rs` 用 winresource 嵌入图标和 VERSIONINFO。
   不要在这里设置 manifest。GPUI 默认的 `windows-manifest` feature 已经通过 embed-resource 嵌入了一份。
 - exe 内嵌的图标资源是唯一来源。不要依赖运行时设置窗口图标。
 - 产物有两种：
@@ -96,7 +84,8 @@
   - macOS 26 runner：arm64，按需加 x86_64。
   - Windows：x64。
   - Linux：用最老支持发行版的容器，x64。
-- 发布产物必须带上：版本号、OS、架构、构建 commit，以及 SHA-256。
+- 发布产物必须带上：版本号、OS、架构、构建 commit，以及 SHA-256。文件名是 `LumilioCL-<version>-<os>-<arch>…`，commit 和签名状态写在每个包里的 `BUILD.txt`（macOS 还写进 Info.plist 的 `LumilioCLCommit`），校验和汇总为 `SHA256SUMS.txt`。
+- 推送 `v<version>` 标签触发发布，标签必须等于工作区版本（SemVer；带 `-` 的预发布版本标为 pre-release）。工作流只建草稿 release，验收通过后由人发布。
 - 验收必须针对下载后的产物，不是构建目录。检查五项：
   1. 首次启动正常。
   2. 图标在各处显示正确。

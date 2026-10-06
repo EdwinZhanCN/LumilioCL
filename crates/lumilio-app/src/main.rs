@@ -1,9 +1,22 @@
+// A released Windows build opens no console window beside the launcher.
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
+
 mod assets;
 mod backend;
 mod images;
 mod live;
 
 use gpui_kit::{App, WindowBounds, WindowOptions, px, size};
+
+/// The launcher's platform identity: the macOS bundle identifier, the Windows
+/// AppUserModelID, the Wayland app id that ties the window to its `.desktop`
+/// file. Fixed once released (assets/icons/PACKAGING.md §0); development
+/// builds take the `.dev` variant so they never share it with the release.
+const APP_ID: &str = if cfg!(debug_assertions) {
+    "app.lumilio.LumilioCL.dev"
+} else {
+    "app.lumilio.LumilioCL"
+};
 
 fn main() {
     let opened = backend::data_root(|name| std::env::var(name).ok())
@@ -28,6 +41,7 @@ fn main() {
         Err(reason) => eprintln!("pictures from the web will not load: {reason}"),
     }
     app.run(move |cx: &mut App| {
+        cx.set_app_identity(APP_ID, "LumilioCL");
         gpui_kit::init(cx);
         lumilio_ui::assets::register_fonts(cx);
         let quit_key = if cfg!(target_os = "macos") {
@@ -68,7 +82,7 @@ fn main() {
             window_bounds: Some(WindowBounds::centered(review_size, cx)),
             window_min_size: Some(size(px(720.), px(480.))),
             titlebar: Some(lumilio_ui::window_titlebar()),
-            app_id: Some("dev.lumilio.launcher".to_owned()),
+            app_id: Some(APP_ID.to_owned()),
             ..WindowOptions::default()
         };
 

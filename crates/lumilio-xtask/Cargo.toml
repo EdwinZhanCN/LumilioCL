@@ -1,0 +1,24 @@
+[package]
+name = "lumilio-xtask"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+# `cargo xtask …` (alias in .cargo/config.toml): release packaging for the
+# platform it runs on (assets/icons/PACKAGING.md).
+[[bin]]
+name = "xtask"
+path = "src/main.rs"
+
+[dependencies]
+serde_json.workspace = true
+sha2.workspace = true
+zip.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

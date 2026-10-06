@@ -41,6 +41,14 @@ test-pkg pkg *filter:
 ia:
     cargo run -p lumilio-docgen -- ia
 
+# Release packages for this platform into dist/ (assets/icons/PACKAGING.md).
+package:
+    cargo xtask package
+
+# Print the release version; with a tag, fail unless it is v<version>.
+release-check *tag:
+    cargo xtask release-check {{tag}}
+
 # Cheap check for docs/harness changes: IA is current, attributions are right.
 docs:
     cargo test -p lumilio-docgen

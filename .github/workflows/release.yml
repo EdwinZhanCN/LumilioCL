@@ -1,0 +1,187 @@
+# Builds the release packages natively on each platform (`cargo xtask
+# package`, assets/icons/PACKAGING.md) and, for a `v*` tag, puts them in a
+# draft GitHub release. Publishing the draft stays a person's job: the
+# downloaded artifacts are checked first (PACKAGING.md §5).
+#
+# A manual run rehearses the packaging without a tag and stops at the
+# workflow artifacts.
+#
+# Signing is optional and switched on by repository secrets; without them the
+# packages are built unsigned (ad hoc on macOS) and say so in BUILD.txt.
+#   macOS:   MACOS_CERTIFICATE_P12 (base64), MACOS_CERTIFICATE_PASSWORD,
+#            MACOS_SIGNING_IDENTITY; notarization: MACOS_NOTARY_KEY (base64
+#            .p8), MACOS_NOTARY_KEY_ID, MACOS_NOTARY_ISSUER
+#   Windows: WINDOWS_CERTIFICATE_PFX (base64), WINDOWS_CERTIFICATE_PASSWORD
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      prerelease: ${{ steps.check.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v5
+      - run: rustup toolchain install
+      # Fails when the tag is not v<workspace version>.
+      - id: check
+        run: cargo xtask release-check ${{ github.ref_type == 'tag' && github.ref_name || '' }} >> "$GITHUB_OUTPUT"
+
+  package:
+    needs: version
+    name: package (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # actool needs Xcode 26 for the Icon Composer icon.
+          - os: macos
+            runner: macos-26
+          - os: windows
+            runner: windows-2022
+          # Built on the oldest supported distribution: the binary needs its
+          # glibc or newer.
+          - os: linux
+            runner: ubuntu-latest
+            container: ubuntu:22.04
+    runs-on: ${{ matrix.runner }}
+    container: ${{ matrix.container }}
+    timeout-minutes: 120
+    env:
+      MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+      MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+      MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+      MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
+      MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+      MACOS_NOTARY_ISSUER: ${{ secrets.MACOS_NOTARY_ISSUER }}
+      WINDOWS_CERTIFICATE_PFX: ${{ secrets.WINDOWS_CERTIFICATE_PFX }}
+      WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+    steps:
+      - name: Install build dependencies (Linux)
+        if: matrix.os == 'linux'
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            build-essential ca-certificates clang cmake curl git pkg-config file xz-utils \
+            dpkg-dev desktop-file-utils \
+            libssl-dev libzstd-dev libfontconfig-dev libfreetype-dev \
+            libvulkan-dev libwayland-dev libxkbcommon-dev libxkbcommon-x11-dev \
+            libx11-dev libx11-xcb-dev libxcb1-dev
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs |
+            sh -s -- -y --profile minimal --default-toolchain none
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - uses: actions/checkout@v5
+      # With no argument rustup installs what rust-toolchain.toml pins.
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release
+
+      - name: Import the signing certificate (macOS)
+        if: matrix.os == 'macos' && env.MACOS_CERTIFICATE_P12 != ''
+        run: |
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          password="$(openssl rand -base64 24)"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          echo "$MACOS_CERTIFICATE_P12" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security import "$RUNNER_TEMP/certificate.p12" -k "$keychain" \
+            -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          rm "$RUNNER_TEMP/certificate.p12"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$password" "$keychain"
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          echo "LUMILIO_MACOS_SIGNING_IDENTITY=$MACOS_SIGNING_IDENTITY" >> "$GITHUB_ENV"
+
+      - name: Configure notarization (macOS)
+        if: matrix.os == 'macos' && env.MACOS_NOTARY_KEY != ''
+        run: |
+          echo "$MACOS_NOTARY_KEY" | base64 --decode > "$RUNNER_TEMP/notary.p8"
+          {
+            echo "LUMILIO_NOTARY_KEY=$RUNNER_TEMP/notary.p8"
+            echo "LUMILIO_NOTARY_KEY_ID=$MACOS_NOTARY_KEY_ID"
+            echo "LUMILIO_NOTARY_ISSUER=$MACOS_NOTARY_ISSUER"
+          } >> "$GITHUB_ENV"
+
+      - name: Install Inno Setup (Windows)
+        if: matrix.os == 'windows'
+        run: |
+          if ! command -v iscc >/dev/null && [ ! -f "/c/Program Files (x86)/Inno Setup 6/ISCC.exe" ]; then
+            choco install innosetup --no-progress -y
+          fi
+
+      - name: Configure signing (Windows)
+        if: matrix.os == 'windows' && env.WINDOWS_CERTIFICATE_PFX != ''
+        run: |
+          certificate="$(cygpath -u "$RUNNER_TEMP")/certificate.pfx"
+          echo "$WINDOWS_CERTIFICATE_PFX" | base64 --decode > "$certificate"
+          # signtool goes on PATH: the sign command must not contain spaces.
+          signtool="$(ls -d "/c/Program Files (x86)/Windows Kits/10/bin/"10.*/x64 | sort -V | tail -1)"
+          cygpath -w "$signtool" >> "$GITHUB_PATH"
+          echo "LUMILIO_WINDOWS_SIGN_COMMAND=signtool sign /fd sha256 /tr http://timestamp.digicert.com /td sha256 /f $(cygpath -w "$certificate") /p $WINDOWS_CERTIFICATE_PASSWORD \$f" >> "$GITHUB_ENV"
+
+      - name: Package
+        run: cargo xtask package
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lumiliocl-${{ needs.version.outputs.version }}-${{ matrix.os }}
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    if: github.ref_type == 'tag'
+    needs: [version, package]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Collect checksums
+        working-directory: dist
+        run: |
+          cat *.sha256 > SHA256SUMS.txt
+          rm *.sha256
+          sha256sum --check SHA256SUMS.txt
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ needs.version.outputs.version }}
+          PRERELEASE: ${{ needs.version.outputs.prerelease }}
+        run: |
+          {
+            echo "Built from ${GITHUB_SHA}."
+            echo
+            echo "Each package's BUILD.txt records its version, platform, commit and signature;"
+            echo "SHA256SUMS.txt lists the checksum of every file here."
+          } > notes.md
+          flags=(--draft --verify-tag --generate-notes --title "LumilioCL $VERSION" --notes-file notes.md)
+          if [ "$PRERELEASE" = true ]; then flags+=(--prerelease); fi
+          gh release create "$TAG" "${flags[@]}" dist/*

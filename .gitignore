@@ -1,4 +1,5 @@
 /target/
+/dist/
 /.worktrees/
 .DS_Store
 3rd-party/

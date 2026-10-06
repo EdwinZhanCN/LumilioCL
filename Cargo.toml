@@ -11,6 +11,7 @@ members = [
     "crates/lumilio-plugin-modrinth",
     "crates/lumilio-plugin-discord",
     "crates/lumilio-schematic-render",
+    "crates/lumilio-xtask",
 ]
 resolver = "3"
 exclude = ["forks/nucleation", "forks/schematic-mesher"]
