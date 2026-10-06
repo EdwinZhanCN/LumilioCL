@@ -45,6 +45,20 @@ interface is in Simplified Chinese.
 > Until it does, sign-in fails at the last step and the launcher explains why. Offline and
 > third-party accounts work in the meantime.
 
+## Gallery
+
+<div align="center">
+
+<table align="center">
+  <tr>
+    <td align="center" width="33%"><a href="assets/screenshots/home.png"><img src="assets/screenshots/home.png" width="280" alt="Home"></a></td>
+    <td align="center" width="33%"><a href="assets/screenshots/game-library.png"><img src="assets/screenshots/game-library.png" width="280" alt="Library"></a></td>
+    <td align="center" width="33%"><a href="assets/screenshots/discovery.png"><img src="assets/screenshots/discovery.png" width="280" alt="Discover"></a></td>
+  </tr>
+</table>
+
+</div>
+
 ## Download
 
 Get the file for your system from

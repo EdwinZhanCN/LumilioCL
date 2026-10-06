@@ -25,7 +25,7 @@
 ## 简介
 
 LumilioCL 用 Rust 编写，界面基于 [GPUI](https://www.gpui.rs/) 和
-[gpui-component](https://github.com/longbridge/gpui-component)，不依赖 Electron 或网页技术。
+[gpui-kit](https://github.com/longbridge/gpui-kit)，不依赖 Electron 或网页技术。
 
 - **游戏库**：新建原版、Fabric 或 Quilt 游戏，用收藏、合集和搜索管理。可以导入 `.mrpack`
   和 MultiMC / Prism 整合包，也可以把其他启动器（MultiMC、Prism、`.minecraft`）里的游戏搬
@@ -40,6 +40,20 @@ LumilioCL 用 Rust 编写，界面基于 [GPUI](https://www.gpui.rs/) 和
 > [!NOTE]
 > Microsoft 正版登录的流程已经做好，但这个启动器的应用注册还在等 Mojang 审批。审批通过之前，
 > 登录会在最后一步失败，界面会说明原因。这段时间可以先用离线账户或第三方登录。
+
+## 画廊
+
+<div align="center">
+
+<table align="center">
+  <tr>
+    <td align="center" width="33%"><a href="assets/screenshots/home.png"><img src="assets/screenshots/home.png" width="280" alt="首页"></a></td>
+    <td align="center" width="33%"><a href="assets/screenshots/game-library.png"><img src="assets/screenshots/game-library.png" width="280" alt="游戏库"></a></td>
+    <td align="center" width="33%"><a href="assets/screenshots/discovery.png"><img src="assets/screenshots/discovery.png" width="280" alt="发现"></a></td>
+  </tr>
+</table>
+
+</div>
 
 ## 获取
 
