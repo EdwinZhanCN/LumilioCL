@@ -38,6 +38,7 @@ impl Backend {
                     Arc::new(lumilio_plugin_crash_analyzer::CrashAnalyzer),
                     Arc::new(lumilio_plugin_litematica::Litematica),
                     Arc::new(lumilio_plugin_modrinth::Modrinth),
+                    Arc::new(lumilio_plugin_discord::Discord::default()),
                 ],
             )
             .map_err(|error| error.to_string())?

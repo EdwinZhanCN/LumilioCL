@@ -4,7 +4,9 @@ mod access;
 mod analysis;
 mod content;
 mod context;
+mod launch;
 mod model;
+mod native;
 mod network;
 mod tabs;
 pub use analysis::PluginFinding;
@@ -41,6 +43,7 @@ pub struct PluginInfo {
 }
 
 struct Entry {
+    core: bool,
     plugin: Arc<dyn Plugin>,
     manifest: Manifest,
     failure: Mutex<Option<String>>,
@@ -61,9 +64,11 @@ struct Preferences {
 }
 
 pub struct PluginHost {
+    core: bool,
     candidates: Vec<Arc<dyn Plugin>>,
     registry: OnceCell<Registry>,
-    preferences: RwLock<Preferences>,
+    preferences: Arc<RwLock<Preferences>>,
+    native: Arc<native::Native>,
     /// UI state per (instance, plugin); owned by the host, not the plugins.
     tab_states: Mutex<BTreeMap<(String, String), lumilio_plugin_api::TabState>>,
     /// Plugins that have answered as a content source, so that a stopped one
@@ -77,16 +82,28 @@ impl PluginHost {
     #[must_use]
     pub fn new(plugins: Vec<Arc<dyn Plugin>>, states: BTreeMap<String, PluginState>) -> Self {
         Self {
+            core: false,
             candidates: plugins,
             registry: OnceCell::new(),
-            preferences: RwLock::new(Preferences {
+            preferences: Arc::new(RwLock::new(Preferences {
                 states,
                 revisions: BTreeMap::new(),
-            }),
+            })),
+            native: Arc::default(),
             tab_states: Mutex::new(BTreeMap::new()),
             content_ids: Mutex::default(),
             timeout: CALL_TIMEOUT,
             network: None,
+        }
+    }
+
+    /// Only statically linked, application-supplied core plugins may receive
+    /// native capabilities. A manifest ID never establishes this trust.
+    #[must_use]
+    pub fn new_core(plugins: Vec<Arc<dyn Plugin>>, states: BTreeMap<String, PluginState>) -> Self {
+        Self {
+            core: true,
+            ..Self::new(plugins, states)
         }
     }
 
@@ -124,7 +141,17 @@ impl PluginHost {
                     let candidate = plugin.clone();
                     match isolated(self.timeout, move || Ok(candidate.manifest())).await {
                         Ok(manifest) => {
-                            if let Err(error) = validate_manifest(&manifest) {
+                            if !self.core
+                                && manifest
+                                    .permissions
+                                    .iter()
+                                    .any(|p| matches!(p, lumilio_plugin_api::Permission::Native(_)))
+                            {
+                                registry.rejected.push(format!(
+                                    "{}: native capabilities require a core plugin",
+                                    manifest.id
+                                ));
+                            } else if let Err(error) = validate_manifest(&manifest) {
                                 registry.rejected.push(format!("{}: {error}", manifest.id));
                             } else if registry.entries.contains_key(&manifest.id) {
                                 registry
@@ -134,6 +161,7 @@ impl PluginHost {
                                 registry.entries.insert(
                                     manifest.id.clone(),
                                     Arc::new(Entry {
+                                        core: self.core,
                                         plugin: plugin.clone(),
                                         manifest,
                                         failure: Mutex::new(None),
@@ -232,7 +260,10 @@ impl PluginHost {
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let revision = preferences.revisions.entry(id.clone()).or_default();
         *revision = revision.wrapping_add(1);
-        preferences.states.insert(id, state);
+        preferences.states.insert(id.clone(), state);
+        // Preference revisions revoke queued/in-flight native contributions.
+        // A later observer call reads the new declarative settings (D6).
+        self.native.clear(&id);
     }
 
     /// All extension-point dispatch goes through this isolation boundary.
@@ -268,6 +299,21 @@ impl PluginHost {
         R: Send + 'static,
         F: FnOnce(&dyn Plugin, &dyn HostContext) -> Result<R, PluginError> + Send + 'static,
     {
+        self.call_scoped(id, game_dir, timeout, None, call).await
+    }
+
+    async fn call_scoped<R, F>(
+        &self,
+        id: &str,
+        game_dir: Option<PathBuf>,
+        timeout: Duration,
+        launch_id: Option<u64>,
+        call: F,
+    ) -> Option<R>
+    where
+        R: Send + 'static,
+        F: FnOnce(&dyn Plugin, &dyn HostContext) -> Result<R, PluginError> + Send + 'static,
+    {
         let entry = self.registry().await.entries.get(id)?.clone();
         let (state, revision) = {
             let preferences = self
@@ -290,7 +336,16 @@ impl PluginHost {
             .network
             .as_ref()
             .map(|network| network.context(timeout));
-        let context = Context::new(&entry.manifest, &state, game_dir, network);
+        let mut context = Context::new(&entry.manifest, &state, game_dir, network);
+        context.launch_id = launch_id;
+        context.revision = revision;
+        context.native = Some(native::Access {
+            native: self.native.clone(),
+            preferences: self.preferences.clone(),
+            entry: entry.clone(),
+            revision,
+            deadline: std::time::Instant::now() + timeout,
+        });
         let plugin = entry.plugin.clone();
         let result = isolated(timeout, move || call(plugin.as_ref(), &context)).await;
         match result {
@@ -322,6 +377,7 @@ impl PluginHost {
                 if failure.is_none() {
                     *failure = Some(fault.message);
                 }
+                self.native.clear(id);
                 None
             }
         }

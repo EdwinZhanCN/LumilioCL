@@ -5,6 +5,7 @@ mod diagnostics;
 mod discover;
 mod java;
 mod launch;
+mod launch_observers;
 mod lifecycle;
 mod models;
 mod packs;

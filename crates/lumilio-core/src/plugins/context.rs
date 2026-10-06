@@ -8,6 +8,9 @@ use lumilio_plugin_api::{
 use super::access;
 
 pub(super) struct Context {
+    pub(super) native: Option<super::native::Access>,
+    pub(super) launch_id: Option<u64>,
+    pub(super) revision: u64,
     values: BTreeMap<String, SettingValue>,
     manifest: Manifest,
     game_dir: Option<PathBuf>,
@@ -35,6 +38,9 @@ impl Context {
             })
             .collect();
         Self {
+            native: None,
+            launch_id: None,
+            revision: 0,
             values,
             manifest: manifest.clone(),
             game_dir,
@@ -44,6 +50,21 @@ impl Context {
 }
 
 impl HostContext for Context {
+    fn launch_id(&self) -> Option<u64> {
+        self.launch_id
+    }
+    fn settings_revision(&self) -> u64 {
+        self.revision
+    }
+    fn discord_activity(
+        &self,
+        activity: Option<lumilio_plugin_api::DiscordActivity>,
+    ) -> Result<(), PluginError> {
+        self.native
+            .as_ref()
+            .ok_or(PluginError::PermissionDenied)?
+            .update(activity)
+    }
     fn setting(&self, key: &str) -> Option<SettingValue> {
         self.values.get(key).cloned()
     }

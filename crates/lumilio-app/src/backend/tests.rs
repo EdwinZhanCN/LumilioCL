@@ -47,14 +47,16 @@ fn the_shipped_backend_registers_the_crash_analyzer_and_its_switch() {
     let service = backend.service.clone();
     futures_block(backend.spawn(async move {
         let plugins = service.plugins().await;
-        assert_eq!(plugins.len(), 3);
+        assert_eq!(plugins.len(), 4);
         let id = &plugins[0].manifest.id;
         assert_eq!(id, lumilio_plugin_crash_analyzer::ID);
-        assert_eq!(plugins[1].manifest.id, lumilio_plugin_litematica::ID);
-        assert_eq!(plugins[2].manifest.id, lumilio_plugin_modrinth::ID);
+        assert_eq!(plugins[1].manifest.id, lumilio_plugin_discord::ID);
+        assert_eq!(plugins[1].status, lumilio_core::PluginStatus::Disabled);
+        assert_eq!(plugins[2].manifest.id, lumilio_plugin_litematica::ID);
+        assert_eq!(plugins[3].manifest.id, lumilio_plugin_modrinth::ID);
         // Discover has its source from the first start, with no setup.
         assert_eq!(
-            plugins[2].status,
+            plugins[3].status,
             lumilio_core::PluginStatus::Enabled,
             "Modrinth is on by default"
         );

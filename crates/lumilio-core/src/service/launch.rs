@@ -12,6 +12,7 @@ use crate::recovery::SessionMarker;
 use crate::settings::validate_memory;
 use crate::transfer::{SourceChain, Transport};
 use crate::tuning::QuickPlay;
+use lumilio_plugin_api::{LaunchEvent, LaunchOutcome, LaunchTarget};
 use tokio::sync::mpsc;
 
 impl<T: Transport + Clone> LauncherService<T> {
@@ -176,12 +177,61 @@ impl<T: Transport + Clone> LauncherService<T> {
             Ok(prepared) => prepared,
             Err(error) => return Err(self.note_attempt(id, started, error)),
         };
-        let launcher = Launcher::new(self.transport.clone(), chain)
-            .with_concurrency(request.download_concurrency);
-        let exit = match launcher.launch(request, updates, cancel).await {
-            Ok(exit) => exit,
-            Err(error) => return Err(self.note_attempt(id, started, error.into())),
+        let event = LaunchEvent::Started {
+            instance_name: request.instance.name.clone(),
+            game_version: request.instance.game_version.clone(),
+            loader: format!("{:?}", request.instance.loader),
+            target: request.quick_play.as_ref().map(|target| match target {
+                QuickPlay::World(name) => LaunchTarget::World(name.clone()),
+                QuickPlay::Server(address) => LaunchTarget::Server(address.clone()),
+            }),
         };
+        let events = self.plugins.launch_events();
+        let (spawned, mut spawned_rx) = mpsc::unbounded_channel();
+        let launcher = Launcher::new(self.transport.clone(), chain)
+            .with_concurrency(request.download_concurrency)
+            .with_spawned(spawned);
+        let launch = launcher.launch(request, updates, cancel);
+        tokio::pin!(launch);
+        let mut announced = false;
+        let result = loop {
+            tokio::select! {
+                biased;
+                Some(()) = spawned_rx.recv(), if !announced => {
+                    announced = true;
+                    let _ = events.send(event.clone());
+                }
+                result = &mut launch => break result,
+            }
+        };
+        // A short-lived process can finish in the same poll as its spawn.
+        if !announced && spawned_rx.try_recv().is_ok() {
+            announced = true;
+            let _ = events.send(event);
+        }
+        let exit = match result {
+            Ok(exit) => exit,
+            Err(error) => {
+                if announced {
+                    let _ = events.send(LaunchEvent::Exited {
+                        outcome: LaunchOutcome::Crashed,
+                        played_seconds: 0,
+                    });
+                }
+                return Err(self.note_attempt(id, started, error.into()));
+            }
+        };
+        // Queue exit even if history persistence fails: presence must not leak.
+        let outcome = match SessionOutcome::of(&exit) {
+            SessionOutcome::Clean => LaunchOutcome::Clean,
+            SessionOutcome::Stopped => LaunchOutcome::Stopped,
+            SessionOutcome::FailedToStart => LaunchOutcome::FailedToStart,
+            _ => LaunchOutcome::Crashed,
+        };
+        let _ = events.send(LaunchEvent::Exited {
+            outcome,
+            played_seconds: exit.ran_for.as_secs(),
+        });
         let mut store = self.store.lock().await;
         store.mark_installed(id, true)?;
         finish_session(&mut store, id, started, &exit)?;
