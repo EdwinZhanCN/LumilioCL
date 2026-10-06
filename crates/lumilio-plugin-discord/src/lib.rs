@@ -9,6 +9,7 @@ use lumilio_plugin_api::{
 };
 
 pub const ID: &str = "lumilio.discord";
+pub const DEFAULT_APPLICATION_ID: &str = "1556820934805954691";
 
 #[derive(Default)]
 pub struct Discord {
@@ -32,7 +33,7 @@ impl Plugin for Discord {
                 SettingField {
                     key: "application_id".into(),
                     label: "Discord 应用 ID".into(),
-                    help: "填写为 LumilioCL 注册的 Discord 应用 ID。留空时不发送状态。".into(),
+                    help: "默认使用 LumilioCL 官方 Discord 应用 ID。留空使用内置 ID，也可填写其他 ID 覆盖。".into(),
                     kind: SettingKind::Text {
                         default: String::new(),
                     },
@@ -96,13 +97,10 @@ impl LaunchObserver for Discord {
 }
 
 fn activity(ctx: &dyn HostContext, event: &LaunchEvent) -> Option<DiscordActivity> {
-    let SettingValue::Text(application_id) = ctx.setting("application_id")? else {
-        return None;
+    let application_id = match ctx.setting("application_id") {
+        Some(SettingValue::Text(value)) if !value.trim().is_empty() => value.trim().to_owned(),
+        _ => DEFAULT_APPLICATION_ID.to_owned(),
     };
-    let application_id = application_id.trim().to_owned();
-    if application_id.is_empty() {
-        return None;
-    }
     let LaunchEvent::Started {
         instance_name,
         game_version,

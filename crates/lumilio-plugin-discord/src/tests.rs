@@ -73,7 +73,7 @@ fn configured() -> Context {
 }
 
 #[test]
-fn defaults_are_private_and_an_unconfigured_application_sends_no_presence() {
+fn defaults_are_private_and_use_the_official_application() {
     let plugin = Discord::default();
     assert!(!plugin.manifest().default_enabled);
     assert_eq!(
@@ -90,7 +90,51 @@ fn defaults_are_private_and_an_unconfigured_application_sends_no_presence() {
             &started(Some(LaunchTarget::Server("private.test".into()))),
         )
         .unwrap();
-    assert_eq!(*ctx.calls.lock().unwrap(), [None]);
+    let activity = ctx.calls.lock().unwrap()[0].clone().unwrap();
+    assert_eq!(activity.application_id, DEFAULT_APPLICATION_ID);
+    assert_eq!(activity.state, None);
+    assert_eq!(
+        ctx.setting("application_id"),
+        Some(SettingValue::Text(String::new()))
+    );
+}
+
+#[test]
+fn absent_invalid_or_blank_application_overrides_use_the_official_default() {
+    for value in [
+        None,
+        Some(SettingValue::Toggle(true)),
+        Some(SettingValue::Text(String::new())),
+        Some(SettingValue::Text(" \t\n ".into())),
+    ] {
+        let mut ctx = configured();
+        ctx.values.remove("application_id");
+        if let Some(value) = value {
+            ctx.values.insert("application_id".into(), value);
+        }
+        assert_eq!(
+            activity(&ctx, &started(None)).unwrap().application_id,
+            DEFAULT_APPLICATION_ID
+        );
+        assert!(activity(&ctx, &exited()).is_none());
+    }
+}
+
+#[test]
+fn a_nonempty_application_override_is_trimmed_and_wins() {
+    let mut ctx = configured();
+    assert_eq!(
+        activity(&ctx, &started(None)).unwrap().application_id,
+        "123456789012345678"
+    );
+    ctx.values.insert(
+        "application_id".into(),
+        SettingValue::Text(" \t123456789012345678\n ".into()),
+    );
+    assert_eq!(
+        activity(&ctx, &started(None)).unwrap().application_id,
+        "123456789012345678"
+    );
 }
 
 #[test]

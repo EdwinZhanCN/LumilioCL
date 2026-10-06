@@ -215,6 +215,8 @@ pub enum Permission {
 
 入口条件：P3 已提交。
 
+内置官方 LumilioCL Discord Application ID `1556820934805954691`。应用 ID 设置默认留空，空值使用内置 ID，用户仍可填写其他 ID 覆盖；插件仍默认关闭（`default_enabled: false`）。
+
 - [x] T23 在 plugin-api 里定义扩展点 `LaunchObserver`，事件有两种：
   - `Started { instance_name, game_version, loader, target: None | World(name) | Server(address) }`
   - `Exited { outcome, played_seconds }`
@@ -227,7 +229,7 @@ pub enum Permission {
 验收：
 
 - [x] 事件的发出时机有测试覆盖：用一个假的观察者，配合现有的启动测试替身。
-- [ ] 维护者要实测一次：打开 Discord 并启用插件，进游戏能看到状态，退出后状态消失。
+- [ ] 维护者要实测一次：启用插件并打开 Discord，进游戏能看到状态，退出后状态消失；无需注册或填写应用 ID。
 
 ## Validation
 
@@ -361,8 +363,8 @@ pub enum Permission {
 - 新分支 `feat/plugin-discord` 从 main `6983d2f`（PR #3 合并）创建，工作区起初干净。T26 明确留到维护者真实 Discord 验收后，本轮不压缩或删除计划。
 - 当前 checkout 没有 `3rd-party/`；已只读查阅上游 `modrinth/code` 的 `packages/app-lib/src/state/discord.rs` 和 Discord 官方 RPC 文档。采用宿主拥有 IPC、插件只生成类型化状态的实现，不复制 Modrinth 代码、应用 ID 或品牌资产。
 - 实施细节：同步 LaunchObserver 通过宿主隔离 worker 接收有序的 Started / Exited；发事件不等待观察者。原生权限由注册来源和每次上下文调用双重检查；撤销设置、失败或超时后清除原生贡献并拒绝旧调用的副作用。
-- 尚无 LumilioCL Discord 应用 ID，已向维护者询问；先提供声明式应用 ID 字段，留空不发送状态。显示游戏名默认开、显示世界或服务器默认关，整个插件默认关。应用 ID 不是秘密，不使用 Modrinth 的 ID。
-- 待验证、未声称完成：T23–T25 测试与完整检查、通用设置表单中的新插件行。维护者验收：注册 / 填写 LumilioCL Discord 应用 ID，打开 Discord，启用插件，启动游戏查看状态，退出确认状态消失；完成后才做 T26。
+- 应用 ID 字段现以官方 LumilioCL ID `1556820934805954691` 为内置默认，留空使用它，用户可覆盖。显示游戏名默认开、显示世界或服务器默认关，整个插件默认关。应用 ID 不是秘密，不使用 Modrinth 的 ID。
+- 待验证、未声称完成：T23–T25 测试与完整检查、通用设置表单中的新插件行。维护者验收：启用插件，打开 Discord，启动游戏查看状态，退出确认状态消失；无需注册或填写应用 ID，完成后才做 T26。
 - 第一轮定向验证：Discord 插件 4 项、插件宿主 54 项（1 项现有真实网络测试忽略）、fake Java 生命周期 4 项均通过。初次编译遇到 Arc 测试替身类型、测试访问私有字段、构建开始后才新增 dev-dependency 的旧 Cargo 元数据问题，均已修正；这些编译失败不是回归证据。
 - 原生授权测试已证明会失败：临时去掉每次调用的 DiscordIpc 授权检查，编译完成后测试因返回 `Some(Ok(()))` 而不是 `Some(Err(PermissionDenied))` 变红（`/tmp/lumilio-p4-guard-red.log`），已还原守卫，正在重跑。补充：进程结束 / 停用 / panic / 宿主释放均撤销连接；启动 future 被丢弃时也结束观察会话（process 已有 kill_on_drop），防止状态残留。
 - 守卫还原后的宿主全套定向测试再次通过（54 passed / 1 ignored，`/tmp/lumilio-p4-host-final-tests.log`）。`just ia` 通过，仍为 201 条 / 17 个文件；新清单使用原有的通用设置路径与权限文案，不新增页面或专门渲染。Linux 上 `cargo install just --locked -j 2` 成功安装 just 1.58.0；Rust 1.98.1，`CARGO_BUILD_JOBS=2 just check` 已开始，结果待记录。
@@ -376,6 +378,12 @@ pub enum Permission {
 ### 2026-10-05 — P4 T23–T25 交付，T26 等待维护者
 
 - 最终代码完整 `CARGO_BUILD_JOBS=2 RUST_TEST_THREADS=1 just check` 通过（`/tmp/lumilio-p4-handoff-check.log`）：build、全部 workspace tests、Clippy `--all-targets -- -D warnings`、fmt 依次成功。core 512 passed / 3 ignored，UI 304 passed / 3 ignored，app 10 项及 native-preview 1 项、Discord 插件 5 项通过；边界、attribution、IA 检查通过。新增 18 项测试覆盖生命周期、授权、IPC 清除、隔离、披露与设置并发。忽略项沿用现有真实网络 / 人工预览项，没有跳过本轮失败项。
-- T23–T25 已完成，D1–D7 保持不变，没有冻结决策阻塞。Windows named pipe 分支和真实 Discord 客户端没有在本机验证；GitHub Actions 仍需跑 macOS `just ci`。缺少应用 ID 不阻塞代码交付，但维护者实测前须提供自己为 LumilioCL 注册的 ID。
-- 维护者验收（PR body 同列）：填写 Discord 应用 ID → 打开 Discord → 设置 › 插件启用 Discord → 启动游戏看见状态（可直接启动世界 / 服务器检查披露开关）→ 退出游戏确认状态消失。验收通过后记录结果，才执行 T26：压缩整个插件计划到 ADR 并删除本文件。本轮保持计划 in_progress，不创建替代 ADR、不勾选 T26。
+- T23–T25 已完成，D1–D7 保持不变，没有冻结决策阻塞。Windows named pipe 分支和真实 Discord 客户端没有在本机验证；GitHub Actions 仍需跑 macOS `just ci`。官方应用 ID 已内置，维护者实测无需提供 ID。
+- 维护者验收：设置 › 插件启用 Discord → 打开 Discord → 启动游戏看见状态（可直接启动世界 / 服务器检查披露开关）→ 退出游戏确认状态消失。无需注册或填写应用 ID。验收通过后记录结果，才执行 T26：压缩整个插件计划到 ADR 并删除本文件。本轮保持计划 in_progress，不创建替代 ADR、不勾选 T26。
 - 最终更新计划后的 `just docs` 通过（`/tmp/lumilio-p4-docs.log`），`git diff --check` 通过。将以短英文 imperative commit 提交，推送 `feat/plugin-discord` 并开 main PR，不合并。
+
+### 2026-10-05 — P4 官方 Discord 应用 ID 默认值补充
+
+- 内置官方 LumilioCL Discord Application ID `1556820934805954691`；设置仍以空字符串为默认，缺失、类型错误、空字符串或纯空白均回退到内置 ID，非空覆盖值去除首尾空白后优先使用。插件仍默认关闭，权限与其他设置默认值不变。
+- 更新设置帮助与维护者验收说明；启用插件、打开 Discord、启动 / 退出游戏即可验收，无需注册或填写 ID。T26 保持未勾选，计划继续 in_progress。
+- 新增回归测试在修改解析逻辑前完成编译，并因默认 / 缺失 ID 返回 None 而失败；自定义 ID 测试通过。修复后 Discord 插件 7 项测试、插件 Clippy、完整 workspace Clippy（`--all-targets -- -D warnings`）、完整 workspace 测试（`CARGO_BUILD_JOBS=2 RUST_TEST_THREADS=1 cargo test`）及 `cargo fmt --check` 均通过，先运行了 `cargo fmt`。按本次要求使用 Cargo，未运行 `just check`；完整日志在 `/tmp/lumilio-discord-default-{clippy,tests}.log`。帮助文案属于 Interface，无布局或动效变化；未做本次原生视觉复查，真实 Discord 验收仍由维护者完成。
