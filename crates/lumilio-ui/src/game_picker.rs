@@ -66,7 +66,7 @@ impl GamePicker {
             let weak = form.downgrade();
             let ok = theme::clickable(
                 Key::new("game-picker-ok")
-                    .label("导入")
+                    .label(crate::tr!("game-picker-import"))
                     .primary()
                     .disabled(!ready)
                     .debug_selector(|| "game-picker-ok".into())
@@ -76,7 +76,7 @@ impl GamePicker {
                 ready,
             );
             theme::dialog(dialog, cx)
-                .title("导入哪个游戏")
+                .title(crate::tr!("game-picker-title"))
                 .w(px(DIALOG_WIDTH))
                 .child(form.clone())
                 .footer(
@@ -86,7 +86,7 @@ impl GamePicker {
                         .gap_2()
                         .child(
                             Key::new("game-picker-cancel")
-                                .label("取消")
+                                .label(crate::tr!("common-cancel"))
                                 .white()
                                 .on_click(|_, window, cx| window.close_dialog(cx)),
                         )
@@ -106,9 +106,12 @@ impl Render for GamePicker {
             .max_h(px(320.))
             .overflow_y_scroll()
             .gap_3()
-            .child(div().text_sm().text_color(colors.muted).child(
-                "这个文件夹里有不止一个游戏。导入会复制一份玩家文件（Mod、存档、设置），原来的不会被改动。",
-            ))
+            .child(
+                div()
+                    .text_sm()
+                    .text_color(colors.muted)
+                    .child(crate::tr!("game-picker-body")),
+            )
             .children(self.rows.iter().enumerate().map(|(index, (game, on))| {
                 let weak = weak.clone();
                 Checkbox::new(("game-picker-row", index))

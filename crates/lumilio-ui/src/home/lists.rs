@@ -14,7 +14,7 @@ pub(super) fn render_first_use(
     // ia[home]: 空库：导入 | 首次使用的「把原来的游戏带过来」 | 同游戏库的导入其他启动器的游戏
     let primary = page_button(
         "home-import",
-        "把原来的游戏带过来",
+        crate::tr!("home-import"),
         LocalActionIcon::Import,
         HomeIntent::Import,
         true,
@@ -23,7 +23,7 @@ pub(super) fn render_first_use(
     // ia[home]: 空库：新建 | 首次使用的「新建」 | 同游戏库的新建游戏
     let secondary = page_button(
         "home-create",
-        "新建",
+        crate::tr!("home-create"),
         LocalActionIcon::Create,
         HomeIntent::Create,
         false,
@@ -43,20 +43,20 @@ pub(super) fn render_first_use(
                     div()
                         .text_xs()
                         .text_color(colors.muted)
-                        .child("第一次来到这里"),
+                        .child(crate::tr!("home-first-use-eyebrow")),
                 )
                 .child(
                     div()
                         .text_size(px(20.))
                         .font_semibold()
                         .text_color(colors.foreground)
-                        .child("先把熟悉的世界放在手边"),
+                        .child(crate::tr!("home-first-use-title")),
                 )
                 .child(
                     div()
                         .text_sm()
                         .text_color(colors.muted)
-                        .child("导入原来的游戏，其余设置之后再慢慢展开。"),
+                        .child(crate::tr!("home-first-use-body")),
                 ),
         )
         .child(h_flex().gap_3().child(primary).child(secondary))
@@ -109,7 +109,11 @@ pub(super) fn render_attention(
                             .text_xs()
                             .text_color(colors.muted)
                             .child(if row.more > 0 {
-                                format!("{}（另有 {} 个问题）", row.detail, row.more)
+                                crate::tr!(
+                                    "home-attention-more",
+                                    detail = row.detail.as_str(),
+                                    more = row.more
+                                )
                             } else {
                                 row.detail.clone()
                             }),
@@ -120,7 +124,7 @@ pub(super) fn render_attention(
     Some(
         v_flex()
             .gap_2()
-            .child(body_label("需要留意", colors.muted))
+            .child(body_label(crate::tr!("home-attention"), colors.muted))
             .child(v_flex().w_full().children(list))
             .into_any_element(),
     )
@@ -170,6 +174,6 @@ pub(super) fn render_recent(
 
     v_flex()
         .gap_3()
-        .child(body_label("最近", colors.muted))
+        .child(body_label(crate::tr!("home-recent"), colors.muted))
         .child(h_flex().flex_wrap().gap_3().children(cards))
 }

@@ -5,6 +5,8 @@
 
 use std::rc::Rc;
 
+use crate::tr;
+
 use crate::controls::Checkbox;
 use crate::key::Key;
 use gpui::{App, Context, Entity, IntoElement, Render, Window, div, prelude::*, px};
@@ -21,12 +23,12 @@ const DIALOG_WIDTH: f32 = 400.;
 pub fn name_problem(name: &str, taken: &[String], original: Option<&str>) -> Option<String> {
     let name = name.trim();
     if name.is_empty() {
-        return Some("请输入名称".to_owned());
+        return Some(tr!("collection-name-required").to_owned());
     }
     taken
         .iter()
         .any(|other| other == name && Some(other.as_str()) != original)
-        .then(|| format!("已经有一个叫“{name}”的合集"))
+        .then(|| tr!("collection-name-taken", name = name))
 }
 
 fn close_with(window: &mut Window, cx: &mut App) {
@@ -45,11 +47,11 @@ pub fn confirm_delete(
     window.open_alert_dialog(cx, move |alert, _, _| {
         let on_ok = on_ok.clone();
         alert
-            .title(format!("删除合集“{name}”？"))
-            .description("只会删除这个合集，里面的游戏都还在游戏库里。")
-            .ok_text("删除")
+            .title(tr!("collection-delete-title", name = name.clone()))
+            .description(tr!("collection-delete-body"))
+            .ok_text(tr!("common-delete"))
             .ok_variant(gpui_component::button::ButtonVariant::Danger)
-            .cancel_text("取消")
+            .cancel_text(tr!("common-cancel"))
             .show_cancel(true)
             .on_ok(move |_, window, cx| {
                 on_ok(window, cx);
@@ -70,11 +72,11 @@ pub fn confirm_game_delete(
     window.open_alert_dialog(cx, move |alert, _, _| {
         let on_ok = on_ok.clone();
         alert
-            .title(format!("删除“{name}”？"))
-            .description("游戏目录、存档和历史会一起删除，之后不能找回。")
-            .ok_text("删除")
+            .title(tr!("game-delete-title", name = name.clone()))
+            .description(tr!("game-delete-body"))
+            .ok_text(tr!("common-delete"))
             .ok_variant(gpui_component::button::ButtonVariant::Danger)
-            .cancel_text("取消")
+            .cancel_text(tr!("common-cancel"))
             .show_cancel(true)
             .on_ok(move |_, window, cx| {
                 on_ok(window, cx);
@@ -93,23 +95,23 @@ pub fn confirm_reclaim(
     cx: &mut App,
 ) {
     let description = if kept.is_empty() {
-        "没有游戏用到它们。删掉后，以后需要时会重新下载。".to_owned()
+        tr!("reclaim-body").to_owned()
     } else {
-        format!(
-            "没有游戏用到它们。删掉后，以后需要时会重新下载。\n没清理的部分：{}",
-            kept.join("；")
+        tr!(
+            "reclaim-body-kept",
+            kept = kept.join(tr!("common-clause-separator"))
         )
     };
-    let title = format!("清理 {size} 没用的游戏文件？");
+    let title = tr!("reclaim-title", size = size);
     let on_ok = Rc::new(on_ok);
     window.open_alert_dialog(cx, move |alert, _, _| {
         let on_ok = on_ok.clone();
         alert
             .title(title.clone())
             .description(description.clone())
-            .ok_text("清理")
+            .ok_text(tr!("reclaim-confirm"))
             .ok_variant(gpui_component::button::ButtonVariant::Danger)
-            .cancel_text("取消")
+            .cancel_text(tr!("common-cancel"))
             .show_cancel(true)
             .on_ok(move |_, window, cx| {
                 on_ok(window, cx);
@@ -142,7 +144,7 @@ impl NamePrompt {
         let start = original.clone().unwrap_or_default();
         let input = cx.new(|cx| {
             InputState::new(window, cx)
-                .placeholder("例如 生存、整合包")
+                .placeholder(tr!("collection-name-placeholder"))
                 .default_value(start)
         });
         cx.subscribe_in(
@@ -215,7 +217,7 @@ impl NamePrompt {
                         .gap_2()
                         .child(
                             Key::new("collection-name-cancel")
-                                .label("取消")
+                                .label(tr!("common-cancel"))
                                 .white()
                                 .on_click(|_, window, cx| close_with(window, cx)),
                         )
@@ -275,7 +277,8 @@ impl CollectionPicker {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let new_name = cx.new(|cx| InputState::new(window, cx).placeholder("或者新建一个合集"));
+        let new_name =
+            cx.new(|cx| InputState::new(window, cx).placeholder(tr!("collection-new-placeholder")));
         cx.subscribe_in(
             &new_name,
             window,
@@ -332,7 +335,7 @@ impl CollectionPicker {
             let weak = form.downgrade();
             let ok = theme::clickable(
                 Key::new("collection-pick-ok")
-                    .label("完成")
+                    .label(tr!("common-done"))
                     .primary()
                     .disabled(!ready)
                     .debug_selector(|| "collection-pick-ok".into())
@@ -342,7 +345,7 @@ impl CollectionPicker {
                 ready,
             );
             theme::dialog(dialog, cx)
-                .title("加入合集")
+                .title(tr!("collection-add-title"))
                 .w(px(DIALOG_WIDTH))
                 .child(form.clone())
                 .footer(
@@ -352,7 +355,7 @@ impl CollectionPicker {
                         .gap_2()
                         .child(
                             Key::new("collection-pick-cancel")
-                                .label("取消")
+                                .label(tr!("common-cancel"))
                                 .white()
                                 .on_click(|_, window, cx| close_with(window, cx)),
                         )
@@ -402,7 +405,7 @@ impl Render for CollectionPicker {
                     .text_xs()
                     .text_color(colors.muted)
                     .font_medium()
-                    .child("还没有合集，在下面起个名字就会新建一个")
+                    .child(tr!("collection-add-none"))
             }))
     }
 }

@@ -17,6 +17,6 @@ pub use self::controls::{DiscoverChangeHandler, LiveControls, LiveCtx, all_loade
 pub use self::discover::{discover, kind_label, project_icon};
 pub use self::home::{HOME_RECENT, home_sections, record_readings};
 pub use self::library::{
-    COLLECTIONS_TAB, LIBRARY_LOADER, LIBRARY_SORT, LIBRARY_TABS, SORT_LABELS, arranged, library,
-    loader_code, present_loaders,
+    COLLECTIONS_TAB, LIBRARY_LOADER, LIBRARY_SORT, arranged, library, library_tabs, loader_code,
+    present_loaders, sort_labels,
 };

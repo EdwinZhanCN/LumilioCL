@@ -46,12 +46,15 @@ pub fn home_places(
     let mut readable: Vec<&WorldInfo> = worlds.iter().filter(|world| !world.damaged).collect();
     readable.sort_by_key(|world| std::cmp::Reverse(world.last_played_ms.unwrap_or(0)));
     let worlds_shown = readable.into_iter().take(PLACE_WORLDS).map(|world| {
-        let mut detail = vec!["世界".to_owned()];
+        let mut detail = vec![crate::tr!("home-place-world").to_owned()];
         if let Some(ms) = world.last_played_ms.filter(|ms| *ms > 0) {
-            detail.push(format!("上次游玩 {}", relative_time(ms as u64 / 1000, now)));
+            detail.push(crate::tr!(
+                "home-place-last-played",
+                when = relative_time(ms as u64 / 1000, now)
+            ));
         }
         if world.hardcore {
-            detail.push("极限模式".to_owned());
+            detail.push(crate::tr!("home-place-hardcore").to_owned());
         }
         Place {
             target: PlaceTarget::World(world.folder.clone()),
@@ -62,7 +65,7 @@ pub fn home_places(
     let servers_shown = servers.iter().take(PLACE_SERVERS).map(|server| Place {
         target: PlaceTarget::Server(server.address.clone()),
         name: server.name.clone(),
-        detail: format!("服务器 · {}", server.address),
+        detail: crate::tr!("home-place-server", address = server.address.as_str()),
     });
     let places = if lumilio_core::quick_play_world_unsupported(&record.game_version) {
         Vec::new()
@@ -94,12 +97,12 @@ pub fn home_presentation(
         id: Some(record.id.clone()),
         title: record.name.clone(),
         metadata: match record.last_played {
-            Some(at) => format!(
-                "{} · 上次游玩于 {}",
-                instance_meta(record),
-                relative_time(at, now)
+            Some(at) => crate::tr!(
+                "home-meta-last-played",
+                meta = instance_meta(record),
+                when = relative_time(at, now)
             ),
-            None => format!("{} · 还没玩过", instance_meta(record)),
+            None => crate::tr!("home-meta-never-played", meta = instance_meta(record)),
         },
         world: world_of(&record.id),
     };

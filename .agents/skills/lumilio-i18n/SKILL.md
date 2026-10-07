@@ -27,8 +27,12 @@ text from content sources never go through them.
 - Never join translated pieces into a sentence; one sentence is one message.
   A list separator is `tr!("common-list-separator")`.
 - The system's own names come from `platform` (`reveal_label`).
-- In `lumilio-app`, `tr!` needs an `i18n.toml` in that crate with
-  `domain = "lumilio-ui"` and `assets_dir` pointing at the UI catalogs.
+- `lumilio-app` uses `lumilio_ui::tr!` with the same catalogs
+  (`crates/lumilio-app/i18n.toml`).
+- Words kept in an entity's state (an input's placeholder, a dropdown's items)
+  do not follow a switch by redrawing. Remember `i18n::generation()` when they
+  are taken and take them again when it changes, keeping what is chosen
+  (`LiveControls::relabel`).
 
 ## Moving a page
 

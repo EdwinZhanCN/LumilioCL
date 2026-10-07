@@ -12,6 +12,11 @@ impl LauncherShell {
     /// Builds the Library and Discover controls the first time the live pages show,
     /// and listens to them.
     pub(super) fn ensure_live_controls(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(controls) = &self.live_controls
+            && controls.read(cx).language != crate::i18n::generation()
+        {
+            controls.update(cx, |controls, cx| controls.relabel(window, cx));
+        }
         if self.live.is_some() && self.live_controls.is_none() {
             let controls = cx.new(|cx| LiveControls::new(window, cx));
             let (search, filter) = {
@@ -86,7 +91,7 @@ impl LauncherShell {
                 window,
                 |this, _, event: &SelectEvent<Labels>, window, cx| {
                     if let SelectEvent::Confirm(Some(label)) = event
-                        && let Some(at) = pages::live::SORT_LABELS
+                        && let Some(at) = pages::live::sort_labels()
                             .iter()
                             .position(|sort| *sort == label)
                     {
@@ -132,14 +137,17 @@ impl LauncherShell {
         // library holds.
         if let (Some(controls), Some(model)) = (&self.live_controls, &self.live) {
             use gpui_component::IndexPath;
-            use pages::live::{LIBRARY_LOADER, LIBRARY_SORT, SORT_LABELS, all_loaders};
+            use pages::live::{LIBRARY_LOADER, LIBRARY_SORT, all_loaders, sort_labels};
             let present = pages::live::present_loaders(&model.library);
             let codes: Vec<usize> = present
                 .iter()
                 .copied()
                 .map(pages::live::loader_code)
                 .collect();
-            let want_sort = self.view.choice(LIBRARY_SORT, 0).min(SORT_LABELS.len() - 1);
+            let want_sort = self
+                .view
+                .choice(LIBRARY_SORT, 0)
+                .min(sort_labels().len() - 1);
             let code = self.view.choice(LIBRARY_LOADER, 0);
             let want_loader = codes.iter().position(|c| *c == code).map_or(0, |at| at + 1);
             let read = controls.read(cx);

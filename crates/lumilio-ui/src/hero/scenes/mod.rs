@@ -48,33 +48,33 @@ impl Scene {
         }
     }
 
-    pub const fn eyebrow(self) -> &'static str {
+    pub fn eyebrow(self) -> &'static str {
         match self {
-            Self::Dawn => "主世界",
-            Self::Caves => "洞穴",
-            Self::Redstone => "红石",
-            Self::Portal => "下界",
-            Self::Hearth(_) => "营地",
+            Self::Dawn => crate::tr!("hero-dawn-eyebrow"),
+            Self::Caves => crate::tr!("hero-caves-eyebrow"),
+            Self::Redstone => crate::tr!("hero-redstone-eyebrow"),
+            Self::Portal => crate::tr!("hero-portal-eyebrow"),
+            Self::Hearth(_) => crate::tr!("hero-hearth-eyebrow"),
         }
     }
 
-    pub const fn title(self) -> &'static str {
+    pub fn title(self) -> &'static str {
         match self {
-            Self::Dawn => "新的一天，从第一块方块开始",
-            Self::Caves => "火把的光，每走一格暗一级",
-            Self::Redstone => "十五格之后，信号就会熄灭",
-            Self::Portal => "四乘五的黑曜石，点燃另一个世界",
-            Self::Hearth(_) => "营火还没有熄",
+            Self::Dawn => crate::tr!("hero-dawn-title"),
+            Self::Caves => crate::tr!("hero-caves-title"),
+            Self::Redstone => crate::tr!("hero-redstone-title"),
+            Self::Portal => crate::tr!("hero-portal-title"),
+            Self::Hearth(_) => crate::tr!("hero-hearth-title"),
         }
     }
 
-    pub const fn caption(self) -> &'static str {
+    pub fn caption(self) -> &'static str {
         match self {
-            Self::Dawn => "太阳是方的，云是平的，一切都刚刚好。",
-            Self::Caves => "挖开最后一格石头，岩浆的光会自己涌进来。",
-            Self::Redstone => "同样长的两条线路，只有经过中继器的那一条点亮了灯。",
-            Self::Portal => "打火石一响，紫色的光就洒在了下界岩上。",
-            Self::Hearth(_) => "世界停在你离开的那一刻。",
+            Self::Dawn => crate::tr!("hero-dawn-caption"),
+            Self::Caves => crate::tr!("hero-caves-caption"),
+            Self::Redstone => crate::tr!("hero-redstone-caption"),
+            Self::Portal => crate::tr!("hero-portal-caption"),
+            Self::Hearth(_) => crate::tr!("hero-hearth-caption"),
         }
     }
 
@@ -82,22 +82,22 @@ impl Scene {
     /// is the texel grid the scene was last rasterised at.
     pub fn hud(self, age: f32, size: (i32, i32)) -> String {
         match self {
-            Self::Dawn => format!("时间 {}", dawn::clock(age)),
+            Self::Dawn => crate::tr!("hero-dawn-hud", time = dawn::clock(age)),
             Self::Caves => {
                 let cave = caves::Cave::new(size.0, size.1);
-                format!("火把 ×{}", cave.torches_lit(age))
+                crate::tr!("hero-caves-hud", torches = cave.torches_lit(age))
             }
-            Self::Redstone => format!("信号强度 {}", redstone::signal(age)),
+            Self::Redstone => crate::tr!("hero-redstone-hud", signal = redstone::signal(age)),
             Self::Portal => {
                 if portal::charge(age) > 0.99 {
-                    "传送门 已激活".to_owned()
+                    crate::tr!("hero-portal-hud-active").to_owned()
                 } else if age >= portal::IGNITE_AT {
-                    "传送门 点燃中".to_owned()
+                    crate::tr!("hero-portal-hud-igniting").to_owned()
                 } else {
-                    "传送门 未激活".to_owned()
+                    crate::tr!("hero-portal-hud-inactive").to_owned()
                 }
             }
-            Self::Hearth(_) => format!("营火 光照 {}", hearth::FIRE_LEVEL),
+            Self::Hearth(_) => crate::tr!("hero-hearth-hud", light = hearth::FIRE_LEVEL),
         }
     }
 }

@@ -1,5 +1,5 @@
 use super::super::ViewState;
-use super::library::SORT_LABELS;
+use super::library::sort_labels;
 use crate::kit::Emit;
 use crate::live::{
     DiscoverChange, LiveHandler, LiveIntent, LiveModel, PAGE_SIZES, SORTS, sort_label,
@@ -29,6 +29,9 @@ pub struct LiveControls {
     /// The Settings plugin list's scroll, so it keeps the wheel while it can
     /// scroll.
     pub plugin_scroll: gpui::ScrollHandle,
+    /// The language switch the placeholders and labels were taken in
+    /// (`i18n::generation`).
+    pub language: u32,
 }
 
 /// The text of the "no loader filter" entry.
@@ -68,7 +71,7 @@ impl LiveControls {
             }),
             version_scroll: gpui::ScrollHandle::new(),
             library_sort: cx.new(|cx| {
-                let labels: Vec<String> = SORT_LABELS.iter().map(|s| (*s).to_owned()).collect();
+                let labels: Vec<String> = sort_labels().iter().map(|s| (*s).to_owned()).collect();
                 SelectState::new(
                     SearchableVec::new(labels),
                     Some(IndexPath::default()),
@@ -86,7 +89,45 @@ impl LiveControls {
             }),
             library_loaders: Vec::new(),
             plugin_scroll: gpui::ScrollHandle::new(),
+            language: crate::i18n::generation(),
         }
+    }
+
+    /// Takes the placeholders and the dropdown labels again after a language
+    /// switch, keeping what is typed and what is chosen. The loader list is
+    /// marked stale, so the shell rebuilds it from the library.
+    pub fn relabel(&mut self, window: &mut Window, cx: &mut gpui::Context<Self>) {
+        self.language = crate::i18n::generation();
+        for (input, placeholder) in [
+            (&self.library_filter, crate::tr!("library-search")),
+            (&self.discover_search, crate::tr!("discover-search")),
+            (&self.version_search, crate::tr!("discover-version-search")),
+        ] {
+            input.update(cx, |input, cx| {
+                input.set_placeholder(placeholder, window, cx)
+            });
+        }
+        let relabel = |select: &Entity<SelectState<SearchableVec<String>>>,
+                       labels: Vec<String>,
+                       window: &mut Window,
+                       cx: &mut gpui::Context<Self>| {
+            select.update(cx, |select, cx| {
+                let chosen = select.selected_index(cx);
+                select.set_items(SearchableVec::new(labels), window, cx);
+                select.set_selected_index(chosen, window, cx);
+            });
+        };
+        let sorts = SORTS.iter().map(|s| sort_label(*s).to_owned()).collect();
+        relabel(&self.sort, sorts, window, cx);
+        let library_sorts = sort_labels().iter().map(|s| (*s).to_owned()).collect();
+        relabel(&self.library_sort, library_sorts, window, cx);
+        relabel(
+            &self.library_loader,
+            vec![all_loaders().to_owned()],
+            window,
+            cx,
+        );
+        self.library_loaders.clear();
     }
 }
 

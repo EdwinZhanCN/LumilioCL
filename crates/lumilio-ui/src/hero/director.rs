@@ -309,7 +309,11 @@ impl Director {
                     size.1.max(1) as usize,
                     self.reveal,
                 );
-                Some(format!("区块 {loaded}/{total}"))
+                Some(crate::tr!(
+                    "hero-loading-hud",
+                    loaded = loaded,
+                    total = total
+                ))
             }
             HeroMode::Still { .. } => None,
         }

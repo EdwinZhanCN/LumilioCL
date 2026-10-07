@@ -163,12 +163,12 @@ impl HomePresentation {
         }
     }
 
-    pub const fn primary_label(&self) -> Option<&'static str> {
+    pub fn primary_label(&self) -> Option<&'static str> {
         match self {
             Self::Loading | Self::Ambient | Self::Launching { .. } | Self::Playing { .. } => None,
-            Self::FirstUse => Some("把原来的游戏带过来"),
-            Self::Continue { .. } => Some("继续"),
-            Self::Recovery { .. } => Some("恢复并继续"),
+            Self::FirstUse => Some(crate::tr!("home-import")),
+            Self::Continue { .. } => Some(crate::tr!("home-continue")),
+            Self::Recovery { .. } => Some(crate::tr!("home-recover")),
         }
     }
 

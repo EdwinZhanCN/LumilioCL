@@ -35,10 +35,10 @@ Modrinth App 用 FormatJS 的 `defineMessages`，皮肤页的分组标题都有�
 ## Tasks
 
 - [x] T1：`i18n-embed`（`fluent-system`、`desktop-requester`）加 `i18n-embed-fl`。目录在 `crates/lumilio-ui/i18n/<语言>/lumilio-ui.ftl`，`crates/lumilio-ui/i18n.toml` 把回退语言定为 `zh-CN`。`rust-i18n` 只留给 gpui-component 内部，它不支持复数（longbridge/rust-i18n#65）。消息 id 用 `页面-部件-含义`（Fluent id 不能有点号）。
-- [ ] T2：把现有 UI 与 app 壳层的可见字符串抽进目录，一次一页。已完成：设置页全部六个页签；导航栏、路由名、详情标题、提示条和共用的「更多 / 技术详情」。剩余按 `crates/lumilio-ui/src/i18n/hardcoded.txt`（约 1180 行、90 个文件）。英文由 `dsh` 按 skill `lumilio-i18n` 的提示词补，人再审一遍。插件清单里展示给设置页的名称、描述和设置项也进目录，按插件 id 查找。app 用 `tr!` 时需要自己的 `i18n.toml`（`domain = "lumilio-ui"`，`assets_dir` 指向 UI 的目录），因为 `fl!` 按调用方 crate 找配置。
+- [ ] T2：把现有 UI 与 app 壳层的可见字符串抽进目录，一次一页。已完成：设置页；导航栏与外壳；首页（含英雄区）；游戏库（含合集、导入选择、app 里游戏库的提示）。剩余按 `crates/lumilio-ui/src/i18n/hardcoded.txt`（约 1020 行、75 个文件），下一页是发现。英文由 `dsh` 按 skill `lumilio-i18n` 的提示词补，人再审一遍。插件清单里展示给设置页的名称、描述和设置项也进目录，按插件 id 查找。app 已有 `crates/lumilio-app/i18n.toml`（`domain = "lumilio-ui"`，指向 UI 的目录），因为 `fl!` 按调用方 crate 找配置。
 - [ ] T2b：core 错误里给人看的句子改为类型化，UI 映射成 message id；crash-analyzer 等核心插件的结论改为 id 加参数，或先记为这一轮的已知缺口。
 - [x] T3：`Preferences.language`（`System` / `SimplifiedChinese` / `English`），设置·通用里的分段。跟随系统取系统语言列表里第一个中文或英文，都没有则简体中文。`i18n::apply_language` 换目录、调 `gpui_component::set_locale` 并刷新窗口；app 启动时先按系统语言，读到保存的选择后再换。
-- [ ] T5：切换语言后，重建把文字存进实体的控件：`LiveControls` 里搜索框的占位符和下拉的选项（「全部加载器」、排序名）在创建时取词，现在要等重启才换。做法候选：`i18n` 给出一个随切换递增的代号，外壳发现代号变了就重建这些控件，并恢复当前选择。
+- [x] T5：切换语言后，把文字存进实体的控件要重新取词。`i18n::generation()` 每次切换加一；`LiveControls` 记下自己的代号，外壳渲染时发现不同就 `relabel`：换占位符、换下拉选项并保留所选的项和已输入的文字，加载器列表标为过期由外壳重建。别处新的这类控件照此办理。
 - [x] T4：`i18n/tests.rs`：两个目录 id 与参数一致、英文复数、参数两侧无方向隔离符、系统语言选择；`hardcoded_chinese_only_shrinks` 只许清单变短（`just hardcoded-chinese` 重写）。`tests/english.rs` 在单独进程里切到英文再切回。已验证：错 id 编译失败，新增中文字面量让清单测试失败。
 
 ## Validation

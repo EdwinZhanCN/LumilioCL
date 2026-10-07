@@ -26,9 +26,9 @@ pub enum Loader {
 }
 
 impl Loader {
-    pub const fn label(self) -> &'static str {
+    pub fn label(self) -> &'static str {
         match self {
-            Self::Vanilla => "原版",
+            Self::Vanilla => crate::tr!("loader-vanilla"),
             Self::Fabric => "Fabric",
             Self::Forge => "Forge",
             Self::NeoForge => "NeoForge",

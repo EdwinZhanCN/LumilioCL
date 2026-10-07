@@ -13,6 +13,11 @@ common-more = More
 common-copy = Copy
 common-close = Close
 common-technical-details = Technical details
+common-cancel = Cancel
+common-delete = Delete
+common-done = Done
+# Between the parts of one sentence, as in "cache; natives".
+common-clause-separator = {"; "}
 # Opens the folder with the item selected, named as each system names it.
 common-reveal-macos = Show in Finder
 common-reveal-windows = Show in File Explorer
@@ -21,6 +26,35 @@ common-reveal-linux = Show in file manager
 common-list-separator = {", "}
 # The first item of a list and how many there are, as in "3 items: -Da, …".
 common-list-first-of = { $count } items: { $first }, …
+
+## Time
+
+time-just-now = Just now
+time-minutes-ago = { $count ->
+    [one] { $count } minute ago
+   *[other] { $count } minutes ago
+}
+time-hours-ago = { $count ->
+    [one] { $count } hour ago
+   *[other] { $count } hours ago
+}
+time-yesterday = Yesterday
+time-days-ago = { $count ->
+    [one] { $count } day ago
+   *[other] { $count } days ago
+}
+time-months-ago = { $count ->
+    [one] { $count } month ago
+   *[other] { $count } months ago
+}
+time-years-ago = { $count ->
+    [one] { $count } year ago
+   *[other] { $count } years ago
+}
+
+## Loaders
+
+loader-vanilla = Vanilla
 
 ## Language names are written in their own language, whatever the interface language.
 
@@ -52,6 +86,172 @@ detail-title-modpack = Modpack details
 detail-title-mod = Mod details
 detail-title-resource-pack = Resource pack details
 detail-title-shader = Shader details
+
+## Home
+
+home-loading = Getting ready
+home-continue = Continue
+home-continue-eyebrow = Pick up where you left off
+home-import = Bring your old game over
+home-create = New
+home-first-use-eyebrow = First time here
+home-first-use-title = Keep a familiar world close
+home-first-use-body = Import your old game; the rest of the settings can unfold later.
+home-phase-verifying = Checking
+home-phase-libraries = Libraries
+home-phase-assets = Assets
+home-phase-starting = Starting
+home-phase-verifying-headline = Checking game files
+home-phase-libraries-headline = Filling in libraries
+home-phase-assets-headline = Preparing assets
+home-phase-starting-headline = Starting the game
+home-entering = Entering · { $title }
+home-playing-eyebrow = In game
+# A line under the hero while a game is running.
+home-playing-caption = { $minutes ->
+    [0] Just started
+    [one] Played for { $minutes } minute
+   *[other] Played for { $minutes } minutes
+} · The launcher stays quiet
+home-stop-game = Quit game
+home-recovery-eyebrow = Needs a look
+home-recovery-crashed-title = The game quit unexpectedly
+home-recovery-failed-title = The last launch didn't succeed
+home-recovery-interrupted = The last session didn't end cleanly.
+home-recovery-exited-early = The game exited while starting.
+home-recovery-exited-early-code = The game exited while starting (exit code { $code }).
+# phase is the name of a launch step, such as "Assets".
+home-recovery-stopped-at = It stopped at the “{ $phase }” step.
+home-recovery-crashed = The game quit unexpectedly.
+home-recovery-crashed-code = The game quit unexpectedly (exit code { $code }).
+home-recover = Recover and continue
+home-attention = Needs attention
+# One notice, when more problems follow.
+home-attention-more = { $detail } ({ $more } more { $more ->
+    [one] issue
+   *[other] issues
+})
+home-recent = Recent
+home-continued = Continue playing
+home-record = Play history
+home-record-play-time = Play time
+home-record-worlds = Worlds
+home-record-servers = Servers
+home-places-empty = No worlds yet
+home-places-empty-help = Press "Continue" to enter the game; worlds you create will show up here
+home-place-enter = Enter
+home-place-world = World
+home-place-last-played = Last played { $when }
+home-place-hardcore = Hardcore
+home-place-server = Server · { $address }
+home-meta-last-played = { $meta } · Last played { $when }
+home-meta-never-played = { $meta } · Never played
+
+## Home hero: the world's way of saying it, with a little in-game play (design language §8).
+
+hero-dawn-eyebrow = Overworld
+hero-dawn-title = A new day starts with the first block
+hero-dawn-caption = The sun is square, the clouds are flat, and everything is just right.
+hero-dawn-hud = Time { $time }
+hero-caves-eyebrow = Caves
+hero-caves-title = Torchlight falls one level with every step
+hero-caves-caption = Break the last block of stone and the lava's glow pours in on its own.
+hero-caves-hud = Torches ×{ $torches }
+hero-redstone-eyebrow = Redstone
+hero-redstone-title = After fifteen blocks the signal goes out
+hero-redstone-caption = Two wires of the same length, and only the one through a repeater lit the lamp.
+hero-redstone-hud = Signal { $signal }
+hero-portal-eyebrow = Nether
+hero-portal-title = Four by five obsidian, and another world catches fire
+hero-portal-caption = One strike of flint and steel, and purple light spills across the netherrack.
+hero-portal-hud-active = Portal active
+hero-portal-hud-igniting = Portal igniting
+hero-portal-hud-inactive = Portal inactive
+hero-hearth-eyebrow = Camp
+hero-hearth-title = The campfire is still burning
+hero-hearth-caption = The world paused the moment you left.
+hero-hearth-hud = Campfire light { $light }
+hero-loading-hud = Chunks { $loaded }/{ $total }
+
+## Library
+
+library-tab-all = All games
+library-tab-favorites = Favorites
+library-tab-collections = Collections
+library-sort = Sort by
+library-sort-recent = Recently played
+library-sort-name = Name
+library-sort-created = Date created
+library-loader = Loader
+library-game-count = { $count ->
+    [one] { $count } game
+   *[other] { $count } games
+}
+library-loading = Reading…
+library-empty = No games yet
+library-empty-help = Create one, or install a modpack from Discover
+library-favorites-empty = No favorites yet
+library-favorites-empty-help = Star a card and the games you play most will show up here
+library-no-match = No matching games
+library-no-match-help = Try another keyword
+library-never-played = Never played
+library-play = Play
+library-favorite = Add to favorites
+library-unfavorite = Remove from favorites
+library-menu-play = Play
+library-menu-open = Open
+library-menu-make-current = Make current game
+library-menu-collections = Add to collection…
+library-menu-copy = Copy…
+library-menu-export = Export modpack…
+library-delete = Delete…
+library-new-game = New game
+library-import-pack = Import modpack
+library-import-game = Import from another launcher…
+library-restore = Restore from backup…
+library-open-folder = Open Library folder
+library-collections-none = No collections yet
+library-collections-none-help = Group games your own way, such as "Survival", "Servers", "Modpacks"
+library-collection-new = New collection
+library-collection-rename = Rename…
+library-collection-delete = Delete collection
+library-collection-empty = This collection is empty; pick "Add to collection…" from a game card's ⋯ menu
+collection-name-required = Enter a name
+collection-name-taken = A collection named "{ $name }" already exists
+collection-name-placeholder = e.g. Survival, Modpacks
+collection-new-placeholder = Or create a new collection
+collection-add-title = Add to collection
+collection-add-none = No collections yet; name one below to create it
+collection-delete-title = Delete collection "{ $name }"?
+collection-delete-body = Only this collection is deleted; its games stay in the Library.
+game-delete-title = Delete "{ $name }"?
+game-delete-body = The game folder, saves and history are deleted with it, and can't be recovered.
+reclaim-title = Clean up { $size } of unused game files?
+reclaim-body = No game uses them. Deleting them means they'll be downloaded again when needed.
+reclaim-body-kept =
+    No game uses them. Deleting them means they'll be downloaded again when needed.
+    Not cleaned up: { $kept }
+reclaim-confirm = Clean up
+collection-rename-title = Rename collection
+collection-rename-confirm = Rename
+collection-create-confirm = Create
+collection-renamed = Collection renamed to "{ $name }"
+collection-created = Collection "{ $name }" created
+collection-save-failed = Couldn't save the collection
+collection-updated = Collection updated
+collection-update-failed = Couldn't update the collection
+library-import-game-prompt = Choose another launcher's game folder
+library-import-game-none = No importable game was found in this folder
+library-import-game-started = Importing { $name }; progress is in Activity
+library-import-game-done = Imported "{ $name }"
+library-import-game-failed = Didn't import { $name }
+library-restore-prompt = Choose a backup file (.zip)
+library-restore-started = Starting the backup restore; progress is in Activity
+library-restore-done = Restored as a new game "{ $name }"
+library-restore-failed = Couldn't restore this backup
+game-picker-title = Which game to import
+game-picker-body = This folder has more than one game. Importing copies the player files (mods, saves, settings); the originals are left untouched.
+game-picker-import = Import
 
 ## Library and Discover search and filters
 

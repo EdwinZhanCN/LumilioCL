@@ -5,7 +5,7 @@
 //! project text from content sources never go through here.
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::atomic::{AtomicU8, AtomicU32, Ordering};
 use std::sync::{LazyLock, PoisonError, RwLock};
 
 use gpui::App;
@@ -83,6 +83,10 @@ static LOADER: LazyLock<FluentLanguageLoader> = LazyLock::new(|| loader(Locale::
 static CURRENT: AtomicU8 = AtomicU8::new(UNSET);
 const UNSET: u8 = u8::MAX;
 
+/// Counts language switches, so a view that keeps words in its state (a
+/// placeholder, a dropdown's items) knows to take them again.
+static GENERATION: AtomicU32 = AtomicU32::new(0);
+
 /// Messages without arguments, formatted once per language and kept.
 static TEXTS: LazyLock<RwLock<HashMap<(Locale, &'static str), &'static str>>> =
     LazyLock::new(RwLock::default);
@@ -127,7 +131,15 @@ pub fn locale() -> Locale {
 pub fn set_locale(locale: Locale) {
     load(&LOADER, locale);
     CURRENT.store(locale as u8, Ordering::Relaxed);
+    GENERATION.fetch_add(1, Ordering::Relaxed);
     gpui_component::set_locale(locale.tag());
+}
+
+/// Which language switch the words in use come from; it changes with every
+/// [`set_locale`].
+#[must_use]
+pub fn generation() -> u32 {
+    GENERATION.load(Ordering::Relaxed)
 }
 
 /// Switches to the language the preference means and redraws every window;
@@ -193,7 +205,9 @@ macro_rules! tr {
         $crate::i18n::text($id)
     }};
     ($id:literal, $($name:ident = $value:expr),+ $(,)?) => {
-        $crate::i18n::__fl!($crate::i18n::current_loader(), $id, $($name = $value),+)
+        // `fl!` pastes each value before `.into()`; the parentheses keep
+        // `a / b` from becoming `a / b.into()`.
+        $crate::i18n::__fl!($crate::i18n::current_loader(), $id, $($name = ($value)),+)
     };
 }
 

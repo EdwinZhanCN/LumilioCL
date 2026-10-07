@@ -6,6 +6,7 @@ use lumilio_core::CancellationToken;
 use lumilio_ui::collections::{CollectionPicker, NamePrompt};
 use lumilio_ui::game_picker::GamePicker;
 use lumilio_ui::toast::Toast;
+use lumilio_ui::tr;
 use std::rc::Rc;
 
 /// Makes `id` the current instance everywhere at once and remembers it for
@@ -68,15 +69,22 @@ pub(super) fn ask_collection_name(
                                 Some(from) => service
                                     .rename_collection(&from, &name)
                                     .await
-                                    .map(|()| format!("合集已改名为“{name}”")),
+                                    .map(|()| tr!("collection-renamed", name = name.as_str())),
                                 None => service
                                     .create_collection(&name)
                                     .await
-                                    .map(|()| format!("已新建合集“{name}”")),
+                                    .map(|()| tr!("collection-created", name = name.as_str())),
                             }
                         },
                         |shell, result, cx| {
-                            shell.toast(outcome(result, |text| text, "没能保存合集".to_owned()), cx)
+                            shell.toast(
+                                outcome(
+                                    result,
+                                    |text| text,
+                                    tr!("collection-save-failed").to_owned(),
+                                ),
+                                cx,
+                            )
                         },
                     );
                 }),
@@ -85,9 +93,21 @@ pub(super) fn ask_collection_name(
             )
         });
         if renaming {
-            NamePrompt::open(form, "合集改名", "改名", window, cx);
+            NamePrompt::open(
+                form,
+                tr!("collection-rename-title"),
+                tr!("collection-rename-confirm"),
+                window,
+                cx,
+            );
         } else {
-            NamePrompt::open(form, "新建合集", "新建", window, cx);
+            NamePrompt::open(
+                form,
+                tr!("library-collection-new"),
+                tr!("collection-create-confirm"),
+                window,
+                cx,
+            );
         }
     });
 }
@@ -129,8 +149,8 @@ pub(super) fn ask_collections_of(wiring: &Wiring, id: String, window: &mut Windo
                             shell.toast(
                                 outcome(
                                     result,
-                                    |()| "合集已更新".to_owned(),
-                                    "没能更新合集".to_owned(),
+                                    |()| tr!("collection-updated").to_owned(),
+                                    tr!("collection-update-failed").to_owned(),
                                 ),
                                 cx,
                             )
@@ -152,7 +172,7 @@ pub(super) fn import_game(wiring: &Wiring, window: &mut Window, cx: &mut App) {
         files: false,
         directories: true,
         multiple: false,
-        prompt: Some("选择其他启动器的游戏文件夹".into()),
+        prompt: Some(tr!("library-import-game-prompt").into()),
     });
     let wiring = wiring.clone();
     let handle = window.window_handle();
@@ -176,7 +196,7 @@ pub(super) fn import_game(wiring: &Wiring, window: &mut Window, cx: &mut App) {
             Err(error) => {
                 let _ = wiring.shell.update(cx, |shell, cx| {
                     shell.toast(
-                        Toast::error("这个文件夹里没找到能导入的游戏").technical(error.to_string()),
+                        Toast::error(tr!("library-import-game-none")).technical(error.to_string()),
                         cx,
                     )
                 });
@@ -194,14 +214,17 @@ pub(super) fn import_game(wiring: &Wiring, window: &mut Window, cx: &mut App) {
                         cx,
                         true,
                         Reload::All,
-                        Some(Toast::info(format!("开始导入 {name}，进度在动态里"))),
+                        Some(Toast::info(tr!(
+                            "library-import-game-started",
+                            name = name.as_str()
+                        ))),
                         async move { service.import_game(game, CancellationToken::new()).await },
                         move |shell, result, cx| {
                             shell.toast(
                                 outcome(
                                     result,
-                                    |record| format!("已导入「{}」", record.name),
-                                    format!("没有导入 {name}"),
+                                    |record| tr!("library-import-game-done", name = record.name),
+                                    tr!("library-import-game-failed", name = name.as_str()),
                                 ),
                                 cx,
                             )
@@ -230,7 +253,7 @@ pub(super) fn restore_backup(wiring: &Wiring, cx: &mut App) {
         files: true,
         directories: false,
         multiple: false,
-        prompt: Some("选择备份文件（.zip）".into()),
+        prompt: Some(tr!("library-restore-prompt").into()),
     });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
@@ -247,7 +270,7 @@ pub(super) fn restore_backup(wiring: &Wiring, cx: &mut App) {
                 cx,
                 true,
                 Reload::All,
-                Some(Toast::info("开始恢复备份，进度在动态里")),
+                Some(Toast::info(tr!("library-restore-started"))),
                 async move {
                     service
                         .restore_backup(&path, CancellationToken::new())
@@ -257,8 +280,8 @@ pub(super) fn restore_backup(wiring: &Wiring, cx: &mut App) {
                     shell.toast(
                         outcome(
                             result,
-                            |record| format!("已恢复为新游戏「{}」", record.name),
-                            "没能恢复这个备份".to_owned(),
+                            |record| tr!("library-restore-done", name = record.name),
+                            tr!("library-restore-failed").to_owned(),
                         ),
                         cx,
                     )

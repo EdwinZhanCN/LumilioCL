@@ -5,19 +5,34 @@ use crate::key::Key;
 use crate::kit::ViewIntent;
 use crate::live::{LibraryCard, LiveIntent, cover_loader};
 use crate::{kit, theme};
+use crate::{tr, tr_all};
 use gpui::prelude::*;
 use gpui::{App, ClickEvent, IntoElement, Window, div, px};
 use gpui_component::Sizable as _;
 use gpui_component::{Icon, h_flex, v_flex};
 
-pub const LIBRARY_TABS: [&str; 3] = ["全部游戏", "收藏", "合集"];
+#[must_use]
+pub fn library_tabs() -> &'static [&'static str] {
+    tr_all![
+        "library-tab-all",
+        "library-tab-favorites",
+        "library-tab-collections"
+    ]
+}
 /// The tab that shows the person's collections.
 pub const COLLECTIONS_TAB: usize = 2;
 
 /// View-state groups of the Library's ordering and loader filter.
 pub const LIBRARY_SORT: u8 = 210;
 pub const LIBRARY_LOADER: u8 = 211;
-pub const SORT_LABELS: [&str; 3] = ["最近游玩", "名称", "创建时间"];
+#[must_use]
+pub fn sort_labels() -> &'static [&'static str] {
+    tr_all![
+        "library-sort-recent",
+        "library-sort-name",
+        "library-sort-created"
+    ]
+}
 
 /// The number a loader is remembered by: 1 vanilla, 2 Fabric, 3 Forge,
 /// 4 NeoForge, 5 Quilt (0 is every loader).
@@ -75,7 +90,7 @@ pub(super) fn card_menu(card: &LibraryCard, ctx: &LiveCtx) -> Vec<kit::MenuEntry
     let delete = {
         let handler = ctx.handler.clone();
         let (id, name) = (card.id.clone(), card.name.clone());
-        kit::MenuEntry::new("删除…", move |window, cx| {
+        kit::MenuEntry::new(tr!("library-delete"), move |window, cx| {
             // Asked here, before the game's page is opened for it.
             let (handler, id) = (handler.clone(), id.clone());
             crate::collections::confirm_game_delete(
@@ -95,16 +110,22 @@ pub(super) fn card_menu(card: &LibraryCard, ctx: &LiveCtx) -> Vec<kit::MenuEntry
     // ia[library]: 在访达中显示 | 卡片 ⋯ 菜单 | 打开游戏目录
     // ia[library]: 导出整合包 | 卡片 ⋯ 菜单 → 导出弹窗 | 先打开游戏页再弹出导出，之后同游戏页
     vec![
-        go("开始游戏", LiveIntent::Play(id())),
-        go("打开", LiveIntent::OpenInstance(id())),
-        go("设为当前游戏", LiveIntent::InstallTarget(id())),
-        go("加入合集…", LiveIntent::EditCollections(id())),
-        go("复制…", LiveIntent::CopyGameOf(id())),
+        go(tr!("library-menu-play"), LiveIntent::Play(id())),
+        go(tr!("library-menu-open"), LiveIntent::OpenInstance(id())),
+        go(
+            tr!("library-menu-make-current"),
+            LiveIntent::InstallTarget(id()),
+        ),
+        go(
+            tr!("library-menu-collections"),
+            LiveIntent::EditCollections(id()),
+        ),
+        go(tr!("library-menu-copy"), LiveIntent::CopyGameOf(id())),
         go(
             crate::platform::reveal_label(),
             LiveIntent::RevealGame(id()),
         ),
-        go("导出整合包…", LiveIntent::ExportPackOf(id())),
+        go(tr!("library-menu-export"), LiveIntent::ExportPackOf(id())),
         delete,
     ]
 }
@@ -114,9 +135,9 @@ pub(super) fn card(index: usize, card: &LibraryCard, ctx: &LiveCtx) -> impl Into
     let open = send(&ctx.handler, LiveIntent::OpenInstance(card.id.clone()));
     let play = send(&ctx.handler, LiveIntent::Play(card.id.clone()));
     let favorite_label = if card.favorite {
-        "取消收藏"
+        tr!("library-unfavorite")
     } else {
-        "收藏游戏"
+        tr!("library-favorite")
     };
     let favorite = {
         let handler = ctx.handler.clone();
@@ -165,7 +186,7 @@ pub(super) fn card(index: usize, card: &LibraryCard, ctx: &LiveCtx) -> impl Into
                 .child(
                     kit::action(
                         ("live-play", index),
-                        "启动",
+                        tr!("library-play"),
                         Some(UiIcon::Play),
                         false,
                         move |window, cx| {
@@ -215,13 +236,13 @@ pub(super) fn collections_body(ctx: &LiveCtx, needle: &str) -> gpui::AnyElement 
             .w_full()
             .gap_3()
             .child(kit::empty(
-                "还没有合集",
-                "把游戏按你的方式归类，比如“生存”“服务器”“整合包”",
+                tr!("library-collections-none"),
+                tr!("library-collections-none-help"),
                 colors,
             ))
             .child(h_flex().justify_center().child(kit::action(
                 "live-collection-empty-new",
-                "新建合集",
+                tr!("library-collection-new"),
                 Some(UiIcon::Plus),
                 true,
                 send(&ctx.handler, LiveIntent::NewCollection),
@@ -242,13 +263,13 @@ pub(super) fn collections_body(ctx: &LiveCtx, needle: &str) -> gpui::AnyElement 
             ("live-collection-more", section),
             vec![
                 kit::MenuEntry::new(
-                    "改名…",
+                    tr!("library-collection-rename"),
                     send(
                         &ctx.handler,
                         LiveIntent::RenameCollection(collection.name.clone()),
                     ),
                 ),
-                kit::MenuEntry::new("删除合集", {
+                kit::MenuEntry::new(tr!("library-collection-delete"), {
                     let handler = ctx.handler.clone();
                     let name = collection.name.clone();
                     move |window, cx| {
@@ -272,9 +293,9 @@ pub(super) fn collections_body(ctx: &LiveCtx, needle: &str) -> gpui::AnyElement 
                 .text_sm()
                 .text_color(colors.muted)
                 .child(if collection.members.is_empty() {
-                    "这个合集还是空的，在游戏卡片的 ⋯ 菜单里选“加入合集…”"
+                    tr!("library-collection-empty")
                 } else {
-                    "没有匹配的游戏"
+                    tr!("library-no-match")
                 })
                 .into_any_element()
         } else {
@@ -311,7 +332,7 @@ pub(super) fn collections_body(ctx: &LiveCtx, needle: &str) -> gpui::AnyElement 
                                     div()
                                         .text_xs()
                                         .text_color(colors.muted)
-                                        .child(format!("{} 个游戏", cards.len())),
+                                        .child(tr!("library-game-count", count = cards.len())),
                                 ),
                         )
                         .child(menu),
@@ -329,10 +350,13 @@ pub(super) fn collections_body(ctx: &LiveCtx, needle: &str) -> gpui::AnyElement 
 
 pub fn library(ctx: &LiveCtx) -> impl IntoElement {
     let colors = ctx.colors;
-    let tab = ctx.state.library_tab.min(LIBRARY_TABS.len() - 1);
+    let tab = ctx.state.library_tab.min(library_tabs().len() - 1);
     let needle = ctx.filter.to_lowercase();
     let loaders = present_loaders(&ctx.model.library);
-    let sort = ctx.state.choice(LIBRARY_SORT, 0).min(SORT_LABELS.len() - 1);
+    let sort = ctx
+        .state
+        .choice(LIBRARY_SORT, 0)
+        .min(sort_labels().len() - 1);
     // The remembered loader, if the library still has one: its place among
     // the chips (0 is every loader).
     let code = ctx.state.choice(LIBRARY_LOADER, 0);
@@ -356,13 +380,16 @@ pub fn library(ctx: &LiveCtx) -> impl IntoElement {
         collections_body(ctx, &needle)
     } else if shown.is_empty() {
         let (title, text) = if !ctx.model.library_loaded {
-            ("正在读取…", "")
+            (tr!("library-loading"), "")
         } else if ctx.model.library.is_empty() {
-            ("还没有游戏", "新建一个，或去发现里装一个整合包")
+            (tr!("library-empty"), tr!("library-empty-help"))
         } else if tab == 1 && needle.is_empty() {
-            ("还没有收藏", "点卡片上的星标，常玩的游戏会出现在这里")
+            (
+                tr!("library-favorites-empty"),
+                tr!("library-favorites-empty-help"),
+            )
         } else {
-            ("没有匹配的游戏", "换个关键词试试")
+            (tr!("library-no-match"), tr!("library-no-match-help"))
         };
         kit::empty(title, text, colors).into_any_element()
     } else {
@@ -385,7 +412,7 @@ pub fn library(ctx: &LiveCtx) -> impl IntoElement {
         actions = actions.secondary(
             kit::action(
                 "live-new-collection",
-                "新建合集",
+                tr!("library-collection-new"),
                 Some(UiIcon::Plus),
                 false,
                 send(&ctx.handler, LiveIntent::NewCollection),
@@ -396,7 +423,7 @@ pub fn library(ctx: &LiveCtx) -> impl IntoElement {
         // ia[library]: 导入整合包 | L2 次要 → 系统选文件（.mrpack，或 MultiMC/Prism/本启动器备份的 .zip） | 后台导入，进度在动态；完成 toast 并可点“打开”
         actions = actions.secondary(kit::action(
             "live-import",
-            "导入整合包",
+            tr!("library-import-pack"),
             Some(UiIcon::Download),
             false,
             send(&ctx.handler, LiveIntent::ImportPack),
@@ -407,21 +434,21 @@ pub fn library(ctx: &LiveCtx) -> impl IntoElement {
     // ia[library]: 打开游戏库文件夹 | L2 ⋯ 菜单 | 在访达中打开所有游戏所在的文件夹
     let actions = actions
         .more(kit::MenuEntry::new(
-            "导入其他启动器的游戏…",
+            tr!("library-import-game"),
             send(&ctx.handler, LiveIntent::ImportGame),
         ))
         .more(kit::MenuEntry::new(
-            "从备份恢复…",
+            tr!("library-restore"),
             send(&ctx.handler, LiveIntent::RestoreBackup),
         ))
         .more(kit::MenuEntry::new(
-            "打开游戏库文件夹",
+            tr!("library-open-folder"),
             send(&ctx.handler, LiveIntent::OpenGamesFolder),
         ))
         // ia[library]: 新建游戏 | L2 主要 → 新建游戏弹窗 | 创建并（可选）立即安装；成功后打开新游戏页
         .primary(kit::action(
             "live-new",
-            "新建游戏",
+            tr!("library-new-game"),
             Some(UiIcon::Plus),
             true,
             send(&ctx.handler, LiveIntent::NewInstance),
@@ -431,14 +458,14 @@ pub fn library(ctx: &LiveCtx) -> impl IntoElement {
         .w_full()
         .gap_5()
         .child(kit::header(
-            "游戏库",
-            format!("{} 个游戏", ctx.model.library.len()),
+            tr!("route-library"),
+            tr!("library-game-count", count = ctx.model.library.len()),
             actions.render(colors),
             colors,
         ))
         .child(kit::toolbar(
             Some(
-                kit::tabs("live-library-tabs", &LIBRARY_TABS, tab, {
+                kit::tabs("live-library-tabs", library_tabs(), tab, {
                     let emit = ctx.emit.clone();
                     move |index, window, app| emit(ViewIntent::LibraryTab(index), window, app)
                 })
@@ -456,13 +483,18 @@ pub fn library(ctx: &LiveCtx) -> impl IntoElement {
                     .items_center()
                     .flex_wrap()
                     .child(toolbar_select(
-                        "排序方式",
+                        tr!("library-sort"),
                         &ctx.controls.library_sort,
                         130.,
                         colors,
                     ))
                     .children((loaders.len() > 1).then(|| {
-                        toolbar_select("加载器", &ctx.controls.library_loader, 150., colors)
+                        toolbar_select(
+                            tr!("library-loader"),
+                            &ctx.controls.library_loader,
+                            150.,
+                            colors,
+                        )
                     }))
             }),
         )

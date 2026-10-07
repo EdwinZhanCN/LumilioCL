@@ -39,7 +39,7 @@ pub(super) const fn ui_loader(loader: Loader) -> crate::cover::Loader {
     }
 }
 
-pub const fn loader_label(loader: Loader) -> &'static str {
+pub fn loader_label(loader: Loader) -> &'static str {
     ui_loader(loader).label()
 }
 
@@ -68,13 +68,13 @@ pub fn world_of(id: &str) -> WorldHint {
 pub fn relative_time(then: u64, now: u64) -> String {
     let seconds = now.saturating_sub(then);
     match seconds {
-        0..60 => "刚刚".to_owned(),
-        60..3600 => format!("{} 分钟前", seconds / 60),
-        3600..86_400 => format!("{} 小时前", seconds / 3600),
-        86_400..172_800 => "昨天".to_owned(),
-        172_800..2_592_000 => format!("{} 天前", seconds / 86_400),
-        2_592_000..31_536_000 => format!("{} 个月前", seconds / 2_592_000),
-        _ => format!("{} 年前", seconds / 31_536_000),
+        0..60 => crate::tr!("time-just-now").to_owned(),
+        60..3600 => crate::tr!("time-minutes-ago", count = seconds / 60),
+        3600..86_400 => crate::tr!("time-hours-ago", count = seconds / 3600),
+        86_400..172_800 => crate::tr!("time-yesterday").to_owned(),
+        172_800..2_592_000 => crate::tr!("time-days-ago", count = seconds / 86_400),
+        2_592_000..31_536_000 => crate::tr!("time-months-ago", count = seconds / 2_592_000),
+        _ => crate::tr!("time-years-ago", count = seconds / 31_536_000),
     }
 }
 
@@ -90,8 +90,8 @@ pub fn library_card(record: &InstanceRecord, now: u64) -> LibraryCard {
         game_version: record.game_version.clone(),
         favorite: record.favorite,
         played: record.last_played.map_or_else(
-            || "还没玩过".to_owned(),
-            |at| format!("上次游玩 {}", relative_time(at, now)),
+            || crate::tr!("library-never-played").to_owned(),
+            |at| crate::tr!("home-place-last-played", when = relative_time(at, now)),
         ),
         seed: seed_of(&record.id),
         loader: record.loader,

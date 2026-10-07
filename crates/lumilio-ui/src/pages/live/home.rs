@@ -37,7 +37,7 @@ pub fn home_sections(ctx: &LiveCtx, home: &HomePresentation) -> Option<AnyElemen
     let recent = (!cards.is_empty()).then(|| {
         v_flex()
             .gap_3()
-            .child(body_label("最近", colors.muted))
+            .child(body_label(crate::tr!("home-recent"), colors.muted))
             .child(
                 h_flex()
                     .flex_wrap()
@@ -79,13 +79,13 @@ pub fn record_readings(places: &HomePlaces) -> Vec<kit::Reading> {
     };
     vec![
         kit::Reading {
-            label: "游玩时间".into(),
+            label: crate::tr!("home-record-play-time").into(),
             value: time,
             digits,
             unit: Some(unit),
         },
-        count("世界", places.worlds),
-        count("服务器", places.servers),
+        count(crate::tr!("home-record-worlds"), places.worlds),
+        count(crate::tr!("home-record-servers"), places.servers),
     ]
 }
 
@@ -98,8 +98,8 @@ fn continued_group(places: &HomePlaces, can_start: bool, ctx: &LiveCtx) -> AnyEl
         let rows: Vec<gpui::Div> = if nothing_yet {
             vec![
                 kit::row(
-                    "还没有世界",
-                    "按「继续」进入游戏，创建的世界会出现在这里",
+                    crate::tr!("home-places-empty"),
+                    crate::tr!("home-places-empty-help"),
                     None,
                     None,
                     colors,
@@ -117,9 +117,13 @@ fn continued_group(places: &HomePlaces, can_start: bool, ctx: &LiveCtx) -> AnyEl
                         LiveIntent::PlayPlace(places.instance.clone(), place.target.clone()),
                     );
                     // ia[home]: 接着玩：进入世界 / 服务器 | 「接着玩」每行的「进入」（继续的游戏最近玩的 3 个世界，再是服务器列表前 2 个） | 启动并直达该世界或服务器，英雄区进入启动时刻 | 启动中和游戏中置灰；1.20 以前的版本不列出；还没有世界时这里说一句它们会出现在哪
-                    let key = kit::ghost(("home-place-enter", index), "进入", enter)
-                        .disabled(!can_start)
-                        .debug_selector(move || format!("home-place-enter-{index}"));
+                    let key = kit::ghost(
+                        ("home-place-enter", index),
+                        crate::tr!("home-place-enter"),
+                        enter,
+                    )
+                    .disabled(!can_start)
+                    .debug_selector(move || format!("home-place-enter-{index}"));
                     kit::row(
                         place.name.clone(),
                         place.detail.clone(),
@@ -134,13 +138,13 @@ fn continued_group(places: &HomePlaces, can_start: bool, ctx: &LiveCtx) -> AnyEl
             .flex_1()
             .min_w(px(320.))
             .gap_3()
-            .child(body_label("接着玩", colors.muted))
+            .child(body_label(crate::tr!("home-continued"), colors.muted))
             .child(kit::panel_list(rows, colors))
     });
     let record = v_flex()
         .flex_none()
         .gap_3()
-        .child(body_label("游戏记录", colors.muted))
+        .child(body_label(crate::tr!("home-record"), colors.muted))
         .child(
             kit::record("home-record", &record_readings(places), colors)
                 .debug_selector(|| "home-record".into()),

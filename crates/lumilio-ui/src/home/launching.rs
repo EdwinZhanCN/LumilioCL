@@ -20,7 +20,7 @@ pub(super) fn render_continue(
     // ia[home]: 继续 | 英雄区主按钮「继续」 | 启动当前游戏，英雄区进入启动时刻；跟随当前游戏（导航右下角芯片）
     let button = art_button(
         "home-continue",
-        "继续",
+        crate::tr!("home-continue"),
         LocalActionIcon::Continue,
         HomeIntent::Continue,
         art.primary,
@@ -30,7 +30,10 @@ pub(super) fn render_continue(
     v_flex()
         .items_start()
         .gap(px(6.))
-        .child(eyebrow("接着上次", world_accent(subject.world)))
+        .child(eyebrow(
+            crate::tr!("home-continue-eyebrow"),
+            world_accent(subject.world),
+        ))
         .child(headline(subject.title.clone()))
         .child(caption(subject.metadata.clone()))
         .child(
@@ -47,21 +50,21 @@ pub(super) fn render_continue(
 }
 
 /// People-facing names of the launch phases, in order.
-pub const fn phase_label(phase: LaunchPhase) -> &'static str {
+pub fn phase_label(phase: LaunchPhase) -> &'static str {
     match phase {
-        LaunchPhase::Verifying => "检查",
-        LaunchPhase::Libraries => "依赖库",
-        LaunchPhase::Assets => "资源",
-        LaunchPhase::Starting => "启动",
+        LaunchPhase::Verifying => crate::tr!("home-phase-verifying"),
+        LaunchPhase::Libraries => crate::tr!("home-phase-libraries"),
+        LaunchPhase::Assets => crate::tr!("home-phase-assets"),
+        LaunchPhase::Starting => crate::tr!("home-phase-starting"),
     }
 }
 
-pub const fn phase_headline(phase: LaunchPhase) -> &'static str {
+pub fn phase_headline(phase: LaunchPhase) -> &'static str {
     match phase {
-        LaunchPhase::Verifying => "正在检查游戏文件",
-        LaunchPhase::Libraries => "正在补齐依赖库",
-        LaunchPhase::Assets => "正在准备资源文件",
-        LaunchPhase::Starting => "正在启动游戏",
+        LaunchPhase::Verifying => crate::tr!("home-phase-verifying-headline"),
+        LaunchPhase::Libraries => crate::tr!("home-phase-libraries-headline"),
+        LaunchPhase::Assets => crate::tr!("home-phase-assets-headline"),
+        LaunchPhase::Starting => crate::tr!("home-phase-starting-headline"),
     }
 }
 
@@ -191,7 +194,7 @@ pub(super) fn render_launching(
         .items_start()
         .gap(px(6.))
         .child(eyebrow(
-            format!("正在进入 · {}", subject.title),
+            crate::tr!("home-entering", title = subject.title.to_string()),
             world_accent(subject.world),
         ))
         .child(headline(phase_headline(phase)))
@@ -206,7 +209,7 @@ pub(super) fn render_launching(
                     // ia[home]: 取消启动 | 启动时刻里的「取消」 | 停止本次启动，回到继续状态
                     art_button(
                         "home-cancel-launch",
-                        "取消",
+                        crate::tr!("common-cancel"),
                         LocalActionIcon::Cancel,
                         HomeIntent::CancelLaunch,
                         art.glass,
@@ -230,17 +233,18 @@ pub(super) fn render_playing(
     art: ArtButtons,
 ) -> AnyElement {
     let minutes = play_minutes(since, Instant::now());
-    let duration = if minutes == 0 {
-        "刚刚开始".to_owned()
-    } else {
-        format!("已经玩了 {minutes} 分钟")
-    };
     v_flex()
         .items_start()
         .gap(px(6.))
-        .child(eyebrow("正在游戏中", world_accent(subject.world)))
+        .child(eyebrow(
+            crate::tr!("home-playing-eyebrow"),
+            world_accent(subject.world),
+        ))
         .child(headline(subject.title.clone()))
-        .child(caption(format!("{duration} · 启动器会保持安静")))
+        .child(caption(crate::tr!(
+            "home-playing-caption",
+            minutes = minutes
+        )))
         .child(
             div()
                 .mt(px(12.))
@@ -248,7 +252,7 @@ pub(super) fn render_playing(
                 // ia[home]: 结束游戏 | 游戏运行中的「结束游戏」 | 停止游戏进程
                 .child(art_button(
                     "home-stop-game",
-                    "结束游戏",
+                    crate::tr!("home-stop-game"),
                     LocalActionIcon::Stop,
                     HomeIntent::StopGame,
                     art.glass,

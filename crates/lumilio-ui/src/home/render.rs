@@ -39,7 +39,7 @@ pub fn render_body(
         HomePresentation::Loading => div()
             .text_sm()
             .text_color(colors.muted)
-            .child("正在准备")
+            .child(crate::tr!("home-loading"))
             .into_any_element(),
         HomePresentation::FirstUse => render_first_use(intent_handler, colors).into_any_element(),
         HomePresentation::Ambient => div().into_any_element(),

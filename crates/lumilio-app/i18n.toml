@@ -1,0 +1,7 @@
+# Read by `lumilio_ui::tr!` (i18n-embed-fl) when it expands in this crate: the
+# app speaks from the UI's catalogs, checked against the Chinese one.
+fallback_language = "zh-CN"
+
+[fluent]
+assets_dir = "../lumilio-ui/i18n"
+domain = "lumilio-ui"
