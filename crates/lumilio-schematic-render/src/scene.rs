@@ -16,14 +16,27 @@ pub struct Frame {
 pub struct Scene {
     meshes: Vec<MeshOutput>,
     renderer: GpuRenderer,
+    undrawable: Vec<String>,
 }
 
 impl Scene {
     /// Parses a `.litematic` and meshes it with the pack's textures. Blocks: call it off the UI thread.
+    ///
+    /// When the pack is a game JAR, block IDs are first converted to that game version, so a
+    /// schematic saved before a rename (`chain` → `iron_chain`) still finds its models.
     pub fn load(schematic: &[u8], pack: &[u8]) -> Result<Self, SceneError> {
-        let schematic = nucleation::formats::litematic::from_litematic(schematic)
+        let mut schematic = nucleation::formats::litematic::from_litematic(schematic)
             .map_err(|e| SceneError::Parse(e.to_string()))?;
+        if let Some(version) = game_data_version(pack) {
+            schematic.convert_to_data_version(version);
+        }
         Self::from_schematic(&schematic, pack)
+    }
+
+    /// Block IDs in the schematic that this pack cannot draw at all. They are left out of the
+    /// picture, so the host should say so.
+    pub fn undrawable_blocks(&self) -> &[String] {
+        &self.undrawable
     }
 
     pub(crate) fn from_schematic(
@@ -32,6 +45,7 @@ impl Scene {
     ) -> Result<Self, SceneError> {
         let pack =
             ResourcePackSource::from_bytes(pack).map_err(|e| SceneError::Pack(e.to_string()))?;
+        let undrawable = schematic.undrawable_blocks(&pack);
         // Nucleation src/rendering/gpu.rs (MIT; see ATTRIBUTIONS.md) consumes
         // only opaque/cutout/transparent layers at this revision, not the
         // mesher's separate greedy_materials. Enabling greedy meshing makes
@@ -43,7 +57,11 @@ impl Scene {
         let meshes = vec![mesh];
         // Creating it here finds out about a missing GPU before the first frame is asked for.
         let renderer = Self::renderer(&meshes, 640, 480)?;
-        Ok(Self { meshes, renderer })
+        Ok(Self {
+            meshes,
+            renderer,
+            undrawable,
+        })
     }
 
     fn renderer(meshes: &[MeshOutput], width: u32, height: u32) -> Result<GpuRenderer, SceneError> {
@@ -79,6 +97,15 @@ impl Scene {
             bgra: pixels,
         })
     }
+}
+
+/// The data version (`world_version`) a client JAR's `version.json` declares; `None` for a plain
+/// resource pack.
+pub(crate) fn game_data_version(pack: &[u8]) -> Option<i32> {
+    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(pack)).ok()?;
+    let file = archive.by_name("version.json").ok()?;
+    let json: serde_json::Value = serde_json::from_reader(file).ok()?;
+    i32::try_from(json.get("world_version")?.as_i64()?).ok()
 }
 
 pub(crate) fn rgba_to_bgra(pixels: &mut [u8]) {

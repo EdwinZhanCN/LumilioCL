@@ -26,15 +26,29 @@ impl BlockTransform {
 }
 
 /// Element-level rotation from model element.
+///
+/// Two JSON forms exist: the single-axis `{"axis", "angle"}` form, and the Euler
+/// form `{"x", "y", "z"}` that Minecraft 26.x uses for angles beyond ±45°.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ElementRotation {
     /// Origin point for rotation (in 0-16 Minecraft coordinates).
     #[serde(default = "default_origin")]
     pub origin: [f32; 3],
-    /// Axis to rotate around.
-    pub axis: Axis,
-    /// Rotation angle in degrees (-45 to 45, in 22.5 increments).
+    /// Axis to rotate around (single-axis form).
+    #[serde(default)]
+    pub axis: Option<Axis>,
+    /// Rotation angle in degrees (single-axis form).
+    #[serde(default)]
     pub angle: f32,
+    /// Degrees about X (Euler form).
+    #[serde(default)]
+    pub x: f32,
+    /// Degrees about Y (Euler form).
+    #[serde(default)]
+    pub y: f32,
+    /// Degrees about Z (Euler form).
+    #[serde(default)]
+    pub z: f32,
     /// Whether to rescale the element after rotation.
     #[serde(default)]
     pub rescale: bool,
@@ -45,6 +59,19 @@ fn default_origin() -> [f32; 3] {
 }
 
 impl ElementRotation {
+    /// Single-axis rotation, the form every Minecraft version accepts.
+    pub fn single(origin: [f32; 3], axis: Axis, angle: f32, rescale: bool) -> Self {
+        Self {
+            origin,
+            axis: Some(axis),
+            angle,
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            rescale,
+        }
+    }
+
     /// Convert origin from Minecraft coordinates (0-16) to normalized (-0.5 to 0.5).
     pub fn normalized_origin(&self) -> [f32; 3] {
         [
@@ -54,18 +81,35 @@ impl ElementRotation {
         ]
     }
 
-    /// Get the angle in radians.
-    pub fn angle_radians(&self) -> f32 {
-        self.angle.to_radians()
-    }
-
-    /// Get the rescale factor for this rotation.
-    /// When rescale is true, the element is scaled to maintain its original size.
-    pub fn rescale_factor(&self) -> f32 {
-        if self.rescale {
-            1.0 / self.angle_radians().cos()
-        } else {
-            1.0
+    /// The linear part of the transform about the origin: rotation, then (when
+    /// `rescale` is set) a per-axis scale applied before it.
+    ///
+    /// Follows Minecraft 26.3 `CuboidRotation`: the single-axis form is a
+    /// right-handed rotation about the positive axis; the Euler form is JOML
+    /// `rotationZYX(z, y, x)`, i.e. `Rz * Ry * Rx` (X applied first). Rescale
+    /// divides each axis by the largest component of its rotated unit vector, so
+    /// a 45° element still spans the full block.
+    pub fn matrix(&self) -> glam::Mat3 {
+        use glam::Mat3;
+        let rotation = match self.axis {
+            Some(Axis::X) => Mat3::from_rotation_x(self.angle.to_radians()),
+            Some(Axis::Y) => Mat3::from_rotation_y(self.angle.to_radians()),
+            Some(Axis::Z) => Mat3::from_rotation_z(self.angle.to_radians()),
+            None => {
+                Mat3::from_rotation_z(self.z.to_radians())
+                    * Mat3::from_rotation_y(self.y.to_radians())
+                    * Mat3::from_rotation_x(self.x.to_radians())
+            }
+        };
+        if !self.rescale || rotation.abs_diff_eq(Mat3::IDENTITY, 1e-6) {
+            return rotation;
         }
+        let factor = |axis: glam::Vec3| 1.0 / (rotation * axis).abs().max_element();
+        rotation
+            * Mat3::from_diagonal(glam::Vec3::new(
+                factor(glam::Vec3::X),
+                factor(glam::Vec3::Y),
+                factor(glam::Vec3::Z),
+            ))
     }
 }

@@ -2,11 +2,17 @@ use std::io::Write;
 
 use nucleation::UniversalSchematic;
 
-use crate::scene::rgba_to_bgra;
+use crate::scene::{game_data_version, rgba_to_bgra};
 use crate::{Scene, SceneError, View};
 
 /// A pack with one block, `minecraft:stone`, a flat red cube.
 fn tiny_pack() -> Vec<u8> {
+    cube_pack("stone", None)
+}
+
+/// A pack whose only block, `minecraft:<block>`, is a flat red cube. With a data version it
+/// carries a client JAR's `version.json`.
+fn cube_pack(block: &str, data_version: Option<i32>) -> Vec<u8> {
     let mut png = Vec::new();
     let red = image::RgbaImage::from_pixel(16, 16, image::Rgba([255, 0, 0, 255]));
     image::DynamicImage::ImageRgba8(red)
@@ -14,26 +20,72 @@ fn tiny_pack() -> Vec<u8> {
         .unwrap();
     let mut zip = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
     let options = zip::write::SimpleFileOptions::default();
-    let files: [(&str, &[u8]); 4] = [
+    let blockstate = format!(r#"{{"variants":{{"":{{"model":"minecraft:block/{block}"}}}}}}"#);
+    let model = format!(
+        r##"{{"textures":{{"all":"minecraft:block/{block}"}},"elements":[{{"from":[0,0,0],"to":[16,16,16],"faces":{{"down":{{"texture":"#all","cullface":"down"}},"up":{{"texture":"#all","cullface":"up"}},"north":{{"texture":"#all","cullface":"north"}},"south":{{"texture":"#all","cullface":"south"}},"west":{{"texture":"#all","cullface":"west"}},"east":{{"texture":"#all","cullface":"east"}}}}}}]}}"##
+    );
+    let version = data_version.map(|v| format!(r#"{{"id":"test","world_version":{v}}}"#));
+    let mut files: Vec<(String, &[u8])> = vec![
         (
-            "pack.mcmeta",
+            "pack.mcmeta".into(),
             br#"{"pack":{"pack_format":34,"description":""}}"#,
         ),
         (
-            "assets/minecraft/blockstates/stone.json",
-            br#"{"variants":{"":{"model":"minecraft:block/stone"}}}"#,
+            format!("assets/minecraft/blockstates/{block}.json"),
+            blockstate.as_bytes(),
         ),
         (
-            "assets/minecraft/models/block/stone.json",
-            br##"{"textures":{"all":"minecraft:block/stone"},"elements":[{"from":[0,0,0],"to":[16,16,16],"faces":{"down":{"texture":"#all","cullface":"down"},"up":{"texture":"#all","cullface":"up"},"north":{"texture":"#all","cullface":"north"},"south":{"texture":"#all","cullface":"south"},"west":{"texture":"#all","cullface":"west"},"east":{"texture":"#all","cullface":"east"}}}]}"##,
+            format!("assets/minecraft/models/block/{block}.json"),
+            model.as_bytes(),
         ),
-        ("assets/minecraft/textures/block/stone.png", &png),
+        (format!("assets/minecraft/textures/block/{block}.png"), &png),
     ];
+    if let Some(version) = &version {
+        files.push(("version.json".into(), version.as_bytes()));
+    }
     for (name, bytes) in files {
         zip.start_file(name, options).unwrap();
         zip.write_all(bytes).unwrap();
     }
     zip.finish().unwrap().into_inner()
+}
+
+#[test]
+fn a_client_jar_names_its_data_version() {
+    assert_eq!(
+        game_data_version(&cube_pack("stone", Some(5023))),
+        Some(5023)
+    );
+    assert_eq!(game_data_version(&tiny_pack()), None);
+    assert_eq!(game_data_version(b"not a zip"), None);
+}
+
+/// `minecraft:chain` became `minecraft:iron_chain` in data version 4541. A schematic saved
+/// before the rename finds the new model in a newer game, and an unconverted one is reported.
+#[test]
+fn renamed_blocks_are_converted_or_reported() {
+    let mut schematic = UniversalSchematic::new("old".into());
+    schematic.set_block_str(0, 0, 0, "minecraft:chain[axis=y,waterlogged=false]");
+    schematic.metadata.mc_version = Some(4400);
+    schematic.metadata.source_data_version = Some(4400);
+    let litematic = nucleation::formats::litematic::to_litematic(&schematic).unwrap();
+
+    for (pack, expected) in [
+        (cube_pack("iron_chain", Some(5023)), &[][..]),
+        (
+            cube_pack("iron_chain", None),
+            &["minecraft:chain".to_string()][..],
+        ),
+    ] {
+        match Scene::load(&litematic, &pack) {
+            Ok(scene) => assert_eq!(scene.undrawable_blocks(), expected),
+            Err(SceneError::NoGpu) => {
+                eprintln!("skipped: no graphics adapter on this machine");
+                return;
+            }
+            Err(e) => panic!("{e}"),
+        }
+    }
 }
 
 #[test]

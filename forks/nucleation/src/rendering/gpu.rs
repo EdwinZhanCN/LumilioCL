@@ -7,7 +7,7 @@ use wgpu::util::DeviceExt;
 
 use crate::meshing::{MeshLayer, MeshOutput};
 
-use super::camera::{compute_view_proj, merged_bounds, CameraConfig};
+use super::camera::{compute_view_proj_reversed, merged_bounds, CameraConfig};
 use super::hdri::HdriData;
 use super::RenderError;
 
@@ -303,6 +303,62 @@ struct LayerBuffers {
     colors: wgpu::Buffer,
     indices: wgpu::Buffer,
     index_count: u32,
+    /// Present for the translucent layer, whose index buffer is rewritten each
+    /// frame in back-to-front order.
+    order: Option<TriangleOrder>,
+}
+
+/// A translucent layer's triangles, kept on the CPU so they can be drawn back to
+/// front. Alpha blending without depth writes only looks right in that order;
+/// a fixed order made glass, ice and water change look as the camera turned.
+/// (LumilioCL local change; see `forks/README.md`.)
+struct TriangleOrder {
+    triangles: Vec<[u32; 3]>,
+    centroids: Vec<[f32; 3]>,
+}
+
+impl TriangleOrder {
+    fn new(layer: &MeshLayer) -> Self {
+        let triangles: Vec<[u32; 3]> = layer
+            .indices
+            .chunks_exact(3)
+            .map(|t| [t[0], t[1], t[2]])
+            .collect();
+        let centroids = triangles
+            .iter()
+            .map(|t| {
+                let [a, b, c] = t.map(|i| layer.positions[i as usize]);
+                [0, 1, 2].map(|k| (a[k] + b[k] + c[k]) / 3.0)
+            })
+            .collect();
+        Self {
+            triangles,
+            centroids,
+        }
+    }
+
+    /// Indices with the farthest triangle first. `view_proj` uses reversed
+    /// depth, so farther means smaller NDC depth.
+    fn back_to_front(&self, view_proj: &[[f32; 4]; 4]) -> Vec<u32> {
+        let m = view_proj;
+        let depth = |p: &[f32; 3]| {
+            let z = m[0][2] * p[0] + m[1][2] * p[1] + m[2][2] * p[2] + m[3][2];
+            let w = m[0][3] * p[0] + m[1][3] * p[1] + m[2][3] * p[2] + m[3][3];
+            // Behind the camera is clipped anyway; draw it last.
+            if w > 1e-6 { z / w } else { f32::INFINITY }
+        };
+        let mut keyed: Vec<(f32, u32)> = self
+            .centroids
+            .iter()
+            .enumerate()
+            .map(|(i, c)| (depth(c), i as u32))
+            .collect();
+        keyed.sort_unstable_by(|a, b| a.0.total_cmp(&b.0));
+        keyed
+            .iter()
+            .flat_map(|&(_, i)| self.triangles[i as usize])
+            .collect()
+    }
 }
 
 struct ChunkGpuData {
@@ -721,8 +777,13 @@ impl GpuRenderer {
         let depth_view = depth_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         // --- Pipelines ---
+        // LumilioCL local change: like Minecraft, every layer culls back faces
+        // (the mesher's winding agrees with its normals, and inside-out elements
+        // such as spawner cages rely on it), and depth is reversed, so tests use
+        // GreaterEqual: a later face at equal depth wins, as with Minecraft's
+        // LEQUAL. Opaque and cutout draw without blending.
         let make_mesh_pipeline =
-            |label: &str, blend: Option<wgpu::BlendState>, depth_write: bool, cull_back: bool| {
+            |label: &str, fragment: &str, blend: Option<wgpu::BlendState>, depth_write: bool| {
                 device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                     label: Some(label),
                     layout: Some(&mesh_pipeline_layout),
@@ -734,7 +795,7 @@ impl GpuRenderer {
                     },
                     fragment: Some(wgpu::FragmentState {
                         module: &shader,
-                        entry_point: Some("fs_main"),
+                        entry_point: Some(fragment),
                         targets: &[Some(wgpu::ColorTargetState {
                             format: color_format,
                             blend,
@@ -745,17 +806,13 @@ impl GpuRenderer {
                     primitive: wgpu::PrimitiveState {
                         topology: wgpu::PrimitiveTopology::TriangleList,
                         front_face: wgpu::FrontFace::Ccw,
-                        cull_mode: if cull_back {
-                            Some(wgpu::Face::Back)
-                        } else {
-                            None
-                        },
+                        cull_mode: Some(wgpu::Face::Back),
                         ..Default::default()
                     },
                     depth_stencil: Some(wgpu::DepthStencilState {
                         format: depth_format,
                         depth_write_enabled: Some(depth_write),
-                        depth_compare: Some(wgpu::CompareFunction::Less),
+                        depth_compare: Some(wgpu::CompareFunction::GreaterEqual),
                         stencil: Default::default(),
                         bias: Default::default(),
                     }),
@@ -765,22 +822,12 @@ impl GpuRenderer {
                 })
             };
 
-        let opaque_pipeline = make_mesh_pipeline(
-            "opaque",
-            Some(wgpu::BlendState::ALPHA_BLENDING),
-            true,
-            false,
-        );
-        let cutout_pipeline = make_mesh_pipeline(
-            "cutout",
-            Some(wgpu::BlendState::ALPHA_BLENDING),
-            true,
-            false,
-        );
+        let opaque_pipeline = make_mesh_pipeline("opaque", "fs_solid", None, true);
+        let cutout_pipeline = make_mesh_pipeline("cutout", "fs_solid", None, true);
         let transparent_pipeline = make_mesh_pipeline(
             "transparent",
+            "fs_main",
             Some(wgpu::BlendState::ALPHA_BLENDING),
-            false,
             false,
         );
 
@@ -812,7 +859,7 @@ impl GpuRenderer {
                     depth_stencil: Some(wgpu::DepthStencilState {
                         format: depth_format,
                         depth_write_enabled: Some(false),
-                        depth_compare: Some(wgpu::CompareFunction::LessEqual),
+                        depth_compare: Some(wgpu::CompareFunction::GreaterEqual),
                         stencil: Default::default(),
                         bias: Default::default(),
                     }),
@@ -875,7 +922,7 @@ impl GpuRenderer {
             depth_stencil: Some(wgpu::DepthStencilState {
                 format: depth_format,
                 depth_write_enabled: Some(false),
-                depth_compare: Some(wgpu::CompareFunction::LessEqual),
+                depth_compare: Some(wgpu::CompareFunction::GreaterEqual),
                 stencil: Default::default(),
                 bias: Default::default(),
             }),
@@ -893,10 +940,15 @@ impl GpuRenderer {
         });
 
         // --- Upload chunk data ---
-        let upload_layer = |layer: &MeshLayer, label: &str| -> Option<LayerBuffers> {
+        let upload_layer = |layer: &MeshLayer, label: &str, sorted: bool| -> Option<LayerBuffers> {
             if layer.is_empty() {
                 return None;
             }
+            let index_usage = if sorted {
+                wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST
+            } else {
+                wgpu::BufferUsages::INDEX
+            };
             Some(LayerBuffers {
                 positions: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: Some(&format!("{}_pos", label)),
@@ -921,9 +973,10 @@ impl GpuRenderer {
                 indices: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: Some(&format!("{}_idx", label)),
                     contents: layer.indices_bytes(),
-                    usage: wgpu::BufferUsages::INDEX,
+                    usage: index_usage,
                 }),
                 index_count: layer.indices.len() as u32,
+                order: sorted.then(|| TriangleOrder::new(layer)),
             })
         };
 
@@ -980,9 +1033,13 @@ impl GpuRenderer {
                 let label = format!("c{}", i);
                 ChunkGpuData {
                     texture_bg,
-                    opaque: upload_layer(&mesh.opaque, &format!("{}_opaque", label)),
-                    cutout: upload_layer(&mesh.cutout, &format!("{}_cutout", label)),
-                    transparent: upload_layer(&mesh.transparent, &format!("{}_transparent", label)),
+                    opaque: upload_layer(&mesh.opaque, &format!("{}_opaque", label), false),
+                    cutout: upload_layer(&mesh.cutout, &format!("{}_cutout", label), false),
+                    transparent: upload_layer(
+                        &mesh.transparent,
+                        &format!("{}_transparent", label),
+                        true,
+                    ),
                 }
             })
             .collect();
@@ -1113,7 +1170,20 @@ impl GpuRenderer {
     ) {
         let aspect = width as f32 / height as f32;
         let (view_proj, inv_view_proj) =
-            compute_view_proj(self.bounds_min, self.bounds_max, aspect, camera);
+            compute_view_proj_reversed(self.bounds_min, self.bounds_max, aspect, camera);
+
+        // Translucent triangles back to front for this camera. Per-mesh poses
+        // are not applied to the sort keys; posed translucent meshes sort by
+        // their rest position.
+        for chunk in &self.chunks_gpu {
+            if let Some(layer) = &chunk.transparent {
+                if let Some(order) = &layer.order {
+                    let indices = order.back_to_front(&view_proj);
+                    self.queue
+                        .write_buffer(&layer.indices, 0, bytemuck::cast_slice(&indices));
+                }
+            }
+        }
 
         let hdri_intensity = if self.hdri_enabled { 2.5f32 } else { 0.0 };
         let hdri_flag = if self.hdri_enabled { 1.0f32 } else { 0.0 };
@@ -1213,7 +1283,7 @@ impl GpuRenderer {
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                 view: depth_view,
                 depth_ops: Some(wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(1.0),
+                    load: wgpu::LoadOp::Clear(0.0),
                     store: wgpu::StoreOp::Store,
                 }),
                 stencil_ops: None,
@@ -1542,6 +1612,60 @@ impl GpuRenderer {
         }
 
         Ok(pixels)
+    }
+}
+
+#[cfg(test)]
+mod triangle_order_tests {
+    use super::*;
+
+    /// One triangle per Z; `back_to_front` must start with the farthest.
+    fn layer(zs: &[f32]) -> MeshLayer {
+        let mut layer = MeshLayer::default();
+        for (i, &z) in zs.iter().enumerate() {
+            for p in [[0.0, 0.0, z], [1.0, 0.0, z], [0.0, 1.0, z]] {
+                layer.positions.push(p);
+                layer.normals.push([0.0, 0.0, 1.0]);
+                layer.uvs.push([0.0, 0.0]);
+                layer.colors.push([1.0; 4]);
+            }
+            let base = (i * 3) as u32;
+            layer.indices.extend([base, base + 1, base + 2]);
+        }
+        layer
+    }
+
+    #[test]
+    fn translucent_triangles_draw_farthest_first() {
+        // Yaw 0, pitch 0 looks down -Z, so smaller Z is farther away.
+        let camera = CameraConfig {
+            yaw_deg: 0.0,
+            pitch_deg: 0.0,
+            ..CameraConfig::default()
+        };
+        let (view_proj, _) =
+            compute_view_proj_reversed([-6.0; 3], [6.0; 3], 1.0, &camera);
+        let order = TriangleOrder::new(&layer(&[2.0, -5.0, 5.0, 0.0]));
+        let first_vertices: Vec<u32> = order
+            .back_to_front(&view_proj)
+            .chunks(3)
+            .map(|t| t[0])
+            .collect();
+        // Triangles at z = -5, 0, 2, 5 start at vertices 3, 9, 0, 6.
+        assert_eq!(first_vertices, [3, 9, 0, 6]);
+
+        // Turned around, the order reverses.
+        let behind = CameraConfig {
+            yaw_deg: 180.0,
+            ..camera
+        };
+        let (view_proj, _) = compute_view_proj_reversed([-6.0; 3], [6.0; 3], 1.0, &behind);
+        let first_vertices: Vec<u32> = order
+            .back_to_front(&view_proj)
+            .chunks(3)
+            .map(|t| t[0])
+            .collect();
+        assert_eq!(first_vertices, [6, 0, 9, 3]);
     }
 }
 

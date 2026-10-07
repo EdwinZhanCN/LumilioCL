@@ -45,18 +45,10 @@ fn wheel_zoom_does_not_scroll_the_page_and_frames_replace_loading(cx: &mut TestA
     model.read_with(cx, |model, _| assert!(model.view.zoom < 1.));
     page.read_with(cx, |page, _| assert_eq!(page.scroll.offset().y, px(0.)));
     model.update(cx, |model, cx| {
-        model.frame_arrived(Ok((
-            Request {
-                view: View::new(),
-                width: 1,
-                height: 1,
-            },
-            lumilio_schematic_render::Frame {
-                width: 1,
-                height: 1,
-                bgra: vec![0, 0, 255, 255],
-            },
-        )));
+        model.frame_arrived(Ok(Event::Loaded {
+            undrawable: Vec::new(),
+        }));
+        model.frame_arrived(Ok(one_pixel_frame()));
         assert_eq!(model.state, State::Ready);
         assert!(model.image.is_some());
         cx.notify();
@@ -64,6 +56,46 @@ fn wheel_zoom_does_not_scroll_the_page_and_frames_replace_loading(cx: &mut TestA
     cx.run_until_parked();
     assert!(cx.debug_bounds("model-loading").is_none());
     assert!(cx.debug_bounds("model-error").is_none());
+    assert!(cx.debug_bounds("model-undrawable").is_none());
+}
+
+fn one_pixel_frame() -> Event {
+    Event::Frame(lumilio_schematic_render::Frame {
+        width: 1,
+        height: 1,
+        bgra: vec![0, 0, 255, 255],
+    })
+}
+
+#[test]
+fn undrawable_blocks_get_one_sentence_and_their_ids_in_technical_details() {
+    assert_eq!(undrawable_note(&[]), None);
+    let ids = ["minecraft:chain".to_string(), "mod:gadget".to_string()];
+    let (sentence, details) = undrawable_note(&ids).unwrap();
+    assert_eq!(sentence, "有 2 种方块这个游戏版本画不出来，预览里没有它们");
+    assert!(!sentence.contains("minecraft:"));
+    assert_eq!(details, "minecraft:chain\nmod:gadget");
+}
+
+#[gpui::test]
+fn the_undrawable_note_shows_with_the_picture(cx: &mut TestAppContext) {
+    cx.update(gpui_component::init);
+    let (model, cx) = cx.add_window_view(|_, cx| ModelView::new(Rc::new(|_, _, _| {}), cx));
+    model.update(cx, |model, cx| {
+        model.frame_arrived(Ok(Event::Loaded {
+            undrawable: vec!["minecraft:chain".into()],
+        }));
+        cx.notify();
+    });
+    cx.run_until_parked();
+    // Nothing to qualify until the picture is there.
+    assert!(cx.debug_bounds("model-undrawable").is_none());
+    model.update(cx, |model, cx| {
+        model.frame_arrived(Ok(one_pixel_frame()));
+        cx.notify();
+    });
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("model-undrawable").is_some());
 }
 
 #[test]

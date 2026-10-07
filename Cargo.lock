@@ -4415,6 +4415,7 @@ dependencies = [
  "image 0.25.10",
  "nucleation",
  "pollster 0.4.0",
+ "serde_json",
  "zip 8.6.0",
 ]
 

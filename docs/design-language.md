@@ -435,8 +435,10 @@ stays in the viewport. Focus the viewport for arrows and +/−; R, double-click
 or the visible ghost key resets the camera. There is no entrance animation or
 idle clock; animated blocks remain still, including under reduced motion.
 Loading and failure occupy the same viewport. Missing game assets and no GPU
-receive a calm explanation; other errors offer 技术详情. Replaced and released
-frames are explicitly removed from GPUI's image cache (ADR 0028).
+receive a calm explanation; other errors offer 技术详情. When the game's assets
+cannot draw some blocks, one muted sentence under the viewport says how many,
+with their IDs behind 技术详情 (ADR 0034). Replaced and released frames are
+explicitly removed from GPUI's image cache (ADR 0028).
 
 ### Tables
 

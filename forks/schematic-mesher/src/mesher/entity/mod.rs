@@ -156,6 +156,18 @@ pub enum BlockEntityType {
     EnchantingTable,
 }
 
+impl BlockEntityType {
+    /// Since Minecraft 26.2 signs and beds are ordinary block models with block
+    /// textures, and the legacy entity textures are gone. When the resolved model
+    /// has geometry, drawing the entity too would add an untextured second copy.
+    pub fn replaced_by_block_model(&self) -> bool {
+        matches!(
+            self,
+            Self::Sign { .. } | Self::HangingSign { .. } | Self::Bed { .. }
+        )
+    }
+}
+
 /// Mob entity types (rendered as static models).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MobType {

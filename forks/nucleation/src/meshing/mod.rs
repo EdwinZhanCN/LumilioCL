@@ -1060,6 +1060,17 @@ impl UniversalSchematic {
         Ok(mesh_output_from_mesher(output, None))
     }
 
+    /// Names of the blocks in this schematic's palettes that `pack` cannot draw
+    /// at all. Meshing skips them with only a log line, so callers can tell the
+    /// user. Sorted and unique. (LumilioCL local change; see `forks/README.md`.)
+    pub fn undrawable_blocks(&self, pack: &ResourcePackSource) -> Vec<String> {
+        let palette: Vec<InputBlock> = std::iter::once(&self.default_region)
+            .chain(self.other_regions.values())
+            .flat_map(|region| region.palette.iter().map(block_state_to_input_block))
+            .collect();
+        schematic_mesher::undrawable_blocks(&pack.pack, &palette)
+    }
+
     /// Build an *animated* GLB replaying a captured scenario.
     ///
     /// The schematic is the initial world state; `timeline_json` is the decoded

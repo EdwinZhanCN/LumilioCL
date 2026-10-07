@@ -20,6 +20,6 @@
 | 删除游戏 | 页头 ⋯ 菜单 → 警告弹窗 | 删除后从历史中移除并后退 |  | `lumilio-ui/src/instance_detail/actions.rs` |
 | 打开插件标签 | 游戏页「插件」标签内的左侧列表 | 读取并显示插件给的内容；插件被关闭或出错时标签消失，回到内置标签 | 插件只描述内容，版式由启动器统一 | `lumilio-ui/src/instance_detail/plugin_tabs.rs` |
 | 切换插件标签 | 游戏页「插件」标签内的左侧列表 | 右侧显示所选插件的内容 |  | `lumilio-ui/src/instance_detail/plugin_tabs.rs` |
-| 旋转与缩放 3D 投影 | 投影详情内联预览 | 拖拽旋转，滚轮缩放且页面不跟着滚动；使用游戏贴图；读取或渲染失败显示说明 | ADR 0028；动画方块暂时静止 | `lumilio-ui/src/model_view/mod.rs` |
+| 旋转与缩放 3D 投影 | 投影详情内联预览 | 拖拽旋转，滚轮缩放且页面不跟着滚动；使用游戏贴图；读取或渲染失败显示说明；游戏版本画不出的方块在预览下方说明，ID 在技术详情 | ADR 0028、0034；动画方块暂时静止 | `lumilio-ui/src/model_view/mod.rs` |
 | 复位 3D 投影视角 | 预览下方「复位视角」 | 回到初始视角与缩放；也可双击预览或聚焦后按 R |  | `lumilio-ui/src/model_view/mod.rs` |
 | 重试 3D 投影预览 | 预览出错后的「重试」 | 重新读取当前投影与游戏贴图并生成预览；失败仍显示说明 |  | `lumilio-ui/src/model_view/mod.rs` |

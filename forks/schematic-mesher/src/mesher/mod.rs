@@ -206,6 +206,31 @@ impl MesherOutput {
     }
 }
 
+/// Names of the blocks among `blocks` that `pack` cannot draw at all: no model
+/// resolves and no fluid, mob or block-entity geometry stands in for them.
+/// Meshing skips them with only a log line, so callers can tell the user.
+/// Sorted and unique; air is never reported.
+pub fn undrawable_blocks<'a>(
+    pack: &ResourcePack,
+    blocks: impl IntoIterator<Item = &'a InputBlock>,
+) -> Vec<String> {
+    let mut names = std::collections::BTreeSet::new();
+    for block in blocks {
+        if block.is_air()
+            || names.contains(&block.name)
+            || entity::detect_mob(block).is_some()
+            || liquid::FluidState::from_block(block).is_some()
+            || entity::detect_block_entity(block).is_some()
+        {
+            continue;
+        }
+        if crate::resolver::resolve_block(pack, block).is_err() {
+            names.insert(block.name.clone());
+        }
+    }
+    names.into_iter().collect()
+}
+
 /// The main mesher struct.
 pub struct Mesher {
     resource_pack: ResourcePack,

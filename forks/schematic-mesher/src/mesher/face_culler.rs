@@ -2,7 +2,8 @@
 //!
 //! Determines block opacity by analyzing the resolved model rather than hardcoded lists.
 //! A block is considered opaque only if its model is a full cube (0-16 on all axes)
-//! with all 6 faces defined.
+//! with all 6 faces defined and no see-through pixels in their textures. A full cube
+//! with see-through pixels (leaves) hides no neighbouring face.
 //!
 //! Transparent blocks (like glass) are handled specially - they only cull against
 //! the same type of transparent block.
@@ -22,6 +23,10 @@ enum BlockCullType {
     /// Transparent blocks that only cull against same type (e.g., glass, ice).
     /// Contains the block's base name for same-type matching.
     Transparent(String),
+    /// Full cube whose textures have see-through pixels and no transparent group
+    /// (leaves). It fills its cell for ambient occlusion but culls no face, its own
+    /// kind included.
+    SeeThrough,
 }
 
 /// Encoded cull type for the flat 3D array.
@@ -99,9 +104,9 @@ impl<'a> FaceCuller<'a> {
         //
         // `block_types` only needs *transparent* blocks: `should_cull` consults
         // it solely to compare transparent groups (an opaque neighbor culls via
-        // the grid before the map is touched, and a missing entry is treated like
-        // opaque). Inserting the millions of opaque blocks was the dominant cost
-        // here, so we skip them entirely.
+        // the grid before the map is touched, and a see-through neighbor has no
+        // entry, so it culls nothing). Inserting the millions of opaque blocks was
+        // the dominant cost here, so we skip them entirely.
         #[allow(unused_mut)]
         let mut filled_parallel = false;
 
@@ -135,7 +140,9 @@ impl<'a> FaceCuller<'a> {
                             };
                             let cell = match &cull_type {
                                 BlockCullType::Opaque => CELL_OPAQUE,
-                                BlockCullType::Transparent(_) => CELL_TRANSPARENT,
+                                BlockCullType::Transparent(_) | BlockCullType::SeeThrough => {
+                                    CELL_TRANSPARENT
+                                }
                                 BlockCullType::NonSolid => CELL_EMPTY,
                             };
                             (culler.grid_index(*pos), cell, *pos, cull_type)
@@ -159,7 +166,7 @@ impl<'a> FaceCuller<'a> {
                 let cull_type = culler.classify_block(block);
                 let cell = match &cull_type {
                     BlockCullType::Opaque => CELL_OPAQUE,
-                    BlockCullType::Transparent(_) => CELL_TRANSPARENT,
+                    BlockCullType::Transparent(_) | BlockCullType::SeeThrough => CELL_TRANSPARENT,
                     BlockCullType::NonSolid => CELL_EMPTY,
                 };
                 if let Some(idx) = culler.grid_index(*pos) {
@@ -283,6 +290,7 @@ impl<'a> FaceCuller<'a> {
 
         // Check each variant's model
         let model_resolver = ModelResolver::new(self.pack);
+        let mut see_through = false;
         for variant in &variants {
             let model = match model_resolver.resolve(&variant.model_location()) {
                 Ok(m) => m,
@@ -293,14 +301,37 @@ impl<'a> FaceCuller<'a> {
             if !self.is_full_opaque_cube(&model) {
                 return BlockCullType::NonSolid;
             }
+            see_through |= self.has_see_through_face(&model_resolver, &model);
         }
 
-        // All variants are full opaque cubes
+        // All variants are full cubes
         if variants.is_empty() {
             BlockCullType::NonSolid
+        } else if see_through {
+            BlockCullType::SeeThrough
         } else {
             BlockCullType::Opaque
         }
+    }
+
+    /// Whether any face texture of a full-cube model has see-through pixels, so the
+    /// block cannot hide what is behind it (a modded grate, say, that no group names).
+    /// A missing texture renders as an opaque tile.
+    fn has_see_through_face(
+        &self,
+        resolver: &ModelResolver,
+        model: &crate::resource_pack::BlockModel,
+    ) -> bool {
+        let textures = resolver.resolve_textures(model);
+        model.elements[0].faces.values().any(|face| {
+            let path = match face.texture.strip_prefix('#') {
+                Some(key) => textures.get(key).map(String::as_str).unwrap_or_default(),
+                None => face.texture.as_str(),
+            };
+            self.pack
+                .get_texture(path)
+                .is_some_and(|texture| texture.has_transparency())
+        })
     }
 
     /// Get the transparent group for a block, if it's a transparent block.
@@ -345,10 +376,14 @@ impl<'a> FaceCuller<'a> {
             return Some("frosted_ice".to_string());
         }
 
-        // Leaves - each type culls against itself
-        if block_id.ends_with("_leaves") {
-            return Some("leaves".to_string());
+        // Copper grates hide faces only against the same block (each oxidation and
+        // waxed stage is its own block), like glass.
+        if block_id.ends_with("copper_grate") {
+            return Some(block_id.to_string());
         }
+
+        // Leaves are not a group: like Minecraft's fancy leaves they keep the faces
+        // between them, and their see-through textures classify them as SeeThrough.
 
         // Slime and honey blocks
         if block_id == "slime_block" {
@@ -361,7 +396,7 @@ impl<'a> FaceCuller<'a> {
         None
     }
 
-    /// Check if a resolved model is a full opaque cube.
+    /// Check if a resolved model is a full cube with all six faces.
     fn is_full_opaque_cube(&self, model: &crate::resource_pack::BlockModel) -> bool {
         // Must have exactly one element
         if model.elements.len() != 1 {

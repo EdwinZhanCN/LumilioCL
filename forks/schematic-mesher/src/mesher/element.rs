@@ -219,6 +219,85 @@ impl<'a> MeshBuilder<'a> {
         pos: BlockPosition,
         block: &InputBlock,
     ) -> Result<()> {
+        let first_face = self.face_textures.len();
+        let result = self.add_block_geometry(pos, block);
+        self.separate_coplanar_faces(first_face);
+        result
+    }
+
+    /// Push every face of one block that lies in the plane of an earlier,
+    /// overlapping face facing the same way a little along its normal.
+    ///
+    /// Minecraft draws such layers (grass side overlays, redstone line and
+    /// overlay, multipart pieces) at the same depth and relies on draw order. A
+    /// renderer that splits them across layers, or triangulates them
+    /// differently, shows them fighting. A step of 1/1024 block keeps the
+    /// original order visible and stays far below one texel.
+    fn separate_coplanar_faces(&mut self, first_face: usize) {
+        const STEP: f32 = 1.0 / 1024.0;
+        let faces: Vec<(usize, usize)> = self.face_textures[first_face..]
+            .iter()
+            .map(|face| (face.vertex_start as usize, face.index_start))
+            .collect();
+        if faces.len() < 2 {
+            return;
+        }
+        let vertices = &self.mesh.vertices;
+        let indices = &self.mesh.indices;
+        let planes: Vec<Option<(Vec3, f32, Vec3, Vec3)>> = faces
+            .iter()
+            .map(|&(start, index_start)| {
+                let corners = vertices.get(start..start + 4)?;
+                let p: [Vec3; 4] = std::array::from_fn(|k| Vec3::from(corners[k].position));
+                // The first triangle's winding is the side the GPU treats as the front.
+                let [a, b, c] = indices
+                    .get(index_start..index_start + 3)?
+                    .iter()
+                    .map(|&i| Vec3::from(vertices[i as usize].position))
+                    .collect::<Vec<_>>()
+                    .try_into()
+                    .ok()?;
+                let normal = (b - a).cross(c - a);
+                if normal.length_squared() < 1e-12 {
+                    return None;
+                }
+                let normal = normal.normalize();
+                let min = p.iter().copied().reduce(Vec3::min)?;
+                let max = p.iter().copied().reduce(Vec3::max)?;
+                Some((normal, normal.dot(p[0]), min, max))
+            })
+            .collect();
+        for i in 1..faces.len() {
+            let Some((normal, plane, min, max)) = planes[i] else {
+                continue;
+            };
+            let below = planes[..i]
+                .iter()
+                .flatten()
+                .filter(|(other_normal, other_plane, other_min, other_max)| {
+                    let overlap = max.min(*other_max) - min.max(*other_min);
+                    let spans = [overlap.x, overlap.y, overlap.z];
+                    other_normal.dot(normal) > 0.9999
+                        && (other_plane - plane).abs() < 1e-4
+                        && spans.iter().all(|&s| s > -1e-5)
+                        && spans.iter().filter(|&&s| s > 1e-5).count() >= 2
+                })
+                .count();
+            if below > 0 {
+                let shift = normal * (STEP * below as f32);
+                let start = faces[i].0;
+                for vertex in &mut self.mesh.vertices[start..start + 4] {
+                    vertex.position = (Vec3::from(vertex.position) + shift).into();
+                }
+            }
+        }
+    }
+
+    fn add_block_geometry(
+        &mut self,
+        pos: BlockPosition,
+        block: &InputBlock,
+    ) -> Result<()> {
         // Check if this is a mob entity — generate custom geometry, bypass model resolution
         if let Some(mob_type) = entity::detect_mob(block) {
             return self.add_mob(pos, block, mob_type);
@@ -270,7 +349,11 @@ impl<'a> MeshBuilder<'a> {
 
         // Check for block entity — generates additive geometry
         if let Some(entity_type) = entity::detect_block_entity(block) {
-            self.add_entity(pos, block, &entity_type)?;
+            let model_draws_it = entity_type.replaced_by_block_model()
+                && resolved.iter().any(|r| !r.model.elements.is_empty());
+            if !model_draws_it {
+                self.add_entity(pos, block, &entity_type)?;
+            }
         }
 
         // Check for inventory property — render hologram above container
@@ -1748,11 +1831,17 @@ impl<'a> MeshBuilder<'a> {
         // Generate the 4 vertices for this face
         let (positions, uvs) = self.generate_face_vertices(direction, from, to, uv, face.rotation);
 
-        // Apply element rotation if present
-        let positions = if let Some(rot) = &element.rotation {
-            self.apply_element_rotation(&positions, rot)
+        // Apply element rotation if present. The normal turns with the face (inverse
+        // transpose, as rescale is not uniform), so a face rotated past 90° — the
+        // 26.x Euler rotations — is lit from the side it actually faces.
+        let (positions, normal) = if let Some(rot) = &element.rotation {
+            let turned = rot.matrix().inverse().transpose() * Vec3::from(normal);
+            (
+                self.apply_element_rotation(&positions, rot),
+                turned.normalize_or(Vec3::from(normal)).into(),
+            )
         } else {
-            positions
+            (positions, normal)
         };
 
         // Apply block transform rotation
@@ -1926,41 +2015,14 @@ impl<'a> MeshBuilder<'a> {
         rotation: &crate::types::ElementRotation,
     ) -> [[f32; 3]; 4] {
         let origin = rotation.normalized_origin();
-        let angle = rotation.angle_radians();
-        let rescale = rotation.rescale_factor();
-
-        let rotation_matrix = match rotation.axis {
-            crate::types::Axis::X => Mat3::from_rotation_x(angle),
-            crate::types::Axis::Y => Mat3::from_rotation_y(angle),
-            crate::types::Axis::Z => Mat3::from_rotation_z(angle),
-        };
+        let matrix = rotation.matrix();
 
         let mut result = [[0.0; 3]; 4];
         for (i, pos) in positions.iter().enumerate() {
-            // Translate to origin
+            // Translate to origin, rotate (and rescale), translate back
             let p = Vec3::new(pos[0] - origin[0], pos[1] - origin[1], pos[2] - origin[2]);
+            let scaled = matrix * p;
 
-            // Rotate
-            let rotated = rotation_matrix * p;
-
-            // Rescale if needed
-            let scaled = if rescale != 1.0 {
-                match rotation.axis {
-                    crate::types::Axis::X => {
-                        Vec3::new(rotated.x, rotated.y * rescale, rotated.z * rescale)
-                    }
-                    crate::types::Axis::Y => {
-                        Vec3::new(rotated.x * rescale, rotated.y, rotated.z * rescale)
-                    }
-                    crate::types::Axis::Z => {
-                        Vec3::new(rotated.x * rescale, rotated.y * rescale, rotated.z)
-                    }
-                }
-            } else {
-                rotated
-            };
-
-            // Translate back
             result[i] = [
                 scaled.x + origin[0],
                 scaled.y + origin[1],
@@ -2859,12 +2921,12 @@ mod tests {
         let element = ModelElement {
             from: [0.0, 0.0, 0.0],
             to: [16.0, 16.0, 16.0],
-            rotation: Some(crate::types::ElementRotation {
-                origin: [8.0, 8.0, 8.0],
-                axis: crate::types::Axis::Y,
-                angle: 22.5,
-                rescale: false,
-            }),
+            rotation: Some(crate::types::ElementRotation::single(
+                [8.0, 8.0, 8.0],
+                crate::types::Axis::Y,
+                22.5,
+                false,
+            )),
             shade: true,
             faces: HashMap::new(),
         };

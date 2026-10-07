@@ -18,7 +18,7 @@ use lumilio_core::ModelPreview;
 use lumilio_schematic_render::{SceneError, View};
 
 use crate::{key::Key, kit, theme::ShellColors};
-use worker::{Request, Worker};
+use worker::{Event, Request, Worker};
 
 type Load = Rc<dyn Fn(u64, &mut Window, &mut App)>;
 
@@ -65,10 +65,25 @@ impl State {
     }
 }
 
+/// One plain sentence about blocks left out of the picture; the IDs go to 技术详情.
+fn undrawable_note(undrawable: &[String]) -> Option<(String, String)> {
+    (!undrawable.is_empty()).then(|| {
+        (
+            format!(
+                "有 {} 种方块这个游戏版本画不出来，预览里没有它们",
+                undrawable.len()
+            ),
+            undrawable.join("\n"),
+        )
+    })
+}
+
 pub struct ModelView {
     load: Load,
     asked: bool,
     state: State,
+    /// Block IDs the game's assets cannot draw, reported once per load.
+    undrawable: Vec<String>,
     view: View,
     worker: Option<Worker>,
     task: Option<Task<()>>,
@@ -86,6 +101,7 @@ impl ModelView {
             load,
             asked: false,
             state: State::Loading,
+            undrawable: Vec::new(),
             view: View::new(),
             worker: None,
             task: None,
@@ -144,7 +160,8 @@ impl ModelView {
 
     fn frame_arrived(&mut self, result: worker::Output) {
         match result {
-            Ok((_, frame)) => {
+            Ok(Event::Loaded { undrawable }) => self.undrawable = undrawable,
+            Ok(Event::Frame(frame)) => {
                 if let Some(buffer) =
                     image::RgbaImage::from_raw(frame.width, frame.height, frame.bgra)
                 {
@@ -175,6 +192,7 @@ impl ModelView {
         self.task = None;
         self.last_request = None;
         self.state = State::Loading;
+        self.undrawable.clear();
         (self.load)(cx.entity_id().as_u64(), window, cx);
         cx.notify();
     }
@@ -259,7 +277,7 @@ impl Render for ModelView {
                 )
                 .into_any_element(),
         };
-        // ia[instance]: 旋转与缩放 3D 投影 | 投影详情内联预览 | 拖拽旋转，滚轮缩放且页面不跟着滚动；使用游戏贴图；读取或渲染失败显示说明 | ADR 0028；动画方块暂时静止
+        // ia[instance]: 旋转与缩放 3D 投影 | 投影详情内联预览 | 拖拽旋转，滚轮缩放且页面不跟着滚动；使用游戏贴图；读取或渲染失败显示说明；游戏版本画不出的方块在预览下方说明，ID 在技术详情 | ADR 0028、0034；动画方块暂时静止
         let viewport = div()
             .id("model-viewport")
             .role(gpui::Role::Image)
@@ -356,12 +374,24 @@ impl Render for ModelView {
                 .ghost()
                 .on_click(cx.listener(|this, _, window, cx| this.retry(window, cx)))
         });
+        let note = (self.state == State::Ready)
+            .then(|| undrawable_note(&self.undrawable))
+            .flatten()
+            .map(|(sentence, ids)| {
+                h_flex()
+                    .debug_selector(|| "model-undrawable".into())
+                    .w_full()
+                    .gap_2()
+                    .child(sentence)
+                    .child(kit::technical("model-undrawable-technical", ids))
+            });
         v_flex()
             .w_full()
             .gap_2()
             .text_sm()
             .text_color(colors.muted)
             .child(viewport)
+            .children(note)
             .child(
                 h_flex()
                     .w_full()

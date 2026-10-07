@@ -52,7 +52,15 @@ impl Mailbox {
     }
 }
 
-pub(super) type Output = Result<(Request, Frame), SceneError>;
+pub(super) enum Event {
+    /// Sent once, before the first frame: block IDs the game's assets cannot draw.
+    Loaded {
+        undrawable: Vec<String>,
+    },
+    Frame(Frame),
+}
+
+pub(super) type Output = Result<Event, SceneError>;
 
 pub(super) struct Worker {
     pub mailbox: Arc<Mailbox>,
@@ -69,9 +77,16 @@ impl Worker {
             .spawn(move || {
                 let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                     let mut scene = Scene::load(&schematic, &pack)?;
+                    let undrawable = scene.undrawable_blocks().to_vec();
+                    if send
+                        .send_blocking(Ok(Event::Loaded { undrawable }))
+                        .is_err()
+                    {
+                        return Ok(());
+                    }
                     while let Some(request) = requests.take() {
                         let frame = scene.render(&request.view, request.width, request.height)?;
-                        if send.send_blocking(Ok((request, frame))).is_err() {
+                        if send.send_blocking(Ok(Event::Frame(frame))).is_err() {
                             break;
                         }
                     }

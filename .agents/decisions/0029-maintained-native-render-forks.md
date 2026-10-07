@@ -3,6 +3,9 @@
 - Status: accepted
 - Date: 2026-10-05
 
+The rendering fixes this record left for later (glass sorting, 26.x model compatibility)
+are decided in ADR 0034.
+
 ## Context
 
 ADR 0028 introduced a native preview using Nucleation and Schematic-Mesher.

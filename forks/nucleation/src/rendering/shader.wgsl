@@ -74,8 +74,20 @@ fn hdri_diffuse(normal: vec3<f32>) -> vec3<f32> {
     return sample_hdri(normal);
 }
 
+// Translucent layer: alpha-blended.
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+    return shade(in);
+}
+
+// Opaque and cutout layers: drawn without blending, so a cutout pixel that
+// survives the alpha test is written fully opaque.
+@fragment
+fn fs_solid(in: VertexOutput) -> @location(0) vec4<f32> {
+    return vec4<f32>(shade(in).rgb, 1.0);
+}
+
+fn shade(in: VertexOutput) -> vec4<f32> {
     let tex_color = textureSample(atlas_texture, atlas_sampler, in.uv);
     let material_alpha = tex_color.a * in.color.a;
     let base_color = tex_color * in.color * draw.tint;
@@ -160,17 +172,18 @@ fn vs_sky(@builtin(vertex_index) vertex_index: u32) -> SkyVertexOutput {
     // Generate fullscreen triangle: covers (-1,-1) to (1,1)
     let x = f32(i32(vertex_index & 1u)) * 4.0 - 1.0;
     let y = f32(i32(vertex_index >> 1u)) * 4.0 - 1.0;
-    out.clip_position = vec4<f32>(x, y, 0.9999, 1.0); // near max depth
+    out.clip_position = vec4<f32>(x, y, 0.0, 1.0); // farthest depth (reversed depth)
     out.clip_pos = vec2<f32>(x, y);
     return out;
 }
 
 @fragment
 fn fs_sky(in: SkyVertexOutput) -> @location(0) vec4<f32> {
-    // Reconstruct world-space ray direction from clip space
-    let clip = vec4<f32>(in.clip_pos.x, in.clip_pos.y, 1.0, 1.0);
-    let world = uniforms.inv_view_proj * clip;
-    let dir = normalize(world.xyz / world.w);
+    // Reconstruct the world-space view ray from two depths on this pixel
+    // (reversed depth: 1 is the near plane, 0.5 lies beyond it).
+    let near_h = uniforms.inv_view_proj * vec4<f32>(in.clip_pos.x, in.clip_pos.y, 1.0, 1.0);
+    let far_h = uniforms.inv_view_proj * vec4<f32>(in.clip_pos.x, in.clip_pos.y, 0.5, 1.0);
+    let dir = normalize(far_h.xyz / far_h.w - near_h.xyz / near_h.w);
 
     let color = sample_hdri(dir);
 

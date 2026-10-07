@@ -111,6 +111,30 @@ pub fn compute_view_proj(
     aspect: f32,
     camera: &CameraConfig,
 ) -> ([[f32; 4]; 4], [[f32; 4]; 4]) {
+    view_proj(bounds_min, bounds_max, aspect, camera, false)
+}
+
+/// [`compute_view_proj`] with reversed depth: the near plane maps to 1 and the
+/// far end to 0 (infinitely far for perspective). With a float depth buffer this
+/// keeps nearly constant relative precision at every distance, so faces a
+/// fraction of a millimetre apart no longer fight. Used by the GPU renderer;
+/// depth tests compare with `Greater`. (LumilioCL local change.)
+pub fn compute_view_proj_reversed(
+    bounds_min: [f32; 3],
+    bounds_max: [f32; 3],
+    aspect: f32,
+    camera: &CameraConfig,
+) -> ([[f32; 4]; 4], [[f32; 4]; 4]) {
+    view_proj(bounds_min, bounds_max, aspect, camera, true)
+}
+
+fn view_proj(
+    bounds_min: [f32; 3],
+    bounds_max: [f32; 3],
+    aspect: f32,
+    camera: &CameraConfig,
+    reversed_depth: bool,
+) -> ([[f32; 4]; 4], [[f32; 4]; 4]) {
     let center = camera.target.unwrap_or([
         (bounds_min[0] + bounds_max[0]) * 0.5,
         (bounds_min[1] + bounds_max[1]) * 0.5,
@@ -180,7 +204,11 @@ pub fn compute_view_proj(
             let view = look_at(eye, center, [0.0, 1.0, 0.0]);
             let near = distance * 0.01;
             let far = distance * 10.0;
-            let proj = perspective(fov, aspect, near, far);
+            let proj = if reversed_depth {
+                perspective_reversed(fov, aspect, near)
+            } else {
+                perspective(fov, aspect, near, far)
+            };
             let view_proj = mat4_mul(proj, view);
             (view_proj, mat4_inverse(view_proj))
         }
@@ -223,7 +251,12 @@ pub fn compute_view_proj(
             let view = look_at(eye, center, [0.0, 1.0, 0.0]);
             let near = 0.01;
             let far = standoff * 2.0 + 1.0;
-            let proj = ortho(-half_w, half_w, -half_h, half_h, near, far);
+            // Swapping near and far reverses the linear depth range.
+            let proj = if reversed_depth {
+                ortho(-half_w, half_w, -half_h, half_h, far, near)
+            } else {
+                ortho(-half_w, half_w, -half_h, half_h, near, far)
+            };
             let view_proj = mat4_mul(proj, view);
             (view_proj, mat4_inverse(view_proj))
         }
@@ -252,6 +285,19 @@ pub fn perspective(fov_y: f32, aspect: f32, near: f32, far: f32) -> [[f32; 4]; 4
         [0.0, f, 0.0, 0.0],
         [0.0, 0.0, far * nf, -1.0],
         [0.0, 0.0, near * far * nf, 0.0],
+    ]
+}
+
+/// Reversed-depth perspective with an infinite far plane: view depth `d` maps to
+/// NDC z `near / d`, so the near plane is 1 and infinity is 0. X, Y and W match
+/// [`perspective`].
+pub fn perspective_reversed(fov_y: f32, aspect: f32, near: f32) -> [[f32; 4]; 4] {
+    let f = 1.0 / (fov_y * 0.5).tan();
+    [
+        [f / aspect, 0.0, 0.0, 0.0],
+        [0.0, f, 0.0, 0.0],
+        [0.0, 0.0, 0.0, -1.0],
+        [0.0, 0.0, near, 0.0],
     ]
 }
 
@@ -423,6 +469,38 @@ mod view_proj_tests {
             out[j] = m[0][j] * v[0] + m[1][j] * v[1] + m[2][j] * v[2] + m[3][j] * v[3];
         }
         out
+    }
+
+    /// Reversed depth keeps the framing and puts nearer points at larger depth,
+    /// with every corner inside (0, 1].
+    #[test]
+    fn reversed_depth_keeps_framing_and_flips_depth_order() {
+        for projection in [Projection::Perspective, Projection::Orthographic] {
+            let cam = CameraConfig {
+                yaw_deg: 30.0,
+                pitch_deg: 25.0,
+                projection,
+                sphere_fit: true,
+                ..CameraConfig::default()
+            };
+            let (bmin, bmax) = ([0.0, 0.0, 0.0], [4.0, 2.0, 6.0]);
+            let (standard, _) = compute_view_proj(bmin, bmax, 1.5, &cam);
+            let (reversed, _) = compute_view_proj_reversed(bmin, bmax, 1.5, &cam);
+            let ndc = |m, p: [f32; 3]| {
+                let c = transform(m, [p[0], p[1], p[2], 1.0]);
+                [c[0] / c[3], c[1] / c[3], c[2] / c[3]]
+            };
+            let corners = [[0.0, 0.0, 0.0], [4.0, 2.0, 6.0], [4.0, 0.0, 0.0], [0.0, 2.0, 6.0]];
+            for p in corners {
+                let (s, r) = (ndc(standard, p), ndc(reversed, p));
+                assert!((s[0] - r[0]).abs() < 1e-4 && (s[1] - r[1]).abs() < 1e-4);
+                assert!(r[2] > 0.0 && r[2] <= 1.0, "{projection:?} z={}", r[2]);
+            }
+            // Along the view ray, the nearer of two points gets the larger depth.
+            let (near, far) = (ndc(reversed, [0.0, 2.0, 6.0]), ndc(reversed, [4.0, 0.0, 0.0]));
+            let (s_near, s_far) = (ndc(standard, [0.0, 2.0, 6.0]), ndc(standard, [4.0, 0.0, 0.0]));
+            assert_eq!(s_near[2] < s_far[2], near[2] > far[2], "{projection:?}");
+        }
     }
 
     #[test]

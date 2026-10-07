@@ -1387,14 +1387,15 @@ fn resolve_block_info(
         for element in &resolved.model.elements {
             let mut faces = Vec::new();
 
-            // Capture element-level rotation
-            let rotation = element.rotation.as_ref().map(|r| {
-                let axis = match r.axis {
+            // Capture element-level rotation. This export only speaks the
+            // single-axis form; a Minecraft 26.x Euler rotation is omitted.
+            let rotation = element.rotation.as_ref().and_then(|r| {
+                let axis = match r.axis? {
                     schematic_mesher::types::Axis::X => "x",
                     schematic_mesher::types::Axis::Y => "y",
                     schematic_mesher::types::Axis::Z => "z",
                 };
-                (r.origin, axis.to_string(), r.angle, r.rescale)
+                Some((r.origin, axis.to_string(), r.angle, r.rescale))
             });
 
             for &dir in &Direction::ALL {

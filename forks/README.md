@@ -27,8 +27,44 @@ Keep upstream license headers and API attribution when changing source.
 
 - Nucleation's mesher dependency uses `../schematic-mesher`.
 - Schematic-Mesher's development dependency uses `../nucleation`.
-- Rendering and parsing source is unchanged at adoption. Glass sorting,
-  Minecraft 26.2 rotations and sign layouts still need separate fixes.
+- Rendering behaviour follows Minecraft's draw rules (ADR 0034). Each change
+  below has a guard that was shown to fail without it; keep them through syncs.
+
+Schematic-Mesher (guards in `schematic-mesher/tests/`, run one with
+`cargo test --manifest-path forks/schematic-mesher/Cargo.toml --test NAME`):
+
+- Face culling (`mesher/face_culler.rs`): a full cube with see-through texture
+  pixels hides no neighbouring face; leaves do not cull each other; copper
+  grates cull only the same block. Guard: `face_culling`.
+- Element rotation (`types/transform.rs`, `mesher/element.rs`): the 26.x Euler
+  form `{x, y, z}` parses, both forms use Minecraft 26.3 `CuboidRotation`
+  semantics, and normals turn with the element. Guard: `element_rotation`.
+- Signs and beds (`mesher/entity/mod.rs`, `mesher/element.rs`): when the block
+  model has elements (26.2+), the legacy entity is not drawn. Guard:
+  `block_model_entities`.
+- Coplanar faces (`mesher/element.rs` `separate_coplanar_faces`): overlapping
+  faces of one block in one plane and facing move out 1/1024 block per earlier
+  face. Guard: `coplanar_faces`.
+- `undrawable_blocks` (`mesher/mod.rs`, re-exported): names blocks no model or
+  stand-in geometry can draw. Guard: `undrawable_blocks`.
+- The crate's own unit tests and `tests/atlas_uv_regression.rs` do not compile
+  at the baseline: upstream `253d2b6` changed `MesherOutput` layers to
+  `MeshLayer` without updating them. Local guards therefore live in new
+  integration test files that share `tests/common/`.
+
+Nucleation (unit guards run with the `--lib` command under Synchronizing
+upstream; its lib tests also write `simple_cube.litematic`,
+`test_schematic.schem` and `tests/output/` into the fork, delete them after):
+
+- Renderer (`src/rendering/gpu.rs`, `shader.wgsl`, `camera.rs`): back-face
+  culling on all layers; reversed depth (`compute_view_proj_reversed`,
+  `GreaterEqual`, clear 0); opaque and cutout without blending (`fs_solid`);
+  translucent triangles re-sorted back to front each frame (`TriangleOrder`).
+  Guards: `reversed_depth_keeps_framing_and_flips_depth_order`,
+  `translucent_triangles_draw_farthest_first`.
+- `UniversalSchematic::undrawable_blocks` (`src/meshing/mod.rs`).
+- `src/meshing/item_model.rs` exports only single-axis element rotations; an
+  Euler rotation is omitted there.
 
 ## Synchronizing upstream
 

@@ -10,10 +10,11 @@ rust-version.workspace = true
 # Locally maintained native rendering chain; upstream baselines in forks/README.md (ADR 0029).
 nucleation = { path = "../../forks/nucleation", default-features = false, features = ["meshing", "rendering"] }
 pollster = "0.4"
+serde_json.workspace = true
+zip.workspace = true
 
 [dev-dependencies]
 image.workspace = true
-zip.workspace = true
 
 [lints]
 workspace = true
