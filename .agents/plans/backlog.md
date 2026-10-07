@@ -21,6 +21,5 @@
 
 ## 只有维护者能做
 
-- 0031：真实的 Microsoft 登录（Xbox / Minecraft 步骤，需要 Mojang 审批）。
 - Litematica 原生预览（ADR 0028）：Windows/Linux 和更老游戏版本的兼容检查；本机原生预览与绘制规则已由维护者验收。
 - ADR 0007 仍是 `proposed`，ADR 0018 推迟中。

@@ -67,3 +67,10 @@ refused with a clear message.
 - Follow-ups: third-party authentication servers (authlib-injector) and skins
   build on the account kinds introduced here; an explicit "play offline once"
   choice for the no-network case is left for a later decision.
+
+## Shipped
+
+The protocol client, credential store, account keys, token refresh, launch
+session and the sign-in dialog shipped with this decision. On 2026-10-07 the
+registration was approved by Minecraft services and the maintainer signed in
+with a real account, confirming the whole chain end to end.
