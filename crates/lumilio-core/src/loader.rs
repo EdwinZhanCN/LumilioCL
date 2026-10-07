@@ -7,7 +7,7 @@
 use serde::Deserialize;
 use url::Url;
 
-use crate::fetch::{FetchError, fetch_document};
+use crate::fetch::{FetchError, fetch_decoded};
 use crate::instance::Loader;
 use crate::transfer::Transport;
 
@@ -121,7 +121,7 @@ pub async fn fetch_versions<T: Transport + ?Sized>(
     transport: &T,
     sources: &[String],
 ) -> Result<Vec<LoaderVersion>, LoaderError> {
-    decode_versions(&fetch_document(transport, sources).await?)
+    Ok(fetch_decoded(transport, sources, |bytes| decode_versions(&bytes)).await?)
 }
 
 /// The newest stable loader version, else the newest of any kind.

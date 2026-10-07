@@ -5,6 +5,41 @@ use crate::activity_log::{RetryAction, TaskOutcome};
 use crate::instance::Loader;
 
 #[tokio::test]
+async fn java_metadata_falls_back_from_bad_index_and_manifest() {
+    let world = world();
+    publish_java(&world, false);
+    world
+        .net
+        .answer("bad-index", b"<html>unavailable</html>".to_vec());
+    let bad_manifest = world.server.join("bad-jmanifest.json");
+    std::fs::write(&bad_manifest, r#"{"error":"unavailable"}"#).unwrap();
+    world
+        .service
+        .set_mirrors(
+            vec![
+                crate::MirrorRule {
+                    official_prefix: crate::java_runtime::INDEX_URL.to_owned(),
+                    mirror_prefix: "https://mirror.test/bad-index".into(),
+                },
+                crate::MirrorRule {
+                    official_prefix: super::file_url(&world.server.join("jmanifest.json")),
+                    mirror_prefix: super::file_url(&bad_manifest),
+                },
+            ],
+            true,
+        )
+        .await
+        .unwrap();
+    let java = world
+        .service
+        .install_java(Some(21), CancellationToken::new())
+        .await
+        .unwrap();
+    assert_eq!(java.major(), 21);
+    assert!(java.executable().is_file());
+}
+
+#[tokio::test]
 async fn java_is_installed_whole_found_by_discovery_and_a_bad_file_leaves_nothing() {
     let world = world();
     publish_java(&world, true);

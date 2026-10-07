@@ -67,10 +67,12 @@ fn presets_map_download_paths_and_keep_the_official_fallback() {
         ),
     ];
     for (original, mirror) in cases {
-        assert_eq!(
-            store.source_chain().unwrap().candidates(original),
+        let expected = if mirror.starts_with("https://mod.mcimirror.top/") {
+            [original, mirror]
+        } else {
             [mirror, original]
-        );
+        };
+        assert_eq!(store.source_chain().unwrap().candidates(original), expected);
     }
     let reopened = SettingsStore::open(root.path()).unwrap();
     assert_eq!(reopened.get().mirrors, rules);

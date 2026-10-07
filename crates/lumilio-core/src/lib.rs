@@ -170,8 +170,8 @@ pub use service::{
     ProjectDetail, ServiceError, ThirdPartySignIn, now as unix_now,
 };
 pub use settings::{
-    AccountEntry, AccountKind, AuthServerEntry, LauncherSettings, MAX_MEMORY_MB, MirrorRule,
-    SettingsError, SettingsStore,
+    AccountEntry, AccountKind, AuthServerEntry, DownloadSourcePreference, LauncherSettings,
+    MAX_MEMORY_MB, MirrorRule, SettingsError, SettingsStore,
 };
 pub use skin::{LITTLE_SKIN_CSL, SkinChoice, SkinError, SkinModel};
 pub use snapshots::{

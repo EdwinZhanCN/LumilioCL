@@ -109,6 +109,48 @@ fn launcher() -> Launcher<FileTransport> {
     Launcher::new(FileTransport, chain)
 }
 
+#[tokio::test]
+async fn release_metadata_falls_back_from_an_unusable_mirror() {
+    let world = world("exit 0");
+    let original = world.request.manifest_url.as_ref().unwrap();
+    let bad = world._dir.path().join("bad.json");
+    let bad_url = url::Url::from_file_path(&bad).unwrap().to_string();
+    let chain = SourceChain::new([
+        Arc::new(crate::transfer::PrefixMirror::new(original, &bad_url, 16).unwrap())
+            as Arc<dyn crate::transfer::SourceProvider>,
+        Arc::new(OfficialSource),
+    ])
+    .unwrap();
+    let launcher = Launcher::new(FileTransport, chain);
+    for bytes in [b"{\"error\":\"unavailable\"}".as_slice(), &[0xff]] {
+        std::fs::write(&bad, bytes).unwrap();
+        let release = launcher.load_release(&world.request).await.unwrap();
+        assert_eq!(release.id(), "1.0");
+        assert_eq!(release.main_class(), Some("net.example.Main"));
+    }
+}
+
+#[tokio::test]
+async fn loader_profile_falls_back_from_an_error_object() {
+    let mut world = world("exit 0");
+    make_fabric(&mut world);
+    let original = world.request.loader_profile_url.as_ref().unwrap();
+    let bad = world._dir.path().join("bad-profile.json");
+    std::fs::write(&bad, r#"{"error":"unavailable"}"#).unwrap();
+    let bad_url = url::Url::from_file_path(&bad).unwrap().to_string();
+    let chain = SourceChain::new([
+        Arc::new(crate::transfer::PrefixMirror::new(original, &bad_url, 16).unwrap())
+            as Arc<dyn crate::transfer::SourceProvider>,
+        Arc::new(OfficialSource),
+    ])
+    .unwrap();
+    let release = Launcher::new(FileTransport, chain)
+        .load_release(&world.request)
+        .await
+        .unwrap();
+    assert_eq!(release.main_class(), Some("net.example.LoaderMain"));
+}
+
 async fn run_to_end(
     launcher: &Launcher<FileTransport>,
     request: LaunchRequest,

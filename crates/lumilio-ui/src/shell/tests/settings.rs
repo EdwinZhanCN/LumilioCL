@@ -26,6 +26,7 @@ fn the_settings_page_shows_each_tab_and_edits_open_a_dialog(cx: &mut TestAppCont
         gpui_component::Root::new(shell, window, cx)
     });
     let shell = slot.borrow().clone().expect("shell");
+    cx.simulate_resize(gpui::size(gpui::px(1080.), gpui::px(720.)));
     shell.update(cx, |shell, _| shell.show(Route::Settings));
     // Before the settings arrive the page says so instead of showing blanks.
     shell.update(cx, |_, cx| cx.notify());
@@ -123,6 +124,36 @@ fn the_settings_page_shows_each_tab_and_edits_open_a_dialog(cx: &mut TestAppCont
             seen.borrow().is_empty(),
             "added presets cannot be submitted twice"
         );
+    }
+    for (selector, preference) in [
+        (
+            "settings-download-source-key-0",
+            lumilio_core::DownloadSourcePreference::OfficialOnly,
+        ),
+        (
+            "settings-download-source-key-2",
+            lumilio_core::DownloadSourcePreference::MirrorFirst,
+        ),
+        (
+            "settings-download-source-key-1",
+            lumilio_core::DownloadSourcePreference::OfficialFirst,
+        ),
+    ] {
+        let key = cx.debug_bounds(selector).expect("source choice");
+        cx.simulate_click(key.center(), Modifiers::none());
+        cx.run_until_parked();
+        assert_eq!(
+            seen.borrow().as_slice(),
+            [LiveIntent::SetDownloadSource(preference)]
+        );
+        seen.borrow_mut().clear();
+        shell.update(cx, |shell, cx| {
+            shell.update_live(
+                |model| model.settings.as_mut().unwrap().download_source = preference,
+                cx,
+            )
+        });
+        cx.run_until_parked();
     }
     shell.update(cx, |shell, cx| {
         shell.apply_view_intent(ViewIntent::Choose(TAB_GROUP, 5), cx)

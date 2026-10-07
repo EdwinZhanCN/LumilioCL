@@ -3,7 +3,7 @@ use super::types::{LaunchRequest, LaunchServiceError, LaunchUpdate};
 use super::{LAUNCHER_NAME, Launcher, QUICK_PLAY_LOG};
 use crate::activity::CancellationToken;
 use crate::environment::HostProfile;
-use crate::fetch::{FetchError, fetch_document};
+use crate::fetch::{FetchError, fetch_decoded, fetch_document};
 use crate::forge_install::ForgeError;
 use crate::install::{InstallError, InstallationPlan, Installer};
 use crate::instance::Loader;
@@ -482,11 +482,24 @@ where
                 .version_json
         } else {
             let sources = self.sources.candidates(url);
-            fetch_document(&self.transport, &sources)
-                .await
-                .map_err(|error: FetchError| {
-                    LaunchServiceError::ManifestUnavailable(error.to_string())
-                })?
+            fetch_decoded(&self.transport, &sources, |bytes| {
+                let profile = normalize_profile(&bytes, &id, game)?;
+                let manifest = ReleaseManifest::decode_json(&profile)
+                    .map_err(|error| crate::loader::LoaderError::Decode(error.to_string()))?;
+                if manifest
+                    .main_class()
+                    .is_none_or(|class| class.trim().is_empty())
+                {
+                    return Err(crate::loader::LoaderError::Decode(
+                        "loader profile has no main class".to_owned(),
+                    ));
+                }
+                Ok::<_, crate::loader::LoaderError>(bytes)
+            })
+            .await
+            .map_err(|error: FetchError| {
+                LaunchServiceError::ManifestUnavailable(error.to_string())
+            })?
         };
         let profile = normalize_profile(&bytes, &id, game)
             .map_err(|error| LaunchServiceError::ManifestUnavailable(error.to_string()))?;
@@ -512,14 +525,14 @@ where
             ))
         })?;
         let sources = self.sources.candidates(url);
-        let bytes =
-            fetch_document(&self.transport, &sources)
-                .await
-                .map_err(|error: FetchError| {
-                    LaunchServiceError::ManifestUnavailable(error.to_string())
-                })?;
-        String::from_utf8(bytes)
-            .map_err(|error| LaunchServiceError::ManifestUnavailable(error.to_string()))
+        fetch_decoded(&self.transport, &sources, |bytes| {
+            let text = String::from_utf8(bytes)
+                .map_err(|error| LaunchServiceError::ManifestUnavailable(error.to_string()))?;
+            ReleaseManifest::decode_json(&text).map_err(LaunchServiceError::Release)?;
+            Ok::<_, LaunchServiceError>(text)
+        })
+        .await
+        .map_err(|error: FetchError| LaunchServiceError::ManifestUnavailable(error.to_string()))
     }
 
     /// Runs the installer, translating its progress into launch signals with

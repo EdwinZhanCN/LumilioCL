@@ -37,7 +37,7 @@
 | 添加 BMCLAPI 镜像 | 下载与存储 · 预设行 [添加] | 添加游戏资源、加载器与 authlib-injector 镜像；保留已有规则和优先顺序，完整添加后禁用按钮 |  | `lumilio-ui/src/pages/settings/storage.rs` |
 | 添加 MCIM 镜像 | 下载与存储 · 预设行 [添加] | 添加 Modrinth / CurseForge 镜像；保留已有规则和优先顺序，完整添加后禁用按钮 |  | `lumilio-ui/src/pages/settings/storage.rs` |
 | 添加腾讯 Maven 镜像 | 下载与存储 · 预设行 [添加] | 添加 Maven Central 镜像；保留已有规则和优先顺序，完整添加后禁用按钮 |  | `lumilio-ui/src/pages/settings/storage.rs` |
-| 优先使用镜像 | 下载与存储 · 开关 | 先试镜像地址，不通再回到官方地址 |  | `lumilio-ui/src/pages/settings/storage.rs` |
+| 下载源 | 下载与存储 · 分段：仅官方 / 官方优先 / 镜像优先 | 立即保存；仅官方不访问镜像，其他模式按顺序回退，MCIM 始终位于官方之后 |  | `lumilio-ui/src/pages/settings/storage.rs` |
 | 镜像规则 | 下载与存储 · 值 + [编辑] 弹窗 | 每行 官方前缀 => 镜像前缀 |  | `lumilio-ui/src/pages/settings/storage.rs` |
 | 同时下载数 | 下载与存储 · 值 + [编辑] 弹窗 | 自动 / 1–32 |  | `lumilio-ui/src/pages/settings/storage.rs` |
 | 数据目录 | 下载与存储 · 路径 + [在访达中显示] | 不可改（App State） |  | `lumilio-ui/src/pages/settings/storage.rs` |

@@ -39,6 +39,16 @@ pub struct MirrorRule {
     pub mirror_prefix: String,
 }
 
+/// Candidate order for downloads. MCIM is a fallback in both priority modes.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DownloadSourcePreference {
+    OfficialOnly,
+    #[default]
+    OfficialFirst,
+    MirrorFirst,
+}
+
 /// What kind of identity an account is.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -134,8 +144,11 @@ pub struct LauncherSettings {
     /// Extra folders searched for Java installations.
     pub extra_java_roots: Vec<PathBuf>,
     pub mirrors: Vec<MirrorRule>,
-    /// Try mirrors before the official address.
+    /// Legacy preference, retained for older settings and callers.
     pub prefer_mirrors: bool,
+    /// Absent in older files; their `prefer_mirrors` supplies the preference.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub download_source: Option<DownloadSourcePreference>,
     pub accounts: Vec<AccountEntry>,
     /// Authentication servers added besides the built-in LittleSkin.
     pub auth_servers: Vec<AuthServerEntry>,
@@ -157,6 +170,17 @@ impl Versioned for LauncherSettings {
     }
     fn set_schema(&mut self, schema: u32) {
         self.schema = schema;
+    }
+}
+
+impl LauncherSettings {
+    #[must_use]
+    pub fn download_source_preference(&self) -> DownloadSourcePreference {
+        self.download_source.unwrap_or(if self.prefer_mirrors {
+            DownloadSourcePreference::MirrorFirst
+        } else {
+            DownloadSourcePreference::OfficialFirst
+        })
     }
 }
 
@@ -330,6 +354,33 @@ impl SettingsStore {
         let mut next = self.settings.clone();
         next.mirrors = mirrors;
         next.prefer_mirrors = prefer;
+        next.download_source = Some(if prefer {
+            DownloadSourcePreference::MirrorFirst
+        } else {
+            DownloadSourcePreference::OfficialFirst
+        });
+        self.save(next)
+    }
+
+    /// Replace rules while preserving the current download source preference.
+    pub fn set_mirror_rules(&mut self, mirrors: Vec<MirrorRule>) -> Result<(), SettingsError> {
+        if mirrors.iter().any(|rule| {
+            rule.official_prefix.trim().is_empty() || rule.mirror_prefix.trim().is_empty()
+        }) {
+            return Err(SettingsError::InvalidMirror);
+        }
+        let mut next = self.settings.clone();
+        next.mirrors = mirrors;
+        self.save(next)
+    }
+
+    pub fn set_download_source(
+        &mut self,
+        preference: DownloadSourcePreference,
+    ) -> Result<(), SettingsError> {
+        let mut next = self.settings.clone();
+        next.download_source = Some(preference);
+        next.prefer_mirrors = preference == DownloadSourcePreference::MirrorFirst;
         self.save(next)
     }
 
@@ -613,21 +664,35 @@ impl SettingsStore {
     /// The download source order these settings describe: mirrors and the
     /// official address, in the configured preference.
     pub fn source_chain(&self) -> Result<SourceChain, SettingsError> {
+        let preference = self.settings.download_source_preference();
+        if preference == DownloadSourcePreference::OfficialOnly {
+            return SourceChain::new([Arc::new(OfficialSource) as Arc<dyn SourceProvider>])
+                .map_err(|_| SettingsError::InvalidMirror);
+        }
         let mut mirrors: Vec<Arc<dyn SourceProvider>> = Vec::new();
+        let mut fallbacks: Vec<Arc<dyn SourceProvider>> = Vec::new();
         for rule in &self.settings.mirrors {
             let mirror = PrefixMirror::new(&rule.official_prefix, &rule.mirror_prefix, 16)
                 .map_err(|_| SettingsError::InvalidMirror)?;
-            mirrors.push(Arc::new(mirror));
+            if crate::mirror_presets::is_fallback_rule(rule) {
+                fallbacks.push(Arc::new(mirror));
+            } else {
+                mirrors.push(Arc::new(mirror));
+            }
         }
         let official: Arc<dyn SourceProvider> = Arc::new(OfficialSource);
-        let providers = if self.settings.prefer_mirrors {
+        let mut providers = if preference == DownloadSourcePreference::MirrorFirst {
             mirrors.into_iter().chain([official]).collect::<Vec<_>>()
         } else {
             std::iter::once(official).chain(mirrors).collect()
         };
+        providers.extend(fallbacks);
         SourceChain::new(providers).map_err(|_| SettingsError::InvalidMirror)
     }
 }
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod download_source_tests;

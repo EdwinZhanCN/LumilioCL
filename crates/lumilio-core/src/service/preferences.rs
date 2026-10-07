@@ -115,13 +115,32 @@ impl<T: Transport + Clone> LauncherService<T> {
         Ok(())
     }
 
+    pub async fn set_mirror_rules(
+        &self,
+        mirrors: Vec<crate::MirrorRule>,
+    ) -> Result<(), ServiceError> {
+        let mut settings = self.settings.lock().await;
+        settings.set_mirror_rules(mirrors)?;
+        self.plugins.set_sources(settings.source_chain()?);
+        Ok(())
+    }
+
+    pub async fn set_download_source(
+        &self,
+        preference: crate::DownloadSourcePreference,
+    ) -> Result<(), ServiceError> {
+        let mut settings = self.settings.lock().await;
+        settings.set_download_source(preference)?;
+        self.plugins.set_sources(settings.source_chain()?);
+        Ok(())
+    }
+
     /// Merge against the latest saved settings, so concurrent preset additions
     /// cannot replace one another with stale UI snapshots.
     pub async fn add_mirror_preset(&self, preset: crate::MirrorPreset) -> Result<(), ServiceError> {
         let mut settings = self.settings.lock().await;
         let mirrors = preset.merge(&settings.get().mirrors);
-        let prefer = settings.get().prefer_mirrors;
-        settings.set_mirrors(mirrors, prefer)?;
+        settings.set_mirror_rules(mirrors)?;
         self.plugins.set_sources(settings.source_chain()?);
         Ok(())
     }

@@ -42,6 +42,22 @@ async fn concurrent_mirror_presets_merge_the_latest_saved_rules() {
     let reopened = SettingsStore::open(world.service.layout().root()).unwrap();
     assert_eq!(reopened.get().mirrors, saved.mirrors);
     assert!(reopened.get().prefer_mirrors);
+    world
+        .service
+        .set_download_source(crate::DownloadSourcePreference::OfficialOnly)
+        .await
+        .unwrap();
+    world
+        .service
+        .add_mirror_preset(MirrorPreset::Bmclapi)
+        .await
+        .unwrap();
+    world.service.set_mirror_rules(saved.mirrors).await.unwrap();
+    let reopened = SettingsStore::open(world.service.layout().root()).unwrap();
+    assert_eq!(
+        reopened.get().download_source_preference(),
+        crate::DownloadSourcePreference::OfficialOnly
+    );
 }
 
 #[tokio::test]

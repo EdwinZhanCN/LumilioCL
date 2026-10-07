@@ -8,7 +8,7 @@ use std::fmt::{self, Display, Formatter};
 
 use serde::Deserialize;
 
-use crate::fetch::{FetchError, fetch_document};
+use crate::fetch::{FetchError, fetch_decoded};
 use crate::transfer::{SourceChain, Transport};
 
 /// Where the official catalog lives.
@@ -218,10 +218,12 @@ impl VersionCatalog {
         chain: &SourceChain,
     ) -> Result<Self, CatalogError> {
         let sources = chain.candidates(OFFICIAL_CATALOG_URL);
-        let bytes = fetch_document(transport, &sources).await?;
-        let text = String::from_utf8(bytes)
-            .map_err(|error| CatalogError::Decode(error.utf8_error().to_string()))?;
-        Self::decode_json(&text)
+        Ok(fetch_decoded(transport, &sources, |bytes| {
+            let text = String::from_utf8(bytes)
+                .map_err(|error| CatalogError::Decode(error.utf8_error().to_string()))?;
+            Self::decode_json(&text)
+        })
+        .await?)
     }
 
     #[must_use]

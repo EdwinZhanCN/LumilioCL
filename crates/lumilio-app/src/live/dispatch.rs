@@ -469,13 +469,25 @@ pub(super) fn on_live_intent(
                 cx,
             );
         }
-        LiveIntent::SetMirrors { mirrors, prefer } => {
+        LiveIntent::SetMirrors(mirrors) => {
             let service = wiring.backend.service.clone();
             change_setting(
                 wiring,
                 window,
-                async move { service.set_mirrors(mirrors, prefer).await },
+                async move { service.set_mirror_rules(mirrors).await },
                 "没能保存镜像设置",
+                None,
+                |_, _| {},
+                cx,
+            );
+        }
+        LiveIntent::SetDownloadSource(preference) => {
+            let service = wiring.backend.service.clone();
+            change_setting(
+                wiring,
+                window,
+                async move { service.set_download_source(preference).await },
+                "没能保存下载源设置",
                 None,
                 |_, _| {},
                 cx,

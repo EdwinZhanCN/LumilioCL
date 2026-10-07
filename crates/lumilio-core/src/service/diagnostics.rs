@@ -354,9 +354,9 @@ impl<T: Transport + Clone> LauncherService<T> {
         );
         let _ = writeln!(
             summary,
-            "mirrors: {} (preferred: {})",
+            "mirrors: {} (source preference: {:?})",
             settings.mirrors.len(),
-            settings.prefer_mirrors
+            settings.download_source_preference()
         );
         let _ = writeln!(
             summary,

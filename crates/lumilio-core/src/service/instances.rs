@@ -6,7 +6,7 @@ use crate::attention::{HomeSummary, summarize};
 use crate::catalog::VersionCatalog;
 use crate::deletion::Deletion;
 use crate::diagnostics::Problem;
-use crate::fetch::fetch_document;
+use crate::fetch::fetch_decoded;
 use crate::instance::{InstanceRecord, Loader, NewInstance};
 use crate::launcher::LaunchServiceError;
 use crate::loader::LAUNCHABLE_LOADERS;
@@ -157,16 +157,24 @@ impl<T: Transport + Clone> LauncherService<T> {
                     .map_err(decode)
             }
             Loader::Forge => {
-                let metadata = fetch_document(
+                let metadata = fetch_decoded(
                     &self.transport,
                     &chain.candidates(forge_meta::FORGE_METADATA_URL),
+                    |bytes| {
+                        forge_meta::forge_versions(&bytes, None, game_version)?;
+                        Ok::<_, loader::LoaderError>(bytes)
+                    },
                 )
                 .await
                 .map_err(remote)?;
                 // Promotions only mark the recommended build; the list stands without them.
-                let promotions = fetch_document(
+                let promotions = fetch_decoded(
                     &self.transport,
                     &chain.candidates(forge_meta::FORGE_PROMOTIONS_URL),
+                    |bytes| {
+                        forge_meta::forge_versions(&metadata, Some(&bytes), game_version)?;
+                        Ok::<_, loader::LoaderError>(bytes)
+                    },
                 )
                 .await
                 .ok();
@@ -174,17 +182,25 @@ impl<T: Transport + Clone> LauncherService<T> {
                     .map_err(decode)
             }
             Loader::NeoForge => {
-                let modern = fetch_document(
+                let modern = fetch_decoded(
                     &self.transport,
                     &chain.candidates(forge_meta::NEOFORGE_VERSIONS_URL),
+                    |bytes| {
+                        forge_meta::neoforge_versions(&bytes, None, game_version)?;
+                        Ok::<_, loader::LoaderError>(bytes)
+                    },
                 )
                 .await
                 .map_err(remote)?;
                 let legacy = if game_version == forge_meta::NEOFORGE_LEGACY_GAME {
                     Some(
-                        fetch_document(
+                        fetch_decoded(
                             &self.transport,
                             &chain.candidates(forge_meta::NEOFORGE_LEGACY_VERSIONS_URL),
+                            |bytes| {
+                                forge_meta::neoforge_versions(&modern, Some(&bytes), game_version)?;
+                                Ok::<_, loader::LoaderError>(bytes)
+                            },
                         )
                         .await
                         .map_err(remote)?,

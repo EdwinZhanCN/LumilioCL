@@ -1,4 +1,6 @@
-use lumilio_core::{LaunchTuning, LauncherSettings, MirrorRule, Preferences, StorageUsage};
+use lumilio_core::{
+    DownloadSourcePreference, LaunchTuning, LauncherSettings, MirrorRule, Preferences, StorageUsage,
+};
 use std::path::{Path, PathBuf};
 
 /// One Java installation of the Java tab.
@@ -22,7 +24,7 @@ pub struct SettingsView {
     pub max_memory_mb: Option<u32>,
     pub download_concurrency: Option<u32>,
     pub mirrors: Vec<MirrorRule>,
-    pub prefer_mirrors: bool,
+    pub download_source: DownloadSourcePreference,
     pub java_roots: Vec<PathBuf>,
     pub java: Vec<JavaRow>,
     /// `None` while the disk is still being measured.
@@ -48,7 +50,7 @@ pub fn settings_view(
         max_memory_mb: settings.default_max_memory_mb,
         download_concurrency: settings.download_concurrency,
         mirrors: settings.mirrors.clone(),
-        prefer_mirrors: settings.prefer_mirrors,
+        download_source: settings.download_source_preference(),
         java_roots: settings.extra_java_roots.clone(),
         java: java
             .iter()

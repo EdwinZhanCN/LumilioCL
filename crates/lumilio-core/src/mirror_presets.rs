@@ -127,5 +127,14 @@ impl MirrorPreset {
     }
 }
 
+/// Recognize the built-in MCIM mappings, including older hand-written rules
+/// without a trailing slash. Other custom mappings retain their chosen order.
+pub(crate) fn is_fallback_rule(rule: &MirrorRule) -> bool {
+    MCIM.iter().any(|(official, mirror)| {
+        rule.official_prefix.trim_end_matches('/') == official.trim_end_matches('/')
+            && rule.mirror_prefix.trim_end_matches('/') == mirror.trim_end_matches('/')
+    })
+}
+
 #[cfg(test)]
 mod tests;

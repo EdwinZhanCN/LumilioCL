@@ -32,13 +32,11 @@ pub const NEOFORGE_LEGACY_GAME: &str = "1.20.1";
 
 #[derive(Deserialize)]
 struct Promotions {
-    #[serde(default)]
     promos: BTreeMap<String, String>,
 }
 
 #[derive(Deserialize)]
 struct MavenVersions {
-    #[serde(default)]
     versions: Vec<String>,
 }
 

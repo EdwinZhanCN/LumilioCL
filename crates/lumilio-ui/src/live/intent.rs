@@ -1,6 +1,8 @@
 use super::discover::DiscoverQuery;
 use gpui::{App, Window};
-use lumilio_core::{LaunchTuning, MirrorPreset, MirrorRule, Preferences, ProjectKind};
+use lumilio_core::{
+    DownloadSourcePreference, LaunchTuning, MirrorPreset, MirrorRule, Preferences, ProjectKind,
+};
 use std::path::PathBuf;
 use std::rc::Rc;
 
@@ -145,10 +147,8 @@ pub enum LiveIntent {
     },
     SetConcurrency(Option<u32>),
     AddMirrorPreset(MirrorPreset),
-    SetMirrors {
-        mirrors: Vec<MirrorRule>,
-        prefer: bool,
-    },
+    SetMirrors(Vec<MirrorRule>),
+    SetDownloadSource(DownloadSourcePreference),
     SetJavaRoots(Vec<PathBuf>),
     /// Turn an installation (by its home folder) off or on.
     SetJavaDisabled {

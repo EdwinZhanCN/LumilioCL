@@ -11,7 +11,7 @@ use gpui::prelude::*;
 use gpui::{AnyElement, IntoElement, div, px};
 use gpui_component::Sizable as _;
 use gpui_component::{h_flex, v_flex};
-use lumilio_core::{MirrorPreset, StorageUsage};
+use lumilio_core::{DownloadSourcePreference, MirrorPreset, StorageUsage};
 use std::rc::Rc;
 
 pub(super) fn storage_bar(usage: &StorageUsage, colors: ShellColors) -> AnyElement {
@@ -97,16 +97,14 @@ pub(super) fn downloads(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
         .iter()
         .map(|rule| format!("{} => {}", rule.official_prefix, rule.mirror_prefix))
         .collect();
-    let prefer = view.prefer_mirrors;
     let mirror_text = mirror_lines.join("\n");
-    let rules_now = view.mirrors.clone();
     let concurrency_now = view.download_concurrency;
 
     // ia[settings]: 添加 BMCLAPI 镜像 | 下载与存储 · 预设行 [添加] | 添加游戏资源、加载器与 authlib-injector 镜像；保留已有规则和优先顺序，完整添加后禁用按钮
     let bmclapi = preset_row(
         "settings-bmclapi",
         "BMCLAPI",
-        "游戏资源、Forge、NeoForge、Fabric 和 authlib-injector。添加后可打开“优先使用镜像”。",
+        "游戏资源、Forge、NeoForge、Fabric 和 authlib-injector。添加后可选择“镜像优先”。",
         MirrorPreset::Bmclapi,
         view,
         ctx,
@@ -115,7 +113,7 @@ pub(super) fn downloads(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
     let mcim = preset_row(
         "settings-mcim",
         "MCIM",
-        "Modrinth 和 CurseForge 的信息与文件。",
+        "Modrinth 和 CurseForge 的信息与文件。始终先试官方，失败再用 MCIM；“仅官方”时不使用。",
         MirrorPreset::Mcim,
         view,
         ctx,
@@ -130,25 +128,26 @@ pub(super) fn downloads(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
         ctx,
     );
 
-    // ia[settings]: 优先使用镜像 | 下载与存储 · 开关 | 先试镜像地址，不通再回到官方地址
+    let source_choices = [
+        DownloadSourcePreference::OfficialOnly,
+        DownloadSourcePreference::OfficialFirst,
+        DownloadSourcePreference::MirrorFirst,
+    ];
+    let selected = source_choices
+        .iter()
+        .position(|choice| *choice == view.download_source)
+        .unwrap_or(1);
+    // ia[settings]: 下载源 | 下载与存储 · 分段：仅官方 / 官方优先 / 镜像优先 | 立即保存；仅官方不访问镜像，其他模式按顺序回退，MCIM 始终位于官方之后
     let prefer_row = row(
-        "settings-prefer-mirrors",
-        "优先使用镜像",
-        Some("先试镜像地址，不通再回到官方地址。".to_owned()),
+        "settings-download-source",
+        "下载源",
+        Some("仅官方不访问镜像。其他模式在首选源失败后尝试下一源；MCIM 始终作为官方后的后备。默认官方优先。".to_owned()),
         "",
         Some(
-            kit::switch(
-                "settings-prefer-switch",
-                prefer,
-                "优先使用镜像",
-                send(
-                    handler,
-                    LiveIntent::SetMirrors {
-                        mirrors: rules_now,
-                        prefer: !prefer,
-                    },
-                ),
-            )
+            kit::segments("settings-download-source", &["仅官方", "官方优先", "镜像优先"], selected, {
+                let handler = handler.clone();
+                move |index, window, cx| handler(LiveIntent::SetDownloadSource(source_choices[index.min(2)]), window, cx)
+            })
             .into_any_element(),
         ),
         colors,
@@ -173,11 +172,8 @@ pub(super) fn downloads(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
                 value: mirror_text.clone(),
                 kind: FieldKind::Lines { rows: 4 },
             }],
-            parse: Rc::new(move |values| forms::mirrors(&values[0], prefer)),
-            reset: Some(LiveIntent::SetMirrors {
-                mirrors: Vec::new(),
-                prefer,
-            }),
+            parse: Rc::new(move |values| forms::mirrors(&values[0])),
+            reset: Some(LiveIntent::SetMirrors(Vec::new())),
         })),
         colors,
     );

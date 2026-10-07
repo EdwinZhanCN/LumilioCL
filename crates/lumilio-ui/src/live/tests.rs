@@ -230,7 +230,10 @@ fn the_settings_view_reads_the_saved_values_and_describes_each_java() {
     assert_eq!(view.max_memory_mb, Some(4096));
     assert_eq!(view.min_memory_mb, None);
     assert_eq!(view.download_concurrency, Some(6));
-    assert!(view.prefer_mirrors);
+    assert_eq!(
+        view.download_source,
+        lumilio_core::DownloadSourcePreference::MirrorFirst
+    );
     assert_eq!(view.java_roots, [PathBuf::from("/opt/jdks")]);
     assert_eq!(view.data_dir, PathBuf::from("/data"));
     assert!(view.java.is_empty() && view.storage.is_none());

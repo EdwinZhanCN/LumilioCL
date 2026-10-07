@@ -10,6 +10,9 @@ use futures_util::StreamExt;
 
 use crate::transfer::Transport;
 
+#[cfg(test)]
+mod decoded_tests;
+
 /// Upper bound for a document read whole, so a misbehaving source cannot
 /// exhaust memory.
 pub const DOCUMENT_LIMIT: usize = 32 * 1024 * 1024;
@@ -46,6 +49,21 @@ where
     T: Transport + ?Sized,
     S: AsRef<str>,
 {
+    fetch_decoded(transport, sources, Ok::<_, std::convert::Infallible>).await
+}
+
+/// Decode each candidate before accepting it. Unusable metadata is a source
+/// failure even when the response has a 2xx status.
+pub async fn fetch_decoded<T, S, V, E>(
+    transport: &T,
+    sources: &[S],
+    mut decode: impl FnMut(Vec<u8>) -> Result<V, E>,
+) -> Result<V, FetchError>
+where
+    T: Transport + ?Sized,
+    S: AsRef<str>,
+    E: Display,
+{
     if sources.is_empty() {
         return Err(FetchError::NoSources);
     }
@@ -53,7 +71,10 @@ where
     for source in sources {
         let source = source.as_ref();
         match read_one(transport, source).await {
-            Ok(bytes) => return Ok(bytes),
+            Ok(bytes) => match decode(bytes) {
+                Ok(value) => return Ok(value),
+                Err(error) => attempts.push((source.to_owned(), error.to_string())),
+            },
             Err(reason) => attempts.push((source.to_owned(), reason)),
         }
     }

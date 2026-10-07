@@ -62,28 +62,42 @@ impl<T: Transport + Clone> LauncherService<T> {
         let platform = runtime::platform_key(&host)
             .ok_or_else(|| fail(runtime::JavaRuntimeError::UnsupportedPlatform.to_string()))?;
         let chain = read_unless_cancelled(&cancel, self.chain()).await?;
-        let fetch = |address: String| {
-            let candidates = chain.candidates(&address);
-            let transport = self.transport.clone();
-            async move {
-                crate::fetch::fetch_document(&transport, &candidates)
-                    .await
-                    .map_err(|error| ServiceError::Remote(error.to_string()))
-            }
-        };
-        let index = read_unless_cancelled(&cancel, fetch(runtime::INDEX_URL.to_owned())).await?;
-        let index = String::from_utf8_lossy(&index).into_owned();
-        let choice = runtime::choose_component(&index, platform, required)
-            .map_err(|error| fail(error.to_string()))?;
+        let choice = read_unless_cancelled(&cancel, async {
+            crate::fetch::fetch_decoded(
+                &self.transport,
+                &chain.candidates(runtime::INDEX_URL),
+                |bytes| {
+                    let index =
+                        String::from_utf8(bytes).map_err(|error| fail(error.to_string()))?;
+                    runtime::choose_component(&index, platform, required)
+                        .map_err(|error| fail(error.to_string()))
+                },
+            )
+            .await
+            .map_err(|error| fail(error.to_string()))
+        })
+        .await?;
 
         let runtimes = self.layout.runtimes();
         let folder = runtimes.join(&choice.component);
         if let Some(found) = Self::runtime_in(&folder) {
             return Ok(found);
         }
-        let manifest = read_unless_cancelled(&cancel, fetch(choice.manifest.url.clone())).await?;
-        let entries = runtime::parse_manifest(&String::from_utf8_lossy(&manifest), allow)
-            .map_err(|error| fail(error.to_string()))?;
+        let entries = read_unless_cancelled(&cancel, async {
+            crate::fetch::fetch_decoded(
+                &self.transport,
+                &chain.candidates(&choice.manifest.url),
+                |bytes| {
+                    let manifest =
+                        String::from_utf8(bytes).map_err(|error| fail(error.to_string()))?;
+                    runtime::parse_manifest(&manifest, allow)
+                        .map_err(|error| fail(error.to_string()))
+                },
+            )
+            .await
+            .map_err(|error| fail(error.to_string()))
+        })
+        .await?;
 
         let staging = runtimes.join(format!(".{}.installing", choice.component));
         let prepared = {

@@ -140,7 +140,7 @@ pub fn concurrency(text: &str) -> Parsed {
 }
 
 /// `official => mirror` per line.
-pub fn mirrors(text: &str, prefer: bool) -> Parsed {
+pub fn mirrors(text: &str) -> Parsed {
     let mut rules = Vec::new();
     for (index, line) in lines(text).into_iter().enumerate() {
         let Some((official, mirror)) = line.split_once("=>") else {
@@ -155,10 +155,7 @@ pub fn mirrors(text: &str, prefer: bool) -> Parsed {
             mirror_prefix: mirror.to_owned(),
         });
     }
-    Ok(LiveIntent::SetMirrors {
-        mirrors: rules,
-        prefer,
-    })
+    Ok(LiveIntent::SetMirrors(rules))
 }
 
 /// One folder per line.
@@ -264,19 +261,16 @@ mod tests {
         assert_eq!(concurrency(""), Ok(LiveIntent::SetConcurrency(None)));
         assert_eq!(concurrency("8"), Ok(LiveIntent::SetConcurrency(Some(8))));
         assert!(concurrency("0").is_err() && concurrency("33").is_err());
-        let parsed = mirrors("https://a.example/ => https://m.example/a/\n", true).unwrap();
+        let parsed = mirrors("https://a.example/ => https://m.example/a/\n").unwrap();
         assert_eq!(
             parsed,
-            LiveIntent::SetMirrors {
-                mirrors: vec![MirrorRule {
-                    official_prefix: "https://a.example/".into(),
-                    mirror_prefix: "https://m.example/a/".into()
-                }],
-                prefer: true
-            }
+            LiveIntent::SetMirrors(vec![MirrorRule {
+                official_prefix: "https://a.example/".into(),
+                mirror_prefix: "https://m.example/a/".into()
+            }])
         );
-        assert!(mirrors("no arrow", false).unwrap_err().contains("第 1 行"));
-        assert!(mirrors("a =>  ", false).unwrap_err().contains("不能为空"));
+        assert!(mirrors("no arrow").unwrap_err().contains("第 1 行"));
+        assert!(mirrors("a =>  ").unwrap_err().contains("不能为空"));
         assert_eq!(
             java_roots("/opt/a\n /opt/b ").unwrap(),
             LiveIntent::SetJavaRoots(vec!["/opt/a".into(), "/opt/b".into()])

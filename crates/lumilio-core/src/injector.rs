@@ -19,7 +19,7 @@ use base64::Engine as _;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
-use crate::fetch::fetch_document;
+use crate::fetch::{fetch_decoded, fetch_document};
 use crate::transfer::{SourceChain, Transport};
 
 /// The index of the latest build.
@@ -113,12 +113,19 @@ async fn latest(
     transport: &(impl Transport + ?Sized),
     chain: &SourceChain,
 ) -> Result<LatestWire, InjectorError> {
-    let bytes = fetch_document(transport, &chain.candidates(LATEST_URL))
-        .await
-        .map_err(|error| InjectorError::Unavailable(error.to_string()))?;
-    serde_json::from_slice(&bytes).map_err(|error| {
-        InjectorError::Unavailable(format!("the index is not understood: {error}"))
+    fetch_decoded(transport, &chain.candidates(LATEST_URL), |bytes| {
+        let latest: LatestWire = serde_json::from_slice(&bytes).map_err(|error| {
+            InjectorError::Unavailable(format!("the index is not understood: {error}"))
+        })?;
+        if !latest.checksums.contains_key("sha256") {
+            return Err(InjectorError::Unavailable(
+                "the index has no checksum".to_owned(),
+            ));
+        }
+        Ok(latest)
     })
+    .await
+    .map_err(|error| InjectorError::Unavailable(error.to_string()))
 }
 
 /// Downloads the latest build into `dir`, unless `dir` already has it or a

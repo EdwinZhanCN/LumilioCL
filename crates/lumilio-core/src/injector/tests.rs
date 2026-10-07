@@ -107,6 +107,21 @@ async fn the_first_use_downloads_a_checked_jar_and_later_uses_the_file() {
 }
 
 #[tokio::test]
+async fn injector_metadata_falls_back_from_a_missing_checksum() {
+    let web = Web::default();
+    let mirror = "https://mirror.test/latest.json";
+    web.index(54, Some("a".repeat(64)), JAR_URL);
+    web.serve(mirror, serde_json::json!({"build_number":54,"version":"1.2.54","download_url":JAR_URL,"checksums":{}}).to_string().into_bytes());
+    let chain = SourceChain::new([
+        Arc::new(PrefixMirror::new(LATEST_URL, mirror, 16).unwrap()) as Arc<dyn SourceProvider>,
+        Arc::new(OfficialSource),
+    ])
+    .unwrap();
+    assert_eq!(latest(&web, &chain).await.unwrap().build_number, 54);
+    assert_eq!(web.asked(), [mirror, LATEST_URL]);
+}
+
+#[tokio::test]
 async fn a_jar_that_does_not_match_or_is_not_the_agent_is_never_kept() {
     let dir = tempfile::tempdir().unwrap();
 
