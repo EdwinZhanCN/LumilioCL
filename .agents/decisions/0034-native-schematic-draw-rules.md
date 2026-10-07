@@ -62,5 +62,6 @@ and `translucent_triangles_draw_farthest_first`, and the adapter and preview tes
 was shown to fail with its fix disabled. A winding probe over all 10 057 block states of the
 26.3 JAR found front faces consistent with normals except the intentionally inside-out models.
 Nucleation's 976 unit tests pass. The maintainer's schematics render at 2.7–3.5 ms per
-1800×1200 frame. Renders of the probe scene were compared by eye; the maintainer still has to
-look at the real preview.
+1800×1200 frame. Renders of the probe scene were compared by eye. On 2026-10-07 the
+maintainer accepted the real preview: copper grates, leaves, glass/ice/honey, carpet on
+glass, redstone, hanging signs, beds, renamed blocks, and the undrawable-block note.
