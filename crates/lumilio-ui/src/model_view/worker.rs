@@ -56,6 +56,7 @@ pub(super) enum Event {
     /// Sent once, before the first frame: block IDs the game's assets cannot draw.
     Loaded {
         undrawable: Vec<String>,
+        explore_position: [f32; 3],
     },
     Frame(Frame),
 }
@@ -78,8 +79,12 @@ impl Worker {
                 let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                     let mut scene = Scene::load(&schematic, &pack)?;
                     let undrawable = scene.undrawable_blocks().to_vec();
+                    let explore_position = scene.explore_position();
                     if send
-                        .send_blocking(Ok(Event::Loaded { undrawable }))
+                        .send_blocking(Ok(Event::Loaded {
+                            undrawable,
+                            explore_position,
+                        }))
                         .is_err()
                     {
                         return Ok(());

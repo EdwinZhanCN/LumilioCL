@@ -307,6 +307,7 @@ The crash-analysis dialog is itself a technical reading surface: evidence and
 analysis failures appear inline under **技术详情**, alongside the findings,
 without another dialog. Its footer copies the complete redacted analysis snapshot.
 
+
 ## 12. The instrument: control language
 
 Adopted by ADR 0013 and implemented by plan 0031.
@@ -426,17 +427,30 @@ a display.
 
 ### Native model preview
 
-The projection detail embeds the game model in L5, before the material table.
-The viewport fills the content column at a steady 360 logical pixels high;
-the surrounding page scrolls at the 720×480 minimum window size. It renders at
-physical resolution, capped proportionally at 4096 pixels per axis to bound
-GPU readback memory. Its clear colour comes from the current panel token.
+The projection detail places the “打开 3D 预览” key and its other actions inline
+with the title. The material table shares the detail pane's scroll rather than
+owning a nested scroll region. A floating “返回顶部” key stays at the pane's
+lower right and returns that shared scroll to the title immediately.
+It opens the same modal family as the screenshot viewer and loads assets only
+for that modal session. Width and viewport height follow the available window,
+including the 720×480 minimum. Rendering uses physical resolution, capped
+proportionally at 4096 pixels per axis to bound GPU readback memory. Its clear
+colour comes from the current panel token.
 
 The model is game art; its surrounding instructions, focus border, reset key
-and failure messages are Interface. Drag to orbit, wheel to zoom; the wheel
-stays in the viewport. Focus the viewport for arrows and +/−; R, double-click
-or the visible ghost key resets the camera. There is no entrance animation or
-idle clock; animated blocks remain still, including under reduced motion.
+and failure messages are Interface. A pair of segment keys selects Orbital or
+Explore and preserves each mode's camera independently. Orbital supports drag
+to rotate, wheel to zoom, arrows and +/−. Explore is first-person free flight:
+click the picture or press Enter to capture the cursor, then mouse look, WASD,
+Space to rise and Shift to descend. Movement uses elapsed time and normalizes
+diagonals; there is no gravity or collision. R or the ghost reset key resets the
+current camera; double-click resets only Orbital. Esc releases capture first,
+then closes the modal and returns focus to its entry key. Closing, switching
+mode, losing focus or a renderer failure releases the cursor and held keys.
+Only captured first-person input schedules a frame clock; idle pictures remain
+still. Intentional camera input stays responsive under reduced motion. Animated
+blocks remain still. Native capture supports macOS, Windows and X11; Wayland
+shows a calm unsupported explanation and retains Orbital (ADR 0036).
 Loading and failure occupy the same viewport. Missing game assets and no GPU
 receive a calm explanation; other errors offer 技术详情. When the game's assets
 cannot draw some blocks, one muted sentence under the viewport says how many,

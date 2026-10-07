@@ -105,6 +105,69 @@ fn zoom_stays_within_its_range() {
 }
 
 #[test]
+fn first_person_moves_by_heading_without_orbit_fitting_or_pitch_affecting_wasd() {
+    let view = View {
+        yaw_deg: 0.,
+        pitch_deg: 80.,
+        position: Some([0., 1.62, 3.]),
+        ..View::new()
+    };
+    assert_eq!(view.moved(0., 0., 1., 2.).position, Some([0., 1.62, 1.]));
+    assert_eq!(view.moved(1., 0., 0., 2.).position, Some([2., 1.62, 3.]));
+    let rotated = View {
+        yaw_deg: 90.,
+        ..view
+    }
+    .moved(0., 0., 1., 2.)
+    .position
+    .unwrap();
+    assert!((rotated[0] + 2.).abs() < 1e-5);
+    assert!((rotated[2] - 3.).abs() < 1e-5);
+    assert_eq!(view.moved(0., 1., 0., 2.).position, Some([0., 3.62, 3.]));
+    assert_eq!(View::new().moved(1., 1., 1., 10.), View::new());
+}
+
+#[test]
+fn first_person_diagonal_speed_matches_straight_speed_and_mouse_look_clamps() {
+    let view = View {
+        yaw_deg: 0.,
+        position: Some([0.; 3]),
+        ..View::new()
+    };
+    let diagonal = view.moved(1., 1., 1., 5.).position.unwrap();
+    let distance = diagonal.iter().map(|axis| axis * axis).sum::<f32>().sqrt();
+    assert!((distance - 5.).abs() < 1e-5);
+    assert_eq!(view.look(15., 1000.).pitch_deg, View::MAX_PITCH);
+    assert_eq!(view.look(15., 0.).yaw_deg, 345.);
+}
+
+#[test]
+fn first_person_projection_uses_the_eye_and_ignores_model_bounds_and_orbit_zoom() {
+    use nucleation::rendering::{
+        CameraConfig,
+        camera::{compute_view_proj_reversed, project_point},
+    };
+    let camera = CameraConfig {
+        yaw_deg: 0.,
+        pitch_deg: 0.,
+        position: Some([10., 2., 5.]),
+        fov_deg: 70.,
+        ..CameraConfig::default()
+    };
+    let (matrix, _) = compute_view_proj_reversed([0.; 3], [20.; 3], 1., &camera);
+    let changed_orbit = CameraConfig {
+        zoom: 8.,
+        target: Some([50.; 3]),
+        ..camera
+    };
+    let (other, _) = compute_view_proj_reversed([-100.; 3], [100.; 3], 1., &changed_orbit);
+    assert_eq!(matrix, other);
+    let (x, y) = project_point(&matrix, [10., 2., 4.], 600, 600).unwrap();
+    assert!((x - 300.).abs() < 1e-4 && (y - 300.).abs() < 1e-4);
+    assert!(project_point(&matrix, [10., 2., 6.], 600, 600).is_none());
+}
+
+#[test]
 fn red_and_blue_trade_places() {
     let mut pixels = [1, 2, 3, 4, 5, 6, 7, 8];
     rgba_to_bgra(&mut pixels);

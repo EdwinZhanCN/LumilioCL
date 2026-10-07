@@ -1,5 +1,10 @@
 # Native schematic preview dependencies
 
+The schematic modal's scoped pointer adapter uses the existing MIT/Apache-2.0
+`core-graphics`, `objc2` and `block2` bindings on macOS and MIT/Apache-2.0 `x11rb` bindings on X11.
+Its Windows module is original Win32 API glue. No upstream source was copied
+into `crates/lumilio-pointer` (ADR 0036).
+
 The UI also maintains gpui-component 0.7.0 from Longbridge's GPUI Kit under
 `forks/gpui-component`, with a local multi-select extension in
 `crates/component/src/select.rs`. It is licensed under Apache-2.0; the complete

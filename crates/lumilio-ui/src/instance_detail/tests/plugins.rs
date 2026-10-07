@@ -248,7 +248,9 @@ fn turning_the_plugin_off_removes_its_tab_and_leaves_an_open_one(cx: &mut TestAp
 }
 
 #[gpui::test]
-fn a_long_table_scrolls_inside_a_capped_box_and_the_keys_stay_on_top(cx: &mut TestAppContext) {
+fn a_long_material_list_shares_the_detail_scroll_and_can_return_to_the_inline_header(
+    cx: &mut TestAppContext,
+) {
     let seen: Rc<RefCell<Vec<InstanceIntent>>> = Rc::default();
     let (view, cx) = open(seen.clone(), cx);
     cx.update(|window, cx| view.update(cx, |view, cx| view.open_shown(4, window, cx)));
@@ -269,6 +271,9 @@ fn a_long_table_scrolls_inside_a_capped_box_and_the_keys_stay_on_top(cx: &mut Te
                     },
                     // Listed after the table, shown before it.
                     key("export", false),
+                    View::Model {
+                        file: "schematics/house.litematic".into(),
+                    },
                 ],
             }),
             cx,
@@ -276,16 +281,41 @@ fn a_long_table_scrolls_inside_a_capped_box_and_the_keys_stay_on_top(cx: &mut Te
     });
     cx.run_until_parked();
     let table = cx.debug_bounds("plugin-table-0").expect("table");
-    assert!(
-        table.size.height <= gpui::px(360.) + gpui::px(1.),
-        "{table:?}"
-    );
+    assert!(table.size.height > gpui::px(360.), "{table:?}");
     let key = cx.debug_bounds("plugin-key-export").expect("key");
     assert!(key.origin.y < table.origin.y, "the key is above the table");
+    let title = cx.debug_bounds("plugin-detail-title").expect("title");
+    let preview = cx.debug_bounds("model-open").expect("preview entry");
+    assert!(f32::from(key.center().y - title.center().y).abs() <= 1.);
+    assert!(f32::from(preview.center().y - title.center().y).abs() <= 1.);
+    assert!(preview.origin.x >= title.right());
+    let floating = cx.debug_bounds("plugin-back-to-top").expect("back to top");
+    view.update(cx, |view, cx| {
+        view.plugin_pane_scroll
+            .set_offset(gpui::point(gpui::px(0.), gpui::px(-400.)));
+        cx.notify();
+    });
+    cx.run_until_parked();
+    view.update(cx, |view, _| {
+        assert!(view.plugin_pane_scroll.offset().y < gpui::px(0.));
+    });
+    assert_eq!(
+        cx.debug_bounds("plugin-back-to-top")
+            .expect("floating button"),
+        floating,
+        "the button stays anchored while the detail moves"
+    );
+    click(cx, "plugin-back-to-top");
+    view.update(cx, |view, _| {
+        assert_eq!(view.plugin_pane_scroll.offset().y, gpui::px(0.));
+    });
+    assert_eq!(cx.debug_bounds("plugin-detail-title"), Some(title));
 }
 
 #[gpui::test]
-fn a_model_loads_inline_once_and_late_assets_do_not_enter_a_replacement(cx: &mut TestAppContext) {
+fn a_model_loads_in_its_modal_once_and_late_assets_do_not_enter_a_replacement(
+    cx: &mut TestAppContext,
+) {
     let seen: Rc<RefCell<Vec<InstanceIntent>>> = Rc::default();
     let (view, cx) = open(seen.clone(), cx);
     cx.update(|window, cx| view.update(cx, |view, cx| view.open_shown(4, window, cx)));
@@ -296,10 +326,15 @@ fn a_model_loads_inline_once_and_late_assets_do_not_enter_a_replacement(cx: &mut
         view.plugin_view_arrived(PLUGIN.into(), shown(model.clone()), cx)
     });
     cx.run_until_parked();
-    assert_eq!(
-        cx.debug_bounds("model-viewport").unwrap().size.height,
-        gpui::px(360.)
+    assert!(cx.debug_bounds("model-viewport").is_none());
+    assert!(
+        !seen
+            .borrow()
+            .iter()
+            .any(|intent| matches!(intent, InstanceIntent::LoadModel { .. }))
     );
+    click(cx, "model-open");
+    assert!(cx.debug_bounds("model-viewport").is_some());
     let requests: Vec<_> = seen
         .borrow()
         .iter()
@@ -326,6 +361,7 @@ fn a_model_loads_inline_once_and_late_assets_do_not_enter_a_replacement(cx: &mut
         view.plugin_model_arrived(old_id, Err("obsolete result".into()), cx)
     });
     cx.run_until_parked();
+    click(cx, "model-open");
     assert!(cx.debug_bounds("model-loading").is_some());
     assert!(cx.debug_bounds("model-error").is_none());
     let newest = seen

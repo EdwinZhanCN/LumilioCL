@@ -124,6 +124,7 @@ impl RenderConfig {
             zoom: self.zoom,
             fov_deg: self.fov,
             target: self.target,
+            position: None,
             projection: self.projection,
             background: self.background,
             sphere_fit: self.sphere_fit,

@@ -16,8 +16,7 @@ use crate::kit::TagKind;
 use crate::theme::{self, ShellColors};
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, App, Context, Entity, ObjectFit, RenderImage, ScrollHandle, SharedString, Window,
-    div, img, px,
+    AnyElement, App, Context, Entity, ObjectFit, RenderImage, SharedString, Window, div, img, px,
 };
 use gpui_component::{StyledExt as _, WindowExt as _, h_flex, v_flex};
 use lumilio_core::PluginTab;
@@ -30,16 +29,13 @@ const PLUGIN_TABS_AT: usize = TAB_SCREENSHOTS + 1;
 const PLUGIN_TAB_LABEL: &str = "插件";
 const THUMB: f32 = 56.;
 const COVER: f32 = 120.;
-/// A table taller than this scrolls inside the page instead of stretching it.
-const TABLE_MAX_HEIGHT: f32 = 360.;
 
 /// What a plugin tab currently has to show.
 pub(super) enum PluginPage {
-    /// The view, its images and one scroll handle per table, in tree order.
+    /// The view, its images and models, in tree order.
     Shown(
         View,
         Vec<Option<Arc<RenderImage>>>,
-        Vec<ScrollHandle>,
         Vec<Entity<crate::model_view::ModelView>>,
     ),
     /// The plugin was switched off or failed while the page was open.
@@ -75,9 +71,6 @@ impl InstanceDetailView {
                     collect_images(&view, &mut images);
                     images.into_iter().map(render_image).collect()
                 };
-                let scrolls = (0..count_tables(&view))
-                    .map(|_| ScrollHandle::new())
-                    .collect();
                 let mut files = Vec::new();
                 collect_models(&view, &mut files);
                 let mut models = Vec::new();
@@ -101,11 +94,15 @@ impl InstanceDetailView {
                         )
                     }));
                 }
-                PluginPage::Shown(view, rendered, scrolls, models)
+                PluginPage::Shown(view, rendered, models)
             }
             Ok(None) => PluginPage::Unavailable,
             Err(detail) => PluginPage::Failed(detail),
         };
+        if self.plugin_open.as_ref() == Some(&plugin) {
+            self.plugin_pane_scroll
+                .set_offset(gpui::point(px(0.), px(0.)));
+        }
         self.plugin_pages.insert(plugin, page);
         cx.notify();
     }
@@ -118,10 +115,10 @@ impl InstanceDetailView {
         cx: &mut Context<Self>,
     ) {
         for page in self.plugin_pages.values() {
-            if let PluginPage::Shown(_, _, _, models) = page
+            if let PluginPage::Shown(_, _, models) = page
                 && let Some(model) = models
                     .iter()
-                    .find(|model| model.entity_id().as_u64() == request)
+                    .find(|model| model.read(cx).request_id() == Some(request))
             {
                 model.update(cx, |model, cx| model.assets(result, cx));
                 return;
@@ -208,6 +205,8 @@ impl InstanceDetailView {
         cx: &mut Context<Self>,
     ) {
         self.confirm = None;
+        self.plugin_pane_scroll
+            .set_offset(gpui::point(px(0.), px(0.)));
         // ia[instance]: 打开插件标签 | 游戏页「插件」标签内的左侧列表 | 读取并显示插件给的内容；插件被关闭或出错时标签消失，回到内置标签 | 插件只描述内容，版式由启动器统一
         self.plugin_open = Some(plugin.clone());
         (self.handler)(InstanceIntent::PluginView(plugin), window, cx);
@@ -233,11 +232,10 @@ impl InstanceDetailView {
                         .child(kit::technical("plugin-technical", detail.clone())),
                 )
                 .into_any_element(),
-            Some(PluginPage::Shown(view, images, scrolls, models)) => {
+            Some(PluginPage::Shown(view, images, models)) => {
                 let mut paint = Paint {
                     plugin,
                     images,
-                    scrolls,
                     models,
                     next_table: 0,
                     next_model: 0,
@@ -288,13 +286,37 @@ impl InstanceDetailView {
             .child(list)
             .child(
                 div()
-                    .id("instance-plugin-pane")
+                    .relative()
                     .flex_1()
                     .min_w_0()
                     .h_full()
                     .min_h_0()
-                    .overflow_y_scroll()
-                    .child(div().w_full().pb(theme::BOTTOM_SAFE_AREA).child(content)),
+                    .child(
+                        div()
+                            .id("instance-plugin-pane")
+                            .size_full()
+                            .overflow_y_scroll()
+                            .track_scroll(&self.plugin_pane_scroll)
+                            .child(div().w_full().pb(theme::BOTTOM_SAFE_AREA).child(content)),
+                    )
+                    .child({
+                        // ia[instance]: 返回插件内容顶部 | 右下角悬浮「返回顶部」按钮 | 将详情和材料清单共享的滚动区域移回顶部
+                        div()
+                            .absolute()
+                            .right_3()
+                            .bottom(theme::BOTTOM_SAFE_AREA)
+                            .child(
+                                Key::new("plugin-back-to-top")
+                                    .label("返回顶部")
+                                    .white()
+                                    .debug_selector(|| "plugin-back-to-top".into())
+                                    .on_click(cx.listener(|view, _, _, cx| {
+                                        view.plugin_pane_scroll
+                                            .set_offset(gpui::point(px(0.), px(0.)));
+                                        cx.notify();
+                                    })),
+                            )
+                    }),
             )
             .into_any_element()
     }
@@ -364,16 +386,6 @@ fn collect_models<'a>(view: &'a View, out: &mut Vec<&'a str>) {
     }
 }
 
-fn count_tables(view: &View) -> usize {
-    match view {
-        View::Table { .. } => 1,
-        View::Section { children, .. } | View::Detail { children, .. } => {
-            children.iter().map(count_tables).sum()
-        }
-        _ => 0,
-    }
-}
-
 /// RGBA pixels from a plugin as the BGRA bitmap GPUI uploads; a malformed
 /// image is left out rather than trusted.
 fn render_image(data: &ImageData) -> Option<Arc<RenderImage>> {
@@ -391,7 +403,6 @@ fn render_image(data: &ImageData) -> Option<Arc<RenderImage>> {
 struct Paint<'a> {
     plugin: &'a str,
     images: &'a [Option<Arc<RenderImage>>],
-    scrolls: &'a [ScrollHandle],
     models: &'a [Entity<crate::model_view::ModelView>],
     next_model: usize,
     next_table: usize,
@@ -434,6 +445,18 @@ impl Paint<'_> {
                 children,
             } => {
                 let picture = image.as_ref().and_then(|_| self.image());
+                // Consume the original tree order before moving entry keys into
+                // the header, so nested images/models keep their asset identity.
+                let mut actions = Vec::new();
+                let mut body = Vec::new();
+                for child in children {
+                    let element = self.view(child, cx);
+                    if matches!(child, View::Key { .. } | View::Model { .. }) {
+                        actions.push(element);
+                    } else {
+                        body.push(element);
+                    }
+                }
                 let head = h_flex()
                     .w_full()
                     .gap_4()
@@ -444,13 +467,27 @@ impl Paint<'_> {
                     )
                     .child(
                         v_flex()
+                            .flex_1()
+                            .min_w_0()
                             .gap_1()
                             .child(
-                                div()
-                                    .text_lg()
-                                    .font_semibold()
-                                    .text_color(colors.foreground)
-                                    .child(title.clone()),
+                                h_flex()
+                                    .w_full()
+                                    .items_center()
+                                    .gap_3()
+                                    .child(
+                                        div()
+                                            .id(("plugin-detail-title", self.id()))
+                                            .debug_selector(|| "plugin-detail-title".into())
+                                            .flex_1()
+                                            .min_w_0()
+                                            .truncate()
+                                            .text_lg()
+                                            .font_semibold()
+                                            .text_color(colors.foreground)
+                                            .child(title.clone()),
+                                    )
+                                    .child(h_flex().flex_none().gap_2().children(actions)),
                             )
                             .children(
                                 subtitle.clone().map(|text| {
@@ -473,24 +510,11 @@ impl Paint<'_> {
                         .into_any_element()
                     })
                     .collect();
-                // Keys sit right under the title, whatever order the tree has
-                // them in: a long table must not push them out of reach.
-                let (keys, others): (Vec<&View>, Vec<&View>) = children
-                    .iter()
-                    .partition(|child| matches!(child, View::Key { .. }));
                 let mut column = v_flex().w_full().gap_4().child(head);
-                if !keys.is_empty() {
-                    column = column.child(
-                        h_flex()
-                            .w_full()
-                            .gap_2()
-                            .children(keys.into_iter().map(|key| self.view(key, cx))),
-                    );
-                }
                 if !rows.is_empty() {
                     column = column.child(kit::list(rows, colors));
                 }
-                column = column.children(others.into_iter().map(|child| self.view(child, cx)));
+                column = column.children(body);
                 column.into_any_element()
             }
             View::Table { columns, rows } => {
@@ -518,16 +542,11 @@ impl Paint<'_> {
                 };
                 let table = self.next_table;
                 self.next_table += 1;
-                let scroll = self.scrolls.get(table).cloned().unwrap_or_default();
-                // The head stays put; only the rows scroll, and the wheel
-                // stays with them while they can move (as the game log does).
+                // Header and material rows follow the detail pane's scroll.
                 let body = div()
                     .id(("plugin-table", table))
                     .debug_selector(move || format!("plugin-table-{table}"))
                     .w_full()
-                    .max_h(px(TABLE_MAX_HEIGHT))
-                    .overflow_y_scroll()
-                    .track_scroll(&scroll)
                     .children(rows.iter().map(|row| {
                         div()
                             .w_full()
@@ -538,7 +557,7 @@ impl Paint<'_> {
                 v_flex()
                     .w_full()
                     .child(kit::list(vec![line(columns, true)], colors))
-                    .child(kit::keep_wheel(body, &scroll))
+                    .child(body)
                     .into_any_element()
             }
             View::Empty { title, message } => {

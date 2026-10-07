@@ -4407,6 +4407,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "lumilio-pointer"
+version = "0.1.0"
+dependencies = [
+ "block2 0.6.2",
+ "core-graphics 0.24.0",
+ "objc2 0.6.4",
+ "objc2-app-kit 0.3.2",
+ "raw-window-handle",
+ "x11rb",
+]
+
+[[package]]
 name = "lumilio-schematic-render"
 version = "0.1.0"
 dependencies = [
@@ -4428,7 +4440,9 @@ dependencies = [
  "image 0.25.10",
  "lumilio-core",
  "lumilio-plugin-api",
+ "lumilio-pointer",
  "lumilio-schematic-render",
+ "raw-window-handle",
 ]
 
 [[package]]

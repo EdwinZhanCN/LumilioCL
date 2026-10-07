@@ -75,6 +75,9 @@ upstream; its lib tests also write `simple_cube.litematic`,
   translucent triangles re-sorted back to front each frame (`TriangleOrder`).
   Guards: `reversed_depth_keeps_framing_and_flips_depth_order`,
   `translucent_triangles_draw_farthest_first`.
+- Camera (`src/rendering/camera.rs`, `mod.rs`): optional first-person eye
+  position bypasses orbit fitting, with a fixed near plane and reversed depth
+  (ADR 0036). The existing RenderConfig continues to produce orbit cameras.
 - `UniversalSchematic::undrawable_blocks` (`src/meshing/mod.rs`).
 - `src/meshing/item_model.rs` exports only single-axis element rotations; an
   Euler rotation is omitted there.

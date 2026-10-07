@@ -39,6 +39,17 @@ impl Scene {
         &self.undrawable
     }
 
+    /// A useful initial flight position, just outside the build at standing eye height.
+    pub fn explore_position(&self) -> [f32; 3] {
+        let (min, max) = nucleation::rendering::camera::merged_bounds(&self.meshes);
+        if (0..3)
+            .any(|axis| !min[axis].is_finite() || !max[axis].is_finite() || min[axis] > max[axis])
+        {
+            return [0., 1.62, 3.];
+        }
+        [(min[0] + max[0]) * 0.5, min[1] + 1.62, max[2] + 3.0]
+    }
+
     pub(crate) fn from_schematic(
         schematic: &UniversalSchematic,
         pack: &[u8],
@@ -81,6 +92,8 @@ impl Scene {
             pitch_deg: view.pitch_deg,
             zoom: view.zoom,
             target: view.target,
+            position: view.position,
+            fov_deg: if view.position.is_some() { 70. } else { 45. },
             background: view.background,
             // Fitting the bounding sphere keeps the distance constant while orbiting.
             sphere_fit: true,

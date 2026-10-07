@@ -1,23 +1,34 @@
-//! Inline schematic preview (ADR 0028). Interface chrome surrounds game art;
-//! no animation clock, blocking I/O, meshing or GPU work runs on the UI thread.
+//! Modal schematic viewer. Meshing and GPU readback stay on the worker;
+//! a frame clock runs only while first-person input is captured.
 
+mod input;
+mod modal;
 #[cfg(test)]
 mod tests;
 mod worker;
 
+pub use modal::ModelView;
+
 use std::rc::Rc;
 use std::sync::Arc;
+use std::time::Instant;
 
 use gpui::prelude::*;
 use gpui::{
-    App, Context, FocusHandle, MouseButton, ObjectFit, Pixels, Point, RenderImage, ScrollDelta,
-    Task, Window, canvas, div, img, px,
+    App, Bounds, Context, FocusHandle, MouseButton, ObjectFit, Pixels, Point, RenderImage,
+    ScrollDelta, Task, Window, canvas, div, img, px,
 };
 use gpui_component::{ActiveTheme as _, h_flex, v_flex};
 use lumilio_core::ModelPreview;
 use lumilio_schematic_render::{SceneError, View};
 
-use crate::{key::Key, kit, theme::ShellColors};
+use crate::{
+    controls::Segments,
+    key::Key,
+    kit,
+    theme::{self, ShellColors},
+};
+use input::{FlightInput, Mode};
 use worker::{Event, Request, Worker};
 
 type Load = Rc<dyn Fn(u64, &mut Window, &mut App)>;
@@ -78,7 +89,7 @@ fn undrawable_note(undrawable: &[String]) -> Option<(String, String)> {
     })
 }
 
-pub struct ModelView {
+struct Viewer {
     load: Load,
     asked: bool,
     state: State,
@@ -93,10 +104,20 @@ pub struct ModelView {
     drag: Option<Point<Pixels>>,
     focus: FocusHandle,
     release_registered: bool,
+    mode: Mode,
+    explore_position: [f32; 3],
+    orbit_view: View,
+    flight_view: Option<View>,
+    input: FlightInput,
+    capture: Option<lumilio_pointer::Capture>,
+    capture_error: Option<&'static str>,
+    viewport: Option<Bounds<Pixels>>,
+    last_tick: Instant,
+    clock_pending: bool,
 }
 
-impl ModelView {
-    pub(crate) fn new(load: Load, cx: &mut Context<Self>) -> Self {
+impl Viewer {
+    fn new(load: Load, cx: &mut Context<Self>) -> Self {
         Self {
             load,
             asked: false,
@@ -111,6 +132,16 @@ impl ModelView {
             drag: None,
             focus: cx.focus_handle(),
             release_registered: false,
+            mode: Mode::Orbital,
+            explore_position: [0., 1.62, 3.],
+            orbit_view: View::new(),
+            flight_view: None,
+            input: FlightInput::default(),
+            capture: None,
+            capture_error: None,
+            viewport: None,
+            last_tick: Instant::now(),
+            clock_pending: false,
         }
     }
 
@@ -160,7 +191,19 @@ impl ModelView {
 
     fn frame_arrived(&mut self, result: worker::Output) {
         match result {
-            Ok(Event::Loaded { undrawable }) => self.undrawable = undrawable,
+            Ok(Event::Loaded {
+                undrawable,
+                explore_position,
+            }) => {
+                self.undrawable = undrawable;
+                self.explore_position = explore_position;
+                self.flight_view = None;
+                if self.mode == Mode::Explore {
+                    self.view.position = Some(explore_position);
+                    self.view.yaw_deg = 0.;
+                    self.view.pitch_deg = 0.;
+                }
+            }
             Ok(Event::Frame(frame)) => {
                 if let Some(buffer) =
                     image::RgbaImage::from_raw(frame.width, frame.height, frame.bgra)
@@ -173,6 +216,7 @@ impl ModelView {
                 }
             }
             Err(error) => {
+                self.release_capture();
                 self.state = State::failed(error);
                 self.worker = None;
             }
@@ -180,14 +224,22 @@ impl ModelView {
     }
 
     fn reset(&mut self, cx: &mut Context<Self>) {
+        self.input.clear();
         self.view = View {
             background: self.view.background,
             ..View::new()
         };
+        if self.mode == Mode::Explore {
+            self.view.position = Some(self.explore_position);
+            self.view.yaw_deg = 0.;
+            self.view.pitch_deg = 0.;
+        }
         cx.notify();
     }
 
     fn retry(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.release_capture();
+        self.capture_error = None;
         self.worker = None;
         self.task = None;
         self.last_request = None;
@@ -195,6 +247,119 @@ impl ModelView {
         self.undrawable.clear();
         (self.load)(cx.entity_id().as_u64(), window, cx);
         cx.notify();
+    }
+
+    fn release_capture(&mut self) {
+        self.capture = None;
+        self.input.clear();
+        self.drag = None;
+    }
+
+    fn select_mode(&mut self, mode: Mode, cx: &mut Context<Self>) {
+        self.release_capture();
+        self.capture_error = None;
+        if mode == self.mode {
+            cx.notify();
+            return;
+        }
+        match self.mode {
+            Mode::Orbital => self.orbit_view = self.view,
+            Mode::Explore => self.flight_view = Some(self.view),
+        }
+        self.mode = mode;
+        self.view = match mode {
+            Mode::Orbital => self.orbit_view,
+            Mode::Explore => self.flight_view.unwrap_or(View {
+                yaw_deg: 0.,
+                pitch_deg: 0.,
+                position: Some(self.explore_position),
+                background: self.view.background,
+                ..View::new()
+            }),
+        };
+        cx.notify();
+    }
+
+    fn capture(&mut self, position: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) {
+        if self.capture.is_some() || self.state != State::Ready {
+            return;
+        }
+        let Some(bounds) = self.viewport else {
+            return;
+        };
+        let offset = bounds.center() - position;
+        let result = raw_window_handle::HasWindowHandle::window_handle(window)
+            .map_err(|_| lumilio_pointer::CaptureError::Unsupported)
+            .and_then(|handle| {
+                lumilio_pointer::Capture::new(
+                    handle.as_raw(),
+                    [offset.x.into(), offset.y.into()],
+                    window.scale_factor(),
+                )
+            });
+        match result {
+            Ok(capture) => {
+                self.capture = Some(capture);
+                self.capture_error = None;
+                self.input.clear();
+                self.input.shift = window.modifiers().shift;
+                self.last_tick = Instant::now();
+                self.schedule_tick(window, cx);
+            }
+            Err(lumilio_pointer::CaptureError::Unsupported) => {
+                self.capture_error = Some("当前窗口系统暂不支持鼠标捕获，请使用 Orbital 模式");
+            }
+            Err(lumilio_pointer::CaptureError::Unavailable) => {
+                self.capture_error = Some("没能捕获鼠标，点击画面重试");
+            }
+        }
+        cx.notify();
+    }
+
+    fn schedule_tick(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.clock_pending {
+            return;
+        }
+        self.clock_pending = true;
+        let viewer = cx.weak_entity();
+        window.on_next_frame(move |window, cx| {
+            let _ = viewer.update(cx, |viewer, cx| viewer.tick(window, cx));
+        });
+    }
+
+    fn tick(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.clock_pending = false;
+        if self.capture.is_none() {
+            return;
+        }
+        if !window.is_window_active() || !self.focus.is_focused(window) {
+            self.release_capture();
+            cx.notify();
+            return;
+        }
+        let now = Instant::now();
+        let elapsed = now
+            .duration_since(self.last_tick)
+            .min(theme::motion::WORLD_TICK);
+        self.last_tick = now;
+        let delta = match self.capture.as_mut().unwrap().sample() {
+            Ok(delta) => delta,
+            Err(_) => {
+                self.release_capture();
+                self.capture_error = Some("鼠标捕获已结束，点击画面重新进入");
+                cx.notify();
+                return;
+            }
+        };
+        let previous = self.view;
+        self.view = self
+            .input
+            .advance(self.view.look(delta[0] * 0.15, delta[1] * 0.15), elapsed);
+        if self.view != previous {
+            cx.notify();
+        }
+        // Input response is intentional motion, including under reduced motion.
+        self.schedule_tick(window, cx);
     }
 
     fn request(&mut self, width: f32, height: f32, scale: f32) {
@@ -216,13 +381,34 @@ impl ModelView {
     }
 }
 
-impl Render for ModelView {
+impl Render for Viewer {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         for old in self.old_images.drain(..) {
             window.drop_image(old).ok();
         }
         if !self.release_registered {
+            let focus = self.focus.clone();
+            window.defer(cx, move |window, cx| window.focus(&focus, cx));
+            cx.observe_window_activation(window, |this, window, cx| {
+                if !window.is_window_active() {
+                    this.release_capture();
+                    cx.notify();
+                }
+            })
+            .detach();
+            cx.observe_window_bounds(window, |this, _, cx| {
+                // A resize/move invalidates the capture anchor and native clip.
+                this.release_capture();
+                cx.notify();
+            })
+            .detach();
+            cx.on_blur(&self.focus.clone(), window, |this, _, cx| {
+                this.release_capture();
+                cx.notify();
+            })
+            .detach();
             cx.on_release_in(window, |this, window, _| {
+                this.release_capture();
                 for image in this.old_images.drain(..).chain(this.image.take()) {
                     window.drop_image(image).ok();
                 }
@@ -243,6 +429,7 @@ impl Render for ModelView {
         let measure = canvas(
             move |bounds, window, cx| {
                 let _ = this.update(cx, |this, _| {
+                    this.viewport = Some(bounds);
                     this.request(
                         bounds.size.width.into(),
                         bounds.size.height.into(),
@@ -277,15 +464,15 @@ impl Render for ModelView {
                 )
                 .into_any_element(),
         };
-        // ia[instance]: 旋转与缩放 3D 投影 | 投影详情内联预览 | 拖拽旋转，滚轮缩放且页面不跟着滚动；使用游戏贴图；读取或渲染失败显示说明；游戏版本画不出的方块在预览下方说明，ID 在技术详情 | ADR 0028、0034；动画方块暂时静止
+        // ia[instance]: 观察 3D 投影 | 3D 预览弹窗画面 | Orbital 拖拽旋转、滚轮缩放；Explore 点击捕获鼠标后第一人称转向，WASD 移动、空格上升、Shift 下降；Esc 先释放鼠标；失焦自动释放 | 自由飞行，不含重力与碰撞；动画方块暂时静止
         let viewport = div()
             .id("model-viewport")
             .role(gpui::Role::Image)
-            .aria_label("3D 投影预览；方向键旋转，加减键缩放，R 复位")
+            .aria_label("3D 投影预览；Orbital 方向键旋转、加减键缩放；Explore 点击或 Enter 捕获鼠标，WASD 移动、空格上升、Shift 下降，Esc 释放；R 复位")
             .debug_selector(|| "model-viewport".into())
             .relative()
             .w_full()
-            .h(px(360.))
+            .h(px((f32::from(window.viewport_size().height) - 240.).clamp(160., 640.)))
             .overflow_hidden()
             .flex()
             .items_center()
@@ -298,10 +485,22 @@ impl Render for ModelView {
                 colors.border
             })
             .track_focus(&self.focus)
+            .tab_stop(true)
+            .on_action(cx.listener(|this, _: &gpui_component::dialog::Confirm, window, cx| {
+                if this.mode == Mode::Explore && this.capture.is_none() {
+                    this.capture(window.mouse_position(), window, cx);
+                }
+                cx.stop_propagation();
+            }))
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(|this, event: &gpui::MouseDownEvent, window, cx| {
                     window.focus(&this.focus, cx);
+                    if this.mode == Mode::Explore {
+                        this.capture(event.position, window, cx);
+                        cx.stop_propagation();
+                        return;
+                    }
                     this.drag = Some(event.position);
                     if event.click_count == 2 {
                         this.reset(cx);
@@ -318,6 +517,7 @@ impl Render for ModelView {
                 cx.listener(|this, _, _, _| this.drag = None),
             )
             .on_mouse_move(cx.listener(|this, event: &gpui::MouseMoveEvent, _, cx| {
+                if this.mode != Mode::Orbital { return; }
                 if !event.dragging() {
                     this.drag = None;
                     return;
@@ -332,6 +532,8 @@ impl Render for ModelView {
                 }
             }))
             .on_scroll_wheel(cx.listener(|this, event: &gpui::ScrollWheelEvent, _, cx| {
+                cx.stop_propagation();
+                if this.mode != Mode::Orbital { return; }
                 let delta = match event.delta {
                     ScrollDelta::Pixels(point) => f32::from(point.y),
                     ScrollDelta::Lines(point) => point.y * 24.,
@@ -340,7 +542,39 @@ impl Render for ModelView {
                 cx.stop_propagation();
                 cx.notify();
             }))
-            .on_key_down(cx.listener(|this, event: &gpui::KeyDownEvent, _, cx| {
+            .on_key_up(cx.listener(|this, event: &gpui::KeyUpEvent, _, cx| {
+                if this.capture.is_some() && this.input.key(&event.keystroke.key, false) {
+                    cx.stop_propagation();
+                }
+            }))
+            .on_modifiers_changed(cx.listener(|this, event: &gpui::ModifiersChangedEvent, _, _| {
+                if this.capture.is_some() {
+                    if event.modifiers.control || event.modifiers.platform || event.modifiers.alt {
+                        this.input.clear();
+                    } else { this.input.shift = event.modifiers.shift; }
+                }
+            }))
+            .on_key_down(cx.listener(|this, event: &gpui::KeyDownEvent, window, cx| {
+                if this.mode == Mode::Explore {
+                    if event.keystroke.key == "enter" && this.capture.is_none() {
+                        this.capture(window.mouse_position(), window, cx);
+                        cx.stop_propagation();
+                        return;
+                    }
+                    if this.capture.is_some() {
+                        if event.keystroke.modifiers.control || event.keystroke.modifiers.platform || event.keystroke.modifiers.alt {
+                            this.input.clear();
+                            return;
+                        }
+                        this.input.shift = event.keystroke.modifiers.shift;
+                        if this.input.key(&event.keystroke.key, true) {
+                            cx.stop_propagation();
+                            return;
+                        }
+                        if matches!(event.keystroke.key.as_str(), "r" | "R") { this.reset(cx); }
+                    }
+                    return;
+                }
                 let (dx, dy, zoom) = match event.keystroke.key.as_str() {
                     "r" | "R" => {
                         this.reset(cx);
@@ -361,13 +595,13 @@ impl Render for ModelView {
             }))
             .child(content)
             .child(measure);
-        // ia[instance]: 复位 3D 投影视角 | 预览下方「复位视角」 | 回到初始视角与缩放；也可双击预览或聚焦后按 R
+        // ia[instance]: 复位 3D 投影视角 | 弹窗「复位视角」 | 当前模式回到初始视角；Orbital 可双击画面，聚焦画面后可按 R
         let reset = Key::new("model-reset")
             .label("复位视角")
             .ghost()
             .disabled(self.state != State::Ready)
             .on_click(cx.listener(|this, _, _, cx| this.reset(cx)));
-        // ia[instance]: 重试 3D 投影预览 | 预览出错后的「重试」 | 重新读取当前投影与游戏贴图并生成预览；失败仍显示说明
+        // ia[instance]: 重试 3D 投影预览 | 弹窗出错后的「重试」 | 重新读取当前投影与游戏贴图并生成预览；失败仍显示说明
         let retry = matches!(self.state, State::Failed { .. }).then(|| {
             Key::new("model-retry")
                 .label("重试")
@@ -385,20 +619,51 @@ impl Render for ModelView {
                     .child(sentence)
                     .child(kit::technical("model-undrawable-technical", ids))
             });
+        let viewer = cx.weak_entity();
+        // ia[instance]: 切换 3D 投影观察模式 | 预览弹窗 Orbital / Explore 分段 | 两种模式分别保留视角；切换时释放鼠标并停止移动
+        let modes = Segments::new(
+            "model-mode",
+            &["Orbital", "Explore"],
+            usize::from(self.mode == Mode::Explore),
+            move |index, _, cx| {
+                let _ = viewer.update(cx, |viewer, cx| {
+                    viewer.select_mode(
+                        if index == 0 {
+                            Mode::Orbital
+                        } else {
+                            Mode::Explore
+                        },
+                        cx,
+                    )
+                });
+            },
+        );
+        let hint = match self.mode {
+            Mode::Orbital => "拖拽旋转 · 滚轮缩放 · 方向键旋转 · + / − 缩放",
+            Mode::Explore if self.capture.is_some() => {
+                "WASD 移动 · 空格上升 · Shift 下降 · Esc 释放鼠标"
+            }
+            Mode::Explore => "点击画面或按 Enter 进入 · WASD 移动 · 空格上升 · Shift 下降",
+        };
         v_flex()
             .w_full()
             .gap_2()
             .text_sm()
             .text_color(colors.muted)
-            .child(viewport)
-            .children(note)
             .child(
                 h_flex()
                     .w_full()
                     .justify_between()
-                    .gap_2()
-                    .child("拖拽旋转 · 滚轮缩放 · 方向键旋转 · + / − 缩放")
+                    .gap_3()
+                    .child(modes)
                     .child(h_flex().gap_2().children(retry).child(reset)),
+            )
+            .child(viewport)
+            .children(note)
+            .child(div().text_xs().child(hint))
+            .children(
+                self.capture_error
+                    .map(|message| div().text_sm().child(message)),
             )
     }
 }

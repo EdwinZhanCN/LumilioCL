@@ -22,6 +22,8 @@ pub struct CameraConfig {
     /// Optional explicit orbit target. When set, the camera orbits and
     /// aims at this point instead of the model's bounding-box centroid.
     pub target: Option<[f32; 3]>,
+    /// LumilioCL: explicit first-person eye; bypass orbit fitting and use yaw/pitch as heading.
+    pub position: Option<[f32; 3]>,
     /// Projection mode.
     pub projection: Projection,
     /// Optional solid RGBA clear color (linear 0.0–1.0). `None` uses the
@@ -48,6 +50,7 @@ impl Default for CameraConfig {
             zoom: 1.0,
             fov_deg: 45.0,
             target: None,
+            position: None,
             projection: Projection::Perspective,
             background: None,
             sphere_fit: false,
@@ -154,6 +157,18 @@ fn view_proj(
     let forward = dir;
     let right = normalize3(cross3(forward, [0.0, 1.0, 0.0]));
     let up = cross3(right, forward);
+
+    if let Some(eye) = camera.position {
+        let target = [eye[0] + dir[0], eye[1] + dir[1], eye[2] + dir[2]];
+        let view = look_at(eye, target, [0.0, 1.0, 0.0]);
+        let projection = if reversed_depth {
+            perspective_reversed(fov, aspect, 0.05)
+        } else {
+            perspective(fov, aspect, 0.05, 100_000.0)
+        };
+        let matrix = mat4_mul(projection, view);
+        return (matrix, mat4_inverse(matrix));
+    }
 
     let corners = [
         [bounds_min[0], bounds_min[1], bounds_min[2]],
@@ -490,15 +505,26 @@ mod view_proj_tests {
                 let c = transform(m, [p[0], p[1], p[2], 1.0]);
                 [c[0] / c[3], c[1] / c[3], c[2] / c[3]]
             };
-            let corners = [[0.0, 0.0, 0.0], [4.0, 2.0, 6.0], [4.0, 0.0, 0.0], [0.0, 2.0, 6.0]];
+            let corners = [
+                [0.0, 0.0, 0.0],
+                [4.0, 2.0, 6.0],
+                [4.0, 0.0, 0.0],
+                [0.0, 2.0, 6.0],
+            ];
             for p in corners {
                 let (s, r) = (ndc(standard, p), ndc(reversed, p));
                 assert!((s[0] - r[0]).abs() < 1e-4 && (s[1] - r[1]).abs() < 1e-4);
                 assert!(r[2] > 0.0 && r[2] <= 1.0, "{projection:?} z={}", r[2]);
             }
             // Along the view ray, the nearer of two points gets the larger depth.
-            let (near, far) = (ndc(reversed, [0.0, 2.0, 6.0]), ndc(reversed, [4.0, 0.0, 0.0]));
-            let (s_near, s_far) = (ndc(standard, [0.0, 2.0, 6.0]), ndc(standard, [4.0, 0.0, 0.0]));
+            let (near, far) = (
+                ndc(reversed, [0.0, 2.0, 6.0]),
+                ndc(reversed, [4.0, 0.0, 0.0]),
+            );
+            let (s_near, s_far) = (
+                ndc(standard, [0.0, 2.0, 6.0]),
+                ndc(standard, [4.0, 0.0, 0.0]),
+            );
             assert_eq!(s_near[2] < s_far[2], near[2] > far[2], "{projection:?}");
         }
     }

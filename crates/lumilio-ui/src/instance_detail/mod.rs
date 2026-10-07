@@ -153,6 +153,8 @@ pub struct InstanceDetailView {
     log_scroll: gpui::ScrollHandle,
     /// The 插件 tab's plugin list scroll (nested in the page's own scroll).
     plugin_list_scroll: gpui::ScrollHandle,
+    /// Plugin content and its tables share this single scroll region.
+    plugin_pane_scroll: gpui::ScrollHandle,
     /// The crash report being read or shown, and what was read.
     crash: Option<(String, Option<CrashRead>)>,
 }
@@ -228,6 +230,7 @@ impl InstanceDetailView {
             refresh_plugin_tabs: false,
             log_scroll: gpui::ScrollHandle::new(),
             plugin_list_scroll: gpui::ScrollHandle::new(),
+            plugin_pane_scroll: gpui::ScrollHandle::new(),
             crash: None,
         }
     }
