@@ -50,7 +50,9 @@ impl Render for InstanceDetailView {
             if self.data.has(Section::Problems) {
                 self.request(Section::Problems, window, cx);
             }
-            if let Some((file, _)) = &self.crash {
+            if matches!(self.log_source, lumilio_core::GameLogSource::Crash(_))
+                && let Some((file, _)) = &self.crash
+            {
                 (self.handler)(InstanceIntent::OpenCrash(file.clone()), window, cx);
             }
         }
@@ -77,7 +79,7 @@ impl Render for InstanceDetailView {
                 TAB_WORLDS => self.worlds_panel(window, colors, cx),
                 TAB_SCREENSHOTS => self.screenshots_panel(colors, cx),
                 TAB_HISTORY => self.history_panel(colors, cx),
-                TAB_DIAGNOSTICS => self.diagnostics_panel(colors, cx),
+                TAB_DIAGNOSTICS => self.diagnostics_panel(window, colors, cx),
                 _ => self.settings_tab(colors, cx),
             }
         } else if let Some(message) = &self.error {
@@ -113,7 +115,26 @@ impl Render for InstanceDetailView {
         // The 插件 tab owns its scroll: its list stays put and only the pane
         // beside it moves. Every other tab scrolls in the region below the
         // fixed header and tabs.
-        let body = if self.record.is_some() && self.plugin_open.is_some() {
+        let log_panel = self.record.is_some()
+            && self.plugin_open.is_none()
+            && self.tab == TAB_DIAGNOSTICS
+            && self.diag_sub == 1;
+        let body = if log_panel {
+            div()
+                .id("live-instance-scroll")
+                .flex_1()
+                .min_h_0()
+                .overflow_y_scroll()
+                .child(
+                    div()
+                        .w_full()
+                        .h_full()
+                        .min_h(px(360.))
+                        .pb(theme::BOTTOM_SAFE_AREA)
+                        .child(panel),
+                )
+                .into_any_element()
+        } else if self.record.is_some() && self.plugin_open.is_some() {
             div()
                 .flex_1()
                 .min_h_0()

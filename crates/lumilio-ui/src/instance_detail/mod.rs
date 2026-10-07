@@ -100,8 +100,16 @@ pub struct InstanceDetailView {
     /// The server the edit dialog is changing (its position and what it read
     /// when opened); `None` while it adds one.
     server_edit: Option<(usize, lumilio_core::ServerEntry)>,
-    /// 日志: the least serious level shown, as an index of the level labels.
-    log_level: usize,
+    /// Independently selected log levels; report text bypasses this filter.
+    log_levels: Vec<lumilio_core::LogLevel>,
+    log_source: lumilio_core::GameLogSource,
+    log_source_select: Option<Dropdown>,
+    log_level_select: Option<Dropdown>,
+    log_choices: Vec<(lumilio_core::GameLogSource, String)>,
+    log_list_scroll: gpui::UniformListScrollHandle,
+    log_follow: bool,
+    analysis_serial: u64,
+    log_analysis: Option<(u64, String, Option<CrashRead>)>,
     settings_sub: usize,
     /// The machine's memory in MB, for the memory hint; unknown until told.
     machine_memory_mb: Option<u64>,
@@ -179,7 +187,20 @@ impl InstanceDetailView {
             refresh_screenshots: false,
             server_edit: None,
             snapshot_scope: 0,
-            log_level: 0,
+            log_levels: vec![
+                lumilio_core::LogLevel::Error,
+                lumilio_core::LogLevel::Warn,
+                lumilio_core::LogLevel::Info,
+                lumilio_core::LogLevel::Debug,
+            ],
+            log_source: lumilio_core::GameLogSource::Live,
+            log_source_select: None,
+            log_level_select: None,
+            log_choices: Vec::new(),
+            log_list_scroll: gpui::UniformListScrollHandle::new(),
+            log_follow: true,
+            analysis_serial: 0,
+            log_analysis: None,
             settings_sub: 0,
             machine_memory_mb: None,
             confirm: None,

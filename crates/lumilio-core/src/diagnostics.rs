@@ -317,6 +317,78 @@ pub fn read_crash_report(game_dir: &Path, file_name: &str, max_bytes: u64) -> io
 
 // ---- files ---------------------------------------------------------------
 
+/// Available ordinary and compressed logs, newest first; latest is a dedicated source.
+pub fn list_game_logs(game_dir: &Path) -> io::Result<Vec<FileEntry>> {
+    let mut files = match list_dir(game_dir, "logs") {
+        Ok(files) => files,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => return Err(error),
+    };
+    files.retain(|file| {
+        !file.is_dir
+            && file.name != "latest.log"
+            && (file.name.ends_with(".log")
+                || file.name.ends_with(".log.gz")
+                || file.name.ends_with(".txt"))
+    });
+    files.sort_by(|a, b| {
+        b.modified
+            .cmp(&a.modified)
+            .then_with(|| a.name.cmp(&b.name))
+    });
+    Ok(files)
+}
+
+fn read_complete_file(
+    game_dir: &Path,
+    folder: &str,
+    name: &str,
+    compressed: bool,
+) -> io::Result<String> {
+    if !is_safe_file_name(name) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "unsafe file name",
+        ));
+    }
+    let path = game_dir.join(folder).join(name);
+    if fs::symlink_metadata(&path)?.file_type().is_symlink() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "log symlinks are not supported",
+        ));
+    }
+    let file = fs::File::open(path)?;
+    let reader: Box<dyn Read> = if compressed {
+        Box::new(flate2::read::GzDecoder::new(file))
+    } else {
+        Box::new(file)
+    };
+    const LIMIT: u64 = 64 * 1024 * 1024;
+    let mut bytes = Vec::new();
+    reader.take(LIMIT + 1).read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > LIMIT {
+        return Err(io::Error::other(
+            "log exceeds the 64 MiB reading limit; open the original file",
+        ));
+    }
+    Ok(String::from_utf8_lossy(&bytes).into_owned())
+}
+
+pub fn read_game_log(game_dir: &Path, name: &str) -> io::Result<String> {
+    if !(name.ends_with(".log") || name.ends_with(".log.gz") || name.ends_with(".txt")) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "unsupported log format",
+        ));
+    }
+    read_complete_file(game_dir, "logs", name, name.ends_with(".gz"))
+}
+
+pub fn read_complete_crash(game_dir: &Path, name: &str) -> io::Result<String> {
+    read_complete_file(game_dir, "crash-reports", name, false)
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FileEntry {
     pub name: String,

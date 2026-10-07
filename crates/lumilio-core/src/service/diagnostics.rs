@@ -21,15 +21,20 @@ impl<T: Transport + Clone> LauncherService<T> {
             .map_err(ServiceError::from)
     }
 
-    /// The end of `logs/latest.log` (at most [`LOG_TAIL_BYTES`]) and the crash
+    /// The complete `logs/latest.log` and the crash
     /// reports, newest first. Reading needs no lease; a missing log is `None`.
     pub async fn logs(&self, id: &str) -> Result<GameLogs, ServiceError> {
         self.instance(id).await?;
         let game_dir = self.layout.game(id);
         tokio::task::spawn_blocking(move || {
             Ok::<_, std::io::Error>(GameLogs {
-                latest: crate::diagnostics::read_latest_log(&game_dir, LOG_TAIL_BYTES)?,
+                latest: match crate::diagnostics::read_game_log(&game_dir, "latest.log") {
+                    Ok(text) => Some(text),
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+                    Err(error) => return Err(error),
+                },
                 crashes: crate::diagnostics::list_crash_reports(&game_dir)?,
+                files: crate::diagnostics::list_game_logs(&game_dir)?,
             })
         })
         .await
@@ -37,7 +42,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         .map_err(ServiceError::from)
     }
 
-    /// One crash report's text (cut at [`REPORT_BYTES`]) with the likely causes
+    /// One complete crash report's text with the likely causes
     /// recognised in it. Names that are not plain file names are refused.
     pub async fn crash_report(
         &self,
@@ -49,7 +54,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         let layout = self.layout.clone();
         let (game_dir, name) = (self.layout.game(id), file_name.to_owned());
         let (text, game) = tokio::task::spawn_blocking(move || {
-            let text = crate::diagnostics::read_crash_report(&game_dir, &name, REPORT_BYTES)?;
+            let text = crate::diagnostics::read_complete_crash(&game_dir, &name)?;
             Ok::<_, std::io::Error>((text, game_facts(&layout, &record, &runtimes)))
         })
         .await
@@ -63,6 +68,100 @@ impl<T: Transport + Clone> LauncherService<T> {
             })
             .await;
         Ok((text, findings))
+    }
+
+    /// Reads an entire selected file. Large files fail explicitly instead of silently truncating.
+    pub async fn game_log(
+        &self,
+        id: &str,
+        source: super::types::GameLogSource,
+    ) -> Result<String, ServiceError> {
+        self.instance(id).await?;
+        let game_dir = self.layout.game(id);
+        Ok(blocking(move || match source {
+            super::types::GameLogSource::Latest => {
+                crate::diagnostics::read_game_log(&game_dir, "latest.log")
+            }
+            super::types::GameLogSource::File(name) => {
+                crate::diagnostics::read_game_log(&game_dir, &name)
+            }
+            super::types::GameLogSource::Crash(name) => {
+                crate::diagnostics::read_complete_crash(&game_dir, &name)
+            }
+            super::types::GameLogSource::Live => Err(std::io::Error::other(
+                "live output is supplied by the running process",
+            )),
+        })
+        .await?)
+    }
+
+    /// Analyzes a snapshot and returns only redacted text and findings for sharing.
+    pub async fn analyze_game_log(
+        &self,
+        id: &str,
+        text: String,
+        crash: bool,
+    ) -> Result<(String, Vec<crate::plugins::PluginFinding>), ServiceError> {
+        let record = self.instance(id).await?;
+        let (settings, runtimes) = self.environment().await;
+        let mut redactor = self.redactor(&settings);
+        redactor.hide_path(&self.layout.game(id), "<game>");
+        let text = redactor.apply(&text);
+        let layout = self.layout.clone();
+        let game = blocking(move || Ok(game_facts(&layout, &record, &runtimes))).await?;
+        let mut findings = self
+            .plugins
+            .analyze(AnalysisInput {
+                text: text.clone(),
+                source: if crash {
+                    AnalysisSource::CrashReport
+                } else {
+                    AnalysisSource::LatestLog
+                },
+                game,
+            })
+            .await;
+        for result in &mut findings {
+            result.finding.title = redactor.apply(&result.finding.title);
+            result.finding.advice = redactor.apply(&result.finding.advice);
+            result.finding.evidence = result
+                .finding
+                .evidence
+                .as_ref()
+                .map(|text| redactor.apply(text));
+        }
+        Ok((text, findings))
+    }
+
+    /// Exports the complete selected source, independent of reading filters.
+    pub async fn export_game_log(
+        &self,
+        id: &str,
+        source: super::types::GameLogSource,
+        live: String,
+        destination: &Path,
+    ) -> Result<(), ServiceError> {
+        let text = if source == super::types::GameLogSource::Live {
+            self.instance(id).await?;
+            live
+        } else {
+            self.game_log(id, source).await?
+        };
+        let settings = self.settings.lock().await.get().clone();
+        let mut redactor = self.redactor(&settings);
+        redactor.hide_path(&self.layout.game(id), "<game>");
+        let destination = destination.to_owned();
+        blocking(move || {
+            let part = destination.with_extension("log.part");
+            let result = std::fs::write(&part, redactor.apply(&text))
+                .and_then(|()| std::fs::rename(&part, &destination));
+            if result.is_err() {
+                let _ = std::fs::remove_file(part);
+            }
+            result
+        })
+        .await?;
+        Ok(())
     }
 
     /// How much disk the game's own folder takes (mods, saves, options…),

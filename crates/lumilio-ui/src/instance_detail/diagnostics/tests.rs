@@ -1,9 +1,8 @@
 use super::helpers::crash_for_session;
 use super::helpers::files_matching;
 use super::helpers::join_path;
-use super::helpers::least_level;
 use super::helpers::parent_path;
-use lumilio_core::{FileEntry, LogLevel};
+use lumilio_core::FileEntry;
 
 #[test]
 fn paths_join_and_climb_one_folder_at_a_time() {
@@ -57,12 +56,4 @@ fn a_crash_report_belongs_to_the_session_it_was_written_in() {
         "a little after the end still counts"
     );
     assert!(crash_for_session(&[report("a.txt", 400)], 100, 100).is_none());
-}
-
-#[test]
-fn a_level_choice_shows_that_level_and_worse() {
-    assert_eq!(least_level(0), None);
-    assert_eq!(least_level(1), Some(LogLevel::Error));
-    assert_eq!(least_level(2), Some(LogLevel::Warn));
-    assert_eq!(least_level(3), Some(LogLevel::Info));
 }

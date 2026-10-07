@@ -298,6 +298,41 @@ impl InstanceDetailView {
         }
     }
 
+    pub fn log_arrived(
+        &mut self,
+        source: lumilio_core::GameLogSource,
+        result: Result<String, String>,
+        cx: &mut Context<Self>,
+    ) {
+        if self.log_source != source {
+            return;
+        }
+        let name = match &source {
+            lumilio_core::GameLogSource::Latest => "latest.log".to_owned(),
+            lumilio_core::GameLogSource::File(name) | lumilio_core::GameLogSource::Crash(name) => {
+                name.clone()
+            }
+            lumilio_core::GameLogSource::Live => return,
+        };
+        self.crash = Some((name, Some(result.map(|text| (text, Vec::new())))));
+        cx.notify();
+    }
+
+    pub fn log_analysis_arrived(
+        &mut self,
+        request: u64,
+        result: CrashRead,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some((current, _, read)) = &mut self.log_analysis
+            && *current == request
+        {
+            *read = Some(result);
+            self.filter_plugin_results();
+            cx.notify();
+        }
+    }
+
     pub fn plugins_changed(&mut self, enabled: Vec<String>, cx: &mut Context<Self>) {
         if self.enabled_plugins.as_ref() == Some(&enabled) {
             return;
@@ -321,6 +356,9 @@ impl InstanceDetailView {
             });
         }
         if let Some((_, Some(Ok((_, findings))))) = &mut self.crash {
+            findings.retain(|finding| enabled.contains(&finding.plugin));
+        }
+        if let Some((_, _, Some(Ok((_, findings))))) = &mut self.log_analysis {
             findings.retain(|finding| enabled.contains(&finding.plugin));
         }
     }

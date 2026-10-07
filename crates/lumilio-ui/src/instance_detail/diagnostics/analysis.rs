@@ -1,0 +1,138 @@
+use super::super::{InstanceDetailView, InstanceIntent};
+use crate::{kit, theme::ShellColors};
+use gpui::prelude::*;
+use gpui::{App, Context, Entity, Window, div, px};
+use gpui_component::{ActiveTheme as _, WindowExt as _, dialog::Dialog, h_flex, v_flex};
+use lumilio_core::GameLogSource;
+
+impl InstanceDetailView {
+    pub(super) fn open_log_analysis(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(text) = self.log_text().map(|text| text.into_owned()) else {
+            return;
+        };
+        self.analysis_serial += 1;
+        let request = self.analysis_serial;
+        self.log_analysis = Some((request, self.log_source_label(), None));
+        let weak = cx.entity().downgrade();
+        window.open_dialog(cx, move |dialog, _, cx| match weak.upgrade() {
+            Some(view) => Self::log_analysis_dialog(&view, dialog, cx),
+            None => dialog,
+        });
+        (self.handler)(
+            InstanceIntent::AnalyzeGameLog {
+                request,
+                text,
+                crash: matches!(self.log_source, GameLogSource::Crash(_)),
+            },
+            window,
+            cx,
+        );
+        cx.notify();
+    }
+
+    fn log_analysis_dialog(view: &Entity<Self>, dialog: Dialog, cx: &mut App) -> Dialog {
+        let this = view.read(cx);
+        let Some((_, source, read)) = &this.log_analysis else {
+            return dialog;
+        };
+        let colors = ShellColors::from_theme(cx.theme());
+        let mut body = v_flex().gap_3().child(
+            div()
+                .text_sm()
+                .text_color(colors.muted)
+                .child(source.clone()),
+        );
+        let mut technical = None;
+        match read {
+            None => {
+                body = body.child(div().child("正在分析…"));
+            }
+            Some(Err(detail)) => {
+                body = body
+                    .child(div().child("没能完成分析"))
+                    .child(kit::technical("log-analysis-error", detail.clone()));
+            }
+            Some(Ok((text, findings))) => {
+                let mut details = format!("来源：{source}\n");
+                if findings.is_empty() {
+                    body = body
+                        .child(
+                            div()
+                                .debug_selector(|| "log-analysis-empty".into())
+                                .child("未识别到已知崩溃原因"),
+                        )
+                        .child(
+                            div()
+                                .text_sm()
+                                .text_color(colors.muted)
+                                .child("这不表示日志没有问题。"),
+                        );
+                    details.push_str("未识别到已知崩溃原因\n");
+                }
+                for (index, result) in findings.iter().enumerate() {
+                    let finding = &result.finding;
+                    details.push_str(&format!("\n{}\n{}\n", finding.title, finding.advice));
+                    if let Some(evidence) = &finding.evidence {
+                        details.push_str(evidence);
+                        details.push('\n');
+                    }
+                    body = body.child(
+                        v_flex()
+                            .gap_2()
+                            .debug_selector(move || format!("crash-finding-{index}"))
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .text_color(colors.foreground)
+                                    .child(finding.title.clone()),
+                            )
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .text_color(colors.muted)
+                                    .child(finding.advice.clone()),
+                            )
+                            .when_some(finding.evidence.as_ref(), |view, evidence| {
+                                view.child(kit::technical(
+                                    ("log-analysis-evidence", index),
+                                    evidence.clone(),
+                                ))
+                            }),
+                    );
+                }
+                details.push_str("\n日志快照（已脱敏）：\n");
+                details.push_str(text);
+                technical = Some(details);
+            }
+        }
+        let closed = view.downgrade();
+        // ia[instance.diagnostics]: 复制分析技术详情 | 崩溃分析弹窗 · 按键「复制技术详情」 | 复制来源、分析结果、证据与点击时的完整日志快照，内容已脱敏；加载和失败时禁用
+        let copy = kit::ghost("log-analysis-copy", "复制技术详情", {
+            let technical = technical.clone();
+            move |_, cx| {
+                if let Some(text) = &technical {
+                    crate::toast::copy_text(text.clone(), cx);
+                }
+            }
+        })
+        .disabled(technical.is_none())
+        .debug_selector(|| "log-analysis-copy".into());
+        dialog
+            .title("崩溃分析")
+            .w(px(600.))
+            .on_close(move |_, _, cx| {
+                let _ = closed.update(cx, |view, cx| {
+                    view.log_analysis = None;
+                    cx.notify();
+                });
+            })
+            .child(
+                div()
+                    .id("log-analysis-content")
+                    .max_h(px(320.))
+                    .overflow_y_scroll()
+                    .child(body),
+            )
+            .footer(h_flex().w_full().justify_end().child(copy))
+    }
+}

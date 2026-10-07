@@ -96,15 +96,25 @@ fn disabling_a_plugin_removes_cached_and_late_analysis_but_keeps_builtin_problem
         view.arrived(
             Arrived::Logs(Ok(lumilio_core::GameLogs {
                 latest: None,
+                files: Vec::new(),
                 crashes: Vec::new(),
             })),
             cx,
         );
     });
     cx.run_until_parked();
+    click(cx, "instance-log-analysis");
+    view.update(cx, |view, cx| {
+        view.log_analysis_arrived(
+            view.analysis_serial,
+            Ok(("report".into(), vec![finding()])),
+            cx,
+        );
+    });
+    cx.run_until_parked();
     assert!(
         cx.debug_bounds("crash-finding-0").is_some(),
-        "plugin data renders through generic report UI"
+        "plugin data renders in the analysis dialog"
     );
 }
 
@@ -153,6 +163,7 @@ fn a_crashed_session_leads_to_the_log_and_a_clean_one_does_not(cx: &mut TestAppC
         view.arrived(
             Arrived::Logs(Ok(lumilio_core::GameLogs {
                 latest: None,
+                files: Vec::new(),
                 crashes: vec![
                     lumilio_core::CrashReport {
                         file_name: "elsewhen.txt".into(),
@@ -198,6 +209,7 @@ fn the_log_tab_loads_once_and_shows_only_the_report_last_asked_for(cx: &mut Test
         view.arrived(
             Arrived::Logs(Ok(lumilio_core::GameLogs {
                 latest: Some("[main] Done".into()),
+                files: Vec::new(),
                 crashes: vec![lumilio_core::CrashReport {
                     file_name: "crash-1.txt".into(),
                     modified: 5,
@@ -207,12 +219,21 @@ fn the_log_tab_loads_once_and_shows_only_the_report_last_asked_for(cx: &mut Test
         );
     });
     cx.run_until_parked();
-    let open = cx.debug_bounds("crash-open").expect("view button");
-    cx.simulate_click(open.center(), Modifiers::none());
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.choose_log(
+                lumilio_core::GameLogSource::Crash("crash-1.txt".into()),
+                window,
+                cx,
+            )
+        })
+    });
     cx.run_until_parked();
     assert_eq!(
         seen.borrow().last(),
-        Some(&InstanceIntent::OpenCrash("crash-1.txt".into()))
+        Some(&InstanceIntent::OpenGameLog(
+            lumilio_core::GameLogSource::Crash("crash-1.txt".into())
+        ))
     );
     view.update(cx, |view, cx| {
         view.crash_arrived("crash-0.txt".into(), Ok(("old".into(), Vec::new())), cx);
@@ -233,12 +254,12 @@ fn the_log_tab_loads_once_and_shows_only_the_report_last_asked_for(cx: &mut Test
     cx.run_until_parked();
     let export = cx.debug_bounds("instance-log-export").expect("export log");
     cx.simulate_click(export.center(), Modifiers::none());
-    assert_eq!(seen.borrow().last(), Some(&InstanceIntent::ExportLog(None)));
-    let export = cx.debug_bounds("crash-export").expect("export report");
-    cx.simulate_click(export.center(), Modifiers::none());
     assert_eq!(
         seen.borrow().last(),
-        Some(&InstanceIntent::ExportLog(Some("crash-1.txt".into())))
+        Some(&InstanceIntent::ExportGameLog {
+            source: lumilio_core::GameLogSource::Crash("crash-1.txt".into()),
+            live: "OOM".into()
+        })
     );
 }
 
@@ -331,12 +352,13 @@ fn scrolling_the_log_leaves_the_page_where_it_is(cx: &mut TestAppContext) {
         view.arrived(
             Arrived::Logs(Ok(lumilio_core::GameLogs {
                 latest: Some(text),
+                files: Vec::new(),
                 crashes: Vec::new(),
             })),
             cx,
         );
     });
-    cx.simulate_resize(gpui::size(px(1080.), px(500.)));
+    cx.simulate_resize(gpui::size(px(1080.), px(720.)));
     cx.run_until_parked();
 
     let wheel = |cx: &mut gpui::VisualTestContext, at: gpui::Point<gpui::Pixels>| {
@@ -375,6 +397,7 @@ fn the_log_view_filters_by_level_and_search_and_keeps_stack_traces_with_their_li
                     "[1] [main/INFO]: loaded sodium\n[2] [main/WARN]: slow tick\n[3] [main/ERROR]: boom\n\tat a.B(B.java)"
                         .into(),
                 ),
+                files: Vec::new(),
                 crashes: Vec::new(),
             })),
             cx,
@@ -386,7 +409,7 @@ fn the_log_view_filters_by_level_and_search_and_keeps_stack_traces_with_their_li
     };
     assert_eq!(shown(&view, cx).lines().count(), 4);
     view.update(cx, |view, cx| {
-        view.log_level = 1;
+        view.log_levels = vec![lumilio_core::LogLevel::Error];
         cx.notify();
     });
     assert_eq!(
@@ -394,9 +417,18 @@ fn the_log_view_filters_by_level_and_search_and_keeps_stack_traces_with_their_li
         "[3] [main/ERROR]: boom\n\tat a.B(B.java)",
         "the trace line belongs to the error"
     );
-    view.update(cx, |view, _| view.log_level = 2);
+    view.update(cx, |view, _| {
+        view.log_levels = vec![lumilio_core::LogLevel::Warn, lumilio_core::LogLevel::Error]
+    });
     assert_eq!(shown(&view, cx).lines().count(), 3);
-    view.update(cx, |view, _| view.log_level = 0);
+    view.update(cx, |view, _| {
+        view.log_levels = vec![
+            lumilio_core::LogLevel::Info,
+            lumilio_core::LogLevel::Debug,
+            lumilio_core::LogLevel::Warn,
+            lumilio_core::LogLevel::Error,
+        ]
+    });
     let search = view.read_with(cx, |view, _| {
         view.fields.as_ref().unwrap().log_search.clone()
     });
@@ -415,6 +447,7 @@ fn the_running_games_output_replaces_the_log_file_until_it_stops(cx: &mut TestAp
         view.arrived(
             Arrived::Logs(Ok(lumilio_core::GameLogs {
                 latest: Some("[1] [main/INFO]: from the file".into()),
+                files: Vec::new(),
                 crashes: Vec::new(),
             })),
             cx,
@@ -441,7 +474,9 @@ fn the_running_games_output_replaces_the_log_file_until_it_stops(cx: &mut TestAp
         "[2] [main/INFO]: live one\n[3] [main/WARN]: live two"
     );
     // The level filter works on the live lines too.
-    view.update(cx, |view, _| view.log_level = 2);
+    view.update(cx, |view, _| {
+        view.log_levels = vec![lumilio_core::LogLevel::Warn]
+    });
     assert_eq!(shown(&view, cx), "[3] [main/WARN]: live two");
 
     let before = seen
@@ -461,6 +496,120 @@ fn the_running_games_output_replaces_the_log_file_until_it_stops(cx: &mut TestAp
         before + 1,
         "the file is read again once the game ends"
     );
-    view.update(cx, |view, _| view.log_level = 0);
+    view.update(cx, |view, _| {
+        view.log_levels = vec![
+            lumilio_core::LogLevel::Info,
+            lumilio_core::LogLevel::Debug,
+            lumilio_core::LogLevel::Warn,
+            lumilio_core::LogLevel::Error,
+        ]
+    });
     assert_eq!(shown(&view, cx), "[1] [main/INFO]: from the file");
+}
+
+#[gpui::test]
+fn unified_log_reader_fills_remaining_height_and_analysis_is_in_a_modal(cx: &mut TestAppContext) {
+    use gpui::{px, size};
+    use lumilio_core::GameLogSource;
+    let seen: Rc<RefCell<Vec<InstanceIntent>>> = Rc::default();
+    let (view, cx) = rooted(cx, seen.clone());
+    let report = format!("{}END", "report line\n".repeat(600));
+    view.update(cx, |view, cx| {
+        view.loaded(Ok((record(), LauncherSettings::default())), cx);
+        view.diag_sub = 1;
+        view.select_tab(TAB_DIAGNOSTICS, cx);
+        view.arrived(
+            Arrived::Logs(Ok(lumilio_core::GameLogs {
+                latest: Some("latest".into()),
+                files: Vec::new(),
+                crashes: Vec::new(),
+            })),
+            cx,
+        );
+    });
+    cx.simulate_resize(size(px(1080.), px(720.)));
+    cx.run_until_parked();
+    let small = cx.debug_bounds("instance-log-lines").unwrap();
+    let search = cx.debug_bounds("instance-log-search").unwrap();
+    let source = cx.debug_bounds("instance-log-source").unwrap();
+    let levels = cx.debug_bounds("instance-log-levels").unwrap();
+    let analysis = cx.debug_bounds("instance-log-analysis").unwrap();
+    assert!(search.right() < source.left() && source.right() < levels.left());
+    assert!(levels.right() < analysis.left());
+    assert_eq!(search.center().y, source.center().y);
+    assert_eq!(source.center().y, levels.center().y);
+    assert_eq!(levels.center().y, analysis.center().y);
+    cx.simulate_resize(size(px(1080.), px(920.)));
+    cx.run_until_parked();
+    let tall = cx.debug_bounds("instance-log-lines").unwrap();
+    assert_eq!(
+        tall.size.height - small.size.height,
+        px(200.),
+        "the reader receives all surplus height"
+    );
+    assert!(cx.debug_bounds("crash-finding-0").is_none());
+    click(cx, "instance-log-levels");
+    cx.simulate_keystrokes("enter");
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.log_levels.len(), 3);
+        assert!(!view.log_levels.contains(&lumilio_core::LogLevel::Error));
+    });
+    cx.simulate_keystrokes("escape");
+    cx.run_until_parked();
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.choose_log(GameLogSource::Crash("crash.txt".into()), window, cx)
+        })
+    });
+    view.update(cx, |view, cx| {
+        view.log_arrived(
+            GameLogSource::File("old.log".into()),
+            Ok("stale".into()),
+            cx,
+        );
+        assert!(view.log_text().is_none());
+        view.log_arrived(
+            GameLogSource::Crash("crash.txt".into()),
+            Ok(report.clone()),
+            cx,
+        );
+        view.log_levels = vec![lumilio_core::LogLevel::Error];
+        assert_eq!(
+            view.visible_log(cx).unwrap(),
+            report,
+            "unlevelled reports remain complete"
+        );
+    });
+    cx.run_until_parked();
+    click(cx, "instance-log-export");
+    assert_eq!(
+        seen.borrow().last(),
+        Some(&InstanceIntent::ExportGameLog {
+            source: GameLogSource::Crash("crash.txt".into()),
+            live: report.clone()
+        })
+    );
+    click(cx, "instance-log-analysis");
+    let request = view.read_with(cx, |view, _| view.analysis_serial);
+    view.update(cx, |view, cx| {
+        view.log_analysis_arrived(
+            request.wrapping_sub(1),
+            Ok(("stale".into(), vec![finding()])),
+            cx,
+        );
+        assert!(matches!(view.log_analysis, Some((_, _, None))));
+        view.log_analysis_arrived(request, Ok(("safe snapshot".into(), vec![finding()])), cx);
+    });
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("crash-finding-0").is_some());
+    click(cx, "log-analysis-copy");
+    let clipboard = cx.read(|cx| cx.read_from_clipboard().unwrap().text().unwrap().to_owned());
+    assert!(clipboard.contains("safe snapshot") && clipboard.contains("OOM"));
+    cx.update(|window, cx| {
+        use gpui_component::WindowExt as _;
+        window.close_dialog(cx);
+    });
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("crash-finding-0").is_none());
 }

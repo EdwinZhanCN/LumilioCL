@@ -111,6 +111,16 @@ pub enum InstanceIntent {
     },
     /// Read this crash report; answer with [`InstanceDetailView::crash_arrived`].
     OpenCrash(String),
+    OpenGameLog(lumilio_core::GameLogSource),
+    AnalyzeGameLog {
+        request: u64,
+        text: String,
+        crash: bool,
+    },
+    ExportGameLog {
+        source: lumilio_core::GameLogSource,
+        live: String,
+    },
     /// List this folder of the game directory (`""` is the directory itself);
     /// answer with [`Arrived::Files`].
     OpenFolder(String),

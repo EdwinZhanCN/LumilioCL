@@ -1,19 +1,6 @@
-use lumilio_core::{FileEntry, LogLevel};
+use lumilio_core::FileEntry;
 
 pub const DIAGNOSTIC_LABELS: [&str; 3] = ["问题", "日志", "文件"];
-pub const LEVEL_LABELS: [&str; 4] = ["全部", "错误", "警告", "信息"];
-/// The log view stays light: the newest lines of what matches.
-pub(super) const LOG_LINES_SHOWN: usize = 300;
-
-/// The least serious level a [`LEVEL_LABELS`] choice still shows.
-pub fn least_level(choice: usize) -> Option<LogLevel> {
-    match choice {
-        1 => Some(LogLevel::Error),
-        2 => Some(LogLevel::Warn),
-        3 => Some(LogLevel::Info),
-        _ => None,
-    }
-}
 
 /// The entries whose name contains `query` (ignoring case); all when empty.
 pub fn files_matching<'a>(entries: &'a [FileEntry], query: &str) -> Vec<&'a FileEntry> {

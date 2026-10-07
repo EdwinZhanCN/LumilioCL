@@ -42,7 +42,7 @@ pub use self::models::ModelPreview;
 pub use self::third_party::ThirdPartySignIn;
 pub use self::types::{
     ActivityView, ContentEffect, ContentResult, DependencyNeed, DependencyReport, DiscoverFilters,
-    GameLogs, InstalledProject, Library, ProjectDetail, now,
+    GameLogSource, GameLogs, InstalledProject, Library, ProjectDetail, now,
 };
 
 use self::support::InstanceLease;

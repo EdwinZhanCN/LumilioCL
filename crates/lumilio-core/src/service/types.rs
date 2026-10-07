@@ -102,6 +102,16 @@ pub const REPORT_BYTES: u64 = 256 * 1024;
 pub struct GameLogs {
     pub latest: Option<String>,
     pub crashes: Vec<crate::diagnostics::CrashReport>,
+    pub files: Vec<crate::diagnostics::FileEntry>,
+}
+
+/// An instance-local source; file names are validated before any disk access.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum GameLogSource {
+    Live,
+    Latest,
+    File(String),
+    Crash(String),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

@@ -68,7 +68,11 @@ async fn logs_and_crash_reports_are_read_safely_without_the_lease() {
     .unwrap();
     let _busy = world.service.reserve_instance(&record.id).unwrap();
     let logs = world.service.logs(&record.id).await.unwrap();
-    assert!(logs.latest.unwrap().len() as u64 <= LOG_TAIL_BYTES);
+    assert_eq!(
+        logs.latest.unwrap(),
+        big,
+        "the unified reader gets the complete file"
+    );
     assert_eq!(logs.crashes[0].file_name, "crash-1.txt");
     let (text, hints) = world
         .service
@@ -110,6 +114,83 @@ async fn a_games_size_counts_its_own_folder_only() {
         world.service.instance_size("ghost").await,
         Err(ServiceError::NoSuchInstance(_))
     ));
+}
+
+#[tokio::test]
+async fn unified_logs_read_compressed_history_and_export_complete_redacted_sources() {
+    use crate::GameLogSource;
+    use std::io::Write;
+    let world = world();
+    let record = world
+        .service
+        .create_instance("Logs", Some("1.0"), Loader::Vanilla, None)
+        .await
+        .unwrap();
+    let game = world.service.layout.game(&record.id);
+    std::fs::create_dir_all(game.join("logs")).unwrap();
+    std::fs::create_dir_all(game.join("crash-reports")).unwrap();
+    let text = format!("Steve {}\n{}END", game.display(), "history\n".repeat(500));
+    let mut gz = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+    gz.write_all(text.as_bytes()).unwrap();
+    std::fs::write(game.join("logs/old.log.gz"), gz.finish().unwrap()).unwrap();
+    std::fs::write(game.join("logs/debug.log"), "debug").unwrap();
+    std::fs::write(game.join("logs/ignored.json"), "{}").unwrap();
+    std::fs::write(game.join("logs/latest.log"), "latest").unwrap();
+    let report = "report\n".repeat(500);
+    std::fs::write(game.join("crash-reports/crash.txt"), &report).unwrap();
+    let logs = world.service.logs(&record.id).await.unwrap();
+    assert_eq!(logs.files.len(), 2);
+    assert!(logs.files.iter().any(|file| file.name == "old.log.gz"));
+    assert_eq!(
+        world
+            .service
+            .game_log(&record.id, GameLogSource::File("old.log.gz".into()))
+            .await
+            .unwrap(),
+        text
+    );
+    assert_eq!(
+        world
+            .service
+            .game_log(&record.id, GameLogSource::Crash("crash.txt".into()))
+            .await
+            .unwrap(),
+        report
+    );
+    let out = world._dir.path().join("selected.log");
+    world
+        .service
+        .export_game_log(
+            &record.id,
+            GameLogSource::File("old.log.gz".into()),
+            "wrong source".into(),
+            &out,
+        )
+        .await
+        .unwrap();
+    let exported = std::fs::read_to_string(&out).unwrap();
+    assert!(exported.starts_with("<player> <game>"));
+    assert!(exported.ends_with("END"));
+    assert!(!exported.contains("wrong source"));
+    world
+        .service
+        .export_game_log(&record.id, GameLogSource::Live, text.clone(), &out)
+        .await
+        .unwrap();
+    assert_eq!(std::fs::read_to_string(&out).unwrap(), exported);
+    let (safe, findings) = world
+        .service
+        .analyze_game_log(&record.id, text, false)
+        .await
+        .unwrap();
+    assert_eq!(safe, exported);
+    assert!(findings.is_empty());
+    for source in [
+        GameLogSource::File("../launcher.db".into()),
+        GameLogSource::Crash("../crash.txt".into()),
+    ] {
+        assert!(world.service.game_log(&record.id, source).await.is_err());
+    }
 }
 
 #[tokio::test]

@@ -130,6 +130,17 @@ pub(super) fn instance_intent(
         }
         InstanceIntent::Reload => load_instance(wiring, id.to_owned(), view, cx),
         InstanceIntent::OpenCrash(file) => open_crash(wiring, id.to_owned(), view, file, cx),
+        InstanceIntent::OpenGameLog(source) => {
+            super::logs::read(wiring, id.to_owned(), view, source, cx)
+        }
+        InstanceIntent::AnalyzeGameLog {
+            request,
+            text,
+            crash,
+        } => super::logs::analyze(wiring, id.to_owned(), view, request, text, crash, cx),
+        InstanceIntent::ExportGameLog { source, live } => {
+            super::logs::export(wiring, id.to_owned(), source, live, cx)
+        }
         InstanceIntent::Load(section) => load_section(wiring, id.to_owned(), view, section, cx),
         InstanceIntent::OpenAccounts => {
             let shell = wiring.shell.clone();

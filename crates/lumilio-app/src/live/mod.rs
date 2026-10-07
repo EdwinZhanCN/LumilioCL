@@ -14,6 +14,7 @@ mod instance_write;
 mod jobs;
 mod launch;
 mod library;
+mod logs;
 mod new_game;
 mod settings;
 

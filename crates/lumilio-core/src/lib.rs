@@ -166,8 +166,8 @@ pub use screenshots::{ScreenshotError, ScreenshotInfo};
 pub use servers::{PackPolicy, PingError, ServerEntry, ServerError, ServerStatus};
 pub use service::{
     ActivityView, ContentEffect, ContentResult, DependencyNeed, DependencyReport, DiscoverFilters,
-    GameLogs, InstalledProject, LauncherService, Library, ModelPreview, ProjectDetail,
-    ServiceError, ThirdPartySignIn, now as unix_now,
+    GameLogSource, GameLogs, InstalledProject, LauncherService, Library, ModelPreview,
+    ProjectDetail, ServiceError, ThirdPartySignIn, now as unix_now,
 };
 pub use settings::{
     AccountEntry, AccountKind, AuthServerEntry, LauncherSettings, MAX_MEMORY_MB, MirrorRule,

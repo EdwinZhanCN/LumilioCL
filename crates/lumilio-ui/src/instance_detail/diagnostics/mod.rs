@@ -4,14 +4,16 @@
 //!
 //! A child module of `instance_detail`, so it shares the view's private state.
 
+mod analysis;
 mod files;
 mod helpers;
 mod logs;
+mod selects;
 
 #[cfg(test)]
 mod tests;
 
-pub use self::helpers::{DIAGNOSTIC_LABELS, crash_for_session, least_level};
+pub use self::helpers::{DIAGNOSTIC_LABELS, crash_for_session};
 
 use super::panels::{act_index, problem_text, problem_tone};
 use super::{InstanceDetailView, InstanceIntent, Section};
@@ -20,7 +22,7 @@ use crate::theme::ShellColors;
 use gpui::prelude::*;
 use gpui::{AnyElement, Context, Window, div, px};
 use gpui_component::{h_flex, v_flex};
-use lumilio_core::{filter_log, log_lines};
+use lumilio_core::log_lines;
 
 impl InstanceDetailView {
     /// Opening the tab loads what its current part shows.
@@ -61,6 +63,7 @@ impl InstanceDetailView {
         self.inspect = None;
         if let Some(report) = crash_for_session(&logs.crashes, started, seconds) {
             let file = report.file_name.clone();
+            self.log_source = lumilio_core::GameLogSource::Crash(file.clone());
             self.crash = Some((file.clone(), None));
             cx.notify();
             (self.handler)(InstanceIntent::OpenCrash(file), window, cx);
@@ -90,8 +93,22 @@ impl InstanceDetailView {
 
     /// The log being read: the game's own output while it runs, else the tail
     /// of `latest.log`.
-    fn log_text(&self) -> Option<std::borrow::Cow<'_, str>> {
-        if let Some(live) = &self.live_output {
+    pub(super) fn log_text(&self) -> Option<std::borrow::Cow<'_, str>> {
+        if let Some((_, read)) = &self.crash {
+            return read
+                .as_ref()
+                .and_then(|result| result.as_ref().ok())
+                .map(|(text, _)| std::borrow::Cow::Borrowed(text.as_str()));
+        }
+        if matches!(
+            self.log_source,
+            lumilio_core::GameLogSource::File(_) | lumilio_core::GameLogSource::Crash(_)
+        ) {
+            return None;
+        }
+        if self.log_source == lumilio_core::GameLogSource::Live
+            && let Some(live) = &self.live_output
+        {
             return Some(std::borrow::Cow::Owned(live.join("\n")));
         }
         let Some(Ok(logs)) = &self.data.logs else {
@@ -104,7 +121,7 @@ impl InstanceDetailView {
     pub(super) fn visible_log(&self, cx: &gpui::App) -> Option<String> {
         let text = self.log_text()?;
         let lines = log_lines(&text);
-        let shown = filter_log(&lines, least_level(self.log_level), &self.log_query(cx));
+        let shown = self.filtered_lines(&lines, cx);
         Some(
             shown
                 .iter()
@@ -115,7 +132,8 @@ impl InstanceDetailView {
     }
 
     pub(super) fn diagnostics_panel(
-        &self,
+        &mut self,
+        window: &mut Window,
         colors: ShellColors,
         cx: &mut Context<Self>,
     ) -> AnyElement {
@@ -132,13 +150,14 @@ impl InstanceDetailView {
         );
         let body = match sub {
             0 => self.problems_body(colors, cx),
-            1 => self.logs_body(colors, cx),
+            1 => self.logs_body(window, colors, cx),
             _ => self.files_body(colors, cx),
         };
         v_flex()
             .w_full()
+            .when(sub == 1, |view| view.h_full().min_h_0())
             .gap_4()
-            .child(h_flex().child(segments))
+            .child(h_flex().flex_none().child(segments))
             .child(body)
             .into_any_element()
     }
