@@ -11,7 +11,7 @@
 | 在访达中显示 | 文件分段 · 按键 | 当前文件夹或所选文件 |  | `lumilio-ui/src/instance_detail/diagnostics/files.rs` |
 | 选择日志来源 | 日志工具栏 · 搜索框右侧单选下拉 | 实时输出、latest.log、历史日志（含 .log.gz）、崩溃报告共用一个阅读区；可搜索来源；选择文件后显示加载或读取失败 |  | `lumilio-ui/src/instance_detail/diagnostics/logs.rs` |
 | 按级别筛选 | 日志工具栏 · 来源右侧多选下拉 | 默认全部，点击或 Enter 独立切换错误、警告、信息、调试；菜单保持打开，Escape 关闭并保留选择；堆栈继承上一行级别；崩溃报告禁用级别筛选 |  | `lumilio-ui/src/instance_detail/diagnostics/logs.rs` |
-| 崩溃分析 | 日志工具栏 · 按键「崩溃分析…」→ 弹窗 | 分析当前完整来源的快照；显示可能原因、建议、可展开证据；无匹配或失败明确提示 |  | `lumilio-ui/src/instance_detail/diagnostics/logs.rs` |
+| 崩溃分析 | 日志工具栏 · 按键「崩溃分析…」→ 弹窗 | 分析当前完整来源的快照；可能原因、建议与技术详情在同一弹窗内直接显示，不再打开额外弹窗；无匹配或失败明确提示 |  | `lumilio-ui/src/instance_detail/diagnostics/logs.rs` |
 | 复制日志 | 日志工具栏 · 按键「复制」 | 复制当前来源筛选出的全部行；无匹配时提示 |  | `lumilio-ui/src/instance_detail/diagnostics/logs.rs` |
 | 导出日志 / 报告 | 日志工具栏 · 按键「导出…」→ 选位置 | 导出当前完整来源，忽略阅读筛选；压缩日志解压为文本；玩家名、UUID 和目录脱敏；实时来源保存点击时的输出快照 |  | `lumilio-ui/src/instance_detail/diagnostics/logs.rs` |
 | 搜索日志 | 日志工具栏 · 搜索框 | 在当前来源中忽略大小写筛选 |  | `lumilio-ui/src/instance_detail/diagnostics/logs.rs` |

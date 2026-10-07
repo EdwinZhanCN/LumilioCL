@@ -1,5 +1,8 @@
 use super::super::{InstanceDetailView, InstanceIntent};
-use crate::{kit, theme::ShellColors};
+use crate::{
+    kit,
+    theme::{self, ShellColors},
+};
 use gpui::prelude::*;
 use gpui::{App, Context, Entity, Window, div, px};
 use gpui_component::{ActiveTheme as _, WindowExt as _, dialog::Dialog, h_flex, v_flex};
@@ -50,7 +53,7 @@ impl InstanceDetailView {
             Some(Err(detail)) => {
                 body = body
                     .child(div().child("没能完成分析"))
-                    .child(kit::technical("log-analysis-error", detail.clone()));
+                    .child(technical_detail("log-analysis-error", detail, colors));
             }
             Some(Ok((text, findings))) => {
                 let mut details = format!("来源：{source}\n");
@@ -93,9 +96,10 @@ impl InstanceDetailView {
                                     .child(finding.advice.clone()),
                             )
                             .when_some(finding.evidence.as_ref(), |view, evidence| {
-                                view.child(kit::technical(
-                                    ("log-analysis-evidence", index),
-                                    evidence.clone(),
+                                view.child(technical_detail(
+                                    format!("log-analysis-evidence-{index}"),
+                                    evidence,
+                                    colors,
                                 ))
                             }),
                     );
@@ -135,4 +139,28 @@ impl InstanceDetailView {
             )
             .footer(h_flex().w_full().justify_end().child(copy))
     }
+}
+
+/// Analysis is already a reading surface; show its evidence and errors here
+/// instead of stacking a second dialog above it.
+fn technical_detail(
+    selector: impl Into<gpui::SharedString>,
+    detail: &str,
+    colors: ShellColors,
+) -> impl IntoElement {
+    let selector = selector.into();
+    v_flex()
+        .w_full()
+        .gap_2()
+        .child(kit::section_label("技术详情", colors))
+        .child(
+            div()
+                .w_full()
+                .min_w_0()
+                .debug_selector(move || selector.to_string())
+                .font_family(theme::MONO_FONT)
+                .text_xs()
+                .text_color(colors.muted)
+                .child(detail.to_owned()),
+        )
 }

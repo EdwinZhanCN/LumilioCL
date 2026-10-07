@@ -303,6 +303,9 @@ Raw error text is never a headline and never page copy: it opens from
 **技术详情** in a dialog that can copy it. Views queue toasts where results
 arrive and show them on their next render (`lumilio-ui::toast`).
 
+The crash-analysis dialog is itself a technical reading surface: evidence and
+analysis failures appear inline under **技术详情**, alongside the findings,
+without another dialog. Its footer copies the complete redacted analysis snapshot.
 
 ## 12. The instrument: control language
 

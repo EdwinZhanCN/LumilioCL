@@ -131,7 +131,7 @@ impl InstanceDetailView {
         let actions = h_flex()
             .flex_none()
             .gap_2()
-            // ia[instance.diagnostics]: 崩溃分析 | 日志工具栏 · 按键「崩溃分析…」→ 弹窗 | 分析当前完整来源的快照；显示可能原因、建议、可展开证据；无匹配或失败明确提示
+            // ia[instance.diagnostics]: 崩溃分析 | 日志工具栏 · 按键「崩溃分析…」→ 弹窗 | 分析当前完整来源的快照；可能原因、建议与技术详情在同一弹窗内直接显示，不再打开额外弹窗；无匹配或失败明确提示
             .child(
                 kit::ghost(
                     "instance-log-analysis",
