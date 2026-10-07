@@ -24,20 +24,34 @@ use self::storage::downloads;
 use super::live::LiveCtx;
 use crate::kit;
 use crate::kit::ViewIntent;
+use crate::{tr, tr_all};
 use gpui::IntoElement;
 use gpui::prelude::*;
 use gpui_component::v_flex;
 
 // ia[settings]: 打开插件 | L3 设置 tab「插件」 | 显示核心插件、权限、运行状态和各插件的声明式设置；没有插件时显示空列表
-pub const TABS: [&str; 6] = ["通用", "游戏默认", "Java", "下载与存储", "关于", "插件"];
+#[must_use]
+pub fn tabs() -> &'static [&'static str] {
+    tr_all![
+        "settings-tab-general",
+        "settings-tab-game-defaults",
+        "settings-tab-java",
+        "settings-tab-downloads",
+        "settings-tab-about",
+        "settings-tab-plugins",
+    ]
+}
 
 /// The view-state group that remembers the chosen tab.
 pub const TAB_GROUP: u8 = 201;
 
-const APPEARANCES: [&str; 3] = ["跟随系统", "浅色", "深色"];
-const AFTER_LAUNCH: [&str; 2] = ["保持", "隐藏启动器"];
-const MOTION: [&str; 3] = ["跟随系统", "减少", "完整"];
-const FULLSCREEN: [&str; 3] = ["关", "开", "不设置"];
+fn fullscreen_choices() -> &'static [&'static str] {
+    tr_all![
+        "settings-fullscreen-off",
+        "settings-fullscreen-on",
+        "settings-fullscreen-unset",
+    ]
+}
 
 /// The 插件 tab: its list and its detail scroll on their own.
 const PLUGINS_TAB: usize = 5;
@@ -46,10 +60,14 @@ const PLUGINS_TAB: usize = 5;
 /// below them scrolls. The 插件 tab owns its scrolling instead (master–detail).
 pub fn render(ctx: &LiveCtx) -> impl IntoElement {
     let colors = ctx.colors;
-    let tab = ctx.state.choice(TAB_GROUP, 0).min(TABS.len() - 1);
+    let tabs = tabs();
+    let tab = ctx.state.choice(TAB_GROUP, 0).min(tabs.len() - 1);
     let body = match &ctx.model.settings {
-        None => kit::scroll_body("settings-scroll", kit::empty("正在读取设置…", "", colors))
-            .into_any_element(),
+        None => kit::scroll_body(
+            "settings-scroll",
+            kit::empty(tr!("settings-loading"), "", colors),
+        )
+        .into_any_element(),
         Some(view) if tab == PLUGINS_TAB => {
             kit::pane_body(plugins::render(view, ctx)).into_any_element()
         }
@@ -72,14 +90,14 @@ pub fn render(ctx: &LiveCtx) -> impl IntoElement {
         .w_full()
         .gap_5()
         .child(kit::header(
-            "设置",
-            "启动器本身，以及每个游戏默认使用的值",
+            tr!("settings-title"),
+            tr!("settings-subtitle"),
             None,
             colors,
         ))
         .child(kit::toolbar(
             Some(
-                kit::tabs("settings-tabs", &TABS, tab, {
+                kit::tabs("settings-tabs", tabs, tab, {
                     let emit = ctx.emit.clone();
                     move |index, window, app| {
                         emit(ViewIntent::Choose(TAB_GROUP, index), window, app)

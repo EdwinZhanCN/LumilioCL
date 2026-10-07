@@ -309,7 +309,7 @@ impl InstanceDetailView {
                         ),
                         // ia[instance.worlds]: 在访达中显示 | 世界行 ⋯ 菜单 | 打开该世界的目录
                         entry(
-                            "在访达中显示",
+                            crate::platform::reveal_label(),
                             InstanceIntent::RevealPath(format!("saves/{folder}")),
                             false,
                         ),

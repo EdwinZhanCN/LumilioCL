@@ -17,6 +17,7 @@
 | 环境变量 | 游戏默认 · 值 + [编辑] 弹窗 | 每行 名称=值 |  | `lumilio-ui/src/pages/settings/game_defaults.rs` |
 | 启动前 / 包装 / 退出后命令 | 游戏默认 · 值 + [编辑] 弹窗 | 以当前用户权限运行；启动前命令失败取消启动，退出后命令失败只记录 |  | `lumilio-ui/src/pages/settings/game_defaults.rs` |
 | 外观 | 通用 · 分段：跟随系统 / 浅色 / 深色 | 立即生效并保存 |  | `lumilio-ui/src/pages/settings/general.rs` |
+| 语言 | 通用 · 分段：跟随系统 / 简体中文 / English | 立即切换并保存，组件自带的文字一起换；跟随系统时取系统语言里第一个中文或英文，都没有则用简体中文 |  | `lumilio-ui/src/pages/settings/general.rs` |
 | 进入游戏后 | 通用 · 分段：保持 / 隐藏启动器 | 没有“关闭启动器”：启动器要守着游戏记录会话与游玩时间，关掉它游戏也会结束 |  | `lumilio-ui/src/pages/settings/general.rs` |
 | 游戏退出后回到前台 | 通用 · 开关（默认开） | 游戏结束时把启动器带回最前面 |  | `lumilio-ui/src/pages/settings/general.rs` |
 | 减少动效 | 通用 · 分段：跟随系统 / 减少 / 完整 | 立即生效 |  | `lumilio-ui/src/pages/settings/general.rs` |

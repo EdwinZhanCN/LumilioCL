@@ -84,7 +84,7 @@ impl InstanceDetailView {
             )
             // ia[instance]: 在访达中显示 | 页头 ⋯ 菜单 | 打开游戏目录
             .more(kit::MenuEntry::new(
-                "在访达中显示",
+                crate::platform::reveal_label(),
                 with_view(|view, window, cx| {
                     (view.handler)(InstanceIntent::RevealPath(String::new()), window, cx)
                 }),

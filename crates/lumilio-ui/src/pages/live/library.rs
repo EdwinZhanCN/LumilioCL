@@ -100,7 +100,10 @@ pub(super) fn card_menu(card: &LibraryCard, ctx: &LiveCtx) -> Vec<kit::MenuEntry
         go("设为当前游戏", LiveIntent::InstallTarget(id())),
         go("加入合集…", LiveIntent::EditCollections(id())),
         go("复制…", LiveIntent::CopyGameOf(id())),
-        go("在访达中显示", LiveIntent::RevealGame(id())),
+        go(
+            crate::platform::reveal_label(),
+            LiveIntent::RevealGame(id()),
+        ),
         go("导出整合包…", LiveIntent::ExportPackOf(id())),
         delete,
     ]

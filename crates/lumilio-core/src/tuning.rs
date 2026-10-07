@@ -366,6 +366,17 @@ pub enum Appearance {
     Dark,
 }
 
+/// The language of the launcher's own words. `System` follows the
+/// operating system among the languages the launcher has.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Language {
+    #[default]
+    System,
+    SimplifiedChinese,
+    English,
+}
+
 /// What the launcher window does once the game is running. There is no
 /// "close": the launcher supervises the game to record its session and play
 /// time, so quitting would end the game with it.
@@ -396,6 +407,7 @@ pub struct Preferences {
     /// `None` means the default, which is to come back to the front.
     pub foreground_on_exit: Option<bool>,
     pub motion: MotionPreference,
+    pub language: Language,
     /// How the Library is ordered (0 recent, 1 name, 2 created) and which
     /// loader it shows (0 all; 1 vanilla, 2 Fabric, 3 Forge, 4 NeoForge,
     /// 5 Quilt). The launcher only remembers them.

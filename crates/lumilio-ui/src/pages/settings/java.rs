@@ -4,6 +4,7 @@ use crate::kit;
 use crate::live::{LiveIntent, SettingsView};
 use crate::settings_dialog::{DialogSpec, FieldKind, FieldSpec};
 use crate::settings_forms as forms;
+use crate::tr;
 use gpui::prelude::*;
 use gpui::{AnyElement, IntoElement};
 use gpui_component::{h_flex, v_flex};
@@ -14,8 +15,8 @@ pub(super) fn java(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
     let handler = &ctx.handler;
     let list = if view.java.is_empty() {
         kit::empty(
-            "没有找到 Java",
-            "点“添加 Java”选一个，或在额外搜索目录里加入它所在的文件夹。",
+            tr!("settings-java-none"),
+            tr!("settings-java-none-help"),
             colors,
         )
         .into_any_element()
@@ -30,7 +31,7 @@ pub(super) fn java(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
                     let toggle = kit::switch(
                         ("settings-java-switch", index),
                         enabled,
-                        "启用这个 Java",
+                        tr!("settings-java-enable"),
                         send(
                             handler,
                             LiveIntent::SetJavaDisabled {
@@ -43,14 +44,14 @@ pub(super) fn java(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
                     let more = kit::more_menu(
                         ("settings-java-more", index),
                         vec![kit::MenuEntry::new(
-                            "在访达中显示",
+                            crate::platform::reveal_label(),
                             send(handler, LiveIntent::Reveal(java.home.clone())),
                         )],
                         colors,
                     );
                     kit::row(
                         if java.disabled {
-                            format!("{}（已停用）", java.title)
+                            tr!("settings-java-disabled", title = java.title.as_str())
                         } else {
                             java.title.clone()
                         },
@@ -81,19 +82,19 @@ pub(super) fn java(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
     // ia[settings]: Java：额外搜索目录 | Java · 值 + [编辑] 弹窗 | 每行一个文件夹，检测时也会找这些位置
     let roots_row = row(
         "settings-java-roots",
-        "额外搜索目录",
-        Some("除了常见位置，也会在这些文件夹里找 Java。".to_owned()),
+        tr!("settings-java-roots"),
+        Some(tr!("settings-java-roots-help").to_owned()),
         if roots.is_empty() {
-            "无".to_owned()
+            tr!("common-none").to_owned()
         } else {
-            format!("{} 个", roots.len())
+            tr!("settings-java-roots-count", count = roots.len())
         },
         Some(edit("settings-java-roots-edit", handler, move || {
             DialogSpec {
-                title: "额外搜索目录",
-                intro: Some("每行一个文件夹。每个游戏会按需要自动选择合适的 Java。"),
+                title: tr!("settings-java-roots"),
+                intro: Some(tr!("settings-java-roots-intro")),
                 fields: vec![FieldSpec {
-                    label: "文件夹",
+                    label: tr!("settings-java-roots-field"),
                     help: None,
                     placeholder: "/opt/jdks",
                     value: roots_text.clone(),
@@ -109,14 +110,14 @@ pub(super) fn java(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
         .w_full()
         .gap_5()
         // ia[settings]: Java：检测与列表 | Java · 已发现的 Java 列表 | 列出检测到的 Java（版本、发行方、架构、路径）；没有时提示添加
-        .child(kit::section("已发现的 Java", colors, list))
+        .child(kit::section(tr!("settings-java-found"), colors, list))
         .child(
             h_flex()
                 .gap_2()
                 // ia[settings]: Java：重新检测 | Java · 按键「重新检测」 | 重新读取设置并检测
                 .child(kit::action(
                     "settings-java-rescan",
-                    "重新检测",
+                    tr!("settings-java-rescan"),
                     Some(crate::assets::UiIcon::Refresh),
                     false,
                     send(handler, LiveIntent::LoadSettings),
@@ -124,7 +125,7 @@ pub(super) fn java(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
                 // ia[settings]: Java：下载推荐的 Java | Java · 按键「下载推荐的 Java」 | 读 Mojang 的运行时索引，装好后出现在列表里；进度在动态 | ADR 0014
                 .child(kit::action(
                     "settings-java-install",
-                    "下载推荐的 Java",
+                    tr!("settings-java-install"),
                     Some(crate::assets::UiIcon::Download),
                     false,
                     send(handler, LiveIntent::InstallJava(None)),
@@ -132,7 +133,7 @@ pub(super) fn java(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
                 // ia[settings]: Java：添加 | Java · 按键「添加 Java…」→ 选 java 程序或 JDK 文件夹 | 加入列表
                 .child(kit::action(
                     "settings-java-add",
-                    "添加 Java…",
+                    tr!("settings-java-add"),
                     Some(crate::assets::UiIcon::Plus),
                     false,
                     send(handler, LiveIntent::AddJava),

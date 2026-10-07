@@ -330,7 +330,7 @@ impl InstanceDetailView {
                     // ia[instance.screenshots]: 在访达中显示截图 | 大图弹窗「在访达中显示」 | 打开 screenshots 文件夹并选中该文件
                     .child(
                         Key::new("shot-reveal")
-                            .label("在访达中显示")
+                            .label(crate::platform::reveal_label())
                             .white()
                             .debug_selector(|| "shot-reveal".into())
                             .on_click(on(|view, file, window, cx| {

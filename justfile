@@ -41,6 +41,11 @@ test-pkg pkg *filter:
 ia:
     cargo run -p lumilio-docgen -- ia
 
+# Rewrite the list of Chinese string literals still in UI and app code
+# (crates/lumilio-ui/src/i18n/hardcoded.txt); it may only shrink.
+hardcoded-chinese:
+    LUMILIO_BLESS_HARDCODED=1 cargo test -p lumilio-ui hardcoded_chinese_only_shrinks
+
 # Release packages for this platform into dist/ (assets/icons/PACKAGING.md).
 package:
     cargo xtask package

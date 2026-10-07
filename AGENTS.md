@@ -90,6 +90,7 @@ Don't write documents that restate the code or upstream; they go stale (ADR 0021
 - `lumilio-exec-plan`: create, continue and close plans.
 - `lumilio-write-a-test`: choose the core/UI/app test boundary and prove a guard can fail.
 - `lumilio-ia-paths`: declare user paths and regenerate `docs/ia/paths/`.
+- `lumilio-i18n`: put launcher text in the language catalogs (`tr!`) and fill the English one.
 - `lumilio-motion-design`: apply the design language to UI, motion, copy or world-scene changes.
 
 Escaped failures are written up in `.agents/postmortems/`.

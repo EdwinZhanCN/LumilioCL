@@ -1,10 +1,10 @@
 use super::super::live::LiveCtx;
 use super::rows::{preference_row, row, send, with_preferences};
-use super::{AFTER_LAUNCH, APPEARANCES, MOTION};
 use crate::kit;
 use crate::live::SettingsView;
+use crate::{tr, tr_all};
 use gpui::{AnyElement, IntoElement};
-use lumilio_core::{AfterLaunch, Appearance, MotionPreference};
+use lumilio_core::{AfterLaunch, Appearance, Language, MotionPreference};
 
 pub(super) fn general(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
     let colors = ctx.colors;
@@ -23,14 +23,24 @@ pub(super) fn general(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
         MotionPreference::Reduce => 1,
         MotionPreference::Full => 2,
     };
+    let language = match prefs.language {
+        Language::System => 0,
+        Language::SimplifiedChinese => 1,
+        Language::English => 2,
+    };
     let foreground = prefs.foreground_on_exit();
     let shown = view.clone();
     let rows = vec![
         // ia[settings]: 外观 | 通用 · 分段：跟随系统 / 浅色 / 深色 | 立即生效并保存
         preference_row(
             "settings-appearance",
-            "外观",
-            &APPEARANCES,
+            tr!("settings-appearance"),
+            None,
+            tr_all![
+                "settings-follow-system",
+                "settings-appearance-light",
+                "settings-appearance-dark",
+            ],
             appearance,
             {
                 let view = shown.clone();
@@ -43,11 +53,37 @@ pub(super) fn general(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
             },
             ctx,
         ),
+        // ia[settings]: 语言 | 通用 · 分段：跟随系统 / 简体中文 / English | 立即切换并保存，组件自带的文字一起换；跟随系统时取系统语言里第一个中文或英文，都没有则用简体中文
+        preference_row(
+            "settings-language",
+            tr!("settings-language"),
+            Some(tr!("settings-language-help")),
+            tr_all![
+                "settings-follow-system",
+                "language-simplified-chinese",
+                "language-english",
+            ],
+            language,
+            {
+                let view = shown.clone();
+                move |index| {
+                    with_preferences(&view, move |prefs| {
+                        prefs.language = [
+                            Language::System,
+                            Language::SimplifiedChinese,
+                            Language::English,
+                        ][index.min(2)];
+                    })
+                }
+            },
+            ctx,
+        ),
         // ia[settings]: 进入游戏后 | 通用 · 分段：保持 / 隐藏启动器 | 没有“关闭启动器”：启动器要守着游戏记录会话与游玩时间，关掉它游戏也会结束
         preference_row(
             "settings-after-launch",
-            "进入游戏后",
-            &AFTER_LAUNCH,
+            tr!("settings-after-launch"),
+            None,
+            tr_all!["settings-after-launch-keep", "settings-after-launch-hide"],
             after,
             {
                 let view = shown.clone();
@@ -62,14 +98,14 @@ pub(super) fn general(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
         // ia[settings]: 游戏退出后回到前台 | 通用 · 开关（默认开） | 游戏结束时把启动器带回最前面
         row(
             "settings-foreground",
-            "游戏退出后回到前台",
-            Some("游戏结束时把启动器带回最前面，方便接着选下一个游戏。".to_owned()),
+            tr!("settings-foreground"),
+            Some(tr!("settings-foreground-help").to_owned()),
             "",
             Some(
                 kit::switch(
                     "settings-foreground-switch",
                     foreground,
-                    "游戏退出后回到前台",
+                    tr!("settings-foreground"),
                     send(
                         &ctx.handler,
                         with_preferences(view, move |prefs| {
@@ -84,8 +120,13 @@ pub(super) fn general(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
         // ia[settings]: 减少动效 | 通用 · 分段：跟随系统 / 减少 / 完整 | 立即生效
         preference_row(
             "settings-motion",
-            "减少动效",
-            &MOTION,
+            tr!("settings-motion"),
+            None,
+            tr_all![
+                "settings-follow-system",
+                "settings-motion-reduce",
+                "settings-motion-full",
+            ],
             motion,
             {
                 let view = shown;
@@ -100,14 +141,6 @@ pub(super) fn general(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
                 }
             },
             ctx,
-        ),
-        row(
-            "settings-language",
-            "语言",
-            Some("目前只有简体中文。".to_owned()),
-            "简体中文",
-            None,
-            colors,
         ),
     ];
     kit::list(rows, colors).into_any_element()

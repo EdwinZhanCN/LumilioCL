@@ -214,11 +214,25 @@ Discover.
 
 ## 8. Voice and copy
 
-- Simplified Chinese, calm and direct, second person implied:
-  "把原来的游戏带过来", "上次没有启动成功".
+- Simplified Chinese first, English beside it; both calm and direct, second
+  person implied: "把原来的游戏带过来", "上次没有启动成功".
 - Errors: one plain sentence saying what happened, one primary action, and
-  technical detail behind **技术详情**. Never blame the user; never show raw
-  error strings as the headline.
+  technical detail behind **技术详情** (*Technical details*). Never blame the
+  user; never show raw error strings as the headline.
+- English is written, not transcribed: say what an English launcher would
+  say. The Chinese is the source for facts, not for phrasing.
+  - Sentence case everywhere: titles, tabs, keys, menu items ("Download
+    recommended Java"). Proper nouns keep their capitals (Java, Fabric,
+    Modrinth).
+  - An action that asks for more before it acts ends in one "…" character
+    ("Export…", "Add Java…"), as the Chinese does. No exclamation marks.
+  - English runs 1.5–2× the width of the Chinese. Keys, segments and tabs
+    never take a width sized to the Chinese; every page is checked in
+    English at the 720 px window.
+- Things the system names, the launcher names the same way on each system:
+  "在访达中显示 / Show in Finder" on macOS, "在文件资源管理器中显示 / Show in
+  File Explorer" on Windows, "在文件管理器中显示 / Show in file manager" on
+  Linux (`platform::reveal_label`).
 - Numbers only when they help decide something ("128 / 342"), not as noise.
 - Game mechanics may be referenced playfully in world-register copy (hero
   captions), never in actionable UI.
@@ -227,7 +241,10 @@ Discover.
     under **启动游戏**), proper nouns (FABRIC, NEOFORGE), versions, numbers
     and units (MB, MODS, STAGE 3/4).
   - Not allowed: a Latin word as the only name of an action or the only
-    statement of a fact. Labels, headings, values and messages stay Chinese.
+    statement of a fact. Labels, headings, values and messages are in the
+    interface language.
+  - In English the legends stay, even where one repeats its label (PLAY
+    under **Play**): silkscreen is part of the instrument, not a translation.
 
 ## 9. Accessibility
 

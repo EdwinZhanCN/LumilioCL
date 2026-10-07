@@ -15,6 +15,7 @@ pub mod game_picker;
 pub mod hero;
 pub mod history;
 pub mod home;
+pub mod i18n;
 pub mod instance_detail;
 pub mod key;
 pub mod kit;

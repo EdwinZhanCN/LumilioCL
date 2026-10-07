@@ -2,6 +2,7 @@ use super::super::live::LiveCtx;
 use super::rows::send;
 use crate::kit::ViewIntent;
 use crate::live::{LiveIntent, SettingsView};
+use crate::tr;
 use crate::{controls::Fader, key::Key, kit, theme};
 use gpui::{AnyElement, IntoElement, SharedString, div, prelude::*, px};
 use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
@@ -14,10 +15,15 @@ pub(super) const PLUGIN_GROUP: u8 = 202;
 
 pub(super) fn permission_text(permission: &Permission) -> String {
     match permission {
-        Permission::ReadGameFiles { under } => format!("读取游戏的 {under} 文件夹"),
-        Permission::Network { hosts } => format!("访问 {}", hosts.join("、")),
-        Permission::LaunchEvents => "了解游戏的启动和退出状态".into(),
-        Permission::Native(NativeCapability::DiscordIpc) => "向本机 Discord 显示游戏状态".into(),
+        Permission::ReadGameFiles { under } => {
+            tr!("settings-plugin-read-files", folder = under.as_str())
+        }
+        Permission::Network { hosts } => tr!(
+            "settings-plugin-network",
+            hosts = hosts.join(tr!("common-list-separator"))
+        ),
+        Permission::LaunchEvents => tr!("settings-plugin-launch-events").into(),
+        Permission::Native(NativeCapability::DiscordIpc) => tr!("settings-plugin-discord").into(),
     }
 }
 
@@ -39,8 +45,8 @@ pub(super) fn render(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
         return div()
             .debug_selector(|| "settings-plugin-empty".into())
             .child(kit::empty(
-                "暂无插件",
-                "核心插件会在这里显示，你可以按需要开关。",
+                tr!("settings-plugins-none"),
+                tr!("settings-plugins-none-help"),
                 ctx.colors,
             ))
             .into_any_element();
@@ -107,15 +113,15 @@ fn plugin_detail(info: &PluginInfo, ctx: &LiveCtx) -> AnyElement {
     let enabled = info.state.enabled.unwrap_or(info.manifest.default_enabled);
     let mut rows = Vec::new();
     let status = match info.status {
-        PluginStatus::Enabled => "已启用",
-        PluginStatus::Disabled => "已停用",
-        PluginStatus::Failed { .. } => "本次运行已停用，重启后重试",
+        PluginStatus::Enabled => tr!("settings-plugin-enabled"),
+        PluginStatus::Disabled => tr!("settings-plugin-disabled"),
+        PluginStatus::Failed { .. } => tr!("settings-plugin-failed"),
     };
     // ia[settings]: 插件：启用 / 停用 | 插件详情 · 设置行开关 | 保存开关；停用后贡献消失，运行失败的插件重启后恢复
     let toggle = Fader::new(
         SharedString::from(format!("{id}-enabled")),
         enabled,
-        "启用插件",
+        tr!("settings-plugin-enable"),
         send(
             &ctx.handler,
             LiveIntent::SetPluginEnabled {
@@ -127,7 +133,7 @@ fn plugin_detail(info: &PluginInfo, ctx: &LiveCtx) -> AnyElement {
     rows.push(
         kit::value_row(
             SharedString::from(format!("{id}-state")),
-            "启用",
+            tr!("settings-plugin-state"),
             None,
             status,
             Some(toggle.into_any_element()),
@@ -140,7 +146,7 @@ fn plugin_detail(info: &PluginInfo, ctx: &LiveCtx) -> AnyElement {
         rows.push(
             kit::value_row(
                 SharedString::from(format!("{id}-permission-{index}")),
-                "权限",
+                tr!("settings-plugin-permission"),
                 None,
                 permission_text(permission),
                 None,
@@ -154,9 +160,9 @@ fn plugin_detail(info: &PluginInfo, ctx: &LiveCtx) -> AnyElement {
         rows.push(
             kit::value_row(
                 SharedString::from(format!("{id}-failure")),
-                "失败原因",
+                tr!("settings-plugin-failure"),
                 None,
-                "本次运行暂停了这个插件",
+                tr!("settings-plugin-failure-value"),
                 Some(
                     kit::technical(
                         SharedString::from(format!("{id}-technical")),
@@ -184,7 +190,7 @@ fn plugin_detail(info: &PluginInfo, ctx: &LiveCtx) -> AnyElement {
             (SettingKind::Toggle { .. }, SettingValue::Toggle(on)) => Fader::new(
                 control_id,
                 on,
-                "启用此设置",
+                tr!("settings-plugin-enable-setting"),
                 send(
                     &handler,
                     LiveIntent::SetPluginValue {
@@ -223,7 +229,7 @@ fn plugin_detail(info: &PluginInfo, ctx: &LiveCtx) -> AnyElement {
             }
             _ => kit::ghost(
                 control_id,
-                "编辑…",
+                tr!("common-edit-more"),
                 send(
                     &handler,
                     LiveIntent::EditPluginSetting {
@@ -250,13 +256,13 @@ fn plugin_detail(info: &PluginInfo, ctx: &LiveCtx) -> AnyElement {
     rows.push(
         kit::value_row(
             SharedString::from(format!("{id}-defaults")),
-            "默认值",
+            tr!("settings-plugin-defaults"),
             None,
             "",
             Some(
                 kit::ghost(
                     SharedString::from(format!("{id}-reset")),
-                    "恢复默认",
+                    tr!("settings-plugin-reset"),
                     send(&ctx.handler, LiveIntent::ResetPlugin(id.clone())),
                 )
                 .into_any_element(),

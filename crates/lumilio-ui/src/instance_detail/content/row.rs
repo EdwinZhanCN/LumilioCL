@@ -176,7 +176,7 @@ impl InstanceDetailView {
         let mut more = vec![{
             let handler = self.handler.clone();
             let name = name.clone();
-            kit::MenuEntry::new("在访达中显示", move |window, cx| {
+            kit::MenuEntry::new(crate::platform::reveal_label(), move |window, cx| {
                 handler(
                     InstanceIntent::RevealContent {
                         kind,

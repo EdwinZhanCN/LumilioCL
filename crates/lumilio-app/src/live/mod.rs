@@ -93,6 +93,9 @@ enum Reload {
 /// Builds the production shell from stores opened before the UI loop starts.
 pub fn build(backend: Backend, window: &mut Window, cx: &mut App) -> Entity<LauncherShell> {
     lumilio_ui::follow_system_appearance(window, cx);
+    // Speak the system's language until the saved choice is read; it is
+    // the default, so most people see no switch.
+    lumilio_ui::i18n::apply_language(lumilio_core::Language::System, cx);
     let backend = Rc::new(backend);
     let state = Rc::new(RefCell::new(State::default()));
     let shell = cx.new(|cx: &mut Context<LauncherShell>| {

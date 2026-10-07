@@ -3,6 +3,7 @@ use crate::kit;
 use crate::live::{LiveHandler, LiveIntent, SettingsView};
 use crate::settings_dialog::{DialogSpec, SettingsDialog};
 use crate::theme::ShellColors;
+use crate::tr;
 use gpui::prelude::*;
 use gpui::{AnyElement, App, IntoElement, SharedString, Window};
 use gpui_component::h_flex;
@@ -23,7 +24,7 @@ pub(super) fn edit(
     spec: impl Fn() -> DialogSpec<LiveIntent> + 'static,
 ) -> AnyElement {
     let handler = handler.clone();
-    kit::ghost(id, "编辑", move |window, cx| {
+    kit::ghost(id, tr!("common-edit"), move |window, cx| {
         SettingsDialog::open(spec(), handler.clone(), window, cx);
     })
     .debug_selector(move || id.to_owned())
@@ -45,6 +46,7 @@ pub(super) fn row(
 pub(super) fn preference_row(
     id: &'static str,
     label: &'static str,
+    help: Option<&'static str>,
     labels: &'static [&'static str],
     selected: usize,
     on_pick: impl Fn(usize) -> LiveIntent + 'static,
@@ -59,7 +61,14 @@ pub(super) fn preference_row(
             move |index, window, cx| handler(on_pick(index), window, cx),
         ))
         .into_any_element();
-    row(id, label, None, "", Some(control), ctx.colors)
+    row(
+        id,
+        label,
+        help.map(str::to_owned),
+        "",
+        Some(control),
+        ctx.colors,
+    )
 }
 
 pub(super) fn with_preferences(

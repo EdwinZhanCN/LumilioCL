@@ -7,6 +7,7 @@ use crate::settings_dialog::{DialogSpec, FieldKind, FieldSpec};
 use crate::settings_forms as forms;
 use crate::theme::ShellColors;
 use crate::{kit, theme};
+use crate::{tr, tr_all};
 use gpui::prelude::*;
 use gpui::{AnyElement, IntoElement, div, px};
 use gpui_component::Sizable as _;
@@ -17,10 +18,14 @@ use std::rc::Rc;
 pub(super) fn storage_bar(usage: &StorageUsage, colors: ShellColors) -> AnyElement {
     let total = usage.total().max(1) as f32;
     let parts = [
-        ("游戏", usage.games, colors.primary),
-        ("共享资源", usage.shared, kit::tone_ok()),
-        ("Java", usage.runtimes, kit::tone_warn()),
-        ("缓存", usage.cache, colors.muted),
+        (tr!("settings-storage-games"), usage.games, colors.primary),
+        (tr!("settings-storage-shared"), usage.shared, kit::tone_ok()),
+        (
+            tr!("settings-storage-java"),
+            usage.runtimes,
+            kit::tone_warn(),
+        ),
+        (tr!("settings-storage-cache"), usage.cache, colors.muted),
     ];
     v_flex()
         .gap_3()
@@ -74,11 +79,15 @@ fn preset_row(
         id,
         label,
         Some(help.to_owned()),
-        if added { "已添加" } else { "未添加" },
+        if added {
+            tr!("settings-mirror-added")
+        } else {
+            tr!("settings-mirror-not-added")
+        },
         Some(
             kit::ghost(
                 (id, 0usize),
-                "添加",
+                tr!("common-add"),
                 send(&ctx.handler, LiveIntent::AddMirrorPreset(preset)),
             )
             .disabled(added)
@@ -104,7 +113,7 @@ pub(super) fn downloads(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
     let bmclapi = preset_row(
         "settings-bmclapi",
         "BMCLAPI",
-        "游戏资源、Forge、NeoForge、Fabric 和 authlib-injector。添加后可选择“镜像优先”。",
+        tr!("settings-bmclapi-help"),
         MirrorPreset::Bmclapi,
         view,
         ctx,
@@ -113,7 +122,7 @@ pub(super) fn downloads(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
     let mcim = preset_row(
         "settings-mcim",
         "MCIM",
-        "Modrinth 和 CurseForge 的信息与文件。始终先试官方，失败再用 MCIM；“仅官方”时不使用。",
+        tr!("settings-mcim-help"),
         MirrorPreset::Mcim,
         view,
         ctx,
@@ -121,8 +130,8 @@ pub(super) fn downloads(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
     // ia[settings]: 添加腾讯 Maven 镜像 | 下载与存储 · 预设行 [添加] | 添加 Maven Central 镜像；保留已有规则和优先顺序，完整添加后禁用按钮
     let maven = preset_row(
         "settings-tencent-maven",
-        "腾讯 Maven",
-        "Maven Central 上的 Java 依赖。",
+        tr!("settings-tencent-maven"),
+        tr!("settings-tencent-maven-help"),
         MirrorPreset::TencentMaven,
         view,
         ctx,
@@ -140,14 +149,29 @@ pub(super) fn downloads(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
     // ia[settings]: 下载源 | 下载与存储 · 分段：仅官方 / 官方优先 / 镜像优先 | 立即保存；仅官方不访问镜像，其他模式按顺序回退，MCIM 始终位于官方之后
     let prefer_row = row(
         "settings-download-source",
-        "下载源",
-        Some("仅官方不访问镜像。其他模式在首选源失败后尝试下一源；MCIM 始终作为官方后的后备。默认官方优先。".to_owned()),
+        tr!("settings-download-source"),
+        Some(tr!("settings-download-source-help").to_owned()),
         "",
         Some(
-            kit::segments("settings-download-source", &["仅官方", "官方优先", "镜像优先"], selected, {
-                let handler = handler.clone();
-                move |index, window, cx| handler(LiveIntent::SetDownloadSource(source_choices[index.min(2)]), window, cx)
-            })
+            kit::segments(
+                "settings-download-source",
+                tr_all![
+                    "settings-source-official-only",
+                    "settings-source-official-first",
+                    "settings-source-mirror-first"
+                ],
+                selected,
+                {
+                    let handler = handler.clone();
+                    move |index, window, cx| {
+                        handler(
+                            LiveIntent::SetDownloadSource(source_choices[index.min(2)]),
+                            window,
+                            cx,
+                        )
+                    }
+                },
+            )
             .into_any_element(),
         ),
         colors,
@@ -155,18 +179,18 @@ pub(super) fn downloads(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
     // ia[settings]: 镜像规则 | 下载与存储 · 值 + [编辑] 弹窗 | 每行 官方前缀 => 镜像前缀
     let rules_row = row(
         "settings-mirrors",
-        "镜像规则",
-        Some("把官方地址的开头换成镜像地址的开头。".to_owned()),
+        tr!("settings-mirrors"),
+        Some(tr!("settings-mirrors-help").to_owned()),
         if mirror_lines.is_empty() {
-            "无".to_owned()
+            tr!("common-none").to_owned()
         } else {
-            format!("{} 条", mirror_lines.len())
+            tr!("settings-mirrors-count", count = mirror_lines.len())
         },
         Some(edit("settings-mirrors-edit", handler, move || DialogSpec {
-            title: "镜像规则",
-            intro: Some("每行一条，写成 官方前缀 => 镜像前缀。"),
+            title: tr!("settings-mirrors"),
+            intro: Some(tr!("settings-mirrors-intro")),
             fields: vec![FieldSpec {
-                label: "规则",
+                label: tr!("settings-mirrors-field"),
                 help: None,
                 placeholder: "https://libraries.minecraft.net/ => https://mirror.example/libraries/",
                 value: mirror_text.clone(),
@@ -180,17 +204,17 @@ pub(super) fn downloads(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
     // ia[settings]: 同时下载数 | 下载与存储 · 值 + [编辑] 弹窗 | 自动 / 1–32
     let concurrency_row = row(
         "settings-concurrency",
-        "同时下载数",
-        Some("同时下载的文件个数，1 到 32。网络不稳时调小。".to_owned()),
-        concurrency_now.map_or_else(|| "自动".to_owned(), |count| count.to_string()),
+        tr!("settings-concurrency"),
+        Some(tr!("settings-concurrency-help").to_owned()),
+        concurrency_now.map_or_else(|| tr!("common-auto").to_owned(), |count| count.to_string()),
         Some(edit("settings-concurrency-edit", handler, move || {
             DialogSpec {
-                title: "同时下载数",
-                intro: Some("留空则由启动器决定。"),
+                title: tr!("settings-concurrency"),
+                intro: Some(tr!("settings-concurrency-intro")),
                 fields: vec![FieldSpec {
-                    label: "个数（1–32）",
+                    label: tr!("settings-concurrency-field"),
                     help: None,
-                    placeholder: "自动",
+                    placeholder: tr!("common-auto"),
                     value: concurrency_now.map(|v| v.to_string()).unwrap_or_default(),
                     kind: FieldKind::Line,
                 }],
@@ -203,13 +227,13 @@ pub(super) fn downloads(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
     // ia[settings]: 数据目录 | 下载与存储 · 路径 + [在访达中显示] | 不可改（App State）
     let data_row = row(
         "settings-data-dir",
-        "数据目录",
-        Some("游戏、共享资源和设置都放在这里，不能更改。".to_owned()),
+        tr!("settings-data-dir"),
+        Some(tr!("settings-data-dir-help").to_owned()),
         view.data_dir.display().to_string(),
         Some(
             kit::ghost(
                 "settings-reveal-data",
-                "在访达中显示",
+                crate::platform::reveal_label(),
                 send(handler, LiveIntent::Reveal(view.data_dir.clone())),
             )
             .into_any_element(),
@@ -228,7 +252,7 @@ pub(super) fn downloads(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
                     // ia[settings]: 检查没用的游戏文件 | 下载与存储 · 按键「检查没用的游戏文件」 | 只报告能回收多少，确认后才删；游戏在安装/更新时拒绝 | ADR 0017
                     .child(
                         Key::new("settings-reclaim")
-                            .label("检查没用的游戏文件")
+                            .label(tr!("settings-reclaim"))
                             .white()
                             .small()
                             .debug_selector(|| "settings-reclaim".into())
@@ -242,7 +266,7 @@ pub(super) fn downloads(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
                     // ia[settings]: 清理缓存 | 下载与存储 · 按键「清理缓存」 | 缓存 = 已解压的 natives 与 cache/，下次启动会重建
                     .child(theme::clickable(
                         Key::new("settings-clear-cache")
-                            .label(format!("清理缓存（{}）", bytes_text(usage.cache)))
+                            .label(tr!("settings-clear-cache", size = bytes_text(usage.cache)))
                             .white()
                             .small()
                             .disabled(usage.cache == 0)
@@ -258,7 +282,7 @@ pub(super) fn downloads(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
             .p_4()
             .text_sm()
             .text_color(colors.muted)
-            .child("正在计算占用…")
+            .child(tr!("settings-usage-measuring"))
             .into_any_element(),
     };
     v_flex()
@@ -266,7 +290,7 @@ pub(super) fn downloads(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
         .gap_5()
         .child(kit::section_at(
             1,
-            "下载",
+            tr!("settings-section-downloads"),
             colors,
             kit::list(
                 vec![bmclapi, mcim, maven, prefer_row, rules_row, concurrency_row],
@@ -275,13 +299,13 @@ pub(super) fn downloads(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
         ))
         .child(kit::section_at(
             2,
-            "存储",
+            tr!("settings-section-storage"),
             colors,
             kit::list(vec![data_row], colors),
         ))
         .child(kit::section_at(
             3,
-            "占用",
+            tr!("settings-section-usage"),
             colors,
             kit::surface(colors).child(usage),
         ))

@@ -1,10 +1,11 @@
 use crate::live::SettingsView;
+use crate::tr;
 use lumilio_core::recommended_memory_mb;
 
 /// `4096 MB`, or `未设置`.
 #[must_use]
 pub fn memory_text(value: Option<u32>) -> String {
-    value.map_or_else(|| "未设置".to_owned(), |mb| format!("{mb} MB"))
+    value.map_or_else(|| tr!("common-not-set").to_owned(), |mb| format!("{mb} MB"))
 }
 
 /// `1280 × 720 · 全屏`, or `未设置`.
@@ -15,10 +16,11 @@ pub fn window_text(view: &SettingsView) -> String {
         .window_width
         .zip(view.launch.window_height)
         .map(|(width, height)| format!("{width} × {height}"));
-    let fullscreen = (view.launch.fullscreen == Some(true)).then_some("全屏".to_owned());
+    let fullscreen = (view.launch.fullscreen == Some(true))
+        .then(|| tr!("settings-window-fullscreen-value").to_owned());
     let parts: Vec<String> = size.into_iter().chain(fullscreen).collect();
     if parts.is_empty() {
-        "未设置".to_owned()
+        tr!("common-not-set").to_owned()
     } else {
         parts.join(" · ")
     }
@@ -28,27 +30,40 @@ pub fn window_text(view: &SettingsView) -> String {
 #[must_use]
 pub fn list_text(items: &[String]) -> String {
     match items {
-        [] => "无".to_owned(),
+        [] => tr!("common-none").to_owned(),
         [only] => only.clone(),
-        [first, rest @ ..] => format!("{first} 等 {} 项", rest.len() + 1),
+        [first, ..] => tr!(
+            "common-list-first-of",
+            first = first.as_str(),
+            count = items.len()
+        ),
     }
 }
 
 #[must_use]
 pub fn commands_text(view: &SettingsView) -> String {
     let set = [
-        ("启动前", view.launch.pre_launch.is_some()),
-        ("包装", view.launch.wrapper.is_some()),
-        ("退出后", view.launch.post_exit.is_some()),
+        (
+            tr!("settings-command-pre-short"),
+            view.launch.pre_launch.is_some(),
+        ),
+        (
+            tr!("settings-command-wrapper-short"),
+            view.launch.wrapper.is_some(),
+        ),
+        (
+            tr!("settings-command-post-short"),
+            view.launch.post_exit.is_some(),
+        ),
     ]
     .into_iter()
     .filter(|(_, on)| *on)
     .map(|(name, _)| name)
     .collect::<Vec<_>>();
     if set.is_empty() {
-        "无".to_owned()
+        tr!("common-none").to_owned()
     } else {
-        set.join("、")
+        set.join(tr!("common-list-separator"))
     }
 }
 
@@ -70,11 +85,11 @@ pub fn bytes_text(bytes: u64) -> String {
 
 pub(super) fn memory_help(total: Option<u64>) -> String {
     match total {
-        Some(total) => format!(
-            "本机内存 {}，推荐最大内存 {} MB。留空则交给 Java 决定；每个游戏还可以单独设置。",
-            bytes_text(total * 1024 * 1024),
-            recommended_memory_mb(total)
+        Some(total) => tr!(
+            "settings-memory-help",
+            total = bytes_text(total * 1024 * 1024),
+            recommended = recommended_memory_mb(total)
         ),
-        None => "留空则交给 Java 决定；每个游戏还可以单独设置。".to_owned(),
+        None => tr!("settings-memory-help-unknown").to_owned(),
     }
 }

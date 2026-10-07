@@ -1,0 +1,6 @@
+# Read by `tr!` (i18n-embed-fl) at compile time: every message id is checked
+# against the Simplified Chinese catalog, which must be complete.
+fallback_language = "zh-CN"
+
+[fluent]
+assets_dir = "i18n"

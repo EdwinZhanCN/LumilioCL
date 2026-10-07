@@ -62,7 +62,7 @@ impl InstanceDetailView {
                     // ia[instance.diagnostics]: 在访达中显示 | 文件分段 · 按键 | 当前文件夹或所选文件
                     .child(kit::ghost(
                         "instance-files-reveal",
-                        "在访达中显示",
+                        crate::platform::reveal_label(),
                         act(cx, move |view, window, cx| {
                             (view.handler)(InstanceIntent::RevealPath(here.clone()), window, cx)
                         }),

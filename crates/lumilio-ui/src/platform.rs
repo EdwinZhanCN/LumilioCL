@@ -90,7 +90,18 @@ pub fn pick_save_path(
     async move { answer.await.ok().and_then(Result::ok).flatten() }
 }
 
-/// Shows a file or folder in the system file manager.
+/// The name of [`reveal`] as this system calls its file manager.
+#[must_use]
+pub fn reveal_label() -> &'static str {
+    if cfg!(target_os = "macos") {
+        crate::tr!("common-reveal-macos")
+    } else if cfg!(target_os = "windows") {
+        crate::tr!("common-reveal-windows")
+    } else {
+        crate::tr!("common-reveal-linux")
+    }
+}
+
 /// Puts a PNG or JPEG on the clipboard as a picture.
 pub fn copy_image(bytes: Vec<u8>, cx: &App) {
     let format = if bytes.starts_with(&[0xff, 0xd8]) {
@@ -103,6 +114,7 @@ pub fn copy_image(bytes: Vec<u8>, cx: &App) {
     )));
 }
 
+/// Shows a file or folder in the system file manager.
 pub fn reveal(path: &Path, cx: &App) {
     cx.reveal_path(path);
 }

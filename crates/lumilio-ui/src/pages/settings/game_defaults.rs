@@ -1,11 +1,12 @@
 use super::super::live::LiveCtx;
-use super::FULLSCREEN;
+use super::fullscreen_choices;
 use super::rows::{edit, row};
 use super::text::{commands_text, list_text, memory_help, memory_text, window_text};
 use crate::kit;
 use crate::live::{LiveIntent, SettingsView};
 use crate::settings_dialog::{DialogSpec, FieldKind, FieldSpec};
 use crate::settings_forms as forms;
+use crate::tr;
 use gpui::prelude::*;
 use gpui::{AnyElement, IntoElement};
 use gpui_component::v_flex;
@@ -23,24 +24,28 @@ pub(super) fn game_defaults(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
     // ia[settings]: 最小 / 最大内存 | 游戏默认 · 值 + [编辑] 弹窗 | 弹窗说明本机内存与推荐值；恢复默认 = 推荐值
     let memory = row(
         "settings-memory",
-        "内存",
+        tr!("settings-memory"),
         Some(memory_help(total)),
-        format!("最小 {} · 最大 {}", memory_text(min), memory_text(max)),
+        tr!(
+            "settings-memory-value",
+            min = memory_text(min),
+            max = memory_text(max)
+        ),
         Some(edit("settings-memory-edit", handler, move || DialogSpec {
-            title: "默认内存",
-            intro: Some("所有游戏默认使用的内存；单个游戏可以覆盖。留空表示不限制。"),
+            title: tr!("settings-memory-dialog"),
+            intro: Some(tr!("settings-memory-intro")),
             fields: vec![
                 FieldSpec {
-                    label: "最小内存（MB）",
-                    help: Some("游戏启动时就占用的内存（-Xms）。"),
-                    placeholder: "不设置",
+                    label: tr!("settings-memory-min"),
+                    help: Some(tr!("settings-memory-min-help")),
+                    placeholder: tr!("settings-memory-placeholder"),
                     value: min.map(|v| v.to_string()).unwrap_or_default(),
                     kind: FieldKind::Line,
                 },
                 FieldSpec {
-                    label: "最大内存（MB）",
-                    help: Some("游戏最多能用的内存（-Xmx）。"),
-                    placeholder: "不设置",
+                    label: tr!("settings-memory-max"),
+                    help: Some(tr!("settings-memory-max-help")),
+                    placeholder: tr!("settings-memory-placeholder"),
                     value: max.map(|v| v.to_string()).unwrap_or_default(),
                     kind: FieldKind::Line,
                 },
@@ -58,7 +63,7 @@ pub(super) fn game_defaults(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
     // ia[settings]: 窗口大小、全屏 | 游戏默认 · 值 + [编辑] 弹窗 | 宽高一起填；全屏 关 / 开 / 不设置
     let window = row(
         "settings-window",
-        "窗口大小与全屏",
+        tr!("settings-window"),
         None,
         window_text(view),
         Some(edit("settings-window-edit", handler, move || {
@@ -69,11 +74,11 @@ pub(super) fn game_defaults(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
                 None => 2,
             };
             DialogSpec {
-                title: "窗口大小与全屏",
-                intro: Some("宽和高需要一起填；都留空则用游戏自己的默认（854 × 480）。"),
+                title: tr!("settings-window"),
+                intro: Some(tr!("settings-window-intro")),
                 fields: vec![
                     FieldSpec {
-                        label: "宽度",
+                        label: tr!("settings-window-width"),
                         help: None,
                         placeholder: "854",
                         value: current
@@ -83,7 +88,7 @@ pub(super) fn game_defaults(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
                         kind: FieldKind::Line,
                     },
                     FieldSpec {
-                        label: "高度",
+                        label: tr!("settings-window-height"),
                         help: None,
                         placeholder: "480",
                         value: current
@@ -93,12 +98,12 @@ pub(super) fn game_defaults(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
                         kind: FieldKind::Line,
                     },
                     FieldSpec {
-                        label: "全屏启动",
+                        label: tr!("settings-window-fullscreen"),
                         help: None,
                         placeholder: "",
                         value: String::new(),
                         kind: FieldKind::Choice {
-                            labels: &FULLSCREEN,
+                            labels: fullscreen_choices(),
                             selected: fullscreen,
                         },
                     },
@@ -158,14 +163,14 @@ pub(super) fn game_defaults(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
         text_row(
             "settings-jvm",
             "settings-jvm-edit",
-            "Java 参数",
-            "传给 Java 的附加参数，例如 -XX:+UseG1GC。游戏自己设置了参数时以游戏的为准。",
+            tr!("settings-jvm"),
+            tr!("settings-jvm-help"),
             list_text(&launch.jvm_arguments),
             forms::join_lines(&launch.jvm_arguments),
             "-XX:+UseG1GC",
             Rc::new(move |values| forms::jvm_arguments(&current, &values[0])),
-            "Java 参数",
-            "每行一个参数。",
+            tr!("settings-jvm"),
+            tr!("settings-one-per-line"),
         )
     };
     let game = {
@@ -174,14 +179,14 @@ pub(super) fn game_defaults(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
         text_row(
             "settings-game-args",
             "settings-game-args-edit",
-            "游戏参数",
-            "传给游戏本身的附加参数，例如 --demo。",
+            tr!("settings-game-args"),
+            tr!("settings-game-args-help"),
             list_text(&launch.game_arguments),
             forms::join_lines(&launch.game_arguments),
             "--demo",
             Rc::new(move |values| forms::game_arguments(&current, &values[0])),
-            "游戏参数",
-            "每行一个参数。",
+            tr!("settings-game-args"),
+            tr!("settings-one-per-line"),
         )
     };
     let environment_text = launch
@@ -195,14 +200,14 @@ pub(super) fn game_defaults(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
         text_row(
             "settings-env",
             "settings-env-edit",
-            "环境变量",
-            "游戏进程启动时额外带上的环境变量。",
+            tr!("settings-env"),
+            tr!("settings-env-help"),
             list_text(&environment_text),
             environment_text.join("\n"),
             "MESA_DEBUG=1",
             Rc::new(move |values| forms::environment(&current, &values[0])),
-            "环境变量",
-            "每行一个，写成 名称=值。",
+            tr!("settings-env"),
+            tr!("settings-env-intro"),
         )
     };
 
@@ -210,35 +215,33 @@ pub(super) fn game_defaults(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
     // ia[settings]: 启动前 / 包装 / 退出后命令 | 游戏默认 · 值 + [编辑] 弹窗 | 以当前用户权限运行；启动前命令失败取消启动，退出后命令失败只记录
     let commands = row(
         "settings-commands",
-        "启动前、包装与退出后命令",
-        Some("这些命令由你自己填写，会以当前用户的权限运行。".to_owned()),
+        tr!("settings-commands"),
+        Some(tr!("settings-commands-help").to_owned()),
         commands_text(view),
         Some(edit("settings-commands-edit", handler, move || {
             let current = commands_current.clone();
             DialogSpec {
-                title: "命令",
-                intro: Some(
-                    "命令以你的用户权限运行，只在你填写后才会执行。可用变量：$INST_ID、$INST_NAME、$INST_DIR（游戏目录）、$INST_JAVA、$INST_MC_VERSION、$INST_LOADER。",
-                ),
+                title: tr!("settings-commands-dialog"),
+                intro: Some(tr!("settings-commands-intro")),
                 fields: vec![
                     FieldSpec {
-                        label: "启动前命令",
-                        help: Some("游戏启动前运行；失败（退出码不为 0）会取消这次启动。"),
-                        placeholder: "例如 ./prepare.sh",
+                        label: tr!("settings-command-pre"),
+                        help: Some(tr!("settings-command-pre-help")),
+                        placeholder: tr!("settings-command-pre-placeholder"),
                         value: current.pre_launch.clone().unwrap_or_default(),
                         kind: FieldKind::Line,
                     },
                     FieldSpec {
-                        label: "包装命令",
-                        help: Some("放在 Java 命令前面，例如 gamemoderun 或 mangohud。"),
-                        placeholder: "例如 gamemoderun",
+                        label: tr!("settings-command-wrapper"),
+                        help: Some(tr!("settings-command-wrapper-help")),
+                        placeholder: tr!("settings-command-wrapper-placeholder"),
                         value: current.wrapper.clone().unwrap_or_default(),
                         kind: FieldKind::Line,
                     },
                     FieldSpec {
-                        label: "退出后命令",
-                        help: Some("游戏退出后运行；失败只会记录，最长运行 60 秒。"),
-                        placeholder: "例如 ./cleanup.sh",
+                        label: tr!("settings-command-post"),
+                        help: Some(tr!("settings-command-post-help")),
+                        placeholder: tr!("settings-command-post-placeholder"),
                         value: current.post_exit.clone().unwrap_or_default(),
                         kind: FieldKind::Line,
                     },
@@ -262,19 +265,19 @@ pub(super) fn game_defaults(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
         .gap_5()
         .child(kit::section_at(
             1,
-            "资源",
+            tr!("settings-section-resources"),
             colors,
             kit::list(vec![memory, window], colors),
         ))
         .child(kit::section_at(
             2,
-            "参数与环境",
+            tr!("settings-section-arguments"),
             colors,
             kit::list(vec![jvm, game, environment], colors),
         ))
         .child(kit::section_at(
             3,
-            "命令",
+            tr!("settings-section-commands"),
             colors,
             kit::list(vec![commands], colors),
         ))

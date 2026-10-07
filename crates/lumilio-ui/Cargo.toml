@@ -17,9 +17,15 @@ lumilio-schematic-render.workspace = true
 lumilio-pointer.workspace = true
 raw-window-handle = "0.6"
 async-channel = "2"
+i18n-embed = { version = "0.16", features = ["fluent-system", "desktop-requester"] }
+i18n-embed-fl = "0.10"
+# `debug-embed` compiles the catalogs in debug builds too, so editing one
+# rebuilds the crate and `tr!` checks its ids again.
+rust-embed = { version = "8", features = ["debug-embed"] }
 
 [dev-dependencies]
 gpui = { workspace = true, features = ["test-support"] }
+fluent-syntax = "0.12"
 
 [lints]
 workspace = true
