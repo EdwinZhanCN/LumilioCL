@@ -40,6 +40,8 @@ Voice (docs/design-language.md §8):
 - English is wider than Chinese; prefer the shorter of two equally clear
   wordings for keys, tabs and segments.
 
-When done, run `cargo test -p lumilio-ui i18n` and fix the English catalog until
-it passes. Reply with one line: how many messages you added, and whether the
-tests passed.
+When done, run
+`cargo test -p lumilio-ui english_has_every_chinese_message_with_the_same_arguments`
+and fix the English catalog until it passes. Other i18n tests may fail while a
+page is mid-move; they are not yours to fix. Reply with one line: how many
+messages you added, and whether that test passed.

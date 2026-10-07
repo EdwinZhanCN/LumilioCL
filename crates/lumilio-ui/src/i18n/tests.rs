@@ -228,8 +228,21 @@ fn rust_files(dir: &Path) -> Vec<PathBuf> {
 }
 
 /// How many lines start or hold a string literal with Chinese in it.
-/// Comments are skipped, so `// ia[...]` declarations do not count.
+/// Comments are skipped, so `// ia[...]` declarations do not count, and so is
+/// an inline test module at the end of a file.
 fn chinese_literal_lines(source: &str) -> usize {
+    let mut offset = 0;
+    let mut previous = "";
+    let mut end = source.len();
+    for line in source.split_inclusive('\n') {
+        if previous.trim() == "#[cfg(test)]" && line.trim() == "mod tests {" {
+            end = offset;
+            break;
+        }
+        previous = line;
+        offset += line.len();
+    }
+    let source = &source[..end];
     let chars: Vec<char> = source.chars().collect();
     let mut lines = BTreeSet::new();
     let (mut index, mut line) = (0, 0);
@@ -309,6 +322,10 @@ let a = "中文"; // 行尾注释的"中文"也不算
 let b = '"'; let c = "plain"; let e = '\''; let f = "\"中文\"";
 /* 块注释 "中文" */
 let d = format!("{} 个", 1);
+#[cfg(test)]
+mod tests {
+    fn data() -> &'static str { "测试数据" }
+}
 "#;
     assert_eq!(chinese_literal_lines(source), 3);
 }

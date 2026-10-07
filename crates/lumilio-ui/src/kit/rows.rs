@@ -12,7 +12,7 @@ use gpui_component::{Icon, h_flex, v_flex};
 pub fn technical(id: impl Into<gpui::ElementId>, detail: impl Into<SharedString>) -> Key {
     let detail: SharedString = detail.into();
     Key::new(id)
-        .label("技术详情")
+        .label(crate::tr!("common-technical-details"))
         .ghost()
         .small()
         .on_click(move |_: &ClickEvent, window, cx| {

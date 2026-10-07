@@ -5,6 +5,7 @@
 use std::rc::Rc;
 
 use crate::key::Key;
+use crate::tr;
 use gpui::{
     Anchor, AnyElement, App, ClickEvent, IntoElement, SharedString, Window, div, prelude::*, px,
 };
@@ -198,7 +199,7 @@ fn capsule(
 fn history_button(
     id: &'static str,
     icon: UiIcon,
-    tooltip: &'static str,
+    tooltip: String,
     enabled: bool,
     on_click: CloseHandler,
 ) -> impl IntoElement {
@@ -256,19 +257,19 @@ fn leading_zone(leading: Leading, colors: ShellColors) -> impl IntoElement {
         )
 }
 
-fn back_tooltip() -> &'static str {
+fn back_tooltip() -> String {
     if cfg!(target_os = "macos") {
-        "后退  ⌘["
+        format!("{}  ⌘[", tr!("nav-back"))
     } else {
-        "后退  Ctrl+["
+        format!("{}  Ctrl+[", tr!("nav-back"))
     }
 }
 
-fn forward_tooltip() -> &'static str {
+fn forward_tooltip() -> String {
     if cfg!(target_os = "macos") {
-        "前进  ⌘]"
+        format!("{}  ⌘]", tr!("nav-forward"))
     } else {
-        "前进  Ctrl+]"
+        format!("{}  Ctrl+]", tr!("nav-forward"))
     }
 }
 
@@ -304,10 +305,10 @@ fn account_zone(account: CurrentAccount, colors: ShellColors) -> AnyElement {
             .child(
                 // ia[navigation]: 没有账户时 | 芯片显示“添加账户” | 打开账户页的添加离线账户弹窗
                 Key::new("navigation-account-empty")
-                    .label("添加账户")
+                    .label(tr!("nav-add-account"))
                     .ghost()
                     .small()
-                    .tooltip("添加一个离线账户才能进游戏")
+                    .tooltip(tr!("nav-add-account-help"))
                     .on_click(move |_: &ClickEvent, window, cx| add(window, cx)),
             )
             .into_any_element();
@@ -315,7 +316,7 @@ fn account_zone(account: CurrentAccount, colors: ShellColors) -> AnyElement {
     let trigger = Key::new("navigation-account-trigger")
         .white()
         .large()
-        .tooltip(format!("当前账户：{}", chosen.name))
+        .tooltip(tr!("nav-current-account", name = chosen.name.to_string()))
         .child(crate::kit::avatar(&chosen.name, 30.));
     let choices = Rc::new(account.choices);
     let choose = account.on_choose;
@@ -343,7 +344,7 @@ fn account_zone(account: CurrentAccount, colors: ShellColors) -> AnyElement {
                                 .text_xs()
                                 .font_semibold()
                                 .text_color(colors.muted)
-                                .child("切换账户"),
+                                .child(tr!("nav-switch-account")),
                         )
                         .children(choices.iter().enumerate().map(|(index, choice)| {
                             let choose = choose.clone();
@@ -411,7 +412,7 @@ fn account_zone(account: CurrentAccount, colors: ShellColors) -> AnyElement {
                                     manage_popover
                                         .update(cx, |state, cx| state.dismiss(window, cx));
                                 })
-                                .child("管理账户…"),
+                                .child(tr!("nav-manage-accounts")),
                         )
                 }),
         )
@@ -427,10 +428,10 @@ fn trailing_zone(current: CurrentInstance, colors: ShellColors) -> AnyElement {
             .child(
                 // ia[navigation]: 没有游戏时点芯片 | 右段文字按钮“还没有游戏” | 打开游戏库
                 Key::new("navigation-instance-empty")
-                    .label("还没有游戏")
+                    .label(tr!("nav-no-game"))
                     .ghost()
                     .small()
-                    .tooltip("去游戏库新建一个")
+                    .tooltip(tr!("nav-no-game-help"))
                     .on_click(move |_: &ClickEvent, window, cx| open(window, cx)),
             )
             .into_any_element();
@@ -440,7 +441,7 @@ fn trailing_zone(current: CurrentInstance, colors: ShellColors) -> AnyElement {
         Key::new("navigation-instance-trigger")
             .white()
             .large()
-            .tooltip("当前游戏：启动和安装都用它")
+            .tooltip(tr!("nav-current-game"))
             .child(
                 h_flex()
                     .gap_2()
@@ -488,7 +489,7 @@ fn trailing_zone(current: CurrentInstance, colors: ShellColors) -> AnyElement {
                                 .text_xs()
                                 .font_semibold()
                                 .text_color(colors.muted)
-                                .child("切换当前游戏"),
+                                .child(tr!("nav-switch-game")),
                         )
                         .children(choices.iter().enumerate().map(|(index, choice)| {
                             let selected = choice.id == chosen_id;

@@ -22,15 +22,15 @@ impl Route {
         Self::Settings,
     ];
 
-    /// Returns the short ZhCN label shown in expanded contexts and tooltips.
-    pub const fn label(self) -> &'static str {
+    /// Returns the short label shown in expanded contexts and tooltips.
+    pub fn label(self) -> &'static str {
         match self {
-            Self::Home => "首页",
-            Self::Library => "游戏库",
-            Self::Discover => "发现",
-            Self::Activity => "动态",
-            Self::Accounts => "账户",
-            Self::Settings => "设置",
+            Self::Home => crate::tr!("route-home"),
+            Self::Library => crate::tr!("route-library"),
+            Self::Discover => crate::tr!("route-discover"),
+            Self::Activity => crate::tr!("route-activity"),
+            Self::Accounts => crate::tr!("route-accounts"),
+            Self::Settings => crate::tr!("route-settings"),
         }
     }
 

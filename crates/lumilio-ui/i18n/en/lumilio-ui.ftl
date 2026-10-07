@@ -9,6 +9,10 @@ common-edit = Edit
 common-edit-more = Edit…
 common-add = Add
 common-auto = Automatic
+common-more = More
+common-copy = Copy
+common-close = Close
+common-technical-details = Technical details
 # Opens the folder with the item selected, named as each system names it.
 common-reveal-macos = Show in Finder
 common-reveal-windows = Show in File Explorer
@@ -22,6 +26,39 @@ common-list-first-of = { $count } items: { $first }, …
 
 language-simplified-chinese = 简体中文
 language-english = English
+
+## Navigation
+
+route-home = Home
+route-library = Library
+route-discover = Discover
+route-activity = Activity
+route-accounts = Accounts
+route-settings = Settings
+nav-back = Back
+nav-forward = Forward
+nav-add-account = Add account
+nav-add-account-help = Add an offline account to play
+nav-current-account = Current account: { $name }
+nav-switch-account = Switch account
+nav-manage-accounts = Manage accounts…
+# A line in the account chip's dropdown, as in “Microsoft · Sign in again”.
+nav-account-needs-sign-in = { $kind } · Sign in again
+nav-no-game = No game yet
+nav-no-game-help = Create one in the Library
+nav-current-game = Current game: launches and installs use it
+nav-switch-game = Switch current game
+detail-title-modpack = Modpack details
+detail-title-mod = Mod details
+detail-title-resource-pack = Resource pack details
+detail-title-shader = Shader details
+
+## Library and Discover search and filters
+
+library-search = Search games
+library-all-loaders = All loaders
+discover-search = Search Modrinth, press Enter
+discover-version-search = Search versions
 
 ## Settings
 

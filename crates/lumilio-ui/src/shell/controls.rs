@@ -132,7 +132,7 @@ impl LauncherShell {
         // library holds.
         if let (Some(controls), Some(model)) = (&self.live_controls, &self.live) {
             use gpui_component::IndexPath;
-            use pages::live::{ALL_LOADERS, LIBRARY_LOADER, LIBRARY_SORT, SORT_LABELS};
+            use pages::live::{LIBRARY_LOADER, LIBRARY_SORT, SORT_LABELS, all_loaders};
             let present = pages::live::present_loaders(&model.library);
             let codes: Vec<usize> = present
                 .iter()
@@ -152,7 +152,7 @@ impl LauncherShell {
             if stale_list || stale_sort || stale_loader {
                 controls.update(cx, |controls, cx| {
                     if stale_list {
-                        let mut items = vec![ALL_LOADERS.to_owned()];
+                        let mut items = vec![all_loaders().to_owned()];
                         items.extend(
                             present
                                 .iter()

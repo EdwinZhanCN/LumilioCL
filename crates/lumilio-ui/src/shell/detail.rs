@@ -147,12 +147,12 @@ impl LauncherShell {
 }
 
 /// How the navigation names a project detail (§6).
-pub(super) const fn detail_title(kind: ProjectKind) -> &'static str {
+pub(super) fn detail_title(kind: ProjectKind) -> &'static str {
     match kind {
-        ProjectKind::Modpack => "整合包详情",
-        ProjectKind::Mod => "Mod 详情",
-        ProjectKind::ResourcePack => "资源包详情",
-        ProjectKind::Shader => "光影详情",
+        ProjectKind::Modpack => crate::tr!("detail-title-modpack"),
+        ProjectKind::Mod => crate::tr!("detail-title-mod"),
+        ProjectKind::ResourcePack => crate::tr!("detail-title-resource-pack"),
+        ProjectKind::Shader => crate::tr!("detail-title-shader"),
     }
 }
 

@@ -13,7 +13,7 @@ mod tests;
 
 pub use self::accounts::accounts;
 pub use self::activity::{ACTIVITY_TABS, activity};
-pub use self::controls::{ALL_LOADERS, DiscoverChangeHandler, LiveControls, LiveCtx};
+pub use self::controls::{DiscoverChangeHandler, LiveControls, LiveCtx, all_loaders};
 pub use self::discover::{discover, kind_label, project_icon};
 pub use self::home::{HOME_RECENT, home_sections, record_readings};
 pub use self::library::{

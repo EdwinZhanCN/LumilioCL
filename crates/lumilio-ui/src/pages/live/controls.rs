@@ -32,14 +32,18 @@ pub struct LiveControls {
 }
 
 /// The text of the "no loader filter" entry.
-pub const ALL_LOADERS: &str = "全部加载器";
+#[must_use]
+pub fn all_loaders() -> &'static str {
+    crate::tr!("library-all-loaders")
+}
 
 impl LiveControls {
     pub fn new(window: &mut Window, cx: &mut gpui::Context<Self>) -> Self {
         Self {
-            library_filter: cx.new(|cx| InputState::new(window, cx).placeholder("搜索游戏")),
+            library_filter: cx
+                .new(|cx| InputState::new(window, cx).placeholder(crate::tr!("library-search"))),
             discover_search: cx
-                .new(|cx| InputState::new(window, cx).placeholder("搜索 Modrinth，回车确认")),
+                .new(|cx| InputState::new(window, cx).placeholder(crate::tr!("discover-search"))),
             sort: cx.new(|cx| {
                 let labels: Vec<String> = SORTS.iter().map(|s| sort_label(*s).to_owned()).collect();
                 SelectState::new(
@@ -59,7 +63,9 @@ impl LiveControls {
                     cx,
                 )
             }),
-            version_search: cx.new(|cx| InputState::new(window, cx).placeholder("搜索版本")),
+            version_search: cx.new(|cx| {
+                InputState::new(window, cx).placeholder(crate::tr!("discover-version-search"))
+            }),
             version_scroll: gpui::ScrollHandle::new(),
             library_sort: cx.new(|cx| {
                 let labels: Vec<String> = SORT_LABELS.iter().map(|s| (*s).to_owned()).collect();
@@ -72,7 +78,7 @@ impl LiveControls {
             }),
             library_loader: cx.new(|cx| {
                 SelectState::new(
-                    SearchableVec::new(vec![ALL_LOADERS.to_owned()]),
+                    SearchableVec::new(vec![all_loaders().to_owned()]),
                     Some(IndexPath::default()),
                     window,
                     cx,

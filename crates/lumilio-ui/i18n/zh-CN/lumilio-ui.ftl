@@ -9,6 +9,10 @@ common-edit = 编辑
 common-edit-more = 编辑…
 common-add = 添加
 common-auto = 自动
+common-more = 更多
+common-copy = 复制
+common-close = 关闭
+common-technical-details = 技术详情
 # 打开并选中文件所在位置。按平台取用户熟悉的名字，见 platform::reveal_label。
 common-reveal-macos = 在访达中显示
 common-reveal-windows = 在文件资源管理器中显示
@@ -22,6 +26,39 @@ common-list-first-of = { $first } 等 { $count } 项
 
 language-simplified-chinese = 简体中文
 language-english = English
+
+## 导航
+
+route-home = 首页
+route-library = 游戏库
+route-discover = 发现
+route-activity = 动态
+route-accounts = 账户
+route-settings = 设置
+nav-back = 后退
+nav-forward = 前进
+nav-add-account = 添加账户
+nav-add-account-help = 添加一个离线账户才能进游戏
+nav-current-account = 当前账户：{ $name }
+nav-switch-account = 切换账户
+nav-manage-accounts = 管理账户…
+# 账户芯片下拉里一行的说明，例如「Microsoft · 需要重新登录」。
+nav-account-needs-sign-in = { $kind } · 需要重新登录
+nav-no-game = 还没有游戏
+nav-no-game-help = 去游戏库新建一个
+nav-current-game = 当前游戏：启动和安装都用它
+nav-switch-game = 切换当前游戏
+detail-title-modpack = 整合包详情
+detail-title-mod = Mod 详情
+detail-title-resource-pack = 资源包详情
+detail-title-shader = 光影详情
+
+## 游戏库与发现的搜索和筛选
+
+library-search = 搜索游戏
+library-all-loaders = 全部加载器
+discover-search = 搜索 Modrinth，回车确认
+discover-version-search = 搜索版本
 
 ## 设置
 

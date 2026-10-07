@@ -55,7 +55,7 @@ impl LauncherShell {
                 key: row.key.clone(),
                 name: row.name.clone().into(),
                 detail: if row.needs_sign_in {
-                    format!("{} · 需要重新登录", row.kind_label())
+                    crate::tr!("nav-account-needs-sign-in", kind = row.kind_label())
                 } else {
                     format!(
                         "{} · {}",

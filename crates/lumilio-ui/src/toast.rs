@@ -92,7 +92,7 @@ fn show(toast: Toast, window: &mut Window, cx: &mut App) {
             crate::theme::clickable(
                 // gpui-component's notification only accepts its own `Button`.
                 Button::new("toast-technical")
-                    .label("技术详情")
+                    .label(crate::tr!("common-technical-details"))
                     .ghost()
                     .small(),
                 true,
@@ -117,7 +117,7 @@ pub fn technical_dialog(detail: impl Into<SharedString>, window: &mut Window, cx
         let mono = cx.theme().mono_font_family.clone();
         let muted = cx.theme().muted_foreground;
         crate::theme::dialog(dialog, cx)
-            .title("技术详情")
+            .title(crate::tr!("common-technical-details"))
             .w(px(520.))
             .child(
                 v_flex().child(
@@ -137,16 +137,17 @@ pub fn technical_dialog(detail: impl Into<SharedString>, window: &mut Window, cx
                     .justify_end()
                     .gap_2()
                     .child(crate::theme::clickable(
-                        Key::new("technical-copy").label("复制").white().on_click(
-                            move |_, _, cx| {
+                        Key::new("technical-copy")
+                            .label(crate::tr!("common-copy"))
+                            .white()
+                            .on_click(move |_, _, cx| {
                                 cx.write_to_clipboard(ClipboardItem::new_string(copy.to_string()))
-                            },
-                        ),
+                            }),
                         true,
                     ))
                     .child(crate::theme::clickable(
                         Key::new("technical-close")
-                            .label("关闭")
+                            .label(crate::tr!("common-close"))
                             .primary()
                             .on_click(|_, window, cx| window.close_dialog(cx)),
                         true,

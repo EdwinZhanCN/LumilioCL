@@ -78,7 +78,7 @@ pub(super) fn more_key(
         .icon(Icon::new(UiIcon::More))
         .black()
         .size(size)
-        .tooltip("更多")
+        .tooltip(crate::tr!("common-more"))
         .dropdown_menu_with_anchor(gpui::Anchor::TopRight, move |menu, _, _| {
             let mut menu = menu.min_w(px(180.));
             for (index, entry) in entries.iter().enumerate() {
