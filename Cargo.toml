@@ -14,7 +14,10 @@ members = [
     "crates/lumilio-xtask",
 ]
 resolver = "3"
-exclude = ["forks/nucleation", "forks/schematic-mesher"]
+exclude = ["forks/nucleation", "forks/schematic-mesher", "forks/gpui-component"]
+
+[patch.crates-io]
+gpui-component = { path = "forks/gpui-component" }
 
 [workspace.package]
 version = "0.1.0"

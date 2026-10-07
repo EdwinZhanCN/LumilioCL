@@ -101,7 +101,9 @@ impl LauncherShell {
                 &library_loader,
                 window,
                 |this, _, event: &SelectEvent<Labels>, window, cx| {
-                    let SelectEvent::Confirm(choice) = event;
+                    let SelectEvent::Confirm(choice) = event else {
+                        return;
+                    };
                     let code = choice.as_ref().map_or(0, |label| {
                         this.live
                             .as_ref()

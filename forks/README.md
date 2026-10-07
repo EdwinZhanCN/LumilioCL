@@ -1,4 +1,17 @@
-# Maintained native rendering forks
+# Maintained dependency forks
+
+The directory also carries `gpui-component` 0.7.0, patched through the root
+`[patch.crates-io]` so both direct UI imports and GPUI Kit use the same Select.
+Its baseline is the crates.io 0.7.0 package, upstream commit
+`0c830f4d257e69fdd17200650533ab4ca9a40cc0` (`crates/component`). Imported paths:
+`src/`, `locales/`, `tests/`, manifest, build script, README and Apache license.
+Only `src/select.rs` is adapted: `SelectState::new_multiple`, committed value
+read/write methods and `SelectEvent::Change` support persistent, independently
+toggled multi-selection. Single selection retains `Confirm` and closes on
+selection. Guards: `crates/lumilio-ui/tests/select_multiple.rs`; run with
+`cargo test -p lumilio-ui --test select_multiple`.
+The package's original lib tests reference fixtures outside the published crate;
+run the dedicated integration target for this local extension.
 
 These are editable source snapshots, owned by LumilioCL (ADR 0029).
 They are separate from the read-only reference repositories in `3rd-party/`.
