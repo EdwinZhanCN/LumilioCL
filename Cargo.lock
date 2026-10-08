@@ -4579,6 +4579,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "lumilio-skin-render"
+version = "0.1.0"
+dependencies = [
+ "image 0.25.10",
+]
+
+[[package]]
 name = "lumilio-ui"
 version = "0.1.0"
 dependencies = [

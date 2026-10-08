@@ -1,0 +1,15 @@
+[package]
+name = "lumilio-skin-render"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+
+[dev-dependencies]
+image.workspace = true
+
+[lints]
+workspace = true
