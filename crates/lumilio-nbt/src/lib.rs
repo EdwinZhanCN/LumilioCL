@@ -10,7 +10,7 @@ use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 use std::io::Read;
 
-use flate2::read::GzDecoder;
+use flate2::read::{GzDecoder, ZlibDecoder};
 
 /// Largest decompressed document accepted.
 pub const MAX_DOCUMENT: u64 = 64 * 1024 * 1024;
@@ -350,9 +350,27 @@ pub fn parse_maybe_gzip(data: &[u8]) -> Result<Tag, NbtError> {
             return Err(NbtError::TooLarge);
         }
         parse(&inflated)
+    } else if data.first().is_some_and(|byte| byte & 0x0f == 8)
+        && data
+            .get(1)
+            .is_some_and(|byte| (u16::from(data[0]) * 256 + u16::from(*byte)) % 31 == 0)
+    {
+        parse_zlib(data)
     } else {
         parse(data)
     }
+}
+
+pub fn parse_zlib(data: &[u8]) -> Result<Tag, NbtError> {
+    let mut inflated = Vec::new();
+    ZlibDecoder::new(data)
+        .take(MAX_DOCUMENT + 1)
+        .read_to_end(&mut inflated)
+        .map_err(|_| NbtError::Truncated)?;
+    if inflated.len() as u64 > MAX_DOCUMENT {
+        return Err(NbtError::TooLarge);
+    }
+    parse(&inflated)
 }
 
 #[cfg(test)]

@@ -148,3 +148,16 @@ fn a_huge_declared_list_does_not_allocate_up_front() {
     out.extend(i32::MAX.to_be_bytes());
     assert_eq!(parse(&out), Err(NbtError::Truncated));
 }
+#[test]
+fn zlib_world_settings_are_parsed_with_the_same_bounds() {
+    use std::io::Write;
+    let tag = super::Tag::Compound(std::collections::BTreeMap::from([(
+        "seed".into(),
+        super::Tag::Long(-262),
+    )]));
+    let mut encoder = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::default());
+    encoder.write_all(&super::to_bytes(&tag)).unwrap();
+    let compressed = encoder.finish().unwrap();
+    assert_eq!(super::parse_maybe_gzip(&compressed).unwrap(), tag);
+    assert!(super::parse_zlib(&compressed[..compressed.len() / 2]).is_err());
+}

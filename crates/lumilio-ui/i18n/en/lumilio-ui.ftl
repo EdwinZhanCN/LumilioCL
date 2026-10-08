@@ -1480,3 +1480,6 @@ settings-java-roots-save-failed = Couldn't save the search folders
 settings-java-save-failed = Couldn't save the Java settings
 settings-plugin-save-failed = Couldn't save the plugin settings
 settings-plugin-reset-failed = Couldn't restore the plugin defaults
+## World map
+map-clear-cache = Clear map cache
+map-cache-cleared = Map cache cleared

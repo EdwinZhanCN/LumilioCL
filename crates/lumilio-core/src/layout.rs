@@ -42,6 +42,10 @@ impl Layout {
         self.root.join("launcher.db")
     }
 
+    pub fn map_cache(&self) -> PathBuf {
+        self.root.join("cache/world-map/seed")
+    }
+
     /// The pre-SQLite library file, imported once and then set aside.
     #[must_use]
     pub fn legacy_library(&self) -> PathBuf {

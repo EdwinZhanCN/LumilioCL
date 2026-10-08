@@ -1339,3 +1339,6 @@ settings-java-roots-save-failed = 没能保存搜索目录
 settings-java-save-failed = 没能保存 Java 设置
 settings-plugin-save-failed = 没能保存插件设置
 settings-plugin-reset-failed = 没能恢复插件默认值
+## 世界地图
+map-clear-cache = 清除地图缓存
+map-cache-cleared = 地图缓存已清除

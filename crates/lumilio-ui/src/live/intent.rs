@@ -160,6 +160,7 @@ pub enum LiveIntent {
     /// Show a file or folder in the system file manager.
     Reveal(PathBuf),
     ClearCache,
+    ClearMapCache,
     /// Choose where to save the diagnostics bundle, then write it.
     ExportDiagnostics,
     Refresh,
