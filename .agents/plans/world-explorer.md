@@ -192,6 +192,8 @@ Xaero's Minimap / World Map 本身不开源（许可证未在本次核实）。�
 
 实施记录（2026-10-08）：T0 部分完成：导入精确源码快照作为构建探针的依赖，Linux GCC 14 / Clang 19 编译及探针测试通过；新增 windows-2022 的独立构建作业。当前主机不是 ubuntu:22.04，MSVC、macOS 与指定 Ubuntu 镜像的结果均为 **pending human acceptance**，等待 PR Actions；不阻塞后续 P0。MIT 声明随快照一起加入，T11 仍需补分发。
 
+实施记录（2026-10-08）：T1 安全范围检查、26 个精确版本名称、三条精确 DataVersion 映射和原生 RGB 配色已实现；其余 DataVersion 明确 Unsupported，不做猜测。独立 C 探针生成 45 组金样（3 版本 × 3 维度 × 5 档），测试与 clippy 通过。全工作区检查进行中；在生成金样文件期间启动的第一次测试遇到文件尚未生成的 setup failure，已生成后重新执行。
+
 - [ ] T0：在 `windows-2022`、`macos-latest`、`ubuntu:22.04` 上各编译一次 `lumilio-cubiomes`（先只有 `build.rs` 和一个探针测试），把 MSVC 的结果记进本计划。失败就在 `forks/cubiomes/` 里做最小修补，并记进 `forks/cubiomes/LUMILIO.md`。编译通过后，在 `.github/workflows/ci.yml` 加一个只跑 `cargo build -p lumilio-cubiomes` 的 Windows 作业（W18）。
 - [ ] T1：`forks/cubiomes/`（新建，快照 `e61f905`，带 `LICENSE` 和新建的补丁日志 `LUMILIO.md`，W14）和 `crates/lumilio-cubiomes/`（新建）：`build.rs` 用 `cc` 编译，不含 `quadbase.c`，`-fwrapv` 用 `flag_if_supported`，关掉上游警告；`src/ffi.rs` 是唯一允许 unsafe 的模块；`src/lib.rs` 提供安全 API 和版本表（版本字符串、数据版本 → `MCVersion`，不在表里就返回 `Unsupported`）。测试放在 `src/tests.rs`：用固定种子取群系 id，与仓库内的金样比对。金样由一个只编译 cubiomes 源码的 C 探针生成，记录生成命令。
 - [ ] T2：`lumilio-plugin-api/src/map.rs`（新建）：`WorldContext`、`WorldId`、`Dimension`、`SourceLink`、`TileKey`、`TileRequest`、`TileReply`、`OverlayRequest`、`MapObject`、`MapIcon`、`BaseMapInfo`、`OverlayInfo`；`BaseMapProvider`、`OverlayProvider` trait；`Plugin::base_map_provider()` / `overlay_provider()` 默认返回 `None`；`View::Map`；`HostContext::cancelled()` 默认 `false`。序列化往返测试。
