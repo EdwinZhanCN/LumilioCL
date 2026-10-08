@@ -4513,6 +4513,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "lumilio-map-render"
+version = "0.1.0"
+dependencies = [
+ "pollster 0.4.0",
+ "wgpu 30.0.1",
+]
+
+[[package]]
 name = "lumilio-nbt"
 version = "0.1.0"
 dependencies = [
@@ -4560,6 +4568,14 @@ dependencies = [
  "serde",
  "serde_json",
  "url",
+]
+
+[[package]]
+name = "lumilio-plugin-world-explorer"
+version = "0.1.0"
+dependencies = [
+ "lumilio-cubiomes",
+ "lumilio-plugin-api",
 ]
 
 [[package]]
