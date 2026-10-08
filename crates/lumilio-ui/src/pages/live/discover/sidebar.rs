@@ -14,6 +14,7 @@ use crate::live::{
     DiscoverChange, Lock, PickGroup, Section, Side, advanced_options, default_loaders,
     section_title, sections, tag_label,
 };
+use crate::tr;
 use gpui::prelude::*;
 use gpui::{App, Window, div, px};
 use gpui_component::input::Input;
@@ -124,13 +125,13 @@ fn locked_box(ctx: &LiveCtx, lock: Lock, what: &'static str, value: String) -> i
                 .text_sm()
                 .font_semibold()
                 .text_color(colors.foreground)
-                .child(format!("{what}由游戏提供：{value}")),
+                .child(tr!("discover-locked", what = what, value = value)),
         )
         .child(
             div()
                 .text_xs()
                 .text_color(colors.muted)
-                .child("解锁后能看到不适合这个游戏的内容，安装时仍只装适合它的版本。"),
+                .child(tr!("discover-locked-help")),
         )
         .child(
             kit::ghost(
@@ -138,7 +139,7 @@ fn locked_box(ctx: &LiveCtx, lock: Lock, what: &'static str, value: String) -> i
                     Lock::Version => "live-unlock-version",
                     Lock::Loader => "live-unlock-loader",
                 },
-                "解锁筛选",
+                tr!("discover-unlock"),
                 move |window, cx| change(DiscoverChange::Unlock(lock), window, cx),
             )
             .debug_selector(move || {
@@ -159,7 +160,7 @@ fn sync_button(ctx: &LiveCtx, lock: Lock) -> impl IntoElement {
             Lock::Version => "live-sync-version",
             Lock::Loader => "live-sync-loader",
         },
-        "与游戏同步",
+        tr!("discover-sync"),
         move |window, cx| change(DiscoverChange::Sync(lock), window, cx),
     )
     .debug_selector(move || {
@@ -175,7 +176,13 @@ fn version_body(ctx: &LiveCtx) -> gpui::AnyElement {
     let query = &ctx.model.query;
     let provided = ctx.model.provided();
     if let (true, Some(version)) = (query.version_locked(&provided), &provided.version) {
-        return locked_box(ctx, Lock::Version, "游戏版本", version.clone()).into_any_element();
+        return locked_box(
+            ctx,
+            Lock::Version,
+            tr!("discover-section-version"),
+            version.clone(),
+        )
+        .into_any_element();
     }
     let colors = ctx.colors;
     let needle = ctx.version_filter.to_lowercase();
@@ -235,7 +242,7 @@ fn version_body(ctx: &LiveCtx) -> gpui::AnyElement {
         .child(
             Checkbox::new("live-all-versions")
                 .checked(all)
-                .label("显示全部版本")
+                .label(tr!("discover-all-versions"))
                 .on_click(move |_, window, cx| {
                     change(DiscoverChange::ShowAllVersions(!all), window, cx)
                 }),
@@ -251,7 +258,13 @@ fn loader_body(ctx: &LiveCtx) -> gpui::AnyElement {
     let query = &ctx.model.query;
     let provided = ctx.model.provided();
     if let (true, Some(loader)) = (query.loader_locked(&provided), &provided.loader) {
-        return locked_box(ctx, Lock::Loader, "加载器", tag_label(loader)).into_any_element();
+        return locked_box(
+            ctx,
+            Lock::Loader,
+            tr!("discover-section-loader"),
+            tag_label(loader),
+        )
+        .into_any_element();
     }
     let colors = ctx.colors;
     let options = ctx.model.filters.loader_options(query.kind);
@@ -288,7 +301,11 @@ fn loader_body(ctx: &LiveCtx) -> gpui::AnyElement {
         .children(expandable.then(|| {
             kit::ghost(
                 "live-loader-more",
-                if more { "收起" } else { "显示更多" },
+                if more {
+                    tr!("common-show-less")
+                } else {
+                    tr!("common-show-more")
+                },
                 move |window, cx| {
                     emit(
                         ViewIntent::Choose(MORE_GROUP, usize::from(!more)),
@@ -346,8 +363,18 @@ fn environment_body(ctx: &LiveCtx) -> gpui::AnyElement {
     v_flex()
         .border_t_1()
         .border_color(ctx.colors.foreground)
-        .child(side_row(ctx, Side::Client, "客户端", query.client))
-        .child(side_row(ctx, Side::Server, "服务端", query.server))
+        .child(side_row(
+            ctx,
+            Side::Client,
+            tr!("environment-client"),
+            query.client,
+        ))
+        .child(side_row(
+            ctx,
+            Side::Server,
+            tr!("environment-server"),
+            query.server,
+        ))
         .into_any_element()
 }
 
@@ -364,7 +391,7 @@ fn license_body(ctx: &LiveCtx) -> gpui::AnyElement {
         .border_color(colors.foreground)
         .child(kit::filter_row(
             "live-license-open",
-            "开源",
+            tr!("discover-open-source"),
             stand,
             true,
             colors,
@@ -385,7 +412,7 @@ fn advanced_body(ctx: &LiveCtx) -> gpui::AnyElement {
             div()
                 .text_xs()
                 .text_color(colors.muted)
-                .child("这里的选择会被记住，下次发现时仍然生效。"),
+                .child(tr!("discover-advanced-remembered")),
         )
         .child(
             v_flex()
@@ -484,7 +511,7 @@ pub(super) fn sidebar(ctx: &LiveCtx) -> impl IntoElement {
             .child(kit::switch(
                 "live-hide-installed",
                 on,
-                "隐藏已安装",
+                tr!("discover-hide-installed"),
                 move |window, cx| change(DiscoverChange::HideInstalled(!on), window, cx),
             ))
             .child(
@@ -492,7 +519,7 @@ pub(super) fn sidebar(ctx: &LiveCtx) -> impl IntoElement {
                     .debug_selector(|| "live-hide-installed-label".into())
                     .text_sm()
                     .text_color(colors.foreground)
-                    .child("隐藏已安装"),
+                    .child(tr!("discover-hide-installed")),
             )
     });
     let list = sections(query.kind, &ctx.model.filters);
@@ -514,14 +541,16 @@ pub(super) fn sidebar(ctx: &LiveCtx) -> impl IntoElement {
                     div()
                         .text_xs()
                         .text_color(colors.danger)
-                        .child("筛选项没有加载"),
+                        .child(tr!("discover-filters-not-loaded")),
                 )
                 .child(kit::technical("live-filters-technical", message.clone()).xsmall())
         }))
         .children(query.filtered().then(|| {
             let change = ctx.change.clone();
-            kit::ghost("live-clear-filters", "清除筛选", move |window, cx| {
-                change(DiscoverChange::ClearFilters, window, cx)
-            })
+            kit::ghost(
+                "live-clear-filters",
+                tr!("discover-clear-filters"),
+                move |window, cx| change(DiscoverChange::ClearFilters, window, cx),
+            )
         }))
 }

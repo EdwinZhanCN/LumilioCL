@@ -52,30 +52,65 @@ const fn under(parent: &'static str, id: &'static str, label: &'static str) -> A
 pub fn advanced_options(kind: ProjectKind) -> Vec<AdvancedOption> {
     let runs_code = matches!(kind, ProjectKind::Mod | ProjectKind::Modpack);
     let mut options = vec![
-        option("ai_content", "AI 生成内容"),
-        under("ai_content", "ai_content_code", "AI 代码"),
-        under("ai_content", "ai_content_assets", "AI 素材"),
-        under("ai_content", "ai_content_text", "AI 文本"),
-        option("ai_functionality", "生成式 AI 功能"),
-        option("advertisements", "广告"),
-        option(EPILEPSY_TRIGGERS, "光敏性触发"),
+        option("ai_content", crate::tr!("discover-exclude-ai-content")),
+        under(
+            "ai_content",
+            "ai_content_code",
+            crate::tr!("discover-exclude-ai-content-code"),
+        ),
+        under(
+            "ai_content",
+            "ai_content_assets",
+            crate::tr!("discover-exclude-ai-content-assets"),
+        ),
+        under(
+            "ai_content",
+            "ai_content_text",
+            crate::tr!("discover-exclude-ai-content-text"),
+        ),
+        option(
+            "ai_functionality",
+            crate::tr!("discover-exclude-ai-functionality"),
+        ),
+        option(
+            "advertisements",
+            crate::tr!("discover-exclude-advertisements"),
+        ),
+        option(EPILEPSY_TRIGGERS, crate::tr!("discover-exclude-epilepsy")),
     ];
     if runs_code {
-        options.push(option("system_interactions", "与外部系统交互"));
-        options.push(option("telemetry", "遥测"));
-        options.push(under("telemetry", "telemetry_opt_in", "遥测·选择加入"));
-        options.push(under("telemetry", "telemetry_opt_out", "遥测·可以退出"));
+        options.push(option(
+            "system_interactions",
+            crate::tr!("discover-exclude-system-interactions"),
+        ));
+        options.push(option(
+            "telemetry",
+            crate::tr!("discover-exclude-telemetry"),
+        ));
+        options.push(under(
+            "telemetry",
+            "telemetry_opt_in",
+            crate::tr!("discover-exclude-telemetry-opt-in"),
+        ));
+        options.push(under(
+            "telemetry",
+            "telemetry_opt_out",
+            crate::tr!("discover-exclude-telemetry-opt-out"),
+        ));
         options.push(under(
             "telemetry",
             "telemetry_always_active",
-            "遥测·始终启用",
+            crate::tr!("discover-exclude-telemetry-always-active"),
         ));
     }
-    options.push(option("paid_features", "付费功能"));
-    options.push(option("archived", "已归档"));
+    options.push(option(
+        "paid_features",
+        crate::tr!("discover-exclude-paid-features"),
+    ));
+    options.push(option("archived", crate::tr!("discover-exclude-archived")));
     if kind == ProjectKind::Mod {
-        options.push(option("plugin", "插件"));
-        options.push(option("datapack", "数据包"));
+        options.push(option("plugin", crate::tr!("discover-exclude-plugin")));
+        options.push(option("datapack", crate::tr!("discover-exclude-datapack")));
     }
     options
 }
@@ -357,16 +392,16 @@ pub fn sections(kind: ProjectKind, filters: &FilterModel) -> Vec<Section> {
 /// Section titles.
 pub fn section_title(section: &Section) -> String {
     match section {
-        Section::Version => "游戏版本".to_owned(),
-        Section::Loader => "加载器".to_owned(),
-        Section::Environment => "运行环境".to_owned(),
-        Section::License => "许可证".to_owned(),
-        Section::Advanced => "高级排除".to_owned(),
+        Section::Version => crate::tr!("discover-section-version").to_owned(),
+        Section::Loader => crate::tr!("discover-section-loader").to_owned(),
+        Section::Environment => crate::tr!("discover-section-environment").to_owned(),
+        Section::License => crate::tr!("discover-section-license").to_owned(),
+        Section::Advanced => crate::tr!("discover-section-advanced").to_owned(),
         Section::Category(header) => match header.as_str() {
-            "categories" => "分类".to_owned(),
-            "features" => "特性".to_owned(),
-            "resolutions" => "分辨率".to_owned(),
-            "performance impact" => "性能影响".to_owned(),
+            "categories" => crate::tr!("discover-section-categories").to_owned(),
+            "features" => crate::tr!("discover-section-features").to_owned(),
+            "resolutions" => crate::tr!("discover-section-resolutions").to_owned(),
+            "performance impact" => crate::tr!("discover-section-performance").to_owned(),
             other => super::tag_label(other),
         },
     }

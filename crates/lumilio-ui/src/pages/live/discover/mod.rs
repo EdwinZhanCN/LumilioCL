@@ -14,6 +14,7 @@ use crate::assets::UiIcon;
 use crate::key::Key;
 use crate::live::{DiscoverChange, LiveIntent, PageItem, SearchStatus, page_items};
 use crate::theme::ShellColors;
+use crate::tr;
 use crate::{kit, theme};
 use gpui::prelude::*;
 use gpui::{ClickEvent, Entity, IntoElement, div, px};
@@ -23,12 +24,12 @@ use gpui_component::{Icon, h_flex, v_flex};
 use lumilio_core::ProjectKind;
 
 /// The tab label of a kind.
-pub const fn kind_label(kind: ProjectKind) -> &'static str {
+pub fn kind_label(kind: ProjectKind) -> &'static str {
     match kind {
-        ProjectKind::Modpack => "整合包",
+        ProjectKind::Modpack => tr!("discover-kind-modpack"),
         ProjectKind::Mod => "Mod",
-        ProjectKind::ResourcePack => "资源包",
-        ProjectKind::Shader => "光影",
+        ProjectKind::ResourcePack => tr!("discover-kind-resource-pack"),
+        ProjectKind::Shader => tr!("discover-kind-shader"),
     }
 }
 
@@ -92,12 +93,12 @@ pub fn discover(ctx: &LiveCtx) -> impl IntoElement {
 
     let body = match &ctx.model.search {
         SearchStatus::Idle | SearchStatus::Searching if ctx.model.results.is_empty() => {
-            kit::empty("正在搜索…", "", colors).into_any_element()
+            kit::empty(tr!("discover-searching"), "", colors).into_any_element()
         }
         // ia[discover]: 没有内容源 | 搜索结果区整页提示 | 说明没有可用的内容源，指向设置里的插件页；打开内容源后重新搜索
         SearchStatus::NoSource => kit::empty(
-            "没有可用的内容源",
-            "在 设置 › 插件 里打开一个内容源（例如 Modrinth）后再来",
+            tr!("discover-no-source"),
+            tr!("discover-no-source-help"),
             colors,
         )
         .into_any_element(),
@@ -105,15 +106,18 @@ pub fn discover(ctx: &LiveCtx) -> impl IntoElement {
         SearchStatus::Failed(message) => v_flex()
             .items_center()
             .child(kit::empty(
-                "现在是离线的，或连不上 Modrinth",
-                "连上网络后再试一次",
+                tr!("discover-offline"),
+                tr!("discover-offline-help"),
                 colors,
             ))
             .child(kit::technical("live-search-technical", message.clone()))
             .into_any_element(),
-        SearchStatus::Done { .. } if ctx.model.results.is_empty() => {
-            kit::empty("没有结果", "换个关键词或放宽筛选试试", colors).into_any_element()
-        }
+        SearchStatus::Done { .. } if ctx.model.results.is_empty() => kit::empty(
+            tr!("discover-no-results"),
+            tr!("discover-no-results-help"),
+            colors,
+        )
+        .into_any_element(),
         _ => v_flex()
             .w_full()
             .border_t_1()
@@ -129,12 +133,12 @@ pub fn discover(ctx: &LiveCtx) -> impl IntoElement {
     };
 
     let actions = kit::PageActions::new("live-discover-actions")
-        .more(kit::MenuEntry::new("在 Modrinth 中浏览", {
+        .more(kit::MenuEntry::new(tr!("discover-browse-modrinth"), {
             let url = lumilio_core::browse_page_url(query.kind);
             move |_, cx| cx.open_url(&url)
         }))
         .more(kit::MenuEntry::new(
-            "重新搜索",
+            tr!("discover-search-again"),
             send(&ctx.handler, LiveIntent::Search(query.clone())),
         ));
 
@@ -142,8 +146,8 @@ pub fn discover(ctx: &LiveCtx) -> impl IntoElement {
         .w_full()
         .gap_5()
         .child(kit::header(
-            "发现",
-            "找到下一次想玩的东西",
+            tr!("route-discover"),
+            tr!("discover-subtitle"),
             actions.render(colors),
             colors,
         ))
@@ -190,13 +194,13 @@ pub fn discover(ctx: &LiveCtx) -> impl IntoElement {
                                         .items_center()
                                         // ia[discover]: 排序 / 显示数量 | L4 两个下拉：相关度、下载量、关注数、发布时间、更新时间；每页 5 / 10 / 15 / 20 / 50 / 100 | 重新搜索；按发布时间排序时卡片显示发布时间，其余显示更新时间
                                         .child(toolbar_select(
-                                            "排序方式",
+                                            tr!("library-sort"),
                                             &ctx.controls.sort,
                                             150.,
                                             colors,
                                         ))
                                         .child(toolbar_select(
-                                            "显示数量",
+                                            tr!("discover-page-size"),
                                             &ctx.controls.page_size,
                                             90.,
                                             colors,

@@ -286,8 +286,14 @@ fn chinese_literal_lines(source: &str) -> usize {
         }
         match (c, next) {
             ('/', Some('/')) => {
+                let start = index;
                 while index < chars.len() && chars[index] != '\n' {
                     index += 1;
+                }
+                // A line that is Chinese on purpose says why at its end.
+                let comment: String = chars[start..index].iter().collect();
+                if comment.starts_with("// i18n-exempt: ") {
+                    lines.remove(&line);
                 }
             }
             ('/', Some('*')) => {
@@ -322,6 +328,7 @@ let a = "中文"; // 行尾注释的"中文"也不算
 let b = '"'; let c = "plain"; let e = '\''; let f = "\"中文\"";
 /* 块注释 "中文" */
 let d = format!("{} 个", 1);
+let g = "万"; // i18n-exempt: only formats Chinese
 #[cfg(test)]
 mod tests {
     fn data() -> &'static str { "测试数据" }

@@ -27,6 +27,11 @@ text from content sources never go through them.
 - Never join translated pieces into a sentence; one sentence is one message.
   A list separator is `tr!("common-list-separator")`.
 - The system's own names come from `platform` (`reveal_label`).
+- An id known only at run time (a Modrinth tag) goes through
+  `i18n::lookup("tag-…")` with a fallback; it is not checked at compile time.
+- Formatting that differs by language beyond words (digit grouping: 万 / K)
+  branches on `i18n::locale()`. A line that is Chinese on purpose ends with
+  `// i18n-exempt: <why>` and is not counted as hardcoded.
 - `lumilio-app` uses `lumilio_ui::tr!` with the same catalogs
   (`crates/lumilio-app/i18n.toml`).
 - Words kept in an entity's state (an input's placeholder, a dropdown's items)

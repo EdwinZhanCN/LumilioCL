@@ -37,6 +37,8 @@ Voice (docs/design-language.md §8):
   光影 = shader; 投影 = schematic; 世界 = world; 存档 = save; 加载器 = loader;
   启动 = launch, but a key that starts the game says "Play"; 技术详情 =
   Technical details.
+- `tag-*` messages are Modrinth's category, feature and loader tags: use the
+  English name Modrinth itself shows for the tag, in sentence case.
 - English is wider than Chinese; prefer the shorter of two equally clear
   wordings for keys, tabs and segments.
 

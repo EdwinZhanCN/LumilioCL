@@ -7,6 +7,7 @@ use std::sync::{Mutex, MutexGuard, PoisonError};
 use gpui::{Context, Entity, IntoElement, Render, TestAppContext, Window, div, prelude::*};
 use gpui_component::IndexPath;
 use lumilio_ui::i18n::{Locale, generation, locale, set_locale};
+use lumilio_ui::live::{count_label, tag_label};
 use lumilio_ui::pages::live::LiveControls;
 use lumilio_ui::pages::settings::{list_text, memory_text, tabs};
 
@@ -28,8 +29,18 @@ fn switching_language_changes_the_launcher_and_component_words() {
         "3 items: -Da, …"
     );
     assert_eq!(&*gpui_component::locale(), "en");
+    // Counts group by thousands in English, by ten thousands in Chinese.
+    assert_eq!(count_label(999), "999");
+    assert_eq!(count_label(12_345), "12.3K");
+    assert_eq!(count_label(2_500_000), "2.5M");
+    // A tag the source sends is looked up at run time; proper nouns stay.
+    assert_eq!(tag_label("kitchen-sink"), "Kitchen sink");
+    assert_eq!(tag_label("fabric"), "Fabric");
+    assert_eq!(tag_label("brand-new-tag"), "Brand new tag");
 
     set_locale(Locale::SimplifiedChinese);
+    assert_eq!(count_label(12_345), "1.2 万");
+    assert_eq!(tag_label("kitchen-sink"), "大杂烩");
     assert_eq!(tabs()[0], "通用");
     assert_eq!(memory_text(None), "未设置");
     assert_eq!(&*gpui_component::locale(), "zh-CN");

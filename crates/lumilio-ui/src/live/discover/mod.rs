@@ -61,11 +61,22 @@ pub enum SearchStatus {
     },
 }
 
+/// A large count, shortened the way the interface language groups digits:
+/// Chinese by ten thousands (万, 亿), English by thousands (K, M, B).
 pub fn count_label(count: u64) -> String {
-    match count {
-        0..10_000 => count.to_string(),
-        10_000..100_000_000 => format!("{:.1} 万", count as f64 / 10_000.0),
-        _ => format!("{:.1} 亿", count as f64 / 100_000_000.0),
+    let short = |unit: f64, suffix: &str| format!("{:.1}{suffix}", count as f64 / unit);
+    match crate::i18n::locale() {
+        crate::i18n::Locale::SimplifiedChinese => match count {
+            0..10_000 => count.to_string(),
+            10_000..100_000_000 => short(10_000.0, " 万"), // i18n-exempt: Chinese digit grouping
+            _ => short(100_000_000.0, " 亿"),              // i18n-exempt: Chinese digit grouping
+        },
+        crate::i18n::Locale::English => match count {
+            0..1_000 => count.to_string(),
+            1_000..1_000_000 => short(1_000.0, "K"),
+            1_000_000..1_000_000_000 => short(1_000_000.0, "M"),
+            _ => short(1_000_000_000.0, "B"),
+        },
     }
 }
 
@@ -155,13 +166,13 @@ pub const SORTS: [SortIndex; 5] = [
     SortIndex::Updated,
 ];
 
-pub const fn sort_label(sort: SortIndex) -> &'static str {
+pub fn sort_label(sort: SortIndex) -> &'static str {
     match sort {
-        SortIndex::Relevance => "相关度",
-        SortIndex::Downloads => "下载量",
-        SortIndex::Follows => "关注数",
-        SortIndex::Newest => "最新发布",
-        SortIndex::Updated => "最近更新",
+        SortIndex::Relevance => crate::tr!("discover-sort-relevance"),
+        SortIndex::Downloads => crate::tr!("discover-sort-downloads"),
+        SortIndex::Follows => crate::tr!("discover-sort-follows"),
+        SortIndex::Newest => crate::tr!("discover-sort-newest"),
+        SortIndex::Updated => crate::tr!("discover-sort-updated"),
     }
 }
 
@@ -203,82 +214,27 @@ pub fn page_items(current: u32, pages: u32) -> Vec<PageItem> {
     items
 }
 
-/// The Chinese name of a Modrinth category, loader or feature tag; unknown
-/// ones are shown as Modrinth spells them, capitalized.
+/// The name of a Modrinth category, loader or feature tag in the interface
+/// language (`tag-<name>` in the catalogs); proper nouns stay as they are,
+/// and unknown ones are shown as Modrinth spells them, capitalized.
 pub fn tag_label(name: &str) -> String {
-    let known = match name {
-        "adventure" => "冒险",
-        "cursed" => "诅咒",
-        "decoration" => "装饰",
-        "economy" => "经济",
-        "equipment" => "装备",
-        "food" => "食物",
-        "game-mechanics" => "游戏机制",
-        "library" => "库",
-        "magic" => "魔法",
-        "management" => "管理",
-        "minigame" => "小游戏",
-        "mobs" => "生物",
-        "optimization" => "优化",
-        "social" => "社交",
-        "storage" => "存储",
-        "technology" => "科技",
-        "transportation" => "交通",
-        "utility" => "实用",
-        "worldgen" => "世界生成",
-        "challenging" => "挑战",
-        "combat" => "战斗",
-        "kitchen-sink" => "大杂烩",
-        "lightweight" => "轻量",
-        "multiplayer" => "多人",
-        "quests" => "任务",
-        "audio" => "音频",
-        "blocks" => "方块",
-        "core-shaders" => "核心着色器",
-        "entities" => "实体",
-        "environment" => "环境",
-        "fonts" => "字体",
-        "gui" => "界面",
-        "items" => "物品",
-        "locale" => "本地化",
-        "modded" => "模组",
-        "models" => "模型",
-        "realistic" => "写实",
-        "simplistic" => "极简",
-        "themed" => "主题",
-        "tweaks" => "调整",
-        "vanilla-like" => "原版风格",
-        "atmosphere" => "大气",
-        "bloom" => "泛光",
-        "cartoon" => "卡通",
-        "colored-lighting" => "彩色光照",
-        "fantasy" => "奇幻",
-        "foliage" => "植被",
-        "path-tracing" => "路径追踪",
-        "pbr" => "PBR",
-        "reflections" => "反射",
-        "semi-realistic" => "半写实",
-        "low" => "低性能影响",
-        "medium" => "中性能影响",
-        "high" => "高性能影响",
-        "potato" => "土豆机",
-        "screenshot" => "截图用",
-        "fabric" => "Fabric",
-        "forge" => "Forge",
-        "neoforge" => "NeoForge",
-        "quilt" => "Quilt",
-        "vanilla" => "原版",
-        "iris" => "Iris",
-        "optifine" => "OptiFine",
-        "liteloader" => "LiteLoader",
-        "babric" => "Babric",
-        "plugin" => "插件",
-        "datapack" => "数据包",
-        "features" => "特性",
-        _ => "",
+    let proper = match name {
+        "pbr" => Some("PBR"),
+        "fabric" => Some("Fabric"),
+        "forge" => Some("Forge"),
+        "neoforge" => Some("NeoForge"),
+        "quilt" => Some("Quilt"),
+        "iris" => Some("Iris"),
+        "optifine" => Some("OptiFine"),
+        "liteloader" => Some("LiteLoader"),
+        "babric" => Some("Babric"),
+        _ => None,
     };
-    if !known.is_empty() {
-        return known.to_owned();
+    if let Some(proper) = proper {
+        return proper.to_owned();
+    }
+    if let Some(named) = crate::i18n::lookup(&format!("tag-{name}")) {
+        return named;
     }
     let spaced = name.replace('-', " ");
     let mut chars = spaced.chars();
@@ -287,13 +243,13 @@ pub fn tag_label(name: &str) -> String {
     })
 }
 
-pub const fn environment_label(environment: Environment) -> &'static str {
+pub fn environment_label(environment: Environment) -> &'static str {
     match environment {
-        Environment::ClientOrServer => "客户端或服务端",
-        Environment::ClientAndServer => "客户端和服务端",
-        Environment::ClientOnly => "客户端",
-        Environment::ServerOnly => "服务端",
-        Environment::SingleplayerOnly => "单人游戏",
-        Environment::DedicatedServerOnly => "专用服务器",
+        Environment::ClientOrServer => crate::tr!("environment-client-or-server"),
+        Environment::ClientAndServer => crate::tr!("environment-client-and-server"),
+        Environment::ClientOnly => crate::tr!("environment-client"),
+        Environment::ServerOnly => crate::tr!("environment-server"),
+        Environment::SingleplayerOnly => crate::tr!("environment-singleplayer"),
+        Environment::DedicatedServerOnly => crate::tr!("environment-dedicated-server"),
     }
 }

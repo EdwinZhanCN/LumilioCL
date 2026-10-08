@@ -2,7 +2,6 @@
 # catalogs under crates/lumilio-ui/i18n; this list may only shrink.
 # Regenerate with `just hardcoded-chinese`.
 crates/lumilio-app/src/live/accounts.rs 6
-crates/lumilio-app/src/live/discover.rs 8
 crates/lumilio-app/src/live/dispatch.rs 28
 crates/lumilio-app/src/live/instance.rs 9
 crates/lumilio-app/src/live/instance_plugins.rs 5
@@ -53,17 +52,12 @@ crates/lumilio-ui/src/instance_detail/settings/saves.rs 4
 crates/lumilio-ui/src/instance_detail/settings/texts.rs 8
 crates/lumilio-ui/src/live/accounts.rs 38
 crates/lumilio-ui/src/live/activity.rs 20
-crates/lumilio-ui/src/live/discover/filters.rs 25
-crates/lumilio-ui/src/live/discover/mod.rs 72
 crates/lumilio-ui/src/microsoft_login.rs 11
 crates/lumilio-ui/src/model_view/mod.rs 18
 crates/lumilio-ui/src/model_view/modal.rs 2
 crates/lumilio-ui/src/new_game.rs 24
 crates/lumilio-ui/src/pages/live/accounts.rs 24
 crates/lumilio-ui/src/pages/live/activity.rs 15
-crates/lumilio-ui/src/pages/live/discover/card.rs 7
-crates/lumilio-ui/src/pages/live/discover/mod.rs 15
-crates/lumilio-ui/src/pages/live/discover/sidebar.rs 16
 crates/lumilio-ui/src/photosensitivity.rs 4
 crates/lumilio-ui/src/placeholders.rs 16
 crates/lumilio-ui/src/plugin_setting_dialog.rs 6

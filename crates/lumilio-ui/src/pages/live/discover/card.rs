@@ -10,6 +10,7 @@ use crate::cover::Loader;
 use crate::home::WorldHint;
 use crate::live::{DateKind, LiveIntent, SearchRow, environment_label, tag_label};
 use crate::theme::ShellColors;
+use crate::tr;
 use crate::{kit, theme};
 use gpui::StyledImage as _;
 use gpui::prelude::*;
@@ -110,7 +111,7 @@ pub(super) fn install_control(
     if ctx.model.installing.contains(&row.slug) {
         return kit::action(
             ("live-installing", index),
-            "安装中…",
+            tr!("discover-installing"),
             Some(UiIcon::Download),
             false,
             |_, _| {},
@@ -123,7 +124,7 @@ pub(super) fn install_control(
         // ia[discover]: 安装（最新兼容版本） | 结果行「安装」 | 后台任务，toast“开始安装”，完成 toast，期间按钮显示「安装中…」；Mod 先过依赖提示
         return kit::action(
             ("live-install", index),
-            "安装",
+            tr!("discover-install"),
             Some(UiIcon::Download),
             false,
             install,
@@ -144,7 +145,7 @@ pub(super) fn install_control(
             let handler = ctx.handler.clone();
             kit::action(
                 ("live-update", index),
-                "更新",
+                tr!("discover-update"),
                 Some(UiIcon::Refresh),
                 false,
                 move |window, cx| {
@@ -158,7 +159,11 @@ pub(super) fn install_control(
         }
         None => div()
             .debug_selector(move || format!("live-installed-{index}"))
-            .child(kit::chip("已安装", Some(kit::tone_ok()), colors))
+            .child(kit::chip(
+                tr!("discover-installed"),
+                Some(kit::tone_ok()),
+                colors,
+            ))
             .into_any_element(),
     }
 }
@@ -306,17 +311,17 @@ pub(super) fn result_row(index: usize, row: &SearchRow, ctx: &LiveCtx) -> impl I
         .context_menu(move |menu, _, _| {
             let (open_url, copy_url) = (menu_url.clone(), copy_url.clone());
             let copy = copy.clone();
-            menu.item(
-                PopupMenuItem::new("在 Modrinth 中打开").on_click(move |_, _, cx| {
+            menu.item(PopupMenuItem::new(tr!("discover-open-modrinth")).on_click(
+                move |_, _, cx| {
                     cx.open_url(&open_url);
-                }),
-            )
+                },
+            ))
             .item(
-                PopupMenuItem::new("复制链接").on_click(move |_, window, cx| {
+                PopupMenuItem::new(tr!("discover-copy-link")).on_click(move |_, window, cx| {
                     copy(
                         LiveIntent::CopyText {
                             text: copy_url.clone(),
-                            notice: "已复制项目链接".to_owned(),
+                            notice: tr!("discover-link-copied").to_owned(),
                         },
                         window,
                         cx,

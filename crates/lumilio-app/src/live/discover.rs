@@ -8,6 +8,7 @@ use lumilio_ui::dependency_prompt::DependencyPrompt;
 use lumilio_ui::live::{DiscoverQuery, FilterModel, Provided, SearchStatus, search_rows};
 use lumilio_ui::project_detail::DetailState;
 use lumilio_ui::toast::Toast;
+use lumilio_ui::tr;
 use std::rc::Rc;
 
 /// What a search needs from the page besides its query.
@@ -186,14 +187,17 @@ pub(super) fn install(
             cx,
             true,
             Reload::All,
-            Some(Toast::info(format!("开始安装 {title}，进度在动态里"))),
+            Some(Toast::info(tr!(
+                "discover-install-started",
+                title = title.as_str()
+            ))),
             async move { service.install_modpack(&slug, cancel).await },
             move |shell, result, cx| {
                 mark_installing_in(shell, &slug_done, false, cx);
                 let toast = outcome(
                     result,
-                    |record| format!("已安装整合包 {}", record.name),
-                    format!("没有装上 {title}"),
+                    |record| tr!("discover-modpack-installed", name = record.name),
+                    tr!("discover-install-failed", title = title.as_str()),
                 );
                 shell.toast(toast, cx);
             },
@@ -203,7 +207,7 @@ pub(super) fn install(
     let target = install_target(wiring, cx);
     let Some((instance, instance_name)) = target else {
         let _ = wiring.shell.update(cx, |shell, cx| {
-            shell.toast(Toast::info("先在游戏库里新建一个游戏"), cx);
+            shell.toast(Toast::info(tr!("discover-needs-game")), cx);
         });
         return;
     };
@@ -321,7 +325,10 @@ pub(super) fn run_install(
         cx,
         true,
         Reload::Lists,
-        Some(Toast::info(format!("开始安装 {title}，进度在动态里"))),
+        Some(Toast::info(tr!(
+            "discover-install-started",
+            title = title.as_str()
+        ))),
         async move {
             let mut failed = Vec::new();
             for (project, version_id, name) in dependencies {
@@ -359,15 +366,22 @@ pub(super) fn run_install(
             let installed = result.is_ok();
             let mut toast = outcome(
                 result,
-                |file| format!("已把 {file} 装进 {instance_name}"),
-                format!("没有装上 {title}"),
+                |file| {
+                    tr!(
+                        "discover-installed-into",
+                        file = file,
+                        game = instance_name.as_str()
+                    )
+                },
+                tr!("discover-install-failed", title = title.as_str()),
             );
             // A failed install already says so; a dependency that failed
             // under a successful one is the news.
             if installed && !failed.is_empty() {
-                toast = Toast::error(format!(
-                    "{} 没有装上，{title} 可能进不了游戏",
-                    failed.join("、")
+                toast = Toast::error(tr!(
+                    "discover-dependencies-failed",
+                    dependencies = failed.join(tr!("common-list-separator")),
+                    title = title.as_str()
                 ));
             }
             shell.toast(toast, cx);

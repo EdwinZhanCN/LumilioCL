@@ -172,6 +172,15 @@ pub fn text(id: &'static str) -> &'static str {
         .or_insert(text)
 }
 
+/// A message whose id is only known at run time, such as `tag-<category>`
+/// for a category a content source sends; `None` when the catalog has none,
+/// so the caller can show the raw name. Unlike `tr!`, nothing checks the id
+/// at compile time.
+#[must_use]
+pub fn lookup(id: &str) -> Option<String> {
+    LOADER.has(id).then(|| LOADER.get(id))
+}
+
 /// Several messages without arguments, as one kept slice: choice labels go
 /// where a `&'static [&'static str]` went.
 #[doc(hidden)]
