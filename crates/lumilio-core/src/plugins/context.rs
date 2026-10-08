@@ -11,6 +11,7 @@ pub(super) struct Context {
     pub(super) native: Option<super::native::Access>,
     pub(super) launch_id: Option<u64>,
     pub(super) revision: u64,
+    pub(super) cancel: Option<crate::activity::CancellationToken>,
     values: BTreeMap<String, SettingValue>,
     manifest: Manifest,
     game_dir: Option<PathBuf>,
@@ -41,6 +42,7 @@ impl Context {
             native: None,
             launch_id: None,
             revision: 0,
+            cancel: None,
             values,
             manifest: manifest.clone(),
             game_dir,
@@ -50,6 +52,11 @@ impl Context {
 }
 
 impl HostContext for Context {
+    fn cancelled(&self) -> bool {
+        self.cancel
+            .as_ref()
+            .is_some_and(crate::activity::CancellationToken::is_cancelled)
+    }
     fn launch_id(&self) -> Option<u64> {
         self.launch_id
     }

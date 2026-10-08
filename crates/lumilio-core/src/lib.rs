@@ -144,8 +144,8 @@ pub use modpack::{
 };
 pub use pack_export::{ExportError, ExportReport, ExportSpec, PackFormat};
 pub use plugins::{
-    PluginContentSource, PluginEffect, PluginFinding, PluginHost, PluginInfo, PluginStatus,
-    PluginTab,
+    MapFailure, MapProviders, PluginContentSource, PluginEffect, PluginFinding, PluginHost,
+    PluginInfo, PluginStatus, PluginTab,
 };
 pub use process::{
     DEFAULT_SETTLE, GameEvent, GameExit, GameOptions, LogStream, ProcessError,
