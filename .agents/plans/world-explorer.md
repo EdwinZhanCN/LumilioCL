@@ -4,24 +4,25 @@
 
 ## Goal
 
-游戏页多一个「地图」标签。它只有一个视口和一个当前底图，底图在种子预测（cubiomes）、真实存档（Anvil）和 Xaero 世界地图之间单选；上面可以同时开任意多个 Overlay：cubiomes 结构、史莱姆区块和出生点，Xaero 路径点，存档里的出生点，启动器自己的标记、路线和测距，以及区块网格、Region 边界和坐标。人可以平移、缩放、切维度、跳到坐标、点一个对象复制坐标；游戏没在运行时，可以在地图上编辑 Xaero 路径点并安全写回。所有计算都在本机后台进行，拖动和缩放不卡界面，过期结果不会画进新视图。种子预测覆盖 cubiomes 原生支持的版本（到 1.21.4），以及 LumilioCL 在自己维护的 cubiomes fork 里补上的新版本，第一个目标是 26.3。地图引擎归宿主；数据源是核心插件 `lumilio.world-explorer` 里的 Provider，以后第三方 WASM 插件也能经同一套接口提供底图和 Overlay。
+游戏页多一个「地图」标签。它只有一个视口和一个当前底图，底图在种子预测（cubiomes）、真实存档（Anvil）和 Xaero 世界地图之间单选；上面可以同时开任意多个 Overlay：cubiomes 结构、史莱姆区块和出生点，Xaero 路径点，存档里的出生点，启动器自己的标记、路线和测距，以及区块网格、Region 边界和坐标。人可以平移、缩放、切维度、跳到坐标、点一个对象复制坐标；游戏没在运行时，可以在地图上编辑 Xaero 路径点并安全写回。所有计算都在本机后台进行，拖动和缩放不卡界面，过期结果不会画进新视图。种子预测先覆盖 cubiomes 原生支持的版本（到 1.21.4）；新版本（第一个目标 26.3）在功能做完之后，于延后阶段 P8 在自己维护的 cubiomes fork 里补上。地图引擎归宿主；数据源是核心插件 `lumilio.world-explorer` 里的 Provider，以后第三方 WASM 插件也能经同一套接口提供底图和 Overlay。
 
 本计划合并并替换了 `xaero-waypoints` 和 `cubiomes-seed-map` 两份旧计划，见「从旧计划迁移」。
 
 ## Scope
 
-- In：Java 版；三种底图与单选切换；在 `forks/cubiomes` 里自行维护新版本（1.21.5 … 26.x）的世界生成，首个交付 26.3；统一 Overlay（图标、点、线、区域、文本、热力图）及宿主的绘制、命中测试、选择与优先级；World Context；2D 正交相机、瓦片、LOD、可见区域调度、取消和过期丢弃；wgpu 离屏合成；瓦片磁盘缓存与存档变化后的增量更新；Xaero 路径点的读取、分享串、编辑、新建、删除和安全写回；自定义标记、路线、测距；下界 8:1 换算工具；面向插件的 `BaseMapProvider` / `OverlayProvider` 扩展点，以及与 WASM 计划的对接。
+- In：Java 版；三种底图与单选切换；统一 Overlay（图标、点、线、区域、文本、热力图）及宿主的绘制、命中测试、选择与优先级；World Context；2D 正交相机、瓦片、LOD、可见区域调度、取消和过期丢弃；wgpu 离屏合成；瓦片磁盘缓存与存档变化后的增量更新；按版本生成并入库的方块颜色表；Xaero 路径点的读取、分享串、编辑、新建、删除和安全写回；自定义标记、路线、测距；下界 8:1 换算工具；面向插件的 `BaseMapProvider` / `OverlayProvider` 扩展点，以及与 WASM 计划的对接。
+- In（延后 / 可选，P8，不阻塞收尾）：在 `forks/cubiomes` 里补新版本（1.21.5 … 26.x）的世界生成，首个目标 26.3。
 - Out（产品边界，来自提案）：3D 世界地图；A/B 分屏对照；滑动差异比较；自动地形差异分析；默认把不同底图混成一张图。
 - Out（工程边界）：游戏页之外的地图入口（W16）；把版本表里没有的版本映射到相邻或最新的生成实现（W14）；基岩版；种子筛选与种子搜索（cubiomes-viewer / Chunkbase 那一整套条件）；游戏内传送；在游戏运行中写任何文件；VoxelMap / JourneyMap 原生格式的读写与导入；死亡点的批量清空；Xaero 小地图在游戏内的渲染；把 cubiomes 链进 `lumilio-core`；让插件拿到 GPUI 窗口、wgpu Device、绘图原语或任意文件；云服务。
 
 ## 接手须知
 
-- 先读：本计划；ADR 0031（插件宿主 D1–D7）、0028/0029/0036（离屏 wgpu、forks、弹窗相机与请求身份）、0011/0022/0025（派生代码与许可）、0019（IA 路径）、0026（检查）；`.agents/plans/wasm-plugin-registry.md`（P8 依赖它）；`forks/README.md` 和 `forks/cubiomes/LUMILIO.md`（P0 新建，fork 的本地补丁日志，W14）；skills `lumilio-i18n`、`lumilio-ia-paths`、`lumilio-write-a-test`、`gpui-kit`、`gpui-kit-design-guides`、`lumilio-motion-design`。
+- 先读：本计划；ADR 0031（插件宿主 D1–D7）、0028/0029/0036（离屏 wgpu、forks、弹窗相机与请求身份）、0011/0022/0025（派生代码与许可）、0019（IA 路径）、0026（检查）；`.agents/plans/wasm-plugin-registry.md`（P7 依赖它）；`forks/README.md` 和 `forks/cubiomes/LUMILIO.md`（P0 新建，fork 的本地补丁日志，W14）；skills `lumilio-i18n`、`lumilio-ia-paths`、`lumilio-write-a-test`、`gpui-kit`、`gpui-kit-design-guides`、`lumilio-motion-design`。
 - 参照代码：插件写法看 `crates/lumilio-plugin-litematica/src/{lib.rs,tab.rs}`；宿主看 `crates/lumilio-core/src/plugins/{mod.rs,access.rs,context.rs,tabs.rs,model.rs}`；离屏渲染与 GPUI 拼接看 `crates/lumilio-schematic-render/src/scene.rs` 和 `crates/lumilio-ui/src/model_view/{mod.rs,worker.rs,modal.rs}`；插件视图渲染器是 `crates/lumilio-ui/src/instance_detail/plugin_tabs.rs`；插件注册在 `crates/lumilio-app/src/backend.rs` 的 `Backend::open`。
 - 容易踩的坑（都已在代码里核实）：
   - 现有插件调用默认 5 秒超时，panic、超时和越权会把插件打成本次运行粘住的 `Failed`（`plugins/mod.rs` 的 `isolated` / `call_scoped`）。瓦片调用不能直接走这条路，见 W15。
-  - `forks/cubiomes` 是我们自己维护的世界生成实现，不是只读的参考。新版本的支持按 W14 的流程加：先有差异清单和实测金样，最后才进版本表。不要为了让某个版本「能看」而把它映射到相邻版本。
-  - Mojang 的 jar、数据生成器的原始报告、数据包 JSON 和反混淆源码只在本机读，不进仓库（W14）。
+  - `forks/cubiomes` 是我们自己维护的世界生成实现，不是只读的参考。新版本的支持按 W14 的流程加：先有差异清单和实测金样，最后才进版本表。不要为了让某个版本「能看」而把它映射到相邻版本。新版本支持在 P8，延后，不要在功能阶段里顺手开工。
+  - 从 Mojang 资料派生的数据（数值表、报告摘录、方块颜色表）可以入库，但每份都要带来源记录，能重新生成（W13、W14）。jar 本身和反编译 / 反混淆的源码不入库。
   - `catch_unwind` 接不住 C 代码的段错误或 `abort`。cubiomes 的输入必须在 Rust 侧先校验（W11）。
   - 插件读文件上限 32 MiB（`access.rs` 的 `MAX_FILE_BYTES`），`list_files` 递归、最多 5000 项、深度 8。Region 文件和 Xaero 世界地图目录都会撞上这些限制，P4/P5 需要新的宿主文件接口。
   - `TabState` 只在内存里（`PluginHost::tab_states`），重启就没了。需要保存的东西（世界关联、标记）归宿主持久化。
@@ -72,27 +73,27 @@
   - 网格、Region 边界、坐标、自定义标记、路线和测距是宿主内部的 Overlay，按同一个 `OverlayProvider` 形状实现，不经插件调用。它们是启动器自己的数据和几何，没必要绕一圈。
   - 宿主从所有启用的插件收集 `base_maps` 和 `overlays`，所以第三方 Provider 和内置的出现在同一个图层面板里。
   - 瓦片和对象调用走新的宿主路径 `PluginHost::map_tile` / `map_objects`（`crates/lumilio-core/src/plugins/map.rs`，新建）：单独的超时（默认 10 秒）、`HostContext::cancelled()`（新的默认方法）让插件在行与行之间检查取消、并发上限。出错时怎么办见 W15。
-  - 宿主为地图补充的能力：`HostContext::read_range(path, offset, len)`、`file_info(path)`（长度、修改时间）、`list_dir(dir)`（不递归、分页），都受 `ReadGameFiles` 约束；`write_file(path, bytes, expected: FileInfo)` 受 `WriteGameFiles` 约束，并做 W7 的检查；`block_palette()`，见 W13。
-  - 将来的第三方 Provider 经 WASM 开放（P8，依赖 `wasm-plugin-registry.md`）：WIT 里加 `base-map-provider` 和 `overlay-provider` 两个接口，类型与 `map.rs` 一一对应；瓦片以 RGBA 字节交回，大小有上限；同样受权限、超时和取消约束。Litematica 插件届时可以提供建筑位置和投影范围 Overlay，不用自己画地图。
+  - 宿主为地图补充的能力：`HostContext::read_range(path, offset, len)`、`file_info(path)`（长度、修改时间）、`list_dir(dir)`（不递归、分页），都受 `ReadGameFiles` 约束；`write_file(path, bytes, expected: FileInfo)` 受 `WriteGameFiles` 约束，并做 W7 的检查。
+  - 将来的第三方 Provider 经 WASM 开放（P7，依赖 `wasm-plugin-registry.md`）：WIT 里加 `base-map-provider` 和 `overlay-provider` 两个接口，类型与 `map.rs` 一一对应；瓦片以 RGBA 字节交回，大小有上限；同样受权限、超时和取消约束。Litematica 插件届时可以提供建筑位置和投影范围 Overlay，不用自己画地图。
 - **W10 声明式编辑。** 可编辑的对象带 `editable: Vec<SettingField>`，直接复用 D6 的 `SettingKind`（Text、Number、Choice、Toggle）和它的 `accepts` 校验。宿主画编辑对话框，参照现有的 `crates/lumilio-ui/src/plugin_setting_dialog/`；确认后调用新方法 `OverlayProvider::apply(ctx, edit: ObjectEdit)`，`ObjectEdit` 是 `Create { at, values } | Update { id, values } | Delete { id }`。插件校验后经 `write_file` 写回。删除走宿主统一确认（D5 的破坏性操作规则）。理由：视图树没有输入控件；为一个插件加一套自由表单，会破坏 D5「插件描述内容」。
-- **W11 cubiomes 只在 FFI crate 里。** 新 crate `lumilio-cubiomes`（新建）：`build.rs` 用 `cc` 编译 `forks/cubiomes/`（新建，W14 的 fork）；安全封装只暴露「版本、种子、维度、范围 → 群系 id」「结构位置与可行性」「史莱姆区块」「出生点」「要塞迭代」。进 C 之前在 Rust 侧检查：版本在支持表里、`scale` 属于 {1,4,16,64,256}、范围不越界、缓冲区大小正确。只有 `lumilio-plugin-world-explorer` 依赖它；`lumilio-core` 不依赖它，也不依赖 `cc`（docgen 测试守住）。版本表里没有的版本返回明确错误，界面显示「不可用」（W14）。
+- **W11 cubiomes 只在 FFI crate 里。** 新 crate `lumilio-cubiomes`（新建）：`build.rs` 用 `cc` 编译 `forks/cubiomes/`（新建，W14 的 fork）；安全封装只暴露「版本、种子、维度、范围 → 群系 id」「结构位置与可行性」「史莱姆区块」「出生点」「要塞迭代」。进 C 之前在 Rust 侧检查：版本在支持表里、`scale` 属于 {1,4,16,64,256}、范围不越界、缓冲区大小正确。只有 `lumilio-plugin-world-explorer` 依赖它；`lumilio-core` 不依赖它，也不依赖 `cc`（docgen 测试守住）。版本表里没有的版本返回明确错误，界面显示「这一版还不能查」（W14）。
 - **W12 文案。** 地图的所有界面文字（底图名、图层名、状态、错误、结构种类）在宿主，走 `tr!` 和中英两份目录，按 `lumilio-i18n` 写。Provider 只给种类 id（`map-structure-village`、`map-base-seed` 等），宿主用 `i18n::lookup` 取文案，取不到时显示 id 本身。用户数据（路径点名、标记名）原样显示，不翻译。插件清单的名称和描述仍是插件里的中文，跟着 `i18n-english.md` 的 T2c 一起处理。
-- **W13 方块颜色来自玩家自己的游戏。** 存档底图和 Xaero 世界地图都要「方块 → 颜色」表。表由宿主从该实例的 `client.jar` 生成（贴图平均色加草、树叶、水的生物群系着色），复用 `crates/lumilio-core/src/model_assets.rs` 读 jar 的路径，结果按 jar 身份缓存，经 `HostContext::block_palette()` 交给插件。仓库里不放 Mojang 衍生的颜色表：fastanvil 的 `palette.tar.gz` 和 XaeroTools 的 `assets/colortable.bin` 都是从游戏贴图生成的，不复制。没装游戏就没有颜色表，存档底图显示一句说明，其他底图照常可用。
-- **W14 cubiomes 是 LumilioCL 自己维护的 fork，新版本自己补。**（维护者 2026-10-08 在 PR #6 上决定）
-  - 来源：`forks/cubiomes/` 是上游 <https://github.com/Cubitect/cubiomes> 在 `e61f90580cbdd883214a8054670dacae655e59c0`（2024-11-10）的源码快照，按 ADR 0029 维护：`forks/README.md` 的表加一行（上游、基线提交、MIT），上游的 `LICENSE`（MIT，Copyright (c) 2020 Cubitect）原样保留，`ATTRIBUTIONS.md` 写一节并附 MIT 全文。改过的 C 文件保留上游的版权头。
+- **W13 方块颜色表按版本生成并入库。** 存档底图和 Xaero 世界地图都要「方块 → 颜色」表（贴图平均色，加上草、树叶、水的生物群系着色标记）。表由我们自己的工具 `cargo xtask block-colors <版本>` 从该版本的原版客户端 jar 生成，写进 `crates/lumilio-plugin-world-explorer/data/block-colors/<版本>.json`，同目录的 `SOURCE.md` 记下版本、客户端 jar 的 sha1、命令和工具的提交，保证能重新生成。插件编译时带上这些表，不需要宿主新接口，也不依赖玩家装没装游戏。一个世界用不晚于它版本的最新那张表；表里没有的方块（模组方块、比表更新的方块）画成中性的「未知方块」色，并在状态行写明有多少。不再在运行时读玩家的 `client.jar`：入库的表已经覆盖原版方块，再保留一条运行时路径只为模组方块，代价不值得（模组方块的颜色往往不在原版贴图的位置，读了也不准）。fastanvil 的 `palette.tar.gz` 和 XaeroTools 的 `assets/colortable.bin` 不直接用：两个仓库的 MIT 由各自作者授予，只覆盖他们自己的工作，文件内容派生自游戏贴图，我们只核实了根目录的 LICENSE，没看到针对这两个文件的单独说明；而且它们的格式和覆盖的版本由别人决定。用自己的工具，来源和版本都清楚。
+- **W14 cubiomes 是 LumilioCL 自己维护的 fork，新版本自己补，放在延后阶段。**（维护者 2026-10-08 在 PR #6 上决定）
+  - 来源：`forks/cubiomes/` 是上游 <https://github.com/Cubitect/cubiomes> 在 `e61f90580cbdd883214a8054670dacae655e59c0`（2024-11-10）的源码快照，按 ADR 0029 维护：`forks/README.md` 的表加一行（上游、基线提交、MIT），上游的 `LICENSE`（MIT，Copyright (c) 2020 Cubitect）原样保留，`ATTRIBUTIONS.md` 写一节并附 MIT 全文。改过的 C 文件保留上游的版权头。fork 在 P0 建立。
   - 本地补丁日志：`forks/cubiomes/LUMILIO.md`（新建）。每个本地改动一条，写明改了哪些文件和符号、为哪个 MC 版本、证据来源（差异清单是哪两个版本、用了哪条生成命令、对应哪组金样），以及维护者实机核对的日期。`forks/README.md` 的「Local changes」只写一句话，指向这个文件。
   - 新加一个 MC 版本的流程，五步缺一不可：
-    1. **差异清单。** 在本机用该版本的原版服务端跑数据生成器（`java -DbundlerMainClass=net.minecraft.data.Main -jar server.jar --reports`；1.18 起服务端 jar 是 bundler，参数待按版本核实），同时从服务端 jar 解出 `data/minecraft/worldgen/**` 和 `data/minecraft/tags/worldgen/**`。和上一个已支持版本比较：多噪声群系参数表（`multi_noise_biome_source_parameter_list` 与报告里的 `biome_parameters`，主世界和下界）、噪声设置和密度函数、群系注册表（新增的群系）、结构集合（`structure_set`：salt、spacing、separation、频率、排除区）、结构的群系标签（`has_structure/*`）、新增的结构。结论写进 `LUMILIO.md`。
-    2. **改 fork。** 新的 `MCVersion` 枚举项；新增群系的 id；参数表变了就重新生成 `tables/btree<版本>.h`；`finders.c` 的结构配置和可行群系；`biomenoise.c` 的噪声参数；新结构的 finder。只引用可合法获取的资料：Mojang 发布的 jar、数据生成器在本机的输出，以及 26.x 起不再混淆的客户端（ADR 0034 已读过 26.3 的 `CuboidRotation`）。读源码是为了确认行为，fork 里的 C 代码自己写，不翻译、不粘贴 Mojang 的代码。
-    3. **金样。** 用该版本的原版服务端，按固定种子生成真实世界，在一组固定坐标采集群系（主世界、下界、末地，几个高度），并记录 `/locate structure` 的结果。金样是我们自己测出来的「种子、维度、坐标、群系 id / 结构位置」，可以入库。
+    1. **差异清单。** 用该版本的原版服务端跑数据生成器（`java -DbundlerMainClass=net.minecraft.data.Main -jar server.jar --reports`；1.18 起服务端 jar 是 bundler，参数待按版本核实），同时从服务端 jar 解出 `data/minecraft/worldgen/**` 和 `data/minecraft/tags/worldgen/**`。和上一个已支持版本比较：多噪声群系参数表（`multi_noise_biome_source_parameter_list` 与报告里的 `biome_parameters`，主世界和下界）、噪声设置和密度函数、群系注册表（新增的群系）、结构集合（`structure_set`：salt、spacing、separation、频率、排除区）、结构的群系标签（`has_structure/*`）、新增的结构。用得上的摘录（例如参数表）存进 `forks/cubiomes/data/<版本>/`，附 `SOURCE.md`；结论写进 `LUMILIO.md`。
+    2. **改 fork。** 新的 `MCVersion` 枚举项；新增群系的 id；参数表变了就重新生成 `tables/btree<版本>.h`；`finders.c` 的结构配置和可行群系；`biomenoise.c` 的噪声参数；新结构的 finder。资料来源：Mojang 发布的 jar、数据生成器的输出，以及 26.x 起不再混淆的客户端（ADR 0034 已读过 26.3 的 `CuboidRotation`）。读源码是为了确认行为，fork 里的 C 代码自己写，不翻译、不粘贴 Mojang 的代码。
+    3. **金样。** 用该版本的原版服务端，按固定种子生成真实世界，在一组固定坐标采集群系（主世界、下界、末地，几个高度），并记录 `/locate structure` 的结果，存为金样（种子、维度、坐标、群系 id / 结构位置）。
     4. **对比。** Rust 测试（`crates/lumilio-cubiomes/src/tests.rs`）逐点比较 fork 的输出和金样，全部一致才算过。
     5. **实机核对。** 维护者在游戏里用 F3 看几个采样点的群系，并用 `/locate` 对照地图上的村庄和要塞。
     做完这五步，这个版本才进版本表（`lumilio-cubiomes/src/lib.rs`）。两个版本可以共用同一个生成实现，但前提是差异清单证明生成输入完全相同，而且每个版本都有自己的金样并且通过。
-  - 什么能入库：自己写的工具和脚本、生成命令、`LUMILIO.md` 里的结论、自己测出来的金样，以及运行所需的数值表（btree 表、结构 salt 等常量；上游 cubiomes 也以这种形式附带这些数值，这一条见开放问题 12）。什么不能入库：服务端和客户端 jar、数据生成器的原始报告、数据包 JSON 的副本、反混淆或反编译的源码及其片段、Mojang 的映射文件。这些只放在 `target/worldgen/<版本>/` 下，被 git 忽略。
-  - 保留规则：版本表里没有的版本，界面显示「这一版还不能查」，不降级到相邻版本，也不像 Axolotl 那样把新版本都映射到最新的枚举（issue #165 已经证明 26.2 的群系变了）。新版本发布到我们支持之间的空窗期就是「不可用」。
-  - 交付：P0、P1 交付上游原生支持的版本（到 1.21.4）。P2 交付 26.3；1.21.5 到 26.2 之间的版本，只有差异清单证明它的生成输入与某个已实现的版本完全相同，并且它自己的金样通过时才顺带支持，其余不保证、显示「不可用」。26.3 之后的版本按上面的流程逐个加，每个版本一条 `LUMILIO.md` 记录。
+  - 入库规则：从 Mojang 资料派生的生成数据（报告摘录、参数表、btree 表、结构常量、金样）在有用时入库，每份都带来源记录（MC 版本、jar 的 sha1、命令、输入），能重新生成。服务端和客户端 jar 本身、反编译或反混淆的源码不入库，只放在被 git 忽略的 `target/worldgen/<版本>/` 下。
+  - 保留规则：版本表里没有的版本，界面显示「这一版还不能查」，不降级到相邻版本，也不像 Axolotl 那样把新版本都映射到最新的枚举（issue #165 已经证明 26.2 的群系变了）。新版本发布到我们支持之间的空窗期就是「这一版还不能查」。
+  - 交付：P0、P1 交付上游原生支持的版本（到 1.21.4）。新版本放在最后的延后阶段 P8：首个目标 26.3；1.21.5 到 26.2 之间的版本，只有差异清单证明它的生成输入与某个已实现的版本完全相同，并且它自己的金样通过时才顺带支持，其余不保证。26.3 之后的版本按上面的流程逐个加，每个版本一条 `LUMILIO.md` 记录。P8 不阻塞计划收尾（T45）。
   - 上游如果恢复更新：把上游的新提交合进 fork，对每个本地补丁判断上游是否已经覆盖。上游的实现能通过我们的全部金样，就采用上游的、删掉我们的补丁；两边结果不一致时，以金样和实机为准，并在 `LUMILIO.md` 写明差异。基线提交在 `forks/README.md` 里更新。
-- **W15 瓦片和对象出错不让插件进 `Failed`。**（维护者 2026-10-08 在 PR #6 上决定；修订 ADR 0031 D2）经 `map_tile` / `map_objects` 的调用，无论是错误、panic 还是超时，都只让这一块瓦片或这一批对象显示「失败 · 重试」，不把插件打成 `Failed`，也不影响同一个插件的其他 Provider 和其他扩展点。同一个 Provider 在一次运行里连续出错 5 次（成功一次就清零），只停用这个 Provider 到重启，并在图层面板里说明原因；插件本身保持启用。普通扩展点（`InstanceTab`、`Analyzer` 等）仍按 D2：panic、超时、越权会进入 `Failed`。理由：一张地图会连续要很多块，一块失败就停掉整个插件，代价不成比例。这条修订在计划收尾时写进新 ADR（T46）。
+- **W15 瓦片和对象出错不让插件进 `Failed`。**（维护者 2026-10-08 在 PR #6 上决定；修订 ADR 0031 D2）经 `map_tile` / `map_objects` 的调用，无论是错误、panic 还是超时，都只让这一块瓦片或这一批对象显示「失败 · 重试」，不把插件打成 `Failed`，也不影响同一个插件的其他 Provider 和其他扩展点。同一个 Provider 在一次运行里连续出错 5 次（成功一次就清零），只停用这个 Provider 到重启，并在图层面板里说明原因；插件本身保持启用。普通扩展点（`InstanceTab`、`Analyzer` 等）仍按 D2：panic、超时、越权会进入 `Failed`。理由：一张地图会连续要很多块，一块失败就停掉整个插件，代价不成比例。这条修订在计划收尾时写进新 ADR（T45）。
 - **W16 地图只在游戏页的插件标签里。**（维护者 2026-10-08 在 PR #6 上决定）地图只出现在游戏页里 `lumilio.world-explorer` 的「地图」标签中，没有全局入口、导航项或单独的窗口。只有种子、没有存档的情况（服务器、别人给的种子）也在某个游戏页的这个标签里用手动种子（T9）。理由：存档、Xaero 数据和版本都属于某个实例，放在游戏页里不用另外选实例；单独的入口要再设计一套「选哪个游戏」的流程。
 
 ## crate 布局与依赖边界
@@ -101,13 +102,13 @@
 |---|---|---|---|
 | `lumilio-plugin-api` | 修改：新增 `src/map.rs`，`View::Map`，`Permission::WriteGameFiles`，`HostContext` 新方法（都有默认实现） | `serde`、`serde_json`（D1 不变） | 其他一切 |
 | `lumilio-cubiomes` | 新建；C 源码在 `forks/cubiomes/` | 构建依赖 `cc`（`Cargo.lock` 已有 1.4.4，来自 rusqlite 的 bundled SQLite） | core、ui、app、gpui、plugin-api |
-| `lumilio-anvil` | 新建（P2 先做区块与群系调色板，供金样工具用；P5 补齐地表）：Region 头、区块解压（gzip、zlib、无压缩、LZ4）、外置 `.mcc` 区块、打包的长整型数组、高度图与顶层方块 | `lumilio-nbt`、`flate2`、一个纯 Rust 的 LZ4 实现（`lz4_flex`，待核实版本） | core、ui、app、gpui |
-| `lumilio-plugin-world-explorer` | 新建：清单、`InstanceTab`、各 Provider、Xaero 格式（`src/xaero/`） | `lumilio-plugin-api`、`lumilio-nbt`、`lumilio-anvil`、`lumilio-cubiomes`、`serde_json`、`zip`、`image`（PNG） | core、ui、app、gpui、wgpu |
+| `lumilio-anvil` | 新建（P4）：Region 头、区块解压（gzip、zlib、无压缩、LZ4）、外置 `.mcc` 区块、打包的长整型数组、群系调色板、高度图与顶层方块 | `lumilio-nbt`、`flate2`、一个纯 Rust 的 LZ4 实现（`lz4_flex`，待核实版本） | core、ui、app、gpui |
+| `lumilio-plugin-world-explorer` | 新建：清单、`InstanceTab`、各 Provider、Xaero 格式（`src/xaero/`）、入库的方块颜色表（`data/block-colors/`） | `lumilio-plugin-api`、`lumilio-nbt`、`lumilio-anvil`、`lumilio-cubiomes`、`serde_json`、`zip`、`image`（PNG） | core、ui、app、gpui、wgpu |
 | `lumilio-map-render` | 新建 | `wgpu` 30（与 Nucleation 同版本）、`pollster` | gpui、core、plugin-api |
 | `lumilio-core` | 修改：`src/world_map/`（新建）、`src/plugins/map.rs`（新建）、`Layout::map_cache`、schema 4 | 照旧；不加 `lumilio-cubiomes`、`cc` | ui、gpui |
 | `lumilio-ui` | 修改：`src/world_explorer/`（新建）、`plugin_tabs.rs` 处理 `View::Map`、设置页权限说明 | `lumilio-map-render`（与 `lumilio-schematic-render` 同样的方式） | — |
 | `lumilio-app` | 修改：`backend.rs` 注册 `WorldExplorer` | 照旧 | — |
-| `lumilio-xtask` | 修改：P2 新增 `worldgen-diff`、`worldgen-golden`、`cubiomes-btree` 子命令（开发工具，不进发布包） | `lumilio-anvil`、`lumilio-nbt`、`serde_json`、`zip`；运行时下载原版服务端 jar 到 `target/worldgen/`，不入库 | core、ui、gpui |
+| `lumilio-xtask` | 修改：P4 新增 `block-colors`；P8 新增 `worldgen-diff`、`worldgen-golden`、`cubiomes-btree`（开发工具，不进发布包） | `lumilio-anvil`、`lumilio-nbt`、`serde_json`、`zip`；运行时下载原版 jar 到被 git 忽略的 `target/worldgen/` | core、ui、gpui |
 
 docgen 测试的改法（`crates/lumilio-docgen/tests/plugin_boundaries.rs`）：
 
@@ -127,9 +128,9 @@ docgen 测试的改法（`crates/lumilio-docgen/tests/plugin_boundaries.rs`）�
 | 项目 | 地址与核实的提交 | 许可证 | 提案点名的文件 | 可以改编吗 | 归属要求 |
 |---|---|---|---|---|---|
 | cubiomes | <https://github.com/Cubitect/cubiomes>，`e61f90580cbdd883214a8054670dacae655e59c0`（2024-11-10，上游最后一次提交） | MIT，Copyright (c) 2020 Cubitect | 入口 `generator.h`、`biomes.h`、`finders.h`、`util.c`（`initBiomeColors`） | 可以，直接作为源码快照放进 `forks/cubiomes/` | 保留 `LICENSE`；`ATTRIBUTIONS.md` 加一节，全文附上 MIT 声明；`forks/README.md` 记基线提交和本地改动 |
-| Axolotl（Modrinth App 的分支） | <https://github.com/Mystic-Stars/Axolotl>，`b957550cff0541e972435e81dd6a8693763d69b3`（2026-10-08） | `apps/app` 和 `apps/app-frontend` 都是 GPL-3.0-only（各自 `LICENSE`、`COPYING.md`）；版权：Rinth, Inc. 及原贡献者，Axolotl 改动 © 2026 Garbage Human Studio | 都存在，真实路径：`apps/app/src/seed_map/cubiomes_bridge.c`（826 行）和 `.h`、`apps/app/src/seed_map/mod.rs`、`apps/app/src/api/seed_map.rs`（Tauri 命令）、`apps/app-frontend/src/pages/LabSeedMap.vue`、`apps/app-frontend/src/lab/seed-map/features.ts`、`apps/app/src/seed_map/ores.rs`、`apps/app/build.rs`（第 148–170 行编译 cubiomes） | 可以（GPLv3 §13），按 ADR 0022 的方式：注释写源路径和 GPL-3.0-only，并改写成我们的 crate 边界 | 注释署名；`ATTRIBUTIONS.md` 一行。`apps/app-frontend/public/seed-map-assets/` 的图标来自 MinecraftSearch 或描绘 Mojang 内容，不能复制；仓库里的 Modrinth 品牌素材同样不能复制 |
-| fastnbt / fastanvil | <https://github.com/owengage/fastnbt>，`986c8594aad0e9dbbe6124d2b0e60506e2125fbd`（2026-08-08） | 根目录 LICENSE 是 MIT（Copyright (c) 2020 Owen Gage）；`fastanvil/Cargo.toml` 与 `fastnbt/Cargo.toml` 声明 `MIT OR Apache-2.0` | `fastanvil/src/region.rs` 存在（609 行）；`chunk.rs` 不在根上，真实路径是 `fastanvil/src/java/chunk.rs` 和 `fastanvil/src/complete/chunk.rs`；`fastanvil/src/render.rs` 存在（`TopShadeRenderer`） | 可以改编 | 注释写源路径与 MIT 版权行；`ATTRIBUTIONS.md` 一节。`palette.tar.gz` 由 `tools/` 从游戏贴图生成，不复制 |
-| XaeroTools | <https://github.com/dekrom/xaerotools>，`7bc650bdf445ec06d0d3fc0fb9e98ba4b86a6b83`（2026-09-03） | MIT，Copyright (c) 2026 Dek | 提案写的 `xaero-core/...` 实际在 `crates/xaero-core/src/`：`codec/`（`mod.rs`、`reader.rs`、`writer.rs`、`legacy.rs`、`nbt.rs`、`zipio.rs`）、`waypoints.rs`、`render/`（`mod.rs`、`colortable.rs`）都存在；`xaerotools/pyramid.rs` 实际是 `crates/xaerotools-server/src/pyramid.rs` | 可以改编 | 注释写源路径与 MIT 版权行；`ATTRIBUTIONS.md` 一节。`assets/colortable.bin`、`blockprops.bin`、`legacy_block_ids.bin` 由 `tools/xaero-colorgen` 从游戏数据生成，不复制 |
+| Axolotl（Modrinth App 的分支） | <https://github.com/Mystic-Stars/Axolotl>，`b957550cff0541e972435e81dd6a8693763d69b3`（2026-10-08） | `apps/app` 和 `apps/app-frontend` 都是 GPL-3.0-only（各自 `LICENSE`、`COPYING.md`）；版权：Rinth, Inc. 及原贡献者，Axolotl 改动 © 2026 Garbage Human Studio | 都存在，真实路径：`apps/app/src/seed_map/cubiomes_bridge.c`（826 行）和 `.h`、`apps/app/src/seed_map/mod.rs`、`apps/app/src/api/seed_map.rs`（Tauri 命令）、`apps/app-frontend/src/pages/LabSeedMap.vue`、`apps/app-frontend/src/lab/seed-map/features.ts`、`apps/app/src/seed_map/ores.rs`、`apps/app/build.rs`（第 148–170 行编译 cubiomes） | 可以（GPLv3 §13），按 ADR 0022 的方式：注释写源路径和 GPL-3.0-only，并改写成我们的 crate 边界 | 注释署名；`ATTRIBUTIONS.md` 一行。`apps/app-frontend/public/seed-map-assets/` 的图标部分来自 MinecraftSearch（权利归其作者，`COPYING.md` 未授权），不复制；仓库里的 Modrinth 品牌素材同样不能复制 |
+| fastnbt / fastanvil | <https://github.com/owengage/fastnbt>，`986c8594aad0e9dbbe6124d2b0e60506e2125fbd`（2026-08-08） | 根目录 LICENSE 是 MIT（Copyright (c) 2020 Owen Gage）；`fastanvil/Cargo.toml` 与 `fastnbt/Cargo.toml` 声明 `MIT OR Apache-2.0` | `fastanvil/src/region.rs` 存在（609 行）；`chunk.rs` 不在根上，真实路径是 `fastanvil/src/java/chunk.rs` 和 `fastanvil/src/complete/chunk.rs`；`fastanvil/src/render.rs` 存在（`TopShadeRenderer`） | 可以改编 | 注释写源路径与 MIT 版权行；`ATTRIBUTIONS.md` 一节。`palette.tar.gz` 由 `tools/` 从游戏贴图生成，不直接用（W13） |
+| XaeroTools | <https://github.com/dekrom/xaerotools>，`7bc650bdf445ec06d0d3fc0fb9e98ba4b86a6b83`（2026-09-03） | MIT，Copyright (c) 2026 Dek | 提案写的 `xaero-core/...` 实际在 `crates/xaero-core/src/`：`codec/`（`mod.rs`、`reader.rs`、`writer.rs`、`legacy.rs`、`nbt.rs`、`zipio.rs`）、`waypoints.rs`、`render/`（`mod.rs`、`colortable.rs`）都存在；`xaerotools/pyramid.rs` 实际是 `crates/xaerotools-server/src/pyramid.rs` | 可以改编 | 注释写源路径与 MIT 版权行；`ATTRIBUTIONS.md` 一节。`assets/colortable.bin`、`blockprops.bin`、`legacy_block_ids.bin` 由 `tools/xaero-colorgen` 从游戏数据生成，不直接用（W13） |
 | cubiomes-viewer | <https://github.com/Cubitect/cubiomes-viewer>，`3acc863245b30c655498d60323c50da0865e0199`（2024-11-10） | 主体 GPLv3（LICENSE 全文；README 只写 GPLv3，没写 or later，按 GPL-3.0-only 对待）；README 写明生物群系配色和图标「受 Amidst 启发」，Amidst 是 GPLv3 | 提案没点名文件；只作 UI 与交互参考 | 法律上可以（GPLv3 §13），本计划只参考交互，不复制代码和图标 | 若真的改编了代码，注释写 GPL-3.0 并加 `ATTRIBUTIONS.md` 行 |
 | Amidst（配色出处） | <https://github.com/toolbox4minecraft/amidst> | GPLv3（`LICENSE.txt`） | cubiomes `util.c` 第 318 行注释：配色「largely inspired by the AMIDST program」 | 只用 cubiomes 自带的色表 | `ATTRIBUTIONS.md` 注明配色出自 cubiomes、受 Amidst 启发（旧计划的要求） |
 
@@ -137,8 +138,8 @@ Xaero's Minimap / World Map 本身不开源（许可证未在本次核实）。�
 
 ### cubiomes 的跨平台构建
 
-- 版本覆盖：`biomes.h` 的 `MCVersion` 到 `MC_1_21_WD`（「Winter Drop」，即 1.21.4），`MC_NEWEST = MC_1_21`。上游最后一次提交是 2024-11-10。issue #161（要求支持 1.21.5 到 26.x）和 #165（26.2 新增硫磺洞穴群系，cubiomes 系的地图画不出来）都还开着。LumilioCL 的实例大多是 26.x，所以新版本由我们在 fork 里自己补（W14，P2 交付 26.3）。Axolotl 把 1.21.4–26.2 都映射到 `MC_NEWEST`（`cubiomes_bridge.c` 第 130–143 行注释说生成没变），#165 证明 26.2 并非如此，所以我们不采用这种映射。
-- 上游怎么接入一个版本：每个版本是 `biomes.h` 的一个 `MCVersion` 枚举项；主世界的多噪声群系查找树放在 `tables/btree<版本>.h`（目前有 `btree18.h`、`btree19.h`、`btree192.h`、`btree20.h`、`btree21wd.h`），由 `biomenoise.c` 按版本选用；结构配置和可行群系在 `finders.c`。上游的树是用 `docs/nptree_c.py` 从 IntelliJ 调试器里导出的游戏内存结构转换的（脚本自述），不能复现。我们要写自己的生成器，从数据生成器报告里的参数表重建同一棵树（P2 T20），并先用 1.21.4 的报告重建出与 `btree21wd.h` 相同的表，以证明生成器正确。
+- 版本覆盖：`biomes.h` 的 `MCVersion` 到 `MC_1_21_WD`（「Winter Drop」，即 1.21.4），`MC_NEWEST = MC_1_21`。上游最后一次提交是 2024-11-10。issue #161（要求支持 1.21.5 到 26.x）和 #165（26.2 新增硫磺洞穴群系，cubiomes 系的地图画不出来）都还开着。新版本由我们在 fork 里自己补，放在延后阶段 P8，首个目标 26.3（W14）。Axolotl 把 1.21.4–26.2 都映射到 `MC_NEWEST`（`cubiomes_bridge.c` 第 130–143 行注释说生成没变），#165 证明 26.2 并非如此，所以我们不采用这种映射。
+- 上游怎么接入一个版本：每个版本是 `biomes.h` 的一个 `MCVersion` 枚举项；主世界的多噪声群系查找树放在 `tables/btree<版本>.h`（目前有 `btree18.h`、`btree19.h`、`btree192.h`、`btree20.h`、`btree21wd.h`），由 `biomenoise.c` 按版本选用；结构配置和可行群系在 `finders.c`。上游的树是用 `docs/nptree_c.py` 从 IntelliJ 调试器里导出的游戏内存结构转换的（脚本自述），不能复现。我们要写自己的生成器，从数据生成器报告里的参数表重建同一棵树（P8 T41），并先用 1.21.4 的报告重建出与 `btree21wd.h` 相同的表，以证明生成器正确。
 - 编译器相关代码：只有 `rng.h` 用了 `__builtin_*` 和 `__attribute__`，都包在 `#if __GNUC__` 里，另有通用回退，`UNREACHABLE()` 在 `_MSC_VER` 下用 `__assume(0)`。没有 `__int128`，没有 SIMD 内建函数。在本机（Linux）用 gcc 14 `-std=c11 -Wvla -Wpedantic` 编译 `biomenoise biomes finders generator layers noise util quadbase` 没有警告；用 clang 19 `-U__GNUC__` 强制走非 GNU 分支，除 `quadbase.c` 外都能编译（只有 `-Wparentheses` 警告）。
 - `quadbase.c` 是四联女巫小屋种子搜索，用 pthread 或 Win32 线程。我们不需要它：不带它也能链接，并在本机用 seed 262 的探针跑通了 `getStructurePos`、`isViableStructurePos` 和 `genBiomes`。去掉它就没有线程依赖。
 - MSVC：上游没有 MSVC 的 CI，cubiomes-viewer 的 Windows 版用 MinGW。**MSVC 编译未核实。** P0 的第一个任务是在 `windows-2022` 上实际编译（手动触发 `release.yml` 或临时 workflow）。`-fwrapv` 只对 gcc/clang 有效，用 `flag_if_supported`（Axolotl 的做法）；上游 `9ec701d` 已经修掉 `rng.h` 里依赖有符号溢出的写法，MSVC 下是否还有依赖溢出的地方，待核实。
@@ -180,7 +181,7 @@ Xaero's Minimap / World Map 本身不开源（许可证未在本次核实）。�
 
 ## 分阶段任务
 
-顺序按代码依赖排：P0 先把宿主、视口和第一个底图打通，后面每个数据源都只是再加一个 Provider。P2 紧跟在 P1 后面，因为维护者在用的是 26.3，种子底图和结构要到 P2 才对他们有用；P2 只改 `forks/cubiomes`、`lumilio-cubiomes` 和 xtask 工具，不碰地图界面，所以可以和 P3 之后的阶段并行。P2 的金样工具要读真实世界的区块，因此 `lumilio-anvil` 的区块与群系部分提前到 P2 做，P5 再补地表。Xaero 路径点（P3、P4）排在存档底图（P5）之前，因为文本格式小、马上有用，而写回所需的编辑契约和写权限也是 P7 标记要用的。P5 和 P6 共用方块颜色表，所以相邻。P8 依赖 WASM 计划。
+顺序按代码依赖排：P0 先把宿主、视口和第一个底图打通，后面每个数据源都只是再加一个 Provider。Xaero 路径点（P2、P3）排在存档底图（P4）之前，因为文本格式小、马上有用，而写回所需的编辑契约和写权限也是 P6 标记要用的。P4 和 P5 共用方块颜色表，所以相邻。P7 依赖 WASM 计划。P8（新版本世界生成）延后到所有功能之后，是可选的，不阻塞收尾；它依赖 P4 的 `lumilio-anvil` 读金样世界。收尾任务 T45 只依赖 P0–P7。
 
 ### P0 视口、网格与种子底图
 
@@ -202,61 +203,63 @@ Xaero's Minimap / World Map 本身不开源（许可证未在本次核实）。�
 
 - [ ] T13：`lumilio-cubiomes` 包装 `getStructurePos`、`isViableStructurePos`、`initFirstStronghold` / `nextStronghold`、`isSlimeChunk`、`getSpawn` / `estimateSpawn`；结构种类按 `finders.h` 的 `StructureType`，每个版本只开放该版本 finder 能给出的种类。
 - [ ] T14：Overlay「结构」：至少村庄、沙漠神殿、丛林神殿、要塞、海底神殿、林地府邸、下界要塞、堡垒遗迹、末地城，以及该版本支持的其他种类（古城、试炼密室、前哨站等）；按种类分组开关。1.18+ 的沙漠神殿、丛林神殿和林地府邸标成「估计」，图层面板写明原因。
-- [ ] T15：Overlay「史莱姆区块」（区域填充，只在细的 LOD 显示）和「出生点」（1.18 前标「估计」；存档里有实际出生点时以 P5 的为准）。
+- [ ] T15：Overlay「史莱姆区块」（区域填充，只在细的 LOD 显示）和「出生点」（1.18 前标「估计」；存档里有实际出生点时以 P4 的为准）。
 - [ ] T16：点选一个对象，显示种类、坐标和来源；「复制坐标」复制 `x z`。测试：至少三个版本（1.16、1.18、1.21.4 或库支持的最新版）的固定种子，结构坐标与 C 探针的金样一致；生成金样的命令写进测试注释。
 
-### P2 新版本世界生成：1.21.5 → 26.3（W14）
+### P2 Xaero 路径点（只读）与分享串
 
-交付 26.3。1.21.5 到 26.2 之间的版本只在 T17 证明生成输入与 1.21.4 或 26.3 完全相同、且自己的金样通过时顺带支持（T22 列出结果），其余显示「不可用」。下面的已知差异来自 cubiomes issue #165；其余差异在 T17 之前一律待核实。
+- [ ] T17：`lumilio-plugin-world-explorer/src/xaero/`（新建：`waypoints.rs`、`naming.rs`、`tests.rs`）：解析集合文件，保留每一行原文、不认识的行和字段；`§§` 转义；`~` 表示没有 Y；死亡点、旧死亡点、禁用和临时点都能识别。改编自 XaeroTools `crates/xaero-core/src/{waypoints.rs,naming.rs}`，注释署名。样本：用一个钉住版本的 Xaero's Minimap 导出主世界、下界、末地各一份，放在 `tests/data/xaero/<版本>/`，注明版本。往返测试：读出再写回逐字节一致。
+- [ ] T18：Overlay「Xaero 路径点」：按世界、维度、集合列出；颜色按下标画；死亡点用单独图标。损坏的文件、读不到的目录变成图层状态（「这份路径点文件读不了」），不让插件 `Failed`。目录结构不认识时说明只支持小地图的路径点。
+- [ ] T19：世界关联：core 列出 `xaero/minimap` 和 `xaero/world-map` 的目录名；单人世界名称完全相同时提出建议，人确认后存进 `launcher.db`；多人目录（`Multiplayer_…`）作为 `WorldId::Server` 单独出现。
+- [ ] T20：选中路径点后「复制分享串」，生成 `xaero-waypoint:` 格式；维度写 `Internal-…-waypoints`。测试覆盖冒号、表情、没有 Y 的点。
 
-- [ ] T17：`cargo xtask worldgen-diff <旧版本> <新版本>`（`crates/lumilio-xtask/src/worldgen/`，新建）：按 Mojang 版本清单下载两个版本的服务端 jar 到 `target/worldgen/<版本>/`（被 git 忽略），在本机跑数据生成器（W14 第 1 步），解出 `data/minecraft/worldgen/**` 与 `tags/worldgen/**`，输出差异摘要：主世界与下界的多噪声参数表、`noise_settings` 与密度函数、噪声参数、群系注册表、`structure_set`（salt、spacing、separation、频率、排除区）、结构的群系标签、新增结构。先对 1.21.4 → 1.21.5、…、26.2 → 26.3 两两跑一遍（具体的正式版列表以 Mojang 版本清单为准，待核实），结论写进 `forks/cubiomes/LUMILIO.md`。已知：26.2 新增硫磺洞穴（sulphur caves）群系（issue #165，在较低的 Y 才看得到，说明是洞穴群系、在多噪声参数表里）；它的参数、引入版本以及有没有别的变化，待核实。
-- [ ] T18：`crates/lumilio-anvil/`（新建）的第一部分：Region 头、四种压缩、外置 `.mcc`、区块的 `sections` 与群系调色板解包（1.18+）。改编自 fastanvil `fastanvil/src/region.rs` 与 `fastanvil/src/java/section_data.rs`（MIT，注释署名）。测试用自己生成的小 Region 样本。
-- [ ] T19：`cargo xtask worldgen-golden <版本> <种子>…`：起一个本机、离线的原版服务端（固定 `level-seed`，托管 Java 由 ADR 0014 的运行时提供），对一组固定坐标 `forceload` 后读区块的群系调色板（三个维度、几个高度），并经 RCON 在几个起点执行 `/locate structure`；结果写成 `crates/lumilio-cubiomes/tests/golden/<版本>/<种子>.json`（我们自己的测量：种子、维度、坐标、群系 id、结构种类与位置）。先对 1.21.4 跑，金样必须与未改动的上游 cubiomes 一致，证明工具本身没错。
-- [ ] T20：`cargo xtask cubiomes-btree <报告>`：从数据生成器报告里的主世界参数表生成 `tables/btree<版本>.h`，树的构造是自己写的实现（按游戏的行为核对，不翻译游戏代码）。验收：用 1.21.4 的报告生成的表与上游 `tables/btree21wd.h` 数值完全一致。
-- [ ] T21：按 T17 的差异改 fork：`biomes.h` 新增 `MC_26_3` 等枚举项（命名跟随上游风格）与新群系 id（硫磺洞穴；若上游以后分配了 id，以上游为准，见 W14）；`tables/btree26_3.h`（若参数表变了）；`biomenoise.c` 按版本选树并处理噪声参数变化；`finders.c` 的 `getStructureConfig` 与可行群系列表（按 `structure_set` 和群系标签的差异）；下界参数表若有变化同样处理；`util.c` 的群系名称与配色（新群系先用相近群系的颜色，记进 `LUMILIO.md`）。每处改动一条 `LUMILIO.md` 记录。
-- [ ] T22：若 T17 发现新结构，或已有结构的生成规则变化到现有 finder 表达不了，就为它写 finder（`finders.c`），并在 `lumilio-cubiomes` 开放；没有就在 `LUMILIO.md` 写明「26.3 无新结构」。中间版本逐个归类：生成输入与 1.21.4 相同（共用 1.21.4 的实现）、与 26.3 相同（共用 26.3 的实现）、都不同（不支持）。前两类采集各自的金样，通过后进入候选。
-- [ ] T23：`lumilio-cubiomes/src/tests.rs` 用 T19 的金样逐点对比 26.3（至少三个种子 × 三个维度 × 几个高度，加上主要结构）以及 T22 的候选版本，全部一致；维护者按 W14 第 5 步实机核对 26.3 后，把 26.3 和通过的候选写进版本表（`lumilio-cubiomes/src/lib.rs`），并在 `LUMILIO.md` 记下核对日期。之后的新版本按同一流程（T17–T23）各加一次。
+### P3 Xaero 路径点编辑与写回
 
-### P3 Xaero 路径点（只读）与分享串
+- [ ] T21：`Permission::WriteGameFiles { under }`、`HostContext::write_file`（`crates/lumilio-core/src/plugins/access.rs` 加写的路径检查，`context.rs` 实现）、设置页的权限说明（`crates/lumilio-ui/src/pages/settings/plugins.rs`，新文案进目录）。测试：写 `xaero/minimap` 以外、`..`、绝对路径、符号链接、非 `mw$*.txt` 文件名都被拒绝，且没有任何文件被创建。
+- [ ] T22：W7 的写入流程在 core（`world_map/write.rs`，新建）：取实例租约、核对长度/修改时间/sha256、备份、临时文件加 rename；`Effect` 不变，插件经 `write_file` 写。测试：游戏运行（租约被占）时没有任何写入；文件在读与写之间变了就拒绝；备份存在且与原文件一致；损坏文件不被覆盖。
+- [ ] T23：W10 编辑契约：`MapObject::editable`、`OverlayProvider::apply`、`ObjectEdit`；UI 的编辑对话框（`crates/lumilio-ui/src/world_explorer/edit.rs`，新建），复用 `SettingKind::accepts` 校验。
+- [ ] T24：路径点可改名称（不超过 32 个字符，拒绝换行）、缩写（不超过 2 个字符）、坐标、颜色（样本证明有效的下标）、启用、传送朝向；在地图上点一下新建普通路径点；删除前确认，死亡点要单独确认；批量操作只作用于普通、启用、非临时的点。只改被编辑的那一行。
+- [ ] T25：游戏运行时编辑入口禁用并说明原因；浏览和复制照常。
 
-- [ ] T24：`lumilio-plugin-world-explorer/src/xaero/`（新建：`waypoints.rs`、`naming.rs`、`tests.rs`）：解析集合文件，保留每一行原文、不认识的行和字段；`§§` 转义；`~` 表示没有 Y；死亡点、旧死亡点、禁用和临时点都能识别。改编自 XaeroTools `crates/xaero-core/src/{waypoints.rs,naming.rs}`，注释署名。样本：用一个钉住版本的 Xaero's Minimap 导出主世界、下界、末地各一份，放在 `tests/data/xaero/<版本>/`，注明版本。往返测试：读出再写回逐字节一致。
-- [ ] T25：Overlay「Xaero 路径点」：按世界、维度、集合列出；颜色按下标画；死亡点用单独图标。损坏的文件、读不到的目录变成图层状态（「这份路径点文件读不了」），不让插件 `Failed`。目录结构不认识时说明只支持小地图的路径点。
-- [ ] T26：世界关联：core 列出 `xaero/minimap` 和 `xaero/world-map` 的目录名；单人世界名称完全相同时提出建议，人确认后存进 `launcher.db`；多人目录（`Multiplayer_…`）作为 `WorldId::Server` 单独出现。
-- [ ] T27：选中路径点后「复制分享串」，生成 `xaero-waypoint:` 格式；维度写 `Internal-…-waypoints`。测试覆盖冒号、表情、没有 Y 的点。
+### P4 存档底图
 
-### P4 Xaero 路径点编辑与写回
+- [ ] T26：`crates/lumilio-anvil/`（新建）：Region 头、四种压缩、外置 `.mcc`、1.18 前后的区块格式、群系调色板、`WORLD_SURFACE` / `MOTION_BLOCKING` 高度图、顶层方块。改编自 fastanvil `fastanvil/src/region.rs` 和 `fastanvil/src/java/`（MIT，注释署名）。测试用真实的小 Region 样本（自己用原版生成，不含第三方存档），覆盖 1.16、1.18+ 和最新版本；坏区块只让这一个区块为空。
+- [ ] T27：宿主文件接口：`read_range`、`file_info`、`list_dir`（`access.rs`、`context.rs`）。测试：越界、链接、超出授权都被拒绝；大文件按区间读不受 32 MiB 上限影响，但单次区间有上限。
+- [ ] T28：W13 方块颜色表：`cargo xtask block-colors <版本>`（`crates/lumilio-xtask/src/block_colors.rs`，新建）从客户端 jar 生成 `crates/lumilio-plugin-world-explorer/data/block-colors/<版本>.json` 和 `SOURCE.md`；先生成实现时最新的正式版和 1.21.4 两张。插件按世界版本选表，表外方块用「未知方块」色。测试：用一个合成的小 jar 跑工具；选表规则（不晚于世界版本的最新一张）；表外方块计数。
+- [ ] T29：存档底图 Provider：level 0 按顶层方块加高度明暗出瓦片（参考 fastanvil `render.rs` 的 `TopShadeRenderer`）；粗 LOD 由宿主合成。没生成过的区块画「无数据」。
+- [ ] T30：增量更新：缓存记下 Region 文件的长度和修改时间；游戏退出后只重建变了的块。测试：改动一个 Region 文件，只有它和它的上层瓦片失效。
+- [ ] T31：Overlay「存档位置」：实际出生点；单人存档 `level.dat` 里 `Player` 的位置和维度（若有）。
 
-- [ ] T28：`Permission::WriteGameFiles { under }`、`HostContext::write_file`（`crates/lumilio-core/src/plugins/access.rs` 加写的路径检查，`context.rs` 实现）、设置页的权限说明（`crates/lumilio-ui/src/pages/settings/plugins.rs`，新文案进目录）。测试：写 `xaero/minimap` 以外、`..`、绝对路径、符号链接、非 `mw$*.txt` 文件名都被拒绝，且没有任何文件被创建。
-- [ ] T29：W7 的写入流程在 core（`world_map/write.rs`，新建）：取实例租约、核对长度/修改时间/sha256、备份、临时文件加 rename；`Effect` 不变，插件经 `write_file` 写。测试：游戏运行（租约被占）时没有任何写入；文件在读与写之间变了就拒绝；备份存在且与原文件一致；损坏文件不被覆盖。
-- [ ] T30：W10 编辑契约：`MapObject::editable`、`OverlayProvider::apply`、`ObjectEdit`；UI 的编辑对话框（`crates/lumilio-ui/src/world_explorer/edit.rs`，新建），复用 `SettingKind::accepts` 校验。
-- [ ] T31：路径点可改名称（不超过 32 个字符，拒绝换行）、缩写（不超过 2 个字符）、坐标、颜色（样本证明有效的下标）、启用、传送朝向；在地图上点一下新建普通路径点；删除前确认，死亡点要单独确认；批量操作只作用于普通、启用、非临时的点。只改被编辑的那一行。
-- [ ] T32：游戏运行时编辑入口禁用并说明原因；浏览和复制照常。
+### P5 Xaero 世界地图底图
 
-### P5 存档底图
+- [ ] T32：`lumilio-plugin-world-explorer/src/xaero/world_map.rs`（新建）：读区域 zip、解码区域流，改编自 XaeroTools `crates/xaero-core/src/codec/` 和 `render/mod.rs`（MIT，注释署名）。支持的版本范围以测试样本为准，其余报「不支持」。颜色用 W13 的表。
+- [ ] T33：按可见区域加载，局部缺失画「无数据」；区域 zip 变了才重建。大存档（数千个区域文件）用 `list_dir` 分页，不一次列完。
 
-- [ ] T33：补齐 `crates/lumilio-anvil/`（T18 已有 Region 与群系部分）：1.18 前的区块格式、`WORLD_SURFACE` / `MOTION_BLOCKING` 高度图、顶层方块。改编自 fastanvil `fastanvil/src/java/`（MIT，注释署名）。测试用真实的小 Region 样本（自己用原版生成，不含第三方存档），覆盖 1.16、1.18+ 和最新版本；坏区块只让这一个区块为空。
-- [ ] T34：宿主文件接口：`read_range`、`file_info`、`list_dir`（`access.rs`、`context.rs`）。测试：越界、链接、超出授权都被拒绝；大文件按区间读不受 32 MiB 上限影响，但单次区间有上限。
-- [ ] T35：W13 方块颜色表：`crates/lumilio-core/src/world_map/palette.rs`（新建），从 `client.jar` 生成，按 jar 身份缓存；`HostContext::block_palette()`。测试用一个合成的小 jar，不放 Mojang 文件。
-- [ ] T36：存档底图 Provider：level 0 按顶层方块加高度明暗出瓦片（参考 fastanvil `render.rs` 的 `TopShadeRenderer`）；粗 LOD 由宿主合成。没生成过的区块画「无数据」。
-- [ ] T37：增量更新：缓存记下 Region 文件的长度和修改时间；游戏退出后只重建变了的块。测试：改动一个 Region 文件，只有它和它的上层瓦片失效。
-- [ ] T38：Overlay「存档位置」：实际出生点；单人存档 `level.dat` 里 `Player` 的位置和维度（若有）。
+### P6 自定义标记、路线、测距与下界换算
 
-### P6 Xaero 世界地图底图
+- [ ] T34：`launcher.db` 的标记与路线表（`world_map/store.rs`）：每条记录带世界、维度、坐标、名称、颜色和可选的关联（cubiomes 结构 key、Xaero 路径点的 `raw_id`）。关联的对象不见了，标记还在，并提示关联失效。
+- [ ] T35：在地图上新建、编辑、删除标记（复用 W10 的对话框）；画路线（折线），显示总长；测距工具（两点间方块距离），不持久化。
+- [ ] T36：下界 8:1 换算工具（W8）：选中的点或输入的坐标，给出另一维度的坐标，可以复制或跳转。测试：负坐标的取整与游戏一致（向下取整，待用实机核对）。
 
-- [ ] T39：`lumilio-plugin-world-explorer/src/xaero/world_map.rs`（新建）：读区域 zip、解码区域流，改编自 XaeroTools `crates/xaero-core/src/codec/` 和 `render/mod.rs`（MIT，注释署名）。支持的版本范围以测试样本为准，其余报「不支持」。颜色用 W13 的表，不用 XaeroTools 的 `colortable.bin`。
-- [ ] T40：按可见区域加载，局部缺失画「无数据」；区域 zip 变了才重建。大存档（数千个区域文件）用 `list_dir` 分页，不一次列完。
+### P7 面向插件的扩展与 WASM（依赖 `wasm-plugin-registry.md` 的 T1、T4）
 
-### P7 自定义标记、路线、测距与下界换算
+- [ ] T37：在 WASM 计划的 WIT 里加 `base-map-provider` 和 `overlay-provider`，类型与 `map.rs` 一一对应；瓦片字节和对象数量有上限；同样经过权限、超时和取消。示例 WASM 插件提供一个热力图 Overlay。
+- [ ] T38：Litematica 插件实现 `OverlayProvider`，给出投影放置的位置和范围。投影放置信息存在哪个文件（Litematica 的配置目录），待核实；需要的 `ReadGameFiles` 范围随之扩大，设置页会显示。
 
-- [ ] T41：`launcher.db` 的标记与路线表（`world_map/store.rs`）：每条记录带世界、维度、坐标、名称、颜色和可选的关联（cubiomes 结构 key、Xaero 路径点的 `raw_id`）。关联的对象不见了，标记还在，并提示关联失效。
-- [ ] T42：在地图上新建、编辑、删除标记（复用 W10 的对话框）；画路线（折线），显示总长；测距工具（两点间方块距离），不持久化。
-- [ ] T43：下界 8:1 换算工具（W8）：选中的点或输入的坐标，给出另一维度的坐标，可以复制或跳转。测试：负坐标的取整与游戏一致（向下取整，待用实机核对）。
+### P8 新版本世界生成：1.21.5 → 26.3（延后 / 可选，W14）
 
-### P8 面向插件的扩展与 WASM（依赖 `wasm-plugin-registry.md` 的 T1、T4）
+所有功能阶段之后再做，不阻塞收尾。首个目标 26.3。1.21.5 到 26.2 之间的版本只在 T39 证明生成输入与 1.21.4 或 26.3 完全相同、且自己的金样通过时顺带支持（T43 列出结果），其余显示「这一版还不能查」。下面的已知差异来自 cubiomes issue #165；其余差异在 T39 之前一律待核实。依赖 P4 的 `lumilio-anvil`（T26）。
 
-- [ ] T44：在 WASM 计划的 WIT 里加 `base-map-provider` 和 `overlay-provider`，类型与 `map.rs` 一一对应；瓦片字节和对象数量有上限；同样经过权限、超时和取消。示例 WASM 插件提供一个热力图 Overlay。
-- [ ] T45：Litematica 插件实现 `OverlayProvider`，给出投影放置的位置和范围。投影放置信息存在哪个文件（Litematica 的配置目录），待核实；需要的 `ReadGameFiles` 范围随之扩大，设置页会显示。
-- [ ] T46：收尾：把冻结的决策压缩进下一个 ADR（编号到时再取，目前最大是 0037），写明对 D2 的修订（W15：瓦片和对象故障不进 `Failed`，同一个 Provider 连续 5 次只停用它）、对 D3（写权限）和 D5（`View::Map` 与编辑契约）的修订，以及 W14（自维护的 cubiomes fork 与加版本的流程）和 W16（地图只在游戏页）；删除本计划。
+- [ ] T39：`cargo xtask worldgen-diff <旧版本> <新版本>`（`crates/lumilio-xtask/src/worldgen/`，新建）：按 Mojang 版本清单下载两个版本的服务端 jar 到被 git 忽略的 `target/worldgen/<版本>/`，跑数据生成器（W14 第 1 步），解出 `data/minecraft/worldgen/**` 与 `tags/worldgen/**`，输出差异摘要：主世界与下界的多噪声参数表、`noise_settings` 与密度函数、噪声参数、群系注册表、`structure_set`（salt、spacing、separation、频率、排除区）、结构的群系标签、新增结构。用得上的摘录连同 `SOURCE.md` 存进 `forks/cubiomes/data/<版本>/`。先对 1.21.4 → 1.21.5、…、26.2 → 26.3 两两跑一遍（具体的正式版列表以 Mojang 版本清单为准，待核实），结论写进 `forks/cubiomes/LUMILIO.md`。已知：26.2 新增硫磺洞穴（sulphur caves）群系（issue #165，在较低的 Y 才看得到，说明是洞穴群系、在多噪声参数表里）；它的参数、引入版本以及有没有别的变化，待核实。
+- [ ] T40：`cargo xtask worldgen-golden <版本> <种子>…`：起一个本机、离线的原版服务端（固定 `level-seed`，托管 Java 由 ADR 0014 的运行时提供），对一组固定坐标 `forceload` 后用 `lumilio-anvil` 读区块的群系调色板（三个维度、几个高度），并经 RCON 在几个起点执行 `/locate structure`；结果写成 `crates/lumilio-cubiomes/tests/golden/<版本>/<种子>.json`（种子、维度、坐标、群系 id、结构种类与位置）。先对 1.21.4 跑，金样必须与未改动的上游 cubiomes 一致，证明工具本身没错。
+- [ ] T41：`cargo xtask cubiomes-btree <参数表>`：从 `forks/cubiomes/data/<版本>/` 里的主世界参数表生成 `tables/btree<版本>.h`，树的构造是自己写的实现（按游戏的行为核对，不翻译游戏代码）。验收：用 1.21.4 的参数表生成的表与上游 `tables/btree21wd.h` 数值完全一致。
+- [ ] T42：按 T39 的差异改 fork：`biomes.h` 新增 `MC_26_3` 等枚举项（命名跟随上游风格）与新群系 id（硫磺洞穴；若上游以后分配了 id，以上游为准，见 W14）；`tables/btree26_3.h`（若参数表变了）；`biomenoise.c` 按版本选树并处理噪声参数变化；`finders.c` 的 `getStructureConfig` 与可行群系列表（按 `structure_set` 和群系标签的差异）；下界参数表若有变化同样处理；`util.c` 的群系名称与配色（新群系先用相近群系的颜色，记进 `LUMILIO.md`）。每处改动一条 `LUMILIO.md` 记录。
+- [ ] T43：若 T39 发现新结构，或已有结构的生成规则变化到现有 finder 表达不了，就为它写 finder（`finders.c`），并在 `lumilio-cubiomes` 开放；没有就在 `LUMILIO.md` 写明「26.3 无新结构」。中间版本逐个归类：生成输入与 1.21.4 相同（共用 1.21.4 的实现）、与 26.3 相同（共用 26.3 的实现）、都不同（不支持）。前两类采集各自的金样，通过后进入候选。
+- [ ] T44：`lumilio-cubiomes/src/tests.rs` 用 T40 的金样逐点对比 26.3（至少三个种子 × 三个维度 × 几个高度，加上主要结构）以及 T43 的候选版本，全部一致；维护者按 W14 第 5 步实机核对 26.3 后，把 26.3 和通过的候选写进版本表（`lumilio-cubiomes/src/lib.rs`），并在 `LUMILIO.md` 记下核对日期。之后的新版本按同一流程（T39–T44）各加一次。
+
+### 收尾（只依赖 P0–P7）
+
+- [ ] T45：把冻结的决策压缩进下一个 ADR（编号到时再取，目前最大是 0037），写明对 D2 的修订（W15：瓦片和对象故障不进 `Failed`，同一个 Provider 连续 5 次只停用它）、对 D3（写权限）和 D5（`View::Map` 与编辑契约）的修订，以及 W13（入库的方块颜色表）、W14（自维护的 cubiomes fork、加版本的流程与入库规则）和 W16（地图只在游戏页）；删除本计划。P8 若还没做完，把 P8 的说明和 T39–T44 原样搬进新计划 `.agents/plans/cubiomes-new-versions.md`（`Status: proposed`，引用新 ADR 而不是本计划），再删本计划；若已做完，ADR 里加一行交付了哪些版本。
 
 ## 每阶段验收
 
@@ -268,35 +271,36 @@ Xaero's Minimap / World Map 本身不开源（许可证未在本次核实）。�
   - 自动：三个版本的结构坐标与金样一致；1.18+ 的估计标记存在。
   - **维护者实机**：用一个已知种子，对照 Chunkbase 或 Cubiomes Viewer 的同一处村庄和要塞。
 - **P2**
-  - 自动：`just test-pkg lumilio-xtask worldgen`；T19 的工具在 1.21.4 上采到的金样与未改动的上游 cubiomes 一致；T20 由 1.21.4 报告生成的表与 `btree21wd.h` 数值一致；`just test-pkg lumilio-cubiomes golden` 中 26.3 与各候选版本的金样逐点一致（三个维度、多个高度、主要结构）；仓库里没有 jar、原始报告和数据包 JSON（`git ls-files` 检查）。
-  - 自动：版本表之外的版本（例如 26.2，若它未被归入候选）仍返回 `Unsupported`，界面显示「不可用」。
-  - **维护者实机**：在 26.3 的游戏里，用两个种子对照地图：F3 看几个采样点的群系（含硫磺洞穴等新群系，若 26.3 有），`/locate` 村庄和要塞与地图上的位置一致。核对之后才把 26.3 加进版本表。
-- **P3**
   - 自动：样本往返逐字节一致；冒号、表情、没有 Y、未知行都能往返；损坏的文件显示错误。
   - **维护者实机**：钉住版本的 Xaero 样本与游戏内列表一致；复制的分享串在游戏里能导入。
-- **P4**
+- **P3**
   - 自动：写权限测试证明插件碰不到 `xaero/minimap` 以外的路径；运行中的实例不会发出任何写入；冲突检测；备份；只有被改的那一行变化。
   - **维护者实机**：改一个点，重新进入世界后 Xaero 列表里看得到；游戏运行中编辑入口禁用。
+- **P4**
+  - 自动：Region 样本解析、坏区块隔离、增量失效；`block-colors` 工具与选表规则；每张入库的颜色表都有 `SOURCE.md`。
+  - **维护者目视**：一个真实存档的地表看起来对（水、树、雪、下界）；退出游戏后新探索的区域出现；带模组方块的存档里「未知方块」的提示。
 - **P5**
-  - 自动：Region 样本解析、坏区块隔离、增量失效。
-  - **维护者目视**：一个真实存档的地表看起来对（水、树、雪、下界）；退出游戏后新探索的区域出现。
-- **P6**
   - 自动：样本区域文件的解码与颜色；不支持的版本报错且不影响其他底图。
   - **维护者目视**：同一个世界的存档底图和 Xaero 底图切换时，中心、缩放和 Overlay 不变，地形大致对得上。
-- **P7**
+- **P6**
   - 自动：标记的增删改与持久化；关联失效的提示；8:1 换算。
   - **维护者实机**：路线和测距的交互。
-- **P8**
+- **P7**
   - 自动：WASM 示例插件的瓦片越权、超大、超时都被拒绝；Litematica Overlay 的范围与投影一致。
   - **维护者实机**：本地加载示例插件，热力图出现在图层面板；安全模式下消失。
+- **P8（延后 / 可选）**
+  - 自动：`just test-pkg lumilio-xtask worldgen`；T40 的工具在 1.21.4 上采到的金样与未改动的上游 cubiomes 一致；T41 由 1.21.4 参数表生成的表与 `btree21wd.h` 数值一致；`just test-pkg lumilio-cubiomes golden` 中 26.3 与各候选版本的金样逐点一致（三个维度、多个高度、主要结构）；`forks/cubiomes/data/` 下每个版本都有 `SOURCE.md`；仓库里没有 jar（`git ls-files '*.jar'` 为空）。
+  - 自动：版本表之外的版本（例如 26.2，若它未被归入候选）仍返回 `Unsupported`，界面显示「这一版还不能查」。
+  - **维护者实机**：在 26.3 的游戏里，用两个种子对照地图：F3 看几个采样点的群系（含硫磺洞穴等新群系，若 26.3 有），`/locate` 村庄和要塞与地图上的位置一致。核对之后才把 26.3 加进版本表。
 
 ## 风险
 
-- 自维护 fork 的长期成本：Mojang 每个版本都可能改世界生成（新群系、参数表、噪声、结构配置），每次都要按 W14 跑一遍差异、改 C、采金样、实机核对。P2 是第一次，工作量最难估；之后每个大版本都要重复。
+- 新版本延后：P8 做完之前，种子底图和结构 Overlay 只覆盖到 1.21.4；维护者和大多数玩家在用的 26.x 会显示「这一版还不能查」。功能阶段的实机验收要用 1.21.4 及更早的世界。
+- 自维护 fork 的长期成本：Mojang 每个版本都可能改世界生成（新群系、参数表、噪声、结构配置），每次都要按 W14 跑一遍差异、改 C、采金样、实机核对。P8 是第一次，工作量最难估；之后每个大版本都要重复。
 - 自己实现可能出错：多噪声树的构造、新群系的参数或结构规则理解错，地图就会画错而看起来很真。兜底是 W14 的金样（我们自己从真实世界测得）和维护者实机核对；金样只覆盖采样点，采样之外的错误仍可能漏掉，所以每个版本至少三个种子、三个维度、多个高度。
-- 空窗期：一个新版本发布后，到我们完成五步之前，种子底图和结构 Overlay 在这个版本上显示「不可用」。玩家升级游戏后会先看到「不可用」。
+- 空窗期：一个新版本发布后，到我们完成五步之前，种子底图和结构 Overlay 在这个版本上显示「这一版还不能查」。玩家升级游戏后会先看到它。
 - 上游 cubiomes 若恢复更新：要把上游的提交合进 fork，并逐个判断本地补丁是否被覆盖。两边对同一版本的实现不同时，以金样和实机为准（W14）；新群系的 id 若和我们自己分配的不同，要迁移种子瓦片缓存（缓存键含配色和版本，换 id 时清掉对应缓存）。
-- 只能依据可合法获取的资料：jar、报告和反混淆源码只在本机读，结论入库。运行所需的数值表是否算「生成数据」需要维护者确认（开放问题 12）。
+- 入库的派生数据会过时：方块颜色表和 `forks/cubiomes/data/` 的摘录都按版本生成，新版本加了方块或改了贴图就要重新跑工具。来源记录不全的表无法重新生成，所以 `SOURCE.md` 由工具写，不手写。
 - cubiomes 里的 C 崩溃会直接带走整个启动器；只能靠 Rust 侧的输入校验和测试降低概率（开放问题 6）。我们自己改的 C 代码增加了这个风险，新增的代码路径也要有越界和异常输入的测试。
 - MSVC 编译和 Windows、Linux 上的 wgpu 离屏渲染都还没验证；CI 只覆盖 macOS。
 - 离屏回读的帧时间在大窗口上可能不够平滑。
@@ -308,7 +312,7 @@ Xaero's Minimap / World Map 本身不开源（许可证未在本次核实）。�
 
 ## 开放问题（附建议的默认值）
 
-已决定、移出本节的：原 1（新版本支持，见 W14 与 P2）、原 4（地图位置，见 W16）、原 8（瓦片故障，见 W15）。
+已决定、移出本节的：新版本支持（W14、P8）、地图位置（W16）、瓦片故障（W15）、派生数据能否入库（W13、W14）。
 
 1. **渲染器的帧时间。** 建议：按提案用 wgpu 离屏，P0 测量；大窗口拖动时每帧超过 8 毫秒就回来讨论（例如瓦片改由 GPUI 的图片元素直接画）。
 2. **LOD 每级 4 倍还是 2 倍。** 建议 4 倍，与 cubiomes 原生比例一致；画面在两级之间靠 GPU 采样。
@@ -321,7 +325,6 @@ Xaero's Minimap / World Map 本身不开源（许可证未在本次核实）。�
 9. **World Explorer 默认启用吗。** 建议默认启用：只读本地文件，写回需要人在地图上明确操作，不向第三方披露任何东西（D4 只默认关闭会披露状态的插件）。
 10. **CI 要不要加 Windows 编译作业。** 建议在 P0 加一个只编译 `lumilio-cubiomes` 的 Windows 作业，避免 MSVC 回归要等到发版才发现；完整 `just ci` 仍只在 macOS 上跑。
 11. **发布包里的第三方声明。** 建议把 `ATTRIBUTIONS.md` 原样放进每个包（P0 T11），同时补上 Nucleation 漏掉的 MIT 声明。
-12. **从数据生成器报告推出的数值表能不能入库。** W14 规定原始报告和数据包 JSON 不入库，但 fork 运行时需要由它们推出的数值（`tables/btree<版本>.h` 的参数和树、结构 salt 等常量）。上游 cubiomes 一直以 C 表的形式附带这些数值。建议：只入库运行必需的数值表，不入库任何原始 JSON 或报告；每张表在 `LUMILIO.md` 写明由哪条命令从哪个版本生成，任何人都能在本机复现。
 
 ## 从旧计划迁移
 
@@ -329,23 +332,23 @@ Xaero's Minimap / World Map 本身不开源（许可证未在本次核实）。�
 
 | 旧条目 | 新位置 |
 |---|---|
-| Goal：按世界和维度看集合；改名称、缩写、坐标、颜色、启用、朝向；新建、删除；复制分享串；运行中只读 | P3 T24–T27、P4 T31–T32、W7 |
-| Scope In：读写一个实例的路径点；集合切换；分享串；写权限只覆盖 `xaero/minimap` | T25、T27、T28、W7 |
-| Scope Out：小地图渲染、游戏内传送、VoxelMap / JourneyMap 原生格式、运行中抢写、死亡点批量清空 | Scope Out（保留原文）；「小地图渲染」指游戏内渲染，Xaero 世界地图作为底图另由 P6 提供 |
+| Goal：按世界和维度看集合；改名称、缩写、坐标、颜色、启用、朝向；新建、删除；复制分享串；运行中只读 | P2 T17–T20、P3 T24–T25、W7 |
+| Scope In：读写一个实例的路径点；集合切换；分享串；写权限只覆盖 `xaero/minimap` | T18、T20、T21、W7 |
+| Scope Out：小地图渲染、游戏内传送、VoxelMap / JourneyMap 原生格式、运行中抢写、死亡点批量清空 | Scope Out（保留原文）；「小地图渲染」指游戏内渲染，Xaero 世界地图作为底图另由 P5 提供 |
 | 调研：目录结构、维度目录、集合文件名 | 调研「Xaero 文件格式要点」，补充了 `_1.txt`、`.temp`、备份目录、world-map 树 |
 | 调研：分享串格式、颜色 0–15 | 同上；补充了 20 色的说法与长度限制，开放问题 4 |
-| 调研：磁盘字段多于分享串、`sets:` 与 `dim:` 头、以选定版本为准并在测试里钉住真实文件 | 同上；`dim:` 标为待核实；T24 钉样本 |
+| 调研：磁盘字段多于分享串、`sets:` 与 `dim:` 头、以选定版本为准并在测试里钉住真实文件 | 同上；`dim:` 标为待核实；T17 钉样本 |
 | 调研：JourneyMap 只做导入；本插件直接编辑 | Scope Out（JourneyMap 格式与导入） |
 | 调研：「视图树适合列表和表单」 | 更正：视图树没有输入控件；改为 W10 声明式编辑 |
-| 调研：窄写权限；Xaero 退出世界时写回、运行中只显示 | W7、T28、T32 |
-| 调研：临时点和死亡点可见；默认删除和批量只作用于普通点；死亡点单独确认 | W7、T31 |
-| T1 解析与写回、未知字段原样保留、三维度样本往返并注明版本 | T24（读与往返）、T29/T31（写） |
-| T2 写权限、设置页一句话、读失败与损坏变成页面状态不进 `Failed` | T28、T25、W15 |
-| T3 列出世界、维度、集合；行内编辑；新建；删除确认；复制分享串 | T25、T26、T27、T31（行内编辑改为地图上的对话框，见 W10） |
-| T4 运行中禁用写入、保留浏览和复制 | T32、W7 |
-| 验收：逐字节往返；损坏不覆盖；写权限测试；运行中不写；实机重新进入世界可见 | P3、P4 验收 |
-| 开放问题：World Map 与小地图分叉时只支持小地图 | 调研里已回答（两棵树早已分开，路径点只在小地图），页面说明保留在 T25 |
-| 开放问题：名称里的冒号和换行 | 调研里已回答：冒号写成 `§§`，换行拒绝（T31） |
+| 调研：窄写权限；Xaero 退出世界时写回、运行中只显示 | W7、T21、T25 |
+| 调研：临时点和死亡点可见；默认删除和批量只作用于普通点；死亡点单独确认 | W7、T24 |
+| T1 解析与写回、未知字段原样保留、三维度样本往返并注明版本 | T17（读与往返）、T22/T24（写） |
+| T2 写权限、设置页一句话、读失败与损坏变成页面状态不进 `Failed` | T21、T18、W15 |
+| T3 列出世界、维度、集合；行内编辑；新建；删除确认；复制分享串 | T18、T19、T20、T24（行内编辑改为地图上的对话框，见 W10） |
+| T4 运行中禁用写入、保留浏览和复制 | T25、W7 |
+| 验收：逐字节往返；损坏不覆盖；写权限测试；运行中不写；实机重新进入世界可见 | P2、P3 验收 |
+| 开放问题：World Map 与小地图分叉时只支持小地图 | 调研里已回答（两棵树早已分开，路径点只在小地图），页面说明保留在 T18 |
+| 开放问题：名称里的冒号和换行 | 调研里已回答：冒号写成 `§§`，换行拒绝（T24） |
 
 `cubiomes-seed-map.md`：
 
@@ -354,7 +357,7 @@ Xaero's Minimap / World Map 本身不开源（许可证未在本次核实）。�
 | Goal：三个维度的生物群系，叠加结构、史莱姆区块、出生点；平移缩放；开关图层；点结构复制坐标；后台计算，取消与切种子时丢弃过期图块 | P0、P1、W4 |
 | Scope In：Java 版、cubiomes 支持的版本、当前实例的种子和版本、宿主画地图而插件只交图块和标记 | Scope、W2、W3、W9 |
 | Scope Out：基岩版、Amidst / Chunkbase 的全部筛选条件、cubiomes 进 core、插件视图树直接画 GPU | Scope Out、W11、W9 |
-| Scope Out：在地图上创建路径点 | **有意改变**：提案把「Waypoints 互动」列为包含项，P4 T31 支持在地图上新建 Xaero 路径点 |
+| Scope Out：在地图上创建路径点 | **有意改变**：提案把「Waypoints 互动」列为包含项，P3 T24 支持在地图上新建 Xaero 路径点 |
 | 调研：入口头文件、`Range` 的五档缩放、垂直 1:1 与 1:4 | 调研、W4 |
 | 调研：Cubiomes Viewer 覆盖到 1.21、GPL-3.0；1.18+ 三种结构估计；1.18 前出生点误差 | 调研（参考项目表、种子与版本）、T14、T15 |
 | 调研：GPLv3 §13 与 AGPL 组合；保留 Cubitect 的 GPL 声明 | **更正**：cubiomes 是 MIT，只需保留 MIT 声明（T11）；GPL 只涉及 cubiomes-viewer 与 Axolotl |
@@ -370,22 +373,21 @@ Xaero's Minimap / World Map 本身不开源（许可证未在本次核实）。�
 | 验收：插件崩溃测试，宿主还在，地图显示失败状态 | T3、P0 验收 |
 | 验收：构建产物的归属声明包含 cubiomes 的「GPL 通知」 | T11、P0 验收（改为 MIT 声明，并真正放进包里） |
 | 验收：实机对照 Chunkbase 或 Cubiomes Viewer | P1 验收 |
-| 开放问题：1.21 之后等上游，不降级 | **有意改变**：不等上游，由 LumilioCL 在 `forks/cubiomes` 自己补（W14），P2 交付 26.3；「不降级」保留，版本表外的版本显示「不可用」 |
+| 开放问题：1.21 之后等上游，不降级 | **有意改变**：不等上游，由 LumilioCL 在 `forks/cubiomes` 自己补（W14），放在延后阶段 P8，首个目标 26.3；「不降级」保留，版本表外的版本显示「这一版还不能查」 |
 | 开放问题：第一轮用 cubiomes 自带的 Amidst 风格色表并注明，不做主题化配色 | T6、T11、参考项目表 |
 
-没有有意舍弃的条目。改变的有四处，上表都已标出：在地图上新建路径点从 Out 变成 In；cubiomes 的许可证从 GPL 更正为 MIT；「命令行输出」改为 C 探针生成的金样；新版本不再等上游，而是自己在 fork 里补（维护者 2026-10-08 的决定）。
+没有有意舍弃的条目。改变的有四处，上表都已标出：在地图上新建路径点从 Out 变成 In；cubiomes 的许可证从 GPL 更正为 MIT；「命令行输出」改为 C 探针生成的金样；新版本不再等上游，而是自己在 fork 里补（维护者 2026-10-08 的决定，放在延后阶段 P8）。
 
 ## References
 
-- ADR：0006、0011、0019、0021、0022、0025、0026、0027、0028、0029、0031（D1–D7）、0034、0036
+- ADR：0006、0011、0014（托管 Java，P8 金样工具起服务端用）、0019、0021、0022、0025、0026、0027、0028、0029、0031（D1–D7）、0034（读过 26.3 不混淆的客户端）、0036
 - 计划：`.agents/plans/wasm-plugin-registry.md`、`.agents/plans/i18n-english.md`（T2c）
 - 本仓库：`crates/lumilio-plugin-api/src/{lib.rs,view.rs,analysis.rs}`、`crates/lumilio-core/src/plugins/{mod.rs,access.rs,context.rs,tabs.rs,model.rs}`、`crates/lumilio-core/src/{worlds.rs,layout.rs,instance.rs,model_assets.rs}`、`crates/lumilio-core/src/service/{launch.rs,models.rs,worlds.rs}`、`crates/lumilio-nbt/src/lib.rs`、`crates/lumilio-schematic-render/src/{scene.rs,view.rs}`、`crates/lumilio-ui/src/model_view/{mod.rs,worker.rs,modal.rs}`、`crates/lumilio-ui/src/instance_detail/plugin_tabs.rs`、`crates/lumilio-ui/src/pages/settings/plugins.rs`、`crates/lumilio-app/src/backend.rs`、`crates/lumilio-docgen/src/lib.rs`、`crates/lumilio-docgen/tests/{plugin_boundaries.rs,attribution.rs}`、`crates/lumilio-pointer/Cargo.toml`、`crates/lumilio-xtask/src/{macos,windows,linux,release}.rs`、`forks/README.md`、`ATTRIBUTIONS.md`、`justfile`、`.github/workflows/{ci.yml,release.yml}`
 - cubiomes：<https://github.com/Cubitect/cubiomes>（`e61f905`；`generator.h`、`finders.h`、`biomes.h`、`rng.h`、`util.c`、`biomenoise.c`、`tables/btree21wd.h`、`docs/nptree_c.py`、`LICENSE`）；issue #161、#165
-- ADR 0014（托管 Java，金样工具起服务端用）、ADR 0034（读过 26.3 不混淆的客户端）
 - cubiomes-viewer：<https://github.com/Cubitect/cubiomes-viewer>（`3acc863`；README「Known issues」「Legal information」）
 - Axolotl：<https://github.com/Mystic-Stars/Axolotl>（`b957550`；`apps/app/src/seed_map/{cubiomes_bridge.c,cubiomes_bridge.h,mod.rs,ores.rs,rng.rs}`、`apps/app/src/api/seed_map.rs`、`apps/app/build.rs`、`apps/app-frontend/src/pages/LabSeedMap.vue`、`apps/app-frontend/src/lab/seed-map/features.ts`、`apps/app/COPYING.md`）
-- fastnbt / fastanvil：<https://github.com/owengage/fastnbt>（`986c859`；`fastanvil/src/{region.rs,render.rs,java/chunk.rs,java/section_data.rs}`）
-- XaeroTools：<https://github.com/dekrom/xaerotools>（`7bc650b`；`crates/xaero-core/src/{waypoints.rs,naming.rs,dimconfig.rs,codec/,render/}`、`crates/xaerotools-server/src/pyramid.rs`）
+- fastnbt / fastanvil：<https://github.com/owengage/fastnbt>（`986c859`；`fastanvil/src/{region.rs,render.rs,java/chunk.rs,java/section_data.rs}`、`palette.tar.gz`）
+- XaeroTools：<https://github.com/dekrom/xaerotools>（`7bc650b`；`crates/xaero-core/src/{waypoints.rs,naming.rs,dimconfig.rs,codec/,render/}`、`crates/xaerotools-server/src/pyramid.rs`、`assets/colortable.bin`）
 - Amidst：<https://github.com/toolbox4minecraft/amidst>（`LICENSE.txt`，GPLv3）
 - Xaero 分享串记录：<https://gist.github.com/macimas/937a392be075b1bce7a2ae69ea933ef5>
 - 颜色下标：<https://github.com/rfresh2/XaeroPlus/issues/301>
@@ -395,3 +397,4 @@ Xaero's Minimap / World Map 本身不开源（许可证未在本次核实）。�
 ## 实施记录
 
 - 2026-10-08：维护者在 PR #6 上决定：cubiomes 作为 LumilioCL 自维护的 fork（`forks/cubiomes`），自行补 1.21.5–26.x 的世界生成，首个交付 26.3（W14、P2）；瓦片和对象故障不进 `Failed`，同一个数据源连续 5 次出错只停用它（W15，修订 ADR 0031 D2）；地图只放在游戏页的插件标签里（W16）。
+- 2026-10-08：维护者在 PR #6 上决定：允许入库从 Mojang 资料派生的生成数据（记录生成命令与来源，W13、W14）；新版本世界生成支持延后到功能完成之后（当时的 P2 改为延后阶段 P8，不阻塞收尾 T45）。上一条里的「P2」指当时的编号。
