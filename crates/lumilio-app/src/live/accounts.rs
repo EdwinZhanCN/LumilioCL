@@ -403,6 +403,26 @@ fn finish_server_change(
 }
 
 /// Opens the skin dialog of an offline account.
+/// Loads what an account looks like and hands it to the Accounts detail.
+pub(super) fn load_account_look(wiring: &Wiring, key: String, cx: &mut App) {
+    let service = wiring.backend.service.clone();
+    let wanted = key.clone();
+    let handle = wiring
+        .backend
+        .spawn(async move { service.account_look(&wanted).await });
+    let wiring = wiring.clone();
+    cx.spawn(async move |cx| {
+        let look = match handle.await {
+            Ok(result) => result.map_err(|error| error.to_string()),
+            Err(error) => Err(error.to_string()),
+        };
+        let _ = wiring
+            .shell
+            .update(cx, |shell, cx| shell.account_look(&key, look, cx));
+    })
+    .detach();
+}
+
 pub(super) fn open_skin_dialog(wiring: &Wiring, key: String, window: &mut Window, cx: &mut App) {
     let wiring = wiring.clone();
     window.defer(cx, move |window, cx| {

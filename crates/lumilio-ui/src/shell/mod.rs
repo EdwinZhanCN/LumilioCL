@@ -1,5 +1,6 @@
 //! Root shell: route state, Home snapshot, and presentation-only intents.
 
+mod account_view;
 mod chips;
 mod chrome;
 mod controls;
@@ -17,6 +18,7 @@ mod tests;
 pub(crate) use self::chrome::sync_appearance;
 pub use self::chrome::{build_root, follow_system_appearance, window_titlebar};
 
+use self::account_view::AccountViewer;
 use self::detail::DetailSlot;
 use self::locations::{HISTORY_LIMIT, Location};
 use crate::hero::HeroCarousel;
@@ -79,6 +81,8 @@ pub struct LauncherShell {
     live: Option<LiveModel>,
     live_handler: Option<LiveHandler>,
     live_controls: Option<Entity<LiveControls>>,
+    /// The look preview of the account the Accounts detail shows.
+    account_viewer: Option<AccountViewer>,
     /// The project open on Discover, in place of the list.
     detail: Option<DetailSlot>,
     live_instance: Option<Entity<InstanceDetailView>>,
@@ -103,6 +107,7 @@ impl LauncherShell {
             live: None,
             live_handler: None,
             live_controls: None,
+            account_viewer: None,
             detail: None,
             live_instance: None,
             history: History::new(HISTORY_LIMIT),

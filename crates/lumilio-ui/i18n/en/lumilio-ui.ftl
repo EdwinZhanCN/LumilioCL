@@ -432,7 +432,6 @@ account-skin-site = Skin site skin
 account-detail-custom-uuid = Custom UUID
 account-copied-uuid = UUID copied
 account-menu-copy-uuid = Copy UUID
-account-menu-skin = Skin…
 account-menu-refresh = Refresh sign-in
 account-menu-remove = Remove…
 account-remove-title = Remove account "{ $name }"?
@@ -1300,6 +1299,20 @@ instance-settings-tab-runtime = Runtime
 instance-settings-tab-java = Java
 instance-settings-tab-performance = Performance
 instance-settings-tab-advanced = Advanced
+
+## Account detail: look
+
+skin-view-loading = Reading the look…
+skin-view-aria = 3D preview of the account's look; drag or use the arrow keys to turn, scroll or plus/minus to zoom, R to reset
+skin-view-hint = Drag to turn · Scroll to zoom · Double-click to reset
+skin-view-failed = Couldn't read this account's look
+account-look = Look
+account-look-skin = Skin and cape
+account-look-offline-help = Only you see an offline account's skin in game.
+account-look-change = Change…
+account-look-microsoft-later = Changing a Microsoft account's skin and cape here is coming soon.
+account-look-third-party = This account's skin is set on its skin site.
+account-make-current = Make current account
 
 ## Library and Discover search and filters
 

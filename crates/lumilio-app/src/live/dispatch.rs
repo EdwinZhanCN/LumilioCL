@@ -1,6 +1,6 @@
 use super::accounts::{
-    open_add_account, open_auth_servers, open_microsoft_sign_in, open_skin_dialog,
-    open_third_party_sign_in,
+    load_account_look, open_add_account, open_auth_servers, open_microsoft_sign_in,
+    open_skin_dialog, open_third_party_sign_in,
 };
 use super::discover::{first_search, install, install_target, load_filters, open_project, search};
 use super::instance::open_instance;
@@ -286,6 +286,7 @@ pub(super) fn on_live_intent(
         LiveIntent::ThirdPartySignIn => open_third_party_sign_in(wiring, window, cx),
         LiveIntent::ManageAuthServers => open_auth_servers(wiring, window, cx),
         LiveIntent::EditSkin(key) => open_skin_dialog(wiring, key, window, cx),
+        LiveIntent::LoadAccountLook(key) => load_account_look(wiring, key, cx),
         LiveIntent::RefreshAccount(key) => {
             let service = wiring.backend.service.clone();
             job(

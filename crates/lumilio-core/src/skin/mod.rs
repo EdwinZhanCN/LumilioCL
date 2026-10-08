@@ -12,7 +12,7 @@ mod pixels;
 mod server;
 mod signer;
 
-pub use self::pixels::{Pixels, cape_pixels, looks_slim, skin_pixels};
+pub use self::pixels::{AccountLook, Pixels, cape_pixels, looks_slim, skin_pixels};
 pub use self::server::{Character, LocalSkinServer};
 pub(crate) use self::signer::KEY_BITS;
 pub use self::signer::Signer;

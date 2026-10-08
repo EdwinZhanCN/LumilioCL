@@ -145,6 +145,8 @@ pub struct LiveCtx<'a> {
     pub filter: String,
     /// What is typed in the sidebar's version search.
     pub version_filter: String,
+    /// The look preview of the account the Accounts detail shows.
+    pub account_viewer: Option<&'a gpui::Entity<crate::skin_view::SkinViewer>>,
 }
 
 pub(super) fn send(

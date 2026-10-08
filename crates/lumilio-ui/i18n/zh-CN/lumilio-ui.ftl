@@ -410,7 +410,6 @@ account-skin-site = 皮肤站皮肤
 account-detail-custom-uuid = 自定义 UUID
 account-copied-uuid = 已复制 UUID
 account-menu-copy-uuid = 复制 UUID
-account-menu-skin = 皮肤…
 account-menu-refresh = 刷新登录
 account-menu-remove = 移除…
 account-remove-title = 移除账户“{ $name }”？
@@ -1164,6 +1163,20 @@ instance-settings-tab-runtime = 运行时
 instance-settings-tab-java = Java
 instance-settings-tab-performance = 性能
 instance-settings-tab-advanced = 高级
+
+## 账户详情：外观
+
+skin-view-loading = 正在读取外观…
+skin-view-aria = 账户外观的立体预览；拖动或方向键旋转，滚轮或加减键缩放，R 复位
+skin-view-hint = 拖动旋转 · 滚轮缩放 · 双击复位
+skin-view-failed = 没能读到这个账户的外观
+account-look = 外观
+account-look-skin = 皮肤与披风
+account-look-offline-help = 离线账户的皮肤只有你自己在游戏里看得见。
+account-look-change = 更改…
+account-look-microsoft-later = 正版账户的皮肤与披风很快就能在这里更换。
+account-look-third-party = 这个账户的皮肤在它的皮肤站上设置。
+account-make-current = 设为当前账户
 
 ## 游戏库与发现的搜索和筛选
 

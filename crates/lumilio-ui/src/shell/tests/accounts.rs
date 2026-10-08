@@ -56,9 +56,10 @@ fn the_account_chip_and_page_choose_add_and_manage_accounts(cx: &mut TestAppCont
     assert_eq!(seen.borrow()[1], LiveIntent::NewAccount);
     cx.simulate_click(at(0.85), Modifiers::none());
     assert_eq!(seen.borrow().last(), Some(&LiveIntent::MicrosoftSignIn));
-    assert!(cx.debug_bounds("account-choose-0").is_none());
+    assert!(cx.debug_bounds("account-item-0").is_none());
+    assert!(cx.debug_bounds("account-detail").is_none());
 
-    // With accounts: the page lists them, a click on a row selects it.
+    // With accounts: the detail shows the current account and loads its look.
     seen.borrow_mut().clear();
     shell.update(cx, |shell, cx| {
         shell.update_live(
@@ -67,11 +68,32 @@ fn the_account_chip_and_page_choose_add_and_manage_accounts(cx: &mut TestAppCont
         );
     });
     cx.run_until_parked();
-    let alex = cx.debug_bounds("account-choose-1").expect("Alex's row");
-    cx.simulate_click(alex.center(), Modifiers::none());
+    assert!(cx.debug_bounds("account-detail").is_some());
+    assert!(cx.debug_bounds("skin-view").is_some());
+    assert!(
+        cx.debug_bounds("account-make-current").is_none(),
+        "Steve is current"
+    );
     assert_eq!(
         seen.borrow().as_slice(),
-        [LiveIntent::SelectAccount("Alex".into())]
+        [LiveIntent::LoadAccountLook("Steve".into())]
+    );
+    // A row shows that account without making it current; the detail does.
+    seen.borrow_mut().clear();
+    let alex = cx.debug_bounds("account-item-1").expect("Alex's row");
+    cx.simulate_click(alex.center(), Modifiers::none());
+    cx.run_until_parked();
+    assert_eq!(
+        seen.borrow().as_slice(),
+        [LiveIntent::LoadAccountLook("Alex".into())]
+    );
+    let make_current = cx
+        .debug_bounds("account-make-current")
+        .expect("Alex is not current");
+    cx.simulate_click(make_current.center(), Modifiers::none());
+    assert_eq!(
+        seen.borrow().last(),
+        Some(&LiveIntent::SelectAccount("Alex".into()))
     );
 
     // The chip lists them too and leads to the page from its foot.

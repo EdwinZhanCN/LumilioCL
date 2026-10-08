@@ -68,6 +68,7 @@ impl Render for LauncherShell {
         let current_account = self.current_account(cx);
 
         self.ensure_live_controls(window, cx);
+        self.ensure_account_viewer(window, cx);
         self.sync_library_dropdowns(window, cx);
         let change_callback = cx.listener(|this, change: &DiscoverChange, window, cx| {
             this.change_query(change.clone(), window, cx);
@@ -100,6 +101,7 @@ impl Render for LauncherShell {
                     controls: controls.read(cx),
                     filter,
                     version_filter,
+                    account_viewer: self.account_viewer.as_ref().map(|viewer| &viewer.view),
                 })
             }
             _ => None,
@@ -124,9 +126,7 @@ impl Render for LauncherShell {
                     }
                     // Settings frames itself: its header and tabs stay put.
                     (Route::Settings, _) => pages::settings::render(ctx).into_any_element(),
-                    (Route::Accounts, _) => {
-                        kit::page("live-accounts", pages::live::accounts(ctx)).into_any_element()
-                    }
+                    (Route::Accounts, _) => pages::live::accounts(ctx).into_any_element(),
                     (Route::Discover, None) => {
                         kit::page("live-discover", pages::live::discover(ctx)).into_any_element()
                     }

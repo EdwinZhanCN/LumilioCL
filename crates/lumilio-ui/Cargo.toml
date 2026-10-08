@@ -14,6 +14,7 @@ image.workspace = true
 lumilio-core.workspace = true
 lumilio-plugin-api.workspace = true
 lumilio-schematic-render.workspace = true
+lumilio-skin-render.workspace = true
 lumilio-pointer.workspace = true
 raw-window-handle = "0.6"
 async-channel = "2"

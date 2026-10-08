@@ -10,6 +10,34 @@ use std::io;
 
 use super::{MAX_SIDE, PICTURE_LIMIT, SkinError};
 
+/// What an account looks like, as pixels for a preview. No skin is the
+/// game's default look.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AccountLook {
+    pub model: super::SkinModel,
+    pub skin: Option<Pixels>,
+    pub cape: Option<Pixels>,
+}
+
+impl AccountLook {
+    /// The pictures a skin choice loaded, decoded for the preview.
+    pub fn from_loaded(loaded: &super::LoadedSkin) -> Result<Self, SkinError> {
+        Ok(Self {
+            model: loaded.model,
+            skin: loaded
+                .skin
+                .as_ref()
+                .map(|texture| skin_pixels(&texture.png))
+                .transpose()?,
+            cape: loaded
+                .cape
+                .as_ref()
+                .map(|texture| cape_pixels(&texture.png))
+                .transpose()?,
+        })
+    }
+}
+
 /// A decoded picture, RGBA, row by row.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Pixels {

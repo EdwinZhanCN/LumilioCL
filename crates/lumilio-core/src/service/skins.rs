@@ -10,7 +10,8 @@ use super::LauncherService;
 use super::error::ServiceError;
 use crate::account::{AuthSession, Injection, Keepalive, OfflineProfile};
 use crate::injector;
-use crate::skin::{self, Character, LoadedSkin, LocalSkinServer, Signer, SkinChoice};
+use crate::settings::{AccountKind, SettingsError};
+use crate::skin::{self, AccountLook, Character, LoadedSkin, LocalSkinServer, Signer, SkinChoice};
 use crate::transfer::Transport;
 
 impl<T: Transport + Clone> LauncherService<T> {
@@ -29,6 +30,33 @@ impl<T: Transport + Clone> LauncherService<T> {
                 .map_err(ServiceError::Skin)?;
         }
         Ok(self.settings.lock().await.set_account_skin(key, skin)?)
+    }
+
+    /// What an account looks like, for the Accounts page's preview: an
+    /// offline account's chosen skin and cape, decoded. The default look
+    /// (no skin) is returned for an account without a choice, and for now
+    /// for signed-in accounts.
+    pub async fn account_look(&self, key: &str) -> Result<AccountLook, ServiceError> {
+        let entry = self
+            .settings
+            .lock()
+            .await
+            .get()
+            .accounts
+            .iter()
+            .find(|entry| entry.key() == key)
+            .cloned()
+            .ok_or_else(|| ServiceError::Settings(SettingsError::UnknownAccount(key.to_owned())))?;
+        let Some(choice) = entry.skin.filter(|_| entry.kind == AccountKind::Offline) else {
+            return Ok(AccountLook::default());
+        };
+        let loaded = skin::load(&self.transport, &choice, &entry.name)
+            .await
+            .map_err(ServiceError::Skin)?;
+        tokio::task::spawn_blocking(move || AccountLook::from_loaded(&loaded))
+            .await
+            .map_err(std::io::Error::other)?
+            .map_err(ServiceError::Skin)
     }
 
     /// The key the skin server signs with, made on first use (and kept in

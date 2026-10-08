@@ -112,6 +112,9 @@ pub enum LiveIntent {
     ManageAuthServers,
     /// Open the skin dialog of this offline account (by key).
     EditSkin(String),
+    /// Load what this account (by key) looks like, for the detail's preview;
+    /// the answer goes to `LauncherShell::account_look`.
+    LoadAccountLook(String),
     /// Refresh this Microsoft account's sign-in now.
     RefreshAccount(String),
     /// Use this account (by key) for later launches.

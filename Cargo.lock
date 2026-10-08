@@ -4601,6 +4601,7 @@ dependencies = [
  "lumilio-plugin-api",
  "lumilio-pointer",
  "lumilio-schematic-render",
+ "lumilio-skin-render",
  "raw-window-handle",
  "rust-embed",
 ]
