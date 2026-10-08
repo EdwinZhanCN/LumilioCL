@@ -22,8 +22,12 @@ use crate::tr;
 #[cfg(test)]
 mod tests;
 
-/// The preview's height; its width follows the column.
-pub const HEIGHT: f32 = 360.;
+/// The preview's height for a window this tall: what is left under the
+/// account's head and above the navigation, within limits. Its width follows
+/// the column.
+fn height_for(window_height: f32) -> f32 {
+    (window_height - 420.).clamp(220., 480.)
+}
 
 /// The pictures a preview draws. No skin is the plain grey figure.
 #[derive(Clone, Debug, Default)]
@@ -271,7 +275,7 @@ impl Render for SkinViewer {
             .debug_selector(|| "skin-view".into())
             .relative()
             .w_full()
-            .h(px(HEIGHT))
+            .h(px(height_for(f32::from(window.viewport_size().height))))
             .overflow_hidden()
             .flex()
             .items_center()
