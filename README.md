@@ -38,8 +38,8 @@ LumilioCL 用 Rust 编写，界面基于 [GPUI](https://www.gpui.rs/) 和
 - **插件**：崩溃分析、Litematica 投影（材料清单和 3D 预览）、Discord 状态显示（默认关闭）。
 
 > [!NOTE]
-> Microsoft 正版登录的流程已经做好，但这个启动器的应用注册还在等 Mojang 审批。审批通过之前，
-> 登录会在最后一步失败，界面会说明原因。这段时间可以先用离线账户或第三方登录。
+> Microsoft 正版登录的流程已经做好，这个启动器应用注册已经通过 Mojang 审批。
+> 同时，你也可以使用离线账户或第三方登录。
 
 ## 画廊
 
@@ -173,6 +173,17 @@ just package               # 为当前平台打包到 dist/
 ## 许可证
 
 LumilioCL 以 GNU Affero 通用公共许可证第 3 版（`AGPL-3.0-only`）发布，见 [`LICENSE`](LICENSE)。
+
+AGPL-3.0-only 有几个比较明显的地方，简单说一下：
+
+- 这是一份 **强著佐权（copyleft）** 许可证：你可以自由使用、修改和分发 LumilioCL，但分发时
+  必须保留同样的许可证，并附上完整的源码。
+- 它比 GPL 多了一条**网络条款**：如果把这个程序的修改版放到服务器上，让别人通过网络使用，
+  那么你也必须向这些用户提供对应的源码。自己在本机改着用不受影响。
+- **不提供任何担保**：软件按「原样」给出，作者不对使用后果负责。
+- 许可证用**英文原文**为准，上面只是便于理解的说明，不构成法律意见；具体条款以
+  [`LICENSE`](LICENSE) 为准。
+
 改编自上游的代码，都在所在文件或函数的注释里写明了来源和许可证。内置字体和图标的许可证见
 [`crates/lumilio-ui/assets/ATTRIBUTIONS.md`](crates/lumilio-ui/assets/ATTRIBUTIONS.md)，
 原生渲染依赖的许可证见 [`ATTRIBUTIONS.md`](ATTRIBUTIONS.md)。
