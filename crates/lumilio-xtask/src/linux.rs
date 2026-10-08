@@ -54,6 +54,7 @@ fn tarball(release: &Release, stage: &Path, desktop: &Path) -> Result<PathBuf> {
         &folder.join("share/icons/hicolor"),
     )?;
     copy(&release.license(), &folder.join("LICENSE"))?;
+    release.notices(&folder)?;
     write(
         &folder.join("BUILD.txt"),
         release.build_info("linux", "unsigned"),
@@ -88,6 +89,7 @@ fn deb(release: &Release, stage: &Path, desktop: &Path) -> Result<PathBuf> {
     )?;
     let doc = root.join("usr/share/doc/lumiliocl");
     copy(&release.license(), &doc.join("copyright"))?;
+    release.notices(&doc)?;
     write(
         &doc.join("BUILD.txt"),
         release.build_info("linux", "unsigned"),

@@ -39,6 +39,7 @@ pub fn package(release: &Release, skip_build: bool) -> Result<Vec<PathBuf>> {
         )?;
     }
     copy(&release.license(), &payload.join("LICENSE.txt"))?;
+    release.notices(&payload)?;
     let signature = if signer.is_some() {
         "Authenticode"
     } else {
