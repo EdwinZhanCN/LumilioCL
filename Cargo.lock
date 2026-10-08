@@ -4460,6 +4460,7 @@ dependencies = [
  "lumilio-plugin-discord",
  "lumilio-plugin-litematica",
  "lumilio-plugin-modrinth",
+ "lumilio-plugin-world-explorer",
  "lumilio-ui",
  "reqwest",
  "tempfile",

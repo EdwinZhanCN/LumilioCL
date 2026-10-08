@@ -9,6 +9,7 @@ use lumilio_plugin_api::{
 };
 
 pub const ID: &str = "lumilio.world-explorer";
+pub const SUPPORTED_VERSIONS: &[&str] = lumilio_cubiomes::SUPPORTED_VERSIONS;
 pub struct WorldExplorer;
 
 impl Plugin for WorldExplorer {

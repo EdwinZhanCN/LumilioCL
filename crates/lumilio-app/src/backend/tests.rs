@@ -41,19 +41,94 @@ fn the_backend_opens_and_runs_work_off_the_calling_thread() {
 }
 
 #[test]
+fn world_map_is_available_without_saves_and_manual_seed_survives_restart() {
+    assert_eq!(
+        lumilio_ui::world_explorer::MANUAL_VERSIONS,
+        lumilio_plugin_world_explorer::SUPPORTED_VERSIONS
+    );
+    let dir = tempfile::tempdir().unwrap();
+    let id = {
+        let backend = Backend::open(dir.path().join("root")).unwrap();
+        let service = backend.service.clone();
+        futures_block(backend.spawn(async move {
+            let record = service
+                .create_instance("Seed", Some("1.21.4"), lumilio_core::Loader::Vanilla, None)
+                .await
+                .unwrap();
+            assert!(
+                service
+                    .plugin_tabs(&record.id)
+                    .await
+                    .unwrap()
+                    .iter()
+                    .any(|tab| tab.plugin == lumilio_plugin_world_explorer::ID)
+            );
+            assert_eq!(
+                service
+                    .plugin_view(&record.id, lumilio_plugin_world_explorer::ID)
+                    .await
+                    .unwrap(),
+                Some(lumilio_plugin_api::View::Map)
+            );
+            service
+                .save_map_seed(&record.id, 262, "1.21.4")
+                .await
+                .unwrap();
+            assert_eq!(
+                service.map_contexts(&record.id).await.unwrap()[0]
+                    .context
+                    .seed,
+                Some(262)
+            );
+            record.id
+        }))
+    };
+    let backend = Backend::open(dir.path().join("root")).unwrap();
+    let service = backend.service.clone();
+    futures_block(backend.spawn(async move {
+        assert_eq!(
+            service.map_contexts(&id).await.unwrap()[0].context.seed,
+            Some(262)
+        );
+        service
+            .set_plugin_enabled(lumilio_plugin_world_explorer::ID, false)
+            .await
+            .unwrap();
+        assert!(
+            !service
+                .plugin_tabs(&id)
+                .await
+                .unwrap()
+                .iter()
+                .any(|tab| tab.plugin == lumilio_plugin_world_explorer::ID)
+        );
+        assert!(
+            !service
+                .map_providers()
+                .await
+                .base_maps
+                .iter()
+                .any(|(plugin, _)| plugin == lumilio_plugin_world_explorer::ID)
+        );
+    }));
+}
+
+#[test]
 fn the_shipped_backend_registers_the_crash_analyzer_and_its_switch() {
     let dir = tempfile::tempdir().unwrap();
     let backend = Backend::open(dir.path().join("root")).unwrap();
     let service = backend.service.clone();
     futures_block(backend.spawn(async move {
         let plugins = service.plugins().await;
-        assert_eq!(plugins.len(), 4);
+        assert_eq!(plugins.len(), 5);
         let id = &plugins[0].manifest.id;
         assert_eq!(id, lumilio_plugin_crash_analyzer::ID);
         assert_eq!(plugins[1].manifest.id, lumilio_plugin_discord::ID);
         assert_eq!(plugins[1].status, lumilio_core::PluginStatus::Disabled);
         assert_eq!(plugins[2].manifest.id, lumilio_plugin_litematica::ID);
         assert_eq!(plugins[3].manifest.id, lumilio_plugin_modrinth::ID);
+        assert_eq!(plugins[4].manifest.id, lumilio_plugin_world_explorer::ID);
+        assert_eq!(plugins[4].status, lumilio_core::PluginStatus::Enabled);
         // Discover has its source from the first start, with no setup.
         assert_eq!(
             plugins[3].status,
@@ -129,7 +204,10 @@ fn the_litematica_tab_follows_the_schematics_folder_and_its_switch() {
             .create_instance("Builder", Some("1.0"), lumilio_core::Loader::Vanilla, None)
             .await
             .unwrap();
-        assert!(service.plugin_tabs(&record.id).await.unwrap().is_empty());
+        assert_eq!(
+            service.plugin_tabs(&record.id).await.unwrap()[0].plugin,
+            lumilio_plugin_world_explorer::ID
+        );
 
         let folder = service.layout().game(&record.id).join("schematics");
         tokio::fs::create_dir_all(&folder).await.unwrap();
@@ -137,7 +215,7 @@ fn the_litematica_tab_follows_the_schematics_folder_and_its_switch() {
             .await
             .unwrap();
         let tabs = service.plugin_tabs(&record.id).await.unwrap();
-        assert_eq!(tabs.len(), 1);
+        assert_eq!(tabs.len(), 2);
         assert_eq!(tabs[0].plugin, lumilio_plugin_litematica::ID);
 
         // A broken file is one row that says so; the list still shows.
@@ -164,7 +242,7 @@ fn the_litematica_tab_follows_the_schematics_folder_and_its_switch() {
                 .schematic,
             b"not a schematic"
         );
-        assert_eq!(service.plugin_tabs(&record.id).await.unwrap().len(), 1);
+        assert_eq!(service.plugin_tabs(&record.id).await.unwrap().len(), 2);
         assert!(
             service
                 .plugin_model(&record.id, lumilio_plugin_litematica::ID, "options.txt")
@@ -176,7 +254,10 @@ fn the_litematica_tab_follows_the_schematics_folder_and_its_switch() {
             .set_plugin_enabled(lumilio_plugin_litematica::ID, false)
             .await
             .unwrap();
-        assert!(service.plugin_tabs(&record.id).await.unwrap().is_empty());
+        assert_eq!(
+            service.plugin_tabs(&record.id).await.unwrap()[0].plugin,
+            lumilio_plugin_world_explorer::ID
+        );
         assert!(
             service
                 .plugin_view(&record.id, lumilio_plugin_litematica::ID)
