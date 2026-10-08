@@ -3,6 +3,8 @@ use lumilio_core::{
     ActiveTask, ActivityView, FinishedTask, RecoveryNote, TaskCategory, TaskOutcome,
 };
 
+use crate::tr;
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct ActivityRow {
     /// The running task's id (running rows only).
@@ -87,9 +89,15 @@ pub(super) fn bytes_text(bytes: f64) -> String {
 #[must_use]
 pub fn rate_text(unit: lumilio_core::ProgressUnit, per_sec: f64) -> String {
     match unit {
-        lumilio_core::ProgressUnit::Bytes => format!("{}/秒", bytes_text(per_sec)),
-        lumilio_core::ProgressUnit::Items if per_sec >= 10. => format!("{per_sec:.0} 个文件/秒"),
-        lumilio_core::ProgressUnit::Items => format!("{per_sec:.1} 个文件/秒"),
+        lumilio_core::ProgressUnit::Bytes => {
+            tr!("activity-rate-bytes", rate = bytes_text(per_sec))
+        }
+        lumilio_core::ProgressUnit::Items if per_sec >= 10. => {
+            tr!("activity-rate-files", rate = format!("{per_sec:.0}"))
+        }
+        lumilio_core::ProgressUnit::Items => {
+            tr!("activity-rate-files", rate = format!("{per_sec:.1}"))
+        }
     }
 }
 
@@ -101,9 +109,13 @@ pub fn eta_text(remaining: u64, per_sec: f64) -> Option<String> {
     }
     let seconds = (remaining as f64 / per_sec).ceil() as u64;
     Some(match seconds {
-        0..=59 => "不到 1 分钟".to_owned(),
-        60..=3599 => format!("约 {} 分钟", seconds.div_ceil(60)),
-        _ => format!("约 {} 小时 {} 分钟", seconds / 3600, seconds % 3600 / 60),
+        0..=59 => tr!("activity-eta-under-minute").to_owned(),
+        60..=3599 => tr!("activity-eta-minutes", count = seconds.div_ceil(60)),
+        _ => tr!(
+            "activity-eta-hours-minutes",
+            hours = seconds / 3600,
+            minutes = seconds % 3600 / 60
+        ),
     })
 }
 
@@ -133,31 +145,37 @@ pub fn recovery_message(notes: &[RecoveryNote]) -> Option<String> {
     let first = notes.iter().min_by_key(|note| rank(note))?;
     let headline = match first {
         LibraryRecovered { candidates, .. } if candidates.is_empty() => {
-            "游戏库文件无法读取，已保留原文件并重新开始".to_owned()
+            tr!("activity-recovery-library").to_owned()
         }
-        LibraryRecovered { candidates, .. } => format!(
-            "游戏库文件无法读取，已保留原文件并重新开始；磁盘上找到 {} 个可能的游戏目录",
-            candidates.len()
+        LibraryRecovered { candidates, .. } => tr!(
+            "activity-recovery-library-candidates",
+            count = candidates.len()
         ),
-        SettingsRecovered { .. } => "设置文件无法读取，已保留原文件并使用默认设置".to_owned(),
+        SettingsRecovered { .. } => tr!("activity-recovery-settings").to_owned(),
         DeleteStuck { .. } | PublishStuck { .. } | RestoreStuck { .. } => {
-            "上次中断的操作还没能收尾，文件已保留，下次启动会再试".to_owned()
+            tr!("activity-recovery-stuck").to_owned()
         }
         DeleteConflict { .. } | JournalUnusable { .. } => {
-            "发现无法自动处理的中断记录，相关文件没有被改动".to_owned()
+            tr!("activity-recovery-conflict").to_owned()
         }
-        RestoreRolledBack { .. } => "上次快照恢复被中断，已回到恢复前的样子".to_owned(),
-        SessionInterrupted { .. } => "启动器上次在游戏运行时退出，那次游玩的结果未知".to_owned(),
-        ProfileMissing { .. } => "有游戏的目录不见了，可以在诊断里查看".to_owned(),
-        DeleteRolledBack { .. } => "上次删除被中断，游戏已原样保留".to_owned(),
-        DeleteCompleted { .. } => "上次中断的删除已经完成".to_owned(),
-        PublishCompleted { .. } => "上次中断的导入或复制已经完成".to_owned(),
-        PublishDiscarded { .. } => "上次中断的导入或复制没有完成，已清理，可以重新开始".to_owned(),
-        ActivityLogSkipped { count } => format!("动态记录里有 {count} 行无法读取，已跳过"),
+        RestoreRolledBack { .. } => tr!("activity-recovery-restore-rolled-back").to_owned(),
+        SessionInterrupted { .. } => tr!("activity-recovery-session-interrupted").to_owned(),
+        ProfileMissing { .. } => tr!("activity-recovery-profile-missing").to_owned(),
+        DeleteRolledBack { .. } => tr!("activity-recovery-delete-rolled-back").to_owned(),
+        DeleteCompleted { .. } => tr!("activity-recovery-delete-completed").to_owned(),
+        PublishCompleted { .. } => tr!("activity-recovery-publish-completed").to_owned(),
+        PublishDiscarded { .. } => tr!("activity-recovery-publish-discarded").to_owned(),
+        ActivityLogSkipped { count } => {
+            tr!("activity-recovery-log-skipped", count = *count)
+        }
     };
     Some(match notes.len() {
         1 => headline,
-        more => format!("{headline}（另有 {} 项恢复记录）", more - 1),
+        more => tr!(
+            "activity-recovery-more",
+            headline = headline,
+            more = more - 1
+        ),
     })
 }
 

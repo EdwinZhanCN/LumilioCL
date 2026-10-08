@@ -1,5 +1,6 @@
 //! Host-owned text and number drafts, retained until asynchronous persistence succeeds.
 use crate::theme::ShellColors;
+use crate::tr;
 use crate::{kit, theme};
 use gpui::{App, Context, Entity, IntoElement, Render, Window, div, prelude::*};
 use gpui_component::input::{Input, InputState};
@@ -29,7 +30,7 @@ impl PluginSettingDialog {
         window: &mut Window,
         cx: &mut App,
     ) -> Option<Entity<Self>> {
-        let title = format!("编辑{}", field.label);
+        let title = tr!("plugin-setting-title", label = field.label.clone());
         let initial = match value {
             SettingValue::Text(text) => text,
             SettingValue::Number(number) => number.to_string(),
@@ -59,7 +60,7 @@ impl PluginSettingDialog {
                         .child(
                             kit::action(
                                 "plugin-setting-cancel",
-                                "取消",
+                                tr!("common-cancel"),
                                 None,
                                 false,
                                 |window, cx| window.close_dialog(cx),
@@ -69,7 +70,7 @@ impl PluginSettingDialog {
                         .child(
                             kit::action(
                                 "plugin-setting-save",
-                                "保存",
+                                tr!("common-save"),
                                 None,
                                 true,
                                 move |window, cx| {
@@ -128,13 +129,13 @@ fn parse(kind: &SettingKind, text: &str) -> Result<SettingValue, String> {
             let number = text
                 .trim()
                 .parse::<i64>()
-                .map_err(|_| "请输入整数".to_owned())?;
+                .map_err(|_| tr!("plugin-setting-integer").to_owned())?;
             if !kind.accepts(&SettingValue::Number(number)) {
-                return Err(format!("请输入 {min} 到 {max} 之间的整数"));
+                return Err(tr!("plugin-setting-integer-range", min = *min, max = *max));
             }
             Ok(SettingValue::Number(number))
         }
-        _ => Err("这个设置请在设置行里选择".into()),
+        _ => Err(tr!("plugin-setting-choice-only").to_owned()),
     }
 }
 

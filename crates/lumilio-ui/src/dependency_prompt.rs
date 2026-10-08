@@ -11,6 +11,7 @@ use gpui_component::{ActiveTheme as _, WindowExt as _, h_flex, v_flex};
 use lumilio_core::{DependencyNeed, DependencyReport};
 
 use crate::theme::{self, ShellColors};
+use crate::tr;
 
 const DIALOG_WIDTH: f32 = 420.;
 
@@ -86,9 +87,9 @@ impl DependencyPrompt {
             let go = theme::clickable(
                 Key::new("dependency-together")
                     .label(if count == 0 {
-                        "只安装它".to_owned()
+                        tr!("dependency-install-alone").to_owned()
                     } else {
-                        format!("一起安装（{} 项）", count + 1)
+                        tr!("dependency-install-together", count = count + 1)
                     })
                     .primary()
                     .debug_selector(|| "dependency-together".into())
@@ -99,9 +100,9 @@ impl DependencyPrompt {
             );
             theme::dialog(dialog, cx)
                 .title(if required_any {
-                    format!("{mod_title} 还需要这些")
+                    tr!("dependency-needs-more", mod_title = mod_title.as_str())
                 } else {
-                    format!("关于 {mod_title}")
+                    tr!("dependency-about", mod_title = mod_title.as_str())
                 })
                 .w(px(DIALOG_WIDTH))
                 .child(form.clone())
@@ -112,13 +113,13 @@ impl DependencyPrompt {
                         .gap_2()
                         .child(
                             Key::new("dependency-cancel")
-                                .label("取消")
+                                .label(tr!("common-cancel"))
                                 .white()
                                 .on_click(|_, window, cx| window.close_dialog(cx)),
                         )
                         .children((count > 0).then(|| {
                             Key::new("dependency-alone")
-                                .label("只安装它")
+                                .label(tr!("dependency-install-alone"))
                                 .white()
                                 .debug_selector(|| "dependency-alone".into())
                                 .on_click(move |_, window, cx| {
@@ -141,7 +142,7 @@ impl Render for DependencyPrompt {
             let available = need.version.is_some();
             let label = match &need.version {
                 Some(version) => format!("{} {}", need.title, version.number),
-                None => format!("{}（没有适合这个游戏的版本）", need.title),
+                None => tr!("dependency-no-version", title = need.title.as_str()),
             };
             Checkbox::new(("dependency-row", index))
                 .checked(on && available)
@@ -156,7 +157,7 @@ impl Render for DependencyPrompt {
                     });
                 })
         };
-        let section = |optional: bool, title: &'static str, note: &'static str| {
+        let section = |optional: bool, header: &'static str| {
             let rows: Vec<_> = self
                 .rows
                 .iter()
@@ -167,32 +168,23 @@ impl Render for DependencyPrompt {
             (!rows.is_empty()).then(|| {
                 v_flex()
                     .gap_2()
-                    .child(
-                        div()
-                            .text_sm()
-                            .text_color(colors.muted)
-                            .child(format!("{title}：{note}")),
-                    )
+                    .child(div().text_sm().text_color(colors.muted).child(header))
                     .children(rows)
             })
         };
         v_flex()
             .w_full()
             .gap_4()
-            .children(section(
-                false,
-                "需要",
-                "没有它们，这个 Mod 多半进不了游戏。取消勾选的不会安装。",
-            ))
-            .children(section(true, "可选", "装上能多一些功能，不装也能用。"))
+            .children(section(false, tr!("dependency-needed")))
+            .children(section(true, tr!("dependency-optional")))
             .children((!self.conflicts.is_empty()).then(|| {
                 div()
                     .debug_selector(|| "dependency-conflicts".into())
                     .text_sm()
                     .text_color(colors.danger)
-                    .child(format!(
-                        "它声明和已装的 {} 不兼容，一起用可能进不了游戏。",
-                        self.conflicts.join("、")
+                    .child(tr!(
+                        "dependency-conflicts",
+                        conflicts = self.conflicts.join(tr!("common-list-separator"))
                     ))
             }))
     }

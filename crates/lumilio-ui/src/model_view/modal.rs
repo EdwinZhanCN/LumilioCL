@@ -1,5 +1,5 @@
 use super::{Load, Viewer};
-use crate::{key::Key, theme};
+use crate::{key::Key, theme, tr};
 use gpui::{
     App, Context, Entity, FocusHandle, Subscription, WeakEntity, Window, div, prelude::*, px,
 };
@@ -86,7 +86,7 @@ impl ModelView {
         let closed = owner.downgrade();
         let cancelled = owner.downgrade();
         theme::dialog(dialog, cx)
-            .title("3D 投影预览")
+            .title(tr!("model-title"))
             .w(px(
                 (f32::from(window.viewport_size().width) - 48.).clamp(280., 1120.)
             ))
@@ -134,7 +134,7 @@ impl Render for ModelView {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         // ia[instance]: 打开 3D 投影预览 | 投影详情标题同行的顶部按钮组「打开 3D 预览」 | 打开观察弹窗后才读取投影和游戏贴图；加载、错误与重试均在弹窗内；游戏版本画不出的方块在技术详情中列出
         let open = Key::new(("model-open", cx.entity_id().as_u64()))
-            .label("打开 3D 预览")
+            .label(tr!("model-open"))
             .white()
             .debug_selector(|| "model-open".into())
             .on_click(cx.listener(|this, _, window, cx| this.open(window, cx)));

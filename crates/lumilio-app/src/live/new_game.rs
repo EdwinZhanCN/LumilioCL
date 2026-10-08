@@ -7,6 +7,7 @@ use gpui_kit::{App, WeakEntity, Window};
 use lumilio_core::{CancellationToken, LaunchServiceError, ServiceError};
 use lumilio_ui::new_game::{NewGameForm, NewGameIntent, NewGameRequest};
 use lumilio_ui::toast::Toast;
+use lumilio_ui::tr;
 use std::rc::Rc;
 
 /// Opens the new-game dialog (IA `library.md#新建游戏`). Deferred: this may
@@ -46,8 +47,14 @@ pub(super) fn new_game_intent(
             cx.spawn(async move |cx| {
                 let result = match handle.await {
                     Ok(Ok(entries)) => Ok(entries),
-                    Ok(Err(error)) => Err(("读不到版本列表".to_owned(), error.to_string())),
-                    Err(error) => Err(("读不到版本列表".to_owned(), error.to_string())),
+                    Ok(Err(error)) => Err((
+                        tr!("new-game-read-game-versions").to_owned(),
+                        error.to_string(),
+                    )),
+                    Err(error) => Err((
+                        tr!("new-game-read-game-versions").to_owned(),
+                        error.to_string(),
+                    )),
                 };
                 let _ = form.update(cx, |form, cx| form.game_versions_arrived(result, cx));
             })
@@ -62,7 +69,10 @@ pub(super) fn new_game_intent(
                 .backend
                 .spawn(async move { service.loader_versions(loader, &wanted).await });
             cx.spawn(async move |cx| {
-                let failed = format!("读不到 {} 的版本", lumilio_ui::live::loader_label(loader));
+                let failed = tr!(
+                    "new-game-read-loader-versions",
+                    loader = lumilio_ui::live::loader_label(loader)
+                );
                 let result = match handle.await {
                     Ok(Ok(versions)) => Ok(versions),
                     Ok(Err(error)) => Err((failed, error.to_string())),
@@ -109,11 +119,11 @@ pub(super) fn create_game(
             Ok(record) => record,
             Err(error) => {
                 let message = match &error {
-                    ServiceError::Launch(LaunchServiceError::LoaderUnsupported(loader)) => format!(
-                        "{} 还不能安装，支持正在路上",
-                        lumilio_ui::live::loader_label(*loader)
+                    ServiceError::Launch(LaunchServiceError::LoaderUnsupported(loader)) => tr!(
+                        "new-game-loader-unsupported-install",
+                        loader = lumilio_ui::live::loader_label(*loader)
                     ),
-                    _ => "没有创建成功，可以再试一次".to_owned(),
+                    _ => tr!("new-game-create-failed").to_owned(),
                 };
                 let _ = form.update(cx, |form, cx| {
                     form.created(Err((message, error.to_string())), cx)
@@ -126,9 +136,9 @@ pub(super) fn create_game(
         let _ = wiring.shell.update(cx, |shell, cx| {
             shell.toast(
                 Toast::success(if request.install {
-                    format!("已创建 {}，正在下载游戏文件", record.name)
+                    tr!("new-game-created-downloading", name = record.name)
                 } else {
-                    format!("已创建 {}", record.name)
+                    tr!("new-game-created", name = record.name)
                 }),
                 cx,
             );
@@ -168,8 +178,7 @@ pub(super) fn install_new_game(wiring: &Wiring, id: String, cx: &mut App) {
         move |shell, result, cx| {
             if let Err(error) = result {
                 shell.toast(
-                    Toast::error("游戏文件没有下载完，开始游戏时会再试")
-                        .technical(error.to_string()),
+                    Toast::error(tr!("new-game-download-failed")).technical(error.to_string()),
                     cx,
                 );
             }
@@ -192,7 +201,7 @@ pub(super) fn import_pack(wiring: &Wiring, cx: &mut App) {
         files: true,
         directories: false,
         multiple: false,
-        prompt: Some("选择整合包（.mrpack，或 MultiMC / Prism 的 .zip）".into()),
+        prompt: Some(tr!("new-game-import-pack-prompt").into()),
     });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
@@ -219,7 +228,10 @@ pub(super) fn import_pack_file(wiring: &Wiring, path: std::path::PathBuf, cx: &m
         cx,
         true,
         Reload::All,
-        Some(Toast::info(format!("开始导入 {name}，进度在动态里"))),
+        Some(Toast::info(tr!(
+            "library-import-game-started",
+            name = name.as_str()
+        ))),
         async move {
             service
                 .import_modpack_file(&path, CancellationToken::new())
@@ -228,8 +240,8 @@ pub(super) fn import_pack_file(wiring: &Wiring, path: std::path::PathBuf, cx: &m
         move |shell, result, cx| {
             let toast = outcome(
                 result,
-                |record| format!("已导入整合包 {}", record.name),
-                format!("没有导入 {name}"),
+                |record| tr!("new-game-import-pack-done", name = record.name),
+                tr!("library-import-game-failed", name = name.as_str()),
             );
             shell.toast(toast, cx);
         },

@@ -16,6 +16,7 @@ use lumilio_core::{ExportSpec, FileEntry, PackFormat};
 
 use crate::kit;
 use crate::theme::{self, ShellColors};
+use crate::tr;
 
 const DIALOG_WIDTH: f32 = 460.;
 pub const FORMAT_LABELS: [&str; 2] = ["Modrinth (.mrpack)", "MultiMC / Prism (.zip)"];
@@ -125,14 +126,14 @@ pub fn spec_from(
     format: PackFormat,
 ) -> Result<ExportSpec, &'static str> {
     if name.trim().is_empty() {
-        return Err("请输入整合包名称");
+        return Err(tr!("export-name-required"));
     }
     if version.trim().is_empty() {
-        return Err("请输入版本号");
+        return Err(tr!("export-version-required"));
     }
     let include: Vec<String> = nodes.iter().flat_map(Node::paths).collect();
     if include.is_empty() {
-        return Err("至少选一项要放进整合包的内容");
+        return Err(tr!("export-include-required"));
     }
     Ok(ExportSpec {
         format,
@@ -165,10 +166,11 @@ impl ExportForm {
         let name = cx.new(|cx| InputState::new(window, cx).default_value(game_name));
         let version = cx.new(|cx| {
             InputState::new(window, cx)
-                .placeholder("例如 1.0.0")
+                .placeholder(tr!("export-version-placeholder"))
                 .default_value("1.0.0")
         });
-        let summary = cx.new(|cx| InputState::new(window, cx).placeholder("一句话介绍（可空）"));
+        let summary =
+            cx.new(|cx| InputState::new(window, cx).placeholder(tr!("export-summary-placeholder")));
         for input in [&name, &version, &summary] {
             cx.subscribe_in(
                 input,
@@ -214,7 +216,7 @@ impl ExportForm {
             let weak = form.downgrade();
             let ok = theme::clickable(
                 Key::new("export-ok")
-                    .label("选择位置并导出")
+                    .label(tr!("export-ok"))
                     .primary()
                     .disabled(!ready)
                     .debug_selector(|| "export-ok".into())
@@ -224,7 +226,7 @@ impl ExportForm {
                 ready,
             );
             theme::dialog(dialog, cx)
-                .title("导出整合包")
+                .title(tr!("export-title"))
                 .w(px(DIALOG_WIDTH))
                 .child(form.clone())
                 .footer(
@@ -234,7 +236,7 @@ impl ExportForm {
                         .gap_2()
                         .child(
                             Key::new("export-cancel")
-                                .label("取消")
+                                .label(tr!("common-cancel"))
                                 .white()
                                 .on_click(|_, window, cx| window.close_dialog(cx)),
                         )
@@ -270,22 +272,22 @@ impl Render for ExportForm {
             .child(
                 v_flex()
                     .gap_1()
-                    .child(label("名称", colors))
+                    .child(label(tr!("common-name"), colors))
                     .child(Input::new(&self.name)),
             )
             .child(
                 v_flex()
                     .gap_1()
-                    .child(label("版本号", colors))
+                    .child(label(tr!("export-version-label"), colors))
                     .child(Input::new(&self.version)),
             )
             .child(
                 v_flex()
                     .gap_1()
-                    .child(label("简介", colors))
+                    .child(label(tr!("export-summary-label"), colors))
                     .child(Input::new(&self.summary)),
             )
-            .child(label("格式", colors))
+            .child(label(tr!("export-format-label"), colors))
             .child(h_flex().child(kit::segments(
                 "export-format",
                 &FORMAT_LABELS,
@@ -304,7 +306,7 @@ impl Render for ExportForm {
                     }
                 },
             )))
-            .child(label("放进整合包的内容", colors))
+            .child(label(tr!("export-include-label"), colors))
             .child(
                 v_flex()
                     .id("export-entries")
@@ -331,7 +333,11 @@ impl Render for ExportForm {
                             )
                             .children((!node.children.is_empty()).then(|| {
                                 Key::new(("export-expand", index))
-                                    .label(if node.expanded { "收起" } else { "展开" })
+                                    .label(if node.expanded {
+                                        tr!("common-show-less")
+                                    } else {
+                                        tr!("common-expand")
+                                    })
                                     .ghost()
                                     .xsmall()
                                     .debug_selector(move || format!("export-expand-{index}"))
@@ -366,9 +372,12 @@ impl Render for ExportForm {
                         v_flex().gap_1().child(head).children(inside)
                     })),
             )
-            .child(div().text_xs().text_color(colors.muted).child(
-                "Modrinth 上有的文件按地址列出，其余的会直接放进整合包。存档和日志默认不放。",
-            ))
+            .child(
+                div()
+                    .text_xs()
+                    .text_color(colors.muted)
+                    .child(tr!("export-note")),
+            )
             .children(problem.map(|problem| {
                 div()
                     .text_xs()

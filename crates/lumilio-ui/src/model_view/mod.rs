@@ -27,6 +27,7 @@ use crate::{
     key::Key,
     kit,
     theme::{self, ShellColors},
+    tr,
 };
 use input::{FlightInput, Mode};
 use worker::{Event, Request, Worker};
@@ -65,11 +66,11 @@ enum State {
 impl State {
     fn failed(error: SceneError) -> Self {
         let message = match &error {
-            SceneError::NoGpu => "这台电脑没有可用的图形设备，无法显示 3D 预览",
-            SceneError::Parse(_) => "读不了这个投影文件",
-            SceneError::Pack(_) => "读不了游戏的贴图包",
-            SceneError::Mesh(_) => "没能生成 3D 预览",
-            SceneError::Render(_) => "没能绘制 3D 预览",
+            SceneError::NoGpu => tr!("model-error-no-gpu"),
+            SceneError::Parse(_) => tr!("model-error-parse"),
+            SceneError::Pack(_) => tr!("model-error-pack"),
+            SceneError::Mesh(_) => tr!("model-error-mesh"),
+            SceneError::Render(_) => tr!("model-error-render"),
         };
         let detail = (error != SceneError::NoGpu).then(|| error.to_string());
         Self::Failed { message, detail }
@@ -80,10 +81,7 @@ impl State {
 fn undrawable_note(undrawable: &[String]) -> Option<(String, String)> {
     (!undrawable.is_empty()).then(|| {
         (
-            format!(
-                "有 {} 种方块这个游戏版本画不出来，预览里没有它们",
-                undrawable.len()
-            ),
+            tr!("model-undrawable", count = undrawable.len()),
             undrawable.join("\n"),
         )
     })
@@ -151,7 +149,7 @@ impl Viewer {
             Ok(preview) => preview,
             Err(detail) => {
                 self.state = State::Failed {
-                    message: "没能读取 3D 预览",
+                    message: tr!("model-read-failed"),
                     detail: Some(detail),
                 };
                 cx.notify();
@@ -160,7 +158,7 @@ impl Viewer {
         };
         let Some(pack) = preview.pack else {
             self.state = State::Failed {
-                message: "安装这个游戏后，就能用它的贴图预览投影",
+                message: tr!("model-needs-game"),
                 detail: None,
             };
             cx.notify();
@@ -307,10 +305,10 @@ impl Viewer {
                 self.schedule_tick(window, cx);
             }
             Err(lumilio_pointer::CaptureError::Unsupported) => {
-                self.capture_error = Some("当前窗口系统暂不支持鼠标捕获，请使用 Orbital 模式");
+                self.capture_error = Some(tr!("model-capture-unsupported"));
             }
             Err(lumilio_pointer::CaptureError::Unavailable) => {
-                self.capture_error = Some("没能捕获鼠标，点击画面重试");
+                self.capture_error = Some(tr!("model-capture-failed"));
             }
         }
         cx.notify();
@@ -346,7 +344,7 @@ impl Viewer {
             Ok(delta) => delta,
             Err(_) => {
                 self.release_capture();
-                self.capture_error = Some("鼠标捕获已结束，点击画面重新进入");
+                self.capture_error = Some(tr!("model-capture-ended"));
                 cx.notify();
                 return;
             }
@@ -446,7 +444,7 @@ impl Render for Viewer {
         let content = match &self.state {
             State::Loading => div()
                 .debug_selector(|| "model-loading".into())
-                .child("正在生成 3D 预览…")
+                .child(tr!("model-loading"))
                 .into_any_element(),
             State::Ready => img(self.image.clone().unwrap())
                 .size_full()
@@ -468,11 +466,13 @@ impl Render for Viewer {
         let viewport = div()
             .id("model-viewport")
             .role(gpui::Role::Image)
-            .aria_label("3D 投影预览；Orbital 方向键旋转、加减键缩放；Explore 点击或 Enter 捕获鼠标，WASD 移动、空格上升、Shift 下降，Esc 释放；R 复位")
+            .aria_label(tr!("model-aria"))
             .debug_selector(|| "model-viewport".into())
             .relative()
             .w_full()
-            .h(px((f32::from(window.viewport_size().height) - 240.).clamp(160., 640.)))
+            .h(px(
+                (f32::from(window.viewport_size().height) - 240.).clamp(160., 640.)
+            ))
             .overflow_hidden()
             .flex()
             .items_center()
@@ -486,12 +486,14 @@ impl Render for Viewer {
             })
             .track_focus(&self.focus)
             .tab_stop(true)
-            .on_action(cx.listener(|this, _: &gpui_component::dialog::Confirm, window, cx| {
-                if this.mode == Mode::Explore && this.capture.is_none() {
-                    this.capture(window.mouse_position(), window, cx);
-                }
-                cx.stop_propagation();
-            }))
+            .on_action(
+                cx.listener(|this, _: &gpui_component::dialog::Confirm, window, cx| {
+                    if this.mode == Mode::Explore && this.capture.is_none() {
+                        this.capture(window.mouse_position(), window, cx);
+                    }
+                    cx.stop_propagation();
+                }),
+            )
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(|this, event: &gpui::MouseDownEvent, window, cx| {
@@ -517,7 +519,9 @@ impl Render for Viewer {
                 cx.listener(|this, _, _, _| this.drag = None),
             )
             .on_mouse_move(cx.listener(|this, event: &gpui::MouseMoveEvent, _, cx| {
-                if this.mode != Mode::Orbital { return; }
+                if this.mode != Mode::Orbital {
+                    return;
+                }
                 if !event.dragging() {
                     this.drag = None;
                     return;
@@ -533,7 +537,9 @@ impl Render for Viewer {
             }))
             .on_scroll_wheel(cx.listener(|this, event: &gpui::ScrollWheelEvent, _, cx| {
                 cx.stop_propagation();
-                if this.mode != Mode::Orbital { return; }
+                if this.mode != Mode::Orbital {
+                    return;
+                }
                 let delta = match event.delta {
                     ScrollDelta::Pixels(point) => f32::from(point.y),
                     ScrollDelta::Lines(point) => point.y * 24.,
@@ -547,13 +553,20 @@ impl Render for Viewer {
                     cx.stop_propagation();
                 }
             }))
-            .on_modifiers_changed(cx.listener(|this, event: &gpui::ModifiersChangedEvent, _, _| {
-                if this.capture.is_some() {
-                    if event.modifiers.control || event.modifiers.platform || event.modifiers.alt {
-                        this.input.clear();
-                    } else { this.input.shift = event.modifiers.shift; }
-                }
-            }))
+            .on_modifiers_changed(
+                cx.listener(|this, event: &gpui::ModifiersChangedEvent, _, _| {
+                    if this.capture.is_some() {
+                        if event.modifiers.control
+                            || event.modifiers.platform
+                            || event.modifiers.alt
+                        {
+                            this.input.clear();
+                        } else {
+                            this.input.shift = event.modifiers.shift;
+                        }
+                    }
+                }),
+            )
             .on_key_down(cx.listener(|this, event: &gpui::KeyDownEvent, window, cx| {
                 if this.mode == Mode::Explore {
                     if event.keystroke.key == "enter" && this.capture.is_none() {
@@ -562,7 +575,10 @@ impl Render for Viewer {
                         return;
                     }
                     if this.capture.is_some() {
-                        if event.keystroke.modifiers.control || event.keystroke.modifiers.platform || event.keystroke.modifiers.alt {
+                        if event.keystroke.modifiers.control
+                            || event.keystroke.modifiers.platform
+                            || event.keystroke.modifiers.alt
+                        {
                             this.input.clear();
                             return;
                         }
@@ -571,7 +587,9 @@ impl Render for Viewer {
                             cx.stop_propagation();
                             return;
                         }
-                        if matches!(event.keystroke.key.as_str(), "r" | "R") { this.reset(cx); }
+                        if matches!(event.keystroke.key.as_str(), "r" | "R") {
+                            this.reset(cx);
+                        }
                     }
                     return;
                 }
@@ -597,14 +615,14 @@ impl Render for Viewer {
             .child(measure);
         // ia[instance]: 复位 3D 投影视角 | 弹窗「复位视角」 | 当前模式回到初始视角；Orbital 可双击画面，聚焦画面后可按 R
         let reset = Key::new("model-reset")
-            .label("复位视角")
+            .label(tr!("model-reset"))
             .ghost()
             .disabled(self.state != State::Ready)
             .on_click(cx.listener(|this, _, _, cx| this.reset(cx)));
         // ia[instance]: 重试 3D 投影预览 | 弹窗出错后的「重试」 | 重新读取当前投影与游戏贴图并生成预览；失败仍显示说明
         let retry = matches!(self.state, State::Failed { .. }).then(|| {
             Key::new("model-retry")
-                .label("重试")
+                .label(tr!("common-retry"))
                 .ghost()
                 .on_click(cx.listener(|this, _, window, cx| this.retry(window, cx)))
         });
@@ -639,11 +657,9 @@ impl Render for Viewer {
             },
         );
         let hint = match self.mode {
-            Mode::Orbital => "拖拽旋转 · 滚轮缩放 · 方向键旋转 · + / − 缩放",
-            Mode::Explore if self.capture.is_some() => {
-                "WASD 移动 · 空格上升 · Shift 下降 · Esc 释放鼠标"
-            }
-            Mode::Explore => "点击画面或按 Enter 进入 · WASD 移动 · 空格上升 · Shift 下降",
+            Mode::Orbital => tr!("model-hint-orbital"),
+            Mode::Explore if self.capture.is_some() => tr!("model-hint-explore-captured"),
+            Mode::Explore => tr!("model-hint-explore"),
         };
         v_flex()
             .w_full()

@@ -13,6 +13,7 @@ use gpui_component::{ActiveTheme as _, StyledExt as _, WindowExt as _, h_flex, v
 
 use crate::kit;
 use crate::theme::{self, ShellColors};
+use crate::tr;
 
 const DIALOG_WIDTH: f32 = 480.;
 
@@ -179,7 +180,7 @@ impl<I: Clone + 'static> SettingsDialog<I> {
                 let weak = weak.clone();
                 theme::clickable(
                     Key::new("settings-save")
-                        .label("保存")
+                        .label(tr!("common-save"))
                         .primary()
                         .debug_selector(|| "settings-save".into())
                         .on_click(move |_, window, cx| {
@@ -190,7 +191,7 @@ impl<I: Clone + 'static> SettingsDialog<I> {
             };
             let cancel = theme::clickable(
                 Key::new("settings-cancel")
-                    .label("取消")
+                    .label(tr!("common-cancel"))
                     .white()
                     .on_click(|_, window, cx| window.close_dialog(cx)),
                 true,
@@ -199,7 +200,7 @@ impl<I: Clone + 'static> SettingsDialog<I> {
                 let handler = handler.clone();
                 theme::clickable(
                     Key::new("settings-reset")
-                        .label("恢复默认")
+                        .label(tr!("common-restore-defaults"))
                         .ghost()
                         .debug_selector(|| "settings-reset".into())
                         .on_click(move |_, window, cx| {
@@ -240,22 +241,32 @@ impl<I: Clone + 'static> Render for SettingsDialog<I> {
                             .gap_2()
                             .child(div().flex_1().child(Input::new(&state)))
                             .child(
-                                kit::ghost("settings-browse", "浏览…", move |window, cx| {
-                                    let chosen =
-                                        crate::platform::pick_path(cx, files, directories, prompt);
-                                    let (handle, state) = (window.window_handle(), state.clone());
-                                    cx.spawn(async move |cx| {
-                                        if let Some(path) = chosen.await {
-                                            let text = path.display().to_string();
-                                            let _ = cx.update_window(handle, |_, window, cx| {
-                                                state.update(cx, |state, cx| {
-                                                    state.set_value(text, window, cx)
-                                                });
-                                            });
-                                        }
-                                    })
-                                    .detach();
-                                })
+                                kit::ghost(
+                                    "settings-browse",
+                                    tr!("common-browse"),
+                                    move |window, cx| {
+                                        let chosen = crate::platform::pick_path(
+                                            cx,
+                                            files,
+                                            directories,
+                                            prompt,
+                                        );
+                                        let (handle, state) =
+                                            (window.window_handle(), state.clone());
+                                        cx.spawn(async move |cx| {
+                                            if let Some(path) = chosen.await {
+                                                let text = path.display().to_string();
+                                                let _ =
+                                                    cx.update_window(handle, |_, window, cx| {
+                                                        state.update(cx, |state, cx| {
+                                                            state.set_value(text, window, cx)
+                                                        });
+                                                    });
+                                            }
+                                        })
+                                        .detach();
+                                    },
+                                )
                                 .debug_selector(|| "settings-browse".into()),
                             )
                             .into_any_element()

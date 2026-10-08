@@ -6,6 +6,7 @@ use crate::assets::UiIcon;
 use crate::key::Key;
 use crate::kit;
 use crate::theme::ShellColors;
+use crate::tr;
 use gpui::prelude::*;
 use gpui::{Context, ObjectFit, div, img, px};
 use gpui_component::{Icon, StyledExt as _, h_flex, v_flex};
@@ -20,7 +21,7 @@ impl ProjectDetailView {
         cx: &mut Context<Self>,
     ) -> gpui::AnyElement {
         if project.gallery.is_empty() {
-            return kit::empty("这个项目没有画廊", "", colors).into_any_element();
+            return kit::empty(tr!("project-gallery-empty"), "", colors).into_any_element();
         }
         let view = cx.entity();
         h_flex()
@@ -180,7 +181,7 @@ impl ProjectDetailView {
                         .child(
                             Key::new("detail-viewer-open")
                                 .icon(Icon::new(UiIcon::External))
-                                .tooltip("在浏览器中打开")
+                                .tooltip(tr!("project-open-in-browser"))
                                 .white()
                                 .on_click(move |_, _, cx| {
                                     cx.stop_propagation();
@@ -190,7 +191,7 @@ impl ProjectDetailView {
                         .child(
                             Key::new("detail-viewer-close")
                                 .icon(Icon::new(UiIcon::Close))
-                                .tooltip("关闭")
+                                .tooltip(tr!("common-close"))
                                 .white()
                                 .debug_selector(|| "detail-viewer-close".into())
                                 .on_click(close_with()),

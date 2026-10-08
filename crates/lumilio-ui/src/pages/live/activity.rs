@@ -3,11 +3,23 @@ use crate::kit;
 use crate::kit::ViewIntent;
 use crate::live::{ActivityRow, ActivityState, LiveHandler, LiveIntent};
 use crate::theme::ShellColors;
+use crate::{tr, tr_all};
 use gpui::prelude::*;
 use gpui::{IntoElement, div, px};
 use gpui_component::{h_flex, v_flex};
 
-pub const ACTIVITY_TABS: [&str; 5] = ["全部", "下载", "安装", "更新", "修复"];
+/// The Activity tabs, as translated labels.
+#[allow(non_snake_case)]
+pub fn ACTIVITY_TABS() -> &'static [&'static str] {
+    tr_all![
+        "activity-tab-all",
+        "activity-tab-download",
+        "activity-tab-install",
+        "activity-tab-update",
+        "activity-tab-repair",
+    ]
+}
+
 /// 「重试」 for a finished task that remembers its input.
 // ia[activity]: 失败重试 | 失败或已取消任务行的「重试」 | 用当时的输入重新发起，作为新任务出现，旧条目保留 | 升级前的旧记录没有输入，不显示
 pub(super) fn retry_button(
@@ -19,7 +31,7 @@ pub(super) fn retry_button(
     Some(
         kit::ghost(
             ("live-retry", index),
-            "重试",
+            tr!("common-retry"),
             send(handler, LiveIntent::RetryTask(action)),
         )
         .debug_selector(move || format!("live-retry-{index}")),
@@ -38,7 +50,7 @@ pub(super) fn open_button(
     Some(
         kit::ghost(
             ("live-open", index),
-            "打开",
+            tr!("common-open"),
             send(handler, LiveIntent::OpenInstance(id)),
         )
         .debug_selector(move || format!("live-open-{index}")),
@@ -52,7 +64,7 @@ pub(super) fn speed_line(row: &ActivityRow, colors: ShellColors) -> Option<gpui:
     if let Some((done, total)) = row.amount
         && let Some(left) = crate::live::eta_text(total.saturating_sub(done), rate)
     {
-        parts.push(format!("剩余{left}"));
+        parts.push(tr!("activity-remaining", left = left));
     }
     Some(
         div()
@@ -89,14 +101,16 @@ pub(super) fn activity_row(
                                 .child(format!("{}%", (fraction * 100.) as u32)),
                         )
                         .into_any_element(),
-                    None => kit::chip("进行中", None, colors).into_any_element(),
+                    None => {
+                        kit::chip(tr!("activity-status-running"), None, colors).into_any_element()
+                    }
                 })
                 .children(speed_line(row, colors))
                 // ia[activity]: 取消 | 运行中任务行的「取消」 | 任务停止，状态“已取消”
                 .children(row.cancel.map(|id| {
                     kit::ghost(
                         ("live-cancel", index),
-                        "取消",
+                        tr!("common-cancel"),
                         send(handler, LiveIntent::CancelTask(id)),
                     )
                 }))
@@ -108,7 +122,11 @@ pub(super) fn activity_row(
                 .gap_2()
                 .items_center()
                 .children(open_button(index, row, handler, opens))
-                .child(kit::chip("已完成", Some(kit::tone_ok()), colors))
+                .child(kit::chip(
+                    tr!("activity-status-done"),
+                    Some(kit::tone_ok()),
+                    colors,
+                ))
                 .into_any_element(),
         ),
         ActivityState::Failed(message) => (
@@ -123,7 +141,11 @@ pub(super) fn activity_row(
                 ))
                 .children(retry_button(index, row, handler))
                 .children(open_button(index, row, handler, opens))
-                .child(kit::chip("失败", Some(colors.danger), colors))
+                .child(kit::chip(
+                    tr!("activity-status-failed"),
+                    Some(colors.danger),
+                    colors,
+                ))
                 .into_any_element(),
         ),
         ActivityState::Cancelled => (
@@ -132,7 +154,7 @@ pub(super) fn activity_row(
                 .gap_2()
                 .items_center()
                 .children(retry_button(index, row, handler))
-                .child(kit::chip("已取消", None, colors))
+                .child(kit::chip(tr!("activity-status-cancelled"), None, colors))
                 .into_any_element(),
         ),
     };
@@ -155,7 +177,7 @@ pub(super) fn activity_row(
 pub fn activity(ctx: &LiveCtx) -> impl IntoElement {
     let colors = ctx.colors;
     let running = ctx.model.active_tasks();
-    let tab = ctx.state.activity_tab.min(ACTIVITY_TABS.len() - 1);
+    let tab = ctx.state.activity_tab.min(ACTIVITY_TABS().len() - 1);
     let shown = crate::live::activity_in_tab(&ctx.model.activity, tab);
     let finished = ctx
         .model
@@ -164,9 +186,14 @@ pub fn activity(ctx: &LiveCtx) -> impl IntoElement {
         .any(|row| row.state != ActivityState::Running);
     let body = if shown.is_empty() {
         if ctx.model.activity.is_empty() {
-            kit::empty("还没有动态", "下载和安装会出现在这里", colors).into_any_element()
+            kit::empty(
+                tr!("activity-empty-title"),
+                tr!("activity-empty-help"),
+                colors,
+            )
+            .into_any_element()
         } else {
-            kit::empty("这一类里没有动态", "", colors).into_any_element()
+            kit::empty(tr!("activity-tab-empty"), "", colors).into_any_element()
         }
     } else {
         kit::panel_list(
@@ -189,7 +216,7 @@ pub fn activity(ctx: &LiveCtx) -> impl IntoElement {
         // ia[activity]: 清除已完成 | L2 次要「清除已完成」 | 清空结束的条目；没有结束的条目时禁用
         kit::action(
             "live-clear-finished",
-            "清除已完成",
+            tr!("activity-clear-finished"),
             None,
             false,
             send(&ctx.handler, LiveIntent::ClearFinished),
@@ -200,10 +227,10 @@ pub fn activity(ctx: &LiveCtx) -> impl IntoElement {
         .w_full()
         .gap_5()
         .child(kit::header(
-            "动态",
+            tr!("route-activity"),
             match running {
-                0 => "现在没有进行中的事情".to_owned(),
-                count => format!("{count} 件事正在进行"),
+                0 => tr!("activity-none-running").to_owned(),
+                count => tr!("activity-running-count", count = count),
             },
             actions.render(colors),
             colors,
@@ -211,7 +238,7 @@ pub fn activity(ctx: &LiveCtx) -> impl IntoElement {
         .child(kit::toolbar(
             Some(
                 // ia[activity]: 分类筛选 | L3 标签：全部 / 下载 / 安装 / 更新 / 修复 | 按任务类别过滤
-                kit::tabs("live-activity-tabs", &ACTIVITY_TABS, tab, {
+                kit::tabs("live-activity-tabs", ACTIVITY_TABS(), tab, {
                     let emit = ctx.emit.clone();
                     move |index, window, app| emit(ViewIntent::ActivityTab(index), window, app)
                 })

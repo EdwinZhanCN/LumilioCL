@@ -9,6 +9,7 @@ use crate::kit;
 use crate::live::{count_label, environment_label, parse_rfc3339, relative_time, tag_label};
 use crate::pages::live::project_icon;
 use crate::theme::ShellColors;
+use crate::tr;
 use gpui::prelude::*;
 use gpui::{App, ClipboardItem, Context, IntoElement, Window, div, px};
 use gpui_component::menu::{ContextMenuExt as _, PopupMenuItem};
@@ -56,15 +57,15 @@ impl ProjectDetailView {
     // ia[discover]: 详情页安装按钮 | 主按钮：安装 / 安装中 / 更新 / 切换版本（已装且在介绍页）/ 已安装（已装且在版本页） | 目标游戏已有的才出现后几种；「切换版本」带你去版本页
     fn install_label(&self, project: &Project, primary: &Primary) -> String {
         if self.installing {
-            return "安装中…".to_owned();
+            return tr!("discover-installing").to_owned();
         }
         match (primary, project.kind, &self.target) {
-            (Primary::Update { .. }, _, _) => "更新".to_owned(),
-            (Primary::SwitchVersion, _, _) => "切换版本".to_owned(),
-            (Primary::Installed, _, _) => "已安装".to_owned(),
-            (_, ProjectKind::Modpack, _) => "安装为新游戏".to_owned(),
-            (_, _, Some(target)) => format!("安装到 {}", target.name),
-            (_, _, None) => "安装".to_owned(),
+            (Primary::Update { .. }, _, _) => tr!("discover-update").to_owned(),
+            (Primary::SwitchVersion, _, _) => tr!("project-switch-version").to_owned(),
+            (Primary::Installed, _, _) => tr!("discover-installed").to_owned(),
+            (_, ProjectKind::Modpack, _) => tr!("project-install-as-new-game").to_owned(),
+            (_, _, Some(target)) => tr!("project-install-into", name = target.name.as_str()),
+            (_, _, None) => tr!("discover-install").to_owned(),
         }
     }
 
@@ -145,17 +146,20 @@ impl ProjectDetailView {
                     move |_, window, cx| install(window, cx)
                 }),
             )
-            .more(kit::MenuEntry::new("在 Modrinth 中打开", {
+            .more(kit::MenuEntry::new(tr!("discover-open-modrinth"), {
                 let url = page_url.clone();
                 move |_, cx| cx.open_url(&url)
             }))
-            .more(kit::MenuEntry::new("复制链接", {
+            .more(kit::MenuEntry::new(tr!("discover-copy-link"), {
                 let page_url = page_url.clone();
                 let copied = copied.clone();
                 move |_, cx| {
                     cx.write_to_clipboard(ClipboardItem::new_string(page_url.clone()));
                     let _ = copied.update(cx, |view, cx| {
-                        view.toast(crate::toast::Toast::success("链接已复制"), cx)
+                        view.toast(
+                            crate::toast::Toast::success(tr!("discover-link-copied")),
+                            cx,
+                        )
                     });
                 }
             }));
@@ -269,17 +273,22 @@ impl ProjectDetailView {
                         .on_click(move |_, window, cx| install(window, cx)),
                 )
                 .separator()
-                .item(
-                    PopupMenuItem::new("在 Modrinth 中打开").on_click(move |_, _, cx| {
+                .item(PopupMenuItem::new(tr!("discover-open-modrinth")).on_click(
+                    move |_, _, cx| {
                         cx.open_url(&open_url);
+                    },
+                ))
+                .item(
+                    PopupMenuItem::new(tr!("discover-copy-link")).on_click(move |_, _, cx| {
+                        cx.write_to_clipboard(ClipboardItem::new_string(copy_url.clone()));
+                        let _ = copied.update(cx, |view, cx| {
+                            view.toast(
+                                crate::toast::Toast::success(tr!("discover-link-copied")),
+                                cx,
+                            )
+                        });
                     }),
                 )
-                .item(PopupMenuItem::new("复制链接").on_click(move |_, _, cx| {
-                    cx.write_to_clipboard(ClipboardItem::new_string(copy_url.clone()));
-                    let _ = copied.update(cx, |view, cx| {
-                        view.toast(crate::toast::Toast::success("链接已复制"), cx)
-                    });
-                }))
             })
     }
 }

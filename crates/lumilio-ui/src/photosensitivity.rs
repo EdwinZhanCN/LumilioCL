@@ -4,6 +4,7 @@
 //! it is a help, not a guarantee.
 
 use crate::key::Key;
+use crate::tr;
 use gpui::{App, Window, div, prelude::*, px};
 use gpui_component::{ActiveTheme as _, WindowExt as _, h_flex};
 
@@ -18,12 +19,14 @@ pub fn warn(
         let muted = cx.theme().muted_foreground;
         let forever = dismiss_forever.clone();
         crate::theme::dialog(dialog, cx)
-            .title("关于光敏性筛选")
+            .title(tr!("photosensitivity-title"))
             .w(px(440.))
-            .child(div().text_sm().text_color(muted).child(
-                "这个筛选只会排除作者自己声明了有闪烁、频闪等光敏性内容的项目。\\
-                         没有声明的项目不会被排除，所以它不能保证内容对光敏性癫痫患者是安全的。",
-            ))
+            .child(
+                div()
+                    .text_sm()
+                    .text_color(muted)
+                    .child(tr!("photosensitivity-body")),
+            )
             .footer(
                 h_flex()
                     .w_full()
@@ -31,7 +34,7 @@ pub fn warn(
                     .gap_2()
                     .child(
                         Key::new("photosensitivity-forever")
-                            .label("知道了，不再提示")
+                            .label(tr!("photosensitivity-dismiss"))
                             .white()
                             .on_click(move |_, window, cx| {
                                 forever(window, cx);
@@ -40,7 +43,7 @@ pub fn warn(
                     )
                     .child(
                         Key::new("photosensitivity-ok")
-                            .label("知道了")
+                            .label(tr!("photosensitivity-ok"))
                             .primary()
                             .on_click(|_, window, cx| window.close_dialog(cx)),
                     ),

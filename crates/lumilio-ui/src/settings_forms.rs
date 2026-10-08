@@ -9,6 +9,7 @@ use lumilio_core::{
 };
 
 use crate::live::LiveIntent;
+use crate::tr;
 
 pub type Parsed = Result<LiveIntent, String>;
 
@@ -34,22 +35,20 @@ fn number(text: &str, what: &str) -> Result<Option<u32>, String> {
     }
     text.parse::<u32>()
         .map(Some)
-        .map_err(|_| format!("{what}需要填一个整数"))
+        .map_err(|_| tr!("settings-number-whole", what = what))
 }
 
 /// Why core refused a tuning, in one sentence.
 #[must_use]
 pub fn tuning_message(error: &TuningError) -> String {
     match error {
-        TuningError::WindowSize => {
-            format!("窗口需要同时填宽和高，范围 1 到 {MAX_WINDOW_SIDE}")
-        }
+        TuningError::WindowSize => tr!("settings-window-size", max = MAX_WINDOW_SIDE),
         TuningError::EnvironmentName(name) => {
-            format!("环境变量名“{name}”不能为空，也不能含等号、空格或控制字符")
+            tr!("settings-env-name-invalid", name = name.as_str())
         }
-        TuningError::ControlCharacter => "参数和命令里不能有控制字符".to_owned(),
-        TuningError::Wrapper => "包装命令的引号没有闭合，或者没有程序名".to_owned(),
-        TuningError::QuickPlay => "直接进入的目标不可用".to_owned(),
+        TuningError::ControlCharacter => tr!("settings-control-character").to_owned(),
+        TuningError::Wrapper => tr!("settings-wrapper-unclosed").to_owned(),
+        TuningError::QuickPlay => tr!("settings-quick-play").to_owned(),
     }
 }
 
@@ -61,17 +60,23 @@ fn tuning(next: LaunchTuning) -> Parsed {
 
 /// Minimum and maximum memory in MB; blank clears a limit.
 pub fn memory(min: &str, max: &str) -> Parsed {
-    let min_mb = number(min, "最小内存")?;
-    let max_mb = number(max, "最大内存")?;
-    for (value, what) in [(min_mb, "最小内存"), (max_mb, "最大内存")] {
+    let min_label = tr!("settings-field-min-memory");
+    let max_label = tr!("settings-field-max-memory");
+    let min_mb = number(min, min_label)?;
+    let max_mb = number(max, max_label)?;
+    for (value, what) in [(min_mb, min_label), (max_mb, max_label)] {
         if value.is_some_and(|value| value == 0 || value > MAX_MEMORY_MB) {
-            return Err(format!("{what}要在 1 到 {MAX_MEMORY_MB} MB 之间"));
+            return Err(tr!(
+                "settings-number-range",
+                what = what,
+                max = MAX_MEMORY_MB
+            ));
         }
     }
     if let (Some(min), Some(max)) = (min_mb, max_mb)
         && min > max
     {
-        return Err("最小内存不能超过最大内存".to_owned());
+        return Err(tr!("settings-memory-min-above-max").to_owned());
     }
     Ok(LiveIntent::SetMemory { min_mb, max_mb })
 }
@@ -79,8 +84,8 @@ pub fn memory(min: &str, max: &str) -> Parsed {
 /// Window size and fullscreen: `fullscreen` is 0 off, 1 on, 2 not set.
 pub fn window(current: &LaunchTuning, width: &str, height: &str, fullscreen: usize) -> Parsed {
     let mut next = current.clone();
-    next.window_width = number(width, "窗口宽度")?;
-    next.window_height = number(height, "窗口高度")?;
+    next.window_width = number(width, tr!("settings-field-window-width"))?;
+    next.window_height = number(height, tr!("settings-field-window-height"))?;
     next.fullscreen = match fullscreen {
         0 => Some(false),
         1 => Some(true),
@@ -106,7 +111,7 @@ pub fn environment(current: &LaunchTuning, text: &str) -> Parsed {
     let mut variables = Vec::new();
     for (index, line) in lines(text).into_iter().enumerate() {
         let Some((name, value)) = line.split_once('=') else {
-            return Err(format!("第 {} 行需要写成 名称=值", index + 1));
+            return Err(tr!("settings-env-line", line = index + 1));
         };
         variables.push(EnvVar {
             name: name.trim().to_owned(),
@@ -128,12 +133,12 @@ pub fn commands(current: &LaunchTuning, pre: &str, wrapper: &str, post: &str) ->
 
 /// Downloads at once; blank leaves it to the launcher.
 pub fn concurrency(text: &str) -> Parsed {
-    let count = number(text, "同时下载数")?;
+    let count = number(text, tr!("settings-concurrency"))?;
     if count.is_some_and(|count| !DOWNLOAD_CONCURRENCY.contains(&count)) {
-        return Err(format!(
-            "同时下载数要在 {} 到 {} 之间",
-            DOWNLOAD_CONCURRENCY.start(),
-            DOWNLOAD_CONCURRENCY.end()
+        return Err(tr!(
+            "settings-concurrency-range",
+            min = *DOWNLOAD_CONCURRENCY.start(),
+            max = *DOWNLOAD_CONCURRENCY.end()
         ));
     }
     Ok(LiveIntent::SetConcurrency(count))
@@ -144,11 +149,11 @@ pub fn mirrors(text: &str) -> Parsed {
     let mut rules = Vec::new();
     for (index, line) in lines(text).into_iter().enumerate() {
         let Some((official, mirror)) = line.split_once("=>") else {
-            return Err(format!("第 {} 行需要写成 官方前缀 => 镜像前缀", index + 1));
+            return Err(tr!("settings-mirror-line", line = index + 1));
         };
         let (official, mirror) = (official.trim(), mirror.trim());
         if official.is_empty() || mirror.is_empty() {
-            return Err(format!("第 {} 行的两个前缀都不能为空", index + 1));
+            return Err(tr!("settings-mirror-prefixes", line = index + 1));
         }
         rules.push(MirrorRule {
             official_prefix: official.to_owned(),

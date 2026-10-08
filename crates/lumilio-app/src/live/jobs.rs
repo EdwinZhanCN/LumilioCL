@@ -8,6 +8,7 @@ use lumilio_ui::live::{
     library_cards,
 };
 use lumilio_ui::toast::Toast;
+use lumilio_ui::tr;
 use std::future::Future;
 
 /// Runs `work` on the worker runtime, then hands the result to `done` on the
@@ -240,7 +241,7 @@ pub(super) fn retry_task(wiring: &Wiring, action: lumilio_core::RetryAction, cx:
         cx,
         true,
         Reload::All,
-        Some(Toast::info("已重新开始，进度在动态里")),
+        Some(Toast::info(tr!("activity-retry-started"))),
         async move {
             // Progress lives in Activity; the channel only has to drain.
             let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
@@ -254,8 +255,8 @@ pub(super) fn retry_task(wiring: &Wiring, action: lumilio_core::RetryAction, cx:
             shell.toast(
                 outcome(
                     result,
-                    |()| "这次成功了".to_owned(),
-                    "还是没有成功".to_owned(),
+                    |()| tr!("activity-retry-ok").to_owned(),
+                    tr!("activity-retry-failed").to_owned(),
                 ),
                 cx,
             )

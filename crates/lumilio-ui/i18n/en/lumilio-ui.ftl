@@ -22,6 +22,12 @@ common-done = Done
 common-clause-separator = {"; "}
 common-remove = Remove
 common-save = Save
+common-retry = Retry
+common-open = Open
+common-name = Name
+common-expand = Expand
+common-browse = Browse…
+common-restore-defaults = Restore defaults
 # Opens the folder with the item selected, named as each system names it.
 common-reveal-macos = Show in Finder
 common-reveal-windows = Show in File Explorer
@@ -563,6 +569,231 @@ account-server-added = Added auth server { $name }
 account-server-removed = Removed auth server
 account-skin-saved = Skin saved; it takes effect on the next launch
 
+## Activity
+
+# Task speed, as in "3.2 MB/s".
+activity-rate-bytes = { $rate }/s
+activity-rate-files = { $rate } files/s
+activity-eta-under-minute = Under a minute
+activity-eta-minutes = { $count ->
+    [one] About { $count } minute
+   *[other] About { $count } minutes
+}
+activity-eta-hours-minutes = About { $hours } { $hours ->
+    [one] hour
+   *[other] hours
+} { $minutes } { $minutes ->
+    [one] minute
+   *[other] minutes
+}
+# Time remaining at the right of a task row; left is a phrase such as "About 3 minutes".
+activity-remaining = { $left } left
+activity-status-running = In progress
+activity-status-done = Done
+activity-status-failed = Failed
+activity-status-cancelled = Cancelled
+activity-empty-title = No activity yet
+activity-empty-help = Downloads and installs show up here
+activity-tab-empty = Nothing in this category
+activity-clear-finished = Clear finished
+activity-none-running = Nothing is running right now
+activity-running-count = { $count ->
+    [one] { $count } thing in progress
+   *[other] { $count } things in progress
+}
+# Launch recovery notes, the most important one first.
+activity-recovery-library = The Library file couldn't be read; the original was kept and it started over
+activity-recovery-library-candidates = The Library file couldn't be read; the original was kept and it started over; found { $count ->
+    [one] { $count } possible game folder
+   *[other] { $count } possible game folders
+} on disk
+activity-recovery-settings = The settings file couldn't be read; the original was kept and defaults are in use
+activity-recovery-stuck = The interrupted operation couldn't be finished; the files were kept and it will try again next launch
+activity-recovery-conflict = An interrupted record was found that can't be handled automatically; the files involved weren't changed
+activity-recovery-restore-rolled-back = The last snapshot restore was interrupted; everything is back to how it was before
+activity-recovery-session-interrupted = The launcher quit while a game was running last time; the result of that session is unknown
+activity-recovery-profile-missing = A game's folder is missing; check it in Diagnostics
+activity-recovery-delete-rolled-back = The last delete was interrupted; the game was kept as it was
+activity-recovery-delete-completed = The interrupted delete finished
+activity-recovery-publish-completed = The interrupted import or copy finished
+activity-recovery-publish-discarded = The interrupted import or copy didn't finish and was cleaned up; you can start again
+activity-recovery-log-skipped = { $count ->
+    [one] { $count } line in the activity log couldn't be read and was skipped
+   *[other] { $count } lines in the activity log couldn't be read and were skipped
+}
+activity-recovery-more = { $headline } ({ $more } more { $more ->
+    [one] recovery record
+   *[other] recovery records
+})
+# Retrying a failed or cancelled task.
+activity-retry-started = Started again; progress is in Activity
+activity-retry-ok = It worked this time
+activity-retry-failed = It still didn't work
+# Activity's category tabs.
+activity-tab-all = All
+activity-tab-download = Downloads
+activity-tab-install = Installs
+activity-tab-update = Updates
+activity-tab-repair = Repairs
+
+## New game
+
+new-game-loader-stable = Stable
+new-game-loader-latest = Latest
+new-game-loader-other = Other
+new-game-install-help = Download them now to make the first launch faster; you can play without them, since starting the game fills them in.
+new-game-channel-snapshot = Snapshot
+new-game-channel-pre-release = Pre-release
+new-game-channel-candidate = Release candidate
+new-game-channel-old = Old
+new-game-loader-tag-stable = Stable
+new-game-loader-tag-testing = Testing
+new-game-default-name = New { $loader } game
+new-game-change-warning = Installed mods may not be compatible with the new game version or loader. Worlds and settings aren't changed; creating a snapshot first is recommended so you can restore if something goes wrong.
+new-game-pick-game-version = Choose a game version
+new-game-pick-loader-version = Choose a loader version
+new-game-resolved-note = Will install { $loader } { $version }
+new-game-change = Change
+new-game-create = Create
+new-game-change-title = Change game version and loader
+new-game-loader-unsupported = { $loader } doesn't support this game version yet; try another version
+new-game-loader-version-label = Loader version
+new-game-install-now = Download game files right after creating
+new-game-snapshot-first = Create a snapshot first
+new-game-read-game-versions = Can't read the version list
+new-game-read-loader-versions = Can't read { $loader } versions
+new-game-loader-unsupported-install = { $loader } can't be installed yet; support is on the way
+new-game-create-failed = Couldn't create it; you can try again
+new-game-created-downloading = Created { $name }; downloading game files
+new-game-created = Created { $name }
+new-game-download-failed = The game files didn't finish downloading; starting the game will try again
+new-game-import-pack-prompt = Choose a modpack (.mrpack, or a MultiMC / Prism .zip)
+new-game-import-pack-done = Imported modpack { $name }
+
+## Project details
+
+project-tab-about = About
+project-tab-versions = Versions
+project-tab-gallery = Gallery
+project-channel-release = Release
+project-channel-beta = Beta
+project-channel-alpha = Alpha
+project-offline = Can't reach Modrinth
+project-offline-help = Check your network and open it again
+project-gallery-empty = This project has no gallery
+project-open-in-browser = Open in browser
+project-switch-version = Switch version
+project-install-as-new-game = Install as a new game
+project-install-into = Install into { $name }
+project-switch = Switch
+project-add-game-version = Add game version
+project-versions-empty = No versions available yet
+project-version-unfit = Doesn't fit the current game
+project-column-channel = Channel
+project-column-published = Published
+project-save-as = Save as
+project-download-version-file = Download this version's file · { $size }
+project-versions-no-match = No versions match the filters
+project-versions-no-match-help = Try loosening the filters
+
+## Dependencies
+
+dependency-install-alone = Install just it
+dependency-install-together = Install together ({ $count ->
+    [one] { $count } item
+   *[other] { $count } items
+})
+dependency-needs-more = { $mod_title } also needs these
+dependency-about = About { $mod_title }
+dependency-no-version = { $title } (no version that fits this game)
+dependency-needed = Required: without them, this mod probably won't launch. Unchecked ones aren't installed.
+dependency-optional = Optional: they add features, and it works without them.
+dependency-conflicts = It declares that it's incompatible with the installed { $conflicts }; using them together may not launch.
+
+## Export modpack
+
+export-name-required = Enter a modpack name
+export-version-required = Enter a version number
+export-include-required = Choose at least one thing to include
+export-version-placeholder = e.g. 1.0.0
+export-summary-placeholder = One-line description (optional)
+export-ok = Choose a location and export
+export-title = Export modpack
+export-version-label = Version
+export-summary-label = Summary
+export-format-label = Format
+export-include-label = What goes into the modpack
+export-note = Files that are on Modrinth are listed by address; the rest are packed in directly. Saves and logs aren't included by default.
+
+## Version picker
+
+version-picker-no-match = No matching versions
+version-picker-loading = Reading versions…
+
+## Model preview
+
+model-title = 3D schematic preview
+model-open = Open 3D preview
+model-error-no-gpu = This computer has no usable graphics device, so the 3D preview can't be shown
+model-error-parse = Can't read this schematic file
+model-error-pack = Can't read the game's texture pack
+model-error-mesh = Couldn't build the 3D preview
+model-error-render = Couldn't draw the 3D preview
+model-undrawable = { $count ->
+    [one] { $count } block type can't be drawn for this game version and is missing from the preview
+   *[other] { $count } block types can't be drawn for this game version and are missing from the preview
+}
+model-read-failed = Couldn't read the 3D preview
+model-needs-game = Once this game is installed, you can preview schematics with its textures
+model-capture-unsupported = The current window system doesn't support mouse capture yet; use Orbital mode
+model-capture-failed = Couldn't capture the mouse; click the view to try again
+model-capture-ended = Mouse capture ended; click the view to re-enter
+model-loading = Building the 3D preview…
+model-aria = 3D schematic preview; in Orbital mode, arrow keys rotate and plus/minus zoom; in Explore mode, click or press Enter to capture the mouse, WASD to move, Space to rise, Shift to descend, Esc to release; R resets
+model-reset = Reset view
+model-hint-orbital = Drag to rotate · Scroll to zoom · Arrow keys rotate · + / − to zoom
+model-hint-explore-captured = WASD to move · Space to rise · Shift to descend · Esc to release the mouse
+model-hint-explore = Click the view or press Enter to enter · WASD to move · Space to rise · Shift to descend
+
+## Placeholder pages
+
+placeholder-library-body = Your games gather here.
+placeholder-discover-title = Nothing discovered yet
+placeholder-discover-body = Mods, resource packs and shaders show up here.
+placeholder-activity-title = Nothing in progress
+placeholder-activity-body = Downloads, installs and repairs leave a trace here when they finish.
+placeholder-accounts-body = Add an offline account to play.
+placeholder-settings-title = Loading settings
+placeholder-settings-body = The launcher and game defaults live here.
+
+## Photosensitivity
+
+photosensitivity-title = About the photosensitivity filter
+photosensitivity-body = This filter only excludes projects whose authors declare flashing or strobing photosensitivity content. Projects without a declaration aren't excluded, so it can't guarantee the content is safe for people with photosensitive epilepsy.
+photosensitivity-dismiss = Got it, don't show again
+photosensitivity-ok = Got it
+
+## Plugin settings
+
+plugin-setting-title = Edit { $label }
+plugin-setting-integer = Enter a whole number
+plugin-setting-integer-range = Enter a whole number between { $min } and { $max }
+plugin-setting-choice-only = Choose this setting in its row instead
+plugin-setting-save-failed = Couldn't save this setting; try again.
+
+## Launch
+
+launch-already-running = A game is already running
+
+## Logs
+
+logs-saved = Saved to { $path } (names and paths redacted)
+logs-export-failed = Couldn't export the logs
+
+## App
+
+app-quit = Quit LumilioCL
+
 ## Library and Discover search and filters
 
 library-search = Search games
@@ -726,3 +957,38 @@ settings-plugin-failure-value = This run paused the plugin
 settings-plugin-enable-setting = Turn on this setting
 settings-plugin-defaults = Defaults
 settings-plugin-reset = Restore defaults
+
+# Validation messages in settings dialogs.
+settings-number-whole = { $what } needs a whole number
+settings-number-range = { $what } must be between 1 and { $max } MB
+settings-window-size = Width and height must both be filled in, from 1 to { $max }
+settings-env-name-invalid = The environment variable name "{ $name }" can't be empty or contain equals signs, spaces or control characters
+settings-control-character = Arguments and commands can't contain control characters
+settings-wrapper-unclosed = The wrapper command has an unclosed quote or no program name
+settings-quick-play = The quick-play target isn't available
+settings-memory-min-above-max = Minimum memory can't be above maximum memory
+settings-env-line = Line { $line } must be written as NAME=value
+settings-concurrency-range = Downloads at once must be between { $min } and { $max }
+settings-mirror-line = Line { $line } must be written as official prefix => mirror prefix
+settings-mirror-prefixes = Both prefixes on line { $line } must be filled in
+# Stand-ins for field names in validation messages, as in "Minimum memory needs a whole number".
+settings-field-min-memory = Minimum memory
+settings-field-max-memory = Maximum memory
+settings-field-window-width = Window width
+settings-field-window-height = Window height
+
+# Action messages triggered by the Settings page.
+settings-java-pick = Choose Java
+settings-java-added = Added Java { $version }
+settings-java-not-found = No Java was found here; choose a Java program or JDK folder
+settings-java-add-failed = Couldn't add Java
+settings-reclaim-failed = Couldn't check for game files
+settings-reclaim-none = No unused game files
+settings-cleaned = Cleaned up { $size }
+settings-clean-files-failed = Couldn't clean up game files
+settings-clear-cache-failed = Couldn't clear the cache
+settings-diagnostics-saved = Diagnostics saved to { $path }
+settings-diagnostics-failed = Couldn't export diagnostics
+settings-java-install-started = Downloading Java; progress is in Activity
+settings-java-installed = Installed Java { $version }
+settings-java-install-failed = Didn't install Java

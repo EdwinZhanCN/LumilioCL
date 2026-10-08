@@ -22,6 +22,12 @@ common-done = 完成
 common-clause-separator = ；
 common-remove = 移除
 common-save = 保存
+common-retry = 重试
+common-open = 打开
+common-name = 名称
+common-expand = 展开
+common-browse = 浏览…
+common-restore-defaults = 恢复默认
 
 ## 时间
 
@@ -526,6 +532,204 @@ account-server-added = 已添加认证服务器 { $name }
 account-server-removed = 已移除认证服务器
 account-skin-saved = 皮肤已保存，下次启动时生效
 
+## 动态
+
+# 任务进行速度，例如「3.2 MB/秒」。
+activity-rate-bytes = { $rate }/秒
+activity-rate-files = { $rate } 个文件/秒
+activity-eta-under-minute = 不到 1 分钟
+activity-eta-minutes = 约 { $count } 分钟
+activity-eta-hours-minutes = 约 { $hours } 小时 { $minutes } 分钟
+# 一条任务行右侧的剩余时间，left 是「约 3 分钟」这样的短语。
+activity-remaining = 剩余{ $left }
+activity-status-running = 进行中
+activity-status-done = 已完成
+activity-status-failed = 失败
+activity-status-cancelled = 已取消
+activity-empty-title = 还没有动态
+activity-empty-help = 下载和安装会出现在这里
+activity-tab-empty = 这一类里没有动态
+activity-clear-finished = 清除已完成
+activity-none-running = 现在没有进行中的事情
+activity-running-count = { $count } 件事正在进行
+# 启动时恢复档的说明，最要紧的一条在前。
+activity-recovery-library = 游戏库文件无法读取，已保留原文件并重新开始
+activity-recovery-library-candidates = 游戏库文件无法读取，已保留原文件并重新开始；磁盘上找到 { $count } 个可能的游戏目录
+activity-recovery-settings = 设置文件无法读取，已保留原文件并使用默认设置
+activity-recovery-stuck = 上次中断的操作还没能收尾，文件已保留，下次启动会再试
+activity-recovery-conflict = 发现无法自动处理的中断记录，相关文件没有被改动
+activity-recovery-restore-rolled-back = 上次快照恢复被中断，已回到恢复前的样子
+activity-recovery-session-interrupted = 启动器上次在游戏运行时退出，那次游玩的结果未知
+activity-recovery-profile-missing = 有游戏的目录不见了，可以在诊断里查看
+activity-recovery-delete-rolled-back = 上次删除被中断，游戏已原样保留
+activity-recovery-delete-completed = 上次中断的删除已经完成
+activity-recovery-publish-completed = 上次中断的导入或复制已经完成
+activity-recovery-publish-discarded = 上次中断的导入或复制没有完成，已清理，可以重新开始
+activity-recovery-log-skipped = 动态记录里有 { $count } 行无法读取，已跳过
+activity-recovery-more = { $headline }（另有 { $more } 项恢复记录）
+# 失败或取消的任务重新发起。
+activity-retry-started = 已重新开始，进度在动态里
+activity-retry-ok = 这次成功了
+activity-retry-failed = 还是没有成功
+# Activity 的分类页签。
+activity-tab-all = 全部
+activity-tab-download = 下载
+activity-tab-install = 安装
+activity-tab-update = 更新
+activity-tab-repair = 修复
+
+## 新建游戏
+
+new-game-loader-stable = 稳定版
+new-game-loader-latest = 最新版
+new-game-loader-other = 其他
+new-game-install-help = 先下载好，第一次启动更快；不下载也能玩，开始游戏时会自动补齐。
+new-game-channel-snapshot = 快照
+new-game-channel-pre-release = 预发布
+new-game-channel-candidate = 候选
+new-game-channel-old = 远古
+new-game-loader-tag-stable = 稳定
+new-game-loader-tag-testing = 测试
+new-game-default-name = 新的{ $loader }游戏
+new-game-change-warning = 已装好的 Mod 可能和新的游戏版本或加载器不兼容。世界和设置不会被改动；建议先建一个快照，出问题时可以恢复。
+new-game-pick-game-version = 选择游戏版本
+new-game-pick-loader-version = 选择加载器版本
+new-game-resolved-note = 将安装 { $loader } { $version }
+new-game-change = 更换
+new-game-create = 创建
+new-game-change-title = 更换游戏版本与加载器
+new-game-loader-unsupported = { $loader } 还不支持这个游戏版本，换一个版本试试
+new-game-loader-version-label = 加载器版本
+new-game-install-now = 创建后立即下载游戏文件
+new-game-snapshot-first = 先建快照
+new-game-read-game-versions = 读不到版本列表
+new-game-read-loader-versions = 读不到 { $loader } 的版本
+new-game-loader-unsupported-install = { $loader } 还不能安装，支持正在路上
+new-game-create-failed = 没有创建成功，可以再试一次
+new-game-created-downloading = 已创建 { $name }，正在下载游戏文件
+new-game-created = 已创建 { $name }
+new-game-download-failed = 游戏文件没有下载完，开始游戏时会再试
+new-game-import-pack-prompt = 选择整合包（.mrpack，或 MultiMC / Prism 的 .zip）
+new-game-import-pack-done = 已导入整合包 { $name }
+
+## 项目详情
+
+project-tab-about = 介绍
+project-tab-versions = 版本
+project-tab-gallery = 画廊
+project-channel-release = 正式版
+project-channel-beta = 测试版
+project-channel-alpha = 早期版
+project-offline = 连不上 Modrinth
+project-offline-help = 检查网络后再打开一次
+project-gallery-empty = 这个项目没有画廊
+project-open-in-browser = 在浏览器中打开
+project-switch-version = 切换版本
+project-install-as-new-game = 安装为新游戏
+project-install-into = 安装到 { $name }
+project-switch = 切换
+project-add-game-version = 添加游戏版本
+project-versions-empty = 还没有可用的版本
+project-version-unfit = 不适用于当前游戏
+project-column-channel = 渠道
+project-column-published = 发布
+project-save-as = 另存为
+project-download-version-file = 下载这个版本的文件 · { $size }
+project-versions-no-match = 没有符合筛选的版本
+project-versions-no-match-help = 放宽筛选试试
+
+## 依赖提示
+
+dependency-install-alone = 只安装它
+dependency-install-together = 一起安装（{ $count } 项）
+dependency-needs-more = { $mod_title } 还需要这些
+dependency-about = 关于 { $mod_title }
+dependency-no-version = { $title }（没有适合这个游戏的版本）
+dependency-needed = 需要：没有它们，这个 Mod 多半进不了游戏。取消勾选的不会安装。
+dependency-optional = 可选：装上能多一些功能，不装也能用。
+dependency-conflicts = 它声明和已装的 { $conflicts } 不兼容，一起用可能进不了游戏。
+
+## 导出整合包
+
+export-name-required = 请输入整合包名称
+export-version-required = 请输入版本号
+export-include-required = 至少选一项要放进整合包的内容
+export-version-placeholder = 例如 1.0.0
+export-summary-placeholder = 一句话介绍（可空）
+export-ok = 选择位置并导出
+export-title = 导出整合包
+export-version-label = 版本号
+export-summary-label = 简介
+export-format-label = 格式
+export-include-label = 放进整合包的内容
+export-note = Modrinth 上有的文件按地址列出，其余的会直接放进整合包。存档和日志默认不放。
+
+## 版本选择
+
+version-picker-no-match = 没有匹配的版本
+version-picker-loading = 正在读取版本…
+
+## 模型预览
+
+model-title = 3D 投影预览
+model-open = 打开 3D 预览
+model-error-no-gpu = 这台电脑没有可用的图形设备，无法显示 3D 预览
+model-error-parse = 读不了这个投影文件
+model-error-pack = 读不了游戏的贴图包
+model-error-mesh = 没能生成 3D 预览
+model-error-render = 没能绘制 3D 预览
+model-undrawable = 有 { $count } 种方块这个游戏版本画不出来，预览里没有它们
+model-read-failed = 没能读取 3D 预览
+model-needs-game = 安装这个游戏后，就能用它的贴图预览投影
+model-capture-unsupported = 当前窗口系统暂不支持鼠标捕获，请使用 Orbital 模式
+model-capture-failed = 没能捕获鼠标，点击画面重试
+model-capture-ended = 鼠标捕获已结束，点击画面重新进入
+model-loading = 正在生成 3D 预览…
+model-aria = 3D 投影预览；Orbital 方向键旋转、加减键缩放；Explore 点击或 Enter 捕获鼠标，WASD 移动、空格上升、Shift 下降，Esc 释放；R 复位
+model-reset = 复位视角
+model-hint-orbital = 拖拽旋转 · 滚轮缩放 · 方向键旋转 · + / − 缩放
+model-hint-explore-captured = WASD 移动 · 空格上升 · Shift 下降 · Esc 释放鼠标
+model-hint-explore = 点击画面或按 Enter 进入 · WASD 移动 · 空格上升 · Shift 下降
+
+## 占位页
+
+placeholder-library-body = 游戏会在这里安静地聚在一起。
+placeholder-discover-title = 还没有发现
+placeholder-discover-body = Mod、资源包和光影会在这里出现。
+placeholder-activity-title = 没有进行中的事情
+placeholder-activity-body = 下载、安装和修复完成后，会在这里留下痕迹。
+placeholder-accounts-body = 添加一个离线账户，就能进入游戏。
+placeholder-settings-title = 设置正在加载
+placeholder-settings-body = 启动器与游戏的默认值会在这里。
+
+## 光敏性提示
+
+photosensitivity-title = 关于光敏性筛选
+photosensitivity-body = 这个筛选只会排除作者自己声明了有闪烁、频闪等光敏性内容的项目。没有声明的项目不会被排除，所以它不能保证内容对光敏性癫痫患者是安全的。
+photosensitivity-dismiss = 知道了，不再提示
+photosensitivity-ok = 知道了
+
+## 插件设置
+
+plugin-setting-title = 编辑{ $label }
+plugin-setting-integer = 请输入整数
+plugin-setting-integer-range = 请输入 { $min } 到 { $max } 之间的整数
+plugin-setting-choice-only = 这个设置请在设置行里选择
+plugin-setting-save-failed = 没能保存这个设置，请重试。
+
+## 启动
+
+launch-already-running = 已经有游戏在运行
+
+## 日志
+
+logs-saved = 已保存到 { $path }（名字和路径已隐去）
+logs-export-failed = 没能导出日志
+
+## 应用
+
+app-quit = 退出 LumilioCL
+
 ## 游戏库与发现的搜索和筛选
 
 library-search = 搜索游戏
@@ -683,3 +887,38 @@ settings-plugin-failure-value = 本次运行暂停了这个插件
 settings-plugin-enable-setting = 启用此设置
 settings-plugin-defaults = 默认值
 settings-plugin-reset = 恢复默认
+
+# 设置对话框里的校验提示。
+settings-number-whole = { $what }需要填一个整数
+settings-number-range = { $what }要在 1 到 { $max } MB 之间
+settings-window-size = 窗口需要同时填宽和高，范围 1 到 { $max }
+settings-env-name-invalid = 环境变量名“{ $name }”不能为空，也不能含等号、空格或控制字符
+settings-control-character = 参数和命令里不能有控制字符
+settings-wrapper-unclosed = 包装命令的引号没有闭合，或者没有程序名
+settings-quick-play = 直接进入的目标不可用
+settings-memory-min-above-max = 最小内存不能超过最大内存
+settings-env-line = 第 { $line } 行需要写成 名称=值
+settings-concurrency-range = 同时下载数要在 { $min } 到 { $max } 之间
+settings-mirror-line = 第 { $line } 行需要写成 官方前缀 => 镜像前缀
+settings-mirror-prefixes = 第 { $line } 行的两个前缀都不能为空
+# 校验提示里代替字段名的说法，例如「最小内存需要填一个整数」。
+settings-field-min-memory = 最小内存
+settings-field-max-memory = 最大内存
+settings-field-window-width = 窗口宽度
+settings-field-window-height = 窗口高度
+
+# Settings 页面触发的操作提示。
+settings-java-pick = 选择 Java
+settings-java-added = 已添加 Java { $version }
+settings-java-not-found = 这里没有找到 Java，请选 java 程序或 JDK 文件夹
+settings-java-add-failed = 没能添加 Java
+settings-reclaim-failed = 没能检查游戏文件
+settings-reclaim-none = 没有多余的游戏文件
+settings-cleaned = 已清理 { $size }
+settings-clean-files-failed = 没能清理游戏文件
+settings-clear-cache-failed = 没能清理缓存
+settings-diagnostics-saved = 诊断包已保存到 { $path }
+settings-diagnostics-failed = 没能导出诊断包
+settings-java-install-started = 开始下载 Java，进度在动态里
+settings-java-installed = 已安装 Java { $version }
+settings-java-install-failed = 没有装上 Java

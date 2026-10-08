@@ -3,41 +3,42 @@
 use gpui::{AnyElement, IntoElement, div, prelude::*, px};
 use gpui_component::{Icon, Sizable as _, StyledExt as _, v_flex};
 
+use crate::tr;
 use crate::{assets::LandmarkIcon, route::Route, theme::ShellColors};
 
 pub fn render(route: Route, colors: ShellColors) -> AnyElement {
     let (eyebrow, title, body, icon) = match route {
         Route::Library => (
-            "游戏库",
-            "还没有游戏",
-            "游戏会在这里安静地聚在一起。",
+            tr!("route-library"),
+            tr!("library-empty"),
+            tr!("placeholder-library-body"),
             LandmarkIcon::Library,
         ),
         Route::Discover => (
-            "发现",
-            "还没有发现",
-            "Mod、资源包和光影会在这里出现。",
+            tr!("route-discover"),
+            tr!("placeholder-discover-title"),
+            tr!("placeholder-discover-body"),
             LandmarkIcon::Discover,
         ),
         Route::Activity => (
-            "动态",
-            "没有进行中的事情",
-            "下载、安装和修复完成后，会在这里留下痕迹。",
+            tr!("route-activity"),
+            tr!("placeholder-activity-title"),
+            tr!("placeholder-activity-body"),
             LandmarkIcon::Activity,
         ),
         Route::Accounts => (
-            "账户",
-            "还没有账户",
-            "添加一个离线账户，就能进入游戏。",
+            tr!("route-accounts"),
+            tr!("account-empty-title"),
+            tr!("placeholder-accounts-body"),
             LandmarkIcon::Accounts,
         ),
         Route::Settings => (
-            "设置",
-            "设置正在加载",
-            "启动器与游戏的默认值会在这里。",
+            tr!("route-settings"),
+            tr!("placeholder-settings-title"),
+            tr!("placeholder-settings-body"),
             LandmarkIcon::Settings,
         ),
-        Route::Home => ("首页", "", "", LandmarkIcon::Home),
+        Route::Home => (tr!("route-home"), "", "", LandmarkIcon::Home),
     };
 
     v_flex()

@@ -6,6 +6,7 @@ use lumilio_core::{CancellationToken, LaunchFailure, LaunchSignal, LaunchUpdate,
 use lumilio_ui::home::{HomePresentation, Subject};
 use lumilio_ui::live::account_failure;
 use lumilio_ui::toast::Toast;
+use lumilio_ui::tr;
 
 pub(super) fn start_launch(wiring: &Wiring, window: gpui_kit::AnyWindowHandle, cx: &mut App) {
     let Some(id) = wiring.state.borrow().continue_id.clone() else {
@@ -142,7 +143,7 @@ pub(super) fn play(wiring: &Wiring, id: String, window: &mut Window, cx: &mut Ap
         let _ = wiring.shell.update(cx, |shell, cx| {
             if !shell.home().can_start() {
                 forget_target();
-                shell.toast(Toast::info("已经有游戏在运行"), cx);
+                shell.toast(Toast::info(tr!("launch-already-running")), cx);
                 return;
             }
             let Some(card) = shell

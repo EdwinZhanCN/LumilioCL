@@ -7,6 +7,7 @@ mod images;
 mod live;
 
 use gpui_kit::{App, WindowBounds, WindowOptions, px, size};
+use lumilio_ui::tr;
 
 /// The launcher's platform identity: the macOS bundle identifier, the Windows
 /// AppUserModelID, the Wayland app id that ties the window to its `.desktop`
@@ -59,7 +60,7 @@ fn main() {
             name: "LumilioCL".into(),
             disabled: false,
             items: vec![gpui_kit::MenuItem::action(
-                "退出 LumilioCL",
+                tr!("app-quit"),
                 lumilio_ui::shell::Quit,
             )],
         }]);

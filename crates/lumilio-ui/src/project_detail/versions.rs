@@ -11,6 +11,7 @@ use crate::key::Key;
 use crate::kit;
 use crate::live::{PageItem, page_items, parse_rfc3339, relative_time, tag_label};
 use crate::theme::ShellColors;
+use crate::tr;
 use gpui::prelude::*;
 use gpui::{Context, Entity, Window, div, px};
 use gpui_component::select::{SearchableVec, Select, SelectEvent, SelectState};
@@ -28,11 +29,13 @@ pub struct Picker {
     key: (bool, usize),
 }
 
-const CHANNELS: [(ReleaseChannel, &str); 3] = [
-    (ReleaseChannel::Release, "正式版"),
-    (ReleaseChannel::Beta, "测试版"),
-    (ReleaseChannel::Alpha, "早期版"),
-];
+fn channels() -> [(ReleaseChannel, &'static str); 3] {
+    [
+        (ReleaseChannel::Release, tr!("project-channel-release")),
+        (ReleaseChannel::Beta, tr!("project-channel-beta")),
+        (ReleaseChannel::Alpha, tr!("project-channel-alpha")),
+    ]
+}
 
 impl ProjectDetailView {
     /// The game versions the list offers: the project's own.
@@ -124,12 +127,15 @@ impl ProjectDetailView {
             .installed
             .get(&project.id)
             .map(|have| have.file_name.clone());
-        let (label, off) = match (installed_version, &installed_file) {
-            (Some(have), _) if have == version.id => ("已安装", true),
-            (Some(_), Some(_)) => ("切换", !fits),
-            _ => ("安装", !fits || self.target.is_none()),
+        let (label, off, switching) = match (installed_version, &installed_file) {
+            (Some(have), _) if have == version.id => (tr!("discover-installed"), true, false),
+            (Some(_), Some(_)) => (tr!("project-switch"), !fits, true),
+            _ => (
+                tr!("discover-install"),
+                !fits || self.target.is_none(),
+                false,
+            ),
         };
-        let switching = label == "切换";
         let (handler, version_id, title) = (
             self.handler.clone(),
             version.id.clone(),
@@ -203,7 +209,8 @@ impl ProjectDetailView {
                 .small();
             if on { key.primary() } else { key.white() }
         };
-        let channels = CHANNELS.iter().map(|(channel, label)| {
+        let channel_list = channels();
+        let channels = channel_list.iter().map(|(channel, label)| {
             let (view, channel) = (view.clone(), *channel);
             let on = self.filters.channels.contains(&channel);
             key(format!("detail-channel-{label}"), (*label).to_owned(), on).on_click(
@@ -260,18 +267,22 @@ impl ProjectDetailView {
         });
         let clear = self.filters.active().then(|| {
             let view = view.clone();
-            kit::ghost("detail-clear-filters", "清除筛选", move |_, cx| {
-                view.update(cx, |view, cx| {
-                    view.filter_versions(
-                        |filters| {
-                            filters.channels.clear();
-                            filters.game_versions.clear();
-                            filters.platforms.clear();
-                        },
-                        cx,
-                    )
-                })
-            })
+            kit::ghost(
+                "detail-clear-filters",
+                tr!("discover-clear-filters"),
+                move |_, cx| {
+                    view.update(cx, |view, cx| {
+                        view.filter_versions(
+                            |filters| {
+                                filters.channels.clear();
+                                filters.game_versions.clear();
+                                filters.platforms.clear();
+                            },
+                            cx,
+                        )
+                    })
+                },
+            )
         });
         h_flex()
             .w_full()
@@ -281,9 +292,11 @@ impl ProjectDetailView {
             .children(channels)
             .children(loaders)
             .child(
-                div()
-                    .w(px(170.))
-                    .child(Select::new(&picker).small().placeholder("添加游戏版本")),
+                div().w(px(170.)).child(
+                    Select::new(&picker)
+                        .small()
+                        .placeholder(tr!("project-add-game-version")),
+                ),
             )
             .children(chosen)
             .children(clear)
@@ -298,7 +311,7 @@ impl ProjectDetailView {
         cx: &mut Context<Self>,
     ) -> gpui::AnyElement {
         if detail.versions.is_empty() {
-            return kit::empty("还没有可用的版本", "", colors).into_any_element();
+            return kit::empty(tr!("project-versions-empty"), "", colors).into_any_element();
         }
         let bar = self.filter_bar(detail, colors, window, cx);
         let project = &detail.project;
@@ -331,11 +344,23 @@ impl ProjectDetailView {
             .pb_2()
             .border_b_1()
             .border_color(colors.foreground)
-            .child(head("渠道").w(px(CHANNEL)).flex_none())
-            .child(head("版本").flex_1().min_w_0())
-            .child(head("游戏版本").w(px(GAME)).flex_none())
-            .child(head("加载器").w(px(LOADER)).flex_none())
-            .child(head("发布").w(px(DATE)).flex_none())
+            .child(
+                head(tr!("project-column-channel"))
+                    .w(px(CHANNEL))
+                    .flex_none(),
+            )
+            .child(head(tr!("project-tab-versions")).flex_1().min_w_0())
+            .child(
+                head(tr!("discover-section-version"))
+                    .w(px(GAME))
+                    .flex_none(),
+            )
+            .child(head(tr!("library-loader")).w(px(LOADER)).flex_none())
+            .child(
+                head(tr!("project-column-published"))
+                    .w(px(DATE))
+                    .flex_none(),
+            )
             .child(div().w(px(ACTIONS)).flex_none());
 
         let rows = shown
@@ -396,8 +421,11 @@ impl ProjectDetailView {
                     let (handler, id, title) = (handler.clone(), id.clone(), title.clone());
                     let file_name = file.filename.clone();
                     Key::new(("detail-version-save", index))
-                        .label("另存为")
-                        .tooltip(format!("下载这个版本的文件 · {}", size_label(file.size)))
+                        .label(tr!("project-save-as"))
+                        .tooltip(tr!(
+                            "project-download-version-file",
+                            size = size_label(file.size)
+                        ))
                         .ghost()
                         .small()
                         .debug_selector(move || format!("detail-version-save-{index}"))
@@ -451,7 +479,7 @@ impl ProjectDetailView {
                                     .truncate()
                                     .child(version.name.clone())
                             }))
-                            .children((!fits).then(|| pill("不适用于当前游戏", colors))),
+                            .children((!fits).then(|| pill(tr!("project-version-unfit"), colors))),
                     )
                     .child(game_tags)
                     .child(platform_tags)
@@ -507,7 +535,12 @@ impl ProjectDetailView {
             )
         });
         let body = if rows.is_empty() {
-            kit::empty("没有符合筛选的版本", "放宽筛选试试", colors).into_any_element()
+            kit::empty(
+                tr!("project-versions-no-match"),
+                tr!("project-versions-no-match-help"),
+                colors,
+            )
+            .into_any_element()
         } else {
             v_flex()
                 .w_full()

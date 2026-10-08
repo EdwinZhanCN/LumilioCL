@@ -19,6 +19,7 @@ use lumilio_core::{CatalogEntry, Loader, LoaderVersion, VersionChannel};
 use crate::kit;
 use crate::theme::{self, ShellColors};
 use crate::version_picker::{Choice, Choices, PickerEvent, VersionPicker};
+use crate::{tr, tr_all};
 
 /// The loaders offered, in the order shown.
 pub const LOADERS: [Loader; 5] = [
@@ -28,14 +29,31 @@ pub const LOADERS: [Loader; 5] = [
     Loader::Forge,
     Loader::Quilt,
 ];
-const LOADER_LABELS: [&str; 5] = ["原版", "Fabric", "NeoForge", "Forge", "Quilt"];
-const LOADER_MODES: [&str; 3] = ["稳定版", "最新版", "其他"];
+fn loader_labels() -> [&'static str; 5] {
+    [
+        tr!("loader-vanilla"),
+        "Fabric",
+        "NeoForge",
+        "Forge",
+        "Quilt",
+    ]
+}
+
+fn loader_modes() -> &'static [&'static str] {
+    tr_all![
+        "new-game-loader-stable",
+        "new-game-loader-latest",
+        "new-game-loader-other",
+    ]
+}
 
 /// The dialog is 480 wide with 16 of padding each side; the popover adds 12.
 const DIALOG_WIDTH: f32 = 480.;
 const PICKER_MENU_WIDTH: gpui::Pixels = px(DIALOG_WIDTH - 32. - 24.);
 
-pub const INSTALL_HELP: &str = "先下载好，第一次启动更快；不下载也能玩，开始游戏时会自动补齐。";
+pub fn install_help() -> &'static str {
+    tr!("new-game-install-help")
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct NewGameRequest {
@@ -74,13 +92,13 @@ pub enum LoaderPick {
 /// What a failure looks like: one sentence, and the raw cause behind 技术详情.
 pub type Failure = (String, String);
 
-const fn channel_tag(channel: VersionChannel) -> Option<&'static str> {
+fn channel_tag(channel: VersionChannel) -> Option<&'static str> {
     match channel {
         VersionChannel::Release => None,
-        VersionChannel::Snapshot => Some("快照"),
-        VersionChannel::PreRelease => Some("预发布"),
-        VersionChannel::Candidate => Some("候选"),
-        VersionChannel::Old => Some("远古"),
+        VersionChannel::Snapshot => Some(tr!("new-game-channel-snapshot")),
+        VersionChannel::PreRelease => Some(tr!("new-game-channel-pre-release")),
+        VersionChannel::Candidate => Some(tr!("new-game-channel-candidate")),
+        VersionChannel::Old => Some(tr!("new-game-channel-old")),
     }
 }
 
@@ -108,7 +126,11 @@ pub fn loader_choices(versions: &[LoaderVersion]) -> Vec<Choice> {
         .map(|version| Choice {
             id: version.version.clone(),
             primary: true,
-            tag: Some(if version.stable { "稳定" } else { "测试" }),
+            tag: Some(if version.stable {
+                tr!("new-game-loader-tag-stable")
+            } else {
+                tr!("new-game-loader-tag-testing")
+            }),
         })
         .collect()
 }
@@ -132,10 +154,10 @@ pub fn resolve(
 /// The name used when the field is left empty: loader and game version.
 #[must_use]
 pub fn default_name(loader: Loader, game_version: Option<&str>) -> String {
-    let label = LOADER_LABELS[LOADERS.iter().position(|l| *l == loader).unwrap_or(0)];
+    let label = loader_labels()[LOADERS.iter().position(|l| *l == loader).unwrap_or(0)];
     match game_version {
         Some(version) => format!("{label} {version}"),
-        None => format!("新的{label}游戏"),
+        None => tr!("new-game-default-name", loader = label),
     }
 }
 
@@ -154,7 +176,9 @@ pub struct RuntimeChange {
     pub snapshot: SnapshotAction,
 }
 
-pub const CHANGE_WARNING: &str = "已装好的 Mod 可能和新的游戏版本或加载器不兼容。世界和设置不会被改动；建议先建一个快照，出问题时可以恢复。";
+pub fn change_warning() -> &'static str {
+    tr!("new-game-change-warning")
+}
 
 pub struct NewGameForm {
     handler: NewGameHandler,
@@ -183,14 +207,20 @@ impl NewGameForm {
     pub fn new(handler: NewGameHandler, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let name = cx.new(|cx| InputState::new(window, cx));
         let game = cx.new(|cx| {
-            VersionPicker::new("new-game-version", true, "选择游戏版本", window, cx)
-                .menu_width(PICKER_MENU_WIDTH)
+            VersionPicker::new(
+                "new-game-version",
+                true,
+                tr!("new-game-pick-game-version"),
+                window,
+                cx,
+            )
+            .menu_width(PICKER_MENU_WIDTH)
         });
         let other = cx.new(|cx| {
             VersionPicker::new(
                 "new-game-loader-version",
                 false,
-                "选择加载器版本",
+                tr!("new-game-pick-loader-version"),
                 window,
                 cx,
             )
@@ -446,12 +476,17 @@ impl NewGameForm {
         let Some(Ok(versions)) = &self.loader_versions else {
             return None;
         };
-        resolve(self.pick, versions, self.other.read(cx).selected())
-            .map(|version| format!("将安装 {} {version}", self.loader_label()))
+        resolve(self.pick, versions, self.other.read(cx).selected()).map(|version| {
+            tr!(
+                "new-game-resolved-note",
+                loader = self.loader_label(),
+                version = version
+            )
+        })
     }
 
     fn loader_label(&self) -> &'static str {
-        LOADER_LABELS[LOADERS.iter().position(|l| *l == self.loader).unwrap_or(0)]
+        loader_labels()[LOADERS.iter().position(|l| *l == self.loader).unwrap_or(0)]
     }
 
     /// Opens the dialog around `form`.
@@ -468,7 +503,11 @@ impl NewGameForm {
         let weak = form.downgrade();
         let create = theme::clickable(
             Key::new("new-game-create")
-                .label(if changing { "更换" } else { "创建" })
+                .label(if changing {
+                    tr!("new-game-change")
+                } else {
+                    tr!("new-game-create")
+                })
                 .primary()
                 .disabled(busy || !ready)
                 .loading(busy)
@@ -480,7 +519,7 @@ impl NewGameForm {
         );
         let cancel = theme::clickable(
             Key::new("new-game-cancel")
-                .label("取消")
+                .label(tr!("common-cancel"))
                 .white()
                 .disabled(busy)
                 .on_click(|_, window, cx| window.close_dialog(cx)),
@@ -488,9 +527,9 @@ impl NewGameForm {
         );
         theme::dialog(dialog, cx)
             .title(if changing {
-                "更换游戏版本与加载器"
+                tr!("new-game-change-title")
             } else {
-                "新建游戏"
+                tr!("library-new-game")
             })
             .w(px(DIALOG_WIDTH))
             .keyboard(!busy)
@@ -535,7 +574,8 @@ impl Render for NewGameForm {
         let entity: WeakEntity<Self> = cx.entity().downgrade();
 
         let loader_index = LOADERS.iter().position(|l| *l == self.loader).unwrap_or(0);
-        let loaders = kit::segments("new-game-loader", &LOADER_LABELS, loader_index, {
+        let labels = loader_labels();
+        let loaders = kit::segments("new-game-loader", &labels, loader_index, {
             let entity = entity.clone();
             move |index, _, cx| {
                 let _ = entity.update(cx, |form, cx| form.set_loader(index, cx));
@@ -550,7 +590,7 @@ impl Render for NewGameForm {
                 LoaderPick::Latest => 1,
                 LoaderPick::Other => 2,
             };
-            let picks = kit::segments("new-game-loader-pick", &LOADER_MODES, mode, {
+            let picks = kit::segments("new-game-loader-pick", loader_modes(), mode, {
                 let entity = entity.clone();
                 move |index, _, cx| {
                     let _ = entity.update(cx, |form, cx| {
@@ -566,9 +606,9 @@ impl Render for NewGameForm {
                     .text_sm()
                     .text_color(colors.muted)
                     .debug_selector(|| "new-game-unsupported".into())
-                    .child(format!(
-                        "{} 还不支持这个游戏版本，换一个版本试试",
-                        self.loader_label()
+                    .child(tr!(
+                        "new-game-loader-unsupported",
+                        loader = self.loader_label()
                     ))
                     .into_any_element()
             } else {
@@ -591,7 +631,7 @@ impl Render for NewGameForm {
             };
             v_flex()
                 .gap_2()
-                .child(label("加载器版本", colors))
+                .child(label(tr!("new-game-loader-version-label"), colors))
                 .child(body)
         });
 
@@ -604,7 +644,7 @@ impl Render for NewGameForm {
                     Checkbox::new("new-game-install")
                         .checked(self.install)
                         .disabled(busy)
-                        .label("创建后立即下载游戏文件")
+                        .label(tr!("new-game-install-now"))
                         .on_click(move |_, _, cx| {
                             let _ = entity.update(cx, |form, cx| {
                                 form.install = !form.install;
@@ -612,7 +652,7 @@ impl Render for NewGameForm {
                             });
                         }),
                 )
-                .child(kit::info("new-game-install-info", INSTALL_HELP))
+                .child(kit::info("new-game-install-info", install_help()))
         };
 
         let changing = self.change.is_some();
@@ -624,19 +664,19 @@ impl Render for NewGameForm {
             .children((!changing).then(|| {
                 v_flex()
                     .gap_2()
-                    .child(label("名称", colors))
+                    .child(label(tr!("common-name"), colors))
                     .child(Input::new(&self.name).disabled(busy))
             }))
             .child(
                 v_flex()
                     .gap_2()
-                    .child(label("加载器", colors))
+                    .child(label(tr!("library-loader"), colors))
                     .child(h_flex().child(loaders)),
             )
             .child(
                 v_flex()
                     .gap_2()
-                    .child(label("游戏版本", colors))
+                    .child(label(tr!("discover-section-version"), colors))
                     .child(self.game.clone()),
             )
             .children(loader_section)
@@ -649,13 +689,15 @@ impl Render for NewGameForm {
                         div()
                             .text_sm()
                             .text_color(colors.muted)
-                            .child(CHANGE_WARNING),
+                            .child(change_warning()),
                     )
                     .child(
                         h_flex().child(
-                            kit::ghost("new-game-snapshot", "先建快照", move |window, cx| {
-                                snapshot(window, cx)
-                            })
+                            kit::ghost(
+                                "new-game-snapshot",
+                                tr!("new-game-snapshot-first"),
+                                move |window, cx| snapshot(window, cx),
+                            )
                             .debug_selector(|| "new-game-snapshot".into())
                             .disabled(busy),
                         ),

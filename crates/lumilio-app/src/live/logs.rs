@@ -4,6 +4,7 @@ use lumilio_core::GameLogSource;
 use lumilio_ui::instance_detail::InstanceDetailView;
 use lumilio_ui::platform;
 use lumilio_ui::toast::Toast;
+use lumilio_ui::tr;
 
 pub(super) fn read(
     wiring: &Wiring,
@@ -88,10 +89,10 @@ pub(super) fn export(
         let _ = wiring.shell.update(cx, |shell, cx| {
             shell.toast(
                 match result {
-                    Ok(()) => {
-                        Toast::success(format!("已保存到 {}（名字和路径已隐去）", path.display()))
+                    Ok(()) => Toast::success(tr!("logs-saved", path = path.display().to_string())),
+                    Err(error) => {
+                        Toast::error(tr!("logs-export-failed")).technical(error.to_string())
                     }
-                    Err(error) => Toast::error("没能导出日志").technical(error.to_string()),
                 },
                 cx,
             )

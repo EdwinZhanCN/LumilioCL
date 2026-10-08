@@ -16,6 +16,7 @@ use gpui_component::{ActiveTheme as _, Icon, Sizable as _, h_flex, v_flex};
 
 use crate::assets::UiIcon;
 use crate::theme::{self, ShellColors};
+use crate::tr;
 
 /// One version that can be chosen.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -88,7 +89,8 @@ impl VersionPicker {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let query = cx.new(|cx| InputState::new(window, cx).placeholder("搜索版本"));
+        let query =
+            cx.new(|cx| InputState::new(window, cx).placeholder(tr!("discover-version-search")));
         cx.subscribe(&query, |_, _, event: &InputEvent, cx| {
             if matches!(event, InputEvent::Change) {
                 cx.notify();
@@ -181,7 +183,7 @@ impl VersionPicker {
                 .text_sm()
                 .text_color(colors.muted)
                 .text_center()
-                .child("没有匹配的版本")
+                .child(tr!("version-picker-no-match"))
                 .into_any_element();
         }
         let shown = Rc::new(shown);
@@ -239,7 +241,11 @@ impl Render for VersionPicker {
         match &self.choices {
             Choices::Loading => {
                 return field(colors)
-                    .child(div().text_color(colors.muted).child("正在读取版本…"))
+                    .child(
+                        div()
+                            .text_color(colors.muted)
+                            .child(tr!("version-picker-loading")),
+                    )
                     .into_any_element();
             }
             Choices::Failed(message) => {
@@ -249,7 +255,7 @@ impl Render for VersionPicker {
                     .child(div().text_color(colors.danger).child(message.clone()))
                     .child(theme::clickable(
                         Key::new((id, 9_000usize))
-                            .label("重试")
+                            .label(tr!("common-retry"))
                             .ghost()
                             .xsmall()
                             .on_click(move |_, _, cx| {
@@ -330,12 +336,12 @@ impl Render for VersionPicker {
                                     div()
                                         .text_sm()
                                         .text_color(colors.muted)
-                                        .child("显示所有版本"),
+                                        .child(tr!("discover-all-versions")),
                                 )
                                 .child(crate::kit::switch(
                                     (id, 9_002usize),
                                     show_all,
-                                    "显示所有版本",
+                                    tr!("discover-all-versions"),
                                     move |_, cx| {
                                         let _ = toggle.update(cx, |picker, cx| {
                                             picker.show_all = !picker.show_all;

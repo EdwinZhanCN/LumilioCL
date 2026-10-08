@@ -6,6 +6,7 @@ use lumilio_core::{CancellationToken, Preferences, ServiceError};
 use lumilio_ui::live::settings_view;
 use lumilio_ui::platform;
 use lumilio_ui::toast::Toast;
+use lumilio_ui::tr;
 use std::future::Future;
 use std::time::Duration;
 
@@ -67,7 +68,7 @@ pub(super) fn edit_plugin_setting(
                     Box::pin(async move {
                         match task.await {
                             Ok(Ok(())) => Ok(()),
-                            _ => Err("没能保存这个设置，请重试。".to_owned()),
+                            _ => Err(tr!("plugin-setting-save-failed").to_owned()),
                         }
                     });
                 pending
@@ -220,7 +221,7 @@ pub(super) fn load_settings(wiring: &Wiring, cx: &mut App) {
 }
 
 pub(super) fn add_java(wiring: &Wiring, cx: &mut App) {
-    let chosen = platform::pick_path(cx, true, true, "选择 Java");
+    let chosen = platform::pick_path(cx, true, true, tr!("settings-java-pick"));
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
         let Some(path) = chosen.await else {
@@ -237,11 +238,13 @@ pub(super) fn add_java(wiring: &Wiring, cx: &mut App) {
         let _ = wiring.shell.update(cx, |shell, cx| {
             shell.toast(
                 match result {
-                    Ok(runtime) => Toast::success(format!("已添加 Java {}", runtime.version())),
-                    Err(ServiceError::NoJavaAt(_)) => {
-                        Toast::error("这里没有找到 Java，请选 java 程序或 JDK 文件夹")
+                    Ok(runtime) => {
+                        Toast::success(tr!("settings-java-added", version = runtime.version()))
                     }
-                    Err(error) => Toast::error("没能添加 Java").technical(error.to_string()),
+                    Err(ServiceError::NoJavaAt(_)) => Toast::error(tr!("settings-java-not-found")),
+                    Err(error) => {
+                        Toast::error(tr!("settings-java-add-failed")).technical(error.to_string())
+                    }
                 },
                 cx,
             )
@@ -267,14 +270,14 @@ pub(super) fn check_reclaimable(wiring: &Wiring, window: &mut Window, cx: &mut A
             Err(error) => {
                 let _ = wiring.shell.update(cx, |shell, cx| {
                     shell.toast(
-                        Toast::error("没能检查游戏文件").technical(error.to_string()),
+                        Toast::error(tr!("settings-reclaim-failed")).technical(error.to_string()),
                         cx,
                     )
                 });
             }
             Ok(found) if found.unused.is_empty() => {
                 let _ = wiring.shell.update(cx, |shell, cx| {
-                    shell.toast(Toast::info("没有多余的游戏文件"), cx)
+                    shell.toast(Toast::info(tr!("settings-reclaim-none")), cx)
                 });
             }
             Ok(found) => {
@@ -311,11 +314,12 @@ pub(super) fn reclaim(wiring: &Wiring, cx: &mut App) {
         |shell, result, cx| {
             shell.toast(
                 match result {
-                    Ok(freed) => Toast::success(format!(
-                        "已清理 {}",
-                        lumilio_ui::pages::settings::bytes_text(freed)
+                    Ok(freed) => Toast::success(tr!(
+                        "settings-cleaned",
+                        size = lumilio_ui::pages::settings::bytes_text(freed)
                     )),
-                    Err(error) => Toast::error("没能清理游戏文件").technical(error.to_string()),
+                    Err(error) => Toast::error(tr!("settings-clean-files-failed"))
+                        .technical(error.to_string()),
                 },
                 cx,
             );
@@ -343,11 +347,12 @@ pub(super) fn clear_cache(wiring: &Wiring, cx: &mut App) {
         |shell, result, cx| {
             shell.toast(
                 match result {
-                    Ok(freed) => Toast::success(format!(
-                        "已清理 {}",
-                        lumilio_ui::pages::settings::bytes_text(freed)
+                    Ok(freed) => Toast::success(tr!(
+                        "settings-cleaned",
+                        size = lumilio_ui::pages::settings::bytes_text(freed)
                     )),
-                    Err(error) => Toast::error("没能清理缓存").technical(error.to_string()),
+                    Err(error) => Toast::error(tr!("settings-clear-cache-failed"))
+                        .technical(error.to_string()),
                 },
                 cx,
             );
@@ -387,8 +392,12 @@ pub(super) fn export_diagnostics(wiring: &Wiring, cx: &mut App) {
         let _ = wiring.shell.update(cx, |shell, cx| {
             shell.toast(
                 match result {
-                    Ok(()) => Toast::success(format!("诊断包已保存到 {}", path.display())),
-                    Err(error) => Toast::error("没能导出诊断包").technical(error.to_string()),
+                    Ok(()) => Toast::success(tr!(
+                        "settings-diagnostics-saved",
+                        path = path.display().to_string()
+                    )),
+                    Err(error) => Toast::error(tr!("settings-diagnostics-failed"))
+                        .technical(error.to_string()),
                 },
                 cx,
             )
@@ -407,7 +416,7 @@ pub(super) fn install_java(wiring: &Wiring, major: Option<u32>, cx: &mut App) {
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
         let _ = wiring.shell.update(cx, |shell, cx| {
-            shell.toast(Toast::info("开始下载 Java，进度在动态里"), cx)
+            shell.toast(Toast::info(tr!("settings-java-install-started")), cx)
         });
         while !handle.is_finished() {
             cx.background_executor().timer(POLL).await;
@@ -420,8 +429,8 @@ pub(super) fn install_java(wiring: &Wiring, major: Option<u32>, cx: &mut App) {
             shell.toast(
                 outcome(
                     result,
-                    |java| format!("已安装 Java {}", java.major()),
-                    "没有装上 Java".to_owned(),
+                    |java| tr!("settings-java-installed", version = java.major()),
+                    tr!("settings-java-install-failed").to_owned(),
                 ),
                 cx,
             )

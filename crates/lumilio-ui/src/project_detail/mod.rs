@@ -22,6 +22,7 @@ use lumilio_core::{
 use crate::kit;
 use crate::live::parse_rfc3339;
 use crate::theme::ShellColors;
+use crate::tr;
 
 /// What the window asks the application to do.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -237,9 +238,9 @@ impl ProjectDetailView {
 
     /// The tabs this project has: the gallery only when there is one.
     pub fn tabs(&self) -> Vec<&'static str> {
-        let mut tabs = vec!["介绍", "版本"];
+        let mut tabs = vec![tr!("project-tab-about"), tr!("project-tab-versions")];
         if matches!(&self.state, DetailState::Ready(detail) if !detail.project.gallery.is_empty()) {
-            tabs.push("画廊");
+            tabs.push(tr!("project-tab-gallery"));
         }
         tabs
     }
@@ -300,11 +301,11 @@ pub fn date_label(iso: &str) -> String {
     }
 }
 
-const fn channel_label(channel: ReleaseChannel) -> &'static str {
+fn channel_label(channel: ReleaseChannel) -> &'static str {
     match channel {
-        ReleaseChannel::Release => "正式版",
-        ReleaseChannel::Beta => "测试版",
-        ReleaseChannel::Alpha => "早期版",
+        ReleaseChannel::Release => tr!("project-channel-release"),
+        ReleaseChannel::Beta => tr!("project-channel-beta"),
+        ReleaseChannel::Alpha => tr!("project-channel-alpha"),
     }
 }
 
@@ -381,12 +382,14 @@ impl Render for ProjectDetailView {
         crate::toast::flush(&mut self.toasts, window, cx);
         let colors = ShellColors::from_theme(cx.theme());
         let body = match self.state.clone() {
-            DetailState::Loading => kit::empty("正在读取…", "", colors).into_any_element(),
+            DetailState::Loading => {
+                kit::empty(tr!("library-loading"), "", colors).into_any_element()
+            }
             DetailState::Failed(message) => v_flex()
                 .items_center()
                 .child(kit::empty(
-                    "连不上 Modrinth",
-                    "检查网络后再打开一次",
+                    tr!("project-offline"),
+                    tr!("project-offline-help"),
                     colors,
                 ))
                 .child(kit::technical("detail-technical", message))
