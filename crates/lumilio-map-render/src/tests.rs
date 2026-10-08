@@ -32,8 +32,10 @@ fn colored_tile_position_zoom_and_bgra_readback() {
     assert!(
         frame
             .bgra
-            .chunks_exact(4)
-            .all(|pixel| pixel == [0, 0, 255, 255])
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .all(|pixel| *pixel == [0, 0, 255, 255])
     );
     let frame = scene
         .render(
