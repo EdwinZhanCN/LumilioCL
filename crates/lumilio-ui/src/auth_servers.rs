@@ -19,6 +19,7 @@ use lumilio_core::AuthServer;
 use crate::kit;
 use crate::new_game::Failure;
 use crate::theme::{self, ShellColors};
+use crate::tr;
 
 const DIALOG_WIDTH: f32 = 480.;
 
@@ -69,7 +70,7 @@ impl ServersDialog {
         cx: &mut Context<Self>,
     ) -> Self {
         let address = cx.new(|cx| {
-            InputState::new(window, cx).placeholder("例如 littleskin.cn 或认证服务器的 API 地址")
+            InputState::new(window, cx).placeholder(tr!("account-server-address-placeholder"))
         });
         cx.subscribe_in(
             &address,
@@ -156,23 +157,20 @@ impl ServersDialog {
     fn ask_remove(&self, row: &ServerRow, window: &mut Window, cx: &mut App) {
         let (handler, url) = (self.handler.clone(), row.url.clone());
         let description = if row.accounts == 0 {
-            "只会忘记这个服务器，之后可以再添加。".to_owned()
+            tr!("account-server-remove-body").to_owned()
         } else {
-            format!(
-                "会忘记这个服务器，并移除在它上面登录的 {} 个账户（连同它们在系统凭据库里的登录信息）。游戏和存档不受影响。",
-                row.accounts
-            )
+            tr!("account-server-remove-body-accounts", count = row.accounts)
         };
         window.open_alert_dialog(cx, {
-            let title = format!("移除认证服务器“{}”？", row.name);
+            let title = tr!("account-server-remove-title", name = row.name.as_str());
             move |alert, _, _| {
                 let (handler, url) = (handler.clone(), url.clone());
                 alert
                     .title(title.clone())
                     .description(description.clone())
-                    .ok_text("移除")
+                    .ok_text(tr!("common-remove"))
                     .ok_variant(gpui_component::button::ButtonVariant::Danger)
-                    .cancel_text("取消")
+                    .cancel_text(tr!("common-cancel"))
                     .show_cancel(true)
                     .on_ok(move |_, window, cx| {
                         handler(ServerIntent::Remove(url.clone()), window, cx);
@@ -189,14 +187,14 @@ impl ServersDialog {
     fn frame(dialog: &Entity<Self>, view: Dialog, cx: &mut App) -> Dialog {
         let locating = dialog.read(cx).phase == Phase::Locating;
         theme::dialog(view, cx)
-            .title("认证服务器")
+            .title(tr!("account-server-label"))
             .w(px(DIALOG_WIDTH))
             .keyboard(!locating)
             .child(dialog.clone())
             .footer(
                 h_flex().w_full().justify_end().child(theme::clickable(
                     Key::new("servers-close")
-                        .label("关闭")
+                        .label(tr!("common-close"))
                         .white()
                         .debug_selector(|| "servers-close".into())
                         .on_click(|_, window, cx| window.close_dialog(cx)),
@@ -217,16 +215,25 @@ impl Render for ServersDialog {
             .map(|(index, row)| {
                 let trail = (!row.builtin).then(|| {
                     let (entity, row) = (entity.clone(), row.clone());
-                    kit::ghost(("server-remove", index), "移除", move |window, cx| {
-                        let _ = entity.update(cx, |dialog, cx| dialog.ask_remove(&row, window, cx));
-                    })
+                    kit::ghost(
+                        ("server-remove", index),
+                        tr!("common-remove"),
+                        move |window, cx| {
+                            let _ =
+                                entity.update(cx, |dialog, cx| dialog.ask_remove(&row, window, cx));
+                        },
+                    )
                     .debug_selector(move || format!("server-remove-{index}"))
                     .into_any_element()
                 });
                 let detail = if row.builtin {
-                    format!("{} · 内置", row.url)
+                    tr!("account-server-builtin", url = row.url.as_str())
                 } else if row.accounts > 0 {
-                    format!("{} · {} 个账户", row.url, row.accounts)
+                    tr!(
+                        "account-server-accounts",
+                        url = row.url.as_str(),
+                        count = row.accounts
+                    )
                 } else {
                     row.url.clone()
                 };
@@ -237,9 +244,15 @@ impl Render for ServersDialog {
         let typed_empty = self.address.read(cx).value().trim().is_empty();
         let find = {
             let entity = entity.clone();
-            kit::action("server-find", "查找", None, false, move |window, cx| {
-                let _ = entity.update(cx, |dialog, cx| dialog.locate(window, cx));
-            })
+            kit::action(
+                "server-find",
+                tr!("account-server-find"),
+                None,
+                false,
+                move |window, cx| {
+                    let _ = entity.update(cx, |dialog, cx| dialog.locate(window, cx));
+                },
+            )
             .loading(locating)
             .disabled(locating || typed_empty)
             .debug_selector(|| "server-find".into())
@@ -248,9 +261,15 @@ impl Render for ServersDialog {
             Phase::Found(server) => {
                 let add = {
                     let entity = entity.clone();
-                    kit::action("server-add", "添加", None, true, move |window, cx| {
-                        let _ = entity.update(cx, |dialog, cx| dialog.add(window, cx));
-                    })
+                    kit::action(
+                        "server-add",
+                        tr!("common-add"),
+                        None,
+                        true,
+                        move |window, cx| {
+                            let _ = entity.update(cx, |dialog, cx| dialog.add(window, cx));
+                        },
+                    )
                     .debug_selector(|| "server-add".into())
                 };
                 let known = self.servers.iter().any(|row| row.url == server.url);
@@ -276,13 +295,13 @@ impl Render for ServersDialog {
                                 .text_xs()
                                 .text_color(colors.danger)
                                 .debug_selector(|| "server-http-warning".into())
-                                .child(crate::third_party_login::HTTP_WARNING)
+                                .child(tr!("account-http-warning"))
                         }))
                         .child(if known {
                             div()
                                 .text_xs()
                                 .text_color(colors.muted)
-                                .child("这个服务器已经在列表里了")
+                                .child(tr!("account-server-already-listed"))
                                 .into_any_element()
                         } else {
                             h_flex().child(add).into_any_element()
@@ -304,7 +323,7 @@ impl Render for ServersDialog {
                             .text_sm()
                             .font_medium()
                             .text_color(colors.foreground)
-                            .child("添加认证服务器"),
+                            .child(tr!("account-server-add-title")),
                     )
                     .child(
                         h_flex()

@@ -17,10 +17,9 @@ use lumilio_core::{MAX_PROFILE_NAME, OfflineProfile, ProfileError, ProfileId};
 use crate::kit;
 use crate::new_game::Failure;
 use crate::theme::{self, ShellColors};
+use crate::tr;
 
 const DIALOG_WIDTH: f32 = 440.;
-
-pub const UUID_HELP: &str = "游戏用它认出你，存档里的玩家数据也按它保存。留空则由名称决定（同名永远得到同一个）；只能在添加时设置，之后不能更改。";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AccountRequest {
@@ -36,10 +35,10 @@ pub type AccountHandler = Rc<dyn Fn(AccountRequest, &mut Window, &mut App)>;
 pub fn name_problem(name: &str) -> Option<String> {
     match OfflineProfile::new(name) {
         Ok(_) => None,
-        Err(ProfileError::Empty) => Some("请输入名称".to_owned()),
-        Err(ProfileError::TooLong) => Some(format!("名称最多 {MAX_PROFILE_NAME} 个字符")),
+        Err(ProfileError::Empty) => Some(tr!("account-name-required").to_owned()),
+        Err(ProfileError::TooLong) => Some(tr!("account-name-too-long", count = MAX_PROFILE_NAME)),
         Err(ProfileError::InvalidCharacter(ch)) => {
-            Some(format!("名称只能用字母、数字和下划线，不能用“{ch}”"))
+            Some(tr!("account-name-invalid-char", character = ch.to_string()))
         }
         Err(ProfileError::InvalidId) => None,
     }
@@ -53,7 +52,7 @@ pub fn uuid_problem(text: &str) -> Option<String> {
     }
     ProfileId::parse(text)
         .err()
-        .map(|_| "UUID 需要 32 位十六进制数字（可带横线）".to_owned())
+        .map(|_| tr!("account-uuid-problem").to_owned())
 }
 
 /// The request the typed values make, or `None` while something is wrong.
@@ -88,8 +87,10 @@ impl AccountForm {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let name = cx.new(|cx| InputState::new(window, cx).placeholder("例如 Steve"));
-        let uuid = cx.new(|cx| InputState::new(window, cx).placeholder("留空：由名称决定"));
+        let name =
+            cx.new(|cx| InputState::new(window, cx).placeholder(tr!("account-name-placeholder")));
+        let uuid =
+            cx.new(|cx| InputState::new(window, cx).placeholder(tr!("account-uuid-placeholder")));
         for input in [&name, &uuid] {
             cx.subscribe_in(
                 input,
@@ -168,7 +169,7 @@ impl AccountForm {
         let weak = form.downgrade();
         let add = theme::clickable(
             Key::new("account-add")
-                .label("添加")
+                .label(tr!("common-add"))
                 .primary()
                 .disabled(busy || !ready)
                 .loading(busy)
@@ -180,14 +181,14 @@ impl AccountForm {
         );
         let cancel = theme::clickable(
             Key::new("account-cancel")
-                .label("取消")
+                .label(tr!("common-cancel"))
                 .white()
                 .disabled(busy)
                 .on_click(|_, window, cx| window.close_dialog(cx)),
             !busy,
         );
         theme::dialog(dialog, cx)
-            .title("添加离线账户")
+            .title(tr!("account-add-offline"))
             .w(px(DIALOG_WIDTH))
             .keyboard(!busy)
             .overlay_closable(!busy)
@@ -236,9 +237,9 @@ impl Render for AccountForm {
             let entity = entity.clone();
             Key::new("account-advanced")
                 .label(if self.advanced {
-                    "收起高级选项"
+                    tr!("account-advanced-collapse")
                 } else {
-                    "高级选项"
+                    tr!("account-advanced-expand")
                 })
                 .ghost()
                 .xsmall()
@@ -256,7 +257,7 @@ impl Render for AccountForm {
             .child(
                 v_flex()
                     .gap_2()
-                    .child(label("名称", colors))
+                    .child(label(tr!("account-name-label"), colors))
                     .child(Input::new(&self.name).disabled(busy))
                     .child(match name_problem {
                         Some(problem) => div()
@@ -264,14 +265,14 @@ impl Render for AccountForm {
                             .text_color(colors.danger)
                             .debug_selector(|| "account-name-problem".into())
                             .child(problem),
-                        None => div().text_xs().text_color(colors.muted).child(format!(
-                            "最多 {MAX_PROFILE_NAME} 位字母、数字或下划线{}",
-                            if self.first {
-                                "。这是第一个账户，会自动设为当前账户"
+                        None => {
+                            let help = if self.first {
+                                tr!("account-name-help-first", count = MAX_PROFILE_NAME)
                             } else {
-                                ""
-                            }
-                        )),
+                                tr!("account-name-help", count = MAX_PROFILE_NAME)
+                            };
+                            div().text_xs().text_color(colors.muted).child(help)
+                        }
                     }),
             )
             .child(h_flex().child(toggle))
@@ -284,7 +285,7 @@ impl Render for AccountForm {
                                 .gap_1()
                                 .items_center()
                                 .child(label("UUID", colors))
-                                .child(kit::info("account-uuid-info", UUID_HELP)),
+                                .child(kit::info("account-uuid-info", tr!("account-uuid-help"))),
                         )
                         .child(Input::new(&self.uuid).disabled(busy))
                         .children(uuid_problem.map(|problem| {

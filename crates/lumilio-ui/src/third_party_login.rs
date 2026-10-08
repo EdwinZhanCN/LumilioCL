@@ -19,13 +19,9 @@ use lumilio_core::{AuthServer, CharacterProfile, ProfileId};
 use crate::kit;
 use crate::new_game::Failure;
 use crate::theme::{self, ShellColors};
+use crate::tr;
 
 const DIALOG_WIDTH: f32 = 460.;
-
-pub const PASSWORD_HINT: &str =
-    "密码只会发给你选的认证服务器；启动器不保存它，只把服务器发来的令牌放进系统凭据库。";
-pub const HTTP_WARNING: &str =
-    "警告：此服务器使用不安全的 HTTP 协议，你的密码在登录时会被明文传输。";
 
 /// What the dialog asks the application to do.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -114,9 +110,9 @@ impl ThirdPartyDialog {
     #[must_use]
     pub fn login_label(&self) -> &'static str {
         if self.current().is_some_and(|server| server.non_email_login) {
-            "用户名"
+            tr!("account-login-username")
         } else {
-            "邮箱"
+            tr!("account-login-email")
         }
     }
 
@@ -218,7 +214,11 @@ impl ThirdPartyDialog {
             let weak = weak.clone();
             theme::clickable(
                 Key::new("tp-go")
-                    .label(if choosing { "选择" } else { "登录" })
+                    .label(if choosing {
+                        tr!("account-choose-character-action")
+                    } else {
+                        tr!("account-sign-in-action")
+                    })
                     .primary()
                     .loading(working)
                     .disabled(working || (!choosing && !ready))
@@ -237,7 +237,7 @@ impl ThirdPartyDialog {
         };
         let cancel = theme::clickable(
             Key::new("tp-cancel")
-                .label("取消")
+                .label(tr!("common-cancel"))
                 .white()
                 .disabled(working)
                 .debug_selector(|| "tp-cancel".into())
@@ -247,7 +247,7 @@ impl ThirdPartyDialog {
             !working,
         );
         theme::dialog(view, cx)
-            .title("登录第三方账户")
+            .title(tr!("account-third-party-title"))
             .w(px(DIALOG_WIDTH))
             .keyboard(!working)
             .overlay_closable(false)
@@ -295,7 +295,7 @@ impl Render for ThirdPartyDialog {
                 characters, chosen, ..
             } => v_flex()
                 .gap_2()
-                .child(label("这个账户有多个角色，选一个用来玩", colors))
+                .child(label(tr!("account-choose-character"), colors))
                 .child(v_flex().children(characters.iter().enumerate().map(
                     |(index, character)| {
                         let entity = entity.clone();
@@ -340,7 +340,7 @@ impl Render for ThirdPartyDialog {
                     let entity = entity.clone();
                     kit::ghost(
                         "tp-manage",
-                        "添加认证服务器…",
+                        tr!("account-server-add-menu"),
                         move |window, cx| {
                             // This dialog gives way to the list of servers.
                             window.close_dialog(cx);
@@ -357,7 +357,7 @@ impl Render for ThirdPartyDialog {
                     .child(
                         v_flex()
                             .gap_1()
-                            .child(label("认证服务器", colors))
+                            .child(label(tr!("account-server-label"), colors))
                             .child(v_flex().children(server_rows))
                             .child(h_flex().child(manage)),
                     )
@@ -369,7 +369,7 @@ impl Render for ThirdPartyDialog {
                                     .text_xs()
                                     .text_color(colors.danger)
                                     .debug_selector(|| "tp-http-warning".into())
-                                    .child(HTTP_WARNING)
+                                    .child(tr!("account-http-warning"))
                             }),
                     )
                     .child(
@@ -381,13 +381,13 @@ impl Render for ThirdPartyDialog {
                     .child(
                         v_flex()
                             .gap_2()
-                            .child(label("密码", colors))
+                            .child(label(tr!("account-password-label"), colors))
                             .child(Input::new(&self.password).disabled(busy))
                             .child(
                                 div()
                                     .text_xs()
                                     .text_color(colors.muted)
-                                    .child(PASSWORD_HINT),
+                                    .child(tr!("account-password-hint")),
                             ),
                     )
                     .children(self.error.clone().map(|(message, technical)| {

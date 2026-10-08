@@ -17,6 +17,7 @@ use gpui_component::{
 use crate::kit;
 use crate::new_game::Failure;
 use crate::theme::{self, ShellColors};
+use crate::tr;
 
 const DIALOG_WIDTH: f32 = 440.;
 
@@ -121,9 +122,9 @@ impl SignInDialog {
             theme::clickable(
                 Key::new("signin-start")
                     .label(if retry {
-                        "再试一次"
+                        tr!("account-microsoft-retry")
                     } else {
-                        "在浏览器中登录"
+                        tr!("account-microsoft-sign-in")
                     })
                     .primary()
                     .loading(waiting_for_code)
@@ -137,7 +138,11 @@ impl SignInDialog {
         };
         let cancel = theme::clickable(
             Key::new("signin-cancel")
-                .label(if active { "取消登录" } else { "关闭" })
+                .label(if active {
+                    tr!("account-microsoft-cancel-sign-in")
+                } else {
+                    tr!("common-close")
+                })
                 .white()
                 .debug_selector(|| "signin-cancel".into())
                 .on_click(move |_, window, cx| {
@@ -146,7 +151,7 @@ impl SignInDialog {
             true,
         );
         theme::dialog(dialog, cx)
-            .title("登录 Microsoft")
+            .title(tr!("account-microsoft-title"))
             .w(px(DIALOG_WIDTH))
             .keyboard(!active)
             .overlay_closable(!active)
@@ -176,26 +181,27 @@ impl Render for SignInDialog {
                     div()
                         .text_sm()
                         .text_color(colors.foreground)
-                        .child("点“在浏览器中登录”，在打开的页面输入一个代码，再回到这里。"),
+                        .child(tr!("account-microsoft-intro")),
                 )
                 .child(
                     div()
                         .text_xs()
                         .text_color(colors.muted)
-                        .child("登录信息只保存在系统凭据库里，不会写进启动器的文件。"),
+                        .child(tr!("account-microsoft-storage-note")),
                 )
                 .into_any_element(),
             Phase::Requesting => div()
                 .text_sm()
                 .text_color(colors.muted)
-                .child("正在向 Microsoft 要一个登录代码…")
+                .child(tr!("account-microsoft-requesting"))
                 .into_any_element(),
             Phase::Waiting { code, address } => {
                 let (copy_code, open_address) = (code.clone(), address.clone());
                 v_flex()
                     .gap_3()
-                    .child(div().text_sm().text_color(colors.muted).child(format!(
-                        "在 {address} 输入这个代码，然后在页面上登录并确认："
+                    .child(div().text_sm().text_color(colors.muted).child(tr!(
+                        "account-microsoft-code-lead",
+                        address = address.as_str()
                     )))
                     .child(
                         div()
@@ -213,15 +219,23 @@ impl Render for SignInDialog {
                         h_flex()
                             .gap_2()
                             .child(
-                                kit::ghost("signin-copy", "复制代码", move |_, cx| {
-                                    crate::toast::copy_text(copy_code.clone(), cx);
-                                })
+                                kit::ghost(
+                                    "signin-copy",
+                                    tr!("account-microsoft-copy-code"),
+                                    move |_, cx| {
+                                        crate::toast::copy_text(copy_code.clone(), cx);
+                                    },
+                                )
                                 .debug_selector(|| "signin-copy".into()),
                             )
                             .child(
-                                kit::ghost("signin-open", "重新打开页面", move |_, cx| {
-                                    crate::platform::open_address(&open_address, cx);
-                                })
+                                kit::ghost(
+                                    "signin-open",
+                                    tr!("account-microsoft-reopen"),
+                                    move |_, cx| {
+                                        crate::platform::open_address(&open_address, cx);
+                                    },
+                                )
                                 .debug_selector(|| "signin-open".into()),
                             ),
                     )
@@ -229,7 +243,7 @@ impl Render for SignInDialog {
                         div()
                             .text_xs()
                             .text_color(colors.muted)
-                            .child("正在等你在浏览器里完成登录…"),
+                            .child(tr!("account-microsoft-waiting")),
                     )
                     .into_any_element()
             }

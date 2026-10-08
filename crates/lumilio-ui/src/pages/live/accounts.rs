@@ -2,6 +2,7 @@ use super::controls::{LiveCtx, send};
 use crate::assets::UiIcon;
 use crate::kit;
 use crate::live::{AccountRow, LiveIntent};
+use crate::tr;
 use gpui::prelude::*;
 use gpui::{App, IntoElement, Window, div, px};
 use gpui_component::StyledExt as _;
@@ -29,17 +30,14 @@ pub(super) fn account_row(index: usize, row: &AccountRow, ctx: &LiveCtx) -> gpui
             ring.child(div().size(px(8.)).rounded_full().bg(colors.primary))
         });
     let short = row.uuid.split('-').next().unwrap_or_default().to_owned();
-    let detail = format!(
-        "{} · {short}{}{}",
-        row.kind_label(),
-        if row.custom_id {
-            " · 自定义 UUID"
-        } else {
-            ""
-        },
-        row.skin_text()
-            .map_or_else(String::new, |skin| format!(" · {skin}")),
-    );
+    let mut parts = vec![row.kind_label().to_owned(), short];
+    if row.custom_id {
+        parts.push(tr!("account-detail-custom-uuid").to_owned());
+    }
+    if let Some(skin) = row.skin_text() {
+        parts.push(skin.to_owned());
+    }
+    let detail = parts.join(" · ");
     // ia[accounts]: 复制 UUID | 账户行 ⋯ 菜单 | 复制到剪贴板，toast“已复制 UUID”
     let copy = {
         let handler = ctx.handler.clone();
@@ -48,7 +46,7 @@ pub(super) fn account_row(index: usize, row: &AccountRow, ctx: &LiveCtx) -> gpui
             handler(
                 LiveIntent::CopyText {
                     text: text.clone(),
-                    notice: "已复制 UUID".to_owned(),
+                    notice: tr!("account-copied-uuid").to_owned(),
                 },
                 window,
                 cx,
@@ -64,18 +62,12 @@ pub(super) fn account_row(index: usize, row: &AccountRow, ctx: &LiveCtx) -> gpui
         move |window: &mut Window, cx: &mut App| {
             let handler = handler.clone();
             let target = key.clone();
-            let title = format!("移除账户“{name}”？");
+            let title = tr!("account-remove-title", name = name.as_str());
             let description = match (microsoft, selected) {
-                (true, true) => {
-                    "会忘记这个身份并从系统凭据库删除它的登录信息（第三方账户还会通知服务器作废令牌），不会删除任何游戏或存档。它是当前账户，移除后会改用剩下的第一个。"
-                }
-                (true, false) => {
-                    "会忘记这个身份并从系统凭据库删除它的登录信息，不会删除任何游戏或存档。"
-                }
-                (false, true) => {
-                    "只会忘记这个身份，不会删除任何游戏或存档。它是当前账户，移除后会改用剩下的第一个。"
-                }
-                (false, false) => "只会忘记这个身份，不会删除任何游戏或存档。",
+                (true, true) => tr!("account-remove-body-signed-in-current"),
+                (true, false) => tr!("account-remove-body-signed-in"),
+                (false, true) => tr!("account-remove-body-offline-current"),
+                (false, false) => tr!("account-remove-body-offline"),
             };
             window.open_alert_dialog(cx, move |alert, _, _| {
                 let handler = handler.clone();
@@ -83,9 +75,9 @@ pub(super) fn account_row(index: usize, row: &AccountRow, ctx: &LiveCtx) -> gpui
                 alert
                     .title(title.clone())
                     .description(description)
-                    .ok_text("移除")
+                    .ok_text(tr!("common-remove"))
                     .ok_variant(gpui_component::button::ButtonVariant::Danger)
-                    .cancel_text("取消")
+                    .cancel_text(tr!("common-cancel"))
                     .show_cancel(true)
                     .on_ok(move |_, window, cx| {
                         handler(LiveIntent::RemoveAccount(target.clone()), window, cx);
@@ -94,22 +86,22 @@ pub(super) fn account_row(index: usize, row: &AccountRow, ctx: &LiveCtx) -> gpui
             });
         }
     };
-    let mut entries = vec![kit::MenuEntry::new("复制 UUID", copy)];
+    let mut entries = vec![kit::MenuEntry::new(tr!("account-menu-copy-uuid"), copy)];
     if !row.microsoft && !row.third_party {
         // ia[accounts]: 设置皮肤 | 离线账户行 ⋯ 菜单「皮肤…」→ 弹窗 | 选默认、本地文件、LittleSkin 或自定义皮肤站；游戏里按所选显示（启动时在本机起一个皮肤服务器，需要 authlib-injector）；加载不到时游戏照常启动并在日志里说明 | ADR 0024
         entries.push(kit::MenuEntry::new(
-            "皮肤…",
+            tr!("account-menu-skin"),
             send(&ctx.handler, LiveIntent::EditSkin(row.key.clone())),
         ));
     }
     if row.signed_in() {
         // ia[accounts]: 刷新登录 | 已登录账户行 ⋯ 菜单「刷新登录」 | 失效的登录显示“需要重新登录”，刷新后恢复
         entries.push(kit::MenuEntry::new(
-            "刷新登录",
+            tr!("account-menu-refresh"),
             send(&ctx.handler, LiveIntent::RefreshAccount(row.key.clone())),
         ));
     }
-    entries.push(kit::MenuEntry::new("移除…", remove).danger());
+    entries.push(kit::MenuEntry::new(tr!("account-menu-remove"), remove).danger());
     let menu = kit::more_menu(("account-more", index), entries, colors);
     h_flex()
         .w_full()
@@ -148,11 +140,11 @@ pub(super) fn account_row(index: usize, row: &AccountRow, ctx: &LiveCtx) -> gpui
         )
         .children(
             row.needs_sign_in
-                .then(|| kit::chip("需要重新登录", Some(colors.danger), colors)),
+                .then(|| kit::chip(tr!("account-needs-sign-in"), Some(colors.danger), colors)),
         )
         .children(
             row.selected
-                .then(|| kit::chip("当前", Some(colors.primary), colors)),
+                .then(|| kit::chip(tr!("account-chip-current"), Some(colors.primary), colors)),
         )
         .child(menu)
 }
@@ -161,14 +153,18 @@ pub fn accounts(ctx: &LiveCtx) -> impl IntoElement {
     let colors = ctx.colors;
     let model = ctx.model;
     let subtitle = match model.selected_account() {
-        Some(row) => format!("当前：{}（{}）", row.name, row.kind_label()),
-        None if model.accounts_loaded => "还没有账户，添加一个才能进游戏".to_owned(),
+        Some(row) => tr!(
+            "account-subtitle-current",
+            name = row.name.as_str(),
+            kind = row.kind_label()
+        ),
+        None if model.accounts_loaded => tr!("account-subtitle-empty").to_owned(),
         None => String::new(),
     };
     // ia[accounts]: 添加离线账户 | L2 次要「添加离线账户」→ 弹窗（可自定义 UUID） | 列表新增；UUID 只在添加时可设
     let add = kit::action(
         "account-new",
-        "添加离线账户",
+        tr!("account-add-offline"),
         Some(UiIcon::Plus),
         false,
         send(&ctx.handler, LiveIntent::NewAccount),
@@ -176,7 +172,7 @@ pub fn accounts(ctx: &LiveCtx) -> impl IntoElement {
     // ia[accounts]: Microsoft 登录 | L2 主要「登录 Microsoft」→ 设备码弹窗 | 登录后出现在列表和导航芯片里，启动用真实的玩家名和令牌 | ADR 0020；真实登录要 Mojang 批准应用注册
     let microsoft = kit::action(
         "account-microsoft",
-        "登录 Microsoft",
+        tr!("account-sign-in-microsoft"),
         None,
         true,
         send(&ctx.handler, LiveIntent::MicrosoftSignIn),
@@ -187,8 +183,8 @@ pub fn accounts(ctx: &LiveCtx) -> impl IntoElement {
         v_flex()
             .items_center()
             .child(kit::empty(
-                "还没有账户",
-                "用 Microsoft 登录可以进入正版服务器；LittleSkin 等第三方认证服务器在右上角 ⋯ 里登录；离线账户不需要登录，名称就是你在游戏里的名字。",
+                tr!("account-empty-title"),
+                tr!("account-empty-help"),
                 colors,
             ))
             .into_any_element()
@@ -208,17 +204,17 @@ pub fn accounts(ctx: &LiveCtx) -> impl IntoElement {
         .w_full()
         .gap_5()
         .child(kit::header(
-            "账户",
+            tr!("route-accounts"),
             subtitle,
             kit::PageActions::new("accounts-actions")
                 .secondary(add)
                 .primary(microsoft)
                 .more(kit::MenuEntry::new(
-                    "第三方登录…",
+                    tr!("account-menu-third-party"),
                     send(&ctx.handler, LiveIntent::ThirdPartySignIn),
                 ))
                 .more(kit::MenuEntry::new(
-                    "认证服务器…",
+                    tr!("account-menu-servers"),
                     send(&ctx.handler, LiveIntent::ManageAuthServers),
                 ))
                 .render(colors),

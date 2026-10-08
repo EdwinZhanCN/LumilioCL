@@ -20,6 +20,8 @@ common-delete = 删除
 common-done = 完成
 # 一句话里并列的几段之间，例如「cache；natives」。
 common-clause-separator = ；
+common-remove = 移除
+common-save = 保存
 
 ## 时间
 
@@ -374,6 +376,155 @@ tag-vanilla = 原版
 tag-plugin = 插件
 tag-datapack = 数据包
 tag-features = 特性
+
+## 账户
+
+# 账户页的页头、空状态与账户行。
+account-add-offline = 添加离线账户
+account-sign-in-microsoft = 登录 Microsoft
+account-menu-third-party = 第三方登录…
+account-menu-servers = 认证服务器…
+account-empty-title = 还没有账户
+account-empty-help = 用 Microsoft 登录可以进入正版服务器；LittleSkin 等第三方认证服务器在右上角 ⋯ 里登录；离线账户不需要登录，名称就是你在游戏里的名字。
+account-subtitle-current = 当前：{ $name }（{ $kind }）
+account-subtitle-empty = 还没有账户，添加一个才能进游戏
+account-needs-sign-in = 需要重新登录
+account-chip-current = 当前
+account-kind-offline = 离线账户
+account-kind-third-party = 第三方账户
+account-skin-local = 本地皮肤
+account-skin-littleskin = LittleSkin 皮肤
+account-skin-site = 皮肤站皮肤
+account-detail-custom-uuid = 自定义 UUID
+account-copied-uuid = 已复制 UUID
+account-menu-copy-uuid = 复制 UUID
+account-menu-skin = 皮肤…
+account-menu-refresh = 刷新登录
+account-menu-remove = 移除…
+account-remove-title = 移除账户“{ $name }”？
+account-remove-body-signed-in-current = 会忘记这个身份并从系统凭据库删除它的登录信息（第三方账户还会通知服务器作废令牌），不会删除任何游戏或存档。它是当前账户，移除后会改用剩下的第一个。
+account-remove-body-signed-in = 会忘记这个身份并从系统凭据库删除它的登录信息，不会删除任何游戏或存档。
+account-remove-body-offline-current = 只会忘记这个身份，不会删除任何游戏或存档。它是当前账户，移除后会改用剩下的第一个。
+account-remove-body-offline = 只会忘记这个身份，不会删除任何游戏或存档。
+
+# 离线账户的添加对话框。
+account-name-label = 名称
+account-name-required = 请输入名称
+account-name-too-long = 名称最多 { $count } 个字符
+account-name-invalid-char = 名称只能用字母、数字和下划线，不能用“{ $character }”
+account-name-help = 最多 { $count } 位字母、数字或下划线
+account-name-help-first = 最多 { $count } 位字母、数字或下划线。这是第一个账户，会自动设为当前账户
+account-name-placeholder = 例如 Steve
+account-uuid-placeholder = 留空：由名称决定
+account-uuid-help = 游戏用它认出你，存档里的玩家数据也按它保存。留空则由名称决定（同名永远得到同一个）；只能在添加时设置，之后不能更改。
+account-uuid-problem = UUID 需要 32 位十六进制数字（可带横线）
+account-advanced-expand = 高级选项
+account-advanced-collapse = 收起高级选项
+
+# 离线账户的皮肤对话框。
+account-skin-title = { $name } 的皮肤
+account-skin-kind-default = 默认
+account-skin-kind-local = 本地文件
+account-skin-kind-littleskin = LittleSkin
+account-skin-kind-site = 皮肤站（CustomSkinLoader）
+account-skin-model-classic = 经典（宽臂）
+account-skin-model-slim = 纤细（窄臂）
+account-skin-model-label = 模型
+account-skin-skin-label = 皮肤图片
+account-skin-skin-placeholder = 皮肤图片（PNG）
+account-skin-cape-label = 披风图片
+account-skin-cape-placeholder = 披风图片（PNG，可空）
+account-skin-api-label = 皮肤站地址
+account-skin-api-placeholder = 皮肤站地址（CustomSkinLoader API）
+account-skin-browse = 浏览…
+account-skin-pick-picture = 选择图片
+account-skin-choose-picture = 选一个皮肤图片，或者一个披风图片
+account-skin-enter-address = 请输入皮肤站地址
+account-skin-save = 保存
+account-skin-api-help = 地址下需要有 <玩家名>.json 和 textures/ 目录，LittleSkin 和 Blessing Skin 皮肤站都是这样。
+account-skin-default-help = 游戏按玩家 UUID 自己挑一个默认皮肤，启动时不需要额外的东西。
+account-littleskin-hint = 你需要在 LittleSkin 上创建一个和这个离线账户同名的角色。之后账户的皮肤就是皮肤站上那个角色所设置的。
+account-skin-agent-note = 选了皮肤后，启动游戏时启动器会在本机起一个小小的皮肤服务器，并加载 authlib-injector（第一次会自动下载）。
+account-open-littleskin = 打开 LittleSkin
+
+# 登录失败的句子（Microsoft、第三方认证与皮肤站）。
+account-auth-declined = 你在浏览器里拒绝了这次登录
+account-auth-expired = 代码已经过期，请重新开始登录
+account-auth-cancelled = 登录已取消
+account-auth-sign-in-required = 登录已失效，需要重新登录
+account-auth-no-xbox = 这个 Microsoft 账户还没有 Xbox 档案，请先在 xbox.com 创建一个
+account-auth-child = 这是儿童账户，需要家长在 Microsoft 家庭组里允许在线游戏
+account-auth-xbox-unavailable = 你所在的地区不提供 Xbox 服务
+account-auth-adult-verification = 这个账户需要先在 Xbox 网站完成成年人验证
+account-auth-no-game = 这个账户没有 Minecraft Java 版
+account-auth-services-refused = Minecraft 服务拒绝了这个启动器的登录，可能这个应用注册还没有通过 Mojang 的审批
+account-auth-credential-store = 系统凭据库不可用，登录信息无法安全保存，所以没有登录
+account-auth-network = 连不上登录服务，请检查网络后重试
+account-auth-protocol = 登录服务的回答不符合预期
+account-yggdrasil-network = 无法连接认证服务器。可能是网络问题，请检查设备能否正常上网，或使用代理服务
+account-yggdrasil-malformed = 无法解析认证服务器响应，可能是服务器故障
+account-yggdrasil-credentials = 用户名或密码错误，或登录次数过多被暂时禁止登录，请稍后再试
+account-yggdrasil-session-expired = 登录已经失效，需要重新登录
+account-yggdrasil-no-character = 该账户在这个服务器上没有角色
+account-yggdrasil-character-deleted = 此角色已被删除
+account-yggdrasil-invalid-token = 登录已经失效，请重新登录
+account-yggdrasil-migrate = 你的账户需要迁移至微软账户。如果已经迁移，请使用迁移后的微软账户登录
+account-skin-error-io = 读不到这个皮肤文件
+account-skin-error-picture = 无法识别的皮肤文件，需要是 PNG 图片
+account-skin-error-network = 连不上皮肤站，请检查网络和地址
+account-skin-error-malformed = 皮肤站的回答不符合预期
+account-skin-error-invalid-api = 皮肤站地址不是一个有效的地址
+account-failure-sign-in-required = 账户 { $name } 需要重新登录
+account-failure-injector = 无法下载 authlib-injector。可能是网络问题，请检查网络、尝试切换下载源或使用代理服务
+account-failure-no-pending = 这次登录已经失效，请重新登录
+account-failure-duplicate = 已经有叫“{ $name }”的账户了（名称不分大小写）
+account-failure-duplicate-uuid = 这个 UUID 已经被另一个账户使用
+account-failure-profile = 名称或 UUID 不符合要求
+account-failure-save = 没能保存账户
+
+# 认证服务器对话框。
+account-server-label = 认证服务器
+account-server-add-title = 添加认证服务器
+account-server-add-menu = 添加认证服务器…
+account-server-address-placeholder = 例如 littleskin.cn 或认证服务器的 API 地址
+account-server-find = 查找
+account-server-builtin = { $url } · 内置
+account-server-accounts = { $url } · { $count } 个账户
+account-server-already-listed = 这个服务器已经在列表里了
+account-server-remove-title = 移除认证服务器“{ $name }”？
+account-server-remove-body = 只会忘记这个服务器，之后可以再添加。
+account-server-remove-body-accounts = 会忘记这个服务器，并移除在它上面登录的 { $count } 个账户（连同它们在系统凭据库里的登录信息）。游戏和存档不受影响。
+
+# 第三方账户登录对话框。
+account-third-party-title = 登录第三方账户
+account-login-username = 用户名
+account-login-email = 邮箱
+account-password-label = 密码
+account-password-hint = 密码只会发给你选的认证服务器；启动器不保存它，只把服务器发来的令牌放进系统凭据库。
+account-http-warning = 警告：此服务器使用不安全的 HTTP 协议，你的密码在登录时会被明文传输。
+account-sign-in-action = 登录
+account-choose-character-action = 选择
+account-choose-character = 这个账户有多个角色，选一个用来玩
+
+# Microsoft 登录对话框。
+account-microsoft-title = 登录 Microsoft
+account-microsoft-sign-in = 在浏览器中登录
+account-microsoft-retry = 再试一次
+account-microsoft-cancel-sign-in = 取消登录
+account-microsoft-intro = 点“在浏览器中登录”，在打开的页面输入一个代码，再回到这里。
+account-microsoft-storage-note = 登录信息只保存在系统凭据库里，不会写进启动器的文件。
+account-microsoft-requesting = 正在向 Microsoft 要一个登录代码…
+account-microsoft-code-lead = 在 { $address } 输入这个代码，然后在页面上登录并确认：
+account-microsoft-copy-code = 复制代码
+account-microsoft-reopen = 重新打开页面
+account-microsoft-waiting = 正在等你在浏览器里完成登录…
+
+# 账户操作的提示消息。
+account-signed-in = 已登录 { $name }
+account-added = 已添加账户 { $name }
+account-server-added = 已添加认证服务器 { $name }
+account-server-removed = 已移除认证服务器
+account-skin-saved = 皮肤已保存，下次启动时生效
 
 ## 游戏库与发现的搜索和筛选
 

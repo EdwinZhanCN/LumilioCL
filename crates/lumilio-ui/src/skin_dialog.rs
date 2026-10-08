@@ -18,18 +18,22 @@ use lumilio_core::{SkinChoice, SkinModel};
 use crate::kit;
 use crate::new_game::Failure;
 use crate::theme::{self, ShellColors};
+use crate::{tr, tr_all};
 
 const DIALOG_WIDTH: f32 = 480.;
 
-pub const LITTLE_SKIN_HINT: &str = "你需要在 LittleSkin 上创建一个和这个离线账户同名的角色。之后账户的皮肤就是皮肤站上那个角色所设置的。";
-pub const AGENT_NOTE: &str = "选了皮肤后，启动游戏时启动器会在本机起一个小小的皮肤服务器，并加载 authlib-injector（第一次会自动下载）。";
-const KINDS: [&str; 4] = [
-    "默认",
-    "本地文件",
-    "LittleSkin",
-    "皮肤站（CustomSkinLoader）",
-];
-const MODELS: [&str; 2] = ["经典（宽臂）", "纤细（窄臂）"];
+fn kinds() -> &'static [&'static str] {
+    tr_all![
+        "account-skin-kind-default",
+        "account-skin-kind-local",
+        "account-skin-kind-littleskin",
+        "account-skin-kind-site",
+    ]
+}
+
+fn models() -> &'static [&'static str] {
+    tr_all!["account-skin-model-classic", "account-skin-model-slim"]
+}
 
 /// What the dialog asks the application to do.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -98,9 +102,9 @@ impl SkinDialog {
                     .placeholder(placeholder)
             })
         };
-        let skin = input(skin, "皮肤图片（PNG）", cx);
-        let cape = input(cape, "披风图片（PNG，可空）", cx);
-        let api = input(api, "皮肤站地址（CustomSkinLoader API）", cx);
+        let skin = input(skin, tr!("account-skin-skin-placeholder"), cx);
+        let cape = input(cape, tr!("account-skin-cape-placeholder"), cx);
+        let api = input(api, tr!("account-skin-api-placeholder"), cx);
         for field in [&skin, &cape, &api] {
             cx.subscribe_in(field, window, |dialog, _, event: &InputEvent, _, cx| {
                 if matches!(event, InputEvent::Change) {
@@ -137,7 +141,7 @@ impl SkinDialog {
             1 => {
                 let (skin, cape) = (Self::text(&self.skin, cx), Self::text(&self.cape, cx));
                 if skin.is_empty() && cape.is_empty() {
-                    return Err("选一个皮肤图片，或者一个披风图片");
+                    return Err(tr!("account-skin-choose-picture"));
                 }
                 let path = |text: String| (!text.is_empty()).then(|| PathBuf::from(text));
                 Ok(Some(SkinChoice::Local {
@@ -154,7 +158,7 @@ impl SkinDialog {
             _ => {
                 let api = Self::text(&self.api, cx);
                 if api.is_empty() {
-                    Err("请输入皮肤站地址")
+                    Err(tr!("account-skin-enter-address"))
                 } else {
                     Ok(Some(SkinChoice::Csl { api }))
                 }
@@ -200,13 +204,13 @@ impl SkinDialog {
         let this = dialog.read(cx);
         let busy = this.busy;
         let ready = this.choice(cx).is_ok();
-        let title = format!("{} 的皮肤", this.name);
+        let title = tr!("account-skin-title", name = this.name.as_str());
         let weak = dialog.downgrade();
         let save = {
             let weak = weak.clone();
             theme::clickable(
                 Key::new("skin-save")
-                    .label("保存")
+                    .label(tr!("account-skin-save"))
                     .primary()
                     .loading(busy)
                     .disabled(busy || !ready)
@@ -219,7 +223,7 @@ impl SkinDialog {
         };
         let cancel = theme::clickable(
             Key::new("skin-cancel")
-                .label("取消")
+                .label(tr!("common-cancel"))
                 .white()
                 .disabled(busy)
                 .on_click(|_, window, cx| window.close_dialog(cx)),
@@ -245,8 +249,9 @@ impl SkinDialog {
     /// A file picker for one of the picture fields.
     fn browse(field: &Entity<InputState>, id: &'static str) -> impl IntoElement {
         let field = field.clone();
-        kit::ghost(id, "浏览…", move |window, cx| {
-            let chosen = crate::platform::pick_path(cx, true, false, "选择图片");
+        kit::ghost(id, tr!("account-skin-browse"), move |window, cx| {
+            let chosen =
+                crate::platform::pick_path(cx, true, false, tr!("account-skin-pick-picture"));
             let (handle, field) = (window.window_handle(), field.clone());
             cx.spawn(async move |cx| {
                 if let Some(path) = chosen.await {
@@ -278,7 +283,7 @@ impl Render for SkinDialog {
         let colors = ShellColors::from_theme(cx.theme());
         let entity = cx.entity().downgrade();
         let busy = self.busy;
-        let kinds = KINDS.iter().enumerate().map(|(index, text)| {
+        let kinds = kinds().iter().enumerate().map(|(index, text)| {
             let entity = entity.clone();
             kit::led_option(
                 ("skin-kind", index),
@@ -299,11 +304,10 @@ impl Render for SkinDialog {
             1 => v_flex()
                 .gap_3()
                 .child(
-                    v_flex().gap_2().child(label("模型", colors)).child(kit::segments(
-                        "skin-model",
-                        &MODELS,
-                        self.model,
-                        {
+                    v_flex()
+                        .gap_2()
+                        .child(label(tr!("account-skin-model-label"), colors))
+                        .child(kit::segments("skin-model", models(), self.model, {
                             let entity = entity.clone();
                             move |index, _, cx| {
                                 let _ = entity.update(cx, |dialog, cx| {
@@ -311,48 +315,62 @@ impl Render for SkinDialog {
                                     cx.notify();
                                 });
                             }
-                        },
-                    )),
+                        })),
                 )
                 .child(
-                    v_flex().gap_2().child(label("皮肤图片", colors)).child(
-                        h_flex()
-                            .gap_2()
-                            .child(div().flex_1().child(Input::new(&self.skin).disabled(busy)))
-                            .child(Self::browse(&self.skin, "skin-browse")),
-                    ),
+                    v_flex()
+                        .gap_2()
+                        .child(label(tr!("account-skin-skin-label"), colors))
+                        .child(
+                            h_flex()
+                                .gap_2()
+                                .child(div().flex_1().child(Input::new(&self.skin).disabled(busy)))
+                                .child(Self::browse(&self.skin, "skin-browse")),
+                        ),
                 )
                 .child(
-                    v_flex().gap_2().child(label("披风图片", colors)).child(
-                        h_flex()
-                            .gap_2()
-                            .child(div().flex_1().child(Input::new(&self.cape).disabled(busy)))
-                            .child(Self::browse(&self.cape, "cape-browse")),
-                    ),
+                    v_flex()
+                        .gap_2()
+                        .child(label(tr!("account-skin-cape-label"), colors))
+                        .child(
+                            h_flex()
+                                .gap_2()
+                                .child(div().flex_1().child(Input::new(&self.cape).disabled(busy)))
+                                .child(Self::browse(&self.cape, "cape-browse")),
+                        ),
                 )
                 .into_any_element(),
             2 => v_flex()
                 .gap_2()
-                .child(div().text_sm().text_color(colors.muted).child(LITTLE_SKIN_HINT))
-                .child(h_flex().child(kit::ghost("skin-open-littleskin", "打开 LittleSkin", |_, cx| {
-                    crate::platform::open_address("https://littleskin.cn/", cx);
-                })))
+                .child(
+                    div()
+                        .text_sm()
+                        .text_color(colors.muted)
+                        .child(tr!("account-littleskin-hint")),
+                )
+                .child(h_flex().child(kit::ghost(
+                    "skin-open-littleskin",
+                    tr!("account-open-littleskin"),
+                    |_, cx| {
+                        crate::platform::open_address("https://littleskin.cn/", cx);
+                    },
+                )))
                 .into_any_element(),
             3 => v_flex()
                 .gap_2()
-                .child(label("皮肤站地址", colors))
+                .child(label(tr!("account-skin-api-label"), colors))
                 .child(Input::new(&self.api).disabled(busy))
                 .child(
                     div()
                         .text_xs()
                         .text_color(colors.muted)
-                        .child("地址下需要有 <玩家名>.json 和 textures/ 目录，LittleSkin 和 Blessing Skin 皮肤站都是这样。"),
+                        .child(tr!("account-skin-api-help")),
                 )
                 .into_any_element(),
             _ => div()
                 .text_sm()
                 .text_color(colors.muted)
-                .child("游戏按玩家 UUID 自己挑一个默认皮肤，启动时不需要额外的东西。")
+                .child(tr!("account-skin-default-help"))
                 .into_any_element(),
         };
         v_flex()
@@ -361,10 +379,12 @@ impl Render for SkinDialog {
             .gap_4()
             .child(v_flex().children(kinds))
             .child(detail)
-            .children(
-                (self.kind != 0)
-                    .then(|| div().text_xs().text_color(colors.muted).child(AGENT_NOTE)),
-            )
+            .children((self.kind != 0).then(|| {
+                div()
+                    .text_xs()
+                    .text_color(colors.muted)
+                    .child(tr!("account-skin-agent-note"))
+            }))
             .children(self.error.clone().map(|(message, technical)| {
                 h_flex()
                     .gap_2()

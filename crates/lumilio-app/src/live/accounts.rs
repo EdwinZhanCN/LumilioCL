@@ -11,6 +11,7 @@ use lumilio_ui::platform;
 use lumilio_ui::skin_dialog::{SkinDialog, SkinIntent};
 use lumilio_ui::third_party_login::{ThirdPartyDialog, ThirdPartyIntent};
 use lumilio_ui::toast::Toast;
+use lumilio_ui::tr;
 use std::rc::Rc;
 
 /// Opens the add-account dialog (IA `accounts.md`). With `then_launch` the
@@ -107,7 +108,7 @@ pub(super) fn start_microsoft_sign_in(
             Ok((_, name)) => {
                 let _ = dialog.update(cx, |dialog, cx| dialog.signed_in(cx));
                 let _ = wiring.shell.update(cx, |shell, cx| {
-                    shell.toast(Toast::success(format!("已登录 {name}")), cx)
+                    shell.toast(Toast::success(tr!("account-signed-in", name = name)), cx)
                 });
                 cx.update(|cx| reload(&wiring, Reload::Lists, cx));
             }
@@ -148,7 +149,10 @@ pub(super) fn add_account(
         }
         let _ = form.update(cx, |form, cx| form.saved(Ok(()), cx));
         let _ = wiring.shell.update(cx, |shell, cx| {
-            shell.toast(Toast::success(format!("已添加账户 {}", request.name)), cx);
+            shell.toast(
+                Toast::success(tr!("account-added", name = request.name)),
+                cx,
+            );
         });
         cx.update(|cx| reload(&wiring, Reload::Lists, cx));
         if then_launch {
@@ -259,7 +263,7 @@ fn third_party_intent(
             Ok(ThirdPartySignIn::Done { name, .. }) => {
                 let _ = dialog.update(cx, |dialog, cx| dialog.signed_in(cx));
                 let _ = wiring.shell.update(cx, |shell, cx| {
-                    shell.toast(Toast::success(format!("已登录 {name}")), cx)
+                    shell.toast(Toast::success(tr!("account-signed-in", name = name)), cx)
                 });
                 cx.update(|cx| reload(&wiring, Reload::Lists, cx));
             }
@@ -344,7 +348,7 @@ fn server_intent(
                 dialog,
                 handle,
                 work,
-                format!("已添加认证服务器 {name}"),
+                tr!("account-server-added", name = name),
                 cx,
             );
         }
@@ -358,7 +362,7 @@ fn server_intent(
                 dialog,
                 handle,
                 work,
-                "已移除认证服务器".to_owned(),
+                tr!("account-server-removed").to_owned(),
                 cx,
             );
         }
@@ -445,7 +449,7 @@ fn save_skin(wiring: &Wiring, dialog: WeakEntity<SkinDialog>, intent: SkinIntent
             Ok(()) => {
                 let _ = dialog.update(cx, |dialog, cx| dialog.saved(Ok(()), cx));
                 let _ = wiring.shell.update(cx, |shell, cx| {
-                    shell.toast(Toast::success("皮肤已保存，下次启动时生效"), cx)
+                    shell.toast(Toast::success(tr!("account-skin-saved")), cx)
                 });
                 cx.update(|cx| reload(&wiring, Reload::Lists, cx));
             }

@@ -20,6 +20,8 @@ common-delete = Delete
 common-done = Done
 # Between the parts of one sentence, as in "cache; natives".
 common-clause-separator = {"; "}
+common-remove = Remove
+common-save = Save
 # Opens the folder with the item selected, named as each system names it.
 common-reveal-macos = Show in Finder
 common-reveal-windows = Show in File Explorer
@@ -396,6 +398,170 @@ tag-vanilla = Vanilla
 tag-plugin = Plugin
 tag-datapack = Data pack
 tag-features = Features
+
+## Accounts
+
+# The Accounts page header, empty state and account rows.
+account-add-offline = Add offline account
+account-sign-in-microsoft = Sign in with Microsoft
+account-menu-third-party = Third-party sign-in…
+account-menu-servers = Auth servers…
+account-empty-title = No accounts yet
+account-empty-help = Sign in with Microsoft to join official servers; sign in to third-party auth servers such as LittleSkin from the ⋯ menu in the top right; an offline account needs no sign-in, and its name is the name you use in game.
+account-subtitle-current = Current: { $name } ({ $kind })
+account-subtitle-empty = No accounts yet; add one to play
+account-needs-sign-in = Sign in again
+account-chip-current = Current
+account-kind-offline = Offline account
+account-kind-third-party = Third-party account
+account-skin-local = Local skin
+account-skin-littleskin = LittleSkin skin
+account-skin-site = Skin site skin
+account-detail-custom-uuid = Custom UUID
+account-copied-uuid = UUID copied
+account-menu-copy-uuid = Copy UUID
+account-menu-skin = Skin…
+account-menu-refresh = Refresh sign-in
+account-menu-remove = Remove…
+account-remove-title = Remove account "{ $name }"?
+account-remove-body-signed-in-current = This identity is forgotten and its sign-in is deleted from the system credential store (a third-party account also tells the server to invalidate its token); no games or saves are deleted. It's the current account, so the first remaining one takes over.
+account-remove-body-signed-in = This identity is forgotten and its sign-in is deleted from the system credential store; no games or saves are deleted.
+account-remove-body-offline-current = This identity is only forgotten; no games or saves are deleted. It's the current account, so the first remaining one takes over.
+account-remove-body-offline = This identity is only forgotten; no games or saves are deleted.
+
+# The offline account add dialog.
+account-name-label = Name
+account-name-required = Enter a name
+account-name-too-long = Name can be at most { $count ->
+    [one] { $count } character
+   *[other] { $count } characters
+}
+account-name-invalid-char = Name can only use letters, numbers and underscores; "{ $character }" isn't allowed
+account-name-help = At most { $count ->
+    [one] { $count } character
+   *[other] { $count } characters
+}, using letters, numbers or underscores
+account-name-help-first = At most { $count ->
+    [one] { $count } character
+   *[other] { $count } characters
+}, using letters, numbers or underscores. This is the first account and becomes the current one automatically
+account-name-placeholder = e.g. Steve
+account-uuid-placeholder = Leave empty: decided by the name
+account-uuid-help = The game uses it to recognize you, and player data in saves is stored under it. Leave it empty and the name decides it (the same name always gets the same one); it can only be set when adding and can't be changed later.
+account-uuid-problem = UUID needs 32 hexadecimal digits (hyphens allowed)
+account-advanced-expand = Advanced options
+account-advanced-collapse = Hide advanced options
+
+# The offline account skin dialog.
+account-skin-title = { $name }'s skin
+account-skin-kind-default = Default
+account-skin-kind-local = Local file
+account-skin-kind-littleskin = LittleSkin
+account-skin-kind-site = Skin site (CustomSkinLoader)
+account-skin-model-classic = Classic (wide arms)
+account-skin-model-slim = Slim (narrow arms)
+account-skin-model-label = Model
+account-skin-skin-label = Skin image
+account-skin-skin-placeholder = Skin image (PNG)
+account-skin-cape-label = Cape image
+account-skin-cape-placeholder = Cape image (PNG, optional)
+account-skin-api-label = Skin site address
+account-skin-api-placeholder = Skin site address (CustomSkinLoader API)
+account-skin-browse = Browse…
+account-skin-pick-picture = Choose image
+account-skin-choose-picture = Choose a skin image, or a cape image
+account-skin-enter-address = Enter the skin site address
+account-skin-save = Save
+account-skin-api-help = The address must serve <player name>.json and a textures/ folder; LittleSkin and Blessing Skin skin sites both work this way.
+account-skin-default-help = The game picks a default skin from the player's UUID on its own; nothing extra is needed at launch.
+account-littleskin-hint = You need to create a character on LittleSkin with the same name as this offline account. The account's skin then comes from whatever that character has set on the skin site.
+account-skin-agent-note = Once a skin is chosen, the launcher starts a small local skin server when launching the game and loads authlib-injector (downloaded automatically the first time).
+account-open-littleskin = Open LittleSkin
+
+# Sign-in failure sentences (Microsoft, third-party auth and skin sites).
+account-auth-declined = You declined this sign-in in the browser
+account-auth-expired = The code has expired; start the sign-in again
+account-auth-cancelled = Sign-in cancelled
+account-auth-sign-in-required = Your sign-in has expired; sign in again
+account-auth-no-xbox = This Microsoft account has no Xbox profile yet; create one at xbox.com first
+account-auth-child = This is a child account; a parent must allow online play in the Microsoft family group
+account-auth-xbox-unavailable = Xbox services aren't available in your region
+account-auth-adult-verification = This account must complete adult verification on the Xbox website first
+account-auth-no-game = This account doesn't own Minecraft: Java Edition
+account-auth-services-refused = Minecraft services refused this launcher's sign-in; the app registration may not be approved by Mojang yet
+account-auth-credential-store = The system credential store isn't available, so the sign-in can't be saved securely and didn't happen
+account-auth-network = Can't reach the sign-in service; check your network and try again
+account-auth-protocol = The sign-in service gave an unexpected response
+account-yggdrasil-network = Can't connect to the auth server. It may be a network problem; check that the device is online, or use a proxy.
+account-yggdrasil-malformed = Can't parse the auth server's response; the server may be down.
+account-yggdrasil-credentials = Wrong username or password, or too many attempts have temporarily blocked sign-in; try again later.
+account-yggdrasil-session-expired = Your sign-in has expired; sign in again.
+account-yggdrasil-no-character = This account has no character on this server
+account-yggdrasil-character-deleted = This character has been deleted
+account-yggdrasil-invalid-token = Your sign-in has expired; sign in again
+account-yggdrasil-migrate = Your account needs to be migrated to a Microsoft account. If it already has been, sign in with the migrated Microsoft account
+account-skin-error-io = Can't read this skin file
+account-skin-error-picture = Unrecognized skin file; it needs to be a PNG image
+account-skin-error-network = Can't reach the skin site; check your network and the address
+account-skin-error-malformed = The skin site gave an unexpected response
+account-skin-error-invalid-api = The skin site address isn't valid
+account-failure-sign-in-required = Account { $name } needs to sign in again
+account-failure-injector = Can't download authlib-injector. It may be a network problem; check your network, try another download source, or use a proxy
+account-failure-no-pending = This sign-in has expired; sign in again
+account-failure-duplicate = An account named "{ $name }" already exists (names aren't case-sensitive)
+account-failure-duplicate-uuid = This UUID is already used by another account
+account-failure-profile = The name or UUID doesn't meet the requirements
+account-failure-save = Couldn't save the account
+
+# The auth server dialog.
+account-server-label = Auth server
+account-server-add-title = Add auth server
+account-server-add-menu = Add auth server…
+account-server-address-placeholder = e.g. littleskin.cn or the auth server's API address
+account-server-find = Find
+account-server-builtin = { $url } · Built-in
+account-server-accounts = { $url } · { $count ->
+    [one] { $count } account
+   *[other] { $count } accounts
+}
+account-server-already-listed = This server is already in the list
+account-server-remove-title = Remove auth server "{ $name }"?
+account-server-remove-body = Only this server is forgotten; you can add it again later.
+account-server-remove-body-accounts = This server is forgotten, and it removes { $count ->
+    [one] { $count } account
+   *[other] { $count } accounts
+} signed in on it (along with their sign-ins in the system credential store). Games and saves aren't affected.
+
+# The third-party account sign-in dialog.
+account-third-party-title = Sign in to a third-party account
+account-login-username = Username
+account-login-email = Email
+account-password-label = Password
+account-password-hint = The password is only sent to the auth server you chose; the launcher doesn't store it and only puts the token the server returns into the system credential store.
+account-http-warning = Warning: this server uses unencrypted HTTP, so your password is sent in the clear when you sign in.
+account-sign-in-action = Sign in
+account-choose-character-action = Choose
+account-choose-character = This account has multiple characters; choose one to play
+
+# The Microsoft sign-in dialog.
+account-microsoft-title = Sign in with Microsoft
+account-microsoft-sign-in = Sign in in the browser
+account-microsoft-retry = Try again
+account-microsoft-cancel-sign-in = Cancel sign-in
+account-microsoft-intro = Choose "Sign in in the browser", enter a code on the page that opens, then come back here.
+account-microsoft-storage-note = Your sign-in is kept only in the system credential store and is never written to the launcher's files.
+account-microsoft-requesting = Asking Microsoft for a sign-in code…
+account-microsoft-code-lead = Enter this code at { $address }, then sign in and confirm on the page:
+account-microsoft-copy-code = Copy code
+account-microsoft-reopen = Reopen the page
+account-microsoft-waiting = Waiting for you to finish signing in in the browser…
+
+# Toast messages for account actions.
+account-signed-in = Signed in as { $name }
+account-added = Added account { $name }
+account-server-added = Added auth server { $name }
+account-server-removed = Removed auth server
+account-skin-saved = Skin saved; it takes effect on the next launch
 
 ## Library and Discover search and filters
 
