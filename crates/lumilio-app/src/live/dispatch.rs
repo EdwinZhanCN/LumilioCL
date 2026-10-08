@@ -424,13 +424,14 @@ pub(super) fn on_live_intent(
         LiveIntent::SetPreferences(preferences) => {
             let service = wiring.backend.service.clone();
             let saved = preferences.clone();
+            let apply_wiring = wiring.clone();
             change_setting(
                 wiring,
                 window,
                 async move { service.set_preferences(saved).await },
                 tr!("settings-save-failed"),
                 None,
-                move |window, cx| apply_preferences(&preferences, window, cx),
+                move |window, cx| apply_preferences(&apply_wiring, &preferences, window, cx),
                 cx,
             );
         }

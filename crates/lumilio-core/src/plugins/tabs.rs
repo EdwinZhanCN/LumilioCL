@@ -4,14 +4,14 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use lumilio_plugin_api::{ActionId, Effect, GameFacts, PluginError, TabState, View};
+use lumilio_plugin_api::{ActionId, Effect, GameFacts, PluginError, TabState, View, Words};
 
 use super::{PluginHost, PluginStatus, access};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PluginTab {
     pub plugin: String,
-    pub title: String,
+    pub title: Words,
 }
 
 /// An [`Effect`] after the host checked it; ready for the interface to run.

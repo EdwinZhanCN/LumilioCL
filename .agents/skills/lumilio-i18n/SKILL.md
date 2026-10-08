@@ -39,6 +39,16 @@ text from content sources never go through them.
   are taken and take them again when it changes, keeping what is chosen
   (`LiveControls::relabel`).
 
+## Outside the UI (ADR 0038)
+
+- `lumilio-core` never words a sentence: it returns types (a task label is an
+  action and a subject, a reclaim reason is an enum) and the UI maps them.
+  Its error `Display` text is English and technical.
+- A plugin owns its words: manifest, setting and tab text are `Words`
+  (Chinese and English), and text a plugin makes at run time follows
+  `HostContext::locale()`. Keep them in the plugin's `src/text.rs`. Setting
+  choice options are stored values and are never translated.
+
 ## Moving a page
 
 1. Replace the page's Chinese literals with `tr!` and add each message to the

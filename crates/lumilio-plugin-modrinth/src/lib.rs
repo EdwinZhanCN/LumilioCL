@@ -6,6 +6,7 @@ mod protocol;
 mod query;
 mod search;
 mod tags;
+mod text;
 mod versions;
 
 #[cfg(test)]
@@ -28,8 +29,8 @@ impl Plugin for Modrinth {
     fn manifest(&self) -> Manifest {
         Manifest {
             id: ID.into(),
-            name: "Modrinth".into(),
-            description: "查找、安装和更新 Mod、整合包、资源包与光影。".into(),
+            name: text::name(),
+            description: text::description(),
             version: env!("CARGO_PKG_VERSION").into(),
             api: API_VERSION,
             default_enabled: true,

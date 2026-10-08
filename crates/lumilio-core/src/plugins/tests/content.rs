@@ -1,5 +1,6 @@
 use super::*;
 use lumilio_plugin_api::ContentSource;
+use lumilio_plugin_api::Words;
 use lumilio_plugin_api::content::*;
 
 struct Source {
@@ -12,8 +13,8 @@ impl Plugin for Source {
     fn manifest(&self) -> Manifest {
         Manifest {
             id: self.id.into(),
-            name: self.id.into(),
-            description: String::new(),
+            name: Words::new(self.id, self.id),
+            description: Words::default(),
             version: "1".into(),
             api: API_VERSION,
             default_enabled: true,

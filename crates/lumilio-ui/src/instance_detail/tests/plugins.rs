@@ -3,7 +3,7 @@ use super::super::{InstanceDetailView, TAB_HISTORY, TAB_SCREENSHOTS, TAB_SETTING
 use super::{click, record, rooted};
 use gpui::TestAppContext;
 use lumilio_core::{LauncherSettings, PluginTab};
-use lumilio_plugin_api::{ActionId, ImageData, KeyKind, ListItem, View};
+use lumilio_plugin_api::{ActionId, ImageData, KeyKind, ListItem, View, Words};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -12,7 +12,7 @@ const PLUGIN: &str = "lumilio.litematica";
 fn tab() -> PluginTab {
     PluginTab {
         plugin: PLUGIN.into(),
-        title: "投影".into(),
+        title: Words::new("投影", "Schematics"),
     }
 }
 
@@ -76,7 +76,7 @@ fn plugins_collapse_into_one_tab_and_built_in_positions_stay(cx: &mut TestAppCon
                 tab(),
                 PluginTab {
                     plugin: "other.plugin".into(),
-                    title: "地图".into(),
+                    title: Words::new("地图", "Maps"),
                 },
             ],
             cx,

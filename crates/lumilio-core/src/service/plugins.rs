@@ -48,6 +48,12 @@ impl<T: Transport + Clone> LauncherService<T> {
         self.plugins.list().await
     }
 
+    /// Tells every plugin context which language the launcher speaks from
+    /// now on, so plugin text follows a language switch.
+    pub async fn set_plugin_locale(&self, tag: &str) {
+        self.plugins.set_locale(tag);
+    }
+
     /// Saves one plugin's preference group atomically, then publishes it to
     /// subsequent calls. An empty state restores the manifest's defaults.
     pub async fn set_plugin(&self, id: &str, state: PluginState) -> Result<(), ServiceError> {

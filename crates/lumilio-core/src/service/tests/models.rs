@@ -2,7 +2,7 @@ use super::world;
 use crate::instance::Loader;
 use crate::plugins::PluginHost;
 use crate::service::ServiceError;
-use lumilio_plugin_api::{API_VERSION, Manifest, Permission, Plugin, PluginError};
+use lumilio_plugin_api::{API_VERSION, Manifest, Permission, Plugin, PluginError, Words};
 use std::io::Write;
 use std::sync::Arc;
 
@@ -12,8 +12,8 @@ impl Plugin for Builder {
     fn manifest(&self) -> Manifest {
         Manifest {
             id: "test.builder".into(),
-            name: "投影替身".into(),
-            description: String::new(),
+            name: Words::new("投影替身", "Schematic double"),
+            description: Words::default(),
             version: "1".into(),
             api: API_VERSION,
             default_enabled: true,

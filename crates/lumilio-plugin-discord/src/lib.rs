@@ -1,5 +1,7 @@
 //! Presence policy only; the host owns the Discord connection.
 
+mod text;
+
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 
@@ -20,8 +22,8 @@ impl Plugin for Discord {
     fn manifest(&self) -> Manifest {
         Manifest {
             id: ID.into(),
-            name: "Discord 游戏状态".into(),
-            description: "在 Discord 中显示正在玩的游戏，退出后清除状态".into(),
+            name: text::name(),
+            description: text::description(),
             version: env!("CARGO_PKG_VERSION").into(),
             api: API_VERSION,
             default_enabled: false,
@@ -32,22 +34,22 @@ impl Plugin for Discord {
             settings: vec![
                 SettingField {
                     key: "application_id".into(),
-                    label: "Discord 应用 ID".into(),
-                    help: "默认使用 LumilioCL 官方 Discord 应用 ID。留空使用内置 ID，也可填写其他 ID 覆盖。".into(),
+                    label: text::application_label(),
+                    help: text::application_help(),
                     kind: SettingKind::Text {
                         default: String::new(),
                     },
                 },
                 SettingField {
                     key: "show_game".into(),
-                    label: "显示游戏名".into(),
-                    help: "在状态中显示实例名称、Minecraft 版本和加载器。".into(),
+                    label: text::show_game_label(),
+                    help: text::show_game_help(),
                     kind: SettingKind::Toggle { default: true },
                 },
                 SettingField {
                     key: "show_target".into(),
-                    label: "显示世界或服务器".into(),
-                    help: "直接启动世界或服务器时，显示世界名或服务器地址。".into(),
+                    label: text::show_target_label(),
+                    help: text::show_target_help(),
                     kind: SettingKind::Toggle { default: false },
                 },
             ],
@@ -114,9 +116,10 @@ fn activity(ctx: &dyn HostContext, event: &LaunchEvent) -> Option<DiscordActivit
     let details = (ctx.setting("show_game") == Some(SettingValue::Toggle(true)))
         .then(|| format!("{instance_name} · Minecraft {game_version} · {loader}"));
     let state = if ctx.setting("show_target") == Some(SettingValue::Toggle(true)) {
+        let locale = ctx.locale();
         target.as_ref().map(|target| match target {
-            LaunchTarget::World(name) => format!("世界：{name}"),
-            LaunchTarget::Server(address) => format!("服务器：{address}"),
+            LaunchTarget::World(name) => text::world(name, locale),
+            LaunchTarget::Server(address) => text::server(address, locale),
         })
     } else {
         None

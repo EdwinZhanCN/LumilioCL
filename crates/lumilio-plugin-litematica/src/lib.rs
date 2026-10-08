@@ -5,10 +5,11 @@ mod format;
 mod tab;
 #[cfg(test)]
 mod tests;
+mod text;
 
 use lumilio_plugin_api::{
     API_VERSION, GameFacts, HostContext, InstanceTab, Manifest, Permission, Plugin, PluginError,
-    TabState, View,
+    TabState, View, Words,
 };
 
 pub const ID: &str = "lumilio.litematica";
@@ -20,8 +21,8 @@ impl Plugin for Litematica {
     fn manifest(&self) -> Manifest {
         Manifest {
             id: ID.into(),
-            name: "Litematica 投影".into(),
-            description: "浏览游戏里的投影文件，查看尺寸和材料清单。".into(),
+            name: text::name(),
+            description: text::description(),
             version: env!("CARGO_PKG_VERSION").into(),
             api: API_VERSION,
             default_enabled: true,
@@ -38,8 +39,8 @@ impl Plugin for Litematica {
 }
 
 impl InstanceTab for Litematica {
-    fn title(&self) -> String {
-        "投影".into()
+    fn title(&self) -> Words {
+        text::tab_title()
     }
 
     /// The game has Litematica, or already has files in `schematics/`.

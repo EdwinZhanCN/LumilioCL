@@ -4,6 +4,7 @@ use lumilio_plugin_api::{FetchResponse, LaunchOutcome};
 struct Context {
     id: u64,
     revision: u64,
+    locale: &'static str,
     values: BTreeMap<String, SettingValue>,
     calls: Mutex<Vec<Option<DiscordActivity>>>,
 }
@@ -13,6 +14,7 @@ impl Default for Context {
         Self {
             id: 1,
             revision: 0,
+            locale: "zh-CN",
             values: Discord::default()
                 .manifest()
                 .settings
@@ -25,6 +27,9 @@ impl Default for Context {
 }
 
 impl HostContext for Context {
+    fn locale(&self) -> &str {
+        self.locale
+    }
     fn launch_id(&self) -> Option<u64> {
         Some(self.id)
     }
@@ -161,6 +166,33 @@ fn both_disclosure_settings_are_read_on_each_call_and_exit_clears() {
     assert_eq!(activity.state.as_deref(), Some("服务器：mc.test:25565"));
     plugin.observe(&ctx, &exited()).unwrap();
     assert_eq!(ctx.calls.lock().unwrap().last(), Some(&None));
+}
+
+#[test]
+fn an_english_context_yields_english_activity_words() {
+    let mut ctx = configured();
+    ctx.locale = "en";
+    ctx.values
+        .insert("show_target".into(), SettingValue::Toggle(true));
+    let server = activity(
+        &ctx,
+        &started(Some(LaunchTarget::Server("mc.test:25565".into()))),
+    )
+    .unwrap();
+    assert_eq!(server.state.as_deref(), Some("Server: mc.test:25565"));
+    let world = activity(&ctx, &started(Some(LaunchTarget::World("Home".into())))).unwrap();
+    assert_eq!(world.state.as_deref(), Some("World: Home"));
+    // The default context stays Chinese.
+    let mut default_ctx = configured();
+    default_ctx
+        .values
+        .insert("show_target".into(), SettingValue::Toggle(true));
+    let chinese = activity(
+        &default_ctx,
+        &started(Some(LaunchTarget::Server("mc.test:25565".into()))),
+    )
+    .unwrap();
+    assert_eq!(chinese.state.as_deref(), Some("服务器：mc.test:25565"));
 }
 
 #[test]

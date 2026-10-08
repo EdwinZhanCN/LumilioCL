@@ -5,7 +5,7 @@ use crate::instance::Loader;
 use crate::plugins::{PluginHost, PluginStatus};
 use lumilio_plugin_api::{
     API_VERSION, HostContext, LaunchEvent, LaunchObserver, LaunchOutcome, LaunchTarget, Manifest,
-    Permission, Plugin, PluginError,
+    Permission, Plugin, PluginError, Words,
 };
 use std::sync::Arc;
 use std::time::Duration;
@@ -20,8 +20,8 @@ impl Plugin for Recorder {
     fn manifest(&self) -> Manifest {
         Manifest {
             id: "test.observer".into(),
-            name: "测试观察者".into(),
-            description: String::new(),
+            name: Words::new("测试观察者", "Test observer"),
+            description: Words::default(),
             version: "1".into(),
             api: API_VERSION,
             default_enabled: true,

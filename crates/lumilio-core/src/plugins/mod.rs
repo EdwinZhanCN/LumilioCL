@@ -74,6 +74,8 @@ pub struct PluginHost {
     /// Plugins that have answered as a content source, so that a stopped one
     /// can be told apart from there being none.
     content_ids: Mutex<std::collections::BTreeSet<String>>,
+    /// The launcher's current language tag, shared with every plugin context.
+    locale: Arc<RwLock<Arc<str>>>,
     timeout: Duration,
     network: Option<network::Network>,
 }
@@ -92,9 +94,26 @@ impl PluginHost {
             native: Arc::default(),
             tab_states: Mutex::new(BTreeMap::new()),
             content_ids: Mutex::default(),
+            locale: Arc::new(RwLock::new(Arc::from("zh-CN"))),
             timeout: CALL_TIMEOUT,
             network: None,
         }
+    }
+
+    /// Updates the language tag every plugin context sees from now on.
+    pub fn set_locale(&self, tag: &str) {
+        *self
+            .locale
+            .write()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Arc::from(tag);
+    }
+
+    /// The tag a fresh [`Context`] should carry.
+    fn locale_tag(&self) -> Arc<str> {
+        self.locale
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
     }
 
     /// Only statically linked, application-supplied core plugins may receive
@@ -336,7 +355,13 @@ impl PluginHost {
             .network
             .as_ref()
             .map(|network| network.context(timeout));
-        let mut context = Context::new(&entry.manifest, &state, game_dir, network);
+        let mut context = Context::new(
+            &entry.manifest,
+            &state,
+            game_dir,
+            network,
+            self.locale_tag(),
+        );
         context.launch_id = launch_id;
         context.revision = revision;
         context.native = Some(native::Access {

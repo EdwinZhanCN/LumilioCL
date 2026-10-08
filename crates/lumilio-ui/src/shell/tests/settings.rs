@@ -168,8 +168,8 @@ fn the_settings_page_shows_each_tab_and_edits_open_a_dialog(cx: &mut TestAppCont
                 view.plugins = vec![lumilio_core::PluginInfo {
                     manifest: lumilio_plugin_api::Manifest {
                         id: "test.fake".into(),
-                        name: "测试插件".into(),
-                        description: "测试说明".into(),
+                        name: lumilio_plugin_api::Words::new("测试插件", "Test plugin"),
+                        description: lumilio_plugin_api::Words::new("测试说明", "For tests"),
                         version: "1".into(),
                         api: lumilio_plugin_api::API_VERSION,
                         default_enabled: true,
@@ -240,8 +240,11 @@ fn the_plugin_list_stays_put_while_its_detail_scrolls(cx: &mut TestAppContext) {
                 let plugin = |index: usize| lumilio_core::PluginInfo {
                     manifest: lumilio_plugin_api::Manifest {
                         id: format!("test.p{index}"),
-                        name: format!("插件 {index}"),
-                        description: String::new(),
+                        name: lumilio_plugin_api::Words::new(
+                            format!("插件 {index}"),
+                            format!("Plugin {index}"),
+                        ),
+                        description: lumilio_plugin_api::Words::default(),
                         version: "1".into(),
                         api: lumilio_plugin_api::API_VERSION,
                         default_enabled: true,

@@ -11,6 +11,8 @@ mod analysis;
 pub mod content;
 mod launch;
 mod network;
+#[cfg(test)]
+mod tests;
 mod view;
 pub use analysis::{
     AnalysisInput, AnalysisSource, Analyzer, Finding, GameFacts, ModFact, Severity,
@@ -22,11 +24,41 @@ pub use view::{ActionId, Effect, ImageData, InstanceTab, KeyKind, ListItem, TabS
 
 pub const API_VERSION: u32 = 1;
 
+/// A plugin's own words in both languages the launcher speaks. A plugin
+/// supplies them together; the host picks by the launcher's locale and never
+/// translates plugin text itself.
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub struct Words {
+    pub zh_cn: String,
+    pub en: String,
+}
+
+impl Words {
+    #[must_use]
+    pub fn new(zh_cn: impl Into<String>, en: impl Into<String>) -> Self {
+        Self {
+            zh_cn: zh_cn.into(),
+            en: en.into(),
+        }
+    }
+
+    /// The words for `locale`: English when the tag starts with `en` and an
+    /// English string exists, Simplified Chinese otherwise.
+    #[must_use]
+    pub fn get(&self, locale: &str) -> &str {
+        if locale.starts_with("en") && !self.en.is_empty() {
+            &self.en
+        } else {
+            &self.zh_cn
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Manifest {
     pub id: String,
-    pub name: String,
-    pub description: String,
+    pub name: Words,
+    pub description: Words,
     pub version: String,
     pub api: u32,
     pub default_enabled: bool,
@@ -50,8 +82,8 @@ pub enum NativeCapability {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SettingField {
     pub key: String,
-    pub label: String,
-    pub help: String,
+    pub label: Words,
+    pub help: Words,
     pub kind: SettingKind,
 }
 
@@ -60,6 +92,9 @@ pub enum SettingKind {
     Toggle {
         default: bool,
     },
+    /// `options` are stored values, never shown text: a plugin matches them
+    /// against its own logic and the host persists whichever one is chosen.
+    /// They are not translated, so they stay identical in every language.
     Choice {
         options: Vec<String>,
         default: String,
@@ -146,6 +181,11 @@ pub struct FetchResponse {
 }
 
 pub trait HostContext: Send + Sync {
+    /// The launcher's language tag, such as `zh-CN` or `en`. A plugin picks
+    /// its words with [`Words::get`] against this.
+    fn locale(&self) -> &str {
+        "zh-CN"
+    }
     /// Identifies this observed process, including when several games overlap.
     fn launch_id(&self) -> Option<u64> {
         None

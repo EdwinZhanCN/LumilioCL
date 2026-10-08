@@ -34,8 +34,8 @@ fn save_failure_keeps_the_draft_and_repeat_submit_waits_for_success(cx: &mut gpu
         PluginSettingDialog::open(
             SettingField {
                 key: "text".into(),
-                label: "名称".into(),
-                help: String::new(),
+                label: lumilio_plugin_api::Words::new("名称", "Name"),
+                help: lumilio_plugin_api::Words::default(),
                 kind: SettingKind::Text {
                     default: String::new(),
                 },

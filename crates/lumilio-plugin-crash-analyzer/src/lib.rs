@@ -3,6 +3,7 @@
 mod rules;
 #[cfg(test)]
 mod tests;
+mod text;
 
 use lumilio_plugin_api::{
     API_VERSION, AnalysisInput, Analyzer, Finding, HostContext, Manifest, Plugin, PluginError,
@@ -16,8 +17,8 @@ impl Plugin for CrashAnalyzer {
     fn manifest(&self) -> Manifest {
         Manifest {
             id: ID.into(),
-            name: "崩溃与日志分析".into(),
-            description: "从游戏日志中找出可能的原因，提供排查建议。".into(),
+            name: text::name(),
+            description: text::description(),
             version: env!("CARGO_PKG_VERSION").into(),
             api: API_VERSION,
             default_enabled: true,
@@ -34,9 +35,9 @@ impl Plugin for CrashAnalyzer {
 impl Analyzer for CrashAnalyzer {
     fn analyze(
         &self,
-        _ctx: &dyn HostContext,
+        ctx: &dyn HostContext,
         input: &AnalysisInput,
     ) -> Result<Vec<Finding>, PluginError> {
-        Ok(rules::analyze(&input.text))
+        Ok(rules::analyze(&input.text, ctx.locale()))
     }
 }

@@ -1,5 +1,5 @@
 use super::*;
-use lumilio_plugin_api::{Permission, SettingField, SettingKind, SettingValue};
+use lumilio_plugin_api::{Permission, SettingField, SettingKind, SettingValue, Words};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[path = "tests/analysis.rs"]
@@ -33,8 +33,8 @@ impl Plugin for Fake {
         self.manifests.fetch_add(1, Ordering::SeqCst);
         Manifest {
             id: self.id.into(),
-            name: "测试插件".into(),
-            description: "只用于测试".into(),
+            name: Words::new("测试插件", "Test plugin"),
+            description: Words::new("只用于测试", "For tests only"),
             version: "1".into(),
             api: self.api,
             default_enabled: self.default_enabled,
@@ -44,14 +44,14 @@ impl Plugin for Fake {
             settings: vec![
                 SettingField {
                     key: "show".into(),
-                    label: "显示".into(),
-                    help: String::new(),
+                    label: Words::new("显示", "Show"),
+                    help: Words::new("", ""),
                     kind: SettingKind::Toggle { default: true },
                 },
                 SettingField {
                     key: "mode".into(),
-                    label: "模式".into(),
-                    help: String::new(),
+                    label: Words::new("模式", "Mode"),
+                    help: Words::new("", ""),
                     kind: SettingKind::Choice {
                         options: vec!["a".into(), "b".into()],
                         default: "a".into(),
@@ -59,16 +59,16 @@ impl Plugin for Fake {
                 },
                 SettingField {
                     key: "name".into(),
-                    label: "名称".into(),
-                    help: String::new(),
+                    label: Words::new("名称", "Name"),
+                    help: Words::new("", ""),
                     kind: SettingKind::Text {
                         default: "default".into(),
                     },
                 },
                 SettingField {
                     key: "count".into(),
-                    label: "数量".into(),
-                    help: String::new(),
+                    label: Words::new("数量", "Count"),
+                    help: Words::new("", ""),
                     kind: SettingKind::Number {
                         min: 1,
                         max: 10,

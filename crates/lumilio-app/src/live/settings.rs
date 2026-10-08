@@ -12,10 +12,24 @@ use std::time::Duration;
 
 /// Applies what the saved preferences say about the look, the motion and
 /// the language.
-pub(super) fn apply_preferences(preferences: &Preferences, window: &mut Window, cx: &mut App) {
+pub(super) fn apply_preferences(
+    wiring: &Wiring,
+    preferences: &Preferences,
+    window: &mut Window,
+    cx: &mut App,
+) {
     platform::apply_appearance(preferences.appearance, window, cx);
     platform::apply_motion(preferences.motion, cx);
     lumilio_ui::i18n::apply_language(preferences.language, cx);
+    // Plugin text is the plugin's own; tell the host which tag to read it in
+    // without blocking the UI thread.
+    let service = wiring.backend.service.clone();
+    let tag = lumilio_ui::i18n::locale().tag().to_owned();
+    drop(
+        wiring
+            .backend
+            .spawn(async move { service.set_plugin_locale(&tag).await }),
+    );
 }
 
 pub(super) fn edit_plugin_setting(
@@ -103,7 +117,7 @@ pub(super) fn apply_saved_preferences(
         };
         wiring.state.borrow_mut().preferences = preferences.clone();
         let _ = cx.update_window(window, |_, window, cx| {
-            apply_preferences(&preferences, window, cx)
+            apply_preferences(&wiring, &preferences, window, cx)
         });
         // The Library comes back ordered and filtered as it was left, and
         // Discover keeps its advanced exclusions.

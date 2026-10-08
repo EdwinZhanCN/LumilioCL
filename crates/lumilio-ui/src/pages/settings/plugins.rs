@@ -71,7 +71,7 @@ pub(super) fn render(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
                 let id = format!("settings-plugin-{}", info.manifest.id);
                 kit::led_option(
                     SharedString::from(id.clone()),
-                    info.manifest.name.clone(),
+                    SharedString::from(info.manifest.name.get(crate::i18n::locale().tag())),
                     index == selected,
                     ctx.colors,
                     move |window, app| emit(ViewIntent::Choose(PLUGIN_GROUP, index), window, app),
@@ -243,8 +243,14 @@ fn plugin_detail(info: &PluginInfo, ctx: &LiveCtx) -> AnyElement {
         rows.push(
             kit::value_row(
                 SharedString::from(format!("{id}-{key}")),
-                field.label.clone(),
-                (!field.help.is_empty()).then(|| field.help.clone().into()),
+                field.label.get(crate::i18n::locale().tag()).to_owned(),
+                (!field.help.get(crate::i18n::locale().tag()).is_empty()).then(|| {
+                    field
+                        .help
+                        .get(crate::i18n::locale().tag())
+                        .to_owned()
+                        .into()
+                }),
                 shown,
                 Some(control),
                 ctx.colors,
@@ -272,15 +278,20 @@ fn plugin_detail(info: &PluginInfo, ctx: &LiveCtx) -> AnyElement {
         .into_any_element(),
     );
     kit::section(
-        info.manifest.name.clone(),
+        info.manifest
+            .name
+            .get(crate::i18n::locale().tag())
+            .to_owned(),
         ctx.colors,
         v_flex()
             .gap_3()
             .child(
-                div()
-                    .text_sm()
-                    .text_color(ctx.colors.muted)
-                    .child(info.manifest.description.clone()),
+                div().text_sm().text_color(ctx.colors.muted).child(
+                    info.manifest
+                        .description
+                        .get(crate::i18n::locale().tag())
+                        .to_owned(),
+                ),
             )
             .child(kit::list(rows, ctx.colors)),
     )

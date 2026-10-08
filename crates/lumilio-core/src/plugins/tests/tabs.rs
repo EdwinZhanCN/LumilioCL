@@ -1,5 +1,5 @@
 use super::*;
-use lumilio_plugin_api::{ActionId, Effect, GameFacts, InstanceTab, TabState, View};
+use lumilio_plugin_api::{ActionId, Effect, GameFacts, InstanceTab, TabState, View, Words};
 
 struct TabPlugin {
     id: &'static str,
@@ -11,8 +11,8 @@ impl Plugin for TabPlugin {
     fn manifest(&self) -> Manifest {
         Manifest {
             id: self.id.into(),
-            name: self.id.into(),
-            description: String::new(),
+            name: Words::new(self.id, self.id),
+            description: Words::default(),
             version: "1".into(),
             api: API_VERSION,
             default_enabled: true,
@@ -28,8 +28,8 @@ impl Plugin for TabPlugin {
 }
 
 impl InstanceTab for TabPlugin {
-    fn title(&self) -> String {
-        "投影".into()
+    fn title(&self) -> Words {
+        Words::new("投影", "Schematics")
     }
     fn appears(&self, _: &GameFacts, _: &dyn HostContext) -> bool {
         self.shown
@@ -116,7 +116,7 @@ async fn tab_appears_only_when_its_condition_holds_and_the_plugin_is_on() {
         tabs,
         vec![PluginTab {
             plugin: "test.tab".into(),
-            title: "投影".into()
+            title: Words::new("投影", "Schematics")
         }]
     );
     assert!(

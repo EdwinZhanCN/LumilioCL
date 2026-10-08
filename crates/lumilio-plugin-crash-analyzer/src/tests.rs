@@ -30,6 +30,39 @@ fn analyze(text: &str) -> Vec<Finding> {
         .unwrap()
 }
 
+/// The same analyzer behind an English launcher language.
+struct English;
+impl HostContext for English {
+    fn locale(&self) -> &str {
+        "en"
+    }
+    fn setting(&self, _: &str) -> Option<SettingValue> {
+        None
+    }
+    fn read_file(&self, _: &str) -> Result<Vec<u8>, PluginError> {
+        panic!("analysis needs no I/O")
+    }
+    fn list_files(&self, _: &str) -> Result<Vec<String>, PluginError> {
+        panic!("analysis needs no I/O")
+    }
+    fn fetch(&self, _: &str) -> Result<FetchResponse, PluginError> {
+        panic!("analysis needs no network")
+    }
+}
+
+fn analyze_in(locale: &dyn HostContext, text: &str) -> Vec<Finding> {
+    CrashAnalyzer
+        .analyze(
+            locale,
+            &AnalysisInput {
+                text: text.into(),
+                source: AnalysisSource::CrashReport,
+                game: GameFacts::default(),
+            },
+        )
+        .unwrap()
+}
+
 fn ids(text: &str) -> Vec<String> {
     analyze(text)
         .into_iter()
@@ -214,6 +247,21 @@ fn a_debug_crash_is_information_and_evidence_is_bounded() {
 }
 
 #[test]
+fn an_english_context_yields_english_words_and_keeps_the_evidence() {
+    let line = "java.lang.OutOfMemoryError: Java heap space";
+    let findings = analyze_in(&English, line);
+    let finding = findings
+        .iter()
+        .find(|finding| finding.rule == "out-of-memory")
+        .expect("the rule still matches the same log text");
+    assert_eq!(finding.title, "Not enough memory");
+    assert!(finding.advice.starts_with("Try raising the maximum memory"));
+    assert_eq!(finding.evidence.as_deref(), Some(line));
+    // The default context stays Chinese.
+    assert_eq!(analyze(line)[0].title, "内存不足");
+}
+
+#[test]
 fn the_manifest_requires_no_permissions_and_enables_only_the_analyzer() {
     let plugin = CrashAnalyzer;
     let manifest = plugin.manifest();
@@ -225,4 +273,20 @@ fn the_manifest_requires_no_permissions_and_enables_only_the_analyzer() {
             && plugin.content_source().is_none()
             && plugin.launch_observer().is_none()
     );
+}
+
+#[test]
+fn every_rule_has_a_title_and_advice_in_both_languages() {
+    for id in super::rules::ids() {
+        for locale in ["zh-CN", "en"] {
+            assert!(
+                !super::text::title(id, locale).is_empty(),
+                "{id} has no {locale} title"
+            );
+            assert!(
+                !super::text::advice(id, locale).is_empty(),
+                "{id} has no {locale} advice"
+            );
+        }
+    }
 }

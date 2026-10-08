@@ -30,7 +30,10 @@ impl PluginSettingDialog {
         window: &mut Window,
         cx: &mut App,
     ) -> Option<Entity<Self>> {
-        let title = tr!("plugin-setting-title", label = field.label.clone());
+        let title = tr!(
+            "plugin-setting-title",
+            label = field.label.get(crate::i18n::locale().tag())
+        );
         let initial = match value {
             SettingValue::Text(text) => text,
             SettingValue::Number(number) => number.to_string(),
@@ -149,15 +152,17 @@ impl Render for PluginSettingDialog {
                 div()
                     .text_sm()
                     .text_color(colors.foreground)
-                    .child(self.field.label.clone()),
+                    .child(self.field.label.get(crate::i18n::locale().tag()).to_owned()),
             )
             .child(Input::new(&self.input).disabled(self.busy))
-            .children((!self.field.help.is_empty()).then(|| {
-                div()
-                    .text_sm()
-                    .text_color(colors.muted)
-                    .child(self.field.help.clone())
-            }))
+            .children(
+                (!self.field.help.get(crate::i18n::locale().tag()).is_empty()).then(|| {
+                    div()
+                        .text_sm()
+                        .text_color(colors.muted)
+                        .child(self.field.help.get(crate::i18n::locale().tag()).to_owned())
+                }),
+            )
             .children(self.error.clone().map(|error| {
                 div()
                     .text_sm()

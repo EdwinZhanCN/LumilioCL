@@ -5,7 +5,7 @@ use crate::instance::Loader;
 use crate::plugins::PluginHost;
 use lumilio_plugin_api::{
     API_VERSION, AnalysisInput, AnalysisSource, Analyzer, Finding, HostContext, Manifest, Plugin,
-    PluginError, Severity,
+    PluginError, Severity, Words,
 };
 use std::sync::{Arc, Mutex};
 
@@ -18,8 +18,8 @@ impl Plugin for Recorder {
     fn manifest(&self) -> Manifest {
         Manifest {
             id: "test.analysis".into(),
-            name: "分析替身".into(),
-            description: String::new(),
+            name: Words::new("分析替身", "Analysis double"),
+            description: Words::default(),
             version: "1".into(),
             api: API_VERSION,
             default_enabled: true,

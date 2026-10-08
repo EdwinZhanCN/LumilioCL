@@ -62,7 +62,7 @@ async fn concurrent_mirror_presets_merge_the_latest_saved_rules() {
 
 #[tokio::test]
 async fn plugin_failure_and_disable_do_not_affect_the_launch_chain() {
-    use lumilio_plugin_api::{API_VERSION, Manifest, Plugin, PluginState};
+    use lumilio_plugin_api::{API_VERSION, Manifest, Plugin, PluginState, Words};
     use std::collections::BTreeMap;
     use std::sync::Arc;
 
@@ -71,8 +71,8 @@ async fn plugin_failure_and_disable_do_not_affect_the_launch_chain() {
         fn manifest(&self) -> Manifest {
             Manifest {
                 id: "test.observer".into(),
-                name: "测试".into(),
-                description: String::new(),
+                name: Words::new("测试", "Test"),
+                description: Words::default(),
                 version: "1".into(),
                 api: API_VERSION,
                 default_enabled: true,

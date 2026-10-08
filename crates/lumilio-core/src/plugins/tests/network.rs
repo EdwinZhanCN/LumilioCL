@@ -4,7 +4,7 @@ use crate::transfer::{
     HttpMethod, HttpRequest, OfficialSource, PrefixMirror, SourceChain, Transport, TransportError,
     TransportFuture, TransportResponse,
 };
-use lumilio_plugin_api::{FetchRequest, FetchResponse};
+use lumilio_plugin_api::{FetchRequest, FetchResponse, Words};
 
 #[derive(Clone, Default)]
 struct Scripted {
@@ -67,8 +67,8 @@ impl Plugin for NetworkPlugin {
     fn manifest(&self) -> Manifest {
         Manifest {
             id: "test.network".into(),
-            name: "网络测试".into(),
-            description: String::new(),
+            name: Words::new("网络测试", "Network test"),
+            description: Words::default(),
             version: "1".into(),
             api: API_VERSION,
             default_enabled: true,

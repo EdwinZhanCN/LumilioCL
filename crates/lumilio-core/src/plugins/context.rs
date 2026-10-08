@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use lumilio_plugin_api::{
     FetchRequest, FetchResponse, HostContext, Manifest, PluginError, PluginState, SettingValue,
@@ -15,6 +16,7 @@ pub(super) struct Context {
     manifest: Manifest,
     game_dir: Option<PathBuf>,
     network: Option<super::network::NetworkContext>,
+    locale: Arc<str>,
 }
 
 impl Context {
@@ -23,6 +25,7 @@ impl Context {
         state: &PluginState,
         game_dir: Option<PathBuf>,
         network: Option<super::network::NetworkContext>,
+        locale: Arc<str>,
     ) -> Self {
         let values = manifest
             .settings
@@ -45,11 +48,15 @@ impl Context {
             manifest: manifest.clone(),
             game_dir,
             network,
+            locale,
         }
     }
 }
 
 impl HostContext for Context {
+    fn locale(&self) -> &str {
+        &self.locale
+    }
     fn launch_id(&self) -> Option<u64> {
         self.launch_id
     }

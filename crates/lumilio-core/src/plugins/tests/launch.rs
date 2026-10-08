@@ -1,6 +1,6 @@
 use super::*;
 use lumilio_plugin_api::{
-    DiscordActivity, LaunchEvent, LaunchObserver, LaunchOutcome, NativeCapability,
+    DiscordActivity, LaunchEvent, LaunchObserver, LaunchOutcome, NativeCapability, Words,
 };
 
 struct Observer {
@@ -15,8 +15,8 @@ impl Plugin for Observer {
     fn manifest(&self) -> Manifest {
         Manifest {
             id: self.id.into(),
-            name: "观察者".into(),
-            description: String::new(),
+            name: Words::new("观察者", "Observer"),
+            description: Words::default(),
             version: "1".into(),
             api: API_VERSION,
             default_enabled: true,

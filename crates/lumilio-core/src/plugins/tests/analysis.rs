@@ -1,5 +1,7 @@
 use super::*;
-use lumilio_plugin_api::{AnalysisInput, AnalysisSource, Analyzer, Finding, GameFacts, Severity};
+use lumilio_plugin_api::{
+    AnalysisInput, AnalysisSource, Analyzer, Finding, GameFacts, Severity, Words,
+};
 
 enum Behavior {
     Good,
@@ -16,8 +18,8 @@ impl Plugin for AnalysisPlugin {
     fn manifest(&self) -> Manifest {
         Manifest {
             id: self.id.into(),
-            name: self.id.into(),
-            description: String::new(),
+            name: Words::new(self.id, self.id),
+            description: Words::default(),
             version: "1".into(),
             api: API_VERSION,
             default_enabled: true,

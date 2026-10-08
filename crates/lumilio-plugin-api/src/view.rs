@@ -3,7 +3,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{GameFacts, HostContext, PluginError};
+use crate::{GameFacts, HostContext, PluginError, Words};
 
 /// Per-instance, per-plugin UI state. The host stores it; plugins do not.
 pub type TabState = serde_json::Value;
@@ -123,7 +123,7 @@ pub enum Effect {
 }
 
 pub trait InstanceTab: Send + Sync {
-    fn title(&self) -> String;
+    fn title(&self) -> Words;
     /// Whether the tab shows for an instance with these facts.
     fn appears(&self, game: &GameFacts, ctx: &dyn HostContext) -> bool;
     fn view(&self, ctx: &dyn HostContext, state: &TabState) -> Result<View, PluginError>;

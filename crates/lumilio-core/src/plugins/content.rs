@@ -18,6 +18,7 @@ impl PluginHost {
     /// Only active content sources contribute choices. Plugin methods,
     /// including capability declarations, run inside the worker boundary.
     pub async fn content_sources(&self) -> Vec<PluginContentSource> {
+        let locale = self.locale_tag();
         let mut sources = Vec::new();
         for info in self.list().await {
             let capabilities = self
@@ -30,7 +31,7 @@ impl PluginHost {
                     .insert(info.manifest.id.clone());
                 sources.push(PluginContentSource {
                     plugin: info.manifest.id,
-                    name: info.manifest.name,
+                    name: info.manifest.name.get(&locale).to_owned(),
                     capabilities,
                 });
             }
@@ -41,6 +42,7 @@ impl PluginHost {
     /// A content source that was answering and has since stopped, with why.
     /// Only for telling "stopped" from "none"; a disabled source is neither.
     pub async fn stopped_content_source(&self) -> Option<(String, String)> {
+        let locale = self.locale_tag();
         let known = self
             .content_ids
             .lock()
@@ -51,7 +53,7 @@ impl PluginHost {
             .into_iter()
             .find_map(|info| match info.status {
                 super::PluginStatus::Failed { message } if known.contains(&info.manifest.id) => {
-                    Some((info.manifest.name, message))
+                    Some((info.manifest.name.get(&locale).to_owned(), message))
                 }
                 _ => None,
             })

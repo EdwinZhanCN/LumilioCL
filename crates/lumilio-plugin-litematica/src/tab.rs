@@ -6,6 +6,7 @@ use lumilio_plugin_api::{
 
 use crate::FOLDER;
 use crate::format::{self, Litematic, Metadata};
+use crate::text::Text;
 
 /// Files read for one list; more are shown by name only.
 const READ_BUDGET: Duration = Duration::from_secs(3);
@@ -47,6 +48,7 @@ pub(crate) fn view(ctx: &dyn HostContext, state: &TabState) -> Result<View, Plug
 }
 
 fn list(ctx: &dyn HostContext) -> Result<View, PluginError> {
+    let text = Text::new(ctx.locale());
     let files: Vec<String> = ctx
         .list_files(FOLDER)?
         .into_iter()
@@ -54,10 +56,8 @@ fn list(ctx: &dyn HostContext) -> Result<View, PluginError> {
         .collect();
     if files.is_empty() {
         return Ok(View::Empty {
-            title: "还没有投影".into(),
-            message:
-                "把 .litematic 文件放进游戏的 schematics 文件夹，或在游戏里用 Litematica 保存投影。"
-                    .into(),
+            title: text.list_empty_title().into(),
+            message: text.list_empty_message().into(),
         });
     }
     let started = Instant::now();
@@ -70,13 +70,13 @@ fn list(ctx: &dyn HostContext) -> Result<View, PluginError> {
             ..ListItem::default()
         };
         if started.elapsed() > READ_BUDGET {
-            item.subtitle = Some("还没有读取".into());
+            item.subtitle = Some(text.not_read().into());
         } else {
             match read(ctx, path) {
                 Ok(file) => {
                     let meta = &file.metadata;
                     item.subtitle = Some(summary(meta, path));
-                    item.value = meta.total_blocks.map(|total| format!("{total} 个方块"));
+                    item.value = meta.total_blocks.map(|total| text.blocks(total));
                     item.image = meta.preview.as_ref().map(|(side, rgba)| ImageData {
                         width: *side,
                         height: *side,
@@ -85,7 +85,7 @@ fn list(ctx: &dyn HostContext) -> Result<View, PluginError> {
                     // ia[plugin.litematica]: 打开一份投影 | 列表行（缩略图、名称、作者与尺寸、方块数） | 进入详情：事实、材料清单；读不了的文件只在自己那一行写「读不了」，不影响列表
                     item.open = Some(ActionId::new(format!("{OPEN}{path}")));
                 }
-                Err(_) => item.subtitle = Some("读不了".into()),
+                Err(_) => item.subtitle = Some(text.unreadable().into()),
             }
         }
         items.push(item);
@@ -113,10 +113,11 @@ fn read(ctx: &dyn HostContext, path: &str) -> Result<Litematic, String> {
 }
 
 fn detail(ctx: &dyn HostContext, path: &str) -> Result<View, PluginError> {
+    let text = Text::new(ctx.locale());
     // ia[plugin.litematica]: 返回列表 | 详情页次要键 | 回到投影列表
     let back = View::Key {
         id: ActionId::new("back"),
-        label: "返回列表".into(),
+        label: text.back().into(),
         kind: KeyKind::Ghost,
         destructive: false,
     };
@@ -127,8 +128,8 @@ fn detail(ctx: &dyn HostContext, path: &str) -> Result<View, PluginError> {
                 title: stem(path).to_owned(),
                 children: vec![
                     View::Empty {
-                        title: "读不了".into(),
-                        message: "这个文件损坏了，或者太大。".into(),
+                        title: text.unreadable().into(),
+                        message: text.detail_read_message().into(),
                     },
                     back,
                 ],
@@ -142,16 +143,19 @@ fn detail(ctx: &dyn HostContext, path: &str) -> Result<View, PluginError> {
             facts.push((label.to_owned(), value));
         }
     };
-    fact("投影名称", meta.name.clone());
-    fact("作者", meta.author.clone());
+    fact(text.schematic_name(), meta.name.clone());
+    fact(text.author(), meta.author.clone());
     fact(
-        "尺寸",
+        text.size(),
         meta.size.map(|(x, y, z)| format!("{x} × {y} × {z}")),
     );
-    fact("方块总数", meta.total_blocks.map(|n| n.to_string()));
-    fact("区域", meta.region_count.map(|n| n.to_string()));
-    fact("修改时间", meta.modified_ms.map(date));
-    fact("文件", Some(path.to_owned()));
+    fact(
+        text.total_blocks(),
+        meta.total_blocks.map(|n| n.to_string()),
+    );
+    fact(text.regions(), meta.region_count.map(|n| n.to_string()));
+    fact(text.modified(), meta.modified_ms.map(date));
+    fact(text.file(), Some(path.to_owned()));
     let mut children = Vec::new();
     if let Some(description) = &meta.description {
         children.push(View::Text {
@@ -168,15 +172,15 @@ fn detail(ctx: &dyn HostContext, path: &str) -> Result<View, PluginError> {
             let mut rows: Vec<(String, u64)> = counts.into_iter().collect();
             rows.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
             children.push(View::Section {
-                title: "材料清单".into(),
+                title: text.materials().into(),
                 children: vec![if rows.is_empty() {
                     View::Empty {
-                        title: "没有方块".into(),
-                        message: "这个投影里只有空气。".into(),
+                        title: text.no_blocks().into(),
+                        message: text.only_air().into(),
                     }
                 } else {
                     View::Table {
-                        columns: vec!["方块".into(), "数量".into()],
+                        columns: vec![text.block_column().into(), text.count_column().into()],
                         rows: rows
                             .into_iter()
                             .map(|(name, count)| vec![name, count.to_string()])
@@ -186,22 +190,22 @@ fn detail(ctx: &dyn HostContext, path: &str) -> Result<View, PluginError> {
             });
         }
         Err(_) => children.push(View::Empty {
-            title: "材料清单读不了".into(),
-            message: "这个投影的方块数据损坏了，或者太大。".into(),
+            title: text.materials_unreadable().into(),
+            message: text.materials_unreadable_message().into(),
         }),
     }
     children.extend([
         // ia[plugin.litematica]: 在文件夹中显示 | 详情页次要键 | 在访达或资源管理器里选中这份投影文件
         View::Key {
             id: ActionId::new("reveal"),
-            label: "在文件夹中显示".into(),
+            label: text.show_in_folder().into(),
             kind: KeyKind::Ghost,
             destructive: false,
         },
         // ia[plugin.litematica]: 导出材料清单（CSV） | 详情页主要键 | 弹出保存对话框，选了位置才写入；按数量从多到少，表头为「方块,数量」 | 文件带 UTF-8 标记，表格软件直接读中文
         View::Key {
             id: ActionId::new("export"),
-            label: "导出材料清单（CSV）".into(),
+            label: text.export_csv().into(),
             kind: KeyKind::Primary,
             destructive: false,
         },
@@ -225,6 +229,7 @@ pub(crate) fn update(
     state: TabState,
     action: &ActionId,
 ) -> Result<(TabState, Vec<Effect>), PluginError> {
+    let text = Text::new(ctx.locale());
     let id = action.0.as_str();
     if let Some(path) = id.strip_prefix(OPEN) {
         if !is_schematic(path) {
@@ -243,13 +248,11 @@ pub(crate) fn update(
         ("export", Some(path)) => {
             let effects = match read(ctx, path).and_then(|file| file.materials()) {
                 Ok(counts) => vec![Effect::SaveAs {
-                    suggested_name: format!(
-                        "{}-材料清单.csv",
-                        file_name(path).trim_end_matches(".litematic")
-                    ),
-                    bytes: csv(counts).into_bytes(),
+                    suggested_name: text
+                        .export_name(file_name(path).trim_end_matches(".litematic")),
+                    bytes: csv(counts, &text).into_bytes(),
                 }],
-                Err(_) => vec![Effect::Toast("没有导出：这个投影读不了".into())],
+                Err(_) => vec![Effect::Toast(text.export_toast().into())],
             };
             Ok((state, effects))
         }
@@ -257,11 +260,11 @@ pub(crate) fn update(
     }
 }
 
-fn csv(counts: std::collections::BTreeMap<String, u64>) -> String {
+fn csv(counts: std::collections::BTreeMap<String, u64>, text: &Text<'_>) -> String {
     let mut rows: Vec<_> = counts.into_iter().collect();
     rows.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
     // A byte-order mark makes spreadsheet apps read the file as UTF-8.
-    let mut out = String::from("\u{feff}方块,数量\r\n");
+    let mut out = String::from(text.csv_header());
     for (name, count) in rows {
         let name = if name.contains([',', '"', '\n']) {
             format!("\"{}\"", name.replace('"', "\"\""))

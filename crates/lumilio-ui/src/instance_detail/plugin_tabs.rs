@@ -268,7 +268,7 @@ impl InstanceDetailView {
                     let entity = entity.clone();
                     kit::led_option(
                         SharedString::from(format!("instance-plugin-tab-{}", tab.plugin)),
-                        tab.title.clone(),
+                        SharedString::from(tab.title.get(crate::i18n::locale().tag())),
                         chosen,
                         colors,
                         move |window, cx| {
