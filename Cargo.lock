@@ -4451,6 +4451,7 @@ dependencies = [
 name = "lumilio-app"
 version = "0.1.0"
 dependencies = [
+ "async-channel",
  "futures",
  "gpui-kit",
  "lumilio-core",
@@ -4614,6 +4615,7 @@ dependencies = [
  "i18n-embed-fl",
  "image 0.25.10",
  "lumilio-core",
+ "lumilio-map-render",
  "lumilio-plugin-api",
  "lumilio-pointer",
  "lumilio-schematic-render",

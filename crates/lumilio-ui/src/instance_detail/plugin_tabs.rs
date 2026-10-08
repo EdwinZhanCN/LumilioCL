@@ -36,6 +36,7 @@ pub(super) enum PluginPage {
         View,
         Vec<Option<Arc<RenderImage>>>,
         Vec<Entity<crate::model_view::ModelView>>,
+        Vec<Entity<crate::world_explorer::MapView>>,
     ),
     /// The plugin was switched off or failed while the page was open.
     Unavailable,
@@ -49,6 +50,11 @@ impl InstanceDetailView {
     /// returns the page to a built-in tab.
     pub fn plugin_tabs_arrived(&mut self, tabs: Vec<PluginTab>, cx: &mut Context<Self>) {
         self.plugin_tabs = tabs;
+        for tab in &mut self.plugin_tabs {
+            if tab.plugin == "lumilio.world-explorer" {
+                tab.title = tr!("map-title").into();
+            }
+        }
         self.keep_enabled_plugin_tabs();
         cx.notify();
     }
@@ -93,7 +99,28 @@ impl InstanceDetailView {
                         )
                     }));
                 }
-                PluginPage::Shown(view, rendered, models)
+                let mut maps = Vec::new();
+                fn count_maps(view: &View) -> usize {
+                    match view {
+                        View::Map => 1,
+                        View::Section { children, .. } | View::Detail { children, .. } => {
+                            children.iter().map(count_maps).sum()
+                        }
+                        _ => 0,
+                    }
+                }
+                for _ in 0..count_maps(&view) {
+                    let handler = self.handler.clone();
+                    maps.push(cx.new(|cx| {
+                        crate::world_explorer::MapView::new(
+                            std::rc::Rc::new(move |request, window, cx| {
+                                handler(InstanceIntent::LoadMap { request }, window, cx)
+                            }),
+                            cx,
+                        )
+                    }));
+                }
+                PluginPage::Shown(view, rendered, models, maps)
             }
             Ok(None) => PluginPage::Unavailable,
             Err(detail) => PluginPage::Failed(detail),
@@ -114,12 +141,28 @@ impl InstanceDetailView {
         cx: &mut Context<Self>,
     ) {
         for page in self.plugin_pages.values() {
-            if let PluginPage::Shown(_, _, models) = page
+            if let PluginPage::Shown(_, _, models, _) = page
                 && let Some(model) = models
                     .iter()
                     .find(|model| model.read(cx).request_id() == Some(request))
             {
                 model.update(cx, |model, cx| model.assets(result, cx));
+                return;
+            }
+        }
+    }
+
+    pub fn plugin_map_arrived(
+        &mut self,
+        request: u64,
+        connection: crate::world_explorer::Connection,
+        cx: &mut Context<Self>,
+    ) {
+        for page in self.plugin_pages.values() {
+            if let PluginPage::Shown(_, _, _, maps) = page
+                && let Some(map) = maps.iter().find(|map| map.entity_id().as_u64() == request)
+            {
+                map.update(cx, |map, cx| map.connect(connection, cx));
                 return;
             }
         }
@@ -237,11 +280,13 @@ impl InstanceDetailView {
                         .child(kit::technical("plugin-technical", detail.clone())),
                 )
                 .into_any_element(),
-            Some(PluginPage::Shown(view, images, models)) => {
+            Some(PluginPage::Shown(view, images, models, maps)) => {
                 let mut paint = Paint {
                     plugin,
                     images,
                     models,
+                    maps,
+                    next_map: 0,
                     next_table: 0,
                     next_model: 0,
                     next_image: 0,
@@ -410,6 +455,8 @@ struct Paint<'a> {
     plugin: &'a str,
     images: &'a [Option<Arc<RenderImage>>],
     models: &'a [Entity<crate::model_view::ModelView>],
+    maps: &'a [Entity<crate::world_explorer::MapView>],
+    next_map: usize,
     next_model: usize,
     next_table: usize,
     next_image: usize,
@@ -592,7 +639,14 @@ impl Paint<'_> {
                 Some(picture) => picture_box(picture, COVER, colors).into_any_element(),
                 None => div().into_any_element(),
             },
-            View::Map => div().into_any_element(),
+            View::Map => {
+                let map = self.maps.get(self.next_map);
+                self.next_map += 1;
+                map.map_or_else(
+                    || div().into_any_element(),
+                    |map| map.clone().into_any_element(),
+                )
+            }
             View::Model { .. } => {
                 let model = self.models.get(self.next_model);
                 self.next_model += 1;

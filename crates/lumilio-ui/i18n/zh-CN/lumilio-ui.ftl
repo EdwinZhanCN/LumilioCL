@@ -1342,3 +1342,17 @@ settings-plugin-reset-failed = 没能恢复插件默认值
 ## 世界地图
 map-clear-cache = 清除地图缓存
 map-cache-cleared = 地图缓存已清除
+map-title = 地图
+map-base-seed = 种子预测
+map-overworld = 主世界
+map-nether = 下界
+map-end = 末地
+map-chunks = 区块网格
+map-regions = Region 边界
+map-jump = 跳到坐标…
+map-coordinates-invalid = 输入世界边界内的 X 和 Z 坐标。
+map-retry-tile = 重试 { $x } { $z }
+map-version-unsupported = 这一版还不能查
+map-seed-needed = 选择世界或输入种子。
+map-render-failed = 地图暂时画不了。
+map-no-data = 没有数据的区域保持为空。

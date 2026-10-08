@@ -1483,3 +1483,17 @@ settings-plugin-reset-failed = Couldn't restore the plugin defaults
 ## World map
 map-clear-cache = Clear map cache
 map-cache-cleared = Map cache cleared
+map-title = Map
+map-base-seed = Seed prediction
+map-overworld = Overworld
+map-nether = Nether
+map-end = End
+map-chunks = Chunk grid
+map-regions = Region boundaries
+map-jump = Go to coordinates…
+map-coordinates-invalid = Enter X and Z coordinates inside the world border.
+map-retry-tile = Retry { $x } { $z }
+map-version-unsupported = This version is not supported yet
+map-seed-needed = Choose a world or enter a seed.
+map-render-failed = The map could not be rendered.
+map-no-data = Areas without data stay empty.

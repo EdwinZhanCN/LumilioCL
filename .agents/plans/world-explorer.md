@@ -206,6 +206,8 @@ Xaero's Minimap / World Map 本身不开源（许可证未在本次核实）。�
 
 实施记录（2026-10-08）：T8 宿主 UtilityOverlay 统一几何契约已实现，区块 16 / Region 512 方块边界；负坐标 -513 到 -1 的守卫通过，光标坐标由 UI 展示。T7 正在检查，无显示器，拖动/滚轮/键盘、明暗主题、720×480 与大窗口均为 **pending human acceptance**。
 
+实施记录（2026-10-08）：T7 View::Map 绑定独立实体、后台数据通道、合并渲染邮箱与帧序号；世界/底图/维度选择、两类网格、拖动/滚轮/键盘、坐标跳转与逐瓦片重试已实现。中英目录与 IA 已加入；cargo check -p lumilio-app 通过，test-support 依赖首次编译仍在运行。原生画面、手感、布局与主题为 **pending human acceptance**，不声称视觉通过。
+
 - [ ] T0：在 `windows-2022`、`macos-latest`、`ubuntu:22.04` 上各编译一次 `lumilio-cubiomes`（先只有 `build.rs` 和一个探针测试），把 MSVC 的结果记进本计划。失败就在 `forks/cubiomes/` 里做最小修补，并记进 `forks/cubiomes/LUMILIO.md`。编译通过后，在 `.github/workflows/ci.yml` 加一个只跑 `cargo build -p lumilio-cubiomes` 的 Windows 作业（W18）。
 - [ ] T1：`forks/cubiomes/`（新建，快照 `e61f905`，带 `LICENSE` 和新建的补丁日志 `LUMILIO.md`，W14）和 `crates/lumilio-cubiomes/`（新建）：`build.rs` 用 `cc` 编译，不含 `quadbase.c`，`-fwrapv` 用 `flag_if_supported`，关掉上游警告；`src/ffi.rs` 是唯一允许 unsafe 的模块；`src/lib.rs` 提供安全 API 和版本表（版本字符串、数据版本 → `MCVersion`，不在表里就返回 `Unsupported`）。测试放在 `src/tests.rs`：用固定种子取群系 id，与仓库内的金样比对。金样由一个只编译 cubiomes 源码的 C 探针生成，记录生成命令。
 - [ ] T2：`lumilio-plugin-api/src/map.rs`（新建）：`WorldContext`、`WorldId`、`Dimension`、`SourceLink`、`TileKey`、`TileRequest`、`TileReply`、`OverlayRequest`、`MapObject`、`MapIcon`、`BaseMapInfo`、`OverlayInfo`；`BaseMapProvider`、`OverlayProvider` trait；`Plugin::base_map_provider()` / `overlay_provider()` 默认返回 `None`；`View::Map`；`HostContext::cancelled()` 默认 `false`。序列化往返测试。

@@ -121,6 +121,9 @@ pub(super) fn instance_intent(
         }
         InstanceIntent::PluginTabs => plugin_tabs(wiring, id.to_owned(), view, cx),
         InstanceIntent::PluginView(plugin) => plugin_view(wiring, id.to_owned(), view, plugin, cx),
+        InstanceIntent::LoadMap { request } => {
+            super::instance_plugins::plugin_map(wiring, id.to_owned(), view, request, cx)
+        }
         InstanceIntent::LoadModel {
             plugin,
             file,

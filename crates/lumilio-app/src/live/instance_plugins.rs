@@ -10,6 +10,57 @@ use lumilio_ui::platform;
 use lumilio_ui::toast::Toast;
 use lumilio_ui::tr;
 
+pub(super) fn plugin_map(
+    wiring: &Wiring,
+    id: String,
+    view: WeakEntity<InstanceDetailView>,
+    request: u64,
+    cx: &mut App,
+) {
+    use lumilio_ui::world_explorer::{Command, Connection, Event};
+    let (send, commands) = async_channel::bounded(128);
+    let (events, receive) = async_channel::bounded(128);
+    let service = wiring.backend.service.clone();
+    wiring.backend.spawn(async move {
+        let mut tasks = tokio::task::JoinSet::new();
+        while let Ok(command) = commands.recv().await {
+            let (service, id, events) = (service.clone(), id.clone(), events.clone());
+            tasks.spawn(async move {
+                let event = match command {
+                    Command::Contexts => {
+                        let providers = service.map_providers().await;
+                        Event::Contexts(
+                            service
+                                .map_contexts(&id)
+                                .await
+                                .map(|contexts| (contexts, providers))
+                                .map_err(|error| error.to_string()),
+                        )
+                    }
+                    Command::Tile {
+                        generation,
+                        request,
+                        cancel,
+                    } => {
+                        let key = request.key.clone();
+                        Event::Tile {
+                            generation,
+                            key,
+                            result: service.map_tile(&id, *request, cancel).await,
+                        }
+                    }
+                };
+                let _ = events.send(event).await;
+            });
+            while tasks.try_join_next().is_some() {}
+        }
+        tasks.abort_all();
+    });
+    let _ = view.update(cx, |view, cx| {
+        view.plugin_map_arrived(request, Connection { send, receive }, cx)
+    });
+}
+
 pub(super) fn plugin_tabs(
     wiring: &Wiring,
     id: String,
