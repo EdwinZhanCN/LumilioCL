@@ -15,6 +15,8 @@ pub type ByteStream = Pin<Box<dyn Stream<Item = Result<Vec<u8>, TransportError>>
 pub enum HttpMethod {
     Get,
     Post,
+    Put,
+    Delete,
 }
 
 /// One request with its own headers and body, for APIs that need more than a

@@ -10,7 +10,7 @@
 //!  v+d+h
 //! ```
 
-use crate::{Arms, Player};
+use crate::{Arms, BackEquipment, Player};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct V3 {
@@ -247,6 +247,10 @@ pub(crate) fn triangles(player: &Player<'_>) -> Vec<Triangle> {
     );
 
     if let Some(cape) = player.cape {
+        if player.back_equipment == BackEquipment::Elytra {
+            wings(&mut out, cape.width as f32 / 64.0);
+            return out;
+        }
         // 10×16×1 from the shoulders, turned to face backwards (its outer
         // picture is the unwrap's front) and swung a little off the back.
         let place = Place {
@@ -268,6 +272,51 @@ pub(crate) fn triangles(player: &Player<'_>) -> Vec<Triangle> {
         );
     }
     out
+}
+
+/// Wing dimensions, cape UV offset and resting angles follow skinview3d's
+/// `src/model.ts::ElytraObject` (MIT, Copyright (c) 2014–2018 Kent Rasmussen;
+/// Copyright (c) 2017–2022 Haowei Wen, Sean Boult and contributors).
+/// License notice: `licenses/skinview3d-MIT.txt`. Our +y-up boxes and software
+/// triangles keep UVs attached when reflecting the second wing.
+fn wings(out: &mut Vec<Triangle>, scale: f32) {
+    let first = out.len();
+    boxed(
+        out,
+        Unwrap {
+            w: 10.0,
+            h: 20.0,
+            d: 2.0,
+            u: 22.0,
+            v: 0.0,
+        },
+        Place {
+            turn_y: -0.01,
+            tilt_x: std::f32::consts::PI / 12.0,
+            roll_z: -std::f32::consts::PI / 12.0,
+            at: V3::new(-5.0, 24.0, -2.4),
+        },
+        V3::new(0.0, -20.0, -2.0),
+        1.0,
+        Source::Cape,
+        scale,
+        true,
+    );
+    let mirrored: Vec<_> = out[first..]
+        .iter()
+        .map(|triangle| {
+            let mut wing = *triangle;
+            for point in &mut wing.points {
+                point.x = -point.x;
+            }
+            // Reflection reverses winding; reverse it back for outward normals.
+            wing.points.swap(1, 2);
+            wing.uv.swap(1, 2);
+            wing.normal.x = -wing.normal.x;
+            wing
+        })
+        .collect();
+    out.extend(mirrored);
 }
 
 /// The six faces of a box whose near-lower-right corner is `origin` in the

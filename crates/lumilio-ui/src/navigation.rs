@@ -325,7 +325,8 @@ fn account_zone(account: CurrentAccount, colors: ShellColors) -> AnyElement {
         .id("navigation-account")
         .debug_selector(|| "navigation-account".into())
         .child(
-            // ia[navigation]: 切换账户 | 右段 Popover 列表：头像、名字、类型（离线/Microsoft）；单选；底部“管理账户…” → 账户页 | 之后的启动使用该身份
+            // ia[navigation]: 切换账户 | 右段 Popover 列表：头像、名字、类型；单选 | 之后的启动使用该身份
+            // ia[navigation]: 查看当前账户 | 账户下拉底部「账户详情」 | 打开当前账户详情与外观；不沿用账户页上次查看的其他账户
             Popover::new("navigation-account-popover")
                 .anchor(Anchor::BottomRight)
                 .trigger(trigger)

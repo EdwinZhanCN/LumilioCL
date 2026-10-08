@@ -110,11 +110,22 @@ pub enum LiveIntent {
     ThirdPartySignIn,
     /// Open the list of authentication servers.
     ManageAuthServers,
+    OpenSkinSite(String),
     /// Open the skin dialog of this offline account (by key).
     EditSkin(String),
     /// Load what this account (by key) looks like, for the detail's preview;
     /// the answer goes to `LauncherShell::account_look`.
     LoadAccountLook(String),
+    /// An appearance operation bound to one retained account detail.
+    Wardrobe {
+        key: String,
+        revision: u64,
+        action: crate::wardrobe::WardrobeAction,
+    },
+    SaveInlineSkin {
+        revision: u64,
+        intent: crate::skin_dialog::SkinIntent,
+    },
     /// Refresh this Microsoft account's sign-in now.
     RefreshAccount(String),
     /// Use this account (by key) for later launches.

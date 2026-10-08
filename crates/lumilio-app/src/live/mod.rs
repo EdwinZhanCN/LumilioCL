@@ -17,6 +17,7 @@ mod library;
 mod logs;
 mod new_game;
 mod settings;
+mod wardrobe;
 
 #[cfg(test)]
 mod tests;

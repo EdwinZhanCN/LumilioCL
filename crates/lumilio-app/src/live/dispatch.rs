@@ -287,6 +287,15 @@ pub(super) fn on_live_intent(
         LiveIntent::ManageAuthServers => open_auth_servers(wiring, window, cx),
         LiveIntent::EditSkin(key) => open_skin_dialog(wiring, key, window, cx),
         LiveIntent::LoadAccountLook(key) => load_account_look(wiring, key, cx),
+        LiveIntent::Wardrobe {
+            key,
+            revision,
+            action,
+        } => super::wardrobe::run(wiring, key, revision, action, cx),
+        LiveIntent::SaveInlineSkin { revision, intent } => {
+            super::wardrobe::save_offline(wiring, revision, intent, cx)
+        }
+        LiveIntent::OpenSkinSite(address) => super::wardrobe::open_site(wiring, address, cx),
         LiveIntent::RefreshAccount(key) => {
             let service = wiring.backend.service.clone();
             job(

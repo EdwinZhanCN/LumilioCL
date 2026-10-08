@@ -85,6 +85,8 @@ impl Transport for HttpTransport {
             let mut builder = match request.method {
                 HttpMethod::Get => client.get(&request.url),
                 HttpMethod::Post => client.post(&request.url),
+                HttpMethod::Put => client.put(&request.url),
+                HttpMethod::Delete => client.delete(&request.url),
             };
             for (name, value) in &request.headers {
                 builder = builder.header(name, value);
@@ -117,6 +119,8 @@ impl Transport for HttpTransport {
             let mut builder = match request.method {
                 HttpMethod::Get => self.client.get(&request.url),
                 HttpMethod::Post => self.client.post(&request.url),
+                HttpMethod::Put => self.client.put(&request.url),
+                HttpMethod::Delete => self.client.delete(&request.url),
             };
             for (name, value) in &request.headers {
                 builder = builder.header(name, value);

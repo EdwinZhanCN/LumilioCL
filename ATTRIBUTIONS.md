@@ -47,3 +47,14 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+# Player preview
+
+`crates/lumilio-skin-render` draws the account preview on the CPU with its own
+rasterizer. The elytra's wing dimensions, cape texture offset and resting angles
+follow [skinview3d](https://github.com/bs-community/skinview3d)'s
+`src/model.ts::ElytraObject` (MIT); its license is kept at
+[licenses/skinview3d-MIT.txt](crates/lumilio-skin-render/licenses/skinview3d-MIT.txt).
+Default player artwork is read from the player's installed client; none is
+distributed. Which default an id gets follows HMCL's `TexturesLoader.java`
+(GPL-3.0-or-later, ADR 0011).

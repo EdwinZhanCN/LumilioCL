@@ -1,6 +1,6 @@
 use super::{Look, SkinViewer};
 use gpui::{Entity, TestAppContext, VisualTestContext};
-use lumilio_skin_render::Arms;
+use lumilio_skin_render::{Arms, BackEquipment, Camera, Texture};
 
 fn open(cx: &mut TestAppContext) -> (Entity<SkinViewer>, &mut VisualTestContext) {
     cx.update(gpui_component::init);
@@ -45,6 +45,49 @@ fn a_failed_look_shows_why_and_draws_nothing(cx: &mut TestAppContext) {
     cx.run_until_parked();
     assert!(cx.debug_bounds("skin-view-error").is_some());
     viewer.read_with(cx, |viewer, _| assert!(viewer.image.is_none()));
+}
+
+#[gpui::test]
+fn switching_equipment_redraws_without_changing_the_look_or_camera(cx: &mut TestAppContext) {
+    let (viewer, cx) = open(cx);
+    let cape = std::sync::Arc::new(Texture::new(64, 32, vec![255; 64 * 32 * 4]).unwrap());
+    viewer.update(cx, |viewer, cx| {
+        viewer.set_look(
+            Ok(Look {
+                cape: Some(cape.clone()),
+                ..Look::default()
+            }),
+            cx,
+        );
+    });
+    cx.run_until_parked();
+    let first = viewer.read_with(cx, |viewer, _| viewer.image.clone().expect("cape frame"));
+    let button = cx
+        .debug_bounds("skin-view-equipment-key-1")
+        .expect("elytra key");
+    cx.simulate_click(button.center(), gpui::Modifiers::none());
+    cx.run_until_parked();
+    viewer.read_with(cx, |viewer, _| {
+        assert_eq!(viewer.back_equipment, BackEquipment::Elytra);
+        assert_eq!(viewer.camera, Camera::HOME);
+        assert!(!std::sync::Arc::ptr_eq(
+            &first,
+            viewer.image.as_ref().unwrap()
+        ));
+        let super::State::Ready(look) = &viewer.state else {
+            panic!("look remains ready")
+        };
+        assert!(std::sync::Arc::ptr_eq(&cape, look.cape.as_ref().unwrap()));
+    });
+    viewer.update(cx, |viewer, cx| {
+        viewer.set_look(Ok(Look::default()), cx);
+        assert!(
+            viewer.image.is_none(),
+            "old picture is removed before the next frame"
+        );
+    });
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("skin-view-equipment-key-1").is_none());
 }
 
 #[test]

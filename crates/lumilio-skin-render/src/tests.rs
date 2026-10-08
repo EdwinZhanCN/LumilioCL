@@ -1,6 +1,6 @@
 use super::model::V3;
 use super::raster::View;
-use super::{Arms, Camera, Frame, Player, Texture, render};
+use super::{Arms, BackEquipment, Camera, Frame, Player, Texture, render};
 
 const RED: [u8; 4] = [220, 30, 30, 255];
 const BLUE: [u8; 4] = [30, 30, 220, 255];
@@ -58,6 +58,7 @@ fn player<'a>(skin: Option<&'a Texture>, cape: Option<&'a Texture>) -> Player<'a
         skin,
         arms: Arms::Classic,
         cape,
+        back_equipment: BackEquipment::Cape,
         outer_layer: true,
     }
 }
@@ -174,6 +175,58 @@ fn the_cape_hangs_behind_and_shows_its_outer_side() {
 }
 
 #[test]
+fn elytra_uses_the_wing_uvs_on_both_sides_and_cuts_out_transparent_texels() {
+    let skin = skin();
+    let mut cape = cape();
+    paint(&mut cape, 22, 0, 24, 22, YELLOW);
+    let back = camera(std::f32::consts::PI);
+    let wings = Player {
+        back_equipment: BackEquipment::Elytra,
+        ..player(Some(&skin), Some(&cape))
+    };
+    let frame = render(&wings, back, W, H);
+    let yellow =
+        |pixel: &[u8]| pixel[3] == 255 && pixel[2] > 100 && pixel[1] > 100 && pixel[0] < 30;
+    for half in [0..W / 2, W / 2..W] {
+        let count = (0..H)
+            .flat_map(|y| half.clone().map(move |x| (y * W + x) as usize * 4))
+            .filter(|&at| yellow(&frame.bgra[at..at + 4]))
+            .count();
+        assert!(
+            count > 200,
+            "both wings show the wing area of the cape texture"
+        );
+    }
+    let cape_frame = render(&player(Some(&skin), Some(&cape)), back, W, H);
+    assert_ne!(frame.bgra, cape_frame.bgra);
+    let empty = Texture::new(64, 32, vec![0; 64 * 32 * 4]).unwrap();
+    let frame = render(
+        &Player {
+            cape: Some(&empty),
+            ..wings
+        },
+        back,
+        W,
+        H,
+    );
+    let no_cape = render(&player(Some(&skin), None), back, W, H);
+    assert!(
+        frame == no_cape,
+        "transparent wings leave no pixels or depth occlusion"
+    );
+    let no_texture = render(
+        &Player {
+            cape: None,
+            ..wings
+        },
+        back,
+        W,
+        H,
+    );
+    assert_eq!(no_texture, no_cape, "no cape texture means no wings");
+}
+
+#[test]
 fn without_a_skin_the_player_is_plain_grey_on_nothing() {
     let camera = camera(0.0);
     let frame = render(&player(None, None), camera, W, H);
@@ -205,13 +258,53 @@ fn write_previews_when_asked() {
     let Some(folder) = std::env::var_os("LUMILIO_SKIN_PREVIEW") else {
         return;
     };
-    let (skin, cape) = (skin(), cape());
-    for (name, yaw, arms) in [
-        ("front", 0.0, Arms::Classic),
-        ("home", Camera::HOME.yaw, Arms::Classic),
-        ("home-slim", Camera::HOME.yaw, Arms::Slim),
-        ("back", std::f32::consts::PI, Arms::Classic),
-        ("right", -std::f32::consts::FRAC_PI_2, Arms::Classic),
+    let (skin, mut cape) = (skin(), cape());
+    paint(&mut cape, 22, 0, 24, 22, YELLOW);
+    for (name, texture) in [("skin-texture", &skin), ("cape-texture", &cape)] {
+        image::RgbaImage::from_raw(texture.width, texture.height, texture.rgba.clone())
+            .unwrap()
+            .save(std::path::Path::new(&folder).join(format!("{name}.png")))
+            .unwrap();
+    }
+    for (name, yaw, arms, back_equipment) in [
+        ("front", 0.0, Arms::Classic, BackEquipment::Cape),
+        ("home", Camera::HOME.yaw, Arms::Classic, BackEquipment::Cape),
+        (
+            "home-slim",
+            Camera::HOME.yaw,
+            Arms::Slim,
+            BackEquipment::Cape,
+        ),
+        (
+            "back",
+            std::f32::consts::PI,
+            Arms::Classic,
+            BackEquipment::Cape,
+        ),
+        (
+            "right",
+            -std::f32::consts::FRAC_PI_2,
+            Arms::Classic,
+            BackEquipment::Cape,
+        ),
+        (
+            "elytra-back",
+            std::f32::consts::PI,
+            Arms::Classic,
+            BackEquipment::Elytra,
+        ),
+        (
+            "elytra-home",
+            Camera::HOME.yaw,
+            Arms::Classic,
+            BackEquipment::Elytra,
+        ),
+        (
+            "elytra-side",
+            -std::f32::consts::FRAC_PI_2,
+            Arms::Classic,
+            BackEquipment::Elytra,
+        ),
     ] {
         let camera = Camera {
             yaw,
@@ -220,6 +313,7 @@ fn write_previews_when_asked() {
         let frame = render(
             &Player {
                 arms,
+                back_equipment,
                 ..player(Some(&skin), Some(&cape))
             },
             camera,

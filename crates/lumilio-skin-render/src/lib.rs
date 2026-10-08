@@ -56,6 +56,15 @@ pub enum Arms {
     Slim,
 }
 
+/// The shape used to preview the cape texture; this does not change what
+/// the account wears in the game.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum BackEquipment {
+    #[default]
+    Cape,
+    Elytra,
+}
+
 /// What to draw. With no skin the player is a plain grey figure, for when
 /// no picture is available.
 #[derive(Clone, Copy, Debug)]
@@ -63,6 +72,7 @@ pub struct Player<'a> {
     pub skin: Option<&'a Texture>,
     pub arms: Arms,
     pub cape: Option<&'a Texture>,
+    pub back_equipment: BackEquipment,
     /// The skin's second layer (hat, jacket, sleeves, trousers).
     pub outer_layer: bool,
 }

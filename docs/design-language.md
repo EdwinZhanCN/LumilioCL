@@ -474,6 +474,25 @@ cannot draw some blocks, one muted sentence under the viewport says how many,
 with their IDs behind 技术详情 (ADR 0034). Replaced and released frames are
 explicitly removed from GPUI's image cache (ADR 0028).
 
+Account details use a CPU-rendered player preview alongside a wardrobe,
+inside the Accounts master–detail page rather than a
+navigation landmark. Microsoft accounts edit their owned profile and capes;
+offline choices are an inline form and still use the local skin server at
+launch. Third-party accounts preview session textures and link to the skin
+site. Local skin imports copy normalized PNGs into the launcher library;
+removing a library entry leaves any already selected offline file usable.
+The wardrobe and preview belong to one retained detail session, so late reads
+cannot replace a newly opened account. Accepted Microsoft writes show pending
+feedback while a delayed profile read confirms propagation. Default artwork
+comes from an installed client jar; missing artwork leaves a grey model with
+an explanation. The account dropdown opens the current account's detail.
+
+The preview shares the Orbital input and frame-cache lifecycle.
+It draws only when the look, camera, equipment shape
+or viewport changes. With a cape texture, segment keys below the viewport
+select Cape or Elytra preview without changing the account's worn equipment.
+Changing looks clears the previous image while the new frame is drawn.
+
 ### Tables
 
 Key/value lists (settings groups, launch stages, version lists) are hairline

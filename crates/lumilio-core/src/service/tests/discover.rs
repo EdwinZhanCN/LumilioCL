@@ -264,7 +264,7 @@ async fn an_unreachable_source_fails_that_call_and_works_again_when_the_network_
     let world = world();
     let error = world.service.discover_filters().await.unwrap_err();
     assert!(
-        matches!(&error, ServiceError::Remote(message) if message.contains("没有回答")),
+        matches!(&error, ServiceError::Remote(message) if message.contains("unreachable")),
         "{error}"
     );
     // Failures are not remembered: the same service answers once it can.
@@ -331,7 +331,10 @@ async fn with_the_source_disabled_nothing_is_served_not_even_from_memory() {
         .await
         .unwrap();
     assert!(list.sources_unavailable);
-    assert_eq!(list.source_note.as_deref(), Some("没有可用的内容源"));
+    assert_eq!(
+        list.source_note.as_deref(),
+        Some("no content source is available")
+    );
 
     world
         .service

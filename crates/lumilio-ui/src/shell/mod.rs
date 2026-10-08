@@ -83,6 +83,7 @@ pub struct LauncherShell {
     live_controls: Option<Entity<LiveControls>>,
     /// The look preview of the account the Accounts detail shows.
     account_viewer: Option<AccountViewer>,
+    account_revision: u64,
     /// The project open on Discover, in place of the list.
     detail: Option<DetailSlot>,
     live_instance: Option<Entity<InstanceDetailView>>,
@@ -108,6 +109,7 @@ impl LauncherShell {
             live_handler: None,
             live_controls: None,
             account_viewer: None,
+            account_revision: 0,
             detail: None,
             live_instance: None,
             history: History::new(HISTORY_LIMIT),

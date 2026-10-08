@@ -174,8 +174,9 @@ pub use settings::{
     MAX_MEMORY_MB, MirrorRule, SettingsError, SettingsStore,
 };
 pub use skin::{
-    AccountLook, LITTLE_SKIN_CSL, Pixels as SkinPixels, SkinChoice, SkinError, SkinModel,
-    cape_pixels, looks_slim, skin_pixels,
+    AccountLook, AppearanceChange, AppearanceError, AppearanceUpdate, LITTLE_SKIN_CSL, LibrarySkin,
+    MojangCape, MojangClient, MojangProfile, MojangSkin, Pixels as SkinPixels, SkinChoice,
+    SkinError, SkinLibrary, SkinModel, SkinSource, cape_pixels, looks_slim, skin_pixels,
 };
 pub use snapshots::{
     RESTORE_LIMIT, SnapshotError, SnapshotInfo, SnapshotScope, create as create_snapshot,

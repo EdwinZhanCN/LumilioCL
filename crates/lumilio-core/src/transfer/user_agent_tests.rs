@@ -134,6 +134,58 @@ async fn transports_without_send_support_fail_permanently() {
 }
 
 #[tokio::test]
+async fn appearance_methods_reach_the_server_for_both_transport_routes() {
+    for method in [HttpMethod::Put, HttpMethod::Delete] {
+        for no_redirect in [false, true] {
+            let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+            let address = listener.local_addr().unwrap();
+            let server = std::thread::spawn(move || {
+                let (mut stream, _) = listener.accept().unwrap();
+                stream
+                    .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+                    .unwrap();
+                let mut received = Vec::new();
+                let mut buffer = [0u8; 4096];
+                while !received.ends_with(b"}") {
+                    let read = stream.read(&mut buffer).unwrap();
+                    assert!(read > 0);
+                    received.extend_from_slice(&buffer[..read]);
+                }
+                stream
+                    .write_all(b"HTTP/1.1 204 No Content\r\nConnection: close\r\n\r\n")
+                    .unwrap();
+                String::from_utf8(received).unwrap()
+            });
+            let transport = HttpTransport::new().unwrap();
+            let request = HttpRequest {
+                method,
+                url: format!("http://{address}/capes/active"),
+                headers: vec![("content-type".into(), "application/json".into())],
+                body: Some(br#"{"capeId":"owned"}"#.to_vec()),
+            };
+            let response = if no_redirect {
+                transport.send_no_redirect(request).await
+            } else {
+                transport.send(request).await
+            }
+            .unwrap();
+            assert_eq!(response.status(), 204);
+            let wire = server.join().unwrap();
+            let verb = if method == HttpMethod::Put {
+                "PUT"
+            } else {
+                "DELETE"
+            };
+            assert!(
+                wire.starts_with(&format!("{verb} /capes/active HTTP/1.1\r\n")),
+                "{wire}"
+            );
+            assert!(wire.ends_with(r#"{"capeId":"owned"}"#));
+        }
+    }
+}
+
+#[tokio::test]
 async fn transports_without_post_support_fail_permanently() {
     let error = FileTransport
         .post_json("file:///x", Vec::new())

@@ -40,6 +40,7 @@ pub mod theme;
 pub mod third_party_login;
 pub mod toast;
 pub mod version_picker;
+pub mod wardrobe;
 
 pub use shell::{
     ActivitySummary, LauncherShell, ShellIntent, build_root, follow_system_appearance,

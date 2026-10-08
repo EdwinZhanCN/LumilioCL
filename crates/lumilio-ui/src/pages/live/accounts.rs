@@ -42,7 +42,9 @@ fn list_item(
     let emit = ctx.emit.clone();
     // ia[accounts]: 查看账户 | 左侧列表的一行 | 右侧显示该账户的详情与外观；不改变当前账户
     h_flex()
-        .id(("account-item", index))
+        .id(gpui::ElementId::Name(
+            format!("account-item-{}", row.key).into(),
+        ))
         .debug_selector(move || format!("account-item-{index}"))
         .w_full()
         .items_center()
@@ -210,40 +212,32 @@ fn detail_head(row: &AccountRow, ctx: &LiveCtx) -> impl IntoElement {
 /// What the account wears, beside the preview.
 fn wardrobe(row: &AccountRow, ctx: &LiveCtx) -> AnyElement {
     let colors = ctx.colors;
-    if row.signed_in() {
-        return div()
-            .text_sm()
-            .text_color(colors.muted)
-            .child(if row.microsoft {
-                tr!("account-look-microsoft-later")
-            } else {
-                tr!("account-look-third-party")
-            })
+    if row.third_party {
+        let address = row.skin_site.clone();
+        // ia[accounts]: 在皮肤站修改 | 第三方账户只读衣橱 | 打开服务器公布的主页（LittleSkin 打开其网站）；皮肤与披风只从会话档案预览
+        return v_flex()
+            .gap_3()
+            .child(
+                div()
+                    .text_sm()
+                    .text_color(colors.muted)
+                    .child(tr!("account-look-third-party")),
+            )
+            .children(address.map(|address| {
+                kit::ghost(
+                    "account-skin-site",
+                    tr!("wardrobe-open-site"),
+                    send(&ctx.handler, LiveIntent::OpenSkinSite(address)),
+                )
+            }))
             .into_any_element();
     }
-    let current = row
-        .skin_text()
-        .unwrap_or_else(|| tr!("account-skin-kind-default"));
-    // ia[accounts]: 设置皮肤 | 离线账户详情「外观」里的「更改…」→ 弹窗 | 选默认、本地文件、LittleSkin 或自定义皮肤站；预览随之更新；游戏里按所选显示（启动时在本机起一个皮肤服务器，需要 authlib-injector）；加载不到时游戏照常启动并在日志里说明 | ADR 0024
-    kit::list(
-        vec![kit::value_row(
-            "account-skin",
-            tr!("account-look-skin"),
-            Some(tr!("account-look-offline-help").into()),
-            current,
-            Some(
-                kit::ghost(
-                    "account-skin-change",
-                    tr!("account-look-change"),
-                    send(&ctx.handler, LiveIntent::EditSkin(row.key.clone())),
-                )
-                .into_any_element(),
-            ),
-            colors,
-        )],
-        colors,
-    )
-    .into_any_element()
+    v_flex()
+        .w_full()
+        .gap_6()
+        .children(ctx.offline_skin.cloned())
+        .children(ctx.wardrobe.cloned())
+        .into_any_element()
 }
 
 fn detail(row: &AccountRow, ctx: &LiveCtx) -> AnyElement {

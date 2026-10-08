@@ -227,6 +227,11 @@ impl std::fmt::Debug for AuthSession {
 }
 
 impl AuthSession {
+    /// Only service protocols may expose this value; Debug remains redacted.
+    pub(crate) fn access_token(&self) -> &str {
+        &self.access_token
+    }
+
     /// A signed-in Microsoft session: the real profile and the Minecraft
     /// access token the game presents to servers.
     #[must_use]

@@ -60,7 +60,7 @@ async fn a_whole_game_is_backed_up_and_restored_as_a_new_one_with_nothing_touche
         .await
         .unwrap();
     assert_ne!(restored.id, record.id);
-    assert_eq!(restored.name, "生存（恢复）");
+    assert_eq!(restored.name, "生存 (2)");
     assert_eq!(
         (restored.game_version.as_str(), restored.loader),
         ("1.0", Loader::Fabric)

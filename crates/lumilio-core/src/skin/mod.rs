@@ -8,10 +8,19 @@
 //! API; the game is pointed at a Yggdrasil server on this machine that answers
 //! for that one player.
 
+pub(crate) mod defaults;
+mod library;
+mod mojang;
 mod pixels;
 mod server;
+pub(crate) mod session;
 mod signer;
 
+pub use self::library::{LibrarySkin, SkinLibrary, SkinSource};
+pub use self::mojang::{
+    AppearanceChange, AppearanceError, AppearanceUpdate, MojangCape, MojangClient, MojangProfile,
+    MojangSkin,
+};
 pub use self::pixels::{AccountLook, Pixels, cape_pixels, looks_slim, skin_pixels};
 pub use self::server::{Character, LocalSkinServer};
 pub(crate) use self::signer::KEY_BITS;

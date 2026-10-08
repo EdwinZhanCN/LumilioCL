@@ -147,6 +147,8 @@ pub struct LiveCtx<'a> {
     pub version_filter: String,
     /// The look preview of the account the Accounts detail shows.
     pub account_viewer: Option<&'a gpui::Entity<crate::skin_view::SkinViewer>>,
+    pub wardrobe: Option<&'a gpui::Entity<crate::wardrobe::Wardrobe>>,
+    pub offline_skin: Option<&'a gpui::Entity<crate::skin_dialog::SkinDialog>>,
 }
 
 pub(super) fn send(

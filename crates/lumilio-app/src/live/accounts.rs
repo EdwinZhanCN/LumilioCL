@@ -405,6 +405,19 @@ fn finish_server_change(
 /// Opens the skin dialog of an offline account.
 /// Loads what an account looks like and hands it to the Accounts detail.
 pub(super) fn load_account_look(wiring: &Wiring, key: String, cx: &mut App) {
+    let Some((revision, _)) = wiring
+        .shell
+        .update(cx, |shell, _| shell.account_detail(&key))
+        .ok()
+        .flatten()
+    else {
+        return;
+    };
+    super::wardrobe::list(wiring, key.clone(), revision, cx);
+    super::wardrobe::load_look(wiring, key, revision, cx);
+}
+
+pub(super) fn load_look_only(wiring: &Wiring, key: String, revision: u64, cx: &mut App) {
     let service = wiring.backend.service.clone();
     let wanted = key.clone();
     let handle = wiring
@@ -418,7 +431,7 @@ pub(super) fn load_account_look(wiring: &Wiring, key: String, cx: &mut App) {
         };
         let _ = wiring
             .shell
-            .update(cx, |shell, cx| shell.account_look(&key, look, cx));
+            .update(cx, |shell, cx| shell.account_look(&key, revision, look, cx));
     })
     .detach();
 }

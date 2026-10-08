@@ -54,6 +54,7 @@ pub enum ServiceError {
     Injector(InjectorError),
     /// A skin could not be used.
     Skin(SkinError),
+    Appearance(crate::skin::AppearanceError),
     /// The sign-in the person is choosing a character for is gone.
     NoPendingSignIn,
     Export(crate::pack_export::ExportError),
@@ -94,6 +95,7 @@ impl Display for ServiceError {
             Self::Yggdrasil(error) => write!(f, "{error}"),
             Self::Injector(error) => write!(f, "{error}"),
             Self::Skin(error) => write!(f, "{error}"),
+            Self::Appearance(error) => write!(f, "{error}"),
             Self::NoPendingSignIn => f.write_str("this sign-in is no longer waiting for a choice"),
             Self::Export(error) => write!(f, "{error}"),
             Self::Snapshot(error) => write!(f, "{error}"),
@@ -103,6 +105,12 @@ impl Display for ServiceError {
 }
 
 impl Error for ServiceError {}
+
+impl From<crate::skin::AppearanceError> for ServiceError {
+    fn from(error: crate::skin::AppearanceError) -> Self {
+        Self::Appearance(error)
+    }
+}
 
 impl From<crate::discover::DiscoverError> for ServiceError {
     fn from(error: crate::discover::DiscoverError) -> Self {

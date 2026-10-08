@@ -8,13 +8,25 @@ use crate::live::LiveIntent;
 use crate::route::Route;
 use crate::skin_view::{Look, SkinViewer};
 use crate::{pages, tr};
+use crate::{skin_dialog::SkinDialog, wardrobe::Wardrobe};
 use gpui::prelude::*;
 use gpui::{Context, Entity, Window};
+use std::rc::Rc;
 
 pub(super) struct AccountViewer {
     key: String,
     skin: Option<lumilio_core::SkinChoice>,
     pub(super) view: Entity<SkinViewer>,
+    revision: u64,
+    cancel: lumilio_core::CancellationToken,
+    pub(super) wardrobe: Option<Entity<Wardrobe>>,
+    pub(super) offline: Option<Entity<SkinDialog>>,
+}
+
+impl Drop for AccountViewer {
+    fn drop(&mut self) {
+        self.cancel.cancel();
+    }
 }
 
 impl LauncherShell {
@@ -24,11 +36,12 @@ impl LauncherShell {
             .as_ref()
             .filter(|_| self.route == Route::Accounts)
             .and_then(|model| pages::live::shown_account(model, &self.view))
-            .map(|(_, row)| (row.key.clone(), row.skin.clone()));
-        let Some((key, skin)) = shown else {
+            .map(|(_, row)| row.clone());
+        let Some(row) = shown else {
             self.account_viewer = None;
             return;
         };
+        let (key, skin) = (row.key.clone(), row.skin.clone());
         if self
             .account_viewer
             .as_ref()
@@ -37,10 +50,42 @@ impl LauncherShell {
             return;
         }
         let view = cx.new(SkinViewer::new);
+        self.account_revision += 1;
+        let revision = self.account_revision;
+        let wardrobe = self
+            .live_handler
+            .clone()
+            .filter(|_| !row.third_party)
+            .map(|handler| {
+                cx.new(|_| Wardrobe::new(key.clone(), revision, row.microsoft, handler))
+            });
+        let offline = self
+            .live_handler
+            .clone()
+            .filter(|_| !row.signed_in())
+            .map(|handler| {
+                cx.new(|cx| {
+                    SkinDialog::new(
+                        Rc::new(move |intent, window, cx| {
+                            handler(LiveIntent::SaveInlineSkin { revision, intent }, window, cx)
+                        }),
+                        key.clone(),
+                        row.name,
+                        skin.as_ref(),
+                        window,
+                        cx,
+                    )
+                    .inline()
+                })
+            });
         self.account_viewer = Some(AccountViewer {
             key: key.clone(),
             skin,
             view,
+            revision,
+            cancel: lumilio_core::CancellationToken::new(),
+            wardrobe,
+            offline,
         });
         if let Some(handler) = self.live_handler.clone() {
             window.defer(cx, move |window, cx| {
@@ -49,17 +94,107 @@ impl LauncherShell {
         }
     }
 
-    /// The look of an account, as core loaded it (or why it could not).
+    /// A generation and cancellation token for the currently retained detail.
+    pub fn account_detail(&self, key: &str) -> Option<(u64, lumilio_core::CancellationToken)> {
+        self.account_viewer
+            .as_ref()
+            .filter(|view| view.key == key)
+            .map(|view| (view.revision, view.cancel.clone()))
+    }
+
+    pub fn wardrobe_listed(
+        &mut self,
+        key: &str,
+        revision: u64,
+        library: Result<Vec<lumilio_core::LibrarySkin>, crate::new_game::Failure>,
+        profile: Option<Result<lumilio_core::MojangProfile, crate::new_game::Failure>>,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(view) = self
+            .account_viewer
+            .as_ref()
+            .filter(|view| view.key == key && view.revision == revision)
+            .and_then(|view| view.wardrobe.as_ref())
+        {
+            view.update(cx, |view, cx| view.listed(library, profile, cx));
+        }
+    }
+
+    pub fn wardrobe_finished(
+        &mut self,
+        key: &str,
+        revision: u64,
+        action: crate::wardrobe::WardrobeAction,
+        result: Result<(), crate::new_game::Failure>,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(view) = self
+            .account_viewer
+            .as_ref()
+            .filter(|view| view.key == key && view.revision == revision)
+            .and_then(|view| view.wardrobe.as_ref())
+        {
+            view.update(cx, |view, cx| view.finished(action, result, cx));
+        }
+    }
+
+    pub fn wardrobe_confirmed(
+        &mut self,
+        key: &str,
+        revision: u64,
+        result: Result<lumilio_core::MojangProfile, crate::new_game::Failure>,
+        matches: Option<bool>,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(view) = self
+            .account_viewer
+            .as_ref()
+            .filter(|view| view.key == key && view.revision == revision)
+            .and_then(|view| view.wardrobe.as_ref())
+        {
+            view.update(cx, |view, cx| view.confirmed(result, matches, cx));
+        }
+    }
+
+    pub fn pending_library_skin(&self, key: &str, revision: u64, cx: &gpui::App) -> Option<String> {
+        self.account_viewer
+            .as_ref()
+            .filter(|view| view.key == key && view.revision == revision)
+            .and_then(|view| view.wardrobe.as_ref())
+            .and_then(|view| view.read(cx).pending_skin())
+    }
+
+    pub fn inline_skin_saved(
+        &mut self,
+        key: &str,
+        revision: u64,
+        result: Result<(), crate::new_game::Failure>,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(view) = self
+            .account_viewer
+            .as_ref()
+            .filter(|view| view.key == key && view.revision == revision)
+            .and_then(|view| view.offline.as_ref())
+        {
+            view.update(cx, |view, cx| view.saved(result, cx));
+        }
+    }
+
+    /// The look of an account, as core loaded it (or why it could not). A
+    /// look read for an earlier detail of the same account (before its skin
+    /// changed) is dropped, so it cannot replace the newer one.
     pub fn account_look(
         &mut self,
         key: &str,
+        revision: u64,
         look: Result<lumilio_core::AccountLook, String>,
         cx: &mut Context<Self>,
     ) {
         let Some(viewer) = self
             .account_viewer
             .as_ref()
-            .filter(|viewer| viewer.key == key)
+            .filter(|viewer| viewer.key == key && viewer.revision == revision)
         else {
             return;
         };

@@ -16,6 +16,7 @@ pub struct AccountRow {
     pub microsoft: bool,
     /// Signed in on an authlib-injector server (LittleSkin and others).
     pub third_party: bool,
+    pub skin_site: Option<String>,
     /// What kind of account this is, in words: `离线账户`, `Microsoft`, or the
     /// name of the server it is signed in on.
     pub kind_text: String,
@@ -89,6 +90,12 @@ pub fn account_rows(settings: &LauncherSettings) -> Vec<AccountRow> {
                 name: entry.name.clone(),
                 microsoft,
                 third_party,
+                skin_site: entry.server.as_ref().filter(|_| third_party).map(|url| {
+                    if url == lumilio_core::LITTLE_SKIN_URL {
+                        return "https://littleskin.cn/".into();
+                    }
+                    url.clone()
+                }),
                 kind_text,
                 skin: entry.skin.clone(),
                 needs_sign_in: entry.needs_sign_in,
@@ -170,6 +177,23 @@ pub fn account_failure(error: &lumilio_core::ServiceError) -> (String, String) {
         ServiceError::Yggdrasil(error) => yggdrasil_message(error),
         ServiceError::Injector(_) => tr!("account-failure-injector").to_owned(),
         ServiceError::Skin(error) => skin_message(error),
+        ServiceError::Appearance(error) => {
+            use lumilio_core::AppearanceError;
+            match error {
+                AppearanceError::NoGameOwnership => tr!("account-auth-no-game"),
+                AppearanceError::SignInRequired => tr!("account-auth-sign-in-required"),
+                AppearanceError::Picture(_) => tr!("account-look-error-picture"),
+                AppearanceError::Network(_) => tr!("account-look-error-network"),
+                AppearanceError::Protocol(_) => tr!("account-look-error-protocol"),
+                AppearanceError::Refused(_) => tr!("account-look-error-refused"),
+                AppearanceError::NotMicrosoft => tr!("account-look-error-read-only"),
+                AppearanceError::CapeNotOwned => tr!("account-look-error-cape"),
+                AppearanceError::Storage(_) => tr!("account-look-error-storage"),
+                AppearanceError::UnknownSkin => tr!("account-look-error-missing"),
+                AppearanceError::InvalidOrder => tr!("account-look-error-order"),
+            }
+            .to_owned()
+        }
         ServiceError::NoPendingSignIn => tr!("account-failure-no-pending").to_owned(),
         ServiceError::Settings(SettingsError::DuplicateAccount(name)) => {
             tr!("account-failure-duplicate", name = name.as_str())

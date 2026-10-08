@@ -58,6 +58,7 @@ pub struct SkinDialog {
     busy: bool,
     error: Option<Failure>,
     close: bool,
+    inline: bool,
 }
 
 impl SkinDialog {
@@ -126,7 +127,14 @@ impl SkinDialog {
             busy: false,
             error: None,
             close: false,
+            inline: false,
         }
+    }
+
+    /// The same offline choice form retained in an account's wardrobe.
+    pub fn inline(mut self) -> Self {
+        self.inline = true;
+        self
     }
 
     fn text(input: &Entity<InputState>, cx: &App) -> String {
@@ -190,7 +198,7 @@ impl SkinDialog {
     pub fn saved(&mut self, result: Result<(), Failure>, cx: &mut Context<Self>) {
         self.busy = false;
         match result {
-            Ok(()) => self.close = true,
+            Ok(()) => self.close = !self.inline,
             Err(failure) => self.error = Some(failure),
         }
         cx.notify();
@@ -247,7 +255,7 @@ impl SkinDialog {
     }
 
     /// A file picker for one of the picture fields.
-    fn browse(field: &Entity<InputState>, id: &'static str) -> impl IntoElement {
+    fn browse(field: &Entity<InputState>, id: &'static str) -> Key {
         let field = field.clone();
         kit::ghost(id, tr!("account-skin-browse"), move |window, cx| {
             let chosen =
@@ -277,7 +285,7 @@ fn label(text: &'static str, colors: ShellColors) -> impl IntoElement {
 
 impl Render for SkinDialog {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        if std::mem::take(&mut self.close) && window.has_active_dialog(cx) {
+        if !self.inline && std::mem::take(&mut self.close) && window.has_active_dialog(cx) {
             window.close_dialog(cx);
         }
         let colors = ShellColors::from_theme(cx.theme());
@@ -292,6 +300,9 @@ impl Render for SkinDialog {
                 colors,
                 move |_, cx| {
                     let _ = entity.update(cx, |dialog, cx| {
+                        if dialog.busy {
+                            return;
+                        }
                         dialog.kind = index;
                         dialog.error = None;
                         cx.notify();
@@ -311,6 +322,9 @@ impl Render for SkinDialog {
                             let entity = entity.clone();
                             move |index, _, cx| {
                                 let _ = entity.update(cx, |dialog, cx| {
+                                    if dialog.busy {
+                                        return;
+                                    }
                                     dialog.model = index;
                                     cx.notify();
                                 });
@@ -325,7 +339,7 @@ impl Render for SkinDialog {
                             h_flex()
                                 .gap_2()
                                 .child(div().flex_1().child(Input::new(&self.skin).disabled(busy)))
-                                .child(Self::browse(&self.skin, "skin-browse")),
+                                .child(Self::browse(&self.skin, "skin-browse").disabled(busy)),
                         ),
                 )
                 .child(
@@ -336,7 +350,7 @@ impl Render for SkinDialog {
                             h_flex()
                                 .gap_2()
                                 .child(div().flex_1().child(Input::new(&self.cape).disabled(busy)))
-                                .child(Self::browse(&self.cape, "cape-browse")),
+                                .child(Self::browse(&self.cape, "cape-browse").disabled(busy)),
                         ),
                 )
                 .into_any_element(),
@@ -393,6 +407,18 @@ impl Render for SkinDialog {
                     .child(div().text_sm().text_color(colors.danger).child(message))
                     .child(kit::technical("skin-technical", technical).xsmall())
             }))
+            .when(self.inline, |form| {
+                // ia[accounts]: 保存离线外观 | 衣橱内联表单 | 默认、本地皮肤与披风、LittleSkin 或自定义站保存为 SkinChoice；预览更新，启动仍按 ADR 0024
+                form.child(
+                    Key::new("skin-inline-save")
+                        .label(tr!("account-skin-save"))
+                        .primary()
+                        .loading(busy)
+                        .disabled(busy || self.choice(cx).is_err())
+                        .debug_selector(|| "skin-inline-save".into())
+                        .on_click(cx.listener(|form, _, window, cx| form.submit(window, cx))),
+                )
+            })
     }
 }
 

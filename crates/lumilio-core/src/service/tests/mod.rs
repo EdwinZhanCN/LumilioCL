@@ -18,6 +18,7 @@ mod settings;
 mod skins;
 mod snapshots;
 mod third_party;
+mod wardrobe;
 mod worlds;
 
 use super::LauncherService;

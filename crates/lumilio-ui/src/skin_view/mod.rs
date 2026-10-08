@@ -13,7 +13,7 @@ use gpui::{
     Task, Window, canvas, div, img, px,
 };
 use gpui_component::{ActiveTheme as _, h_flex, v_flex};
-use lumilio_skin_render::{Arms, Camera, Player, Texture, render};
+use lumilio_skin_render::{Arms, BackEquipment, Camera, Player, Texture, render};
 
 use crate::kit;
 use crate::theme::ShellColors;
@@ -64,6 +64,7 @@ enum State {
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct Request {
     camera: Camera,
+    back_equipment: BackEquipment,
     width: u32,
     height: u32,
     /// Which look the frame is of; a frame of an older look is dropped.
@@ -74,6 +75,7 @@ pub struct SkinViewer {
     state: State,
     look: u64,
     camera: Camera,
+    back_equipment: BackEquipment,
     focus: FocusHandle,
     drag: Option<Point<Pixels>>,
     image: Option<Arc<RenderImage>>,
@@ -92,6 +94,7 @@ impl SkinViewer {
             state: State::Loading,
             look: 0,
             camera: Camera::HOME,
+            back_equipment: BackEquipment::Cape,
             focus: cx.focus_handle(),
             drag: None,
             image: None,
@@ -108,6 +111,9 @@ impl SkinViewer {
         self.look += 1;
         self.shown = None;
         self.queued = None;
+        if let Some(old) = self.image.take() {
+            self.old_images.push(old);
+        }
         self.state = match look {
             Ok(look) => State::Ready(look),
             Err((message, detail)) => State::Failed { message, detail },
@@ -123,6 +129,13 @@ impl SkinViewer {
         }
         .clamped();
         cx.notify();
+    }
+
+    fn show_back_equipment(&mut self, equipment: BackEquipment, cx: &mut Context<Self>) {
+        if self.back_equipment != equipment {
+            self.back_equipment = equipment;
+            cx.notify();
+        }
     }
 
     fn zoom(&mut self, factor: f32, cx: &mut Context<Self>) {
@@ -145,6 +158,7 @@ impl SkinViewer {
         }
         let request = Request {
             camera: self.camera,
+            back_equipment: self.back_equipment,
             width: (width * scale).round() as u32,
             height: (height * scale).round() as u32,
             look: self.look,
@@ -173,6 +187,7 @@ impl SkinViewer {
                         skin: look.skin.as_deref(),
                         arms: look.arms,
                         cape: look.cape.as_deref(),
+                        back_equipment: request.back_equipment,
                         outer_layer: true,
                     };
                     render(&player, request.camera, request.width, request.height)
@@ -190,6 +205,7 @@ impl SkinViewer {
     ) {
         self.drawing = None;
         if request.look == self.look
+            && request.back_equipment == self.back_equipment
             && let Some(buffer) = image::RgbaImage::from_raw(frame.width, frame.height, frame.bgra)
         {
             let image = Arc::new(RenderImage::new([image::Frame::new(buffer)]));
@@ -367,19 +383,55 @@ impl Render for SkinViewer {
             }))
             .child(measure)
             .child(content);
-        v_flex().w_full().gap_2().child(viewport).child(
-            h_flex()
-                .w_full()
-                .justify_between()
-                .items_center()
-                .gap_3()
-                .child(
+        let has_cape = matches!(&self.state, State::Ready(look) if look.cape.is_some());
+        let this = cx.weak_entity();
+        // ia[accounts]: 披风 / 鞘翅预览 | 立体预览下的分段按键（有披风时） | 同一贴图在披风与鞘翅形态间切换，保留相机；只改变预览，不改变账户穿戴
+        let equipment = has_cape.then(|| {
+            kit::segments(
+                "skin-view-equipment",
+                crate::tr_all!["skin-view-cape", "skin-view-elytra"],
+                usize::from(self.back_equipment == BackEquipment::Elytra),
+                move |index, _, cx| {
+                    let _ = this.update(cx, |this, cx| {
+                        this.show_back_equipment(
+                            if index == 0 {
+                                BackEquipment::Cape
+                            } else {
+                                BackEquipment::Elytra
+                            },
+                            cx,
+                        )
+                    });
+                },
+            )
+        });
+        v_flex()
+            .w_full()
+            .gap_2()
+            .child(viewport)
+            .children(equipment)
+            // ia[accounts]: 没有可用默认贴图 | 未安装游戏或客户端 jar 无默认皮肤 | 灰色模型与说明；安装游戏后重新打开详情读取贴图
+            .children(
+                matches!(&self.state, State::Ready(look) if look.skin.is_none()).then(|| {
                     div()
                         .text_xs()
                         .text_color(colors.muted)
-                        .child(tr!("skin-view-hint")),
-                )
-                .child(kit::ghost("skin-view-reset", tr!("model-reset"), reset)),
-        )
+                        .child(tr!("skin-view-default-missing"))
+                }),
+            )
+            .child(
+                h_flex()
+                    .w_full()
+                    .justify_between()
+                    .items_center()
+                    .gap_3()
+                    .child(
+                        div()
+                            .text_xs()
+                            .text_color(colors.muted)
+                            .child(tr!("skin-view-hint")),
+                    )
+                    .child(kit::ghost("skin-view-reset", tr!("model-reset"), reset)),
+            )
     }
 }

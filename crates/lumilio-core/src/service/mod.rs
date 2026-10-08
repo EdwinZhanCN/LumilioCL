@@ -32,6 +32,7 @@ mod support;
 mod third_party;
 mod tracking;
 mod types;
+mod wardrobe;
 mod worlds;
 
 #[cfg(test)]
@@ -101,6 +102,9 @@ pub struct LauncherService<T> {
     /// One refresh at a time: refresh tokens rotate, so two at once would
     /// invalidate each other.
     auth_lock: Mutex<()>,
+    /// Library index writes and per-profile appearance changes serialize,
+    /// independently of credential refresh.
+    wardrobe_lock: Mutex<()>,
     /// Third-party sign-ins waiting for the person to choose a character:
     /// the session stays in memory only, until chosen or abandoned.
     pending_sign_ins: StdMutex<BTreeMap<u64, third_party::PendingSignIn>>,
@@ -153,6 +157,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             filters: Mutex::new(None),
             credentials: Arc::new(SystemCredentials),
             auth_lock: Mutex::new(()),
+            wardrobe_lock: Mutex::new(()),
             pending_sign_ins: StdMutex::default(),
             next_pending: std::sync::atomic::AtomicU64::new(1),
             client_token_override: None,
