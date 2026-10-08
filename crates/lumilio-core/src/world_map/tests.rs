@@ -28,17 +28,40 @@ fn request() -> TileRequest {
     }
 }
 #[test]
-fn stale_generations_and_duplicate_keys_are_rejected() {
+fn retained_tiles_finish_once_and_departed_tiles_are_cancelled() {
     let key = request().key;
     let mut schedule = MapSchedule::default();
     let generation = schedule.update(std::slice::from_ref(&key));
     let (_, cancel) = schedule.begin(&key).unwrap();
     assert!(schedule.begin(&key).is_none());
     schedule.update(std::slice::from_ref(&key));
-    assert!(cancel.is_cancelled());
-    assert!(!schedule.accept(generation, &key));
-    let (generation, _) = schedule.begin(&key).unwrap();
+    assert!(!cancel.is_cancelled());
+    assert!(schedule.begin(&key).is_none());
     assert!(schedule.accept(generation, &key));
+    assert!(!schedule.accept(generation, &key));
+    let (old_generation, cancel) = schedule.begin(&key).unwrap();
+    let mut next = key.clone();
+    next.tx += 1;
+    schedule.update(std::slice::from_ref(&next));
+    assert!(cancel.is_cancelled());
+    assert!(!schedule.accept(old_generation, &key));
+    schedule.update(std::slice::from_ref(&key));
+    let (new_generation, _) = schedule.begin(&key).unwrap();
+    assert!(!schedule.accept(old_generation, &key));
+    assert!(schedule.accept(new_generation, &key));
+}
+
+#[test]
+fn worker_cancellation_does_not_hide_current_tile_error() {
+    let key = request().key;
+    let mut schedule = MapSchedule::default();
+    schedule.update(std::slice::from_ref(&key));
+    let (generation, cancel) = schedule.begin(&key).unwrap();
+    // The host cancels the worker after timeout or provider failure, before
+    // delivering its error to the viewport. That error still needs rendering.
+    cancel.cancel();
+    assert!(schedule.accept(generation, &key));
+    assert!(!schedule.accept(generation, &key));
 }
 #[test]
 fn cache_hits_and_lru_eviction() {

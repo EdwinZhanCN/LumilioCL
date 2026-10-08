@@ -224,6 +224,12 @@ impl PluginHost {
             }
             Err(fault) => {
                 cancel.cancel();
+                // An explicit version refusal is a capability limit, not a
+                // broken provider. An unsupported save must not prevent the
+                // user from opening a supported manual seed afterward.
+                if fault.message == "map-version-unsupported" {
+                    return Err(MapFailure::Failed(fault.message));
+                }
                 let count = failures.entry(key).or_default();
                 *count = count.saturating_add(1);
                 Err(MapFailure::Failed(fault.message))

@@ -81,6 +81,7 @@ pub struct MapView {
     image: Option<Arc<RenderImage>>,
     old: Vec<Arc<RenderImage>>,
     error: Option<String>,
+    no_gpu: bool,
     release: bool,
 }
 impl MapView {
@@ -111,6 +112,7 @@ impl MapView {
             image: None,
             old: vec![],
             error: None,
+            no_gpu: false,
             release: false,
         }
     }
@@ -149,7 +151,10 @@ impl MapView {
                                         }
                                     }
                                     Ok(_) => {}
-                                    Err(error) => this.error = Some(format!("{error:?}")),
+                                    Err(error) => {
+                                        this.no_gpu = error == lumilio_map_render::Error::NoGpu;
+                                        this.error = Some(format!("{error:?}"));
+                                    }
                                 }
                                 cx.notify();
                             })
@@ -170,12 +175,8 @@ impl MapView {
             Event::Seed(Ok((contexts, context))) => {
                 self.contexts = contexts;
                 self.context = Some(context);
-                self.tiles.clear();
-                self.failed.clear();
                 self.error = None;
-                if let Some(old) = self.image.take() {
-                    self.old.push(old);
-                }
+                self.reset_view();
                 self.refresh();
             }
             Event::Seed(Err(error)) => self.error = Some(error),
@@ -207,6 +208,16 @@ impl MapView {
             }
         }
         cx.notify();
+    }
+    fn reset_view(&mut self) {
+        self.schedule.update(&[]);
+        self.tiles.clear();
+        self.failed.clear();
+        self.visible.clear();
+        self.serial = self.serial.wrapping_add(1);
+        if let Some(old) = self.image.take() {
+            self.old.push(old);
+        }
     }
     fn refresh(&mut self) {
         let Some(context) = self.context.clone() else {
@@ -243,16 +254,20 @@ impl MapView {
             let Some((generation, cancel)) = self.schedule.begin(&key) else {
                 continue;
             };
-            if let Some(connection) = &self.connection {
-                let _ = connection.send.try_send(Command::Tile {
+            if let Some(connection) = &self.connection
+                && let Err(error) = connection.send.try_send(Command::Tile {
                     generation,
                     request: Box::new(TileRequest {
                         context: context.clone(),
-                        key,
+                        key: key.clone(),
                         pixels: 256,
                     }),
                     cancel,
-                });
+                })
+            {
+                self.schedule.accept(generation, &key);
+                self.failed
+                    .insert(key, MapFailure::Failed(error.to_string()));
             }
         }
         self.frame();
@@ -445,8 +460,7 @@ impl Render for MapView {
                             [Dimension::Overworld, Dimension::Nether, Dimension::End][index]
                                 .clone();
                     }
-                    this.tiles.clear();
-                    this.failed.clear();
+                    this.reset_view();
                     this.refresh();
                     cx.notify();
                 });
@@ -463,8 +477,7 @@ impl Render for MapView {
                     .small()
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.context = Some(this.contexts[index].context.clone());
-                        this.tiles.clear();
-                        this.failed.clear();
+                        this.reset_view();
                         this.refresh();
                         cx.notify();
                     }))
@@ -488,8 +501,7 @@ impl Render for MapView {
                             .selected(index == self.base)
                             .on_click(cx.listener(move |this, _, _, cx| {
                                 this.base = index;
-                                this.tiles.clear();
-                                this.failed.clear();
+                                this.reset_view();
                                 this.refresh();
                                 cx.notify();
                             }))
@@ -549,6 +561,14 @@ impl Render for MapView {
         ) {
             tr!("map-version-unsupported")
         } else if self
+            .failed
+            .values()
+            .any(|failure| *failure == MapFailure::ProviderStopped)
+        {
+            tr!("map-provider-stopped")
+        } else if self.no_gpu {
+            tr!("map-no-gpu")
+        } else if self
             .context
             .as_ref()
             .is_none_or(|context| context.seed.is_none())
@@ -556,18 +576,28 @@ impl Render for MapView {
             tr!("map-seed-needed")
         } else if self.error.is_some() {
             tr!("map-render-failed")
+        } else if !self.failed.is_empty() {
+            tr!("map-tile-failed")
         } else {
             tr!("map-no-data")
         };
         // ia[plugin.world-explorer]: 平移与缩放 | 地图视口 · 拖动 / 滚轮 / + − 与方向键 | 锚点缩放；过期世代与旧视口结果不进入当前帧
         let viewport = div()
             .id("world-map")
+            .debug_selector(|| "world-map".into())
             .track_focus(&self.focus)
+            .tab_stop(true)
             .relative()
             .w_full()
             .h_96()
             .overflow_hidden()
             .bg(colors.surface_subtle)
+            .border_1()
+            .border_color(if self.focus.is_focused(window) {
+                colors.focus
+            } else {
+                colors.border
+            })
             .children(
                 self.image
                     .clone()

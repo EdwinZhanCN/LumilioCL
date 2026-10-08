@@ -16,8 +16,8 @@ impl Plugin for WorldExplorer {
     fn manifest(&self) -> Manifest {
         Manifest {
             id: ID.into(),
-            name: "世界地图".into(),
-            description: "在本机查看存档与种子地图。".into(),
+            name: "World Explorer".into(),
+            description: "Browse local worlds and seed maps.".into(),
             version: env!("CARGO_PKG_VERSION").into(),
             api: API_VERSION,
             default_enabled: true,
@@ -41,7 +41,7 @@ impl Plugin for WorldExplorer {
 }
 impl InstanceTab for WorldExplorer {
     fn title(&self) -> String {
-        "地图".into()
+        "Map".into()
     }
     // ia[plugin.world-explorer]: 打开地图 | 游戏页「插件」标签内的地图 | 宿主显示世界选择与地图；没有存档时可输入手动种子 | 插件默认启用，关闭后入口消失
     fn appears(&self, _: &GameFacts, _: &dyn HostContext) -> bool {

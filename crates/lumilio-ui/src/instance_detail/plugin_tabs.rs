@@ -50,11 +50,6 @@ impl InstanceDetailView {
     /// returns the page to a built-in tab.
     pub fn plugin_tabs_arrived(&mut self, tabs: Vec<PluginTab>, cx: &mut Context<Self>) {
         self.plugin_tabs = tabs;
-        for tab in &mut self.plugin_tabs {
-            if tab.plugin == "lumilio.world-explorer" {
-                tab.title = tr!("map-title").into();
-            }
-        }
         self.keep_enabled_plugin_tabs();
         cx.notify();
     }
@@ -313,7 +308,11 @@ impl InstanceDetailView {
                     let entity = entity.clone();
                     kit::led_option(
                         SharedString::from(format!("instance-plugin-tab-{}", tab.plugin)),
-                        tab.title.clone(),
+                        if tab.plugin == "lumilio.world-explorer" {
+                            tr!("map-title").to_owned()
+                        } else {
+                            tab.title.clone()
+                        },
                         chosen,
                         colors,
                         move |window, cx| {

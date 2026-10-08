@@ -63,16 +63,19 @@ impl Viewport {
 pub struct MapSchedule {
     generation: u64,
     visible: BTreeSet<TileKey>,
-    pending: BTreeMap<TileKey, CancellationToken>,
+    pending: BTreeMap<TileKey, (u64, CancellationToken)>,
 }
 impl MapSchedule {
     pub fn update(&mut self, keys: &[TileKey]) -> u64 {
         self.generation = self.generation.wrapping_add(1);
-        for token in self.pending.values() {
-            token.cancel();
-        }
-        self.pending.clear();
         self.visible = keys.iter().cloned().collect();
+        self.pending.retain(|key, (_, token)| {
+            let retained = self.visible.contains(key);
+            if !retained {
+                token.cancel();
+            }
+            retained
+        });
         self.generation
     }
     pub fn begin(&mut self, key: &TileKey) -> Option<(u64, CancellationToken)> {
@@ -80,21 +83,29 @@ impl MapSchedule {
             return None;
         }
         let token = CancellationToken::new();
-        self.pending.insert(key.clone(), token.clone());
+        self.pending
+            .insert(key.clone(), (self.generation, token.clone()));
         Some((self.generation, token))
     }
     pub fn accept(&mut self, generation: u64, key: &TileKey) -> bool {
-        if generation != self.generation || !self.visible.contains(key) {
+        if !self.visible.contains(key)
+            || self
+                .pending
+                .get(key)
+                .is_none_or(|(pending_generation, _)| *pending_generation != generation)
+        {
             return false;
         }
-        self.pending
-            .remove(key)
-            .is_some_and(|token| !token.is_cancelled())
+        // Cancellation also stops a timed-out/failing worker. Only removal
+        // from this viewport invalidates its reply; a current error must reach
+        // the user so the tile can explain the failure and offer a retry.
+        self.pending.remove(key);
+        true
     }
 }
 impl Drop for MapSchedule {
     fn drop(&mut self) {
-        for token in self.pending.values() {
+        for (_, token) in self.pending.values() {
             token.cancel();
         }
     }

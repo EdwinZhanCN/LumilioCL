@@ -203,6 +203,10 @@ fn the_portable_zip_unpacks_into_one_folder() {
     names.sort_unstable();
     assert_eq!(
         names,
-        ["LumilioCL/ATTRIBUTIONS.md", "LumilioCL/lumiliocl.exe", "LumilioCL/sub/notes.txt"]
+        [
+            "LumilioCL/ATTRIBUTIONS.md",
+            "LumilioCL/lumiliocl.exe",
+            "LumilioCL/sub/notes.txt"
+        ]
     );
 }

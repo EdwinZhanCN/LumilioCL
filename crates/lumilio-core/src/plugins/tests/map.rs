@@ -19,6 +19,39 @@ impl Plugin for Fake {
 }
 
 #[tokio::test]
+async fn unsupported_world_does_not_stop_supported_worlds() {
+    let host = PluginHost::new(vec![Arc::new(Fake)], BTreeMap::new());
+    for _ in 0..8 {
+        assert_eq!(
+            host.map_call(
+                "test.maps",
+                "base:seed",
+                None,
+                CancellationToken::new(),
+                MAP_TIMEOUT,
+                |_, _| -> Result<(), PluginError> {
+                    Err(PluginError::Unavailable("map-version-unsupported".into()))
+                }
+            )
+            .await,
+            Err(MapFailure::Failed("map-version-unsupported".into()))
+        );
+    }
+    assert!(
+        host.map_call(
+            "test.maps",
+            "base:seed",
+            None,
+            CancellationToken::new(),
+            MAP_TIMEOUT,
+            |_, _| Ok(())
+        )
+        .await
+        .is_ok()
+    );
+}
+
+#[tokio::test]
 async fn faults_stop_only_provider_and_success_resets_counter() {
     let host = PluginHost::new(vec![Arc::new(Fake)], BTreeMap::new());
     for _ in 0..4 {
