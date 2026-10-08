@@ -13,6 +13,7 @@ name = "lumiliocl"
 path = "src/main.rs"
 
 [dependencies]
+async-channel = "2"
 gpui-kit.workspace = true
 lumilio-core.workspace = true
 lumilio-plugin-api.workspace = true
@@ -20,6 +21,7 @@ lumilio-plugin-crash-analyzer.workspace = true
 lumilio-plugin-litematica.workspace = true
 lumilio-plugin-modrinth.workspace = true
 lumilio-plugin-discord.workspace = true
+lumilio-plugin-world-explorer.workspace = true
 lumilio-ui.workspace = true
 futures = "0.3"
 reqwest.workspace = true

@@ -20,7 +20,7 @@
 | 删除游戏 | 页头 ⋯ 菜单 → 警告弹窗 | 删除后从历史中移除并后退 |  | `lumilio-ui/src/instance_detail/actions.rs` |
 | 打开插件标签 | 游戏页「插件」标签内的左侧列表 | 读取并显示插件给的内容；插件被关闭或出错时标签消失，回到内置标签 | 插件只描述内容，版式由启动器统一 | `lumilio-ui/src/instance_detail/plugin_tabs.rs` |
 | 切换插件标签 | 游戏页「插件」标签内的左侧列表 | 右侧显示所选插件的内容 |  | `lumilio-ui/src/instance_detail/plugin_tabs.rs` |
-| 返回插件内容顶部 | 右下角悬浮「返回顶部」按钮 | 将详情和材料清单共享的滚动区域移回顶部 |  | `lumilio-ui/src/instance_detail/plugin_tabs.rs` |
+| 返回插件内容顶部 | 非地图插件内容 · 右下角悬浮「返回顶部」按钮 | 将详情和材料清单共享的滚动区域移回顶部；地图使用填满高度的视口 |  | `lumilio-ui/src/instance_detail/plugin_tabs.rs` |
 | 观察 3D 投影 | 3D 预览弹窗画面 | Orbital 拖拽旋转、滚轮缩放；Explore 点击捕获鼠标后第一人称转向，WASD 移动、空格上升、Shift 下降；Esc 先释放鼠标；失焦自动释放 | 自由飞行，不含重力与碰撞；动画方块暂时静止 | `lumilio-ui/src/model_view/mod.rs` |
 | 复位 3D 投影视角 | 弹窗「复位视角」 | 当前模式回到初始视角；Orbital 可双击画面，聚焦画面后可按 R |  | `lumilio-ui/src/model_view/mod.rs` |
 | 重试 3D 投影预览 | 弹窗出错后的「重试」 | 重新读取当前投影与游戏贴图并生成预览；失败仍显示说明 |  | `lumilio-ui/src/model_view/mod.rs` |

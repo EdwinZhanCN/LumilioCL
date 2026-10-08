@@ -550,6 +550,7 @@ pub(super) fn on_live_intent(
         LiveIntent::ImportGame => import_game(wiring, window, cx),
         LiveIntent::Reveal(path) => platform::reveal(&path, cx),
         LiveIntent::ClearCache => clear_cache(wiring, cx),
+        LiveIntent::ClearMapCache => super::settings::clear_map_cache(wiring, cx),
         LiveIntent::CheckReclaimable => check_reclaimable(wiring, window, cx),
         LiveIntent::Reclaim => reclaim(wiring, cx),
         LiveIntent::ExportDiagnostics => export_diagnostics(wiring, cx),

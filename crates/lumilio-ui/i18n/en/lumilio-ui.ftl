@@ -1549,3 +1549,37 @@ settings-java-roots-save-failed = Couldn't save the search folders
 settings-java-save-failed = Couldn't save the Java settings
 settings-plugin-save-failed = Couldn't save the plugin settings
 settings-plugin-reset-failed = Couldn't restore the plugin defaults
+## World map
+map-clear-cache = Clear map cache
+map-cache-cleared = Map cache cleared
+map-base-seed = Seed prediction
+map-overworld = Overworld
+map-nether = Nether
+map-end = End
+map-chunks = Chunk grid
+map-regions = Region boundaries
+map-jump = Go to coordinates
+map-jump-placeholder = x z or x, z
+map-coordinates-invalid = Enter X and Z coordinates inside the world border.
+map-retry-failed = { $count ->
+    [one] Retry { $count } failed tile
+   *[other] Retry { $count } failed tiles
+    }
+map-version-unsupported = This version is not supported yet
+map-seed-needed = Choose a world or enter a seed.
+map-render-failed = The map could not be rendered.
+map-no-gpu = No graphics adapter is available to draw the map. Try updating the graphics driver.
+map-provider-stopped = This map source stopped after repeated errors. Restart the launcher to try again.
+map-tile-failed = Some tiles could not be loaded. Retry those tiles below.
+map-no-data = Areas without data stay empty.
+map-seed = Seed
+map-seed-placeholder = A number or text seed
+map-version = Game version
+map-seed-empty = Enter a seed.
+map-seed-save-failed = Couldn't apply the seed. Try again.
+map-world = Saved world
+map-choose-world = Choose a saved world
+map-search-worlds = Search saved worlds
+map-search-versions = Search versions
+map-layers = Layers
+map-chunks-hidden = Chunk lines are hidden when zoomed out.

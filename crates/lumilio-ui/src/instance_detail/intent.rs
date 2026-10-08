@@ -109,6 +109,9 @@ pub enum InstanceIntent {
         file: String,
         request: u64,
     },
+    LoadMap {
+        request: u64,
+    },
     /// Read this crash report; answer with [`InstanceDetailView::crash_arrived`].
     OpenCrash(String),
     OpenGameLog(lumilio_core::GameLogSource),

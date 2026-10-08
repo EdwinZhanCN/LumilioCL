@@ -4451,6 +4451,7 @@ dependencies = [
 name = "lumilio-app"
 version = "0.1.0"
 dependencies = [
+ "async-channel",
  "futures",
  "gpui-kit",
  "lumilio-core",
@@ -4459,6 +4460,7 @@ dependencies = [
  "lumilio-plugin-discord",
  "lumilio-plugin-litematica",
  "lumilio-plugin-modrinth",
+ "lumilio-plugin-world-explorer",
  "lumilio-ui",
  "reqwest",
  "tempfile",
@@ -4498,11 +4500,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "lumilio-cubiomes"
+version = "0.1.0"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "lumilio-docgen"
 version = "0.1.0"
 dependencies = [
  "tempfile",
  "toml 0.9.12+spec-1.1.0",
+]
+
+[[package]]
+name = "lumilio-map-render"
+version = "0.1.0"
+dependencies = [
+ "pollster 0.4.0",
+ "wgpu 30.0.1",
 ]
 
 [[package]]
@@ -4556,6 +4573,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "lumilio-plugin-world-explorer"
+version = "0.1.0"
+dependencies = [
+ "lumilio-cubiomes",
+ "lumilio-plugin-api",
+]
+
+[[package]]
 name = "lumilio-pointer"
 version = "0.1.0"
 dependencies = [
@@ -4598,6 +4623,7 @@ dependencies = [
  "i18n-embed-fl",
  "image 0.25.10",
  "lumilio-core",
+ "lumilio-map-render",
  "lumilio-plugin-api",
  "lumilio-pointer",
  "lumilio-schematic-render",

@@ -302,21 +302,21 @@ pub type Select = Rc<dyn Fn(usize, &mut Window, &mut App)>;
 #[derive(IntoElement)]
 pub struct Segments {
     id: &'static str,
-    labels: Vec<&'static str>,
+    labels: Vec<SharedString>,
     active: usize,
     on_select: Select,
 }
 
 impl Segments {
-    pub fn new(
+    pub fn new<S: Clone + Into<SharedString>>(
         id: &'static str,
-        labels: &[&'static str],
+        labels: &[S],
         active: usize,
         on_select: impl Fn(usize, &mut Window, &mut App) + 'static,
     ) -> Self {
         Self {
             id,
-            labels: labels.to_vec(),
+            labels: labels.iter().cloned().map(Into::into).collect(),
             active,
             on_select: Rc::new(on_select),
         }

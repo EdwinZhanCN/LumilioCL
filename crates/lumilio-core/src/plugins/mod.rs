@@ -5,12 +5,14 @@ mod analysis;
 mod content;
 mod context;
 mod launch;
+mod map;
 mod model;
 mod native;
 mod network;
 mod tabs;
 pub use analysis::PluginFinding;
 pub use content::PluginContentSource;
+pub use map::{MapFailure, MapProviders};
 pub use tabs::{PluginEffect, PluginTab};
 #[cfg(test)]
 mod tests;
@@ -78,6 +80,8 @@ pub struct PluginHost {
     locale: Arc<RwLock<Arc<str>>>,
     timeout: Duration,
     network: Option<network::Network>,
+    map_calls: Arc<tokio::sync::Semaphore>,
+    map_failures: Mutex<BTreeMap<(String, String), u8>>,
 }
 
 impl PluginHost {
@@ -97,6 +101,11 @@ impl PluginHost {
             locale: Arc::new(RwLock::new(Arc::from("zh-CN"))),
             timeout: CALL_TIMEOUT,
             network: None,
+            map_calls: Arc::new(tokio::sync::Semaphore::new(
+                std::thread::available_parallelism()
+                    .map_or(1, |n| n.get().saturating_sub(1).max(1)),
+            )),
+            map_failures: Mutex::default(),
         }
     }
 

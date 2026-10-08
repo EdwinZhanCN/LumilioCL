@@ -5,13 +5,14 @@
 
 | 页面 | 路径数 |
 |---|---|
+| [插件 · 世界地图](plugin.world-explorer.md) | 12 |
 | [全局导航](navigation.md) | 8 |
 | [首页](home.md) | 10 |
 | [游戏库](library.md) | 21 |
 | [发现](discover.md) | 23 |
 | [动态](activity.md) | 8 |
 | [账户](accounts.md) | 17 |
-| [设置](settings.md) | 39 |
+| [设置](settings.md) | 40 |
 | [游戏页（整体）](instance.md) | 21 |
 | [游戏页 · 概览](instance.overview.md) | 4 |
 | [游戏页 · 内容](instance.content.md) | 16 |

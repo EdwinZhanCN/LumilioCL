@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 mod analysis;
 pub mod content;
 mod launch;
+pub mod map;
 mod network;
 #[cfg(test)]
 mod tests;
@@ -186,6 +187,10 @@ pub trait HostContext: Send + Sync {
     fn locale(&self) -> &str {
         "zh-CN"
     }
+    /// Cooperative cancellation for bounded map work on a host worker.
+    fn cancelled(&self) -> bool {
+        false
+    }
     /// Identifies this observed process, including when several games overlap.
     fn launch_id(&self) -> Option<u64> {
         None
@@ -222,6 +227,12 @@ pub trait HostContext: Send + Sync {
 }
 
 pub trait Plugin: Send + Sync + 'static {
+    fn base_map_provider(&self) -> Option<&dyn map::BaseMapProvider> {
+        None
+    }
+    fn overlay_provider(&self) -> Option<&dyn map::OverlayProvider> {
+        None
+    }
     fn manifest(&self) -> Manifest;
     fn analyzer(&self) -> Option<&dyn Analyzer> {
         None

@@ -22,6 +22,10 @@ pub struct Page {
 
 pub const PAGES: &[Page] = &[
     Page {
+        key: "plugin.world-explorer",
+        title: "插件 · 世界地图",
+    },
+    Page {
         key: "navigation",
         title: "全局导航",
     },

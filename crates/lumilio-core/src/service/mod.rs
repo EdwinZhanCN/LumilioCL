@@ -33,6 +33,7 @@ mod third_party;
 mod tracking;
 mod types;
 mod wardrobe;
+mod world_map;
 mod worlds;
 
 #[cfg(test)]

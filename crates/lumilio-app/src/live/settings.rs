@@ -383,6 +383,28 @@ pub(super) fn clear_cache(wiring: &Wiring, cx: &mut App) {
     .detach();
 }
 
+pub(super) fn clear_map_cache(wiring: &Wiring, cx: &mut App) {
+    let service = wiring.backend.service.clone();
+    job(
+        wiring,
+        cx,
+        false,
+        Reload::Nothing,
+        None,
+        async move { service.clear_map_cache().await },
+        |shell, result, cx| {
+            shell.toast(
+                match result {
+                    Ok(()) => Toast::success(tr!("map-cache-cleared")),
+                    Err(error) => Toast::error(tr!("settings-clear-cache-failed"))
+                        .technical(error.to_string()),
+                },
+                cx,
+            );
+        },
+    );
+}
+
 pub(super) fn export_diagnostics(wiring: &Wiring, cx: &mut App) {
     let start = std::env::var_os("HOME")
         .or_else(|| std::env::var_os("USERPROFILE"))
