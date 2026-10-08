@@ -35,6 +35,7 @@ pub fn package(release: &Release, skip_build: bool) -> Result<Vec<PathBuf>> {
     let contents = app.join("Contents");
     let resources = contents.join("Resources");
     create_dir(&resources)?;
+    release.notices(&resources)?;
 
     // 1. Resources, including the compiled icon.
     copy(&release.binary(), &contents.join("MacOS").join(BINARY))?;
@@ -60,6 +61,7 @@ pub fn package(release: &Release, skip_build: bool) -> Result<Vec<PathBuf>> {
         .arg(image_root.join(format!("{APP_NAME}.app"))))?;
     symlink(Path::new("/Applications"), &image_root.join("Applications"))?;
     copy(&release.license(), &image_root.join("LICENSE.txt"))?;
+    release.notices(&image_root)?;
     write(
         &image_root.join("BUILD.txt"),
         release.build_info("macos", signing.describe()),

@@ -1,6 +1,6 @@
 # World Explorer：原生 2D 世界地图
 
-- Status: proposed
+- Status: in_progress
 
 ## Goal
 
@@ -190,19 +190,53 @@ Xaero's Minimap / World Map 本身不开源（许可证未在本次核实）。�
 
 ### P0 视口、网格与种子底图
 
+实施记录（2026-10-08）：T0 部分完成：导入精确源码快照作为构建探针的依赖，Linux GCC 14 / Clang 19 编译及探针测试通过；新增 windows-2022 的独立构建作业。当前主机不是 ubuntu:22.04，MSVC、macOS 与指定 Ubuntu 镜像的结果均为 **pending human acceptance**，等待 PR Actions；不阻塞后续 P0。MIT 声明随快照一起加入，T11 仍需补分发。
+
+实施记录（2026-10-08）：T1 安全范围检查、26 个精确版本名称、三条精确 DataVersion 映射和原生 RGB 配色已实现；其余 DataVersion 明确 Unsupported，不做猜测。独立 C 探针生成 45 组金样（3 版本 × 3 维度 × 5 档），测试与 clippy 通过。在生成金样文件期间启动的第一次测试遇到文件尚未生成的 setup failure，已生成后重新执行。
+
+实施记录（2026-10-08）：T2 数据契约、Provider 默认扩展点、View::Map 和取消查询已加入；API_VERSION 仍为 1。序列化往返及无效瓦片校验测试通过。UI 暂时仅接受新节点，实际视口由 T7 接入。
+
+实施记录（2026-10-08）：T3 独立 10 秒调用、协作取消和 worker 生命周期并发上限已加入；连续五次故障仅停 Provider，成功清零。panic / PermissionDenied / timeout / cancellation / disabled 的隔离测试通过，普通 call 仍可调用。T4 开始实现宿主世界上下文、世代调度与磁盘 LRU。
+
+实施记录（2026-10-08）：T4 世界上下文、出生点、split worldgen 与有界 zlib 读取、可见瓦片排序/预取、世代取消、1 GiB 磁盘 LRU、service API 和设置清除入口已实现。三个调度/缓存测试通过；设置视觉验收为 **pending human acceptance**。当前缓存只服务 P0 种子源，存档/Xaero 增量来源元数据留到 P4/P5。
+
+实施记录（2026-10-08）：T5 wgpu 30 离屏瓦片四边形、纹理 LRU、网格和 BGRA 回读通过像素测试。1800×1200、单瓦片、10 帧热身后诊断平均 5.80 ms/frame（本机软件渲染，**not representative**，不是 W5 实机通过）；真实硬件的拖动帧时间和地图外观为 **pending human acceptance**。
+
+实施记录（2026-10-08）：T6 默认启用的世界地图插件、每个实例均显示的 Map 节点、saves/xaero 只读权限和种子瓦片 Provider 已加入。每行检查取消，所有五档原生生成；未知版本返回类型化消息 id。Provider 测试、clippy 和 just docs 通过；世界列表由宿主视口统一画，避免插件重复解析上下文。
+
+实施记录（2026-10-08）：T8 宿主 UtilityOverlay 统一几何契约已实现，区块 16 / Region 512 方块边界；负坐标 -513 到 -1 的守卫通过，光标坐标由 UI 展示。T7 正在检查，无显示器，拖动/滚轮/键盘、明暗主题、720×480 与大窗口均为 **pending human acceptance**。
+
+实施记录（2026-10-08）：T7 View::Map 绑定独立实体、后台数据通道、合并渲染邮箱与帧序号；世界/底图/维度选择、两类网格、拖动/滚轮/键盘、坐标跳转与逐瓦片重试已实现。中英目录与 IA 已加入；cargo check -p lumilio-app 和两项 world_explorer 测试通过，包含实际 GPUI 交互。原生画面、手感、布局与主题为 **pending human acceptance**，不声称视觉通过。
+
+实施记录（2026-10-08）：T9 手动数字/Java UTF-16 文字种子、精确版本选择、schema 4 与实例范围持久化已实现；seed store 两个测试通过，含 emoji 与 i64::MIN。SQLite instance 表整体替换不级联删除种子；实例真正移除后清理对应记录。旧版本升级时保留 schema 0 的 legacy import 分支。
+
+实施记录（2026-10-08）：T10 Backend 注册世界地图，按插件 id 排序断言更新；七个 backend 测试通过，验证无存档 Map、手动种子重启、关闭插件后的 tab/provider 消失。额外守卫校验宿主版本选择与 Provider 版本表一致。
+
+实施记录（2026-10-08）：T11 cubiomes MIT 全文、上游提交与 Amidst 配色来源在 T0 随源码加入；本任务补齐 macOS app Resources/DMG、Windows ZIP/Inno 安装内容、Linux tar/deb/用户安装的 ATTRIBUTIONS.md。xtask 测试验证声明全文复制与 ZIP 路径；平台安装产物实测仍为 **pending human acceptance**。
+
+实施记录（2026-10-08）：T12 加入 FFI/NBT 库、renderer、API-only-serde 和 core-no-cubiomes/cc 守卫，递归检查重命名、目标平台和构建依赖。五条边界规则与五条署名规则逐一注入错误，十个 probe 均出现预期断言失败，再改为拒绝断言后 docgen 全部通过。
+
+实施记录（2026-10-08）：P0 首轮完整 `just check` 通过。收尾复查补了三个回归守卫：保留仍可见的在途瓦片、不接受已离开的旧请求；不支持版本的明确拒绝不累计 Provider 故障，避免一个新版本存档阻止随后查看受支持的手动种子；worker 因失败而取消后，当前瓦片的错误仍交给视口显示。保留瓦片与版本拒绝的守卫先复现失败再修正。GPUI 实际鼠标/按键/维度分段测试通过，移除结果校验后在旧瓦片断言处失败，恢复后通过；包含重新打开实体拒绝旧回复。切换世界/维度/底图立即清除旧帧；满队列变成可重试的瓦片失败；停用来源和 NoGpu 有中英文说明，插件名称/说明/标签跟随当前语言。修正后再次执行最终闭环。
+
+P0 任务勾选表示实现与本机自动验证完成，**不表示人工验收通过**。T0 保持部分完成。P1 及以后未开始，本计划保留用于后续阶段。
+
+实施记录（2026-10-08）：最终 `just check` 完整通过（workspace build → test → clippy → fmt）；最后一次 clippy 报新队列错误处理的 collapsible_if，按建议合并后重跑完整闭环通过。回归探针的四次失败均为编译完成后的预期行为断言（保留瓦片、版本拒绝、GPUI 旧回复、worker 取消后的错误），修正后全套测试为绿；边界/署名的十个失败探针同样已恢复为绿。`just ia` 生成 223 条路径、18 个文件；T0 本机 GCC/Clang、NBT、Provider、renderer、core、UI、backend、xtask、docgen 定向测试均通过。普通检查跳过的帧时间诊断已单独用 `--ignored --nocapture` 执行，结果见 T5。
+
+P0 **pending human acceptance**：Windows MSVC Actions；macOS 与指定 ubuntu:22.04 的原生构建/探针；真实地图与群系配色、负坐标网格和粗 LOD；拖动、滚轮、键盘缩放与快速切换/逐块重试的手感；中英、浅深主题、焦点与 reduced motion；720×480 和大窗口布局；真实硬件 1800×1200 拖动帧时间（8 ms 阈值）；无可用图形设备的说明；三平台实际安装包中第三方声明的安装位置。本机没有可目视的显示器，未声称任何一项视觉或实机通过。
+
 - [ ] T0：在 `windows-2022`、`macos-latest`、`ubuntu:22.04` 上各编译一次 `lumilio-cubiomes`（先只有 `build.rs` 和一个探针测试），把 MSVC 的结果记进本计划。失败就在 `forks/cubiomes/` 里做最小修补，并记进 `forks/cubiomes/LUMILIO.md`。编译通过后，在 `.github/workflows/ci.yml` 加一个只跑 `cargo build -p lumilio-cubiomes` 的 Windows 作业（W18）。
-- [ ] T1：`forks/cubiomes/`（新建，快照 `e61f905`，带 `LICENSE` 和新建的补丁日志 `LUMILIO.md`，W14）和 `crates/lumilio-cubiomes/`（新建）：`build.rs` 用 `cc` 编译，不含 `quadbase.c`，`-fwrapv` 用 `flag_if_supported`，关掉上游警告；`src/ffi.rs` 是唯一允许 unsafe 的模块；`src/lib.rs` 提供安全 API 和版本表（版本字符串、数据版本 → `MCVersion`，不在表里就返回 `Unsupported`）。测试放在 `src/tests.rs`：用固定种子取群系 id，与仓库内的金样比对。金样由一个只编译 cubiomes 源码的 C 探针生成，记录生成命令。
-- [ ] T2：`lumilio-plugin-api/src/map.rs`（新建）：`WorldContext`、`WorldId`、`Dimension`、`SourceLink`、`TileKey`、`TileRequest`、`TileReply`、`OverlayRequest`、`MapObject`、`MapIcon`、`BaseMapInfo`、`OverlayInfo`；`BaseMapProvider`、`OverlayProvider` trait；`Plugin::base_map_provider()` / `overlay_provider()` 默认返回 `None`；`View::Map`；`HostContext::cancelled()` 默认 `false`。序列化往返测试。
-- [ ] T3：`crates/lumilio-core/src/plugins/map.rs`（新建）：`map_tile`、`map_objects`，单独超时、取消令牌、并发上限，故障只落到这一块（W15）。测试：panic、超时、错误、取消都不改变 `PluginStatus`；同一个 Provider 连续 5 次故障后只停用它，第 4 次后成功一次就清零；同一插件的 `InstanceTab` 不受影响；插件被关掉后不再派发。
-- [ ] T4：`crates/lumilio-core/src/world_map/`（新建：`mod.rs`、`context.rs`、`schedule.rs`、`cache.rs`、`tests.rs`）：读 `level.dat` 和 `world_gen_settings.dat` 的种子、版本、数据版本（`lumilio-nbt` 补 zlib）；可见集合、`generation`、排序和取消；磁盘缓存与淘汰（默认上限 1 GiB，W6）；`Layout::map_cache()`；`LauncherService` 上的地图方法（`service/world_map.rs`，新建）。测试：旧世代的结果被丢弃；同一 key 不重复计算；缓存命中；超过上限时按最近使用淘汰。设置 › 存储的「清除地图缓存」行也在这里接上。
-- [ ] T5：`crates/lumilio-map-render/`（新建）：设备、瓦片纹理 LRU、瓦片和网格的绘制、BGRA 回读；没有显卡时返回 `NoGpu`。GPU 像素测试照 `lumilio-schematic-render/src/tests.rs`：一块已知颜色的瓦片画在正确的屏幕位置；缩放后位置正确；回读尺寸正确。
-- [ ] T6：`crates/lumilio-plugin-world-explorer/`（新建）：清单（`lumilio.world-explorer`，`default_enabled: true`（W9），`api: API_VERSION` 仍是 1，`ReadGameFiles` 覆盖 `saves` 和 `xaero`）；`InstanceTab`「地图」（插件启用时每个游戏页都出现，没有存档的游戏页也要能用手动种子，W16），视图是世界列表加 `View::Map`；种子底图 Provider 按 LOD 调 `lumilio-cubiomes` 填瓦片，配色用 cubiomes 的 `initBiomeColors`。`ia[plugin.world-explorer]` 写在插件里；`crates/lumilio-docgen/src/lib.rs` 的 `PAGES` 加 `plugin.world-explorer`（「插件 · 世界地图」）。
-- [ ] T7：`crates/lumilio-ui/src/world_explorer/`（新建：`mod.rs`、`worker.rs`、`camera.rs`、`layers.rs`、`tests.rs`）和 `plugin_tabs.rs` 对 `View::Map` 的处理：拖动平移、滚轮和按键缩放、维度分段、底图分段（这一阶段只有种子）、图层面板（网格、Region 边界）、光标坐标、「跳到坐标」输入、无数据和失败的底纹、每块的「重试」。控件用 `lumilio-ui` 的 `Key`、`controls` 和 `kit`，不用 gpui-component 的 Button/Switch/TabBar。所有文字走 `tr!`，中英两份目录一起写。每个入口一条 `ia[...]`。
-- [ ] T8：宿主内部的网格、Region 边界和坐标 Overlay（`world_map/utility.rs`，新建）。测试：边界线在 512 的整数倍上；负坐标不差一。
-- [ ] T9：手动种子：没有存档或读不到种子时，输入种子并选择版本；存进 `launcher.db`（schema 4，`world_map/store.rs`，新建）。版本不在版本表里时写明「这一版还不能查」，不降级（W14）。这是只有种子时的唯一入口，没有全局的地图页（W16）。
-- [ ] T10：`crates/lumilio-app/src/backend.rs` 注册插件；`backend/tests.rs` 里的插件顺序断言加上它。
-- [ ] T11：许可与分发（W18）：`ATTRIBUTIONS.md` 加 cubiomes 一节（MIT 全文、基线提交、配色受 Amidst 启发）；`forks/README.md` 加一行；`crates/lumilio-xtask` 把 `ATTRIBUTIONS.md` 作为第三方声明放进三种包（这个缺口也覆盖已有的 Nucleation），`crates/lumilio-xtask/src/tests.rs` 断言包里有它。
-- [ ] T12：docgen 的依赖边界与署名测试按上面「crate 布局与依赖边界」扩展，每条规则先证明能失败。
+- [x] T1：`forks/cubiomes/`（新建，快照 `e61f905`，带 `LICENSE` 和新建的补丁日志 `LUMILIO.md`，W14）和 `crates/lumilio-cubiomes/`（新建）：`build.rs` 用 `cc` 编译，不含 `quadbase.c`，`-fwrapv` 用 `flag_if_supported`，关掉上游警告；`src/ffi.rs` 是唯一允许 unsafe 的模块；`src/lib.rs` 提供安全 API 和版本表（版本字符串、数据版本 → `MCVersion`，不在表里就返回 `Unsupported`）。测试放在 `src/tests.rs`：用固定种子取群系 id，与仓库内的金样比对。金样由一个只编译 cubiomes 源码的 C 探针生成，记录生成命令。
+- [x] T2：`lumilio-plugin-api/src/map.rs`（新建）：`WorldContext`、`WorldId`、`Dimension`、`SourceLink`、`TileKey`、`TileRequest`、`TileReply`、`OverlayRequest`、`MapObject`、`MapIcon`、`BaseMapInfo`、`OverlayInfo`；`BaseMapProvider`、`OverlayProvider` trait；`Plugin::base_map_provider()` / `overlay_provider()` 默认返回 `None`；`View::Map`；`HostContext::cancelled()` 默认 `false`。序列化往返测试。
+- [x] T3：`crates/lumilio-core/src/plugins/map.rs`（新建）：`map_tile`、`map_objects`，单独超时、取消令牌、并发上限，故障只落到这一块（W15）。测试：panic、超时、错误、取消都不改变 `PluginStatus`；同一个 Provider 连续 5 次故障后只停用它，第 4 次后成功一次就清零；同一插件的 `InstanceTab` 不受影响；插件被关掉后不再派发。
+- [x] T4：`crates/lumilio-core/src/world_map/`（新建：`mod.rs`、`context.rs`、`schedule.rs`、`cache.rs`、`tests.rs`）：读 `level.dat` 和 `world_gen_settings.dat` 的种子、版本、数据版本（`lumilio-nbt` 补 zlib）；可见集合、`generation`、排序和取消；磁盘缓存与淘汰（默认上限 1 GiB，W6）；`Layout::map_cache()`；`LauncherService` 上的地图方法（`service/world_map.rs`，新建）。测试：旧世代的结果被丢弃；同一 key 不重复计算；缓存命中；超过上限时按最近使用淘汰。设置 › 存储的「清除地图缓存」行也在这里接上。
+- [x] T5：`crates/lumilio-map-render/`（新建）：设备、瓦片纹理 LRU、瓦片和网格的绘制、BGRA 回读；没有显卡时返回 `NoGpu`。GPU 像素测试照 `lumilio-schematic-render/src/tests.rs`：一块已知颜色的瓦片画在正确的屏幕位置；缩放后位置正确；回读尺寸正确。
+- [x] T6：`crates/lumilio-plugin-world-explorer/`（新建）：清单（`lumilio.world-explorer`，`default_enabled: true`（W9），`api: API_VERSION` 仍是 1，`ReadGameFiles` 覆盖 `saves` 和 `xaero`）；`InstanceTab`「地图」（插件启用时每个游戏页都出现，没有存档的游戏页也要能用手动种子，W16），视图是世界列表加 `View::Map`；种子底图 Provider 按 LOD 调 `lumilio-cubiomes` 填瓦片，配色用 cubiomes 的 `initBiomeColors`。`ia[plugin.world-explorer]` 写在插件里；`crates/lumilio-docgen/src/lib.rs` 的 `PAGES` 加 `plugin.world-explorer`（「插件 · 世界地图」）。
+- [x] T7：`crates/lumilio-ui/src/world_explorer/`（新建：`mod.rs`、`worker.rs`、`camera.rs`、`layers.rs`、`tests.rs`）和 `plugin_tabs.rs` 对 `View::Map` 的处理：拖动平移、滚轮和按键缩放、维度分段、底图分段（这一阶段只有种子）、图层面板（网格、Region 边界）、光标坐标、「跳到坐标」输入、无数据和失败的底纹、每块的「重试」。控件用 `lumilio-ui` 的 `Key`、`controls` 和 `kit`，不用 gpui-component 的 Button/Switch/TabBar。所有文字走 `tr!`，中英两份目录一起写。每个入口一条 `ia[...]`。
+- [x] T8：宿主内部的网格、Region 边界和坐标 Overlay（`world_map/utility.rs`，新建）。测试：边界线在 512 的整数倍上；负坐标不差一。
+- [x] T9：手动种子：没有存档或读不到种子时，输入种子并选择版本；存进 `launcher.db`（schema 4，`world_map/store.rs`，新建）。版本不在版本表里时写明「这一版还不能查」，不降级（W14）。这是只有种子时的唯一入口，没有全局的地图页（W16）。
+- [x] T10：`crates/lumilio-app/src/backend.rs` 注册插件；`backend/tests.rs` 里的插件顺序断言加上它。
+- [x] T11：许可与分发（W18）：`ATTRIBUTIONS.md` 加 cubiomes 一节（MIT 全文、基线提交、配色受 Amidst 启发）；`forks/README.md` 加一行；`crates/lumilio-xtask` 把 `ATTRIBUTIONS.md` 作为第三方声明放进三种包（这个缺口也覆盖已有的 Nucleation），`crates/lumilio-xtask/src/tests.rs` 断言包里有它。
+- [x] T12：docgen 的依赖边界与署名测试按上面「crate 布局与依赖边界」扩展，每条规则先证明能失败。
 
 ### P1 cubiomes 结构、史莱姆区块与出生点
 
@@ -389,6 +423,8 @@ Xaero's Minimap / World Map 本身不开源（许可证未在本次核实）。�
 - 仓库根目录 `LICENSE`（AGPL-3.0-only）
 
 ## 实施记录
+
+- 2026-10-08：按 Edwin 的桌面反馈修正 P0 控件：种子/坐标改行内 Input，版本/存档改可搜索 Select，底图/维度用 Segments，图层移到右下角浮层并用开关与粗缩放提示，失败块统一重试，地图填满剩余高度；补 GPUI 交互守卫和 AGENTS 控件选择约定，新布局目视验收仍待维护者。
 
 - 2026-10-08：维护者在 PR #6 上决定：cubiomes 作为 LumilioCL 自维护的 fork（`forks/cubiomes`），自行补 1.21.5–26.x 的世界生成，首个交付 26.3（W14、P2）；瓦片和对象故障不进 `Failed`，同一个数据源连续 5 次出错只停用它（W15，修订 ADR 0031 D2）；地图只放在游戏页的插件标签里（W16）。
 - 2026-10-08：维护者在 PR #6 上决定：允许入库从 Mojang 资料派生的生成数据（记录生成命令与来源，W13、W14）；新版本世界生成支持延后到功能完成之后（当时的 P2 改为延后阶段 P8，不阻塞收尾 T45）。上一条里的「P2」指当时的编号。

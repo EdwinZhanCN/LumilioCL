@@ -13,6 +13,14 @@ use lumilio_plugin_api::{NativeCapability, Permission, SettingField, SettingKind
 /// The view-state group that remembers the chosen plugin.
 pub(super) const PLUGIN_GROUP: u8 = 202;
 
+fn plugin_name(info: &PluginInfo) -> String {
+    if info.manifest.id == "lumilio.world-explorer" {
+        tr!("map-plugin-name").into()
+    } else {
+        info.manifest.name.clone()
+    }
+}
+
 pub(super) fn permission_text(permission: &Permission) -> String {
     match permission {
         Permission::ReadGameFiles { under } => {
@@ -71,7 +79,7 @@ pub(super) fn render(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
                 let id = format!("settings-plugin-{}", info.manifest.id);
                 kit::led_option(
                     SharedString::from(id.clone()),
-                    info.manifest.name.clone(),
+                    plugin_name(info),
                     index == selected,
                     ctx.colors,
                     move |window, app| emit(ViewIntent::Choose(PLUGIN_GROUP, index), window, app),
@@ -272,16 +280,17 @@ fn plugin_detail(info: &PluginInfo, ctx: &LiveCtx) -> AnyElement {
         .into_any_element(),
     );
     kit::section(
-        info.manifest.name.clone(),
+        plugin_name(info),
         ctx.colors,
         v_flex()
             .gap_3()
-            .child(
-                div()
-                    .text_sm()
-                    .text_color(ctx.colors.muted)
-                    .child(info.manifest.description.clone()),
-            )
+            .child(div().text_sm().text_color(ctx.colors.muted).child(
+                if info.manifest.id == "lumilio.world-explorer" {
+                    tr!("map-plugin-description").to_owned()
+                } else {
+                    info.manifest.description.clone()
+                },
+            ))
             .child(kit::list(rows, ctx.colors)),
     )
     .into_any_element()

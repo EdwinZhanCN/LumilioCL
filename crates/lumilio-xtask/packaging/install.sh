@@ -35,6 +35,7 @@ esac
 
 mkdir -p "$lib" "$bin" "$data/applications"
 install -m 755 "$here/lumiliocl" "$lib/lumiliocl"
+install -m 644 "$here/LICENSE" "$here/ATTRIBUTIONS.md" "$lib/"
 ln -sf "$lib/lumiliocl" "$bin/lumiliocl"
 (cd "$here/share/icons" && find hicolor -type f) | while IFS= read -r icon; do
     mkdir -p "$data/icons/$(dirname -- "$icon")"

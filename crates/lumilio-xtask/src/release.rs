@@ -71,6 +71,12 @@ impl Release {
     pub fn license(&self) -> PathBuf {
         self.root.join("LICENSE")
     }
+    pub fn notices(&self, destination: &Path) -> Result {
+        copy(
+            &self.root.join("ATTRIBUTIONS.md"),
+            &destination.join("ATTRIBUTIONS.md"),
+        )
+    }
 
     /// The release executable `cargo build --release` leaves behind.
     pub fn binary(&self) -> PathBuf {

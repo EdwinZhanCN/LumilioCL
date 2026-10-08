@@ -53,6 +53,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 [Files]
 Source: "{#SourceDir}\lumiliocl.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceDir}\LICENSE.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\ATTRIBUTIONS.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceDir}\BUILD.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 ; The shortcuts carry the AppUserModelID the process sets, so a pinned

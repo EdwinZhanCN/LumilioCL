@@ -19,7 +19,7 @@ use crate::persist::{self, PersistError, Versioned};
 use crate::tuning::InstanceLaunch;
 
 /// Stored as SQLite's `user_version`; bump with a migration when tables change.
-const SCHEMA_VERSION: u32 = 3;
+const SCHEMA_VERSION: u32 = 4;
 
 /// SQLite integers are signed; timestamps and counters never get near the limit.
 fn int<T: TryInto<i64>>(value: T) -> i64 {
@@ -305,6 +305,12 @@ impl InstanceStore {
                 position INTEGER NOT NULL,
                 instance TEXT NOT NULL,
                 PRIMARY KEY (collection, instance)
+            );
+            CREATE TABLE IF NOT EXISTS world_map_seeds (
+                instance TEXT NOT NULL,
+                seed INTEGER NOT NULL,
+                version TEXT NOT NULL,
+                PRIMARY KEY (instance, seed, version)
             );",
         )?;
         // Schema 1 had no `tuning` column. Keep the old file beside the new
@@ -340,6 +346,9 @@ impl InstanceStore {
                 }
             }
             db.execute_batch("ALTER TABLE instances ADD COLUMN source_project TEXT;")?;
+        }
+        if version != 0 {
+            db.pragma_update(None, "user_version", SCHEMA_VERSION)?;
         }
         Ok(db)
     }
@@ -851,6 +860,10 @@ impl InstanceStore {
                 )?;
             }
         }
+        transaction.execute(
+            "DELETE FROM world_map_seeds WHERE instance NOT IN (SELECT id FROM instances)",
+            [],
+        )?;
         transaction.pragma_update(None, "user_version", SCHEMA_VERSION)?;
         transaction.commit()?;
         self.index = next;

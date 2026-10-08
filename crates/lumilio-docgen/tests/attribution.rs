@@ -42,6 +42,37 @@ fn comment_blocks(text: &str) -> Vec<(usize, String)> {
 
 /// What is wrong with one comment block, if it credits upstream code.
 fn problem(block: &str) -> Option<&'static str> {
+    if block.contains("Axolotl")
+        && [".c", ".h", ".rs", ".vue"]
+            .iter()
+            .any(|ext| block.contains(ext))
+        && !block.contains("GPL-3.0-only")
+    {
+        return Some("Axolotl code names GPL-3.0-only");
+    }
+    if block.contains("cubiomes-viewer")
+        && [".cpp", ".h"].iter().any(|ext| block.contains(ext))
+        && !block.contains("GPL-3.0")
+    {
+        return Some("cubiomes-viewer code names GPL-3.0");
+    }
+    for (source, license, copyright) in [
+        ("cubiomes", "MIT", "Copyright (c) 2020 Cubitect"),
+        (
+            "fastanvil",
+            "MIT OR Apache-2.0",
+            "Copyright (c) 2020 Owen Gage",
+        ),
+        ("XaeroTools", "MIT", "Copyright (c) 2026 Dek"),
+    ] {
+        if block.contains(source)
+            && !block.contains("cubiomes-viewer")
+            && [".rs", ".c", ".h"].iter().any(|ext| block.contains(ext))
+            && (!block.contains(license) || !block.contains(copyright))
+        {
+            return Some("map upstream credit needs its license and copyright");
+        }
+    }
     let cites_hmcl = block.contains("HMCL") && block.contains(".java");
     // A Modrinth credit names a file or a license; "after Modrinth App's
     // browse page (ADR 0022)" follows a design and copies no code.
@@ -63,6 +94,43 @@ fn problem(block: &str) -> Option<&'static str> {
         return Some("a Modrinth App attribution names GPL-3.0-only");
     }
     None
+}
+
+fn missing_credit(credit: &str) {
+    assert!(problem(credit).is_some(), "{credit}");
+}
+
+#[test]
+fn complete_map_credits_are_accepted() {
+    for credit in [
+        "Axolotl bridge.c GPL-3.0-only",
+        "cubiomes-viewer map.cpp GPL-3.0",
+        "cubiomes generator.h MIT Copyright (c) 2020 Cubitect",
+        "fastanvil region.rs MIT OR Apache-2.0 Copyright (c) 2020 Owen Gage",
+        "XaeroTools waypoints.rs MIT Copyright (c) 2026 Dek",
+    ] {
+        assert_eq!(problem(credit), None, "{credit}");
+    }
+}
+#[test]
+fn axolotl_guard_probe() {
+    missing_credit("Axolotl bridge.c");
+}
+#[test]
+fn viewer_guard_probe() {
+    missing_credit("cubiomes-viewer map.cpp");
+}
+#[test]
+fn cubiomes_guard_probe() {
+    missing_credit("cubiomes generator.h");
+}
+#[test]
+fn fastanvil_guard_probe() {
+    missing_credit("fastanvil region.rs");
+}
+#[test]
+fn xaerotools_guard_probe() {
+    missing_credit("XaeroTools waypoints.rs");
 }
 
 #[test]

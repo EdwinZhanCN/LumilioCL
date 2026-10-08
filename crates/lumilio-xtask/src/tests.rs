@@ -84,6 +84,17 @@ fn artifact_names_carry_version_os_and_arch() {
 }
 
 #[test]
+fn package_notices_include_cubiomes_and_nucleation_mit_text() {
+    let dir = tempfile::tempdir().unwrap();
+    release("0.1.0").notices(dir.path()).unwrap();
+    let copied = std::fs::read_to_string(dir.path().join("ATTRIBUTIONS.md")).unwrap();
+    assert_eq!(copied, repo_file("ATTRIBUTIONS.md"));
+    assert!(copied.contains("Copyright (c) 2020 Cubitect"));
+    assert!(copied.contains("Nucleation"));
+    assert!(copied.contains("Permission is hereby granted"));
+}
+
+#[test]
 fn info_plist_is_complete_and_names_the_icon_both_ways() {
     let plist = macos::info_plist(&release("0.3.0-rc.2")).unwrap();
     assert!(!plist.contains("{{"));
@@ -185,12 +196,17 @@ fn the_portable_zip_unpacks_into_one_folder() {
     std::fs::write(payload.join("lumiliocl.exe"), b"exe").unwrap();
     std::fs::write(payload.join("sub/notes.txt"), b"notes").unwrap();
     let archive = dir.path().join("out.zip");
+    release("0.1.0").notices(&payload).unwrap();
     windows::zip_folder(&payload, "LumilioCL", &archive).unwrap();
     let zip = zip::ZipArchive::new(std::fs::File::open(&archive).unwrap()).unwrap();
     let mut names: Vec<_> = zip.file_names().collect();
     names.sort_unstable();
     assert_eq!(
         names,
-        ["LumilioCL/lumiliocl.exe", "LumilioCL/sub/notes.txt"]
+        [
+            "LumilioCL/ATTRIBUTIONS.md",
+            "LumilioCL/lumiliocl.exe",
+            "LumilioCL/sub/notes.txt"
+        ]
     );
 }

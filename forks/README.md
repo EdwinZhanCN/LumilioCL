@@ -19,6 +19,7 @@ The launcher uses local Cargo paths, not remotely published fork repositories.
 
 | Directory | Upstream | Baseline commit | License |
 | --- | --- | --- | --- |
+| `cubiomes/` | [Cubitect/cubiomes](https://github.com/Cubitect/cubiomes) | `e61f90580cbdd883214a8054670dacae655e59c0` | [MIT](cubiomes/LICENSE) |
 | `nucleation/` | [Schem-at/Nucleation](https://github.com/Schem-at/Nucleation) | `51de345adce496c34e73a6458b2a2d107a1148c2` | [MIT](nucleation/LICENSE) |
 | `schematic-mesher/` | [Schem-at/Schematic-Mesher](https://github.com/Schem-at/Schematic-Mesher) | `286323e472cd8a5363b66a035a3be02ecdd4f164` | [AGPL-3.0-only](schematic-mesher/LICENSE) |
 
@@ -37,6 +38,8 @@ their entire optional tool/test suite is not part of every launcher check.
 Keep upstream license headers and API attribution when changing source.
 
 ## Local changes
+
+- cubiomes: see [the local patch log](cubiomes/LUMILIO.md).
 
 - Nucleation's mesher dependency uses `../schematic-mesher`.
 - Schematic-Mesher's development dependency uses `../nucleation`.

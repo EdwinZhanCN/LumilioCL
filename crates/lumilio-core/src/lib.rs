@@ -143,9 +143,10 @@ pub use modpack::{
     plan as plan_modpack, read_index as read_pack_index,
 };
 pub use pack_export::{ExportError, ExportReport, ExportSpec, PackFormat};
+pub mod world_map;
 pub use plugins::{
-    PluginContentSource, PluginEffect, PluginFinding, PluginHost, PluginInfo, PluginStatus,
-    PluginTab,
+    MapFailure, MapProviders, PluginContentSource, PluginEffect, PluginFinding, PluginHost,
+    PluginInfo, PluginStatus, PluginTab,
 };
 pub use process::{
     DEFAULT_SETTLE, GameEvent, GameExit, GameOptions, LogStream, ProcessError,

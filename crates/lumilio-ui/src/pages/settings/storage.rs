@@ -241,10 +241,20 @@ pub(super) fn downloads(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
         colors,
     );
     // ia[settings]: 存储占用 | 下载与存储 · 游戏 / 共享资源 / Java / 缓存 条形图 | 后台计算后显示
+    // ia[settings]: 清除地图缓存 | 下载与存储 · 按键「清除地图缓存」 | 后台删除种子地图缓存；下次查看时重新计算
+    let clear_map = Key::new("settings-clear-map-cache")
+        .label(tr!("map-clear-cache"))
+        .white()
+        .small()
+        .on_click({
+            let handler = handler.clone();
+            move |_, window, cx| handler(LiveIntent::ClearMapCache, window, cx)
+        });
     let usage = match &view.storage {
         Some(usage) => v_flex()
             .gap_4()
             .p_4()
+            .child(clear_map)
             .child(storage_bar(usage, colors))
             .child(
                 h_flex()
