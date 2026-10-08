@@ -2,28 +2,23 @@
 mod camera;
 mod layers;
 mod seed;
+mod toolbar;
 pub use seed::VERSIONS as MANUAL_VERSIONS;
 #[cfg(test)]
 mod tests;
 mod worker;
 
-use crate::{
-    controls::Segments,
-    key::Key,
-    settings_dialog::{DialogSpec, FieldKind, FieldSpec, SettingsDialog},
-    theme::ShellColors,
-    tr, tr_all,
-};
+use crate::{theme::ShellColors, tr};
 use gpui::prelude::*;
 use gpui::{
     App, Bounds, Context, FocusHandle, MouseButton, ObjectFit, Pixels, Point, RenderImage, Task,
     Window, canvas, div, img, px,
 };
-use gpui_component::{ActiveTheme as _, Selectable as _, Sizable as _, h_flex, v_flex};
+use gpui_component::{ActiveTheme as _, h_flex, v_flex};
 use lumilio_core::world_map::{MapSchedule, Viewport, WorldMapContext};
 use lumilio_core::{CancellationToken, MapFailure, MapProviders};
 use lumilio_map_render::{Grid, Tile};
-use lumilio_plugin_api::map::{Dimension, TileKey, TileReply, TileRequest, WorldContext};
+use lumilio_plugin_api::map::{TileKey, TileReply, TileRequest, WorldContext};
 use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -82,6 +77,7 @@ pub struct MapView {
     old: Vec<Arc<RenderImage>>,
     error: Option<String>,
     no_gpu: bool,
+    form: Option<seed::Form>,
     release: bool,
 }
 impl MapView {
@@ -113,6 +109,7 @@ impl MapView {
             old: vec![],
             error: None,
             no_gpu: false,
+            form: None,
             release: false,
         }
     }
@@ -173,13 +170,27 @@ impl MapView {
     fn event(&mut self, event: Event, cx: &mut Context<Self>) {
         match event {
             Event::Seed(Ok((contexts, context))) => {
+                if let Some(form) = &self.form
+                    && form.submitted.as_ref().is_none_or(|submitted| {
+                        context.seed != Some(submitted.0)
+                            || context.version.as_ref() != Some(&submitted.1)
+                    })
+                {
+                    return;
+                }
                 self.contexts = contexts;
                 self.context = Some(context);
                 self.error = None;
                 self.reset_view();
                 self.refresh();
             }
-            Event::Seed(Err(error)) => self.error = Some(error),
+            Event::Seed(Err(error)) => {
+                self.error = Some(error);
+                if let Some(form) = &mut self.form {
+                    form.seed_error = Some("map-seed-save-failed");
+                    form.submitted = None;
+                }
+            }
             Event::Contexts(Ok((contexts, providers))) => {
                 self.contexts = contexts;
                 self.providers = providers;
@@ -345,52 +356,6 @@ impl MapView {
             });
         }
     }
-    fn jump(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let target = cx.weak_entity();
-        SettingsDialog::open(
-            DialogSpec {
-                title: tr!("map-jump"),
-                intro: None,
-                fields: [("X", self.camera.x), ("Z", self.camera.z)]
-                    .into_iter()
-                    .map(|(label, value)| FieldSpec {
-                        label,
-                        help: None,
-                        placeholder: "",
-                        value: format!("{value:.0}"),
-                        kind: FieldKind::Line,
-                    })
-                    .collect(),
-                parse: Rc::new(|values| {
-                    let x = values[0]
-                        .parse::<f64>()
-                        .map_err(|_| tr!("map-coordinates-invalid").to_owned())?;
-                    let z = values[1]
-                        .parse::<f64>()
-                        .map_err(|_| tr!("map-coordinates-invalid").to_owned())?;
-                    if !x.is_finite()
-                        || !z.is_finite()
-                        || x.abs() > 29_900_000.
-                        || z.abs() > 29_900_000.
-                    {
-                        return Err(tr!("map-coordinates-invalid").into());
-                    }
-                    Ok([x, z])
-                }),
-                reset: None,
-            },
-            Rc::new(move |at, _, cx| {
-                let _ = target.update(cx, |this, cx| {
-                    this.camera.x = at[0];
-                    this.camera.z = at[1];
-                    this.refresh();
-                    cx.notify();
-                });
-            }),
-            window,
-            cx,
-        );
-    }
 }
 impl Render for MapView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
@@ -417,12 +382,20 @@ impl Render for MapView {
             window.defer(cx, move |window, cx| load(id, window, cx));
         }
         let colors = ShellColors::from_theme(cx.theme());
-        // ia[plugin.world-explorer]: 输入手动种子 | 地图顶部 ·「输入种子…」 | 数字或文字种子，明确选择支持的版本；保存到该实例的 launcher.db
-        let seed = Key::new("map-enter-seed")
-            .label(tr!("map-enter-seed"))
-            .white()
-            .small()
-            .on_click(cx.listener(|this, _, window, cx| this.manual_seed(window, cx)));
+        if self.form.is_none() {
+            let target = cx.weak_entity();
+            // InputState installs focus/blur observers. Create it outside the
+            // drawing phase so those observers join the window's live state.
+            window.defer(cx, move |window, cx| {
+                let _ = target.update(cx, |this, cx| {
+                    this.ensure_form(window, cx);
+                    cx.notify();
+                });
+            });
+            return v_flex().w_full().h_full();
+        }
+        self.ensure_form(window, cx);
+        let toolbar = self.toolbar(cx);
         let target = cx.weak_entity();
         let measure = canvas(
             move |bounds, _, cx| {
@@ -442,120 +415,6 @@ impl Render for MapView {
         )
         .absolute()
         .size_full();
-        let dimensions = match self.context.as_ref().map(|context| &context.dimension) {
-            Some(Dimension::Nether) => 1,
-            Some(Dimension::End) => 2,
-            _ => 0,
-        };
-        let target = cx.weak_entity();
-        // ia[plugin.world-explorer]: 切换维度 | 地图工具栏 · 维度分段 | 保留相机；清除旧维度瓦片并取消旧请求
-        let dimensions = Segments::new(
-            "map-dimension",
-            tr_all!["map-overworld", "map-nether", "map-end"],
-            dimensions,
-            move |index, _, cx| {
-                let _ = target.update(cx, |this, cx| {
-                    if let Some(context) = &mut this.context {
-                        context.dimension =
-                            [Dimension::Overworld, Dimension::Nether, Dimension::End][index]
-                                .clone();
-                    }
-                    this.reset_view();
-                    this.refresh();
-                    cx.notify();
-                });
-            },
-        );
-        // ia[plugin.world-explorer]: 选择世界 | 地图顶部 · 存档名称 | 使用该世界的种子与版本，取消上一世界请求
-        let worlds = h_flex()
-            .gap_2()
-            .flex_wrap()
-            .children(self.contexts.iter().enumerate().map(|(index, world)| {
-                Key::new(("map-world", index))
-                    .label(world.name.clone())
-                    .white()
-                    .small()
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.context = Some(this.contexts[index].context.clone());
-                        this.reset_view();
-                        this.refresh();
-                        cx.notify();
-                    }))
-            }));
-        // ia[plugin.world-explorer]: 选择底图 | 地图工具栏 · 底图按键 | 单选；保留相机与维度，取消旧底图请求
-        let bases = h_flex()
-            .gap_2()
-            .children(
-                self.providers
-                    .base_maps
-                    .iter()
-                    .enumerate()
-                    .map(|(index, (_, base))| {
-                        Key::new(("map-base", index))
-                            .label(
-                                crate::i18n::lookup(&base.kind_id)
-                                    .unwrap_or_else(|| base.kind_id.clone()),
-                            )
-                            .white()
-                            .small()
-                            .selected(index == self.base)
-                            .on_click(cx.listener(move |this, _, _, cx| {
-                                this.base = index;
-                                this.reset_view();
-                                this.refresh();
-                                cx.notify();
-                            }))
-                    }),
-            );
-        // ia[plugin.world-explorer]: 显示区块与 Region 网格 | 地图工具栏 · 网格开关 | 只改变宿主 Overlay；粗缩放自动隐藏区块细线
-        let layers = h_flex()
-            .gap_2()
-            .child(
-                Key::new("map-chunks")
-                    .label(tr!("map-chunks"))
-                    .white()
-                    .small()
-                    .selected(self.layers.chunks)
-                    .on_click(cx.listener(|this, _, _, cx| {
-                        this.layers.chunks = !this.layers.chunks;
-                        this.frame();
-                        cx.notify();
-                    })),
-            )
-            .child(
-                Key::new("map-regions")
-                    .label(tr!("map-regions"))
-                    .white()
-                    .small()
-                    .selected(self.layers.regions)
-                    .on_click(cx.listener(|this, _, _, cx| {
-                        this.layers.regions = !this.layers.regions;
-                        this.frame();
-                        cx.notify();
-                    })),
-            );
-        // ia[plugin.world-explorer]: 跳到坐标 | 地图工具栏 ·「跳到坐标…」 | 校验 X/Z；移动地图中心
-        let jump = Key::new("map-jump")
-            .label(tr!("map-jump"))
-            .white()
-            .small()
-            .on_click(cx.listener(|this, _, window, cx| this.jump(window, cx)));
-        // ia[plugin.world-explorer]: 重试失败瓦片 | 地图状态行 · 瓦片坐标按键 | 重新派发该块；连续五次故障停用 Provider 到重启
-        let retries =
-            h_flex()
-                .gap_2()
-                .flex_wrap()
-                .children(self.failed.keys().cloned().enumerate().map(|(index, key)| {
-                    Key::new(("map-retry", index))
-                        .label(tr!("map-retry-tile", x = key.tx, z = key.tz))
-                        .white()
-                        .small()
-                        .on_click(cx.listener(move |this, _, _, cx| {
-                            this.failed.remove(&key);
-                            this.refresh();
-                            cx.notify();
-                        }))
-                }));
         let status = if self.failed.values().any(
             |failure| matches!(failure,MapFailure::Failed(id) if id=="map-version-unsupported"),
         ) {
@@ -589,7 +448,8 @@ impl Render for MapView {
             .tab_stop(true)
             .relative()
             .w_full()
-            .h_96()
+            .flex_1()
+            .min_h(px(192.))
             .overflow_hidden()
             .bg(colors.surface_subtle)
             .border_1()
@@ -604,6 +464,14 @@ impl Render for MapView {
                     .map(|image| img(image).size_full().object_fit(ObjectFit::Fill)),
             )
             .child(measure)
+            .child(
+                div()
+                    .absolute()
+                    .right_3()
+                    .bottom_3()
+                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .child(self.layer_popover(cx)),
+            )
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(|this, event: &gpui::MouseDownEvent, window, cx| {
@@ -653,7 +521,10 @@ impl Render for MapView {
                 cx.stop_propagation();
                 cx.notify();
             }))
-            .on_key_down(cx.listener(|this, event: &gpui::KeyDownEvent, _, cx| {
+            .on_key_down(cx.listener(|this, event: &gpui::KeyDownEvent, window, cx| {
+                if !this.focus.is_focused(window) {
+                    return;
+                }
                 match event.keystroke.key.as_str() {
                     "+" | "=" => this.camera.zoom(
                         0.8,
@@ -678,17 +549,9 @@ impl Render for MapView {
         v_flex()
             .gap_3()
             .w_full()
-            .child(worlds)
-            .child(seed)
-            .child(
-                h_flex()
-                    .gap_3()
-                    .flex_wrap()
-                    .child(dimensions)
-                    .child(bases)
-                    .child(layers)
-                    .child(jump),
-            )
+            .h_full()
+            .min_h_0()
+            .child(toolbar)
             .child(viewport)
             .child(
                 h_flex()
@@ -696,6 +559,6 @@ impl Render for MapView {
                     .child(status)
                     .child(format!("X {:.0}  Z {:.0}", self.cursor[0], self.cursor[1])),
             )
-            .child(retries)
+            .children(self.retry_button(cx))
     }
 }

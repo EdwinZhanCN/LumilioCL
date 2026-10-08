@@ -1492,9 +1492,13 @@ map-nether = Nether
 map-end = End
 map-chunks = Chunk grid
 map-regions = Region boundaries
-map-jump = Go to coordinates…
+map-jump = Go to coordinates
+map-jump-placeholder = x z or x, z
 map-coordinates-invalid = Enter X and Z coordinates inside the world border.
-map-retry-tile = Retry { $x } { $z }
+map-retry-failed = { $count ->
+    [one] Retry { $count } failed tile
+   *[other] Retry { $count } failed tiles
+    }
 map-version-unsupported = This version is not supported yet
 map-seed-needed = Choose a world or enter a seed.
 map-render-failed = The map could not be rendered.
@@ -1502,9 +1506,14 @@ map-no-gpu = No graphics adapter is available to draw the map. Try updating the 
 map-provider-stopped = This map source stopped after repeated errors. Restart the launcher to try again.
 map-tile-failed = Some tiles could not be loaded. Retry those tiles below.
 map-no-data = Areas without data stay empty.
-map-enter-seed = Enter seed…
-map-manual-help = Seed prediction does not read saved terrain. Choose the seed’s game version.
 map-seed = Seed
 map-seed-placeholder = A number or text seed
 map-version = Game version
 map-seed-empty = Enter a seed.
+map-seed-save-failed = Couldn't apply the seed. Try again.
+map-world = Saved world
+map-choose-world = Choose a saved world
+map-search-worlds = Search saved worlds
+map-search-versions = Search versions
+map-layers = Layers
+map-chunks-hidden = Chunk lines are hidden when zoomed out.

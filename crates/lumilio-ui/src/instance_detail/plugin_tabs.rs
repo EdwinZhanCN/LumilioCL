@@ -254,6 +254,10 @@ impl InstanceDetailView {
         let Some(plugin) = &self.plugin_open else {
             return div().into_any_element();
         };
+        let full_map = matches!(
+            self.plugin_pages.get(plugin),
+            Some(PluginPage::Shown(View::Map, ..))
+        );
         let content = match self.plugin_pages.get(plugin) {
             None => kit::empty(tr!("library-loading"), "", colors).into_any_element(),
             Some(PluginPage::Unavailable) => kit::empty(
@@ -346,10 +350,16 @@ impl InstanceDetailView {
                             .size_full()
                             .overflow_y_scroll()
                             .track_scroll(&self.plugin_pane_scroll)
-                            .child(div().w_full().pb(theme::BOTTOM_SAFE_AREA).child(content)),
+                            .child(
+                                div()
+                                    .w_full()
+                                    .when(full_map, |pane| pane.h_full().min_h_0())
+                                    .when(!full_map, |pane| pane.pb(theme::BOTTOM_SAFE_AREA))
+                                    .child(content),
+                            ),
                     )
-                    .child({
-                        // ia[instance]: 返回插件内容顶部 | 右下角悬浮「返回顶部」按钮 | 将详情和材料清单共享的滚动区域移回顶部
+                    .children((!full_map).then(|| {
+                        // ia[instance]: 返回插件内容顶部 | 非地图插件内容 · 右下角悬浮「返回顶部」按钮 | 将详情和材料清单共享的滚动区域移回顶部；地图使用填满高度的视口
                         div()
                             .absolute()
                             .right_3()
@@ -365,7 +375,7 @@ impl InstanceDetailView {
                                         cx.notify();
                                     })),
                             )
-                    }),
+                    })),
             )
             .into_any_element()
     }
