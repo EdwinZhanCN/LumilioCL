@@ -12,6 +12,7 @@ members = [
     "crates/lumilio-plugin-discord",
     "crates/lumilio-schematic-render",
     "crates/lumilio-pointer",
+    "crates/lumilio-cubiomes",
     "crates/lumilio-xtask",
 ]
 resolver = "3"

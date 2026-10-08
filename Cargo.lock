@@ -4498,6 +4498,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "lumilio-cubiomes"
+version = "0.1.0"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "lumilio-docgen"
 version = "0.1.0"
 dependencies = [

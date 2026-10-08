@@ -1,6 +1,6 @@
 # World Explorer：原生 2D 世界地图
 
-- Status: proposed
+- Status: in_progress
 
 ## Goal
 
@@ -189,6 +189,8 @@ Xaero's Minimap / World Map 本身不开源（许可证未在本次核实）。�
 顺序按代码依赖排：P0 先把宿主、视口和第一个底图打通，后面每个数据源都只是再加一个 Provider。Xaero 路径点（P2、P3）排在存档底图（P4）之前，因为文本格式小、马上有用，而写回所需的编辑契约和写权限也是 P6 标记要用的。P4 和 P5 共用方块颜色表，所以相邻。P7 依赖 WASM 计划。P8（新版本世界生成）延后到所有功能之后，是可选的，不阻塞收尾；它依赖 P4 的 `lumilio-anvil` 读金样世界。收尾任务 T45 只依赖 P0–P7。
 
 ### P0 视口、网格与种子底图
+
+实施记录（2026-10-08）：T0 部分完成：导入精确源码快照作为构建探针的依赖，Linux GCC 14 / Clang 19 编译及探针测试通过；新增 windows-2022 的独立构建作业。当前主机不是 ubuntu:22.04，MSVC、macOS 与指定 Ubuntu 镜像的结果均为 **pending human acceptance**，等待 PR Actions；不阻塞后续 P0。MIT 声明随快照一起加入，T11 仍需补分发。
 
 - [ ] T0：在 `windows-2022`、`macos-latest`、`ubuntu:22.04` 上各编译一次 `lumilio-cubiomes`（先只有 `build.rs` 和一个探针测试），把 MSVC 的结果记进本计划。失败就在 `forks/cubiomes/` 里做最小修补，并记进 `forks/cubiomes/LUMILIO.md`。编译通过后，在 `.github/workflows/ci.yml` 加一个只跑 `cargo build -p lumilio-cubiomes` 的 Windows 作业（W18）。
 - [ ] T1：`forks/cubiomes/`（新建，快照 `e61f905`，带 `LICENSE` 和新建的补丁日志 `LUMILIO.md`，W14）和 `crates/lumilio-cubiomes/`（新建）：`build.rs` 用 `cc` 编译，不含 `quadbase.c`，`-fwrapv` 用 `flag_if_supported`，关掉上游警告；`src/ffi.rs` 是唯一允许 unsafe 的模块；`src/lib.rs` 提供安全 API 和版本表（版本字符串、数据版本 → `MCVersion`，不在表里就返回 `Unsupported`）。测试放在 `src/tests.rs`：用固定种子取群系 id，与仓库内的金样比对。金样由一个只编译 cubiomes 源码的 C 探针生成，记录生成命令。
