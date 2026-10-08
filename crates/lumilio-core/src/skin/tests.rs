@@ -572,3 +572,67 @@ fn the_signing_key_is_made_once_and_kept_private() {
     fs::write(&path, "garbage").unwrap();
     assert!(Signer::load_or_create(&path, 1024).is_ok());
 }
+
+fn picture(width: u32, height: u32, paint: impl Fn(u32, u32) -> [u8; 4]) -> Vec<u8> {
+    let image = image::RgbaImage::from_fn(width, height, |x, y| image::Rgba(paint(x, y)));
+    let mut bytes = Vec::new();
+    image
+        .write_to(
+            &mut std::io::Cursor::new(&mut bytes),
+            image::ImageFormat::Png,
+        )
+        .unwrap();
+    bytes
+}
+
+fn texel(pixels: &Pixels, x: u32, y: u32) -> [u8; 4] {
+    let at = ((y * pixels.width + x) * 4) as usize;
+    pixels.rgba[at..at + 4].try_into().unwrap()
+}
+
+#[test]
+fn a_legacy_skin_gets_mirrored_left_limbs_and_a_cleared_hat() {
+    // Old skins: every texel opaque; the right arm's front is one colour
+    // with a marker in its left column.
+    let old = picture(64, 32, |x, y| match (x, y) {
+        (44, 20..32) => [255, 0, 0, 255],
+        (45..48, 20..32) => [0, 255, 0, 255],
+        _ => [10, 10, 10, 255],
+    });
+    let skin = skin_pixels(&old).unwrap();
+    assert_eq!((skin.width, skin.height), (64, 64));
+    // The left arm's front is the right arm's front, mirrored.
+    assert_eq!(texel(&skin, 39, 52), [255, 0, 0, 255]);
+    assert_eq!(texel(&skin, 36, 52), [0, 255, 0, 255]);
+    // A hat area with no transparency was filler.
+    assert_eq!(texel(&skin, 40, 8)[3], 0);
+    assert!(!looks_slim(&skin));
+}
+
+#[test]
+fn modern_skins_pass_through_and_odd_shapes_are_refused() {
+    let modern = picture(64, 64, |x, _| {
+        if (54..56).contains(&x) {
+            [0; 4]
+        } else {
+            [1, 2, 3, 255]
+        }
+    });
+    let skin = skin_pixels(&modern).unwrap();
+    assert_eq!(texel(&skin, 0, 0), [1, 2, 3, 255]);
+    assert!(looks_slim(&skin));
+    assert!(skin_pixels(&picture(64, 48, |_, _| [0; 4])).is_err());
+    assert!(skin_pixels(&picture(100, 100, |_, _| [0; 4])).is_err());
+    assert!(skin_pixels(b"not a picture").is_err());
+}
+
+#[test]
+fn capes_are_two_to_one_and_early_ones_are_placed_on_a_canvas() {
+    let cape = cape_pixels(&picture(128, 64, |_, _| [9, 9, 9, 255])).unwrap();
+    assert_eq!((cape.width, cape.height), (128, 64));
+    let early = cape_pixels(&picture(22, 17, |_, _| [5, 5, 5, 255])).unwrap();
+    assert_eq!((early.width, early.height), (64, 32));
+    assert_eq!(texel(&early, 21, 16), [5, 5, 5, 255]);
+    assert_eq!(texel(&early, 30, 20)[3], 0);
+    assert!(cape_pixels(&picture(64, 64, |_, _| [0; 4])).is_err());
+}

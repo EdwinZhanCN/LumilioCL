@@ -8,9 +8,11 @@
 //! API; the game is pointed at a Yggdrasil server on this machine that answers
 //! for that one player.
 
+mod pixels;
 mod server;
 mod signer;
 
+pub use self::pixels::{Pixels, cape_pixels, looks_slim, skin_pixels};
 pub use self::server::{Character, LocalSkinServer};
 pub(crate) use self::signer::KEY_BITS;
 pub use self::signer::Signer;
