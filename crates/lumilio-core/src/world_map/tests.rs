@@ -70,3 +70,56 @@ fn visible_tiles_include_negative_prefetch_and_center_first() {
     assert_eq!((tiles[0].tx, tiles[0].tz), (-1, -1));
     assert_eq!(tiles.len(), 9);
 }
+
+#[test]
+fn region_lines_are_exact_for_negative_coordinates() {
+    struct NoIo;
+    impl lumilio_plugin_api::HostContext for NoIo {
+        fn setting(&self, _: &str) -> Option<lumilio_plugin_api::SettingValue> {
+            None
+        }
+        fn read_file(&self, _: &str) -> Result<Vec<u8>, lumilio_plugin_api::PluginError> {
+            panic!("no I/O")
+        }
+        fn list_files(&self, _: &str) -> Result<Vec<String>, lumilio_plugin_api::PluginError> {
+            panic!("no I/O")
+        }
+        fn fetch(
+            &self,
+            _: &str,
+        ) -> Result<lumilio_plugin_api::FetchResponse, lumilio_plugin_api::PluginError> {
+            panic!("no network")
+        }
+    }
+    let objects = UtilityOverlay
+        .objects(
+            &NoIo,
+            &OverlayRequest {
+                context: request().context,
+                overlay: "map-regions".into(),
+                bounds: MapBounds {
+                    min: MapPoint {
+                        x: -513.,
+                        z: -1025.,
+                    },
+                    max: MapPoint { x: -1., z: -1. },
+                },
+                level: 0,
+            },
+        )
+        .unwrap();
+    assert_eq!(objects.len(), 3);
+    for object in objects {
+        if let MapObjectKind::Polyline(line) = object.kind {
+            let coordinate = if line[0].x == line[1].x {
+                line[0].x
+            } else {
+                line[0].z
+            };
+            assert_eq!(coordinate % 512., 0.);
+            assert!(coordinate < 0.);
+        } else {
+            panic!("expected lines");
+        }
+    }
+}
