@@ -109,3 +109,108 @@ fn renamed_and_target_specific_dependencies_cannot_evade_the_guard() {
     .unwrap();
     assert!(inspect(good.as_table().unwrap(), &workspace).is_empty());
 }
+
+fn contract_problems(
+    table: &toml::Table,
+    workspace: &toml::Table,
+    crate_name: &str,
+) -> Vec<String> {
+    let mut problems = Vec::new();
+    for section in ["dependencies", "dev-dependencies", "build-dependencies"] {
+        if let Some(deps) = table.get(section).and_then(Value::as_table) {
+            for (alias, spec) in deps {
+                let spec = if spec.get("workspace").and_then(Value::as_bool) == Some(true) {
+                    workspace.get(alias).unwrap_or(spec)
+                } else {
+                    spec
+                };
+                let package = spec.get("package").and_then(Value::as_str).unwrap_or(alias);
+                let forbidden = match crate_name {
+                    "lumilio-plugin-api" => !["serde", "serde_json"].contains(&package),
+                    "lumilio-core" => ["cc", "lumilio-cubiomes"].contains(&package),
+                    "lumilio-map-render" => {
+                        package.starts_with("gpui")
+                            || [
+                                "lumilio-core",
+                                "lumilio-ui",
+                                "lumilio-app",
+                                "lumilio-plugin-api",
+                            ]
+                            .contains(&package)
+                    }
+                    _ => {
+                        package.starts_with("gpui")
+                            || ["lumilio-core", "lumilio-ui", "lumilio-app"].contains(&package)
+                    }
+                };
+                if forbidden {
+                    problems.push(format!("{section}: forbidden dependency {package}"));
+                }
+            }
+        }
+    }
+    if let Some(targets) = table.get("target").and_then(Value::as_table) {
+        for target in targets.values().filter_map(Value::as_table) {
+            problems.extend(contract_problems(target, workspace, crate_name));
+        }
+    }
+    problems
+}
+
+#[test]
+fn map_libraries_preserve_their_dependency_boundaries() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace: Value =
+        toml::from_str(&fs::read_to_string(root.join("Cargo.toml")).unwrap()).unwrap();
+    let deps = workspace["workspace"]["dependencies"].as_table().unwrap();
+    for name in [
+        "lumilio-cubiomes",
+        "lumilio-nbt",
+        "lumilio-map-render",
+        "lumilio-plugin-api",
+        "lumilio-core",
+    ] {
+        let manifest: Value = toml::from_str(
+            &fs::read_to_string(root.join("crates").join(name).join("Cargo.toml")).unwrap(),
+        )
+        .unwrap();
+        assert!(
+            contract_problems(manifest.as_table().unwrap(), deps, name).is_empty(),
+            "{name}: {:?}",
+            contract_problems(manifest.as_table().unwrap(), deps, name)
+        );
+    }
+}
+
+fn injected(crate_name: &str, dependency: &str) {
+    let manifest:Value=toml::from_str(&format!("[target.'cfg(unix)'.build-dependencies]\nrenamed = {{ package = \"{dependency}\", version = \"1\" }}")).unwrap();
+    let problems = contract_problems(
+        manifest.as_table().unwrap(),
+        &toml::Table::new(),
+        crate_name,
+    );
+    assert!(
+        !problems.is_empty(),
+        "{crate_name} failed to reject {dependency}"
+    );
+}
+#[test]
+fn cubiomes_guard_probe() {
+    injected("lumilio-cubiomes", "lumilio-core");
+}
+#[test]
+fn nbt_guard_probe() {
+    injected("lumilio-nbt", "gpui-pre");
+}
+#[test]
+fn renderer_guard_probe() {
+    injected("lumilio-map-render", "lumilio-plugin-api");
+}
+#[test]
+fn api_guard_probe() {
+    injected("lumilio-plugin-api", "tokio");
+}
+#[test]
+fn core_guard_probe() {
+    injected("lumilio-core", "cc");
+}
