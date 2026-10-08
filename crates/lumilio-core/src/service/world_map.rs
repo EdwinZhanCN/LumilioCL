@@ -10,13 +10,46 @@ impl<T: Transport + Clone> LauncherService<T> {
         self.instance(instance).await?;
         let dir = self.layout.game(instance);
         let instance = instance.to_owned();
-        tokio::task::spawn_blocking(move || world_map::contexts(&instance, &dir))
-            .await
-            .map_err(std::io::Error::other)?
-            .map_err(ServiceError::from)
+        let database = self.layout.database();
+        tokio::task::spawn_blocking(move || {
+            let mut contexts =
+                world_map::contexts(&instance, &dir).map_err(std::io::Error::other)?;
+            contexts.extend(
+                world_map::store::load(&database, &instance).map_err(std::io::Error::other)?,
+            );
+            Ok::<_, std::io::Error>(contexts)
+        })
+        .await
+        .map_err(std::io::Error::other)?
+        .map_err(ServiceError::from)
     }
     pub async fn map_providers(&self) -> MapProviders {
         self.plugins.map_providers().await
+    }
+    pub async fn save_map_seed(
+        &self,
+        instance: &str,
+        seed: i64,
+        version: &str,
+    ) -> Result<(), ServiceError> {
+        self.instance(instance).await?;
+        if version.is_empty() || version.len() > 64 {
+            return Err(ServiceError::Plugin(
+                lumilio_plugin_api::PluginError::InvalidInput("invalid map version".into()),
+            ));
+        }
+        let (database, instance, version) = (
+            self.layout.database(),
+            instance.to_owned(),
+            version.to_owned(),
+        );
+        tokio::task::spawn_blocking(move || {
+            world_map::store::save(&database, &instance, seed, &version)
+        })
+        .await
+        .map_err(std::io::Error::other)?
+        .map_err(std::io::Error::other)?;
+        Ok(())
     }
     pub async fn map_tile(
         &self,

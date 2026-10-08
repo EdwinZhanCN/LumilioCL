@@ -1,6 +1,8 @@
 //! Host-owned map viewport. Background data and rendering enter through mailboxes.
 mod camera;
 mod layers;
+mod seed;
+pub use seed::VERSIONS as MANUAL_VERSIONS;
 #[cfg(test)]
 mod tests;
 mod worker;
@@ -28,6 +30,10 @@ use std::sync::Arc;
 
 pub enum Command {
     Contexts,
+    SaveSeed {
+        seed: i64,
+        version: String,
+    },
     Tile {
         generation: u64,
         request: Box<TileRequest>,
@@ -35,6 +41,7 @@ pub enum Command {
     },
 }
 pub enum Event {
+    Seed(Result<(Vec<WorldMapContext>, WorldContext), String>),
     Contexts(Result<(Vec<WorldMapContext>, MapProviders), String>),
     Tile {
         generation: u64,
@@ -160,6 +167,18 @@ impl MapView {
     }
     fn event(&mut self, event: Event, cx: &mut Context<Self>) {
         match event {
+            Event::Seed(Ok((contexts, context))) => {
+                self.contexts = contexts;
+                self.context = Some(context);
+                self.tiles.clear();
+                self.failed.clear();
+                self.error = None;
+                if let Some(old) = self.image.take() {
+                    self.old.push(old);
+                }
+                self.refresh();
+            }
+            Event::Seed(Err(error)) => self.error = Some(error),
             Event::Contexts(Ok((contexts, providers))) => {
                 self.contexts = contexts;
                 self.providers = providers;
@@ -383,6 +402,12 @@ impl Render for MapView {
             window.defer(cx, move |window, cx| load(id, window, cx));
         }
         let colors = ShellColors::from_theme(cx.theme());
+        // ia[plugin.world-explorer]: 输入手动种子 | 地图顶部 ·「输入种子…」 | 数字或文字种子，明确选择支持的版本；保存到该实例的 launcher.db
+        let seed = Key::new("map-enter-seed")
+            .label(tr!("map-enter-seed"))
+            .white()
+            .small()
+            .on_click(cx.listener(|this, _, window, cx| this.manual_seed(window, cx)));
         let target = cx.weak_entity();
         let measure = canvas(
             move |bounds, _, cx| {
@@ -624,6 +649,7 @@ impl Render for MapView {
             .gap_3()
             .w_full()
             .child(worlds)
+            .child(seed)
             .child(
                 h_flex()
                     .gap_3()

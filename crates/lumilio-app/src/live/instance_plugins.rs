@@ -27,6 +27,15 @@ pub(super) fn plugin_map(
             let (service, id, events) = (service.clone(), id.clone(), events.clone());
             tasks.spawn(async move {
                 let event = match command {
+                    Command::SaveSeed { seed, version } => {
+                        let result = async {
+                            service.save_map_seed(&id, seed, &version).await.map_err(|error|error.to_string())?;
+                            let contexts=service.map_contexts(&id).await.map_err(|error|error.to_string())?;
+                            let context=contexts.iter().find(|world|matches!(&world.context.world,lumilio_plugin_api::map::WorldId::Seed { seed: saved,version: name } if *saved==seed && *name==version)).ok_or_else(||"saved seed unavailable".to_owned())?.context.clone();
+                            Ok((contexts,context))
+                        }.await;
+                        Event::Seed(result)
+                    },
                     Command::Contexts => {
                         let providers = service.map_providers().await;
                         Event::Contexts(

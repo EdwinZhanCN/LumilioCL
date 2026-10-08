@@ -2,6 +2,7 @@
 mod cache;
 mod context;
 mod schedule;
+pub mod store;
 mod utility;
 pub use cache::TileCache;
 pub use context::{WorldMapContext, contexts};
