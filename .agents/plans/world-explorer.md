@@ -49,16 +49,16 @@
 - **W4 Map Scene。**
   - 坐标：Minecraft 方块 X/Z，`f64`；屏幕向右为 +X，向下为 +Z（游戏里南方）。
   - 相机：2D 正交，中心点加每像素方块数。缩放连续，取数据时按 LOD 取整。
-  - LOD：`level 0..=4` 对应每像素 1、4、16、64、256 方块，正好是 cubiomes `Range.scale` 支持的五档（`generator.h`）。种子底图在每一级都能直接按原生比例计算，不在 C 侧重采样。存档和 Xaero 底图只在 level 0 有原生数据，粗一级的瓦片由宿主从细一级合成并缓存（XaeroTools `pyramid.rs` 的做法）。相邻两级之间的缩放由 GPU 采样补足。
+  - LOD：`level 0..=4` 对应每像素 1、4、16、64、256 方块，正好是 cubiomes `Range.scale` 支持的五档（`generator.h`）。种子底图在每一级都能直接按原生比例计算，不在 C 侧重采样。存档和 Xaero 底图只在 level 0 有原生数据，粗一级的瓦片由宿主从细一级合成并缓存（XaeroTools `pyramid.rs` 的做法）。相邻两级之间的缩放由 GPU 采样补足。每级 4 倍，不用 2 倍（维护者 2026-10-08 在 PR #6 上决定（采用默认））。
   - 瓦片：256×256 像素。`TileKey = (provider, base_map, world, dimension, level, tx, tz)`，level 0 的一块覆盖 256 方块，正好是半个 Region。
   - 调度：每次相机或数据源变化，`generation` 加一。可见集合加一圈预取，按离中心的距离排序；同时在跑的瓦片任务有上限（`available_parallelism` 减一）。离开可见集合的任务发取消；结果回来时 `generation` 或 key 不在当前集合里就丢掉。每个视口实例有自己的请求身份，关掉再开，迟到的结果进不了新视口（ADR 0036 的做法）。
-- **W5 渲染器复用离屏 wgpu。** 新 crate `lumilio-map-render`（新建）只依赖 `wgpu` 和 `pollster`，不依赖 GPUI 和 launcher，和 `lumilio-schematic-render` 一样输出 BGRA 帧。`wgpu` 用 `forks/nucleation` 已锁定的 30.x，不引入第三个版本（`Cargo.lock` 里已有 29.0.4（GPUI）和 30.0.1（Nucleation））。它负责瓦片纹理缓存（按字节 LRU）、实例化绘制瓦片四边形，以及批量绘制点、线、面、热力图和网格。文本标签、选中光晕、控件和图例由 GPUI 叠在帧上面画，因为 wgpu 侧没有字形栅格化。UI 侧的 worker、邮箱合并请求、帧替换时 `drop_image`，都照 `model_view/worker.rs` 写。只在相机、尺寸或数据变化时出帧，没有空转时钟（设计语言：没有为了「活着」的动画）。不引入 Canvas、WebView 或另一套 UI。理由：提案 §6，且 ADR 0028 已证明离屏 + 回读能放进页面里，和弹窗、提示、滚动共存。代价同 ADR 0028：每帧要回读一次 GPU；P0 要测量（开放问题 1）。
+- **W5 渲染器复用离屏 wgpu。** 新 crate `lumilio-map-render`（新建）只依赖 `wgpu` 和 `pollster`，不依赖 GPUI 和 launcher，和 `lumilio-schematic-render` 一样输出 BGRA 帧。`wgpu` 用 `forks/nucleation` 已锁定的 30.x，不引入第三个版本（`Cargo.lock` 里已有 29.0.4（GPUI）和 30.0.1（Nucleation））。它负责瓦片纹理缓存（按字节 LRU）、实例化绘制瓦片四边形，以及批量绘制点、线、面、热力图和网格。文本标签、选中光晕、控件和图例由 GPUI 叠在帧上面画，因为 wgpu 侧没有字形栅格化。UI 侧的 worker、邮箱合并请求、帧替换时 `drop_image`，都照 `model_view/worker.rs` 写。只在相机、尺寸或数据变化时出帧，没有空转时钟（设计语言：没有为了「活着」的动画）。不引入 Canvas、WebView 或另一套 UI。理由：提案 §6，且 ADR 0028 已证明离屏 + 回读能放进页面里，和弹窗、提示、滚动共存。代价同 ADR 0028：每帧要回读一次 GPU。P0 测量帧时间；1800×1200 的大窗口拖动时每帧超过 8 毫秒，才回来讨论别的画法（例如瓦片改由 GPUI 的图片元素直接画），在此之前不改方案（维护者 2026-10-08 在 PR #6 上决定（采用默认））。
 - **W6 本地优先的数据、缓存与同步。** 没有任何网络调用。
   - 种子瓦片按 `(seed, cubiomes 版本枚举, 生成参数, 维度, level, tx, tz, 配色版本)` 缓存，跨实例共享，放在 `Layout::map_cache()`（新建，`<数据根>/cache/world-map/seed/`）。
   - 存档和 Xaero 瓦片按实例和世界放在 `Layout::profile(id)/map-cache/`（新建，与 `thumbnails` 一样可以随便删，删了会重建）。
   - 每块缓存记下来源文件的长度和修改时间（Region 文件或 Xaero 区域 zip）。打开地图、视口移动到新 Region、游戏退出时重新取一次文件信息，只重建变了的 Region 及其上层合成瓦片。游戏在运行时，按低频轮询可见 Region。
-  - 缓存总量有上限，按最近使用淘汰；设置 › 存储加一行「清除地图缓存」。
-  - 世界关联、手动种子、自定义标记和路线存在 `launcher.db` 的新表里，schema 从 3 升到 4（`crates/lumilio-core/src/instance.rs` 的 `SCHEMA_VERSION`）。理由：ADR 0006 把关系型的启动器数据放进 SQLite，而标记要按世界、维度查询，还要关联别的来源。
+  - 缓存总量默认上限 1 GiB，按最近使用淘汰；设置 › 存储加一行「清除地图缓存」（维护者 2026-10-08 在 PR #6 上决定（采用默认））。
+  - 世界关联、手动种子、自定义标记和路线存在 `launcher.db` 的新表里，不用 JSON；schema 从 3 升到 4（`crates/lumilio-core/src/instance.rs` 的 `SCHEMA_VERSION`）。理由：ADR 0006 把关系型的启动器数据放进 SQLite，而标记要按世界、维度查询，还要关联别的来源（维护者 2026-10-08 在 PR #6 上决定（采用默认））。
 - **W7 Xaero 写回安全。**
   - 运行中只读：写回入口在 core，先取实例租约（`reserve_instance`）。拿不到（游戏在跑或有别的操作）就不写，页面保留浏览和复制，并说明「退出游戏后再改」。Xaero 退出世界时会把内存里的路径点写回磁盘，运行中写的东西会被覆盖。
   - 冲突保护：读时记下文件长度、修改时间和 sha256。写前重新读，三者有一项不同就拒绝写入，重新加载并告诉人文件被别处改过。
@@ -68,7 +68,8 @@
   - 死亡点、临时点要显示出来；默认的删除和批量操作只作用于普通、启用、非临时的点，删死亡点单独确认。
 - **W8 维度隔离。** 视口一次只显示一个维度；Provider 只拿到当前维度的请求；对象不会跨维度显示。下界 8:1 换算是一个显式工具：选中一个点或输入坐标，给出另一维度的对应坐标，可以复制或跳过去，但不会把另一维度的数据自动叠上来。
 - **W9 插件集成。**
-  - World Explorer 是编译进来的核心插件 `lumilio.world-explorer`（crate `lumilio-plugin-world-explorer`，新建）。它提供 `InstanceTab`「地图」，视图里放一个新节点 `View::Map`；同时实现内置的 Provider：种子底图、存档底图、Xaero 世界地图底图，以及 cubiomes 结构、Xaero 路径点、存档位置三类 Overlay。在设置 › 插件里关掉它，地图标签和它的 Provider 一起消失。地图出现在哪里见 W16。
+  - World Explorer 是编译进来的核心插件 `lumilio.world-explorer`（crate `lumilio-plugin-world-explorer`，新建）。它提供 `InstanceTab`「地图」，视图里放一个新节点 `View::Map`；同时实现内置的 Provider：种子底图、存档底图、Xaero 世界地图底图，以及 cubiomes 结构、Xaero 路径点、存档位置三类 Overlay。在设置 › 插件里关掉它，地图标签和它的 Provider 一起消失。它默认启用：只读本地文件，写回要人在地图上明确操作，不向第三方披露任何东西（D4 只默认关闭会披露状态的插件）（维护者 2026-10-08 在 PR #6 上决定（采用默认））。地图出现在哪里见 W16。
+  - 原生插件的 `API_VERSION` 保持 1：新增的都是带默认实现的方法和新的枚举变体，现有四个插件不用改。WIT 另有自己的版本号（维护者 2026-10-08 在 PR #6 上决定（采用默认））。
   - 地图引擎属于宿主：World Context 与调度、缓存、标记存储在 core（`crates/lumilio-core/src/world_map/`，新建）；视口与图层面板在 UI（`crates/lumilio-ui/src/world_explorer/`，新建）；合成在 `lumilio-map-render`。插件不碰 GPUI 窗口、wgpu Device 或任意文件，这和提案 §7、D1、D5 一致。`View::Map` 的处理照搬 `View::Model`：插件只说「这里有张地图」，宿主决定怎么画。
   - 网格、Region 边界、坐标、自定义标记、路线和测距是宿主内部的 Overlay，按同一个 `OverlayProvider` 形状实现，不经插件调用。它们是启动器自己的数据和几何，没必要绕一圈。
   - 宿主从所有启用的插件收集 `base_maps` 和 `overlays`，所以第三方 Provider 和内置的出现在同一个图层面板里。
@@ -76,7 +77,7 @@
   - 宿主为地图补充的能力：`HostContext::read_range(path, offset, len)`、`file_info(path)`（长度、修改时间）、`list_dir(dir)`（不递归、分页），都受 `ReadGameFiles` 约束；`write_file(path, bytes, expected: FileInfo)` 受 `WriteGameFiles` 约束，并做 W7 的检查。
   - 将来的第三方 Provider 经 WASM 开放（P7，依赖 `wasm-plugin-registry.md`）：WIT 里加 `base-map-provider` 和 `overlay-provider` 两个接口，类型与 `map.rs` 一一对应；瓦片以 RGBA 字节交回，大小有上限；同样受权限、超时和取消约束。Litematica 插件届时可以提供建筑位置和投影范围 Overlay，不用自己画地图。
 - **W10 声明式编辑。** 可编辑的对象带 `editable: Vec<SettingField>`，直接复用 D6 的 `SettingKind`（Text、Number、Choice、Toggle）和它的 `accepts` 校验。宿主画编辑对话框，参照现有的 `crates/lumilio-ui/src/plugin_setting_dialog/`；确认后调用新方法 `OverlayProvider::apply(ctx, edit: ObjectEdit)`，`ObjectEdit` 是 `Create { at, values } | Update { id, values } | Delete { id }`。插件校验后经 `write_file` 写回。删除走宿主统一确认（D5 的破坏性操作规则）。理由：视图树没有输入控件；为一个插件加一套自由表单，会破坏 D5「插件描述内容」。
-- **W11 cubiomes 只在 FFI crate 里。** 新 crate `lumilio-cubiomes`（新建）：`build.rs` 用 `cc` 编译 `forks/cubiomes/`（新建，W14 的 fork）；安全封装只暴露「版本、种子、维度、范围 → 群系 id」「结构位置与可行性」「史莱姆区块」「出生点」「要塞迭代」。进 C 之前在 Rust 侧检查：版本在支持表里、`scale` 属于 {1,4,16,64,256}、范围不越界、缓冲区大小正确。只有 `lumilio-plugin-world-explorer` 依赖它；`lumilio-core` 不依赖它，也不依赖 `cc`（docgen 测试守住）。版本表里没有的版本返回明确错误，界面显示「这一版还不能查」（W14）。
+- **W11 cubiomes 只在 FFI crate 里。** 新 crate `lumilio-cubiomes`（新建）：`build.rs` 用 `cc` 编译 `forks/cubiomes/`（新建，W14 的 fork）；安全封装只暴露「版本、种子、维度、范围 → 群系 id」「结构位置与可行性」「史莱姆区块」「出生点」「要塞迭代」。进 C 之前在 Rust 侧检查：版本在支持表里、`scale` 属于 {1,4,16,64,256}、范围不越界、缓冲区大小正确。只有 `lumilio-plugin-world-explorer` 依赖它；`lumilio-core` 不依赖它，也不依赖 `cc`（docgen 测试守住）。cubiomes 跑在启动器进程内，不开子进程：C 崩溃靠这些校验和测试防住，真出现过崩溃再考虑子进程（维护者 2026-10-08 在 PR #6 上决定（采用默认））。版本表里没有的版本返回明确错误，界面显示「这一版还不能查」（W14）。
 - **W12 文案。** 地图的所有界面文字（底图名、图层名、状态、错误、结构种类）在宿主，走 `tr!` 和中英两份目录，按 `lumilio-i18n` 写。Provider 只给种类 id（`map-structure-village`、`map-base-seed` 等），宿主用 `i18n::lookup` 取文案，取不到时显示 id 本身。用户数据（路径点名、标记名）原样显示，不翻译。插件清单的名称和描述仍是插件里的中文，跟着 `i18n-english.md` 的 T2c 一起处理。
 - **W13 方块颜色表按版本生成并入库。** 存档底图和 Xaero 世界地图都要「方块 → 颜色」表（贴图平均色，加上草、树叶、水的生物群系着色标记）。表由我们自己的工具 `cargo xtask block-colors <版本>` 从该版本的原版客户端 jar 生成，写进 `crates/lumilio-plugin-world-explorer/data/block-colors/<版本>.json`，同目录的 `SOURCE.md` 记下版本、客户端 jar 的 sha1、命令和工具的提交，保证能重新生成。插件编译时带上这些表，不需要宿主新接口，也不依赖玩家装没装游戏。一个世界用不晚于它版本的最新那张表；表里没有的方块（模组方块、比表更新的方块）画成中性的「未知方块」色，并在状态行写明有多少。不再在运行时读玩家的 `client.jar`：入库的表已经覆盖原版方块，再保留一条运行时路径只为模组方块，代价不值得（模组方块的颜色往往不在原版贴图的位置，读了也不准）。fastanvil 的 `palette.tar.gz` 和 XaeroTools 的 `assets/colortable.bin` 不直接用：两个仓库的 MIT 由各自作者授予，只覆盖他们自己的工作，文件内容派生自游戏贴图，我们只核实了根目录的 LICENSE，没看到针对这两个文件的单独说明；而且它们的格式和覆盖的版本由别人决定。用自己的工具，来源和版本都清楚。
 - **W14 cubiomes 是 LumilioCL 自己维护的 fork，新版本自己补，放在延后阶段。**（维护者 2026-10-08 在 PR #6 上决定）
@@ -95,6 +96,10 @@
   - 上游如果恢复更新：把上游的新提交合进 fork，对每个本地补丁判断上游是否已经覆盖。上游的实现能通过我们的全部金样，就采用上游的、删掉我们的补丁；两边结果不一致时，以金样和实机为准，并在 `LUMILIO.md` 写明差异。基线提交在 `forks/README.md` 里更新。
 - **W15 瓦片和对象出错不让插件进 `Failed`。**（维护者 2026-10-08 在 PR #6 上决定；修订 ADR 0031 D2）经 `map_tile` / `map_objects` 的调用，无论是错误、panic 还是超时，都只让这一块瓦片或这一批对象显示「失败 · 重试」，不把插件打成 `Failed`，也不影响同一个插件的其他 Provider 和其他扩展点。同一个 Provider 在一次运行里连续出错 5 次（成功一次就清零），只停用这个 Provider 到重启，并在图层面板里说明原因；插件本身保持启用。普通扩展点（`InstanceTab`、`Analyzer` 等）仍按 D2：panic、超时、越权会进入 `Failed`。理由：一张地图会连续要很多块，一块失败就停掉整个插件，代价不成比例。这条修订在计划收尾时写进新 ADR（T45）。
 - **W16 地图只在游戏页的插件标签里。**（维护者 2026-10-08 在 PR #6 上决定）地图只出现在游戏页里 `lumilio.world-explorer` 的「地图」标签中，没有全局入口、导航项或单独的窗口。只有种子、没有存档的情况（服务器、别人给的种子）也在某个游戏页的这个标签里用手动种子（T9）。理由：存档、Xaero 数据和版本都属于某个实例，放在游戏页里不用另外选实例；单独的入口要再设计一套「选哪个游戏」的流程。
+- **W17 Xaero 钉一个版本，颜色下标以样本为准。**（维护者 2026-10-08 在 PR #6 上决定（采用默认））实现 P2 时钉住当时最新的 26.x 版 Xaero's Minimap，版本号写进样本目录名（`tests/data/xaero/<版本>/`）和本计划的实施记录。颜色下标以这个版本的真实样本为准：样本证明之前，取色器只开放 0–15；样本证明 16–19 有效后再开放。遇到不认识的下标原样保留，显示为最接近的颜色。
+- **W18 构建与分发。**（维护者 2026-10-08 在 PR #6 上决定（采用默认））
+  - `.github/workflows/ci.yml` 加一个 Windows 作业，只跑 `cargo build -p lumilio-cubiomes`，让 MSVC 的回归在 PR 上就暴露；完整的 `just ci` 仍只在 macOS 上跑（ADR 0026 不变）。
+  - `cargo xtask package` 把 `ATTRIBUTIONS.md` 作为第三方声明放进三种发布包，同时补上已经链接的 Nucleation（MIT）缺的声明。
 
 ## crate 布局与依赖边界
 
@@ -145,7 +150,7 @@ Xaero's Minimap / World Map 本身不开源（许可证未在本次核实）。�
 - MSVC：上游没有 MSVC 的 CI，cubiomes-viewer 的 Windows 版用 MinGW。**MSVC 编译未核实。** P0 的第一个任务是在 `windows-2022` 上实际编译（手动触发 `release.yml` 或临时 workflow）。`-fwrapv` 只对 gcc/clang 有效，用 `flag_if_supported`（Axolotl 的做法）；上游 `9ec701d` 已经修掉 `rng.h` 里依赖有符号溢出的写法，MSVC 下是否还有依赖溢出的地方，待核实。
 - macOS：clang；打包目前只出运行机的架构（`macos-26` 是 arm64，xtask 的 `macos.rs` 没有 universal 构建），C 代码没有架构相关的东西。x86_64 只有在本机交叉编译时才遇到，`cc` 会按目标传 `-arch`。
 - Linux：`release.yml` 的 ubuntu:22.04 容器已装 `build-essential` 和 `clang`。
-- CI 与打包：`cc` 已经因为 rusqlite 的 bundled SQLite 在三个平台上跑过，所以不需要新的工具链。`ci.yml` 只有 macOS；建议在 P0 期间给 `ci.yml` 加一个 Windows 的 `cargo build -p lumilio-cubiomes` 作业，或者至少手动跑一次打包矩阵（开放问题 10）。`cargo xtask package` 不用改构建步骤，但要把第三方声明带进包里（P0 T11）。
+- CI 与打包：`cc` 已经因为 rusqlite 的 bundled SQLite 在三个平台上跑过，所以不需要新的工具链。`ci.yml` 只有 macOS；P0 给它加一个只编译 `lumilio-cubiomes` 的 Windows 作业（W18、T0）。`cargo xtask package` 不用改构建步骤，但要把第三方声明带进包里（W18、T11）。
 - 源码放置与钉版本：`forks/cubiomes/`，按 ADR 0029 作为可编辑快照：只导入 `*.c`、`*.h`、`tables/`、`LICENSE`、`README.md`，不导入 `tests.c`、`docs/`、`quadbase.*`（如果导入就要写明不编译）。`forks/README.md` 的表加一行（上游、基线提交、MIT），本地改动逐条记在 `forks/cubiomes/LUMILIO.md`（W14），`forks/README.md` 的「Local changes」只指向它。不用 git submodule：本仓库的 forks 都是快照，而且 CI 不拉子模块。
 - 许可：cubiomes 是 MIT，与 AGPL-3.0-only 兼容，只需保留版权与许可声明。旧计划写的「保留 Cubitect 的 GPL 声明」是错的。
 
@@ -164,7 +169,7 @@ Xaero's Minimap / World Map 本身不开源（许可证未在本次核实）。�
 - 行格式，XaeroTools 说是对照 `WaypointIO` 字节码核实的：`waypoint:name:initials:x:y:z:color:disabled:type:set:rotate_on_tp:tp_yaw:visibility_type:destination`。`y` 缺省时写 `~`；`type` 是 0 普通、1 死亡点、2 旧死亡点；文件里还有 `sets:` 行；旧计划提到的 `dim:` 头，待核实。
 - 名称里的冒号写成 `§§`，读时还原。这回答了旧计划的开放问题：照 Xaero 的写法转义，不自创。换行在格式里无法表示，保存时拒绝。
 - 长度：社区 gist 记录分享串的名称不超过 32 个字符，缩写不超过 2 个；超出时 Xaero 报错。磁盘文件是否同样限制，待核实；编辑时按这个限制校验。
-- 颜色：gist 和 XaeroPlus issue #301 说是 0–15 的 Minecraft 文字颜色下标；XaeroTools 说 `WaypointColor` 枚举有 20 个（16 色之外还有 magenta、light blue、lime、pink）。可能是版本差异。实现时以钉住的版本的真实样本为准：取色器只提供样本证明有效的下标；遇到不认识的下标原样保留，显示为最接近的颜色。
+- 颜色：gist 和 XaeroPlus issue #301 说是 0–15 的 Minecraft 文字颜色下标；XaeroTools 说 `WaypointColor` 枚举有 20 个（16 色之外还有 magenta、light blue、lime、pink）。可能是版本差异。以钉住版本的真实样本为准，样本证明之前只开放 0–15（W17）。
 - 分享串：`xaero-waypoint:name:marker:x:y:z:color:use_yaw:yaw:dimension`，原版维度写成 `Internal-overworld-waypoints`、`Internal-the-nether-waypoints`、`Internal-the-end-waypoints`；`yaw` 的范围是 -999 到 9999。
 - XaeroTools 的解析器会丢掉注释行并重写每一行，这不满足我们的「逐字节往返」。我们改编它的字段解析，但文件模型要保留每一行的原文。
 - 世界地图区域文件：zip 里一个区域流，XaeroTools 能解码主版本 0–7、次版本到 8 以及更早的无版本格式（`codec/mod.rs`、`legacy.rs`），状态调色板用 NBT。读不懂的版本报「这个版本的 Xaero 地图还不支持」，不影响其他 Provider。
@@ -185,18 +190,18 @@ Xaero's Minimap / World Map 本身不开源（许可证未在本次核实）。�
 
 ### P0 视口、网格与种子底图
 
-- [ ] T0：在 `windows-2022`、`macos-latest`、`ubuntu:22.04` 上各编译一次 `lumilio-cubiomes`（先只有 `build.rs` 和一个探针测试），把 MSVC 的结果记进本计划。失败就在 `forks/cubiomes/` 里做最小修补，并记进 `forks/cubiomes/LUMILIO.md`。
+- [ ] T0：在 `windows-2022`、`macos-latest`、`ubuntu:22.04` 上各编译一次 `lumilio-cubiomes`（先只有 `build.rs` 和一个探针测试），把 MSVC 的结果记进本计划。失败就在 `forks/cubiomes/` 里做最小修补，并记进 `forks/cubiomes/LUMILIO.md`。编译通过后，在 `.github/workflows/ci.yml` 加一个只跑 `cargo build -p lumilio-cubiomes` 的 Windows 作业（W18）。
 - [ ] T1：`forks/cubiomes/`（新建，快照 `e61f905`，带 `LICENSE` 和新建的补丁日志 `LUMILIO.md`，W14）和 `crates/lumilio-cubiomes/`（新建）：`build.rs` 用 `cc` 编译，不含 `quadbase.c`，`-fwrapv` 用 `flag_if_supported`，关掉上游警告；`src/ffi.rs` 是唯一允许 unsafe 的模块；`src/lib.rs` 提供安全 API 和版本表（版本字符串、数据版本 → `MCVersion`，不在表里就返回 `Unsupported`）。测试放在 `src/tests.rs`：用固定种子取群系 id，与仓库内的金样比对。金样由一个只编译 cubiomes 源码的 C 探针生成，记录生成命令。
 - [ ] T2：`lumilio-plugin-api/src/map.rs`（新建）：`WorldContext`、`WorldId`、`Dimension`、`SourceLink`、`TileKey`、`TileRequest`、`TileReply`、`OverlayRequest`、`MapObject`、`MapIcon`、`BaseMapInfo`、`OverlayInfo`；`BaseMapProvider`、`OverlayProvider` trait；`Plugin::base_map_provider()` / `overlay_provider()` 默认返回 `None`；`View::Map`；`HostContext::cancelled()` 默认 `false`。序列化往返测试。
 - [ ] T3：`crates/lumilio-core/src/plugins/map.rs`（新建）：`map_tile`、`map_objects`，单独超时、取消令牌、并发上限，故障只落到这一块（W15）。测试：panic、超时、错误、取消都不改变 `PluginStatus`；同一个 Provider 连续 5 次故障后只停用它，第 4 次后成功一次就清零；同一插件的 `InstanceTab` 不受影响；插件被关掉后不再派发。
-- [ ] T4：`crates/lumilio-core/src/world_map/`（新建：`mod.rs`、`context.rs`、`schedule.rs`、`cache.rs`、`tests.rs`）：读 `level.dat` 和 `world_gen_settings.dat` 的种子、版本、数据版本（`lumilio-nbt` 补 zlib）；可见集合、`generation`、排序和取消；磁盘缓存与淘汰；`Layout::map_cache()`；`LauncherService` 上的地图方法（`service/world_map.rs`，新建）。测试：旧世代的结果被丢弃；同一 key 不重复计算；缓存命中。
+- [ ] T4：`crates/lumilio-core/src/world_map/`（新建：`mod.rs`、`context.rs`、`schedule.rs`、`cache.rs`、`tests.rs`）：读 `level.dat` 和 `world_gen_settings.dat` 的种子、版本、数据版本（`lumilio-nbt` 补 zlib）；可见集合、`generation`、排序和取消；磁盘缓存与淘汰（默认上限 1 GiB，W6）；`Layout::map_cache()`；`LauncherService` 上的地图方法（`service/world_map.rs`，新建）。测试：旧世代的结果被丢弃；同一 key 不重复计算；缓存命中；超过上限时按最近使用淘汰。设置 › 存储的「清除地图缓存」行也在这里接上。
 - [ ] T5：`crates/lumilio-map-render/`（新建）：设备、瓦片纹理 LRU、瓦片和网格的绘制、BGRA 回读；没有显卡时返回 `NoGpu`。GPU 像素测试照 `lumilio-schematic-render/src/tests.rs`：一块已知颜色的瓦片画在正确的屏幕位置；缩放后位置正确；回读尺寸正确。
-- [ ] T6：`crates/lumilio-plugin-world-explorer/`（新建）：清单（`lumilio.world-explorer`，默认启用，`ReadGameFiles` 覆盖 `saves` 和 `xaero`）；`InstanceTab`「地图」（插件启用时每个游戏页都出现，没有存档的游戏页也要能用手动种子，W16），视图是世界列表加 `View::Map`；种子底图 Provider 按 LOD 调 `lumilio-cubiomes` 填瓦片，配色用 cubiomes 的 `initBiomeColors`。`ia[plugin.world-explorer]` 写在插件里；`crates/lumilio-docgen/src/lib.rs` 的 `PAGES` 加 `plugin.world-explorer`（「插件 · 世界地图」）。
+- [ ] T6：`crates/lumilio-plugin-world-explorer/`（新建）：清单（`lumilio.world-explorer`，`default_enabled: true`（W9），`api: API_VERSION` 仍是 1，`ReadGameFiles` 覆盖 `saves` 和 `xaero`）；`InstanceTab`「地图」（插件启用时每个游戏页都出现，没有存档的游戏页也要能用手动种子，W16），视图是世界列表加 `View::Map`；种子底图 Provider 按 LOD 调 `lumilio-cubiomes` 填瓦片，配色用 cubiomes 的 `initBiomeColors`。`ia[plugin.world-explorer]` 写在插件里；`crates/lumilio-docgen/src/lib.rs` 的 `PAGES` 加 `plugin.world-explorer`（「插件 · 世界地图」）。
 - [ ] T7：`crates/lumilio-ui/src/world_explorer/`（新建：`mod.rs`、`worker.rs`、`camera.rs`、`layers.rs`、`tests.rs`）和 `plugin_tabs.rs` 对 `View::Map` 的处理：拖动平移、滚轮和按键缩放、维度分段、底图分段（这一阶段只有种子）、图层面板（网格、Region 边界）、光标坐标、「跳到坐标」输入、无数据和失败的底纹、每块的「重试」。控件用 `lumilio-ui` 的 `Key`、`controls` 和 `kit`，不用 gpui-component 的 Button/Switch/TabBar。所有文字走 `tr!`，中英两份目录一起写。每个入口一条 `ia[...]`。
 - [ ] T8：宿主内部的网格、Region 边界和坐标 Overlay（`world_map/utility.rs`，新建）。测试：边界线在 512 的整数倍上；负坐标不差一。
 - [ ] T9：手动种子：没有存档或读不到种子时，输入种子并选择版本；存进 `launcher.db`（schema 4，`world_map/store.rs`，新建）。版本不在版本表里时写明「这一版还不能查」，不降级（W14）。这是只有种子时的唯一入口，没有全局的地图页（W16）。
 - [ ] T10：`crates/lumilio-app/src/backend.rs` 注册插件；`backend/tests.rs` 里的插件顺序断言加上它。
-- [ ] T11：许可与分发：`ATTRIBUTIONS.md` 加 cubiomes 一节（MIT 全文、基线提交、配色受 Amidst 启发）；`forks/README.md` 加一行；`crates/lumilio-xtask` 把 `ATTRIBUTIONS.md` 作为第三方声明放进三种包（这个缺口也覆盖已有的 Nucleation），`crates/lumilio-xtask/src/tests.rs` 断言包里有它。
+- [ ] T11：许可与分发（W18）：`ATTRIBUTIONS.md` 加 cubiomes 一节（MIT 全文、基线提交、配色受 Amidst 启发）；`forks/README.md` 加一行；`crates/lumilio-xtask` 把 `ATTRIBUTIONS.md` 作为第三方声明放进三种包（这个缺口也覆盖已有的 Nucleation），`crates/lumilio-xtask/src/tests.rs` 断言包里有它。
 - [ ] T12：docgen 的依赖边界与署名测试按上面「crate 布局与依赖边界」扩展，每条规则先证明能失败。
 
 ### P1 cubiomes 结构、史莱姆区块与出生点
@@ -208,7 +213,7 @@ Xaero's Minimap / World Map 本身不开源（许可证未在本次核实）。�
 
 ### P2 Xaero 路径点（只读）与分享串
 
-- [ ] T17：`lumilio-plugin-world-explorer/src/xaero/`（新建：`waypoints.rs`、`naming.rs`、`tests.rs`）：解析集合文件，保留每一行原文、不认识的行和字段；`§§` 转义；`~` 表示没有 Y；死亡点、旧死亡点、禁用和临时点都能识别。改编自 XaeroTools `crates/xaero-core/src/{waypoints.rs,naming.rs}`，注释署名。样本：用一个钉住版本的 Xaero's Minimap 导出主世界、下界、末地各一份，放在 `tests/data/xaero/<版本>/`，注明版本。往返测试：读出再写回逐字节一致。
+- [ ] T17：`lumilio-plugin-world-explorer/src/xaero/`（新建：`waypoints.rs`、`naming.rs`、`tests.rs`）：解析集合文件，保留每一行原文、不认识的行和字段；`§§` 转义；`~` 表示没有 Y；死亡点、旧死亡点、禁用和临时点都能识别。改编自 XaeroTools `crates/xaero-core/src/{waypoints.rs,naming.rs}`，注释署名。样本：用实现时最新的 26.x 版 Xaero's Minimap（W17）导出主世界、下界、末地各一份，放在 `tests/data/xaero/<版本>/`，版本号同时记进本计划的实施记录。往返测试：读出再写回逐字节一致。
 - [ ] T18：Overlay「Xaero 路径点」：按世界、维度、集合列出；颜色按下标画；死亡点用单独图标。损坏的文件、读不到的目录变成图层状态（「这份路径点文件读不了」），不让插件 `Failed`。目录结构不认识时说明只支持小地图的路径点。
 - [ ] T19：世界关联：core 列出 `xaero/minimap` 和 `xaero/world-map` 的目录名；单人世界名称完全相同时提出建议，人确认后存进 `launcher.db`；多人目录（`Multiplayer_…`）作为 `WorldId::Server` 单独出现。
 - [ ] T20：选中路径点后「复制分享串」，生成 `xaero-waypoint:` 格式；维度写 `Internal-…-waypoints`。测试覆盖冒号、表情、没有 Y 的点。
@@ -218,7 +223,7 @@ Xaero's Minimap / World Map 本身不开源（许可证未在本次核实）。�
 - [ ] T21：`Permission::WriteGameFiles { under }`、`HostContext::write_file`（`crates/lumilio-core/src/plugins/access.rs` 加写的路径检查，`context.rs` 实现）、设置页的权限说明（`crates/lumilio-ui/src/pages/settings/plugins.rs`，新文案进目录）。测试：写 `xaero/minimap` 以外、`..`、绝对路径、符号链接、非 `mw$*.txt` 文件名都被拒绝，且没有任何文件被创建。
 - [ ] T22：W7 的写入流程在 core（`world_map/write.rs`，新建）：取实例租约、核对长度/修改时间/sha256、备份、临时文件加 rename；`Effect` 不变，插件经 `write_file` 写。测试：游戏运行（租约被占）时没有任何写入；文件在读与写之间变了就拒绝；备份存在且与原文件一致；损坏文件不被覆盖。
 - [ ] T23：W10 编辑契约：`MapObject::editable`、`OverlayProvider::apply`、`ObjectEdit`；UI 的编辑对话框（`crates/lumilio-ui/src/world_explorer/edit.rs`，新建），复用 `SettingKind::accepts` 校验。
-- [ ] T24：路径点可改名称（不超过 32 个字符，拒绝换行）、缩写（不超过 2 个字符）、坐标、颜色（样本证明有效的下标）、启用、传送朝向；在地图上点一下新建普通路径点；删除前确认，死亡点要单独确认；批量操作只作用于普通、启用、非临时的点。只改被编辑的那一行。
+- [ ] T24：路径点可改名称（不超过 32 个字符，拒绝换行）、缩写（不超过 2 个字符）、坐标、颜色（0–15；样本证明 16–19 有效后再开放，W17）、启用、传送朝向；在地图上点一下新建普通路径点；删除前确认，死亡点要单独确认；批量操作只作用于普通、启用、非临时的点。只改被编辑的那一行。
 - [ ] T25：游戏运行时编辑入口禁用并说明原因；浏览和复制照常。
 
 ### P4 存档底图
@@ -265,14 +270,15 @@ Xaero's Minimap / World Map 本身不开源（许可证未在本次核实）。�
 
 - **P0**
   - 自动：`just test-pkg lumilio-cubiomes`（金样）、`just test-pkg lumilio-core world_map`、`just test-pkg lumilio-core plugins::tests`（瓦片故障不改变插件状态）、`just test-pkg lumilio-map-render`（GPU 像素）、`just test-pkg lumilio-ui world_explorer`（GPUI 交互：拖动后旧世代的瓦片不进入新视图；切换维度保留中心与缩放；关闭再开不吃旧结果）、`just test-pkg lumilio-docgen`（边界、署名、IA）、`just ia`、`just check`。
-  - 自动：xtask 测试证明三种包都带第三方声明。
-  - **维护者实机或目视**：Windows 上 `cubiomes` 用 MSVC 编译通过且探针结果与 macOS 相同；macOS 上拖动和缩放的手感、帧时间（记下 1800×1200 下每帧的毫秒数）；浅色和深色；720×480 和大窗口；没有显卡时的说明。
+  - 自动：xtask 测试证明三种包都带 `ATTRIBUTIONS.md`；`ci.yml` 的 Windows 作业在 PR 上通过。
+  - **维护者实机或目视**：Windows 上 `cubiomes` 用 MSVC 编译通过且探针结果与 macOS 相同；macOS 上拖动和缩放的手感；帧时间：记下 1800×1200 下拖动时每帧的毫秒数，写进实施记录，超过 8 毫秒就回到 W5 讨论；浅色和深色；720×480 和大窗口；没有显卡时的说明。
 - **P1**
   - 自动：三个版本的结构坐标与金样一致；1.18+ 的估计标记存在。
   - **维护者实机**：用一个已知种子，对照 Chunkbase 或 Cubiomes Viewer 的同一处村庄和要塞。
 - **P2**
   - 自动：样本往返逐字节一致；冒号、表情、没有 Y、未知行都能往返；损坏的文件显示错误。
-  - **维护者实机**：钉住版本的 Xaero 样本与游戏内列表一致；复制的分享串在游戏里能导入。
+  - 自动：取色器只给出 0–15（除非样本已证明 16–19）。
+  - **维护者实机**：钉住版本（W17）的 Xaero 样本与游戏内列表一致；复制的分享串在游戏里能导入。
 - **P3**
   - 自动：写权限测试证明插件碰不到 `xaero/minimap` 以外的路径；运行中的实例不会发出任何写入；冲突检测；备份；只有被改的那一行变化。
   - **维护者实机**：改一个点，重新进入世界后 Xaero 列表里看得到；游戏运行中编辑入口禁用。
@@ -301,7 +307,7 @@ Xaero's Minimap / World Map 本身不开源（许可证未在本次核实）。�
 - 空窗期：一个新版本发布后，到我们完成五步之前，种子底图和结构 Overlay 在这个版本上显示「这一版还不能查」。玩家升级游戏后会先看到它。
 - 上游 cubiomes 若恢复更新：要把上游的提交合进 fork，并逐个判断本地补丁是否被覆盖。两边对同一版本的实现不同时，以金样和实机为准（W14）；新群系的 id 若和我们自己分配的不同，要迁移种子瓦片缓存（缓存键含配色和版本，换 id 时清掉对应缓存）。
 - 入库的派生数据会过时：方块颜色表和 `forks/cubiomes/data/` 的摘录都按版本生成，新版本加了方块或改了贴图就要重新跑工具。来源记录不全的表无法重新生成，所以 `SOURCE.md` 由工具写，不手写。
-- cubiomes 里的 C 崩溃会直接带走整个启动器；只能靠 Rust 侧的输入校验和测试降低概率（开放问题 6）。我们自己改的 C 代码增加了这个风险，新增的代码路径也要有越界和异常输入的测试。
+- cubiomes 里的 C 崩溃会直接带走整个启动器；按 W11 留在进程内，只能靠 Rust 侧的输入校验和测试降低概率。我们自己改的 C 代码增加了这个风险，新增的代码路径也要有越界和异常输入的测试。
 - MSVC 编译和 Windows、Linux 上的 wgpu 离屏渲染都还没验证；CI 只覆盖 macOS。
 - 离屏回读的帧时间在大窗口上可能不够平滑。
 - Xaero 的格式没有公开规范，只有 XaeroTools 的逆向结论和社区记录，而且颜色下标的数量互相矛盾；新版本可能悄悄改格式。
@@ -310,21 +316,9 @@ Xaero's Minimap / World Map 本身不开源（许可证未在本次核实）。�
 - wgpu 30 和 GPUI 的 wgpu 29 在同一进程里各开一个设备；schematic 预览已经这样跑，地图多一个设备，显存占用要观察。
 - 冷编译时间再增加（C 库加一个 wgpu crate）。
 
-## 开放问题（附建议的默认值）
+## 开放问题
 
-已决定、移出本节的：新版本支持（W14、P8）、地图位置（W16）、瓦片故障（W15）、派生数据能否入库（W13、W14）。
-
-1. **渲染器的帧时间。** 建议：按提案用 wgpu 离屏，P0 测量；大窗口拖动时每帧超过 8 毫秒就回来讨论（例如瓦片改由 GPUI 的图片元素直接画）。
-2. **LOD 每级 4 倍还是 2 倍。** 建议 4 倍，与 cubiomes 原生比例一致；画面在两级之间靠 GPU 采样。
-3. **标记存 SQLite 还是 JSON。** 建议 `launcher.db` 新表（schema 4）。
-4. **Xaero 颜色下标 16 还是 20。** 建议：以钉住版本的样本为准；样本证明之前只开放 0–15。
-5. **钉哪一版 Xaero's Minimap。** 建议：实现时最新的 26.x 版本，版本号写进样本目录名和本计划。
-6. **cubiomes 放在进程内还是子进程。** 建议进程内，靠校验和测试；真出现过崩溃再改成子进程。
-7. **缓存上限。** 建议默认 1 GiB，设置 › 存储里能清除。
-8. **`API_VERSION` 要不要升。** 建议原生插件保持 1，新增的都是带默认实现的方法和新的枚举变体；WIT 另有自己的版本号。
-9. **World Explorer 默认启用吗。** 建议默认启用：只读本地文件，写回需要人在地图上明确操作，不向第三方披露任何东西（D4 只默认关闭会披露状态的插件）。
-10. **CI 要不要加 Windows 编译作业。** 建议在 P0 加一个只编译 `lumilio-cubiomes` 的 Windows 作业，避免 MSVC 回归要等到发版才发现；完整 `just ci` 仍只在 macOS 上跑。
-11. **发布包里的第三方声明。** 建议把 `ATTRIBUTIONS.md` 原样放进每个包（P0 T11），同时补上 Nucleation 漏掉的 MIT 声明。
+目前没有未决问题（2026-10-08 维护者采用了全部默认值）。
 
 ## 从旧计划迁移
 
@@ -336,7 +330,7 @@ Xaero's Minimap / World Map 本身不开源（许可证未在本次核实）。�
 | Scope In：读写一个实例的路径点；集合切换；分享串；写权限只覆盖 `xaero/minimap` | T18、T20、T21、W7 |
 | Scope Out：小地图渲染、游戏内传送、VoxelMap / JourneyMap 原生格式、运行中抢写、死亡点批量清空 | Scope Out（保留原文）；「小地图渲染」指游戏内渲染，Xaero 世界地图作为底图另由 P5 提供 |
 | 调研：目录结构、维度目录、集合文件名 | 调研「Xaero 文件格式要点」，补充了 `_1.txt`、`.temp`、备份目录、world-map 树 |
-| 调研：分享串格式、颜色 0–15 | 同上；补充了 20 色的说法与长度限制，开放问题 4 |
+| 调研：分享串格式、颜色 0–15 | 同上；补充了 20 色的说法与长度限制；下标规则见 W17 |
 | 调研：磁盘字段多于分享串、`sets:` 与 `dim:` 头、以选定版本为准并在测试里钉住真实文件 | 同上；`dim:` 标为待核实；T17 钉样本 |
 | 调研：JourneyMap 只做导入；本插件直接编辑 | Scope Out（JourneyMap 格式与导入） |
 | 调研：「视图树适合列表和表单」 | 更正：视图树没有输入控件；改为 W10 声明式编辑 |
@@ -398,3 +392,4 @@ Xaero's Minimap / World Map 本身不开源（许可证未在本次核实）。�
 
 - 2026-10-08：维护者在 PR #6 上决定：cubiomes 作为 LumilioCL 自维护的 fork（`forks/cubiomes`），自行补 1.21.5–26.x 的世界生成，首个交付 26.3（W14、P2）；瓦片和对象故障不进 `Failed`，同一个数据源连续 5 次出错只停用它（W15，修订 ADR 0031 D2）；地图只放在游戏页的插件标签里（W16）。
 - 2026-10-08：维护者在 PR #6 上决定：允许入库从 Mojang 资料派生的生成数据（记录生成命令与来源，W13、W14）；新版本世界生成支持延后到功能完成之后（当时的 P2 改为延后阶段 P8，不阻塞收尾 T45）。上一条里的「P2」指当时的编号。
+- 2026-10-08：维护者在 PR #6 上采用了剩下 11 个开放问题的全部默认值，已并入冻结决策：帧时间测量与 8 毫秒阈值 → W5；LOD 每级 4 倍 → W4；标记存 `launcher.db`（schema 4）与缓存上限 1 GiB → W6；cubiomes 留在进程内 → W11；默认启用与不升 `API_VERSION` → W9；Xaero 钉最新 26.x 版与颜色下标先开放 0–15 → W17；Windows 编译作业与发布包带 `ATTRIBUTIONS.md` → W18。
