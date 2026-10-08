@@ -372,7 +372,8 @@ fn collect_images<'a>(view: &'a View, out: &mut Vec<&'a ImageData>) {
             children.iter().for_each(|child| collect_images(child, out));
         }
         View::Image(image) => out.push(image),
-        View::Model { .. }
+        View::Map
+        | View::Model { .. }
         | View::Table { .. }
         | View::Empty { .. }
         | View::Text { .. }
@@ -591,6 +592,7 @@ impl Paint<'_> {
                 Some(picture) => picture_box(picture, COVER, colors).into_any_element(),
                 None => div().into_any_element(),
             },
+            View::Map => div().into_any_element(),
             View::Model { .. } => {
                 let model = self.models.get(self.next_model);
                 self.next_model += 1;

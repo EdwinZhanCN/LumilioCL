@@ -63,6 +63,8 @@ pub struct ListItem {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum View {
+    /// The host's world explorer for this instance; no plugin-owned layout.
+    Map,
     Section {
         title: String,
         children: Vec<View>,
