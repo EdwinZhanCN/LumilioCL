@@ -2,7 +2,7 @@ use super::LauncherService;
 use super::error::{ServiceError, read_unless_cancelled};
 use super::support::blocking;
 use crate::activity::CancellationToken;
-use crate::activity_log::{RetryAction, TaskCategory};
+use crate::activity_log::{RetryAction, TaskAction, TaskCategory, TaskLabel};
 use crate::environment::HostProfile;
 use crate::java::JavaLocator;
 use crate::transfer::{TransferEngine, TransferRequest, Transport};
@@ -22,9 +22,9 @@ impl<T: Transport + Clone> LauncherService<T> {
         let task = self
             .begin(
                 TaskCategory::Install,
-                match required {
-                    Some(major) => format!("安装 Java {major}"),
-                    None => "安装 Java".to_owned(),
+                TaskLabel::Typed {
+                    action: TaskAction::InstallJava,
+                    subject: required.map_or_else(String::new, |major| major.to_string()),
                 },
                 None,
                 Some(&cancel),

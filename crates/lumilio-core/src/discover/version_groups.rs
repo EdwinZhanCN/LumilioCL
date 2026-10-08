@@ -5,11 +5,39 @@
 //! (GPL-3.0-only; ADR 0022).
 
 use super::tags::GameVersionTag;
+use std::borrow::Cow;
 use std::collections::HashMap;
+
+/// What a group of game versions is called, as a type rather than a sentence:
+/// the interface turns the named ranges into words and shows a `Range` as is.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum GroupLabel {
+    Ancient,
+    AlphaBeta,
+    Alpha,
+    Beta,
+    PreAlpha,
+    Range(String),
+}
+
+impl GroupLabel {
+    /// The text of the label, for a caller with no catalog.
+    #[must_use]
+    pub fn text(&self) -> Cow<'_, str> {
+        match self {
+            Self::Ancient => Cow::Borrowed("all ancient versions"),
+            Self::AlphaBeta => Cow::Borrowed("all Alpha and Beta versions"),
+            Self::Alpha => Cow::Borrowed("all Alpha versions"),
+            Self::Beta => Cow::Borrowed("all Beta versions"),
+            Self::PreAlpha => Cow::Borrowed("all Pre-alpha versions"),
+            Self::Range(range) => Cow::Borrowed(range),
+        }
+    }
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VersionGroup {
-    pub label: String,
+    pub label: GroupLabel,
     pub versions: Vec<String>,
 }
 
@@ -95,19 +123,19 @@ fn consecutive_ranges(versions: &[String], reference: &[&GameVersionTag]) -> Vec
     ranges
 }
 
-fn range_label(range: &str) -> String {
+fn range_label(range: &str) -> GroupLabel {
     match range {
-        "rd-132211–b1.8.1" => return "所有远古版本".to_owned(),
-        "a1.0.4–b1.8.1" => return "所有 Alpha 和 Beta 版本".to_owned(),
-        "a1.0.4–a1.2.6" => return "所有 Alpha 版本".to_owned(),
-        "b1.0–b1.8.1" => return "所有 Beta 版本".to_owned(),
-        "rd-132211–inf20100618" => return "所有 Pre-alpha 版本".to_owned(),
+        "rd-132211–b1.8.1" => return GroupLabel::Ancient,
+        "a1.0.4–b1.8.1" => return GroupLabel::AlphaBeta,
+        "a1.0.4–a1.2.6" => return GroupLabel::Alpha,
+        "b1.0–b1.8.1" => return GroupLabel::Beta,
+        "rd-132211–inf20100618" => return GroupLabel::PreAlpha,
         _ => {}
     }
-    match range.split_once('–') {
+    GroupLabel::Range(match range.split_once('–') {
         Some((a, b)) if a == b => a.to_owned(),
         _ => range.to_owned(),
-    }
+    })
 }
 
 /// `versions` (a project's) as display groups against Modrinth's whole list
@@ -159,7 +187,7 @@ pub fn version_groups(versions: &[String], all: &[GameVersionTag]) -> Vec<Versio
             let versions: Vec<String> = minor.iter().map(|m| name(&major, *m)).collect();
             if minor.len() == 1 {
                 return VersionGroup {
-                    label: versions[0].clone(),
+                    label: GroupLabel::Range(versions[0].clone()),
                     versions,
                 };
             }
@@ -169,16 +197,16 @@ pub fn version_groups(versions: &[String], all: &[GameVersionTag]) -> Vec<Versio
                 .is_some_and(|range| range.minor == minor)
             {
                 return VersionGroup {
-                    label: format!("{major}.x"),
+                    label: GroupLabel::Range(format!("{major}.x")),
                     versions,
                 };
             }
             VersionGroup {
-                label: format!(
+                label: GroupLabel::Range(format!(
                     "{}–{}",
                     name(&major, minor[0]),
                     name(&major, minor[minor.len() - 1])
-                ),
+                )),
                 versions,
             }
         })
@@ -202,7 +230,7 @@ pub fn version_groups(versions: &[String], all: &[GameVersionTag]) -> Vec<Versio
             shown
                 .into_iter()
                 .map(|version| VersionGroup {
-                    label: version.clone(),
+                    label: GroupLabel::Range(version.clone()),
                     versions: vec![version],
                 })
                 .collect()
@@ -216,7 +244,7 @@ pub fn version_groups(versions: &[String], all: &[GameVersionTag]) -> Vec<Versio
             output.insert(
                 0,
                 VersionGroup {
-                    label: (*snapshot).clone(),
+                    label: GroupLabel::Range((*snapshot).clone()),
                     versions: vec![(*snapshot).clone()],
                 },
             );

@@ -3,7 +3,7 @@ use super::error::{ServiceError, read_unless_cancelled};
 use super::support::blocking;
 use super::types::{DependencyNeed, DependencyReport, InstalledProject, now};
 use crate::activity::CancellationToken;
-use crate::activity_log::{RetryAction, TaskCategory};
+use crate::activity_log::{RetryAction, TaskAction, TaskCategory, TaskLabel};
 use crate::content::ContentError;
 use crate::content::scan as scan_content;
 use crate::discover::{ProjectKind, Version, fits, install_request, pick_version};
@@ -27,7 +27,10 @@ impl<T: Transport + Clone> LauncherService<T> {
         let task = self
             .begin(
                 TaskCategory::Download,
-                format!("下载 {project}"),
+                TaskLabel::Typed {
+                    action: TaskAction::DownloadContent,
+                    subject: project.to_owned(),
+                },
                 None,
                 Some(&cancel),
             )
@@ -285,7 +288,10 @@ impl<T: Transport + Clone> LauncherService<T> {
         let task = self
             .begin(
                 TaskCategory::Download,
-                format!("安装 {project}"),
+                TaskLabel::Typed {
+                    action: TaskAction::InstallContent,
+                    subject: project.to_owned(),
+                },
                 Some(instance_id.to_owned()),
                 Some(&cancel),
             )
@@ -386,7 +392,10 @@ impl<T: Transport + Clone> LauncherService<T> {
         let task = self
             .begin(
                 TaskCategory::Update,
-                format!("切换 {file_name} 的版本"),
+                TaskLabel::Typed {
+                    action: TaskAction::SwitchContentVersion,
+                    subject: file_name.to_owned(),
+                },
                 Some(instance_id.to_owned()),
                 Some(&cancel),
             )

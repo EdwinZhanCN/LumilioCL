@@ -46,6 +46,17 @@ impl From<io::Error> for ReclaimError {
     }
 }
 
+/// Why a part of the shared files was left alone on purpose.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum KeptReason {
+    /// A Forge / NeoForge game is installed: the libraries its installer made
+    /// have no manifest, so the library folder is left as it is.
+    InstallerLibraries,
+    /// An asset index of a needed version cannot be read, so the asset
+    /// objects are left as they are.
+    UnreadableAssetIndex,
+}
+
 /// What the scan found.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Reclaimable {
@@ -53,7 +64,7 @@ pub struct Reclaimable {
     /// their sizes. Everything is below `meta/`.
     pub unused: Vec<(PathBuf, u64)>,
     /// Parts that were left alone on purpose, and why.
-    pub kept: Vec<String>,
+    pub kept: Vec<KeptReason>,
 }
 
 impl Reclaimable {
@@ -226,9 +237,7 @@ pub fn scan(layout: &Layout, instances: &[InstanceRecord]) -> Result<Reclaimable
         .iter()
         .any(|record| matches!(record.loader, Loader::Forge | Loader::NeoForge));
     if installer_games {
-        report.kept.push(
-            "有 Forge / NeoForge 游戏：它们安装时生成的库文件没有清单，库文件夹先不清理".to_owned(),
-        );
+        report.kept.push(KeptReason::InstallerLibraries);
     } else {
         let libraries = layout.libraries();
         let mut files = Vec::new();
@@ -292,9 +301,7 @@ pub fn scan(layout: &Layout, instances: &[InstanceRecord]) -> Result<Reclaimable
             }
         }
     } else {
-        report
-            .kept
-            .push("有游戏的资源索引读不到，资源文件先不清理".to_owned());
+        report.kept.push(KeptReason::UnreadableAssetIndex);
     }
     if let Ok(entries) = fs::read_dir(assets.join("log_configs")) {
         for entry in entries.flatten() {

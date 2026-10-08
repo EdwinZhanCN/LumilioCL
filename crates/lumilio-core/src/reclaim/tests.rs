@@ -165,7 +165,7 @@ fn installer_made_loaders_keep_the_libraries_and_an_unreadable_asset_index_keeps
             .iter()
             .all(|n| !n.starts_with("libraries/"))
     );
-    assert!(report.kept.iter().any(|note| note.contains("Forge")));
+    assert!(report.kept.contains(&KeptReason::InstallerLibraries));
 
     fs::remove_file(layout.assets().join("indexes/17.json")).unwrap();
     let vanilla = [record("a", "1.21.1", Loader::Vanilla, None)];
@@ -175,7 +175,7 @@ fn installer_made_loaders_keep_the_libraries_and_an_unreadable_asset_index_keeps
             .iter()
             .all(|n| !n.starts_with("assets/objects/"))
     );
-    assert!(report.kept.iter().any(|note| note.contains("资源")));
+    assert!(report.kept.contains(&KeptReason::UnreadableAssetIndex));
 }
 
 #[test]

@@ -127,7 +127,7 @@ fn copying_takes_the_players_files_and_leaves_the_other_launchers_behind() {
         loader: Loader::Vanilla,
         loader_version: None,
         game_dir: root.clone(),
-        origin: "t",
+        origin: GameOrigin::MultiMcPrism,
     };
     let into = dir.path().join("into");
     let copied = copy_game_files(&game, &into, &crate::activity::CancellationToken::new()).unwrap();

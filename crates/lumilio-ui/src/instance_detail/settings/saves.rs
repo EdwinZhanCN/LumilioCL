@@ -2,7 +2,7 @@ use super::super::InstanceIntent;
 use super::texts::NONE_ON_PURPOSE;
 use crate::settings_forms as shared;
 use crate::tr;
-use lumilio_core::{AfterLaunch, EnvVar, InstanceSettings, QuickPlay};
+use lumilio_core::{AfterLaunch, EnvVar, InstanceSettings, QuickPlay, QuickPlayProblem};
 use std::path::PathBuf;
 
 pub(super) type Saved = Result<InstanceIntent, String>;
@@ -57,6 +57,17 @@ pub fn after_launch(current: &InstanceSettings, choice: usize) -> Saved {
     })
 }
 
+/// Why core refused a quick-play target, in one sentence.
+#[must_use]
+pub fn quick_play_message(problem: QuickPlayProblem) -> String {
+    match problem {
+        QuickPlayProblem::EmptyWorld => tr!("instance-settings-quick-world-empty").to_owned(),
+        QuickPlayProblem::InvalidWorld => tr!("instance-settings-quick-world-invalid").to_owned(),
+        QuickPlayProblem::InvalidHost => tr!("instance-settings-quick-host-invalid").to_owned(),
+        QuickPlayProblem::InvalidPort => tr!("instance-settings-quick-port-invalid").to_owned(),
+    }
+}
+
 /// Kind 0 none, 1 a world, 2 a server.
 pub fn quick_play(current: &InstanceSettings, kind: usize, target: &str) -> Saved {
     let target = target.trim();
@@ -69,7 +80,7 @@ pub fn quick_play(current: &InstanceSettings, kind: usize, target: &str) -> Save
         _ => Some(QuickPlay::Server(target.to_owned())),
     };
     if let Some(problem) = chosen.as_ref().and_then(lumilio_core::quick_play_problem) {
-        return Err(problem.to_owned());
+        return Err(quick_play_message(problem));
     }
     save(current.clone(), |next| next.launch.quick_play = chosen)
 }

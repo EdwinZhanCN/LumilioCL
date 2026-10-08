@@ -404,7 +404,9 @@ impl<T: Transport + Clone> LauncherService<T> {
             let _ = writeln!(
                 tasks,
                 "{} · {:?} · {:?}",
-                task.label, task.category, task.outcome
+                task.label.text(),
+                task.category,
+                task.outcome
             );
         }
 

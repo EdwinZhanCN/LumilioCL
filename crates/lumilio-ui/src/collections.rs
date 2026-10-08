@@ -6,6 +6,7 @@
 use std::rc::Rc;
 
 use crate::tr;
+use lumilio_core::KeptReason;
 
 use crate::controls::Checkbox;
 use crate::key::Key;
@@ -85,11 +86,20 @@ pub fn confirm_game_delete(
     });
 }
 
+/// Why a part of the shared files was left alone, in the person's language.
+#[must_use]
+pub fn kept_reason(reason: KeptReason) -> String {
+    match reason {
+        KeptReason::InstallerLibraries => tr!("reclaim-kept-installer-libraries").to_owned(),
+        KeptReason::UnreadableAssetIndex => tr!("reclaim-kept-asset-index").to_owned(),
+    }
+}
+
 /// Offers to remove shared game files nobody uses, saying how much, and what
 /// was left alone on purpose.
 pub fn confirm_reclaim(
     size: &str,
-    kept: &[String],
+    kept: &[KeptReason],
     on_ok: impl Fn(&mut Window, &mut App) + 'static,
     window: &mut Window,
     cx: &mut App,
@@ -97,6 +107,7 @@ pub fn confirm_reclaim(
     let description = if kept.is_empty() {
         tr!("reclaim-body").to_owned()
     } else {
+        let kept: Vec<String> = kept.iter().copied().map(kept_reason).collect();
         tr!(
             "reclaim-body-kept",
             kept = kept.join(tr!("common-clause-separator"))

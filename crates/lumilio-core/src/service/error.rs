@@ -68,7 +68,7 @@ impl Display for ServiceError {
             Self::Store(error) => write!(f, "{error}"),
             Self::Settings(error) => write!(f, "{error}"),
             Self::Remote(message) => write!(f, "could not reach the service: {message}"),
-            Self::NoContentSource => f.write_str("没有可用的内容源"),
+            Self::NoContentSource => f.write_str("no content source is available"),
             Self::RootBusy(root) => write!(
                 f,
                 "launcher data at {} is already in use; close the other launcher and retry",

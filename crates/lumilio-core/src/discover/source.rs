@@ -91,7 +91,7 @@ impl PluginHost {
         let Some(source) = self.content_sources().await.into_iter().next() else {
             return Err(match self.stopped_content_source().await {
                 Some((name, message)) => {
-                    DiscoverError::Unavailable(format!("{name}已停止：{message}"))
+                    DiscoverError::Unavailable(format!("{name} stopped: {message}"))
                 }
                 None => DiscoverError::NoSource,
             });
@@ -143,13 +143,13 @@ impl ContentClient<'_> {
             .find(|info| info.manifest.id == self.plugin);
         match info.map(|info| info.status) {
             Some(PluginStatus::Failed { message }) => {
-                DiscoverError::Unavailable(format!("{}已停止：{message}", self.name))
+                DiscoverError::Unavailable(format!("{} stopped: {message}", self.name))
             }
             Some(PluginStatus::Enabled) => {
                 let why = self.host.last_transient_error(&self.plugin).await;
                 DiscoverError::Unavailable(match why {
-                    Some(why) => format!("{}没有回答：{why}", self.name),
-                    None => format!("{}没有回答", self.name),
+                    Some(why) => format!("{} did not answer: {why}", self.name),
+                    None => format!("{} did not answer", self.name),
                 })
             }
             _ => DiscoverError::NoSource,

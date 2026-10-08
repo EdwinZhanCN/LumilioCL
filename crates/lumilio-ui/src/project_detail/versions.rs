@@ -16,12 +16,27 @@ use gpui::prelude::*;
 use gpui::{Context, Entity, Window, div, px};
 use gpui_component::select::{SearchableVec, Select, SelectEvent, SelectState};
 use gpui_component::{Icon, Sizable as _, StyledExt as _, h_flex, v_flex};
-use lumilio_core::{ProjectDetail, ProjectKind, ReleaseChannel, Version, version_groups};
+use lumilio_core::{
+    GroupLabel, ProjectDetail, ProjectKind, ReleaseChannel, Version, version_groups,
+};
 
 /// Game version groups a row lists before "+N".
 const GROUPS_SHOWN: usize = 3;
 /// Platforms a row lists before "+N".
 const PLATFORMS_SHOWN: usize = 2;
+
+/// A game version group in the person's language.
+#[must_use]
+pub fn group_label(label: &GroupLabel) -> String {
+    match label {
+        GroupLabel::Ancient => tr!("project-group-ancient").to_owned(),
+        GroupLabel::AlphaBeta => tr!("project-group-alpha-beta").to_owned(),
+        GroupLabel::Alpha => tr!("project-group-alpha").to_owned(),
+        GroupLabel::Beta => tr!("project-group-beta").to_owned(),
+        GroupLabel::PreAlpha => tr!("project-group-pre-alpha").to_owned(),
+        GroupLabel::Range(range) => range.clone(),
+    }
+}
 
 pub struct Picker {
     state: Entity<SelectState<SearchableVec<String>>>,
@@ -378,7 +393,7 @@ impl ProjectDetailView {
                 } else {
                     version_groups(&version.game_versions, &self.game_tags)
                         .into_iter()
-                        .map(|group| group.label)
+                        .map(|group| group_label(&group.label))
                         .collect()
                 };
                 let game_tags = h_flex()

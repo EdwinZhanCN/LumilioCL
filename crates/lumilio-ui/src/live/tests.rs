@@ -13,7 +13,7 @@ use super::settings::settings_view;
 use crate::home::HomePresentation;
 use lumilio_core::{
     ActiveTask, ActivityView, FinishedTask, HomeSummary, InstanceRecord, LauncherSettings, Loader,
-    TaskCategory, TaskOutcome,
+    TaskCategory, TaskLabel, TaskOutcome,
 };
 use std::path::{Path, PathBuf};
 
@@ -364,7 +364,7 @@ fn activity_shows_running_first_and_maps_outcomes() {
         active: vec![ActiveTask {
             id: 1,
             category: TaskCategory::Download,
-            label: "安装 sodium".to_owned(),
+            label: TaskLabel::Text("安装 sodium".to_owned()),
             instance_id: Some("a".to_owned()),
             started: 0,
             progress: Some((50, 200)),
@@ -375,7 +375,7 @@ fn activity_shows_running_first_and_maps_outcomes() {
         finished: vec![
             FinishedTask {
                 category: TaskCategory::Install,
-                label: "ok".to_owned(),
+                label: TaskLabel::Text("ok".to_owned()),
                 instance_id: None,
                 started: 0,
                 finished: NOW - 120,
@@ -384,7 +384,7 @@ fn activity_shows_running_first_and_maps_outcomes() {
             },
             FinishedTask {
                 category: TaskCategory::Download,
-                label: "bad".to_owned(),
+                label: TaskLabel::Text("bad".to_owned()),
                 instance_id: None,
                 started: 0,
                 finished: NOW,
@@ -440,7 +440,7 @@ fn a_finished_row_keeps_what_it_needs_to_be_retried_or_opened() {
         cancellable: Default::default(),
         finished: vec![FinishedTask {
             category: TaskCategory::Install,
-            label: "bad".to_owned(),
+            label: TaskLabel::Text("bad".to_owned()),
             instance_id: Some("a".to_owned()),
             started: 0,
             finished: NOW,
@@ -593,7 +593,7 @@ fn unknown_progress_is_not_a_fraction() {
     let task = ActiveTask {
         id: 1,
         category: TaskCategory::Install,
-        label: String::new(),
+        label: TaskLabel::Text(String::new()),
         instance_id: None,
         started: 0,
         progress: Some((0, 0)),

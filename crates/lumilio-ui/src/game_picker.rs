@@ -7,7 +7,7 @@ use crate::controls::Checkbox;
 use crate::key::Key;
 use gpui::{App, Context, Entity, IntoElement, Render, Window, div, prelude::*, px};
 use gpui_component::{ActiveTheme as _, WindowExt as _, h_flex, v_flex};
-use lumilio_core::FoundGame;
+use lumilio_core::{FoundGame, GameOrigin};
 
 use crate::live::loader_label;
 use crate::theme::{self, ShellColors};
@@ -15,6 +15,15 @@ use crate::theme::{self, ShellColors};
 const DIALOG_WIDTH: f32 = 440.;
 
 pub type PickHandler = Rc<dyn Fn(Vec<FoundGame>, &mut Window, &mut App)>;
+
+/// Where a game was found, in the person's language.
+#[must_use]
+pub fn origin_label(origin: GameOrigin) -> String {
+    match origin {
+        GameOrigin::MultiMcPrism => "MultiMC / Prism".to_owned(),
+        GameOrigin::MinecraftFolder => crate::tr!("game-picker-origin-minecraft").to_owned(),
+    }
+}
 
 /// The games ticked, in the order found.
 #[must_use]
@@ -25,14 +34,15 @@ pub fn chosen(rows: &[(FoundGame, bool)]) -> Vec<FoundGame> {
         .collect()
 }
 
-/// What a row says: the name's game and loader.
+/// What a row says: the name's game, loader and where it was found.
 #[must_use]
 pub fn describe(game: &FoundGame) -> String {
     format!(
-        "{} · {} {}",
+        "{} · {} {} · {}",
         game.name,
         game.game_version,
-        loader_label(game.loader)
+        loader_label(game.loader),
+        origin_label(game.origin)
     )
 }
 
@@ -141,7 +151,7 @@ mod tests {
             loader,
             loader_version: None,
             game_dir: "/x".into(),
-            origin: "t",
+            origin: GameOrigin::MultiMcPrism,
         }
     }
 
@@ -165,6 +175,6 @@ mod tests {
         assert_eq!(names(&rows), ["c"]);
         rows[1].1 = true;
         assert_eq!(names(&rows), ["b", "c"]);
-        assert_eq!(describe(&rows[1].0), "b · 1.21.1 Fabric");
+        assert_eq!(describe(&rows[1].0), "b · 1.21.1 Fabric · MultiMC / Prism");
     }
 }

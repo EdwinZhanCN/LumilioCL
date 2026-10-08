@@ -127,6 +127,32 @@ fn a_clock_that_goes_backwards_never_makes_a_negative_duration() {
 }
 
 #[test]
+fn a_typed_line_and_a_line_from_before_labels_were_typed_both_read() {
+    let (_dir, log) = log();
+    std::fs::write(
+        log.path.clone(),
+        concat!(
+            "{\"category\":\"install\",\"label\":\"安装 生存\",\"instance_id\":null,",
+            "\"started\":1,\"finished\":2,\"outcome\":{\"result\":\"succeeded\"}}\n",
+            "{\"category\":\"install\",\"label\":{\"action\":\"install_game\",\"subject\":\"生存\"},",
+            "\"instance_id\":null,\"started\":3,\"finished\":4,",
+            "\"outcome\":{\"result\":\"succeeded\"}}\n",
+        ),
+    )
+    .unwrap();
+    let (tasks, skipped) = log.read().unwrap();
+    assert_eq!(skipped, 0);
+    assert_eq!(tasks[0].label, TaskLabel::Text("安装 生存".to_owned()));
+    assert_eq!(
+        tasks[1].label,
+        TaskLabel::Typed {
+            action: TaskAction::InstallGame,
+            subject: "生存".to_owned(),
+        }
+    );
+}
+
+#[test]
 fn views_filter_by_category_newest_first_and_ids_are_distinct() {
     let (_dir, log) = log();
     let mut board = TaskBoard::default();
@@ -141,8 +167,8 @@ fn views_filter_by_category_newest_first_and_ids_are_distinct() {
             .unwrap();
     }
     let installs = log.recent(Some(TaskCategory::Install), 10).unwrap();
-    let labels: Vec<_> = installs.iter().map(|t| t.label.as_str()).collect();
-    assert_eq!(labels, ["c", "a"]);
+    let labels: Vec<_> = installs.iter().map(|t| t.label.clone()).collect();
+    assert_eq!(labels, [TaskLabel::from("c"), TaskLabel::from("a")]);
     assert_eq!(installs[0].outcome, TaskOutcome::Failed("boom".into()));
     assert_eq!(log.recent(None, 2).unwrap().len(), 2);
 }
@@ -163,5 +189,5 @@ fn torn_lines_are_skipped_and_compact_keeps_the_newest() {
     assert_eq!((tasks.len(), skipped), (4, 1));
     log.compact(2).unwrap();
     let labels: Vec<_> = log.read().unwrap().0.into_iter().map(|t| t.label).collect();
-    assert_eq!(labels, ["t3", "t4"]);
+    assert_eq!(labels, [TaskLabel::from("t3"), TaskLabel::from("t4")]);
 }

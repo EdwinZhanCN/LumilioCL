@@ -3,7 +3,7 @@ use super::support::{TaskLease, meter_bytes};
 use super::types::now;
 use super::{LauncherService, TRANSFER_CONCURRENCY};
 use crate::activity::CancellationToken;
-use crate::activity_log::{TaskBoard, TaskCategory, TaskOutcome};
+use crate::activity_log::{TaskBoard, TaskCategory, TaskLabel, TaskOutcome};
 use crate::launcher::{LaunchRequest, LaunchServiceError, LaunchUpdate, Launcher};
 use crate::transfer::Transport;
 use std::sync::Mutex as StdMutex;
@@ -70,7 +70,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     pub(super) fn begin(
         &self,
         category: TaskCategory,
-        label: String,
+        label: TaskLabel,
         instance: Option<String>,
         cancel: Option<&CancellationToken>,
     ) -> TaskLease<'_> {

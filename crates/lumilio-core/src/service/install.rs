@@ -1,7 +1,7 @@
 use super::error::ServiceError;
 use super::{LauncherService, loader_text};
 use crate::activity::CancellationToken;
-use crate::activity_log::{RetryAction, TaskCategory};
+use crate::activity_log::{RetryAction, TaskAction, TaskCategory, TaskLabel};
 use crate::history::ChangeKind;
 use crate::instance::{InstanceRecord, Loader, StoreError};
 use crate::launcher::{LaunchServiceError, LaunchUpdate, Launcher};
@@ -24,7 +24,10 @@ impl<T: Transport + Clone> LauncherService<T> {
         let task = self
             .begin(
                 TaskCategory::Install,
-                format!("安装 {}", request.instance.name),
+                TaskLabel::Typed {
+                    action: TaskAction::InstallGame,
+                    subject: request.instance.name.clone(),
+                },
                 Some(id.to_owned()),
                 Some(&cancel),
             )
@@ -63,7 +66,10 @@ impl<T: Transport + Clone> LauncherService<T> {
         let task = self
             .begin(
                 TaskCategory::Repair,
-                format!("修复 {}", request.instance.name),
+                TaskLabel::Typed {
+                    action: TaskAction::RepairGame,
+                    subject: request.instance.name.clone(),
+                },
                 Some(id.to_owned()),
                 Some(&cancel),
             )
@@ -155,7 +161,10 @@ impl<T: Transport + Clone> LauncherService<T> {
         let task = self
             .begin(
                 TaskCategory::Update,
-                format!("更换 {} 的版本", current.name),
+                TaskLabel::Typed {
+                    action: TaskAction::ChangeVersion,
+                    subject: current.name.clone(),
+                },
                 Some(id.to_owned()),
                 Some(&cancel),
             )

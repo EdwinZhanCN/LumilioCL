@@ -242,6 +242,8 @@ reclaim-body-kept =
     No game uses them. Deleting them means they'll be downloaded again when needed.
     Not cleaned up: { $kept }
 reclaim-confirm = Clean up
+reclaim-kept-installer-libraries = Forge / NeoForge games found: the libraries they generated at install time have no manifest, so the libraries folder isn't cleaned up yet
+reclaim-kept-asset-index = A game's asset index can't be read, so asset files aren't cleaned up yet
 collection-rename-title = Rename collection
 collection-rename-confirm = Rename
 collection-create-confirm = Create
@@ -262,6 +264,7 @@ library-restore-failed = Couldn't restore this backup
 game-picker-title = Which game to import
 game-picker-body = This folder has more than one game. Importing copies the player files (mods, saves, settings); the originals are left untouched.
 game-picker-import = Import
+game-picker-origin-minecraft = Minecraft folder
 collection-deleted = Deleted collection "{ $name }"
 collection-delete-failed = Couldn't delete the collection
 library-drop-unsupported = Only a modpack (.mrpack or .zip) can be dropped here
@@ -643,6 +646,24 @@ activity-tab-install = Installs
 activity-tab-update = Updates
 activity-tab-repair = Repairs
 
+## Activity tasks: core gives the action and the subject; this turns them into one sentence
+
+task-install-game = Install { $subject }
+task-repair-game = Repair { $subject }
+task-change-version = Change the version of { $subject }
+task-export-world = Export { $subject }
+task-download-content = Download { $subject }
+task-install-content = Install { $subject }
+task-switch-content-version = Switch the version of { $subject }
+task-import-game = Import { $subject }
+task-backup-game = Back up { $subject }
+task-restore-backup = Restore backup { $subject }
+task-install-java = Install Java { $subject }
+task-install-java-any = Install Java
+task-copy-game = Copy { $subject }
+task-install-modpack = Install modpack { $subject }
+task-import-modpack = Import modpack { $subject }
+
 ## New game
 
 new-game-loader-stable = Stable
@@ -708,6 +729,11 @@ project-save-failed = Didn't download { $title }
 project-update-started = Updating { $title }; progress is in Activity
 project-updated-to = Updated to { $file } ({ $instance })
 project-update-failed = Didn't update { $title }
+project-group-ancient = All ancient versions
+project-group-alpha-beta = All alpha and beta versions
+project-group-alpha = All alpha versions
+project-group-beta = All beta versions
+project-group-pre-alpha = All pre-alpha versions
 
 ## Dependencies
 
@@ -1265,6 +1291,10 @@ instance-settings-quick-world = World · { $name }
 instance-settings-quick-server = Server · { $address }
 instance-settings-command-none = Don't use
 instance-settings-quick-target-required = Enter a world name or server address
+instance-settings-quick-world-empty = The world name can't be empty
+instance-settings-quick-world-invalid = That world name isn't a valid save folder
+instance-settings-quick-host-invalid = The server address isn't a valid host name
+instance-settings-quick-port-invalid = The port must be a number from 1 to 65535
 instance-settings-tab-game = Game
 instance-settings-tab-runtime = Runtime
 instance-settings-tab-java = Java

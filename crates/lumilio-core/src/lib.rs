@@ -69,8 +69,8 @@ pub use activity::{
     ProgressSnapshot,
 };
 pub use activity_log::{
-    ActiveTask, ActivityLog, FinishedTask, ProgressUnit, RetryAction, TaskBoard, TaskCategory,
-    TaskOutcome,
+    ActiveTask, ActivityLog, FinishedTask, ProgressUnit, RetryAction, TaskAction, TaskBoard,
+    TaskCategory, TaskLabel, TaskOutcome,
 };
 pub use artifact::{CoordinateError, PackageCoordinate};
 pub use attention::{AttentionItem, HomeSummary, summarize as summarize_home};
@@ -91,7 +91,7 @@ pub use diagnostics::{
 };
 pub use discover::{
     CategoryTag, ContentClient, DependencyKind, DiscoverError, Environment, GalleryImage,
-    GameVersionTag, IntentError, KindAbilities, LoaderTag, Pick, Project, ProjectKind,
+    GameVersionTag, GroupLabel, IntentError, KindAbilities, LoaderTag, Pick, Project, ProjectKind,
     ProjectLinks, ProjectSummary, ReleaseChannel, SITE_BASE, SearchHit, SearchPage, SearchQuery,
     SideSupport, SortIndex, SourceFilters, Stance, Version, VersionFile, VersionGroup,
     browse_page_url, environment, fits as version_fits, install_request as content_install_request,
@@ -106,7 +106,7 @@ pub use history::{
     ChangeKind, HistoryEvent, HistoryLog, HistoryRead, SessionOutcome, finish_session,
     record_attempt,
 };
-pub use import_game::{FoundGame, ImportError};
+pub use import_game::{FoundGame, GameOrigin, ImportError};
 pub use inspect::inspect_instance;
 pub use install::{
     ArchiveLimits, ArtifactKind, AssetIndex, AssetIndexError, AssetObject, InstallError,
@@ -151,7 +151,7 @@ pub use process::{
     DEFAULT_SETTLE, GameEvent, GameExit, GameOptions, LogStream, ProcessError,
     command_line as game_command_line, run as run_game,
 };
-pub use reclaim::{ReclaimError, Reclaimable};
+pub use reclaim::{KeptReason, ReclaimError, Reclaimable};
 pub use recovery::RecoveryNote;
 pub use release::{
     ArgumentGroups, ArgumentTemplate, AssetCatalog, DownloadDescriptor, ExtractionPolicy,
@@ -192,8 +192,8 @@ pub use transfer::{
 };
 pub use tuning::{
     AfterLaunch, Appearance, DOWNLOAD_CONCURRENCY, DiscoverPreferences, EnvVar, InstanceLaunch,
-    Language, LaunchTuning, MAX_WINDOW_SIDE, MotionPreference, Preferences, QuickPlay, TuningError,
-    quick_play_problem, quick_play_world_unsupported, split_words,
+    Language, LaunchTuning, MAX_WINDOW_SIDE, MotionPreference, Preferences, QuickPlay,
+    QuickPlayProblem, TuningError, quick_play_problem, quick_play_world_unsupported, split_words,
 };
 pub use updates::{
     ContentUpdate, UpdateError, UpdateReport, apply as apply_update, check as check_updates,

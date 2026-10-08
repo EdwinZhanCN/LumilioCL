@@ -4,7 +4,7 @@ use super::packs::backup_failure;
 use super::support::blocking_value;
 use super::types::now;
 use crate::activity::CancellationToken;
-use crate::activity_log::{RetryAction, TaskCategory};
+use crate::activity_log::{RetryAction, TaskAction, TaskCategory, TaskLabel};
 use crate::instance::{InstanceRecord, InstanceSettings, Loader, NewInstance};
 use crate::staged::Staged;
 use crate::transfer::Transport;
@@ -32,7 +32,10 @@ impl<T: Transport + Clone> LauncherService<T> {
     ) -> Result<InstanceRecord, ServiceError> {
         let task = self.begin(
             TaskCategory::Install,
-            format!("导入 {}", game.name),
+            TaskLabel::Typed {
+                action: TaskAction::ImportGame,
+                subject: game.name.clone(),
+            },
             None,
             Some(&cancel),
         );
@@ -127,7 +130,10 @@ impl<T: Transport + Clone> LauncherService<T> {
         let task = self
             .begin(
                 TaskCategory::Install,
-                format!("备份 {}", record.name),
+                TaskLabel::Typed {
+                    action: TaskAction::BackupGame,
+                    subject: record.name.clone(),
+                },
                 Some(id.to_owned()),
                 Some(&cancel),
             )
@@ -172,7 +178,10 @@ impl<T: Transport + Clone> LauncherService<T> {
         let task = self
             .begin(
                 TaskCategory::Install,
-                format!("恢复备份 {label}"),
+                TaskLabel::Typed {
+                    action: TaskAction::RestoreBackup,
+                    subject: label,
+                },
                 None,
                 Some(&cancel),
             )
@@ -201,14 +210,24 @@ impl<T: Transport + Clone> LauncherService<T> {
         .map_err(backup_failure)?;
         let (id, name) = {
             let store = self.store.lock().await;
-            let taken = store
-                .instances()
-                .iter()
-                .any(|record| record.name.trim() == meta.name.trim());
-            let name = if taken {
-                format!("{}（恢复）", meta.name.trim())
+            let base = meta.name.trim();
+            let taken = |candidate: &str| {
+                store
+                    .instances()
+                    .iter()
+                    .any(|record| record.name.trim() == candidate)
+            };
+            let name = if taken(base) {
+                let mut count = 2;
+                loop {
+                    let candidate = format!("{base} ({count})");
+                    if !taken(&candidate) {
+                        break candidate;
+                    }
+                    count += 1;
+                }
             } else {
-                meta.name.trim().to_owned()
+                base.to_owned()
             };
             (store.suggest_id(&name)?, name)
         };

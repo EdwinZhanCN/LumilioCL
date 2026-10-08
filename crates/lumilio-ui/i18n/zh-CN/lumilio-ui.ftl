@@ -220,6 +220,8 @@ reclaim-body-kept =
     没有游戏用到它们。删掉后，以后需要时会重新下载。
     没清理的部分：{ $kept }
 reclaim-confirm = 清理
+reclaim-kept-installer-libraries = 有 Forge / NeoForge 游戏：它们安装时生成的库文件没有清单，库文件夹先不清理
+reclaim-kept-asset-index = 有游戏的资源索引读不到，资源文件先不清理
 collection-rename-title = 合集改名
 collection-rename-confirm = 改名
 collection-create-confirm = 新建
@@ -240,6 +242,7 @@ library-restore-failed = 没能恢复这个备份
 game-picker-title = 导入哪个游戏
 game-picker-body = 这个文件夹里有不止一个游戏。导入会复制一份玩家文件（Mod、存档、设置），原来的不会被改动。
 game-picker-import = 导入
+game-picker-origin-minecraft = Minecraft 文件夹
 collection-deleted = 已删除合集“{ $name }”
 collection-delete-failed = 没能删除合集
 library-drop-unsupported = 这里只能放整合包（.mrpack 或 .zip）
@@ -585,6 +588,23 @@ activity-tab-install = 安装
 activity-tab-update = 更新
 activity-tab-repair = 修复
 
+## 动态任务：core 只给出动作和对象，这里把它说成一句话
+task-install-game = 安装 { $subject }
+task-repair-game = 修复 { $subject }
+task-change-version = 更换 { $subject } 的版本
+task-export-world = 导出 { $subject }
+task-download-content = 下载 { $subject }
+task-install-content = 安装 { $subject }
+task-switch-content-version = 切换 { $subject } 的版本
+task-import-game = 导入 { $subject }
+task-backup-game = 备份 { $subject }
+task-restore-backup = 恢复备份 { $subject }
+task-install-java = 安装 Java { $subject }
+task-install-java-any = 安装 Java
+task-copy-game = 复制 { $subject }
+task-install-modpack = 安装整合包 { $subject }
+task-import-modpack = 导入整合包 { $subject }
+
 ## 新建游戏
 
 new-game-loader-stable = 稳定版
@@ -650,6 +670,11 @@ project-save-failed = 没有下载 { $title }
 project-update-started = 开始更新 { $title }，进度在动态里
 project-updated-to = 已更新为 { $file }（{ $instance }）
 project-update-failed = 没有更新 { $title }
+project-group-ancient = 所有远古版本
+project-group-alpha-beta = 所有 Alpha 和 Beta 版本
+project-group-alpha = 所有 Alpha 版本
+project-group-beta = 所有 Beta 版本
+project-group-pre-alpha = 所有 Pre-alpha 版本
 
 ## 依赖提示
 
@@ -1130,6 +1155,10 @@ instance-settings-quick-world = 世界 · { $name }
 instance-settings-quick-server = 服务器 · { $address }
 instance-settings-command-none = 不使用
 instance-settings-quick-target-required = 请填写世界名或服务器地址
+instance-settings-quick-world-empty = 世界名不能为空
+instance-settings-quick-world-invalid = 世界名不是一个有效的存档文件夹
+instance-settings-quick-host-invalid = 服务器地址不是有效的主机名
+instance-settings-quick-port-invalid = 端口需要是 1 到 65535 的数字
 instance-settings-tab-game = 游戏
 instance-settings-tab-runtime = 运行时
 instance-settings-tab-java = Java

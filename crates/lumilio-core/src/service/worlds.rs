@@ -1,7 +1,7 @@
 use super::LauncherService;
 use super::error::{ServiceError, read_unless_cancelled};
 use crate::activity::CancellationToken;
-use crate::activity_log::TaskCategory;
+use crate::activity_log::{TaskAction, TaskCategory, TaskLabel};
 use crate::history::ChangeKind;
 use crate::instance::InstanceRecord;
 use crate::transfer::Transport;
@@ -91,7 +91,10 @@ impl<T: Transport + Clone> LauncherService<T> {
         let record = self.instance(id).await?;
         let task = self.begin(
             TaskCategory::Install,
-            format!("导出 {}", spec.name.trim()),
+            TaskLabel::Typed {
+                action: TaskAction::ExportWorld,
+                subject: spec.name.trim().to_owned(),
+            },
             Some(id.to_owned()),
             Some(&cancel),
         );

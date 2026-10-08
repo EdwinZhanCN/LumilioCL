@@ -151,7 +151,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         let target = QuickPlay::Server(address.trim().to_owned());
         if let Some(problem) = crate::tuning::quick_play_problem(&target) {
             return Err(ServiceError::Store(StoreError::InvalidLaunch(
-                problem.to_owned(),
+                problem.as_str().to_owned(),
             )));
         }
         self.launch_with(id, Some(Some(target)), updates, cancel)

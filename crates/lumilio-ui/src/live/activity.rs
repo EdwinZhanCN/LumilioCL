@@ -1,6 +1,7 @@
 use super::library::relative_time;
 use lumilio_core::{
-    ActiveTask, ActivityView, FinishedTask, RecoveryNote, TaskCategory, TaskOutcome,
+    ActiveTask, ActivityView, FinishedTask, RecoveryNote, TaskAction, TaskCategory, TaskLabel,
+    TaskOutcome,
 };
 
 use crate::tr;
@@ -179,6 +180,39 @@ pub fn recovery_message(notes: &[RecoveryNote]) -> Option<String> {
     })
 }
 
+/// A task's label in the person's language. A line written before labels were
+/// typed is shown as it was.
+#[must_use]
+pub fn task_label(label: &TaskLabel) -> String {
+    let TaskLabel::Typed { action, subject } = label else {
+        return label.text().to_owned();
+    };
+    match action {
+        TaskAction::InstallGame => tr!("task-install-game", subject = subject.as_str()),
+        TaskAction::RepairGame => tr!("task-repair-game", subject = subject.as_str()),
+        TaskAction::ChangeVersion => tr!("task-change-version", subject = subject.as_str()),
+        TaskAction::ExportWorld => tr!("task-export-world", subject = subject.as_str()),
+        TaskAction::DownloadContent => tr!("task-download-content", subject = subject.as_str()),
+        TaskAction::InstallContent => tr!("task-install-content", subject = subject.as_str()),
+        TaskAction::SwitchContentVersion => {
+            tr!("task-switch-content-version", subject = subject.as_str())
+        }
+        TaskAction::ImportGame => tr!("task-import-game", subject = subject.as_str()),
+        TaskAction::BackupGame => tr!("task-backup-game", subject = subject.as_str()),
+        TaskAction::RestoreBackup => tr!("task-restore-backup", subject = subject.as_str()),
+        TaskAction::InstallJava => {
+            if subject.is_empty() {
+                tr!("task-install-java-any").to_owned()
+            } else {
+                tr!("task-install-java", subject = subject.as_str())
+            }
+        }
+        TaskAction::CopyGame => tr!("task-copy-game", subject = subject.as_str()),
+        TaskAction::InstallModpack => tr!("task-install-modpack", subject = subject.as_str()),
+        TaskAction::ImportModpack => tr!("task-import-modpack", subject = subject.as_str()),
+    }
+}
+
 pub(super) fn active_row(task: &ActiveTask, cancellable: bool) -> ActivityRow {
     ActivityRow {
         task: Some(task.id),
@@ -188,7 +222,7 @@ pub(super) fn active_row(task: &ActiveTask, cancellable: bool) -> ActivityRow {
         instance: task.instance_id.clone(),
         retry: None,
         category: task.category,
-        title: task.label.clone(),
+        title: task_label(&task.label),
         detail: task.instance_id.clone().unwrap_or_default(),
         fraction: task
             .progress
@@ -213,7 +247,7 @@ pub(super) fn finished_row(task: &FinishedTask, now: u64) -> ActivityRow {
         instance: task.instance_id.clone(),
         retry: task.retry.clone(),
         category: task.category,
-        title: task.label.clone(),
+        title: task_label(&task.label),
         detail: relative_time(task.finished, now),
         fraction: None,
         state,

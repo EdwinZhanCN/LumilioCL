@@ -15,9 +15,11 @@ pub enum DiscoverError {
 impl Display for DiscoverError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Self::NoSource => f.write_str("没有可用的内容源"),
-            Self::Unavailable(message) => write!(f, "内容源不可用：{message}"),
-            Self::Invalid(message) => write!(f, "内容源的回答无法使用：{message}"),
+            Self::NoSource => f.write_str("no content source is available"),
+            Self::Unavailable(message) => f.write_str(message),
+            Self::Invalid(message) => {
+                write!(f, "the content source's answer cannot be used: {message}")
+            }
         }
     }
 }

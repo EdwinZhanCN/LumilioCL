@@ -4,7 +4,7 @@ use super::{
     Scripted, fake_java, instance_with_profile, operation_dirs, publish_release, reopen, world,
 };
 use crate::activity::CancellationToken;
-use crate::activity_log::{FinishedTask, TaskCategory, TaskOutcome};
+use crate::activity_log::{FinishedTask, TaskCategory, TaskLabel, TaskOutcome};
 use crate::deletion::Deletion;
 use crate::instance::{Loader, NewInstance, StoreError};
 use crate::launch_session::LaunchSignal;
@@ -290,7 +290,7 @@ async fn damaged_settings_and_torn_activity_lines_are_reported_with_counts() {
     std::fs::write(root.join("settings.json"), b"{ nope").unwrap();
     let good = FinishedTask {
         category: TaskCategory::Install,
-        label: "ok".into(),
+        label: TaskLabel::Text("ok".into()),
         instance_id: None,
         started: 1,
         finished: 2,

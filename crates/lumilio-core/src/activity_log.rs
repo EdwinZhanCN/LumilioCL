@@ -83,6 +83,63 @@ pub enum RetryAction {
     },
 }
 
+/// What a task is doing, as a type rather than a sentence: the interface
+/// turns it into words in the person's language.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum TaskLabel {
+    Typed {
+        action: TaskAction,
+        subject: String,
+    },
+    /// A line written before labels were typed: shown as it was.
+    Text(String),
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskAction {
+    InstallGame,
+    RepairGame,
+    ChangeVersion,
+    ExportWorld,
+    DownloadContent,
+    InstallContent,
+    SwitchContentVersion,
+    ImportGame,
+    BackupGame,
+    RestoreBackup,
+    InstallJava,
+    CopyGame,
+    InstallModpack,
+    ImportModpack,
+}
+
+impl From<&str> for TaskLabel {
+    fn from(text: &str) -> Self {
+        Self::Text(text.to_owned())
+    }
+}
+
+impl From<String> for TaskLabel {
+    fn from(text: String) -> Self {
+        Self::Text(text)
+    }
+}
+
+impl TaskLabel {
+    /// The label's own text: the subject of a typed label, or the whole text
+    /// of a written one. The action itself needs the catalog; this is what a
+    /// log line or a caller with no words can show.
+    #[must_use]
+    pub fn text(&self) -> &str {
+        match self {
+            Self::Typed { subject, .. } => subject,
+            Self::Text(text) => text,
+        }
+    }
+}
+
 /// What a task's progress numbers count.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -97,7 +154,7 @@ pub enum ProgressUnit {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct FinishedTask {
     pub category: TaskCategory,
-    pub label: String,
+    pub label: TaskLabel,
     pub instance_id: Option<String>,
     pub started: u64,
     pub finished: u64,
@@ -111,7 +168,7 @@ pub struct FinishedTask {
 pub struct ActiveTask {
     pub id: u64,
     pub category: TaskCategory,
-    pub label: String,
+    pub label: TaskLabel,
     pub instance_id: Option<String>,
     pub started: u64,
     /// Done and total in `unit`, if known.
@@ -133,7 +190,7 @@ impl TaskBoard {
     pub fn start(
         &mut self,
         category: TaskCategory,
-        label: impl Into<String>,
+        label: impl Into<TaskLabel>,
         instance_id: Option<String>,
         now: u64,
     ) -> u64 {

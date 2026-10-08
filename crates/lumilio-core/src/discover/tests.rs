@@ -319,8 +319,11 @@ fn game(version: &str, kind: &str, date: &str) -> super::tags::GameVersionTag {
     }
 }
 
-fn labels(groups: &[super::version_groups::VersionGroup]) -> Vec<&str> {
-    groups.iter().map(|group| group.label.as_str()).collect()
+fn labels(groups: &[super::version_groups::VersionGroup]) -> Vec<String> {
+    groups
+        .iter()
+        .map(|group| group.label.text().into_owned())
+        .collect()
 }
 
 #[test]

@@ -29,7 +29,7 @@ pub use self::query::{Pick, SearchQuery, Stance};
 pub use self::search::{Environment, SearchHit, SearchPage, SideSupport, environment};
 pub use self::source::{ContentClient, KindAbilities, SourceFilters};
 pub use self::tags::{CategoryTag, GameVersionTag, LoaderTag, ProjectSummary};
-pub use self::version_groups::{VersionGroup, version_groups};
+pub use self::version_groups::{GroupLabel, VersionGroup, version_groups};
 pub use self::versions::{
     Dependency, DependencyKind, ReleaseChannel, Version, VersionFile, fits, pick_version,
 };

@@ -222,15 +222,46 @@ pub struct InstanceLaunch {
 /// Longest world folder name or server address accepted.
 const QUICK_PLAY_LIMIT: usize = 255;
 
+/// Why a quick-play target cannot be used, as a type rather than a sentence:
+/// the interface turns it into words in the person's language.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum QuickPlayProblem {
+    EmptyWorld,
+    InvalidWorld,
+    InvalidHost,
+    InvalidPort,
+}
+
+impl QuickPlayProblem {
+    /// The technical reason, for a log or a caller with no catalog.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::EmptyWorld => "the world name is empty",
+            Self::InvalidWorld => "the world name is not a valid save folder",
+            Self::InvalidHost => "the server address is not a valid host",
+            Self::InvalidPort => "the port is not a number from 1 to 65535",
+        }
+    }
+}
+
+impl Display for QuickPlayProblem {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl Error for QuickPlayProblem {}
+
 /// Why a quick-play target cannot be used.
 #[must_use]
-pub fn quick_play_problem(target: &QuickPlay) -> Option<&'static str> {
+pub fn quick_play_problem(target: &QuickPlay) -> Option<QuickPlayProblem> {
     match target {
         QuickPlay::World(name) => {
             if name.is_empty() || name.len() > QUICK_PLAY_LIMIT {
-                Some("世界名不能为空")
+                Some(QuickPlayProblem::EmptyWorld)
             } else if name.contains(['/', '\\']) || name == "." || name == ".." || !plain(name) {
-                Some("世界名不是一个有效的存档文件夹")
+                Some(QuickPlayProblem::InvalidWorld)
             } else {
                 None
             }
@@ -247,9 +278,9 @@ pub fn quick_play_problem(target: &QuickPlay) -> Option<&'static str> {
                     .chars()
                     .any(|ch| ch.is_whitespace() || ch.is_control() || ch == '/')
             {
-                Some("服务器地址不是有效的主机名")
+                Some(QuickPlayProblem::InvalidHost)
             } else if port.is_some_and(|port| port.parse::<u16>().map_or(true, |port| port == 0)) {
-                Some("端口需要是 1 到 65535 的数字")
+                Some(QuickPlayProblem::InvalidPort)
             } else {
                 None
             }

@@ -4,7 +4,7 @@ use super::packs::{PackKind, UnpackError, sniff_pack, unpack_instance_zip};
 use super::support::blocking_value;
 use super::types::now;
 use crate::activity::CancellationToken;
-use crate::activity_log::{RetryAction, TaskCategory};
+use crate::activity_log::{RetryAction, TaskAction, TaskCategory, TaskLabel};
 use crate::instance::{InstanceRecord, NewInstance};
 use crate::modpack;
 use crate::staged::Staged;
@@ -31,7 +31,10 @@ impl<T: Transport + Clone> LauncherService<T> {
         let task = self
             .begin(
                 TaskCategory::Install,
-                format!("复制 {}", source.name),
+                TaskLabel::Typed {
+                    action: TaskAction::CopyGame,
+                    subject: source.name.clone(),
+                },
                 Some(source_id.to_owned()),
                 Some(&cancel),
             )
@@ -117,7 +120,10 @@ impl<T: Transport + Clone> LauncherService<T> {
         let task = self
             .begin(
                 TaskCategory::Install,
-                format!("安装整合包 {project}"),
+                TaskLabel::Typed {
+                    action: TaskAction::InstallModpack,
+                    subject: project.to_owned(),
+                },
                 None,
                 Some(&cancel),
             )
@@ -146,7 +152,10 @@ impl<T: Transport + Clone> LauncherService<T> {
         let task = self
             .begin(
                 TaskCategory::Install,
-                format!("导入整合包 {label}"),
+                TaskLabel::Typed {
+                    action: TaskAction::ImportModpack,
+                    subject: label.clone(),
+                },
                 None,
                 Some(&cancel),
             )

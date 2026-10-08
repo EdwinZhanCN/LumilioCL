@@ -2,7 +2,9 @@ use super::super::error::ServiceError;
 use super::super::support::meter_bytes;
 use super::{change_subjects, mod_version, world};
 use crate::activity::CancellationToken;
-use crate::activity_log::{FinishedTask, RetryAction, TaskBoard, TaskCategory, TaskOutcome};
+use crate::activity_log::{
+    FinishedTask, RetryAction, TaskBoard, TaskCategory, TaskLabel, TaskOutcome,
+};
 use crate::discover::ProjectKind;
 use crate::instance::Loader;
 use std::sync::Mutex as StdMutex;
@@ -61,7 +63,7 @@ async fn clearing_finished_work_empties_the_history_and_keeps_running_tasks() {
     let world = world();
     let finished = |label: &str| FinishedTask {
         category: TaskCategory::Download,
-        label: label.to_owned(),
+        label: TaskLabel::Text(label.to_owned()),
         instance_id: None,
         started: 1,
         finished: 2,
@@ -343,9 +345,12 @@ async fn log_failure_keeps_terminal_results_visible_without_resurrecting_tasks()
     std::fs::create_dir(&log_path).unwrap();
     let result: Result<(), ServiceError> = Ok(());
     for _ in 0..2 {
-        let task = world
-            .service
-            .begin(TaskCategory::Install, "same operation".into(), None, None);
+        let task = world.service.begin(
+            TaskCategory::Install,
+            TaskLabel::Text("same operation".to_owned()),
+            None,
+            None,
+        );
         world.service.end(task, &result);
     }
     let activity = world.service.activity(10);

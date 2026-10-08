@@ -15,6 +15,14 @@ use serde::Deserialize;
 
 use crate::instance::Loader;
 
+/// Which launcher's folder a game was found in, as a type rather than a
+/// sentence: the interface turns it into words in the person's language.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum GameOrigin {
+    MultiMcPrism,
+    MinecraftFolder,
+}
+
 /// A game found in someone else's folder.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FoundGame {
@@ -25,7 +33,7 @@ pub struct FoundGame {
     /// The folder holding the game's own files (mods, saves, options…).
     pub game_dir: PathBuf,
     /// Where it was found, for the person to recognise.
-    pub origin: &'static str,
+    pub origin: GameOrigin,
 }
 
 #[derive(Debug)]
@@ -102,7 +110,7 @@ fn read_prism(folder: &Path) -> Result<FoundGame, ImportError> {
         .find(|dir| dir.is_dir())
         .ok_or_else(|| ImportError::Unreadable("the instance has no game folder".to_owned()))?;
     let fallback = folder.file_name().map_or_else(
-        || "导入的游戏".to_owned(),
+        || "Imported game".to_owned(),
         |n| n.to_string_lossy().into_owned(),
     );
     Ok(FoundGame {
@@ -113,7 +121,7 @@ fn read_prism(folder: &Path) -> Result<FoundGame, ImportError> {
         loader,
         loader_version,
         game_dir,
-        origin: "MultiMC / Prism",
+        origin: GameOrigin::MultiMcPrism,
     })
 }
 
@@ -197,7 +205,7 @@ fn read_plain(folder: &Path) -> Result<Vec<FoundGame>, ImportError> {
             loader,
             loader_version,
             game_dir: if isolated { dir } else { folder.to_owned() },
-            origin: "Minecraft 文件夹",
+            origin: GameOrigin::MinecraftFolder,
         });
     }
     if found.is_empty() {
