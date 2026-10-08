@@ -11,7 +11,7 @@ use crate::pages::settings::{bytes_text, list_text};
 use crate::settings_dialog::{DialogSpec, FieldKind, FieldSpec};
 use crate::settings_forms as shared;
 use crate::theme::ShellColors;
-use crate::{kit, live};
+use crate::{kit, live, tr};
 use gpui::prelude::*;
 use gpui::{AnyElement, Context};
 use lumilio_core::{AfterLaunch, EnvVar, LauncherSettings, QuickPlay, recommended_memory_mb};
@@ -24,7 +24,7 @@ impl InstanceDetailView {
         let defaults: &LauncherSettings = &self.defaults;
 
         let size_default = window_text(defaults.launch.window_width, defaults.launch.window_height)
-            .unwrap_or_else(|| "未设置".to_owned());
+            .unwrap_or_else(|| tr!("common-not-set").to_owned());
         let overridden = own.launch.window_width.is_some()
             || own.launch.window_height.is_some()
             || own.launch.fullscreen.is_some();
@@ -35,9 +35,13 @@ impl InstanceDetailView {
             .fullscreen
             .or(defaults.launch.fullscreen)
             .unwrap_or(false);
-        let effective = format!("{size}{}", if fullscreen { " · 全屏" } else { "" });
+        let effective = if fullscreen {
+            tr!("instance-settings-window-fullscreen", size = size)
+        } else {
+            size
+        };
         let window_value = if overridden {
-            format!("{effective}（已自定义）")
+            tr!("instance-settings-window-custom", value = effective)
         } else {
             followed(None, effective)
         };
@@ -46,17 +50,17 @@ impl InstanceDetailView {
             // ia[instance.settings]: 窗口大小、全屏 | 设置 · 游戏组，值 + [编辑] 弹窗 | 宽高一起填（留空跟随默认）；全屏 关 / 开 / 跟随默认；恢复默认＝移除覆盖
             self.setting_row(
                 "isettings-window",
-                "窗口大小与全屏",
-                Some("宽和高需要一起填；留空跟随启动器的默认。".to_owned()),
+                tr!("settings-window"),
+                Some(tr!("instance-settings-window-help").to_owned()),
                 window_value,
                 Some(self.edit_spec("isettings-window-edit", move || DialogSpec {
-                    title: "窗口大小与全屏",
-                    intro: Some("只改这个游戏；留空或选“跟随默认”就用启动器的默认值。"),
+                    title: tr!("settings-window"),
+                    intro: Some(tr!("instance-settings-window-intro")),
                     fields: vec![
                             FieldSpec {
-                                label: "宽度",
+                                label: tr!("settings-window-width"),
                                 help: None,
-                                placeholder: "跟随默认",
+                                placeholder: tr!("instance-settings-follow-default"),
                                 value: current
                                     .launch
                                     .window_width
@@ -65,9 +69,9 @@ impl InstanceDetailView {
                                 kind: FieldKind::Line,
                             },
                             FieldSpec {
-                                label: "高度",
+                                label: tr!("settings-window-height"),
                                 help: None,
-                                placeholder: "跟随默认",
+                                placeholder: tr!("instance-settings-follow-default"),
                                 value: current
                                     .launch
                                     .window_height
@@ -76,7 +80,7 @@ impl InstanceDetailView {
                                 kind: FieldKind::Line,
                             },
                             FieldSpec {
-                                label: "全屏启动",
+                                label: tr!("settings-window-fullscreen"),
                                 help: None,
                                 placeholder: "",
                                 value: String::new(),
@@ -116,8 +120,8 @@ impl InstanceDetailView {
             // ia[instance.settings]: 进入游戏后 | 设置 · 游戏组，值 + [编辑] 弹窗 | 保持 / 隐藏启动器 / 跟随默认
             self.setting_row(
                 "isettings-after",
-                "进入游戏后",
-                Some("这个游戏开始运行后，启动器窗口怎么处理。".to_owned()),
+                tr!("settings-after-launch"),
+                Some(tr!("instance-settings-after-help").to_owned()),
                 followed(
                     own.launch
                         .after_launch
@@ -125,10 +129,10 @@ impl InstanceDetailView {
                     after_launch_text(defaults.preferences.after_launch),
                 ),
                 Some(self.edit_spec("isettings-after-edit", move || DialogSpec {
-                    title: "进入游戏后",
+                    title: tr!("settings-after-launch"),
                     intro: None,
                     fields: vec![FieldSpec {
-                        label: "启动器窗口",
+                        label: tr!("instance-settings-launcher-window"),
                         help: None,
                         placeholder: "",
                         value: String::new(),
@@ -158,11 +162,8 @@ impl InstanceDetailView {
             // ia[instance.settings]: 直接进入（Quick Play） | 设置 · 游戏组，值 + [编辑] 弹窗：类型 + 目标 | 启动后直达世界或服务器；版本不支持单人世界时启动会说明原因；世界页的「进入」用同一个能力
             self.setting_row(
                 "isettings-quick",
-                "直接进入",
-                Some(
-                    "开始游戏后直接进入一个世界或服务器。较旧的游戏版本不能直接进入单人世界。"
-                        .to_owned(),
-                ),
+                tr!("instance-settings-quick-play"),
+                Some(tr!("instance-settings-quick-help").to_owned()),
                 quick_play_text(own.launch.quick_play.as_ref()),
                 Some(self.edit_spec("isettings-quick-edit", move || {
                     let (kind, target) = match &current.launch.quick_play {
@@ -171,11 +172,11 @@ impl InstanceDetailView {
                         Some(QuickPlay::Server(address)) => (2, address.clone()),
                     };
                     DialogSpec {
-                        title: "直接进入",
-                        intro: Some("世界名是存档文件夹的名字；服务器写成 地址 或 地址:端口。"),
+                        title: tr!("instance-settings-quick-play"),
+                        intro: Some(tr!("instance-settings-quick-intro")),
                         fields: vec![
                             FieldSpec {
-                                label: "类型",
+                                label: tr!("instance-settings-type"),
                                 help: None,
                                 placeholder: "",
                                 value: String::new(),
@@ -185,9 +186,9 @@ impl InstanceDetailView {
                                 },
                             },
                             FieldSpec {
-                                label: "目标",
+                                label: tr!("instance-settings-target"),
                                 help: None,
-                                placeholder: "世界名或服务器地址",
+                                placeholder: tr!("instance-settings-target-placeholder"),
                                 value: target,
                                 kind: FieldKind::Line,
                             },
@@ -228,27 +229,27 @@ impl InstanceDetailView {
             // ia[instance.settings]: 更换游戏版本 / 加载器 | 设置 · 运行时，「游戏版本」「加载器」行的 [更换…] → 弹窗（加载器分段 + 版本选择器，起点是游戏现在的组合） | 警告“装好的 Mod 可能不兼容，先建快照” + [先建快照]；与现在相同时不能提交；失败回到旧组合
             self.setting_row(
                 "isettings-version",
-                "游戏版本",
-                Some("更换前建议先建一个快照；世界和设置不会被改动。".to_owned()),
+                tr!("instance-field-game-version"),
+                Some(tr!("instance-settings-version-help").to_owned()),
                 record.game_version.clone(),
                 Some(button(
                     "isettings-version-change",
-                    "更换…",
+                    tr!("instance-action-change"),
                     InstanceIntent::OpenRuntimeChange,
                 )),
                 colors,
             ),
             self.setting_row(
                 "isettings-loader",
-                "加载器",
-                Some("已装好的 Mod 可能和新的加载器不兼容。".to_owned()),
+                tr!("library-loader"),
+                Some(tr!("instance-settings-loader-help").to_owned()),
                 match &record.loader_version {
                     Some(version) => format!("{} {version}", live::loader_label(record.loader)),
                     None => live::loader_label(record.loader).to_owned(),
                 },
                 Some(button(
                     "isettings-loader-change",
-                    "更换…",
+                    tr!("instance-action-change"),
                     InstanceIntent::OpenRuntimeChange,
                 )),
                 colors,
@@ -256,17 +257,18 @@ impl InstanceDetailView {
             // ia[instance.settings]: 修复游戏文件 | 设置 · 运行时，「游戏文件」行的 [修复] | 逐个核对游戏文件，缺的或损坏的重新下载；世界、Mod 和设置不会被改动；后台任务
             self.setting_row(
                 "isettings-files",
-                "游戏文件",
-                Some(
-                    "逐个核对游戏文件，缺的或损坏的会重新下载；世界、Mod 和设置不会被改动。"
-                        .to_owned(),
-                ),
+                tr!("instance-settings-game-files"),
+                Some(tr!("instance-settings-files-help").to_owned()),
                 if record.installed {
-                    "已安装"
+                    tr!("discover-installed")
                 } else {
-                    "未下载"
+                    tr!("instance-settings-not-downloaded")
                 },
-                Some(button("isettings-repair", "修复", InstanceIntent::Repair)),
+                Some(button(
+                    "isettings-repair",
+                    tr!("instance-action-repair"),
+                    InstanceIntent::Repair,
+                )),
                 colors,
             ),
         ];
@@ -282,17 +284,18 @@ impl InstanceDetailView {
             self.setting_row(
                 "isettings-java",
                 "Java",
-                Some("自动选择会按这个游戏需要的 Java 版本挑一个已发现的；也可以指定一个。".to_owned()),
-                own.java_path
-                    .as_ref()
-                    .map_or_else(|| "自动选择".to_owned(), |path| path.display().to_string()),
+                Some(tr!("instance-settings-java-help").to_owned()),
+                own.java_path.as_ref().map_or_else(
+                    || tr!("instance-settings-java-auto").to_owned(),
+                    |path| path.display().to_string(),
+                ),
                 Some(self.edit_spec("isettings-java-edit", move || DialogSpec {
                     title: "Java",
-                    intro: Some("留空表示自动选择。指定时填 java 程序或 JDK 文件夹的路径；已发现的 Java 在“设置 › Java”里。"),
+                    intro: Some(tr!("instance-settings-java-intro")),
                     fields: vec![FieldSpec {
-                        label: "路径",
+                        label: tr!("instance-settings-path"),
                         help: None,
-                        placeholder: "自动选择",
+                        placeholder: tr!("instance-settings-java-auto"),
                         value: current
                             .java_path
                             .as_ref()
@@ -301,7 +304,7 @@ impl InstanceDetailView {
                         kind: FieldKind::Path {
                             files: true,
                             directories: true,
-                            prompt: "选择 java 程序或 JDK 文件夹",
+                            prompt: tr!("instance-settings-java-pick"),
                         },
                     }],
                     parse: {
@@ -319,18 +322,18 @@ impl InstanceDetailView {
             // ia[instance.settings]: Java 参数 | 设置 · Java 组，值 + [编辑] 弹窗 | 多行文本，每行一个参数
             self.setting_row(
                 "isettings-jvm",
-                "Java 参数",
-                Some("设置后替换启动器默认的 Java 参数；留空则跟随默认。".to_owned()),
+                tr!("settings-jvm"),
+                Some(tr!("instance-settings-jvm-help").to_owned()),
                 if own.jvm_arguments.is_empty() {
                     followed(None, default)
                 } else {
                     list_text(&own.jvm_arguments)
                 },
                 Some(self.edit_spec("isettings-jvm-edit", move || DialogSpec {
-                    title: "Java 参数",
-                    intro: Some("每行一个参数。留空则跟随启动器默认。"),
+                    title: tr!("settings-jvm"),
+                    intro: Some(tr!("instance-settings-jvm-intro")),
                     fields: vec![FieldSpec {
-                        label: "参数",
+                        label: tr!("instance-settings-args"),
                         help: None,
                         placeholder: "-XX:+UseG1GC",
                         value: shared::join_lines(&current.jvm_arguments),
@@ -355,12 +358,12 @@ impl InstanceDetailView {
         let total = self.machine_memory_mb?;
         Some(self.setting_row(
             "isettings-machine-memory",
-            "本机内存",
-            Some("推荐的最大内存是本机内存的一半，不超过 8 GB。".to_owned()),
-            format!(
-                "{} · 推荐最大 {} MB",
-                bytes_text(total * 1024 * 1024),
-                recommended_memory_mb(total)
+            tr!("instance-settings-machine-memory"),
+            Some(tr!("instance-settings-machine-memory-help").to_owned()),
+            tr!(
+                "instance-settings-machine-memory-value",
+                total = bytes_text(total * 1024 * 1024),
+                recommended = recommended_memory_mb(total)
             ),
             None,
             colors,
@@ -378,23 +381,20 @@ impl InstanceDetailView {
             // ia[instance.settings]: 游戏参数 | 设置 · 高级组，值 + [编辑] 弹窗 | 来源（跟随默认 / 自己设置）+ 多行
             self.setting_row(
                 "isettings-game-args",
-                "游戏参数",
-                Some(
-                    "传给游戏本身的参数。自己设置后替换默认；设置为空表示这个游戏不用任何参数。"
-                        .to_owned(),
-                ),
+                tr!("settings-game-args"),
+                Some(tr!("instance-settings-game-args-help").to_owned()),
                 match &own.launch.game_arguments {
                     None => followed(None, default),
-                    Some(list) if list.is_empty() => "无".to_owned(),
+                    Some(list) if list.is_empty() => tr!("common-none").to_owned(),
                     Some(list) => list_text(list),
                 },
                 Some(
                     self.edit_spec("isettings-game-args-edit", move || DialogSpec {
-                        title: "游戏参数",
-                        intro: Some("每行一个参数。"),
+                        title: tr!("settings-game-args"),
+                        intro: Some(tr!("settings-one-per-line")),
                         fields: vec![
                             FieldSpec {
-                                label: "来源",
+                                label: tr!("instance-settings-source"),
                                 help: None,
                                 placeholder: "",
                                 value: String::new(),
@@ -404,7 +404,7 @@ impl InstanceDetailView {
                                 },
                             },
                             FieldSpec {
-                                label: "参数",
+                                label: tr!("instance-settings-args"),
                                 help: None,
                                 placeholder: "--demo",
                                 value: shared::join_lines(
@@ -438,19 +438,19 @@ impl InstanceDetailView {
             // ia[instance.settings]: 环境变量 | 设置 · 高级组，值 + [编辑] 弹窗 | 来源 + 每行 名称=值
             self.setting_row(
                 "isettings-env",
-                "环境变量",
-                Some("游戏进程额外带上的环境变量。自己设置后替换默认。".to_owned()),
+                tr!("settings-env"),
+                Some(tr!("instance-settings-env-help").to_owned()),
                 match &own.launch.environment {
                     None => followed(None, default),
-                    Some(list) if list.is_empty() => "无".to_owned(),
+                    Some(list) if list.is_empty() => tr!("common-none").to_owned(),
                     Some(list) => list_text(&env_lines(list)),
                 },
                 Some(self.edit_spec("isettings-env-edit", move || DialogSpec {
-                    title: "环境变量",
-                    intro: Some("每行一个，写成 名称=值。"),
+                    title: tr!("settings-env"),
+                    intro: Some(tr!("settings-env-intro")),
                     fields: vec![
                         FieldSpec {
-                            label: "来源",
+                            label: tr!("instance-settings-source"),
                             help: None,
                             placeholder: "",
                             value: String::new(),
@@ -460,7 +460,7 @@ impl InstanceDetailView {
                             },
                         },
                         FieldSpec {
-                            label: "变量",
+                            label: tr!("instance-settings-variables"),
                             help: None,
                             placeholder: "MESA_DEBUG=1",
                             value: current
@@ -486,17 +486,17 @@ impl InstanceDetailView {
 
         let commands_row = {
             let current = own.clone();
-            let value = format!(
-                "启动前：{} · 包装：{} · 退出后：{}",
-                command_text(own.launch.pre_launch.as_ref(), defaults.pre_launch.as_ref()),
-                command_text(own.launch.wrapper.as_ref(), defaults.wrapper.as_ref()),
-                command_text(own.launch.post_exit.as_ref(), defaults.post_exit.as_ref()),
+            let value = tr!(
+                "instance-settings-commands-value",
+                pre = command_text(own.launch.pre_launch.as_ref(), defaults.pre_launch.as_ref()),
+                wrapper = command_text(own.launch.wrapper.as_ref(), defaults.wrapper.as_ref()),
+                post = command_text(own.launch.post_exit.as_ref(), defaults.post_exit.as_ref()),
             );
             // ia[instance.settings]: 启动前 / 包装 / 退出后命令 | 设置 · 高级组，值 + [编辑] 弹窗 | 三个输入：留空跟随默认，填 - 表示这个游戏不使用；说明可用变量
             self.setting_row(
                 "isettings-commands",
-                "启动前、包装与退出后命令",
-                Some("命令由你自己填写，会以当前用户的权限运行。".to_owned()),
+                tr!("settings-commands"),
+                Some(tr!("instance-settings-commands-help").to_owned()),
                 value,
                 Some(self.edit_spec("isettings-commands-edit", move || {
                     let shown = |own: &Option<String>| match own {
@@ -505,27 +505,27 @@ impl InstanceDetailView {
                         Some(text) => text.clone(),
                     };
                     DialogSpec {
-                        title: "命令",
-                        intro: Some("留空跟随启动器默认；填 - 表示这个游戏不使用。命令以你的用户权限运行。可用变量：$INST_ID、$INST_NAME、$INST_DIR、$INST_JAVA、$INST_MC_VERSION、$INST_LOADER。"),
+                        title: tr!("settings-commands-dialog"),
+                        intro: Some(tr!("instance-settings-commands-intro")),
                         fields: vec![
                             FieldSpec {
-                                label: "启动前命令",
-                                help: Some("失败（退出码不为 0）会取消这次启动。"),
-                                placeholder: "跟随默认",
+                                label: tr!("settings-command-pre"),
+                                help: Some(tr!("instance-settings-command-pre-help")),
+                                placeholder: tr!("instance-settings-follow-default"),
                                 value: shown(&current.launch.pre_launch),
                                 kind: FieldKind::Line,
                             },
                             FieldSpec {
-                                label: "包装命令",
-                                help: Some("放在 Java 命令前面。"),
-                                placeholder: "跟随默认",
+                                label: tr!("settings-command-wrapper"),
+                                help: Some(tr!("instance-settings-command-wrapper-help")),
+                                placeholder: tr!("instance-settings-follow-default"),
                                 value: shown(&current.launch.wrapper),
                                 kind: FieldKind::Line,
                             },
                             FieldSpec {
-                                label: "退出后命令",
-                                help: Some("失败只会记录，最长运行 60 秒。"),
-                                placeholder: "跟随默认",
+                                label: tr!("settings-command-post"),
+                                help: Some(tr!("instance-settings-command-post-help")),
+                                placeholder: tr!("instance-settings-follow-default"),
                                 value: shown(&current.launch.post_exit),
                                 kind: FieldKind::Line,
                             },

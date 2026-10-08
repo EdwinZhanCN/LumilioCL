@@ -4,6 +4,7 @@ use super::helpers::{files_matching, join_path, parent_path};
 use crate::assets::UiIcon;
 use crate::kit;
 use crate::theme::ShellColors;
+use crate::tr;
 use gpui::prelude::*;
 use gpui::{AnyElement, Context, div, px};
 use gpui_component::Sizable as _;
@@ -21,9 +22,12 @@ impl InstanceDetailView {
             return div().into_any_element();
         };
         let trail = if folder.is_empty() {
-            "游戏目录".to_owned()
+            tr!("instance-diagnostics-game-dir").to_owned()
         } else {
-            format!("游戏目录 / {}", folder.replace('/', " / "))
+            tr!(
+                "instance-diagnostics-path",
+                folder = folder.replace('/', " / ")
+            )
         };
         let (here, up) = (folder.clone(), parent_path(folder));
         let header = h_flex()
@@ -38,7 +42,7 @@ impl InstanceDetailView {
                     .children((!folder.is_empty()).then(|| {
                         kit::ghost(
                             "instance-files-up",
-                            "上一级",
+                            tr!("instance-files-up"),
                             act(cx, move |view, window, cx| {
                                 view.open_folder(up.clone(), window, cx)
                             }),
@@ -84,9 +88,14 @@ impl InstanceDetailView {
             .child(header)
             .child(if rows.is_empty() {
                 if entries.is_empty() {
-                    kit::empty("这个文件夹是空的", "", colors).into_any_element()
+                    kit::empty(tr!("instance-files-empty"), "", colors).into_any_element()
                 } else {
-                    kit::empty("没有匹配的文件", "换个关键词试试", colors).into_any_element()
+                    kit::empty(
+                        tr!("instance-files-no-match"),
+                        tr!("library-no-match-help"),
+                        colors,
+                    )
+                    .into_any_element()
                 }
             } else {
                 kit::list(rows, colors).into_any_element()
@@ -104,14 +113,14 @@ pub(super) fn file_row(
 ) -> gpui::Div {
     let path = join_path(folder, &entry.name);
     let detail = if entry.is_dir {
-        format!("文件夹 · {}", clock(entry.modified))
+        tr!("instance-files-folder-meta", time = clock(entry.modified))
     } else {
         format!("{} · {}", size_label(entry.size), clock(entry.modified))
     };
     let action = if entry.is_dir {
         kit::ghost(
             ("file-open", row),
-            "打开",
+            tr!("common-open"),
             act(cx, move |view, window, cx| {
                 view.open_folder(path.clone(), window, cx)
             }),
@@ -120,7 +129,7 @@ pub(super) fn file_row(
     } else {
         kit::ghost(
             ("file-reveal", row),
-            "显示",
+            tr!("instance-files-reveal"),
             act(cx, move |view, window, cx| {
                 (view.handler)(InstanceIntent::RevealPath(path.clone()), window, cx)
             }),

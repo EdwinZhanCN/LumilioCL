@@ -13,19 +13,92 @@ mod texts;
 mod tests;
 
 use super::{InstanceDetailView, InstanceIntent};
-use crate::kit;
 use crate::settings_dialog::{DialogSpec, SettingsDialog};
 use crate::theme::ShellColors;
+use crate::{kit, tr, tr_all};
 use gpui::prelude::*;
 use gpui::{AnyElement, Context, SharedString};
 use gpui_component::{h_flex, v_flex};
 
-pub const SUBTABS: [&str; 5] = ["游戏", "运行时", "Java", "性能", "高级"];
+/// Label lists read through `Deref`, so each read takes the words again and a
+/// language switch reaches the segment bars and dropdowns.
+pub static SUBTABS: Subtabs = Subtabs;
 
-const FULLSCREEN: [&str; 3] = ["跟随默认", "开", "关"];
-const AFTER_LAUNCH: [&str; 3] = ["跟随默认", "保持", "隐藏启动器"];
-const QUICK_PLAY: [&str; 3] = ["无", "世界", "服务器"];
-const FOLLOW_OR_OWN: [&str; 2] = ["跟随默认", "自己设置"];
+pub struct Subtabs;
+
+impl std::ops::Deref for Subtabs {
+    type Target = [&'static str];
+
+    fn deref(&self) -> &'static [&'static str] {
+        tr_all![
+            "instance-settings-tab-game",
+            "instance-settings-tab-runtime",
+            "instance-settings-tab-java",
+            "instance-settings-tab-performance",
+            "instance-settings-tab-advanced",
+        ]
+    }
+}
+
+static FULLSCREEN: Fullscreen = Fullscreen;
+
+struct Fullscreen;
+
+impl std::ops::Deref for Fullscreen {
+    type Target = [&'static str];
+
+    fn deref(&self) -> &'static [&'static str] {
+        tr_all![
+            "instance-settings-follow-default",
+            "settings-fullscreen-on",
+            "settings-fullscreen-off",
+        ]
+    }
+}
+
+static AFTER_LAUNCH: AfterLaunch = AfterLaunch;
+
+struct AfterLaunch;
+
+impl std::ops::Deref for AfterLaunch {
+    type Target = [&'static str];
+
+    fn deref(&self) -> &'static [&'static str] {
+        tr_all![
+            "instance-settings-follow-default",
+            "settings-after-launch-keep",
+            "settings-after-launch-hide",
+        ]
+    }
+}
+
+static QUICK_PLAY: QuickPlay = QuickPlay;
+
+struct QuickPlay;
+
+impl std::ops::Deref for QuickPlay {
+    type Target = [&'static str];
+
+    fn deref(&self) -> &'static [&'static str] {
+        tr_all![
+            "common-none",
+            "instance-worlds-world",
+            "instance-worlds-server",
+        ]
+    }
+}
+
+static FOLLOW_OR_OWN: FollowOrOwn = FollowOrOwn;
+
+struct FollowOrOwn;
+
+impl std::ops::Deref for FollowOrOwn {
+    type Target = [&'static str];
+
+    fn deref(&self) -> &'static [&'static str] {
+        tr_all!["instance-settings-follow-default", "instance-settings-own"]
+    }
+}
 
 impl InstanceDetailView {
     fn setting_row(
@@ -49,7 +122,7 @@ impl InstanceDetailView {
         let handler = self.handler.clone();
         let busy = self.busy;
         crate::theme::clickable(
-            kit::ghost(id, "编辑", move |window, cx| {
+            kit::ghost(id, tr!("common-edit"), move |window, cx| {
                 SettingsDialog::open(spec(), handler.clone(), window, cx);
             })
             .disabled(busy)

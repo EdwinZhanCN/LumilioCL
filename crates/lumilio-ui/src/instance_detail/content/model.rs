@@ -1,4 +1,5 @@
 use super::super::InstanceDetailView;
+use crate::{tr, tr_all};
 use gpui::{Context, Window, px};
 use lumilio_core::{ContentEntry, ReleaseChannel};
 use std::rc::Rc;
@@ -19,7 +20,14 @@ pub(super) const FILTERS: [ContentFilter; 4] = [
     ContentFilter::Disabled,
     ContentFilter::Unknown,
 ];
-pub(super) const FILTER_LABELS: [&str; 4] = ["全部", "有更新", "已停用", "未识别"];
+pub(super) fn filter_labels() -> &'static [&'static str] {
+    tr_all![
+        "instance-content-filter-all",
+        "instance-content-filter-updates",
+        "instance-content-filter-disabled",
+        "instance-content-filter-unknown",
+    ]
+}
 
 /// What a bulk-bar button does to the view.
 pub(super) type BulkAction =
@@ -68,10 +76,10 @@ pub fn visible<'a>(
         .collect()
 }
 
-pub(super) const fn channel_label(channel: ReleaseChannel) -> &'static str {
+pub(super) fn channel_label(channel: ReleaseChannel) -> &'static str {
     match channel {
-        ReleaseChannel::Release => "正式",
-        ReleaseChannel::Beta => "测试",
-        ReleaseChannel::Alpha => "内测",
+        ReleaseChannel::Release => tr!("instance-content-channel-release"),
+        ReleaseChannel::Beta => tr!("instance-content-channel-beta"),
+        ReleaseChannel::Alpha => tr!("instance-content-channel-alpha"),
     }
 }

@@ -8,6 +8,7 @@ use lumilio_plugin_api::ActionId;
 use lumilio_ui::instance_detail::InstanceDetailView;
 use lumilio_ui::platform;
 use lumilio_ui::toast::Toast;
+use lumilio_ui::tr;
 
 pub(super) fn plugin_tabs(
     wiring: &Wiring,
@@ -104,12 +105,15 @@ pub(super) fn plugin_action(
             }
             Ok(None) => {
                 let _ = view.update(cx, |view, cx| {
-                    view.toast(Toast::error("这个插件现在不可用"), cx);
+                    view.toast(Toast::error(tr!("instance-plugin-unavailable")), cx);
                 });
             }
             Err(detail) => {
                 let _ = view.update(cx, |view, cx| {
-                    view.toast(Toast::error("没有完成").technical(detail), cx);
+                    view.toast(
+                        Toast::error(tr!("instance-plugin-action-failed")).technical(detail),
+                        cx,
+                    );
                 });
             }
         }
@@ -150,9 +154,15 @@ async fn perform(
                 .spawn(async move { tokio::fs::write(&target, bytes).await })
                 .await;
             let toast = match written {
-                Ok(Ok(())) => Toast::success(format!("已保存到 {}", path.display())),
-                Ok(Err(error)) => Toast::error("没有保存成功").technical(error.to_string()),
-                Err(error) => Toast::error("没有保存成功").technical(error.to_string()),
+                Ok(Ok(())) => {
+                    Toast::success(tr!("instance-saved-to", path = path.display().to_string()))
+                }
+                Ok(Err(error)) => {
+                    Toast::error(tr!("instance-save-failed")).technical(error.to_string())
+                }
+                Err(error) => {
+                    Toast::error(tr!("instance-save-failed")).technical(error.to_string())
+                }
             };
             let _ = view.update(cx, |view, cx| view.toast(toast, cx));
         }

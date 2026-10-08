@@ -11,6 +11,7 @@ use crate::assets::UiIcon;
 use crate::key::Key;
 use crate::kit;
 use crate::theme::{self, ShellColors};
+use crate::tr;
 use gpui::prelude::*;
 use gpui::{AnyElement, App, Context, Entity, ObjectFit, Window, div, img, px};
 use gpui_component::dialog::Dialog;
@@ -38,7 +39,7 @@ impl InstanceDetailView {
         // ia[instance.screenshots]: 刷新截图 | L2 次要「刷新」 | 重新读取 screenshots 文件夹；游戏里新拍的在游戏结束后也会自动出现
         let refresh = kit::action(
             "shots-refresh",
-            "刷新",
+            tr!("instance-refresh"),
             Some(UiIcon::Refresh),
             false,
             act(cx, |view, window, cx| {
@@ -49,7 +50,7 @@ impl InstanceDetailView {
         // ia[instance.screenshots]: 打开截图文件夹 | L2 次要「打开文件夹」 | 在访达中显示 screenshots 文件夹
         let folder = kit::action(
             "shots-folder",
-            "打开文件夹",
+            tr!("instance-open-folder"),
             Some(UiIcon::External),
             false,
             act(cx, |view, window, cx| {
@@ -69,8 +70,8 @@ impl InstanceDetailView {
                 .gap_3()
                 .child(controls)
                 .child(kit::empty(
-                    "还没有截图",
-                    "在游戏里按 F2 截图，拍下的画面会出现在这里",
+                    tr!("instance-screenshots-empty"),
+                    tr!("instance-screenshots-empty-help"),
                     colors,
                 ))
                 .into_any_element();
@@ -89,7 +90,7 @@ impl InstanceDetailView {
                     .justify_center()
                     .text_xs()
                     .text_color(colors.muted)
-                    .child("无法预览")
+                    .child(tr!("instance-screenshot-no-preview"))
                     .into_any_element(),
                 _ => div().size_full().into_any_element(),
             };
@@ -119,7 +120,7 @@ impl InstanceDetailView {
             h_flex().w_full().justify_center().child(
                 kit::action(
                     "shots-more",
-                    "显示更多",
+                    tr!("common-show-more"),
                     None,
                     false,
                     act(cx, |view, _, cx| view.show_more_screenshots(cx)),
@@ -316,7 +317,7 @@ impl InstanceDetailView {
                     // ia[instance.screenshots]: 复制截图 | 大图弹窗「复制图片」 | 图片进剪贴板，toast“已复制图片”
                     .child(
                         Key::new("shot-copy")
-                            .label("复制图片")
+                            .label(tr!("instance-screenshot-copy"))
                             .white()
                             .debug_selector(|| "shot-copy".into())
                             .on_click(on(|view, file, window, cx| {
@@ -344,7 +345,7 @@ impl InstanceDetailView {
                     // ia[instance.screenshots]: 删除截图 | 大图弹窗「删除」→ 警告弹窗 | 删除文件，之后不能找回；游戏运行时也可以删
                     .child(
                         Key::new("shot-delete")
-                            .label("删除")
+                            .label(tr!("common-delete"))
                             .white()
                             .debug_selector(|| "shot-delete".into())
                             .on_click(on(|view, file, window, cx| {

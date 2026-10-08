@@ -7,6 +7,7 @@ use super::helpers::act;
 use crate::kit;
 use crate::theme::ShellColors;
 use crate::toast::Toast;
+use crate::tr;
 use gpui::prelude::*;
 use gpui::{AnyElement, Context, Window, div};
 use gpui_component::{h_flex, v_flex};
@@ -16,14 +17,18 @@ use lumilio_core::ServerEntry;
 #[must_use]
 pub fn server_detail(address: &str, state: Option<&ServerState>) -> String {
     match state {
-        None | Some(ServerState::Checking) => format!("{address} · 正在检查…"),
-        Some(ServerState::Offline) => format!("{address} · 无法连接"),
+        None | Some(ServerState::Checking) => {
+            tr!("instance-server-checking", address = address)
+        }
+        Some(ServerState::Offline) => tr!("instance-server-offline", address = address),
         Some(ServerState::Online(status)) => {
             let mut parts = vec![address.to_owned()];
             if let Some(online) = status.online {
                 parts.push(match status.max {
-                    Some(max) => format!("{online}/{max} 在线"),
-                    None => format!("{online} 在线"),
+                    Some(max) => {
+                        tr!("instance-server-online-of", online = online, max = max)
+                    }
+                    None => tr!("instance-server-online", online = online),
                 });
             }
             if let Some(ms) = status.latency_ms {
@@ -53,8 +58,12 @@ impl InstanceDetailView {
         // While a game runs it owns the file: nothing here can change.
         let busy = self.busy || running;
         if servers.is_empty() {
-            return kit::empty("还没有服务器", "添加后，游戏的多人游戏列表里就有它", colors)
-                .into_any_element();
+            return kit::empty(
+                tr!("instance-servers-empty"),
+                tr!("instance-servers-empty-help"),
+                colors,
+            )
+            .into_any_element();
         }
         let entity = cx.entity().downgrade();
         let too_old = self
@@ -73,7 +82,7 @@ impl InstanceDetailView {
                 let enter = {
                     let button = kit::ghost(
                         ("server-play", row),
-                        "进入",
+                        tr!("instance-server-enter"),
                         act(cx, move |view, window, cx| {
                             view.send(InstanceIntent::PlayServer(address.clone()), window, cx)
                         }),
@@ -81,7 +90,7 @@ impl InstanceDetailView {
                     .disabled(busy || too_old)
                     .debug_selector(move || format!("server-play-{row}"));
                     if too_old {
-                        button.tooltip("这个游戏版本不能直接进入服务器，请从多人游戏列表进入")
+                        button.tooltip(tr!("instance-server-old-version"))
                     } else {
                         button
                     }
@@ -107,12 +116,12 @@ impl InstanceDetailView {
                     ("server-more", row),
                     vec![
                         // ia[instance.worlds]: 编辑服务器 | 服务器行 ⋯ 菜单 → 弹窗 | 改名称或地址，保留游戏记下的图标等其他信息
-                        entry("编辑", busy, |view, index, _, window, cx| {
+                        entry(tr!("common-edit"), busy, |view, index, _, window, cx| {
                             view.open_server_editor(Some(index), window, cx)
                         }),
                         // ia[instance.worlds]: 排序服务器 | 服务器行 ⋯ 菜单「上移 / 下移」 | 调整在游戏里的显示顺序
                         entry(
-                            "上移",
+                            tr!("instance-server-move-up"),
                             busy || row == 0,
                             |view, index, server, window, cx| {
                                 view.send(
@@ -127,7 +136,7 @@ impl InstanceDetailView {
                             },
                         ),
                         entry(
-                            "下移",
+                            tr!("instance-server-move-down"),
                             busy || row == last,
                             |view, index, server, window, cx| {
                                 view.send(
@@ -142,12 +151,16 @@ impl InstanceDetailView {
                             },
                         ),
                         // ia[instance.worlds]: 复制服务器地址 | 服务器行 ⋯ 菜单 | 复制到剪贴板，toast“已复制地址”
-                        entry("复制地址", false, |view, _, server, _, cx| {
-                            cx.write_to_clipboard(gpui::ClipboardItem::new_string(
-                                server.address.clone(),
-                            ));
-                            view.toast(Toast::info("已复制地址"), cx);
-                        }),
+                        entry(
+                            tr!("instance-server-copy-address"),
+                            false,
+                            |view, _, server, _, cx| {
+                                cx.write_to_clipboard(gpui::ClipboardItem::new_string(
+                                    server.address.clone(),
+                                ));
+                                view.toast(Toast::info(tr!("instance-server-copied")), cx);
+                            },
+                        ),
                     ],
                     colors,
                 );
@@ -158,7 +171,7 @@ impl InstanceDetailView {
                     // ia[instance.worlds]: 删除服务器 | 服务器行 🗑 → 警告弹窗 | 只从列表移除，不影响服务器本身
                     .child(self.asking(
                         ("server-delete", row),
-                        "删除",
+                        tr!("common-delete"),
                         Confirm::DeleteServer {
                             index: row,
                             entry: server.clone(),
@@ -179,9 +192,9 @@ impl InstanceDetailView {
             .w_full()
             .gap_3()
             .child(div().text_sm().text_color(colors.muted).child(if running {
-                "游戏正在运行，服务器列表先不能修改；结束游戏后再来。"
+                tr!("instance-servers-running")
             } else {
-                "这里的改动就是游戏里的多人游戏列表。游戏运行时不能修改。"
+                tr!("instance-servers-help")
             }))
             .child(kit::list(rows, colors))
             .into_any_element()
@@ -226,7 +239,7 @@ impl InstanceDetailView {
         let name = fields.server_name.read(cx).value().trim().to_owned();
         let address = fields.server_address.read(cx).value().trim().to_owned();
         if name.is_empty() || address.is_empty() {
-            self.editor_error = Some("请输入名称和地址".into());
+            self.editor_error = Some(tr!("instance-server-name-address-required").into());
             cx.notify();
             return;
         }

@@ -2,7 +2,7 @@ use super::super::{InstanceDetailView, InstanceIntent, Section};
 use super::helpers::{act, clock};
 use super::labels::{change_label, duration_label, outcome_label};
 use crate::theme::ShellColors;
-use crate::{kit, live};
+use crate::{kit, live, tr};
 use gpui::prelude::*;
 use gpui::{AnyElement, Context, Div, Window, div, px};
 use gpui_component::{h_flex, v_flex};
@@ -62,17 +62,24 @@ pub enum ProblemAction {
 #[must_use]
 pub fn problem_action(kind: &ProblemKind) -> Option<(ProblemAction, &'static str)> {
     Some(match kind {
-        ProblemKind::NotInstalled => (ProblemAction::Install, "安装"),
-        ProblemKind::LoaderUnsupported(_) => (ProblemAction::ChangeRuntime, "更换…"),
-        ProblemKind::NoJava { required } => (ProblemAction::InstallJava(*required), "安装 Java"),
-        ProblemKind::NoAccount => (ProblemAction::Accounts, "去添加"),
-        ProblemKind::DamagedFiles { .. } => (ProblemAction::Repair, "修复"),
-        ProblemKind::WrongLoaderMods { .. } | ProblemKind::DuplicateMods { .. } => {
-            (ProblemAction::Content, "去内容")
+        ProblemKind::NotInstalled => (ProblemAction::Install, tr!("instance-action-install")),
+        ProblemKind::LoaderUnsupported(_) => {
+            (ProblemAction::ChangeRuntime, tr!("instance-action-change"))
         }
-        ProblemKind::LowMemory { .. } => (ProblemAction::Settings(3), "去调整"),
+        ProblemKind::NoJava { required } => (
+            ProblemAction::InstallJava(*required),
+            tr!("instance-action-install-java"),
+        ),
+        ProblemKind::NoAccount => (ProblemAction::Accounts, tr!("instance-action-add-account")),
+        ProblemKind::DamagedFiles { .. } => (ProblemAction::Repair, tr!("instance-action-repair")),
+        ProblemKind::WrongLoaderMods { .. } | ProblemKind::DuplicateMods { .. } => {
+            (ProblemAction::Content, tr!("instance-action-go-content"))
+        }
+        ProblemKind::LowMemory { .. } => {
+            (ProblemAction::Settings(3), tr!("instance-action-go-adjust"))
+        }
         ProblemKind::LastSessionFailed(_) | ProblemKind::Finding(_) => {
-            (ProblemAction::Logs, "查看日志")
+            (ProblemAction::Logs, tr!("instance-view-logs"))
         }
     })
 }
@@ -81,35 +88,45 @@ pub fn problem_action(kind: &ProblemKind) -> Option<(ProblemAction, &'static str
 pub fn problem_text(problem: &Problem) -> (String, String) {
     match &problem.kind {
         ProblemKind::NotInstalled => (
-            "游戏文件还没有安装".into(),
-            "可以现在安装，也可以首次启动时自动准备".into(),
+            tr!("instance-problem-not-installed").into(),
+            tr!("instance-problem-not-installed-help").into(),
         ),
         ProblemKind::LoaderUnsupported(loader) => (
-            format!("暂时不能启动 {}", live::loader_label(*loader)),
-            "这个加载器还没有支持，可以改用 Fabric、Quilt 或原版".into(),
+            tr!(
+                "instance-problem-loader-unsupported",
+                loader = live::loader_label(*loader)
+            ),
+            tr!("instance-problem-loader-unsupported-help").into(),
         ),
         ProblemKind::NoJava { required } => (
-            "没有找到可用的 Java".into(),
+            tr!("instance-problem-no-java").into(),
             match required {
-                Some(major) => format!("这个版本需要 Java {major}"),
-                None => "请安装 Java 后重试".into(),
+                Some(major) => tr!("instance-problem-java-required", major = *major),
+                None => tr!("instance-problem-install-java-help").into(),
             },
         ),
-        ProblemKind::NoAccount => ("还没有选择账户".into(), "离线游玩需要一个玩家名".into()),
-        ProblemKind::DamagedFiles { count } => (
-            "有游戏文件缺失或损坏".into(),
-            format!("共 {count} 个，重新安装会补回它们"),
+        ProblemKind::NoAccount => (
+            tr!("instance-problem-no-account").into(),
+            tr!("instance-problem-no-account-help").into(),
         ),
-        ProblemKind::WrongLoaderMods { names } => {
-            ("有 Mod 不是为当前加载器制作的".into(), names.join("、"))
-        }
-        ProblemKind::DuplicateMods { ids } => ("同一个 Mod 装了不止一份".into(), ids.join("、")),
+        ProblemKind::DamagedFiles { count } => (
+            tr!("instance-problem-damaged").into(),
+            tr!("instance-problem-damaged-help", count = *count),
+        ),
+        ProblemKind::WrongLoaderMods { names } => (
+            tr!("instance-problem-wrong-loader").into(),
+            names.join(tr!("common-list-separator")),
+        ),
+        ProblemKind::DuplicateMods { ids } => (
+            tr!("instance-problem-duplicate-mods").into(),
+            ids.join(tr!("common-list-separator")),
+        ),
         ProblemKind::LowMemory { max_mb } => (
-            "最大内存偏低".into(),
-            format!("当前上限 {max_mb} MB，游戏可能因内存不足而崩溃"),
+            tr!("instance-problem-low-memory").into(),
+            tr!("instance-problem-low-memory-help", max = *max_mb),
         ),
         ProblemKind::LastSessionFailed(outcome) => (
-            "上一次游玩没有顺利结束".into(),
+            tr!("instance-problem-last-session").into(),
             outcome_label(*outcome).into(),
         ),
         ProblemKind::Finding(result) => {
@@ -207,7 +224,7 @@ impl InstanceDetailView {
                         h_flex().justify_end().child(
                             kit::ghost(
                                 id,
-                                "查看全部",
+                                tr!("instance-history-view-all"),
                                 act(cx, move |view, window, cx| {
                                     view.history_sub = sub;
                                     view.open_tab(super::super::TAB_HISTORY, window, cx);
@@ -248,13 +265,19 @@ impl InstanceDetailView {
                 .w_full()
                 .gap_5()
                 .children(part(
-                    "最近游玩",
+                    tr!("library-sort-recent"),
                     "overview-all-sessions",
                     1,
                     session_rows,
                     cx,
                 ))
-                .children(part("最近变更", "overview-all-changes", 0, change_rows, cx))
+                .children(part(
+                    tr!("instance-overview-recent-changes"),
+                    "overview-all-changes",
+                    0,
+                    change_rows,
+                    cx,
+                ))
                 .into_any_element(),
         )
     }
@@ -294,18 +317,18 @@ impl InstanceDetailView {
             .collect();
         Some(if rows.is_empty() {
             kit::section(
-                "状态",
+                tr!("instance-problems-status"),
                 colors,
                 kit::surface(colors).p_4().child(
                     div()
                         .text_sm()
                         .text_color(colors.muted)
-                        .child("没有发现问题"),
+                        .child(tr!("instance-problems-none")),
                 ),
             )
             .into_any_element()
         } else {
-            kit::section("需要留意", colors, kit::list(rows, colors)).into_any_element()
+            kit::section(tr!("home-attention"), colors, kit::list(rows, colors)).into_any_element()
         })
     }
 }

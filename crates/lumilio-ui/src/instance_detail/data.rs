@@ -5,6 +5,7 @@ use super::{
     TAB_OVERVIEW, TAB_SCREENSHOTS, TAB_WORLDS, TABS, panels, settings,
 };
 use crate::toast::Toast;
+use crate::tr;
 use gpui::{Context, Window};
 use lumilio_core::{InstanceRecord, LauncherSettings};
 
@@ -25,7 +26,7 @@ impl InstanceDetailView {
             }
             Ok(_) => return,
             Err(detail) => {
-                self.error = Some("没有读到这个游戏，可以重试".into());
+                self.error = Some(tr!("instance-read-failed").into());
                 self.load_technical = Some(detail);
             }
         }
@@ -46,18 +47,18 @@ impl InstanceDetailView {
                 self.editor_result(None, cx);
                 self.toast(
                     Toast::success(if memory {
-                        "内存已保存，下次启动时生效"
+                        tr!("instance-memory-saved")
                     } else {
-                        "名称已保存"
+                        tr!("instance-name-saved")
                     }),
                     cx,
                 );
             }
             Err(detail) => {
                 self.busy = false;
-                const FAILED: &str = "没有保存成功，输入已保留，可以重试";
-                if !self.editor_result(Some(FAILED.into()), cx) {
-                    self.toast(Toast::error(FAILED).technical(detail), cx);
+                let failed = tr!("instance-save-failed-draft");
+                if !self.editor_result(Some(failed.into()), cx) {
+                    self.toast(Toast::error(failed).technical(detail), cx);
                 }
                 cx.notify();
             }
@@ -73,11 +74,14 @@ impl InstanceDetailView {
         match result {
             Ok(data) => {
                 self.loaded(Ok(data), cx);
-                self.toast(Toast::success("已保存，下次启动时生效"), cx);
+                self.toast(Toast::success(tr!("settings-saved-next-launch")), cx);
             }
             Err(detail) => {
                 self.busy = false;
-                self.toast(Toast::error("没有保存成功，可以重试").technical(detail), cx);
+                self.toast(
+                    Toast::error(tr!("instance-save-failed-retry")).technical(detail),
+                    cx,
+                );
                 cx.notify();
             }
         }

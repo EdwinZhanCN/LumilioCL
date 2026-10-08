@@ -25,6 +25,7 @@ use lumilio_ui::platform;
 use lumilio_ui::route::Route;
 use lumilio_ui::shell::ShellIntent;
 use lumilio_ui::toast::Toast;
+use lumilio_ui::tr;
 
 pub(super) fn on_shell_intent(
     wiring: &Wiring,
@@ -107,7 +108,10 @@ pub(super) fn on_live_intent(
                         cx,
                         true,
                         Reload::Lists,
-                        Some(Toast::info(format!("开始下载 {title}，进度在动态里"))),
+                        Some(Toast::info(tr!(
+                            "project-save-started",
+                            title = title.as_str()
+                        ))),
                         async move {
                             service
                                 .save_version_as(
@@ -122,8 +126,8 @@ pub(super) fn on_live_intent(
                             shell.toast(
                                 outcome(
                                     result,
-                                    |_| format!("已保存到 {}", path.display()),
-                                    format!("没有下载 {title}"),
+                                    |_| tr!("project-saved-to", path = path.display().to_string()),
+                                    tr!("project-save-failed", title = title.as_str()),
                                 ),
                                 cx,
                             )
@@ -150,7 +154,10 @@ pub(super) fn on_live_intent(
                 cx,
                 true,
                 Reload::Lists,
-                Some(Toast::info(format!("开始更新 {title}，进度在动态里"))),
+                Some(Toast::info(tr!(
+                    "project-update-started",
+                    title = title.as_str()
+                ))),
                 async move {
                     service
                         .switch_content_version(
@@ -168,8 +175,14 @@ pub(super) fn on_live_intent(
                     shell.toast(
                         outcome(
                             result,
-                            |file| format!("已更新为 {file}（{instance_name}）"),
-                            format!("没有更新 {title}"),
+                            |file| {
+                                tr!(
+                                    "project-updated-to",
+                                    file = file,
+                                    instance = instance_name.as_str()
+                                )
+                            },
+                            tr!("project-update-failed", title = title.as_str()),
                         ),
                         cx,
                     )
@@ -203,7 +216,7 @@ pub(super) fn on_live_intent(
                 .collect();
             if packs.is_empty() {
                 let _ = wiring.shell.update(cx, |shell, cx| {
-                    shell.toast(Toast::info("这里只能放整合包（.mrpack 或 .zip）"), cx)
+                    shell.toast(Toast::info(tr!("library-drop-unsupported")), cx)
                 });
             }
             for path in packs {
@@ -258,8 +271,8 @@ pub(super) fn on_live_intent(
                     shell.toast(
                         outcome(
                             result,
-                            |name| format!("已删除合集“{name}”"),
-                            "没能删除合集".to_owned(),
+                            |name| tr!("collection-deleted", name = name.as_str()),
+                            tr!("collection-delete-failed").to_owned(),
                         ),
                         cx,
                     )
@@ -285,7 +298,7 @@ pub(super) fn on_live_intent(
                 |shell, result, cx| {
                     shell.toast(
                         match result {
-                            Ok(()) => Toast::success("登录已刷新"),
+                            Ok(()) => Toast::success(tr!("account-refreshed")),
                             Err(error) => {
                                 let (message, technical) = account_failure(&error);
                                 Toast::error(message).technical(technical)
@@ -308,7 +321,7 @@ pub(super) fn on_live_intent(
                 |shell, result, cx| {
                     if let Err(error) = result {
                         shell.toast(
-                            Toast::error("没能切换账户").technical(error.to_string()),
+                            Toast::error(tr!("account-switch-failed")).technical(error.to_string()),
                             cx,
                         );
                     }
@@ -329,8 +342,8 @@ pub(super) fn on_live_intent(
                     shell.toast(
                         outcome(
                             result,
-                            |()| format!("已移除账户 {removed}"),
-                            "没能移除账户".to_owned(),
+                            |()| tr!("account-removed", name = removed.as_str()),
+                            tr!("account-remove-failed").to_owned(),
                         ),
                         cx,
                     );
@@ -345,7 +358,7 @@ pub(super) fn on_live_intent(
                 wiring,
                 window,
                 async move { service.set_plugin_enabled(&id, enabled).await },
-                "没能保存插件设置",
+                tr!("settings-plugin-save-failed"),
                 None,
                 move |_, cx| reload(&changed, Reload::All, cx),
                 cx,
@@ -357,7 +370,7 @@ pub(super) fn on_live_intent(
                 wiring,
                 window,
                 async move { service.set_plugin_value(&id, &key, value).await },
-                "没能保存插件设置",
+                tr!("settings-plugin-save-failed"),
                 None,
                 |_, _| {},
                 cx,
@@ -370,7 +383,7 @@ pub(super) fn on_live_intent(
                 wiring,
                 window,
                 async move { service.reset_plugin(&id).await },
-                "没能恢复插件默认值",
+                tr!("settings-plugin-reset-failed"),
                 None,
                 move |_, cx| reload(&changed, Reload::All, cx),
                 cx,
@@ -415,7 +428,7 @@ pub(super) fn on_live_intent(
                 wiring,
                 window,
                 async move { service.set_preferences(saved).await },
-                "没能保存设置",
+                tr!("settings-save-failed"),
                 None,
                 move |window, cx| apply_preferences(&preferences, window, cx),
                 cx,
@@ -427,8 +440,8 @@ pub(super) fn on_live_intent(
                 wiring,
                 window,
                 async move { service.set_launch_defaults(launch).await },
-                "没能保存设置",
-                Some("已保存，下次启动游戏时生效"),
+                tr!("settings-save-failed"),
+                Some(tr!("settings-saved-next-launch")),
                 |_, _| {},
                 cx,
             );
@@ -439,8 +452,8 @@ pub(super) fn on_live_intent(
                 wiring,
                 window,
                 async move { service.set_default_memory(min_mb, max_mb).await },
-                "没能保存内存设置",
-                Some("已保存，下次启动游戏时生效"),
+                tr!("settings-memory-save-failed"),
+                Some(tr!("settings-saved-next-launch")),
                 |_, _| {},
                 cx,
             );
@@ -451,8 +464,8 @@ pub(super) fn on_live_intent(
                 wiring,
                 window,
                 async move { service.set_download_concurrency(count).await },
-                "没能保存设置",
-                Some("已保存，下次下载时生效"),
+                tr!("settings-save-failed"),
+                Some(tr!("settings-saved-next-download")),
                 |_, _| {},
                 cx,
             );
@@ -463,7 +476,7 @@ pub(super) fn on_live_intent(
                 wiring,
                 window,
                 async move { service.add_mirror_preset(preset).await },
-                "没能添加镜像预设",
+                tr!("settings-mirror-add-failed"),
                 None,
                 |_, _| {},
                 cx,
@@ -475,7 +488,7 @@ pub(super) fn on_live_intent(
                 wiring,
                 window,
                 async move { service.set_mirror_rules(mirrors).await },
-                "没能保存镜像设置",
+                tr!("settings-mirrors-save-failed"),
                 None,
                 |_, _| {},
                 cx,
@@ -487,7 +500,7 @@ pub(super) fn on_live_intent(
                 wiring,
                 window,
                 async move { service.set_download_source(preference).await },
-                "没能保存下载源设置",
+                tr!("settings-download-source-save-failed"),
                 None,
                 |_, _| {},
                 cx,
@@ -499,7 +512,7 @@ pub(super) fn on_live_intent(
                 wiring,
                 window,
                 async move { service.set_java_roots(roots).await },
-                "没能保存搜索目录",
+                tr!("settings-java-roots-save-failed"),
                 None,
                 |_, _| {},
                 cx,
@@ -511,7 +524,7 @@ pub(super) fn on_live_intent(
                 wiring,
                 window,
                 async move { service.set_java_disabled(&home, disabled).await },
-                "没能保存 Java 设置",
+                tr!("settings-java-save-failed"),
                 None,
                 |_, _| {},
                 cx,

@@ -1,6 +1,6 @@
 use super::super::panels::{act, clock};
 use super::super::{InstanceDetailView, InstanceIntent, Section};
-use crate::{kit, theme::ShellColors, toast::Toast};
+use crate::{kit, theme::ShellColors, toast::Toast, tr};
 use gpui::prelude::*;
 use gpui::{AnyElement, Context, ScrollStrategy, Window, div, px, uniform_list};
 use gpui_component::Sizable as _;
@@ -52,14 +52,14 @@ impl InstanceDetailView {
     pub(super) fn log_source_label(&self) -> String {
         match &self.log_source {
             GameLogSource::Live => if self.live_output.is_some() {
-                "实时输出"
+                tr!("instance-log-live")
             } else {
-                "最近日志 · latest.log"
+                tr!("instance-log-latest")
             }
-            .into(),
+            .to_owned(),
             GameLogSource::Latest => "latest.log".into(),
             GameLogSource::File(name) => name.clone(),
-            GameLogSource::Crash(name) => format!("崩溃报告 · {name}"),
+            GameLogSource::Crash(name) => tr!("instance-log-crash", name = name.as_str()),
         }
     }
 
@@ -78,9 +78,9 @@ impl InstanceDetailView {
         let mut sources = vec![(
             GameLogSource::Live,
             if self.live_output.is_some() {
-                "实时输出"
+                tr!("instance-log-live")
             } else {
-                "最近日志 · latest.log"
+                tr!("instance-log-latest")
             }
             .to_owned(),
         )];
@@ -90,13 +90,21 @@ impl InstanceDetailView {
         sources.extend(logs.files.iter().map(|file| {
             (
                 GameLogSource::File(file.name.clone()),
-                format!("{} · {}", file.name, clock(file.modified)),
+                tr!(
+                    "instance-log-file-meta",
+                    name = file.name.as_str(),
+                    time = clock(file.modified)
+                ),
             )
         }));
         sources.extend(logs.crashes.iter().map(|file| {
             (
                 GameLogSource::Crash(file.file_name.clone()),
-                format!("崩溃报告 · {} · {}", file.file_name, clock(file.modified)),
+                tr!(
+                    "instance-log-crash-meta",
+                    name = file.file_name.as_str(),
+                    time = clock(file.modified)
+                ),
             )
         }));
         let (source_select, level_select) = self.log_selects(sources, window, cx);
@@ -108,9 +116,9 @@ impl InstanceDetailView {
             .child(
                 Select::new(&source_select)
                     .small()
-                    .accessibility_label("日志来源")
+                    .accessibility_label(tr!("instance-log-source-label"))
                     .menu_width(px(320.))
-                    .search_placeholder("搜索日志来源"),
+                    .search_placeholder(tr!("instance-log-source-search")),
             );
         let report = matches!(self.log_source, GameLogSource::Crash(_));
         // ia[instance.diagnostics]: 按级别筛选 | 日志工具栏 · 来源右侧多选下拉 | 默认全部，点击或 Enter 独立切换错误、警告、信息、调试；菜单保持打开，Escape 关闭并保留选择；堆栈继承上一行级别；崩溃报告禁用级别筛选
@@ -121,9 +129,9 @@ impl InstanceDetailView {
             .child(
                 Select::new(&level_select)
                     .small()
-                    .accessibility_label("日志级别")
-                    .title_prefix("级别 · ")
-                    .placeholder("未选择级别")
+                    .accessibility_label(tr!("instance-log-level-label"))
+                    .title_prefix(tr!("instance-log-level-prefix"))
+                    .placeholder(tr!("instance-log-level-placeholder"))
                     .disabled(report),
             );
         let text = self.log_text().map(|text| text.into_owned());
@@ -135,7 +143,7 @@ impl InstanceDetailView {
             .child(
                 kit::ghost(
                     "instance-log-analysis",
-                    "崩溃分析…",
+                    tr!("instance-log-analysis-action"),
                     act(cx, |view, window, cx| view.open_log_analysis(window, cx)),
                 )
                 .disabled(!has_text)
@@ -145,13 +153,13 @@ impl InstanceDetailView {
             .child(
                 kit::ghost(
                     "instance-log-copy",
-                    "复制",
+                    tr!("common-copy"),
                     act(cx, |view, _, cx| {
                         if let Some(text) = view.visible_log(cx).filter(|text| !text.is_empty()) {
                             crate::toast::copy_text(text, cx);
-                            view.toast(Toast::success("已复制日志"), cx);
+                            view.toast(Toast::success(tr!("instance-log-copied")), cx);
                         } else {
-                            view.toast(Toast::error("没有可复制的日志行"), cx);
+                            view.toast(Toast::error(tr!("instance-log-copy-empty")), cx);
                         }
                     }),
                 )
@@ -162,7 +170,7 @@ impl InstanceDetailView {
             .child(
                 kit::ghost(
                     "instance-log-export",
-                    "导出…",
+                    tr!("instance-log-export-action"),
                     act(cx, |view, window, cx| {
                         let source = if view.log_source == GameLogSource::Live
                             && view.live_output.is_none()
@@ -265,17 +273,13 @@ impl InstanceDetailView {
             .into_any_element()
         } else {
             let message = match &self.crash {
-                Some((_, Some(Err(_)))) => "没有读到这份日志",
-                Some((_, None)) => "正在读取日志…",
-                _ => "还没有日志",
+                Some((_, Some(Err(_)))) => tr!("instance-log-read-failed"),
+                Some((_, None)) => tr!("instance-log-reading"),
+                _ => tr!("instance-log-none"),
             };
             v_flex()
                 .gap_2()
-                .child(kit::empty(
-                    message,
-                    "选择其他来源，或运行游戏后再查看",
-                    colors,
-                ))
+                .child(kit::empty(message, tr!("instance-log-none-help"), colors))
                 .children(
                     self.crash
                         .as_ref()
@@ -288,9 +292,9 @@ impl InstanceDetailView {
         let note = if !has_text {
             "".to_owned()
         } else if matched_count == 0 {
-            "没有符合条件的日志行".into()
+            tr!("instance-log-no-match").to_owned()
         } else {
-            format!("{matched_count} 行")
+            tr!("instance-log-line-count", count = matched_count)
         };
         v_flex()
             .w_full()
@@ -316,7 +320,7 @@ impl InstanceDetailView {
                         // ia[instance.diagnostics]: 回到底部 | 日志状态行 · 按键 | 回到实时输出末尾并恢复跟随；向上滚动暂停跟随
                         kit::ghost(
                             "instance-log-bottom",
-                            "回到底部",
+                            tr!("instance-log-bottom"),
                             act(cx, |view, _, cx| {
                                 view.log_follow = true;
                                 cx.notify();

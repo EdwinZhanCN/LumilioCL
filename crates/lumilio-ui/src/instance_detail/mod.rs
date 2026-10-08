@@ -24,6 +24,7 @@ use self::editors::Editor;
 use self::forms::Fields;
 use self::panels::{Confirm, Data};
 use crate::toast::Toast;
+use crate::{tr, tr_all};
 use gpui::{App, Entity, Window};
 use lumilio_core::{InstanceRecord, LauncherSettings, PluginFinding};
 use std::rc::Rc;
@@ -35,7 +36,27 @@ type CrashRead = Result<(String, Vec<PluginFinding>), String>;
 pub type Dropdown =
     Entity<gpui_component::select::SelectState<gpui_component::select::SearchableVec<String>>>;
 
-pub const TABS: [&str; 7] = ["概览", "内容", "世界", "截图", "历史", "诊断", "设置"];
+/// The tab labels in order. Indexing or slicing goes through `Deref`, which
+/// takes the words again each time, so a language switch reaches the tab bar.
+pub static TABS: Tabs = Tabs;
+
+pub struct Tabs;
+
+impl std::ops::Deref for Tabs {
+    type Target = [&'static str];
+
+    fn deref(&self) -> &'static [&'static str] {
+        tr_all![
+            "instance-tab-overview",
+            "instance-tab-content",
+            "instance-tab-worlds",
+            "instance-tab-screenshots",
+            "instance-tab-history",
+            "instance-tab-diagnostics",
+            "route-settings",
+        ]
+    }
+}
 pub const TAB_OVERVIEW: usize = 0;
 pub const TAB_CONTENT: usize = 1;
 pub const TAB_WORLDS: usize = 2;
@@ -241,6 +262,6 @@ impl InstanceDetailView {
     pub fn title(&self) -> &str {
         self.record
             .as_ref()
-            .map_or("游戏详情", |record| record.name.as_str())
+            .map_or(tr!("instance-title"), |record| record.name.as_str())
     }
 }

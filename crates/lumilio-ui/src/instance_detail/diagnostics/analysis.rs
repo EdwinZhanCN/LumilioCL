@@ -2,6 +2,7 @@ use super::super::{InstanceDetailView, InstanceIntent};
 use crate::{
     kit,
     theme::{self, ShellColors},
+    tr,
 };
 use gpui::prelude::*;
 use gpui::{App, Context, Entity, Window, div, px};
@@ -48,29 +49,31 @@ impl InstanceDetailView {
         let mut technical = None;
         match read {
             None => {
-                body = body.child(div().child("正在分析…"));
+                body = body.child(div().child(tr!("instance-analysis-running")));
             }
             Some(Err(detail)) => {
                 body = body
-                    .child(div().child("没能完成分析"))
+                    .child(div().child(tr!("instance-analysis-failed")))
                     .child(technical_detail("log-analysis-error", detail, colors));
             }
             Some(Ok((text, findings))) => {
-                let mut details = format!("来源：{source}\n");
+                let mut details = tr!("instance-analysis-source", source = source.as_str());
+                details.push('\n');
                 if findings.is_empty() {
                     body = body
                         .child(
                             div()
                                 .debug_selector(|| "log-analysis-empty".into())
-                                .child("未识别到已知崩溃原因"),
+                                .child(tr!("instance-analysis-none")),
                         )
                         .child(
                             div()
                                 .text_sm()
                                 .text_color(colors.muted)
-                                .child("这不表示日志没有问题。"),
+                                .child(tr!("instance-analysis-none-help")),
                         );
-                    details.push_str("未识别到已知崩溃原因\n");
+                    details.push_str(tr!("instance-analysis-none"));
+                    details.push('\n');
                 }
                 for (index, result) in findings.iter().enumerate() {
                     let finding = &result.finding;
@@ -104,14 +107,16 @@ impl InstanceDetailView {
                             }),
                     );
                 }
-                details.push_str("\n日志快照（已脱敏）：\n");
+                details.push('\n');
+                details.push_str(tr!("instance-analysis-snapshot"));
+                details.push('\n');
                 details.push_str(text);
                 technical = Some(details);
             }
         }
         let closed = view.downgrade();
         // ia[instance.diagnostics]: 复制分析技术详情 | 崩溃分析弹窗 · 按键「复制技术详情」 | 复制来源、分析结果、证据与点击时的完整日志快照，内容已脱敏；加载和失败时禁用
-        let copy = kit::ghost("log-analysis-copy", "复制技术详情", {
+        let copy = kit::ghost("log-analysis-copy", tr!("instance-analysis-copy"), {
             let technical = technical.clone();
             move |_, cx| {
                 if let Some(text) = &technical {
@@ -122,7 +127,7 @@ impl InstanceDetailView {
         .disabled(technical.is_none())
         .debug_selector(|| "log-analysis-copy".into());
         dialog
-            .title("崩溃分析")
+            .title(tr!("instance-analysis-title"))
             .w(px(600.))
             .on_close(move |_, _, cx| {
                 let _ = closed.update(cx, |view, cx| {
@@ -152,7 +157,7 @@ fn technical_detail(
     v_flex()
         .w_full()
         .gap_2()
-        .child(kit::section_label("技术详情", colors))
+        .child(kit::section_label(tr!("common-technical-details"), colors))
         .child(
             div()
                 .w_full()

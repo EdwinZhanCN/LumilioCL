@@ -6,6 +6,7 @@ use crate::assets::UiIcon;
 use crate::kit;
 use crate::theme::ShellColors;
 use crate::toast::Toast;
+use crate::tr;
 use gpui::prelude::*;
 use gpui::{AnyElement, Context, Window, div, px};
 use gpui_component::IndexPath;
@@ -63,10 +64,10 @@ impl InstanceDetailView {
             })
             .collect();
         match zips.as_slice() {
-            [] => self.toast(Toast::info("这里只能放世界的 .zip"), cx),
+            [] => self.toast(Toast::info(tr!("instance-world-drop-unsupported")), cx),
             [only] => self.send(InstanceIntent::AddWorld((*only).clone()), window, cx),
             [first, ..] => {
-                self.toast(Toast::info("一次只导入一个世界，先导入了第一个"), cx);
+                self.toast(Toast::info(tr!("instance-world-drop-one")), cx);
                 self.send(InstanceIntent::AddWorld((*first).clone()), window, cx);
             }
         }
@@ -89,7 +90,7 @@ impl InstanceDetailView {
             // ia[instance.worlds]: 刷新状态 | L4 次要「刷新状态」 | 逐个检查服务器：在线人数、延迟、版本和 MOTD；连不上显示“无法连接”（5 秒超时）
             let refresh = kit::action(
                 "server-refresh",
-                "刷新状态",
+                tr!("instance-server-refresh"),
                 Some(UiIcon::Refresh),
                 false,
                 act(cx, |view, _, cx| {
@@ -101,7 +102,7 @@ impl InstanceDetailView {
             // ia[instance.worlds]: 添加服务器 | L4 次要「添加服务器」→ 弹窗（名称、地址） | 追加到服务器列表，游戏里立刻可见；游戏运行时不可改
             let add = kit::action(
                 "server-add",
-                "添加服务器",
+                tr!("instance-server-add"),
                 Some(UiIcon::Plus),
                 false,
                 act(cx, |view, window, cx| {
@@ -120,7 +121,7 @@ impl InstanceDetailView {
             // ia[instance.worlds]: 导入世界 | L4 次要「导入世界」→ 选 .zip；也可把 .zip 拖进世界页（一次一个） | 识别含 level.dat 的最浅文件夹，解压到 saves，重名自动加序号，不覆盖
             kit::action(
                 "world-import",
-                "导入世界",
+                tr!("instance-world-import"),
                 Some(UiIcon::Download),
                 false,
                 act(cx, |view, window, cx| {
@@ -216,8 +217,8 @@ impl InstanceDetailView {
             .and_then(|started| playing_world(worlds, started));
         if worlds.is_empty() {
             return kit::empty(
-                "还没有世界",
-                "进入游戏创建的世界会出现在这里，也可以导入一个 .zip",
+                tr!("instance-worlds-empty"),
+                tr!("instance-worlds-empty-help"),
                 colors,
             )
             .into_any_element();
@@ -235,19 +236,22 @@ impl InstanceDetailView {
             .map(|(row, world)| {
                 let mut detail = Vec::new();
                 if playing == Some(world.folder.as_str()) {
-                    detail.push("正在游玩".to_owned());
+                    detail.push(tr!("instance-world-playing").to_owned());
                 }
                 if world.damaged {
-                    detail.push("存档信息无法读取".to_owned());
+                    detail.push(tr!("instance-world-damaged").to_owned());
                 }
                 if world.hardcore {
-                    detail.push("极限模式".to_owned());
+                    detail.push(tr!("home-place-hardcore").to_owned());
                 }
                 if let Some(version) = &world.game_version {
                     detail.push(version.clone());
                 }
                 if let Some(played) = world.last_played_ms.filter(|ms| *ms > 0) {
-                    detail.push(format!("{}游玩", clock(played as u64 / 1000)));
+                    detail.push(tr!(
+                        "instance-world-played-at",
+                        when = clock(played as u64 / 1000)
+                    ));
                 }
                 if detail.is_empty() {
                     detail.push(world.folder.clone());
@@ -261,7 +265,7 @@ impl InstanceDetailView {
                     let folder = folder.clone();
                     let button = kit::ghost(
                         ("world-play", row),
-                        "进入",
+                        tr!("instance-world-enter"),
                         act(cx, move |view, window, cx| {
                             view.send(InstanceIntent::PlayWorld(folder.clone()), window, cx)
                         }),
@@ -269,7 +273,7 @@ impl InstanceDetailView {
                     .disabled(busy || world.damaged || too_old)
                     .debug_selector(move || format!("world-play-{row}"));
                     if too_old {
-                        button.tooltip("这个游戏版本不能直接进入世界，请从主菜单进入")
+                        button.tooltip(tr!("instance-world-old-version"))
                     } else {
                         button
                     }
@@ -294,16 +298,20 @@ impl InstanceDetailView {
                     ("world-more", row),
                     vec![
                         // ia[instance.worlds]: 复制世界 | 世界行 ⋯ 菜单 | 复制到新文件夹（重名自动加序号）→ toast
-                        entry("复制", InstanceIntent::CopyWorld(folder.clone()), true),
+                        entry(
+                            tr!("instance-world-copy"),
+                            InstanceIntent::CopyWorld(folder.clone()),
+                            true,
+                        ),
                         // ia[instance.worlds]: 创建备份 | 世界行 ⋯ 菜单 | 仅这个世界的快照 → 历史·快照可见
                         entry(
-                            "创建备份",
+                            tr!("instance-world-backup"),
                             InstanceIntent::BackupWorld(folder.clone()),
                             true,
                         ),
                         // ia[instance.worlds]: 导出为 .zip | 世界行 ⋯ 菜单 → 选位置 | 后台打包，toast；不含 session.lock
                         entry(
-                            "导出为 .zip…",
+                            tr!("instance-world-export"),
                             InstanceIntent::ExportWorld(folder.clone()),
                             false,
                         ),
@@ -323,7 +331,7 @@ impl InstanceDetailView {
                     // ia[instance.worlds]: 删除世界 | 世界行 🗑 → 警告弹窗 | 删除世界文件夹，写历史
                     .child(self.asking(
                         ("world-delete", row),
-                        "删除",
+                        tr!("common-delete"),
                         Confirm::DeleteWorld(folder),
                         cx,
                     ))
@@ -364,12 +372,17 @@ impl InstanceDetailView {
             )
             .child(controls)
             .child(div().text_sm().text_color(colors.muted).child(if running {
-                "游戏正在运行，世界先不能复制、备份、导出或删除；结束游戏后再来。"
+                tr!("instance-worlds-running")
             } else {
-                "复制和导入总是另存为新世界，不会覆盖已有的世界。游戏运行时不能修改。"
+                tr!("instance-worlds-help")
             }))
             .child(if rows.is_empty() {
-                kit::empty("没有匹配的世界", "换个关键词试试", colors).into_any_element()
+                kit::empty(
+                    tr!("instance-worlds-no-match"),
+                    tr!("library-no-match-help"),
+                    colors,
+                )
+                .into_any_element()
             } else {
                 kit::list(rows, colors).into_any_element()
             })

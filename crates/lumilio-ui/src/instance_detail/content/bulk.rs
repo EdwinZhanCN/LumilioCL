@@ -5,6 +5,7 @@ use crate::assets::UiIcon;
 use crate::key::Key;
 use crate::theme;
 use crate::theme::ShellColors;
+use crate::tr;
 use gpui::prelude::*;
 use gpui::{AnyElement, Context, Window, div, px};
 use gpui_component::Sizable as _;
@@ -42,7 +43,7 @@ impl InstanceDetailView {
             let files = files.clone();
             action(
                 "content-bulk-enable",
-                "启用",
+                tr!("instance-content-enable"),
                 Rc::new(move |view, window, cx| {
                     view.set_content_enabled(files.clone(), true, window, cx)
                 }),
@@ -52,7 +53,7 @@ impl InstanceDetailView {
             let files = files.clone();
             action(
                 "content-bulk-disable",
-                "停用",
+                tr!("instance-content-disable"),
                 Rc::new(move |view, window, cx| {
                     view.set_content_enabled(files.clone(), false, window, cx)
                 }),
@@ -64,7 +65,7 @@ impl InstanceDetailView {
             theme::clickable(
                 Key::new("content-bulk-delete")
                     .icon(Icon::new(UiIcon::Trash))
-                    .label("删除")
+                    .label(tr!("common-delete"))
                     .danger()
                     .small()
                     .disabled(busy),
@@ -79,7 +80,7 @@ impl InstanceDetailView {
         };
         let clear = action(
             "content-bulk-clear",
-            "清除选择",
+            tr!("instance-content-clear-selection"),
             Rc::new(|view, _, cx| {
                 view.selected.clear();
                 cx.notify();
@@ -103,7 +104,7 @@ impl InstanceDetailView {
                             .text_sm()
                             .font_medium()
                             .text_color(colors.foreground)
-                            .child(format!("已选 {} 项", files.len())),
+                            .child(tr!("instance-content-selected", count = files.len())),
                     )
                     .child(clear),
             )
@@ -127,12 +128,10 @@ impl InstanceDetailView {
             let view = view.clone();
             let updates = updates.clone();
             alert
-                .title(format!("更新 {count} 个文件？"))
-                .description(
-                    "每个都会换成兼容这个游戏的最新版本；换版本可能让游戏出问题，必要时先建快照。",
-                )
-                .ok_text("全部更新")
-                .cancel_text("取消")
+                .title(tr!("instance-content-update-title", count = count))
+                .description(tr!("instance-content-update-body"))
+                .ok_text(tr!("instance-content-update-all"))
+                .cancel_text(tr!("common-cancel"))
                 .show_cancel(true)
                 .on_ok(move |_, window, cx| {
                     let updates = updates.clone();

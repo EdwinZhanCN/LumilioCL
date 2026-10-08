@@ -13,12 +13,13 @@ mod selects;
 #[cfg(test)]
 mod tests;
 
-pub use self::helpers::{DIAGNOSTIC_LABELS, crash_for_session};
+pub use self::helpers::{crash_for_session, diagnostic_labels};
 
 use super::panels::{act_index, problem_text, problem_tone};
 use super::{InstanceDetailView, InstanceIntent, Section};
 use crate::kit;
 use crate::theme::ShellColors;
+use crate::tr;
 use gpui::prelude::*;
 use gpui::{AnyElement, Context, Window, div, px};
 use gpui_component::{h_flex, v_flex};
@@ -137,10 +138,10 @@ impl InstanceDetailView {
         colors: ShellColors,
         cx: &mut Context<Self>,
     ) -> AnyElement {
-        let sub = self.diag_sub.min(DIAGNOSTIC_LABELS.len() - 1);
+        let sub = self.diag_sub.min(diagnostic_labels().len() - 1);
         let segments = kit::segments(
             "instance-diagnostic-parts",
-            &DIAGNOSTIC_LABELS,
+            diagnostic_labels(),
             sub,
             act_index(cx, |view, index: usize, window, cx| {
                 view.diag_sub = index;
@@ -171,7 +172,12 @@ impl InstanceDetailView {
             return div().into_any_element();
         };
         if problems.is_empty() {
-            return kit::empty("没有发现问题", "游戏现在看起来一切正常", colors).into_any_element();
+            return kit::empty(
+                tr!("instance-problems-none"),
+                tr!("instance-problems-none-help"),
+                colors,
+            )
+            .into_any_element();
         }
         let rows: Vec<_> = problems
             .iter()

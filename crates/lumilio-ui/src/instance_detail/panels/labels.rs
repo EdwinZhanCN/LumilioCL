@@ -1,59 +1,64 @@
+use crate::tr;
 use lumilio_core::{ChangeKind, SessionOutcome};
 
 pub fn change_label(kind: ChangeKind) -> &'static str {
     match kind {
-        ChangeKind::ContentAdded => "添加了",
-        ChangeKind::ContentRemoved => "移除了",
-        ChangeKind::ContentEnabled => "启用了",
-        ChangeKind::ContentDisabled => "停用了",
-        ChangeKind::ContentUpdated => "更新了",
-        ChangeKind::SettingsChanged => "修改了设置",
-        ChangeKind::GameVersionChanged => "更换了游戏版本",
-        ChangeKind::Repaired => "修复了",
-        ChangeKind::WorldCopied => "复制了世界",
-        ChangeKind::WorldDeleted => "删除了世界",
-        ChangeKind::WorldImported => "导入了世界",
-        ChangeKind::SnapshotCreated => "创建了快照",
-        ChangeKind::SnapshotRestored => "恢复了快照",
-        ChangeKind::SnapshotDeleted => "删除了快照",
+        ChangeKind::ContentAdded => tr!("instance-change-content-added"),
+        ChangeKind::ContentRemoved => tr!("instance-change-content-removed"),
+        ChangeKind::ContentEnabled => tr!("instance-change-content-enabled"),
+        ChangeKind::ContentDisabled => tr!("instance-change-content-disabled"),
+        ChangeKind::ContentUpdated => tr!("instance-change-content-updated"),
+        ChangeKind::SettingsChanged => tr!("instance-change-settings"),
+        ChangeKind::GameVersionChanged => tr!("instance-change-game-version"),
+        ChangeKind::Repaired => tr!("instance-change-repaired"),
+        ChangeKind::WorldCopied => tr!("instance-change-world-copied"),
+        ChangeKind::WorldDeleted => tr!("instance-change-world-deleted"),
+        ChangeKind::WorldImported => tr!("instance-change-world-imported"),
+        ChangeKind::SnapshotCreated => tr!("instance-change-snapshot-created"),
+        ChangeKind::SnapshotRestored => tr!("instance-change-snapshot-restored"),
+        ChangeKind::SnapshotDeleted => tr!("instance-change-snapshot-deleted"),
     }
 }
 
 pub fn outcome_label(outcome: SessionOutcome) -> &'static str {
     match outcome {
-        SessionOutcome::Clean => "正常结束",
-        SessionOutcome::Crashed => "异常退出",
-        SessionOutcome::FailedToStart => "没能启动",
-        SessionOutcome::Stopped => "被手动停止",
-        SessionOutcome::FailedToPrepare => "准备阶段失败",
-        SessionOutcome::Cancelled => "启动前取消",
-        SessionOutcome::Interrupted => "启动器中途退出，结果未知",
+        SessionOutcome::Clean => tr!("instance-outcome-clean"),
+        SessionOutcome::Crashed => tr!("instance-outcome-crashed"),
+        SessionOutcome::FailedToStart => tr!("instance-outcome-failed-to-start"),
+        SessionOutcome::Stopped => tr!("instance-outcome-stopped"),
+        SessionOutcome::FailedToPrepare => tr!("instance-outcome-failed-to-prepare"),
+        SessionOutcome::Cancelled => tr!("instance-outcome-cancelled"),
+        SessionOutcome::Interrupted => tr!("instance-outcome-interrupted"),
     }
 }
 
 /// What a finished export tells, in words.
 pub fn export_notice(report: &lumilio_core::ExportReport, path: &std::path::Path) -> String {
     if report.lookup_failed {
-        format!(
-            "没能连上 Modrinth，{} 个文件都直接放进了整合包。已导出到 {}",
-            report.bundled,
-            path.display()
+        tr!(
+            "instance-export-offline",
+            bundled = report.bundled,
+            path = path.display().to_string()
         )
     } else {
-        format!(
-            "已导出到 {}：{} 个文件按地址列出，{} 个放在包里",
-            path.display(),
-            report.linked,
-            report.bundled
+        tr!(
+            "instance-export-linked",
+            path = path.display().to_string(),
+            linked = report.linked,
+            bundled = report.bundled
         )
     }
 }
 
 pub fn duration_label(seconds: u64) -> String {
     match seconds {
-        0..=59 => "不到 1 分钟".to_owned(),
-        60..=3599 => format!("{} 分钟", seconds / 60),
-        _ => format!("{} 小时 {} 分钟", seconds / 3600, seconds % 3600 / 60),
+        0..=59 => tr!("activity-eta-under-minute").to_owned(),
+        60..=3599 => tr!("instance-duration-minutes", count = seconds / 60),
+        _ => tr!(
+            "instance-duration-hours-minutes",
+            hours = seconds / 3600,
+            minutes = seconds % 3600 / 60
+        ),
     }
 }
 

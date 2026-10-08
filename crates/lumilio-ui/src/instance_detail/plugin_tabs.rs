@@ -14,6 +14,7 @@ use crate::key::Key;
 use crate::kit;
 use crate::kit::TagKind;
 use crate::theme::{self, ShellColors};
+use crate::tr;
 use gpui::prelude::*;
 use gpui::{
     AnyElement, App, Context, Entity, ObjectFit, RenderImage, SharedString, Window, div, img, px,
@@ -25,8 +26,6 @@ use lumilio_plugin_api::{ActionId, ImageData, KeyKind, ListItem, Tone, View};
 /// Plugin tabs sit right after the built-in 截图 tab, so built-in positions
 /// never change.
 const PLUGIN_TABS_AT: usize = TAB_SCREENSHOTS + 1;
-/// The one tab that holds every plugin's tab, so the bar keeps its length.
-const PLUGIN_TAB_LABEL: &str = "插件";
 const THUMB: f32 = 56.;
 const COVER: f32 = 120.;
 
@@ -157,7 +156,7 @@ impl InstanceDetailView {
             .map(|label| (*label).to_owned())
             .collect();
         if self.has_plugin_tab() {
-            labels.push(PLUGIN_TAB_LABEL.to_owned());
+            labels.push(tr!("settings-tab-plugins").to_owned());
         }
         labels.extend(
             TABS[PLUGIN_TABS_AT..]
@@ -218,14 +217,20 @@ impl InstanceDetailView {
             return div().into_any_element();
         };
         let content = match self.plugin_pages.get(plugin) {
-            None => kit::empty("正在读取…", "", colors).into_any_element(),
-            Some(PluginPage::Unavailable) => {
-                kit::empty("这个标签现在不可用", "插件已关闭，或者出了问题", colors)
-                    .into_any_element()
-            }
+            None => kit::empty(tr!("library-loading"), "", colors).into_any_element(),
+            Some(PluginPage::Unavailable) => kit::empty(
+                tr!("instance-plugin-unavailable-title"),
+                tr!("instance-plugin-unavailable-help"),
+                colors,
+            )
+            .into_any_element(),
             Some(PluginPage::Failed(detail)) => v_flex()
                 .gap_3()
-                .child(kit::empty("没有读到这部分内容", "可以重试", colors))
+                .child(kit::empty(
+                    tr!("instance-section-read-failed"),
+                    tr!("instance-section-retry-help"),
+                    colors,
+                ))
                 .child(
                     h_flex()
                         .justify_center()
@@ -307,7 +312,7 @@ impl InstanceDetailView {
                             .bottom(theme::BOTTOM_SAFE_AREA)
                             .child(
                                 Key::new("plugin-back-to-top")
-                                    .label("返回顶部")
+                                    .label(tr!("instance-back-to-top"))
                                     .white()
                                     .debug_selector(|| "plugin-back-to-top".into())
                                     .on_click(cx.listener(|view, _, _, cx| {
@@ -339,11 +344,11 @@ impl InstanceDetailView {
         window.open_alert_dialog(cx, move |alert, _, _| {
             let (handler, intent) = (handler.clone(), intent.clone());
             alert
-                .title(format!("{label}？"))
-                .description("这个操作做了就撤不回来。")
+                .title(tr!("instance-plugin-confirm-title", label = label.as_str()))
+                .description(tr!("instance-plugin-confirm-body"))
                 .ok_text(label.clone())
                 .ok_variant(gpui_component::button::ButtonVariant::Danger)
-                .cancel_text("取消")
+                .cancel_text(tr!("common-cancel"))
                 .show_cancel(true)
                 .on_ok(move |_, window, cx| {
                     handler(intent.clone(), window, cx);

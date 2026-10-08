@@ -1,5 +1,6 @@
 use super::super::panels::CONTENT_KINDS;
 use super::super::{InstanceDetailView, InstanceIntent};
+use crate::tr;
 use gpui::{App, Context, Window};
 use gpui_component::WindowExt as _;
 use lumilio_core::{ContentList, ProjectKind};
@@ -36,19 +37,22 @@ impl InstanceDetailView {
         }
         let view = cx.entity().downgrade();
         let title = if files.len() == 1 {
-            format!("删除“{}”？", files[0].trim_end_matches(".disabled"))
+            tr!(
+                "game-delete-title",
+                name = files[0].trim_end_matches(".disabled")
+            )
         } else {
-            format!("删除这 {} 个文件？", files.len())
+            tr!("instance-content-delete-title-many", count = files.len())
         };
         window.open_alert_dialog(cx, move |alert, _, _| {
             let view = view.clone();
             let files = files.clone();
             alert
                 .title(title.clone())
-                .description("文件会从这个游戏里移走，删除记录会写进历史。")
-                .ok_text("删除")
+                .description(tr!("instance-content-delete-body"))
+                .ok_text(tr!("common-delete"))
                 .ok_variant(gpui_component::button::ButtonVariant::Danger)
-                .cancel_text("取消")
+                .cancel_text(tr!("common-cancel"))
                 .show_cancel(true)
                 .on_ok(move |_, window, cx| {
                     let files = files.clone();

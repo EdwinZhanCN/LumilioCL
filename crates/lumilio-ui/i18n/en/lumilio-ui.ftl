@@ -262,6 +262,9 @@ library-restore-failed = Couldn't restore this backup
 game-picker-title = Which game to import
 game-picker-body = This folder has more than one game. Importing copies the player files (mods, saves, settings); the originals are left untouched.
 game-picker-import = Import
+collection-deleted = Deleted collection "{ $name }"
+collection-delete-failed = Couldn't delete the collection
+library-drop-unsupported = Only a modpack (.mrpack or .zip) can be dropped here
 
 ## Discover
 
@@ -568,6 +571,10 @@ account-added = Added account { $name }
 account-server-added = Added auth server { $name }
 account-server-removed = Removed auth server
 account-skin-saved = Skin saved; it takes effect on the next launch
+account-refreshed = Sign-in refreshed
+account-switch-failed = Couldn't switch accounts
+account-removed = Removed account { $name }
+account-remove-failed = Couldn't remove the account
 
 ## Activity
 
@@ -695,6 +702,12 @@ project-save-as = Save as
 project-download-version-file = Download this version's file · { $size }
 project-versions-no-match = No versions match the filters
 project-versions-no-match-help = Try loosening the filters
+project-save-started = Downloading { $title }; progress is in Activity
+project-saved-to = Saved to { $path }
+project-save-failed = Didn't download { $title }
+project-update-started = Updating { $title }; progress is in Activity
+project-updated-to = Updated to { $file } ({ $instance })
+project-update-failed = Didn't update { $title }
 
 ## Dependencies
 
@@ -793,6 +806,467 @@ logs-export-failed = Couldn't export the logs
 ## App
 
 app-quit = Quit LumilioCL
+
+## Game details
+
+instance-title = Game details
+instance-tab-overview = Overview
+instance-tab-content = Content
+instance-tab-worlds = Worlds
+instance-tab-screenshots = Screenshots
+instance-tab-history = History
+instance-tab-diagnostics = Diagnostics
+
+instance-play = Play
+instance-install-files = Install game files
+instance-repair-files = Repair game files
+instance-create-snapshot = Create snapshot…
+instance-copy-game = Copy this game…
+instance-backup-game = Full backup…
+instance-delete-game = Delete game…
+
+instance-read-failed = Couldn't read this game; you can try again
+instance-read-versions-help = Close it and try again
+instance-save-failed-retry = Couldn't save; try again
+instance-save-failed-draft = Couldn't save; your input was kept, so you can try again
+instance-name-saved = Name saved
+instance-memory-saved = Memory saved; it takes effect on the next launch
+instance-write-failed = That didn't work; the game is unchanged, and you can try again later
+
+instance-import-content-prompt = Choose files to add
+instance-import-world-prompt = Choose a world .zip
+instance-export-unavailable = Couldn't read the game's files, so it can't be exported
+instance-saved-to = Saved to { $path }
+instance-exported-to = Exported to { $path }
+instance-backed-up-to = Backed up to { $path }
+instance-save-failed = Couldn't save
+
+instance-runtime-changed = Switched to { $runtime }
+instance-game-copied = Copied as "{ $name }"
+instance-game-deleted = Game deleted
+instance-files-installed = Game files installed
+instance-files-repaired = Game files checked; missing and damaged ones were restored
+instance-java-installed = Java installed
+
+instance-content-add-files = Add files
+instance-content-browse-mod = Browse mods
+instance-content-browse-resource-pack = Browse resource packs
+instance-content-browse-shader = Browse shaders
+instance-content-empty = No { $noun } yet
+instance-content-empty-help = Choose one with "Browse", or add local files
+instance-content-refresh-tip = Read and identify again
+instance-content-update-all-count = Update all ({ $count } { $count -> [one] file *[other] files })
+instance-content-no-match = No matching items
+instance-content-no-match-help = Try another keyword or filter
+instance-content-source-note = Source information isn't available right now{ $reason }; files can still be enabled, disabled and deleted as usual.
+instance-content-filter-all = All
+instance-content-filter-updates = Has update
+instance-content-filter-disabled = Disabled
+instance-content-filter-unknown = Unrecognized
+instance-content-enable = Enable
+instance-content-disable = Disable
+instance-content-clear-selection = Clear selection
+instance-content-selected = { $count } { $count ->
+    [one] item
+   *[other] items
+} selected
+instance-content-delete-title-many = Delete { $count } { $count ->
+    [one] file
+   *[other] files
+}?
+instance-content-delete-body = The files are removed from this game, and the delete is written to History.
+instance-content-update-title = Update { $count } { $count ->
+    [one] file
+   *[other] files
+}?
+instance-content-update-body = Each is replaced with the latest version that fits this game; changing versions can break it, so create a snapshot first when in doubt.
+instance-content-update-all = Update all
+instance-content-unchanged = Nothing needs changing
+instance-content-changed-enabled = Enabled { $count } { $count ->
+    [one] file
+   *[other] files
+}
+instance-content-changed-disabled = Disabled { $count } { $count ->
+    [one] file
+   *[other] files
+}
+instance-content-changed-deleted = Deleted { $count } { $count ->
+    [one] file
+   *[other] files
+}
+instance-content-switched = Switched to { $name }
+instance-content-updated = Updated { $count } { $count ->
+    [one] file
+   *[other] files
+}
+instance-content-update-partial =
+    { $ok } { $ok ->
+        [one] file
+       *[other] files
+    } updated, { $failed } { $failed ->
+        [one] file
+       *[other] files
+    } didn't work
+    { $detail }
+instance-content-added = Added { $count } { $count ->
+    [one] file
+   *[other] files
+}
+instance-content-add-partial =
+    Added { $ok } { $ok ->
+        [one] file
+       *[other] files
+    }, { $failed } { $failed ->
+        [one] file
+       *[other] files
+    } didn't get added
+    { $detail }
+instance-content-local-file = Local file
+instance-content-unknown-version = Unknown
+instance-content-link-copied = Link copied
+instance-content-channel-release = Release
+instance-content-channel-beta = Beta
+instance-content-channel-alpha = Alpha
+instance-content-search-versions = Search versions
+instance-content-switch-to = Switch to { $version }
+instance-content-switch-title = Switch version · { $title }
+instance-content-switch-note = Changing versions can break the game; create a snapshot in History first when in doubt.
+instance-content-current = Current
+instance-content-latest = Latest
+instance-content-incompatible = Incompatible
+instance-content-show-incompatible = Show incompatible versions
+instance-content-version-meta = { $loaders } · { $versions }
+instance-content-version-meta-incompatible = { $loaders } · { $versions } · incompatible with this game
+instance-content-no-changelog = This version has no changelog
+
+instance-world-imported = Imported "{ $name }"
+instance-world-copied = Copied as "{ $name }"
+instance-world-backed-up = Backed up "{ $name }"; you can restore it from snapshots in History
+instance-world-deleted = World deleted
+instance-server-saved = Saved "{ $name }"
+instance-server-added = Added "{ $name }"
+instance-server-deleted = Server deleted
+instance-servers-reordered = Order changed
+instance-screenshot-copied = Image copied
+instance-screenshot-copy-failed = Couldn't copy it
+instance-screenshot-deleted = Screenshot deleted
+instance-snapshot-created = Snapshot created
+instance-snapshot-restored = Snapshot restored
+instance-snapshot-deleted = Snapshot deleted
+instance-snapshot-manual = Manual snapshot
+instance-snapshot-manual-backup = Manual backup
+
+instance-plugin-unavailable = This plugin isn't available right now
+instance-plugin-action-failed = It didn't finish
+
+instance-rename-title = Rename
+instance-rename-help = Renaming keeps the game folder, favorites and history.
+instance-rename-required = Enter a game name
+instance-memory-title = Edit memory
+instance-min-memory-help = Memory the game takes as soon as it starts (-Xms). Leave it empty to follow the launcher default; if there is none, Java decides.
+instance-max-memory-help = The most memory the game can use (-Xmx). Leave it empty to follow the launcher default; if there is none, Java decides.
+instance-memory-help-footer = Leave empty to follow the default; it takes effect on the next launch.
+instance-memory-reset = Follow defaults everywhere
+instance-server-edit-title = Edit server
+instance-server-add-title = Add server
+instance-server-address = Address
+instance-server-address-help = Host name or IP, with an optional port (25565 by default), such as mc.example.com or mc.example.com:25570.
+instance-snapshot-title = Create snapshot
+instance-snapshot-note = Note
+instance-snapshot-scope = Scope
+instance-snapshot-scope-all = All worlds and settings
+instance-snapshot-scope-world = Back up only the world "{ $name }"
+instance-copy-title = Copy game
+instance-copy-confirm = Start copying
+instance-copy-name = New game name
+instance-copy-name-required = Enter the new game's name
+instance-copy-name-suffix = { $name } copy
+instance-copy-include-worlds = Copy saves too
+instance-copy-help = Logs and crash reports aren't copied; favorites, play time, history and snapshots start from scratch.
+instance-delete-body = The game folder, saves and history are deleted with it; an interruption is finished or rolled back on the next launch.
+instance-memory-invalid = Enter a whole number of MB, or leave it empty to inherit the default
+instance-memory-range = Memory must be within 1–1048576 MB, and the minimum can't exceed the effective maximum
+instance-memory-inherit = Follow default · { $value } MB
+instance-memory-java = Decided by Java
+
+instance-field-game-name = Game name
+instance-field-inherit-default = Inherit default
+instance-field-new-game-name = New game's name
+instance-field-search = Search
+instance-field-snapshot-note = Note (optional)
+instance-field-search-worlds = Search worlds
+instance-field-server-name = Server name
+instance-field-server-address = Address, such as mc.example.com:25565
+instance-field-search-logs = Search logs
+instance-field-search-files = Search files
+
+instance-diagnostic-problems = Problems
+instance-diagnostic-logs = Logs
+instance-diagnostic-files = Files
+instance-problems-none = No problems found
+instance-problems-none-help = The game looks fine right now
+instance-diagnostics-game-dir = Game folder
+instance-diagnostics-path = Game folder / { $folder }
+instance-files-up = Go up
+instance-files-empty = This folder is empty
+instance-files-no-match = No matching files
+instance-files-folder-meta = Folder · { $time }
+instance-files-reveal = Show
+instance-log-live = Live output
+instance-log-latest = Latest log · latest.log
+instance-log-crash = Crash report · { $name }
+instance-log-source-label = Log source
+instance-log-source-search = Search log sources
+instance-log-level-label = Log level
+instance-log-level-prefix = Level ·{ " " }
+instance-log-level-placeholder = No level selected
+instance-log-level-error = Error
+instance-log-level-warn = Warning
+instance-log-level-info = Info
+instance-log-level-debug = Debug
+instance-log-file-meta = { $name } · { $time }
+instance-log-crash-meta = Crash report · { $name } · { $time }
+instance-log-analysis-action = Crash analysis…
+instance-log-copied = Log copied
+instance-log-copy-empty = No log lines to copy
+instance-log-export-action = Export…
+instance-log-read-failed = Couldn't read this log
+instance-log-reading = Reading the log…
+instance-log-none = No logs yet
+instance-log-none-help = Choose another source, or run the game and come back
+instance-log-no-match = No matching log lines
+instance-log-line-count = { $count } { $count ->
+    [one] line
+   *[other] lines
+}
+instance-log-bottom = Go to bottom
+instance-analysis-running = Analyzing…
+instance-analysis-failed = Couldn't finish the analysis
+instance-analysis-source = Source: { $source }
+instance-analysis-none = No known crash cause was recognized
+instance-analysis-none-help = That doesn't mean the log is problem-free.
+instance-analysis-snapshot = Log snapshot (redacted):
+instance-analysis-copy = Copy technical details
+instance-analysis-title = Crash analysis
+
+# Game details: overview, content, worlds, screenshots, history and settings.
+instance-field-game-version = Game version
+instance-overview-install-record = Install record
+instance-overview-installed-help = It was fully installed once; files are still checked at launch.
+instance-overview-pending-help = The install isn't finished; game files are prepared on the first launch.
+instance-overview-pending = Pending install
+instance-overview-size = Size on disk
+instance-overview-size-help = This game's own files; game files shared between games aren't counted.
+instance-overview-size-computing = Calculating…
+instance-overview-size-failed = Unavailable
+instance-section-read-failed = Couldn't read this section
+instance-section-retry-help = You can try again
+instance-action-install = Install
+instance-action-install-java = Install Java
+instance-action-add-account = Add one
+instance-action-repair = Repair
+instance-action-change = Change…
+instance-action-go-content = Go to content
+instance-action-go-adjust = Go to settings
+instance-view-logs = View logs
+instance-problem-not-installed = Game files aren't installed yet
+instance-problem-not-installed-help = Install them now, or let the first launch prepare them
+instance-problem-loader-unsupported = { $loader } can't launch yet
+instance-problem-loader-unsupported-help = This loader isn't supported yet; switch to Fabric, Quilt or Vanilla
+instance-problem-no-java = No usable Java found
+instance-problem-java-required = This version needs Java { $major }
+instance-problem-install-java-help = Install Java and try again
+instance-problem-no-account = No account chosen yet
+instance-problem-no-account-help = Offline play needs a player name
+instance-problem-damaged = Some game files are missing or damaged
+instance-problem-damaged-help = { $count } { $count ->
+    [one] file
+   *[other] files
+} in all; reinstalling will bring them back
+instance-problem-wrong-loader = A mod wasn't made for the current loader
+instance-problem-duplicate-mods = The same mod is installed more than once
+instance-problem-low-memory = The maximum memory is low
+instance-problem-low-memory-help = The current limit is { $max } MB; the game may crash from running out of memory
+instance-problem-last-session = The last session didn't end cleanly
+instance-history-view-all = View all
+instance-overview-recent-changes = Recent changes
+instance-problems-status = Status
+instance-change-content-added = Added
+instance-change-content-removed = Removed
+instance-change-content-enabled = Enabled
+instance-change-content-disabled = Disabled
+instance-change-content-updated = Updated
+instance-change-settings = Changed settings
+instance-change-game-version = Changed the game version
+instance-change-repaired = Repaired
+instance-change-world-copied = Copied a world
+instance-change-world-deleted = Deleted a world
+instance-change-world-imported = Imported a world
+instance-change-snapshot-created = Created a snapshot
+instance-change-snapshot-restored = Restored a snapshot
+instance-change-snapshot-deleted = Deleted a snapshot
+instance-outcome-clean = Ended normally
+instance-outcome-crashed = Crashed
+instance-outcome-failed-to-start = Couldn't start
+instance-outcome-stopped = Stopped manually
+instance-outcome-failed-to-prepare = Failed while preparing
+instance-outcome-cancelled = Cancelled before launch
+instance-outcome-interrupted = The launcher quit midway; the result is unknown
+instance-export-offline = Couldn't reach Modrinth; all { $bundled } { $bundled ->
+    [one] file
+   *[other] files
+} went straight into the modpack. Exported to { $path }
+instance-export-linked = Exported to { $path }: { $linked } { $linked ->
+    [one] file
+   *[other] files
+} listed by address, { $bundled } { $bundled ->
+    [one] file
+   *[other] files
+} packed in
+instance-duration-minutes = { $count } { $count ->
+    [one] minute
+   *[other] minutes
+}
+instance-duration-hours-minutes = { $hours } { $hours ->
+    [one] hour
+   *[other] hours
+} { $minutes } { $minutes ->
+    [one] minute
+   *[other] minutes
+}
+instance-confirm-delete-world = Delete the world "{ $name }"?
+instance-world-delete-body = The world and everything in it are deleted, and it can't be recovered. Create a backup first if you want a way back.
+instance-confirm-delete-screenshot = Delete the screenshot "{ $file }"?
+instance-screenshot-delete-body = The file is deleted from the game's screenshots folder, and it can't be recovered.
+instance-confirm-delete-server = Delete the server "{ $name }"?
+instance-server-delete-body = It's only removed from this game's list, and the server itself is unaffected; you can add it again later.
+instance-snapshot-untitled = This snapshot
+instance-confirm-restore-snapshot = Restore "{ $label }"?
+instance-snapshot-restore-body = Restoring replaces the current worlds and settings with the snapshot; the current state is saved first, and a failure or quit midway goes back to how it was before.
+instance-snapshot-restore = Restore
+instance-confirm-delete-snapshot = Delete the snapshot "{ $label }"?
+instance-snapshot-delete-body = After deleting it, you can't restore to this point.
+instance-history-skipped = { $count } { $count ->
+    [one] record
+   *[other] records
+} couldn't be read and were skipped
+instance-history-sessions-empty = No play sessions yet
+instance-history-changes-empty = No change records yet
+instance-snapshot-create-now = Create a snapshot now
+instance-snapshots-empty = No snapshots yet
+instance-snapshots-empty-help = A snapshot saves all worlds and game settings; a failed restore automatically goes back
+instance-history-snapshot-scope-world = World { $name }
+instance-content-kind-mod = Mod
+instance-content-kind-resource-pack = Resource pack
+instance-content-kind-shader = Shader
+instance-history-changes = Changes
+instance-history-sessions = Play sessions
+instance-history-snapshots = Snapshots
+instance-worlds-world = World
+instance-worlds-server = Server
+instance-refresh = Refresh
+instance-open-folder = Open folder
+instance-screenshots-empty = No screenshots yet
+instance-screenshots-empty-help = Press F2 in game; the pictures you take show up here
+instance-screenshot-no-preview = No preview
+instance-screenshot-copy = Copy image
+instance-server-checking = { $address } · Checking…
+instance-server-offline = { $address } · Can't connect
+instance-server-online-of = { $online }/{ $max } { $online ->
+    [one] player
+   *[other] players
+} online
+instance-server-online = { $online } { $online ->
+    [one] player
+   *[other] players
+} online
+instance-servers-empty = No servers yet
+instance-servers-empty-help = Once added, it appears in the game's multiplayer list
+instance-server-move-up = Move up
+instance-server-move-down = Move down
+instance-server-copy-address = Copy address
+instance-server-copied = Address copied
+instance-server-enter = Enter
+instance-server-old-version = This game version can't join the server directly; join from the multiplayer list
+instance-servers-running = The game is running, so the server list can't be changed; come back after quitting.
+instance-servers-help = Changes here are the game's multiplayer list. They can't be changed while the game runs.
+instance-server-name-address-required = Enter a name and an address
+instance-world-drop-unsupported = Only a world .zip can be dropped here
+instance-world-drop-one = Import one world at a time; the first one was imported
+instance-server-refresh = Refresh status
+instance-server-add = Add server
+instance-world-import = Import world
+instance-worlds-empty = No worlds yet
+instance-worlds-empty-help = Worlds you create in game show up here, and you can import a .zip
+instance-world-playing = Playing
+instance-world-damaged = Save information can't be read
+instance-world-played-at = Played { $when }
+instance-world-enter = Enter
+instance-world-old-version = This game version can't enter the world directly; enter from the main menu
+instance-world-copy = Copy
+instance-world-backup = Create backup
+instance-world-export = Export as .zip…
+instance-worlds-running = The game is running, so worlds can't be copied, backed up, exported or deleted; come back after quitting.
+instance-worlds-help = Copying and importing always save as a new world and never overwrite an existing one. They can't be changed while the game runs.
+instance-worlds-no-match = No matching worlds
+instance-load-failed = Couldn't read the game
+instance-loading = Reading the game…
+instance-plugin-unavailable-title = This tab isn't available right now
+instance-plugin-unavailable-help = The plugin is off, or something went wrong
+instance-back-to-top = Back to top
+instance-plugin-confirm-title = { $label }?
+instance-plugin-confirm-body = This can't be undone.
+instance-settings-window-fullscreen = { $size } · Fullscreen
+instance-settings-window-custom = { $value } (custom)
+instance-settings-window-help = Width and height must be filled in together; leave them empty to follow the launcher default.
+instance-settings-window-intro = Only this game is changed; leaving it empty or choosing "Follow default" uses the launcher's defaults.
+instance-settings-follow-default = Follow default
+instance-settings-after-help = What the launcher window does once this game starts running.
+instance-settings-launcher-window = Launcher window
+instance-settings-quick-play = Quick play
+instance-settings-quick-help = Go straight into a world or server after starting the game. Older game versions can't enter a singleplayer world directly.
+instance-settings-quick-intro = The world name is the save folder's name; write a server as address or address:port.
+instance-settings-type = Type
+instance-settings-target = Target
+instance-settings-target-placeholder = World name or server address
+instance-settings-version-help = Create a snapshot first when changing it; worlds and settings aren't changed.
+instance-settings-loader-help = Installed mods may not be compatible with the new loader.
+instance-settings-game-files = Game files
+instance-settings-files-help = Checks each game file one by one and redownloads missing or damaged ones; worlds, mods and settings aren't changed.
+instance-settings-not-downloaded = Not downloaded
+instance-settings-java-help = Automatic picks one of the discovered Java versions that this game needs; you can also specify one.
+instance-settings-java-auto = Automatic
+instance-settings-java-intro = Empty means automatic. When specifying, enter the path to a Java program or a JDK folder; discovered Java versions are in Settings › Java.
+instance-settings-path = Path
+instance-settings-java-pick = Choose a Java program or JDK folder
+instance-settings-jvm-help = Setting this replaces the launcher's default Java arguments; leave it empty to follow the default.
+instance-settings-jvm-intro = One argument per line. Leave it empty to follow the launcher default.
+instance-settings-args = Arguments
+instance-settings-machine-memory = This computer's memory
+instance-settings-machine-memory-help = The recommended maximum is half of this computer's memory, up to 8 GB.
+instance-settings-machine-memory-value = { $total } · recommended max { $recommended } MB
+instance-settings-game-args-help = Arguments passed to the game itself. Setting them replaces the default; an empty value means this game uses no arguments.
+instance-settings-source = Source
+instance-settings-env-help = Extra environment variables for the game process. Setting them replaces the default.
+instance-settings-variables = Variables
+instance-settings-commands-value = Before launch: { $pre } · Wrapper: { $wrapper } · After exit: { $post }
+instance-settings-commands-help = You write these commands yourself; they run with your user's permissions.
+instance-settings-commands-intro = Leave empty to follow the launcher default; enter - to make this game use none. Commands run with your user's permissions. Variables: $INST_ID, $INST_NAME, $INST_DIR, $INST_JAVA, $INST_MC_VERSION, $INST_LOADER.
+instance-settings-command-pre-help = A failure (exit code not 0) cancels this launch.
+instance-settings-command-wrapper-help = Goes in front of the Java command.
+instance-settings-command-post-help = A failure is only recorded, and it may run for up to 60 seconds.
+instance-settings-own = Custom
+instance-settings-followed = Follow default · { $value }
+instance-settings-quick-none = None (go to main menu)
+instance-settings-quick-world = World · { $name }
+instance-settings-quick-server = Server · { $address }
+instance-settings-command-none = Don't use
+instance-settings-quick-target-required = Enter a world name or server address
+instance-settings-tab-game = Game
+instance-settings-tab-runtime = Runtime
+instance-settings-tab-java = Java
+instance-settings-tab-performance = Performance
+instance-settings-tab-advanced = Advanced
 
 ## Library and Discover search and filters
 
@@ -992,3 +1466,14 @@ settings-diagnostics-failed = Couldn't export diagnostics
 settings-java-install-started = Downloading Java; progress is in Activity
 settings-java-installed = Installed Java { $version }
 settings-java-install-failed = Didn't install Java
+settings-save-failed = Couldn't save the settings
+settings-saved-next-launch = Saved; it takes effect on the next launch
+settings-memory-save-failed = Couldn't save the memory settings
+settings-saved-next-download = Saved; it takes effect on the next download
+settings-mirror-add-failed = Couldn't add the mirror preset
+settings-mirrors-save-failed = Couldn't save the mirror settings
+settings-download-source-save-failed = Couldn't save the download source setting
+settings-java-roots-save-failed = Couldn't save the search folders
+settings-java-save-failed = Couldn't save the Java settings
+settings-plugin-save-failed = Couldn't save the plugin settings
+settings-plugin-reset-failed = Couldn't restore the plugin defaults

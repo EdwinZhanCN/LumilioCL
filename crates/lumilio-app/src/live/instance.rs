@@ -15,6 +15,7 @@ use lumilio_ui::new_game::{NewGameForm, NewGameIntent, RuntimeChange};
 use lumilio_ui::platform;
 use lumilio_ui::route::Route;
 use lumilio_ui::toast::Toast;
+use lumilio_ui::tr;
 use std::rc::Rc;
 
 /// Opens a game's page; `then` is something to ask of the page once it is up.
@@ -219,7 +220,7 @@ pub(super) fn instance_intent(
                 files: true,
                 directories: false,
                 multiple: true,
-                prompt: Some("选择要添加的文件".into()),
+                prompt: Some(tr!("instance-import-content-prompt").into()),
             });
             let wiring = wiring.clone();
             let id = id.to_owned();
@@ -328,7 +329,7 @@ pub(super) fn instance_intent(
                 files: true,
                 directories: false,
                 multiple: false,
-                prompt: Some("选择世界的 .zip".into()),
+                prompt: Some(tr!("instance-import-world-prompt").into()),
             });
             let wiring = wiring.clone();
             let id = id.to_owned();
@@ -535,9 +536,12 @@ fn copy_screenshot(
         let _ = view.update(cx, |view, cx| match result {
             Ok(bytes) => {
                 platform::copy_image(bytes, cx);
-                view.toast(Toast::success("已复制图片"), cx);
+                view.toast(Toast::success(tr!("instance-screenshot-copied")), cx);
             }
-            Err(detail) => view.toast(Toast::error("没有复制成功").technical(detail), cx),
+            Err(detail) => view.toast(
+                Toast::error(tr!("instance-screenshot-copy-failed")).technical(detail),
+                cx,
+            ),
         });
     })
     .detach();
@@ -639,8 +643,19 @@ pub(super) fn open_folder(
     .detach();
 }
 
+/// What a write did to the selected files, for the success sentence.
+#[derive(Clone, Copy)]
+pub(super) enum ContentAction {
+    Enable,
+    Disable,
+    Delete,
+}
+
 /// What a batch of content changes amounts to, in words.
-pub(super) fn content_notice(results: &[ContentResult], did: &str) -> Result<String, String> {
+pub(super) fn content_notice(
+    results: &[ContentResult],
+    action: ContentAction,
+) -> Result<String, String> {
     let failed: Vec<String> = results
         .iter()
         .filter_map(|result| {
@@ -659,9 +674,13 @@ pub(super) fn content_notice(results: &[ContentResult], did: &str) -> Result<Str
         .filter(|result| !matches!(result.outcome, Ok(ContentEffect::Unchanged)))
         .count();
     Ok(if changed == 0 {
-        "没有需要改动的文件".to_owned()
+        tr!("instance-content-unchanged").to_owned()
     } else {
-        format!("已{did} {changed} 个文件")
+        match action {
+            ContentAction::Enable => tr!("instance-content-changed-enabled", count = changed),
+            ContentAction::Disable => tr!("instance-content-changed-disabled", count = changed),
+            ContentAction::Delete => tr!("instance-content-changed-deleted", count = changed),
+        }
     })
 }
 
@@ -722,7 +741,7 @@ pub(super) fn open_export(
             Err(detail) => {
                 let _ = view.update(cx, |view, cx| {
                     view.toast(
-                        Toast::error("没能读取游戏的文件，无法导出").technical(detail),
+                        Toast::error(tr!("instance-export-unavailable")).technical(detail),
                         cx,
                     )
                 });
@@ -826,10 +845,10 @@ pub(super) fn export_log(wiring: &Wiring, id: String, crash: Option<String>, cx:
         let _ = wiring.shell.update(cx, |shell, cx| {
             shell.toast(
                 match result {
-                    Ok(()) => {
-                        Toast::success(format!("已保存到 {}（名字和路径已隐去）", path.display()))
+                    Ok(()) => Toast::success(tr!("logs-saved", path = path.display().to_string())),
+                    Err(error) => {
+                        Toast::error(tr!("logs-export-failed")).technical(error.to_string())
                     }
-                    Err(error) => Toast::error("没能导出日志").technical(error.to_string()),
                 },
                 cx,
             )

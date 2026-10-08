@@ -6,6 +6,7 @@ use super::labels::{change_label, duration_label, outcome_label, size_label};
 use crate::assets::UiIcon;
 use crate::kit;
 use crate::theme::ShellColors;
+use crate::tr;
 use gpui::prelude::*;
 use gpui::{AnyElement, Context, div, px};
 use gpui_component::{h_flex, v_flex};
@@ -84,7 +85,7 @@ impl InstanceDetailView {
                     .then(|| {
                         kit::ghost(
                             ("session-inspect", started as usize),
-                            "查看日志",
+                            tr!("instance-view-logs"),
                             act(cx, move |view, window, cx| {
                                 view.inspect_session(started, seconds, window, cx)
                             }),
@@ -128,14 +129,14 @@ impl InstanceDetailView {
                 div()
                     .text_sm()
                     .text_color(colors.muted)
-                    .child(format!("有 {skipped} 行记录无法读取，已跳过"))
+                    .child(tr!("instance-history-skipped", count = skipped))
             }))
             .child(if rows.is_empty() {
                 kit::empty(
                     if sessions {
-                        "还没有游玩记录"
+                        tr!("instance-history-sessions-empty")
                     } else {
-                        "还没有变更记录"
+                        tr!("instance-history-changes-empty")
                     },
                     "",
                     colors,
@@ -153,7 +154,7 @@ impl InstanceDetailView {
             // ia[instance.history]: 创建快照 | 历史 · 快照分段「现在创建快照」→ 弹窗（备注、范围） | 后台创建 → toast
             kit::action(
                 "snapshot-create",
-                "现在创建快照",
+                tr!("instance-snapshot-create-now"),
                 Some(UiIcon::Plus),
                 true,
                 act(cx, |view, window, cx| {
@@ -173,8 +174,8 @@ impl InstanceDetailView {
             };
             if snapshots.is_empty() {
                 kit::empty(
-                    "还没有快照",
-                    "快照保存所有世界和游戏设置，恢复失败会自动回到恢复前",
+                    tr!("instance-snapshots-empty"),
+                    tr!("instance-snapshots-empty-help"),
                     colors,
                 )
                 .into_any_element()
@@ -184,22 +185,24 @@ impl InstanceDetailView {
                     .enumerate()
                     .map(|(row, snapshot)| {
                         let scope = match &snapshot.scope {
-                            SnapshotScope::Full => "全部世界与设置".to_owned(),
-                            SnapshotScope::World(name) => format!("世界 {name}"),
+                            SnapshotScope::Full => tr!("instance-snapshot-scope-all").to_owned(),
+                            SnapshotScope::World(name) => {
+                                tr!("instance-history-snapshot-scope-world", name = name)
+                            }
                         };
                         let trail = h_flex()
                             .gap_1()
                             // ia[instance.history]: 恢复快照 | 快照行「恢复」→ 警告弹窗“恢复会用快照替换当前的 X，当前状态会先自动存一份” | 后台恢复 → toast；失败自动回到恢复前
                             .child(self.asking(
                                 ("snapshot-restore", row),
-                                "恢复",
+                                tr!("instance-snapshot-restore"),
                                 Confirm::RestoreSnapshot(snapshot.id.clone()),
                                 cx,
                             ))
                             // ia[instance.history]: 删除快照 | 快照行「删除」→ 警告弹窗 | 删除快照文件
                             .child(self.asking(
                                 ("snapshot-delete", row),
-                                "删除",
+                                tr!("common-delete"),
                                 Confirm::DeleteSnapshot(snapshot.id.clone()),
                                 cx,
                             ));

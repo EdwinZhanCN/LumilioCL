@@ -1,5 +1,6 @@
 use super::super::Section;
 use super::CONTENT_KINDS;
+use crate::tr;
 use lumilio_core::{
     ContentList, FileEntry, GameLogs, HistoryRead, Problem, ProjectKind, ScreenshotInfo,
     ServerEntry, ServerStatus, SnapshotInfo, WorldInfo,
@@ -149,42 +150,45 @@ impl Confirm {
                     .find(|world| &world.folder == folder)
                     .map_or(folder.as_str(), |world| world.name.as_str());
                 (
-                    format!("删除世界“{name}”？"),
-                    "世界和里面的东西都会删除，之后不能找回。想留个后手的话，先创建备份。"
-                        .to_owned(),
-                    "删除",
+                    tr!("instance-confirm-delete-world", name = name),
+                    tr!("instance-world-delete-body").to_owned(),
+                    tr!("common-delete"),
                 )
             }
             Self::DeleteScreenshot(file) => (
-                format!("删除截图“{file}”？"),
-                "文件会从游戏的 screenshots 文件夹里删除，之后不能找回。".to_owned(),
-                "删除",
+                tr!("instance-confirm-delete-screenshot", file = file.as_str()),
+                tr!("instance-screenshot-delete-body").to_owned(),
+                tr!("common-delete"),
             ),
             Self::DeleteServer { entry, .. } => (
-                format!("删除服务器“{}”？", entry.name),
-                "只从这个游戏的列表里移除，不影响服务器本身；之后可以重新添加。".to_owned(),
-                "删除",
+                tr!("instance-confirm-delete-server", name = entry.name.as_str()),
+                tr!("instance-server-delete-body").to_owned(),
+                tr!("common-delete"),
             ),
             Self::RestoreSnapshot(id) => {
                 let label = snapshots
                     .iter()
                     .find(|snapshot| &snapshot.id == id)
-                    .map_or("这份快照", |snapshot| snapshot.label.as_str());
+                    .map_or(tr!("instance-snapshot-untitled"), |snapshot| {
+                        snapshot.label.as_str()
+                    });
                 (
-                    format!("恢复“{label}”？"),
-                    "恢复会用快照替换现有的世界和设置，当前状态会先自动存一份；中途失败或退出会回到恢复前的样子。".to_owned(),
-                    "恢复",
+                    tr!("instance-confirm-restore-snapshot", label = label),
+                    tr!("instance-snapshot-restore-body").to_owned(),
+                    tr!("instance-snapshot-restore"),
                 )
             }
             Self::DeleteSnapshot(id) => {
                 let label = snapshots
                     .iter()
                     .find(|snapshot| &snapshot.id == id)
-                    .map_or("这份快照", |snapshot| snapshot.label.as_str());
+                    .map_or(tr!("instance-snapshot-untitled"), |snapshot| {
+                        snapshot.label.as_str()
+                    });
                 (
-                    format!("删除快照“{label}”？"),
-                    "删除后不能再恢复到这个时间点。".to_owned(),
-                    "删除",
+                    tr!("instance-confirm-delete-snapshot", label = label),
+                    tr!("instance-snapshot-delete-body").to_owned(),
+                    tr!("common-delete"),
                 )
             }
         }

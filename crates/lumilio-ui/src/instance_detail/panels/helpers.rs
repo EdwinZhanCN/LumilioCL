@@ -2,7 +2,7 @@ use super::super::{InstanceDetailView, Section};
 use super::data::{Confirm, Loaded};
 use crate::assets::UiIcon;
 use crate::theme::ShellColors;
-use crate::{kit, live};
+use crate::{kit, live, tr};
 use gpui::prelude::*;
 use gpui::{AnyElement, App, Context, Window};
 use gpui_component::{h_flex, v_flex};
@@ -54,18 +54,22 @@ impl InstanceDetailView {
         cx: &mut Context<Self>,
     ) -> Option<AnyElement> {
         match data {
-            None => Some(kit::empty("正在读取…", "", colors).into_any_element()),
+            None => Some(kit::empty(tr!("library-loading"), "", colors).into_any_element()),
             Some(Err(detail)) => Some(
                 v_flex()
                     .gap_3()
-                    .child(kit::empty("没有读到这部分内容", "可以重试", colors))
+                    .child(kit::empty(
+                        tr!("instance-section-read-failed"),
+                        tr!("instance-section-retry-help"),
+                        colors,
+                    ))
                     .child(
                         h_flex()
                             .justify_center()
                             .gap_2()
                             .child(kit::action(
                                 ("instance-section-retry", 0usize),
-                                "重试",
+                                tr!("common-retry"),
                                 Some(UiIcon::Refresh),
                                 false,
                                 act(cx, move |view, window, cx| view.request(retry, window, cx)),

@@ -1,7 +1,7 @@
 use super::InstanceDetailView;
 use super::editors::Editor;
 use super::intent::InstanceIntent;
-use crate::{kit, theme};
+use crate::{kit, theme, tr};
 use gpui::prelude::*;
 use gpui::{Context, Entity, Window};
 use gpui_component::input::InputState;
@@ -36,7 +36,7 @@ pub(super) fn memory_draft(
             value
                 .parse::<u32>()
                 .map(Some)
-                .map_err(|_| "请输入整数 MB，留空可继承默认值")
+                .map_err(|_| tr!("instance-memory-invalid"))
         }
     };
     let mut next = saved.clone();
@@ -46,7 +46,7 @@ pub(super) fn memory_draft(
         defaults.default_min_memory_mb,
         defaults.default_max_memory_mb,
     )
-    .map_err(|_| "内存需在 1–1048576 MB 内，最小值不能超过生效的最大值")?;
+    .map_err(|_| tr!("instance-memory-range"))?;
     Ok(next)
 }
 
@@ -58,8 +58,8 @@ pub(super) fn memory_text(value: Option<u32>) -> String {
 pub(super) fn effective_label(value: Option<u32>, default: Option<u32>) -> String {
     match (value, default) {
         (Some(value), _) => format!("{value} MB"),
-        (None, Some(value)) => format!("跟随默认 · {value} MB"),
-        (None, None) => "由 Java 决定".to_owned(),
+        (None, Some(value)) => tr!("instance-memory-inherit", value = value),
+        (None, None) => tr!("instance-memory-java").to_owned(),
     }
 }
 
@@ -68,7 +68,7 @@ impl InstanceDetailView {
         let Some(fields) = &self.fields else { return };
         let name = fields.copy_name.read(cx).value().trim().to_owned();
         if name.is_empty() {
-            self.editor_error = Some("请输入新游戏的名称".into());
+            self.editor_error = Some(tr!("instance-copy-name-required").into());
             cx.notify();
             return;
         }
@@ -86,7 +86,7 @@ impl InstanceDetailView {
     pub(super) fn ensure_fields(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(record) = &self.record else { return };
         let name = record.name.clone();
-        let copy_name = format!("{name} 副本");
+        let copy_name = tr!("instance-copy-name-suffix", name = name.as_str());
         let min = memory_text(record.settings.min_memory_mb);
         let max = memory_text(record.settings.max_memory_mb);
         if let Some(fields) = &self.fields {
@@ -109,19 +109,31 @@ impl InstanceDetailView {
                 })
             };
             self.fields = Some(Fields {
-                name: input(name, "游戏名称", cx),
-                min: input(min, "继承默认", cx),
-                max: input(max, "继承默认", cx),
-                copy_name: input(copy_name, "新游戏的名称", cx),
-                content_search: cx.new(|cx| InputState::new(window, cx).placeholder("搜索")),
-                snapshot_note: cx.new(|cx| InputState::new(window, cx).placeholder("备注（可空）")),
-                world_search: cx.new(|cx| InputState::new(window, cx).placeholder("搜索世界")),
-                server_name: cx.new(|cx| InputState::new(window, cx).placeholder("服务器名称")),
-                server_address: cx.new(|cx| {
-                    InputState::new(window, cx).placeholder("地址，例如 mc.example.com:25565")
+                name: input(name, tr!("instance-field-game-name"), cx),
+                min: input(min, tr!("instance-field-inherit-default"), cx),
+                max: input(max, tr!("instance-field-inherit-default"), cx),
+                copy_name: input(copy_name, tr!("instance-field-new-game-name"), cx),
+                content_search: cx.new(|cx| {
+                    InputState::new(window, cx).placeholder(tr!("instance-field-search"))
                 }),
-                log_search: cx.new(|cx| InputState::new(window, cx).placeholder("搜索日志")),
-                file_search: cx.new(|cx| InputState::new(window, cx).placeholder("搜索文件")),
+                snapshot_note: cx.new(|cx| {
+                    InputState::new(window, cx).placeholder(tr!("instance-field-snapshot-note"))
+                }),
+                world_search: cx.new(|cx| {
+                    InputState::new(window, cx).placeholder(tr!("instance-field-search-worlds"))
+                }),
+                server_name: cx.new(|cx| {
+                    InputState::new(window, cx).placeholder(tr!("instance-field-server-name"))
+                }),
+                server_address: cx.new(|cx| {
+                    InputState::new(window, cx).placeholder(tr!("instance-field-server-address"))
+                }),
+                log_search: cx.new(|cx| {
+                    InputState::new(window, cx).placeholder(tr!("instance-field-search-logs"))
+                }),
+                file_search: cx.new(|cx| {
+                    InputState::new(window, cx).placeholder(tr!("instance-field-search-files"))
+                }),
             });
             if let Some(fields) = &self.fields {
                 Self::watch_content_search(&fields.content_search.clone(), cx);
@@ -157,7 +169,7 @@ impl InstanceDetailView {
         } else {
             let name = fields.name.read(cx).value().trim().to_owned();
             if name.is_empty() {
-                self.editor_error = Some("请输入游戏名称".into());
+                self.editor_error = Some(tr!("instance-rename-required").into());
                 cx.notify();
                 return;
             }
@@ -187,7 +199,7 @@ impl InstanceDetailView {
         cx: &mut Context<Self>,
     ) -> gpui::AnyElement {
         theme::clickable(
-            kit::ghost(id, "编辑", |_, _| {})
+            kit::ghost(id, tr!("common-edit"), |_, _| {})
                 .disabled(self.busy)
                 .debug_selector(move || id.into())
                 .on_click(

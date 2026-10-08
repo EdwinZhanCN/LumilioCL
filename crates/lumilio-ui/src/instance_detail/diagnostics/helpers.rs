@@ -1,6 +1,13 @@
+use crate::tr_all;
 use lumilio_core::FileEntry;
 
-pub const DIAGNOSTIC_LABELS: [&str; 3] = ["问题", "日志", "文件"];
+pub fn diagnostic_labels() -> &'static [&'static str] {
+    tr_all![
+        "instance-diagnostic-problems",
+        "instance-diagnostic-logs",
+        "instance-diagnostic-files",
+    ]
+}
 
 /// The entries whose name contains `query` (ignoring case); all when empty.
 pub fn files_matching<'a>(entries: &'a [FileEntry], query: &str) -> Vec<&'a FileEntry> {

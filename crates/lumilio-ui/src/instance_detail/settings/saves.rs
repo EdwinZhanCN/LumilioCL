@@ -1,6 +1,7 @@
 use super::super::InstanceIntent;
 use super::texts::NONE_ON_PURPOSE;
 use crate::settings_forms as shared;
+use crate::tr;
 use lumilio_core::{AfterLaunch, EnvVar, InstanceSettings, QuickPlay};
 use std::path::PathBuf;
 
@@ -25,12 +26,15 @@ pub(super) fn number(text: &str, what: &str) -> Result<Option<u32>, String> {
     }
     text.parse()
         .map(Some)
-        .map_err(|_| format!("{what}需要填一个整数"))
+        .map_err(|_| tr!("settings-number-whole", what = what))
 }
 
 /// Window size (blank clears) and fullscreen (0 follow, 1 on, 2 off).
 pub fn window(current: &InstanceSettings, width: &str, height: &str, fullscreen: usize) -> Saved {
-    let (width, height) = (number(width, "窗口宽度")?, number(height, "窗口高度")?);
+    let (width, height) = (
+        number(width, tr!("settings-field-window-width"))?,
+        number(height, tr!("settings-field-window-height"))?,
+    );
     save(current.clone(), |next| {
         next.launch.window_width = width;
         next.launch.window_height = height;
@@ -58,7 +62,9 @@ pub fn quick_play(current: &InstanceSettings, kind: usize, target: &str) -> Save
     let target = target.trim();
     let chosen = match kind {
         0 => None,
-        _ if target.is_empty() => return Err("请填写世界名或服务器地址".to_owned()),
+        _ if target.is_empty() => {
+            return Err(tr!("instance-settings-quick-target-required").to_owned());
+        }
         1 => Some(QuickPlay::World(target.to_owned())),
         _ => Some(QuickPlay::Server(target.to_owned())),
     };
@@ -92,7 +98,7 @@ pub fn environment(current: &InstanceSettings, choice: usize, text: &str) -> Sav
         let mut variables = Vec::new();
         for (index, line) in shared::lines(text).into_iter().enumerate() {
             let Some((name, value)) = line.split_once('=') else {
-                return Err(format!("第 {} 行需要写成 名称=值", index + 1));
+                return Err(tr!("settings-env-line", line = index + 1));
             };
             variables.push(EnvVar {
                 name: name.trim().to_owned(),

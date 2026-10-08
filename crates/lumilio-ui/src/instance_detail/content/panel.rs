@@ -1,10 +1,10 @@
 use super::super::panels::{CONTENT_KINDS, CONTENT_LABELS};
 use super::super::{InstanceDetailView, InstanceIntent, Section};
-use super::model::{BAR_HEIGHT, FILTER_LABELS, FILTERS, visible};
+use super::model::{BAR_HEIGHT, FILTERS, filter_labels, visible};
 use crate::assets::UiIcon;
 use crate::key::Key;
 use crate::theme::ShellColors;
-use crate::{kit, theme};
+use crate::{kit, theme, tr, tr_all};
 use gpui::prelude::*;
 use gpui::{AnyElement, App, Context, Entity, Window, div, px};
 use gpui_component::IndexPath;
@@ -12,6 +12,14 @@ use gpui_component::Sizable as _;
 use gpui_component::input::{Input, InputEvent, InputState};
 use gpui_component::select::{SearchableVec, Select, SelectEvent, SelectState};
 use gpui_component::{Icon, h_flex, v_flex};
+
+fn browse_labels() -> &'static [&'static str] {
+    tr_all![
+        "instance-content-browse-mod",
+        "instance-content-browse-resource-pack",
+        "instance-content-browse-shader",
+    ]
+}
 
 impl InstanceDetailView {
     // ia[instance.content]: 识别来源 | 进入内容标签时自动 | 按 SHA-1 查 Modrinth：图标、项目名、作者、版本、项目链接；离线时照常列出，未识别的没有切换版本键 | 识别结果不缓存
@@ -44,7 +52,7 @@ impl InstanceDetailView {
             // ia[instance.content]: 添加本地文件 | L4a 次要「添加文件」→ 选文件（拖入内容页没做） | 冲突逐项报告，不静默覆盖同名异内容的文件
             kit::action(
                 "content-add-files",
-                "添加文件",
+                tr!("instance-content-add-files"),
                 Some(UiIcon::Plus),
                 false,
                 move |window, cx| handler(InstanceIntent::ImportContent(kind), window, cx),
@@ -55,7 +63,7 @@ impl InstanceDetailView {
             let handler = self.handler.clone();
             kit::action(
                 "content-browse",
-                ["浏览 Mod", "浏览资源包", "浏览光影"][index],
+                browse_labels()[index],
                 Some(UiIcon::Search),
                 true,
                 move |window, cx| handler(InstanceIntent::BrowseContent(kind), window, cx),
@@ -99,7 +107,7 @@ impl InstanceDetailView {
         if let Some(select) = &self.content_filter_select {
             return select.clone();
         }
-        let labels: Vec<String> = FILTER_LABELS
+        let labels: Vec<String> = filter_labels()
             .iter()
             .map(|label| (*label).to_owned())
             .collect();
@@ -116,7 +124,7 @@ impl InstanceDetailView {
             window,
             |this, _, event: &SelectEvent<SearchableVec<String>>, _, cx| {
                 if let SelectEvent::Confirm(Some(label)) = event
-                    && let Some(index) = FILTER_LABELS.iter().position(|text| *text == label)
+                    && let Some(index) = filter_labels().iter().position(|text| *text == label)
                 {
                     this.content_filter = FILTERS[index];
                     cx.notify();
@@ -140,8 +148,8 @@ impl InstanceDetailView {
         };
         if list.entries.is_empty() {
             return kit::empty(
-                format!("还没有{noun}"),
-                "点「浏览」找一个装进来，或者添加本地文件",
+                tr!("instance-content-empty", noun = noun),
+                tr!("instance-content-empty-help"),
                 colors,
             )
             .into_any_element();
@@ -176,7 +184,7 @@ impl InstanceDetailView {
                 theme::clickable(
                     Key::new("content-update-all")
                         .icon(Icon::new(UiIcon::Refresh))
-                        .label(format!("全部更新（{count}）"))
+                        .label(tr!("instance-content-update-all-count", count = count))
                         .white()
                         .small()
                         .disabled(busy),
@@ -197,7 +205,7 @@ impl InstanceDetailView {
                         .icon(Icon::new(UiIcon::Refresh))
                         .ghost()
                         .small()
-                        .tooltip("重新读取并识别"),
+                        .tooltip(tr!("instance-content-refresh-tip")),
                     true,
                 )
                 .on_click(move |_, window, cx| {
@@ -248,7 +256,12 @@ impl InstanceDetailView {
             .map(|(index, entry)| self.row(index, entry, colors, cx))
             .collect();
         let list_block = if rows.is_empty() {
-            kit::empty("没有符合的条目", "换个关键词或筛选试试", colors).into_any_element()
+            kit::empty(
+                tr!("instance-content-no-match"),
+                tr!("instance-content-no-match-help"),
+                colors,
+            )
+            .into_any_element()
         } else {
             kit::panel_list(rows, colors).into_any_element()
         };
@@ -262,9 +275,12 @@ impl InstanceDetailView {
                     .source_note
                     .as_deref()
                     .map_or_else(String::new, |note| format!("（{note}）"));
-                body.child(div().text_xs().text_color(colors.muted).child(format!(
-                    "来源信息暂时不可用{reason}；文件照常可以启停和删除。"
-                )))
+                body.child(
+                    div()
+                        .text_xs()
+                        .text_color(colors.muted)
+                        .child(tr!("instance-content-source-note", reason = reason)),
+                )
             })
             .into_any_element()
     }

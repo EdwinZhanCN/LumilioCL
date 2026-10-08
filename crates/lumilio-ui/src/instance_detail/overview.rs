@@ -1,7 +1,7 @@
 use super::editors::Editor;
 use super::{InstanceDetailView, editors, panels};
 use crate::theme::ShellColors;
-use crate::{kit, live};
+use crate::{kit, live, tr};
 use gpui::Context;
 use gpui::prelude::*;
 use gpui_component::v_flex;
@@ -17,7 +17,7 @@ impl InstanceDetailView {
                     // ia[instance.overview]: 改名 | 概览「名称」行 [编辑] → 弹窗 | 改名保留游戏目录、收藏和历史记录
                     kit::value_row(
                         "overview-name",
-                        "名称",
+                        tr!("common-name"),
                         Some(editors::RENAME_HELP.into()),
                         record.name.clone(),
                         Some(self.edit_button("instance-rename", Editor::Rename, cx)),
@@ -25,7 +25,7 @@ impl InstanceDetailView {
                     ),
                     kit::value_row(
                         "overview-version",
-                        "游戏版本",
+                        tr!("instance-field-game-version"),
                         None,
                         format!(
                             "{} · {}",
@@ -37,19 +37,19 @@ impl InstanceDetailView {
                     ),
                     kit::value_row(
                         "overview-installed",
-                        "安装记录",
+                        tr!("instance-overview-install-record"),
                         Some(
                             if record.installed {
-                                "曾完成安装，启动时仍会检查文件。"
+                                tr!("instance-overview-installed-help")
                             } else {
-                                "尚未完成安装，首次启动时准备游戏文件。"
+                                tr!("instance-overview-pending-help")
                             }
                             .into(),
                         ),
                         if record.installed {
-                            "已安装"
+                            tr!("discover-installed")
                         } else {
-                            "待安装"
+                            tr!("instance-overview-pending")
                         },
                         None,
                         colors,
@@ -57,12 +57,12 @@ impl InstanceDetailView {
                     // ia[instance.overview]: 占用空间 | 概览「占用空间」行 | 后台计算，只算这个游戏自己的文件
                     kit::value_row(
                         "overview-size",
-                        "占用空间",
-                        Some("这个游戏自己的文件；多个游戏共用的游戏文件不算在内。".into()),
+                        tr!("instance-overview-size"),
+                        Some(tr!("instance-overview-size-help").into()),
                         match &self.data.size {
-                            None => "计算中…".to_owned(),
+                            None => tr!("instance-overview-size-computing").to_owned(),
                             Some(Ok(bytes)) => panels::size_label(*bytes),
-                            Some(Err(_)) => "读不到".to_owned(),
+                            Some(Err(_)) => tr!("instance-overview-size-failed").to_owned(),
                         },
                         None,
                         colors,

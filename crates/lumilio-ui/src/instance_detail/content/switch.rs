@@ -4,7 +4,7 @@ use super::model::{channel_label, title_of};
 use crate::assets::UiIcon;
 use crate::key::Key;
 use crate::theme::ShellColors;
-use crate::{kit, theme};
+use crate::{kit, theme, tr};
 use gpui::prelude::*;
 use gpui::{
     AnyElement, App, Context, Entity, IntoElement, Render, WeakEntity, Window, div, px,
@@ -127,7 +127,9 @@ impl VersionSwitch {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let query = cx.new(|cx| InputState::new(window, cx).placeholder("查找版本"));
+        let query = cx.new(|cx| {
+            InputState::new(window, cx).placeholder(tr!("instance-content-search-versions"))
+        });
         cx.subscribe(&query, |_, _, event: &InputEvent, cx| {
             if matches!(event, InputEvent::Change) {
                 cx.notify();
@@ -240,8 +242,13 @@ impl VersionSwitch {
             .as_ref()
             .is_some_and(|version| version.id != this.target.current);
         let label = match &chosen {
-            Some(version) if differs => format!("切换到 {}", version.number),
-            _ => "切换版本".to_owned(),
+            Some(version) if differs => {
+                tr!(
+                    "instance-content-switch-to",
+                    version = version.number.as_str()
+                )
+            }
+            _ => tr!("project-switch-version").to_owned(),
         };
         let weak = entity.downgrade();
         let commit = theme::clickable(
@@ -258,7 +265,7 @@ impl VersionSwitch {
         );
         let cancel = theme::clickable(
             Key::new("switch-cancel")
-                .label("取消")
+                .label(tr!("common-cancel"))
                 .white()
                 .disabled(busy)
                 .on_click(|_, window, cx| window.close_dialog(cx)),
@@ -266,7 +273,10 @@ impl VersionSwitch {
         );
         let colors = ShellColors::from_theme(cx.theme());
         theme::dialog(dialog, cx)
-            .title(format!("切换版本 · {}", this.target.title))
+            .title(tr!(
+                "instance-content-switch-title",
+                title = this.target.title.as_str()
+            ))
             .w(px(760.))
             .keyboard(!busy)
             .overlay_closable(!busy)
@@ -282,7 +292,7 @@ impl VersionSwitch {
                             .flex_1()
                             .text_xs()
                             .text_color(colors.muted)
-                            .child("换版本可能让游戏出问题，必要时先在「历史」里建一个快照。"),
+                            .child(tr!("instance-content-switch-note")),
                     )
                     .child(cancel)
                     .child(commit),
@@ -297,10 +307,14 @@ impl Render for VersionSwitch {
         }
         let colors = ShellColors::from_theme(cx.theme());
         let left: AnyElement = match &self.versions {
-            None => kit::empty("正在读取版本…", "", colors).into_any_element(),
+            None => kit::empty(tr!("version-picker-loading"), "", colors).into_any_element(),
             Some(Err(message)) => v_flex()
                 .gap_2()
-                .child(kit::empty("读不到版本列表", "可以关掉再试一次", colors))
+                .child(kit::empty(
+                    tr!("new-game-read-game-versions"),
+                    tr!("instance-read-versions-help"),
+                    colors,
+                ))
                 .child(kit::technical("switch-technical", message.clone()))
                 .into_any_element(),
             Some(Ok(versions)) => {
@@ -332,9 +346,9 @@ impl Render for VersionSwitch {
                             let picked = selected.as_deref() == Some(id.as_str());
                             let view = view.clone();
                             let marker = if version.id == current {
-                                Some("当前")
+                                Some(tr!("instance-content-current"))
                             } else if newest_fit.as_deref() == Some(id.as_str()) {
-                                Some("最新")
+                                Some(tr!("instance-content-latest"))
                             } else {
                                 None
                             };
@@ -384,7 +398,10 @@ impl Render for VersionSwitch {
                                 }))
                                 .when(!fits, |row| {
                                     row.child(
-                                        div().text_xs().text_color(colors.danger).child("不兼容"),
+                                        div()
+                                            .text_xs()
+                                            .text_color(colors.danger)
+                                            .child(tr!("instance-content-incompatible")),
                                     )
                                 })
                         })
@@ -404,12 +421,12 @@ impl Render for VersionSwitch {
                     div()
                         .text_xs()
                         .text_color(colors.muted)
-                        .child("显示不兼容的版本"),
+                        .child(tr!("instance-content-show-incompatible")),
                 )
                 .child(kit::switch(
                     "switch-incompatible",
                     self.show_incompatible,
-                    "显示不兼容的版本",
+                    tr!("instance-content-show-incompatible"),
                     move |_, cx| {
                         let _ = view.update(cx, |switch, cx| {
                             switch.show_incompatible = !switch.show_incompatible;
@@ -444,23 +461,30 @@ impl Render for VersionSwitch {
                         div()
                             .text_xs()
                             .text_color(if fits { colors.muted } else { colors.danger })
-                            .child(format!(
-                                "{} · {}{}",
-                                version.loaders.join(" / "),
-                                version
+                            .child({
+                                let loaders = version.loaders.join(" / ");
+                                let versions = version
                                     .game_versions
                                     .iter()
                                     .rev()
                                     .take(4)
                                     .cloned()
                                     .collect::<Vec<_>>()
-                                    .join(", "),
+                                    .join(", ");
                                 if fits {
-                                    ""
+                                    tr!(
+                                        "instance-content-version-meta",
+                                        loaders = loaders,
+                                        versions = versions
+                                    )
                                 } else {
-                                    " · 和这个游戏不兼容"
+                                    tr!(
+                                        "instance-content-version-meta-incompatible",
+                                        loaders = loaders,
+                                        versions = versions
+                                    )
                                 }
-                            )),
+                            }),
                     )
                     .child(
                         div()
@@ -471,7 +495,7 @@ impl Render for VersionSwitch {
                             .child(if version.changelog.trim().is_empty() {
                                 div()
                                     .text_color(colors.muted)
-                                    .child("这个版本没有写更新日志")
+                                    .child(tr!("instance-content-no-changelog"))
                                     .into_any_element()
                             } else {
                                 TextView::markdown(

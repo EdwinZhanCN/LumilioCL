@@ -5,7 +5,7 @@ use super::{
     TAB_WORLDS,
 };
 use crate::theme::ShellColors;
-use crate::{kit, live, theme};
+use crate::{kit, live, theme, tr};
 use gpui::prelude::*;
 use gpui::{Context, IntoElement, Render, Window, div, px};
 use gpui_component::ActiveTheme as _;
@@ -86,14 +86,18 @@ impl Render for InstanceDetailView {
             let retry = self.handler.clone();
             v_flex()
                 .gap_3()
-                .child(kit::empty("没有读到游戏", message.clone(), colors))
+                .child(kit::empty(
+                    tr!("instance-load-failed"),
+                    message.clone(),
+                    colors,
+                ))
                 .child(
                     h_flex()
                         .justify_center()
                         .gap_2()
                         .child(kit::action(
                             "instance-retry",
-                            "重试",
+                            tr!("common-retry"),
                             None,
                             true,
                             move |window, cx| retry(InstanceIntent::Reload, window, cx),
@@ -106,7 +110,7 @@ impl Render for InstanceDetailView {
                 )
                 .into_any_element()
         } else {
-            kit::empty("正在读取游戏…", "", colors).into_any_element()
+            kit::empty(tr!("instance-loading"), "", colors).into_any_element()
         };
         let tabs =
             cx.listener(|view, index: &usize, window, cx| view.open_shown(*index, window, cx));

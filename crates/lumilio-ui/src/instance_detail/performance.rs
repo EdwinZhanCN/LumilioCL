@@ -3,6 +3,7 @@ use super::forms::effective_label;
 use super::{InstanceDetailView, editors};
 use crate::kit;
 use crate::theme::ShellColors;
+use crate::tr;
 use gpui::Context;
 use gpui::prelude::*;
 use gpui_component::{h_flex, v_flex};
@@ -23,7 +24,7 @@ impl InstanceDetailView {
                     .w_full()
                     .items_center()
                     .justify_between()
-                    .child(kit::section_label("内存", colors))
+                    .child(kit::section_label(tr!("settings-memory"), colors))
                     // ia[instance.settings]: 内存 | 设置 · 性能组，「内存」区 [编辑] 弹窗（最小 / 最大） | 留空跟随默认；性能组另有只读的“本机内存 · 推荐最大”一行
                     .child(self.edit_button("instance-memory-edit", Editor::Memory, cx)),
             )
@@ -31,7 +32,7 @@ impl InstanceDetailView {
                 vec![
                     kit::value_row(
                         "memory-min",
-                        "最小内存",
+                        tr!("settings-field-min-memory"),
                         Some(editors::MIN_MEMORY_HELP.into()),
                         effective_label(
                             record.settings.min_memory_mb,
@@ -42,7 +43,7 @@ impl InstanceDetailView {
                     ),
                     kit::value_row(
                         "memory-max",
-                        "最大内存",
+                        tr!("settings-field-max-memory"),
                         Some(editors::MAX_MEMORY_HELP.into()),
                         effective_label(
                             record.settings.max_memory_mb,

@@ -1,4 +1,5 @@
 use super::super::{Dropdown, InstanceDetailView};
+use crate::tr;
 use gpui::{AppContext as _, Context, Window};
 use gpui_component::{
     IndexPath,
@@ -6,12 +7,14 @@ use gpui_component::{
 };
 use lumilio_core::{GameLogSource, LogLevel};
 
-pub(super) const LEVELS: [(LogLevel, &str); 4] = [
-    (LogLevel::Error, "错误"),
-    (LogLevel::Warn, "警告"),
-    (LogLevel::Info, "信息"),
-    (LogLevel::Debug, "调试"),
-];
+pub(super) fn levels() -> [(LogLevel, &'static str); 4] {
+    [
+        (LogLevel::Error, tr!("instance-log-level-error")),
+        (LogLevel::Warn, tr!("instance-log-level-warn")),
+        (LogLevel::Info, tr!("instance-log-level-info")),
+        (LogLevel::Debug, tr!("instance-log-level-debug")),
+    ]
+}
 
 impl InstanceDetailView {
     pub(super) fn log_selects(
@@ -75,10 +78,10 @@ impl InstanceDetailView {
             });
         }
 
-        let levels = if let Some(select) = &self.log_level_select {
+        let level_select = if let Some(select) = &self.log_level_select {
             select.clone()
         } else {
-            let indices = LEVELS
+            let indices = levels()
                 .iter()
                 .enumerate()
                 .filter(|(_, (level, _))| self.log_levels.contains(level))
@@ -87,7 +90,7 @@ impl InstanceDetailView {
             let select = cx.new(|cx| {
                 SelectState::new_multiple(
                     SearchableVec::new(
-                        LEVELS
+                        levels()
                             .iter()
                             .map(|(_, label)| label.to_string())
                             .collect::<Vec<_>>(),
@@ -102,7 +105,7 @@ impl InstanceDetailView {
                 window,
                 |view, _, event: &SelectEvent<SearchableVec<String>>, _, cx| {
                     if let SelectEvent::Change(labels) = event {
-                        view.log_levels = LEVELS
+                        view.log_levels = levels()
                             .iter()
                             .filter(|(_, label)| labels.iter().any(|text| text == label))
                             .map(|(level, _)| *level)
@@ -115,18 +118,18 @@ impl InstanceDetailView {
             self.log_level_select = Some(select.clone());
             select
         };
-        let values = LEVELS
+        let values = levels()
             .iter()
             .filter(|(level, _)| self.log_levels.contains(level))
             .map(|(_, label)| label.to_string())
             .collect::<Vec<_>>();
-        let committed = levels.read(cx).selected_values();
+        let committed = level_select.read(cx).selected_values();
         if values.len() != committed.len() || values.iter().any(|value| !committed.contains(value))
         {
-            levels.update(cx, |select, cx| {
+            level_select.update(cx, |select, cx| {
                 select.set_selected_values(&values, window, cx)
             });
         }
-        (source, levels)
+        (source, level_select)
     }
 }

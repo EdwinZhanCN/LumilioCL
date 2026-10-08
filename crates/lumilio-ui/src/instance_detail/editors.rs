@@ -11,7 +11,24 @@ use gpui_component::{ActiveTheme as _, StyledExt as _, WindowExt as _, h_flex, v
 
 use super::panels::Confirm;
 use super::{InstanceDetailView, InstanceIntent, Section};
-use crate::{kit, theme};
+use crate::{kit, theme, tr};
+
+/// One of the page's help lines, taken when it is shown so a language switch
+/// reaches it. The `From` impl keeps the settings rows' `.into()` call sites.
+#[derive(Clone, Copy)]
+pub struct HelpText(fn() -> &'static str);
+
+impl HelpText {
+    fn words(self) -> &'static str {
+        (self.0)()
+    }
+}
+
+impl From<HelpText> for gpui::SharedString {
+    fn from(help: HelpText) -> Self {
+        help.words().into()
+    }
+}
 
 /// Which edit dialog is open.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -23,14 +40,11 @@ pub enum Editor {
     Server,
 }
 
-pub const MIN_MEMORY_HELP: &str =
-    "游戏启动时就占用的内存（-Xms）。留空则跟随启动器默认；默认也没有时由 Java 决定。";
-pub const MAX_MEMORY_HELP: &str =
-    "游戏最多能用的内存（-Xmx）。留空则跟随启动器默认；默认也没有时由 Java 决定。";
-pub const RENAME_HELP: &str = "改名保留游戏目录、收藏和历史记录。";
-pub const SERVER_ADDRESS_HELP: &str =
-    "主机名或 IP，端口可选（默认 25565），例如 mc.example.com 或 mc.example.com:25570。";
-pub const COPY_HELP: &str = "日志与崩溃报告不会复制；收藏、游玩时间、历史和快照从零开始。";
+pub static MIN_MEMORY_HELP: HelpText = HelpText(|| tr!("instance-min-memory-help"));
+pub static MAX_MEMORY_HELP: HelpText = HelpText(|| tr!("instance-max-memory-help"));
+pub static RENAME_HELP: HelpText = HelpText(|| tr!("instance-rename-help"));
+pub static SERVER_ADDRESS_HELP: HelpText = HelpText(|| tr!("instance-server-address-help"));
+pub static COPY_HELP: HelpText = HelpText(|| tr!("instance-copy-help"));
 
 impl InstanceDetailView {
     /// Opens an edit dialog with a fresh draft taken from the saved record.
@@ -151,29 +165,29 @@ impl InstanceDetailView {
 
         let (title, commit_label, body) = match editor {
             Editor::Rename => (
-                "重命名",
-                "保存",
+                tr!("instance-rename-title"),
+                tr!("common-save"),
                 v_flex().child(field(
-                    "名称",
-                    Some(RENAME_HELP),
+                    tr!("common-name"),
+                    Some(RENAME_HELP.words()),
                     "rename-info",
                     &fields.name,
                 )),
             ),
             Editor::Memory => (
-                "编辑内存",
-                "保存",
+                tr!("instance-memory-title"),
+                tr!("common-save"),
                 v_flex()
                     .gap_4()
                     .child(field(
-                        "最小内存（MB）",
-                        Some(MIN_MEMORY_HELP),
+                        tr!("settings-memory-min"),
+                        Some(MIN_MEMORY_HELP.words()),
                         "min-info",
                         &fields.min,
                     ))
                     .child(field(
-                        "最大内存（MB）",
-                        Some(MAX_MEMORY_HELP),
+                        tr!("settings-memory-max"),
+                        Some(MAX_MEMORY_HELP.words()),
                         "max-info",
                         &fields.max,
                     ))
@@ -181,45 +195,58 @@ impl InstanceDetailView {
                         div()
                             .text_xs()
                             .text_color(colors.muted)
-                            .child("留空则跟随默认，下次启动时生效。"),
+                            .child(tr!("instance-memory-help-footer")),
                     ),
             ),
             Editor::Server => (
                 if this.server_edit.is_some() {
-                    "编辑服务器"
+                    tr!("instance-server-edit-title")
                 } else {
-                    "添加服务器"
+                    tr!("instance-server-add-title")
                 },
-                "保存",
+                tr!("common-save"),
                 v_flex()
                     .gap_4()
-                    .child(field("名称", None, "server-name-info", &fields.server_name))
                     .child(field(
-                        "地址",
-                        Some(SERVER_ADDRESS_HELP),
+                        tr!("common-name"),
+                        None,
+                        "server-name-info",
+                        &fields.server_name,
+                    ))
+                    .child(field(
+                        tr!("instance-server-address"),
+                        Some(SERVER_ADDRESS_HELP.words()),
                         "server-address-info",
                         &fields.server_address,
                     )),
             ),
             Editor::Snapshot => {
                 let weak = view.downgrade();
-                let mut scopes: Vec<String> = vec!["全部世界与设置".to_owned()];
+                let mut scopes: Vec<String> = vec![tr!("instance-snapshot-scope-all").to_owned()];
                 if let Some(Ok(worlds)) = &this.data.worlds {
-                    scopes.extend(
-                        worlds
-                            .iter()
-                            .map(|world| format!("只备份世界“{}”", world.name)),
-                    );
+                    scopes.extend(worlds.iter().map(|world| {
+                        tr!("instance-snapshot-scope-world", name = world.name.as_str())
+                    }));
                 }
                 (
-                    "创建快照",
-                    "创建",
+                    tr!("instance-snapshot-title"),
+                    tr!("new-game-create"),
                     v_flex()
                         .gap_4()
-                        .child(field("备注", None, "snapshot-info", &fields.snapshot_note))
+                        .child(field(
+                            tr!("instance-snapshot-note"),
+                            None,
+                            "snapshot-info",
+                            &fields.snapshot_note,
+                        ))
                         .child(
                             v_flex()
-                                .child(div().text_sm().font_medium().child("范围"))
+                                .child(
+                                    div()
+                                        .text_sm()
+                                        .font_medium()
+                                        .child(tr!("instance-snapshot-scope")),
+                                )
                                 .children(scopes.into_iter().enumerate().map(|(index, text)| {
                                     let weak = weak.clone();
                                     kit::led_option(
@@ -242,13 +269,13 @@ impl InstanceDetailView {
                 let include = this.include_worlds;
                 let toggle = view.downgrade();
                 (
-                    "复制游戏",
-                    "开始复制",
+                    tr!("instance-copy-title"),
+                    tr!("instance-copy-confirm"),
                     v_flex()
                         .gap_4()
                         .child(field(
-                            "新游戏名称",
-                            Some(COPY_HELP),
+                            tr!("instance-copy-name"),
+                            Some(COPY_HELP.words()),
                             "copy-info",
                             &fields.copy_name,
                         ))
@@ -256,15 +283,25 @@ impl InstanceDetailView {
                             h_flex()
                                 .justify_between()
                                 .items_center()
-                                .child(div().text_sm().font_medium().child("同时复制存档"))
-                                .child(kit::switch("copy-worlds", include, "同时复制存档", {
-                                    move |_, cx| {
-                                        let _ = toggle.update(cx, |view, cx| {
-                                            view.include_worlds = !view.include_worlds;
-                                            cx.notify();
-                                        });
-                                    }
-                                })),
+                                .child(
+                                    div()
+                                        .text_sm()
+                                        .font_medium()
+                                        .child(tr!("instance-copy-include-worlds")),
+                                )
+                                .child(kit::switch(
+                                    "copy-worlds",
+                                    include,
+                                    tr!("instance-copy-include-worlds"),
+                                    {
+                                        move |_, cx| {
+                                            let _ = toggle.update(cx, |view, cx| {
+                                                view.include_worlds = !view.include_worlds;
+                                                cx.notify();
+                                            });
+                                        }
+                                    },
+                                )),
                         ),
                 )
             }
@@ -300,7 +337,7 @@ impl InstanceDetailView {
         };
         let cancel = theme::clickable(
             Key::new("instance-editor-cancel")
-                .label("取消")
+                .label(tr!("common-cancel"))
                 .white()
                 .disabled(busy),
             !busy,
@@ -310,7 +347,7 @@ impl InstanceDetailView {
             let view = view.downgrade();
             theme::clickable(
                 Key::new("instance-memory-reset")
-                    .label("全部跟随默认")
+                    .label(tr!("instance-memory-reset"))
                     .ghost()
                     .disabled(busy)
                     .debug_selector(|| "instance-memory-reset".into()),
@@ -388,7 +425,7 @@ impl InstanceDetailView {
                 .description(description.clone())
                 .ok_text(ok)
                 .ok_variant(gpui_component::button::ButtonVariant::Danger)
-                .cancel_text("取消")
+                .cancel_text(tr!("common-cancel"))
                 .show_cancel(true)
                 .on_ok(move |_, window, cx| {
                     let _ = view.update(cx, |view, cx| view.confirmed(&what, window, cx));
@@ -414,11 +451,11 @@ impl InstanceDetailView {
         window.open_alert_dialog(cx, move |alert, _, _| {
             let view = view.clone();
             alert
-                .title(format!("删除“{name}”？"))
-                .description("游戏目录、存档和历史会一起删除；中途中断也会在下次启动时补完或恢复。")
-                .ok_text("删除")
+                .title(tr!("game-delete-title", name = name.as_str()))
+                .description(tr!("instance-delete-body"))
+                .ok_text(tr!("common-delete"))
                 .ok_variant(gpui_component::button::ButtonVariant::Danger)
-                .cancel_text("取消")
+                .cancel_text(tr!("common-cancel"))
                 .show_cancel(true)
                 .on_ok(move |_, window, cx| {
                     let _ = view.update(cx, |view, cx| {

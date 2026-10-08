@@ -2,7 +2,7 @@ use super::InstanceDetailView;
 use super::editors::Editor;
 use super::intent::InstanceIntent;
 use crate::theme::ShellColors;
-use crate::{kit, theme};
+use crate::{kit, theme, tr};
 use gpui::prelude::*;
 use gpui::{App, Context, Window};
 
@@ -28,7 +28,7 @@ impl InstanceDetailView {
             // ia[instance]: 结束游戏 | 本启动器启动的游戏运行时，页头主按钮变「结束游戏」 | 终止进程，会话写入历史
             kit::action(
                 "instance-stop",
-                "结束游戏",
+                tr!("home-stop-game"),
                 Some(crate::assets::UiIcon::Close),
                 false,
                 move |window, cx| play(InstanceIntent::Stop, window, cx),
@@ -38,7 +38,7 @@ impl InstanceDetailView {
             // ia[instance]: 开始游戏 | 页头主按钮「启动游戏」 | 首页启动时刻接管
             kit::action(
                 "instance-play",
-                "启动游戏",
+                tr!("instance-play"),
                 Some(crate::assets::UiIcon::Play),
                 true,
                 move |window, cx| play(InstanceIntent::Play, window, cx),
@@ -52,7 +52,7 @@ impl InstanceDetailView {
             actions = actions.more(
                 // ia[instance]: 安装游戏文件 | 页头 ⋯ 菜单（游戏还没装好时才有） | 后台任务，动态可见；完成 toast
                 kit::MenuEntry::new(
-                    "安装游戏文件",
+                    tr!("instance-install-files"),
                     with_view(|view, window, cx| view.send(InstanceIntent::Install, window, cx)),
                 )
                 .disabled(busy),
@@ -61,7 +61,7 @@ impl InstanceDetailView {
         actions
             // ia[instance]: 设为当前游戏 | 页头 ⋯ 菜单 | 导航右段芯片跟着换；之后的启动指向它
             .more(kit::MenuEntry::new(
-                "设为当前游戏",
+                tr!("library-menu-make-current"),
                 with_view(|view, window, cx| {
                     (view.handler)(InstanceIntent::SetCurrent, window, cx)
                 }),
@@ -69,7 +69,7 @@ impl InstanceDetailView {
             .more(
                 // ia[instance]: 修复游戏文件 | 页头 ⋯ 菜单 | 核对并补齐/重下损坏文件，后台任务，动态可见 | 运行中或没装好时禁用
                 kit::MenuEntry::new(
-                    "修复游戏文件",
+                    tr!("instance-repair-files"),
                     with_view(|view, window, cx| view.send(InstanceIntent::Repair, window, cx)),
                 )
                 .disabled(busy || running || !record.installed),
@@ -77,7 +77,7 @@ impl InstanceDetailView {
             .more(
                 // ia[instance]: 创建快照 | 页头 ⋯ 菜单 → 弹窗（备注可空；范围＝全部或某个世界） | 后台创建，历史·快照可见
                 kit::MenuEntry::new(
-                    "创建快照…",
+                    tr!("instance-create-snapshot"),
                     with_view(|view, window, cx| view.open_editor(Editor::Snapshot, window, cx)),
                 )
                 .disabled(busy),
@@ -92,7 +92,7 @@ impl InstanceDetailView {
             .more(
                 // ia[instance]: 复制游戏 | 页头 ⋯ 菜单 → 弹窗（新名称、是否复制存档） | 后台复制成独立副本；不复制历史、快照和游玩时间
                 kit::MenuEntry::new(
-                    "复制这个游戏…",
+                    tr!("instance-copy-game"),
                     with_view(|view, window, cx| view.open_editor(Editor::Copy, window, cx)),
                 )
                 .disabled(busy),
@@ -100,7 +100,7 @@ impl InstanceDetailView {
             .more(
                 // ia[instance]: 完整备份 | 页头 ⋯ 菜单 → 选位置 | 后台打成一个 zip（含存档，不含日志），toast；之后可在游戏库「从备份恢复」 | ADR 0015；运行中禁用
                 kit::MenuEntry::new(
-                    "完整备份…",
+                    tr!("instance-backup-game"),
                     with_view(|view, window, cx| {
                         (view.handler)(InstanceIntent::BackupGame, window, cx)
                     }),
@@ -109,7 +109,7 @@ impl InstanceDetailView {
             )
             // ia[instance]: 导出整合包 | 页头 ⋯ 菜单 → 导出弹窗（格式、勾选文件） | 后台导出，可取消
             .more(kit::MenuEntry::new(
-                "导出整合包…",
+                tr!("library-menu-export"),
                 with_view(|view, window, cx| {
                     (view.handler)(InstanceIntent::ExportPack, window, cx)
                 }),
@@ -117,7 +117,7 @@ impl InstanceDetailView {
             .more(
                 // ia[instance]: 删除游戏 | 页头 ⋯ 菜单 → 警告弹窗 | 删除后从历史中移除并后退
                 kit::MenuEntry::new(
-                    "删除游戏…",
+                    tr!("instance-delete-game"),
                     with_view(|view, window, cx| view.confirm_delete(window, cx)),
                 )
                 .danger()

@@ -5,7 +5,7 @@ use crate::assets::UiIcon;
 use crate::controls::Checkbox;
 use crate::key::Key;
 use crate::theme::ShellColors;
-use crate::{kit, theme};
+use crate::{kit, theme, tr};
 use gpui::prelude::*;
 use gpui::{AnyElement, ClipboardItem, Context, div, px};
 use gpui_component::Sizable as _;
@@ -82,14 +82,14 @@ impl InstanceDetailView {
         let byline = match source.as_ref().and_then(|source| source.author.clone()) {
             Some(author) => author,
             None if source.is_some() => "Modrinth".to_owned(),
-            None => "本地文件".to_owned(),
+            None => tr!("instance-content-local-file").to_owned(),
         };
 
         let version = source
             .as_ref()
             .map(|source| source.version_number.clone())
             .filter(|number| !number.is_empty())
-            .unwrap_or_else(|| "未知".to_owned());
+            .unwrap_or_else(|| tr!("instance-content-unknown-version").to_owned());
 
         let switch_button = source.as_ref().map(|_| {
             let entry = entry.clone();
@@ -100,7 +100,7 @@ impl InstanceDetailView {
             let button = if update {
                 Key::new(("content-update", index))
                     .icon(Icon::new(UiIcon::Refresh))
-                    .label("更新")
+                    .label(tr!("discover-update"))
                     .primary()
                     .small()
             } else {
@@ -108,7 +108,7 @@ impl InstanceDetailView {
                     .icon(Icon::new(UiIcon::Switch))
                     .ghost()
                     .small()
-                    .tooltip("切换版本")
+                    .tooltip(tr!("project-switch-version"))
             };
             theme::clickable(button.disabled(busy), !busy)
                 .debug_selector(move || format!("content-switch-version-{index}"))
@@ -130,7 +130,7 @@ impl InstanceDetailView {
                     crate::controls::Fader::new(
                         ("content-switch", index),
                         entry.item.enabled,
-                        "启用",
+                        tr!("instance-content-enable"),
                         move |window, cx| {
                             let name = name.clone();
                             let _ = view.update(cx, |view, cx| {
@@ -159,7 +159,7 @@ impl InstanceDetailView {
                     .icon(Icon::new(UiIcon::Trash))
                     .ghost()
                     .small()
-                    .tooltip("删除")
+                    .tooltip(tr!("common-delete"))
                     .disabled(busy),
                 !busy,
             )
@@ -191,12 +191,18 @@ impl InstanceDetailView {
             let link = lumilio_core::project_page_url(kind, &source.slug);
             let view = view.clone();
             // ia[instance.content]: 复制链接 | 行 ⋯ 菜单（仅已识别） | 复制 Modrinth 项目链接，toast“链接已复制”
-            more.push(kit::MenuEntry::new("复制链接", move |_, cx| {
-                cx.write_to_clipboard(ClipboardItem::new_string(link.clone()));
-                let _ = view.update(cx, |view, cx| {
-                    view.toast(crate::toast::Toast::success("链接已复制"), cx)
-                });
-            }));
+            more.push(kit::MenuEntry::new(
+                tr!("discover-copy-link"),
+                move |_, cx| {
+                    cx.write_to_clipboard(ClipboardItem::new_string(link.clone()));
+                    let _ = view.update(cx, |view, cx| {
+                        view.toast(
+                            crate::toast::Toast::success(tr!("instance-content-link-copied")),
+                            cx,
+                        )
+                    });
+                },
+            ));
         }
 
         h_flex()
