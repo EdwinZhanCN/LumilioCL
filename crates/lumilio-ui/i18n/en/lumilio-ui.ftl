@@ -855,7 +855,10 @@ instance-content-browse-shader = Browse shaders
 instance-content-empty = No { $noun } yet
 instance-content-empty-help = Choose one with "Browse", or add local files
 instance-content-refresh-tip = Read and identify again
-instance-content-update-all-count = Update all ({ $count } { $count -> [one] file *[other] files })
+instance-content-update-all-count = Update all ({ $count ->
+    [one] { $count } file
+   *[other] { $count } files
+})
 instance-content-no-match = No matching items
 instance-content-no-match-help = Try another keyword or filter
 instance-content-source-note = Source information isn't available right now{ $reason }; files can still be enabled, disabled and deleted as usual.

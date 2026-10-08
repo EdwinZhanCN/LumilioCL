@@ -19,6 +19,9 @@ Fluent rules:
           [one] { $count } game
          *[other] { $count } games
       }
+- A select never fits on one line: `->` ends its line and every variant
+  (`[one] …`, `*[other] …`) starts a new line, as above. A one-line select
+  makes the whole catalog fail to parse.
 - Leading and trailing spaces are dropped by Fluent; write a value that needs
   them as a string literal, e.g. `{", "}`.
 - A `#` comment above a Chinese message explains it; write the comment above the
