@@ -13,6 +13,7 @@ members = [
     "crates/lumilio-schematic-render",
     "crates/lumilio-pointer",
     "crates/lumilio-cubiomes",
+    "crates/lumilio-map-render",
     "crates/lumilio-xtask",
 ]
 resolver = "3"
@@ -47,6 +48,7 @@ lumilio-plugin-discord = { path = "crates/lumilio-plugin-discord" }
 lumilio-nbt = { path = "crates/lumilio-nbt" }
 lumilio-schematic-render = { path = "crates/lumilio-schematic-render" }
 lumilio-pointer = { path = "crates/lumilio-pointer" }
+lumilio-map-render = { path = "crates/lumilio-map-render" }
 lumilio-ui = { path = "crates/lumilio-ui" }
 md-5 = "0.11"
 regex = "1.11"
