@@ -5,7 +5,7 @@
 
 | 页面 | 路径数 |
 |---|---|
-| [插件 · 世界地图](plugin.world-explorer.md) | 19 |
+| [插件 · 世界地图](plugin.world-explorer.md) | 20 |
 | [全局导航](navigation.md) | 8 |
 | [首页](home.md) | 10 |
 | [游戏库](library.md) | 21 |

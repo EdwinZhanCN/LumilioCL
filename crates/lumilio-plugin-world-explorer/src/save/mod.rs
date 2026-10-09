@@ -2,6 +2,7 @@
 //! above. Only level 0 is drawn here; the host builds the coarser levels from
 //! it and keeps them until a region file changes (plan W4, W6).
 pub(crate) mod colors;
+pub(crate) mod positions;
 mod render;
 
 use lumilio_anvil::{Error as AnvilError, Region, Source, region_coords};

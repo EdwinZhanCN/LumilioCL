@@ -157,6 +157,8 @@ pub enum MapIcon {
     /// Where a player died; drawn apart from ordinary waypoints.
     Death,
     Marker,
+    /// Where a player last was.
+    Player,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]

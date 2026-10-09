@@ -191,8 +191,8 @@ fn structure_layers_follow_the_worlds_version_and_dimension() {
             )
             .is_empty()
     );
-    // 18 structure layers, spawn, slime chunks and Xaero waypoints.
-    assert_eq!(WorldExplorer.overlays().len(), 21);
+    // 18 structure layers, spawn, slime chunks, save positions and Xaero waypoints.
+    assert_eq!(WorldExplorer.overlays().len(), 22);
 }
 
 #[test]

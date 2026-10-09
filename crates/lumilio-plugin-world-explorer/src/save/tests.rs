@@ -107,14 +107,18 @@ mod drawing {
     use std::collections::BTreeMap;
 
     /// A game directory in memory, read the way the host lets the plugin.
-    struct Files(BTreeMap<String, Vec<u8>>);
+    pub(super) struct Files(pub(super) BTreeMap<String, Vec<u8>>);
 
     impl HostContext for Files {
         fn setting(&self, _: &str) -> Option<SettingValue> {
             None
         }
-        fn read_file(&self, _: &str) -> Result<Vec<u8>, PluginError> {
-            panic!("regions are read by range")
+        fn read_file(&self, path: &str) -> Result<Vec<u8>, PluginError> {
+            assert!(!path.ends_with(".mca"), "regions are read by range");
+            self.0
+                .get(path)
+                .cloned()
+                .ok_or_else(|| PluginError::Unavailable("missing".into()))
         }
         fn list_files(&self, _: &str) -> Result<Vec<String>, PluginError> {
             panic!("regions are listed a page at a time")
@@ -164,7 +168,7 @@ mod drawing {
         }
     }
 
-    fn sample(version: &str, name: &str) -> Vec<u8> {
+    pub(super) fn sample(version: &str, name: &str) -> Vec<u8> {
         std::fs::read(
             std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
                 .join("../lumilio-anvil/tests/data")
@@ -174,7 +178,7 @@ mod drawing {
         .unwrap()
     }
 
-    fn request(
+    pub(super) fn request(
         data_version: i32,
         dimension: Dimension,
         level: u8,
@@ -386,5 +390,202 @@ mod drawing {
         assert_eq!(sources(&files, &seed).unwrap(), Some(vec![]));
         assert_eq!(tile(&files, &seed).unwrap(), TileReply::Empty);
         assert!(tile(&files, &request(1, Dimension::Overworld, 1, 0, 0)).is_err());
+    }
+}
+
+mod positions {
+    use super::super::positions::{self, Place, objects};
+    use super::drawing::{Files, request, sample};
+    use lumilio_nbt::Tag;
+    use lumilio_plugin_api::PluginError;
+    use lumilio_plugin_api::map::{
+        Dimension, MapBounds, MapIcon, MapObjectKind, MapPoint, OverlayRequest, WorldId,
+    };
+    use std::collections::BTreeMap;
+
+    fn compound(entries: Vec<(&str, Tag)>) -> Tag {
+        Tag::Compound(
+            entries
+                .into_iter()
+                .map(|(key, tag)| (key.to_owned(), tag))
+                .collect(),
+        )
+    }
+
+    fn level(data: Vec<(&str, Tag)>) -> Tag {
+        compound(vec![("Data", compound(data))])
+    }
+
+    fn parse(version: &str) -> Tag {
+        lumilio_nbt::parse_maybe_gzip(&sample(version, "level.dat")).unwrap()
+    }
+
+    #[test]
+    fn the_spawn_is_read_from_both_layouts_of_real_level_dat_files() {
+        // Servers write no player into level.dat.
+        for version in ["1.16.5", "1.18.2", "26.3"] {
+            let level = parse(version);
+            let spawn = positions::spawn(&level).unwrap();
+            assert_eq!(spawn.dimension, Dimension::Overworld, "{version}");
+            assert!(spawn.at.iter().all(|axis| axis.abs() < 1000.), "{version}");
+            assert_eq!(positions::player(&level), None, "{version}");
+        }
+        // 26.x keeps it as `Data.spawn{pos:[I;0,85,0],dimension:"minecraft:overworld"}`.
+        assert!(parse("26.3").at(&["Data", "SpawnX"]).is_none());
+        assert_eq!(positions::spawn(&parse("26.3")).unwrap().at, [0., 85., 0.]);
+        assert!(parse("1.18.2").at(&["Data", "SpawnX"]).is_some());
+    }
+
+    #[test]
+    fn the_player_is_read_with_either_kind_of_dimension() {
+        let pos = |x: f64, y: f64, z: f64| {
+            Tag::List(vec![Tag::Double(x), Tag::Double(y), Tag::Double(z)])
+        };
+        let with = |dimension: Tag| {
+            level(vec![(
+                "Player",
+                compound(vec![
+                    ("Pos", pos(-12.7, 64., 300.2)),
+                    ("Dimension", dimension),
+                ]),
+            )])
+        };
+        // Before 1.16 a number, from 1.16 a resource id.
+        assert_eq!(
+            positions::player(&with(Tag::Int(-1))),
+            Some(Place {
+                dimension: Dimension::Nether,
+                at: [-12.7, 64., 300.2]
+            })
+        );
+        assert_eq!(
+            positions::player(&with(Tag::String("minecraft:the_end".into())))
+                .unwrap()
+                .dimension,
+            Dimension::End
+        );
+        assert_eq!(
+            positions::player(&with(Tag::String("mymod:sky".into())))
+                .unwrap()
+                .dimension,
+            Dimension::Custom("mymod:sky".into())
+        );
+        let broken = level(vec![(
+            "Player",
+            compound(vec![("Pos", pos(f64::NAN, 0., 0.))]),
+        )]);
+        assert_eq!(positions::player(&broken), None);
+        // A 26.x spawn in another dimension keeps it.
+        let spawn = level(vec![(
+            "spawn",
+            compound(vec![
+                ("pos", Tag::IntArray(vec![1, 2, 3])),
+                ("dimension", Tag::String("minecraft:the_nether".into())),
+            ]),
+        )]);
+        assert_eq!(
+            positions::spawn(&spawn),
+            Some(Place {
+                dimension: Dimension::Nether,
+                at: [1., 2., 3.]
+            })
+        );
+    }
+
+    fn overlay(dimension: Dimension, min: f64, max: f64) -> OverlayRequest {
+        OverlayRequest {
+            context: request(1, dimension, 0, 0, 0).context,
+            overlay: positions::LAYER.into(),
+            bounds: MapBounds {
+                min: MapPoint { x: min, z: min },
+                max: MapPoint { x: max, z: max },
+            },
+            level: 0,
+        }
+    }
+
+    #[test]
+    fn objects_show_each_place_in_its_own_dimension_and_area() {
+        let dat = level(vec![
+            ("SpawnX", Tag::Int(10)),
+            ("SpawnY", Tag::Int(70)),
+            ("SpawnZ", Tag::Int(20)),
+            (
+                "Player",
+                compound(vec![
+                    (
+                        "Pos",
+                        Tag::List(vec![Tag::Double(5.5), Tag::Double(40.), Tag::Double(6.5)]),
+                    ),
+                    ("Dimension", Tag::String("minecraft:the_nether".into())),
+                ]),
+            ),
+        ]);
+        let files = Files(BTreeMap::from([(
+            "saves/World/level.dat".to_owned(),
+            lumilio_nbt::to_bytes(&dat),
+        )]));
+        let found = objects(&files, &overlay(Dimension::Overworld, 0., 64.)).unwrap();
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].label_id.as_deref(), Some("map-save-spawn"));
+        assert!(matches!(
+            found[0].kind,
+            MapObjectKind::Icon { icon: MapIcon::Spawn, at } if at == MapPoint { x: 10., z: 20. }
+        ));
+        assert_eq!(found[0].note.as_deref(), Some("Y 70"));
+        let nether = objects(&files, &overlay(Dimension::Nether, 0., 64.)).unwrap();
+        assert_eq!(nether.len(), 1);
+        assert_eq!(nether[0].label_id.as_deref(), Some("map-save-player"));
+        assert_eq!(nether[0].dimension, Dimension::Nether);
+        assert!(
+            objects(&files, &overlay(Dimension::Overworld, 100., 200.))
+                .unwrap()
+                .is_empty()
+        );
+        // No level.dat, another kind of world: nothing. A damaged one: a status.
+        assert!(
+            objects(
+                &Files(BTreeMap::new()),
+                &overlay(Dimension::Overworld, 0., 64.)
+            )
+            .unwrap()
+            .is_empty()
+        );
+        let mut seed = overlay(Dimension::Overworld, 0., 64.);
+        seed.context.world = WorldId::Seed {
+            seed: 1,
+            version: "1.21.4".into(),
+        };
+        assert!(objects(&files, &seed).unwrap().is_empty());
+        let damaged = Files(BTreeMap::from([(
+            "saves/World/level.dat".to_owned(),
+            vec![0x1f, 0x8b, 1, 2, 3],
+        )]));
+        assert_eq!(
+            objects(&damaged, &overlay(Dimension::Overworld, 0., 64.)),
+            Err(PluginError::Unavailable("map-save-unreadable".into()))
+        );
+    }
+
+    #[test]
+    fn a_save_offers_its_positions_instead_of_the_seed_spawn_estimate() {
+        use lumilio_plugin_api::map::OverlayProvider;
+        let mut context = request(1, Dimension::Overworld, 0, 0, 0).context;
+        context.seed = Some(262);
+        context.version = Some("1.21.4".into());
+        let ids = |context: &lumilio_plugin_api::map::WorldContext| {
+            crate::WorldExplorer
+                .overlays_for(context)
+                .into_iter()
+                .map(|layer| layer.id)
+                .filter(|id| id.starts_with("world.") || id.starts_with("save."))
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(ids(&context), ["world.slime", "save.positions"]);
+        context.world = WorldId::Seed {
+            seed: 262,
+            version: "1.21.4".into(),
+        };
+        assert_eq!(ids(&context), ["world.spawn", "world.slime"]);
     }
 }

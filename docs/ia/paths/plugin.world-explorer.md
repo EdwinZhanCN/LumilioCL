@@ -7,6 +7,7 @@
 | 操作 | 层 / 组件 | 结果与反馈 | 备注 | 实现 |
 |---|---|---|---|---|
 | 打开地图 | 游戏页「插件」标签内的地图 | 宿主显示世界选择与地图；没有存档时可输入手动种子 | 插件默认启用，关闭后入口消失 | `lumilio-plugin-world-explorer/src/lib.rs` |
+| 显示存档位置 | 图层浮层 ·「存档位置」开关 | 画出 level.dat 里的实际出生点和单人玩家最后的位置，只在所在维度显示；点选可看坐标并复制 | 默认打开；只对单人存档出现，此时种子估算的出生点不再显示 | `lumilio-plugin-world-explorer/src/save/positions.rs` |
 | 退出游戏后更新存档底图 | 地图视口 · 游戏结束时自动 | 重新取可见瓦片；只有 Region 文件长度或修改时间变了的块及其上层合成块重画，其余用缓存 | 缓存在 profiles/<实例>/map-cache，可在设置 › 存储清除 | `lumilio-ui/src/instance_detail/data.rs` |
 | 新建路径点 | 地图左下角「添加路径点」→ 点一下地图 | 打开新建对话框，位置取点击处；游戏运行中禁用并说明原因 |  | `lumilio-ui/src/world_explorer/edit.rs` |
 | 打开图层 | 地图视口右下角 ·「图层」 | 打开次要图层浮层；Escape 或点击外部关闭并返回焦点 |  | `lumilio-ui/src/world_explorer/layers.rs` |

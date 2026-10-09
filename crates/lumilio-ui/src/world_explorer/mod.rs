@@ -112,6 +112,7 @@ const TILE_CAP: usize = 512;
 const STAND_INS: usize = 192;
 /// Structure layers shown before the user chooses any.
 const DEFAULT_LAYERS: &[&str] = &[
+    "save.positions",
     "structure.village",
     "structure.stronghold",
     "structure.fortress",
@@ -856,46 +857,47 @@ impl MapView {
     }
     /// The one line of status under the map, most important first.
     fn status_line(&self) -> Option<String> {
-        let status =
-            if self.failed.values().any(
-                |failure| matches!(failure,MapFailure::Failed(id) if id=="map-version-unsupported"),
-            ) {
-                Some(tr!("map-version-unsupported"))
-            } else if self
-                .failed
-                .values()
-                .any(|failure| *failure == MapFailure::ProviderStopped)
-            {
-                Some(tr!("map-provider-stopped"))
-            } else if self.no_gpu {
-                Some(tr!("map-no-gpu"))
-            } else if self.base_kind() == Some("map-base-seed")
-                && self
-                    .context
-                    .as_ref()
-                    .is_none_or(|context| context.seed.is_none())
-            {
-                Some(tr!("map-seed-needed"))
-            } else if self.base_kind() == Some("map-base-save")
-                && self
-                    .context
-                    .as_ref()
-                    .is_none_or(|context| !matches!(context.world, WorldId::Save { .. }))
-            {
-                Some(tr!("map-save-needed"))
-            } else if self.objects.failed_with("map-xaero-unreadable") {
-                Some(tr!("map-xaero-unreadable"))
-            } else if self.failed.values().any(
+        let status = if self.failed.values().any(
+            |failure| matches!(failure,MapFailure::Failed(id) if id=="map-version-unsupported"),
+        ) {
+            Some(tr!("map-version-unsupported"))
+        } else if self
+            .failed
+            .values()
+            .any(|failure| *failure == MapFailure::ProviderStopped)
+        {
+            Some(tr!("map-provider-stopped"))
+        } else if self.no_gpu {
+            Some(tr!("map-no-gpu"))
+        } else if self.base_kind() == Some("map-base-seed")
+            && self
+                .context
+                .as_ref()
+                .is_none_or(|context| context.seed.is_none())
+        {
+            Some(tr!("map-seed-needed"))
+        } else if self.base_kind() == Some("map-base-save")
+            && self
+                .context
+                .as_ref()
+                .is_none_or(|context| !matches!(context.world, WorldId::Save { .. }))
+        {
+            Some(tr!("map-save-needed"))
+        } else if self.objects.failed_with("map-xaero-unreadable") {
+            Some(tr!("map-xaero-unreadable"))
+        } else if self.objects.failed_with("map-save-unreadable")
+            || self.failed.values().any(
                 |failure| matches!(failure, MapFailure::Failed(id) if id == "map-save-unreadable"),
-            ) {
-                Some(tr!("map-save-unreadable"))
-            } else if self.error.is_some() {
-                Some(tr!("map-render-failed"))
-            } else if !self.failed.is_empty() || self.objects.failed() > 0 {
-                Some(tr!("map-tile-failed"))
-            } else {
-                None
-            };
+            )
+        {
+            Some(tr!("map-save-unreadable"))
+        } else if self.error.is_some() {
+            Some(tr!("map-render-failed"))
+        } else if !self.failed.is_empty() || self.objects.failed() > 0 {
+            Some(tr!("map-tile-failed"))
+        } else {
+            None
+        };
         // ia[plugin.world-explorer]: 查看存档底图 | 底图分段 ·「存档」 | 从单人存档的 Region 文件画地表（按高度明暗、按群系着色）；没生成完的区块显示无数据；颜色表里没有的方块画成淡紫色并在状态行写明种数 | 粗缩放由宿主用细一级合成
         let unknown = self.unknown_blocks();
         let status = status
