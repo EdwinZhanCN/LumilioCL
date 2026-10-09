@@ -79,7 +79,7 @@ type Toggle = Rc<dyn Fn(&mut Window, &mut App)>;
 pub struct Fader {
     id: ElementId,
     on: bool,
-    label: &'static str,
+    label: SharedString,
     disabled: bool,
     on_toggle: Toggle,
 }
@@ -88,13 +88,13 @@ impl Fader {
     pub fn new(
         id: impl Into<ElementId>,
         on: bool,
-        label: &'static str,
+        label: impl Into<SharedString>,
         on_toggle: impl Fn(&mut Window, &mut App) + 'static,
     ) -> Self {
         Self {
             id: id.into(),
             on,
-            label,
+            label: label.into(),
             disabled: false,
             on_toggle: Rc::new(on_toggle),
         }
@@ -124,7 +124,7 @@ impl RenderOnce for Fader {
             .flex()
             .items_center()
             .gap(px(8.))
-            .aria_label(self.label)
+            .aria_label(self.label.clone())
             .child(
                 div()
                     .relative()

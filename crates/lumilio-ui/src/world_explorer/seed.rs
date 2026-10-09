@@ -152,6 +152,7 @@ impl MapView {
                             form.submitted = None;
                         }
                         this.reset_view();
+                        this.context_changed();
                         this.refresh();
                         cx.notify();
                     }

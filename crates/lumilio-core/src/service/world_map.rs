@@ -1,6 +1,8 @@
 use super::{LauncherService, ServiceError};
 use crate::{CancellationToken, MapFailure, MapProviders, Transport, world_map};
-use lumilio_plugin_api::map::{TileReply, TileRequest};
+use lumilio_plugin_api::map::{
+    MapObject, OverlayInfo, OverlayRequest, TileReply, TileRequest, WorldContext,
+};
 
 impl<T: Transport + Clone> LauncherService<T> {
     pub async fn map_contexts(
@@ -25,6 +27,21 @@ impl<T: Transport + Clone> LauncherService<T> {
     }
     pub async fn map_providers(&self) -> MapProviders {
         self.plugins.map_providers().await
+    }
+    pub async fn map_overlays(&self, context: &WorldContext) -> Vec<(String, OverlayInfo)> {
+        self.plugins.map_overlays(context).await
+    }
+    pub async fn map_objects(
+        &self,
+        instance: &str,
+        plugin: &str,
+        request: OverlayRequest,
+        cancel: CancellationToken,
+    ) -> Result<Vec<MapObject>, MapFailure> {
+        self.instance(instance).await.map_err(|_| MapFailure::Off)?;
+        self.plugins
+            .map_objects(plugin, self.layout.game(instance), request, cancel)
+            .await
     }
     pub async fn save_map_seed(
         &self,

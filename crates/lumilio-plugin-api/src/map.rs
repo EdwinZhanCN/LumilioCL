@@ -117,14 +117,25 @@ pub struct OverlayRequest {
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum MapIcon {
     Village,
-    Temple,
-    Stronghold,
+    DesertPyramid,
+    JungleTemple,
+    SwampHut,
+    Igloo,
+    OceanRuin,
+    Shipwreck,
     Monument,
     Mansion,
+    Outpost,
+    RuinedPortal,
+    AncientCity,
+    TrailRuins,
+    TrialChambers,
+    Stronghold,
     Fortress,
     Bastion,
     EndCity,
     Spawn,
+    SlimeChunk,
     Waypoint,
     Marker,
 }
@@ -176,6 +187,12 @@ pub struct OverlayInfo {
     pub id: String,
     pub kind_id: String,
     pub dimensions: Vec<Dimension>,
+    /// Shown beside the layer's switch.
+    pub icon: Option<MapIcon>,
+    /// Layers sharing a group id are listed together under the group's title.
+    pub group_id: Option<String>,
+    /// For this world the layer's positions are estimates, not exact.
+    pub approximate: bool,
 }
 
 pub trait BaseMapProvider: Send + Sync {
@@ -185,6 +202,11 @@ pub trait BaseMapProvider: Send + Sync {
 
 pub trait OverlayProvider: Send + Sync {
     fn overlays(&self) -> Vec<OverlayInfo>;
+    /// The layers that exist for one world. A provider whose offer depends on
+    /// the game version overrides this; the default is the whole catalog.
+    fn overlays_for(&self, _context: &WorldContext) -> Vec<OverlayInfo> {
+        self.overlays()
+    }
     fn objects(
         &self,
         ctx: &dyn HostContext,

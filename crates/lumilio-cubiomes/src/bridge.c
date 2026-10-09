@@ -1,5 +1,6 @@
 /* Uses cubiomes generator.h (MIT, Copyright (c) 2020 Cubitect).
  * The bridge is LumilioCL code; upstream structs stay on the C side. */
+#include "finders.h"
 #include "generator.h"
 #include "util.h"
 #include <stdlib.h>
@@ -43,6 +44,115 @@ int lumilio_cubiomes_generate(int mc, uint64_t seed, int dim,
     }
     free(cache);
     return result;
+}
+
+/* Region-grid structures. Index = the Rust `Structure` discriminant; the
+ * cubiomes enum itself never crosses the boundary. */
+static const int KINDS[] = {
+    Desert_Pyramid, Jungle_Pyramid, Swamp_Hut, Igloo, Village, Ocean_Ruin,
+    Shipwreck, Monument, Mansion, Outpost, Ruined_Portal, Ancient_City,
+    Trail_Ruins, Trial_Chambers, Fortress, Bastion, End_City,
+};
+#define KIND_COUNT ((int)(sizeof(KINDS) / sizeof(KINDS[0])))
+
+static int kind_config(int mc, int dim, int kind, int *type, StructureConfig *sc)
+{
+    if (kind < 0 || kind >= KIND_COUNT) return 0;
+    int t = KINDS[kind];
+    if (t == Ruined_Portal && dim == DIM_NETHER) t = Ruined_Portal_N;
+    if (!getStructureConfig(t, mc, sc) || sc->dim != dim) return 0;
+    *type = t;
+    return 1;
+}
+
+int lumilio_cubiomes_structure_available(int mc, int dim, int kind)
+{
+    int type;
+    StructureConfig sc;
+    return kind_config(mc, dim, kind, &type, &sc);
+}
+
+static int floor_div(int a, int b)
+{
+    int q = a / b;
+    return (a % b != 0 && (a < 0) != (b < 0)) ? q - 1 : q;
+}
+
+/* Viable positions inside [x0, x1) x [z0, z1) blocks. `out` holds x,z pairs
+ * and must have room for `cap` pairs; the number written goes to *count.
+ * Returns 0 ok, 1 error, 2 cancelled, 3 more positions than `cap`. */
+int lumilio_cubiomes_structures(int mc, uint64_t seed, int dim, int kind,
+    int x0, int z0, int x1, int z1, int *out, size_t cap, size_t *count,
+    int (*cancelled)(void *), void *user)
+{
+    int type;
+    StructureConfig sc;
+    *count = 0;
+    if (!kind_config(mc, dim, kind, &type, &sc)) return 1;
+    Generator g;
+    setupGenerator(&g, mc, 0);
+    applySeed(&g, dim, seed);
+    int size = sc.regionSize * 16;
+    int rx0 = floor_div(x0, size), rx1 = floor_div(x1 - 1, size);
+    int rz0 = floor_div(z0, size), rz1 = floor_div(z1 - 1, size);
+    for (int rz = rz0; rz <= rz1; rz++)
+    {
+        if (cancelled && cancelled(user)) return 2;
+        for (int rx = rx0; rx <= rx1; rx++)
+        {
+            Pos p;
+            if (!getStructurePos(type, mc, seed, rx, rz, &p)) continue;
+            if (p.x < x0 || p.x >= x1 || p.z < z0 || p.z >= z1) continue;
+            if (!isViableStructurePos(type, &g, p.x, p.z, 0)) continue;
+            if (*count >= cap) return 3;
+            out[*count * 2] = p.x;
+            out[*count * 2 + 1] = p.z;
+            (*count)++;
+        }
+    }
+    return 0;
+}
+
+/* Up to `cap` strongholds in generation order (x,z pairs). */
+int lumilio_cubiomes_strongholds(int mc, uint64_t seed, int *out, size_t cap,
+    size_t *count, int (*cancelled)(void *), void *user)
+{
+    *count = 0;
+    Generator g;
+    setupGenerator(&g, mc, 0);
+    applySeed(&g, DIM_OVERWORLD, seed);
+    StrongholdIter sh;
+    initFirstStronghold(&sh, mc, seed);
+    while (*count < cap)
+    {
+        if (cancelled && cancelled(user)) return 2;
+        /* The result counts strongholds from this one on; 0 means none left. */
+        if (nextStronghold(&sh, &g) <= 0) break;
+        out[*count * 2] = sh.pos.x;
+        out[*count * 2 + 1] = sh.pos.z;
+        (*count)++;
+    }
+    return 0;
+}
+
+int lumilio_cubiomes_spawn(int mc, uint64_t seed, int dim, int *out)
+{
+    Generator g;
+    setupGenerator(&g, mc, 0);
+    applySeed(&g, dim, seed);
+    Pos p = getSpawn(&g);
+    out[0] = p.x;
+    out[1] = p.z;
+    return 0;
+}
+
+/* One byte per chunk, row-major: 1 for a slime chunk. */
+void lumilio_cubiomes_slime(uint64_t seed, int cx, int cz, int width, int height,
+    unsigned char *out)
+{
+    for (int z = 0; z < height; z++)
+        for (int x = 0; x < width; x++)
+            out[(size_t)z * (size_t)width + (size_t)x] = (unsigned char)isSlimeChunk(seed, cx + x, cz + z);
 }
 
 void lumilio_cubiomes_colors(unsigned char *out)

@@ -1,5 +1,9 @@
 //! Safe boundary around the pinned cubiomes source snapshot.
 mod ffi;
+mod finders;
+pub use finders::{
+    MAX_AREA, Position, Spawn, Structure, slime_chunks, spawn, strongholds, structures,
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Error {
@@ -40,6 +44,19 @@ impl Version {
                 mc: index as i32 + 3,
             })
             .ok_or(Error::Unsupported)
+    }
+
+    /// A stable ordinal: larger is a later release.
+    pub fn index(self) -> i32 {
+        self.mc
+    }
+
+    /// Whether this is `name` or a later supported release.
+    pub fn at_least(self, name: &str) -> bool {
+        SUPPORTED_VERSIONS
+            .iter()
+            .position(|candidate| *candidate == name)
+            .is_some_and(|index| self.mc >= index as i32 + 3)
     }
 
     /// Exact data-version identities, used only when level.dat lacks a name.

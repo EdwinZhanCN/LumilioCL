@@ -2,7 +2,7 @@
 use super::{Context, PluginHost, PluginStatus, enabled, isolated};
 use crate::activity::CancellationToken;
 use lumilio_plugin_api::map::{
-    BaseMapInfo, MapObject, OverlayInfo, OverlayRequest, TileReply, TileRequest,
+    BaseMapInfo, MapObject, OverlayInfo, OverlayRequest, TileReply, TileRequest, WorldContext,
 };
 use lumilio_plugin_api::{HostContext, Plugin, PluginError};
 use std::path::PathBuf;
@@ -65,6 +65,39 @@ impl PluginHost {
             }
         }
         providers
+    }
+
+    /// The overlay layers each enabled plugin offers for one world.
+    pub async fn map_overlays(&self, context: &WorldContext) -> Vec<(String, OverlayInfo)> {
+        let mut layers = Vec::new();
+        for info in self.list().await {
+            if info.status != PluginStatus::Enabled {
+                continue;
+            }
+            let context = context.clone();
+            let result = self
+                .map_call(
+                    &info.manifest.id,
+                    "catalog",
+                    None,
+                    CancellationToken::new(),
+                    MAP_TIMEOUT,
+                    move |plugin, _| {
+                        Ok(plugin
+                            .overlay_provider()
+                            .map_or_else(Vec::new, |p| p.overlays_for(&context)))
+                    },
+                )
+                .await;
+            if let Ok(overlays) = result {
+                layers.extend(
+                    overlays
+                        .into_iter()
+                        .map(|overlay| (info.manifest.id.clone(), overlay)),
+                );
+            }
+        }
+        layers
     }
 
     pub async fn map_tile(

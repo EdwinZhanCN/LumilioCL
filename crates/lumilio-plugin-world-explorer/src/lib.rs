@@ -1,13 +1,15 @@
 //! Local seed-map provider. The host owns the world picker and map viewport.
-use lumilio_cubiomes::{Range, Version};
+use lumilio_cubiomes::Range;
 use lumilio_plugin_api::map::{
-    BaseMapInfo, BaseMapProvider, Dimension, TILE_PIXELS, TileReply, TileRequest,
+    BaseMapInfo, BaseMapProvider, Dimension, MapObject, OverlayInfo, OverlayProvider,
+    OverlayRequest, TILE_PIXELS, TileReply, TileRequest, WorldContext,
 };
 use lumilio_plugin_api::{
     API_VERSION, ActionId, Effect, GameFacts, HostContext, ImageData, InstanceTab, Manifest,
     Permission, Plugin, PluginError, TabState, View, Words,
 };
 
+mod structures;
 mod text;
 
 pub const ID: &str = "lumilio.world-explorer";
@@ -39,6 +41,24 @@ impl Plugin for WorldExplorer {
     }
     fn base_map_provider(&self) -> Option<&dyn BaseMapProvider> {
         Some(self)
+    }
+    fn overlay_provider(&self) -> Option<&dyn OverlayProvider> {
+        Some(self)
+    }
+}
+impl OverlayProvider for WorldExplorer {
+    fn overlays(&self) -> Vec<OverlayInfo> {
+        structures::catalog()
+    }
+    fn overlays_for(&self, context: &WorldContext) -> Vec<OverlayInfo> {
+        structures::catalog_for(context)
+    }
+    fn objects(
+        &self,
+        ctx: &dyn HostContext,
+        request: &OverlayRequest,
+    ) -> Result<Vec<MapObject>, PluginError> {
+        structures::objects(ctx, request)
     }
 }
 impl InstanceTab for WorldExplorer {
@@ -79,15 +99,7 @@ impl BaseMapProvider for WorldExplorer {
         {
             return Err(PluginError::InvalidInput("invalid seed tile".into()));
         }
-        let version = match request.context.version.as_deref() {
-            Some(name) => Version::from_name(name),
-            None => request
-                .context
-                .data_version
-                .ok_or(lumilio_cubiomes::Error::Unsupported)
-                .and_then(Version::from_data_version),
-        }
-        .map_err(|_| PluginError::Unavailable("map-version-unsupported".into()))?;
+        let version = structures::world_version(&request.context)?;
         let Some(seed) = request.context.seed else {
             return Ok(TileReply::Empty);
         };

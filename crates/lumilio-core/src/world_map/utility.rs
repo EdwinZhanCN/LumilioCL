@@ -13,6 +13,9 @@ impl OverlayProvider for UtilityOverlay {
                 id: id.into(),
                 kind_id: id.into(),
                 dimensions: vec![Dimension::Overworld, Dimension::Nether, Dimension::End],
+                icon: None,
+                group_id: None,
+                approximate: false,
             })
             .collect()
     }

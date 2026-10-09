@@ -103,6 +103,7 @@ impl MapView {
                                 .clone();
                     }
                     this.reset_view();
+                    this.context_changed();
                     this.refresh();
                     cx.notify();
                 });
@@ -177,7 +178,7 @@ impl MapView {
     }
 
     pub(super) fn retry_button(&self, cx: &mut Context<Self>) -> Option<Key> {
-        let count = self.failed.len();
+        let count = self.failed.len() + self.objects.failed();
         // ia[plugin.world-explorer]: 重试失败瓦片 | 地图左下角状态条 ·「重试失败的 N 块」 | 一次重新派发全部失败块；没有失败时隐藏；暂停的来源重启后恢复
         (count > 0).then(|| {
             Key::new("map-retry")
@@ -187,6 +188,7 @@ impl MapView {
                 .debug_selector(move || format!("map-retry-{count}"))
                 .on_click(cx.listener(|this, _, _, cx| {
                     this.failed.clear();
+                    this.objects.retry();
                     this.refresh();
                     cx.notify();
                 }))

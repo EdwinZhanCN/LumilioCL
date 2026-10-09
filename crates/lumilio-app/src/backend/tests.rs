@@ -80,6 +80,36 @@ fn world_map_is_available_without_saves_and_manual_seed_survives_restart() {
                     .seed,
                 Some(262)
             );
+            // The whole overlay path through the shipped host: the catalog for
+            // this world, then objects for one of its layers.
+            let context = service.map_contexts(&record.id).await.unwrap()[0]
+                .context
+                .clone();
+            let layers = service.map_overlays(&context).await;
+            let village = layers
+                .iter()
+                .find(|(_, layer)| layer.id == "structure.village")
+                .expect("villages are offered for a 1.21.4 seed");
+            let found = service
+                .map_objects(
+                    &record.id,
+                    &village.0,
+                    lumilio_plugin_api::map::OverlayRequest {
+                        context,
+                        overlay: "structure.village".into(),
+                        bounds: lumilio_plugin_api::map::MapBounds {
+                            min: lumilio_plugin_api::map::MapPoint {
+                                x: -1536.,
+                                z: -1536.,
+                            },
+                            max: lumilio_plugin_api::map::MapPoint { x: 1536., z: 1536. },
+                        },
+                        level: 0,
+                    },
+                    lumilio_core::CancellationToken::new(),
+                )
+                .await;
+            assert_eq!(found.map(|objects| objects.len()), Ok(7));
             record.id
         }))
     };

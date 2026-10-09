@@ -1,9 +1,15 @@
 //! Host-owned map viewport. Background data and rendering enter through mailboxes.
 mod camera;
+mod canvas;
 mod layers;
+mod objects;
 mod seed;
+mod stats;
 mod toolbar;
+pub use objects::ObjectKey;
 pub use seed::VERSIONS as MANUAL_VERSIONS;
+#[cfg(test)]
+mod perf;
 #[cfg(test)]
 mod tests;
 mod worker;
@@ -17,11 +23,16 @@ use gpui::{
 use gpui_component::{ActiveTheme as _, h_flex, v_flex};
 use lumilio_core::world_map::{MapSchedule, Viewport, WorldMapContext};
 use lumilio_core::{CancellationToken, MapFailure, MapProviders};
-use lumilio_map_render::{Grid, Tile};
-use lumilio_plugin_api::map::{TileKey, TileReply, TileRequest, WorldContext};
+use lumilio_map_render::{Grid, Sprite, Tile};
+use lumilio_plugin_api::map::{
+    MapObject, MapObjectKind, OverlayInfo, OverlayRequest, TileKey, TileReply, TileRequest,
+    WorldContext,
+};
 use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 use std::sync::Arc;
+use std::sync::atomic::Ordering::Relaxed;
+use std::time::{Duration, Instant};
 
 pub enum Command {
     Contexts,
@@ -34,6 +45,17 @@ pub enum Command {
         request: Box<TileRequest>,
         cancel: CancellationToken,
     },
+    /// The layers the plugins offer for one world.
+    Overlays {
+        context: WorldContext,
+    },
+    Objects {
+        generation: u64,
+        plugin: String,
+        request: Box<OverlayRequest>,
+        key: ObjectKey,
+        cancel: CancellationToken,
+    },
 }
 pub enum Event {
     Seed(Result<(Vec<WorldMapContext>, WorldContext), String>),
@@ -42,6 +64,15 @@ pub enum Event {
         generation: u64,
         key: TileKey,
         result: Result<TileReply, MapFailure>,
+    },
+    Overlays {
+        context: WorldContext,
+        layers: Vec<(String, OverlayInfo)>,
+    },
+    Objects {
+        generation: u64,
+        key: ObjectKey,
+        result: Result<Vec<MapObject>, MapFailure>,
     },
 }
 pub struct Connection {
@@ -59,6 +90,17 @@ const IN_FLIGHT: usize = 12;
 const TILE_CAP: usize = 512;
 /// Stand-ins drawn under a frame, so one frame stays a bounded number of draws.
 const STAND_INS: usize = 192;
+/// Structure layers shown before the user chooses any.
+const DEFAULT_LAYERS: &[&str] = &[
+    "structure.village",
+    "structure.stronghold",
+    "structure.fortress",
+    "structure.end-city",
+];
+/// Icons drawn at once; the most important win when a view holds more.
+const MAX_ICONS: usize = 400;
+/// Icon edge on screen, in pixels.
+const ICON: u32 = 28;
 
 /// A tile's pixels, prepared once on arrival. `rgba` is `None` for a tile the
 /// provider answered as empty; it is drawn as the empty-tile pattern.
@@ -124,6 +166,8 @@ pub struct MapView {
     base: usize,
     camera: camera::Camera,
     layers: layers::Layers,
+    objects: objects::Objects,
+    layer_scroll: gpui::ScrollHandle,
     schedule: MapSchedule,
     tiles: BTreeMap<TileKey, Loaded>,
     clock: u64,
@@ -143,6 +187,36 @@ pub struct MapView {
     no_gpu: bool,
     form: Option<seed::Form>,
     release: bool,
+    stats: Arc<stats::Stats>,
+    /// When the latest frame was shown, until the view next renders.
+    shown_at: Option<Instant>,
+    backend: Backend,
+    painter: std::rc::Rc<std::cell::RefCell<canvas::Painter>>,
+    report: (stats::Snapshot, Instant),
+}
+
+/// How the map reaches the screen.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum Backend {
+    /// Tiles and icons painted by GPUI itself (`canvas.rs`). The default: it
+    /// draws at device resolution with no readback, and measured and looked
+    /// better than the wgpu path in the maintainer's side-by-side.
+    Canvas,
+    /// Composed on our own wgpu device and read back as one image. Kept for
+    /// comparison, behind `LUMILIO_MAP_BACKEND=wgpu`.
+    Wgpu,
+}
+
+impl Backend {
+    fn from_env() -> Self {
+        Self::parse(std::env::var("LUMILIO_MAP_BACKEND").ok().as_deref())
+    }
+    fn parse(choice: Option<&str>) -> Self {
+        match choice {
+            Some("wgpu") => Self::Wgpu,
+            _ => Self::Canvas,
+        }
+    }
 }
 impl MapView {
     pub fn new(load: Load, cx: &mut Context<Self>) -> Self {
@@ -160,6 +234,8 @@ impl MapView {
             base: 0,
             camera: camera::Camera::default(),
             layers: layers::Layers::default(),
+            objects: objects::Objects::new(DEFAULT_LAYERS),
+            layer_scroll: gpui::ScrollHandle::new(),
             schedule: MapSchedule::default(),
             tiles: BTreeMap::new(),
             clock: 0,
@@ -179,9 +255,21 @@ impl MapView {
             no_gpu: false,
             form: None,
             release: false,
+            stats: Arc::default(),
+            shown_at: None,
+            backend: Backend::from_env(),
+            painter: Default::default(),
+            report: (stats::Snapshot::default(), Instant::now()),
         }
     }
     pub fn connect(&mut self, connection: Connection, cx: &mut Context<Self>) {
+        self.attach(connection, cx);
+        if self.backend == Backend::Wgpu {
+            self.start_renderer(cx);
+        }
+    }
+    /// Listens to the application's events and asks for the world list.
+    fn attach(&mut self, connection: Connection, cx: &mut Context<Self>) {
         let receive = connection.receive.clone();
         let _ = connection.send.try_send(Command::Contexts);
         self.connection = Some(connection);
@@ -192,15 +280,28 @@ impl MapView {
                 }
             }
         }));
+    }
+    /// Starts the render thread and shows its frames.
+    fn start_renderer(&mut self, cx: &mut Context<Self>) {
         match worker::Worker::start() {
             Ok(worker) => {
                 let receive = worker.output.clone();
+                let stats = worker.stats.clone();
+                let report = std::env::var_os("LUMILIO_MAP_STATS").is_some();
                 self.render_task = Some(cx.spawn(async move |this, cx| {
+                    let (mut since, mut last) = (stats::Snapshot::default(), Instant::now());
                     while let Ok(result) = receive.recv().await {
+                        if report && last.elapsed() >= Duration::from_secs(2) {
+                            let now = stats.snapshot();
+                            eprintln!("[map-stats] {}", now.since(since).line());
+                            (since, last) = (now, Instant::now());
+                        }
                         if this
                             .update(cx, |this, cx| {
                                 match result {
-                                    Ok((serial, frame)) if serial == this.serial => {
+                                    Ok(done) if done.serial == this.serial => {
+                                        let building = Instant::now();
+                                        let frame = done.frame;
                                         if let Some(buffer) = image::RgbaImage::from_raw(
                                             frame.width,
                                             frame.height,
@@ -213,9 +314,16 @@ impl MapView {
                                             if let Some(old) = this.image.replace(image) {
                                                 this.old.push(old);
                                             }
+                                            let stats = &this.stats;
+                                            stats.displayed.fetch_add(1, Relaxed);
+                                            stats::add(&stats.image_us, building.elapsed());
+                                            stats::add(&stats.latency_us, done.issued.elapsed());
+                                            this.shown_at = Some(Instant::now());
                                         }
                                     }
-                                    Ok(_) => {}
+                                    Ok(_) => {
+                                        this.stats.discarded.fetch_add(1, Relaxed);
+                                    }
                                     Err(error) => {
                                         this.no_gpu = error == lumilio_map_render::Error::NoGpu;
                                         this.error = Some(format!("{error:?}"));
@@ -229,6 +337,7 @@ impl MapView {
                         }
                     }
                 }));
+                self.stats = worker.stats.clone();
                 self.worker = Some(worker);
             }
             Err(error) => self.error = Some(error.to_string()),
@@ -250,6 +359,7 @@ impl MapView {
                 self.context = Some(context);
                 self.error = None;
                 self.reset_view();
+                self.context_changed();
                 self.refresh();
             }
             Event::Seed(Err(error)) => {
@@ -263,9 +373,32 @@ impl MapView {
                 self.contexts = contexts;
                 self.providers = providers;
                 self.context = self.contexts.first().map(|world| world.context.clone());
+                self.context_changed();
                 self.refresh();
             }
             Event::Contexts(Err(error)) => self.error = Some(error),
+            Event::Overlays { context, layers } => {
+                if self.context.as_ref() != Some(&context) {
+                    return;
+                }
+                self.objects.layers = layers;
+                self.refresh_objects();
+            }
+            Event::Objects {
+                generation,
+                key,
+                result,
+            } => {
+                if !self.objects.accept(generation, &key) {
+                    return;
+                }
+                match result {
+                    Ok(found) => self.objects.store(key, found),
+                    Err(_) => self.objects.fail(key),
+                }
+                self.dispatch_objects();
+                self.frame();
+            }
             Event::Tile {
                 generation,
                 key,
@@ -298,6 +431,138 @@ impl MapView {
         }
         cx.notify();
     }
+    /// The world or dimension changed: what it can show is asked for again.
+    fn context_changed(&mut self) {
+        self.objects.clear();
+        self.objects.layers.clear();
+        if let (Some(connection), Some(context)) = (&self.connection, &self.context) {
+            let _ = connection.send.try_send(Command::Overlays {
+                context: context.clone(),
+            });
+        }
+    }
+    /// The viewport in blocks, `[x0, z0, x1, z1]`.
+    fn view_blocks(&self) -> [f64; 4] {
+        let half = [
+            f64::from(self.size[0]) * self.camera.scale / 2.,
+            f64::from(self.size[1]) * self.camera.scale / 2.,
+        ];
+        [
+            self.camera.x - half[0],
+            self.camera.z - half[1],
+            self.camera.x + half[0],
+            self.camera.z + half[1],
+        ]
+    }
+    /// Icons for the visible objects as screen-space sprites for the frame,
+    /// the more important drawn later. They are painted into the map image
+    /// itself, so they share its layering and clipping and never intercept the
+    /// mouse.
+    fn sprites(&self) -> Vec<Sprite> {
+        let (width, height) = (f64::from(self.size[0]), f64::from(self.size[1]));
+        let objects = self.objects.visible(self.view_blocks());
+        let skip = objects.len().saturating_sub(MAX_ICONS);
+        objects
+            .into_iter()
+            .skip(skip)
+            .filter_map(|object| {
+                let MapObjectKind::Icon { icon, at } = &object.kind else {
+                    return None;
+                };
+                let pixels = crate::map_icons::pixels(*icon);
+                Some(Sprite {
+                    id: pixels.name.into(),
+                    width: pixels.width,
+                    height: pixels.height,
+                    rgba: pixels.rgba.clone(),
+                    x: (at.x - self.camera.x) / self.camera.scale + width / 2.,
+                    y: (at.z - self.camera.z) / self.camera.scale + height / 2.,
+                    size: ICON,
+                    opacity: if object.approximate { 0.7 } else { 1. },
+                })
+            })
+            .collect()
+    }
+    /// The canvas backend's drawing surface, filling the viewport: it paints
+    /// this frame's tiles, icons and grid straight through GPUI.
+    fn canvas_layer(&mut self) -> Option<gpui::Canvas<()>> {
+        if self.backend != Backend::Canvas {
+            return None;
+        }
+        self.report_stats();
+        if self.size.contains(&0) {
+            return None;
+        }
+        let frame = canvas::Frame {
+            camera: lumilio_map_render::Camera {
+                x: self.camera.x,
+                z: self.camera.z,
+                blocks_per_pixel: self.camera.scale,
+            },
+            tiles: self.scene_tiles(),
+            sprites: self.sprites(),
+            grid: Grid {
+                chunks: self.layers.chunks,
+                regions: self.layers.regions,
+            },
+        };
+        let (painter, stats) = (self.painter.clone(), self.stats.clone());
+        Some(
+            canvas(
+                |_, _, _| (),
+                move |bounds, (), window, _| {
+                    painter.borrow_mut().paint(window, bounds, &frame, &stats)
+                },
+            )
+            .absolute()
+            .size_full(),
+        )
+    }
+    /// `LUMILIO_MAP_STATS=1`: a summary of the last two seconds on stderr.
+    fn report_stats(&mut self) {
+        if std::env::var_os("LUMILIO_MAP_STATS").is_none()
+            || self.report.1.elapsed() < Duration::from_secs(2)
+        {
+            return;
+        }
+        let now = self.stats.snapshot();
+        eprintln!("[map-stats] {}", now.since(self.report.0).line());
+        self.report = (now, Instant::now());
+    }
+    fn refresh_objects(&mut self) {
+        let Some(context) = self.context.clone() else {
+            return;
+        };
+        if self.size.contains(&0) {
+            return;
+        }
+        self.objects
+            .update(&context, self.view_blocks(), self.camera.scale);
+        self.dispatch_objects();
+    }
+    fn dispatch_objects(&mut self) {
+        let Some(context) = self.context.clone() else {
+            return;
+        };
+        for next in self.objects.next(&context) {
+            let sent = self.connection.as_ref().is_some_and(|connection| {
+                connection
+                    .send
+                    .try_send(Command::Objects {
+                        generation: next.generation,
+                        plugin: next.plugin,
+                        request: Box::new(next.request),
+                        key: next.key.clone(),
+                        cancel: next.cancel,
+                    })
+                    .is_ok()
+            });
+            if !sent {
+                self.objects.accept(next.generation, &next.key);
+                self.objects.fail(next.key);
+            }
+        }
+    }
     fn reset_view(&mut self) {
         self.schedule.update(&[]);
         self.tiles.clear();
@@ -309,6 +574,12 @@ impl MapView {
         }
     }
     fn refresh(&mut self) {
+        let started = Instant::now();
+        self.refresh_now();
+        stats::add(&self.stats.refresh_us, started.elapsed());
+        self.stats.refreshes.fetch_add(1, Relaxed);
+    }
+    fn refresh_now(&mut self) {
         let Some(context) = self.context.clone() else {
             return;
         };
@@ -336,6 +607,7 @@ impl MapView {
         self.failed.retain(|key, _| visible.contains(key));
         self.visible = visible;
         self.dispatch();
+        self.refresh_objects();
         self.frame();
     }
     /// Starts requests for visible tiles that have neither pixels nor a
@@ -401,20 +673,24 @@ impl MapView {
     /// cached tiles of other levels over them (coarsest first) so a zoom never
     /// shows a hole, then the visible level's own tiles.
     fn frame(&mut self) {
-        if self.size.contains(&0) {
+        // The canvas backend paints from the view's state on every render.
+        if self.size.contains(&0) || self.backend == Backend::Canvas {
             return;
         }
         self.serial = self.serial.wrapping_add(1);
         let tiles = self.scene_tiles();
+        let sprites = self.sprites();
         if let Some(worker) = &self.worker {
             worker.mailbox.put(worker::Request {
                 serial: self.serial,
+                issued: Instant::now(),
                 camera: lumilio_map_render::Camera {
                     x: self.camera.x,
                     z: self.camera.z,
                     blocks_per_pixel: self.camera.scale,
                 },
                 tiles,
+                sprites,
                 grid: Grid {
                     chunks: self.layers.chunks,
                     regions: self.layers.regions,
@@ -501,6 +777,10 @@ impl MapView {
 }
 impl Render for MapView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if let Some(shown) = self.shown_at.take() {
+            stats::add(&self.stats.paint_lag_us, shown.elapsed());
+            self.stats.paints.fetch_add(1, Relaxed);
+        }
         for old in self.old.drain(..) {
             let _ = window.drop_image(old);
         }
@@ -509,6 +789,7 @@ impl Render for MapView {
                 for image in this.old.drain(..).chain(this.image.take()) {
                     let _ = window.drop_image(image);
                 }
+                this.painter.borrow_mut().release(window);
                 if let Some(connection) = &this.connection {
                     connection.send.close();
                     connection.receive.close();
@@ -577,7 +858,7 @@ impl Render for MapView {
             Some(tr!("map-seed-needed"))
         } else if self.error.is_some() {
             Some(tr!("map-render-failed"))
-        } else if !self.failed.is_empty() {
+        } else if !self.failed.is_empty() || self.objects.failed() > 0 {
             Some(tr!("map-tile-failed"))
         } else {
             None
@@ -617,8 +898,10 @@ impl Render for MapView {
             .children(
                 self.image
                     .clone()
+                    .filter(|_| self.backend == Backend::Wgpu)
                     .map(|image| img(image).size_full().object_fit(ObjectFit::Fill)),
             )
+            .children(self.canvas_layer())
             .child(measure)
             .child(float().top_3().left_3().child(self.view_controls(cx)))
             .child(float().top_3().right_3().child(self.jump_controls(cx)))

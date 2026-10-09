@@ -46,6 +46,21 @@ pub(super) fn plugin_map(
                                 .map_err(|error| error.to_string()),
                         )
                     }
+                    Command::Overlays { context } => Event::Overlays {
+                        layers: service.map_overlays(&context).await,
+                        context,
+                    },
+                    Command::Objects {
+                        generation,
+                        plugin,
+                        request,
+                        key,
+                        cancel,
+                    } => Event::Objects {
+                        generation,
+                        key,
+                        result: service.map_objects(&id, &plugin, *request, cancel).await,
+                    },
                     Command::Tile {
                         generation,
                         request,
