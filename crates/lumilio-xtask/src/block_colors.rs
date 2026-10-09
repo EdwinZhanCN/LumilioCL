@@ -31,7 +31,7 @@ const FACES: [&str; 10] = [
 const MANIFEST: &str = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
 
 fn read_entry<R: Read + Seek>(jar: &mut zip::ZipArchive<R>, name: &str) -> Option<Vec<u8>> {
-    let mut entry = jar.by_name(name).ok()?;
+    let entry = jar.by_name(name).ok()?;
     let mut bytes = Vec::new();
     entry.take(32 * 1024 * 1024).read_to_end(&mut bytes).ok()?;
     Some(bytes)
@@ -48,12 +48,11 @@ fn without_namespace(reference: &str) -> &str {
 /// The first model a blockstate file names, in either of its two forms.
 fn first_model(state: &Value) -> Option<String> {
     let pick = |value: &Value| {
-        let one = value.as_array().map_or(value, |list| {
-            &list[0..1.min(list.len())][..]
-                .first()
-                .unwrap_or(value)
-                .clone()
-        });
+        // A weighted list of variants; the first stands for the block.
+        let one = match value.as_array() {
+            Some(list) => list.first()?,
+            None => value,
+        };
         one.get("model")?.as_str().map(str::to_owned)
     };
     if let Some(variants) = state.get("variants").and_then(Value::as_object) {
