@@ -23,6 +23,8 @@ pub const TINT_FOLIAGE: u8 = 4;
 pub const TINT_WATER: u8 = 8;
 
 pub type Table = BTreeMap<String, [u8; 4]>;
+/// Per biome: grass, foliage and water colour, each `0xRRGGBB`.
+pub type Biomes = BTreeMap<String, [u32; 3]>;
 
 /// Which texture of a model to show from above, most wanted first.
 const FACES: [&str; 10] = [
@@ -160,6 +162,85 @@ fn fixed_tint(block: &str) -> Option<[u8; 3]> {
     }
 }
 
+/// A colour in a biome file: an integer up to 1.21, `"#rrggbb"` from 26.x.
+fn color_value(value: &Value) -> Option<u32> {
+    match value {
+        Value::Number(number) => number
+            .as_u64()
+            .and_then(|n| u32::try_from(n & 0xff_ffff).ok()),
+        Value::String(text) => u32::from_str_radix(text.strip_prefix('#')?, 16).ok(),
+        _ => None,
+    }
+}
+
+/// The colour a 256×256 colormap gives a biome's temperature and downfall:
+/// the map is indexed by temperature across and by downfall (scaled by
+/// temperature) down, as the game samples it.
+fn colormap(map: &image::RgbaImage, temperature: f64, downfall: f64) -> Option<u32> {
+    let temperature = temperature.clamp(0.0, 1.0);
+    let downfall = downfall.clamp(0.0, 1.0) * temperature;
+    let x = ((1.0 - temperature) * 255.0) as u32;
+    let y = ((1.0 - downfall) * 255.0) as u32;
+    let pixel = map.get_pixel_checked(x, y)?;
+    Some(u32::from(pixel[0]) << 16 | u32::from(pixel[1]) << 8 | u32::from(pixel[2]))
+}
+
+/// Grass, foliage and water colour of every biome the jar defines: the
+/// biome's own colour where it names one, otherwise its spot on the grass or
+/// foliage colormap. The swamp's grass is the drier of its two noise colours;
+/// the dark forest's grass is darkened the way the game does.
+pub fn build_biomes<R: Read + Seek>(jar: &mut zip::ZipArchive<R>) -> Biomes {
+    let load = |jar: &mut zip::ZipArchive<R>, name: &str| {
+        read_entry(
+            jar,
+            &format!("assets/minecraft/textures/colormap/{name}.png"),
+        )
+        .and_then(|png| image::load_from_memory_with_format(&png, image::ImageFormat::Png).ok())
+        .map(|image| image.to_rgba8())
+    };
+    let (Some(grass_map), Some(foliage_map)) = (load(jar, "grass"), load(jar, "foliage")) else {
+        return Biomes::new();
+    };
+    let names: Vec<String> = jar
+        .file_names()
+        .filter_map(|name| {
+            name.strip_prefix("data/minecraft/worldgen/biome/")?
+                .strip_suffix(".json")
+                .filter(|name| !name.contains('/'))
+                .map(str::to_owned)
+        })
+        .collect();
+    let mut biomes = Biomes::new();
+    for name in names {
+        let Some(biome) = json(jar, &format!("data/minecraft/worldgen/biome/{name}.json")) else {
+            continue;
+        };
+        let number = |key: &str| biome.get(key).and_then(Value::as_f64);
+        let (Some(temperature), Some(downfall)) = (number("temperature"), number("downfall"))
+        else {
+            continue;
+        };
+        let effects = biome.get("effects").cloned().unwrap_or(Value::Null);
+        let own = |key: &str| effects.get(key).and_then(color_value);
+        let Some(mut grass) =
+            own("grass_color").or_else(|| colormap(&grass_map, temperature, downfall))
+        else {
+            continue;
+        };
+        match effects.get("grass_color_modifier").and_then(Value::as_str) {
+            Some("swamp") => grass = 0x6a7039,
+            Some("dark_forest") => grass = ((grass & 0xfefefe) + 0x28340a) >> 1,
+            _ => {}
+        }
+        let foliage = own("foliage_color")
+            .or_else(|| colormap(&foliage_map, temperature, downfall))
+            .unwrap_or(grass);
+        let water = own("water_color").unwrap_or(0x3f76e4);
+        biomes.insert(format!("minecraft:{name}"), [grass, foliage, water]);
+    }
+    biomes
+}
+
 /// The data version a client jar was built for, from its `version.json`.
 pub fn data_version<R: Read + Seek>(jar: &mut zip::ZipArchive<R>) -> Option<i64> {
     json(jar, "version.json")?.get("world_version")?.as_i64()
@@ -222,8 +303,9 @@ pub fn build_table<R: Read + Seek>(jar: &mut zip::ZipArchive<R>) -> Table {
 
 /// The table as JSON, one block per line so a regenerated table diffs cleanly.
 /// `version` and `data_version` say which game the table was built from; the
-/// launcher picks a world's table by data version.
-pub fn render(table: &Table, version: &str, data_version: i64) -> String {
+/// launcher picks a world's table by data version. Biome colours are written
+/// as `[grass, foliage, water]`, each `0xRRGGBB` as a number.
+pub fn render(table: &Table, biomes: &Biomes, version: &str, data_version: i64) -> String {
     let mut out = format!(
         "{{\n  \"version\": {},\n  \"data_version\": {data_version},\n  \"blocks\": {{\n",
         Value::from(version)
@@ -232,6 +314,12 @@ pub fn render(table: &Table, version: &str, data_version: i64) -> String {
     for (at, (block, [r, g, b, flags])) in table.iter().enumerate() {
         let comma = if at == last { "" } else { "," };
         let _ = writeln!(out, "    \"{block}\": [{r}, {g}, {b}, {flags}]{comma}");
+    }
+    out.push_str("  },\n  \"biomes\": {\n");
+    let last = biomes.len().saturating_sub(1);
+    for (at, (biome, [grass, foliage, water])) in biomes.iter().enumerate() {
+        let comma = if at == last { "" } else { "," };
+        let _ = writeln!(out, "    \"{biome}\": [{grass}, {foliage}, {water}]{comma}");
     }
     out.push_str("  }\n}\n");
     out
@@ -248,7 +336,7 @@ pub fn source_section(
 ) -> String {
     let heading = format!("## {version}\n");
     let section = format!(
-        "{heading}\n- Client jar sha1: `{sha1}` (from Mojang's version metadata)\n- Command: `cargo xtask block-colors {version}`\n- Tool commit: `{commit}`\n- Blocks: {blocks}\n- Colour: the mean of the visible pixels of the texture a block shows from above (`top`, then `up`, `all`, `end`, `side`); spruce and birch leaves and lily pads have the game's fixed tint multiplied in; flags 1 = see-through, 2 = grass tint, 4 = foliage tint, 8 = water tint\n\n"
+        "{heading}\n- Client jar sha1: `{sha1}` (from Mojang's version metadata)\n- Command: `cargo xtask block-colors {version}`\n- Tool commit: `{commit}`\n- Blocks: {blocks}\n- Colour: the mean of the visible pixels of the texture a block shows from above (`top`, then `up`, `all`, `end`, `side`); spruce and birch leaves and lily pads have the game's fixed tint multiplied in; flags 1 = see-through, 2 = grass tint, 4 = foliage tint, 8 = water tint; biomes give grass, foliage and water colour from the jar's biome files and colormaps\n\n"
     );
     let mut out = if existing.trim().is_empty() {
         String::from(
@@ -354,6 +442,13 @@ pub fn run(version: &str, root: &Path, target: &Path) -> Result {
     let file = std::fs::File::open(&jar_file).map_err(|error| error.to_string())?;
     let mut jar = zip::ZipArchive::new(file).map_err(|error| error.to_string())?;
     let table = build_table(&mut jar);
+    let biomes = build_biomes(&mut jar);
+    if biomes.len() < 10 {
+        return Err(format!(
+            "only {} biomes found; the jar layout may have changed",
+            biomes.len()
+        ));
+    }
     let data_version =
         data_version(&mut jar).ok_or("the client jar's version.json has no world_version")?;
     if table.len() < 100 {
@@ -366,7 +461,7 @@ pub fn run(version: &str, root: &Path, target: &Path) -> Result {
     std::fs::create_dir_all(&data).map_err(|error| error.to_string())?;
     std::fs::write(
         data.join(format!("{version}.json")),
-        render(&table, version, data_version),
+        render(&table, &biomes, version, data_version),
     )
     .map_err(|error| error.to_string())?;
     let source = data.join("SOURCE.md");
@@ -376,6 +471,6 @@ pub fn run(version: &str, root: &Path, target: &Path) -> Result {
         source_section(&existing, version, &sha1, &commit(root), table.len()),
     )
     .map_err(|error| error.to_string())?;
-    println!("{version}: {} blocks", table.len());
+    println!("{version}: {} blocks, {} biomes", table.len(), biomes.len());
     Ok(())
 }
