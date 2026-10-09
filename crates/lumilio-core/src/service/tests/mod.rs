@@ -8,6 +8,7 @@ mod launch;
 mod launch_observers;
 mod lifecycle;
 mod map_edit;
+mod map_tiles;
 mod models;
 mod packs;
 mod plugin_analysis;

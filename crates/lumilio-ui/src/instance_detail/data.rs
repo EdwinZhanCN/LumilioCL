@@ -281,6 +281,8 @@ impl InstanceDetailView {
         } else if self.live_output.take().is_some() {
             self.refresh_logs = true;
             self.game_started_ms = None;
+            // ia[plugin.world-explorer]: 退出游戏后更新存档底图 | 地图视口 · 游戏结束时自动 | 重新取可见瓦片；只有 Region 文件长度或修改时间变了的块及其上层合成块重画，其余用缓存 | 缓存在 profiles/<实例>/map-cache，可在设置 › 存储清除
+            self.maps_files_changed(cx);
             if self.data.has(Section::Worlds) {
                 self.refresh_worlds = true;
             }

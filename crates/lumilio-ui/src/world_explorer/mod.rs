@@ -207,6 +207,9 @@ pub struct MapView {
     pending_pixels: Arc<[u8]>,
     failed_pixels: Arc<[u8]>,
     visible: Vec<TileKey>,
+    /// Shown tiles to ask for again, because the files they were drawn from
+    /// may have changed; each keeps showing until its answer replaces it.
+    stale: BTreeSet<TileKey>,
     failed: BTreeMap<TileKey, MapFailure>,
     size: [u32; 2],
     bounds: Option<Bounds<Pixels>>,
@@ -288,6 +291,7 @@ impl MapView {
             pending_pixels: pattern(false),
             failed_pixels: pattern(true),
             visible: Vec::new(),
+            stale: BTreeSet::new(),
             failed: BTreeMap::new(),
             size: [0, 0],
             bounds: None,
@@ -491,6 +495,7 @@ impl MapView {
                 if !self.schedule.accept(generation, &key) {
                     return;
                 }
+                self.stale.remove(&key);
                 match result {
                     Ok(reply) => {
                         self.failed.remove(&key);
@@ -693,8 +698,23 @@ impl MapView {
             }
         }
     }
+    /// The game's files may have changed (the game just exited): the visible
+    /// tiles are asked for again, and the host redraws only those whose files
+    /// did change; tiles out of view are forgotten.
+    pub fn files_changed(&mut self, cx: &mut Context<Self>) {
+        let visible: BTreeSet<TileKey> = self.visible.iter().cloned().collect();
+        self.tiles.retain(|key, _| visible.contains(key));
+        self.stale = visible
+            .into_iter()
+            .filter(|key| self.tiles.contains_key(key))
+            .collect();
+        self.failed.clear();
+        self.dispatch();
+        cx.notify();
+    }
     fn reset_view(&mut self) {
         self.schedule.update(&[]);
+        self.stale.clear();
         self.tiles.clear();
         self.failed.clear();
         self.visible.clear();
@@ -735,6 +755,7 @@ impl MapView {
         .visible(&template);
         self.schedule.update(&visible);
         self.failed.retain(|key, _| visible.contains(key));
+        self.stale.retain(|key| visible.contains(key));
         self.visible = visible;
         self.dispatch();
         self.refresh_objects();
@@ -750,7 +771,10 @@ impl MapView {
         let wanted: Vec<TileKey> = self
             .visible
             .iter()
-            .filter(|key| !self.tiles.contains_key(key) && !self.failed.contains_key(key))
+            .filter(|key| {
+                (!self.tiles.contains_key(key) || self.stale.contains(key))
+                    && !self.failed.contains_key(key)
+            })
             .cloned()
             .collect();
         for key in wanted {

@@ -172,8 +172,9 @@ impl<T: Transport + Clone> LauncherService<T> {
         Ok(reply)
     }
     /// A tile of a base map drawn from the world's files: nothing when none of
-    /// its files exist, level 0 from the provider, and every coarser level
-    /// built here from its 16 children.
+    /// its files exist; the kept tile while its files are unchanged; otherwise
+    /// level 0 from the provider and every coarser level built here from its
+    /// 16 children (each of which is kept or rebuilt the same way).
     fn file_tile<'a>(
         &'a self,
         instance: &'a str,
@@ -185,12 +186,37 @@ impl<T: Transport + Clone> LauncherService<T> {
             if stamps.iter().all(|(_, stat)| stat.is_none()) {
                 return Ok(TileReply::Empty);
             }
+            let cache = world_map::SourcedCache::new(self.layout.map_tiles(instance));
+            let (reader, key, kept) = (cache.clone(), request.key.clone(), stamps.clone());
+            if let Ok(Ok(Some(reply))) =
+                tokio::task::spawn_blocking(move || reader.get(&key, &kept)).await
+            {
+                return Ok(reply);
+            }
+            let reply = self
+                .draw_file_tile(instance, &request, cancel.clone())
+                .await?;
+            if cancel.is_cancelled() {
+                return Err(MapFailure::Cancelled);
+            }
+            let (key, saved) = (request.key.clone(), reply.clone());
+            let _ = tokio::task::spawn_blocking(move || cache.put(&key, stamps, saved)).await;
+            Ok(reply)
+        })
+    }
+    async fn draw_file_tile(
+        &self,
+        instance: &str,
+        request: &TileRequest,
+        cancel: CancellationToken,
+    ) -> Result<TileReply, MapFailure> {
+        {
             let provider = request.key.provider.clone();
             let game = self.layout.game(instance);
             if request.key.level == 0 {
                 return self
                     .plugins
-                    .map_tile(&provider, game, request, cancel)
+                    .map_tile(&provider, game, request.clone(), cancel)
                     .await;
             }
             let children = (0..world_map::SPLIT * world_map::SPLIT).map(|index| {
@@ -209,11 +235,8 @@ impl<T: Transport + Clone> LauncherService<T> {
                 }
             });
             let children = futures_util::future::try_join_all(children).await?;
-            if cancel.is_cancelled() {
-                return Err(MapFailure::Cancelled);
-            }
             Ok(world_map::compose(&children))
-        })
+        }
     }
     /// Whether an edit could start now: no game running on the instance and
     /// no other operation holding it.
@@ -243,11 +266,23 @@ impl<T: Transport + Clone> LauncherService<T> {
             )
             .await
     }
+    /// Clears the shared seed tiles and every instance's save tiles.
     pub async fn clear_map_cache(&self) -> Result<(), ServiceError> {
-        let root = self.layout.map_cache();
-        tokio::task::spawn_blocking(move || world_map::TileCache::clear(&root))
-            .await
-            .map_err(std::io::Error::other)??;
+        let (seed, profiles) = (self.layout.map_cache(), self.layout.profiles());
+        tokio::task::spawn_blocking(move || {
+            world_map::TileCache::clear(&seed)?;
+            let Ok(entries) = std::fs::read_dir(&profiles) else {
+                return Ok(());
+            };
+            for entry in entries.flatten() {
+                if entry.file_type().is_ok_and(|kind| kind.is_dir()) {
+                    world_map::TileCache::clear(&entry.path().join("map-cache"))?;
+                }
+            }
+            Ok::<_, std::io::Error>(())
+        })
+        .await
+        .map_err(std::io::Error::other)??;
         Ok(())
     }
 }

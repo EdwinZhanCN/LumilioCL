@@ -2135,3 +2135,86 @@ fn the_save_map_says_what_it_needs_and_counts_blocks_without_colour(cx: &mut Tes
     });
     assert!(cx.debug_bounds("map-status").is_some());
 }
+
+#[gpui::test]
+fn after_the_game_exits_visible_tiles_are_asked_again_and_keep_showing_meanwhile(
+    cx: &mut TestAppContext,
+) {
+    let (view, cx, commands) = ready_view(cx);
+    cx.simulate_resize(gpui::size(px(600.), px(400.)));
+    cx.run_until_parked();
+    let take = |commands: &async_channel::Receiver<Command>| {
+        let mut sent = vec![];
+        while let Ok(command) = commands.try_recv() {
+            if let Command::Tile {
+                request,
+                generation,
+                ..
+            } = command
+            {
+                sent.push((generation, request.key));
+            }
+        }
+        sent
+    };
+    // Answer every tile until the view is complete.
+    loop {
+        let sent = take(&commands);
+        if sent.is_empty() {
+            break;
+        }
+        view.update(cx, |view, cx| {
+            for (generation, key) in sent {
+                view.event(
+                    Event::Tile {
+                        generation,
+                        key,
+                        result: Ok(image(10)),
+                    },
+                    cx,
+                );
+            }
+        });
+    }
+    let visible = view.read_with(cx, |view, _| {
+        assert!(view.visible.iter().all(|key| view.tiles.contains_key(key)));
+        view.visible.clone()
+    });
+    // A tile out of view is forgotten; the visible ones are asked for again.
+    view.update(cx, |view, cx| {
+        view.tiles.insert(
+            tile_key(0, 9_000, 9_000),
+            Loaded {
+                rgba: None,
+                unknown: Vec::new(),
+                revision: 0,
+                used: 0,
+            },
+        );
+        view.files_changed(cx);
+    });
+    let again = take(&commands);
+    assert_eq!(again.len(), visible.len().min(IN_FLIGHT));
+    view.read_with(cx, |view, _| {
+        assert!(!view.tiles.contains_key(&tile_key(0, 9_000, 9_000)));
+        assert!(
+            visible.iter().all(|key| view.tiles.contains_key(key)),
+            "the old pixels stay until the new ones arrive"
+        );
+    });
+    let (generation, key) = again[0].clone();
+    view.update(cx, |view, cx| {
+        view.event(
+            Event::Tile {
+                generation,
+                key: key.clone(),
+                result: Ok(image(200)),
+            },
+            cx,
+        );
+    });
+    view.read_with(cx, |view, _| {
+        assert!(!view.stale.contains(&key));
+        assert_eq!(view.tiles[&key].rgba.as_ref().unwrap()[0], 200);
+    });
+}
