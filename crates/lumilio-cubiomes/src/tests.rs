@@ -1,3 +1,5 @@
+mod releases;
+
 #[test]
 fn native_generator_links_and_runs() {
     assert!(super::probe() >= 0);
@@ -42,7 +44,7 @@ fn native_c_goldens_match_all_dimensions_and_scales() {
 #[test]
 fn rejects_unknown_versions_and_dangerous_ranges() {
     use super::*;
-    for name in ["26.3", "1.21.5", "1.21", "snapshot", "1.18.1"] {
+    for name in ["26.4", "26.3-snapshot-1", "1.21", "snapshot", "1.18.1"] {
         assert_eq!(Version::from_name(name), Err(Error::Unsupported));
     }
     assert_eq!(Version::from_data_version(9999), Err(Error::Unsupported));
@@ -292,9 +294,17 @@ fn estimated_flags_follow_the_height_dependent_kinds_since_1_18() {
             kind,
             Structure::DesertPyramid | Structure::JungleTemple | Structure::Mansion
         );
-        assert!(!kind.estimated(old), "{kind:?}");
-        assert_eq!(kind.estimated(new), height_bound, "{kind:?}");
+        assert_eq!(
+            kind.estimated(old),
+            kind == Structure::AbandonedCamp,
+            "{kind:?}"
+        );
+        assert_eq!(
+            kind.estimated(new),
+            height_bound || kind == Structure::AbandonedCamp,
+            "{kind:?}"
+        );
     }
     assert!(spawn(old, 262).estimated);
-    assert!(!spawn(new, 262).estimated);
+    assert!(spawn(new, 262).estimated);
 }

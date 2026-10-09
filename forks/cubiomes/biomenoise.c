@@ -5,6 +5,9 @@
 #include "tables/btree19.h"
 #include "tables/btree20.h"
 #include "tables/btree21wd.h"
+#include "tables/btree215.h"
+#include "tables/btree26_2.h"
+#include "tables/btree26_3.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -1388,6 +1391,24 @@ static
 int get_resulting_node(const uint64_t np[6], const BiomeTree *bt, int idx,
     int alt, uint64_t ds, int depth)
 {
+    if (bt->ends)
+    {
+        uint64_t node = bt->nodes[idx];
+        if ((node >> 56) == 0xff)
+            return idx;
+        int leaf = alt;
+        for (uint32_t inner = node >> 48; inner < bt->ends[idx]; inner = bt->ends[inner])
+        {
+            uint64_t bound = get_np_dist(np, bt, inner);
+            if (bound < ds)
+            {
+                int candidate = get_resulting_node(np, bt, inner, leaf, ds, depth + 1);
+                uint64_t distance = get_np_dist(np, bt, candidate);
+                if (distance < ds) { ds = distance; leaf = candidate; }
+            }
+        }
+        return leaf;
+    }
     if (bt->steps[depth] == 0)
         return idx;
     uint32_t step;
@@ -1453,11 +1474,29 @@ int climateToBiome(int mc, const uint64_t np[6], uint64_t *dat)
         btree21wd_steps, &btree21wd_param[0][0], btree21wd_nodes, btree21wd_order,
         sizeof(btree21wd_nodes) / sizeof(uint64_t)
     };
+    static const BiomeTree btree215 = {
+        btree215_steps, &btree215_param[0][0], btree215_nodes, btree215_order,
+        sizeof(btree215_nodes) / sizeof(uint64_t), btree215_ends
+    };
+    static const BiomeTree btree26_2 = {
+        btree26_2_steps, &btree26_2_param[0][0], btree26_2_nodes, btree26_2_order,
+        sizeof(btree26_2_nodes) / sizeof(uint64_t), btree26_2_ends
+    };
+    static const BiomeTree btree26_3 = {
+        btree26_3_steps, &btree26_3_param[0][0], btree26_3_nodes, btree26_3_order,
+        sizeof(btree26_3_nodes) / sizeof(uint64_t), btree26_3_ends
+    };
 
     const BiomeTree *bt;
     int idx;
 
-    if (mc >= MC_1_21_WD)
+    if (mc >= MC_26_3)
+        bt = &btree26_3;
+    else if (mc >= MC_26_2)
+        bt = &btree26_2;
+    else if (mc >= MC_1_21_5)
+        bt = &btree215;
+    else if (mc >= MC_1_21_WD)
         bt = &btree21wd;
     else if (mc >= MC_1_20_6)
         bt = &btree20;
@@ -1468,7 +1507,7 @@ int climateToBiome(int mc, const uint64_t np[6], uint64_t *dat)
     else
         bt = &btree18;
 
-    if (dat)
+    if (dat && (*dat != 0 || mc < MC_1_21_5))
     {
         int alt = (int) *dat;
         uint64_t ds = get_np_dist(np, bt, alt);
@@ -1478,6 +1517,7 @@ int climateToBiome(int mc, const uint64_t np[6], uint64_t *dat)
     else
     {
         idx = get_resulting_node(np, bt, 0, 0, -1, 0);
+        if (dat) *dat = (uint64_t) idx;
     }
 
     return (bt->nodes[idx] >> 48) & 0xFF;

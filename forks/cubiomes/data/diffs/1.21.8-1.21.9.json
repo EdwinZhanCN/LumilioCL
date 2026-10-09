@@ -1,0 +1,18 @@
+{
+  "changed": [
+    "data/minecraft/tags/worldgen/biome/stronghold_biased_to.json",
+    "data/minecraft/worldgen/biome/mushroom_fields.json",
+    "data/minecraft/worldgen/noise_settings/amplified.json",
+    "data/minecraft/worldgen/noise_settings/caves.json",
+    "data/minecraft/worldgen/noise_settings/end.json",
+    "data/minecraft/worldgen/noise_settings/floating_islands.json",
+    "data/minecraft/worldgen/noise_settings/large_biomes.json",
+    "data/minecraft/worldgen/noise_settings/nether.json",
+    "data/minecraft/worldgen/noise_settings/overworld.json",
+    "data/minecraft/worldgen/placed_feature/trees_mangrove.json"
+  ],
+  "new": "1.21.9",
+  "new_sha1": "b2577f52223dee1d5b9ba1716475a98ae023fd8f",
+  "old": "1.21.8",
+  "old_sha1": "dfab25f1ae7287c10dea4efad8797a680d4286ab"
+}

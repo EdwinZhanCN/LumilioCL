@@ -85,6 +85,8 @@ int getStructureConfig(int structureType, int mc, StructureConfig *sconf)
     s_ancient_city          = { 20083232, 24, 16, Ancient_City,     0,0},
     s_trail_ruins           = { 83469867, 34, 26, Trail_Ruins,      0,0},
     s_trial_chambers        = { 94251327, 34, 22, Trial_Chambers,   0,0},
+    // Mojang 26.3 structure_set/abandoned_camp.json, see data/26.3/SOURCE.md.
+    s_abandoned_camp        = { 91231127, 37, 29, Abandoned_Camp,   0,0},
     s_treasure              = { 10387320,  1,  1, Treasure,         0,0},
     s_mineshaft             = {        0,  1,  1, Mineshaft,        0,0},
     s_desert_well_115       = {    30010,  1,  1, Desert_Well,      0, 1.f/1000},
@@ -193,6 +195,9 @@ int getStructureConfig(int structureType, int mc, StructureConfig *sconf)
     case Trial_Chambers:
         *sconf = s_trial_chambers;
         return mc >= MC_1_21_1;
+    case Abandoned_Camp:
+        *sconf = s_abandoned_camp;
+        return mc >= MC_26_3;
     default:
         memset(sconf, 0, sizeof(StructureConfig));
         return 0;
@@ -236,6 +241,7 @@ int getStructurePos(int structureType, int mc, uint64_t seed, int regX, int regZ
     case Ancient_City:
     case Trail_Ruins:
     case Trial_Chambers:
+    case Abandoned_Camp:
         *pos = getFeaturePos(sconf, seed, regX, regZ);
         return 1;
 
@@ -825,7 +831,12 @@ int isStrongholdBiome(int mc, int id)
         return mc <= MC_1_15 || mc >= MC_1_18;
     case mangrove_swamp:
     case deep_dark:
+    case dappled_forest:
         return 0;
+    case cherry_grove:
+        // Added to stronghold_biased_to in 1.21.9. Preserve the baseline
+        // behaviour of earlier imported releases; new releases use the tag.
+        return mc < MC_1_21_5 || mc >= MC_1_21_9;
     default:
         return 1;
     }
@@ -1233,6 +1244,19 @@ int isViableFeatureBiome(int mc, int structureType, int biomeID)
         if (mc <= MC_1_20) return 0;
         return biomeID != deep_dark && isOverworld(mc, biomeID);
 
+    case Abandoned_Camp:
+        if (mc < MC_26_3) return 0;
+        switch (biomeID) {
+        case bamboo_jungle: case birch_forest: case cherry_grove:
+        case dappled_forest: case flower_forest: case forest: case meadow:
+        case old_growth_birch_forest: case old_growth_pine_taiga:
+        case old_growth_spruce_taiga: case pale_garden: case savanna:
+        case snowy_taiga: case sparse_jungle: case swamp: case taiga:
+        case windswept_forest: case wooded_badlands:
+            return 1;
+        default: return 0;
+        }
+
     case Treasure:
         if (mc <= MC_1_12) return 0;
         return biomeID == beach || biomeID == snowy_beach;
@@ -1282,7 +1306,8 @@ int isViableFeatureBiome(int mc, int structureType, int biomeID)
 
     case Mansion:
         if (mc <= MC_1_10) return 0;
-        return biomeID == dark_forest || biomeID == dark_forest_hills;
+        return biomeID == dark_forest || biomeID == dark_forest_hills ||
+            (mc >= MC_1_21_5 && biomeID == pale_garden);
 
     case Fortress:
         return (biomeID == nether_wastes || biomeID == soul_sand_valley ||
@@ -1787,6 +1812,15 @@ L_jigsaw:
         goto L_viable;
 
     case Mineshaft:
+        goto L_viable;
+
+    case Abandoned_Camp:
+        if (g->mc < MC_26_3) goto L_not_viable;
+        // Surface-projected jigsaws need terrain height and their randomly
+        // selected template's centre. This is a biome estimate; the Rust API
+        // marks every camp approximate, like other height-bound structures.
+        id = getBiomeAt(g, 4, chunkX * 4 + 2, 16, chunkZ * 4 + 2);
+        if (!isViableFeatureBiome(g->mc, structureType, id)) goto L_not_viable;
         goto L_viable;
 
     default:

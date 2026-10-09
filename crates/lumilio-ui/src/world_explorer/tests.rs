@@ -205,7 +205,7 @@ fn inline_seed_enter_and_blur_apply_without_map_stealing_typing(cx: &mut TestApp
     view.read_with(cx, |view, _| {
         assert!(view.form.as_ref().unwrap().submitted.is_some())
     });
-    assert_eq!(next_seed(&commands), (-262, "1.21.4".into()));
+    assert_eq!(next_seed(&commands), (-262, "26.3".into()));
     let input = view.read_with(cx, |view, _| view.form.as_ref().unwrap().seed.clone());
     cx.update(|window, cx| input.update(cx, |input, cx| input.set_value("", window, cx)));
     cx.simulate_input("hello");
@@ -231,15 +231,15 @@ fn inline_seed_enter_and_blur_apply_without_map_stealing_typing(cx: &mut TestApp
             assert!(!form.seed_dirty, "blur must apply the draft");
         })
     });
-    assert_eq!(next_seed(&commands), (99_162_322, "1.21.4".into()));
+    assert_eq!(next_seed(&commands), (99_162_322, "26.3".into()));
     assert!(cx.debug_bounds("map-seed-error").is_none());
     let context = WorldContext {
         world: WorldId::Seed {
             seed: 99_162_322,
-            version: "1.21.4".into(),
+            version: "26.3".into(),
         },
         seed: Some(99_162_322),
-        version: Some("1.21.4".into()),
+        version: Some("26.3".into()),
         data_version: None,
         dimension: Dimension::Overworld,
         sources: vec![],
@@ -340,7 +340,7 @@ fn searchable_world_and_version_selects_follow_supported_defaults(cx: &mut TestA
                 .read(cx)
                 .selected_value()
                 .map(String::as_str),
-            Some("1.21.4")
+            Some("26.3")
         );
     });
     click(cx, "map-version-select");

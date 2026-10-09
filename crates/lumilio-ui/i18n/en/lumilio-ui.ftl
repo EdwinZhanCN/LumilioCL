@@ -1611,6 +1611,7 @@ map-structure-ruined-portal = Ruined portal
 map-structure-ancient-city = Ancient city
 map-structure-trail-ruins = Trail ruins
 map-structure-trial-chambers = Trial chambers
+map-structure-abandoned-camp = Abandoned camp
 map-structure-stronghold = Stronghold
 map-structure-fortress = Nether fortress
 map-structure-bastion = Bastion remnant

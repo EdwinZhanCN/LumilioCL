@@ -14,6 +14,19 @@ int lumilio_cubiomes_probe(void)
     return getBiomeAt(&g, 1, 0, 64, 0);
 }
 
+/* Independent original-game goldens cover several vertical levels, while
+ * the product's 2D tiles continue to use block Y=64. Coordinates are quart. */
+int lumilio_cubiomes_sample(int mc, uint64_t seed, int dim, int x, int y, int z)
+{
+    if (mc < MC_1_0 || mc > MC_NEWEST ||
+        x < -7500000 || x > 7500000 || z < -7500000 || z > 7500000 ||
+        y < -16 || y > 80 || (dim != -1 && dim != 0 && dim != 1)) return -1;
+    Generator g;
+    setupGenerator(&g, mc, 0);
+    applySeed(&g, dim, seed);
+    return getBiomeAt(&g, 4, x, y, z);
+}
+
 /* Rows per genBiomes call. The generator is seeded once; the cancellation
  * hook is polled between bands so a stale tile releases its worker quickly. */
 #define LUMILIO_BAND 16
@@ -51,7 +64,7 @@ int lumilio_cubiomes_generate(int mc, uint64_t seed, int dim,
 static const int KINDS[] = {
     Desert_Pyramid, Jungle_Pyramid, Swamp_Hut, Igloo, Village, Ocean_Ruin,
     Shipwreck, Monument, Mansion, Outpost, Ruined_Portal, Ancient_City,
-    Trail_Ruins, Trial_Chambers, Fortress, Bastion, End_City,
+    Trail_Ruins, Trial_Chambers, Fortress, Bastion, End_City, Abandoned_Camp,
 };
 #define KIND_COUNT ((int)(sizeof(KINDS) / sizeof(KINDS[0])))
 
@@ -70,6 +83,27 @@ int lumilio_cubiomes_structure_available(int mc, int dim, int kind)
     int type;
     StructureConfig sc;
     return kind_config(mc, dim, kind, &type, &sc);
+}
+
+/* Oracle tests compare the unfiltered regional placement, including candidates
+ * outside an allowed biome. Product queries apply viability afterwards. */
+int lumilio_cubiomes_placement(int mc, uint64_t seed, int kind, int rx, int rz, int *out)
+{
+    if (kind < 0 || kind >= KIND_COUNT || rx < -100 || rx > 100 || rz < -100 || rz > 100) return 1;
+    StructureConfig sc;
+    int type = KINDS[kind];
+    if (!getStructureConfig(type, mc, &sc)) return 1;
+    Pos p = (type == Monument || type == Mansion || type == End_City)
+        ? getLargeStructurePos(sc, seed, rx, rz) : getFeaturePos(sc, seed, rx, rz);
+    out[0] = p.x; out[1] = p.z;
+    return 0;
+}
+
+int lumilio_cubiomes_biome_rule(int mc, int rule, int biome)
+{
+    if (rule == -1) return isStrongholdBiome(mc, biome);
+    if (rule < 0 || rule >= KIND_COUNT) return 0;
+    return isViableFeatureBiome(mc, KINDS[rule], biome);
 }
 
 static int floor_div(int a, int b)
