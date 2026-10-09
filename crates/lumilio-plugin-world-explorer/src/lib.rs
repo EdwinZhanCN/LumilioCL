@@ -10,6 +10,9 @@ use lumilio_plugin_api::{
 };
 
 mod landmarks;
+// Read by the save base map provider, which comes next (T29).
+#[allow(dead_code)]
+mod save;
 mod structures;
 mod text;
 mod xaero;
