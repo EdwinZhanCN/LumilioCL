@@ -39,9 +39,14 @@ pub struct Region<S> {
 }
 
 impl<S: Source> Region<S> {
-    /// Reads the 8 KiB header. A file shorter than that is not a region.
+    /// Reads the 8 KiB header. An empty file is a region with no chunks (the
+    /// game leaves those behind); any other file shorter than the header is
+    /// not a region.
     pub fn open(source: S, region_x: i32, region_z: i32) -> Result<Self, Error> {
-        let header = source.read(0, HEADER)?;
+        let mut header = source.read(0, HEADER)?;
+        if header.is_empty() {
+            header = vec![0; HEADER];
+        }
         if header.len() < HEADER {
             return Err(Error::Format("region header is truncated"));
         }
@@ -148,4 +153,12 @@ fn decompress(kind: u8, packed: &[u8]) -> Result<Vec<u8>, Error> {
         4 => lz4::decode(packed, MAX_CHUNK),
         other => Err(Error::Compression(other)),
     }
+}
+
+/// The region coordinates in a region file name, `r.<x>.<z>.mca`.
+pub fn region_coords(name: &str) -> Option<(i32, i32)> {
+    let mut parts = name.strip_prefix("r.")?.strip_suffix(".mca")?.split('.');
+    let x = parts.next()?.parse().ok()?;
+    let z = parts.next()?.parse().ok()?;
+    parts.next().is_none().then_some((x, z))
 }

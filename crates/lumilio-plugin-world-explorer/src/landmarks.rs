@@ -5,7 +5,7 @@ use lumilio_cubiomes::Version;
 use lumilio_plugin_api::PluginError;
 use lumilio_plugin_api::map::{
     Dimension, MapBounds, MapIcon, MapObject, MapObjectKind, MapPoint, OverlayInfo, OverlayRequest,
-    WorldContext,
+    WorldContext, WorldId,
 };
 use std::sync::Mutex;
 
@@ -26,13 +26,19 @@ pub(crate) fn catalog() -> Vec<OverlayInfo> {
 }
 
 /// The landmark layers a world offers: the Overworld of a world with a seed.
+/// A save has its actual spawn in `level.dat` (the 「存档位置」 layer), so the
+/// seed's spawn is not offered for it.
 pub(crate) fn catalog_for(context: &WorldContext) -> Vec<OverlayInfo> {
     let (Ok(version), Dimension::Overworld, Some(_)) =
         (world_version(context), &context.dimension, context.seed)
     else {
         return vec![];
     };
-    layers(lumilio_cubiomes::spawn(version, 0).estimated)
+    let mut layers = layers(lumilio_cubiomes::spawn(version, 0).estimated);
+    if matches!(context.world, WorldId::Save { .. }) {
+        layers.retain(|layer| layer.id != SPAWN);
+    }
+    layers
 }
 
 fn layers(spawn_estimated: bool) -> Vec<OverlayInfo> {

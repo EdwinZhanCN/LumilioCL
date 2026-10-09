@@ -368,7 +368,80 @@ mod block_colors {
                 "assets/minecraft/textures/block/lava_still.png",
                 png(16, 16, |_, _| [220, 100, 20, 255]),
             ),
+            // A fixed tint is multiplied in rather than flagged.
+            (
+                "assets/minecraft/blockstates/birch_leaves.json",
+                text(r#"{"variants":{"":{"model":"block/leaves"}}}"#),
+            ),
+            (
+                "version.json",
+                text(r#"{"id":"1.21.4","world_version":4189}"#),
+            ),
+            // Colormaps: red grows across (temperature), green down (downfall).
+            (
+                "assets/minecraft/textures/colormap/grass.png",
+                png(256, 256, |x, y| [x as u8, y as u8, 0, 255]),
+            ),
+            (
+                "assets/minecraft/textures/colormap/foliage.png",
+                png(256, 256, |x, y| [0, x as u8, y as u8, 255]),
+            ),
+            (
+                "data/minecraft/worldgen/biome/plains.json",
+                text(r#"{"temperature":0.8,"downfall":0.4,"effects":{"water_color":4159204}}"#),
+            ),
+            // 26.x writes colours as strings.
+            (
+                "data/minecraft/worldgen/biome/badlands.json",
+                text(
+                    r##"{"temperature":2.0,"downfall":0.0,"effects":{"grass_color":"#90814d","foliage_color":"#9e814d","water_color":"#3f76e4"}}"##,
+                ),
+            ),
+            (
+                "data/minecraft/worldgen/biome/swamp.json",
+                text(
+                    r#"{"temperature":0.8,"downfall":0.9,"effects":{"grass_color_modifier":"swamp","water_color":6388580}}"#,
+                ),
+            ),
+            (
+                "data/minecraft/worldgen/biome/dark_forest.json",
+                text(
+                    r#"{"temperature":0.7,"downfall":0.8,"effects":{"grass_color_modifier":"dark_forest"}}"#,
+                ),
+            ),
+            (
+                "data/minecraft/worldgen/biome/broken.json",
+                text(r#"{"effects":{}}"#),
+            ),
         ])
+    }
+
+    #[test]
+    fn biomes_take_their_own_colours_or_their_colormap_spot() {
+        let biomes = build_biomes(&mut sample());
+        // Plains: temperature 0.8 → x (1 - 0.8) × 255, which truncates to 50
+        // in floating point as it does in the game; downfall 0.4 × 0.8 → y 173.
+        assert_eq!(
+            biomes["minecraft:plains"],
+            [50 << 16 | 173 << 8, 50 << 8 | 173, 0x3f76e4]
+        );
+        assert_eq!(biomes["minecraft:badlands"], [0x90814d, 0x9e814d, 0x3f76e4]);
+        assert_eq!(biomes["minecraft:swamp"][0], 0x6a7039);
+        assert_eq!(biomes["minecraft:swamp"][2], 6388580);
+        // Dark forest: x 76, y 112 → 0x4c7000, darkened.
+        assert_eq!(
+            biomes["minecraft:dark_forest"][0],
+            ((0x4c7000 & 0xfefefe) + 0x28340a) >> 1
+        );
+        assert_eq!(
+            biomes["minecraft:dark_forest"][2], 0x3f76e4,
+            "default water"
+        );
+        assert!(!biomes.contains_key("minecraft:broken"));
+        assert!(
+            build_biomes(&mut jar(&[])).is_empty(),
+            "no colormaps, no biomes"
+        );
     }
 
     #[test]
@@ -387,6 +460,11 @@ mod block_colors {
             "first frame of the strip"
         );
         assert_eq!(table["minecraft:oak_leaves"], [90, 90, 90, TINT_FOLIAGE]);
+        assert_eq!(
+            table["minecraft:birch_leaves"],
+            [45, 58, 30, 0],
+            "90 × the birch colour 0x80a755"
+        );
         assert_eq!(table["minecraft:water"], [60, 90, 200, TINT_WATER]);
         assert_eq!(table["minecraft:lava"], [220, 100, 20, 0]);
         let grass = table["minecraft:short_grass"];
@@ -403,20 +481,30 @@ mod block_colors {
         for left_out in ["minecraft:ghost", "minecraft:bad", "minecraft:empty"] {
             assert!(!table.contains_key(left_out), "{left_out}");
         }
-        assert_eq!(table.len(), 8);
+        assert_eq!(table.len(), 9);
+        assert_eq!(data_version(&mut sample()), Some(4189));
+        assert_eq!(data_version(&mut jar(&[])), None);
     }
 
     #[test]
     fn the_table_renders_the_same_way_every_time() {
         let table = build_table(&mut sample());
-        let first = render(&table);
-        assert_eq!(first, render(&build_table(&mut sample())));
+        let biomes = build_biomes(&mut sample());
+        let first = render(&table, &biomes, "1.21.4", 4189);
+        assert_eq!(
+            first,
+            render(&build_table(&mut sample()), &biomes, "1.21.4", 4189)
+        );
         assert!(first.contains("    \"minecraft:stone\": [100, 120, 140, 0],\n"));
         let parsed: serde_json::Value = serde_json::from_str(&first).unwrap();
         assert_eq!(parsed["blocks"]["minecraft:water"][3], TINT_WATER);
+        assert_eq!(parsed["version"], "1.21.4");
+        assert_eq!(parsed["data_version"], 4189);
+        assert_eq!(parsed["biomes"]["minecraft:swamp"][0], 0x6a7039);
         assert!(first.ends_with("  }\n}\n"));
         assert!(!first.contains(",\n  }"), "no trailing comma");
-        let names: Vec<&str> = first
+        let blocks = first.split("\"biomes\"").next().unwrap();
+        let names: Vec<&str> = blocks
             .lines()
             .filter_map(|line| line.trim().split('"').nth(1))
             .filter(|n| n.starts_with("minecraft:"))

@@ -258,3 +258,91 @@ mod xaero {
         }
     }
 }
+
+mod composing {
+    use crate::world_map::compose;
+    use lumilio_plugin_api::ImageData;
+    use lumilio_plugin_api::map::TileReply;
+
+    fn flat(rgb: [u8; 3]) -> TileReply {
+        TileReply::Image(ImageData {
+            width: 256,
+            height: 256,
+            rgba: [rgb[0], rgb[1], rgb[2], 255].repeat(256 * 256),
+        })
+    }
+
+    fn pixel(reply: &TileReply, x: usize, y: usize) -> ([u8; 4], u8) {
+        let (image, covered) = match reply {
+            TileReply::Image(image) => (image, 255),
+            TileReply::Partial {
+                image, coverage, ..
+            } => (image, coverage[y * 256 + x]),
+            TileReply::Empty => panic!("empty"),
+        };
+        let at = (y * 256 + x) * 4;
+        (image.rgba[at..at + 4].try_into().unwrap(), covered)
+    }
+
+    #[test]
+    fn children_shrink_into_their_quarter_cells() {
+        let mut children = vec![TileReply::Empty; 16];
+        children[0] = flat([200, 0, 0]);
+        // Child (x 1, z 2): a left half of blue, a right half of no data.
+        let mut coverage = vec![0u8; 256 * 256];
+        for y in 0..256 {
+            coverage[y * 256..y * 256 + 128].fill(255);
+        }
+        children[2 * 4 + 1] = TileReply::Partial {
+            image: ImageData {
+                width: 256,
+                height: 256,
+                rgba: [0, 0, 200, 255].repeat(256 * 256),
+            },
+            coverage,
+            unknown: vec!["mod:b".into(), "mod:a".into()],
+        };
+        let parent = compose(&children);
+        assert_eq!(pixel(&parent, 0, 0), ([200, 0, 0, 255], 255));
+        assert_eq!(pixel(&parent, 63, 63), ([200, 0, 0, 255], 255));
+        assert_eq!(pixel(&parent, 64, 0).1, 0, "an empty child is no data");
+        assert_eq!(pixel(&parent, 64, 128), ([0, 0, 200, 255], 255));
+        assert_eq!(pixel(&parent, 64 + 31, 128).1, 255);
+        assert_eq!(pixel(&parent, 64 + 32, 128).1, 0);
+        let TileReply::Partial { unknown, .. } = parent else {
+            panic!("partly covered");
+        };
+        assert_eq!(unknown, ["mod:a", "mod:b"]);
+    }
+
+    #[test]
+    fn a_partly_covered_cell_takes_the_mean_of_what_it_has() {
+        let mut coverage = vec![0u8; 256 * 256];
+        let mut rgba = vec![0u8; 256 * 256 * 4];
+        // In the first 4×4 cell: two pixels, one 100 and one 200 red.
+        coverage[0] = 255;
+        coverage[1] = 255;
+        rgba[0] = 100;
+        rgba[4] = 200;
+        let mut children = vec![TileReply::Empty; 16];
+        children[0] = TileReply::Partial {
+            image: ImageData {
+                width: 256,
+                height: 256,
+                rgba,
+            },
+            coverage,
+            unknown: vec![],
+        };
+        assert!(compose(&children).is_valid());
+        assert_eq!(pixel(&compose(&children), 0, 0), ([150, 0, 0, 255], 255));
+    }
+
+    #[test]
+    fn nothing_anywhere_is_empty_and_everything_is_a_full_image() {
+        assert_eq!(compose(&vec![TileReply::Empty; 16]), TileReply::Empty);
+        let full = compose(&vec![flat([1, 2, 3]); 16]);
+        assert!(matches!(full, TileReply::Image(_)));
+        assert!(full.is_valid());
+    }
+}

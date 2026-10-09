@@ -19,7 +19,7 @@ impl MapView {
                     .debug_selector(|| "map-seed-input".into())
                     .child(Input::new(&form.seed).small()),
             );
-        // ia[plugin.world-explorer]: 选择种子版本 | 种子旁 · 可搜索版本下拉 | 默认世界的受支持版本，否则 1.21.4；确认后应用输入种子，不自动降级存档
+        // ia[plugin.world-explorer]: 选择种子版本 | 种子旁 · 可搜索版本下拉 | 默认世界的受支持版本，否则最新的受支持版本（26.3）；确认后应用输入种子，不自动降级存档
         let version = v_flex()
             .w(px(128.))
             .gap_1()

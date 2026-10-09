@@ -48,77 +48,25 @@ impl TileCache {
         Ok(self.root.join(format!("{digest}.tile")))
     }
     pub fn get(&self, request: &TileRequest) -> io::Result<Option<TileReply>> {
-        let path = self.path(request)?;
-        let meta = match fs::symlink_metadata(&path) {
-            Ok(meta) => meta,
-            Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(None),
-            Err(e) => return Err(e),
-        };
-        if !meta.is_file() || meta.len() > MAX_ENTRY {
+        let Some(bytes) = read_entry(&self.path(request)?, MAX_ENTRY)? else {
             return Ok(None);
-        }
-        let reply: TileReply = match serde_json::from_slice(&fs::read(&path)?) {
-            Ok(reply) => reply,
-            Err(_) => return Ok(None),
         };
-        if !reply.is_valid() {
-            return Ok(None);
-        }
-        fs::File::open(&path)?.set_modified(SystemTime::now())?;
-        Ok(Some(reply))
+        Ok(serde_json::from_slice::<TileReply>(&bytes)
+            .ok()
+            .filter(TileReply::is_valid))
     }
     pub fn put(&self, request: &TileRequest, reply: &TileReply) -> io::Result<()> {
         if !reply.is_valid() {
             return Err(io_error("invalid cache tile"));
         }
-        fs::create_dir_all(&self.root)?;
         let bytes = serde_json::to_vec(reply).map_err(io_error)?;
-        if bytes.len() as u64 > MAX_ENTRY {
-            return Err(io_error("cache tile too large"));
-        }
-        let staging = self.root.join(format!(
-            ".{}-{}.part",
-            std::process::id(),
-            NEXT.fetch_add(1, Ordering::Relaxed)
-        ));
-        let result = (|| {
-            let mut file = fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&staging)?;
-            file.write_all(&bytes)?;
-            file.sync_all()?;
-            fs::rename(&staging, self.path(request)?)?;
-            self.evict()
-        })();
-        if result.is_err() {
-            let _ = fs::remove_file(staging);
-        }
-        result
-    }
-    fn evict(&self) -> io::Result<()> {
-        let mut entries = Vec::new();
-        let mut size = 0;
-        for entry in fs::read_dir(&self.root)? {
-            let entry = entry?;
-            if entry.path().extension().is_none_or(|ext| ext != "tile")
-                || !entry.file_type()?.is_file()
-            {
-                continue;
-            }
-            let meta = entry.metadata()?;
-            size += meta.len();
-            entries.push((meta.modified()?, entry.path(), meta.len()));
-        }
-        entries.sort();
-        for (_, path, len) in entries {
-            if size <= self.limit {
-                break;
-            }
-            fs::remove_file(path)?;
-            size -= len;
-        }
-        Ok(())
+        write_entry(
+            &self.root,
+            self.limit,
+            &self.path(request)?,
+            &bytes,
+            MAX_ENTRY,
+        )
     }
     pub fn clear(root: &Path) -> io::Result<()> {
         match fs::symlink_metadata(root) {
@@ -128,4 +76,78 @@ impl TileCache {
             Ok(_) => fs::remove_dir_all(root),
         }
     }
+}
+
+/// The bytes of a cache entry no larger than `max`, marking it used; `None`
+/// when there is none.
+pub(super) fn read_entry(path: &Path, max: u64) -> io::Result<Option<Vec<u8>>> {
+    let meta = match fs::symlink_metadata(path) {
+        Ok(meta) => meta,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(e),
+    };
+    if !meta.is_file() || meta.len() > max {
+        return Ok(None);
+    }
+    let bytes = fs::read(path)?;
+    fs::File::open(path)?.set_modified(SystemTime::now())?;
+    Ok(Some(bytes))
+}
+
+/// Writes an entry whole (a staging file renamed into place), then drops the
+/// least recently used entries until `root` is within `limit`.
+pub(super) fn write_entry(
+    root: &Path,
+    limit: u64,
+    path: &Path,
+    bytes: &[u8],
+    max: u64,
+) -> io::Result<()> {
+    if bytes.len() as u64 > max {
+        return Err(io_error("cache tile too large"));
+    }
+    fs::create_dir_all(root)?;
+    let staging = root.join(format!(
+        ".{}-{}.part",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    ));
+    let result = (|| {
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&staging)?;
+        file.write_all(bytes)?;
+        file.sync_all()?;
+        fs::rename(&staging, path)?;
+        evict(root, limit)
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(staging);
+    }
+    result
+}
+
+fn evict(root: &Path, limit: u64) -> io::Result<()> {
+    let mut entries = Vec::new();
+    let mut size = 0;
+    for entry in fs::read_dir(root)? {
+        let entry = entry?;
+        if entry.path().extension().is_none_or(|ext| ext != "tile") || !entry.file_type()?.is_file()
+        {
+            continue;
+        }
+        let meta = entry.metadata()?;
+        size += meta.len();
+        entries.push((meta.modified()?, entry.path(), meta.len()));
+    }
+    entries.sort();
+    for (_, path, len) in entries {
+        if size <= limit {
+            break;
+        }
+        fs::remove_file(path)?;
+        size -= len;
+    }
+    Ok(())
 }

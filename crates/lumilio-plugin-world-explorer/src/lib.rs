@@ -10,6 +10,7 @@ use lumilio_plugin_api::{
 };
 
 mod landmarks;
+mod save;
 mod structures;
 mod text;
 mod xaero;
@@ -56,12 +57,14 @@ impl OverlayProvider for WorldExplorer {
     fn overlays(&self) -> Vec<OverlayInfo> {
         let mut layers = structures::catalog();
         layers.extend(landmarks::catalog());
+        layers.extend(save::positions::catalog());
         layers.extend(xaero::overlay::catalog());
         layers
     }
     fn overlays_for(&self, context: &WorldContext) -> Vec<OverlayInfo> {
         let mut layers = structures::catalog_for(context);
         layers.extend(landmarks::catalog_for(context));
+        layers.extend(save::positions::catalog_for(context));
         layers.extend(xaero::overlay::catalog_for(context));
         layers
     }
@@ -73,7 +76,9 @@ impl OverlayProvider for WorldExplorer {
         ctx: &dyn HostContext,
         request: &OverlayRequest,
     ) -> Result<Vec<MapObject>, PluginError> {
-        if landmarks::is_landmark(&request.overlay) {
+        if save::positions::is_layer(&request.overlay) {
+            save::positions::objects(ctx, request)
+        } else if landmarks::is_landmark(&request.overlay) {
             landmarks::objects(request)
         } else if xaero::overlay::is_layer(&request.overlay) {
             xaero::overlay::objects(ctx, request)
@@ -104,14 +109,36 @@ impl InstanceTab for WorldExplorer {
 }
 impl BaseMapProvider for WorldExplorer {
     fn base_maps(&self) -> Vec<BaseMapInfo> {
-        vec![BaseMapInfo {
-            id: "seed".into(),
-            kind_id: "map-base-seed".into(),
-            dimensions: vec![Dimension::Overworld, Dimension::Nether, Dimension::End],
-            levels: vec![0, 1, 2, 3, 4],
-        }]
+        vec![
+            BaseMapInfo {
+                id: "seed".into(),
+                kind_id: "map-base-seed".into(),
+                dimensions: vec![Dimension::Overworld, Dimension::Nether, Dimension::End],
+                levels: vec![0, 1, 2, 3, 4],
+            },
+            save::info(),
+        ]
+    }
+    fn sources(
+        &self,
+        ctx: &dyn HostContext,
+        request: &TileRequest,
+    ) -> Result<Option<Vec<String>>, PluginError> {
+        if request.key.base_map == save::BASE {
+            save::sources(ctx, request)
+        } else {
+            Ok(None)
+        }
     }
     fn tile(&self, ctx: &dyn HostContext, request: &TileRequest) -> Result<TileReply, PluginError> {
+        if request.key.base_map == save::BASE
+            && request.key.provider == ID
+            && request.pixels == TILE_PIXELS
+            && request.context.world == request.key.world
+            && request.context.dimension == request.key.dimension
+        {
+            return save::tile(ctx, request);
+        }
         if request.key.base_map != "seed"
             || request.key.provider != ID
             || request.pixels != TILE_PIXELS

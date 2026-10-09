@@ -4586,8 +4586,11 @@ dependencies = [
 name = "lumilio-plugin-world-explorer"
 version = "0.1.0"
 dependencies = [
+ "lumilio-anvil",
  "lumilio-cubiomes",
+ "lumilio-nbt",
  "lumilio-plugin-api",
+ "serde_json",
 ]
 
 [[package]]

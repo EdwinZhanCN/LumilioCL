@@ -46,6 +46,18 @@ pub(super) enum PluginPage {
 pub(super) type PluginPages = HashMap<String, PluginPage>;
 
 impl InstanceDetailView {
+    /// The game ended and may have written its saves: open maps look at the
+    /// world's files again.
+    pub(super) fn maps_files_changed(&mut self, cx: &mut Context<Self>) {
+        for page in self.plugin_pages.values() {
+            if let PluginPage::Shown(_, _, _, maps) = page {
+                for map in maps {
+                    map.update(cx, |map, cx| map.files_changed(cx));
+                }
+            }
+        }
+    }
+
     /// Which plugin tabs show for this game. A tab that went away while open
     /// returns the page to a built-in tab.
     pub fn plugin_tabs_arrived(&mut self, tabs: Vec<PluginTab>, cx: &mut Context<Self>) {

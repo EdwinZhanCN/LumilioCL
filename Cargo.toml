@@ -49,6 +49,7 @@ lumilio-plugin-litematica = { path = "crates/lumilio-plugin-litematica" }
 lumilio-plugin-modrinth = { path = "crates/lumilio-plugin-modrinth" }
 lumilio-plugin-discord = { path = "crates/lumilio-plugin-discord" }
 lumilio-nbt = { path = "crates/lumilio-nbt" }
+lumilio-anvil = { path = "crates/lumilio-anvil" }
 lumilio-schematic-render = { path = "crates/lumilio-schematic-render" }
 lumilio-skin-render = { path = "crates/lumilio-skin-render" }
 lumilio-pointer = { path = "crates/lumilio-pointer" }

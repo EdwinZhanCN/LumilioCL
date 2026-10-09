@@ -81,6 +81,33 @@ SOFTWARE.
 
 # Map code adapted from other projects
 
+## fastanvil — MIT License
+
+The region layout and the packed block-state unpacking in
+`crates/lumilio-anvil/`, and the height shading of the save map in
+`crates/lumilio-plugin-world-explorer/src/save/render.rs`, are adapted from
+[owengage/fastnbt](https://github.com/owengage/fastnbt) at
+`986c8594aad0e9dbbe6124d2b0e60506e2125fbd`
+(`fastanvil/src/{region.rs,render.rs,java/section_data.rs}`; the crate declares
+`MIT OR Apache-2.0`, and we take it under MIT).
+
+Copyright (c) 2020 Owen Gage
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+associated documentation files (the "Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the
+following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial
+portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT
+LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO
+EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+USE OR OTHER DEALINGS IN THE SOFTWARE.
+
 ## XaeroTools — MIT License
 
 The Xaero Minimap file naming and waypoint field parsing in

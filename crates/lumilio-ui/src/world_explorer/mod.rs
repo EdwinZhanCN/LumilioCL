@@ -29,7 +29,7 @@ use lumilio_core::{CancellationToken, MapFailure, MapProviders};
 use lumilio_map_render::{Grid, Sprite, Tile};
 use lumilio_plugin_api::map::{
     MapObject, MapObjectKind, MapPoint, OverlayInfo, OverlayRequest, TileKey, TileReply,
-    TileRequest, WorldContext,
+    TileRequest, WorldContext, WorldId,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
@@ -112,6 +112,7 @@ const TILE_CAP: usize = 512;
 const STAND_INS: usize = 192;
 /// Structure layers shown before the user chooses any.
 const DEFAULT_LAYERS: &[&str] = &[
+    "save.positions",
     "structure.village",
     "structure.stronghold",
     "structure.fortress",
@@ -128,6 +129,8 @@ const ICON: u32 = 28;
 /// provider answered as empty; it is drawn as the empty-tile pattern.
 struct Loaded {
     rgba: Option<Arc<[u8]>>,
+    /// Blocks the provider had no colour for in this tile.
+    unknown: Vec<String>,
     /// Names the texture on the render thread; a retried tile gets a new one.
     revision: u64,
     used: u64,
@@ -150,27 +153,35 @@ fn pattern(failed: bool) -> Arc<[u8]> {
         .collect()
 }
 
-/// RGBA for a reply; areas the provider has no data for show as flat grey.
-fn prepare(reply: TileReply) -> Option<Arc<[u8]>> {
+/// RGBA for a reply, and the blocks it had no colour for; areas the provider
+/// has no data for show as flat grey.
+fn prepare(reply: TileReply) -> (Option<Arc<[u8]>>, Vec<String>) {
     match reply {
-        TileReply::Image(image) => Some(image.rgba.into()),
-        TileReply::Partial { image, coverage } => Some(
-            image
-                .rgba
-                .as_chunks::<4>()
-                .0
-                .iter()
-                .zip(coverage)
-                .flat_map(|(pixel, covered)| {
-                    if covered > 0 {
-                        *pixel
-                    } else {
-                        [96, 96, 96, 255]
-                    }
-                })
-                .collect(),
+        TileReply::Image(image) => (Some(image.rgba.into()), Vec::new()),
+        TileReply::Partial {
+            image,
+            coverage,
+            unknown,
+        } => (
+            Some(
+                image
+                    .rgba
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
+                    .zip(coverage)
+                    .flat_map(|(pixel, covered)| {
+                        if covered > 0 {
+                            *pixel
+                        } else {
+                            [96, 96, 96, 255]
+                        }
+                    })
+                    .collect(),
+            ),
+            unknown,
         ),
-        TileReply::Empty => None,
+        TileReply::Empty => (None, Vec::new()),
     }
 }
 
@@ -197,6 +208,9 @@ pub struct MapView {
     pending_pixels: Arc<[u8]>,
     failed_pixels: Arc<[u8]>,
     visible: Vec<TileKey>,
+    /// Shown tiles to ask for again, because the files they were drawn from
+    /// may have changed; each keeps showing until its answer replaces it.
+    stale: BTreeSet<TileKey>,
     failed: BTreeMap<TileKey, MapFailure>,
     size: [u32; 2],
     bounds: Option<Bounds<Pixels>>,
@@ -278,6 +292,7 @@ impl MapView {
             pending_pixels: pattern(false),
             failed_pixels: pattern(true),
             visible: Vec::new(),
+            stale: BTreeSet::new(),
             failed: BTreeMap::new(),
             size: [0, 0],
             bounds: None,
@@ -481,14 +496,17 @@ impl MapView {
                 if !self.schedule.accept(generation, &key) {
                     return;
                 }
+                self.stale.remove(&key);
                 match result {
                     Ok(reply) => {
                         self.failed.remove(&key);
                         self.revision += 1;
+                        let (rgba, unknown) = prepare(reply);
                         self.tiles.insert(
                             key,
                             Loaded {
-                                rgba: prepare(reply),
+                                rgba,
+                                unknown,
                                 revision: self.revision,
                                 used: self.clock,
                             },
@@ -681,8 +699,23 @@ impl MapView {
             }
         }
     }
+    /// The game's files may have changed (the game just exited): the visible
+    /// tiles are asked for again, and the host redraws only those whose files
+    /// did change; tiles out of view are forgotten.
+    pub fn files_changed(&mut self, cx: &mut Context<Self>) {
+        let visible: BTreeSet<TileKey> = self.visible.iter().cloned().collect();
+        self.tiles.retain(|key, _| visible.contains(key));
+        self.stale = visible
+            .into_iter()
+            .filter(|key| self.tiles.contains_key(key))
+            .collect();
+        self.failed.clear();
+        self.dispatch();
+        cx.notify();
+    }
     fn reset_view(&mut self) {
         self.schedule.update(&[]);
+        self.stale.clear();
         self.tiles.clear();
         self.failed.clear();
         self.visible.clear();
@@ -723,6 +756,7 @@ impl MapView {
         .visible(&template);
         self.schedule.update(&visible);
         self.failed.retain(|key, _| visible.contains(key));
+        self.stale.retain(|key| visible.contains(key));
         self.visible = visible;
         self.dispatch();
         self.refresh_objects();
@@ -738,7 +772,10 @@ impl MapView {
         let wanted: Vec<TileKey> = self
             .visible
             .iter()
-            .filter(|key| !self.tiles.contains_key(key) && !self.failed.contains_key(key))
+            .filter(|key| {
+                (!self.tiles.contains_key(key) || self.stale.contains(key))
+                    && !self.failed.contains_key(key)
+            })
             .cloned()
             .collect();
         for key in wanted {
@@ -817,6 +854,76 @@ impl MapView {
                 height: self.size[1],
             });
         }
+    }
+    /// The one line of status under the map, most important first.
+    fn status_line(&self) -> Option<String> {
+        let status = if self.failed.values().any(
+            |failure| matches!(failure,MapFailure::Failed(id) if id=="map-version-unsupported"),
+        ) {
+            Some(tr!("map-version-unsupported"))
+        } else if self
+            .failed
+            .values()
+            .any(|failure| *failure == MapFailure::ProviderStopped)
+        {
+            Some(tr!("map-provider-stopped"))
+        } else if self.no_gpu {
+            Some(tr!("map-no-gpu"))
+        } else if self.base_kind() == Some("map-base-seed")
+            && self
+                .context
+                .as_ref()
+                .is_none_or(|context| context.seed.is_none())
+        {
+            Some(tr!("map-seed-needed"))
+        } else if self.base_kind() == Some("map-base-save")
+            && self
+                .context
+                .as_ref()
+                .is_none_or(|context| !matches!(context.world, WorldId::Save { .. }))
+        {
+            Some(tr!("map-save-needed"))
+        } else if self.objects.failed_with("map-xaero-unreadable") {
+            Some(tr!("map-xaero-unreadable"))
+        } else if self.objects.failed_with("map-save-unreadable")
+            || self.failed.values().any(
+                |failure| matches!(failure, MapFailure::Failed(id) if id == "map-save-unreadable"),
+            )
+        {
+            Some(tr!("map-save-unreadable"))
+        } else if self.error.is_some() {
+            Some(tr!("map-render-failed"))
+        } else if !self.failed.is_empty() || self.objects.failed() > 0 {
+            Some(tr!("map-tile-failed"))
+        } else {
+            None
+        };
+        // ia[plugin.world-explorer]: 查看存档底图 | 底图分段 ·「存档」 | 从单人存档的 Region 文件画地表（按高度明暗、按群系着色）；没生成完的区块显示无数据；颜色表里没有的方块画成淡紫色并在状态行写明种数 | 粗缩放由宿主用细一级合成
+        let unknown = self.unknown_blocks();
+        let status = status
+            .map(|text| text.to_string())
+            .or_else(|| (unknown > 0).then(|| tr!("map-unknown-blocks", count = unknown)));
+        self.edit_error
+            .as_deref()
+            .map(edit::failure_text)
+            .or_else(|| self.placing.then(|| tr!("map-placing-hint").to_string()))
+            .or(status)
+    }
+    /// The catalog id of the chosen base map, which says what it needs.
+    fn base_kind(&self) -> Option<&str> {
+        self.providers
+            .base_maps
+            .get(self.base)
+            .map(|(_, base)| base.kind_id.as_str())
+    }
+    /// Distinct blocks the visible tiles had no colour for.
+    fn unknown_blocks(&self) -> usize {
+        self.visible
+            .iter()
+            .filter_map(|key| self.tiles.get(key))
+            .flat_map(|tile| &tile.unknown)
+            .collect::<BTreeSet<_>>()
+            .len()
     }
     fn scene_tiles(&mut self) -> Vec<Tile> {
         self.clock += 1;
@@ -962,39 +1069,7 @@ impl Render for MapView {
         )
         .absolute()
         .size_full();
-        let status = if self.failed.values().any(
-            |failure| matches!(failure,MapFailure::Failed(id) if id=="map-version-unsupported"),
-        ) {
-            Some(tr!("map-version-unsupported"))
-        } else if self
-            .failed
-            .values()
-            .any(|failure| *failure == MapFailure::ProviderStopped)
-        {
-            Some(tr!("map-provider-stopped"))
-        } else if self.no_gpu {
-            Some(tr!("map-no-gpu"))
-        } else if self
-            .context
-            .as_ref()
-            .is_none_or(|context| context.seed.is_none())
-        {
-            Some(tr!("map-seed-needed"))
-        } else if self.objects.failed_with("map-xaero-unreadable") {
-            Some(tr!("map-xaero-unreadable"))
-        } else if self.error.is_some() {
-            Some(tr!("map-render-failed"))
-        } else if !self.failed.is_empty() || self.objects.failed() > 0 {
-            Some(tr!("map-tile-failed"))
-        } else {
-            None
-        };
-        let status: Option<String> = self
-            .edit_error
-            .as_deref()
-            .map(edit::failure_text)
-            .or_else(|| self.placing.then(|| tr!("map-placing-hint").to_string()))
-            .or_else(|| status.map(|text| text.to_string()));
+        let status = self.status_line();
         // Floating panels sit over the map; pressing or wheeling on them must
         // not pan or zoom the map beneath.
         let float = || {

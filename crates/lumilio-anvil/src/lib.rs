@@ -1,5 +1,6 @@
 //! Reading Minecraft's Anvil world files: a region's chunk table, compressed
-//! chunks, the block states inside them, and the top block of each column.
+//! chunks, the block states and biomes inside them, their heightmaps, and the
+//! top block of each column.
 //!
 //! Nothing here touches the file system. A region is read through a
 //! [`Source`], which hands out byte ranges, so the caller decides where the
@@ -13,14 +14,16 @@
 //! external `.mcc` chunks are supported, and NBT comes from `lumilio-nbt`, which
 //! caps the size and depth of what it parses.
 
+mod biome;
 mod chunk;
 mod lz4;
 mod region;
 mod surface;
 
-pub use chunk::{Chunk, Section, UnsupportedVersion};
-pub use region::{ChunkLocation, Region, Source};
-pub use surface::{Column, columns};
+pub use biome::legacy_name as legacy_biome_name;
+pub use chunk::{Chunk, Heightmap, Section, UnsupportedVersion};
+pub use region::{ChunkLocation, Region, Source, region_coords};
+pub use surface::{Column, columns, columns_below};
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum Error {

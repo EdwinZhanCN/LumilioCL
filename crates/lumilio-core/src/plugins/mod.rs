@@ -12,6 +12,7 @@ mod network;
 mod tabs;
 pub use analysis::PluginFinding;
 pub use content::PluginContentSource;
+pub(crate) use map::SourceStamp;
 pub use map::{MapFailure, MapProviders};
 pub use tabs::{PluginEffect, PluginTab};
 #[cfg(test)]

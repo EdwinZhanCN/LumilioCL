@@ -1566,6 +1566,7 @@ settings-plugin-reset-failed = Couldn't restore the plugin defaults
 map-clear-cache = Clear map cache
 map-cache-cleared = Map cache cleared
 map-base-seed = Seed prediction
+map-base-save = Save
 map-overworld = Overworld
 map-nether = Nether
 map-end = End
@@ -1579,6 +1580,12 @@ map-retry-failed = { $count ->
     }
 map-version-unsupported = This version is not supported yet
 map-seed-needed = Choose a world or enter a seed.
+map-save-needed = The save map draws single-player saves only; choose a saved world.
+map-save-unreadable = A region file could not be read; it may be being written or damaged. Its area shows as no data.
+map-unknown-blocks = { $count ->
+    [one] { $count } kind of block is not in the colour table (likely from a mod) and is drawn in violet.
+   *[other] { $count } kinds of block are not in the colour table (likely from mods) and are drawn in violet.
+    }
 map-render-failed = The map could not be rendered.
 map-no-gpu = No graphics adapter is available to draw the map. Try updating the graphics driver.
 map-provider-stopped = This map source stopped after repeated errors. Restart the launcher to try again.
@@ -1618,6 +1625,9 @@ map-structure-bastion = Bastion remnant
 map-structure-end-city = End city
 map-group-world = World
 map-world-spawn = World spawn
+map-save-positions = Save positions
+map-save-spawn = World spawn (save)
+map-save-player = Player
 map-world-slime = Slime chunks
 map-fine-layers-hidden = Slime chunks show only when zoomed in to 1 block per pixel.
 map-source-seed = Seed prediction

@@ -33,7 +33,7 @@ fn bytes(icon: MapIcon) -> Option<&'static [u8]> {
         MapIcon::EndCity => icon!("end_city"),
         MapIcon::Spawn => icon!("spawn_point"),
         MapIcon::SlimeChunk => icon!("slime_chunks"),
-        MapIcon::Waypoint | MapIcon::Death | MapIcon::Marker => return None,
+        MapIcon::Waypoint | MapIcon::Death | MapIcon::Marker | MapIcon::Player => return None,
     })
 }
 
@@ -88,6 +88,7 @@ fn name(icon: MapIcon) -> &'static str {
         MapIcon::Waypoint => "waypoint",
         MapIcon::Death => "death",
         MapIcon::Marker => "marker",
+        MapIcon::Player => "player",
     }
 }
 
@@ -145,6 +146,7 @@ enum Shape {
     Disc,
     Cross,
     Diamond,
+    Ring,
 }
 
 /// Signed distance from the shape's edge at `(x, z)` from the glyph's centre:
@@ -153,6 +155,8 @@ fn distance(shape: Shape, x: f32, z: f32) -> f32 {
     match shape {
         Shape::Disc => (x * x + z * z).sqrt() - 7.5,
         Shape::Diamond => (x.abs() + z.abs()) / std::f32::consts::SQRT_2 - 7.5,
+        // A ring 3 px wide, open in the middle so the ground shows through.
+        Shape::Ring => ((x * x + z * z).sqrt() - 6.).abs() - 1.5,
         // Two diagonal strokes, each 3.6 px wide, clipped to the glyph's box.
         Shape::Cross => {
             let reach = x.abs().max(z.abs()) - 7.5;
@@ -194,7 +198,7 @@ fn glyph(shape: Shape, color: [u8; 3], name: String) -> Pixels {
 }
 
 /// The pixels for a marker drawn in `color`: a disc for a waypoint, a cross for
-/// a death point, a diamond for a custom marker. Icons with artwork ignore the
+/// a death point, a diamond for a custom marker, a ring for a player. Icons with artwork ignore the
 /// colour and come from [`pixels`].
 pub(crate) fn marker(icon: MapIcon, color: [u8; 3]) -> Arc<Pixels> {
     type Made = std::sync::Mutex<Vec<((MapIcon, [u8; 3]), Arc<Pixels>)>>;
@@ -203,6 +207,7 @@ pub(crate) fn marker(icon: MapIcon, color: [u8; 3]) -> Arc<Pixels> {
         MapIcon::Waypoint => Shape::Disc,
         MapIcon::Death => Shape::Cross,
         MapIcon::Marker => Shape::Diamond,
+        MapIcon::Player => Shape::Ring,
         _ => return pixels(icon),
     };
     let cache = CACHE.get_or_init(Default::default);

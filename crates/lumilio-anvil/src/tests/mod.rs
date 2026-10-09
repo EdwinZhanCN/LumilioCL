@@ -423,3 +423,118 @@ fn the_pre_1_18_layout_and_unsupported_formats() {
         assert_eq!(chunk.is_complete(), complete, "{status}");
     }
 }
+
+#[test]
+fn an_empty_region_file_has_no_chunks() {
+    // The game leaves zero-length `r.x.z.mca` files beside the ones it fills.
+    let empty = Region::open(
+        Memory {
+            bytes: Vec::new(),
+            external: BTreeMap::new(),
+        },
+        0,
+        0,
+    )
+    .unwrap();
+    assert_eq!(empty.chunk_count(), 0);
+    assert_eq!(empty.chunk(0, 0).unwrap(), None);
+}
+
+#[test]
+fn region_file_names() {
+    assert_eq!(region_coords("r.0.-1.mca"), Some((0, -1)));
+    assert_eq!(region_coords("r.-12.300.mca"), Some((-12, 300)));
+    for bad in [
+        "r.0.mca",
+        "r.0.0.0.mca",
+        "r.a.0.mca",
+        "c.0.0.mcc",
+        "r.0.0.mca.tmp",
+    ] {
+        assert_eq!(region_coords(bad), None, "{bad}");
+    }
+}
+
+#[test]
+fn biomes_before_1_18_are_numeric_ids() {
+    let level = |biomes: Tag| {
+        compound(vec![
+            ("DataVersion", Tag::Int(2586)),
+            (
+                "Level",
+                compound(vec![
+                    ("Biomes", biomes),
+                    (
+                        "Sections",
+                        Tag::List(vec![compound(vec![
+                            ("Y", Tag::Byte(0)),
+                            ("Palette", palette(&[STONE])),
+                        ])]),
+                    ),
+                ]),
+            ),
+        ])
+    };
+    // 1.15–1.17: 4×4×4 cells, 64 layers; the cell at y 64..68 of column x 4..8.
+    let mut cells = vec![1; 1024];
+    cells[(16 << 4) | 1] = 6;
+    let chunk = Chunk::from_nbt(&level(Tag::IntArray(cells))).unwrap();
+    assert_eq!(chunk.biome(5, 65, 0), Some("minecraft:swamp"));
+    assert_eq!(chunk.biome(5, 60, 0), Some("minecraft:plains"));
+    assert_eq!(chunk.biome(16, 60, 0), None);
+    // Before 1.15: one byte per column.
+    let mut columns = vec![2u8; 256];
+    columns[3 * 16 + 2] = 140;
+    let chunk = Chunk::from_nbt(&level(Tag::ByteArray(
+        columns.into_iter().map(|id| id as i8).collect(),
+    )))
+    .unwrap();
+    assert_eq!(chunk.biome(2, 0, 3), Some("minecraft:ice_spikes"));
+    assert_eq!(chunk.biome(0, 0, 0), Some("minecraft:desert"));
+    assert_eq!(crate::legacy_biome_name(9999), None);
+}
+
+#[test]
+fn a_heightmap_of_an_unknown_width_is_ignored() {
+    let mut chunk = modern_chunk(3955, "full", vec![]);
+    if let Tag::Compound(map) = &mut chunk {
+        map.insert(
+            "Heightmaps".into(),
+            compound(vec![("WORLD_SURFACE", Tag::LongArray(vec![0; 5]))]),
+        );
+    }
+    let chunk = Chunk::from_nbt(&chunk).unwrap();
+    assert_eq!(chunk.heightmap(Heightmap::WorldSurface), None);
+    assert_eq!(chunk.heightmap(Heightmap::MotionBlocking), None);
+}
+
+#[test]
+fn under_a_roof_the_column_shows_the_floor_below_the_first_gap() {
+    // Bedrock at 15, netherrack 12..15, air 6..12, netherrack floor up to 5.
+    let names = [AIR, "minecraft:bedrock", "minecraft:netherrack"];
+    let section = modern_section(
+        0,
+        &names,
+        |x, y, _| match y {
+            15 => 1,
+            12..=14 => 2,
+            6..=11 if x == 3 => 2,
+            6..=11 => 0,
+            _ => 2,
+        },
+        false,
+    );
+    let chunk = Chunk::from_nbt(&modern_chunk(3955, "full", vec![section])).unwrap();
+    let below = columns_below(&chunk, 15, |_| false);
+    let floor = below[0].unwrap();
+    assert_eq!((floor.block, floor.y), ("minecraft:netherrack", 5));
+    assert_eq!(below[3], None, "solid from the roof down");
+    assert_eq!(
+        columns(&chunk, |_| false)[0].unwrap().block,
+        "minecraft:bedrock"
+    );
+    // Starting inside the gap shows the floor straight away.
+    assert_eq!(columns_below(&chunk, 9, |_| false)[0].unwrap().y, 5);
+}
+
+mod samples;

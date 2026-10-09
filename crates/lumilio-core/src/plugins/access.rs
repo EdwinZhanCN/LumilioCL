@@ -223,12 +223,16 @@ pub(super) fn read_range(
     let full = resolve(game_dir, manifest, relative)?;
     let mut file =
         std::fs::File::open(&full).map_err(|error| PluginError::Unavailable(error.to_string()))?;
-    if !file
+    let meta = file
         .metadata()
-        .map_err(|error| PluginError::Unavailable(error.to_string()))?
-        .is_file()
-    {
+        .map_err(|error| PluginError::Unavailable(error.to_string()))?;
+    if !meta.is_file() {
         return Err(PluginError::InvalidInput("not a file".into()));
+    }
+    // Past the end is an empty range, however far past (a seek beyond
+    // `i64::MAX` would be an error instead).
+    if offset >= meta.len() {
+        return Ok(Vec::new());
     }
     file.seek(SeekFrom::Start(offset))
         .map_err(|error| PluginError::Unavailable(error.to_string()))?;

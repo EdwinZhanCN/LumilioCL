@@ -46,6 +46,12 @@ impl Layout {
         self.root.join("cache/world-map/seed")
     }
 
+    /// Map tiles drawn from one instance's saves; rebuilt when deleted.
+    #[must_use]
+    pub fn map_tiles(&self, instance_id: &str) -> PathBuf {
+        self.profile(instance_id).join("map-cache")
+    }
+
     /// The pre-SQLite library file, imported once and then set aside.
     #[must_use]
     pub fn legacy_library(&self) -> PathBuf {
