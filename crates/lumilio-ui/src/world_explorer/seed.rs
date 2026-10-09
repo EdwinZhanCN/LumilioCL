@@ -12,7 +12,8 @@ use lumilio_plugin_api::map::{WorldContext, WorldId};
 pub const VERSIONS: &[&str] = &[
     "1.0.0", "1.1", "1.2.5", "1.3.2", "1.4.7", "1.5.2", "1.6.4", "1.7.10", "1.8.9", "1.9.4",
     "1.10.2", "1.11.2", "1.12.2", "1.13.2", "1.14.4", "1.15.2", "1.16.1", "1.16.5", "1.17.1",
-    "1.18.2", "1.19.2", "1.19.4", "1.20.6", "1.21.1", "1.21.3", "1.21.4",
+    "1.18.2", "1.19.2", "1.19.4", "1.20.6", "1.21.1", "1.21.3", "1.21.4", "1.21.5", "1.21.6",
+    "1.21.7", "1.21.8", "1.21.9", "1.21.10", "1.21.11", "26.1", "26.1.1", "26.1.2", "26.2", "26.3",
 ];
 
 #[derive(Clone, PartialEq)]
@@ -56,7 +57,7 @@ fn default_version(context: Option<&WorldContext>) -> &'static str {
                 .copied()
                 .find(|candidate| *candidate == version)
         })
-        .unwrap_or("1.21.4")
+        .unwrap_or(VERSIONS[VERSIONS.len() - 1])
 }
 
 /// One coordinate field: a finite number inside the world border.

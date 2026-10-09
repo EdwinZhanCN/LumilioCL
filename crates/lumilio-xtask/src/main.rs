@@ -8,6 +8,9 @@
 //!   its client jar (see `block_colors.rs`).
 //! - `release-check [TAG]`: print `version=` and `prerelease=` lines (for
 //!   `$GITHUB_OUTPUT`), failing if TAG is not `v<workspace version>`.
+//! - `worldgen-*` and `cubiomes-btree`: reproduce original-game goldens and
+//!   biome tables (see `forks/cubiomes/data/README.md`).
+//!   The table format comes from cubiomes (MIT, Copyright (c) 2020 Cubitect).
 
 mod block_colors;
 mod linux;
@@ -15,13 +18,14 @@ mod macos;
 mod release;
 mod version;
 mod windows;
+mod worldgen;
 
 use std::process::ExitCode;
 
 use release::{Release, Result};
 use version::Version;
 
-const USAGE: &str = "usage: cargo xtask package [--skip-build]\n       cargo xtask release-check [TAG]\n       cargo xtask block-colors VERSION";
+const USAGE: &str = "usage: cargo xtask package [--skip-build]\n       cargo xtask release-check [TAG]\n       cargo xtask block-colors VERSION\n       cargo xtask worldgen-prepare VERSION\n       cargo xtask worldgen-golden VERSION\n       cargo xtask worldgen-import VERSION\n       cargo xtask worldgen-save-read VERSION\n       cargo xtask worldgen-diff OLD NEW\n       cargo xtask cubiomes-btree INPUT OUTPUT NAME";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -33,6 +37,22 @@ fn main() -> ExitCode {
         ["release-check", tag] => release_check(Some(tag)),
         ["block-colors", version] => Release::detect()
             .and_then(|release| block_colors::run(version, &release.root, &release.target)),
+        ["cubiomes-btree", input, output, name] => worldgen::btree(input, output, name),
+        ["worldgen-prepare", version] => {
+            Release::detect().and_then(|r| worldgen::prepare(&r.root, version))
+        }
+        ["worldgen-save-read", version] => {
+            Release::detect().and_then(|r| worldgen::saved(&r.root, version))
+        }
+        ["worldgen-golden", version] => {
+            Release::detect().and_then(|r| worldgen::golden(&r.root, version))
+        }
+        ["worldgen-import", version] => {
+            Release::detect().and_then(|r| worldgen::import(&r.root, version))
+        }
+        ["worldgen-diff", old, new] => {
+            Release::detect().and_then(|r| worldgen::diff(&r.root, old, new))
+        }
         _ => {
             eprintln!("{USAGE}");
             return ExitCode::from(2);

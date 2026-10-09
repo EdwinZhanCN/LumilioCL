@@ -76,6 +76,18 @@ const char* mc2str(int mc)
     case MC_1_21_1: return "1.21.1"; break;
     case MC_1_21_3: return "1.21.3"; break;
     case MC_1_21_WD: return "1.21 WD"; break;
+    case MC_1_21_5: return "1.21.5";
+    case MC_1_21_6: return "1.21.6";
+    case MC_1_21_7: return "1.21.7";
+    case MC_1_21_8: return "1.21.8";
+    case MC_1_21_9: return "1.21.9";
+    case MC_1_21_10: return "1.21.10";
+    case MC_1_21_11: return "1.21.11";
+    case MC_26_1: return "26.1";
+    case MC_26_1_1: return "26.1.1";
+    case MC_26_1_2: return "26.1.2";
+    case MC_26_2: return "26.2";
+    case MC_26_3: return "26.3";
     default:        return "?";
     }
 }
@@ -83,6 +95,19 @@ const char* mc2str(int mc)
 int str2mc(const char *s)
 {
     if (!strcmp(s, "1.21"))     return MC_1_21;
+    if (!strcmp(s, "1.21.4"))   return MC_1_21_4;
+    if (!strcmp(s, "1.21.5"))   return MC_1_21_5;
+    if (!strcmp(s, "1.21.6"))   return MC_1_21_6;
+    if (!strcmp(s, "1.21.7"))   return MC_1_21_7;
+    if (!strcmp(s, "1.21.8"))   return MC_1_21_8;
+    if (!strcmp(s, "1.21.9"))   return MC_1_21_9;
+    if (!strcmp(s, "1.21.10"))  return MC_1_21_10;
+    if (!strcmp(s, "1.21.11"))  return MC_1_21_11;
+    if (!strcmp(s, "26.1"))     return MC_26_1;
+    if (!strcmp(s, "26.1.1"))   return MC_26_1_1;
+    if (!strcmp(s, "26.1.2"))   return MC_26_1_2;
+    if (!strcmp(s, "26.2"))     return MC_26_2;
+    if (!strcmp(s, "26.3"))     return MC_26_3;
     if (!strcmp(s, "1.21 WD"))  return MC_1_21_WD;
     if (!strcmp(s, "1.21.3"))   return MC_1_21_3;
     if (!strcmp(s, "1.21.2"))   return MC_1_21_3; // backwards compatibility
@@ -271,6 +296,8 @@ const char *biome2str(int mc, int id)
     case cherry_grove: return "cherry_grove";
     // 1.21.4 (Winter Drop)
     case pale_garden: return "pale_garden";
+    case sulfur_caves: return "sulfur_caves";
+    case dappled_forest: return "dappled_forest";
     }
     return NULL;
 }
@@ -298,6 +325,7 @@ const char* struct2str(int stype)
     case Ancient_City:      return "ancient_city";
     case Trail_Ruins:       return "trail_ruins";
     case Trial_Chambers:    return "trial_chambers";
+    case Abandoned_Camp:    return "abandoned_camp";
     case Fortress:          return "fortress";
     case Bastion:           return "bastion_remnant";
     case End_City:          return "end_city";
@@ -417,6 +445,8 @@ void initBiomeColors(unsigned char colors[256][3])
     setColor(colors, mangrove_swamp,                   0x2ccc8e); // -
     setColor(colors, cherry_grove,                     0xff91c8); // -
     setColor(colors, pale_garden,                      0x696d95); // -
+    setColor(colors, sulfur_caves,                     0xc9bd45);
+    setColor(colors, dappled_forest,                   0xc5813a);
 }
 
 void initBiomeTypeColors(unsigned char colors[256][3])

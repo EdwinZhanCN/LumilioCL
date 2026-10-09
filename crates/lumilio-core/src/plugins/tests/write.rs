@@ -179,6 +179,30 @@ fn a_write_needs_the_file_to_be_what_was_read_and_backs_up_the_old_one() {
 }
 
 #[test]
+fn a_new_backup_is_kept_after_collision_stamps_advance_past_the_clock() {
+    let dir = game();
+    let backups = tempfile::tempdir().unwrap();
+    let folder = backups.path().join(FILE.replace('/', "__"));
+    std::fs::create_dir_all(&folder).unwrap();
+    let future = crate::world_map::write::millis_of(Some(std::time::SystemTime::now())) + 60_000;
+    for round in 0..KEEP_BACKUPS {
+        std::fs::write(folder.join((future + round as i64).to_string()), "older\n").unwrap();
+    }
+    let path = dir.path().join(FILE);
+    let (_, info) = describe(&path).unwrap();
+    write_checked(&path, FILE, b"new\n", Some(&info), backups.path()).unwrap();
+    let kept: Vec<_> = std::fs::read_dir(&folder)
+        .unwrap()
+        .map(|entry| std::fs::read_to_string(entry.unwrap().path()).unwrap())
+        .collect();
+    assert_eq!(kept.len(), KEEP_BACKUPS);
+    assert!(
+        kept.contains(&"old\n".to_owned()),
+        "latest pre-write content retained"
+    );
+}
+
+#[test]
 fn only_the_latest_backups_of_a_file_are_kept() {
     let dir = game();
     let backups = tempfile::tempdir().unwrap();
