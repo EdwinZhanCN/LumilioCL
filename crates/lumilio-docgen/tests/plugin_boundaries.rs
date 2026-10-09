@@ -166,6 +166,7 @@ fn map_libraries_preserve_their_dependency_boundaries() {
     for name in [
         "lumilio-cubiomes",
         "lumilio-nbt",
+        "lumilio-anvil",
         "lumilio-map-render",
         "lumilio-plugin-api",
         "lumilio-core",
@@ -201,6 +202,10 @@ fn cubiomes_guard_probe() {
 #[test]
 fn nbt_guard_probe() {
     injected("lumilio-nbt", "gpui-pre");
+}
+#[test]
+fn anvil_guard_probe() {
+    injected("lumilio-anvil", "lumilio-core");
 }
 #[test]
 fn renderer_guard_probe() {
