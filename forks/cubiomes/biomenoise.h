@@ -152,6 +152,8 @@ STRUCT(BiomeTree)
     const uint64_t *nodes;
     uint32_t order;
     uint32_t len;
+    // One-past-subtree indices for the variable arity trees in newer releases.
+    const uint32_t *ends;
 };
 
 #ifdef __cplusplus

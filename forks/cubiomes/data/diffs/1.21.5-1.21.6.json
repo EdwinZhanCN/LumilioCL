@@ -1,0 +1,9 @@
+{
+  "changed": [
+    "data/minecraft/worldgen/configured_feature/patch_leaf_litter.json"
+  ],
+  "new": "1.21.6",
+  "new_sha1": "dfab25f1ae7287c10dea4efad8797a680d4286ab",
+  "old": "1.21.5",
+  "old_sha1": "be124633b7d258517522f758d77bea258208ef86"
+}

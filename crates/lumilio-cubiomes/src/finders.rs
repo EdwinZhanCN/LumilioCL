@@ -24,10 +24,12 @@ pub enum Structure {
     Fortress,
     Bastion,
     EndCity,
+    /// Surface-projected jigsaw; positions are candidates, viability estimated.
+    AbandonedCamp,
 }
 
 impl Structure {
-    pub const ALL: [Structure; 17] = [
+    pub const ALL: [Structure; 18] = [
         Structure::DesertPyramid,
         Structure::JungleTemple,
         Structure::SwampHut,
@@ -45,6 +47,7 @@ impl Structure {
         Structure::Fortress,
         Structure::Bastion,
         Structure::EndCity,
+        Structure::AbandonedCamp,
     ];
 
     /// Whether this version generates the kind in the dimension, and cubiomes
@@ -61,13 +64,14 @@ impl Structure {
             .collect()
     }
 
-    /// Positions are right but viability is approximated: since 1.18 these
-    /// depend on terrain height, which cubiomes does not compute.
+    /// Region candidates are exact; generation and template offsets depend
+    /// on terrain height, which cubiomes does not compute.
     pub fn estimated(self, version: Version) -> bool {
-        matches!(
-            self,
-            Structure::DesertPyramid | Structure::JungleTemple | Structure::Mansion
-        ) && version.at_least("1.18.2")
+        self == Structure::AbandonedCamp
+            || matches!(
+                self,
+                Structure::DesertPyramid | Structure::JungleTemple | Structure::Mansion
+            ) && version.at_least("1.18.2")
     }
 }
 
@@ -131,15 +135,14 @@ pub fn strongholds(
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Spawn {
     pub at: Position,
-    /// Before 1.18 the spawn depends on which block is grass, which cubiomes
-    /// can only estimate from biomes.
+    /// Spawn depends on grass and terrain height; cubiomes approximates both.
     pub estimated: bool,
 }
 
 pub fn spawn(version: Version, seed: i64) -> Spawn {
     Spawn {
         at: ffi::spawn(version, seed),
-        estimated: !version.at_least("1.18.2"),
+        estimated: true,
     }
 }
 

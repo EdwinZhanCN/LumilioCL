@@ -1470,6 +1470,7 @@ map-structure-ruined-portal = 废弃传送门
 map-structure-ancient-city = 远古城市
 map-structure-trail-ruins = 古迹废墟
 map-structure-trial-chambers = 试炼密室
+map-structure-abandoned-camp = 废弃营地
 map-structure-stronghold = 要塞
 map-structure-fortress = 下界要塞
 map-structure-bastion = 堡垒遗迹

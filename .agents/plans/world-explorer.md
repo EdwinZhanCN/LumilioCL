@@ -287,7 +287,7 @@ P0 **pending human acceptance**：Windows MSVC Actions；macOS 与指定 ubuntu:
 
 ### P8 新版本世界生成（已拆出）
 
-P8（T39–T44，新版本世界生成，延后 / 可选）已拆成独立计划 [`cubiomes-new-versions.md`](cubiomes-new-versions.md)，编号不变；不阻塞收尾。
+P8（T39–T44，新版本世界生成，延后 / 可选）已拆成独立计划 [`cubiomes-new-versions.md`](cubiomes-new-versions.md)，编号不变；不阻塞收尾。1.21.5–26.3 已在那份计划里实现并通过自动验证，等待维护者实机核对。
 
 ### 收尾（只依赖 P0–P7）
 
@@ -325,7 +325,7 @@ P8（T39–T44，新版本世界生成，延后 / 可选）已拆成独立计划
 
 ## 风险
 
-- 新版本延后：P8（[`cubiomes-new-versions.md`](cubiomes-new-versions.md)，其中也列了自维护 fork 的风险）做完之前，种子底图和结构 Overlay 只覆盖到 1.21.4；维护者和大多数玩家在用的 26.x 会显示「这一版还不能查」。功能阶段的实机验收要用 1.21.4 及更早的世界。
+- 新版本：P8（[`cubiomes-new-versions.md`](cubiomes-new-versions.md)，其中也列了自维护 fork 的风险）已让种子底图和结构 Overlay 覆盖 1.21.5–26.3，实机核对之前仍属待验收；版本表之外的版本仍显示「这一版还不能查」。
 - 入库的派生数据会过时：方块颜色表和 `forks/cubiomes/data/` 的摘录都按版本生成，新版本加了方块或改了贴图就要重新跑工具。来源记录不全的表无法重新生成，所以 `SOURCE.md` 由工具写，不手写。
 - cubiomes 里的 C 崩溃会直接带走整个启动器；按 W11 留在进程内，只能靠 Rust 侧的输入校验和测试降低概率。我们自己改的 C 代码增加了这个风险，新增的代码路径也要有越界和异常输入的测试。
 - MSVC 编译和 Windows、Linux 上的 wgpu 离屏渲染都还没验证；CI 只覆盖 macOS。

@@ -1,6 +1,39 @@
 use super::*;
 use lumilio_plugin_api::map::{TileKey, WorldContext, WorldId};
 use lumilio_plugin_api::{FetchResponse, SettingValue};
+#[test]
+fn new_release_worlds_and_data_version_only_saves_reach_the_provider() {
+    for name in ["1.21.5", "1.21.11", "26.1.2", "26.2", "26.3"] {
+        let world = overlay_request("", Dimension::Overworld, name, [0.; 4]).context;
+        let offered = WorldExplorer.overlays_for(&world);
+        assert!(
+            offered.iter().any(|l| l.id == "structure.village"),
+            "{name}"
+        );
+        assert_eq!(
+            offered.iter().any(|l| l.id == "structure.abandoned-camp"),
+            name == "26.3"
+        );
+        for camp in offered
+            .iter()
+            .filter(|l| l.id == "structure.abandoned-camp")
+        {
+            assert!(camp.approximate);
+        }
+    }
+    let mut world = overlay_request("", Dimension::Overworld, "26.3", [0.; 4]).context;
+    world.version = None;
+    world.data_version = Some(5023);
+    assert!(
+        WorldExplorer
+            .overlays_for(&world)
+            .iter()
+            .any(|l| l.id == "structure.abandoned-camp")
+    );
+    world.data_version = Some(5024);
+    assert!(WorldExplorer.overlays_for(&world).is_empty());
+}
+
 struct Context {
     cancelled: bool,
 }
@@ -52,7 +85,7 @@ fn seed_provider_generates_valid_tiles_and_rejects_new_versions() {
     let context = Context { cancelled: false };
     assert!(WorldExplorer.tile(&context, &request()).unwrap().is_valid());
     let mut unsupported = request();
-    unsupported.context.version = Some("26.3".into());
+    unsupported.context.version = Some("26.4".into());
     assert_eq!(
         WorldExplorer.tile(&context, &unsupported),
         Err(PluginError::Unavailable("map-version-unsupported".into()))
@@ -187,12 +220,12 @@ fn structure_layers_follow_the_worlds_version_and_dimension() {
     assert!(
         WorldExplorer
             .overlays_for(
-                &overlay_request("", Dimension::Overworld, "26.3", [0., 0., 1., 1.]).context
+                &overlay_request("", Dimension::Overworld, "26.4", [0., 0., 1., 1.]).context
             )
             .is_empty()
     );
-    // 18 structure layers, spawn, slime chunks, save positions and Xaero waypoints.
-    assert_eq!(WorldExplorer.overlays().len(), 22);
+    // 19 structure layers, spawn, slime chunks, save positions and Xaero waypoints.
+    assert_eq!(WorldExplorer.overlays().len(), 23);
 }
 
 #[test]
@@ -310,7 +343,7 @@ fn structure_objects_reject_bad_bounds_and_stop_when_cancelled() {
             &overlay_request(
                 "structure.village",
                 Dimension::Overworld,
-                "26.3",
+                "26.4",
                 [0., 0., 512., 512.]
             )
         ),
@@ -344,7 +377,7 @@ fn landmark_layers_are_overworld_only_and_slime_is_a_fine_zoom_layer() {
             .approximate
     };
     assert!(spawn("1.16.5"), "before 1.18 the spawn is an estimate");
-    assert!(!spawn("1.21.4"));
+    assert!(spawn("1.21.4"));
     let mut nether = overworld;
     nether.dimension = Dimension::Nether;
     assert!(
@@ -371,7 +404,7 @@ fn spawn_and_slime_objects_match_cubiomes() {
     let (x, z) = (f64::from(spawn.at[0]), f64::from(spawn.at[1]));
     let found = around("world.spawn", [x - 10., z - 10., x + 10., z + 10.]);
     assert_eq!(spots(&found), [spawn.at]);
-    assert!(!found[0].approximate);
+    assert!(found[0].approximate);
     assert!(around("world.spawn", [x + 20., z + 20., x + 40., z + 40.]).is_empty());
 
     // 256x256 chunks: the one Heat object lists exactly cubiomes' slime chunks.

@@ -96,18 +96,25 @@ pub fn write_checked(
 fn backup(path: &Path, label: &str, backups: &Path) -> Result<(), PluginError> {
     let folder = backups.join(label.replace(['/', '\\'], "__"));
     fs::create_dir_all(&folder).map_err(unavailable)?;
-    let mut stamp = millis(SystemTime::now());
-    // Two writes in one millisecond must not overwrite each other's copy.
-    while folder.join(stamp.to_string()).exists() {
-        stamp += 1;
-    }
-    fs::copy(path, folder.join(stamp.to_string())).map_err(unavailable)?;
     let mut copies: Vec<(i64, std::path::PathBuf)> = fs::read_dir(&folder)
         .map_err(unavailable)?
         .flatten()
         .filter_map(|entry| Some((entry.file_name().to_str()?.parse().ok()?, entry.path())))
         .collect();
     copies.sort();
+    let mut stamp = millis(SystemTime::now());
+    // Collision stamps can run ahead of the clock. The next copy must stay
+    // newer than every retained copy, even after older names have been freed.
+    if let Some((latest, _)) = copies.last() {
+        stamp = stamp.max(
+            latest
+                .checked_add(1)
+                .ok_or_else(|| unavailable("backup timestamp overflow"))?,
+        );
+    }
+    let destination = folder.join(stamp.to_string());
+    fs::copy(path, &destination).map_err(unavailable)?;
+    copies.push((stamp, destination));
     let extra = copies.len().saturating_sub(KEEP_BACKUPS);
     for (_, old) in copies.into_iter().take(extra) {
         let _ = fs::remove_file(old);

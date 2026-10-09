@@ -1,6 +1,19 @@
 #![allow(unsafe_code)]
 
 unsafe extern "C" {
+    #[cfg(test)]
+    fn lumilio_cubiomes_sample(mc: i32, seed: u64, dim: i32, x: i32, y: i32, z: i32) -> i32;
+    #[cfg(test)]
+    fn lumilio_cubiomes_placement(
+        mc: i32,
+        seed: u64,
+        kind: i32,
+        rx: i32,
+        rz: i32,
+        out: *mut i32,
+    ) -> i32;
+    #[cfg(test)]
+    fn lumilio_cubiomes_biome_rule(mc: i32, rule: i32, biome: i32) -> i32;
     fn lumilio_cubiomes_probe() -> i32;
     fn lumilio_cubiomes_generate(
         mc: i32,
@@ -44,6 +57,59 @@ unsafe extern "C" {
     ) -> i32;
     fn lumilio_cubiomes_spawn(mc: i32, seed: u64, dim: i32, out: *mut i32) -> i32;
     fn lumilio_cubiomes_slime(seed: u64, cx: i32, cz: i32, width: i32, height: i32, out: *mut u8);
+}
+
+#[cfg(test)]
+pub(super) fn sample(
+    version: super::Version,
+    seed: i64,
+    dimension: super::Dimension,
+    at: [i32; 3],
+) -> i32 {
+    // SAFETY: version/dimension are closed Rust identities. The C function
+    // also bounds all coordinates before creating or sampling a generator.
+    unsafe {
+        lumilio_cubiomes_sample(
+            version.mc,
+            seed as u64,
+            dimension as i32,
+            at[0],
+            at[1],
+            at[2],
+        )
+    }
+}
+
+#[cfg(test)]
+pub(super) fn placement(
+    version: super::Version,
+    seed: i64,
+    kind: super::Structure,
+    region: [i32; 2],
+) -> Result<[i32; 2], super::Error> {
+    let mut out = [0; 2];
+    // SAFETY: fixed two-element output; closed kind/version and bounded region.
+    let result = unsafe {
+        lumilio_cubiomes_placement(
+            version.mc,
+            seed as u64,
+            kind as i32,
+            region[0],
+            region[1],
+            out.as_mut_ptr(),
+        )
+    };
+    if result == 0 {
+        Ok(out)
+    } else {
+        Err(super::Error::Generation)
+    }
+}
+
+#[cfg(test)]
+pub(super) fn biome_rule(version: super::Version, rule: i32, biome: i32) -> bool {
+    // SAFETY: bridge validates the rule before indexing, no pointers cross FFI.
+    unsafe { lumilio_cubiomes_biome_rule(version.mc, rule, biome) != 0 }
 }
 
 /// Trampoline for the bridge's cancellation hook.

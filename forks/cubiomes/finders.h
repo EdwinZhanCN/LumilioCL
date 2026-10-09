@@ -39,6 +39,7 @@ enum StructureType
     End_Island,
     Trail_Ruins,
     Trial_Chambers,
+    Abandoned_Camp,
     FEATURE_NUM
 };
 
@@ -289,6 +290,7 @@ int isEndChunkEmpty(const EndNoise *en, const SurfaceNoise *sn, uint64_t seed,
  *
  * Returns the approximate block position of the first stronghold.
  */
+int isStrongholdBiome(int mc, int biomeID);
 Pos initFirstStronghold(StrongholdIter *sh, int mc, uint64_t s48);
 
 /* Performs the biome checks for the stronghold iterator and finds its accurate
