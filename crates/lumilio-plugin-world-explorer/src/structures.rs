@@ -21,7 +21,7 @@ struct Layer {
     icon: MapIcon,
 }
 
-const LAYERS: [Layer; 19] = [
+const LAYERS: [Layer; 24] = [
     layer("village", Some(Structure::Village), MapIcon::Village),
     layer(
         "desert-pyramid",
@@ -67,7 +67,24 @@ const LAYERS: [Layer; 19] = [
     layer(
         "abandoned-camp",
         Some(Structure::AbandonedCamp),
-        MapIcon::Marker,
+        MapIcon::AbandonedCamp,
+    ),
+    layer(
+        "buried-treasure",
+        Some(Structure::Treasure),
+        MapIcon::BuriedTreasure,
+    ),
+    layer("mineshaft", Some(Structure::Mineshaft), MapIcon::Mineshaft),
+    layer(
+        "desert-well",
+        Some(Structure::DesertWell),
+        MapIcon::DesertWell,
+    ),
+    layer("geode", Some(Structure::Geode), MapIcon::Geode),
+    layer(
+        "end-gateway",
+        Some(Structure::EndGateway),
+        MapIcon::EndGateway,
     ),
 ];
 

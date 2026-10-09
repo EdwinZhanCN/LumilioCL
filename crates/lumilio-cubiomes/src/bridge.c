@@ -65,6 +65,7 @@ static const int KINDS[] = {
     Desert_Pyramid, Jungle_Pyramid, Swamp_Hut, Igloo, Village, Ocean_Ruin,
     Shipwreck, Monument, Mansion, Outpost, Ruined_Portal, Ancient_City,
     Trail_Ruins, Trial_Chambers, Fortress, Bastion, End_City, Abandoned_Camp,
+    Treasure, Mineshaft, Desert_Well, Geode, End_Gateway,
 };
 #define KIND_COUNT ((int)(sizeof(KINDS) / sizeof(KINDS[0])))
 
@@ -83,6 +84,17 @@ int lumilio_cubiomes_structure_available(int mc, int dim, int kind)
     int type;
     StructureConfig sc;
     return kind_config(mc, dim, kind, &type, &sc);
+}
+
+/* The region grid's block edge for a kind, so the caller can size its output
+ * buffer from the kind rather than the smallest upstream region. 0 when the
+ * kind is unavailable in that version and dimension. */
+int lumilio_cubiomes_region_blocks(int mc, int dim, int kind)
+{
+    int type;
+    StructureConfig sc;
+    if (!kind_config(mc, dim, kind, &type, &sc)) return 0;
+    return sc.regionSize * 16;
 }
 
 /* Oracle tests compare the unfiltered regional placement, including candidates

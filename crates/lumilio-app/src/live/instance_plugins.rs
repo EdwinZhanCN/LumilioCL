@@ -2,13 +2,16 @@
 //! they contain, and performs the effects a plugin's action asks for.
 
 use super::Wiring;
-use gpui_kit::{App, WeakEntity};
+use gpui_kit::{
+    App, AppContext as _, TitlebarOptions, WeakEntity, WindowBounds, WindowOptions, px, size,
+};
 use lumilio_core::PluginEffect;
 use lumilio_plugin_api::ActionId;
 use lumilio_ui::instance_detail::InstanceDetailView;
 use lumilio_ui::platform;
 use lumilio_ui::toast::Toast;
 use lumilio_ui::tr;
+use lumilio_ui::world_explorer::{Command, Connection, Event, MapHandoff, MapWindow};
 
 pub(super) fn plugin_map(
     wiring: &Wiring,
@@ -17,7 +20,39 @@ pub(super) fn plugin_map(
     request: u64,
     cx: &mut App,
 ) {
-    use lumilio_ui::world_explorer::{Command, Connection, Event};
+    let connection = map_connection(wiring, id);
+    let _ = view.update(cx, |view, cx| {
+        view.plugin_map_arrived(request, connection, cx)
+    });
+}
+
+/// Opens the map in a window of its own. Its connection is made here and
+/// belongs to that window alone, so closing the window ends only that
+/// connection.
+pub(super) fn pop_out_map(wiring: &Wiring, id: String, handoff: MapHandoff, cx: &mut App) {
+    let connection = map_connection(wiring, id);
+    let options = WindowOptions {
+        window_bounds: Some(WindowBounds::centered(size(px(1080.), px(720.)), cx)),
+        window_min_size: Some(size(px(480.), px(320.))),
+        titlebar: Some(TitlebarOptions {
+            title: Some(tr!("map-window-title").into()),
+            ..lumilio_ui::window_titlebar()
+        }),
+        app_id: Some(crate::APP_ID.to_owned()),
+        ..WindowOptions::default()
+    };
+    let opened = gpui_kit::open_window(options, cx, move |window, cx| {
+        lumilio_ui::follow_system_appearance(window, cx);
+        cx.new(|cx| MapWindow::new(handoff, connection, cx))
+    });
+    if let Err(reason) = opened {
+        eprintln!("LumilioCL could not open the map window: {reason}");
+    }
+}
+
+/// A new connection between one map view and the service: commands go in,
+/// answers come back as events.
+fn map_connection(wiring: &Wiring, id: String) -> Connection {
     let (send, commands) = async_channel::bounded(128);
     let (events, receive) = async_channel::bounded(128);
     let service = wiring.backend.service.clone();
@@ -104,9 +139,7 @@ pub(super) fn plugin_map(
         }
         tasks.abort_all();
     });
-    let _ = view.update(cx, |view, cx| {
-        view.plugin_map_arrived(request, Connection { send, receive }, cx)
-    });
+    Connection { send, receive }
 }
 
 pub(super) fn plugin_tabs(

@@ -281,12 +281,21 @@ impl Render for EditDialog {
                             .into_any_element()
                     }
                 };
-                let shows_label = !matches!(control, Control::Toggle(_));
+                // A fader's label is only its accessible name, so a switch row
+                // draws its own title, leading, with the switch trailing.
+                if matches!(control, Control::Toggle(_)) {
+                    return h_flex()
+                        .w_full()
+                        .justify_between()
+                        .items_center()
+                        .gap_2()
+                        .child(div().text_sm().child(label))
+                        .child(body)
+                        .into_any_element();
+                }
                 v_flex()
                     .gap_1()
-                    .children(
-                        shows_label.then(|| div().text_xs().text_color(colors.muted).child(label)),
-                    )
+                    .child(div().text_xs().text_color(colors.muted).child(label))
                     .child(body)
                     .into_any_element()
             })
@@ -540,7 +549,7 @@ impl MapView {
             .active()
             .any(|(_, layer)| !layer.creatable.is_empty())
             .then(|| {
-                // ia[plugin.world-explorer]: 新建路径点 | 地图左下角「添加路径点」→ 点一下地图 | 打开新建对话框，位置取点击处；游戏运行中禁用并说明原因
+                // ia[plugin.world-explorer]: 新建路径点 | 地图左上角「添加路径点」→ 点一下地图 | 打开新建对话框，位置取点击处；游戏运行中禁用并说明原因
                 Key::new("map-place")
                     .label(if self.placing {
                         tr!("map-place-cancel")

@@ -59,16 +59,27 @@ pub(super) fn resolve(
     {
         return Err(PluginError::PermissionDenied);
     }
+    below(game_dir, &clean)
+}
+
+/// `clean` below `game_dir`, refusing a symbolic link on the way. The path
+/// need not exist: once a part is missing, the parts after it are appended
+/// unchecked, so the result is always the whole path asked for.
+fn below(game_dir: &Path, clean: &Path) -> Result<PathBuf, PluginError> {
     let mut full = game_dir.to_path_buf();
-    for part in clean.components() {
+    let mut parts = clean.components();
+    while let Some(part) = parts.next() {
         full.push(part);
         match std::fs::symlink_metadata(&full) {
             Ok(meta) if meta.file_type().is_symlink() => {
                 return Err(PluginError::PermissionDenied);
             }
             Ok(_) => {}
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => break,
-            Err(error) => return Err(PluginError::Unavailable(error.to_string())),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                full.extend(parts.by_ref());
+                break;
+            }
+            Err(error) => return Err(crate::world_map::write::io_error("inspect", &full, &error)),
         }
     }
     Ok(full)
@@ -158,19 +169,7 @@ pub(super) fn resolve_write(
     if !granted {
         return Err(PluginError::PermissionDenied);
     }
-    let mut full = game_dir.to_path_buf();
-    for part in clean.components() {
-        full.push(part);
-        match std::fs::symlink_metadata(&full) {
-            Ok(meta) if meta.file_type().is_symlink() => {
-                return Err(PluginError::PermissionDenied);
-            }
-            Ok(_) => {}
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => break,
-            Err(error) => return Err(PluginError::Unavailable(error.to_string())),
-        }
-    }
-    Ok(full)
+    below(game_dir, &clean)
 }
 
 /// A readable file's bytes with the [`lumilio_plugin_api::FileInfo`] a later

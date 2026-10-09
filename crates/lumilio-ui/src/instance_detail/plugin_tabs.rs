@@ -117,7 +117,7 @@ impl InstanceDetailView {
                     }
                 }
                 for _ in 0..count_maps(&view) {
-                    let handler = self.handler.clone();
+                    let (handler, pop_out) = (self.handler.clone(), self.handler.clone());
                     maps.push(cx.new(|cx| {
                         crate::world_explorer::MapView::new(
                             std::rc::Rc::new(move |request, window, cx| {
@@ -125,6 +125,11 @@ impl InstanceDetailView {
                             }),
                             cx,
                         )
+                        .on_pop_out(std::rc::Rc::new(
+                            move |handoff, window, cx| {
+                                pop_out(InstanceIntent::PopOutMap { handoff }, window, cx)
+                            },
+                        ))
                     }));
                 }
                 PluginPage::Shown(view, rendered, models, maps)

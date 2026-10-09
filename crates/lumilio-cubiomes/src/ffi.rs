@@ -31,6 +31,7 @@ unsafe extern "C" {
     ) -> i32;
     fn lumilio_cubiomes_colors(out: *mut u8);
     fn lumilio_cubiomes_structure_available(mc: i32, dim: i32, kind: i32) -> i32;
+    fn lumilio_cubiomes_region_blocks(mc: i32, dim: i32, kind: i32) -> i32;
     fn lumilio_cubiomes_structures(
         mc: i32,
         seed: u64,
@@ -176,6 +177,13 @@ pub(super) fn probe() -> i32 {
 pub(super) fn structure_available(mc: i32, dim: i32, kind: i32) -> bool {
     // SAFETY: plain integers in, a plain integer out.
     unsafe { lumilio_cubiomes_structure_available(mc, dim, kind) != 0 }
+}
+
+/// The region grid's block edge for a kind, 0 when unavailable. Sizes the
+/// output buffer the query needs.
+pub(super) fn region_blocks(mc: i32, dim: i32, kind: i32) -> i32 {
+    // SAFETY: plain integers in, a plain integer out.
+    unsafe { lumilio_cubiomes_region_blocks(mc, dim, kind) }
 }
 
 /// Viable positions of one structure kind in `[x0, x1) x [z0, z1)`.

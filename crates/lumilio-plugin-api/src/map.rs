@@ -151,6 +151,13 @@ pub enum MapIcon {
     Fortress,
     Bastion,
     EndCity,
+    DesertWell,
+    Mineshaft,
+    BuriedTreasure,
+    Geode,
+    EndGateway,
+    /// A 26.3 surface jigsaw camp; the same icon family as the other structures.
+    AbandonedCamp,
     Spawn,
     SlimeChunk,
     Waypoint,

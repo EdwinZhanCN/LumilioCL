@@ -187,7 +187,7 @@ fn structure_layers_follow_the_worlds_version_and_dimension() {
         "1.21.4",
         [0., 0., 1., 1.],
     ));
-    assert_eq!(end, ["structure.end-city"]);
+    assert_eq!(end, ["structure.end-city", "structure.end-gateway"]);
     // Height-bound kinds are marked estimated from 1.18 on, and only those.
     let flags = |version: &str| -> Vec<(String, bool)> {
         WorldExplorer
@@ -224,8 +224,8 @@ fn structure_layers_follow_the_worlds_version_and_dimension() {
             )
             .is_empty()
     );
-    // 19 structure layers, spawn, slime chunks, save positions and Xaero waypoints.
-    assert_eq!(WorldExplorer.overlays().len(), 23);
+    // 24 structure layers, spawn, slime chunks, save positions and Xaero waypoints.
+    assert_eq!(WorldExplorer.overlays().len(), 28);
 }
 
 #[test]

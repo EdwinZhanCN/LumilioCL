@@ -2,8 +2,9 @@
 use crate::{Dimension, Error, Version, ffi};
 
 /// Structures placed on a region grid, in the order the C bridge indexes them.
-/// Treasure, mineshafts, wells, geodes and the End's gateways and islands are
-/// decorators with no region grid and are not offered.
+/// The decorators (buried treasure, mineshafts, wells, geodes and End gateways)
+/// have a one-chunk region rather than a coarse one; the End's islands are left
+/// out because the map has no icon for them.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(i32)]
 pub enum Structure {
@@ -26,10 +27,20 @@ pub enum Structure {
     EndCity,
     /// Surface-projected jigsaw; positions are candidates, viability estimated.
     AbandonedCamp,
+    /// One attempt per chunk, one in a hundred of them survives; a beach find.
+    Treasure,
+    /// A mineshaft start per chunk, so it is dense and off by default.
+    Mineshaft,
+    /// One attempt per chunk, one in a thousand.
+    DesertWell,
+    /// One attempt per chunk, about one in twenty-four.
+    Geode,
+    /// One attempt per chunk in the End.
+    EndGateway,
 }
 
 impl Structure {
-    pub const ALL: [Structure; 18] = [
+    pub const ALL: [Structure; 23] = [
         Structure::DesertPyramid,
         Structure::JungleTemple,
         Structure::SwampHut,
@@ -48,6 +59,11 @@ impl Structure {
         Structure::Bastion,
         Structure::EndCity,
         Structure::AbandonedCamp,
+        Structure::Treasure,
+        Structure::Mineshaft,
+        Structure::DesertWell,
+        Structure::Geode,
+        Structure::EndGateway,
     ];
 
     /// Whether this version generates the kind in the dimension, and cubiomes
@@ -81,6 +97,10 @@ pub type Position = [i32; 2];
 /// Largest area edge `structures` accepts, in blocks.
 pub const MAX_AREA: i32 = 1 << 17;
 
+/// Largest number of region cells a query may span, so the output buffer stays
+/// bounded even for the one-chunk decorators.
+const MAX_CELLS: i64 = 1 << 20;
+
 /// Viable positions of `kind` in the block area `[x0, x1) x [z0, z1)`.
 pub fn structures(
     version: Version,
@@ -104,11 +124,23 @@ pub fn structures(
     if !kind.available(version, dimension) {
         return Err(Error::Unsupported);
     }
-    // At most one position per region; the smallest region any kind uses is
-    // 16 chunks, and the area can straddle one more on each side.
-    const MIN_REGION_BLOCKS: i64 = 16 * 16;
-    let cells = |lo: i32, hi: i32| (i64::from(hi) - i64::from(lo)) / MIN_REGION_BLOCKS + 2;
-    let cap = usize::try_from(cells(x0, x1) * cells(z0, z1)).map_err(|_| Error::InvalidRange)?;
+    // At most one position per region. The region edge is a kind property:
+    // the coarse kinds use hundreds of blocks, the decorators a single chunk,
+    // so the buffer follows the kind instead of the smallest upstream region.
+    let region = i64::from(ffi::region_blocks(
+        version.mc,
+        dimension as i32,
+        kind as i32,
+    ));
+    if region <= 0 {
+        return Err(Error::Unsupported);
+    }
+    let cells = |lo: i32, hi: i32| (i64::from(hi) - i64::from(lo)) / region + 2;
+    let cap = cells(x0, x1)
+        .checked_mul(cells(z0, z1))
+        .filter(|count| *count <= MAX_CELLS)
+        .and_then(|count| usize::try_from(count).ok())
+        .ok_or(Error::InvalidRange)?;
     let mut cancelled = cancelled;
     ffi::structures(
         version,

@@ -225,6 +225,23 @@ impl PixelGrid {
         }
     }
 
+    /// The same dissolve as `fade_bottom`, turned to the left edge: the first
+    /// column is exactly the page and the art thickens toward the right.
+    pub fn fade_left(&mut self, columns: usize, page: Rgb) {
+        let columns = columns.min(self.width);
+        for band in 0..columns {
+            let t = 1. - band as f32 / columns as f32;
+            for y in 0..self.height {
+                let texel = if bayer4(band as i32, y as i32) < smoothstep(0., 1., t) {
+                    page
+                } else {
+                    self.get(band, y).lerp(page, t * 0.65)
+                };
+                self.set(band, y, texel);
+            }
+        }
+    }
+
     /// Darkens and slightly desaturates the whole grid, for frames that sit
     /// behind foreground content while nothing is happening in the world.
     pub fn dim(&mut self, brightness: f32) {
@@ -404,6 +421,20 @@ mod tests {
         let dissolved = |y| (0..8).filter(|&x| grid.get(x, y) == page).count();
         assert!(dissolved(4) < dissolved(7), "density rises toward the page");
         assert_ne!(grid.get(0, 3), page, "rows above the band are untouched");
+    }
+
+    #[test]
+    fn the_left_fade_ends_on_the_page_and_thins_toward_the_right() {
+        let mut grid = PixelGrid::new(10, 8);
+        grid.shade(|x, y| Rgb::new(x as f32 / 10., y as f32 / 8., 0.5));
+        let page = Rgb::hex(0xf7f7f8);
+        let right = grid.get(9, 3);
+        grid.fade_left(6, page);
+        assert!(
+            (0..8).all(|y| grid.get(0, y) == page),
+            "first column is the page"
+        );
+        assert_eq!(grid.get(9, 3), right, "columns past the band are untouched");
     }
 
     #[test]

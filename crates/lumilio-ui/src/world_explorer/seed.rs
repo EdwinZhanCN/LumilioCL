@@ -39,6 +39,8 @@ pub(super) struct Form {
     pub jump_z: Entity<InputState>,
     pub seed_error: Option<&'static str>,
     pub jump_error: bool,
+    /// X and Z fields are showing in place of the cursor read-out.
+    pub jumping: bool,
     jump_checked: Option<(String, String)>,
     pub seed_dirty: bool,
     seed_checked: Option<String>,
@@ -188,6 +190,7 @@ impl MapView {
                 jump_z,
                 seed_error: None,
                 jump_error: false,
+                jumping: false,
                 jump_checked: None,
                 seed_dirty: false,
                 seed_checked: None,
@@ -263,6 +266,24 @@ impl MapView {
         }
     }
 
+    /// Swaps the cursor read-out for the X and Z fields and focuses X.
+    pub(super) fn open_jump(&mut self, window: &mut gpui::Window, cx: &mut Context<Self>) {
+        let Some(form) = &mut self.form else {
+            return;
+        };
+        form.jumping = true;
+        form.jump_x.update(cx, |input, cx| input.focus(window, cx));
+        cx.notify();
+    }
+
+    pub(super) fn close_jump(&mut self, cx: &mut Context<Self>) {
+        if let Some(form) = &mut self.form {
+            form.jumping = false;
+            form.jump_error = false;
+        }
+        cx.notify();
+    }
+
     /// Centres the map on the X and Z fields; an unreadable pair is flagged
     /// beside the fields and leaves the camera alone.
     pub(super) fn jump(&mut self, cx: &mut Context<Self>) {
@@ -276,6 +297,7 @@ impl MapView {
         let (x, z) = (axis(&x_text), axis(&z_text));
         form.jump_checked = Some((x_text, z_text));
         form.jump_error = x.is_none() || z.is_none();
+        form.jumping &= form.jump_error;
         if let (Some(x), Some(z)) = (x, z) {
             self.camera.x = x;
             self.camera.z = z;

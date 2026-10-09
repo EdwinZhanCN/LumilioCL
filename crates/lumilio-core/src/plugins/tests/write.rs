@@ -179,6 +179,61 @@ fn a_write_needs_the_file_to_be_what_was_read_and_backs_up_the_old_one() {
 }
 
 #[test]
+fn a_path_with_missing_folders_resolves_to_the_whole_path() {
+    let dir = game();
+    let manifest = manifest();
+    // `dim%-1` does not exist yet: the file goes below it, never in its place.
+    let relative = "xaero/minimap/World/dim%-1/mw$default_1.txt";
+    assert_eq!(
+        access::resolve_write(dir.path(), &manifest, relative),
+        Ok(dir.path().join(relative))
+    );
+    assert_eq!(
+        access::resolve(dir.path(), &manifest, relative),
+        Ok(dir.path().join(relative))
+    );
+
+    let backups = tempfile::tempdir().unwrap();
+    let mut context = context::Context::new(
+        &manifest,
+        &PluginState::default(),
+        Some(dir.path().to_owned()),
+        None,
+        "en".into(),
+    );
+    context.writer = Some(backups.path().to_owned());
+    context.write_file(relative, b"new\n", None).unwrap();
+    assert!(dir.path().join("xaero/minimap/World/dim%-1").is_dir());
+    assert_eq!(std::fs::read(dir.path().join(relative)).unwrap(), b"new\n");
+}
+
+#[test]
+fn a_file_where_a_folder_should_be_is_named_in_the_error() {
+    let dir = game();
+    let backups = tempfile::tempdir().unwrap();
+    // `dim%-1` is a plain file, so nothing can be created below it.
+    let blocker = dir.path().join("xaero/minimap/World/dim%-1");
+    std::fs::write(&blocker, "not a folder").unwrap();
+    let path = blocker.join("mw$default_1.txt");
+
+    let Err(PluginError::Unavailable(message)) =
+        write_checked(&path, "new", b"x", None, backups.path())
+    else {
+        panic!("writing below a file must fail");
+    };
+    assert!(message.contains("dim%-1"), "{message}");
+
+    let manifest = manifest();
+    let relative = "xaero/minimap/World/dim%-1/mw$default_1.txt";
+    let Err(PluginError::Unavailable(message)) =
+        access::resolve_write(dir.path(), &manifest, relative)
+    else {
+        panic!("resolving below a file must fail");
+    };
+    assert!(message.contains("dim%-1"), "{message}");
+}
+
+#[test]
 fn a_new_backup_is_kept_after_collision_stamps_advance_past_the_clock() {
     let dir = game();
     let backups = tempfile::tempdir().unwrap();

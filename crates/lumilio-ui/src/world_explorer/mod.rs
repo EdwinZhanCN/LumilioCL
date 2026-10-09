@@ -3,21 +3,24 @@ mod camera;
 mod canvas;
 mod edit;
 mod layers;
+mod notices;
 mod objects;
 mod seed;
 mod select;
 mod stats;
 mod toolbar;
+mod window;
 mod xaero;
 pub use objects::ObjectKey;
 pub use seed::VERSIONS as MANUAL_VERSIONS;
+pub use window::{MapHandoff, MapWindow, PopOut};
 #[cfg(test)]
 mod perf;
 #[cfg(test)]
 mod tests;
 mod worker;
 
-use crate::{theme::ShellColors, tr};
+use crate::{key::KeySize, theme::ShellColors, tr};
 use gpui::prelude::*;
 use gpui::{
     App, Bounds, Context, FocusHandle, MouseButton, ObjectFit, Pixels, Point, RenderImage, Task,
@@ -28,7 +31,7 @@ use lumilio_core::world_map::{MapSchedule, Viewport, WorldMapContext};
 use lumilio_core::{CancellationToken, MapFailure, MapProviders};
 use lumilio_map_render::{Grid, Sprite, Tile};
 use lumilio_plugin_api::map::{
-    MapObject, MapObjectKind, MapPoint, OverlayInfo, OverlayRequest, TileKey, TileReply,
+    Dimension, MapObject, MapObjectKind, MapPoint, OverlayInfo, OverlayRequest, TileKey, TileReply,
     TileRequest, WorldContext, WorldId,
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -187,6 +190,10 @@ fn prepare(reply: TileReply) -> (Option<Arc<[u8]>>, Vec<String>) {
 
 pub struct MapView {
     load: Load,
+    /// Opens the map in a window of its own; `None` for a map that already is.
+    pop_out: Option<PopOut>,
+    /// The world and dimension another map showed, shown once the worlds arrive.
+    restore: Option<(WorldId, Dimension)>,
     asked: bool,
     focus: FocusHandle,
     connection: Option<Connection>,
@@ -271,6 +278,8 @@ impl MapView {
     pub fn new(load: Load, cx: &mut Context<Self>) -> Self {
         Self {
             load,
+            pop_out: None,
+            restore: None,
             asked: false,
             focus: cx.focus_handle(),
             connection: None,
@@ -429,7 +438,7 @@ impl MapView {
             Event::Contexts(Ok((contexts, providers))) => {
                 self.contexts = contexts;
                 self.providers = providers;
-                self.context = self.contexts.first().map(|world| world.context.clone());
+                self.context = self.initial_context();
                 self.context_changed();
                 self.refresh();
             }
@@ -857,6 +866,21 @@ impl MapView {
     }
     /// The one line of status under the map, most important first.
     fn status_line(&self) -> Option<String> {
+        self.edit_error
+            .as_deref()
+            .map(edit::failure_text)
+            .or_else(|| self.placing.then(|| tr!("map-placing-hint").to_string()))
+            .or_else(|| self.base_status())
+    }
+    /// What went wrong or is missing, as the messages menu words it. Placing
+    /// a waypoint is a mode, not a message, so its hint is not here.
+    fn problem_line(&self) -> Option<String> {
+        self.edit_error
+            .as_deref()
+            .map(edit::failure_text)
+            .or_else(|| self.base_status())
+    }
+    fn base_status(&self) -> Option<String> {
         let status = if self.failed.values().any(
             |failure| matches!(failure,MapFailure::Failed(id) if id=="map-version-unsupported"),
         ) {
@@ -898,16 +922,11 @@ impl MapView {
         } else {
             None
         };
-        // ia[plugin.world-explorer]: 查看存档底图 | 底图分段 ·「存档」 | 从单人存档的 Region 文件画地表（按高度明暗、按群系着色）；没生成完的区块显示无数据；颜色表里没有的方块画成淡紫色并在状态行写明种数 | 粗缩放由宿主用细一级合成
+        // ia[plugin.world-explorer]: 查看存档底图 | 底图分段 ·「存档」 | 从单人存档的 Region 文件画地表（按高度明暗、按群系着色）；没生成完的区块显示无数据；颜色表里没有的方块画成淡紫色并在消息里写明种数 | 粗缩放由宿主用细一级合成
         let unknown = self.unknown_blocks();
-        let status = status
+        status
             .map(|text| text.to_string())
-            .or_else(|| (unknown > 0).then(|| tr!("map-unknown-blocks", count = unknown)));
-        self.edit_error
-            .as_deref()
-            .map(edit::failure_text)
-            .or_else(|| self.placing.then(|| tr!("map-placing-hint").to_string()))
-            .or(status)
+            .or_else(|| (unknown > 0).then(|| tr!("map-unknown-blocks", count = unknown)))
     }
     /// The catalog id of the chosen base map, which says what it needs.
     fn base_kind(&self) -> Option<&str> {
@@ -1069,7 +1088,6 @@ impl Render for MapView {
         )
         .absolute()
         .size_full();
-        let status = self.status_line();
         // Floating panels sit over the map; pressing or wheeling on them must
         // not pan or zoom the map beneath.
         let float = || {
@@ -1083,7 +1101,34 @@ impl Render for MapView {
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .on_scroll_wheel(|_, _, cx| cx.stop_propagation())
         };
-        let retry = self.retry_button(cx);
+        // Controls that carry their own face sit on the map without a panel.
+        let bare = || {
+            div()
+                .absolute()
+                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_scroll_wheel(|_, _, cx| cx.stop_propagation())
+        };
+        // A bordered plate for read-outs beside the messages key. Collapsed it is
+        // exactly as tall as that key; the jump fields make it grow.
+        let plate = || {
+            h_flex()
+                .flex_none()
+                .items_center()
+                .min_h(px(KeySize::Small.height()))
+                .px_2()
+                .rounded(px(6.))
+                .border_1()
+                .border_color(colors.border)
+                .bg(colors.surface)
+        };
+        let jumping = self.form.as_ref().is_some_and(|form| form.jumping);
+        let hint = self.placing.then(|| {
+            div()
+                .debug_selector(|| "map-hint".into())
+                .text_xs()
+                .text_color(colors.muted)
+                .child(tr!("map-placing-hint"))
+        });
         // ia[plugin.world-explorer]: 平移与缩放 | 地图视口 · 拖动 / 滚轮 / + − 与方向键 | 锚点缩放；过期世代与旧视口结果不进入当前帧
         let viewport = div()
             .id("world-map")
@@ -1110,34 +1155,36 @@ impl Render for MapView {
             )
             .children(self.canvas_layer())
             .child(measure)
-            .child(float().top_3().left_3().child(self.view_controls(cx)))
-            .child(float().top_3().right_3().child(self.jump_controls(cx)))
+            .child(bare().top_3().left_3().child(self.view_controls(cx)))
+            .child(bare().top_3().right_3().child(self.base_controls(cx)))
             .child(
-                float().bottom_3().left_3().max_w(relative(0.7)).child(
+                // The messages key stays at the far left; the read-out is a
+                // plate of its own beside it, as tall as the key.
+                bare().bottom_3().left_3().max_w(relative(0.7)).child(
                     h_flex()
-                        .gap_3()
-                        .items_center()
-                        .flex_wrap()
+                        .gap_2()
+                        .items_end()
+                        .child(self.notice_popover(cx))
                         .child(
-                            div()
-                                .debug_selector(|| "map-cursor".into())
-                                .child(format!("X {:.0}  Z {:.0}", self.cursor[0], self.cursor[1])),
+                            plate()
+                                .when(jumping, |plate| plate.py_1())
+                                .child(self.coordinates(cx)),
                         )
-                        .children(status.map(|status| {
-                            div()
-                                .debug_selector(|| "map-status".into())
-                                .text_color(colors.muted)
-                                .child(status)
-                        }))
-                        .children(retry)
-                        .children(self.place_key(cx))
-                        .children(self.xaero_link_prompt(cx)),
+                        .children(hint.map(|hint| plate().child(hint))),
                 ),
             )
-            .child(float().bottom_3().right_3().child(self.layer_popover(cx)))
+            .child(
+                bare().bottom_3().right_3().child(
+                    h_flex()
+                        .gap_2()
+                        .items_center()
+                        .children(self.pop_out_key(cx))
+                        .child(self.layer_popover(cx)),
+                ),
+            )
             .children(
                 self.selection_card(cx)
-                    .map(|card| float().left_3().bottom(px(56.)).child(card)),
+                    .map(|card| float().right_3().bottom(px(56.)).child(card)),
             )
             .on_mouse_down(
                 MouseButton::Left,

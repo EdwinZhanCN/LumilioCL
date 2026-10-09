@@ -159,28 +159,31 @@ impl Render for InstanceDetailView {
                 )
                 .into_any_element()
         };
+        // The cover is the header's backdrop: anchored to the top-right under
+        // the page actions and dissolving left and down, so it costs no height
+        // and never sits behind the title (design language §6, §12).
+        let cover = self.record.as_ref().map(|record| {
+            div()
+                .absolute()
+                .top_0()
+                .right_0()
+                .w(px(560.))
+                .h(TITLE_BAR_HEIGHT + px(128.))
+                .child(crate::cover::corner(
+                    live::seed_of(&record.id),
+                    live::cover_loader(record.loader),
+                    live::world_of(&record.id),
+                    colors.background,
+                    px(64.),
+                ))
+        });
         v_flex().id("live-instance").size_full().child(
             div()
                 .relative()
                 .w_full()
                 .flex_1()
                 .min_h_0()
-                .children(self.record.as_ref().map(|record| {
-                    div()
-                        .absolute()
-                        .top_0()
-                        .left_0()
-                        .w_full()
-                        .h(px(168.))
-                        .child(crate::cover::element(
-                            live::seed_of(&record.id),
-                            live::cover_loader(record.loader),
-                            live::world_of(&record.id),
-                            colors.background,
-                            theme::HERO_FADE,
-                            px(0.),
-                        ))
-                }))
+                .children(cover)
                 .child(
                     theme::content_column()
                         .mx_auto()
@@ -188,9 +191,6 @@ impl Render for InstanceDetailView {
                         .min_h_0()
                         .gap_5()
                         .pt(TITLE_BAR_HEIGHT + px(12.))
-                        // Room for the cover above the title; going back is
-                        // the navigation's job (design language §6).
-                        .child(div().h(px(84.)))
                         .child(kit::header(
                             self.title().to_owned(),
                             self.record

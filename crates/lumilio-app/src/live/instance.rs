@@ -124,6 +124,9 @@ pub(super) fn instance_intent(
         InstanceIntent::LoadMap { request } => {
             super::instance_plugins::plugin_map(wiring, id.to_owned(), view, request, cx)
         }
+        InstanceIntent::PopOutMap { handoff } => {
+            super::instance_plugins::pop_out_map(wiring, id.to_owned(), handoff, cx)
+        }
         InstanceIntent::LoadModel {
             plugin,
             file,

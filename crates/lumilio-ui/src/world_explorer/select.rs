@@ -129,7 +129,7 @@ impl MapView {
             .as_ref()
             .and(object.label_id.as_deref())
             .map(|id| crate::i18n::lookup(id).unwrap_or_else(|| id.to_owned()));
-        // ia[plugin.world-explorer]: 点选地图对象 | 地图左下角信息卡 · 种类、坐标、来源与「复制坐标」 | 点图标选中并显示；点空白处或「×」取消；复制 `x z`；估计的位置标「估计」
+        // ia[plugin.world-explorer]: 点选地图对象 | 地图右下角信息卡 · 种类、坐标、来源与「复制坐标」 | 点图标选中并显示；点空白处或「×」取消；复制 `x z`；估计的位置标「估计」
         Some(
             v_flex()
                 .gap_1()

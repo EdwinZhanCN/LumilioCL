@@ -112,6 +112,10 @@ pub enum InstanceIntent {
     LoadMap {
         request: u64,
     },
+    /// Open the map in a window of its own, starting from what it shows now.
+    PopOutMap {
+        handoff: crate::world_explorer::MapHandoff,
+    },
     /// Read this crash report; answer with [`InstanceDetailView::crash_arrived`].
     OpenCrash(String),
     OpenGameLog(lumilio_core::GameLogSource),

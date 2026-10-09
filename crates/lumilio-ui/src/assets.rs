@@ -85,13 +85,16 @@ impl AssetSource for Assets {
             "icons/lucide/chevron-up.svg" => {
                 include_bytes!("../assets/icons/lucide/chevron-up.svg").as_slice()
             }
+            "icons/lucide/maximize.svg" => {
+                include_bytes!("../assets/icons/lucide/maximize.svg").as_slice()
+            }
             _ => return Ok(None),
         };
         Ok(Some(Cow::Borrowed(data)))
     }
 
     fn list(&self, path: &str) -> Result<Vec<SharedString>> {
-        const ASSETS: [&str; 30] = [
+        const ASSETS: [&str; 31] = [
             "icons/phosphor/house.svg",
             "icons/phosphor/books.svg",
             "icons/phosphor/compass.svg",
@@ -122,6 +125,7 @@ impl AssetSource for Assets {
             "icons/lucide/ban.svg",
             "icons/lucide/lock.svg",
             "icons/lucide/chevron-up.svg",
+            "icons/lucide/maximize.svg",
         ];
 
         Ok(ASSETS
@@ -178,6 +182,7 @@ pub enum UiIcon {
     Ban,
     Lock,
     Collapse,
+    Maximize,
 }
 
 impl IconNamed for UiIcon {
@@ -205,6 +210,7 @@ impl IconNamed for UiIcon {
             Self::Ban => "icons/lucide/ban.svg",
             Self::Lock => "icons/lucide/lock.svg",
             Self::Collapse => "icons/lucide/chevron-up.svg",
+            Self::Maximize => "icons/lucide/maximize.svg",
         }
         .into()
     }

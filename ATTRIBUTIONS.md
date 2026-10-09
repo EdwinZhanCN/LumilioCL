@@ -136,12 +136,13 @@ USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 # Map icons
 
-The icons in `crates/lumilio-ui/assets/map-icons/` come from the Axolotl
-launcher, which took some of them from MinecraftSearch; the rest depict Mojang's
-Minecraft content. They are **not** licensed to LumilioCL and are not covered by
-this repository's license: the rights stay with MinecraftSearch, the original
-creators and Mojang, and we use them for identification only, on the same
-footing as Axolotl. Provenance, status and how to remove them are in
+The icons in `crates/lumilio-ui/assets/map-icons/` are the structure-marker set
+of [MinecraftSearch](https://minecraftsearch.com) (`/images/structures/`),
+fetched 2026-10-09 and converted from WebP to PNG. They depict Minecraft's own
+structures and features. They are **not** licensed to LumilioCL and are not
+covered by this repository's license: the rights stay with MinecraftSearch, the
+original creators and Mojang, and we use them for identification only, on the
+same footing as Axolotl did. Provenance, status and how to remove them are in
 [crates/lumilio-ui/assets/map-icons/NOTICE.md](crates/lumilio-ui/assets/map-icons/NOTICE.md).
 Minecraft is a trademark of Mojang Synergies AB; LumilioCL is not affiliated
 with or endorsed by Mojang or MinecraftSearch.

@@ -1,26 +1,33 @@
 # Map icons: provenance and status
 
-These 20 icons (80×80 PNG) are the structure and marker icons of the
-[Axolotl](https://github.com/Mystic-Stars/Axolotl) launcher, commit
-`b957550cff0541e972435e81dd6a8693763d69b3`, `apps/app-frontend/public/seed-map-assets/structures/`.
-They were converted from WebP to PNG without other changes. Only the ones the
-map draws are kept; Axolotl has seven more (geode, buried treasure, desert
-well, mineshaft, end gateway and two end-city variants) that we left out.
+These are the structure-marker icons of
+[MinecraftSearch](https://minecraftsearch.com), its seed map's
+`/images/structures/` set. The files were fetched on 2026-10-09 and converted
+from WebP to PNG without other changes (80×80, RGBA). This replaces the earlier
+set, which was taken from the [Axolotl](https://github.com/Mystic-Stars/Axolotl)
+launcher.
 
-Axolotl states in its `apps/app/COPYING.md` that some structure icons were
-sourced from [MinecraftSearch](https://minecraftsearch.com), that MinecraftSearch
-and the respective creators retain their rights in that artwork, and that the
-remaining images depict Mojang's Minecraft content, used for identification in an
-unofficial tool. MinecraftSearch's About page says its block, mob and biome
-pictures come in large part from the Minecraft Wiki (CC BY-NC-SA 3.0) and that
-it intends to replace them with its own.
+The set is the whole folder, including icons the map does not draw yet — ore
+veins, caves, dungeons, fossils, the sulfur spring and a few item markers.
+Which ones the map uses is the table in `crates/lumilio-ui/src/map_icons.rs`:
+the structures the seed layer computes (village, the temples, igloo, ruins,
+shipwreck, monument, mansion, outpost, ruined portal, ancient city, trail
+ruins, trial chambers, stronghold, nether fortress, bastion, End city, End
+gateway, abandoned camp, mineshaft, buried treasure, desert well, amethyst
+geode) plus the world-spawn and slime-chunk markers. An icon with no entry
+draws a plain dot; a file with no entry is simply unused.
+
+MinecraftSearch's About page says its block, mob and biome pictures come in
+large part from the Minecraft Wiki (CC BY-NC-SA 3.0) and that it intends to
+replace them with its own, and most of these images depict Mojang's Minecraft
+content.
 
 **Status: not licensed to LumilioCL.** Nobody has granted us a license for
-these files. We use them the way Axolotl does, on the same footing and with the
-same risk: for identification inside an unofficial launcher, with the rights
-staying with their owners (MinecraftSearch, the original creators, Mojang).
-Nothing here is released under the repository's license (AGPL-3.0-only), and
-the files must not be described as CC BY-NC-SA or as anything else.
+these files. We use them for identification inside an unofficial launcher, on
+the same footing as Axolotl, with the rights staying with MinecraftSearch, the
+original creators and Mojang. Nothing here is released under the repository's
+license (AGPL-3.0-only), and the files must not be described as CC BY-NC-SA or
+as anything else.
 
 Minecraft is a trademark of Mojang Synergies AB. LumilioCL is not affiliated
 with or endorsed by Mojang or MinecraftSearch.
@@ -30,4 +37,5 @@ with or endorsed by Mojang or MinecraftSearch.
 Every use goes through `crates/lumilio-ui/src/map_icons.rs`, which falls back to
 a plain dot for a missing icon. If a rights holder objects, or an original set
 replaces these, delete this directory and the table in that file; nothing else
-refers to the files. (Decision: maintainer, 2026-10-08.)
+refers to the files. (Decision: maintainer, 2026-10-08; set replaced
+2026-10-09.)

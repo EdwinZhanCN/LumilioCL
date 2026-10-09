@@ -19,6 +19,7 @@
 | 游戏页·投影观察 | Wayland 原生相对指针与鼠标锁定 | 接入 GPUI 的 relative-pointer / pointer-constraints 协议；当前明确提示不支持捕获，Orbital 可用；ADR 0036 |
 | 整合包 | 整合包更新（识别包管理文件）；整合包内容单独更新时的提示 | — |
 | 恢复 | 恢复模式界面、数据迁移、未完成安装/更新的恢复、进程失联接管、跨卷删除 | ADR 0007 P2/P3 |
+| 世界地图·结构 | 站点 Seed Map 上的 feature marker：矿脉（Iron/Copper Vein）、Cheese Cave、Ravine、Lava Pool、Dungeon×3、Fossil / Nether Fossil、Sulfur Spring、Enchanted Golden Apple，以及末地岛屿 | `forks/cubiomes` 的 `StructureType` 只有标准结构，没有这些 finder，要自行实现（站点用 `cubiomesType` 201–223 是他们自己的 fork）。图标已全部入库 `crates/lumilio-ui/assets/map-icons/`（2026-10-09），只差 finder 与图层。Maps 的结构图标来源见同目录 `NOTICE.md` |
 
 ## 只有维护者能做
 

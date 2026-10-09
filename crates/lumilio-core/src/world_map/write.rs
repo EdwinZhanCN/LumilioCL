@@ -27,12 +27,19 @@ fn unavailable(error: impl ToString) -> PluginError {
     PluginError::Unavailable(error.to_string())
 }
 
+/// An I/O failure that names what was being done and to which path. A bare
+/// `Not a directory (os error 20)` does not say which folder on the way is
+/// really a file.
+pub fn io_error(action: &str, path: &Path, error: &std::io::Error) -> PluginError {
+    PluginError::Unavailable(format!("{action} {}: {error}", path.display()))
+}
+
 /// A file's bytes and what it looked like when they were read.
 pub fn describe(path: &Path) -> Result<(Vec<u8>, FileInfo), PluginError> {
-    let bytes = fs::read(path).map_err(unavailable)?;
+    let bytes = fs::read(path).map_err(|error| io_error("read", path, &error))?;
     let modified = fs::metadata(path)
         .and_then(|meta| meta.modified())
-        .map_err(unavailable)?;
+        .map_err(|error| io_error("stat", path, &error))?;
     let info = FileInfo {
         len: bytes.len() as u64,
         modified_ms: millis(modified),
@@ -73,7 +80,10 @@ pub fn write_checked(
         }
         (Some(_), false) => return Err(unavailable(CONFLICT)),
         (None, true) => return Err(unavailable(CONFLICT)),
-        (None, false) => fs::create_dir_all(parent).map_err(unavailable)?,
+        (None, false) => {
+            fs::create_dir_all(parent)
+                .map_err(|error| io_error("create folder", parent, &error))?;
+        }
     }
     let name = path
         .file_name()
@@ -81,23 +91,26 @@ pub fn write_checked(
         .ok_or_else(|| PluginError::InvalidInput("bad file name".into()))?;
     let temporary = parent.join(format!("{name}.lumilio-tmp"));
     let written = (|| {
-        let mut file = fs::File::create(&temporary)?;
-        file.write_all(bytes)?;
-        file.sync_all()?;
-        fs::rename(&temporary, path)
+        let mut file = fs::File::create(&temporary)
+            .map_err(|error| io_error("create file", &temporary, &error))?;
+        file.write_all(bytes)
+            .and_then(|()| file.sync_all())
+            .map_err(|error| io_error("write file", &temporary, &error))?;
+        fs::rename(&temporary, path).map_err(|error| io_error("replace file", path, &error))
     })();
     if let Err(error) = written {
         let _ = fs::remove_file(&temporary);
-        return Err(unavailable(error));
+        return Err(error);
     }
     Ok(())
 }
 
 fn backup(path: &Path, label: &str, backups: &Path) -> Result<(), PluginError> {
     let folder = backups.join(label.replace(['/', '\\'], "__"));
-    fs::create_dir_all(&folder).map_err(unavailable)?;
+    fs::create_dir_all(&folder)
+        .map_err(|error| io_error("create backup folder", &folder, &error))?;
     let mut copies: Vec<(i64, std::path::PathBuf)> = fs::read_dir(&folder)
-        .map_err(unavailable)?
+        .map_err(|error| io_error("read backup folder", &folder, &error))?
         .flatten()
         .filter_map(|entry| Some((entry.file_name().to_str()?.parse().ok()?, entry.path())))
         .collect();
@@ -113,7 +126,7 @@ fn backup(path: &Path, label: &str, backups: &Path) -> Result<(), PluginError> {
         );
     }
     let destination = folder.join(stamp.to_string());
-    fs::copy(path, &destination).map_err(unavailable)?;
+    fs::copy(path, &destination).map_err(|error| io_error("back up to", &destination, &error))?;
     copies.push((stamp, destination));
     let extra = copies.len().saturating_sub(KEEP_BACKUPS);
     for (_, old) in copies.into_iter().take(extra) {

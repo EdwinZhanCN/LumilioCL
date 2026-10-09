@@ -204,9 +204,10 @@ Discover.
   instance id and themed by loader/pack type (`lumilio-ui::cover`). Covers are
   static today; only the hovered card may animate (not yet built). A card's
   cover is its faceplate's display: it sits in a display window and does not
-  dissolve (§12). The Instance page's cover runs
-  under the title bar and dissolves into the page, with the title sitting on
-  the page colour below it.
+  dissolve (§12). The Instance page's cover is the
+  header's backdrop: it sits in the top-right corner under the title bar and
+  page actions, and dissolves leftward and downward into the page, so the
+  title always sits on the page colour and the cover costs no height.
 - Starting an install from Discover sends the item's icon to the Activity
   landmark (the game's item-pickup motion) and the task appears there.
 - Empty states are a single small vignette with one moving element and one

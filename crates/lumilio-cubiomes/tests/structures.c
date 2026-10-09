@@ -8,8 +8,10 @@
 static const int KINDS[] = {
     Desert_Pyramid, Jungle_Pyramid, Swamp_Hut, Igloo, Village, Ocean_Ruin,
     Shipwreck, Monument, Mansion, Outpost, Ruined_Portal, Ancient_City,
-    Trail_Ruins, Trial_Chambers, Fortress, Bastion, End_City,
+    Trail_Ruins, Trial_Chambers, Fortress, Bastion, End_City, Abandoned_Camp,
+    Treasure, Mineshaft, Desert_Well, Geode, End_Gateway,
 };
+#define KIND_COUNT ((int)(sizeof(KINDS) / sizeof(KINDS[0])))
 
 int main(void)
 {
@@ -27,7 +29,7 @@ int main(void)
             Generator g;
             setupGenerator(&g, mc, 0);
             applySeed(&g, dims[d], seed);
-            for (int k = 0; k < 17; k++)
+            for (int k = 0; k < KIND_COUNT; k++)
             {
                 int type = KINDS[k];
                 if (type == Ruined_Portal && dims[d] == DIM_NETHER) type = Ruined_Portal_N;

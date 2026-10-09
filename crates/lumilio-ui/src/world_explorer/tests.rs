@@ -96,7 +96,7 @@ fn pointer_keyboard_and_dimension_controls_preserve_camera_and_reject_departed_t
         (view.camera, generation.unwrap(), key)
     });
     cx.run_until_parked();
-    let nether = cx.debug_bounds("map-dimension-key-1").unwrap().center();
+    let nether = cx.debug_bounds("map-dimension-tab-1").unwrap().center();
     cx.simulate_click(nether, Modifiers::none());
     view.update(cx, |view, cx| {
         assert_eq!(view.camera, camera);
@@ -111,7 +111,7 @@ fn pointer_keyboard_and_dimension_controls_preserve_camera_and_reject_departed_t
         );
         assert!(!view.tiles.contains_key(&key));
     });
-    click(cx, "map-base-key-1");
+    click(cx, "map-base-tab-1");
     view.read_with(cx, |view, _| {
         assert_eq!(view.base, 1);
         assert_eq!(view.camera, camera);
@@ -215,7 +215,7 @@ fn inline_seed_enter_and_blur_apply_without_map_stealing_typing(cx: &mut TestApp
         assert_eq!(form.seed.read(cx).value().as_str(), "hello");
         assert!(form.seed_dirty);
     });
-    click(cx, "map-jump-x");
+    click(cx, "map-cursor");
     cx.update(|window, cx| {
         view.read_with(cx, |view, cx| {
             use gpui::Focusable as _;
@@ -402,12 +402,20 @@ fn go_key_and_enter_move_camera_and_a_bad_axis_shows_inline_error(cx: &mut TestA
         cx.run_until_parked();
     };
     set(cx, "-12", "34");
+    // The fields only show once the cursor read-out has been clicked.
+    assert!(cx.debug_bounds("map-go").is_none());
+    click(cx, "map-cursor");
     click(cx, "map-go");
     view.read_with(cx, |view, _| {
         assert_eq!([view.camera.x, view.camera.z], [-12., 34.])
     });
     assert!(cx.debug_bounds("map-jump-error").is_none());
+    assert!(
+        cx.debug_bounds("map-go").is_none(),
+        "a jump gives the read-out back"
+    );
     set(cx, "-56", "-78");
+    click(cx, "map-cursor");
     click(cx, "map-jump-z");
     cx.simulate_keystrokes("enter");
     cx.run_until_parked();
@@ -416,6 +424,7 @@ fn go_key_and_enter_move_camera_and_a_bad_axis_shows_inline_error(cx: &mut TestA
     });
     // One bad axis moves nothing; fixing the field clears the message.
     set(cx, "oops", "5");
+    click(cx, "map-cursor");
     click(cx, "map-go");
     view.read_with(cx, |view, _| {
         assert!(view.form.as_ref().unwrap().jump_error);
@@ -427,6 +436,13 @@ fn go_key_and_enter_move_camera_and_a_bad_axis_shows_inline_error(cx: &mut TestA
     cx.simulate_input("1");
     cx.run_until_parked();
     assert!(cx.debug_bounds("map-jump-error").is_none());
+    // Cancel gives the read-out back and leaves the camera alone.
+    click(cx, "map-jump-cancel");
+    assert!(cx.debug_bounds("map-go").is_none());
+    assert!(cx.debug_bounds("map-cursor").is_some());
+    view.read_with(cx, |view, _| {
+        assert_eq!([view.camera.x, view.camera.z], [-56., -78.])
+    });
 }
 
 #[gpui::test]
@@ -464,6 +480,126 @@ fn layers_popover_switches_show_state_and_coarse_zoom_hint_in_both_themes(cx: &m
 }
 
 #[gpui::test]
+fn the_pop_out_key_sits_left_of_layers_and_hands_over_what_the_map_shows(cx: &mut TestAppContext) {
+    let (view, cx) = rooted_map(cx, gpui_component::ThemeMode::Light);
+    let _commands = connect_commands(&view, cx);
+    assert!(
+        cx.debug_bounds("map-pop-out").is_none(),
+        "a map the host cannot pop out has no key"
+    );
+    let opened = Rc::new(std::cell::RefCell::new(Vec::new()));
+    let sink = opened.clone();
+    let second = saved_world("Second", "26.3", 263);
+    view.update(cx, |view, cx| {
+        view.pop_out = Some(Rc::new(move |handoff, _, _| {
+            sink.borrow_mut().push(handoff)
+        }));
+        view.contexts = vec![saved_world("First", "1.18.2", 262), second.clone()];
+        let mut context = second.context.clone();
+        context.dimension = Dimension::Nether;
+        view.context = Some(context);
+        view.camera = Camera {
+            x: 640.,
+            z: -128.,
+            scale: 2.,
+        };
+        view.layers.regions = true;
+        view.objects.enabled.insert("structure.village".into());
+        cx.notify();
+    });
+    cx.run_until_parked();
+    let key = cx.debug_bounds("map-pop-out").expect("the key");
+    let layers = cx.debug_bounds("map-layers").expect("the layers key");
+    let gap = f32::from(layers.left() - key.right());
+    assert!(
+        (0. ..=12.).contains(&gap),
+        "a small gap, left of Layers: {gap}"
+    );
+    assert!((f32::from(key.center().y - layers.center().y)).abs() <= 1.);
+    assert!(opened.borrow().is_empty());
+
+    click(cx, "map-pop-out");
+    assert_eq!(opened.borrow().len(), 1, "one click opens one window");
+    // The original keeps showing what it showed.
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.camera.scale, 2.);
+        assert_eq!(view.context.as_ref().unwrap().dimension, Dimension::Nether);
+    });
+
+    // The new map starts where the old one was, once the worlds arrive.
+    let handoff = opened.borrow()[0].clone();
+    let fresh = cx.new(|cx| MapView::new(Rc::new(|_, _, _| {}), cx));
+    fresh.update(cx, |fresh, cx| {
+        fresh.restore(handoff.clone());
+        assert_eq!(fresh.camera, view_camera());
+        assert!(fresh.layers.regions && !fresh.layers.chunks);
+        assert!(fresh.objects.enabled.contains("structure.village"));
+        assert!(fresh.pop_out.is_none(), "already in its own window");
+        fresh.event(
+            Event::Contexts(Ok((
+                vec![saved_world("First", "1.18.2", 262), second.clone()],
+                MapProviders::default(),
+            ))),
+            cx,
+        );
+        let context = fresh.context.as_ref().unwrap();
+        assert_eq!(context.world, second.context.world);
+        assert_eq!(context.dimension, Dimension::Nether);
+    });
+
+    // A world that is gone falls back to the first.
+    let gone = cx.new(|cx| MapView::new(Rc::new(|_, _, _| {}), cx));
+    gone.update(cx, |gone, cx| {
+        gone.restore(handoff);
+        gone.event(
+            Event::Contexts(Ok((
+                vec![saved_world("First", "1.18.2", 262)],
+                MapProviders::default(),
+            ))),
+            cx,
+        );
+        assert_eq!(
+            gone.context.as_ref().unwrap().world,
+            saved_world("First", "1.18.2", 262).context.world
+        );
+    });
+}
+
+fn view_camera() -> Camera {
+    Camera {
+        x: 640.,
+        z: -128.,
+        scale: 2.,
+    }
+}
+
+#[gpui::test]
+fn the_map_window_shows_the_map_without_a_pop_out_key(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_component::init(cx);
+        crate::theme::tune(cx);
+        cx.set_reduce_motion(true);
+    });
+    let (send, commands) = async_channel::bounded(128);
+    let (_events, receive) = async_channel::bounded(128);
+    let source = cx.new(|cx| MapView::new(Rc::new(|_, _, _| {}), cx));
+    let handoff = source.read_with(cx, |source, _| source.handoff());
+    let (_, cx) = cx.add_window_view(|window, cx| {
+        let content = cx.new(|cx| MapWindow::new(handoff, Connection { send, receive }, cx));
+        gpui_component::Root::new(content, window, cx)
+    });
+    cx.update(|window, _| window.activate_window());
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("world-map").is_some());
+    assert!(cx.debug_bounds("map-layers").is_some());
+    assert!(cx.debug_bounds("map-pop-out").is_none());
+    assert!(
+        matches!(commands.try_recv(), Ok(Command::Contexts)),
+        "the window asks for the worlds on its own connection"
+    );
+}
+
+#[gpui::test]
 fn retry_uses_one_counted_button_and_viewport_receives_surplus_height(cx: &mut TestAppContext) {
     let (view, cx) = rooted_map(cx, gpui_component::ThemeMode::Light);
     assert!(cx.debug_bounds("map-retry-0").is_none());
@@ -492,6 +628,10 @@ fn retry_uses_one_counted_button_and_viewport_receives_surplus_height(cx: &mut T
         cx.notify();
     });
     cx.run_until_parked();
+    // The map shows a dot; the retry key is in the messages menu.
+    assert!(cx.debug_bounds("map-notice-dot").is_some());
+    assert!(cx.debug_bounds("map-retry-3").is_none());
+    click(cx, "map-notices");
     assert!(cx.debug_bounds("map-retry-3").is_some());
     assert!(cx.debug_bounds("map-retry-2").is_none());
     click(cx, "map-retry-3");
@@ -1683,6 +1823,8 @@ fn a_same_named_xaero_directory_is_offered_and_linking_it_adds_the_layer(cx: &mu
         cx.notify();
     });
     cx.run_until_parked();
+    assert!(cx.debug_bounds("map-notice-dot").is_some());
+    click(cx, "map-notices");
     assert!(cx.debug_bounds("map-xaero-link").is_some());
     while commands.try_recv().is_ok() {}
     click(cx, "map-xaero-link-key");
@@ -1801,6 +1943,8 @@ fn an_unreadable_waypoint_file_is_a_status_not_a_plugin_failure(cx: &mut TestApp
     view.read_with(cx, |view, _| {
         assert!(view.objects.failed_with("map-xaero-unreadable"))
     });
+    assert!(cx.debug_bounds("map-notice-dot").is_some());
+    click(cx, "map-notices");
     assert!(cx.debug_bounds("map-status").is_some());
 }
 
@@ -2025,7 +2169,7 @@ fn a_new_object_is_placed_by_clicking_the_map_and_pre_filled_with_the_position(
     cx.run_until_parked();
     click(cx, "map-place");
     view.read_with(cx, |view, _| assert!(view.placing));
-    assert!(cx.debug_bounds("map-status").is_some(), "the hint is shown");
+    assert!(cx.debug_bounds("map-hint").is_some(), "the hint is shown");
     let (spot, expected) = view.update(cx, |view, _| {
         let origin = view.bounds.unwrap().origin;
         let local = [300.0_f64, 200.0];
@@ -2133,6 +2277,8 @@ fn the_save_map_says_what_it_needs_and_counts_blocks_without_colour(cx: &mut Tes
             Some(tr!("map-unknown-blocks", count = 3))
         );
     });
+    assert!(cx.debug_bounds("map-notice-dot").is_some());
+    click(cx, "map-notices");
     assert!(cx.debug_bounds("map-status").is_some());
 }
 

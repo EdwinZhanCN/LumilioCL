@@ -75,7 +75,19 @@ fn palette(loader: Loader, world: WorldHint) -> Palette {
     }
 }
 
-/// Rasterises one cover. The last `fade_rows` dissolve into `page`.
+/// Which edges of a cover dissolve into the surface it sits on.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Dissolve {
+    /// The last rows, the way a card or a page cover meets what is below it.
+    Bottom,
+    /// The leading columns as well as the last rows: a cover anchored to the
+    /// trailing corner that dies away behind a header's text.
+    Corner,
+}
+
+/// Rasterises one cover. The last `fade_rows` dissolve into `page`, and a
+/// `Corner` cover also dissolves its leading `fade_cols`.
+#[allow(clippy::too_many_arguments)]
 pub fn render(
     seed: u32,
     loader: Loader,
@@ -83,6 +95,7 @@ pub fn render(
     columns: usize,
     rows: usize,
     fade_rows: usize,
+    fade_cols: usize,
     page: Rgb,
 ) -> PixelGrid {
     let colors = palette(loader, world);
@@ -139,6 +152,7 @@ pub fn render(
     }
 
     grid.fade_bottom(fade_rows.min(rows / 2), page);
+    grid.fade_left(fade_cols, page);
     grid
 }
 
@@ -151,6 +165,31 @@ pub fn element(
     page: Hsla,
     fade: Pixels,
     round: Pixels,
+) -> impl IntoElement {
+    painted(seed, loader, world, page, fade, round, Dissolve::Bottom)
+}
+
+/// A header's backdrop: the cover fills its parent, dissolving on the left
+/// and bottom so only the trailing corner keeps its colour. The parent is
+/// anchored to the corner and sized by the caller.
+pub fn corner(
+    seed: u32,
+    loader: Loader,
+    world: WorldHint,
+    page: Hsla,
+    fade: Pixels,
+) -> impl IntoElement {
+    painted(seed, loader, world, page, fade, px(0.), Dissolve::Corner)
+}
+
+fn painted(
+    seed: u32,
+    loader: Loader,
+    world: WorldHint,
+    page: Hsla,
+    fade: Pixels,
+    round: Pixels,
+    dissolve: Dissolve,
 ) -> impl IntoElement {
     let page = page.to_rgb();
     let page = Rgb::new(page.r, page.g, page.b);
@@ -173,6 +212,7 @@ pub fn element(
                 px_w,
                 px_h,
                 (f32::from(fade) * scale).round() as u32,
+                dissolve as u8,
                 Rgb::new(page.r, page.g, page.b).pack(),
             );
             let image = cached(key, window, || {
@@ -180,7 +220,15 @@ pub fn element(
                 let texel = width / columns as f32;
                 let rows = ((height / texel).round() as usize).max(4);
                 let fade_rows = (f32::from(fade) / (height / rows as f32)).round() as usize;
-                let grid = render(seed, loader, world, columns, rows, fade_rows, page);
+                let fade_cols = match dissolve {
+                    Dissolve::Bottom => 0,
+                    // Most of the width, so the left edge is the page and the
+                    // text over it never meets busy art.
+                    Dissolve::Corner => columns * 9 / 10,
+                };
+                let grid = render(
+                    seed, loader, world, columns, rows, fade_rows, fade_cols, page,
+                );
                 let bytes = rasterize(&grid, px_w as usize, px_h as usize);
                 let buffer = image::RgbaImage::from_raw(px_w, px_h, bytes)?;
                 Some(Arc::new(RenderImage::new([image::Frame::new(buffer)])))
@@ -226,7 +274,7 @@ fn rasterize(grid: &PixelGrid, width: usize, height: usize) -> Vec<u8> {
     bytes
 }
 
-type CoverKey = (u32, u8, u8, u32, u32, u32, u32);
+type CoverKey = (u32, u8, u8, u32, u32, u32, u8, u32);
 
 thread_local! {
     /// Covers already uploaded, so a repaint reuses the same atlas entry
@@ -268,7 +316,7 @@ mod tests {
 
     fn cover(seed: u32, loader: Loader) -> Vec<u32> {
         let page = Rgb::hex(0x101010);
-        let grid = render(seed, loader, WorldHint::Overworld, 40, 20, 6, page);
+        let grid = render(seed, loader, WorldHint::Overworld, 40, 20, 6, 0, page);
         (0..20)
             .flat_map(|y| (0..40).map(move |x| (x, y)))
             .map(|(x, y)| grid.get(x, y).pack())
@@ -299,9 +347,18 @@ mod tests {
     #[test]
     fn the_last_row_is_exactly_the_page() {
         let page = Rgb::hex(0x101010);
-        let grid = render(9, Loader::Quilt, WorldHint::Nether, 40, 20, 6, page);
+        let grid = render(9, Loader::Quilt, WorldHint::Nether, 40, 20, 6, 0, page);
         for x in 0..40 {
             assert_eq!(grid.get(x, 19).pack(), page.pack());
+        }
+    }
+
+    #[test]
+    fn a_corner_cover_also_ends_on_the_page_at_its_leading_edge() {
+        let page = Rgb::hex(0x101010);
+        let grid = render(9, Loader::Quilt, WorldHint::Nether, 40, 20, 6, 36, page);
+        for y in 0..20 {
+            assert_eq!(grid.get(0, y).pack(), page.pack());
         }
     }
 }
