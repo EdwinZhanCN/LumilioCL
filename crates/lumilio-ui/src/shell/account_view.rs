@@ -52,13 +52,6 @@ impl LauncherShell {
         let view = cx.new(SkinViewer::new);
         self.account_revision += 1;
         let revision = self.account_revision;
-        let wardrobe = self
-            .live_handler
-            .clone()
-            .filter(|_| !row.third_party)
-            .map(|handler| {
-                cx.new(|_| Wardrobe::new(key.clone(), revision, row.microsoft, handler))
-            });
         let offline = self
             .live_handler
             .clone()
@@ -76,6 +69,22 @@ impl LauncherShell {
                         cx,
                     )
                     .inline()
+                })
+            });
+        let wardrobe = self
+            .live_handler
+            .clone()
+            .filter(|_| !row.third_party)
+            .map(|handler| {
+                let viewer = view.downgrade();
+                let form = offline.clone();
+                cx.new(|cx| {
+                    let wardrobe =
+                        Wardrobe::new(key.clone(), revision, row.microsoft, handler, viewer, cx);
+                    match form {
+                        Some(form) => wardrobe.with_offline_form(form),
+                        None => wardrobe,
+                    }
                 })
             });
         self.account_viewer = Some(AccountViewer {
@@ -108,6 +117,7 @@ impl LauncherShell {
         revision: u64,
         library: Result<Vec<lumilio_core::LibrarySkin>, crate::new_game::Failure>,
         profile: Option<Result<lumilio_core::MojangProfile, crate::new_game::Failure>>,
+        warning: Option<crate::new_game::Failure>,
         cx: &mut Context<Self>,
     ) {
         if let Some(view) = self
@@ -116,7 +126,44 @@ impl LauncherShell {
             .filter(|view| view.key == key && view.revision == revision)
             .and_then(|view| view.wardrobe.as_ref())
         {
-            view.update(cx, |view, cx| view.listed(library, profile, cx));
+            view.update(cx, |view, cx| view.listed(library, profile, warning, cx));
+        }
+    }
+
+    pub fn wardrobe_worn(
+        &mut self,
+        key: &str,
+        revision: u64,
+        ids: std::collections::HashSet<String>,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(view) = self
+            .account_viewer
+            .as_ref()
+            .filter(|view| view.key == key && view.revision == revision)
+            .and_then(|view| view.wardrobe.as_ref())
+        {
+            view.update(cx, |view, cx| view.set_worn(ids, cx));
+        }
+    }
+
+    /// The pictures of the library skins and the owned capes, for the
+    /// wardrobe's tiles.
+    pub fn wardrobe_pictures(
+        &mut self,
+        key: &str,
+        revision: u64,
+        skins: Vec<(String, lumilio_core::AccountLook)>,
+        capes: Option<Vec<(String, lumilio_core::SkinPixels)>>,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(view) = self
+            .account_viewer
+            .as_ref()
+            .filter(|view| view.key == key && view.revision == revision)
+            .and_then(|view| view.wardrobe.as_ref())
+        {
+            view.update(cx, |view, cx| view.update_pictures(skins, capes, cx));
         }
     }
 
@@ -135,6 +182,27 @@ impl LauncherShell {
             .and_then(|view| view.wardrobe.as_ref())
         {
             view.update(cx, |view, cx| view.finished(action, result, cx));
+        }
+    }
+
+    pub fn wardrobe_partially_finished(
+        &mut self,
+        key: &str,
+        revision: u64,
+        action: crate::wardrobe::WardrobeAction,
+        remaining: crate::wardrobe::WardrobeAction,
+        error: crate::new_game::Failure,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(view) = self
+            .account_viewer
+            .as_ref()
+            .filter(|view| view.key == key && view.revision == revision)
+            .and_then(|view| view.wardrobe.as_ref())
+        {
+            view.update(cx, |view, cx| {
+                view.partially_finished(action, remaining, error, cx)
+            });
         }
     }
 

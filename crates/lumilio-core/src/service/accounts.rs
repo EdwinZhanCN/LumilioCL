@@ -42,6 +42,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             .find(|entry| entry.key() == key)
             .cloned();
         self.settings.lock().await.remove_account(key)?;
+        self.profiles.remove(key).await;
         if let Some(entry) = signed_in.filter(|entry| entry.kind == AccountKind::ThirdParty) {
             self.sign_out_third_party(key, &entry).await;
         }

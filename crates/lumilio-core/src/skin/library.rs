@@ -16,12 +16,24 @@ pub enum SkinSource {
     Mojang(String),
 }
 
+/// The cape a library skin is worn with on a Microsoft account. Entries
+/// written before pairing existed keep the cape as it is.
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub enum PairedCape {
+    #[default]
+    Keep,
+    Hidden,
+    Cape(String),
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct LibrarySkin {
     pub id: String,
     pub name: String,
     pub model: SkinModel,
     pub source: SkinSource,
+    #[serde(default)]
+    pub cape: PairedCape,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -121,6 +133,7 @@ impl SkinLibrary {
             name,
             model,
             source,
+            cape: PairedCape::Keep,
         };
         let mut index = self.index.clone();
         index.entries.push(entry.clone());
@@ -137,6 +150,67 @@ impl SkinLibrary {
             .find(|entry| entry.id == id)
             .expect("checked id")
             .model = model;
+        self.commit(index)
+    }
+
+    pub fn rename(&mut self, id: &str, name: &str) -> Result<(), AppearanceError> {
+        let name = name.trim();
+        if name.is_empty() {
+            return Err(AppearanceError::EmptyName);
+        }
+        self.update(id, |entry| entry.name = name.to_owned())
+    }
+
+    pub fn set_cape(&mut self, id: &str, cape: PairedCape) -> Result<(), AppearanceError> {
+        self.update(id, |entry| entry.cape = cape)
+    }
+
+    /// Puts another picture in an entry's place, keeping its name, model,
+    /// cape and position. The old file stays, like a removed entry's, so an
+    /// offline account that chose it still launches. A picture already in
+    /// the library takes the place and the duplicate row is dropped.
+    pub fn replace(
+        &mut self,
+        id: &str,
+        bytes: &[u8],
+        source: SkinSource,
+    ) -> Result<LibrarySkin, AppearanceError> {
+        let old = self.entry(id)?.clone();
+        let added = self.add(old.name.clone(), bytes, old.model, source)?;
+        if added.id == old.id {
+            return Ok(added);
+        }
+        let mut index = self.index.clone();
+        index.entries.retain(|entry| entry.id != added.id);
+        let at = index
+            .entries
+            .iter()
+            .position(|entry| entry.id == old.id)
+            .expect("checked id");
+        let replaced = LibrarySkin {
+            id: added.id,
+            source: added.source,
+            ..old
+        };
+        index.entries[at] = replaced.clone();
+        self.commit(index)?;
+        Ok(replaced)
+    }
+
+    fn update(
+        &mut self,
+        id: &str,
+        change: impl FnOnce(&mut LibrarySkin),
+    ) -> Result<(), AppearanceError> {
+        self.entry(id)?;
+        let mut index = self.index.clone();
+        change(
+            index
+                .entries
+                .iter_mut()
+                .find(|entry| entry.id == id)
+                .expect("checked id"),
+        );
         self.commit(index)
     }
 

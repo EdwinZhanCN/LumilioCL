@@ -18,6 +18,12 @@ pub enum AppearanceError {
     Network(String),
     Protocol(String),
     Refused(u16),
+    /// Mojang answered 429: too many profile changes in a short time.
+    RateLimited,
+    /// A server-provided Retry-After delay, in seconds.
+    RateLimitedFor(u64),
+    /// A library entry's name is empty.
+    EmptyName,
     NotMicrosoft,
     CapeNotOwned,
     Storage(String),
@@ -34,6 +40,10 @@ impl Display for AppearanceError {
             Self::Network(why) => write!(f, "appearance request failed: {why}"),
             Self::Protocol(why) => write!(f, "unexpected appearance response: {why}"),
             Self::Refused(status) => write!(f, "appearance request refused: HTTP {status}"),
+            Self::RateLimited | Self::RateLimitedFor(_) => {
+                f.write_str("too many appearance changes; Mojang asked to wait")
+            }
+            Self::EmptyName => f.write_str("a library skin needs a name"),
             Self::NotMicrosoft => f.write_str("appearance changes require a Microsoft account"),
             Self::CapeNotOwned => f.write_str("the profile does not own that cape"),
             Self::Storage(why) => write!(f, "skin library storage failed: {why}"),
@@ -109,12 +119,23 @@ pub struct AppearanceUpdate {
 
 pub struct MojangClient<'a, T: Transport + ?Sized> {
     transport: &'a T,
+    textures: Option<&'a super::cache::TextureCache>,
 }
 
 impl<'a, T: Transport + ?Sized> MojangClient<'a, T> {
     #[must_use]
     pub const fn new(transport: &'a T) -> Self {
-        Self { transport }
+        Self {
+            transport,
+            textures: None,
+        }
+    }
+
+    pub(crate) fn cached(transport: &'a T, textures: &'a super::cache::TextureCache) -> Self {
+        Self {
+            transport,
+            textures: Some(textures),
+        }
     }
 
     async fn send(
@@ -151,6 +172,7 @@ impl<'a, T: Transport + ?Sized> MojangClient<'a, T> {
                     "server rejected the picture".into(),
                 ));
             }
+            429 => return Err(rate_limited(&response)),
             status => return Err(AppearanceError::Refused(status)),
         }
         bounded_body(response, 1024 * 1024).await
@@ -163,6 +185,25 @@ impl<'a, T: Transport + ?Sized> MojangClient<'a, T> {
 
     /// PNG validation precedes every request, including legacy conversion.
     pub async fn change(
+        &self,
+        token: &Secret,
+        change: AppearanceChange,
+    ) -> Result<AppearanceUpdate, AppearanceError> {
+        if let AppearanceChange::Cape(Some(id)) = &change
+            && !self
+                .profile(token)
+                .await?
+                .capes
+                .iter()
+                .any(|cape| &cape.id == id)
+        {
+            return Err(AppearanceError::CapeNotOwned);
+        }
+        self.change_validated(token, change).await
+    }
+
+    /// The service validates cape ownership against its shared profile snapshot.
+    pub(crate) async fn change_validated(
         &self,
         token: &Secret,
         change: AppearanceChange,
@@ -196,25 +237,14 @@ impl<'a, T: Transport + ?Sized> MojangClient<'a, T> {
             }
             AppearanceChange::DefaultSkin => (HttpMethod::Delete, "/skins/active", None),
             AppearanceChange::Cape(None) => (HttpMethod::Delete, "/capes/active", None),
-            AppearanceChange::Cape(Some(id)) => {
-                if !self
-                    .profile(token)
-                    .await?
-                    .capes
-                    .iter()
-                    .any(|cape| cape.id == id)
-                {
-                    return Err(AppearanceError::CapeNotOwned);
-                }
-                (
-                    HttpMethod::Put,
-                    "/capes/active",
-                    Some((
-                        "application/json".into(),
-                        serde_json::json!({"capeId": id}).to_string().into_bytes(),
-                    )),
-                )
-            }
+            AppearanceChange::Cape(Some(id)) => (
+                HttpMethod::Put,
+                "/capes/active",
+                Some((
+                    "application/json".into(),
+                    serde_json::json!({"capeId": id}).to_string().into_bytes(),
+                )),
+            ),
         };
         let bytes = self.send(method, suffix, token, content).await?;
         Ok(AppearanceUpdate {
@@ -225,6 +255,12 @@ impl<'a, T: Transport + ?Sized> MojangClient<'a, T> {
     /// Texture requests never carry the account's bearer token.
     pub async fn skin_png(&self, skin: &MojangSkin) -> Result<Vec<u8>, AppearanceError> {
         normalize_png(&self.texture(&skin.url).await?)
+    }
+
+    /// A cape's picture, for the wardrobe's cape list. Texture requests
+    /// never carry the account's bearer token.
+    pub async fn cape_png(&self, cape: &MojangCape) -> Result<Vec<u8>, AppearanceError> {
+        self.texture(&cape.url).await
     }
 
     /// Texture requests never carry the account's bearer token.
@@ -247,31 +283,68 @@ impl<'a, T: Transport + ?Sized> MojangClient<'a, T> {
     }
 
     async fn texture(&self, address: &str) -> Result<Vec<u8>, AppearanceError> {
-        let mut url = url::Url::parse(address)
-            .map_err(|error| AppearanceError::Protocol(error.to_string()))?;
-        if !matches!(url.scheme(), "http" | "https")
-            || url.host_str() != Some("textures.minecraft.net")
-            || !url.username().is_empty()
-            || url.password().is_some()
-            || url.port().is_some()
-        {
-            return Err(AppearanceError::Protocol(
-                "untrusted Mojang texture address".into(),
-            ));
+        if let Some(cache) = self.textures {
+            return cache.get(self.transport, address).await;
         }
-        // Profile URLs historically use HTTP; fetch their HTTPS equivalent.
-        url.set_scheme("https")
-            .map_err(|()| AppearanceError::Protocol("invalid texture scheme".into()))?;
+        self.texture_uncached(address).await
+    }
+
+    pub(super) async fn texture_uncached(&self, address: &str) -> Result<Vec<u8>, AppearanceError> {
+        let url = texture_url(address)?;
         let response = self
             .transport
             .get(url.as_str())
             .await
             .map_err(|error| AppearanceError::Network(error.to_string()))?;
         if response.status() != 200 {
-            return Err(AppearanceError::Refused(response.status()));
+            return Err(match response.status() {
+                429 => rate_limited(&response),
+                status => AppearanceError::Refused(status),
+            });
         }
         bounded_body(response, super::PICTURE_LIMIT as usize).await
     }
+}
+
+pub(super) fn texture_url(address: &str) -> Result<url::Url, AppearanceError> {
+    let mut url =
+        url::Url::parse(address).map_err(|error| AppearanceError::Protocol(error.to_string()))?;
+    if !matches!(url.scheme(), "http" | "https")
+        || url.host_str() != Some("textures.minecraft.net")
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.port().is_some()
+        || !url.path().starts_with("/texture/")
+        || url.query().is_some()
+        || url.fragment().is_some()
+    {
+        return Err(AppearanceError::Protocol(
+            "untrusted Mojang texture address".into(),
+        ));
+    }
+    // Profile URLs historically use HTTP; fetch their HTTPS equivalent.
+    url.set_scheme("https")
+        .map_err(|()| AppearanceError::Protocol("invalid texture scheme".into()))?;
+    Ok(url)
+}
+
+fn rate_limited(response: &crate::transfer::TransportResponse) -> AppearanceError {
+    response.header("retry-after").and_then(retry_after).map_or(
+        AppearanceError::RateLimited,
+        AppearanceError::RateLimitedFor,
+    )
+}
+
+fn retry_after(value: &str) -> Option<u64> {
+    const MAX_WAIT: u64 = 24 * 60 * 60;
+    if let Ok(seconds) = value.trim().parse::<u64>() {
+        return Some(seconds.clamp(1, MAX_WAIT));
+    }
+    let date = chrono::DateTime::parse_from_rfc2822(value.trim()).ok()?;
+    let seconds = date
+        .timestamp()
+        .saturating_sub(chrono::Utc::now().timestamp());
+    Some(seconds.clamp(1, MAX_WAIT as i64) as u64)
 }
 
 async fn bounded_body(

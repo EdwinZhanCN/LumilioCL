@@ -39,7 +39,7 @@ use tokio::sync::mpsc;
 /// Answers addresses containing a key from a table, and `file:` addresses
 /// from disk; everything else fails like an unreachable host.
 type Answer = (String, Vec<u8>);
-type Replies = BTreeMap<String, std::collections::VecDeque<(u16, String)>>;
+type Replies = BTreeMap<String, std::collections::VecDeque<(u16, String, Vec<(String, String)>)>>;
 
 #[derive(Clone, Default)]
 struct Scripted {
@@ -54,12 +54,22 @@ struct Scripted {
 
 impl Scripted {
     fn reply(&self, url: &str, status: u16, body: &str) {
+        self.reply_with_headers(url, status, body, Vec::new());
+    }
+    fn reply_with_headers(&self, url: &str, status: u16, body: &str, headers: Vec<(&str, &str)>) {
         self.replies
             .lock()
             .unwrap()
             .entry(url.to_owned())
             .or_default()
-            .push_back((status, body.to_owned()));
+            .push_back((
+                status,
+                body.to_owned(),
+                headers
+                    .into_iter()
+                    .map(|(name, value)| (name.to_owned(), value.to_owned()))
+                    .collect(),
+            ));
     }
     fn clear_replies(&self, url: &str) {
         self.replies.lock().unwrap().remove(url);
@@ -96,8 +106,9 @@ impl Transport for Scripted {
         });
         Box::pin(async move {
             match answer {
-                Some((status, body)) => {
-                    Ok(TransportResponse::from_bytes(status, body.into_bytes()))
+                Some((status, body, headers)) => {
+                    Ok(TransportResponse::from_bytes(status, body.into_bytes())
+                        .with_headers(headers))
                 }
                 None => Err(crate::transfer::TransportError::transient("no route")),
             }

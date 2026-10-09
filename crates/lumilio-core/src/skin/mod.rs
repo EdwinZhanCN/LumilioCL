@@ -8,6 +8,7 @@
 //! API; the game is pointed at a Yggdrasil server on this machine that answers
 //! for that one player.
 
+pub(crate) mod cache;
 pub(crate) mod defaults;
 mod library;
 mod mojang;
@@ -16,7 +17,7 @@ mod server;
 pub(crate) mod session;
 mod signer;
 
-pub use self::library::{LibrarySkin, SkinLibrary, SkinSource};
+pub use self::library::{LibrarySkin, PairedCape, SkinLibrary, SkinSource};
 pub use self::mojang::{
     AppearanceChange, AppearanceError, AppearanceUpdate, MojangCape, MojangClient, MojangProfile,
     MojangSkin,
@@ -48,7 +49,7 @@ const PICTURE_LIMIT: u64 = 2 * 1024 * 1024;
 const MAX_SIDE: u32 = 4096;
 
 /// How the arms are shaped.
-#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SkinModel {
     /// The classic 4-pixel arms (HMCL's `default`, "Steve").

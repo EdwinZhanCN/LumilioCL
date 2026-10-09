@@ -176,6 +176,20 @@ impl NamePrompt {
         }
     }
 
+    /// Shows `text` as the empty field's hint instead of the collection
+    /// examples, for prompts that name something else.
+    #[must_use]
+    pub fn with_placeholder(
+        self,
+        text: &'static str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        self.input
+            .update(cx, |input, cx| input.set_placeholder(text, window, cx));
+        self
+    }
+
     fn typed(&self, cx: &App) -> String {
         self.input.read(cx).value().to_string()
     }

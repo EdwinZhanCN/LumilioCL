@@ -2,11 +2,13 @@
 //! interface asks (library, Home, create, launch, search, install).
 //!
 //! Every method is `async` and `Send`, so any front end can run it on a
-//! runtime; nothing here knows about a window. Locks are never held across a
-//! network wait.
+//! runtime; nothing here knows about a window. Resource-specific profile and
+//! texture locks can span their own network reads to coalesce requests; global
+//! settings and library locks do not.
 
 mod accounts;
 mod activity;
+mod appearance;
 mod content;
 mod content_install;
 mod diagnostics;
@@ -39,6 +41,7 @@ mod worlds;
 #[cfg(test)]
 mod tests;
 
+pub use self::appearance::ProfileSnapshot;
 pub use self::error::ServiceError;
 pub use self::models::ModelPreview;
 pub use self::third_party::ThirdPartySignIn;
@@ -46,6 +49,7 @@ pub use self::types::{
     ActivityView, ContentEffect, ContentResult, DependencyNeed, DependencyReport, DiscoverFilters,
     GameLogSource, GameLogs, InstalledProject, Library, ProjectDetail, now,
 };
+pub use self::wardrobe::AppearanceApplyResult;
 
 use self::support::InstanceLease;
 use crate::activity::CancellationToken;
@@ -106,6 +110,8 @@ pub struct LauncherService<T> {
     /// Library index writes and per-profile appearance changes serialize,
     /// independently of credential refresh.
     wardrobe_lock: Mutex<()>,
+    profiles: appearance::Profiles,
+    textures: crate::skin::cache::TextureCache,
     /// Third-party sign-ins waiting for the person to choose a character:
     /// the session stays in memory only, until chosen or abandoned.
     pending_sign_ins: StdMutex<BTreeMap<u64, third_party::PendingSignIn>>,
@@ -145,6 +151,10 @@ impl<T: Transport + Clone> LauncherService<T> {
             .with_network_config(transport.clone(), settings.source_chain().ok());
         Ok(Self {
             plugins: Arc::new(plugins),
+            textures: crate::skin::cache::TextureCache::new(
+                layout.root().join("cache/skin-textures"),
+            ),
+            profiles: appearance::Profiles::default(),
             layout,
             transport,
             store: Mutex::new(store),

@@ -408,7 +408,6 @@ impl Render for SkinDialog {
                     .child(kit::technical("skin-technical", technical).xsmall())
             }))
             .when(self.inline, |form| {
-                // ia[accounts]: 保存离线外观 | 衣橱内联表单 | 默认、本地皮肤与披风、LittleSkin 或自定义站保存为 SkinChoice；预览更新，启动仍按 ADR 0024
                 form.child(
                     Key::new("skin-inline-save")
                         .label(tr!("account-skin-save"))

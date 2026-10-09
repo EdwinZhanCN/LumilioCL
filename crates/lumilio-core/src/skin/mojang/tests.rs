@@ -37,6 +37,94 @@ impl Transport for Script {
 
 const PROFILE: &str = r#"{"id":"123e4567e89b12d3a456426614174000","name":"Player","skins":[{"id":"skin","state":"ACTIVE","url":"http://textures.minecraft.net/texture/skin","variant":"SLIM"}],"capes":[{"id":"owned","state":"ACTIVE","url":"http://textures.minecraft.net/texture/cape","alias":"Minecon"}]}"#;
 
+#[test]
+fn retry_after_accepts_seconds_and_http_date_with_a_safe_limit() {
+    assert_eq!(retry_after("12"), Some(12));
+    assert_eq!(retry_after("0"), Some(1));
+    assert_eq!(retry_after("999999999999"), Some(24 * 60 * 60));
+    assert_eq!(retry_after("invalid"), None);
+    let future = (chrono::Utc::now() + chrono::Duration::minutes(5)).to_rfc2822();
+    let seconds = retry_after(&future).unwrap();
+    assert!((295..=300).contains(&seconds));
+}
+
+#[tokio::test]
+async fn texture_cache_coalesces_readers_and_reuses_disk_without_credentials() {
+    let root = tempfile::tempdir().unwrap();
+    let cache = super::super::cache::TextureCache::new(root.path().join("textures"));
+    let script = Script::default();
+    let bytes = png(64, 64, [4, 5, 6, 255]);
+    script.answer(200, bytes.clone());
+    let url = "http://textures.minecraft.net/texture/shared";
+    let (one, two) = tokio::join!(
+        cache.get(&script, url),
+        cache.get(&script, "https://textures.minecraft.net/texture/shared"),
+    );
+    assert_eq!(one.unwrap(), bytes);
+    assert_eq!(two.unwrap(), bytes);
+    {
+        let requests = script.requests.lock().unwrap();
+        assert_eq!(requests.len(), 1);
+        assert_eq!(
+            requests[0].url,
+            "https://textures.minecraft.net/texture/shared"
+        );
+        assert!(requests[0].headers.is_empty());
+    }
+    let reopened = super::super::cache::TextureCache::new(root.path().join("textures"));
+    assert_eq!(reopened.get(&script, url).await.unwrap(), bytes);
+    assert_eq!(script.requests.lock().unwrap().len(), 1);
+    let file = std::fs::read_dir(root.path().join("textures"))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    std::fs::write(file, b"broken PNG").unwrap();
+    script.answer(200, bytes.clone());
+    let recovered = super::super::cache::TextureCache::new(root.path().join("textures"));
+    assert_eq!(recovered.get(&script, url).await.unwrap(), bytes);
+    assert_eq!(script.requests.lock().unwrap().len(), 2);
+}
+
+#[tokio::test]
+async fn texture_cache_rejects_bad_png_and_does_not_persist_it() {
+    let root = tempfile::tempdir().unwrap();
+    let cache = super::super::cache::TextureCache::new(root.path().join("textures"));
+    let script = Script::default();
+    script.answer(200, b"not a PNG".to_vec());
+    assert!(matches!(
+        cache
+            .get(&script, "https://textures.minecraft.net/texture/bad")
+            .await,
+        Err(AppearanceError::Picture(_))
+    ));
+    assert!(!root.path().join("textures").exists());
+    // A new cache instance has no poisoned in-memory slot.
+    let cache = super::super::cache::TextureCache::new(root.path().join("textures"));
+    script.answer(200, png(64, 64, [1, 2, 3, 255]));
+    assert!(
+        cache
+            .get(&script, "https://textures.minecraft.net/texture/bad")
+            .await
+            .is_ok()
+    );
+}
+
+#[tokio::test]
+async fn texture_download_has_a_size_limit() {
+    let root = tempfile::tempdir().unwrap();
+    let cache = super::super::cache::TextureCache::new(root.path().join("textures"));
+    let script = Script::default();
+    script.answer(200, vec![0; super::super::PICTURE_LIMIT as usize + 1]);
+    assert!(matches!(
+        cache
+            .get(&script, "https://textures.minecraft.net/texture/oversize")
+            .await,
+        Err(AppearanceError::Protocol(_))
+    ));
+}
+
 pub(crate) fn png(width: u32, height: u32, color: [u8; 4]) -> Vec<u8> {
     let image = image::RgbaImage::from_pixel(width, height, image::Rgba(color));
     let mut bytes = Vec::new();
@@ -206,6 +294,7 @@ async fn ownership_token_picture_and_network_failures_stay_distinct_and_redacted
         (404, AppearanceError::NoGameOwnership),
         (401, AppearanceError::SignInRequired),
         (403, AppearanceError::Refused(403)),
+        (429, AppearanceError::RateLimited),
     ] {
         script.answer(status, "private-token");
         let error = client.profile(&token).await.unwrap_err();

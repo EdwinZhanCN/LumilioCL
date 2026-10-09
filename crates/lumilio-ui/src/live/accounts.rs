@@ -186,6 +186,10 @@ pub fn account_failure(error: &lumilio_core::ServiceError) -> (String, String) {
                 AppearanceError::Network(_) => tr!("account-look-error-network"),
                 AppearanceError::Protocol(_) => tr!("account-look-error-protocol"),
                 AppearanceError::Refused(_) => tr!("account-look-error-refused"),
+                AppearanceError::RateLimited | AppearanceError::RateLimitedFor(_) => {
+                    tr!("account-look-error-rate-limited")
+                }
+                AppearanceError::EmptyName => tr!("collection-name-required"),
                 AppearanceError::NotMicrosoft => tr!("account-look-error-read-only"),
                 AppearanceError::CapeNotOwned => tr!("account-look-error-cape"),
                 AppearanceError::Storage(_) => tr!("account-look-error-storage"),

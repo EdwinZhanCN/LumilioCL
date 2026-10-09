@@ -170,7 +170,14 @@ fn reopening_the_same_account_drops_old_look_and_wardrobe_results(cx: &mut TestA
     assert_ne!(old, new);
     shell.update(cx, |shell, cx| {
         shell.account_look("Steve", old, Err("late old failure".into()), cx);
-        shell.wardrobe_listed("Steve", old, Err(("late".into(), "old".into())), None, cx);
+        shell.wardrobe_listed(
+            "Steve",
+            old,
+            Err(("late".into(), "old".into())),
+            None,
+            None,
+            cx,
+        );
     });
     cx.run_until_parked();
     assert!(cx.debug_bounds("skin-view-error").is_none());

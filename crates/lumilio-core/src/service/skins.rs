@@ -48,7 +48,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             .ok_or_else(|| ServiceError::Settings(SettingsError::UnknownAccount(key.to_owned())))?;
         let mut look = if entry.kind == AccountKind::Microsoft {
             let profile = self.account_profile(key).await?;
-            crate::skin::MojangClient::new(&self.transport)
+            crate::skin::MojangClient::cached(&self.transport, &self.textures)
                 .look(&profile)
                 .await
                 .map_err(ServiceError::from)?

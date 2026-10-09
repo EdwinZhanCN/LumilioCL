@@ -166,9 +166,10 @@ pub use repair::{
 pub use screenshots::{ScreenshotError, ScreenshotInfo};
 pub use servers::{PackPolicy, PingError, ServerEntry, ServerError, ServerStatus};
 pub use service::{
-    ActivityView, ContentEffect, ContentResult, DependencyNeed, DependencyReport, DiscoverFilters,
-    GameLogSource, GameLogs, InstalledProject, LauncherService, Library, ModelPreview,
-    ProjectDetail, ServiceError, ThirdPartySignIn, now as unix_now,
+    ActivityView, AppearanceApplyResult, ContentEffect, ContentResult, DependencyNeed,
+    DependencyReport, DiscoverFilters, GameLogSource, GameLogs, InstalledProject, LauncherService,
+    Library, ModelPreview, ProfileSnapshot, ProjectDetail, ServiceError, ThirdPartySignIn,
+    now as unix_now,
 };
 pub use settings::{
     AccountEntry, AccountKind, AuthServerEntry, DownloadSourcePreference, LauncherSettings,
@@ -176,8 +177,9 @@ pub use settings::{
 };
 pub use skin::{
     AccountLook, AppearanceChange, AppearanceError, AppearanceUpdate, LITTLE_SKIN_CSL, LibrarySkin,
-    MojangCape, MojangClient, MojangProfile, MojangSkin, Pixels as SkinPixels, SkinChoice,
-    SkinError, SkinLibrary, SkinModel, SkinSource, cape_pixels, looks_slim, skin_pixels,
+    MojangCape, MojangClient, MojangProfile, MojangSkin, PairedCape, Pixels as SkinPixels,
+    SkinChoice, SkinError, SkinLibrary, SkinModel, SkinSource, cape_pixels, looks_slim,
+    skin_pixels,
 };
 pub use snapshots::{
     RESTORE_LIMIT, SnapshotError, SnapshotInfo, SnapshotScope, create as create_snapshot,

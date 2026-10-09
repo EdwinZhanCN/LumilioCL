@@ -476,21 +476,43 @@ explicitly removed from GPUI's image cache (ADR 0028).
 
 Account details use a CPU-rendered player preview alongside a wardrobe,
 inside the Accounts master–detail page rather than a
-navigation landmark. Microsoft accounts edit their owned profile and capes;
-offline choices are an inline form and still use the local skin server at
-launch. Third-party accounts preview session textures and link to the skin
-site. Local skin imports copy normalized PNGs into the launcher library;
-removing a library entry leaves any already selected offline file usable.
-The wardrobe and preview belong to one retained detail session, so late reads
-cannot replace a newly opened account. Accepted Microsoft writes show pending
-feedback while a delayed profile read confirms propagation. Default artwork
+navigation landmark. The look has two layers, after Modrinth App's skin page.
+The first is the figure, unframed, with one place to act under it, beside a
+grid of skin pictures. The grid's first cell adds a skin (choose or drop a
+PNG); each other cell is only a picture, a name and ⋯ (rename, edit, move,
+remove). The worn skin carries a tick; a tried-on skin is ringed and the
+figure is badged 试穿中. Choosing a picture only changes the local preview,
+and the place under the figure becomes Revert and Apply. Otherwise it holds
+Edit appearance, with ⋯ beside it for a Microsoft account (save the current
+skin to the library, restore the default skin, refresh). The account head
+shows the name and kind; the UUID is copied from its menu.
+The second layer replaces the grid while the figure follows the draft:
+texture, arm model and cape pictures are edited together, Apply to account
+and Save to library name their target, an unchanged draft cannot be
+submitted, and Cancel or Escape restores the previous preview and returns
+focus to Edit appearance. An offline account's skin source (default, local
+file, LittleSkin, custom site) is that same layer; it still uses the local
+skin server at launch. When a read fails or the shown profile is stale,
+Refresh appearance also sits beside the explanation under the figure. A
+failed read keeps the last picture and says it was not updated. Pictures are
+keys: they take focus, and Enter or Space acts as a click. Third-party
+accounts preview session textures and link to the skin site. Local skin
+imports copy normalized PNGs into the launcher library; removing a library
+entry leaves any already selected offline file usable. The wardrobe and
+preview belong to one retained detail session, so late reads cannot replace a
+newly opened account. Profile reads and texture downloads are cached per
+account and per texture address. Accepted Microsoft writes show pending
+feedback while one delayed profile read confirms propagation; that delay does
+not prove the change has reached every Minecraft server. Default artwork
 comes from an installed client jar; missing artwork leaves a grey model with
 an explanation. The account dropdown opens the current account's detail.
 
 The preview shares the Orbital input and frame-cache lifecycle.
 It draws only when the look, camera, equipment shape
-or viewport changes. With a cape texture, segment keys below the viewport
-select Cape or Elytra preview without changing the account's worn equipment.
+or viewport changes. Dragging right turns the face to the screen's right,
+as Orbital does; R or a double-click resets the camera, with no reset key.
+With a cape texture, a small Elytra key in the viewport's corner switches
+the preview shape without changing the account's worn equipment.
 Changing looks clears the previous image while the new frame is drawn.
 
 ### Tables

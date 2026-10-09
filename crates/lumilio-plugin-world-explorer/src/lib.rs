@@ -8,6 +8,8 @@ use lumilio_plugin_api::{
     Permission, Plugin, PluginError, TabState, View, Words,
 };
 
+mod text;
+
 pub const ID: &str = "lumilio.world-explorer";
 pub const SUPPORTED_VERSIONS: &[&str] = lumilio_cubiomes::SUPPORTED_VERSIONS;
 pub struct WorldExplorer;
@@ -16,11 +18,8 @@ impl Plugin for WorldExplorer {
     fn manifest(&self) -> Manifest {
         Manifest {
             id: ID.into(),
-            name: Words::new("世界地图", "World Explorer"),
-            description: Words::new(
-                "在本机查看存档与种子地图。",
-                "Browse local worlds and seed maps.",
-            ),
+            name: text::name(),
+            description: text::description(),
             version: env!("CARGO_PKG_VERSION").into(),
             api: API_VERSION,
             default_enabled: true,
@@ -44,7 +43,7 @@ impl Plugin for WorldExplorer {
 }
 impl InstanceTab for WorldExplorer {
     fn title(&self) -> Words {
-        Words::new("地图", "Map")
+        text::tab_title()
     }
     // ia[plugin.world-explorer]: 打开地图 | 游戏页「插件」标签内的地图 | 宿主显示世界选择与地图；没有存档时可输入手动种子 | 插件默认启用，关闭后入口消失
     fn appears(&self, _: &GameFacts, _: &dyn HostContext) -> bool {

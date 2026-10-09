@@ -8,6 +8,7 @@ use crate::assets::UiIcon;
 use crate::kit::{self, ViewIntent};
 use crate::live::{AccountRow, LiveIntent, LiveModel};
 use crate::pages::ViewState;
+use crate::wardrobe::{PINNED_PREVIEW_WIDTH, PREVIEW_WIDTH};
 use crate::{theme, tr};
 use gpui::prelude::*;
 use gpui::{AnyElement, App, IntoElement, Window, div, px};
@@ -132,7 +133,8 @@ fn remove_action(row: &AccountRow, ctx: &LiveCtx) -> impl Fn(&mut Window, &mut A
 /// The account's name, kind and id, with what can be done to it.
 fn detail_head(row: &AccountRow, ctx: &LiveCtx) -> impl IntoElement {
     let colors = ctx.colors;
-    let mut facts = vec![row.kind_label().to_owned(), row.uuid.clone()];
+    // The UUID is copied from the ⋯ menu; reading it is rarely the task.
+    let mut facts = vec![row.kind_label().to_owned()];
     if row.custom_id {
         facts.push(tr!("account-detail-custom-uuid").to_owned());
     }
@@ -209,57 +211,77 @@ fn detail_head(row: &AccountRow, ctx: &LiveCtx) -> impl IntoElement {
         .child(kit::more_menu("account-detail-more", entries, colors))
 }
 
-/// What the account wears, beside the preview.
-fn wardrobe(row: &AccountRow, ctx: &LiveCtx) -> AnyElement {
+/// A third-party account's look: the preview, and where to change it.
+fn third_party_look(row: &AccountRow, ctx: &LiveCtx) -> AnyElement {
     let colors = ctx.colors;
-    if row.third_party {
-        let address = row.skin_site.clone();
-        // ia[accounts]: 在皮肤站修改 | 第三方账户只读衣橱 | 打开服务器公布的主页（LittleSkin 打开其网站）；皮肤与披风只从会话档案预览
-        return v_flex()
-            .gap_3()
-            .child(
-                div()
-                    .text_sm()
-                    .text_color(colors.muted)
-                    .child(tr!("account-look-third-party")),
-            )
-            .children(address.map(|address| {
-                kit::ghost(
-                    "account-skin-site",
-                    tr!("wardrobe-open-site"),
-                    send(&ctx.handler, LiveIntent::OpenSkinSite(address)),
-                )
-            }))
-            .into_any_element();
-    }
-    v_flex()
+    let address = row.skin_site.clone();
+    h_flex()
         .w_full()
-        .gap_6()
-        .children(ctx.offline_skin.cloned())
-        .children(ctx.wardrobe.cloned())
+        .flex_wrap()
+        .items_start()
+        .gap_8()
+        .children(
+            ctx.account_viewer
+                .map(|viewer| div().w(px(PREVIEW_WIDTH)).flex_none().child(viewer.clone())),
+        )
+        // ia[accounts]: 在皮肤站修改 | 第三方账户人物旁的「在皮肤站修改」 | 打开服务器公布的主页（LittleSkin 打开其网站）；皮肤与披风只从会话档案预览
+        .child(
+            v_flex()
+                .flex_1()
+                .min_w(px(200.))
+                .gap_3()
+                .child(
+                    div()
+                        .text_sm()
+                        .text_color(colors.muted)
+                        .child(tr!("account-look-third-party")),
+                )
+                .children(address.map(|address| {
+                    h_flex().child(kit::action(
+                        "account-skin-site",
+                        tr!("wardrobe-open-site"),
+                        Some(UiIcon::External),
+                        false,
+                        send(&ctx.handler, LiveIntent::OpenSkinSite(address)),
+                    ))
+                })),
+        )
         .into_any_element()
 }
 
+/// The detail fills the pane: the account's head over its look. With room,
+/// the wardrobe keeps the figure put and scrolls its own grid; in a narrow
+/// window everything stacks and scrolls together.
 fn detail(row: &AccountRow, ctx: &LiveCtx) -> AnyElement {
-    let colors = ctx.colors;
-    let preview = ctx
-        .account_viewer
-        .map(|viewer| div().w(px(280.)).flex_none().child(viewer.clone()));
+    let look = match ctx.wardrobe {
+        Some(wardrobe) => wardrobe.clone().into_any_element(),
+        None => third_party_look(row, ctx),
+    };
+    if ctx.window_width < PINNED_PREVIEW_WIDTH || ctx.wardrobe.is_none() {
+        return div()
+            .id("account-detail")
+            .debug_selector(|| "account-detail".into())
+            .size_full()
+            .min_h_0()
+            .overflow_y_scroll()
+            .child(
+                v_flex()
+                    .w_full()
+                    .gap_6()
+                    .pb(theme::BOTTOM_SAFE_AREA)
+                    .child(detail_head(row, ctx))
+                    .child(look),
+            )
+            .into_any_element();
+    }
     v_flex()
-        .w_full()
+        .id("account-detail")
+        .debug_selector(|| "account-detail".into())
+        .size_full()
+        .min_h_0()
         .gap_6()
         .child(detail_head(row, ctx))
-        .child(kit::section(
-            tr!("account-look"),
-            colors,
-            h_flex()
-                .w_full()
-                .items_start()
-                .flex_wrap()
-                .gap_6()
-                .children(preview)
-                .child(div().flex_1().min_w(px(240.)).child(wardrobe(row, ctx))),
-        ))
+        .child(div().flex_1().min_h_0().child(look))
         .into_any_element()
 }
 
@@ -338,19 +360,11 @@ pub fn accounts(ctx: &LiveCtx) -> impl IntoElement {
                         .map(|(index, row)| list_item(index, row, index == shown, ctx)),
                 );
             let pane = div()
-                .id("account-detail")
-                .debug_selector(|| "account-detail".into())
                 .flex_1()
                 .min_w_0()
                 .h_full()
                 .min_h_0()
-                .overflow_y_scroll()
-                .child(
-                    div()
-                        .w_full()
-                        .pb(theme::BOTTOM_SAFE_AREA)
-                        .child(detail(row, ctx)),
-                );
+                .child(detail(row, ctx));
             kit::pane_body(
                 h_flex()
                     .w_full()

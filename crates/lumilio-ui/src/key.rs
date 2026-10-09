@@ -7,10 +7,10 @@
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, BoxShadow, ClickEvent, Div, ElementId, FontWeight, Hsla, InteractiveElement,
-    Interactivity, IntoElement, ParentElement, RenderOnce, SharedString, Stateful,
-    StatefulInteractiveElement as _, StyleRefinement, Styled, Window, div, hsla, point, prelude::*,
-    px,
+    AnyElement, App, BoxShadow, ClickEvent, Div, ElementId, FocusHandle, FontWeight, Hsla,
+    InteractiveElement, Interactivity, IntoElement, ParentElement, RenderOnce, SharedString,
+    Stateful, StatefulInteractiveElement as _, StyleRefinement, Styled, Window, div, hsla, point,
+    prelude::*, px,
 };
 use gpui_component::spinner::Spinner;
 use gpui_component::{ActiveTheme as _, Icon, Sizable};
@@ -135,6 +135,8 @@ pub struct Key {
     bold: bool,
     tooltip: Option<SharedString>,
     on_click: Option<ClickHandler>,
+    /// A handle the owner keeps, so it can give focus back to this key.
+    focus: Option<FocusHandle>,
 }
 
 impl Key {
@@ -155,7 +157,15 @@ impl Key {
             bold: false,
             tooltip: None,
             on_click: None,
+            focus: None,
         }
+    }
+
+    /// Tracks this handle instead of one of the key's own, so whoever
+    /// opened something from the key can return focus to it on close.
+    pub fn focus_handle(mut self, focus: FocusHandle) -> Self {
+        self.focus = Some(focus);
+        self
     }
 
     pub fn label(mut self, label: impl Into<SharedString>) -> Self {
@@ -316,10 +326,12 @@ impl RenderOnce for Key {
         } = face(self.kind, self.disabled, body);
         let square = self.label.is_none() && self.children.is_empty();
         let height = self.size.height();
-        let focus = window
-            .use_keyed_state(self.id.clone(), cx, |_, cx| cx.focus_handle())
-            .read(cx)
-            .clone();
+        let focus = self.focus.clone().unwrap_or_else(|| {
+            window
+                .use_keyed_state(self.id.clone(), cx, |_, cx| cx.focus_handle())
+                .read(cx)
+                .clone()
+        });
         let tall = matches!(self.size, KeySize::Regular | KeySize::Large);
         let icon_size = if tall { px(14.) } else { px(13.) };
         let resting = if raised {

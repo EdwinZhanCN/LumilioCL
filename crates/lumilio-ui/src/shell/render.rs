@@ -102,14 +102,11 @@ impl Render for LauncherShell {
                     filter,
                     version_filter,
                     account_viewer: self.account_viewer.as_ref().map(|viewer| &viewer.view),
+                    window_width: f32::from(window.viewport_size().width),
                     wardrobe: self
                         .account_viewer
                         .as_ref()
                         .and_then(|viewer| viewer.wardrobe.as_ref()),
-                    offline_skin: self
-                        .account_viewer
-                        .as_ref()
-                        .and_then(|viewer| viewer.offline.as_ref()),
                 })
             }
             _ => None,

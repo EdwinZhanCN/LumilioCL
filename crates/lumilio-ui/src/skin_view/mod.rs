@@ -12,9 +12,10 @@ use gpui::{
     App, Context, FocusHandle, MouseButton, ObjectFit, Pixels, Point, RenderImage, ScrollDelta,
     Task, Window, canvas, div, img, px,
 };
-use gpui_component::{ActiveTheme as _, h_flex, v_flex};
+use gpui_component::{ActiveTheme as _, Selectable as _, Sizable as _, v_flex};
 use lumilio_skin_render::{Arms, BackEquipment, Camera, Player, Texture, render};
 
+use crate::key::Key;
 use crate::kit;
 use crate::theme::ShellColors;
 use crate::tr;
@@ -26,7 +27,19 @@ mod tests;
 /// account's head and above the navigation, within limits. Its width follows
 /// the column.
 fn height_for(window_height: f32) -> f32 {
-    (window_height - 420.).clamp(220., 480.)
+    (window_height - 480.).clamp(200., 480.)
+}
+
+/// The camera after a drag. Yaw grows toward the player's left (the
+/// renderer's convention), which turns the figure left on screen, so a drag
+/// to the right takes yaw away.
+fn dragged(camera: Camera, dx: f32, dy: f32) -> Camera {
+    Camera {
+        yaw: camera.yaw - dx,
+        pitch: camera.pitch + dy,
+        ..camera
+    }
+    .clamped()
 }
 
 /// The pictures a preview draws. No skin is the plain grey figure.
@@ -55,6 +68,15 @@ impl Look {
     }
 }
 
+/// A skin shown on trial over the account's own look, before it is worn.
+#[derive(Clone, Debug)]
+pub struct Trial {
+    pub skin: Option<Arc<Texture>>,
+    pub arms: Arms,
+    /// `None` keeps the account's cape; `Some(None)` shows no cape.
+    pub cape: Option<Option<Arc<Texture>>>,
+}
+
 enum State {
     Loading,
     Ready(Look),
@@ -73,6 +95,7 @@ struct Request {
 
 pub struct SkinViewer {
     state: State,
+    stale_error: Option<(String, String)>,
     look: u64,
     camera: Camera,
     back_equipment: BackEquipment,
@@ -86,12 +109,15 @@ pub struct SkinViewer {
     queued: Option<Request>,
     drawing: Option<Task<()>>,
     release_registered: bool,
+    /// The look on trial, drawn instead of the account's own.
+    trial: Option<Look>,
 }
 
 impl SkinViewer {
     pub fn new(cx: &mut Context<Self>) -> Self {
         Self {
             state: State::Loading,
+            stale_error: None,
             look: 0,
             camera: Camera::HOME,
             back_equipment: BackEquipment::Cape,
@@ -103,31 +129,83 @@ impl SkinViewer {
             queued: None,
             drawing: None,
             release_registered: false,
+            trial: None,
         }
+    }
+
+    /// The look drawn now: the one on trial, or the account's own.
+    pub(crate) fn shown_look(&self) -> Option<&Look> {
+        match (&self.trial, &self.state) {
+            (Some(trial), _) => Some(trial),
+            (None, State::Ready(look)) => Some(look),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn own_look(&self) -> Option<&Look> {
+        match &self.state {
+            State::Ready(look) => Some(look),
+            _ => None,
+        }
+    }
+
+    /// Shows a skin on trial, or the account's own look again with `None`.
+    /// The picture stays until the new frame replaces it, so it does not
+    /// flash.
+    pub fn try_on(&mut self, trial: Option<Trial>, cx: &mut Context<Self>) {
+        let own_cape = match &self.state {
+            State::Ready(look) => look.cape.clone(),
+            _ => None,
+        };
+        self.trial = trial.map(|trial| Look {
+            skin: trial.skin,
+            cape: trial.cape.unwrap_or(own_cape),
+            arms: trial.arms,
+        });
+        self.look += 1;
+        self.shown = None;
+        self.queued = None;
+        cx.notify();
+    }
+
+    #[must_use]
+    pub fn is_trying_on(&self) -> bool {
+        self.trial.is_some()
     }
 
     /// Shows the look core loaded, or why it could not be loaded.
     pub fn set_look(&mut self, look: Result<Look, (String, String)>, cx: &mut Context<Self>) {
+        let look = match look {
+            Ok(look) => look,
+            Err(error) => {
+                if matches!(self.state, State::Ready(_)) {
+                    self.stale_error = Some(error);
+                } else {
+                    self.state = State::Failed {
+                        message: error.0,
+                        detail: error.1,
+                    };
+                }
+                cx.notify();
+                return;
+            }
+        };
+        self.stale_error = None;
         self.look += 1;
         self.shown = None;
         self.queued = None;
         if let Some(old) = self.image.take() {
             self.old_images.push(old);
         }
-        self.state = match look {
-            Ok(look) => State::Ready(look),
-            Err((message, detail)) => State::Failed { message, detail },
-        };
+        self.state = State::Ready(look);
         cx.notify();
     }
 
-    fn turn(&mut self, yaw: f32, pitch: f32, cx: &mut Context<Self>) {
-        self.camera = Camera {
-            yaw: self.camera.yaw + yaw,
-            pitch: self.camera.pitch + pitch,
-            ..self.camera
-        }
-        .clamped();
+    /// Turns the player as if dragged by `dx`, `dy` radians' worth: right
+    /// turns its face to the screen's right, down tips its head toward the
+    /// viewer, as the schematic preview's orbit does.
+    fn turn(&mut self, dx: f32, dy: f32, cx: &mut Context<Self>) {
+        self.camera = dragged(self.camera, dx, dy);
         cx.notify();
     }
 
@@ -153,7 +231,7 @@ impl SkinViewer {
     }
 
     fn request(&mut self, width: f32, height: f32, scale: f32, cx: &mut Context<Self>) {
-        if !matches!(self.state, State::Ready(_)) || width < 1. || height < 1. {
+        if self.shown_look().is_none() || width < 1. || height < 1. {
             return;
         }
         let request = Request {
@@ -174,10 +252,9 @@ impl SkinViewer {
     }
 
     fn draw(&mut self, request: Request, cx: &mut Context<Self>) {
-        let State::Ready(look) = &self.state else {
+        let Some(look) = self.shown_look().cloned() else {
             return;
         };
-        let look = look.clone();
         self.shown = Some(request);
         self.drawing = Some(cx.spawn(async move |this, cx| {
             let frame = cx
@@ -237,12 +314,6 @@ impl Render for SkinViewer {
             self.release_registered = true;
         }
         let colors = ShellColors::from_theme(cx.theme());
-        let reset = {
-            let this = cx.weak_entity();
-            move |_: &mut Window, cx: &mut App| {
-                let _ = this.update(cx, |this, cx| this.reset(cx));
-            }
-        };
         let this = cx.weak_entity();
         let measure = canvas(
             move |bounds, window, cx: &mut App| {
@@ -261,7 +332,12 @@ impl Render for SkinViewer {
         .top_0()
         .left_0()
         .size_full();
+        let trying = self.trial.is_some();
         let content = match (&self.state, &self.image) {
+            (_, Some(image)) if trying => img(image.clone())
+                .size_full()
+                .object_fit(ObjectFit::Contain)
+                .into_any_element(),
             (State::Failed { message, detail }, _) => v_flex()
                 .debug_selector(|| "skin-view-error".into())
                 .items_center()
@@ -283,6 +359,32 @@ impl Render for SkinViewer {
                 .child(tr!("skin-view-loading"))
                 .into_any_element(),
         };
+        let has_cape = self.shown_look().is_some_and(|look| look.cape.is_some());
+        let elytra = self.back_equipment == BackEquipment::Elytra;
+        let toggle = cx.weak_entity();
+        // ia[accounts]: 披风 / 鞘翅预览 | 立体预览右下角的「鞘翅」键（有披风时） | 同一贴图在披风与鞘翅形态间切换，保留相机；只改变预览，不改变账户穿戴
+        let equipment = has_cape.then(|| {
+            div().absolute().bottom_2().right_2().child(
+                Key::new("skin-view-elytra")
+                    .label(tr!("skin-view-elytra"))
+                    .ghost()
+                    .small()
+                    .selected(elytra)
+                    .debug_selector(|| "skin-view-elytra".into())
+                    .on_click(move |_, _, cx| {
+                        let _ = toggle.update(cx, |this, cx| {
+                            this.show_back_equipment(
+                                if elytra {
+                                    BackEquipment::Cape
+                                } else {
+                                    BackEquipment::Elytra
+                                },
+                                cx,
+                            )
+                        });
+                    }),
+            )
+        });
         // ia[accounts]: 观察外观 | 详情里的立体预览 | 拖动或方向键旋转，滚轮或 + / − 缩放，双击或 R 复位；第二层与披风一起画
         let viewport = div()
             .id("skin-view")
@@ -296,12 +398,14 @@ impl Render for SkinViewer {
             .flex()
             .items_center()
             .justify_center()
-            .bg(colors.surface)
+            .rounded_md()
+            // No frame: the figure stands on the page. The ring only shows
+            // where keyboard turns and zooms go.
             .border_1()
             .border_color(if self.focus.is_focused(window) {
                 colors.focus
             } else {
-                colors.border
+                gpui::transparent_black()
             })
             .track_focus(&self.focus)
             .tab_stop(true)
@@ -382,56 +486,53 @@ impl Render for SkinViewer {
                 }
             }))
             .child(measure)
-            .child(content);
-        let has_cape = matches!(&self.state, State::Ready(look) if look.cape.is_some());
-        let this = cx.weak_entity();
-        // ia[accounts]: 披风 / 鞘翅预览 | 立体预览下的分段按键（有披风时） | 同一贴图在披风与鞘翅形态间切换，保留相机；只改变预览，不改变账户穿戴
-        let equipment = has_cape.then(|| {
-            kit::segments(
-                "skin-view-equipment",
-                crate::tr_all!["skin-view-cape", "skin-view-elytra"],
-                usize::from(self.back_equipment == BackEquipment::Elytra),
-                move |index, _, cx| {
-                    let _ = this.update(cx, |this, cx| {
-                        this.show_back_equipment(
-                            if index == 0 {
-                                BackEquipment::Cape
-                            } else {
-                                BackEquipment::Elytra
-                            },
-                            cx,
-                        )
-                    });
-                },
-            )
-        });
+            .child(content)
+            .children(trying.then(|| {
+                div()
+                    .absolute()
+                    .top_2()
+                    .left_2()
+                    .debug_selector(|| "skin-view-trial".into())
+                    .child(kit::chip(
+                        tr!("skin-view-trial"),
+                        Some(colors.primary),
+                        colors,
+                    ))
+            }))
+            .children(equipment);
         v_flex()
             .w_full()
             .gap_2()
             .child(viewport)
-            .children(equipment)
+            .children(self.stale_error.as_ref().map(|(message, detail)| {
+                v_flex()
+                    .gap_2()
+                    .child(
+                        div()
+                            .text_sm()
+                            .text_color(colors.danger)
+                            .child(message.clone()),
+                    )
+                    .child(kit::technical("skin-view-stale-technical", detail.clone()))
+            }))
             // ia[accounts]: 没有可用默认贴图 | 未安装游戏或客户端 jar 无默认皮肤 | 灰色模型与说明；安装游戏后重新打开详情读取贴图
             .children(
-                matches!(&self.state, State::Ready(look) if look.skin.is_none()).then(|| {
-                    div()
-                        .text_xs()
-                        .text_color(colors.muted)
-                        .child(tr!("skin-view-default-missing"))
-                }),
-            )
-            .child(
-                h_flex()
-                    .w_full()
-                    .justify_between()
-                    .items_center()
-                    .gap_3()
-                    .child(
+                self.shown_look()
+                    .is_some_and(|look| look.skin.is_none())
+                    .then(|| {
                         div()
                             .text_xs()
                             .text_color(colors.muted)
-                            .child(tr!("skin-view-hint")),
-                    )
-                    .child(kit::ghost("skin-view-reset", tr!("model-reset"), reset)),
+                            .child(tr!("skin-view-default-missing"))
+                    }),
+            )
+            .child(
+                div()
+                    .w_full()
+                    .text_center()
+                    .text_xs()
+                    .text_color(colors.muted)
+                    .child(tr!("skin-view-hint")),
             )
     }
 }

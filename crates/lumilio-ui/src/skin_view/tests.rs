@@ -48,6 +48,26 @@ fn a_failed_look_shows_why_and_draws_nothing(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn failed_refresh_keeps_the_last_visible_look(cx: &mut TestAppContext) {
+    let (viewer, cx) = open(cx);
+    viewer.update(cx, |viewer, cx| viewer.set_look(Ok(Look::default()), cx));
+    cx.run_until_parked();
+    let first = viewer.read_with(cx, |viewer, _| viewer.image.clone().expect("drawn"));
+    viewer.update(cx, |viewer, cx| {
+        viewer.set_look(Err(("refresh failed".into(), "offline".into())), cx)
+    });
+    cx.run_until_parked();
+    viewer.read_with(cx, |viewer, _| {
+        assert!(viewer.shown_look().is_some());
+        assert!(std::sync::Arc::ptr_eq(
+            &first,
+            viewer.image.as_ref().unwrap()
+        ));
+        assert!(viewer.stale_error.is_some());
+    });
+}
+
+#[gpui::test]
 fn switching_equipment_redraws_without_changing_the_look_or_camera(cx: &mut TestAppContext) {
     let (viewer, cx) = open(cx);
     let cape = std::sync::Arc::new(Texture::new(64, 32, vec![255; 64 * 32 * 4]).unwrap());
@@ -62,9 +82,7 @@ fn switching_equipment_redraws_without_changing_the_look_or_camera(cx: &mut Test
     });
     cx.run_until_parked();
     let first = viewer.read_with(cx, |viewer, _| viewer.image.clone().expect("cape frame"));
-    let button = cx
-        .debug_bounds("skin-view-equipment-key-1")
-        .expect("elytra key");
+    let button = cx.debug_bounds("skin-view-elytra").expect("elytra key");
     cx.simulate_click(button.center(), gpui::Modifiers::none());
     cx.run_until_parked();
     viewer.read_with(cx, |viewer, _| {
@@ -87,7 +105,23 @@ fn switching_equipment_redraws_without_changing_the_look_or_camera(cx: &mut Test
         );
     });
     cx.run_until_parked();
-    assert!(cx.debug_bounds("skin-view-equipment-key-1").is_none());
+    assert!(cx.debug_bounds("skin-view-elytra").is_none());
+}
+
+#[test]
+fn dragging_right_turns_the_face_to_the_screens_right() {
+    // From the front, the player's left is on the screen's right. Turning the
+    // face there a quarter turn shows the player's right side, which the
+    // renderer draws at yaw −π/2 (`the_back_and_the_right_side_show_their_faces`).
+    let front = Camera {
+        yaw: 0.,
+        ..Camera::HOME
+    };
+    let turned = super::dragged(front, std::f32::consts::FRAC_PI_2, 0.);
+    let right_side = (-std::f32::consts::FRAC_PI_2).rem_euclid(std::f32::consts::TAU);
+    assert!((turned.yaw - right_side).abs() < 1e-5, "{}", turned.yaw);
+    // Dragging down lifts the camera, tipping the head toward the viewer.
+    assert!(super::dragged(front, 0., 0.2).pitch > front.pitch);
 }
 
 #[test]
