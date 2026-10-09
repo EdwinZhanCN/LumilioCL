@@ -88,6 +88,8 @@ impl OverlayProvider for UtilityOverlay {
                     priority: 0,
                     approximate: false,
                     color: None,
+                    note: None,
+                    share: None,
                 });
             }
         }

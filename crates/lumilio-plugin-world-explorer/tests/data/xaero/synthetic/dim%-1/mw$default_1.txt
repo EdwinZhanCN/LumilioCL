@@ -1,0 +1,5 @@
+#
+#waypoint:name:initials:x:y:z:color:disabled:type:set:rotate_on_tp:tp_yaw:visibility_type:destination
+#
+sets:gui.xaero_default
+waypoint:Fortress:F:-120:~:80:14:false:0:gui.xaero_default:false:0:0:false

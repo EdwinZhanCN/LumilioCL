@@ -248,6 +248,7 @@ fn inline_seed_enter_and_blur_apply_without_map_stealing_typing(cx: &mut TestApp
         view.event(
             Event::Seed(Ok((
                 vec![WorldMapContext {
+                    suggested_xaero: None,
                     name: "manual".into(),
                     context: context.clone(),
                     spawn: None,
@@ -277,6 +278,7 @@ fn inline_seed_enter_and_blur_apply_without_map_stealing_typing(cx: &mut TestApp
 
 fn saved_world(folder: &str, version: &str, seed: i64) -> WorldMapContext {
     WorldMapContext {
+        suggested_xaero: None,
         name: folder.to_owned(),
         spawn: None,
         context: WorldContext {
@@ -681,6 +683,8 @@ fn icon_object(x: f64, z: f64, priority: i32) -> MapObject {
         priority,
         approximate: false,
         color: None,
+        note: None,
+        share: None,
     }
 }
 
@@ -778,7 +782,7 @@ fn clearing_objects_cancels_requests_and_refuses_late_answers() {
     objects.update(&context, [10., 10., 20., 20.], 1.);
     let again = objects.next(&context);
     assert!(objects.accept(again[0].generation, &again[0].key));
-    objects.fail(again[0].key.clone());
+    objects.fail(again[0].key.clone(), String::new());
     assert_eq!(objects.failed(), 1);
     assert!(objects.next(&context).is_empty());
     objects.retry();
@@ -940,6 +944,7 @@ fn icons_arrive_through_a_live_connection_after_the_world_is_chosen(cx: &mut Tes
                 let event = match command {
                     Command::Contexts => Event::Contexts(Ok((
                         vec![WorldMapContext {
+                            suggested_xaero: None,
                             name: "manual".into(),
                             context: answer_world.clone(),
                             spawn: None,
@@ -957,6 +962,7 @@ fn icons_arrive_through_a_live_connection_after_the_world_is_chosen(cx: &mut Tes
                             overlays: vec![],
                         },
                     ))),
+                    Command::LinkXaero { .. } => continue,
                     Command::Overlays { context } => Event::Overlays {
                         context,
                         layers: vec![village_layer()],
@@ -1598,4 +1604,195 @@ fn copied_coordinates_are_whole_blocks_x_then_z() {
     use lumilio_plugin_api::map::MapPoint;
     assert_eq!(select::coordinates(MapPoint { x: 12., z: -34. }), "12 -34");
     assert_eq!(select::coordinates(MapPoint { x: -0.4, z: 7.6 }), "0 8");
+}
+
+#[test]
+fn coloured_markers_take_their_colour_and_keep_a_dark_outline() {
+    use lumilio_plugin_api::map::MapIcon;
+    let red = crate::map_icons::marker(MapIcon::Waypoint, [255, 0, 0]);
+    let blue = crate::map_icons::marker(MapIcon::Waypoint, [0, 0, 255]);
+    assert_ne!(red.name, blue.name, "one texture per colour");
+    assert!(std::sync::Arc::ptr_eq(
+        &red,
+        &crate::map_icons::marker(MapIcon::Waypoint, [255, 0, 0])
+    ));
+    let pixel = |marker: &crate::map_icons::Pixels, x: u32, y: u32| {
+        let at = ((y * marker.width + x) * 4) as usize;
+        [
+            marker.rgba[at],
+            marker.rgba[at + 1],
+            marker.rgba[at + 2],
+            marker.rgba[at + 3],
+        ]
+    };
+    // The middle is the colour, opaque; the corner is clear; the rim is dark.
+    assert_eq!(pixel(&red, 12, 12), [255, 0, 0, 255]);
+    assert_eq!(pixel(&blue, 12, 12), [0, 0, 255, 255]);
+    assert_eq!(pixel(&red, 0, 0)[3], 0);
+    let rim = pixel(&red, 12, 3);
+    assert!(rim[3] > 200 && rim[0] < 80, "{rim:?}");
+    // A death point is a cross: its centre is filled, the middle of an edge is not.
+    let cross = crate::map_icons::marker(MapIcon::Death, [200, 200, 200]);
+    assert_eq!(pixel(&cross, 12, 12)[3], 255);
+    assert_eq!(pixel(&cross, 12, 4)[3], 0, "between the arms");
+    assert_ne!(cross.rgba, red.rgba);
+    // An icon with artwork ignores the colour.
+    let village = crate::map_icons::marker(MapIcon::Village, [1, 2, 3]);
+    assert_eq!(village.name, "village");
+}
+
+#[gpui::test]
+fn a_same_named_xaero_directory_is_offered_and_linking_it_adds_the_layer(cx: &mut TestAppContext) {
+    use lumilio_plugin_api::map::SourceLink;
+    let (view, cx, commands) = ready_view(cx);
+    cx.simulate_resize(gpui::size(px(900.), px(600.)));
+    let world = lumilio_plugin_api::map::WorldId::Save {
+        instance: "i".into(),
+        folder: "Survival".into(),
+    };
+    let saved = |suggested: Option<&str>, linked: bool| {
+        let mut sources = vec![SourceLink::Save("Survival".into())];
+        if linked {
+            sources.push(SourceLink::XaeroMinimap("Survival".into()));
+        }
+        lumilio_core::world_map::WorldMapContext {
+            name: "Survival".into(),
+            spawn: None,
+            suggested_xaero: suggested.map(str::to_owned),
+            context: WorldContext {
+                world: world.clone(),
+                version: Some("1.21.4".into()),
+                data_version: None,
+                seed: Some(5),
+                dimension: Dimension::Nether,
+                sources,
+            },
+        }
+    };
+    view.update(cx, |view, cx| {
+        let offered = saved(Some("Survival"), false);
+        view.context = Some(offered.context.clone());
+        view.contexts = vec![offered];
+        cx.notify();
+    });
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("map-xaero-link").is_some());
+    while commands.try_recv().is_ok() {}
+    click(cx, "map-xaero-link-key");
+    let mut sent = None;
+    while let Ok(command) = commands.try_recv() {
+        if let Command::LinkXaero { folder, dir } = command {
+            sent = Some((folder, dir));
+        }
+    }
+    assert_eq!(sent, Some(("Survival".into(), "Survival".into())));
+    // The answer carries the link: the prompt goes, the layer is asked for in
+    // the dimension that was on screen.
+    view.update(cx, |view, cx| {
+        view.event(Event::Linked(Ok(vec![saved(None, true)])), cx)
+    });
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("map-xaero-link").is_none());
+    let context = view.read_with(cx, |view, _| view.context.clone().unwrap());
+    assert_eq!(context.dimension, Dimension::Nether);
+    assert!(
+        context
+            .sources
+            .contains(&SourceLink::XaeroMinimap("Survival".into()))
+    );
+    let mut asked = None;
+    while let Ok(command) = commands.try_recv() {
+        if let Command::Overlays { context } = command {
+            asked = Some(context);
+        }
+    }
+    assert_eq!(asked, Some(context));
+}
+
+#[gpui::test]
+fn a_waypoint_card_names_its_set_and_offers_the_share_string(cx: &mut TestAppContext) {
+    let (view, cx, commands) = ready_view(cx);
+    cx.simulate_resize(gpui::size(px(800.), px(600.)));
+    cx.run_until_parked();
+    view.update(cx, |view, _| {
+        view.camera = Camera {
+            x: 0.,
+            z: 0.,
+            scale: 1.,
+        };
+        view.objects.layers = vec![village_layer()];
+        view.refresh();
+    });
+    let mut waypoint = icon_object(0., 0., 5);
+    waypoint.label = Some("Home: base".into());
+    waypoint.label_id = Some("map-xaero-waypoint".into());
+    waypoint.color = Some([255, 85, 85]);
+    waypoint.note = Some("farms".into());
+    waypoint.share =
+        Some("xaero-waypoint:Home§§ base:H:0:64:0:12:false:0:Internal-overworld-waypoints".into());
+    waypoint.kind = MapObjectKind::Icon {
+        icon: lumilio_plugin_api::map::MapIcon::Waypoint,
+        at: lumilio_plugin_api::map::MapPoint { x: 0., z: 0. },
+    };
+    answer_objects(&view, cx, &commands, vec![waypoint]);
+    let on_icon = view.update(cx, |view, _| {
+        view.bounds.unwrap().origin
+            + point(px(view.size[0] as f32 / 2.), px(view.size[1] as f32 / 2.))
+    });
+    cx.simulate_click(on_icon, Modifiers::none());
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("map-selection").is_some());
+    assert!(cx.debug_bounds("map-selection-note").is_some());
+    click(cx, "map-copy-share");
+    assert_eq!(
+        cx.read_from_clipboard()
+            .and_then(|item| item.text())
+            .as_deref(),
+        Some("xaero-waypoint:Home§§ base:H:0:64:0:12:false:0:Internal-overworld-waypoints")
+    );
+    // The sprite is the data's colour, not the artwork's.
+    let sprites = view.update(cx, |view, _| view.sprites());
+    assert_eq!(sprites.len(), 1);
+    assert!(
+        sprites[0].id.starts_with("waypoint-ff5555"),
+        "{}",
+        sprites[0].id
+    );
+}
+
+#[gpui::test]
+fn an_unreadable_waypoint_file_is_a_status_not_a_plugin_failure(cx: &mut TestAppContext) {
+    let (view, cx, commands) = ready_view(cx);
+    cx.simulate_resize(gpui::size(px(800.), px(600.)));
+    cx.run_until_parked();
+    view.update(cx, |view, _| {
+        view.objects.layers = vec![village_layer()];
+        view.refresh();
+    });
+    let mut requested = vec![];
+    while let Ok(command) = commands.try_recv() {
+        if let Command::Objects {
+            generation, key, ..
+        } = command
+        {
+            requested.push((generation, key));
+        }
+    }
+    view.update(cx, |view, cx| {
+        for (generation, key) in requested {
+            view.event(
+                Event::Objects {
+                    generation,
+                    key,
+                    result: Err(MapFailure::Failed("map-xaero-unreadable".into())),
+                },
+                cx,
+            );
+        }
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(view.objects.failed_with("map-xaero-unreadable"))
+    });
+    assert!(cx.debug_bounds("map-status").is_some());
 }

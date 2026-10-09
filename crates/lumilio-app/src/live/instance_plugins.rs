@@ -46,6 +46,20 @@ pub(super) fn plugin_map(
                                 .map_err(|error| error.to_string()),
                         )
                     }
+                    Command::LinkXaero { folder, dir } => {
+                        let result = async {
+                            service
+                                .link_map_xaero(&id, &folder, &dir)
+                                .await
+                                .map_err(|error| error.to_string())?;
+                            service
+                                .map_contexts(&id)
+                                .await
+                                .map_err(|error| error.to_string())
+                        }
+                        .await;
+                        Event::Linked(result)
+                    }
                     Command::Overlays { context } => Event::Overlays {
                         layers: service.map_overlays(&context).await,
                         context,

@@ -146,3 +146,115 @@ fn region_lines_are_exact_for_negative_coordinates() {
         }
     }
 }
+
+mod xaero {
+    use super::super::WorldMapContext;
+    use super::super::xaero::{attach, minimap_dirs};
+    use lumilio_plugin_api::map::{Dimension, SourceLink, WorldContext, WorldId};
+    use std::collections::BTreeMap;
+
+    fn save(folder: &str) -> WorldMapContext {
+        WorldMapContext {
+            name: folder.into(),
+            spawn: None,
+            suggested_xaero: None,
+            context: WorldContext {
+                world: WorldId::Save {
+                    instance: "i".into(),
+                    folder: folder.into(),
+                },
+                version: Some("1.21.4".into()),
+                data_version: None,
+                seed: Some(1),
+                dimension: Dimension::Overworld,
+                sources: vec![SourceLink::Save(folder.into())],
+            },
+        }
+    }
+
+    fn strings(names: &[&str]) -> Vec<String> {
+        names.iter().map(|name| (*name).to_owned()).collect()
+    }
+
+    #[test]
+    fn a_same_named_directory_is_only_suggested_until_the_person_links_it() {
+        let dirs = strings(&["Multiplayer_play.example.org", "Survival", "Unrelated"]);
+        let mut worlds = vec![save("Survival"), save("Creative")];
+        attach(&mut worlds, "i", &dirs, &BTreeMap::new());
+        assert_eq!(worlds[0].suggested_xaero.as_deref(), Some("Survival"));
+        assert_eq!(worlds[1].suggested_xaero, None);
+        assert!(
+            worlds[0]
+                .context
+                .sources
+                .iter()
+                .all(|source| !matches!(source, SourceLink::XaeroMinimap(_))),
+            "a suggestion attaches nothing"
+        );
+        // Confirmed: the directory becomes a source and stops being a suggestion.
+        let links = BTreeMap::from([("Creative".to_owned(), "Unrelated".to_owned())]);
+        let mut worlds = vec![save("Survival"), save("Creative")];
+        attach(&mut worlds, "i", &dirs, &links);
+        assert!(
+            worlds[1]
+                .context
+                .sources
+                .contains(&SourceLink::XaeroMinimap("Unrelated".into()))
+        );
+        assert_eq!(worlds[1].suggested_xaero, None);
+        assert_eq!(worlds[0].suggested_xaero.as_deref(), Some("Survival"));
+        // A link to a directory that has since gone is ignored.
+        let stale = BTreeMap::from([("Creative".to_owned(), "Deleted".to_owned())]);
+        let mut worlds = vec![save("Creative")];
+        attach(&mut worlds, "i", &dirs, &stale);
+        assert!(worlds[0].context.sources.len() == 1);
+    }
+
+    #[test]
+    fn multiplayer_directories_become_server_worlds() {
+        let dirs = strings(&["Multiplayer_play.example.org", "Survival"]);
+        let mut worlds = vec![save("Survival")];
+        attach(&mut worlds, "i", &dirs, &BTreeMap::new());
+        let server = worlds.last().unwrap();
+        assert_eq!(server.name, "play.example.org");
+        assert_eq!(
+            server.context.world,
+            WorldId::Server {
+                instance: "i".into(),
+                address: "play.example.org".into()
+            }
+        );
+        assert_eq!(server.context.seed, None);
+        assert_eq!(
+            server.context.sources,
+            [SourceLink::XaeroMinimap(
+                "Multiplayer_play.example.org".into()
+            )]
+        );
+        // A multiplayer directory linked to a save is that save, not a server.
+        let links = BTreeMap::from([(
+            "Survival".to_owned(),
+            "Multiplayer_play.example.org".to_owned(),
+        )]);
+        let mut worlds = vec![save("Survival")];
+        attach(&mut worlds, "i", &dirs, &links);
+        assert_eq!(worlds.len(), 1);
+    }
+
+    #[test]
+    fn minimap_directories_skip_files_backups_hidden_entries_and_links() {
+        let game = tempfile::tempdir().unwrap();
+        assert!(minimap_dirs(game.path()).is_empty());
+        let root = game.path().join("xaero/minimap");
+        for dir in ["Survival", "Multiplayer_a", "backup", "backup--", ".hidden"] {
+            std::fs::create_dir_all(root.join(dir)).unwrap();
+        }
+        std::fs::write(root.join("notes.txt"), "x").unwrap();
+        assert_eq!(minimap_dirs(game.path()), ["Multiplayer_a", "Survival"]);
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(&root, root.join("Looped")).unwrap();
+            assert_eq!(minimap_dirs(game.path()), ["Multiplayer_a", "Survival"]);
+        }
+    }
+}

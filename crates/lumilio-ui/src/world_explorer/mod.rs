@@ -7,6 +7,7 @@ mod seed;
 mod select;
 mod stats;
 mod toolbar;
+mod xaero;
 pub use objects::ObjectKey;
 pub use seed::VERSIONS as MANUAL_VERSIONS;
 #[cfg(test)]
@@ -50,6 +51,11 @@ pub enum Command {
     Overlays {
         context: WorldContext,
     },
+    /// The person confirmed that this save uses this Minimap directory.
+    LinkXaero {
+        folder: String,
+        dir: String,
+    },
     Objects {
         generation: u64,
         plugin: String,
@@ -70,6 +76,8 @@ pub enum Event {
         context: WorldContext,
         layers: Vec<(String, OverlayInfo)>,
     },
+    /// The worlds again, after a link changed what they can show.
+    Linked(Result<Vec<WorldMapContext>, String>),
     Objects {
         generation: u64,
         key: ObjectKey,
@@ -386,6 +394,29 @@ impl MapView {
                 self.refresh();
             }
             Event::Contexts(Err(error)) => self.error = Some(error),
+            Event::Linked(Ok(contexts)) => {
+                // Stay on the world being looked at; it now carries the link.
+                let shown = self.context.as_ref().map(|context| context.world.clone());
+                self.contexts = contexts;
+                if let Some(world) = self
+                    .contexts
+                    .iter()
+                    .find(|world| Some(&world.context.world) == shown.as_ref())
+                {
+                    let dimension = self
+                        .context
+                        .as_ref()
+                        .map(|context| context.dimension.clone());
+                    let mut context = world.context.clone();
+                    if let Some(dimension) = dimension {
+                        context.dimension = dimension;
+                    }
+                    self.context = Some(context);
+                }
+                self.context_changed();
+                self.refresh();
+            }
+            Event::Linked(Err(error)) => self.error = Some(error),
             Event::Overlays { context, layers } => {
                 if self.context.as_ref() != Some(&context) {
                     return;
@@ -403,7 +434,13 @@ impl MapView {
                 }
                 match result {
                     Ok(found) => self.objects.store(key, found),
-                    Err(_) => self.objects.fail(key),
+                    Err(error) => self.objects.fail(
+                        key,
+                        match error {
+                            MapFailure::Failed(reason) => reason,
+                            _ => String::new(),
+                        },
+                    ),
                 }
                 self.dispatch_objects();
                 self.frame();
@@ -479,9 +516,12 @@ impl MapView {
                 let MapObjectKind::Icon { icon, at } = &object.kind else {
                     return None;
                 };
-                let pixels = crate::map_icons::pixels(*icon);
+                let pixels = match object.color {
+                    Some(color) => crate::map_icons::marker(*icon, color),
+                    None => crate::map_icons::pixels(*icon),
+                };
                 Some(Sprite {
-                    id: pixels.name.into(),
+                    id: pixels.name.clone(),
                     width: pixels.width,
                     height: pixels.height,
                     rgba: pixels.rgba.clone(),
@@ -609,7 +649,7 @@ impl MapView {
             });
             if !sent {
                 self.objects.accept(next.generation, &next.key);
-                self.objects.fail(next.key);
+                self.objects.fail(next.key, String::new());
             }
         }
     }
@@ -906,6 +946,8 @@ impl Render for MapView {
             .is_none_or(|context| context.seed.is_none())
         {
             Some(tr!("map-seed-needed"))
+        } else if self.objects.failed_with("map-xaero-unreadable") {
+            Some(tr!("map-xaero-unreadable"))
         } else if self.error.is_some() {
             Some(tr!("map-render-failed"))
         } else if !self.failed.is_empty() || self.objects.failed() > 0 {
@@ -972,7 +1014,8 @@ impl Render for MapView {
                                 .text_color(colors.muted)
                                 .child(status)
                         }))
-                        .children(retry),
+                        .children(retry)
+                        .children(self.xaero_link_prompt(cx)),
                 ),
             )
             .child(float().bottom_3().right_3().child(self.layer_popover(cx)))

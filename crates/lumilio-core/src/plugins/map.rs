@@ -257,10 +257,14 @@ impl PluginHost {
             }
             Err(fault) => {
                 cancel.cancel();
-                // An explicit version refusal is a capability limit, not a
-                // broken provider. An unsupported save must not prevent the
-                // user from opening a supported manual seed afterward.
-                if fault.message == "map-version-unsupported" {
+                // An explicit version refusal, or a data file the provider
+                // cannot read, is a limit of this world, not a broken provider.
+                // An unsupported save must not prevent the user from opening a
+                // supported manual seed afterward.
+                if matches!(
+                    fault.message.as_str(),
+                    "map-version-unsupported" | "map-xaero-unreadable"
+                ) {
                     return Err(MapFailure::Failed(fault.message));
                 }
                 let count = failures.entry(key).or_default();

@@ -99,6 +99,8 @@ fn object(
         priority: 20,
         approximate,
         color: None,
+        note: None,
+        share: None,
     }
 }
 

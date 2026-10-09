@@ -36,7 +36,12 @@ impl MapView {
         let world = self
             .contexts
             .iter()
-            .any(|world| matches!(world.context.world, WorldId::Save { .. }))
+            .any(|world| {
+                matches!(
+                    world.context.world,
+                    WorldId::Save { .. } | WorldId::Server { .. }
+                )
+            })
             .then(|| {
                 v_flex()
                     .flex_1()

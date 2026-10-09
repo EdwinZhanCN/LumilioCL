@@ -311,6 +311,12 @@ impl InstanceStore {
                 seed INTEGER NOT NULL,
                 version TEXT NOT NULL,
                 PRIMARY KEY (instance, seed, version)
+            );
+            CREATE TABLE IF NOT EXISTS world_map_links (
+                instance TEXT NOT NULL,
+                folder TEXT NOT NULL,
+                xaero_dir TEXT NOT NULL,
+                PRIMARY KEY (instance, folder)
             );",
         )?;
         // Schema 1 had no `tuning` column. Keep the old file beside the new
@@ -862,6 +868,10 @@ impl InstanceStore {
         }
         transaction.execute(
             "DELETE FROM world_map_seeds WHERE instance NOT IN (SELECT id FROM instances)",
+            [],
+        )?;
+        transaction.execute(
+            "DELETE FROM world_map_links WHERE instance NOT IN (SELECT id FROM instances)",
             [],
         )?;
         transaction.pragma_update(None, "user_version", SCHEMA_VERSION)?;

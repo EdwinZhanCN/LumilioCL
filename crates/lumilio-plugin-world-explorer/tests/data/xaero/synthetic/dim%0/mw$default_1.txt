@@ -1,0 +1,10 @@
+#
+#waypoint:name:initials:x:y:z:color:disabled:type:set:rotate_on_tp:tp_yaw:visibility_type:destination
+#
+sets:gui.xaero_default:farms
+waypoint:Home base:H:100:64:-250:10:false:0:gui.xaero_default:false:0:0:false
+waypoint:Nether§§ portal:N:12:~:-40:12:false:0:gui.xaero_default:true:90:0:false
+waypoint:StashFinder - 🪧 8:🪧:-24:64:20999928:6:false:0:farms:false:0:0:false
+waypoint:gui.xaero_deathpoint:D:5:70:5:4:false:1:gui.xaero_default:false:0:0:false
+waypoint:Old grave:G:-300:70:300:7:true:2:gui.xaero_default:false:0:0:false
+futurestuff:kept:verbatim

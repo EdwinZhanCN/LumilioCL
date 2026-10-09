@@ -9,6 +9,9 @@ pub struct WorldMapContext {
     pub name: String,
     pub context: WorldContext,
     pub spawn: Option<[i64; 3]>,
+    /// A Xaero Minimap directory named like this save and not yet linked to
+    /// it, offered for the person to confirm.
+    pub suggested_xaero: Option<String>,
 }
 
 fn read(path: &Path, base: &Path) -> Option<nbt::Tag> {
@@ -67,6 +70,7 @@ pub fn contexts(
                 .map(|key| field(&["Data", key]).and_then(nbt::Tag::as_i64));
             WorldMapContext {
                 name: world.name,
+                suggested_xaero: None,
                 spawn: match spawn {
                     [Some(x), Some(y), Some(z)] => Some([x, y, z]),
                     _ => None,

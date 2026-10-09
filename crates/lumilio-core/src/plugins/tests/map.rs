@@ -52,6 +52,40 @@ async fn unsupported_world_does_not_stop_supported_worlds() {
 }
 
 #[tokio::test]
+async fn an_unreadable_data_file_is_a_world_limit_and_never_stops_the_layer() {
+    let host = PluginHost::new(vec![Arc::new(Fake)], BTreeMap::new());
+    for _ in 0..8 {
+        assert_eq!(
+            host.map_call(
+                "test.maps",
+                "overlay:xaero.waypoints",
+                None,
+                CancellationToken::new(),
+                MAP_TIMEOUT,
+                |_, _| -> Result<(), PluginError> {
+                    Err(PluginError::Unavailable("map-xaero-unreadable".into()))
+                }
+            )
+            .await,
+            Err(MapFailure::Failed("map-xaero-unreadable".into()))
+        );
+    }
+    assert!(
+        host.map_call(
+            "test.maps",
+            "overlay:xaero.waypoints",
+            None,
+            CancellationToken::new(),
+            MAP_TIMEOUT,
+            |_, _| Ok(())
+        )
+        .await
+        .is_ok(),
+        "eight bad files in a row do not count as eight faults"
+    );
+}
+
+#[tokio::test]
 async fn faults_stop_only_provider_and_success_resets_counter() {
     let host = PluginHost::new(vec![Arc::new(Fake)], BTreeMap::new());
     for _ in 0..4 {

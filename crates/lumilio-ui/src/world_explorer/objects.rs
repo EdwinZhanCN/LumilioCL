@@ -34,7 +34,8 @@ pub(super) struct Objects {
     pub enabled: BTreeSet<String>,
     cells: BTreeMap<ObjectKey, Vec<MapObject>>,
     order: VecDeque<ObjectKey>,
-    failed: BTreeSet<ObjectKey>,
+    /// Cells whose request failed, with the failure's message id if it has one.
+    failed: BTreeMap<ObjectKey, String>,
     pending: BTreeMap<ObjectKey, (u64, CancellationToken)>,
     wanted: Vec<ObjectKey>,
     generation: u64,
@@ -135,7 +136,7 @@ impl Objects {
                 break;
             }
             if self.cells.contains_key(&key)
-                || self.failed.contains(&key)
+                || self.failed.contains_key(&key)
                 || self.pending.contains_key(&key)
             {
                 continue;
@@ -200,8 +201,13 @@ impl Objects {
         }
     }
 
-    pub fn fail(&mut self, key: ObjectKey) {
-        self.failed.insert(key);
+    pub fn fail(&mut self, key: ObjectKey, reason: String) {
+        self.failed.insert(key, reason);
+    }
+
+    /// Whether some failed cell failed with this message id.
+    pub fn failed_with(&self, reason: &str) -> bool {
+        self.failed.values().any(|known| known == reason)
     }
 
     pub fn failed(&self) -> usize {

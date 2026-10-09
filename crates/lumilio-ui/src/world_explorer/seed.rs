@@ -234,7 +234,12 @@ impl MapView {
         let worlds: Vec<_> = self
             .contexts
             .iter()
-            .filter(|world| matches!(world.context.world, WorldId::Save { .. }))
+            .filter(|world| {
+                matches!(
+                    world.context.world,
+                    WorldId::Save { .. } | WorldId::Server { .. }
+                )
+            })
             .map(|world| WorldChoice {
                 id: world.context.world.clone(),
                 name: world.name.clone(),

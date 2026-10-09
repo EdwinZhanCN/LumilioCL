@@ -258,6 +258,8 @@ pub(crate) fn objects(
             priority: if layer.kind.is_none() { 10 } else { 0 },
             approximate,
             color: None,
+            note: None,
+            share: None,
         })
         .collect())
 }

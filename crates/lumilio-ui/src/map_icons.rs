@@ -33,7 +33,7 @@ fn bytes(icon: MapIcon) -> Option<&'static [u8]> {
         MapIcon::EndCity => icon!("end_city"),
         MapIcon::Spawn => icon!("spawn_point"),
         MapIcon::SlimeChunk => icon!("slime_chunks"),
-        MapIcon::Waypoint | MapIcon::Marker => return None,
+        MapIcon::Waypoint | MapIcon::Death | MapIcon::Marker => return None,
     })
 }
 
@@ -57,7 +57,7 @@ pub(crate) fn image(icon: MapIcon) -> Option<Arc<Image>> {
 /// An icon's pixels for the map frame: straight-alpha RGBA at its own size.
 pub(crate) struct Pixels {
     /// Names the icon to the renderer, which keeps one texture per name.
-    pub name: &'static str,
+    pub name: String,
     pub width: u32,
     pub height: u32,
     pub rgba: Arc<[u8]>,
@@ -86,12 +86,13 @@ fn name(icon: MapIcon) -> &'static str {
         MapIcon::Spawn => "spawn",
         MapIcon::SlimeChunk => "slime-chunk",
         MapIcon::Waypoint => "waypoint",
+        MapIcon::Death => "death",
         MapIcon::Marker => "marker",
     }
 }
 
 /// A plain dot, for an icon with no file.
-fn dot(name: &'static str) -> Pixels {
+fn dot(name: String) -> Pixels {
     const EDGE: u32 = 24;
     let centre = (EDGE as f32 - 1.) / 2.;
     let rgba = (0..EDGE * EDGE)
@@ -126,14 +127,100 @@ pub(crate) fn pixels(icon: MapIcon) -> Arc<Pixels> {
         .map(|decoded| {
             let rgba = decoded.to_rgba8();
             Pixels {
-                name: name(icon),
+                name: name(icon).to_owned(),
                 width: rgba.width(),
                 height: rgba.height(),
                 rgba: rgba.into_raw().into(),
             }
         })
-        .unwrap_or_else(|| dot(name(icon)));
+        .unwrap_or_else(|| dot(name(icon).to_owned()));
     let found = Arc::new(decoded);
     cache.push((icon, found.clone()));
     found
+}
+
+/// How a data-coloured marker is shaped.
+#[derive(Clone, Copy)]
+enum Shape {
+    Disc,
+    Cross,
+    Diamond,
+}
+
+/// Signed distance from the shape's edge at `(x, z)` from the glyph's centre:
+/// negative inside.
+fn distance(shape: Shape, x: f32, z: f32) -> f32 {
+    match shape {
+        Shape::Disc => (x * x + z * z).sqrt() - 7.5,
+        Shape::Diamond => (x.abs() + z.abs()) / std::f32::consts::SQRT_2 - 7.5,
+        // Two diagonal strokes, each 3.6 px wide, clipped to the glyph's box.
+        Shape::Cross => {
+            let reach = x.abs().max(z.abs()) - 7.5;
+            let stroke = |across: f32| (across.abs() / std::f32::consts::SQRT_2 - 1.8).max(reach);
+            stroke(x - z).min(stroke(x + z))
+        }
+    }
+}
+
+/// A marker in a colour the data chose: the shape filled with `color` inside a
+/// dark outline, so it reads on any biome.
+fn glyph(shape: Shape, color: [u8; 3], name: String) -> Pixels {
+    const EDGE: u32 = 24;
+    let centre = (EDGE as f32 - 1.) / 2.;
+    let rgba = (0..EDGE * EDGE)
+        .flat_map(|at| {
+            let (x, z) = ((at % EDGE) as f32 - centre, (at / EDGE) as f32 - centre);
+            let d = distance(shape, x, z);
+            let fill = (0.5 - d).clamp(0., 1.);
+            let outline = (0.5 - (d - 2.)).clamp(0., 1.);
+            // Outline under, colour over it, both anti-aliased.
+            let alpha = outline.max(fill);
+            let mix = if alpha > 0. { fill / alpha } else { 0. };
+            let channel = |c: u8| (f32::from(c) * mix + 24. * (1. - mix)).round() as u8;
+            [
+                channel(color[0]),
+                channel(color[1]),
+                channel(color[2]),
+                (alpha * 255.).round() as u8,
+            ]
+        })
+        .collect();
+    Pixels {
+        name,
+        width: EDGE,
+        height: EDGE,
+        rgba,
+    }
+}
+
+/// The pixels for a marker drawn in `color`: a disc for a waypoint, a cross for
+/// a death point, a diamond for a custom marker. Icons with artwork ignore the
+/// colour and come from [`pixels`].
+pub(crate) fn marker(icon: MapIcon, color: [u8; 3]) -> Arc<Pixels> {
+    type Made = std::sync::Mutex<Vec<((MapIcon, [u8; 3]), Arc<Pixels>)>>;
+    static CACHE: OnceLock<Made> = OnceLock::new();
+    let shape = match icon {
+        MapIcon::Waypoint => Shape::Disc,
+        MapIcon::Death => Shape::Cross,
+        MapIcon::Marker => Shape::Diamond,
+        _ => return pixels(icon),
+    };
+    let cache = CACHE.get_or_init(Default::default);
+    let mut cache = cache
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if let Some((_, found)) = cache.iter().find(|(known, _)| *known == (icon, color)) {
+        return found.clone();
+    }
+    let [r, g, b] = color;
+    let made = Arc::new(glyph(
+        shape,
+        color,
+        format!("{}-{r:02x}{g:02x}{b:02x}", name(icon)),
+    ));
+    if cache.len() >= 64 {
+        cache.remove(0);
+    }
+    cache.push(((icon, color), made.clone()));
+    made
 }

@@ -12,6 +12,7 @@ use lumilio_plugin_api::{
 mod landmarks;
 mod structures;
 mod text;
+mod xaero;
 
 pub const ID: &str = "lumilio.world-explorer";
 pub const SUPPORTED_VERSIONS: &[&str] = lumilio_cubiomes::SUPPORTED_VERSIONS;
@@ -51,11 +52,13 @@ impl OverlayProvider for WorldExplorer {
     fn overlays(&self) -> Vec<OverlayInfo> {
         let mut layers = structures::catalog();
         layers.extend(landmarks::catalog());
+        layers.extend(xaero::overlay::catalog());
         layers
     }
     fn overlays_for(&self, context: &WorldContext) -> Vec<OverlayInfo> {
         let mut layers = structures::catalog_for(context);
         layers.extend(landmarks::catalog_for(context));
+        layers.extend(xaero::overlay::catalog_for(context));
         layers
     }
     fn objects(
@@ -65,6 +68,8 @@ impl OverlayProvider for WorldExplorer {
     ) -> Result<Vec<MapObject>, PluginError> {
         if landmarks::is_landmark(&request.overlay) {
             landmarks::objects(request)
+        } else if xaero::overlay::is_layer(&request.overlay) {
+            xaero::overlay::objects(ctx, request)
         } else {
             structures::objects(ctx, request)
         }

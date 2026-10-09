@@ -137,6 +137,8 @@ pub enum MapIcon {
     Spawn,
     SlimeChunk,
     Waypoint,
+    /// Where a player died; drawn apart from ordinary waypoints.
+    Death,
     Marker,
 }
 
@@ -172,6 +174,13 @@ pub struct MapObject {
     pub priority: i32,
     pub approximate: bool,
     pub color: Option<[u8; 3]>,
+    /// One more line for the selection card, user data shown as written.
+    #[serde(default)]
+    pub note: Option<String>,
+    /// Text the card can copy besides the coordinates, such as a waypoint's
+    /// share string.
+    #[serde(default)]
+    pub share: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

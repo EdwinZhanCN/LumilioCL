@@ -247,10 +247,10 @@ P0 **pending human acceptance**：Windows MSVC Actions；macOS 与指定 ubuntu:
 
 ### P2 Xaero 路径点（只读）与分享串
 
-- [ ] T17：`lumilio-plugin-world-explorer/src/xaero/`（新建：`waypoints.rs`、`naming.rs`、`tests.rs`）：解析集合文件，保留每一行原文、不认识的行和字段；`§§` 转义；`~` 表示没有 Y；死亡点、旧死亡点、禁用和临时点都能识别。改编自 XaeroTools `crates/xaero-core/src/{waypoints.rs,naming.rs}`，注释署名。样本：用实现时最新的 26.x 版 Xaero's Minimap（W17）导出主世界、下界、末地各一份，放在 `tests/data/xaero/<版本>/`，版本号同时记进本计划的实施记录。往返测试：读出再写回逐字节一致。
-- [ ] T18：Overlay「Xaero 路径点」：按世界、维度、集合列出；颜色按下标画；死亡点用单独图标。损坏的文件、读不到的目录变成图层状态（「这份路径点文件读不了」），不让插件 `Failed`。目录结构不认识时说明只支持小地图的路径点。
-- [ ] T19：世界关联：core 列出 `xaero/minimap` 和 `xaero/world-map` 的目录名；单人世界名称完全相同时提出建议，人确认后存进 `launcher.db`；多人目录（`Multiplayer_…`）作为 `WorldId::Server` 单独出现。
-- [ ] T20：选中路径点后「复制分享串」，生成 `xaero-waypoint:` 格式；维度写 `Internal-…-waypoints`。测试覆盖冒号、表情、没有 Y 的点。
+- [x] T17：`lumilio-plugin-world-explorer/src/xaero/`（新建：`waypoints.rs`、`naming.rs`、`tests.rs`）：解析集合文件，保留每一行原文、不认识的行和字段；`§§` 转义；`~` 表示没有 Y；死亡点、旧死亡点、禁用和临时点都能识别。改编自 XaeroTools `crates/xaero-core/src/{waypoints.rs,naming.rs}`，注释署名。样本：用实现时最新的 26.x 版 Xaero's Minimap（W17）导出主世界、下界、末地各一份，放在 `tests/data/xaero/<版本>/`，版本号同时记进本计划的实施记录。往返测试：读出再写回逐字节一致。
+- [x] T18：Overlay「Xaero 路径点」：按世界、维度、集合列出；颜色按下标画；死亡点用单独图标。损坏的文件、读不到的目录变成图层状态（「这份路径点文件读不了」），不让插件 `Failed`。目录结构不认识时说明只支持小地图的路径点。
+- [x] T19：世界关联：core 列出 `xaero/minimap` 和 `xaero/world-map` 的目录名；单人世界名称完全相同时提出建议，人确认后存进 `launcher.db`；多人目录（`Multiplayer_…`）作为 `WorldId::Server` 单独出现。
+- [x] T20：选中路径点后「复制分享串」，生成 `xaero-waypoint:` 格式；维度写 `Internal-…-waypoints`。测试覆盖冒号、表情、没有 Y 的点。
 
 ### P3 Xaero 路径点编辑与写回
 
@@ -424,6 +424,7 @@ P0 **pending human acceptance**：Windows MSVC Actions；macOS 与指定 ubuntu:
 
 ## 实施记录
 
+- 2026-10-09：T17–T20 完成（P2），**真实 Xaero 样本仍缺**。插件 `src/xaero/`：`naming.rs`、`waypoints.rs` 改编自 XaeroTools（MIT，署名与 `ATTRIBUTIONS.md` 已加）；文件模型逐行保留原文（含注释、未知行、CRLF），读出再拼回逐字节一致，改一行只动那一行；`overlay.rs` 是「Xaero 路径点」图层，读 `xaero/minimap/<目录>/<维度>/mw$*.txt`，跳过 `.temp`、`.backupN` 和 `backup-` 目录；颜色 0–19 取 XaeroTools 的 20 色表（编辑器将只开放 0–15，W17），未知下标显示灰色；死亡点（type 1/2）用叉形、停用点优先级低并标「已停用」，非默认集合名写在信息卡里；`destination` 字段对应计划里的「临时点」，Xaero 自己的临时点不落盘。文件有解析不了的 `waypoint:` 行或不是 UTF-8 时，图层返回 `map-xaero-unreadable`，状态行写明，且不计入 Provider 的 5 次故障（`plugins/map.rs`）。分享串 `xaero-waypoint:名称:缩写:x:y:z:颜色:旋转:yaw:Internal-…-waypoints`，冒号写 `§§`，没有 Y 写 `~`；信息卡加「复制分享串」。`MapObject` 新增 `note`、`share`，`MapIcon::Death`，宿主按数据颜色画程序化的圆点/叉/菱形。T19：core `world_map/xaero.rs` 列目录；同名目录只作为建议，地图左下角提示、人点「关联」后存进 `launcher.db` 新表 `world_map_links`（仍是 schema 4，建表用 IF NOT EXISTS）；`Multiplayer_*` 目录成为 `WorldId::Server` 世界，世界下拉也列它们。**样本**：`tests/data/xaero/synthetic/` 是按文档格式手写的合成样本（README 已说明），不是游戏导出；W17 要求的钉住版本 26.x 真实样本、以及「分享串在游戏里能导入」「游戏内列表一致」都 **pending human acceptance**。
 - 2026-10-09：T15、T16 完成（P1）。出生点和史莱姆区块在插件的 `landmarks.rs`：只在主世界、有种子时出现，组「世界」；出生点是一个图标，1.18 前标「估计」，用 `lumilio_cubiomes::spawn` 并缓存最近 8 个世界；史莱姆区块每个 4096 方块的格子只返回一个 `Heat { cell: 16 }` 对象（列出格内所有史莱姆区块的角点），由宿主画成半透明方块。`OverlayInfo` 新增 `max_scale`（该层最粗画到每像素几个方块；`None` 用宿主默认 16），史莱姆为 1，超过就不请求、不画，图层面板写明「放大到每像素 1 方块才显示」。Canvas 后端 `Frame.fills` 画区域矩形（wgpu 旧路径不画）。「存档里有实际出生点时以存档为准」留给 T31。点选在 `select.rs`：按下后移动不超过 4 px 算点击，取图标框外 4 px 内最近的对象，选中后在图标下垫一块白色高亮，左下角信息卡显示种类（或用户标签）、`X Z`、来源和「估计」，「复制坐标」写 `x z`，点空白或「关闭」取消。测试：插件里出生点/史莱姆与 cubiomes 逐点一致、版本与维度的取舍；UI 里填充矩形的屏幕位置与缩放界限、点击与拖动的区分、剪贴板内容。P1 验收里「三个版本的结构坐标与金样一致」由 T13/T14 的金样测试覆盖；Chunkbase 对照仍待维护者实机。
 - 2026-10-09：2D 地图默认改用 GPUI Canvas 后端（`lumilio-ui/src/world_explorer/canvas.rs`），wgpu 整帧合成加读回的旧路径留在 `LUMILIO_MAP_BACKEND=wgpu` 之后，供对照。依据：维护者真机并排对比，Canvas 清晰度和拖动手感都好得多；测量（M2 Pro，模拟 120 Hz 拖动）wgpu 每帧渲染 5.7 ms、2x 分辨率下丢弃 20% 的帧且读回 11 MB/帧，Canvas 每帧 CPU 绘制 0.18 ms、没有读回；wgpu 首帧还要等 29–55 秒（全在 `request_adapter`，原因未查）。Canvas 的取舍：GPUI 对图片只做线性采样；图标透明度烤进像素 alpha；网格线用 1 逻辑像素的半透明方块。「wgpu 离屏合成」不再是 2D 地图的合成方式，`lumilio-map-render` 暂时保留给对照和可能的 Litematica/3D 用途，何时移除另行决定。`LUMILIO_MAP_STATS=1` 每 2 秒在终端打印渲染统计。
 

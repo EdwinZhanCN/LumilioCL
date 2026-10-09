@@ -101,6 +101,13 @@ impl MapView {
             })
             .unwrap_or_else(|| object.raw_id.clone());
         let text = coordinates(at);
+        let share = object.share.clone();
+        // What the object is, when its title is the user's own name for it.
+        let kind = object
+            .label
+            .as_ref()
+            .and(object.label_id.as_deref())
+            .map(|id| crate::i18n::lookup(id).unwrap_or_else(|| id.to_owned()));
         // ia[plugin.world-explorer]: 点选地图对象 | 地图左下角信息卡 · 种类、坐标、来源与「复制坐标」 | 点图标选中并显示；点空白处或「×」取消；复制 `x z`；估计的位置标「估计」
         Some(
             v_flex()
@@ -122,6 +129,19 @@ impl MapView {
                             )
                         }),
                 )
+                .children(kind.map(|kind| {
+                    div()
+                        .text_xs()
+                        .text_color(cx.theme().muted_foreground)
+                        .child(kind)
+                }))
+                .children(object.note.clone().map(|note| {
+                    div()
+                        .text_xs()
+                        .text_color(cx.theme().muted_foreground)
+                        .debug_selector(|| "map-selection-note".into())
+                        .child(note)
+                }))
                 .child(
                     div()
                         .debug_selector(|| "map-selection-coordinates".into())
@@ -153,6 +173,17 @@ impl MapView {
                                     cx.write_to_clipboard(ClipboardItem::new_string(text.clone()));
                                 })),
                         )
+                        .children(share.map(|share| {
+                            // ia[plugin.world-explorer]: 复制路径点分享串 | 信息卡 ·「复制分享串」 | 复制 Xaero 的 xaero-waypoint: 格式，可在游戏里导入；只在路径点上出现
+                            Key::new("map-copy-share")
+                                .label(tr!("map-copy-share"))
+                                .white()
+                                .small()
+                                .debug_selector(|| "map-copy-share".into())
+                                .on_click(cx.listener(move |_, _, _, cx| {
+                                    cx.write_to_clipboard(ClipboardItem::new_string(share.clone()));
+                                }))
+                        }))
                         .child(
                             Key::new("map-selection-close")
                                 .label(tr!("map-selection-close"))

@@ -16,6 +16,14 @@ impl<T: Transport + Clone> LauncherService<T> {
         tokio::task::spawn_blocking(move || {
             let mut contexts =
                 world_map::contexts(&instance, &dir).map_err(std::io::Error::other)?;
+            let links =
+                world_map::store::links(&database, &instance).map_err(std::io::Error::other)?;
+            world_map::xaero::attach(
+                &mut contexts,
+                &instance,
+                &world_map::xaero::minimap_dirs(&dir),
+                &links,
+            );
             contexts.extend(
                 world_map::store::load(&database, &instance).map_err(std::io::Error::other)?,
             );
@@ -24,6 +32,48 @@ impl<T: Transport + Clone> LauncherService<T> {
         .await
         .map_err(std::io::Error::other)?
         .map_err(ServiceError::from)
+    }
+    /// Records that the person confirmed a save's Minimap directory. The
+    /// directory must exist, so a stale suggestion cannot be linked.
+    pub async fn link_map_xaero(
+        &self,
+        instance: &str,
+        folder: &str,
+        dir: &str,
+    ) -> Result<(), ServiceError> {
+        self.instance(instance).await?;
+        let game = self.layout.game(instance);
+        let (database, instance, folder, dir) = (
+            self.layout.database(),
+            instance.to_owned(),
+            folder.to_owned(),
+            dir.to_owned(),
+        );
+        tokio::task::spawn_blocking(move || {
+            if !world_map::xaero::minimap_dirs(&game).contains(&dir) {
+                return Err(std::io::Error::other("unknown Minimap directory"));
+            }
+            world_map::store::link(&database, &instance, &folder, &dir)
+                .map_err(std::io::Error::other)
+        })
+        .await
+        .map_err(std::io::Error::other)?
+        .map_err(ServiceError::from)
+    }
+    pub async fn unlink_map_xaero(&self, instance: &str, folder: &str) -> Result<(), ServiceError> {
+        self.instance(instance).await?;
+        let (database, instance, folder) = (
+            self.layout.database(),
+            instance.to_owned(),
+            folder.to_owned(),
+        );
+        tokio::task::spawn_blocking(move || {
+            world_map::store::unlink(&database, &instance, &folder)
+        })
+        .await
+        .map_err(std::io::Error::other)?
+        .map_err(std::io::Error::other)?;
+        Ok(())
     }
     pub async fn map_providers(&self) -> MapProviders {
         self.plugins.map_providers().await

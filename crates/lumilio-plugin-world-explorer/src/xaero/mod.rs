@@ -1,0 +1,10 @@
+//! Xaero's Minimap waypoints: file naming, a line-preserving file model, share
+//! strings, and the overlay that draws them. The format has no public
+//! specification; what is known comes from XaeroTools and is checked against
+//! the pinned sample in `tests/data/xaero/` (plan W17).
+pub(crate) mod naming;
+pub(crate) mod overlay;
+pub(crate) mod waypoints;
+
+#[cfg(test)]
+mod tests;
