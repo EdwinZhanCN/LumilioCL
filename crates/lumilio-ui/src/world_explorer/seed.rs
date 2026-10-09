@@ -34,10 +34,11 @@ pub(super) struct Form {
     pub seed: Entity<InputState>,
     pub version: Entity<SelectState<SearchableVec<String>>>,
     pub world: Entity<SelectState<SearchableVec<WorldChoice>>>,
-    pub jump: Entity<InputState>,
+    pub jump_x: Entity<InputState>,
+    pub jump_z: Entity<InputState>,
     pub seed_error: Option<&'static str>,
     pub jump_error: bool,
-    jump_checked: Option<String>,
+    jump_checked: Option<(String, String)>,
     pub seed_dirty: bool,
     seed_checked: Option<String>,
     pub submitted: Option<(i64, String)>,
@@ -58,19 +59,10 @@ fn default_version(context: Option<&WorldContext>) -> &'static str {
         .unwrap_or("1.21.4")
 }
 
-pub(super) fn coordinates(text: &str) -> Option<[f64; 2]> {
-    let parts: Vec<_> = if text.contains(',') {
-        text.split(',').map(str::trim).collect()
-    } else {
-        text.split_whitespace().collect()
-    };
-    let [x, z] = parts.as_slice() else {
-        return None;
-    };
-    let at = [x.parse::<f64>().ok()?, z.parse::<f64>().ok()?];
-    at.iter()
-        .all(|value| value.is_finite() && value.abs() <= 29_900_000.)
-        .then_some(at)
+/// One coordinate field: a finite number inside the world border.
+pub(super) fn axis(text: &str) -> Option<f64> {
+    let value = text.trim().parse::<f64>().ok()?;
+    (value.is_finite() && value.abs() <= 29_900_000.).then_some(value)
 }
 
 impl MapView {
@@ -78,8 +70,8 @@ impl MapView {
         if self.form.is_none() {
             let seed =
                 cx.new(|cx| InputState::new(window, cx).placeholder(tr!("map-seed-placeholder")));
-            let jump =
-                cx.new(|cx| InputState::new(window, cx).placeholder(tr!("map-jump-placeholder")));
+            let jump_x = cx.new(|cx| InputState::new(window, cx).placeholder("X"));
+            let jump_z = cx.new(|cx| InputState::new(window, cx).placeholder("Z"));
             let version = cx.new(|cx| {
                 SelectState::new(
                     SearchableVec::new(
@@ -166,41 +158,32 @@ impl MapView {
                 },
             )
             .detach();
-            cx.subscribe_in(&jump, window, |this, _, event: &InputEvent, _, cx| {
-                match event {
-                    InputEvent::PressEnter { .. } => {
-                        let at = this
-                            .form
-                            .as_ref()
-                            .and_then(|form| coordinates(&form.jump.read(cx).value()));
-                        if let Some(at) = at {
-                            this.camera.x = at[0];
-                            this.camera.z = at[1];
-                            this.refresh();
+            for input in [&jump_x, &jump_z] {
+                cx.subscribe_in(input, window, |this, _, event: &InputEvent, _, cx| {
+                    match event {
+                        InputEvent::PressEnter { .. } => this.jump(cx),
+                        InputEvent::Change => {
+                            if let Some(form) = &mut this.form
+                                && form.jump_checked.as_ref().is_none_or(|(x, z)| {
+                                    x != form.jump_x.read(cx).value().as_str()
+                                        || z != form.jump_z.read(cx).value().as_str()
+                                })
+                            {
+                                form.jump_error = false;
+                            }
                         }
-                        if let Some(form) = &mut this.form {
-                            form.jump_error = at.is_none();
-                            form.jump_checked = Some(form.jump.read(cx).value().to_string());
-                        }
+                        _ => {}
                     }
-                    InputEvent::Change => {
-                        if let Some(form) = &mut this.form
-                            && form.jump_checked.as_deref()
-                                != Some(form.jump.read(cx).value().as_str())
-                        {
-                            form.jump_error = false;
-                        }
-                    }
-                    _ => {}
-                }
-                cx.notify();
-            })
-            .detach();
+                    cx.notify();
+                })
+                .detach();
+            }
             self.form = Some(Form {
                 seed,
                 version,
                 world,
-                jump,
+                jump_x,
+                jump_z,
                 seed_error: None,
                 jump_error: false,
                 jump_checked: None,
@@ -269,11 +252,29 @@ impl MapView {
             form.seed.update(cx, |seed, cx| {
                 seed.set_placeholder(tr!("map-seed-placeholder"), window, cx)
             });
-            form.jump.update(cx, |jump, cx| {
-                jump.set_placeholder(tr!("map-jump-placeholder"), window, cx)
-            });
             form.locale = crate::i18n::generation();
         }
+    }
+
+    /// Centres the map on the X and Z fields; an unreadable pair is flagged
+    /// beside the fields and leaves the camera alone.
+    pub(super) fn jump(&mut self, cx: &mut Context<Self>) {
+        let Some(form) = &mut self.form else {
+            return;
+        };
+        let (x_text, z_text) = (
+            form.jump_x.read(cx).value().to_string(),
+            form.jump_z.read(cx).value().to_string(),
+        );
+        let (x, z) = (axis(&x_text), axis(&z_text));
+        form.jump_checked = Some((x_text, z_text));
+        form.jump_error = x.is_none() || z.is_none();
+        if let (Some(x), Some(z)) = (x, z) {
+            self.camera.x = x;
+            self.camera.z = z;
+            self.refresh();
+        }
+        cx.notify();
     }
 
     fn apply_seed(&mut self, cx: &mut Context<Self>) {

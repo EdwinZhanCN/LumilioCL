@@ -8,9 +8,22 @@ fn zoom_keeps_pointer_world_coordinate_and_lod_uses_fourfold_steps() {
     let before = camera.world([100., 50.], [800, 600]);
     camera.zoom(0.5, [100., 50.], [800, 600]);
     assert_eq!(camera.world([100., 50.], [800, 600]), before);
-    assert_eq!(camera.level(), 0);
-    camera.scale = 16.;
-    assert_eq!(camera.level(), 2);
+    // Level changes where a tile texel is twice a screen pixel, so a level is
+    // never generated finer than it can be told apart.
+    for (scale, level) in [
+        (0.25, 0),
+        (1.99, 0),
+        (2., 1),
+        (7.9, 1),
+        (8., 2),
+        (16., 2),
+        (32., 3),
+        (128., 4),
+        (256., 4),
+    ] {
+        camera.scale = scale;
+        assert_eq!(camera.level(), level, "{scale}");
+    }
 }
 
 #[gpui::test]
@@ -202,13 +215,13 @@ fn inline_seed_enter_and_blur_apply_without_map_stealing_typing(cx: &mut TestApp
         assert_eq!(form.seed.read(cx).value().as_str(), "hello");
         assert!(form.seed_dirty);
     });
-    click(cx, "map-jump-input");
+    click(cx, "map-jump-x");
     cx.update(|window, cx| {
         view.read_with(cx, |view, cx| {
             use gpui::Focusable as _;
             let form = view.form.as_ref().unwrap();
             assert!(
-                form.jump.read(cx).focus_handle(cx).is_focused(window),
+                form.jump_x.read(cx).focus_handle(cx).is_focused(window),
                 "jump should take focus"
             );
             assert!(
@@ -348,51 +361,70 @@ fn searchable_world_and_version_selects_follow_supported_defaults(cx: &mut TestA
 }
 
 #[test]
-fn jump_coordinates_accept_two_formats_and_reject_invalid_or_outside_border() {
-    for text in ["-12 34", " -12, 34 ", " -12   34 "] {
-        assert_eq!(seed::coordinates(text), Some([-12., 34.]));
+fn jump_axis_accepts_numbers_inside_the_border_only() {
+    for (text, value) in [
+        ("-12", -12.),
+        (" 34 ", 34.),
+        ("0.5", 0.5),
+        ("29900000", 29_900_000.),
+    ] {
+        assert_eq!(seed::axis(text), Some(value), "{text}");
     }
     for text in [
         "",
-        "12",
-        "1 2 3",
-        "1,,2",
-        "NaN 1",
-        "inf, 2",
-        "30000000 0",
-        "word 4",
+        "  ",
+        "1 2",
+        "1,2",
+        "NaN",
+        "inf",
+        "30000000",
+        "-30000000",
+        "word",
     ] {
-        assert_eq!(seed::coordinates(text), None, "{text}");
+        assert_eq!(seed::axis(text), None, "{text}");
     }
 }
 
 #[gpui::test]
-fn jump_enter_moves_camera_and_invalid_input_shows_inline_error(cx: &mut TestAppContext) {
+fn go_key_and_enter_move_camera_and_a_bad_axis_shows_inline_error(cx: &mut TestAppContext) {
     let (view, cx) = rooted_map(cx, gpui_component::ThemeMode::Dark);
-    let jump = view.read_with(cx, |view, _| view.form.as_ref().unwrap().jump.clone());
-    for text in ["-12 34", " -56, -78 "] {
-        click(cx, "map-jump-input");
-        cx.update(|window, cx| jump.update(cx, |jump, cx| jump.set_value(text, window, cx)));
-        cx.simulate_keystrokes("enter");
-        cx.run_until_parked();
-        view.read_with(cx, |view, _| {
-            let expected = seed::coordinates(text).unwrap();
-            assert_eq!([view.camera.x, view.camera.z], expected);
+    let (x, z) = view.read_with(cx, |view, _| {
+        let form = view.form.as_ref().unwrap();
+        (form.jump_x.clone(), form.jump_z.clone())
+    });
+    let set = |cx: &mut gpui::VisualTestContext, x_text: &str, z_text: &str| {
+        cx.update(|window, cx| {
+            x.update(cx, |input, cx| input.set_value(x_text, window, cx));
+            z.update(cx, |input, cx| input.set_value(z_text, window, cx));
         });
-        assert!(cx.debug_bounds("map-jump-error").is_none());
-    }
-    cx.update(|window, cx| jump.update(cx, |jump, cx| jump.set_value("oops", window, cx)));
-    cx.run_until_parked();
-    click(cx, "map-jump-input");
+        cx.run_until_parked();
+    };
+    set(cx, "-12", "34");
+    click(cx, "map-go");
+    view.read_with(cx, |view, _| {
+        assert_eq!([view.camera.x, view.camera.z], [-12., 34.])
+    });
+    assert!(cx.debug_bounds("map-jump-error").is_none());
+    set(cx, "-56", "-78");
+    click(cx, "map-jump-z");
     cx.simulate_keystrokes("enter");
     cx.run_until_parked();
     view.read_with(cx, |view, _| {
-        assert!(view.form.as_ref().unwrap().jump_error)
-    });
-    assert!(cx.debug_bounds("map-jump-error").is_some());
-    view.read_with(cx, |view, _| {
         assert_eq!([view.camera.x, view.camera.z], [-56., -78.])
     });
+    // One bad axis moves nothing; fixing the field clears the message.
+    set(cx, "oops", "5");
+    click(cx, "map-go");
+    view.read_with(cx, |view, _| {
+        assert!(view.form.as_ref().unwrap().jump_error);
+        assert_eq!([view.camera.x, view.camera.z], [-56., -78.]);
+    });
+    assert!(cx.debug_bounds("map-jump-error").is_some());
+    // Typing into a field is an edit; the stale message goes away.
+    click(cx, "map-jump-x");
+    cx.simulate_input("1");
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("map-jump-error").is_none());
 }
 
 #[gpui::test]
@@ -470,4 +502,150 @@ fn retry_uses_one_counted_button_and_viewport_receives_surplus_height(cx: &mut T
     cx.run_until_parked();
     let tall = cx.debug_bounds("world-map").unwrap();
     assert_eq!(tall.size.height - small.size.height, px(200.));
+}
+
+fn tile_key(level: u8, tx: i32, tz: i32) -> TileKey {
+    TileKey {
+        provider: "test.seed".into(),
+        base_map: "seed".into(),
+        world: WorldId::Seed {
+            seed: 262,
+            version: "1.21.4".into(),
+        },
+        dimension: Dimension::Overworld,
+        level,
+        tx,
+        tz,
+    }
+}
+
+fn ready_view(
+    cx: &mut TestAppContext,
+) -> (
+    gpui::Entity<MapView>,
+    &mut gpui::VisualTestContext,
+    async_channel::Receiver<Command>,
+) {
+    let (view, cx) = rooted_map(cx, gpui_component::ThemeMode::Light);
+    let commands = connect_commands(&view, cx);
+    view.update(cx, |view, cx| {
+        view.context = Some(WorldContext {
+            world: tile_key(0, 0, 0).world,
+            seed: Some(262),
+            version: Some("1.21.4".into()),
+            data_version: None,
+            dimension: Dimension::Overworld,
+            sources: vec![],
+        });
+        view.providers.base_maps.push((
+            "test.seed".into(),
+            BaseMapInfo {
+                id: "seed".into(),
+                kind_id: "map-base-seed".into(),
+                dimensions: vec![Dimension::Overworld],
+                levels: vec![0, 1, 2, 3, 4],
+            },
+        ));
+        cx.notify();
+    });
+    cx.run_until_parked();
+    (view, cx, commands)
+}
+
+fn image(shade: u8) -> TileReply {
+    TileReply::Image(lumilio_plugin_api::ImageData {
+        width: 256,
+        height: 256,
+        rgba: [shade, shade, shade, 255].repeat(256 * 256),
+    })
+}
+
+#[gpui::test]
+fn dispatch_keeps_a_bounded_queue_and_refills_it_as_tiles_arrive(cx: &mut TestAppContext) {
+    let (view, cx, commands) = ready_view(cx);
+    // A wide, zoomed-out window wants far more tiles than may be in flight.
+    cx.simulate_resize(gpui::size(px(1900.), px(1100.)));
+    cx.run_until_parked();
+    let sent = |commands: &async_channel::Receiver<Command>| {
+        let mut keys = vec![];
+        while let Ok(command) = commands.try_recv() {
+            if let Command::Tile {
+                request,
+                generation,
+                ..
+            } = command
+            {
+                keys.push((generation, request.key));
+            }
+        }
+        keys
+    };
+    let first = sent(&commands);
+    let wanted = view.read_with(cx, |view, _| view.visible.len());
+    assert!(wanted > IN_FLIGHT, "scenario must exceed the cap: {wanted}");
+    assert_eq!(first.len(), IN_FLIGHT);
+    view.update(cx, |view, cx| {
+        let (generation, key) = first[0].clone();
+        view.event(
+            Event::Tile {
+                generation,
+                key,
+                result: Ok(image(10)),
+            },
+            cx,
+        );
+    });
+    assert_eq!(sent(&commands).len(), 1, "one finished, one more starts");
+}
+
+#[gpui::test]
+fn finished_tiles_of_another_level_stand_in_and_are_evicted_oldest_first(cx: &mut TestAppContext) {
+    let (view, cx, _commands) = ready_view(cx);
+    cx.simulate_resize(gpui::size(px(800.), px(600.)));
+    cx.run_until_parked();
+    view.update(cx, |view, _| {
+        let visible = view.visible.clone();
+        assert!(!visible.is_empty());
+        let level = visible[0].level;
+        // A cached coarser tile over the viewport centre.
+        let coarse = tile_key(level + 1, 0, 0);
+        view.revision += 1;
+        view.tiles.insert(
+            coarse.clone(),
+            Loaded {
+                rgba: prepare(image(7)),
+                revision: view.revision,
+                used: 0,
+            },
+        );
+        let ids: Vec<String> = view.scene_tiles().into_iter().map(|tile| tile.id).collect();
+        // Patterns for the unloaded visible tiles first, the stand-in on top of
+        // them; nothing else is cached to draw.
+        assert_eq!(ids.len(), visible.len() + 1, "{ids:?}");
+        assert!(ids[..visible.len()].iter().all(|id| id == "pending"));
+        assert_eq!(ids[visible.len()], format!("tile-{}", view.revision));
+        // Fill past the cap with old, off-screen tiles.
+        for n in 0..(TILE_CAP as i32 + 40) {
+            view.revision += 1;
+            view.tiles.insert(
+                tile_key(0, 10_000 + n, 10_000),
+                Loaded {
+                    rgba: None,
+                    revision: view.revision,
+                    used: n as u64 + 1,
+                },
+            );
+        }
+        view.evict();
+        assert_eq!(view.tiles.len(), TILE_CAP);
+        assert!(
+            view.tiles
+                .contains_key(&tile_key(0, 10_000 + 40 + 1, 10_000)),
+            "newer survive"
+        );
+        assert!(
+            !view.tiles.contains_key(&tile_key(0, 10_000, 10_000)),
+            "oldest go first"
+        );
+    });
 }

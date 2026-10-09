@@ -349,8 +349,10 @@ impl InstanceDetailView {
                             .child(
                                 div()
                                     .w_full()
+                                    // The map fills the pane's height, but stops above
+                                    // the floating navigation bar like every other page.
                                     .when(full_map, |pane| pane.h_full().min_h_0())
-                                    .when(!full_map, |pane| pane.pb(theme::BOTTOM_SAFE_AREA))
+                                    .pb(theme::BOTTOM_SAFE_AREA)
                                     .child(content),
                             ),
                     )

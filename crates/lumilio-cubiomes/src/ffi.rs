@@ -13,8 +13,21 @@ unsafe extern "C" {
         height: i32,
         out: *mut i32,
         count: usize,
+        cancelled: Option<unsafe extern "C" fn(*mut std::ffi::c_void) -> i32>,
+        user: *mut std::ffi::c_void,
     ) -> i32;
     fn lumilio_cubiomes_colors(out: *mut u8);
+}
+
+/// Trampoline for the bridge's cancellation hook.
+///
+/// # Safety
+/// `user` must point to a live `&mut dyn FnMut() -> bool` for the whole call.
+unsafe extern "C" fn poll(user: *mut std::ffi::c_void) -> i32 {
+    // SAFETY: `generate` passes a pointer to its own `&mut dyn FnMut` and the
+    // bridge only calls this synchronously while `generate` is on the stack.
+    let cancelled = unsafe { &mut *user.cast::<&mut dyn FnMut() -> bool>() };
+    i32::from(cancelled())
 }
 
 pub(super) fn generate(
@@ -22,10 +35,13 @@ pub(super) fn generate(
     seed: i64,
     dimension: super::Dimension,
     range: super::Range,
+    cancelled: &mut dyn FnMut() -> bool,
 ) -> Result<Vec<i32>, super::Error> {
     let mut out = vec![0; range.width as usize * range.height as usize];
+    let mut hook: &mut dyn FnMut() -> bool = cancelled;
     // SAFETY: only validated bounded ranges reach this private function. The
-    // bridge allocates cubiomes' scratch cache and copies exactly out.len() ints.
+    // bridge allocates cubiomes' scratch cache and copies exactly out.len() ints;
+    // `hook` outlives the call and is only used from this thread.
     let result = unsafe {
         lumilio_cubiomes_generate(
             version.mc,
@@ -38,10 +54,14 @@ pub(super) fn generate(
             range.height,
             out.as_mut_ptr(),
             out.len(),
+            Some(poll),
+            (&raw mut hook).cast(),
         )
     };
     if result == 0 {
         Ok(out)
+    } else if result == 2 {
+        Err(super::Error::Cancelled)
     } else {
         Err(super::Error::Generation)
     }

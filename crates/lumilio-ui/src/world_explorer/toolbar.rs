@@ -5,7 +5,8 @@ use gpui_component::{Sizable as _, h_flex, input::Input, select::Select, v_flex}
 use lumilio_plugin_api::map::{Dimension, WorldId};
 
 impl MapView {
-    pub(super) fn toolbar(&self, cx: &mut Context<Self>) -> AnyElement {
+    /// The seed row above the map: what world the map shows.
+    pub(super) fn toolbar(&self) -> AnyElement {
         let form = self.form.as_ref().unwrap();
         // ia[plugin.world-explorer]: 输入手动种子 | 地图顶部 · 种子输入框 | 数字或文字种子，Enter 或失焦应用；错误留在输入框旁；保存到该实例
         let seed = v_flex()
@@ -52,13 +53,44 @@ impl MapView {
                         ),
                     )
             });
+        v_flex()
+            .w_full()
+            .flex_none()
+            .gap_1()
+            .child(
+                h_flex()
+                    .w_full()
+                    .gap_3()
+                    .flex_wrap()
+                    .items_end()
+                    .child(seed)
+                    .child(version)
+                    .children(world),
+            )
+            .when_some(form.seed_error, |toolbar, error| {
+                toolbar.child(
+                    div()
+                        .debug_selector(|| "map-seed-error".into())
+                        .text_xs()
+                        .child(if error == "map-seed-empty" {
+                            tr!("map-seed-empty")
+                        } else {
+                            tr!("map-seed-save-failed")
+                        }),
+                )
+            })
+            .into_any_element()
+    }
+
+    /// Dimension and base-map choices, floated over the map's top-left corner.
+    pub(super) fn view_controls(&self, cx: &mut Context<Self>) -> AnyElement {
         let selected = match self.context.as_ref().map(|context| &context.dimension) {
             Some(Dimension::Nether) => 1,
             Some(Dimension::End) => 2,
             _ => 0,
         };
         let target = cx.weak_entity();
-        // ia[plugin.world-explorer]: 切换维度 | 地图工具栏 · 维度分段 | 保留相机；清除旧维度帧和瓦片，取消旧请求
+        // ia[plugin.world-explorer]: 切换维度 | 地图左上角 · 维度分段 | 保留相机；清除旧维度帧和瓦片，取消旧请求
         let dimensions = Segments::new(
             "map-dimension",
             tr_all!["map-overworld", "map-nether", "map-end"],
@@ -85,7 +117,7 @@ impl MapView {
             })
             .collect();
         let target = cx.weak_entity();
-        // ia[plugin.world-explorer]: 选择底图 | 地图工具栏 · 底图分段 | 单选；保留相机与维度，清除旧帧并取消旧底图请求
+        // ia[plugin.world-explorer]: 选择底图 | 地图左上角 · 底图分段 | 单选；保留相机与维度，清除旧帧并取消旧底图请求
         let bases = Segments::new("map-base", &labels, self.base, move |index, _, cx| {
             let _ = target.update(cx, |this, cx| {
                 this.base = index;
@@ -94,15 +126,44 @@ impl MapView {
                 cx.notify();
             });
         });
-        // ia[plugin.world-explorer]: 跳到坐标 | 地图工具栏 · 坐标输入框 | 输入 x z 或 x, z；Enter 移动中心；无效输入在框旁说明
-        let jump = v_flex()
-            .w(px(160.))
+        h_flex()
+            .gap_4()
+            .items_start()
+            .child(dimensions)
+            .child(bases)
+            .into_any_element()
+    }
+
+    /// X and Z fields with an explicit "Go" key, floated over the top-right corner.
+    pub(super) fn jump_controls(&self, cx: &mut Context<Self>) -> AnyElement {
+        let form = self.form.as_ref().unwrap();
+        // ia[plugin.world-explorer]: 前往坐标 | 地图右上角 · X、Z 两个输入框与「前往」键 | 点「前往」或在任一框按 Enter 把视图中心移到该点；X 或 Z 无法读取时在框下说明，视图不动
+        v_flex()
             .gap_1()
-            .child(div().text_xs().child(tr!("map-jump")))
             .child(
-                div()
-                    .debug_selector(|| "map-jump-input".into())
-                    .child(Input::new(&form.jump).small()),
+                h_flex()
+                    .gap_2()
+                    .items_center()
+                    .child(
+                        div()
+                            .w(px(96.))
+                            .debug_selector(|| "map-jump-x".into())
+                            .child(Input::new(&form.jump_x).small()),
+                    )
+                    .child(
+                        div()
+                            .w(px(96.))
+                            .debug_selector(|| "map-jump-z".into())
+                            .child(Input::new(&form.jump_z).small()),
+                    )
+                    .child(
+                        Key::new("map-go")
+                            .label(tr!("map-go"))
+                            .white()
+                            .small()
+                            .debug_selector(|| "map-go".into())
+                            .on_click(cx.listener(|this, _, _, cx| this.jump(cx))),
+                    ),
             )
             .when(form.jump_error, |field| {
                 field.child(
@@ -111,48 +172,13 @@ impl MapView {
                         .text_xs()
                         .child(tr!("map-coordinates-invalid")),
                 )
-            });
-        v_flex()
-            .w_full()
-            .flex_none()
-            .gap_2()
-            .child(
-                h_flex()
-                    .w_full()
-                    .gap_3()
-                    .flex_wrap()
-                    .items_end()
-                    .child(seed)
-                    .child(version)
-                    .children(world),
-            )
-            .when_some(form.seed_error, |toolbar, error| {
-                toolbar.child(
-                    div()
-                        .debug_selector(|| "map-seed-error".into())
-                        .text_xs()
-                        .child(if error == "map-seed-empty" {
-                            tr!("map-seed-empty")
-                        } else {
-                            tr!("map-seed-save-failed")
-                        }),
-                )
             })
-            .child(
-                h_flex()
-                    .gap_3()
-                    .flex_wrap()
-                    .items_end()
-                    .child(dimensions)
-                    .child(bases)
-                    .child(jump),
-            )
             .into_any_element()
     }
 
     pub(super) fn retry_button(&self, cx: &mut Context<Self>) -> Option<Key> {
         let count = self.failed.len();
-        // ia[plugin.world-explorer]: 重试失败瓦片 | 地图状态行 ·「重试失败的 N 块」 | 一次重新派发全部失败块；没有失败时隐藏；暂停的来源重启后恢复
+        // ia[plugin.world-explorer]: 重试失败瓦片 | 地图左下角状态条 ·「重试失败的 N 块」 | 一次重新派发全部失败块；没有失败时隐藏；暂停的来源重启后恢复
         (count > 0).then(|| {
             Key::new("map-retry")
                 .label(tr!("map-retry-failed", count = count))

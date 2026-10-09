@@ -12,14 +12,14 @@ use crate::{theme::ShellColors, tr};
 use gpui::prelude::*;
 use gpui::{
     App, Bounds, Context, FocusHandle, MouseButton, ObjectFit, Pixels, Point, RenderImage, Task,
-    Window, canvas, div, img, px,
+    Window, canvas, div, img, px, relative,
 };
 use gpui_component::{ActiveTheme as _, h_flex, v_flex};
 use lumilio_core::world_map::{MapSchedule, Viewport, WorldMapContext};
 use lumilio_core::{CancellationToken, MapFailure, MapProviders};
 use lumilio_map_render::{Grid, Tile};
 use lumilio_plugin_api::map::{TileKey, TileReply, TileRequest, WorldContext};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -50,6 +50,66 @@ pub struct Connection {
 }
 pub type Load = Rc<dyn Fn(u64, &mut Window, &mut App)>;
 
+/// Tiles dispatched at once. More only lengthens the queue ahead of whatever
+/// the next pan makes important, and cancelled work still holds its worker
+/// until the next poll.
+const IN_FLIGHT: usize = 12;
+/// Decoded tiles kept across zooms (256 KiB each). Coarser or finer neighbours
+/// stand in for the visible level while its own tiles are still being made.
+const TILE_CAP: usize = 512;
+/// Stand-ins drawn under a frame, so one frame stays a bounded number of draws.
+const STAND_INS: usize = 192;
+
+/// A tile's pixels, prepared once on arrival. `rgba` is `None` for a tile the
+/// provider answered as empty; it is drawn as the empty-tile pattern.
+struct Loaded {
+    rgba: Option<Arc<[u8]>>,
+    /// Names the texture on the render thread; a retried tile gets a new one.
+    revision: u64,
+    used: u64,
+}
+
+fn pattern(failed: bool) -> Arc<[u8]> {
+    (0..256 * 256)
+        .flat_map(|pixel| {
+            let shade = if ((pixel % 256) / 16 + (pixel / 256) / 16) % 2 == 0 {
+                80
+            } else {
+                96
+            };
+            if failed {
+                [shade + 32, shade, shade, 255]
+            } else {
+                [shade, shade, shade, 255]
+            }
+        })
+        .collect()
+}
+
+/// RGBA for a reply; areas the provider has no data for show as flat grey.
+fn prepare(reply: TileReply) -> Option<Arc<[u8]>> {
+    match reply {
+        TileReply::Image(image) => Some(image.rgba.into()),
+        TileReply::Partial { image, coverage } => Some(
+            image
+                .rgba
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .zip(coverage)
+                .flat_map(|(pixel, covered)| {
+                    if covered > 0 {
+                        *pixel
+                    } else {
+                        [96, 96, 96, 255]
+                    }
+                })
+                .collect(),
+        ),
+        TileReply::Empty => None,
+    }
+}
+
 pub struct MapView {
     load: Load,
     asked: bool,
@@ -65,7 +125,11 @@ pub struct MapView {
     camera: camera::Camera,
     layers: layers::Layers,
     schedule: MapSchedule,
-    tiles: BTreeMap<TileKey, TileReply>,
+    tiles: BTreeMap<TileKey, Loaded>,
+    clock: u64,
+    revision: u64,
+    pending_pixels: Arc<[u8]>,
+    failed_pixels: Arc<[u8]>,
     visible: Vec<TileKey>,
     failed: BTreeMap<TileKey, MapFailure>,
     size: [u32; 2],
@@ -98,6 +162,10 @@ impl MapView {
             layers: layers::Layers::default(),
             schedule: MapSchedule::default(),
             tiles: BTreeMap::new(),
+            clock: 0,
+            revision: 0,
+            pending_pixels: pattern(false),
+            failed_pixels: pattern(true),
             visible: Vec::new(),
             failed: BTreeMap::new(),
             size: [0, 0],
@@ -209,12 +277,22 @@ impl MapView {
                 match result {
                     Ok(reply) => {
                         self.failed.remove(&key);
-                        self.tiles.insert(key, reply);
+                        self.revision += 1;
+                        self.tiles.insert(
+                            key,
+                            Loaded {
+                                rgba: prepare(reply),
+                                revision: self.revision,
+                                used: self.clock,
+                            },
+                        );
+                        self.evict();
                     }
                     Err(error) => {
                         self.failed.insert(key, error);
                     }
                 }
+                self.dispatch();
                 self.frame();
             }
         }
@@ -255,12 +333,27 @@ impl MapView {
         }
         .visible(&template);
         self.schedule.update(&visible);
-        self.visible = visible.clone();
-        self.tiles.retain(|key, _| visible.contains(key));
         self.failed.retain(|key, _| visible.contains(key));
-        for key in visible {
-            if self.tiles.contains_key(&key) || self.failed.contains_key(&key) {
-                continue;
+        self.visible = visible;
+        self.dispatch();
+        self.frame();
+    }
+    /// Starts requests for visible tiles that have neither pixels nor a
+    /// failure, nearest the centre first, up to [`IN_FLIGHT`] at a time. A
+    /// finished tile calls this again, so the queue drains as the map settles.
+    fn dispatch(&mut self) {
+        let Some(context) = self.context.clone() else {
+            return;
+        };
+        let wanted: Vec<TileKey> = self
+            .visible
+            .iter()
+            .filter(|key| !self.tiles.contains_key(key) && !self.failed.contains_key(key))
+            .cloned()
+            .collect();
+        for key in wanted {
+            if self.schedule.pending_len() >= IN_FLIGHT {
+                break;
             }
             let Some((generation, cancel)) = self.schedule.begin(&key) else {
                 continue;
@@ -281,63 +374,38 @@ impl MapView {
                     .insert(key, MapFailure::Failed(error.to_string()));
             }
         }
-        self.frame();
     }
+    /// Drops the least recently drawn tiles beyond [`TILE_CAP`], never one of
+    /// the visible ones.
+    fn evict(&mut self) {
+        let extra = self.tiles.len().saturating_sub(TILE_CAP);
+        if extra == 0 {
+            return;
+        }
+        let visible: BTreeSet<&TileKey> = self.visible.iter().collect();
+        let mut stale: Vec<(u64, TileKey)> = self
+            .tiles
+            .iter()
+            .filter(|(key, _)| !visible.contains(key))
+            .map(|(key, tile)| (tile.used, key.clone()))
+            .collect();
+        stale.sort();
+        for (_, key) in stale.into_iter().take(extra) {
+            self.tiles.remove(&key);
+        }
+    }
+    /// Hands the render thread what to draw. Costs a handful of `Arc` clones
+    /// per tile, so it can run on every pan and tile arrival.
+    ///
+    /// Draw order, bottom to top: patterns for visible tiles without pixels,
+    /// cached tiles of other levels over them (coarsest first) so a zoom never
+    /// shows a hole, then the visible level's own tiles.
     fn frame(&mut self) {
         if self.size.contains(&0) {
             return;
         }
         self.serial = self.serial.wrapping_add(1);
-        let tiles = self
-            .visible
-            .iter()
-            .filter_map(|key| {
-                let rgba = match self.tiles.get(key) {
-                    Some(TileReply::Image(image)) => image.rgba.clone(),
-                    Some(TileReply::Partial { image, coverage }) => image
-                        .rgba
-                        .as_chunks::<4>()
-                        .0
-                        .iter()
-                        .zip(coverage)
-                        .flat_map(|(pixel, covered)| {
-                            if *covered > 0 {
-                                *pixel
-                            } else {
-                                [96, 96, 96, 255]
-                            }
-                        })
-                        .collect(),
-                    _ => (0..256 * 256)
-                        .flat_map(|pixel| {
-                            let shade = if ((pixel % 256) / 16 + (pixel / 256) / 16) % 2 == 0 {
-                                80
-                            } else {
-                                96
-                            };
-                            if self.failed.contains_key(key) {
-                                [shade + 32, shade, shade, 255]
-                            } else {
-                                [shade, shade, shade, 255]
-                            }
-                        })
-                        .collect(),
-                };
-                let span = f64::from(key.blocks_per_pixel()?) * 256.;
-                Some(Tile {
-                    id: format!(
-                        "{key:?}:{:?}:{}:{}",
-                        self.context,
-                        self.failed.contains_key(key),
-                        self.tiles.contains_key(key)
-                    ),
-                    x: f64::from(key.tx) * span,
-                    z: f64::from(key.tz) * span,
-                    span,
-                    rgba,
-                })
-            })
-            .collect();
+        let tiles = self.scene_tiles();
         if let Some(worker) = &self.worker {
             worker.mailbox.put(worker::Request {
                 serial: self.serial,
@@ -355,6 +423,80 @@ impl MapView {
                 height: self.size[1],
             });
         }
+    }
+    fn scene_tiles(&mut self) -> Vec<Tile> {
+        self.clock += 1;
+        let clock = self.clock;
+        let placed = |key: &TileKey, id: String, rgba: &Arc<[u8]>| {
+            let span = f64::from(key.blocks_per_pixel()?) * 256.;
+            Some(Tile {
+                id,
+                x: f64::from(key.tx) * span,
+                z: f64::from(key.tz) * span,
+                span,
+                rgba: rgba.clone(),
+            })
+        };
+        let mut tiles = Vec::new();
+        for key in &self.visible {
+            match self.tiles.get(key) {
+                Some(Loaded { rgba: Some(_), .. }) => {}
+                _ if self.failed.contains_key(key) => {
+                    tiles.extend(placed(key, "failed".into(), &self.failed_pixels))
+                }
+                _ => tiles.extend(placed(key, "pending".into(), &self.pending_pixels)),
+            }
+        }
+        if let Some(template) = self.visible.first() {
+            let half = [
+                f64::from(self.size[0]) * self.camera.scale / 2.,
+                f64::from(self.size[1]) * self.camera.scale / 2.,
+            ];
+            let shown: BTreeSet<&TileKey> = self.visible.iter().collect();
+            let mut stand_ins: Vec<&TileKey> = self
+                .tiles
+                .iter()
+                .filter(|(key, tile)| {
+                    tile.rgba.is_some()
+                        && key.level != template.level
+                        && key.provider == template.provider
+                        && key.base_map == template.base_map
+                        && key.world == template.world
+                        && key.dimension == template.dimension
+                        && !shown.contains(key)
+                        && key.blocks_per_pixel().is_some_and(|scale| {
+                            let span = f64::from(scale) * 256.;
+                            let (x, z) = (f64::from(key.tx) * span, f64::from(key.tz) * span);
+                            x < self.camera.x + half[0]
+                                && x + span > self.camera.x - half[0]
+                                && z < self.camera.z + half[1]
+                                && z + span > self.camera.z - half[1]
+                        })
+                })
+                .map(|(key, _)| key)
+                .collect();
+            stand_ins.sort_by(|a, b| b.level.cmp(&a.level).then_with(|| a.cmp(b)));
+            // Keep the coarsest: they cover the most ground per draw.
+            stand_ins.truncate(STAND_INS);
+            let keys: Vec<TileKey> = stand_ins.into_iter().cloned().collect();
+            for key in keys {
+                if let Some(tile) = self.tiles.get_mut(&key) {
+                    tile.used = clock;
+                    if let Some(rgba) = &tile.rgba {
+                        tiles.extend(placed(&key, format!("tile-{}", tile.revision), rgba));
+                    }
+                }
+            }
+        }
+        for key in &self.visible {
+            if let Some(tile) = self.tiles.get_mut(key) {
+                tile.used = clock;
+                if let Some(rgba) = &tile.rgba {
+                    tiles.extend(placed(key, format!("tile-{}", tile.revision), rgba));
+                }
+            }
+        }
+        tiles
     }
 }
 impl Render for MapView {
@@ -395,7 +537,7 @@ impl Render for MapView {
             return v_flex().w_full().h_full();
         }
         self.ensure_form(window, cx);
-        let toolbar = self.toolbar(cx);
+        let toolbar = self.toolbar();
         let target = cx.weak_entity();
         let measure = canvas(
             move |bounds, _, cx| {
@@ -418,28 +560,42 @@ impl Render for MapView {
         let status = if self.failed.values().any(
             |failure| matches!(failure,MapFailure::Failed(id) if id=="map-version-unsupported"),
         ) {
-            tr!("map-version-unsupported")
+            Some(tr!("map-version-unsupported"))
         } else if self
             .failed
             .values()
             .any(|failure| *failure == MapFailure::ProviderStopped)
         {
-            tr!("map-provider-stopped")
+            Some(tr!("map-provider-stopped"))
         } else if self.no_gpu {
-            tr!("map-no-gpu")
+            Some(tr!("map-no-gpu"))
         } else if self
             .context
             .as_ref()
             .is_none_or(|context| context.seed.is_none())
         {
-            tr!("map-seed-needed")
+            Some(tr!("map-seed-needed"))
         } else if self.error.is_some() {
-            tr!("map-render-failed")
+            Some(tr!("map-render-failed"))
         } else if !self.failed.is_empty() {
-            tr!("map-tile-failed")
+            Some(tr!("map-tile-failed"))
         } else {
-            tr!("map-no-data")
+            None
         };
+        // Floating panels sit over the map; pressing or wheeling on them must
+        // not pan or zoom the map beneath.
+        let float = || {
+            div()
+                .absolute()
+                .p_2()
+                .rounded(px(6.))
+                .border_1()
+                .border_color(colors.border)
+                .bg(colors.surface)
+                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_scroll_wheel(|_, _, cx| cx.stop_propagation())
+        };
+        let retry = self.retry_button(cx);
         // ia[plugin.world-explorer]: 平移与缩放 | 地图视口 · 拖动 / 滚轮 / + − 与方向键 | 锚点缩放；过期世代与旧视口结果不进入当前帧
         let viewport = div()
             .id("world-map")
@@ -464,14 +620,29 @@ impl Render for MapView {
                     .map(|image| img(image).size_full().object_fit(ObjectFit::Fill)),
             )
             .child(measure)
+            .child(float().top_3().left_3().child(self.view_controls(cx)))
+            .child(float().top_3().right_3().child(self.jump_controls(cx)))
             .child(
-                div()
-                    .absolute()
-                    .right_3()
-                    .bottom_3()
-                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                    .child(self.layer_popover(cx)),
+                float().bottom_3().left_3().max_w(relative(0.7)).child(
+                    h_flex()
+                        .gap_3()
+                        .items_center()
+                        .flex_wrap()
+                        .child(
+                            div()
+                                .debug_selector(|| "map-cursor".into())
+                                .child(format!("X {:.0}  Z {:.0}", self.cursor[0], self.cursor[1])),
+                        )
+                        .children(status.map(|status| {
+                            div()
+                                .debug_selector(|| "map-status".into())
+                                .text_color(colors.muted)
+                                .child(status)
+                        }))
+                        .children(retry),
+                ),
             )
+            .child(float().bottom_3().right_3().child(self.layer_popover(cx)))
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(|this, event: &gpui::MouseDownEvent, window, cx| {
@@ -553,12 +724,5 @@ impl Render for MapView {
             .min_h_0()
             .child(toolbar)
             .child(viewport)
-            .child(
-                h_flex()
-                    .gap_3()
-                    .child(status)
-                    .child(format!("X {:.0}  Z {:.0}", self.cursor[0], self.cursor[1])),
-            )
-            .children(self.retry_button(cx))
     }
 }

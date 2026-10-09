@@ -120,31 +120,30 @@ impl BaseMapProvider for WorldExplorer {
         }
         let colors = lumilio_cubiomes::biome_colors();
         let mut rgba = Vec::with_capacity(256 * 256 * 4);
-        for row in 0..256 {
-            if ctx.cancelled() {
-                return Err(PluginError::Transient("map-cancelled".into()));
-            }
-            let biomes = lumilio_cubiomes::biomes(
-                version,
-                seed,
-                dimension,
-                Range {
-                    scale,
-                    x,
-                    z: z + row,
-                    width: 256,
-                    height: 1,
-                },
-            )
-            .map_err(|_| PluginError::InvalidInput("biome generation failed".into()))?;
-            for biome in biomes {
-                let color = usize::try_from(biome)
-                    .ok()
-                    .and_then(|id| colors.get(id))
-                    .copied()
-                    .unwrap_or([128; 3]);
-                rgba.extend([color[0], color[1], color[2], 255]);
-            }
+        let biomes = lumilio_cubiomes::biomes_until(
+            version,
+            seed,
+            dimension,
+            Range {
+                scale,
+                x,
+                z,
+                width: 256,
+                height: 256,
+            },
+            || ctx.cancelled(),
+        )
+        .map_err(|error| match error {
+            lumilio_cubiomes::Error::Cancelled => PluginError::Transient("map-cancelled".into()),
+            _ => PluginError::InvalidInput("biome generation failed".into()),
+        })?;
+        for biome in biomes {
+            let color = usize::try_from(biome)
+                .ok()
+                .and_then(|id| colors.get(id))
+                .copied()
+                .unwrap_or([128; 3]);
+            rgba.extend([color[0], color[1], color[2], 255]);
         }
         Ok(TileReply::Image(ImageData {
             width: 256,

@@ -83,3 +83,54 @@ fn rejects_unknown_versions_and_dangerous_ranges() {
         );
     }
 }
+
+#[test]
+fn banded_generation_equals_row_by_row_and_stops_when_cancelled() {
+    use super::{Dimension, Error, Range, Version, biomes, biomes_until};
+    for name in ["1.16.5", "1.21.4"] {
+        let version = Version::from_name(name).unwrap();
+        let whole = Range {
+            scale: 4,
+            x: -20,
+            z: -37,
+            width: 24,
+            height: 40,
+        };
+        let banded = biomes(version, 262, Dimension::Overworld, whole).unwrap();
+        let rows: Vec<i32> = (0..whole.height)
+            .flat_map(|row| {
+                biomes(
+                    version,
+                    262,
+                    Dimension::Overworld,
+                    Range {
+                        z: whole.z + row,
+                        height: 1,
+                        ..whole
+                    },
+                )
+                .unwrap()
+            })
+            .collect();
+        assert_eq!(banded, rows, "{name}");
+    }
+    let mut polls = 0;
+    let stopped = biomes_until(
+        Version::from_name("1.21.4").unwrap(),
+        262,
+        Dimension::Overworld,
+        Range {
+            scale: 4,
+            x: 0,
+            z: 0,
+            width: 64,
+            height: 64,
+        },
+        || {
+            polls += 1;
+            polls > 1
+        },
+    );
+    assert_eq!(stopped, Err(Error::Cancelled));
+    assert_eq!(polls, 2, "polled once per band, stopped at the first yes");
+}

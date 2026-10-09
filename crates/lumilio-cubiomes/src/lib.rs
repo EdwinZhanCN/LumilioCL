@@ -6,6 +6,7 @@ pub enum Error {
     Unsupported,
     InvalidRange,
     Generation,
+    Cancelled,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -68,6 +69,18 @@ pub fn biomes(
     dimension: Dimension,
     range: Range,
 ) -> Result<Vec<i32>, Error> {
+    biomes_until(version, seed, dimension, range, || false)
+}
+
+/// Like [`biomes`], polling `cancelled` between bands of rows; a true answer
+/// stops generation with [`Error::Cancelled`].
+pub fn biomes_until(
+    version: Version,
+    seed: i64,
+    dimension: Dimension,
+    range: Range,
+    mut cancelled: impl FnMut() -> bool,
+) -> Result<Vec<i32>, Error> {
     if ![1, 4, 16, 64, 256].contains(&range.scale)
         || !(1..=256).contains(&range.width)
         || !(1..=256).contains(&range.height)
@@ -82,7 +95,7 @@ pub fn biomes(
             return Err(Error::InvalidRange);
         }
     }
-    ffi::generate(version, seed, dimension, range)
+    ffi::generate(version, seed, dimension, range, &mut cancelled)
 }
 
 pub fn biome_colors() -> [[u8; 3]; 256] {

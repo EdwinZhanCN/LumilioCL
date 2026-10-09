@@ -22,7 +22,8 @@ pub struct Tile {
     pub x: f64,
     pub z: f64,
     pub span: f64,
-    pub rgba: Vec<u8>,
+    /// Shared so the host keeps one copy per tile across frames.
+    pub rgba: std::sync::Arc<[u8]>,
 }
 
 #[derive(Clone, Copy, Debug, Default)]

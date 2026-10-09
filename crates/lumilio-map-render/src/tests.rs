@@ -12,7 +12,7 @@ fn colored_tile_position_zoom_and_bgra_readback() {
         x: 0.,
         z: 0.,
         span: 256.,
-        rgba: [255, 0, 0, 255].repeat(256 * 256),
+        rgba: [255, 0, 0, 255].repeat(256 * 256).into(),
     };
     let camera = Camera {
         x: 128.,
@@ -69,7 +69,7 @@ fn headless_frame_time() {
         x: 0.,
         z: 0.,
         span: 4096.,
-        rgba: [0, 128, 0, 255].repeat(256 * 256),
+        rgba: [0, 128, 0, 255].repeat(256 * 256).into(),
     }];
     let camera = Camera {
         x: 2048.,

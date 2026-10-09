@@ -78,6 +78,10 @@ impl MapSchedule {
         });
         self.generation
     }
+    /// Requests dispatched for the current viewport and not yet answered.
+    pub fn pending_len(&self) -> usize {
+        self.pending.len()
+    }
     pub fn begin(&mut self, key: &TileKey) -> Option<(u64, CancellationToken)> {
         if !self.visible.contains(key) || self.pending.contains_key(key) {
             return None;

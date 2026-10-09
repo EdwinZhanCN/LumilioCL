@@ -25,8 +25,11 @@ impl Camera {
         self.z += (at[1] - f64::from(size[1]) / 2.) * (old - self.scale);
         self.pan(0., 0.);
     }
+    /// The tile level whose texels are at most twice as coarse as a screen
+    /// pixel. Generating at a finer level than that costs 4x per level while
+    /// the extra detail is minified away.
     pub fn level(&self) -> u8 {
-        ((self.scale.max(1.).ln() / 4_f64.ln()).floor() as u8).min(4)
+        (((self.scale * 2.).max(1.).ln() / 4_f64.ln()).floor() as u8).min(4)
     }
     pub fn world(&self, at: [f64; 2], size: [u32; 2]) -> [f64; 2] {
         [
