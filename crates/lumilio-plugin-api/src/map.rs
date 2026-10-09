@@ -1,6 +1,7 @@
 //! Data-only world-map contracts. The host owns rendering and interaction.
-use crate::{HostContext, ImageData, PluginError};
+use crate::{HostContext, ImageData, PluginError, SettingField, SettingValue};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 pub const TILE_PIXELS: u32 = 256;
 
@@ -181,6 +182,10 @@ pub struct MapObject {
     /// share string.
     #[serde(default)]
     pub share: Option<String>,
+    /// The fields the host's edit dialog offers for this object; empty when it
+    /// cannot be edited.
+    #[serde(default)]
+    pub editable: Vec<SettingField>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -205,6 +210,33 @@ pub struct OverlayInfo {
     /// The coarsest zoom the layer is drawn at, in blocks per pixel; `None`
     /// leaves it to the host's default.
     pub max_scale: Option<u32>,
+    /// The fields of a new object placed on the map; empty when the layer
+    /// cannot create any.
+    #[serde(default)]
+    pub creatable: Vec<SettingField>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub enum EditAction {
+    /// A new object at a map position, with the values of the `creatable` fields.
+    Create {
+        at: MapPoint,
+        values: BTreeMap<String, SettingValue>,
+    },
+    Update {
+        id: String,
+        values: BTreeMap<String, SettingValue>,
+    },
+    Delete {
+        id: String,
+    },
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ObjectEdit {
+    pub context: WorldContext,
+    pub overlay: String,
+    pub action: EditAction,
 }
 
 pub trait BaseMapProvider: Send + Sync {
@@ -224,6 +256,11 @@ pub trait OverlayProvider: Send + Sync {
         ctx: &dyn HostContext,
         request: &OverlayRequest,
     ) -> Result<Vec<MapObject>, PluginError>;
+    /// Applies an edit the person confirmed. The plugin validates every value,
+    /// and writes through [`HostContext::write_file`].
+    fn apply(&self, _ctx: &dyn HostContext, _edit: &ObjectEdit) -> Result<(), PluginError> {
+        Err(PluginError::Unavailable("map-edit-unsupported".into()))
+    }
 }
 
 #[cfg(test)]

@@ -14,6 +14,8 @@ mod modrinth;
 mod network;
 #[path = "tests/tabs.rs"]
 mod tabs;
+#[path = "tests/write.rs"]
+mod write;
 
 struct Fake {
     id: &'static str,

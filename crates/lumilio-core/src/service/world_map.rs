@@ -163,6 +163,34 @@ impl<T: Transport + Clone> LauncherService<T> {
         let _ = tokio::task::spawn_blocking(move || cache.put(&request, &saved)).await;
         Ok(reply)
     }
+    /// Whether an edit could start now: no game running on the instance and
+    /// no other operation holding it.
+    pub fn map_can_edit(&self, instance: &str) -> bool {
+        self.reserve_instance(instance).is_ok()
+    }
+    /// Applies a confirmed edit to the instance's files. The instance is held
+    /// for the duration, which is how a running game (it holds the same
+    /// lease) keeps edits out: Xaero rewrites its files when the player leaves
+    /// a world, so a write during play would be lost or would fight it.
+    pub async fn map_apply(
+        &self,
+        instance: &str,
+        plugin: &str,
+        edit: lumilio_plugin_api::map::ObjectEdit,
+    ) -> Result<(), MapFailure> {
+        self.instance(instance).await.map_err(|_| MapFailure::Off)?;
+        let _lease = self
+            .reserve_instance(instance)
+            .map_err(|_| MapFailure::Failed("map-edit-running".into()))?;
+        self.plugins
+            .map_apply(
+                plugin,
+                self.layout.game(instance),
+                self.layout.profile(instance).join("xaero-backups"),
+                edit,
+            )
+            .await
+    }
     pub async fn clear_map_cache(&self) -> Result<(), ServiceError> {
         let root = self.layout.map_cache();
         tokio::task::spawn_blocking(move || world_map::TileCache::clear(&root))

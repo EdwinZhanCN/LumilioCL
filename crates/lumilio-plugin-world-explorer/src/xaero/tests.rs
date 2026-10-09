@@ -383,3 +383,467 @@ fn damaged_waypoint_files_make_the_layer_unavailable_instead_of_partial() {
         Err(PluginError::Unavailable("map-xaero-unreadable".into()))
     );
 }
+
+mod editing {
+    use super::*;
+    use crate::xaero::edit::{self, INITIALS_MAX, NAME_MAX};
+    use lumilio_plugin_api::map::{EditAction, ObjectEdit};
+    use lumilio_plugin_api::{FileInfo, SettingValue};
+    use std::sync::Mutex;
+
+    /// A game directory in memory that also takes writes, as the host would:
+    /// a write needs the `FileInfo` of the last read.
+    struct Disk {
+        files: Mutex<BTreeMap<String, Vec<u8>>>,
+        writes: Mutex<Vec<String>>,
+    }
+    impl Disk {
+        fn new(dir: &str) -> Self {
+            Self {
+                files: Mutex::new(game(dir).0),
+                writes: Mutex::new(vec![]),
+            }
+        }
+        fn info(bytes: &[u8]) -> FileInfo {
+            FileInfo {
+                len: bytes.len() as u64,
+                modified_ms: 1,
+                sha256: format!(
+                    "{}-{}",
+                    bytes.len(),
+                    bytes.iter().map(|b| u64::from(*b)).sum::<u64>()
+                ),
+            }
+        }
+        fn text(&self, path: &str) -> String {
+            String::from_utf8(self.files.lock().unwrap()[path].clone()).unwrap()
+        }
+    }
+    impl HostContext for Disk {
+        fn setting(&self, _: &str) -> Option<SettingValue> {
+            None
+        }
+        fn read_file(&self, path: &str) -> Result<Vec<u8>, PluginError> {
+            self.files
+                .lock()
+                .unwrap()
+                .get(path)
+                .cloned()
+                .ok_or_else(|| PluginError::Unavailable("missing".into()))
+        }
+        fn read_file_info(&self, path: &str) -> Result<(Vec<u8>, FileInfo), PluginError> {
+            let bytes = self.read_file(path)?;
+            let info = Self::info(&bytes);
+            Ok((bytes, info))
+        }
+        fn list_files(&self, dir: &str) -> Result<Vec<String>, PluginError> {
+            Ok(self
+                .files
+                .lock()
+                .unwrap()
+                .keys()
+                .filter(|path| path.starts_with(&format!("{dir}/")))
+                .cloned()
+                .collect())
+        }
+        fn write_file(
+            &self,
+            path: &str,
+            bytes: &[u8],
+            expected: Option<&FileInfo>,
+        ) -> Result<(), PluginError> {
+            let mut files = self.files.lock().unwrap();
+            match (files.get(path), expected) {
+                (Some(old), Some(expected)) if &Self::info(old) == expected => {}
+                (None, None) => {}
+                _ => return Err(PluginError::Unavailable("map-edit-conflict".into())),
+            }
+            files.insert(path.to_owned(), bytes.to_vec());
+            self.writes.lock().unwrap().push(path.to_owned());
+            Ok(())
+        }
+        fn fetch(&self, _: &str) -> Result<FetchResponse, PluginError> {
+            panic!("no network")
+        }
+    }
+
+    fn values(pairs: &[(&str, SettingValue)]) -> BTreeMap<String, SettingValue> {
+        pairs
+            .iter()
+            .map(|(key, value)| ((*key).to_owned(), value.clone()))
+            .collect()
+    }
+    fn full(name: &str, x: i64) -> BTreeMap<String, SettingValue> {
+        values(&[
+            ("name", SettingValue::Text(name.into())),
+            ("initials", SettingValue::Text(String::new())),
+            ("x", SettingValue::Number(x)),
+            ("has_y", SettingValue::Toggle(true)),
+            ("y", SettingValue::Number(70)),
+            ("z", SettingValue::Number(-5)),
+            ("color", SettingValue::Choice("12".into())),
+            ("enabled", SettingValue::Toggle(true)),
+            ("rotate", SettingValue::Toggle(false)),
+            ("yaw", SettingValue::Number(0)),
+        ])
+    }
+    const FILE: &str = "xaero/minimap/Edit/dim%0/mw$default_1.txt";
+
+    fn edit_of(dir: &str, dimension: Dimension, action: EditAction) -> ObjectEdit {
+        ObjectEdit {
+            context: linked(dir, dimension),
+            overlay: overlay::LAYER.into(),
+            action,
+        }
+    }
+    fn home_id(disk: &Disk, dir: &str) -> (String, Vec<lumilio_plugin_api::SettingField>) {
+        overlay::forget_recent();
+        let found = WorldExplorer
+            .objects(
+                disk,
+                &request(
+                    linked(dir, Dimension::Overworld),
+                    [-1000., -1000., 1000., 1000.],
+                ),
+            )
+            .unwrap();
+        (found[0].id.clone(), found[0].editable.clone())
+    }
+
+    #[test]
+    fn updating_changes_one_line_and_keeps_what_the_dialog_does_not_show() {
+        let disk = Disk::new("Edit");
+        let before = disk.text(FILE);
+        let (id, fields) = home_id(&disk, "Edit");
+        assert!(fields.iter().any(|f| f.key == "color"));
+        WorldExplorer
+            .apply(
+                &disk,
+                &edit_of(
+                    "Edit",
+                    Dimension::Overworld,
+                    EditAction::Update {
+                        id,
+                        values: full("Base: new", 101),
+                    },
+                ),
+            )
+            .unwrap();
+        let after = disk.text(FILE);
+        let (old, new): (Vec<&str>, Vec<&str>) = (
+            before.split_inclusive('\n').collect(),
+            after.split_inclusive('\n').collect(),
+        );
+        assert_eq!(old.len(), new.len());
+        let changed: Vec<usize> = (0..old.len()).filter(|i| old[*i] != new[*i]).collect();
+        assert_eq!(changed, [4], "only the edited line differs");
+        assert_eq!(
+            new[4],
+            "waypoint:Base§§ new:B:101:70:-5:12:false:0:gui.xaero_default:false:0:0:false\n"
+        );
+        // A death point stays a death point and a farms-set point stays in farms.
+        let (death, _) = {
+            overlay::forget_recent();
+            let found = WorldExplorer
+                .objects(
+                    &disk,
+                    &request(linked("Edit", Dimension::Overworld), [-10., -10., 10., 10.]),
+                )
+                .unwrap();
+            let death = found
+                .iter()
+                .find(|o| o.label_id.as_deref() == Some("map-xaero-death"))
+                .unwrap();
+            (death.id.clone(), ())
+        };
+        WorldExplorer
+            .apply(
+                &disk,
+                &edit_of(
+                    "Edit",
+                    Dimension::Overworld,
+                    EditAction::Update {
+                        id: death,
+                        values: full("Grave", 5),
+                    },
+                ),
+            )
+            .unwrap();
+        assert!(
+            disk.text(FILE).contains(
+                "waypoint:Grave:G:5:70:-5:12:false:1:gui.xaero_default:false:0:0:false\n"
+            )
+        );
+    }
+
+    #[test]
+    fn invalid_values_are_refused_before_anything_is_written() {
+        let disk = Disk::new("Edit");
+        let (id, _) = home_id(&disk, "Edit");
+        let bad = |change: &dyn Fn(&mut BTreeMap<String, SettingValue>)| {
+            let mut map = full("Fine", 1);
+            change(&mut map);
+            WorldExplorer.apply(
+                &disk,
+                &edit_of(
+                    "Edit",
+                    Dimension::Overworld,
+                    EditAction::Update {
+                        id: id.clone(),
+                        values: map,
+                    },
+                ),
+            )
+        };
+        let long = "x".repeat(NAME_MAX + 1);
+        assert_eq!(
+            bad(&|m| {
+                m.insert("name".into(), SettingValue::Text(long.clone()));
+            }),
+            Err(PluginError::Unavailable("map-edit-name-invalid".into()))
+        );
+        assert!(
+            bad(&|m| {
+                m.insert("name".into(), SettingValue::Text("a\nb".into()));
+            })
+            .is_err()
+        );
+        assert!(
+            bad(&|m| {
+                m.insert("name".into(), SettingValue::Text("  ".into()));
+            })
+            .is_err()
+        );
+        assert_eq!(
+            bad(&|m| {
+                m.insert(
+                    "initials".into(),
+                    SettingValue::Text("A".repeat(INITIALS_MAX + 1)),
+                );
+            }),
+            Err(PluginError::Unavailable("map-edit-initials-invalid".into()))
+        );
+        // Colours past 15 are not offered, out-of-range numbers and wrong kinds are not accepted.
+        assert!(
+            bad(&|m| {
+                m.insert("color".into(), SettingValue::Choice("16".into()));
+            })
+            .is_err()
+        );
+        assert!(
+            bad(&|m| {
+                m.insert("x".into(), SettingValue::Number(40_000_000));
+            })
+            .is_err()
+        );
+        assert!(
+            bad(&|m| {
+                m.insert("yaw".into(), SettingValue::Number(10_000));
+            })
+            .is_err()
+        );
+        assert!(
+            bad(&|m| {
+                m.insert("x".into(), SettingValue::Text("1".into()));
+            })
+            .is_err()
+        );
+        assert!(
+            bad(&|m| {
+                m.remove("z");
+            })
+            .is_err()
+        );
+        assert!(disk.writes.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_changed_file_or_line_refuses_the_edit() {
+        let disk = Disk::new("Edit");
+        let (id, _) = home_id(&disk, "Edit");
+        // The game rewrote the file in between: the same line index now holds another waypoint.
+        let moved = disk.text(FILE).replacen("Home base", "Someone else", 1);
+        disk.files
+            .lock()
+            .unwrap()
+            .insert(FILE.into(), moved.clone().into_bytes());
+        assert_eq!(
+            WorldExplorer.apply(
+                &disk,
+                &edit_of(
+                    "Edit",
+                    Dimension::Overworld,
+                    EditAction::Update {
+                        id: id.clone(),
+                        values: full("Mine", 1)
+                    }
+                )
+            ),
+            Err(PluginError::Unavailable("map-edit-stale".into()))
+        );
+        assert_eq!(
+            WorldExplorer.apply(
+                &disk,
+                &edit_of("Edit", Dimension::Overworld, EditAction::Delete { id })
+            ),
+            Err(PluginError::Unavailable("map-edit-stale".into()))
+        );
+        assert_eq!(disk.text(FILE), moved);
+        // Comment lines and unknown ids are never edited.
+        for id in [
+            "xaero.waypoints:mw$default_1.txt:0:00000000",
+            "xaero.waypoints:nonsense",
+            "other:1",
+        ] {
+            assert!(
+                WorldExplorer
+                    .apply(
+                        &disk,
+                        &edit_of(
+                            "Edit",
+                            Dimension::Overworld,
+                            EditAction::Delete { id: id.into() }
+                        )
+                    )
+                    .is_err()
+            );
+        }
+        assert!(disk.writes.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn deleting_and_creating_touch_only_their_own_line() {
+        let disk = Disk::new("Edit");
+        let before = disk.text(FILE);
+        let (id, _) = home_id(&disk, "Edit");
+        WorldExplorer
+            .apply(
+                &disk,
+                &edit_of("Edit", Dimension::Overworld, EditAction::Delete { id }),
+            )
+            .unwrap();
+        assert_eq!(
+            disk.text(FILE),
+            before.replacen(
+                "waypoint:Home base:H:100:64:-250:10:false:0:gui.xaero_default:false:0:0:false\n",
+                "",
+                1
+            )
+        );
+        // A new waypoint goes at the end of the dimension's file with the file's ending.
+        let nether = "xaero/minimap/Edit/dim%-1/mw$default_1.txt";
+        WorldExplorer
+            .apply(
+                &disk,
+                &edit_of(
+                    "Edit",
+                    Dimension::Nether,
+                    EditAction::Create {
+                        at: MapPoint { x: 7., z: 9. },
+                        values: full("Bastion", 7),
+                    },
+                ),
+            )
+            .unwrap();
+        let text = disk.text(nether);
+        assert!(text.starts_with(NETHER), "existing lines are untouched");
+        assert!(
+            text.ends_with(
+                "waypoint:Bastion:B:7:70:-5:12:false:0:gui.xaero_default:false:0:0:false\r\n"
+            ),
+            "{text:?}"
+        );
+        // A dimension with no file gets a fresh one with the header.
+        WorldExplorer
+            .apply(
+                &disk,
+                &edit_of(
+                    "Edit",
+                    Dimension::Custom("mod:deep".into()),
+                    EditAction::Create {
+                        at: MapPoint { x: 0., z: 0. },
+                        values: full("Deep", 0),
+                    },
+                ),
+            )
+            .unwrap();
+        let fresh = disk.text("xaero/minimap/Edit/dim%mod$deep/mw$default_1.txt");
+        assert!(
+            fresh.starts_with("#\n#waypoint:name:")
+                && fresh.contains("sets:gui.xaero_default\nwaypoint:Deep:")
+        );
+        // The layer offers creation; an unlinked world cannot be edited at all.
+        let layer = WorldExplorer
+            .overlays_for(&linked("Edit", Dimension::Overworld))
+            .into_iter()
+            .find(|layer| layer.id == overlay::LAYER)
+            .unwrap();
+        assert!(layer.creatable.iter().any(|f| f.key == "name"));
+        let mut unlinked = edit_of(
+            "Edit",
+            Dimension::Overworld,
+            EditAction::Delete { id: "x".into() },
+        );
+        unlinked.context.sources.clear();
+        assert_eq!(
+            WorldExplorer.apply(&disk, &unlinked),
+            Err(PluginError::Unavailable("map-edit-unlinked".into()))
+        );
+    }
+
+    #[test]
+    fn a_damaged_file_is_never_rewritten() {
+        let disk = Disk::new("Edit");
+        let (id, _) = home_id(&disk, "Edit");
+        let damaged = format!("{}waypoint:oops:o:x\n", disk.text(FILE));
+        disk.files
+            .lock()
+            .unwrap()
+            .insert(FILE.into(), damaged.clone().into_bytes());
+        assert_eq!(
+            WorldExplorer.apply(
+                &disk,
+                &edit_of("Edit", Dimension::Overworld, EditAction::Delete { id })
+            ),
+            Err(PluginError::Unavailable("map-xaero-unreadable".into()))
+        );
+        assert_eq!(
+            WorldExplorer.apply(
+                &disk,
+                &edit_of(
+                    "Edit",
+                    Dimension::Overworld,
+                    EditAction::Create {
+                        at: MapPoint { x: 0., z: 0. },
+                        values: full("N", 0)
+                    }
+                )
+            ),
+            Err(PluginError::Unavailable("map-xaero-unreadable".into()))
+        );
+        assert_eq!(disk.text(FILE), damaged);
+    }
+
+    #[test]
+    fn waypoint_files_grow_and_shrink_without_disturbing_line_endings() {
+        let mut file = WaypointFile::parse(
+            "#c\r\nwaypoint:A:A:1:~:1:1:false:0:s:false:0:0:false\r\nlast-without-ending",
+        );
+        let waypoint = file.lines()[1].waypoint.clone().unwrap();
+        file.push(waypoint.clone());
+        assert_eq!(
+            file.text(),
+            "#c\r\nwaypoint:A:A:1:~:1:1:false:0:s:false:0:0:false\r\nlast-without-ending\r\nwaypoint:A:A:1:~:1:1:false:0:s:false:0:0:false\r\n"
+        );
+        assert_eq!(file.remove(1), Some(waypoint));
+        assert!(file.remove(0).is_none(), "a comment is not removed");
+        assert_eq!(file.remove(99), None);
+        assert!(
+            !file
+                .text()
+                .contains("waypoint:A:A:1:~:1:1:false:0:s:false:0:0:false\r\nlast")
+        );
+        assert_eq!(edit::fingerprint("a"), edit::fingerprint("a"));
+        assert_ne!(edit::fingerprint("a"), edit::fingerprint("b"));
+    }
+}

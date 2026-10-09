@@ -18,6 +18,9 @@ pub(super) fn permission_text(permission: &Permission) -> String {
         Permission::ReadGameFiles { under } => {
             tr!("settings-plugin-read-files", folder = under.as_str())
         }
+        Permission::WriteGameFiles { under, .. } => {
+            tr!("settings-plugin-write-files", folder = under.as_str())
+        }
         Permission::Network { hosts } => tr!(
             "settings-plugin-network",
             hosts = hosts.join(tr!("common-list-separator"))

@@ -2,7 +2,8 @@
 use super::{Context, PluginHost, PluginStatus, enabled, isolated};
 use crate::activity::CancellationToken;
 use lumilio_plugin_api::map::{
-    BaseMapInfo, MapObject, OverlayInfo, OverlayRequest, TileReply, TileRequest, WorldContext,
+    BaseMapInfo, MapObject, ObjectEdit, OverlayInfo, OverlayRequest, TileReply, TileRequest,
+    WorldContext,
 };
 use lumilio_plugin_api::{HostContext, Plugin, PluginError};
 use std::path::PathBuf;
@@ -182,6 +183,54 @@ impl PluginHost {
         R: Send + 'static,
         F: FnOnce(&dyn Plugin, &dyn HostContext) -> Result<R, PluginError> + Send + 'static,
     {
+        self.map_call_with(id, provider, game_dir, None, cancel, timeout, call)
+            .await
+    }
+
+    /// Applies an edit. The caller must hold the instance (so the game is not
+    /// running) for as long as this runs; `backups` is where replaced files
+    /// are copied. An edit is not cancelled halfway: it runs to the end or not
+    /// at all.
+    pub async fn map_apply(
+        &self,
+        plugin: &str,
+        game_dir: PathBuf,
+        backups: PathBuf,
+        edit: ObjectEdit,
+    ) -> Result<(), MapFailure> {
+        let provider = format!("edit:{}", edit.overlay);
+        self.map_call_with(
+            plugin,
+            &provider,
+            Some(game_dir),
+            Some(backups),
+            CancellationToken::new(),
+            MAP_TIMEOUT,
+            move |plugin, ctx| {
+                plugin
+                    .overlay_provider()
+                    .ok_or_else(|| PluginError::Unavailable("no overlay provider".into()))?
+                    .apply(ctx, &edit)
+            },
+        )
+        .await
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn map_call_with<R, F>(
+        &self,
+        id: &str,
+        provider: &str,
+        game_dir: Option<PathBuf>,
+        writer: Option<PathBuf>,
+        cancel: CancellationToken,
+        timeout: Duration,
+        call: F,
+    ) -> Result<R, MapFailure>
+    where
+        R: Send + 'static,
+        F: FnOnce(&dyn Plugin, &dyn HostContext) -> Result<R, PluginError> + Send + 'static,
+    {
         let key = (id.to_owned(), provider.to_owned());
         let entry = self
             .registry()
@@ -227,6 +276,7 @@ impl PluginHost {
         }
         let mut context = Context::new(&entry.manifest, &state, game_dir, None, self.locale_tag());
         context.cancel = Some(cancel.clone());
+        context.writer = writer;
         context.revision = revision;
         let plugin = Arc::clone(&entry.plugin);
         let work = isolated(timeout, move || {
@@ -261,10 +311,10 @@ impl PluginHost {
                 // cannot read, is a limit of this world, not a broken provider.
                 // An unsupported save must not prevent the user from opening a
                 // supported manual seed afterward.
-                if matches!(
-                    fault.message.as_str(),
-                    "map-version-unsupported" | "map-xaero-unreadable"
-                ) {
+                if fault.message.starts_with("map-version-")
+                    || fault.message.starts_with("map-xaero-")
+                    || fault.message.starts_with("map-edit-")
+                {
                     return Err(MapFailure::Failed(fault.message));
                 }
                 let count = failures.entry(key).or_default();

@@ -22,6 +22,16 @@ fn grants(manifest: &Manifest) -> Vec<PathBuf> {
         .collect()
 }
 
+/// Whether `name` matches a grant's pattern, in which one `*` is any text.
+fn name_matches(pattern: &str, name: &str) -> bool {
+    match pattern.split_once('*') {
+        Some((head, tail)) => {
+            name.len() >= head.len() + tail.len() && name.starts_with(head) && name.ends_with(tail)
+        }
+        None => name == pattern,
+    }
+}
+
 /// Splits a plugin-supplied path into plain components, or refuses it.
 fn plain(path: &str) -> Result<PathBuf, PluginError> {
     let mut clean = PathBuf::new();
@@ -126,4 +136,58 @@ fn walk(game_dir: &Path, dir: &Path, depth: usize, found: &mut Vec<String>) {
             );
         }
     }
+}
+
+/// The absolute path of a file the plugin may write: below a `WriteGameFiles`
+/// grant, with a name the grant allows, and no link on the way. Like
+/// [`resolve`], the file itself need not exist yet.
+pub(super) fn resolve_write(
+    game_dir: &Path,
+    manifest: &Manifest,
+    relative: &str,
+) -> Result<PathBuf, PluginError> {
+    let clean = plain(relative)?;
+    let name = clean
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or(PluginError::PermissionDenied)?;
+    let granted = manifest.permissions.iter().any(|permission| {
+        matches!(permission, Permission::WriteGameFiles { under, names }
+            if clean.starts_with(under) && clean != Path::new(under) && name_matches(names, name))
+    });
+    if !granted {
+        return Err(PluginError::PermissionDenied);
+    }
+    let mut full = game_dir.to_path_buf();
+    for part in clean.components() {
+        full.push(part);
+        match std::fs::symlink_metadata(&full) {
+            Ok(meta) if meta.file_type().is_symlink() => {
+                return Err(PluginError::PermissionDenied);
+            }
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => break,
+            Err(error) => return Err(PluginError::Unavailable(error.to_string())),
+        }
+    }
+    Ok(full)
+}
+
+/// A readable file's bytes with the [`lumilio_plugin_api::FileInfo`] a later
+/// write must present.
+pub(super) fn read_info(
+    game_dir: &Path,
+    manifest: &Manifest,
+    relative: &str,
+) -> Result<(Vec<u8>, lumilio_plugin_api::FileInfo), PluginError> {
+    let full = resolve(game_dir, manifest, relative)?;
+    let meta =
+        std::fs::metadata(&full).map_err(|error| PluginError::Unavailable(error.to_string()))?;
+    if !meta.is_file() {
+        return Err(PluginError::InvalidInput("not a file".into()));
+    }
+    if meta.len() > MAX_FILE_BYTES {
+        return Err(PluginError::Unavailable("file is too large".into()));
+    }
+    crate::world_map::write::describe(&full)
 }

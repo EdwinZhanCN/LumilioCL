@@ -4,6 +4,7 @@ mod context;
 mod schedule;
 pub mod store;
 mod utility;
+pub mod write;
 pub mod xaero;
 pub use cache::TileCache;
 pub use context::{WorldMapContext, contexts};

@@ -27,6 +27,7 @@ fn info() -> OverlayInfo {
         group_id: Some(GROUP.into()),
         approximate: false,
         max_scale: None,
+        creatable: super::edit::fields(None, None),
     }
 }
 
@@ -54,6 +55,11 @@ type Recent = Option<((String, Dimension), Instant, Files)>;
 /// few small files; the last read is reused for this long.
 static RECENT: Mutex<Recent> = Mutex::new(None);
 const REUSE: Duration = Duration::from_secs(1);
+
+/// Drops the reused read; called after the files change.
+pub(crate) fn forget_recent() {
+    *RECENT.lock().unwrap_or_else(PoisonError::into_inner) = None;
+}
 
 /// Each waypoint file of the world's directory in this dimension, read and
 /// parsed. A file that cannot be read or has lines that do not parse makes the
@@ -112,6 +118,7 @@ fn object(
     request: &OverlayRequest,
     file: &str,
     index: usize,
+    raw: &str,
     waypoint: &Waypoint,
 ) -> Option<MapObject> {
     let (x, z) = (f64::from(waypoint.x), f64::from(waypoint.z));
@@ -126,7 +133,7 @@ fn object(
         (false, false) => "map-xaero-waypoint",
     };
     Some(MapObject {
-        id: format!("{LAYER}:{file}:{index}"),
+        id: super::edit::object_id(file, index, raw),
         raw_id: format!("{file}#{index}"),
         source: SOURCE.into(),
         world: request.context.world.clone(),
@@ -146,6 +153,7 @@ fn object(
         color: Some(color_rgb(waypoint.color)),
         note: (waypoint.set != DEFAULT_SET).then(|| waypoint.set.clone()),
         share: Some(share_string(waypoint, &request.context.dimension)),
+        editable: super::edit::fields(Some(waypoint), None),
     })
 }
 
@@ -171,7 +179,7 @@ pub(crate) fn objects(
                 .iter()
                 .enumerate()
                 .filter_map(move |(index, line)| {
-                    object(request, name, index, line.waypoint.as_ref()?)
+                    object(request, name, index, line.raw(), line.waypoint.as_ref()?)
                 })
         })
         .collect())

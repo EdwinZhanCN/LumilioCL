@@ -61,6 +61,20 @@ impl MapView {
             .map(|(_, object)| object.clone())
     }
 
+    /// The block position of a click: a release near its press, in world
+    /// coordinates; `None` when the pointer moved far enough to be a pan.
+    pub(super) fn click_point(&self, down: Point<Pixels>, at: Point<Pixels>) -> Option<[f64; 2]> {
+        let moved = at - down;
+        if f32::from(moved.x).hypot(f32::from(moved.y)) > CLICK_SLOP {
+            return None;
+        }
+        let local = at - self.bounds?.origin;
+        Some(self.camera.world(
+            [f32::from(local.x) as f64, f32::from(local.y) as f64],
+            self.size,
+        ))
+    }
+
     /// A release at `at` after a press at `down` selects the object under it,
     /// or clears the selection over empty map.
     pub(super) fn click(&mut self, down: Point<Pixels>, at: Point<Pixels>) {
@@ -71,6 +85,13 @@ impl MapView {
         let Some(bounds) = self.bounds else { return };
         let local = at - bounds.origin;
         self.selected = self.pick([f32::from(local.x) as f64, f32::from(local.y) as f64]);
+        if self
+            .selected
+            .as_ref()
+            .is_some_and(|o| !o.editable.is_empty())
+        {
+            self.probe_edit();
+        }
     }
 
     /// A soft square behind the selected icon, painted under the icons.
@@ -160,6 +181,7 @@ impl MapView {
                             source = source_name(&object.source)
                         )),
                 )
+                .children(self.edit_keys(cx))
                 .child(
                     h_flex()
                         .gap_2()

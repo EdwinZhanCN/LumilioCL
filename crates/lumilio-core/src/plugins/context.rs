@@ -13,6 +13,9 @@ pub(super) struct Context {
     pub(super) launch_id: Option<u64>,
     pub(super) revision: u64,
     pub(super) cancel: Option<crate::activity::CancellationToken>,
+    /// Present only while the host holds the instance for an edit; without it
+    /// every write is refused.
+    pub(super) writer: Option<PathBuf>,
     values: BTreeMap<String, SettingValue>,
     manifest: Manifest,
     game_dir: Option<PathBuf>,
@@ -46,6 +49,7 @@ impl Context {
             launch_id: None,
             revision: 0,
             cancel: None,
+            writer: None,
             values,
             manifest: manifest.clone(),
             game_dir,
@@ -95,6 +99,30 @@ impl HostContext for Context {
             .as_ref()
             .ok_or(PluginError::PermissionDenied)?;
         access::list(game_dir, &self.manifest, dir)
+    }
+    fn read_file_info(
+        &self,
+        path: &str,
+    ) -> Result<(Vec<u8>, lumilio_plugin_api::FileInfo), PluginError> {
+        let game_dir = self
+            .game_dir
+            .as_ref()
+            .ok_or(PluginError::PermissionDenied)?;
+        access::read_info(game_dir, &self.manifest, path)
+    }
+    fn write_file(
+        &self,
+        path: &str,
+        bytes: &[u8],
+        expected: Option<&lumilio_plugin_api::FileInfo>,
+    ) -> Result<(), PluginError> {
+        let game_dir = self
+            .game_dir
+            .as_ref()
+            .ok_or(PluginError::PermissionDenied)?;
+        let full = access::resolve_write(game_dir, &self.manifest, path)?;
+        let backups = self.writer.as_ref().ok_or(PluginError::PermissionDenied)?;
+        crate::world_map::write::write_checked(&full, path, bytes, expected, backups)
     }
     fn fetch(&self, url: &str) -> Result<FetchResponse, PluginError> {
         self.request(FetchRequest::get(url))

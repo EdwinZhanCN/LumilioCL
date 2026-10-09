@@ -7,6 +7,7 @@ mod java;
 mod launch;
 mod launch_observers;
 mod lifecycle;
+mod map_edit;
 mod models;
 mod packs;
 mod plugin_analysis;

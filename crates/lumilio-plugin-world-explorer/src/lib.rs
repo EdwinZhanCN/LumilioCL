@@ -1,7 +1,7 @@
 //! Local seed-map provider. The host owns the world picker and map viewport.
 use lumilio_cubiomes::Range;
 use lumilio_plugin_api::map::{
-    BaseMapInfo, BaseMapProvider, Dimension, MapObject, OverlayInfo, OverlayProvider,
+    BaseMapInfo, BaseMapProvider, Dimension, MapObject, ObjectEdit, OverlayInfo, OverlayProvider,
     OverlayRequest, TILE_PIXELS, TileReply, TileRequest, WorldContext,
 };
 use lumilio_plugin_api::{
@@ -34,6 +34,10 @@ impl Plugin for WorldExplorer {
                 Permission::ReadGameFiles {
                     under: "xaero".into(),
                 },
+                Permission::WriteGameFiles {
+                    under: "xaero/minimap".into(),
+                    names: "mw$*.txt".into(),
+                },
             ],
             settings: vec![],
         }
@@ -60,6 +64,9 @@ impl OverlayProvider for WorldExplorer {
         layers.extend(landmarks::catalog_for(context));
         layers.extend(xaero::overlay::catalog_for(context));
         layers
+    }
+    fn apply(&self, ctx: &dyn HostContext, edit: &ObjectEdit) -> Result<(), PluginError> {
+        xaero::edit::apply(ctx, edit)
     }
     fn objects(
         &self,

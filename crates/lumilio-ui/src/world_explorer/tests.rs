@@ -663,6 +663,7 @@ fn village_layer() -> (String, OverlayInfo) {
             group_id: Some("map-group-structures".into()),
             approximate: false,
             max_scale: None,
+            creatable: vec![],
         },
     )
 }
@@ -685,6 +686,7 @@ fn icon_object(x: f64, z: f64, priority: i32) -> MapObject {
         color: None,
         note: None,
         share: None,
+        editable: vec![],
     }
 }
 
@@ -962,7 +964,9 @@ fn icons_arrive_through_a_live_connection_after_the_world_is_chosen(cx: &mut Tes
                             overlays: vec![],
                         },
                     ))),
-                    Command::LinkXaero { .. } => continue,
+                    Command::LinkXaero { .. } | Command::Apply { .. } | Command::CanEdit => {
+                        continue;
+                    }
                     Command::Overlays { context } => Event::Overlays {
                         context,
                         layers: vec![village_layer()],
@@ -1421,6 +1425,7 @@ fn slime_layer() -> (String, OverlayInfo) {
             group_id: Some("map-group-world".into()),
             approximate: false,
             max_scale: Some(1),
+            creatable: vec![],
         },
     )
 }
@@ -1795,4 +1800,257 @@ fn an_unreadable_waypoint_file_is_a_status_not_a_plugin_failure(cx: &mut TestApp
         assert!(view.objects.failed_with("map-xaero-unreadable"))
     });
     assert!(cx.debug_bounds("map-status").is_some());
+}
+
+fn waypoint_fields(name: &str) -> Vec<lumilio_plugin_api::SettingField> {
+    use lumilio_plugin_api::{SettingField, SettingKind, Words};
+    let field = |key: &str, kind| SettingField {
+        key: key.into(),
+        label: Words::new(key, key),
+        help: Words::default(),
+        kind,
+    };
+    vec![
+        field(
+            "name",
+            SettingKind::Text {
+                default: name.into(),
+            },
+        ),
+        field(
+            "x",
+            SettingKind::Number {
+                min: -1000,
+                max: 1000,
+                default: 0,
+            },
+        ),
+        field(
+            "z",
+            SettingKind::Number {
+                min: -1000,
+                max: 1000,
+                default: 0,
+            },
+        ),
+        field(
+            "color",
+            SettingKind::Choice {
+                options: (0..16).map(|i| i.to_string()).collect(),
+                default: "10".into(),
+            },
+        ),
+        field("enabled", SettingKind::Toggle { default: true }),
+    ]
+}
+
+fn editable_layer() -> (String, OverlayInfo) {
+    let (plugin, mut layer) = village_layer();
+    layer.id = "structure.village".into();
+    layer.creatable = waypoint_fields("");
+    (plugin, layer)
+}
+
+fn sent_edits(
+    commands: &async_channel::Receiver<Command>,
+) -> Vec<(String, lumilio_plugin_api::map::ObjectEdit)> {
+    let mut found = vec![];
+    while let Ok(command) = commands.try_recv() {
+        if let Command::Apply { plugin, edit } = command {
+            found.push((plugin, *edit));
+        }
+    }
+    found
+}
+
+#[gpui::test]
+fn editing_a_selected_object_is_locked_while_the_game_runs_and_reports_the_hosts_answer(
+    cx: &mut TestAppContext,
+) {
+    use lumilio_plugin_api::SettingValue;
+    use lumilio_plugin_api::map::EditAction;
+    let (view, cx, commands) = ready_view(cx);
+    cx.simulate_resize(gpui::size(px(900.), px(600.)));
+    cx.run_until_parked();
+    view.update(cx, |view, _| {
+        view.camera = Camera {
+            x: 0.,
+            z: 0.,
+            scale: 1.,
+        };
+        view.objects.layers = vec![editable_layer()];
+        view.refresh();
+    });
+    let mut thing = icon_object(0., 0., 5);
+    thing.label = Some("Home".into());
+    thing.editable = waypoint_fields("Home");
+    answer_objects(&view, cx, &commands, vec![thing]);
+    let on_icon = view.update(cx, |view, _| {
+        view.bounds.unwrap().origin
+            + point(px(view.size[0] as f32 / 2.), px(view.size[1] as f32 / 2.))
+    });
+    cx.simulate_click(on_icon, Modifiers::none());
+    cx.run_until_parked();
+    // Selecting an editable object asks the host whether writing is possible; until it
+    // says yes the keys are locked and say why.
+    let mut probed = false;
+    while let Ok(command) = commands.try_recv() {
+        probed |= matches!(command, Command::CanEdit);
+    }
+    assert!(probed);
+    assert!(cx.debug_bounds("map-edit-locked").is_some());
+    view.update(cx, |view, cx| view.event(Event::CanEdit(false), cx));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert!(!view.can_edit));
+    view.update(cx, |view, cx| view.event(Event::CanEdit(true), cx));
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("map-edit-locked").is_none());
+    click(cx, "map-edit");
+    assert!(
+        cx.debug_bounds("map-edit-name").is_some(),
+        "the dialog is open"
+    );
+    assert!(cx.debug_bounds("map-edit-color-12").is_some());
+    click(cx, "map-edit-color-12");
+    click(cx, "map-edit-save");
+    let sent = sent_edits(&commands);
+    assert_eq!(sent.len(), 1);
+    assert_eq!(sent[0].0, "test.seed");
+    assert_eq!(sent[0].1.overlay, "structure.village");
+    let EditAction::Update { id, values } = &sent[0].1.action else {
+        panic!("{:?}", sent[0].1.action);
+    };
+    assert_eq!(id, "structure.village:0:0");
+    assert_eq!(values["name"], SettingValue::Text("Home".into()));
+    assert_eq!(values["color"], SettingValue::Choice("12".into()));
+    assert_eq!(values["enabled"], SettingValue::Toggle(true));
+    assert_eq!(values["x"], SettingValue::Number(0));
+    // A refusal stays in the dialog with its reason.
+    view.update(cx, |view, cx| {
+        view.event(Event::Applied(Err("map-edit-conflict".into())), cx)
+    });
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("map-edit-error").is_some());
+    assert!(cx.debug_bounds("map-edit-name").is_some());
+    // Success closes it, forgets the selection and reads the objects again.
+    view.update(cx, |view, cx| view.event(Event::Applied(Ok(())), cx));
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("map-edit-name").is_none());
+    view.read_with(cx, |view, _| assert!(view.selected.is_none()));
+    let mut again = false;
+    while let Ok(command) = commands.try_recv() {
+        again |= matches!(command, Command::Objects { .. });
+    }
+    assert!(again, "the cells are requested again after a write");
+}
+
+#[gpui::test]
+fn bad_dialog_values_never_leave_the_dialog_and_delete_asks_first(cx: &mut TestAppContext) {
+    use lumilio_plugin_api::map::EditAction;
+    let (view, cx, commands) = ready_view(cx);
+    cx.simulate_resize(gpui::size(px(900.), px(600.)));
+    cx.run_until_parked();
+    view.update(cx, |view, _| {
+        view.camera = Camera {
+            x: 0.,
+            z: 0.,
+            scale: 1.,
+        };
+        view.can_edit = true;
+        view.objects.layers = vec![editable_layer()];
+        view.refresh();
+    });
+    let mut thing = icon_object(0., 0., 5);
+    thing.label = Some("Home".into());
+    thing.editable = waypoint_fields("Home");
+    answer_objects(&view, cx, &commands, vec![thing]);
+    let on_icon = view.update(cx, |view, _| {
+        view.bounds.unwrap().origin
+            + point(px(view.size[0] as f32 / 2.), px(view.size[1] as f32 / 2.))
+    });
+    cx.simulate_click(on_icon, Modifiers::none());
+    cx.run_until_parked();
+    view.update(cx, |view, cx| view.event(Event::CanEdit(true), cx));
+    cx.run_until_parked();
+    // An X outside the field's range is caught by the dialog itself.
+    click(cx, "map-edit");
+    let dialog = view.read_with(cx, |view, _| {
+        view.edit_dialog.as_ref().unwrap().upgrade().unwrap()
+    });
+    dialog.update_in(cx, |dialog, window, cx| {
+        dialog.set_number_for_test("x", "5000", window, cx)
+    });
+    click(cx, "map-edit-save");
+    assert!(cx.debug_bounds("map-edit-error").is_some());
+    assert!(sent_edits(&commands).is_empty(), "nothing was sent");
+    cx.simulate_keystrokes("escape");
+    cx.run_until_parked();
+    // Deleting goes through a confirmation, and only then reaches the host.
+    click(cx, "map-delete");
+    assert!(sent_edits(&commands).is_empty(), "asked first");
+    cx.simulate_keystrokes("enter");
+    cx.run_until_parked();
+    let sent = sent_edits(&commands);
+    assert_eq!(sent.len(), 1);
+    assert!(
+        matches!(&sent[0].1.action, EditAction::Delete { id } if id == "structure.village:0:0")
+    );
+}
+
+#[gpui::test]
+fn a_new_object_is_placed_by_clicking_the_map_and_pre_filled_with_the_position(
+    cx: &mut TestAppContext,
+) {
+    use lumilio_plugin_api::SettingValue;
+    use lumilio_plugin_api::map::EditAction;
+    let (view, cx, commands) = ready_view(cx);
+    cx.simulate_resize(gpui::size(px(900.), px(600.)));
+    cx.run_until_parked();
+    // Without a layer that can create anything there is no key for it.
+    assert!(cx.debug_bounds("map-place").is_none());
+    view.update(cx, |view, cx| {
+        view.camera = Camera {
+            x: 0.,
+            z: 0.,
+            scale: 1.,
+        };
+        view.can_edit = true;
+        view.objects.layers = vec![editable_layer()];
+        view.objects.enabled = ["structure.village".to_owned()].into();
+        view.refresh();
+        cx.notify();
+    });
+    cx.run_until_parked();
+    click(cx, "map-place");
+    view.read_with(cx, |view, _| assert!(view.placing));
+    assert!(cx.debug_bounds("map-status").is_some(), "the hint is shown");
+    let (spot, expected) = view.update(cx, |view, _| {
+        let origin = view.bounds.unwrap().origin;
+        let local = [300.0_f64, 200.0];
+        let at = view.camera.world(local, view.size);
+        (origin + point(px(local[0] as f32), px(local[1] as f32)), at)
+    });
+    cx.simulate_click(spot, Modifiers::none());
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert!(!view.placing));
+    assert!(cx.debug_bounds("map-edit-name").is_some());
+    click(cx, "map-edit-save");
+    let sent = sent_edits(&commands);
+    assert_eq!(sent.len(), 1);
+    let EditAction::Create { at, values } = &sent[0].1.action else {
+        panic!("{:?}", sent[0].1.action);
+    };
+    assert_eq!((at.x, at.z), (expected[0], expected[1]));
+    assert_eq!(
+        values["x"],
+        SettingValue::Number(expected[0].round() as i64)
+    );
+    assert_eq!(
+        values["z"],
+        SettingValue::Number(expected[1].round() as i64)
+    );
+    // Locked while the game runs.
+    view.update(cx, |view, cx| view.event(Event::CanEdit(false), cx));
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("map-place").is_some());
 }

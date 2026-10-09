@@ -2,6 +2,7 @@
 //! strings, and the overlay that draws them. The format has no public
 //! specification; what is known comes from XaeroTools and is checked against
 //! the pinned sample in `tests/data/xaero/` (plan W17).
+pub(crate) mod edit;
 pub(crate) mod naming;
 pub(crate) mod overlay;
 pub(crate) mod waypoints;

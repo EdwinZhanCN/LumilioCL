@@ -17,7 +17,7 @@ impl MapView {
         let world = self
             .contexts
             .iter()
-            .find(|world| &world.context.world == &context.world)?;
+            .find(|world| world.context.world == context.world)?;
         Some((folder.clone(), world.suggested_xaero.clone()?))
     }
 

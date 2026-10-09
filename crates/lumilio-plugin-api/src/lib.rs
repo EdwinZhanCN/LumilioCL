@@ -69,10 +69,31 @@ pub struct Manifest {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum Permission {
-    ReadGameFiles { under: String },
-    Network { hosts: Vec<String> },
+    ReadGameFiles {
+        under: String,
+    },
+    /// Writes below `under`, only to files whose name matches `names`: one `*`
+    /// stands for any text (`mw$*.txt`). The host also refuses to write while
+    /// the game is running or the file changed since the plugin read it.
+    WriteGameFiles {
+        under: String,
+        names: String,
+    },
+    Network {
+        hosts: Vec<String>,
+    },
     LaunchEvents,
     Native(NativeCapability),
+}
+
+/// What a file looked like when a plugin read it. A write is refused unless
+/// the file still looks exactly like this.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct FileInfo {
+    pub len: u64,
+    /// Milliseconds since the Unix epoch.
+    pub modified_ms: i64,
+    pub sha256: String,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -211,6 +232,22 @@ pub trait HostContext: Send + Sync {
     /// Lists files (recursively, relative to the game directory) below a
     /// granted `ReadGameFiles` directory.
     fn list_files(&self, dir: &str) -> Result<Vec<String>, PluginError>;
+    /// Reads a file below a granted `ReadGameFiles` directory together with
+    /// the [`FileInfo`] to pass back when writing it.
+    fn read_file_info(&self, _path: &str) -> Result<(Vec<u8>, FileInfo), PluginError> {
+        Err(PluginError::PermissionDenied)
+    }
+    /// Replaces a file below a `WriteGameFiles` grant. `expected` is what
+    /// [`read_file_info`](Self::read_file_info) returned; `None` means the file
+    /// must not exist yet. The host backs the old file up first.
+    fn write_file(
+        &self,
+        _path: &str,
+        _bytes: &[u8],
+        _expected: Option<&FileInfo>,
+    ) -> Result<(), PluginError> {
+        Err(PluginError::PermissionDenied)
+    }
     fn fetch(&self, url: &str) -> Result<FetchResponse, PluginError>;
     /// HTTP requests still pass through the host's permissions and transport.
     /// Existing contexts support a plain GET only until they implement this.

@@ -12,9 +12,6 @@
 //! and written back is identical byte for byte, and an edit changes only the
 //! line that was edited.
 
-// The writing half (T22–T24) uses the rest; until then only tests do.
-#![cfg_attr(not(test), allow(dead_code))]
-
 pub(crate) const DEFAULT_SET: &str = "gui.xaero_default";
 const COLON_ESCAPE: &str = "§§";
 
@@ -152,6 +149,13 @@ pub(crate) struct WaypointFile {
     lines: Vec<Line>,
 }
 
+impl Line {
+    /// The line exactly as it was in the file, ending included.
+    pub fn raw(&self) -> &str {
+        &self.raw
+    }
+}
+
 impl WaypointFile {
     pub fn parse(text: &str) -> Self {
         Self {
@@ -182,6 +186,39 @@ impl WaypointFile {
 
     pub fn malformed(&self) -> usize {
         self.lines.iter().filter(|line| line.malformed).count()
+    }
+
+    /// Appends a waypoint as a new last line, in the file's own line-ending
+    /// style (a bare newline for a file with no lines yet).
+    pub fn push(&mut self, waypoint: Waypoint) {
+        let ending = self
+            .lines
+            .iter()
+            .rev()
+            .find_map(|line| {
+                let content = line.raw.trim_end_matches(['\n', '\r']);
+                let ending = &line.raw[content.len()..];
+                (!ending.is_empty()).then(|| ending.to_owned())
+            })
+            .unwrap_or_else(|| "\n".to_owned());
+        // A last line that lacks its ending gets one before the new line.
+        if let Some(last) = self.lines.last_mut()
+            && !last.raw.ends_with('\n')
+        {
+            last.raw.push_str(&ending);
+        }
+        self.lines.push(Line {
+            raw: format!("{}{ending}", format_line(&waypoint)),
+            waypoint: Some(waypoint),
+            malformed: false,
+        });
+    }
+
+    /// Removes line `index` if it holds a waypoint; every other line stays as
+    /// it was.
+    pub fn remove(&mut self, index: usize) -> Option<Waypoint> {
+        self.lines.get(index)?.waypoint.as_ref()?;
+        self.lines.remove(index).waypoint
     }
 
     /// Replaces the waypoint on line `index`, keeping that line's ending style.

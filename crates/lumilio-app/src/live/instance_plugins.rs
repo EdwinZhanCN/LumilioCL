@@ -46,6 +46,16 @@ pub(super) fn plugin_map(
                                 .map_err(|error| error.to_string()),
                         )
                     }
+                    Command::CanEdit => Event::CanEdit(service.map_can_edit(&id)),
+                    Command::Apply { plugin, edit } => Event::Applied(
+                        service
+                            .map_apply(&id, &plugin, *edit)
+                            .await
+                            .map_err(|failure| match failure {
+                                lumilio_core::MapFailure::Failed(reason) => reason,
+                                _ => "map-edit-failed".to_owned(),
+                            }),
+                    ),
                     Command::LinkXaero { folder, dir } => {
                         let result = async {
                             service

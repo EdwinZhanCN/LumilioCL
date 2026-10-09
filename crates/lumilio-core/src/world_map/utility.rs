@@ -17,6 +17,7 @@ impl OverlayProvider for UtilityOverlay {
                 group_id: None,
                 approximate: false,
                 max_scale: None,
+                creatable: vec![],
             })
             .collect()
     }
@@ -90,6 +91,7 @@ impl OverlayProvider for UtilityOverlay {
                     color: None,
                     note: None,
                     share: None,
+                    editable: vec![],
                 });
             }
         }

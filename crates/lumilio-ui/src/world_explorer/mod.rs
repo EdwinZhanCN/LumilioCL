@@ -1,6 +1,7 @@
 //! Host-owned map viewport. Background data and rendering enter through mailboxes.
 mod camera;
 mod canvas;
+mod edit;
 mod layers;
 mod objects;
 mod seed;
@@ -27,8 +28,8 @@ use lumilio_core::world_map::{MapSchedule, Viewport, WorldMapContext};
 use lumilio_core::{CancellationToken, MapFailure, MapProviders};
 use lumilio_map_render::{Grid, Sprite, Tile};
 use lumilio_plugin_api::map::{
-    MapObject, MapObjectKind, OverlayInfo, OverlayRequest, TileKey, TileReply, TileRequest,
-    WorldContext,
+    MapObject, MapObjectKind, MapPoint, OverlayInfo, OverlayRequest, TileKey, TileReply,
+    TileRequest, WorldContext,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
@@ -56,6 +57,13 @@ pub enum Command {
         folder: String,
         dir: String,
     },
+    /// Apply an edit the person confirmed in the dialog.
+    Apply {
+        plugin: String,
+        edit: Box<lumilio_plugin_api::map::ObjectEdit>,
+    },
+    /// Ask whether the game's files could be written now.
+    CanEdit,
     Objects {
         generation: u64,
         plugin: String,
@@ -78,6 +86,9 @@ pub enum Event {
     },
     /// The worlds again, after a link changed what they can show.
     Linked(Result<Vec<WorldMapContext>, String>),
+    /// The result of an applied edit; the error is a message id.
+    Applied(Result<(), String>),
+    CanEdit(bool),
     Objects {
         generation: u64,
         key: ObjectKey,
@@ -194,6 +205,15 @@ pub struct MapView {
     /// barely moved.
     press: Option<Point<Pixels>>,
     selected: Option<MapObject>,
+    /// Whether the files could be written now (no game running).
+    can_edit: bool,
+    edit_dialog: Option<gpui::WeakEntity<edit::EditDialog>>,
+    /// A message id for an edit that failed with no dialog open.
+    edit_error: Option<String>,
+    /// The next click on the map places a new object.
+    placing: bool,
+    /// An edit's answer waiting for the next render, which has the window.
+    applied: Option<Result<(), String>>,
     cursor: [f64; 2],
     serial: u64,
     image: Option<Arc<RenderImage>>,
@@ -264,6 +284,11 @@ impl MapView {
             drag: None,
             press: None,
             selected: None,
+            can_edit: false,
+            edit_dialog: None,
+            edit_error: None,
+            placing: false,
+            applied: None,
             cursor: [0., 0.],
             serial: 0,
             image: None,
@@ -417,11 +442,14 @@ impl MapView {
                 self.refresh();
             }
             Event::Linked(Err(error)) => self.error = Some(error),
+            Event::Applied(result) => self.applied = Some(result),
+            Event::CanEdit(yes) => self.can_edit = yes,
             Event::Overlays { context, layers } => {
                 if self.context.as_ref() != Some(&context) {
                     return;
                 }
                 self.objects.layers = layers;
+                self.probe_edit();
                 self.refresh_objects();
             }
             Event::Objects {
@@ -895,6 +923,12 @@ impl Render for MapView {
             window.defer(cx, move |window, cx| load(id, window, cx));
         }
         let colors = ShellColors::from_theme(cx.theme());
+        if let Some(result) = self.applied.take() {
+            let target = cx.weak_entity();
+            window.defer(cx, move |window, cx| {
+                let _ = target.update(cx, |this, cx| this.edit_applied(result, window, cx));
+            });
+        }
         if self.form.is_none() {
             let target = cx.weak_entity();
             // InputState installs focus/blur observers. Create it outside the
@@ -955,6 +989,12 @@ impl Render for MapView {
         } else {
             None
         };
+        let status: Option<String> = self
+            .edit_error
+            .as_deref()
+            .map(edit::failure_text)
+            .or_else(|| self.placing.then(|| tr!("map-placing-hint").to_string()))
+            .or_else(|| status.map(|text| text.to_string()));
         // Floating panels sit over the map; pressing or wheeling on them must
         // not pan or zoom the map beneath.
         let float = || {
@@ -1015,6 +1055,7 @@ impl Render for MapView {
                                 .child(status)
                         }))
                         .children(retry)
+                        .children(self.place_key(cx))
                         .children(self.xaero_link_prompt(cx)),
                 ),
             )
@@ -1033,10 +1074,16 @@ impl Render for MapView {
             )
             .on_mouse_up(
                 MouseButton::Left,
-                cx.listener(|this, event: &gpui::MouseUpEvent, _, cx| {
+                cx.listener(|this, event: &gpui::MouseUpEvent, window, cx| {
                     this.drag = None;
                     if let Some(down) = this.press.take() {
-                        this.click(down, event.position);
+                        if this.placing {
+                            if let Some(at) = this.click_point(down, event.position) {
+                                this.create_at(MapPoint { x: at[0], z: at[1] }, window, cx);
+                            }
+                        } else {
+                            this.click(down, event.position);
+                        }
                         cx.notify();
                     }
                 }),

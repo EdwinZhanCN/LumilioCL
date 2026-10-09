@@ -4,8 +4,6 @@
 //! Adapted from XaeroTools crates/xaero-core/src/naming.rs (MIT, Copyright (c) 2026 Dek), ADR 0022.
 //! Reworked onto `lumilio_plugin_api::map::Dimension`.
 
-// The writing half (T22–T24) uses the rest; until then only tests do.
-#![cfg_attr(not(test), allow(dead_code))]
 use lumilio_plugin_api::map::Dimension;
 
 /// Directory, below the game directory, holding the Minimap's per-world data.

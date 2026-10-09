@@ -45,6 +45,7 @@ fn layers(spawn_estimated: bool) -> Vec<OverlayInfo> {
             group_id: Some(GROUP.into()),
             approximate: spawn_estimated,
             max_scale: None,
+            creatable: vec![],
         },
         OverlayInfo {
             id: SLIME.into(),
@@ -54,6 +55,7 @@ fn layers(spawn_estimated: bool) -> Vec<OverlayInfo> {
             group_id: Some(GROUP.into()),
             approximate: false,
             max_scale: Some(SLIME_MAX_SCALE),
+            creatable: vec![],
         },
     ]
 }
@@ -101,6 +103,7 @@ fn object(
         color: None,
         note: None,
         share: None,
+        editable: vec![],
     }
 }
 
