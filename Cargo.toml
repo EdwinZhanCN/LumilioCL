@@ -6,6 +6,7 @@ members = [
     "crates/lumilio-ui",
     "crates/lumilio-plugin-api",
     "crates/lumilio-nbt",
+    "crates/lumilio-anvil",
     "crates/lumilio-plugin-crash-analyzer",
     "crates/lumilio-plugin-litematica",
     "crates/lumilio-plugin-modrinth",

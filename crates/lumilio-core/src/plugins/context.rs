@@ -100,6 +100,32 @@ impl HostContext for Context {
             .ok_or(PluginError::PermissionDenied)?;
         access::list(game_dir, &self.manifest, dir)
     }
+    fn file_stat(&self, path: &str) -> Result<Option<lumilio_plugin_api::FileStat>, PluginError> {
+        let game_dir = self
+            .game_dir
+            .as_ref()
+            .ok_or(PluginError::PermissionDenied)?;
+        access::stat(game_dir, &self.manifest, path)
+    }
+    fn read_range(&self, path: &str, offset: u64, len: usize) -> Result<Vec<u8>, PluginError> {
+        let game_dir = self
+            .game_dir
+            .as_ref()
+            .ok_or(PluginError::PermissionDenied)?;
+        access::read_range(game_dir, &self.manifest, path, offset, len)
+    }
+    fn list_dir(
+        &self,
+        dir: &str,
+        after: Option<&str>,
+        limit: usize,
+    ) -> Result<lumilio_plugin_api::DirPage, PluginError> {
+        let game_dir = self
+            .game_dir
+            .as_ref()
+            .ok_or(PluginError::PermissionDenied)?;
+        access::list_dir(game_dir, &self.manifest, dir, after, limit)
+    }
     fn read_file_info(
         &self,
         path: &str,

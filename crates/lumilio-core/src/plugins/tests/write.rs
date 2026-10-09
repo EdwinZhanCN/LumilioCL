@@ -208,3 +208,119 @@ fn only_the_latest_backups_of_a_file_are_kept() {
     );
     assert!(!kept.contains(&"old\n".to_owned()), "oldest copy dropped");
 }
+
+#[test]
+fn ranges_stats_and_pages_obey_the_read_grant_and_do_not_need_the_whole_file() {
+    let dir = game();
+    let root = dir.path();
+    let manifest = manifest();
+    let big = root.join("xaero/big.bin");
+    let file = std::fs::File::create(&big).unwrap();
+    // Larger than a whole-file read allows, but a range of it is fine.
+    file.set_len(access::MAX_FILE_BYTES + 4096).unwrap();
+    std::fs::write(root.join("xaero/small.txt"), "0123456789").unwrap();
+    assert!(access::read(root, &manifest, "xaero/big.bin").is_err());
+    let tail =
+        access::read_range(root, &manifest, "xaero/big.bin", access::MAX_FILE_BYTES, 16).unwrap();
+    assert_eq!(tail, vec![0; 16]);
+    assert_eq!(
+        access::read_range(root, &manifest, "xaero/small.txt", 4, 100).unwrap(),
+        b"456789",
+        "a range past the end is cut short"
+    );
+    assert!(
+        access::read_range(root, &manifest, "xaero/small.txt", 99, 4)
+            .unwrap()
+            .is_empty()
+    );
+    assert!(matches!(
+        access::read_range(
+            root,
+            &manifest,
+            "xaero/small.txt",
+            0,
+            lumilio_plugin_api::MAX_RANGE + 1
+        ),
+        Err(PluginError::InvalidInput(_))
+    ));
+    for bad in ["options.txt", "../x", "/etc/passwd", "xaero/../options.txt"] {
+        assert_eq!(
+            access::read_range(root, &manifest, bad, 0, 1),
+            Err(PluginError::PermissionDenied),
+            "{bad}"
+        );
+        assert_eq!(
+            access::stat(root, &manifest, bad),
+            Err(PluginError::PermissionDenied)
+        );
+        assert_eq!(
+            access::list_dir(root, &manifest, bad, None, 10),
+            Err(PluginError::PermissionDenied)
+        );
+    }
+    let stat = access::stat(root, &manifest, "xaero/small.txt")
+        .unwrap()
+        .unwrap();
+    assert_eq!(stat.len, 10);
+    assert!(stat.modified_ms > 0);
+    assert_eq!(
+        access::stat(root, &manifest, "xaero/nothing").unwrap(),
+        None
+    );
+    assert_eq!(
+        access::stat(root, &manifest, "xaero/minimap").unwrap(),
+        None,
+        "a directory is not a file"
+    );
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink(root.join("options.txt"), root.join("xaero/link")).unwrap();
+        assert_eq!(
+            access::read_range(root, &manifest, "xaero/link", 0, 1),
+            Err(PluginError::PermissionDenied)
+        );
+        assert_eq!(
+            access::stat(root, &manifest, "xaero/link"),
+            Err(PluginError::PermissionDenied)
+        );
+    }
+
+    // Pages: sorted, resumable with `after`, links left out, a missing directory is empty.
+    let many = root.join("xaero/many");
+    std::fs::create_dir_all(&many).unwrap();
+    for n in 0..25 {
+        std::fs::write(many.join(format!("r.{n:02}.mca")), "x").unwrap();
+    }
+    std::fs::create_dir_all(many.join("sub")).unwrap();
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(root.join("options.txt"), many.join("aaa-link")).unwrap();
+    let mut seen = Vec::new();
+    let mut after: Option<String> = None;
+    let mut pages = 0;
+    loop {
+        let page = access::list_dir(root, &manifest, "xaero/many", after.as_deref(), 10).unwrap();
+        assert!(page.entries.len() <= 10);
+        seen.extend(
+            page.entries
+                .iter()
+                .map(|entry| (entry.name.clone(), entry.is_dir)),
+        );
+        pages += 1;
+        match page.next {
+            Some(next) => after = Some(next),
+            None => break,
+        }
+    }
+    assert_eq!(pages, 3);
+    assert_eq!(seen.len(), 26, "25 files and one directory, no link");
+    assert!(
+        seen.windows(2).all(|pair| pair[0].0 < pair[1].0),
+        "sorted, no repeats"
+    );
+    assert!(seen.contains(&("sub".to_owned(), true)));
+    assert!(!seen.iter().any(|(name, _)| name == "aaa-link"));
+    assert_eq!(
+        access::list_dir(root, &manifest, "xaero/absent", None, 10).unwrap(),
+        lumilio_plugin_api::DirPage::default()
+    );
+}

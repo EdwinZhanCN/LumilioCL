@@ -4,9 +4,12 @@
 //!   for the platform this runs on. Each platform packs natively; there is no
 //!   cross packaging (assets/icons/PACKAGING.md §5). Artifacts land in
 //!   `dist/`, each with a `.sha256` beside it.
+//! - `block-colors VERSION`: build the block colour table of a game version from
+//!   its client jar (see `block_colors.rs`).
 //! - `release-check [TAG]`: print `version=` and `prerelease=` lines (for
 //!   `$GITHUB_OUTPUT`), failing if TAG is not `v<workspace version>`.
 
+mod block_colors;
 mod linux;
 mod macos;
 mod release;
@@ -18,8 +21,7 @@ use std::process::ExitCode;
 use release::{Release, Result};
 use version::Version;
 
-const USAGE: &str =
-    "usage: cargo xtask package [--skip-build]\n       cargo xtask release-check [TAG]";
+const USAGE: &str = "usage: cargo xtask package [--skip-build]\n       cargo xtask release-check [TAG]\n       cargo xtask block-colors VERSION";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -29,6 +31,8 @@ fn main() -> ExitCode {
         ["package", "--skip-build"] => package(true),
         ["release-check"] => release_check(None),
         ["release-check", tag] => release_check(Some(tag)),
+        ["block-colors", version] => Release::detect()
+            .and_then(|release| block_colors::run(version, &release.root, &release.target)),
         _ => {
             eprintln!("{USAGE}");
             return ExitCode::from(2);

@@ -86,6 +86,33 @@ pub enum Permission {
     Native(NativeCapability),
 }
 
+/// A file's size and modification time, without reading it.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct FileStat {
+    pub len: u64,
+    /// Milliseconds since the Unix epoch.
+    pub modified_ms: i64,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct DirEntry {
+    pub name: String,
+    pub is_dir: bool,
+}
+
+/// One page of a directory, sorted by name. `next` is the name to pass as
+/// `after` for the following page; `None` means this was the last one.
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub struct DirPage {
+    pub entries: Vec<DirEntry>,
+    pub next: Option<String>,
+}
+
+/// Largest range one `read_range` call returns.
+pub const MAX_RANGE: usize = 8 * 1024 * 1024;
+/// Most entries one `list_dir` page holds.
+pub const MAX_PAGE: usize = 1000;
+
 /// What a file looked like when a plugin read it. A write is refused unless
 /// the file still looks exactly like this.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -232,6 +259,27 @@ pub trait HostContext: Send + Sync {
     /// Lists files (recursively, relative to the game directory) below a
     /// granted `ReadGameFiles` directory.
     fn list_files(&self, dir: &str) -> Result<Vec<String>, PluginError>;
+    /// Size and modification time of a file below a granted `ReadGameFiles`
+    /// directory; `Ok(None)` when it does not exist.
+    fn file_stat(&self, _path: &str) -> Result<Option<FileStat>, PluginError> {
+        Err(PluginError::PermissionDenied)
+    }
+    /// Up to `len` bytes (at most [`MAX_RANGE`]) from `offset`, so a file larger
+    /// than a whole-file read allows can still be read in pieces. A range
+    /// that runs past the end is cut short.
+    fn read_range(&self, _path: &str, _offset: u64, _len: usize) -> Result<Vec<u8>, PluginError> {
+        Err(PluginError::PermissionDenied)
+    }
+    /// One directory level, paged, below a granted `ReadGameFiles` directory.
+    /// A missing directory is an empty page.
+    fn list_dir(
+        &self,
+        _dir: &str,
+        _after: Option<&str>,
+        _limit: usize,
+    ) -> Result<DirPage, PluginError> {
+        Err(PluginError::PermissionDenied)
+    }
     /// Reads a file below a granted `ReadGameFiles` directory together with
     /// the [`FileInfo`] to pass back when writing it.
     fn read_file_info(&self, _path: &str) -> Result<(Vec<u8>, FileInfo), PluginError> {

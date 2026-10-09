@@ -210,3 +210,236 @@ fn the_portable_zip_unpacks_into_one_folder() {
         ]
     );
 }
+
+mod block_colors {
+    use crate::block_colors::*;
+    use std::io::{Cursor, Write};
+
+    fn png(width: u32, height: u32, pixel: impl Fn(u32, u32) -> [u8; 4]) -> Vec<u8> {
+        let image = image::RgbaImage::from_fn(width, height, |x, y| image::Rgba(pixel(x, y)));
+        let mut out = Cursor::new(Vec::new());
+        image.write_to(&mut out, image::ImageFormat::Png).unwrap();
+        out.into_inner()
+    }
+
+    fn jar(files: &[(&str, Vec<u8>)]) -> zip::ZipArchive<Cursor<Vec<u8>>> {
+        let mut writer = zip::ZipWriter::new(Cursor::new(Vec::new()));
+        for (name, bytes) in files {
+            writer
+                .start_file(*name, zip::write::SimpleFileOptions::default())
+                .unwrap();
+            writer.write_all(bytes).unwrap();
+        }
+        zip::ZipArchive::new(Cursor::new(writer.finish().unwrap().into_inner())).unwrap()
+    }
+
+    fn text(value: &str) -> Vec<u8> {
+        value.as_bytes().to_vec()
+    }
+
+    fn sample() -> zip::ZipArchive<Cursor<Vec<u8>>> {
+        let red = |_, _| [200, 0, 0, 255];
+        jar(&[
+            // A cube whose model names top and side textures through a parent.
+            (
+                "assets/minecraft/blockstates/stone.json",
+                text(r#"{"variants":{"":{"model":"minecraft:block/stone"}}}"#),
+            ),
+            (
+                "assets/minecraft/models/block/stone.json",
+                text(
+                    r##"{"parent":"minecraft:block/cube_all","textures":{"all":"minecraft:block/stone"}}"##,
+                ),
+            ),
+            (
+                "assets/minecraft/models/block/cube_all.json",
+                text(r##"{"parent":"block/cube","textures":{"particle":"#all","down":"#all"}}"##),
+            ),
+            (
+                "assets/minecraft/models/block/cube.json",
+                text(r##"{"textures":{"particle":"#missing"}}"##),
+            ),
+            (
+                "assets/minecraft/textures/block/stone.png",
+                png(16, 16, |_, _| [100, 120, 140, 255]),
+            ),
+            // Top beats side; the child's texture beats the parent's.
+            (
+                "assets/minecraft/blockstates/grass_block.json",
+                text(
+                    r#"{"variants":{"snowy=false":[{"model":"block/grass_block"},{"model":"block/other"}]}}"#,
+                ),
+            ),
+            (
+                "assets/minecraft/models/block/grass_block.json",
+                text(
+                    r##"{"parent":"block/cube_bottom_top","textures":{"top":"block/grass_block_top","side":"block/grass_block_side"}}"##,
+                ),
+            ),
+            (
+                "assets/minecraft/models/block/cube_bottom_top.json",
+                text(r##"{"textures":{"top":"block/wrong","bottom":"block/dirt"}}"##),
+            ),
+            (
+                "assets/minecraft/textures/block/grass_block_top.png",
+                png(16, 16, |_, _| [150, 150, 150, 255]),
+            ),
+            (
+                "assets/minecraft/textures/block/grass_block_side.png",
+                png(16, 16, red),
+            ),
+            // Multipart blocks use their first applied model.
+            (
+                "assets/minecraft/blockstates/oak_fence.json",
+                text(
+                    r#"{"multipart":[{"apply":{"model":"block/fence_post"}},{"when":{"north":"true"},"apply":{"model":"block/fence_side"}}]}"#,
+                ),
+            ),
+            (
+                "assets/minecraft/models/block/fence_post.json",
+                text(r#"{"textures":{"texture":"block/planks"}}"#),
+            ),
+            (
+                "assets/minecraft/textures/block/planks.png",
+                png(16, 16, |_, _| [160, 130, 80, 255]),
+            ),
+            // Mostly transparent textures are see-through; animation strips use frame one.
+            (
+                "assets/minecraft/blockstates/short_grass.json",
+                text(r#"{"variants":{"":{"model":"block/short_grass"}}}"#),
+            ),
+            (
+                "assets/minecraft/models/block/short_grass.json",
+                text(r#"{"textures":{"cross":"block/short_grass"}}"#),
+            ),
+            (
+                "assets/minecraft/textures/block/short_grass.png",
+                png(16, 16, |x, y| {
+                    if x == 8 && y < 8 {
+                        [0, 200, 0, 255]
+                    } else {
+                        [0, 0, 0, 0]
+                    }
+                }),
+            ),
+            (
+                "assets/minecraft/blockstates/magma_block.json",
+                text(r#"{"variants":{"":{"model":"block/magma"}}}"#),
+            ),
+            (
+                "assets/minecraft/models/block/magma.json",
+                text(r#"{"textures":{"all":"block/magma"}}"#),
+            ),
+            (
+                "assets/minecraft/textures/block/magma.png",
+                png(16, 48, |_, y| {
+                    if y < 16 {
+                        [255, 0, 0, 255]
+                    } else {
+                        [0, 0, 255, 255]
+                    }
+                }),
+            ),
+            (
+                "assets/minecraft/blockstates/oak_leaves.json",
+                text(r#"{"variants":{"":{"model":"block/leaves"}}}"#),
+            ),
+            (
+                "assets/minecraft/models/block/leaves.json",
+                text(r#"{"textures":{"all":"block/leaves"}}"#),
+            ),
+            (
+                "assets/minecraft/textures/block/leaves.png",
+                png(16, 16, |_, _| [90, 90, 90, 255]),
+            ),
+            // Broken or missing pieces just leave the block out.
+            (
+                "assets/minecraft/blockstates/ghost.json",
+                text(r#"{"variants":{"":{"model":"block/nowhere"}}}"#),
+            ),
+            ("assets/minecraft/blockstates/bad.json", text("{ not json")),
+            ("assets/minecraft/blockstates/empty.json", text("{}")),
+            // Fluids have no blockstate; their textures are looked up by name.
+            (
+                "assets/minecraft/textures/block/water_still.png",
+                png(16, 32, |_, _| [60, 90, 200, 255]),
+            ),
+            (
+                "assets/minecraft/textures/block/lava_still.png",
+                png(16, 16, |_, _| [220, 100, 20, 255]),
+            ),
+        ])
+    }
+
+    #[test]
+    fn blocks_get_the_mean_colour_of_the_texture_they_show_from_above() {
+        let table = build_table(&mut sample());
+        assert_eq!(table["minecraft:stone"], [100, 120, 140, 0]);
+        assert_eq!(
+            table["minecraft:grass_block"],
+            [150, 150, 150, TINT_GRASS],
+            "top, tinted"
+        );
+        assert_eq!(table["minecraft:oak_fence"], [160, 130, 80, 0]);
+        assert_eq!(
+            table["minecraft:magma_block"],
+            [255, 0, 0, 0],
+            "first frame of the strip"
+        );
+        assert_eq!(table["minecraft:oak_leaves"], [90, 90, 90, TINT_FOLIAGE]);
+        assert_eq!(table["minecraft:water"], [60, 90, 200, TINT_WATER]);
+        assert_eq!(table["minecraft:lava"], [220, 100, 20, 0]);
+        let grass = table["minecraft:short_grass"];
+        assert_eq!(
+            grass[3] & SEE_THROUGH,
+            SEE_THROUGH,
+            "a few pixels of a plant are not a surface"
+        );
+        assert_eq!(
+            grass[..3],
+            [0, 200, 0],
+            "the colour is of the visible pixels only"
+        );
+        for left_out in ["minecraft:ghost", "minecraft:bad", "minecraft:empty"] {
+            assert!(!table.contains_key(left_out), "{left_out}");
+        }
+        assert_eq!(table.len(), 8);
+    }
+
+    #[test]
+    fn the_table_renders_the_same_way_every_time() {
+        let table = build_table(&mut sample());
+        let first = render(&table);
+        assert_eq!(first, render(&build_table(&mut sample())));
+        assert!(first.contains("    \"minecraft:stone\": [100, 120, 140, 0],\n"));
+        let parsed: serde_json::Value = serde_json::from_str(&first).unwrap();
+        assert_eq!(parsed["blocks"]["minecraft:water"][3], TINT_WATER);
+        assert!(first.ends_with("  }\n}\n"));
+        assert!(!first.contains(",\n  }"), "no trailing comma");
+        let names: Vec<&str> = first
+            .lines()
+            .filter_map(|line| line.trim().split('"').nth(1))
+            .filter(|n| n.starts_with("minecraft:"))
+            .collect();
+        assert!(names.windows(2).all(|pair| pair[0] < pair[1]), "sorted");
+    }
+
+    #[test]
+    fn source_notes_replace_their_own_version_and_keep_the_others() {
+        let first = source_section("", "1.21.4", &"a".repeat(40), "c0ffee", 900);
+        assert!(first.starts_with("# Block colour tables"));
+        assert!(
+            first.contains("`cargo xtask block-colors 1.21.4`") && first.contains(&"a".repeat(40))
+        );
+        let both = source_section(&first, "26.3", &"b".repeat(40), "decade", 1000);
+        assert!(both.contains("## 1.21.4") && both.contains("## 26.3"));
+        let again = source_section(&both, "1.21.4", &"d".repeat(40), "feed", 901);
+        assert_eq!(again.matches("## 1.21.4").count(), 1);
+        assert!(again.contains(&"d".repeat(40)) && !again.contains(&"a".repeat(40)));
+        assert!(
+            again.contains("## 26.3") && again.contains(&"b".repeat(40)),
+            "the other version is kept"
+        );
+        assert!(again.contains("Blocks: 901") && again.contains("Blocks: 1000"));
+    }
+}

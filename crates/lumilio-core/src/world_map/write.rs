@@ -12,6 +12,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub const KEEP_BACKUPS: usize = 10;
 const CONFLICT: &str = "map-edit-conflict";
 
+/// A modification time as milliseconds since the epoch, 0 when unknown.
+pub fn millis_of(time: Option<SystemTime>) -> i64 {
+    time.map_or(0, millis)
+}
+
 fn millis(time: SystemTime) -> i64 {
     time.duration_since(UNIX_EPOCH).map_or(0, |since| {
         i64::try_from(since.as_millis()).unwrap_or(i64::MAX)

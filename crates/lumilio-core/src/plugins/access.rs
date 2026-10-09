@@ -191,3 +191,93 @@ pub(super) fn read_info(
     }
     crate::world_map::write::describe(&full)
 }
+
+pub(super) fn stat(
+    game_dir: &Path,
+    manifest: &Manifest,
+    relative: &str,
+) -> Result<Option<lumilio_plugin_api::FileStat>, PluginError> {
+    let full = resolve(game_dir, manifest, relative)?;
+    match std::fs::symlink_metadata(&full) {
+        Ok(meta) if meta.is_file() => Ok(Some(lumilio_plugin_api::FileStat {
+            len: meta.len(),
+            modified_ms: crate::world_map::write::millis_of(meta.modified().ok()),
+        })),
+        Ok(_) => Ok(None),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(PluginError::Unavailable(error.to_string())),
+    }
+}
+
+pub(super) fn read_range(
+    game_dir: &Path,
+    manifest: &Manifest,
+    relative: &str,
+    offset: u64,
+    len: usize,
+) -> Result<Vec<u8>, PluginError> {
+    use std::io::{Read, Seek, SeekFrom};
+    if len > lumilio_plugin_api::MAX_RANGE {
+        return Err(PluginError::InvalidInput("range is too large".into()));
+    }
+    let full = resolve(game_dir, manifest, relative)?;
+    let mut file =
+        std::fs::File::open(&full).map_err(|error| PluginError::Unavailable(error.to_string()))?;
+    if !file
+        .metadata()
+        .map_err(|error| PluginError::Unavailable(error.to_string()))?
+        .is_file()
+    {
+        return Err(PluginError::InvalidInput("not a file".into()));
+    }
+    file.seek(SeekFrom::Start(offset))
+        .map_err(|error| PluginError::Unavailable(error.to_string()))?;
+    let mut bytes = Vec::new();
+    file.take(len as u64)
+        .read_to_end(&mut bytes)
+        .map_err(|error| PluginError::Unavailable(error.to_string()))?;
+    Ok(bytes)
+}
+
+pub(super) fn list_dir(
+    game_dir: &Path,
+    manifest: &Manifest,
+    dir: &str,
+    after: Option<&str>,
+    limit: usize,
+) -> Result<lumilio_plugin_api::DirPage, PluginError> {
+    use lumilio_plugin_api::{DirEntry, DirPage, MAX_PAGE};
+    let limit = limit.clamp(1, MAX_PAGE);
+    let full = resolve(game_dir, manifest, dir)?;
+    let mut names: Vec<DirEntry> = match std::fs::read_dir(&full) {
+        Ok(entries) => entries
+            .flatten()
+            .filter_map(|entry| {
+                let kind = entry.file_type().ok()?;
+                // Links are never followed, so they are not listed either.
+                if kind.is_symlink() {
+                    return None;
+                }
+                Some(DirEntry {
+                    name: entry.file_name().to_str()?.to_owned(),
+                    is_dir: kind.is_dir(),
+                })
+            })
+            .collect(),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+        Err(error) => return Err(PluginError::Unavailable(error.to_string())),
+    };
+    names.sort_by(|a, b| a.name.cmp(&b.name));
+    let start = after.map_or(0, |after| {
+        names.partition_point(|entry| entry.name.as_str() <= after)
+    });
+    let rest = &names[start.min(names.len())..];
+    let page: Vec<DirEntry> = rest.iter().take(limit).cloned().collect();
+    let next = (rest.len() > limit)
+        .then(|| page.last().map(|entry| entry.name.clone()))
+        .flatten();
+    Ok(DirPage {
+        entries: page,
+        next,
+    })
+}

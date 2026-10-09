@@ -4448,6 +4448,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "lumilio-anvil"
+version = "0.1.0"
+dependencies = [
+ "flate2",
+ "lumilio-nbt",
+ "lz4_flex",
+]
+
+[[package]]
 name = "lumilio-app"
 version = "0.1.0"
 dependencies = [
@@ -4637,7 +4646,9 @@ dependencies = [
 name = "lumilio-xtask"
 version = "0.1.0"
 dependencies = [
+ "image 0.25.10",
  "serde_json",
+ "sha1 0.11.0",
  "sha2 0.11.0",
  "tempfile",
  "zip 8.6.0",
@@ -4694,6 +4705,12 @@ dependencies = [
  "lyon_path",
  "num-traits",
 ]
+
+[[package]]
+name = "lz4_flex"
+version = "0.11.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "373f5eceeeab7925e0c1098212f2fbc4d416adec9d35051a6ab251e824c1854a"
 
 [[package]]
 name = "mac"
