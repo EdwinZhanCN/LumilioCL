@@ -324,3 +324,67 @@ fn ranges_stats_and_pages_obey_the_read_grant_and_do_not_need_the_whole_file() {
         lumilio_plugin_api::DirPage::default()
     );
 }
+
+#[test]
+fn ranges_and_pages_refuse_links_anywhere_on_the_path() {
+    let dir = game();
+    let root = dir.path();
+    let manifest = manifest();
+    std::fs::create_dir_all(root.join("secret")).unwrap();
+    std::fs::write(root.join("secret/r.0.0.mca"), "outside").unwrap();
+    std::fs::write(root.join("xaero/r.0.0.mca"), "inside").unwrap();
+    assert!(matches!(
+        access::read_range(root, &manifest, "xaero/minimap", 0, 1),
+        Err(PluginError::InvalidInput(_))
+    ));
+    assert_eq!(
+        access::read_range(root, &manifest, "xaero/r.0.0.mca", u64::MAX, 4).unwrap(),
+        Vec::<u8>::new(),
+        "an offset far past the end is an empty range, not an error"
+    );
+    #[cfg(unix)]
+    {
+        // A granted-looking path that walks through a linked directory.
+        std::os::unix::fs::symlink(root.join("secret"), root.join("xaero/region")).unwrap();
+        assert_eq!(
+            access::read_range(root, &manifest, "xaero/region/r.0.0.mca", 0, 4),
+            Err(PluginError::PermissionDenied)
+        );
+        assert_eq!(
+            access::stat(root, &manifest, "xaero/region/r.0.0.mca"),
+            Err(PluginError::PermissionDenied)
+        );
+        assert_eq!(
+            access::list_dir(root, &manifest, "xaero/region", None, 10),
+            Err(PluginError::PermissionDenied)
+        );
+        let page = access::list_dir(root, &manifest, "xaero", None, 10).unwrap();
+        assert!(
+            !page.entries.iter().any(|entry| entry.name == "region"),
+            "a linked directory is not listed"
+        );
+    }
+}
+
+#[test]
+fn file_access_needs_a_game_directory() {
+    let context = context::Context::new(
+        &manifest(),
+        &PluginState::default(),
+        None,
+        None,
+        "en".into(),
+    );
+    assert_eq!(
+        context.read_range("xaero/r.0.0.mca", 0, 1),
+        Err(PluginError::PermissionDenied)
+    );
+    assert_eq!(
+        context.file_stat("xaero/r.0.0.mca"),
+        Err(PluginError::PermissionDenied)
+    );
+    assert_eq!(
+        context.list_dir("xaero", None, 1),
+        Err(PluginError::PermissionDenied)
+    );
+}
