@@ -134,7 +134,7 @@ fn average(png: &[u8]) -> Option<([u8; 3], f64)> {
 fn tint_of(block: &str) -> u8 {
     match block {
         "grass_block" | "grass" | "short_grass" | "tall_grass" | "fern" | "large_fern"
-        | "sugar_cane" | "potted_fern" => TINT_GRASS,
+        | "sugar_cane" | "potted_fern" | "bush" => TINT_GRASS,
         "vine"
         | "oak_leaves"
         | "jungle_leaves"
@@ -146,6 +146,23 @@ fn tint_of(block: &str) -> u8 {
         "water" | "bubble_column" | "water_cauldron" => TINT_WATER,
         _ => 0,
     }
+}
+
+/// Blocks the game tints with one colour everywhere rather than by biome
+/// (`BlockColors`: the evergreen and birch foliage colours, the lily pad's).
+/// The tint is multiplied into the table's colour.
+fn fixed_tint(block: &str) -> Option<[u8; 3]> {
+    match block {
+        "spruce_leaves" => Some([0x61, 0x99, 0x61]),
+        "birch_leaves" => Some([0x80, 0xa7, 0x55]),
+        "lily_pad" => Some([0x20, 0x80, 0x30]),
+        _ => None,
+    }
+}
+
+/// The data version a client jar was built for, from its `version.json`.
+pub fn data_version<R: Read + Seek>(jar: &mut zip::ZipArchive<R>) -> Option<i64> {
+    json(jar, "version.json")?.get("world_version")?.as_i64()
 }
 
 /// Builds the table from a client jar's blockstates, models and textures.
@@ -169,9 +186,14 @@ pub fn build_table<R: Read + Seek>(jar: &mut zip::ZipArchive<R>) -> Table {
         let Some(png) = read_entry(jar, &format!("assets/minecraft/textures/{texture}.png")) else {
             continue;
         };
-        let Some((rgb, visible)) = average(&png) else {
+        let Some((mut rgb, visible)) = average(&png) else {
             continue;
         };
+        if let Some(tint) = fixed_tint(&block) {
+            for (channel, tint) in rgb.iter_mut().zip(tint) {
+                *channel = (u16::from(*channel) * u16::from(tint) / 255) as u8;
+            }
+        }
         let mut flags = tint_of(&block);
         if visible < 0.5 {
             flags |= SEE_THROUGH;
@@ -199,8 +221,13 @@ pub fn build_table<R: Read + Seek>(jar: &mut zip::ZipArchive<R>) -> Table {
 }
 
 /// The table as JSON, one block per line so a regenerated table diffs cleanly.
-pub fn render(table: &Table) -> String {
-    let mut out = String::from("{\n  \"blocks\": {\n");
+/// `version` and `data_version` say which game the table was built from; the
+/// launcher picks a world's table by data version.
+pub fn render(table: &Table, version: &str, data_version: i64) -> String {
+    let mut out = format!(
+        "{{\n  \"version\": {},\n  \"data_version\": {data_version},\n  \"blocks\": {{\n",
+        Value::from(version)
+    );
     let last = table.len().saturating_sub(1);
     for (at, (block, [r, g, b, flags])) in table.iter().enumerate() {
         let comma = if at == last { "" } else { "," };
@@ -221,7 +248,7 @@ pub fn source_section(
 ) -> String {
     let heading = format!("## {version}\n");
     let section = format!(
-        "{heading}\n- Client jar sha1: `{sha1}` (from Mojang's version metadata)\n- Command: `cargo xtask block-colors {version}`\n- Tool commit: `{commit}`\n- Blocks: {blocks}\n- Colour: the mean of the visible pixels of the texture a block shows from above (`top`, then `up`, `all`, `end`, `side`); flags 1 = see-through, 2 = grass tint, 4 = foliage tint, 8 = water tint\n\n"
+        "{heading}\n- Client jar sha1: `{sha1}` (from Mojang's version metadata)\n- Command: `cargo xtask block-colors {version}`\n- Tool commit: `{commit}`\n- Blocks: {blocks}\n- Colour: the mean of the visible pixels of the texture a block shows from above (`top`, then `up`, `all`, `end`, `side`); spruce and birch leaves and lily pads have the game's fixed tint multiplied in; flags 1 = see-through, 2 = grass tint, 4 = foliage tint, 8 = water tint\n\n"
     );
     let mut out = if existing.trim().is_empty() {
         String::from(
@@ -269,14 +296,23 @@ fn sha1_of(path: &Path) -> Result<String> {
         .collect())
 }
 
+/// The commit the tool runs at, marked `-dirty` when the tool's own sources
+/// differ from it (the table would then not be reproducible from the commit).
 fn commit(root: &Path) -> String {
-    Command::new("git")
-        .args(["rev-parse", "HEAD"])
-        .current_dir(root)
-        .output()
-        .ok()
-        .and_then(|out| String::from_utf8(out.stdout).ok())
-        .map_or_else(|| "unknown".to_owned(), |text| text.trim().to_owned())
+    let git = |args: &[&str]| {
+        Command::new("git")
+            .args(args)
+            .current_dir(root)
+            .output()
+            .ok()
+            .and_then(|out| String::from_utf8(out.stdout).ok())
+    };
+    let head = git(&["rev-parse", "HEAD"])
+        .map_or_else(|| "unknown".to_owned(), |text| text.trim().to_owned());
+    match git(&["status", "--porcelain", "--", "crates/lumilio-xtask"]) {
+        Some(changes) if !changes.trim().is_empty() => format!("{head}-dirty"),
+        _ => head,
+    }
 }
 
 /// Downloads `version`'s client jar, builds its table and writes it under
@@ -318,6 +354,8 @@ pub fn run(version: &str, root: &Path, target: &Path) -> Result {
     let file = std::fs::File::open(&jar_file).map_err(|error| error.to_string())?;
     let mut jar = zip::ZipArchive::new(file).map_err(|error| error.to_string())?;
     let table = build_table(&mut jar);
+    let data_version =
+        data_version(&mut jar).ok_or("the client jar's version.json has no world_version")?;
     if table.len() < 100 {
         return Err(format!(
             "only {} blocks found; the jar layout may have changed",
@@ -326,8 +364,11 @@ pub fn run(version: &str, root: &Path, target: &Path) -> Result {
     }
     let data = root.join("crates/lumilio-plugin-world-explorer/data/block-colors");
     std::fs::create_dir_all(&data).map_err(|error| error.to_string())?;
-    std::fs::write(data.join(format!("{version}.json")), render(&table))
-        .map_err(|error| error.to_string())?;
+    std::fs::write(
+        data.join(format!("{version}.json")),
+        render(&table, version, data_version),
+    )
+    .map_err(|error| error.to_string())?;
     let source = data.join("SOURCE.md");
     let existing = std::fs::read_to_string(&source).unwrap_or_default();
     std::fs::write(
