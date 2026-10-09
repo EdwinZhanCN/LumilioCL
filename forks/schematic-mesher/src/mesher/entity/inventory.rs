@@ -1,7 +1,7 @@
+use super::EntityFaceTexture;
 use crate::mesher::geometry::Vertex;
 use crate::resolver::ModelResolver;
 use crate::resource_pack::ResourcePack;
-use super::EntityFaceTexture;
 
 /// Grid layout constants (fallback transparent grid).
 const COLS: u32 = 9;
@@ -27,20 +27,27 @@ pub(crate) fn render_inventory_hologram(
     resource_pack: &ResourcePack,
     model_resolver: &ModelResolver,
     inventory_str: &str,
-) -> Option<(Vec<Vertex>, Vec<u32>, Vec<EntityFaceTexture>, crate::resource_pack::TextureData)> {
+) -> Option<(
+    Vec<Vertex>,
+    Vec<u32>,
+    Vec<EntityFaceTexture>,
+    crate::resource_pack::TextureData,
+)> {
     let slots: Vec<&str> = inventory_str.split(',').collect();
     if slots.is_empty() {
         return None;
     }
 
     // Try GUI-based rendering first, fall back to transparent grid
-    let texture_data = if let Some(td) = render_gui_inventory(resource_pack, model_resolver, &slots) {
+    let texture_data = if let Some(td) = render_gui_inventory(resource_pack, model_resolver, &slots)
+    {
         td
     } else {
         render_fallback_inventory(resource_pack, model_resolver, &slots)
     };
 
-    let (vertices, indices, face_textures) = generate_hologram_quad(texture_data.width, texture_data.height);
+    let (vertices, indices, face_textures) =
+        generate_hologram_quad(texture_data.width, texture_data.height);
     Some((vertices, indices, face_textures, texture_data))
 }
 
@@ -68,10 +75,28 @@ fn render_gui_inventory(
     let mut pixels = vec![0u8; (crop_w * crop_h * 4) as usize];
 
     // Copy top section (title + slot rows)
-    copy_region(&gui_frame.pixels, gui_frame.width, &mut pixels, crop_w, 0, 0, crop_w, top_h);
+    copy_region(
+        &gui_frame.pixels,
+        gui_frame.width,
+        &mut pixels,
+        crop_w,
+        0,
+        0,
+        crop_w,
+        top_h,
+    );
 
     // Copy bottom border strip from the full 6-row frame bottom
-    copy_region(&gui_frame.pixels, gui_frame.width, &mut pixels, crop_w, border_src_y, top_h, crop_w, GUI_BOTTOM_PAD);
+    copy_region(
+        &gui_frame.pixels,
+        gui_frame.width,
+        &mut pixels,
+        crop_w,
+        border_src_y,
+        top_h,
+        crop_w,
+        GUI_BOTTOM_PAD,
+    );
 
     // Blit item icons at correct slot positions
     for (i, slot) in slots.iter().enumerate() {
@@ -266,9 +291,14 @@ fn blit_texture(
                     let da = dst[di + 3] as f32 / 255.0;
                     let out_a = sa + da * (1.0 - sa);
                     if out_a > 0.0 {
-                        dst[di] = ((src[si] as f32 * sa + dst[di] as f32 * da * (1.0 - sa)) / out_a) as u8;
-                        dst[di + 1] = ((src[si + 1] as f32 * sa + dst[di + 1] as f32 * da * (1.0 - sa)) / out_a) as u8;
-                        dst[di + 2] = ((src[si + 2] as f32 * sa + dst[di + 2] as f32 * da * (1.0 - sa)) / out_a) as u8;
+                        dst[di] = ((src[si] as f32 * sa + dst[di] as f32 * da * (1.0 - sa)) / out_a)
+                            as u8;
+                        dst[di + 1] = ((src[si + 1] as f32 * sa
+                            + dst[di + 1] as f32 * da * (1.0 - sa))
+                            / out_a) as u8;
+                        dst[di + 2] = ((src[si + 2] as f32 * sa
+                            + dst[di + 2] as f32 * da * (1.0 - sa))
+                            / out_a) as u8;
                         dst[di + 3] = (out_a * 255.0) as u8;
                     }
                 }
@@ -307,7 +337,14 @@ fn generate_hologram_quad(
     vertices.push(Vertex::new([x1, y1, z], [0.0, 0.0, 1.0], [1.0, 0.0]));
     vertices.push(Vertex::new([x1, y0, z], [0.0, 0.0, 1.0], [1.0, 1.0]));
     vertices.push(Vertex::new([x0, y0, z], [0.0, 0.0, 1.0], [0.0, 1.0]));
-    indices.extend_from_slice(&[v_base, v_base + 1, v_base + 2, v_base, v_base + 2, v_base + 3]);
+    indices.extend_from_slice(&[
+        v_base,
+        v_base + 1,
+        v_base + 2,
+        v_base,
+        v_base + 2,
+        v_base + 3,
+    ]);
 
     // Back face (facing -Z, reversed winding)
     let v_base2 = vertices.len() as u32;
@@ -315,11 +352,24 @@ fn generate_hologram_quad(
     vertices.push(Vertex::new([x1, y1, z], [0.0, 0.0, -1.0], [1.0, 0.0]));
     vertices.push(Vertex::new([x1, y0, z], [0.0, 0.0, -1.0], [1.0, 1.0]));
     vertices.push(Vertex::new([x0, y0, z], [0.0, 0.0, -1.0], [0.0, 1.0]));
-    indices.extend_from_slice(&[v_base2, v_base2 + 2, v_base2 + 1, v_base2, v_base2 + 3, v_base2 + 2]);
+    indices.extend_from_slice(&[
+        v_base2,
+        v_base2 + 2,
+        v_base2 + 1,
+        v_base2,
+        v_base2 + 3,
+        v_base2 + 2,
+    ]);
 
     let face_textures = vec![
-        EntityFaceTexture { texture: String::new(), is_transparent: true },
-        EntityFaceTexture { texture: String::new(), is_transparent: true },
+        EntityFaceTexture {
+            texture: String::new(),
+            is_transparent: true,
+        },
+        EntityFaceTexture {
+            texture: String::new(),
+            is_transparent: true,
+        },
     ];
 
     (vertices, indices, face_textures)

@@ -1,12 +1,17 @@
-use super::{EntityCube, EntityModelDef, EntityPart, EntityPartPose};
 use super::armor_stand::parse_pose;
 use super::mob::mob_root;
+use super::{EntityCube, EntityModelDef, EntityPart, EntityPartPose};
 use crate::types::InputBlock;
 
 /// Determine whether the player should use slim (Alex) arms.
 fn is_slim(block: &InputBlock) -> bool {
     // Explicit slim property
-    if block.properties.get("slim").map(|v| v == "true").unwrap_or(false) {
+    if block
+        .properties
+        .get("slim")
+        .map(|v| v == "true")
+        .unwrap_or(false)
+    {
         return true;
     }
     // UUID parity: odd first hex digit → Alex (slim)
@@ -89,7 +94,11 @@ pub(crate) fn player_model(block: &InputBlock, texture_path: &str) -> EntityMode
     // ── Right Arm + Right Sleeve overlay ──
     // Wide: origin [-3, -2, -2], dims [4, 12, 4]
     // Slim: origin [-2, -2, -2], dims [3, 12, 4]
-    let right_arm_origin = if slim { [-2.0, -2.0, -2.0] } else { [-3.0, -2.0, -2.0] };
+    let right_arm_origin = if slim {
+        [-2.0, -2.0, -2.0]
+    } else {
+        [-3.0, -2.0, -2.0]
+    };
     let mut right_arm = EntityPart {
         cubes: vec![EntityCube {
             origin: right_arm_origin,
@@ -265,8 +274,7 @@ mod tests {
 
     #[test]
     fn test_player_model_wide_geometry_count() {
-        let block = InputBlock::new("entity:player")
-            .with_property("facing", "south");
+        let block = InputBlock::new("entity:player").with_property("facing", "south");
         let model = player_model(&block, "entity/player/wide/steve");
         // 12 cubes (6 base + 6 overlay) × 6 faces = 72 faces
         assert_eq!(count_cubes(&model.parts), 12);
@@ -284,8 +292,7 @@ mod tests {
 
     #[test]
     fn test_player_model_slim_arm_width() {
-        let block = InputBlock::new("entity:player")
-            .with_property("slim", "true");
+        let block = InputBlock::new("entity:player").with_property("slim", "true");
         let model = player_model(&block, "test");
         // Find arm cubes — they should have width 3
         let root = &model.parts[0];
@@ -331,8 +338,7 @@ mod tests {
 
     #[test]
     fn test_player_pose_applied() {
-        let block = InputBlock::new("entity:player")
-            .with_property("HeadPose", "45,0,0");
+        let block = InputBlock::new("entity:player").with_property("HeadPose", "45,0,0");
         let model = player_model(&block, "test");
         let root = &model.parts[0];
         let head = &root.children[0];

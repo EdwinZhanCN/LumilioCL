@@ -17,7 +17,11 @@ pub(super) fn bed_model(color: &str, is_head: bool) -> EntityModelDef {
     // Skip the face at the head/foot boundary to prevent z-fighting:
     // RotX(PI/2) maps +Y→+Z, -Y→-Z, so head skips Up (→+Z shared face),
     // foot skips Down (→-Z shared face).
-    let shared_face = if is_head { Direction::Up } else { Direction::Down };
+    let shared_face = if is_head {
+        Direction::Up
+    } else {
+        Direction::Down
+    };
     let main = EntityPart {
         cubes: vec![EntityCube {
             origin: [0.0, 0.0, 0.0],

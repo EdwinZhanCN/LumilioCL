@@ -33,7 +33,11 @@ pub fn export_usda(output: &MesherOutput) -> Result<UsdaExport> {
         .greedy_materials
         .iter()
         .any(|gm| !gm.opaque_mesh.is_empty() || !gm.transparent_mesh.is_empty());
-    if output.opaque_mesh.is_empty() && output.cutout_mesh.is_empty() && output.transparent_mesh.is_empty() && !has_greedy {
+    if output.opaque_mesh.is_empty()
+        && output.cutout_mesh.is_empty()
+        && output.transparent_mesh.is_empty()
+        && !has_greedy
+    {
         return Err(MesherError::Export("Cannot export empty mesh".to_string()));
     }
 
@@ -41,8 +45,14 @@ pub fn export_usda(output: &MesherOutput) -> Result<UsdaExport> {
 
     // Pre-size the output buffer: ~200 bytes per vertex (multiple arrays) + ~10 per index
     let vert_count = output.total_vertices();
-    let idx_count = output.opaque_mesh.indices.len() + output.cutout_mesh.indices.len() + output.transparent_mesh.indices.len()
-        + output.greedy_materials.iter().map(|gm| gm.opaque_mesh.indices.len() + gm.transparent_mesh.indices.len()).sum::<usize>();
+    let idx_count = output.opaque_mesh.indices.len()
+        + output.cutout_mesh.indices.len()
+        + output.transparent_mesh.indices.len()
+        + output
+            .greedy_materials
+            .iter()
+            .map(|gm| gm.opaque_mesh.indices.len() + gm.transparent_mesh.indices.len())
+            .sum::<usize>();
     let estimated_size = 2048 + vert_count * 200 + idx_count * 10;
     let mut usda = String::with_capacity(estimated_size);
 
@@ -57,7 +67,13 @@ pub fn export_usda(output: &MesherOutput) -> Result<UsdaExport> {
     writeln!(usda, "{{").unwrap();
 
     // Atlas materials
-    write_material(&mut usda, "atlas_opaque", "textures/atlas.png", "clamp", 1.0);
+    write_material(
+        &mut usda,
+        "atlas_opaque",
+        "textures/atlas.png",
+        "clamp",
+        1.0,
+    );
     write_material(
         &mut usda,
         "atlas_transparent",
@@ -95,10 +111,20 @@ pub fn export_usda(output: &MesherOutput) -> Result<UsdaExport> {
     // AoS Mesh, so convert at the boundary.
     use crate::mesh_output::layer_to_internal_mesh;
     if !output.opaque_mesh.is_empty() {
-        write_mesh_prim(&mut usda, "opaque", &layer_to_internal_mesh(&output.opaque_mesh), "atlas_opaque");
+        write_mesh_prim(
+            &mut usda,
+            "opaque",
+            &layer_to_internal_mesh(&output.opaque_mesh),
+            "atlas_opaque",
+        );
     }
     if !output.cutout_mesh.is_empty() {
-        write_mesh_prim(&mut usda, "cutout", &layer_to_internal_mesh(&output.cutout_mesh), "atlas_opaque");
+        write_mesh_prim(
+            &mut usda,
+            "cutout",
+            &layer_to_internal_mesh(&output.cutout_mesh),
+            "atlas_opaque",
+        );
     }
     if !output.transparent_mesh.is_empty() {
         write_mesh_prim(
@@ -222,35 +248,16 @@ fn write_material(usda: &mut String, name: &str, texture_path: &str, wrap: &str,
     // Texture
     writeln!(usda, "        def Shader \"diffuse\"").unwrap();
     writeln!(usda, "        {{").unwrap();
-    writeln!(
-        usda,
-        "            uniform token info:id = \"UsdUVTexture\""
-    )
-    .unwrap();
-    writeln!(
-        usda,
-        "            asset inputs:file = @{}@",
-        texture_path
-    )
-    .unwrap();
+    writeln!(usda, "            uniform token info:id = \"UsdUVTexture\"").unwrap();
+    writeln!(usda, "            asset inputs:file = @{}@", texture_path).unwrap();
     writeln!(
         usda,
         "            float2 inputs:st.connect = </Root/{}/st.outputs:result>",
         name
     )
     .unwrap();
-    writeln!(
-        usda,
-        "            token inputs:wrapS = \"{}\"",
-        wrap
-    )
-    .unwrap();
-    writeln!(
-        usda,
-        "            token inputs:wrapT = \"{}\"",
-        wrap
-    )
-    .unwrap();
+    writeln!(usda, "            token inputs:wrapS = \"{}\"", wrap).unwrap();
+    writeln!(usda, "            token inputs:wrapT = \"{}\"", wrap).unwrap();
     writeln!(usda, "            float3 outputs:rgb").unwrap();
     if opacity < 1.0 {
         writeln!(usda, "            float outputs:a").unwrap();
@@ -265,11 +272,7 @@ fn write_material(usda: &mut String, name: &str, texture_path: &str, wrap: &str,
         "            uniform token info:id = \"UsdPrimvarReader_float2\""
     )
     .unwrap();
-    writeln!(
-        usda,
-        "            string inputs:varname = \"st\""
-    )
-    .unwrap();
+    writeln!(usda, "            string inputs:varname = \"st\"").unwrap();
     writeln!(usda, "            float2 outputs:result").unwrap();
     writeln!(usda, "        }}").unwrap();
 
@@ -315,7 +318,12 @@ fn write_mesh_prim(usda: &mut String, name: &str, mesh: &Mesh, material: &str) {
     // Points
     write!(usda, "        point3f[] points = [").unwrap();
     write_array_inline(usda, &mesh.vertices, |v, s| {
-        write!(s, "({}, {}, {})", v.position[0], v.position[1], v.position[2]).unwrap();
+        write!(
+            s,
+            "({}, {}, {})",
+            v.position[0], v.position[1], v.position[2]
+        )
+        .unwrap();
     });
     writeln!(usda, "]").unwrap();
 
@@ -338,9 +346,10 @@ fn write_mesh_prim(usda: &mut String, name: &str, mesh: &Mesh, material: &str) {
     writeln!(usda, "        )").unwrap();
 
     // Vertex colors
-    let has_non_white = mesh.vertices.iter().any(|v| {
-        v.color[0] != 1.0 || v.color[1] != 1.0 || v.color[2] != 1.0 || v.color[3] != 1.0
-    });
+    let has_non_white = mesh
+        .vertices
+        .iter()
+        .any(|v| v.color[0] != 1.0 || v.color[1] != 1.0 || v.color[2] != 1.0 || v.color[3] != 1.0);
     if has_non_white {
         write!(usda, "        color3f[] primvars:displayColor = [").unwrap();
         write_array_inline(usda, &mesh.vertices, |v, s| {
@@ -363,12 +372,7 @@ fn write_mesh_prim(usda: &mut String, name: &str, mesh: &Mesh, material: &str) {
     }
 
     // Material binding
-    writeln!(
-        usda,
-        "        rel material:binding = </Root/{}>",
-        material
-    )
-    .unwrap();
+    writeln!(usda, "        rel material:binding = </Root/{}>", material).unwrap();
 
     writeln!(usda, "    }}\n").unwrap();
 }

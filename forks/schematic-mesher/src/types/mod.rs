@@ -3,7 +3,7 @@
 mod direction;
 mod transform;
 
-pub use direction::{Direction, Axis};
+pub use direction::{Axis, Direction};
 pub use transform::{BlockTransform, ElementRotation};
 
 use std::collections::HashMap;

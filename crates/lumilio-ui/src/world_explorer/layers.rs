@@ -92,6 +92,13 @@ impl MapView {
             .into_any_element()
     }
 
+    /// An enabled layer with its own zoom limit is hidden at this zoom.
+    fn fine_layer_hidden(&self) -> bool {
+        self.objects.active().any(|(_, layer)| {
+            layer.max_scale.is_some() && !super::objects::shown_at(layer, self.camera.scale)
+        })
+    }
+
     /// Plugin layers grouped under their titles, in the order the plugin lists
     /// them. A long group scrolls inside the panel rather than growing it.
     fn overlay_groups(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
@@ -204,6 +211,14 @@ impl MapView {
                             .text_xs()
                             .debug_selector(|| "map-structures-hint".into())
                             .child(tr!("map-structures-hidden")),
+                    )
+                })
+                .when(self.fine_layer_hidden(), |panel| {
+                    panel.child(
+                        div()
+                            .text_xs()
+                            .debug_selector(|| "map-fine-layers-hint".into())
+                            .child(tr!("map-fine-layers-hidden")),
                     )
                 })
                 .when(estimated, |panel| {

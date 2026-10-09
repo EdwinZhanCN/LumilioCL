@@ -9,6 +9,7 @@ use lumilio_plugin_api::{
     Permission, Plugin, PluginError, TabState, View, Words,
 };
 
+mod landmarks;
 mod structures;
 mod text;
 
@@ -48,17 +49,25 @@ impl Plugin for WorldExplorer {
 }
 impl OverlayProvider for WorldExplorer {
     fn overlays(&self) -> Vec<OverlayInfo> {
-        structures::catalog()
+        let mut layers = structures::catalog();
+        layers.extend(landmarks::catalog());
+        layers
     }
     fn overlays_for(&self, context: &WorldContext) -> Vec<OverlayInfo> {
-        structures::catalog_for(context)
+        let mut layers = structures::catalog_for(context);
+        layers.extend(landmarks::catalog_for(context));
+        layers
     }
     fn objects(
         &self,
         ctx: &dyn HostContext,
         request: &OverlayRequest,
     ) -> Result<Vec<MapObject>, PluginError> {
-        structures::objects(ctx, request)
+        if landmarks::is_landmark(&request.overlay) {
+            landmarks::objects(request)
+        } else {
+            structures::objects(ctx, request)
+        }
     }
 }
 impl InstanceTab for WorldExplorer {

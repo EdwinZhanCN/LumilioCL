@@ -146,7 +146,10 @@ pub fn build_animated_glb(
     for ev in &events {
         match ev {
             TimelineEvent::SetBlock {
-                tick, pos, block, props,
+                tick,
+                pos,
+                block,
+                props,
             } => {
                 let lp = [pos[0] - origin[0], pos[1] - origin[1], pos[2] - origin[2]];
                 if let Some(&until) = consumed.get(&lp) {
@@ -164,7 +167,10 @@ pub fn build_animated_glb(
                 state_stops.entry(lp).or_default().push((*tick, blk));
             }
             TimelineEvent::Piston {
-                tick, pos, action, dir,
+                tick,
+                pos,
+                action,
+                dir,
             } => {
                 let base = [pos[0] - origin[0], pos[1] - origin[1], pos[2] - origin[2]];
                 let off = dir.offset();
@@ -350,7 +356,8 @@ pub fn build_animated_glb(
             .collect();
         if !static_blocks.is_empty() {
             let bounds = bounds_of(static_blocks.iter().map(|(p, _)| *p));
-            let out = piece_mesher.mesh_blocks(static_blocks.iter().map(|(p, b)| (*p, b)), bounds)?;
+            let out =
+                piece_mesher.mesh_blocks(static_blocks.iter().map(|(p, b)| (*p, b)), bounds)?;
             pieces.push(AnimatedPiece {
                 mesh: out.mesh(),
                 scale_keys: None,

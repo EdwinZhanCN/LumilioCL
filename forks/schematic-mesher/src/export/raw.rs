@@ -46,12 +46,18 @@ pub fn export_raw(output: &MesherOutput) -> RawMeshData {
 impl RawMeshData {
     /// Get positions as a flat array.
     pub fn positions_flat(&self) -> Vec<f32> {
-        self.positions.iter().flat_map(|p| p.iter().copied()).collect()
+        self.positions
+            .iter()
+            .flat_map(|p| p.iter().copied())
+            .collect()
     }
 
     /// Get normals as a flat array.
     pub fn normals_flat(&self) -> Vec<f32> {
-        self.normals.iter().flat_map(|n| n.iter().copied()).collect()
+        self.normals
+            .iter()
+            .flat_map(|n| n.iter().copied())
+            .collect()
     }
 
     /// Get UVs as a flat array.

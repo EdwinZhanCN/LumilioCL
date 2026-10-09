@@ -42,20 +42,30 @@ pub fn emission_level(block: &InputBlock) -> u8 {
 
     match block_id {
         // Level 15
-        "beacon" | "conduit" | "end_gateway" | "end_portal" | "fire"
-        | "glowstone" | "jack_o_lantern" | "lava" | "lantern"
-        | "sea_lantern" | "shroomlight" | "respawn_anchor" => 15,
+        "beacon" | "conduit" | "end_gateway" | "end_portal" | "fire" | "glowstone"
+        | "jack_o_lantern" | "lava" | "lantern" | "sea_lantern" | "shroomlight"
+        | "respawn_anchor" => 15,
 
         // Lit variants
         "campfire" | "redstone_lamp" => {
-            if block.properties.get("lit").map(|v| v == "true").unwrap_or(false) {
+            if block
+                .properties
+                .get("lit")
+                .map(|v| v == "true")
+                .unwrap_or(false)
+            {
                 15
             } else {
                 0
             }
         }
         "furnace" | "blast_furnace" | "smoker" => {
-            if block.properties.get("lit").map(|v| v == "true").unwrap_or(false) {
+            if block
+                .properties
+                .get("lit")
+                .map(|v| v == "true")
+                .unwrap_or(false)
+            {
                 13
             } else {
                 0
@@ -73,7 +83,12 @@ pub fn emission_level(block: &InputBlock) -> u8 {
 
         // Level 10
         "soul_campfire" => {
-            if block.properties.get("lit").map(|v| v == "true").unwrap_or(false) {
+            if block
+                .properties
+                .get("lit")
+                .map(|v| v == "true")
+                .unwrap_or(false)
+            {
                 10
             } else {
                 0
@@ -106,14 +121,19 @@ pub fn emission_level(block: &InputBlock) -> u8 {
         "brewing_stand" | "brown_mushroom" | "sculk_shrieker" => 1,
 
         // Candles: 3 per candle when lit
-        "candle" | "white_candle" | "orange_candle" | "magenta_candle"
-        | "light_blue_candle" | "yellow_candle" | "lime_candle"
-        | "pink_candle" | "gray_candle" | "light_gray_candle"
-        | "cyan_candle" | "purple_candle" | "blue_candle"
-        | "brown_candle" | "green_candle" | "red_candle"
-        | "black_candle" => {
-            if block.properties.get("lit").map(|v| v == "true").unwrap_or(false) {
-                let count: u8 = block.properties.get("candles")
+        "candle" | "white_candle" | "orange_candle" | "magenta_candle" | "light_blue_candle"
+        | "yellow_candle" | "lime_candle" | "pink_candle" | "gray_candle" | "light_gray_candle"
+        | "cyan_candle" | "purple_candle" | "blue_candle" | "brown_candle" | "green_candle"
+        | "red_candle" | "black_candle" => {
+            if block
+                .properties
+                .get("lit")
+                .map(|v| v == "true")
+                .unwrap_or(false)
+            {
+                let count: u8 = block
+                    .properties
+                    .get("candles")
                     .and_then(|v| v.parse().ok())
                     .unwrap_or(1);
                 (3 * count).min(15)
@@ -124,7 +144,12 @@ pub fn emission_level(block: &InputBlock) -> u8 {
 
         // Redstone torch
         "redstone_torch" | "redstone_wall_torch" => {
-            if block.properties.get("lit").map(|v| v == "true").unwrap_or(true) {
+            if block
+                .properties
+                .get("lit")
+                .map(|v| v == "true")
+                .unwrap_or(true)
+            {
                 7
             } else {
                 0
@@ -133,10 +158,17 @@ pub fn emission_level(block: &InputBlock) -> u8 {
 
         // Sea pickle: 6 + 3*(count-1) when in water
         "sea_pickle" => {
-            let count: u8 = block.properties.get("pickles")
+            let count: u8 = block
+                .properties
+                .get("pickles")
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(1);
-            if block.properties.get("waterlogged").map(|v| v == "true").unwrap_or(false) {
+            if block
+                .properties
+                .get("waterlogged")
+                .map(|v| v == "true")
+                .unwrap_or(false)
+            {
                 (6 + 3 * (count - 1)).min(15)
             } else {
                 0
@@ -169,8 +201,12 @@ pub fn block_opacity(block: &InputBlock) -> u8 {
         "cobweb" => 1,
 
         // Non-solid blocks that don't block light much
-        "torch" | "wall_torch" | "soul_torch" | "soul_wall_torch"
-        | "redstone_torch" | "redstone_wall_torch" => 0,
+        "torch"
+        | "wall_torch"
+        | "soul_torch"
+        | "soul_wall_torch"
+        | "redstone_torch"
+        | "redstone_wall_torch" => 0,
         "lantern" | "soul_lantern" => 0,
         "fire" | "soul_fire" => 0,
         "sign" | "wall_sign" | "hanging_sign" | "wall_hanging_sign" => 0,
@@ -194,16 +230,14 @@ pub fn block_opacity(block: &InputBlock) -> u8 {
 
         // Flowers and plants
         _ if block_id.ends_with("_sapling") => 0,
-        "dandelion" | "poppy" | "blue_orchid" | "allium" | "azure_bluet"
-        | "red_tulip" | "orange_tulip" | "white_tulip" | "pink_tulip"
-        | "oxeye_daisy" | "cornflower" | "lily_of_the_valley" | "wither_rose"
-        | "torchflower" | "pink_petals" => 0,
-        "sunflower" | "lilac" | "rose_bush" | "peony" | "tall_grass"
-        | "large_fern" | "pitcher_plant" => 0,
+        "dandelion" | "poppy" | "blue_orchid" | "allium" | "azure_bluet" | "red_tulip"
+        | "orange_tulip" | "white_tulip" | "pink_tulip" | "oxeye_daisy" | "cornflower"
+        | "lily_of_the_valley" | "wither_rose" | "torchflower" | "pink_petals" => 0,
+        "sunflower" | "lilac" | "rose_bush" | "peony" | "tall_grass" | "large_fern"
+        | "pitcher_plant" => 0,
         "short_grass" | "fern" | "dead_bush" => 0,
         "brown_mushroom" | "red_mushroom" => 0,
-        "sugar_cane" | "bamboo" | "kelp" | "kelp_plant" | "seagrass"
-        | "tall_seagrass" => 0,
+        "sugar_cane" | "bamboo" | "kelp" | "kelp_plant" | "seagrass" | "tall_seagrass" => 0,
 
         // Leaves reduce light by 1
         _ if block_id.ends_with("_leaves") => 1,
@@ -238,10 +272,7 @@ pub struct LightMap {
 
 impl LightMap {
     /// Compute lighting for a set of blocks.
-    pub fn compute(
-        blocks: &[(BlockPosition, &InputBlock)],
-        config: &LightingConfig,
-    ) -> Self {
+    pub fn compute(blocks: &[(BlockPosition, &InputBlock)], config: &LightingConfig) -> Self {
         if blocks.is_empty() || !config.is_enabled() {
             return Self {
                 block_light: Vec::new(),
@@ -265,8 +296,12 @@ impl LightMap {
             max[2] = max[2].max(pos.z);
         }
         // Pad by 1 for face light sampling (sample at neighbor positions)
-        min[0] -= 1; min[1] -= 1; min[2] -= 1;
-        max[0] += 1; max[1] += 1; max[2] += 1;
+        min[0] -= 1;
+        min[1] -= 1;
+        min[2] -= 1;
+        max[0] += 1;
+        max[1] += 1;
+        max[2] += 1;
 
         let grid_size = [
             (max[0] - min[0] + 1) as usize,
@@ -392,7 +427,11 @@ impl LightMap {
 
     /// Convert a block position to a flat grid index.
     #[inline]
-    fn grid_index_static(pos: BlockPosition, grid_min: [i32; 3], grid_size: [usize; 3]) -> Option<usize> {
+    fn grid_index_static(
+        pos: BlockPosition,
+        grid_min: [i32; 3],
+        grid_size: [usize; 3],
+    ) -> Option<usize> {
         let x = pos.x - grid_min[0];
         let y = pos.y - grid_min[1];
         let z = pos.z - grid_min[2];
@@ -413,8 +452,10 @@ impl LightMap {
     #[inline]
     fn get_light(&self, pos: BlockPosition) -> (u8, u8) {
         if let Some(idx) = Self::grid_index_static(pos, self.grid_min, self.grid_size) {
-            (self.block_light.get(idx).copied().unwrap_or(0),
-             self.sky_light.get(idx).copied().unwrap_or(0))
+            (
+                self.block_light.get(idx).copied().unwrap_or(0),
+                self.sky_light.get(idx).copied().unwrap_or(0),
+            )
         } else {
             (0, 0)
         }
@@ -467,16 +508,13 @@ mod tests {
 
     #[test]
     fn test_emission_state_dependent() {
-        let lit_furnace = InputBlock::new("minecraft:furnace")
-            .with_property("lit", "true");
+        let lit_furnace = InputBlock::new("minecraft:furnace").with_property("lit", "true");
         assert_eq!(emission_level(&lit_furnace), 13);
 
-        let unlit_furnace = InputBlock::new("minecraft:furnace")
-            .with_property("lit", "false");
+        let unlit_furnace = InputBlock::new("minecraft:furnace").with_property("lit", "false");
         assert_eq!(emission_level(&unlit_furnace), 0);
 
-        let lit_lamp = InputBlock::new("minecraft:redstone_lamp")
-            .with_property("lit", "true");
+        let lit_lamp = InputBlock::new("minecraft:redstone_lamp").with_property("lit", "true");
         assert_eq!(emission_level(&lit_lamp), 15);
     }
 
@@ -552,8 +590,18 @@ mod tests {
         let (bl3, _) = light_map.get_light(BlockPosition::new(3, 0, 0));
 
         assert_eq!(bl0, 15);
-        assert!(bl1 > bl2, "Light should decrease with distance: {} > {}", bl1, bl2);
-        assert!(bl2 > bl3, "Light should decrease with distance: {} > {}", bl2, bl3);
+        assert!(
+            bl1 > bl2,
+            "Light should decrease with distance: {} > {}",
+            bl1,
+            bl2
+        );
+        assert!(
+            bl2 > bl3,
+            "Light should decrease with distance: {} > {}",
+            bl2,
+            bl3
+        );
     }
 
     #[test]
@@ -615,7 +663,12 @@ mod tests {
         assert_eq!(bl_torch, 14);
         // Light behind stone should be lower than the torch
         // (can still reach around stone in 3D but attenuated by extra distance)
-        assert!(bl_behind < bl_torch, "Light behind stone ({}) should be less than torch ({})", bl_behind, bl_torch);
+        assert!(
+            bl_behind < bl_torch,
+            "Light behind stone ({}) should be less than torch ({})",
+            bl_behind,
+            bl_torch
+        );
     }
 
     #[test]
@@ -662,6 +715,9 @@ mod tests {
 
         // Face facing east (toward the air block) should have brightness
         let brightness = light_map.face_brightness(BlockPosition::new(0, 0, 0), Direction::East);
-        assert!(brightness > 0.0, "Face toward lit neighbor should be bright");
+        assert!(
+            brightness > 0.0,
+            "Face toward lit neighbor should be bright"
+        );
     }
 }

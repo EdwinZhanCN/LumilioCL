@@ -660,6 +660,7 @@ fn village_layer() -> (String, OverlayInfo) {
             icon: Some(lumilio_plugin_api::map::MapIcon::Village),
             group_id: Some("map-group-structures".into()),
             approximate: false,
+            max_scale: None,
         },
     )
 }
@@ -1401,4 +1402,200 @@ fn the_gpui_canvas_is_the_default_backend_and_wgpu_is_opt_in() {
     assert_eq!(Backend::parse(Some("")), Backend::Canvas);
     assert_eq!(Backend::parse(Some("nonsense")), Backend::Canvas);
     assert_eq!(Backend::parse(Some("wgpu")), Backend::Wgpu);
+}
+
+fn slime_layer() -> (String, OverlayInfo) {
+    (
+        "test.seed".into(),
+        OverlayInfo {
+            id: "world.slime".into(),
+            kind_id: "map-world-slime".into(),
+            dimensions: vec![Dimension::Overworld],
+            icon: Some(lumilio_plugin_api::map::MapIcon::SlimeChunk),
+            group_id: Some("map-group-world".into()),
+            approximate: false,
+            max_scale: Some(1),
+        },
+    )
+}
+
+/// One heat object holding the slime chunks at chunk (0, 0) and (2, 1).
+fn slime_object() -> MapObject {
+    let mut object = icon_object(0., 0., -10);
+    object.id = "world.slime:0:0".into();
+    object.kind = MapObjectKind::Heat {
+        cell: 16.,
+        values: vec![
+            (lumilio_plugin_api::map::MapPoint { x: 0., z: 0. }, 1.),
+            (lumilio_plugin_api::map::MapPoint { x: 32., z: 16. }, 1.),
+        ],
+    };
+    object.color = Some([88, 214, 74]);
+    object
+}
+
+/// Answers every pending object request with `objects` for the cell holding
+/// the origin and nothing for the others.
+fn answer_objects(
+    view: &gpui::Entity<MapView>,
+    cx: &mut gpui::VisualTestContext,
+    commands: &async_channel::Receiver<Command>,
+    objects: Vec<MapObject>,
+) {
+    let mut requested = vec![];
+    while let Ok(command) = commands.try_recv() {
+        if let Command::Objects {
+            generation,
+            key,
+            request,
+            ..
+        } = command
+        {
+            requested.push((generation, key, request.bounds));
+        }
+    }
+    view.update(cx, |view, cx| {
+        for (generation, key, bounds) in requested {
+            let holds =
+                bounds.min.x <= 0. && 0. < bounds.max.x && bounds.min.z <= 0. && 0. < bounds.max.z;
+            view.event(
+                Event::Objects {
+                    generation,
+                    key,
+                    result: Ok(if holds { objects.clone() } else { vec![] }),
+                },
+                cx,
+            );
+        }
+    });
+    cx.run_until_parked();
+}
+
+#[gpui::test]
+fn area_layers_fill_their_cells_only_at_their_own_zoom(cx: &mut TestAppContext) {
+    let (view, cx, commands) = ready_view(cx);
+    cx.simulate_resize(gpui::size(px(800.), px(600.)));
+    cx.run_until_parked();
+    view.update(cx, |view, _| {
+        view.camera = Camera {
+            x: 0.,
+            z: 0.,
+            scale: 1.,
+        };
+        view.objects.layers = vec![slime_layer()];
+        view.objects.enabled = ["world.slime".to_owned()].into();
+        view.refresh();
+    });
+    answer_objects(&view, cx, &commands, vec![slime_object()]);
+    let (fills, size) = view.update(cx, |view, _| (view.fills(), view.size));
+    assert_eq!(fills.len(), 2);
+    let centre = [f64::from(size[0]) / 2., f64::from(size[1]) / 2.];
+    // At one block per pixel a chunk is 16 px; chunk (0, 0) starts at the centre.
+    assert_eq!(
+        fills[0].rect,
+        [centre[0], centre[1], centre[0] + 16., centre[1] + 16.]
+    );
+    assert_eq!(
+        fills[1].rect,
+        [
+            centre[0] + 32.,
+            centre[1] + 16.,
+            centre[0] + 48.,
+            centre[1] + 32.
+        ]
+    );
+    assert_eq!(fills[0].rgba[..3], [88, 214, 74]);
+    assert!(
+        fills[0].rgba[3] > 0 && fills[0].rgba[3] < 255,
+        "translucent"
+    );
+    assert!(cx.debug_bounds("map-fine-layers-hint").is_none());
+    // Zoomed out one step the layer is not asked for, not drawn, and says why.
+    view.update(cx, |view, cx| {
+        view.camera.scale = 4.;
+        view.refresh();
+        cx.notify();
+    });
+    cx.run_until_parked();
+    assert!(view.update(cx, |view, _| view.fills()).is_empty());
+    while let Ok(command) = commands.try_recv() {
+        assert!(
+            !matches!(command, Command::Objects { .. }),
+            "no object requests while the layer is hidden"
+        );
+    }
+    click(cx, "map-layers");
+    assert!(cx.debug_bounds("map-fine-layers-hint").is_some());
+}
+
+#[gpui::test]
+fn clicking_an_icon_selects_it_and_copies_its_coordinates(cx: &mut TestAppContext) {
+    let (view, cx, commands) = ready_view(cx);
+    cx.simulate_resize(gpui::size(px(800.), px(600.)));
+    cx.run_until_parked();
+    view.update(cx, |view, _| {
+        view.camera = Camera {
+            x: 0.,
+            z: 0.,
+            scale: 1.,
+        };
+        view.objects.layers = vec![village_layer()];
+        view.refresh();
+    });
+    let mut village = icon_object(0., 0., 0);
+    village.approximate = true;
+    answer_objects(&view, cx, &commands, vec![village]);
+    let map = cx.debug_bounds("world-map").unwrap();
+    let on_icon = view.update(cx, |view, _| {
+        let origin = view.bounds.unwrap().origin;
+        origin + point(px(view.size[0] as f32 / 2.), px(view.size[1] as f32 / 2.))
+    });
+    // A press that drags away is a pan, not a pick.
+    cx.simulate_mouse_down(on_icon, MouseButton::Left, Modifiers::none());
+    cx.simulate_mouse_move(
+        on_icon + point(px(30.), px(0.)),
+        MouseButton::Left,
+        Modifiers::none(),
+    );
+    cx.simulate_mouse_up(
+        on_icon + point(px(30.), px(0.)),
+        MouseButton::Left,
+        Modifiers::none(),
+    );
+    view.read_with(cx, |view, _| assert!(view.selected.is_none()));
+    view.update(cx, |view, _| {
+        view.camera.x = 0.;
+        view.refresh();
+    });
+    cx.simulate_click(on_icon, Modifiers::none());
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        let picked = view.selected.as_ref().expect("the icon is selected");
+        assert_eq!(picked.id, "structure.village:0:0");
+    });
+    assert!(cx.debug_bounds("map-selection").is_some());
+    assert!(cx.debug_bounds("map-selection-coordinates").is_some());
+    assert!(
+        view.update(cx, |view, _| view.selection_fill()).is_some(),
+        "a highlight is drawn under the icon"
+    );
+    click(cx, "map-copy-coordinates");
+    assert_eq!(
+        cx.read_from_clipboard().and_then(|item| item.text()),
+        Some("0 0".to_owned())
+    );
+    // A click on empty map clears the selection; so does the close key.
+    cx.simulate_click(map.origin + point(px(300.), px(200.)), Modifiers::none());
+    view.read_with(cx, |view, _| assert!(view.selected.is_none()));
+    assert!(cx.debug_bounds("map-selection").is_none());
+    cx.simulate_click(on_icon, Modifiers::none());
+    click(cx, "map-selection-close");
+    view.read_with(cx, |view, _| assert!(view.selected.is_none()));
+}
+
+#[test]
+fn copied_coordinates_are_whole_blocks_x_then_z() {
+    use lumilio_plugin_api::map::MapPoint;
+    assert_eq!(select::coordinates(MapPoint { x: 12., z: -34. }), "12 -34");
+    assert_eq!(select::coordinates(MapPoint { x: -0.4, z: 7.6 }), "0 8");
 }

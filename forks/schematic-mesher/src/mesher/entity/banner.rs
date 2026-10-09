@@ -183,9 +183,12 @@ fn apply_pattern_mask(
 
             let out_a = mask_a + dst_a * (1.0 - mask_a);
             if out_a > 0.0 {
-                pixels[dst_idx] = ((src_r * mask_a + dst_r * dst_a * (1.0 - mask_a)) / out_a).min(255.0) as u8;
-                pixels[dst_idx + 1] = ((src_g * mask_a + dst_g * dst_a * (1.0 - mask_a)) / out_a).min(255.0) as u8;
-                pixels[dst_idx + 2] = ((src_b * mask_a + dst_b * dst_a * (1.0 - mask_a)) / out_a).min(255.0) as u8;
+                pixels[dst_idx] =
+                    ((src_r * mask_a + dst_r * dst_a * (1.0 - mask_a)) / out_a).min(255.0) as u8;
+                pixels[dst_idx + 1] =
+                    ((src_g * mask_a + dst_g * dst_a * (1.0 - mask_a)) / out_a).min(255.0) as u8;
+                pixels[dst_idx + 2] =
+                    ((src_b * mask_a + dst_b * dst_a * (1.0 - mask_a)) / out_a).min(255.0) as u8;
                 pixels[dst_idx + 3] = (out_a * 255.0).min(255.0) as u8;
             }
         }

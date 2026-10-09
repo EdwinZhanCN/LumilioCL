@@ -59,10 +59,15 @@ pub fn export_glb(output: &MesherOutput) -> Result<Vec<u8>> {
     let transparent_mesh = &output.transparent_mesh;
     let atlas = &output.atlas;
     // Check if all meshes are empty
-    let has_greedy = output.greedy_materials.iter().any(|gm| {
-        !gm.opaque_mesh.is_empty() || !gm.transparent_mesh.is_empty()
-    });
-    if opaque_mesh.is_empty() && cutout_mesh.is_empty() && transparent_mesh.is_empty() && !has_greedy {
+    let has_greedy = output
+        .greedy_materials
+        .iter()
+        .any(|gm| !gm.opaque_mesh.is_empty() || !gm.transparent_mesh.is_empty());
+    if opaque_mesh.is_empty()
+        && cutout_mesh.is_empty()
+        && transparent_mesh.is_empty()
+        && !has_greedy
+    {
         return Err(MesherError::Export("Cannot export empty mesh".to_string()));
     }
 
@@ -270,20 +275,45 @@ pub fn export_glb(output: &MesherOutput) -> Result<Vec<u8>> {
         let accessor_start = accessors.len() as u32;
 
         // 5 buffer views: positions, normals, uvs, colors, indices
-        buffer_views.push(create_buffer_view(offsets.pos_offset, offsets.pos_bytes, Some(json::buffer::Target::ArrayBuffer)));
-        let pos_view = *buffer_view_idx; *buffer_view_idx += 1;
+        buffer_views.push(create_buffer_view(
+            offsets.pos_offset,
+            offsets.pos_bytes,
+            Some(json::buffer::Target::ArrayBuffer),
+        ));
+        let pos_view = *buffer_view_idx;
+        *buffer_view_idx += 1;
 
-        buffer_views.push(create_buffer_view(offsets.norm_offset, offsets.norm_bytes, Some(json::buffer::Target::ArrayBuffer)));
-        let norm_view = *buffer_view_idx; *buffer_view_idx += 1;
+        buffer_views.push(create_buffer_view(
+            offsets.norm_offset,
+            offsets.norm_bytes,
+            Some(json::buffer::Target::ArrayBuffer),
+        ));
+        let norm_view = *buffer_view_idx;
+        *buffer_view_idx += 1;
 
-        buffer_views.push(create_buffer_view(offsets.uv_offset, offsets.uv_bytes, Some(json::buffer::Target::ArrayBuffer)));
-        let uv_view = *buffer_view_idx; *buffer_view_idx += 1;
+        buffer_views.push(create_buffer_view(
+            offsets.uv_offset,
+            offsets.uv_bytes,
+            Some(json::buffer::Target::ArrayBuffer),
+        ));
+        let uv_view = *buffer_view_idx;
+        *buffer_view_idx += 1;
 
-        buffer_views.push(create_buffer_view(offsets.color_offset, offsets.color_bytes, Some(json::buffer::Target::ArrayBuffer)));
-        let color_view = *buffer_view_idx; *buffer_view_idx += 1;
+        buffer_views.push(create_buffer_view(
+            offsets.color_offset,
+            offsets.color_bytes,
+            Some(json::buffer::Target::ArrayBuffer),
+        ));
+        let color_view = *buffer_view_idx;
+        *buffer_view_idx += 1;
 
-        buffer_views.push(create_buffer_view(offsets.idx_offset, offsets.idx_bytes, Some(json::buffer::Target::ElementArrayBuffer)));
-        let idx_view = *buffer_view_idx; *buffer_view_idx += 1;
+        buffer_views.push(create_buffer_view(
+            offsets.idx_offset,
+            offsets.idx_bytes,
+            Some(json::buffer::Target::ElementArrayBuffer),
+        ));
+        let idx_view = *buffer_view_idx;
+        *buffer_view_idx += 1;
 
         // Position accessor: i16, not normalized, with integer min/max
         accessors.push(create_accessor(
@@ -353,15 +383,25 @@ pub fn export_glb(output: &MesherOutput) -> Result<Vec<u8>> {
             None,
         ));
 
-        primitives.push(create_primitive(accessor_start, accessor_start + 4, material_idx));
+        primitives.push(create_primitive(
+            accessor_start,
+            accessor_start + 4,
+            material_idx,
+        ));
     }
 
     // Material 0: Atlas opaque
-    materials.push(create_material_with_texture(json::material::AlphaMode::Opaque, 0));
+    materials.push(create_material_with_texture(
+        json::material::AlphaMode::Opaque,
+        0,
+    ));
     // Material 1: Atlas cutout (alpha-tested, writes depth — fire, flowers, leaves)
     materials.push(create_material_with_alpha_cutoff(0, 0.5));
     // Material 2: Atlas transparent (alpha-blended — water, ice, stained glass)
-    materials.push(create_material_with_texture(json::material::AlphaMode::Blend, 0));
+    materials.push(create_material_with_texture(
+        json::material::AlphaMode::Blend,
+        0,
+    ));
 
     // Atlas texture image and glTF texture
     buffer_views.push(json::buffer::View {
@@ -392,13 +432,34 @@ pub fn export_glb(output: &MesherOutput) -> Result<Vec<u8>> {
 
     // Add atlas-based primitives
     if let Some(ref offsets) = opaque_offsets {
-        add_mesh_primitive(offsets, 0, &mut buffer_views, &mut accessors, &mut primitives, &mut buffer_view_idx);
+        add_mesh_primitive(
+            offsets,
+            0,
+            &mut buffer_views,
+            &mut accessors,
+            &mut primitives,
+            &mut buffer_view_idx,
+        );
     }
     if let Some(ref offsets) = cutout_offsets {
-        add_mesh_primitive(offsets, 1, &mut buffer_views, &mut accessors, &mut primitives, &mut buffer_view_idx);
+        add_mesh_primitive(
+            offsets,
+            1,
+            &mut buffer_views,
+            &mut accessors,
+            &mut primitives,
+            &mut buffer_view_idx,
+        );
     }
     if let Some(ref offsets) = transparent_offsets {
-        add_mesh_primitive(offsets, 2, &mut buffer_views, &mut accessors, &mut primitives, &mut buffer_view_idx);
+        add_mesh_primitive(
+            offsets,
+            2,
+            &mut buffer_views,
+            &mut accessors,
+            &mut primitives,
+            &mut buffer_view_idx,
+        );
     }
 
     // Add greedy material images, textures, materials, and primitives
@@ -440,19 +501,39 @@ pub fn export_glb(output: &MesherOutput) -> Result<Vec<u8>> {
 
         // Opaque material for this greedy texture
         let opaque_mat_idx = materials.len() as u32;
-        materials.push(create_material_with_texture(json::material::AlphaMode::Opaque, texture_idx));
+        materials.push(create_material_with_texture(
+            json::material::AlphaMode::Opaque,
+            texture_idx,
+        ));
 
         // Transparent material for this greedy texture
         let transparent_mat_idx = materials.len() as u32;
-        materials.push(create_material_with_texture(json::material::AlphaMode::Blend, texture_idx));
+        materials.push(create_material_with_texture(
+            json::material::AlphaMode::Blend,
+            texture_idx,
+        ));
 
         let (ref opaque_off, ref transparent_off) = greedy_mesh_offsets[i];
 
         if let Some(ref offsets) = opaque_off {
-            add_mesh_primitive(offsets, opaque_mat_idx, &mut buffer_views, &mut accessors, &mut primitives, &mut buffer_view_idx);
+            add_mesh_primitive(
+                offsets,
+                opaque_mat_idx,
+                &mut buffer_views,
+                &mut accessors,
+                &mut primitives,
+                &mut buffer_view_idx,
+            );
         }
         if let Some(ref offsets) = transparent_off {
-            add_mesh_primitive(offsets, transparent_mat_idx, &mut buffer_views, &mut accessors, &mut primitives, &mut buffer_view_idx);
+            add_mesh_primitive(
+                offsets,
+                transparent_mat_idx,
+                &mut buffer_views,
+                &mut accessors,
+                &mut primitives,
+                &mut buffer_view_idx,
+            );
         }
     }
 
@@ -490,24 +571,53 @@ pub fn export_glb(output: &MesherOutput) -> Result<Vec<u8>> {
 
     // Build scene extras with animation metadata
     let scene_extras: json::Extras = if !output.animated_textures.is_empty() {
-        let anim_entries: Vec<serde_json::Value> = output.animated_textures.iter().enumerate().map(|(i, at)| {
-            let mut entry = serde_json::Map::new();
-            entry.insert("imageIndex".into(), serde_json::Value::from(anim_texture_indices[i] as u64));
-            entry.insert("frameCount".into(), serde_json::Value::from(at.frame_count as u64));
-            entry.insert("frametime".into(), serde_json::Value::from(at.frametime as u64));
-            entry.insert("interpolate".into(), serde_json::Value::from(at.interpolate));
-            entry.insert("frameWidth".into(), serde_json::Value::from(at.frame_width as u64));
-            entry.insert("frameHeight".into(), serde_json::Value::from(at.frame_height as u64));
-            entry.insert("atlasX".into(), serde_json::Value::from(at.atlas_x as u64));
-            entry.insert("atlasY".into(), serde_json::Value::from(at.atlas_y as u64));
-            if let Some(ref frames) = at.frames {
-                let frame_values: Vec<serde_json::Value> = frames.iter().map(|&f| serde_json::Value::from(f as u64)).collect();
-                entry.insert("frames".into(), serde_json::Value::from(frame_values));
-            }
-            serde_json::Value::from(entry)
-        }).collect();
+        let anim_entries: Vec<serde_json::Value> = output
+            .animated_textures
+            .iter()
+            .enumerate()
+            .map(|(i, at)| {
+                let mut entry = serde_json::Map::new();
+                entry.insert(
+                    "imageIndex".into(),
+                    serde_json::Value::from(anim_texture_indices[i] as u64),
+                );
+                entry.insert(
+                    "frameCount".into(),
+                    serde_json::Value::from(at.frame_count as u64),
+                );
+                entry.insert(
+                    "frametime".into(),
+                    serde_json::Value::from(at.frametime as u64),
+                );
+                entry.insert(
+                    "interpolate".into(),
+                    serde_json::Value::from(at.interpolate),
+                );
+                entry.insert(
+                    "frameWidth".into(),
+                    serde_json::Value::from(at.frame_width as u64),
+                );
+                entry.insert(
+                    "frameHeight".into(),
+                    serde_json::Value::from(at.frame_height as u64),
+                );
+                entry.insert("atlasX".into(), serde_json::Value::from(at.atlas_x as u64));
+                entry.insert("atlasY".into(), serde_json::Value::from(at.atlas_y as u64));
+                if let Some(ref frames) = at.frames {
+                    let frame_values: Vec<serde_json::Value> = frames
+                        .iter()
+                        .map(|&f| serde_json::Value::from(f as u64))
+                        .collect();
+                    entry.insert("frames".into(), serde_json::Value::from(frame_values));
+                }
+                serde_json::Value::from(entry)
+            })
+            .collect();
         let mut extras_obj = serde_json::Map::new();
-        extras_obj.insert("animatedTextures".into(), serde_json::Value::from(anim_entries));
+        extras_obj.insert(
+            "animatedTextures".into(),
+            serde_json::Value::from(anim_entries),
+        );
         let json_str = serde_json::to_string(&extras_obj).unwrap_or_default();
         serde_json::value::RawValue::from_string(json_str).ok()
     } else {
@@ -752,7 +862,10 @@ fn create_material_with_alpha_cutoff(texture_idx: u32, cutoff: f32) -> json::Mat
 }
 
 /// Create a material with the specified alpha mode and texture index.
-fn create_material_with_texture(alpha_mode: json::material::AlphaMode, texture_idx: u32) -> json::Material {
+fn create_material_with_texture(
+    alpha_mode: json::material::AlphaMode,
+    texture_idx: u32,
+) -> json::Material {
     // Opaque materials use backface culling; transparent/blended materials are double-sided
     // (cross-model plants, etc. need both sides visible)
     let double_sided = matches!(alpha_mode, json::material::AlphaMode::Blend);
@@ -891,9 +1004,15 @@ mod tests {
 
     #[test]
     fn test_quantize_color() {
-        assert_eq!(super::quantize_color([1.0, 1.0, 1.0, 1.0]), [255, 255, 255, 255]);
+        assert_eq!(
+            super::quantize_color([1.0, 1.0, 1.0, 1.0]),
+            [255, 255, 255, 255]
+        );
         assert_eq!(super::quantize_color([0.0, 0.0, 0.0, 0.0]), [0, 0, 0, 0]);
-        assert_eq!(super::quantize_color([0.5, 0.5, 0.5, 1.0]), [128, 128, 128, 255]);
+        assert_eq!(
+            super::quantize_color([0.5, 0.5, 0.5, 1.0]),
+            [128, 128, 128, 255]
+        );
     }
 
     #[test]
@@ -917,9 +1036,14 @@ mod tests {
         let glb = export_glb(&output).unwrap();
         // Parse the JSON to verify u16 indices
         let json_chunk_len = u32::from_le_bytes([glb[12], glb[13], glb[14], glb[15]]) as usize;
-        let json_str = std::str::from_utf8(&glb[20..20 + json_chunk_len]).unwrap().trim();
+        let json_str = std::str::from_utf8(&glb[20..20 + json_chunk_len])
+            .unwrap()
+            .trim();
         // Should contain UNSIGNED_SHORT (5123) for indices, not UNSIGNED_INT (5125)
-        assert!(json_str.contains("5123"), "Expected u16 indices (5123) in JSON");
+        assert!(
+            json_str.contains("5123"),
+            "Expected u16 indices (5123) in JSON"
+        );
     }
 
     #[test]
@@ -929,7 +1053,11 @@ mod tests {
         for i in 0..100 {
             let x = i as f32;
             let v0 = mesh.add_vertex(Vertex::new([x, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0]));
-            let v1 = mesh.add_vertex(Vertex::new([x + 1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.0, 0.0]));
+            let v1 = mesh.add_vertex(Vertex::new(
+                [x + 1.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+                [1.0, 0.0],
+            ));
             let v2 = mesh.add_vertex(Vertex::new([x, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0]));
             mesh.add_triangle(v0, v1, v2);
         }
@@ -948,6 +1076,10 @@ mod tests {
         // 300 vertices × 48 bytes old = 14400 bytes for vertex data alone
         // 300 vertices × 21 bytes new = 6300 bytes + alignment padding
         // Total GLB includes JSON + textures, so just verify it's reasonably sized
-        assert!(glb.len() < 14400, "Quantized GLB ({}) should be smaller than old vertex data alone (14400)", glb.len());
+        assert!(
+            glb.len() < 14400,
+            "Quantized GLB ({}) should be smaller than old vertex data alone (14400)",
+            glb.len()
+        );
     }
 }

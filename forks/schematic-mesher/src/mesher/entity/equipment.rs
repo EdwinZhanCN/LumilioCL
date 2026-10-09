@@ -26,7 +26,11 @@ pub(crate) fn overlays_for(
 ) -> Vec<EquipmentOverlay> {
     let mut out = Vec::new();
 
-    let saddled = block.properties.get("saddle").map(|v| v == "true").unwrap_or(false)
+    let saddled = block
+        .properties
+        .get("saddle")
+        .map(|v| v == "true")
+        .unwrap_or(false)
         || block.properties.contains_key("rider");
 
     match mob_type {

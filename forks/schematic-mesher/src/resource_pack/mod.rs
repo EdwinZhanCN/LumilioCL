@@ -3,14 +3,14 @@
 //! This module handles loading Minecraft resource packs (ZIP files or directories)
 //! and parsing their contents including blockstates, models, and textures.
 
-pub mod loader;
 pub mod blockstate;
+pub mod loader;
 pub mod model;
 pub mod texture;
 
 pub use blockstate::{BlockstateDefinition, ModelVariant, MultipartCase, MultipartCondition};
 pub use model::{BlockModel, ModelElement, ModelFace};
-pub use texture::{TextureData, AnimationMeta, AnimFrame};
+pub use texture::{AnimFrame, AnimationMeta, TextureData};
 
 use std::collections::HashMap;
 
@@ -38,9 +38,7 @@ impl ResourcePack {
     /// Get a blockstate definition by full resource location (e.g., "minecraft:stone").
     pub fn get_blockstate(&self, resource_location: &str) -> Option<&BlockstateDefinition> {
         let (namespace, path) = parse_resource_location(resource_location);
-        self.blockstates
-            .get(namespace)
-            .and_then(|ns| ns.get(path))
+        self.blockstates.get(namespace).and_then(|ns| ns.get(path))
     }
 
     /// Get a model by full resource location (e.g., "minecraft:block/stone").
@@ -101,7 +99,9 @@ impl ResourcePack {
 
     /// Get all namespaces in the resource pack.
     pub fn namespaces(&self) -> Vec<&str> {
-        let mut namespaces: Vec<_> = self.blockstates.keys()
+        let mut namespaces: Vec<_> = self
+            .blockstates
+            .keys()
             .chain(self.models.keys())
             .chain(self.textures.keys())
             .map(|s| s.as_str())
@@ -117,7 +117,11 @@ impl ResourcePack {
     /// as-is. Mirrors Minecraft's resource-pack priority model where packs
     /// loaded later override packs loaded earlier.
     pub fn overlay(&mut self, higher: ResourcePack) {
-        let ResourcePack { blockstates, models, textures } = higher;
+        let ResourcePack {
+            blockstates,
+            models,
+            textures,
+        } = higher;
 
         for (ns, entries) in blockstates {
             self.blockstates.entry(ns).or_default().extend(entries);
@@ -177,7 +181,11 @@ mod tests {
     #[test]
     fn overlay_empty_onto_pack_is_identity() {
         let mut base = ResourcePack::new();
-        base.add_texture("minecraft", "block/stone", solid_color_texture(10, 20, 30, 255));
+        base.add_texture(
+            "minecraft",
+            "block/stone",
+            solid_color_texture(10, 20, 30, 255),
+        );
         base.add_model("minecraft", "block/stone", empty_model());
         base.add_blockstate("minecraft", "stone", empty_blockstate());
 
@@ -194,7 +202,11 @@ mod tests {
     fn overlay_pack_onto_empty_copies_content() {
         let mut base = ResourcePack::new();
         let mut higher = ResourcePack::new();
-        higher.add_texture("minecraft", "block/stone", solid_color_texture(5, 6, 7, 255));
+        higher.add_texture(
+            "minecraft",
+            "block/stone",
+            solid_color_texture(5, 6, 7, 255),
+        );
 
         base.overlay(higher);
         assert_eq!(base.texture_count(), 1);
@@ -207,10 +219,18 @@ mod tests {
     #[test]
     fn overlay_higher_pack_wins_on_collision() {
         let mut base = ResourcePack::new();
-        base.add_texture("minecraft", "block/stone", solid_color_texture(10, 20, 30, 255));
+        base.add_texture(
+            "minecraft",
+            "block/stone",
+            solid_color_texture(10, 20, 30, 255),
+        );
 
         let mut higher = ResourcePack::new();
-        higher.add_texture("minecraft", "block/stone", solid_color_texture(250, 0, 0, 255));
+        higher.add_texture(
+            "minecraft",
+            "block/stone",
+            solid_color_texture(250, 0, 0, 255),
+        );
 
         base.overlay(higher);
         assert_eq!(base.texture_count(), 1);
@@ -223,10 +243,18 @@ mod tests {
     #[test]
     fn overlay_preserves_non_colliding_entries() {
         let mut base = ResourcePack::new();
-        base.add_texture("minecraft", "block/stone", solid_color_texture(10, 10, 10, 255));
+        base.add_texture(
+            "minecraft",
+            "block/stone",
+            solid_color_texture(10, 10, 10, 255),
+        );
 
         let mut higher = ResourcePack::new();
-        higher.add_texture("minecraft", "block/dirt", solid_color_texture(120, 72, 0, 255));
+        higher.add_texture(
+            "minecraft",
+            "block/dirt",
+            solid_color_texture(120, 72, 0, 255),
+        );
         higher.add_texture("mymod", "block/custom", solid_color_texture(1, 2, 3, 255));
 
         base.overlay(higher);
@@ -241,7 +269,11 @@ mod tests {
         let mut base = ResourcePack::new();
         base.add_blockstate("minecraft", "stone", empty_blockstate());
         base.add_model("minecraft", "block/stone", empty_model());
-        base.add_texture("minecraft", "block/stone", solid_color_texture(1, 1, 1, 255));
+        base.add_texture(
+            "minecraft",
+            "block/stone",
+            solid_color_texture(1, 1, 1, 255),
+        );
 
         let mut higher = ResourcePack::new();
         higher.add_blockstate("minecraft", "dirt", empty_blockstate());
@@ -259,13 +291,25 @@ mod tests {
         // Simulate layered loading manually (without hitting the filesystem):
         // the deterministic test is that overlay is applied in iteration order.
         let mut low = ResourcePack::new();
-        low.add_texture("minecraft", "block/stone", solid_color_texture(10, 10, 10, 255));
+        low.add_texture(
+            "minecraft",
+            "block/stone",
+            solid_color_texture(10, 10, 10, 255),
+        );
 
         let mut mid = ResourcePack::new();
-        mid.add_texture("minecraft", "block/stone", solid_color_texture(20, 20, 20, 255));
+        mid.add_texture(
+            "minecraft",
+            "block/stone",
+            solid_color_texture(20, 20, 20, 255),
+        );
 
         let mut high = ResourcePack::new();
-        high.add_texture("minecraft", "block/stone", solid_color_texture(30, 30, 30, 255));
+        high.add_texture(
+            "minecraft",
+            "block/stone",
+            solid_color_texture(30, 30, 30, 255),
+        );
 
         let mut merged = ResourcePack::new();
         for pack in [low, mid, high] {

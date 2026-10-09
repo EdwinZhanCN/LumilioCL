@@ -162,6 +162,7 @@ fn structure_layers_follow_the_worlds_version_and_dimension() {
                 &overlay_request("", Dimension::Overworld, version, [0., 0., 1., 1.]).context,
             )
             .into_iter()
+            .filter(|layer| layer.id.starts_with("structure."))
             .map(|layer| (layer.id, layer.approximate))
             .collect()
     };
@@ -190,7 +191,8 @@ fn structure_layers_follow_the_worlds_version_and_dimension() {
             )
             .is_empty()
     );
-    assert_eq!(WorldExplorer.overlays().len(), 18);
+    // 18 structure layers plus the spawn and slime-chunk layers.
+    assert_eq!(WorldExplorer.overlays().len(), 20);
 }
 
 #[test]
@@ -314,4 +316,94 @@ fn structure_objects_reject_bad_bounds_and_stop_when_cancelled() {
         ),
         Err(PluginError::Unavailable("map-version-unsupported".into()))
     );
+}
+
+#[test]
+fn landmark_layers_are_overworld_only_and_slime_is_a_fine_zoom_layer() {
+    let overworld = overlay_request("world.spawn", Dimension::Overworld, "1.21.4", [0.; 4]).context;
+    let layers = WorldExplorer.overlays_for(&overworld);
+    let ids: Vec<&str> = layers
+        .iter()
+        .filter(|layer| layer.group_id.as_deref() == Some(landmarks::GROUP))
+        .map(|layer| layer.id.as_str())
+        .collect();
+    assert_eq!(ids, ["world.spawn", "world.slime"]);
+    let slime = layers
+        .iter()
+        .find(|layer| layer.id == "world.slime")
+        .unwrap();
+    assert_eq!(slime.max_scale, Some(1));
+    let spawn = |version: &str| {
+        let context =
+            overlay_request("world.spawn", Dimension::Overworld, version, [0.; 4]).context;
+        WorldExplorer
+            .overlays_for(&context)
+            .into_iter()
+            .find(|layer| layer.id == "world.spawn")
+            .unwrap()
+            .approximate
+    };
+    assert!(spawn("1.16.5"), "before 1.18 the spawn is an estimate");
+    assert!(!spawn("1.21.4"));
+    let mut nether = overworld;
+    nether.dimension = Dimension::Nether;
+    assert!(
+        WorldExplorer
+            .overlays_for(&nether)
+            .iter()
+            .all(|layer| layer.group_id.as_deref() != Some(landmarks::GROUP))
+    );
+}
+
+#[test]
+fn spawn_and_slime_objects_match_cubiomes() {
+    let context = Context { cancelled: false };
+    let spawn =
+        lumilio_cubiomes::spawn(lumilio_cubiomes::Version::from_name("1.21.4").unwrap(), 262);
+    let around = |overlay: &str, area: [f64; 4]| {
+        WorldExplorer
+            .objects(
+                &context,
+                &overlay_request(overlay, Dimension::Overworld, "1.21.4", area),
+            )
+            .unwrap()
+    };
+    let (x, z) = (f64::from(spawn.at[0]), f64::from(spawn.at[1]));
+    let found = around("world.spawn", [x - 10., z - 10., x + 10., z + 10.]);
+    assert_eq!(spots(&found), [spawn.at]);
+    assert!(!found[0].approximate);
+    assert!(around("world.spawn", [x + 20., z + 20., x + 40., z + 40.]).is_empty());
+
+    // 256x256 chunks: the one Heat object lists exactly cubiomes' slime chunks.
+    let found = around("world.slime", [-2048., -2048., 2048., 2048.]);
+    let [slime] = found.as_slice() else {
+        panic!("one object per request, got {}", found.len());
+    };
+    let lumilio_plugin_api::map::MapObjectKind::Heat { cell, values } = &slime.kind else {
+        panic!("slime chunks are heat cells");
+    };
+    assert_eq!(*cell, 16.);
+    let flags = lumilio_cubiomes::slime_chunks(262, -128, -128, 256, 256).unwrap();
+    assert_eq!(values.len(), flags.iter().filter(|slime| **slime).count());
+    for (at, _) in values {
+        assert_eq!(at.x % 16., 0.);
+        let (cx, cz) = ((at.x / 16.) as i32 + 128, (at.z / 16.) as i32 + 128);
+        assert!(flags[(cz * 256 + cx) as usize], "chunk {cx},{cz}");
+    }
+    assert!(!values.is_empty());
+    // Not a slime layer in the Nether, and a bad box is refused.
+    let nether = overlay_request(
+        "world.slime",
+        Dimension::Nether,
+        "1.21.4",
+        [0., 0., 64., 64.],
+    );
+    assert!(WorldExplorer.objects(&context, &nether).unwrap().is_empty());
+    let bad = overlay_request(
+        "world.slime",
+        Dimension::Overworld,
+        "1.21.4",
+        [0., 0., 0., 64.],
+    );
+    assert!(WorldExplorer.objects(&context, &bad).is_err());
 }

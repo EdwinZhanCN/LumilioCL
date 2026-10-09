@@ -185,8 +185,14 @@ pub(super) fn wolf_model() -> EntityModelDef {
             ..Default::default()
         },
         children: vec![
-            head, body, upper_body, tail,
-            right_hind_leg, left_hind_leg, right_front_leg, left_front_leg,
+            head,
+            body,
+            upper_body,
+            tail,
+            right_hind_leg,
+            left_hind_leg,
+            right_front_leg,
+            left_front_leg,
         ],
     };
 

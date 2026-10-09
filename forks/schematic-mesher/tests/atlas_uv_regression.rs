@@ -20,8 +20,9 @@
 use std::collections::HashMap;
 
 use schematic_mesher::{
-    load_resource_pack, Mesher, MesherConfig, TintProvider,
+    load_resource_pack,
     types::{BlockPosition, BlockSource, BoundingBox, InputBlock},
+    Mesher, MesherConfig, TintProvider,
 };
 
 struct Scene {
@@ -45,7 +46,8 @@ impl Scene {
         self.bounds.max[2] = self.bounds.max[2].max(z as f32 + 1.0);
     }
     fn set(&mut self, x: i32, y: i32, z: i32, id: &str) {
-        self.blocks.insert(BlockPosition::new(x, y, z), InputBlock::new(id));
+        self.blocks
+            .insert(BlockPosition::new(x, y, z), InputBlock::new(id));
         self.grow(x, y, z);
     }
     fn set_with(&mut self, x: i32, y: i32, z: i32, id: &str, props: &[(&str, &str)]) {
@@ -59,39 +61,51 @@ impl Scene {
 }
 
 impl BlockSource for Scene {
-    fn get_block(&self, p: BlockPosition) -> Option<&InputBlock> { self.blocks.get(&p) }
+    fn get_block(&self, p: BlockPosition) -> Option<&InputBlock> {
+        self.blocks.get(&p)
+    }
     fn iter_blocks(&self) -> Box<dyn Iterator<Item = (BlockPosition, &InputBlock)> + '_> {
         Box::new(self.blocks.iter().map(|(p, b)| (*p, b)))
     }
-    fn bounds(&self) -> BoundingBox { self.bounds }
+    fn bounds(&self) -> BoundingBox {
+        self.bounds
+    }
 }
 
 /// Returns the first atlas-mesh vertex whose UVs exceed `[-EPS, 1 + EPS]` on
 /// either axis, or `None` if every atlas UV is in range.
-fn find_stretched_atlas_uv(output: &schematic_mesher::MesherOutput) -> Option<(&'static str, [f32; 2])> {
+fn find_stretched_atlas_uv(
+    output: &schematic_mesher::MesherOutput,
+) -> Option<(&'static str, [f32; 2])> {
     const EPS: f32 = 1e-3;
-    let check = |name: &'static str, verts: &[schematic_mesher::Vertex]| -> Option<(&'static str, [f32; 2])> {
+    let check = |name: &'static str,
+                 verts: &[schematic_mesher::Vertex]|
+     -> Option<(&'static str, [f32; 2])> {
         for v in verts {
-            if v.uv[0] < -EPS || v.uv[0] > 1.0 + EPS
-                || v.uv[1] < -EPS || v.uv[1] > 1.0 + EPS
-            {
+            if v.uv[0] < -EPS || v.uv[0] > 1.0 + EPS || v.uv[1] < -EPS || v.uv[1] > 1.0 + EPS {
                 return Some((name, v.uv));
             }
         }
         None
     };
 
-    if let Some(hit) = check("opaque", &output.opaque_mesh.vertices) { return Some(hit); }
-    if let Some(hit) = check("cutout", &output.cutout_mesh.vertices) { return Some(hit); }
-    if let Some(hit) = check("transparent", &output.transparent_mesh.vertices) { return Some(hit); }
+    if let Some(hit) = check("opaque", &output.opaque_mesh.vertices) {
+        return Some(hit);
+    }
+    if let Some(hit) = check("cutout", &output.cutout_mesh.vertices) {
+        return Some(hit);
+    }
+    if let Some(hit) = check("transparent", &output.transparent_mesh.vertices) {
+        return Some(hit);
+    }
     None
 }
 
 #[test]
 fn atlas_mesh_uvs_stay_normalized_with_greedy_meshing() {
     // pack.zip is the vanilla resource pack that ships with the repo.
-    let pack = load_resource_pack("pack.zip")
-        .expect("pack.zip must exist at repo root for this test");
+    let pack =
+        load_resource_pack("pack.zip").expect("pack.zip must exist at repo root for this test");
 
     let mut scene = Scene::new();
     // 3×3×3 of stone — greedy-eligible, should fully merge into greedy materials.
@@ -105,9 +119,13 @@ fn atlas_mesh_uvs_stay_normalized_with_greedy_meshing() {
     // A non-greedy block (stairs) on top — exercises the atlas path.
     scene.set_with(1, 3, 1, "minecraft:oak_stairs", &[("facing", "south")]);
     // A waterlogged stair — exercises fluid + atlas interaction.
-    scene.set_with(2, 3, 1, "minecraft:oak_stairs", &[
-        ("facing", "south"), ("waterlogged", "true"),
-    ]);
+    scene.set_with(
+        2,
+        3,
+        1,
+        "minecraft:oak_stairs",
+        &[("facing", "south"), ("waterlogged", "true")],
+    );
 
     // Greedy ON — the bug only manifests with merging enabled.
     let config = MesherConfig {
@@ -135,8 +153,14 @@ fn atlas_mesh_uvs_stay_normalized_with_greedy_meshing() {
     let atlas_verts = output.opaque_mesh.vertices.len()
         + output.cutout_mesh.vertices.len()
         + output.transparent_mesh.vertices.len();
-    assert!(atlas_verts > 0, "expected non-greedy atlas geometry from stairs");
-    assert!(!output.greedy_materials.is_empty(), "expected greedy merging on the stone cube");
+    assert!(
+        atlas_verts > 0,
+        "expected non-greedy atlas geometry from stairs"
+    );
+    assert!(
+        !output.greedy_materials.is_empty(),
+        "expected greedy merging on the stone cube"
+    );
 
     if let Some((which, uv)) = find_stretched_atlas_uv(&output) {
         panic!(

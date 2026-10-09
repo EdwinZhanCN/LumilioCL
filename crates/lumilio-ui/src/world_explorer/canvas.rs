@@ -32,6 +32,15 @@ pub(super) struct Frame {
     pub tiles: Vec<Tile>,
     pub sprites: Vec<Sprite>,
     pub grid: Grid,
+    /// Translucent rectangles between the tiles and the icons: area layers.
+    pub fills: Vec<Fill>,
+}
+
+/// A filled rectangle in logical pixels from the viewport's top left.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(super) struct Fill {
+    pub rect: [f64; 4],
+    pub rgba: [u8; 4],
 }
 
 /// Where a tile's edges fall, in logical pixels from the viewport's top left:
@@ -142,6 +151,25 @@ impl Painter {
             tiles += 1;
         }
         self.paint_grid(window, bounds, frame, (width, height), dpr);
+        for fill_rect in &frame.fills {
+            let [left, top, right, bottom] = fill_rect.rect.map(|edge| device(edge, dpr));
+            if right < 0. || bottom < 0. || left > width || top > height {
+                continue;
+            }
+            let [r, g, b, a] = fill_rect.rgba;
+            window.paint_quad(fill(
+                Bounds::from_corners(
+                    point(px((origin_x + left) as f32), px((origin_y + top) as f32)),
+                    point(
+                        px((origin_x + right) as f32),
+                        px((origin_y + bottom) as f32),
+                    ),
+                ),
+                gpui::rgba(
+                    u32::from(r) << 24 | u32::from(g) << 16 | u32::from(b) << 8 | u32::from(a),
+                ),
+            ));
+        }
         let mut painted = 0;
         for sprite in &frame.sprites {
             let edge = f64::from(sprite.size);

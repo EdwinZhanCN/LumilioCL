@@ -34,58 +34,160 @@ pub(super) fn generate_item_frame_geometry(
     // All UVs from template_item_frame.json, in [0,16] pixel space.
     // Element 1: Backing (from [3,3,15.5] to [13,13,16])
     let backing_faces: &[FaceDef] = &[
-        FaceDef { dir: Direction::North, uv: [3.0, 3.0, 13.0, 13.0] },
-        FaceDef { dir: Direction::South, uv: [3.0, 3.0, 13.0, 13.0] },
+        FaceDef {
+            dir: Direction::North,
+            uv: [3.0, 3.0, 13.0, 13.0],
+        },
+        FaceDef {
+            dir: Direction::South,
+            uv: [3.0, 3.0, 13.0, 13.0],
+        },
     ];
 
     // Element 2: Top border (from [2,2,15] to [14,3,16])
     let top_faces: &[FaceDef] = &[
-        FaceDef { dir: Direction::Down,  uv: [2.0,  0.0, 14.0,  1.0] },
-        FaceDef { dir: Direction::Up,    uv: [2.0, 15.0, 14.0, 16.0] },
-        FaceDef { dir: Direction::North, uv: [2.0, 13.0, 14.0, 14.0] },
-        FaceDef { dir: Direction::South, uv: [2.0, 13.0, 14.0, 14.0] },
-        FaceDef { dir: Direction::West,  uv: [15.0, 13.0, 16.0, 14.0] },
-        FaceDef { dir: Direction::East,  uv: [0.0, 13.0, 1.0, 14.0] },
+        FaceDef {
+            dir: Direction::Down,
+            uv: [2.0, 0.0, 14.0, 1.0],
+        },
+        FaceDef {
+            dir: Direction::Up,
+            uv: [2.0, 15.0, 14.0, 16.0],
+        },
+        FaceDef {
+            dir: Direction::North,
+            uv: [2.0, 13.0, 14.0, 14.0],
+        },
+        FaceDef {
+            dir: Direction::South,
+            uv: [2.0, 13.0, 14.0, 14.0],
+        },
+        FaceDef {
+            dir: Direction::West,
+            uv: [15.0, 13.0, 16.0, 14.0],
+        },
+        FaceDef {
+            dir: Direction::East,
+            uv: [0.0, 13.0, 1.0, 14.0],
+        },
     ];
 
     // Element 3: Bottom border (from [2,13,15] to [14,14,16])
     let bottom_faces: &[FaceDef] = &[
-        FaceDef { dir: Direction::Down,  uv: [2.0,  0.0, 14.0,  1.0] },
-        FaceDef { dir: Direction::Up,    uv: [2.0, 15.0, 14.0, 16.0] },
-        FaceDef { dir: Direction::North, uv: [2.0,  2.0, 14.0,  3.0] },
-        FaceDef { dir: Direction::South, uv: [2.0,  2.0, 14.0,  3.0] },
-        FaceDef { dir: Direction::West,  uv: [15.0,  2.0, 16.0,  3.0] },
-        FaceDef { dir: Direction::East,  uv: [0.0,  2.0,  1.0,  3.0] },
+        FaceDef {
+            dir: Direction::Down,
+            uv: [2.0, 0.0, 14.0, 1.0],
+        },
+        FaceDef {
+            dir: Direction::Up,
+            uv: [2.0, 15.0, 14.0, 16.0],
+        },
+        FaceDef {
+            dir: Direction::North,
+            uv: [2.0, 2.0, 14.0, 3.0],
+        },
+        FaceDef {
+            dir: Direction::South,
+            uv: [2.0, 2.0, 14.0, 3.0],
+        },
+        FaceDef {
+            dir: Direction::West,
+            uv: [15.0, 2.0, 16.0, 3.0],
+        },
+        FaceDef {
+            dir: Direction::East,
+            uv: [0.0, 2.0, 1.0, 3.0],
+        },
     ];
 
     // Element 4: Left border (from [2,3,15] to [3,13,16])
     let left_faces: &[FaceDef] = &[
-        FaceDef { dir: Direction::North, uv: [13.0, 3.0, 14.0, 13.0] },
-        FaceDef { dir: Direction::South, uv: [2.0, 3.0, 3.0, 13.0] },
-        FaceDef { dir: Direction::West,  uv: [15.0, 3.0, 16.0, 13.0] },
-        FaceDef { dir: Direction::East,  uv: [0.0, 3.0, 1.0, 13.0] },
+        FaceDef {
+            dir: Direction::North,
+            uv: [13.0, 3.0, 14.0, 13.0],
+        },
+        FaceDef {
+            dir: Direction::South,
+            uv: [2.0, 3.0, 3.0, 13.0],
+        },
+        FaceDef {
+            dir: Direction::West,
+            uv: [15.0, 3.0, 16.0, 13.0],
+        },
+        FaceDef {
+            dir: Direction::East,
+            uv: [0.0, 3.0, 1.0, 13.0],
+        },
     ];
 
     // Element 5: Right border (from [13,3,15] to [14,13,16])
     let right_faces: &[FaceDef] = &[
-        FaceDef { dir: Direction::North, uv: [2.0, 3.0, 3.0, 13.0] },
-        FaceDef { dir: Direction::South, uv: [13.0, 3.0, 14.0, 13.0] },
-        FaceDef { dir: Direction::West,  uv: [15.0, 3.0, 16.0, 13.0] },
-        FaceDef { dir: Direction::East,  uv: [0.0, 3.0, 1.0, 13.0] },
+        FaceDef {
+            dir: Direction::North,
+            uv: [2.0, 3.0, 3.0, 13.0],
+        },
+        FaceDef {
+            dir: Direction::South,
+            uv: [13.0, 3.0, 14.0, 13.0],
+        },
+        FaceDef {
+            dir: Direction::West,
+            uv: [15.0, 3.0, 16.0, 13.0],
+        },
+        FaceDef {
+            dir: Direction::East,
+            uv: [0.0, 3.0, 1.0, 13.0],
+        },
     ];
 
     let elements: &[(&[f32; 3], &[f32; 3], &str, bool, &[FaceDef])] = &[
-        (&[3.0, 3.0, 15.5], &[13.0, 13.0, 16.0], frame_tex, true, backing_faces),
-        (&[2.0, 2.0, 15.0], &[14.0, 3.0, 16.0], wood_tex, false, top_faces),
-        (&[2.0, 13.0, 15.0], &[14.0, 14.0, 16.0], wood_tex, false, bottom_faces),
-        (&[2.0, 3.0, 15.0], &[3.0, 13.0, 16.0], wood_tex, false, left_faces),
-        (&[13.0, 3.0, 15.0], &[14.0, 13.0, 16.0], wood_tex, false, right_faces),
+        (
+            &[3.0, 3.0, 15.5],
+            &[13.0, 13.0, 16.0],
+            frame_tex,
+            true,
+            backing_faces,
+        ),
+        (
+            &[2.0, 2.0, 15.0],
+            &[14.0, 3.0, 16.0],
+            wood_tex,
+            false,
+            top_faces,
+        ),
+        (
+            &[2.0, 13.0, 15.0],
+            &[14.0, 14.0, 16.0],
+            wood_tex,
+            false,
+            bottom_faces,
+        ),
+        (
+            &[2.0, 3.0, 15.0],
+            &[3.0, 13.0, 16.0],
+            wood_tex,
+            false,
+            left_faces,
+        ),
+        (
+            &[13.0, 3.0, 15.0],
+            &[14.0, 13.0, 16.0],
+            wood_tex,
+            false,
+            right_faces,
+        ),
     ];
 
     for &(from, to, texture, is_transparent, faces) in elements {
         add_element(
-            *from, *to, texture, is_transparent, faces,
-            &mut vertices, &mut indices, &mut face_textures,
+            *from,
+            *to,
+            texture,
+            is_transparent,
+            faces,
+            &mut vertices,
+            &mut indices,
+            &mut face_textures,
         );
     }
 
@@ -116,7 +218,8 @@ pub(super) fn generate_item_frame_geometry(
 
 /// Add a box element with per-face UVs, using block-model coordinates [0,16].
 fn add_element(
-    from: [f32; 3], to: [f32; 3],
+    from: [f32; 3],
+    to: [f32; 3],
     texture: &str,
     is_transparent: bool,
     faces: &[FaceDef],
@@ -147,12 +250,12 @@ fn add_element(
     // Corner indices and normals for each face direction
     fn corner_info(dir: Direction) -> ([usize; 4], [f32; 3]) {
         match dir {
-            Direction::Down  => ([4, 5, 1, 0], [0.0, -1.0, 0.0]),
-            Direction::Up    => ([3, 2, 6, 7], [0.0, 1.0, 0.0]),
+            Direction::Down => ([4, 5, 1, 0], [0.0, -1.0, 0.0]),
+            Direction::Up => ([3, 2, 6, 7], [0.0, 1.0, 0.0]),
             Direction::North => ([1, 0, 3, 2], [0.0, 0.0, -1.0]),
             Direction::South => ([4, 5, 6, 7], [0.0, 0.0, 1.0]),
-            Direction::West  => ([0, 4, 7, 3], [-1.0, 0.0, 0.0]),
-            Direction::East  => ([5, 1, 2, 6], [1.0, 0.0, 0.0]),
+            Direction::West => ([0, 4, 7, 3], [-1.0, 0.0, 0.0]),
+            Direction::East => ([5, 1, 2, 6], [1.0, 0.0, 0.0]),
         }
     }
 
@@ -180,17 +283,27 @@ fn add_element(
         }
 
         // Winding: sides get (0,1,2)(0,2,3), top/bottom get (0,2,1)(0,3,2)
-        let is_side = matches!(face.dir,
-            Direction::North | Direction::South | Direction::West | Direction::East);
+        let is_side = matches!(
+            face.dir,
+            Direction::North | Direction::South | Direction::West | Direction::East
+        );
         if is_side {
             indices.extend_from_slice(&[
-                v_start, v_start + 1, v_start + 2,
-                v_start, v_start + 2, v_start + 3,
+                v_start,
+                v_start + 1,
+                v_start + 2,
+                v_start,
+                v_start + 2,
+                v_start + 3,
             ]);
         } else {
             indices.extend_from_slice(&[
-                v_start, v_start + 2, v_start + 1,
-                v_start, v_start + 3, v_start + 2,
+                v_start,
+                v_start + 2,
+                v_start + 1,
+                v_start,
+                v_start + 3,
+                v_start + 2,
             ]);
         }
 

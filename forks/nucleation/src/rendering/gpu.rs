@@ -345,7 +345,11 @@ impl TriangleOrder {
             let z = m[0][2] * p[0] + m[1][2] * p[1] + m[2][2] * p[2] + m[3][2];
             let w = m[0][3] * p[0] + m[1][3] * p[1] + m[2][3] * p[2] + m[3][3];
             // Behind the camera is clipped anyway; draw it last.
-            if w > 1e-6 { z / w } else { f32::INFINITY }
+            if w > 1e-6 {
+                z / w
+            } else {
+                f32::INFINITY
+            }
         };
         let mut keyed: Vec<(f32, u32)> = self
             .centroids
@@ -1643,8 +1647,7 @@ mod triangle_order_tests {
             pitch_deg: 0.0,
             ..CameraConfig::default()
         };
-        let (view_proj, _) =
-            compute_view_proj_reversed([-6.0; 3], [6.0; 3], 1.0, &camera);
+        let (view_proj, _) = compute_view_proj_reversed([-6.0; 3], [6.0; 3], 1.0, &camera);
         let order = TriangleOrder::new(&layer(&[2.0, -5.0, 5.0, 0.0]));
         let first_vertices: Vec<u32> = order
             .back_to_front(&view_proj)

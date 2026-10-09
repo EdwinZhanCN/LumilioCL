@@ -132,34 +132,22 @@ impl Mesh {
 
     /// Get positions as a flat array (for glTF export).
     pub fn positions_flat(&self) -> Vec<f32> {
-        self.vertices
-            .iter()
-            .flat_map(|v| v.position)
-            .collect()
+        self.vertices.iter().flat_map(|v| v.position).collect()
     }
 
     /// Get normals as a flat array (for glTF export).
     pub fn normals_flat(&self) -> Vec<f32> {
-        self.vertices
-            .iter()
-            .flat_map(|v| v.normal)
-            .collect()
+        self.vertices.iter().flat_map(|v| v.normal).collect()
     }
 
     /// Get UVs as a flat array (for glTF export).
     pub fn uvs_flat(&self) -> Vec<f32> {
-        self.vertices
-            .iter()
-            .flat_map(|v| v.uv)
-            .collect()
+        self.vertices.iter().flat_map(|v| v.uv).collect()
     }
 
     /// Get colors as a flat array (for glTF export).
     pub fn colors_flat(&self) -> Vec<f32> {
-        self.vertices
-            .iter()
-            .flat_map(|v| v.color)
-            .collect()
+        self.vertices.iter().flat_map(|v| v.color).collect()
     }
 }
 

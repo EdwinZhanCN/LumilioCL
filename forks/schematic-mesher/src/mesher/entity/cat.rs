@@ -137,9 +137,9 @@ pub(super) fn cat_model() -> EntityModelDef {
     }
 
     let right_hind_leg = hind_leg(-1.1);
-    let left_hind_leg  = hind_leg(1.1);
+    let left_hind_leg = hind_leg(1.1);
     let right_front_leg = front_leg(-1.2);
-    let left_front_leg  = front_leg(1.2);
+    let left_front_leg = front_leg(1.2);
 
     // CatModel applies MeshTransformer.scaling(0.8). Feet land at model y=24,
     // post-scale at y=19.2, so the root translate matches.
@@ -151,8 +151,14 @@ pub(super) fn cat_model() -> EntityModelDef {
             scale: [0.8, 0.8, 0.8],
         },
         children: vec![
-            head, body, tail1, tail2,
-            right_hind_leg, left_hind_leg, right_front_leg, left_front_leg,
+            head,
+            body,
+            tail1,
+            tail2,
+            right_hind_leg,
+            left_hind_leg,
+            right_front_leg,
+            left_front_leg,
         ],
     };
 

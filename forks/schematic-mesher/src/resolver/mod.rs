@@ -3,16 +3,16 @@
 //! This module handles resolving block states to concrete model variants
 //! and resolving model inheritance chains.
 
-pub mod state_resolver;
 pub mod model_resolver;
 pub mod multipart;
+pub mod state_resolver;
 
-pub use state_resolver::StateResolver;
 pub use model_resolver::ModelResolver;
+pub use state_resolver::StateResolver;
 
+use crate::error::Result;
 use crate::resource_pack::{BlockModel, BlockstateDefinition, ModelVariant, ResourcePack};
 use crate::types::InputBlock;
-use crate::error::Result;
 
 /// A resolved model ready for meshing.
 #[derive(Debug, Clone)]
@@ -24,10 +24,7 @@ pub struct ResolvedModel {
 }
 
 /// Resolve a block to its model(s).
-pub fn resolve_block(
-    pack: &ResourcePack,
-    block: &InputBlock,
-) -> Result<Vec<ResolvedModel>> {
+pub fn resolve_block(pack: &ResourcePack, block: &InputBlock) -> Result<Vec<ResolvedModel>> {
     let state_resolver = StateResolver::new(pack);
     let model_resolver = ModelResolver::new(pack);
 
@@ -40,11 +37,7 @@ pub fn resolve_block(
         let model = model_resolver.resolve(&variant.model)?;
         resolved.push(ResolvedModel {
             model,
-            transform: crate::types::BlockTransform::new(
-                variant.x,
-                variant.y,
-                variant.uvlock,
-            ),
+            transform: crate::types::BlockTransform::new(variant.x, variant.y, variant.uvlock),
         });
     }
 

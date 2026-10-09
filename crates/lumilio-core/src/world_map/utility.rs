@@ -16,6 +16,7 @@ impl OverlayProvider for UtilityOverlay {
                 icon: None,
                 group_id: None,
                 approximate: false,
+                max_scale: None,
             })
             .collect()
     }

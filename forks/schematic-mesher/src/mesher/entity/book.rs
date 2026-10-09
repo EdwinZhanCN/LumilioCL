@@ -139,7 +139,15 @@ pub(super) fn book_model() -> EntityModelDef {
     EntityModelDef {
         texture_path: "entity/enchanting_table_book".to_string(),
         texture_size: [64, 32],
-        parts: vec![left_lid, right_lid, seam, left_pages, right_pages, flip_page1, flip_page2],
+        parts: vec![
+            left_lid,
+            right_lid,
+            seam,
+            left_pages,
+            right_pages,
+            flip_page1,
+            flip_page2,
+        ],
         is_opaque: false,
     }
 }

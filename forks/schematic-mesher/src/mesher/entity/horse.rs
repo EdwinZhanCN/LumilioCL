@@ -145,9 +145,9 @@ pub(super) fn horse_model() -> EntityModelDef {
     }
 
     let right_hind_leg = leg([-1.0, -1.01, -1.0], false, [-4.0, 14.0, 7.0]);
-    let left_hind_leg  = leg([-3.0, -1.01, -1.0], true,  [ 4.0, 14.0, 7.0]);
+    let left_hind_leg = leg([-3.0, -1.01, -1.0], true, [4.0, 14.0, 7.0]);
     let right_front_leg = leg([-1.0, -1.01, -1.9], false, [-4.0, 14.0, -10.0]);
-    let left_front_leg  = leg([-3.0, -1.01, -1.9], true,  [ 4.0, 14.0, -10.0]);
+    let left_front_leg = leg([-3.0, -1.01, -1.9], true, [4.0, 14.0, -10.0]);
 
     let root = EntityPart {
         cubes: vec![],
@@ -157,8 +157,12 @@ pub(super) fn horse_model() -> EntityModelDef {
             ..Default::default()
         },
         children: vec![
-            body, head_parts,
-            right_hind_leg, left_hind_leg, right_front_leg, left_front_leg,
+            body,
+            head_parts,
+            right_hind_leg,
+            left_hind_leg,
+            right_front_leg,
+            left_front_leg,
         ],
     };
 

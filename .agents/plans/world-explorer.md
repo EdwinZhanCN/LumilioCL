@@ -242,8 +242,8 @@ P0 **pending human acceptance**：Windows MSVC Actions；macOS 与指定 ubuntu:
 
 - [x] T13：`lumilio-cubiomes` 包装 `getStructurePos`、`isViableStructurePos`、`initFirstStronghold` / `nextStronghold`、`isSlimeChunk`、`getSpawn` / `estimateSpawn`；结构种类按 `finders.h` 的 `StructureType`，每个版本只开放该版本 finder 能给出的种类。
 - [x] T14：Overlay「结构」：至少村庄、沙漠神殿、丛林神殿、要塞、海底神殿、林地府邸、下界要塞、堡垒遗迹、末地城，以及该版本支持的其他种类（古城、试炼密室、前哨站等）；按种类分组开关。1.18+ 的沙漠神殿、丛林神殿和林地府邸标成「估计」，图层面板写明原因。
-- [ ] T15：Overlay「史莱姆区块」（区域填充，只在细的 LOD 显示）和「出生点」（1.18 前标「估计」；存档里有实际出生点时以 P4 的为准）。
-- [ ] T16：点选一个对象，显示种类、坐标和来源；「复制坐标」复制 `x z`。测试：至少三个版本（1.16、1.18、1.21.4 或库支持的最新版）的固定种子，结构坐标与 C 探针的金样一致；生成金样的命令写进测试注释。
+- [x] T15：Overlay「史莱姆区块」（区域填充，只在细的 LOD 显示）和「出生点」（1.18 前标「估计」；存档里有实际出生点时以 P4 的为准）。
+- [x] T16：点选一个对象，显示种类、坐标和来源；「复制坐标」复制 `x z`。测试：至少三个版本（1.16、1.18、1.21.4 或库支持的最新版）的固定种子，结构坐标与 C 探针的金样一致；生成金样的命令写进测试注释。
 
 ### P2 Xaero 路径点（只读）与分享串
 
@@ -424,6 +424,7 @@ P0 **pending human acceptance**：Windows MSVC Actions；macOS 与指定 ubuntu:
 
 ## 实施记录
 
+- 2026-10-09：T15、T16 完成（P1）。出生点和史莱姆区块在插件的 `landmarks.rs`：只在主世界、有种子时出现，组「世界」；出生点是一个图标，1.18 前标「估计」，用 `lumilio_cubiomes::spawn` 并缓存最近 8 个世界；史莱姆区块每个 4096 方块的格子只返回一个 `Heat { cell: 16 }` 对象（列出格内所有史莱姆区块的角点），由宿主画成半透明方块。`OverlayInfo` 新增 `max_scale`（该层最粗画到每像素几个方块；`None` 用宿主默认 16），史莱姆为 1，超过就不请求、不画，图层面板写明「放大到每像素 1 方块才显示」。Canvas 后端 `Frame.fills` 画区域矩形（wgpu 旧路径不画）。「存档里有实际出生点时以存档为准」留给 T31。点选在 `select.rs`：按下后移动不超过 4 px 算点击，取图标框外 4 px 内最近的对象，选中后在图标下垫一块白色高亮，左下角信息卡显示种类（或用户标签）、`X Z`、来源和「估计」，「复制坐标」写 `x z`，点空白或「关闭」取消。测试：插件里出生点/史莱姆与 cubiomes 逐点一致、版本与维度的取舍；UI 里填充矩形的屏幕位置与缩放界限、点击与拖动的区分、剪贴板内容。P1 验收里「三个版本的结构坐标与金样一致」由 T13/T14 的金样测试覆盖；Chunkbase 对照仍待维护者实机。
 - 2026-10-09：2D 地图默认改用 GPUI Canvas 后端（`lumilio-ui/src/world_explorer/canvas.rs`），wgpu 整帧合成加读回的旧路径留在 `LUMILIO_MAP_BACKEND=wgpu` 之后，供对照。依据：维护者真机并排对比，Canvas 清晰度和拖动手感都好得多；测量（M2 Pro，模拟 120 Hz 拖动）wgpu 每帧渲染 5.7 ms、2x 分辨率下丢弃 20% 的帧且读回 11 MB/帧，Canvas 每帧 CPU 绘制 0.18 ms、没有读回；wgpu 首帧还要等 29–55 秒（全在 `request_adapter`，原因未查）。Canvas 的取舍：GPUI 对图片只做线性采样；图标透明度烤进像素 alpha；网格线用 1 逻辑像素的半透明方块。「wgpu 离屏合成」不再是 2D 地图的合成方式，`lumilio-map-render` 暂时保留给对照和可能的 Litematica/3D 用途，何时移除另行决定。`LUMILIO_MAP_STATS=1` 每 2 秒在终端打印渲染统计。
 
 - 2026-10-08：T13、T14 完成。`lumilio-cubiomes` 新增 `finders.rs`（`Structure` 17 种区域网格结构、`structures`、`strongholds`、`spawn`、`slime_chunks`），金样来自 `tests/structures.c`（两个种子 × 1.16.5/1.18.2/1.21.4，命令写在 `tests/SOURCE.md`）。插件 API：`MapIcon` 扩到 22 个，`OverlayInfo` 加 `icon`、`group_id`、`approximate`，`OverlayProvider::overlays_for(context)` 让目录随世界版本与维度变化。结构 Overlay 每种一层、各有开关（`structure.<名>`），要塞整世界算一次并缓存 4 个世界；沙漠神殿、丛林神殿、林地府邸 1.18 起标「估计」。UI：`objects.rs` 按 4096 方块的格子取对象（最多 4 个在途、离开视野就取消、超过每像素 16 方块不画），图标作为屏幕空间精灵画进 wgpu 帧里（`lumilio-map-render` 的 `Sprite`，带 alpha 混合，80 px 原图按盒式滤波缩到 28 px），不是叠在帧上的 GPUI 元素——最初的 GPUI 元素版在真机上不显示（原因没查明，布局测试看不出），改画进帧后由像素测试读回验证；图层浮层按组列出开关，长列表在浮层里滚动。默认打开村庄、要塞、下界要塞、末地城。点选与复制坐标是 T16。

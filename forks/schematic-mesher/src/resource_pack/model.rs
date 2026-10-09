@@ -178,18 +178,53 @@ impl ModelFace {
 
     /// Get UV coordinates, auto-calculating from element bounds when not specified.
     /// Minecraft auto-generates UVs from element from/to based on face direction.
-    pub fn uv_or_auto(&self, direction: Direction, element_from: &[f32; 3], element_to: &[f32; 3]) -> [f32; 4] {
+    pub fn uv_or_auto(
+        &self,
+        direction: Direction,
+        element_from: &[f32; 3],
+        element_to: &[f32; 3],
+    ) -> [f32; 4] {
         if let Some(uv) = self.uv {
             return uv;
         }
         // Auto-UV mapping per Minecraft spec: project element bounds onto the face plane
         match direction {
-            Direction::Down  => [element_from[0], 16.0 - element_to[2], element_to[0], 16.0 - element_from[2]],
-            Direction::Up    => [element_from[0], element_from[2], element_to[0], element_to[2]],
-            Direction::North => [16.0 - element_to[0], 16.0 - element_to[1], 16.0 - element_from[0], 16.0 - element_from[1]],
-            Direction::South => [element_from[0], 16.0 - element_to[1], element_to[0], 16.0 - element_from[1]],
-            Direction::West  => [element_from[2], 16.0 - element_to[1], element_to[2], 16.0 - element_from[1]],
-            Direction::East  => [16.0 - element_to[2], 16.0 - element_to[1], 16.0 - element_from[2], 16.0 - element_from[1]],
+            Direction::Down => [
+                element_from[0],
+                16.0 - element_to[2],
+                element_to[0],
+                16.0 - element_from[2],
+            ],
+            Direction::Up => [
+                element_from[0],
+                element_from[2],
+                element_to[0],
+                element_to[2],
+            ],
+            Direction::North => [
+                16.0 - element_to[0],
+                16.0 - element_to[1],
+                16.0 - element_from[0],
+                16.0 - element_from[1],
+            ],
+            Direction::South => [
+                element_from[0],
+                16.0 - element_to[1],
+                element_to[0],
+                16.0 - element_from[1],
+            ],
+            Direction::West => [
+                element_from[2],
+                16.0 - element_to[1],
+                element_to[2],
+                16.0 - element_from[1],
+            ],
+            Direction::East => [
+                16.0 - element_to[2],
+                16.0 - element_to[1],
+                16.0 - element_from[2],
+                16.0 - element_from[1],
+            ],
         }
     }
 
@@ -200,7 +235,12 @@ impl ModelFace {
     }
 
     /// Get normalized UV coordinates (0-1 range), auto-calculating from element bounds if needed.
-    pub fn normalized_uv_auto(&self, direction: Direction, element_from: &[f32; 3], element_to: &[f32; 3]) -> [f32; 4] {
+    pub fn normalized_uv_auto(
+        &self,
+        direction: Direction,
+        element_from: &[f32; 3],
+        element_to: &[f32; 3],
+    ) -> [f32; 4] {
         let uv = self.uv_or_auto(direction, element_from, element_to);
         [uv[0] / 16.0, uv[1] / 16.0, uv[2] / 16.0, uv[3] / 16.0]
     }

@@ -56,23 +56,24 @@ pub(super) fn spider_model() -> EntityModelDef {
     // MC uses two cube builders: right legs get box(-15, -1, -1, 16, 2, 2)
     // extending toward -X from the pivot; left legs are mirrored with
     // box(-1, -1, -1, 16, 2, 2) extending toward +X.
-    let f = 0.7853982_f32;   // PI/4
-    let f2 = 0.3926991_f32;  // PI/8
+    let f = 0.7853982_f32; // PI/4
+    let f2 = 0.3926991_f32; // PI/8
     let f3 = 0.58119464_f32; // inner-leg Z rotation
 
     let legs = [
         // (side_is_right, position, rot_y, rot_z)
-        (true,  [-4.0, 15.0,  2.0],  f,  -f),
-        (false, [ 4.0, 15.0,  2.0], -f,   f),
-        (true,  [-4.0, 15.0,  1.0],  f2, -f3),
-        (false, [ 4.0, 15.0,  1.0], -f2,  f3),
-        (true,  [-4.0, 15.0,  0.0], -f2, -f3),
-        (false, [ 4.0, 15.0,  0.0],  f2,  f3),
-        (true,  [-4.0, 15.0, -1.0], -f,  -f),
-        (false, [ 4.0, 15.0, -1.0],  f,   f),
+        (true, [-4.0, 15.0, 2.0], f, -f),
+        (false, [4.0, 15.0, 2.0], -f, f),
+        (true, [-4.0, 15.0, 1.0], f2, -f3),
+        (false, [4.0, 15.0, 1.0], -f2, f3),
+        (true, [-4.0, 15.0, 0.0], -f2, -f3),
+        (false, [4.0, 15.0, 0.0], f2, f3),
+        (true, [-4.0, 15.0, -1.0], -f, -f),
+        (false, [4.0, 15.0, -1.0], f, f),
     ];
 
-    let leg_parts: Vec<EntityPart> = legs.iter()
+    let leg_parts: Vec<EntityPart> = legs
+        .iter()
         .map(|&(right, pos, ry, rz)| spider_leg(right, pos, ry, rz))
         .collect();
 

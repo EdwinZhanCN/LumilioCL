@@ -1,22 +1,22 @@
-use super::{EntityCube, EntityModelDef, EntityPart, EntityPartPose, MobType};
 use super::armor_stand;
 use super::bat;
+use super::blaze;
 use super::boat;
 use super::cat;
 use super::chicken;
 use super::cow;
 use super::enderman;
+use super::ghast;
 use super::horse;
 use super::iron_golem;
+use super::magma_cube;
 use super::minecart;
 use super::sheep;
-use super::blaze;
-use super::ghast;
-use super::magma_cube;
 use super::slime;
 use super::spider;
 use super::villager;
 use super::wolf;
+use super::{EntityCube, EntityModelDef, EntityPart, EntityPartPose, MobType};
 use crate::types::InputBlock;
 
 pub(crate) fn build_mob_model(mob_type: MobType, block: &InputBlock) -> EntityModelDef {
@@ -50,20 +50,34 @@ pub(crate) fn build_mob_model(mob_type: MobType, block: &InputBlock) -> EntityMo
         MobType::IronGolem => iron_golem::iron_golem_model(),
         MobType::Bat => bat::bat_model(),
         MobType::Boat => boat::boat_model(
-            block.properties.get("wood").map(|s| s.as_str()).unwrap_or("oak"),
+            block
+                .properties
+                .get("wood")
+                .map(|s| s.as_str())
+                .unwrap_or("oak"),
             false,
         ),
         MobType::ChestBoat => boat::boat_model(
-            block.properties.get("wood").map(|s| s.as_str()).unwrap_or("oak"),
+            block
+                .properties
+                .get("wood")
+                .map(|s| s.as_str())
+                .unwrap_or("oak"),
             true,
         ),
         MobType::ItemFrame | MobType::GlowItemFrame | MobType::DroppedItem | MobType::Player => {
-            unreachable!("Item frames, dropped items, and players handled in generate_mob_geometry/add_mob")
+            unreachable!(
+                "Item frames, dropped items, and players handled in generate_mob_geometry/add_mob"
+            )
         }
     };
 
     // Apply baby scaling if is_baby property is set
-    if block.properties.get("is_baby").map(|v| v == "true").unwrap_or(false)
+    if block
+        .properties
+        .get("is_baby")
+        .map(|v| v == "true")
+        .unwrap_or(false)
         && supports_baby(mob_type)
     {
         apply_baby_scaling(&mut model, mob_type);
@@ -261,7 +275,9 @@ fn zombie_model() -> EntityModelDef {
         children: vec![],
     };
 
-    let root = mob_root(vec![head, hat, body, right_arm, left_arm, right_leg, left_leg]);
+    let root = mob_root(vec![
+        head, hat, body, right_arm, left_arm, right_leg, left_leg,
+    ]);
 
     EntityModelDef {
         texture_path: "entity/zombie/zombie".to_string(),
@@ -473,7 +489,14 @@ fn creeper_model() -> EntityModelDef {
         children: vec![],
     };
 
-    let root = mob_root(vec![head, body, right_hind_leg, left_hind_leg, right_front_leg, left_front_leg]);
+    let root = mob_root(vec![
+        head,
+        body,
+        right_hind_leg,
+        left_hind_leg,
+        right_front_leg,
+        left_front_leg,
+    ]);
 
     EntityModelDef {
         texture_path: "entity/creeper/creeper".to_string(),
@@ -596,7 +619,14 @@ fn pig_model() -> EntityModelDef {
         children: vec![],
     };
 
-    let root = mob_root(vec![head, body, right_hind_leg, left_hind_leg, right_front_leg, left_front_leg]);
+    let root = mob_root(vec![
+        head,
+        body,
+        right_hind_leg,
+        left_hind_leg,
+        right_front_leg,
+        left_front_leg,
+    ]);
 
     EntityModelDef {
         texture_path: "entity/pig/temperate_pig".to_string(),

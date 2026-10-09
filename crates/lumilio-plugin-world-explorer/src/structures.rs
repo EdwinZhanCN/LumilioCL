@@ -117,6 +117,7 @@ pub(crate) fn catalog() -> Vec<OverlayInfo> {
             icon: Some(layer.icon),
             group_id: Some(GROUP.into()),
             approximate: false,
+            max_scale: None,
         })
         .collect()
 }
@@ -141,6 +142,7 @@ pub(crate) fn catalog_for(context: &WorldContext) -> Vec<OverlayInfo> {
             icon: Some(layer.icon),
             group_id: Some(GROUP.into()),
             approximate: layer.kind.is_some_and(|kind| kind.estimated(version)),
+            max_scale: None,
         })
         .collect()
 }

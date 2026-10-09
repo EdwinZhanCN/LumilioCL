@@ -140,9 +140,9 @@ impl MultipartCondition {
             MultipartCondition::Or { OR } => {
                 OR.iter().any(|cond| Self::matches_simple(cond, properties))
             }
-            MultipartCondition::And { AND } => {
-                AND.iter().all(|cond| Self::matches_simple(cond, properties))
-            }
+            MultipartCondition::And { AND } => AND
+                .iter()
+                .all(|cond| Self::matches_simple(cond, properties)),
             MultipartCondition::Simple(cond) => Self::matches_simple(cond, properties),
         }
     }
@@ -297,12 +297,14 @@ mod tests {
                 .collect(),
         );
 
-        let props: HashMap<String, String> =
-            [("facing".to_string(), "north".to_string())].into_iter().collect();
+        let props: HashMap<String, String> = [("facing".to_string(), "north".to_string())]
+            .into_iter()
+            .collect();
         assert!(cond.matches(&props));
 
-        let wrong_props: HashMap<String, String> =
-            [("facing".to_string(), "south".to_string())].into_iter().collect();
+        let wrong_props: HashMap<String, String> = [("facing".to_string(), "south".to_string())]
+            .into_iter()
+            .collect();
         assert!(!cond.matches(&wrong_props));
     }
 
@@ -311,12 +313,15 @@ mod tests {
         let json = r#"{ "OR": [{ "facing": "north" }, { "facing": "south" }] }"#;
         let cond: MultipartCondition = serde_json::from_str(json).unwrap();
 
-        let north: HashMap<String, String> =
-            [("facing".to_string(), "north".to_string())].into_iter().collect();
-        let south: HashMap<String, String> =
-            [("facing".to_string(), "south".to_string())].into_iter().collect();
-        let east: HashMap<String, String> =
-            [("facing".to_string(), "east".to_string())].into_iter().collect();
+        let north: HashMap<String, String> = [("facing".to_string(), "north".to_string())]
+            .into_iter()
+            .collect();
+        let south: HashMap<String, String> = [("facing".to_string(), "south".to_string())]
+            .into_iter()
+            .collect();
+        let east: HashMap<String, String> = [("facing".to_string(), "east".to_string())]
+            .into_iter()
+            .collect();
 
         assert!(cond.matches(&north));
         assert!(cond.matches(&south));
@@ -331,12 +336,15 @@ mod tests {
                 .collect(),
         );
 
-        let north: HashMap<String, String> =
-            [("facing".to_string(), "north".to_string())].into_iter().collect();
-        let south: HashMap<String, String> =
-            [("facing".to_string(), "south".to_string())].into_iter().collect();
-        let east: HashMap<String, String> =
-            [("facing".to_string(), "east".to_string())].into_iter().collect();
+        let north: HashMap<String, String> = [("facing".to_string(), "north".to_string())]
+            .into_iter()
+            .collect();
+        let south: HashMap<String, String> = [("facing".to_string(), "south".to_string())]
+            .into_iter()
+            .collect();
+        let east: HashMap<String, String> = [("facing".to_string(), "east".to_string())]
+            .into_iter()
+            .collect();
 
         assert!(cond.matches(&north));
         assert!(cond.matches(&south));

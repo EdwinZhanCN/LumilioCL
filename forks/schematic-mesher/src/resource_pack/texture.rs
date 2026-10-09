@@ -29,32 +29,45 @@ pub fn parse_mcmeta(json: &str) -> Option<AnimationMeta> {
     let parsed: serde_json::Value = serde_json::from_str(json).ok()?;
     let anim = parsed.get("animation")?;
 
-    let frametime = anim.get("frametime")
-        .and_then(|v| v.as_u64())
-        .unwrap_or(1) as u32;
+    let frametime = anim.get("frametime").and_then(|v| v.as_u64()).unwrap_or(1) as u32;
 
-    let interpolate = anim.get("interpolate")
+    let interpolate = anim
+        .get("interpolate")
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
 
     let frame_width = anim.get("width").and_then(|v| v.as_u64()).map(|v| v as u32);
-    let frame_height = anim.get("height").and_then(|v| v.as_u64()).map(|v| v as u32);
+    let frame_height = anim
+        .get("height")
+        .and_then(|v| v.as_u64())
+        .map(|v| v as u32);
 
     let frames = anim.get("frames").and_then(|v| v.as_array()).map(|arr| {
-        arr.iter().filter_map(|entry| {
-            if let Some(idx) = entry.as_u64() {
-                Some(AnimFrame { index: idx as u32, time: None })
-            } else if let Some(obj) = entry.as_object() {
-                let index = obj.get("index")?.as_u64()? as u32;
-                let time = obj.get("time").and_then(|v| v.as_u64()).map(|v| v as u32);
-                Some(AnimFrame { index, time })
-            } else {
-                None
-            }
-        }).collect()
+        arr.iter()
+            .filter_map(|entry| {
+                if let Some(idx) = entry.as_u64() {
+                    Some(AnimFrame {
+                        index: idx as u32,
+                        time: None,
+                    })
+                } else if let Some(obj) = entry.as_object() {
+                    let index = obj.get("index")?.as_u64()? as u32;
+                    let time = obj.get("time").and_then(|v| v.as_u64()).map(|v| v as u32);
+                    Some(AnimFrame { index, time })
+                } else {
+                    None
+                }
+            })
+            .collect()
     });
 
-    Some(AnimationMeta { frametime, interpolate, frames, frame_width, frame_height })
+    Some(AnimationMeta {
+        frametime,
+        interpolate,
+        frames,
+        frame_width,
+        frame_height,
+    })
 }
 
 /// Raw texture data loaded from PNG.
@@ -182,7 +195,8 @@ impl TextureData {
 
         // Determine frame dimensions
         let frame_height = if let Some(ref meta) = self.animation {
-            meta.frame_height.unwrap_or(meta.frame_width.unwrap_or(self.width))
+            meta.frame_height
+                .unwrap_or(meta.frame_width.unwrap_or(self.width))
         } else {
             self.height / self.frame_count
         };
@@ -261,7 +275,13 @@ mod tests {
 
     #[test]
     fn test_get_pixel() {
-        let tex = TextureData::new(2, 2, vec![255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255]);
+        let tex = TextureData::new(
+            2,
+            2,
+            vec![
+                255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255,
+            ],
+        );
 
         assert_eq!(tex.get_pixel(0, 0), [255, 0, 0, 255]); // Red
         assert_eq!(tex.get_pixel(1, 0), [0, 255, 0, 255]); // Green
@@ -352,9 +372,18 @@ mod tests {
                 frametime: 1,
                 interpolate: false,
                 frames: Some(vec![
-                    AnimFrame { index: 2, time: None },
-                    AnimFrame { index: 0, time: None },
-                    AnimFrame { index: 1, time: None },
+                    AnimFrame {
+                        index: 2,
+                        time: None,
+                    },
+                    AnimFrame {
+                        index: 0,
+                        time: None,
+                    },
+                    AnimFrame {
+                        index: 1,
+                        time: None,
+                    },
                 ]),
                 frame_width: None,
                 frame_height: None,

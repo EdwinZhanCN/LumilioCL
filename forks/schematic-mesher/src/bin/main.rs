@@ -3,9 +3,7 @@
 //! Generate 3D meshes from Minecraft block data.
 
 use clap::{Parser, Subcommand, ValueEnum};
-use schematic_mesher::{
-    export_glb, load_resource_pack, Mesher, MesherConfig, ObjExport,
-};
+use schematic_mesher::{export_glb, load_resource_pack, Mesher, MesherConfig, ObjExport};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
@@ -396,7 +394,11 @@ impl SimpleBlockSource {
         } else {
             BoundingBox::new(
                 [min[0] as f32, min[1] as f32, min[2] as f32],
-                [(max[0] + 1) as f32, (max[1] + 1) as f32, (max[2] + 1) as f32],
+                [
+                    (max[0] + 1) as f32,
+                    (max[1] + 1) as f32,
+                    (max[2] + 1) as f32,
+                ],
             )
         };
 
@@ -415,8 +417,12 @@ impl schematic_mesher::types::BlockSource for SimpleBlockSource {
     fn iter_blocks(
         &self,
     ) -> Box<
-        dyn Iterator<Item = (schematic_mesher::types::BlockPosition, &schematic_mesher::types::InputBlock)>
-            + '_,
+        dyn Iterator<
+                Item = (
+                    schematic_mesher::types::BlockPosition,
+                    &schematic_mesher::types::InputBlock,
+                ),
+            > + '_,
     > {
         Box::new(self.blocks.iter().map(|(k, v)| (*k, v)))
     }

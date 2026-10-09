@@ -29,7 +29,8 @@ pub fn load_from_bytes(data: &[u8]) -> Result<ResourcePack> {
 
     // Collect .png.mcmeta entries to apply after all textures are loaded
     // (ZIP entry order is arbitrary, mcmeta may appear before its PNG)
-    let mut pending_mcmeta: Vec<(String, String, crate::resource_pack::texture::AnimationMeta)> = Vec::new();
+    let mut pending_mcmeta: Vec<(String, String, crate::resource_pack::texture::AnimationMeta)> =
+        Vec::new();
 
     // Iterate through all files in the archive
     for i in 0..archive.len() {
@@ -90,7 +91,11 @@ pub fn load_from_bytes(data: &[u8]) -> Result<ResourcePack> {
                         file.read_to_string(&mut contents)?;
                         let texture_path = asset_path.trim_end_matches(".png.mcmeta");
                         if let Some(meta) = parse_mcmeta(&contents) {
-                            pending_mcmeta.push((namespace.to_string(), texture_path.to_string(), meta));
+                            pending_mcmeta.push((
+                                namespace.to_string(),
+                                texture_path.to_string(),
+                                meta,
+                            ));
                         }
                     } else if asset_path.ends_with(".png") {
                         let mut data = Vec::new();
@@ -146,10 +151,7 @@ fn load_from_directory(path: &Path) -> Result<ResourcePack> {
             continue;
         }
 
-        let namespace = namespace_entry
-            .file_name()
-            .to_string_lossy()
-            .to_string();
+        let namespace = namespace_entry.file_name().to_string_lossy().to_string();
         let namespace_path = namespace_entry.path();
 
         // Load blockstates
@@ -165,29 +167,43 @@ fn load_from_directory(path: &Path) -> Result<ResourcePack> {
         // Load models
         let models_path = namespace_path.join("models");
         if models_path.exists() {
-            load_json_files_recursive(&models_path, &models_path, &namespace, &mut |model_path, contents| {
-                if let Ok(model) = serde_json::from_str::<BlockModel>(contents) {
-                    pack.add_model(&namespace, model_path, model);
-                }
-            })?;
+            load_json_files_recursive(
+                &models_path,
+                &models_path,
+                &namespace,
+                &mut |model_path, contents| {
+                    if let Ok(model) = serde_json::from_str::<BlockModel>(contents) {
+                        pack.add_model(&namespace, model_path, model);
+                    }
+                },
+            )?;
         }
 
         // Load textures
         let textures_path = namespace_path.join("textures");
         if textures_path.exists() {
-            load_texture_files_recursive(&textures_path, &textures_path, &namespace, &mut |texture_path, data| {
-                if let Ok(texture) = load_texture_from_bytes(data) {
-                    pack.add_texture(&namespace, texture_path, texture);
-                }
-            })?;
+            load_texture_files_recursive(
+                &textures_path,
+                &textures_path,
+                &namespace,
+                &mut |texture_path, data| {
+                    if let Ok(texture) = load_texture_from_bytes(data) {
+                        pack.add_texture(&namespace, texture_path, texture);
+                    }
+                },
+            )?;
 
             // Load .png.mcmeta files and apply to textures
             let mut pending_mcmeta = Vec::new();
-            load_mcmeta_files_recursive(&textures_path, &textures_path, &mut |texture_path, contents| {
-                if let Some(meta) = parse_mcmeta(contents) {
-                    pending_mcmeta.push((texture_path.to_string(), meta));
-                }
-            })?;
+            load_mcmeta_files_recursive(
+                &textures_path,
+                &textures_path,
+                &mut |texture_path, contents| {
+                    if let Some(meta) = parse_mcmeta(contents) {
+                        pending_mcmeta.push((texture_path.to_string(), meta));
+                    }
+                },
+            )?;
 
             for (texture_path, meta) in pending_mcmeta {
                 if let Some(ns_textures) = pack.textures.get_mut(&namespace) {
@@ -225,11 +241,7 @@ where
         let path = entry.path();
 
         if path.extension().map(|e| e == "json").unwrap_or(false) {
-            let file_name = path
-                .file_stem()
-                .unwrap()
-                .to_string_lossy()
-                .to_string();
+            let file_name = path.file_stem().unwrap().to_string_lossy().to_string();
 
             let contents = std::fs::read_to_string(&path)?;
             handler(&file_name, &contents);
@@ -301,11 +313,7 @@ where
 }
 
 /// Load .png.mcmeta files recursively from a directory.
-fn load_mcmeta_files_recursive<F>(
-    base: &Path,
-    dir: &Path,
-    handler: &mut F,
-) -> Result<()>
+fn load_mcmeta_files_recursive<F>(base: &Path, dir: &Path, handler: &mut F) -> Result<()>
 where
     F: FnMut(&str, &str),
 {

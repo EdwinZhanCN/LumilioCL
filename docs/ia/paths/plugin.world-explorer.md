@@ -12,6 +12,7 @@
 | 显示 Region 边界 | 图层浮层 · Region 边界开关 | 即刻开关 512 方块边界；不改变底图或相机 |  | `lumilio-ui/src/world_explorer/layers.rs` |
 | 显示或隐藏结构图层 | 图层浮层 · 按种类分组的开关 | 即刻开关，图标按世界版本与维度出现；每像素超过 16 方块时隐藏并说明；1.18 起沙漠神殿、丛林神殿、林地府邸标「估计」 |  | `lumilio-ui/src/world_explorer/layers.rs` |
 | 平移与缩放 | 地图视口 · 拖动 / 滚轮 / + − 与方向键 | 锚点缩放；过期世代与旧视口结果不进入当前帧 |  | `lumilio-ui/src/world_explorer/mod.rs` |
+| 点选地图对象 | 地图左下角信息卡 · 种类、坐标、来源与「复制坐标」 | 点图标选中并显示；点空白处或「×」取消；复制 `x z`；估计的位置标「估计」 |  | `lumilio-ui/src/world_explorer/select.rs` |
 | 输入手动种子 | 地图顶部 · 种子输入框 | 数字或文字种子，Enter 或失焦应用；错误留在输入框旁；保存到该实例 |  | `lumilio-ui/src/world_explorer/toolbar.rs` |
 | 选择种子版本 | 种子旁 · 可搜索版本下拉 | 默认世界的受支持版本，否则 1.21.4；确认后应用输入种子，不自动降级存档 |  | `lumilio-ui/src/world_explorer/toolbar.rs` |
 | 选择世界 | 地图顶部 · 存档下拉 | 只列该实例存档；无存档时隐藏；选择后同步种子与版本，取消上一世界请求 |  | `lumilio-ui/src/world_explorer/toolbar.rs` |

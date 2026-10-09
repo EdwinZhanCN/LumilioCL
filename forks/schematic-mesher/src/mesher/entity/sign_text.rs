@@ -84,7 +84,11 @@ pub(crate) fn parse_text_component(input: &str, default_color: &str) -> Vec<Text
     }]
 }
 
-fn parse_json_value(value: &serde_json::Value, parent_color: &str, segments: &mut Vec<TextSegment>) {
+fn parse_json_value(
+    value: &serde_json::Value,
+    parent_color: &str,
+    segments: &mut Vec<TextSegment>,
+) {
     match value {
         serde_json::Value::String(s) => {
             if !s.is_empty() {
@@ -95,7 +99,8 @@ fn parse_json_value(value: &serde_json::Value, parent_color: &str, segments: &mu
             }
         }
         serde_json::Value::Object(obj) => {
-            let color = obj.get("color")
+            let color = obj
+                .get("color")
                 .and_then(|v| v.as_str())
                 .unwrap_or(parent_color);
             if let Some(text) = obj.get("text").and_then(|v| v.as_str()) {
@@ -123,11 +128,15 @@ fn parse_json_value(value: &serde_json::Value, parent_color: &str, segments: &mu
 
 /// Calculate the total pixel width of segments using font glyph widths.
 fn segments_width(segments: &[TextSegment], font: &FontData, glyph_scale: u32) -> u32 {
-    segments.iter().map(|seg| {
-        seg.text.bytes()
-            .map(|ch| font.glyph_widths[ch as usize] as u32 * glyph_scale)
-            .sum::<u32>()
-    }).sum()
+    segments
+        .iter()
+        .map(|seg| {
+            seg.text
+                .bytes()
+                .map(|ch| font.glyph_widths[ch as usize] as u32 * glyph_scale)
+                .sum::<u32>()
+        })
+        .sum()
 }
 
 /// Load font glyph data from the resource pack.
@@ -168,7 +177,14 @@ fn load_font(rp: &ResourcePack) -> Option<FontData> {
         };
     }
 
-    Some(FontData { pixels, width, height, glyph_widths, cell_w, cell_h })
+    Some(FontData {
+        pixels,
+        width,
+        height,
+        glyph_widths,
+        cell_w,
+        cell_h,
+    })
 }
 
 /// Sign kind, determines which UV region in the base texture holds the visible
@@ -214,7 +230,8 @@ pub(crate) fn composite_sign_with_text(
             let src_idx = (src_y * base_tex.width + src_x) as usize * 4;
             let dst_idx = (y * out_w + x) as usize * 4;
             if src_idx + 3 < base_tex.pixels.len() {
-                pixels[dst_idx..dst_idx + 4].copy_from_slice(&base_tex.pixels[src_idx..src_idx + 4]);
+                pixels[dst_idx..dst_idx + 4]
+                    .copy_from_slice(&base_tex.pixels[src_idx..src_idx + 4]);
             }
         }
     }
@@ -227,13 +244,18 @@ pub(crate) fn composite_sign_with_text(
     // Hanging sign board:  tex_offs(0,12), dim(14,10, 2) → N=(2,14,14,10), S=(18,14,14,10)
     let regions: &[(u32, u32, u32, u32)] = match kind {
         SignKind::Standing => &[(2, 2, 24, 12)],
-        SignKind::Wall     => &[(2, 2, 24, 12), (28, 2, 24, 12)],
-        SignKind::Hanging  => &[(2, 14, 14, 10), (18, 14, 14, 10)],
+        SignKind::Wall => &[(2, 2, 24, 12), (28, 2, 24, 12)],
+        SignKind::Hanging => &[(2, 14, 14, 10), (18, 14, 14, 10)],
     };
 
     // Count non-empty lines so we can vertically center the text block — MC
     // centers text on the sign regardless of how many of the 4 slots are used.
-    let non_empty = lines.iter().take(4).filter(|l| !l.is_empty()).count().max(1) as u32;
+    let non_empty = lines
+        .iter()
+        .take(4)
+        .filter(|l| !l.is_empty())
+        .count()
+        .max(1) as u32;
 
     for &(rx, ry, rw, rh) in regions {
         let text_x0 = rx * scale;
@@ -272,10 +294,13 @@ pub(crate) fn composite_sign_with_text(
             };
 
             render_segments(
-                &mut pixels, out_w,
-                &font, glyph_scale,
+                &mut pixels,
+                out_w,
+                &font,
+                glyph_scale,
                 &segments,
-                x_offset, y_start,
+                x_offset,
+                y_start,
                 text_x0 + text_w,
                 glowing,
             );
@@ -313,8 +338,14 @@ fn render_segments(
             // Glow outline: render 8 directional offsets in darkened color first
             let outline_rgb = outline_color(&rgb);
             let offsets: [(i32, i32); 8] = [
-                (-1, 0), (1, 0), (0, -1), (0, 1),
-                (-1, -1), (-1, 1), (1, -1), (1, 1),
+                (-1, 0),
+                (1, 0),
+                (0, -1),
+                (0, 1),
+                (-1, -1),
+                (-1, 1),
+                (1, -1),
+                (1, 1),
             ];
             // We need to compute cursor positions for outline pass without advancing cursor_x
             let mut outline_cursor = cursor_x;
@@ -328,9 +359,14 @@ fn render_segments(
                     let oy = y_start as i32 + dy;
                     if ox >= 0 && oy >= 0 {
                         blit_glyph(
-                            pixels, buf_w, font, glyph_scale,
-                            ch, &outline_rgb,
-                            ox as u32, oy as u32,
+                            pixels,
+                            buf_w,
+                            font,
+                            glyph_scale,
+                            ch,
+                            &outline_rgb,
+                            ox as u32,
+                            oy as u32,
                             x_max,
                         );
                     }
@@ -346,9 +382,14 @@ fn render_segments(
                 break;
             }
             blit_glyph(
-                pixels, buf_w, font, glyph_scale,
-                ch, &rgb,
-                cursor_x, y_start,
+                pixels,
+                buf_w,
+                font,
+                glyph_scale,
+                ch,
+                &rgb,
+                cursor_x,
+                y_start,
                 x_max,
             );
             cursor_x += glyph_w;
@@ -458,18 +499,34 @@ mod tests {
             "black",
         );
         assert_eq!(segments.len(), 3);
-        assert_eq!(segments[0], TextSegment { text: "A".into(), color: "red".into() });
-        assert_eq!(segments[1], TextSegment { text: "B".into(), color: "green".into() });
+        assert_eq!(
+            segments[0],
+            TextSegment {
+                text: "A".into(),
+                color: "red".into()
+            }
+        );
+        assert_eq!(
+            segments[1],
+            TextSegment {
+                text: "B".into(),
+                color: "green".into()
+            }
+        );
         // C inherits parent color "red"
-        assert_eq!(segments[2], TextSegment { text: "C".into(), color: "red".into() });
+        assert_eq!(
+            segments[2],
+            TextSegment {
+                text: "C".into(),
+                color: "red".into()
+            }
+        );
     }
 
     #[test]
     fn test_parse_color_inheritance() {
-        let segments = parse_text_component(
-            r#"[{"text":"A","color":"gold"},{"text":"B"}]"#,
-            "white",
-        );
+        let segments =
+            parse_text_component(r#"[{"text":"A","color":"gold"},{"text":"B"}]"#, "white");
         assert_eq!(segments.len(), 2);
         assert_eq!(segments[0].color, "gold");
         // B inherits parent_color from array context = "white"
@@ -490,7 +547,7 @@ mod tests {
         let outline = outline_color(&rgb);
         assert_eq!(outline[0], 63); // 255 * 0.25
         assert_eq!(outline[1], 42); // 170 * 0.25
-        assert_eq!(outline[2], 0);  // 0 * 0.25
+        assert_eq!(outline[2], 0); // 0 * 0.25
     }
 
     #[test]

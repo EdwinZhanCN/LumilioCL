@@ -139,7 +139,8 @@ impl MeshLayer {
         self.normals.extend_from_slice(&other.normals);
         self.uvs.extend_from_slice(&other.uvs);
         self.colors.extend_from_slice(&other.colors);
-        self.indices.extend(other.indices.iter().map(|&i| i + offset));
+        self.indices
+            .extend(other.indices.iter().map(|&i| i + offset));
     }
 }
 
@@ -595,10 +596,7 @@ mod tests {
             1,
             "greedy_materials wiped by MeshOutput::to_mesher_output roundtrip"
         );
-        assert_eq!(
-            roundtripped.greedy_materials[0].texture_path,
-            "block/stone"
-        );
+        assert_eq!(roundtripped.greedy_materials[0].texture_path, "block/stone");
     }
 
     /// Regression: the GLB produced via `MeshOutput::to_glb` must contain
@@ -612,11 +610,9 @@ mod tests {
         let glb = output.to_glb().expect("export glb");
 
         // Parse the GLB JSON chunk to count primitives.
-        let json_len =
-            u32::from_le_bytes(glb[12..16].try_into().unwrap()) as usize;
+        let json_len = u32::from_le_bytes(glb[12..16].try_into().unwrap()) as usize;
         let json_bytes = &glb[20..20 + json_len];
-        let root: serde_json::Value =
-            serde_json::from_slice(json_bytes).expect("parse glb json");
+        let root: serde_json::Value = serde_json::from_slice(json_bytes).expect("parse glb json");
         let prims = root["meshes"][0]["primitives"]
             .as_array()
             .expect("primitives array");

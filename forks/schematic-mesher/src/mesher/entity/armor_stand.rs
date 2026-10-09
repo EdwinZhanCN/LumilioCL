@@ -5,7 +5,8 @@ use glam::{Mat4, Vec3};
 
 /// Parse a pose property string "x,y,z" (degrees) into [rx, ry, rz] radians.
 pub(super) fn parse_pose(s: &str) -> [f32; 3] {
-    let parts: Vec<f32> = s.split(',')
+    let parts: Vec<f32> = s
+        .split(',')
         .map(|p| p.trim().parse::<f32>().unwrap_or(0.0).to_radians())
         .collect();
     [
@@ -196,8 +197,16 @@ pub(super) fn armor_stand_model(block: &InputBlock) -> EntityModelDef {
             ..Default::default()
         },
         children: vec![
-            head, body, right_arm, left_arm, right_leg, left_leg,
-            right_body_stick, left_body_stick, shoulder_stick, base_plate,
+            head,
+            body,
+            right_arm,
+            left_arm,
+            right_leg,
+            left_leg,
+            right_body_stick,
+            left_body_stick,
+            shoulder_stick,
+            base_plate,
         ],
     };
 
@@ -214,18 +223,35 @@ pub(super) fn armor_stand_model(block: &InputBlock) -> EntityModelDef {
 /// Armor material type — determines texture path.
 #[derive(Debug, Clone, Copy)]
 enum ArmorMaterial {
-    Leather, Chainmail, Iron, Gold, Diamond, Netherite,
+    Leather,
+    Chainmail,
+    Iron,
+    Gold,
+    Diamond,
+    Netherite,
 }
 
 impl ArmorMaterial {
     fn from_item(item_id: &str) -> Option<Self> {
         let name = item_id.strip_prefix("minecraft:").unwrap_or(item_id);
-        if name.starts_with("leather_") { return Some(Self::Leather); }
-        if name.starts_with("chainmail_") { return Some(Self::Chainmail); }
-        if name.starts_with("iron_") { return Some(Self::Iron); }
-        if name.starts_with("golden_") { return Some(Self::Gold); }
-        if name.starts_with("diamond_") { return Some(Self::Diamond); }
-        if name.starts_with("netherite_") { return Some(Self::Netherite); }
+        if name.starts_with("leather_") {
+            return Some(Self::Leather);
+        }
+        if name.starts_with("chainmail_") {
+            return Some(Self::Chainmail);
+        }
+        if name.starts_with("iron_") {
+            return Some(Self::Iron);
+        }
+        if name.starts_with("golden_") {
+            return Some(Self::Gold);
+        }
+        if name.starts_with("diamond_") {
+            return Some(Self::Diamond);
+        }
+        if name.starts_with("netherite_") {
+            return Some(Self::Netherite);
+        }
         None
     }
 
@@ -264,10 +290,18 @@ enum ArmorSlot {
 impl ArmorSlot {
     fn from_item(item_id: &str) -> Option<Self> {
         let name = item_id.strip_prefix("minecraft:").unwrap_or(item_id);
-        if name.ends_with("_helmet") || name == "turtle_helmet" { return Some(Self::Helmet); }
-        if name.ends_with("_chestplate") { return Some(Self::Chestplate); }
-        if name.ends_with("_leggings") { return Some(Self::Leggings); }
-        if name.ends_with("_boots") { return Some(Self::Boots); }
+        if name.ends_with("_helmet") || name == "turtle_helmet" {
+            return Some(Self::Helmet);
+        }
+        if name.ends_with("_chestplate") {
+            return Some(Self::Chestplate);
+        }
+        if name.ends_with("_leggings") {
+            return Some(Self::Leggings);
+        }
+        if name.ends_with("_boots") {
+            return Some(Self::Boots);
+        }
         None
     }
 }

@@ -168,9 +168,9 @@ pub use types::{Axis, BlockPosition, BlockSource, BoundingBox, Direction, InputB
 pub use animate::{build_animated_glb, PistonAction, Timeline, TimelineEvent};
 
 // --- Mesher ---
+pub use mesher::undrawable_blocks;
 pub use mesher::ChunkIter;
 pub use mesher::{Mesh, Mesher, MesherConfig, MesherOutput, TintColors, TintProvider, Vertex};
-pub use mesher::undrawable_blocks;
 
 // --- Canonical output types ---
 pub use mesh_output::{MeshLayer, MeshOutput};

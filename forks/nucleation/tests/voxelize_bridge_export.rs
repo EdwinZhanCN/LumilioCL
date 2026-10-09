@@ -101,13 +101,7 @@ fn bounded_chunk_query_uses_each_regions_palette() {
     use nucleation::{BlockState, UniversalSchematic};
     let mut source = UniversalSchematic::new("regions".into());
     source.set_block(0, 0, 0, &BlockState::new("minecraft:stone"));
-    source.set_block_in_region(
-        "other",
-        -3,
-        0,
-        0,
-        &BlockState::new("minecraft:glass"),
-    );
+    source.set_block_in_region("other", -3, 0, 0, &BlockState::new("minecraft:glass"));
     let bytes = nucleation::formats::litematic::to_litematic(&source).unwrap();
     let s = Schematic::from_litematic(&bytes).unwrap();
     let out = written(|w| {

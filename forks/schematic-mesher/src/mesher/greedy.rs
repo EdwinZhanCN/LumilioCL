@@ -306,7 +306,13 @@ impl GreedyMesher {
             .or_default()
             .entry(layer)
             .or_default()
-            .insert((u, v), GreedyFace { key, is_transparent });
+            .insert(
+                (u, v),
+                GreedyFace {
+                    key,
+                    is_transparent,
+                },
+            );
     }
 
     /// Run the greedy merge algorithm and return merged quads.
@@ -352,9 +358,8 @@ fn merge_layer(
     let mut result = Vec::new();
 
     // Inline helper to index into visited array
-    let idx = |u: i32, v: i32| -> usize {
-        (u - u_min) as usize + (v - v_min) as usize * grid_width
-    };
+    let idx =
+        |u: i32, v: i32| -> usize { (u - u_min) as usize + (v - v_min) as usize * grid_width };
 
     // Scan in v-major order (top to bottom, left to right)
     for v in v_min..=v_max {
@@ -467,7 +472,12 @@ mod tests {
     #[test]
     fn test_single_face_no_merge() {
         let mut mesher = GreedyMesher::new();
-        mesher.add_face(BlockPosition::new(0, 0, 0), Direction::Up, stone_key(), false);
+        mesher.add_face(
+            BlockPosition::new(0, 0, 0),
+            Direction::Up,
+            stone_key(),
+            false,
+        );
 
         let quads = mesher.merge();
         assert_eq!(quads.len(), 1);
@@ -479,7 +489,12 @@ mod tests {
     fn test_merge_row() {
         let mut mesher = GreedyMesher::new();
         for x in 0..4 {
-            mesher.add_face(BlockPosition::new(x, 0, 0), Direction::Up, stone_key(), false);
+            mesher.add_face(
+                BlockPosition::new(x, 0, 0),
+                Direction::Up,
+                stone_key(),
+                false,
+            );
         }
 
         let quads = mesher.merge();
@@ -493,7 +508,12 @@ mod tests {
         let mut mesher = GreedyMesher::new();
         for x in 0..3 {
             for z in 0..2 {
-                mesher.add_face(BlockPosition::new(x, 0, z), Direction::Up, stone_key(), false);
+                mesher.add_face(
+                    BlockPosition::new(x, 0, z),
+                    Direction::Up,
+                    stone_key(),
+                    false,
+                );
             }
         }
 
@@ -506,8 +526,18 @@ mod tests {
     #[test]
     fn test_no_merge_different_textures() {
         let mut mesher = GreedyMesher::new();
-        mesher.add_face(BlockPosition::new(0, 0, 0), Direction::Up, stone_key(), false);
-        mesher.add_face(BlockPosition::new(1, 0, 0), Direction::Up, dirt_key(), false);
+        mesher.add_face(
+            BlockPosition::new(0, 0, 0),
+            Direction::Up,
+            stone_key(),
+            false,
+        );
+        mesher.add_face(
+            BlockPosition::new(1, 0, 0),
+            Direction::Up,
+            dirt_key(),
+            false,
+        );
 
         let quads = mesher.merge();
         assert_eq!(quads.len(), 2);
@@ -519,8 +549,18 @@ mod tests {
         let mut mesher = GreedyMesher::new();
         // Two rows on different Y layers
         for x in 0..3 {
-            mesher.add_face(BlockPosition::new(x, 0, 0), Direction::Up, stone_key(), false);
-            mesher.add_face(BlockPosition::new(x, 1, 0), Direction::Up, stone_key(), false);
+            mesher.add_face(
+                BlockPosition::new(x, 0, 0),
+                Direction::Up,
+                stone_key(),
+                false,
+            );
+            mesher.add_face(
+                BlockPosition::new(x, 1, 0),
+                Direction::Up,
+                stone_key(),
+                false,
+            );
         }
 
         let quads = mesher.merge();
@@ -581,10 +621,30 @@ mod tests {
         // xxx
         // x
         let mut mesher = GreedyMesher::new();
-        mesher.add_face(BlockPosition::new(0, 0, 0), Direction::Up, stone_key(), false);
-        mesher.add_face(BlockPosition::new(1, 0, 0), Direction::Up, stone_key(), false);
-        mesher.add_face(BlockPosition::new(2, 0, 0), Direction::Up, stone_key(), false);
-        mesher.add_face(BlockPosition::new(0, 0, 1), Direction::Up, stone_key(), false);
+        mesher.add_face(
+            BlockPosition::new(0, 0, 0),
+            Direction::Up,
+            stone_key(),
+            false,
+        );
+        mesher.add_face(
+            BlockPosition::new(1, 0, 0),
+            Direction::Up,
+            stone_key(),
+            false,
+        );
+        mesher.add_face(
+            BlockPosition::new(2, 0, 0),
+            Direction::Up,
+            stone_key(),
+            false,
+        );
+        mesher.add_face(
+            BlockPosition::new(0, 0, 1),
+            Direction::Up,
+            stone_key(),
+            false,
+        );
 
         let quads = mesher.merge();
         // Greedy should produce 2 quads: top row (3x1) + bottom-left (1x1)
@@ -599,7 +659,12 @@ mod tests {
         let mut mesher = GreedyMesher::new();
         for x in 0..4 {
             for z in 0..4 {
-                mesher.add_face(BlockPosition::new(x, 3, z), Direction::Up, stone_key(), false);
+                mesher.add_face(
+                    BlockPosition::new(x, 3, z),
+                    Direction::Up,
+                    stone_key(),
+                    false,
+                );
             }
         }
 

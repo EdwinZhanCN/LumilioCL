@@ -36,7 +36,8 @@ impl FluidState {
             _ => return None,
         };
 
-        let level: u8 = block.properties
+        let level: u8 = block
+            .properties
             .get("level")
             .and_then(|s| s.parse().ok())
             .unwrap_or(0);
@@ -52,7 +53,12 @@ impl FluidState {
             (false, 8)
         };
 
-        Some(FluidState { fluid_type, is_source, amount, is_falling })
+        Some(FluidState {
+            fluid_type,
+            is_source,
+            amount,
+            is_falling,
+        })
     }
 
     /// Height of this fluid block (0.0 to ~0.89).
@@ -83,7 +89,11 @@ impl FluidState {
 
 /// Check if a block has the `waterlogged=true` property.
 pub fn is_waterlogged(block: &InputBlock) -> bool {
-    block.properties.get("waterlogged").map(|v| v == "true").unwrap_or(false)
+    block
+        .properties
+        .get("waterlogged")
+        .map(|v| v == "true")
+        .unwrap_or(false)
 }
 
 /// Get the fluid state at a neighboring position.
@@ -171,9 +181,9 @@ pub fn corner_heights(
 ) -> [f32; 4] {
     [
         corner_height(pos, state, -1, -1, block_map), // NW corner
-        corner_height(pos, state,  1, -1, block_map), // NE corner
-        corner_height(pos, state,  1,  1, block_map), // SE corner
-        corner_height(pos, state, -1,  1, block_map), // SW corner
+        corner_height(pos, state, 1, -1, block_map),  // NE corner
+        corner_height(pos, state, 1, 1, block_map),   // SE corner
+        corner_height(pos, state, -1, 1, block_map),  // SW corner
     ]
 }
 
@@ -209,7 +219,12 @@ pub fn visible_faces(
     }
 
     // Sides: hide if same fluid or opaque neighbor
-    let side_dirs = [Direction::North, Direction::South, Direction::West, Direction::East];
+    let side_dirs = [
+        Direction::North,
+        Direction::South,
+        Direction::West,
+        Direction::East,
+    ];
     for (i, &dir) in side_dirs.iter().enumerate() {
         let neighbor = pos.neighbor(dir);
         if is_same_fluid(neighbor, state.fluid_type, block_map) || is_opaque_fn(neighbor) {
@@ -257,7 +272,12 @@ pub fn generate_fluid_geometry(
     // === Top face ===
     if faces[1] {
         let shade = direction_shade(Direction::Up);
-        let color = [base_color[0] * shade, base_color[1] * shade, base_color[2] * shade, base_color[3]];
+        let color = [
+            base_color[0] * shade,
+            base_color[1] * shade,
+            base_color[2] * shade,
+            base_color[3],
+        ];
         let normal = [0.0, 1.0, 0.0];
         let tex = state.still_texture();
 
@@ -265,69 +285,120 @@ pub fn generate_fluid_geometry(
         // Winding order: NW, NE, SE, SW — CCW triangles 0,3,2 + 0,2,1 for upward normal
         vertices.push(Vertex::new([x, y + h_nw, z], normal, [0.0, 0.0]).with_color(color));
         vertices.push(Vertex::new([x + 1.0, y + h_ne, z], normal, [1.0, 0.0]).with_color(color));
-        vertices.push(Vertex::new([x + 1.0, y + h_se, z + 1.0], normal, [1.0, 1.0]).with_color(color));
+        vertices
+            .push(Vertex::new([x + 1.0, y + h_se, z + 1.0], normal, [1.0, 1.0]).with_color(color));
         vertices.push(Vertex::new([x, y + h_sw, z + 1.0], normal, [0.0, 1.0]).with_color(color));
 
-        indices.extend_from_slice(&[v_start, v_start + 3, v_start + 2, v_start, v_start + 2, v_start + 1]);
-        face_textures.push(FaceTexture { texture: tex, is_transparent: state.fluid_type == FluidType::Water });
+        indices.extend_from_slice(&[
+            v_start,
+            v_start + 3,
+            v_start + 2,
+            v_start,
+            v_start + 2,
+            v_start + 1,
+        ]);
+        face_textures.push(FaceTexture {
+            texture: tex,
+            is_transparent: state.fluid_type == FluidType::Water,
+        });
     }
 
     // === Bottom face ===
     if faces[0] {
         let shade = direction_shade(Direction::Down);
-        let color = [base_color[0] * shade, base_color[1] * shade, base_color[2] * shade, base_color[3]];
+        let color = [
+            base_color[0] * shade,
+            base_color[1] * shade,
+            base_color[2] * shade,
+            base_color[3],
+        ];
         let normal = [0.0, -1.0, 0.0];
         let tex = state.still_texture();
 
         let v_start = vertices.len() as u32;
         // Winding order for Down face: SW, SE, NE, NW — CCW triangles 0,3,2 + 0,2,1 for downward normal
         vertices.push(Vertex::new([x, y + eps, z + 1.0], normal, [0.0, 1.0]).with_color(color));
-        vertices.push(Vertex::new([x + 1.0, y + eps, z + 1.0], normal, [1.0, 1.0]).with_color(color));
+        vertices
+            .push(Vertex::new([x + 1.0, y + eps, z + 1.0], normal, [1.0, 1.0]).with_color(color));
         vertices.push(Vertex::new([x + 1.0, y + eps, z], normal, [1.0, 0.0]).with_color(color));
         vertices.push(Vertex::new([x, y + eps, z], normal, [0.0, 0.0]).with_color(color));
 
-        indices.extend_from_slice(&[v_start, v_start + 3, v_start + 2, v_start, v_start + 2, v_start + 1]);
-        face_textures.push(FaceTexture { texture: tex, is_transparent: state.fluid_type == FluidType::Water });
+        indices.extend_from_slice(&[
+            v_start,
+            v_start + 3,
+            v_start + 2,
+            v_start,
+            v_start + 2,
+            v_start + 1,
+        ]);
+        face_textures.push(FaceTexture {
+            texture: tex,
+            is_transparent: state.fluid_type == FluidType::Water,
+        });
     }
 
     // === Side faces ===
     // North face (z- side)
     if faces[2] {
         emit_side_face(
-            &mut vertices, &mut indices, &mut face_textures,
-            state, base_color, Direction::North,
-            [x + 1.0, y, z + eps], [x, y, z + eps],
-            h_ne, h_nw,
+            &mut vertices,
+            &mut indices,
+            &mut face_textures,
+            state,
+            base_color,
+            Direction::North,
+            [x + 1.0, y, z + eps],
+            [x, y, z + eps],
+            h_ne,
+            h_nw,
         );
     }
 
     // South face (z+ side)
     if faces[3] {
         emit_side_face(
-            &mut vertices, &mut indices, &mut face_textures,
-            state, base_color, Direction::South,
-            [x, y, z + 1.0 - eps], [x + 1.0, y, z + 1.0 - eps],
-            h_sw, h_se,
+            &mut vertices,
+            &mut indices,
+            &mut face_textures,
+            state,
+            base_color,
+            Direction::South,
+            [x, y, z + 1.0 - eps],
+            [x + 1.0, y, z + 1.0 - eps],
+            h_sw,
+            h_se,
         );
     }
 
     // West face (x- side)
     if faces[4] {
         emit_side_face(
-            &mut vertices, &mut indices, &mut face_textures,
-            state, base_color, Direction::West,
-            [x + eps, y, z], [x + eps, y, z + 1.0],
-            h_nw, h_sw,
+            &mut vertices,
+            &mut indices,
+            &mut face_textures,
+            state,
+            base_color,
+            Direction::West,
+            [x + eps, y, z],
+            [x + eps, y, z + 1.0],
+            h_nw,
+            h_sw,
         );
     }
 
     // East face (x+ side)
     if faces[5] {
         emit_side_face(
-            &mut vertices, &mut indices, &mut face_textures,
-            state, base_color, Direction::East,
-            [x + 1.0 - eps, y, z + 1.0], [x + 1.0 - eps, y, z],
-            h_se, h_ne,
+            &mut vertices,
+            &mut indices,
+            &mut face_textures,
+            state,
+            base_color,
+            Direction::East,
+            [x + 1.0 - eps, y, z + 1.0],
+            [x + 1.0 - eps, y, z],
+            h_se,
+            h_ne,
         );
     }
 
@@ -356,7 +427,12 @@ fn emit_side_face(
     h_right: f32,
 ) {
     let shade = direction_shade(direction);
-    let color = [base_color[0] * shade, base_color[1] * shade, base_color[2] * shade, base_color[3]];
+    let color = [
+        base_color[0] * shade,
+        base_color[1] * shade,
+        base_color[2] * shade,
+        base_color[3],
+    ];
     let normal = direction.normal();
     let tex = state.flow_texture();
     let is_transparent = state.fluid_type == FluidType::Water;
@@ -376,8 +452,18 @@ fn emit_side_face(
     vertices.push(Vertex::new(v_br, normal, [1.0, 1.0]).with_color(color));
     vertices.push(Vertex::new(v_bl, normal, [0.0, 1.0]).with_color(color));
 
-    indices.extend_from_slice(&[v_start, v_start + 3, v_start + 2, v_start, v_start + 2, v_start + 1]);
-    face_textures.push(FaceTexture { texture: tex, is_transparent });
+    indices.extend_from_slice(&[
+        v_start,
+        v_start + 3,
+        v_start + 2,
+        v_start,
+        v_start + 2,
+        v_start + 1,
+    ]);
+    face_textures.push(FaceTexture {
+        texture: tex,
+        is_transparent,
+    });
 
     // Back face (inward-facing for double-sided rendering) — CCW winding 0,3,2 + 0,2,1
     let neg_normal = [-normal[0], -normal[1], -normal[2]];
@@ -388,8 +474,18 @@ fn emit_side_face(
     vertices.push(Vertex::new(v_bl, neg_normal, [0.0, 1.0]).with_color(color));
     vertices.push(Vertex::new(v_br, neg_normal, [1.0, 1.0]).with_color(color));
 
-    indices.extend_from_slice(&[v_start2, v_start2 + 3, v_start2 + 2, v_start2, v_start2 + 2, v_start2 + 1]);
-    face_textures.push(FaceTexture { texture: tex, is_transparent });
+    indices.extend_from_slice(&[
+        v_start2,
+        v_start2 + 3,
+        v_start2 + 2,
+        v_start2,
+        v_start2 + 2,
+        v_start2 + 1,
+    ]);
+    face_textures.push(FaceTexture {
+        texture: tex,
+        is_transparent,
+    });
 }
 
 #[cfg(test)]
@@ -451,13 +547,28 @@ mod tests {
 
     #[test]
     fn test_own_height() {
-        let source = FluidState { fluid_type: FluidType::Water, amount: 8, is_source: true, is_falling: false };
+        let source = FluidState {
+            fluid_type: FluidType::Water,
+            amount: 8,
+            is_source: true,
+            is_falling: false,
+        };
         assert!((source.own_height() - 8.0 / 9.0).abs() < 0.01);
 
-        let flowing = FluidState { fluid_type: FluidType::Water, amount: 4, is_source: false, is_falling: false };
+        let flowing = FluidState {
+            fluid_type: FluidType::Water,
+            amount: 4,
+            is_source: false,
+            is_falling: false,
+        };
         assert!((flowing.own_height() - 4.0 / 9.0).abs() < 0.01);
 
-        let falling = FluidState { fluid_type: FluidType::Water, amount: 8, is_source: false, is_falling: true };
+        let falling = FluidState {
+            fluid_type: FluidType::Water,
+            amount: 8,
+            is_source: false,
+            is_falling: true,
+        };
         assert!((falling.own_height() - 1.0).abs() < 0.01);
     }
 
@@ -465,7 +576,8 @@ mod tests {
     fn test_corner_heights_isolated_source() {
         let block = water_source();
         let pos = BlockPosition::new(0, 0, 0);
-        let mut map: rustc_hash::FxHashMap<BlockPosition, &InputBlock> = rustc_hash::FxHashMap::default();
+        let mut map: rustc_hash::FxHashMap<BlockPosition, &InputBlock> =
+            rustc_hash::FxHashMap::default();
         map.insert(pos, &block);
 
         let state = FluidState::from_block(&block).unwrap();
@@ -483,7 +595,8 @@ mod tests {
         let above = water_source();
         let pos = BlockPosition::new(0, 0, 0);
         let above_pos = BlockPosition::new(0, 1, 0);
-        let mut map: rustc_hash::FxHashMap<BlockPosition, &InputBlock> = rustc_hash::FxHashMap::default();
+        let mut map: rustc_hash::FxHashMap<BlockPosition, &InputBlock> =
+            rustc_hash::FxHashMap::default();
         map.insert(pos, &block);
         map.insert(above_pos, &above);
 
@@ -491,7 +604,11 @@ mod tests {
         let heights = corner_heights(pos, &state, &map);
 
         for h in &heights {
-            assert!((*h - 1.0).abs() < 0.01, "Height should be 1.0 with fluid above, got {}", h);
+            assert!(
+                (*h - 1.0).abs() < 0.01,
+                "Height should be 1.0 with fluid above, got {}",
+                h
+            );
         }
     }
 
@@ -499,7 +616,8 @@ mod tests {
     fn test_visible_faces_isolated() {
         let block = water_source();
         let pos = BlockPosition::new(0, 0, 0);
-        let mut map: rustc_hash::FxHashMap<BlockPosition, &InputBlock> = rustc_hash::FxHashMap::default();
+        let mut map: rustc_hash::FxHashMap<BlockPosition, &InputBlock> =
+            rustc_hash::FxHashMap::default();
         map.insert(pos, &block);
 
         let state = FluidState::from_block(&block).unwrap();
@@ -515,7 +633,8 @@ mod tests {
         let above = water_source();
         let pos = BlockPosition::new(0, 0, 0);
         let above_pos = BlockPosition::new(0, 1, 0);
-        let mut map: rustc_hash::FxHashMap<BlockPosition, &InputBlock> = rustc_hash::FxHashMap::default();
+        let mut map: rustc_hash::FxHashMap<BlockPosition, &InputBlock> =
+            rustc_hash::FxHashMap::default();
         map.insert(pos, &block);
         map.insert(above_pos, &above);
 
@@ -530,7 +649,8 @@ mod tests {
     fn test_generate_geometry_produces_vertices() {
         let block = water_source();
         let pos = BlockPosition::new(0, 0, 0);
-        let mut map: rustc_hash::FxHashMap<BlockPosition, &InputBlock> = rustc_hash::FxHashMap::default();
+        let mut map: rustc_hash::FxHashMap<BlockPosition, &InputBlock> =
+            rustc_hash::FxHashMap::default();
         map.insert(pos, &block);
 
         let state = FluidState::from_block(&block).unwrap();
@@ -547,26 +667,34 @@ mod tests {
 
     #[test]
     fn test_texture_paths() {
-        let water = FluidState { fluid_type: FluidType::Water, amount: 8, is_source: true, is_falling: false };
+        let water = FluidState {
+            fluid_type: FluidType::Water,
+            amount: 8,
+            is_source: true,
+            is_falling: false,
+        };
         assert_eq!(water.still_texture(), "block/water_still");
         assert_eq!(water.flow_texture(), "block/water_flow");
 
-        let lava = FluidState { fluid_type: FluidType::Lava, amount: 8, is_source: true, is_falling: false };
+        let lava = FluidState {
+            fluid_type: FluidType::Lava,
+            amount: 8,
+            is_source: true,
+            is_falling: false,
+        };
         assert_eq!(lava.still_texture(), "block/lava_still");
         assert_eq!(lava.flow_texture(), "block/lava_flow");
     }
 
     #[test]
     fn test_is_waterlogged_true() {
-        let block = InputBlock::new("minecraft:oak_stairs")
-            .with_property("waterlogged", "true");
+        let block = InputBlock::new("minecraft:oak_stairs").with_property("waterlogged", "true");
         assert!(is_waterlogged(&block));
     }
 
     #[test]
     fn test_is_waterlogged_false() {
-        let block = InputBlock::new("minecraft:oak_stairs")
-            .with_property("waterlogged", "false");
+        let block = InputBlock::new("minecraft:oak_stairs").with_property("waterlogged", "false");
         assert!(!is_waterlogged(&block));
 
         let block = InputBlock::new("minecraft:oak_stairs");
@@ -575,12 +703,13 @@ mod tests {
 
     #[test]
     fn test_waterlogged_neighbor_is_same_fluid() {
-        let waterlogged = InputBlock::new("minecraft:oak_slab")
-            .with_property("waterlogged", "true");
+        let waterlogged =
+            InputBlock::new("minecraft:oak_slab").with_property("waterlogged", "true");
         let water = water_source();
         let pos_water = BlockPosition::new(0, 0, 0);
         let pos_wl = BlockPosition::new(1, 0, 0);
-        let mut map: rustc_hash::FxHashMap<BlockPosition, &InputBlock> = rustc_hash::FxHashMap::default();
+        let mut map: rustc_hash::FxHashMap<BlockPosition, &InputBlock> =
+            rustc_hash::FxHashMap::default();
         map.insert(pos_water, &water);
         map.insert(pos_wl, &waterlogged);
 
@@ -592,7 +721,8 @@ mod tests {
     fn test_non_waterlogged_not_same_fluid() {
         let slab = InputBlock::new("minecraft:oak_slab");
         let pos = BlockPosition::new(0, 0, 0);
-        let mut map: rustc_hash::FxHashMap<BlockPosition, &InputBlock> = rustc_hash::FxHashMap::default();
+        let mut map: rustc_hash::FxHashMap<BlockPosition, &InputBlock> =
+            rustc_hash::FxHashMap::default();
         map.insert(pos, &slab);
 
         assert!(!is_same_fluid(pos, FluidType::Water, &map));

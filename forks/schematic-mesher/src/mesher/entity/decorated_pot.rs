@@ -23,10 +23,22 @@ fn parse_sherds(block: &InputBlock) -> [String; 4] {
     if let Some(sherds_str) = block.properties.get("sherds") {
         let parts: Vec<&str> = sherds_str.split(',').collect();
         [
-            parts.first().map(|s| sherd_texture(s.trim())).unwrap_or_else(|| POT_SIDE_TEXTURE.to_string()),
-            parts.get(1).map(|s| sherd_texture(s.trim())).unwrap_or_else(|| POT_SIDE_TEXTURE.to_string()),
-            parts.get(2).map(|s| sherd_texture(s.trim())).unwrap_or_else(|| POT_SIDE_TEXTURE.to_string()),
-            parts.get(3).map(|s| sherd_texture(s.trim())).unwrap_or_else(|| POT_SIDE_TEXTURE.to_string()),
+            parts
+                .first()
+                .map(|s| sherd_texture(s.trim()))
+                .unwrap_or_else(|| POT_SIDE_TEXTURE.to_string()),
+            parts
+                .get(1)
+                .map(|s| sherd_texture(s.trim()))
+                .unwrap_or_else(|| POT_SIDE_TEXTURE.to_string()),
+            parts
+                .get(2)
+                .map(|s| sherd_texture(s.trim()))
+                .unwrap_or_else(|| POT_SIDE_TEXTURE.to_string()),
+            parts
+                .get(3)
+                .map(|s| sherd_texture(s.trim()))
+                .unwrap_or_else(|| POT_SIDE_TEXTURE.to_string()),
         ]
     } else {
         [
@@ -50,7 +62,11 @@ pub(crate) fn generate_decorated_pot_geometry(
     block: &InputBlock,
 ) -> (Vec<Vertex>, Vec<u32>, Vec<EntityFaceTexture>) {
     let sherds = parse_sherds(block);
-    let facing = block.properties.get("facing").map(|s| s.as_str()).unwrap_or("north");
+    let facing = block
+        .properties
+        .get("facing")
+        .map(|s| s.as_str())
+        .unwrap_or("north");
 
     let mut vertices = Vec::new();
     let mut indices = Vec::new();
@@ -61,10 +77,10 @@ pub(crate) fn generate_decorated_pot_geometry(
     // humanoid-tuned `facing_rotation_rad`.
     let yrot_deg = match facing {
         "south" => 180.0_f32,
-        "west"  => 90.0_f32,
+        "west" => 90.0_f32,
         "north" => 0.0_f32,
-        "east"  => 270.0_f32,
-        _       => 0.0_f32,
+        "east" => 270.0_f32,
+        _ => 0.0_f32,
     };
     let facing_mat = Mat4::from_translation(Vec3::new(0.5, 0.0, 0.5))
         * Mat4::from_rotation_y(yrot_deg.to_radians())
@@ -79,9 +95,14 @@ pub(crate) fn generate_decorated_pot_geometry(
     // Pot sides are opaque: the pattern (sherd) texture is composited over the
     // base pot-side texture in element.rs::composite_pot_side before rendering.
     add_box_with_side_textures(
-        &mut vertices, &mut indices, &mut face_textures,
-        body_min, body_max, &facing_mat,
-        &sherds, false,
+        &mut vertices,
+        &mut indices,
+        &mut face_textures,
+        body_min,
+        body_max,
+        &facing_mat,
+        &sherds,
+        false,
     );
 
     // Neck geometry from MC's NECK part. After `RotX(π) + offset(0, 37, 16)`
@@ -93,16 +114,26 @@ pub(crate) fn generate_decorated_pot_geometry(
     let rim_min = [5.0 / 16.0, 16.0 / 16.0, 5.0 / 16.0];
     let rim_max = [11.0 / 16.0, 17.0 / 16.0, 11.0 / 16.0];
     add_box(
-        &mut vertices, &mut indices, &mut face_textures,
-        rim_min, rim_max, &facing_mat,
-        POT_SIDE_TEXTURE, false,
+        &mut vertices,
+        &mut indices,
+        &mut face_textures,
+        rim_min,
+        rim_max,
+        &facing_mat,
+        POT_SIDE_TEXTURE,
+        false,
     );
     let neck_min = [4.0 / 16.0, 17.0 / 16.0, 4.0 / 16.0];
     let neck_max = [12.0 / 16.0, 20.0 / 16.0, 12.0 / 16.0];
     add_box(
-        &mut vertices, &mut indices, &mut face_textures,
-        neck_min, neck_max, &facing_mat,
-        POT_SIDE_TEXTURE, false,
+        &mut vertices,
+        &mut indices,
+        &mut face_textures,
+        neck_min,
+        neck_max,
+        &facing_mat,
+        POT_SIDE_TEXTURE,
+        false,
     );
 
     (vertices, indices, face_textures)
@@ -124,19 +155,25 @@ fn add_box(
 
     // 6 faces
     let face_defs: [([usize; 4], [f32; 3]); 6] = [
-        ([4, 5, 1, 0], [0.0, -1.0, 0.0]),  // Down
-        ([3, 2, 6, 7], [0.0, 1.0, 0.0]),   // Up
-        ([1, 0, 3, 2], [0.0, 0.0, -1.0]),  // North
-        ([4, 5, 6, 7], [0.0, 0.0, 1.0]),   // South
-        ([0, 4, 7, 3], [-1.0, 0.0, 0.0]),  // West
-        ([5, 1, 2, 6], [1.0, 0.0, 0.0]),   // East
+        ([4, 5, 1, 0], [0.0, -1.0, 0.0]), // Down
+        ([3, 2, 6, 7], [0.0, 1.0, 0.0]),  // Up
+        ([1, 0, 3, 2], [0.0, 0.0, -1.0]), // North
+        ([4, 5, 6, 7], [0.0, 0.0, 1.0]),  // South
+        ([0, 4, 7, 3], [-1.0, 0.0, 0.0]), // West
+        ([5, 1, 2, 6], [1.0, 0.0, 0.0]),  // East
     ];
 
     for &(ci, normal) in &face_defs {
         add_quad(
-            vertices, indices, face_textures,
-            &transformed, ci, normal, facing_mat,
-            texture, is_transparent,
+            vertices,
+            indices,
+            face_textures,
+            &transformed,
+            ci,
+            normal,
+            facing_mat,
+            texture,
+            is_transparent,
         );
     }
 }
@@ -161,19 +198,25 @@ fn add_box_with_side_textures(
     // non-trivial UVs that don't map cleanly across a full face, and MC's
     // pot top/bottom faces are near-uniform terracotta anyway.
     let face_defs: [([usize; 4], [f32; 3], &str); 6] = [
-        ([4, 5, 1, 0], [0.0, -1.0, 0.0], POT_SIDE_TEXTURE),   // Down
-        ([3, 2, 6, 7], [0.0, 1.0, 0.0], POT_SIDE_TEXTURE),    // Up
-        ([1, 0, 3, 2], [0.0, 0.0, -1.0], &sherds[0]),         // North
-        ([4, 5, 6, 7], [0.0, 0.0, 1.0], &sherds[2]),          // South
-        ([0, 4, 7, 3], [-1.0, 0.0, 0.0], &sherds[3]),         // West
-        ([5, 1, 2, 6], [1.0, 0.0, 0.0], &sherds[1]),          // East
+        ([4, 5, 1, 0], [0.0, -1.0, 0.0], POT_SIDE_TEXTURE), // Down
+        ([3, 2, 6, 7], [0.0, 1.0, 0.0], POT_SIDE_TEXTURE),  // Up
+        ([1, 0, 3, 2], [0.0, 0.0, -1.0], &sherds[0]),       // North
+        ([4, 5, 6, 7], [0.0, 0.0, 1.0], &sherds[2]),        // South
+        ([0, 4, 7, 3], [-1.0, 0.0, 0.0], &sherds[3]),       // West
+        ([5, 1, 2, 6], [1.0, 0.0, 0.0], &sherds[1]),        // East
     ];
 
     for &(ci, normal, texture) in &face_defs {
         add_quad(
-            vertices, indices, face_textures,
-            &transformed, ci, normal, facing_mat,
-            texture, is_transparent,
+            vertices,
+            indices,
+            face_textures,
+            &transformed,
+            ci,
+            normal,
+            facing_mat,
+            texture,
+            is_transparent,
         );
     }
 }
@@ -242,13 +285,21 @@ fn add_quad(
     let is_side = normal[1].abs() < 0.5;
     if is_side {
         indices.extend_from_slice(&[
-            v_start, v_start + 1, v_start + 2,
-            v_start, v_start + 2, v_start + 3,
+            v_start,
+            v_start + 1,
+            v_start + 2,
+            v_start,
+            v_start + 2,
+            v_start + 3,
         ]);
     } else {
         indices.extend_from_slice(&[
-            v_start, v_start + 2, v_start + 1,
-            v_start, v_start + 3, v_start + 2,
+            v_start,
+            v_start + 2,
+            v_start + 1,
+            v_start,
+            v_start + 3,
+            v_start + 2,
         ]);
     }
 
@@ -293,8 +344,7 @@ mod tests {
 
     #[test]
     fn test_decorated_pot_geometry_count() {
-        let block = InputBlock::new("minecraft:decorated_pot")
-            .with_property("facing", "north");
+        let block = InputBlock::new("minecraft:decorated_pot").with_property("facing", "north");
         let (verts, indices, faces) = generate_decorated_pot_geometry(&block);
 
         // 3 boxes: body + neck + rim = 18 faces
@@ -317,16 +367,18 @@ mod tests {
 
     #[test]
     fn test_decorated_pot_facing_changes_vertices() {
-        let block_n = InputBlock::new("minecraft:decorated_pot")
-            .with_property("facing", "north");
-        let block_e = InputBlock::new("minecraft:decorated_pot")
-            .with_property("facing", "east");
+        let block_n = InputBlock::new("minecraft:decorated_pot").with_property("facing", "north");
+        let block_e = InputBlock::new("minecraft:decorated_pot").with_property("facing", "east");
         let (verts_n, _, _) = generate_decorated_pot_geometry(&block_n);
         let (verts_e, _, _) = generate_decorated_pot_geometry(&block_e);
 
-        let any_different = verts_n.iter().zip(verts_e.iter())
-            .any(|(a, b)| (a.position[0] - b.position[0]).abs() > 0.01
-                       || (a.position[2] - b.position[2]).abs() > 0.01);
-        assert!(any_different, "Different facings should produce different vertex positions");
+        let any_different = verts_n.iter().zip(verts_e.iter()).any(|(a, b)| {
+            (a.position[0] - b.position[0]).abs() > 0.01
+                || (a.position[2] - b.position[2]).abs() > 0.01
+        });
+        assert!(
+            any_different,
+            "Different facings should produce different vertex positions"
+        );
     }
 }

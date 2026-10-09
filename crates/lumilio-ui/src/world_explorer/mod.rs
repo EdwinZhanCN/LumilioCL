@@ -4,6 +4,7 @@ mod canvas;
 mod layers;
 mod objects;
 mod seed;
+mod select;
 mod stats;
 mod toolbar;
 pub use objects::ObjectKey;
@@ -99,6 +100,8 @@ const DEFAULT_LAYERS: &[&str] = &[
 ];
 /// Icons drawn at once; the most important win when a view holds more.
 const MAX_ICONS: usize = 400;
+/// Area rectangles drawn at once.
+const MAX_FILLS: usize = 6000;
 /// Icon edge on screen, in pixels.
 const ICON: u32 = 28;
 
@@ -179,6 +182,10 @@ pub struct MapView {
     size: [u32; 2],
     bounds: Option<Bounds<Pixels>>,
     drag: Option<Point<Pixels>>,
+    /// Where the left button went down, until it comes up: a click if it
+    /// barely moved.
+    press: Option<Point<Pixels>>,
+    selected: Option<MapObject>,
     cursor: [f64; 2],
     serial: u64,
     image: Option<Arc<RenderImage>>,
@@ -247,6 +254,8 @@ impl MapView {
             size: [0, 0],
             bounds: None,
             drag: None,
+            press: None,
+            selected: None,
             cursor: [0., 0.],
             serial: 0,
             image: None,
@@ -433,6 +442,7 @@ impl MapView {
     }
     /// The world or dimension changed: what it can show is asked for again.
     fn context_changed(&mut self) {
+        self.selected = None;
         self.objects.clear();
         self.objects.layers.clear();
         if let (Some(connection), Some(context)) = (&self.connection, &self.context) {
@@ -483,6 +493,45 @@ impl MapView {
             })
             .collect()
     }
+    /// Rectangles for the visible area layers (slime chunks): each heat cell
+    /// in view, translucent, under the icons.
+    fn fills(&self) -> Vec<canvas::Fill> {
+        let view = self.view_blocks();
+        let (width, height) = (f64::from(self.size[0]), f64::from(self.size[1]));
+        let to_screen = |x: f64, z: f64| {
+            (
+                (x - self.camera.x) / self.camera.scale + width / 2.,
+                (z - self.camera.z) / self.camera.scale + height / 2.,
+            )
+        };
+        let mut fills: Vec<canvas::Fill> = self.selection_fill().into_iter().collect();
+        for object in self.objects.visible(view) {
+            let MapObjectKind::Heat { cell, values } = &object.kind else {
+                continue;
+            };
+            let [r, g, b] = object.color.unwrap_or([255, 255, 255]);
+            for (at, strength) in values {
+                if at.x + cell < view[0]
+                    || at.x > view[2]
+                    || at.z + cell < view[1]
+                    || at.z > view[3]
+                {
+                    continue;
+                }
+                let (left, top) = to_screen(at.x, at.z);
+                let (right, bottom) = to_screen(at.x + cell, at.z + cell);
+                let alpha = (strength.clamp(0., 1.) * 110.).round() as u8;
+                fills.push(canvas::Fill {
+                    rect: [left, top, right, bottom],
+                    rgba: [r, g, b, alpha],
+                });
+                if fills.len() >= MAX_FILLS {
+                    return fills;
+                }
+            }
+        }
+        fills
+    }
     /// The canvas backend's drawing surface, filling the viewport: it paints
     /// this frame's tiles, icons and grid straight through GPUI.
     fn canvas_layer(&mut self) -> Option<gpui::Canvas<()>> {
@@ -505,6 +554,7 @@ impl MapView {
                 chunks: self.layers.chunks,
                 regions: self.layers.regions,
             },
+            fills: self.fills(),
         };
         let (painter, stats) = (self.painter.clone(), self.stats.clone());
         Some(
@@ -926,20 +976,34 @@ impl Render for MapView {
                 ),
             )
             .child(float().bottom_3().right_3().child(self.layer_popover(cx)))
+            .children(
+                self.selection_card(cx)
+                    .map(|card| float().left_3().bottom(px(56.)).child(card)),
+            )
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(|this, event: &gpui::MouseDownEvent, window, cx| {
                     window.focus(&this.focus, cx);
                     this.drag = Some(event.position);
+                    this.press = Some(event.position);
                 }),
             )
             .on_mouse_up(
                 MouseButton::Left,
-                cx.listener(|this, _, _, _| this.drag = None),
+                cx.listener(|this, event: &gpui::MouseUpEvent, _, cx| {
+                    this.drag = None;
+                    if let Some(down) = this.press.take() {
+                        this.click(down, event.position);
+                        cx.notify();
+                    }
+                }),
             )
             .on_mouse_up_out(
                 MouseButton::Left,
-                cx.listener(|this, _, _, _| this.drag = None),
+                cx.listener(|this, _, _, _| {
+                    this.drag = None;
+                    this.press = None;
+                }),
             )
             .on_mouse_move(cx.listener(|this, event: &gpui::MouseMoveEvent, _, cx| {
                 if let Some(bounds) = this.bounds {

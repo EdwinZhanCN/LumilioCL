@@ -2,10 +2,10 @@
 
 use crate::atlas::{AtlasBuilder, TextureAtlas};
 use crate::error::{MesherError, Result};
+use crate::mesher::entity;
 use crate::mesher::face_culler::FaceCuller;
 use crate::mesher::geometry::{Mesh, Vertex};
-use crate::mesher::greedy::{FaceMergeKey, GreedyMesher, quantize_color};
-use crate::mesher::entity;
+use crate::mesher::greedy::{quantize_color, FaceMergeKey, GreedyMesher};
 use crate::mesher::liquid::{self, FluidState};
 use crate::mesher::MesherConfig;
 use crate::resolver::{resolve_block, ModelResolver, ResolvedModel};
@@ -16,9 +16,12 @@ use crate::resource_pack::{ModelElement, ModelFace, ResourcePack, TextureData};
 // eligible for a binary greedy mesher) vs total, and how many of those are fully
 // lit (mergeable without per-AO handling). Used to size the hybrid binary mesher
 // against the non-cube/state reality before integrating it.
-pub(crate) static STAT_TOTAL_FACES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-pub(crate) static STAT_CUBE_FACES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-pub(crate) static STAT_CUBE_LIT_FACES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+pub(crate) static STAT_TOTAL_FACES: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(0);
+pub(crate) static STAT_CUBE_FACES: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(0);
+pub(crate) static STAT_CUBE_LIT_FACES: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(0);
 
 #[inline]
 fn stats_enabled() -> bool {
@@ -214,11 +217,7 @@ impl<'a> MeshBuilder<'a> {
     }
 
     /// Add a block to the mesh.
-    pub fn add_block(
-        &mut self,
-        pos: BlockPosition,
-        block: &InputBlock,
-    ) -> Result<()> {
+    pub fn add_block(&mut self, pos: BlockPosition, block: &InputBlock) -> Result<()> {
         let first_face = self.face_textures.len();
         let result = self.add_block_geometry(pos, block);
         self.separate_coplanar_faces(first_face);
@@ -293,11 +292,7 @@ impl<'a> MeshBuilder<'a> {
         }
     }
 
-    fn add_block_geometry(
-        &mut self,
-        pos: BlockPosition,
-        block: &InputBlock,
-    ) -> Result<()> {
+    fn add_block_geometry(&mut self, pos: BlockPosition, block: &InputBlock) -> Result<()> {
         // Check if this is a mob entity — generate custom geometry, bypass model resolution
         if let Some(mob_type) = entity::detect_mob(block) {
             return self.add_mob(pos, block, mob_type);
@@ -334,7 +329,8 @@ impl<'a> MeshBuilder<'a> {
                 };
                 let rc = std::rc::Rc::new(resolved_models);
                 // Store in cache for future blocks with same identity
-                self.resolve_cache.insert(cache_key, std::rc::Rc::clone(&rc));
+                self.resolve_cache
+                    .insert(cache_key, std::rc::Rc::clone(&rc));
                 rc
             };
             self.last_block_ptr = block_ptr;
@@ -433,7 +429,9 @@ impl<'a> MeshBuilder<'a> {
 
         // Opacity check function using the culler
         let is_opaque = |p: BlockPosition| -> bool {
-            self.culler.map(|c| c.is_fully_opaque_at(p)).unwrap_or(false)
+            self.culler
+                .map(|c| c.is_fully_opaque_at(p))
+                .unwrap_or(false)
         };
 
         let (mut vertices, indices, face_textures) =
@@ -547,7 +545,10 @@ impl<'a> MeshBuilder<'a> {
         let base_vertex = self.mesh.vertex_count() as u32;
         let base_index = self.mesh.indices.len();
 
-        let is_emissive = self.light_map.map(|lm| lm.is_emissive(pos)).unwrap_or(false);
+        let is_emissive = self
+            .light_map
+            .map(|lm| lm.is_emissive(pos))
+            .unwrap_or(false);
 
         for v in &vertices {
             let mut vertex = *v;
@@ -598,21 +599,28 @@ impl<'a> MeshBuilder<'a> {
         block: &InputBlock,
         mob_type: entity::MobType,
     ) -> Result<()> {
-        let (vertices, indices, mut face_textures) =
-            entity::generate_mob_geometry(block, mob_type);
+        let (vertices, indices, mut face_textures) = entity::generate_mob_geometry(block, mob_type);
 
         // Villagers render as three stacked draw passes in MC: base skin +
         // biome overlay + profession overlay. Composite them into one texture.
         if matches!(mob_type, entity::MobType::Villager) {
-            let biome = block.properties.get("biome")
-                .map(|s| s.as_str()).unwrap_or("plains");
-            let profession = block.properties.get("profession")
-                .map(|s| s.as_str()).unwrap_or("none");
+            let biome = block
+                .properties
+                .get("biome")
+                .map(|s| s.as_str())
+                .unwrap_or("plains");
+            let profession = block
+                .properties
+                .get("profession")
+                .map(|s| s.as_str())
+                .unwrap_or("none");
             let tex_key = format!("_villager/{}/{}", biome, profession);
 
             if !self.dynamic_textures.contains_key(&tex_key) {
                 if let Some(tex) = entity::villager_texture::composite_villager_texture(
-                    self.resource_pack, biome, profession,
+                    self.resource_pack,
+                    biome,
+                    profession,
                 ) {
                     self.dynamic_textures.insert(tex_key.clone(), tex);
                 }
@@ -662,19 +670,29 @@ impl<'a> MeshBuilder<'a> {
         }
 
         // Item frames: render item inside the frame if "item" property is set
-        if matches!(mob_type, entity::MobType::ItemFrame | entity::MobType::GlowItemFrame) {
+        if matches!(
+            mob_type,
+            entity::MobType::ItemFrame | entity::MobType::GlowItemFrame
+        ) {
             if let Some(item_id) = block.properties.get("item") {
-                let item_rotation: u8 = block.properties.get("item_rotation")
+                let item_rotation: u8 = block
+                    .properties
+                    .get("item_rotation")
                     .and_then(|s| s.parse().ok())
                     .unwrap_or(0);
-                let facing = block.properties.get("facing")
+                let facing = block
+                    .properties
+                    .get("facing")
                     .map(|s| s.as_str())
                     .unwrap_or("south");
 
                 if let Some((item_verts, item_indices, item_faces)) =
                     entity::item_render::render_item_in_frame(
-                        self.resource_pack, &self.model_resolver,
-                        item_id, item_rotation, facing,
+                        self.resource_pack,
+                        &self.model_resolver,
+                        item_id,
+                        item_rotation,
+                        facing,
                     )
                 {
                     self.add_item_geometry(pos, &item_verts, &item_indices, &item_faces);
@@ -685,14 +703,18 @@ impl<'a> MeshBuilder<'a> {
         // Dropped items: render via item_render module
         if matches!(mob_type, entity::MobType::DroppedItem) {
             if let Some(item_id) = block.properties.get("item") {
-                let facing = block.properties.get("facing")
+                let facing = block
+                    .properties
+                    .get("facing")
                     .map(|s| s.as_str())
                     .unwrap_or("south");
 
                 if let Some((item_verts, item_indices, item_faces)) =
                     entity::item_render::render_dropped_item(
-                        self.resource_pack, &self.model_resolver,
-                        item_id, facing,
+                        self.resource_pack,
+                        &self.model_resolver,
+                        item_id,
+                        facing,
                     )
                 {
                     self.add_item_geometry(pos, &item_verts, &item_indices, &item_faces);
@@ -705,7 +727,12 @@ impl<'a> MeshBuilder<'a> {
             let mut wool_model = crate::mesher::entity::sheep::sheep_wool_model();
             // Apply baby scaling to wool overlay too (head gets same extra 2× so
             // it tracks the base sheep's big-head proportions).
-            if block.properties.get("is_baby").map(|v| v == "true").unwrap_or(false) {
+            if block
+                .properties
+                .get("is_baby")
+                .map(|v| v == "true")
+                .unwrap_or(false)
+            {
                 if let Some(root) = wool_model.parts.first_mut() {
                     root.pose.scale = [0.5, 0.5, 0.5];
                     root.pose.position[1] = 12.0;
@@ -716,7 +743,9 @@ impl<'a> MeshBuilder<'a> {
                     }
                 }
             }
-            let facing = block.properties.get("facing")
+            let facing = block
+                .properties
+                .get("facing")
                 .map(|s| s.as_str())
                 .unwrap_or("south");
             let facing_angle = entity::facing_rotation_rad(facing);
@@ -739,7 +768,9 @@ impl<'a> MeshBuilder<'a> {
             );
 
             // Apply dye color tint to wool vertices
-            let dye_color = block.properties.get("color")
+            let dye_color = block
+                .properties
+                .get("color")
                 .map(|c| dye_rgb(c))
                 .unwrap_or([1.0, 1.0, 1.0, 1.0]);
             for v in &mut wool_verts {
@@ -783,7 +814,9 @@ impl<'a> MeshBuilder<'a> {
             // Build player model with dynamic texture key
             let model = entity::player::player_model(block, &tex_key);
 
-            let facing = block.properties.get("facing")
+            let facing = block
+                .properties
+                .get("facing")
                 .map(|s| s.as_str())
                 .unwrap_or("south");
             let facing_angle = entity::facing_rotation_rad(facing);
@@ -811,8 +844,13 @@ impl<'a> MeshBuilder<'a> {
         }
 
         // Armor stands and players: render armor overlay if armor properties are set
-        if matches!(mob_type, entity::MobType::ArmorStand | entity::MobType::Player) {
-            let facing = block.properties.get("facing")
+        if matches!(
+            mob_type,
+            entity::MobType::ArmorStand | entity::MobType::Player
+        ) {
+            let facing = block
+                .properties
+                .get("facing")
                 .map(|s| s.as_str())
                 .unwrap_or("south");
             let (armor_verts, armor_indices, armor_faces) =
@@ -824,18 +862,23 @@ impl<'a> MeshBuilder<'a> {
 
         // Equipment overlays (saddle on pig/horse, horse armor). Rendered as a
         // second pass over the mob's model with cubes inflated slightly.
-        if !matches!(mob_type, entity::MobType::Player
-            | entity::MobType::DroppedItem
-            | entity::MobType::ItemFrame
-            | entity::MobType::GlowItemFrame
-            | entity::MobType::Boat
-            | entity::MobType::ChestBoat)
-        {
+        if !matches!(
+            mob_type,
+            entity::MobType::Player
+                | entity::MobType::DroppedItem
+                | entity::MobType::ItemFrame
+                | entity::MobType::GlowItemFrame
+                | entity::MobType::Boat
+                | entity::MobType::ChestBoat
+        ) {
             let base_model = entity::mob::build_mob_model(mob_type, block);
             let overlays = entity::equipment::overlays_for(mob_type, block, &base_model);
             if !overlays.is_empty() {
-                let facing = block.properties.get("facing")
-                    .map(|s| s.as_str()).unwrap_or("south");
+                let facing = block
+                    .properties
+                    .get("facing")
+                    .map(|s| s.as_str())
+                    .unwrap_or("south");
                 let facing_angle = entity::facing_rotation_rad(facing);
                 let facing_mat = glam::Mat4::from_translation(glam::Vec3::new(0.5, 0.0, 0.5))
                     * glam::Mat4::from_rotation_y(facing_angle)
@@ -845,8 +888,13 @@ impl<'a> MeshBuilder<'a> {
                     let mut indices = Vec::new();
                     let mut faces = Vec::new();
                     entity::traverse_parts(
-                        &overlay.model.parts, glam::Mat4::IDENTITY, &facing_mat,
-                        &overlay.model, &mut verts, &mut indices, &mut faces,
+                        &overlay.model.parts,
+                        glam::Mat4::IDENTITY,
+                        &facing_mat,
+                        &overlay.model,
+                        &mut verts,
+                        &mut indices,
+                        &mut faces,
                     );
                     if !verts.is_empty() {
                         self.add_offset_geometry(pos, [0.0, 0.0, 0.0], &verts, &indices, &faces);
@@ -881,18 +929,40 @@ impl<'a> MeshBuilder<'a> {
 
         // Rider faces the same way as the host by default, and inherits any visual
         // props the rider's renderer needs (skin, armor, etc.).
-        let host_facing = host_block.properties.get("facing")
-            .map(|s| s.as_str()).unwrap_or("south");
-        rider_block.properties.insert("facing".to_string(), host_facing.to_string());
-        for key in ["skin", "skin_base64", "uuid", "slim", "helmet", "chestplate",
-                    "leggings", "boots", "color", "variant", "is_baby"] {
+        let host_facing = host_block
+            .properties
+            .get("facing")
+            .map(|s| s.as_str())
+            .unwrap_or("south");
+        rider_block
+            .properties
+            .insert("facing".to_string(), host_facing.to_string());
+        for key in [
+            "skin",
+            "skin_base64",
+            "uuid",
+            "slim",
+            "helmet",
+            "chestplate",
+            "leggings",
+            "boots",
+            "color",
+            "variant",
+            "is_baby",
+        ] {
             if let Some(v) = host_block.properties.get(key) {
                 rider_block.properties.insert(key.to_string(), v.clone());
             }
         }
         // Copy pose properties so a riding player can have posed arms/legs.
-        for key in ["HeadPose", "BodyPose", "RightArmPose", "LeftArmPose",
-                    "RightLegPose", "LeftLegPose"] {
+        for key in [
+            "HeadPose",
+            "BodyPose",
+            "RightArmPose",
+            "LeftArmPose",
+            "RightLegPose",
+            "LeftLegPose",
+        ] {
             if let Some(v) = host_block.properties.get(key) {
                 rider_block.properties.insert(key.to_string(), v.clone());
             }
@@ -908,12 +978,19 @@ impl<'a> MeshBuilder<'a> {
         // when `isPassenger`: legs bent forward ~81° and spread ±18°.
         let is_humanoid_rider = matches!(
             rider_type,
-            entity::MobType::Player | entity::MobType::Zombie | entity::MobType::Skeleton
-                | entity::MobType::Villager | entity::MobType::ArmorStand
+            entity::MobType::Player
+                | entity::MobType::Zombie
+                | entity::MobType::Skeleton
+                | entity::MobType::Villager
+                | entity::MobType::ArmorStand
         );
         if is_humanoid_rider && !rider_block.properties.contains_key("RightLegPose") {
-            rider_block.properties.insert("RightLegPose".to_string(), "-81,18,0".to_string());
-            rider_block.properties.insert("LeftLegPose".to_string(), "-81,-18,0".to_string());
+            rider_block
+                .properties
+                .insert("RightLegPose".to_string(), "-81,18,0".to_string());
+            rider_block
+                .properties
+                .insert("LeftLegPose".to_string(), "-81,-18,0".to_string());
         }
 
         let saddle = entity::rider_offset(host_mob);
@@ -952,8 +1029,13 @@ impl<'a> MeshBuilder<'a> {
             let mut indices = Vec::new();
             let mut faces = Vec::new();
             entity::traverse_parts(
-                &model.parts, glam::Mat4::IDENTITY, &facing_mat, &model,
-                &mut verts, &mut indices, &mut faces,
+                &model.parts,
+                glam::Mat4::IDENTITY,
+                &facing_mat,
+                &model,
+                &mut verts,
+                &mut indices,
+                &mut faces,
             );
             self.add_offset_geometry(host_pos, saddle, &verts, &indices, &faces);
         } else {
@@ -963,14 +1045,22 @@ impl<'a> MeshBuilder<'a> {
             // Villagers need the biome+profession compositing like the top-level
             // villager handling does; without it the rider is "naked".
             if matches!(rider_type, entity::MobType::Villager) {
-                let biome = rider_block.properties.get("biome")
-                    .map(|s| s.as_str()).unwrap_or("plains");
-                let profession = rider_block.properties.get("profession")
-                    .map(|s| s.as_str()).unwrap_or("none");
+                let biome = rider_block
+                    .properties
+                    .get("biome")
+                    .map(|s| s.as_str())
+                    .unwrap_or("plains");
+                let profession = rider_block
+                    .properties
+                    .get("profession")
+                    .map(|s| s.as_str())
+                    .unwrap_or("none");
                 let tex_key = format!("_villager/{}/{}", biome, profession);
                 if !self.dynamic_textures.contains_key(&tex_key) {
                     if let Some(tex) = entity::villager_texture::composite_villager_texture(
-                        self.resource_pack, biome, profession,
+                        self.resource_pack,
+                        biome,
+                        profession,
                     ) {
                         self.dynamic_textures.insert(tex_key.clone(), tex);
                     }
@@ -1032,11 +1122,7 @@ impl<'a> MeshBuilder<'a> {
     }
 
     /// Add inventory hologram above a container block.
-    fn add_inventory_hologram(
-        &mut self,
-        pos: BlockPosition,
-        inventory_str: &str,
-    ) -> Result<()> {
+    fn add_inventory_hologram(&mut self, pos: BlockPosition, inventory_str: &str) -> Result<()> {
         if let Some((mut verts, indices, mut face_textures, tex_data)) =
             entity::inventory::render_inventory_hologram(
                 self.resource_pack,
@@ -1104,9 +1190,9 @@ impl<'a> MeshBuilder<'a> {
         for quad in &source.quads {
             if let Some(anim) = entity::particle::particle_anim_def(quad.texture) {
                 if !self.dynamic_textures.contains_key(anim.key) {
-                    if let Some(tex) = entity::particle::build_particle_sprite_sheet(
-                        self.resource_pack, anim,
-                    ) {
+                    if let Some(tex) =
+                        entity::particle::build_particle_sprite_sheet(self.resource_pack, anim)
+                    {
                         self.dynamic_textures.insert(anim.key.to_string(), tex);
                     }
                 }
@@ -1171,7 +1257,9 @@ impl<'a> MeshBuilder<'a> {
         is_wall: bool,
     ) -> Result<()> {
         // Parse pattern property
-        let patterns = block.properties.get("patterns")
+        let patterns = block
+            .properties
+            .get("patterns")
             .map(|s| entity::banner::parse_patterns(s))
             .unwrap_or_default();
 
@@ -1183,11 +1271,9 @@ impl<'a> MeshBuilder<'a> {
 
         // Composite the texture if not already cached
         if !self.dynamic_textures.contains_key(&tex_key) {
-            if let Some(tex) = entity::banner::composite_banner_texture(
-                self.resource_pack,
-                base_color,
-                &patterns,
-            ) {
+            if let Some(tex) =
+                entity::banner::composite_banner_texture(self.resource_pack, base_color, &patterns)
+            {
                 self.dynamic_textures.insert(tex_key.clone(), tex);
             }
         }
@@ -1238,22 +1324,33 @@ impl<'a> MeshBuilder<'a> {
         is_wall: bool,
     ) -> Result<()> {
         let base_texture = entity::sign::sign_texture_path(wood);
-        let color = block.properties.get("color")
+        let color = block
+            .properties
+            .get("color")
             .map(|s| s.as_str())
             .unwrap_or("black");
-        let glowing = block.properties.get("glowing")
+        let glowing = block
+            .properties
+            .get("glowing")
             .map(|s| s == "true")
             .unwrap_or(false);
 
         let lines: Vec<&str> = (1..=4)
             .filter_map(|i| {
-                block.properties.get(&format!("text{}", i))
+                block
+                    .properties
+                    .get(&format!("text{}", i))
                     .map(|s| s.as_str())
             })
             .collect();
 
         // Generate unique texture key (includes glowing flag)
-        let mut tex_key = format!("_sign/{}_{}_{}", base_texture, color, if glowing { "glow" } else { "normal" });
+        let mut tex_key = format!(
+            "_sign/{}_{}_{}",
+            base_texture,
+            color,
+            if glowing { "glow" } else { "normal" }
+        );
         for line in &lines {
             tex_key.push('_');
             tex_key.push_str(line);
@@ -1267,13 +1364,20 @@ impl<'a> MeshBuilder<'a> {
         };
         if !self.dynamic_textures.contains_key(&tex_key) {
             if let Some(tex) = entity::sign_text::composite_sign_with_text(
-                self.resource_pack, base_texture, &lines, color, glowing, kind,
+                self.resource_pack,
+                base_texture,
+                &lines,
+                color,
+                glowing,
+                kind,
             ) {
                 self.dynamic_textures.insert(tex_key.clone(), tex);
             } else {
                 // Fallback to normal sign rendering (no font available)
-                let (vertices, indices, face_textures) =
-                    entity::generate_entity_geometry(block, &entity::BlockEntityType::Sign { wood, is_wall });
+                let (vertices, indices, face_textures) = entity::generate_entity_geometry(
+                    block,
+                    &entity::BlockEntityType::Sign { wood, is_wall },
+                );
                 if !vertices.is_empty() {
                     self.add_item_geometry(pos, &vertices, &indices, &face_textures);
                 }
@@ -1316,11 +1420,7 @@ impl<'a> MeshBuilder<'a> {
     }
 
     /// Add decorated pot with per-face sherd textures.
-    fn add_decorated_pot(
-        &mut self,
-        pos: BlockPosition,
-        block: &InputBlock,
-    ) -> Result<()> {
+    fn add_decorated_pot(&mut self, pos: BlockPosition, block: &InputBlock) -> Result<()> {
         let (vertices, indices, mut face_textures) =
             entity::decorated_pot::generate_decorated_pot_geometry(block);
 
@@ -1334,7 +1434,9 @@ impl<'a> MeshBuilder<'a> {
         // We composite each unique pattern onto the side texture and swap the
         // face texture to point at the composite.
         for ft in face_textures.iter_mut() {
-            if let Some(pat) = ft.texture.strip_prefix("entity/decorated_pot/")
+            if let Some(pat) = ft
+                .texture
+                .strip_prefix("entity/decorated_pot/")
                 .and_then(|s| s.strip_suffix("_pottery_pattern"))
             {
                 let key = format!("_pot/{}", pat);
@@ -1358,11 +1460,7 @@ impl<'a> MeshBuilder<'a> {
     }
 
     /// Add player head entity with skin texture support.
-    fn add_player_head(
-        &mut self,
-        pos: BlockPosition,
-        block: &InputBlock,
-    ) -> Result<()> {
+    fn add_player_head(&mut self, pos: BlockPosition, block: &InputBlock) -> Result<()> {
         let block_id = block.block_id();
         let is_wall = block_id.contains("wall");
 
@@ -1387,7 +1485,8 @@ impl<'a> MeshBuilder<'a> {
             if !self.dynamic_textures.contains_key(&tex_key) {
                 let fallback_path = entity::skull::player_skin_fallback_path(block);
                 if let Some(fallback_tex) = self.resource_pack.get_texture(fallback_path) {
-                    self.dynamic_textures.insert(tex_key.clone(), fallback_tex.clone());
+                    self.dynamic_textures
+                        .insert(tex_key.clone(), fallback_tex.clone());
                 }
             }
         }
@@ -1435,21 +1534,32 @@ impl<'a> MeshBuilder<'a> {
         is_wall: bool,
     ) -> Result<()> {
         let base_texture = entity::hanging_sign::hanging_sign_texture_path(wood);
-        let color = block.properties.get("color")
+        let color = block
+            .properties
+            .get("color")
             .map(|s| s.as_str())
             .unwrap_or("black");
-        let glowing = block.properties.get("glowing")
+        let glowing = block
+            .properties
+            .get("glowing")
             .map(|s| s == "true")
             .unwrap_or(false);
 
         let lines: Vec<&str> = (1..=4)
             .filter_map(|i| {
-                block.properties.get(&format!("text{}", i))
+                block
+                    .properties
+                    .get(&format!("text{}", i))
                     .map(|s| s.as_str())
             })
             .collect();
 
-        let mut tex_key = format!("_hanging_sign/{}_{}_{}", base_texture, color, if glowing { "glow" } else { "normal" });
+        let mut tex_key = format!(
+            "_hanging_sign/{}_{}_{}",
+            base_texture,
+            color,
+            if glowing { "glow" } else { "normal" }
+        );
         for line in &lines {
             tex_key.push('_');
             tex_key.push_str(line);
@@ -1457,14 +1567,20 @@ impl<'a> MeshBuilder<'a> {
 
         if !self.dynamic_textures.contains_key(&tex_key) {
             if let Some(tex) = entity::sign_text::composite_sign_with_text(
-                self.resource_pack, base_texture, &lines, color, glowing,
+                self.resource_pack,
+                base_texture,
+                &lines,
+                color,
+                glowing,
                 entity::sign_text::SignKind::Hanging,
             ) {
                 self.dynamic_textures.insert(tex_key.clone(), tex);
             } else {
                 // Fallback to normal hanging sign rendering (no font available)
-                let (vertices, indices, face_textures) =
-                    entity::generate_entity_geometry(block, &entity::BlockEntityType::HangingSign { wood, is_wall });
+                let (vertices, indices, face_textures) = entity::generate_entity_geometry(
+                    block,
+                    &entity::BlockEntityType::HangingSign { wood, is_wall },
+                );
                 if !vertices.is_empty() {
                     self.add_item_geometry(pos, &vertices, &indices, &face_textures);
                 }
@@ -1533,8 +1649,8 @@ impl<'a> MeshBuilder<'a> {
 
         let mut item_idx_offset = item_base_index;
         for ft in item_faces {
-            let face_v_start = (item_idx_offset - item_base_index) as u32 / 6 * 4
-                + item_base_vertex;
+            let face_v_start =
+                (item_idx_offset - item_base_index) as u32 / 6 * 4 + item_base_vertex;
             self.face_textures.push(FaceTextureMapping {
                 vertex_start: face_v_start,
                 index_start: item_idx_offset,
@@ -1566,7 +1682,14 @@ impl<'a> MeshBuilder<'a> {
 
         // Process each element
         for element in &model.elements {
-            self.add_element(pos, block, element, transform, &resolved_textures, single_element)?;
+            self.add_element(
+                pos,
+                block,
+                element,
+                transform,
+                &resolved_textures,
+                single_element,
+            )?;
         }
 
         Ok(())
@@ -1633,7 +1756,10 @@ impl<'a> MeshBuilder<'a> {
         single_element: bool,
     ) -> Result<()> {
         // Compute lighting factor for this block position
-        let is_emissive = self.light_map.map(|lm| lm.is_emissive(pos)).unwrap_or(false);
+        let is_emissive = self
+            .light_map
+            .map(|lm| lm.is_emissive(pos))
+            .unwrap_or(false);
 
         // Process each face. Iterate the fixed Direction::ALL order (not the
         // model's `faces` HashMap, whose iteration order is hash-random) so the
@@ -1680,7 +1806,8 @@ impl<'a> MeshBuilder<'a> {
             }
 
             // Check if texture has transparency
-            let is_transparent = self.resource_pack
+            let is_transparent = self
+                .resource_pack
                 .get_texture(&texture_path)
                 .map(|t| t.has_transparency())
                 .unwrap_or(false);
@@ -1747,9 +1874,8 @@ impl<'a> MeshBuilder<'a> {
             // These are decorative halo quads (e.g., repeater/comparator/torch glow).
             // Render them semi-transparent so they blend softly instead of appearing
             // as opaque panels (Minecraft uses bloom post-processing for the glow).
-            let is_glow_overlay = !element.shade
-                && element.faces.len() == 1
-                && face.cullface.is_none();
+            let is_glow_overlay =
+                !element.shade && element.faces.len() == 1 && face.cullface.is_none();
             let is_transparent = is_transparent || is_glow_overlay;
 
             // Track texture mapping for UV remapping
@@ -1774,7 +1900,17 @@ impl<'a> MeshBuilder<'a> {
             let alpha_override = if is_glow_overlay { Some(0.4_f32) } else { None };
 
             // Generate face geometry (with lighting applied)
-            self.add_face(pos, block, element, *direction, face, transform, ao_values, light_factor, alpha_override)?;
+            self.add_face(
+                pos,
+                block,
+                element,
+                *direction,
+                face,
+                transform,
+                ao_values,
+                light_factor,
+                alpha_override,
+            )?;
         }
 
         Ok(())
@@ -2111,18 +2247,18 @@ impl<'a> MeshBuilder<'a> {
                 ao: quad.ao,
             });
 
-            let v0 = self.mesh.add_vertex(
-                Vertex::new(positions[0], normal, uvs[0]).with_color(base_color),
-            );
-            let v1 = self.mesh.add_vertex(
-                Vertex::new(positions[1], normal, uvs[1]).with_color(base_color),
-            );
-            let v2 = self.mesh.add_vertex(
-                Vertex::new(positions[2], normal, uvs[2]).with_color(base_color),
-            );
-            let v3 = self.mesh.add_vertex(
-                Vertex::new(positions[3], normal, uvs[3]).with_color(base_color),
-            );
+            let v0 = self
+                .mesh
+                .add_vertex(Vertex::new(positions[0], normal, uvs[0]).with_color(base_color));
+            let v1 = self
+                .mesh
+                .add_vertex(Vertex::new(positions[1], normal, uvs[1]).with_color(base_color));
+            let v2 = self
+                .mesh
+                .add_vertex(Vertex::new(positions[2], normal, uvs[2]).with_color(base_color));
+            let v3 = self
+                .mesh
+                .add_vertex(Vertex::new(positions[3], normal, uvs[3]).with_color(base_color));
 
             // Use AO-aware triangulation even though colors are uniform,
             // to keep consistent winding with the AO baked into the texture
@@ -2143,7 +2279,17 @@ impl<'a> MeshBuilder<'a> {
     /// If `pre_built_atlas` is `Some`, it is used directly instead of building a new atlas.
     /// Dynamic textures (banners, signs, skins) that are NOT in the pre-built atlas will be
     /// added to it via a supplemental atlas build pass.
-    pub fn build(mut self, pre_built_atlas: Option<TextureAtlas>) -> Result<(crate::mesh_output::MeshLayer, crate::mesh_output::MeshLayer, crate::mesh_output::MeshLayer, TextureAtlas, Vec<GreedyMaterial>, Vec<super::AnimatedTextureExport>)> {
+    pub fn build(
+        mut self,
+        pre_built_atlas: Option<TextureAtlas>,
+    ) -> Result<(
+        crate::mesh_output::MeshLayer,
+        crate::mesh_output::MeshLayer,
+        crate::mesh_output::MeshLayer,
+        TextureAtlas,
+        Vec<GreedyMaterial>,
+        Vec<super::AnimatedTextureExport>,
+    )> {
         // Emit greedy-merged quads into the mesh before atlas building
         self.emit_greedy_quads();
 
@@ -2158,7 +2304,14 @@ impl<'a> MeshBuilder<'a> {
 
         let animated_exports = self.collect_dynamic_animated(&atlas);
 
-        Ok((opaque_mesh, cutout_mesh, transparent_mesh, atlas, greedy_materials, animated_exports))
+        Ok((
+            opaque_mesh,
+            cutout_mesh,
+            transparent_mesh,
+            atlas,
+            greedy_materials,
+            animated_exports,
+        ))
     }
 
     /// Collect animated-texture sprite-sheet exports for any dynamic textures
@@ -2221,10 +2374,8 @@ impl<'a> MeshBuilder<'a> {
             }
             if !missing_textures.is_empty() {
                 // Rebuild atlas with both pre-built and missing textures
-                let mut atlas_builder = AtlasBuilder::new(
-                    self.config.atlas_max_size,
-                    self.config.atlas_padding,
-                );
+                let mut atlas_builder =
+                    AtlasBuilder::new(self.config.atlas_max_size, self.config.atlas_padding);
                 // Re-add all existing textures from the pre-built atlas
                 for texture_ref in atlas.regions.keys() {
                     if let Some(texture) = self.resource_pack.get_texture(texture_ref) {
@@ -2240,10 +2391,8 @@ impl<'a> MeshBuilder<'a> {
             atlas
         } else {
             // Build texture atlas from scratch (only for non-greedy faces)
-            let mut atlas_builder = AtlasBuilder::new(
-                self.config.atlas_max_size,
-                self.config.atlas_padding,
-            );
+            let mut atlas_builder =
+                AtlasBuilder::new(self.config.atlas_max_size, self.config.atlas_padding);
 
             // Atlas packing order (and thus determinism) is handled inside
             // AtlasBuilder::build, which sorts by height + path — so add order
@@ -2299,13 +2448,22 @@ impl<'a> MeshBuilder<'a> {
         self,
         partials: Vec<PartialMesh>,
         pre_built_atlas: Option<TextureAtlas>,
-    ) -> Result<(crate::mesh_output::MeshLayer, crate::mesh_output::MeshLayer, crate::mesh_output::MeshLayer, TextureAtlas, Vec<GreedyMaterial>, Vec<super::AnimatedTextureExport>)>
-    {
+    ) -> Result<(
+        crate::mesh_output::MeshLayer,
+        crate::mesh_output::MeshLayer,
+        crate::mesh_output::MeshLayer,
+        TextureAtlas,
+        Vec<GreedyMaterial>,
+        Vec<super::AnimatedTextureExport>,
+    )> {
         let _prof = std::env::var("MESHER_PROFILE").is_ok();
         let _t = super::prof_now();
         let atlas = self.build_atlas(pre_built_atlas)?;
         if _prof {
-            eprintln!("MPROFILE\t  build.atlas\t{}", _t.map_or(0, |t| t.elapsed().as_micros()));
+            eprintln!(
+                "MPROFILE\t  build.atlas\t{}",
+                _t.map_or(0, |t| t.elapsed().as_micros())
+            );
         }
         let _t = super::prof_now();
 
@@ -2328,7 +2486,11 @@ impl<'a> MeshBuilder<'a> {
         // ~40x above the memory-bandwidth floor, so it parallelizes well; the
         // final concat is the only bandwidth-bound copy.
         #[cfg(not(target_arch = "wasm32"))]
-        let per_chunk: Vec<(crate::mesh_output::MeshLayer, crate::mesh_output::MeshLayer, crate::mesh_output::MeshLayer)> = {
+        let per_chunk: Vec<(
+            crate::mesh_output::MeshLayer,
+            crate::mesh_output::MeshLayer,
+            crate::mesh_output::MeshLayer,
+        )> = {
             use rayon::prelude::*;
             partials
                 .par_iter()
@@ -2337,19 +2499,41 @@ impl<'a> MeshBuilder<'a> {
                     op.reserve(p.mesh.vertices.len(), p.mesh.indices.len());
                     let mut cut = crate::mesh_output::MeshLayer::new();
                     let mut tr = crate::mesh_output::MeshLayer::new();
-                    split_faces_into(&p.mesh.vertices, &p.mesh.indices, &p.face_textures, &atlas, pack, &mut op, &mut cut, &mut tr);
+                    split_faces_into(
+                        &p.mesh.vertices,
+                        &p.mesh.indices,
+                        &p.face_textures,
+                        &atlas,
+                        pack,
+                        &mut op,
+                        &mut cut,
+                        &mut tr,
+                    );
                     (op, cut, tr)
                 })
                 .collect()
         };
         #[cfg(target_arch = "wasm32")]
-        let per_chunk: Vec<(crate::mesh_output::MeshLayer, crate::mesh_output::MeshLayer, crate::mesh_output::MeshLayer)> = partials
+        let per_chunk: Vec<(
+            crate::mesh_output::MeshLayer,
+            crate::mesh_output::MeshLayer,
+            crate::mesh_output::MeshLayer,
+        )> = partials
             .iter()
             .map(|p| {
                 let mut op = crate::mesh_output::MeshLayer::new();
                 let mut cut = crate::mesh_output::MeshLayer::new();
                 let mut tr = crate::mesh_output::MeshLayer::new();
-                split_faces_into(&p.mesh.vertices, &p.mesh.indices, &p.face_textures, &atlas, pack, &mut op, &mut cut, &mut tr);
+                split_faces_into(
+                    &p.mesh.vertices,
+                    &p.mesh.indices,
+                    &p.face_textures,
+                    &atlas,
+                    pack,
+                    &mut op,
+                    &mut cut,
+                    &mut tr,
+                );
                 (op, cut, tr)
             })
             .collect();
@@ -2359,7 +2543,10 @@ impl<'a> MeshBuilder<'a> {
             transparent_mesh.merge(tr);
         }
         if _prof {
-            eprintln!("MPROFILE\t  build.split\t{}", _t.map_or(0, |t| t.elapsed().as_micros()));
+            eprintln!(
+                "MPROFILE\t  build.split\t{}",
+                _t.map_or(0, |t| t.elapsed().as_micros())
+            );
         }
         let _t = super::prof_now();
 
@@ -2378,13 +2565,19 @@ impl<'a> MeshBuilder<'a> {
         }
         let greedy_materials = self.finalize_greedy_materials(greedy_map);
         if _prof {
-            eprintln!("MPROFILE\t  build.greedy\t{}", _t.map_or(0, |t| t.elapsed().as_micros()));
+            eprintln!(
+                "MPROFILE\t  build.greedy\t{}",
+                _t.map_or(0, |t| t.elapsed().as_micros())
+            );
         }
         let _t = super::prof_now();
 
         let animated_exports = self.collect_dynamic_animated(&atlas);
         if _prof {
-            eprintln!("MPROFILE\t  build.animated\t{}", _t.map_or(0, |t| t.elapsed().as_micros()));
+            eprintln!(
+                "MPROFILE\t  build.animated\t{}",
+                _t.map_or(0, |t| t.elapsed().as_micros())
+            );
         }
         Ok((
             opaque_mesh,
@@ -2433,7 +2626,13 @@ impl<'a> MeshBuilder<'a> {
                         .get_texture(&texture_path)
                         .map(|t| {
                             let frame = t.first_frame();
-                            bake_ao_into_tile(&frame.pixels, frame.width, frame.height, ao, ao_intensity)
+                            bake_ao_into_tile(
+                                &frame.pixels,
+                                frame.width,
+                                frame.height,
+                                ao,
+                                ao_intensity,
+                            )
                         })
                         .unwrap_or_default()
                 };
@@ -2515,9 +2714,24 @@ fn accumulate_greedy_materials(
             let i0 = indices[base];
             let i1 = indices[base + 1];
             let i2 = indices[base + 2];
-            let new_i0 = match i0 - orig_v0 { 0 => v0, 1 => v1, 2 => v2, _ => v3 };
-            let new_i1 = match i1 - orig_v0 { 0 => v0, 1 => v1, 2 => v2, _ => v3 };
-            let new_i2 = match i2 - orig_v0 { 0 => v0, 1 => v1, 2 => v2, _ => v3 };
+            let new_i0 = match i0 - orig_v0 {
+                0 => v0,
+                1 => v1,
+                2 => v2,
+                _ => v3,
+            };
+            let new_i1 = match i1 - orig_v0 {
+                0 => v0,
+                1 => v1,
+                2 => v2,
+                _ => v3,
+            };
+            let new_i2 = match i2 - orig_v0 {
+                0 => v0,
+                1 => v1,
+                2 => v2,
+                _ => v3,
+            };
             target_mesh.add_triangle(new_i0, new_i1, new_i2);
         }
     }
@@ -2621,9 +2835,24 @@ fn split_faces_into(
             let i0 = indices[base];
             let i1 = indices[base + 1];
             let i2 = indices[base + 2];
-            let new_i0 = match i0 - orig_v0 { 0 => v0, 1 => v1, 2 => v2, _ => v3 };
-            let new_i1 = match i1 - orig_v0 { 0 => v0, 1 => v1, 2 => v2, _ => v3 };
-            let new_i2 = match i2 - orig_v0 { 0 => v0, 1 => v1, 2 => v2, _ => v3 };
+            let new_i0 = match i0 - orig_v0 {
+                0 => v0,
+                1 => v1,
+                2 => v2,
+                _ => v3,
+            };
+            let new_i1 = match i1 - orig_v0 {
+                0 => v0,
+                1 => v1,
+                2 => v2,
+                _ => v3,
+            };
+            let new_i2 = match i2 - orig_v0 {
+                0 => v0,
+                1 => v1,
+                2 => v2,
+                _ => v3,
+            };
             target_mesh.indices.push(new_i0);
             target_mesh.indices.push(new_i1);
             target_mesh.indices.push(new_i2);
@@ -2635,7 +2864,12 @@ fn split_faces_into(
 /// ao_level: 0-3 (0=darkest, 3=brightest)
 /// intensity: AO intensity (0.0-1.0)
 /// light_factor: lighting brightness multiplier (0.0-1.0)
-fn apply_ao_and_light(color: [f32; 4], ao_level: u8, intensity: f32, light_factor: f32) -> [f32; 4] {
+fn apply_ao_and_light(
+    color: [f32; 4],
+    ao_level: u8,
+    intensity: f32,
+    light_factor: f32,
+) -> [f32; 4] {
     let ao_brightness = 1.0 - intensity * (1.0 - ao_level as f32 / 3.0);
     let combined = ao_brightness * light_factor;
     [
@@ -2678,9 +2912,8 @@ fn bake_ao_into_tile(
     let h = height.max(1) as f32;
 
     // Precompute brightness for each AO level
-    let brightness: [f32; 4] = std::array::from_fn(|i| {
-        1.0 - intensity * (1.0 - ao[i] as f32 / 3.0)
-    });
+    let brightness: [f32; 4] =
+        std::array::from_fn(|i| 1.0 - intensity * (1.0 - ao[i] as f32 / 3.0));
 
     for row in 0..height {
         for col in 0..width {
@@ -2691,9 +2924,9 @@ fn bake_ao_into_tile(
             // Bilinear interpolation of corner brightness values
             // Image corners: top-left=AO[0], top-right=AO[1], bottom-left=AO[3], bottom-right=AO[2]
             let b = (1.0 - cx) * (1.0 - cy) * brightness[0]
-                  + cx * (1.0 - cy) * brightness[1]
-                  + (1.0 - cx) * cy * brightness[3]
-                  + cx * cy * brightness[2];
+                + cx * (1.0 - cy) * brightness[1]
+                + (1.0 - cx) * cy * brightness[3]
+                + cx * cy * brightness[2];
 
             let pixel = img.get_pixel_mut(col, row);
             pixel[0] = (pixel[0] as f32 * b).round().min(255.0) as u8;

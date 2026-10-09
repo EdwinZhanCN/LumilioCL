@@ -23,8 +23,9 @@ mod tests {
         .into_iter()
         .collect();
 
-        let only_north: HashMap<String, String> =
-            [("north".to_string(), "true".to_string())].into_iter().collect();
+        let only_north: HashMap<String, String> = [("north".to_string(), "true".to_string())]
+            .into_iter()
+            .collect();
 
         assert!(cond.matches(&both));
         assert!(!cond.matches(&only_north));

@@ -5,11 +5,11 @@
 //! sprite sheets so the existing animated texture viewer system can cycle
 //! frames automatically.
 
-use crate::mesher::geometry::Vertex;
-use crate::resource_pack::{ResourcePack, TextureData};
-use crate::resource_pack::texture::AnimationMeta;
-use crate::types::InputBlock;
 use super::EntityFaceTexture;
+use crate::mesher::geometry::Vertex;
+use crate::resource_pack::texture::AnimationMeta;
+use crate::resource_pack::{ResourcePack, TextureData};
+use crate::types::InputBlock;
 
 /// A single particle quad to render.
 pub struct ParticleQuad {
@@ -73,10 +73,18 @@ static SOUL_FLAME_ANIM: ParticleAnimDef = ParticleAnimDef {
 static BIG_SMOKE_ANIM: ParticleAnimDef = ParticleAnimDef {
     key: "_particle/big_smoke",
     frames: &[
-        "particle/big_smoke_0", "particle/big_smoke_1", "particle/big_smoke_2",
-        "particle/big_smoke_3", "particle/big_smoke_4", "particle/big_smoke_5",
-        "particle/big_smoke_6", "particle/big_smoke_7", "particle/big_smoke_8",
-        "particle/big_smoke_9", "particle/big_smoke_10", "particle/big_smoke_11",
+        "particle/big_smoke_0",
+        "particle/big_smoke_1",
+        "particle/big_smoke_2",
+        "particle/big_smoke_3",
+        "particle/big_smoke_4",
+        "particle/big_smoke_5",
+        "particle/big_smoke_6",
+        "particle/big_smoke_7",
+        "particle/big_smoke_8",
+        "particle/big_smoke_9",
+        "particle/big_smoke_10",
+        "particle/big_smoke_11",
     ],
     frametime: 3,
     synthetic_flicker: false,
@@ -86,9 +94,14 @@ static BIG_SMOKE_ANIM: ParticleAnimDef = ParticleAnimDef {
 static SMOKE_ANIM: ParticleAnimDef = ParticleAnimDef {
     key: "_particle/smoke",
     frames: &[
-        "particle/generic_0", "particle/generic_1", "particle/generic_2",
-        "particle/generic_3", "particle/generic_4", "particle/generic_5",
-        "particle/generic_6", "particle/generic_7",
+        "particle/generic_0",
+        "particle/generic_1",
+        "particle/generic_2",
+        "particle/generic_3",
+        "particle/generic_4",
+        "particle/generic_5",
+        "particle/generic_6",
+        "particle/generic_7",
     ],
     frametime: 3,
     synthetic_flicker: false,
@@ -98,9 +111,14 @@ static SMOKE_ANIM: ParticleAnimDef = ParticleAnimDef {
 static GLITTER_ANIM: ParticleAnimDef = ParticleAnimDef {
     key: "_particle/glitter",
     frames: &[
-        "particle/glitter_0", "particle/glitter_1", "particle/glitter_2",
-        "particle/glitter_3", "particle/glitter_4", "particle/glitter_5",
-        "particle/glitter_6", "particle/glitter_7",
+        "particle/glitter_0",
+        "particle/glitter_1",
+        "particle/glitter_2",
+        "particle/glitter_3",
+        "particle/glitter_4",
+        "particle/glitter_5",
+        "particle/glitter_6",
+        "particle/glitter_7",
     ],
     frametime: 2,
     synthetic_flicker: false,
@@ -258,7 +276,12 @@ pub fn detect_particle_source(block: &InputBlock) -> Option<ParticleSource> {
 
         // Campfire (only when lit)
         "campfire" | "soul_campfire" => {
-            if block.properties.get("lit").map(|v| v == "true").unwrap_or(false) {
+            if block
+                .properties
+                .get("lit")
+                .map(|v| v == "true")
+                .unwrap_or(false)
+            {
                 Some(ParticleSource {
                     quads: vec![
                         ParticleQuad {
@@ -285,8 +308,15 @@ pub fn detect_particle_source(block: &InputBlock) -> Option<ParticleSource> {
 
         // Candles (lit only, 1-4 candles with per-wick positions)
         id if id == "candle" || id.ends_with("_candle") => {
-            if block.properties.get("lit").map(|v| v == "true").unwrap_or(false) {
-                let count: u8 = block.properties.get("candles")
+            if block
+                .properties
+                .get("lit")
+                .map(|v| v == "true")
+                .unwrap_or(false)
+            {
+                let count: u8 = block
+                    .properties
+                    .get("candles")
                     .and_then(|s| s.parse().ok())
                     .unwrap_or(1);
                 let quads = candle_positions(count)
@@ -335,8 +365,15 @@ pub fn detect_particle_source(block: &InputBlock) -> Option<ParticleSource> {
 
         // Furnace variants (lit only)
         "furnace" | "smoker" | "blast_furnace" => {
-            if block.properties.get("lit").map(|v| v == "true").unwrap_or(false) {
-                let facing = block.properties.get("facing")
+            if block
+                .properties
+                .get("lit")
+                .map(|v| v == "true")
+                .unwrap_or(false)
+            {
+                let facing = block
+                    .properties
+                    .get("facing")
                     .map(|s| s.as_str())
                     .unwrap_or("north");
                 let mut quads = Vec::new();
@@ -366,16 +403,18 @@ pub fn detect_particle_source(block: &InputBlock) -> Option<ParticleSource> {
 /// Wall torch flame position based on facing direction.
 /// `facing` indicates the direction the torch points (not the wall it's on).
 fn wall_torch_center(block: &InputBlock, y: f32) -> [f32; 3] {
-    let facing = block.properties.get("facing")
+    let facing = block
+        .properties
+        .get("facing")
         .map(|s| s.as_str())
         .unwrap_or("north");
     // Flame is near the wall (torch only tilts 22.5°, tip stays close).
     // MC uses: 0.5 + 0.27 * opposite_direction
     match facing {
-        "north" => [0.5, y, 0.73],  // wall on south side (+Z), flame near wall
-        "south" => [0.5, y, 0.27],  // wall on north side (-Z), flame near wall
-        "east" => [0.27, y, 0.5],   // wall on west side (-X), flame near wall
-        "west" => [0.73, y, 0.5],   // wall on east side (+X), flame near wall
+        "north" => [0.5, y, 0.73], // wall on south side (+Z), flame near wall
+        "south" => [0.5, y, 0.27], // wall on north side (-Z), flame near wall
+        "east" => [0.27, y, 0.5],  // wall on west side (-X), flame near wall
+        "west" => [0.73, y, 0.5],  // wall on east side (+X), flame near wall
         _ => [0.5, y, 0.5],
     }
 }
@@ -385,10 +424,7 @@ fn wall_torch_center(block: &InputBlock, y: f32) -> [f32; 3] {
 fn candle_positions(count: u8) -> Vec<[f32; 3]> {
     match count {
         1 => vec![[0.5, 0.5, 0.5]],
-        2 => vec![
-            [0.375, 0.44, 0.5],
-            [0.625, 0.5, 0.5],
-        ],
+        2 => vec![[0.375, 0.44, 0.5], [0.625, 0.5, 0.5]],
         3 => vec![
             [0.5, 0.5, 0.375],
             [0.375, 0.44, 0.625],
@@ -406,7 +442,9 @@ fn candle_positions(count: u8) -> Vec<[f32; 3]> {
 
 /// End rod tip position based on facing.
 fn end_rod_tip(block: &InputBlock) -> [f32; 3] {
-    let facing = block.properties.get("facing")
+    let facing = block
+        .properties
+        .get("facing")
         .map(|s| s.as_str())
         .unwrap_or("up");
     match facing {
@@ -529,8 +567,12 @@ fn emit_double_sided_quad(
     vertices.push(Vertex::new(tr, normal, uvs[2]).with_color(white));
     vertices.push(Vertex::new(tl, normal, uvs[3]).with_color(white));
     indices.extend_from_slice(&[
-        v_start, v_start + 1, v_start + 2,
-        v_start, v_start + 2, v_start + 3,
+        v_start,
+        v_start + 1,
+        v_start + 2,
+        v_start,
+        v_start + 2,
+        v_start + 3,
     ]);
     face_textures.push(EntityFaceTexture {
         texture: texture.to_string(),
@@ -544,8 +586,12 @@ fn emit_double_sided_quad(
     vertices.push(Vertex::new(tr, back_normal, uvs[2]).with_color(white));
     vertices.push(Vertex::new(tl, back_normal, uvs[3]).with_color(white));
     indices.extend_from_slice(&[
-        v_start, v_start + 2, v_start + 1,
-        v_start, v_start + 3, v_start + 2,
+        v_start,
+        v_start + 2,
+        v_start + 1,
+        v_start,
+        v_start + 3,
+        v_start + 2,
     ]);
     face_textures.push(EntityFaceTexture {
         texture: texture.to_string(),
@@ -574,8 +620,7 @@ mod tests {
 
     #[test]
     fn test_detect_wall_torch() {
-        let block = InputBlock::new("minecraft:wall_torch")
-            .with_property("facing", "north");
+        let block = InputBlock::new("minecraft:wall_torch").with_property("facing", "north");
         let source = detect_particle_source(&block).unwrap();
         assert_eq!(source.quads.len(), 1);
         // North facing: flame near south wall (+Z side), so z > 0.5
@@ -584,16 +629,14 @@ mod tests {
 
     #[test]
     fn test_detect_campfire_lit() {
-        let block = InputBlock::new("minecraft:campfire")
-            .with_property("lit", "true");
+        let block = InputBlock::new("minecraft:campfire").with_property("lit", "true");
         let source = detect_particle_source(&block).unwrap();
         assert_eq!(source.quads.len(), 3); // 3 rising smoke quads
     }
 
     #[test]
     fn test_detect_campfire_unlit() {
-        let block = InputBlock::new("minecraft:campfire")
-            .with_property("lit", "false");
+        let block = InputBlock::new("minecraft:campfire").with_property("lit", "false");
         assert!(detect_particle_source(&block).is_none());
     }
 
@@ -617,8 +660,7 @@ mod tests {
 
     #[test]
     fn test_detect_candle_unlit() {
-        let block = InputBlock::new("minecraft:candle")
-            .with_property("lit", "false");
+        let block = InputBlock::new("minecraft:candle").with_property("lit", "false");
         assert!(detect_particle_source(&block).is_none());
     }
 
@@ -639,8 +681,7 @@ mod tests {
 
     #[test]
     fn test_detect_end_rod() {
-        let block = InputBlock::new("minecraft:end_rod")
-            .with_property("facing", "up");
+        let block = InputBlock::new("minecraft:end_rod").with_property("facing", "up");
         let source = detect_particle_source(&block).unwrap();
         assert_eq!(source.quads[0].texture, "particle/glitter_0");
         assert!(source.quads[0].center[1] > 0.9); // tip near top
@@ -658,8 +699,7 @@ mod tests {
 
     #[test]
     fn test_detect_furnace_unlit() {
-        let block = InputBlock::new("minecraft:furnace")
-            .with_property("lit", "false");
+        let block = InputBlock::new("minecraft:furnace").with_property("lit", "false");
         assert!(detect_particle_source(&block).is_none());
     }
 
@@ -704,15 +744,27 @@ mod tests {
         // Campfire has 3 smoke quads → 3 × 4 = 12 quads total
         let source = ParticleSource {
             quads: vec![
-                ParticleQuad { center: [0.5, 0.8, 0.5], half_size: 0.15, texture: "particle/big_smoke_0" },
-                ParticleQuad { center: [0.5, 1.1, 0.5], half_size: 0.12, texture: "particle/big_smoke_0" },
-                ParticleQuad { center: [0.5, 1.4, 0.5], half_size: 0.10, texture: "particle/big_smoke_0" },
+                ParticleQuad {
+                    center: [0.5, 0.8, 0.5],
+                    half_size: 0.15,
+                    texture: "particle/big_smoke_0",
+                },
+                ParticleQuad {
+                    center: [0.5, 1.1, 0.5],
+                    half_size: 0.12,
+                    texture: "particle/big_smoke_0",
+                },
+                ParticleQuad {
+                    center: [0.5, 1.4, 0.5],
+                    half_size: 0.10,
+                    texture: "particle/big_smoke_0",
+                },
             ],
         };
         let (verts, indices, faces) = generate_particle_geometry(&source);
-        assert_eq!(verts.len(), 48);  // 3 × 16
+        assert_eq!(verts.len(), 48); // 3 × 16
         assert_eq!(indices.len(), 72); // 3 × 24
-        assert_eq!(faces.len(), 12);   // 3 × 4
+        assert_eq!(faces.len(), 12); // 3 × 4
     }
 
     #[test]

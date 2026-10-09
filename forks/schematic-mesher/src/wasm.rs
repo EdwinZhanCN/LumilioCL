@@ -40,8 +40,8 @@ impl ResourcePackHandle {
     /// Load a resource pack from a ZIP file's bytes.
     #[wasm_bindgen(constructor)]
     pub fn new(data: &[u8]) -> Result<ResourcePackHandle, JsError> {
-        let pack = crate::load_resource_pack_from_bytes(data)
-            .map_err(|e| JsError::new(&e.to_string()))?;
+        let pack =
+            crate::load_resource_pack_from_bytes(data).map_err(|e| JsError::new(&e.to_string()))?;
         Ok(ResourcePackHandle { inner: pack })
     }
 
@@ -217,13 +217,11 @@ pub fn mesh_block(
     let bounds = crate::BoundingBox::new([0.0, 0.0, 0.0], [1.0, 1.0, 1.0]);
 
     let mesher = crate::Mesher::with_config(pack.inner.clone(), config);
-    let output = mesher.mesh_blocks(
-        blocks.iter().map(|(p, b)| (*p, b)),
-        bounds,
-    ).map_err(|e| JsError::new(&e.to_string()))?;
-
-    let glb_data = crate::export_glb(&output)
+    let output = mesher
+        .mesh_blocks(blocks.iter().map(|(p, b)| (*p, b)), bounds)
         .map_err(|e| JsError::new(&e.to_string()))?;
+
+    let glb_data = crate::export_glb(&output).map_err(|e| JsError::new(&e.to_string()))?;
 
     Ok(MeshResult {
         glb_data,
@@ -254,13 +252,11 @@ pub fn mesh_blocks_json(
     let config = build_config(&options);
 
     let mesher = crate::Mesher::with_config(pack.inner.clone(), config);
-    let output = mesher.mesh_blocks(
-        blocks.iter().map(|(p, b)| (*p, b)),
-        bounds,
-    ).map_err(|e| JsError::new(&e.to_string()))?;
-
-    let glb_data = crate::export_glb(&output)
+    let output = mesher
+        .mesh_blocks(blocks.iter().map(|(p, b)| (*p, b)), bounds)
         .map_err(|e| JsError::new(&e.to_string()))?;
+
+    let glb_data = crate::export_glb(&output).map_err(|e| JsError::new(&e.to_string()))?;
 
     Ok(MeshResult {
         glb_data,
@@ -271,7 +267,15 @@ pub fn mesh_blocks_json(
 }
 
 /// Parse blocks JSON into a Vec of (position, block) pairs and bounding box.
-fn parse_blocks_json(json: &str) -> Result<(Vec<(crate::BlockPosition, crate::InputBlock)>, crate::BoundingBox), JsError> {
+fn parse_blocks_json(
+    json: &str,
+) -> Result<
+    (
+        Vec<(crate::BlockPosition, crate::InputBlock)>,
+        crate::BoundingBox,
+    ),
+    JsError,
+> {
     #[derive(serde::Deserialize)]
     struct BlockData {
         blocks: Vec<BlockEntry>,
@@ -292,8 +296,8 @@ fn parse_blocks_json(json: &str) -> Result<(Vec<(crate::BlockPosition, crate::In
         "minecraft:stone".to_string()
     }
 
-    let data: BlockData = serde_json::from_str(json)
-        .map_err(|e| JsError::new(&format!("Invalid JSON: {}", e)))?;
+    let data: BlockData =
+        serde_json::from_str(json).map_err(|e| JsError::new(&format!("Invalid JSON: {}", e)))?;
 
     let mut blocks = Vec::new();
     let mut min = [i32::MAX; 3];
@@ -324,7 +328,11 @@ fn parse_blocks_json(json: &str) -> Result<(Vec<(crate::BlockPosition, crate::In
     } else {
         crate::BoundingBox::new(
             [min[0] as f32, min[1] as f32, min[2] as f32],
-            [(max[0] + 1) as f32, (max[1] + 1) as f32, (max[2] + 1) as f32],
+            [
+                (max[0] + 1) as f32,
+                (max[1] + 1) as f32,
+                (max[2] + 1) as f32,
+            ],
         )
     };
 
@@ -374,9 +382,8 @@ pub struct MeshOutputWrapper {
 /// The input bytes must be aligned to 4 bytes and have a length that is a multiple of 4.
 /// The returned view is only valid for the lifetime of the underlying data.
 fn f32_typed_array(bytes: &[u8]) -> js_sys::Float32Array {
-    let f32_slice = unsafe {
-        std::slice::from_raw_parts(bytes.as_ptr() as *const f32, bytes.len() / 4)
-    };
+    let f32_slice =
+        unsafe { std::slice::from_raw_parts(bytes.as_ptr() as *const f32, bytes.len() / 4) };
     unsafe { js_sys::Float32Array::view(f32_slice) }
 }
 
@@ -386,9 +393,8 @@ fn f32_typed_array(bytes: &[u8]) -> js_sys::Float32Array {
 /// The input bytes must be aligned to 4 bytes and have a length that is a multiple of 4.
 /// The returned view is only valid for the lifetime of the underlying data.
 fn u32_typed_array(bytes: &[u8]) -> js_sys::Uint32Array {
-    let u32_slice = unsafe {
-        std::slice::from_raw_parts(bytes.as_ptr() as *const u32, bytes.len() / 4)
-    };
+    let u32_slice =
+        unsafe { std::slice::from_raw_parts(bytes.as_ptr() as *const u32, bytes.len() / 4) };
     unsafe { js_sys::Uint32Array::view(u32_slice) }
 }
 
@@ -563,7 +569,9 @@ impl MeshOutputWrapper {
 
     /// Export to GLB (binary glTF) format.
     pub fn to_glb(&self) -> Result<js_sys::Uint8Array, JsValue> {
-        let bytes = self.inner.to_glb()
+        let bytes = self
+            .inner
+            .to_glb()
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
         let len = bytes.len();
         let arr = js_sys::Uint8Array::new_with_length(len as u32);
@@ -573,7 +581,9 @@ impl MeshOutputWrapper {
 
     /// Export to USDZ format.
     pub fn to_usdz(&self) -> Result<js_sys::Uint8Array, JsValue> {
-        let bytes = self.inner.to_usdz()
+        let bytes = self
+            .inner
+            .to_usdz()
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
         let len = bytes.len();
         let arr = js_sys::Uint8Array::new_with_length(len as u32);
@@ -698,7 +708,9 @@ impl crate::BlockSource for WasmBlockSource {
         self.blocks.iter().find(|(p, _)| *p == pos).map(|(_, b)| b)
     }
 
-    fn iter_blocks(&self) -> Box<dyn Iterator<Item = (crate::BlockPosition, &crate::InputBlock)> + '_> {
+    fn iter_blocks(
+        &self,
+    ) -> Box<dyn Iterator<Item = (crate::BlockPosition, &crate::InputBlock)> + '_> {
         Box::new(self.blocks.iter().map(|(p, b)| (*p, b)))
     }
 
@@ -731,8 +743,5 @@ pub fn mesh_chunks_json(
         results.push(result.map_err(|e| JsError::new(&e.to_string()))?);
     }
 
-    Ok(ChunkMeshIteratorWrapper {
-        results,
-        index: 0,
-    })
+    Ok(ChunkMeshIteratorWrapper { results, index: 0 })
 }

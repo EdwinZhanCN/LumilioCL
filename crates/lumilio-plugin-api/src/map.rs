@@ -193,6 +193,9 @@ pub struct OverlayInfo {
     pub group_id: Option<String>,
     /// For this world the layer's positions are estimates, not exact.
     pub approximate: bool,
+    /// The coarsest zoom the layer is drawn at, in blocks per pixel; `None`
+    /// leaves it to the host's default.
+    pub max_scale: Option<u32>,
 }
 
 pub trait BaseMapProvider: Send + Sync {

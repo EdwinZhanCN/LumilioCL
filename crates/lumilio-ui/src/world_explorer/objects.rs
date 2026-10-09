@@ -3,7 +3,8 @@
 //! nearest first with a small in-flight limit, and dropped when they leave view.
 use lumilio_core::CancellationToken;
 use lumilio_plugin_api::map::{
-    Dimension, MapBounds, MapObject, MapPoint, OverlayInfo, OverlayRequest, WorldContext, WorldId,
+    Dimension, MapBounds, MapObject, MapObjectKind, MapPoint, OverlayInfo, OverlayRequest,
+    WorldContext, WorldId,
 };
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
@@ -47,6 +48,11 @@ pub(super) struct Dispatch {
     pub cancel: CancellationToken,
 }
 
+/// Whether a layer is drawn at this zoom, in blocks per pixel.
+pub(super) fn shown_at(layer: &OverlayInfo, scale: f64) -> bool {
+    scale <= layer.max_scale.map_or(MAX_SCALE, f64::from)
+}
+
 impl Objects {
     pub fn new(enabled: &[&str]) -> Self {
         Self {
@@ -85,11 +91,11 @@ impl Objects {
     pub fn update(&mut self, context: &WorldContext, view: [f64; 4], scale: f64) {
         self.generation = self.generation.wrapping_add(1);
         let mut wanted = Vec::new();
-        if scale <= MAX_SCALE && view.iter().all(|edge| edge.is_finite()) {
+        if view.iter().all(|edge| edge.is_finite()) {
             let range = |lo: f64, hi: f64| (lo / CELL).floor() as i32..=(hi / CELL).floor() as i32;
             let (xs, zs) = (range(view[0], view[2]), range(view[1], view[3]));
             let centre = [(view[0] + view[2]) / 2., (view[1] + view[3]) / 2.];
-            for (_, layer) in self.active() {
+            for (_, layer) in self.active().filter(|(_, layer)| shown_at(layer, scale)) {
                 for x in xs.clone() {
                     for z in zs.clone() {
                         wanted.push(ObjectKey {
@@ -215,9 +221,10 @@ impl Objects {
             .filter_map(|key| self.cells.get(key))
             .flatten()
             .filter(|object| match &object.kind {
-                lumilio_plugin_api::map::MapObjectKind::Icon { at, .. } => {
+                MapObjectKind::Icon { at, .. } => {
                     at.x >= view[0] && at.x <= view[2] && at.z >= view[1] && at.z <= view[3]
                 }
+                MapObjectKind::Heat { .. } => true,
                 _ => false,
             })
             .collect();

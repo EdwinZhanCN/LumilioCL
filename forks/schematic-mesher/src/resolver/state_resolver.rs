@@ -20,19 +20,12 @@ impl<'a> StateResolver<'a> {
     pub fn resolve(&self, block: &InputBlock) -> Result<Vec<ModelVariant>> {
         // Get the blockstate definition
         let blockstate = self.pack.get_blockstate(&block.name).ok_or_else(|| {
-            MesherError::BlockstateResolution(format!(
-                "No blockstate found for {}",
-                block.name
-            ))
+            MesherError::BlockstateResolution(format!("No blockstate found for {}", block.name))
         })?;
 
         match blockstate {
-            BlockstateDefinition::Variants(variants) => {
-                self.resolve_variants(variants, block)
-            }
-            BlockstateDefinition::Multipart(cases) => {
-                self.resolve_multipart(cases, block)
-            }
+            BlockstateDefinition::Variants(variants) => self.resolve_variants(variants, block),
+            BlockstateDefinition::Multipart(cases) => self.resolve_multipart(cases, block),
         }
     }
 
@@ -67,7 +60,9 @@ impl<'a> StateResolver<'a> {
             // for the properties NOT specified by the user
             let best = matching_variants
                 .into_iter()
-                .max_by_key(|(key, _)| self.calculate_default_score_for_unspecified(key, &block.properties))
+                .max_by_key(|(key, _)| {
+                    self.calculate_default_score_for_unspecified(key, &block.properties)
+                })
                 .unwrap();
             return Ok(vec![best.1[0].clone()]);
         }
@@ -131,20 +126,17 @@ impl<'a> StateResolver<'a> {
         // Property-specific defaults
         match property {
             "axis" => match value {
-                "y" => return 50,  // Y is default for logs, pillars
+                "y" => return 50, // Y is default for logs, pillars
                 _ => return 0,
             },
-            "waterlogged" | "powered" | "open" | "lit" | "enabled" |
-            "triggered" | "inverted" | "extended" | "locked" | "attached" |
-            "disarmed" | "occupied" | "has_record" | "has_book" | "signal_fire" |
-            "hanging" | "persistent" | "unstable" | "bottom" | "drag" |
-            "eye" | "in_wall" | "snowy" | "up" | "conditional" => {
-                match value {
-                    "false" => return 100,
-                    "true" => return -100,
-                    _ => return 0,
-                }
-            }
+            "waterlogged" | "powered" | "open" | "lit" | "enabled" | "triggered" | "inverted"
+            | "extended" | "locked" | "attached" | "disarmed" | "occupied" | "has_record"
+            | "has_book" | "signal_fire" | "hanging" | "persistent" | "unstable" | "bottom"
+            | "drag" | "eye" | "in_wall" | "snowy" | "up" | "conditional" => match value {
+                "false" => return 100,
+                "true" => return -100,
+                _ => return 0,
+            },
             "half" => match value {
                 "bottom" | "lower" => return 50,
                 "top" | "upper" => return -50,
@@ -166,7 +158,9 @@ impl<'a> StateResolver<'a> {
             },
             "shape" => match value {
                 "straight" => return 50,
-                "ascending_north" | "ascending_south" | "ascending_east" | "ascending_west" => return 0,
+                "ascending_north" | "ascending_south" | "ascending_east" | "ascending_west" => {
+                    return 0
+                }
                 _ => return -20,
             },
             // Connection properties (fences, walls, redstone)
@@ -328,8 +322,7 @@ mod tests {
         let pack = create_test_pack();
         let resolver = StateResolver::new(&pack);
 
-        let block = InputBlock::new("minecraft:furnace")
-            .with_property("facing", "east");
+        let block = InputBlock::new("minecraft:furnace").with_property("facing", "east");
         let variants = resolver.resolve(&block).unwrap();
 
         assert_eq!(variants.len(), 1);
@@ -375,16 +368,14 @@ mod tests {
         let resolver = StateResolver::new(&pack);
 
         // Test with only facing specified - should pick extended=false (more default)
-        let block = InputBlock::new("minecraft:piston")
-            .with_property("facing", "north");
+        let block = InputBlock::new("minecraft:piston").with_property("facing", "north");
         let variants = resolver.resolve(&block).unwrap();
 
         assert_eq!(variants.len(), 1);
         assert_eq!(variants[0].model, "block/piston"); // extended=false version
 
         // Test with only extended specified - should pick facing=north (more default)
-        let block = InputBlock::new("minecraft:piston")
-            .with_property("extended", "true");
+        let block = InputBlock::new("minecraft:piston").with_property("extended", "true");
         let variants = resolver.resolve(&block).unwrap();
 
         assert_eq!(variants.len(), 1);

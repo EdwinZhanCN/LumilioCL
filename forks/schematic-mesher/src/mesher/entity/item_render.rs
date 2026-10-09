@@ -96,7 +96,8 @@ pub fn render_dropped_item(
 
     // Resolve model (same logic as item frames)
     let model_path = format!("item/{}", name);
-    let model = model_resolver.resolve(&format!("minecraft:{}", model_path))
+    let model = model_resolver
+        .resolve(&format!("minecraft:{}", model_path))
         .or_else(|_| model_resolver.resolve(&format!("minecraft:block/{}", name)))
         .ok()?;
 
@@ -145,10 +146,7 @@ pub fn render_dropped_item(
 /// 2. Display.ground transform
 /// 3. Facing rotation (Y-axis)
 /// 4. Translate to hover position (center of block, slight hover)
-fn build_dropped_item_transform(
-    display: &DisplayTransform,
-    facing: &str,
-) -> Mat4 {
+fn build_dropped_item_transform(display: &DisplayTransform, facing: &str) -> Mat4 {
     let center = Mat4::from_translation(Vec3::new(-0.5, -0.5, -0.5));
 
     let dt_translate = Mat4::from_translation(Vec3::new(
@@ -200,26 +198,49 @@ fn generate_flat_dropped(
         };
         let tw = tex_data.width;
         let th = tex_data.height;
-        if tw == 0 || th == 0 { continue; }
+        if tw == 0 || th == 0 {
+            continue;
+        }
 
         let z_offset = layer_idx as f32 * 0.01;
         let fz = 0.5 + z_offset;
         let bz = 0.5 - z_offset - 1.0 / 16.0;
 
         add_flat_face(
-            &mut vertices, &mut indices, &mut face_textures,
-            [0.0, 0.0], [1.0, 1.0], fz, [0.0, 0.0, 1.0],
-            [0.0, 0.0, 1.0, 1.0], false, texture_path,
+            &mut vertices,
+            &mut indices,
+            &mut face_textures,
+            [0.0, 0.0],
+            [1.0, 1.0],
+            fz,
+            [0.0, 0.0, 1.0],
+            [0.0, 0.0, 1.0, 1.0],
+            false,
+            texture_path,
         );
         add_flat_face(
-            &mut vertices, &mut indices, &mut face_textures,
-            [0.0, 0.0], [1.0, 1.0], bz, [0.0, 0.0, -1.0],
-            [1.0, 0.0, 0.0, 1.0], true, texture_path,
+            &mut vertices,
+            &mut indices,
+            &mut face_textures,
+            [0.0, 0.0],
+            [1.0, 1.0],
+            bz,
+            [0.0, 0.0, -1.0],
+            [1.0, 0.0, 0.0, 1.0],
+            true,
+            texture_path,
         );
 
         generate_edges(
-            &tex_data.pixels, tw, th, fz, bz, texture_path,
-            &mut vertices, &mut indices, &mut face_textures,
+            &tex_data.pixels,
+            tw,
+            th,
+            fz,
+            bz,
+            texture_path,
+            &mut vertices,
+            &mut indices,
+            &mut face_textures,
         );
     }
 
@@ -240,7 +261,13 @@ fn generate_block_dropped(
     let mut face_textures = Vec::new();
 
     for element in &model.elements {
-        add_block_element(element, resolved_textures, &mut vertices, &mut indices, &mut face_textures);
+        add_block_element(
+            element,
+            resolved_textures,
+            &mut vertices,
+            &mut indices,
+            &mut face_textures,
+        );
     }
 
     let mat = build_dropped_item_transform(display, facing);
@@ -250,9 +277,7 @@ fn generate_block_dropped(
 
 /// Strip `minecraft:` prefix from an item ID.
 fn bare_name(item_id: &str) -> &str {
-    item_id
-        .strip_prefix("minecraft:")
-        .unwrap_or(item_id)
+    item_id.strip_prefix("minecraft:").unwrap_or(item_id)
 }
 
 /// Resolve an item ID to its render type by checking item and block model paths.
@@ -369,11 +394,7 @@ fn parse_f32_array(val: Option<&serde_json::Value>, default: [f32; 3]) -> [f32; 
 /// 3. Item rotation: rotZ(item_rotation * 45deg)
 /// 4. Translate to frame surface: (0.5, 0.5, 15.0/16.0)
 /// 5. Facing rotation around (0.5, 0.5, 0.5)
-fn build_item_transform(
-    display: &DisplayTransform,
-    item_rotation: u8,
-    facing: &str,
-) -> Mat4 {
+fn build_item_transform(display: &DisplayTransform, item_rotation: u8, facing: &str) -> Mat4 {
     // Step 1: center at origin
     let center = Mat4::from_translation(Vec3::new(-0.5, -0.5, -0.5));
 
@@ -470,18 +491,26 @@ fn generate_flat_item(
 
         // Generate front and back quads for this layer
         add_flat_face(
-            &mut vertices, &mut indices, &mut face_textures,
-            [0.0, 0.0], [1.0, 1.0],
-            fz, [0.0, 0.0, 1.0],
+            &mut vertices,
+            &mut indices,
+            &mut face_textures,
+            [0.0, 0.0],
+            [1.0, 1.0],
+            fz,
+            [0.0, 0.0, 1.0],
             [0.0, 0.0, 1.0, 1.0], // UVs: full texture
-            false, // not flipped
+            false,                // not flipped
             texture_path,
         );
         // Back face (-Z): mirrored horizontally
         add_flat_face(
-            &mut vertices, &mut indices, &mut face_textures,
-            [0.0, 0.0], [1.0, 1.0],
-            bz, [0.0, 0.0, -1.0],
+            &mut vertices,
+            &mut indices,
+            &mut face_textures,
+            [0.0, 0.0],
+            [1.0, 1.0],
+            bz,
+            [0.0, 0.0, -1.0],
             [1.0, 0.0, 0.0, 1.0], // UVs: mirrored horizontally
             true,
             texture_path,
@@ -489,10 +518,15 @@ fn generate_flat_item(
 
         // Pixel edge extrusion
         generate_edges(
-            &tex_data.pixels, tw, th,
-            fz, bz,
+            &tex_data.pixels,
+            tw,
+            th,
+            fz,
+            bz,
             texture_path,
-            &mut vertices, &mut indices, &mut face_textures,
+            &mut vertices,
+            &mut indices,
+            &mut face_textures,
         );
     }
 
@@ -538,8 +572,12 @@ fn add_flat_face(
 
     // Two triangles (CCW): (0,2,1) (0,3,2) — matches Mesh::add_quad
     indices.extend_from_slice(&[
-        v_start, v_start + 2, v_start + 1,
-        v_start, v_start + 3, v_start + 2,
+        v_start,
+        v_start + 2,
+        v_start + 1,
+        v_start,
+        v_start + 3,
+        v_start + 2,
     ]);
 
     face_textures.push(EntityFaceTexture {
@@ -592,8 +630,11 @@ fn generate_edges(
             // West edge (px-1 is transparent)
             if !is_opaque(px - 1, py) {
                 add_edge_quad(
-                    vertices, indices, face_textures,
-                    [x0, y0, back_z], [x0, y1, front_z],
+                    vertices,
+                    indices,
+                    face_textures,
+                    [x0, y0, back_z],
+                    [x0, y1, front_z],
                     [-1.0, 0.0, 0.0],
                     [u0, v1, u1, v0], // single pixel column
                     texture_path,
@@ -603,8 +644,11 @@ fn generate_edges(
             // East edge (px+1 is transparent)
             if !is_opaque(px + 1, py) {
                 add_edge_quad(
-                    vertices, indices, face_textures,
-                    [x1, y0, front_z], [x1, y1, back_z],
+                    vertices,
+                    indices,
+                    face_textures,
+                    [x1, y0, front_z],
+                    [x1, y1, back_z],
                     [1.0, 0.0, 0.0],
                     [u0, v1, u1, v0],
                     texture_path,
@@ -614,8 +658,11 @@ fn generate_edges(
             // Up edge (py-1 is transparent, i.e. above in image = higher Y in model)
             if !is_opaque(px, py - 1) {
                 add_edge_quad(
-                    vertices, indices, face_textures,
-                    [x0, y1, front_z], [x1, y1, back_z],
+                    vertices,
+                    indices,
+                    face_textures,
+                    [x0, y1, front_z],
+                    [x1, y1, back_z],
                     [0.0, 1.0, 0.0],
                     [u0, v0, u1, v1],
                     texture_path,
@@ -625,8 +672,11 @@ fn generate_edges(
             // Down edge (py+1 is transparent)
             if !is_opaque(px, py + 1) {
                 add_edge_quad(
-                    vertices, indices, face_textures,
-                    [x0, y0, back_z], [x1, y0, front_z],
+                    vertices,
+                    indices,
+                    face_textures,
+                    [x0, y0, back_z],
+                    [x1, y0, front_z],
                     [0.0, -1.0, 0.0],
                     [u0, v0, u1, v1],
                     texture_path,
@@ -641,8 +691,8 @@ fn add_edge_quad(
     vertices: &mut Vec<Vertex>,
     indices: &mut Vec<u32>,
     face_textures: &mut Vec<EntityFaceTexture>,
-    min: [f32; 3],  // one corner
-    max: [f32; 3],  // opposite corner
+    min: [f32; 3], // one corner
+    max: [f32; 3], // opposite corner
     normal: [f32; 3],
     uv_rect: [f32; 4],
     texture_path: &str,
@@ -668,8 +718,12 @@ fn add_edge_quad(
     }
 
     indices.extend_from_slice(&[
-        v_start, v_start + 2, v_start + 1,
-        v_start, v_start + 3, v_start + 2,
+        v_start,
+        v_start + 2,
+        v_start + 1,
+        v_start,
+        v_start + 3,
+        v_start + 2,
     ]);
 
     face_textures.push(EntityFaceTexture {
@@ -801,8 +855,12 @@ fn add_block_element(
 
         // CCW winding: (0,2,1)(0,3,2) — matches Mesh::add_quad
         indices.extend_from_slice(&[
-            v_start, v_start + 2, v_start + 1,
-            v_start, v_start + 3, v_start + 2,
+            v_start,
+            v_start + 2,
+            v_start + 1,
+            v_start,
+            v_start + 3,
+            v_start + 2,
         ]);
 
         face_textures.push(EntityFaceTexture {
@@ -858,8 +916,7 @@ mod tests {
     fn test_flat_item_edge_count() {
         // 2x2 fully opaque texture = 2 face quads + 8 edge quads = 10
         let pixels = vec![
-            255, 0, 0, 255,  0, 255, 0, 255,
-            0, 0, 255, 255,  255, 255, 0, 255,
+            255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 0, 255,
         ];
 
         let mut vertices = Vec::new();
@@ -868,20 +925,41 @@ mod tests {
 
         // Add front + back quads
         add_flat_face(
-            &mut vertices, &mut indices, &mut face_textures,
-            [0.0, 0.0], [1.0, 1.0], 0.5, [0.0, 0.0, 1.0],
-            [0.0, 0.0, 1.0, 1.0], false, "test",
+            &mut vertices,
+            &mut indices,
+            &mut face_textures,
+            [0.0, 0.0],
+            [1.0, 1.0],
+            0.5,
+            [0.0, 0.0, 1.0],
+            [0.0, 0.0, 1.0, 1.0],
+            false,
+            "test",
         );
         add_flat_face(
-            &mut vertices, &mut indices, &mut face_textures,
-            [0.0, 0.0], [1.0, 1.0], 0.4375, [0.0, 0.0, -1.0],
-            [1.0, 0.0, 0.0, 1.0], true, "test",
+            &mut vertices,
+            &mut indices,
+            &mut face_textures,
+            [0.0, 0.0],
+            [1.0, 1.0],
+            0.4375,
+            [0.0, 0.0, -1.0],
+            [1.0, 0.0, 0.0, 1.0],
+            true,
+            "test",
         );
 
         // Generate edges
         generate_edges(
-            &pixels, 2, 2, 0.5, 0.4375, "test",
-            &mut vertices, &mut indices, &mut face_textures,
+            &pixels,
+            2,
+            2,
+            0.5,
+            0.4375,
+            "test",
+            &mut vertices,
+            &mut indices,
+            &mut face_textures,
         );
 
         // 2 face quads + 8 edge quads (4 pixels × boundary edges = 8 perimeter edges)
@@ -894,8 +972,8 @@ mod tests {
     fn test_flat_item_with_transparency() {
         // 2x2 texture where top-right pixel is transparent
         let pixels = vec![
-            255, 0, 0, 255,  0, 0, 0, 0,    // top-left opaque, top-right transparent
-            0, 0, 255, 255,  255, 255, 0, 255, // bottom-left opaque, bottom-right opaque
+            255, 0, 0, 255, 0, 0, 0, 0, // top-left opaque, top-right transparent
+            0, 0, 255, 255, 255, 255, 0, 255, // bottom-left opaque, bottom-right opaque
         ];
 
         let mut vertices = Vec::new();
@@ -903,8 +981,15 @@ mod tests {
         let mut face_textures = Vec::new();
 
         generate_edges(
-            &pixels, 2, 2, 0.5, 0.4375, "test",
-            &mut vertices, &mut indices, &mut face_textures,
+            &pixels,
+            2,
+            2,
+            0.5,
+            0.4375,
+            "test",
+            &mut vertices,
+            &mut indices,
+            &mut face_textures,
         );
 
         // 3 opaque pixels: each has perimeter edges where neighbor is transparent/OOB
@@ -922,13 +1007,16 @@ mod tests {
         // Create a simple cube model element with all 6 faces
         let mut faces = HashMap::new();
         for dir in Direction::ALL {
-            faces.insert(dir, crate::resource_pack::ModelFace {
-                uv: None,
-                texture: "#all".to_string(),
-                cullface: None,
-                rotation: 0,
-                tintindex: -1,
-            });
+            faces.insert(
+                dir,
+                crate::resource_pack::ModelFace {
+                    uv: None,
+                    texture: "#all".to_string(),
+                    cullface: None,
+                    rotation: 0,
+                    tintindex: -1,
+                },
+            );
         }
         let element = ModelElement {
             from: [0.0, 0.0, 0.0],
@@ -955,7 +1043,7 @@ mod tests {
 
         assert_eq!(face_textures.len(), 6);
         assert_eq!(vertices.len(), 24); // 6 faces × 4 verts
-        assert_eq!(indices.len(), 36);  // 6 faces × 6 indices
+        assert_eq!(indices.len(), 36); // 6 faces × 6 indices
     }
 
     #[test]

@@ -111,7 +111,8 @@ pub fn export_obj(output: &MesherOutput, name: &str) -> Result<(String, String)>
     // Greedy material faces
     for (gi, gm) in output.greedy_materials.iter().enumerate() {
         let mat_name = format!("greedy_{}", gi);
-        for (sub_mesh, _is_transparent) in [(&gm.opaque_mesh, false), (&gm.transparent_mesh, true)] {
+        for (sub_mesh, _is_transparent) in [(&gm.opaque_mesh, false), (&gm.transparent_mesh, true)]
+        {
             if sub_mesh.is_empty() {
                 continue;
             }
@@ -184,13 +185,17 @@ impl ObjExport {
     pub fn from_output(output: &MesherOutput, name: &str) -> Result<Self> {
         let (obj, mtl) = export_obj(output, name)?;
         let texture_png = output.atlas.to_png()?;
-        let greedy_textures = output.greedy_materials.iter().map(|gm| {
-            let filename = format!("{}.png", gm.texture_path.replace('/', "_"));
-            ObjTexture {
-                filename,
-                png_data: gm.texture_png.clone(),
-            }
-        }).collect();
+        let greedy_textures = output
+            .greedy_materials
+            .iter()
+            .map(|gm| {
+                let filename = format!("{}.png", gm.texture_path.replace('/', "_"));
+                ObjTexture {
+                    filename,
+                    png_data: gm.texture_png.clone(),
+                }
+            })
+            .collect();
         Ok(Self {
             obj,
             mtl,

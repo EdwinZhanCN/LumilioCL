@@ -57,13 +57,21 @@ impl TintColors {
                 colors.foliage = [0.41, 0.55, 0.27, 1.0];
                 colors.water = [0.38, 0.48, 0.27, 1.0];
             }
-            "badlands" | "minecraft:badlands" | "wooded_badlands" | "minecraft:wooded_badlands"
-            | "eroded_badlands" | "minecraft:eroded_badlands" => {
+            "badlands"
+            | "minecraft:badlands"
+            | "wooded_badlands"
+            | "minecraft:wooded_badlands"
+            | "eroded_badlands"
+            | "minecraft:eroded_badlands" => {
                 colors.grass = [0.56, 0.50, 0.30, 1.0];
                 colors.foliage = [0.62, 0.56, 0.35, 1.0];
             }
-            "jungle" | "minecraft:jungle" | "bamboo_jungle" | "minecraft:bamboo_jungle"
-            | "sparse_jungle" | "minecraft:sparse_jungle" => {
+            "jungle"
+            | "minecraft:jungle"
+            | "bamboo_jungle"
+            | "minecraft:bamboo_jungle"
+            | "sparse_jungle"
+            | "minecraft:sparse_jungle" => {
                 colors.grass = [0.35, 0.75, 0.15, 1.0];
                 colors.foliage = [0.30, 0.72, 0.20, 1.0];
             }
@@ -71,8 +79,14 @@ impl TintColors {
                 colors.grass = [0.31, 0.55, 0.20, 1.0];
                 colors.foliage = [0.31, 0.55, 0.20, 1.0];
             }
-            "snowy_plains" | "minecraft:snowy_plains" | "snowy_taiga" | "minecraft:snowy_taiga"
-            | "snowy_beach" | "minecraft:snowy_beach" | "snowy_slopes" | "minecraft:snowy_slopes" => {
+            "snowy_plains"
+            | "minecraft:snowy_plains"
+            | "snowy_taiga"
+            | "minecraft:snowy_taiga"
+            | "snowy_beach"
+            | "minecraft:snowy_beach"
+            | "snowy_slopes"
+            | "minecraft:snowy_slopes" => {
                 colors.grass = [0.50, 0.70, 0.50, 1.0];
                 colors.foliage = [0.39, 0.61, 0.39, 1.0];
             }
@@ -80,15 +94,28 @@ impl TintColors {
                 colors.grass = [0.75, 0.72, 0.45, 1.0];
                 colors.foliage = [0.68, 0.68, 0.40, 1.0];
             }
-            "ocean" | "minecraft:ocean" | "deep_ocean" | "minecraft:deep_ocean"
-            | "cold_ocean" | "minecraft:cold_ocean" | "deep_cold_ocean" | "minecraft:deep_cold_ocean" => {
+            "ocean"
+            | "minecraft:ocean"
+            | "deep_ocean"
+            | "minecraft:deep_ocean"
+            | "cold_ocean"
+            | "minecraft:cold_ocean"
+            | "deep_cold_ocean"
+            | "minecraft:deep_cold_ocean" => {
                 colors.water = [0.24, 0.36, 0.75, 1.0];
             }
-            "warm_ocean" | "minecraft:warm_ocean" | "lukewarm_ocean" | "minecraft:lukewarm_ocean"
-            | "deep_lukewarm_ocean" | "minecraft:deep_lukewarm_ocean" => {
+            "warm_ocean"
+            | "minecraft:warm_ocean"
+            | "lukewarm_ocean"
+            | "minecraft:lukewarm_ocean"
+            | "deep_lukewarm_ocean"
+            | "minecraft:deep_lukewarm_ocean" => {
                 colors.water = [0.26, 0.53, 0.80, 1.0];
             }
-            "frozen_ocean" | "minecraft:frozen_ocean" | "deep_frozen_ocean" | "minecraft:deep_frozen_ocean" => {
+            "frozen_ocean"
+            | "minecraft:frozen_ocean"
+            | "deep_frozen_ocean"
+            | "minecraft:deep_frozen_ocean" => {
                 colors.water = [0.24, 0.30, 0.60, 1.0];
             }
             _ => {
@@ -185,9 +212,15 @@ impl TintProvider {
     /// Categorize a block by its tinting behavior.
     fn categorize_block(&self, block_id: &str) -> TintCategory {
         // Grass-colored blocks
-        if matches!(block_id,
-            "grass_block" | "grass" | "tall_grass" | "fern" | "large_fern" |
-            "potted_fern" | "short_grass"
+        if matches!(
+            block_id,
+            "grass_block"
+                | "grass"
+                | "tall_grass"
+                | "fern"
+                | "large_fern"
+                | "potted_fern"
+                | "short_grass"
         ) {
             return TintCategory::Grass;
         }
@@ -196,8 +229,15 @@ impl TintProvider {
         if block_id.ends_with("_leaves") && !block_id.starts_with("azalea") {
             return TintCategory::Foliage;
         }
-        if matches!(block_id, "vine" | "oak_leaves" | "jungle_leaves" | "acacia_leaves" |
-                    "dark_oak_leaves" | "mangrove_leaves") {
+        if matches!(
+            block_id,
+            "vine"
+                | "oak_leaves"
+                | "jungle_leaves"
+                | "acacia_leaves"
+                | "dark_oak_leaves"
+                | "mangrove_leaves"
+        ) {
             return TintCategory::Foliage;
         }
 
@@ -217,7 +257,10 @@ impl TintProvider {
         }
 
         // Stems
-        if matches!(block_id, "melon_stem" | "pumpkin_stem" | "attached_melon_stem" | "attached_pumpkin_stem") {
+        if matches!(
+            block_id,
+            "melon_stem" | "pumpkin_stem" | "attached_melon_stem" | "attached_pumpkin_stem"
+        ) {
             return TintCategory::Stem;
         }
 
@@ -236,7 +279,8 @@ impl TintProvider {
 
     /// Get redstone tint based on power level.
     fn get_redstone_tint(&self, block: &InputBlock) -> [f32; 4] {
-        let power = block.properties
+        let power = block
+            .properties
             .get("power")
             .and_then(|s| s.parse::<usize>().ok())
             .unwrap_or(0)
@@ -253,7 +297,8 @@ impl TintProvider {
             return self.colors.stem[7];
         }
 
-        let age = block.properties
+        let age = block
+            .properties
             .get("age")
             .and_then(|s| s.parse::<usize>().ok())
             .unwrap_or(0)
@@ -310,10 +355,8 @@ mod tests {
     fn test_redstone_tint() {
         let provider = TintProvider::new();
 
-        let redstone_0 = InputBlock::new("minecraft:redstone_wire")
-            .with_property("power", "0");
-        let redstone_15 = InputBlock::new("minecraft:redstone_wire")
-            .with_property("power", "15");
+        let redstone_0 = InputBlock::new("minecraft:redstone_wire").with_property("power", "0");
+        let redstone_15 = InputBlock::new("minecraft:redstone_wire").with_property("power", "15");
 
         let tint_0 = provider.get_tint(&redstone_0, 0);
         let tint_15 = provider.get_tint(&redstone_15, 0);
@@ -326,10 +369,8 @@ mod tests {
     fn test_stem_tint() {
         let provider = TintProvider::new();
 
-        let stem_0 = InputBlock::new("minecraft:melon_stem")
-            .with_property("age", "0");
-        let stem_7 = InputBlock::new("minecraft:melon_stem")
-            .with_property("age", "7");
+        let stem_0 = InputBlock::new("minecraft:melon_stem").with_property("age", "0");
+        let stem_7 = InputBlock::new("minecraft:melon_stem").with_property("age", "7");
 
         let tint_0 = provider.get_tint(&stem_0, 0);
         let tint_7 = provider.get_tint(&stem_7, 0);

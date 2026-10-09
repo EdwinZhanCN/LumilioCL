@@ -39,7 +39,10 @@ pub(super) fn skull_model(skull_type: SkullType) -> EntityModelDef {
     let mut inner_parts = vec![head];
 
     // Hat overlay for types that have hat texture region (zombie, piglin, player).
-    let has_hat = matches!(skull_type, SkullType::Zombie | SkullType::Piglin | SkullType::Player);
+    let has_hat = matches!(
+        skull_type,
+        SkullType::Zombie | SkullType::Piglin | SkullType::Player
+    );
     if has_hat {
         inner_parts.push(EntityPart {
             cubes: vec![EntityCube {
@@ -212,14 +215,20 @@ mod tests {
     fn test_detect_player_head() {
         let block = InputBlock::new("minecraft:player_head");
         let entity = super::super::detect_block_entity(&block);
-        assert!(matches!(entity, Some(super::super::BlockEntityType::Skull(SkullType::Player))));
+        assert!(matches!(
+            entity,
+            Some(super::super::BlockEntityType::Skull(SkullType::Player))
+        ));
     }
 
     #[test]
     fn test_detect_player_wall_head() {
         let block = InputBlock::new("minecraft:player_wall_head");
         let entity = super::super::detect_block_entity(&block);
-        assert!(matches!(entity, Some(super::super::BlockEntityType::Skull(SkullType::Player))));
+        assert!(matches!(
+            entity,
+            Some(super::super::BlockEntityType::Skull(SkullType::Player))
+        ));
     }
 
     #[test]
@@ -233,7 +242,8 @@ mod tests {
     fn test_decode_hex_skin_valid() {
         // Create a minimal 1x1 PNG and hex-encode it
         use image::{ImageBuffer, Rgba};
-        let img: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::from_pixel(1, 1, Rgba([255, 0, 0, 255]));
+        let img: ImageBuffer<Rgba<u8>, Vec<u8>> =
+            ImageBuffer::from_pixel(1, 1, Rgba([255, 0, 0, 255]));
         let mut buf = Vec::new();
         let mut cursor = std::io::Cursor::new(&mut buf);
         img.write_to(&mut cursor, image::ImageFormat::Png).unwrap();
@@ -247,19 +257,23 @@ mod tests {
     #[test]
     fn test_player_skin_fallback_steve() {
         let block = InputBlock::new("minecraft:player_head");
-        assert_eq!(player_skin_fallback_path(&block), "entity/player/wide/steve");
+        assert_eq!(
+            player_skin_fallback_path(&block),
+            "entity/player/wide/steve"
+        );
 
         // Even first digit → Steve
-        let block = InputBlock::new("minecraft:player_head")
-            .with_property("uuid", "2a3b4c5d");
-        assert_eq!(player_skin_fallback_path(&block), "entity/player/wide/steve");
+        let block = InputBlock::new("minecraft:player_head").with_property("uuid", "2a3b4c5d");
+        assert_eq!(
+            player_skin_fallback_path(&block),
+            "entity/player/wide/steve"
+        );
     }
 
     #[test]
     fn test_player_skin_fallback_alex_by_uuid() {
         // Odd first digit → Alex
-        let block = InputBlock::new("minecraft:player_head")
-            .with_property("uuid", "1a2b3c4d");
+        let block = InputBlock::new("minecraft:player_head").with_property("uuid", "1a2b3c4d");
         assert_eq!(player_skin_fallback_path(&block), "entity/player/slim/alex");
     }
 
@@ -277,7 +291,7 @@ mod tests {
         }
         let total_cubes = count_cubes(&model.parts);
         assert_eq!(total_cubes, 2); // head + hat
-        // Each cube = 6 faces, so 12 faces total
+                                    // Each cube = 6 faces, so 12 faces total
         assert_eq!(total_cubes * 6, 12);
     }
 }

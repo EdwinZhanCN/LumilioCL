@@ -164,7 +164,14 @@ pub(super) fn cow_model() -> EntityModelDef {
             rotation: [std::f32::consts::PI, 0.0, 0.0],
             ..Default::default()
         },
-        children: vec![head, body, right_hind_leg, left_hind_leg, right_front_leg, left_front_leg],
+        children: vec![
+            head,
+            body,
+            right_hind_leg,
+            left_hind_leg,
+            right_front_leg,
+            left_front_leg,
+        ],
     };
 
     EntityModelDef {

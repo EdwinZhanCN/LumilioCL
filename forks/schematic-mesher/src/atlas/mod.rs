@@ -5,4 +5,4 @@
 
 mod builder;
 
-pub use builder::{AtlasBuilder, TextureAtlas, AtlasRegion};
+pub use builder::{AtlasBuilder, AtlasRegion, TextureAtlas};

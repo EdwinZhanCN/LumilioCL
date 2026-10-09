@@ -153,7 +153,15 @@ pub(crate) fn boat_model(wood: &str, is_chest: bool) -> EntityModelDef {
         children: vec![],
     };
 
-    let mut parts = vec![bottom, back, front, right_plank, left_plank, left_paddle, right_paddle];
+    let mut parts = vec![
+        bottom,
+        back,
+        front,
+        right_plank,
+        left_plank,
+        left_paddle,
+        right_paddle,
+    ];
 
     if is_chest {
         parts.push(EntityPart {

@@ -85,8 +85,18 @@ pub(super) fn double_chest_model(variant: ChestVariant, side: DoubleChestSide) -
     // Double chest values from EntityModelJson dump.
     // Each half is 15 units wide with a 2-unit gap between halves (intentional seam).
     let (bottom_origin, lid_origin, lock_origin, lock_dims) = match side {
-        DoubleChestSide::Left => ([0.0, 0.0, 1.0], [0.0, 0.0, 0.0], [0.0, -1.0, 15.0], [1.0, 4.0, 1.0]),
-        DoubleChestSide::Right => ([1.0, 0.0, 1.0], [1.0, 0.0, 0.0], [15.0, -1.0, 15.0], [1.0, 4.0, 1.0]),
+        DoubleChestSide::Left => (
+            [0.0, 0.0, 1.0],
+            [0.0, 0.0, 0.0],
+            [0.0, -1.0, 15.0],
+            [1.0, 4.0, 1.0],
+        ),
+        DoubleChestSide::Right => (
+            [1.0, 0.0, 1.0],
+            [1.0, 0.0, 0.0],
+            [15.0, -1.0, 15.0],
+            [1.0, 4.0, 1.0],
+        ),
     };
 
     let bottom = EntityPart {

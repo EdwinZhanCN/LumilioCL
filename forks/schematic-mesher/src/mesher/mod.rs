@@ -10,10 +10,10 @@
 //! All methods return geometry separated into opaque, cutout, and transparent layers
 //! with a shared texture atlas.
 
-pub mod geometry;
 pub mod element;
 pub mod entity;
 pub mod face_culler;
+pub mod geometry;
 pub mod greedy;
 pub mod lighting;
 
@@ -182,7 +182,10 @@ impl MesherOutput {
     pub fn has_transparency(&self) -> bool {
         !self.cutout_mesh.is_empty()
             || !self.transparent_mesh.is_empty()
-            || self.greedy_materials.iter().any(|gm| !gm.transparent_mesh.is_empty())
+            || self
+                .greedy_materials
+                .iter()
+                .any(|gm| !gm.transparent_mesh.is_empty())
     }
 
     /// Get total vertex count across all meshes.
@@ -190,9 +193,11 @@ impl MesherOutput {
         self.opaque_mesh.vertex_count()
             + self.cutout_mesh.vertex_count()
             + self.transparent_mesh.vertex_count()
-            + self.greedy_materials.iter().map(|gm| {
-                gm.opaque_mesh.vertex_count() + gm.transparent_mesh.vertex_count()
-            }).sum::<usize>()
+            + self
+                .greedy_materials
+                .iter()
+                .map(|gm| gm.opaque_mesh.vertex_count() + gm.transparent_mesh.vertex_count())
+                .sum::<usize>()
     }
 
     /// Get total triangle count across all meshes.
@@ -200,9 +205,11 @@ impl MesherOutput {
         self.opaque_mesh.triangle_count()
             + self.cutout_mesh.triangle_count()
             + self.transparent_mesh.triangle_count()
-            + self.greedy_materials.iter().map(|gm| {
-                gm.opaque_mesh.triangle_count() + gm.transparent_mesh.triangle_count()
-            }).sum::<usize>()
+            + self
+                .greedy_materials
+                .iter()
+                .map(|gm| gm.opaque_mesh.triangle_count() + gm.transparent_mesh.triangle_count())
+                .sum::<usize>()
     }
 }
 
@@ -446,7 +453,8 @@ impl Mesher {
             match partials {
                 Some(partials) => {
                     mesh_builder.merge_metadata_only(&partials);
-                    mesh_builder.build_from_partials(partials, self.config.pre_built_atlas.clone())?
+                    mesh_builder
+                        .build_from_partials(partials, self.config.pre_built_atlas.clone())?
                 }
                 None => mesh_builder.build(self.config.pre_built_atlas.clone())?,
             };
@@ -527,7 +535,10 @@ impl Mesher {
     ///
     /// Runs the full face processing pipeline to collect texture references, but the
     /// resulting mesh is discarded. Use this to pre-scan blocks for a global atlas.
-    pub fn discover_textures<S: BlockSource>(&self, source: &S) -> std::collections::HashSet<String> {
+    pub fn discover_textures<S: BlockSource>(
+        &self,
+        source: &S,
+    ) -> std::collections::HashSet<String> {
         let blocks: Vec<_> = source.iter_blocks().collect();
         let block_map: rustc_hash::FxHashMap<BlockPosition, &InputBlock> =
             blocks.iter().map(|(pos, block)| (*pos, *block)).collect();
@@ -592,9 +603,9 @@ impl Mesher {
             let frame_height = anim.and_then(|a| a.frame_height).unwrap_or(frame_width);
             let frametime = anim.map(|a| a.frametime).unwrap_or(1);
             let interpolate = anim.map(|a| a.interpolate).unwrap_or(false);
-            let frames = anim.and_then(|a| a.frames.as_ref()).map(|fs| {
-                fs.iter().map(|f| f.index).collect()
-            });
+            let frames = anim
+                .and_then(|a| a.frames.as_ref())
+                .map(|fs| fs.iter().map(|f| f.index).collect());
 
             // Convert atlas region from UV (0-1) to pixel coordinates
             let atlas_x = (region.u_min * atlas.width as f32).round() as u32;
@@ -660,7 +671,11 @@ impl<'s, S: BlockSource> Iterator for ChunkIter<'s, S> {
         let cs = self.chunk_size;
         let chunk_bounds = BoundingBox::new(
             [(cx * cs) as f32, (cy * cs) as f32, (cz * cs) as f32],
-            [((cx + 1) * cs) as f32, ((cy + 1) * cs) as f32, ((cz + 1) * cs) as f32],
+            [
+                ((cx + 1) * cs) as f32,
+                ((cy + 1) * cs) as f32,
+                ((cz + 1) * cs) as f32,
+            ],
         );
 
         // Get blocks in this chunk region
@@ -681,10 +696,7 @@ impl<'s, S: BlockSource> Iterator for ChunkIter<'s, S> {
         }
 
         // Mesh this chunk
-        let result = self.mesher.mesh_blocks(
-            blocks.into_iter(),
-            chunk_bounds,
-        );
+        let result = self.mesher.mesh_blocks(blocks.into_iter(), chunk_bounds);
 
         Some(result.map(|mesher_output| {
             let mut mesh_output = crate::mesh_output::MeshOutput::from(mesher_output);
@@ -725,9 +737,18 @@ mod chunk_tests {
         // block at (4,0,0) => chunk (1,0,0)
         // block at (0,4,0) => chunk (0,1,0)
         let blocks = vec![
-            (BlockPosition::new(0, 0, 0), InputBlock::new("minecraft:stone")),
-            (BlockPosition::new(4, 0, 0), InputBlock::new("minecraft:stone")),
-            (BlockPosition::new(0, 4, 0), InputBlock::new("minecraft:stone")),
+            (
+                BlockPosition::new(0, 0, 0),
+                InputBlock::new("minecraft:stone"),
+            ),
+            (
+                BlockPosition::new(4, 0, 0),
+                InputBlock::new("minecraft:stone"),
+            ),
+            (
+                BlockPosition::new(0, 4, 0),
+                InputBlock::new("minecraft:stone"),
+            ),
         ];
         let source = TestBlockSource {
             bounds: BoundingBox::new([0.0, 0.0, 0.0], [5.0, 5.0, 1.0]),
@@ -752,9 +773,18 @@ mod chunk_tests {
     fn test_chunk_iter_single_chunk() {
         // All blocks in same chunk
         let blocks = vec![
-            (BlockPosition::new(0, 0, 0), InputBlock::new("minecraft:stone")),
-            (BlockPosition::new(1, 0, 0), InputBlock::new("minecraft:stone")),
-            (BlockPosition::new(0, 1, 0), InputBlock::new("minecraft:stone")),
+            (
+                BlockPosition::new(0, 0, 0),
+                InputBlock::new("minecraft:stone"),
+            ),
+            (
+                BlockPosition::new(1, 0, 0),
+                InputBlock::new("minecraft:stone"),
+            ),
+            (
+                BlockPosition::new(0, 1, 0),
+                InputBlock::new("minecraft:stone"),
+            ),
         ];
         let source = TestBlockSource {
             bounds: BoundingBox::new([0.0, 0.0, 0.0], [2.0, 2.0, 1.0]),
@@ -773,8 +803,14 @@ mod chunk_tests {
     fn test_chunk_iter_negative_coords() {
         // Blocks in negative coordinate space
         let blocks = vec![
-            (BlockPosition::new(-1, 0, 0), InputBlock::new("minecraft:stone")),
-            (BlockPosition::new(0, 0, 0), InputBlock::new("minecraft:stone")),
+            (
+                BlockPosition::new(-1, 0, 0),
+                InputBlock::new("minecraft:stone"),
+            ),
+            (
+                BlockPosition::new(0, 0, 0),
+                InputBlock::new("minecraft:stone"),
+            ),
         ];
         let source = TestBlockSource {
             bounds: BoundingBox::new([-1.0, 0.0, 0.0], [1.0, 1.0, 1.0]),

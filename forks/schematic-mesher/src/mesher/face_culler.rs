@@ -455,9 +455,10 @@ impl<'a> FaceCuller<'a> {
         let neighbor_type = self.block_types.get(&neighbor_pos);
 
         match (current_type, neighbor_type) {
-            (Some(BlockCullType::Transparent(current_group)), Some(BlockCullType::Transparent(neighbor_group))) => {
-                current_group == neighbor_group
-            }
+            (
+                Some(BlockCullType::Transparent(current_group)),
+                Some(BlockCullType::Transparent(neighbor_group)),
+            ) => current_group == neighbor_group,
             _ => false,
         }
     }
@@ -478,7 +479,9 @@ impl<'a> FaceCuller<'a> {
     /// Check if a block is fully occluded (all 6 neighbors are fully opaque).
     /// A fully occluded block can be skipped entirely during meshing.
     pub fn is_fully_occluded(&self, pos: BlockPosition) -> bool {
-        Direction::ALL.iter().all(|&dir| self.is_fully_opaque_at(pos.neighbor(dir)))
+        Direction::ALL
+            .iter()
+            .all(|&dir| self.is_fully_opaque_at(pos.neighbor(dir)))
     }
 
     /// Check if a position is occupied.
@@ -494,7 +497,8 @@ impl<'a> FaceCuller<'a> {
         let corner_neighbors = get_ao_neighbors(direction);
 
         let mut ao_values = [3u8; 4];
-        for (i, (side1_offset, side2_offset, corner_offset)) in corner_neighbors.iter().enumerate() {
+        for (i, (side1_offset, side2_offset, corner_offset)) in corner_neighbors.iter().enumerate()
+        {
             let side1_pos = BlockPosition::new(
                 pos.x + side1_offset[0],
                 pos.y + side1_offset[1],
@@ -619,7 +623,11 @@ impl FaceCullerSimple {
         }
 
         // Ice
-        if block_id == "ice" || block_id == "packed_ice" || block_id == "blue_ice" || block_id == "frosted_ice" {
+        if block_id == "ice"
+            || block_id == "packed_ice"
+            || block_id == "blue_ice"
+            || block_id == "frosted_ice"
+        {
             return Some(block_id.to_string());
         }
 
@@ -649,9 +657,10 @@ impl FaceCullerSimple {
 
         match (current_type, neighbor_type) {
             (_, Some(SimpleCullType::Opaque)) => true,
-            (Some(SimpleCullType::Transparent(current)), Some(SimpleCullType::Transparent(neighbor))) => {
-                current == neighbor
-            }
+            (
+                Some(SimpleCullType::Transparent(current)),
+                Some(SimpleCullType::Transparent(neighbor)),
+            ) => current == neighbor,
             _ => false,
         }
     }
@@ -672,7 +681,9 @@ impl FaceCullerSimple {
 
     /// Check if a block is fully occluded (all 6 neighbors are fully opaque).
     pub fn is_fully_occluded(&self, pos: BlockPosition) -> bool {
-        Direction::ALL.iter().all(|&dir| self.is_fully_opaque_at(pos.neighbor(dir)))
+        Direction::ALL
+            .iter()
+            .all(|&dir| self.is_fully_opaque_at(pos.neighbor(dir)))
     }
 
     /// Check if a position is occupied.
@@ -685,7 +696,8 @@ impl FaceCullerSimple {
         let corner_neighbors = get_ao_neighbors(direction);
 
         let mut ao_values = [3u8; 4];
-        for (i, (side1_offset, side2_offset, corner_offset)) in corner_neighbors.iter().enumerate() {
+        for (i, (side1_offset, side2_offset, corner_offset)) in corner_neighbors.iter().enumerate()
+        {
             let side1_pos = BlockPosition::new(
                 pos.x + side1_offset[0],
                 pos.y + side1_offset[1],
@@ -734,29 +746,107 @@ fn is_likely_full_cube(name: &str) -> bool {
 
     // Common patterns for non-full blocks
     let non_full_patterns = [
-        "slab", "stairs", "fence", "wall", "door", "trapdoor",
-        "sign", "banner", "button", "lever", "torch", "lantern",
-        "pressure_plate", "carpet", "rail", "flower", "sapling",
-        "glass_pane", "iron_bars", "chain", "rod", "candle",
-        "head", "skull", "pot", "campfire", "anvil", "bell", "shulker",
-        "brewing_stand", "cauldron", "hopper", "lectern",
-        "grindstone", "stonecutter", "enchanting_table",
-        "repeater", "comparator", "daylight_detector",
-        "piston", "tripwire", "string", "cobweb", "vine",
-        "ladder", "scaffolding", "coral_fan", "pickle",
-        "egg", "frogspawn", "dripleaf", "azalea", "roots",
-        "sprouts", "fungus", "mushroom", "grass", "fern",
-        "bush", "berry", "wart", "stem", "crop", "wheat",
-        "carrots", "potatoes", "beetroots", "cocoa", "cactus",
-        "sugar_cane", "bamboo", "kelp", "seagrass", "lichen",
-        "vein", "fire", "snow", "layer",
+        "slab",
+        "stairs",
+        "fence",
+        "wall",
+        "door",
+        "trapdoor",
+        "sign",
+        "banner",
+        "button",
+        "lever",
+        "torch",
+        "lantern",
+        "pressure_plate",
+        "carpet",
+        "rail",
+        "flower",
+        "sapling",
+        "glass_pane",
+        "iron_bars",
+        "chain",
+        "rod",
+        "candle",
+        "head",
+        "skull",
+        "pot",
+        "campfire",
+        "anvil",
+        "bell",
+        "shulker",
+        "brewing_stand",
+        "cauldron",
+        "hopper",
+        "lectern",
+        "grindstone",
+        "stonecutter",
+        "enchanting_table",
+        "repeater",
+        "comparator",
+        "daylight_detector",
+        "piston",
+        "tripwire",
+        "string",
+        "cobweb",
+        "vine",
+        "ladder",
+        "scaffolding",
+        "coral_fan",
+        "pickle",
+        "egg",
+        "frogspawn",
+        "dripleaf",
+        "azalea",
+        "roots",
+        "sprouts",
+        "fungus",
+        "mushroom",
+        "grass",
+        "fern",
+        "bush",
+        "berry",
+        "wart",
+        "stem",
+        "crop",
+        "wheat",
+        "carrots",
+        "potatoes",
+        "beetroots",
+        "cocoa",
+        "cactus",
+        "sugar_cane",
+        "bamboo",
+        "kelp",
+        "seagrass",
+        "lichen",
+        "vein",
+        "fire",
+        "snow",
+        "layer",
         // Block entities with non-full geometry
-        "_bed", "chest", "armor_stand", "minecart", "item_frame",
+        "_bed",
+        "chest",
+        "armor_stand",
+        "minecart",
+        "item_frame",
         // Specific flowers that don't have "flower" in name
-        "poppy", "dandelion", "orchid", "allium", "tulip",
-        "oxeye_daisy", "cornflower", "lily_of_the_valley",
-        "wither_rose", "sunflower", "lilac", "rose_bush",
-        "peony", "pitcher_plant", "torchflower", "pink_petals",
+        "poppy",
+        "dandelion",
+        "orchid",
+        "allium",
+        "tulip",
+        "oxeye_daisy",
+        "cornflower",
+        "lily_of_the_valley",
+        "wither_rose",
+        "sunflower",
+        "lilac",
+        "rose_bush",
+        "peony",
+        "pitcher_plant",
+        "torchflower",
+        "pink_petals",
     ];
 
     for pattern in &non_full_patterns {
@@ -935,7 +1025,9 @@ mod tests {
     #[test]
     fn test_is_fully_occluded() {
         // Create a 3x3x3 cube of stone — the center block should be fully occluded
-        let stones: Vec<InputBlock> = (0..27).map(|_| InputBlock::new("minecraft:stone")).collect();
+        let stones: Vec<InputBlock> = (0..27)
+            .map(|_| InputBlock::new("minecraft:stone"))
+            .collect();
         let mut blocks = Vec::new();
         let mut i = 0;
         for x in 0..3 {
