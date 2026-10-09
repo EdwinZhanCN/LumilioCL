@@ -12,6 +12,7 @@
 | 显示区块网格 | 图层浮层 · 区块网格开关 | 即刻开关；每像素超过 4 方块时隐藏细线，并在开关旁说明 |  | `lumilio-ui/src/world_explorer/layers.rs` |
 | 显示 Region 边界 | 图层浮层 · Region 边界开关 | 即刻开关 512 方块边界；不改变底图或相机 |  | `lumilio-ui/src/world_explorer/layers.rs` |
 | 显示或隐藏结构图层 | 图层浮层 · 按种类分组的开关 | 即刻开关，图标按世界版本与维度出现；每像素超过 16 方块时隐藏并说明；1.18 起沙漠神殿、丛林神殿、林地府邸标「估计」 |  | `lumilio-ui/src/world_explorer/layers.rs` |
+| 查看存档底图 | 底图分段 ·「存档」 | 从单人存档的 Region 文件画地表（按高度明暗、按群系着色）；没生成完的区块显示无数据；颜色表里没有的方块画成淡紫色并在状态行写明种数 | 粗缩放由宿主用细一级合成 | `lumilio-ui/src/world_explorer/mod.rs` |
 | 平移与缩放 | 地图视口 · 拖动 / 滚轮 / + − 与方向键 | 锚点缩放；过期世代与旧视口结果不进入当前帧 |  | `lumilio-ui/src/world_explorer/mod.rs` |
 | 点选地图对象 | 地图左下角信息卡 · 种类、坐标、来源与「复制坐标」 | 点图标选中并显示；点空白处或「×」取消；复制 `x z`；估计的位置标「估计」 |  | `lumilio-ui/src/world_explorer/select.rs` |
 | 复制路径点分享串 | 信息卡 ·「复制分享串」 | 复制 Xaero 的 xaero-waypoint: 格式，可在游戏里导入；只在路径点上出现 |  | `lumilio-ui/src/world_explorer/select.rs` |

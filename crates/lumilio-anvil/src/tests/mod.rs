@@ -508,4 +508,33 @@ fn a_heightmap_of_an_unknown_width_is_ignored() {
     assert_eq!(chunk.heightmap(Heightmap::MotionBlocking), None);
 }
 
+#[test]
+fn under_a_roof_the_column_shows_the_floor_below_the_first_gap() {
+    // Bedrock at 15, netherrack 12..15, air 6..12, netherrack floor up to 5.
+    let names = [AIR, "minecraft:bedrock", "minecraft:netherrack"];
+    let section = modern_section(
+        0,
+        &names,
+        |x, y, _| match y {
+            15 => 1,
+            12..=14 => 2,
+            6..=11 if x == 3 => 2,
+            6..=11 => 0,
+            _ => 2,
+        },
+        false,
+    );
+    let chunk = Chunk::from_nbt(&modern_chunk(3955, "full", vec![section])).unwrap();
+    let below = columns_below(&chunk, 15, |_| false);
+    let floor = below[0].unwrap();
+    assert_eq!((floor.block, floor.y), ("minecraft:netherrack", 5));
+    assert_eq!(below[3], None, "solid from the roof down");
+    assert_eq!(
+        columns(&chunk, |_| false)[0].unwrap().block,
+        "minecraft:bedrock"
+    );
+    // Starting inside the gap shows the floor straight away.
+    assert_eq!(columns_below(&chunk, 9, |_| false)[0].unwrap().y, 5);
+}
+
 mod samples;

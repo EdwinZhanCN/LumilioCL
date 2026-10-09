@@ -136,6 +136,14 @@ impl<T: Transport + Clone> LauncherService<T> {
         {
             return Err(MapFailure::Off);
         }
+        let game = self.layout.game(instance);
+        if let Some(stamps) = self
+            .plugins
+            .map_sources(&provider, game, request.clone(), cancel.clone())
+            .await?
+        {
+            return self.file_tile(instance, request, stamps, cancel).await;
+        }
         let cache = world_map::TileCache::new(self.layout.map_cache());
         let (read_cache, read_request) = (cache.clone(), request.clone());
         if let Ok(Ok(Some(reply))) =
@@ -162,6 +170,50 @@ impl<T: Transport + Clone> LauncherService<T> {
         let saved = reply.clone();
         let _ = tokio::task::spawn_blocking(move || cache.put(&request, &saved)).await;
         Ok(reply)
+    }
+    /// A tile of a base map drawn from the world's files: nothing when none of
+    /// its files exist, level 0 from the provider, and every coarser level
+    /// built here from its 16 children.
+    fn file_tile<'a>(
+        &'a self,
+        instance: &'a str,
+        request: TileRequest,
+        stamps: Vec<crate::plugins::SourceStamp>,
+        cancel: CancellationToken,
+    ) -> futures_util::future::BoxFuture<'a, Result<TileReply, MapFailure>> {
+        Box::pin(async move {
+            if stamps.iter().all(|(_, stat)| stat.is_none()) {
+                return Ok(TileReply::Empty);
+            }
+            let provider = request.key.provider.clone();
+            let game = self.layout.game(instance);
+            if request.key.level == 0 {
+                return self
+                    .plugins
+                    .map_tile(&provider, game, request, cancel)
+                    .await;
+            }
+            let children = (0..world_map::SPLIT * world_map::SPLIT).map(|index| {
+                let mut child = request.clone();
+                child.key.level -= 1;
+                child.key.tx = request.key.tx * world_map::SPLIT + index % world_map::SPLIT;
+                child.key.tz = request.key.tz * world_map::SPLIT + index / world_map::SPLIT;
+                let (provider, game, cancel) = (provider.clone(), game.clone(), cancel.clone());
+                async move {
+                    let stamps = self
+                        .plugins
+                        .map_sources(&provider, game, child.clone(), cancel.clone())
+                        .await?
+                        .unwrap_or_default();
+                    self.file_tile(instance, child, stamps, cancel).await
+                }
+            });
+            let children = futures_util::future::try_join_all(children).await?;
+            if cancel.is_cancelled() {
+                return Err(MapFailure::Cancelled);
+            }
+            Ok(world_map::compose(&children))
+        })
     }
     /// Whether an edit could start now: no game running on the instance and
     /// no other operation holding it.

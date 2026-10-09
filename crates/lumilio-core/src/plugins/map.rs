@@ -5,7 +5,7 @@ use lumilio_plugin_api::map::{
     BaseMapInfo, MapObject, ObjectEdit, OverlayInfo, OverlayRequest, TileReply, TileRequest,
     WorldContext,
 };
-use lumilio_plugin_api::{HostContext, Plugin, PluginError};
+use lumilio_plugin_api::{FileStat, HostContext, Plugin, PluginError};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -19,6 +19,9 @@ pub enum MapFailure {
     ProviderStopped,
     Failed(String),
 }
+
+/// A file a tile is drawn from and what it looked like (`None`: missing).
+pub type SourceStamp = (String, Option<FileStat>);
 
 #[derive(Clone, Debug, Default)]
 pub struct MapProviders {
@@ -132,6 +135,55 @@ impl PluginHost {
                     return Err(PluginError::InvalidInput("invalid tile reply".into()));
                 }
                 Ok(reply)
+            },
+        )
+        .await
+    }
+
+    /// The files a tile is drawn from, each with its length and modification
+    /// time as the host sees them; `None` for a base map not drawn from files.
+    /// See [`lumilio_plugin_api::map::BaseMapProvider::sources`].
+    pub async fn map_sources(
+        &self,
+        plugin: &str,
+        game_dir: PathBuf,
+        request: TileRequest,
+        cancel: CancellationToken,
+    ) -> Result<Option<Vec<SourceStamp>>, MapFailure> {
+        if request.key.provider != plugin
+            || request.key.level > 4
+            || request.context.world != request.key.world
+            || request.context.dimension != request.key.dimension
+        {
+            return Err(MapFailure::Failed("invalid tile request".into()));
+        }
+        let provider = format!("base:{}", request.key.base_map);
+        self.map_call(
+            plugin,
+            &provider,
+            Some(game_dir),
+            cancel,
+            MAP_TIMEOUT,
+            move |plugin, ctx| {
+                let Some(paths) = plugin
+                    .base_map_provider()
+                    .ok_or_else(|| PluginError::Unavailable("no base provider".into()))?
+                    .sources(ctx, &request)?
+                else {
+                    return Ok(None);
+                };
+                if paths.len() > lumilio_plugin_api::map::MAX_SOURCES {
+                    return Err(PluginError::InvalidInput("too many tile sources".into()));
+                }
+                // Stat through the plugin's own grants: a source outside them
+                // is refused like any other read.
+                let mut stamps = paths
+                    .into_iter()
+                    .map(|path| Ok((path.clone(), ctx.file_stat(&path)?)))
+                    .collect::<Result<Vec<_>, PluginError>>()?;
+                stamps.sort_by(|a, b| a.0.cmp(&b.0));
+                stamps.dedup_by(|a, b| a.0 == b.0);
+                Ok(Some(stamps))
             },
         )
         .await
@@ -313,6 +365,7 @@ impl PluginHost {
                 // supported manual seed afterward.
                 if fault.message.starts_with("map-version-")
                     || fault.message.starts_with("map-xaero-")
+                    || fault.message.starts_with("map-save-")
                     || fault.message.starts_with("map-edit-")
                 {
                     return Err(MapFailure::Failed(fault.message));

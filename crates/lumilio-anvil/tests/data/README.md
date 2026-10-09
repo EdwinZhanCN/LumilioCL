@@ -67,5 +67,6 @@ open(dst, 'wb').write(head + stamps + body)
 - 26.3: dimensions moved under `dimensions/minecraft/<name>/`; palette entries
   are plain strings, or `{"": name}` and `{id, properties}` in a mixed list;
   `level.dat` keeps the spawn as `Data.spawn{pos:[I;x,y,z],dimension,…}`.
-  Chunk column x = 8 stopped at `minecraft:biomes` and x = 7 at
-  `initialize_light`, so the sample also has unfinished chunks.
+  Chunk column x = 8 stopped at `minecraft:biomes`, x = 7 at
+  `minecraft:terrain` and x = 6 at `minecraft:initialize_light` (features
+  placed), so the sample also has unfinished chunks.

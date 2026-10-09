@@ -62,7 +62,26 @@ fn map_contracts_round_trip_without_launcher_types() {
             rgba: vec![0; 4],
         },
         coverage: vec![255],
+        unknown: vec!["mod:block".into()],
     });
+    let full = |unknown: Vec<String>| TileReply::Partial {
+        image: ImageData {
+            width: 256,
+            height: 256,
+            rgba: vec![0; 256 * 256 * 4],
+        },
+        coverage: vec![255; 256 * 256],
+        unknown,
+    };
+    assert!(full(vec!["mod:block".into()]).is_valid());
+    assert!(!full(vec!["x".into(); MAX_UNKNOWN + 1]).is_valid());
+    assert!(!full(vec!["x".repeat(257)]).is_valid());
+    // A reply written before `unknown` existed still reads.
+    let old: TileReply = serde_json::from_str(
+        r#"{"Partial":{"image":{"width":1,"height":1,"rgba":[0,0,0,0]},"coverage":[255]}}"#,
+    )
+    .unwrap();
+    assert!(matches!(old, TileReply::Partial { unknown, .. } if unknown.is_empty()));
     assert!(
         !TileReply::Image(ImageData {
             width: 256,

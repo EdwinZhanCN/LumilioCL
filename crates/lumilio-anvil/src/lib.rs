@@ -23,7 +23,7 @@ mod surface;
 pub use biome::legacy_name as legacy_biome_name;
 pub use chunk::{Chunk, Heightmap, Section, UnsupportedVersion};
 pub use region::{ChunkLocation, Region, Source, region_coords};
-pub use surface::{Column, columns};
+pub use surface::{Column, columns, columns_below};
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum Error {

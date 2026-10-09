@@ -10,8 +10,6 @@ use lumilio_plugin_api::{
 };
 
 mod landmarks;
-// Read by the save base map provider, which comes next (T29).
-#[allow(dead_code)]
 mod save;
 mod structures;
 mod text;
@@ -107,14 +105,36 @@ impl InstanceTab for WorldExplorer {
 }
 impl BaseMapProvider for WorldExplorer {
     fn base_maps(&self) -> Vec<BaseMapInfo> {
-        vec![BaseMapInfo {
-            id: "seed".into(),
-            kind_id: "map-base-seed".into(),
-            dimensions: vec![Dimension::Overworld, Dimension::Nether, Dimension::End],
-            levels: vec![0, 1, 2, 3, 4],
-        }]
+        vec![
+            BaseMapInfo {
+                id: "seed".into(),
+                kind_id: "map-base-seed".into(),
+                dimensions: vec![Dimension::Overworld, Dimension::Nether, Dimension::End],
+                levels: vec![0, 1, 2, 3, 4],
+            },
+            save::info(),
+        ]
+    }
+    fn sources(
+        &self,
+        ctx: &dyn HostContext,
+        request: &TileRequest,
+    ) -> Result<Option<Vec<String>>, PluginError> {
+        if request.key.base_map == save::BASE {
+            save::sources(ctx, request)
+        } else {
+            Ok(None)
+        }
     }
     fn tile(&self, ctx: &dyn HostContext, request: &TileRequest) -> Result<TileReply, PluginError> {
+        if request.key.base_map == save::BASE
+            && request.key.provider == ID
+            && request.pixels == TILE_PIXELS
+            && request.context.world == request.key.world
+            && request.context.dimension == request.key.dimension
+        {
+            return save::tile(ctx, request);
+        }
         if request.key.base_map != "seed"
             || request.key.provider != ID
             || request.pixels != TILE_PIXELS

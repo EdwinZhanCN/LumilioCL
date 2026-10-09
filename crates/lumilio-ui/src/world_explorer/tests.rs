@@ -615,7 +615,8 @@ fn finished_tiles_of_another_level_stand_in_and_are_evicted_oldest_first(cx: &mu
         view.tiles.insert(
             coarse.clone(),
             Loaded {
-                rgba: prepare(image(7)),
+                rgba: prepare(image(7)).0,
+                unknown: Vec::new(),
                 revision: view.revision,
                 used: 0,
             },
@@ -633,6 +634,7 @@ fn finished_tiles_of_another_level_stand_in_and_are_evicted_oldest_first(cx: &mu
                 tile_key(0, 10_000 + n, 10_000),
                 Loaded {
                     rgba: None,
+                    unknown: Vec::new(),
                     revision: view.revision,
                     used: n as u64 + 1,
                 },
@@ -2053,4 +2055,83 @@ fn a_new_object_is_placed_by_clicking_the_map_and_pre_filled_with_the_position(
     view.update(cx, |view, cx| view.event(Event::CanEdit(false), cx));
     cx.run_until_parked();
     assert!(cx.debug_bounds("map-place").is_some());
+}
+
+#[gpui::test]
+fn the_save_map_says_what_it_needs_and_counts_blocks_without_colour(cx: &mut TestAppContext) {
+    let (view, cx, commands) = ready_view(cx);
+    cx.simulate_resize(gpui::size(px(800.), px(600.)));
+    cx.run_until_parked();
+    view.update(cx, |view, _| {
+        view.providers.base_maps.push((
+            "test.seed".into(),
+            BaseMapInfo {
+                id: "save".into(),
+                kind_id: "map-base-save".into(),
+                dimensions: vec![Dimension::Overworld],
+                levels: vec![0],
+            },
+        ));
+        view.base = 1;
+        assert_eq!(
+            view.status_line().as_deref(),
+            Some(tr!("map-save-needed")),
+            "a seed-only world has no save to draw"
+        );
+        view.context.as_mut().unwrap().seed = None;
+        view.base = 0;
+        assert_eq!(view.status_line().as_deref(), Some(tr!("map-seed-needed")));
+        view.base = 1;
+        view.context.as_mut().unwrap().world = WorldId::Save {
+            instance: "i".into(),
+            folder: "World".into(),
+        };
+        assert_eq!(view.status_line(), None, "a save needs no seed");
+    });
+    // Two visible tiles name three distinct blocks between them.
+    let mut sent = vec![];
+    while let Ok(command) = commands.try_recv() {
+        if let Command::Tile {
+            request,
+            generation,
+            ..
+        } = command
+        {
+            sent.push((generation, request.key));
+        }
+    }
+    assert!(sent.len() >= 2);
+    let partial = |unknown: &[&str]| TileReply::Partial {
+        image: lumilio_plugin_api::ImageData {
+            width: 256,
+            height: 256,
+            rgba: vec![0; 256 * 256 * 4],
+        },
+        coverage: vec![255; 256 * 256],
+        unknown: unknown.iter().map(|name| (*name).to_owned()).collect(),
+    };
+    view.update(cx, |view, cx| {
+        for ((generation, key), unknown) in sent.into_iter().zip([
+            &["mod:pipe", "mod:tank"][..],
+            &["mod:tank", "other:ore"][..],
+        ]) {
+            view.event(
+                Event::Tile {
+                    generation,
+                    key,
+                    result: Ok(partial(unknown)),
+                },
+                cx,
+            );
+        }
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.unknown_blocks(), 3);
+        assert_eq!(
+            view.status_line(),
+            Some(tr!("map-unknown-blocks", count = 3))
+        );
+    });
+    assert!(cx.debug_bounds("map-status").is_some());
 }

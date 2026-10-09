@@ -4,6 +4,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 pub const TILE_PIXELS: u32 = 256;
+/// Most block names a tile may report as having no colour.
+pub const MAX_UNKNOWN: usize = 64;
+/// Most files one tile may name as its sources.
+pub const MAX_SOURCES: usize = 20_000;
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 pub enum WorldId {
@@ -76,6 +80,11 @@ pub enum TileReply {
     Partial {
         image: ImageData,
         coverage: Vec<u8>,
+        /// Names of the blocks in this tile the provider had no colour for
+        /// (drawn in a placeholder colour); the host counts them for the
+        /// status line. At most [`MAX_UNKNOWN`].
+        #[serde(default)]
+        unknown: Vec<String>,
     },
     Empty,
 }
@@ -88,8 +97,15 @@ impl TileReply {
         match self {
             Self::Empty => true,
             Self::Image(image) => valid(image),
-            Self::Partial { image, coverage } => {
-                valid(image) && coverage.len() == (TILE_PIXELS * TILE_PIXELS) as usize
+            Self::Partial {
+                image,
+                coverage,
+                unknown,
+            } => {
+                valid(image)
+                    && coverage.len() == (TILE_PIXELS * TILE_PIXELS) as usize
+                    && unknown.len() <= MAX_UNKNOWN
+                    && unknown.iter().all(|name| name.len() <= 256)
             }
         }
     }
@@ -242,6 +258,24 @@ pub struct ObjectEdit {
 pub trait BaseMapProvider: Send + Sync {
     fn base_maps(&self) -> Vec<BaseMapInfo>;
     fn tile(&self, ctx: &dyn HostContext, request: &TileRequest) -> Result<TileReply, PluginError>;
+    /// The game files (relative to the game directory) a tile is drawn from,
+    /// for a base map drawn from a world's files; at most [`MAX_SOURCES`].
+    /// `None`, the default, is a map computed from the request alone, such as
+    /// a seed map.
+    ///
+    /// A map drawn from files draws level 0 only: the host builds the coarser
+    /// levels from level 0, answers a tile whose files do not exist as
+    /// [`TileReply::Empty`] without asking for it, and rebuilds a cached tile
+    /// only when one of its files changed length or modification time. A
+    /// tile may name files that do not exist yet, so that their appearance
+    /// counts as a change.
+    fn sources(
+        &self,
+        _ctx: &dyn HostContext,
+        _request: &TileRequest,
+    ) -> Result<Option<Vec<String>>, PluginError> {
+        Ok(None)
+    }
 }
 
 pub trait OverlayProvider: Send + Sync {

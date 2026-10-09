@@ -84,10 +84,11 @@ SOFTWARE.
 ## fastanvil — MIT License
 
 The region layout and the packed block-state unpacking in
-`crates/lumilio-anvil/` are adapted from
+`crates/lumilio-anvil/`, and the height shading of the save map in
+`crates/lumilio-plugin-world-explorer/src/save/render.rs`, are adapted from
 [owengage/fastnbt](https://github.com/owengage/fastnbt) at
 `986c8594aad0e9dbbe6124d2b0e60506e2125fbd`
-(`fastanvil/src/{region.rs,java/section_data.rs}`; the crate declares
+(`fastanvil/src/{region.rs,render.rs,java/section_data.rs}`; the crate declares
 `MIT OR Apache-2.0`, and we take it under MIT).
 
 Copyright (c) 2020 Owen Gage
