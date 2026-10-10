@@ -157,6 +157,9 @@ that alone does not authenticate the publisher.
 
 ## Development
 
+Read the [documentation](https://launcher.lumilio.org/docs/) for installation and contribution procedures.
+The contribution rules apply to people, Coding Agents, and joint work.
+
 ```sh
 cargo run -p lumilio-app   # run it
 just check                 # build, test, clippy, rustfmt, the same as CI

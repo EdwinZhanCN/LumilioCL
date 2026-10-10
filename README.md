@@ -145,6 +145,8 @@ xattr -dr com.apple.quarantine /Applications/LumilioCL.app
 
 ## 参与开发
 
+安装与贡献规范见[文档站](https://launcher.lumilio.org/docs/)。贡献规范适用于人类、Coding Agent 和两者协作。
+
 ```sh
 cargo run -p lumilio-app   # 运行
 just check                 # 构建、测试、clippy、rustfmt，和 CI 一致

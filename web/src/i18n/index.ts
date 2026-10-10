@@ -1,7 +1,7 @@
 import { zhCN, type Catalog } from "./zh-cn";
 
-// English joins here (and in astro.config.mjs `i18n.locales` routing) once
-// `en.ts` is written against `Catalog`.
+// Marketing catalogs are separate from Starlight's document language.
+// Add `en.ts` here when the English marketing catalog is available.
 const catalogs: Record<string, Catalog> = {
   "zh-cn": zhCN,
 };

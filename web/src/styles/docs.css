@@ -1,0 +1,80 @@
+/* Interface register: quiet surfaces and orange actions. Starlight owns
+   navigation. These tokens apply only to the documentation layout. */
+@font-face {
+  font-family: "Space Grotesk";
+  src: url("/fonts/SpaceGrotesk-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Space Grotesk";
+  src: url("/fonts/SpaceGrotesk-Bold.otf") format("opentype");
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/JetBrainsMono-Regular.ttf") format("truetype");
+  font-display: swap;
+}
+:root {
+  --sl-font: "Space Grotesk", system-ui, sans-serif;
+  --sl-font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --sl-color-accent-low: #432516;
+  --sl-color-accent: #ff6a2a;
+  --sl-color-accent-high: #ffb58f;
+  --sl-color-white: #ecebe7;
+  --sl-color-gray-1: #d8d7d2;
+  --sl-color-gray-2: #b8b7b0;
+  --sl-color-gray-3: #8c8b86;
+  --sl-color-gray-4: #565651;
+  --sl-color-gray-5: #353533;
+  --sl-color-gray-6: #1b1b1b;
+  --sl-color-black: #111111;
+  --sl-color-bg-nav: #171717;
+  --sl-color-bg-sidebar: #171717;
+  --sl-content-width: 48rem;
+  --sl-text-h1: clamp(2rem, 4vw, 3rem);
+}
+:root[data-theme="light"] {
+  --sl-color-accent-low: #fce1d1;
+  --sl-color-accent: #b53c08;
+  --sl-color-accent-high: #8b2a00;
+  --sl-color-white: #121212;
+  --sl-color-gray-1: #292925;
+  --sl-color-gray-2: #494943;
+  --sl-color-gray-3: #666662;
+  --sl-color-gray-4: #92928b;
+  --sl-color-gray-5: #c9c9c2;
+  --sl-color-gray-6: #e4e4e1;
+  --sl-color-gray-7: #eeeeeb;
+  --sl-color-black: #f9f9f7;
+  --sl-color-bg-nav: #eeeeeb;
+  --sl-color-bg-sidebar: #eeeeeb;
+}
+.site-title { color: var(--sl-color-white); font-size: 1.05rem; letter-spacing: -0.025em; }
+.site-title img { width: 1.75rem; height: 1.75rem; }
+.sl-markdown-content { line-height: 1.75; }
+.sl-markdown-content h2 { letter-spacing: -0.025em; }
+.sl-markdown-content a { text-underline-offset: 0.2em; }
+.sl-markdown-content :is(th, td) { vertical-align: top; }
+.sl-markdown-content code { overflow-wrap: anywhere; }
+.sl-markdown-content table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.sl-markdown-content table code { white-space: nowrap; overflow-wrap: normal; }
+.sidebar-content a[aria-current="page"] { border-inline-start: 3px solid var(--sl-color-accent); }
+:focus-visible { outline: 2px solid var(--sl-color-accent); outline-offset: 3px; }
+.primary-plans { list-style: none; padding: 0 !important; }
+.primary-plan, .release-note { padding-block: 2rem; border-top: 1px solid var(--sl-color-gray-5); }
+.primary-plan h2, .release-note h2 { margin-top: 0.65rem; }
+.plan-meta { display: flex; flex-wrap: wrap; gap: 0.75rem 1.5rem; color: var(--sl-color-gray-2); font-size: 0.875rem; }
+.plan-status { color: var(--sl-color-accent-high); font-weight: 700; }
+.plan-status[data-status="completed"] { color: var(--sl-color-white); }
+.release-note__body img { max-width: 100%; height: auto; }
+.release-note__body pre { overflow-x: auto; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
+}

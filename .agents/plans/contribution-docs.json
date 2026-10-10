@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "contribution-docs",
+  "title": "Starlight installation and contribution documentation",
+  "summary": "Add branded documentation to the existing website. Use controlled English for installation and contribution procedures.",
+  "status": "completed",
+  "visibility": "internal",
+  "scope": {
+    "included": ["Starlight at /docs/, installation, contribution procedures for people and Coding Agents, feature and WASM documentation entry pages."],
+    "excluded": ["A CONTRIBUTING.md file, website deployment, new launcher features, implementation of WASM plugins."]
+  },
+  "tasks": [
+    {"id": "T1", "title": "Commit the harness migration", "status": "completed", "acceptance": "The harness changes have a separate Git commit before documentation changes."},
+    {"id": "T2", "title": "Add branded Starlight pages", "status": "completed", "acceptance": "Documentation works at /docs/ with search, mobile navigation and both themes. The existing home page still works."},
+    {"id": "T3", "title": "Write installation and contribution procedures", "status": "completed", "acceptance": "Pages cover people, Coding Agents and joint work. Procedures match repository commands and use ASD-STE100 writing rules with defined technical terms."},
+    {"id": "T4", "title": "Verify documentation and keep the record", "status": "completed", "acceptance": "just web and just docs pass. Visual checks cover desktop and mobile layouts, both themes and keyboard controls."}
+  ],
+  "validation": [
+    {"criterion": "The harness has a separate commit.", "result": "9879aa6: refactor(harness): retain JSON plans and remove legacy records."},
+    {"criterion": "just web and just docs pass with current generated plans.", "result": "2026-10-10: just web passed with zero Astro diagnostics, 10 existing tests and 11 built routes. just docs passed. Local checks used a working Node 22 installation because the default Node binary has a missing system library."},
+    {"criterion": "Visual and interaction checks pass for the documentation.", "result": "Chromium: 1440x1000 desktop and 390x844 mobile; light and dark screenshots reviewed. Search returns the installation page for checksum. Keyboard shortcut opens search; Escape closes it. Mobile menu exposes contribution navigation. Reduced motion has no added animation. The table scrolls inside 358 pixels; document width remains 390 pixels. No browser page errors. Home retains zh-CN and links to /docs/."},
+    {"criterion": "Technical claims and controlled English receive a review.", "result": "Reviewed against AGENTS.md, justfile, README.en.md, CI and ASD-STE100 Issue 9 writing rules. Prose sentence lengths are at most 20 words. Defined necessary software nouns and verbs. Checked all nine document routes, local links and anchors. No personal names or machine-specific paths in new pages. This is a project language review, not independent ASD-STE100 certification."}
+  ],
+  "decisions": [
+    {"id": "D1", "decision": "Use Starlight inside web/ at /docs/.", "rationale": "Keep the website and documentation in one build and deployment.", "consequences": "Content uses a docs subdirectory. The home page retains its own layout and Chinese catalog."},
+    {"id": "D2", "decision": "Use English with ASD-STE100 writing rules and defined software terms.", "rationale": "Give people and Coding Agents the same clear procedures.", "consequences": "Use short active sentences and one action per step. Do not claim automated dictionary certification."}
+  ],
+  "references": ["AGENTS.md", "justfile", "README.en.md", "https://starlight.astro.build/manual-setup/", "https://www.asd-ste100.org/"],
+  "dependencies": [],
+  "lessonsLearned": ["Long package identifiers caused excessive wrapping on mobile. Documentation tables now scroll locally and preserve identifiers; narrow-screen browser checks confirm no document overflow."],
+  "outcome": "Added nine branded Starlight pages at /docs/. Installation and contribution procedures cover people, Coding Agents and joint work. Feature and WASM entry pages state their scope without claiming unimplemented capabilities. README and website links expose the documentation. No CONTRIBUTING.md was created. Documentation changes are ready for review; no deployment was performed."
+}

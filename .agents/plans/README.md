@@ -40,7 +40,8 @@ Optional `decisions` have `id`, `decision`, `rationale`, `consequences`;
 `visibility: internal` excludes website projection, not repository readers:
 generated Markdown includes internal fields. Never store credentials. Only
 `visibility: public` AND `roadmap.enabled: true` enters the website; cancelled
-plans are excluded. The whitelist is roadmap `id`, `planId`, `name`, `lede`,
+plans are excluded. These selected plans are the website's primary plans, shown
+on the independent Roadmap page. The whitelist is roadmap `id`, `planId`, `name`, `lede`,
 `version` and plan `status`, ordered by `roadmap.order` then plan ID. No nested
 tasks, decisions, references, validation or lessons are copied. `targetVersion`
 is a target, never a release or date. Logo positions use three curated IDs.

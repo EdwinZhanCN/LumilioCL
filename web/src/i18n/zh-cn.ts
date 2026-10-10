@@ -26,6 +26,7 @@ export const zhCN = {
     lede: "基于全新的GPU桌面UI渲染框架，你的最后一个下一代 Minecraft 启动器。",
     cta: "免费下载",
     source: "查看源代码",
+    docs: "查看文档",
     plateLabel: "LumilioCL 的面板，每个格子都能按",
     idle: "碰碰我？",
     download: "下载",
@@ -163,6 +164,7 @@ export const zhCN = {
   },
 
   roadmap: {
+    details: "查看完整路线图",
     title: "接下来",
     lede: "版本号只往前走。每一步做什么，计划都在仓库里公开。",
     current: "已发布",
@@ -200,6 +202,8 @@ export const zhCN = {
   },
 
   footer: {
+    changelog: "更新日志",
+    docs: "文档与贡献规范",
     source: "源代码",
     releases: "发布",
     license: "许可证 AGPL-3.0-only",

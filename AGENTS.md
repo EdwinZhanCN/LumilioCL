@@ -37,6 +37,12 @@ needs eyes.
 
 ## Where the facts are
 
+- **Installation and contribution procedures**: `web/src/content/docs/docs/` (Chinese, `/docs/`)
+  and `web/src/content/docs/en/docs/` (English, `/en/docs/`). English pages use ASD-STE100
+  writing rules and defined software terms; Chinese pages use the same clear structure.
+  Keep both languages consistent
+  with this manual and `justfile`; do not create a separate `CONTRIBUTING.md`.
+
 - **What the launcher does today**: the generated user paths in `docs/ia/paths/`, then the code.
 - **How others do it**: read the upstream source directly.
   - [Modrinth App](https://github.com/modrinth/code): `packages/app-lib` is a Rust launcher backend, the first

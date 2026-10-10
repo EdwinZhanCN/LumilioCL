@@ -31,6 +31,7 @@ const shipping = release?.version;
     <header class="section-head">
       <h2 id="roadmap-title" class="title">{t.roadmap.title}</h2>
       <p class="lede">{t.roadmap.lede}</p>
+      <a href="/docs/roadmap/">{t.roadmap.details} →</a>
     </header>
     <ol class="display roadmap__strip">
       {
@@ -77,6 +78,8 @@ const shipping = release?.version;
       <span>LumilioCL</span>
     </div>
     <ul class="footer__links">
+      <li><a href="/docs/">{t.footer.docs}</a></li>
+      <li><a href="/docs/changelog/">{t.footer.changelog}</a></li>
       <li><a href={REPO_URL}>{t.footer.source}</a></li>
       <li><a href={RELEASES_URL}>{t.footer.releases}</a></li>
       <li><a href={LICENSE_URL}>{t.footer.license}</a></li>
