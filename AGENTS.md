@@ -1,11 +1,12 @@
 # LumilioCL — Agent Work Manual
 
-LumilioCL is a Minecraft launcher in **Rust + GPUI + gpui-component**. The goal is a good
+LumilioCL is a native Minecraft launcher in **Rust + GPUI + gpui-kit**. The UI also uses
+**gpui-component 0.7**, patched locally through `forks/gpui-component`. The goal is a good
 launcher; the documents below serve that goal and never outrank it.
 
 ## Invariants
 
-1. **core does not depend on UI.** `lumilio-core` never depends on gpui / gpui-component. Domain
+1. **core does not depend on UI.** `lumilio-core` never depends on `gpui`, `gpui-kit`, or `gpui-component`. Domain
    logic stays independently testable. This is the insurance against UI framework churn.
 2. **`3rd-party/` is read-only**: never modify, move or delete anything under it.
 3. **Adapted code keeps its attribution.** Code taken or adapted from upstream carries a comment
@@ -17,12 +18,15 @@ launcher; the documents below serve that goal and never outrank it.
 
 ## Verification
 
-The `justfile` is the single source of truth for checks; CI (`.github/workflows/ci.yml`) runs
-`just ci` on every push to `main` and every pull request (ADR 0026). There are no git hooks.
+The `justfile` is the single source of truth for checks; Code CI (`.github/workflows/ci.yml`) runs
+`just ci` for eligible code changes on `main` and pull requests (ADR 0026); path filters exclude
+most Markdown and `.agents/**` changes. The website has a separate `web.yml` workflow. There are
+no git hooks.
 
 - **While iterating**: only what the change touches (skill `lumilio-select-checks`), e.g.
   `just test-pkg lumilio-ui project_detail`.
-- **Docs and harness only** (`docs/**`, `.agents/**`, `*.md`): `just docs`, which takes seconds.
+- **Docs and harness only** (`docs/**`, `.agents/**`, `*.md`): run `just docs` locally.
+  The code CI workflow does not generally run on Markdown- or harness-only changes.
 - **Before handing off a code change**: `just check` (build → test → clippy → fmt, in that order).
 
 Green checks do not prove a UI change looks right: state what the tests verified and what still
@@ -45,11 +49,14 @@ Don't write documents that restate the code or upstream; they go stale (ADR 0021
 
 ## Structure
 
-- Rust stable (pinned by `rust-toolchain.toml`), edition 2024.
+- Rust edition 2024. The development toolchain is pinned to **1.98.1** in
+  `rust-toolchain.toml`; `Cargo.toml` declares **1.95** as the minimum Rust version.
 - Dependency direction `lumilio-app → lumilio-ui → lumilio-core`. Core owns launcher state,
   metadata, downloads, auth and instance operations. UI owns pages and GPUI state. App owns
   startup, configuration, logging and composition.
 - Async: core uses tokio; UI bridges via `cx.spawn`/channels. **No blocking I/O on the UI thread.**
+- `web/` is a separate Astro + React website and Cloudflare Worker, not the desktop UI. Use
+  `just web` and `.github/workflows/web.yml` for website changes.
 - File layout: a module does one thing. Past about 800 lines of non-test code, split a file into a
   directory module (`name/mod.rs` for the public surface and shared types, one file per concern).
   Unit tests live in `tests.rs` or `tests/<theme>.rs` beside the code (`#[cfg(test)] mod tests;`),
@@ -62,8 +69,9 @@ Don't write documents that restate the code or upstream; they go stale (ADR 0021
 - Before UI work, load the repo-local [gpui-kit](.agents/skills/gpui-kit/SKILL.md) and
   [gpui-kit-design-guides](.agents/skills/gpui-kit-design-guides/SKILL.md) skills. Prefer existing
   gpui-component components over custom ones. Verify APIs against the locked dependency source;
-  the upstream skills follow the latest GPUI Kit. This project's crate boundaries, controls and
-  design language take precedence over upstream examples.
+  the upstream skills follow the latest GPUI Kit. The `gpui-kit` dependency is the primary
+  application toolkit; `gpui-component` provides underlying components through the local fork.
+  This project's crate boundaries, controls and design language take precedence over upstream examples.
 - Buttons, switches, tabs, segments and tags come from `lumilio-ui` (`key::Key`, `controls`,
   `kit`), drawn per design-language §12. Don't use gpui-component's `Button`/`Switch`/`TabBar`
   in pages.
