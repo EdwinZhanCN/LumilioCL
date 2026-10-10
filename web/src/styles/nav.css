@@ -1,0 +1,86 @@
+/* Floating bottom navigation, three zones on one line (§6). */
+
+.nav {
+  position: fixed;
+  inset: auto 0 18px;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  width: min(100% - 2 * var(--gutter), var(--column));
+  margin-inline: auto;
+  pointer-events: none;
+}
+
+.nav__zone {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--panel-shadow);
+  pointer-events: auto;
+}
+
+.nav__lead {
+  justify-self: start;
+  gap: 10px;
+  height: 40px;
+  padding: 0 14px 0 12px;
+  font-size: 14px;
+}
+
+.nav__trail {
+  justify-self: end;
+}
+
+.nav__key {
+  gap: 7px;
+  padding: 0 10px;
+  overflow: hidden;
+}
+
+.nav__key .led {
+  width: 5px;
+  height: 5px;
+}
+
+.nav__key[aria-pressed="true"] {
+  font-weight: 500;
+}
+
+.nav__label {
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .nav {
+    grid-template-columns: auto 1fr;
+  }
+  .nav__lead {
+    display: none;
+  }
+  .nav__capsule {
+    justify-self: start;
+  }
+  .nav__key[aria-pressed="true"] .nav__label {
+    display: none;
+  }
+  .nav__capsule {
+    gap: 2px;
+  }
+  .nav__key {
+    gap: 4px;
+    padding: 0 7px;
+  }
+}
+
+/* The source link is also in the hero and the footer. */
+@media (max-width: 480px) {
+  .nav__trail {
+    display: none;
+  }
+}

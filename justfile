@@ -55,6 +55,13 @@ package:
 release-check *tag:
     cargo xtask release-check {{tag}}
 
+# The website and release mirror in web/ (pnpm): types, Worker tests, build.
+web:
+    pnpm --dir web install --frozen-lockfile
+    pnpm --dir web check
+    pnpm --dir web test
+    pnpm --dir web build
+
 # Cheap check for docs/harness changes: IA is current, attributions are right.
 docs:
     cargo test -p lumilio-docgen

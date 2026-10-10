@@ -1,0 +1,87 @@
+# The website and release mirror at launcher.lumilio.org (web/). Checks run
+# through `just web`; a push to main, or a published release (so the download
+# panel names the new files), deploys the Worker.
+#
+# Deploying needs two repository secrets: CLOUDFLARE_API_TOKEN (a token with
+# "Edit Cloudflare Workers" on the account) and CLOUDFLARE_ACCOUNT_ID.
+name: Web
+
+on:
+  push:
+    branches: [main]
+    paths: &paths
+      - "web/**"
+      # Copied into the site at build time (web/scripts/sync-assets.mjs).
+      - "crates/lumilio-ui/assets/fonts/**"
+      - "assets/icons/src/tile/**"
+      - "assets/screenshots/**"
+      - ".github/workflows/web.yml"
+  pull_request:
+    paths: *paths
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # A release rebuilds the current site, not the tagged commit's.
+          ref: ${{ github.event_name == 'release' && 'main' || github.sha }}
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just
+      - run: just web
+        env:
+          # The download panel reads the latest release at build time.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: web/dist
+          retention-days: 7
+
+  deploy:
+    needs: check
+    if: github.event_name == 'release' || (github.event_name != 'pull_request' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'release' && 'main' || github.sha }}
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - run: pnpm --dir web install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: site
+          path: web/dist
+      - run: pnpm --dir web exec wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

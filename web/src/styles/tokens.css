@@ -1,0 +1,98 @@
+/* Tokens of the launcher's instrument (docs/design-language.md §2, §12, §13;
+   values from crates/lumilio-ui/src/theme.rs). The page follows the system
+   appearance. */
+
+:root {
+  --page: #e4e4e1;
+  --panel: #eeeeeb;
+  --hairline: #bcbcb7;
+  --ink: #121212;
+  --muted: #666662;
+  --key-white: #f9f9f7;
+  --key-white-hover: #f1f1ee;
+  --key-black: #1d1d1d;
+  --key-black-hover: #2b2b2a;
+  --key-grey: #d3d3cf;
+  --on-white: #121212;
+  --on-black: #f2f2ef;
+  --orange: #f0520f;
+  --orange-hover: #f8622a;
+  --orange-text: #b53c08;
+  --led-off: #a3a39e;
+  --display: #141414;
+  --display-ink: #ff6a2a;
+  --display-dim: #3d2619;
+  --display-label: #948479;
+  --screw: #a9a69f;
+  --slot: #d2d0c9;
+  --plate-face: #e4e3de;
+  --plate-black: #1f1f1d;
+  --plate-edge: #c7c5be;
+
+  --key-shadow: 0 1px 0 rgb(0 0 0 / 0.22), 0 3px 6px rgb(0 0 0 / 0.12),
+    inset 0 1px 0 rgb(255 255 255 / 0.7);
+  --pressed-shadow: inset 0 1px 2px rgb(0 0 0 / 0.22);
+  --recess-shadow: inset 0 1px 2px rgb(0 0 0 / 0.1);
+  --display-shadow: inset 0 1px 3px rgb(0 0 0 / 0.6);
+  --panel-shadow: 0 4px 12px rgb(0 0 0 / 0.1);
+
+  --instant: 90ms;
+  --quick: 160ms;
+  --settle: 280ms;
+  --scene: 700ms;
+  --lift: 8px;
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --font-sans: "Space Grotesk", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI",
+    "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-display: "DSEG7 Classic", var(--font-mono);
+
+  --column: 1200px;
+  --gutter: clamp(20px, 4vw, 48px);
+
+  color-scheme: light;
+}
+
+/* Night. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #111111;
+    --panel: #1b1b1b;
+    --hairline: #353533;
+    --ink: #ecebe7;
+    --muted: #8c8b86;
+    --key-white: #313130;
+    --key-white-hover: #3a3a39;
+    --key-black: #2a2a2a;
+    --key-black-hover: #333332;
+    --key-grey: #262626;
+    --on-white: #ecebe7;
+    --on-black: #ecebe7;
+    --orange: #ff5a1a;
+    --orange-hover: #ff6d33;
+    --orange-text: #ff5a1a;
+    --led-off: #3a3a38;
+    --display: #070707;
+    --display-dim: #3a2418;
+    --screw: #5e5c57;
+    --slot: #3b3a37;
+    --plate-face: #262624;
+    --plate-black: #e4e3de;
+    --plate-edge: #0d0d0c;
+    --key-shadow: 0 1px 0 rgb(0 0 0 / 0.7), 0 3px 6px rgb(0 0 0 / 0.45),
+      inset 0 1px 0 rgb(255 255 255 / 0.16);
+    --recess-shadow: inset 0 1px 2px rgb(0 0 0 / 0.5);
+    --panel-shadow: 0 4px 12px rgb(0 0 0 / 0.5);
+    color-scheme: dark;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --instant: 0ms;
+    --quick: 0ms;
+    --settle: 0ms;
+    --scene: 0ms;
+  }
+}

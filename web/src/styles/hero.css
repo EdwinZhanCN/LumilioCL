@@ -1,0 +1,462 @@
+/* The hero plate, proportioned from assets/icons/src/tile/tile-light.svg:
+   an 896 plate with 144 corners, a 3×3 grid of 164 cells with 28 gaps from
+   174 in, screws 88 in, and a 24 bottom edge. */
+
+.hero {
+  position: relative;
+  display: grid;
+  min-height: 100dvh;
+  align-items: center;
+  padding-block: 96px 120px;
+}
+
+.hero__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  gap: clamp(32px, 6vw, 96px);
+  align-items: center;
+}
+
+.hero__copy {
+  display: grid;
+  gap: 24px;
+  align-content: center;
+}
+
+.hero__title {
+  font-weight: 300;
+  font-size: clamp(36px, 4.4vw, 62px);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.hero__title > span {
+  display: block;
+  white-space: nowrap;
+}
+
+.hero__name {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font: 500 15px/1 var(--font-sans);
+}
+
+.hero__name img {
+  width: 28px;
+  height: 28px;
+}
+
+.hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+@media (max-width: 860px) {
+  .hero__grid {
+    grid-template-columns: 1fr;
+  }
+  .hero {
+    padding-block: 72px 112px;
+  }
+}
+
+/* ---- Plate ---- */
+
+.plate-wrap {
+  display: grid;
+  gap: 22px;
+  justify-items: center;
+  width: min(100%, 560px);
+  margin-inline: auto;
+  /* cqw below is the plate's width: the wrap is exactly as wide. */
+  container-type: inline-size;
+}
+
+.plate {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  margin-bottom: 2.7cqw;
+  border-radius: 16%;
+  background: var(--plate-face);
+  box-shadow:
+    0 2.7cqw 0 var(--plate-edge),
+    0 5cqw 10cqw rgb(0 0 0 / 0.14);
+}
+
+.plate__screw {
+  position: absolute;
+  width: 3.6cqw;
+  height: 3.6cqw;
+  border: 0.7cqw solid var(--screw);
+  border-radius: 50%;
+}
+
+.plate__screw--tl,
+.plate__screw--bl {
+  left: 9.82%;
+  translate: -50% 0;
+}
+
+.plate__screw--tr,
+.plate__screw--br {
+  right: 9.82%;
+  translate: 50% 0;
+}
+
+.plate__screw--tl,
+.plate__screw--tr {
+  top: 9.82%;
+  margin-top: -1.8cqw;
+}
+
+.plate__screw--bl,
+.plate__screw--br {
+  bottom: 9.82%;
+  margin-bottom: -1.8cqw;
+}
+
+.plate__grid {
+  position: absolute;
+  inset: 19.42%;
+  display: grid;
+  grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+  gap: 5.11%;
+}
+
+.cell {
+  position: relative;
+  top: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 6.7%;
+  background: var(--slot);
+  box-shadow: var(--recess-shadow);
+  cursor: pointer;
+  transition: top var(--instant) linear;
+}
+
+.cell__face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--plate-black);
+  box-shadow: 0 1px 0 rgb(0 0 0 / 0.25), inset 0 1px 0 rgb(255 255 255 / 0.08);
+  transition: box-shadow var(--instant) linear;
+}
+
+.cell--planned .cell__face {
+  background: var(--slot);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.25);
+}
+
+.cell:hover,
+.cell:focus-visible,
+.cell[data-held="true"] {
+  top: 1px;
+}
+
+.cell:hover .cell__face,
+.cell:focus-visible .cell__face {
+  box-shadow: var(--pressed-shadow);
+}
+
+.cell:focus-visible {
+  outline-offset: 4px;
+}
+
+.cell__slot {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+/* The display window inside a dark cell: closed, it is the cell's own face;
+   on hover it fills with the cell's world. */
+.cell__window {
+  position: absolute;
+  inset: 9%;
+  overflow: hidden;
+  border-radius: 3px;
+  background: transparent;
+  transition: background-color var(--quick) var(--ease-out-quint);
+}
+
+.cell[data-shown="true"] .cell__window {
+  background: var(--display);
+  box-shadow: var(--display-shadow);
+}
+
+.cell__window canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.cell__readout {
+  color: var(--display-ink);
+  font: 400 4.4cqw/1 var(--font-display);
+  opacity: 0;
+  transition: opacity var(--instant) linear;
+}
+
+.cell--planned:hover .cell__face,
+.cell--planned:focus-visible .cell__face {
+  background: var(--display);
+}
+
+.cell--planned:hover .cell__readout,
+.cell--planned:focus-visible .cell__readout {
+  opacity: 1;
+}
+
+.cell--launch {
+  border-radius: 50%;
+  background: var(--orange);
+  box-shadow:
+    0 1px 0 rgb(0 0 0 / 0.25),
+    inset 0 1px 0 rgb(255 255 255 / 0.3);
+  transition:
+    top var(--instant) linear,
+    background-color var(--instant) linear,
+    box-shadow var(--quick) linear;
+}
+
+.cell--launch:hover,
+.cell--launch:focus-visible,
+.cell--launch[data-held="true"] {
+  background: var(--orange-hover);
+  box-shadow:
+    var(--pressed-shadow),
+    0 0 6cqw 0.6cqw color-mix(in srgb, var(--orange) 45%, transparent);
+}
+
+.cell__arrow {
+  width: 30%;
+  height: 30%;
+  color: #ffffff;
+  opacity: 0;
+  translate: 0 -12%;
+  transition:
+    opacity var(--instant) linear,
+    translate var(--quick) var(--ease-out-quint);
+}
+
+.cell--launch:hover .cell__arrow,
+.cell--launch:focus-visible .cell__arrow,
+.cell--launch[data-held="true"] .cell__arrow {
+  opacity: 1;
+  translate: 0 0;
+}
+
+/* ---- Legend strip ---- */
+
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: min(100%, 320px);
+  height: 40px;
+  padding: 0 14px;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.legend--display {
+  justify-content: flex-start;
+  gap: 14px;
+}
+
+.legend__stage {
+  color: var(--display-ink);
+  font-weight: 500;
+  min-width: 4em;
+}
+
+.legend--display .meter {
+  margin-left: auto;
+}
+
+/* ---- Explorer window ---- */
+
+.explorer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: color-mix(in srgb, var(--page) 72%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+.explorer-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: clamp(12px, 4vw, 48px);
+}
+
+.explorer {
+  position: relative;
+  width: min(100%, 1040px);
+  max-height: calc(100dvh - 2 * clamp(12px, 4vw, 48px));
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  background: var(--panel);
+  box-shadow: 0 24px 64px rgb(0 0 0 / 0.22);
+}
+
+.explorer--planned {
+  width: min(100%, 460px);
+}
+
+.explorer__content {
+  position: relative;
+  display: grid;
+  gap: 24px;
+  max-height: inherit;
+  overflow: auto;
+  padding: clamp(24px, 4vw, 44px);
+}
+
+.explorer__content::before,
+.explorer__content::after,
+.explorer__content > .screws::before,
+.explorer__content > .screws::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  width: 7px;
+  height: 7px;
+  border: 1.5px solid var(--screw);
+  border-radius: 50%;
+}
+
+.explorer__content::before {
+  top: 10px;
+  left: 10px;
+}
+.explorer__content::after {
+  top: 10px;
+  right: 10px;
+}
+.explorer__content > .screws::before {
+  bottom: 10px;
+  left: 10px;
+}
+.explorer__content > .screws::after {
+  bottom: 10px;
+  right: 10px;
+}
+
+.explorer__cover {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 60%;
+  aspect-ratio: 72 / 24;
+  pointer-events: none;
+}
+
+/* Copy stays above the cover's dissolving edge. */
+.explorer__head > *,
+.explorer__body {
+  position: relative;
+}
+
+.explorer__head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.explorer__title {
+  font-weight: 300;
+  font-size: 36px;
+  line-height: 1.1;
+}
+
+.explorer__close {
+  margin-left: auto;
+}
+
+.explorer__body {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 32px;
+  align-items: start;
+  margin-top: clamp(24px, 6vw, 72px);
+}
+
+.explorer__shot {
+  margin: 0;
+  aspect-ratio: 16 / 10;
+}
+
+.explorer__shot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top left;
+}
+
+.placeholder {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  padding: 24px;
+  text-align: center;
+  background: repeating-linear-gradient(135deg, transparent 0 10px, rgb(255 255 255 / 0.03) 10px 20px);
+}
+
+.placeholder .silk {
+  max-width: 28em;
+  color: var(--display-label);
+  line-height: 1.6;
+}
+
+.explorer__text {
+  display: grid;
+  gap: 20px;
+}
+
+.facts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--ink);
+}
+
+.facts li {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 14px;
+}
+
+.explorer__readout {
+  display: grid;
+  gap: 10px;
+  padding: 18px 20px;
+}
+
+.explorer__digits {
+  font-size: 56px;
+}
+
+@media (max-width: 760px) {
+  .explorer__body {
+    grid-template-columns: 1fr;
+  }
+  .explorer__cover {
+    width: 100%;
+  }
+  .explorer__title {
+    font-size: 28px;
+  }
+}

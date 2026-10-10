@@ -1,0 +1,526 @@
+@import "./tokens.css";
+
+/* The launcher's three faces (design language §13), copied from
+   crates/lumilio-ui/assets/fonts with their OFL licences. Chinese falls back
+   to the system font, as in the app. */
+@font-face {
+  font-family: "Space Grotesk";
+  src: url("/fonts/SpaceGrotesk-Light.otf") format("opentype");
+  font-weight: 300;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Space Grotesk";
+  src: url("/fonts/SpaceGrotesk-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Space Grotesk";
+  src: url("/fonts/SpaceGrotesk-Medium.otf") format("opentype");
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Space Grotesk";
+  src: url("/fonts/SpaceGrotesk-Bold.otf") format("opentype");
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/JetBrainsMono-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/JetBrainsMono-Medium.ttf") format("truetype");
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: "DSEG7 Classic";
+  src: url("/fonts/DSEG7Classic-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-display: block;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /* The pinned sections carry snap points (sections.css); everything else
+     scrolls freely, so proximity snapping only acts near them. */
+  scroll-snap-type: y proximity;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  transition: background-color var(--settle) var(--ease-out-quint);
+}
+
+img,
+canvas {
+  display: block;
+  max-width: 100%;
+}
+
+a {
+  color: inherit;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--orange) 70%, transparent);
+  outline-offset: 2px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Artwork with a light and a dark variant (the icon). */
+.on-dark {
+  display: none !important;
+}
+
+@media (prefers-color-scheme: dark) {
+  .on-light {
+    display: none !important;
+  }
+  .on-dark {
+    display: revert !important;
+  }
+}
+
+.column {
+  width: min(100% - 2 * var(--gutter), var(--column));
+  margin-inline: auto;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.accent {
+  color: var(--orange-text);
+}
+
+/* Page title scale: 36 px light in the app; the site's section titles go a
+   step larger, its hero larger again. */
+.title {
+  font-weight: 300;
+  font-size: clamp(32px, 4.2vw, 52px);
+  line-height: 1.12;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+  /* Chinese headlines break at punctuation, not inside a phrase. */
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.lede {
+  max-width: 34em;
+  color: var(--muted);
+  font-size: 17px;
+  text-wrap: pretty;
+}
+
+/* ---- Keys (§12 Keys; crates/lumilio-ui/src/key.rs) ---- */
+
+.key {
+  --face: var(--key-white);
+  --face-hover: var(--key-white-hover);
+  --label: var(--on-white);
+  position: relative;
+  top: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--face);
+  box-shadow: var(--key-shadow);
+  color: var(--label);
+  font: 500 14px/1 var(--font-sans);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background-color var(--instant) linear,
+    top var(--instant) linear,
+    box-shadow var(--instant) linear;
+}
+
+.key:hover {
+  background: var(--face-hover);
+}
+
+.key:active,
+.key[aria-pressed="true"] {
+  top: 1px;
+  box-shadow: var(--pressed-shadow);
+}
+
+.key--black {
+  --face: var(--key-black);
+  --face-hover: var(--key-black-hover);
+  --label: var(--on-black);
+}
+
+.key--orange {
+  --face: var(--orange);
+  --face-hover: var(--orange-hover);
+  --label: #ffffff;
+}
+
+.key--ghost {
+  --face: transparent;
+  --face-hover: var(--key-grey);
+  box-shadow: none;
+}
+
+.key--ghost:active {
+  box-shadow: none;
+}
+
+.key--icon {
+  width: 34px;
+  padding: 0;
+}
+
+.key--small {
+  height: 28px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+
+.key[aria-disabled="true"],
+.key:disabled {
+  --face: var(--key-grey);
+  --face-hover: var(--key-grey);
+  --label: var(--muted);
+  top: 0;
+  box-shadow: none;
+  cursor: default;
+}
+
+.key svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+
+/* ---- LEDs ---- */
+
+.led {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--led-off);
+  transition:
+    background-color var(--instant) linear,
+    box-shadow var(--instant) linear;
+}
+
+.led[data-lit="true"] {
+  background: var(--orange);
+  box-shadow: 0 0 6px 1px color-mix(in srgb, var(--orange) 55%, transparent);
+}
+
+.led[data-tone="green"][data-lit="true"] {
+  background: #3fbf5f;
+  box-shadow: 0 0 6px 1px rgb(63 191 95 / 0.5);
+}
+
+/* ---- Silkscreen ---- */
+
+.silk {
+  color: var(--muted);
+  font: 500 10px/1.2 var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.index {
+  color: var(--orange-text);
+  font: 500 13px/1 var(--font-mono);
+}
+
+/* ---- Tags ---- */
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 2px;
+  background: var(--key-grey);
+  color: var(--ink);
+  font: 400 11px/1 var(--font-mono);
+}
+
+.tag--ink {
+  background: var(--ink);
+  color: var(--page);
+}
+
+.tag--orange {
+  background: var(--orange);
+  color: #ffffff;
+}
+
+/* ---- Displays (§12 Displays) ---- */
+
+.display {
+  border-radius: 6px;
+  background: var(--display);
+  box-shadow: var(--display-shadow);
+  color: var(--display-ink);
+}
+
+.display__legend {
+  color: var(--display-label);
+  font: 500 10px/1.2 var(--font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* Segment digits over their unlit "8"s. */
+.digits {
+  position: relative;
+  display: inline-block;
+  font-family: var(--font-display);
+  font-size: 28px;
+  line-height: 1;
+  letter-spacing: 0.04em;
+}
+
+.digits::before {
+  content: attr(data-ghost);
+  position: absolute;
+  inset: 0;
+  color: var(--display-dim);
+}
+
+.digits > span {
+  position: relative;
+}
+
+.meter {
+  display: flex;
+  gap: 3px;
+}
+
+.meter > i {
+  width: 4px;
+  height: 14px;
+  border-radius: 1px;
+  background: var(--display-dim);
+}
+
+.meter > i[data-lit="true"] {
+  background: var(--display-ink);
+}
+
+/* A display window: the one framed place for world art (§12 Faceplates). */
+.window {
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--display);
+  box-shadow: var(--display-shadow);
+}
+
+.pixelated {
+  image-rendering: pixelated;
+}
+
+/* ---- Faceplates and panels ---- */
+
+.faceplate {
+  position: relative;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  background: var(--panel);
+  box-shadow: var(--panel-shadow);
+}
+
+/* The bottom pair of screws hangs off this span; it must take no grid cell. */
+.screws {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.faceplate::before,
+.faceplate::after,
+.faceplate > .screws::before,
+.faceplate > .screws::after {
+  content: "";
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border: 1.5px solid var(--screw);
+  border-radius: 50%;
+}
+
+.faceplate::before {
+  top: 9px;
+  left: 9px;
+}
+.faceplate::after {
+  top: 9px;
+  right: 9px;
+}
+.faceplate > .screws::before {
+  bottom: 9px;
+  left: 9px;
+}
+.faceplate > .screws::after {
+  bottom: 9px;
+  right: 9px;
+}
+
+/* ---- Hairline tables (§12 Tables) ---- */
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  border-top: 1px solid var(--ink);
+}
+
+.table th,
+.table td {
+  padding: 11px 0;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 14px;
+  text-align: left;
+  vertical-align: baseline;
+}
+
+.table th {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.table td {
+  font-family: var(--font-mono);
+  text-align: right;
+}
+
+/* ---- Segment keys (§12 State) ---- */
+
+.segments {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.segment {
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+}
+
+.segment .key {
+  height: 28px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+
+.segment .key[aria-pressed="true"] {
+  font-weight: 700;
+}
+
+/* ---- Fader switch ---- */
+
+.fader {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  padding: 4px 0;
+  background: none;
+  color: var(--ink);
+  font: 400 14px var(--font-sans);
+  cursor: pointer;
+}
+
+.fader__slot {
+  position: relative;
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--key-black);
+}
+
+.fader__cap {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--key-white);
+  box-shadow: var(--key-shadow);
+  transform: translate(0, -50%);
+  transition: transform var(--quick) var(--ease-out-quint);
+}
+
+.fader[aria-checked="true"] .fader__cap {
+  transform: translate(24px, -50%);
+}
+
+/* ---- Entrances ---- */
+
+@media (prefers-reduced-motion: no-preference) {
+  .rise {
+    animation: rise var(--scene) var(--ease-out-quint) both;
+    animation-delay: calc(var(--i, 0) * 70ms);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(var(--lift));
+  }
+}

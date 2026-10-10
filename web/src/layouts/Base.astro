@@ -1,0 +1,37 @@
+---
+import "../styles/global.css";
+import type { Catalog } from "../i18n";
+
+interface Props {
+  t: Catalog;
+}
+
+const { t } = Astro.props;
+const canonical = new URL(Astro.url.pathname, Astro.site);
+---
+
+<!doctype html>
+<html lang={t.lang}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{t.meta.title}</title>
+    <meta name="description" content={t.meta.description} />
+    <link rel="canonical" href={canonical} />
+    <meta property="og:title" content={t.meta.title} />
+    <meta property="og:description" content={t.meta.description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonical} />
+    <!-- TODO(asset): og:image, 1200×630, the hero plate beside the headline. -->
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#e4e4e1" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#111111" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" href="/icons/tile-32.svg" type="image/svg+xml" media="(prefers-color-scheme: light)" />
+    <link rel="icon" href="/icons/tile-dark.svg" type="image/svg+xml" media="(prefers-color-scheme: dark)" />
+    <link rel="preload" href="/fonts/SpaceGrotesk-Light.otf" as="font" type="font/otf" crossorigin />
+    <link rel="preload" href="/fonts/DSEG7Classic-Regular.ttf" as="font" type="font/ttf" crossorigin />
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>
