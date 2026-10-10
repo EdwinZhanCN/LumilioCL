@@ -67,8 +67,8 @@ Don't write documents that restate the code or upstream; they go stale (ADR 0021
 ## UI
 
 - Before UI work, load the repo-local [gpui-kit](.agents/skills/gpui-kit/SKILL.md) and
-  [gpui-kit-design-guides](.agents/skills/gpui-kit-design-guides/SKILL.md) skills. Prefer existing
-  gpui-component components over custom ones. Verify APIs against the locked dependency source;
+  [gpui-kit-design-guides](.agents/skills/gpui-kit-design-guides/SKILL.md) skills. Prefer gpui-kit APIs and existing
+  `lumilio-ui` wrappers; use gpui-component underneath when appropriate instead of inventing a parallel UI system. Verify APIs against the locked dependency source;
   the upstream skills follow the latest GPUI Kit. The `gpui-kit` dependency is the primary
   application toolkit; `gpui-component` provides underlying components through the local fork.
   This project's crate boundaries, controls and design language take precedence over upstream examples.
