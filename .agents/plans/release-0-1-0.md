@@ -8,8 +8,8 @@
 
 ## Scope
 
-- 包括：xtask 打包、release 工作流、平台身份、图标，以及首个标签。
-- 不包括：macOS x86_64、RPM / Arch、Flatpak / AppImage、自动更新、真正的便携数据目录。
+- 包括：xtask 打包、release 工作流、平台身份、图标、自动更新（见 `auto-update.md`），以及首个标签。
+- 不包括：macOS x86_64、RPM / Arch、Flatpak / AppImage、真正的便携数据目录。
 
 ## Tasks
 
