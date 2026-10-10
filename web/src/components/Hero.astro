@@ -1,0 +1,43 @@
+---
+import "../styles/hero.css";
+import { DownloadSimpleIcon as DownloadSimple, GithubLogoIcon as GithubLogo } from "@phosphor-icons/react";
+import type { Catalog } from "../i18n";
+import { Faceplate } from "./hero/Faceplate";
+import { REPO_URL } from "../data/links";
+
+interface Props {
+  t: Catalog;
+}
+
+const { t } = Astro.props;
+const plate = { hero: t.hero, features: t.features, planned: t.planned, launch: t.launch };
+---
+
+<section id="home" class="hero" aria-labelledby="hero-title">
+  <div class="column hero__grid">
+    <div class="hero__copy">
+      <p class="hero__name rise">
+        <img class="on-light" src="/icons/tile-light.svg" alt="" width="28" height="28" />
+        <img class="on-dark" src="/icons/tile-dark.svg" alt="" width="28" height="28" />
+        LumilioCL
+      </p>
+      <h1 id="hero-title" class="hero__title rise" style="--i: 1">
+        {t.hero.title.map((line) => <span>{line}</span>)}
+      </h1>
+      <p class="lede rise" style="--i: 2">{t.hero.lede}</p>
+      <div class="hero__actions rise" style="--i: 3">
+        <a class="key key--orange" href="#download">
+          <DownloadSimple weight="bold" aria-hidden="true" />
+          {t.hero.cta}
+        </a>
+        <a class="key" href={REPO_URL}>
+          <GithubLogo weight="bold" aria-hidden="true" />
+          {t.hero.source}
+        </a>
+      </div>
+    </div>
+    <div class="rise" style="--i: 2">
+      <Faceplate client:load t={plate} />
+    </div>
+  </div>
+</section>

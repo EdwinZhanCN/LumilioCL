@@ -8,6 +8,8 @@ on:
       - "**"
       - "!.agents/**"
       - "!**/*.md"
+      # The website has its own workflow (web.yml).
+      - "!web/**"
       # Generated from code; a hand edit must still fail the IA test.
       - "docs/ia/**"
   pull_request:
@@ -15,6 +17,7 @@ on:
       - "**"
       - "!.agents/**"
       - "!**/*.md"
+      - "!web/**"
       - "docs/ia/**"
   workflow_dispatch:
 

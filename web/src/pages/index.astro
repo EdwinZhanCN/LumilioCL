@@ -1,0 +1,19 @@
+---
+import "../styles/nav.css";
+import Base from "../layouts/Base.astro";
+import Hero from "../components/Hero.astro";
+import Sections from "../components/Sections.astro";
+import { Nav } from "../components/Nav";
+import { catalog } from "../i18n";
+import { REPO_URL } from "../data/links";
+
+const t = catalog(Astro.currentLocale);
+---
+
+<Base t={t}>
+  <main>
+    <Hero t={t} />
+    <Sections t={t} />
+  </main>
+  <Nav client:load t={t.nav} repo={REPO_URL} />
+</Base>

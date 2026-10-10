@@ -1,0 +1,23 @@
+---
+import Base from "../layouts/Base.astro";
+import { catalog } from "../i18n";
+
+const t = catalog(Astro.currentLocale);
+---
+
+<Base t={t}>
+  <main class="column notfound">
+    <h1 class="title">{t.notFound.title}</h1>
+    <a class="key" href="/">{t.notFound.home}</a>
+  </main>
+</Base>
+
+<style>
+  .notfound {
+    display: grid;
+    min-height: 100dvh;
+    align-content: center;
+    justify-items: start;
+    gap: 28px;
+  }
+</style>

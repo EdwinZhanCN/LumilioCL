@@ -1,0 +1,659 @@
+/* Sections below the hero. Each uses a different layout: display cards,
+   a pinned horizontal track, an exploded drawing beside a table, a display
+   strip, and a split download panel. */
+
+.section-head {
+  display: grid;
+  gap: 16px;
+  max-width: 40em;
+}
+
+/* ---- Proof (measured numbers) ---- */
+
+.proof {
+  display: grid;
+  min-height: 100dvh;
+  align-content: center;
+  padding-block: 120px;
+}
+
+.proof__grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 16px;
+  margin-top: 48px;
+}
+
+.proof__card {
+  display: grid;
+  gap: 22px;
+  align-content: start;
+  padding: 24px 24px 26px;
+}
+
+.proof__label {
+  display: grid;
+  gap: 6px;
+}
+
+.proof__name {
+  color: #ecebe7;
+  font-weight: 500;
+}
+
+.proof__reading {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.proof__digits {
+  font-size: clamp(40px, 5vw, 72px);
+}
+
+/* Big digits: the unlit 8s step back so a lit 1 is not read as an 8. */
+.proof__card .digits::before {
+  color: #24170f;
+}
+
+.proof__card:first-child .proof__digits {
+  font-size: clamp(56px, 7vw, 104px);
+}
+
+.proof__reading--them {
+  padding-top: 14px;
+  border-top: 1px solid #262220;
+}
+
+.proof__reading--them .digits {
+  font-size: 28px;
+}
+
+.proof__reading--them .digits > span {
+  color: var(--display-label);
+}
+
+.proof__method {
+  max-width: 60em;
+  margin-top: 22px;
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+@media (max-width: 860px) {
+  .proof__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- Audiences (horizontal) ---- */
+
+.audiences {
+  position: relative;
+  padding-block: 120px;
+}
+
+.audiences--pinned {
+  padding-block: 0;
+}
+
+.audiences__snap {
+  position: absolute;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  scroll-snap-align: start;
+}
+
+.audiences__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px 48px;
+  align-items: end;
+  justify-content: space-between;
+}
+
+.audiences--pinned .audiences__stage {
+  position: sticky;
+  top: 0;
+  display: grid;
+  height: 100dvh;
+  /* One viewport-wide column: the max-content track must not widen it. */
+  grid-template-columns: minmax(0, 1fr);
+  align-content: center;
+  gap: 36px;
+  overflow: hidden;
+}
+
+.audiences__track {
+  display: flex;
+  gap: 28px;
+  width: max-content;
+  padding-inline: max(var(--gutter), (100vw - var(--column)) / 2);
+  will-change: transform;
+}
+
+.audiences--pinned .audiences__track {
+  justify-self: start;
+}
+
+.audiences:not(.audiences--pinned) .audiences__track {
+  width: auto;
+  margin-top: 36px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: var(--gutter);
+  padding-bottom: 24px;
+}
+
+.audiences:not(.audiences--pinned) .audience {
+  scroll-snap-align: start;
+}
+
+.audience {
+  display: grid;
+  flex: none;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  gap: 36px;
+  align-items: center;
+  width: min(86vw, var(--column));
+  padding: 40px;
+}
+
+.audience__text {
+  display: grid;
+  gap: 16px;
+  justify-items: start;
+}
+
+.audience__title {
+  font-weight: 300;
+  font-size: clamp(26px, 2.6vw, 36px);
+  line-height: 1.15;
+  word-break: keep-all;
+}
+
+/* Points are keys in a hairline list (§12 Tables): the chosen one has its LED
+   lit, ink text and the medium weight, never the LED alone (§9). */
+.audience__points {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--ink);
+}
+
+.audience__points li {
+  border-bottom: 1px solid var(--hairline);
+}
+
+.audience__point {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 8px 10px 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: 400 14px/1.5 var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    color var(--instant) linear,
+    background-color var(--instant) linear;
+}
+
+.audience__point:hover {
+  color: var(--ink);
+}
+
+.audience__point[aria-pressed="true"] {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.audience__point .led {
+  flex: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .audience__shot img {
+    animation: shot-in var(--quick) var(--ease-out-quint);
+  }
+}
+
+@keyframes shot-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.audience__shot {
+  margin: 0;
+  aspect-ratio: 16 / 10;
+}
+
+.audience__shot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top left;
+}
+
+@media (max-width: 899px) {
+  .audience {
+    grid-template-columns: 1fr;
+    padding: 28px 22px;
+  }
+}
+
+/* ---- Stack (exploded layers, parallax) ---- */
+
+.stack {
+  position: relative;
+  padding-block: 120px;
+}
+
+.stack--pinned {
+  padding-block: 0;
+}
+
+.stack__snap {
+  position: absolute;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  scroll-snap-align: start;
+}
+
+.stack--pinned .stack__stage {
+  position: sticky;
+  top: 0;
+  display: grid;
+  height: 100dvh;
+  align-content: center;
+  overflow: hidden;
+}
+
+.stack__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
+  grid-template-rows: auto 1fr;
+  gap: 32px 64px;
+  align-items: center;
+}
+
+.stack__head {
+  grid-column: 1 / -1;
+}
+
+.stack__drawing {
+  display: grid;
+  height: min(54dvh, 480px);
+  place-items: center;
+  perspective: 1600px;
+}
+
+.stack__iso {
+  position: relative;
+  margin-top: 90px;
+  width: min(62%, 300px);
+  aspect-ratio: 1;
+  transform: rotateX(58deg) rotateZ(-42deg);
+  transform-style: preserve-3d;
+}
+
+.stack__plate {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: end start;
+  padding: 14px 16px;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 1px 0 var(--hairline), 0 18px 30px rgb(0 0 0 / 0.12);
+  transition:
+    border-color var(--quick) linear,
+    background-color var(--quick) linear;
+}
+
+.stack__plate--ui {
+  background:
+    radial-gradient(circle at 74% 26%, var(--orange) 0 9%, transparent 9.5%),
+    linear-gradient(var(--plate-black), var(--plate-black)) 16% 16% / 22% 22% no-repeat,
+    linear-gradient(var(--plate-black), var(--plate-black)) 16% 50% / 22% 22% no-repeat,
+    linear-gradient(var(--plate-black), var(--plate-black)) 16% 84% / 22% 22% no-repeat,
+    linear-gradient(var(--plate-black), var(--plate-black)) 50% 84% / 22% 22% no-repeat,
+    linear-gradient(var(--plate-black), var(--plate-black)) 84% 84% / 22% 22% no-repeat,
+    var(--plate-face);
+}
+
+.stack__plate--gpu {
+  background:
+    repeating-linear-gradient(0deg, rgb(255 106 42 / 0.28) 0 1px, transparent 1px 12.5%),
+    repeating-linear-gradient(90deg, rgb(255 106 42 / 0.28) 0 1px, transparent 1px 12.5%),
+    var(--display);
+  border-color: #000;
+}
+
+.stack__plate--core {
+  background: var(--key-black);
+  border-color: #000;
+}
+
+.stack__plate--data {
+  background:
+    repeating-linear-gradient(0deg, var(--hairline) 0 1px, transparent 1px 16%),
+    var(--panel);
+}
+
+.stack__plate[data-lit="true"] {
+  border-color: var(--orange);
+}
+
+.stack__legend {
+  color: var(--muted);
+  font: 500 11px/1 var(--font-mono);
+  letter-spacing: 0.1em;
+}
+
+.stack__plate--gpu .stack__legend,
+.stack__plate--core .stack__legend {
+  color: var(--display-label);
+}
+
+.stack__table th {
+  width: 7em;
+  white-space: nowrap;
+  vertical-align: top;
+  transition: color var(--quick) linear;
+}
+
+.stack__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.stack__table td {
+  font-family: var(--font-sans);
+  text-align: left;
+}
+
+.stack__tech {
+  display: block;
+  font-family: var(--font-mono);
+}
+
+.stack__note {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.stack__table .stack__link {
+  width: 1%;
+  padding-left: 16px;
+  text-align: right;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.stack__table tr[data-active="true"] th {
+  color: var(--ink);
+}
+
+@media (max-width: 860px) {
+  .stack__grid {
+    grid-template-columns: 1fr;
+  }
+  .stack__drawing {
+    height: 300px;
+  }
+}
+
+/* ---- Roadmap ---- */
+
+.roadmap {
+  display: grid;
+  min-height: 80dvh;
+  align-content: center;
+  padding-block: 120px;
+}
+
+.roadmap__strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 48px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.roadmap__item {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  padding: 26px 24px 28px;
+}
+
+.roadmap__item + .roadmap__item {
+  border-left: 1px solid #262220;
+}
+
+.roadmap__legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.roadmap__legend .led:not([data-lit="true"]) {
+  background: #3a3a38;
+}
+
+.roadmap__digits {
+  font-size: clamp(30px, 3.4vw, 44px);
+}
+
+.roadmap__item:not([data-current="true"]) .roadmap__digits > span {
+  opacity: 0.55;
+}
+
+.roadmap__name {
+  color: #ecebe7;
+  font-weight: 500;
+}
+
+.roadmap__lede {
+  color: var(--display-label);
+  font-size: 14px;
+}
+
+@media (max-width: 860px) {
+  .roadmap__strip {
+    grid-template-columns: 1fr 1fr;
+  }
+  .roadmap__item:nth-child(3) {
+    border-left: 0;
+  }
+  .roadmap__item:nth-child(n + 3) {
+    border-top: 1px solid #262220;
+  }
+}
+
+/* ---- Download ---- */
+
+.download {
+  display: grid;
+  min-height: 100dvh;
+  align-items: center;
+  padding-block: 120px 160px;
+}
+
+.download__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 4fr) minmax(0, 6fr);
+  gap: 48px 72px;
+  align-items: center;
+}
+
+.download__help {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--orange-text);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.download__help:hover {
+  text-decoration: underline;
+}
+
+.download__panel {
+  display: grid;
+  gap: 22px;
+  padding: 32px;
+}
+
+.download__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: end;
+  justify-content: space-between;
+}
+
+.download__version {
+  display: grid;
+  gap: 6px;
+  padding: 10px 14px;
+}
+
+.download__needs {
+  font-size: 14px;
+}
+
+.download__files {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--ink);
+}
+
+.download__files li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  gap: 16px;
+  align-items: center;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 14px;
+}
+
+.download__file {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.download__name {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.download__github,
+.download__sums a {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.download__pending {
+  display: grid;
+  gap: 18px;
+  justify-items: start;
+  padding: 18px 0 4px;
+  border-top: 1px solid var(--ink);
+}
+
+@media (max-width: 860px) {
+  .download__grid {
+    grid-template-columns: 1fr;
+  }
+  .download__panel {
+    padding: 28px 20px 24px;
+  }
+  .download__panel .segments {
+    gap: 6px;
+  }
+  .download__panel .segment .key {
+    padding: 0 10px;
+  }
+  .download__files li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .download__files li .mono.muted:not(.download__name),
+  .download__github {
+    display: none;
+  }
+}
+
+/* ---- Footer ---- */
+
+.footer {
+  padding: 56px 0 112px;
+  border-top: 1px solid var(--hairline);
+}
+
+.footer__grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 24px 48px;
+  align-items: center;
+}
+
+.footer__brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 500;
+}
+
+.footer__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  justify-content: flex-end;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+}
+
+.footer__links a {
+  text-decoration: none;
+}
+
+.footer__links a:hover {
+  color: var(--orange-text);
+}
+
+.footer__fine {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+@media (max-width: 640px) {
+  .footer__grid {
+    grid-template-columns: 1fr;
+  }
+  .footer__links {
+    justify-content: flex-start;
+  }
+}

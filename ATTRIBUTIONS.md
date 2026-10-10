@@ -157,3 +157,13 @@ follow [skinview3d](https://github.com/bs-community/skinview3d)'s
 Default player artwork is read from the player's installed client; none is
 distributed. Which default an id gets follows HMCL's `TexturesLoader.java`
 (GPL-3.0-or-later, ADR 0011).
+
+# Website and release mirror
+
+The site in `web/` uses the launcher's own fonts (Space Grotesk, JetBrains Mono
+and DSEG7, each under the SIL OFL 1.1, copied from `crates/lumilio-ui/assets/fonts`
+with their licences at build time) and icons from
+[Phosphor](https://github.com/phosphor-icons/react) (MIT). The release mirror in
+`web/worker/proxy.ts` follows the approach of
+[gh-proxy](https://github.com/hunshcn/gh-proxy) (MIT): manual redirect following
+and a streamed body. No gh-proxy source was copied.

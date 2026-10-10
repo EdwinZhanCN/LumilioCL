@@ -1,0 +1,86 @@
+---
+// Everything below the hero, in page order.
+import "../styles/sections.css";
+import { ArrowUpRightIcon as ArrowUpRight } from "@phosphor-icons/react";
+import type { Catalog } from "../i18n";
+import Proof from "./Proof.astro";
+import { Audiences } from "./Audiences";
+import { Stack } from "./Stack";
+import { Download } from "./Download";
+import { latestRelease } from "../data/release";
+import { ATTRIBUTIONS_URL, LICENSE_URL, RELEASES_URL, REPO_URL, UNSIGNED_HELP_URL } from "../data/links";
+
+interface Props {
+  t: Catalog;
+}
+
+const { t } = Astro.props;
+const release = await latestRelease();
+const shipping = release?.version ?? t.roadmap.items[0].version;
+---
+
+<Proof t={t} />
+
+<Audiences client:load t={t.audiences} />
+
+<Stack client:load t={t.stack} />
+
+<section id="roadmap" class="roadmap" aria-labelledby="roadmap-title">
+  <div class="column">
+    <header class="section-head">
+      <h2 id="roadmap-title" class="title">{t.roadmap.title}</h2>
+      <p class="lede">{t.roadmap.lede}</p>
+    </header>
+    <ol class="display roadmap__strip">
+      {
+        t.roadmap.items.map((item) => {
+          const current = item.version === shipping;
+          return (
+            <li class="roadmap__item" data-current={current}>
+              <span class="roadmap__legend display__legend">
+                <span class="led" data-lit={current} />
+                {current ? t.roadmap.current : t.roadmap.planned}
+              </span>
+              <span class="digits roadmap__digits" data-ghost={item.version.replace(/\d/g, "8")}>
+                <span>{item.version}</span>
+              </span>
+              <span class="roadmap__name">{item.name}</span>
+              <span class="roadmap__lede">{item.lede}</span>
+            </li>
+          );
+        })
+      }
+    </ol>
+  </div>
+</section>
+
+<section id="download" class="download" aria-labelledby="download-title">
+  <div class="column download__grid">
+    <header class="section-head">
+      <h2 id="download-title" class="title">{t.download.title}</h2>
+      <p class="lede">{t.download.unsigned}</p>
+      <a class="download__help" href={UNSIGNED_HELP_URL}>
+        {t.download.unsignedLink}
+        <ArrowUpRight weight="bold" aria-hidden="true" />
+      </a>
+    </header>
+    <Download client:load t={t.download} release={release} releasesUrl={RELEASES_URL} />
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="column footer__grid">
+    <div class="footer__brand">
+      <img class="on-light" src="/icons/tile-light.svg" alt="" width="32" height="32" />
+      <img class="on-dark" src="/icons/tile-dark.svg" alt="" width="32" height="32" />
+      <span>LumilioCL</span>
+    </div>
+    <ul class="footer__links">
+      <li><a href={REPO_URL}>{t.footer.source}</a></li>
+      <li><a href={RELEASES_URL}>{t.footer.releases}</a></li>
+      <li><a href={LICENSE_URL}>{t.footer.license}</a></li>
+      <li><a href={ATTRIBUTIONS_URL}>{t.footer.attributions}</a></li>
+    </ul>
+    <p class="footer__fine muted">{t.footer.disclaimer}<br />{t.footer.fonts}</p>
+  </div>
+</footer>

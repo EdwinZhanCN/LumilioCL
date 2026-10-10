@@ -1,0 +1,91 @@
+---
+// The measured comparison. Every number is from src/data/benchmark.ts, and
+// the method sits under the numbers, so the claim can be checked.
+import type { Catalog } from "../i18n";
+import { fill } from "../i18n";
+import { BENCHMARK as B } from "../data/benchmark";
+
+interface Props {
+  t: Catalog;
+}
+
+const { t } = Astro.props;
+const p = t.proof;
+const cut = Math.round(
+  ((B.them.memoryMb - B.us.memoryMb) / B.them.memoryMb) * 100,
+);
+const ghost = (value: number) => String(value).replace(/\d/g, "8");
+
+const rows = [
+  {
+    label: p.memory,
+    note: p.memoryNote,
+    us: B.us.memoryMb,
+    them: B.them.memoryMb,
+    unit: "MB",
+  },
+  {
+    label: p.processes,
+    note: p.processesNote,
+    us: B.us.processes,
+    them: B.them.processes,
+    unit: "",
+  },
+  {
+    label: p.size,
+    note: p.sizeNote,
+    us: B.us.sizeMb,
+    them: B.them.sizeMb,
+    unit: "MB",
+  },
+];
+---
+
+<section id="proof" class="proof" aria-labelledby="proof-title">
+  <div class="column">
+    <header class="section-head">
+      <h2 id="proof-title" class="title">
+        {fill(p.title, { percent: String(cut) })}
+      </h2>
+      <p class="lede">{p.lede}</p>
+    </header>
+    <div class="proof__grid">
+      {rows.map((row) => (
+        <div class="display proof__card">
+          <div class="proof__label">
+            <span class="proof__name">{row.label}</span>
+            <span class="display__legend">{row.note}</span>
+          </div>
+          <div class="proof__reading">
+            <span class="display__legend">{p.us}</span>
+            <span class="digits proof__digits" data-ghost={ghost(row.us)}>
+              <span>{row.us}</span>
+            </span>
+            <span class="display__legend">{row.unit}</span>
+          </div>
+          <div class="proof__reading proof__reading--them">
+            <span class="display__legend">{B.them.name}</span>
+            <span
+              class="digits proof__digits--them"
+              data-ghost={ghost(row.them)}
+            >
+              <span>{row.them}</span>
+            </span>
+            <span class="display__legend">{row.unit}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+    <p class="proof__method muted">
+      {fill(p.method, {
+        machine: B.machine,
+        os: B.os,
+        us: B.us.version,
+        them: B.them.name,
+        themVersion: B.them.version,
+        runs: String(B.runs),
+        date: B.date,
+      })}
+    </p>
+  </div>
+</section>
