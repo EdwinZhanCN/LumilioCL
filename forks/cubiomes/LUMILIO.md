@@ -45,7 +45,8 @@ reproduce all 9,112 upstream node words.
 
 Full `just check` passes: build, workspace tests, Clippy and formatting.
 Validation used `CARGO_INCREMENTAL=0 DISPLAY=:99` in the managed Linux
-environment; no Windows/MSVC or maintainer game acceptance is claimed.
+environment; Windows/MSVC was not covered by that run.
 
-Maintainer F3/map acceptance is pending; automated samples cover their tested
-points and do not claim exhaustive terrain simulation or human acceptance.
+The maintainer confirmed game verification on 2026-10-09, including the F3
+and `/locate` review required by W14. Automated samples cover their tested
+points and do not claim exhaustive terrain simulation.
