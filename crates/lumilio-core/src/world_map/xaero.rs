@@ -9,6 +9,7 @@ use std::path::Path;
 
 /// Where the Minimap keeps its per-world directories, relative to the game.
 const ROOT: &str = "xaero/minimap";
+const WORLD_ROOT: &str = "xaero/world-map";
 /// Multiplayer directories are named after the server address.
 const SERVER_PREFIX: &str = "Multiplayer_";
 
@@ -16,9 +17,33 @@ const SERVER_PREFIX: &str = "Multiplayer_";
 /// directories, hidden entries and the mod's own `backup` directories are left
 /// out.
 pub fn minimap_dirs(game_dir: &Path) -> Vec<String> {
+    dirs(game_dir, ROOT)
+}
+
+/// `top-level world / dimension / multiworld id` paths. Enumerating only
+/// directories keeps even thousands of region ZIPs out of the catalog call.
+pub fn world_map_ids(game_dir: &Path) -> BTreeMap<String, Vec<String>> {
+    dirs(game_dir, WORLD_ROOT)
+        .into_iter()
+        .map(|world| {
+            let mut ids = Vec::new();
+            for dimension in ["null", "DIM-1", "DIM1"] {
+                ids.extend(
+                    dirs(game_dir, &format!("{WORLD_ROOT}/{world}/{dimension}"))
+                        .into_iter()
+                        .filter(|id| id.starts_with("mw$"))
+                        .map(|id| format!("{world}/{dimension}/{id}")),
+                );
+            }
+            (world, ids)
+        })
+        .collect()
+}
+
+fn dirs(game_dir: &Path, root: &str) -> Vec<String> {
     let mut found = Vec::new();
     let mut checked = game_dir.to_path_buf();
-    for part in ROOT.split('/') {
+    for part in root.split('/') {
         checked.push(part);
         if std::fs::symlink_metadata(&checked).is_ok_and(|meta| meta.file_type().is_symlink()) {
             return found;
@@ -52,6 +77,7 @@ pub fn attach(
     contexts: &mut Vec<WorldMapContext>,
     instance: &str,
     dirs: &[String],
+    world_ids: &BTreeMap<String, Vec<String>>,
     links: &BTreeMap<String, String>,
 ) {
     let mut used: Vec<&str> = Vec::new();
@@ -65,6 +91,12 @@ pub fn attach(
                     .context
                     .sources
                     .push(SourceLink::XaeroMinimap(dir.clone()));
+                if let Some(ids) = world_ids.get(dir) {
+                    world
+                        .context
+                        .sources
+                        .extend(ids.iter().cloned().map(SourceLink::XaeroWorldMap));
+                }
                 used.push(dir);
             }
             None => {
@@ -92,7 +124,13 @@ pub fn attach(
                     data_version: None,
                     seed: None,
                     dimension: Dimension::Overworld,
-                    sources: vec![SourceLink::XaeroMinimap(dir.clone())],
+                    sources: {
+                        let mut sources = vec![SourceLink::XaeroMinimap(dir.clone())];
+                        if let Some(ids) = world_ids.get(dir) {
+                            sources.extend(ids.iter().cloned().map(SourceLink::XaeroWorldMap));
+                        }
+                        sources
+                    },
                 },
             }),
     );

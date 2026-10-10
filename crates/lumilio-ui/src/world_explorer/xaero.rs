@@ -2,11 +2,108 @@
 //! only suggested; the person confirms it here, and the link is saved.
 use super::{Command, MapView};
 use crate::{key::Key, tr};
-use gpui::{AnyElement, Context, div, prelude::*};
-use gpui_component::{Sizable as _, v_flex};
-use lumilio_plugin_api::map::WorldId;
+use gpui::{Anchor, AnyElement, Context, div, prelude::*, px};
+use gpui_component::{Sizable as _, popover::Popover, v_flex};
+use lumilio_plugin_api::map::{Dimension, SourceLink, WorldId};
 
 impl MapView {
+    pub(super) fn xaero_map_ids(&self) -> Vec<String> {
+        let Some(context) = self.context.as_ref() else {
+            return vec![];
+        };
+        let dimension = match context.dimension {
+            Dimension::Overworld => "null",
+            Dimension::Nether => "DIM-1",
+            Dimension::End => "DIM1",
+            Dimension::Custom(_) => return vec![],
+        };
+        context
+            .sources
+            .iter()
+            .filter_map(|source| {
+                let SourceLink::XaeroWorldMap(path) = source else {
+                    return None;
+                };
+                let mut parts = path.split('/');
+                let (Some(_world), Some(found), Some(id), None) =
+                    (parts.next(), parts.next(), parts.next(), parts.next())
+                else {
+                    return None;
+                };
+                (found == dimension && id.starts_with("mw$")).then(|| path.clone())
+            })
+            .collect()
+    }
+
+    pub(super) fn xaero_map_choice(&self) -> Option<String> {
+        let context = self.context.as_ref()?;
+        let ids = self.xaero_map_ids();
+        if ids.len() == 1 {
+            return ids.into_iter().next();
+        }
+        self.xaero_maps
+            .get(&(context.world.clone(), context.dimension.clone()))
+            .filter(|choice| ids.contains(choice))
+            .cloned()
+    }
+
+    pub(super) fn xaero_map_picker(&self, cx: &mut Context<Self>) -> Option<Popover> {
+        if self.base_kind() != Some("map-base-xaero") {
+            return None;
+        }
+        let ids = self.xaero_map_ids();
+        if ids.len() < 2 {
+            return None;
+        }
+        let chosen = self.xaero_map_choice();
+        let label = chosen
+            .as_deref()
+            .and_then(|path| path.rsplit('/').next())
+            .map(str::to_owned)
+            .unwrap_or_else(|| tr!("map-xaero-choose").to_string());
+        let target = cx.weak_entity();
+        // ia[plugin.world-explorer]: 选择 Xaero 世界地图 | 地图右上角 · Xaero 底图旁的地图下拉 | 同维度多份 mw$ 地图时选择其中一份；切换后保留中心、缩放与图层，瓦片缓存按选择隔离
+        Some(
+            Popover::new("map-xaero-map-picker")
+                .anchor(Anchor::TopRight)
+                .trigger(
+                    Key::new("map-xaero-map")
+                        .label(label)
+                        .white()
+                        .small()
+                        .debug_selector(|| "map-xaero-map".into()),
+                )
+                .content(move |_, _, _| {
+                    v_flex()
+                        .w(px(180.))
+                        .gap_1()
+                        .children(ids.iter().enumerate().map(|(index, path)| {
+                            let picked = path.clone();
+                            let target = target.clone();
+                            Key::new(format!("map-xaero-map-option-{index}"))
+                                .label(path.rsplit('/').next().unwrap_or(path).to_owned())
+                                .white()
+                                .small()
+                                .debug_selector(move || format!("map-xaero-map-option-{index}"))
+                                .on_click(move |_, _, cx| {
+                                    let _ = target.update(cx, |this, cx| {
+                                        if let Some(context) = &this.context {
+                                            this.xaero_maps.insert(
+                                                (context.world.clone(), context.dimension.clone()),
+                                                picked.clone(),
+                                            );
+                                        }
+                                        this.reset_view();
+                                        this.refresh();
+                                        cx.notify();
+                                    });
+                                })
+                        }))
+                        .into_any_element()
+                }),
+        )
+    }
+
     /// The save on screen and the directory suggested for it, if the person
     /// has not linked one yet.
     pub(super) fn xaero_suggestion(&self) -> Option<(String, String)> {

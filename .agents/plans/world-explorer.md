@@ -271,19 +271,19 @@ P0 **pending human acceptance**：Windows MSVC Actions；macOS 与指定 ubuntu:
 
 ### P5 Xaero 世界地图底图
 
-- [ ] T32：`lumilio-plugin-world-explorer/src/xaero/world_map.rs`（新建）：读区域 zip、解码区域流，改编自 XaeroTools `crates/xaero-core/src/codec/` 和 `render/mod.rs`（MIT，注释署名）。支持的版本范围以测试样本为准，其余报「不支持」。颜色用 W13 的表。
-- [ ] T33：按可见区域加载，局部缺失画「无数据」；区域 zip 变了才重建。大存档（数千个区域文件）用 `list_dir` 分页，不一次列完。
+- [x] T32：`lumilio-plugin-world-explorer/src/xaero/world_map.rs`（新建）：读区域 zip、解码区域流，改编自 XaeroTools `crates/xaero-core/src/codec/` 和 `render/mod.rs`（MIT，注释署名）。支持的版本范围以测试样本为准，其余报「不支持」。颜色用 W13 的表。
+- [x] T33：按可见区域加载，局部缺失画「无数据」；区域 zip 变了才重建。大存档（数千个区域文件）用 `list_dir` 分页，不一次列完。
 
 ### P6 自定义标记、路线、测距与下界换算
 
-- [ ] T34：`launcher.db` 的标记与路线表（`world_map/store.rs`）：每条记录带世界、维度、坐标、名称、颜色和可选的关联（cubiomes 结构 key、Xaero 路径点的 `raw_id`）。关联的对象不见了，标记还在，并提示关联失效。
-- [ ] T35：在地图上新建、编辑、删除标记（复用 W10 的对话框）；画路线（折线），显示总长；测距工具（两点间方块距离），不持久化。
-- [ ] T36：下界 8:1 换算工具（W8）：选中的点或输入的坐标，给出另一维度的坐标，可以复制或跳转。测试：负坐标的取整与游戏一致（向下取整，待用实机核对）。
+- [x] T34：`launcher.db` 的标记与路线表（`world_map/store.rs`）：每条记录带世界、维度、坐标、名称、颜色和可选的关联（cubiomes 结构 key、Xaero 路径点的 `raw_id`）。关联的对象不见了，标记还在，并提示关联失效。
+- [x] T35：在地图上新建、编辑、删除标记（复用 W10 的对话框）；画路线（折线），显示总长；测距工具（两点间方块距离），不持久化。
+- [x] T36：下界 8:1 换算工具（W8）：选中的点或输入的坐标，给出另一维度的坐标，可以复制或跳转。测试：负坐标的取整与游戏一致（向下取整，待用实机核对）。
 
 ### P7 面向插件的扩展与 WASM（依赖 `wasm-plugin-registry.md` 的 T1、T4）
 
 - [ ] T37：在 WASM 计划的 WIT 里加 `base-map-provider` 和 `overlay-provider`，类型与 `map.rs` 一一对应；瓦片字节和对象数量有上限；同样经过权限、超时和取消。示例 WASM 插件提供一个热力图 Overlay。
-- [ ] T38：Litematica 插件实现 `OverlayProvider`，给出投影放置的位置和范围。投影放置信息存在哪个文件（Litematica 的配置目录），待核实；需要的 `ReadGameFiles` 范围随之扩大，设置页会显示。
+- [x] T38：Litematica 插件实现 `OverlayProvider`，给出投影放置的位置和范围。投影放置信息存在哪个文件（Litematica 的配置目录），待核实；需要的 `ReadGameFiles` 范围随之扩大，设置页会显示。
 
 ### P8 新版本世界生成（已拆出）
 
@@ -409,6 +409,15 @@ P8（T39–T44，新版本世界生成）已完成：1.21.5–26.3 通过自动�
 - 仓库根目录 `LICENSE`（AGPL-3.0-only）
 
 ## 实施记录
+
+- 2026-10-10：实机截图发现 Xaero 路径点信息卡误写「来源：种子预测」。原因是 `MapObject.source` 记的是插件 ID，同一个 `lumilio.world-explorer` 同时产出种子、存档、Xaero 对象；信息卡原先把整个插件 ID 映射成种子。现按对象图层标签显示 Xaero 路径点、存档或种子来源，底图选择不改变 Overlay 来源，并补回归测试。
+- 2026-10-10：XaeroTools 不需要自维护 fork。按维护者确认，把完整上游仓库快照缩为 `vendor/xaerotools`：仅保留未修改的 `xaero-core`、其测试辅助 crate、两份编译所需的内嵌数据及 MIT 许可证；工作区清单只列这两个 crate。启动器依赖和上游样本路径指向新位置，来源与基线提交记在 `vendor/xaerotools/LUMILIO.md`。以后只有实际修改上游代码才按 fork 管理。
+- 2026-10-10：本轮收尾复查补了 Litematica 异常坐标与尺寸的溢出防护，并修正仅供测试的服务器 ping 入口在正式构建下触发的 Clippy 错误。T37 尚未开始：`wasm-plugin-registry.md` 的 T1/T4 仍未实现，当前仓库没有 Wasmtime 宿主或可供地图扩展的 WIT 世界；不能把原生 Provider 视为 WASM 扩展。T45 随 P7 保留未完成。P5/P6/P7 的真实界面与游戏内对照、Windows 验收仍待实机。
+- 2026-10-10：T33 完成。同一世界、维度的多个 Xaero `mw$` 目录在地图底图旁列出，必须明确选择；选中的相对目录进入 `TileKey.base_map`（`xaero@…`），所以切换多世界地图不会复用别的地图瓦片，弹出独立窗口时也保留选择。core 只枚举顶层世界/维度/多世界目录，不列区域 ZIP；插件只读可见区域，粗层的文件来源仍分页列举，按来源文件长度和修改时间失效缓存。测试覆盖目录枚举、未选择时不请求瓦片、选择后键分离、未关联的 ID 被拒绝。Xaero 7.8 真实区域文件只读解码通过；与存档底图切换的地形对齐、局部空白与颜色仍待维护者目视核对。
+- 2026-10-10：T38 完成。核实 Litematica 26.2 的放置信息在 `config/litematica/litematica_<世界>_dim_minecraft_<维度>.json` 的 `placements.placements`；启用的放置项里记原理图路径、原点、镜像/旋转和子区域相对位置，尺寸来自对应 `schematics/*.litematic` 的 `Regions.<name>.Size`。插件增加 `ReadGameFiles` 的 `config/litematica` 范围和「Litematica 投影位置」Overlay，按 Litematica 原公式计算子区域边框、按可见格返回，地图用折线绘制。合成测试覆盖范围、禁用项、旋转和负尺寸；维护者本机一份 26.2 配置和原理图只读核对通过（数据不入库）。实机外观仍待维护者目视核对。
+
+- 2026-10-09：T34–T36 的代码与自动测试完成。`world_map_annotations` 按实例、世界和维度隔离，删除实例时清理；标记可保留来源对象的 `source`/`raw_id`，对象查询完成后若找不到原对象才提示关联失效。地图工具可放置标记、依次点击画路线、测两点距离；标记和路线可改名、改色、删除，路线显示总长。选中点或手填坐标可按下界 8:1 换算并复制或跳转，负坐标向下取整。`lumilio-core` 持久化/删除测试和 `lumilio-ui` 交互测试已新增；路线与测距的实机手感、负坐标与游戏内行为仍待维护者验收。
+- 2026-10-09：T32 完成，T33 未完成。引入 MIT 许可的 XaeroTools `xaero-core` 源码快照（提交 `7bc650bdf445ec06d0d3fc0fb9e98ba4b86a6b83`，见 `vendor/xaerotools/LUMILIO.md` 和 `ATTRIBUTIONS.md`）；插件按需读取区域 ZIP，以 XaeroTools 的解码模型取方块、覆盖层和高度，颜色用现有版本表，局部未探索像素透明；文件来源列表由宿主缓存按长度和修改时间失效。自动测试用上游入库的 0.4 区域文件验证覆盖像素与空白像素、用未来版本头验证拒绝；另用维护者本机 7.8 区域文件只读验证解码完成（样本不随仓库提交）。当前同一维度有多份 `mw$*` 世界地图时明确报「暂时无法选择」，选择器尚未实现；P5 因此未勾选。区域渲染外观尚待维护者目视核对。
 
 - 2026-10-09：结构图标改用 MinecraftSearch 的 52 个资源，并接通 `desert_well`、`mineshaft`、`buried_treasure`、`amethyst_geode`、`end_gateway` 和废弃营地图层。来源与使用边界见 `crates/lumilio-ui/assets/map-icons/NOTICE.md`；未有 finder 的 feature marker 只入库图标，后续工作在 backlog。Mineshaft 的实机观感待维护者查看。
 

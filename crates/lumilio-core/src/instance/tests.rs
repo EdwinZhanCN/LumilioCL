@@ -10,6 +10,46 @@ fn request(name: &str) -> NewInstance {
 }
 
 #[test]
+fn map_annotations_survive_library_updates_and_leave_with_the_instance() {
+    use crate::world_map::store::annotations::{Annotation, AnnotationKind, list, put};
+    use lumilio_plugin_api::map::{Dimension, MapPoint, WorldId};
+
+    let dir = tempfile::tempdir().unwrap();
+    let mut store = InstanceStore::open(dir.path()).unwrap();
+    let instance = store.create(request("World"), 1).unwrap().id.clone();
+    let path = store.layout.database();
+    let world = WorldId::Save {
+        instance: instance.clone(),
+        folder: "World".into(),
+    };
+    let item = Annotation {
+        id: 0,
+        world: world.clone(),
+        dimension: Dimension::Overworld,
+        kind: AnnotationKind::Marker,
+        name: "Home".into(),
+        color: [1, 2, 3],
+        points: vec![MapPoint { x: 4., z: -5. }],
+        linked_source: None,
+        linked_raw_id: None,
+    };
+    put(&path, &instance, &item).unwrap();
+    store.rename(&instance, "Renamed").unwrap();
+    assert_eq!(
+        list(&path, &instance, &world, &Dimension::Overworld)
+            .unwrap()
+            .len(),
+        1
+    );
+    store.remove(&instance).unwrap();
+    assert!(
+        list(&path, &instance, &world, &Dimension::Overworld)
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[test]
 fn collections_are_renamed_and_assigned_without_losing_order_or_members() {
     let dir = tempfile::tempdir().unwrap();
     let mut store = InstanceStore::open(dir.path()).unwrap();

@@ -6,6 +6,7 @@ pub(crate) mod edit;
 pub(crate) mod naming;
 pub(crate) mod overlay;
 pub(crate) mod waypoints;
+pub(crate) mod world_map;
 
 #[cfg(test)]
 mod tests;

@@ -5,6 +5,8 @@ use rusqlite::{Connection, params};
 use std::collections::BTreeMap;
 use std::path::Path;
 
+pub mod annotations;
+
 pub fn parse_seed(text: &str) -> Option<i64> {
     let text = text.trim();
     if text.is_empty() {

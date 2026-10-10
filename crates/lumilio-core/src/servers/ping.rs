@@ -111,6 +111,7 @@ pub async fn probe(
 
 /// Asks `host:port` directly (no SRV lookup) with the handshake `protocol`
 /// calls for: the legacy one for a pre-1.7 version, otherwise the modern one.
+#[cfg(test)]
 pub async fn probe_at(
     host: &str,
     port: u16,

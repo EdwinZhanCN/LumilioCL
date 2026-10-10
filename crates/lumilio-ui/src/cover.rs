@@ -9,7 +9,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use gpui::{Bounds, Corners, Hsla, Pixels, RenderImage, Window, canvas, prelude::*, px};
+use gpui::{Bounds, Corners, Hsla, Pixels, RenderImage, Window, canvas, prelude::*};
 
 use crate::hero::noise::{bayer4, fbm2, hash2, smoothstep};
 use crate::hero::raster::{PixelGrid, Rgb};

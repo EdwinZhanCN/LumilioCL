@@ -366,6 +366,7 @@ impl PluginHost {
                 if fault.message.starts_with("map-version-")
                     || fault.message.starts_with("map-xaero-")
                     || fault.message.starts_with("map-save-")
+                    || fault.message.starts_with("map-litematica-")
                     || fault.message.starts_with("map-edit-")
                 {
                     return Err(MapFailure::Failed(fault.message));

@@ -1,4 +1,5 @@
 //! Host-owned map viewport. Background data and rendering enter through mailboxes.
+mod annotations;
 mod camera;
 mod canvas;
 mod edit;
@@ -27,12 +28,13 @@ use gpui::{
     Window, canvas, div, img, px, relative,
 };
 use gpui_component::{ActiveTheme as _, h_flex, v_flex};
+use lumilio_core::world_map::store::annotations::{Annotation, AnnotationKind, route_length};
 use lumilio_core::world_map::{MapSchedule, Viewport, WorldMapContext};
 use lumilio_core::{CancellationToken, MapFailure, MapProviders};
 use lumilio_map_render::{Grid, Sprite, Tile};
 use lumilio_plugin_api::map::{
-    Dimension, MapObject, MapObjectKind, MapPoint, OverlayInfo, OverlayRequest, TileKey, TileReply,
-    TileRequest, WorldContext, WorldId,
+    Dimension, MapIcon, MapObject, MapObjectKind, MapPoint, OverlayInfo, OverlayRequest, TileKey,
+    TileReply, TileRequest, WorldContext, WorldId,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
@@ -42,6 +44,17 @@ use std::time::{Duration, Instant};
 
 pub enum Command {
     Contexts,
+    Annotations {
+        context: WorldContext,
+    },
+    PutAnnotation {
+        context: WorldContext,
+        annotation: Box<Annotation>,
+    },
+    RemoveAnnotation {
+        context: WorldContext,
+        id: i64,
+    },
     SaveSeed {
         seed: i64,
         version: String,
@@ -78,6 +91,10 @@ pub enum Command {
 pub enum Event {
     Seed(Result<(Vec<WorldMapContext>, WorldContext), String>),
     Contexts(Result<(Vec<WorldMapContext>, MapProviders), String>),
+    Annotations {
+        context: WorldContext,
+        result: Result<Vec<Annotation>, String>,
+    },
     Tile {
         generation: u64,
         key: TileKey,
@@ -115,6 +132,7 @@ const TILE_CAP: usize = 512;
 const STAND_INS: usize = 192;
 /// Structure layers shown before the user chooses any.
 const DEFAULT_LAYERS: &[&str] = &[
+    "litematica.placements",
     "save.positions",
     "structure.village",
     "structure.stronghold",
@@ -204,9 +222,12 @@ pub struct MapView {
     providers: MapProviders,
     context: Option<WorldContext>,
     base: usize,
+    xaero_maps: BTreeMap<(WorldId, Dimension), String>,
     camera: camera::Camera,
     layers: layers::Layers,
     objects: objects::Objects,
+    layers_ready: bool,
+    annotations: Vec<Annotation>,
     layer_scroll: gpui::ScrollHandle,
     schedule: MapSchedule,
     tiles: BTreeMap<TileKey, Loaded>,
@@ -233,6 +254,13 @@ pub struct MapView {
     edit_error: Option<String>,
     /// The next click on the map places a new object.
     placing: bool,
+    marking: bool,
+    routing: bool,
+    route_points: Vec<MapPoint>,
+    measure_mode: bool,
+    measure_start: Option<MapPoint>,
+    measure_end: Option<MapPoint>,
+    annotation_pending: bool,
     /// An edit's answer waiting for the next render, which has the window.
     applied: Option<Result<(), String>>,
     cursor: [f64; 2],
@@ -290,9 +318,12 @@ impl MapView {
             providers: MapProviders::default(),
             context: None,
             base: 0,
+            xaero_maps: BTreeMap::new(),
             camera: camera::Camera::default(),
             layers: layers::Layers::default(),
             objects: objects::Objects::new(DEFAULT_LAYERS),
+            layers_ready: false,
+            annotations: Vec::new(),
             layer_scroll: gpui::ScrollHandle::new(),
             schedule: MapSchedule::default(),
             tiles: BTreeMap::new(),
@@ -312,6 +343,13 @@ impl MapView {
             edit_dialog: None,
             edit_error: None,
             placing: false,
+            marking: false,
+            routing: false,
+            route_points: Vec::new(),
+            measure_mode: false,
+            measure_start: None,
+            measure_end: None,
+            annotation_pending: false,
             applied: None,
             cursor: [0., 0.],
             serial: 0,
@@ -443,6 +481,23 @@ impl MapView {
                 self.refresh();
             }
             Event::Contexts(Err(error)) => self.error = Some(error),
+            Event::Annotations { context, result } => {
+                if self.context.as_ref() != Some(&context) {
+                    return;
+                }
+                if self.annotation_pending {
+                    self.annotation_pending = false;
+                    self.applied = Some(result.as_ref().map(|_| ()).map_err(Clone::clone));
+                }
+                match result {
+                    Ok(annotations) => {
+                        self.annotations = annotations;
+                        self.error = None;
+                        self.frame();
+                    }
+                    Err(error) => self.error = Some(error),
+                }
+            }
             Event::Linked(Ok(contexts)) => {
                 // Stay on the world being looked at; it now carries the link.
                 let shown = self.context.as_ref().map(|context| context.world.clone());
@@ -473,6 +528,7 @@ impl MapView {
                     return;
                 }
                 self.objects.layers = layers;
+                self.layers_ready = true;
                 self.probe_edit();
                 self.refresh_objects();
             }
@@ -535,10 +591,21 @@ impl MapView {
     /// The world or dimension changed: what it can show is asked for again.
     fn context_changed(&mut self) {
         self.selected = None;
+        self.marking = false;
+        self.routing = false;
+        self.route_points.clear();
+        self.measure_mode = false;
+        self.measure_start = None;
+        self.measure_end = None;
+        self.annotations.clear();
         self.objects.clear();
         self.objects.layers.clear();
+        self.layers_ready = false;
         if let (Some(connection), Some(context)) = (&self.connection, &self.context) {
             let _ = connection.send.try_send(Command::Overlays {
+                context: context.clone(),
+            });
+            let _ = connection.send.try_send(Command::Annotations {
                 context: context.clone(),
             });
         }
@@ -562,7 +629,9 @@ impl MapView {
     /// mouse.
     fn sprites(&self) -> Vec<Sprite> {
         let (width, height) = (f64::from(self.size[0]), f64::from(self.size[1]));
-        let objects = self.objects.visible(self.view_blocks());
+        let annotations = self.annotation_objects();
+        let mut objects: Vec<&MapObject> = self.objects.visible(self.view_blocks());
+        objects.extend(annotations.iter());
         let skip = objects.len().saturating_sub(MAX_ICONS);
         objects
             .into_iter()
@@ -585,6 +654,69 @@ impl MapView {
                     size: ICON,
                     opacity: if object.approximate { 0.7 } else { 1. },
                 })
+            })
+            .collect()
+    }
+
+    fn annotation_objects(&self) -> Vec<MapObject> {
+        let Some(context) = &self.context else {
+            return Vec::new();
+        };
+        let view = self.view_blocks();
+        self.annotations
+            .iter()
+            .filter(|item| item.world == context.world && item.dimension == context.dimension)
+            .filter(|item| {
+                item.points.iter().any(|at| {
+                    at.x >= view[0] && at.x <= view[2] && at.z >= view[1] && at.z <= view[3]
+                }) || (item.kind == AnnotationKind::Route
+                    && item.points.windows(2).any(|segment| {
+                        let (a, b) = (segment[0], segment[1]);
+                        a.x.min(b.x) <= view[2]
+                            && a.x.max(b.x) >= view[0]
+                            && a.z.min(b.z) <= view[3]
+                            && a.z.max(b.z) >= view[1]
+                    }))
+            })
+            .map(|item| MapObject {
+                id: format!("annotation:{}", item.id),
+                raw_id: item.id.to_string(),
+                source: "lumilio.launcher".into(),
+                world: item.world.clone(),
+                dimension: item.dimension.clone(),
+                kind: match item.kind {
+                    AnnotationKind::Marker => MapObjectKind::Icon {
+                        icon: MapIcon::Marker,
+                        at: item.points[0],
+                    },
+                    AnnotationKind::Route => MapObjectKind::Polyline(item.points.clone()),
+                },
+                label: Some(item.name.clone()),
+                label_id: Some(
+                    match item.kind {
+                        AnnotationKind::Marker => "map-annotation-marker",
+                        AnnotationKind::Route => "map-annotation-route",
+                    }
+                    .into(),
+                ),
+                priority: 100,
+                approximate: false,
+                color: Some(item.color),
+                note: if let (Some(source), Some(raw_id)) =
+                    (&item.linked_source, &item.linked_raw_id)
+                {
+                    (self.layers_ready && self.objects.link_missing(source, raw_id))
+                        .then(|| tr!("map-annotation-link-missing").to_owned())
+                } else if item.kind == AnnotationKind::Route {
+                    Some(tr!(
+                        "map-route-length",
+                        length = route_length(&item.points).round() as i64
+                    ))
+                } else {
+                    None
+                },
+                share: None,
+                editable: vec![],
             })
             .collect()
     }
@@ -662,6 +794,46 @@ impl MapView {
             .absolute()
             .size_full(),
         )
+    }
+    fn route_layer(&self) -> gpui::Canvas<()> {
+        let view = self.view_blocks();
+        let mut routes: Vec<_> = self
+            .annotations
+            .iter()
+            .filter(|item| {
+                item.kind == AnnotationKind::Route
+                    && item.points.windows(2).any(|segment| {
+                        let (a, b) = (segment[0], segment[1]);
+                        a.x.min(b.x) <= view[2]
+                            && a.x.max(b.x) >= view[0]
+                            && a.z.min(b.z) <= view[3]
+                            && a.z.max(b.z) >= view[1]
+                    })
+            })
+            .map(|item| (item.points.clone(), item.color))
+            .collect();
+        routes.extend(self.objects.visible(view).into_iter().filter_map(|object| {
+            let MapObjectKind::Polyline(points) = &object.kind else {
+                return None;
+            };
+            Some((points.clone(), object.color.unwrap_or([106, 199, 225])))
+        }));
+        if self.route_points.len() >= 2 {
+            let shade = edit::SWATCHES[6];
+            routes.push((
+                self.route_points.clone(),
+                [(shade >> 16) as u8, (shade >> 8) as u8, shade as u8],
+            ));
+        }
+        let camera = self.camera;
+        canvas(
+            |_, _, _| (),
+            move |bounds, (), window, _| {
+                canvas::paint_routes(window, bounds, camera, &routes);
+            },
+        )
+        .absolute()
+        .size_full()
     }
     /// `LUMILIO_MAP_STATS=1`: a summary of the last two seconds on stderr.
     fn report_stats(&mut self) {
@@ -746,9 +918,22 @@ impl MapView {
         let Some((provider, base)) = self.providers.base_maps.get(self.base) else {
             return;
         };
+        if base.id == "xaero" && self.xaero_map_ids().len() > 1 && self.xaero_map_choice().is_none()
+        {
+            self.schedule.update(&[]);
+            self.visible.clear();
+            self.refresh_objects();
+            self.frame();
+            return;
+        }
         let template = TileKey {
             provider: provider.clone(),
-            base_map: base.id.clone(),
+            base_map: if base.id == "xaero" {
+                self.xaero_map_choice()
+                    .map_or_else(|| base.id.clone(), |id| format!("xaero@{id}"))
+            } else {
+                base.id.clone()
+            },
             world: context.world.clone(),
             dimension: context.dimension.clone(),
             level: self.camera.level(),
@@ -864,7 +1049,9 @@ impl MapView {
             });
         }
     }
-    /// The one line of status under the map, most important first.
+    /// What went wrong or is missing, as the messages menu words it. Placing
+    /// a waypoint is a mode, not a message, so its hint is not here.
+    #[cfg(test)]
     fn status_line(&self) -> Option<String> {
         self.edit_error
             .as_deref()
@@ -872,8 +1059,6 @@ impl MapView {
             .or_else(|| self.placing.then(|| tr!("map-placing-hint").to_string()))
             .or_else(|| self.base_status())
     }
-    /// What went wrong or is missing, as the messages menu words it. Placing
-    /// a waypoint is a mode, not a message, so its hint is not here.
     fn problem_line(&self) -> Option<String> {
         self.edit_error
             .as_deref()
@@ -907,8 +1092,25 @@ impl MapView {
                 .is_none_or(|context| !matches!(context.world, WorldId::Save { .. }))
         {
             Some(tr!("map-save-needed"))
+        } else if self.base_kind() == Some("map-base-xaero") && self.xaero_map_ids().is_empty() {
+            Some(tr!("map-xaero-needed"))
+        } else if self.base_kind() == Some("map-base-xaero")
+            && self.xaero_map_ids().len() > 1
+            && self.xaero_map_choice().is_none()
+        {
+            Some(tr!("map-xaero-choose-map"))
+        } else if self.failed.values().any(|failure| matches!(failure, MapFailure::Failed(id) if id == "map-xaero-choose-map")) {
+            Some(tr!("map-xaero-choose-map"))
+        } else if self.failed.values().any(|failure| matches!(failure, MapFailure::Failed(id) if id == "map-xaero-region-too-large")) {
+            Some(tr!("map-xaero-region-too-large"))
+        } else if self.failed.values().any(|failure| matches!(failure, MapFailure::Failed(id) if id == "map-xaero-unsupported")) {
+            Some(tr!("map-xaero-unsupported"))
+        } else if self.failed.values().any(|failure| matches!(failure, MapFailure::Failed(id) if id == "map-xaero-unreadable")) {
+            Some(tr!("map-xaero-unreadable"))
         } else if self.objects.failed_with("map-xaero-unreadable") {
             Some(tr!("map-xaero-unreadable"))
+        } else if self.objects.failed_with("map-litematica-unreadable") {
+            Some(tr!("map-litematica-unreadable"))
         } else if self.objects.failed_with("map-save-unreadable")
             || self.failed.values().any(
                 |failure| matches!(failure, MapFailure::Failed(id) if id == "map-save-unreadable"),
@@ -1122,12 +1324,17 @@ impl Render for MapView {
                 .bg(colors.surface)
         };
         let jumping = self.form.as_ref().is_some_and(|form| form.jumping);
-        let hint = self.placing.then(|| {
+        let hint = if self.placing {
+            Some(tr!("map-placing-hint").to_owned())
+        } else {
+            self.annotation_hint()
+        }
+        .map(|message| {
             div()
                 .debug_selector(|| "map-hint".into())
                 .text_xs()
                 .text_color(colors.muted)
-                .child(tr!("map-placing-hint"))
+                .child(message)
         });
         // ia[plugin.world-explorer]: 平移与缩放 | 地图视口 · 拖动 / 滚轮 / + − 与方向键 | 锚点缩放；过期世代与旧视口结果不进入当前帧
         let viewport = div()
@@ -1154,6 +1361,7 @@ impl Render for MapView {
                     .map(|image| img(image).size_full().object_fit(ObjectFit::Fill)),
             )
             .children(self.canvas_layer())
+            .child(self.route_layer())
             .child(measure)
             .child(bare().top_3().left_3().child(self.view_controls(cx)))
             .child(bare().top_3().right_3().child(self.base_controls(cx)))
@@ -1179,6 +1387,7 @@ impl Render for MapView {
                         .gap_2()
                         .items_center()
                         .children(self.pop_out_key(cx))
+                        .child(self.annotation_controls(cx))
                         .child(self.layer_popover(cx)),
                 ),
             )
@@ -1202,6 +1411,14 @@ impl Render for MapView {
                         if this.placing {
                             if let Some(at) = this.click_point(down, event.position) {
                                 this.create_at(MapPoint { x: at[0], z: at[1] }, window, cx);
+                            }
+                        } else if this.marking || this.routing || this.measure_mode {
+                            if let Some(at) = this.click_point(down, event.position) {
+                                this.map_annotation_click(
+                                    MapPoint { x: at[0], z: at[1] },
+                                    window,
+                                    cx,
+                                );
                             }
                         } else {
                             this.click(down, event.position);
@@ -1251,6 +1468,7 @@ impl Render for MapView {
                 cx.stop_propagation();
                 cx.notify();
             }))
+            // ia[plugin.world-explorer]: 取消地图工具 | 地图视口 · Esc | 取消正在放置的标记、路线或测距，丢弃未保存的点
             .on_key_down(cx.listener(|this, event: &gpui::KeyDownEvent, window, cx| {
                 if !this.focus.is_focused(window) {
                     return;
@@ -1270,6 +1488,27 @@ impl Render for MapView {
                     "right" => this.camera.pan(-32., 0.),
                     "up" => this.camera.pan(0., 32.),
                     "down" => this.camera.pan(0., -32.),
+                    "escape" => {
+                        if !(this.marking
+                            || this.routing
+                            || this.measure_mode
+                            || this.placing
+                            || this.measure_start.is_some())
+                        {
+                            return;
+                        }
+                        this.marking = false;
+                        this.routing = false;
+                        this.route_points.clear();
+                        this.measure_mode = false;
+                        this.measure_start = None;
+                        this.measure_end = None;
+                        this.placing = false;
+                        this.frame();
+                        cx.stop_propagation();
+                        cx.notify();
+                        return;
+                    }
                     _ => return,
                 }
                 this.refresh();

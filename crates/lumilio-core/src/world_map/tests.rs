@@ -149,7 +149,7 @@ fn region_lines_are_exact_for_negative_coordinates() {
 
 mod xaero {
     use super::super::WorldMapContext;
-    use super::super::xaero::{attach, minimap_dirs};
+    use super::super::xaero::{attach, minimap_dirs, world_map_ids};
     use lumilio_plugin_api::map::{Dimension, SourceLink, WorldContext, WorldId};
     use std::collections::BTreeMap;
 
@@ -180,7 +180,7 @@ mod xaero {
     fn a_same_named_directory_is_only_suggested_until_the_person_links_it() {
         let dirs = strings(&["Multiplayer_play.example.org", "Survival", "Unrelated"]);
         let mut worlds = vec![save("Survival"), save("Creative")];
-        attach(&mut worlds, "i", &dirs, &BTreeMap::new());
+        attach(&mut worlds, "i", &dirs, &BTreeMap::new(), &BTreeMap::new());
         assert_eq!(worlds[0].suggested_xaero.as_deref(), Some("Survival"));
         assert_eq!(worlds[1].suggested_xaero, None);
         assert!(
@@ -194,7 +194,7 @@ mod xaero {
         // Confirmed: the directory becomes a source and stops being a suggestion.
         let links = BTreeMap::from([("Creative".to_owned(), "Unrelated".to_owned())]);
         let mut worlds = vec![save("Survival"), save("Creative")];
-        attach(&mut worlds, "i", &dirs, &links);
+        attach(&mut worlds, "i", &dirs, &BTreeMap::new(), &links);
         assert!(
             worlds[1]
                 .context
@@ -203,10 +203,26 @@ mod xaero {
         );
         assert_eq!(worlds[1].suggested_xaero, None);
         assert_eq!(worlds[0].suggested_xaero.as_deref(), Some("Survival"));
+        let mut worlds = vec![save("Creative")];
+        attach(
+            &mut worlds,
+            "i",
+            &dirs,
+            &BTreeMap::from([("Unrelated".into(), strings(&["Unrelated/null/mw$default"]))]),
+            &links,
+        );
+        assert!(
+            worlds[0]
+                .context
+                .sources
+                .contains(&SourceLink::XaeroWorldMap(
+                    "Unrelated/null/mw$default".into()
+                ))
+        );
         // A link to a directory that has since gone is ignored.
         let stale = BTreeMap::from([("Creative".to_owned(), "Deleted".to_owned())]);
         let mut worlds = vec![save("Creative")];
-        attach(&mut worlds, "i", &dirs, &stale);
+        attach(&mut worlds, "i", &dirs, &BTreeMap::new(), &stale);
         assert!(worlds[0].context.sources.len() == 1);
     }
 
@@ -214,7 +230,7 @@ mod xaero {
     fn multiplayer_directories_become_server_worlds() {
         let dirs = strings(&["Multiplayer_play.example.org", "Survival"]);
         let mut worlds = vec![save("Survival")];
-        attach(&mut worlds, "i", &dirs, &BTreeMap::new());
+        attach(&mut worlds, "i", &dirs, &BTreeMap::new(), &BTreeMap::new());
         let server = worlds.last().unwrap();
         assert_eq!(server.name, "play.example.org");
         assert_eq!(
@@ -237,7 +253,7 @@ mod xaero {
             "Multiplayer_play.example.org".to_owned(),
         )]);
         let mut worlds = vec![save("Survival")];
-        attach(&mut worlds, "i", &dirs, &links);
+        attach(&mut worlds, "i", &dirs, &BTreeMap::new(), &links);
         assert_eq!(worlds.len(), 1);
     }
 
@@ -256,6 +272,20 @@ mod xaero {
             std::os::unix::fs::symlink(&root, root.join("Looped")).unwrap();
             assert_eq!(minimap_dirs(game.path()), ["Multiplayer_a", "Survival"]);
         }
+    }
+
+    #[test]
+    fn world_map_catalog_lists_multiworld_ids_without_region_files() {
+        let game = tempfile::tempdir().unwrap();
+        let root = game.path().join("xaero/world-map/Survival/null");
+        std::fs::create_dir_all(root.join("mw$default")).unwrap();
+        std::fs::create_dir_all(root.join("mw$default_1")).unwrap();
+        std::fs::create_dir_all(root.join(".backup")).unwrap();
+        std::fs::write(root.join("mw$default/0_0.zip"), b"irrelevant").unwrap();
+        assert_eq!(
+            world_map_ids(game.path())["Survival"],
+            strings(&["Survival/null/mw$default", "Survival/null/mw$default_1"])
+        );
     }
 }
 

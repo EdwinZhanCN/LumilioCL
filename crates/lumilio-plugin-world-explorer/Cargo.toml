@@ -12,6 +12,7 @@ lumilio-cubiomes.workspace = true
 lumilio-anvil.workspace = true
 lumilio-nbt.workspace = true
 serde_json.workspace = true
+xaero-core = { path = "../../vendor/xaerotools/crates/xaero-core" }
 
 [lints]
 workspace = true

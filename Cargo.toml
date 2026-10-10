@@ -20,7 +20,7 @@ members = [
     "crates/lumilio-xtask",
 ]
 resolver = "3"
-exclude = ["forks/nucleation", "forks/schematic-mesher", "forks/gpui-component"]
+exclude = ["forks/nucleation", "forks/schematic-mesher", "forks/gpui-component", "vendor/xaerotools"]
 
 [patch.crates-io]
 gpui-component = { path = "forks/gpui-component" }

@@ -55,6 +55,47 @@ pub(super) fn shown_at(layer: &OverlayInfo, scale: f64) -> bool {
 }
 
 impl Objects {
+    /// A link is missing only after the source's visible, enabled cells have
+    /// answered. A hidden or still-loading layer cannot prove absence.
+    pub fn link_missing(&self, source: &str, raw_id: &str) -> bool {
+        let offered: Vec<&OverlayInfo> = self
+            .layers
+            .iter()
+            .filter(|(plugin, _)| plugin == source)
+            .map(|(_, layer)| layer)
+            .collect();
+        if offered.is_empty() {
+            return true;
+        }
+        let active: BTreeSet<&str> = offered
+            .iter()
+            .filter(|layer| self.enabled.contains(&layer.id))
+            .map(|layer| layer.id.as_str())
+            .collect();
+        if active.is_empty() {
+            return false;
+        }
+        let keys: Vec<_> = self
+            .wanted
+            .iter()
+            .filter(|key| active.contains(key.overlay.as_str()))
+            .collect();
+        if keys.is_empty()
+            || keys.iter().any(|key| {
+                self.pending.contains_key(*key)
+                    || self.failed.contains_key(*key)
+                    || !self.cells.contains_key(*key)
+            })
+        {
+            return false;
+        }
+        !keys
+            .iter()
+            .filter_map(|key| self.cells.get(*key))
+            .flatten()
+            .any(|object| object.raw_id == raw_id)
+    }
+
     pub fn new(enabled: &[&str]) -> Self {
         Self {
             enabled: enabled.iter().map(|id| (*id).to_owned()).collect(),
@@ -231,9 +272,18 @@ impl Objects {
                     at.x >= view[0] && at.x <= view[2] && at.z >= view[1] && at.z <= view[3]
                 }
                 MapObjectKind::Heat { .. } => true,
+                MapObjectKind::Polyline(points) => points.windows(2).any(|segment| {
+                    let (a, b) = (segment[0], segment[1]);
+                    a.x.min(b.x) <= view[2]
+                        && a.x.max(b.x) >= view[0]
+                        && a.z.min(b.z) <= view[3]
+                        && a.z.max(b.z) >= view[1]
+                }),
                 _ => false,
             })
             .collect();
+        let mut seen = BTreeSet::new();
+        found.retain(|object| seen.insert((object.source.as_str(), object.id.as_str())));
         found.sort_by_key(|object| object.priority);
         found
     }

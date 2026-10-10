@@ -99,13 +99,7 @@ pub fn faceplate_cover(
     world: crate::home::WorldHint,
     colors: ShellColors,
 ) -> impl IntoElement {
-    crate::cover::element(
-        seed,
-        loader,
-        world,
-        colors.body.display,
-        FACEPLATE_FADE,
-    )
+    crate::cover::element(seed, loader, world, colors.body.display, FACEPLATE_FADE)
 }
 
 /// A faceplate's cover has no dissolve into the page: it sits in a window.

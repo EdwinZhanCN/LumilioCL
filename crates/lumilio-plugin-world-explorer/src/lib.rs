@@ -117,6 +117,7 @@ impl BaseMapProvider for WorldExplorer {
                 levels: vec![0, 1, 2, 3, 4],
             },
             save::info(),
+            xaero::world_map::info(),
         ]
     }
     fn sources(
@@ -126,11 +127,20 @@ impl BaseMapProvider for WorldExplorer {
     ) -> Result<Option<Vec<String>>, PluginError> {
         if request.key.base_map == save::BASE {
             save::sources(ctx, request)
+        } else if request.key.base_map == xaero::world_map::BASE
+            || request.key.base_map.starts_with("xaero@")
+        {
+            xaero::world_map::sources(ctx, request)
         } else {
             Ok(None)
         }
     }
     fn tile(&self, ctx: &dyn HostContext, request: &TileRequest) -> Result<TileReply, PluginError> {
+        if request.key.base_map == xaero::world_map::BASE
+            || request.key.base_map.starts_with("xaero@")
+        {
+            return xaero::world_map::tile(ctx, request);
+        }
         if request.key.base_map == save::BASE
             && request.key.provider == ID
             && request.pixels == TILE_PIXELS

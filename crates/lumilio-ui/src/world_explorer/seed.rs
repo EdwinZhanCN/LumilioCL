@@ -313,7 +313,9 @@ impl MapView {
         form.seed_checked = Some(form.seed.read(cx).value().to_string());
         let Some(seed) = lumilio_core::world_map::store::parse_seed(&form.seed.read(cx).value())
         else {
-            form.seed_error = Some("map-seed-empty");
+            // An empty draft is already clear from the input; keep the map
+            // instead of adding a redundant row above it.
+            form.seed_error = None;
             return;
         };
         let Some(version) = form.version.read(cx).selected_value().cloned() else {

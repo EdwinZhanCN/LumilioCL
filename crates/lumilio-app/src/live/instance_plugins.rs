@@ -81,6 +81,41 @@ fn map_connection(wiring: &Wiring, id: String) -> Connection {
                                 .map_err(|error| error.to_string()),
                         )
                     }
+                    Command::Annotations { context } => Event::Annotations {
+                        result: service
+                            .map_annotations(&id, &context.world, &context.dimension)
+                            .await
+                            .map_err(|error| error.to_string()),
+                        context,
+                    },
+                    Command::PutAnnotation { context, annotation } => {
+                        let result = async {
+                            service
+                                .put_map_annotation(&id, *annotation)
+                                .await
+                                .map_err(|error| error.to_string())?;
+                            service
+                                .map_annotations(&id, &context.world, &context.dimension)
+                                .await
+                                .map_err(|error| error.to_string())
+                        }
+                        .await;
+                        Event::Annotations { context, result }
+                    }
+                    Command::RemoveAnnotation { context, id: annotation_id } => {
+                        let result = async {
+                            service
+                                .remove_map_annotation(&id, annotation_id)
+                                .await
+                                .map_err(|error| error.to_string())?;
+                            service
+                                .map_annotations(&id, &context.world, &context.dimension)
+                                .await
+                                .map_err(|error| error.to_string())
+                        }
+                        .await;
+                        Event::Annotations { context, result }
+                    }
                     Command::CanEdit => Event::CanEdit(service.map_can_edit(&id)),
                     Command::Apply { plugin, edit } => Event::Applied(
                         service

@@ -18,7 +18,7 @@ use std::rc::Rc;
 
 /// The 16 Minecraft text colours, which the colour field of a Choice offers by
 /// index. A field named `color` whose options are indices shows these.
-const SWATCHES: [u32; 16] = [
+pub(super) const SWATCHES: [u32; 16] = [
     0x000000, 0x0000AA, 0x00AA00, 0x00AAAA, 0xAA0000, 0xAA00AA, 0xFFAA00, 0xAAAAAA, 0x555555,
     0x5555FF, 0x55FF55, 0x55FFFF, 0xFF5555, 0xFF55FF, 0xFFFF55, 0xFFFFFF,
 ];
@@ -30,7 +30,7 @@ enum Control {
     Choice(String),
 }
 
-type Submit = Rc<dyn Fn(BTreeMap<String, SettingValue>, &mut Window, &mut App)>;
+pub(super) type Submit = Rc<dyn Fn(BTreeMap<String, SettingValue>, &mut Window, &mut App)>;
 
 pub(super) struct EditDialog {
     fields: Vec<(SettingField, Control)>,

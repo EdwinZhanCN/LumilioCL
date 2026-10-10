@@ -2,6 +2,7 @@
 //! details and material lists. All file access goes through the host.
 
 mod format;
+mod overlay;
 mod tab;
 #[cfg(test)]
 mod tests;
@@ -26,14 +27,23 @@ impl Plugin for Litematica {
             version: env!("CARGO_PKG_VERSION").into(),
             api: API_VERSION,
             default_enabled: true,
-            permissions: vec![Permission::ReadGameFiles {
-                under: FOLDER.into(),
-            }],
+            permissions: vec![
+                Permission::ReadGameFiles {
+                    under: FOLDER.into(),
+                },
+                Permission::ReadGameFiles {
+                    under: "config/litematica".into(),
+                },
+            ],
             settings: Vec::new(),
         }
     }
 
     fn instance_tab(&self) -> Option<&dyn InstanceTab> {
+        Some(self)
+    }
+
+    fn overlay_provider(&self) -> Option<&dyn lumilio_plugin_api::map::OverlayProvider> {
         Some(self)
     }
 }

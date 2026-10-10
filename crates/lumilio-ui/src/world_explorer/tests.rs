@@ -27,6 +27,57 @@ fn zoom_keeps_pointer_world_coordinate_and_lod_uses_fourfold_steps() {
 }
 
 #[gpui::test]
+fn route_and_measure_tools_follow_pointer_clicks(cx: &mut TestAppContext) {
+    let (view, cx) = rooted_map(cx, gpui_component::ThemeMode::Dark);
+    view.update(cx, |view, cx| {
+        view.context = Some(world_context());
+        cx.notify();
+    });
+    click(cx, "map-tools");
+    click(cx, "map-draw-route");
+    let center = cx.debug_bounds("world-map").unwrap().center();
+    let next = center + point(px(30.), px(40.));
+    cx.simulate_click(center, Modifiers::none());
+    cx.simulate_click(next, Modifiers::none());
+    view.read_with(cx, |view, _| {
+        assert!(view.routing);
+        assert_eq!(view.route_points.len(), 2);
+        assert!(
+            (lumilio_core::world_map::store::annotations::route_length(&view.route_points) - 200.)
+                .abs()
+                < 1.
+        );
+    });
+    if cx.debug_bounds("map-finish-route").is_none() {
+        click(cx, "map-tools");
+    }
+    assert!(cx.debug_bounds("map-finish-route").is_some());
+    click(cx, "map-measure");
+    cx.simulate_click(center, Modifiers::none());
+    cx.simulate_click(next, Modifiers::none());
+    view.read_with(cx, |view, _| {
+        assert!(!view.measure_mode);
+        assert!(view.measure_end.is_some());
+        assert!(view.route_points.is_empty());
+    });
+}
+
+#[test]
+fn annotation_link_waits_for_source_before_reporting_it_missing() {
+    let mut cells = objects::Objects::new(&["structure.village"]);
+    cells.layers.push(village_layer());
+    let context = world_context();
+    cells.update(&context, [-10., -10., 10., 10.], 1.);
+    assert!(!cells.link_missing("test.seed", "village:home"));
+    for request in cells.next(&context) {
+        assert!(cells.accept(request.generation, &request.key));
+        cells.store(request.key, vec![]);
+    }
+    assert!(cells.link_missing("test.seed", "village:home"));
+    assert!(cells.link_missing("plugin.gone", "anything"));
+}
+
+#[gpui::test]
 fn pointer_keyboard_and_dimension_controls_preserve_camera_and_reject_departed_tiles(
     cx: &mut TestAppContext,
 ) {
@@ -273,7 +324,13 @@ fn inline_seed_enter_and_blur_apply_without_map_stealing_typing(cx: &mut TestApp
     cx.update(|window, cx| input.update(cx, |input, cx| input.set_value("", window, cx)));
     cx.simulate_keystrokes("enter");
     cx.run_until_parked();
-    assert!(cx.debug_bounds("map-seed-error").is_some());
+    assert!(cx.debug_bounds("map-seed-error").is_none());
+    while let Ok(command) = commands.try_recv() {
+        assert!(
+            !matches!(command, Command::SaveSeed { .. }),
+            "empty drafts are not submitted"
+        );
+    }
 }
 
 fn saved_world(folder: &str, version: &str, seed: i64) -> WorldMapContext {
@@ -509,12 +566,14 @@ fn the_pop_out_key_sits_left_of_layers_and_hands_over_what_the_map_shows(cx: &mu
     });
     cx.run_until_parked();
     let key = cx.debug_bounds("map-pop-out").expect("the key");
+    let tools = cx.debug_bounds("map-tools").expect("the tools key");
     let layers = cx.debug_bounds("map-layers").expect("the layers key");
-    let gap = f32::from(layers.left() - key.right());
+    let gap = f32::from(tools.left() - key.right());
     assert!(
         (0. ..=12.).contains(&gap),
-        "a small gap, left of Layers: {gap}"
+        "a small gap, left of Tools: {gap}"
     );
+    assert!((0. ..=12.).contains(&f32::from(layers.left() - tools.right())));
     assert!((f32::from(key.center().y - layers.center().y)).abs() <= 1.);
     assert!(opened.borrow().is_empty());
 
@@ -694,6 +753,60 @@ fn ready_view(
     (view, cx, commands)
 }
 
+#[gpui::test]
+fn xaero_multiworld_choice_changes_tile_identity_without_moving_the_camera(
+    cx: &mut TestAppContext,
+) {
+    let (view, cx, commands) = ready_view(cx);
+    view.update(cx, |view, cx| {
+        let context = view.context.as_mut().unwrap();
+        context.sources = vec![
+            lumilio_plugin_api::map::SourceLink::XaeroWorldMap("World/null/mw$default".into()),
+            lumilio_plugin_api::map::SourceLink::XaeroWorldMap("World/null/mw$default_1".into()),
+        ];
+        view.providers.base_maps.push((
+            "lumilio.world-explorer".into(),
+            BaseMapInfo {
+                id: "xaero".into(),
+                kind_id: "map-base-xaero".into(),
+                dimensions: vec![Dimension::Overworld],
+                levels: vec![0],
+            },
+        ));
+        view.base = 1;
+        view.camera.x = 512.;
+        view.camera.z = -256.;
+        view.refresh();
+        cx.notify();
+    });
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("map-xaero-map").is_some());
+    assert_eq!(
+        view.read_with(cx, |view, _| view.base_status()),
+        Some(tr!("map-xaero-choose-map").to_string())
+    );
+    assert!(
+        !std::iter::from_fn(|| commands.try_recv().ok())
+            .any(|command| matches!(command, Command::Tile { .. }))
+    );
+    click(cx, "map-xaero-map");
+    click(cx, "map-xaero-map-option-1");
+    let tile = std::iter::from_fn(|| commands.try_recv().ok())
+        .find_map(|command| match command {
+            Command::Tile { request, .. } => Some(request.key),
+            _ => None,
+        })
+        .expect("selected map requests tiles");
+    assert_eq!(tile.base_map, "xaero@World/null/mw$default_1");
+    view.read_with(cx, |view, _| {
+        assert_eq!((view.camera.x, view.camera.z), (512., -256.));
+        assert_eq!(
+            view.xaero_map_choice().as_deref(),
+            Some("World/null/mw$default_1")
+        );
+    });
+}
+
 fn image(shade: u8) -> TileReply {
     TileReply::Image(lumilio_plugin_api::ImageData {
         width: 256,
@@ -830,6 +943,29 @@ fn icon_object(x: f64, z: f64, priority: i32) -> MapObject {
         share: None,
         editable: vec![],
     }
+}
+
+#[test]
+fn selection_source_follows_the_object_layer_not_the_base_map() {
+    let mut object = icon_object(18853., 11996., 5);
+    object.source = "lumilio.world-explorer".into();
+    object.label_id = Some("map-xaero-waypoint".into());
+    assert_eq!(
+        super::select::source_name_id(&object),
+        Some("map-source-xaero-waypoint")
+    );
+
+    object.label_id = Some("map-save-player".into());
+    assert_eq!(
+        super::select::source_name_id(&object),
+        Some("map-source-save")
+    );
+
+    object.label_id = Some("map-structure-village".into());
+    assert_eq!(
+        super::select::source_name_id(&object),
+        Some("map-source-seed")
+    );
 }
 
 fn world_context() -> WorldContext {
@@ -1106,9 +1242,17 @@ fn icons_arrive_through_a_live_connection_after_the_world_is_chosen(cx: &mut Tes
                             overlays: vec![],
                         },
                     ))),
-                    Command::LinkXaero { .. } | Command::Apply { .. } | Command::CanEdit => {
+                    Command::LinkXaero { .. }
+                    | Command::Apply { .. }
+                    | Command::CanEdit
+                    | Command::PutAnnotation { .. }
+                    | Command::RemoveAnnotation { .. } => {
                         continue;
                     }
+                    Command::Annotations { context } => Event::Annotations {
+                        context,
+                        result: Ok(vec![]),
+                    },
                     Command::Overlays { context } => Event::Overlays {
                         context,
                         layers: vec![village_layer()],

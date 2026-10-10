@@ -3,12 +3,154 @@ use std::io::Write;
 
 use lumilio_nbt::Tag;
 use lumilio_plugin_api::{
-    ActionId, Effect, FetchResponse, GameFacts, HostContext, InstanceTab, ModFact, PluginError,
-    SettingValue, TabState, View,
+    ActionId, Effect, FetchResponse, GameFacts, HostContext, InstanceTab, ModFact, Plugin,
+    PluginError, SettingValue, TabState, View,
 };
 
 use crate::format::{self, pack};
 use crate::{FOLDER, Litematica};
+
+#[test]
+fn placement_overlay_uses_world_config_and_schematic_region_bounds() {
+    use lumilio_plugin_api::map::{
+        Dimension, MapBounds, MapObjectKind, MapPoint, OverlayProvider, OverlayRequest,
+        WorldContext, WorldId,
+    };
+    let world = WorldId::Save {
+        instance: "i".into(),
+        folder: "New World".into(),
+    };
+    let context = WorldContext {
+        world: world.clone(),
+        version: None,
+        data_version: None,
+        seed: None,
+        dimension: Dimension::Overworld,
+        sources: vec![],
+    };
+    let config = serde_json::json!({
+        "placements": { "placements": [
+            {"name":"House", "enabled":true, "origin":[100,64,-20],
+             "rotation":"NONE", "mirror":"NONE", "bb_color":-65281,
+             "schematic":"/game/schematics/house.litematic",
+             "placements":[{"name":"main", "placement":{"pos":[2,0,3],
+                 "rotation":"NONE", "mirror":"NONE", "enabled":true}}]},
+            {"name":"Hidden", "enabled":false, "origin":[0,0,0],
+             "schematic":"/game/schematics/house.litematic"}
+        ]}
+    });
+    let ctx = Files(BTreeMap::from([
+        (
+            "config/litematica/litematica_New World_dim_minecraft_overworld.json".into(),
+            serde_json::to_vec(&config).unwrap(),
+        ),
+        (
+            "schematics/house.litematic".into(),
+            litematic("House", (2, 1, 3), &["minecraft:stone"], &[0; 6]),
+        ),
+    ]));
+    let request = OverlayRequest {
+        context,
+        overlay: "litematica.placements".into(),
+        bounds: MapBounds {
+            min: MapPoint { x: 0., z: -100. },
+            max: MapPoint { x: 200., z: 100. },
+        },
+        level: 0,
+    };
+    let objects = Litematica.objects(&ctx, &request).unwrap();
+    assert_eq!(objects.len(), 1);
+    assert_eq!(objects[0].label.as_deref(), Some("House"));
+    assert_eq!(objects[0].color, Some([255, 0, 255]));
+    assert_eq!(
+        objects[0].kind,
+        MapObjectKind::Polyline(vec![
+            MapPoint { x: 102., z: -17. },
+            MapPoint { x: 104., z: -17. },
+            MapPoint { x: 104., z: -14. },
+            MapPoint { x: 102., z: -14. },
+            MapPoint { x: 102., z: -17. },
+        ])
+    );
+    let mut outside = request;
+    outside.bounds = MapBounds {
+        min: MapPoint { x: -200., z: -200. },
+        max: MapPoint { x: -100., z: -100. },
+    };
+    assert!(Litematica.objects(&ctx, &outside).unwrap().is_empty());
+    assert!(Litematica.manifest().permissions.iter().any(|permission|
+        matches!(permission, lumilio_plugin_api::Permission::ReadGameFiles { under } if under == "config/litematica")));
+}
+
+#[test]
+#[ignore = "set LUMILIO_LITEMATICA_GAME to a local game folder with a saved placement"]
+fn local_placement_and_schematic_agree_on_subregion_names() {
+    use lumilio_plugin_api::map::{
+        Dimension, MapBounds, MapPoint, OverlayProvider, OverlayRequest, WorldContext, WorldId,
+    };
+    let game =
+        std::path::PathBuf::from(std::env::var("LUMILIO_LITEMATICA_GAME").expect("game folder"));
+    let name = "litematica_paranoid.modrinth.gg_dim_minecraft_overworld.json";
+    let mut config: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(game.join("config/litematica").join(name)).unwrap())
+            .unwrap();
+    let placements = config
+        .pointer_mut("/placements/placements")
+        .unwrap()
+        .as_array_mut()
+        .unwrap();
+    let first = placements.first_mut().unwrap();
+    first["enabled"] = serde_json::Value::Bool(true);
+    let schematic = first["schematic"]
+        .as_str()
+        .unwrap()
+        .replace('\\', "/")
+        .rsplit('/')
+        .next()
+        .unwrap()
+        .to_owned();
+    let ctx = Files(BTreeMap::from([
+        (
+            format!("config/litematica/{name}"),
+            serde_json::to_vec(&config).unwrap(),
+        ),
+        (
+            format!("schematics/{schematic}"),
+            std::fs::read(game.join("schematics").join(schematic)).unwrap(),
+        ),
+    ]));
+    let objects = Litematica
+        .objects(
+            &ctx,
+            &OverlayRequest {
+                context: WorldContext {
+                    world: WorldId::Server {
+                        instance: "test".into(),
+                        address: "paranoid.modrinth.gg".into(),
+                    },
+                    version: None,
+                    data_version: None,
+                    seed: None,
+                    dimension: Dimension::Overworld,
+                    sources: vec![],
+                },
+                overlay: "litematica.placements".into(),
+                bounds: MapBounds {
+                    min: MapPoint {
+                        x: -30_000_000.,
+                        z: -30_000_000.,
+                    },
+                    max: MapPoint {
+                        x: 30_000_000.,
+                        z: 30_000_000.,
+                    },
+                },
+                level: 0,
+            },
+        )
+        .unwrap();
+    assert!(!objects.is_empty());
+}
 
 struct Files(BTreeMap<String, Vec<u8>>);
 

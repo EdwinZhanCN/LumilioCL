@@ -108,14 +108,22 @@ EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
 USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+## Litematica — LGPL-3.0
+
+The placement corner transformation in
+`crates/lumilio-plugin-litematica/src/overlay.rs` is adapted from
+[maruohon/litematica](https://github.com/maruohon/litematica/blob/ornithe/1.12.2/src/main/java/litematica/schematic/placement/SchematicPlacement.java),
+`SchematicPlacement.getSelectionBoxForRegion`. Copyright Litematica contributors.
+The upstream license is [LGPL-3.0](https://github.com/maruohon/litematica/blob/ornithe/1.12.2/LICENSE.txt).
+
 ## XaeroTools — MIT License
 
 The Xaero Minimap file naming and waypoint field parsing in
 `crates/lumilio-plugin-world-explorer/src/xaero/` are adapted from
 [dekrom/xaerotools](https://github.com/dekrom/xaerotools) at
 `7bc650bdf445ec06d0d3fc0fb9e98ba4b86a6b83` (`crates/xaero-core/src/{naming,waypoints}.rs`).
-
-Copyright (c) 2026 Dek
+The World Map region decoder and its data model are used from the pinned
+`vendor/xaerotools/crates/xaero-core` source snapshot at the same commit.
 
 Copyright (c) 2026 Dek
 

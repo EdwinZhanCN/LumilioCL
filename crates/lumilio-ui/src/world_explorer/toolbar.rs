@@ -1,8 +1,9 @@
 use super::MapView;
 use crate::{key::Key, kit, theme, tr, tr_all};
-use gpui::{AnyElement, Context, div, prelude::*, px};
+use gpui::{AnyElement, ClipboardItem, Context, div, prelude::*, px};
 use gpui_component::{Sizable as _, h_flex, input::Input, select::Select, v_flex};
-use lumilio_plugin_api::map::{Dimension, WorldId};
+use lumilio_core::world_map::store::annotations::portal_coordinates;
+use lumilio_plugin_api::map::{Dimension, MapPoint, WorldId};
 
 impl MapView {
     /// The seed row above the map: what world the map shows.
@@ -72,16 +73,12 @@ impl MapView {
                     .child(version)
                     .children(world),
             )
-            .when_some(form.seed_error, |toolbar, error| {
+            .when_some(form.seed_error, |toolbar, _| {
                 toolbar.child(
                     div()
                         .debug_selector(|| "map-seed-error".into())
                         .text_xs()
-                        .child(if error == "map-seed-empty" {
-                            tr!("map-seed-empty")
-                        } else {
-                            tr!("map-seed-save-failed")
-                        }),
+                        .child(tr!("map-seed-save-failed")),
                 )
             })
             .into_any_element()
@@ -134,15 +131,20 @@ impl MapView {
             .collect();
         let target = cx.weak_entity();
         // ia[plugin.world-explorer]: 选择底图 | 地图右上角 · 底图标签 | 单选；保留相机与维度，清除旧帧并取消旧底图请求
-        kit::tabs("map-base", &labels, self.base, move |index, _, cx| {
+        let bases = kit::tabs("map-base", &labels, self.base, move |index, _, cx| {
             let _ = target.update(cx, |this, cx| {
                 this.base = index;
                 this.reset_view();
                 this.refresh();
                 cx.notify();
             });
-        })
-        .into_any_element()
+        });
+        h_flex()
+            .gap_2()
+            .items_center()
+            .child(bases)
+            .children(self.xaero_map_picker(cx))
+            .into_any_element()
     }
 
     /// The cursor's world position in the bottom-left corner. Clicking it
@@ -161,6 +163,26 @@ impl MapView {
                 .on_click(cx.listener(|this, _, window, cx| this.open_jump(window, cx)))
                 .into_any_element();
         }
+        let portal = form
+            .jump_x
+            .read(cx)
+            .value()
+            .trim()
+            .parse::<f64>()
+            .ok()
+            .zip(form.jump_z.read(cx).value().trim().parse::<f64>().ok())
+            .and_then(|(x, z)| {
+                self.context.as_ref().and_then(|context| {
+                    portal_coordinates(MapPoint { x, z }, &context.dimension).map(|coords| {
+                        let target = if context.dimension == Dimension::Overworld {
+                            Dimension::Nether
+                        } else {
+                            Dimension::Overworld
+                        };
+                        (coords, target)
+                    })
+                })
+            });
         // ia[plugin.world-explorer]: 前往坐标 | 地图左下角 · X、Z 两个输入框与「前往」键 | 点「前往」或在任一框按 Enter 把视图中心移到该点并收回读数；Esc 取消；X 或 Z 无法读取时在框上说明，视图不动
         v_flex()
             .gap_1()
@@ -210,6 +232,46 @@ impl MapView {
                         .child(tr!("map-coordinates-invalid")),
                 )
             })
+            .children(portal.map(|((x, z), target)| {
+                // ia[plugin.world-explorer]: 输入坐标换算下界 | 地图左下角 · 坐标跳转输入下的换算行 | 输入 X、Z 后显示 8:1 坐标；可复制或跳到另一维度
+                h_flex()
+                    .gap_2()
+                    .items_center()
+                    .child(
+                        div()
+                            .text_xs()
+                            .child(tr!("map-portal-coordinates", x = x, z = z)),
+                    )
+                    .child(
+                        Key::new("map-jump-copy-portal")
+                            .label(tr!("map-copy-portal"))
+                            .white()
+                            .compact()
+                            .on_click(cx.listener(move |_, _, _, cx| {
+                                cx.write_to_clipboard(ClipboardItem::new_string(format!(
+                                    "{x} {z}"
+                                )));
+                            })),
+                    )
+                    .child(
+                        Key::new("map-jump-go-portal")
+                            .label(tr!("map-go-portal"))
+                            .white()
+                            .compact()
+                            .on_click(cx.listener(move |this, _, _, cx| {
+                                if let Some(context) = &mut this.context {
+                                    context.dimension = target.clone();
+                                }
+                                this.camera.x = x as f64;
+                                this.camera.z = z as f64;
+                                this.close_jump(cx);
+                                this.reset_view();
+                                this.context_changed();
+                                this.refresh();
+                                cx.notify();
+                            })),
+                    )
+            }))
             .into_any_element()
     }
 

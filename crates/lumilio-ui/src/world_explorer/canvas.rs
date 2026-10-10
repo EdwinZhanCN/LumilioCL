@@ -8,8 +8,9 @@
 //! bilinearly (our scene used nearest), and opacity is baked into a sprite's
 //! alpha because `paint_image` has no opacity parameter.
 use super::stats::{Stats, add};
-use gpui::{Bounds, Corners, Pixels, RenderImage, Window, fill, point, px};
+use gpui::{Bounds, Corners, PathBuilder, Pixels, RenderImage, Window, fill, point, px};
 use lumilio_map_render::{Camera, Grid, Sprite, Tile, scale_to};
+use lumilio_plugin_api::map::MapPoint;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::Ordering::Relaxed;
@@ -24,6 +25,48 @@ const TILES_KEPT: usize = 700;
 const SPRITES_KEPT: usize = 256;
 /// Grid lines drawn per axis, at most.
 const LINES: i64 = 600;
+
+/// Launcher routes are a small vector overlay above either map backend. This
+/// keeps their geometry at device resolution while the camera moves.
+pub(super) fn paint_routes(
+    window: &mut Window,
+    bounds: Bounds<Pixels>,
+    camera: super::camera::Camera,
+    routes: &[(Vec<MapPoint>, [u8; 3])],
+) {
+    let width = f64::from(bounds.size.width);
+    let height = f64::from(bounds.size.height);
+    let mut budget = 4096;
+    for (points, [r, g, b]) in routes {
+        if points.len() < 2 || budget == 0 {
+            continue;
+        }
+        let mut line = PathBuilder::stroke(px(2.));
+        for (index, at) in points.iter().enumerate() {
+            if budget == 0 {
+                break;
+            }
+            budget -= 1;
+            let x = (at.x - camera.x) / camera.scale + width / 2.;
+            let y = (at.z - camera.z) / camera.scale + height / 2.;
+            let position = point(
+                bounds.origin.x + px(x as f32),
+                bounds.origin.y + px(y as f32),
+            );
+            if index == 0 {
+                line.move_to(position);
+            } else {
+                line.line_to(position);
+            }
+        }
+        if let Ok(path) = line.build() {
+            window.paint_path(
+                path,
+                gpui::rgba(u32::from(*r) << 24 | u32::from(*g) << 16 | u32::from(*b) << 8 | 0xDF),
+            );
+        }
+    }
+}
 
 /// What to paint in one frame, in the same terms as the wgpu scene: tile and
 /// camera positions in blocks, sprites and the viewport in logical pixels.

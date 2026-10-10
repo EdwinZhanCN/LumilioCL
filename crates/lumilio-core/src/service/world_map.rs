@@ -1,10 +1,63 @@
 use super::{LauncherService, ServiceError};
+use crate::world_map::store::annotations::{Annotation, AnnotationError};
 use crate::{CancellationToken, MapFailure, MapProviders, Transport, world_map};
 use lumilio_plugin_api::map::{
-    MapObject, OverlayInfo, OverlayRequest, TileReply, TileRequest, WorldContext,
+    Dimension, MapObject, OverlayInfo, OverlayRequest, TileReply, TileRequest, WorldContext,
+    WorldId,
 };
 
 impl<T: Transport + Clone> LauncherService<T> {
+    pub async fn map_annotations(
+        &self,
+        instance: &str,
+        world: &WorldId,
+        dimension: &Dimension,
+    ) -> Result<Vec<Annotation>, ServiceError> {
+        self.instance(instance).await?;
+        let (path, instance, world, dimension) = (
+            self.layout.database(),
+            instance.to_owned(),
+            world.clone(),
+            dimension.clone(),
+        );
+        tokio::task::spawn_blocking(move || {
+            world_map::store::annotations::list(&path, &instance, &world, &dimension)
+        })
+        .await
+        .map_err(std::io::Error::other)?
+        .map_err(|error| ServiceError::Io(std::io::Error::other(error)))
+    }
+
+    pub async fn put_map_annotation(
+        &self,
+        instance: &str,
+        annotation: Annotation,
+    ) -> Result<i64, ServiceError> {
+        self.instance(instance).await?;
+        let (path, instance) = (self.layout.database(), instance.to_owned());
+        tokio::task::spawn_blocking(move || {
+            world_map::store::annotations::put(&path, &instance, &annotation)
+        })
+        .await
+        .map_err(std::io::Error::other)?
+        .map_err(|error: AnnotationError| ServiceError::Io(std::io::Error::other(error)))
+    }
+
+    pub async fn remove_map_annotation(
+        &self,
+        instance: &str,
+        id: i64,
+    ) -> Result<bool, ServiceError> {
+        self.instance(instance).await?;
+        let (path, instance) = (self.layout.database(), instance.to_owned());
+        tokio::task::spawn_blocking(move || {
+            world_map::store::annotations::remove(&path, &instance, id)
+        })
+        .await
+        .map_err(std::io::Error::other)?
+        .map_err(|error: AnnotationError| ServiceError::Io(std::io::Error::other(error)))
+    }
+
     pub async fn map_contexts(
         &self,
         instance: &str,
@@ -22,6 +75,7 @@ impl<T: Transport + Clone> LauncherService<T> {
                 &mut contexts,
                 &instance,
                 &world_map::xaero::minimap_dirs(&dir),
+                &world_map::xaero::world_map_ids(&dir),
                 &links,
             );
             contexts.extend(

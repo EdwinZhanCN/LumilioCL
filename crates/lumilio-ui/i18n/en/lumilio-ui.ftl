@@ -1567,6 +1567,43 @@ map-clear-cache = Clear map cache
 map-cache-cleared = Map cache cleared
 map-base-seed = Seed prediction
 map-base-save = Save
+map-base-xaero = Xaero World Map
+map-xaero-choose-map = This dimension has multiple Xaero maps. Choose one beside the base map control.
+map-xaero-choose = Choose map
+map-xaero-needed = Link this world's Xaero map data before selecting this base map.
+map-xaero-region-too-large = The Xaero region file is too large to read.
+map-xaero-unsupported = This Xaero map format is not supported yet.
+map-portal-coordinates = Corresponding coordinates X {$x}  Z {$z}
+map-copy-portal = Copy
+map-go-portal = Go there
+map-annotation-marker = Marker
+map-annotation-route = Route
+map-annotation-name = Name
+map-annotation-color = Color
+map-annotation-invalid-name = Enter a name of up to 64 characters
+map-annotation-save-failed = Could not save the annotation. Try again.
+map-annotation-delete-title = Delete “{$name}”?
+map-add-marker = Add marker
+map-tools = Tools
+map-draw-route = Draw route
+map-finish-route = Finish route
+map-measure = Measure
+map-marker-hint = Click the map to place a marker
+map-route-hint = { $count ->
+    [one] 1 point selected; finish after at least two
+   *[other] {$count} points selected; finish after at least two
+  }
+map-measure-hint = Click two places to measure the distance
+map-measure-result = Distance: { $length ->
+    [one] 1 block
+   *[other] {$length} blocks
+  }
+map-route-length = Route length: { $length ->
+    [one] 1 block
+   *[other] {$length} blocks
+  }
+map-bookmark = Save marker
+map-annotation-link-missing = Linked object could not be found
 map-overworld = Overworld
 map-nether = Nether
 map-end = End
@@ -1593,7 +1630,6 @@ map-tile-failed = Some map data could not be loaded. Retry it with the button be
 map-seed = Seed
 map-seed-placeholder = A number or text seed
 map-version = Game version
-map-seed-empty = Enter a seed.
 map-seed-save-failed = Couldn't apply the seed. Try again.
 map-world = Saved world
 map-choose-world = Choose a saved world
@@ -1633,6 +1669,8 @@ map-structure-fortress = Nether fortress
 map-structure-bastion = Bastion remnant
 map-structure-end-city = End city
 map-group-world = World
+map-litematica-placements = Litematica placements
+map-litematica-unreadable = A Litematica placement or schematic file cannot be read.
 map-world-spawn = World spawn
 map-save-positions = Save positions
 map-save-spawn = World spawn (save)
@@ -1640,6 +1678,10 @@ map-save-player = Player
 map-world-slime = Slime chunks
 map-fine-layers-hidden = Slime chunks show only when zoomed in to 1 block per pixel.
 map-source-seed = Seed prediction
+map-source-xaero-waypoint = Xaero waypoints
+map-source-save = Save data
+map-source-litematica = Litematica placement
+map-source-launcher = Launcher marker
 map-selection-source = Source: { $source }
 map-copy-coordinates = Copy coordinates
 map-selection-close = Close

@@ -317,6 +317,18 @@ impl InstanceStore {
                 folder TEXT NOT NULL,
                 xaero_dir TEXT NOT NULL,
                 PRIMARY KEY (instance, folder)
+            );
+            CREATE TABLE IF NOT EXISTS world_map_annotations (
+                id INTEGER PRIMARY KEY,
+                instance TEXT NOT NULL,
+                world TEXT NOT NULL,
+                dimension TEXT NOT NULL,
+                kind TEXT NOT NULL CHECK (kind IN ('marker', 'route')),
+                name TEXT NOT NULL,
+                color INTEGER NOT NULL,
+                points TEXT NOT NULL,
+                linked_source TEXT,
+                linked_raw_id TEXT
             );",
         )?;
         // Schema 1 had no `tuning` column. Keep the old file beside the new
@@ -872,6 +884,10 @@ impl InstanceStore {
         )?;
         transaction.execute(
             "DELETE FROM world_map_links WHERE instance NOT IN (SELECT id FROM instances)",
+            [],
+        )?;
+        transaction.execute(
+            "DELETE FROM world_map_annotations WHERE instance NOT IN (SELECT id FROM instances)",
             [],
         )?;
         transaction.pragma_update(None, "user_version", SCHEMA_VERSION)?;

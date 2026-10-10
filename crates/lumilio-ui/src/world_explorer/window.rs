@@ -8,7 +8,7 @@ use crate::{key::Key, tr};
 use gpui::{App, Context, Entity, IntoElement, Render, Window, div, prelude::*, px};
 use gpui_component::{ActiveTheme as _, Icon, Sizable as _, TitleBar, v_flex};
 use lumilio_plugin_api::map::{Dimension, WorldContext, WorldId};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 
 /// What the person was looking at, so the map in its own window opens on the
@@ -19,6 +19,7 @@ pub struct MapHandoff {
     place: Option<(WorldId, Dimension)>,
     camera: Camera,
     base: usize,
+    xaero_maps: BTreeMap<(WorldId, Dimension), String>,
     chunks: bool,
     regions: bool,
     layers: BTreeSet<String>,
@@ -46,6 +47,7 @@ impl MapView {
                 .map(|context| (context.world.clone(), context.dimension.clone())),
             camera: self.camera,
             base: self.base,
+            xaero_maps: self.xaero_maps.clone(),
             chunks: self.layers.chunks,
             regions: self.layers.regions,
             layers: self.objects.enabled.clone(),
@@ -58,6 +60,7 @@ impl MapView {
     pub(super) fn restore(&mut self, handoff: MapHandoff) {
         self.camera = handoff.camera;
         self.base = handoff.base;
+        self.xaero_maps = handoff.xaero_maps;
         self.layers = Layers {
             chunks: handoff.chunks,
             regions: handoff.regions,

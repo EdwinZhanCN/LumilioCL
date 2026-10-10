@@ -78,6 +78,14 @@ fn preview(pixels: &[i32]) -> Option<(u32, Vec<u8>)> {
 }
 
 impl Litematic {
+    /// Signed region dimensions, as Litematica uses them to choose the far
+    /// corner relative to a sub-region placement origin.
+    pub fn region_size(&self, name: &str) -> Option<(i64, i64, i64)> {
+        let region = self.root.at(&["Regions", name])?;
+        let axis = |key| region.at(&["Size", key]).and_then(Tag::as_i64);
+        Some((axis("x")?, axis("y")?, axis("z")?))
+    }
+
     /// Block id → count across all regions, air excluded.
     pub fn materials(&self) -> Result<BTreeMap<String, u64>, String> {
         let mut counts = BTreeMap::new();
