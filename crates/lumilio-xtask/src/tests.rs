@@ -211,6 +211,22 @@ fn the_portable_zip_unpacks_into_one_folder() {
     );
 }
 
+#[test]
+fn inno_paths_strip_windows_verbatim_prefixes() {
+    assert_eq!(
+        windows::inno_path(Path::new(r"\\?\D:\a\LumilioCL\target\package")),
+        r"D:\a\LumilioCL\target\package"
+    );
+    assert_eq!(
+        windows::inno_path(Path::new(r"\\?\UNC\server\share\LumilioCL")),
+        r"\\server\share\LumilioCL"
+    );
+    assert_eq!(
+        windows::inno_path(Path::new(r"D:\a\LumilioCL\target\package")),
+        r"D:\a\LumilioCL\target\package"
+    );
+}
+
 mod block_colors {
     use crate::block_colors::*;
     use std::io::{Cursor, Write};

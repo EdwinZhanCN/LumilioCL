@@ -20,7 +20,7 @@
 - [x] 自动更新实现进入 0.1.0：正式版检查、校验下载、平台安装和重启入口；各安装方式的支持范围见 `auto-update.md` 和 ADR 0042
 - [x] 本机 macOS 打包演练（ad hoc 签名）：DMG 25 MB；Info.plist、`Assets.car`、签名验证和 SHA-256 都正确；从 DMG 复制出来的 app 能启动到首页
 - [ ] 在 Icon Composer 里检查 `AppIcon.icon` 的深色外观，以及 26 和 27 两代渲染
-- [ ] 提交并推送后，先手动跑一次 release 工作流演练（workflow_dispatch），确认 Windows 和 Linux 都能编译出包
+- [ ] 手动跑 release 工作流演练（workflow_dispatch），确认 Windows 和 Linux 都能编译出包。首次演练中 Windows 的 Rust 编译成功，但 ISCC 拒绝 `\\?\D:` 扩展路径前缀；已在传参边界做路径规范化，待 CI 重跑验收。
 - [x] 签名：维护者决定不签名。README（中英文）用最直白的话解释首次打开时的警告，并写明 macOS、Windows 上怎么放行
 - [ ] 打 `v0.1.0` 标签，等草稿 release 生成
 - [ ] 验收下载后的产物（PACKAGING.md §5 的五项），通过后发布

@@ -84,16 +84,12 @@ pub fn package(release: &Release, skip_build: bool) -> Result<Vec<PathBuf>> {
         ("NumericVersion", release.version.windows()),
         ("AppId", APP_ID.to_owned()),
         ("Homepage", HOMEPAGE.to_owned()),
-        ("SourceDir", payload.display().to_string()),
-        ("OutputDir", release.dist.display().to_string()),
+        ("SourceDir", inno_path(&payload)),
+        ("OutputDir", inno_path(&release.dist)),
         ("OutputBase", setup_base),
         (
             "IconFile",
-            release
-                .icons()
-                .join("windows/LumilioCL.ico")
-                .display()
-                .to_string(),
+            inno_path(&release.icons().join("windows/LumilioCL.ico")),
         ),
     ] {
         iscc.arg(format!("/D{name}={value}"));
@@ -102,10 +98,10 @@ pub fn package(release: &Release, skip_build: bool) -> Result<Vec<PathBuf>> {
         Some(signer) => {
             iscc.arg("/DSign");
             raw_arg(&mut iscc, &format!("\"/Slumilio={signer}\""));
-            iscc.arg(&script);
+            iscc.arg(inno_path(&script));
             run_labelled(&mut iscc, "iscc (signing the installer and uninstaller)")?;
         }
-        None => run(iscc.arg(&script))?,
+        None => run(iscc.arg(inno_path(&script)))?,
     }
     if !setup.is_file() {
         return Err(format!("Inno Setup did not write {}", setup.display()));
@@ -114,6 +110,17 @@ pub fn package(release: &Release, skip_build: bool) -> Result<Vec<PathBuf>> {
         eprintln!("warning: unsigned; SmartScreen will warn on first run");
     }
     Ok(vec![setup, portable])
+}
+
+/// Inno Setup does not accept Windows' extended-length path prefix.
+pub(super) fn inno_path(path: &Path) -> String {
+    let path = path.to_string_lossy();
+    let path = path.as_ref();
+    if let Some(unc_path) = path.strip_prefix(r"\\?\UNC\") {
+        format!(r"\\{unc_path}")
+    } else {
+        path.strip_prefix(r"\\?\").unwrap_or(path).to_owned()
+    }
 }
 
 /// The signing command for one file. It runs through `cmd` so the configured
