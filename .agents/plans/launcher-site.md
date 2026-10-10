@@ -13,7 +13,7 @@ GitHub Release 反向代理。页面用启动器自己的设计语言（铝面�
 - In：`web/` 下的 Astro + React 站点（i18n 结构，先只写中文）；首屏「logo 面板」探索视窗；视差与横向滚动
   （版块之间不做滚动吸附，维护者试过，手感别扭）；下载区；Worker 的 `/releases/*` 镜像；部署 workflow。
 - Out：截图、GIF 和视频素材（维护者提供，页面留占位与注释）；英文文案；`/plugins/*`
-  （`wasm-plugin-registry.md` 的 T6 (b)(c)）；启动器内的自动更新（`release-0-1-0.md`，参考 Zed）。
+  （`wasm-plugin-registry.md` 的 T6 (b)(c)）；启动器内的自动更新（`auto-update.md`）。
 
 ## 决定
 
@@ -38,7 +38,7 @@ GitHub Release 反向代理。页面用启动器自己的设计语言（铝面�
   原生技术层（分层展开的视差）、路线图、下载区、页脚。实测数据在 `web/src/data/benchmark.ts`，
   文件头写着重测方法；发新版本后要重测并更新。
 - [x] S4：Worker 反代与测试；静态资源与反代合一的 `wrangler.jsonc`。
-- [ ] S5：`ci.yml` 排除 `web/**`、`web.yml` 检查与部署（已写）；仓库加 `CLOUDFLARE_API_TOKEN`、
+- [x] S5：`ci.yml` 排除 `web/**`、`web.yml` 检查与部署（已写）；仓库加 `CLOUDFLARE_API_TOKEN`、
   `CLOUDFLARE_ACCOUNT_ID` 两个 secret，首次 `wrangler deploy` 绑定 `launcher.lumilio.org`（维护者做）。
 - [ ] S6：维护者补截图与 GIF，按 `TODO(asset)` 注释替换占位；og:image。
 
