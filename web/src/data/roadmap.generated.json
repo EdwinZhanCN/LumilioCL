@@ -1,0 +1,37 @@
+{
+  "_generated": "lumilio-docgen plans generate; edit .agents/plans/*.json",
+  "items": [
+    {
+      "id": "release-0-1-0",
+      "planId": "release-0-1-0",
+      "name": "首个版本",
+      "lede": "三个平台的安装包，自带自动更新。",
+      "version": "0.1.0",
+      "status": "in_progress"
+    },
+    {
+      "id": "appearance",
+      "planId": "appearance",
+      "name": "主题与外观",
+      "lede": "更多主题，界面字体与字号。",
+      "version": "0.1.1",
+      "status": "proposed"
+    },
+    {
+      "id": "discover-translation",
+      "planId": "discover-translation",
+      "name": "发现页翻译",
+      "lede": "简介和更新日志翻译成界面语言。",
+      "version": "0.2.0",
+      "status": "proposed"
+    },
+    {
+      "id": "wasm-plugin-registry",
+      "planId": "wasm-plugin-registry",
+      "name": "社区插件",
+      "lede": "WASM 插件和可审核的插件目录。",
+      "version": "0.3.0",
+      "status": "proposed"
+    }
+  ]
+}

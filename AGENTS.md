@@ -8,9 +8,11 @@ launcher; the documents below serve that goal and never outrank it.
 
 1. **core does not depend on UI.** `lumilio-core` never depends on `gpui`, `gpui-kit`, or `gpui-component`. Domain
    logic stays independently testable. This is the insurance against UI framework churn.
-2. **`3rd-party/` is read-only**: never modify, move or delete anything under it.
+2. **Reference sources stay separate.** Read upstream repositories at their published
+   URLs; do not require untracked local clones. Maintained dependencies live in
+   the Git-tracked `forks/` and `vendor/` directories.
 3. **Adapted code keeps its attribution.** Code taken or adapted from upstream carries a comment
-   naming the source path and its license notice (ADR 0011, 0022). Respect files under a
+   naming the source path and its license notice. Respect files under a
    different license, never copy Modrinth branding, and adapt to Rust and our crate boundaries
    instead of porting mechanically.
 4. **Closed verification loop.** A code change is handed off only after `just check` passes.
@@ -19,14 +21,15 @@ launcher; the documents below serve that goal and never outrank it.
 ## Verification
 
 The `justfile` is the single source of truth for checks; Code CI (`.github/workflows/ci.yml`) runs
-`just ci` for eligible code changes on `main` and pull requests (ADR 0026); path filters exclude
-most Markdown and `.agents/**` changes. The website has a separate `web.yml` workflow. There are
+`just ci` for eligible code changes on `main` and pull requests; path filters exclude
+most Markdown and `.agents/**` changes. `plans.yml` runs `just docs` for plan inputs,
+schema, projections and harness changes. The website has a separate `web.yml` workflow. There are
 no git hooks.
 
 - **While iterating**: only what the change touches (skill `lumilio-select-checks`), e.g.
   `just test-pkg lumilio-ui project_detail`.
 - **Docs and harness only** (`docs/**`, `.agents/**`, `*.md`): run `just docs` locally.
-  The code CI workflow does not generally run on Markdown- or harness-only changes.
+  Plan/harness inputs and generated plan output are also checked by `plans.yml`.
 - **Before handing off a code change**: `just check` (build → test → clippy → fmt, in that order).
 
 Green checks do not prove a UI change looks right: state what the tests verified and what still
@@ -36,16 +39,16 @@ needs eyes.
 
 - **What the launcher does today**: the generated user paths in `docs/ia/paths/`, then the code.
 - **How others do it**: read the upstream source directly.
-  - `3rd-party/modrinth`: Modrinth App. `packages/app-lib` is a Rust launcher backend, the first
+  - [Modrinth App](https://github.com/modrinth/code): `packages/app-lib` is a Rust launcher backend, the first
     place to look for how something is built (auth, Java runtimes, instances, modpacks,
     processes); `packages/daedalus` covers version metadata.
-  - `3rd-party/HMCL`: HMCL (Java). The first place to look for feature breadth, platform quirks
+  - [HMCL](https://github.com/HMCL-dev/HMCL) (Java): the first place to look for feature breadth, platform quirks
     and edge cases.
-- **Why things are the way they are**: `.agents/decisions/`. **What is in flight**: `.agents/plans/`.
+- **Current plans, decisions and lessons**: `.agents/plans/*.json`.
   **What is wanted but not planned**: `.agents/plans/backlog.md`.
 - **How the UI looks, moves and speaks**: `docs/design-language.md` and `docs/design-patterns.md`.
 
-Don't write documents that restate the code or upstream; they go stale (ADR 0021).
+Don't write documents that restate the code or upstream; they go stale.
 
 ## Structure
 
@@ -80,19 +83,28 @@ Don't write documents that restate the code or upstream; they go stale (ADR 0021
   `Segments`. `SettingsDialog` `Choice` is only for a few short labels; long lists must
   remain reachable through a dropdown rather than overflowing a dialog.
 - A built user path is declared by a one-line comment at its code:
-  `// ia[page]: 操作 | 层 / 组件 | 结果与反馈 [| 备注]` (ADR 0019, 0021; skill `lumilio-ia-paths`).
+  `// ia[page]: 操作 | 层 / 组件 | 结果与反馈 [| 备注]` (skill `lumilio-ia-paths`).
   `just ia` regenerates `docs/ia/paths/`, and `cargo test` fails
   while it is stale.
 
 ## Plans and decisions
 
-- Multi-step or multi-session work gets a plan in `.agents/plans/<slug>.md`, and the plan
-  exists only while the work is active. When it finishes, condense it into the next decision
-  record if it made a choice worth explaining, and delete it either way (skill
-  `lumilio-exec-plan`). At session start, read the `in_progress` plans.
-- Code cites `ADR NNNN`, never a plan. Older "plan NNNN" citations resolve through
-  `.agents/decisions/plan-history.md`.
-- An ADR records a decision; it is not a permission gate. Nothing needs an ADR before it is built.
+- Multi-step or multi-session work gets `.agents/plans/<slug>.json` (skill
+  `lumilio-exec-plan`). Read relevant `in_progress` JSON plans at session start.
+  Track acceptance, decisions and lessons there; record outcome and retain completed
+  or cancelled JSON. Small Issue/PR fixes need no plan.
+- JSON is authoritative; `just plans` generates read-only `docs/plans/*.md` and
+  the website's whitelisted roadmap. `just plans-check` rejects stale output.
+  Completed does not mean released.
+- Code may cite stable plan IDs or long-lived design/API contracts. Decisions belong in
+  `decisions`, escaped failures and their guards in `lessonsLearned` within the JSON plan.
+- Do not create standalone ADRs, postmortems, legacy/archive directories or historical
+  mapping tables. Removed material is available in Git history when needed.
+  A decision record is not a permission gate.
+- Refer to anyone executing project work as `Project Maintainer`. Use repository-relative,
+  Git-tracked paths or published upstream URLs in durable records; omit personal names,
+  machine-specific paths and dependencies on private local tools. Preserve license
+  attribution, public repository identifiers and documented runtime path examples.
 
 ## Skills (`.agents/skills/`)
 
@@ -105,7 +117,7 @@ Don't write documents that restate the code or upstream; they go stale (ADR 0021
 - `lumilio-i18n`: put launcher text in the language catalogs (`tr!`) and fill the English one.
 - `lumilio-motion-design`: apply the design language to UI, motion, copy or world-scene changes.
 
-Escaped failures are written up in `.agents/postmortems/`.
+Escaped failures and their guards go in the plan's `lessonsLearned`.
 
 ## Hardening
 

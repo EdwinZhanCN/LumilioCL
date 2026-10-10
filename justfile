@@ -41,6 +41,13 @@ test-pkg pkg *filter:
 ia:
     cargo run -p lumilio-docgen -- ia
 
+# Generate the retained plans and explicitly public roadmap projection.
+plans:
+    cargo run -p lumilio-docgen -- plans generate
+
+plans-check:
+    cargo run -p lumilio-docgen -- plans check
+
 # Rewrite the list of Chinese string literals still in UI and app code
 # (crates/lumilio-ui/src/i18n/hardcoded.txt), which may only shrink, and run
 # the other catalog tests (parsing, ids and arguments) with it.
@@ -57,12 +64,15 @@ release-check *tag:
 
 # The website and release mirror in web/ (pnpm): types, Worker tests, build.
 web:
-    pnpm --dir web install --frozen-lockfile
-    pnpm --dir web check
-    pnpm --dir web test
-    pnpm --dir web build
+    cd web && pnpm install --frozen-lockfile
+    cd web && pnpm check
+    cd web && pnpm test
+    cd web && pnpm build
 
 # Cheap check for docs/harness changes: IA is current, attributions are right.
 docs:
     cargo test -p lumilio-docgen
+    # Workspace feature unification must not change generated JSON bytes.
+    cargo test -p lumilio-docgen --lib --features serde_json/preserve_order plans::
+    just plans-check
     cargo fmt --check

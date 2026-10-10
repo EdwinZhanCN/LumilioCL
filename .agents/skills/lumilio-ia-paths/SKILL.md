@@ -9,8 +9,7 @@ description: Use when adding, changing or removing anything a person can do on a
 
 User paths (what a person can click, drop, type or choose, and what happens) are
 not written in documents. The comment at the code that implements the path is the
-only source; `lumilio-docgen` turns the comments into `docs/ia/paths/<page>.md`
-(ADR 0019). A path is in the generated table if and only if its comment exists,
+only source; `lumilio-docgen` turns the comments into `docs/ia/paths/<page>.md`. A path is in the generated table if and only if its comment exists,
 so every row means "built".
 
 ## The comment
@@ -26,7 +25,7 @@ Three fields separated by `|`, plus an optional fourth:
 | 操作 | What the person does, in the words of the screen. Unique within the page |
 | 层 / 组件 | Where it is: the layer (L1–L6, `docs/design-language.md` §7) and the control |
 | 结果与反馈 | What happens, including the feedback and the failure behaviour worth knowing |
-| 备注 (optional) | A caveat, an ADR, or a limit ("运行中禁用") |
+| 备注 (optional) | A caveat, a plan reference, or a limit ("运行中禁用") |
 
 No `|` inside a field. Page keys are the `PAGES` table in
 `crates/lumilio-docgen/src/lib.rs`: `navigation`, `home`, `library`, `discover`,

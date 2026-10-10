@@ -24,8 +24,7 @@ them to manufacture a clean baseline.
 
 ## Evidence map
 
-Every command here is a `justfile` recipe, the single source of truth that CI also runs
-(ADR 0026).
+Every command here is a `justfile` recipe, the single source of truth that CI also runs.
 
 | Diff area | While iterating | Before handoff |
 | --- | --- | --- |
@@ -35,7 +34,8 @@ Every command here is a `justfile` recipe, the single source of truth that CI al
 | `crates/lumilio-app/**` | `cargo check -p lumilio-app` | `just check` |
 | workspace manifests/toolchain, `justfile`, `.github/**` | `cargo metadata --no-deps` | `just check` |
 | `docs/**`, `AGENTS.md`, `.agents/**`, `*.md` only | link/path review | `just docs` (seconds); no full loop |
-| `3rd-party/**` | none — the tree is read-only | Do not modify, move, or delete it |
+| `.agents/plans/*.json`, `.agents/schemas/**`, `docs/plans/**` | `just plans`, then `just plans-check` | `just docs`; `just web` if public roadmap changes |
+| `web/**` | `just web` | `just web`; generated roadmap changes also require `just docs` |
 
 Focused checks are not a substitute for `just check` on a code change. Report only
 recipes that actually ran, and name anything skipped. CI repeats `just ci` after push;

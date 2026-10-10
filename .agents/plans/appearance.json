@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "id": "appearance",
+  "title": "主题与外观后续验收",
+  "summary": "主题、字体与界面缩放已实现；保留网站原 0.1.1 目标关联，完成来源核实与版本验收。目标版本不代表已经发布。",
+  "status": "proposed",
+  "visibility": "public",
+  "scope": {
+    "included": [
+      "核实主题来源与 window_background 契约，验收已有主题、字体和缩放。"
+    ],
+    "excluded": [
+      "间距密度、Gruvbox、Tokyo Night、Mica 仍留 backlog，未排期。"
+    ]
+  },
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "核实并验收主题、字体与缩放",
+      "status": "proposed",
+      "acceptance": "核实 window_background 键与 Rosé Pine 色值；完成外观实机验收并记录结果。"
+    }
+  ],
+  "validation": [
+    {
+      "criterion": "来源核实、外观实机验收及适用的 just check 通过。",
+      "result": null
+    }
+  ],
+  "references": [
+    ".agents/plans/backlog.md"
+  ],
+  "dependencies": [],
+  "roadmap": {
+    "enabled": true,
+    "id": "appearance",
+    "name": "主题与外观",
+    "lede": "更多主题，界面字体与字号。",
+    "targetVersion": "0.1.1",
+    "order": 10
+  }
+}

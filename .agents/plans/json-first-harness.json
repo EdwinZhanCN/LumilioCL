@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "id": "json-first-harness",
+  "title": "JSON-first Agent Harness 与公开 Roadmap",
+  "summary": "将计划迁移为可验证、可保留、可投影的 JSON 生命周期记录。JSON 是唯一可编辑数据源；Markdown 与网站 Roadmap 是确定性生成物。决策与事故教训写入 JSON；移除独立 ADR、Postmortem、Legacy Plan 和旧入口，历史材料仅从 Git 查看。小修复不强制写计划。",
+  "status": "completed",
+  "visibility": "internal",
+  "scope": {
+    "included": [
+      "版本化 JSON 计划、Rust 验证与确定性投影、现有计划迁移、网站 Roadmap 与 harness/CI 原子切换。"
+    ],
+    "excluded": [
+      "产品架构改动、WASM 实现、发布日期承诺。"
+    ]
+  },
+  "tasks": [
+    {
+      "id": "P1",
+      "title": "P1 — Schema + reference examples：定义 v1 Schema、合法/非法 fixture、字段语义；覆盖重复 ID、未知 status、缺少验收条件、无效关联。根据实际任务决定是显式 JSON Schema 校验库还是 Rust 强类型验证，但必须由 CLI 和 CI 执行校验，不只是提供 schema 文件。",
+      "status": "completed",
+      "acceptance": "P1 — Schema + reference examples：定义 v1 Schema、合法/非法 fixture、字段语义；覆盖重复 ID、未知 status、缺少验收条件、无效关联。根据实际任务决定是显式 JSON Schema 校验库还是 Rust 强类型验证，但必须由 CLI 和 CI 执行校验，不只是提供 schema 文件。"
+    },
+    {
+      "id": "P2",
+      "title": "P2 — Generator：优先扩展 `crates/lumilio-docgen` 或拆出独立清晰模块，实现 `plans validate`、`plans generate`、`plans check`；确定性从 JSON 生成 `docs/plans/*.md` 和 `web/src/data/roadmap.generated.json`，固定顺序，UTF-8，跳过私有字段；输出头部标记不可手改。必要时给 `justfile` 增加 `plans`/`plans-check`，并让 `just docs` 覆盖检查。",
+      "status": "completed",
+      "acceptance": "P2 — Generator：优先扩展 `crates/lumilio-docgen` 或拆出独立清晰模块，实现 `plans validate`、`plans generate`、`plans check`；确定性从 JSON 生成 `docs/plans/*.md` 和 `web/src/data/roadmap.generated.json`，固定顺序，UTF-8，跳过私有字段；输出头部标记不可手改。必要时给 `justfile` 增加 `plans`/`plans-check`，并让 `just docs` 覆盖检查。"
+    },
+    {
+      "id": "P3",
+      "title": "P3 — Site integration：`web/src/components/Sections.astro` 从生成的 JSON 消费公开 Roadmap；本地化文案可以保留在站点目录，但与 Plan 同一事实不能手写双份。Logo 三个灰格是固定位置的 curated teaser，引用稳定 Plan/roadmap ID 而不是直接映射任意数量的计划。现有 `0.1.1 / 0.2.0 / 0.3.0` 文案须逐条与计划关联后再切换；发布版本仍来自真实 Release。",
+      "status": "completed",
+      "acceptance": "P3 — Site integration：`web/src/components/Sections.astro` 从生成的 JSON 消费公开 Roadmap；本地化文案可以保留在站点目录，但与 Plan 同一事实不能手写双份。Logo 三个灰格是固定位置的 curated teaser，引用稳定 Plan/roadmap ID 而不是直接映射任意数量的计划。现有 `0.1.1 / 0.2.0 / 0.3.0` 文案须逐条与计划关联后再切换；发布版本仍来自真实 Release。"
+    },
+    {
+      "id": "P4",
+      "title": "P4 — Migration：迁移 active/proposed 计划为 JSON，未排期点子保留在 backlog 或候选计划；移除独立 ADR、Postmortem、Legacy Plan 和旧 Markdown 入口。",
+      "status": "completed",
+      "acceptance": "JSON 保留任务与决策；旧体系目录和跳转入口全部删除，不创建归档或历史映射表。"
+    },
+    {
+      "id": "P5",
+      "title": "P5 — Harness switch：更新 AGENTS.md、目录入口与技能，统一创建 → 跟踪 → 验证 → outcome → 保留 JSON。",
+      "status": "completed",
+      "acceptance": "入口和技能只维护 JSON 生命周期，历史材料从 Git 查看。"
+    },
+    {
+      "id": "P6",
+      "title": "P6 — CI verification：`.github/workflows/ci.yml` 继续检查 Rust；另加对 `.agents/plans/**/*.json`、Schema、生成器、`docs/plans/**`、Roadmap 生成文件及相关工具改动触发的验证工作流，确保 docs-only PR 也有自动检查。测试生成可重复、过时 Markdown 检测、私有信息不会泄漏、无效 Schema/状态会阻止合并，并对 `just web` 做回归验证。",
+      "status": "completed",
+      "acceptance": "P6 — CI verification：`.github/workflows/ci.yml` 继续检查 Rust；另加对 `.agents/plans/**/*.json`、Schema、生成器、`docs/plans/**`、Roadmap 生成文件及相关工具改动触发的验证工作流，确保 docs-only PR 也有自动检查。测试生成可重复、过时 Markdown 检测、私有信息不会泄漏、无效 Schema/状态会阻止合并，并对 `just web` 做回归验证。"
+    }
+  ],
+  "validation": [
+    {
+      "criterion": "新建一个 proposed JSON Plan，生成可读的 GitHub Markdown，并能更新任务状态、添加验收记录和 outcome；标记 completed 后源 JSON 不被删除。",
+      "result": "lifecycle_is_retained_deterministic_and_staleness_fails 已验证创建、更新、验收、outcome 与完成后保留 JSON。"
+    },
+    {
+      "criterion": "相同输入运行两次，生成字节一致；手改生成文件或源字段无效时 `plans check` 失败。",
+      "result": "生成器测试覆盖重复生成字节一致、手改 Markdown/Roadmap、孤立输出及无效源字段；CLI generate/check 通过。"
+    },
+    {
+      "criterion": "`visibility: internal`、`roadmap.enabled: false` 的项目不会进入 `web/src/data/roadmap.generated.json`；任何内部决策细节都不能通过嵌套字段意外泄漏。",
+      "result": "projection_is_a_whitelist_and_visibility_is_independent 覆盖 internal、disabled、cancelled 与精确六字段白名单。"
+    },
+    {
+      "criterion": "网站 Roadmap 和 Logo 固定灰格都能从有效计划读到各自需要的数据；公开计划不能被误标为“已发布”。",
+      "result": "just web：Astro 零错误、10 项测试通过、构建成功。Safari 检查路线图与外观灰格；发布标识使用构建取得的真实 Release。仅目视检查当前系统亮色外观，布局与动效沿用既有实现。"
+    },
+    {
+      "criterion": "`just docs`、`just web` 与 `just check` 在适当阶段验证通过；独立 Plan CI 在只改 `.agents/plans/**` 的 PR 也执行。",
+      "result": "2026-10-10：just docs（包含默认配置与 serde_json/preserve_order）、just web（Astro 零错误、10 项测试、构建）、just check（build → test → clippy → fmt）全部通过；独立 plans.yml 的 push/pull_request 路径 .agents/** 覆盖 JSON-only 变更。"
+    },
+    {
+      "criterion": "独立 ADR、Postmortem、Legacy Plan、旧 Markdown 跳转入口和历史映射表均已移除，新体系不引用已删除路径。",
+      "result": "2026-10-10：旧目录及七个 Markdown 跳转入口已删除；未创建 legacy/archive 或映射表。AGENTS、目录入口、技能和 JSON 引用已同步；删除路径扫描无匹配，just docs 与 git diff --check 通过。"
+    },
+    {
+      "criterion": "新 Agent 只靠 `AGENTS.md` + plan skill 能执行生命周期；小型 PR 不会被迫创建 JSON Plan。",
+      "result": "AGENTS.md 与 plan skill 指向 example、validate/generate/check、验证结果和 outcome，明确小型 Issue/PR 无计划门槛。"
+    }
+  ],
+  "references": [],
+  "dependencies": [],
+  "lessonsLearned": [
+    "serde_json::Value 的字段顺序受工作区 preserve_order feature 统一影响，曾使独立 docgen 新鲜度测试失败。改用显式 PublicRoadmap/PublicRoadmapItem 序列化；just docs 同时检查默认与 preserve_order 配置，防止生成字节漂移（crates/lumilio-docgen/src/plans/mod.rs、tests.rs、justfile）。",
+    "Corepack 在仓库根目录选择的默认 pnpm 与 web/package.json 锁定版本不符。just web 已改为在 web/ 运行 pnpm；普通 just web 无环境变量通过，版本由站点 packageManager 决定（justfile）。"
+  ],
+  "decisions": [
+    {
+      "id": "D1",
+      "decision": "以严格 serde v1 类型及语义规则执行契约，扩展 lumilio-docgen。",
+      "rationale": "复用现有 Rust/CI 边界，无额外服务或 Schema 校验运行时。",
+      "consequences": "Schema 提供公开结构说明；CLI 与测试执行 ID、关联、完成证据与输出新鲜度校验。"
+    },
+    {
+      "id": "D2",
+      "decision": "保留 JSON 生命周期记录；公开网站只读取显式白名单投影。",
+      "rationale": "保留可接续任务与决策，并避免内部验证/调研泄漏到网站。",
+      "consequences": "仅保留 JSON 与生成投影；独立历史记录和旧入口删除，历史材料从 Git 查看；completed 与实际 Release 分开。"
+    },
+    {
+      "id": "D3",
+      "decision": "外观已有主题、字体与缩放实现，新增 proposed appearance 候选计划关联网站 0.1.1 目标。",
+      "rationale": "保留稳定计划关联，并明确已有实现与待核实/验收的区别。",
+      "consequences": "未排期的密度、主题和 Mica 继续留 backlog；目标版本不代表实际发布。"
+    },
+    {
+      "id": "D4",
+      "decision": "按Project Maintainer要求直接移除旧独立记录体系，不维护归档或历史映射。",
+      "rationale": "个人项目历史可从 Git 查看，保持新体系简洁。",
+      "consequences": "决策和教训仅写入 JSON；历史编号不再提供工作区内兼容入口。"
+    }
+  ],
+  "outcome": "完成 JSON-first 迁移，保留七份迁移计划及一个外观候选计划。CLI、确定性投影、白名单 Roadmap、稳定 ID 灰格、技能与独立 CI 已落地；移除旧独立记录体系，历史内容由 Git 保留。completed 不代表 released。"
+}

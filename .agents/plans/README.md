@@ -1,56 +1,49 @@
-# plans/ — Active plans
+# Plans — retained JSON lifecycle
 
-Only work that is in progress or proposed lives here, plus [`backlog.md`](backlog.md)
-for ideas nobody has planned yet. Finished work leaves this folder (ADR 0021).
+Edit `<slug>.json` only. Stable `id` is independent of filename; preserve plan
+and task IDs. `backlog.md` holds unscheduled ideas. Small Issue/PR fixes need no plan.
 
-## Rules
+## Lifecycle
 
-- Filename: a slug, `kebab-case-goal.md`. No number: a plan gets a decision number
-  only if it becomes a decision record.
-- Write a plan for work that spans several steps or sessions. A local edit needs none.
-- Status is one line at the top: `proposed | in_progress`.
-- Keep it honest as you go: tick tasks, record what you learned, note open questions.
-- When upstream code informs the work, name the files (e.g.
-  `3rd-party/modrinth/packages/app-lib/src/api/jre.rs`) under **References**.
+`proposed → in_progress → completed`; `blocked` and `cancelled` record real
+interruptions. Completed means work and acceptance finished, never released.
+Keep JSON, including cancelled plans. Decisions and lessons go here. Long-lived
+cross-plan contracts belong in code/API/design documents with stable references.
 
-## When it finishes
+## Contract and commands
 
-1. If it contains a decision someone could later question, condense it into the next
-   `.agents/decisions/NNNN-*.md`: context, decision, consequences, and one line on
-   what shipped. Drop the task list and validation log.
-2. Delete the plan file. A pure refactor or a mechanical change just gets deleted.
-3. If it was abandoned, delete it too. Write a `rejected` decision if the reason
-   would save someone from trying again.
+- [v1 structural schema](../schemas/plan.schema.json)
+- [valid proposed example](../schemas/examples/proposed.json)
+- Invalid fixtures: [unknown status](../schemas/examples/invalid-status.json),
+  [missing acceptance](../schemas/examples/missing-acceptance.json); docgen tests
+  must reject both, and exercise duplicate IDs and invalid dependencies.
+- `cargo run -p lumilio-docgen -- plans validate`: strict typed v1 parsing plus
+  unique plan/task/decision/roadmap IDs, valid dependencies, nonempty acceptance,
+  and completion evidence.
+- `just plans`: generate `docs/plans/*.md` and `web/src/data/roadmap.generated.json`.
+- `just plans-check`: reject missing, edited or orphan generated output.
+- `just docs`: plan tests, freshness, existing IA checks and formatting.
 
-## Template
+Required: `schemaVersion: 1`, stable `id`, `title`, `summary`, `status`,
+`visibility`, `scope` (`included`/`excluded`), nonempty `tasks` and `validation`.
+Each task has `id`, `title`, `status`, observable `acceptance`. Each validation
+entry has `criterion` and optional `result`: null means pending; a result records
+evidence, not a command to run. Completed requires terminal tasks, all validation
+results and nonempty `outcome`.
 
-```markdown
-# <short goal>
+Optional `decisions` have `id`, `decision`, `rationale`, `consequences`;
+`references` are paths/URLs; `dependencies` are existing plan IDs;
+`lessonsLearned` records failures and linked guards; `outcome` states the result.
 
-- Status: proposed
+## Public boundary
 
-## Goal
+`visibility: internal` excludes website projection, not repository readers:
+generated Markdown includes internal fields. Never store credentials. Only
+`visibility: public` AND `roadmap.enabled: true` enters the website; cancelled
+plans are excluded. The whitelist is roadmap `id`, `planId`, `name`, `lede`,
+`version` and plan `status`, ordered by `roadmap.order` then plan ID. No nested
+tasks, decisions, references, validation or lessons are copied. `targetVersion`
+is a target, never a release or date. Logo positions use three curated IDs.
 
-<One paragraph: what will be true when this is done.>
-
-## Scope
-
-- In: …
-- Out: …
-
-## References
-
-- <upstream files, ADRs>
-
-## Tasks
-
-- [ ] T1: <verifiable unit>
-
-## Validation
-
-<Commands and acceptance; core logic has tests.>
-
-## Open questions
-
-- …
-```
+No standalone ADRs, postmortems, legacy/archive directories, Markdown redirects
+or historical mapping tables. Removed material remains available in Git history.

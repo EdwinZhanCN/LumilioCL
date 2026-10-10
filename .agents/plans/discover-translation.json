@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "id": "discover-translation",
+  "title": "发现页的免费机器翻译",
+  "summary": "发现页上的项目标题、简介、正文、图库说明、版本名称和更新日志，可以翻译成当前界面语言。翻译调用 SiliconFlow 上的免费翻译模型，密钥只进系统凭据库。默认关闭。失败、限流或未配置密钥时仍显示原文。这是启动器功能，不是插件。",
+  "status": "proposed",
+  "visibility": "public",
+  "scope": {
+    "included": [
+      "In：发现搜索结果和项目详情里给人读的文字；按界面语言翻译；磁盘缓存；密钥、开关和「显示原文」；限流与模型不可用时的明确状态。"
+    ],
+    "excluded": [
+      "Out：翻译启动器自己的界面、作者名、文件名、版本号、许可证 id、分类 id、日志和崩溃报告；自动改用付费模型；把正文用于模型训练。"
+    ]
+  },
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "T1：core 增加翻译客户端。请求只含待译文本和目标语言。解析失败、429、50505、网络失败各自返回原因。测试用脚本化服务器，不访问真实 SiliconFlow。",
+      "status": "proposed",
+      "acceptance": "T1：core 增加翻译客户端。请求只含待译文本和目标语言。解析失败、429、50505、网络失败各自返回原因。测试用脚本化服务器，不访问真实 SiliconFlow。"
+    },
+    {
+      "id": "T2",
+      "title": "T2：凭据库存密钥。设置页有开关、线路、密钥状态、清除缓存。开关默认关。模型 id 固定为 `tencent/Hunyuan-MT-7B`，不提供随意填写付费模型的框。",
+      "status": "proposed",
+      "acceptance": "T2：凭据库存密钥。设置页有开关、线路、密钥状态、清除缓存。开关默认关。模型 id 固定为 `tencent/Hunyuan-MT-7B`，不提供随意填写付费模型的框。"
+    },
+    {
+      "id": "T3",
+      "title": "T3：发现列表翻译 `title` 和 `description`。详情翻译 `body`、图库标题和说明、版本 `name` 与 `changelog`。每条能切回原文。缓存命中不再请求。",
+      "status": "proposed",
+      "acceptance": "T3：发现列表翻译 `title` 和 `description`。详情翻译 `body`、图库标题和说明、版本 `name` 与 `changelog`。每条能切回原文。缓存命中不再请求。"
+    },
+    {
+      "id": "T4",
+      "title": "T4：界面语言切换后使用对应缓存；没有缓存时重新请求。关闭开关立即回到原文，不删缓存。",
+      "status": "proposed",
+      "acceptance": "T4：界面语言切换后使用对应缓存；没有缓存时重新请求。关闭开关立即回到原文，不删缓存。"
+    }
+  ],
+  "validation": [
+    {
+      "criterion": "脚本化响应覆盖成功回填、条数不匹配、限流、过载和空密钥。",
+      "result": null
+    },
+    {
+      "criterion": "缓存测试证明相同原文不第二次出网，清除后会再请求。",
+      "result": null
+    },
+    {
+      "criterion": "诊断和日志夹具里不出现密钥。",
+      "result": null
+    },
+    {
+      "criterion": "作者名、文件名、版本号保持原文。",
+      "result": null
+    },
+    {
+      "criterion": "实机：用Project Maintainer自己的免费密钥打开一页英文项目，标题和简介变为中文，失败时卡片仍可打开。",
+      "result": null
+    }
+  ],
+  "references": [
+    "`crates/lumilio-plugin-api/src/content.rs`：`SearchHit`、`Project`、`GalleryImage`、`Version`",
+    "SiliconFlow Chat Completions：<https://docs.siliconflow.cn/cn/api-reference/chat-completions/chat-completions>",
+    "Hunyuan-MT-7B：<https://www.siliconflow.com/models/hunyuan-mt-7b>"
+  ],
+  "dependencies": [],
+  "lessonsLearned": [],
+  "roadmap": {
+    "enabled": true,
+    "id": "discover-translation",
+    "name": "发现页翻译",
+    "lede": "简介和更新日志翻译成界面语言。",
+    "targetVersion": "0.2.0",
+    "order": 20
+  }
+}

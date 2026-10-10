@@ -46,7 +46,7 @@ and supports Simplified Chinese and English.
 
 > [!NOTE]
 > Microsoft account sign-in is implemented. The application's Minecraft services registration
-> was approved, and the maintainer verified a real sign-in on October 7, 2026. Offline and
+> was approved, and the Project Maintainer verified a real sign-in on October 7, 2026. Offline and
 > third-party authentication accounts are also supported.
 
 ## Gallery
