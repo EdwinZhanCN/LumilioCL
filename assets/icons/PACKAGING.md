@@ -86,9 +86,10 @@
   - Linux：用最老支持发行版的容器，x64。
 - 发布产物必须带上：版本号、OS、架构、构建 commit，以及 SHA-256。文件名是 `LumilioCL-<version>-<os>-<arch>…`，commit 和签名状态写在每个包里的 `BUILD.txt`（macOS 还写进 Info.plist 的 `LumilioCLCommit`），校验和汇总为 `SHA256SUMS.txt`。
 - 推送 `v<version>` 标签触发发布，标签必须等于工作区版本（SemVer；带 `-` 的预发布版本标为 pre-release）。工作流只建草稿 release，验收通过后由人发布。
-- 验收必须针对下载后的产物，不是构建目录。检查五项：
+- 验收必须针对下载后的产物，不是构建目录。检查六项：
   1. 首次启动正常。
   2. 图标在各处显示正确。
-  3. 从 N 覆盖安装到 N+1 后，设置和快捷方式都还在。
+  3. 从 N 自动更新到 N+1 后（第一个版本用 rc 演练，见 `.agents/plans/auto-update.md`），设置和快捷方式都还在。
   4. 卸载后只留下用户数据。
   5. 签名和公证状态有效。
+  6. `just sign-release <tag>` 已签好 `update-stable.json`，用内置公钥自检通过。
