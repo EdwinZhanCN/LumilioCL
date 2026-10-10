@@ -133,7 +133,7 @@ impl AccountEntry {
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(default)]
 pub struct LauncherSettings {
     schema: u32,
@@ -160,8 +160,39 @@ pub struct LauncherSettings {
     pub download_concurrency: Option<u32>,
     /// Java installations the user turned off; they are never chosen.
     pub disabled_java: Vec<PathBuf>,
+    /// Whether the launcher checks for and downloads stable launcher updates.
+    #[serde(default = "auto_update_default")]
+    pub auto_update: bool,
     /// How the game starts, for every instance that does not override it.
     pub launch: LaunchTuning,
+}
+
+fn auto_update_default() -> bool {
+    true
+}
+
+impl Default for LauncherSettings {
+    fn default() -> Self {
+        Self {
+            schema: 0,
+            plugins: BTreeMap::new(),
+            default_max_memory_mb: None,
+            default_min_memory_mb: None,
+            extra_java_roots: Vec::new(),
+            mirrors: Vec::new(),
+            prefer_mirrors: false,
+            download_source: None,
+            accounts: Vec::new(),
+            auth_servers: Vec::new(),
+            selected_account: None,
+            current_instance: None,
+            preferences: Preferences::default(),
+            download_concurrency: None,
+            disabled_java: Vec::new(),
+            auto_update: true,
+            launch: LaunchTuning::default(),
+        }
+    }
 }
 
 impl Versioned for LauncherSettings {
@@ -326,6 +357,12 @@ impl SettingsStore {
         }
         let mut next = self.settings.clone();
         next.download_concurrency = count;
+        self.save(next)
+    }
+
+    pub fn set_auto_update(&mut self, enabled: bool) -> Result<(), SettingsError> {
+        let mut next = self.settings.clone();
+        next.auto_update = enabled;
         self.save(next)
     }
 

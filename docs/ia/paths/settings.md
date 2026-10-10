@@ -7,6 +7,8 @@
 | 操作 | 层 / 组件 | 结果与反馈 | 备注 | 实现 |
 |---|---|---|---|---|
 | 版本 | 关于 · 值 | 显示 LumilioCL 版本号 |  | `lumilio-ui/src/pages/settings/about.rs` |
+| 手动检查更新 | 关于 · 按键 | 检查正式版并显示进度、结果或失败原因 |  | `lumilio-ui/src/pages/settings/about.rs` |
+| 自动更新 | 关于 · 开关 | 开启时启动后与每小时静默检查并下载；关闭后只保留手动检查 |  | `lumilio-ui/src/pages/settings/about.rs` |
 | 启动器日志 | 关于 · 按键 | 在访达中显示日志目录 |  | `lumilio-ui/src/pages/settings/about.rs` |
 | 导出诊断包 | 关于 · 按键 | 打包版本、设置摘要、Java 列表和各游戏最近日志；玩家名、UUID、路径脱敏 |  | `lumilio-ui/src/pages/settings/about.rs` |
 | 开源许可 | 关于 · 值 | 显示 AGPL-3.0-only |  | `lumilio-ui/src/pages/settings/about.rs` |

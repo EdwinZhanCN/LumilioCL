@@ -22,6 +22,9 @@ use crate::release::{
 const INSTALLER_SCRIPT: &str = include_str!("../packaging/LumilioCL.iss");
 
 pub fn package(release: &Release, skip_build: bool) -> Result<Vec<PathBuf>> {
+    if skip_build {
+        return Err("Windows packages need separate installer and portable builds".to_owned());
+    }
     if !skip_build {
         release.build(&[])?;
     }
@@ -52,7 +55,23 @@ pub fn package(release: &Release, skip_build: bool) -> Result<Vec<PathBuf>> {
 
     let stem = release.stem("windows");
     let portable = release.dist_file(&format!("{stem}-portable.zip"))?;
-    zip_folder(&payload, APP_NAME, &portable)?;
+    release.build(&[("LUMILIO_UPDATE_EXPLANATION", "portable-windows")])?;
+    let portable_payload = stage.join("portable");
+    let portable_exe = portable_payload.join(format!("{BINARY}.exe"));
+    copy(&release.binary(), &portable_exe)?;
+    if let Some(signer) = &signer {
+        run_labelled(
+            &mut sign_command(signer, &portable_exe),
+            &format!("sign {}", portable_exe.display()),
+        )?;
+    }
+    copy(&release.license(), &portable_payload.join("LICENSE.txt"))?;
+    release.notices(&portable_payload)?;
+    write(
+        &portable_payload.join("BUILD.txt"),
+        release.build_info("windows", signature),
+    )?;
+    zip_folder(&portable_payload, APP_NAME, &portable)?;
 
     let script = stage.join("LumilioCL.iss");
     write(&script, INSTALLER_SCRIPT)?;

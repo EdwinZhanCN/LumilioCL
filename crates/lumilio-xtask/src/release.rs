@@ -95,6 +95,7 @@ impl Release {
             "-p",
             "lumilio-app",
         ]);
+        command.env_remove("LUMILIO_UPDATE_EXPLANATION");
         for (key, value) in env {
             command.env(key, value);
         }

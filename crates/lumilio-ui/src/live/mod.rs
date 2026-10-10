@@ -12,6 +12,7 @@ mod home;
 mod intent;
 mod library;
 mod settings;
+mod update;
 
 #[cfg(test)]
 mod tests;
@@ -40,6 +41,7 @@ pub use self::library::{
     library_cards, loader_label, relative_time, seed_of, world_of,
 };
 pub use self::settings::{JavaRow, SettingsView, settings_view};
+pub use self::update::{UpdateStatus, UpdateUnavailability};
 
 use self::activity::{RateSample, next_sample};
 use gpui::RenderImage;
@@ -82,6 +84,7 @@ pub struct LiveModel {
     /// so an account that has none is not asked for again and again.
     pub faces: HashMap<String, Option<Arc<RenderImage>>>,
     pub settings: Option<SettingsView>,
+    pub update_status: UpdateStatus,
 }
 
 impl Default for LiveModel {
@@ -107,6 +110,7 @@ impl Default for LiveModel {
             accounts_loaded: false,
             faces: HashMap::new(),
             settings: None,
+            update_status: UpdateStatus::default(),
         }
     }
 }

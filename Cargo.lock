@@ -4563,6 +4563,7 @@ dependencies = [
  "lumilio-plugin-modrinth",
  "lumilio-plugin-world-explorer",
  "lumilio-ui",
+ "lumilio-updater",
  "reqwest",
  "tempfile",
  "tokio",
@@ -4737,6 +4738,19 @@ dependencies = [
  "lumilio-skin-render",
  "raw-window-handle",
  "rust-embed",
+]
+
+[[package]]
+name = "lumilio-updater"
+version = "0.1.0"
+dependencies = [
+ "flate2",
+ "futures-util",
+ "reqwest",
+ "semver",
+ "sha2 0.11.0",
+ "tempfile",
+ "tokio",
 ]
 
 [[package]]

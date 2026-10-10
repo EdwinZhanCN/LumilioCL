@@ -2,7 +2,7 @@ use super::{LauncherShell, ShellIntent};
 use crate::home::{HomeIntent, ShellHomeColors};
 use crate::kit::{Emit, ViewIntent};
 use crate::live::{DiscoverChange, LiveIntent};
-use crate::navigation::Leading;
+use crate::navigation::{Leading, ReadyUpdate};
 use crate::project_detail::ProjectDetailView;
 use crate::route::Route;
 use crate::theme::ShellColors;
@@ -62,6 +62,20 @@ impl Render for LauncherShell {
                 can_forward: self.can_go_forward(),
                 on_back: Rc::new(move |window, cx| back(&(), window, cx)),
                 on_forward: Rc::new(move |window, cx| forward(&(), window, cx)),
+                update: self
+                    .live
+                    .as_ref()
+                    .and_then(|model| model.update_status.ready_version())
+                    .and_then(|version| {
+                        let handler = self.live_handler.clone()?;
+                        Some(ReadyUpdate {
+                            version: version.to_owned().into(),
+                            game_running: self.game_running,
+                            on_apply: Rc::new(move |window, cx| {
+                                handler(LiveIntent::ApplyUpdate, window, cx)
+                            }),
+                        })
+                    }),
             }
         };
         let current_instance = self.current_instance(cx);

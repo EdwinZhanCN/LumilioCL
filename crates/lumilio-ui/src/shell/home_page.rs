@@ -51,6 +51,14 @@ impl LauncherShell {
 
     /// Feeds one launch signal into the Home launch moment.
     pub fn apply_launch_signal(&mut self, signal: LaunchSignal, cx: &mut Context<Self>) {
+        if matches!(&signal, LaunchSignal::Running) {
+            self.game_running = true;
+        } else if matches!(
+            &signal,
+            LaunchSignal::Exited { .. } | LaunchSignal::Failed(_) | LaunchSignal::Cancelled
+        ) {
+            self.game_running = false;
+        }
         let home = std::mem::take(&mut self.home).on_launch_signal(signal, Instant::now());
         self.set_home(home, cx);
     }

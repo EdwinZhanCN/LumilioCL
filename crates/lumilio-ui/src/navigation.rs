@@ -32,6 +32,14 @@ pub struct Leading {
     pub can_forward: bool,
     pub on_back: CloseHandler,
     pub on_forward: CloseHandler,
+    pub update: Option<ReadyUpdate>,
+}
+
+/// A verified update ready to install from the leading navigation zone.
+pub struct ReadyUpdate {
+    pub version: SharedString,
+    pub game_running: bool,
+    pub on_apply: CloseHandler,
 }
 
 /// One instance the trailing zone can switch to.
@@ -221,44 +229,67 @@ fn history_button(
 
 fn leading_zone(leading: Leading, colors: ShellColors) -> impl IntoElement {
     let title = leading.title.clone();
-    zone(colors)
-        .id("navigation-leading")
-        .debug_selector(|| "navigation-leading".into())
+    h_flex()
+        .items_center()
+        .gap_2()
+        .min_w_0()
         .max_w_full()
-        // ia[navigation]: 后退 / 前进 | 左段的两个图标按钮 | 回到上/下一个位置；位置 = 地标页、游戏页、项目详情；标签/筛选/滚动不进历史
-        .child(history_button(
-            "navigation-back",
-            UiIcon::Back,
-            back_tooltip(),
-            leading.can_back,
-            leading.on_back,
-        ))
-        .child(history_button(
-            "navigation-forward",
-            UiIcon::Next,
-            forward_tooltip(),
-            leading.can_forward,
-            leading.on_forward,
-        ))
         .child(
-            div()
-                .id("navigation-title")
-                .debug_selector(|| "navigation-title".into())
+            zone(colors)
+                .id("navigation-leading")
+                .debug_selector(|| "navigation-leading".into())
                 .min_w_0()
-                .max_w(px(180.))
-                .pl(px(4.))
-                .pr(px(10.))
-                .overflow_hidden()
-                .text_ellipsis()
-                .whitespace_nowrap()
-                .text_sm()
-                .font_medium()
-                .text_color(colors.foreground)
-                .tooltip(move |window, cx| {
-                    gpui_component::tooltip::Tooltip::new(title.clone()).build(window, cx)
-                })
-                .child(leading.title),
+                // ia[navigation]: 后退 / 前进 | 左段的两个图标按钮 | 回到上/下一个位置；位置 = 地标页、游戏页、项目详情；标签/筛选/滚动不进历史
+                .child(history_button(
+                    "navigation-back",
+                    UiIcon::Back,
+                    back_tooltip(),
+                    leading.can_back,
+                    leading.on_back,
+                ))
+                .child(history_button(
+                    "navigation-forward",
+                    UiIcon::Next,
+                    forward_tooltip(),
+                    leading.can_forward,
+                    leading.on_forward,
+                ))
+                .child(
+                    div()
+                        .id("navigation-title")
+                        .debug_selector(|| "navigation-title".into())
+                        .min_w_0()
+                        .max_w(px(180.))
+                        .pl(px(4.))
+                        .pr(px(10.))
+                        .overflow_hidden()
+                        .text_ellipsis()
+                        .whitespace_nowrap()
+                        .text_sm()
+                        .font_medium()
+                        .text_color(colors.foreground)
+                        .tooltip(move |window, cx| {
+                            gpui_component::tooltip::Tooltip::new(title.clone()).build(window, cx)
+                        })
+                        .child(leading.title),
+                ),
         )
+        .children(leading.update.map(|update| {
+            let on_apply = update.on_apply;
+            // ia[navigation]: 重启以更新 | 左侧导航块右边的橙色按键 | 安装已校验的新版本并重启；游戏运行时禁用
+            Key::new("navigation-update")
+                .icon(Icon::new(UiIcon::Refresh))
+                .primary()
+                .large()
+                .disabled(update.game_running)
+                .tooltip(if update.game_running {
+                    tr!("nav-update-game-running").to_owned()
+                } else {
+                    tr!("nav-update-ready", version = update.version.to_string())
+                })
+                .debug_selector(|| "navigation-update".into())
+                .on_click(move |_: &ClickEvent, window, cx| on_apply(window, cx))
+        }))
 }
 
 fn back_tooltip() -> String {
@@ -606,6 +637,7 @@ mod tests {
                         can_forward: false,
                         on_back: Rc::new(|_, _| {}),
                         on_forward: Rc::new(|_, _| {}),
+                        update: None,
                     },
                     None,
                     None,

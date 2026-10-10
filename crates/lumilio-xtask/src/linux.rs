@@ -17,6 +17,11 @@ pub const MAINTAINER: &str = "EdwinZhan <EdwinZhanCN@users.noreply.github.com>";
 const LOADED_AT_RUN_TIME: &str = "libvulkan1";
 
 pub fn package(release: &Release, skip_build: bool) -> Result<Vec<PathBuf>> {
+    if skip_build {
+        return Err(
+            "Linux packages need separate updater-enabled and package-managed builds".to_owned(),
+        );
+    }
     if !skip_build {
         release.build(&[])?;
     }
@@ -31,6 +36,7 @@ pub fn package(release: &Release, skip_build: bool) -> Result<Vec<PathBuf>> {
     let stage = release.stage("linux")?;
     let mut artifacts = vec![tarball(release, &stage, &desktop)?];
     if on_path("dpkg-deb") && on_path("dpkg-shlibdeps") {
+        release.build(&[("LUMILIO_UPDATE_EXPLANATION", "package-managed-linux")])?;
         artifacts.push(deb(release, &stage, &desktop)?);
     } else {
         eprintln!("warning: dpkg-deb or dpkg-shlibdeps missing; no .deb this time");

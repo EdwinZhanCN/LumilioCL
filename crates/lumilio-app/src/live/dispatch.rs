@@ -14,6 +14,7 @@ use super::settings::{
     add_java, apply_preferences, change_setting, check_reclaimable, clear_cache,
     export_diagnostics, install_java, load_settings, reclaim,
 };
+use super::update;
 use super::{Reload, Wiring};
 use gpui_kit::AppContext as _;
 use gpui_kit::{App, Window};
@@ -362,6 +363,21 @@ pub(super) fn on_live_intent(
             );
         }
         LiveIntent::LoadSettings => load_settings(wiring, cx),
+        LiveIntent::CheckUpdates => update::check_manually(wiring),
+        LiveIntent::SetAutoUpdate(enabled) => {
+            let service = wiring.backend.service.clone();
+            let update_wiring = wiring.clone();
+            change_setting(
+                wiring,
+                window,
+                async move { service.set_auto_update(enabled).await },
+                tr!("settings-save-failed"),
+                None,
+                move |_, _| update::set_automatic(&update_wiring, enabled),
+                cx,
+            );
+        }
+        LiveIntent::ApplyUpdate => update::apply(wiring),
         LiveIntent::SetPluginEnabled { id, enabled } => {
             let service = wiring.backend.service.clone();
             let changed = wiring.clone();

@@ -8,6 +8,7 @@
 |---|---|---|---|---|
 | 点地标 | 中段胶囊按钮 | 打开该页并清空“前进” |  | `lumilio-ui/src/navigation.rs` |
 | 后退 / 前进 | 左段的两个图标按钮 | 回到上/下一个位置；位置 = 地标页、游戏页、项目详情；标签/筛选/滚动不进历史 |  | `lumilio-ui/src/navigation.rs` |
+| 重启以更新 | 左侧导航块右边的橙色按键 | 安装已校验的新版本并重启；游戏运行时禁用 |  | `lumilio-ui/src/navigation.rs` |
 | 没有账户时 | 芯片显示“添加账户” | 打开账户页的添加离线账户弹窗 |  | `lumilio-ui/src/navigation.rs` |
 | 切换账户 | 右段 Popover 列表：头像、名字、类型；单选 | 之后的启动使用该身份 |  | `lumilio-ui/src/navigation.rs` |
 | 查看当前账户 | 账户下拉底部「账户详情」 | 打开当前账户详情与外观；不沿用账户页上次查看的其他账户 |  | `lumilio-ui/src/navigation.rs` |

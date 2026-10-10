@@ -137,7 +137,7 @@ the content column; the landmark capsule stays centred in the window.
 
 | Zone | Shows | Rules |
 |---|---|---|
-| Leading | ‹ › and the current location's name | Browser-style history of *locations*: a landmark page, an Instance, a project detail. Tabs, filters and scroll position are view state, not history. A direction with nowhere to go is disabled (muted, arrow cursor), never hidden, so the name does not jump. Shortcuts: ⌘[ / ⌘], and Esc goes back from a detail. |
+| Leading | ‹ › and the current location's name | Browser-style history of *locations*: a landmark page, an Instance, a project detail. Tabs, filters and scroll position are view state, not history. A direction with nowhere to go is disabled (muted, arrow cursor), never hidden, so the name does not jump. A verified stable launcher update adds an orange restart key beside this zone; it is disabled while a game runs. Shortcuts: ⌘[ / ⌘], and Esc goes back from a detail. |
 | Centre | The landmark capsule: Home, Library, Discover, Activity; Accounts and Settings join when their pages exist | Choosing a landmark opens a new location (and clears what was ahead). Icon-only keys; the open landmark sits pressed with its LED lit (§12); tooltip with label and shortcut. Activity carries the running-task badge: a lit LED with a mono count. |
 | Trailing | The current instance: its cover, name and a ⇅ mark | The instance that play and Discover installs target. Clicking opens a popover list to switch (a quick action, §10). Switching never retargets an operation already started. With no instances it reads "还没有游戏" and opens Library. The cover sits in a display window (§12), the same one a faceplate uses. |
 

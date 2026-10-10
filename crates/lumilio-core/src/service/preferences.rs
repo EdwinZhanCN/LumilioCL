@@ -60,6 +60,10 @@ impl<T: Transport + Clone> LauncherService<T> {
         Ok(self.settings.lock().await.set_download_concurrency(count)?)
     }
 
+    pub async fn set_auto_update(&self, enabled: bool) -> Result<(), ServiceError> {
+        Ok(self.settings.lock().await.set_auto_update(enabled)?)
+    }
+
     /// Turns a Java installation off (or back on) by its home folder.
     pub async fn set_java_disabled(&self, home: &Path, disabled: bool) -> Result<(), ServiceError> {
         let mut settings = self.settings.lock().await;

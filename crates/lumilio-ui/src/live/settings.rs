@@ -25,6 +25,7 @@ pub struct SettingsView {
     pub download_concurrency: Option<u32>,
     pub mirrors: Vec<MirrorRule>,
     pub download_source: DownloadSourcePreference,
+    pub auto_update_enabled: bool,
     pub java_roots: Vec<PathBuf>,
     pub java: Vec<JavaRow>,
     /// `None` while the disk is still being measured.
@@ -51,6 +52,7 @@ pub fn settings_view(
         download_concurrency: settings.download_concurrency,
         mirrors: settings.mirrors.clone(),
         download_source: settings.download_source_preference(),
+        auto_update_enabled: settings.auto_update,
         java_roots: settings.extra_java_roots.clone(),
         java: java
             .iter()

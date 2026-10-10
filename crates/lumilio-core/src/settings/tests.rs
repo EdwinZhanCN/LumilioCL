@@ -65,8 +65,19 @@ fn settings_files_from_before_custom_ids_and_current_instance_still_load() {
     let store = SettingsStore::open(dir.path()).unwrap();
     assert!(!store.recovered_from_damage());
     assert_eq!(store.get().current_instance, None);
+    assert!(store.get().auto_update);
     let steve = store.selected_profile().unwrap();
     assert_eq!(steve.id(), ProfileId::offline("Steve"));
+}
+
+#[test]
+fn automatic_update_preference_defaults_on_and_persists() {
+    let (dir, mut store) = store();
+    assert!(store.get().auto_update);
+    store.set_auto_update(false).unwrap();
+    assert!(!SettingsStore::open(dir.path()).unwrap().get().auto_update);
+    store.set_auto_update(true).unwrap();
+    assert!(SettingsStore::open(dir.path()).unwrap().get().auto_update);
 }
 
 #[test]

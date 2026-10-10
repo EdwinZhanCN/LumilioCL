@@ -17,6 +17,7 @@ mod library;
 mod logs;
 mod new_game;
 mod settings;
+mod update;
 mod wardrobe;
 
 #[cfg(test)]
@@ -67,6 +68,8 @@ struct State {
     installed_key: Option<(String, ProjectKind)>,
     /// What the running game has printed: the instance and its newest lines.
     game_log: Option<(String, std::collections::VecDeque<String>)>,
+    /// Commands for the background update service.
+    update_commands: Option<tokio::sync::mpsc::UnboundedSender<update::UpdateCommand>>,
 }
 
 /// How many lines of the running game's output are kept.
@@ -131,6 +134,7 @@ pub fn build(backend: Backend, window: &mut Window, cx: &mut App) -> Entity<Laun
         shell: shell.downgrade(),
         state,
     };
+    update::start(&wiring, cx);
     reload(&wiring, Reload::All, cx);
     apply_saved_preferences(&wiring, window.window_handle(), cx);
     open_requested_page(&wiring, &shell, window, cx);

@@ -57,6 +57,7 @@
 - 产物有两种：
   - 便携 ZIP：先签名的 exe 再加运行时文件。
   - Inno Setup 安装器：`SetupIconFile` 和 `UninstallDisplayIcon` 都指向同一个图标。
+- 安装器构建支持自动更新；便携 ZIP 的构建会禁用自动更新，因为它没有可安全覆盖的安装位置。
 - 签名顺序：先签 exe，再打包，最后签 setup.exe。卸载器的签名按 Inno 的 SignedUninstaller 流程处理。
 - 验收：在干净的 VM 上，以 100% 和 200% 缩放分别检查标题栏、任务栏、开始菜单和资源管理器里的图标。
 
@@ -74,6 +75,7 @@
   - `.tar.gz` 加 `install.sh`，安装到用户级 XDG 目录。
   - `.deb`，`Depends` 由 `dpkg-shlibdeps` 推导，不要从别的应用复制。
   - RPM 和 Arch 包复用同一棵 staging 树。
+- `.tar.gz` 安装到 `~/.local/lib/lumiliocl/` 后支持自动更新；`.deb` 构建会禁用自动更新，升级交给系统包管理器。
 - 在你支持的最老发行版上构建。运行需要可用的 Vulkan 驱动。
 - 发布前对 `.desktop` 文件运行 `desktop-file-validate`。
 - Flatpak 和 AppImage 暂缓。启动器需要拉起 Java 进程、读写大量游戏目录，沙箱权限要单独设计。

@@ -64,3 +64,4 @@ Name: "{autodesktop}\LumilioCL"; Filename: "{app}\lumiliocl.exe"; AppUserModelID
 
 [Run]
 Filename: "{app}\lumiliocl.exe"; Description: "{cm:LaunchProgram,LumilioCL}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\lumiliocl.exe"; Flags: nowait; Check: WizardSilent

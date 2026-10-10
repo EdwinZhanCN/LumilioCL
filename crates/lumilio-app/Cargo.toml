@@ -23,6 +23,7 @@ lumilio-plugin-modrinth.workspace = true
 lumilio-plugin-discord.workspace = true
 lumilio-plugin-world-explorer.workspace = true
 lumilio-ui.workspace = true
+lumilio-updater = { path = "../lumilio-updater" }
 futures = "0.3"
 reqwest.workspace = true
 tokio.workspace = true

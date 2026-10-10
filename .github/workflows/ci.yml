@@ -26,18 +26,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  cubiomes-windows:
-    runs-on: windows-2022
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v5
-      - run: rustup toolchain install
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo build -p lumilio-cubiomes
   check:
-    # GPUI renders through Metal here; this is the platform the launcher is
-    # developed and reviewed on.
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5

@@ -142,6 +142,12 @@ pub enum LiveIntent {
     },
     /// Read the settings, Java list and disk use again.
     LoadSettings,
+    /// Check for the latest stable LumilioCL release.
+    CheckUpdates,
+    /// Change whether checks and downloads happen automatically.
+    SetAutoUpdate(bool),
+    /// Install the downloaded launcher update and restart.
+    ApplyUpdate,
     SetPluginEnabled {
         id: String,
         enabled: bool,
