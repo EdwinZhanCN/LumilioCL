@@ -4,7 +4,7 @@
 
 ## Goal
 
-照 Zed 的 `auto_update`：启动器自己发现最新的正式版，后台下载，标题栏出现「重启以更新」，点了就换成新版本。不打扰，不弹窗。
+照 Zed 的 `auto_update`：启动器自己发现最新的正式版，后台下载，下载好后左下角导航块右边出现一个「重启以更新」按钮，点了就换成新版本。不打扰，不弹窗。
 
 ## 冻结的决策
 
@@ -16,14 +16,14 @@
    - Linux：只管 `install.sh` 装的那份，把 tar.gz 解到 `~/.local/lib/lumiliocl/` 覆盖；重启直接起新二进制。
    - Windows：退出时以 `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS` 运行下载好的 Inno 安装器，`.iss` 的 `[Run]` 加一条静默安装后重新打开 `lumiliocl.exe`。
 5. **不自动更新的构建**：构建时设了 `LUMILIO_UPDATE_EXPLANATION`（对应 Zed 的 `ZED_UPDATE_EXPLANATION`）就完全不检查，手动检查只显示这句话。deb 和 Windows 便携 zip 由 xtask 打包时设上；debug 构建也不检查。
-6. **游戏在运行时不重启**：有 `LaunchStatus::Running` 的会话时「重启以更新」置灰，说明「游戏结束后再更新」。
+6. **入口与游戏运行时不重启**：只在新版本下载好后出现一个橙色图标键，位于左下角「‹ › 页面标题」导航块的右边、中间导航坞的左边，与导航块同高；提示「新版本 X.Y.Z 已就绪，点击重启并更新」。有 `LaunchStatus::Running` 的会话时置灰，提示「游戏正在运行，游戏结束后再重启更新」。
 
 ## Tasks
 
 - [ ] T1：新 crate `crates/lumilio-updater`：解析 SHA256SUMS 找本机资源、版本比较、Worker → GitHub 回退、下载与 sha256 校验、每小时轮询；单元测试覆盖解析、版本比较和回退。
 - [ ] T2：各平台安装与重启，`crates/lumilio-updater/src/install/{macos,linux,windows}.rs`；`crates/lumilio-xtask/packaging/LumilioCL.iss` 加静默安装后重启。
 - [ ] T3：`LUMILIO_UPDATE_EXPLANATION`：`crates/lumilio-xtask/src/{linux,windows}.rs` 给 deb 和便携 zip 设上，updater 读到就不检查。
-- [ ] T4：设置与界面：`LauncherSettings` 加 `auto_update`；`crates/lumilio-app/src/live/update.rs` 接状态；标题栏「重启以更新」按钮（游戏运行时置灰）、`pages/settings/about.rs` 的版本、状态和「检查更新」；中英 `.ftl`、`just ia`。
+- [ ] T4：设置与界面：`LauncherSettings` 加 `auto_update`；`crates/lumilio-app/src/live/update.rs` 接状态。更新键放在 `crates/lumilio-ui/src/navigation.rs` 的 `leading_zone`（渲染「‹ › 页面标题」的左下角导航块，数据来自 `shell/render.rs` 的 `Leading`）右边：给 `Leading` 加一个可选的更新状态，只在已下载好时渲染；用 `key.rs` 的 `Key::new(..).icon(..).primary()`（主题橙色 `orange`）做图标键，高度与导航块一致，`.tooltip(..)` 写「新版本 X.Y.Z 已就绪，点击重启并更新」；游戏运行时 `.disabled(true)`，提示「游戏正在运行，游戏结束后再重启更新」。`pages/settings/about.rs` 显示版本、状态和「检查更新」。中英 `.ftl`；`just ia` 更新 IA 文档（左下角导航块多一个按条件出现的更新键）。
 - [ ] T5：验证：`just check`；下一个版本发布时，Edwin 在自己的 Mac 上从 0.1.0 自动更新一次。
 
 ## 风险
