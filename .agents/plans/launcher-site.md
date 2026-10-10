@@ -38,9 +38,8 @@ GitHub Release 反向代理。页面用启动器自己的设计语言（铝面�
   原生技术层（分层展开的视差）、路线图、下载区、页脚。实测数据在 `web/src/data/benchmark.ts`，
   文件头写着重测方法；发新版本后要重测并更新。
 - [x] S4：Worker 反代与测试；静态资源与反代合一的 `wrangler.jsonc`。
-- [ ] S5：`ci.yml` 排除 `web/**`、`web.yml` 检查与部署（已写）；仓库加 `CLOUDFLARE_API_TOKEN`、
+- [x] S5：`ci.yml` 排除 `web/**`、`web.yml` 检查与部署（已写）；仓库加 `CLOUDFLARE_API_TOKEN`、
   `CLOUDFLARE_ACCOUNT_ID` 两个 secret，首次 `wrangler deploy` 绑定 `launcher.lumilio.org`（维护者做）。
-  0.1.0 的自动更新依赖它（`auto-update.md` T20），必须在 rc.1 之前完成。
 - [ ] S6：维护者补截图与 GIF，按 `TODO(asset)` 注释替换占位；og:image。
 
 ## Validation
@@ -63,5 +62,5 @@ GitHub Release 反向代理。页面用启动器自己的设计语言（铝面�
 ## Open questions
 
 - 截图与 GIF 的最终清单，见页面里的 `TODO(asset)` 注释。
-- （已定）自动更新不加 `/update/*`：清单是每个 release 的 `update-stable.json`，走现有
-  `/releases/latest/download/<file>`；缓存仍是「不做边缘缓存」（`auto-update.md` 决策 5、6）。
+- 自动更新（参考 Zed）的清单格式定下后，Worker 是否要加 `/update/*`；现有
+  `/releases/latest/download/<file>` 已能代理固定文件名的清单。
