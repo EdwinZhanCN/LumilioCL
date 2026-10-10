@@ -439,6 +439,7 @@ pub struct Preferences {
     pub foreground_on_exit: Option<bool>,
     pub motion: MotionPreference,
     pub language: Language,
+    pub look: LookPreferences,
     /// How the Library is ordered (0 recent, 1 name, 2 created) and which
     /// loader it shows (0 all; 1 vanilla, 2 Fabric, 3 Forge, 4 NeoForge,
     /// 5 Quilt). The launcher only remembers them.
@@ -446,6 +447,43 @@ pub struct Preferences {
     pub library_loader: u8,
     pub discover: DiscoverPreferences,
 }
+
+/// Which theme and type faces the launcher shows itself in. The themes are
+/// named, not owned: the files live in the UI's catalog and the launcher's
+/// `themes` directory, and a name that no longer resolves falls back to the
+/// built-in look.
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(default)]
+pub struct LookPreferences {
+    /// The theme used while the launcher is light; `None` is the built-in.
+    pub light_theme: Option<String>,
+    /// The theme used while the launcher is dark; `None` is the built-in.
+    pub dark_theme: Option<String>,
+    /// Font families that override the theme's. `None` keeps the theme's.
+    pub sans_font: Option<String>,
+    pub mono_font: Option<String>,
+    pub cjk_font: Option<String>,
+    /// Interface scale in percent; `None` is 100.
+    pub font_scale: Option<u16>,
+    /// The Home wallpaper: a file name inside the launcher's `themes`
+    /// folder. `None` is the procedural world.
+    pub wallpaper: Option<String>,
+}
+
+impl LookPreferences {
+    /// The scale in percent, held inside [`FONT_SCALE_PERCENT`].
+    #[must_use]
+    pub fn scale_percent(&self) -> u16 {
+        let range = FONT_SCALE_PERCENT;
+        self.font_scale
+            .unwrap_or(100)
+            .clamp(*range.start(), *range.end())
+    }
+}
+
+/// Smallest and largest interface scale, in percent. Below the floor text is
+/// unreadable; above the ceiling the pages break.
+pub const FONT_SCALE_PERCENT: std::ops::RangeInclusive<u16> = 85..=130;
 
 /// What Discover remembers between visits (Modrinth App keeps the same four
 /// things: its advanced exclusions, whether that group is open, the

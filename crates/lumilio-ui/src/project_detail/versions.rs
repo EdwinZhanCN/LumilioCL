@@ -348,8 +348,8 @@ impl ProjectDetailView {
         const ACTIONS: f32 = 150.;
         let head = |text: &'static str| {
             div()
-                .font_family(crate::theme::MONO_FONT)
-                .text_size(px(10.))
+                .font_family(crate::theme::mono_font())
+                .text_size(crate::theme::font_px(10.))
                 .text_color(colors.muted)
                 .child(text)
         };

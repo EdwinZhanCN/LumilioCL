@@ -61,7 +61,7 @@ pub fn faceplate_head(
         .pt(px(4.))
         .child(
             div()
-                .text_size(px(20.))
+                .text_size(crate::theme::font_px(20.))
                 .line_height(px(26.))
                 .font_weight(gpui::FontWeight::LIGHT)
                 .text_color(colors.foreground)
@@ -72,7 +72,7 @@ pub fn faceplate_head(
         )
         .child(
             div()
-                .font_family(theme::MONO_FONT)
+                .font_family(theme::mono_font())
                 .text_xs()
                 .text_color(colors.body.orange_text)
                 .child(SharedString::from(loader.into().to_uppercase())),

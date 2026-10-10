@@ -10,9 +10,7 @@ use crate::key::Key;
 use gpui::{App, Context, Entity, IntoElement, Render, Window, div, prelude::*, px};
 use gpui_component::dialog::Dialog;
 use gpui_component::input::{Input, InputEvent, InputState};
-use gpui_component::{
-    ActiveTheme as _, Sizable as _, StyledExt as _, WindowExt as _, h_flex, v_flex,
-};
+use gpui_component::{Sizable as _, StyledExt as _, WindowExt as _, h_flex, v_flex};
 use lumilio_core::{SkinChoice, SkinModel};
 
 use crate::kit;
@@ -288,7 +286,7 @@ impl Render for SkinDialog {
         if !self.inline && std::mem::take(&mut self.close) && window.has_active_dialog(cx) {
             window.close_dialog(cx);
         }
-        let colors = ShellColors::from_theme(cx.theme());
+        let colors = ShellColors::current(cx);
         let entity = cx.entity().downgrade();
         let busy = self.busy;
         let kinds = kinds().iter().enumerate().map(|(index, text)| {

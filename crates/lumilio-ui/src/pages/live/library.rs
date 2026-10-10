@@ -164,8 +164,8 @@ pub(super) fn card(index: usize, card: &LibraryCard, ctx: &LiveCtx) -> impl Into
             h_flex().justify_between().items_center().gap(px(8.)).child(
                 div()
                     .min_w_0()
-                    .font_family(theme::MONO_FONT)
-                    .text_size(px(10.))
+                    .font_family(theme::mono_font())
+                    .text_size(crate::theme::font_px(10.))
                     .text_color(colors.muted)
                     .overflow_hidden()
                     .text_ellipsis()

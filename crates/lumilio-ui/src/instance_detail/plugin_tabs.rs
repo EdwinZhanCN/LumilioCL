@@ -606,7 +606,7 @@ impl Paint<'_> {
                             if head {
                                 text.text_color(colors.muted)
                             } else {
-                                text.font_family(theme::MONO_FONT)
+                                text.font_family(theme::mono_font())
                                     .text_color(colors.foreground)
                             }
                             .into_any_element()
@@ -642,7 +642,7 @@ impl Paint<'_> {
                     Tone::Secondary => base.text_color(colors.muted),
                     Tone::Mono => base
                         .text_color(colors.foreground)
-                        .font_family(theme::MONO_FONT),
+                        .font_family(theme::mono_font()),
                 }
                 .into_any_element()
             }
@@ -718,7 +718,7 @@ impl Paint<'_> {
                 )
                 .children(item.value.clone().map(|value| {
                     div()
-                        .font_family(theme::MONO_FONT)
+                        .font_family(theme::mono_font())
                         .text_xs()
                         .text_color(colors.muted)
                         .child(value)

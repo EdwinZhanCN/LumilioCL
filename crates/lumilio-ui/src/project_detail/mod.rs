@@ -13,7 +13,7 @@ mod versions;
 use std::rc::Rc;
 
 use gpui::{App, Context, Div, IntoElement, Render, SharedString, Window, div, prelude::*, px};
-use gpui_component::{ActiveTheme as _, TITLE_BAR_HEIGHT, v_flex};
+use gpui_component::{TITLE_BAR_HEIGHT, v_flex};
 use lumilio_core::{
     GameVersionTag, Loader, Project, ProjectDetail, ProjectKind, ReleaseChannel, Version,
     version_fits,
@@ -335,14 +335,14 @@ fn spec_cell(legend: &'static str, value: impl Into<SharedString>, colors: Shell
         .pr(px(28.))
         .child(
             div()
-                .font_family(crate::theme::MONO_FONT)
-                .text_size(px(10.))
+                .font_family(crate::theme::mono_font())
+                .text_size(crate::theme::font_px(10.))
                 .text_color(colors.muted)
                 .child(legend),
         )
         .child(
             div()
-                .font_family(crate::theme::MONO_FONT)
+                .font_family(crate::theme::mono_font())
                 .text_sm()
                 .text_color(colors.foreground)
                 .child(value.into()),
@@ -380,7 +380,7 @@ impl ProjectDetailView {
 impl Render for ProjectDetailView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         crate::toast::flush(&mut self.toasts, window, cx);
-        let colors = ShellColors::from_theme(cx.theme());
+        let colors = ShellColors::current(cx);
         let body = match self.state.clone() {
             DetailState::Loading => {
                 kit::empty(tr!("library-loading"), "", colors).into_any_element()

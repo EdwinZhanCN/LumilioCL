@@ -1,0 +1,61 @@
+{
+  "name": "Rosé Pine",
+  "themes": [
+    {
+      "name": "Rosé Pine Dawn",
+      "appearance": "light",
+      "source": "Palette by Rosé Pine, https://github.com/rose-pine/rose-pine-theme (MIT License, Copyright (c) 2023 Rosé Pine). Display colours use the main palette.",
+      "colors": {
+        "page": "#f2e9e1",
+        "panel": "#faf4ed",
+        "hairline": "#cecacd",
+        "ink": "#575279",
+        "muted": "#797593",
+        "key_white": "#fffaf3",
+        "key_black": "#575279",
+        "key_grey": "#dfdad9",
+        "on_white": "#575279",
+        "on_black": "#faf4ed",
+        "orange": "#d7827e",
+        "orange_text": "#b4637a",
+        "on_orange": "#faf4ed",
+        "danger": "#b4637a",
+        "danger_text": "#b4637a",
+        "led_off": "#cecacd",
+        "ok": "#286983",
+        "display": "#191724",
+        "display_ink": "#f6c177",
+        "display_dim": "#26233a",
+        "display_label": "#6e6a86"
+      }
+    },
+    {
+      "name": "Rosé Pine",
+      "appearance": "dark",
+      "source": "Palette by Rosé Pine, https://github.com/rose-pine/rose-pine-theme (MIT License, Copyright (c) 2023 Rosé Pine).",
+      "colors": {
+        "page": "#191724",
+        "panel": "#1f1d2e",
+        "hairline": "#403d52",
+        "ink": "#e0def4",
+        "muted": "#908caa",
+        "key_white": "#403d52",
+        "key_black": "#26233a",
+        "key_grey": "#21202e",
+        "on_white": "#e0def4",
+        "on_black": "#e0def4",
+        "orange": "#ebbcba",
+        "orange_text": "#ebbcba",
+        "on_orange": "#191724",
+        "danger": "#eb6f92",
+        "danger_text": "#eb6f92",
+        "led_off": "#524f67",
+        "ok": "#9ccfd8",
+        "display": "#191724",
+        "display_ink": "#f6c177",
+        "display_dim": "#26233a",
+        "display_label": "#6e6a86"
+      }
+    }
+  ]
+}

@@ -9,9 +9,7 @@ use crate::controls::Checkbox;
 use crate::key::Key;
 use gpui::{App, Context, Entity, IntoElement, Render, Window, div, prelude::*, px};
 use gpui_component::input::{Input, InputEvent, InputState};
-use gpui_component::{
-    ActiveTheme as _, Sizable as _, StyledExt as _, WindowExt as _, h_flex, v_flex,
-};
+use gpui_component::{Sizable as _, StyledExt as _, WindowExt as _, h_flex, v_flex};
 use lumilio_core::{ExportSpec, FileEntry, PackFormat};
 
 use crate::kit;
@@ -256,7 +254,7 @@ fn label(text: &'static str, colors: ShellColors) -> impl IntoElement {
 
 impl Render for ExportForm {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let colors = ShellColors::from_theme(cx.theme());
+        let colors = ShellColors::current(cx);
         let weak = cx.entity().downgrade();
         let [name, version, summary] = self.typed(cx);
         // Nothing is nagged about until something was typed or unticked.

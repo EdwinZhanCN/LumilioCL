@@ -80,10 +80,10 @@ fn spec(legend: &'static str, value: String, colors: ShellColors) -> impl IntoEl
         .gap(px(8.))
         .items_baseline()
         .justify_end()
-        .font_family(theme::MONO_FONT)
+        .font_family(theme::mono_font())
         .child(
             div()
-                .text_size(px(10.))
+                .text_size(crate::theme::font_px(10.))
                 .text_color(colors.muted)
                 .child(legend),
         )
@@ -242,7 +242,7 @@ pub(super) fn result_row(index: usize, row: &SearchRow, ctx: &LiveCtx) -> impl I
                 .flex_none()
                 .w(px(24.))
                 .pt(px(4.))
-                .font_family(theme::MONO_FONT)
+                .font_family(theme::mono_font())
                 .text_xs()
                 .text_color(body.orange_text)
                 .child(format!("{:02}", index + 1)),
@@ -264,7 +264,7 @@ pub(super) fn result_row(index: usize, row: &SearchRow, ctx: &LiveCtx) -> impl I
                 .gap(px(6.))
                 .child(
                     div()
-                        .text_size(px(20.))
+                        .text_size(crate::theme::font_px(20.))
                         .line_height(px(26.))
                         .font_weight(gpui::FontWeight::LIGHT)
                         .text_color(colors.foreground)
@@ -272,8 +272,8 @@ pub(super) fn result_row(index: usize, row: &SearchRow, ctx: &LiveCtx) -> impl I
                 )
                 .child(
                     div()
-                        .font_family(theme::MONO_FONT)
-                        .text_size(px(11.))
+                        .font_family(theme::mono_font())
+                        .text_size(crate::theme::font_px(11.))
                         .text_color(colors.muted)
                         .child(row.author.to_uppercase()),
                 )

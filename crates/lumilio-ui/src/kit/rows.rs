@@ -63,7 +63,7 @@ pub fn value_row(
         )
         .child(
             div()
-                .font_family(theme::MONO_FONT)
+                .font_family(theme::mono_font())
                 .text_xs()
                 .text_color(colors.muted)
                 .child(value.into()),
@@ -98,7 +98,7 @@ pub(super) fn silk_label(
         .gap(px(10.))
         .children(index.map(|index| {
             div()
-                .font_family(theme::MONO_FONT)
+                .font_family(theme::mono_font())
                 .text_xs()
                 .text_color(colors.body.orange_text)
                 .child(format!("{index:02}"))

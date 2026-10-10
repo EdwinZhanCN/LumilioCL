@@ -4,7 +4,7 @@ use crate::tr;
 use crate::{kit, theme};
 use gpui::{App, Context, Entity, IntoElement, Render, Window, div, prelude::*};
 use gpui_component::input::{Input, InputState};
-use gpui_component::{ActiveTheme as _, WindowExt as _, h_flex, v_flex};
+use gpui_component::{WindowExt as _, h_flex, v_flex};
 use lumilio_plugin_api::{SettingField, SettingKind, SettingValue};
 use std::{future::Future, pin::Pin, rc::Rc};
 
@@ -144,7 +144,7 @@ fn parse(kind: &SettingKind, text: &str) -> Result<SettingValue, String> {
 
 impl Render for PluginSettingDialog {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let colors = ShellColors::from_theme(cx.theme());
+        let colors = ShellColors::current(cx);
         v_flex()
             .gap_3()
             .w_full()

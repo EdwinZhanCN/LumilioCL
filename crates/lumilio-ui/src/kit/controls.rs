@@ -207,8 +207,8 @@ pub fn tag(text: impl Into<SharedString>, kind: TagKind, colors: ShellColors) ->
         .rounded(px(2.))
         .bg(bg)
         .text_color(fg)
-        .font_family(theme::MONO_FONT)
-        .text_size(px(11.))
+        .font_family(theme::mono_font())
+        .text_size(crate::theme::font_px(11.))
         .child(text.into())
 }
 

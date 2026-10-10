@@ -450,7 +450,7 @@ impl Render for Wardrobe {
             .detach();
             self.release_registered = true;
         }
-        let colors = ShellColors::from_theme(cx.theme());
+        let colors = ShellColors::current(cx);
         let drop = cx.weak_entity();
         let preview = v_flex()
             .w_full()

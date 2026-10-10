@@ -145,6 +145,10 @@ pub struct Theme {
     /// [`Theme::change`] names that family here, so every text lookup hits
     /// the font cache. A family set explicitly is used as-is.
     pub font_family: SharedString,
+    /// Families tried, in order, for characters `font_family` lacks, before
+    /// the system's own fallback. Empty by default. The root applies them to
+    /// every window, so dialogs and menus follow too.
+    pub font_fallbacks: Vec<SharedString>,
     /// The base font size for the application, default is 16px.
     pub font_size: Pixels,
     /// The monospace font family for the application.
@@ -748,6 +752,7 @@ impl From<&ThemeColor> for Theme {
             mode: ThemeMode::default(),
             transparent: Hsla::transparent_black(),
             font_family: ".SystemUIFont".into(),
+            font_fallbacks: Vec::new(),
             font_size: px(16.),
             mono_font_family: mono_font::default_mono_font_family(),
             mono_font_size: px(13.),

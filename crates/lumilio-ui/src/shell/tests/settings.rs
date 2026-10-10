@@ -48,7 +48,6 @@ fn the_settings_page_shows_each_tab_and_edits_open_a_dialog(cx: &mut TestAppCont
     });
     cx.run_until_parked();
     for selector in [
-        "settings-appearance",
         "settings-after-launch",
         "settings-foreground",
         "settings-motion",
@@ -58,11 +57,20 @@ fn the_settings_page_shows_each_tab_and_edits_open_a_dialog(cx: &mut TestAppCont
     }
 
     let tabs = [
-        (1, "settings-memory"),
-        (2, "settings-java-roots"),
-        (3, "settings-data-dir"),
-        (4, "settings-version"),
-        (5, "settings-plugin-empty"),
+        (1, "settings-appearance"),
+        (1, "settings-theme-light"),
+        (1, "settings-theme-dark"),
+        (1, "settings-theme-local"),
+        (1, "settings-font-sans"),
+        (1, "settings-font-mono"),
+        (1, "settings-font-cjk"),
+        (1, "settings-scale"),
+        (1, "settings-wallpaper"),
+        (2, "settings-memory"),
+        (3, "settings-java-roots"),
+        (4, "settings-data-dir"),
+        (5, "settings-version"),
+        (6, "settings-plugin-empty"),
     ];
     for (tab, selector) in tabs {
         shell.update(cx, |shell, cx| {
@@ -77,7 +85,7 @@ fn the_settings_page_shows_each_tab_and_edits_open_a_dialog(cx: &mut TestAppCont
 
     // Mirror presets send their stable identity; core merges the saved rules.
     shell.update(cx, |shell, cx| {
-        shell.apply_view_intent(ViewIntent::Choose(TAB_GROUP, 3), cx)
+        shell.apply_view_intent(ViewIntent::Choose(TAB_GROUP, 4), cx)
     });
     cx.run_until_parked();
     for (selector, preset) in [
@@ -156,7 +164,7 @@ fn the_settings_page_shows_each_tab_and_edits_open_a_dialog(cx: &mut TestAppCont
         cx.run_until_parked();
     }
     shell.update(cx, |shell, cx| {
-        shell.apply_view_intent(ViewIntent::Choose(TAB_GROUP, 5), cx)
+        shell.apply_view_intent(ViewIntent::Choose(TAB_GROUP, 6), cx)
     });
     cx.run_until_parked();
 
@@ -200,7 +208,7 @@ fn the_settings_page_shows_each_tab_and_edits_open_a_dialog(cx: &mut TestAppCont
 
     // An edit button opens its dialog; cancelling sends nothing.
     shell.update(cx, |shell, cx| {
-        shell.apply_view_intent(ViewIntent::Choose(TAB_GROUP, 1), cx)
+        shell.apply_view_intent(ViewIntent::Choose(TAB_GROUP, 2), cx)
     });
     cx.run_until_parked();
     let edit = cx
@@ -213,6 +221,40 @@ fn the_settings_page_shows_each_tab_and_edits_open_a_dialog(cx: &mut TestAppCont
         "the dialog opened"
     );
     assert!(seen.borrow().is_empty());
+
+    // 外观: a chosen font shows in its row, and 恢复默认 in its dialog clears
+    // it through the preferences.
+    cx.simulate_keystrokes("escape");
+    cx.run_until_parked();
+    shell.update(cx, |shell, cx| {
+        shell.update_live(
+            |model| {
+                let view = model.settings.as_mut().unwrap();
+                view.preferences.look.mono_font = Some("Menlo".into());
+            },
+            cx,
+        );
+        shell.apply_view_intent(ViewIntent::Choose(TAB_GROUP, 1), cx)
+    });
+    cx.run_until_parked();
+    let edit = cx
+        .debug_bounds("settings-font-mono-edit")
+        .expect("font edit button");
+    cx.simulate_click(edit.center(), Modifiers::none());
+    cx.run_until_parked();
+    assert!(
+        cx.debug_bounds("settings-save").is_some(),
+        "the font dialog opened"
+    );
+    let reset = cx.debug_bounds("settings-reset").expect("restore defaults");
+    cx.simulate_click(reset.center(), Modifiers::none());
+    cx.run_until_parked();
+    assert_eq!(
+        seen.borrow().as_slice(),
+        [LiveIntent::SetPreferences(
+            lumilio_core::Preferences::default()
+        )]
+    );
 }
 
 /// Settings is an app shell: on the 插件 tab the list and the detail each
@@ -234,7 +276,7 @@ fn the_plugin_list_stays_put_while_its_detail_scrolls(cx: &mut TestAppContext) {
     cx.simulate_resize(gpui::size(px(1080.), px(600.)));
     shell.update(cx, |shell, cx| {
         shell.show(Route::Settings);
-        shell.apply_view_intent(ViewIntent::Choose(TAB_GROUP, 5), cx);
+        shell.apply_view_intent(ViewIntent::Choose(TAB_GROUP, 6), cx);
         shell.update_live(
             |model| {
                 let plugin = |index: usize| lumilio_core::PluginInfo {

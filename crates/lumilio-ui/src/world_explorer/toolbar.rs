@@ -157,7 +157,7 @@ impl MapView {
                 .id("map-cursor")
                 .debug_selector(|| "map-cursor".into())
                 .cursor_pointer()
-                .font_family(theme::MONO_FONT)
+                .font_family(theme::mono_font())
                 .text_xs()
                 .child(format!("X {:.0}  Z {:.0}", self.cursor[0], self.cursor[1]))
                 .on_click(cx.listener(|this, _, window, cx| this.open_jump(window, cx)))

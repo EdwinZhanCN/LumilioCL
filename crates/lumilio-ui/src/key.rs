@@ -13,7 +13,7 @@ use gpui::{
     prelude::*, px,
 };
 use gpui_component::spinner::Spinner;
-use gpui_component::{ActiveTheme as _, Icon, Sizable};
+use gpui_component::{Icon, Sizable};
 
 use crate::theme::{self, Body};
 
@@ -315,7 +315,7 @@ impl InteractiveElement for Key {
 
 impl RenderOnce for Key {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let body = Body::of_theme(cx.theme());
+        let body = Body::current(cx);
         let inert = !self.shows_pointer();
         let self_pointer = !inert;
         let KeyFace {

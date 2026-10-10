@@ -46,7 +46,12 @@ pub fn render(route: Route, colors: ShellColors) -> AnyElement {
         .gap_3()
         .child(Icon::new(icon).with_size(px(28.)).text_color(colors.muted))
         .child(div().text_sm().text_color(colors.muted).child(eyebrow))
-        .child(div().text_size(px(32.)).font_semibold().child(title))
+        .child(
+            div()
+                .text_size(crate::theme::font_px(32.))
+                .font_semibold()
+                .child(title),
+        )
         .child(div().text_base().text_color(colors.muted).child(body))
         .into_any_element()
 }

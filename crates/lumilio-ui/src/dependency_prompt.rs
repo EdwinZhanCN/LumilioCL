@@ -7,7 +7,7 @@ use std::rc::Rc;
 use crate::controls::Checkbox;
 use crate::key::Key;
 use gpui::{App, Context, Entity, IntoElement, Render, Window, div, prelude::*, px};
-use gpui_component::{ActiveTheme as _, WindowExt as _, h_flex, v_flex};
+use gpui_component::{WindowExt as _, h_flex, v_flex};
 use lumilio_core::{DependencyNeed, DependencyReport};
 
 use crate::theme::{self, ShellColors};
@@ -135,7 +135,7 @@ impl DependencyPrompt {
 
 impl Render for DependencyPrompt {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let colors = ShellColors::from_theme(cx.theme());
+        let colors = ShellColors::current(cx);
         let weak = cx.entity().downgrade();
         let row = |index: usize, need: &DependencyNeed, on: bool| {
             let weak = weak.clone();

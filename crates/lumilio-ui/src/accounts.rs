@@ -9,9 +9,7 @@ use crate::key::Key;
 use gpui::{App, Context, Entity, IntoElement, Render, WeakEntity, Window, div, prelude::*, px};
 use gpui_component::dialog::Dialog;
 use gpui_component::input::{Input, InputEvent, InputState};
-use gpui_component::{
-    ActiveTheme as _, Sizable as _, StyledExt as _, WindowExt as _, h_flex, v_flex,
-};
+use gpui_component::{Sizable as _, StyledExt as _, WindowExt as _, h_flex, v_flex};
 use lumilio_core::{MAX_PROFILE_NAME, OfflineProfile, ProfileError, ProfileId};
 
 use crate::kit;
@@ -218,7 +216,7 @@ impl Render for AccountForm {
         if std::mem::take(&mut self.close) && window.has_active_dialog(cx) {
             window.close_dialog(cx);
         }
-        let colors = ShellColors::from_theme(cx.theme());
+        let colors = ShellColors::current(cx);
         let busy = self.busy;
         let (name, uuid) = self.typed(cx);
         // An empty box is not nagged about; the Add button just stays off.

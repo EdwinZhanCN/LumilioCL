@@ -12,7 +12,7 @@ use gpui::{
 };
 use gpui_component::input::{Input, InputEvent, InputState};
 use gpui_component::popover::Popover;
-use gpui_component::{ActiveTheme as _, Icon, Sizable as _, h_flex, v_flex};
+use gpui_component::{Icon, Sizable as _, h_flex, v_flex};
 
 use crate::assets::UiIcon;
 use crate::theme::{self, ShellColors};
@@ -236,7 +236,7 @@ impl VersionPicker {
 
 impl Render for VersionPicker {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let colors = ShellColors::from_theme(cx.theme());
+        let colors = ShellColors::current(cx);
         let id = self.id;
         match &self.choices {
             Choices::Loading => {

@@ -11,9 +11,7 @@ use crate::key::Key;
 use gpui::{App, Context, Entity, IntoElement, Render, Window, div, prelude::*, px};
 use gpui_component::dialog::Dialog;
 use gpui_component::input::{Input, InputEvent, InputState};
-use gpui_component::{
-    ActiveTheme as _, Sizable as _, StyledExt as _, WindowExt as _, h_flex, v_flex,
-};
+use gpui_component::{Sizable as _, StyledExt as _, WindowExt as _, h_flex, v_flex};
 use lumilio_core::AuthServer;
 
 use crate::kit;
@@ -206,7 +204,7 @@ impl ServersDialog {
 
 impl Render for ServersDialog {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let colors = ShellColors::from_theme(cx.theme());
+        let colors = ShellColors::current(cx);
         let entity = cx.entity().downgrade();
         let rows: Vec<_> = self
             .servers

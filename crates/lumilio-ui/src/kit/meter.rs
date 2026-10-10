@@ -83,7 +83,7 @@ pub fn record(
                 .gap(px(6.))
                 .child(
                     div()
-                        .text_size(px(11.))
+                        .text_size(crate::theme::font_px(11.))
                         .text_color(body.display_label)
                         .child(reading.label.clone()),
                 )
@@ -98,8 +98,8 @@ pub fn record(
                         ))
                         .children(reading.unit.map(|unit| {
                             div()
-                                .font_family(theme::MONO_FONT)
-                                .text_size(px(10.))
+                                .font_family(theme::mono_font())
+                                .text_size(crate::theme::font_px(10.))
                                 .text_color(body.display_label)
                                 .child(unit)
                         })),
@@ -135,8 +135,8 @@ pub fn progress(
                 .child(segment_digits(format!("{percent:03}"), 18., body))
                 .child(
                     div()
-                        .font_family(theme::MONO_FONT)
-                        .text_size(px(10.))
+                        .font_family(theme::mono_font())
+                        .text_size(crate::theme::font_px(10.))
                         .text_color(body.display_label)
                         .child("%"),
                 ),

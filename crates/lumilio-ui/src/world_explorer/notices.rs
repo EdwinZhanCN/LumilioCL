@@ -17,7 +17,7 @@ impl MapView {
 
     /// The messages key with a dot on it while the menu has something to read.
     pub(super) fn notice_popover(&self, cx: &mut Context<Self>) -> AnyElement {
-        let colors = ShellColors::from_theme(cx.theme());
+        let colors = ShellColors::current(cx);
         let target = cx.weak_entity();
         // ia[plugin.world-explorer]: 查看地图消息 | 地图左下角 ·「消息」键与小红点 | 有失败、缺少的输入或可关联的 Xaero 数据时键上亮一个点（不带数字）；点开列出消息、重试键与关联键；Escape 或点击外部关闭
         let popover = Popover::new("map-notice-popover")

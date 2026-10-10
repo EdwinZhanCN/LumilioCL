@@ -199,7 +199,7 @@ impl ProjectDetailView {
                                 .gap(px(8.))
                                 .child(
                                     div()
-                                        .text_size(px(36.))
+                                        .text_size(crate::theme::font_px(36.))
                                         .line_height(px(42.))
                                         .font_weight(gpui::FontWeight::LIGHT)
                                         .text_color(colors.foreground)
@@ -207,8 +207,8 @@ impl ProjectDetailView {
                                 )
                                 .children(owner.map(|owner| {
                                     div()
-                                        .font_family(crate::theme::MONO_FONT)
-                                        .text_size(px(11.))
+                                        .font_family(crate::theme::mono_font())
+                                        .text_size(crate::theme::font_px(11.))
                                         .text_color(colors.muted)
                                         .child(owner.to_uppercase())
                                 }))

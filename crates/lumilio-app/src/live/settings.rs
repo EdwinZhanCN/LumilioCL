@@ -2,9 +2,12 @@ use super::jobs::{job, outcome, reload};
 use super::{POLL, Reload, Wiring};
 use gpui_kit::AppContext as _;
 use gpui_kit::{App, Window};
-use lumilio_core::{CancellationToken, Preferences, ServiceError};
+use lumilio_core::{
+    CancellationToken, Preferences, ServiceError, import_wallpaper, remove_wallpapers,
+};
 use lumilio_ui::live::settings_view;
 use lumilio_ui::platform;
+use lumilio_ui::theme::{Catalog, scan_dir};
 use lumilio_ui::toast::Toast;
 use lumilio_ui::tr;
 use std::future::Future;
@@ -19,6 +22,8 @@ pub(super) fn apply_preferences(
     cx: &mut App,
 ) {
     platform::apply_appearance(preferences.appearance, window, cx);
+    platform::apply_look(&preferences.look, window, cx);
+    apply_wallpaper(wiring, preferences.look.wallpaper.clone(), cx);
     platform::apply_motion(preferences.motion, cx);
     lumilio_ui::i18n::apply_language(preferences.language, cx);
     // Plugin text is the plugin's own; tell the host which tag to read it in
@@ -30,6 +35,81 @@ pub(super) fn apply_preferences(
             .backend
             .spawn(async move { service.set_plugin_locale(&tag).await }),
     );
+}
+
+/// Shows the chosen wallpaper once its file is found, off the UI thread. No
+/// choice puts the world back and clears the stored pictures; a choice whose
+/// file is gone shows the world and says so on the Appearance tab.
+fn apply_wallpaper(wiring: &Wiring, chosen: Option<String>, cx: &mut App) {
+    let dir = wiring.backend.service.layout().themes();
+    let check = wiring.backend.spawn(async move {
+        let Some(name) = chosen else {
+            let cleared = dir.clone();
+            let _ = tokio::task::spawn_blocking(move || remove_wallpapers(&cleared, None)).await;
+            return (None, false);
+        };
+        // A hand-edited name must stay inside the folder.
+        let plain = std::path::Path::new(&name).file_name() == Some(name.as_ref());
+        let path = dir.join(&name);
+        if plain
+            && tokio::fs::metadata(&path)
+                .await
+                .is_ok_and(|meta| meta.is_file())
+        {
+            (Some(path), false)
+        } else {
+            (None, true)
+        }
+    });
+    cx.spawn(async move |cx| {
+        if let Ok((path, missing)) = check.await {
+            cx.update(|cx| platform::apply_wallpaper(path, missing, cx));
+        }
+    })
+    .detach();
+}
+
+/// Copies the chosen picture into the launcher's folder off the UI thread,
+/// then saves it as the wallpaper through the ordinary preferences path.
+pub(super) fn set_wallpaper(
+    wiring: &Wiring,
+    source: std::path::PathBuf,
+    window: &Window,
+    cx: &mut App,
+) {
+    let dir = wiring.backend.service.layout().themes();
+    let import = wiring.backend.spawn(async move {
+        tokio::task::spawn_blocking(move || import_wallpaper(&source, &dir)).await
+    });
+    let wiring = wiring.clone();
+    let window = window.window_handle();
+    cx.spawn(async move |cx| {
+        let failure = match import.await {
+            Ok(Ok(Ok(name))) => {
+                let mut next = wiring.state.borrow().preferences.clone();
+                next.look.wallpaper = Some(name);
+                let _ = cx.update_window(window, |_, window, cx| {
+                    super::dispatch::on_live_intent(
+                        &wiring,
+                        lumilio_ui::live::LiveIntent::SetPreferences(next),
+                        window,
+                        cx,
+                    );
+                });
+                return;
+            }
+            Ok(Ok(Err(error))) => error.to_string(),
+            Ok(Err(error)) => error.to_string(),
+            Err(error) => error.to_string(),
+        };
+        let _ = wiring.shell.update(cx, |shell, cx| {
+            shell.toast(
+                Toast::error(tr!("settings-wallpaper-failed")).technical(failure),
+                cx,
+            )
+        });
+    })
+    .detach();
 }
 
 pub(super) fn edit_plugin_setting(
@@ -100,6 +180,23 @@ pub(super) fn edit_plugin_setting(
     .detach();
 }
 
+/// Reads the local theme files off the UI thread and applies the look again
+/// once they are in, so a theme chosen earlier shows as soon as it is found.
+pub(super) fn reload_themes(wiring: &Wiring, window: gpui_kit::AnyWindowHandle, cx: &mut App) {
+    let themes = wiring.backend.service.layout().themes();
+    let scan = wiring
+        .backend
+        .spawn(async move { tokio::task::spawn_blocking(move || scan_dir(&themes)).await });
+    cx.spawn(async move |cx| {
+        if let Ok(Ok((entries, rejected))) = scan.await {
+            let _ = cx.update_window(window, |_, window, cx| {
+                platform::apply_catalog(Catalog::with_local(entries, rejected), window, cx);
+            });
+        }
+    })
+    .detach();
+}
+
 /// Reads the saved preferences once at start-up and applies them.
 pub(super) fn apply_saved_preferences(
     wiring: &Wiring,
@@ -110,6 +207,7 @@ pub(super) fn apply_saved_preferences(
     let handle = wiring
         .backend
         .spawn(async move { service.settings().await.preferences });
+    reload_themes(wiring, window, cx);
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
         let Ok(preferences) = handle.await else {

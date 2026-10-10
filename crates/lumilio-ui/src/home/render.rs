@@ -149,7 +149,7 @@ pub(super) fn eyebrow(label: impl Into<SharedString>, accent: Hsla) -> impl Into
 
 pub(super) fn headline(text: impl Into<SharedString>) -> impl IntoElement {
     div()
-        .text_size(px(30.))
+        .text_size(crate::theme::font_px(30.))
         .line_height(px(38.))
         .font_semibold()
         .text_color(on_art())

@@ -11,9 +11,7 @@ use crate::key::Key;
 use gpui::{App, Context, Entity, IntoElement, Render, WeakEntity, Window, div, prelude::*, px};
 use gpui_component::dialog::Dialog;
 use gpui_component::input::{Input, InputState};
-use gpui_component::{
-    ActiveTheme as _, Sizable as _, StyledExt as _, WindowExt as _, h_flex, v_flex,
-};
+use gpui_component::{Sizable as _, StyledExt as _, WindowExt as _, h_flex, v_flex};
 use lumilio_core::{CatalogEntry, Loader, LoaderVersion, VersionChannel};
 
 use crate::kit;
@@ -563,7 +561,7 @@ impl Render for NewGameForm {
         if !self.busy {
             self.request_loader_versions(window, cx);
         }
-        let colors = ShellColors::from_theme(cx.theme());
+        let colors = ShellColors::current(cx);
         let placeholder = default_name(self.loader, self.game_version(cx).as_deref());
         if placeholder != self.placeholder {
             self.placeholder = placeholder.clone();

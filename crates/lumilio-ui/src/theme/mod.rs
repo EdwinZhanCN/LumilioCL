@@ -1,5 +1,16 @@
 //! Semantic tokens: the instrument's two bodies (design language §12), brand
-//! type (§13), and motion (§2).
+//! type (§13), and motion (§2). Themes, fonts and the interface scale that
+//! replace them are described in ADR 0044.
+
+mod look;
+mod spec;
+#[cfg(test)]
+mod tests;
+
+pub use look::{
+    ALUMINIUM, Catalog, Choice, Entry, Look, NIGHT, Origin, Rejected, Wallpaper, scan_dir,
+};
+pub use spec::{Color, Fonts, Palette, Resolved, ThemeSpec, Tone, WindowBackground, parse_file};
 
 use gpui::{BoxShadow, Hsla, Pixels, px};
 use gpui_component::Theme;
@@ -49,6 +60,33 @@ pub const SANS_FONT: &str = "Space Grotesk";
 pub const MONO_FONT: &str = "JetBrains Mono";
 /// Segment digits on a display, nowhere else.
 pub const LCD_FONT: &str = "DSEG7 Classic";
+
+/// The monospace family in force, for the many places that name it without a
+/// context at hand. [`tune`] sets it with the rest of the look, so it is
+/// process-wide state: one look is shown at a time.
+static MONO_FAMILY: std::sync::RwLock<Option<gpui::SharedString>> = std::sync::RwLock::new(None);
+
+/// The monospace family the launcher draws values and logs in now.
+#[must_use]
+pub fn mono_font() -> gpui::SharedString {
+    MONO_FAMILY
+        .read()
+        .ok()
+        .and_then(|family| family.clone())
+        .unwrap_or_else(|| MONO_FONT.into())
+}
+
+/// A text size written in pixels at 100 %, as a rem, so it follows the
+/// interface scale like the stock text sizes do. Display digits are not sized
+/// with this: they keep their pixel size so they cannot outgrow the window.
+#[must_use]
+pub fn font_px(size: f32) -> gpui::Rems {
+    gpui::rems(size / BASE_FONT_SIZE)
+}
+
+/// The interface's body text size at 100 %, which is also the rem.
+pub const BASE_FONT_SIZE: f32 = 16.;
+pub const BASE_MONO_FONT_SIZE: f32 = 13.;
 
 fn hex(value: u32) -> Hsla {
     gpui::rgb(value).into()
@@ -143,9 +181,14 @@ impl Body {
         }
     }
 
-    /// The body the component theme is currently showing.
-    pub fn of_theme(theme: &Theme) -> Self {
-        Self::of(theme.mode.is_dark())
+    /// The body the launcher is drawn with now: the chosen theme's colours,
+    /// or the built-in body of the component theme's mode before a look has
+    /// been applied.
+    pub fn current(cx: &gpui::App) -> Self {
+        match cx.try_global::<Look>() {
+            Some(look) => look.theme.body,
+            None => Self::of(Theme::global(cx).mode.is_dark()),
+        }
     }
 }
 
@@ -236,13 +279,25 @@ pub fn glow(color: Hsla) -> Vec<BoxShadow> {
 /// Stock dialogs, menus, popovers, toasts and inputs follow these tokens; only
 /// their shapes stay stock.
 pub fn tune(cx: &mut gpui::App) {
+    let tone = Tone::of(Theme::global(cx).mode.is_dark());
+    let look = Look::resolve(cx, tone);
+    cx.set_global(look.clone());
+    let body = look.theme.body;
     let theme = Theme::global_mut(cx);
-    let body = Body::of_theme(theme);
 
-    theme.font_family = SANS_FONT.into();
-    theme.mono_font_family = MONO_FONT.into();
-    theme.radius = px(4.);
-    theme.radius_lg = px(6.);
+    if let Ok(mut family) = MONO_FAMILY.write() {
+        *family = Some(look.mono.clone().into());
+    }
+    theme.font_family = look.sans.into();
+    theme.mono_font_family = look.mono.into();
+    // A chosen Chinese face is tried before the system's, in every window.
+    theme.font_fallbacks = look.cjk.into_iter().map(Into::into).collect();
+    // The root sets the rem size from this, so every rem-based size follows.
+    let scale = f32::from(look.scale_percent) / 100.;
+    theme.font_size = px(BASE_FONT_SIZE * scale);
+    theme.mono_font_size = px(BASE_MONO_FONT_SIZE * scale);
+    theme.radius = look.theme.radius;
+    theme.radius_lg = look.theme.radius_lg;
     // The stock dialog overlay (20 % black in dark) vanishes against our
     // near-black page, so a dialog would not read as in front (§10).
     theme.overlay = if body.dark {
@@ -322,8 +377,8 @@ pub struct ShellColors {
 }
 
 impl ShellColors {
-    pub fn from_theme(theme: &Theme) -> Self {
-        let body = Body::of_theme(theme);
+    pub fn current(cx: &gpui::App) -> Self {
+        let body = Body::current(cx);
         Self {
             body,
             background: body.page,
@@ -368,116 +423,6 @@ pub mod motion {
         #[test]
         fn interface_durations_are_strictly_ordered() {
             assert!(INSTANT < QUICK && QUICK < SETTLE && SETTLE < SCENE);
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use gpui::{Hsla, Rgba, TestAppContext};
-    use gpui_component::{Theme, ThemeMode};
-
-    use super::{Body, ShellColors, tune};
-
-    fn luminance(color: Hsla) -> f32 {
-        let rgba = Rgba::from(color);
-        let channel = |value: f32| {
-            if value <= 0.03928 {
-                value / 12.92
-            } else {
-                ((value + 0.055) / 1.055).powf(2.4)
-            }
-        };
-        0.2126 * channel(rgba.r) + 0.7152 * channel(rgba.g) + 0.0722 * channel(rgba.b)
-    }
-
-    /// WCAG 2 contrast ratio.
-    fn contrast(a: Hsla, b: Hsla) -> f32 {
-        let (a, b) = (luminance(a), luminance(b));
-        (a.max(b) + 0.05) / (a.min(b) + 0.05)
-    }
-
-    fn bodies() -> [(&'static str, Body); 2] {
-        [("aluminium", Body::of(false)), ("night", Body::of(true))]
-    }
-
-    #[test]
-    fn text_tokens_reach_4_5_to_1_on_what_they_sit_on() {
-        for (name, b) in bodies() {
-            let pairs = [
-                ("ink on page", b.ink, b.page),
-                ("ink on panel", b.ink, b.panel),
-                ("muted on page", b.muted, b.page),
-                ("muted on panel", b.muted, b.panel),
-                ("on white key", b.on_white, b.key_white),
-                ("on black key", b.on_black, b.key_black),
-                ("ink on key grey (plain tag, port tab)", b.ink, b.key_grey),
-                ("orange text on page", b.orange_text, b.page),
-                ("orange text on panel", b.orange_text, b.panel),
-                ("danger text on page", b.danger_text, b.page),
-                ("danger text on panel", b.danger_text, b.panel),
-                ("white on danger key", b.on_orange, b.danger),
-                ("display ink on display", b.display_ink, b.display),
-                ("display label on display", b.display_label, b.display),
-                ("page on ink tag", b.page, b.ink),
-            ];
-            for (what, fg, bg) in pairs {
-                let ratio = contrast(fg, bg);
-                assert!(ratio >= 4.5, "{name}: {what} is {ratio:.2}:1");
-            }
-        }
-    }
-
-    /// The accepted exceptions (design language §9), listed so that they can
-    /// neither widen nor sink further unnoticed.
-    #[test]
-    fn white_on_orange_stays_within_the_accepted_exception() {
-        let (aluminium, night) = (Body::of(false), Body::of(true));
-        let light = contrast(aluminium.on_orange, aluminium.orange);
-        let dark = contrast(night.on_orange, night.orange);
-        assert!((3.4..3.7).contains(&light), "aluminium: {light:.2}:1");
-        assert!((3.0..3.3).contains(&dark), "night: {dark:.2}:1");
-    }
-
-    #[test]
-    fn marks_that_stand_alone_reach_3_to_1() {
-        for (name, b) in bodies() {
-            // A lit LED is never the only sign of state (§9), which is why
-            // orange on aluminium may sit at 2.8:1 on the page; held to 3:1
-            // everywhere else. Keys are identified by their labels, which the
-            // text test covers.
-            let led = contrast(b.orange, b.page);
-            let floor = if b.dark { 3. } else { 2.7 };
-            assert!(led >= floor, "{name}: lit LED on page is {led:.2}:1");
-            let on_panel = contrast(b.orange, b.panel);
-            assert!(on_panel >= 3., "{name}: orange on panel is {on_panel:.2}:1");
-            let led_off = contrast(b.led_off, b.page);
-            assert!(
-                led_off >= 1.5,
-                "{name}: an unlit LED still shows ({led_off:.2}:1)"
-            );
-        }
-    }
-
-    #[gpui::test]
-    fn tune_maps_the_body_onto_the_component_theme_in_both_appearances(cx: &mut TestAppContext) {
-        cx.update(gpui_component::init);
-        for mode in [ThemeMode::Light, ThemeMode::Dark] {
-            cx.update(|cx| {
-                Theme::change(mode, None, cx);
-                tune(cx);
-                let theme = Theme::global(cx);
-                let body = Body::of(mode.is_dark());
-                assert_eq!(theme.primary, body.orange, "{mode:?}");
-                assert_eq!(theme.background, body.page, "{mode:?}");
-                assert_eq!(theme.foreground, body.ink, "{mode:?}");
-                assert_eq!(theme.border, body.hairline, "{mode:?}");
-                assert_eq!(theme.font_family.as_ref(), super::SANS_FONT);
-                assert_eq!(theme.mono_font_family.as_ref(), super::MONO_FONT);
-                let colors = ShellColors::from_theme(theme);
-                assert_eq!(colors.primary, theme.primary);
-                assert_eq!(colors.background, theme.background);
-            });
         }
     }
 }

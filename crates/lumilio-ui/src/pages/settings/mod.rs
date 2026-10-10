@@ -3,6 +3,7 @@
 //! controls; anything typed is edited in a dialog (design language §10).
 
 mod about;
+mod appearance;
 mod game_defaults;
 mod general;
 mod java;
@@ -17,6 +18,7 @@ mod tests;
 pub use self::text::{bytes_text, commands_text, list_text, memory_text, window_text};
 
 use self::about::about;
+use self::appearance::appearance;
 use self::game_defaults::game_defaults;
 use self::general::general;
 use self::java::java;
@@ -34,6 +36,7 @@ use gpui_component::v_flex;
 pub fn tabs() -> &'static [&'static str] {
     tr_all![
         "settings-tab-general",
+        "settings-tab-appearance",
         "settings-tab-game-defaults",
         "settings-tab-java",
         "settings-tab-downloads",
@@ -54,7 +57,7 @@ fn fullscreen_choices() -> &'static [&'static str] {
 }
 
 /// The 插件 tab: its list and its detail scroll on their own.
-const PLUGINS_TAB: usize = 5;
+const PLUGINS_TAB: usize = 6;
 
 /// The page is an app shell: the header and tabs stay put and only the body
 /// below them scrolls. The 插件 tab owns its scrolling instead (master–detail).
@@ -74,9 +77,10 @@ pub fn render(ctx: &LiveCtx) -> impl IntoElement {
         Some(view) => {
             let content = match tab {
                 0 => general(view, ctx),
-                1 => game_defaults(view, ctx),
-                2 => java(view, ctx),
-                3 => downloads(view, ctx),
+                1 => appearance(view, ctx),
+                2 => game_defaults(view, ctx),
+                3 => java(view, ctx),
+                4 => downloads(view, ctx),
                 _ => about(view, ctx),
             };
             kit::scroll_body(

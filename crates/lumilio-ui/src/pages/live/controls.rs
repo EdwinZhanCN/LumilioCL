@@ -151,6 +151,10 @@ pub struct LiveCtx<'a> {
     pub account_viewer: Option<&'a gpui::Entity<crate::skin_view::SkinViewer>>,
     /// Its look area (the preview beside the skins), unless it is read-only.
     pub wardrobe: Option<&'a gpui::Entity<crate::wardrobe::Wardrobe>>,
+    /// The look in force and the themes found, for the 外观 tab.
+    pub look: Option<&'a crate::theme::Look>,
+    pub catalog: Option<&'a crate::theme::Catalog>,
+    pub wallpaper: Option<&'a crate::theme::Wallpaper>,
 }
 
 pub(super) fn send(

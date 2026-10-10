@@ -12,13 +12,23 @@
 | 启动器日志 | 关于 · 按键 | 在访达中显示日志目录 |  | `lumilio-ui/src/pages/settings/about.rs` |
 | 导出诊断包 | 关于 · 按键 | 打包版本、设置摘要、Java 列表和各游戏最近日志；玩家名、UUID、路径脱敏 |  | `lumilio-ui/src/pages/settings/about.rs` |
 | 开源许可 | 关于 · 值 | 显示 AGPL-3.0-only |  | `lumilio-ui/src/pages/settings/about.rs` |
+| 明暗 | 外观 · 分段：跟随系统 / 浅色 / 深色 | 立即生效并保存 |  | `lumilio-ui/src/pages/settings/appearance.rs` |
+| 浅色主题 | 外观 · 值 + 更改 → 对话框里可搜索的主题列表 | 立即切换并保存；“恢复默认”回到内置的铝 |  | `lumilio-ui/src/pages/settings/appearance.rs` |
+| 深色主题 | 外观 · 值 + 更改 → 对话框里可搜索的主题列表 | 立即切换并保存；“恢复默认”回到内置的夜 |  | `lumilio-ui/src/pages/settings/appearance.rs` |
+| 界面字体 | 外观 · 值 + 更改 → 对话框里可搜索的已装字体 | 立即生效并保存；“恢复默认”回到 Space Grotesk |  | `lumilio-ui/src/pages/settings/appearance.rs` |
+| 等宽字体 | 外观 · 值 + 更改 → 对话框里可搜索的已装字体 | 版本号、数值和游戏日志跟着变；“恢复默认”回到 JetBrains Mono |  | `lumilio-ui/src/pages/settings/appearance.rs` |
+| 中文字体 | 外观 · 值 + 更改 → 对话框里可搜索的已装字体 | 汉字优先用它；没装就回退系统中文字体并在这里说明，不会用拉丁字体画汉字 |  | `lumilio-ui/src/pages/settings/appearance.rs` |
+| 界面缩放 | 外观 · 分段：85% / 100% / 115% / 130% | 文字和间距一起缩放，立即生效并保存；范围有上下限，防止破版 |  | `lumilio-ui/src/pages/settings/appearance.rs` |
+| 主页壁纸 | 外观 · 按键「选择图片…」→ 系统文件选择器 | 图片缩小后存进启动器文件夹，主页换成这张图，底部仍溶解进页面；不是图片就提示，当前壁纸不变 |  | `lumilio-ui/src/pages/settings/appearance.rs` |
+| 恢复默认壁纸 | 外观 · 按键 | 主页回到默认的像素世界，存下的图片一并删除 |  | `lumilio-ui/src/pages/settings/appearance.rs` |
+| 重新读取本地主题 | 外观 · 按键 | 重新扫描 themes 文件夹；能用的出现在上面的列表里，不能用的在下面说明原因 |  | `lumilio-ui/src/pages/settings/appearance.rs` |
+| 打开主题文件夹 | 外观 · 按键 | 在系统文件管理器里显示 themes 文件夹，没有就先建好 |  | `lumilio-ui/src/pages/settings/appearance.rs` |
 | 最小 / 最大内存 | 游戏默认 · 值 + [编辑] 弹窗 | 弹窗说明本机内存与推荐值；恢复默认 = 推荐值 |  | `lumilio-ui/src/pages/settings/game_defaults.rs` |
 | 窗口大小、全屏 | 游戏默认 · 值 + [编辑] 弹窗 | 宽高一起填；全屏 关 / 开 / 不设置 |  | `lumilio-ui/src/pages/settings/game_defaults.rs` |
 | Java 参数 | 游戏默认 · 值 + [编辑] 弹窗 | 每行一项；游戏自己设置了参数时以游戏的为准 |  | `lumilio-ui/src/pages/settings/game_defaults.rs` |
 | 游戏参数 | 游戏默认 · 值 + [编辑] 弹窗 | 每行一项 |  | `lumilio-ui/src/pages/settings/game_defaults.rs` |
 | 环境变量 | 游戏默认 · 值 + [编辑] 弹窗 | 每行 名称=值 |  | `lumilio-ui/src/pages/settings/game_defaults.rs` |
 | 启动前 / 包装 / 退出后命令 | 游戏默认 · 值 + [编辑] 弹窗 | 以当前用户权限运行；启动前命令失败取消启动，退出后命令失败只记录 |  | `lumilio-ui/src/pages/settings/game_defaults.rs` |
-| 外观 | 通用 · 分段：跟随系统 / 浅色 / 深色 | 立即生效并保存 |  | `lumilio-ui/src/pages/settings/general.rs` |
 | 语言 | 通用 · 分段：跟随系统 / 简体中文 / English | 立即切换并保存，组件自带的文字一起换；跟随系统时取系统语言里第一个中文或英文，都没有则用简体中文 |  | `lumilio-ui/src/pages/settings/general.rs` |
 | 进入游戏后 | 通用 · 分段：保持 / 隐藏启动器 | 没有“关闭启动器”：启动器要守着游戏记录会话与游玩时间，关掉它游戏也会结束 |  | `lumilio-ui/src/pages/settings/general.rs` |
 | 游戏退出后回到前台 | 通用 · 开关（默认开） | 游戏结束时把启动器带回最前面 |  | `lumilio-ui/src/pages/settings/general.rs` |

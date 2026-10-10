@@ -18,7 +18,7 @@ use gpui::{
     App, Bounds, Context, FocusHandle, MouseButton, ObjectFit, Pixels, Point, RenderImage,
     ScrollDelta, Task, Window, canvas, div, img, px,
 };
-use gpui_component::{ActiveTheme as _, h_flex, v_flex};
+use gpui_component::{h_flex, v_flex};
 use lumilio_core::ModelPreview;
 use lumilio_schematic_render::{SceneError, View};
 
@@ -419,7 +419,7 @@ impl Render for Viewer {
             let (load, id) = (self.load.clone(), cx.entity_id().as_u64());
             window.defer(cx, move |window, cx| load(id, window, cx));
         }
-        let colors = ShellColors::from_theme(cx.theme());
+        let colors = ShellColors::current(cx);
         let rgb = colors.surface.to_rgb();
         // Nucleation clears in linear RGB; GPUI's theme colours are sRGB.
         self.view.background = Some([linear(rgb.r), linear(rgb.g), linear(rgb.b), 1.]);

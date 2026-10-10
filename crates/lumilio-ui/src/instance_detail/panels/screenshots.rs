@@ -15,7 +15,7 @@ use crate::tr;
 use gpui::prelude::*;
 use gpui::{AnyElement, App, Context, Entity, ObjectFit, Window, div, img, px};
 use gpui_component::dialog::Dialog;
-use gpui_component::{ActiveTheme as _, Icon, WindowExt as _, h_flex, v_flex};
+use gpui_component::{Icon, WindowExt as _, h_flex, v_flex};
 use lumilio_core::ScreenshotInfo;
 
 /// How many cards are shown at first, and added each time more are asked for.
@@ -243,7 +243,7 @@ impl InstanceDetailView {
         };
         let shot: &ScreenshotInfo = &shots[at];
         let (file, path, total) = (shot.file.clone(), shot.path.clone(), shots.len());
-        let colors = theme::ShellColors::from_theme(cx.theme());
+        let colors = theme::ShellColors::current(cx);
         let on = |run: fn(
             &mut InstanceDetailView,
             &str,

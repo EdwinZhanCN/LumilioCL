@@ -174,7 +174,7 @@ pub fn render(
                     .h(scene_height)
                     .overflow_hidden()
                     .font_family(font_family)
-                    .text_size(px(13.))
+                    .text_size(crate::theme::font_px(13.))
                     .line_height(px(CELL_HEIGHT))
                     .whitespace_nowrap()
                     .children(lines.into_iter().map(move |line| {

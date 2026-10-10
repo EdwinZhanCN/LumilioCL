@@ -12,7 +12,7 @@ use gpui::{
     App, Context, FocusHandle, MouseButton, ObjectFit, Pixels, Point, RenderImage, ScrollDelta,
     Task, Window, canvas, div, img, px,
 };
-use gpui_component::{ActiveTheme as _, Selectable as _, Sizable as _, v_flex};
+use gpui_component::{Selectable as _, Sizable as _, v_flex};
 use lumilio_skin_render::{Arms, BackEquipment, Camera, Player, Texture, render};
 
 use crate::key::Key;
@@ -313,7 +313,7 @@ impl Render for SkinViewer {
             .detach();
             self.release_registered = true;
         }
-        let colors = ShellColors::from_theme(cx.theme());
+        let colors = ShellColors::current(cx);
         let this = cx.weak_entity();
         let measure = canvas(
             move |bounds, window, cx: &mut App| {

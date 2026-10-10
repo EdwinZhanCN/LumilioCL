@@ -47,7 +47,7 @@ pub(super) fn render_first_use(
                 )
                 .child(
                     div()
-                        .text_size(px(20.))
+                        .text_size(crate::theme::font_px(20.))
                         .font_semibold()
                         .text_color(colors.foreground)
                         .child(crate::tr!("home-first-use-title")),

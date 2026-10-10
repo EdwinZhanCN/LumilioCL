@@ -159,3 +159,22 @@ fn hero_contact_sheet() {
         std::fs::write(format!("{dir}/{name}.ppm"), bytes).expect("write frame");
     }
 }
+
+#[test]
+fn a_chosen_picture_ends_exactly_in_the_page_colour_and_breaks_up_on_the_way() {
+    use super::wallpaper::{is_page, veil};
+    let (columns, rows) = (64, 13);
+    let page_cells = |band: usize| (0..columns).filter(|x| is_page(*x, band, rows)).count();
+    assert_eq!(page_cells(rows - 1), columns, "the last row is all page");
+    assert!(page_cells(0) < columns / 4, "the top row is mostly picture");
+    // Ordered dither picks a different threshold row by row, so single rows
+    // are not monotonic; the band as a whole thickens toward the page.
+    let upper: usize = (0..rows / 2).map(page_cells).sum();
+    let lower: usize = (rows / 2..rows).map(page_cells).sum();
+    assert!(
+        upper * 2 < lower,
+        "{upper} page texels above, {lower} below"
+    );
+    assert!((0..rows).any(|band| (1..columns).contains(&page_cells(band))));
+    assert!((0..rows).all(|band| veil(band, rows) <= 0.65 + f32::EPSILON));
+}

@@ -199,7 +199,7 @@ impl EditDialog {
 
 impl Render for EditDialog {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let colors = ShellColors::from_theme(cx.theme());
+        let colors = ShellColors::current(cx);
         let busy = self.busy;
         let rows: Vec<AnyElement> = self
             .fields

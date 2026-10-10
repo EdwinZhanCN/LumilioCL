@@ -6,7 +6,7 @@ use crate::{
 };
 use gpui::prelude::*;
 use gpui::{App, Context, Entity, Window, div, px};
-use gpui_component::{ActiveTheme as _, WindowExt as _, dialog::Dialog, h_flex, v_flex};
+use gpui_component::{WindowExt as _, dialog::Dialog, h_flex, v_flex};
 use lumilio_core::GameLogSource;
 
 impl InstanceDetailView {
@@ -39,7 +39,7 @@ impl InstanceDetailView {
         let Some((_, source, read)) = &this.log_analysis else {
             return dialog;
         };
-        let colors = ShellColors::from_theme(cx.theme());
+        let colors = ShellColors::current(cx);
         let mut body = v_flex().gap_3().child(
             div()
                 .text_sm()
@@ -163,7 +163,7 @@ fn technical_detail(
                 .w_full()
                 .min_w_0()
                 .debug_selector(move || selector.to_string())
-                .font_family(theme::MONO_FONT)
+                .font_family(theme::mono_font())
                 .text_xs()
                 .text_color(colors.muted)
                 .child(detail.to_owned()),

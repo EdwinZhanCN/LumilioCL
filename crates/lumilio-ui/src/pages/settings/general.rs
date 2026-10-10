@@ -4,16 +4,11 @@ use crate::kit;
 use crate::live::SettingsView;
 use crate::{tr, tr_all};
 use gpui::{AnyElement, IntoElement};
-use lumilio_core::{AfterLaunch, Appearance, Language, MotionPreference};
+use lumilio_core::{AfterLaunch, Language, MotionPreference};
 
 pub(super) fn general(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
     let colors = ctx.colors;
     let prefs = &view.preferences;
-    let appearance = match prefs.appearance {
-        Appearance::System => 0,
-        Appearance::Light => 1,
-        Appearance::Dark => 2,
-    };
     let after = match prefs.after_launch {
         AfterLaunch::Keep => 0,
         AfterLaunch::Hide => 1,
@@ -31,28 +26,6 @@ pub(super) fn general(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
     let foreground = prefs.foreground_on_exit();
     let shown = view.clone();
     let rows = vec![
-        // ia[settings]: 外观 | 通用 · 分段：跟随系统 / 浅色 / 深色 | 立即生效并保存
-        preference_row(
-            "settings-appearance",
-            tr!("settings-appearance"),
-            None,
-            tr_all![
-                "settings-follow-system",
-                "settings-appearance-light",
-                "settings-appearance-dark",
-            ],
-            appearance,
-            {
-                let view = shown.clone();
-                move |index| {
-                    with_preferences(&view, move |prefs| {
-                        prefs.appearance =
-                            [Appearance::System, Appearance::Light, Appearance::Dark][index.min(2)];
-                    })
-                }
-            },
-            ctx,
-        ),
         // ia[settings]: 语言 | 通用 · 分段：跟随系统 / 简体中文 / English | 立即切换并保存，组件自带的文字一起换；跟随系统时取系统语言里第一个中文或英文，都没有则用简体中文
         preference_row(
             "settings-language",

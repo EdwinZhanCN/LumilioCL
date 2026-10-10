@@ -1,0 +1,61 @@
+{
+  "name": "Catppuccin",
+  "themes": [
+    {
+      "name": "Catppuccin Latte",
+      "appearance": "light",
+      "source": "Palette by Catppuccin, https://github.com/catppuccin/catppuccin (MIT License, Copyright (c) 2021 Catppuccin). Display colours use the Mocha palette.",
+      "colors": {
+        "page": "#e6e9ef",
+        "panel": "#eff1f5",
+        "hairline": "#acb0be",
+        "ink": "#4c4f69",
+        "muted": "#6c6f85",
+        "key_white": "#eff1f5",
+        "key_black": "#4c4f69",
+        "key_grey": "#ccd0da",
+        "on_white": "#4c4f69",
+        "on_black": "#eff1f5",
+        "orange": "#8839ef",
+        "orange_text": "#8839ef",
+        "on_orange": "#eff1f5",
+        "danger": "#d20f39",
+        "danger_text": "#d20f39",
+        "led_off": "#acb0be",
+        "ok": "#40a02b",
+        "display": "#1e1e2e",
+        "display_ink": "#fab387",
+        "display_dim": "#313244",
+        "display_label": "#7f849c"
+      }
+    },
+    {
+      "name": "Catppuccin Mocha",
+      "appearance": "dark",
+      "source": "Palette by Catppuccin, https://github.com/catppuccin/catppuccin (MIT License, Copyright (c) 2021 Catppuccin).",
+      "colors": {
+        "page": "#181825",
+        "panel": "#1e1e2e",
+        "hairline": "#45475a",
+        "ink": "#cdd6f4",
+        "muted": "#a6adc8",
+        "key_white": "#45475a",
+        "key_black": "#11111b",
+        "key_grey": "#313244",
+        "on_white": "#cdd6f4",
+        "on_black": "#cdd6f4",
+        "orange": "#cba6f7",
+        "orange_text": "#cba6f7",
+        "on_orange": "#11111b",
+        "danger": "#f38ba8",
+        "danger_text": "#f38ba8",
+        "led_off": "#585b70",
+        "ok": "#a6e3a1",
+        "display": "#11111b",
+        "display_ink": "#fab387",
+        "display_dim": "#313244",
+        "display_label": "#7f849c"
+      }
+    }
+  ]
+}

@@ -188,8 +188,8 @@ fn capsule(
                         .child(crate::controls::led(true, body))
                         .child(
                             div()
-                                .font_family(theme::MONO_FONT)
-                                .text_size(px(10.))
+                                .font_family(theme::mono_font())
+                                .text_size(crate::theme::font_px(10.))
                                 .line_height(px(10.))
                                 .text_color(colors.foreground)
                                 .child(ActivityBadge::text(activity_count)),
@@ -615,7 +615,7 @@ mod tests {
     }
 
     impl Render for Page {
-        fn render(&mut self, _: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
+        fn render(&mut self, _: &mut Window, cx: &mut gpui::Context<Self>) -> impl IntoElement {
             let clicks = self.clicks.clone();
             div()
                 .size_full()
@@ -629,7 +629,7 @@ mod tests {
                 .child(render(
                     Route::Home,
                     0,
-                    ShellColors::from_theme(&gpui_component::Theme::default()),
+                    ShellColors::current(cx),
                     Rc::new(|_, _, _| {}),
                     Leading {
                         title: "首页".into(),

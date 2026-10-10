@@ -58,6 +58,12 @@ impl Layout {
         self.root.join("library.json")
     }
 
+    /// Where local theme files and the home wallpaper are kept.
+    #[must_use]
+    pub fn themes(&self) -> PathBuf {
+        self.root.join("themes")
+    }
+
     #[must_use]
     pub fn meta(&self) -> PathBuf {
         self.root.join("meta")

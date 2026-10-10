@@ -445,6 +445,12 @@ impl gpui_base::RootPlugin for WindowState {
                 .bg(cx.theme().tokens.background)
                 .text_color(cx.theme().foreground),
         );
+        let fallbacks = &cx.theme().font_fallbacks;
+        if !fallbacks.is_empty() {
+            surface.style().text.font_fallbacks = Some(gpui::FontFallbacks::from_fonts(
+                fallbacks.iter().map(ToString::to_string).collect(),
+            ));
+        }
     }
 
     fn decorate(

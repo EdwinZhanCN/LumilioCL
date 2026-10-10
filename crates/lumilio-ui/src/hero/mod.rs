@@ -13,6 +13,7 @@ pub(crate) mod raster;
 mod scenes;
 mod timeline;
 mod transition;
+mod wallpaper;
 
 use std::cell::Cell;
 use std::rc::Rc;
@@ -207,6 +208,13 @@ pub fn accent(scene: Scene) -> Hsla {
 
 impl Render for HeroCarousel {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // A chosen picture replaces the world, scenes and their copy with it.
+        if let Some(path) = cx
+            .try_global::<theme::Wallpaper>()
+            .and_then(|wallpaper| wallpaper.path.clone())
+        {
+            return wallpaper::view(path, cx.theme().background).into_any_element();
+        }
         let reduce_motion = cx.reduce_motion();
         let now = Instant::now();
         let step = self
@@ -262,7 +270,7 @@ impl Render for HeroCarousel {
             )
             .child(
                 div()
-                    .text_size(px(28.))
+                    .text_size(crate::theme::font_px(28.))
                     .line_height(px(36.))
                     .font_semibold()
                     .text_color(white)
@@ -356,6 +364,7 @@ impl Render for HeroCarousel {
                     .justify_center()
                     .child(column),
             )
+            .into_any_element()
     }
 }
 

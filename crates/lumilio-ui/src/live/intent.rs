@@ -163,6 +163,11 @@ pub enum LiveIntent {
         key: String,
     },
     SetPreferences(Preferences),
+    /// Read the `themes` folder again.
+    ReloadThemes,
+    /// Make this picture the Home wallpaper (copied into the launcher's
+    /// folder first).
+    SetWallpaper(PathBuf),
     SetLaunchDefaults(LaunchTuning),
     SetMemory {
         min_mb: Option<u32>,

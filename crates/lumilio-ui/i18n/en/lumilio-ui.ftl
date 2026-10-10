@@ -1372,11 +1372,45 @@ settings-tab-java = Java
 settings-tab-downloads = Downloads & storage
 settings-tab-about = About
 settings-tab-plugins = Plugins
+settings-tab-appearance = Appearance
 
 settings-follow-system = System
 settings-appearance = Appearance
 settings-appearance-light = Light
 settings-appearance-dark = Dark
+settings-appearance-mode = Light or dark
+settings-theme-light = Light theme
+settings-theme-dark = Dark theme
+settings-theme-pick-help = Pick one for light and one for dark; with System, the launcher switches with the system.
+settings-theme-missing = This theme leaves out { $count ->
+    [one] { $count } colour
+   *[other] { $count } colours
+    }; the defaults fill in.
+settings-theme-local = Local themes
+settings-theme-local-help = Put .json theme files in this folder, then choose Reload.
+settings-theme-reload = Reload
+settings-theme-rejected = Could not use { $file }: { $reason }
+settings-font-sans = Interface font
+settings-font-mono = Monospace font
+settings-font-mono-help = Used for versions, values and game logs.
+settings-font-cjk = Chinese font
+settings-font-cjk-help = Chinese characters use this font first; without it they fall back to the system's Chinese font.
+settings-font-cjk-missing = This font is not installed; Chinese text keeps the system's Chinese font.
+settings-font-default = Default
+settings-scale = Interface scale
+settings-scale-help = Scales text and spacing together.
+settings-scale-85 = 85%
+settings-scale-100 = 100%
+settings-scale-115 = 115%
+settings-scale-130 = 130%
+settings-wallpaper = Home wallpaper
+settings-wallpaper-help = Replaces Home's pixel world with your own picture. The picture is scaled down and kept in the launcher's folder, so the original can move.
+settings-wallpaper-default = Default world
+settings-wallpaper-chosen = Your picture
+settings-wallpaper-choose = Choose picture…
+settings-wallpaper-prompt = Choose a wallpaper
+settings-wallpaper-missing = The wallpaper file is missing; Home shows the default world for now.
+settings-wallpaper-failed = Could not use that picture
 settings-after-launch = When the game starts
 settings-after-launch-keep = Keep
 settings-after-launch-hide = Hide launcher

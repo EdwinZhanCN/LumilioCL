@@ -27,7 +27,7 @@ use gpui::{
     App, Bounds, Context, FocusHandle, MouseButton, ObjectFit, Pixels, Point, RenderImage, Task,
     Window, canvas, div, img, px, relative,
 };
-use gpui_component::{ActiveTheme as _, h_flex, v_flex};
+use gpui_component::{h_flex, v_flex};
 use lumilio_core::world_map::store::annotations::{Annotation, AnnotationKind, route_length};
 use lumilio_core::world_map::{MapSchedule, Viewport, WorldMapContext};
 use lumilio_core::{CancellationToken, MapFailure, MapProviders};
@@ -1250,7 +1250,7 @@ impl Render for MapView {
             let id = cx.entity_id().as_u64();
             window.defer(cx, move |window, cx| load(id, window, cx));
         }
-        let colors = ShellColors::from_theme(cx.theme());
+        let colors = ShellColors::current(cx);
         if let Some(result) = self.applied.take() {
             let target = cx.weak_entity();
             window.defer(cx, move |window, cx| {

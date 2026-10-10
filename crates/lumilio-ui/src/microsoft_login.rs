@@ -10,9 +10,7 @@ use std::rc::Rc;
 use crate::key::Key;
 use gpui::{App, Context, Entity, IntoElement, Render, Window, div, prelude::*, px};
 use gpui_component::dialog::Dialog;
-use gpui_component::{
-    ActiveTheme as _, Sizable as _, StyledExt as _, WindowExt as _, h_flex, v_flex,
-};
+use gpui_component::{Sizable as _, StyledExt as _, WindowExt as _, h_flex, v_flex};
 
 use crate::kit;
 use crate::new_game::Failure;
@@ -173,7 +171,7 @@ impl Render for SignInDialog {
         if std::mem::take(&mut self.close) && window.has_active_dialog(cx) {
             window.close_dialog(cx);
         }
-        let colors = ShellColors::from_theme(cx.theme());
+        let colors = ShellColors::current(cx);
         let body = match &self.phase {
             Phase::Intro => v_flex()
                 .gap_2()
@@ -210,7 +208,7 @@ impl Render for SignInDialog {
                             .rounded(px(10.))
                             .bg(colors.surface_subtle)
                             .debug_selector(|| "signin-code".into())
-                            .text_size(px(28.))
+                            .text_size(crate::theme::font_px(28.))
                             .font_semibold()
                             .text_color(colors.foreground)
                             .child(code.clone()),

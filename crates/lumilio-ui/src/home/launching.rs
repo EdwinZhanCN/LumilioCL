@@ -146,7 +146,7 @@ pub(super) fn render_launching(
         .child(h_flex().gap(px(SEGMENT_GAP)).children(segments))
         .child(
             div()
-                .font_family(crate::theme::MONO_FONT)
+                .font_family(crate::theme::mono_font())
                 .text_xs()
                 .text_color(night.display_label)
                 .child(counts),

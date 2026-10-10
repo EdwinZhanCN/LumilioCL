@@ -8,8 +8,10 @@ use std::rc::Rc;
 
 use crate::key::Key;
 use gpui::{App, Context, Entity, IntoElement, Render, Window, div, prelude::*, px};
+use gpui_component::IndexPath;
 use gpui_component::input::{Input, InputState, Textarea, TextareaState};
-use gpui_component::{ActiveTheme as _, StyledExt as _, WindowExt as _, h_flex, v_flex};
+use gpui_component::select::{SearchableVec, Select, SelectState};
+use gpui_component::{StyledExt as _, WindowExt as _, h_flex, v_flex};
 
 use crate::kit;
 use crate::theme::{self, ShellColors};
@@ -46,6 +48,13 @@ pub enum FieldKind {
         labels: &'static [&'static str],
         selected: usize,
     },
+    /// One of many options, found by searching; the value is the chosen
+    /// option's text, empty while nothing is chosen. For lists that would
+    /// overflow a dialog (installed fonts, themes).
+    Pick {
+        options: Vec<String>,
+        selected: Option<usize>,
+    },
 }
 
 pub struct FieldSpec {
@@ -71,6 +80,7 @@ enum Field {
     Line(Entity<InputState>),
     Lines(Entity<TextareaState>),
     Choice(usize),
+    Pick(Entity<SelectState<SearchableVec<String>>>),
 }
 
 pub struct SettingsDialog<I> {
@@ -121,6 +131,15 @@ impl<I: Clone + 'static> SettingsDialog<I> {
                         .default_value(field.value.clone())
                 })),
                 FieldKind::Choice { selected, .. } => Field::Choice(*selected),
+                FieldKind::Pick { options, selected } => Field::Pick(cx.new(|cx| {
+                    SelectState::new(
+                        SearchableVec::new(options.clone()),
+                        selected.map(IndexPath::new),
+                        window,
+                        cx,
+                    )
+                    .searchable(true)
+                })),
             });
         }
         Self {
@@ -141,6 +160,11 @@ impl<I: Clone + 'static> SettingsDialog<I> {
                 Field::Line(state) => state.read(cx).value().to_string(),
                 Field::Lines(state) => state.read(cx).value().to_string(),
                 Field::Choice(index) => index.to_string(),
+                Field::Pick(select) => select
+                    .read(cx)
+                    .selected_value()
+                    .cloned()
+                    .unwrap_or_default(),
             })
             .collect()
     }
@@ -229,7 +253,7 @@ impl<I: Clone + 'static> SettingsDialog<I> {
 
 impl<I: Clone + 'static> Render for SettingsDialog<I> {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let colors = ShellColors::from_theme(cx.theme());
+        let colors = ShellColors::current(cx);
         let entity = cx.entity().downgrade();
         let fields = self.spec_fields.iter().enumerate().map(|(index, spec)| {
             let (label, help, choices) = *spec;
@@ -274,6 +298,7 @@ impl<I: Clone + 'static> Render for SettingsDialog<I> {
                     None => Input::new(state).into_any_element(),
                 },
                 (Field::Lines(state), _) => Textarea::new(state).into_any_element(),
+                (Field::Pick(select), _) => Select::new(select).into_any_element(),
                 (Field::Choice(selected), Some(labels)) => {
                     let entity = entity.clone();
                     h_flex()

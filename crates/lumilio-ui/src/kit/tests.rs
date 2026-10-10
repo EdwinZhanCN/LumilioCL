@@ -1,7 +1,7 @@
 use gpui::prelude::*;
 
 use gpui::{IntoElement, Render, TestAppContext, Window, div};
-use gpui_component::{ActiveTheme as _, Theme, ThemeMode};
+use gpui_component::{Theme, ThemeMode};
 
 use super::{TagKind, list, lit_bars, panel_list, tag};
 use crate::theme::{self, ShellColors};
@@ -10,7 +10,7 @@ struct Sheet;
 
 impl Render for Sheet {
     fn render(&mut self, _: &mut Window, cx: &mut gpui::Context<Self>) -> impl IntoElement {
-        let colors = ShellColors::from_theme(cx.theme());
+        let colors = ShellColors::current(cx);
         div()
             .w(gpui::px(300.))
             .child(

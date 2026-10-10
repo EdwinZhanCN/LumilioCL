@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use gpui::{App, Global, PathPromptOptions, Window};
 use gpui_component::ThemeMode;
-use lumilio_core::{Appearance, MotionPreference};
+use lumilio_core::{Appearance, LookPreferences, MotionPreference};
 
 /// What the person chose for the look; `System` follows the OS.
 #[derive(Default)]
@@ -30,6 +30,29 @@ pub(crate) fn chosen_appearance(cx: &App) -> Appearance {
 /// Switches to the chosen look now; later system changes still follow it.
 pub fn apply_appearance(appearance: Appearance, window: &mut Window, cx: &mut App) {
     cx.set_global(AppearanceChoice(appearance));
+    crate::shell::sync_appearance(window, cx);
+}
+
+/// Switches to the chosen themes, fonts and scale now.
+pub fn apply_look(look: &LookPreferences, window: &mut Window, cx: &mut App) {
+    cx.set_global(crate::theme::Choice(look.clone()));
+    crate::shell::sync_appearance(window, cx);
+}
+
+/// Shows the picture behind Home (`path`), or the procedural world for
+/// `None`. `missing` says a chosen picture was not found.
+pub fn apply_wallpaper(path: Option<std::path::PathBuf>, missing: bool, cx: &mut App) {
+    let next = crate::theme::Wallpaper { path, missing };
+    if cx.try_global::<crate::theme::Wallpaper>() != Some(&next) {
+        cx.set_global(next);
+        cx.refresh_windows();
+    }
+}
+
+/// Takes the themes found on disk into use; a theme the person had chosen
+/// that was not there yet shows as soon as it is.
+pub fn apply_catalog(catalog: crate::theme::Catalog, window: &mut Window, cx: &mut App) {
+    cx.set_global(catalog);
     crate::shell::sync_appearance(window, cx);
 }
 

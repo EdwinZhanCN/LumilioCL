@@ -59,6 +59,7 @@ mod storage;
 mod transfer;
 mod tuning;
 mod updates;
+mod wallpaper;
 mod worlds;
 mod yggdrasil;
 
@@ -198,13 +199,15 @@ pub use transfer::{
     TransferRequest, Transport, TransportError, TransportFuture, TransportResponse,
 };
 pub use tuning::{
-    AfterLaunch, Appearance, DOWNLOAD_CONCURRENCY, DiscoverPreferences, EnvVar, InstanceLaunch,
-    Language, LaunchTuning, MAX_WINDOW_SIDE, MotionPreference, Preferences, QuickPlay,
-    QuickPlayProblem, TuningError, quick_play_problem, quick_play_world_unsupported, split_words,
+    AfterLaunch, Appearance, DOWNLOAD_CONCURRENCY, DiscoverPreferences, EnvVar, FONT_SCALE_PERCENT,
+    InstanceLaunch, Language, LaunchTuning, LookPreferences, MAX_WINDOW_SIDE, MotionPreference,
+    Preferences, QuickPlay, QuickPlayProblem, TuningError, quick_play_problem,
+    quick_play_world_unsupported, split_words,
 };
 pub use updates::{
     ContentUpdate, UpdateError, UpdateReport, apply as apply_update, check as check_updates,
 };
+pub use wallpaper::{WallpaperError, import_wallpaper, remove_wallpapers};
 pub use worlds::{
     WorldError, WorldInfo, copy_name as world_copy_name, delete as delete_world,
     duplicate as duplicate_world, scan as scan_worlds, size as world_size,

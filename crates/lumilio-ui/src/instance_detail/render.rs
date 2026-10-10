@@ -8,7 +8,6 @@ use crate::theme::ShellColors;
 use crate::{kit, live, theme, tr};
 use gpui::prelude::*;
 use gpui::{Context, IntoElement, Render, Window, div, px};
-use gpui_component::ActiveTheme as _;
 use gpui_component::{TITLE_BAR_HEIGHT, h_flex, v_flex};
 
 impl Render for InstanceDetailView {
@@ -69,7 +68,7 @@ impl Render for InstanceDetailView {
             self.ensure(Section::Size, window, cx);
             self.ensure(Section::History, window, cx);
         }
-        let colors = ShellColors::from_theme(cx.theme());
+        let colors = ShellColors::current(cx);
         let panel = if self.record.is_some() && self.plugin_open.is_some() {
             self.plugin_panel(colors, cx)
         } else if self.record.is_some() {

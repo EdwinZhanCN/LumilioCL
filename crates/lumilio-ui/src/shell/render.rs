@@ -9,14 +9,13 @@ use crate::theme::ShellColors;
 use crate::{home, kit, navigation, pages, placeholders, theme, toast};
 use gpui::prelude::*;
 use gpui::{App, Context, IntoElement, Render, Window, div};
-use gpui_component::ActiveTheme as _;
 use gpui_component::{TITLE_BAR_HEIGHT, TitleBar, v_flex};
 use std::rc::Rc;
 
 impl Render for LauncherShell {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         toast::flush(&mut self.toasts, window, cx);
-        let colors = ShellColors::from_theme(cx.theme());
+        let colors = ShellColors::current(cx);
         let home_colors = ShellHomeColors {
             foreground: colors.foreground,
             muted: colors.muted,
@@ -122,6 +121,9 @@ impl Render for LauncherShell {
                         .account_viewer
                         .as_ref()
                         .and_then(|viewer| viewer.wardrobe.as_ref()),
+                    look: cx.try_global::<crate::theme::Look>(),
+                    catalog: cx.try_global::<crate::theme::Catalog>(),
+                    wallpaper: cx.try_global::<crate::theme::Wallpaper>(),
                 })
             }
             _ => None,

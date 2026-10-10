@@ -9,7 +9,7 @@ use gpui::{
     ParentElement as _, RenderOnce, SharedString, Stateful, StatefulInteractiveElement as _,
     Styled as _, Window, div, point, prelude::*, px,
 };
-use gpui_component::{ActiveTheme as _, Icon, IconName, Selectable as _, Sizable as _};
+use gpui_component::{Icon, IconName, Selectable as _, Sizable as _};
 
 use crate::key::{ClickHandler, Key};
 use crate::theme::{self, Body};
@@ -37,7 +37,7 @@ pub fn tone_led(color: gpui::Hsla) -> Div {
 /// A 10 px muted silkscreen legend.
 pub fn silk(text: impl Into<SharedString>, body: Body) -> Div {
     div()
-        .text_size(px(10.))
+        .text_size(crate::theme::font_px(10.))
         .text_color(body.muted)
         .child(text.into())
 }
@@ -108,7 +108,7 @@ impl Fader {
 
 impl RenderOnce for Fader {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let body = Body::of_theme(cx.theme());
+        let body = Body::current(cx);
         let on = self.on;
         let toggle = self.on_toggle;
         let slot = if body.dark {
@@ -216,7 +216,7 @@ impl Checkbox {
 
 impl RenderOnce for Checkbox {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let body = Body::of_theme(cx.theme());
+        let body = Body::current(cx);
         let box_id = format!("{}-box", self.id);
         let checked = self.checked;
         let control = div()
@@ -325,7 +325,7 @@ impl Segments {
 
 impl RenderOnce for Segments {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
-        let body = Body::of_theme(cx.theme());
+        let body = Body::current(cx);
         let (id, active) = (self.id, self.active);
         div()
             .flex()
@@ -384,7 +384,7 @@ impl PortTabs {
 
 impl RenderOnce for PortTabs {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let body = Body::of_theme(cx.theme());
+        let body = Body::current(cx);
         let (id, active) = (self.id, self.active);
         let tabs: Vec<Stateful<Div>> = self
             .labels
@@ -401,7 +401,7 @@ impl RenderOnce for PortTabs {
                     .px(px(16.))
                     .flex()
                     .items_center()
-                    .text_size(px(12.))
+                    .text_size(crate::theme::font_px(12.))
                     .cursor_pointer()
                     .bg(if open { body.orange } else { rest })
                     .text_color(if open { body.on_orange } else { body.ink })

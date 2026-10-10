@@ -21,6 +21,11 @@ impl<I: Clone + 'static> SettingsDialog<I> {
                 state.update(cx, |state, cx| state.set_value(text.to_owned(), window, cx));
             }
             Field::Choice(_) => {}
+            Field::Pick(select) => {
+                select.update(cx, |select, cx| {
+                    select.set_selected_value(&text.to_owned(), window, cx)
+                });
+            }
         }
     }
 }

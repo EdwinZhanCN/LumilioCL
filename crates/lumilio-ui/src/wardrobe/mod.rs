@@ -18,7 +18,7 @@ use gpui::{
     App, Context, Entity, FocusHandle, IntoElement, ObjectFit, Render, RenderImage, Task,
     WeakEntity, Window, div, img, prelude::*, px,
 };
-use gpui_component::{ActiveTheme as _, Sizable as _, StyledExt as _, h_flex, v_flex};
+use gpui_component::{Sizable as _, StyledExt as _, h_flex, v_flex};
 use lumilio_core::{AccountLook, LibrarySkin, MojangProfile, PairedCape, SkinModel};
 use lumilio_skin_render::{Arms, Camera, Player, Texture, render};
 use std::collections::{HashMap, HashSet};

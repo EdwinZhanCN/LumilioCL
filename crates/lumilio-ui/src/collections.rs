@@ -12,7 +12,7 @@ use crate::controls::Checkbox;
 use crate::key::Key;
 use gpui::{App, Context, Entity, IntoElement, Render, Window, div, prelude::*, px};
 use gpui_component::input::{Input, InputEvent, InputState};
-use gpui_component::{ActiveTheme as _, StyledExt as _, WindowExt as _, h_flex, v_flex};
+use gpui_component::{StyledExt as _, WindowExt as _, h_flex, v_flex};
 
 use crate::theme::{self, ShellColors};
 
@@ -255,7 +255,7 @@ impl NamePrompt {
 
 impl Render for NamePrompt {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let colors = ShellColors::from_theme(cx.theme());
+        let colors = ShellColors::current(cx);
         let typed = self.typed(cx);
         // An empty box is not nagged about; the button just stays off.
         let problem = if typed.trim().is_empty() {
@@ -392,7 +392,7 @@ impl CollectionPicker {
 
 impl Render for CollectionPicker {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let colors = ShellColors::from_theme(cx.theme());
+        let colors = ShellColors::current(cx);
         let typed = self.typed(cx);
         let problem = if typed.trim().is_empty() {
             None

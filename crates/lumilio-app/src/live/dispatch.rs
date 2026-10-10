@@ -12,7 +12,7 @@ use super::library::{
 use super::new_game::{import_pack, import_pack_file, open_new_game};
 use super::settings::{
     add_java, apply_preferences, change_setting, check_reclaimable, clear_cache,
-    export_diagnostics, install_java, load_settings, reclaim,
+    export_diagnostics, install_java, load_settings, reclaim, reload_themes, set_wallpaper,
 };
 use super::update;
 use super::{Reload, Wiring};
@@ -448,6 +448,8 @@ pub(super) fn on_live_intent(
                     .spawn(async move { service.set_preferences(preferences).await }),
             );
         }
+        LiveIntent::ReloadThemes => reload_themes(wiring, window.window_handle(), cx),
+        LiveIntent::SetWallpaper(path) => set_wallpaper(wiring, path, window, cx),
         LiveIntent::SetPreferences(preferences) => {
             let service = wiring.backend.service.clone();
             let saved = preferences.clone();

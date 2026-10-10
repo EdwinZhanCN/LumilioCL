@@ -106,7 +106,7 @@ pub fn header(
                 .gap_1()
                 .child(
                     div()
-                        .text_size(px(36.))
+                        .text_size(crate::theme::font_px(36.))
                         .line_height(px(42.))
                         .font_weight(gpui::FontWeight::LIGHT)
                         .text_color(colors.foreground)

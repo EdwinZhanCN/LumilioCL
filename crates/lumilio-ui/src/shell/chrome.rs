@@ -24,6 +24,10 @@ pub(crate) fn sync_appearance(window: &mut Window, cx: &mut App) {
         },
     }
     theme::tune(cx);
+    let background = cx
+        .try_global::<theme::Look>()
+        .map_or_else(Default::default, |look| look.theme.window_background);
+    window.set_background_appearance(background.to_gpui());
 }
 
 /// Builds the window content. The caller mounts it under the framework `Root`

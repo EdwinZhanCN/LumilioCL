@@ -10,7 +10,6 @@ use gpui::{
     AnyElement, App, Context, Entity, IntoElement, Render, WeakEntity, Window, div, px,
     uniform_list,
 };
-use gpui_component::ActiveTheme as _;
 use gpui_component::Sizable as _;
 use gpui_component::StyledExt as _;
 use gpui_component::WindowExt as _;
@@ -271,7 +270,7 @@ impl VersionSwitch {
                 .on_click(|_, window, cx| window.close_dialog(cx)),
             !busy,
         );
-        let colors = ShellColors::from_theme(cx.theme());
+        let colors = ShellColors::current(cx);
         theme::dialog(dialog, cx)
             .title(tr!(
                 "instance-content-switch-title",
@@ -305,7 +304,7 @@ impl Render for VersionSwitch {
         if std::mem::take(&mut self.close) && window.has_active_dialog(cx) {
             window.close_dialog(cx);
         }
-        let colors = ShellColors::from_theme(cx.theme());
+        let colors = ShellColors::current(cx);
         let left: AnyElement = match &self.versions {
             None => kit::empty(tr!("version-picker-loading"), "", colors).into_any_element(),
             Some(Err(message)) => v_flex()

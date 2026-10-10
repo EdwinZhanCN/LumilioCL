@@ -7,7 +7,7 @@ use crate::key::Key;
 use gpui::{App, Context, Entity, Window, div, prelude::*, px};
 use gpui_component::dialog::Dialog;
 use gpui_component::input::Input;
-use gpui_component::{ActiveTheme as _, StyledExt as _, WindowExt as _, h_flex, v_flex};
+use gpui_component::{StyledExt as _, WindowExt as _, h_flex, v_flex};
 
 use super::panels::Confirm;
 use super::{InstanceDetailView, InstanceIntent, Section};
@@ -145,7 +145,7 @@ impl InstanceDetailView {
             return dialog;
         };
         let busy = this.busy;
-        let colors = theme::ShellColors::from_theme(cx.theme());
+        let colors = theme::ShellColors::current(cx);
         let label = |text: &'static str, help: Option<&'static str>, id: &'static str| {
             h_flex()
                 .gap_1()

@@ -167,7 +167,7 @@ impl ProjectDetailView {
                         )
                         .child(
                             div()
-                                .font_family(crate::theme::MONO_FONT)
+                                .font_family(crate::theme::mono_font())
                                 .text_xs()
                                 .text_color(gpui::white().opacity(0.75))
                                 .child(format!("{} / {}", at + 1, total)),
