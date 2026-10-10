@@ -57,7 +57,7 @@ fn list_item(
         .when(shown, |item| item.bg(colors.surface_subtle))
         .hover(|item| item.bg(colors.surface_subtle))
         .on_click(move |_, window, cx| emit(ViewIntent::Choose(ACCOUNT_GROUP, index), window, cx))
-        .child(kit::avatar(&row.name, 28.))
+        .child(kit::avatar(&row.name, ctx.model.face_of(&row.key), 28.))
         .child(
             v_flex()
                 .flex_1()
@@ -160,7 +160,7 @@ fn detail_head(row: &AccountRow, ctx: &LiveCtx) -> impl IntoElement {
         .w_full()
         .items_center()
         .gap_4()
-        .child(kit::avatar(&row.name, 56.))
+        .child(kit::avatar(&row.name, ctx.model.face_of(&row.key), 56.))
         .child(
             v_flex()
                 .flex_1()

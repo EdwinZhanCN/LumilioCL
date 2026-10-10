@@ -4,10 +4,13 @@ use crate::key::Key;
 use crate::theme;
 use crate::theme::ShellColors;
 use gpui::prelude::*;
-use gpui::{App, ClickEvent, Hsla, IntoElement, SharedString, Window, div, px};
+use gpui::{
+    App, ClickEvent, Hsla, IntoElement, ObjectFit, RenderImage, SharedString, Window, div, img, px,
+};
 use gpui_component::Sizable as _;
 use gpui_component::StyledExt as _;
 use gpui_component::{Icon, h_flex};
+use std::sync::Arc;
 
 /// View tabs as port labels (design language §12).
 pub fn tabs<S: Clone + Into<SharedString>>(
@@ -144,10 +147,18 @@ pub fn filter_row(
         }))
 }
 
-/// A round identity mark: the name's first letter on a colour taken from the
-/// name, so the same account always looks the same. Stands in for the skin
-/// head until skins exist.
-pub fn avatar(name: &str, size: f32) -> gpui::Div {
+/// A round identity mark: the player's own face when it is known, otherwise
+/// the name's first letter on a colour taken from the name, so the same
+/// account always looks the same.
+pub fn avatar(name: &str, face: Option<Arc<RenderImage>>, size: f32) -> gpui::Div {
+    if let Some(image) = face {
+        return div()
+            .flex_none()
+            .size(px(size))
+            .rounded_full()
+            .overflow_hidden()
+            .child(img(image).size_full().object_fit(ObjectFit::Cover));
+    }
     let hue = (crate::live::seed_of(name) % 360) as f32 / 360.;
     let initial = name
         .chars()

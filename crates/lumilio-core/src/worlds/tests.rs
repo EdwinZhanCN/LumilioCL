@@ -49,8 +49,10 @@ fn lists_worlds_newest_first_with_their_details() {
     let names: Vec<_> = worlds.iter().map(|w| w.name.as_str()).collect();
     assert_eq!(names, ["New World", "Old World"]);
     assert_eq!(worlds[0].game_version.as_deref(), Some("1.21.1"));
-    assert!(worlds[0].hardcore && worlds[0].has_icon && !worlds[0].damaged);
-    assert!(!worlds[1].hardcore && !worlds[1].has_icon);
+    assert!(worlds[0].hardcore && !worlds[0].damaged);
+    let icon = worlds[0].icon.as_deref().expect("new has a cover");
+    assert_eq!(icon, game.join("saves/new/icon.png"));
+    assert!(!worlds[1].hardcore && worlds[1].icon.is_none());
     assert_eq!(worlds[0].last_played_ms, Some(2000));
 }
 

@@ -84,7 +84,7 @@ fn world(folder: &str) -> lumilio_core::WorldInfo {
         last_played_ms: None,
         game_version: None,
         hardcore: false,
-        has_icon: false,
+        icon: None,
         damaged: false,
         lock_touched_ms: None,
     }

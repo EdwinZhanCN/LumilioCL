@@ -12,6 +12,7 @@ fn server(name: &str, address: &str) -> ServerEntry {
         name: name.into(),
         address: address.into(),
         packs: PackPolicy::Ask,
+        icon: None,
     }
 }
 
@@ -22,6 +23,7 @@ fn status() -> ServerStatus {
         max: Some(20),
         version: Some("Paper 1.21".into()),
         latency_ms: Some(42),
+        favicon: None,
     }
 }
 

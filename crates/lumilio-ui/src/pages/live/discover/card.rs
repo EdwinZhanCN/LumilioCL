@@ -43,7 +43,6 @@ fn placeholder(seed: u32, colors: ShellColors) -> gpui::AnyElement {
             WORLDS[seed as usize / 5 % WORLDS.len()],
             colors.surface,
             px(0.),
-            px(0.),
         ))
         .into_any_element()
 }

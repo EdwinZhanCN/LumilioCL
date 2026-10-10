@@ -22,7 +22,7 @@ pub use self::mojang::{
     AppearanceChange, AppearanceError, AppearanceUpdate, MojangCape, MojangClient, MojangProfile,
     MojangSkin,
 };
-pub use self::pixels::{AccountLook, Pixels, cape_pixels, looks_slim, skin_pixels};
+pub use self::pixels::{AccountLook, Pixels, cape_pixels, face, looks_slim, skin_pixels};
 pub use self::server::{Character, LocalSkinServer};
 pub(crate) use self::signer::KEY_BITS;
 pub use self::signer::Signer;

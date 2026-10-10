@@ -461,18 +461,13 @@ fn collect_models<'a>(view: &'a View, out: &mut Vec<&'a str>) {
     }
 }
 
-/// RGBA pixels from a plugin as the BGRA bitmap GPUI uploads; a malformed
-/// image is left out rather than trusted.
+/// RGBA pixels from a plugin as the bitmap GPUI uploads; a malformed image is
+/// left out rather than trusted.
 fn render_image(data: &ImageData) -> Option<Arc<RenderImage>> {
     if !data.is_valid() {
         return None;
     }
-    let mut bytes = data.rgba.clone();
-    for pixel in bytes.as_chunks_mut::<4>().0 {
-        pixel.swap(0, 2);
-    }
-    let buffer = image::RgbaImage::from_raw(data.width, data.height, bytes)?;
-    Some(Arc::new(RenderImage::new([image::Frame::new(buffer)])))
+    crate::pixels::image(data.width, data.height, &data.rgba)
 }
 
 struct Paint<'a> {

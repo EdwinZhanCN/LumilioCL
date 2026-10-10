@@ -27,6 +27,7 @@ pub mod navigation;
 pub mod new_game;
 pub mod pages;
 pub mod photosensitivity;
+pub mod pixels;
 pub mod placeholders;
 pub mod platform;
 pub mod plugin_setting_dialog;

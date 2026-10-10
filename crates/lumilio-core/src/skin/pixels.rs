@@ -127,6 +127,62 @@ pub fn looks_slim(skin: &Pixels) -> bool {
     })
 }
 
+/// The player's face for an avatar: the head's front 8×8 texels with the hat
+/// layer over them, drawn at `size` square by nearest sampling. A real skin's
+/// head front is opaque, so the result is opaque too; a transparent hat simply
+/// leaves the face colour.
+#[must_use]
+pub fn face(skin: &Pixels, size: u32) -> Pixels {
+    let side = size.max(1);
+    let mut rgba = vec![0_u8; side as usize * side as usize * 4];
+    if skin.width < 64 || !skin.width.is_multiple_of(64) || skin.height != skin.width {
+        return Pixels {
+            width: side,
+            height: side,
+            rgba,
+        };
+    }
+    let scale = skin.width / 64;
+    for y in 0..side {
+        for x in 0..side {
+            let (fx, fy) = (x * 8 / side, y * 8 / side);
+            let base = texel(skin, (8 + fx) * scale, (8 + fy) * scale);
+            let hat = texel(skin, (40 + fx) * scale, (8 + fy) * scale);
+            let at = ((y * side + x) * 4) as usize;
+            rgba[at..at + 4].copy_from_slice(&over(hat, base));
+        }
+    }
+    Pixels {
+        width: side,
+        height: side,
+        rgba,
+    }
+}
+
+fn texel(skin: &Pixels, x: u32, y: u32) -> [u8; 4] {
+    let at = ((y * skin.width + x) * 4) as usize;
+    [
+        skin.rgba[at],
+        skin.rgba[at + 1],
+        skin.rgba[at + 2],
+        skin.rgba[at + 3],
+    ]
+}
+
+/// `top` over `bottom`, both straight (non-premultiplied) RGBA.
+fn over(top: [u8; 4], bottom: [u8; 4]) -> [u8; 4] {
+    let a = f32::from(top[3]) / 255.;
+    let ba = f32::from(bottom[3]) / 255.;
+    let out_a = a + ba * (1. - a);
+    if out_a <= 0. {
+        return [0, 0, 0, 0];
+    }
+    let mix = |c: usize| {
+        ((f32::from(top[c]) * a + f32::from(bottom[c]) * ba * (1. - a)) / out_a).round() as u8
+    };
+    [mix(0), mix(1), mix(2), (out_a * 255.).round() as u8]
+}
+
 /// The game's own upgrade of a 64×32 skin: each face of the right leg and
 /// right arm is copied, mirrored, to the left limb's place, and a hat area
 /// with no transparency at all is cleared (old skins filled it).

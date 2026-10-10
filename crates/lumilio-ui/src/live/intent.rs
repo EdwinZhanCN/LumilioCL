@@ -116,6 +116,9 @@ pub enum LiveIntent {
     /// Load what this account (by key) looks like, for the detail's preview;
     /// the answer goes to `LauncherShell::account_look`.
     LoadAccountLook(String),
+    /// Load the face of this account (by key) for an avatar chip; the answer
+    /// goes to `LauncherShell::account_face`.
+    LoadAccountFace(String),
     /// An appearance operation bound to one retained account detail.
     Wardrobe {
         key: String,

@@ -40,6 +40,7 @@ base64 = "0.22"
 flate2 = "1"
 futures-util = "0.3.34"
 getrandom = "0.3"
+hickory-resolver = "0.25"
 keyring = "4.2"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 lumilio-core = { path = "crates/lumilio-core" }

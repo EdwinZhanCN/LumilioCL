@@ -8,6 +8,7 @@ fn entry(name: &str, address: &str) -> ServerEntry {
         name: name.into(),
         address: address.into(),
         packs: PackPolicy::Ask,
+        icon: None,
     }
 }
 

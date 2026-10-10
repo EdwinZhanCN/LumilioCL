@@ -696,7 +696,7 @@ fn home_places_are_the_latest_readable_worlds_then_the_first_servers() {
         last_played_ms: played,
         game_version: None,
         hardcore: folder == "hard",
-        has_icon: false,
+        icon: None,
         damaged,
         lock_touched_ms: None,
     };
@@ -713,6 +713,7 @@ fn home_places_are_the_latest_readable_worlds_then_the_first_servers() {
             name: (*name).to_owned(),
             address: format!("{name}.example"),
             packs: PackPolicy::Ask,
+            icon: None,
         })
         .collect();
     let mut game = record("a", false, None, 1);

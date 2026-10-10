@@ -190,8 +190,7 @@ pub(super) fn reload(wiring: &Wiring, what: Reload, cx: &mut App) {
                         })
                         .collect();
                     model.set_activity(rows, unix_millis());
-                    model.accounts = accounts;
-                    model.accounts_loaded = true;
+                    model.set_accounts(accounts);
                 },
                 cx,
             );

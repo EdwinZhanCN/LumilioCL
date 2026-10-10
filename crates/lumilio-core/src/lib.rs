@@ -164,7 +164,7 @@ pub use repair::{
     RepairReport,
 };
 pub use screenshots::{ScreenshotError, ScreenshotInfo};
-pub use servers::{PackPolicy, PingError, ServerEntry, ServerError, ServerStatus};
+pub use servers::{PackPolicy, PingError, ProtocolVersion, ServerEntry, ServerError, ServerStatus};
 pub use service::{
     ActivityView, AppearanceApplyResult, ContentEffect, ContentResult, DependencyNeed,
     DependencyReport, DiscoverFilters, GameLogSource, GameLogs, InstalledProject, LauncherService,

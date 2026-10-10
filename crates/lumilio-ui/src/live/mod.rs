@@ -42,8 +42,10 @@ pub use self::library::{
 pub use self::settings::{JavaRow, SettingsView, settings_view};
 
 use self::activity::{RateSample, next_sample};
+use gpui::RenderImage;
 use lumilio_core::ProjectKind;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
+use std::sync::Arc;
 
 /// Everything the live pages show.
 #[derive(Clone, Debug)]
@@ -76,6 +78,9 @@ pub struct LiveModel {
     rates: BTreeMap<u64, RateSample>,
     pub accounts: Vec<AccountRow>,
     pub accounts_loaded: bool,
+    /// Each account's skin face, by key. `Some(None)` is "asked, no face",
+    /// so an account that has none is not asked for again and again.
+    pub faces: HashMap<String, Option<Arc<RenderImage>>>,
     pub settings: Option<SettingsView>,
 }
 
@@ -100,6 +105,7 @@ impl Default for LiveModel {
             rates: BTreeMap::new(),
             accounts: Vec::new(),
             accounts_loaded: false,
+            faces: HashMap::new(),
             settings: None,
         }
     }
@@ -155,6 +161,22 @@ impl LiveModel {
     /// The account later launches use, if one is chosen.
     pub fn selected_account(&self) -> Option<&AccountRow> {
         self.accounts.iter().find(|row| row.selected)
+    }
+
+    /// Replaces the account rows, keeping the faces of accounts that are still
+    /// here so they are not fetched again on every refresh.
+    pub fn set_accounts(&mut self, accounts: Vec<AccountRow>) {
+        let keys: std::collections::HashSet<String> =
+            accounts.iter().map(|row| row.key.clone()).collect();
+        self.faces.retain(|key, _| keys.contains(key));
+        self.accounts = accounts;
+        self.accounts_loaded = true;
+    }
+
+    /// The face of an account, if one has been loaded.
+    #[must_use]
+    pub fn face_of(&self, key: &str) -> Option<Arc<RenderImage>> {
+        self.faces.get(key).cloned().flatten()
     }
 
     /// How many pages the current results span.

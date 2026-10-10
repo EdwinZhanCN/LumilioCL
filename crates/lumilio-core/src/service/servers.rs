@@ -69,9 +69,24 @@ impl<T: Transport + Clone> LauncherService<T> {
             .map_err(ServiceError::from)
     }
 
-    /// Asks a server how it is. Needs no instance; a server that does not
-    /// answer is an error the caller shows as "offline".
-    pub async fn server_status(&self, address: &str) -> Result<ServerStatus, ServiceError> {
-        servers::probe(address).await.map_err(ServiceError::from)
+    /// Asks a server how it is, with the handshake the instance's game version
+    /// calls for (the legacy ping for a pre-1.7 version). A server that does
+    /// not answer is an error the caller shows as "offline".
+    pub async fn server_status(
+        &self,
+        id: &str,
+        address: &str,
+    ) -> Result<ServerStatus, ServiceError> {
+        let record = self.instance(id).await?;
+        let versions = self.layout.versions();
+        let game_version = record.game_version;
+        let protocol = tokio::task::spawn_blocking(move || {
+            servers::protocol_version(&game_version, &versions)
+        })
+        .await
+        .map_err(std::io::Error::other)?;
+        servers::probe(address, protocol)
+            .await
+            .map_err(ServiceError::from)
     }
 }

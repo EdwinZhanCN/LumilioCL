@@ -3,11 +3,13 @@
 //! current instance on the trailing side.
 
 use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::key::Key;
 use crate::tr;
 use gpui::{
-    Anchor, AnyElement, App, ClickEvent, IntoElement, SharedString, Window, div, prelude::*, px,
+    Anchor, AnyElement, App, ClickEvent, IntoElement, RenderImage, SharedString, Window, div,
+    prelude::*, px,
 };
 use gpui_component::popover::Popover;
 use gpui_component::{Icon, Selectable as _, Sizable as _, StyledExt as _, h_flex, v_flex};
@@ -61,6 +63,8 @@ pub struct AccountChoice {
     pub name: SharedString,
     pub detail: SharedString,
     pub selected: bool,
+    /// The account's skin face, once it has been loaded.
+    pub face: Option<Arc<RenderImage>>,
 }
 
 /// The trailing zone's account chip: who plays, and the others to switch to.
@@ -317,7 +321,7 @@ fn account_zone(account: CurrentAccount, colors: ShellColors) -> AnyElement {
         .white()
         .large()
         .tooltip(tr!("nav-current-account", name = chosen.name.to_string()))
-        .child(crate::kit::avatar(&chosen.name, 30.));
+        .child(crate::kit::avatar(&chosen.name, chosen.face.clone(), 30.));
     let choices = Rc::new(account.choices);
     let choose = account.on_choose;
     let manage = account.on_manage;
@@ -368,7 +372,7 @@ fn account_zone(account: CurrentAccount, colors: ShellColors) -> AnyElement {
                                     choose(&key, window, cx);
                                     popover.update(cx, |state, cx| state.dismiss(window, cx));
                                 })
-                                .child(crate::kit::avatar(&choice.name, 28.))
+                                .child(crate::kit::avatar(&choice.name, choice.face.clone(), 28.))
                                 .child(
                                     v_flex()
                                         .flex_1()

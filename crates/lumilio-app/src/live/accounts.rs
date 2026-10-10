@@ -417,6 +417,27 @@ pub(super) fn load_account_look(wiring: &Wiring, key: String, cx: &mut App) {
     super::wardrobe::load_look(wiring, key, revision, cx);
 }
 
+/// Loads one account's face for an avatar chip. Nothing is stored if the
+/// account has no skin: the chip keeps its letter mark.
+pub(super) fn load_account_face(wiring: &Wiring, key: String, cx: &mut App) {
+    let service = wiring.backend.service.clone();
+    let wanted = key.clone();
+    let handle = wiring
+        .backend
+        .spawn(async move { service.account_face(&wanted).await });
+    let wiring = wiring.clone();
+    cx.spawn(async move |cx| {
+        let result = match handle.await {
+            Ok(result) => result.map_err(|error| error.to_string()),
+            Err(error) => Err(error.to_string()),
+        };
+        let _ = wiring
+            .shell
+            .update(cx, |shell, cx| shell.account_face(&key, result, cx));
+    })
+    .detach();
+}
+
 pub(super) fn load_look_only(wiring: &Wiring, key: String, revision: u64, cx: &mut App) {
     let service = wiring.backend.service.clone();
     let wanted = key.clone();

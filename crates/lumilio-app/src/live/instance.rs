@@ -114,7 +114,9 @@ pub(super) fn instance_intent(
             wiring.state.borrow_mut().next_server = Some(address);
             play(wiring, id.to_owned(), window, cx);
         }
-        InstanceIntent::PingServer(address) => ping_server(wiring, view, address, cx),
+        InstanceIntent::PingServer(address) => {
+            ping_server(wiring, id.to_owned(), view, address, cx)
+        }
         InstanceIntent::Thumbnail(file) => make_thumbnail(wiring, id.to_owned(), view, file, cx),
         InstanceIntent::CopyScreenshot(file) => {
             copy_screenshot(wiring, id.to_owned(), view, file, cx)
@@ -553,9 +555,11 @@ fn copy_screenshot(
     .detach();
 }
 
-/// Asks one server how it is, off the interface thread.
+/// Asks one server how it is, off the interface thread. The instance's game
+/// version decides the handshake (the legacy ping for a pre-1.7 version).
 fn ping_server(
     wiring: &Wiring,
+    id: String,
     view: WeakEntity<InstanceDetailView>,
     address: String,
     cx: &mut App,
@@ -564,7 +568,7 @@ fn ping_server(
     let asked = address.clone();
     let handle = wiring
         .backend
-        .spawn(async move { service.server_status(&asked).await });
+        .spawn(async move { service.server_status(&id, &asked).await });
     cx.spawn(async move |cx| {
         let result = match handle.await {
             Ok(result) => result.map_err(|error| error.to_string()),

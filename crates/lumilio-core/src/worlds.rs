@@ -28,7 +28,9 @@ pub struct WorldInfo {
     pub last_played_ms: Option<i64>,
     pub game_version: Option<String>,
     pub hardcore: bool,
-    pub has_icon: bool,
+    /// The world's cover, when the player chose one in the game
+    /// (`saves/<folder>/icon.png`).
+    pub icon: Option<PathBuf>,
     /// `level.dat` exists but could not be understood.
     pub damaged: bool,
     /// When the game last touched `session.lock` (ms since the Unix epoch).
@@ -103,6 +105,7 @@ pub fn scan(game_dir: &Path) -> Result<Vec<WorldInfo>, WorldError> {
             continue;
         }
         let data = read_level(&level);
+        let icon = path.join(ICON_FILE);
         let field = |key: &[&str]| {
             data.as_ref()
                 .and_then(|tag| tag.at(&[&["Data"], key].concat()))
@@ -117,7 +120,7 @@ pub fn scan(game_dir: &Path) -> Result<Vec<WorldInfo>, WorldError> {
                 .and_then(|tag| tag.as_str())
                 .map(str::to_owned),
             hardcore: field(&["hardcore"]).and_then(nbt::Tag::as_i64) == Some(1),
-            has_icon: path.join(ICON_FILE).is_file(),
+            icon: icon.is_file().then_some(icon),
             damaged: data.is_none(),
             lock_touched_ms: fs::metadata(path.join(LOCK_FILE))
                 .and_then(|metadata| metadata.modified())

@@ -8,7 +8,7 @@ use crate::theme::ShellColors;
 use crate::toast::Toast;
 use crate::tr;
 use gpui::prelude::*;
-use gpui::{AnyElement, Context, Window, div, px};
+use gpui::{AnyElement, Context, ObjectFit, Window, div, img, px};
 use gpui_component::IndexPath;
 use gpui_component::Sizable as _;
 use gpui_component::input::Input;
@@ -25,6 +25,44 @@ pub fn playing_world(worlds: &[WorldInfo], started_ms: i64) -> Option<&str> {
         .filter_map(|world| Some((world.lock_touched_ms.filter(|at| *at >= started_ms)?, world)))
         .max_by_key(|(at, _)| *at)
         .map(|(_, world)| world.folder.as_str())
+}
+
+/// A world row's leading mark: the cover the player chose in the game, or a
+/// procedural cover seeded by the folder when there is none.
+fn cover_lead(
+    world: &WorldInfo,
+    loader: Option<lumilio_core::Loader>,
+    colors: ShellColors,
+) -> AnyElement {
+    let tile = |inner: AnyElement| {
+        div()
+            .relative()
+            .flex_none()
+            .size(px(40.))
+            .overflow_hidden()
+            .bg(colors.body.display)
+            .child(inner)
+            .into_any_element()
+    };
+    if let Some(path) = &world.icon {
+        return tile(
+            img(path.clone())
+                .size_full()
+                .object_fit(ObjectFit::Cover)
+                .into_any_element(),
+        );
+    }
+    let loader = loader.map_or(crate::cover::Loader::Vanilla, crate::live::cover_loader);
+    tile(
+        crate::cover::element(
+            crate::live::seed_of(&world.folder),
+            loader,
+            crate::home::WorldHint::Overworld,
+            colors.body.display,
+            px(0.),
+        )
+        .into_any_element(),
+    )
 }
 
 /// The worlds that match `query` (in the name or the folder, ignoring case),
@@ -336,10 +374,15 @@ impl InstanceDetailView {
                         cx,
                     ))
                     .child(menu);
+                let lead = cover_lead(
+                    world,
+                    self.record.as_ref().map(|record| record.loader),
+                    colors,
+                );
                 kit::row(
                     world.name.clone(),
                     detail.join(" · "),
-                    None,
+                    Some(lead),
                     Some(trail.into_any_element()),
                     colors,
                 )

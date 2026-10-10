@@ -1,11 +1,15 @@
-//! Asking a server how it is (Server List Ping, protocol 1.7+).
+//! Asking a server how it is (Server List Ping): the modern 1.7+ handshake and
+//! the legacy pre-1.7 one.
 //!
 //! Adapted from Modrinth App (`packages/app-lib/src/util/server_ping.rs`,
-//! GPL-3.0-only; ADR 0022): the handshake and status exchange and the limits on
-//! lengths a server states. Everything a server sends is untrusted, so every
-//! length is capped before memory is reserved and the whole exchange has a
-//! deadline.
+//! GPL-3.0-only; ADR 0022): the handshake and status exchange, the legacy
+//! packet, and the limits on lengths a server states. Everything a server sends
+//! is untrusted, so every length is capped before memory is reserved and the
+//! whole exchange has a deadline.
 
+use super::protocol::ProtocolVersion;
+use crate::skin::Pixels;
+use base64::Engine as _;
 use serde_json::Value;
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
@@ -19,6 +23,10 @@ const TIMEOUT: Duration = Duration::from_secs(5);
 /// The status JSON is at most 32 767 characters, up to three bytes each.
 const MAX_STATUS_BYTES: usize = 32_767 * 3;
 const MAX_VARINT_BYTES: usize = 5;
+/// A legacy status is at most 32 767 UTF-16 units.
+const MAX_LEGACY_CHARS: usize = 32_767;
+/// A server's `favicon` is a PNG data URI; only this form is a picture.
+const FAVICON_PREFIX: &str = "data:image/png;base64,";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ServerStatus {
@@ -29,6 +37,8 @@ pub struct ServerStatus {
     pub version: Option<String>,
     /// Round-trip time of the ping, when the server answered it.
     pub latency_ms: Option<u64>,
+    /// The server's icon, when it sent one that is a usable PNG.
+    pub favicon: Option<Pixels>,
 }
 
 #[derive(Debug)]
@@ -83,15 +93,77 @@ pub fn parse_address(address: &str) -> Result<(String, u16), PingError> {
     Ok((host.to_owned(), port))
 }
 
-pub async fn probe(address: &str) -> Result<ServerStatus, PingError> {
-    let (host, port) = parse_address(address)?;
-    probe_at(&host, port).await
+/// Asks the server `address` names. An address without a port is first looked
+/// up as a Minecraft SRV record; the handshake still carries the name that was
+/// typed, as the game does.
+pub async fn probe(
+    address: &str,
+    protocol: Option<ProtocolVersion>,
+) -> Result<ServerStatus, PingError> {
+    let (name, name_port) = parse_address(address)?;
+    tokio::time::timeout(TIMEOUT, async {
+        let (host, port) = resolve_server_address(&name, name_port).await;
+        dispatch((&host, port), (&name, name_port), protocol).await
+    })
+    .await
+    .map_err(|_| PingError::TimedOut)?
 }
 
-pub async fn probe_at(host: &str, port: u16) -> Result<ServerStatus, PingError> {
-    tokio::time::timeout(TIMEOUT, exchange(host, port))
+/// Asks `host:port` directly (no SRV lookup) with the handshake `protocol`
+/// calls for: the legacy one for a pre-1.7 version, otherwise the modern one.
+pub async fn probe_at(
+    host: &str,
+    port: u16,
+    protocol: Option<ProtocolVersion>,
+) -> Result<ServerStatus, PingError> {
+    tokio::time::timeout(TIMEOUT, dispatch((host, port), (host, port), protocol))
         .await
         .map_err(|_| PingError::TimedOut)?
+}
+
+/// Connects to `connect` and asks as `name`; the two differ when an SRV record
+/// redirects the connection.
+async fn dispatch(
+    connect: (&str, u16),
+    name: (&str, u16),
+    protocol: Option<ProtocolVersion>,
+) -> Result<ServerStatus, PingError> {
+    match protocol {
+        Some(known) if known.legacy => legacy_exchange(connect, name, known.version).await,
+        known => exchange(connect, name, known.map(|known| known.version)).await,
+    }
+}
+
+/// Where a server named `host` (no explicit port) really is: its
+/// `_minecraft._tcp.<host>` SRV record, or the address itself when there is no
+/// record, the host is an IP literal, or a port was given.
+async fn resolve_server_address(host: &str, port: u16) -> (String, u16) {
+    if port != DEFAULT_PORT
+        || host.parse::<std::net::Ipv4Addr>().is_ok()
+        || host.parse::<std::net::Ipv6Addr>().is_ok()
+    {
+        return (host.to_owned(), port);
+    }
+    match lookup_srv(host).await {
+        Some((target, port)) => (target, port),
+        None => (host.to_owned(), port),
+    }
+}
+
+/// A DNS `_minecraft._tcp.<host>` SRV lookup: its first target and port (the
+/// game resolves a bare domain the same way). Any failure is "no record".
+async fn lookup_srv(host: &str) -> Option<(String, u16)> {
+    use hickory_resolver::TokioResolver;
+    let resolver = TokioResolver::builder_tokio().ok()?.build();
+    let lookup = resolver
+        .srv_lookup(format!("_minecraft._tcp.{host}"))
+        .await
+        .ok()?;
+    let record = lookup.into_iter().next()?;
+    Some((
+        record.target().to_string().trim_end_matches('.').to_owned(),
+        record.port(),
+    ))
 }
 
 fn write_varint(out: &mut Vec<u8>, value: i32) {
@@ -130,14 +202,24 @@ fn packet(body: &[u8]) -> Vec<u8> {
     out
 }
 
-async fn exchange(host: &str, port: u16) -> Result<ServerStatus, PingError> {
-    let mut stream = TcpStream::connect((host, port)).await?;
+async fn exchange(
+    connect: (&str, u16),
+    name: (&str, u16),
+    protocol: Option<u32>,
+) -> Result<ServerStatus, PingError> {
+    let mut stream = TcpStream::connect(connect).await?;
     stream.set_nodelay(true)?;
 
+    // The handshake carries the name that was typed, not the SRV target.
+    let (host, port) = name;
     let mut handshake = Vec::new();
     write_varint(&mut handshake, 0);
-    // -1: no particular protocol version; servers answer all the same.
-    write_varint(&mut handshake, -1);
+    // The game's protocol, or -1 for "no particular version"; servers answer
+    // all the same.
+    write_varint(
+        &mut handshake,
+        protocol.map_or(-1, |version| version as i32),
+    );
     write_varint(&mut handshake, host.len() as i32);
     handshake.extend(host.as_bytes());
     handshake.extend(port.to_be_bytes());
@@ -167,6 +249,93 @@ async fn exchange(host: &str, port: u16) -> Result<ServerStatus, PingError> {
     let mut status = read_status(&json)?;
     status.latency_ms = latency(&mut stream).await.ok();
     Ok(status)
+}
+
+/// The legacy (pre-1.7) ping: a `0xFE` packet carrying the host and port,
+/// answered by one UTF-16 string of `§`- or NUL-separated fields. Adapted from
+/// Modrinth App `server_ping.rs::legacy` (GPL-3.0-only; ADR 0022). No latency
+/// is measured here.
+async fn legacy_exchange(
+    connect: (&str, u16),
+    name: (&str, u16),
+    protocol: u32,
+) -> Result<ServerStatus, PingError> {
+    // The protocol byte gates the packet layout: below 47 there is no hostname
+    // field, below 73 no "MC|PingHost" prefix.
+    let protocol = u8::try_from(protocol).unwrap_or(74);
+    let (host, port) = name;
+    let mut request = vec![0xfe];
+    if protocol >= 47 {
+        request.push(0x01);
+    }
+    if protocol >= 73 {
+        request.push(0xfa);
+        write_legacy(&mut request, "MC|PingHost");
+        let from = request.len();
+        request.push(protocol);
+        write_legacy(&mut request, host);
+        request.extend_from_slice(&u32::from(port).to_be_bytes());
+        let length = u16::try_from(request.len() - from).map_err(|_| PingError::BadAddress)?;
+        request.splice(from..from, length.to_be_bytes());
+    }
+
+    let mut stream = TcpStream::connect(connect).await?;
+    stream.write_all(&request).await?;
+    stream.flush().await?;
+
+    if stream.read_u8().await? != 0xff {
+        return Err(PingError::Protocol("not a legacy status"));
+    }
+    let chars = usize::from(stream.read_u16().await?);
+    if chars > MAX_LEGACY_CHARS {
+        return Err(PingError::Protocol("the status is too long"));
+    }
+    let mut utf16 = vec![0_u16; chars];
+    for unit in &mut utf16 {
+        *unit = stream.read_u16().await?;
+    }
+
+    let text = String::from_utf16_lossy(&utf16);
+    let mut ancient = false;
+    let mut parts = text.split('\0');
+    // Modern legacy answers start with "§1"; older ones are `§`-separated.
+    if parts.next() != Some("§1") {
+        ancient = true;
+        parts = text.split('§');
+    }
+    let mut version = None;
+    if !ancient {
+        let _protocol = parts.next().and_then(|text| text.parse::<u32>().ok());
+        version = parts
+            .next()
+            .filter(|name| !name.is_empty())
+            .map(str::to_owned);
+    }
+    let motd = parts.next().unwrap_or_default();
+    let online = parts.next().and_then(|text| text.parse::<u32>().ok());
+    let max = parts.next().and_then(|text| text.parse::<u32>().ok());
+    Ok(ServerStatus {
+        motd: strip_codes(motd.trim()),
+        online,
+        max,
+        version,
+        latency_ms: None,
+        favicon: None,
+    })
+}
+
+/// A UTF-16 string with its length in units, big-endian, as the legacy ping
+/// writes text.
+fn write_legacy(out: &mut Vec<u8>, text: &str) {
+    let encoded: Vec<u16> = text.encode_utf16().collect();
+    out.extend_from_slice(
+        &u16::try_from(encoded.len())
+            .unwrap_or(u16::MAX)
+            .to_be_bytes(),
+    );
+    for unit in encoded {
+        out.extend_from_slice(&unit.to_be_bytes());
+    }
 }
 
 async fn latency(stream: &mut TcpStream) -> Result<u64, PingError> {
@@ -209,7 +378,21 @@ pub(super) fn read_status(json: &[u8]) -> Result<ServerStatus, PingError> {
             .and_then(Value::as_str)
             .map(strip_codes),
         latency_ms: None,
+        favicon: value
+            .get("favicon")
+            .and_then(Value::as_str)
+            .and_then(favicon),
     })
+}
+
+/// The status `favicon` field: `data:image/png;base64,…`, decoded with limits.
+/// Anything else is no icon.
+fn favicon(value: &str) -> Option<Pixels> {
+    let encoded = value.trim().strip_prefix(FAVICON_PREFIX)?;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(encoded)
+        .ok()?;
+    super::decode_icon(&bytes)
 }
 
 /// The text of a chat component: its own `text`, then its `extra` parts.

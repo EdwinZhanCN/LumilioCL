@@ -11,8 +11,13 @@ use super::error::ServiceError;
 use crate::account::{AuthSession, Injection, Keepalive, OfflineProfile};
 use crate::injector;
 use crate::settings::{AccountKind, SettingsError};
-use crate::skin::{self, AccountLook, Character, LoadedSkin, LocalSkinServer, Signer, SkinChoice};
+use crate::skin::{
+    self, AccountLook, Character, LoadedSkin, LocalSkinServer, Pixels, Signer, SkinChoice,
+};
 use crate::transfer::Transport;
+
+/// The side of an avatar face, in pixels (crisp down to a 32 px chip).
+pub const FACE_SIZE: u32 = 64;
 
 impl<T: Transport + Clone> LauncherService<T> {
     /// Chooses how an offline account looks (`None` is the game's default
@@ -106,6 +111,13 @@ impl<T: Transport + Clone> LauncherService<T> {
             }
         }
         Ok(look)
+    }
+
+    /// The face of an account's skin, for an avatar chip. `None` when no skin
+    /// is known, so the caller keeps its letter mark.
+    pub async fn account_face(&self, key: &str) -> Result<Option<Pixels>, ServiceError> {
+        let look = self.account_look(key).await?;
+        Ok(look.skin.as_ref().map(|skin| skin::face(skin, FACE_SIZE)))
     }
 
     /// The key the skin server signs with, made on first use (and kept in

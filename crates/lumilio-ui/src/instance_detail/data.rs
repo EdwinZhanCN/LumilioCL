@@ -172,7 +172,16 @@ impl InstanceDetailView {
     /// A section's data arrived. A failure is page state: the section shows
     /// it in place, with its own 技术详情 (§11).
     pub fn arrived(&mut self, arrived: Arrived, cx: &mut Context<Self>) {
-        if matches!(arrived, Arrived::Servers(Ok(_))) {
+        if let Arrived::Servers(Ok(servers)) = &arrived {
+            // The game's cached icons, until a ping brings the live favicon.
+            self.server_icons = servers
+                .iter()
+                .filter_map(|server| {
+                    let pixels = server.icon.as_ref()?;
+                    let image = crate::pixels::image(pixels.width, pixels.height, &pixels.rgba)?;
+                    Some((server.address.clone(), image))
+                })
+                .collect();
             self.ping_servers = true;
         }
         let screenshots = matches!(arrived, Arrived::Screenshots(_));
@@ -231,13 +240,23 @@ impl InstanceDetailView {
         result: Result<lumilio_core::ServerStatus, String>,
         cx: &mut Context<Self>,
     ) {
-        self.server_status.insert(
-            address,
-            match result {
-                Ok(status) => panels::ServerState::Online(status),
-                Err(_) => panels::ServerState::Offline,
-            },
-        );
+        match result {
+            Ok(status) => {
+                // A live icon replaces the one the game cached.
+                if let Some(pixels) = status.favicon.as_ref()
+                    && let Some(image) =
+                        crate::pixels::image(pixels.width, pixels.height, &pixels.rgba)
+                {
+                    self.server_icons.insert(address.clone(), image);
+                }
+                self.server_status
+                    .insert(address, panels::ServerState::Online(status));
+            }
+            Err(_) => {
+                self.server_status
+                    .insert(address, panels::ServerState::Offline);
+            }
+        }
         cx.notify();
     }
 

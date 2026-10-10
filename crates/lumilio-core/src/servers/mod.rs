@@ -5,10 +5,15 @@
 //! cannot be read is reported and left alone, never overwritten.
 
 mod ping;
+mod protocol;
 
 pub use self::ping::{PingError, ServerStatus, probe};
+pub use self::protocol::ProtocolVersion;
 
 use crate::nbt::{self, NbtError, Tag};
+use crate::skin::Pixels;
+use base64::Engine as _;
+use image::ImageReader;
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
@@ -21,6 +26,10 @@ const FILE: &str = "servers.dat";
 const BACKUP: &str = "servers.dat_old";
 const LIST_LIMIT: u64 = 8 * 1024 * 1024;
 const MAX_FIELD: usize = 255;
+/// A server icon is a small PNG (the game writes 64×64); anything far bigger
+/// is not one.
+const ICON_LIMIT: usize = 1024 * 1024;
+const MAX_ICON_SIDE: u32 = 512;
 
 /// What the game does when the server offers a resource pack.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -36,6 +45,10 @@ pub struct ServerEntry {
     /// `host` or `host:port`, as the game stores it (`ip`).
     pub address: String,
     pub packs: PackPolicy,
+    /// The icon the game cached for this server, when it has one (the `icon`
+    /// field of `servers.dat`), decoded for the preview. Read only: edits keep
+    /// the game's copy, so the launcher never loses it.
+    pub icon: Option<Pixels>,
 }
 
 #[derive(Debug)]
@@ -87,7 +100,41 @@ fn entry_of(raw: &Raw) -> ServerEntry {
             Some(_) => PackPolicy::Deny,
             None => PackPolicy::Ask,
         },
+        icon: raw.get("icon").and_then(Tag::as_str).and_then(stored_icon),
     }
+}
+
+/// Decodes a server icon (a small PNG) with limits. Anything unreadable,
+/// oversized or not an image is `None`: an icon is a nicety, not a fact the
+/// list depends on. Everything a server sends is untrusted, so the size and
+/// pixel count are capped before memory is reserved.
+fn decode_icon(bytes: &[u8]) -> Option<Pixels> {
+    if bytes.is_empty() || bytes.len() > ICON_LIMIT {
+        return None;
+    }
+    let mut reader = ImageReader::new(io::Cursor::new(bytes))
+        .with_guessed_format()
+        .ok()?;
+    let mut limits = image::Limits::default();
+    limits.max_image_width = Some(MAX_ICON_SIDE);
+    limits.max_image_height = Some(MAX_ICON_SIDE);
+    limits.max_alloc = Some(16 * 1024 * 1024);
+    reader.limits(limits);
+    let image = reader.decode().ok()?.to_rgba8();
+    Some(Pixels {
+        width: image.width(),
+        height: image.height(),
+        rgba: image.into_raw(),
+    })
+}
+
+/// The game keeps a server's icon in `servers.dat` as base64 PNG.
+fn stored_icon(text: &str) -> Option<Pixels> {
+    let compact: String = text.chars().filter(|ch| !ch.is_whitespace()).collect();
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(compact.as_bytes())
+        .ok()?;
+    decode_icon(&bytes)
 }
 
 fn apply(raw: &mut Raw, entry: &ServerEntry) {
@@ -122,6 +169,7 @@ fn validated(entry: &ServerEntry) -> Result<ServerEntry, ServerError> {
         name: name.to_owned(),
         address: address.to_owned(),
         packs: entry.packs,
+        icon: entry.icon.clone(),
     })
 }
 
@@ -234,6 +282,35 @@ pub fn move_to(
     let moved = servers.remove(index);
     servers.insert(to.min(servers.len()), moved);
     store(game_dir, root, servers)
+}
+
+/// The protocol a server must be asked with for `game_version`: the table for
+/// versions before `version.json` was added to the client jar, otherwise the
+/// number the jar carries. `None` when neither is known, so the modern
+/// handshake goes out without a version.
+#[must_use]
+pub fn protocol_version(game_version: &str, versions_dir: &Path) -> Option<ProtocolVersion> {
+    if let Some(known) = protocol::OLD_PROTOCOL_VERSIONS.get(game_version) {
+        return Some(*known);
+    }
+    let jar = versions_dir
+        .join(game_version)
+        .join(format!("{game_version}.jar"));
+    protocol_from_jar(&jar).map(ProtocolVersion::modern)
+}
+
+/// The `protocolVersion` a client jar embeds in `version.json` (present from
+/// snapshot 18w47b onward). A missing or unreadable jar is `None`.
+fn protocol_from_jar(jar: &Path) -> Option<u32> {
+    let mut archive = zip::ZipArchive::new(fs::File::open(jar).ok()?).ok()?;
+    let mut entry = archive.by_name("version.json").ok()?;
+    let mut text = String::new();
+    io::Read::read_to_string(&mut entry, &mut text).ok()?;
+    serde_json::from_str::<serde_json::Value>(&text)
+        .ok()?
+        .get("protocolVersion")
+        .and_then(serde_json::Value::as_u64)
+        .and_then(|version| u32::try_from(version).ok())
 }
 
 #[cfg(test)]

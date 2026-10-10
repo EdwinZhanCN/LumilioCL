@@ -105,7 +105,6 @@ pub fn faceplate_cover(
         world,
         colors.body.display,
         FACEPLATE_FADE,
-        px(3.),
     )
 }
 

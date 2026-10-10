@@ -30,6 +30,65 @@ impl Drop for AccountViewer {
 }
 
 impl LauncherShell {
+    /// Asks for the face of every account that does not have one yet. An
+    /// offline account answers at once (its skin is local); a Microsoft or
+    /// third-party account arrives later, keeping its letter mark until then.
+    pub(super) fn ensure_account_faces(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(handler) = self.live_handler.clone() else {
+            return;
+        };
+        let wanted: Vec<String> = {
+            let Some(model) = self.live.as_mut() else {
+                return;
+            };
+            if !model.accounts_loaded {
+                return;
+            }
+            let wanted: Vec<String> = model
+                .accounts
+                .iter()
+                .filter(|row| !model.faces.contains_key(&row.key))
+                .map(|row| row.key.clone())
+                .collect();
+            // Marked asked before the answers come, so a slow account is not
+            // asked again on the next frame.
+            for key in &wanted {
+                model.faces.insert(key.clone(), None);
+            }
+            wanted
+        };
+        if wanted.is_empty() {
+            return;
+        }
+        window.defer(cx, move |window, cx| {
+            for key in wanted {
+                handler(LiveIntent::LoadAccountFace(key), window, cx);
+            }
+        });
+    }
+
+    /// A face arrived (or could not). A key that is no longer an account is
+    /// dropped; a failure keeps the letter mark and is not asked for again.
+    pub fn account_face(
+        &mut self,
+        key: &str,
+        result: Result<Option<lumilio_core::SkinPixels>, String>,
+        cx: &mut Context<Self>,
+    ) {
+        let image = match result {
+            Ok(Some(pixels)) => crate::pixels::image(pixels.width, pixels.height, &pixels.rgba),
+            _ => None,
+        };
+        self.update_live(
+            |model| {
+                if model.accounts.iter().any(|row| row.key == key) {
+                    model.faces.insert(key.to_owned(), image);
+                }
+            },
+            cx,
+        );
+    }
+
     pub(super) fn ensure_account_viewer(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let shown = self
             .live

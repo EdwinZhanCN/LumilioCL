@@ -75,10 +75,13 @@ fn the_account_chip_and_page_choose_add_and_manage_accounts(cx: &mut TestAppCont
         cx.debug_bounds("account-make-current").is_none(),
         "Steve is current"
     );
-    assert_eq!(
-        seen.borrow().as_slice(),
-        [LiveIntent::LoadAccountLook("Steve".into())]
-    );
+    // The detail loads the shown account's look, and every account is asked
+    // once for its avatar face.
+    let asked = seen.borrow().clone();
+    assert_eq!(asked.len(), 3, "{asked:?}");
+    assert!(asked.contains(&LiveIntent::LoadAccountLook("Steve".into())));
+    assert!(asked.contains(&LiveIntent::LoadAccountFace("Steve".into())));
+    assert!(asked.contains(&LiveIntent::LoadAccountFace("Alex".into())));
     // A row shows that account without making it current; the detail does.
     seen.borrow_mut().clear();
     let alex = cx.debug_bounds("account-item-1").expect("Alex's row");

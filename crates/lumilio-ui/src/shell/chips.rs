@@ -75,6 +75,7 @@ impl LauncherShell {
                 }
                 .into(),
                 selected: row.selected,
+                face: model.face_of(&row.key),
             })
             .collect();
         let choose = handler.clone();

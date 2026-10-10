@@ -15,6 +15,7 @@ flate2.workspace = true
 image.workspace = true
 futures-util.workspace = true
 getrandom.workspace = true
+hickory-resolver.workspace = true
 keyring.workspace = true
 md-5.workspace = true
 regex.workspace = true

@@ -164,9 +164,8 @@ pub fn element(
     world: WorldHint,
     page: Hsla,
     fade: Pixels,
-    round: Pixels,
 ) -> impl IntoElement {
-    painted(seed, loader, world, page, fade, round, Dissolve::Bottom)
+    painted(seed, loader, world, page, fade, Dissolve::Bottom)
 }
 
 /// A header's backdrop: the cover fills its parent, dissolving on the left
@@ -179,7 +178,7 @@ pub fn corner(
     page: Hsla,
     fade: Pixels,
 ) -> impl IntoElement {
-    painted(seed, loader, world, page, fade, px(0.), Dissolve::Corner)
+    painted(seed, loader, world, page, fade, Dissolve::Corner)
 }
 
 fn painted(
@@ -188,7 +187,6 @@ fn painted(
     world: WorldHint,
     page: Hsla,
     fade: Pixels,
-    round: Pixels,
     dissolve: Dissolve,
 ) -> impl IntoElement {
     let page = page.to_rgb();
@@ -234,16 +232,8 @@ fn painted(
                 Some(Arc::new(RenderImage::new([image::Frame::new(buffer)])))
             });
             if let Some(image) = image {
-                // The shader rounds the corners; only the top ones, because
-                // the bottom dissolves into the surface anyway.
-                let radii = Corners {
-                    top_left: round,
-                    top_right: round,
-                    bottom_left: px(0.),
-                    bottom_right: px(0.),
-                };
                 window
-                    .paint_image(bounds, bounds, radii, image, 0, false)
+                    .paint_image(bounds, bounds, Corners::default(), image, 0, false)
                     .ok();
             }
         },

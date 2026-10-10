@@ -627,6 +627,37 @@ fn modern_skins_pass_through_and_odd_shapes_are_refused() {
 }
 
 #[test]
+fn the_face_is_the_head_front_with_the_hat_over_it() {
+    // Head front (8..16, 8..16) red; hat front (40..48, 8..16) a half-blue.
+    let skin = skin_pixels(&picture(64, 64, |x, y| match (x / 8, y / 8) {
+        (1, 1) => [255, 0, 0, 255],
+        (5, 1) => [0, 0, 255, 128],
+        _ => [0, 0, 0, 0],
+    }))
+    .unwrap();
+    let made = face(&skin, 8);
+    assert_eq!((made.width, made.height), (8, 8));
+    // Red under a ~50% blue hat: opaque, and both colours show through.
+    let blended = texel(&made, 0, 0);
+    assert_eq!(blended[3], 255);
+    assert!(blended[0] > 100 && blended[2] > 100, "{blended:?}");
+    // A skin with no hat keeps the face colour, at any avatar size.
+    let plain = skin_pixels(&picture(64, 64, |x, y| {
+        if (8..16).contains(&x) && (8..16).contains(&y) {
+            [10, 20, 30, 255]
+        } else {
+            [0, 0, 0, 0]
+        }
+    }))
+    .unwrap();
+    for size in [8, 64] {
+        let made = face(&plain, size);
+        assert_eq!((made.width, made.height), (size, size));
+        assert_eq!(texel(&made, size - 1, size - 1), [10, 20, 30, 255]);
+    }
+}
+
+#[test]
 fn capes_are_two_to_one_and_early_ones_are_placed_on_a_canvas() {
     let cape = cape_pixels(&picture(128, 64, |_, _| [9, 9, 9, 255])).unwrap();
     assert_eq!((cape.width, cape.height), (128, 64));

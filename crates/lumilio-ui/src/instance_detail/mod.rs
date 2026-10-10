@@ -25,9 +25,10 @@ use self::forms::Fields;
 use self::panels::{Confirm, Data};
 use crate::toast::Toast;
 use crate::{tr, tr_all};
-use gpui::{App, Entity, Window};
+use gpui::{App, Entity, RenderImage, Window};
 use lumilio_core::{InstanceRecord, LauncherSettings, PluginFinding};
 use std::rc::Rc;
+use std::sync::Arc;
 
 /// A crash report's text and the causes recognised in it, or why it could not be read.
 type CrashRead = Result<(String, Vec<PluginFinding>), String>;
@@ -106,6 +107,9 @@ pub struct InstanceDetailView {
     worlds_sub: usize,
     /// What the last check found out about each server, by address.
     server_status: std::collections::HashMap<String, panels::ServerState>,
+    /// Each server's icon, by address: the game's cached one, or the live
+    /// `favicon` once the server has answered.
+    server_icons: std::collections::HashMap<String, Arc<RenderImage>>,
     /// 截图: the thumbnails asked for or made, by file name, and how many
     /// cards are shown (more are added on request).
     thumbs: std::collections::HashMap<String, panels::Thumb>,
@@ -202,6 +206,7 @@ impl InstanceDetailView {
             world_sort_select: None,
             worlds_sub: 0,
             server_status: std::collections::HashMap::new(),
+            server_icons: std::collections::HashMap::new(),
             ping_servers: false,
             thumbs: std::collections::HashMap::new(),
             shots_shown: panels::SHOTS_PAGE,

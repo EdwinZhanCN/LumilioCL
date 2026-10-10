@@ -69,6 +69,7 @@ impl Render for LauncherShell {
 
         self.ensure_live_controls(window, cx);
         self.ensure_account_viewer(window, cx);
+        self.ensure_account_faces(window, cx);
         self.sync_library_dropdowns(window, cx);
         let change_callback = cx.listener(|this, change: &DiscoverChange, window, cx| {
             this.change_query(change.clone(), window, cx);

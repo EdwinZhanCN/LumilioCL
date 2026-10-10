@@ -156,6 +156,37 @@ async fn a_skin_is_chosen_checked_kept_and_cleared_for_offline_accounts_only() {
 }
 
 #[tokio::test]
+async fn an_account_face_is_the_head_of_its_skin_and_none_without_one() {
+    let world = skin_world();
+    // No chosen skin and no installed client to fall back to: no face.
+    assert!(world.service.account_face("Steve").await.unwrap().is_none());
+
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("me.png");
+    std::fs::write(&file, picture([1, 2, 3, 255])).unwrap();
+    world
+        .service
+        .set_account_skin(
+            "Steve",
+            Some(SkinChoice::Local {
+                model: SkinModel::Wide,
+                skin: Some(file),
+                cape: None,
+            }),
+        )
+        .await
+        .unwrap();
+    let face = world
+        .service
+        .account_face("Steve")
+        .await
+        .unwrap()
+        .expect("a face");
+    assert_eq!((face.width, face.height), (64, 64));
+    assert_eq!(face.rgba.len(), 64 * 64 * 4);
+}
+
+#[tokio::test]
 async fn an_offline_player_without_a_skin_needs_no_agent_and_no_download() {
     let world = skin_world();
     let settings = world.service.settings().await;

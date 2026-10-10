@@ -26,7 +26,7 @@ Implement Minecraft Java releases 1.21.5 through 26.3 in the maintained cubiomes
 - [x] Collect independent game goldens and verify C/Rust output.
 - [x] Update candidate version identities, plugin integration and manual picker after automated verification.
 - [x] Run focused checks and `just check`.
-- [ ] Record maintainer game verification before merging/publishing verified support.
+- [x] Record maintainer game verification before merging/publishing verified support.
 
 ## Validation
 

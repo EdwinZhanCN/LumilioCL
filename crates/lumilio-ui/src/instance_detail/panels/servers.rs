@@ -9,9 +9,10 @@ use crate::theme::ShellColors;
 use crate::toast::Toast;
 use crate::tr;
 use gpui::prelude::*;
-use gpui::{AnyElement, Context, Window, div};
+use gpui::{AnyElement, Context, ObjectFit, RenderImage, Window, div, img, px};
 use gpui_component::{h_flex, v_flex};
 use lumilio_core::ServerEntry;
+use std::sync::Arc;
 
 /// What a server row says under its name: where it is and how it is.
 #[must_use]
@@ -44,6 +45,40 @@ pub fn server_detail(address: &str, state: Option<&ServerState>) -> String {
             parts.join(" · ")
         }
     }
+}
+
+/// A server row's leading mark: the icon the server sent or the game cached,
+/// or a procedural cover seeded by its address when there is none.
+fn icon_lead(icon: Option<&Arc<RenderImage>>, seed: u32, colors: ShellColors) -> AnyElement {
+    let tile = |inner: AnyElement| {
+        div()
+            .relative()
+            .flex_none()
+            .size(px(40.))
+            .rounded(px(4.))
+            .overflow_hidden()
+            .bg(colors.body.display)
+            .child(inner)
+            .into_any_element()
+    };
+    if let Some(image) = icon {
+        return tile(
+            img(image.clone())
+                .size_full()
+                .object_fit(ObjectFit::Cover)
+                .into_any_element(),
+        );
+    }
+    tile(
+        crate::cover::element(
+            seed,
+            crate::cover::Loader::Vanilla,
+            crate::home::WorldHint::Overworld,
+            colors.body.display,
+            px(0.),
+        )
+        .into_any_element(),
+    )
 }
 
 impl InstanceDetailView {
@@ -179,10 +214,15 @@ impl InstanceDetailView {
                         cx,
                     ))
                     .child(menu);
+                let lead = icon_lead(
+                    self.server_icons.get(&server.address),
+                    crate::live::seed_of(&server.address),
+                    colors,
+                );
                 kit::row(
                     server.name.clone(),
                     detail,
-                    None,
+                    Some(lead),
                     Some(trail.into_any_element()),
                     colors,
                 )
@@ -255,6 +295,8 @@ impl InstanceDetailView {
                     name,
                     address,
                     packs,
+                    // The icon is the game's; `servers.dat` keeps it as it is.
+                    icon: None,
                 },
             },
             window,
