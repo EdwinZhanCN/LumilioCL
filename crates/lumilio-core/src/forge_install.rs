@@ -413,7 +413,7 @@ pub async fn run_processors(
         let line = command(processor, &vars, paths.libraries, java, &host)?;
         let tool = processor.jar.to_string();
         log(format!("running {tool}"));
-        let mut child = tokio::process::Command::new(&line[0]);
+        let mut child = crate::process::background_command(&line[0]);
         child
             .args(&line[1..])
             .current_dir(paths.work)
