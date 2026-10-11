@@ -4,12 +4,16 @@
 #
 # Deploying needs two repository secrets: CLOUDFLARE_API_TOKEN (a token with
 # "Edit Cloudflare Workers" on the account) and CLOUDFLARE_ACCOUNT_ID.
+#
+# Pull requests always start; the `changes` job decides whether `web` runs.
+# See ci.yml.
 name: Web
 
 on:
   push:
     branches: [main]
-    paths: &paths
+    # Keep in sync with the filter in the `changes` job.
+    paths:
       - "web/**"
       # Copied into the site at build time (web/scripts/sync-assets.mjs).
       - "crates/lumilio-ui/assets/fonts/**"
@@ -17,7 +21,6 @@ on:
       - "assets/screenshots/**"
       - ".github/workflows/web.yml"
   pull_request:
-    paths: *paths
   release:
     types: [published]
   workflow_dispatch:
@@ -30,7 +33,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      run: ${{ github.event_name != 'pull_request' || steps.filter.outputs.web == 'true' }}
+    steps:
+      - id: filter
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            web:
+              - "web/**"
+              - "crates/lumilio-ui/assets/fonts/**"
+              - "assets/icons/src/tile/**"
+              - "assets/screenshots/**"
+              - ".github/workflows/web.yml"
+
+  web:
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.run == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -60,7 +84,7 @@ jobs:
           retention-days: 7
 
   deploy:
-    needs: check
+    needs: web
     if: github.event_name == 'release' || (github.event_name != 'pull_request' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     timeout-minutes: 10

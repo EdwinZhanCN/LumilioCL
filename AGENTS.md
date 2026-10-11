@@ -20,11 +20,12 @@ launcher; the documents below serve that goal and never outrank it.
 
 ## Verification
 
-The `justfile` is the single source of truth for checks; Code CI (`.github/workflows/ci.yml`) runs
-`just ci` for eligible code changes on `main` and pull requests; path filters exclude
-most Markdown and `.agents/**` changes. `plans.yml` runs `just docs` for plan inputs,
-schema, projections and harness changes. The website has a separate `web.yml` workflow. There are
-no git hooks.
+The `justfile` is the single source of truth for checks. Every change reaches `main` through a
+pull request on a prefixed branch (`feat/`, `fix/`, `docs/`, `build/`, `web/`); `main` rejects
+direct pushes. The required checks are the jobs `rust` (`ci.yml`, `just ci`), `plans`
+(`plans.yml`, `just docs`) and `web` (`web.yml`, `just web`). Each workflow's `changes` job skips
+its check when a pull request does not touch its paths; keep those filters in sync with
+`on.push.paths`. There are no git hooks.
 
 - **While iterating**: only what the change touches (skill `lumilio-select-checks`), e.g.
   `just test-pkg lumilio-ui project_detail`.

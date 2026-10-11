@@ -1,8 +1,11 @@
+# Pull requests always start; the `changes` job decides whether `plans` runs.
+# See ci.yml.
 name: Plans
 on:
   push:
     branches: [main]
-    paths: &paths
+    # Keep in sync with the filter in the `changes` job.
+    paths:
       - ".agents/**"
       - "AGENTS.md"
       - "docs/plans/**"
@@ -17,12 +20,40 @@ on:
       - "justfile"
       - ".github/workflows/plans.yml"
   pull_request:
-    paths: *paths
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
-  check:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      run: ${{ github.event_name != 'pull_request' || steps.filter.outputs.plans == 'true' }}
+    steps:
+      - id: filter
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            plans:
+              - ".agents/**"
+              - "AGENTS.md"
+              - "docs/plans/**"
+              - "crates/lumilio-docgen/**"
+              - "web/src/data/roadmap*"
+              - "web/src/i18n/**"
+              - "web/src/components/Sections.astro"
+              - "web/src/components/hero/**"
+              - "Cargo.toml"
+              - "Cargo.lock"
+              - "rust-toolchain.toml"
+              - "justfile"
+              - ".github/workflows/plans.yml"
+
+  plans:
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.run == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -31,5 +62,5 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@v2
         with:
-          tool: just
+          tool: just,cargo-nextest
       - run: just docs

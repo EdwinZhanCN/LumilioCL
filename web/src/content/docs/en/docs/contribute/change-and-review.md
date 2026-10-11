@@ -92,6 +92,42 @@ When the task authorizes submission:
 4. Add the handoff report to the pull request description.
 5. Resolve check failures before merge.
 
+## Branches and merges
+
+`main` is the only long-lived branch, and it is always ready for release.
+All changes go into `main` through a pull request, including changes from maintainers.
+`main` does not accept direct pushes or force pushes.
+
+Start the branch name with the same type prefix that the commit uses:
+
+| Prefix | Use |
+| --- | --- |
+| `feat/` | New feature |
+| `fix/` | Defect fix |
+| `docs/` | Documents, plans, or harness |
+| `build/` | Build, checks, or CI |
+| `web/` | Website |
+
+The `rust`, `plans`, and `web` checks must pass before merge.
+Each pull request starts all three checks.
+When the change does not touch the paths of a check, that check is skipped and counts as passed.
+For example, a pull request that changes only documents does not run the Rust build.
+Squash merge is the default.
+After the merge, GitHub deletes the branch.
+
+When a generated file has a conflict, do not merge it manually:
+
+1. Resolve the conflicts in the source files first.
+2. For the generated file, accept either side.
+3. Run `just plans` for plan output, or `just ia` for user paths.
+4. Commit the generated files again.
+
+The generated files are `docs/plans/`, `web/src/data/roadmap.generated.json`, and `docs/ia/paths/`.
+
+A release is a `v*` tag on `main`.
+Only maintainers can create release tags.
+Create a `release/<major.minor>` branch from a version tag only when that version needs a patch and `main` already contains changes for the next version.
+
 Include source attribution for adapted code.
 The project license is `AGPL-3.0-only`.
 Read the [license](https://github.com/EdwinZhanCN/LumilioCL/blob/main/LICENSE) before you distribute a changed application.
