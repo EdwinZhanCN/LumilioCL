@@ -14,6 +14,19 @@ use std::os::unix::fs::PermissionsExt;
 use tokio::sync::mpsc;
 
 #[tokio::test]
+async fn a_relative_root_is_opened_as_an_absolute_path() {
+    // NeoForge installer processors run in their own working directory; a
+    // relative root left their classpath pointing nowhere.
+    let dir = tempfile::tempdir_in(".").unwrap();
+    let relative = dir.path().file_name().unwrap();
+    let service = LauncherService::open(relative, Scripted::default(), Vec::new()).unwrap();
+    assert_eq!(
+        service.layout().root(),
+        std::env::current_dir().unwrap().join(relative)
+    );
+}
+
+#[tokio::test]
 async fn delete_removes_only_that_profile_and_leaves_no_journal() {
     let world = world();
     publish_release(&world);
