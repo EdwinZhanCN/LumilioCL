@@ -32,6 +32,14 @@
       "lede": "WASM 插件和可审核的插件目录。",
       "version": "0.3.0",
       "status": "proposed"
+    },
+    {
+      "id": "terracotta-multiplayer",
+      "planId": "terracotta-multiplayer",
+      "name": "陶瓦联机插件",
+      "lede": "接入陶瓦联机插件，在启动器中使用联机功能。",
+      "version": "0.4.0",
+      "status": "proposed"
     }
   ]
 }
