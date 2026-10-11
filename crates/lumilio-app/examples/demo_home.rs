@@ -6,14 +6,17 @@
 //! LUMILIO_HOME=<data folder> cargo run --release -p lumilio-app
 //! ```
 //!
-//! Start from an empty folder. The spec lists other launchers' folders to
-//! import, games to create (with Modrinth content), modpacks and servers:
+//! The spec lists other launchers' folders to import, games to create (with
+//! Modrinth content and copied files), modpacks and servers. Running it again
+//! only adds what is missing, matching games by name, so a folder someone has
+//! signed in to can be extended:
 //!
 //! ```json
 //! {
-//!   "import": ["/path/to/.minecraft"],
+//!   "import": [{ "path": "/path/to/.minecraft", "name": "Imported" }],
 //!   "games": [{ "name": "Survival", "version": "26.3", "loader": "fabric",
 //!               "mods": ["fabric-api", "sodium"], "shaders": [], "resourcepacks": [],
+//!               "copy": [{ "from": "/path/to/World", "into": "saves" }],
 //!               "favorite": true }],
 //!   "modpacks": ["fabulously-optimized"],
 //!   "servers": [{ "game": "Survival", "name": "Hub", "address": "play.example.net" }],
@@ -25,7 +28,7 @@
 //! needs an account: with none, the tool borrows an offline one and removes it
 //! at the end. Sign in from the launcher afterwards.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use lumilio_core::{
@@ -73,8 +76,19 @@ struct Game {
     shaders: Vec<String>,
     #[serde(default)]
     resourcepacks: Vec<String>,
+    /// Files or folders copied into the game folder, e.g. worlds into
+    /// `saves` or Litematica projections into `schematics`.
+    #[serde(default)]
+    copy: Vec<Copy>,
     #[serde(default)]
     favorite: bool,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Copy {
+    from: PathBuf,
+    into: PathBuf,
 }
 
 #[derive(Deserialize)]
@@ -139,7 +153,6 @@ fn main() -> Result<(), String> {
 }
 
 async fn build(service: &Service, spec: Spec) -> Result<(), ServiceError> {
-    let mut names = Vec::new();
     for import in &spec.import {
         let found = service.detect_games(&import.path).await?;
         if import.name.is_some() && found.len() != 1 {
@@ -150,74 +163,79 @@ async fn build(service: &Service, spec: Spec) -> Result<(), ServiceError> {
             )));
         }
         for game in found {
-            println!("import {} ({})", game.name, import.path.display());
+            let name = import.name.clone().unwrap_or_else(|| game.name.clone());
+            if game_named(service, &name).await.is_some() {
+                println!("import {name}: already there");
+                continue;
+            }
+            println!("import {name} ({})", import.path.display());
             let record = service.import_game(game, CancellationToken::new()).await?;
-            let name = match &import.name {
-                Some(name) => {
-                    service.rename(&record.id, name).await?;
-                    name.clone()
-                }
-                None => record.name,
-            };
+            if record.name != name {
+                service.rename(&record.id, &name).await?;
+            }
             install(service, &record.id, &name).await?;
-            names.push((name, record.id));
         }
     }
     for game in &spec.games {
-        // Pick the loader version as the New Game form does: the
-        // recommended one of those offered for this game version.
-        let versions = service.loader_versions(game.loader, &game.version).await?;
-        let loader_version = recommended_loader(&versions).map(|version| version.version.clone());
-        println!(
-            "create {} {} {:?} {}",
-            game.name,
-            game.version,
-            game.loader,
-            loader_version.as_deref().unwrap_or("")
-        );
-        let record = service
-            .create_instance(
-                &game.name,
-                Some(&game.version),
-                game.loader,
-                loader_version.as_deref(),
-            )
-            .await?;
+        let id = match game_named(service, &game.name).await {
+            Some(id) => {
+                println!("game {}: already there", game.name);
+                id
+            }
+            None => create(service, game).await?,
+        };
         for (kind, projects) in [
             (ProjectKind::Mod, &game.mods),
             (ProjectKind::Shader, &game.shaders),
             (ProjectKind::ResourcePack, &game.resourcepacks),
         ] {
+            let installed = service.installed_projects(&id, kind).await?;
             for project in projects {
+                let detail = service.project_detail(project).await?;
+                if installed.contains_key(&detail.project.id) {
+                    continue;
+                }
                 let file = service
-                    .install_content(&record.id, kind, project, CancellationToken::new())
+                    .install_content(&id, kind, project, CancellationToken::new())
                     .await?;
                 println!("  + {file}");
             }
         }
-        if game.favorite {
-            service.set_favorite(&record.id, true).await?;
+        for copy in &game.copy {
+            copy_into(&service.layout().game(&id).join(&copy.into), &copy.from)?;
         }
-        install(service, &record.id, &record.name).await?;
-        names.push((record.name, record.id));
+        if game.favorite {
+            service.set_favorite(&id, true).await?;
+        }
+        install(service, &id, &game.name).await?;
     }
     for project in &spec.modpacks {
+        let id = service.project_detail(project).await?.project.id;
+        let made = service.library().await.instances.into_iter().any(|game| {
+            game.source_project
+                .is_some_and(|source| source == id || source == *project)
+        });
+        if made {
+            println!("modpack {project}: already there");
+            continue;
+        }
         println!("modpack {project}");
         let record = service
             .install_modpack(project, CancellationToken::new())
             .await?;
         install(service, &record.id, &record.name).await?;
-        names.push((record.name, record.id));
     }
-    let id_of = |game: &str| {
-        names
-            .iter()
-            .find(|(name, _)| name == game)
-            .map(|(_, id)| id.clone())
-            .ok_or_else(|| ServiceError::Install(format!("no game named {game}")))
-    };
     for server in spec.servers {
-        let id = id_of(&server.game)?;
+        let id = id_of(service, &server.game).await?;
+        if service
+            .servers(&id)
+            .await?
+            .iter()
+            .any(|entry| entry.address == server.address)
+        {
+            println!("server {}: already there", server.name);
+            continue;
+        }
         println!("server {} → {}", server.name, server.game);
         let entry = ServerEntry {
             name: server.name,
@@ -229,8 +247,71 @@ async fn build(service: &Service, spec: Spec) -> Result<(), ServiceError> {
     }
     if let Some(game) = &spec.current {
         println!("current {game}");
-        service.set_current_instance(&id_of(game)?).await?;
+        service
+            .set_current_instance(&id_of(service, game).await?)
+            .await?;
     }
+    Ok(())
+}
+
+async fn game_named(service: &Service, name: &str) -> Option<String> {
+    service
+        .library()
+        .await
+        .instances
+        .into_iter()
+        .find(|game| game.name == name)
+        .map(|game| game.id)
+}
+
+async fn id_of(service: &Service, name: &str) -> Result<String, ServiceError> {
+    game_named(service, name)
+        .await
+        .ok_or_else(|| ServiceError::Install(format!("no game named {name}")))
+}
+
+async fn create(service: &Service, game: &Game) -> Result<String, ServiceError> {
+    // Pick the loader version as the New Game form does: the recommended one
+    // of those offered for this game version.
+    let versions = service.loader_versions(game.loader, &game.version).await?;
+    let loader_version = recommended_loader(&versions).map(|version| version.version.clone());
+    println!(
+        "create {} {} {:?} {}",
+        game.name,
+        game.version,
+        game.loader,
+        loader_version.as_deref().unwrap_or("")
+    );
+    let record = service
+        .create_instance(
+            &game.name,
+            Some(&game.version),
+            game.loader,
+            loader_version.as_deref(),
+        )
+        .await?;
+    Ok(record.id)
+}
+
+/// Copies a file or a folder into `folder`, keeping what is already there.
+fn copy_into(folder: &Path, from: &Path) -> Result<(), ServiceError> {
+    let name = from
+        .file_name()
+        .ok_or_else(|| ServiceError::Install(format!("{} has no name", from.display())))?;
+    let target = folder.join(name);
+    if target.exists() {
+        println!("  = {}", target.display());
+        return Ok(());
+    }
+    std::fs::create_dir_all(folder)?;
+    if from.is_dir() {
+        for entry in std::fs::read_dir(from)? {
+            copy_into(&target, &entry?.path())?;
+        }
+    } else {
+        std::fs::copy(from, &target)?;
+    }
+    println!("  + {}", target.display());
     Ok(())
 }
 
