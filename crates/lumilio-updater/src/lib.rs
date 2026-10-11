@@ -11,4 +11,6 @@ mod manifest;
 #[cfg(test)]
 mod tests;
 
-pub use self::client::{CheckResult, UpdateClient, UpdateError, UpdateRelease, UpdateRestriction};
+pub use self::client::{
+    CheckResult, Relaunch, UpdateClient, UpdateError, UpdateRelease, UpdateRestriction,
+};

@@ -1,10 +1,12 @@
+use crate::Relaunch;
 use std::fs;
 use std::os::unix::fs::PermissionsExt as _;
 use std::path::Path;
 use std::process::Command;
 
-pub(super) fn install_and_restart(update: &Path) -> Result<(), String> {
-    let executable = std::env::current_exe().map_err(|error| error.to_string())?;
+/// Atomically replaces the executable. The running process keeps the old
+/// file open; the new version starts on the next launch.
+pub(super) fn install(executable: &Path, update: &Path) -> Result<Relaunch, String> {
     let parent = executable
         .parent()
         .ok_or_else(|| "running executable has no parent folder".to_owned())?;
@@ -38,10 +40,7 @@ pub(super) fn install_and_restart(update: &Path) -> Result<(), String> {
     fs::set_permissions(staged.path(), fs::Permissions::from_mode(0o755))
         .map_err(|error| error.to_string())?;
     staged
-        .persist(&executable)
+        .persist(executable)
         .map_err(|error| error.error.to_string())?;
-    Command::new(&executable)
-        .spawn()
-        .map_err(|error| format!("cannot restart LumilioCL: {error}"))?;
-    Ok(())
+    Ok(Relaunch::Restart(executable.to_owned()))
 }
