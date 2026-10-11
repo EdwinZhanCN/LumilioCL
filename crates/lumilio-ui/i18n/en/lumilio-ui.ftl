@@ -102,6 +102,7 @@ detail-title-shader = Shader details
 ## Home
 
 home-loading = Getting ready
+library-current-save-failed = Couldn't save the current game
 home-continue = Continue
 home-continue-eyebrow = Pick up where you left off
 home-import = Bring your old game over

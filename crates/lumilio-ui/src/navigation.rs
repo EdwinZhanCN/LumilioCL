@@ -508,7 +508,7 @@ fn trailing_zone(current: CurrentInstance, colors: ShellColors) -> AnyElement {
         .id("navigation-instance")
         .debug_selector(|| "navigation-instance".into())
         .child(
-            // ia[navigation]: 切换当前游戏 | 右段 Popover 列表：封面、名称、版本 · 加载器；当前项高亮；游戏多时顶部出现搜索 | 之后的“开始游戏”和发现页安装都指向它；已开始的操作不受影响；保存在 settings.json，重启后保持，被删除时回落到剩余第一个
+            // ia[navigation]: 切换当前游戏 | 右段 Popover 列表：封面、名称、版本 · 加载器；当前项高亮；游戏多时顶部出现搜索 | 主页从已保存数据更新，不等待文件校验；之后的“开始游戏”和发现页安装都指向它；旧异步结果不覆盖新选择；保存失败提示；重启后保持，被删除时回落到剩余第一个
             Popover::new("navigation-instance-popover")
                 .anchor(Anchor::BottomRight)
                 .trigger(trigger)

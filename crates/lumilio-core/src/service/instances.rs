@@ -56,7 +56,16 @@ impl<T: Transport + Clone> LauncherService<T> {
         Ok(())
     }
 
-    /// Continue / Recent / Needs Attention for Home.
+    /// Saved records and recency, without Java discovery or disk diagnosis.
+    /// The application uses this before supplementing Home with `home`.
+    pub async fn home_snapshot(&self) -> (Vec<InstanceRecord>, HomeSummary) {
+        let instances = self.store.lock().await.instances().to_vec();
+        let summary = summarize(&instances, &BTreeMap::new(), RECENT_LIMIT);
+        (instances, summary)
+    }
+
+    /// Background Continue / Recent / Needs Attention checks for Home.
+    /// Full content verification remains in explicit diagnostics and repair.
     pub async fn home(&self) -> (Vec<InstanceRecord>, HomeSummary) {
         let instances = self.store.lock().await.instances().to_vec();
         let (settings, runtimes) = self.environment().await;
@@ -65,7 +74,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         let mut problems: BTreeMap<String, Vec<Problem>> = BTreeMap::new();
         for record in recent.into_iter().take(DIAGNOSED_LIMIT) {
             let found = self
-                .inspect_with_plugins(&settings, &runtimes, record)
+                .inspect_with_analysis(&settings, &runtimes, record, false)
                 .await;
             problems.insert(record.id.clone(), found);
         }

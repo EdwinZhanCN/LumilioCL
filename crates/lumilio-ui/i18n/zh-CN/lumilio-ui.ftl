@@ -87,6 +87,7 @@ detail-title-shader = 光影详情
 ## 首页
 
 home-loading = 正在准备
+library-current-save-failed = 没有保存当前游戏
 home-continue = 继续
 home-continue-eyebrow = 接着上次
 home-import = 把原来的游戏带过来

@@ -49,6 +49,12 @@ const POLL: Duration = Duration::from_millis(600);
 
 #[derive(Default)]
 struct State {
+    /// Older snapshots and diagnostics cannot replace a newer request.
+    reload_seq: u64,
+    home_seq: u64,
+    home_diagnostics: Option<tokio::task::AbortHandle>,
+    selection_seq: u64,
+    selection_save: Option<tokio::task::AbortHandle>,
     /// The instance Home's Continue launches.
     continue_id: Option<String>,
     /// Stops the launch or the running game.
@@ -90,6 +96,8 @@ enum Reload {
     Nothing,
     /// Library and Activity.
     Lists,
+    /// Current game and Home from saved data, without rerunning diagnostics.
+    Selection,
     /// Everything, including Home.
     All,
 }

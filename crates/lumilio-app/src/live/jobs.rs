@@ -112,11 +112,24 @@ pub(super) fn reload(wiring: &Wiring, what: Reload, cx: &mut App) {
     if what == Reload::Nothing {
         return;
     }
-    let full = what == Reload::All;
+    let full = matches!(what, Reload::All | Reload::Selection);
+    let (seq, home_seq) = {
+        let mut state = wiring.state.borrow_mut();
+        state.reload_seq += 1;
+        if full {
+            state.home_seq += 1;
+            if let Some(task) = state.home_diagnostics.take() {
+                task.abort();
+            }
+        }
+        (state.reload_seq, state.home_seq)
+    };
     let service = wiring.backend.service.clone();
     let handle = wiring.backend.spawn(async move {
+        // Saved records suffice to offer Continue. Disk diagnostics arrive
+        // separately and must never hold the first usable Home hostage.
         let (records, summary) = if full {
-            let (records, summary) = service.home().await;
+            let (records, summary) = service.home_snapshot().await;
             (records, Some(summary))
         } else {
             (service.library().await.instances, None)
@@ -135,12 +148,14 @@ pub(super) fn reload(wiring: &Wiring, what: Reload, cx: &mut App) {
         let Ok((records, summary, activity, settings, current, collections)) = handle.await else {
             return;
         };
+        if (full && wiring.state.borrow().home_seq != home_seq)
+            || (!full && wiring.state.borrow().reload_seq != seq)
+        {
+            return;
+        }
         let now = unix_now();
         let cards = library_cards(&records, now);
         let rows = activity_rows(&activity, now);
-        let attention = summary
-            .as_ref()
-            .map(|summary| attention_rows(&summary.needs_attention, &cards));
         let accounts = account_rows(&settings);
         let home =
             summary.map(|summary| home_presentation(&records, &summary, current.as_deref(), now));
@@ -179,8 +194,11 @@ pub(super) fn reload(wiring: &Wiring, what: Reload, cx: &mut App) {
             shell.update_live(
                 |model| {
                     model.set_library(cards, hint);
-                    if let Some(attention) = attention {
-                        model.attention = attention;
+                    model
+                        .attention
+                        .retain(|row| records.iter().any(|record| record.id == row.instance));
+                    if full {
+                        model.home_places = None;
                     }
                     model.collections = collections
                         .into_iter()
@@ -196,8 +214,35 @@ pub(super) fn reload(wiring: &Wiring, what: Reload, cx: &mut App) {
             );
         });
         if let Some(record) = continued {
-            cx.update(|cx| refresh_places(&wiring, record, cx));
+            cx.update(|cx| refresh_places(&wiring, record, home_seq, cx));
         }
+        if what == Reload::All {
+            cx.update(|cx| refresh_attention(&wiring, home_seq, cx));
+        }
+    })
+    .detach();
+}
+
+/// Only the attention rows depend on background diagnostics; the current
+/// game's identity stays owned by the saved selection and fast snapshot.
+fn refresh_attention(wiring: &Wiring, seq: u64, cx: &mut App) {
+    let service = wiring.backend.service.clone();
+    let handle = wiring.backend.spawn(async move { service.home().await });
+    wiring.state.borrow_mut().home_diagnostics = Some(handle.abort_handle());
+    let wiring = wiring.clone();
+    cx.spawn(async move |cx| {
+        let Ok((records, summary)) = handle.await else {
+            return;
+        };
+        if wiring.state.borrow().home_seq != seq {
+            return;
+        }
+        wiring.state.borrow_mut().home_diagnostics = None;
+        let cards = library_cards(&records, unix_now());
+        let attention = attention_rows(&summary.needs_attention, &cards);
+        let _ = wiring.shell.update(cx, |shell, cx| {
+            shell.update_live(|model| model.attention = attention, cx);
+        });
     })
     .detach();
 }
@@ -205,7 +250,7 @@ pub(super) fn reload(wiring: &Wiring, what: Reload, cx: &mut App) {
 /// Reads the worlds and servers of the game Home continues. A game that
 /// cannot be read just lists nothing; an answer for a game Home has moved
 /// away from meanwhile is dropped.
-fn refresh_places(wiring: &Wiring, record: lumilio_core::InstanceRecord, cx: &mut App) {
+fn refresh_places(wiring: &Wiring, record: lumilio_core::InstanceRecord, seq: u64, cx: &mut App) {
     let service = wiring.backend.service.clone();
     let id = record.id.clone();
     let handle = wiring.backend.spawn(async move {
@@ -219,7 +264,9 @@ fn refresh_places(wiring: &Wiring, record: lumilio_core::InstanceRecord, cx: &mu
         let Ok((worlds, servers)) = handle.await else {
             return;
         };
-        if wiring.state.borrow().continue_id.as_ref() != Some(&record.id) {
+        if wiring.state.borrow().home_seq != seq
+            || wiring.state.borrow().continue_id.as_ref() != Some(&record.id)
+        {
             return;
         }
         let places = home_places(&record, &worlds, &servers, unix_now());
