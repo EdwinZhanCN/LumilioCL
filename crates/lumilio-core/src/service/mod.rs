@@ -133,12 +133,16 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// Opens (creating on first use) everything under `root`.
     /// `plugins` are trusted, statically linked core plugins supplied by the
     /// application. Untrusted registration uses `PluginHost::new` instead.
+    ///
+    /// A relative `root` is made absolute against the current directory:
+    /// installer processors and the game run in other working directories,
+    /// where relative library paths would point nowhere.
     pub fn open(
         root: impl Into<PathBuf>,
         transport: T,
         plugins: Vec<Arc<dyn lumilio_plugin_api::Plugin>>,
     ) -> Result<Self, ServiceError> {
-        let layout = Layout::new(root);
+        let layout = Layout::new(std::path::absolute(root.into())?);
         let root_lock = crate::root_lock::RootLock::acquire(layout.root())?;
         let store = InstanceStore::open(layout.root())?;
         let settings = SettingsStore::open(layout.root())?;
