@@ -35,6 +35,27 @@ pub async fn inspect_instance(
     runtimes: &[JavaRuntime],
     record: &InstanceRecord,
 ) -> Vec<Problem> {
+    inspect(layout, settings, runtimes, record, true).await
+}
+
+/// Home's background checks omit content hashing. Explicit diagnostics and
+/// repair retain the complete installation verification.
+pub(crate) async fn inspect_home_instance(
+    layout: &Layout,
+    settings: &LauncherSettings,
+    runtimes: &[JavaRuntime],
+    record: &InstanceRecord,
+) -> Vec<Problem> {
+    inspect(layout, settings, runtimes, record, false).await
+}
+
+async fn inspect(
+    layout: &Layout,
+    settings: &LauncherSettings,
+    runtimes: &[JavaRuntime],
+    record: &InstanceRecord,
+    verify_files: bool,
+) -> Vec<Problem> {
     let directories = layout.launch_directories(record);
 
     let release = match record.release_id() {
@@ -52,20 +73,28 @@ pub async fn inspect_instance(
         .and_then(|release| release.java_requirement())
         .map(|java| java.major());
     let damaged_files = match &release {
-        Some(release) => damaged_count(release, &directories).await,
-        None => None,
+        Some(release) if verify_files => damaged_count(release, &directories).await,
+        _ => None,
     };
 
-    let mods = mods_with_metadata(directories.game());
-    let last_session = HistoryLog::for_instance(layout.root(), &record.id)
-        .sessions()
-        .ok()
-        .and_then(|sessions| {
-            sessions.into_iter().find_map(|event| match event {
-                HistoryEvent::Session { outcome, .. } => Some(outcome),
-                HistoryEvent::Change { .. } => None,
-            })
-        });
+    let game = directories.game().to_owned();
+    let root = layout.root().to_owned();
+    let id = record.id.clone();
+    let (mods, last_session) = tokio::task::spawn_blocking(move || {
+        let mods = mods_with_metadata(&game);
+        let last_session = HistoryLog::for_instance(&root, &id)
+            .sessions()
+            .ok()
+            .and_then(|sessions| {
+                sessions.into_iter().find_map(|event| match event {
+                    HistoryEvent::Session { outcome, .. } => Some(outcome),
+                    HistoryEvent::Change { .. } => None,
+                })
+            });
+        (mods, last_session)
+    })
+    .await
+    .unwrap_or_default();
 
     let facts = Facts {
         instance: record,

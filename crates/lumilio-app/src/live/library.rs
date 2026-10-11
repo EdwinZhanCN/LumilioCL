@@ -1,4 +1,4 @@
-use super::jobs::{job, outcome};
+use super::jobs::{job, outcome, refresh_installed, reload};
 use super::{Reload, Wiring};
 use gpui_kit::AppContext as _;
 use gpui_kit::{App, Window};
@@ -16,15 +16,44 @@ pub(super) fn choose_current(wiring: &Wiring, id: String, cx: &mut App) {
         .shell
         .update(cx, |shell, cx| shell.set_install_target(id.clone(), cx));
     let service = wiring.backend.service.clone();
-    job(
-        wiring,
-        cx,
-        false,
-        Reload::All,
-        None,
-        async move { service.set_current_instance(&id).await },
-        |_, _, _| {},
-    );
+    let seq = {
+        let mut state = wiring.state.borrow_mut();
+        state.selection_seq += 1;
+        state.reload_seq += 1;
+        state.home_seq += 1;
+        if let Some(task) = state.selection_save.take() {
+            task.abort();
+        }
+        if let Some(task) = state.home_diagnostics.take() {
+            task.abort();
+        }
+        state.selection_seq
+    };
+    let handle = wiring
+        .backend
+        .spawn(async move { service.set_current_instance(&id).await });
+    wiring.state.borrow_mut().selection_save = Some(handle.abort_handle());
+    let wiring = wiring.clone();
+    cx.spawn(async move |cx| {
+        let Ok(result) = handle.await else { return };
+        if wiring.state.borrow().selection_seq != seq {
+            return;
+        }
+        wiring.state.borrow_mut().selection_save = None;
+        if let Err(error) = result {
+            let _ = wiring.shell.update(cx, |shell, cx| {
+                shell.toast(
+                    Toast::error(tr!("library-current-save-failed")).technical(error.to_string()),
+                    cx,
+                );
+            });
+        }
+        cx.update(|cx| {
+            reload(&wiring, Reload::Selection, cx);
+            refresh_installed(&wiring, cx);
+        });
+    })
+    .detach();
 }
 
 /// The names of the collections the library page shows.

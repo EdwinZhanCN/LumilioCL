@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "home-readiness",
+  "title": "主页快速准备与后台诊断",
+  "summary": "启动先显示已保存的游戏与当前选择，后台补充健康检查；切换游戏不再等待完整文件校验。",
+  "status": "in_progress",
+  "visibility": "internal",
+  "scope": {
+    "included": ["主页快照与后台诊断分离", "切换游戏的轻量刷新", "过期异步结果丢弃", "主页免除完整文件校验"],
+    "excluded": ["背景动画调整", "持久化诊断缓存", "修改显式诊断与修复的完整校验"]
+  },
+  "tasks": [
+    {"id": "T1", "title": "拆分准备链路", "status": "completed", "acceptance": "主页先显示快照，诊断只补充需要留意；切换游戏不触发诊断"},
+    {"id": "T2", "title": "回归验证", "status": "completed", "acceptance": "完整诊断仍报告损坏文件；主页不读取校验文件；旧请求不能覆盖新选择；just check 通过"},
+    {"id": "T3", "title": "真实窗口体验验收", "status": "proposed", "acceptance": "Project Maintainer 在真实窗口确认启动、连续切换与最小窗口；在代表性游戏库计时"}
+  ],
+  "validation": [
+    {"criterion": "回归测试与完整检查", "result": "just check 通过：1292 项测试通过，15 项跳过；doctests、Clippy、格式检查通过。macOS 更新器磁盘镜像测试在沙箱内失败，在允许 hdiutil 的环境下通过完整检查。核心回归测试曾临时恢复主页完整校验并按预期失败，恢复修复后通过。应用回归覆盖初始主页快照、连续选择、保存的当前游戏和安装目标一致；快照不会调用分析插件，后台诊断仍提供分析结果。"},
+    {"criterion": "窗口检查", "result": null}
+  ],
+  "decisions": [{"id": "D1", "decision": "主页只执行无需完整文件校验的后台诊断", "rationale": "展示当前游戏不依赖资源内容校验", "consequences": "文件损坏通过显式诊断与修复发现；后台检查仍报告 Java、账户、Mod 与上次运行的问题"}],
+  "references": ["crates/lumilio-app/src/live/jobs.rs", "crates/lumilio-core/src/inspect.rs"],
+  "outcome": "代码实现与自动化验证完成。临时数据目录启动的原生应用未能完成目视检查：电脑控制工具未获准访问测试应用。保留 T3，尚未测得代表性游戏库的准备耗时；不宣称视觉验收或性能倍率。"
+}

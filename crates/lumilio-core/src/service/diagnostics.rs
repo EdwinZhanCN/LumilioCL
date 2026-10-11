@@ -205,7 +205,22 @@ impl<T: Transport + Clone> LauncherService<T> {
         runtimes: &[crate::java::JavaRuntime],
         record: &crate::instance::InstanceRecord,
     ) -> Vec<Problem> {
-        let mut problems = inspect_instance(&self.layout, settings, runtimes, record).await;
+        self.inspect_with_analysis(settings, runtimes, record, true)
+            .await
+    }
+
+    pub(super) async fn inspect_with_analysis(
+        &self,
+        settings: &crate::settings::LauncherSettings,
+        runtimes: &[crate::java::JavaRuntime],
+        record: &crate::instance::InstanceRecord,
+        verify_files: bool,
+    ) -> Vec<Problem> {
+        let mut problems = if verify_files {
+            inspect_instance(&self.layout, settings, runtimes, record).await
+        } else {
+            crate::inspect::inspect_home_instance(&self.layout, settings, runtimes, record).await
+        };
         if problems
             .iter()
             .any(|problem| matches!(problem.kind, ProblemKind::LastSessionFailed(_)))

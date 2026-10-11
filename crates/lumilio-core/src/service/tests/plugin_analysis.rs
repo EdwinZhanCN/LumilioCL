@@ -121,6 +121,15 @@ async fn analysis_uses_latest_report_for_a_failed_session_and_home_picks_the_mos
         ),
         ("1.0", "vanilla", Some(21))
     );
+    let count = inputs.lock().unwrap().len();
+    let (records, snapshot) = world.service.home_snapshot().await;
+    assert_eq!(records[0].id, record.id);
+    assert!(snapshot.needs_attention.is_empty());
+    assert_eq!(
+        inputs.lock().unwrap().len(),
+        count,
+        "snapshot never invokes analyzers"
+    );
     let (_, home) = world.service.home().await;
     assert!(
         matches!(&home.needs_attention[0].headline.kind, ProblemKind::Finding(result) if result.finding.rule == "major")

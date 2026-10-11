@@ -43,6 +43,27 @@ fn kinds(problems: Vec<Problem>) -> Vec<ProblemKind> {
 }
 
 #[tokio::test]
+async fn home_checks_keep_setup_problems_but_leave_file_damage_to_explicit_diagnostics() {
+    let (_dir, mut store, record) = store_with_instance();
+    let manifest_dir = store.directories(&record).versions().join("1.0");
+    fs::create_dir_all(&manifest_dir).unwrap();
+    fs::write(manifest_dir.join("1.0.json"), MANIFEST).unwrap();
+    store.mark_installed(&record.id, true).unwrap();
+    let record = store.get(&record.id).unwrap();
+    let settings = LauncherSettings::default();
+    let home = kinds(inspect_home_instance(store.layout(), &settings, &[], record).await);
+    assert!(home.contains(&ProblemKind::NoAccount));
+    assert!(home.contains(&ProblemKind::NoJava { required: Some(21) }));
+    assert!(
+        !home
+            .iter()
+            .any(|kind| matches!(kind, ProblemKind::DamagedFiles { .. }))
+    );
+    let explicit = kinds(inspect_instance(store.layout(), &settings, &[], record).await);
+    assert!(explicit.contains(&ProblemKind::DamagedFiles { count: 1 }));
+}
+
+#[tokio::test]
 async fn a_fresh_instance_reports_the_setup_gaps() {
     let (_dir, store, record) = store_with_instance();
     let kinds =
