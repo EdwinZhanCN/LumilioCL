@@ -128,6 +128,11 @@ Escaped failures and their guards go in the plan's `lessonsLearned`.
 
 ## Hardening
 
+- Windows background console processes (game Java, launch hooks, wrappers and installer
+  processors) must use `crates/lumilio-core/src/process.rs`'s `background_command`, which
+  sets `CREATE_NO_WINDOW`. Piped output and the launcher's `windows_subsystem` attribute
+  do not prevent child console windows; preserve stdout/stderr capture for launcher logs.
+
 When a mistake recurs, fix the cause with the cheapest mechanism that stops it: a test, then a
 lint or check, then a skill step. Add a line here only if you can name the real failure it
 prevents. Remove rules that no longer prevent anything.

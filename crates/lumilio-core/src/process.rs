@@ -4,6 +4,7 @@
 //! spawns it, streams its output, and reports how it ended.
 
 use std::error::Error;
+use std::ffi::OsStr;
 use std::fmt::{self, Display, Formatter};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -27,6 +28,19 @@ const DRAIN_LIMIT: Duration = Duration::from_millis(500);
 
 /// Text the game prints once it has read its arguments and is starting up.
 const STARTED_MARKER: &str = "Setting user:";
+
+/// Creates a supervised child without allocating a Windows console window.
+/// Redirecting stdout/stderr alone does not suppress a console application's window.
+pub(crate) fn background_command(program: impl AsRef<OsStr>) -> Command {
+    let command = Command::new(program);
+    #[cfg(windows)]
+    let command = {
+        let mut command = command;
+        command.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+        command
+    };
+    command
+}
 
 /// Flags every launch gets unless the user's own arguments already set the
 /// same property. They close a remote-code-execution hole in the logging
@@ -308,7 +322,7 @@ pub async fn run_with_environment(
         program: program.clone(),
         reason: error.to_string(),
     })?;
-    let mut child = Command::new(program)
+    let mut child = background_command(program)
         .args(arguments)
         .envs(environment.iter().map(|(name, value)| (name, value)))
         .current_dir(working_dir)
@@ -430,11 +444,11 @@ pub async fn run_hook(
         reason: error.to_string(),
     })?;
     let mut shell = if cfg!(windows) {
-        let mut shell = Command::new("cmd");
+        let mut shell = background_command("cmd");
         shell.arg("/C").arg(command);
         shell
     } else {
-        let mut shell = Command::new("sh");
+        let mut shell = background_command("sh");
         shell.arg("-c").arg(command);
         shell
     };
