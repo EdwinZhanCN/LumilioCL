@@ -1,4 +1,8 @@
 # Runs `just ci` (the justfile is the single source of truth for checks).
+#
+# Pull requests run every workflow without path filters: `rust`, `plans` and
+# `web` are required checks on main, and a workflow skipped by a path filter
+# would leave its check pending forever.
 name: CI
 
 on:
@@ -13,12 +17,6 @@ on:
       # Generated from code; a hand edit must still fail the IA test.
       - "docs/ia/**"
   pull_request:
-    paths:
-      - "**"
-      - "!.agents/**"
-      - "!**/*.md"
-      - "!web/**"
-      - "docs/ia/**"
   workflow_dispatch:
 
 concurrency:
@@ -26,7 +24,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
+  rust:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:

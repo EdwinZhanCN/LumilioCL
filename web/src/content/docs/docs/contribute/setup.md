@@ -21,10 +21,11 @@ git clone https://github.com/EdwinZhanCN/LumilioCL.git
 cd LumilioCL
 ```
 
-为修改创建分支：
+为修改创建分支。
+前缀见[分支与合并](/docs/contribute/change-and-review/#分支与合并)：
 
 ```sh
-git switch -c <change-name>
+git switch -c fix/<change-name>
 ```
 
 安装 `rust-toolchain.toml` 指定的工具链：

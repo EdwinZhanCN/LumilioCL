@@ -92,6 +92,40 @@ Pull request 应说明最终实现。
 4. 在描述中加入交接报告。
 5. 合并前，解决检查失败。
 
+## 分支与合并
+
+`main` 是唯一的长期分支，并且始终可发布。
+所有修改都通过 pull request 进入 `main`，维护者的修改也一样。
+`main` 不接受直接推送和强制推送。
+
+工作分支名使用与提交相同的类型前缀：
+
+| 前缀 | 用途 |
+| --- | --- |
+| `feat/` | 新功能 |
+| `fix/` | 缺陷修复 |
+| `docs/` | 文档、计划或 harness |
+| `build/` | 构建、检查或 CI |
+| `web/` | 网站 |
+
+合并前，`rust`、`plans` 和 `web` 三项检查必须通过。
+pull request 会运行全部三项检查，即使修改只涉及其中一个领域。
+默认使用 squash 合并。
+合并后，GitHub 删除工作分支。
+
+生成文件发生冲突时，不要手动合并：
+
+1. 先解决源文件的冲突。
+2. 生成文件接受任意一侧。
+3. 计划输出运行 `just plans`，用户路径运行 `just ia`。
+4. 提交重新生成的文件。
+
+生成文件包括 `docs/plans/`、`web/src/data/roadmap.generated.json` 和 `docs/ia/paths/`。
+
+版本发布在 `main` 上创建 `v*` 标签。
+只有维护者可以创建发布标签。
+仅当旧版本需要补丁、而 `main` 已包含下一版本的修改时，才从该版本标签创建 `release/<主版本.次版本>` 分支。
+
 改编代码应保留来源归属。
 项目许可证是 `AGPL-3.0-only`。
 分发修改后的应用前，阅读[许可证](https://github.com/EdwinZhanCN/LumilioCL/blob/main/LICENSE)。

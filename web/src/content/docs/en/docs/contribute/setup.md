@@ -21,10 +21,11 @@ git clone https://github.com/EdwinZhanCN/LumilioCL.git
 cd LumilioCL
 ```
 
-Create a branch for the change:
+Create a branch for the change.
+For the prefix, see [Branches and merges](/en/docs/contribute/change-and-review/#branches-and-merges):
 
 ```sh
-git switch -c <change-name>
+git switch -c fix/<change-name>
 ```
 
 Install the toolchain specified in `rust-toolchain.toml`:

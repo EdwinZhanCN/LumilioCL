@@ -1,8 +1,9 @@
+# Pull requests run without a path filter; see ci.yml.
 name: Plans
 on:
   push:
     branches: [main]
-    paths: &paths
+    paths:
       - ".agents/**"
       - "AGENTS.md"
       - "docs/plans/**"
@@ -17,12 +18,11 @@ on:
       - "justfile"
       - ".github/workflows/plans.yml"
   pull_request:
-    paths: *paths
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
-  check:
+  plans:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
