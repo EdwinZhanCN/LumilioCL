@@ -2,9 +2,9 @@
 
 # 主题与外观后续验收
 
-Status: Proposed
+Status: Completed
 
-主题、字体与界面缩放已实现；保留网站原 0.1.1 目标关联，完成来源核实与版本验收。目标版本不代表已经发布。
+主题、字体与界面缩放已实现，来源核实与外观实机验收已完成。目标版本不代表已经发布。
 
 ## Scope
 
@@ -13,14 +13,28 @@ Status: Proposed
 
 ## Tasks
 
-- [ ] T1 — 核实并验收主题、字体与缩放 (Proposed)
+- [x] T1 — 核实并验收主题、字体与缩放 (Completed)
   Acceptance: 核实 window_background 键与 Rosé Pine 色值；完成外观实机验收并记录结果。
 
 ## Validation
 
 - 来源核实、外观实机验收及适用的 just check 通过。
-  Result: pending
+  Result: 来源已核实（见 theme-format-boundary 决策）。Project Maintainer 于 2026-10-10 报告主题、字体与缩放的外观实机验收通过，0.1.1 候选的 just check 与 just docs 通过。
+
+## Decision theme-format-boundary
+
+window_background is the project theme field, not a Zed-compatible field.
+
+Why: Zed's v0.2.0 schema uses style.background.appearance. The project parser uses its own semantic fields and validates opaque, transparent and blurred.
+
+Consequences: Keep the existing project format. Do not claim Zed theme-file compatibility. Bundled Rosé Pine colours use the published main and Dawn palettes; the Dawn display intentionally uses main colours.
 
 ## References
 
 - [.agents/plans/backlog.md](../../.agents/plans/backlog.md)
+- https://zed.dev/schema/themes/v0.2.0.json
+- https://rosepinetheme.com/palette/
+
+## Outcome
+
+主题、字体与界面缩放随 0.1.1 候选完成验收；其余外观想法留在 backlog。

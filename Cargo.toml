@@ -27,7 +27,7 @@ exclude = ["forks/nucleation", "forks/schematic-mesher", "forks/gpui-component",
 gpui-component = { path = "forks/gpui-component" }
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 publish = false
 rust-version = "1.95"
