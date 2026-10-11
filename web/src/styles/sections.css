@@ -458,7 +458,7 @@
   font-size: clamp(30px, 3.4vw, 44px);
 }
 
-.roadmap__item:not([data-current="true"]) .roadmap__digits > span {
+.roadmap__item:not([data-completed="true"]) .roadmap__digits > span {
   opacity: 0.55;
 }
 

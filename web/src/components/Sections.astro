@@ -8,7 +8,7 @@ import { Audiences } from "./Audiences";
 import { Stack } from "./Stack";
 import { Download } from "./Download";
 import { latestRelease } from "../data/release";
-import { roadmapItems } from "../data/roadmap";
+import { primaryPlans } from "../data/roadmap";
 import { ATTRIBUTIONS_URL, LICENSE_URL, RELEASES_URL, REPO_URL, UNSIGNED_HELP_URL } from "../data/links";
 
 interface Props {
@@ -17,7 +17,7 @@ interface Props {
 
 const { t } = Astro.props;
 const release = await latestRelease();
-const shipping = release?.version;
+const plans = primaryPlans("zh-CN");
 ---
 
 <Proof t={t} />
@@ -35,13 +35,13 @@ const shipping = release?.version;
     </header>
     <ol class="display roadmap__strip">
       {
-        roadmapItems.map((item) => {
-          const current = shipping !== undefined && item.version === shipping;
+        plans.map((item) => {
+          const completed = item.status === "completed";
           return (
-            <li class="roadmap__item" data-current={current}>
+            <li class="roadmap__item" data-completed={completed}>
               <span class="roadmap__legend display__legend">
-                <span class="led" data-lit={current} />
-                {current ? t.roadmap.current : t.roadmap.planned}
+                <span class="led" data-lit={completed} />
+                {item.statusLabel}
               </span>
               <span class="digits roadmap__digits" data-ghost={(item.version ?? "").replace(/\d/g, "8")}>
                 <span>{item.version ?? t.roadmap.planned}</span>
