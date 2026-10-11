@@ -13,6 +13,7 @@ export function primaryPlans(language: DocsLanguage) {
     if (!translated) throw new Error(`Missing English primary plan copy: ${item.planId}`);
     return {
       ...item,
+      statusLabel: t.status[item.status as keyof typeof t.status],
       name: translated.name,
       lede: translated.lede,
       source: `${REPO_URL}/blob/main/.agents/plans/${encodeURIComponent(item.planId)}.json`,
