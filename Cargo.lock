@@ -4565,6 +4565,8 @@ dependencies = [
  "lumilio-ui",
  "lumilio-updater",
  "reqwest",
+ "serde",
+ "serde_json",
  "tempfile",
  "tokio",
  "winresource",
