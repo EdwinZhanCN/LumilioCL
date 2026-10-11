@@ -24,7 +24,7 @@ Status: InProgress
 - [x] T5 — T5：生成 IA 路径并跑 `just check`；Project Maintainer于 2026-10-10 报告检查和界面目视验证均通过。 (Completed)
   Acceptance: T5：生成 IA 路径并跑 `just check`；Project Maintainer于 2026-10-10 报告检查和界面目视验证均通过。
 - [ ] T6 — T6：macOS 实机自动更新验收 (InProgress)
-  Acceptance: 从包含 restart-after-exit 修复的版本，在 macOS 上自动更新到下一正式版：后台安装完成后点击重启，窗口关闭后由固定在 Dock 上的同一个图标打开新版本，Dock 上不出现第二个 LumilioCL。
+  Acceptance: 从包含 restart-after-exit 修复的版本，在 macOS 上自动更新到下一正式版：后台安装完成后点击重启，窗口关闭后由固定在 Dock 上的同一个图标打开新版本，Dock 上不出现第二个 LumilioCL。0.1.2 → 0.1.3 即为这次检查（release-0-1-3 R5）。
 
 ## Validation
 
