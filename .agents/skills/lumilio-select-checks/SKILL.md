@@ -30,7 +30,7 @@ Every command here is a `justfile` recipe, the single source of truth that CI al
 | --- | --- | --- |
 | `crates/lumilio-core/**` | `just test-pkg lumilio-core [filter]` | `just check` |
 | `crates/lumilio-ui/**` | `just test-pkg lumilio-ui [filter]`; load repo-local `gpui-kit`/`gpui-kit-design-guides` skills for UI behavior | `just check` |
-| `crates/lumilio-ui/src/hero/**` | `just test-pkg lumilio-ui hero::`, then review frames from `LUMILIO_HERO_DUMP=<dir> cargo test -p lumilio-ui hero_contact_sheet -- --ignored` | `just check`; scene changes are visual, so look at the frames |
+| `crates/lumilio-ui/src/hero/**` | `just test-pkg lumilio-ui hero::`, then review frames from `LUMILIO_HERO_DUMP=<dir> cargo nextest run -p lumilio-ui hero_contact_sheet --ignored` | `just check`; scene changes are visual, so look at the frames |
 | `crates/lumilio-app/**` | `cargo check -p lumilio-app` | `just check` |
 | workspace manifests/toolchain, `justfile`, `.github/**` | `cargo metadata --no-deps` | `just check` |
 | `docs/**`, `AGENTS.md`, `.agents/**`, `*.md` only | link/path review | `just docs` (seconds); no full loop |

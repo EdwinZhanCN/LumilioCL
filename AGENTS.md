@@ -90,7 +90,7 @@ Don't write documents that restate the code or upstream; they go stale.
   remain reachable through a dropdown rather than overflowing a dialog.
 - A built user path is declared by a one-line comment at its code:
   `// ia[page]: 操作 | 层 / 组件 | 结果与反馈 [| 备注]` (skill `lumilio-ia-paths`).
-  `just ia` regenerates `docs/ia/paths/`, and `cargo test` fails
+  `just ia` regenerates `docs/ia/paths/`, and `just check` fails
   while it is stale.
 
 ## Plans and decisions

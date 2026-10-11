@@ -45,7 +45,7 @@ Never put one on a handler far from the control: it will outlive the control.
 1. Change the UI code and add, edit or delete its `// ia[...]` comments in the same change.
 2. Run `just ia`. It validates the comments (known page,
    no repeated action) and rewrites `docs/ia/paths/`.
-3. Commit the regenerated files with the change. `cargo test` fails with
+3. Commit the regenerated files with the change. `just check` fails with
    `docs/ia/paths is stale` if you forgot.
 4. If the change builds something listed in `.agents/plans/backlog.md`, delete
    that line.

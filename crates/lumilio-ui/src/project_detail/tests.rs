@@ -262,7 +262,7 @@ fn an_installed_project_offers_switching_and_the_installed_version_is_marked(
 }
 
 /// Not a check: prints the per-frame cost of a long description.
-/// `cargo test -p lumilio-ui detail_frame_cost -- --ignored --nocapture`
+/// `cargo nextest run -p lumilio-ui detail_frame_cost --ignored --no-capture`
 #[gpui::test]
 #[ignore = "a measurement, not a check"]
 fn detail_frame_cost_of_a_long_description(cx: &mut TestAppContext) {

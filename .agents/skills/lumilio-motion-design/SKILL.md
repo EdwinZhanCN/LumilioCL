@@ -71,7 +71,7 @@ details behind **技术详情**, no raw error strings as headlines. Domain types
   outline mode. Read the component source or assert the
   painted result.
 - World-register changes: render frames with
-  `LUMILIO_HERO_DUMP=<dir> cargo test -p lumilio-ui hero_contact_sheet -- --ignored`
+  `LUMILIO_HERO_DUMP=<dir> cargo nextest run -p lumilio-ui hero_contact_sheet --ignored`
   and look at them (`sips -s format png` converts PPM on macOS).
 - Interface changes: run `LUMILIO_HOME=<temp folder> cargo run -p lumilio-app` (a
   disposable data folder; review hooks are in `README.md`) and check hover, focus,

@@ -58,8 +58,8 @@ text from content sources never go through them.
    check plurals, sentence case, the term list and short keys. This workflow
    requires no private local tool.
 3. `just hardcoded-chinese` so `crates/lumilio-ui/src/i18n/hardcoded.txt`
-   shrinks, then `cargo test -p lumilio-ui i18n` and
-   `cargo test -p lumilio-ui --test english`.
+   shrinks, then `cargo nextest run -p lumilio-ui i18n` and
+   `cargo nextest run -p lumilio-ui --test english`.
 4. Tests in the unit-test binary assert Chinese; switching the language is
    process-wide, so English assertions go in `crates/lumilio-ui/tests/english.rs`.
 
