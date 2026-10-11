@@ -109,7 +109,9 @@ Start the branch name with the same type prefix that the commit uses:
 | `web/` | Website |
 
 The `rust`, `plans`, and `web` checks must pass before merge.
-A pull request runs all three checks, also when the change touches only one area.
+Each pull request starts all three checks.
+When the change does not touch the paths of a check, that check is skipped and counts as passed.
+For example, a pull request that changes only documents does not run the Rust build.
 Squash merge is the default.
 After the merge, GitHub deletes the branch.
 

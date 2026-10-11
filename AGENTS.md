@@ -22,9 +22,10 @@ launcher; the documents below serve that goal and never outrank it.
 
 The `justfile` is the single source of truth for checks. Every change reaches `main` through a
 pull request on a prefixed branch (`feat/`, `fix/`, `docs/`, `build/`, `web/`); `main` rejects
-direct pushes. Pull requests run all three workflows, whose jobs `rust` (`ci.yml`, `just ci`),
-`plans` (`plans.yml`, `just docs`) and `web` (`web.yml`, `just web`) are required checks.
-Pushes to `main` keep path filters. There are no git hooks.
+direct pushes. The required checks are the jobs `rust` (`ci.yml`, `just ci`), `plans`
+(`plans.yml`, `just docs`) and `web` (`web.yml`, `just web`). Each workflow's `changes` job skips
+its check when a pull request does not touch its paths; keep those filters in sync with
+`on.push.paths`. There are no git hooks.
 
 - **While iterating**: only what the change touches (skill `lumilio-select-checks`), e.g.
   `just test-pkg lumilio-ui project_detail`.

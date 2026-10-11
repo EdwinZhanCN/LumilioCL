@@ -1,13 +1,16 @@
 # Runs `just ci` (the justfile is the single source of truth for checks).
 #
-# Pull requests run every workflow without path filters: `rust`, `plans` and
-# `web` are required checks on main, and a workflow skipped by a path filter
-# would leave its check pending forever.
+# `rust`, `plans` and `web` are required checks on main. A workflow that a
+# path filter never starts leaves its check pending forever, but a skipped job
+# counts as passed. So pull requests always start the workflow, and the
+# `changes` job decides whether the check runs. If `changes` fails, the check
+# runs anyway. Pushes to main filter in `on.push.paths`.
 name: CI
 
 on:
   push:
     branches: [main]
+    # Keep in sync with the filters in the `changes` job.
     paths:
       - "**"
       - "!.agents/**"
@@ -24,7 +27,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      run: ${{ github.event_name != 'pull_request' || steps.filter.outputs.code == 'true' || steps.filter.outputs.ia == 'true' }}
+    steps:
+      - id: filter
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@v3
+        with:
+          # A file matches `code` only when it matches every pattern.
+          predicate-quantifier: every
+          filters: |
+            code:
+              - "**"
+              - "!.agents/**"
+              - "!**/*.md"
+              - "!web/**"
+            ia:
+              - "docs/ia/**"
+
   rust:
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.run == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:

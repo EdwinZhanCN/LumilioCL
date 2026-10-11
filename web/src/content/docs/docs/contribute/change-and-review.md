@@ -109,7 +109,9 @@ Pull request 应说明最终实现。
 | `web/` | 网站 |
 
 合并前，`rust`、`plans` 和 `web` 三项检查必须通过。
-pull request 会运行全部三项检查，即使修改只涉及其中一个领域。
+每个 pull request 都会启动三项检查。
+修改不涉及某项检查的路径时，该检查跳过并视为通过。
+例如，只修改文档的 pull request 不运行 Rust 构建。
 默认使用 squash 合并。
 合并后，GitHub 删除工作分支。
 
