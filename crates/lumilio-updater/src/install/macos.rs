@@ -20,10 +20,11 @@ pub(super) fn install(executable: &Path, update: &Path) -> Result<Relaunch, Stri
     // The same approach as Zed's auto_update (crates/auto_update): rsync
     // writes each file beside its target and renames it into place, so the
     // running process keeps the files it has open, and --delete drops files
-    // that the new version no longer ships.
+    // that the new version no longer ships. `Icon?` is Finder's custom-icon
+    // file, which Zed leaves alone as well.
     let copied = mounted_app(&mount).and_then(|source| {
         run(Command::new("rsync")
-            .args(["-a", "--delete"])
+            .args(["-a", "--delete", "--exclude", "Icon?"])
             .arg(contents_of(&source))
             .arg(app))
     });

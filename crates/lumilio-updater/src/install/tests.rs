@@ -64,6 +64,14 @@ fn the_bundle_is_replaced_beside_the_running_files_and_restarts_from_the_bundle(
     let relaunch = install(&executable, &image).unwrap();
 
     assert_eq!(relaunch, Relaunch::Restart(app.clone()));
+    let Relaunch::Restart(path) = &relaunch else {
+        unreachable!()
+    };
+    assert_eq!(
+        path.extension().and_then(|extension| extension.to_str()),
+        Some("app"),
+        "GPUI reopens the bundle, never the binary inside it"
+    );
     assert_eq!(fs::read_to_string(&executable).unwrap(), "new");
     assert!(app.join("Contents/Resources/kept.txt").is_file());
     assert!(
@@ -116,4 +124,37 @@ fn the_executable_is_replaced_atomically_and_restarts_from_its_original_path() {
         "old",
         "the running process keeps the file it opened"
     );
+}
+
+/// `open -n` starts a second instance with its own Dock item (0.1.1). The
+/// restart goes through GPUI's `App::restart`, which waits for this process
+/// to exit and then runs a plain `open` on the bundle.
+#[test]
+fn nothing_starts_a_second_instance_with_open_n() {
+    fn sources(folder: &Path, found: &mut Vec<std::path::PathBuf>) {
+        for entry in fs::read_dir(folder).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                sources(&path, found);
+            } else if path.extension().is_some_and(|extension| extension == "rs")
+                && path != Path::new(file!())
+                && !path.ends_with(file!())
+            {
+                found.push(path);
+            }
+        }
+    }
+    let crates = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+    let mut found = Vec::new();
+    sources(&crates.join("lumilio-updater/src"), &mut found);
+    sources(&crates.join("lumilio-app/src"), &mut found);
+    assert!(!found.is_empty());
+    for path in found {
+        let text = fs::read_to_string(&path).unwrap();
+        assert!(
+            !(text.contains("Command::new(\"open\")") && text.contains("\"-n\"")),
+            "{} spawns `open -n`",
+            path.display()
+        );
+    }
 }
