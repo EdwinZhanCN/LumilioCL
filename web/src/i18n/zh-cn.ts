@@ -1,5 +1,6 @@
 // The source catalog. Facts here follow README.md and docs/ia/paths/; a
 // feature the launcher does not have is not written here.
+import { plannedTeasers } from "../data/roadmap";
 export const zhCN = {
   lang: "zh-CN",
   meta: {
@@ -25,6 +26,7 @@ export const zhCN = {
     lede: "基于全新的GPU桌面UI渲染框架，你的最后一个下一代 Minecraft 启动器。",
     cta: "免费下载",
     source: "查看源代码",
+    docs: "查看文档",
     plateLabel: "LumilioCL 的面板，每个格子都能按",
     idle: "碰碰我？",
     download: "下载",
@@ -70,11 +72,7 @@ export const zhCN = {
   },
 
   // The three grey tiles: the roadmap (.agents/plans/).
-  planned: {
-    appearance: { version: "0.1.1", name: "主题与外观", lede: "换一套主题，调整界面字体和字号。" },
-    translation: { version: "0.2.0", name: "发现页翻译", lede: "模组的简介和更新日志，用你的语言读。" },
-    plugins: { version: "0.3.0", name: "社区插件", lede: "插件以 WASM 运行，只能用你允许的能力。" },
-  },
+  planned: plannedTeasers,
 
   launch: {
     stages: ["检查", "依赖库", "资源", "启动"],
@@ -144,7 +142,7 @@ export const zhCN = {
           { text: "AGPL-3.0-only；安装包由 GitHub Actions 从公开代码构建", shot: null },
           { text: "没有内置遥测，发现页还能排除带遥测的模组", shot: null },
           { text: "下载地址规则随你改，官方源始终是回退", shot: null },
-          { text: "插件系统已经就位，0.3.0 起支持 WASM 社区插件", shot: null },
+          { text: `插件系统已经就位，${plannedTeasers.plugins.version} 目标为 WASM 社区插件`, shot: null },
         ],
         // TODO(asset): a screenshot for this group, e.g. the diagnostics log view.
         shot: null,
@@ -166,16 +164,11 @@ export const zhCN = {
   },
 
   roadmap: {
+    details: "查看完整路线图",
     title: "接下来",
     lede: "版本号只往前走。每一步做什么，计划都在仓库里公开。",
-    current: "即将发布",
+    current: "已发布",
     planned: "计划中",
-    items: [
-      { version: "0.1.0", name: "首个版本", lede: "三个平台的安装包，自带自动更新。" },
-      { version: "0.1.1", name: "主题与外观", lede: "更多主题，界面字体与字号。" },
-      { version: "0.2.0", name: "发现页翻译", lede: "简介和更新日志翻译成界面语言。" },
-      { version: "0.3.0", name: "社区插件", lede: "WASM 插件和可审核的插件目录。" },
-    ],
   },
 
   download: {
@@ -209,6 +202,8 @@ export const zhCN = {
   },
 
   footer: {
+    changelog: "更新日志",
+    docs: "文档与贡献规范",
     source: "源代码",
     releases: "发布",
     license: "许可证 AGPL-3.0-only",

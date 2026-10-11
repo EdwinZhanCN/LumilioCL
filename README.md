@@ -13,7 +13,7 @@
 
 ![Rust](https://img.shields.io/badge/Rust-2024_edition-000000?logo=rust)
 ![GPUI](https://img.shields.io/badge/UI-GPUI-4F46E5)
-![gpui-component](https://img.shields.io/badge/gpui--component-0.7-4F46E5)
+![gpui-kit](https://img.shields.io/badge/UI-gpui--kit%200.7-4F46E5)
 ![Tokio](https://img.shields.io/badge/async-Tokio-463D3B)
 ![SQLite](https://img.shields.io/badge/storage-SQLite-003B57?logo=sqlite&logoColor=white)
 ![wgpu](https://img.shields.io/badge/3D_preview-wgpu-2B6CB0)
@@ -24,8 +24,9 @@
 
 ## 简介
 
-LumilioCL 用 Rust 编写，界面基于 [GPUI](https://www.gpui.rs/) 和
-[gpui-kit](https://github.com/longbridge/gpui-kit)，不依赖 Electron 或网页技术。
+LumilioCL 使用 Rust 开发，桌面界面基于 [GPUI](https://www.gpui.rs/) 与
+[gpui-kit](https://github.com/longbridge/gpui-kit) 构建，底层组件使用本仓库维护的
+gpui-component 0.7 Fork。桌面应用不依赖 Electron 或 WebView。
 
 - **游戏库**：新建原版、Fabric 或 Quilt 游戏，用收藏、合集和搜索管理。可以导入 `.mrpack`
   和 MultiMC / Prism 整合包，也可以把其他启动器（MultiMC、Prism、`.minecraft`）里的游戏搬
@@ -35,7 +36,8 @@ LumilioCL 用 Rust 编写，界面基于 [GPUI](https://www.gpui.rs/) 和
 - **账户**：离线账户（可以换皮肤），以及 LittleSkin 等第三方认证服务器。
 - **游戏页**：管理内容、世界和服务器，查看截图和启动历史，做完整备份和恢复。游戏崩溃时，
   诊断页会说明可能的原因。
-- **插件**：崩溃分析、Litematica 投影（材料清单和 3D 预览）、Discord 状态显示（默认关闭）。
+- **世界地图**：查看种子预测、存档地图和 Xaero 地图，叠加结构物及路径点等图层。
+- **内置插件**：崩溃分析、Litematica 投影（材料清单和 3D 预览）、Modrinth 内容源、世界地图与 Discord 状态显示（默认关闭）。社区 WASM 插件尚在规划中，当前不支持独立安装第三方插件。
 
 > [!NOTE]
 > Microsoft 正版登录的流程已经做好，这个启动器应用注册已经通过 Mojang 审批。
@@ -81,12 +83,12 @@ LumilioCL 用 Rust 编写，界面基于 [GPUI](https://www.gpui.rs/) 和
 
 ## 第一次打开时系统弹出警告？
 
-**这是正常的，只需要处理一次。**
+**请先确认安装包来自本仓库的 GitHub Releases。**
 
-Apple 和微软会给付费购买了「开发者证书」的软件做标记，系统认得这个标记，就不会提醒。
-LumilioCL 是免费的个人项目，没有购买证书，所以 macOS 和 Windows 第一次打开时会提醒你
-「无法确认开发者」。这只说明系统不认识开发者，**不代表软件有问题**。LumilioCL 的代码全部公开，
-安装包由 GitHub 根据公开的代码自动构建。
+发布流程支持可选的代码签名和 macOS 公证；未签名或缺少系统信任记录的安装包，可能触发
+macOS Gatekeeper 或 Windows SmartScreen 提醒。此类提醒并不直接证明文件恶意，
+但也不能作为文件安全的保证。LumilioCL 的源码与 GitHub Actions 构建流程均公开，
+安装前建议核对发布来源与 SHA-256。
 
 ### macOS
 
@@ -108,8 +110,9 @@ LumilioCL 是免费的个人项目，没有购买证书，所以 macOS 和 Windo
 <details>
 <summary>提示「已损坏，无法打开」</summary>
 
-这是 macOS 对从网上下载的未签名应用的另一种拦截方式，软件本身没有损坏。打开「终端」，粘贴
-下面这行，按回车：
+该提示也可能由下载损坏或安全校验失败引起，并不一定只是签名问题。请先从官方 Releases
+重新下载并核对 SHA-256。仅在确认文件来源可信、问题确实与隔离标记有关时，才考虑在「终端」
+运行下面的命令移除该应用的隔离标记：
 
 ```sh
 xattr -dr com.apple.quarantine /Applications/LumilioCL.app
@@ -126,7 +129,7 @@ xattr -dr com.apple.quarantine /Applications/LumilioCL.app
 
 ### Linux
 
-不会弹警告，按上面的方法安装即可。
+系统提示取决于发行版与桌面环境，请按上述说明安装。
 
 ### 想确认下载的文件没被改过？
 
@@ -138,9 +141,11 @@ xattr -dr com.apple.quarantine /Applications/LumilioCL.app
 - Windows（PowerShell）：`Get-FileHash .\文件名 -Algorithm SHA256`，再把结果和
   `SHA256SUMS.txt` 里对应的那一行比对。
 
-显示 `OK`，或者两串字符完全一样，就说明文件和 GitHub 构建出来的一模一样。
+显示 `OK`，或者两串字符一致，说明文件与 Release 提供的校验值相符；这并不能单独证明发布者身份。
 
 ## 参与开发
+
+安装与贡献规范见[文档站](https://launcher.lumilio.org/docs/)。贡献规范适用于人类、Coding Agent 和两者协作。
 
 ```sh
 cargo run -p lumilio-app   # 运行
@@ -148,13 +153,14 @@ just check                 # 构建、测试、clippy、rustfmt，和 CI 一致
 just package               # 为当前平台打包到 dist/
 ```
 
-- 工作区：`lumilio-core`（与界面无关的启动器逻辑）、`lumilio-ui`（GPUI 界面）、`lumilio-app`
+- 开发约定见 [`AGENTS.md`](AGENTS.md)；工作区：`lumilio-core`（与界面无关的启动器逻辑）、`lumilio-ui`（GPUI / gpui-kit 界面）、`lumilio-app`
   （进程启动和组装）、`lumilio-schematic-render`（原生投影渲染）、`lumilio-plugin-*`（插件），
   以及 `lumilio-xtask`（发布打包）。
 - 用 `LUMILIO_HOME=/tmp/<任意文件夹>` 换一个一次性的数据目录。
 - 启动器现在能做什么，见从代码生成的 [`docs/ia/paths/`](docs/ia/paths/README.md)；正在进行的
   工作在 [`.agents/plans/`](.agents/plans/README.md)；界面、动效和文案遵循
   [`docs/design-language.md`](docs/design-language.md)。
+- 网站与下载代理位于 `web/`（Astro + React + Cloudflare Worker），运行 `just web` 验证。
 - 发布：推送和工作区版本一致的 `v<版本>` 标签（SemVer），会在三个平台上打包并创建草稿
   Release，详见 [`assets/icons/PACKAGING.md`](assets/icons/PACKAGING.md) 和 ADR 0032。
 

@@ -13,7 +13,7 @@ A native Minecraft launcher written in Rust.
 
 ![Rust](https://img.shields.io/badge/Rust-2024_edition-000000?logo=rust)
 ![GPUI](https://img.shields.io/badge/UI-GPUI-4F46E5)
-![gpui-component](https://img.shields.io/badge/gpui--component-0.7-4F46E5)
+![gpui-kit](https://img.shields.io/badge/UI-gpui--kit%200.7-4F46E5)
 ![Tokio](https://img.shields.io/badge/async-Tokio-463D3B)
 ![SQLite](https://img.shields.io/badge/storage-SQLite-003B57?logo=sqlite&logoColor=white)
 ![wgpu](https://img.shields.io/badge/3D_preview-wgpu-2B6CB0)
@@ -24,9 +24,10 @@ A native Minecraft launcher written in Rust.
 
 ## About
 
-LumilioCL is written in Rust. Its interface is built with [GPUI](https://www.gpui.rs/) and
-[gpui-component](https://github.com/longbridge/gpui-component), with no Electron or web view. The
-interface is in Simplified Chinese.
+LumilioCL is written in Rust. Its native desktop interface uses [GPUI](https://www.gpui.rs/)
+and [gpui-kit](https://github.com/longbridge/gpui-kit), with a locally maintained fork of
+gpui-component 0.7 for underlying components. The desktop app uses neither Electron nor WebView
+and supports Simplified Chinese and English.
 
 - **Library**: create vanilla, Fabric or Quilt games and organize them with favorites, collections
   and search. Import `.mrpack` and MultiMC / Prism modpacks, or bring games over from other
@@ -37,13 +38,16 @@ interface is in Simplified Chinese.
 - **Accounts**: offline accounts (with skins) and third-party auth servers such as LittleSkin.
 - **Game page**: manage content, worlds and servers; see screenshots and launch history; make full
   backups and restore them. When a game crashes, the diagnostics tab explains the likely cause.
-- **Plugins**: crash analysis, Litematica schematics (material lists and a 3D preview), and
-  Discord presence (off by default).
+- **World map**: explore seed predictions, save data and Xaero maps with structures and waypoint
+  overlays.
+- **Built-in plugins**: crash analysis, Litematica schematics (material lists and a 3D
+  preview), Modrinth content, world exploration, and Discord presence (off by default).
+  Installable third-party WASM plugins are planned, not available in this release.
 
 > [!NOTE]
-> Microsoft sign-in is built, but Mojang has not yet approved the launcher's app registration.
-> Until it does, sign-in fails at the last step and the launcher explains why. Offline and
-> third-party accounts work in the meantime.
+> Microsoft account sign-in is implemented. The application's Minecraft services registration
+> was approved, and the Project Maintainer verified a real sign-in on October 7, 2026. Offline and
+> third-party authentication accounts are also supported.
 
 ## Gallery
 
@@ -86,13 +90,13 @@ Uninstalling LumilioCL does not delete your games or saves. They live in
 
 ## A warning when you first open it?
 
-**That is expected, and you only have to deal with it once.**
+**First verify that you downloaded the package from this repository's GitHub Releases.**
 
-Apple and Microsoft recognize apps whose developers pay for a yearly signing certificate.
-LumilioCL is a free personal project without one, so on first launch macOS and Windows say they
-cannot verify the developer. That only means the system does not know who made the app.
-**It does not mean anything is wrong with it.** The code is fully public, and GitHub builds the
-packages from that public code.
+The release workflow supports optional code signing and macOS notarization. Unsigned packages,
+or packages without established platform reputation, may trigger macOS Gatekeeper or Windows
+SmartScreen warnings. Such a warning does not by itself prove the package is malicious, but
+neither does it guarantee the package is safe. The source and GitHub Actions build workflow are
+public; verify the release source and SHA-256 before proceeding.
 
 ### macOS
 
@@ -115,8 +119,10 @@ again.
 <details>
 <summary>It says the app “is damaged and can't be opened”</summary>
 
-This is another way macOS blocks unsigned apps downloaded from the internet; nothing is
-actually damaged. Open Terminal, paste this line and press Return:
+This warning can also indicate a damaged download or a failed security check, not just missing
+signing. Download the package again from official Releases and verify its SHA-256 first. Only if
+you trust the source and have confirmed the problem is the quarantine attribute should you
+consider running the following command in Terminal to remove that attribute:
 
 ```sh
 xattr -dr com.apple.quarantine /Applications/LumilioCL.app
@@ -134,7 +140,7 @@ Then double-click the app again.
 
 ### Linux
 
-There is no warning; just install as described above.
+Warnings depend on your distribution and desktop environment; install as described above.
 
 ### Want to check that the file was not tampered with?
 
@@ -146,9 +152,13 @@ the download and run:
 - Windows (PowerShell): `Get-FileHash .\<file> -Algorithm SHA256`, then compare the result with
   the matching line in `SHA256SUMS.txt`.
 
-If it says `OK`, or the two strings are identical, your file is exactly what GitHub built.
+If it says `OK`, or the two strings match, your file matches the published release checksum;
+that alone does not authenticate the publisher.
 
 ## Development
+
+Read the [documentation](https://launcher.lumilio.org/docs/) for installation and contribution procedures.
+The contribution rules apply to people, Coding Agents, and joint work.
 
 ```sh
 cargo run -p lumilio-app   # run it
@@ -156,7 +166,8 @@ just check                 # build, test, clippy, rustfmt, the same as CI
 just package               # package for this platform into dist/
 ```
 
-- Workspace: `lumilio-core` (launcher logic, independent of the UI), `lumilio-ui` (GPUI views),
+- Development conventions: [`AGENTS.md`](AGENTS.md). Workspace: `lumilio-core` (launcher logic,
+  independent of the UI), `lumilio-ui` (GPUI / gpui-kit views),
   `lumilio-app` (process startup and composition), `lumilio-schematic-render` (native schematic
   rendering), `lumilio-plugin-*` (plugins) and `lumilio-xtask` (release packaging).
 - Use `LUMILIO_HOME=/tmp/<any-folder>` for a disposable data folder.
@@ -164,6 +175,8 @@ just package               # package for this platform into dist/
   [`docs/ia/paths/`](docs/ia/paths/README.md); work in flight is in
   [`.agents/plans/`](.agents/plans/README.md); the look, motion and copy follow
   [`docs/design-language.md`](docs/design-language.md).
+- The website and release proxy are in `web/` (Astro + React + Cloudflare Worker); run `just web`
+  for checks.
 - Releases: pushing a `v<version>` tag that matches the workspace version (SemVer) packages all
   three platforms and opens a draft release. See
   [`assets/icons/PACKAGING.md`](assets/icons/PACKAGING.md) and ADR 0032.

@@ -39,7 +39,7 @@ text from content sources never go through them.
   are taken and take them again when it changes, keeping what is chosen
   (`LiveControls::relabel`).
 
-## Outside the UI (ADR 0038)
+## Outside the UI
 
 - `lumilio-core` never words a sentence: it returns types (a task label is an
   action and a subject, a reclaim reason is an enum) and the UI maps them.
@@ -53,19 +53,13 @@ text from content sources never go through them.
 
 1. Replace the page's Chinese literals with `tr!` and add each message to the
    Chinese catalog under a `## <page>` section, in reading order.
-2. Fill the English catalog: either write it, or hand it to DeepSeek through
-   the maintainer's `dsh` (it edits the English file and runs the i18n tests):
-
-   ```bash
-   dsh --profile headless "$(cat .agents/skills/lumilio-i18n/translate-prompt.md)"
-   ```
-
-   Then read the English diff yourself. Check plurals, sentence case, the term
-   list in the prompt, and that keys stay short. `dsh` is not in CI; the
-   catalogs it writes are reviewed like any other change.
+2. Fill the English catalog using the requirements in
+   `.agents/skills/lumilio-i18n/translate-prompt.md`. Review the English diff:
+   check plurals, sentence case, the term list and short keys. This workflow
+   requires no private local tool.
 3. `just hardcoded-chinese` so `crates/lumilio-ui/src/i18n/hardcoded.txt`
-   shrinks, then `cargo test -p lumilio-ui i18n` and
-   `cargo test -p lumilio-ui --test english`.
+   shrinks, then `cargo nextest run -p lumilio-ui i18n` and
+   `cargo nextest run -p lumilio-ui --test english`.
 4. Tests in the unit-test binary assert Chinese; switching the language is
    process-wide, so English assertions go in `crates/lumilio-ui/tests/english.rs`.
 

@@ -1,15 +1,18 @@
 # LumilioCL — Agent Work Manual
 
-LumilioCL is a Minecraft launcher in **Rust + GPUI + gpui-component**. The goal is a good
+LumilioCL is a native Minecraft launcher in **Rust + GPUI + gpui-kit**. The UI also uses
+**gpui-component 0.7**, patched locally through `forks/gpui-component`. The goal is a good
 launcher; the documents below serve that goal and never outrank it.
 
 ## Invariants
 
-1. **core does not depend on UI.** `lumilio-core` never depends on gpui / gpui-component. Domain
+1. **core does not depend on UI.** `lumilio-core` never depends on `gpui`, `gpui-kit`, or `gpui-component`. Domain
    logic stays independently testable. This is the insurance against UI framework churn.
-2. **`3rd-party/` is read-only**: never modify, move or delete anything under it.
+2. **Reference sources stay separate.** Read upstream repositories at their published
+   URLs; do not require untracked local clones. Maintained dependencies live in
+   the Git-tracked `forks/` and `vendor/` directories.
 3. **Adapted code keeps its attribution.** Code taken or adapted from upstream carries a comment
-   naming the source path and its license notice (ADR 0011, 0022). Respect files under a
+   naming the source path and its license notice. Respect files under a
    different license, never copy Modrinth branding, and adapt to Rust and our crate boundaries
    instead of porting mechanically.
 4. **Closed verification loop.** A code change is handed off only after `just check` passes.
@@ -17,12 +20,16 @@ launcher; the documents below serve that goal and never outrank it.
 
 ## Verification
 
-The `justfile` is the single source of truth for checks; CI (`.github/workflows/ci.yml`) runs
-`just ci` on every push to `main` and every pull request (ADR 0026). There are no git hooks.
+The `justfile` is the single source of truth for checks; Code CI (`.github/workflows/ci.yml`) runs
+`just ci` for eligible code changes on `main` and pull requests; path filters exclude
+most Markdown and `.agents/**` changes. `plans.yml` runs `just docs` for plan inputs,
+schema, projections and harness changes. The website has a separate `web.yml` workflow. There are
+no git hooks.
 
 - **While iterating**: only what the change touches (skill `lumilio-select-checks`), e.g.
   `just test-pkg lumilio-ui project_detail`.
-- **Docs and harness only** (`docs/**`, `.agents/**`, `*.md`): `just docs`, which takes seconds.
+- **Docs and harness only** (`docs/**`, `.agents/**`, `*.md`): run `just docs` locally.
+  Plan/harness inputs and generated plan output are also checked by `plans.yml`.
 - **Before handing off a code change**: `just check` (build → test → clippy → fmt, in that order).
 
 Green checks do not prove a UI change looks right: state what the tests verified and what still
@@ -30,26 +37,35 @@ needs eyes.
 
 ## Where the facts are
 
+- **Installation and contribution procedures**: `web/src/content/docs/docs/` (Chinese, `/docs/`)
+  and `web/src/content/docs/en/docs/` (English, `/en/docs/`). English pages use ASD-STE100
+  writing rules and defined software terms; Chinese pages use the same clear structure.
+  Keep both languages consistent
+  with this manual and `justfile`; do not create a separate `CONTRIBUTING.md`.
+
 - **What the launcher does today**: the generated user paths in `docs/ia/paths/`, then the code.
 - **How others do it**: read the upstream source directly.
-  - `3rd-party/modrinth`: Modrinth App. `packages/app-lib` is a Rust launcher backend, the first
+  - [Modrinth App](https://github.com/modrinth/code): `packages/app-lib` is a Rust launcher backend, the first
     place to look for how something is built (auth, Java runtimes, instances, modpacks,
     processes); `packages/daedalus` covers version metadata.
-  - `3rd-party/HMCL`: HMCL (Java). The first place to look for feature breadth, platform quirks
+  - [HMCL](https://github.com/HMCL-dev/HMCL) (Java): the first place to look for feature breadth, platform quirks
     and edge cases.
-- **Why things are the way they are**: `.agents/decisions/`. **What is in flight**: `.agents/plans/`.
+- **Current plans, decisions and lessons**: `.agents/plans/*.json`.
   **What is wanted but not planned**: `.agents/plans/backlog.md`.
 - **How the UI looks, moves and speaks**: `docs/design-language.md` and `docs/design-patterns.md`.
 
-Don't write documents that restate the code or upstream; they go stale (ADR 0021).
+Don't write documents that restate the code or upstream; they go stale.
 
 ## Structure
 
-- Rust stable (pinned by `rust-toolchain.toml`), edition 2024.
+- Rust edition 2024. The development toolchain is pinned to **1.98.1** in
+  `rust-toolchain.toml`; `Cargo.toml` declares **1.95** as the minimum Rust version.
 - Dependency direction `lumilio-app → lumilio-ui → lumilio-core`. Core owns launcher state,
   metadata, downloads, auth and instance operations. UI owns pages and GPUI state. App owns
   startup, configuration, logging and composition.
 - Async: core uses tokio; UI bridges via `cx.spawn`/channels. **No blocking I/O on the UI thread.**
+- `web/` is a separate Astro + React website and Cloudflare Worker, not the desktop UI. Use
+  `just web` and `.github/workflows/web.yml` for website changes.
 - File layout: a module does one thing. Past about 800 lines of non-test code, split a file into a
   directory module (`name/mod.rs` for the public surface and shared types, one file per concern).
   Unit tests live in `tests.rs` or `tests/<theme>.rs` beside the code (`#[cfg(test)] mod tests;`),
@@ -60,10 +76,11 @@ Don't write documents that restate the code or upstream; they go stale (ADR 0021
 ## UI
 
 - Before UI work, load the repo-local [gpui-kit](.agents/skills/gpui-kit/SKILL.md) and
-  [gpui-kit-design-guides](.agents/skills/gpui-kit-design-guides/SKILL.md) skills. Prefer existing
-  gpui-component components over custom ones. Verify APIs against the locked dependency source;
-  the upstream skills follow the latest GPUI Kit. This project's crate boundaries, controls and
-  design language take precedence over upstream examples.
+  [gpui-kit-design-guides](.agents/skills/gpui-kit-design-guides/SKILL.md) skills. Prefer gpui-kit APIs and existing
+  `lumilio-ui` wrappers; use gpui-component underneath when appropriate instead of inventing a parallel UI system. Verify APIs against the locked dependency source;
+  the upstream skills follow the latest GPUI Kit. The `gpui-kit` dependency is the primary
+  application toolkit; `gpui-component` provides underlying components through the local fork.
+  This project's crate boundaries, controls and design language take precedence over upstream examples.
 - Buttons, switches, tabs, segments and tags come from `lumilio-ui` (`key::Key`, `controls`,
   `kit`), drawn per design-language §12. Don't use gpui-component's `Button`/`Switch`/`TabBar`
   in pages.
@@ -72,19 +89,28 @@ Don't write documents that restate the code or upstream; they go stale (ADR 0021
   `Segments`. `SettingsDialog` `Choice` is only for a few short labels; long lists must
   remain reachable through a dropdown rather than overflowing a dialog.
 - A built user path is declared by a one-line comment at its code:
-  `// ia[page]: 操作 | 层 / 组件 | 结果与反馈 [| 备注]` (ADR 0019, 0021; skill `lumilio-ia-paths`).
-  `just ia` regenerates `docs/ia/paths/`, and `cargo test` fails
+  `// ia[page]: 操作 | 层 / 组件 | 结果与反馈 [| 备注]` (skill `lumilio-ia-paths`).
+  `just ia` regenerates `docs/ia/paths/`, and `just check` fails
   while it is stale.
 
 ## Plans and decisions
 
-- Multi-step or multi-session work gets a plan in `.agents/plans/<slug>.md`, and the plan
-  exists only while the work is active. When it finishes, condense it into the next decision
-  record if it made a choice worth explaining, and delete it either way (skill
-  `lumilio-exec-plan`). At session start, read the `in_progress` plans.
-- Code cites `ADR NNNN`, never a plan. Older "plan NNNN" citations resolve through
-  `.agents/decisions/plan-history.md`.
-- An ADR records a decision; it is not a permission gate. Nothing needs an ADR before it is built.
+- Multi-step or multi-session work gets `.agents/plans/<slug>.json` (skill
+  `lumilio-exec-plan`). Read relevant `in_progress` JSON plans at session start.
+  Track acceptance, decisions and lessons there; record outcome and retain completed
+  or cancelled JSON. Small Issue/PR fixes need no plan.
+- JSON is authoritative; `just plans` generates read-only `docs/plans/*.md` and
+  the website's whitelisted roadmap. `just plans-check` rejects stale output.
+  Completed does not mean released.
+- Code may cite stable plan IDs or long-lived design/API contracts. Decisions belong in
+  `decisions`, escaped failures and their guards in `lessonsLearned` within the JSON plan.
+- Do not create standalone ADRs, postmortems, legacy/archive directories or historical
+  mapping tables. Removed material is available in Git history when needed.
+  A decision record is not a permission gate.
+- Refer to anyone executing project work as `Project Maintainer`. Use repository-relative,
+  Git-tracked paths or published upstream URLs in durable records; omit personal names,
+  machine-specific paths and dependencies on private local tools. Preserve license
+  attribution, public repository identifiers and documented runtime path examples.
 
 ## Skills (`.agents/skills/`)
 
@@ -97,7 +123,7 @@ Don't write documents that restate the code or upstream; they go stale (ADR 0021
 - `lumilio-i18n`: put launcher text in the language catalogs (`tr!`) and fill the English one.
 - `lumilio-motion-design`: apply the design language to UI, motion, copy or world-scene changes.
 
-Escaped failures are written up in `.agents/postmortems/`.
+Escaped failures and their guards go in the plan's `lessonsLearned`.
 
 ## Hardening
 

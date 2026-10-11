@@ -264,7 +264,7 @@ Discover.
   label stays ink, and the open port tab is filled.
 - Text reaches 4.5:1 against what it sits on, accent text included. Orange
   and danger as text use their text tokens (§12).
-- **Accepted exception** (maintainer, 2026-10-03): white labels on the
+- **Accepted exception** (Project Maintainer, 2026-10-03): white labels on the
   bright orange fill measure 3.55:1 on aluminium and 3.12:1 on night. They
   are kept for the look, and only on orange keys, the open port tab and the
   orange tag. A darker fill (`#C94108`, 4.95:1) was tried and rejected as too

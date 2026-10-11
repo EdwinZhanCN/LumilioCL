@@ -1,0 +1,23 @@
+---
+import { primaryPlans } from "../../data/roadmap";
+import { docsCatalog, type DocsLanguage } from "../../i18n/docs";
+
+const language: DocsLanguage = Astro.locals.starlightRoute.lang.startsWith("en") ? "en" : "zh-CN";
+const t = docsCatalog(language).roadmap;
+const plans = primaryPlans(language);
+---
+
+{plans.length === 0 && <p>{t.empty}</p>}
+<ol class="primary-plans" aria-label={t.label}>
+  {plans.map((plan) => (
+    <li class="primary-plan">
+      <div class="plan-meta">
+        <span class="plan-status" data-status={plan.status}>{t.status[plan.status as keyof typeof t.status]}</span>
+        <span>{t.target} <strong>{plan.version ?? t.noVersion}</strong></span>
+      </div>
+      <h2 id={`plan-${plan.id}`}>{plan.name}</h2>
+      <p>{plan.lede}</p>
+      <a href={plan.source}>{t.source} →</a>
+    </li>
+  ))}
+</ol>

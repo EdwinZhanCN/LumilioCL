@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "id": "wasm-plugin-registry",
+  "title": "WASM 插件与可审核的社区目录",
+  "summary": "社区插件以 WASM 运行，能力只能通过宿主的 WIT 接口获得。随应用发布的五个插件仍是核心插件。社区插件默认不运行；启动器提供受限模式和安全模式。社区目录只列出经过扫描、版本被哈希钉住的插件，安装源默认是这个目录，而不是任意网址。",
+  "status": "proposed",
+  "visibility": "public",
+  "scope": {
+    "included": [
+      "In：Wasmtime 宿主、与现有扩展点对应的 WIT、核心 / 社区区分、受限模式、安全模式、目录客户端、安装与卸载、权限展示、开发期从本地目录加载。"
+    ],
+    "excluded": [
+      "Out：把现有四个核心插件改写成 WASM、插件内自由画 UI、插件市场付款、自动更新启动器、要求社区插件使用 AGPL。"
+    ]
+  },
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "T1：引入 Wasmtime 与 WIT。一个示例插件实现只读分析器，编译为 `wasm32-wasip2`。宿主按能力调用，插件访问未授权路径或主机时失败。解压测试包含 `../` 路径，必须拒绝且不落盘。",
+      "status": "proposed",
+      "acceptance": "T1：引入 Wasmtime 与 WIT。一个示例插件实现只读分析器，编译为 `wasm32-wasip2`。宿主按能力调用，插件访问未授权路径或主机时失败。解压测试包含 `../` 路径，必须拒绝且不落盘。"
+    },
+    {
+      "id": "T2",
+      "title": "T2：插件来源分为核心与社区。设置页分两组。受限模式默认开启。`--safe` 与连续启动失败进入安全模式，只留核心插件。退出安全模式要人确认。",
+      "status": "proposed",
+      "acceptance": "T2：插件来源分为核心与社区。设置页分两组。受限模式默认开启。`--safe` 与连续启动失败进入安全模式，只留核心插件。退出安全模式要人确认。"
+    },
+    {
+      "id": "T3",
+      "title": "T3：目录索引、哈希校验、权限与扫描结果的展示。已审核版本可以安装、启用、停用、卸载。未审核版本和本地开发目录要单独的确认，不进入默认列表。",
+      "status": "proposed",
+      "acceptance": "T3：目录索引、哈希校验、权限与扫描结果的展示。已审核版本可以安装、启用、停用、卸载。未审核版本和本地开发目录要单独的确认，不进入默认列表。"
+    },
+    {
+      "id": "T4",
+      "title": "T4：示例插件的崩溃、超时和取消不拖垮 UI，行为与 既有设计 的原生隔离一致。WASM 调用同样不在 UI 线程上阻塞。",
+      "status": "proposed",
+      "acceptance": "T4：示例插件的崩溃、超时和取消不拖垮 UI，行为与 既有设计 的原生隔离一致。WASM 调用同样不在 UI 线程上阻塞。"
+    }
+  ],
+  "validation": [
+    {
+      "criterion": "示例插件在授权范围内返回结果；越权、损坏的 wasm、错误的哈希、压缩包路径穿越都被拒绝。",
+      "result": null
+    },
+    {
+      "criterion": "受限模式和安全模式下，已安装的社区插件不会被调用。",
+      "result": null
+    },
+    {
+      "criterion": "核心插件在安全模式下仍可开关。",
+      "result": null
+    },
+    {
+      "criterion": "索引签名或哈希不符时不安装。",
+      "result": null
+    },
+    {
+      "criterion": "实机：从本地目录加载示例插件，再打开安全模式确认它消失，核心插件还在。",
+      "result": null
+    }
+  ],
+  "references": [
+    "Zed 扩展开发：<https://zed.dev/docs/extensions/developing-extensions>",
+    "Zed 扩展生命周期：<https://zed.dev/blog/zed-decoded-extensions>",
+    "Obsidian Restricted Mode：<https://obsidian.md/help/plugin-security>",
+    "Obsidian 开发者政策：<https://docs.obsidian.md/community-directory/developer-policies>"
+  ],
+  "dependencies": [],
+  "lessonsLearned": [],
+  "roadmap": {
+    "enabled": true,
+    "id": "wasm-plugin-registry",
+    "name": "社区插件",
+    "lede": "WASM 插件和可审核的插件目录。",
+    "targetVersion": "0.3.0",
+    "order": 30
+  }
+}

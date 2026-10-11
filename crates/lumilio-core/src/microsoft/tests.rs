@@ -330,7 +330,7 @@ fn the_client_id_can_be_overridden_for_development() {
 
 /// Asks Microsoft for a code with the registered client id; nothing is
 /// signed in. Run on purpose with
-/// `cargo test -p lumilio-core real_device_code -- --ignored --nocapture`.
+/// `cargo nextest run -p lumilio-core real_device_code --ignored --no-capture`.
 #[tokio::test]
 #[ignore = "talks to the real Microsoft sign-in service"]
 async fn real_device_code_is_offered_for_the_registered_client() {

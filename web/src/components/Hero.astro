@@ -1,6 +1,6 @@
 ---
 import "../styles/hero.css";
-import { DownloadSimpleIcon as DownloadSimple, GithubLogoIcon as GithubLogo } from "@phosphor-icons/react";
+import { BookOpenIcon as BookOpen, DownloadSimpleIcon as DownloadSimple, GithubLogoIcon as GithubLogo } from "@phosphor-icons/react";
 import type { Catalog } from "../i18n";
 import { Faceplate } from "./hero/Faceplate";
 import { REPO_URL } from "../data/links";
@@ -33,6 +33,10 @@ const plate = { hero: t.hero, features: t.features, planned: t.planned, launch: 
         <a class="key" href={REPO_URL}>
           <GithubLogo weight="bold" aria-hidden="true" />
           {t.hero.source}
+        </a>
+        <a class="key" href="/docs/">
+          <BookOpen weight="bold" aria-hidden="true" />
+          {t.hero.docs}
         </a>
       </div>
     </div>

@@ -2,7 +2,7 @@
 //!
 //! Ignored by default: it needs the network, downloads the game, and starts it.
 //! Run with
-//! `LUMILIO_LIVE_HOME=/some/folder cargo test -p lumilio-core --test live_smoke -- --ignored --nocapture`.
+//! `LUMILIO_LIVE_HOME=/some/folder cargo nextest run -p lumilio-core --test live_smoke --ignored --no-capture`.
 //! The game is stopped as soon as it reports running.
 
 use std::time::Duration;

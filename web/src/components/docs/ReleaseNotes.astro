@@ -1,0 +1,24 @@
+---
+import { releaseNotes } from "../../data/release-notes";
+import { RELEASES_URL } from "../../data/links";
+import { docsCatalog } from "../../i18n/docs";
+
+const language = Astro.locals.starlightRoute.lang;
+const t = docsCatalog(language).changelog;
+const notes = await releaseNotes();
+---
+
+{!notes.available && <p role="status">{t.unavailable}</p>}
+{notes.available && notes.releases.length === 0 && <p>{t.empty}</p>}
+<p><a href={RELEASES_URL}>{t.all} →</a></p>
+{notes.releases.map((release) => (
+  <article class="release-note" aria-labelledby={`release-${release.id}`}>
+    <div class="plan-meta">
+      <span class="plan-status">{release.prerelease ? t.prerelease : t.stable}</span>
+      <span>{t.published} <time datetime={release.publishedAt}>{new Intl.DateTimeFormat(language, { dateStyle: "medium", timeZone: "UTC" }).format(new Date(release.publishedAt))}</time></span>
+    </div>
+    <h2 id={`release-${release.id}`}>{release.name}</h2>
+    <p><code>{release.tag}</code> · <a href={release.url}>{t.source} →</a></p>
+    {release.html ? <div class="release-note__body" set:html={release.html} /> : <p>{t.noNotes}</p>}
+  </article>
+))}

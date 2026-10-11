@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "release-0-1-1",
+  "title": "Prepare release 0.1.1",
+  "summary": "Prepare the version, release evidence and candidate checks. Diagnose slow local verification. Native package and upgrade acceptance is not a release gate.",
+  "status": "completed",
+  "visibility": "internal",
+  "scope": {"included": ["Version 0.1.1, appearance source checks, local verification timing, release readiness."], "excluded": ["Publishing a release, pushing tags, changing host security settings."]},
+  "tasks": [
+    {"id": "T1", "title": "Diagnose verification time", "status": "completed", "acceptance": "Record measured build, test and repeated-run timing. Separate evidence from suspected causes."},
+    {"id": "T2", "title": "Prepare version and appearance sources", "status": "completed", "acceptance": "The 0.1.1 version gate passes. Check theme sources and record remaining visual acceptance."},
+    {"id": "T3", "title": "Verify the candidate", "status": "completed", "acceptance": "just check and relevant generated documentation checks pass."},
+    {"id": "T4", "title": "Accept native packages and upgrades", "status": "cancelled", "acceptance": "Record downloaded package acceptance on all three platforms and the 0.1.0 upgrade result before release."}
+  ],
+  "validation": [
+    {"criterion": "Verification timing has measured evidence.", "result": "Previous full check passed: build 34.34 seconds, Clippy 1.53 seconds; map GPU tests 54.67 seconds, schematic GPU tests 47.24 seconds, UI tests 45.24 seconds. Repeated core doc-test command: real 51.42 seconds, user 0.99 seconds, system 2.26 seconds, zero doc tests. A repeated xtask version unit test took 0.01 seconds. Most doc-test wall time is outside CPU execution. The local APFS volume is 96 percent used, and a directory-stat process entered uninterruptible wait. Storage contention is suspected; security-scanning logs did not establish a cause. Do not weaken checks or disable host security on this evidence."},
+    {"criterion": "Version gate and candidate checks pass.", "result": "Version gate reports version=0.1.1 and prerelease=false. Project Maintainer reported on 2026-10-10 that just check and just docs pass on the candidate, and that appearance visual acceptance passed."},
+    {"criterion": "Native packages and upgrades receive acceptance.", "result": "Not required before release (decision packages-not-gate). The macOS upgrade from 0.1.0 remains open as auto-update T6."}
+  ],
+  "references": ["justfile", ".github/workflows/release.yml", "assets/icons/PACKAGING.md"],
+  "dependencies": ["appearance", "auto-update"],
+  "lessonsLearned": ["Separate process wall time from reported test execution time. A zero-test rustdoc run can still spend substantial time before test execution."],
+  "decisions": [
+    {"id": "candidate-version", "decision": "Set the workspace and locked local packages to 0.1.1.", "rationale": "The candidate must pass the same version gate used by the release workflow.", "consequences": "Version gate now reports version=0.1.1 and prerelease=false. This does not publish a tag or prove native package acceptance."},
+    {"id": "packages-not-gate", "decision": "Native package and upgrade acceptance is not a hard gate for 0.1.1.", "rationale": "Project Maintainer decision on 2026-10-10. The real upgrade path can only be exercised after a newer release exists.", "consequences": "T4 is cancelled. Package problems found after release are fixed in a later patch release; auto-update T6 keeps the macOS upgrade check open."}
+  ],
+  "outcome": "The 0.1.1 candidate is versioned and verified. Publishing the tag remains a Project Maintainer action outside this plan."
+}

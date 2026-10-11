@@ -58,7 +58,7 @@ fn the_world_dissolves_into_the_live_page_colour() {
 
 /// Visual review aid: writes a contact sheet of every scene and a
 /// transition as binary PPM files.
-/// `LUMILIO_HERO_DUMP=/some/dir cargo test -p lumilio-ui hero_contact_sheet -- --ignored`
+/// `LUMILIO_HERO_DUMP=/some/dir cargo nextest run -p lumilio-ui hero_contact_sheet --ignored`
 #[test]
 #[ignore = "writes images for manual review"]
 fn hero_contact_sheet() {

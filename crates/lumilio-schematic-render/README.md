@@ -24,7 +24,7 @@ error, data-version and GPU pixel tests. The pixel test explains its skip if no 
 available. For release measurements, run:
 
 ```sh
-cargo test --release -p lumilio-schematic-render preview_timings -- --ignored --nocapture
+cargo nextest run --release -p lumilio-schematic-render preview_timings --ignored --no-capture
 ```
 
 By default this measures a generated stone cube and a generated minimal pack.

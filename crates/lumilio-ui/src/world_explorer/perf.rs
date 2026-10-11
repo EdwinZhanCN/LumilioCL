@@ -1,5 +1,5 @@
 //! A measurement of the render pipeline under a simulated drag, not a
-//! pass/fail test: `cargo test -p lumilio-ui drag_pipeline -- --ignored --nocapture`.
+//! pass/fail test: `cargo nextest run -p lumilio-ui drag_pipeline --ignored --no-capture`.
 //! `LUMILIO_PERF_RATIO` sets the pixel ratio (1 = the logical-size frames the
 //! map used before HiDPI, 2 = a Retina frame); `LUMILIO_PERF_HZ` the event rate.
 use super::stats::Snapshot;

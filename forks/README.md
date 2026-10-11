@@ -14,7 +14,7 @@ The package's original lib tests reference fixtures outside the published crate;
 run the dedicated integration target for this local extension.
 
 These are editable source snapshots, owned by LumilioCL (ADR 0029).
-They are separate from the read-only reference repositories in `3rd-party/`.
+Reference-only projects are consulted through their published upstream URLs.
 The launcher uses local Cargo paths, not remotely published fork repositories.
 
 | Directory | Upstream | Baseline commit | License |

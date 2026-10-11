@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "id": "example",
+  "title": "Example internal plan",
+  "summary": "Demonstrate the retained plan lifecycle without publishing a roadmap item.",
+  "status": "proposed",
+  "visibility": "internal",
+  "scope": { "included": ["Plan lifecycle"], "excluded": ["Product changes"] },
+  "tasks": [{ "id": "T1", "title": "Validate the contract", "status": "proposed", "acceptance": "plans validate succeeds" }],
+  "validation": [{ "criterion": "plans check detects stale output", "result": null }],
+  "decisions": [{ "id": "D1", "decision": "Retain JSON", "rationale": "Resume without reconstructing state", "consequences": "Generated Markdown is read-only" }],
+  "roadmap": { "enabled": false, "id": "example", "name": "Example", "lede": "Example only", "targetVersion": null, "order": 0 }
+}

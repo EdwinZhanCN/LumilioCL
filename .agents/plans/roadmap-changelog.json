@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "roadmap-changelog",
+  "title": "Bilingual primary roadmap and release notes",
+  "summary": "Add independent roadmap and changelog pages. Add Chinese documentation and a home-page documentation action.",
+  "status": "completed",
+  "visibility": "internal",
+  "scope": {"included": ["Chinese /docs/ and English /en/docs/, primary roadmap, published release notes, home-page entry beside source code."], "excluded": ["WASM implementation, launcher changes, deployment, automatic translation of release notes."]},
+  "tasks": [
+    {"id": "T1", "title": "Add primary roadmap and release notes", "status": "completed", "acceptance": "Independent pages use public primary plans and published GitHub release notes. Drafts stay private. Markdown is sanitized."},
+    {"id": "T2", "title": "Add documentation languages and entry points", "status": "completed", "acceptance": "All document routes have Chinese and English pages. Language switching preserves the route. Home has a documentation action beside source code."},
+    {"id": "T3", "title": "Verify all routes and states", "status": "completed", "acceptance": "just web and just docs pass. Browser checks cover bilingual navigation, data pages, mobile and themes. Tests cover release-note fallback."}
+  ],
+  "validation": [
+    {"criterion": "Public selection and release-note rendering tests pass.", "result": "15 website tests pass. New tests cover primary-plan selection, bilingual labels, draft exclusion, pagination, sanitized Markdown and API failure. Bypassing sanitization makes the unsafe-content assertion fail; restoring sanitization passes."},
+    {"criterion": "just web and just docs pass.", "result": "2026-10-10: just web and just docs pass. Astro reports no errors, warnings or hints. Both languages have eleven document pages."},
+    {"criterion": "Bilingual routes, visual checks and source links work.", "result": "Chromium checks cover Chinese and English route switching, four primary plans, live v0.1.0 release notes, Chinese search, mobile navigation and themes. Desktop and mobile screenshots reviewed. Mobile document width is 390 pixels without overflow. Static link review found missing English homepage links; an English root redirect now routes to the existing homepage."}
+  ],
+  "decisions": [
+    {"id": "D1", "decision": "Treat explicitly enabled public roadmap plans as primary plans.", "rationale": "Reuse the existing reviewed public selection and whitelist.", "consequences": "Do not expose internal tasks or add a second plan hierarchy."},
+    {"id": "D2", "decision": "Mirror published GitHub release notes at build time.", "rationale": "GitHub Releases remain the source of the changelog.", "consequences": "Retain source language and links, exclude drafts, label pre-releases, and show a source link if the API fails."},
+    {"id": "D3", "decision": "Use Chinese at the root and English under /en/.", "rationale": "Match the home-page language and support a shared document structure.", "consequences": "Starlight language routing handles equivalent pages. Interface copy lives in locale catalogs."}
+  ],
+  "references": [".agents/plans/contribution-docs.json", ".agents/plans/README.md", "web/src/data/roadmap.generated.json", "https://docs.github.com/en/rest/releases/releases#list-releases"],
+  "dependencies": ["contribution-docs"],
+  "lessonsLearned": ["Starlight localizes homepage links. Provide an English root route when the marketing homepage only exists at the root."],
+  "outcome": "Added independent primary roadmap and release-note pages in Chinese and English. Chinese is the default documentation language. The homepage documentation action follows the source action. Locale catalogs hold interface text, and equivalent pages share route structure. Release notes retain their source language. No deployment was performed."
+}

@@ -45,6 +45,6 @@ Voice (docs/design-language.md §8):
 - English is wider than Chinese; prefer the shorter of two equally clear
   wordings for keys, tabs and segments.
 
-Do not build or run tests; the maintainer runs them. Before you reply, check
+Do not build or run tests; the Project Maintainer runs them. Before you reply, check
 by reading both files that every Chinese id has an English entry with the
 same arguments. Reply with one line: how many messages you added.

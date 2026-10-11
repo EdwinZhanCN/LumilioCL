@@ -9,6 +9,8 @@
 //! separated by `|`. A path appears in the generated file if and only if
 //! its comment exists, so every generated row means "built".
 
+pub mod plans;
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};

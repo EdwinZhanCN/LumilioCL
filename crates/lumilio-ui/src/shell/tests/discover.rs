@@ -518,7 +518,7 @@ fn a_gallery_image_shown_large_is_drawn_by_the_shell_over_everything(cx: &mut Te
 
 /// Not a check: prints how long the Discover list takes to lay out and
 /// paint, so performance work has a number to move. Run with
-/// `cargo test -p lumilio-ui frame_cost -- --ignored --nocapture`
+/// `cargo nextest run -p lumilio-ui frame_cost --ignored --no-capture`
 /// (add `--release` for an optimized figure).
 #[gpui::test]
 #[ignore = "a measurement, not a check"]

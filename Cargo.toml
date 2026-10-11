@@ -27,7 +27,7 @@ exclude = ["forks/nucleation", "forks/schematic-mesher", "forks/gpui-component",
 gpui-component = { path = "forks/gpui-component" }
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 publish = false
 rust-version = "1.95"
@@ -83,13 +83,25 @@ dbg_macro = "deny"
 todo = "deny"
 unimplemented = "deny"
 
+# `cargo build`, `cargo nextest run` and `cargo test --doc` share one set of
+# artifacts: the test profile inherits dev and must not override it, or every
+# dependency is compiled and stored twice. Hands-on checks use
+# `cargo run --release` (default release profile).
+#
+# Line tables keep backtraces readable. Full debug info with macOS's unpacked
+# split-debuginfo leaves an object file per codegen unit in target/, which grew
+# target/debug/deps to a million files and made every rustc call scan it.
+[profile.dev]
+debug = "line-tables-only"
+
 # GPUI does layout, text shaping and painting on the CPU every frame; built
 # without optimization it runs about 13x slower (measured: a Discover page of
 # 20 rows costs 76 ms a frame unoptimized, 6 ms optimized). Dependencies are
-# optimized even in dev builds; our own crates stay debuggable and fast to
+# optimized even in dev builds, and compiled once; our own crates stay fast to
 # rebuild.
 [profile.dev.package."*"]
 opt-level = 3
+debug = 0
 
 # Readback colour conversion touches every pixel. Keep it vectorized in the
 # development app as well; the GPUI-facing view remains unoptimized (ADR 0028).

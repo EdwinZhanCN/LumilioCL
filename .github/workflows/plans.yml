@@ -1,0 +1,35 @@
+name: Plans
+on:
+  push:
+    branches: [main]
+    paths: &paths
+      - ".agents/**"
+      - "AGENTS.md"
+      - "docs/plans/**"
+      - "crates/lumilio-docgen/**"
+      - "web/src/data/roadmap*"
+      - "web/src/i18n/**"
+      - "web/src/components/Sections.astro"
+      - "web/src/components/hero/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "justfile"
+      - ".github/workflows/plans.yml"
+  pull_request:
+    paths: *paths
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just
+      - run: just docs

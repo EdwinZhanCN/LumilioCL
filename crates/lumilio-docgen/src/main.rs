@@ -13,6 +13,15 @@ fn root() -> PathBuf {
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let root = root();
+    if args.first().map(String::as_str) == Some("plans") {
+        return match lumilio_docgen::plans::run(&root, args.get(1).map(String::as_str)) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => {
+                eprintln!("{error}");
+                ExitCode::FAILURE
+            }
+        };
+    }
     let (paths, mut problems) = scan(&root);
     problems.extend(validate(&paths));
     if !problems.is_empty() {
@@ -44,7 +53,7 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         _ => {
-            eprintln!("usage: lumilio-docgen ia [--check]");
+            eprintln!("usage: lumilio-docgen ia [--check] | plans validate|generate|check");
             ExitCode::FAILURE
         }
     }

@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "id": "release-0-1-0",
+  "title": "发布 0.1.0",
+  "summary": "`v0.1.0` 的草稿 release 里有 macOS、Windows、Linux 三个平台的包。每个下载下来的包都按 PACKAGING.md §5 验收通过后，再发布这个 release。打包方式见 PACKAGING.md。",
+  "status": "in_progress",
+  "visibility": "public",
+  "scope": {
+    "included": [
+      "包括：xtask 打包、release 工作流、平台身份、图标、自动更新（见 `auto-update.json`），以及首个标签。"
+    ],
+    "excluded": [
+      "不包括：macOS x86_64、RPM / Arch、Flatpak / AppImage、真正的便携数据目录。"
+    ]
+  },
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "图标目录移到 `assets/icons/`；手写 `macos/AppIcon.icon`，用 Xcode 26.6 的 actool 编译验证，产出 `Assets.car` 和 `AppIcon.icns`",
+      "status": "completed",
+      "acceptance": "图标目录移到 `assets/icons/`；手写 `macos/AppIcon.icon`，用 Xcode 26.6 的 actool 编译验证，产出 `Assets.car` 和 `AppIcon.icns`"
+    },
+    {
+      "id": "T2",
+      "title": "`lumilio-app`：可执行文件改名 `lumiliocl`，设置 `APP_ID` 和 `set_app_identity`，Windows 用 build.rs 嵌入资源，release 构建不弹控制台窗口",
+      "status": "completed",
+      "acceptance": "`lumilio-app`：可执行文件改名 `lumiliocl`，设置 `APP_ID` 和 `set_app_identity`，Windows 用 build.rs 嵌入资源，release 构建不弹控制台窗口"
+    },
+    {
+      "id": "T3",
+      "title": "`crates/lumilio-xtask`、`just package`、`.github/workflows/release.yml`",
+      "status": "completed",
+      "acceptance": "`crates/lumilio-xtask`、`just package`、`.github/workflows/release.yml`"
+    },
+    {
+      "id": "T4",
+      "title": "CI 在 Linux 上统一运行 `just ci`；平台原生打包留在 release workflow，移除单独的 Windows cubiomes 编译 job",
+      "status": "completed",
+      "acceptance": "CI 在 Linux 上统一运行 `just ci`；平台原生打包留在 release workflow，移除单独的 Windows cubiomes 编译 job"
+    },
+    {
+      "id": "T5",
+      "title": "自动更新实现进入 0.1.0：正式版检查、校验下载、平台安装和重启入口；各安装方式的支持范围见 `auto-update.json`",
+      "status": "completed",
+      "acceptance": "自动更新实现进入 0.1.0：正式版检查、校验下载、平台安装和重启入口；各安装方式的支持范围见 `auto-update.json`"
+    },
+    {
+      "id": "T6",
+      "title": "本机 macOS 打包演练（ad hoc 签名）：DMG 25 MB；Info.plist、`Assets.car`、签名验证和 SHA-256 都正确；从 DMG 复制出来的 app 能启动到首页",
+      "status": "completed",
+      "acceptance": "本机 macOS 打包演练（ad hoc 签名）：DMG 25 MB；Info.plist、`Assets.car`、签名验证和 SHA-256 都正确；从 DMG 复制出来的 app 能启动到首页"
+    },
+    {
+      "id": "T7",
+      "title": "在 Icon Composer 里检查 `AppIcon.icon` 的深色外观，以及 26 和 27 两代渲染",
+      "status": "proposed",
+      "acceptance": "在 Icon Composer 里检查 `AppIcon.icon` 的深色外观，以及 26 和 27 两代渲染"
+    },
+    {
+      "id": "T8",
+      "title": "手动跑 release 工作流演练（workflow_dispatch），确认 Windows 和 Linux 都能编译出包。首次演练中 Windows 的 Rust 编译成功，但 ISCC 拒绝 `\\\\?\\D:` 扩展路径前缀；已在传参边界做路径规范化，待 CI 重跑验收。",
+      "status": "proposed",
+      "acceptance": "手动跑 release 工作流演练（workflow_dispatch），确认 Windows 和 Linux 都能编译出包。首次演练中 Windows 的 Rust 编译成功，但 ISCC 拒绝 `\\\\?\\D:` 扩展路径前缀；已在传参边界做路径规范化，待 CI 重跑验收。"
+    },
+    {
+      "id": "T9",
+      "title": "签名：Project Maintainer决定不签名。README（中英文）用最直白的话解释首次打开时的警告，并写明 macOS、Windows 上怎么放行",
+      "status": "completed",
+      "acceptance": "签名：Project Maintainer决定不签名。README（中英文）用最直白的话解释首次打开时的警告，并写明 macOS、Windows 上怎么放行"
+    },
+    {
+      "id": "T10",
+      "title": "打 `v0.1.0` 标签，等草稿 release 生成",
+      "status": "proposed",
+      "acceptance": "打 `v0.1.0` 标签，等草稿 release 生成"
+    },
+    {
+      "id": "T11",
+      "title": "验收下载后的产物（PACKAGING.md §5 的五项），通过后发布",
+      "status": "proposed",
+      "acceptance": "验收下载后的产物（PACKAGING.md §5 的五项），通过后发布"
+    },
+    {
+      "id": "T12",
+      "title": "下一正式版发布后，在 macOS 上从 0.1.0 实测自动更新（`auto-update.json` T5）",
+      "status": "proposed",
+      "acceptance": "下一正式版发布后，在 macOS 上从 0.1.0 实测自动更新（`auto-update.json` T5）"
+    }
+  ],
+  "validation": [
+    {
+      "criterion": "原计划的实机与平台验收全部完成。",
+      "result": null
+    }
+  ],
+  "references": [],
+  "dependencies": [
+    "auto-update"
+  ],
+  "lessonsLearned": [],
+  "roadmap": {
+    "enabled": true,
+    "id": "release-0-1-0",
+    "name": "首个版本",
+    "lede": "三个平台的安装包，自带自动更新。",
+    "targetVersion": "0.1.0",
+    "order": 0
+  }
+}

@@ -252,7 +252,7 @@ mod tests {
     }
 
     /// Touches the real credential store of this machine; run on purpose with
-    /// `cargo test -p lumilio-core system_store -- --ignored`.
+    /// `cargo nextest run -p lumilio-core system_store --ignored`.
     #[test]
     #[ignore = "touches the real operating system credential store"]
     fn the_system_store_round_trips_a_secret() {

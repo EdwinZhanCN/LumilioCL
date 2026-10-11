@@ -33,7 +33,7 @@ an inline `#[cfg(test)] mod tests` at the end of a file):
    add `// i18n-exempt: <why>` at the end of that line.
 
 When every file is done, run `cargo check -p lumilio-app` once and fix only
-what it reports. Do not run tests, clippy or `just` recipes; the maintainer
+what it reports. Do not run tests, clippy or `just` recipes; the Project Maintainer
 runs those.
 
 Reply with one line: how many literals you moved, how many messages you
