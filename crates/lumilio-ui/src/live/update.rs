@@ -8,6 +8,9 @@ pub enum UpdateStatus {
     Downloading {
         version: String,
     },
+    Installing {
+        version: String,
+    },
     Ready {
         version: String,
     },

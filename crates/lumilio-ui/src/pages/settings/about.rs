@@ -18,7 +18,7 @@ pub(super) fn about(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
         .map(|detail| kit::technical("settings-update-technical", detail).into_any_element());
     let update_busy = matches!(
         &ctx.model.update_status,
-        UpdateStatus::Checking | UpdateStatus::Downloading { .. }
+        UpdateStatus::Checking | UpdateStatus::Downloading { .. } | UpdateStatus::Installing { .. }
     );
     let auto_update = view.auto_update_enabled;
     let rows = vec![
@@ -124,6 +124,9 @@ fn update_status_text(status: &UpdateStatus) -> String {
         UpdateStatus::Checking => tr!("settings-update-checking").to_owned(),
         UpdateStatus::Downloading { version } => {
             tr!("settings-update-downloading", version = version.as_str())
+        }
+        UpdateStatus::Installing { version } => {
+            tr!("settings-update-installing", version = version.as_str())
         }
         UpdateStatus::Ready { version } => tr!("settings-update-ready", version = version.as_str()),
         UpdateStatus::UpToDate => tr!("settings-update-current").to_owned(),

@@ -85,32 +85,50 @@ pub enum CheckResult {
     Available(UpdateRelease),
 }
 
+/// How the launcher finishes after `UpdateClient::install`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Relaunch {
+    /// Start this path again once the running process has exited
+    /// (GPUI's `App::restart`): the `.app` bundle on macOS, the executable on
+    /// Linux.
+    Restart(PathBuf),
+    /// Quit; the installer that `install` started opens the new version.
+    Quit,
+}
+
 #[derive(Clone)]
 pub struct UpdateClient {
     http: Client,
     updates_dir: PathBuf,
     current: Version,
-    build_restriction: Option<UpdateRestriction>,
+    /// Read at startup: on Linux, once the file is replaced, the running
+    /// process's `current_exe` ends in " (deleted)".
+    executable: Option<PathBuf>,
+    restriction: Option<UpdateRestriction>,
 }
 
 impl UpdateClient {
     pub fn from_build(data_dir: impl Into<PathBuf>) -> Self {
-        let build_restriction = if cfg!(debug_assertions) {
+        let executable = std::env::current_exe().ok();
+        let restriction = if cfg!(debug_assertions) {
             Some(UpdateRestriction::DebugBuild)
         } else {
-            option_env!("LUMILIO_UPDATE_EXPLANATION").map(UpdateRestriction::from_build_value)
+            option_env!("LUMILIO_UPDATE_EXPLANATION")
+                .map(UpdateRestriction::from_build_value)
+                .or_else(|| runtime_restriction(executable.as_deref()))
         };
         Self {
             http: Client::new(),
             updates_dir: data_dir.into().join("updates"),
             current: Version::parse(env!("CARGO_PKG_VERSION"))
                 .expect("workspace package version is SemVer"),
-            build_restriction,
+            executable,
+            restriction,
         }
     }
 
     pub fn restriction(&self) -> Option<UpdateRestriction> {
-        self.build_restriction.or_else(runtime_restriction)
+        self.restriction
     }
 
     pub async fn check(&self) -> Result<CheckResult, UpdateError> {
@@ -161,11 +179,24 @@ impl UpdateClient {
         Ok(destination)
     }
 
-    pub fn install_and_restart(&self, update: &Path) -> Result<(), UpdateError> {
+    /// Whether `install` replaces the launcher while it keeps running
+    /// (macOS, Linux). The Windows installer needs the launcher closed, so
+    /// there it runs only when the user asks to restart.
+    pub fn installs_while_running(&self) -> bool {
+        crate::install::WHILE_RUNNING
+    }
+
+    /// Installs a verified update. It blocks on external tools: call it off
+    /// the async runtime.
+    pub fn install(&self, update: &Path) -> Result<Relaunch, UpdateError> {
         if let Some(reason) = self.restriction() {
             return Err(UpdateError::Restricted(reason));
         }
-        crate::install::install_and_restart(update).map_err(UpdateError::Install)
+        let executable = self
+            .executable
+            .as_deref()
+            .ok_or_else(|| UpdateError::Install("cannot locate the running launcher".to_owned()))?;
+        crate::install::install(executable, update).map_err(UpdateError::Install)
     }
 
     async fn fetch_manifest(&self, base: &str) -> Result<String, UpdateError> {
@@ -229,7 +260,20 @@ impl UpdateClient {
     }
 }
 
-fn runtime_restriction() -> Option<UpdateRestriction> {
+fn runtime_restriction(executable: Option<&Path>) -> Option<UpdateRestriction> {
+    let Some(running) = executable else {
+        return Some(UpdateRestriction::UnsupportedInstall);
+    };
+    #[cfg(target_os = "macos")]
+    {
+        // The installer replaces the whole bundle.
+        if !running
+            .ancestors()
+            .any(|path| path.extension().is_some_and(|extension| extension == "app"))
+        {
+            return Some(UpdateRestriction::UnsupportedInstall);
+        }
+    }
     #[cfg(target_os = "linux")]
     {
         let Some(home) = std::env::var_os("HOME") else {
@@ -241,7 +285,7 @@ fn runtime_restriction() -> Option<UpdateRestriction> {
         else {
             return Some(UpdateRestriction::UnsupportedInstall);
         };
-        let Ok(running) = std::env::current_exe().and_then(|path| path.canonicalize()) else {
+        let Ok(running) = running.canonicalize() else {
             return Some(UpdateRestriction::UnsupportedInstall);
         };
         if running != expected {
@@ -250,9 +294,6 @@ fn runtime_restriction() -> Option<UpdateRestriction> {
     }
     #[cfg(target_os = "windows")]
     {
-        let Ok(running) = std::env::current_exe() else {
-            return Some(UpdateRestriction::UnsupportedInstall);
-        };
         for variable in ["ProgramFiles", "ProgramFiles(x86)", "ProgramW6432"] {
             let Some(root) = std::env::var_os(variable) else {
                 continue;
