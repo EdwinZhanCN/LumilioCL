@@ -73,11 +73,15 @@ fn main() {
         .detach();
 
         // Isolated visual-review hooks; they never persist system preferences.
+        // LUMILIO_REVIEW_SIZE=<width>x<height> fixes the window for recordings.
         let minimum = std::env::var("LUMILIO_REVIEW_MIN").as_deref() == Ok("1");
-        let review_size = if minimum {
-            size(px(720.), px(480.))
-        } else {
-            size(px(1080.), px(720.))
+        let requested = std::env::var("LUMILIO_REVIEW_SIZE")
+            .ok()
+            .and_then(|value| review_size(&value));
+        let review_size = match requested {
+            Some((width, height)) => size(px(width), px(height)),
+            None if minimum => size(px(720.), px(480.)),
+            None => size(px(1080.), px(720.)),
         };
         let options = WindowOptions {
             window_bounds: Some(WindowBounds::centered(review_size, cx)),
@@ -99,3 +103,16 @@ fn main() {
         cx.activate(true);
     });
 }
+
+/// Parses `<width>x<height>` in logical pixels, no smaller than the window's
+/// minimum size.
+fn review_size(value: &str) -> Option<(f32, f32)> {
+    let (width, height) = value.trim().split_once(['x', 'X'])?;
+    let width: f32 = width.trim().parse().ok()?;
+    let height: f32 = height.trim().parse().ok()?;
+    (width >= 720. && height >= 480. && width.is_finite() && height.is_finite())
+        .then_some((width, height))
+}
+
+#[cfg(test)]
+mod tests;

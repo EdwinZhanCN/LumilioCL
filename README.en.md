@@ -189,6 +189,7 @@ just package               # package for this platform into dist/
 - `LUMILIO_INSTANCE=<id>` (with `LUMILIO_INSTANCE_TAB`, `LUMILIO_INSTANCE_GROUP`) and
   `LUMILIO_PROJECT=mod/sodium` open a game or a project detail.
 - `LUMILIO_REVIEW_APPEARANCE=light|dark`, `LUMILIO_REVIEW_MIN=1` (720×480),
+  `LUMILIO_REVIEW_SIZE=1600x1000` (a fixed logical window size for recordings),
   `LUMILIO_REVIEW_STILL=1` (reduced motion).
 
 </details>
