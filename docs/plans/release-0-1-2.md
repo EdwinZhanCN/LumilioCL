@@ -4,7 +4,7 @@
 
 Status: InProgress
 
-汇集当前分支的自动更新修复、Xaero 26.x 兼容、Windows 凭据容量 hotfix、相对数据目录修复和宣传录制工具，经过 PR 与检查后生成 0.1.2 三平台草稿安装包。下载后验收通过再正式发布。
+0.1.2 已于 2026-10-11 按 Project Maintainer 明确指令正式发布，包含自动更新修复、Xaero 26.x 兼容、Windows 凭据容量 hotfix、相对数据目录修复和宣传录制工具。三平台构建与下载包校验通过；尚未记录的实机验收保留为后续任务。
 
 ## Scope
 
@@ -27,8 +27,10 @@ Status: InProgress
   Acceptance: PR 明确列出发布内容与证据，rust、plans、web 适用检查通过后合入 main。
 - [x] R4 — 生成 v0.1.2 三平台草稿安装包 (Completed)
   Acceptance: v0.1.2 标签指向经过 PR 的发布提交；Release 工作流成功，草稿含三平台安装包、BUILD.txt 与 SHA256SUMS.txt。
-- [ ] R5 — 下载后验收并正式发布 (InProgress)
-  Acceptance: 按 assets/icons/PACKAGING.md §5 检查下载后的安装包；Windows 实机登录长令牌成功，Xaero 26.x 路径点与地图正常。Project Maintainer 确认验收后发布草稿。
+- [x] R5 — 整理发布说明并正式发布 (Completed)
+  Acceptance: 按照 Project Maintainer 的发布指令完善 release notes，将 v0.1.2 草稿转为正式 release，三平台安装包和校验和公开可下载。
+- [ ] R6 — 补齐下载包实机验收记录 (Proposed)
+  Acceptance: 按 assets/icons/PACKAGING.md §5 记录下载后实机检查；Windows 登录长令牌成功，Xaero 26.x 路径点与地图正常，启动、覆盖升级和卸载结果均有证据。
 
 ## Validation
 
@@ -36,7 +38,9 @@ Status: InProgress
   Result: 2026-10-11 本地 just check 通过，1290 项测试通过、15 项跳过；just docs、just web（0 错误、15 项测试通过）及 just release-check v0.1.2 通过。Windows 长令牌回归测试已证明恢复整条写入会因容量超限失败。PR #16 的 rust、plans、web 检查均通过，合入 main 的提交为 345f58710277056d8b8a03b0ced612f005357255；v0.1.2 标签指向该提交。
 - 三平台草稿安装包生成并校验下载后的产物。
   Result: 2026-10-11 Release 工作流 38128702112 全部成功；草稿包含 macOS arm64 DMG、Windows x64 安装器与便携 ZIP、Linux x64 deb 与 tar.gz，及 SHA256SUMS.txt。重新下载草稿中的五个包，SHA-256 全部通过。Windows ZIP、Linux tar.gz/deb 的 BUILD.txt 及 macOS Info.plist 均为 0.1.2、提交 345f58710277056d8b8a03b0ced612f005357255；deb Version 为 0.1.2。DMG 只读挂载与资源检查通过，app 的 codesign --verify --deep --strict 通过；签名是 adhoc，无 Developer ID 或公证，Windows 包为未签名。真实启动、覆盖升级、卸载和 Windows 登录验收仍待 Project Maintainer 完成。
-- Project Maintainer 确认下载后实机验收并正式发布。
+- Project Maintainer 授权正式发布，release notes 与产物公开可用。
+  Result: 2026-10-11 Project Maintainer 明确要求撰写 release notes 并发布 0.1.2。已完善修复、工具、安装包和签名状态说明并发布；GitHub 返回 isDraft=false、isPrerelease=false，publishedAt=2026-10-11T10:49:45Z。该指令不是实机测试通过的证据。
+- 下载包的真实启动、覆盖升级、卸载、Windows 登录及 Xaero 实机验收已记录。
   Result: pending
 
 ## Decision release-scope
@@ -47,11 +51,20 @@ Why: Windows 登录失败与 Xaero 格式兼容问题需要随本次补丁一起
 
 Consequences: 自动更新 T6 保持开放，需从包含修复的版本更新到后续版本才能验证；旧首发验收计划单独关闭。
 
+## Decision publish-on-maintainer-instruction
+
+在五个下载包校验通过后，按 Project Maintainer 明确指令发布 0.1.2。
+
+Why: Project Maintainer 要求立即正式发布，优先于原计划中先补齐实机验收记录的顺序。
+
+Consequences: 版本已正式发布；未观察到的实机验收仍保留在 R6，不将发布授权记为测试通过，自动更新 T6 保持开放。
+
 ## References
 
 - https://github.com/EdwinZhanCN/LumilioCL/pull/15
 - https://github.com/EdwinZhanCN/LumilioCL/pull/16
 - https://github.com/EdwinZhanCN/LumilioCL/actions/runs/38128702112
+- https://github.com/EdwinZhanCN/LumilioCL/releases/tag/v0.1.2
 - [assets/icons/PACKAGING.md](../../assets/icons/PACKAGING.md)
 - [.agents/plans/auto-update.json](../../.agents/plans/auto-update.json)
 - [.agents/plans/world-explorer.json](../../.agents/plans/world-explorer.json)

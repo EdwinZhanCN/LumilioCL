@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "id": "terracotta-multiplayer",
+  "title": "0.4.0 陶瓦联机插件",
+  "summary": "目标在 0.4.0 接入陶瓦联机插件，让用户从启动器使用联机功能。先确认上游来源、许可和接入契约，再实现并完成跨平台联机验收。",
+  "status": "proposed",
+  "visibility": "public",
+  "scope": {
+    "included": [
+      "确认陶瓦联机插件的官方来源、许可、支持平台与接入方式。",
+      "接入插件并提供必要的联机入口、状态反馈和退出清理。",
+      "验证两台设备之间的实际联机及故障恢复，记录支持范围。"
+    ],
+    "excluded": [
+      "本次只新增计划，不在 0.1.2 中交付联机功能。",
+      "上游确认前不承诺具体协议、服务部署或账号体系。"
+    ]
+  },
+  "tasks": [
+    { "id": "T1", "title": "确认上游与插件接入契约", "status": "proposed", "acceptance": "记录官方来源和许可，确认可用接口、支持平台、网络与运行时需求，并决定是否依赖 WASM 插件宿主。" },
+    { "id": "T2", "title": "实现陶瓦联机插件接入", "status": "proposed", "acceptance": "用户可以通过启动器进入经 T1 确认的联机流程；连接状态、失败原因和取消操作有反馈，退出游戏或停用插件后正确释放资源。" },
+    { "id": "T3", "title": "跨设备与跨平台验收", "status": "proposed", "acceptance": "两台设备完成一次实际联机；对声明支持的平台验证连接、断线恢复、取消和退出，适用检查通过并由 Project Maintainer 验收。" }
+  ],
+  "validation": [
+    { "criterion": "上游来源、许可与插件接口已核实，支持范围明确。", "result": null },
+    { "criterion": "两台设备实际联机成功，取消、断线与退出不会留下失控的后台任务。", "result": null },
+    { "criterion": "适用自动检查和声明支持平台的实机验收通过。", "result": null }
+  ],
+  "references": [".agents/plans/wasm-plugin-registry.json"],
+  "dependencies": [],
+  "decisions": [
+    { "id": "target-version", "decision": "将陶瓦联机插件列为 0.4.0 的公开目标。", "rationale": "Project Maintainer 指定该功能与目标版本。", "consequences": "计划保持 proposed；目标版本不代表已经实现或发布，插件形态及依赖在 T1 确认。" }
+  ],
+  "roadmap": {
+    "enabled": true,
+    "id": "terracotta-multiplayer",
+    "name": "陶瓦联机插件",
+    "lede": "接入陶瓦联机插件，在启动器中使用联机功能。",
+    "targetVersion": "0.4.0",
+    "order": 40
+  }
+}
