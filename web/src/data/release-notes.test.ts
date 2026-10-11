@@ -59,4 +59,15 @@ describe("published release notes", () => {
     expect(await loadReleaseNotes(vi.fn<typeof fetch>().mockRejectedValue(new Error("offline"))))
       .toEqual({ available: false, releases: [] });
   });
+
+  it("renders the release template's sections below the release heading", () => {
+    const html = renderReleaseNote(
+      "0.1.3 让主页更快。\n\n## 修复\n\n- 修好了。\n\n## 更新说明\n\n- 见[安装文档](https://github.com/EdwinZhanCN/LumilioCL/blob/v0.1.3/web/src/content/docs/docs/install.md)。\n\n源码提交：`abc`（[PR #23](https://github.com/EdwinZhanCN/LumilioCL/pull/23)）。",
+      `${RELEASES_URL}/tag/v0.1.3`, "v0.1.3",
+    );
+    expect(html).toContain("<h3>修复</h3>");
+    expect(html).toContain("<h3>更新说明</h3>");
+    expect(html).toContain('href="https://github.com/EdwinZhanCN/LumilioCL/blob/v0.1.3/web/src/content/docs/docs/install.md"');
+    expect(html).toContain("<code>abc</code>");
+  });
 });
