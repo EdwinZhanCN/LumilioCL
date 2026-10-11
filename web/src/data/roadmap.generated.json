@@ -7,7 +7,7 @@
       "name": "首个版本",
       "lede": "三个平台的安装包，自带自动更新。",
       "version": "0.1.0",
-      "status": "in_progress"
+      "status": "completed"
     },
     {
       "id": "appearance",

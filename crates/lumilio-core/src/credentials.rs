@@ -9,6 +9,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::microsoft::AuthError;
 
+#[cfg(any(target_os = "windows", test))]
+mod chunked;
+
 /// The service name every entry is kept under.
 pub const SERVICE: &str = "LumilioCL";
 
@@ -29,7 +32,45 @@ fn failure(error: &keyring::Error) -> AuthError {
     AuthError::CredentialStore(error.to_string())
 }
 
+// Keep the raw keyring adapter separate so Windows can assemble bounded entries.
+struct RawCredentials;
+
 impl CredentialStore for SystemCredentials {
+    fn get(&self, key: &str) -> Result<Option<String>, AuthError> {
+        #[cfg(target_os = "windows")]
+        {
+            chunked::get(&RawCredentials, key)
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            RawCredentials.get(key)
+        }
+    }
+
+    fn set(&self, key: &str, secret: &str) -> Result<(), AuthError> {
+        #[cfg(target_os = "windows")]
+        {
+            chunked::set(&RawCredentials, key, secret)
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            RawCredentials.set(key, secret)
+        }
+    }
+
+    fn delete(&self, key: &str) -> Result<(), AuthError> {
+        #[cfg(target_os = "windows")]
+        {
+            chunked::delete(&RawCredentials, key)
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            RawCredentials.delete(key)
+        }
+    }
+}
+
+impl CredentialStore for RawCredentials {
     fn get(&self, key: &str) -> Result<Option<String>, AuthError> {
         let entry = keyring::Entry::new(SERVICE, key).map_err(|error| failure(&error))?;
         match entry.get_password() {

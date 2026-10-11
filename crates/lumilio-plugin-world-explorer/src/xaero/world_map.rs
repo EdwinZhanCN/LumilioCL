@@ -1,6 +1,6 @@
 //! Xaero World Map region tiles. Region framing and palette decoding use the
 //! MIT-licensed XaeroTools `crates/xaero-core/src/{codec,model}` snapshot at
-//! `7bc650bdf445ec06d0d3fc0fb9e98ba4b86a6b83` (see ATTRIBUTIONS.md).
+//! `66694bf5a3d13ba55bd35d9045832353063422eb` (see ATTRIBUTIONS.md).
 //! Color lookup uses LumilioCL's generated versioned block tables.
 use crate::save::colors;
 use lumilio_plugin_api::map::{

@@ -160,6 +160,8 @@ fn dimension_folders_and_file_names_follow_the_mods_conventions() {
     assert_eq!(parse_file_name("mw$default_1.json"), None);
     let root = "xaero/minimap/Multiplayer_x/dim%0";
     assert!(waypoint_file(&format!("{root}/mw$default_1.txt"), "Multiplayer_x").is_some());
+    assert!(waypoint_file(&format!("{root}/waypoints.txt"), "Multiplayer_x").is_some());
+    assert!(waypoint_file(&format!("{root}/config.txt"), "Multiplayer_x").is_none());
     assert!(waypoint_file(&format!("{root}/mw$default_1.txt.temp"), "Multiplayer_x").is_none());
     assert!(
         waypoint_file(
@@ -845,5 +847,50 @@ mod editing {
         );
         assert_eq!(edit::fingerprint("a"), edit::fingerprint("a"));
         assert_ne!(edit::fingerprint("a"), edit::fingerprint("b"));
+    }
+
+    /// Xaero's Minimap 26.6 keeps a single-player world's points in
+    /// `waypoints.txt`; they are shown, and new points join that file.
+    #[test]
+    fn a_single_player_waypoints_txt_from_26_6_is_read_and_extended() {
+        const REAL: &str = include_str!("../../tests/data/xaero/26.6.0/dim%0/waypoints.txt");
+        const PLAIN: &str = "xaero/minimap/Solo/dim%0/waypoints.txt";
+        let disk = Disk {
+            files: Mutex::new(BTreeMap::from([(
+                PLAIN.to_owned(),
+                REAL.as_bytes().to_vec(),
+            )])),
+            writes: Mutex::new(vec![]),
+        };
+        overlay::forget_recent();
+        let found = WorldExplorer
+            .objects(
+                &disk,
+                &request(linked("Solo", Dimension::Overworld), [0., 0., 1000., 1000.]),
+            )
+            .unwrap();
+        let names: Vec<_> = found.iter().filter_map(|o| o.label.clone()).collect();
+        assert_eq!(names, ["樱花林", "雪山"]);
+        WorldExplorer
+            .apply(
+                &disk,
+                &edit_of(
+                    "Solo",
+                    Dimension::Overworld,
+                    EditAction::Create {
+                        at: MapPoint { x: 1., z: 2. },
+                        values: full("Camp", 1),
+                    },
+                ),
+            )
+            .unwrap();
+        assert_eq!(*disk.writes.lock().unwrap(), [PLAIN]);
+        let text = disk.text(PLAIN);
+        assert!(
+            text.starts_with(REAL)
+                && text.ends_with(
+                    "waypoint:Camp:C:1:70:-5:12:false:0:gui.xaero_default:false:0:0:false\n"
+                )
+        );
     }
 }

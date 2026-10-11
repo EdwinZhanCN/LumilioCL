@@ -123,7 +123,9 @@ The Xaero Minimap file naming and waypoint field parsing in
 [dekrom/xaerotools](https://github.com/dekrom/xaerotools) at
 `7bc650bdf445ec06d0d3fc0fb9e98ba4b86a6b83` (`crates/xaero-core/src/{naming,waypoints}.rs`).
 The World Map region decoder and its data model are used from the pinned
-`vendor/xaerotools/crates/xaero-core` source snapshot at the same commit.
+`vendor/xaerotools/crates/xaero-core` source snapshot at
+`66694bf5a3d13ba55bd35d9045832353063422eb` (0.5.1, which reads World Map 1.47's
+26.3 regions).
 
 Copyright (c) 2026 Dek
 

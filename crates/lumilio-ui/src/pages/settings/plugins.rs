@@ -145,13 +145,20 @@ fn plugin_detail(info: &PluginInfo, ctx: &LiveCtx) -> AnyElement {
         .into_any_element(),
     );
     // ia[settings]: 插件：查看权限 | 插件详情 · 权限行 | 逐条显示可读取的游戏文件夹、可访问的主机和其他能力
+    // Two write grants under one folder (different file names) read as one line.
+    let mut shown: Vec<String> = Vec::new();
     for (index, permission) in info.manifest.permissions.iter().enumerate() {
+        let text = permission_text(permission);
+        if shown.contains(&text) {
+            continue;
+        }
+        shown.push(text.clone());
         rows.push(
             kit::value_row(
                 SharedString::from(format!("{id}-permission-{index}")),
                 tr!("settings-plugin-permission"),
                 None,
-                permission_text(permission),
+                text,
                 None,
                 ctx.colors,
             )

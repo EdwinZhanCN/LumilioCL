@@ -71,9 +71,13 @@ pub(crate) fn is_transient(name: &str) -> bool {
             .is_some_and(|(_, n)| !n.is_empty() && n.bytes().all(|byte| byte.is_ascii_digit()))
 }
 
+/// The file without a multiworld id. Xaero's Minimap 26.6 writes it for a
+/// single-player world (tests/data/xaero/26.6.0).
+pub(crate) const PLAIN_FILE: &str = "waypoints.txt";
+
 /// A waypoint file name, `<multiworldId>_<displayName>.txt` with `_` in the
-/// display name stored as `%us%`, plus the legacy `waypoints.txt` that carries
-/// no multiworld id. Returns the multiworld id and the display name.
+/// display name stored as `%us%`, plus `waypoints.txt`, which carries no
+/// multiworld id. Returns the multiworld id and the display name.
 pub(crate) fn parse_file_name(name: &str) -> Option<(Option<&str>, String)> {
     let (stem, extension) = name.rsplit_once('.')?;
     if extension != "txt" {
@@ -101,7 +105,10 @@ pub(crate) fn waypoint_file<'a>(path: &'a str, world: &str) -> Option<(Dimension
     let [folder] = parts.as_slice() else {
         return None;
     };
-    if is_backup_dir(folder) || is_transient(file) || !file.starts_with("mw$") {
+    if is_backup_dir(folder)
+        || is_transient(file)
+        || !(file.starts_with("mw$") || file == PLAIN_FILE)
+    {
         return None;
     }
     parse_file_name(file)?;
