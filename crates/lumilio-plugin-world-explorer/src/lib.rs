@@ -39,6 +39,10 @@ impl Plugin for WorldExplorer {
                     under: "xaero/minimap".into(),
                     names: "mw$*.txt".into(),
                 },
+                Permission::WriteGameFiles {
+                    under: "xaero/minimap".into(),
+                    names: xaero::naming::PLAIN_FILE.into(),
+                },
             ],
             settings: vec![],
         }

@@ -60,9 +60,34 @@ fn legacy_region_renders_covered_pixels_and_leaves_unexplored_pixels_empty() {
     assert!(empty > 0);
 }
 
+/// World Map 1.47.0 writes 26.3 regions as 8.8 (block-state keys `id` /
+/// `properties`). The vendored fixture is the first tile chunk of a real one.
+#[test]
+fn a_26_3_region_renders_with_known_block_colours() {
+    let fixture = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../vendor/xaerotools/crates/xaero-core/tests/fixtures/major8/v8.8_null_-6_1.zip"
+    );
+    let bytes = std::fs::read(fixture).unwrap();
+    let stream = xaero_core::read_region_container(&bytes).unwrap();
+    let region = xaero_core::decode_region(&stream).unwrap();
+    assert_eq!((region.version.major, region.version.minor), (8, 8));
+    let mut tile = request(-12, 2);
+    tile.context.version = Some("26.3".into());
+    match render_quarter(&region, &tile) {
+        TileReply::Partial {
+            coverage, unknown, ..
+        } => {
+            assert!(coverage.iter().any(|&value| value != 0));
+            assert!(unknown.is_empty(), "uncoloured blocks: {unknown:?}");
+        }
+        other => panic!("unexpected tile: {other:?}"),
+    }
+}
+
 #[test]
 fn codec_rejects_a_future_region_version() {
-    let stream = [0xff, 0, 8, 0, 0];
+    let stream = [0xff, 0, 9, 0, 0];
     assert!(matches!(
         xaero_core::decode_region(&stream),
         Err(xaero_core::codec::CodecError::UnsupportedVersion { .. })

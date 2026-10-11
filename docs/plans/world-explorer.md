@@ -214,3 +214,5 @@ Consequences: 后续变更更新本 JSON，长期跨计划契约整理到设计/
 - JourneyMap 的目录匹配：<https://teamjm.github.io/journeymap-docs/6.0.x/client/waypoints>
 - 仓库根目录 `LICENSE`（AGPL-3.0-only）
 - [Plan wasm-plugin-registry](wasm-plugin-registry.md)
+
+- Lesson: Xaero 的 26.x 版本改了磁盘格式，插件全靠手写样本，没有发现：Minimap 26.6 在单人世界写 dim%0/waypoints.txt，而 waypoint_file 只接受 mw$*.txt，路径点图层为空；World Map 1.47 把 26.3 区域写成 8.8，vendored XaeroTools 0.5.0 只读到 7.8。现以 tests/data/xaero/26.6.0 的真实路径点样本守住读取和新建写回（写权限同时放行 waypoints.txt），并把 vendor/xaerotools 升到 0.5.1，用其真实 8.8 区域守住渲染（crates/lumilio-plugin-world-explorer/src/xaero/tests.rs、world_map/tests.rs）。W17 要求的「真实样本」对世界地图同样适用。

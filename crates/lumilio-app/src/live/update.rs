@@ -1,6 +1,6 @@
 use super::Wiring;
 use lumilio_ui::live::{UpdateStatus, UpdateUnavailability};
-use lumilio_updater::{CheckResult, UpdateClient, UpdateError, UpdateRestriction};
+use lumilio_updater::{CheckResult, Relaunch, UpdateClient, UpdateError, UpdateRestriction};
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::sync::mpsc;
@@ -15,7 +15,16 @@ pub(super) enum UpdateCommand {
 
 enum UpdateEvent {
     Status(UpdateStatus),
-    Restart,
+    Relaunch(Relaunch),
+}
+
+/// A verified download. Where the platform allows it, it is installed as
+/// soon as it arrives, so the restart key only restarts.
+#[derive(Clone)]
+struct Ready {
+    version: String,
+    path: PathBuf,
+    installed: Option<Relaunch>,
 }
 
 pub(super) fn start(wiring: &Wiring, cx: &mut gpui_kit::App) {
@@ -40,8 +49,17 @@ pub(super) fn start(wiring: &Wiring, cx: &mut gpui_kit::App) {
                         shell.update_live(|model| model.update_status = status, cx);
                     });
                 }
-                UpdateEvent::Restart => {
-                    cx.update(|cx| cx.quit());
+                UpdateEvent::Relaunch(relaunch) => {
+                    cx.update(|cx| match relaunch {
+                        // GPUI waits for this process to exit before it
+                        // opens the path again, so macOS reuses the Dock
+                        // item instead of adding a second instance.
+                        Relaunch::Restart(path) => {
+                            cx.set_restart_path(path);
+                            cx.restart();
+                        }
+                        Relaunch::Quit => cx.quit(),
+                    });
                     break;
                 }
             }
@@ -79,7 +97,7 @@ async fn run(
     mut commands: mpsc::UnboundedReceiver<UpdateCommand>,
     events: mpsc::UnboundedSender<UpdateEvent>,
 ) {
-    let mut ready: Option<(String, PathBuf)> = None;
+    let mut ready: Option<Ready> = None;
     if let Some(reason) = client.restriction() {
         auto_update = false;
         publish(&events, UpdateStatus::Unavailable(view_restriction(reason)));
@@ -107,10 +125,19 @@ async fn run(
                         }
                     }
                     Some(UpdateCommand::Apply) => {
-                        let Some((_, path)) = ready.as_ref() else { continue };
-                        match client.install_and_restart(path) {
-                            Ok(()) => {
-                                let _ = events.send(UpdateEvent::Restart);
+                        let Some(update) = ready.as_ref() else { continue };
+                        let relaunch = match &update.installed {
+                            Some(relaunch) => Ok(relaunch.clone()),
+                            None => {
+                                publish(&events, UpdateStatus::Installing {
+                                    version: update.version.clone(),
+                                });
+                                install(&client, update.path.clone()).await
+                            }
+                        };
+                        match relaunch {
+                            Ok(relaunch) => {
+                                let _ = events.send(UpdateEvent::Relaunch(relaunch));
                             }
                             Err(error) => publish(&events, failed(error)),
                         }
@@ -129,16 +156,16 @@ async fn refresh(
     client: &UpdateClient,
     events: &mpsc::UnboundedSender<UpdateEvent>,
     manual: bool,
-    previous: Option<(String, PathBuf)>,
-) -> Option<(String, PathBuf)> {
-    if let Some(ready) = check(client, events, manual).await {
+    previous: Option<Ready>,
+) -> Option<Ready> {
+    if let Some(ready) = check(client, events, manual, previous.as_ref()).await {
         return Some(ready);
     }
-    if let Some((version, _)) = &previous {
+    if let Some(ready) = &previous {
         publish(
             events,
             UpdateStatus::Ready {
-                version: version.clone(),
+                version: ready.version.clone(),
             },
         );
     } else if !manual {
@@ -151,7 +178,8 @@ async fn check(
     client: &UpdateClient,
     events: &mpsc::UnboundedSender<UpdateEvent>,
     manual: bool,
-) -> Option<(String, PathBuf)> {
+    previous: Option<&Ready>,
+) -> Option<Ready> {
     publish(events, UpdateStatus::Checking);
     let release = match client.check().await {
         Ok(CheckResult::UpToDate) => {
@@ -165,27 +193,62 @@ async fn check(
         }
     };
     let version = release.version().to_string();
+    // The hourly check finds the same release until the launcher restarts;
+    // it is already downloaded and, where possible, installed.
+    if let Some(ready) = previous.filter(|ready| ready.version == version) {
+        publish(events, UpdateStatus::Ready { version });
+        return Some(ready.clone());
+    }
     publish(
         events,
         UpdateStatus::Downloading {
             version: version.clone(),
         },
     );
-    match client.download(&release).await {
-        Ok(path) => {
-            publish(
-                events,
-                UpdateStatus::Ready {
-                    version: version.clone(),
-                },
-            );
-            Some((version, path))
-        }
+    let path = match client.download(&release).await {
+        Ok(path) => path,
         Err(error) => {
             report_failure(events, error, manual);
-            None
+            return None;
         }
-    }
+    };
+    let installed = if client.installs_while_running() {
+        publish(
+            events,
+            UpdateStatus::Installing {
+                version: version.clone(),
+            },
+        );
+        match install(client, path.clone()).await {
+            Ok(relaunch) => Some(relaunch),
+            Err(error) => {
+                report_failure(events, error, manual);
+                return None;
+            }
+        }
+    } else {
+        None
+    };
+    publish(
+        events,
+        UpdateStatus::Ready {
+            version: version.clone(),
+        },
+    );
+    Some(Ready {
+        version,
+        path,
+        installed,
+    })
+}
+
+/// Installation runs external tools that block; keep them off the runtime's
+/// worker threads.
+async fn install(client: &UpdateClient, path: PathBuf) -> Result<Relaunch, UpdateError> {
+    let client = client.clone();
+    tokio::task::spawn_blocking(move || client.install(&path))
+        .await
+        .unwrap_or_else(|error| Err(UpdateError::Install(error.to_string())))
 }
 
 fn failed(error: UpdateError) -> UpdateStatus {

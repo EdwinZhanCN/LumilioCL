@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "id": "release-0-1-0",
   "title": "发布 0.1.0",
-  "summary": "`v0.1.0` 的草稿 release 里有 macOS、Windows、Linux 三个平台的包。每个下载下来的包都按 PACKAGING.md §5 验收通过后，再发布这个 release。打包方式见 PACKAGING.md。",
-  "status": "in_progress",
+  "summary": "0.1.0 已完成三平台打包、下载后验收和正式发布。Project Maintainer 于 2026-10-11 确认原计划验收早已全部通过，关闭并保留本计划。后续自动更新修复的实机验收由 auto-update T6 继续跟踪。",
+  "status": "completed",
   "visibility": "public",
   "scope": {
     "included": [
@@ -53,14 +53,14 @@
     {
       "id": "T7",
       "title": "在 Icon Composer 里检查 `AppIcon.icon` 的深色外观，以及 26 和 27 两代渲染",
-      "status": "proposed",
+      "status": "completed",
       "acceptance": "在 Icon Composer 里检查 `AppIcon.icon` 的深色外观，以及 26 和 27 两代渲染"
     },
     {
       "id": "T8",
-      "title": "手动跑 release 工作流演练（workflow_dispatch），确认 Windows 和 Linux 都能编译出包。首次演练中 Windows 的 Rust 编译成功，但 ISCC 拒绝 `\\\\?\\D:` 扩展路径前缀；已在传参边界做路径规范化，待 CI 重跑验收。",
-      "status": "proposed",
-      "acceptance": "手动跑 release 工作流演练（workflow_dispatch），确认 Windows 和 Linux 都能编译出包。首次演练中 Windows 的 Rust 编译成功，但 ISCC 拒绝 `\\\\?\\D:` 扩展路径前缀；已在传参边界做路径规范化，待 CI 重跑验收。"
+      "title": "手动跑 release 工作流演练（workflow_dispatch），确认 Windows 和 Linux 都能编译出包；修复 ISCC 扩展路径前缀后重跑成功。",
+      "status": "completed",
+      "acceptance": "手动 release 工作流演练重跑通过，Windows、Linux 和 macOS 原生安装包生成成功。"
     },
     {
       "id": "T9",
@@ -71,33 +71,39 @@
     {
       "id": "T10",
       "title": "打 `v0.1.0` 标签，等草稿 release 生成",
-      "status": "proposed",
+      "status": "completed",
       "acceptance": "打 `v0.1.0` 标签，等草稿 release 生成"
     },
     {
       "id": "T11",
       "title": "验收下载后的产物（PACKAGING.md §5 的五项），通过后发布",
-      "status": "proposed",
+      "status": "completed",
       "acceptance": "验收下载后的产物（PACKAGING.md §5 的五项），通过后发布"
     },
     {
       "id": "T12",
-      "title": "下一正式版发布后，在 macOS 上从 0.1.0 实测自动更新（`auto-update.json` T5）",
-      "status": "proposed",
-      "acceptance": "下一正式版发布后，在 macOS 上从 0.1.0 实测自动更新（`auto-update.json` T5）"
+      "title": "在 macOS 上从 0.1.0 实测自动更新到 0.1.1，记录后续问题并交由 auto-update T6 验收修复",
+      "status": "completed",
+      "acceptance": "0.1.0 到下一正式版的自动更新实测已有记录；后台安装和退出后重启修复的后续验收由 auto-update T6 跟踪。"
     }
   ],
   "validation": [
     {
       "criterion": "原计划的实机与平台验收全部完成。",
-      "result": null
+      "result": "2026-10-11 Project Maintainer 确认 0.1.0 的图标和下载后安装包验收早已全部通过。workflow_dispatch 38031572334 和标签工作流 38032647761 成功；v0.1.0 于 2026-10-10T07:16:40Z 正式发布，含 macOS DMG、Windows 安装器及便携 ZIP、Linux deb 及 tar.gz 和 SHA256SUMS.txt。0.1.0 到 0.1.1 的 macOS 更新实测记录保留在 auto-update lessonsLearned；修复验收继续由其 T6 负责。"
     }
   ],
-  "references": [],
+  "references": [
+    "https://github.com/EdwinZhanCN/LumilioCL/releases/tag/v0.1.0",
+    "https://github.com/EdwinZhanCN/LumilioCL/actions/runs/38031572334",
+    "https://github.com/EdwinZhanCN/LumilioCL/actions/runs/38032647761",
+    ".agents/plans/auto-update.json"
+  ],
   "dependencies": [
     "auto-update"
   ],
   "lessonsLearned": [],
+  "outcome": "首个正式版 0.1.0 已发布，三平台安装包、图标及下载后验收由 Project Maintainer 确认通过。保留完成记录；下一轮自动更新修复验收在 auto-update T6 继续，不阻止本首发计划关闭。",
   "roadmap": {
     "enabled": true,
     "id": "release-0-1-0",

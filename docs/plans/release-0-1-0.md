@@ -2,9 +2,9 @@
 
 # 发布 0.1.0
 
-Status: InProgress
+Status: Completed
 
-`v0.1.0` 的草稿 release 里有 macOS、Windows、Linux 三个平台的包。每个下载下来的包都按 PACKAGING.md §5 验收通过后，再发布这个 release。打包方式见 PACKAGING.md。
+0.1.0 已完成三平台打包、下载后验收和正式发布。Project Maintainer 于 2026-10-11 确认原计划验收早已全部通过，关闭并保留本计划。后续自动更新修复的实机验收由 auto-update T6 继续跟踪。
 
 ## Scope
 
@@ -25,24 +25,32 @@ Status: InProgress
   Acceptance: 自动更新实现进入 0.1.0：正式版检查、校验下载、平台安装和重启入口；各安装方式的支持范围见 `auto-update.json`
 - [x] T6 — 本机 macOS 打包演练（ad hoc 签名）：DMG 25 MB；Info.plist、`Assets.car`、签名验证和 SHA-256 都正确；从 DMG 复制出来的 app 能启动到首页 (Completed)
   Acceptance: 本机 macOS 打包演练（ad hoc 签名）：DMG 25 MB；Info.plist、`Assets.car`、签名验证和 SHA-256 都正确；从 DMG 复制出来的 app 能启动到首页
-- [ ] T7 — 在 Icon Composer 里检查 `AppIcon.icon` 的深色外观，以及 26 和 27 两代渲染 (Proposed)
+- [x] T7 — 在 Icon Composer 里检查 `AppIcon.icon` 的深色外观，以及 26 和 27 两代渲染 (Completed)
   Acceptance: 在 Icon Composer 里检查 `AppIcon.icon` 的深色外观，以及 26 和 27 两代渲染
-- [ ] T8 — 手动跑 release 工作流演练（workflow_dispatch），确认 Windows 和 Linux 都能编译出包。首次演练中 Windows 的 Rust 编译成功，但 ISCC 拒绝 `\\?\D:` 扩展路径前缀；已在传参边界做路径规范化，待 CI 重跑验收。 (Proposed)
-  Acceptance: 手动跑 release 工作流演练（workflow_dispatch），确认 Windows 和 Linux 都能编译出包。首次演练中 Windows 的 Rust 编译成功，但 ISCC 拒绝 `\\?\D:` 扩展路径前缀；已在传参边界做路径规范化，待 CI 重跑验收。
+- [x] T8 — 手动跑 release 工作流演练（workflow_dispatch），确认 Windows 和 Linux 都能编译出包；修复 ISCC 扩展路径前缀后重跑成功。 (Completed)
+  Acceptance: 手动 release 工作流演练重跑通过，Windows、Linux 和 macOS 原生安装包生成成功。
 - [x] T9 — 签名：Project Maintainer决定不签名。README（中英文）用最直白的话解释首次打开时的警告，并写明 macOS、Windows 上怎么放行 (Completed)
   Acceptance: 签名：Project Maintainer决定不签名。README（中英文）用最直白的话解释首次打开时的警告，并写明 macOS、Windows 上怎么放行
-- [ ] T10 — 打 `v0.1.0` 标签，等草稿 release 生成 (Proposed)
+- [x] T10 — 打 `v0.1.0` 标签，等草稿 release 生成 (Completed)
   Acceptance: 打 `v0.1.0` 标签，等草稿 release 生成
-- [ ] T11 — 验收下载后的产物（PACKAGING.md §5 的五项），通过后发布 (Proposed)
+- [x] T11 — 验收下载后的产物（PACKAGING.md §5 的五项），通过后发布 (Completed)
   Acceptance: 验收下载后的产物（PACKAGING.md §5 的五项），通过后发布
-- [ ] T12 — 下一正式版发布后，在 macOS 上从 0.1.0 实测自动更新（`auto-update.json` T5） (Proposed)
-  Acceptance: 下一正式版发布后，在 macOS 上从 0.1.0 实测自动更新（`auto-update.json` T5）
+- [x] T12 — 在 macOS 上从 0.1.0 实测自动更新到 0.1.1，记录后续问题并交由 auto-update T6 验收修复 (Completed)
+  Acceptance: 0.1.0 到下一正式版的自动更新实测已有记录；后台安装和退出后重启修复的后续验收由 auto-update T6 跟踪。
 
 ## Validation
 
 - 原计划的实机与平台验收全部完成。
-  Result: pending
+  Result: 2026-10-11 Project Maintainer 确认 0.1.0 的图标和下载后安装包验收早已全部通过。workflow_dispatch 38031572334 和标签工作流 38032647761 成功；v0.1.0 于 2026-10-10T07:16:40Z 正式发布，含 macOS DMG、Windows 安装器及便携 ZIP、Linux deb 及 tar.gz 和 SHA256SUMS.txt。0.1.0 到 0.1.1 的 macOS 更新实测记录保留在 auto-update lessonsLearned；修复验收继续由其 T6 负责。
 
 ## References
 
+- https://github.com/EdwinZhanCN/LumilioCL/releases/tag/v0.1.0
+- https://github.com/EdwinZhanCN/LumilioCL/actions/runs/38031572334
+- https://github.com/EdwinZhanCN/LumilioCL/actions/runs/38032647761
+- [.agents/plans/auto-update.json](../../.agents/plans/auto-update.json)
 - [Plan auto-update](auto-update.md)
+
+## Outcome
+
+首个正式版 0.1.0 已发布，三平台安装包、图标及下载后验收由 Project Maintainer 确认通过。保留完成记录；下一轮自动更新修复验收在 auto-update T6 继续，不阻止本首发计划关闭。

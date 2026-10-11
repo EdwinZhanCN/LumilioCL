@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "id": "release-0-1-2",
+  "title": "准备发布 0.1.2",
+  "summary": "汇集当前分支的自动更新修复、Xaero 26.x 兼容、Windows 凭据容量 hotfix、相对数据目录修复和宣传录制工具，经过 PR 与检查后生成 0.1.2 三平台草稿安装包。下载后验收通过再正式发布。",
+  "status": "in_progress",
+  "visibility": "internal",
+  "scope": {
+    "included": [
+      "PR #15 的后台安装、退出后重启修复。",
+      "Xaero Minimap 26.6 waypoints.txt 与 World Map 8.8 格式兼容，XaeroTools vendor 0.5.1 和真实样本。",
+      "Windows 超长登录数据分块保存在系统凭据库，兼容旧凭据及写入失败回滚。",
+      "相对数据目录绝对化、LUMILIO_REVIEW_SIZE、demo_home 录制工具。",
+      "版本、计划与发布说明更新，以及三平台草稿安装包。"
+    ],
+    "excluded": [
+      "不将被 Git 忽略的宣传片工程、成品和录制数据放入安装包。",
+      "不扩展 WASM 插件接口或网站素材任务。",
+      "不将 0.1.1 到 0.1.2 更新视为新重启逻辑的实机验收：升级执行的是旧版本代码。"
+    ]
+  },
+  "tasks": [
+    { "id": "R1", "title": "收拢发布内容并更新版本和计划", "status": "completed", "acceptance": "工作区版本为 0.1.2，保留所有当前分支变更，关闭已验收的 release-0-1-0 并生成计划投影。" },
+    { "id": "R2", "title": "完成本地检查与回归验证", "status": "completed", "acceptance": "just check、just docs、just web 和 release-check v0.1.2 通过；Windows 长令牌回归测试能在恢复整条写入时失败。" },
+    { "id": "R3", "title": "通过 PR 将发布候选合入 main", "status": "in_progress", "acceptance": "PR 明确列出发布内容与证据，rust、plans、web 适用检查通过后合入 main。" },
+    { "id": "R4", "title": "生成 v0.1.2 三平台草稿安装包", "status": "proposed", "acceptance": "v0.1.2 标签指向经过 PR 的发布提交；Release 工作流成功，草稿含三平台安装包、BUILD.txt 与 SHA256SUMS.txt。" },
+    { "id": "R5", "title": "下载后验收并正式发布", "status": "proposed", "acceptance": "按 assets/icons/PACKAGING.md §5 检查下载后的安装包；Windows 实机登录长令牌成功，Xaero 26.x 路径点与地图正常。Project Maintainer 确认验收后发布草稿。" }
+  ],
+  "validation": [
+    { "criterion": "发布候选的本地与 PR 检查通过。", "result": "2026-10-11 本地 just check 通过，1290 项测试通过、15 项跳过；just docs、just web（0 错误、15 项测试通过）及 just release-check v0.1.2 通过。Windows 长令牌回归测试已证明恢复整条写入会因容量超限失败。PR 检查待运行。" },
+    { "criterion": "三平台草稿安装包生成并校验下载后的产物。", "result": null },
+    { "criterion": "Project Maintainer 确认下载后实机验收并正式发布。", "result": null }
+  ],
+  "references": [
+    "https://github.com/EdwinZhanCN/LumilioCL/pull/15",
+    "assets/icons/PACKAGING.md",
+    ".agents/plans/auto-update.json",
+    ".agents/plans/world-explorer.json"
+  ],
+  "dependencies": [],
+  "decisions": [
+    {
+      "id": "release-scope",
+      "decision": "0.1.2 包含 Project Maintainer 指定的当前分支全部发布内容，遵循 prefixed branch → PR → main → 标签 → 草稿安装包 → 下载后验收的流程。",
+      "rationale": "Windows 登录失败与 Xaero 格式兼容问题需要随本次补丁一起交付。",
+      "consequences": "自动更新 T6 保持开放，需从包含修复的版本更新到后续版本才能验证；旧首发验收计划单独关闭。"
+    }
+  ],
+  "lessonsLearned": [
+    "Windows 系统凭据单条容量有限，完整登录 JSON 中的长令牌超限会令登录失败。分块凭据保持在系统凭据库，先写新分块再提交清单，旧数据兼容且失败不覆盖原登录。Guard：crates/lumilio-core/src/credentials/chunked/tests.rs，覆盖长微软及第三方令牌、Unicode、旧数据迁移、清理与失败回滚；模拟恢复整条写入后微软登录回归测试按容量限制失败。"
+  ]
+}
