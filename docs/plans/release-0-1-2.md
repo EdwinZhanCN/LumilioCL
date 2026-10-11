@@ -23,19 +23,19 @@ Status: InProgress
   Acceptance: 工作区版本为 0.1.2，保留所有当前分支变更，关闭已验收的 release-0-1-0 并生成计划投影。
 - [x] R2 — 完成本地检查与回归验证 (Completed)
   Acceptance: just check、just docs、just web 和 release-check v0.1.2 通过；Windows 长令牌回归测试能在恢复整条写入时失败。
-- [ ] R3 — 通过 PR 将发布候选合入 main (InProgress)
+- [x] R3 — 通过 PR 将发布候选合入 main (Completed)
   Acceptance: PR 明确列出发布内容与证据，rust、plans、web 适用检查通过后合入 main。
-- [ ] R4 — 生成 v0.1.2 三平台草稿安装包 (Proposed)
+- [x] R4 — 生成 v0.1.2 三平台草稿安装包 (Completed)
   Acceptance: v0.1.2 标签指向经过 PR 的发布提交；Release 工作流成功，草稿含三平台安装包、BUILD.txt 与 SHA256SUMS.txt。
-- [ ] R5 — 下载后验收并正式发布 (Proposed)
+- [ ] R5 — 下载后验收并正式发布 (InProgress)
   Acceptance: 按 assets/icons/PACKAGING.md §5 检查下载后的安装包；Windows 实机登录长令牌成功，Xaero 26.x 路径点与地图正常。Project Maintainer 确认验收后发布草稿。
 
 ## Validation
 
 - 发布候选的本地与 PR 检查通过。
-  Result: 2026-10-11 本地 just check 通过，1290 项测试通过、15 项跳过；just docs、just web（0 错误、15 项测试通过）及 just release-check v0.1.2 通过。Windows 长令牌回归测试已证明恢复整条写入会因容量超限失败。PR 检查待运行。
+  Result: 2026-10-11 本地 just check 通过，1290 项测试通过、15 项跳过；just docs、just web（0 错误、15 项测试通过）及 just release-check v0.1.2 通过。Windows 长令牌回归测试已证明恢复整条写入会因容量超限失败。PR #16 的 rust、plans、web 检查均通过，合入 main 的提交为 345f58710277056d8b8a03b0ced612f005357255；v0.1.2 标签指向该提交。
 - 三平台草稿安装包生成并校验下载后的产物。
-  Result: pending
+  Result: 2026-10-11 Release 工作流 38128702112 全部成功；草稿包含 macOS arm64 DMG、Windows x64 安装器与便携 ZIP、Linux x64 deb 与 tar.gz，及 SHA256SUMS.txt。重新下载草稿中的五个包，SHA-256 全部通过。Windows ZIP、Linux tar.gz/deb 的 BUILD.txt 及 macOS Info.plist 均为 0.1.2、提交 345f58710277056d8b8a03b0ced612f005357255；deb Version 为 0.1.2。DMG 只读挂载与资源检查通过，app 的 codesign --verify --deep --strict 通过；签名是 adhoc，无 Developer ID 或公证，Windows 包为未签名。真实启动、覆盖升级、卸载和 Windows 登录验收仍待 Project Maintainer 完成。
 - Project Maintainer 确认下载后实机验收并正式发布。
   Result: pending
 
@@ -50,6 +50,8 @@ Consequences: 自动更新 T6 保持开放，需从包含修复的版本更新�
 ## References
 
 - https://github.com/EdwinZhanCN/LumilioCL/pull/15
+- https://github.com/EdwinZhanCN/LumilioCL/pull/16
+- https://github.com/EdwinZhanCN/LumilioCL/actions/runs/38128702112
 - [assets/icons/PACKAGING.md](../../assets/icons/PACKAGING.md)
 - [.agents/plans/auto-update.json](../../.agents/plans/auto-update.json)
 - [.agents/plans/world-explorer.json](../../.agents/plans/world-explorer.json)
