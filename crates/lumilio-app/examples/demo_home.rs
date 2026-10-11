@@ -293,7 +293,8 @@ async fn create(service: &Service, game: &Game) -> Result<String, ServiceError> 
     Ok(record.id)
 }
 
-/// Copies a file or a folder into `folder`, keeping what is already there.
+/// Copies a file or a folder into `folder`, unless something of that name is
+/// already there.
 fn copy_into(folder: &Path, from: &Path) -> Result<(), ServiceError> {
     let name = from
         .file_name()
@@ -304,15 +305,22 @@ fn copy_into(folder: &Path, from: &Path) -> Result<(), ServiceError> {
         return Ok(());
     }
     std::fs::create_dir_all(folder)?;
-    if from.is_dir() {
-        for entry in std::fs::read_dir(from)? {
-            copy_into(&target, &entry?.path())?;
-        }
-    } else {
-        std::fs::copy(from, &target)?;
-    }
+    copy_tree(from, &target)?;
     println!("  + {}", target.display());
     Ok(())
+}
+
+fn copy_tree(from: &Path, to: &Path) -> std::io::Result<()> {
+    if from.is_dir() {
+        std::fs::create_dir_all(to)?;
+        for entry in std::fs::read_dir(from)? {
+            let entry = entry?;
+            copy_tree(&entry.path(), &to.join(entry.file_name()))?;
+        }
+        Ok(())
+    } else {
+        std::fs::copy(from, to).map(drop)
+    }
 }
 
 async fn install(service: &Service, id: &str, name: &str) -> Result<(), ServiceError> {
