@@ -22,25 +22,43 @@ pub struct TintColors {
     pub lily_pad: [f32; 4],
     /// Potion/cauldron water color
     pub cauldron_water: [f32; 4],
+    /// Dry foliage tint (leaf litter, 1.21.5+).
+    pub dry_foliage: [f32; 4],
 }
+
+/// An opaque `0xRRGGBB` color as linear-blend RGBA factors.
+const fn rgb(hex: u32) -> [f32; 4] {
+    [
+        ((hex >> 16) & 0xFF) as f32 / 255.0,
+        ((hex >> 8) & 0xFF) as f32 / 255.0,
+        (hex & 0xFF) as f32 / 255.0,
+        1.0,
+    ]
+}
+
+// Minecraft's fixed block colors (`FoliageColor`, `BlockColors.createDefault`).
+const EVERGREEN_FOLIAGE: [f32; 4] = rgb(0x619961);
+const BIRCH_FOLIAGE: [f32; 4] = rgb(0x80A755);
+const MANGROVE_FOLIAGE: [f32; 4] = rgb(0x92C648);
+const ATTACHED_STEM: [f32; 4] = rgb(0xE0C71C);
 
 impl Default for TintColors {
     fn default() -> Self {
         Self {
-            // Default grass color (plains biome approximate)
-            grass: [0.56, 0.74, 0.35, 1.0],
-            // Default foliage color (plains biome approximate)
-            foliage: [0.47, 0.66, 0.23, 1.0],
-            // Default water color (light blue)
-            water: [0.247, 0.463, 0.894, 1.0],
+            // Plains: the grass, foliage and dry-foliage colormaps sampled at
+            // temperature 0.8, downfall 0.4, as Minecraft does for that biome.
+            grass: rgb(0x91BD59),
+            foliage: rgb(0x77AB2F),
+            water: rgb(0x3F76E4),
             // Redstone dust colors from power 0 to 15
             redstone: Self::default_redstone_colors(),
             // Stem colors from stage 0 to 7
             stem: Self::default_stem_colors(),
-            // Lily pad has a darker green
-            lily_pad: [0.13, 0.55, 0.13, 1.0],
+            // A placed lily pad's fixed color.
+            lily_pad: rgb(0x208030),
             // Cauldron water (same as regular water by default)
-            cauldron_water: [0.247, 0.463, 0.894, 1.0],
+            cauldron_water: rgb(0x3F76E4),
+            dry_foliage: rgb(0xA37546),
         }
     }
 }
@@ -126,31 +144,26 @@ impl TintColors {
         colors
     }
 
-    /// Generate default redstone colors for power levels 0-15.
+    /// Redstone dust colors for power levels 0-15 (Minecraft's
+    /// `RedStoneWireBlock.getColorForPower`).
     fn default_redstone_colors() -> [[f32; 4]; 16] {
         let mut colors = [[0.0; 4]; 16];
-        for power in 0..16 {
-            // Minecraft redstone color formula (approximation)
-            // At power 0: dim red, at power 15: bright red
-            let brightness = (power as f32) / 15.0;
-            let r = 0.3 + brightness * 0.7;
-            let g = brightness * 0.1;
-            let b = brightness * 0.1;
-            colors[power] = [r, g, b, 1.0];
+        for (power, color) in colors.iter_mut().enumerate() {
+            let f = power as f32 / 15.0;
+            let r = f * 0.6 + if f > 0.0 { 0.4 } else { 0.3 };
+            let g = (f * f * 0.7 - 0.5).clamp(0.0, 1.0);
+            let b = (f * f * 0.6 - 0.7).clamp(0.0, 1.0);
+            *color = [r, g, b, 1.0];
         }
         colors
     }
 
-    /// Generate default stem colors for growth stages 0-7.
+    /// Stem colors for growth stages 0-7 (Minecraft: `age * 32, 255 - age * 8, age * 4`).
     fn default_stem_colors() -> [[f32; 4]; 8] {
         let mut colors = [[0.0; 4]; 8];
-        for stage in 0..8 {
-            // Young stems are green, mature stems are yellow/orange
-            let t = stage as f32 / 7.0;
-            let r = 0.2 + t * 0.6;
-            let g = 0.7 - t * 0.2;
-            let b = 0.1;
-            colors[stage] = [r, g, b, 1.0];
+        for (age, color) in colors.iter_mut().enumerate() {
+            let age = age as u32;
+            *color = rgb((age * 32) << 16 | (255 - age * 8) << 8 | age * 4);
         }
         colors
     }
@@ -193,9 +206,11 @@ impl TintProvider {
         let block_id = block.block_id();
 
         // Determine tint category based on block name
-        match self.categorize_block(block_id) {
+        match self.categorize_block(block_id, tint_index) {
             TintCategory::Grass => self.colors.grass,
             TintCategory::Foliage => self.colors.foliage,
+            TintCategory::Fixed(color) => color,
+            TintCategory::DryFoliage => self.colors.dry_foliage,
             TintCategory::Water => self.colors.water,
             TintCategory::Redstone => self.get_redstone_tint(block),
             TintCategory::Stem => self.get_stem_tint(block),
@@ -209,72 +224,31 @@ impl TintProvider {
         &self.colors
     }
 
-    /// Categorize a block by its tinting behavior.
-    fn categorize_block(&self, block_id: &str) -> TintCategory {
-        // Grass-colored blocks
-        if matches!(
-            block_id,
-            "grass_block"
-                | "grass"
-                | "tall_grass"
-                | "fern"
-                | "large_fern"
-                | "potted_fern"
-                | "short_grass"
-        ) {
-            return TintCategory::Grass;
+    /// Categorize a block by its tinting behavior, following the color providers
+    /// Minecraft registers in `BlockColors.createDefault`. A block with no
+    /// provider stays untinted even when its model has a `tintindex`, as
+    /// cherry, pale oak and azalea leaves, bamboo and the stonecutter saw do.
+    fn categorize_block(&self, block_id: &str, tint_index: i32) -> TintCategory {
+        match block_id {
+            "grass_block" | "grass" | "short_grass" | "tall_grass" | "fern" | "large_fern"
+            | "potted_fern" | "bush" | "sugar_cane" => TintCategory::Grass,
+            // Only the stems (tint index 1) take the grass color.
+            "pink_petals" | "wildflowers" if tint_index != 0 => TintCategory::Grass,
+            "oak_leaves" | "jungle_leaves" | "acacia_leaves" | "dark_oak_leaves" | "vine" => {
+                TintCategory::Foliage
+            }
+            "spruce_leaves" => TintCategory::Fixed(EVERGREEN_FOLIAGE),
+            "birch_leaves" => TintCategory::Fixed(BIRCH_FOLIAGE),
+            "mangrove_leaves" => TintCategory::Fixed(MANGROVE_FOLIAGE),
+            "leaf_litter" => TintCategory::DryFoliage,
+            "water" | "bubble_column" | "water_cauldron" => TintCategory::Water,
+            "redstone_wire" | "redstone_dust" => TintCategory::Redstone,
+            "melon_stem" | "pumpkin_stem" | "attached_melon_stem" | "attached_pumpkin_stem" => {
+                TintCategory::Stem
+            }
+            "lily_pad" => TintCategory::LilyPad,
+            _ => TintCategory::None,
         }
-
-        // Foliage-colored blocks (leaves, vines)
-        if block_id.ends_with("_leaves") && !block_id.starts_with("azalea") {
-            return TintCategory::Foliage;
-        }
-        if matches!(
-            block_id,
-            "vine"
-                | "oak_leaves"
-                | "jungle_leaves"
-                | "acacia_leaves"
-                | "dark_oak_leaves"
-                | "mangrove_leaves"
-        ) {
-            return TintCategory::Foliage;
-        }
-
-        // Water-colored blocks
-        if matches!(block_id, "water" | "bubble_column") {
-            return TintCategory::Water;
-        }
-
-        // Cauldron with water
-        if block_id == "water_cauldron" {
-            return TintCategory::Water;
-        }
-
-        // Redstone
-        if block_id == "redstone_wire" || block_id == "redstone_dust" {
-            return TintCategory::Redstone;
-        }
-
-        // Stems
-        if matches!(
-            block_id,
-            "melon_stem" | "pumpkin_stem" | "attached_melon_stem" | "attached_pumpkin_stem"
-        ) {
-            return TintCategory::Stem;
-        }
-
-        // Lily pad
-        if block_id == "lily_pad" {
-            return TintCategory::LilyPad;
-        }
-
-        // Sugar cane has a slight green tint in some conditions
-        if block_id == "sugar_cane" {
-            return TintCategory::Grass;
-        }
-
-        TintCategory::None
     }
 
     /// Get redstone tint based on power level.
@@ -292,9 +266,8 @@ impl TintProvider {
     fn get_stem_tint(&self, block: &InputBlock) -> [f32; 4] {
         let block_id = block.block_id();
 
-        // Attached stems are fully grown
         if block_id.starts_with("attached_") {
-            return self.colors.stem[7];
+            return ATTACHED_STEM;
         }
 
         let age = block
@@ -320,6 +293,10 @@ enum TintCategory {
     Grass,
     /// Foliage tinting for leaves (biome-dependent)
     Foliage,
+    /// A color Minecraft fixes regardless of biome (spruce, birch, mangrove leaves)
+    Fixed([f32; 4]),
+    /// Dry foliage tinting (leaf litter, biome-dependent)
+    DryFoliage,
     /// Water tinting (biome-dependent)
     Water,
     /// Redstone dust tinting (power-level dependent)

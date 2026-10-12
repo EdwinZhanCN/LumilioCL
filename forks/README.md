@@ -71,6 +71,11 @@ Schematic-Mesher (guards in `schematic-mesher/tests/`, run one with
   `uvlock` variant transforms its face UVs like Minecraft's
   `BlockMath.getUVLockTransform`, so rotated stairs, walls, fences and fence
   gates keep world-aligned textures. Guard: `uvlock`.
+- Block tints (`mesher/tint.rs`): follow the color providers Minecraft
+  registers — fixed spruce, birch and mangrove leaf colors; no tint for cherry,
+  pale oak and azalea leaves; grass color for bushes and flower-bed stems; dry
+  foliage for leaf litter; Minecraft's redstone, stem and lily pad colors.
+  Guard: `block_tints`.
 - Texture aliases (`resource_pack/mod.rs` `texture_aliases`): a missing texture
   name can answer for another path without copying pixels. Nucleation fills it
   (below).
