@@ -67,6 +67,10 @@ Schematic-Mesher (guards in `schematic-mesher/tests/`, run one with
   turn the way Minecraft's renderers do (glam's rotation has the opposite sign
   of Minecraft yaw), so chests, double chests, wall banners and mobs face their
   side. Guard: `entity_facing`.
+- UV lock (`types/transform.rs` `uvlock_matrix`, `mesher/element.rs`): a
+  `uvlock` variant transforms its face UVs like Minecraft's
+  `BlockMath.getUVLockTransform`, so rotated stairs, walls, fences and fence
+  gates keep world-aligned textures. Guard: `uvlock`.
 - The crate's own unit tests and `tests/atlas_uv_regression.rs` do not compile
   at the baseline: upstream `253d2b6` changed `MesherOutput` layers to
   `MeshLayer` without updating them. Local guards therefore live in new

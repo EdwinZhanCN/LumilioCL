@@ -1966,6 +1966,14 @@ impl<'a> MeshBuilder<'a> {
 
         // Generate the 4 vertices for this face
         let (positions, uvs) = self.generate_face_vertices(direction, from, to, uv, face.rotation);
+        // A uvlock variant keeps the texture aligned to the world, not the model.
+        let uvs = match transform.uvlock_matrix(direction) {
+            Some(lock) => uvs.map(|[u, v]| {
+                let p = lock * Vec3::new(u - 0.5, v - 0.5, 0.0);
+                [p.x + 0.5, p.y + 0.5]
+            }),
+            None => uvs,
+        };
 
         // Apply element rotation if present. The normal turns with the face (inverse
         // transpose, as rescale is not uniform), so a face rotated past 90° — the

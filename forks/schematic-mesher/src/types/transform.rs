@@ -1,6 +1,6 @@
 //! Transform types for block and element rotations.
 
-use super::Axis;
+use super::{Axis, Direction};
 use serde::{Deserialize, Serialize};
 
 /// Block-level transform from blockstate variant.
@@ -22,6 +22,46 @@ impl BlockTransform {
     /// Check if this is an identity transform (no rotation).
     pub fn is_identity(&self) -> bool {
         self.x == 0 && self.y == 0
+    }
+
+    /// The variant rotation, X first, then Y (Minecraft's `BlockModelRotation`).
+    pub fn matrix(&self) -> glam::Mat3 {
+        glam::Mat3::from_rotation_y((-self.y as f32).to_radians())
+            * glam::Mat3::from_rotation_x((-self.x as f32).to_radians())
+    }
+
+    /// With `uvlock`, the map that keeps a face's texture aligned to the world
+    /// after the variant rotation, applied to `(u - 0.5, v - 0.5, 0)` of the
+    /// face's UVs in 0–1 units. `face` is the face's direction before rotation.
+    ///
+    /// Follows Minecraft's `BlockMath.getUVLockTransform`:
+    /// `localToGlobal(face)⁻¹ · rotation⁻¹ · localToGlobal(rotated face)`.
+    pub fn uvlock_matrix(&self, face: Direction) -> Option<glam::Mat3> {
+        if !self.uvlock || self.is_identity() {
+            return None;
+        }
+        let rotation = self.matrix();
+        let rotated = Direction::nearest(rotation * glam::Vec3::from(face.normal()));
+        Some(
+            local_to_global(face).transpose()
+                * rotation.transpose()
+                * local_to_global(rotated),
+        )
+    }
+}
+
+/// The rotation that turns a south face's UV plane onto `face` (Minecraft's
+/// `VANILLA_UV_TRANSFORM_LOCAL_TO_GLOBAL`).
+fn local_to_global(face: Direction) -> glam::Mat3 {
+    use glam::Mat3;
+    use std::f32::consts::{FRAC_PI_2, PI};
+    match face {
+        Direction::South => Mat3::IDENTITY,
+        Direction::East => Mat3::from_rotation_y(FRAC_PI_2),
+        Direction::West => Mat3::from_rotation_y(-FRAC_PI_2),
+        Direction::North => Mat3::from_rotation_y(PI),
+        Direction::Up => Mat3::from_rotation_x(-FRAC_PI_2),
+        Direction::Down => Mat3::from_rotation_x(FRAC_PI_2),
     }
 }
 
