@@ -8,8 +8,9 @@
 //!   its client jar (see `block_colors.rs`).
 //! - `release-check [TAG]`: print `version=` and `prerelease=` lines (for
 //!   `$GITHUB_OUTPUT`), failing if TAG is not `v<workspace version>`.
-//! - `worldgen-*` and `cubiomes-btree`: reproduce original-game goldens and
-//!   biome tables (see `forks/cubiomes/data/README.md`).
+//! - `worldgen-*`, `cubiomes-btree` and `cubiomes-tables`: reproduce
+//!   original-game goldens, biome, decoration and loot tables (see
+//!   `forks/cubiomes/data/README.md`).
 //!   The table format comes from cubiomes (MIT, Copyright (c) 2020 Cubitect).
 
 mod block_colors;
@@ -25,7 +26,7 @@ use std::process::ExitCode;
 use release::{Release, Result};
 use version::Version;
 
-const USAGE: &str = "usage: cargo xtask package [--skip-build]\n       cargo xtask release-check [TAG]\n       cargo xtask block-colors VERSION\n       cargo xtask worldgen-prepare VERSION\n       cargo xtask worldgen-golden VERSION\n       cargo xtask worldgen-import VERSION\n       cargo xtask worldgen-save-read VERSION\n       cargo xtask worldgen-diff OLD NEW\n       cargo xtask cubiomes-btree INPUT OUTPUT NAME";
+const USAGE: &str = "usage: cargo xtask package [--skip-build]\n       cargo xtask release-check [TAG]\n       cargo xtask block-colors VERSION\n       cargo xtask worldgen-prepare VERSION\n       cargo xtask worldgen-golden VERSION\n       cargo xtask worldgen-import VERSION\n       cargo xtask worldgen-save-read VERSION\n       cargo xtask worldgen-diff OLD NEW\n       cargo xtask cubiomes-btree INPUT OUTPUT NAME\n       cargo xtask cubiomes-tables";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -38,6 +39,7 @@ fn main() -> ExitCode {
         ["block-colors", version] => Release::detect()
             .and_then(|release| block_colors::run(version, &release.root, &release.target)),
         ["cubiomes-btree", input, output, name] => worldgen::btree(input, output, name),
+        ["cubiomes-tables"] => Release::detect().and_then(|r| worldgen::tables(&r.root)),
         ["worldgen-prepare", version] => {
             Release::detect().and_then(|r| worldgen::prepare(&r.root, version))
         }

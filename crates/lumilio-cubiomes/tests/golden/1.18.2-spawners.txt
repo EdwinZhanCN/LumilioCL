@@ -1,0 +1,9 @@
+262 0 52 39 -55 minecraft:cave_spider
+9876543210 0 44 -2 -30 minecraft:skeleton
+9876543210 0 2300 -5 -2310 minecraft:cave_spider
+9876543210 0 2300 -1 -2312 minecraft:cave_spider
+-123456789012345 0 42 -9 -18 minecraft:skeleton
+-123456789012345 0 -672 -25 523 minecraft:cave_spider
+-123456789012345 0 -645 -12 627 minecraft:zombie
+-123456789012345 0 -626 -33 522 minecraft:cave_spider
+-123456789012345 0 -581 11 609 minecraft:spider

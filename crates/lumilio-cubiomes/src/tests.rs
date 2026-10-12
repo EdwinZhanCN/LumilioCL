@@ -1,4 +1,9 @@
+mod decorations;
+mod loot;
+mod ravines;
 mod releases;
+mod variants;
+mod veins;
 
 #[test]
 fn native_generator_links_and_runs() {
@@ -223,6 +228,11 @@ fn structure_strongholds_spawn_and_slime_goldens_match_the_c_probe() {
         for (v, name) in GOLDEN_VERSIONS.iter().enumerate() {
             for (d, dimension) in GOLDEN_DIMENSIONS.iter().enumerate() {
                 for (k, kind) in Structure::ALL.iter().enumerate() {
+                    // A LumilioCL addition, checked against original servers
+                    // in tests/variants.rs rather than the upstream probe.
+                    if *kind == Structure::NetherFossil {
+                        continue;
+                    }
                     assert_eq!(
                         kind.available(Version::from_name(name).unwrap(), *dimension),
                         listed.contains(&(s, v, d, k)),
@@ -294,14 +304,12 @@ fn estimated_flags_follow_the_height_dependent_kinds_since_1_18() {
             kind,
             Structure::DesertPyramid | Structure::JungleTemple | Structure::Mansion
         );
-        assert_eq!(
-            kind.estimated(old),
-            kind == Structure::AbandonedCamp,
-            "{kind:?}"
-        );
+        // Camps need terrain the fork does not model in every release.
+        let terrain_bound = kind == Structure::AbandonedCamp;
+        assert_eq!(kind.estimated(old), terrain_bound, "{kind:?}");
         assert_eq!(
             kind.estimated(new),
-            height_bound || kind == Structure::AbandonedCamp,
+            height_bound || terrain_bound,
             "{kind:?}"
         );
     }
