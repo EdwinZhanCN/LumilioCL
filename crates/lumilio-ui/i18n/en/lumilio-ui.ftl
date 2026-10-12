@@ -1730,6 +1730,7 @@ map-group-features = Features
 map-feature-fossil = Fossil
 map-feature-fossil-diamond = Deep fossil (diamond ore)
 map-feature-lava-lake = Lava lake
+map-feature-enchanted-golden-apple = Enchanted golden apple (desert pyramid)
 map-group-underground = Underground
 map-underground-copper-vein = Copper vein (Y 0 to 50)
 map-underground-iron-vein = Iron vein (Y −60 to −8)

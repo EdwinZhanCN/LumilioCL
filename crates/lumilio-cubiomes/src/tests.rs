@@ -1,4 +1,5 @@
 mod decorations;
+mod loot;
 mod ravines;
 mod releases;
 mod variants;

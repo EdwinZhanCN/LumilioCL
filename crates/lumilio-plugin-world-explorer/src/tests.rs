@@ -224,9 +224,10 @@ fn structure_layers_follow_the_worlds_version_and_dimension() {
             )
             .is_empty()
     );
-    // 25 structure layers, 3 decoration layers, 3 underground layers, spawn,
-    // slime chunks, save positions and Xaero waypoints.
-    assert_eq!(WorldExplorer.overlays().len(), 35);
+    // 25 structure layers, 3 decoration layers, the apple layer, 3
+    // underground layers, spawn, slime chunks, save positions and Xaero
+    // waypoints.
+    assert_eq!(WorldExplorer.overlays().len(), 36);
 }
 
 #[test]
@@ -338,6 +339,39 @@ fn ravines_draw_their_start_and_walk() {
 }
 
 #[test]
+fn apple_layer_marks_the_pyramid_whose_chest_holds_one() {
+    use lumilio_plugin_api::map::MapObjectKind;
+    let context = Context { cancelled: false };
+    let found = |area: [f64; 4]| -> Vec<[i32; 2]> {
+        WorldExplorer
+            .objects(
+                &context,
+                &overlay_request(
+                    "feature.enchanted-golden-apple",
+                    Dimension::Overworld,
+                    "26.3",
+                    area,
+                ),
+            )
+            .unwrap()
+            .into_iter()
+            .map(|object| match object.kind {
+                MapObjectKind::Icon { at, .. } => {
+                    assert!(object.approximate);
+                    [at.x as i32, at.z as i32]
+                }
+                other => panic!("apples are icons, got {other:?}"),
+            })
+            .collect()
+    };
+    // The original 26.3 server filled a chest of seed 262's pyramid at chunk
+    // (464, 416) with an apple; the one at (432, -595) holds none
+    // (crates/lumilio-cubiomes/tests/golden/26.3-pyramid-loot.txt).
+    assert!(found([7168., 6400., 7680., 6912.]).contains(&[7434, 6666]));
+    assert!(!found([6656., -9728., 7168., -9216.]).contains(&[6922, -9510]));
+}
+
+#[test]
 fn decoration_and_nether_fossil_layers_need_their_tables() {
     let offered = |dimension: Dimension, version: &str| -> Vec<(String, bool, Option<String>)> {
         WorldExplorer
@@ -358,9 +392,16 @@ fn decoration_and_nether_fossil_layers_need_their_tables() {
         [
             "feature.fossil",
             "feature.fossil-diamond",
-            "feature.lava-lake"
+            "feature.lava-lake",
+            "feature.enchanted-golden-apple"
         ]
     );
+    // Pyramid loot needs data-driven enchantments (1.21+).
+    let apples = |version: &str| {
+        features(&offered(Dimension::Overworld, version))
+            .contains(&"feature.enchanted-golden-apple".to_owned())
+    };
+    assert!(apples("1.21.1") && !apples("1.20.6"));
     // Terrain decides each of them: estimated, in their own group.
     assert!(
         new.iter()

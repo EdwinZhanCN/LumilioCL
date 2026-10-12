@@ -1,6 +1,7 @@
 //! Reproducible development tools for the maintained world generator.
 mod btree;
 mod decorations;
+mod loot;
 mod prepare;
 mod saves;
 #[cfg(test)]
@@ -18,8 +19,38 @@ pub(crate) fn btree(input: &str, output: &str, name: &str) -> Result {
     btree::run(Path::new(input), Path::new(output), name)
 }
 
-pub(crate) fn decorations(root: &Path) -> Result {
-    decorations::generate(root)
+/// Rewrites the fork's generated tables from the committed release data.
+pub(crate) fn tables(root: &Path) -> Result {
+    let tables = root.join("forks/cubiomes/tables");
+    std::fs::write(tables.join("decorations.h"), decorations::render(root)?)
+        .map_err(|e| e.to_string())?;
+    std::fs::write(tables.join("loot.h"), loot::render(root)?).map_err(|e| e.to_string())
+}
+
+/// Every release directory's `name` file, ordered by release.
+fn releases(root: &Path, name: &str) -> Result<Vec<(String, Value)>> {
+    let data = root.join("forks/cubiomes/data");
+    let mut releases = vec![];
+    for entry in std::fs::read_dir(&data).map_err(|e| e.to_string())? {
+        let path = entry.map_err(|e| e.to_string())?.path();
+        let file = path.join(name);
+        if !file.exists() {
+            continue;
+        }
+        let version = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .ok_or("invalid release directory")?
+            .to_owned();
+        releases.push((version, prepare::json(&file)?));
+    }
+    releases.sort_by_key(|(version, _)| {
+        version
+            .split('.')
+            .map(|part| part.parse::<u32>().unwrap_or(0))
+            .collect::<Vec<_>>()
+    });
+    Ok(releases)
 }
 
 pub(crate) fn prepare(root: &Path, version: &str) -> Result {
@@ -81,6 +112,9 @@ pub(crate) fn import(root: &Path, version: &str) -> Result {
         &data.join("decorations.json"),
         &decorations::extract(&probe["features"], &inputs)?,
     )?;
+    if let Some(loot) = loot::extract(&work, &inputs)? {
+        prepare::write_json(&data.join("loot.json"), &loot)?;
+    }
     let mut golden = String::new();
     for sample in probe["samples"]
         .as_array()
@@ -160,16 +194,19 @@ pub(crate) fn import(root: &Path, version: &str) -> Result {
     }
     std::fs::write(out.join(format!("{version}-veins.txt")), veins).map_err(|e| e.to_string())?;
     // Rows `value sin cos`: Mth's table lookups for float inputs.
-    let mut trig = String::new();
-    for row in probe["trig"].as_array().ok_or("missing trig samples")? {
-        writeln!(trig, "{} {} {}", row["value"], row["sin"], row["cos"]).unwrap();
+    // Probes from before these samples leave the existing goldens alone.
+    if let Some(rows) = probe["trig"].as_array() {
+        let mut trig = String::new();
+        for row in rows {
+            writeln!(trig, "{} {} {}", row["value"], row["sin"], row["cos"]).unwrap();
+        }
+        std::fs::write(out.join(format!("{version}-trig.txt")), trig).map_err(|e| e.to_string())?;
     }
-    std::fs::write(out.join(format!("{version}-trig.txt")), trig).map_err(|e| e.to_string())?;
     // Rows `seed chunk_x chunk_z blocks checksum`: each canyon start near the
     // origin, carved by the original carver (26.x only; older carvers need
     // a whole chunk).
     let mut ravines = String::new();
-    for row in probe["ravines"].as_array().ok_or("missing ravines")? {
+    for row in probe["ravines"].as_array().into_iter().flatten() {
         let checksum = row["checksum"].as_str().ok_or("ravine checksum")?;
         writeln!(
             ravines,

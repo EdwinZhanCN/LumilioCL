@@ -6,7 +6,7 @@
  * random runs a placed feature's placement modifiers, then the feature itself.
  * The per-release data (decoration step and index, modifiers, the biomes that
  * list a feature) is tables/decorations.h, generated from the original game
- * data by `cargo xtask cubiomes-decorations`.
+ * data by `cargo xtask cubiomes-tables`.
  */
 
 #include "generator.h"

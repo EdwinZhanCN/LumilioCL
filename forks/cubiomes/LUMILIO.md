@@ -39,7 +39,7 @@ Omitted: `quadbase.*` (seed search and threads), `tests.c`, docs and build files
 - `decorations.c` / `decorations.h` and the generated `tables/decorations.h`
   are LumilioCL additions under this directory's MIT license. They run a
   placed feature's placement modifiers as the 26.3 `FeaturePlacer` does
-  (depth first), from per-release data that `cargo xtask cubiomes-decorations`
+  (depth first), from per-release data that `cargo xtask cubiomes-tables`
   builds out of `data/<release>/decorations.json`: decoration step and index
   from the original `FeatureSorter`, modifiers, and the biomes listing the
   feature. Original-server sequences of every tracked feature match exactly.
@@ -62,6 +62,17 @@ Omitted: `quadbase.*` (seed search and threads), `tests.c`, docs and build files
   indexed with a float product before 1.21.11 and a double after. The blocks
   every canyon carves near the origin match the original 26.3 carver's
   carving masks; the trig lookups of 1.21.4 and 26.3 match their `Mth`.
+
+- `loot.c` / `loot.h` and the generated `tables/loot.h` (LumilioCL, MIT):
+  desert pyramid chests from 1.21. All four lie in the start chunk; its
+  surface-structure decoration random draws the height offset, then one loot
+  seed per chest in north, east, south, west order through the piece's random
+  facing. The pyramid's index in that step is its place among the step's
+  structures sorted by id. The first pool of the loot table is simulated from
+  the seed (rolls, weights, set_count ranges, enchanted books from the
+  `#on_random_loot` tag in order). Each of 40 chests in original 26.3 worlds
+  has the saved loot seed, and once the server fills it, exactly the predicted
+  first-pool items, counts, enchantments and levels.
 
 Sources, hashes, differences and reproduction commands are in [data](data/README.md).
 The host-owned bridge lives in `crates/lumilio-cubiomes/src/bridge.c`.

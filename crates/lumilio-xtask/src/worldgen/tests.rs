@@ -49,12 +49,18 @@ fn original_1_21_4_export_reconstructs_every_upstream_node() {
 }
 
 #[test]
-fn checked_in_decoration_table_is_reproducible() {
+fn checked_in_generated_tables_are_reproducible() {
     let root = root();
-    assert_eq!(
-        decorations::render(&root).unwrap(),
-        std::fs::read_to_string(root.join("forks/cubiomes/tables/decorations.h")).unwrap()
-    );
+    for (table, rendered) in [
+        ("decorations.h", decorations::render(&root).unwrap()),
+        ("loot.h", loot::render(&root).unwrap()),
+    ] {
+        assert_eq!(
+            rendered,
+            std::fs::read_to_string(root.join("forks/cubiomes/tables").join(table)).unwrap(),
+            "{table}"
+        );
+    }
 }
 
 #[test]

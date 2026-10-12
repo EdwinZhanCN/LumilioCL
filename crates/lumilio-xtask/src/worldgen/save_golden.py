@@ -200,10 +200,64 @@ def collect(version, seed):
                     process.wait()
 
 
-def attempt(version, seed):
+def chests(version, seed):
+    """Reopen a completed world and fill its desert pyramid chests from their
+    loot seeds (reading a slot does), recording what each one holds."""
+    source = ROOT / "target/worldgen" / version
+    saved = source / "saves" / str(seed)
+    golden = ROOT / "crates/lumilio-cubiomes/tests/golden" / f"{version}-pyramid-chests.txt"
+    rows = [line.split() for line in golden.read_text().splitlines() if line.split()[0] == str(seed)]
+    positions = [(int(r[3]), int(r[4]), int(r[5])) for r in rows]
+    # Filling a chest drops its loot seed: work on a copy, keep the original.
+    work = source / "saves" / f"{seed}-chests"
+    if work.exists():
+        shutil.rmtree(work)
+    shutil.copytree(saved, work)
+    log = work / "chests.log"
+    java = os.environ.get("WORLDGEN_JAVA", "java")
+    with log.open("w") as output:
+        process = subprocess.Popen([java, "-Xms256m", "-Xmx3G", "-jar", str(source / "server.jar"), "nogui"],
+                                   cwd=work, stdin=subprocess.PIPE, stdout=output, stderr=output, text=True)
+        def command(text):
+            process.stdin.write(text + "\n")
+            process.stdin.flush()
+        try:
+            deadline = time.monotonic() + 300
+            while "Done (" not in log.read_text(errors="replace"):
+                if time.monotonic() > deadline or process.poll() is not None:
+                    raise RuntimeError(f"server did not start: {log}")
+                time.sleep(0.25)
+            found = []
+            for x, y, z in positions:
+                command(f"forceload add {x} {z}")
+                before = len(log.read_text(errors="replace"))
+                command(f"item replace block {x} {y} {z} container.0 from block {x} {y} {z} container.0")
+                command(f"data get block {x} {y} {z} Items")
+                pattern = re.compile(rf"{x}, {y}, {z} has the following block data: (.*)$", re.MULTILINE)
+                deadline = time.monotonic() + 120
+                while not (match := pattern.search(log.read_text(errors="replace")[before:])):
+                    if time.monotonic() > deadline:
+                        raise TimeoutError(f"chest timeout: {version} {seed} {x} {y} {z}")
+                    time.sleep(0.25)
+                found.append({"x": x, "y": y, "z": z, "items": match[1]})
+            (saved / "chests.json").write_text(json.dumps(found))
+            command("stop")
+            process.wait(timeout=600)
+            print(f"{version} {seed}: filled {len(found)} pyramid chests", flush=True)
+        finally:
+            if process.poll() is None:
+                process.terminate()
+                try:
+                    process.wait(timeout=15)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait()
+
+
+def attempt(work, version, seed):
     """One world; a failure is reported and the other worlds still run."""
     try:
-        collect(version, seed)
+        work(version, seed)
         return None
     except Exception as error:
         print(f"{version} {seed}: FAILED: {error}", flush=True)
@@ -211,8 +265,13 @@ def attempt(version, seed):
 
 
 if __name__ == "__main__":
-    jobs = [(version, seed) for version in sys.argv[1:] for seed in SEEDS]
+    # `--chests VERSION...` fills the recorded pyramid chests of completed
+    # worlds (after `worldgen-save-read`); otherwise generate the worlds.
+    fill = sys.argv[1:2] == ["--chests"]
+    versions = sys.argv[2:] if fill else sys.argv[1:]
+    jobs = [(version, seed) for version in versions for seed in SEEDS]
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
-        failed = [f for f in pool.map(lambda job: attempt(*job), jobs) if f]
+        work = chests if fill else collect
+        failed = [f for f in pool.map(lambda job: attempt(work, *job), jobs) if f]
     if failed:
         sys.exit("failed worlds: " + ", ".join(failed))

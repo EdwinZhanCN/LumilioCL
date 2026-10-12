@@ -180,6 +180,8 @@ pub enum MapIcon {
     /// A ravine's start, on land or under an ocean.
     Ravine,
     UnderwaterRavine,
+    /// Loot: a chest holding an enchanted golden apple.
+    EnchantedGoldenApple,
     Spawn,
     SlimeChunk,
     Waypoint,

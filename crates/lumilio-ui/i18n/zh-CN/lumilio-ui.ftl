@@ -1570,6 +1570,7 @@ map-group-features = 地物
 map-feature-fossil = 化石
 map-feature-fossil-diamond = 深层化石（钻石矿石）
 map-feature-lava-lake = 熔岩湖
+map-feature-enchanted-golden-apple = 附魔金苹果（沙漠神殿）
 map-group-underground = 地下
 map-underground-copper-vein = 铜矿脉（Y 0–50）
 map-underground-iron-vein = 铁矿脉（Y −60 – −8）

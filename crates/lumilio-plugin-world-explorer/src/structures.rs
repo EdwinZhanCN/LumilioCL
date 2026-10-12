@@ -21,18 +21,20 @@ enum Kind {
     /// Not a region grid: a world's 128, computed once.
     Strongholds,
     Decoration(Decoration),
+    /// Desert pyramids whose chests hold an enchanted golden apple.
+    PyramidApples,
 }
 
 /// One switchable layer. Structures are named `structure.<name>` with the
-/// catalog label `map-structure-<name>`, decorations `feature.<name>` and
-/// `map-feature-<name>`.
+/// catalog label `map-structure-<name>`, features (decorations and chest
+/// loot) `feature.<name>` and `map-feature-<name>`.
 struct Layer {
     name: &'static str,
     kind: Kind,
     icon: MapIcon,
 }
 
-const LAYERS: [Layer; 28] = [
+const LAYERS: [Layer; 29] = [
     structure("village", Structure::Village, MapIcon::Village),
     structure(
         "desert-pyramid",
@@ -97,6 +99,11 @@ const LAYERS: [Layer; 28] = [
         MapIcon::DiamondFossil,
     ),
     decoration("lava-lake", Decoration::LavaLake, MapIcon::LavaLake),
+    Layer {
+        name: "enchanted-golden-apple",
+        kind: Kind::PyramidApples,
+        icon: MapIcon::EnchantedGoldenApple,
+    },
 ];
 
 const fn structure(name: &'static str, kind: Structure, icon: MapIcon) -> Layer {
@@ -117,7 +124,7 @@ const fn decoration(name: &'static str, kind: Decoration, icon: MapIcon) -> Laye
 
 impl Layer {
     fn decoration(&self) -> bool {
-        matches!(self.kind, Kind::Decoration(_))
+        matches!(self.kind, Kind::Decoration(_) | Kind::PyramidApples)
     }
     fn id(&self) -> String {
         let prefix = if self.decoration() {
@@ -156,6 +163,8 @@ impl Layer {
             // Each passes a terrain check (heights, empty corners) the fork
             // does not evaluate.
             Kind::Decoration(_) => true,
+            // The loot is exact; whether the pyramid stands is estimated.
+            Kind::PyramidApples => Structure::DesertPyramid.estimated(version),
         }
     }
     /// The layer's icon in a dimension: Nether ruined portals have their own.
@@ -210,6 +219,10 @@ fn offered(layer: &Layer, version: Version, dimension: Cube) -> bool {
         Kind::Structure(kind) => kind.available(version, dimension),
         Kind::Strongholds => dimension == Cube::Overworld,
         Kind::Decoration(kind) => kind.available(version, dimension),
+        Kind::PyramidApples => {
+            Structure::DesertPyramid.available(version, dimension)
+                && lumilio_cubiomes::desert_pyramid_loot_available(version)
+        }
     }
 }
 
@@ -352,6 +365,27 @@ pub(crate) fn objects(
                 .into_iter()
                 .filter(|placed| !placed.after)
                 .map(|placed| [placed.at[0], placed.at[2]])
+                .collect()
+        }),
+        // Pyramids in the area whose chests hold an apple, marked at the
+        // middle of their four chests.
+        Kind::PyramidApples => lumilio_cubiomes::structures(
+            version,
+            seed,
+            dimension,
+            Structure::DesertPyramid,
+            [x0, z0, x1, z1],
+            cancelled,
+        )
+        .map(|pyramids| {
+            pyramids
+                .into_iter()
+                .filter(|at| {
+                    lumilio_cubiomes::desert_pyramid_chests(version, seed, *at)
+                        .iter()
+                        .any(|chest| chest.enchanted_golden_apples > 0)
+                })
+                .map(|[x, z]| [x + 10, z + 10])
                 .collect()
         }),
     }

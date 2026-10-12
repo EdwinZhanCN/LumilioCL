@@ -17,6 +17,7 @@ fn main() {
         "finders",
         "generator",
         "layers",
+        "loot",
         "noise",
         "util",
         "veins",

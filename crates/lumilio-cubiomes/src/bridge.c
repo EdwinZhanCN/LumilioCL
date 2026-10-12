@@ -4,9 +4,11 @@
 #include "decorations.h"
 #include "finders.h"
 #include "generator.h"
+#include "loot.h"
 #include "util.h"
 #include "veins.h"
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -329,6 +331,56 @@ int lumilio_cubiomes_vein_zones(int mc, uint64_t seed, int vein, int x0, int z0,
     }
     free(corner);
     return 0;
+}
+
+/* A pyramid chest's first-pool items for the tests, one line each:
+ * "id count", or "minecraft:enchanted_book enchantment level" for a book.
+ * Returns the bytes written (excluding the terminator), -1 if too small. */
+int lumilio_cubiomes_pyramid_items(int mc, uint64_t lootSeed, char *out, size_t cap)
+{
+    const PyramidLoot *loot = getPyramidLoot(mc);
+    LootDraw draw[16];
+    int n = getPyramidLootDraws(loot, lootSeed, draw, 16);
+    size_t used = 0;
+    if (cap) out[0] = 0;
+    for (int i = 0; i < n; i++)
+    {
+        const LootEntry *e = &loot->entries[draw[i].entry];
+        int w;
+        if (!e->item)
+            continue;
+        if (e->kind == LE_ENCHANT && draw[i].enchantment >= 0)
+            w = snprintf(out + used, cap - used, "minecraft:enchanted_book %s %d\n",
+                e->enchantments[draw[i].enchantment], draw[i].level);
+        else
+            w = snprintf(out + used, cap - used, "%s %d\n", e->item, draw[i].count);
+        if (w < 0 || (size_t)w >= cap - used) return -1;
+        used += (size_t)w;
+    }
+    return (int)used;
+}
+
+int lumilio_cubiomes_pyramid_loot_available(int mc)
+{
+    return getPyramidLoot(mc) != NULL;
+}
+
+/* A desert pyramid starting at block (x, z): each chest's x, z, loot seed and
+ * enchanted golden apples. Returns the chest count, 0 without release data. */
+int lumilio_cubiomes_pyramid_chests(int mc, uint64_t seed, int x, int z,
+    int *xz, uint64_t *seeds, int *apples)
+{
+    StructureChest chest[4];
+    const PyramidLoot *loot = getPyramidLoot(mc);
+    int n = getDesertPyramidChests(chest, mc, seed, x >> 4, z >> 4);
+    for (int i = 0; i < n; i++)
+    {
+        xz[2 * i] = chest[i].x;
+        xz[2 * i + 1] = chest[i].z;
+        seeds[i] = chest[i].lootSeed;
+        apples[i] = getPyramidEnchantedApples(loot, chest[i].lootSeed);
+    }
+    return n;
 }
 
 /* Mth.sin (0) or Mth.cos (1) of a release, for the oracle tests. */

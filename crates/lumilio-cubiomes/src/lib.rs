@@ -2,6 +2,7 @@
 mod decorations;
 mod ffi;
 mod finders;
+mod loot;
 mod ravines;
 mod veins;
 pub use decorations::{Decoration, MAX_DECORATION_AREA, Placed, decorations};
@@ -9,6 +10,7 @@ pub use finders::{
     Bastion, MAX_AREA, Position, Spawn, Structure, Variant, slime_chunks, spawn, strongholds,
     structures,
 };
+pub use loot::{Chest, desert_pyramid_chests, desert_pyramid_loot_available};
 pub use ravines::{MAX_RAVINE_AREA, Ravine, ravines, ravines_available};
 pub use veins::{MAX_VEIN_CELLS, Vein, vein_zones};
 

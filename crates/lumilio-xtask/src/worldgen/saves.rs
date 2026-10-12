@@ -149,6 +149,69 @@ fn start_variant(chunk: &Tag, structure: &str) -> Result<(i32, i32)> {
     Ok((kind, variant))
 }
 
+/// A chest's items from `/data get` output (SNBT): each stack's id and count,
+/// and an enchanted book's stored enchantment and level (1.21–1.21.4 nest
+/// them under `levels`).
+fn chest_items(text: &str) -> Vec<(String, i64, Option<(String, i64)>)> {
+    let mut stacks = vec![];
+    let (mut depth, mut start) = (0, None);
+    for (i, c) in text.char_indices() {
+        match c {
+            '{' => {
+                if depth == 0 {
+                    start = Some(i);
+                }
+                depth += 1;
+            }
+            '}' => {
+                depth -= 1;
+                if depth == 0
+                    && let Some(s) = start.take()
+                {
+                    stacks.push(&text[s..=i]);
+                }
+            }
+            _ => {}
+        }
+    }
+    let quoted = |stack: &str, key: &str| -> Option<String> {
+        let rest = &stack[stack.find(key)? + key.len()..];
+        let rest = &rest[rest.find('"')? + 1..];
+        Some(rest[..rest.find('"')?].to_owned())
+    };
+    let number = |stack: &str, key: &str| -> Option<i64> {
+        let rest = &stack[stack.rfind(key)? + key.len()..];
+        let digits: String = rest
+            .trim_start()
+            .chars()
+            .take_while(char::is_ascii_digit)
+            .collect();
+        digits.parse().ok()
+    };
+    stacks
+        .into_iter()
+        .filter_map(|stack| {
+            let id = quoted(stack, " id:")?;
+            let count = number(stack, "count:")?;
+            let enchantment = stack.find("stored_enchantments").and_then(|at| {
+                let rest = &stack[at..];
+                let rest = rest.strip_prefix("stored_enchantments\": {")?;
+                let rest = rest.strip_prefix("levels: {").unwrap_or(rest);
+                let name = rest.strip_prefix('"')?;
+                let end = name.find('"')?;
+                // `"id": level`: the digits right after the quoted id.
+                let digits: String = name[end + 1..]
+                    .trim_start_matches([':', ' '])
+                    .chars()
+                    .take_while(char::is_ascii_digit)
+                    .collect();
+                Some((name[..end].to_owned(), digits.parse().ok()?))
+            });
+            Some((id, count, enchantment))
+        })
+        .collect()
+}
+
 /// Blocks the area goldens record, by what generates them alone.
 #[derive(Default)]
 struct AreaFinds {
@@ -279,6 +342,9 @@ pub(super) fn read(root: &Path, version: &str) -> Result {
     let mut located = String::new();
     let mut variants = String::new();
     let mut fossils = String::new();
+    let mut chests = String::new();
+    let mut loot = String::new();
+    let mut stacks = String::new();
     let mut finds = AreaFinds::default();
     for seed in [262_i64, 9_876_543_210, -123_456_789_012_345] {
         let save = work.join("saves").join(seed.to_string());
@@ -345,11 +411,67 @@ pub(super) fn read(root: &Path, version: &str) -> Result {
             writeln!(located, "{seed} {dim} {kind} {} {}", row["x"], row["z"]).unwrap();
         }
         read_areas(&save, seed, &mut finds)?;
+        // Filled by `save_golden.py --chests` on a copy of the world.
+        let filled = save.join("chests.json");
+        if filled.exists() {
+            for chest in json(&filled)?.as_array().ok_or("invalid chest list")? {
+                let items = chest["items"].as_str().ok_or("chest without items")?;
+                let apples = items.matches("minecraft:enchanted_golden_apple").count();
+                let at = format!("{} {} {}", chest["x"], chest["y"], chest["z"]);
+                writeln!(loot, "{seed} {at} {apples}").unwrap();
+                // Totals per item (chests split stacks across slots), and
+                // each enchanted book on its own row.
+                let mut totals = std::collections::BTreeMap::new();
+                for (id, count, enchantment) in chest_items(items) {
+                    match enchantment {
+                        Some((name, level)) => {
+                            writeln!(stacks, "{seed} {at} {id}:{name} {level}").unwrap();
+                        }
+                        None => *totals.entry(id).or_insert(0) += count,
+                    }
+                }
+                for (id, count) in totals {
+                    writeln!(stacks, "{seed} {at} {id} {count}").unwrap();
+                }
+            }
+        }
         for row in json(&save.join("starts.json"))?
             .as_array()
             .ok_or("invalid structure start list")?
         {
             let structure = row["structure"].as_str().ok_or("invalid structure name")?;
+            if structure == "minecraft:desert_pyramid" {
+                let number = |key: &str| {
+                    row[key]
+                        .as_i64()
+                        .and_then(|v| i32::try_from(v).ok())
+                        .ok_or("invalid structure start position")
+                };
+                let (cx, cz) = (number("x")?.div_euclid(16), number("z")?.div_euclid(16));
+                // Its four chests sit 8 to 12 blocks into the start chunk.
+                let root = chunk(&save, 0, cx, cz)?;
+                if let Some(Tag::List(entities)) = root.get("block_entities") {
+                    for entity in entities {
+                        let table = entity.get("LootTable").and_then(Tag::as_str);
+                        if table != Some("minecraft:chests/desert_pyramid") {
+                            continue;
+                        }
+                        let at = ["x", "y", "z"]
+                            .map(|key| entity.get(key).and_then(Tag::as_i64).unwrap_or(0));
+                        let loot = entity
+                            .get("LootTableSeed")
+                            .and_then(Tag::as_i64)
+                            .ok_or("pyramid chest without a loot seed")?;
+                        writeln!(
+                            chests,
+                            "{seed} {cx} {cz} {} {} {} {loot}",
+                            at[0], at[1], at[2]
+                        )
+                        .unwrap();
+                    }
+                }
+                continue;
+            }
             if structure == "minecraft:nether_fossil" {
                 let number = |key: &str| {
                     row[key]
@@ -412,6 +534,18 @@ pub(super) fn read(root: &Path, version: &str) -> Result {
     std::fs::write(out.join(format!("{version}-saved.txt")), output).map_err(|e| e.to_string())?;
     std::fs::write(out.join(format!("{version}-variants.txt")), variants)
         .map_err(|e| e.to_string())?;
+    // Rows `seed chunk_x chunk_z x y z loot_seed`: unopened desert pyramid chests.
+    std::fs::write(out.join(format!("{version}-pyramid-chests.txt")), chests)
+        .map_err(|e| e.to_string())?;
+    // Rows `seed x y z apples`: enchanted golden apples in the filled chests.
+    // Rows `seed x y z id total`, `seed x y z minecraft:enchanted_book:<id> level`:
+    // everything those chests hold.
+    if !loot.is_empty() {
+        std::fs::write(out.join(format!("{version}-pyramid-loot.txt")), loot)
+            .map_err(|e| e.to_string())?;
+        std::fs::write(out.join(format!("{version}-pyramid-items.txt")), stacks)
+            .map_err(|e| e.to_string())?;
+    }
     // Rows `seed x z y`: the saved nether fossil piece's template position.
     std::fs::write(out.join(format!("{version}-nether-fossils.txt")), fossils)
         .map_err(|e| e.to_string())?;

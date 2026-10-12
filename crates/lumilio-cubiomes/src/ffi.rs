@@ -71,6 +71,23 @@ unsafe extern "C" {
     fn lumilio_cubiomes_decoration_available(mc: i32, dim: i32, kind: i32) -> i32;
     #[cfg(test)]
     fn lumilio_cubiomes_trig(mc: i32, cos: i32, value: f32) -> f32;
+    fn lumilio_cubiomes_pyramid_loot_available(mc: i32) -> i32;
+    #[cfg(test)]
+    fn lumilio_cubiomes_pyramid_items(
+        mc: i32,
+        seed: u64,
+        out: *mut std::ffi::c_char,
+        cap: usize,
+    ) -> i32;
+    fn lumilio_cubiomes_pyramid_chests(
+        mc: i32,
+        seed: u64,
+        x: i32,
+        z: i32,
+        xz: *mut i32,
+        seeds: *mut u64,
+        apples: *mut i32,
+    ) -> i32;
     #[cfg(test)]
     fn lumilio_cubiomes_ravine_check(
         mc: i32,
@@ -359,6 +376,53 @@ pub(super) fn strongholds(
         2 => Err(super::Error::Cancelled),
         _ => Err(super::Error::Generation),
     }
+}
+
+/// The first-pool items of a pyramid chest with `loot_seed`, one line each.
+#[cfg(test)]
+pub(super) fn pyramid_items(version: super::Version, loot_seed: i64) -> String {
+    let mut out = vec![0_u8; 4096];
+    // SAFETY: the bridge writes at most `out.len()` bytes, terminator included.
+    let n = unsafe {
+        lumilio_cubiomes_pyramid_items(
+            version.mc,
+            loot_seed as u64,
+            out.as_mut_ptr().cast(),
+            out.len(),
+        )
+    };
+    out.truncate(n.max(0) as usize);
+    String::from_utf8(out).unwrap_or_default()
+}
+
+pub(super) fn pyramid_loot_available(mc: i32) -> bool {
+    // SAFETY: a plain integer in and out.
+    unsafe { lumilio_cubiomes_pyramid_loot_available(mc) != 0 }
+}
+
+/// A desert pyramid's chests in creation order: ([x, z], loot seed,
+/// enchanted golden apples).
+pub(super) fn pyramid_chests(
+    version: super::Version,
+    seed: i64,
+    at: [i32; 2],
+) -> Vec<([i32; 2], i64, i32)> {
+    let (mut xz, mut seeds, mut apples) = ([0; 8], [0_u64; 4], [0; 4]);
+    // SAFETY: room for the four chests the bridge writes at most.
+    let n = unsafe {
+        lumilio_cubiomes_pyramid_chests(
+            version.mc,
+            seed as u64,
+            at[0],
+            at[1],
+            xz.as_mut_ptr(),
+            seeds.as_mut_ptr(),
+            apples.as_mut_ptr(),
+        )
+    };
+    (0..n.max(0) as usize)
+        .map(|i| ([xz[2 * i], xz[2 * i + 1]], seeds[i] as i64, apples[i]))
+        .collect()
 }
 
 /// The release's `Mth.sin` (or `Mth.cos`) of a float.
