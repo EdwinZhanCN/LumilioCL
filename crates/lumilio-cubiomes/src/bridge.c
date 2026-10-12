@@ -1,5 +1,6 @@
 /* Uses cubiomes generator.h (MIT, Copyright (c) 2020 Cubitect).
  * The bridge is LumilioCL code; upstream structs stay on the C side. */
+#include "decorations.h"
 #include "finders.h"
 #include "generator.h"
 #include "util.h"
@@ -65,7 +66,7 @@ static const int KINDS[] = {
     Desert_Pyramid, Jungle_Pyramid, Swamp_Hut, Igloo, Village, Ocean_Ruin,
     Shipwreck, Monument, Mansion, Outpost, Ruined_Portal, Ancient_City,
     Trail_Ruins, Trial_Chambers, Fortress, Bastion, End_City, Abandoned_Camp,
-    Treasure, Mineshaft, Desert_Well, Geode, End_Gateway,
+    Treasure, Mineshaft, Desert_Well, Geode, End_Gateway, Nether_Fossil,
 };
 #define KIND_COUNT ((int)(sizeof(KINDS) / sizeof(KINDS[0])))
 
@@ -111,6 +112,25 @@ int lumilio_cubiomes_placement(int mc, uint64_t seed, int kind, int rx, int rz, 
     return 0;
 }
 
+/* The raw candidate sequence of one decoration in a chunk, as x,y,z triples:
+ * every candidate kept, as if each failed its biome check. Returns the count,
+ * or -1 when the release table lacks the decoration. */
+int lumilio_cubiomes_decoration_raw(int mc, int dim, int type, uint64_t seed,
+    int cx, int cz, int *out, int cap)
+{
+    const DecoEntry *e = getDecorationEntry(mc, dim, type);
+    DecoPos pos[256];
+    if (!e || cap > 256) return -1;
+    int n = getDecorations(e, NULL, seed, cx, cz, pos, cap);
+    for (int i = 0; i < n; i++)
+    {
+        out[i * 3] = pos[i].x;
+        out[i * 3 + 1] = pos[i].y;
+        out[i * 3 + 2] = pos[i].z;
+    }
+    return n;
+}
+
 int lumilio_cubiomes_biome_rule(int mc, int rule, int biome)
 {
     if (rule == -1) return isStrongholdBiome(mc, biome);
@@ -154,6 +174,82 @@ int lumilio_cubiomes_structures(int mc, uint64_t seed, int dim, int kind,
             out[*count * 2] = p.x;
             out[*count * 2 + 1] = p.z;
             (*count)++;
+        }
+    }
+    return 0;
+}
+
+/* What tells one placed structure from another of its kind, where its start
+ * alone decides it (no terrain): the bastion's start piece 0..3 (housing
+ * units, hoglin stable, treasure, bridge), 1 for an igloo with a basement,
+ * 1 for an End City with a ship. -1 for kinds without such a variant. */
+int lumilio_cubiomes_variant(int mc, uint64_t seed, int kind, int x, int z)
+{
+    if (kind < 0 || kind >= KIND_COUNT || mc < MC_1_0 || mc > MC_NEWEST) return -1;
+    int type = KINDS[kind];
+    StructureVariant sv;
+    switch (type)
+    {
+    case Bastion:
+        if (mc < MC_1_16_1 || !getVariant(&sv, Bastion, mc, seed, x, z, -1)) return -1;
+        return sv.start;
+    case Igloo:
+        if (mc < MC_1_9 || !getVariant(&sv, Igloo, mc, seed, x, z, -1)) return -1;
+        return sv.basement;
+    case End_City:
+    {
+        if (mc < MC_1_9) return -1;
+        Piece *pieces = malloc(sizeof(Piece) * END_CITY_PIECES_MAX);
+        if (!pieces) return -1;
+        int n = getEndCityPieces(pieces, seed, x >> 4, z >> 4);
+        int ship = 0;
+        for (int i = 0; i < n; i++)
+            if (pieces[i].type == END_SHIP) ship = 1;
+        free(pieces);
+        return ship;
+    }
+    default:
+        return -1;
+    }
+}
+
+int lumilio_cubiomes_decoration_available(int mc, int dim, int type)
+{
+    return getDecorationEntry(mc, dim, type) != NULL;
+}
+
+/* Biome-filtered candidates of one decoration whose column lies inside
+ * [x0, x1) x [z0, z1), as x,y,z,flags quads (flags: DecoPos flags).
+ * Returns 0 ok, 1 error, 2 cancelled, 3 more candidates than `cap`. */
+int lumilio_cubiomes_decorations(int mc, uint64_t seed, int dim, int type,
+    int x0, int z0, int x1, int z1, int *out, size_t cap, size_t *count,
+    int (*cancelled)(void *), void *user)
+{
+    *count = 0;
+    const DecoEntry *e = getDecorationEntry(mc, dim, type);
+    if (!e) return 1;
+    Generator g;
+    setupGenerator(&g, mc, 0);
+    applySeed(&g, dim, seed);
+    int cx0 = floor_div(x0, 16), cx1 = floor_div(x1 - 1, 16);
+    int cz0 = floor_div(z0, 16), cz1 = floor_div(z1 - 1, 16);
+    DecoPos found[256];
+    for (int cz = cz0; cz <= cz1; cz++)
+    {
+        if (cancelled && cancelled(user)) return 2;
+        for (int cx = cx0; cx <= cx1; cx++)
+        {
+            int n = getDecorations(e, &g, seed, cx, cz, found, 256);
+            if (n < 0) return 1;
+            for (int i = 0; i < n; i++)
+            {
+                DecoPos p = found[i];
+                if (p.x < x0 || p.x >= x1 || p.z < z0 || p.z >= z1) continue;
+                if (*count >= cap) return 3;
+                int *o = out + *count * 4;
+                o[0] = p.x; o[1] = p.y; o[2] = p.z; o[3] = p.flags;
+                (*count)++;
+            }
         }
     }
     return 0;

@@ -65,6 +65,140 @@ public class Probe {
         }
         return out;
     }
+    static Object construct(Class<?> cls, Object... args) throws Exception {
+        for (Constructor<?> c : cls.getDeclaredConstructors()) {
+            if (c.getParameterCount() != args.length) continue;
+            Class<?>[] types = c.getParameterTypes();
+            boolean matches = true;
+            for (int i = 0; i < args.length; i++) {
+                if (types[i] == long.class) matches &= args[i] instanceof Long;
+                else if (types[i] == int.class) matches &= args[i] instanceof Integer;
+                else if (types[i].isPrimitive()) matches = false;
+                else matches &= types[i].isInstance(args[i]);
+            }
+            if (!matches) continue;
+            c.setAccessible(true);
+            return c.newInstance(args);
+        }
+        throw new NoSuchMethodException(cls.getName() + " constructor");
+    }
+    /* A world that only answers its height bounds: placement modifiers that
+     * draw random numbers read nothing else. */
+    static Object level(int minY, int height) throws Exception {
+        Class<?> cls = type("world.level.WorldGenLevel");
+        return Proxy.newProxyInstance(cls.getClassLoader(), new Class<?>[]{cls}, (proxy, method, args) -> {
+            switch (method.getName()) {
+                case "getMinY": case "getMinBuildHeight": return minY;
+                case "getHeight": return height;
+                case "getMaxY": return minY + height - 1;
+                case "getMaxBuildHeight": return minY + height;
+                case "getMinSectionY": case "getMinSection": return minY >> 4;
+                default:
+                    if (method.isDefault()) return InvocationHandler.invokeDefault(proxy, method, args);
+                    throw new UnsupportedOperationException(method.getName());
+            }
+        });
+    }
+    /* Filters that read the world and draw no random numbers pass through:
+     * the sequence is the game's when every candidate fails its biome check. */
+    static final List<String> PASSED = List.of("BiomeFilter", "HeightmapPlacement", "EnvironmentScanPlacement",
+        "SurfaceRelativeThresholdFilter", "BlockPredicateFilter");
+    static final List<String> TRACKED = List.of("minecraft:fossil_upper", "minecraft:fossil_lower",
+        "minecraft:lake_lava_surface", "minecraft:lake_lava_underground", "minecraft:monster_room",
+        "minecraft:monster_room_deep", "minecraft:rooted_sulfur_spring", "minecraft:amethyst_geode",
+        "minecraft:desert_well", "minecraft:end_island_decorated", "minecraft:end_gateway_return");
+    static List<?> modify(Object modifier, Object context, Object random, Object pos) throws Exception {
+        if (PASSED.contains(modifier.getClass().getSimpleName())) return List.of(pos);
+        List<Object> out = new ArrayList<>();
+        try { call(modifier, "modify", context, random, pos, (java.util.function.Consumer<Object>)out::add); }
+        catch (NoSuchMethodException older) {
+            out.addAll(((java.util.stream.Stream<?>)call(modifier, "getPositions", context, random, pos)).toList());
+        }
+        return out;
+    }
+    static void candidates(JsonArray out, String dimension, Object source, Object settingHolder,
+            List<?> steps, Map<Object, String> names) throws Exception {
+        Object generator = construct(type("world.level.levelgen.NoiseBasedChunkGenerator"), source, settingHolder);
+        int minY = dimension.equals("overworld") ? -64 : 0;
+        int height = dimension.equals("overworld") ? 384 : 256;
+        Object context = construct(type("world.level.levelgen.placement.PlacementContext"), level(minY, height), generator, Optional.empty());
+        for (int step = 0; step < steps.size(); step++) {
+            List<?> list = (List<?>)call(steps.get(step), "features");
+            for (int index = 0; index < list.size(); index++) {
+                String name = names.get(list.get(index));
+                if (!TRACKED.contains(name)) continue;
+                List<?> modifiers = (List<?>)call(list.get(index), "placement");
+                // Counted features yield many candidates per chunk: fewer chunks.
+                boolean counted = modifiers.get(0).getClass().getSimpleName().equals("CountPlacement");
+                int edge = counted ? 4 : 16;
+                for (long seed : new long[]{262L, 9876543210L, -123456789012345L}) {
+                    for (int cz = -edge / 2; cz < edge / 2; cz++) {
+                        for (int cx = -edge / 2; cx < edge / 2; cx++) {
+                            Object random = construct(type("world.level.levelgen.WorldgenRandom"),
+                                construct(type("world.level.levelgen.XoroshiroRandomSource"), 0L));
+                            long decoration = (Long)call(random, "setDecorationSeed", seed, cx << 4, cz << 4);
+                            call(random, "setFeatureSeed", decoration, index, step);
+                            JsonArray found = new JsonArray();
+                            // Depth first, like the game's feature placer.
+                            Deque<Object[]> stack = new ArrayDeque<>();
+                            stack.push(new Object[]{construct(type("core.BlockPos"), cx << 4, minY, cz << 4), 0});
+                            while (!stack.isEmpty()) {
+                                Object[] top = stack.pop();
+                                int at = (Integer)top[1];
+                                List<?> made = modify(modifiers.get(at), context, random, top[0]);
+                                if (at + 1 < modifiers.size()) {
+                                    for (int i = made.size() - 1; i >= 0; i--) stack.push(new Object[]{made.get(i), at + 1});
+                                } else {
+                                    for (Object pos : made) {
+                                        JsonArray xyz = new JsonArray();
+                                        for (String axis : List.of("getX", "getY", "getZ")) xyz.add((Integer)call(pos, axis));
+                                        found.add(xyz);
+                                    }
+                                }
+                            }
+                            if (found.isEmpty()) continue;
+                            JsonObject row = new JsonObject();
+                            row.addProperty("feature", name);
+                            row.addProperty("seed", seed);
+                            row.addProperty("cx", cx);
+                            row.addProperty("cz", cz);
+                            row.add("positions", found);
+                            out.add(row);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    /* The ore vein noises of a world, sampled as their density functions read
+     * them (input scaled by the function's xz/y scale). */
+    static void oreNoises(JsonArray out, Object setting, Object noises) throws Exception {
+        String[] names = {"ORE_VEININESS", "ORE_VEIN_A", "ORE_VEIN_B", "ORE_GAP"};
+        double[] scales = {1.5, 4.0, 4.0, 1.0};
+        for (long seed : new long[]{262L, 9876543210L, -123456789012345L}) {
+            Object state;
+            try { state = call(type("world.level.levelgen.RandomState"), "create", setting, noises, seed); }
+            catch (NoSuchMethodException e) { state = call(type("world.level.levelgen.RandomState"), "create", noises, seed, setting); }
+            for (int n = 0; n < names.length; n++) {
+                Object noise = call(state, "getOrCreateNoise", field(type("world.level.levelgen.Noises"), names[n]));
+                for (int i = 0; i < 64; i++) {
+                    int x = (i * 1543 % 2003) - 1000, y = (i * 37 % 121) - 64, z = (i * 7919 % 1999) - 1000;
+                    double s = scales[n];
+                    Object value;
+                    try { value = call(noise, "getValue", x * s, y * s, z * s); }
+                    catch (NoSuchMethodException e) { value = call(noise, "get", x * s, y * s, z * s); }
+                    JsonObject row = new JsonObject();
+                    row.addProperty("seed", seed);
+                    row.addProperty("noise", n);
+                    row.addProperty("x", x);
+                    row.addProperty("y", y);
+                    row.addProperty("z", z);
+                    row.addProperty("value", ((Number)value).doubleValue());
+                    out.add(row);
+                }
+            }
+        }
+    }
     public static void main(String[] args) throws Exception {
         call(type("SharedConstants"), "tryDetectVersion");
         call(type("server.Bootstrap"), "bootStrap");
@@ -79,7 +213,15 @@ public class Probe {
         Object settings = call(registries, "lookupOrThrow", field(type("core.registries.Registries"), "NOISE_SETTINGS"));
         JsonObject output = new JsonObject();
         JsonObject trees = new JsonObject();
+        JsonObject features = new JsonObject();
+        JsonArray decorations = new JsonArray();
+        JsonArray veins = new JsonArray();
         JsonArray samples = new JsonArray();
+        Map<Object, String> placedNames = new IdentityHashMap<>();
+        Object placed = call(registries, "lookupOrThrow", field(type("core.registries.Registries"), "PLACED_FEATURE"));
+        for (Object holder : ((java.util.stream.Stream<?>)call(placed, "listElements")).toList()) {
+            placedNames.put(call(holder, "value"), biome(holder));
+        }
         for (String dimension : List.of("overworld", "nether", "end")) {
             Object source;
             if (dimension.equals("end")) source = call(type("world.level.biome.TheEndBiomeSource"), "create", biomes);
@@ -90,8 +232,26 @@ public class Probe {
                 Object parameters = call(call(holder, "value"), "parameters");
                 trees.add(dimension, tree(field(field(parameters, "index"), "root")));
             }
+            // The decoration order a chunk generator over this source uses:
+            // a feature's seed index is its position within its step.
+            List<Object> possible = new ArrayList<>((Collection<?>)call(source, "possibleBiomes"));
+            java.util.function.Function<Object, Object> generation = holder -> {
+                try { return call(call(call(holder, "value"), "getGenerationSettings"), "features"); }
+                catch (Exception e) { throw new RuntimeException(e); }
+            };
+            JsonArray steps = new JsonArray();
+            List<?> stepData = (List<?>)call(type("world.level.biome.FeatureSorter"), "buildFeaturesPerStep", possible, generation, true);
+            for (Object step : stepData) {
+                JsonArray names = new JsonArray();
+                for (Object feature : (List<?>)call(step, "features")) names.add(placedNames.get(feature));
+                steps.add(names);
+            }
+            features.add(dimension, steps);
             Object settingKey = field(type("world.level.levelgen.NoiseGeneratorSettings"), dimension.toUpperCase());
-            Object setting = call(call(settings, "getOrThrow", settingKey), "value");
+            Object settingHolder = call(settings, "getOrThrow", settingKey);
+            Object setting = call(settingHolder, "value");
+            candidates(decorations, dimension, source, settingHolder, stepData, placedNames);
+            if (dimension.equals("overworld")) oreNoises(veins, setting, noises);
             for (long seed : new long[]{262L, 9876543210L, -123456789012345L}) {
                 Object random;
                 Object sampler;
@@ -133,15 +293,24 @@ public class Probe {
             }
         }
         output.add("trees", trees);
+        output.add("features", features);
+        output.add("decorations", decorations);
+        output.add("veins", veins);
         output.add("samples", samples);
         JsonArray placements = new JsonArray();
         Object sets = call(registries, "lookupOrThrow", field(type("core.registries.Registries"), "STRUCTURE_SET"));
-        String[] setNames = {"DESERT_PYRAMIDS", "JUNGLE_TEMPLES", "SWAMP_HUTS", "IGLOOS", "VILLAGES", "OCEAN_RUINS", "SHIPWRECKS", "OCEAN_MONUMENTS", "WOODLAND_MANSIONS", "PILLAGER_OUTPOSTS", "RUINED_PORTALS", "ANCIENT_CITIES", "TRAIL_RUINS", "TRIAL_CHAMBERS", "NETHER_COMPLEXES", "NETHER_COMPLEXES", "END_CITIES", "ABANDONED_CAMP"};
+        String[] setNames = {"DESERT_PYRAMIDS", "JUNGLE_TEMPLES", "SWAMP_HUTS", "IGLOOS", "VILLAGES", "OCEAN_RUINS", "SHIPWRECKS", "OCEAN_MONUMENTS", "WOODLAND_MANSIONS", "PILLAGER_OUTPOSTS", "RUINED_PORTALS", "ANCIENT_CITIES", "TRAIL_RUINS", "TRIAL_CHAMBERS", "NETHER_COMPLEXES", "NETHER_COMPLEXES", "END_CITIES", "ABANDONED_CAMP",
+            // Rust kinds 18–22 are one-chunk decorators without a set here.
+            "", "", "", "", "", "NETHER_FOSSILS"};
         for (int kind = 0; kind < setNames.length; kind++) {
             Object key;
             try { key = field(type("world.level.levelgen.structure.BuiltinStructureSets"), setNames[kind]); }
             catch (NoSuchFieldException absent) { continue; }
-            Object placement = call(call(call(sets, "getOrThrow", key), "value"), "placement");
+            // A set behind an experimental feature flag (1.20.5–1.20.6 trial
+            // chambers) has a key but no vanilla registry entry.
+            Optional<?> set = (Optional<?>)call(sets, "get", key);
+            if (set.isEmpty()) continue;
+            Object placement = call(call(set.get(), "value"), "placement");
             int spacing = (Integer)call(placement, "spacing");
             for (long seed : new long[]{262L, 9876543210L, -123456789012345L}) {
                 for (int rx = -2; rx <= 2; rx++) {

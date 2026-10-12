@@ -14,6 +14,17 @@ unsafe extern "C" {
     ) -> i32;
     #[cfg(test)]
     fn lumilio_cubiomes_biome_rule(mc: i32, rule: i32, biome: i32) -> i32;
+    #[cfg(test)]
+    fn lumilio_cubiomes_decoration_raw(
+        mc: i32,
+        dim: i32,
+        kind: i32,
+        seed: u64,
+        cx: i32,
+        cz: i32,
+        out: *mut i32,
+        cap: i32,
+    ) -> i32;
     fn lumilio_cubiomes_probe() -> i32;
     fn lumilio_cubiomes_generate(
         mc: i32,
@@ -50,6 +61,23 @@ unsafe extern "C" {
     fn lumilio_cubiomes_strongholds(
         mc: i32,
         seed: u64,
+        out: *mut i32,
+        cap: usize,
+        count: *mut usize,
+        cancelled: Option<unsafe extern "C" fn(*mut std::ffi::c_void) -> i32>,
+        user: *mut std::ffi::c_void,
+    ) -> i32;
+    fn lumilio_cubiomes_variant(mc: i32, seed: u64, kind: i32, x: i32, z: i32) -> i32;
+    fn lumilio_cubiomes_decoration_available(mc: i32, dim: i32, kind: i32) -> i32;
+    fn lumilio_cubiomes_decorations(
+        mc: i32,
+        seed: u64,
+        dim: i32,
+        kind: i32,
+        x0: i32,
+        z0: i32,
+        x1: i32,
+        z1: i32,
         out: *mut i32,
         cap: usize,
         count: *mut usize,
@@ -111,6 +139,35 @@ pub(super) fn placement(
 pub(super) fn biome_rule(version: super::Version, rule: i32, biome: i32) -> bool {
     // SAFETY: bridge validates the rule before indexing, no pointers cross FFI.
     unsafe { lumilio_cubiomes_biome_rule(version.mc, rule, biome) != 0 }
+}
+
+/// The raw candidate sequence of decoration `kind` (the fork's
+/// `DecorationType`) in a chunk, or `None` when the release lacks it.
+#[cfg(test)]
+pub(super) fn decoration_raw(
+    version: super::Version,
+    dimension: super::Dimension,
+    kind: i32,
+    seed: i64,
+    chunk: [i32; 2],
+) -> Option<Vec<[i32; 3]>> {
+    let mut out = [0; 256 * 3];
+    // SAFETY: `out` holds the 256 triples the cap allows; the bridge rejects
+    // larger caps and writes at most `cap` triples.
+    let n = unsafe {
+        lumilio_cubiomes_decoration_raw(
+            version.mc,
+            dimension as i32,
+            kind,
+            seed as u64,
+            chunk[0],
+            chunk[1],
+            out.as_mut_ptr(),
+            256,
+        )
+    };
+    let n = usize::try_from(n).ok()?;
+    Some(out[..n * 3].as_chunks::<3>().0.to_vec())
 }
 
 /// Trampoline for the bridge's cancellation hook.
@@ -253,6 +310,59 @@ pub(super) fn strongholds(
         2 => Err(super::Error::Cancelled),
         _ => Err(super::Error::Generation),
     }
+}
+
+pub(super) fn decoration_available(mc: i32, dim: i32, kind: i32) -> bool {
+    // SAFETY: plain integers in, a plain integer out.
+    unsafe { lumilio_cubiomes_decoration_available(mc, dim, kind) != 0 }
+}
+
+/// Biome-filtered candidates of decoration `kind` in `[x0, x1) x [z0, z1)`,
+/// as (x, y, z, flags). `cap` bounds the number of candidates.
+pub(super) fn decorations(
+    version: super::Version,
+    seed: i64,
+    dimension: super::Dimension,
+    kind: i32,
+    area: [i32; 4],
+    cap: usize,
+    cancelled: &mut dyn FnMut() -> bool,
+) -> Result<Vec<[i32; 4]>, super::Error> {
+    let mut out = vec![0; cap * 4];
+    let mut count = 0;
+    let mut hook: &mut dyn FnMut() -> bool = cancelled;
+    // SAFETY: `out` has room for `cap` quads, which the bridge never exceeds
+    // (it stops with code 3); `count` and `hook` outlive the synchronous call.
+    let result = unsafe {
+        lumilio_cubiomes_decorations(
+            version.mc,
+            seed as u64,
+            dimension as i32,
+            kind,
+            area[0],
+            area[1],
+            area[2],
+            area[3],
+            out.as_mut_ptr(),
+            cap,
+            &mut count,
+            Some(poll),
+            (&raw mut hook).cast(),
+        )
+    };
+    match result {
+        0 => Ok(out[..count * 4].as_chunks::<4>().0.to_vec()),
+        2 => Err(super::Error::Cancelled),
+        3 => Err(super::Error::InvalidRange),
+        _ => Err(super::Error::Generation),
+    }
+}
+
+/// The kind's start variant at a structure position, or -1 for none.
+pub(super) fn variant(mc: i32, seed: i64, kind: i32, at: [i32; 2]) -> i32 {
+    // SAFETY: plain integers in, a plain integer out; the bridge bounds `kind`
+    // and owns the End City piece buffer it allocates.
+    unsafe { lumilio_cubiomes_variant(mc, seed as u64, kind, at[0], at[1]) }
 }
 
 pub(super) fn spawn(version: super::Version, seed: i64) -> [i32; 2] {

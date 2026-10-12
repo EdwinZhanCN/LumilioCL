@@ -1,8 +1,11 @@
 //! Safe boundary around the pinned cubiomes source snapshot.
+mod decorations;
 mod ffi;
 mod finders;
+pub use decorations::{Decoration, MAX_DECORATION_AREA, Placed, decorations};
 pub use finders::{
-    MAX_AREA, Position, Spawn, Structure, slime_chunks, spawn, strongholds, structures,
+    Bastion, MAX_AREA, Position, Spawn, Structure, Variant, slime_chunks, spawn, strongholds,
+    structures,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

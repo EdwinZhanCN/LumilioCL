@@ -1,5 +1,6 @@
 //! Reproducible development tools for the maintained world generator.
 mod btree;
+mod decorations;
 mod prepare;
 mod saves;
 #[cfg(test)]
@@ -15,6 +16,10 @@ use std::process::Command;
 
 pub(crate) fn btree(input: &str, output: &str, name: &str) -> Result {
     btree::run(Path::new(input), Path::new(output), name)
+}
+
+pub(crate) fn decorations(root: &Path) -> Result {
+    decorations::generate(root)
 }
 
 pub(crate) fn prepare(root: &Path, version: &str) -> Result {
@@ -71,6 +76,11 @@ pub(crate) fn import(root: &Path, version: &str) -> Result {
     )
     .map_err(|e| e.to_string())?;
     gzip.finish().map_err(|e| e.to_string())?;
+    let inputs = prepare::json(&work.join("data.json"))?;
+    prepare::write_json(
+        &data.join("decorations.json"),
+        &decorations::extract(&probe["features"], &inputs)?,
+    )?;
     let mut golden = String::new();
     for sample in probe["samples"]
         .as_array()
@@ -113,7 +123,42 @@ pub(crate) fn import(root: &Path, version: &str) -> Result {
     }
     std::fs::write(out.join(format!("{version}-structures.txt")), placements)
         .map_err(|e| e.to_string())?;
-    let inputs = prepare::json(&work.join("data.json"))?;
+    let mut candidates = String::new();
+    for row in probe["decorations"]
+        .as_array()
+        .ok_or("missing decoration candidates")?
+    {
+        let name = row["feature"].as_str().ok_or("candidate without feature")?;
+        let kind = decorations::TRACKED
+            .iter()
+            .position(|(tracked, ..)| Some(*tracked) == name.strip_prefix("minecraft:"))
+            .ok_or_else(|| format!("untracked candidate feature {name}"))?;
+        for xyz in row["positions"].as_array().ok_or("candidate positions")? {
+            writeln!(
+                candidates,
+                "{} {kind} {} {} {} {} {}",
+                row["seed"], row["cx"], row["cz"], xyz[0], xyz[1], xyz[2]
+            )
+            .unwrap();
+        }
+    }
+    std::fs::write(out.join(format!("{version}-decorations.txt")), candidates)
+        .map_err(|e| e.to_string())?;
+    // Rows `seed noise x y z value`: noise 0 ore_veininess, 1 ore_vein_a,
+    // 2 ore_vein_b, 3 ore_gap, at the block position its density function reads.
+    let mut veins = String::new();
+    for row in probe["veins"]
+        .as_array()
+        .ok_or("missing ore vein samples")?
+    {
+        writeln!(
+            veins,
+            "{} {} {} {} {} {}",
+            row["seed"], row["noise"], row["x"], row["y"], row["z"], row["value"]
+        )
+        .unwrap();
+    }
+    std::fs::write(out.join(format!("{version}-veins.txt")), veins).map_err(|e| e.to_string())?;
     let mut rules = String::new();
     for (rule, tag) in [
         (-1, "stronghold_biased_to"),

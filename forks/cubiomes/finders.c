@@ -87,6 +87,7 @@ int getStructureConfig(int structureType, int mc, StructureConfig *sconf)
     s_trial_chambers        = { 94251327, 34, 22, Trial_Chambers,   0,0},
     // Mojang 26.3 structure_set/abandoned_camp.json, see data/26.3/SOURCE.md.
     s_abandoned_camp        = { 91231127, 37, 29, Abandoned_Camp,   0,0},
+    s_nether_fossil         = { 14357921,  2,  1, Nether_Fossil,    DIM_NETHER,0},
     s_treasure              = { 10387320,  1,  1, Treasure,         0,0},
     s_mineshaft             = {        0,  1,  1, Mineshaft,        0,0},
     s_desert_well_115       = {    30010,  1,  1, Desert_Well,      0, 1.f/1000},
@@ -198,6 +199,10 @@ int getStructureConfig(int structureType, int mc, StructureConfig *sconf)
     case Abandoned_Camp:
         *sconf = s_abandoned_camp;
         return mc >= MC_26_3;
+    case Nether_Fossil:
+        // Earlier releases choose the fossil's column differently.
+        *sconf = s_nether_fossil;
+        return mc >= MC_1_18;
     default:
         memset(sconf, 0, sizeof(StructureConfig));
         return 0;
@@ -248,6 +253,14 @@ int getStructurePos(int structureType, int mc, uint64_t seed, int regX, int regZ
     case Monument:
     case Mansion:
         *pos = getLargeStructurePos(sconf, seed, regX, regZ);
+        return 1;
+
+    case Nether_Fossil:
+        // The start chunk's structure random picks the column within it.
+        *pos = getFeaturePos(sconf, seed, regX, regZ);
+        seed = chunkGenerateRnd(seed, pos->x >> 4, pos->z >> 4);
+        pos->x += nextInt(&seed, 16);
+        pos->z += nextInt(&seed, 16);
         return 1;
 
     case End_City:
@@ -834,9 +847,9 @@ int isStrongholdBiome(int mc, int id)
     case dappled_forest:
         return 0;
     case cherry_grove:
-        // Added to stronghold_biased_to in 1.21.9. Preserve the baseline
-        // behaviour of earlier imported releases; new releases use the tag.
-        return mc < MC_1_21_5 || mc >= MC_1_21_9;
+        // Absent from stronghold_biased_to from its 1.20 introduction until
+        // 1.21.9 (original-server tags of 1.20.6–1.21.8).
+        return mc >= MC_1_21_9;
     default:
         return 1;
     }
@@ -1319,6 +1332,9 @@ int isViableFeatureBiome(int mc, int structureType, int biomeID)
         return (biomeID == nether_wastes || biomeID == soul_sand_valley ||
                 biomeID == warped_forest || biomeID == crimson_forest);
 
+    case Nether_Fossil:
+        return mc >= MC_1_18 && biomeID == soul_sand_valley;
+
     case End_City:
         if (mc <= MC_1_8) return 0;
         return biomeID == end_midlands || biomeID == end_highlands;
@@ -1479,6 +1495,11 @@ int isViableStructurePos(int structureType, Generator *g, int x, int z, uint32_t
             return 0;
         if (structureType == Ruined_Portal_N)
             return 1;
+        if (structureType == Nether_Fossil)
+        {   // checked at the fossil's own column; nether biomes ignore y
+            id = getBiomeAt(g, 4, x >> 2, 0, z >> 2);
+            return isViableFeatureBiome(g->mc, Nether_Fossil, id);
+        }
         if (structureType == Fortress)
         {   // in 1.18+ fortresses generate everywhere, where bastions don't
             StructureConfig sc;

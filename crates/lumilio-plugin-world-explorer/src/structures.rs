@@ -1,7 +1,7 @@
-//! Structure layers from cubiomes' finders, one overlay per kind so each has
-//! its own switch. Positions are exact for the seed; viability is cubiomes'
-//! biome check (an estimate for the height-bound kinds since 1.18).
-use lumilio_cubiomes::{Dimension as Cube, Structure, Version};
+//! Structure and decoration layers from the cubiomes fork, one overlay per
+//! kind so each has its own switch. Positions are exact for the seed;
+//! viability is the fork's biome check, an estimate where terrain decides.
+use lumilio_cubiomes::{Bastion, Decoration, Dimension as Cube, Structure, Variant, Version};
 use lumilio_plugin_api::map::{
     Dimension, MapBounds, MapIcon, MapObject, MapObjectKind, MapPoint, OverlayInfo, OverlayRequest,
     WorldContext,
@@ -10,94 +10,177 @@ use lumilio_plugin_api::{HostContext, PluginError};
 use std::sync::Mutex;
 
 pub(crate) const GROUP: &str = "map-group-structures";
+/// Features the decoration random places in a chunk: fossils, lava lakes.
+pub(crate) const FEATURE_GROUP: &str = "map-group-features";
 const SOURCE: &str = crate::ID;
 
-/// One switchable layer, named `structure.<name>` with the catalog label
-/// `map-structure-<name>`. A `None` kind is the strongholds, which are not a
-/// region grid.
+/// What a layer shows.
+#[derive(Clone, Copy)]
+enum Kind {
+    Structure(Structure),
+    /// Not a region grid: a world's 128, computed once.
+    Strongholds,
+    Decoration(Decoration),
+}
+
+/// One switchable layer. Structures are named `structure.<name>` with the
+/// catalog label `map-structure-<name>`, decorations `feature.<name>` and
+/// `map-feature-<name>`.
 struct Layer {
     name: &'static str,
-    kind: Option<Structure>,
+    kind: Kind,
     icon: MapIcon,
 }
 
-const LAYERS: [Layer; 24] = [
-    layer("village", Some(Structure::Village), MapIcon::Village),
-    layer(
+const LAYERS: [Layer; 28] = [
+    structure("village", Structure::Village, MapIcon::Village),
+    structure(
         "desert-pyramid",
-        Some(Structure::DesertPyramid),
+        Structure::DesertPyramid,
         MapIcon::DesertPyramid,
     ),
-    layer(
+    structure(
         "jungle-temple",
-        Some(Structure::JungleTemple),
+        Structure::JungleTemple,
         MapIcon::JungleTemple,
     ),
-    layer("swamp-hut", Some(Structure::SwampHut), MapIcon::SwampHut),
-    layer("igloo", Some(Structure::Igloo), MapIcon::Igloo),
-    layer("outpost", Some(Structure::Outpost), MapIcon::Outpost),
-    layer("monument", Some(Structure::Monument), MapIcon::Monument),
-    layer("mansion", Some(Structure::Mansion), MapIcon::Mansion),
-    layer("ocean-ruin", Some(Structure::OceanRuin), MapIcon::OceanRuin),
-    layer("shipwreck", Some(Structure::Shipwreck), MapIcon::Shipwreck),
-    layer(
+    structure("swamp-hut", Structure::SwampHut, MapIcon::SwampHut),
+    structure("igloo", Structure::Igloo, MapIcon::Igloo),
+    structure("outpost", Structure::Outpost, MapIcon::Outpost),
+    structure("monument", Structure::Monument, MapIcon::Monument),
+    structure("mansion", Structure::Mansion, MapIcon::Mansion),
+    structure("ocean-ruin", Structure::OceanRuin, MapIcon::OceanRuin),
+    structure("shipwreck", Structure::Shipwreck, MapIcon::Shipwreck),
+    structure(
         "ruined-portal",
-        Some(Structure::RuinedPortal),
+        Structure::RuinedPortal,
         MapIcon::RuinedPortal,
     ),
-    layer(
-        "ancient-city",
-        Some(Structure::AncientCity),
-        MapIcon::AncientCity,
-    ),
-    layer(
-        "trail-ruins",
-        Some(Structure::TrailRuins),
-        MapIcon::TrailRuins,
-    ),
-    layer(
+    structure("ancient-city", Structure::AncientCity, MapIcon::AncientCity),
+    structure("trail-ruins", Structure::TrailRuins, MapIcon::TrailRuins),
+    structure(
         "trial-chambers",
-        Some(Structure::TrialChambers),
+        Structure::TrialChambers,
         MapIcon::TrialChambers,
     ),
-    layer("stronghold", None, MapIcon::Stronghold),
-    layer("fortress", Some(Structure::Fortress), MapIcon::Fortress),
-    layer("bastion", Some(Structure::Bastion), MapIcon::Bastion),
-    layer("end-city", Some(Structure::EndCity), MapIcon::EndCity),
-    layer(
+    Layer {
+        name: "stronghold",
+        kind: Kind::Strongholds,
+        icon: MapIcon::Stronghold,
+    },
+    structure("fortress", Structure::Fortress, MapIcon::Fortress),
+    structure("bastion", Structure::Bastion, MapIcon::Bastion),
+    structure(
+        "nether-fossil",
+        Structure::NetherFossil,
+        MapIcon::NetherFossil,
+    ),
+    structure("end-city", Structure::EndCity, MapIcon::EndCity),
+    structure(
         "abandoned-camp",
-        Some(Structure::AbandonedCamp),
+        Structure::AbandonedCamp,
         MapIcon::AbandonedCamp,
     ),
-    layer(
+    structure(
         "buried-treasure",
-        Some(Structure::Treasure),
+        Structure::Treasure,
         MapIcon::BuriedTreasure,
     ),
-    layer("mineshaft", Some(Structure::Mineshaft), MapIcon::Mineshaft),
-    layer(
-        "desert-well",
-        Some(Structure::DesertWell),
-        MapIcon::DesertWell,
+    structure("mineshaft", Structure::Mineshaft, MapIcon::Mineshaft),
+    structure("desert-well", Structure::DesertWell, MapIcon::DesertWell),
+    structure("geode", Structure::Geode, MapIcon::Geode),
+    structure("end-gateway", Structure::EndGateway, MapIcon::EndGateway),
+    decoration("fossil", Decoration::Fossil, MapIcon::Fossil),
+    decoration(
+        "fossil-diamond",
+        Decoration::DiamondFossil,
+        MapIcon::DiamondFossil,
     ),
-    layer("geode", Some(Structure::Geode), MapIcon::Geode),
-    layer(
-        "end-gateway",
-        Some(Structure::EndGateway),
-        MapIcon::EndGateway,
-    ),
+    decoration("lava-lake", Decoration::LavaLake, MapIcon::LavaLake),
 ];
 
-const fn layer(name: &'static str, kind: Option<Structure>, icon: MapIcon) -> Layer {
-    Layer { name, kind, icon }
+const fn structure(name: &'static str, kind: Structure, icon: MapIcon) -> Layer {
+    Layer {
+        name,
+        kind: Kind::Structure(kind),
+        icon,
+    }
+}
+
+const fn decoration(name: &'static str, kind: Decoration, icon: MapIcon) -> Layer {
+    Layer {
+        name,
+        kind: Kind::Decoration(kind),
+        icon,
+    }
 }
 
 impl Layer {
+    fn decoration(&self) -> bool {
+        matches!(self.kind, Kind::Decoration(_))
+    }
     fn id(&self) -> String {
-        format!("structure.{}", self.name)
+        let prefix = if self.decoration() {
+            "feature"
+        } else {
+            "structure"
+        };
+        format!("{prefix}.{}", self.name)
     }
     fn label_id(&self) -> String {
-        format!("map-structure-{}", self.name)
+        let prefix = if self.decoration() {
+            "map-feature"
+        } else {
+            "map-structure"
+        };
+        format!("{prefix}-{}", self.name)
+    }
+    fn group(&self) -> &'static str {
+        if self.decoration() {
+            FEATURE_GROUP
+        } else {
+            GROUP
+        }
+    }
+    fn structure(&self) -> Option<Structure> {
+        match self.kind {
+            Kind::Structure(kind) => Some(kind),
+            _ => None,
+        }
+    }
+    /// Whether this version's positions are estimates, not certainties.
+    fn estimated(&self, version: Version) -> bool {
+        match self.kind {
+            Kind::Structure(kind) => kind.estimated(version),
+            Kind::Strongholds => false,
+            // Each passes a terrain check (heights, empty corners) the fork
+            // does not evaluate.
+            Kind::Decoration(_) => true,
+        }
+    }
+    /// The layer's icon in a dimension: Nether ruined portals have their own.
+    fn icon_in(&self, dimension: Cube) -> MapIcon {
+        match (self.icon, dimension) {
+            (MapIcon::RuinedPortal, Cube::Nether) => MapIcon::RuinedPortalNether,
+            (icon, _) => icon,
+        }
+    }
+    /// The icon and catalog label of one found structure: its start variant's
+    /// where the kind has one, else the layer's own.
+    fn appearance(&self, variant: Option<Variant>, dimension: Cube) -> (MapIcon, String) {
+        let (icon, suffix) = match variant {
+            Some(Variant::Bastion(start)) => match start {
+                Bastion::Housing => (MapIcon::BastionHousing, "-housing"),
+                Bastion::HoglinStable => (MapIcon::BastionHoglinStable, "-hoglin-stable"),
+                Bastion::Treasure => (MapIcon::BastionTreasure, "-treasure"),
+                Bastion::Bridge => (MapIcon::BastionBridge, "-bridge"),
+            },
+            Some(Variant::Igloo { basement: true }) => (MapIcon::IglooBasement, "-basement"),
+            Some(Variant::Igloo { basement: false }) => (MapIcon::IglooNoBasement, ""),
+            Some(Variant::EndCity { ship: true }) => (self.icon, "-ship"),
+            Some(Variant::EndCity { ship: false }) | None => (self.icon_in(dimension), ""),
+        };
+        (icon, format!("{}{suffix}", self.label_id()))
     }
 }
 
@@ -124,8 +207,9 @@ fn cube(dimension: &Dimension) -> Option<Cube> {
 
 fn offered(layer: &Layer, version: Version, dimension: Cube) -> bool {
     match layer.kind {
-        Some(kind) => kind.available(version, dimension),
-        None => dimension == Cube::Overworld,
+        Kind::Structure(kind) => kind.available(version, dimension),
+        Kind::Strongholds => dimension == Cube::Overworld,
+        Kind::Decoration(kind) => kind.available(version, dimension),
     }
 }
 
@@ -137,7 +221,7 @@ pub(crate) fn catalog() -> Vec<OverlayInfo> {
             kind_id: layer.label_id(),
             dimensions: vec![Dimension::Overworld, Dimension::Nether, Dimension::End],
             icon: Some(layer.icon),
-            group_id: Some(GROUP.into()),
+            group_id: Some(layer.group().into()),
             approximate: false,
             max_scale: None,
             creatable: vec![],
@@ -162,9 +246,9 @@ pub(crate) fn catalog_for(context: &WorldContext) -> Vec<OverlayInfo> {
             id: layer.id(),
             kind_id: layer.label_id(),
             dimensions: vec![context.dimension.clone()],
-            icon: Some(layer.icon),
-            group_id: Some(GROUP.into()),
-            approximate: layer.kind.is_some_and(|kind| kind.estimated(version)),
+            icon: Some(layer.icon_in(dimension)),
+            group_id: Some(layer.group().into()),
+            approximate: layer.estimated(version),
             max_scale: None,
             creatable: vec![],
         })
@@ -240,7 +324,7 @@ pub(crate) fn objects(
     let [x0, z0, x1, z1] = area(&request.bounds)?;
     let cancelled = || ctx.cancelled();
     let found = match layer.kind {
-        Some(kind) => lumilio_cubiomes::structures(
+        Kind::Structure(kind) => lumilio_cubiomes::structures(
             version,
             seed,
             dimension,
@@ -248,9 +332,26 @@ pub(crate) fn objects(
             [x0, z0, x1, z1],
             cancelled,
         ),
-        None => strongholds(version, seed, cancelled).map(|all| {
+        Kind::Strongholds => strongholds(version, seed, cancelled).map(|all| {
             all.into_iter()
                 .filter(|[x, z]| (x0..x1).contains(x) && (z0..z1).contains(z))
+                .collect()
+        }),
+        // A candidate after a placement in its chunk is not known; the modelled
+        // layers have one candidate per chunk, so none is dropped in practice.
+        Kind::Decoration(kind) => lumilio_cubiomes::decorations(
+            version,
+            seed,
+            dimension,
+            kind,
+            [x0, z0, x1, z1],
+            cancelled,
+        )
+        .map(|found| {
+            found
+                .into_iter()
+                .filter(|placed| !placed.after)
+                .map(|placed| [placed.at[0], placed.at[2]])
                 .collect()
         }),
     }
@@ -261,30 +362,52 @@ pub(crate) fn objects(
         }
         _ => PluginError::InvalidInput("structure search failed".into()),
     })?;
-    let approximate = layer.kind.is_some_and(|kind| kind.estimated(version));
+    let approximate = layer.estimated(version);
     Ok(found
         .into_iter()
-        .map(|[x, z]| MapObject {
-            id: format!("{}:{x}:{z}", request.overlay),
-            raw_id: format!("{x},{z}"),
-            source: SOURCE.into(),
-            world: context.world.clone(),
-            dimension: context.dimension.clone(),
-            kind: MapObjectKind::Icon {
-                icon: layer.icon,
-                at: MapPoint {
-                    x: f64::from(x),
-                    z: f64::from(z),
-                },
-            },
-            label: None,
-            label_id: Some(layer.label_id()),
-            priority: if layer.kind.is_none() { 10 } else { 0 },
-            approximate,
-            color: None,
-            note: None,
-            share: None,
-            editable: vec![],
+        .map(|[x, z]| {
+            let variant = layer
+                .structure()
+                .and_then(|kind| kind.variant(version, seed, [x, z]));
+            let (icon, label_id) = layer.appearance(variant, dimension);
+            object(request, layer, [x, z], icon, label_id, approximate)
         })
         .collect())
+}
+
+fn object(
+    request: &OverlayRequest,
+    layer: &Layer,
+    [x, z]: [i32; 2],
+    icon: MapIcon,
+    label_id: String,
+    approximate: bool,
+) -> MapObject {
+    let context = &request.context;
+    MapObject {
+        id: format!("{}:{x}:{z}", request.overlay),
+        raw_id: format!("{x},{z}"),
+        source: SOURCE.into(),
+        world: context.world.clone(),
+        dimension: context.dimension.clone(),
+        kind: MapObjectKind::Icon {
+            icon,
+            at: MapPoint {
+                x: f64::from(x),
+                z: f64::from(z),
+            },
+        },
+        label: None,
+        label_id: Some(label_id),
+        priority: if matches!(layer.kind, Kind::Strongholds) {
+            10
+        } else {
+            0
+        },
+        approximate,
+        color: None,
+        note: None,
+        share: None,
+        editable: vec![],
+    }
 }

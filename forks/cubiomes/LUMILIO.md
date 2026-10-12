@@ -25,6 +25,27 @@ Omitted: `quadbase.*` (seed search and threads), `tests.c`, docs and build files
   for seed -123456789012345. Native spawn coordinates remain unchanged; the
   adapter now marks spawn estimates in every release, including 1.18+.
 
+- 2026-10-12 (plan `seed-map-prediction`): `isStrongholdBiome` excludes
+  cherry grove before 1.21.9. The original 1.20.6–1.21.8 servers leave it out
+  of `stronghold_biased_to`; the baseline counted it, which could bias
+  1.20–1.21.4 strongholds toward the wrong biome. Guard: biome-tag goldens of
+  1.19.4, 1.20.6, 1.21.1, 1.21.3 and 1.21.4 in
+  `crates/lumilio-cubiomes/src/tests/releases.rs`.
+- `Nether_Fossil` structure type (1.18+): the `nether_fossils` set (salt
+  14357921, spacing 2, separation 1); `getStructurePos` returns the fossil's
+  column, which the start chunk's structure random picks; the biome check is
+  soul sand valley at that column. Its height and whether it finds ground
+  depend on the Nether's terrain, so the adapter marks it estimated.
+- `decorations.c` / `decorations.h` and the generated `tables/decorations.h`
+  are LumilioCL additions under this directory's MIT license. They run a
+  placed feature's placement modifiers as the 26.3 `FeaturePlacer` does
+  (depth first), from per-release data that `cargo xtask cubiomes-decorations`
+  builds out of `data/<release>/decorations.json`: decoration step and index
+  from the original `FeatureSorter`, modifiers, and the biomes listing the
+  feature. Original-server sequences of every tracked feature match exactly.
+  Decoration salts are identical from 1.19.4 to 26.3, confirming the
+  baseline's geode, desert well and End gateway salts for the new releases.
+
 Sources, hashes, differences and reproduction commands are in [data](data/README.md).
 The host-owned bridge lives in `crates/lumilio-cubiomes/src/bridge.c`.
 The upstream baseline and MIT attribution are retained.

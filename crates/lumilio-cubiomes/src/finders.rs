@@ -3,8 +3,8 @@ use crate::{Dimension, Error, Version, ffi};
 
 /// Structures placed on a region grid, in the order the C bridge indexes them.
 /// The decorators (buried treasure, mineshafts, wells, geodes and End gateways)
-/// have a one-chunk region rather than a coarse one; the End's islands are left
-/// out because the map has no icon for them.
+/// have a one-chunk region rather than a coarse one, nether fossils a
+/// two-chunk one.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(i32)]
 pub enum Structure {
@@ -37,10 +37,13 @@ pub enum Structure {
     Geode,
     /// One attempt per chunk in the End.
     EndGateway,
+    /// A start every two chunks, in soul sand valleys; 1.18+. Its column is
+    /// exact, whether it finds ground (and its height) depends on terrain.
+    NetherFossil,
 }
 
 impl Structure {
-    pub const ALL: [Structure; 23] = [
+    pub const ALL: [Structure; 24] = [
         Structure::DesertPyramid,
         Structure::JungleTemple,
         Structure::SwampHut,
@@ -64,6 +67,7 @@ impl Structure {
         Structure::DesertWell,
         Structure::Geode,
         Structure::EndGateway,
+        Structure::NetherFossil,
     ];
 
     /// Whether this version generates the kind in the dimension, and cubiomes
@@ -83,12 +87,50 @@ impl Structure {
     /// Region candidates are exact; generation and template offsets depend
     /// on terrain height, which cubiomes does not compute.
     pub fn estimated(self, version: Version) -> bool {
-        self == Structure::AbandonedCamp
+        matches!(self, Structure::AbandonedCamp | Structure::NetherFossil)
             || matches!(
                 self,
                 Structure::DesertPyramid | Structure::JungleTemple | Structure::Mansion
             ) && version.at_least("1.18.2")
     }
+
+    /// The start variant of the structure at `at`, a position this kind's
+    /// query returned. Exact: the structure's own chunk random decides it.
+    pub fn variant(self, version: Version, seed: i64, at: Position) -> Option<Variant> {
+        let code = ffi::variant(version.mc, seed, self as i32, at);
+        match (self, code) {
+            (Structure::Bastion, 0) => Some(Variant::Bastion(Bastion::Housing)),
+            (Structure::Bastion, 1) => Some(Variant::Bastion(Bastion::HoglinStable)),
+            (Structure::Bastion, 2) => Some(Variant::Bastion(Bastion::Treasure)),
+            (Structure::Bastion, 3) => Some(Variant::Bastion(Bastion::Bridge)),
+            (Structure::Igloo, 0 | 1) => Some(Variant::Igloo {
+                basement: code == 1,
+            }),
+            (Structure::EndCity, 0 | 1) => Some(Variant::EndCity { ship: code == 1 }),
+            _ => None,
+        }
+    }
+}
+
+/// How one placed structure differs from others of its kind.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Variant {
+    Bastion(Bastion),
+    Igloo { basement: bool },
+    EndCity { ship: bool },
+}
+
+/// A bastion remnant's start piece, in the start pool's order.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Bastion {
+    /// `bastion/units/air_base`.
+    Housing,
+    /// `bastion/hoglin_stable/air_base`.
+    HoglinStable,
+    /// `bastion/treasure/big_air_full`.
+    Treasure,
+    /// `bastion/bridge/starting_pieces/entrance_base`.
+    Bridge,
 }
 
 /// A block position, X then Z.

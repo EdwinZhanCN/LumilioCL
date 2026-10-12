@@ -224,8 +224,144 @@ fn structure_layers_follow_the_worlds_version_and_dimension() {
             )
             .is_empty()
     );
-    // 24 structure layers, spawn, slime chunks, save positions and Xaero waypoints.
-    assert_eq!(WorldExplorer.overlays().len(), 28);
+    // 25 structure layers, 3 decoration layers, spawn, slime chunks, save
+    // positions and Xaero waypoints.
+    assert_eq!(WorldExplorer.overlays().len(), 32);
+}
+
+#[test]
+fn decoration_and_nether_fossil_layers_need_their_tables() {
+    let offered = |dimension: Dimension, version: &str| -> Vec<(String, bool, Option<String>)> {
+        WorldExplorer
+            .overlays_for(&overlay_request("", dimension, version, [0., 0., 1., 1.]).context)
+            .into_iter()
+            .map(|layer| (layer.id, layer.approximate, layer.group_id))
+            .collect()
+    };
+    let features = |list: &[(String, bool, Option<String>)]| -> Vec<String> {
+        list.iter()
+            .filter(|(id, ..)| id.starts_with("feature."))
+            .map(|(id, ..)| id.clone())
+            .collect()
+    };
+    let new = offered(Dimension::Overworld, "26.3");
+    assert_eq!(
+        features(&new),
+        [
+            "feature.fossil",
+            "feature.fossil-diamond",
+            "feature.lava-lake"
+        ]
+    );
+    // Terrain decides each of them: estimated, in their own group.
+    assert!(
+        new.iter()
+            .filter(|(id, ..)| id.starts_with("feature."))
+            .all(|(_, estimated, group)| *estimated
+                && group.as_deref() == Some("map-group-features"))
+    );
+    // No original-server table before 1.19.4: nothing is offered.
+    assert!(features(&offered(Dimension::Overworld, "1.18.2")).is_empty());
+    assert!(features(&offered(Dimension::Overworld, "1.16.5")).is_empty());
+    let has_fossils = |version: &str| {
+        offered(Dimension::Nether, version)
+            .iter()
+            .any(|(id, estimated, _)| id == "structure.nether-fossil" && *estimated)
+    };
+    assert!(has_fossils("26.3") && has_fossils("1.18.2"));
+    assert!(!has_fossils("1.16.5"));
+}
+
+#[test]
+fn structure_objects_show_their_start_variant() {
+    use lumilio_plugin_api::map::{MapIcon, MapObjectKind};
+    let context = Context { cancelled: false };
+    let found = |overlay: &str, dimension: Dimension, area: [f64; 4]| {
+        WorldExplorer
+            .objects(&context, &overlay_request(overlay, dimension, "26.3", area))
+            .unwrap()
+            .into_iter()
+            .map(|object| match object.kind {
+                MapObjectKind::Icon { icon, at } => (
+                    [at.x as i32, at.z as i32],
+                    icon,
+                    object.label_id.unwrap_or_default(),
+                ),
+                other => panic!("structures are icons, got {other:?}"),
+            })
+            .collect::<Vec<_>>()
+    };
+    let at = |list: &[([i32; 2], MapIcon, String)], spot: [i32; 2]| {
+        list.iter()
+            .find(|(found, ..)| *found == spot)
+            .map(|(_, icon, label)| (*icon, label.clone()))
+            .unwrap_or_else(|| panic!("no structure at {spot:?} in {list:?}"))
+    };
+    // Starts saved by the original 26.3 server for seed 262
+    // (crates/lumilio-cubiomes/tests/golden/26.3-variants.txt).
+    let bastions = found(
+        "structure.bastion",
+        Dimension::Nether,
+        [-2048., -2048., 2048., 2048.],
+    );
+    for (spot, icon, label) in [
+        ([144, 1456], MapIcon::BastionHousing, "housing"),
+        ([-1520, 32], MapIcon::BastionHoglinStable, "hoglin-stable"),
+        ([256, 48], MapIcon::BastionTreasure, "treasure"),
+        ([112, -1648], MapIcon::BastionBridge, "bridge"),
+    ] {
+        assert_eq!(
+            at(&bastions, spot),
+            (icon, format!("map-structure-bastion-{label}"))
+        );
+    }
+    let igloos = found(
+        "structure.igloo",
+        Dimension::Overworld,
+        [-2048., -1024., 3072., 1536.],
+    );
+    assert_eq!(
+        at(&igloos, [-384, 800]),
+        (
+            MapIcon::IglooBasement,
+            "map-structure-igloo-basement".into()
+        )
+    );
+    assert_eq!(
+        at(&igloos, [2560, -400]),
+        (MapIcon::IglooNoBasement, "map-structure-igloo".into())
+    );
+    let cities = found(
+        "structure.end-city",
+        Dimension::End,
+        [1024., 0., 2048., 2560.],
+    );
+    assert_eq!(
+        at(&cities, [1712, 96]),
+        (MapIcon::EndCity, "map-structure-end-city-ship".into())
+    );
+    assert_eq!(
+        at(&cities, [1296, 2272]),
+        (MapIcon::EndCity, "map-structure-end-city".into())
+    );
+    // A ruined portal has its own icon in the Nether, on the layer too.
+    let portals = found(
+        "structure.ruined-portal",
+        Dimension::Nether,
+        [-1024., -1024., 1024., 1024.],
+    );
+    assert!(!portals.is_empty());
+    assert!(
+        portals
+            .iter()
+            .all(|(_, icon, _)| *icon == MapIcon::RuinedPortalNether)
+    );
+    let layer = WorldExplorer
+        .overlays_for(&overlay_request("", Dimension::Nether, "26.3", [0., 0., 1., 1.]).context)
+        .into_iter()
+        .find(|layer| layer.id == "structure.ruined-portal")
+        .unwrap();
+    assert_eq!(layer.icon, Some(MapIcon::RuinedPortalNether));
 }
 
 #[test]

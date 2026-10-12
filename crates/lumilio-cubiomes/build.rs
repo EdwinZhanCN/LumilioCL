@@ -10,6 +10,7 @@ fn main() {
     for name in [
         "biomenoise",
         "biomes",
+        "decorations",
         "finders",
         "generator",
         "layers",
