@@ -1764,8 +1764,10 @@ impl<'a> MeshBuilder<'a> {
             .unwrap_or(false);
         // Ambient occlusion darkens this element only if the config, the block's
         // light, the element and its model (`ambientocclusion`) all allow it.
-        let takes_ao =
-            self.config.ambient_occlusion && !is_emissive && element.shade && model_ambient_occlusion;
+        let takes_ao = self.config.ambient_occlusion
+            && !is_emissive
+            && element.shade
+            && model_ambient_occlusion;
 
         // Process each face. Iterate the fixed Direction::ALL order (not the
         // model's `faces` HashMap, whose iteration order is hash-random) so the

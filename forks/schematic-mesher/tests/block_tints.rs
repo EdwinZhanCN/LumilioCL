@@ -25,8 +25,17 @@ fn leaves_take_their_own_colors() {
     assert_eq!(tint("minecraft:spruce_leaves", 0), hex(0x619961));
     assert_eq!(tint("minecraft:birch_leaves", 0), hex(0x80A755));
     assert_eq!(tint("minecraft:mangrove_leaves", 0), hex(0x92C648));
-    for untinted in ["cherry_leaves", "pale_oak_leaves", "azalea_leaves", "bamboo"] {
-        assert_eq!(tint(&format!("minecraft:{untinted}"), 0), [255; 3], "{untinted}");
+    for untinted in [
+        "cherry_leaves",
+        "pale_oak_leaves",
+        "azalea_leaves",
+        "bamboo",
+    ] {
+        assert_eq!(
+            tint(&format!("minecraft:{untinted}"), 0),
+            [255; 3],
+            "{untinted}"
+        );
     }
 }
 

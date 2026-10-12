@@ -25,7 +25,11 @@ fn darkest_corner(plant_parent: &str) -> f32 {
     add_texture(&mut pack, "block/stone", false);
     add_texture(&mut pack, "block/plant", false);
     let parent = cube_model("minecraft:block/plant").replacen('{', plant_parent, 1);
-    pack.add_model("minecraft", "block/parent", serde_json::from_str(&parent).unwrap());
+    pack.add_model(
+        "minecraft",
+        "block/parent",
+        serde_json::from_str(&parent).unwrap(),
+    );
     add_block(
         &mut pack,
         "plant",
@@ -51,7 +55,10 @@ fn darkest_corner(plant_parent: &str) -> f32 {
 
 #[test]
 fn a_parent_without_ambient_occlusion_keeps_the_child_flat() {
-    assert!(darkest_corner("{") < 0.99, "ambient occlusion applies by default");
+    assert!(
+        darkest_corner("{") < 0.99,
+        "ambient occlusion applies by default"
+    );
     assert!(darkest_corner(r#"{"ambientocclusion":false,"#) > 0.999);
 }
 

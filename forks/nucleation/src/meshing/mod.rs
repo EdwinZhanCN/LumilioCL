@@ -143,7 +143,12 @@ impl ResourcePackSource {
         // name the pack lacks answer for its one moved file, so a banner is not
         // drawn with the missing-texture tile.
         let mut moved: std::collections::BTreeMap<String, Vec<String>> = Default::default();
-        for path in pack.textures.get("minecraft").into_iter().flat_map(|t| t.keys()) {
+        for path in pack
+            .textures
+            .get("minecraft")
+            .into_iter()
+            .flat_map(|t| t.keys())
+        {
             let Some((_folder, file)) = path
                 .strip_prefix("entity/")
                 .and_then(|rest| rest.split_once('/'))
@@ -2183,8 +2188,7 @@ mod tests {
         pack.add_blockstate(
             "minecraft",
             "stone",
-            serde_json::from_str(r#"{"variants":{"":{"model":"minecraft:block/stone"}}}"#)
-                .unwrap(),
+            serde_json::from_str(r#"{"variants":{"":{"model":"minecraft:block/stone"}}}"#).unwrap(),
         );
         let face = r##"{"texture":"#all"}"##;
         pack.add_model(
@@ -2195,7 +2199,11 @@ mod tests {
             ))
             .unwrap(),
         );
-        pack.add_texture("minecraft", "block/stone", TextureData::new(1, 1, vec![9, 9, 9, 255]));
+        pack.add_texture(
+            "minecraft",
+            "block/stone",
+            TextureData::new(1, 1, vec![9, 9, 9, 255]),
+        );
         let pack = ResourcePackSource::from_resource_pack(pack);
 
         let stone = BlockState::new("minecraft:stone".to_string());
@@ -2235,9 +2243,17 @@ mod tests {
         let red = |name: &str| source.get_texture_pixels(name).map(|p| p[0]);
         assert_eq!(red("entity/banner_base"), Some(1));
         assert_eq!(red("entity/enchanting_table_book"), Some(2));
-        assert_eq!(red("entity/bat"), Some(3), "the folder named after the file wins");
+        assert_eq!(
+            red("entity/bat"),
+            Some(3),
+            "the folder named after the file wins"
+        );
         assert_eq!(red("entity/same"), None, "an ambiguous name stays missing");
-        assert_eq!(red("entity/kept"), Some(7), "a texture the pack has is never replaced");
+        assert_eq!(
+            red("entity/kept"),
+            Some(7),
+            "a texture the pack has is never replaced"
+        );
     }
 
     #[test]

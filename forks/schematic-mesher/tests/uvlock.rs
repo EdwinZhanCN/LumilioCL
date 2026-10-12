@@ -27,7 +27,10 @@ fn pack(x: i32, y: i32, uvlock: bool) -> ResourcePack {
 
 /// UV of every vertex, keyed by its face normal and position (rounded).
 fn uv_by_corner(pack: ResourcePack) -> HashMap<[i32; 6], [f32; 2]> {
-    let source = Blocks(vec![(BlockPosition::new(0, 0, 0), InputBlock::new("minecraft:cube"))]);
+    let source = Blocks(vec![(
+        BlockPosition::new(0, 0, 0),
+        InputBlock::new("minecraft:cube"),
+    )]);
     let out = Mesher::new(pack).mesh(&source).unwrap();
     let layer = &out.opaque_mesh;
     let round = |v: f32| (v * 1000.0).round() as i32;
@@ -35,7 +38,14 @@ fn uv_by_corner(pack: ResourcePack) -> HashMap<[i32; 6], [f32; 2]> {
         .map(|i| {
             let (n, p) = (layer.normals[i], layer.positions[i]);
             (
-                [round(n[0]), round(n[1]), round(n[2]), round(p[0]), round(p[1]), round(p[2])],
+                [
+                    round(n[0]),
+                    round(n[1]),
+                    round(n[2]),
+                    round(p[0]),
+                    round(p[1]),
+                    round(p[2]),
+                ],
                 layer.uvs[i],
             )
         })
@@ -45,8 +55,9 @@ fn uv_by_corner(pack: ResourcePack) -> HashMap<[i32; 6], [f32; 2]> {
 fn same(a: &HashMap<[i32; 6], [f32; 2]>, b: &HashMap<[i32; 6], [f32; 2]>) -> bool {
     a.len() == b.len()
         && a.iter().all(|(key, uv)| {
-            b.get(key)
-                .is_some_and(|other| (uv[0] - other[0]).abs() < 1e-4 && (uv[1] - other[1]).abs() < 1e-4)
+            b.get(key).is_some_and(|other| {
+                (uv[0] - other[0]).abs() < 1e-4 && (uv[1] - other[1]).abs() < 1e-4
+            })
         })
 }
 
@@ -55,8 +66,19 @@ fn same(a: &HashMap<[i32; 6], [f32; 2]>, b: &HashMap<[i32; 6], [f32; 2]>) -> boo
 fn locked_cubes_keep_world_aligned_textures() {
     let unrotated = uv_by_corner(pack(0, 0, false));
     assert_eq!(unrotated.len(), 24);
-    for (x, y) in [(0, 90), (0, 180), (0, 270), (180, 0), (90, 270), (270, 90), (180, 90)] {
-        assert!(same(&unrotated, &uv_by_corner(pack(x, y, true))), "x={x} y={y}");
+    for (x, y) in [
+        (0, 90),
+        (0, 180),
+        (0, 270),
+        (180, 0),
+        (90, 270),
+        (270, 90),
+        (180, 90),
+    ] {
+        assert!(
+            same(&unrotated, &uv_by_corner(pack(x, y, true))),
+            "x={x} y={y}"
+        );
     }
 }
 

@@ -220,10 +220,17 @@ mod tests {
         );
         let mut read = |name: &str| {
             let mut text = String::new();
-            archive.by_name(name).unwrap().read_to_string(&mut text).unwrap();
+            archive
+                .by_name(name)
+                .unwrap()
+                .read_to_string(&mut text)
+                .unwrap();
             text
         };
-        assert_eq!(read("assets/minecraft/textures/block/glass.png"), "png bytes");
+        assert_eq!(
+            read("assets/minecraft/textures/block/glass.png"),
+            "png bytes"
+        );
         assert_eq!(
             read("assets/minecraft/models/block/glass.json"),
             r#"{"textures":{"all":"block/glass"}}"#

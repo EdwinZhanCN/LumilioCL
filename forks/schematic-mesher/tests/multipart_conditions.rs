@@ -10,7 +10,10 @@ use std::collections::HashMap;
 use schematic_mesher::resource_pack::MultipartCondition;
 
 fn props(pairs: &[(&str, &str)]) -> HashMap<String, String> {
-    pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
+    pairs
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect()
 }
 
 #[test]

@@ -590,7 +590,9 @@ fn parse_regions(root: &NbtCompound, schematic: &mut UniversalSchematic) -> Resu
                 .map(|state| state.unwrap_or_else(|| BlockState::new("minecraft:air".to_string())))
                 .collect();
             if region.palette.is_empty() {
-                region.palette.push(BlockState::new("minecraft:air".to_string()));
+                region
+                    .palette
+                    .push(BlockState::new("minecraft:air".to_string()));
             }
 
             // Parse BlockStates. A truncated array would index past its end
@@ -610,10 +612,16 @@ fn parse_regions(root: &NbtCompound, schematic: &mut UniversalSchematic) -> Resu
             region.blocks = region.unpack_block_states(block_states);
             let palette_len = region.palette.len();
             if region.blocks.iter().any(|&index| index >= palette_len) {
-                let air = match region.palette.iter().position(|s| s.name == "minecraft:air") {
+                let air = match region
+                    .palette
+                    .iter()
+                    .position(|s| s.name == "minecraft:air")
+                {
                     Some(air) => air,
                     None => {
-                        region.palette.push(BlockState::new("minecraft:air".to_string()));
+                        region
+                            .palette
+                            .push(BlockState::new("minecraft:air".to_string()));
                         palette_len
                     }
                 };
@@ -1206,11 +1214,21 @@ mod tests {
     #[test]
     fn a_block_index_past_the_palette_reads_as_air() {
         // Three entries → 2 bits; the second cell holds index 3.
-        let palette = vec![named("minecraft:air"), named("minecraft:stone"), named("minecraft:dirt")];
+        let palette = vec![
+            named("minecraft:air"),
+            named("minecraft:stone"),
+            named("minecraft:dirt"),
+        ];
         let bytes = damaged_litematic(palette, vec![0b11_01], (2, 1, 1));
         let schem = from_litematic(&bytes).expect("parse");
-        assert_eq!(schem.get_block(0, 0, 0).map(|b| b.name.as_str()), Some("minecraft:stone"));
-        assert_eq!(schem.get_block(1, 0, 0).map(|b| b.name.as_str()), Some("minecraft:air"));
+        assert_eq!(
+            schem.get_block(0, 0, 0).map(|b| b.name.as_str()),
+            Some("minecraft:stone")
+        );
+        assert_eq!(
+            schem.get_block(1, 0, 0).map(|b| b.name.as_str()),
+            Some("minecraft:air")
+        );
     }
 
     // LumilioCL local change: a BlockStates array shorter than the region read

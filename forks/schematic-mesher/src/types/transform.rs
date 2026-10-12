@@ -42,11 +42,7 @@ impl BlockTransform {
         }
         let rotation = self.matrix();
         let rotated = Direction::nearest(rotation * glam::Vec3::from(face.normal()));
-        Some(
-            local_to_global(face).transpose()
-                * rotation.transpose()
-                * local_to_global(rotated),
-        )
+        Some(local_to_global(face).transpose() * rotation.transpose() * local_to_global(rotated))
     }
 }
 
