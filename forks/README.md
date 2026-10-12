@@ -76,6 +76,9 @@ Schematic-Mesher (guards in `schematic-mesher/tests/`, run one with
   and a child that does not set it inherits it; an element's 26.x
   `shade_direction_override` becomes its faces' lighting normal. Guard:
   `model_shading`.
+- Fluid surfaces (`mesher/liquid.rs` `corner_height`): corner heights follow
+  Minecraft's `calculateAverageHeight`, so a surface slopes toward empty
+  neighbors, and waterlogged neighbors count as water. Guard: `fluid_heights`.
 - Block tints (`mesher/tint.rs`): follow the color providers Minecraft
   registers — fixed spruce, birch and mangrove leaf colors; no tint for cherry,
   pale oak and azalea leaves; grass color for bushes and flower-bed stems; dry
