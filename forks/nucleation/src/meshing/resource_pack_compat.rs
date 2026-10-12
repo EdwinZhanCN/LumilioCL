@@ -7,69 +7,74 @@ use zip::{ZipArchive, ZipWriter};
 /// equivalent schema understood by schematic-mesher 0.2.
 ///
 /// Returns `Ok(None)` for non-ZIP input or when no entry needs normalization.
+///
+/// The result keeps only what the mesher's loader reads — blockstates, models
+/// and textures under `assets/` — and copies textures without recompressing
+/// them. A client jar is mostly class files; decompressing and deflating all of
+/// it again made every preview wait seconds. (LumilioCL local change; see
+/// `forks/README.md`.)
 pub(super) fn normalize_zip(data: &[u8]) -> Result<Option<Vec<u8>>, String> {
     let mut archive = match ZipArchive::new(Cursor::new(data)) {
         Ok(archive) => archive,
         Err(_) => return Ok(None),
     };
 
-    let mut entries = Vec::with_capacity(archive.len());
+    let mut output = ZipWriter::new(Cursor::new(Vec::new()));
     let mut any_changed = false;
+    let stored = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
 
     for index in 0..archive.len() {
-        let mut file = archive.by_index(index).map_err(|e| e.to_string())?;
-        let name = file.name().to_string();
-        let is_dir = file.is_dir();
-        let compression = file.compression();
-        let permissions = file.unix_mode();
-        let mut bytes = Vec::new();
-        file.read_to_end(&mut bytes).map_err(|e| e.to_string())?;
-
-        if name.ends_with(".json") {
-            if let Ok(mut json) = serde_json::from_slice::<Value>(&bytes) {
-                let changed = if name.contains("/models/") {
-                    normalize_model(&mut json)
-                } else if name.contains("/blockstates/") {
-                    normalize_blockstate(&mut json)
-                } else {
-                    false
-                };
-                if changed {
-                    bytes = serde_json::to_vec(&json).map_err(|e| e.to_string())?;
-                    any_changed = true;
-                }
-            }
+        let name = archive
+            .name_for_index(index)
+            .unwrap_or_default()
+            .to_string();
+        if !is_mesher_asset(&name) {
+            any_changed = true;
+            continue;
+        }
+        if !name.ends_with(".json") || name.contains("/textures/") {
+            let file = archive.by_index_raw(index).map_err(|e| e.to_string())?;
+            output.raw_copy_file(file).map_err(|e| e.to_string())?;
+            continue;
         }
 
-        entries.push((name, is_dir, compression, permissions, bytes));
+        let mut bytes = Vec::new();
+        archive
+            .by_index(index)
+            .map_err(|e| e.to_string())?
+            .read_to_end(&mut bytes)
+            .map_err(|e| e.to_string())?;
+        if let Ok(mut json) = serde_json::from_slice::<Value>(&bytes) {
+            let changed = if name.contains("/models/") {
+                normalize_model(&mut json)
+            } else {
+                normalize_blockstate(&mut json)
+            };
+            if changed {
+                bytes = serde_json::to_vec(&json).map_err(|e| e.to_string())?;
+                any_changed = true;
+            }
+        }
+        output.start_file(name, stored).map_err(|e| e.to_string())?;
+        output.write_all(&bytes).map_err(|e| e.to_string())?;
     }
 
     if !any_changed {
         return Ok(None);
     }
-
-    let mut output = Cursor::new(Vec::with_capacity(data.len()));
-    {
-        let mut writer = ZipWriter::new(&mut output);
-        for (name, is_dir, compression, permissions, bytes) in entries {
-            let mut options = SimpleFileOptions::default().compression_method(compression);
-            if let Some(mode) = permissions {
-                options = options.unix_permissions(mode);
-            }
-            if is_dir {
-                writer
-                    .add_directory(name, options)
-                    .map_err(|e| e.to_string())?;
-            } else {
-                writer
-                    .start_file(name, options)
-                    .map_err(|e| e.to_string())?;
-                writer.write_all(&bytes).map_err(|e| e.to_string())?;
-            }
-        }
-        writer.finish().map_err(|e| e.to_string())?;
-    }
+    let output = output.finish().map_err(|e| e.to_string())?;
     Ok(Some(output.into_inner()))
+}
+
+/// Whether schematic-mesher's loader reads this archive entry: a file under
+/// `assets/<namespace>/blockstates|models|textures/`.
+fn is_mesher_asset(name: &str) -> bool {
+    let mut parts = name.splitn(4, '/');
+    matches!(
+        (parts.next(), parts.next(), parts.next(), parts.next()),
+        (Some("assets"), Some(_), Some("blockstates" | "models" | "textures"), Some(file))
+            if !file.is_empty() && !name.ends_with('/')
+    )
 }
 
 fn normalize_model(root: &mut Value) -> bool {
@@ -179,6 +184,57 @@ mod tests {
         assert!(normalize_model(&mut model));
         assert_eq!(model["textures"]["all"], "minecraft:block/glass");
         assert_eq!(model["elements"][0]["faces"]["down"]["cullface"], "down");
+    }
+
+    /// A client jar is mostly code. Rewriting all of it on every preview took
+    /// seconds; only the assets the mesher reads are kept, textures unchanged.
+    #[test]
+    fn normalized_jars_keep_only_mesher_assets() {
+        let options = SimpleFileOptions::default();
+        let mut writer = ZipWriter::new(Cursor::new(Vec::new()));
+        for (name, bytes) in [
+            ("net/minecraft/Main.class", &b"\xca\xfe\xba\xbe code"[..]),
+            ("version.json", br#"{"world_version":5023}"#),
+            ("assets/minecraft/textures/block/glass.png", b"png bytes"),
+            (
+                "assets/minecraft/models/block/glass.json",
+                br#"{"textures":{"all":{"sprite":"block/glass","force_translucent":true}}}"#,
+            ),
+            ("assets/minecraft/lang/en_us.json", br#"{"a":"b"}"#),
+        ] {
+            writer.start_file(name, options).unwrap();
+            writer.write_all(bytes).unwrap();
+        }
+        let jar = writer.finish().unwrap().into_inner();
+
+        let normalized = normalize_zip(&jar).unwrap().expect("rewritten");
+        let mut archive = ZipArchive::new(Cursor::new(normalized)).unwrap();
+        let mut names: Vec<_> = archive.file_names().map(str::to_string).collect();
+        names.sort();
+        assert_eq!(
+            names,
+            [
+                "assets/minecraft/models/block/glass.json",
+                "assets/minecraft/textures/block/glass.png"
+            ]
+        );
+        let mut read = |name: &str| {
+            let mut text = String::new();
+            archive
+                .by_name(name)
+                .unwrap()
+                .read_to_string(&mut text)
+                .unwrap();
+            text
+        };
+        assert_eq!(
+            read("assets/minecraft/textures/block/glass.png"),
+            "png bytes"
+        );
+        assert_eq!(
+            read("assets/minecraft/models/block/glass.json"),
+            r#"{"textures":{"all":"block/glass"}}"#
+        );
     }
 
     #[test]

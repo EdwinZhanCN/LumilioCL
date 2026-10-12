@@ -456,15 +456,16 @@ pub(crate) fn get_facing(block: &InputBlock) -> &str {
         .unwrap_or("north")
 }
 
-/// Y rotation angle for a facing direction (radians).
-/// In Minecraft, entity models face south by default (toward +Z).
-/// North = 180deg, South = 0deg, East = -90deg (270), West = 90deg.
+/// Y rotation angle for a facing direction (radians), for `Mat4::from_rotation_y`.
+/// Entity models face south (+Z) unrotated. glam turns counter-clockwise seen from
+/// above, so +Z reaches +X (east) at +90° — the opposite sign of Minecraft's yaw
+/// (east = 270°). Minecraft's renderers use `Axis.YP.rotationDegrees(-yaw)`.
 pub(crate) fn facing_rotation_rad(facing: &str) -> f32 {
     match facing {
         "north" => std::f32::consts::PI,
         "south" => 0.0,
-        "east" => -std::f32::consts::FRAC_PI_2,
-        "west" => std::f32::consts::FRAC_PI_2,
+        "east" => std::f32::consts::FRAC_PI_2,
+        "west" => -std::f32::consts::FRAC_PI_2,
         _ => std::f32::consts::PI,
     }
 }

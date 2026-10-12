@@ -51,7 +51,8 @@ Schematic-Mesher (guards in `schematic-mesher/tests/`, run one with
 
 - Face culling (`mesher/face_culler.rs`): a full cube with see-through texture
   pixels hides no neighbouring face; leaves do not cull each other; copper
-  grates cull only the same block. Guard: `face_culling`.
+  grates cull only the same block; a model whose one full cube carries overlay
+  elements (the grass block) is as solid as a plain cube. Guard: `face_culling`.
 - Element rotation (`types/transform.rs`, `mesher/element.rs`): the 26.x Euler
   form `{x, y, z}` parses, both forms use Minecraft 26.3 `CuboidRotation`
   semantics, and normals turn with the element. Guard: `element_rotation`.
@@ -63,6 +64,33 @@ Schematic-Mesher (guards in `schematic-mesher/tests/`, run one with
   face. Guard: `coplanar_faces`.
 - `undrawable_blocks` (`mesher/mod.rs`, re-exported): names blocks no model or
   stand-in geometry can draw. Guard: `undrawable_blocks`.
+- Entity facing (`mesher/entity/mod.rs` `facing_rotation_rad`): east and west
+  turn the way Minecraft's renderers do (glam's rotation has the opposite sign
+  of Minecraft yaw), so chests, double chests, wall banners and mobs face their
+  side. Guard: `entity_facing`.
+- UV lock (`types/transform.rs` `uvlock_matrix`, `mesher/element.rs`): a
+  `uvlock` variant transforms its face UVs like Minecraft's
+  `BlockMath.getUVLockTransform`, so rotated stairs, walls, fences and fence
+  gates keep world-aligned textures. Guard: `uvlock`.
+- Multipart conditions (`resource_pack/blockstate.rs`): `OR`/`AND` nest and a
+  leading `!` negates the listed values, as in Minecraft, instead of failing
+  the whole blockstate. Guard: `multipart_conditions`.
+- Model shading (`resource_pack/model.rs`, `resolver/model_resolver.rs`,
+  `mesher/element.rs`): `ambientocclusion: false` turns ambient occlusion off
+  and a child that does not set it inherits it; an element's 26.x
+  `shade_direction_override` becomes its faces' lighting normal. Guard:
+  `model_shading`.
+- Fluid surfaces (`mesher/liquid.rs` `corner_height`): corner heights follow
+  Minecraft's `calculateAverageHeight`, so a surface slopes toward empty
+  neighbors, and waterlogged neighbors count as water. Guard: `fluid_heights`.
+- Block tints (`mesher/tint.rs`): follow the color providers Minecraft
+  registers — fixed spruce, birch and mangrove leaf colors; no tint for cherry,
+  pale oak and azalea leaves; grass color for bushes and flower-bed stems; dry
+  foliage for leaf litter; Minecraft's redstone, stem and lily pad colors.
+  Guard: `block_tints`.
+- Texture aliases (`resource_pack/mod.rs` `texture_aliases`): a missing texture
+  name can answer for another path without copying pixels. Nucleation fills it
+  (below).
 - The crate's own unit tests and `tests/atlas_uv_regression.rs` do not compile
   at the baseline: upstream `253d2b6` changed `MesherOutput` layers to
   `MeshLayer` without updating them. Local guards therefore live in new
@@ -82,6 +110,29 @@ upstream; its lib tests also write `simple_cube.litematic`,
   position bypasses orbit fitting, with a fixed near plane and reversed depth
   (ADR 0036). The existing RenderConfig continues to produce orbit cameras.
 - `UniversalSchematic::undrawable_blocks` (`src/meshing/mod.rs`).
+- Pack normalization (`src/meshing/resource_pack_compat.rs` `normalize_zip`):
+  keeps only the blockstates, models and textures the mesher's loader reads,
+  copies textures without recompressing, and stores rewritten JSON, instead
+  of decompressing and deflating a whole client jar on every load. Guard:
+  `normalized_jars_keep_only_mesher_assets`.
+- Litematic regions (`src/formats/litematic.rs` `parse_regions`): an
+  unreadable palette entry becomes air instead of shifting later entries; a
+  block index past the palette reads as air, as in Litematica; a truncated
+  `BlockStates` array and impossible region bounds are parse errors, not
+  panics. Guards: `an_unreadable_palette_entry_keeps_later_entries_in_place`,
+  `a_block_index_past_the_palette_reads_as_air`,
+  `a_truncated_block_state_array_is_a_parse_error`. `test_parse_regions`
+  encoded a stone as palette index 2 of a two-entry palette; its data now uses
+  index 1.
+- Overlapping regions (`src/meshing/mod.rs` `compute_mesh_output`): regions
+  are collected in a fixed order (default, then by name) and where they
+  overlap the first block keeps the cell. Guard:
+  `overlapping_regions_draw_one_block_per_cell`.
+- Entity texture renames (`src/meshing/mod.rs` `with_mesher_texture_aliases`):
+  renamed textures are aliased instead of copied, and every old flat
+  `entity/<file>` the pack lacks answers for its one moved `entity/<folder>/<file>`
+  (26.x banners and the enchanting-table book). Guard:
+  `moved_entity_textures_answer_for_their_old_flat_names`.
 - `src/meshing/item_model.rs` exports only single-axis element rotations; an
   Euler rotation is omitted there.
 

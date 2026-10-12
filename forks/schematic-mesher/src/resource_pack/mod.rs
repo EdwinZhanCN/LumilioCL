@@ -28,6 +28,12 @@ pub struct ResourcePack {
     /// Texture data by namespace and texture path.
     /// Key: namespace, Value: map of texture_path to data.
     pub textures: HashMap<String, HashMap<String, TextureData>>,
+
+    /// Names that answer for a texture stored under another path, as full
+    /// `namespace:path` locations, consulted only when the name itself is
+    /// missing. Lets a renamed game texture keep the name the mesher asks for
+    /// without copying its pixels. (LumilioCL local change; see `forks/README.md`.)
+    pub texture_aliases: HashMap<String, String>,
 }
 
 impl ResourcePack {
@@ -50,7 +56,23 @@ impl ResourcePack {
     /// Get a texture by full resource location (e.g., "minecraft:block/stone").
     pub fn get_texture(&self, resource_location: &str) -> Option<&TextureData> {
         let (namespace, path) = parse_resource_location(resource_location);
-        self.textures.get(namespace).and_then(|ns| ns.get(path))
+        self.textures
+            .get(namespace)
+            .and_then(|ns| ns.get(path))
+            .or_else(|| {
+                let target = self.texture_aliases.get(&format!("{namespace}:{path}"))?;
+                let (namespace, path) = parse_resource_location(target);
+                self.textures.get(namespace).and_then(|ns| ns.get(path))
+            })
+    }
+
+    /// Let `name` answer for the texture at `target` while `name` itself is missing.
+    pub fn alias_texture(&mut self, name: &str, target: &str) {
+        let full = |location: &str| {
+            let (namespace, path) = parse_resource_location(location);
+            format!("{namespace}:{path}")
+        };
+        self.texture_aliases.insert(full(name), full(target));
     }
 
     /// Add a blockstate definition.
@@ -121,7 +143,9 @@ impl ResourcePack {
             blockstates,
             models,
             textures,
+            texture_aliases,
         } = higher;
+        self.texture_aliases.extend(texture_aliases);
 
         for (ns, entries) in blockstates {
             self.blockstates.entry(ns).or_default().extend(entries);

@@ -743,7 +743,7 @@ impl Region {
         self.blocks = new_blocks;
         self.rebuild_bbox();
     }
-    fn calculate_bits_per_block(&self) -> usize {
+    pub(crate) fn calculate_bits_per_block(&self) -> usize {
         let palette_size = self.palette.len();
         if palette_size <= 1 {
             2

@@ -1689,6 +1689,7 @@ impl<'a> MeshBuilder<'a> {
                 transform,
                 &resolved_textures,
                 single_element,
+                model.uses_ambient_occlusion(),
             )?;
         }
 
@@ -1754,12 +1755,19 @@ impl<'a> MeshBuilder<'a> {
         transform: &BlockTransform,
         resolved_textures: &std::collections::HashMap<String, String>,
         single_element: bool,
+        model_ambient_occlusion: bool,
     ) -> Result<()> {
         // Compute lighting factor for this block position
         let is_emissive = self
             .light_map
             .map(|lm| lm.is_emissive(pos))
             .unwrap_or(false);
+        // Ambient occlusion darkens this element only if the config, the block's
+        // light, the element and its model (`ambientocclusion`) all allow it.
+        let takes_ao = self.config.ambient_occlusion
+            && !is_emissive
+            && element.shade
+            && model_ambient_occlusion;
 
         // Process each face. Iterate the fixed Direction::ALL order (not the
         // model's `faces` HashMap, whose iteration order is hash-random) so the
@@ -1793,7 +1801,7 @@ impl<'a> MeshBuilder<'a> {
                 STAT_TOTAL_FACES.fetch_add(1, Relaxed);
                 if single_element && self.is_greedy_eligible(element, face, transform) {
                     STAT_CUBE_FACES.fetch_add(1, Relaxed);
-                    let lit = !(self.config.ambient_occlusion && !is_emissive && element.shade)
+                    let lit = !takes_ao
                         || self
                             .culler
                             .map(|c| c.calculate_ao(pos, world_direction))
@@ -1840,7 +1848,7 @@ impl<'a> MeshBuilder<'a> {
                 && self.is_greedy_eligible(element, face, transform)
             {
                 // Compute per-vertex AO; only fully-lit faces are eligible to merge.
-                let ao = if self.config.ambient_occlusion && !is_emissive && element.shade {
+                let ao = if takes_ao {
                     self.culler
                         .map(|c| c.calculate_ao(pos, world_direction))
                         .unwrap_or([3, 3, 3, 3])
@@ -1890,7 +1898,7 @@ impl<'a> MeshBuilder<'a> {
 
             // Calculate AO if enabled (use world direction for neighbor checks)
             // Skip AO for emissive blocks and elements with shade: false
-            let ao_values = if self.config.ambient_occlusion && !is_emissive && element.shade {
+            let ao_values = if takes_ao {
                 self.culler.map(|c| c.calculate_ao(pos, world_direction))
             } else {
                 None
@@ -1966,6 +1974,14 @@ impl<'a> MeshBuilder<'a> {
 
         // Generate the 4 vertices for this face
         let (positions, uvs) = self.generate_face_vertices(direction, from, to, uv, face.rotation);
+        // A uvlock variant keeps the texture aligned to the world, not the model.
+        let uvs = match transform.uvlock_matrix(direction) {
+            Some(lock) => uvs.map(|[u, v]| {
+                let p = lock * Vec3::new(u - 0.5, v - 0.5, 0.0);
+                [p.x + 0.5, p.y + 0.5]
+            }),
+            None => uvs,
+        };
 
         // Apply element rotation if present. The normal turns with the face (inverse
         // transpose, as rescale is not uniform), so a face rotated past 90° — the
@@ -1979,6 +1995,12 @@ impl<'a> MeshBuilder<'a> {
         } else {
             (positions, normal)
         };
+
+        // A 26.x shade override lights the face as if it faced that direction;
+        // the renderer shades by the vertex normal (winding still decides culling).
+        let normal = element
+            .shade_direction_override
+            .map_or(normal, |shade| shade.normal());
 
         // Apply block transform rotation
         let positions = self.apply_block_transform(&positions, transform);
@@ -3047,6 +3069,7 @@ mod tests {
             to: [16.0, 16.0, 16.0],
             rotation: None,
             shade: true,
+            shade_direction_override: None,
             faces: HashMap::new(),
         }
     }
@@ -3086,6 +3109,7 @@ mod tests {
             to: [16.0, 8.0, 16.0],
             rotation: None,
             shade: true,
+            shade_direction_override: None,
             faces: HashMap::new(),
         };
         let face = full_face();
@@ -3161,6 +3185,7 @@ mod tests {
                 false,
             )),
             shade: true,
+            shade_direction_override: None,
             faces: HashMap::new(),
         };
         let face = full_face();

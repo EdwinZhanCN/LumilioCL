@@ -86,8 +86,9 @@ impl<'a> ModelResolver<'a> {
             merged.elements = child.elements.clone();
         }
 
-        // Use child ambient_occlusion setting
-        merged.ambient_occlusion = child.ambient_occlusion;
+        // A child that does not set ambientocclusion keeps its parent's choice
+        // (cross plants, torches and doors turn it off in a parent model).
+        merged.ambient_occlusion = child.ambient_occlusion.or(parent.ambient_occlusion);
 
         // Merge display contexts: child contexts override parent, but parent
         // contexts not present in child are preserved. This is important because
@@ -180,6 +181,7 @@ mod tests {
                 to: [16.0, 16.0, 16.0],
                 rotation: None,
                 shade: true,
+                shade_direction_override: None,
                 faces: Direction::ALL
                     .iter()
                     .map(|d| {
@@ -203,7 +205,7 @@ mod tests {
         // Add cube (grandparent) - just to test inheritance works
         let cube = BlockModel {
             parent: None,
-            ambient_occlusion: true,
+            ambient_occlusion: Some(true),
             textures: HashMap::new(),
             elements: vec![],
             ..Default::default()

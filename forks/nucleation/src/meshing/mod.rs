@@ -101,56 +101,80 @@ pub struct ResourcePackSource {
 
 impl ResourcePackSource {
     fn with_mesher_texture_aliases(mut pack: ResourcePack) -> Self {
-        // schematic-mesher 0.2 names this texture `wood`, while vanilla packs
-        // ship it as `armorstand.png`. Preserve an explicitly supplied legacy
-        // override; otherwise alias the canonical texture so the entity enters
-        // the atlas instead of using the missing-texture tile.
-        if pack.get_texture("entity/armorstand/wood").is_none() {
-            if let Some(texture) = pack.get_texture("entity/armorstand/armorstand").cloned() {
-                pack.add_texture("minecraft", "entity/armorstand/wood", texture);
-            }
-        }
-        // schematic-mesher's minecart model reads `entity/minecart`, but the
-        // client jar moved the texture to `entity/minecart/minecart.png` in
-        // 1.21.x. Alias it so carts get their hull texture instead of the
-        // missing-texture tile.
-        if pack.get_texture("entity/minecart").is_none() {
-            if let Some(texture) = pack.get_texture("entity/minecart/minecart").cloned() {
-                pack.add_texture("minecraft", "entity/minecart", texture);
-            }
-        }
-        // More renames between the names schematic-mesher 0.2 asks for and
-        // what the current client jar ships: the 1.21.5 mob-variant split
-        // named files `<mob>/temperate_<mob>.png`, and 26.2 flipped them to
-        // `<mob>/<mob>_temperate.png`; the bat moved into a folder; the cat
-        // breeds gained a `cat_` prefix. Alias each canonical name the mesher
-        // reads to whichever spelling the pack actually has, so these mobs
-        // render with their skins instead of the missing-texture tile.
+        // Names schematic-mesher 0.2 asks for that the client jar has renamed,
+        // aliased (not copied) to whichever spelling the pack actually has so
+        // these entities render with their textures instead of the
+        // missing-texture tile. An explicitly supplied legacy texture wins.
+        // - the armor stand's `wood` ships as `armorstand.png`;
+        // - the 1.21.5 mob-variant split named files `<mob>/temperate_<mob>.png`,
+        //   and 26.2 flipped them to `<mob>/<mob>_temperate.png`;
+        // - the cat breeds gained a `cat_` prefix.
         for (wanted, candidates) in [
             (
+                "entity/armorstand/wood",
+                &["entity/armorstand/armorstand"][..],
+            ),
+            (
                 "entity/pig/temperate_pig",
-                ["entity/pig/pig_temperate", "entity/pig/pig"],
+                &["entity/pig/pig_temperate", "entity/pig/pig"],
             ),
             (
                 "entity/cow/temperate_cow",
-                ["entity/cow/cow_temperate", "entity/cow/cow"],
+                &["entity/cow/cow_temperate", "entity/cow/cow"],
             ),
             (
                 "entity/chicken/temperate_chicken",
-                ["entity/chicken/chicken_temperate", "entity/chicken/chicken"],
+                &["entity/chicken/chicken_temperate", "entity/chicken/chicken"],
             ),
-            (
-                "entity/cat/tabby",
-                ["entity/cat/cat_tabby", "entity/cat/tabby"],
-            ),
-            ("entity/bat", ["entity/bat/bat", "entity/bat"]),
-            ("entity/blaze", ["entity/blaze/blaze", "entity/blaze"]),
+            ("entity/cat/tabby", &["entity/cat/cat_tabby"]),
         ] {
             if pack.get_texture(wanted).is_some() {
                 continue;
             }
-            if let Some(texture) = candidates.iter().find_map(|c| pack.get_texture(c).cloned()) {
-                pack.add_texture("minecraft", wanted, texture);
+            if let Some(found) = candidates.iter().find(|c| pack.get_texture(c).is_some()) {
+                pack.alias_texture(wanted, found);
+            }
+        }
+        // Newer jars also move entity textures one folder deeper without
+        // renaming them: `entity/minecart` became `entity/minecart/minecart`
+        // (1.21.x), `entity/banner_base` became `entity/banner/banner_base` and
+        // `entity/enchanting_table_book` became
+        // `entity/enchantment/enchanting_table_book` (26.x). Let every old flat
+        // name the pack lacks answer for its one moved file, so a banner is not
+        // drawn with the missing-texture tile.
+        let mut moved: std::collections::BTreeMap<String, Vec<String>> = Default::default();
+        for path in pack
+            .textures
+            .get("minecraft")
+            .into_iter()
+            .flat_map(|t| t.keys())
+        {
+            let Some((_folder, file)) = path
+                .strip_prefix("entity/")
+                .and_then(|rest| rest.split_once('/'))
+            else {
+                continue;
+            };
+            if !file.contains('/') {
+                moved
+                    .entry(format!("entity/{file}"))
+                    .or_default()
+                    .push(path.clone());
+            }
+        }
+        for (flat, paths) in moved {
+            if pack.get_texture(&flat).is_some() {
+                continue;
+            }
+            // A file name found in several folders is ambiguous: take the
+            // folder named after it (`bat/bat`) or leave the name unresolved.
+            let own_folder = format!("{flat}/{}", flat.trim_start_matches("entity/"));
+            let target = match paths.as_slice() {
+                [only] => Some(only),
+                _ => paths.iter().find(|p| **p == own_folder),
+            };
+            if let Some(target) = target {
+                pack.alias_texture(&flat, target);
             }
         }
         Self { pack }
@@ -1028,9 +1052,32 @@ impl UniversalSchematic {
             &mut max,
         );
 
-        // Process other regions
-        for region in self.other_regions.values() {
+        // Process other regions in a fixed order (they live in a hash map). Where
+        // regions overlap, the block collected first keeps the cell: drawing
+        // both stacked two blocks in one place, in a different order each
+        // load. (LumilioCL local change; see `forks/README.md`.)
+        let mut others: Vec<&Region> = self.other_regions.values().collect();
+        others.sort_by(|a, b| a.name.cmp(&b.name));
+        for region in &others {
             collect_region_blocks(region, &mut all_blocks, &mut palette, &mut min, &mut max);
+        }
+        let boxes: Vec<_> = std::iter::once(&self.default_region)
+            .chain(others.iter().copied())
+            .map(Region::get_bounding_box)
+            .collect();
+        let overlap = boxes.iter().enumerate().any(|(i, a)| {
+            boxes[i + 1..].iter().any(|b| {
+                a.min.0 <= b.max.0
+                    && b.min.0 <= a.max.0
+                    && a.min.1 <= b.max.1
+                    && b.min.1 <= a.max.1
+                    && a.min.2 <= b.max.2
+                    && b.min.2 <= a.max.2
+            })
+        });
+        if overlap {
+            let mut seen = rustc_hash::FxHashSet::default();
+            all_blocks.retain(|(pos, _)| seen.insert(*pos));
         }
         phase!(t1, "collect_region_blocks");
 
@@ -2128,6 +2175,84 @@ mod tests {
                 .get_texture("entity/armorstand/wood")
                 .is_some(),
             "schematic-mesher's armor stand model currently requests the legacy wood alias"
+        );
+    }
+
+    /// Two Litematica regions may overlap. Drawing both stacked two cubes in
+    /// one cell; the region collected first keeps it.
+    #[test]
+    fn overlapping_regions_draw_one_block_per_cell() {
+        use schematic_mesher::resource_pack::TextureData;
+
+        let mut pack = ResourcePack::new();
+        pack.add_blockstate(
+            "minecraft",
+            "stone",
+            serde_json::from_str(r#"{"variants":{"":{"model":"minecraft:block/stone"}}}"#).unwrap(),
+        );
+        let face = r##"{"texture":"#all"}"##;
+        pack.add_model(
+            "minecraft",
+            "block/stone",
+            serde_json::from_str(&format!(
+                r#"{{"textures":{{"all":"minecraft:block/stone"}},"elements":[{{"from":[0,0,0],"to":[16,16,16],"faces":{{"down":{face},"up":{face},"north":{face},"south":{face},"west":{face},"east":{face}}}}}]}}"#
+            ))
+            .unwrap(),
+        );
+        pack.add_texture(
+            "minecraft",
+            "block/stone",
+            TextureData::new(1, 1, vec![9, 9, 9, 255]),
+        );
+        let pack = ResourcePackSource::from_resource_pack(pack);
+
+        let stone = BlockState::new("minecraft:stone".to_string());
+        let mut schematic = UniversalSchematic::new("overlap".to_string());
+        schematic.set_block(0, 0, 0, &stone);
+        for name in ["b", "c"] {
+            let mut region = Region::new(name.to_string(), (0, 0, 0), (1, 1, 1));
+            region.set_block(0, 0, 0, &stone);
+            schematic.add_region(region);
+        }
+        let mesh = schematic.to_mesh(&pack, &MeshConfig::default()).unwrap();
+        assert_eq!(mesh.total_vertices(), 24, "one cube, six faces");
+    }
+
+    /// 26.x moved `entity/banner_base.png` and `entity/enchanting_table_book.png`
+    /// one folder deeper; banners and enchanting tables drew the missing-texture
+    /// tile until the old flat names answered for the moved files.
+    #[test]
+    fn moved_entity_textures_answer_for_their_old_flat_names() {
+        use schematic_mesher::resource_pack::TextureData;
+
+        let pixel = |r| TextureData::new(1, 1, vec![r, 0, 0, 255]);
+        let mut pack = ResourcePack::new();
+        for (path, r) in [
+            ("entity/banner/banner_base", 1),
+            ("entity/enchantment/enchanting_table_book", 2),
+            ("entity/bat/bat", 3),
+            ("entity/x/bat", 4),
+            ("entity/a/same", 5),
+            ("entity/b/same", 6),
+            ("entity/kept", 7),
+            ("entity/other/kept", 8),
+        ] {
+            pack.add_texture("minecraft", path, pixel(r));
+        }
+        let source = ResourcePackSource::from_resource_pack(pack);
+        let red = |name: &str| source.get_texture_pixels(name).map(|p| p[0]);
+        assert_eq!(red("entity/banner_base"), Some(1));
+        assert_eq!(red("entity/enchanting_table_book"), Some(2));
+        assert_eq!(
+            red("entity/bat"),
+            Some(3),
+            "the folder named after the file wins"
+        );
+        assert_eq!(red("entity/same"), None, "an ambiguous name stays missing");
+        assert_eq!(
+            red("entity/kept"),
+            Some(7),
+            "a texture the pack has is never replaced"
         );
     }
 
