@@ -17,7 +17,7 @@ interface Props {
 
 const { t } = Astro.props;
 const release = await latestRelease();
-const plans = primaryPlans("zh-CN");
+const plans = primaryPlans("zh-CN").filter((p) => p.status !== "completed").slice(0, 3);
 ---
 
 <Proof t={t} />
