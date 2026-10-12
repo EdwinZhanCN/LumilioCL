@@ -71,6 +71,9 @@ Schematic-Mesher (guards in `schematic-mesher/tests/`, run one with
   `uvlock` variant transforms its face UVs like Minecraft's
   `BlockMath.getUVLockTransform`, so rotated stairs, walls, fences and fence
   gates keep world-aligned textures. Guard: `uvlock`.
+- Texture aliases (`resource_pack/mod.rs` `texture_aliases`): a missing texture
+  name can answer for another path without copying pixels. Nucleation fills it
+  (below).
 - The crate's own unit tests and `tests/atlas_uv_regression.rs` do not compile
   at the baseline: upstream `253d2b6` changed `MesherOutput` layers to
   `MeshLayer` without updating them. Local guards therefore live in new
@@ -90,6 +93,11 @@ upstream; its lib tests also write `simple_cube.litematic`,
   position bypasses orbit fitting, with a fixed near plane and reversed depth
   (ADR 0036). The existing RenderConfig continues to produce orbit cameras.
 - `UniversalSchematic::undrawable_blocks` (`src/meshing/mod.rs`).
+- Entity texture renames (`src/meshing/mod.rs` `with_mesher_texture_aliases`):
+  renamed textures are aliased instead of copied, and every old flat
+  `entity/<file>` the pack lacks answers for its one moved `entity/<folder>/<file>`
+  (26.x banners and the enchanting-table book). Guard:
+  `moved_entity_textures_answer_for_their_old_flat_names`.
 - `src/meshing/item_model.rs` exports only single-axis element rotations; an
   Euler rotation is omitted there.
 
