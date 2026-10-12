@@ -136,6 +136,12 @@ pub struct InstanceDetailView {
     analysis_serial: u64,
     log_analysis: Option<(u64, String, Option<CrashRead>)>,
     settings_sub: usize,
+    /// The Java dropdown, created once the view has a window, and the
+    /// entries it shows.
+    java_select: Option<Dropdown>,
+    java_picks: Vec<(settings::JavaPick, String)>,
+    /// The record changed: read what the next launch's Java is again.
+    refresh_java: bool,
     /// The machine's memory in MB, for the memory hint; unknown until told.
     machine_memory_mb: Option<u64>,
     confirm: Option<Confirm>,
@@ -230,6 +236,9 @@ impl InstanceDetailView {
             analysis_serial: 0,
             log_analysis: None,
             settings_sub: 0,
+            java_select: None,
+            java_picks: Vec::new(),
+            refresh_java: false,
             machine_memory_mb: None,
             confirm: None,
             editor: None,

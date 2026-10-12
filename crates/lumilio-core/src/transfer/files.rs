@@ -1,6 +1,7 @@
 use super::TEMPORARY_FILE_SEQUENCE;
-use super::request::{TransferError, TransferRequest};
+use super::request::{ContentDigest, TransferError, TransferRequest};
 use sha1::{Digest, Sha1};
+use sha2::Sha256;
 use std::fmt::Debug;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
@@ -24,10 +25,39 @@ impl AttemptFailure {
     }
 }
 
+/// Hashes content with the algorithm an expected digest names.
+pub(super) enum ContentHasher {
+    Sha1(Sha1),
+    Sha256(Sha256),
+}
+
+impl ContentHasher {
+    pub(super) fn for_digest(expected: &ContentDigest) -> Self {
+        match expected {
+            ContentDigest::Sha1(_) => Self::Sha1(Sha1::new()),
+            ContentDigest::Sha256(_) => Self::Sha256(Sha256::new()),
+        }
+    }
+
+    pub(super) fn update(&mut self, bytes: &[u8]) {
+        match self {
+            Self::Sha1(hasher) => hasher.update(bytes),
+            Self::Sha256(hasher) => hasher.update(bytes),
+        }
+    }
+
+    pub(super) fn finish_hex(self) -> String {
+        match self {
+            Self::Sha1(hasher) => encode_lower_hex(&hasher.finalize()),
+            Self::Sha256(hasher) => encode_lower_hex(&hasher.finalize()),
+        }
+    }
+}
+
 pub(super) async fn verify_file(
     path: &Path,
     expected_size: Option<u64>,
-    expected_sha1: Option<&str>,
+    expected_digest: Option<&ContentDigest>,
 ) -> Result<bool, TransferError> {
     let metadata = match fs::metadata(path).await {
         Ok(metadata) => metadata,
@@ -40,14 +70,14 @@ pub(super) async fn verify_file(
     if expected_size.is_some_and(|expected| metadata.len() != expected) {
         return Ok(false);
     }
-    let Some(expected_sha1) = expected_sha1 else {
+    let Some(expected_digest) = expected_digest else {
         return Ok(true);
     };
 
     let mut file = File::open(path)
         .await
         .map_err(|error| file_system_error("open", path, error))?;
-    let mut hasher = Sha1::new();
+    let mut hasher = ContentHasher::for_digest(expected_digest);
     let mut buffer = vec![0_u8; 64 * 1024];
     loop {
         let read = file
@@ -59,7 +89,9 @@ pub(super) async fn verify_file(
         }
         hasher.update(&buffer[..read]);
     }
-    Ok(encode_lower_hex(&hasher.finalize()).eq_ignore_ascii_case(expected_sha1))
+    Ok(hasher
+        .finish_hex()
+        .eq_ignore_ascii_case(expected_digest.hex()))
 }
 
 pub(super) fn encode_lower_hex(bytes: &[u8]) -> String {
@@ -85,7 +117,7 @@ pub(super) async fn copy_verified_candidate(
         if !verify_file(
             &temporary_path,
             request.expected_size,
-            request.expected_sha1.as_deref(),
+            request.expected_digest.as_ref(),
         )
         .await?
         {

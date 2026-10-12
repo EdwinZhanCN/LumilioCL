@@ -175,3 +175,82 @@ fn java_and_after_launch_can_be_set_and_cleared() {
     );
     assert_eq!(saved(after_launch(&base, 0)).launch.after_launch, None);
 }
+
+mod java_dropdown {
+    use super::super::java::{JavaPick, java_picks, java_summary, picked};
+    use lumilio_core::{
+        HostProfile, InstanceJava, JavaChoice, JavaRuntime, MachineArchitecture, PlatformFamily,
+    };
+    use std::path::{Path, PathBuf};
+
+    fn runtime(root: &Path, name: &str, version: &str, arch: &str) -> JavaRuntime {
+        let home = root.join(name);
+        std::fs::create_dir_all(home.join("bin")).unwrap();
+        std::fs::write(home.join("bin/java"), "").unwrap();
+        std::fs::write(
+            home.join("release"),
+            format!(
+                "JAVA_VERSION=\"{version}\"\nIMPLEMENTOR=\"Eclipse Adoptium\"\nOS_ARCH=\"{arch}\"\n"
+            ),
+        )
+        .unwrap();
+        JavaRuntime::inspect(&home).unwrap()
+    }
+
+    fn mac() -> HostProfile {
+        HostProfile::new(PlatformFamily::MacOs, MachineArchitecture::Arm64, "")
+    }
+
+    #[test]
+    fn the_dropdown_lists_automatic_each_java_and_a_custom_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let a = runtime(dir.path(), "jdk-a", "21.0.3", "aarch64");
+        let b = runtime(dir.path(), "jdk-b", "21.0.3", "aarch64");
+        let intel = runtime(dir.path(), "jdk-8", "1.8.0_74", "x86_64");
+        let java = InstanceJava {
+            runtimes: vec![a.clone(), b, intel],
+            choice: None,
+            automatic: None,
+            needed: Some(21),
+            auto_install: true,
+        };
+        let picks = java_picks(Some(&java), &mac());
+        let labels: Vec<&str> = picks.iter().map(|(_, label)| label.as_str()).collect();
+        assert_eq!(
+            labels,
+            [
+                "自动（推荐）",
+                "Java 21 · Eclipse Adoptium · aarch64 · jdk-a",
+                "Java 21 · Eclipse Adoptium · aarch64 · jdk-b",
+                "Java 8 · Eclipse Adoptium · x86_64 · 转译",
+                "自定义路径…",
+            ]
+        );
+        assert_eq!(picked(Some(&java), None), JavaPick::Automatic);
+        assert_eq!(
+            picked(Some(&java), Some(a.executable())),
+            JavaPick::Installed(a.home().to_owned())
+        );
+        assert_eq!(
+            picked(Some(&java), Some(&PathBuf::from("/opt/other/bin/java"))),
+            JavaPick::Custom
+        );
+        assert_eq!(
+            java_summary(Some(&java)),
+            "没有合适的 Java，启动时会自动下载 Java 21"
+        );
+        let chosen = InstanceJava {
+            choice: Some(JavaChoice {
+                runtime: a.clone(),
+                broken: Vec::new(),
+                chosen_by_user: false,
+            }),
+            ..java
+        };
+        assert_eq!(
+            java_summary(Some(&chosen)),
+            format!("将使用 Java 21.0.3（{}）", a.home().display())
+        );
+        assert_eq!(java_summary(None), "正在检测 Java…");
+    }
+}

@@ -14,6 +14,7 @@ pub enum Section {
     Logs,
     Files,
     Size,
+    Java,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

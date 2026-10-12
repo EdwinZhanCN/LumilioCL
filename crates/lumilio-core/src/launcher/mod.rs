@@ -12,12 +12,14 @@ mod types;
 mod tests;
 
 pub use self::progress::runtimes_root;
-pub use self::types::{LaunchRequest, LaunchServiceError, LaunchUpdate};
+pub use self::types::{JavaRequest, LaunchRequest, LaunchServiceError, LaunchUpdate};
 
 use crate::activity::CancellationToken;
+use crate::java::JavaRuntime;
 use crate::launch_session::{LaunchFailure, LaunchSignal};
 use crate::process::GameExit;
 use crate::transfer::{SourceChain, Transport};
+use std::sync::Mutex as StdMutex;
 use tokio::sync::mpsc;
 
 /// Shown in the game's debug screen as the launcher brand.
@@ -31,6 +33,10 @@ pub struct Launcher<T> {
     sources: SourceChain,
     concurrency: usize,
     spawned: Option<mpsc::UnboundedSender<()>>,
+    /// Where to ask for a Java when none installed fits; `None` fails instead.
+    java_installer: Option<mpsc::UnboundedSender<JavaRequest>>,
+    /// Java downloaded during this launch, beside the request's runtimes.
+    installed_java: StdMutex<Vec<JavaRuntime>>,
 }
 
 impl<T> Launcher<T>
@@ -45,12 +51,24 @@ where
             sources,
             concurrency,
             spawned: None,
+            java_installer: None,
+            installed_java: StdMutex::new(Vec::new()),
         }
     }
 
     /// Service-level observation starts only after the OS creates a process.
     pub(crate) fn with_spawned(mut self, sender: mpsc::UnboundedSender<()>) -> Self {
         self.spawned = Some(sender);
+        self
+    }
+
+    /// When no installed Java may run the game, asks `sender` for one
+    /// instead of failing.
+    pub(crate) fn with_java_installer(
+        mut self,
+        sender: mpsc::UnboundedSender<JavaRequest>,
+    ) -> Self {
+        self.java_installer = Some(sender);
         self
     }
 

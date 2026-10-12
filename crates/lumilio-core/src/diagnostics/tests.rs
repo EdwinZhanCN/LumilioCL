@@ -102,12 +102,22 @@ fn meta(id: &str, loader: &'static str) -> Option<ModMetadata> {
     })
 }
 
+static MAC: std::sync::LazyLock<HostProfile> = std::sync::LazyLock::new(|| {
+    HostProfile::new(
+        crate::environment::PlatformFamily::MacOs,
+        crate::environment::MachineArchitecture::Arm64,
+        "",
+    )
+});
+
 fn healthy<'a>(instance: &'a InstanceRecord, runtimes: &'a [JavaRuntime]) -> Facts<'a> {
     Facts {
         instance,
         launchable_loaders: &[Loader::Vanilla, Loader::Fabric],
         runtimes,
-        required_java: Some(21),
+        java_needs: JavaNeeds::new(&instance.game_version, instance.loader, Some(21)),
+        auto_install_java: false,
+        host: &MAC,
         has_account: true,
         damaged_files: Some(0),
         mods: &[],
@@ -157,6 +167,65 @@ fn an_older_java_is_not_enough_but_a_newer_one_is() {
     );
     let newer = [java(25)];
     assert!(diagnose(&healthy(&instance, &newer)).is_empty());
+}
+
+#[test]
+fn a_missing_java_that_the_launch_downloads_is_only_information() {
+    let instance = record(Loader::Vanilla, true);
+    let mut facts = healthy(&instance, &[]);
+    facts.auto_install_java = true;
+    assert_eq!(
+        diagnose(&facts),
+        [Problem {
+            severity: Severity::Info,
+            kind: ProblemKind::JavaWillDownload { major: Some(21) },
+        }]
+    );
+}
+
+#[test]
+fn a_chosen_java_that_cannot_run_the_game_and_advice_are_told_apart() {
+    let dir = tempfile::tempdir().unwrap();
+    let make = |name: &str, version: &str| {
+        let home = dir.path().join(name);
+        fs::create_dir_all(home.join("bin")).unwrap();
+        fs::write(home.join("bin/java"), "").unwrap();
+        fs::write(home.join("release"), format!("JAVA_VERSION=\"{version}\"")).unwrap();
+        JavaRuntime::inspect(&home).unwrap()
+    };
+    let (java8, java17) = (make("j8", "1.8.0_412"), make("j17", "17.0.9"));
+    let mut instance = record(Loader::Forge, true);
+    instance.game_version = "1.12.2".into();
+    instance.settings.java_path = Some(java17.home().to_owned());
+    let runtimes = [java8.clone(), java17.clone()];
+    let mut facts = healthy(&instance, &runtimes);
+    facts.launchable_loaders = &[Loader::Forge];
+    facts.java_needs = JavaNeeds::new("1.12.2", Loader::Forge, Some(8))
+        .with_start("net.minecraft.launchwrapper.Launch", &[]);
+    let kinds: Vec<_> = diagnose(&facts).into_iter().map(|p| p.kind).collect();
+    assert_eq!(
+        kinds,
+        [ProblemKind::JavaMismatch {
+            chosen: 17,
+            needed: 8
+        }]
+    );
+
+    // 1.16.5 Forge on Java 17 starts, but Java 8 is what it is tested on.
+    let mut instance = record(Loader::Forge, true);
+    instance.game_version = "1.16.5".into();
+    let only17 = [java17];
+    let mut facts = healthy(&instance, &only17);
+    facts.launchable_loaders = &[Loader::Forge];
+    facts.java_needs = JavaNeeds::new("1.16.5", Loader::Forge, Some(8));
+    let kinds: Vec<_> = diagnose(&facts).into_iter().map(|p| p.kind).collect();
+    assert_eq!(
+        kinds,
+        [ProblemKind::JavaAdvice {
+            advised: 8,
+            chosen_by_user: false
+        }]
+    );
 }
 
 #[test]

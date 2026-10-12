@@ -489,6 +489,13 @@ pub(super) fn load_section(
                     .await
                     .map_err(|error| error.to_string()),
             ),
+            Section::Java => Arrived::Java(
+                service
+                    .instance_java(&id)
+                    .await
+                    .map(Box::new)
+                    .map_err(|error| error.to_string()),
+            ),
         }
     });
     cx.spawn(async move |cx| {
@@ -615,6 +622,7 @@ pub(super) fn failed_section(section: Section, detail: String) -> Arrived {
         Section::Problems => Arrived::Problems(Err(detail)),
         Section::Files => Arrived::Files(String::new(), Err(detail)),
         Section::Size => Arrived::Size(Err(detail)),
+        Section::Java => Arrived::Java(Err(detail)),
     }
 }
 

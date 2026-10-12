@@ -20,6 +20,31 @@ impl<T: Transport + Clone> LauncherService<T> {
             .map_or(TRANSFER_CONCURRENCY, |count| count as usize)
     }
 
+    /// [`Self::install_tracked`] through a new launcher that may download the
+    /// Java a Forge or NeoForge installer runs on.
+    pub(super) async fn install_serving_java(
+        &self,
+        task: u64,
+        chain: crate::transfer::SourceChain,
+        request: LaunchRequest,
+        updates: mpsc::UnboundedSender<LaunchUpdate>,
+        cancel: CancellationToken,
+    ) -> Result<(), ServiceError> {
+        let (launcher, java_requests) = self
+            .with_java_installer(
+                Launcher::new(self.transport.clone(), chain)
+                    .with_concurrency(request.download_concurrency),
+            )
+            .await;
+        let watch = cancel.clone();
+        self.serving_java(
+            java_requests,
+            &watch,
+            Self::install_tracked(&self.board, task, &launcher, request, updates, cancel),
+        )
+        .await
+    }
+
     /// Installs through `launcher`, passing its updates on while showing their
     /// file counts as the task's progress.
     pub(super) async fn install_tracked(

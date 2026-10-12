@@ -117,7 +117,12 @@ pub use install::{
 pub use instance::{
     Collection, InstanceRecord, InstanceSettings, InstanceStore, Loader, NewInstance, StoreError,
 };
-pub use java::{JavaLocator, JavaRuntime, choose as choose_java, parse_major as parse_java_major};
+pub use java::{
+    JavaChoice, JavaLocator, JavaNeeds, JavaRule, JavaRuntime, RuleStrength, choose as choose_java,
+    install_major as java_install_major, parse_major as parse_java_major,
+};
+pub use java_runtime::JavaSource;
+pub use java_runtime::graalvm::LICENSE_URL as GRAALVM_LICENSE_URL;
 pub use launch::{
     LaunchContext, LaunchDirectories, LaunchError, LaunchPlan, NativeArchive, RequiredDownload,
 };
@@ -168,9 +173,9 @@ pub use screenshots::{ScreenshotError, ScreenshotInfo};
 pub use servers::{PackPolicy, PingError, ProtocolVersion, ServerEntry, ServerError, ServerStatus};
 pub use service::{
     ActivityView, AppearanceApplyResult, ContentEffect, ContentResult, DependencyNeed,
-    DependencyReport, DiscoverFilters, GameLogSource, GameLogs, InstalledProject, LauncherService,
-    Library, ModelPreview, ProfileSnapshot, ProjectDetail, ServiceError, ThirdPartySignIn,
-    now as unix_now,
+    DependencyReport, DiscoverFilters, GameLogSource, GameLogs, InstalledProject, InstanceJava,
+    LauncherService, Library, ModelPreview, ProfileSnapshot, ProjectDetail, ServiceError,
+    ThirdPartySignIn, now as unix_now,
 };
 pub use settings::{
     AccountEntry, AccountKind, AuthServerEntry, DownloadSourcePreference, LauncherSettings,
@@ -193,10 +198,11 @@ pub use storage::{
 };
 pub use transfer::USER_AGENT;
 pub use transfer::{
-    ByteStream, DefaultTransport, FileTransport, HttpMethod, HttpRequest, HttpTransport,
-    OfficialSource, PrefixMirror, RetryPolicy, SourceChain, SourceFailure, SourceProvider,
-    TransferBatchReport, TransferEngine, TransferError, TransferEvent, TransferOutcome,
-    TransferRequest, Transport, TransportError, TransportFuture, TransportResponse,
+    ByteStream, ContentDigest, DefaultTransport, FileTransport, HttpMethod, HttpRequest,
+    HttpTransport, OfficialSource, PrefixMirror, RetryPolicy, SourceChain, SourceFailure,
+    SourceProvider, TransferBatchReport, TransferEngine, TransferError, TransferEvent,
+    TransferOutcome, TransferRequest, Transport, TransportError, TransportFuture,
+    TransportResponse,
 };
 pub use tuning::{
     AfterLaunch, Appearance, DOWNLOAD_CONCURRENCY, DiscoverPreferences, EnvVar, FONT_SCALE_PERCENT,

@@ -17,6 +17,7 @@ pub mod history;
 pub mod home;
 pub mod i18n;
 pub mod instance_detail;
+pub mod java_conflict;
 pub mod key;
 pub mod kit;
 pub mod live;

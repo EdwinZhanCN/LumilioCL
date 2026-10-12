@@ -1,7 +1,6 @@
 use super::super::{InstanceDetailView, InstanceIntent};
 use super::saves::{
-    after_launch, cleared, commands, environment, game_arguments, java, jvm_arguments, quick_play,
-    window,
+    after_launch, cleared, commands, environment, game_arguments, jvm_arguments, quick_play, window,
 };
 use super::texts::{
     NONE_ON_PURPOSE, after_launch_text, command_text, followed, quick_play_text, window_text,
@@ -13,7 +12,7 @@ use crate::settings_forms as shared;
 use crate::theme::ShellColors;
 use crate::{kit, live, tr};
 use gpui::prelude::*;
-use gpui::{AnyElement, Context};
+use gpui::{AnyElement, Context, Window};
 use lumilio_core::{AfterLaunch, EnvVar, LauncherSettings, QuickPlay, recommended_memory_mb};
 use std::rc::Rc;
 
@@ -275,47 +274,15 @@ impl InstanceDetailView {
         kit::list(rows, colors).into_any_element()
     }
 
-    pub(super) fn group_java(&self, colors: ShellColors) -> AnyElement {
+    pub(super) fn group_java(
+        &mut self,
+        window: &mut Window,
+        colors: ShellColors,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let mut rows = self.java_row(window, colors, cx);
         let record = self.record.as_ref().expect("loaded");
         let own = record.settings.clone();
-        let java_row = {
-            let current = own.clone();
-            // ia[instance.settings]: 指定 Java | 设置 · Java 组，值 + [编辑] 弹窗 | 路径留空自动选择；保存时检查路径存在；已发现的 Java 列表在全局设置·Java
-            self.setting_row(
-                "isettings-java",
-                "Java",
-                Some(tr!("instance-settings-java-help").to_owned()),
-                own.java_path.as_ref().map_or_else(
-                    || tr!("instance-settings-java-auto").to_owned(),
-                    |path| path.display().to_string(),
-                ),
-                Some(self.edit_spec("isettings-java-edit", move || DialogSpec {
-                    title: "Java",
-                    intro: Some(tr!("instance-settings-java-intro")),
-                    fields: vec![FieldSpec {
-                        label: tr!("instance-settings-path"),
-                        help: None,
-                        placeholder: tr!("instance-settings-java-auto"),
-                        value: current
-                            .java_path
-                            .as_ref()
-                            .map(|path| path.display().to_string())
-                            .unwrap_or_default(),
-                        kind: FieldKind::Path {
-                            files: true,
-                            directories: true,
-                            prompt: tr!("instance-settings-java-pick"),
-                        },
-                    }],
-                    parse: {
-                        let current = current.clone();
-                        Rc::new(move |values| java(&current, &values[0]))
-                    },
-                    reset: cleared(&current, |next| next.java_path = None),
-                })),
-                colors,
-            )
-        };
         let jvm_row = {
             let current = own.clone();
             let default = list_text(&self.defaults.launch.jvm_arguments);
@@ -348,7 +315,8 @@ impl InstanceDetailView {
                 colors,
             )
         };
-        kit::list(vec![java_row, jvm_row], colors).into_any_element()
+        rows.push(jvm_row);
+        kit::list(rows, colors).into_any_element()
     }
 
     pub(in super::super) fn machine_memory_row(
