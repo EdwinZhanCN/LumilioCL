@@ -124,6 +124,10 @@ upstream; its lib tests also write `simple_cube.litematic`,
   `a_truncated_block_state_array_is_a_parse_error`. `test_parse_regions`
   encoded a stone as palette index 2 of a two-entry palette; its data now uses
   index 1.
+- Overlapping regions (`src/meshing/mod.rs` `compute_mesh_output`): regions
+  are collected in a fixed order (default, then by name) and where they
+  overlap the first block keeps the cell. Guard:
+  `overlapping_regions_draw_one_block_per_cell`.
 - Entity texture renames (`src/meshing/mod.rs` `with_mesher_texture_aliases`):
   renamed textures are aliased instead of copied, and every old flat
   `entity/<file>` the pack lacks answers for its one moved `entity/<folder>/<file>`

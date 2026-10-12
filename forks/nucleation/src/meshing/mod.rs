@@ -1047,9 +1047,32 @@ impl UniversalSchematic {
             &mut max,
         );
 
-        // Process other regions
-        for region in self.other_regions.values() {
+        // Process other regions in a fixed order (they live in a hash map). Where
+        // regions overlap, the block collected first keeps the cell: drawing
+        // both stacked two blocks in one place, in a different order each
+        // load. (LumilioCL local change; see `forks/README.md`.)
+        let mut others: Vec<&Region> = self.other_regions.values().collect();
+        others.sort_by(|a, b| a.name.cmp(&b.name));
+        for region in &others {
             collect_region_blocks(region, &mut all_blocks, &mut palette, &mut min, &mut max);
+        }
+        let boxes: Vec<_> = std::iter::once(&self.default_region)
+            .chain(others.iter().copied())
+            .map(Region::get_bounding_box)
+            .collect();
+        let overlap = boxes.iter().enumerate().any(|(i, a)| {
+            boxes[i + 1..].iter().any(|b| {
+                a.min.0 <= b.max.0
+                    && b.min.0 <= a.max.0
+                    && a.min.1 <= b.max.1
+                    && b.min.1 <= a.max.1
+                    && a.min.2 <= b.max.2
+                    && b.min.2 <= a.max.2
+            })
+        });
+        if overlap {
+            let mut seen = rustc_hash::FxHashSet::default();
+            all_blocks.retain(|(pos, _)| seen.insert(*pos));
         }
         phase!(t1, "collect_region_blocks");
 
@@ -2148,6 +2171,43 @@ mod tests {
                 .is_some(),
             "schematic-mesher's armor stand model currently requests the legacy wood alias"
         );
+    }
+
+    /// Two Litematica regions may overlap. Drawing both stacked two cubes in
+    /// one cell; the region collected first keeps it.
+    #[test]
+    fn overlapping_regions_draw_one_block_per_cell() {
+        use schematic_mesher::resource_pack::TextureData;
+
+        let mut pack = ResourcePack::new();
+        pack.add_blockstate(
+            "minecraft",
+            "stone",
+            serde_json::from_str(r#"{"variants":{"":{"model":"minecraft:block/stone"}}}"#)
+                .unwrap(),
+        );
+        let face = r##"{"texture":"#all"}"##;
+        pack.add_model(
+            "minecraft",
+            "block/stone",
+            serde_json::from_str(&format!(
+                r#"{{"textures":{{"all":"minecraft:block/stone"}},"elements":[{{"from":[0,0,0],"to":[16,16,16],"faces":{{"down":{face},"up":{face},"north":{face},"south":{face},"west":{face},"east":{face}}}}}]}}"#
+            ))
+            .unwrap(),
+        );
+        pack.add_texture("minecraft", "block/stone", TextureData::new(1, 1, vec![9, 9, 9, 255]));
+        let pack = ResourcePackSource::from_resource_pack(pack);
+
+        let stone = BlockState::new("minecraft:stone".to_string());
+        let mut schematic = UniversalSchematic::new("overlap".to_string());
+        schematic.set_block(0, 0, 0, &stone);
+        for name in ["b", "c"] {
+            let mut region = Region::new(name.to_string(), (0, 0, 0), (1, 1, 1));
+            region.set_block(0, 0, 0, &stone);
+            schematic.add_region(region);
+        }
+        let mesh = schematic.to_mesh(&pack, &MeshConfig::default()).unwrap();
+        assert_eq!(mesh.total_vertices(), 24, "one cube, six faces");
     }
 
     /// 26.x moved `entity/banner_base.png` and `entity/enchanting_table_book.png`
