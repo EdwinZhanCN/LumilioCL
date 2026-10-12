@@ -8,6 +8,7 @@
 mod accounts;
 mod discover;
 mod dispatch;
+mod game_settings;
 mod instance;
 mod instance_plugins;
 mod instance_write;

@@ -31,6 +31,7 @@ pub struct Launcher<T> {
     sources: SourceChain,
     concurrency: usize,
     spawned: Option<mpsc::UnboundedSender<()>>,
+    before_start: Option<mpsc::UnboundedSender<tokio::sync::oneshot::Sender<Result<(), String>>>>,
 }
 
 impl<T> Launcher<T>
@@ -45,12 +46,21 @@ where
             sources,
             concurrency,
             spawned: None,
+            before_start: None,
         }
     }
 
     /// Service-level observation starts only after the OS creates a process.
     pub(crate) fn with_spawned(mut self, sender: mpsc::UnboundedSender<()>) -> Self {
         self.spawned = Some(sender);
+        self
+    }
+
+    pub(crate) fn with_before_start(
+        mut self,
+        sender: mpsc::UnboundedSender<tokio::sync::oneshot::Sender<Result<(), String>>>,
+    ) -> Self {
+        self.before_start = Some(sender);
         self
     }
 

@@ -75,9 +75,10 @@ pub fn problem_action(kind: &ProblemKind) -> Option<(ProblemAction, &'static str
         ProblemKind::WrongLoaderMods { .. } | ProblemKind::DuplicateMods { .. } => {
             (ProblemAction::Content, tr!("instance-action-go-content"))
         }
-        ProblemKind::LowMemory { .. } => {
-            (ProblemAction::Settings(3), tr!("instance-action-go-adjust"))
-        }
+        ProblemKind::LowMemory { .. } => (
+            ProblemAction::Settings(super::super::SETTINGS_PERFORMANCE),
+            tr!("instance-action-go-adjust"),
+        ),
         ProblemKind::LastSessionFailed(_) | ProblemKind::Finding(_) => {
             (ProblemAction::Logs, tr!("instance-view-logs"))
         }

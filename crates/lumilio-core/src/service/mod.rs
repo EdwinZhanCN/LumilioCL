@@ -14,6 +14,7 @@ mod content_install;
 mod diagnostics;
 mod discover;
 mod error;
+mod game_settings;
 mod install;
 mod instances;
 mod java;

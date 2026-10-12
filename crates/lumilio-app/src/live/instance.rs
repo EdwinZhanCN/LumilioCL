@@ -103,6 +103,17 @@ pub(super) fn instance_intent(
 ) {
     match intent {
         InstanceIntent::Play => play(wiring, id.to_owned(), window, cx),
+        InstanceIntent::ChoosePreset => {
+            super::game_settings::choose_preset(wiring, id.to_owned(), view, window, cx)
+        }
+        InstanceIntent::EditOption(key) => {
+            super::game_settings::edit_option(wiring, id.to_owned(), key, view, window, cx)
+        }
+        write @ (InstanceIntent::SetOption { .. }
+        | InstanceIntent::ResolveOptions { .. }
+        | InstanceIntent::RecoverOptions) => {
+            super::game_settings::write_option(wiring, id.to_owned(), view, write, cx)
+        }
         InstanceIntent::OpenRuntimeChange => {
             open_runtime_change(wiring, id.to_owned(), view, window, cx)
         }
@@ -489,6 +500,13 @@ pub(super) fn load_section(
                     .await
                     .map_err(|error| error.to_string()),
             ),
+            Section::GameOptions => Arrived::GameOptions(
+                service
+                    .game_options(&id)
+                    .await
+                    .map(Box::new)
+                    .map_err(|error| error.to_string()),
+            ),
         }
     });
     cx.spawn(async move |cx| {
@@ -615,6 +633,7 @@ pub(super) fn failed_section(section: Section, detail: String) -> Arrived {
         Section::Problems => Arrived::Problems(Err(detail)),
         Section::Files => Arrived::Files(String::new(), Err(detail)),
         Section::Size => Arrived::Size(Err(detail)),
+        Section::GameOptions => Arrived::GameOptions(Err(detail)),
     }
 }
 

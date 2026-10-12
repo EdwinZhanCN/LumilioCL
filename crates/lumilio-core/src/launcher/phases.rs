@@ -362,6 +362,22 @@ where
             }
         }
 
+        if let Some(before_start) = &self.before_start {
+            let (reply, ready) = tokio::sync::oneshot::channel();
+            before_start.send(reply).map_err(|_| {
+                LaunchServiceError::GameSettings("settings preparation disconnected".into())
+            })?;
+            ready
+                .await
+                .map_err(|_| {
+                    LaunchServiceError::GameSettings("settings preparation interrupted".into())
+                })?
+                .map_err(LaunchServiceError::GameSettings)?;
+        }
+        if cancel.is_cancelled() {
+            return Err(LaunchServiceError::Cancelled);
+        }
+
         for note in request.session.notes() {
             let _ = updates.send(LaunchUpdate::Log {
                 stream: LogStream::Stderr,

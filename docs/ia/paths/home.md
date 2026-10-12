@@ -6,6 +6,7 @@
 
 | 操作 | 层 / 组件 | 结果与反馈 | 备注 | 实现 |
 |---|---|---|---|---|
+| 处理游戏选项 | 需要留意里的游戏选项行「处理…」 | 打开该游戏的 设置 › 选项，待决定的修改在最上面 |  | `lumilio-ui/src/game_settings/mod.rs` |
 | 继续 | 英雄区主按钮「继续」 | 启动当前游戏，英雄区进入启动时刻；跟随当前游戏（导航右下角芯片） |  | `lumilio-ui/src/home/launching.rs` |
 | 取消启动 | 启动时刻里的「取消」 | 停止本次启动，回到继续状态 |  | `lumilio-ui/src/home/launching.rs` |
 | 结束游戏 | 游戏运行中的「结束游戏」 | 停止游戏进程 |  | `lumilio-ui/src/home/launching.rs` |

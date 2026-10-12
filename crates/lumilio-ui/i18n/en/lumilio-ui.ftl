@@ -1298,6 +1298,7 @@ instance-settings-quick-world-invalid = That world name isn't a valid save folde
 instance-settings-quick-host-invalid = The server address isn't a valid host name
 instance-settings-quick-port-invalid = The port must be a number from 1 to 65535
 instance-settings-tab-game = Game
+instance-settings-tab-options = Options
 instance-settings-tab-runtime = Runtime
 instance-settings-tab-java = Java
 instance-settings-tab-performance = Performance
@@ -1764,3 +1765,278 @@ map-edit-initials-invalid = Initials are at most 2 characters and cannot contain
 map-edit-unlinked = This world is not linked to Xaero's Minimap data.
 map-edit-unsupported = This layer cannot be edited.
 map-chunks-hidden = Chunk lines are hidden when zoomed out.
+
+## Game options and presets
+library-tab-presets = Presets
+preset-count = { $count ->
+    [one] { $count } preset
+   *[other] { $count } presets
+    }
+preset-search = Search options
+preset-new = New preset…
+preset-create-title = New preset
+preset-create = Create
+preset-name = Name
+preset-name-placeholder = For example: Everyday
+preset-source = Read options from
+preset-source-none = No games yet
+preset-share = Share
+preset-group-controls-detail = Key bindings, mouse sensitivity, auto-jump, toggle sneak and sprint
+preset-group-sound-detail = Master volume and every sound category
+preset-group-video-detail = Render distance, frame rate, FOV, brightness, GUI scale; often differ by modpack
+preset-group-chat-detail = Chat visibility, colors, size and opacity
+preset-group-accessibility-detail = Subtitles, high contrast, screen and FOV effects
+preset-group-general-detail = Game language
+preset-rename-title = Rename preset
+preset-copy-title = Copy preset
+preset-copy-name = { $name } copy
+preset-copy-commit = Copy
+preset-scope-title = Shared options
+preset-scope-help = Cleared options stop syncing, and each game keeps its own. The preset keeps their values, so you can share them again later.
+preset-scope = Shared options…
+preset-rename = Rename…
+preset-copy = Copy…
+preset-delete = Delete…
+preset-delete-title = Delete “{ $name }”?
+preset-delete-body = The preset’s options are deleted with it. Games keep their own options.
+preset-list-detail = { $options ->
+    [one] { $options } option
+   *[other] { $options } options
+    } · { $games ->
+    [one] { $games } game
+   *[other] { $games } games
+    }
+preset-detail-facts = { $options ->
+    [one] Shares { $options } option
+   *[other] Shares { $options } options
+    } · { $games ->
+    [one] used by { $games } game
+   *[other] used by { $games } games
+    }
+preset-games = Games using it
+preset-games-help = Changes here reach these games the next time they launch. Options changed in a game never go back into the preset on their own; you decide in that game’s Settings › Options.
+preset-games-none = No game uses it yet. Choose this preset in a game’s Settings › Options.
+preset-game-open = Open
+preset-left-out = { $count ->
+    [one] { $count } more option is not shared; its value stays in the preset.
+   *[other] { $count } more options are not shared; their values stay in the preset.
+    }
+preset-empty = No presets yet
+preset-empty-help = A preset keeps in-game options such as key bindings and volume in sync across games. Start from a game you have played.
+preset-load-failed = Couldn’t read the presets.
+preset-fields = { $count ->
+    [one] Shares { $count } option
+   *[other] Shares { $count } options
+    }
+preset-on = On
+preset-off = Off
+preset-group-controls = Keys and mouse
+preset-group-sound = Volume
+preset-group-general = Language
+preset-group-chat = Chat
+preset-group-accessibility = Accessibility
+preset-group-video = Graphics and performance
+preset-created = Created “{ $name }”.
+preset-renamed = Renamed to “{ $name }”.
+preset-copied = Copied as “{ $name }”.
+preset-scope-saved = Shared options saved. Games get them on their next launch.
+preset-deleted = Preset deleted.
+preset-stale = The preset just changed somewhere else and has been read again. Try again.
+preset-save-failed-detail = Couldn’t save.
+    { $detail }
+preset-delete-failed-detail = Couldn’t delete the preset.
+    { $detail }
+preset-load-failed-detail = Couldn’t read the presets.
+    { $detail }
+preset-attention = Options changed in the game
+preset-attention-help = { $count ->
+    [one] { $count } change waits for you to decide whether to share it.
+   *[other] { $count } changes wait for you to decide whether to share them.
+    }
+preset-attention-review = Review…
+preset-attention-recovery = Confirm the game has closed
+preset-attention-error = Options couldn’t sync
+preset-attention-error-help = The game’s own options are unchanged. Open Settings › Options to see why.
+options-loading = Reading options…
+options-load-failed = Couldn’t read this game’s options.
+options-busy = The game is running. Options can be changed after it closes.
+options-preset = Preset
+options-preset-help = A game that uses a preset receives the preset’s shared options before each launch. Without a preset, the game uses only its own options.
+options-preset-none = No preset
+options-preset-none-detail = The game manages all of its options
+options-preset-change = Change…
+options-recovery-help = The game did not close normally last time. Once it has closed, check its options. Don’t confirm while it is still open.
+options-recover = Game has closed
+options-sync-failed = Options couldn’t sync last time. The game’s own options are unchanged.
+options-skipped = { $count ->
+    [one] { $count } preset option was not applied
+   *[other] { $count } preset options were not applied
+    }
+options-skipped-help = This game’s options file doesn’t have them, or its version doesn’t support them. The game writes its options on its first launch; the preset applies from the launch after.
+options-missing = No options yet
+options-missing-help = Launch the game once, then change its options here.
+options-unsupported = Options of { $version } can’t be changed here yet
+options-unsupported-help = Change them in the game.
+options-unreadable = Couldn’t read this game’s options file.
+options-none = No options can be changed here.
+options-no-match = No matching options
+options-following = From preset · { $value }
+options-override = This game only · { $value }
+options-pending = Undecided · { $value }
+options-follow = Use preset value ({ $value })
+options-note-shared = Preset “{ $preset }” shares this option. Saving here changes only this game; the preset and other games stay as they are.
+options-out-of-range = Enter a whole number from { $min } to { $max }.
+options-change = { $before } → { $after }
+options-chunks = { $count ->
+    [one] { $count } chunk
+   *[other] { $count } chunks
+    }
+options-unlimited = Unlimited
+options-auto = Auto
+options-choice-chatvisibility-0 = Shown
+options-choice-chatvisibility-1 = Commands only
+options-choice-chatvisibility-2 = Hidden
+options-key-unbound = Not bound
+options-key-space = Space
+options-key-left = Left { $key }
+options-key-right = Right { $key }
+options-key-keypad = Keypad { $key }
+options-key-mouse-left = Left mouse button
+options-key-mouse-right = Right mouse button
+options-key-mouse-middle = Middle mouse button
+options-key-mouse = Mouse button { $button }
+options-bind-title = Choose preset
+options-bind-no-presets = No presets yet. Make one from a game in Library › Presets.
+options-bind-commit = Use preset
+options-unbind-commit = Stop using
+options-bind-recovery = Confirm the last game has closed before changing the preset.
+options-bind-pending = Decide on the options changed in the game before changing the preset.
+options-bind-none-preview = Options stop syncing. This game keeps its current options.
+options-bind-first-launch = The game has no options file yet. It writes one on its first launch, and the preset applies from the launch after.
+options-bind-same = This game’s options already match the preset.
+options-bind-changes = { $count ->
+    [one] The next launch changes { $count } option:
+   *[other] The next launch changes { $count } options:
+    }
+options-bind-missing = { $count ->
+    [one] { $count } more option isn’t in this game and won’t be applied.
+   *[other] { $count } more options aren’t in this game and won’t be applied.
+    }
+options-bound = Now uses “{ $name }”. Applies on the next launch.
+options-unbound = No longer uses a preset. The game keeps its current options.
+options-review-title = { $count ->
+    [one] { $count } option changed in the game
+   *[other] { $count } options changed in the game
+    }
+options-review-help = The preset shares these options. “This game only” keeps the change here; “Update preset” gives it to other games on their next launch; “Use preset value” restores the preset’s value on the next launch.
+options-review-none-selected = Select the options to decide on
+options-review-selected = { $count } selected
+options-keep-here = This game only
+options-share = Update preset
+options-restore = Use preset value
+options-review-conflict = The preset changed it to { $value } too
+options-review-conflict-help = The preset also changed the selected options.
+options-review-replace = Replace with this game’s values…
+options-replace-title = { $count ->
+    [one] Replace { $count } preset option with this game’s value?
+   *[other] Replace { $count } preset options with this game’s values?
+    }
+options-replace-body = The preset’s new values are replaced. Other games that use this preset get this game’s values on their next launch.
+options-replace = Replace
+options-resolved = { $count ->
+    [one] Decided { $count } option. Applies on the next launch.
+   *[other] Decided { $count } options. Applies on the next launch.
+    }
+options-checked = Options checked.
+options-conflict = { $count ->
+    [one] The preset also changed { $count } of them. Review before deciding.
+   *[other] The preset also changed { $count } of them. Review before deciding.
+    }
+options-stale = The options just changed somewhere else and have been read again. Try again.
+options-save-failed = Couldn’t save the options.
+options-status-busy = Running
+options-status-recovery = Confirm it has closed
+options-status-error = Couldn’t sync
+options-status-pending = { $count } undecided
+options-status-overrides = { $count ->
+    [one] { $count } kept for this game
+   *[other] { $count } kept for this game
+    }
+options-status-following = Follows the preset
+preset-setting-soundcategory-master = Master volume
+preset-setting-soundcategory-music = Music
+preset-setting-soundcategory-record = Jukeboxes and note blocks
+preset-setting-soundcategory-weather = Weather
+preset-setting-soundcategory-block = Blocks
+preset-setting-soundcategory-hostile = Hostile creatures
+preset-setting-soundcategory-neutral = Friendly creatures
+preset-setting-soundcategory-player = Players
+preset-setting-soundcategory-ambient = Ambient
+preset-setting-soundcategory-voice = Voice
+preset-setting-soundcategory-ui = UI sounds
+preset-setting-fov = Field of view
+preset-setting-gamma = Brightness
+preset-setting-renderdistance = Render distance
+preset-setting-simulationdistance = Simulation distance
+preset-setting-maxfps = Frame rate limit
+preset-setting-guiscale = GUI scale
+preset-setting-mipmaplevels = Mipmap levels
+preset-setting-entityshadows = Entity shadows
+preset-setting-bobview = View bobbing
+preset-setting-mousesensitivity = Mouse sensitivity
+preset-setting-invertymouse = Invert mouse
+preset-setting-autojump = Auto jump
+preset-setting-rawmouseinput = Raw mouse input
+preset-setting-togglecrouch = Toggle crouch
+preset-setting-togglesprint = Toggle sprint
+preset-setting-lang = Language
+preset-setting-subtitles = Subtitles
+preset-setting-highcontrast = High contrast
+preset-setting-darknesseffectscale = Darkness effect
+preset-setting-damagetiltstrength = Damage tilt
+preset-setting-screeneffectscale = Screen effects
+preset-setting-foveffectscale = FOV effects
+preset-setting-chatvisibility = Chat visibility
+preset-setting-chatcolors = Chat colors
+preset-setting-chatlinks = Chat links
+preset-setting-chatlinksprompt = Ask before opening links
+preset-setting-chatopacity = Chat opacity
+preset-setting-chatscale = Chat scale
+preset-setting-chatwidth = Chat width
+preset-setting-chatheightfocused = Focused chat height
+preset-setting-chatheightunfocused = Unfocused chat height
+preset-setting-chatbackgroundopacity = Chat background opacity
+preset-setting-chatlinespacing = Chat line spacing
+preset-setting-key-forward = Move forward
+preset-setting-key-left = Strafe left
+preset-setting-key-back = Move backward
+preset-setting-key-right = Strafe right
+preset-setting-key-jump = Jump
+preset-setting-key-sneak = Sneak
+preset-setting-key-sprint = Sprint
+preset-setting-key-inventory = Inventory
+preset-setting-key-swapoffhand = Swap offhand item
+preset-setting-key-drop = Drop item
+preset-setting-key-use = Use item
+preset-setting-key-attack = Attack
+preset-setting-key-pickitem = Pick block
+preset-setting-key-chat = Open chat
+preset-setting-key-playerlist = Player list
+preset-setting-key-command = Command
+preset-setting-key-screenshot = Screenshot
+preset-setting-key-toggleperspective = Toggle perspective
+preset-setting-key-smoothcamera = Smooth camera
+preset-setting-key-fullscreen = Toggle fullscreen
+preset-setting-key-spectatoroutlines = Spectator outlines
+preset-setting-key-advancements = Advancements
+preset-setting-key-savetoolbaractivator = Save hotbar
+preset-setting-key-loadtoolbaractivator = Load hotbar
+preset-setting-key-hotbar-1 = Hotbar 1
+preset-setting-key-hotbar-2 = Hotbar 2
+preset-setting-key-hotbar-3 = Hotbar 3
+preset-setting-key-hotbar-4 = Hotbar 4
+preset-setting-key-hotbar-5 = Hotbar 5
+preset-setting-key-hotbar-6 = Hotbar 6
+preset-setting-key-hotbar-7 = Hotbar 7
+preset-setting-key-hotbar-8 = Hotbar 8
+preset-setting-key-hotbar-9 = Hotbar 9

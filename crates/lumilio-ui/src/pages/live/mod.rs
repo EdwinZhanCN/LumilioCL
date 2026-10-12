@@ -7,6 +7,7 @@ mod controls;
 mod discover;
 mod home;
 mod library;
+mod presets;
 
 #[cfg(test)]
 mod tests;
@@ -17,6 +18,7 @@ pub use self::controls::{DiscoverChangeHandler, LiveControls, LiveCtx, all_loade
 pub use self::discover::{discover, kind_label, project_icon};
 pub use self::home::{HOME_RECENT, home_sections, record_readings};
 pub use self::library::{
-    COLLECTIONS_TAB, LIBRARY_LOADER, LIBRARY_SORT, arranged, library, library_tabs, loader_code,
-    present_loaders, sort_labels,
+    COLLECTIONS_TAB, LIBRARY_LOADER, LIBRARY_SORT, PRESETS_TAB, arranged, library, library_tabs,
+    loader_code, present_loaders, sort_labels,
 };
+pub use self::presets::{PRESET_GROUP, presets, shown_preset};

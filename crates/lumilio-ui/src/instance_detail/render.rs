@@ -44,6 +44,16 @@ impl Render for InstanceDetailView {
         if std::mem::take(&mut self.refresh_logs) && self.data.has(Section::Logs) {
             self.request(Section::Logs, window, cx);
         }
+        if std::mem::take(&mut self.refresh_options) && self.data.has(Section::GameOptions) {
+            self.request(Section::GameOptions, window, cx);
+        }
+        // However the 选项 group was opened, it reads what it shows.
+        if self.record.is_some()
+            && self.tab == super::TAB_SETTINGS
+            && self.settings_sub == super::SETTINGS_OPTIONS
+        {
+            self.ensure(Section::GameOptions, window, cx);
+        }
         if self.refresh_analysis && !self.data.pending.contains(&Section::Problems) {
             self.refresh_analysis = false;
             if self.data.has(Section::Problems) {

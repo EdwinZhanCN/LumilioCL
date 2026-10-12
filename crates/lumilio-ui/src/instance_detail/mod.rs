@@ -19,6 +19,10 @@ mod tests;
 
 pub use self::intent::{InstanceIntent, Section};
 pub use self::panels::{Arrived, ProblemAction, export_notice, problem_action, problem_text};
+pub use self::settings::{
+    SETTINGS_ADVANCED, SETTINGS_GAME, SETTINGS_JAVA, SETTINGS_OPTIONS, SETTINGS_PERFORMANCE,
+    SETTINGS_RUNTIME,
+};
 
 use self::editors::Editor;
 use self::forms::Fields;
@@ -136,6 +140,12 @@ pub struct InstanceDetailView {
     analysis_serial: u64,
     log_analysis: Option<(u64, String, Option<CrashRead>)>,
     settings_sub: usize,
+    /// 选项: the changes made in the game that are selected for a decision,
+    /// and those whose preset value also changed (shown after a refusal).
+    options_selected: std::collections::BTreeSet<String>,
+    options_conflicts: Vec<String>,
+    /// The game stopped: read its options again on the next render.
+    refresh_options: bool,
     /// The machine's memory in MB, for the memory hint; unknown until told.
     machine_memory_mb: Option<u64>,
     confirm: Option<Confirm>,
@@ -230,6 +240,9 @@ impl InstanceDetailView {
             analysis_serial: 0,
             log_analysis: None,
             settings_sub: 0,
+            options_selected: std::collections::BTreeSet::new(),
+            options_conflicts: Vec::new(),
+            refresh_options: false,
             machine_memory_mb: None,
             confirm: None,
             editor: None,

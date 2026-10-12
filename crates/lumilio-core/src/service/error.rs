@@ -20,6 +20,7 @@ use std::path::PathBuf;
 
 #[derive(Debug)]
 pub enum ServiceError {
+    GameSettings(crate::GameSettingsError),
     Plugin(lumilio_plugin_api::PluginError),
     Store(StoreError),
     Settings(SettingsError),
@@ -65,6 +66,7 @@ pub enum ServiceError {
 impl Display for ServiceError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
+            Self::GameSettings(error) => error.fmt(f),
             Self::Plugin(error) => write!(f, "plugin: {error}"),
             Self::Store(error) => write!(f, "{error}"),
             Self::Settings(error) => write!(f, "{error}"),
@@ -101,6 +103,12 @@ impl Display for ServiceError {
             Self::Snapshot(error) => write!(f, "{error}"),
             Self::Io(error) => write!(f, "{error}"),
         }
+    }
+}
+
+impl From<crate::GameSettingsError> for ServiceError {
+    fn from(error: crate::GameSettingsError) -> Self {
+        Self::GameSettings(error)
     }
 }
 

@@ -2,7 +2,7 @@ use super::intent::{InstanceIntent, Section};
 use super::panels::{Arrived, Confirm};
 use super::{
     CrashRead, InstanceDetailView, Operated, TAB_CONTENT, TAB_DIAGNOSTICS, TAB_HISTORY,
-    TAB_OVERVIEW, TAB_SCREENSHOTS, TAB_WORLDS, TABS, panels, settings,
+    TAB_OVERVIEW, TAB_SCREENSHOTS, TAB_SETTINGS, TAB_WORLDS, TABS, panels, settings,
 };
 use crate::toast::Toast;
 use crate::tr;
@@ -141,6 +141,10 @@ impl InstanceDetailView {
                 self.ask_thumbs = true;
             }
             TAB_DIAGNOSTICS => self.open_diagnostics(window, cx),
+            // Read again each time: a preset may have changed on another page.
+            TAB_SETTINGS if self.settings_sub == settings::SETTINGS_OPTIONS => {
+                self.request(Section::GameOptions, window, cx);
+            }
             TAB_HISTORY => {
                 let section = if self.history_sub == 2 {
                     Section::Snapshots
@@ -185,6 +189,18 @@ impl InstanceDetailView {
             self.ping_servers = true;
         }
         let screenshots = matches!(arrived, Arrived::Screenshots(_));
+        if let Arrived::GameOptions(Ok(options)) = &arrived {
+            // Only changes that still wait can stay selected or in conflict.
+            let waiting = |key: &String| {
+                options
+                    .view
+                    .pending
+                    .iter()
+                    .any(|change| change.setting == *key)
+            };
+            self.options_selected.retain(waiting);
+            self.options_conflicts.retain(waiting);
+        }
         self.data.store(arrived);
         self.filter_plugin_results();
         if screenshots {
@@ -260,6 +276,13 @@ impl InstanceDetailView {
         cx.notify();
     }
 
+    /// Sharing these option changes was refused: the preset changed them too.
+    /// They stay selected and show the preset's value until decided.
+    pub fn options_conflicted(&mut self, keys: Vec<String>, cx: &mut Context<Self>) {
+        self.options_conflicts = keys;
+        cx.notify();
+    }
+
     /// Tells what just happened, as a toast over the page.
     pub fn toast(&mut self, toast: Toast, cx: &mut Context<Self>) {
         self.toasts.push(toast);
@@ -304,6 +327,10 @@ impl InstanceDetailView {
             self.maps_files_changed(cx);
             if self.data.has(Section::Worlds) {
                 self.refresh_worlds = true;
+            }
+            // Leaving the game is when its option changes are found.
+            if self.data.has(Section::GameOptions) {
+                self.refresh_options = true;
             }
             // The game may have taken pictures.
             if self.data.has(Section::Screenshots) {
@@ -405,11 +432,14 @@ impl InstanceDetailView {
                 None => Toast::success(done.notice),
             });
         } else if !self.editor_result(failure, cx) {
-            let toast = match done.technical {
-                Some(detail) => Toast::error(done.notice).technical(detail),
-                None => Toast::success(done.notice),
-            };
-            self.toasts.push(toast);
+            match done.technical {
+                Some(detail) => self
+                    .toasts
+                    .push(Toast::error(done.notice).technical(detail)),
+                // A change the page shows itself (a switch) needs no notice.
+                None if done.notice.is_empty() => {}
+                None => self.toasts.push(Toast::success(done.notice)),
+            }
         }
         // Writes feed the change history and can change what is wrong.
         let mut stale = done.refresh;

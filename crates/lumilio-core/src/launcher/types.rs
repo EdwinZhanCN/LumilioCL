@@ -46,6 +46,7 @@ pub enum LaunchUpdate {
 
 #[derive(Debug)]
 pub enum LaunchServiceError {
+    GameSettings(String),
     /// This loader cannot be installed or started yet.
     LoaderUnsupported(Loader),
     /// A loader instance without a loader version cannot name its release.
@@ -83,6 +84,7 @@ pub enum LaunchServiceError {
 impl Display for LaunchServiceError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
+            Self::GameSettings(error) => f.write_str(error),
             Self::LoaderUnsupported(loader) => {
                 write!(f, "{loader:?} instances cannot be launched yet")
             }

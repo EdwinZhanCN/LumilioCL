@@ -141,11 +141,20 @@ pub(super) fn reload(wiring: &Wiring, what: Reload, cx: &mut App) {
             service.settings().await,
             service.current_instance().await,
             service.library().await.collections,
+            async {
+                Ok::<_, lumilio_core::ServiceError>((
+                    service.settings_presets().await?,
+                    service.all_game_settings().await?,
+                ))
+            }
+            .await,
         )
     });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let Ok((records, summary, activity, settings, current, collections)) = handle.await else {
+        let Ok((records, summary, activity, settings, current, collections, presets)) =
+            handle.await
+        else {
             return;
         };
         if (full && wiring.state.borrow().home_seq != home_seq)
@@ -193,6 +202,14 @@ pub(super) fn reload(wiring: &Wiring, what: Reload, cx: &mut App) {
             }
             shell.update_live(
                 |model| {
+                    match presets {
+                        Ok((presets, instances)) => {
+                            model.settings_presets = presets;
+                            model.game_settings = instances;
+                            model.presets_error = None;
+                        }
+                        Err(error) => model.presets_error = Some(error.to_string()),
+                    }
                     model.set_library(cards, hint);
                     model
                         .attention

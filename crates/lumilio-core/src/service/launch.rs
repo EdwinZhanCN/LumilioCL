@@ -188,15 +188,24 @@ impl<T: Transport + Clone> LauncherService<T> {
         };
         let events = self.plugins.launch_events();
         let (spawned, mut spawned_rx) = mpsc::unbounded_channel();
+        let (before_start, mut preparation_rx) =
+            mpsc::unbounded_channel::<tokio::sync::oneshot::Sender<Result<(), String>>>();
         let launcher = Launcher::new(self.transport.clone(), chain)
             .with_concurrency(request.download_concurrency)
-            .with_spawned(spawned);
-        let launch = launcher.launch(request, updates, cancel);
+            .with_spawned(spawned)
+            .with_before_start(before_start);
+        let launch = launcher.launch(request, updates.clone(), cancel);
         tokio::pin!(launch);
         let mut announced = false;
+        let mut settings_prepared = false;
         let result = loop {
             tokio::select! {
                 biased;
+                Some(reply) = preparation_rx.recv() => {
+                    let result = self.apply_game_settings(id).await.map_err(|e| e.to_string());
+                    settings_prepared = result.is_ok();
+                    let _ = reply.send(result);
+                }
                 Some(()) = spawned_rx.recv(), if !announced => {
                     announced = true;
                     let _ = events.send(event.clone());
@@ -208,6 +217,14 @@ impl<T: Transport + Clone> LauncherService<T> {
         if !announced && spawned_rx.try_recv().is_ok() {
             announced = true;
             let _ = events.send(event);
+        }
+        // Capturing changes is separate from the game's result and history. Failure is
+        // retained on the binding for review instead of turning a clean exit into a crash.
+        if settings_prepared && let Err(error) = self.capture_game_settings(id).await {
+            let _ = updates.send(LaunchUpdate::Log {
+                stream: crate::process::LogStream::Stderr,
+                text: format!("game settings review: {error}"),
+            });
         }
         let exit = match result {
             Ok(exit) => exit,

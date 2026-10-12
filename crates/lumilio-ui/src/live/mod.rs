@@ -52,6 +52,9 @@ use std::sync::Arc;
 /// Everything the live pages show.
 #[derive(Clone, Debug)]
 pub struct LiveModel {
+    pub settings_presets: Vec<lumilio_core::SettingsPreset>,
+    pub game_settings: Vec<lumilio_core::GameSettingsView>,
+    pub presets_error: Option<String>,
     pub library: Vec<LibraryCard>,
     pub collections: Vec<CollectionRow>,
     /// Games with something wrong, for Home.
@@ -90,6 +93,9 @@ pub struct LiveModel {
 impl Default for LiveModel {
     fn default() -> Self {
         Self {
+            settings_presets: Vec::new(),
+            game_settings: Vec::new(),
+            presets_error: None,
             library: Vec::new(),
             collections: Vec::new(),
             attention: Vec::new(),

@@ -137,7 +137,7 @@ fn every_problem_with_something_to_do_names_it() {
         ),
         (
             ProblemKind::LowMemory { max_mb: 512 },
-            ProblemAction::Settings(3),
+            ProblemAction::Settings(crate::instance_detail::SETTINGS_PERFORMANCE),
         ),
         (
             ProblemKind::LastSessionFailed(SessionOutcome::Crashed),
