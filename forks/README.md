@@ -103,6 +103,11 @@ upstream; its lib tests also write `simple_cube.litematic`,
   position bypasses orbit fitting, with a fixed near plane and reversed depth
   (ADR 0036). The existing RenderConfig continues to produce orbit cameras.
 - `UniversalSchematic::undrawable_blocks` (`src/meshing/mod.rs`).
+- Pack normalization (`src/meshing/resource_pack_compat.rs` `normalize_zip`):
+  keeps only the blockstates, models and textures the mesher's loader reads,
+  copies textures without recompressing, and stores rewritten JSON, instead
+  of decompressing and deflating a whole client jar on every load. Guard:
+  `normalized_jars_keep_only_mesher_assets`.
 - Litematic regions (`src/formats/litematic.rs` `parse_regions`): an
   unreadable palette entry becomes air instead of shifting later entries; a
   block index past the palette reads as air, as in Litematica; a truncated
