@@ -199,6 +199,64 @@ public class Probe {
             }
         }
     }
+    /* Mth.sin and Mth.cos of float inputs, as carvers call them. */
+    static void trig(JsonArray out) throws Exception {
+        for (int i = 0; i < 400; i++) {
+            float value = (i - 200) * 0.0371f + (i % 7) * 1.0e-3f;
+            JsonObject row = new JsonObject();
+            row.addProperty("value", value);
+            row.addProperty("sin", ((Number)call(type("util.Mth"), "sin", value)).floatValue());
+            row.addProperty("cos", ((Number)call(type("util.Mth"), "cos", value)).floatValue());
+            out.add(row);
+        }
+    }
+    static long carvedKey(int tx, int tz, int index) {
+        long k = ((long)tx * 0x9E3779B1L) ^ ((long)tz * 0x85EBCA77L) ^ ((long)index * 0xC2B2AE3DL);
+        k *= 0xFF51AFD7ED558CCDL;
+        return k ^ (k >>> 33);
+    }
+    /* Every canyon starting near the origin, carved by the original carver
+     * into a carving mask for each chunk it can reach (26.x carver API). */
+    static void ravines(JsonArray out, Object registries, Object generator) throws Exception {
+        Object carvers = call(registries, "lookupOrThrow", field(type("core.registries.Registries"), "CARVER"));
+        Object canyon = null;
+        for (Object holder : ((java.util.stream.Stream<?>)call(carvers, "listElements")).toList()) {
+            if (biome(holder).equals("minecraft:canyon")) canyon = call(holder, "value");
+        }
+        Object context = construct(type("world.level.levelgen.WorldGenerationContext"), generator, level(-64, 384));
+        for (long seed : new long[]{262L, 9876543210L, -123456789012345L}) {
+            for (int sz = -12; sz < 12; sz++) {
+                for (int sx = -12; sx < 12; sx++) {
+                    Object random = construct(type("world.level.levelgen.WorldgenRandom"),
+                        construct(type("world.level.levelgen.LegacyRandomSource"), 0L));
+                    call(random, "setLargeFeatureSeed", seed + 2, sx, sz);
+                    if (!(Boolean)call(canyon, "isStartChunk", random)) continue;
+                    long count = 0, checksum = 0;
+                    for (int tz = sz - 8; tz <= sz + 8; tz++) {
+                        for (int tx = sx - 8; tx <= sx + 8; tx++) {
+                            call(random, "setLargeFeatureSeed", seed + 2, sx, sz);
+                            call(canyon, "isStartChunk", random);
+                            Object mask = construct(type("world.level.chunk.CarvingMask"), -63, 312);
+                            call(canyon, "carve", context, random, construct(type("world.level.ChunkPos"), tx, tz),
+                                construct(type("world.level.ChunkPos"), sx, sz), mask);
+                            BitSet bits = (BitSet)field(mask, "mask");
+                            for (int i = bits.nextSetBit(0); i >= 0; i = bits.nextSetBit(i + 1)) {
+                                count++;
+                                checksum += carvedKey(tx, tz, i);
+                            }
+                        }
+                    }
+                    JsonObject row = new JsonObject();
+                    row.addProperty("seed", seed);
+                    row.addProperty("sx", sx);
+                    row.addProperty("sz", sz);
+                    row.addProperty("count", count);
+                    row.addProperty("checksum", Long.toUnsignedString(checksum));
+                    out.add(row);
+                }
+            }
+        }
+    }
     public static void main(String[] args) throws Exception {
         call(type("SharedConstants"), "tryDetectVersion");
         call(type("server.Bootstrap"), "bootStrap");
@@ -216,6 +274,9 @@ public class Probe {
         JsonObject features = new JsonObject();
         JsonArray decorations = new JsonArray();
         JsonArray veins = new JsonArray();
+        JsonArray ravineRows = new JsonArray();
+        JsonArray trigRows = new JsonArray();
+        trig(trigRows);
         JsonArray samples = new JsonArray();
         Map<Object, String> placedNames = new IdentityHashMap<>();
         Object placed = call(registries, "lookupOrThrow", field(type("core.registries.Registries"), "PLACED_FEATURE"));
@@ -251,7 +312,13 @@ public class Probe {
             Object settingHolder = call(settings, "getOrThrow", settingKey);
             Object setting = call(settingHolder, "value");
             candidates(decorations, dimension, source, settingHolder, stepData, placedNames);
-            if (dimension.equals("overworld")) oreNoises(veins, setting, noises);
+            if (dimension.equals("overworld")) {
+                oreNoises(veins, setting, noises);
+                Object generator = construct(type("world.level.levelgen.NoiseBasedChunkGenerator"), source, settingHolder);
+                // Before 26.1 a carver needs a whole chunk to carve into.
+                try { ravines(ravineRows, registries, generator); }
+                catch (NoSuchFieldException | NoSuchMethodException older) { ravineRows = new JsonArray(); }
+            }
             for (long seed : new long[]{262L, 9876543210L, -123456789012345L}) {
                 Object random;
                 Object sampler;
@@ -296,6 +363,8 @@ public class Probe {
         output.add("features", features);
         output.add("decorations", decorations);
         output.add("veins", veins);
+        output.add("ravines", ravineRows);
+        output.add("trig", trigRows);
         output.add("samples", samples);
         JsonArray placements = new JsonArray();
         Object sets = call(registries, "lookupOrThrow", field(type("core.registries.Registries"), "STRUCTURE_SET"));

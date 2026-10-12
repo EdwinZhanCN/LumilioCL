@@ -11,7 +11,11 @@ macro_rules! variant_golden {
         )
     };
 }
-const VARIANTS: &[(&str, &str)] = &[variant_golden!("26.3")];
+const VARIANTS: &[(&str, &str)] = &[
+    variant_golden!("1.18.2"),
+    variant_golden!("1.19.2"),
+    variant_golden!("26.3"),
+];
 
 fn code(variant: Option<Variant>) -> Option<i64> {
     match variant? {
@@ -87,7 +91,11 @@ macro_rules! fossil_golden {
 }
 /// Saved nether fossil pieces, rows `seed x z y`: the template position the
 /// start chose, located from spread-out origins.
-const NETHER_FOSSILS: &[(&str, &str)] = &[fossil_golden!("26.3")];
+const NETHER_FOSSILS: &[(&str, &str)] = &[
+    fossil_golden!("1.18.2"),
+    fossil_golden!("1.19.2"),
+    fossil_golden!("26.3"),
+];
 
 #[test]
 fn nether_fossil_columns_match_the_fossils_original_servers_saved() {

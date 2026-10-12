@@ -224,9 +224,9 @@ fn structure_layers_follow_the_worlds_version_and_dimension() {
             )
             .is_empty()
     );
-    // 25 structure layers, 3 decoration layers, 2 vein layers, spawn, slime
-    // chunks, save positions and Xaero waypoints.
-    assert_eq!(WorldExplorer.overlays().len(), 34);
+    // 25 structure layers, 3 decoration layers, 3 underground layers, spawn,
+    // slime chunks, save positions and Xaero waypoints.
+    assert_eq!(WorldExplorer.overlays().len(), 35);
 }
 
 #[test]
@@ -284,13 +284,57 @@ fn vein_zones_cover_the_raw_ore_an_original_server_saved() {
         WorldExplorer
             .overlays_for(&overlay_request("", dimension, version, [0., 0., 1., 1.]).context)
             .into_iter()
-            .filter(|layer| layer.id.starts_with("underground."))
+            .filter(|layer| layer.id.ends_with("-vein"))
             .count()
     };
     assert_eq!(offered(Dimension::Overworld, "26.3"), 2);
     assert_eq!(offered(Dimension::Overworld, "1.18.2"), 2);
     assert_eq!(offered(Dimension::Overworld, "1.16.5"), 0);
     assert_eq!(offered(Dimension::Nether, "26.3"), 0);
+}
+
+#[test]
+fn ravines_draw_their_start_and_walk() {
+    use lumilio_plugin_api::map::{MapIcon, MapObjectKind};
+    let context = Context { cancelled: false };
+    let objects = WorldExplorer
+        .objects(
+            &context,
+            &overlay_request(
+                "underground.ravine",
+                Dimension::Overworld,
+                "26.3",
+                [-192., -192., 192., 192.],
+            ),
+        )
+        .unwrap();
+    // The original 26.3 carver starts canyons for seed 262 in chunks (7, -11)
+    // and (-7, 11) (crates/lumilio-cubiomes/tests/golden/26.3-ravines.txt).
+    let starts: Vec<[i32; 2]> = objects
+        .iter()
+        .filter_map(|object| match &object.kind {
+            MapObjectKind::Icon { icon, at } => {
+                assert!(matches!(icon, MapIcon::Ravine | MapIcon::UnderwaterRavine));
+                Some([(at.x as i32).div_euclid(16), (at.z as i32).div_euclid(16)])
+            }
+            _ => None,
+        })
+        .collect();
+    assert!(
+        starts.contains(&[7, -11]) && starts.contains(&[-7, 11]),
+        "{starts:?}"
+    );
+    // Each start comes with its walk: 84 to 111 steps from 112-block reach.
+    let walks: Vec<usize> = objects
+        .iter()
+        .filter_map(|object| match &object.kind {
+            MapObjectKind::Polyline(points) => Some(points.len()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(walks.len(), starts.len());
+    assert!(walks.iter().all(|n| (84..112).contains(n)), "{walks:?}");
+    assert!(objects.iter().all(|o| !o.approximate && o.color.is_some()));
 }
 
 #[test]

@@ -11,7 +11,11 @@ macro_rules! ore_golden {
         )
     };
 }
-const ORES: &[(&str, &str)] = &[ore_golden!("26.3")];
+const ORES: &[(&str, &str)] = &[
+    ore_golden!("1.18.2"),
+    ore_golden!("1.19.2"),
+    ore_golden!("26.3"),
+];
 
 /// The fork's `VB_RAW_COPPER` and `VB_RAW_IRON`.
 const RAW: [u8; 2] = [3, 6];

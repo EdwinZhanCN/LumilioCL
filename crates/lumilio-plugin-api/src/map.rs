@@ -177,6 +177,9 @@ pub enum MapIcon {
     /// Where large copper and iron veins run.
     CopperVein,
     IronVein,
+    /// A ravine's start, on land or under an ocean.
+    Ravine,
+    UnderwaterRavine,
     Spawn,
     SlimeChunk,
     Waypoint,

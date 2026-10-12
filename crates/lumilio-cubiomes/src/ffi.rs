@@ -70,6 +70,30 @@ unsafe extern "C" {
     fn lumilio_cubiomes_variant(mc: i32, seed: u64, kind: i32, x: i32, z: i32) -> i32;
     fn lumilio_cubiomes_decoration_available(mc: i32, dim: i32, kind: i32) -> i32;
     #[cfg(test)]
+    fn lumilio_cubiomes_trig(mc: i32, cos: i32, value: f32) -> f32;
+    #[cfg(test)]
+    fn lumilio_cubiomes_ravine_check(
+        mc: i32,
+        seed: u64,
+        sx: i32,
+        sz: i32,
+        count: *mut i64,
+        checksum: *mut u64,
+    ) -> i32;
+    fn lumilio_cubiomes_ravines(
+        mc: i32,
+        seed: u64,
+        x0: i32,
+        z0: i32,
+        x1: i32,
+        z1: i32,
+        out: *mut i32,
+        cap: usize,
+        used: *mut usize,
+        cancelled: Option<unsafe extern "C" fn(*mut std::ffi::c_void) -> i32>,
+        user: *mut std::ffi::c_void,
+    ) -> i32;
+    #[cfg(test)]
     fn lumilio_cubiomes_vein_noise(mc: i32, seed: u64, noise: i32, x: i32, y: i32, z: i32) -> f64;
     #[cfg(test)]
     fn lumilio_cubiomes_vein_column(
@@ -333,6 +357,76 @@ pub(super) fn strongholds(
     match result {
         0 => Ok(out[..count * 2].as_chunks::<2>().0.to_vec()),
         2 => Err(super::Error::Cancelled),
+        _ => Err(super::Error::Generation),
+    }
+}
+
+/// The release's `Mth.sin` (or `Mth.cos`) of a float.
+#[cfg(test)]
+pub(super) fn trig(version: super::Version, cos: bool, value: f32) -> f32 {
+    // SAFETY: plain values in and out.
+    unsafe { lumilio_cubiomes_trig(version.mc, i32::from(cos), value) }
+}
+
+/// A canyon start's carved blocks in every chunk it reaches: (count,
+/// checksum), or `None` when the chunk starts none.
+#[cfg(test)]
+pub(super) fn ravine_check(
+    version: super::Version,
+    seed: i64,
+    chunk: [i32; 2],
+) -> Option<(i64, u64)> {
+    let (mut count, mut checksum) = (0, 0);
+    // SAFETY: two outputs that outlive the synchronous call.
+    let found = unsafe {
+        lumilio_cubiomes_ravine_check(
+            version.mc,
+            seed as u64,
+            chunk[0],
+            chunk[1],
+            &mut count,
+            &mut checksum,
+        )
+    };
+    (found == 1).then_some((count, checksum))
+}
+
+/// Ravines whose start chunk lies in the block area, packed as the bridge
+/// writes them; `cap` bounds the ints.
+pub(super) fn ravines(
+    version: super::Version,
+    seed: i64,
+    area: [i32; 4],
+    cap: usize,
+    cancelled: &mut dyn FnMut() -> bool,
+) -> Result<Vec<i32>, super::Error> {
+    let mut out = vec![0; cap];
+    let mut used = 0;
+    let mut hook: &mut dyn FnMut() -> bool = cancelled;
+    // SAFETY: `out` holds `cap` ints and the bridge stops before exceeding
+    // them (code 3); `used` and `hook` outlive the synchronous call.
+    let result = unsafe {
+        lumilio_cubiomes_ravines(
+            version.mc,
+            seed as u64,
+            area[0],
+            area[1],
+            area[2],
+            area[3],
+            out.as_mut_ptr(),
+            cap,
+            &mut used,
+            Some(poll),
+            (&raw mut hook).cast(),
+        )
+    };
+    match result {
+        0 => {
+            out.truncate(used);
+            Ok(out)
+        }
+        2 => Err(super::Error::Cancelled),
+        3 => Err(super::Error::InvalidRange),
         _ => Err(super::Error::Generation),
     }
 }

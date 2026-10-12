@@ -2,12 +2,14 @@
 mod decorations;
 mod ffi;
 mod finders;
+mod ravines;
 mod veins;
 pub use decorations::{Decoration, MAX_DECORATION_AREA, Placed, decorations};
 pub use finders::{
     Bastion, MAX_AREA, Position, Spawn, Structure, Variant, slime_chunks, spawn, strongholds,
     structures,
 };
+pub use ravines::{MAX_RAVINE_AREA, Ravine, ravines, ravines_available};
 pub use veins::{MAX_VEIN_CELLS, Vein, vein_zones};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

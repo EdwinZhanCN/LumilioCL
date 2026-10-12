@@ -1,10 +1,12 @@
 /* Uses cubiomes generator.h (MIT, Copyright (c) 2020 Cubitect).
  * The bridge is LumilioCL code; upstream structs stay on the C side. */
+#include "carvers.h"
 #include "decorations.h"
 #include "finders.h"
 #include "generator.h"
 #include "util.h"
 #include "veins.h"
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -327,6 +329,94 @@ int lumilio_cubiomes_vein_zones(int mc, uint64_t seed, int vein, int x0, int z0,
     }
     free(corner);
     return 0;
+}
+
+/* Mth.sin (0) or Mth.cos (1) of a release, for the oracle tests. */
+float lumilio_cubiomes_trig(int mc, int cos, float value)
+{
+    return cos ? mcCos(mc, value) : mcSin(mc, value);
+}
+
+/* Order-free checksum of one carved block, as the oracle probe sums them:
+ * target chunk and the carving mask's bit index. */
+static uint64_t carvedKey(int tx, int tz, int index)
+{
+    uint64_t k = ((uint64_t)(int64_t)tx * 0x9E3779B1ULL)
+        ^ ((uint64_t)(int64_t)tz * 0x85EBCA77ULL)
+        ^ ((uint64_t)(int64_t)index * 0xC2B2AE3DULL);
+    k *= 0xFF51AFD7ED558CCDULL;
+    return k ^ (k >> 33);
+}
+
+/* The blocks a ravine starting in chunk (sx, sz) carves in every chunk it can
+ * reach (8 chunks around): their number and checksum. Returns 0 when the
+ * chunk starts none, 1 otherwise, -1 on error. */
+int lumilio_cubiomes_ravine_check(int mc, uint64_t seed, int sx, int sz,
+    int64_t *count, uint64_t *checksum)
+{
+    Ravine *rv = malloc(sizeof(Ravine));
+    unsigned char *mask = malloc(256 * 376);
+    int found = -1;
+    *count = 0;
+    *checksum = 0;
+    if (rv && mask)
+    {
+        found = getRavine(rv, mc, seed, sx, sz);
+        for (int tz = sz - 8; found == 1 && tz <= sz + 8; tz++)
+            for (int tx = sx - 8; tx <= sx + 8; tx++)
+            {
+                *count += carveRavineChunk(rv, tx, tz, mask);
+                for (int i = 0; i < 256 * 376; i++)
+                    if (mask[i]) *checksum += carvedKey(tx, tz, i);
+            }
+    }
+    free(rv);
+    free(mask);
+    return found;
+}
+
+/* Ravines whose start chunk lies in [x0, x1) x [z0, z1) (block bounds),
+ * packed into `out` as: start x, y, z, underwater (0/1), steps n, then n
+ * carved-or-not step centres as x, z (rounded down). `cap` counts ints.
+ * Returns 0 ok, 1 error, 2 cancelled, 3 more than `cap`. */
+int lumilio_cubiomes_ravines(int mc, uint64_t seed, int x0, int z0, int x1, int z1,
+    int *out, size_t cap, size_t *used, int (*cancelled)(void *), void *user)
+{
+    *used = 0;
+    if (mc < MC_1_18) return 1;
+    Ravine *rv = malloc(sizeof(Ravine));
+    if (!rv) return 1;
+    Generator g;
+    setupGenerator(&g, mc, 0);
+    applySeed(&g, DIM_OVERWORLD, seed);
+    int result = 0;
+    int cx0 = floor_div(x0, 16), cx1 = floor_div(x1 - 1, 16);
+    int cz0 = floor_div(z0, 16), cz1 = floor_div(z1 - 1, 16);
+    for (int cz = cz0; cz <= cz1 && result == 0; cz++)
+    {
+        if (cancelled && cancelled(user)) { result = 2; break; }
+        for (int cx = cx0; cx <= cx1; cx++)
+        {
+            if (!getRavine(rv, mc, seed, cx, cz)) continue;
+            size_t need = 5 + 2 * (size_t)rv->steps;
+            if (*used + need > cap) { result = 3; break; }
+            int *o = out + *used;
+            // Under an ocean the ravine fills with water: the start column's
+            // biome at sea level decides how the map draws it.
+            int biome = getBiomeAt(&g, 4, rv->x >> 2, 63 >> 2, rv->z >> 2);
+            o[0] = rv->x; o[1] = rv->y; o[2] = rv->z;
+            o[3] = isOceanic(biome);
+            o[4] = rv->steps;
+            for (int i = 0; i < rv->steps; i++)
+            {
+                o[5 + 2 * i] = (int)floor(rv->step[i].x);
+                o[6 + 2 * i] = (int)floor(rv->step[i].z);
+            }
+            *used += need;
+        }
+    }
+    free(rv);
+    return result;
 }
 
 /* Up to `cap` strongholds in generation order (x,z pairs). */

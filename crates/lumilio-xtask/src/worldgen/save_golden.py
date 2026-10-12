@@ -91,7 +91,8 @@ def collect(version, seed):
     log = work / "server.log"
     java = os.environ.get("WORLDGEN_JAVA", "java")
     with log.open("w") as output:
-        process = subprocess.Popen([java, "-Xms256m", "-Xmx1G", "-jar", str(source / "server.jar"), "nogui"],
+        # The force-loaded areas and their neighbours stay in memory.
+        process = subprocess.Popen([java, "-Xms256m", "-Xmx3G", "-jar", str(source / "server.jar"), "nogui"],
                                    cwd=work, stdin=subprocess.PIPE, stdout=output, stderr=output, text=True)
         def command(text):
             process.stdin.write(text + "\n")
@@ -199,7 +200,19 @@ def collect(version, seed):
                     process.wait()
 
 
+def attempt(version, seed):
+    """One world; a failure is reported and the other worlds still run."""
+    try:
+        collect(version, seed)
+        return None
+    except Exception as error:
+        print(f"{version} {seed}: FAILED: {error}", flush=True)
+        return f"{version} {seed}"
+
+
 if __name__ == "__main__":
     jobs = [(version, seed) for version in sys.argv[1:] for seed in SEEDS]
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
-        list(pool.map(lambda job: collect(*job), jobs))
+        failed = [f for f in pool.map(lambda job: attempt(*job), jobs) if f]
+    if failed:
+        sys.exit("failed worlds: " + ", ".join(failed))

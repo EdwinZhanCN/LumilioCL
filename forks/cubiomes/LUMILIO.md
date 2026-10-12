@@ -56,6 +56,13 @@ Omitted: `quadbase.*` (seed search and threads), `tests.c`, docs and build files
   rule's raw block. The fork now compiles with `-ffp-contract=off`, as Java
   does not fuse multiply-adds.
 
+- `carvers.c` / `carvers.h` (LumilioCL, MIT): the 1.18+ canyon carver. The
+  start chance, start, thickness, distance and the ellipsoid walk follow the
+  `canyon` carver (constants unchanged 1.18–26.3); `Mth`'s sine table is
+  indexed with a float product before 1.21.11 and a double after. The blocks
+  every canyon carves near the origin match the original 26.3 carver's
+  carving masks; the trig lookups of 1.21.4 and 26.3 match their `Mth`.
+
 Sources, hashes, differences and reproduction commands are in [data](data/README.md).
 The host-owned bridge lives in `crates/lumilio-cubiomes/src/bridge.c`.
 The upstream baseline and MIT attribution are retained.

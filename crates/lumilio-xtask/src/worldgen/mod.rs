@@ -159,6 +159,29 @@ pub(crate) fn import(root: &Path, version: &str) -> Result {
         .unwrap();
     }
     std::fs::write(out.join(format!("{version}-veins.txt")), veins).map_err(|e| e.to_string())?;
+    // Rows `value sin cos`: Mth's table lookups for float inputs.
+    let mut trig = String::new();
+    for row in probe["trig"].as_array().ok_or("missing trig samples")? {
+        writeln!(trig, "{} {} {}", row["value"], row["sin"], row["cos"]).unwrap();
+    }
+    std::fs::write(out.join(format!("{version}-trig.txt")), trig).map_err(|e| e.to_string())?;
+    // Rows `seed chunk_x chunk_z blocks checksum`: each canyon start near the
+    // origin, carved by the original carver (26.x only; older carvers need
+    // a whole chunk).
+    let mut ravines = String::new();
+    for row in probe["ravines"].as_array().ok_or("missing ravines")? {
+        let checksum = row["checksum"].as_str().ok_or("ravine checksum")?;
+        writeln!(
+            ravines,
+            "{} {} {} {} {checksum}",
+            row["seed"], row["sx"], row["sz"], row["count"]
+        )
+        .unwrap();
+    }
+    if !ravines.is_empty() {
+        std::fs::write(out.join(format!("{version}-ravines.txt")), ravines)
+            .map_err(|e| e.to_string())?;
+    }
     let mut rules = String::new();
     for (rule, tag) in [
         (-1, "stronghold_biased_to"),
