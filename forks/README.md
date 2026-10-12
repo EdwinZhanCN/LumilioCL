@@ -63,6 +63,10 @@ Schematic-Mesher (guards in `schematic-mesher/tests/`, run one with
   face. Guard: `coplanar_faces`.
 - `undrawable_blocks` (`mesher/mod.rs`, re-exported): names blocks no model or
   stand-in geometry can draw. Guard: `undrawable_blocks`.
+- Entity facing (`mesher/entity/mod.rs` `facing_rotation_rad`): east and west
+  turn the way Minecraft's renderers do (glam's rotation has the opposite sign
+  of Minecraft yaw), so chests, double chests, wall banners and mobs face their
+  side. Guard: `entity_facing`.
 - The crate's own unit tests and `tests/atlas_uv_regression.rs` do not compile
   at the baseline: upstream `253d2b6` changed `MesherOutput` layers to
   `MeshLayer` without updating them. Local guards therefore live in new
