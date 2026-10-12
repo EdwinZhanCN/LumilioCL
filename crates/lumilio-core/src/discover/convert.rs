@@ -109,11 +109,13 @@ fn environment_from_api(environment: api::Environment) -> Environment {
 
 pub(super) fn page_from_api(page: api::SearchPage) -> SearchPage {
     SearchPage {
+        source: String::new(),
         total_hits: page.total_hits,
         hits: page
             .hits
             .into_iter()
             .map(|hit| SearchHit {
+                page_url: hit.page_url,
                 project_id: hit.project_id,
                 slug: hit.slug,
                 title: hit.title,
@@ -139,6 +141,8 @@ pub(super) fn project_from_api(project: api::Project) -> (Project, Option<String
     let author = project.author;
     (
         Project {
+            source: String::new(),
+            page_url: project.page_url,
             id: project.id,
             slug: project.slug,
             title: project.title,

@@ -25,6 +25,8 @@ pub struct ProjectLinks {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Project {
+    pub source: String,
+    pub page_url: String,
     pub id: String,
     pub slug: String,
     pub title: String,
@@ -51,6 +53,10 @@ pub struct Project {
 impl Project {
     #[must_use]
     pub fn page_url(&self) -> String {
-        project_page_url(self.kind, &self.slug)
+        if self.page_url.is_empty() {
+            project_page_url(self.kind, &self.slug)
+        } else {
+            self.page_url.clone()
+        }
     }
 }

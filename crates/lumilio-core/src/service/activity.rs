@@ -32,6 +32,13 @@ impl<T: Transport + Clone> LauncherService<T> {
         cancel: CancellationToken,
     ) -> Result<(), ServiceError> {
         match action {
+            RetryAction::FromContentSource { source, operation } => {
+                self.from_content_source(
+                    Some(source),
+                    Box::pin(self.retry_task(*operation, updates, cancel)),
+                )
+                .await
+            }
             RetryAction::InstallInstance { instance } => {
                 self.install_instance(&instance, updates, cancel).await
             }

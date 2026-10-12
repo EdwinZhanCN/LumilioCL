@@ -433,6 +433,7 @@ pub enum MotionPreference {
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(default)]
 pub struct Preferences {
+    pub translation: crate::translation::TranslationPreferences,
     pub appearance: Appearance,
     pub after_launch: AfterLaunch,
     /// `None` means the default, which is to come back to the front.

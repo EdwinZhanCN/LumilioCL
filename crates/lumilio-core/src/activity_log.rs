@@ -30,6 +30,10 @@ pub enum TaskOutcome {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(tag = "action", rename_all = "snake_case")]
 pub enum RetryAction {
+    FromContentSource {
+        source: String,
+        operation: Box<RetryAction>,
+    },
     InstallInstance {
         instance: String,
     },

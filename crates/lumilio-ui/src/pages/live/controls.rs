@@ -13,6 +13,7 @@ use gpui_component::select::{SearchableVec, SelectState};
 
 /// Inputs the live pages own. Created lazily, because they need a window.
 pub struct LiveControls {
+    pub translation_provider: Entity<SelectState<SearchableVec<String>>>,
     pub library_filter: Entity<InputState>,
     pub discover_search: Entity<InputState>,
     pub sort: Entity<SelectState<SearchableVec<String>>>,
@@ -43,6 +44,14 @@ pub fn all_loaders() -> &'static str {
 impl LiveControls {
     pub fn new(window: &mut Window, cx: &mut gpui::Context<Self>) -> Self {
         Self {
+            translation_provider: cx.new(|cx| {
+                SelectState::new(
+                    SearchableVec::new(vec!["Microsoft Edge".to_owned()]),
+                    Some(IndexPath::default()),
+                    window,
+                    cx,
+                )
+            }),
             library_filter: cx
                 .new(|cx| InputState::new(window, cx).placeholder(crate::tr!("library-search"))),
             discover_search: cx

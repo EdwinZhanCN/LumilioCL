@@ -127,9 +127,9 @@ impl<T: Transport + Clone> LauncherService<T> {
                 None,
                 Some(&cancel),
             )
-            .retrying(RetryAction::InstallModpack {
+            .retrying(self.content_retry(RetryAction::InstallModpack {
                 project: project.to_owned(),
-            });
+            }));
         let result = self.install_modpack_inner(task.id, project, cancel).await;
         if let Ok(record) = &result {
             task.about(&record.id);

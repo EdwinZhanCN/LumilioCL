@@ -9,6 +9,13 @@ use std::rc::Rc;
 /// What a live page asks the application to do.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum LiveIntent {
+    TranslateBody {
+        source: String,
+        project: String,
+        original: String,
+        request: u64,
+    },
+    ClearTranslationCache,
     /// Create an instance with the newest release.
     NewInstance,
     /// Choose a local `.mrpack` and import it as a new instance.

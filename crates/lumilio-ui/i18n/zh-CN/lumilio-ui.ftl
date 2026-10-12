@@ -4,6 +4,20 @@
 ## 通用
 
 common-none = 无
+settings-translation = 翻译
+settings-translation-help = 开启后，发现页简介自动使用 MCIM 中文译文，缺译时保留原文；详情正文点击“翻译”后发送给所选提供商。当前仅支持简体中文，标题不翻译。
+settings-translation-provider = 翻译提供商
+settings-translation-cache = 翻译缓存
+settings-translation-cache-help = 成功译文保存在本地，有效期 7 天。清除后，下次翻译会重新请求。
+translation-clear = 清除
+translation-action = 翻译
+translation-loading = 正在翻译…
+translation-original = 显示原文
+translation-retry = 重试翻译
+translation-failed = 翻译失败，已保留原文。可以重试。
+translation-partial = 部分内容未能翻译，已保留对应原文。再次翻译时会重试。
+translation-cache-cleared = 翻译缓存已清除
+translation-cache-clear-failed = 无法清除翻译缓存
 common-not-set = 未设置
 common-edit = 编辑
 common-edit-more = 编辑…

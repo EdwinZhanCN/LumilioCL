@@ -29,6 +29,9 @@
 | 游戏参数 | 游戏默认 · 值 + [编辑] 弹窗 | 每行一项 |  | `lumilio-ui/src/pages/settings/game_defaults.rs` |
 | 环境变量 | 游戏默认 · 值 + [编辑] 弹窗 | 每行 名称=值 |  | `lumilio-ui/src/pages/settings/game_defaults.rs` |
 | 启动前 / 包装 / 退出后命令 | 游戏默认 · 值 + [编辑] 弹窗 | 以当前用户权限运行；启动前命令失败取消启动，退出后命令失败只记录 |  | `lumilio-ui/src/pages/settings/game_defaults.rs` |
+| 开启翻译 | 通用 · 开关与信息按钮 | 默认关闭；开启后自动显示 MCIM 中文简介，正文点击翻译；关闭恢复原文 |  | `lumilio-ui/src/pages/settings/general.rs` |
+| 翻译提供商 | 通用 · 下拉框 | 当前默认微软 Edge，MCIM 是简介数据来源，不列入实时提供商 |  | `lumilio-ui/src/pages/settings/general.rs` |
+| 清除翻译缓存 | 通用 · 按钮 | 删除本地 SQLite 译文，下次按原有翻译路径重新请求 |  | `lumilio-ui/src/pages/settings/general.rs` |
 | 语言 | 通用 · 分段：跟随系统 / 简体中文 / English | 立即切换并保存，组件自带的文字一起换；跟随系统时取系统语言里第一个中文或英文，都没有则用简体中文 |  | `lumilio-ui/src/pages/settings/general.rs` |
 | 进入游戏后 | 通用 · 分段：保持 / 隐藏启动器 | 没有“关闭启动器”：启动器要守着游戏记录会话与游玩时间，关掉它游戏也会结束 |  | `lumilio-ui/src/pages/settings/general.rs` |
 | 游戏退出后回到前台 | 通用 · 开关（默认开） | 游戏结束时把启动器带回最前面 |  | `lumilio-ui/src/pages/settings/general.rs` |

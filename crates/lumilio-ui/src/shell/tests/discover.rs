@@ -97,6 +97,8 @@ fn a_result_the_target_already_has_shows_installed_or_offers_the_update(cx: &mut
                 model.query = crate::live::DiscoverQuery::new(lumilio_core::ProjectKind::Mod);
                 model.results = (0..3)
                     .map(|n| SearchRow {
+                        source: "lumilio.modrinth".into(),
+                        original_summary: String::new(),
                         project_id: format!("P{n}"),
                         kind: lumilio_core::ProjectKind::Mod,
                         slug: format!("mod-{n}"),
@@ -532,6 +534,8 @@ fn frame_cost_of_a_full_discover_page(cx: &mut TestAppContext) {
     });
     let rows: Vec<SearchRow> = (0..20)
         .map(|n| SearchRow {
+            source: "lumilio.modrinth".into(),
+            original_summary: String::new(),
             project_id: format!("id{n}"),
             kind: ProjectKind::Modpack,
             slug: format!("p{n}"),

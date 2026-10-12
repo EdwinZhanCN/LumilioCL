@@ -43,6 +43,21 @@ impl LauncherShell {
         };
         let project = slug.to_owned();
         let handler: DetailHandler = Rc::new(move |intent, window, cx| match intent {
+            DetailIntent::Translate {
+                source,
+                project,
+                original,
+                request,
+            } => live(
+                LiveIntent::TranslateBody {
+                    source,
+                    project,
+                    original,
+                    request,
+                },
+                window,
+                cx,
+            ),
             DetailIntent::SaveAs {
                 version_id,
                 file_name,
@@ -98,7 +113,15 @@ impl LauncherShell {
             view.set_target_quiet(target);
             view
         });
-        view.update(cx, |view, cx| view.set_game_tags(tags, cx));
+        let enabled = self
+            .live
+            .as_ref()
+            .and_then(|model| model.settings.as_ref())
+            .is_some_and(|settings| settings.preferences.translation.enabled);
+        view.update(cx, |view, cx| {
+            view.set_game_tags(tags, cx);
+            view.set_translation_enabled(enabled, cx);
+        });
         self.visit();
         self.live_instance = None;
         self.detail = Some(DetailSlot {
@@ -143,6 +166,10 @@ impl LauncherShell {
         self.detail
             .as_ref()
             .map(|slot| (slot.kind, slot.slug.as_str()))
+    }
+
+    pub fn detail_view(&self) -> Option<Entity<ProjectDetailView>> {
+        self.detail.as_ref().map(|slot| slot.view.clone())
     }
 }
 

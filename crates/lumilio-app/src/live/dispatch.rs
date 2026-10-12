@@ -91,6 +91,7 @@ pub(super) fn on_live_intent(
             file_name,
             title,
         } => {
+            let source = super::discover::source_of(wiring, &project, cx);
             let start = std::env::var_os("HOME")
                 .or_else(|| std::env::var_os("USERPROFILE"))
                 .map(std::path::PathBuf::from)
@@ -115,11 +116,14 @@ pub(super) fn on_live_intent(
                         ))),
                         async move {
                             service
-                                .save_version_as(
-                                    &project,
-                                    &version_id,
-                                    &target,
-                                    CancellationToken::new(),
+                                .from_content_source(
+                                    source,
+                                    service.save_version_as(
+                                        &project,
+                                        &version_id,
+                                        &target,
+                                        CancellationToken::new(),
+                                    ),
                                 )
                                 .await
                         },
@@ -150,6 +154,7 @@ pub(super) fn on_live_intent(
             };
             let service = wiring.backend.service.clone();
             let state = wiring.state.clone();
+            let source = super::discover::source_of(wiring, &project, cx);
             job(
                 wiring,
                 cx,
@@ -161,13 +166,16 @@ pub(super) fn on_live_intent(
                 ))),
                 async move {
                     service
-                        .switch_content_version(
-                            &instance,
-                            kind,
-                            &file_name,
-                            &project,
-                            &version_id,
-                            CancellationToken::new(),
+                        .from_content_source(
+                            source,
+                            service.switch_content_version(
+                                &instance,
+                                kind,
+                                &file_name,
+                                &project,
+                                &version_id,
+                                CancellationToken::new(),
+                            ),
                         )
                         .await
                 },
@@ -591,6 +599,33 @@ pub(super) fn on_live_intent(
         }
         LiveIntent::Search(query) => search(wiring, &query, cx),
         LiveIntent::LoadFilters => load_filters(wiring, cx),
+        LiveIntent::TranslateBody {
+            source,
+            project,
+            original,
+            request,
+        } => super::discover::translate_body(wiring, source, project, original, request, cx),
+        LiveIntent::ClearTranslationCache => {
+            let service = wiring.backend.service.clone();
+            job(
+                wiring,
+                cx,
+                false,
+                Reload::Nothing,
+                None,
+                async move { service.clear_translation_cache().await },
+                |shell, result, cx| {
+                    shell.toast(
+                        outcome(
+                            result,
+                            |()| tr!("translation-cache-cleared").to_owned(),
+                            tr!("translation-cache-clear-failed").to_owned(),
+                        ),
+                        cx,
+                    )
+                },
+            );
+        }
         LiveIntent::OpenProject { kind, slug } => open_project(wiring, kind, slug, window, cx),
         LiveIntent::Install {
             kind,

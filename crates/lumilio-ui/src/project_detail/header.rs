@@ -12,6 +12,7 @@ use crate::theme::ShellColors;
 use crate::tr;
 use gpui::prelude::*;
 use gpui::{App, ClipboardItem, Context, IntoElement, Window, div, px};
+use gpui_component::Selectable as _;
 use gpui_component::menu::{ContextMenuExt as _, PopupMenuItem};
 use gpui_component::{Icon, h_flex, v_flex};
 use lumilio_core::{Project, ProjectKind, environment};
@@ -123,7 +124,7 @@ impl ProjectDetailView {
         let page_url = self.url.to_string();
         let copied = cx.entity().downgrade();
 
-        let actions = kit::PageActions::new("detail-actions")
+        let mut actions = kit::PageActions::new("detail-actions")
             .primary(
                 crate::theme::clickable(
                     Key::new("detail-install")
@@ -163,6 +164,36 @@ impl ProjectDetailView {
                     });
                 }
             }));
+
+        if self.translation_enabled {
+            let entity = cx.entity();
+            let active = self.show_translation || self.translation_loading;
+            // ia[discover]: 翻译 / 显示原文 | 详情页安装按钮左侧 · Languages 图标开关 | 开启时使用主题强调色；再次点击恢复正文原文，简介自动使用 MCIM，标题不翻译
+            actions = actions.secondary(
+                Key::new("detail-translate")
+                    .icon(Icon::new(UiIcon::Languages))
+                    .kind(if active {
+                        crate::key::KeyKind::Orange
+                    } else {
+                        crate::key::KeyKind::White
+                    })
+                    .selected(active)
+                    .loading(self.translation_loading)
+                    .tooltip(if self.translation_loading {
+                        tr!("translation-loading")
+                    } else if self.show_translation {
+                        tr!("translation-original")
+                    } else if self.translation_error {
+                        tr!("translation-retry")
+                    } else {
+                        tr!("translation-action")
+                    })
+                    .debug_selector(|| "detail-translate".into())
+                    .on_click(move |_, window, cx| {
+                        entity.update(cx, |view, cx| view.toggle_translation(window, cx))
+                    }),
+            );
+        }
 
         let body = colors.body;
         let updated =
@@ -216,7 +247,14 @@ impl ProjectDetailView {
                                     div()
                                         .text_sm()
                                         .text_color(colors.muted)
-                                        .child(project.description.clone()),
+                                        .debug_selector(|| "detail-summary".into())
+                                        .child(gpui_component::text::TextView::markdown(
+                                            "detail-summary-text",
+                                            self.summary_translation
+                                                .as_ref()
+                                                .unwrap_or(&project.description)
+                                                .clone(),
+                                        )),
                                 )
                                 .child(
                                     h_flex()

@@ -1,78 +1,258 @@
 {
   "schemaVersion": 1,
   "id": "discover-translation",
-  "title": "发现页的免费机器翻译",
-  "summary": "发现页上的项目标题、简介、正文、图库说明、版本名称和更新日志，可以翻译成当前界面语言。翻译调用 SiliconFlow 上的免费翻译模型，密钥只进系统凭据库。默认关闭。失败、限流或未配置密钥时仍显示原文。这是启动器功能，不是插件。",
-  "status": "proposed",
+  "title": "发现页的双来源翻译",
+  "summary": "设置 → 通用中开启翻译后，MCIM 自动提供发现列表中文简介，详情正文点击「翻译」后调用所选提供商。当前目标仅简体中文，下拉仅微软 Edge 且默认选中；标题始终原文。MCIM 仅在信息按钮说明，不列入实时提供商。已实现 SQLite 七天缓存、HTML / Markdown 结构翻译、批量及有限重试；未命中或失败保留原文，不切换镜像路由。内容操作及重试绑定发起源。自动化验证已覆盖缓存、格式、批量、正文点击及源隔离；应用内检查由 Project Maintainer 执行，大陆直连验收仍待完成，计划保持进行中。",
+  "status": "in_progress",
   "visibility": "public",
   "scope": {
     "included": [
-      "In：发现搜索结果和项目详情里给人读的文字；按界面语言翻译；磁盘缓存；密钥、开关和「显示原文」；限流与模型不可用时的明确状态。"
+      "发现列表简介自动翻译为简体中文；项目详情描述正文点击按钮翻译为简体中文；本地 SQLite 缓存默认有效期 7 天、恢复原文和失败反馈。目标语言不跟随界面语言。",
+      "HTML 与 Markdown 按结构翻译，尽量保留原始格式；批量调度、结果对应校验与有限失败重试。",
+      "微软 / 腾讯 / 火山 / Yandex / DeepL / Google 免 Key 接口的协议、维护成本与大陆可用性调查；大陆直连与用户已有代理分开验收。",
+      "MCIM 的 Modrinth / CurseForge 中文预翻译简介查询、批量按 id 对应和原文校验；微软只在点击详情正文翻译时调用。",
+      "内容源与翻译后端分离；源限定的项目身份、缓存和异步回填；为未来 CurseForge 保留已有 ContentSource 扩展边界。"
     ],
     "excluded": [
-      "Out：翻译启动器自己的界面、作者名、文件名、版本号、许可证 id、分类 id、日志和崩溃报告；自动改用付费模型；把正文用于模型训练。"
+      "其他目标语言、标题翻译、图库文字、版本名称和更新日志翻译；翻译启动器自己的界面、作者名、文件名、版本号、许可证 id、分类 id、日志和崩溃报告；自动改用付费服务。",
+      "SiliconFlow 接入、MCIM 元数据或下载镜像路由；在本计划实现 CurseForge 插件、整合跨源搜索或自动跨源匹配项目。",
+      "除明确选定的 MCIM 简介数据服务外，内置其他公共第三方翻译中转站、共享密钥或修改 hosts；为翻译引入网页运行时或通用插件框架。"
     ]
   },
   "tasks": [
     {
       "id": "T1",
-      "title": "T1：core 增加翻译客户端。请求只含待译文本和目标语言。解析失败、429、50505、网络失败各自返回原因。测试用脚本化服务器，不访问真实 SiliconFlow。",
-      "status": "proposed",
-      "acceptance": "T1：core 增加翻译客户端。请求只含待译文本和目标语言。解析失败、429、50505、网络失败各自返回原因。测试用脚本化服务器，不访问真实 SiliconFlow。"
+      "title": "core 增加翻译调度和微软实时翻译适配器。",
+      "status": "completed",
+      "acceptance": "按 D7 接入微软 Edge，按 D10 将目标固定为 zh-Hans；仅当通用设置已开启且用户点击详情正文「翻译」时调度所选提供商。配置保存稳定的提供商 id，UI 动作名称不硬编码目标语言，适配器与目标语言保持独立参数以便以后扩展，但首版不暴露其他目标或未实现提供商。T6 大陆验收单独完成。请求只传待译正文段、源语言（或自动检测）和目标语言，不传项目或实例身份。适配器声明文本批次上限；成功、条数错位、空结果、响应过大、超时、403 / 429、5xx 分别处理。限并发、合并重复请求、限次退避并尊重 Retry-After；失败不无限重试。脚本化服务器覆盖协议，不访问真实服务；core 不依赖 GPUI。"
     },
     {
       "id": "T2",
-      "title": "T2：凭据库存密钥。设置页有开关、线路、密钥状态、清除缓存。开关默认关。模型 id 固定为 `tencent/Hunyuan-MT-7B`，不提供随意填写付费模型的框。",
-      "status": "proposed",
-      "acceptance": "T2：凭据库存密钥。设置页有开关、线路、密钥状态、清除缓存。开关默认关。模型 id 固定为 `tencent/Hunyuan-MT-7B`，不提供随意填写付费模型的框。"
+      "title": "提供自动简介翻译设置与正文翻译操作。",
+      "status": "completed",
+      "acceptance": "设置 → 通用提供翻译开关，默认关闭；开启后才允许 MCIM 自动简介查询和点击正文翻译。提供商使用下拉框，即使当前仅有微软 Edge，也自动初始化为默认选择；只列已实现提供商，不把 MCIM 当作实时提供商选项。信息按钮说明实时正文翻译、固定中文目标，以及 MCIM 额外提供预翻译简介、查询发送平台与 id、未命中保留原文。正文按钮文字为「翻译」，初始显示原文，加载中防重复提交，成功后可恢复原文，失败可重试；关闭功能后不允许调度并立即恢复原文。目标当前仅中文，不显示目标语言选择或密钥框。网络沿用已有配置。缓存可清除。所有文案走中英语言目录、IA 和设计语言。"
     },
     {
       "id": "T3",
-      "title": "T3：发现列表翻译 `title` 和 `description`。详情翻译 `body`、图库标题和说明、版本 `name` 与 `changelog`。每条能切回原文。缓存命中不再请求。",
-      "status": "proposed",
-      "acceptance": "T3：发现列表翻译 `title` 和 `description`。详情翻译 `body`、图库标题和说明、版本 `name` 与 `changelog`。每条能切回原文。缓存命中不再请求。"
+      "title": "发现列表与详情显示译文，原文始终可恢复。",
+      "status": "completed",
+      "acceptance": "列表与详情页头自动翻译 description，详情正文 body 仍需点击翻译；标题原文，图库、版本名和更新日志不翻译。简介译文独立保存，不覆盖源对象；直接打开详情、及进入详情后开启设置也能查询 MCIM。正文开关位于安装按钮左侧，使用 Lucide Languages 图标，开启 / 加载时为主题强调色，关闭恢复普通样式和原文，加载反馈与失败重试可见。命中正文缓存也不自动开启译文。HTML / Markdown 结构、代码、链接目标与图片地址保留，部分失败保持对应原文。"
     },
     {
       "id": "T4",
-      "title": "T4：界面语言切换后使用对应缓存；没有缓存时重新请求。关闭开关立即回到原文，不删缓存。",
-      "status": "proposed",
-      "acceptance": "T4：界面语言切换后使用对应缓存；没有缓存时重新请求。关闭开关立即回到原文，不删缓存。"
+      "title": "内容源、原文和翻译状态变化时隔离缓存与迟到结果。",
+      "status": "completed",
+      "acceptance": "相同原文与来源命中缓存；内容、提供商或分段算法变化不复用旧译文。目标固定中文并写入缓存身份；界面语言变化不改变目标语言。关闭通用翻译开关立即恢复简介与正文原文并阻止调度和迟到回填；正文选择原文后迟到结果不得切回译文。翻页、换项目、换源和设置变化都检查请求身份；打开新详情初始显示原文。清除缓存后旧任务不能重新写回被清除的缓存。"
+    },
+    {
+      "id": "T5",
+      "title": "调查免 Key 接口，审查未来内容源扩展边界。",
+      "status": "completed",
+      "acceptance": "2026-10-11 已核对 DeepL 官方鉴权、Google Cloud 鉴权、DLX 当前实现、Googletrans 和沉浸式翻译旧版说明，并在 D1–D4 记录结论和可核查来源。已确认 source.rs 选首个启用源，convert.rs 丢弃源提供的 page_url，project.rs / kinds.rs 按 Modrinth 拼链接。公开资料调查不算大陆真实翻译请求验收。"
+    },
+    {
+      "id": "T6",
+      "title": "完成 MCIM 与微软的大陆网络实测。",
+      "status": "in_progress",
+      "acceptance": "按 D8 验收 MCIM 查询与微软实时翻译；D6 的其他候选只保留调查结论。由 Project Maintainer 在明确禁用代理的大陆网络执行真实请求，记录日期、地区、运营商、接口域名、客户端版本、HTTP 状态、业务结果、耗时和成功次数；首轮一个代表性网络，发布前再扩大到电信 / 联通 / 移动和跨日期低频重复请求。MCIM 检查单条、批量、缺失和原文一致性；微软检查短简介、包含中文 / emoji 的临界长度分段、长正文分段及内容顺序。DNS / TLS 成功或网页可打开不能代替业务成功。代理结果单列，失败区分网络与反自动化。原型工作不必等待三网全部完成，但不得宣称未经验证的大陆可用性；若不能满足直连目标，记录缺口，不默认接入其他公共中转。"
+    },
+    {
+      "id": "T7",
+      "title": "补齐发现页的源限定身份与链接传递。",
+      "status": "completed",
+      "acceptance": "服务、搜索结果与详情持有源 plugin_id 和源内 project_id；详情与后续请求使用打开时的源，不能再次选择第一个启用源。保留 ContentSource 返回的 page_url，打开项目不按 Modrinth 拼地址。使用两个脚本化内容源返回同名 / 同 id 项目的夹具，证明链接、翻译缓存、版本请求与迟到结果互不串源；不要求实现 CurseForge。安装路径中的源身份一并审查，禁止将另一源版本交给当前默认源。"
+    },
+    {
+      "id": "T8",
+      "title": "接入 MCIM 预翻译简介的自动查询。",
+      "status": "completed",
+      "acceptance": "通用翻译开关开启后自动查询可见项目的中文简介，不依赖界面语言；通过显式平台映射识别 Modrinth / CurseForge 的规范 id，不猜测其他插件的 id。用 POST 批量查询，按返回 project_id / modid 关联，不依赖数组位置；缺失、重复、未知 id、空译文和 original 不一致均不得显示错误译文。未命中或失败保留原文，不调用微软补齐简介。缓存包含平台、id、当前简介 hash、中文目标与来源，并设有效期以重新获取修订译文；404 短期负缓存，服务失败不永久缓存。MCIM 仅在信息按钮说明，不进入提供商下拉；仅查询翻译端点，不切换内容下载源。脚本化服务器覆盖乱序 / 少项、过期原文、关闭功能不请求及未命中不调用微软；不需要 CurseForge 插件才能完成协议测试。"
+    },
+    {
+      "id": "T9",
+      "title": "建立 SQLite 七天缓存并验证失效和清除行为。",
+      "status": "completed",
+      "acceptance": "MCIM 简介及微软正文成功译文存入本地 SQLite，默认 TTL 为成功写入后的 7 × 24 小时，读取不延长有效期；到期即未命中，原文变化立即失效。缓存键区分源身份、项目 / 字段、原文 hash、提供商、目标语言和格式 / 分段算法版本。跨重启复用缓存，过期清理与容量约束避免无限增长。SQLite I/O 在后台运行，存储故障不影响阅读和安装；失败不写作成功缓存，MCIM 缺失仅短期负缓存。清除使用 generation 防止旧任务重新写入。测试注入时钟，覆盖到期边界、读取不续期、重启、源隔离、原文变化和迟到结果。"
+    },
+    {
+      "id": "T10",
+      "title": "保留 HTML / Markdown 格式并完善批量与失败重试。",
+      "status": "completed",
+      "acceptance": "简介和正文显式区分纯文本、HTML 或 Markdown；保留段落、标题、列表、强调、表格及链接 / 图片属性，代码块与行内代码不翻译。HTML 只提取可译文本节点，结果转义后回填，不执行脚本或将译文作为任意 HTML；无法可靠对应的片段保留原文并反馈。MCIM 只提供整条预翻译简介，原文及格式可校验才应用，不将单条译文猜配到多个节点。微软按文本段批量发送，限制批次字符数和并发，严格校验响应条数及对应，超长段按 Unicode 边界分段。MCIM 按 id 批量关联并允许缺项。暂时网络错误、超时、429、5xx 最多重试两次，指数退避带抖动并尊重 Retry-After；403、其他永久错误及协议错位不盲目重试。部分成功只重试失败批次，保留成功缓存，允许用户手动重试；关闭功能或离开页面停止调度。脚本化服务器覆盖 HTML 嵌套 / 实体 / 属性、Markdown 代码与链接、批量错位、限流、次数上限和部分失败。"
+    },
+    {
+      "id": "T11",
+      "title": "Project Maintainer 完成应用内交互和外观验收。",
+      "status": "in_progress",
+      "acceptance": "2026-10-11 Project Maintainer 明确自行检查应用。检查浅色 / 深色、中文 / English、720×480 最小窗口与减少动效；通用设置开关、提供商下拉、MCIM 信息提示和缓存清除可达。启用后列表简介中文且标题原文，正文初始原文，翻译 / 加载 / 显示原文 / 重试反馈正确；关闭后立即恢复原文且迟到响应不回填。核对嵌套 HTML / Markdown、代码、链接、图片、列表和表格的实际呈现；关闭并重开应用验证缓存。工具审阅独立测试应用未获自动审批，不将该尝试记录为已完成视觉验收。"
     }
   ],
   "validation": [
     {
-      "criterion": "脚本化响应覆盖成功回填、条数不匹配、限流、过载和空密钥。",
+      "criterion": "图标开关的绘制色测试能阻止选中状态退回普通按钮色。",
+      "result": "临时把开启分支的 Orange key 改成 White，translation_requires 测试在主题强调色绘制断言处按预期失败；恢复后同一测试通过。页头源文件恢复后的 SHA-256 与完整 just check 通过时相同，未保留故意引入的回归。"
+    },
+    {
+      "criterion": "应用内反馈修正：详情页头简介自动使用 MCIM，正文开关为安装左侧的 Languages 图标，并以主题强调色显示开启。",
+      "result": "已补齐详情加载完成、通用设置开启及设置数据加载后的 MCIM 查询入口，直接打开详情也可使用 SQLite 简介缓存。简介译文独立保存并检查源 / 项目 / 原文 / revision；关闭恢复原文，旧请求不能在重开后回填。按钮通过 PageActions.secondary 放在安装左侧，使用 Lucide Languages SVG 和主题 key 色，加载中保留开启色并显示忙碌状态。11 项 project_detail 测试通过，覆盖按钮同行与左右位置、实际绘制的强调色（含悬停色）、点击切回原文和简介迟到回填。just check 完整通过：1306 项测试通过、15 项既有跳过，build / Clippy / fmt 通过；IA 已生成。应用内外观仍由 T11 验收。"
+    },
+    {
+      "criterion": "确认 MCIM 支持的平台、字段、语言、匿名访问及未命中的批量行为。",
+      "result": "2026-10-11：已读 mcim-rust-api 的 routes / services / models/translate 及主程序，并核对 mcim-translate README 与生成脚本。服务仅查数据库中的中文简介，非任意文本翻译。当前网络未带 Key 请求 Modrinth P7dR8mSH 和 CurseForge 238222 成功；Modrinth 批量提交两个有效 id 和一个虚构 id，只返回两个有效结果，单查虚构 id 为 HTTP 404。P7dR8mSH 返回 original 与当日官方 Modrinth description 一致。非大陆网络验收，未证明全部项目覆盖或模型整体质量。"
+    },
+    {
+      "criterion": "公开资料调查和内容源边界审查有可核查来源，明确大陆实测的缺口。",
+      "result": "2026-10-11：T5 已完成；调查结论与源码路径见 D1–D6。当前工作环境中微软批量两条、腾讯单条、火山单条和 Yandex 单条均返回 HTTP 200 与中文译文，分别约 0.60 / 0.98 / 1.08 / 0.74 秒。火山原路径 307，跟随后转向带尾斜杠地址成功；Yandex 缺少 id 时 HTTP 403 / 业务码 405，带会话 id 后成功。这些是单次冒烟测试，不代表性能、长期稳定性或大陆直连通过。"
+    },
+    {
+      "criterion": "脚本化响应覆盖批量成功 / 部分失败、条数不匹配、限流、有限重试、服务拒绝、响应大小限制与网络失败；HTML / Markdown 结构、链接和代码不被改写。",
+      "result": "已实现受限 JSON 读取、20 秒超时、最多两次暂时错误重试、带抖动的指数退避与 Retry-After；403 和协议错位不重试。九项 translation core 测试覆盖重试次数、响应条数、MCIM 乱序 / 缺项 / 旧原文、HTML / Markdown 的链接属性及代码、Unicode 分段、部分失败只重试未成功段、关闭取消等。当前网络按实际自动检测源语言的 Edge 路径请求成功；该请求仍不算大陆直连验收。"
+    },
+    {
+      "criterion": "腾讯、微软、火山使用同组 Minecraft 文本对比，记录结果和首个原型选型，不把样本等同于全面质量或大陆直连结论。",
+      "result": "2026-10-11：七条合成样本涵盖 Sodium 简介、Fabric Loader 版本与仅客户端限制、地图 / 维度、崩溃修复、JAR 文件名、含 URL / 命令的 Markdown、中英混排 / emoji。微软和腾讯各一个七条批次，火山逐条请求，全部 HTTP 200；两个数组响应均七条按序对应。微软保留 Sodium、文件名与 emoji，腾讯丢失 emoji，火山改写 Sodium / 文件名。三家都破坏直接提交的 Markdown，且维度等术语都有误译。微软批次约 1.04 秒，腾讯约 2.95 秒，火山逐条约 0.92–1.77 秒；请求形状不同且样本仅一次，不作为性能排名。微软为首个原型候选，具体约束见 D7。"
+    },
+    {
+      "criterion": "SQLite 缓存跨重启有效，默认保存成功译文 7 天；到期边界、原文变化和手动清除使缓存失效，读取不续期。",
+      "result": "core SQLite 测试验证成功写入后七天边界、读取不续期、重新打开数据库仍命中、清除后迟到写入不复活，以及重建 TranslationService 后正文不再次出网、清除后再次出网。缓存有 10000 条 / 64 MiB 译文容量约束。期限测试使用需求中的独立七天值；临时将实现 TTL 改为八天时，在七天到期断言处观察到 Some(译文) != None 的预期失败，恢复七天后完整验证。"
+    },
+    {
+      "criterion": "缓存隔离两个内容源的同 id 项目；原文变化失效；清除后迟到结果不能重新写入。",
+      "result": "cache_identity 测试隔离源、内容和提供商；SQLite clear generation 拒绝迟到写入。两个脚本化源并发返回相同 id / 标题，断言各自 source 与 page_url 不串且作用域不泄漏；安装、依赖、保存、版本切换及整合包操作绑定发起源，Activity 重试输入保留该源并验证序列化，源关闭后重试不回退默认源。"
+    },
+    {
+      "criterion": "标题、作者名、文件名、版本号保持原文；只有列表简介自动译为中文，详情正文必须点击后才显示中文，MCIM 未命中不调用微软。",
+      "result": "GPUI 交互测试通过真实按钮点击验证：默认无正文翻译按钮，开启后不自动发正文请求，点击才发 Translate 意图，标题原样、译文可切回原文，关闭后迟到结果被拒绝。MCIM 只查询简介端点，未命中保留原文；正文只提取文本节点，代码和链接属性保持原样。实际外观及真实长正文体验由 T11 验收。"
+    },
+    {
+      "criterion": "大陆三网真实翻译验收按 T6 记录；实机英文项目译成中文，失败仍可打开和安装；代理结果独立记录。",
       "result": null
     },
     {
-      "criterion": "缓存测试证明相同原文不第二次出网，清除后会再请求。",
-      "result": null
+      "criterion": "计划变更通过 just docs；公开路线图投影变化通过 just web；实现交付前通过 just check。",
+      "result": "调查阶段 plans validate、just plans、just docs 与 just web 已通过。实现阶段九项 core translation 测试、GPUI 点击测试、并发源隔离及重试源持久化测试通过。最终 just check 在获准的沙盒外完整通过：build、1305 项测试（15 项按既有配置跳过）、Clippy、fmt 均通过。默认沙盒中现有 macOS 更新器 hdiutil 测试失败，沙盒外单项及完整检查均通过，未修改该测试。IA 已重新生成，国际化目录完整性八项测试通过。视觉检查交由 T11，大陆网络交由 T6。"
+    }
+  ],
+  "decisions": [
+    {
+      "id": "D1",
+      "decision": "撤销 SiliconFlow 与固定 Hunyuan 模型方案。DeepL API Free 仍需要 Key；Google Cloud v2 支持 API Key 等鉴权，v3 使用其他凭据，也不是匿名服务。当前调查的免 Key 方案属于非官方客户端接口。",
+      "rationale": "Project Maintainer 明确不再采用 SiliconFlow。免费额度、无需 API Key 与无需任何凭据是不同条件；不能把官方免费 API 当作匿名接口。",
+      "consequences": "删除原计划中的模型 id、专用错误码和必填密钥步骤；按 T6 调查和 D7 原型选型推进，不在功能里保留未实现的后端选项。"
     },
     {
-      "criterion": "诊断和日志夹具里不出现密钥。",
-      "result": null
+      "id": "D2",
+      "decision": "Google 免 Key 接口不作为大陆直连默认线路。Googletrans 使用 Google 网页接口；沉浸式翻译当前 FAQ 的 Google Translate Being Blocked in China 条目仍要求将 translate.googleapis.com 加入代理规则。已有代理时可作为候选，尚未完成当前大陆实测。",
+      "rationale": "上游一手资料已有大陆访问障碍说明；Googletrans 明示非官方接口没有持续可用保证，还可能封禁客户端 IP。沉浸式翻译当前 FAQ 还报告其免费 Google 接口的翻译质量下降；这是该产品的观察，不扩展为所有 Google 接口的普遍结论。资料不能替代 2026 年各运营商的业务请求实测。",
+      "consequences": "不采用换 hosts、固定 IP 或公共镜像作为默认产品依赖；代理连通不计作大陆直连验收，仍需 T6 的实际业务请求。"
     },
     {
-      "criterion": "作者名、文件名、版本号保持原文。",
-      "result": null
+      "id": "D3",
+      "decision": "DeepL 匿名方案保留为待实测候选，不宣称大陆可稳定直连。DeepLX 仓库现名 DLX，当前源码使用 oneshot-free.www.deepl.com/v1/translate；旧 www2.deepl.com/jsonrpc 教程不能直接作为实现依据。",
+      "rationale": "2026-10-11 上游实现与近期 issue #236 显示需要维护客户端版本和 TLS / 请求指纹一致性；429 可能来自客户端识别失败，不能都解释为流量配额。当前上游按整批 1500 个 UTF-16 code units 限制匿名输入，并不提供官方 v2 的 HTML / XML tag handling。大陆出口没有实测证据。",
+      "consequences": "优先做短文本及分段正文试验；Rust reqwest 能发 HTTP 不等于能复现上游客户端。原生适配器与用户自托管 DLX 的维护成本在 T6 选型时比较；自托管只移动出口，不能消除上游限制，额外部署也不能被当作免配置。"
     },
     {
-      "criterion": "实机：用Project Maintainer自己的免费密钥打开一页英文项目，标题和简介变为中文，失败时卡片仍可打开。",
-      "result": null
+      "id": "D4",
+      "decision": "翻译后端和内容源是两个独立边界。ContentSource 只交原始项目内容；core 负责翻译调度、持久缓存和 typed 错误，UI 负责原文 / 译文呈现。翻译适配器保持窄接口，不为未来 CurseForge 创建新的通用插件体系。",
+      "rationale": "现有 content.rs 已有源无关契约，但 source.rs 只选首源、convert.rs 丢掉 page_url，Project::page_url 仍拼 Modrinth URL。若缓存只用 project_id 或回填时再查默认源，后续加 CurseForge 会串项目。正文还需显式处理格式，而非假设所有源都是 Markdown。",
+      "consequences": "先按 T7 保留源身份和链接。缓存键包括源 plugin_id、源内项目 / 版本 / 图库字段身份、原文 hash、源 / 目标语言、后端及其配置身份、分段算法版本；配置身份不得含明文凭据。缓存有容量上限，只缓存成功结果；译文是可删除的派生数据，不改安装身份或源响应。异步结果另检查页面 generation 和设置 revision。完整多源选择和 CurseForge 插件另行规划。"
+    },
+    {
+      "id": "D5",
+      "decision": "参考沉浸式翻译的免 Key 请求和分段调度，但区分旧版开源实现、当前产品服务和用户自备凭据。旧版 Google 直接 POST translate.googleapis.com/translate_a/t?anno=3&client=te&v=1.0&format=html，附 sl / tl、计算 tk，并以重复 q 字段发送转义后的文本；不经沉浸式翻译中转。",
+      "rationale": "2026-10-11 已读 old-immersive-translate 的 src/background/translationService.js：Service 合并在途请求、查询持久缓存并按累计长度组批，Google 用带序号的 a 标记恢复段落对应。其 800 字符组批阈值是旧客户端策略，不是经验证的服务器硬上限，也不能保证超长单段被切开。DeepL 分支则用 chrome.tabs 打开网页和消息回传，仅处理首段，不能当作适合 Rust 原生启动器的 HTTP API。当前仓库 README 明示不含产品源码；DeepL 文档列出会员服务和自备官方 Key，因此不能据此推断当前产品所有线路的内部实现。",
+      "consequences": "Google 候选优先核对这条实际协议，复用段落身份、请求去重和缓存思路；重写为 Rust 窄适配器，并测试超长段、中文 / emoji、空段、标记丢失 / 重排和返回错位。候选接口仍需真实请求测试；不移植浏览器 API，不默认调用沉浸式翻译会员或聚合服务的内部端点。旧版为 MPL-2.0，若后续直接改编代码须按文件许可证保留归属；本轮仅记录设计调查，没有复制实现。"
+    },
+    {
+      "id": "D6",
+      "decision": "免 Key 调查扩展到微软 Edge、腾讯交互翻译、火山网页接口和 Yandex。优先验证腾讯交互翻译，微软 Edge 与火山作为同组对比候选；排序是基于协议形状与大陆目标的工程判断，尚非大陆连通或翻译质量结论。",
+      "rationale": "2026-10-11 核对 KISS Translator 当前 src/apis/trans.js，并执行真实短文本请求：Edge POST https://edge.microsoft.com/translate/translatetext?from=en&to=zh-Hans&isEnterpriseClient=false，无 Authorization，JSON 字符串数组，两条输入按序返回；腾讯 POST https://transmart.qq.com/api/imt，auto_translation / plain / normal、source.text_list 与 target.lang，使用公开源码中的浏览器客户端标识和 Referer，返回 ret_code=succ；火山 POST https://translate.volcengine.com/crx/translate/v1/，source_language / target_language / text，返回 status_code=0；Yandex POST https://translate.yandex.net/api/v1/tr.json/translate，srv=android、会话 id 与语言 / 文本参数，返回业务码 200。微软旧 /translate/auth 在 2026-08-05 的上游 issue 已报告 404，新 Edge 路径不能与旧获取令牌流程混用。",
+      "consequences": "腾讯和火山网页接口与各自云平台官方 API 是不同服务；不能把官方 API 要 Key 推断成网页接口也要用户 Key。当前匿名接口都没有官方开发者稳定性承诺，需检查大陆业务请求和批次上限。腾讯客户端标识在实现时核对生成 / 会话策略，不把上游固定标识当成长期契约。火山的单 text 输入不能像上游示例那样简单拼空格并猜回段落；微软和腾讯的数组响应也须严格校验对应关系。后端保持可替换但不同时接入所有候选。自托管 LibreTranslate 可不启用 API Key，不过部署 / 模型与质量成本另算，不作为免配置默认方案；官方百度 / 腾讯云 / 火山 OpenAPI 需凭据，可作为以后用户自备 Key 的选项。"
+    },
+    {
+      "id": "D7",
+      "decision": "同组七条样本后选择微软 Edge 为首个原型候选，更新 D6 的调查优先顺序；腾讯仍为后续对比选项。原型可先推进，但大陆直连验收和长文本 / 临界长度验证仍待完成，T6 保持 in_progress。",
+      "rationale": "2026-10-11 当前工作环境的实测：微软将 Sodium 简介译为「免费且开源的 Minecraft 渲染优化模组」，保留版本、文件名与 emoji；腾讯将 mod 译作「模块」并丢失混排样本 emoji；火山将 Sodium 变成 Sodia，把 sodium-fabric-0.6.0+mc1.21.1.jar 变成「钠织物0.6.0+mc1.21.1. jar」。维度样本中微软把 the End 译为「终结」，腾讯将 the Nether / the End 译为「虚空 / 终结」，火山译为「地狱 / 末日」，三者均不满足 Minecraft 术语准确性。微软批量契约不需要网页客户端标识，七条按序对应，原生接入负担较小。该结论只针对本组英文到简体中文样本，不能推断其他语言或整体服务质量。腾讯使用本轮新生成的客户端 UUID / 时间戳也成功，未依赖上游固定标识。",
+      "consequences": "禁止把整份 Markdown 直接交给文本后端：样本三家均破坏链接括号 / 反引号 / 代码块，其中腾讯还改写 URL，火山改写 java 命令空格。正文先解析结构，仅发送可译文本叶节点；URL、代码块、行内代码与独立文件身份本地原样保留，校验后再回填。项目名称和专用标识保留原文，列表标题显示原文并提供译文辅助，不把机器译名用于搜索或安装。首版明确译文是机器翻译、可随时显示原文，不承诺术语库质量；不靠全局字符串替换强行修正 End 等歧义词。协议测试用脚本化服务器覆盖批次对应、空条目、超长分段和结构保留；运行时失败回退原文，不静默换另一家。"
+    },
+    {
+      "id": "D8",
+      "decision": "按 Project Maintainer 的双来源要求采用 MCIM 预翻译简介 + 微软 Edge 实时翻译。MCIM 是按平台与项目 id 查询的派生简介数据，不与任意文本翻译适配器强行共用协议；core 调度层按字段和授权组合两者。",
+      "rationale": "mcim-translate 明确从 Modrinth description / CurseForge summary 生成中文译文；mcim-rust-api 仅查询 modrinth_translated / curseforge_translated，无目标语言参数，不提供标题、正文、图库、版本名或更新日志翻译。GET /translate/modrinth/{project_id} 与 /curseforge/{mod_id} 查单条，POST 同平台路径批量接收 project_ids / modids。批量遍历数据库结果，会省略缺失记录且没有按输入排序契约。生成器使用可配置的 OpenAI 兼容 chat/completions，当前源码默认 DeepSeek 地址与 deepseek-v4-flash 模型；这只是默认配置，不能证明部署使用的模型，API 也不返回模型身份。",
+      "consequences": "T8 单独接入 MCIM 简介查询，T1 保持微软文本协议；T2 更新为两条线路分别启用，明确预翻译简介未命中时的实时补充条件。这是授权的覆盖补充，取代仅实现一个来源的旧范围，不把微软失败继续转给其他候选。MCIM original 必须与当前简介一致；translated_at 不能单独证明新鲜，因为响应转换在数据库时间缺失时会填 Utc::now，且 need_to_update 不对外暴露。MCIM 源内 id 必须绑定明确平台，不能使用 slug 或跨源同 id 猜配。只调用翻译端点，不更改 Modrinth / CurseForge 元数据和下载路由；启动器用户不需要上游 LLM Key，也不重新接入 SiliconFlow。"
+    },
+    {
+      "id": "D9",
+      "decision": "收敛首版为固定中文目标：MCIM 自动翻译发现列表简介，微软仅响应详情描述正文的翻译按钮，标题始终不翻译。覆盖 D8 的自动实时补充方案和此前按界面语言翻译所有字段的范围。",
+      "rationale": "Project Maintainer 明确选定微软 Edge 与 MCIM，并要求发现页自动中文、描述页点击翻译和标题原样。按职责拆开两条线路即可满足当前需求，不需要目标语言选择、后端选择或列表缺译时的实时机器翻译。",
+      "consequences": "目标采用简体中文，与 MCIM 现有中文样本及微软 zh-Hans 对齐；自动简介翻译默认开启且可关闭，正文始终先显示原文，即便已有缓存也由点击决定显示译文。MCIM 缺失或过期保留简介原文；首版不翻译图库文字、版本名或更新日志。T1–T4、T8 以本决策为当前验收依据，原有协议调查保留为证据；大陆直连仍由 T6 验收，不阻塞原型实现。"
+    },
+    {
+      "id": "D10",
+      "decision": "正文按钮改为「翻译」。翻译必须先在设置 → 通用启用，配合提供商下拉；首版仅微软 Edge 并自动初始化为默认值。MCIM 作为额外简介数据来源在信息按钮说明，不进入实时提供商选项。覆盖 D9 的默认开启和不提供后端选择器部分。",
+      "rationale": "Project Maintainer 要求按钮保持可扩展性，并明确通用设置的开关与提供商下拉。目标语言首版仍仅中文，但 UI 不将目标语言写死在动作名称中。MCIM 只提供按项目 id 查询的中文简介，不能与正文翻译后端互换。",
+      "consequences": "通用开关默认关闭，开启后列表可自动查询 MCIM，正文仍需点击。未来增加实时提供商沿用下拉和稳定 id，无需改按钮；当前不增加未实现选项或静默失败转发。信息按钮解释 MCIM 的作用与局限。MCIM 还提供 Modrinth / CurseForge 元数据缓存镜像 API，包括搜索、项目 / 模组信息、版本 / 文件元数据、分类及文件哈希 / 指纹等；仓库 README 当前说明文件下载暂时不提供。此调查不扩大为镜像路由接入任务，也不推断普通镜像响应已经翻译正文。"
+    },
+    {
+      "id": "D11",
+      "decision": "成功译文使用本地 SQLite，默认有效期七天；HTML / Markdown 保留原始结构，支持批量请求及有限失败重试。不接入镜像路由。",
+      "rationale": "Project Maintainer 明确要求 SQLite 七天缓存、HTML 翻译格式保留、批量翻译和失败重试，并明确排除镜像路由。Edge 匿名接口按文本数组返回，MCIM 按项目 id 返回整条简介，二者均不能直接假定具有可靠的 HTML 标签处理。",
+      "consequences": "T9、T10 为新增验收任务，补充 T1、T3、T4、T8。七天从成功保存计时，访问不续期；缓存过期后只在原有自动简介 / 点击正文路径重新请求。HTML / Markdown 本地解析和回填，链接、代码及格式在客户端保留；MCIM 缺少分段译文时不得猜测对应或自动交微软。首版七天为内部默认，不增加 TTL 设置控件。"
+    },
+    {
+      "id": "D12",
+      "decision": "发现内容操作用任务作用域绑定源 plugin_id 与启动器根目录，保留源给出的 page_url；Activity 重试输入包装原始源身份。",
+      "rationale": "翻译缓存必须区分同 id 的不同源；打开详情后再安装、查依赖、保存文件或切版本，也不能重新选择默认源。任务作用域沿同一异步操作传递身份，保持现有安装公共 API 可用，并隔离并发操作与不同启动器根目录。",
+      "consequences": "from_content_source 只影响其 future；内容源关闭时请求失败而非换源。重试记录 FromContentSource 包装并保留序列化身份，旧记录继续按原 API 读取。两个源同 id / 标题的并发夹具和 scoped retry 测试验证边界；缓存仍由独立翻译服务维护，未接入 CurseForge 插件或 MCIM 镜像路由。"
     }
   ],
   "references": [
-    "`crates/lumilio-plugin-api/src/content.rs`：`SearchHit`、`Project`、`GalleryImage`、`Version`",
-    "SiliconFlow Chat Completions：<https://docs.siliconflow.cn/cn/api-reference/chat-completions/chat-completions>",
-    "Hunyuan-MT-7B：<https://www.siliconflow.com/models/hunyuan-mt-7b>"
+    "https://github.com/mcmod-info-mirror/mcim-rust-api",
+    "https://github.com/mcmod-info-mirror/mcim-rust-api/blob/main/src/routes/modrinth.rs",
+    "https://github.com/mcmod-info-mirror/mcim-rust-api/blob/main/src/routes/curseforge.rs",
+    "crates/lumilio-plugin-api/src/content.rs",
+    "crates/lumilio-core/src/discover/source.rs",
+    "crates/lumilio-core/src/discover/convert.rs",
+    "crates/lumilio-core/src/discover/project.rs",
+    "crates/lumilio-core/src/discover/kinds.rs",
+    "crates/lumilio-core/src/service/discover.rs",
+    "https://developers.deepl.com/docs/getting-started/auth",
+    "https://docs.cloud.google.com/translate/docs/authentication",
+    "https://github.com/OwO-Network/DLX",
+    "https://github.com/OwO-Network/DLX/blob/main/translate/translate.go",
+    "https://github.com/OwO-Network/DLX/issues/236",
+    "https://github.com/ssut/py-googletrans",
+    "https://github.com/immersive-translate/old-immersive-translate#中国用户谷歌翻译接口被墙说明",
+    "https://github.com/immersive-translate/old-immersive-translate/blob/main/src/background/translationService.js",
+    "https://github.com/immersive-translate/immersive-translate/blob/main/README.md",
+    "https://immersivetranslate.com/docs/faq/",
+    "https://immersivetranslate.com/docs/services/deepL/",
+    "https://github.com/fishjar/kiss-translator/blob/master/src/apis/trans.js",
+    "https://github.com/FilipePS/Traduzir-paginas-web/blob/master/src/background/translationService.js",
+    "https://github.com/YiiGuxing/TranslationPlugin/issues/6451",
+    "https://github.com/plainheart/bing-translate-api",
+    "https://cloud.tencent.com/document/product/551/104415",
+    "https://api.fanyi.baidu.com/api/trans/product/apidoc/",
+    "https://api.volcengine.com/api-sdk?serviceCode=translate&version=2025-03-01",
+    "https://docs.libretranslate.com/guides/manage_api_keys/",
+    "https://github.com/mcmod-info-mirror/mcim-rust-api/blob/main/src/routes/translate.rs",
+    "https://github.com/mcmod-info-mirror/mcim-rust-api/blob/main/src/services/translate.rs",
+    "https://github.com/mcmod-info-mirror/mcim-rust-api/blob/main/src/models/translate/responses.rs",
+    "https://github.com/mcmod-info-mirror/mcim-translate",
+    "https://github.com/mcmod-info-mirror/mcim-translate/blob/main/mcim_translate/translate/__init__.py",
+    "https://github.com/mcmod-info-mirror/mcim-translate/blob/main/mcim_translate/config/__init__.py",
+    "https://mod.mcimirror.top/docs"
   ],
   "dependencies": [],
-  "lessonsLearned": [],
+  "lessonsLearned": [
+    "应用内验收发现详情页头的简介未翻译：首轮只把 MCIM 译文回填到列表，页头仍直接读取原始 description。修正为详情独立查询 SQLite / MCIM，覆盖直接打开、数据加载及开启设置三条入口；以源、项目、原文和设置 revision 拒绝迟到回填，并新增简介状态与关闭 / 重开设置的回归测试。列表验收不能替代详情页头验收。"
+  ],
   "roadmap": {
     "enabled": true,
     "id": "discover-translation",
     "name": "发现页翻译",
-    "lede": "简介和更新日志翻译成界面语言。",
+    "lede": "简介自动显示中文，详情正文点击翻译，标题保留原文。",
     "targetVersion": "0.2.0",
     "order": 20
   }

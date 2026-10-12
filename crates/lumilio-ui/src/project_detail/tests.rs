@@ -8,6 +8,145 @@ fn sizes_read_naturally() {
     assert_eq!(size_label(3 * 1024 * 1024 * 1024), "3.0 GB");
 }
 
+#[gpui::test]
+fn translation_requires_the_setting_and_a_click_and_ignores_disabled_late_results(
+    cx: &mut TestAppContext,
+) {
+    let (view, cx, seen) = mount(cx, None, detail());
+    assert!(cx.debug_bounds("detail-translate").is_none());
+    view.update(cx, |view, cx| view.set_translation_enabled(true, cx));
+    cx.run_until_parked();
+    assert!(
+        seen.borrow().is_empty(),
+        "enabling does not translate a body"
+    );
+    let button = cx.debug_bounds("detail-translate").unwrap();
+    let install = cx.debug_bounds("detail-install").unwrap();
+    assert!(
+        button.origin.x + button.size.width <= install.origin.x,
+        "translation toggle precedes install"
+    );
+    assert!(
+        (f32::from(button.origin.y) - f32::from(install.origin.y)).abs() < 1.5,
+        "translation belongs to the same header action row"
+    );
+    cx.simulate_click(button.center(), gpui::Modifiers::none());
+    let request = match seen.borrow().last().unwrap() {
+        DetailIntent::Translate {
+            source,
+            project,
+            original,
+            request,
+        } => {
+            assert_eq!(source, "lumilio.modrinth");
+            assert_eq!(project, "P");
+            assert!(!original.is_empty());
+            *request
+        }
+        _ => panic!("translation button must emit translation intent"),
+    };
+    view.update(cx, |view, cx| {
+        view.set_translation(
+            request,
+            Ok(lumilio_core::TranslatedDocument {
+                text: "<p>中文</p>".into(),
+                partial: false,
+            }),
+            cx,
+        )
+    });
+    view.read_with(cx, |view, _| {
+        assert!(view.show_translation);
+        assert_eq!(view.title(), "Cool");
+    });
+    cx.run_until_parked();
+    let bounds = cx.debug_bounds("detail-translate").unwrap();
+    cx.simulate_mouse_move(
+        gpui::point(gpui::px(0.), gpui::px(0.)),
+        None,
+        gpui::Modifiers::none(),
+    );
+    cx.run_until_parked();
+    cx.update(|window, cx| {
+        let color = crate::theme::Body::current(cx).orange;
+        let scale = window.scale_factor();
+        assert!(
+            window
+                .painted_quads()
+                .iter()
+                .any(|quad| (quad.background.as_solid() == Some(color)
+                    || quad.background.as_solid() == Some(crate::theme::nudge(color)))
+                    && (quad.bounds.origin.x.0 / scale - f32::from(bounds.origin.x)).abs() < 1.5),
+            "enabled translation toggle uses the theme accent, including its hover shade"
+        );
+    });
+    let button = cx.debug_bounds("detail-translate").unwrap();
+    cx.simulate_click(button.center(), gpui::Modifiers::none());
+    view.read_with(cx, |view, _| assert!(!view.show_translation));
+    cx.run_until_parked();
+    let button = cx.debug_bounds("detail-translate").unwrap();
+    cx.simulate_click(button.center(), gpui::Modifiers::none());
+    let pending = view.read_with(cx, |view, _| view.translation_request().unwrap());
+    view.update(cx, |view, cx| {
+        view.set_translation_enabled(false, cx);
+        view.set_translation(
+            pending,
+            Ok(lumilio_core::TranslatedDocument {
+                text: "late".into(),
+                partial: false,
+            }),
+            cx,
+        );
+    });
+    view.read_with(cx, |view, _| {
+        assert!(!view.show_translation && view.translation_request().is_none())
+    });
+}
+
+#[gpui::test]
+fn detail_summary_uses_mcim_without_mutating_original_and_rejects_old_settings_results(
+    cx: &mut TestAppContext,
+) {
+    let (view, cx, _) = mount(cx, None, detail());
+    view.update(cx, |view, cx| view.set_translation_enabled(true, cx));
+    let (source, project, original, revision) =
+        view.read_with(cx, |view, _| view.summary_query().unwrap());
+    view.update(cx, |view, cx| {
+        view.set_summary_translation(
+            revision,
+            &source,
+            &project,
+            &original,
+            Some("中文简介".into()),
+            cx,
+        )
+    });
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.summary_translation.as_deref(), Some("中文简介"));
+        let DetailState::Ready(detail) = view.state() else {
+            panic!("ready")
+        };
+        assert_eq!(detail.project.description, "summary");
+        assert!(
+            !view.show_translation,
+            "summary does not opt the body into translation"
+        );
+    });
+    view.update(cx, |view, cx| {
+        view.set_translation_enabled(false, cx);
+        view.set_translation_enabled(true, cx);
+        view.set_summary_translation(
+            revision,
+            &source,
+            &project,
+            &original,
+            Some("late".into()),
+            cx,
+        );
+    });
+    view.read_with(cx, |view, _| assert!(view.summary_translation.is_none()));
+}
+
 #[test]
 fn dates_are_days_or_nothing() {
     assert_eq!(date_label("2024-01-05T10:00:00Z"), "2024-01-05");
@@ -36,6 +175,8 @@ use lumilio_core::{GalleryImage, ProjectLinks, SideSupport, VersionFile};
 pub(crate) fn detail() -> ProjectDetail {
     ProjectDetail {
         project: Project {
+            source: "lumilio.modrinth".into(),
+            page_url: String::new(),
             id: "P".to_owned(),
             slug: "cool".to_owned(),
             title: "Cool".to_owned(),

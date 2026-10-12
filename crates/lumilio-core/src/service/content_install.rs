@@ -34,11 +34,11 @@ impl<T: Transport + Clone> LauncherService<T> {
                 None,
                 Some(&cancel),
             )
-            .retrying(RetryAction::SaveVersion {
+            .retrying(self.content_retry(RetryAction::SaveVersion {
                 project: project.to_owned(),
                 version_id: version_id.to_owned(),
                 path: destination.display().to_string(),
-            });
+            }));
         let result = self
             .save_version_inner(task.id, project, version_id, destination, cancel)
             .await;
@@ -295,12 +295,12 @@ impl<T: Transport + Clone> LauncherService<T> {
                 Some(instance_id.to_owned()),
                 Some(&cancel),
             )
-            .retrying(RetryAction::InstallContent {
+            .retrying(self.content_retry(RetryAction::InstallContent {
                 instance: instance_id.to_owned(),
                 kind,
                 project: project.to_owned(),
                 version: version_id.map(str::to_owned),
-            });
+            }));
         let result = self
             .install_content_inner(task.id, &record, kind, project, version_id, cancel)
             .await;
@@ -399,13 +399,13 @@ impl<T: Transport + Clone> LauncherService<T> {
                 Some(instance_id.to_owned()),
                 Some(&cancel),
             )
-            .retrying(RetryAction::SwitchContent {
+            .retrying(self.content_retry(RetryAction::SwitchContent {
                 instance: instance_id.to_owned(),
                 kind,
                 file_name: file_name.to_owned(),
                 project: project.to_owned(),
                 version_id: version_id.to_owned(),
-            });
+            }));
         let result = self
             .switch_inner(
                 task.id,

@@ -26,6 +26,34 @@ pub(super) fn apply_preferences(
     apply_wallpaper(wiring, preferences.look.wallpaper.clone(), cx);
     platform::apply_motion(preferences.motion, cx);
     lumilio_ui::i18n::apply_language(preferences.language, cx);
+    let translation = preferences.translation.clone();
+    let changed = wiring.state.borrow().preferences.translation != translation;
+    let _ = wiring.shell.update(cx, |shell, cx| {
+        shell.update_live(
+            |model| {
+                if let Some(settings) = &mut model.settings {
+                    settings.preferences.translation = translation;
+                }
+            },
+            cx,
+        )
+    });
+    if changed {
+        super::discover::request_detail_summary(wiring, cx);
+        let query = wiring
+            .shell
+            .read_with(cx, |shell, _| {
+                shell
+                    .live()
+                    .filter(|model| !model.results.is_empty())
+                    .map(|model| model.query.clone())
+            })
+            .ok()
+            .flatten();
+        if let Some(query) = query {
+            super::discover::search(wiring, &query, cx);
+        }
+    }
     // Plugin text is the plugin's own; tell the host which tag to read it in
     // without blocking the UI thread.
     let service = wiring.backend.service.clone();
@@ -310,6 +338,7 @@ pub(super) fn load_settings(wiring: &Wiring, cx: &mut App) {
                 cx,
             );
         });
+        cx.update(|cx| super::discover::request_detail_summary(&wiring, cx));
         let service = wiring.backend.service.clone();
         let Ok(usage) = wiring
             .backend

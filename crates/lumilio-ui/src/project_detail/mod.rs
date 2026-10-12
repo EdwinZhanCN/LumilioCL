@@ -27,6 +27,12 @@ use crate::tr;
 /// What the window asks the application to do.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DetailIntent {
+    Translate {
+        source: String,
+        project: String,
+        original: String,
+        request: u64,
+    },
     /// Install this version, or the newest that fits when `None`.
     Install {
         version_id: Option<String>,
@@ -109,6 +115,14 @@ pub(super) fn toggle<T: PartialEq>(list: &mut Vec<T>, item: T) {
 }
 
 pub struct ProjectDetailView {
+    summary_translation: Option<String>,
+    summary_revision: u64,
+    translation_enabled: bool,
+    translation_request: u64,
+    translation_loading: bool,
+    translation: Option<lumilio_core::TranslatedDocument>,
+    translation_error: bool,
+    show_translation: bool,
     title: SharedString,
     url: SharedString,
     state: DetailState,
@@ -141,6 +155,14 @@ impl ProjectDetailView {
         handler: DetailHandler,
     ) -> Self {
         Self {
+            summary_translation: None,
+            summary_revision: 0,
+            translation_enabled: false,
+            translation_request: 0,
+            translation_loading: false,
+            translation: None,
+            translation_error: false,
+            show_translation: false,
             title: title.into(),
             url: url.into(),
             state: DetailState::Loading,
@@ -159,8 +181,15 @@ impl ProjectDetailView {
     }
 
     pub fn set_state(&mut self, state: DetailState, cx: &mut Context<Self>) {
+        self.summary_revision = self.summary_revision.wrapping_add(1);
+        self.summary_translation = None;
+        self.translation_request = self.translation_request.wrapping_add(1);
+        self.translation = None;
+        self.translation_loading = false;
+        self.show_translation = false;
         if let DetailState::Ready(detail) = &state {
             self.title = detail.project.title.clone().into();
+            self.url = detail.project.page_url().into();
         }
         self.state = state;
         self.prefilter();
@@ -461,12 +490,152 @@ impl ProjectDetailView {
         } else {
             project.body.clone()
         };
-        div()
+        let translated = self
+            .show_translation
+            .then_some(self.translation.as_ref())
+            .flatten();
+        let content = match translated {
+            Some(translated) => gpui_component::text::TextView::html(
+                "detail-body-translated",
+                translated.text.clone(),
+            )
+            .selectable(true),
+            None => gpui_component::text::TextView::markdown("detail-body", text).selectable(true),
+        };
+        v_flex()
             .w_full()
             .debug_selector(|| "detail-description".into())
             .text_color(colors.foreground)
-            .child(gpui_component::text::TextView::markdown("detail-body", text).selectable(true))
+            .children(
+                translated
+                    .filter(|translation| translation.partial)
+                    .map(|_| {
+                        div()
+                            .text_sm()
+                            .text_color(colors.muted)
+                            .child(tr!("translation-partial"))
+                    }),
+            )
+            .child(content)
             .into_any_element()
+    }
+
+    pub fn set_translation_enabled(&mut self, enabled: bool, cx: &mut Context<Self>) {
+        if self.translation_enabled != enabled {
+            self.summary_revision = self.summary_revision.wrapping_add(1);
+            self.summary_translation = None;
+            self.translation_enabled = enabled;
+            self.translation_request = self.translation_request.wrapping_add(1);
+            self.translation_loading = false;
+            self.show_translation = false;
+            cx.notify();
+        }
+    }
+
+    pub fn translation_request(&self) -> Option<u64> {
+        (self.translation_enabled && self.translation_loading).then_some(self.translation_request)
+    }
+
+    pub fn summary_query(&self) -> Option<(String, String, String, u64)> {
+        if !self.translation_enabled {
+            return None;
+        }
+        let DetailState::Ready(detail) = &self.state else {
+            return None;
+        };
+        Some((
+            detail.project.source.clone(),
+            detail.project.id.clone(),
+            detail.project.description.clone(),
+            self.summary_revision,
+        ))
+    }
+
+    pub fn set_summary_translation(
+        &mut self,
+        revision: u64,
+        source: &str,
+        project: &str,
+        original: &str,
+        translated: Option<String>,
+        cx: &mut Context<Self>,
+    ) {
+        if self.summary_query().as_ref()
+            != Some(&(
+                source.to_owned(),
+                project.to_owned(),
+                original.to_owned(),
+                revision,
+            ))
+        {
+            return;
+        }
+        self.summary_translation = translated;
+        cx.notify();
+    }
+
+    pub fn set_translation(
+        &mut self,
+        request: u64,
+        result: Result<lumilio_core::TranslatedDocument, lumilio_core::TranslationError>,
+        cx: &mut Context<Self>,
+    ) {
+        if self.translation_request() != Some(request) {
+            return;
+        }
+        self.translation_loading = false;
+        match result {
+            Ok(translation) => {
+                self.translation = Some(translation);
+                self.show_translation = true;
+                self.translation_error = false;
+            }
+            Err(lumilio_core::TranslationError::Disabled) => {
+                self.translation_error = false;
+                self.show_translation = false;
+            }
+            Err(error) => {
+                self.translation_error = true;
+                self.show_translation = false;
+                self.toasts.push(
+                    crate::toast::Toast::error(tr!("translation-failed"))
+                        .technical(error.to_string()),
+                );
+            }
+        }
+        cx.notify();
+    }
+
+    fn toggle_translation(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.translation_enabled || self.translation_loading {
+            return;
+        }
+        if self.show_translation {
+            self.show_translation = false;
+            cx.notify();
+            return;
+        }
+        let DetailState::Ready(detail) = &self.state else {
+            return;
+        };
+        self.translation_request = self.translation_request.wrapping_add(1);
+        self.translation_loading = true;
+        self.translation_error = false;
+        (self.handler)(
+            DetailIntent::Translate {
+                source: detail.project.source.clone(),
+                project: detail.project.id.clone(),
+                original: if detail.project.body.trim().is_empty() {
+                    detail.project.description.clone()
+                } else {
+                    detail.project.body.clone()
+                },
+                request: self.translation_request,
+            },
+            window,
+            cx,
+        );
+        cx.notify();
     }
 }
 

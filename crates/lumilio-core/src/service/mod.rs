@@ -33,6 +33,7 @@ mod snapshots;
 mod support;
 mod third_party;
 mod tracking;
+mod translation;
 mod types;
 mod wardrobe;
 mod world_map;
@@ -87,6 +88,7 @@ const TOKEN_MARGIN_SECONDS: u64 = 300;
 const CREDENTIAL_PROBE: &str = "lumilio-store-check";
 
 pub struct LauncherService<T> {
+    translation: crate::translation::SharedTranslation,
     pub(crate) plugins: Arc<crate::plugins::PluginHost>,
     layout: Layout,
     transport: T,
@@ -154,6 +156,9 @@ impl<T: Transport + Clone> LauncherService<T> {
             // until corrected; the rest of the service remains available.
             .with_network_config(transport.clone(), settings.source_chain().ok());
         Ok(Self {
+            translation: Arc::new(crate::translation::TranslationService::new(
+                layout.root().to_owned(),
+            )),
             plugins: Arc::new(plugins),
             textures: crate::skin::cache::TextureCache::new(
                 layout.root().join("cache/skin-textures"),
