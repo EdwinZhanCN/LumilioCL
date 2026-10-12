@@ -133,7 +133,8 @@
     }
   ],
   "lessonsLearned": [
-    "Mojang 的运行时索引也列出 minecraft-java-exe 等非 Java 组件，按版本名解析会把它当成 Java 12/14。防护：java_runtime::is_runtime_component 只接受 java-runtime-* 与 jre-* 组件，java_runtime/tests.rs 的 Apple 芯片回落测试断言 offered_majors 不含它"
+    "Mojang 的运行时索引也列出 minecraft-java-exe 等非 Java 组件，按版本名解析会把它当成 Java 12/14。防护：java_runtime::is_runtime_component 只接受 java-runtime-* 与 jre-* 组件，java_runtime/tests.rs 的 Apple 芯片回落测试断言 offered_majors 不含它",
+    "选 Java 的规则随宿主变化：未安装的实例读不到版本自身的最低 Java，测试夹具的 \"1.0\" 在 64 位 Linux 上被旧版本规则限制到 Java 8，macOS 本地通过而 CI 失败。防护：service/tests 中依赖选中 Java 的测试先 install_instance，让版本声明的 Java 21 生效；规则本身用显式 HostProfile 在 java 单元测试里覆盖"
   ],
   "references": [
     "crates/lumilio-core/src/java/choice.rs",

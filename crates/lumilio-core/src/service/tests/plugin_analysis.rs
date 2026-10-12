@@ -1,4 +1,5 @@
 use super::{World, fake_java, publish_release, world};
+use crate::activity::CancellationToken;
 use crate::diagnostics::ProblemKind;
 use crate::history::{SessionOutcome, record_attempt};
 use crate::instance::Loader;
@@ -80,6 +81,14 @@ async fn analysis_uses_latest_report_for_a_failed_session_and_home_picks_the_mos
     let record = world
         .service
         .create_instance("Analysis", Some("1.0"), Loader::Vanilla, None)
+        .await
+        .unwrap();
+    // A game that crashed was installed, so its release names its Java (21).
+    // Without it "1.0" is an old game, which 64-bit Linux keeps on Java 8.
+    let (updates, _progress) = tokio::sync::mpsc::unbounded_channel();
+    world
+        .service
+        .install_instance(&record.id, updates, CancellationToken::new())
         .await
         .unwrap();
     let game = world.service.layout.game(&record.id);
