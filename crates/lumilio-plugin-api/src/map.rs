@@ -174,6 +174,9 @@ pub enum MapIcon {
     DiamondFossil,
     /// A lava lake on the surface.
     LavaLake,
+    /// Where large copper and iron veins run.
+    CopperVein,
+    IronVein,
     Spawn,
     SlimeChunk,
     Waypoint,

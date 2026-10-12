@@ -1,6 +1,7 @@
 mod decorations;
 mod releases;
 mod variants;
+mod veins;
 
 #[test]
 fn native_generator_links_and_runs() {

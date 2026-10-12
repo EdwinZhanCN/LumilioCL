@@ -149,6 +149,128 @@ fn start_variant(chunk: &Tag, structure: &str) -> Result<(i32, i32)> {
     Ok((kind, variant))
 }
 
+/// Blocks the area goldens record, by what generates them alone.
+#[derive(Default)]
+struct AreaFinds {
+    /// `seed x y z kind`: raw ore blocks (1 copper, 2 iron), which only veins place.
+    ores: String,
+    /// `seed dimension x y z entity`: spawners and their mob.
+    spawners: String,
+    /// `seed dimension x0 y0 z0 x1 y1 z1 blocks`: bone block clusters (fossils).
+    fossils: String,
+}
+
+/// Scans every fully generated area of a saved world.
+fn read_areas(save: &Path, seed: i64, finds: &mut AreaFinds) -> Result {
+    let areas = save.join("areas.json");
+    for area in json(&areas)?.as_array().ok_or("invalid area list")? {
+        let number = |key: &str| {
+            area[key]
+                .as_i64()
+                .and_then(|v| i32::try_from(v).ok())
+                .ok_or("invalid area bounds")
+        };
+        let dim = match area["dimension"].as_str() {
+            Some("overworld") => 0,
+            Some("the_nether") => -1,
+            Some("the_end") => 1,
+            _ => return Err("unknown area dimension".into()),
+        };
+        let mut bones = std::collections::BTreeSet::new();
+        for cx in number("cx0")?..=number("cx1")? {
+            for cz in number("cz0")?..=number("cz1")? {
+                let root = chunk(save, dim, cx, cz)?;
+                let parsed = lumilio_anvil::Chunk::from_nbt(&root).map_err(|e| format!("{e:?}"))?;
+                for section in &parsed.sections {
+                    if section.is_empty() {
+                        continue;
+                    }
+                    for y in 0..16 {
+                        for z in 0..16 {
+                            for x in 0..16 {
+                                let block = section.block(x, y, z);
+                                let at = [
+                                    cx * 16 + x as i32,
+                                    section.y * 16 + y as i32,
+                                    cz * 16 + z as i32,
+                                ];
+                                match block {
+                                    "minecraft:raw_copper_block" | "minecraft:raw_iron_block" => {
+                                        let kind = if block.contains("copper") { 1 } else { 2 };
+                                        writeln!(
+                                            finds.ores,
+                                            "{seed} {} {} {} {kind}",
+                                            at[0], at[1], at[2]
+                                        )
+                                        .unwrap();
+                                    }
+                                    "minecraft:bone_block" => {
+                                        bones.insert(at);
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        }
+                    }
+                }
+                if let Some(Tag::List(entities)) = root.get("block_entities") {
+                    for entity in entities {
+                        if entity.get("id").and_then(Tag::as_str) != Some("minecraft:mob_spawner") {
+                            continue;
+                        }
+                        let at = ["x", "y", "z"]
+                            .map(|key| entity.get(key).and_then(Tag::as_i64).unwrap_or(0));
+                        let mob = entity
+                            .at(&["SpawnData", "entity", "id"])
+                            .and_then(Tag::as_str)
+                            .unwrap_or("?");
+                        writeln!(
+                            finds.spawners,
+                            "{seed} {dim} {} {} {} {mob}",
+                            at[0], at[1], at[2]
+                        )
+                        .unwrap();
+                    }
+                }
+            }
+        }
+        // Bone blocks within two blocks of each other belong to one fossil.
+        while let Some(&first) = bones.iter().next() {
+            bones.remove(&first);
+            let mut cluster = vec![first];
+            let mut next = 0;
+            while next < cluster.len() {
+                let [x, y, z] = cluster[next];
+                next += 1;
+                for dx in -2..=2 {
+                    for dy in -2..=2 {
+                        for dz in -2..=2 {
+                            if bones.remove(&[x + dx, y + dy, z + dz]) {
+                                cluster.push([x + dx, y + dy, z + dz]);
+                            }
+                        }
+                    }
+                }
+            }
+            let low = |i: usize| cluster.iter().map(|p| p[i]).min().unwrap();
+            let high = |i: usize| cluster.iter().map(|p| p[i]).max().unwrap();
+            writeln!(
+                finds.fossils,
+                "{seed} {dim} {} {} {} {} {} {} {}",
+                low(0),
+                low(1),
+                low(2),
+                high(0),
+                high(1),
+                high(2),
+                cluster.len()
+            )
+            .unwrap();
+        }
+    }
+    Ok(())
+}
+
 pub(super) fn read(root: &Path, version: &str) -> Result {
     let work = path(root, version)?;
     let ids: Value =
@@ -157,6 +279,7 @@ pub(super) fn read(root: &Path, version: &str) -> Result {
     let mut located = String::new();
     let mut variants = String::new();
     let mut fossils = String::new();
+    let mut finds = AreaFinds::default();
     for seed in [262_i64, 9_876_543_210, -123_456_789_012_345] {
         let save = work.join("saves").join(seed.to_string());
         let level = lumilio_nbt::parse_maybe_gzip(
@@ -221,6 +344,7 @@ pub(super) fn read(root: &Path, version: &str) -> Result {
             };
             writeln!(located, "{seed} {dim} {kind} {} {}", row["x"], row["z"]).unwrap();
         }
+        read_areas(&save, seed, &mut finds)?;
         for row in json(&save.join("starts.json"))?
             .as_array()
             .ok_or("invalid structure start list")?
@@ -277,6 +401,14 @@ pub(super) fn read(root: &Path, version: &str) -> Result {
         }
     }
     let out = root.join("crates/lumilio-cubiomes/tests/golden");
+    for (name, rows) in [
+        ("ores", &finds.ores),
+        ("spawners", &finds.spawners),
+        ("bones", &finds.fossils),
+    ] {
+        std::fs::write(out.join(format!("{version}-{name}.txt")), rows)
+            .map_err(|e| e.to_string())?;
+    }
     std::fs::write(out.join(format!("{version}-saved.txt")), output).map_err(|e| e.to_string())?;
     std::fs::write(out.join(format!("{version}-variants.txt")), variants)
         .map_err(|e| e.to_string())?;

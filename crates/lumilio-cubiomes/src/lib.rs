@@ -2,11 +2,13 @@
 mod decorations;
 mod ffi;
 mod finders;
+mod veins;
 pub use decorations::{Decoration, MAX_DECORATION_AREA, Placed, decorations};
 pub use finders::{
     Bastion, MAX_AREA, Position, Spawn, Structure, Variant, slime_chunks, spawn, strongholds,
     structures,
 };
+pub use veins::{MAX_VEIN_CELLS, Vein, vein_zones};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Error {

@@ -69,6 +69,31 @@ unsafe extern "C" {
     ) -> i32;
     fn lumilio_cubiomes_variant(mc: i32, seed: u64, kind: i32, x: i32, z: i32) -> i32;
     fn lumilio_cubiomes_decoration_available(mc: i32, dim: i32, kind: i32) -> i32;
+    #[cfg(test)]
+    fn lumilio_cubiomes_vein_noise(mc: i32, seed: u64, noise: i32, x: i32, y: i32, z: i32) -> f64;
+    #[cfg(test)]
+    fn lumilio_cubiomes_vein_column(
+        mc: i32,
+        seed: u64,
+        x: i32,
+        z: i32,
+        y0: i32,
+        y1: i32,
+        out: *mut u8,
+    ) -> i32;
+    fn lumilio_cubiomes_vein_zones(
+        mc: i32,
+        seed: u64,
+        vein: i32,
+        x0: i32,
+        z0: i32,
+        cell: i32,
+        w: i32,
+        h: i32,
+        out: *mut f32,
+        cancelled: Option<unsafe extern "C" fn(*mut std::ffi::c_void) -> i32>,
+        user: *mut std::ffi::c_void,
+    ) -> i32;
     fn lumilio_cubiomes_decorations(
         mc: i32,
         seed: u64,
@@ -307,6 +332,74 @@ pub(super) fn strongholds(
     };
     match result {
         0 => Ok(out[..count * 2].as_chunks::<2>().0.to_vec()),
+        2 => Err(super::Error::Cancelled),
+        _ => Err(super::Error::Generation),
+    }
+}
+
+/// One raw vein noise (the fork's `VN_*`) at a block.
+#[cfg(test)]
+pub(super) fn vein_noise(version: super::Version, seed: i64, noise: i32, at: [i32; 3]) -> f64 {
+    // SAFETY: plain values in and out; the bridge bounds `noise`.
+    unsafe { lumilio_cubiomes_vein_noise(version.mc, seed as u64, noise, at[0], at[1], at[2]) }
+}
+
+/// The vein rule's block codes (`VB_*`) for a column from `y0` to `y1`.
+#[cfg(test)]
+pub(super) fn vein_column(
+    version: super::Version,
+    seed: i64,
+    column: [i32; 2],
+    y0: i32,
+    y1: i32,
+) -> Vec<u8> {
+    let mut out = vec![0_u8; (y1 - y0 + 1).max(0) as usize];
+    // SAFETY: `out` holds one byte per height the bridge writes.
+    unsafe {
+        lumilio_cubiomes_vein_column(
+            version.mc,
+            seed as u64,
+            column[0],
+            column[1],
+            y0,
+            y1,
+            out.as_mut_ptr(),
+        )
+    };
+    out
+}
+
+/// Zone strengths of `vein` on a `w` × `h` grid of `cell`-block squares.
+pub(super) fn vein_zones(
+    version: super::Version,
+    seed: i64,
+    vein: i32,
+    origin: [i32; 2],
+    cell: i32,
+    size: [i32; 2],
+    cancelled: &mut dyn FnMut() -> bool,
+) -> Result<Vec<f32>, super::Error> {
+    let mut out = vec![0_f32; size[0] as usize * size[1] as usize];
+    let mut hook: &mut dyn FnMut() -> bool = cancelled;
+    // SAFETY: `out` holds the w × h cells the bridge writes; `hook` outlives
+    // the synchronous call.
+    let result = unsafe {
+        lumilio_cubiomes_vein_zones(
+            version.mc,
+            seed as u64,
+            vein,
+            origin[0],
+            origin[1],
+            cell,
+            size[0],
+            size[1],
+            out.as_mut_ptr(),
+            Some(poll),
+            (&raw mut hook).cast(),
+        )
+    };
+    match result {
+        0 => Ok(out),
         2 => Err(super::Error::Cancelled),
         _ => Err(super::Error::Generation),
     }

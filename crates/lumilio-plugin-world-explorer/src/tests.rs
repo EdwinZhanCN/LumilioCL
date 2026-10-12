@@ -224,9 +224,73 @@ fn structure_layers_follow_the_worlds_version_and_dimension() {
             )
             .is_empty()
     );
-    // 25 structure layers, 3 decoration layers, spawn, slime chunks, save
-    // positions and Xaero waypoints.
-    assert_eq!(WorldExplorer.overlays().len(), 32);
+    // 25 structure layers, 3 decoration layers, 2 vein layers, spawn, slime
+    // chunks, save positions and Xaero waypoints.
+    assert_eq!(WorldExplorer.overlays().len(), 34);
+}
+
+#[test]
+fn vein_zones_cover_the_raw_ore_an_original_server_saved() {
+    use lumilio_plugin_api::map::MapObjectKind;
+    let context = Context { cancelled: false };
+    // Raw blocks the original 26.3 server saved for seed 262
+    // (crates/lumilio-cubiomes/tests/golden/26.3-ores.txt): (x, z, iron).
+    let saved = [
+        (7, 45, true),
+        (21, 20, true),
+        (41, -2, true),
+        (34, 18, true),
+        (-981, 3133, true),
+        (-965, 3119, true),
+        (-915, 3218, false),
+        (-916, 3221, false),
+    ];
+    let heat = |overlay: &str, area: [f64; 4]| {
+        let objects = WorldExplorer
+            .objects(
+                &context,
+                &overlay_request(overlay, Dimension::Overworld, "26.3", area),
+            )
+            .unwrap();
+        objects
+            .into_iter()
+            .flat_map(|object| match object.kind {
+                MapObjectKind::Heat { cell, values } => {
+                    assert_eq!(cell, 8.);
+                    assert!(object.color.is_some() && !object.approximate);
+                    values
+                }
+                other => panic!("veins are heat, got {other:?}"),
+            })
+            .collect::<Vec<_>>()
+    };
+    for (overlay, iron) in [
+        ("underground.iron-vein", true),
+        ("underground.copper-vein", false),
+    ] {
+        let squares = heat(overlay, [-1024., -64., 64., 4032.]);
+        assert!(squares.iter().all(|(_, v)| (0.35..=1.).contains(v)));
+        for &(x, z, _) in saved.iter().filter(|(.., i)| *i == iron) {
+            let (x, z) = (f64::from(x), f64::from(z));
+            assert!(
+                squares.iter().any(|(at, _)| (at.x..at.x + 8.).contains(&x)
+                    && (at.z..at.z + 8.).contains(&z)),
+                "{overlay} misses {x} {z}"
+            );
+        }
+    }
+    // Large veins began in 1.18, and only the Overworld has them.
+    let offered = |dimension: Dimension, version: &str| {
+        WorldExplorer
+            .overlays_for(&overlay_request("", dimension, version, [0., 0., 1., 1.]).context)
+            .into_iter()
+            .filter(|layer| layer.id.starts_with("underground."))
+            .count()
+    };
+    assert_eq!(offered(Dimension::Overworld, "26.3"), 2);
+    assert_eq!(offered(Dimension::Overworld, "1.18.2"), 2);
+    assert_eq!(offered(Dimension::Overworld, "1.16.5"), 0);
+    assert_eq!(offered(Dimension::Nether, "26.3"), 0);
 }
 
 #[test]

@@ -4,6 +4,7 @@
 #include "finders.h"
 #include "generator.h"
 #include "util.h"
+#include "veins.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -252,6 +253,79 @@ int lumilio_cubiomes_decorations(int mc, uint64_t seed, int dim, int type,
             }
         }
     }
+    return 0;
+}
+
+/* One raw vein noise at a block (VN_*), for the oracle tests. */
+double lumilio_cubiomes_vein_noise(int mc, uint64_t seed, int noise, int x, int y, int z)
+{
+    OreVeinNoise vn;
+    if (noise < 0 || noise >= VN_MAX || !initOreVeinNoise(&vn, mc, seed)) return 0;
+    return sampleOreVeinNoise(&vn, noise, x, y, z);
+}
+
+/* What the vein rule makes of each block of a column, y from y0 up to y1
+ * inclusive (VB_* codes), for the saved-world tests. */
+int lumilio_cubiomes_vein_column(int mc, uint64_t seed, int x, int z, int y0, int y1,
+    unsigned char *out)
+{
+    OreVeinNoise vn;
+    if (y1 < y0 || y1 - y0 > 512 || !initOreVeinNoise(&vn, mc, seed)) return 1;
+    for (int y = y0; y <= y1; y++)
+        out[y - y0] = (unsigned char)getOreVeinBlock(&vn, x, y, z);
+    return 0;
+}
+
+/* Zones of one vein type (VEIN_COPPER or VEIN_IRON) on a grid of `cell`-block
+ * squares from (x0, z0), both multiples of 4. The game interpolates the
+ * toggle between noise corners 4 blocks apart (8 in height), so a square's
+ * strongest block lies near one of the corner columns on or around it; each
+ * corner column is read at every corner height inside the vein's range.
+ * `out` gets how far past the threshold the square's strongest corner is,
+ * or -1 outside any zone. Returns 0 ok, 1 error, 2 cancelled. */
+int lumilio_cubiomes_vein_zones(int mc, uint64_t seed, int vein, int x0, int z0,
+    int cell, int w, int h, float *out, int (*cancelled)(void *), void *user)
+{
+    OreVeinNoise vn;
+    if ((vein != VEIN_COPPER && vein != VEIN_IRON) || cell < 4 || cell % 4 ||
+        (x0 & 3) || (z0 & 3) || w < 1 || h < 1)
+        return 1;
+    if (!initOreVeinNoise(&vn, mc, seed)) return 1;
+    int ylo = vein == VEIN_COPPER ? 0 : -56, yhi = vein == VEIN_COPPER ? 48 : -8;
+    int step = cell / 4, cw = w * step + 1, ch = h * step + 1;
+    float *corner = malloc(sizeof(float) * (size_t)cw * (size_t)ch);
+    if (!corner) return 1;
+    for (int j = 0; j < ch; j++)
+    {
+        if (cancelled && cancelled(user)) { free(corner); return 2; }
+        for (int i = 0; i < cw; i++)
+        {
+            double best = -1;
+            for (int y = ylo; y <= yhi; y += 8)
+            {
+                double strength;
+                if (getOreVeinZone(&vn, x0 + 4 * i, y, z0 + 4 * j, &strength) == vein
+                    && strength > best)
+                    best = strength;
+            }
+            corner[(size_t)j * cw + i] = (float)best;
+        }
+    }
+    for (int j = 0; j < h; j++)
+    {
+        for (int i = 0; i < w; i++)
+        {
+            float best = -1;
+            for (int b = 0; b <= step; b++)
+                for (int a = 0; a <= step; a++)
+                {
+                    float v = corner[(size_t)(j * step + b) * cw + (size_t)(i * step + a)];
+                    if (v > best) best = v;
+                }
+            out[(size_t)j * w + i] = best;
+        }
+    }
+    free(corner);
     return 0;
 }
 

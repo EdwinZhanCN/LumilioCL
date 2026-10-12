@@ -46,6 +46,16 @@ Omitted: `quadbase.*` (seed search and threads), `tests.c`, docs and build files
   Decoration salts are identical from 1.19.4 to 26.3, confirming the
   baseline's geode, desert well and End gateway salts for the new releases.
 
+- `veins.c` / `veins.h` (LumilioCL, MIT): large ore veins from 1.18. The
+  toggle, ridge and gap noises are seeded from md5 hashes of their names as
+  `RandomState` does; the toggle and ridges are interpolated over 4×8×4 noise
+  cells in the noise chunk's order (y, x, z); the per-block chances use the
+  positional random of `minecraft:ore`. 26.3 moved veins into material rules
+  with the same draws in single precision and exclusive top heights. Every
+  raw copper and raw iron block in the original servers' saved areas is the
+  rule's raw block. The fork now compiles with `-ffp-contract=off`, as Java
+  does not fuse multiply-adds.
+
 Sources, hashes, differences and reproduction commands are in [data](data/README.md).
 The host-owned bridge lives in `crates/lumilio-cubiomes/src/bridge.c`.
 The upstream baseline and MIT attribution are retained.
