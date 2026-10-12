@@ -3,7 +3,8 @@ use super::rows::{preference_row, row, send, with_preferences};
 use crate::kit;
 use crate::live::SettingsView;
 use crate::{tr, tr_all};
-use gpui::{AnyElement, IntoElement};
+use gpui::{AnyElement, IntoElement, div, prelude::*, px};
+use gpui_component::{Sizable as _, select::Select};
 use lumilio_core::{AfterLaunch, Language, MotionPreference};
 
 pub(super) fn general(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
@@ -26,6 +27,63 @@ pub(super) fn general(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
     let foreground = prefs.foreground_on_exit();
     let shown = view.clone();
     let rows = vec![
+        // ia[settings]: 开启翻译 | 通用 · 开关与信息按钮 | 默认关闭；开启后自动显示 MCIM 中文简介，正文点击翻译；关闭恢复原文
+        row(
+            "settings-translation",
+            tr!("settings-translation"),
+            Some(tr!("settings-translation-help").to_owned()),
+            "",
+            Some(
+                kit::switch(
+                    "settings-translation-switch",
+                    prefs.translation.enabled,
+                    tr!("settings-translation"),
+                    send(
+                        &ctx.handler,
+                        with_preferences(view, {
+                            let enabled = prefs.translation.enabled;
+                            move |prefs| prefs.translation.enabled = !enabled
+                        }),
+                    ),
+                )
+                .into_any_element(),
+            ),
+            colors,
+        ),
+        // ia[settings]: 翻译提供商 | 通用 · 下拉框 | 当前默认微软 Edge，MCIM 是简介数据来源，不列入实时提供商
+        row(
+            "settings-translation-provider",
+            tr!("settings-translation-provider"),
+            None,
+            "",
+            Some(
+                div()
+                    .w(px(180.))
+                    .child(
+                        Select::new(&ctx.controls.translation_provider)
+                            .small()
+                            .disabled(!prefs.translation.enabled),
+                    )
+                    .into_any_element(),
+            ),
+            colors,
+        ),
+        // ia[settings]: 清除翻译缓存 | 通用 · 按钮 | 删除本地 SQLite 译文，下次按原有翻译路径重新请求
+        row(
+            "settings-translation-cache",
+            tr!("settings-translation-cache"),
+            Some(tr!("settings-translation-cache-help").to_owned()),
+            "",
+            Some(
+                kit::ghost(
+                    "settings-translation-clear",
+                    tr!("translation-clear"),
+                    send(&ctx.handler, crate::live::LiveIntent::ClearTranslationCache),
+                )
+                .into_any_element(),
+            ),
+            colors,
+        ),
         // ia[settings]: 语言 | 通用 · 分段：跟随系统 / 简体中文 / English | 立即切换并保存，组件自带的文字一起换；跟随系统时取系统语言里第一个中文或英文，都没有则用简体中文
         preference_row(
             "settings-language",

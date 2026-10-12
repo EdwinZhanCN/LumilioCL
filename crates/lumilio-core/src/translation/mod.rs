@@ -1,0 +1,285 @@
+//! Derived project text, independent of content plugins and presentation.
+mod cache;
+mod document;
+mod protocol;
+#[cfg(test)]
+mod tests;
+
+use crate::transfer::Transport;
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::collections::BTreeMap;
+use std::path::PathBuf;
+use std::sync::Arc;
+use tokio::sync::Mutex;
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TranslationProvider {
+    #[default]
+    MicrosoftEdge,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(default)]
+pub struct TranslationPreferences {
+    pub enabled: bool,
+    pub provider: TranslationProvider,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TranslationError {
+    Disabled,
+    Network,
+    Http(u16),
+    Protocol,
+    TooLarge,
+    Format,
+    Storage,
+}
+
+impl std::fmt::Display for TranslationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "translation: {self:?}")
+    }
+}
+impl std::error::Error for TranslationError {}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TranslatedDocument {
+    pub text: String,
+    pub partial: bool,
+}
+
+pub(crate) struct TranslationService {
+    cancel: std::sync::Mutex<crate::CancellationToken>,
+    cache: cache::Cache,
+    /// Serializes translation jobs without holding launcher settings; coalesces
+    /// repeated requests through the cache and bounds outbound concurrency.
+    gate: Mutex<()>,
+}
+
+impl TranslationService {
+    pub(crate) fn new(root: PathBuf) -> Self {
+        Self {
+            cancel: std::sync::Mutex::new(crate::CancellationToken::new()),
+            cache: cache::Cache::new(root.join("cache/translations.sqlite")),
+            gate: Mutex::new(()),
+        }
+    }
+
+    pub(crate) fn invalidate(&self) {
+        let mut cancel = self
+            .cancel
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        cancel.cancel();
+        *cancel = crate::CancellationToken::new();
+        self.cache.invalidate();
+    }
+
+    pub(crate) async fn clear(&self) -> Result<(), TranslationError> {
+        self.invalidate();
+        self.cache.clear().await
+    }
+
+    pub(crate) async fn body<T: Transport>(
+        &self,
+        transport: &T,
+        source: &str,
+        project: &str,
+        original: &str,
+    ) -> Result<TranslatedDocument, TranslationError> {
+        let cancel = self
+            .cancel
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        tokio::select! { () = cancel.cancelled() => Err(TranslationError::Disabled), result = self.body_inner(transport, source, project, original) => result }
+    }
+
+    async fn body_inner<T: Transport>(
+        &self,
+        transport: &T,
+        source: &str,
+        project: &str,
+        original: &str,
+    ) -> Result<TranslatedDocument, TranslationError> {
+        if original.len() > 2 * 1024 * 1024 {
+            return Err(TranslationError::TooLarge);
+        }
+        let _guard = self.gate.lock().await;
+        let generation = self.cache.generation();
+        let identity = key(source, project, "body", "edge", original);
+        if let Some(text) = self
+            .cache
+            .get(identity.clone(), crate::service::now())
+            .await
+        {
+            return Ok(TranslatedDocument {
+                text,
+                partial: false,
+            });
+        }
+        let parts = document::Document::parse(original)?.texts();
+        let mut translated = Vec::with_capacity(parts.len());
+        let mut partial = false;
+        for batch in document::batches(&parts) {
+            let mut outputs = Vec::new();
+            let mut missing = Vec::new();
+            for (index, text) in batch.iter().enumerate() {
+                let part_key = key(source, project, "segment-v1", "edge", text);
+                match self.cache.get(part_key, crate::service::now()).await {
+                    Some(saved) => outputs.push(Some(saved)),
+                    None => {
+                        outputs.push(None);
+                        missing.push(index);
+                    }
+                }
+            }
+            if !missing.is_empty() {
+                let requested: Vec<String> = missing.iter().map(|&i| batch[i].clone()).collect();
+                match protocol::edge(transport, &requested).await {
+                    Ok(found) => {
+                        for (index, text) in missing.into_iter().zip(found) {
+                            self.cache
+                                .put(
+                                    key(source, project, "segment-v1", "edge", &batch[index]),
+                                    text.clone(),
+                                    crate::service::now(),
+                                    generation,
+                                )
+                                .await;
+                            outputs[index] = Some(text);
+                        }
+                    }
+                    Err(error)
+                        if translated.is_empty()
+                            && outputs.iter().all(Option::is_none)
+                            && batch.len() == parts.len() =>
+                    {
+                        return Err(error);
+                    }
+                    Err(_) => partial = true,
+                }
+            }
+            for (original, output) in batch.iter().zip(outputs) {
+                translated.push(output.unwrap_or_else(|| {
+                    partial = true;
+                    original.clone()
+                }));
+            }
+            if translated.iter().map(String::len).sum::<usize>() > 8 * 1024 * 1024 {
+                return Err(TranslationError::TooLarge);
+            }
+        }
+        let text = document::Document::parse(original)?.replace(&translated)?;
+        if !partial {
+            self.cache
+                .put(identity, text.clone(), crate::service::now(), generation)
+                .await;
+        }
+        Ok(TranslatedDocument { text, partial })
+    }
+
+    pub(crate) async fn summaries<T: Transport>(
+        &self,
+        transport: &T,
+        source: &str,
+        items: &[(String, String)],
+    ) -> BTreeMap<String, String> {
+        let cancel = self
+            .cancel
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        tokio::select! { () = cancel.cancelled() => BTreeMap::new(), result = self.summaries_inner(transport, source, items) => result }
+    }
+
+    async fn summaries_inner<T: Transport>(
+        &self,
+        transport: &T,
+        source: &str,
+        items: &[(String, String)],
+    ) -> BTreeMap<String, String> {
+        let platform = match source {
+            "lumilio.modrinth" => "modrinth",
+            "lumilio.curseforge" => "curseforge",
+            _ => return BTreeMap::new(),
+        };
+        let _guard = self.gate.lock().await;
+        let generation = self.cache.generation();
+        let mut result = BTreeMap::new();
+        let mut missing = Vec::new();
+        for (id, original) in items {
+            if let Some(text) = self
+                .cache
+                .get(
+                    key(source, id, "summary", "mcim", original),
+                    crate::service::now(),
+                )
+                .await
+            {
+                if !text.is_empty() {
+                    result.insert(id.clone(), text);
+                }
+            } else {
+                missing.push((id.clone(), original.clone()));
+            }
+        }
+        for batch in missing.chunks(50) {
+            let ids: Vec<String> = batch.iter().map(|(id, _)| id.clone()).collect();
+            let Ok(found) = protocol::mcim(transport, platform, &ids).await else {
+                continue;
+            };
+            for (id, original) in batch {
+                if !found.contains_key(id) {
+                    self.cache
+                        .put_for(
+                            key(source, id, "summary", "mcim", original),
+                            String::new(),
+                            crate::service::now(),
+                            generation,
+                            10 * 60,
+                        )
+                        .await;
+                }
+                if let Some((remote_original, translated)) = found.get(id)
+                    && remote_original == original
+                    && !translated.trim().is_empty()
+                    && document::safe_summary(original, translated)
+                {
+                    self.cache
+                        .put(
+                            key(source, id, "summary", "mcim", original),
+                            translated.clone(),
+                            crate::service::now(),
+                            generation,
+                        )
+                        .await;
+                    result.insert(id.clone(), translated.clone());
+                }
+            }
+        }
+        result
+    }
+}
+
+fn key(source: &str, project: &str, field: &str, provider: &str, original: &str) -> String {
+    let encoded = serde_json::to_vec(&(
+        source,
+        project,
+        field,
+        provider,
+        "zh-Hans",
+        "format-v1",
+        original,
+    ))
+    .expect("string tuple serializes");
+    Sha256::digest(encoded)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+pub(crate) type SharedTranslation = Arc<TranslationService>;

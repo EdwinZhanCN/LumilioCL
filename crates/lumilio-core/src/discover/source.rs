@@ -86,6 +86,23 @@ pub struct ContentClient<'a> {
 }
 
 impl PluginHost {
+    pub async fn content_client_for(
+        &self,
+        plugin: &str,
+    ) -> Result<ContentClient<'_>, DiscoverError> {
+        let source = self
+            .content_sources()
+            .await
+            .into_iter()
+            .find(|source| source.plugin == plugin)
+            .ok_or(DiscoverError::NoSource)?;
+        Ok(ContentClient {
+            host: self,
+            plugin: source.plugin,
+            name: source.name,
+            capabilities: source.capabilities,
+        })
+    }
     /// The first enabled content source, or [`DiscoverError::NoSource`].
     pub async fn content_client(&self) -> Result<ContentClient<'_>, DiscoverError> {
         let Some(source) = self.content_sources().await.into_iter().next() else {
@@ -171,7 +188,11 @@ impl ContentClient<'_> {
             query.sort = *first;
         }
         match self.host.search_content(&self.plugin, query).await {
-            Some(page) => Ok(page_from_api(page)),
+            Some(page) => {
+                let mut page = page_from_api(page);
+                page.source.clone_from(&self.plugin);
+                Ok(page)
+            }
             None => Err(self.unavailable().await),
         }
     }
@@ -182,7 +203,9 @@ impl ContentClient<'_> {
         let project = self
             .call(move |source, ctx| source.project(ctx, &id))
             .await?;
-        Ok(project_from_api(project))
+        let (mut project, author) = project_from_api(project);
+        project.source.clone_from(&self.plugin);
+        Ok((project, author))
     }
 
     pub async fn versions(&self, project: &str) -> Result<Vec<Version>, DiscoverError> {

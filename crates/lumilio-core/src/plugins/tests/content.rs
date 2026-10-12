@@ -127,6 +127,31 @@ impl ContentSource for Source {
         })
     }
     fn project(&self, _: &dyn HostContext, _: &str) -> Result<Project, PluginError> {
+        if self.id.starts_with("test.origin-") {
+            return Ok(Project {
+                id: "shared".into(),
+                slug: "same".into(),
+                title: "Same title".into(),
+                description: "Hello".into(),
+                body: "Hello".into(),
+                kind: ProjectKind::Mod,
+                categories: vec![],
+                loaders: vec![],
+                downloads: 0,
+                followers: 0,
+                published: String::new(),
+                updated: String::new(),
+                client_side: SideSupport::Unknown,
+                server_side: SideSupport::Unknown,
+                license: None,
+                links: ProjectLinks::default(),
+                gallery: vec![],
+                icon_url: None,
+                game_versions: vec![],
+                page_url: format!("https://{}.example/shared", self.id),
+                author: None,
+            });
+        }
         Err(PluginError::Unavailable("fixture has no project".into()))
     }
     fn versions(
@@ -199,6 +224,58 @@ fn source(id: &'static str, panic: bool) -> Arc<dyn Plugin> {
         panic,
         caller: std::thread::current().id(),
     })
+}
+
+#[tokio::test]
+async fn source_scopes_keep_same_project_ids_and_links_distinct_during_concurrent_operations() {
+    #[derive(Clone)]
+    struct UnusedTransport;
+    impl crate::Transport for UnusedTransport {
+        fn get<'a>(&'a self, _: &'a str) -> crate::TransportFuture<'a> {
+            Box::pin(async {
+                Err(crate::TransportError::permanent(
+                    "unexpected network request",
+                ))
+            })
+        }
+    }
+    let root = tempfile::tempdir().unwrap();
+    let service = crate::LauncherService::open(
+        root.path(),
+        UnusedTransport,
+        vec![
+            source("test.origin-a", false),
+            source("test.origin-b", false),
+        ],
+    )
+    .unwrap();
+    let (a, b) = tokio::join!(
+        service.from_content_source(
+            Some("test.origin-a".into()),
+            service.project_detail("shared")
+        ),
+        service.from_content_source(
+            Some("test.origin-b".into()),
+            service.project_detail("shared")
+        ),
+    );
+    let (a, b) = (a.unwrap().project, b.unwrap().project);
+    assert_eq!(a.id, b.id);
+    assert_eq!(a.title, b.title);
+    assert_eq!(a.source, "test.origin-a");
+    assert_eq!(b.source, "test.origin-b");
+    assert_ne!(a.page_url(), b.page_url());
+    assert!(b.page_url().contains("test.origin-b.example"));
+    assert_eq!(
+        service
+            .project_detail("shared")
+            .await
+            .unwrap()
+            .project
+            .source,
+        "test.origin-a",
+        "scoped origin does not leak into the next operation"
+    );
 }
 
 #[test]

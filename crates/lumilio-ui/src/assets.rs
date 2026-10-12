@@ -39,6 +39,9 @@ impl AssetSource for Assets {
                 include_bytes!("../assets/icons/lucide/refresh-cw.svg").as_slice()
             }
             "icons/lucide/info.svg" => include_bytes!("../assets/icons/lucide/info.svg").as_slice(),
+            "icons/lucide/languages.svg" => {
+                include_bytes!("../assets/icons/lucide/languages.svg").as_slice()
+            }
             "icons/lucide/arrow-right.svg" => {
                 include_bytes!("../assets/icons/lucide/arrow-right.svg").as_slice()
             }
@@ -94,7 +97,7 @@ impl AssetSource for Assets {
     }
 
     fn list(&self, path: &str) -> Result<Vec<SharedString>> {
-        const ASSETS: [&str; 31] = [
+        const ASSETS: [&str; 32] = [
             "icons/phosphor/house.svg",
             "icons/phosphor/books.svg",
             "icons/phosphor/compass.svg",
@@ -104,6 +107,7 @@ impl AssetSource for Assets {
             "icons/lucide/play.svg",
             "icons/lucide/refresh-cw.svg",
             "icons/lucide/info.svg",
+            "icons/lucide/languages.svg",
             "icons/lucide/arrow-right.svg",
             "icons/lucide/x.svg",
             "icons/lucide/square.svg",
@@ -160,6 +164,7 @@ pub fn register_fonts(cx: &mut gpui::App) {
 /// Small interface glyphs used by the page kit.
 #[derive(Clone, Copy)]
 pub enum UiIcon {
+    Languages,
     Star,
     StarFilled,
     Back,
@@ -188,6 +193,7 @@ pub enum UiIcon {
 impl IconNamed for UiIcon {
     fn path(self) -> SharedString {
         match self {
+            Self::Languages => "icons/lucide/languages.svg",
             Self::Star => "icons/lucide/star.svg",
             Self::StarFilled => "icons/lucide/star-filled.svg",
             Self::Back => "icons/lucide/chevron-left.svg",

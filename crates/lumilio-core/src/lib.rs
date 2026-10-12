@@ -57,6 +57,7 @@ mod snapshots;
 mod staged;
 mod storage;
 mod transfer;
+mod translation;
 mod tuning;
 mod updates;
 mod wallpaper;
@@ -144,6 +145,9 @@ pub use modpack::{
     plan as plan_modpack, read_index as read_pack_index,
 };
 pub use pack_export::{ExportError, ExportReport, ExportSpec, PackFormat};
+pub use translation::{
+    TranslatedDocument, TranslationError, TranslationPreferences, TranslationProvider,
+};
 pub mod world_map;
 pub use plugins::{
     MapFailure, MapProviders, PluginContentSource, PluginEffect, PluginFinding, PluginHost,

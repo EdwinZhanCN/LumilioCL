@@ -46,7 +46,13 @@ impl<T: Transport + Clone> LauncherService<T> {
         &self,
         preferences: crate::tuning::Preferences,
     ) -> Result<(), ServiceError> {
-        Ok(self.settings.lock().await.set_preferences(preferences)?)
+        let mut settings = self.settings.lock().await;
+        let changed = settings.get().preferences.translation != preferences.translation;
+        settings.set_preferences(preferences)?;
+        if changed {
+            self.translation.invalidate();
+        }
+        Ok(())
     }
 
     pub async fn set_launch_defaults(

@@ -27,6 +27,8 @@ pub enum DateKind {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SearchRow {
+    pub source: String,
+    pub original_summary: String,
     /// Modrinth's id, to recognise what the game already has.
     pub project_id: String,
     pub kind: ProjectKind,
@@ -96,6 +98,8 @@ pub fn search_row(
         DateKind::Updated => &hit.updated,
     };
     SearchRow {
+        source: String::new(),
+        original_summary: hit.description.clone(),
         project_id: hit.project_id.clone(),
         kind: hit.kind,
         slug: hit.slug.clone(),
@@ -122,7 +126,11 @@ pub fn search_rows(
 ) -> Vec<SearchRow> {
     page.hits
         .iter()
-        .map(|hit| search_row(hit, now, query, filters))
+        .map(|hit| {
+            let mut row = search_row(hit, now, query, filters);
+            row.source.clone_from(&page.source);
+            row
+        })
         .collect()
 }
 

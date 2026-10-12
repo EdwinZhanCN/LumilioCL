@@ -26,6 +26,15 @@ impl LauncherShell {
     pub fn update_live(&mut self, change: impl FnOnce(&mut LiveModel), cx: &mut Context<Self>) {
         if let Some(model) = &mut self.live {
             change(model);
+            if model
+                .settings
+                .as_ref()
+                .is_none_or(|settings| !settings.preferences.translation.enabled)
+            {
+                for row in &mut model.results {
+                    row.summary.clone_from(&row.original_summary);
+                }
+            }
             self.activity = ActivitySummary::new(model.active_tasks());
             if let Some(slot) = &self.detail {
                 let installed = model.installed.clone();
@@ -35,6 +44,13 @@ impl LauncherShell {
                     view.set_installed(installed, cx);
                     view.set_installing(installing, cx);
                     view.set_game_tags(tags, cx);
+                    view.set_translation_enabled(
+                        model
+                            .settings
+                            .as_ref()
+                            .is_some_and(|settings| settings.preferences.translation.enabled),
+                        cx,
+                    );
                 });
             }
             cx.notify();

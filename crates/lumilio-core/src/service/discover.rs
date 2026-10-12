@@ -5,10 +5,48 @@ use crate::activity::CancellationToken;
 use crate::discover::{ContentClient, ProjectKind, SearchPage, SearchQuery};
 use crate::transfer::Transport;
 
+tokio::task_local! {
+    /// The origin of one content operation, never a launcher-wide selection.
+    static CONTENT_ORIGIN: (std::path::PathBuf, String);
+}
+
 impl<T: Transport + Clone> LauncherService<T> {
+    pub(super) fn content_retry(&self, action: crate::RetryAction) -> crate::RetryAction {
+        match CONTENT_ORIGIN.try_with(Clone::clone) {
+            Ok((root, source)) if root == self.layout.root() => {
+                crate::RetryAction::FromContentSource {
+                    source,
+                    operation: Box::new(action),
+                }
+            }
+            _ => action,
+        }
+    }
+    /// Pins all content reads in an operation (including dependency reads) to
+    /// its initiating source. The scope ends with the future and does not
+    /// affect concurrent operations or another launcher root.
+    pub async fn from_content_source<R>(
+        &self,
+        source: Option<String>,
+        operation: impl std::future::Future<Output = R>,
+    ) -> R {
+        match source {
+            Some(source) => {
+                CONTENT_ORIGIN
+                    .scope((self.layout.root().to_owned(), source), operation)
+                    .await
+            }
+            None => operation.await,
+        }
+    }
     /// The enabled content source, asked afresh every time so that turning
     /// the plugin off takes effect at once, whatever was cached.
     pub(super) async fn content_client(&self) -> Result<ContentClient<'_>, ServiceError> {
+        if let Ok((root, source)) = CONTENT_ORIGIN.try_with(Clone::clone)
+            && root == self.layout.root()
+        {
+            return Ok(self.plugins.content_client_for(&source).await?);
+        }
         Ok(self.plugins.content_client().await?)
     }
 
@@ -43,6 +81,15 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// Everything the detail window shows about a project.
     pub async fn project_detail(&self, project: &str) -> Result<ProjectDetail, ServiceError> {
         let client = self.content_client().await?;
+        self.project_detail_from(client.plugin_id(), project).await
+    }
+
+    pub async fn project_detail_from(
+        &self,
+        source: &str,
+        project: &str,
+    ) -> Result<ProjectDetail, ServiceError> {
+        let client = self.plugins.content_client_for(source).await?;
         let (details, versions) = tokio::join!(client.project(project), client.versions(project));
         let (details, owner) = details?;
         let mut versions = versions?;

@@ -4,6 +4,20 @@
 ## Common
 
 common-none = None
+settings-translation = Translation
+settings-translation-help = When enabled, Discover uses Chinese summaries from MCIM where available; click Translate to send the description to the selected provider. Only Simplified Chinese is supported, and titles stay unchanged.
+settings-translation-provider = Translation provider
+settings-translation-cache = Translation cache
+settings-translation-cache-help = Successful translations are stored locally for 7 days. After you clear the cache, the next translation sends a new request.
+translation-clear = Clear
+translation-action = Translate
+translation-loading = Translating…
+translation-original = Show original
+translation-retry = Retry translation
+translation-failed = Translation failed. The original text is kept. You can retry.
+translation-partial = Some text could not be translated. The original text is kept. Translate again to retry.
+translation-cache-cleared = Translation cache cleared
+translation-cache-clear-failed = Could not clear the translation cache
 common-not-set = Not set
 common-edit = Edit
 common-edit-more = Edit…

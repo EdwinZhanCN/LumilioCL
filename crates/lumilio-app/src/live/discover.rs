@@ -63,6 +63,7 @@ fn run_search(wiring: &Wiring, query: &DiscoverQuery, seq: u64, cx: &mut App) {
     let service = wiring.backend.service.clone();
     let state = wiring.state.clone();
     let asked = query.clone();
+    let translated_wiring = wiring.clone();
     job(
         wiring,
         cx,
@@ -110,6 +111,7 @@ fn run_search(wiring: &Wiring, query: &DiscoverQuery, seq: u64, cx: &mut App) {
                 },
                 cx,
             );
+            request_summaries(&translated_wiring, seq, cx);
         },
     );
 }
@@ -179,6 +181,7 @@ pub(super) fn install(
 ) {
     let service = wiring.backend.service.clone();
     let cancel = CancellationToken::new();
+    let source = source_of(wiring, &slug, cx);
     if kind == ProjectKind::Modpack {
         mark_installing(wiring, &slug, true, cx);
         let slug_done = slug.clone();
@@ -191,7 +194,11 @@ pub(super) fn install(
                 "discover-install-started",
                 title = title.as_str()
             ))),
-            async move { service.install_modpack(&slug, cancel).await },
+            async move {
+                service
+                    .from_content_source(source, service.install_modpack(&slug, cancel))
+                    .await
+            },
             move |shell, result, cx| {
                 mark_installing_in(shell, &slug_done, false, cx);
                 let toast = outcome(
@@ -221,6 +228,7 @@ pub(super) fn install(
             title,
             version,
             Vec::new(),
+            source,
             cx,
         );
         return;
@@ -229,9 +237,18 @@ pub(super) fn install(
     // the install, so a failed check installs the mod alone.
     let check = {
         let (instance, slug, version) = (instance.clone(), slug.clone(), version.clone());
+        let source = source.clone();
         wiring.backend.spawn(async move {
             service
-                .dependency_report(&instance, ProjectKind::Mod, &slug, version.as_deref())
+                .from_content_source(
+                    source,
+                    service.dependency_report(
+                        &instance,
+                        ProjectKind::Mod,
+                        &slug,
+                        version.as_deref(),
+                    ),
+                )
                 .await
         })
     };
@@ -250,6 +267,7 @@ pub(super) fn install(
                     title,
                     version,
                     Vec::new(),
+                    source.clone(),
                     cx,
                 );
                 return;
@@ -289,6 +307,7 @@ pub(super) fn install(
                                 title.clone(),
                                 version.clone(),
                                 extra,
+                                source.clone(),
                                 cx,
                             );
                         }),
@@ -314,6 +333,7 @@ pub(super) fn run_install(
     title: String,
     version: Option<String>,
     dependencies: Vec<(String, String, String)>,
+    source: Option<String>,
     cx: &mut App,
 ) {
     let service = wiring.backend.service.clone();
@@ -330,35 +350,45 @@ pub(super) fn run_install(
             title = title.as_str()
         ))),
         async move {
-            let mut failed = Vec::new();
-            for (project, version_id, name) in dependencies {
-                if service
-                    .install_version(
-                        &instance,
-                        kind,
-                        &project,
-                        &version_id,
-                        CancellationToken::new(),
-                    )
-                    .await
-                    .is_err()
-                {
-                    failed.push(name);
-                }
-            }
-            let installed = match version {
-                Some(version) => {
-                    service
-                        .install_version(&instance, kind, &slug, &version, CancellationToken::new())
-                        .await
-                }
-                None => {
-                    service
-                        .install_content(&instance, kind, &slug, CancellationToken::new())
-                        .await
-                }
-            };
-            (installed, failed)
+            service
+                .from_content_source(source, async {
+                    let mut failed = Vec::new();
+                    for (project, version_id, name) in dependencies {
+                        if service
+                            .install_version(
+                                &instance,
+                                kind,
+                                &project,
+                                &version_id,
+                                CancellationToken::new(),
+                            )
+                            .await
+                            .is_err()
+                        {
+                            failed.push(name);
+                        }
+                    }
+                    let installed = match version {
+                        Some(version) => {
+                            service
+                                .install_version(
+                                    &instance,
+                                    kind,
+                                    &slug,
+                                    &version,
+                                    CancellationToken::new(),
+                                )
+                                .await
+                        }
+                        None => {
+                            service
+                                .install_content(&instance, kind, &slug, CancellationToken::new())
+                                .await
+                        }
+                    };
+                    (installed, failed)
+                })
+                .await
         },
         move |shell, (result, failed), cx| {
             mark_installing_in(shell, &slug_done, false, cx);
@@ -451,11 +481,33 @@ pub(super) fn open_project(
             .shell
             .update(cx, |shell, cx| shell.open_detail(kind, &project, cx));
         let service = wiring.backend.service.clone();
-        let handle = wiring
-            .backend
-            .spawn(async move { service.project_detail(&slug).await });
+        let source = wiring
+            .shell
+            .read_with(cx, |shell, _| {
+                shell.live().and_then(|model| {
+                    model
+                        .results
+                        .iter()
+                        .find(|row| row.slug == slug)
+                        .map(|row| row.source.clone())
+                })
+            })
+            .ok()
+            .flatten();
+        let handle = wiring.backend.spawn(async move {
+            match source {
+                Some(source) if !source.is_empty() => {
+                    service.project_detail_from(&source, &slug).await
+                }
+                _ => service.project_detail(&slug).await,
+            }
+        });
         let shell = wiring.shell.clone();
         let project = slug_of(&shell, cx);
+        let opened_view = shell
+            .read_with(cx, |shell, _| shell.detail_view())
+            .ok()
+            .flatten();
         cx.spawn(async move |cx| {
             let Ok(result) = handle.await else { return };
             let state = match result {
@@ -464,6 +516,9 @@ pub(super) fn open_project(
             };
             if let Some(project) = project {
                 let _ = shell.update(cx, |shell, cx| {
+                    if shell.detail_view() != opened_view {
+                        return;
+                    }
                     shell.set_detail_state(&project, state, cx);
                     // Dev hook: `LUMILIO_DETAIL_TAB=1|2` starts on Versions / Gallery.
                     if let Some(tab) = std::env::var("LUMILIO_DETAIL_TAB")
@@ -474,6 +529,7 @@ pub(super) fn open_project(
                     }
                 });
             }
+            cx.update(|cx| request_detail_summary(&wiring, cx));
         })
         .detach();
     });
@@ -487,4 +543,168 @@ pub(super) fn slug_of(shell: &WeakEntity<LauncherShell>, cx: &mut App) -> Option
         })
         .ok()
         .flatten()
+}
+
+pub(super) fn source_of(wiring: &Wiring, project: &str, cx: &mut App) -> Option<String> {
+    wiring
+        .shell
+        .read_with(cx, |shell, cx| {
+            if let Some(view) = shell.detail_view()
+                && let DetailState::Ready(detail) = view.read(cx).state()
+                && (detail.project.slug == project || detail.project.id == project)
+            {
+                return Some(detail.project.source.clone());
+            }
+            shell
+                .live()?
+                .results
+                .iter()
+                .find(|row| row.slug == project || row.project_id == project)
+                .map(|row| row.source.clone())
+        })
+        .ok()
+        .flatten()
+        .filter(|source| !source.is_empty())
+}
+
+pub(super) fn request_detail_summary(wiring: &Wiring, cx: &mut App) {
+    let pending = wiring
+        .shell
+        .read_with(cx, |shell, cx| {
+            let view = shell.detail_view()?;
+            let query = view.read(cx).summary_query()?;
+            Some((view, query))
+        })
+        .ok()
+        .flatten();
+    let Some((view, (source, project, original, revision))) = pending else {
+        return;
+    };
+    let service = wiring.backend.service.clone();
+    let (asked_source, asked_project, asked_original) =
+        (source.clone(), project.clone(), original.clone());
+    let handle = wiring.backend.spawn(async move {
+        service
+            .translate_summaries(&asked_source, &[(asked_project.clone(), asked_original)])
+            .await
+            .remove(&asked_project)
+    });
+    let shell = wiring.shell.clone();
+    cx.spawn(async move |cx| {
+        let Ok(translated) = handle.await else { return };
+        let current = shell
+            .read_with(cx, |shell, _| shell.detail_view())
+            .ok()
+            .flatten();
+        if current != Some(view.clone()) {
+            return;
+        }
+        view.update(cx, |view, cx| {
+            view.set_summary_translation(revision, &source, &project, &original, translated, cx)
+        });
+    })
+    .detach();
+}
+
+fn request_summaries(wiring: &Wiring, seq: u64, cx: &mut gpui_kit::Context<LauncherShell>) {
+    let wiring = wiring.clone();
+    cx.spawn(async move |_, cx| {
+        cx.update(|cx| {
+            let rows = wiring
+                .shell
+                .read_with(cx, |shell, _| {
+                    shell.live().map(|model| model.results.clone())
+                })
+                .ok()
+                .flatten()
+                .unwrap_or_default();
+            let Some(source) = rows.first().map(|row| row.source.clone()) else {
+                return;
+            };
+            let items = rows
+                .iter()
+                .map(|row| (row.project_id.clone(), row.original_summary.clone()))
+                .collect::<Vec<_>>();
+            let service = wiring.backend.service.clone();
+            let state = wiring.state.clone();
+            let asked_source = source.clone();
+            job(
+                &wiring,
+                cx,
+                false,
+                Reload::Nothing,
+                None,
+                async move { service.translate_summaries(&source, &items).await },
+                move |shell, translations, cx| {
+                    if state.borrow().search_seq != seq {
+                        return;
+                    }
+                    shell.update_live(
+                        |model| {
+                            if model
+                                .settings
+                                .as_ref()
+                                .is_some_and(|settings| settings.preferences.translation.enabled)
+                            {
+                                for row in &mut model.results {
+                                    if row.source == asked_source
+                                        && let Some(text) = translations.get(&row.project_id)
+                                    {
+                                        row.summary.clone_from(text);
+                                    }
+                                }
+                            }
+                        },
+                        cx,
+                    );
+                },
+            );
+        });
+    })
+    .detach();
+}
+
+pub(super) fn translate_body(
+    wiring: &Wiring,
+    source: String,
+    project: String,
+    original: String,
+    request: u64,
+    cx: &mut App,
+) {
+    let wiring = wiring.clone();
+    cx.spawn(async move |cx| {
+        let view = cx.update(|cx| {
+            wiring
+                .shell
+                .read_with(cx, |shell, _| shell.detail_view())
+                .ok()
+                .flatten()
+        });
+        let Some(view) = view else { return };
+        let service = wiring.backend.service.clone();
+        let handle = wiring
+            .backend
+            .spawn(async move { service.translate_body(&source, &project, &original).await });
+        while !handle.is_finished() {
+            cx.background_executor().timer(super::POLL).await;
+            let current = cx.update(|cx| {
+                wiring
+                    .shell
+                    .read_with(cx, |shell, _| shell.detail_view())
+                    .ok()
+                    .flatten()
+                    == Some(view.clone())
+                    && view.read(cx).translation_request() == Some(request)
+            });
+            if !current {
+                handle.abort();
+                return;
+            }
+        }
+        if let Ok(result) = handle.await {
+            view.update(cx, |view, cx| view.set_translation(request, result, cx));
+        }
+    })
+    .detach();
 }

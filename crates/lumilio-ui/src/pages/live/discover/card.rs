@@ -282,7 +282,18 @@ pub(super) fn result_row(index: usize, row: &SearchRow, ctx: &LiveCtx) -> impl I
                         .text_sm()
                         .text_color(colors.muted)
                         .line_clamp(2)
-                        .child(row.summary.clone()),
+                        .child(if row.summary.contains('<') {
+                            gpui_component::text::TextView::html(
+                                gpui::SharedString::from(format!(
+                                    "summary-{}-{}",
+                                    row.source, row.project_id
+                                )),
+                                row.summary.clone(),
+                            )
+                            .into_any_element()
+                        } else {
+                            div().child(row.summary.clone()).into_any_element()
+                        }),
                 )
                 .child(div().pt(px(2.)).child(tag_line(row, colors))),
         )

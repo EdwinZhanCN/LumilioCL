@@ -478,6 +478,7 @@ fn the_version_list_shows_releases_unless_all_are_asked_for() {
 
 fn hit(categories: &[&str], loaders: &[&str]) -> SearchHit {
     SearchHit {
+        page_url: String::new(),
         project_id: "P".to_owned(),
         slug: "fo".to_owned(),
         title: "FO".to_owned(),
