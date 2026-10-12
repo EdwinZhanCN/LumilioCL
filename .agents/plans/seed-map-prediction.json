@@ -1,0 +1,193 @@
+{
+  "schemaVersion": 1,
+  "id": "seed-map-prediction",
+  "title": "种子地图：扩展可预测内容（到 26.3）",
+  "summary": "世界地图的种子底图上多出一批从种子就能算出的内容：已有结构的变体（堡垒遗迹四种开局、带不带地下室的雪屋、下界里的废弃传送门），装饰类地物（化石、下界化石、岩浆湖、地牢、硫磺泉），峡谷，铜/铁矿脉，奇形洞穴（cheese cave），沙漠神殿里的附魔金苹果，以及末地小岛。每一类都按原版源码实现（反编译原版 jar，与 mcsrc.dev 相同的做法），并由原版服务端金样逐版本核对；只有核对通过的版本才显示，其余版本不降级。完全由种子决定的标成精确，依赖地形的标成估计并在图层面板写明原因。图标已在 `crates/lumilio-ui/assets/map-icons/`。本计划接替 backlog 里「世界地图·结构」那一行，延续 world-explorer 的 W11、W14。",
+  "status": "in_progress",
+  "visibility": "internal",
+  "scope": {
+    "included": [
+      "已有结构的变体：堡垒遗迹的四种开局（桥、疣猪兽圈、住所、宝藏室）、雪屋有无地下室、下界的废弃传送门用自己的图标、末地城是否带末地船（卡片备注）。",
+      "装饰类地物：化石（煤、钻石两种）、下界化石（含 1.21.6 起的干枯恶魂）、地下岩浆湖、地牢（僵尸、骷髅、蜘蛛）、硫磺泉（26.2+）、末地小岛。",
+      "雕刻器：峡谷（含海底峡谷），给出起点与走向。",
+      "噪声：铜矿脉、铁矿脉的分布区域；奇形洞穴（cheese cave）；为依赖地形的项目提供地表高度与地下空腔。",
+      "战利品：沙漠神殿箱子里的附魔金苹果。",
+      "开发工具：`Probe.java` 与 `save_golden.py` 的新金样（特征顺序、雕刻器掩码、噪声取样、真实存档里的结构起点、箱子种子与地牢刷怪笼）；按版本生成并入库的表。",
+      "界面：`MapIcon` 新变体、`map_icons.rs` 的图标表、中英目录、图层分组与「估计」说明。"
+    ],
+    "excluded": [
+      "「巨型峡谷」「巨型海底峡谷」：原版 Java 没有这一类生成，只能凭阈值硬分，不做；对应图标保持不用。",
+      "矿石查找（钻石、远古残骸等单个矿石）、其他结构的战利品。",
+      "基岩版、大型生物群系、自定义世界预设。",
+      "版本表里有、但新金样没有覆盖或没通过的版本：这些版本不显示新图层，不降级到相邻版本（world-explorer W14）。",
+      "把 cubiomes 链进 `lumilio-core`（world-explorer W11）。"
+    ]
+  },
+  "tasks": [
+    {
+      "id": "S1",
+      "title": "计划、分支与原版源码：`feat/seed-map-prediction`；`cargo xtask worldgen-prepare` 下载原版服务端，Vineflower 反编译到被忽略的 `target/worldgen/<版本>/src/`（与 mcsrc.dev 同法）。",
+      "status": "completed",
+      "acceptance": "本 JSON 存在且 `plans validate` 通过；26.3 的反编译源码在 `target/worldgen/26.3/src/`，不入库；backlog 的「世界地图·结构」行删除。"
+    },
+    {
+      "id": "S2",
+      "title": "结构变体（精确）：堡垒遗迹开局、雪屋地下室、下界废弃传送门图标、末地船备注。`lumilio-cubiomes` 的结构结果带变体；插件按变体选图标与文案。",
+      "status": "completed",
+      "acceptance": "真实存档金样：原版服务端生成的世界里，每个被 `/locate` 到并强制加载的堡垒遗迹与雪屋，其区块 NBT 里的结构起点（开局模板、是否有地下室）与 fork 的结果一致，覆盖 1.18.2 起到 26.3 的金样版本；末地城的船与 `getEndCityPieces` 一致。"
+    },
+    {
+      "id": "S3",
+      "title": "特征顺序表：`Probe.java` 导出每个版本每个生成步骤里地物的全局下标（`FeatureSorter`），以及每一步的结构顺序；生成 `forks/cubiomes/tables/` 下的版本表，取代手写的装饰盐值。",
+      "status": "completed",
+      "acceptance": "表由命令重新生成且与入库一致；已有的紫晶洞、沙漠水井盐值在 1.18.2–26.3 的每个金样版本与表一致（不一致就修正并记进 LUMILIO.md）。"
+    },
+    {
+      "id": "S4",
+      "title": "化石与下界化石：主世界化石（上层煤、下层钻石）按特征种子取候选、按 3D 群系过滤；下界化石按 2×2 区块网格、灵魂沙峡谷群系。高度与是否成形依赖地形，标为估计，S7 之后改用地形结果。",
+      "status": "in_progress",
+      "acceptance": "运行时金样：候选位置与原版放置器（Probe 调用原版 `PlacedFeature` 的放置修饰器）一致；真实存档里的化石骨块与下界化石结构起点落在预测候选上。"
+    },
+    {
+      "id": "S5",
+      "title": "峡谷：峡谷雕刻器的起点、路径与半径；1.18 前的海底峡谷雕刻器单独成类，1.18 起以起点群系是否海洋区分海底峡谷。地图画起点图标和走向折线。",
+      "status": "completed",
+      "acceptance": "运行时金样：对固定种子的若干区块，fork 计算的雕刻掩码与原版 `CanyonWorldCarver.carve` 的掩码逐方块一致。"
+    },
+    {
+      "id": "S6",
+      "title": "铜、铁矿脉：矿脉开关噪声与脊噪声，按版本的噪声参数与位置随机源；地图显示每 4×4 方块是否有矿脉区（铜 0–50、铁 −60–−8 的高度区间内任一格达到阈值）。",
+      "status": "completed",
+      "acceptance": "运行时金样：fork 的矿脉噪声取样与原版 `RandomState` 一致（1.18–26.2 双精度容差 1e-12；26.3 改为单精度求和，容差 1e-5）；真实存档里每个生铜块、生铁块都是矿脉规则逐方块给出的生矿块。"
+    },
+    {
+      "id": "S7",
+      "title": "地形引擎：按版本的密度函数（入库的原版数据摘录驱动，不手写每个版本）求主世界与下界的地表高度、地下实心/空腔与含水层；给化石、下界化石、岩浆湖、地牢、硫磺泉、奇形洞穴和已有的估计结构使用。",
+      "status": "proposed",
+      "acceptance": "运行时金样：`final_density`、`preliminary_surface_level` 在固定点与原版一致（容差 1e-9）；真实存档的高度图与预测一致。"
+    },
+    {
+      "id": "S8",
+      "title": "地牢、岩浆湖、硫磺泉、奇形洞穴：在地形引擎之上判断是否成形；地牢给出刷怪笼生物。",
+      "status": "proposed",
+      "acceptance": "真实存档金样：原版世界里的刷怪笼位置与生物、岩浆湖、硫磺泉与预测一致的比例写进本计划；不一致的类继续标估计并写明原因。"
+    },
+    {
+      "id": "S9",
+      "title": "附魔金苹果：沙漠神殿各箱子的战利品种子（结构步骤的装饰随机数）与战利品表模拟。",
+      "status": "completed",
+      "acceptance": "真实存档金样（1.21 起，附魔为数据驱动）：未打开的箱子 NBT 里的 `LootTableSeed` 与预测一致；在原版服务端里让箱子按该种子装填后，第一池的物品、数量、附魔书的附魔与等级（含附魔金苹果）与模拟一致。"
+    },
+    {
+      "id": "S10",
+      "title": "末地小岛：cubiomes `getEndIslands` 的小岛，画成圆形区域。",
+      "status": "proposed",
+      "acceptance": "运行时金样：小岛中心与半径与原版 `EndIslandFeature` 的放置一致；地图有能画出小岛的方式（宿主的区域绘制或一枚图标），而不是无图标时的圆点。"
+    },
+    {
+      "id": "S11",
+      "title": "界面：`MapIcon` 新变体与图标表；图层分组（结构、地物、地下）；中英文案；估计原因的说明；默认开关（密集图层默认关）。",
+      "status": "in_progress",
+      "acceptance": "`just test-pkg lumilio-plugin-world-explorer`、`just test-pkg lumilio-ui world_explorer` 通过；每个新图标在 `map_icons.rs` 有条目；两份目录键一致；新图层在常见窗口尺寸下不超过宿主每帧的绘制上限（热力格 6000）。"
+    },
+    {
+      "id": "S12",
+      "title": "Project Maintainer 实机核对：用一个已知种子，在 26.3 和一个 1.21.x 版本里核对每类新内容的几个点。",
+      "status": "proposed",
+      "acceptance": "核对日期与结论写进本计划和 `forks/cubiomes/LUMILIO.md`。"
+    }
+  ],
+  "validation": [
+    {
+      "criterion": "已完成的类（S2、S3、S5、S6、S9、下界化石）各自的原版金样全部通过，覆盖写明的版本。",
+      "result": "2026-10-12 `cargo nextest run -p lumilio-cubiomes`：1.18.2–26.3 共 19 个版本的原版存档里 950 个结构起点的变体、342 个下界化石的列与高度、887 个生铜块/生铁块逐块一致；1.21.1–26.3 共 15 个版本的 600 个沙漠神殿箱子战利品种子一致；1.19.4–26.3 共 17 个版本的 15,172 个装饰候选与原版放置修饰器逐个一致；26.3 的 18 条峡谷雕刻掩码逐块一致，1.21.4 与 26.3 的 `Mth` 三角函数表、矿脉噪声（1e-12 / 单精度 1e-5）一致；这 600 个箱子由原版服务端按种子装填后，第一池的物品、数量、附魔书的附魔与等级逐一一致（其中 23 个附魔金苹果）。新增 1.19.4、1.20.6、1.21.1、1.21.3、1.21.4 的标签与区域放置金样同时通过。"
+    },
+    {
+      "criterion": "每一类新内容都有原版服务端金样，并写明覆盖的版本；只有通过的版本显示该图层。",
+      "result": null
+    },
+    {
+      "criterion": "`just check` 通过；fork 的改动记进 `forks/cubiomes/LUMILIO.md`。",
+      "result": null
+    },
+    {
+      "criterion": "Project Maintainer 实机核对（S12）。",
+      "result": null
+    }
+  ],
+  "references": [
+    ".agents/plans/world-explorer.json",
+    "forks/cubiomes/LUMILIO.md",
+    "forks/cubiomes/data/README.md",
+    "crates/lumilio-xtask/src/worldgen/",
+    "crates/lumilio-cubiomes/src/",
+    "crates/lumilio-plugin-world-explorer/src/structures.rs",
+    "crates/lumilio-ui/src/map_icons.rs",
+    "crates/lumilio-ui/assets/map-icons/NOTICE.md",
+    "https://mcsrc.dev/",
+    "https://github.com/FabricMC/mcsrc",
+    "https://github.com/Vineflower/vineflower",
+    "https://minecraftsearch.com/tools/seed-map"
+  ],
+  "dependencies": [
+    "world-explorer"
+  ],
+  "decisions": [
+    {
+      "id": "D1",
+      "decision": "精确与估计按对象标：只由种子和群系决定的（结构网格、变体、雕刻器路径、噪声）标精确；要看地形、方块或相邻区块装饰顺序的标估计，图层面板写明原因。地形引擎（S7）落地后，能由它判定的改为由它判定，但仍按金样结果决定是否标估计。",
+      "rationale": "地图会被拿来找东西，假精确比不显示更糟；world-explorer 已用同样的规则标 1.18+ 的神殿与府邸。",
+      "consequences": "每一类在 Rust 侧有 `estimated(version)`，金样记录一致率。"
+    },
+    {
+      "id": "D2",
+      "decision": "算法依据是原版代码本身：用 Vineflower 反编译 Mojang 发布的 jar（mcsrc.dev 的做法；26.x 不混淆，旧版本按 Mojang 映射表改名），只放在被忽略的 `target/worldgen/<版本>/src/`。fork 里的 C 按 cubiomes 的写法自己写，不粘贴原版代码。",
+      "rationale": "延续 world-explorer W14 的入库规则；本地反编译可以逐版本对照，不依赖网页。",
+      "consequences": "每个新类在 `LUMILIO.md` 写明读过哪些类、哪个版本。"
+    },
+    {
+      "id": "D3",
+      "decision": "新算法放在 `forks/cubiomes/` 的新 C 文件里（与 cubiomes 的随机数、噪声和群系共用），经 `crates/lumilio-cubiomes/src/bridge.c` 暴露，Rust 只做安全边界；按版本变化的常量由 xtask 从原版数据生成表，不手写。",
+      "rationale": "cubiomes 已有精确的 Java 随机数、Perlin 与群系实现；表格化避免每个版本一组手写常量（Project Maintainer 偏好通用、数据驱动的机制）。",
+      "consequences": "fork 的新文件记进 `LUMILIO.md`，沿用目录的 MIT 许可；`build.rs` 一并编译。"
+    },
+    {
+      "id": "D4",
+      "decision": "不做「巨型峡谷」「巨型海底峡谷」。",
+      "rationale": "原版 Java 的峡谷只有一种雕刻器（1.18 前另有海底峡谷），「巨型」只能凭一个自定的厚度阈值区分，没有游戏依据。",
+      "consequences": "`mega_ravine.png`、`mega_underwater_ravine.png` 不进图标表；`lava_flooded_cave.png` 在 S7 的含水层结果能说明「岩浆淹没的洞穴」之前也不用。"
+    },
+    {
+      "id": "D5",
+      "decision": "原版金样分两条路：运行时探针（`Probe.java` 直接调用原版类：放置修饰器、峡谷雕刻器、噪声、`Mth`）核对随机数与几何；一次性原版存档（`save_golden.py`）核对真实结果：结构起点 NBT、强制加载区域里的方块与方块实体、按种子装填后的箱子。装填箱子在世界副本上做，原世界里的战利品种子不受影响。",
+      "rationale": "运行时探针快、逐点精确，但只覆盖不读地形的部分；存档才能证明地形、方块实体和战利品表的最终结果。",
+      "consequences": "存档格式带版本号（`FORMAT`），读取器只追加文件；26.x 之前的雕刻器要整块区块才能运行，只用三角函数表金样补足。"
+    },
+    {
+      "id": "D6",
+      "decision": "沙漠神殿的附魔金苹果只做 1.21 起（附魔为数据驱动、可从 jar 的标签与附魔定义生成表）；结构在其生成步骤里的序号按该步骤结构 id 的字母序取得，由存档里的战利品种子证实。",
+      "rationale": "1.21 前的附魔候选表写死在代码里，要逐版本手写，违背 D3。",
+      "consequences": "1.18.2–1.20.6 不显示附魔金苹果图层。"
+    },
+    {
+      "id": "D7",
+      "decision": "矿脉区按 16 方块的格子画热力格（只在每像素不超过 2 方块时显示），每格取格上与周围 4 方块噪声角点在矿脉高度内的最强值；峡谷只在每像素不超过 4 方块时显示。",
+      "rationale": "宿主每帧最多画 6000 个热力格；游戏在 4×8×4 的格子角点之间插值，格内最强处必在某个角点附近。",
+      "consequences": "缩小到更粗的比例时这些图层隐藏，图层面板会说明。"
+    }
+  ],
+  "lessonsLearned": [
+    "入库的 saved 金样出自两种取点方式：1.21.4 与 26.3 用每个维度的第 0、23、47、71 个探针点，1.21.5–26.2 只用第 0 个，而入库的 `save_golden.py` 只剩后一种，重跑 26.3 会悄悄删掉四分之三的存档群系样本。现统一为四个点：1.21.4 与 26.3 的金样逐字节重现，其余版本只增加样本、不删除，全部通过。",
+    "1.18.2 没有 `execute if loaded`：命令报错时服务端会回显整条命令，回显里含等待标记，脚本因此误判区块已加载。现改用各版本都有的 `unless block`（未加载的位置会报错），并只认服务端自己的 `[Server] 标记` 行。",
+    "扩大到 1.19.4–1.21.4 的原版标签金样后发现：上游 cubiomes 在 1.21.5 之前把樱花树林算进要塞偏好群系，而原版 1.20.6–1.21.8 的 `stronghold_biased_to` 不含它，1.20–1.21.4 的要塞可能偏向错误的群系。已修正，守卫是 `upstream_releases_match_their_own_original_server_samples`。",
+    "存档金样服务端在 1 GiB 堆里同时强制加载四块区域与结构起点时内存溢出，一个世界失败后整批中止。现给 3 GiB 堆，并让单个世界失败时其余世界照常完成、最后汇总失败。"
+  ],
+  "roadmap": {
+    "enabled": false,
+    "id": "seed-map-prediction",
+    "name": "种子地图可预测内容",
+    "lede": "矿脉、峡谷、化石、地牢与结构变体",
+    "targetVersion": null,
+    "order": 0
+  }
+}

@@ -4,7 +4,7 @@ use crate::activity::CancellationToken;
 use crate::activity_log::{RetryAction, TaskAction, TaskCategory, TaskLabel};
 use crate::history::ChangeKind;
 use crate::instance::{InstanceRecord, Loader, StoreError};
-use crate::launcher::{LaunchServiceError, LaunchUpdate, Launcher};
+use crate::launcher::{LaunchServiceError, LaunchUpdate};
 use crate::loader::LAUNCHABLE_LOADERS;
 use crate::transfer::Transport;
 use tokio::sync::mpsc;
@@ -34,10 +34,9 @@ impl<T: Transport + Clone> LauncherService<T> {
             .retrying(RetryAction::InstallInstance {
                 instance: id.to_owned(),
             });
-        let launcher = Launcher::new(self.transport.clone(), chain)
-            .with_concurrency(request.download_concurrency);
-        let mut result =
-            Self::install_tracked(&self.board, task.id, &launcher, request, updates, cancel).await;
+        let mut result = self
+            .install_serving_java(task.id, chain, request, updates, cancel)
+            .await;
         if result.is_ok() {
             result = self
                 .store
@@ -76,10 +75,9 @@ impl<T: Transport + Clone> LauncherService<T> {
             .retrying(RetryAction::RepairInstance {
                 instance: id.to_owned(),
             });
-        let launcher = Launcher::new(self.transport.clone(), chain)
-            .with_concurrency(request.download_concurrency);
-        let mut result =
-            Self::install_tracked(&self.board, task.id, &launcher, request, updates, cancel).await;
+        let mut result = self
+            .install_serving_java(task.id, chain, request, updates, cancel)
+            .await;
         if result.is_ok() {
             result = self
                 .store
@@ -174,10 +172,9 @@ impl<T: Transport + Clone> LauncherService<T> {
                 loader,
                 loader_version: loader_version.clone(),
             });
-        let launcher = Launcher::new(self.transport.clone(), chain)
-            .with_concurrency(request.download_concurrency);
-        let mut result =
-            Self::install_tracked(&self.board, task.id, &launcher, request, updates, cancel).await;
+        let mut result = self
+            .install_serving_java(task.id, chain, request, updates, cancel)
+            .await;
         if result.is_ok() {
             result = self
                 .store

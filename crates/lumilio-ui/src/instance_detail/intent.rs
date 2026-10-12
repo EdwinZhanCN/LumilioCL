@@ -16,6 +16,7 @@ pub enum Section {
     Size,
     /// The game's own options and how they relate to a preset.
     GameOptions,
+    Java,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

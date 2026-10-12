@@ -94,3 +94,28 @@ fn copper_grates_cull_only_their_own_block() {
         assert!(!culler.should_cull(at(1, 0, -1), Direction::East));
     });
 }
+
+/// A full cube with an overlay element (the grass block's tinted sides) is as
+/// solid as any cube: it hides its neighbours' faces and darkens their corners.
+#[test]
+fn cubes_with_overlay_elements_are_solid() {
+    let mut pack = cube_pack(&[("dirt", false)]);
+    let face = r##"{"texture":"#all"}"##;
+    common::add_block(
+        &mut pack,
+        "grass_block",
+        &format!(
+            r#"{{"textures":{{"all":"minecraft:block/dirt"}},"elements":[
+                {{"from":[0,0,0],"to":[16,16,16],"faces":{{"down":{face},"up":{face},"north":{face},"south":{face},"west":{face},"east":{face}}}}},
+                {{"from":[0,0,0],"to":[16,16,16],"faces":{{"north":{face},"south":{face}}}}}]}}"#
+        ),
+    );
+    let blocks = [
+        (at(0, 0, 0), "minecraft:dirt"),
+        (at(0, 1, 0), "minecraft:grass_block"),
+    ];
+    culler_test(&pack, &blocks, |culler| {
+        assert!(culler.should_cull(at(0, 0, 0), Direction::Up));
+        assert!(culler.is_fully_opaque_at(at(0, 1, 0)));
+    });
+}

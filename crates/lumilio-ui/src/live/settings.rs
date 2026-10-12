@@ -1,5 +1,6 @@
 use lumilio_core::{
-    DownloadSourcePreference, LaunchTuning, LauncherSettings, MirrorRule, Preferences, StorageUsage,
+    DownloadSourcePreference, HostProfile, JavaRuntime, JavaSource, LaunchTuning, LauncherSettings,
+    MirrorRule, Preferences, StorageUsage,
 };
 use std::path::{Path, PathBuf};
 
@@ -12,6 +13,21 @@ pub struct JavaRow {
     /// `Zulu · arm64 · /path/to/home`.
     pub detail: String,
     pub disabled: bool,
+    /// The launcher installed it into its own folder, so it may delete it.
+    pub removable: bool,
+}
+
+/// How a Java reads in a list or a dropdown: `Java 21 · Temurin · arm64`,
+/// with a note when it runs translated on this machine.
+#[must_use]
+pub fn java_label(runtime: &JavaRuntime, host: &HostProfile) -> String {
+    let mut parts = vec![format!("Java {}", runtime.major())];
+    parts.extend(runtime.vendor().map(str::to_owned));
+    parts.extend(runtime.architecture().map(str::to_owned));
+    if !runtime.is_native(host) {
+        parts.push(crate::tr!("java-translated").to_owned());
+    }
+    parts.join(" · ")
 }
 
 /// Everything the Settings page shows.
@@ -28,6 +44,12 @@ pub struct SettingsView {
     pub auto_update_enabled: bool,
     pub java_roots: Vec<PathBuf>,
     pub java: Vec<JavaRow>,
+    /// Where downloaded Java comes from.
+    pub java_source: JavaSource,
+    /// Whether a launch without a fitting Java downloads one first.
+    pub auto_install_java: bool,
+    /// The majors each download source offers this machine; empty until read.
+    pub java_offers: Vec<(JavaSource, Vec<u32>)>,
     /// `None` while the disk is still being measured.
     pub storage: Option<StorageUsage>,
     pub data_dir: PathBuf,
@@ -69,8 +91,12 @@ pub fn settings_view(
                 .collect::<Vec<_>>()
                 .join(" · "),
                 disabled: *disabled,
+                removable: runtime.installed_under(&data_dir.join("runtimes")),
             })
             .collect(),
+        java_source: settings.java_source,
+        auto_install_java: settings.auto_install_java,
+        java_offers: Vec::new(),
         storage,
         data_dir: data_dir.to_owned(),
         total_memory_mb,

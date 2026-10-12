@@ -41,6 +41,9 @@ impl Render for InstanceDetailView {
         if std::mem::take(&mut self.ask_thumbs) && self.tab == TAB_SCREENSHOTS {
             self.ask_thumbnails(window, cx);
         }
+        if std::mem::take(&mut self.refresh_java) && self.data.has(Section::Java) {
+            self.request(Section::Java, window, cx);
+        }
         if std::mem::take(&mut self.refresh_logs) && self.data.has(Section::Logs) {
             self.request(Section::Logs, window, cx);
         }
@@ -89,7 +92,7 @@ impl Render for InstanceDetailView {
                 TAB_SCREENSHOTS => self.screenshots_panel(colors, cx),
                 TAB_HISTORY => self.history_panel(colors, cx),
                 TAB_DIAGNOSTICS => self.diagnostics_panel(window, colors, cx),
-                _ => self.settings_tab(colors, cx),
+                _ => self.settings_tab(window, colors, cx),
             }
         } else if let Some(message) = &self.error {
             let retry = self.handler.clone();

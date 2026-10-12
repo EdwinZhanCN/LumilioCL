@@ -44,6 +44,7 @@ mod tests;
 
 pub use self::appearance::ProfileSnapshot;
 pub use self::error::ServiceError;
+pub use self::java::InstanceJava;
 pub use self::models::ModelPreview;
 pub use self::third_party::ThirdPartySignIn;
 pub use self::types::{
@@ -99,6 +100,9 @@ pub struct LauncherService<T> {
     /// What the start-up recovery found and did.
     startup: Vec<RecoveryNote>,
     operations: StdMutex<BTreeSet<String>>,
+    /// Instances whose next launch picks its Java automatically, whatever
+    /// their settings say (the person chose 本次改用 when asked).
+    automatic_java_once: StdMutex<BTreeSet<String>>,
     log: ActivityLog,
     /// Replaces the conventional Java search locations (tests, portable setups).
     runtime_roots: Option<Vec<PathBuf>>,
@@ -166,6 +170,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             settings: Mutex::new(settings),
             board: StdMutex::new(TaskBoard::default()),
             cancels: StdMutex::default(),
+            automatic_java_once: StdMutex::default(),
             startup,
             operations: StdMutex::new(BTreeSet::new()),
             log,

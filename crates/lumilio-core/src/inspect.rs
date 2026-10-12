@@ -68,10 +68,10 @@ async fn inspect(
         }
         None => None,
     };
-    let required_java = release
-        .as_ref()
-        .and_then(|release| release.java_requirement())
-        .map(|java| java.major());
+    let java_needs = release.as_ref().map_or_else(
+        || crate::java::JavaNeeds::new(&record.game_version, record.loader, None),
+        |release| crate::java::JavaNeeds::of_release(record, release),
+    );
     let damaged_files = match &release {
         Some(release) if verify_files => damaged_count(release, &directories).await,
         _ => None,
@@ -96,11 +96,14 @@ async fn inspect(
     .await
     .unwrap_or_default();
 
+    let host = HostProfile::current();
     let facts = Facts {
         instance: record,
         launchable_loaders: &LAUNCHABLE_LOADERS,
         runtimes,
-        required_java,
+        java_needs,
+        auto_install_java: settings.auto_install_java,
+        host: &host,
         has_account: settings.selected_account.as_deref().is_some_and(|key| {
             settings
                 .accounts

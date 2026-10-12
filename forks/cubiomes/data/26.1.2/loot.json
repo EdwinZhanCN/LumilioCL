@@ -1,0 +1,191 @@
+{
+  "pyramid": {
+    "entries": [
+      {
+        "count": [
+          1,
+          3
+        ],
+        "item": "minecraft:diamond",
+        "weight": 5
+      },
+      {
+        "count": [
+          1,
+          5
+        ],
+        "item": "minecraft:iron_ingot",
+        "weight": 15
+      },
+      {
+        "count": [
+          2,
+          7
+        ],
+        "item": "minecraft:gold_ingot",
+        "weight": 15
+      },
+      {
+        "count": [
+          1,
+          3
+        ],
+        "item": "minecraft:emerald",
+        "weight": 15
+      },
+      {
+        "count": [
+          4,
+          6
+        ],
+        "item": "minecraft:bone",
+        "weight": 25
+      },
+      {
+        "count": [
+          1,
+          3
+        ],
+        "item": "minecraft:spider_eye",
+        "weight": 25
+      },
+      {
+        "count": [
+          3,
+          7
+        ],
+        "item": "minecraft:rotten_flesh",
+        "weight": 25
+      },
+      {
+        "count": [
+          1,
+          5
+        ],
+        "item": "minecraft:leather",
+        "weight": 20
+      },
+      {
+        "item": "minecraft:copper_horse_armor",
+        "weight": 15
+      },
+      {
+        "item": "minecraft:iron_horse_armor",
+        "weight": 15
+      },
+      {
+        "item": "minecraft:golden_horse_armor",
+        "weight": 10
+      },
+      {
+        "item": "minecraft:diamond_horse_armor",
+        "weight": 5
+      },
+      {
+        "enchantments": [
+          "minecraft:protection",
+          "minecraft:fire_protection",
+          "minecraft:feather_falling",
+          "minecraft:blast_protection",
+          "minecraft:projectile_protection",
+          "minecraft:respiration",
+          "minecraft:aqua_affinity",
+          "minecraft:thorns",
+          "minecraft:depth_strider",
+          "minecraft:sharpness",
+          "minecraft:smite",
+          "minecraft:bane_of_arthropods",
+          "minecraft:knockback",
+          "minecraft:fire_aspect",
+          "minecraft:looting",
+          "minecraft:sweeping_edge",
+          "minecraft:efficiency",
+          "minecraft:silk_touch",
+          "minecraft:unbreaking",
+          "minecraft:fortune",
+          "minecraft:power",
+          "minecraft:punch",
+          "minecraft:flame",
+          "minecraft:infinity",
+          "minecraft:luck_of_the_sea",
+          "minecraft:lure",
+          "minecraft:loyalty",
+          "minecraft:impaling",
+          "minecraft:riptide",
+          "minecraft:channeling",
+          "minecraft:multishot",
+          "minecraft:quick_charge",
+          "minecraft:piercing",
+          "minecraft:density",
+          "minecraft:breach",
+          "minecraft:lunge",
+          "minecraft:binding_curse",
+          "minecraft:vanishing_curse",
+          "minecraft:frost_walker",
+          "minecraft:mending"
+        ],
+        "item": "minecraft:book",
+        "levels": [
+          4,
+          4,
+          4,
+          4,
+          4,
+          3,
+          1,
+          3,
+          3,
+          5,
+          5,
+          5,
+          2,
+          2,
+          3,
+          3,
+          5,
+          1,
+          3,
+          3,
+          5,
+          2,
+          1,
+          1,
+          3,
+          3,
+          3,
+          5,
+          3,
+          1,
+          1,
+          3,
+          4,
+          5,
+          4,
+          3,
+          1,
+          1,
+          2,
+          1
+        ],
+        "weight": 20
+      },
+      {
+        "item": "minecraft:golden_apple",
+        "weight": 20
+      },
+      {
+        "item": "minecraft:enchanted_golden_apple",
+        "weight": 2
+      },
+      {
+        "weight": 15
+      }
+    ],
+    "index": 1,
+    "rolls": [
+      2,
+      4
+    ],
+    "step": 4
+  }
+}

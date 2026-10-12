@@ -126,6 +126,17 @@ impl Direction {
         // Apply X rotation first, then Y rotation (same order as geometry transform)
         self.rotate_x(x_rot).rotate_y(y_rot)
     }
+
+    /// The direction closest to a vector (Minecraft's `Direction.getApproximateNearest`).
+    pub fn nearest(v: glam::Vec3) -> Direction {
+        Direction::ALL
+            .into_iter()
+            .max_by(|a, b| {
+                let dot = |d: &Direction| v.dot(glam::Vec3::from(d.normal()));
+                dot(a).total_cmp(&dot(b))
+            })
+            .unwrap_or(Direction::Up)
+    }
 }
 
 impl std::fmt::Display for Direction {

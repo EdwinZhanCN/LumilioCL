@@ -40,7 +40,7 @@ pub use self::library::{
     CollectionRow, LibraryCard, attention_rows, cover_loader, instance_meta, library_card,
     library_cards, loader_label, relative_time, seed_of, world_of,
 };
-pub use self::settings::{JavaRow, SettingsView, settings_view};
+pub use self::settings::{JavaRow, SettingsView, java_label, settings_view};
 pub use self::update::{UpdateStatus, UpdateUnavailability};
 
 use self::activity::{RateSample, next_sample};

@@ -35,10 +35,13 @@
 | 减少动效 | 通用 · 分段：跟随系统 / 减少 / 完整 | 立即生效 |  | `lumilio-ui/src/pages/settings/general.rs` |
 | Java：停用 / 启用 | Java · 列表行开关 | 停用不删除文件，之后不会被自动选中 |  | `lumilio-ui/src/pages/settings/java.rs` |
 | Java：在访达中显示 | Java · 列表行 ⋯ 菜单 | 打开并选中它所在位置 |  | `lumilio-ui/src/pages/settings/java.rs` |
+| Java：删除 | Java · 列表行 ⋯ 菜单「删除…」（只有启动器下载的 Java）→ 确认框 | 删除它的文件夹并重新检测；其它 Java 只能停用 |  | `lumilio-ui/src/pages/settings/java.rs` |
 | Java：额外搜索目录 | Java · 值 + [编辑] 弹窗 | 每行一个文件夹，检测时也会找这些位置 |  | `lumilio-ui/src/pages/settings/java.rs` |
-| Java：检测与列表 | Java · 已发现的 Java 列表 | 列出检测到的 Java（版本、发行方、架构、路径）；没有时提示添加 |  | `lumilio-ui/src/pages/settings/java.rs` |
+| Java：下载来源 | Java · 分段「Mojang / Oracle GraalVM」 | 下载与启动时自动下载都从这里取；GraalVM 只有 Java 21 和 25，其它版本仍从 Mojang 下载 |  | `lumilio-ui/src/pages/settings/java.rs` |
+| Java：启动时自动下载 | Java · 开关 | 开启时，启动或安装时没有合适的 Java 就先下载游戏需要的版本，进度在动态；关闭后提示去安装 |  | `lumilio-ui/src/pages/settings/java.rs` |
+| Java：下载 Java… | Java · 按键「下载 Java…」→ 弹窗选大版本 | 版本来自所选下载来源（Mojang 读运行时索引），默认 21；装好后出现在列表里，进度在动态 | ADR 0014 | `lumilio-ui/src/pages/settings/java.rs` |
+| Java：检测与列表 | Java · 已发现的 Java 列表 | 列出检测到的 Java（版本、发行方、架构、路径），包括官方启动器的运行时与 PATH 中的 java；没有时提示添加 |  | `lumilio-ui/src/pages/settings/java.rs` |
 | Java：重新检测 | Java · 按键「重新检测」 | 重新读取设置并检测 |  | `lumilio-ui/src/pages/settings/java.rs` |
-| Java：下载推荐的 Java | Java · 按键「下载推荐的 Java」 | 读 Mojang 的运行时索引，装好后出现在列表里；进度在动态 | ADR 0014 | `lumilio-ui/src/pages/settings/java.rs` |
 | Java：添加 | Java · 按键「添加 Java…」→ 选 java 程序或 JDK 文件夹 | 加入列表 |  | `lumilio-ui/src/pages/settings/java.rs` |
 | 打开插件 | L3 设置 tab「插件」 | 显示核心插件、权限、运行状态和各插件的声明式设置；没有插件时显示空列表 |  | `lumilio-ui/src/pages/settings/mod.rs` |
 | 选择插件 | 插件 · 左侧列表 | 右侧显示所选插件的状态、权限和设置 |  | `lumilio-ui/src/pages/settings/plugins.rs` |

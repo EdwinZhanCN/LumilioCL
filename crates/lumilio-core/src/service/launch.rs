@@ -110,6 +110,15 @@ impl<T: Transport + Clone> LauncherService<T> {
         Ok((request, chain))
     }
 
+    /// Lets the next launch of `id` pick its Java automatically, once,
+    /// whatever its settings say. Any launch of it uses this up.
+    pub fn launch_next_with_automatic_java(&self, id: &str) {
+        self.automatic_java_once
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .insert(id.to_owned());
+    }
+
     /// Prepares and starts an instance, recording the session afterwards.
     pub async fn launch(
         &self,
@@ -167,16 +176,24 @@ impl<T: Transport + Clone> LauncherService<T> {
     ) -> Result<GameExit, ServiceError> {
         let _lease = self.reserve_instance(id)?;
         let started = now();
+        let automatic_java = self
+            .automatic_java_once
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .remove(id);
         if self.store.lock().await.get(id).is_none() {
             return Err(ServiceError::NoSuchInstance(id.to_owned()));
         }
         // Dropped on every way out; only the launcher dying leaves it behind.
         let _marker = SessionMarker::place(&self.layout, id, started)?;
         let prepared = self.launch_request(id, quick_play, &cancel).await;
-        let (request, chain) = match prepared {
+        let (mut request, chain) = match prepared {
             Ok(prepared) => prepared,
             Err(error) => return Err(self.note_attempt(id, started, error)),
         };
+        if automatic_java {
+            request.instance.settings.java_path = None;
+        }
         let event = LaunchEvent::Started {
             instance_name: request.instance.name.clone(),
             game_version: request.instance.game_version.clone(),
@@ -190,11 +207,19 @@ impl<T: Transport + Clone> LauncherService<T> {
         let (spawned, mut spawned_rx) = mpsc::unbounded_channel();
         let (before_start, mut preparation_rx) =
             mpsc::unbounded_channel::<tokio::sync::oneshot::Sender<Result<(), String>>>();
-        let launcher = Launcher::new(self.transport.clone(), chain)
-            .with_concurrency(request.download_concurrency)
-            .with_spawned(spawned)
-            .with_before_start(before_start);
-        let launch = launcher.launch(request, updates.clone(), cancel);
+        let (launcher, java_requests) = self
+            .with_java_installer(
+                Launcher::new(self.transport.clone(), chain)
+                    .with_concurrency(request.download_concurrency)
+                    .with_spawned(spawned)
+                    .with_before_start(before_start),
+            )
+            .await;
+        let launch = self.serving_java(
+            java_requests,
+            &cancel,
+            launcher.launch(request, updates.clone(), cancel.clone()),
+        );
         tokio::pin!(launch);
         let mut announced = false;
         let mut settings_prepared = false;

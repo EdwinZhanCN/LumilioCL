@@ -14,6 +14,17 @@ unsafe extern "C" {
     ) -> i32;
     #[cfg(test)]
     fn lumilio_cubiomes_biome_rule(mc: i32, rule: i32, biome: i32) -> i32;
+    #[cfg(test)]
+    fn lumilio_cubiomes_decoration_raw(
+        mc: i32,
+        dim: i32,
+        kind: i32,
+        seed: u64,
+        cx: i32,
+        cz: i32,
+        out: *mut i32,
+        cap: i32,
+    ) -> i32;
     fn lumilio_cubiomes_probe() -> i32;
     fn lumilio_cubiomes_generate(
         mc: i32,
@@ -50,6 +61,91 @@ unsafe extern "C" {
     fn lumilio_cubiomes_strongholds(
         mc: i32,
         seed: u64,
+        out: *mut i32,
+        cap: usize,
+        count: *mut usize,
+        cancelled: Option<unsafe extern "C" fn(*mut std::ffi::c_void) -> i32>,
+        user: *mut std::ffi::c_void,
+    ) -> i32;
+    fn lumilio_cubiomes_variant(mc: i32, seed: u64, kind: i32, x: i32, z: i32) -> i32;
+    fn lumilio_cubiomes_decoration_available(mc: i32, dim: i32, kind: i32) -> i32;
+    #[cfg(test)]
+    fn lumilio_cubiomes_trig(mc: i32, cos: i32, value: f32) -> f32;
+    fn lumilio_cubiomes_pyramid_loot_available(mc: i32) -> i32;
+    #[cfg(test)]
+    fn lumilio_cubiomes_nether_fossil_y(mc: i32, seed: u64, x: i32, z: i32) -> i32;
+    #[cfg(test)]
+    fn lumilio_cubiomes_pyramid_items(
+        mc: i32,
+        seed: u64,
+        out: *mut std::ffi::c_char,
+        cap: usize,
+    ) -> i32;
+    fn lumilio_cubiomes_pyramid_chests(
+        mc: i32,
+        seed: u64,
+        x: i32,
+        z: i32,
+        xz: *mut i32,
+        seeds: *mut u64,
+        apples: *mut i32,
+    ) -> i32;
+    #[cfg(test)]
+    fn lumilio_cubiomes_ravine_check(
+        mc: i32,
+        seed: u64,
+        sx: i32,
+        sz: i32,
+        count: *mut i64,
+        checksum: *mut u64,
+    ) -> i32;
+    fn lumilio_cubiomes_ravines(
+        mc: i32,
+        seed: u64,
+        x0: i32,
+        z0: i32,
+        x1: i32,
+        z1: i32,
+        out: *mut i32,
+        cap: usize,
+        used: *mut usize,
+        cancelled: Option<unsafe extern "C" fn(*mut std::ffi::c_void) -> i32>,
+        user: *mut std::ffi::c_void,
+    ) -> i32;
+    #[cfg(test)]
+    fn lumilio_cubiomes_vein_noise(mc: i32, seed: u64, noise: i32, x: i32, y: i32, z: i32) -> f64;
+    #[cfg(test)]
+    fn lumilio_cubiomes_vein_column(
+        mc: i32,
+        seed: u64,
+        x: i32,
+        z: i32,
+        y0: i32,
+        y1: i32,
+        out: *mut u8,
+    ) -> i32;
+    fn lumilio_cubiomes_vein_zones(
+        mc: i32,
+        seed: u64,
+        vein: i32,
+        x0: i32,
+        z0: i32,
+        cell: i32,
+        w: i32,
+        h: i32,
+        out: *mut f32,
+        cancelled: Option<unsafe extern "C" fn(*mut std::ffi::c_void) -> i32>,
+        user: *mut std::ffi::c_void,
+    ) -> i32;
+    fn lumilio_cubiomes_decorations(
+        mc: i32,
+        seed: u64,
+        dim: i32,
+        kind: i32,
+        x0: i32,
+        z0: i32,
+        x1: i32,
+        z1: i32,
         out: *mut i32,
         cap: usize,
         count: *mut usize,
@@ -111,6 +207,35 @@ pub(super) fn placement(
 pub(super) fn biome_rule(version: super::Version, rule: i32, biome: i32) -> bool {
     // SAFETY: bridge validates the rule before indexing, no pointers cross FFI.
     unsafe { lumilio_cubiomes_biome_rule(version.mc, rule, biome) != 0 }
+}
+
+/// The raw candidate sequence of decoration `kind` (the fork's
+/// `DecorationType`) in a chunk, or `None` when the release lacks it.
+#[cfg(test)]
+pub(super) fn decoration_raw(
+    version: super::Version,
+    dimension: super::Dimension,
+    kind: i32,
+    seed: i64,
+    chunk: [i32; 2],
+) -> Option<Vec<[i32; 3]>> {
+    let mut out = [0; 256 * 3];
+    // SAFETY: `out` holds the 256 triples the cap allows; the bridge rejects
+    // larger caps and writes at most `cap` triples.
+    let n = unsafe {
+        lumilio_cubiomes_decoration_raw(
+            version.mc,
+            dimension as i32,
+            kind,
+            seed as u64,
+            chunk[0],
+            chunk[1],
+            out.as_mut_ptr(),
+            256,
+        )
+    };
+    let n = usize::try_from(n).ok()?;
+    Some(out[..n * 3].as_chunks::<3>().0.to_vec())
 }
 
 /// Trampoline for the bridge's cancellation hook.
@@ -253,6 +378,253 @@ pub(super) fn strongholds(
         2 => Err(super::Error::Cancelled),
         _ => Err(super::Error::Generation),
     }
+}
+
+/// The first-pool items of a pyramid chest with `loot_seed`, one line each.
+#[cfg(test)]
+pub(super) fn pyramid_items(version: super::Version, loot_seed: i64) -> String {
+    let mut out = vec![0_u8; 4096];
+    // SAFETY: the bridge writes at most `out.len()` bytes, terminator included.
+    let n = unsafe {
+        lumilio_cubiomes_pyramid_items(
+            version.mc,
+            loot_seed as u64,
+            out.as_mut_ptr().cast(),
+            out.len(),
+        )
+    };
+    out.truncate(n.max(0) as usize);
+    String::from_utf8(out).unwrap_or_default()
+}
+
+/// The height of the nether fossil at column `at`: `Some(0)` when it fails,
+/// `None` before 1.18.
+#[cfg(test)]
+pub(super) fn nether_fossil_y(version: super::Version, seed: i64, at: [i32; 2]) -> Option<i32> {
+    // SAFETY: plain values in and out.
+    let y = unsafe { lumilio_cubiomes_nether_fossil_y(version.mc, seed as u64, at[0], at[1]) };
+    (y >= 0).then_some(y)
+}
+
+pub(super) fn pyramid_loot_available(mc: i32) -> bool {
+    // SAFETY: a plain integer in and out.
+    unsafe { lumilio_cubiomes_pyramid_loot_available(mc) != 0 }
+}
+
+/// A desert pyramid's chests in creation order: ([x, z], loot seed,
+/// enchanted golden apples).
+pub(super) fn pyramid_chests(
+    version: super::Version,
+    seed: i64,
+    at: [i32; 2],
+) -> Vec<([i32; 2], i64, i32)> {
+    let (mut xz, mut seeds, mut apples) = ([0; 8], [0_u64; 4], [0; 4]);
+    // SAFETY: room for the four chests the bridge writes at most.
+    let n = unsafe {
+        lumilio_cubiomes_pyramid_chests(
+            version.mc,
+            seed as u64,
+            at[0],
+            at[1],
+            xz.as_mut_ptr(),
+            seeds.as_mut_ptr(),
+            apples.as_mut_ptr(),
+        )
+    };
+    (0..n.max(0) as usize)
+        .map(|i| ([xz[2 * i], xz[2 * i + 1]], seeds[i] as i64, apples[i]))
+        .collect()
+}
+
+/// The release's `Mth.sin` (or `Mth.cos`) of a float.
+#[cfg(test)]
+pub(super) fn trig(version: super::Version, cos: bool, value: f32) -> f32 {
+    // SAFETY: plain values in and out.
+    unsafe { lumilio_cubiomes_trig(version.mc, i32::from(cos), value) }
+}
+
+/// A canyon start's carved blocks in every chunk it reaches: (count,
+/// checksum), or `None` when the chunk starts none.
+#[cfg(test)]
+pub(super) fn ravine_check(
+    version: super::Version,
+    seed: i64,
+    chunk: [i32; 2],
+) -> Option<(i64, u64)> {
+    let (mut count, mut checksum) = (0, 0);
+    // SAFETY: two outputs that outlive the synchronous call.
+    let found = unsafe {
+        lumilio_cubiomes_ravine_check(
+            version.mc,
+            seed as u64,
+            chunk[0],
+            chunk[1],
+            &mut count,
+            &mut checksum,
+        )
+    };
+    (found == 1).then_some((count, checksum))
+}
+
+/// Ravines whose start chunk lies in the block area, packed as the bridge
+/// writes them; `cap` bounds the ints.
+pub(super) fn ravines(
+    version: super::Version,
+    seed: i64,
+    area: [i32; 4],
+    cap: usize,
+    cancelled: &mut dyn FnMut() -> bool,
+) -> Result<Vec<i32>, super::Error> {
+    let mut out = vec![0; cap];
+    let mut used = 0;
+    let mut hook: &mut dyn FnMut() -> bool = cancelled;
+    // SAFETY: `out` holds `cap` ints and the bridge stops before exceeding
+    // them (code 3); `used` and `hook` outlive the synchronous call.
+    let result = unsafe {
+        lumilio_cubiomes_ravines(
+            version.mc,
+            seed as u64,
+            area[0],
+            area[1],
+            area[2],
+            area[3],
+            out.as_mut_ptr(),
+            cap,
+            &mut used,
+            Some(poll),
+            (&raw mut hook).cast(),
+        )
+    };
+    match result {
+        0 => {
+            out.truncate(used);
+            Ok(out)
+        }
+        2 => Err(super::Error::Cancelled),
+        3 => Err(super::Error::InvalidRange),
+        _ => Err(super::Error::Generation),
+    }
+}
+
+/// One raw vein noise (the fork's `VN_*`) at a block.
+#[cfg(test)]
+pub(super) fn vein_noise(version: super::Version, seed: i64, noise: i32, at: [i32; 3]) -> f64 {
+    // SAFETY: plain values in and out; the bridge bounds `noise`.
+    unsafe { lumilio_cubiomes_vein_noise(version.mc, seed as u64, noise, at[0], at[1], at[2]) }
+}
+
+/// The vein rule's block codes (`VB_*`) for a column from `y0` to `y1`.
+#[cfg(test)]
+pub(super) fn vein_column(
+    version: super::Version,
+    seed: i64,
+    column: [i32; 2],
+    y0: i32,
+    y1: i32,
+) -> Vec<u8> {
+    let mut out = vec![0_u8; (y1 - y0 + 1).max(0) as usize];
+    // SAFETY: `out` holds one byte per height the bridge writes.
+    unsafe {
+        lumilio_cubiomes_vein_column(
+            version.mc,
+            seed as u64,
+            column[0],
+            column[1],
+            y0,
+            y1,
+            out.as_mut_ptr(),
+        )
+    };
+    out
+}
+
+/// Zone strengths of `vein` on a `w` × `h` grid of `cell`-block squares.
+pub(super) fn vein_zones(
+    version: super::Version,
+    seed: i64,
+    vein: i32,
+    origin: [i32; 2],
+    cell: i32,
+    size: [i32; 2],
+    cancelled: &mut dyn FnMut() -> bool,
+) -> Result<Vec<f32>, super::Error> {
+    let mut out = vec![0_f32; size[0] as usize * size[1] as usize];
+    let mut hook: &mut dyn FnMut() -> bool = cancelled;
+    // SAFETY: `out` holds the w × h cells the bridge writes; `hook` outlives
+    // the synchronous call.
+    let result = unsafe {
+        lumilio_cubiomes_vein_zones(
+            version.mc,
+            seed as u64,
+            vein,
+            origin[0],
+            origin[1],
+            cell,
+            size[0],
+            size[1],
+            out.as_mut_ptr(),
+            Some(poll),
+            (&raw mut hook).cast(),
+        )
+    };
+    match result {
+        0 => Ok(out),
+        2 => Err(super::Error::Cancelled),
+        _ => Err(super::Error::Generation),
+    }
+}
+
+pub(super) fn decoration_available(mc: i32, dim: i32, kind: i32) -> bool {
+    // SAFETY: plain integers in, a plain integer out.
+    unsafe { lumilio_cubiomes_decoration_available(mc, dim, kind) != 0 }
+}
+
+/// Biome-filtered candidates of decoration `kind` in `[x0, x1) x [z0, z1)`,
+/// as (x, y, z, flags). `cap` bounds the number of candidates.
+pub(super) fn decorations(
+    version: super::Version,
+    seed: i64,
+    dimension: super::Dimension,
+    kind: i32,
+    area: [i32; 4],
+    cap: usize,
+    cancelled: &mut dyn FnMut() -> bool,
+) -> Result<Vec<[i32; 4]>, super::Error> {
+    let mut out = vec![0; cap * 4];
+    let mut count = 0;
+    let mut hook: &mut dyn FnMut() -> bool = cancelled;
+    // SAFETY: `out` has room for `cap` quads, which the bridge never exceeds
+    // (it stops with code 3); `count` and `hook` outlive the synchronous call.
+    let result = unsafe {
+        lumilio_cubiomes_decorations(
+            version.mc,
+            seed as u64,
+            dimension as i32,
+            kind,
+            area[0],
+            area[1],
+            area[2],
+            area[3],
+            out.as_mut_ptr(),
+            cap,
+            &mut count,
+            Some(poll),
+            (&raw mut hook).cast(),
+        )
+    };
+    match result {
+        0 => Ok(out[..count * 4].as_chunks::<4>().0.to_vec()),
+        2 => Err(super::Error::Cancelled),
+        3 => Err(super::Error::InvalidRange),
+        _ => Err(super::Error::Generation),
+    }
+}
+
+/// The kind's start variant at a structure position, or -1 for none.
+pub(super) fn variant(mc: i32, seed: i64, kind: i32, at: [i32; 2]) -> i32 {
+    // SAFETY: plain integers in, a plain integer out; the bridge bounds `kind`
+    // and owns the End City piece buffer it allocates.
+    unsafe { lumilio_cubiomes_variant(mc, seed as u64, kind, at[0], at[1]) }
 }
 
 pub(super) fn spawn(version: super::Version, seed: i64) -> [i32; 2] {

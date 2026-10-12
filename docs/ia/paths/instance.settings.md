@@ -14,11 +14,12 @@
 | 直接进入（Quick Play） | 设置 · 游戏组，值 + [编辑] 弹窗：类型 + 目标 | 启动后直达世界或服务器；版本不支持单人世界时启动会说明原因；世界页的「进入」用同一个能力 |  | `lumilio-ui/src/instance_detail/settings/groups.rs` |
 | 更换游戏版本 / 加载器 | 设置 · 运行时，「游戏版本」「加载器」行的 [更换…] → 弹窗（加载器分段 + 版本选择器，起点是游戏现在的组合） | 警告“装好的 Mod 可能不兼容，先建快照” + [先建快照]；与现在相同时不能提交；失败回到旧组合 |  | `lumilio-ui/src/instance_detail/settings/groups.rs` |
 | 修复游戏文件 | 设置 · 运行时，「游戏文件」行的 [修复] | 逐个核对游戏文件，缺的或损坏的重新下载；世界、Mod 和设置不会被改动；后台任务 |  | `lumilio-ui/src/instance_detail/settings/groups.rs` |
-| 指定 Java | 设置 · Java 组，值 + [编辑] 弹窗 | 路径留空自动选择；保存时检查路径存在；已发现的 Java 列表在全局设置·Java |  | `lumilio-ui/src/instance_detail/settings/groups.rs` |
 | Java 参数 | 设置 · Java 组，值 + [编辑] 弹窗 | 多行文本，每行一个参数 |  | `lumilio-ui/src/instance_detail/settings/groups.rs` |
 | 游戏参数 | 设置 · 高级组，值 + [编辑] 弹窗 | 来源（跟随默认 / 自己设置）+ 多行 |  | `lumilio-ui/src/instance_detail/settings/groups.rs` |
 | 环境变量 | 设置 · 高级组，值 + [编辑] 弹窗 | 来源 + 每行 名称=值 |  | `lumilio-ui/src/instance_detail/settings/groups.rs` |
 | 启动前 / 包装 / 退出后命令 | 设置 · 高级组，值 + [编辑] 弹窗 | 三个输入：留空跟随默认，填 - 表示这个游戏不使用；说明可用变量 |  | `lumilio-ui/src/instance_detail/settings/groups.rs` |
+| 指定 Java | 设置 · Java 组，下拉「自动（推荐）/ 已发现的 Java / 自定义路径…」 | 选中即保存；值下方写出下次启动用哪个 Java，没有合适的时写出启动时会下载的版本；已停用的 Java 不在列表里 | java-management T4 | `lumilio-ui/src/instance_detail/settings/java.rs` |
+| 自定义 Java 路径 | 设置 · Java 组，选「自定义路径…」后出现的路径行 + [编辑] 弹窗 | 填 java 程序或 JDK 文件夹；保存时检查路径存在；恢复默认＝回到自动 |  | `lumilio-ui/src/instance_detail/settings/java.rs` |
 | 选项 | 设置 tab 的分段「选项」 | 显示游戏内「选项」里的设置（按键、音量、画面、聊天、辅助功能、语言），游戏关着时可在这里改 |  | `lumilio-ui/src/instance_detail/settings/mod.rs` |
 | 选择预设 | 设置 › 选项，「预设」行的「更换…」→ 弹窗：不使用预设或某个预设，并预览下次启动会改变的选项 | 选了预设后下次启动应用它共享的选项；改回不使用时保留现在的选项；游戏运行、有待决定的修改或上次会话未确认关闭时不能换 |  | `lumilio-ui/src/instance_detail/settings/options.rs` |
 | 确认游戏已关闭 | 设置 › 选项，上次会话中断时的说明和「游戏已关闭」 | 玩家确认后才比较游戏文件和上次应用的值，找出游戏里改过的选项；游戏还开着时不要点 |  | `lumilio-ui/src/instance_detail/settings/options.rs` |

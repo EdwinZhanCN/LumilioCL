@@ -2,8 +2,8 @@ use super::super::Section;
 use super::CONTENT_KINDS;
 use crate::tr;
 use lumilio_core::{
-    ContentList, FileEntry, GameLogs, HistoryRead, InstanceOptions, Problem, ProjectKind,
-    ScreenshotInfo, ServerEntry, ServerStatus, SnapshotInfo, WorldInfo,
+    ContentList, FileEntry, GameLogs, HistoryRead, InstanceJava, InstanceOptions, Problem,
+    ProjectKind, ScreenshotInfo, ServerEntry, ServerStatus, SnapshotInfo, WorldInfo,
 };
 
 pub type Loaded<T> = Option<Result<T, String>>;
@@ -24,6 +24,8 @@ pub struct Data {
     pub files: Loaded<(String, Vec<FileEntry>)>,
     pub size: Loaded<u64>,
     pub game_options: Loaded<InstanceOptions>,
+    /// The Java the next launch uses and the ones it could.
+    pub java: Loaded<InstanceJava>,
     pub pending: Vec<Section>,
 }
 
@@ -40,6 +42,7 @@ pub enum Arrived {
     Files(String, Result<Vec<FileEntry>, String>),
     Size(Result<u64, String>),
     GameOptions(Result<Box<InstanceOptions>, String>),
+    Java(Result<Box<InstanceJava>, String>),
 }
 
 impl Arrived {
@@ -56,6 +59,7 @@ impl Arrived {
             Self::Files(..) => Section::Files,
             Self::Size(_) => Section::Size,
             Self::GameOptions(_) => Section::GameOptions,
+            Self::Java(_) => Section::Java,
         }
     }
 }
@@ -80,6 +84,7 @@ impl Data {
             Arrived::GameOptions(result) => {
                 self.game_options = Some(result.map(|options| *options))
             }
+            Arrived::Java(result) => self.java = Some(result.map(|java| *java)),
             Arrived::Files(folder, result) => {
                 self.files = Some(result.map(|entries| (folder, entries)));
             }
@@ -102,6 +107,7 @@ impl Data {
             Section::Files => self.files.is_some(),
             Section::Size => self.size.is_some(),
             Section::GameOptions => self.game_options.is_some(),
+            Section::Java => self.java.is_some(),
         }
     }
 }

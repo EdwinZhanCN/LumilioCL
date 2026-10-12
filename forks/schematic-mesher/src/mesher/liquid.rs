@@ -125,8 +125,43 @@ fn is_same_fluid(
     false
 }
 
-/// Compute the height at one corner of a fluid block, averaging with neighbors.
-/// Returns a height in [0, 1].
+/// The height Minecraft's `LiquidBlockRenderer.getHeight` gives a cell: the
+/// fluid's own height (1 with the same fluid above), 0 for an empty cell the
+/// surface slopes toward, and -1 for a block that takes no part.
+fn cell_height(
+    pos: BlockPosition,
+    fluid_type: FluidType,
+    block_map: &rustc_hash::FxHashMap<BlockPosition, &InputBlock>,
+) -> f32 {
+    let Some(block) = block_map.get(&pos) else {
+        return 0.0;
+    };
+    let fluid = FluidState::from_block(block).or_else(|| {
+        (fluid_type == FluidType::Water && is_waterlogged(block)).then_some(FluidState {
+            fluid_type: FluidType::Water,
+            amount: 8,
+            is_source: true,
+            is_falling: false,
+        })
+    });
+    match fluid {
+        Some(fluid) if fluid.fluid_type == fluid_type => {
+            let above = BlockPosition::new(pos.x, pos.y + 1, pos.z);
+            if is_same_fluid(above, fluid_type, block_map) {
+                1.0
+            } else {
+                fluid.own_height()
+            }
+        }
+        _ if block.is_air() => 0.0,
+        _ => -1.0,
+    }
+}
+
+/// Compute the height at one corner of a fluid block, averaging with neighbors
+/// like Minecraft's `LiquidBlockRenderer.calculateAverageHeight`: heights of
+/// 0.8 and more weigh ten times as much, and an empty neighbor pulls the corner
+/// down, so the surface slopes toward open edges. Returns a height in [0, 1].
 fn corner_height(
     pos: BlockPosition,
     state: &FluidState,
@@ -134,41 +169,51 @@ fn corner_height(
     dz: i32,
     block_map: &rustc_hash::FxHashMap<BlockPosition, &InputBlock>,
 ) -> f32 {
-    // If there's the same fluid directly above, height is always 1.0
-    let above = BlockPosition::new(pos.x, pos.y + 1, pos.z);
-    if is_same_fluid(above, state.fluid_type, block_map) {
+    let own = cell_height(pos, state.fluid_type, block_map);
+    if own >= 1.0 {
         return 1.0;
     }
-
-    // Sample this block + up to 3 neighbors sharing this corner
-    let offsets = [(0, 0), (dx, 0), (0, dz), (dx, dz)];
-    let mut total_height = 0.0f32;
-    let mut total_weight = 0.0f32;
-
-    for (ox, oz) in &offsets {
-        let np = BlockPosition::new(pos.x + ox, pos.y, pos.z + oz);
-
-        // Check if same fluid above this neighbor → height 1.0 with high weight
-        let np_above = BlockPosition::new(np.x, np.y + 1, np.z);
-        if is_same_fluid(np_above, state.fluid_type, block_map) {
+    let along_z = cell_height(
+        BlockPosition::new(pos.x, pos.y, pos.z + dz),
+        state.fluid_type,
+        block_map,
+    );
+    let along_x = cell_height(
+        BlockPosition::new(pos.x + dx, pos.y, pos.z),
+        state.fluid_type,
+        block_map,
+    );
+    if along_z >= 1.0 || along_x >= 1.0 {
+        return 1.0;
+    }
+    let mut total = [0.0f32; 2];
+    let mut add = |height: f32| {
+        if height >= 0.8 {
+            total[0] += height * 10.0;
+            total[1] += 10.0;
+        } else if height >= 0.0 {
+            total[0] += height;
+            total[1] += 1.0;
+        }
+    };
+    if along_z > 0.0 || along_x > 0.0 {
+        let diagonal = cell_height(
+            BlockPosition::new(pos.x + dx, pos.y, pos.z + dz),
+            state.fluid_type,
+            block_map,
+        );
+        if diagonal >= 1.0 {
             return 1.0;
         }
-
-        if let Some(nf) = get_neighbor_fluid(np, block_map) {
-            if nf.fluid_type == state.fluid_type {
-                let h = nf.own_height();
-                // Source blocks get extra weight to smooth corners
-                let w = if h >= 0.8 { 10.0 } else { 1.0 };
-                total_height += h * w;
-                total_weight += w;
-            }
-        }
+        add(diagonal);
     }
-
-    if total_weight > 0.0 {
-        total_height / total_weight
+    add(own);
+    add(along_x);
+    add(along_z);
+    if total[1] == 0.0 {
+        0.0
     } else {
-        state.own_height()
+        total[0] / total[1]
     }
 }
 

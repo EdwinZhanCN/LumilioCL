@@ -70,6 +70,22 @@ pub fn problem_action(kind: &ProblemKind) -> Option<(ProblemAction, &'static str
             ProblemAction::InstallJava(*required),
             tr!("instance-action-install-java"),
         ),
+        ProblemKind::JavaWillDownload { major } => (
+            ProblemAction::InstallJava(*major),
+            tr!("instance-action-download-java-now"),
+        ),
+        ProblemKind::JavaMismatch { .. }
+        | ProblemKind::JavaAdvice {
+            chosen_by_user: true,
+            ..
+        } => (
+            ProblemAction::Settings(super::super::SETTINGS_JAVA),
+            tr!("instance-action-go-adjust"),
+        ),
+        ProblemKind::JavaAdvice { advised, .. } => (
+            ProblemAction::InstallJava(Some(*advised)),
+            tr!("instance-action-install-java"),
+        ),
         ProblemKind::NoAccount => (ProblemAction::Accounts, tr!("instance-action-add-account")),
         ProblemKind::DamagedFiles { .. } => (ProblemAction::Repair, tr!("instance-action-repair")),
         ProblemKind::WrongLoaderMods { .. } | ProblemKind::DuplicateMods { .. } => {
@@ -105,6 +121,25 @@ pub fn problem_text(problem: &Problem) -> (String, String) {
                 Some(major) => tr!("instance-problem-java-required", major = *major),
                 None => tr!("instance-problem-install-java-help").into(),
             },
+        ),
+        ProblemKind::JavaWillDownload { major } => (
+            tr!("instance-problem-java-will-download").into(),
+            match major {
+                Some(major) => tr!("instance-problem-java-will-download-help", major = *major),
+                None => tr!("instance-problem-java-will-download-any").into(),
+            },
+        ),
+        ProblemKind::JavaMismatch { chosen, needed } => (
+            tr!("instance-problem-java-mismatch").into(),
+            tr!(
+                "instance-problem-java-mismatch-help",
+                chosen = *chosen,
+                needed = *needed
+            ),
+        ),
+        ProblemKind::JavaAdvice { advised, .. } => (
+            tr!("instance-problem-java-advice", advised = *advised),
+            tr!("instance-problem-java-advice-help", advised = *advised),
         ),
         ProblemKind::NoAccount => (
             tr!("instance-problem-no-account").into(),

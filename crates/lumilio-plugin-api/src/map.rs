@@ -158,6 +158,30 @@ pub enum MapIcon {
     EndGateway,
     /// A 26.3 surface jigsaw camp; the same icon family as the other structures.
     AbandonedCamp,
+    /// A bastion remnant drawn by its start piece.
+    BastionHousing,
+    BastionHoglinStable,
+    BastionTreasure,
+    BastionBridge,
+    /// An igloo with its basement laboratory, and one without.
+    IglooBasement,
+    IglooNoBasement,
+    /// A ruined portal in the Nether.
+    RuinedPortalNether,
+    NetherFossil,
+    /// Bones with coal, and the deep fossils with diamonds.
+    Fossil,
+    DiamondFossil,
+    /// A lava lake on the surface.
+    LavaLake,
+    /// Where large copper and iron veins run.
+    CopperVein,
+    IronVein,
+    /// A ravine's start, on land or under an ocean.
+    Ravine,
+    UnderwaterRavine,
+    /// Loot: a chest holding an enchanted golden apple.
+    EnchantedGoldenApple,
     Spawn,
     SlimeChunk,
     Waypoint,

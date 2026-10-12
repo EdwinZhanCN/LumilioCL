@@ -21,6 +21,7 @@ impl InstanceDetailView {
                 self.record = Some(record);
                 self.defaults = defaults;
                 self.sync_fields = 3;
+                self.refresh_java = true;
                 self.error = None;
                 self.load_technical = None;
             }

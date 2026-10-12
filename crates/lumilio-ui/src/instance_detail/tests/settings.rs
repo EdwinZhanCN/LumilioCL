@@ -177,7 +177,12 @@ fn the_settings_groups_show_effective_values_and_restoring_removes_the_override(
         cx.debug_bounds("settings-save").is_some(),
         "the dialog opened"
     );
-    assert_eq!(seen.borrow().len(), 3, "only the overview's loads so far");
+    assert_eq!(
+        seen.borrow().len(),
+        4,
+        "only the overview's loads and the Java group's so far"
+    );
+    assert!(seen.borrow().contains(&InstanceIntent::Load(Section::Java)));
 
     // Restoring defaults sends the settings with the override removed.
     click(cx, "settings-reset");

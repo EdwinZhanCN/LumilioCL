@@ -68,6 +68,9 @@ struct State {
     next_world: Option<String>,
     /// A server address the next launch goes straight onto, once.
     next_server: Option<String>,
+    /// The game whose Java conflict the person just answered: its next
+    /// Continue starts without asking again.
+    java_answered: Option<String>,
     /// Stops the Microsoft sign-in that is waiting for the browser.
     sign_in_cancel: Option<CancellationToken>,
     /// The target game and kind `installed` was last read for; `None` when it

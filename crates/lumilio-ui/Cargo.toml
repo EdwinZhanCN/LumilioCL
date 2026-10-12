@@ -30,6 +30,7 @@ rust-embed = { version = "8", features = ["debug-embed"] }
 [dev-dependencies]
 gpui = { workspace = true, features = ["test-support"] }
 fluent-syntax = "0.12"
+tempfile.workspace = true
 
 [lints]
 workspace = true

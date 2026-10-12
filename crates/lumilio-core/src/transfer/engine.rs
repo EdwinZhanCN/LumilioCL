@@ -1,5 +1,5 @@
 use super::files::{
-    AttemptFailure, copy_verified_candidate, create_temporary_sibling, encode_lower_hex,
+    AttemptFailure, ContentHasher, copy_verified_candidate, create_temporary_sibling,
     file_system_error, publish_temporary, verify_file,
 };
 use super::request::{
@@ -8,7 +8,6 @@ use super::request::{
 use super::transport::Transport;
 use crate::activity::CancellationToken;
 use futures_util::stream::StreamExt;
-use sha1::{Digest, Sha1};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -124,7 +123,7 @@ where
             && verify_file(
                 &request.destination,
                 request.expected_size,
-                request.expected_sha1.as_deref(),
+                request.expected_digest.as_ref(),
             )
             .await?
         {
@@ -138,7 +137,7 @@ where
             let candidate_is_valid = verify_file(
                 candidate,
                 request.expected_size,
-                request.expected_sha1.as_deref(),
+                request.expected_digest.as_ref(),
             )
             .await
             .unwrap_or(false);
@@ -230,7 +229,10 @@ where
         let result = async {
             let mut body = response.into_body();
             let mut bytes_written = 0_u64;
-            let mut digest = Sha1::new();
+            let mut digest = request
+                .expected_digest
+                .as_ref()
+                .map(ContentHasher::for_digest);
             loop {
                 let chunk = tokio::select! {
                     () = cancellation.cancelled() => {
@@ -252,7 +254,9 @@ where
                         error,
                     ))
                 })?;
-                digest.update(&chunk);
+                if let Some(digest) = &mut digest {
+                    digest.update(&chunk);
+                }
                 bytes_written = bytes_written.saturating_add(chunk.len() as u64);
                 let _ = self.events.send(TransferEvent::Progress {
                     id: request.id.clone(),
@@ -278,11 +282,13 @@ where
                     "file size was {bytes_written}, expected {expected_size}"
                 )));
             }
-            if let Some(expected) = &request.expected_sha1 {
-                let actual = encode_lower_hex(&digest.finalize());
-                if !actual.eq_ignore_ascii_case(expected) {
+            if let (Some(expected), Some(digest)) = (&request.expected_digest, digest) {
+                let actual = digest.finish_hex();
+                if !actual.eq_ignore_ascii_case(expected.hex()) {
                     return Err(AttemptFailure::source(format!(
-                        "SHA-1 was {actual}, expected {expected}"
+                        "{} was {actual}, expected {}",
+                        expected.algorithm(),
+                        expected.hex()
                     )));
                 }
             }

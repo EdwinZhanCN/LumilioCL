@@ -95,9 +95,10 @@ impl<T: Transport + Clone> LauncherService<T> {
                 .restore_backup(Path::new(&path), cancel)
                 .await
                 .map(|_| ()),
-            RetryAction::InstallJava { major } => {
-                self.install_java(major, cancel).await.map(|_| ())
-            }
+            RetryAction::InstallJava { major, source } => self
+                .install_java_from(source, major, cancel)
+                .await
+                .map(|_| ()),
             RetryAction::SaveVersion {
                 project,
                 version_id,

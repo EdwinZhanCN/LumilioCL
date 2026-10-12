@@ -38,6 +38,15 @@ pub struct LaunchRequest {
     pub quick_play: Option<QuickPlay>,
 }
 
+/// A launch asking for a Java to be downloaded because none installed may
+/// run the game: the major (`None` for the recommended one), answered with
+/// the installed runtime or why it could not be installed.
+#[derive(Debug)]
+pub struct JavaRequest {
+    pub major: Option<u32>,
+    pub reply: tokio::sync::oneshot::Sender<Result<JavaRuntime, String>>,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum LaunchUpdate {
     Signal(LaunchSignal),
@@ -61,6 +70,8 @@ pub enum LaunchServiceError {
     NoJava {
         required: Option<u32>,
     },
+    /// No installed Java fitted and downloading one failed.
+    JavaInstall(String),
     Process(ProcessError),
     /// This game version cannot start in a world or on a server directly.
     QuickPlayUnsupported {
@@ -98,8 +109,14 @@ impl Display for LaunchServiceError {
             Self::Install(error) => write!(f, "{error}"),
             Self::NoJava {
                 required: Some(major),
-            } => write!(f, "Java {major} or newer is required but not installed"),
+            } => write!(
+                f,
+                "no installed Java can run this game; it needs Java {major}"
+            ),
             Self::NoJava { required: None } => f.write_str("no Java installation found"),
+            Self::JavaInstall(why) => {
+                write!(f, "the Java this game needs could not be downloaded: {why}")
+            }
             Self::Process(error) => write!(f, "{error}"),
             Self::QuickPlayUnsupported { mode } => write!(
                 f,

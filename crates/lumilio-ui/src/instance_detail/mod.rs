@@ -146,6 +146,12 @@ pub struct InstanceDetailView {
     options_conflicts: Vec<String>,
     /// The game stopped: read its options again on the next render.
     refresh_options: bool,
+    /// The Java dropdown, created once the view has a window, and the
+    /// entries it shows.
+    java_select: Option<Dropdown>,
+    java_picks: Vec<(settings::JavaPick, String)>,
+    /// The record changed: read what the next launch's Java is again.
+    refresh_java: bool,
     /// The machine's memory in MB, for the memory hint; unknown until told.
     machine_memory_mb: Option<u64>,
     confirm: Option<Confirm>,
@@ -243,6 +249,9 @@ impl InstanceDetailView {
             options_selected: std::collections::BTreeSet::new(),
             options_conflicts: Vec::new(),
             refresh_options: false,
+            java_select: None,
+            java_picks: Vec::new(),
+            refresh_java: false,
             machine_memory_mb: None,
             confirm: None,
             editor: None,

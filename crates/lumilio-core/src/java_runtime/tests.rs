@@ -69,6 +69,68 @@ fn systems_map_to_the_index_names() {
 }
 
 #[test]
+fn apple_silicon_falls_back_to_the_intel_runtime_only_where_no_native_one_exists() {
+    let entry = |name: &str| {
+        format!(
+            r#"[{{"manifest":{{"url":"https://launchermeta.mojang.com/{name}","sha1":"aa","size":1}},"version":{{"name":"{name}"}}}}]"#
+        )
+    };
+    let index = format!(
+        r#"{{"mac-os-arm64":{{"java-runtime-delta":{d}}},
+           "mac-os":{{"jre-legacy":{l},"java-runtime-delta":{d},"minecraft-java-exe":{exe}}}}}"#,
+        d = entry("21.0.7"),
+        l = entry("8u74"),
+        exe = entry("14"),
+    );
+    let arm = HostProfile::new(PlatformFamily::MacOs, MachineArchitecture::Arm64, "");
+    assert_eq!(platform_keys(&arm), ["mac-os-arm64", "mac-os"]);
+    assert_eq!(
+        choose_for_host(&index, &arm, Some(8)).unwrap().component,
+        "jre-legacy"
+    );
+    let native = choose_for_host(&index, &arm, Some(21)).unwrap();
+    assert_eq!(
+        native.manifest.url,
+        "https://launchermeta.mojang.com/21.0.7"
+    );
+    assert_eq!(
+        choose_for_host(&index, &arm, Some(17)),
+        Err(JavaRuntimeError::NoSuchRuntime(Some(17)))
+    );
+    // The launcher helper in the index is not a Java.
+    assert_eq!(offered_majors(&index, &arm).unwrap(), [8, 21]);
+    let intel = HostProfile::new(PlatformFamily::MacOs, MachineArchitecture::X86_64, "");
+    assert_eq!(platform_keys(&intel), ["mac-os"]);
+    let riscv = HostProfile::new(
+        PlatformFamily::Linux,
+        MachineArchitecture::Other("riscv64".into()),
+        "",
+    );
+    assert_eq!(
+        choose_for_host(&index, &riscv, Some(21)),
+        Err(JavaRuntimeError::UnsupportedPlatform)
+    );
+}
+
+#[test]
+fn graalvm_is_used_only_for_the_majors_it_offers() {
+    let mac = HostProfile::new(PlatformFamily::MacOs, MachineArchitecture::Arm64, "");
+    let graal = JavaSource::OracleGraalVm;
+    assert_eq!(source_for(graal, &mac, Some(21)), graal);
+    assert_eq!(source_for(graal, &mac, None), graal);
+    // Old versions need Java 8, which only Mojang has.
+    assert_eq!(source_for(graal, &mac, Some(8)), JavaSource::Mojang);
+    assert_eq!(
+        source_for(JavaSource::Mojang, &mac, Some(21)),
+        JavaSource::Mojang
+    );
+    let windows_arm = HostProfile::new(PlatformFamily::Windows, MachineArchitecture::Arm64, "");
+    assert_eq!(source_for(graal, &windows_arm, None), JavaSource::Mojang);
+    assert_eq!(graal.folder_name(25).as_deref(), Some("graalvm-25"));
+    assert_eq!(JavaSource::Mojang.folder_name(25), None);
+}
+
+#[test]
 fn a_manifest_is_read_and_anything_that_could_escape_is_refused() {
     let good = r#"{"files":{
         "bin":{"type":"directory"},

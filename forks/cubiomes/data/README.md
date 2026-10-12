@@ -18,6 +18,7 @@ cargo xtask worldgen-prepare 26.3
 cargo xtask worldgen-golden 26.3
 cargo xtask worldgen-diff 26.2 26.3
 cargo xtask cubiomes-btree forks/cubiomes/data/26.3/trees.json.gz forks/cubiomes/tables/btree26_3.h btree26_3
+cargo xtask cubiomes-tables
 python3 crates/lumilio-xtask/src/worldgen/save_golden.py 26.3
 cargo xtask worldgen-save-read 26.3
 ```
@@ -35,6 +36,23 @@ and records vanilla `/locate` results. `worldgen-save-read` reads the saved
 Anvil biome palettes and world spawn without using the runtime probe. Negative heights are
 sampled only in the Overworld, where those sections exist.
 
+The probe also records each tracked placed feature's decoration order
+(`FeatureSorter`) and runs its original placement modifiers over fixed chunks,
+passing the filters that read the world. `worldgen-import` writes the order,
+modifiers and biome lists to `<release>/decorations.json`;
+`cargo xtask cubiomes-tables` turns every release's file into
+`../tables/decorations.h`. From 1.21 (data-driven enchantments) it also
+writes `<release>/loot.json` from the server jar: the desert pyramid's place
+among the decoration step's structures (registries order them by id), its
+loot table's first pool, and the maximum level of each enchantment its book
+can draw, in tag order; `../tables/loot.h` is generated from them. Releases 1.19.4–1.21.3 have runtime goldens and
+decoration data from the same probe; 1.18.2 and 1.19.2 only saved worlds.
+
+The saved worlds also load the start chunks of several located bastions,
+igloos, End Cities, nether fossils and desert pyramids, and fully generated
+chunk squares around the origin and the nearest desert, swamp and soul sand
+valley (`starts.json`, `areas.json`), for checks that read blocks.
+
 Fixture rows use these fields:
 
 - Biomes: `seed dimension quart_x quart_y quart_z biome_id`.
@@ -42,6 +60,12 @@ Fixture rows use these fields:
 - Biome rules: `kind biome_id allowed`; kind -1 is the stronghold bias tag.
 - Saved locates: `seed dimension kind block_x block_z`; kind -2 is world
   spawn, -1 is stronghold, and other kinds are Rust `Structure` indices.
+- Saved start variants: `seed dimension kind block_x block_z variant`: the
+  bastion's start piece (0 housing, 1 hoglin stable, 2 treasure, 3 bridge),
+  or 1 for an igloo with a basement and an End City with a ship.
+- Saved nether fossils: `seed x z y`, the piece's template position.
+- Decoration candidates: `seed kind chunk_x chunk_z x y z` in placement
+  order; kind is the fork's `DecorationType`.
 
 Dimensions are -1 (Nether), 0 (Overworld), and 1 (End). Camp locates validate
 the exact region grid; their terrain-dependent viability remains estimated.
