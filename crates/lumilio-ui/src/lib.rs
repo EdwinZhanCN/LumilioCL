@@ -34,6 +34,7 @@ pub mod placeholders;
 pub mod platform;
 pub mod plugin_setting_dialog;
 pub mod project_detail;
+pub mod release_notes;
 pub mod route;
 pub mod settings_dialog;
 pub mod settings_forms;

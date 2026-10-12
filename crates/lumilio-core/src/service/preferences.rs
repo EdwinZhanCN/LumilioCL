@@ -64,6 +64,11 @@ impl<T: Transport + Clone> LauncherService<T> {
         Ok(self.settings.lock().await.set_auto_update(enabled)?)
     }
 
+    /// Remembers that the release notes of `version` were shown.
+    pub async fn set_release_notes_seen(&self, version: &str) -> Result<(), ServiceError> {
+        Ok(self.settings.lock().await.set_release_notes_seen(version)?)
+    }
+
     pub async fn set_java_source(
         &self,
         source: crate::java_runtime::JavaSource,

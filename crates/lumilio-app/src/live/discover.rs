@@ -191,7 +191,11 @@ pub(super) fn install(
                 "discover-install-started",
                 title = title.as_str()
             ))),
-            async move { service.install_modpack(&slug, cancel).await },
+            async move {
+                service
+                    .install_modpack(&slug, version.as_deref(), cancel)
+                    .await
+            },
             move |shell, result, cx| {
                 mark_installing_in(shell, &slug_done, false, cx);
                 let toast = outcome(

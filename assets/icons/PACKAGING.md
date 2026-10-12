@@ -88,7 +88,7 @@
   - Linux：用最老支持发行版的容器，x64。
 - 发布产物必须带上：版本号、OS、架构、构建 commit，以及 SHA-256。文件名是 `LumilioCL-<version>-<os>-<arch>…`，commit 和签名状态写在每个包里的 `BUILD.txt`（macOS 还写进 Info.plist 的 `LumilioCLCommit`），校验和汇总为 `SHA256SUMS.txt`。
 - 推送 `v<version>` 标签触发发布，标签必须等于工作区版本（SemVer；带 `-` 的预发布版本标为 pre-release）。工作流只建草稿 release，验收通过后由人发布。
-- 发布说明按 `.github/release-template.md` 的固定小节写：一句话概括，新功能 / 改进 / 修复（空的删掉，可加「工具」），更新说明，最后一行源码提交与 PR。工作流用它生成草稿正文；网站更新日志直接渲染这段 Markdown。
+- 发布说明在打标签前写进 `release-notes/<version>.md`（可另写 `<version>.en.md`，小节和条目数与中文一致）：一句话概括，然后 `## 新功能` / `## 改进` / `## 修复`（空的删掉，可加「工具」），有升级注意事项（自动更新由旧版本的逻辑执行）时加 `## 更新说明`。启动器把它编进程序，更新后第一次打开时显示；版本号变了而缺这个文件时 `lumilio-ui` 的测试失败。工作流把它接上 `.github/release-template.md`（安装包与源码提交）生成草稿正文，正文的 PR 编号发布前补上；网站更新日志直接渲染这段 Markdown。
 - 验收必须针对下载后的产物，不是构建目录。检查五项：
   1. 首次启动正常。
   2. 图标在各处显示正确。

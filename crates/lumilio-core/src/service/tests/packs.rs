@@ -1,10 +1,10 @@
 use super::super::error::ServiceError;
 use super::{
-    World, instance_with_profile, no_leftovers, pack_file, pack_index, sha1_hex, world,
+    World, file_url, instance_with_profile, no_leftovers, pack_file, pack_index, sha1_hex, world,
     write_mrpack,
 };
 use crate::activity::CancellationToken;
-use crate::activity_log::TaskOutcome;
+use crate::activity_log::{RetryAction, TaskOutcome};
 use crate::history::{ChangeKind, HistoryEvent, HistoryLog};
 use crate::instance::{InstanceSettings, Loader, StoreError};
 use std::sync::Arc;
@@ -66,6 +66,62 @@ async fn an_exported_pack_carries_everything_when_modrinth_is_out_of_reach_and_n
             crate::pack_export::ExportError::NothingChosen
         ))
     ));
+}
+
+#[tokio::test]
+async fn a_chosen_pack_version_is_installed_and_retried_instead_of_the_newest() {
+    let world = world();
+    let mut versions = Vec::new();
+    for (id, day, options) in [("v1", 1, "older"), ("v2", 2, "newest")] {
+        let pack = world.server.join(format!("{id}.mrpack"));
+        write_mrpack(
+            &pack,
+            &pack_index(""),
+            &[("overrides/options.txt", options)],
+        );
+        let bytes = std::fs::read(&pack).unwrap();
+        versions.push(format!(
+            r#"{{"id":"{id}","project_id":"P","name":"{id}","version_number":"{id}",
+                "version_type":"release","game_versions":["1.21.1"],"loaders":["fabric"],
+                "date_published":"2024-01-0{day}T00:00:00Z",
+                "files":[{{"url":"{}","filename":"{id}.mrpack","primary":true,"size":{},
+                           "hashes":{{"sha1":"{}"}}}}]}}"#,
+            file_url(&pack),
+            bytes.len(),
+            sha1_hex(&bytes)
+        ));
+    }
+    world.net.answer(
+        "/v2/project/pack/version",
+        format!("[{}]", versions.join(",")),
+    );
+    let install = |version: Option<&'static str>| {
+        world
+            .service
+            .install_modpack("pack", version, CancellationToken::new())
+    };
+    let options = |id: &str| {
+        std::fs::read_to_string(world.service.layout.game(id).join("options.txt")).unwrap()
+    };
+
+    let chosen = install(Some("v1")).await.unwrap();
+    assert_eq!(options(&chosen.id), "older");
+    let newest = install(None).await.unwrap();
+    assert_eq!(options(&newest.id), "newest");
+
+    // A version the project no longer has fails, and its retry asks for it again.
+    assert!(matches!(
+        install(Some("gone")).await,
+        Err(ServiceError::NoCompatibleVersion)
+    ));
+    assert_eq!(
+        world.service.activity(10).finished[0].retry,
+        Some(RetryAction::InstallModpack {
+            project: "pack".into(),
+            version: Some("gone".into()),
+        })
+    );
+    no_leftovers(&world);
 }
 
 #[tokio::test]

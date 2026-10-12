@@ -85,6 +85,7 @@ fn a_log_line_from_before_retry_existed_still_reads_and_a_retry_survives_the_log
         id,
         RetryAction::InstallModpack {
             project: "pack".into(),
+            version: None,
         },
     );
     board
@@ -96,7 +97,8 @@ fn a_log_line_from_before_retry_existed_still_reads_and_a_retry_survives_the_log
     assert_eq!(
         tasks[1].retry,
         Some(RetryAction::InstallModpack {
-            project: "pack".into()
+            project: "pack".into(),
+            version: None,
         })
     );
 }

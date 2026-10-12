@@ -111,10 +111,12 @@ impl<T: Transport + Clone> LauncherService<T> {
         Ok(record)
     }
 
-    /// Installs a modpack project as a new instance.
+    /// Installs a modpack project as a new instance: `version` (a version id
+    /// of the project), or its newest version when `None`.
     pub async fn install_modpack(
         &self,
         project: &str,
+        version: Option<&str>,
         cancel: CancellationToken,
     ) -> Result<InstanceRecord, ServiceError> {
         let task = self
@@ -129,8 +131,11 @@ impl<T: Transport + Clone> LauncherService<T> {
             )
             .retrying(RetryAction::InstallModpack {
                 project: project.to_owned(),
+                version: version.map(str::to_owned),
             });
-        let result = self.install_modpack_inner(task.id, project, cancel).await;
+        let result = self
+            .install_modpack_inner(task.id, project, version, cancel)
+            .await;
         if let Ok(record) = &result {
             task.about(&record.id);
         }
@@ -247,6 +252,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         &self,
         task: u64,
         project: &str,
+        wanted: Option<&str>,
         cancel: CancellationToken,
     ) -> Result<InstanceRecord, ServiceError> {
         let chain = read_unless_cancelled(&cancel, self.chain()).await?;
@@ -255,10 +261,11 @@ impl<T: Transport + Clone> LauncherService<T> {
             client.versions(project).await.map_err(ServiceError::from)
         })
         .await?;
-        let version = versions
-            .iter()
-            .max_by(|a, b| a.published.cmp(&b.published))
-            .ok_or(ServiceError::NoCompatibleVersion)?;
+        let version = match wanted {
+            Some(id) => versions.iter().find(|version| version.id == id),
+            None => versions.iter().max_by(|a, b| a.published.cmp(&b.published)),
+        }
+        .ok_or(ServiceError::NoCompatibleVersion)?;
         let file = version
             .install_file()
             .ok_or(ServiceError::NoCompatibleVersion)?;

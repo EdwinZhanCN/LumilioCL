@@ -160,7 +160,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          sparse-checkout: .github/release-template.md
+          sparse-checkout: |
+            .github/release-template.md
+            release-notes/
           sparse-checkout-cone-mode: false
       - uses: actions/download-artifact@v4
         with:
@@ -180,9 +182,13 @@ jobs:
           VERSION: ${{ needs.version.outputs.version }}
           PRERELEASE: ${{ needs.version.outputs.prerelease }}
         run: |
-          # The fixed sections every release note keeps (PACKAGING.md §5).
-          sed -e "s|{{VERSION}}|$VERSION|g" -e "s|{{TAG}}|$TAG|g" -e "s|{{SHA}}|$GITHUB_SHA|g" \
-            .github/release-template.md > notes.md
+          # The version's notes, which the launcher also shows after updating,
+          # then the package details every release repeats (PACKAGING.md §5).
+          {
+            cat "release-notes/$VERSION.md"
+            echo
+            sed -e "s|{{TAG}}|$TAG|g" -e "s|{{SHA}}|$GITHUB_SHA|g" .github/release-template.md
+          } > notes.md
           flags=(--draft --verify-tag --title "LumilioCL $VERSION" --notes-file notes.md)
           if [ "$PRERELEASE" = true ]; then flags+=(--prerelease); fi
           gh release create "$TAG" "${flags[@]}" dist/*
