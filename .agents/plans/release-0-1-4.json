@@ -7,7 +7,7 @@
   "visibility": "internal",
   "scope": {
     "included": [
-      "投影 3D 预览修复（fix/schematic-renderer，PR 待开）。",
+      "PR #28：投影 3D 预览对照 Minecraft 26.3 修正朝向与双箱、uvlock、26.x 贴图路径、着色、阴影、水面和解析健壮性，并加快资源加载。",
       "PR #24：Release 工作流按 .github/release-template.md 生成固定小节的发布说明草稿。",
       "PR #26：网站截图更新、路线图分节上限与首页动态预告。",
       "版本号、计划与发布说明。"
@@ -19,7 +19,7 @@
   },
   "tasks": [
     { "id": "R1", "title": "更新版本与计划", "status": "in_progress", "acceptance": "工作区版本为 0.1.4，Cargo.lock 同步，release-0-1-3 记录已发布状态，本计划与投影生成。" },
-    { "id": "R2", "title": "合入投影预览修复", "status": "proposed", "acceptance": "修复 PR 的 rust、plans 检查通过，与 main 无冲突后合入。" },
+    { "id": "R2", "title": "合入投影预览修复", "status": "in_progress", "acceptance": "PR #28 的 rust、plans 检查通过，与 main 无冲突后合入；启动器内目视检查留在 schematic-render-parity T9。" },
     { "id": "R3", "title": "通过 PR 合入版本更新", "status": "proposed", "acceptance": "PR 列出发布内容，rust、plans 检查通过后合入 main。" },
     { "id": "R4", "title": "打 v0.1.4 标签并生成三平台草稿安装包", "status": "proposed", "acceptance": "v0.1.4 标签指向合入后的提交；Release 工作流成功，草稿含三平台安装包与 SHA256SUMS.txt，发布说明为模板的固定小节。" },
     { "id": "R5", "title": "整理发布说明并正式发布", "status": "proposed", "acceptance": "按模板填写摘要和小节、删除空小节与注释后，由 Project Maintainer 发布草稿。" }
@@ -29,9 +29,11 @@
     { "criterion": "三平台草稿安装包生成，下载后的产物校验通过。", "result": null }
   ],
   "references": [
+    "https://github.com/EdwinZhanCN/LumilioCL/pull/28",
     "https://github.com/EdwinZhanCN/LumilioCL/pull/24",
     "https://github.com/EdwinZhanCN/LumilioCL/pull/26",
     ".agents/plans/release-0-1-3.json",
+    ".agents/plans/schematic-render-parity.json",
     ".github/release-template.md",
     "assets/icons/PACKAGING.md"
   ],

@@ -8,7 +8,7 @@ Status: InProgress
 
 ## Scope
 
-- In: 投影 3D 预览修复（fix/schematic-renderer，PR 待开）。
+- In: PR #28：投影 3D 预览对照 Minecraft 26.3 修正朝向与双箱、uvlock、26.x 贴图路径、着色、阴影、水面和解析健壮性，并加快资源加载。
 - In: PR #24：Release 工作流按 .github/release-template.md 生成固定小节的发布说明草稿。
 - In: PR #26：网站截图更新、路线图分节上限与首页动态预告。
 - In: 版本号、计划与发布说明。
@@ -19,8 +19,8 @@ Status: InProgress
 
 - [ ] R1 — 更新版本与计划 (InProgress)
   Acceptance: 工作区版本为 0.1.4，Cargo.lock 同步，release-0-1-3 记录已发布状态，本计划与投影生成。
-- [ ] R2 — 合入投影预览修复 (Proposed)
-  Acceptance: 修复 PR 的 rust、plans 检查通过，与 main 无冲突后合入。
+- [ ] R2 — 合入投影预览修复 (InProgress)
+  Acceptance: PR #28 的 rust、plans 检查通过，与 main 无冲突后合入；启动器内目视检查留在 schematic-render-parity T9。
 - [ ] R3 — 通过 PR 合入版本更新 (Proposed)
   Acceptance: PR 列出发布内容，rust、plans 检查通过后合入 main。
 - [ ] R4 — 打 v0.1.4 标签并生成三平台草稿安装包 (Proposed)
@@ -45,8 +45,10 @@ Consequences: 功能分支完成后进入后续 minor 版本；若投影修复�
 
 ## References
 
+- https://github.com/EdwinZhanCN/LumilioCL/pull/28
 - https://github.com/EdwinZhanCN/LumilioCL/pull/24
 - https://github.com/EdwinZhanCN/LumilioCL/pull/26
 - [.agents/plans/release-0-1-3.json](../../.agents/plans/release-0-1-3.json)
+- [.agents/plans/schematic-render-parity.json](../../.agents/plans/schematic-render-parity.json)
 - .github/release-template.md
 - [assets/icons/PACKAGING.md](../../assets/icons/PACKAGING.md)
