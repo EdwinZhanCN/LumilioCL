@@ -40,6 +40,21 @@ fn comment_blocks(text: &str) -> Vec<(usize, String)> {
     blocks
 }
 
+/// `block` without the folder names in paths into this repository's forks.
+/// `forks/cubiomes/tables/loot.h` names a file here, often one an xtask
+/// writes; only the project's name in the text credits the project.
+fn without_fork_folders(block: &str) -> String {
+    let mut out = String::new();
+    let mut rest = block;
+    while let Some(start) = rest.find("forks/") {
+        let (before, after) = rest.split_at(start + "forks/".len());
+        out.push_str(before);
+        rest = after.trim_start_matches(|c: char| c.is_ascii_alphanumeric() || "-_".contains(c));
+    }
+    out.push_str(rest);
+    out
+}
+
 /// What is wrong with one comment block, if it credits upstream code.
 fn problem(block: &str) -> Option<&'static str> {
     if block.contains("Axolotl")
@@ -56,6 +71,7 @@ fn problem(block: &str) -> Option<&'static str> {
     {
         return Some("cubiomes-viewer code names GPL-3.0");
     }
+    let named = without_fork_folders(block);
     for (source, license, copyright) in [
         ("cubiomes", "MIT", "Copyright (c) 2020 Cubitect"),
         (
@@ -65,10 +81,10 @@ fn problem(block: &str) -> Option<&'static str> {
         ),
         ("XaeroTools", "MIT", "Copyright (c) 2026 Dek"),
     ] {
-        if block.contains(source)
-            && !block.contains("cubiomes-viewer")
-            && [".rs", ".c", ".h"].iter().any(|ext| block.contains(ext))
-            && (!block.contains(license) || !block.contains(copyright))
+        if named.contains(source)
+            && !named.contains("cubiomes-viewer")
+            && [".rs", ".c", ".h"].iter().any(|ext| named.contains(ext))
+            && (!named.contains(license) || !named.contains(copyright))
         {
             return Some("map upstream credit needs its license and copyright");
         }
@@ -131,6 +147,14 @@ fn fastanvil_guard_probe() {
 #[test]
 fn xaerotools_guard_probe() {
     missing_credit("XaeroTools waypoints.rs");
+}
+#[test]
+fn a_path_into_a_fork_is_not_a_credit() {
+    assert_eq!(
+        problem("`table` writes `forks/cubiomes/tables/loot.h`."),
+        None
+    );
+    missing_credit("Adapted from cubiomes `forks/cubiomes/finders.c`.");
 }
 
 #[test]
