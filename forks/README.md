@@ -72,6 +72,9 @@ Schematic-Mesher (guards in `schematic-mesher/tests/`, run one with
   `uvlock` variant transforms its face UVs like Minecraft's
   `BlockMath.getUVLockTransform`, so rotated stairs, walls, fences and fence
   gates keep world-aligned textures. Guard: `uvlock`.
+- Multipart conditions (`resource_pack/blockstate.rs`): `OR`/`AND` nest and a
+  leading `!` negates the listed values, as in Minecraft, instead of failing
+  the whole blockstate. Guard: `multipart_conditions`.
 - Model shading (`resource_pack/model.rs`, `resolver/model_resolver.rs`,
   `mesher/element.rs`): `ambientocclusion: false` turns ambient occlusion off
   and a child that does not set it inherits it; an element's 26.x

@@ -122,13 +122,18 @@ impl ApplyValue {
 }
 
 /// Multipart condition for when a case applies.
+///
+/// `OR` and `AND` nest (Minecraft's condition codec is recursive), and a value
+/// that starts with `!` matches every value except those listed. Either form
+/// used to fail the whole blockstate. (LumilioCL local change; see
+/// `forks/README.md`.)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum MultipartCondition {
     /// OR condition: any of the sub-conditions must match.
-    Or { OR: Vec<HashMap<String, String>> },
+    Or { OR: Vec<MultipartCondition> },
     /// AND condition: all of the sub-conditions must match.
-    And { AND: Vec<HashMap<String, String>> },
+    And { AND: Vec<MultipartCondition> },
     /// Simple condition: all properties must match.
     Simple(HashMap<String, String>),
 }
@@ -137,12 +142,8 @@ impl MultipartCondition {
     /// Check if the condition matches the given block properties.
     pub fn matches(&self, properties: &HashMap<String, String>) -> bool {
         match self {
-            MultipartCondition::Or { OR } => {
-                OR.iter().any(|cond| Self::matches_simple(cond, properties))
-            }
-            MultipartCondition::And { AND } => AND
-                .iter()
-                .all(|cond| Self::matches_simple(cond, properties)),
+            MultipartCondition::Or { OR } => OR.iter().any(|cond| cond.matches(properties)),
+            MultipartCondition::And { AND } => AND.iter().all(|cond| cond.matches(properties)),
             MultipartCondition::Simple(cond) => Self::matches_simple(cond, properties),
         }
     }
@@ -153,25 +154,20 @@ impl MultipartCondition {
         properties: &HashMap<String, String>,
     ) -> bool {
         condition.iter().all(|(key, expected_value)| {
-            // Handle pipe-separated values (e.g., "north|south")
-            if expected_value.contains('|') {
-                let allowed: Vec<&str> = expected_value.split('|').collect();
-                properties
-                    .get(key)
-                    .map(|v| allowed.contains(&v.as_str()))
-                    .unwrap_or_else(|| {
-                        // If property is missing, check if any allowed value is a default
-                        allowed.iter().any(|v| Self::is_default_value(v))
-                    })
-            } else {
-                properties
-                    .get(key)
-                    .map(|v| v == expected_value)
-                    .unwrap_or_else(|| {
-                        // If property is missing, check if expected value is a default
-                        Self::is_default_value(expected_value)
-                    })
-            }
+            // "!a|b" matches anything but a or b; "a|b" matches either.
+            let (negated, values) = match expected_value.strip_prefix('!') {
+                Some(rest) => (true, rest),
+                None => (false, expected_value.as_str()),
+            };
+            let listed: Vec<&str> = values.split('|').collect();
+            let hit = properties
+                .get(key)
+                .map(|v| listed.contains(&v.as_str()))
+                .unwrap_or_else(|| {
+                    // If property is missing, check if any listed value is a default
+                    listed.iter().any(|v| Self::is_default_value(v))
+                });
+            hit != negated
         })
     }
 
