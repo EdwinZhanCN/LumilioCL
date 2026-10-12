@@ -274,6 +274,74 @@ async fn corrupted_source_falls_back_without_publishing_partial_bytes() {
 }
 
 #[tokio::test]
+async fn sha256_digests_reject_a_corrupt_source_and_reuse_a_verified_file() {
+    use sha2::Sha256;
+    let sha256 = |bytes: &[u8]| -> String {
+        Sha256::digest(bytes)
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect()
+    };
+    let temp = tempdir().unwrap();
+    let destination = temp.path().join("graalvm.tar.gz");
+    let transport = ScriptedTransport::default();
+    transport.push(
+        "https://mirror.invalid/graalvm.tar.gz",
+        Reply::Body {
+            status: 200,
+            bytes: b"corrupt".to_vec(),
+        },
+    );
+    transport.push(
+        "https://origin.invalid/graalvm.tar.gz",
+        Reply::Body {
+            status: 200,
+            bytes: b"archive".to_vec(),
+        },
+    );
+    let request = || {
+        TransferRequest::new(
+            "graalvm",
+            [
+                "https://mirror.invalid/graalvm.tar.gz",
+                "https://origin.invalid/graalvm.tar.gz",
+            ],
+            &destination,
+        )
+        .unwrap()
+        .expect_sha256(sha256(b"archive"))
+        .unwrap()
+        .with_retry_policy(RetryPolicy::immediate(1).unwrap())
+    };
+    assert!(request().expected_sha1().is_none());
+    let engine = TransferEngine::new(transport.clone(), 2).unwrap();
+    let outcome = engine
+        .transfer(request(), CancellationToken::new())
+        .await
+        .unwrap();
+    assert!(matches!(
+        outcome,
+        TransferOutcome::Downloaded { attempts: 2, .. }
+    ));
+    assert_eq!(std::fs::read(&destination).unwrap(), b"archive");
+
+    // The file on disk already matches: nothing is fetched again.
+    let outcome = engine
+        .transfer(request(), CancellationToken::new())
+        .await
+        .unwrap();
+    assert_eq!(outcome, TransferOutcome::ReusedExisting);
+    assert_eq!(transport.calls().len(), 2);
+    // A SHA-256 digest must have 64 hex digits.
+    assert!(
+        TransferRequest::new("x", ["https://origin.invalid/x"], &destination)
+            .unwrap()
+            .expect_sha256(sha1(b"archive"))
+            .is_err()
+    );
+}
+
+#[tokio::test]
 async fn exhausted_sources_leave_existing_destination_untouched() {
     let temp = tempdir().unwrap();
     let destination = temp.path().join("client.jar");

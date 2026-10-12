@@ -1,5 +1,5 @@
 use super::progress::{ItemProgress, forward_game_event, handle_stage, uses_installer};
-use super::types::{LaunchRequest, LaunchServiceError, LaunchUpdate};
+use super::types::{JavaRequest, LaunchRequest, LaunchServiceError, LaunchUpdate};
 use super::{LAUNCHER_NAME, Launcher, QUICK_PLAY_LOG};
 use crate::activity::CancellationToken;
 use crate::environment::HostProfile;
@@ -7,7 +7,7 @@ use crate::fetch::{FetchError, fetch_decoded, fetch_document};
 use crate::forge_install::ForgeError;
 use crate::install::{InstallError, InstallationPlan, Installer};
 use crate::instance::Loader;
-use crate::java::choose;
+use crate::java::{JavaChoice, JavaNeeds, JavaRuntime, choose, install_major};
 use crate::launch::{LaunchContext, LaunchPlan};
 use crate::launch_session::{LaunchPhase, LaunchSignal};
 use crate::loader::{LAUNCHABLE_LOADERS, normalize_profile};
@@ -206,13 +206,10 @@ where
             }
         }
 
-        let required = launch_plan.java_requirement().map(|java| java.major());
-        let java = choose(
-            &request.runtimes,
-            required,
-            record.settings.java_path.as_deref(),
-        )
-        .ok_or(LaunchServiceError::NoJava { required })?;
+        let java = self
+            .java_for(request, launch_plan, updates, cancel)
+            .await?
+            .runtime;
         let minecraft_jar = versions.join(&id).join(format!("{id}.jar"));
         let work = versions.join(&id).join("installer-work");
         let root = versions.parent().unwrap_or(versions);
@@ -289,9 +286,10 @@ where
         let min_memory = settings.min_memory_mb.or(request.default_min_memory_mb);
         let max_memory = settings.max_memory_mb.or(request.default_max_memory_mb);
 
-        let required = launch_plan.java_requirement().map(|java| java.major());
-        let java = choose(&request.runtimes, required, settings.java_path.as_deref())
-            .ok_or(LaunchServiceError::NoJava { required })?;
+        let java = self
+            .java_for(&request, &launch_plan, updates, cancel)
+            .await?
+            .runtime;
         let tuning = request
             .tuning
             .for_instance(&settings.jvm_arguments, &settings.launch);
@@ -433,6 +431,71 @@ where
             }
         }
         Ok(exit)
+    }
+
+    /// The Java this launch starts with (see [`crate::java::choose`]). When
+    /// none installed may run the game and an installer is attached, the
+    /// one the rules call for is downloaded first.
+    pub(super) async fn java_for(
+        &self,
+        request: &LaunchRequest,
+        plan: &LaunchPlan,
+        updates: &mpsc::UnboundedSender<LaunchUpdate>,
+        cancel: &CancellationToken,
+    ) -> Result<JavaChoice, LaunchServiceError> {
+        let needs = JavaNeeds::of_plan(&request.instance, plan);
+        let host = HostProfile::current();
+        let preferred = request.instance.settings.java_path.as_deref();
+        let known = |installed: &[JavaRuntime]| {
+            let mut runtimes = request.runtimes.clone();
+            runtimes.extend(installed.iter().cloned());
+            choose(&runtimes, &needs, preferred, &host)
+        };
+        let installed = self
+            .installed_java
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        if let Some(choice) = known(&installed) {
+            return Ok(choice);
+        }
+        let required = install_major(&needs, &host);
+        let Some(installer) = &self.java_installer else {
+            return Err(LaunchServiceError::NoJava { required });
+        };
+        let _ = updates.send(LaunchUpdate::Log {
+            stream: LogStream::Stdout,
+            text: match required {
+                Some(major) => format!("no installed Java fits; downloading Java {major}"),
+                None => "no Java is installed; downloading one".to_owned(),
+            },
+        });
+        let (reply, answer) = tokio::sync::oneshot::channel();
+        if installer
+            .send(JavaRequest {
+                major: required,
+                reply,
+            })
+            .is_err()
+        {
+            return Err(LaunchServiceError::NoJava { required });
+        }
+        let runtime = tokio::select! {
+            () = cancel.cancelled() => return Err(LaunchServiceError::Cancelled),
+            answer = answer => match answer {
+                Ok(Ok(runtime)) => runtime,
+                Ok(Err(why)) => return Err(LaunchServiceError::JavaInstall(why)),
+                Err(_) => return Err(LaunchServiceError::NoJava { required }),
+            },
+        };
+        let mut installed = installed;
+        installed.push(runtime);
+        let choice = known(&installed).ok_or(LaunchServiceError::NoJava { required })?;
+        *self
+            .installed_java
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = installed;
+        Ok(choice)
     }
 
     /// The release for the instance's version: the installed copy when there

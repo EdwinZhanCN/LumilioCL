@@ -221,7 +221,7 @@ async fn failed_start_uses_latest_log_and_missing_or_unreadable_logs_keep_builti
     assert!(
         empty
             .iter()
-            .any(|p| matches!(p.kind, ProblemKind::NoJava { .. }))
+            .any(|p| matches!(p.kind, ProblemKind::JavaWillDownload { .. }))
     );
     std::fs::create_dir_all(game.join("logs")).unwrap();
     std::fs::write(game.join("logs/latest.log"), "failed start log").unwrap();
@@ -235,7 +235,7 @@ async fn failed_start_uses_latest_log_and_missing_or_unreadable_logs_keep_builti
     assert!(
         unreadable
             .iter()
-            .any(|p| matches!(p.kind, ProblemKind::NoJava { .. }))
+            .any(|p| matches!(p.kind, ProblemKind::JavaWillDownload { .. }))
     );
     assert_eq!(inputs.lock().unwrap().len(), 1);
 }
@@ -293,7 +293,7 @@ async fn game_facts_include_enabled_mods_and_disabling_analysis_keeps_duplicate_
     assert!(
         problems
             .iter()
-            .any(|p| matches!(p.kind, ProblemKind::NoJava { .. }))
+            .any(|p| matches!(p.kind, ProblemKind::JavaWillDownload { .. }))
     );
     assert!(
         !problems

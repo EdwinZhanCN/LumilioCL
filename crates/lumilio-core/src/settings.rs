@@ -160,6 +160,11 @@ pub struct LauncherSettings {
     pub download_concurrency: Option<u32>,
     /// Java installations the user turned off; they are never chosen.
     pub disabled_java: Vec<PathBuf>,
+    /// Where downloaded Java comes from when that source has the major.
+    pub java_source: crate::java_runtime::JavaSource,
+    /// Whether a launch without a fitting Java downloads one first.
+    #[serde(default = "auto_install_java_default")]
+    pub auto_install_java: bool,
     /// Whether the launcher checks for and downloads stable launcher updates.
     #[serde(default = "auto_update_default")]
     pub auto_update: bool,
@@ -168,6 +173,10 @@ pub struct LauncherSettings {
 }
 
 fn auto_update_default() -> bool {
+    true
+}
+
+fn auto_install_java_default() -> bool {
     true
 }
 
@@ -189,6 +198,8 @@ impl Default for LauncherSettings {
             preferences: Preferences::default(),
             download_concurrency: None,
             disabled_java: Vec::new(),
+            java_source: crate::java_runtime::JavaSource::default(),
+            auto_install_java: true,
             auto_update: true,
             launch: LaunchTuning::default(),
         }
@@ -363,6 +374,21 @@ impl SettingsStore {
     pub fn set_auto_update(&mut self, enabled: bool) -> Result<(), SettingsError> {
         let mut next = self.settings.clone();
         next.auto_update = enabled;
+        self.save(next)
+    }
+
+    pub fn set_java_source(
+        &mut self,
+        source: crate::java_runtime::JavaSource,
+    ) -> Result<(), SettingsError> {
+        let mut next = self.settings.clone();
+        next.java_source = source;
+        self.save(next)
+    }
+
+    pub fn set_auto_install_java(&mut self, enabled: bool) -> Result<(), SettingsError> {
+        let mut next = self.settings.clone();
+        next.auto_install_java = enabled;
         self.save(next)
     }
 

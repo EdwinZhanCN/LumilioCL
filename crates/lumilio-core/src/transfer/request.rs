@@ -67,13 +67,57 @@ impl Default for RetryPolicy {
     }
 }
 
+/// What a file's content must hash to, as lowercase hex.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ContentDigest {
+    Sha1(String),
+    Sha256(String),
+}
+
+impl ContentDigest {
+    /// Checks the hex length for the algorithm and lowercases it.
+    fn parse(digest: String, sha256: bool) -> Result<Self, TransferError> {
+        let (length, name) = if sha256 {
+            (64, "SHA-256")
+        } else {
+            (40, "SHA-1")
+        };
+        if digest.len() != length || !digest.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            return Err(TransferError::InvalidRequest(format!(
+                "invalid {name} digest: {digest}"
+            )));
+        }
+        let digest = digest.to_ascii_lowercase();
+        Ok(if sha256 {
+            Self::Sha256(digest)
+        } else {
+            Self::Sha1(digest)
+        })
+    }
+
+    #[must_use]
+    pub fn hex(&self) -> &str {
+        match self {
+            Self::Sha1(hex) | Self::Sha256(hex) => hex,
+        }
+    }
+
+    #[must_use]
+    pub const fn algorithm(&self) -> &'static str {
+        match self {
+            Self::Sha1(_) => "SHA-1",
+            Self::Sha256(_) => "SHA-256",
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TransferRequest {
     pub(super) id: String,
     pub(super) sources: Vec<String>,
     pub(super) destination: PathBuf,
     pub(super) expected_size: Option<u64>,
-    pub(super) expected_sha1: Option<String>,
+    pub(super) expected_digest: Option<ContentDigest>,
     pub(super) cache_candidates: Vec<PathBuf>,
     pub(super) retry_policy: RetryPolicy,
     pub(super) reuse_existing: bool,
@@ -118,7 +162,7 @@ impl TransferRequest {
             sources,
             destination,
             expected_size: None,
-            expected_sha1: None,
+            expected_digest: None,
             cache_candidates: Vec::new(),
             retry_policy: RetryPolicy::default(),
             reuse_existing: true,
@@ -132,13 +176,13 @@ impl TransferRequest {
     }
 
     pub fn expect_sha1(mut self, digest: impl Into<String>) -> Result<Self, TransferError> {
-        let digest = digest.into();
-        if digest.len() != 40 || !digest.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-            return Err(TransferError::InvalidRequest(format!(
-                "invalid SHA-1 digest: {digest}"
-            )));
-        }
-        self.expected_sha1 = Some(digest.to_ascii_lowercase());
+        self.expected_digest = Some(ContentDigest::parse(digest.into(), false)?);
+        Ok(self)
+    }
+
+    /// For sources that publish SHA-256 instead of SHA-1 (Oracle GraalVM).
+    pub fn expect_sha256(mut self, digest: impl Into<String>) -> Result<Self, TransferError> {
+        self.expected_digest = Some(ContentDigest::parse(digest.into(), true)?);
         Ok(self)
     }
 
@@ -185,7 +229,15 @@ impl TransferRequest {
 
     #[must_use]
     pub fn expected_sha1(&self) -> Option<&str> {
-        self.expected_sha1.as_deref()
+        match &self.expected_digest {
+            Some(ContentDigest::Sha1(hex)) => Some(hex),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub const fn expected_digest(&self) -> Option<&ContentDigest> {
+        self.expected_digest.as_ref()
     }
 
     #[must_use]

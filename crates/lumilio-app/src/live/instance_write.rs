@@ -274,7 +274,10 @@ pub(super) fn write_instance(
                 }
                 InstanceIntent::InstallJava(major) => {
                     service.install_java(major, cancel).await?;
-                    done(tr!("instance-java-installed"), vec![Section::Problems])
+                    done(
+                        tr!("instance-java-installed"),
+                        vec![Section::Problems, Section::Java],
+                    )
                 }
                 InstanceIntent::Repair => {
                     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();

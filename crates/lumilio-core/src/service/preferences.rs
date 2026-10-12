@@ -64,6 +64,17 @@ impl<T: Transport + Clone> LauncherService<T> {
         Ok(self.settings.lock().await.set_auto_update(enabled)?)
     }
 
+    pub async fn set_java_source(
+        &self,
+        source: crate::java_runtime::JavaSource,
+    ) -> Result<(), ServiceError> {
+        Ok(self.settings.lock().await.set_java_source(source)?)
+    }
+
+    pub async fn set_auto_install_java(&self, enabled: bool) -> Result<(), ServiceError> {
+        Ok(self.settings.lock().await.set_auto_install_java(enabled)?)
+    }
+
     /// Turns a Java installation off (or back on) by its home folder.
     pub async fn set_java_disabled(&self, home: &Path, disabled: bool) -> Result<(), ServiceError> {
         let mut settings = self.settings.lock().await;

@@ -72,6 +72,9 @@ pub enum RetryAction {
     },
     InstallJava {
         major: Option<u32>,
+        /// Absent in entries written before there was a choice.
+        #[serde(default)]
+        source: crate::java_runtime::JavaSource,
     },
     SaveVersion {
         project: String,

@@ -64,7 +64,8 @@ impl MachineArchitecture {
         }
     }
 
-    fn matches_name(&self, name: &str) -> bool {
+    /// Whether `name` (`aarch64`, `amd64`, `x86`…) names this architecture.
+    pub(crate) fn matches_name(&self, name: &str) -> bool {
         match name.to_ascii_lowercase().as_str() {
             "x86" | "i386" | "i486" | "i586" | "i686" | "32" => {
                 matches!(self, Self::X86)

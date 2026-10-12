@@ -4600,6 +4600,7 @@ dependencies = [
  "sha1 0.10.7",
  "sha1 0.11.0",
  "sha2 0.11.0",
+ "tar",
  "tempfile",
  "tokio",
  "toml 0.9.12+spec-1.1.0",
@@ -4746,6 +4747,7 @@ dependencies = [
  "rust-embed",
  "serde",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]
@@ -8255,6 +8257,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "tar"
+version = "0.4.46"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f6221d9a6003c78398e3b239969f352578258df48c8eb051caadae0015bc840"
+dependencies = [
+ "filetime",
+ "libc",
+ "xattr",
+]
+
+[[package]]
 name = "tauri-winrt-notification"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10495,6 +10508,16 @@ dependencies = [
  "smallvec",
  "thiserror 2.0.20",
  "zip 8.6.0",
+]
+
+[[package]]
+name = "xattr"
+version = "1.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32e45ad4206f6d2479085147f02bc2ef834ac85886624a23575ae137c8aa8156"
+dependencies = [
+ "libc",
+ "rustix",
 ]
 
 [[package]]

@@ -6,12 +6,14 @@
 //! A child module of `instance_detail`, so it shares the view's private state.
 
 mod groups;
+mod java;
 mod saves;
 mod texts;
 
 #[cfg(test)]
 mod tests;
 
+pub(super) use self::java::JavaPick;
 use super::{InstanceDetailView, InstanceIntent};
 use crate::settings_dialog::{DialogSpec, SettingsDialog};
 use crate::theme::ShellColors;
@@ -133,7 +135,12 @@ impl InstanceDetailView {
     }
 
     /// The Settings tab: a second-level choice and that group's rows.
-    pub(super) fn settings_tab(&self, colors: ShellColors, cx: &mut Context<Self>) -> AnyElement {
+    pub(super) fn settings_tab(
+        &mut self,
+        window: &mut gpui::Window,
+        colors: ShellColors,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let sub = self.settings_sub.min(SUBTABS.len() - 1);
         let entity = cx.entity().downgrade();
         let segments = kit::segments(
@@ -150,7 +157,7 @@ impl InstanceDetailView {
         let body = match sub {
             0 => self.group_game(colors),
             1 => self.group_runtime(colors, cx),
-            2 => self.group_java(colors),
+            2 => self.group_java(window, colors, cx),
             3 => self.performance(colors, cx),
             _ => self.group_advanced(colors),
         };

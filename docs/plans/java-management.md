@@ -2,53 +2,59 @@
 
 # Java 管理改进
 
-Status: Proposed
+Status: InProgress
 
-按游戏版本选对 Java（含上限与同架构优先），多找几处已装的 Java，启动时自动补装缺少的 Java；实例 Java 改为下拉，全局页可删除自装 Java、按大版本下载；启动时冲突只弹一次确认。
+按游戏版本选对 Java（含上限与同架构优先），多找几处已装的 Java，启动时自动补装缺少的 Java；新增 Oracle GraalVM 下载来源；实例 Java 改为下拉，全局页可删除自装 Java、按大版本下载；启动时冲突只弹一次确认。代码已实现并通过窄测试，等待 Project Maintainer 的 just check 与实机检查；JVM 立即退出提示仍未做。
 
 ## Scope
 
 - In: 选择规则：LaunchWrapper / 旧版带 Mod 的 Java 8 上限，同架构优先
 - In: 补充发现路径：官方启动器 runtime 目录、PATH、更多厂商目录
 - In: 启动时自动下载缺少的 Java（开关，默认开）
+- In: 下载来源：Mojang（默认）与 Oracle GraalVM，直接从 Oracle 的 latest 地址下载并按 SHA-256 校验
 - In: 实例 Java 下拉：自动（推荐）/ 已发现的 Java / 自定义路径…
 - In: 全局 Java 页：删除启动器安装的 Java；下载弹窗按大版本选择
 - In: 启动时处理：强制不匹配单次确认、建议级问题进概览、JVM 立即退出提示
-- Out: foojay / 第三方发行版下载
+- Out: foojay 与其它第三方发行版（Temurin、Zulu、GraalVM Community 等）
 - Out: 压缩包拖入安装
 - Out: 运行 java 检测版本及其缓存
 - Out: Windows 注册表扫描
 - Out: 内存自动分配改版
+- Out: 旧版本在 ARM 主机上替换 arm64 natives
 
 ## Tasks
 
-- [ ] T1 — 选择规则：上限与同架构优先 (Proposed)
-  Acceptance: crates/lumilio-core/src/java.rs 的 choose 增加小规则表：≤1.12 且使用 LaunchWrapper（Forge 旧版等）或 1.7.10–1.16 带 Mod 时上限为 Java 8（前者强制、后者建议）；候选按宿主架构优先（OS_ARCH），非原生仅作后备。choose 返回所选 Java 及是否违反强制/建议规则，launcher/phases.rs 与 service/diagnostics.rs 使用同一结果。单元测试覆盖 1.12.2 Forge 只有 8/21、arm64 主机有 x64 与 arm64 的 21 等情况
-- [ ] T2 — 补充发现路径 (Proposed)
+- [x] T1 — 选择规则：上限与同架构优先 (Completed)
+  Acceptance: crates/lumilio-core/src/java/choice.rs 的 choose 使用小规则表：≤1.12 且使用 LaunchWrapper（Forge 旧版等）时上限为 Java 8（强制），1.7.10–1.16 的 Forge/NeoForge 建议 Java 8（以及 1.17→16、1.18–1.20.4→17、≥1.20.5→21）；候选按宿主架构优先（OS_ARCH），非原生仅作后备。choose 返回所选 Java 及违反的强制/建议规则，launcher/phases.rs、service/diagnostics.rs 与 diagnostics.rs 使用同一结果。单元测试覆盖 1.12.2 Forge 只有 8/21、arm64 主机有 x64 与 arm64 的 21 等情况
+- [x] T2 — 补充发现路径 (Completed)
   Acceptance: JavaLocator::standard 加入 ~/.minecraft/runtime、~/Library/Application Support/minecraft/runtime、Windows 官方启动器与 MS Store runtime 目录（<component>/<platform>/<component> 布局）、PATH 中 java 反查的 home，以及 BellSoft、Semeru、AdoptOpenJDK、Eclipse Foundation 厂商目录；仍只读 release 文件、按真实路径去重；有测试覆盖 runtime 布局与 PATH 反查
-- [ ] T3 — 启动时自动下载缺少的 Java (Proposed)
-  Acceptance: 全局 Java 页新增开关「启动时自动下载缺少的 Java」（默认开）。实例为自动模式且 choose 无可用结果时，启动流程调用 service.install_java(required)，动态显示「安装 Java N」，装好后继续启动；开关关闭时维持现有 NoJava 问题与「安装 Java」按钮
-- [ ] T4 — 实例 Java 下拉 (Proposed)
-  Acceptance: instance_detail/settings/groups.rs::group_java 的 Java 行改为下拉：自动（推荐）/ 每个已启用的 Java（如「Java 21 · Temurin · arm64」，非原生加「· x64 转译」）/ 自定义路径…；只有选自定义时出现路径输入（沿用 FieldKind::Path 与保存校验）。数据仍为 java_path（None = 自动）。副标题显示「将使用：Java 21（路径）」或「没有合适的 Java，启动时会自动下载 Java N」；IA 文档 docs/ia/paths/instance.settings.md 同步
-- [ ] T5 — 全局 Java 页：删除与按版本下载 (Proposed)
-  Acceptance: pages/settings/java.rs 列表行 ⋯ 菜单对 runtimes/ 下由启动器安装的 Java 增加「删除」（确认后删除目录并重新检测），外部 Java 只保留启用开关；「下载推荐的 Java」改为「下载 Java…」，弹窗只有一个大版本下拉（来自 Mojang 索引中本平台可用的版本，默认 21）和「下载」，进度仍在动态；docs/ia/paths/settings.md 同步
-- [ ] T6 — 启动时冲突与损坏提示 (Proposed)
-  Acceptance: 手动选的 Java 违反强制规则时只弹一个确认框：「这个版本需要 Java N，你选的是 Java M。」按钮「本次改用 Java N」（本机没有则为「下载并使用 Java N」）/「仍然启动」/「取消」；建议级问题（Mod 建议版本、非原生架构）不弹窗，进入实例概览问题区并带「切换」；JVM 启动后立即退出时失败提示附「这个 Java 可能损坏」与「在设置中停用」。Edwin 在 Mac 上实测这三条路径
+- [x] T3 — 启动时自动下载缺少的 Java (Completed)
+  Acceptance: 全局 Java 页新增开关「启动时自动下载 Java」（默认开）。没有可用的 Java 时，启动与安装流程请求服务层按规则下载需要的大版本（Java 8 上限优先于发布的最低版本），动态显示「安装 Java N」，装好后继续；开关关闭时维持 NoJava 问题与「安装 Java」按钮；概览中缺 Java 在开关开启时只是信息级「启动时会下载 Java」
+- [ ] T4 — 实例 Java 下拉 (InProgress)
+  Acceptance: instance_detail/settings/java.rs 的 Java 行为下拉：自动（推荐）/ 每个已启用的 Java（如「Java 21 · Temurin · aarch64」，非原生加「· 转译」）/ 自定义路径…；只有选自定义时出现路径行（沿用 FieldKind::Path 与保存校验）。数据仍为 java_path（None = 自动）。值下方显示「将使用 Java 21.0.x（路径）」或「没有合适的 Java，启动时会自动下载 Java N」；IA 文档 docs/ia/paths/instance.settings.md 同步。已实现，等待实机检查
+- [ ] T5 — 全局 Java 页：删除与按版本下载 (InProgress)
+  Acceptance: pages/settings/java.rs 列表行 ⋯ 菜单对 runtimes/ 下由启动器安装的 Java 增加「删除…」（确认后删除目录并重新检测），外部 Java 只保留启用开关；「下载推荐的 Java」改为「下载 Java…」，弹窗只有一个大版本下拉（来自所选下载来源，Mojang 读本平台的运行时索引，读不到时用 8/16/17/21/25，默认 21），进度仍在动态；docs/ia/paths/settings.md 同步。已实现，等待实机检查
+- [ ] T6 — 启动时冲突与损坏提示 (InProgress)
+  Acceptance: 手动选的 Java 违反强制规则时只弹一个确认框：「这个版本需要 Java N」，按钮「本次改用 Java N」（本机没有则为「下载并使用 Java N」）/「仍然启动」/「取消」，回答只影响这一次；建议级问题（Mod 建议版本）不弹窗，进入实例概览问题区并带「安装 Java」或「去调整」；JVM 启动后立即退出时失败提示附「这个 Java 可能损坏」与「在设置中停用」。前两项已实现；JVM 立即退出提示未做
+- [x] T7 — Oracle GraalVM 下载来源 (Completed)
+  Acceptance: 全局 Java 页有「下载来源」分段（Mojang / Oracle GraalVM），保存在设置的 java_source；GraalVM 从 https://download.oracle.com/graalvm/<major>/latest/ 下载本平台压缩包，先取同名 .sha256 并由传输引擎按 SHA-256 校验，解包（tar.gz / zip，拒绝越界路径与链接）到 runtimes/graalvm-<major> 后即被发现；只提供 21 与 25，所选来源没有需要的大版本时回落 Mojang；失败不留下半个运行时；服务层测试覆盖成功、校验失败与回落
 
 ## Validation
 
 - just check 通过，新增选择规则与发现路径单元测试
   Result: pending
-- Edwin 在 Mac 上实测：1.12.2 Forge 自动选 Java 8、缺 Java 自动下载、实例下拉与冲突确认框
+- 改动的 crate 单独测试：cargo nextest run -p lumilio-core / lumilio-ui / lumilio-app / lumilio-docgen，clippy -D warnings 与 fmt 只针对这三个 crate，plans-check
+  Result: 2026-10-12 本地全部通过（core 674、ui 405、app 15、docgen 26）；未运行完整 just check
+- Project Maintainer 在 Mac 上实测：1.12.2 Forge 自动选 Java 8、缺 Java 自动下载、GraalVM 21 下载并启动、实例下拉与冲突确认框
   Result: pending
 
 ## Decision D1
 
-仅用 Mojang 运行时，不接 foojay
+默认用 Mojang 运行时，另提供 Oracle GraalVM；不接 foojay
 
-Why: Mojang 已覆盖游戏所需的 8/16/17/21/25，且已有 BMCLAPI 镜像；foojay 国内无镜像
+Why: Mojang 已覆盖游戏所需的 8/16/17/21/25，且已有 BMCLAPI 镜像；Project Maintainer 需要 GraalVM。Oracle 为 21 与 25 提供稳定的 latest 地址和同名 .sha256（2026-10-12 验证：17 与 26 没有，Windows Arm 没有），不需要 foojay，而 foojay 国内无镜像
 
-Consequences: 下载弹窗只选大版本，不选发行版与包类型
+Consequences: 下载弹窗只选大版本；GraalVM 只有 21、25；以后加别的发行版是再写一个压缩包来源，不是新机制
 
 ## Decision D2
 
@@ -66,14 +72,61 @@ Why: 速度快、无需缓存；损坏在启动失败时提示
 
 Consequences: 损坏的 Java 可能出现在列表中，靠启动失败提示与停用开关处理
 
+## Decision D4
+
+下载来源是启动器级设置，手动下载与启动时自动下载共用
+
+Why: 选 GraalVM 的人希望自动补装的也是 GraalVM；在每次下载时再选一遍来源只多一步
+
+Consequences: 所选来源没有需要的大版本（如 Java 8）时回落 Mojang；动态里的任务写明来源，重试按原来源
+
+## Decision D5
+
+规则表改写自 HMCL 的 JavaVersionConstraint，只取强制规则与 Forge/NeoForge 建议版本
+
+Why: 强制规则（发布最低版本、≤1.12 的 LaunchWrapper、64 位 Linux 上 ≤1.12）违反必崩；Forge 建议版本违反常常仍能启动。上限低于发布最低版本的规则不适用，与 HMCL 相同
+
+Consequences: 未采用 Cleanroom、单个 Forge 构建（MODLAUNCHER_8）与 <1.6 强制 x86 规则；快照版本只看发布的最低版本
+
+## Decision D6
+
+架构只用于排序：原生优先、转译后备，不作为概览问题
+
+Why: 启动器不替换 natives，旧版本在 Apple 芯片上只有 x64 natives，转译的 Java 反而能运行；Mojang 在 arm64 Mac 与 Windows on Arm 上没有 Java 8，下载时回落 x64 运行时
+
+Consequences: 两种架构都有同一大版本时选原生；旧版本在 ARM 主机上的 natives 问题留在范围外
+
+## Decision D7
+
+启动中缺 Java 时由启动器经通道请求服务层下载，而不是失败后重跑整个启动
+
+Why: 下载是动态里的一项任务、可随启动取消；重跑会重复校验游戏文件并让 Home 先显示一次失败
+
+Consequences: Launcher 多一个可选的下载请求通道；安装与修复流程同样受益（Forge 安装器需要 Java）
+
+## Decision D8
+
+冲突确认的回答只影响这一次启动
+
+Why: 设置是人的选择，确认框不应悄悄改掉它；服务端用一次性标记让下次启动改用自动选择
+
+Consequences: 想长期改用自动需在实例设置里改；任何一次启动都会用掉这个标记
+
 ## References
 
-- [crates/lumilio-core/src/java.rs](../../crates/lumilio-core/src/java.rs)
+- [crates/lumilio-core/src/java/choice.rs](../../crates/lumilio-core/src/java/choice.rs)
+- [crates/lumilio-core/src/java/locator.rs](../../crates/lumilio-core/src/java/locator.rs)
 - [crates/lumilio-core/src/java_runtime.rs](../../crates/lumilio-core/src/java_runtime.rs)
+- [crates/lumilio-core/src/java_runtime/graalvm.rs](../../crates/lumilio-core/src/java_runtime/graalvm.rs)
+- [crates/lumilio-core/src/java_runtime/archive.rs](../../crates/lumilio-core/src/java_runtime/archive.rs)
 - [crates/lumilio-core/src/service/java.rs](../../crates/lumilio-core/src/service/java.rs)
 - [crates/lumilio-core/src/launcher/phases.rs](../../crates/lumilio-core/src/launcher/phases.rs)
-- [crates/lumilio-core/src/service/diagnostics.rs](../../crates/lumilio-core/src/service/diagnostics.rs)
+- [crates/lumilio-core/src/diagnostics.rs](../../crates/lumilio-core/src/diagnostics.rs)
 - [crates/lumilio-ui/src/pages/settings/java.rs](../../crates/lumilio-ui/src/pages/settings/java.rs)
-- [crates/lumilio-ui/src/instance_detail/settings/groups.rs](../../crates/lumilio-ui/src/instance_detail/settings/groups.rs)
-- [crates/lumilio-ui/src/instance_detail/panels/overview.rs](../../crates/lumilio-ui/src/instance_detail/panels/overview.rs)
-- https://github.com/HMCL-dev/HMCL
+- [crates/lumilio-ui/src/instance_detail/settings/java.rs](../../crates/lumilio-ui/src/instance_detail/settings/java.rs)
+- [crates/lumilio-ui/src/java_conflict.rs](../../crates/lumilio-ui/src/java_conflict.rs)
+- https://github.com/HMCL-dev/HMCL/blob/main/HMCLCore/src/main/java/org/jackhuang/hmcl/game/JavaVersionConstraint.java
+- https://github.com/HMCL-dev/HMCL/blob/main/HMCL/src/main/java/org/jackhuang/hmcl/java/JavaManager.java
+- https://www.oracle.com/downloads/licenses/graal-free-license.html
+
+- Lesson: Mojang 的运行时索引也列出 minecraft-java-exe 等非 Java 组件，按版本名解析会把它当成 Java 12/14。防护：java_runtime::is_runtime_component 只接受 java-runtime-* 与 jre-* 组件，java_runtime/tests.rs 的 Apple 芯片回落测试断言 offered_majors 不含它

@@ -1,19 +1,79 @@
 //! Java runtimes the launcher installs itself (`ADR 0014`).
 //!
-//! Mojang publishes the runtimes its own launcher uses as a public index:
-//! per platform, per component, a manifest naming every file with its size,
-//! SHA-1 and address. This module reads those documents; the service does the
-//! downloading.
+//! Two sources. Mojang publishes the runtimes its own launcher uses as a
+//! public index: per platform, per component, a manifest naming every file
+//! with its size, SHA-1 and address; this module reads those documents.
+//! Oracle GraalVM ships one archive per platform ([`graalvm`]), unpacked by
+//! [`archive`]. The service does the downloading.
+
+pub mod archive;
+pub mod graalvm;
 
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 use std::path::{Path, PathBuf};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::environment::{HostProfile, MachineArchitecture, PlatformFamily};
 use crate::modpack::is_safe_relative;
+
+/// Where the launcher downloads a Java from.
+#[derive(
+    Clone, Copy, Debug, Default, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum JavaSource {
+    /// The runtimes Mojang publishes for its own launcher.
+    #[default]
+    Mojang,
+    /// Oracle GraalVM, under the GraalVM Free Terms and Conditions.
+    OracleGraalVm,
+}
+
+impl JavaSource {
+    pub const ALL: [Self; 2] = [Self::Mojang, Self::OracleGraalVm];
+
+    /// The product name, the same in every language.
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Mojang => "Mojang",
+            Self::OracleGraalVm => "Oracle GraalVM",
+        }
+    }
+
+    /// The folder below `runtimes/` a download of `major` lands in, for
+    /// sources whose folder does not come from their index.
+    #[must_use]
+    pub fn folder_name(self, major: u32) -> Option<String> {
+        match self {
+            Self::Mojang => None,
+            Self::OracleGraalVm => Some(format!("graalvm-{major}")),
+        }
+    }
+}
+
+/// The source a download of `major` uses: the preferred one when it offers
+/// that major to this system, else Mojang, which has every major a game
+/// needs. Without a wanted major any source with something to offer fits.
+#[must_use]
+pub fn source_for(preferred: JavaSource, host: &HostProfile, major: Option<u32>) -> JavaSource {
+    let offered = match preferred {
+        JavaSource::Mojang => return JavaSource::Mojang,
+        JavaSource::OracleGraalVm => graalvm::offered_majors(host),
+    };
+    let fits = major.map_or(!offered.is_empty(), |major| offered.contains(&major));
+    if fits { preferred } else { JavaSource::Mojang }
+}
+
+/// Whether a manifest component holds a Java runtime: the index also lists
+/// helpers such as `minecraft-java-exe`.
+fn is_runtime_component(component: &str) -> bool {
+    (component.starts_with("java-runtime-") || component.starts_with("jre-"))
+        && !component.contains("snapshot")
+}
 
 /// Where the index of runtimes lives.
 pub const INDEX_URL: &str = "https://launchermeta.mojang.com/v1/products/java-runtime/2ec0cc96c44e5a76b9c8b7c39df7210883d12871/all.json";
@@ -80,6 +140,69 @@ pub fn platform_key(host: &HostProfile) -> Option<&'static str> {
     })
 }
 
+/// The index's names whose runtimes run here, native first. Apple silicon
+/// runs Intel runtimes under Rosetta 2 and Windows on Arm runs x64 ones
+/// under emulation; those only fill majors without a native build (Mojang
+/// has no Java 8 for either).
+#[must_use]
+pub fn platform_keys(host: &HostProfile) -> Vec<&'static str> {
+    use MachineArchitecture::Arm64;
+    let mut keys: Vec<_> = platform_key(host).into_iter().collect();
+    match (host.platform(), host.architecture()) {
+        (PlatformFamily::MacOs, Arm64) => keys.push("mac-os"),
+        (PlatformFamily::Windows, Arm64) => keys.push("windows-x64"),
+        _ => {}
+    }
+    keys
+}
+
+/// [`choose_component`] over every platform that runs here, native first.
+pub fn choose_for_host(
+    index: &str,
+    host: &HostProfile,
+    wanted: Option<u32>,
+) -> Result<RuntimeChoice, JavaRuntimeError> {
+    let keys = platform_keys(host);
+    if keys.is_empty() {
+        return Err(JavaRuntimeError::UnsupportedPlatform);
+    }
+    let mut last = JavaRuntimeError::UnsupportedPlatform;
+    for (position, platform) in keys.iter().enumerate() {
+        // Without a wanted major only the native default is offered.
+        if wanted.is_none() && position > 0 {
+            break;
+        }
+        match choose_component(index, platform, wanted) {
+            Ok(choice) => return Ok(choice),
+            Err(error @ JavaRuntimeError::Invalid(_)) => return Err(error),
+            Err(error) => last = error,
+        }
+    }
+    Err(match last {
+        JavaRuntimeError::UnsupportedPlatform => JavaRuntimeError::NoSuchRuntime(wanted),
+        other => other,
+    })
+}
+
+/// Every Java major the index offers to this system, ascending.
+pub fn offered_majors(index: &str, host: &HostProfile) -> Result<Vec<u32>, JavaRuntimeError> {
+    let all: BTreeMap<String, BTreeMap<String, Vec<RawEntry>>> = serde_json::from_str(index)
+        .map_err(|error| JavaRuntimeError::Invalid(error.to_string()))?;
+    let mut majors: Vec<u32> = platform_keys(host)
+        .into_iter()
+        .filter_map(|platform| all.get(platform))
+        .flat_map(|components| {
+            components
+                .iter()
+                .filter(|(component, _)| is_runtime_component(component))
+                .filter_map(|(_, entries)| major_of(&entries.first()?.version.name))
+        })
+        .collect();
+    majors.sort_unstable();
+    majors.dedup();
+    Ok(majors)
+}
+
 /// A file to download: where, how big, and its SHA-1.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 pub struct Download {
@@ -132,7 +255,7 @@ pub fn choose_component(
         .iter()
         .filter_map(|(component, entries)| {
             // Snapshot components are Mojang's own testing copies.
-            if component.contains("snapshot") {
+            if !is_runtime_component(component) {
                 return None;
             }
             let entry = entries.first()?;
