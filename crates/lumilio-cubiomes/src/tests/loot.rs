@@ -3,23 +3,86 @@
 use crate::{Version, ffi};
 use std::collections::BTreeMap;
 
-const PYRAMID_CHESTS: &[(&str, &str)] = &[(
-    "26.3",
-    include_str!("../../tests/golden/26.3-pyramid-chests.txt"),
-)];
+macro_rules! chest_golden {
+    ($version:literal) => {
+        (
+            $version,
+            include_str!(concat!(
+                "../../tests/golden/",
+                $version,
+                "-pyramid-chests.txt"
+            )),
+        )
+    };
+}
+/// Releases with loot data (1.21+, data-driven enchantments).
+const PYRAMID_CHESTS: &[(&str, &str)] = &[
+    chest_golden!("1.21.1"),
+    chest_golden!("1.21.3"),
+    chest_golden!("1.21.4"),
+    chest_golden!("1.21.5"),
+    chest_golden!("1.21.6"),
+    chest_golden!("1.21.7"),
+    chest_golden!("1.21.8"),
+    chest_golden!("1.21.9"),
+    chest_golden!("1.21.10"),
+    chest_golden!("1.21.11"),
+    chest_golden!("26.1"),
+    chest_golden!("26.1.1"),
+    chest_golden!("26.1.2"),
+    chest_golden!("26.2"),
+    chest_golden!("26.3"),
+];
 
-/// Rows `seed x y z apples`: the same chests, filled by the original server
-/// from their loot seeds (`save_golden.py --chests`).
-const PYRAMID_LOOT: &[(&str, &str)] = &[(
-    "26.3",
-    include_str!("../../tests/golden/26.3-pyramid-loot.txt"),
-)];
+/// Each loot release's goldens: (release, apples per filled chest, everything
+/// the filled chests hold, the chests' loot seeds). The chests were filled by
+/// the original server from their loot seeds (`save_golden.py --chests`).
+macro_rules! filled_golden {
+    ($version:literal) => {
+        (
+            $version,
+            include_str!(concat!(
+                "../../tests/golden/",
+                $version,
+                "-pyramid-loot.txt"
+            )),
+            include_str!(concat!(
+                "../../tests/golden/",
+                $version,
+                "-pyramid-items.txt"
+            )),
+            include_str!(concat!(
+                "../../tests/golden/",
+                $version,
+                "-pyramid-chests.txt"
+            )),
+        )
+    };
+}
+const FILLED: &[(&str, &str, &str, &str)] = &[
+    filled_golden!("1.21.1"),
+    filled_golden!("1.21.3"),
+    filled_golden!("1.21.4"),
+    filled_golden!("1.21.5"),
+    filled_golden!("1.21.6"),
+    filled_golden!("1.21.7"),
+    filled_golden!("1.21.8"),
+    filled_golden!("1.21.9"),
+    filled_golden!("1.21.10"),
+    filled_golden!("1.21.11"),
+    filled_golden!("26.1"),
+    filled_golden!("26.1.1"),
+    filled_golden!("26.1.2"),
+    filled_golden!("26.2"),
+    filled_golden!("26.3"),
+];
 
 #[test]
 fn desert_pyramid_chests_hold_the_apples_original_servers_fill_them_with() {
-    for &(name, rows) in PYRAMID_LOOT {
+    let mut apples = 0;
+    for &(name, rows, ..) in FILLED {
         let version = Version::from_name(name).unwrap();
-        let (mut chests, mut apples) = (0, 0);
+        let mut chests = 0;
         for line in rows.lines() {
             let f: Vec<i64> = line
                 .split_whitespace()
@@ -40,18 +103,10 @@ fn desert_pyramid_chests_hold_the_apples_original_servers_fill_them_with() {
             apples += want;
         }
         assert!(chests >= 32, "{name}: {chests} chests");
-        // Apples are rare; the sample must hold at least one.
-        assert!(apples >= 1, "{name}: no apple in {chests} chests");
     }
+    // Apples are rare (2 in 152 weight per roll); the sample must hold some.
+    assert!(apples >= 10, "{apples} apples in every filled chest");
 }
-
-/// Rows `seed x y z id total` and `seed x y z minecraft:enchanted_book:<id>
-/// level`: everything the filled chests hold.
-const PYRAMID_ITEMS: &[(&str, &str, &str)] = &[(
-    "26.3",
-    include_str!("../../tests/golden/26.3-pyramid-items.txt"),
-    include_str!("../../tests/golden/26.3-pyramid-chests.txt"),
-)];
 
 /// The other pools of the pyramid's table, whose items the simulated first
 /// pool cannot account for (1.21–26.3).
@@ -67,7 +122,7 @@ const OTHER_POOLS: [&str; 6] = [
 #[test]
 fn desert_pyramid_first_pools_match_what_original_servers_filled() {
     type Chest = (i64, i32, i32, i32);
-    for &(name, items, chests) in PYRAMID_ITEMS {
+    for &(name, _, items, chests) in FILLED {
         let version = Version::from_name(name).unwrap();
         let mut saved: BTreeMap<Chest, Vec<(String, i64)>> = BTreeMap::new();
         for line in items.lines() {
@@ -125,11 +180,14 @@ fn desert_pyramid_first_pools_match_what_original_servers_filled() {
     }
 }
 
+/// A pyramid (seed, start chunk) and its chests' columns and loot seeds.
+type Pyramids = BTreeMap<(i64, i32, i32), Vec<([i32; 2], i64)>>;
+
 #[test]
 fn desert_pyramid_chests_get_the_loot_seeds_original_servers_saved() {
     for &(name, rows) in PYRAMID_CHESTS {
         let version = Version::from_name(name).unwrap();
-        let mut pyramids: BTreeMap<(i64, i32, i32), Vec<([i32; 2], i64)>> = BTreeMap::new();
+        let mut pyramids = Pyramids::new();
         for line in rows.lines() {
             let f: Vec<i64> = line
                 .split_whitespace()

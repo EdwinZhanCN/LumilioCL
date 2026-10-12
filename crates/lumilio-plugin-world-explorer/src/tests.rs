@@ -257,7 +257,7 @@ fn vein_zones_cover_the_raw_ore_an_original_server_saved() {
             .into_iter()
             .flat_map(|object| match object.kind {
                 MapObjectKind::Heat { cell, values } => {
-                    assert_eq!(cell, 8.);
+                    assert_eq!(cell, 16.);
                     assert!(object.color.is_some() && !object.approximate);
                     values
                 }
@@ -274,8 +274,10 @@ fn vein_zones_cover_the_raw_ore_an_original_server_saved() {
         for &(x, z, _) in saved.iter().filter(|(.., i)| *i == iron) {
             let (x, z) = (f64::from(x), f64::from(z));
             assert!(
-                squares.iter().any(|(at, _)| (at.x..at.x + 8.).contains(&x)
-                    && (at.z..at.z + 8.).contains(&z)),
+                squares
+                    .iter()
+                    .any(|(at, _)| (at.x..at.x + 16.).contains(&x)
+                        && (at.z..at.z + 16.).contains(&z)),
                 "{overlay} misses {x} {z}"
             );
         }
@@ -415,7 +417,8 @@ fn decoration_and_nether_fossil_layers_need_their_tables() {
     let has_fossils = |version: &str| {
         offered(Dimension::Nether, version)
             .iter()
-            .any(|(id, estimated, _)| id == "structure.nether-fossil" && *estimated)
+            // Exact: the fork models the Nether's terrain the column needs.
+            .any(|(id, estimated, _)| id == "structure.nether-fossil" && !*estimated)
     };
     assert!(has_fossils("26.3") && has_fossils("1.18.2"));
     assert!(!has_fossils("1.16.5"));

@@ -14,6 +14,22 @@ macro_rules! ore_golden {
 const ORES: &[(&str, &str)] = &[
     ore_golden!("1.18.2"),
     ore_golden!("1.19.2"),
+    ore_golden!("1.19.4"),
+    ore_golden!("1.20.6"),
+    ore_golden!("1.21.1"),
+    ore_golden!("1.21.3"),
+    ore_golden!("1.21.4"),
+    ore_golden!("1.21.5"),
+    ore_golden!("1.21.6"),
+    ore_golden!("1.21.7"),
+    ore_golden!("1.21.8"),
+    ore_golden!("1.21.9"),
+    ore_golden!("1.21.10"),
+    ore_golden!("1.21.11"),
+    ore_golden!("26.1"),
+    ore_golden!("26.1.1"),
+    ore_golden!("26.1.2"),
+    ore_golden!("26.2"),
     ore_golden!("26.3"),
 ];
 

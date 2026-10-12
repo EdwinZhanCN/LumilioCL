@@ -5,6 +5,7 @@
 #include "finders.h"
 #include "generator.h"
 #include "loot.h"
+#include "terrain.h"
 #include "util.h"
 #include "veins.h"
 #include <math.h>
@@ -163,6 +164,9 @@ int lumilio_cubiomes_structures(int mc, uint64_t seed, int dim, int kind,
     Generator g;
     setupGenerator(&g, mc, 0);
     applySeed(&g, dim, seed);
+    // A nether fossil also needs ground above the lava sea in its column.
+    NetherTerrain nether;
+    int fossil = type == Nether_Fossil && initNetherTerrain(&nether, mc, seed);
     int size = sc.regionSize * 16;
     int rx0 = floor_div(x0, size), rx1 = floor_div(x1 - 1, size);
     int rz0 = floor_div(z0, size), rz1 = floor_div(z1 - 1, size);
@@ -175,6 +179,14 @@ int lumilio_cubiomes_structures(int mc, uint64_t seed, int dim, int kind,
             if (!getStructurePos(type, mc, seed, rx, rz, &p)) continue;
             if (p.x < x0 || p.x >= x1 || p.z < z0 || p.z >= z1) continue;
             if (!isViableStructurePos(type, &g, p.x, p.z, 0)) continue;
+            if (fossil)
+            {
+                uint64_t r = chunkGenerateRnd(seed, p.x >> 4, p.z >> 4);
+                nextInt(&r, 16);
+                nextInt(&r, 16);
+                int start = nextInt(&r, 125 - 32 + 1) + 32;
+                if (!getNetherFossilY(&nether, p.x, p.z, start)) continue;
+            }
             if (*count >= cap) return 3;
             out[*count * 2] = p.x;
             out[*count * 2 + 1] = p.z;
@@ -381,6 +393,21 @@ int lumilio_cubiomes_pyramid_chests(int mc, uint64_t seed, int x, int z,
         apples[i] = getPyramidEnchantedApples(loot, chest[i].lootSeed);
     }
     return n;
+}
+
+/* The height of the nether fossil whose column is (x, z) (a position the
+ * Nether_Fossil query returned): its start chunk's structure random draws the
+ * column, then the search start in 32..125. 0 when it fails, -1 before 1.18. */
+int lumilio_cubiomes_nether_fossil_y(int mc, uint64_t seed, int x, int z)
+{
+    NetherTerrain nt;
+    if (!initNetherTerrain(&nt, mc, seed)) return -1;
+    // The start chunk's structure random: the column, then the search start.
+    uint64_t r = chunkGenerateRnd(seed, x >> 4, z >> 4);
+    nextInt(&r, 16);
+    nextInt(&r, 16);
+    int start = nextInt(&r, 125 - 32 + 1) + 32;
+    return getNetherFossilY(&nt, x, z, start);
 }
 
 /* Mth.sin (0) or Mth.cos (1) of a release, for the oracle tests. */

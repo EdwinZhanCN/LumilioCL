@@ -304,8 +304,8 @@ fn estimated_flags_follow_the_height_dependent_kinds_since_1_18() {
             kind,
             Structure::DesertPyramid | Structure::JungleTemple | Structure::Mansion
         );
-        // Camps and nether fossils need terrain in every release they exist.
-        let terrain_bound = matches!(kind, Structure::AbandonedCamp | Structure::NetherFossil);
+        // Camps need terrain the fork does not model in every release.
+        let terrain_bound = kind == Structure::AbandonedCamp;
         assert_eq!(kind.estimated(old), terrain_bound, "{kind:?}");
         assert_eq!(
             kind.estimated(new),

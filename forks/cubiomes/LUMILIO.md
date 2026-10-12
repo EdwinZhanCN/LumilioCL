@@ -35,7 +35,14 @@ Omitted: `quadbase.*` (seed search and threads), `tests.c`, docs and build files
   14357921, spacing 2, separation 1); `getStructurePos` returns the fossil's
   column, which the start chunk's structure random picks; the biome check is
   soul sand valley at that column. Its height and whether it finds ground
-  depend on the Nether's terrain, so the adapter marks it estimated.
+  come from the Nether's noise terrain (`terrain.c` below).
+- `terrain.c` / `terrain.h` (LumilioCL, MIT): the 1.18+ Nether's final
+  density: the old blended noise (legacy octaves seeded from the world seed),
+  the floor and ceiling slides, 4×8×4 interpolation and squeeze. A nether
+  fossil walks down from its drawn start to the first air above solid ground
+  above the lava sea; all 54 fossils saved by original 1.18.2, 1.19.2 and 26.3
+  servers have exactly the predicted height, so the structure query drops the
+  columns that find no ground and the layer is exact.
 - `decorations.c` / `decorations.h` and the generated `tables/decorations.h`
   are LumilioCL additions under this directory's MIT license. They run a
   placed feature's placement modifiers as the 26.3 `FeaturePlacer` does

@@ -7,15 +7,18 @@ from WebP to PNG without other changes (80×80, RGBA). This replaces the earlier
 set, which was taken from the [Axolotl](https://github.com/Mystic-Stars/Axolotl)
 launcher.
 
-The set is the whole folder, including icons the map does not draw yet — ore
-veins, caves, dungeons, fossils, the sulfur spring and a few item markers.
-Which ones the map uses is the table in `crates/lumilio-ui/src/map_icons.rs`:
-the structures the seed layer computes (village, the temples, igloo, ruins,
-shipwreck, monument, mansion, outpost, ruined portal, ancient city, trail
-ruins, trial chambers, stronghold, nether fortress, bastion, End city, End
-gateway, abandoned camp, mineshaft, buried treasure, desert well, amethyst
-geode) plus the world-spawn and slime-chunk markers. An icon with no entry
-draws a plain dot; a file with no entry is simply unused.
+The set is the whole folder, including icons the map does not draw yet —
+dungeons, caves, the sulfur spring and the mega ravines. Which ones the map
+uses is the table in `crates/lumilio-ui/src/map_icons.rs`: the structures the
+seed layer computes (village, the temples, igloo with and without basement,
+ruins, shipwreck, monument, mansion, outpost, ruined portal and its Nether
+form, ancient city, trail ruins, trial chambers, stronghold, nether fortress,
+the four bastion remnants, nether fossil, End city, End gateway, abandoned
+camp, mineshaft, buried treasure, desert well, amethyst geode), the fossils,
+the lava lake (`underground_lava_lake.png`), the copper and iron veins, the
+ravines, the enchanted golden apple, plus the world-spawn and slime-chunk
+markers. An icon with no entry draws a plain dot; a file with no entry is
+simply unused.
 
 MinecraftSearch's About page says its block, mob and biome pictures come in
 large part from the Minecraft Wiki (CC BY-NC-SA 3.0) and that it intends to

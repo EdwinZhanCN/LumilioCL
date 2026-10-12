@@ -11,8 +11,9 @@ use lumilio_plugin_api::{HostContext, PluginError};
 
 pub(crate) const GROUP: &str = "map-group-underground";
 const SOURCE: &str = crate::ID;
-/// Zone squares, in blocks: a vein is tens of blocks across.
-const CELL: i32 = 8;
+/// Zone squares, in blocks: a vein is tens of blocks across, and the host
+/// draws at most a few thousand squares a frame.
+const CELL: i32 = 16;
 
 #[derive(Clone, Copy)]
 enum Kind {
@@ -37,7 +38,7 @@ const LAYERS: [Layer; 3] = [
         kind: Kind::Vein(Vein::Copper),
         icon: MapIcon::CopperVein,
         color: [222, 120, 70],
-        max_scale: 4,
+        max_scale: 2,
     },
     Layer {
         id: "underground.iron-vein",
@@ -45,7 +46,7 @@ const LAYERS: [Layer; 3] = [
         kind: Kind::Vein(Vein::Iron),
         icon: MapIcon::IronVein,
         color: [226, 196, 164],
-        max_scale: 4,
+        max_scale: 2,
     },
     Layer {
         id: "underground.ravine",
@@ -53,7 +54,8 @@ const LAYERS: [Layer; 3] = [
         kind: Kind::Ravines,
         icon: MapIcon::Ravine,
         color: [120, 96, 82],
-        max_scale: 8,
+        // One ravine per hundred chunks, each a line of about a hundred points.
+        max_scale: 4,
     },
 ];
 /// The colour of a ravine's walk under an ocean.

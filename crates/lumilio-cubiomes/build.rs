@@ -19,6 +19,7 @@ fn main() {
         "layers",
         "loot",
         "noise",
+        "terrain",
         "util",
         "veins",
     ] {

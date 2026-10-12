@@ -73,6 +73,8 @@ unsafe extern "C" {
     fn lumilio_cubiomes_trig(mc: i32, cos: i32, value: f32) -> f32;
     fn lumilio_cubiomes_pyramid_loot_available(mc: i32) -> i32;
     #[cfg(test)]
+    fn lumilio_cubiomes_nether_fossil_y(mc: i32, seed: u64, x: i32, z: i32) -> i32;
+    #[cfg(test)]
     fn lumilio_cubiomes_pyramid_items(
         mc: i32,
         seed: u64,
@@ -393,6 +395,15 @@ pub(super) fn pyramid_items(version: super::Version, loot_seed: i64) -> String {
     };
     out.truncate(n.max(0) as usize);
     String::from_utf8(out).unwrap_or_default()
+}
+
+/// The height of the nether fossil at column `at`: `Some(0)` when it fails,
+/// `None` before 1.18.
+#[cfg(test)]
+pub(super) fn nether_fossil_y(version: super::Version, seed: i64, at: [i32; 2]) -> Option<i32> {
+    // SAFETY: plain values in and out.
+    let y = unsafe { lumilio_cubiomes_nether_fossil_y(version.mc, seed as u64, at[0], at[1]) };
+    (y >= 0).then_some(y)
 }
 
 pub(super) fn pyramid_loot_available(mc: i32) -> bool {

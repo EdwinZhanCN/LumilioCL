@@ -149,10 +149,14 @@ fn start_variant(chunk: &Tag, structure: &str) -> Result<(i32, i32)> {
     Ok((kind, variant))
 }
 
+/// One stack of a chest: item id, count, and an enchanted book's stored
+/// enchantment and level.
+type Stack = (String, i64, Option<(String, i64)>);
+
 /// A chest's items from `/data get` output (SNBT): each stack's id and count,
 /// and an enchanted book's stored enchantment and level (1.21–1.21.4 nest
 /// them under `levels`).
-fn chest_items(text: &str) -> Vec<(String, i64, Option<(String, i64)>)> {
+fn chest_items(text: &str) -> Vec<Stack> {
     let mut stacks = vec![];
     let (mut depth, mut start) = (0, None);
     for (i, c) in text.char_indices() {

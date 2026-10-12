@@ -14,6 +14,22 @@ macro_rules! variant_golden {
 const VARIANTS: &[(&str, &str)] = &[
     variant_golden!("1.18.2"),
     variant_golden!("1.19.2"),
+    variant_golden!("1.19.4"),
+    variant_golden!("1.20.6"),
+    variant_golden!("1.21.1"),
+    variant_golden!("1.21.3"),
+    variant_golden!("1.21.4"),
+    variant_golden!("1.21.5"),
+    variant_golden!("1.21.6"),
+    variant_golden!("1.21.7"),
+    variant_golden!("1.21.8"),
+    variant_golden!("1.21.9"),
+    variant_golden!("1.21.10"),
+    variant_golden!("1.21.11"),
+    variant_golden!("26.1"),
+    variant_golden!("26.1.1"),
+    variant_golden!("26.1.2"),
+    variant_golden!("26.2"),
     variant_golden!("26.3"),
 ];
 
@@ -94,6 +110,22 @@ macro_rules! fossil_golden {
 const NETHER_FOSSILS: &[(&str, &str)] = &[
     fossil_golden!("1.18.2"),
     fossil_golden!("1.19.2"),
+    fossil_golden!("1.19.4"),
+    fossil_golden!("1.20.6"),
+    fossil_golden!("1.21.1"),
+    fossil_golden!("1.21.3"),
+    fossil_golden!("1.21.4"),
+    fossil_golden!("1.21.5"),
+    fossil_golden!("1.21.6"),
+    fossil_golden!("1.21.7"),
+    fossil_golden!("1.21.8"),
+    fossil_golden!("1.21.9"),
+    fossil_golden!("1.21.10"),
+    fossil_golden!("1.21.11"),
+    fossil_golden!("26.1"),
+    fossil_golden!("26.1.1"),
+    fossil_golden!("26.1.2"),
+    fossil_golden!("26.2"),
     fossil_golden!("26.3"),
 ];
 
@@ -107,7 +139,7 @@ fn nether_fossil_columns_match_the_fossils_original_servers_saved() {
                 .split_whitespace()
                 .map(|v| v.parse().unwrap())
                 .collect();
-            let [seed, x, z, _y] = fields.as_slice() else {
+            let [seed, x, z, y] = fields.as_slice() else {
                 panic!("invalid nether fossil row")
             };
             let at = [*x as i32, *z as i32];
@@ -121,6 +153,12 @@ fn nether_fossil_columns_match_the_fossils_original_servers_saved() {
             )
             .unwrap();
             assert!(found.contains(&at), "{name} {line}: {found:?}");
+            // The Nether's noise terrain gives the height the search stops at.
+            assert_eq!(
+                crate::ffi::nether_fossil_y(version, *seed, at),
+                Some(*y as i32),
+                "{name} {line}"
+            );
             count += 1;
         }
         assert!(count >= 6, "{name}: {count} saved fossils");

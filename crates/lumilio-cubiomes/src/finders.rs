@@ -37,8 +37,9 @@ pub enum Structure {
     Geode,
     /// One attempt per chunk in the End.
     EndGateway,
-    /// A start every two chunks, in soul sand valleys; 1.18+. Its column is
-    /// exact, whether it finds ground (and its height) depends on terrain.
+    /// A start every two chunks, in soul sand valleys; 1.18+. The query keeps
+    /// only fossils whose column has ground above the lava sea in the
+    /// Nether's noise terrain, which the fork models.
     NetherFossil,
 }
 
@@ -87,7 +88,7 @@ impl Structure {
     /// Region candidates are exact; generation and template offsets depend
     /// on terrain height, which cubiomes does not compute.
     pub fn estimated(self, version: Version) -> bool {
-        matches!(self, Structure::AbandonedCamp | Structure::NetherFossil)
+        self == Structure::AbandonedCamp
             || matches!(
                 self,
                 Structure::DesertPyramid | Structure::JungleTemple | Structure::Mansion
