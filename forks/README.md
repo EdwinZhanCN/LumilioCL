@@ -51,7 +51,8 @@ Schematic-Mesher (guards in `schematic-mesher/tests/`, run one with
 
 - Face culling (`mesher/face_culler.rs`): a full cube with see-through texture
   pixels hides no neighbouring face; leaves do not cull each other; copper
-  grates cull only the same block. Guard: `face_culling`.
+  grates cull only the same block; a model whose one full cube carries overlay
+  elements (the grass block) is as solid as a plain cube. Guard: `face_culling`.
 - Element rotation (`types/transform.rs`, `mesher/element.rs`): the 26.x Euler
   form `{x, y, z}` parses, both forms use Minecraft 26.3 `CuboidRotation`
   semantics, and normals turn with the element. Guard: `element_rotation`.
