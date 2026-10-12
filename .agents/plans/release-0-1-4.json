@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "id": "release-0-1-4",
+  "title": "准备发布 0.1.4",
+  "summary": "0.1.4 是补丁版本，汇总 v0.1.3 之后合入 main 的修复：投影（schematic）3D 预览的解析与显示修复，以及发布说明的固定小节模板和网站截图更新。功能分支（游戏设置预设、Java 管理、种子地图预测、发现页翻译）不进入本版本。",
+  "status": "in_progress",
+  "visibility": "internal",
+  "scope": {
+    "included": [
+      "投影 3D 预览修复（fix/schematic-renderer，PR 待开）。",
+      "PR #24：Release 工作流按 .github/release-template.md 生成固定小节的发布说明草稿。",
+      "PR #26：网站截图更新、路线图分节上限与首页动态预告。",
+      "版本号、计划与发布说明。"
+    ],
+    "excluded": [
+      "不新增功能或界面：游戏设置预设、Java 管理（PR #27）、种子地图预测和发现页翻译（PR #25，路线图 0.2.0）留待后续版本。",
+      "不改变签名与公证状态：macOS 仍为 ad hoc 签名，Windows 未签名。"
+    ]
+  },
+  "tasks": [
+    { "id": "R1", "title": "更新版本与计划", "status": "in_progress", "acceptance": "工作区版本为 0.1.4，Cargo.lock 同步，release-0-1-3 记录已发布状态，本计划与投影生成。" },
+    { "id": "R2", "title": "合入投影预览修复", "status": "proposed", "acceptance": "修复 PR 的 rust、plans 检查通过，与 main 无冲突后合入。" },
+    { "id": "R3", "title": "通过 PR 合入版本更新", "status": "proposed", "acceptance": "PR 列出发布内容，rust、plans 检查通过后合入 main。" },
+    { "id": "R4", "title": "打 v0.1.4 标签并生成三平台草稿安装包", "status": "proposed", "acceptance": "v0.1.4 标签指向合入后的提交；Release 工作流成功，草稿含三平台安装包与 SHA256SUMS.txt，发布说明为模板的固定小节。" },
+    { "id": "R5", "title": "整理发布说明并正式发布", "status": "proposed", "acceptance": "按模板填写摘要和小节、删除空小节与注释后，由 Project Maintainer 发布草稿。" }
+  ],
+  "validation": [
+    { "criterion": "发布候选的本地与 PR 检查通过。", "result": null },
+    { "criterion": "三平台草稿安装包生成，下载后的产物校验通过。", "result": null }
+  ],
+  "references": [
+    "https://github.com/EdwinZhanCN/LumilioCL/pull/24",
+    "https://github.com/EdwinZhanCN/LumilioCL/pull/26",
+    ".agents/plans/release-0-1-3.json",
+    ".github/release-template.md",
+    "assets/icons/PACKAGING.md"
+  ],
+  "dependencies": [],
+  "decisions": [
+    {
+      "id": "release-scope",
+      "decision": "0.1.4 只包含修复与工具改动，等投影预览修复合入后发布，不等待进行中的功能分支。",
+      "rationale": "补丁版本只交付修复；功能分支仍在实现或等待实机验收，发现页翻译按路线图属于 0.2.0。",
+      "consequences": "功能分支完成后进入后续 minor 版本；若投影修复短期内无法收尾，由 Project Maintainer 决定是否先发 0.1.4。"
+    }
+  ],
+  "lessonsLearned": []
+}
