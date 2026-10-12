@@ -30,8 +30,15 @@ pub struct Release {
 }
 
 impl Release {
+    /// The checkout comes from `CARGO_MANIFEST_DIR` at run time, which
+    /// `cargo xtask` sets: a binary another worktree built into a shared
+    /// `target/` would otherwise write into that worktree.
     pub fn detect() -> Result<Self> {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        let root = std::env::var_os("CARGO_MANIFEST_DIR")
+            .map_or_else(
+                || Path::new(env!("CARGO_MANIFEST_DIR")).into(),
+                PathBuf::from,
+            )
             .join("../..")
             .canonicalize()
             .map_err(|error| format!("cannot find the workspace root: {error}"))?;
