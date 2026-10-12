@@ -6,8 +6,17 @@ use std::process::ExitCode;
 
 use lumilio_docgen::{generate, scan, stale, validate, write};
 
+/// The checkout `cargo run` runs the tool in. Cargo also sets
+/// `CARGO_MANIFEST_DIR` at run time; the build-time value names the checkout
+/// that built the binary, which a shared `target/` can hold from another
+/// worktree, so its output would land there.
 fn root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
+    std::env::var_os("CARGO_MANIFEST_DIR")
+        .map_or_else(
+            || Path::new(env!("CARGO_MANIFEST_DIR")).into(),
+            PathBuf::from,
+        )
+        .join("../..")
 }
 
 fn main() -> ExitCode {
