@@ -574,25 +574,55 @@ fn parse_regions(root: &NbtCompound, schematic: &mut UniversalSchematic) -> Resu
                 size.get::<_, i32>("z")?,
             );
 
-            let mut region = Region::new(name.to_string(), position, size);
+            let mut region = Region::try_new(name.to_string(), position, size)?;
 
-            // Parse BlockStatePalette
+            // Parse BlockStatePalette. Block states refer to entries by index, so
+            // an entry that cannot be read becomes air rather than being dropped:
+            // dropping it shifted every later entry and drew the wrong blocks.
+            // (LumilioCL local change; see `forks/README.md`.)
             let palette = region_nbt.get::<_, &NbtList>("BlockStatePalette")?;
             region.palette = palette
                 .iter()
-                .filter_map(|tag| {
-                    if let NbtTag::Compound(compound) = tag {
-                        BlockState::from_nbt(compound).ok()
-                    } else {
-                        None
-                    }
+                .map(|tag| match tag {
+                    NbtTag::Compound(compound) => BlockState::from_nbt(compound).ok(),
+                    _ => None,
                 })
+                .map(|state| state.unwrap_or_else(|| BlockState::new("minecraft:air".to_string())))
                 .collect();
+            if region.palette.is_empty() {
+                region.palette.push(BlockState::new("minecraft:air".to_string()));
+            }
 
-            // Parse BlockStates
+            // Parse BlockStates. A truncated array would index past its end
+            // while unpacking; an index past the palette is drawn as air, as
+            // Litematica does.
             let block_states = region_nbt.get::<_, &[i64]>("BlockStates")?;
-            // region.unpack_block_states(block_states);
+            let bits = region.calculate_bits_per_block();
+            let needed_bits = region.volume() as u128 * bits as u128;
+            if (block_states.len() as u128) * 64 < needed_bits {
+                return Err(format!(
+                    "region {name}: BlockStates holds {} longs, {} needed",
+                    block_states.len(),
+                    needed_bits.div_ceil(64)
+                )
+                .into());
+            }
             region.blocks = region.unpack_block_states(block_states);
+            let palette_len = region.palette.len();
+            if region.blocks.iter().any(|&index| index >= palette_len) {
+                let air = match region.palette.iter().position(|s| s.name == "minecraft:air") {
+                    Some(air) => air,
+                    None => {
+                        region.palette.push(BlockState::new("minecraft:air".to_string()));
+                        palette_len
+                    }
+                };
+                for index in &mut region.blocks {
+                    if *index >= palette_len {
+                        *index = air;
+                    }
+                }
+            }
 
             // Rebuild caches after directly setting palette and blocks
             region.rebuild_palette_index();
@@ -1116,6 +1146,84 @@ mod tests {
         assert_eq!(items_len, 1);
     }
 
+    /// A one-region litematic of `size` with the given palette entries and
+    /// packed block states.
+    fn damaged_litematic(palette: Vec<NbtTag>, states: Vec<i64>, size: (i32, i32, i32)) -> Vec<u8> {
+        let mut list = NbtList::new();
+        for entry in palette {
+            list.push(entry);
+        }
+        let vec3 = |(x, y, z): (i32, i32, i32)| {
+            let mut c = NbtCompound::new();
+            c.insert("x", NbtTag::Int(x));
+            c.insert("y", NbtTag::Int(y));
+            c.insert("z", NbtTag::Int(z));
+            NbtTag::Compound(c)
+        };
+        let mut region = NbtCompound::new();
+        region.insert("Position", vec3((0, 0, 0)));
+        region.insert("Size", vec3(size));
+        region.insert("BlockStatePalette", NbtTag::List(list));
+        region.insert("BlockStates", NbtTag::LongArray(states));
+        let mut regions = NbtCompound::new();
+        regions.insert("r", NbtTag::Compound(region));
+        let mut root = NbtCompound::new();
+        root.insert("MinecraftDataVersion", NbtTag::Int(4189));
+        root.insert("Version", NbtTag::Int(7));
+        root.insert("Metadata", NbtTag::Compound(NbtCompound::new()));
+        root.insert("Regions", NbtTag::Compound(regions));
+        gzip_litematic(&root)
+    }
+
+    fn named(name: &str) -> NbtTag {
+        let mut c = NbtCompound::new();
+        c.insert("Name", NbtTag::String(name.to_string()));
+        NbtTag::Compound(c)
+    }
+
+    // LumilioCL local change (see forks/README.md): a palette entry that could
+    // not be read was dropped, which shifted every later entry (and could change
+    // the packed bit width), so the whole region drew the wrong blocks.
+    #[test]
+    fn an_unreadable_palette_entry_keeps_later_entries_in_place() {
+        // Four entries → 2 bits; cells hold palette indices 3, 2, 0.
+        let palette = vec![
+            named("minecraft:air"),
+            NbtTag::Compound(NbtCompound::new()),
+            named("minecraft:stone"),
+            named("minecraft:glass"),
+        ];
+        let bytes = damaged_litematic(palette, vec![0b00_10_11], (3, 1, 1));
+        let schem = from_litematic(&bytes).expect("parse");
+        let name = |x| schem.get_block(x, 0, 0).map(|b| b.name.to_string());
+        assert_eq!(name(0).as_deref(), Some("minecraft:glass"));
+        assert_eq!(name(1).as_deref(), Some("minecraft:stone"));
+        assert_eq!(name(2).as_deref(), Some("minecraft:air"));
+    }
+
+    // LumilioCL local change: an index past the palette panicked during
+    // meshing; like Litematica, it now reads as air.
+    #[test]
+    fn a_block_index_past_the_palette_reads_as_air() {
+        // Three entries → 2 bits; the second cell holds index 3.
+        let palette = vec![named("minecraft:air"), named("minecraft:stone"), named("minecraft:dirt")];
+        let bytes = damaged_litematic(palette, vec![0b11_01], (2, 1, 1));
+        let schem = from_litematic(&bytes).expect("parse");
+        assert_eq!(schem.get_block(0, 0, 0).map(|b| b.name.as_str()), Some("minecraft:stone"));
+        assert_eq!(schem.get_block(1, 0, 0).map(|b| b.name.as_str()), Some("minecraft:air"));
+    }
+
+    // LumilioCL local change: a BlockStates array shorter than the region read
+    // past its end and panicked; it is now a parse error.
+    #[test]
+    fn a_truncated_block_state_array_is_a_parse_error() {
+        // 40 cells × 3 bits = 120 bits need two longs; one is given.
+        let palette = (0..5).map(|i| named(&format!("minecraft:b{i}"))).collect();
+        let bytes = damaged_litematic(palette, vec![0], (40, 1, 1));
+        let error = from_litematic(&bytes).expect_err("truncated");
+        assert!(error.to_string().contains("BlockStates"), "{error}");
+    }
+
     // Litematica stores mobile entity Pos relative to the region Position/origin
     // corner, not the min corner used by the block array. For negative-size
     // regions those corners differ. Regression for sheep_test.litematic: a boat
@@ -1304,8 +1412,9 @@ mod tests {
         ]);
         region.insert("BlockStatePalette", NbtTag::List(palette));
 
-        // 2x2x2 region with 2 stone blocks and 6 air blocks
-        region.insert("BlockStates", NbtTag::LongArray(vec![0b10000001]));
+        // 2x2x2 region with 2 stone blocks and 6 air blocks (palette index 1 in
+        // cells 0 and 3; upstream wrote index 2, which is past the palette).
+        region.insert("BlockStates", NbtTag::LongArray(vec![0b01000001]));
 
         regions.insert("TestRegion", NbtTag::Compound(region));
         root.insert("Regions", NbtTag::Compound(regions));

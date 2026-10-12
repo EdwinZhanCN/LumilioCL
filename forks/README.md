@@ -103,6 +103,15 @@ upstream; its lib tests also write `simple_cube.litematic`,
   position bypasses orbit fitting, with a fixed near plane and reversed depth
   (ADR 0036). The existing RenderConfig continues to produce orbit cameras.
 - `UniversalSchematic::undrawable_blocks` (`src/meshing/mod.rs`).
+- Litematic regions (`src/formats/litematic.rs` `parse_regions`): an
+  unreadable palette entry becomes air instead of shifting later entries; a
+  block index past the palette reads as air, as in Litematica; a truncated
+  `BlockStates` array and impossible region bounds are parse errors, not
+  panics. Guards: `an_unreadable_palette_entry_keeps_later_entries_in_place`,
+  `a_block_index_past_the_palette_reads_as_air`,
+  `a_truncated_block_state_array_is_a_parse_error`. `test_parse_regions`
+  encoded a stone as palette index 2 of a two-entry palette; its data now uses
+  index 1.
 - Entity texture renames (`src/meshing/mod.rs` `with_mesher_texture_aliases`):
   renamed textures are aliased instead of copied, and every old flat
   `entity/<file>` the pack lacks answers for its one moved `entity/<folder>/<file>`
