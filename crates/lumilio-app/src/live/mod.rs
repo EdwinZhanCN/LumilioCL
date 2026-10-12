@@ -149,6 +149,7 @@ pub fn build(backend: Backend, window: &mut Window, cx: &mut App) -> Entity<Laun
     update::start(&wiring, cx);
     reload(&wiring, Reload::All, cx);
     apply_saved_preferences(&wiring, window.window_handle(), cx);
+    update::announce(&wiring, window.window_handle(), cx);
     open_requested_page(&wiring, &shell, window, cx);
     // What start-up recovery did is told once, in words; details are in stderr.
     if let Some(text) = lumilio_ui::live::recovery_message(wiring.backend.service.startup_notes()) {

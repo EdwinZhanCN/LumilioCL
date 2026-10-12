@@ -170,6 +170,12 @@ pub struct LauncherSettings {
     pub auto_update: bool,
     /// How the game starts, for every instance that does not override it.
     pub launch: LaunchTuning,
+    /// The launcher version whose release notes were last shown. New
+    /// settings start at the running version, so a fresh install shows
+    /// nothing; a file from before release notes has none, so the first
+    /// start after updating shows them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub release_notes_seen: Option<String>,
 }
 
 fn auto_update_default() -> bool {
@@ -202,6 +208,7 @@ impl Default for LauncherSettings {
             auto_install_java: true,
             auto_update: true,
             launch: LaunchTuning::default(),
+            release_notes_seen: Some(env!("CARGO_PKG_VERSION").to_owned()),
         }
     }
 }
@@ -374,6 +381,15 @@ impl SettingsStore {
     pub fn set_auto_update(&mut self, enabled: bool) -> Result<(), SettingsError> {
         let mut next = self.settings.clone();
         next.auto_update = enabled;
+        self.save(next)
+    }
+
+    pub fn set_release_notes_seen(&mut self, version: &str) -> Result<(), SettingsError> {
+        if self.settings.release_notes_seen.as_deref() == Some(version) {
+            return Ok(());
+        }
+        let mut next = self.settings.clone();
+        next.release_notes_seen = Some(version.to_owned());
         self.save(next)
     }
 

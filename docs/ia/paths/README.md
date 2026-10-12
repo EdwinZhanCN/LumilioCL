@@ -7,12 +7,12 @@
 |---|---|
 | [插件 · 世界地图](plugin.world-explorer.md) | 34 |
 | [全局导航](navigation.md) | 9 |
-| [首页](home.md) | 12 |
+| [首页](home.md) | 13 |
 | [游戏库](library.md) | 30 |
 | [发现](discover.md) | 23 |
 | [动态](activity.md) | 8 |
 | [账户](accounts.md) | 26 |
-| [设置](settings.md) | 55 |
+| [设置](settings.md) | 56 |
 | [游戏页（整体）](instance.md) | 21 |
 | [游戏页 · 概览](instance.overview.md) | 4 |
 | [游戏页 · 内容](instance.content.md) | 16 |

@@ -1424,6 +1424,9 @@ settings-update-check-help = 启动时和每小时检查正式版。
 settings-update-check-now = 现在检查
 settings-auto-update = 自动更新
 settings-auto-update-help = 在后台下载更新。关闭后只保留手动检查。
+settings-release-notes = 更新内容
+settings-release-notes-help = 这个版本的新功能、改进和修复。
+settings-release-notes-open = 查看
 settings-update-not-checked = 尚未检查
 settings-update-checking = 正在检查更新…
 settings-update-downloading = 正在下载 { $version }…
@@ -1885,3 +1888,9 @@ preset-setting-key-hotbar-6 = 快捷栏 6
 preset-setting-key-hotbar-7 = 快捷栏 7
 preset-setting-key-hotbar-8 = 快捷栏 8
 preset-setting-key-hotbar-9 = 快捷栏 9
+
+## 更新内容
+release-notes-updated = 已更新到 LumilioCL { $version }
+release-notes-title = LumilioCL { $version } 更新内容
+release-notes-all = 全部更新日志
+release-notes-done = 知道了

@@ -1569,6 +1569,9 @@ settings-update-check-help = Stable releases are checked at startup and every ho
 settings-update-check-now = Check now
 settings-auto-update = Automatic updates
 settings-auto-update-help = Downloads updates in the background. Turn this off to check manually.
+settings-release-notes = What's new
+settings-release-notes-help = New features, improvements and fixes in this version.
+settings-release-notes-open = View
 settings-update-not-checked = Not checked yet
 settings-update-checking = Checking for updates…
 settings-update-downloading = Downloading { $version }…
@@ -2096,3 +2099,9 @@ preset-setting-key-hotbar-6 = Hotbar 6
 preset-setting-key-hotbar-7 = Hotbar 7
 preset-setting-key-hotbar-8 = Hotbar 8
 preset-setting-key-hotbar-9 = Hotbar 9
+
+## Release notes
+release-notes-updated = Updated to LumilioCL { $version }
+release-notes-title = What's new in LumilioCL { $version }
+release-notes-all = All release notes
+release-notes-done = Got it

@@ -71,6 +71,20 @@ fn settings_files_from_before_custom_ids_and_current_instance_still_load() {
 }
 
 #[test]
+fn a_new_install_has_seen_its_own_notes_and_an_older_file_has_seen_none() {
+    let (dir, store) = store();
+    let running = env!("CARGO_PKG_VERSION");
+    assert_eq!(store.get().release_notes_seen.as_deref(), Some(running));
+
+    std::fs::write(dir.path().join(FILE), r#"{"schema":1}"#).unwrap();
+    let mut older = SettingsStore::open(dir.path()).unwrap();
+    assert_eq!(older.get().release_notes_seen, None);
+    older.set_release_notes_seen("9.9.9").unwrap();
+    let reopened = SettingsStore::open(dir.path()).unwrap();
+    assert_eq!(reopened.get().release_notes_seen.as_deref(), Some("9.9.9"));
+}
+
+#[test]
 fn automatic_update_preference_defaults_on_and_persists() {
     let (dir, mut store) = store();
     assert!(store.get().auto_update);

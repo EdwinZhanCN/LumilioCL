@@ -7,6 +7,7 @@
 | 操作 | 层 / 组件 | 结果与反馈 | 备注 | 实现 |
 |---|---|---|---|---|
 | 版本 | 关于 · 值 | 显示 LumilioCL 版本号 |  | `lumilio-ui/src/pages/settings/about.rs` |
+| 更新内容 | 关于 · 按键 | 打开这个版本的更新内容弹窗（新功能、改进、修复）；没有这个版本的说明时不显示按键 |  | `lumilio-ui/src/pages/settings/about.rs` |
 | 手动检查更新 | 关于 · 按键 | 检查正式版并显示进度、结果或失败原因 |  | `lumilio-ui/src/pages/settings/about.rs` |
 | 自动更新 | 关于 · 开关 | 开启时启动后与每小时静默检查并下载；关闭后只保留手动检查 |  | `lumilio-ui/src/pages/settings/about.rs` |
 | 启动器日志 | 关于 · 按键 | 在访达中显示日志目录 |  | `lumilio-ui/src/pages/settings/about.rs` |

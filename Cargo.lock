@@ -4745,6 +4745,7 @@ dependencies = [
  "lumilio-skin-render",
  "raw-window-handle",
  "rust-embed",
+ "semver",
  "serde",
  "serde_json",
  "tempfile",
