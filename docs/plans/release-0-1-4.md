@@ -4,29 +4,34 @@
 
 Status: InProgress
 
-0.1.4 是补丁版本，汇总 v0.1.3 之后合入 main 的修复：投影（schematic）3D 预览的解析与显示修复，以及发布说明的固定小节模板和网站截图更新。功能分支（游戏设置预设、Java 管理、种子地图预测、发现页翻译）不进入本版本。
+0.1.4 汇总 v0.1.3 之后合入 main 的全部改动：游戏设置预设与游戏外编辑选项、Java 管理（按规则选择、启动时自动下载、Oracle GraalVM 来源）、种子地图新增可预测内容、投影 3D 预览的解析与显示修正、更新后显示更新内容、整合包安装指定版本，以及发布说明与生成工具的改进。从这个版本起，发布说明写在 release-notes/<version>.md，启动器更新后第一次打开时显示。
 
 ## Scope
 
+- In: PR #30：游戏设置预设与游戏外编辑选项。
+- In: PR #27：Java 管理改进与 Oracle GraalVM 下载来源。
+- In: PR #29：种子地图的结构变体、矿脉、峡谷、下界化石与沙漠神殿附魔金苹果，支持到 26.3。
 - In: PR #28：投影 3D 预览对照 Minecraft 26.3 修正朝向与双箱、uvlock、26.x 贴图路径、着色、阴影、水面和解析健壮性，并加快资源加载。
-- In: PR #24：Release 工作流按 .github/release-template.md 生成固定小节的发布说明草稿。
-- In: PR #26：网站截图更新、路线图分节上限与首页动态预告。
-- In: 版本号、计划与发布说明。
-- Out: 不新增功能或界面：游戏设置预设、Java 管理（PR #27）、种子地图预测和发现页翻译（PR #25，路线图 0.2.0）留待后续版本。
+- In: PR #32：更新后显示更新内容（release-notes/），整合包可以安装指定版本。
+- In: PR #24、#26、#31：发布说明固定小节、网站截图与路线图、docgen 按运行时的仓库定位。
+- In: 版本号、计划与 release-notes/0.1.4.md。
+- Out: 发现页翻译（PR #25）仍未合入，按路线图属于 0.2.0。
 - Out: 不改变签名与公证状态：macOS 仍为 ad hoc 签名，Windows 未签名。
 
 ## Tasks
 
-- [ ] R1 — 更新版本与计划 (InProgress)
-  Acceptance: 工作区版本为 0.1.4，Cargo.lock 同步，release-0-1-3 记录已发布状态，本计划与投影生成。
-- [ ] R2 — 合入投影预览修复 (InProgress)
-  Acceptance: PR #28 的 rust、plans 检查通过，与 main 无冲突后合入；启动器内目视检查留在 schematic-render-parity T9。
-- [ ] R3 — 通过 PR 合入版本更新 (Proposed)
-  Acceptance: PR 列出发布内容，rust、plans 检查通过后合入 main。
+- [x] R1 — 更新版本、计划与发布说明 (Completed)
+  Acceptance: 工作区版本为 0.1.4，Cargo.lock 同步，release-0-1-3 记录已发布状态，release-notes/0.1.4.md 与 .en.md 写好，本计划与投影生成。
+- [x] R2 — 合入投影预览修复 (Completed)
+  Acceptance: PR #28 的 rust、plans 检查通过后合入；启动器内目视检查留在 schematic-render-parity T9。
+- [ ] R3 — 通过 PR 合入版本更新 (InProgress)
+  Acceptance: PR 列出发布内容，rust、plans 检查通过后合入 main，合入后 main 的 CI 通过。
 - [ ] R4 — 打 v0.1.4 标签并生成三平台草稿安装包 (Proposed)
-  Acceptance: v0.1.4 标签指向合入后的提交；Release 工作流成功，草稿含三平台安装包与 SHA256SUMS.txt，发布说明为模板的固定小节。
-- [ ] R5 — 整理发布说明并正式发布 (Proposed)
-  Acceptance: 按模板填写摘要和小节、删除空小节与注释后，由 Project Maintainer 发布草稿。
+  Acceptance: v0.1.4 标签指向合入后的提交；Release 工作流成功，草稿含三平台安装包与 SHA256SUMS.txt，正文为 release-notes/0.1.4.md 加安装包小节。
+- [ ] R5 — 补全发布说明并正式发布 (Proposed)
+  Acceptance: Project Maintainer 补上正文末行的 PR 编号后发布草稿。
+- [ ] R6 — 从 0.1.3 更新后显示 0.1.4 的更新内容 (Proposed)
+  Acceptance: Project Maintainer 从 0.1.3 自动更新到 0.1.4，重启后第一次打开弹出「已更新到 LumilioCL 0.1.4」，关闭后再次打开不再弹出。
 
 ## Validation
 
@@ -34,21 +39,32 @@ Status: InProgress
   Result: pending
 - 三平台草稿安装包生成，下载后的产物校验通过。
   Result: pending
+- 0.1.3 → 0.1.4 更新后显示一次更新内容。
+  Result: pending
 
 ## Decision release-scope
 
-0.1.4 只包含修复与工具改动，等投影预览修复合入后发布，不等待进行中的功能分支。
+0.1.4 包含发布时 main 上的全部改动，包括游戏设置预设、Java 管理和种子地图预测，版本号仍为 0.1.4。
 
-Why: 补丁版本只交付修复；功能分支仍在实现或等待实机验收，发现页翻译按路线图属于 0.2.0。
+Why: Project Maintainer 已在启动器里验收这些改动，并决定把 main 上的所有更新放进 0.1.4 发布，取代此前只发修复的范围。
 
-Consequences: 功能分支完成后进入后续 minor 版本；若投影修复短期内无法收尾，由 Project Maintainer 决定是否先发 0.1.4。
+Consequences: 这些功能各自的计划里仍未关闭的实机验收照常进行；发现页翻译仍按路线图进入 0.2.0。
 
 ## References
 
-- https://github.com/EdwinZhanCN/LumilioCL/pull/28
 - https://github.com/EdwinZhanCN/LumilioCL/pull/24
 - https://github.com/EdwinZhanCN/LumilioCL/pull/26
+- https://github.com/EdwinZhanCN/LumilioCL/pull/27
+- https://github.com/EdwinZhanCN/LumilioCL/pull/28
+- https://github.com/EdwinZhanCN/LumilioCL/pull/29
+- https://github.com/EdwinZhanCN/LumilioCL/pull/30
+- https://github.com/EdwinZhanCN/LumilioCL/pull/31
+- https://github.com/EdwinZhanCN/LumilioCL/pull/32
 - [.agents/plans/release-0-1-3.json](../../.agents/plans/release-0-1-3.json)
+- [.agents/plans/java-management.json](../../.agents/plans/java-management.json)
+- [.agents/plans/game-settings-presets.json](../../.agents/plans/game-settings-presets.json)
+- [.agents/plans/seed-map-prediction.json](../../.agents/plans/seed-map-prediction.json)
 - [.agents/plans/schematic-render-parity.json](../../.agents/plans/schematic-render-parity.json)
+- release-notes/0.1.4.md
 - .github/release-template.md
 - [assets/icons/PACKAGING.md](../../assets/icons/PACKAGING.md)
