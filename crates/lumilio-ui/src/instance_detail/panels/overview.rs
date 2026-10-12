@@ -43,9 +43,6 @@ pub fn recent_changes(read: &HistoryRead, count: usize) -> Vec<(u64, ChangeKind,
         .collect()
 }
 
-/// The Java group of the game's settings (see `instance_settings::SUBTABS`).
-const JAVA_SETTINGS: usize = 2;
-
 /// What a problem's button does.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ProblemAction {
@@ -82,7 +79,7 @@ pub fn problem_action(kind: &ProblemKind) -> Option<(ProblemAction, &'static str
             chosen_by_user: true,
             ..
         } => (
-            ProblemAction::Settings(JAVA_SETTINGS),
+            ProblemAction::Settings(super::super::SETTINGS_JAVA),
             tr!("instance-action-go-adjust"),
         ),
         ProblemKind::JavaAdvice { advised, .. } => (
@@ -94,9 +91,10 @@ pub fn problem_action(kind: &ProblemKind) -> Option<(ProblemAction, &'static str
         ProblemKind::WrongLoaderMods { .. } | ProblemKind::DuplicateMods { .. } => {
             (ProblemAction::Content, tr!("instance-action-go-content"))
         }
-        ProblemKind::LowMemory { .. } => {
-            (ProblemAction::Settings(3), tr!("instance-action-go-adjust"))
-        }
+        ProblemKind::LowMemory { .. } => (
+            ProblemAction::Settings(super::super::SETTINGS_PERFORMANCE),
+            tr!("instance-action-go-adjust"),
+        ),
         ProblemKind::LastSessionFailed(_) | ProblemKind::Finding(_) => {
             (ProblemAction::Logs, tr!("instance-view-logs"))
         }

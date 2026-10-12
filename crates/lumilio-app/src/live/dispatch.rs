@@ -135,6 +135,7 @@ pub(super) fn on_live_intent(
 ) {
     match intent {
         LiveIntent::NewInstance => open_new_game(wiring, window, cx),
+        LiveIntent::Preset(intent) => super::game_settings::preset(wiring, intent, window, cx),
         LiveIntent::ImportPack => import_pack(wiring, cx),
         LiveIntent::OpenInstance(id) => open_instance(wiring, id, None, window, cx),
         LiveIntent::SaveVersionAs {

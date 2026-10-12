@@ -2,8 +2,8 @@ use super::super::Section;
 use super::CONTENT_KINDS;
 use crate::tr;
 use lumilio_core::{
-    ContentList, FileEntry, GameLogs, HistoryRead, InstanceJava, Problem, ProjectKind,
-    ScreenshotInfo, ServerEntry, ServerStatus, SnapshotInfo, WorldInfo,
+    ContentList, FileEntry, GameLogs, HistoryRead, InstanceJava, InstanceOptions, Problem,
+    ProjectKind, ScreenshotInfo, ServerEntry, ServerStatus, SnapshotInfo, WorldInfo,
 };
 
 pub type Loaded<T> = Option<Result<T, String>>;
@@ -23,6 +23,7 @@ pub struct Data {
     /// The folder shown in 文件 (relative to the game directory) and its entries.
     pub files: Loaded<(String, Vec<FileEntry>)>,
     pub size: Loaded<u64>,
+    pub game_options: Loaded<InstanceOptions>,
     /// The Java the next launch uses and the ones it could.
     pub java: Loaded<InstanceJava>,
     pub pending: Vec<Section>,
@@ -40,6 +41,7 @@ pub enum Arrived {
     Logs(Result<GameLogs, String>),
     Files(String, Result<Vec<FileEntry>, String>),
     Size(Result<u64, String>),
+    GameOptions(Result<Box<InstanceOptions>, String>),
     Java(Result<Box<InstanceJava>, String>),
 }
 
@@ -56,6 +58,7 @@ impl Arrived {
             Self::Logs(_) => Section::Logs,
             Self::Files(..) => Section::Files,
             Self::Size(_) => Section::Size,
+            Self::GameOptions(_) => Section::GameOptions,
             Self::Java(_) => Section::Java,
         }
     }
@@ -78,6 +81,9 @@ impl Data {
             Arrived::Problems(result) => self.problems = Some(result),
             Arrived::Logs(result) => self.logs = Some(result),
             Arrived::Size(result) => self.size = Some(result),
+            Arrived::GameOptions(result) => {
+                self.game_options = Some(result.map(|options| *options))
+            }
             Arrived::Java(result) => self.java = Some(result.map(|java| *java)),
             Arrived::Files(folder, result) => {
                 self.files = Some(result.map(|entries| (folder, entries)));
@@ -100,6 +106,7 @@ impl Data {
             Section::Logs => self.logs.is_some(),
             Section::Files => self.files.is_some(),
             Section::Size => self.size.is_some(),
+            Section::GameOptions => self.game_options.is_some(),
             Section::Java => self.java.is_some(),
         }
     }

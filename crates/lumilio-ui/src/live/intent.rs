@@ -9,6 +9,8 @@ use std::rc::Rc;
 /// What a live page asks the application to do.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum LiveIntent {
+    /// Something on the Library's preset page.
+    Preset(crate::game_settings::PresetIntent),
     /// Create an instance with the newest release.
     NewInstance,
     /// Choose a local `.mrpack` and import it as a new instance.

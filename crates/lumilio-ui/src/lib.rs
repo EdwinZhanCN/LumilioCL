@@ -12,6 +12,7 @@ pub mod export_form;
 #[cfg(test)]
 pub mod backdrop;
 pub mod game_picker;
+pub mod game_settings;
 pub mod hero;
 pub mod history;
 pub mod home;

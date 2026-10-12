@@ -17,6 +17,11 @@ impl LauncherShell {
         {
             controls.update(cx, |controls, cx| controls.relabel(window, cx));
         }
+        if let Some(controls) = &self.live_controls {
+            // The Library's search box says what the open tab searches.
+            let presets = self.view.library_tab == crate::pages::live::PRESETS_TAB;
+            controls.update(cx, |controls, cx| controls.search_for(presets, window, cx));
+        }
         if self.live.is_some() && self.live_controls.is_none() {
             let controls = cx.new(|cx| LiveControls::new(window, cx));
             let (search, filter) = {

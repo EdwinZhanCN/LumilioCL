@@ -19,7 +19,7 @@ use crate::persist::{self, PersistError, Versioned};
 use crate::tuning::InstanceLaunch;
 
 /// Stored as SQLite's `user_version`; bump with a migration when tables change.
-const SCHEMA_VERSION: u32 = 4;
+const SCHEMA_VERSION: u32 = 6;
 
 /// SQLite integers are signed; timestamps and counters never get near the limit.
 fn int<T: TryInto<i64>>(value: T) -> i64 {
@@ -296,6 +296,17 @@ impl InstanceStore {
                 tuning TEXT,
                 source_project TEXT
             );
+            CREATE TABLE IF NOT EXISTS game_settings_presets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                revision INTEGER NOT NULL DEFAULT 1,
+                settings TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS game_settings_bindings (
+                instance TEXT PRIMARY KEY NOT NULL,
+                preset INTEGER NOT NULL,
+                state TEXT NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS collections (
                 position INTEGER NOT NULL,
                 name TEXT PRIMARY KEY NOT NULL
@@ -331,6 +342,11 @@ impl InstanceStore {
                 linked_raw_id TEXT
             );",
         )?;
+        // Schema 5's initial preset payload contained only values. Schema 6
+        // retains those values when a field is excluded from sharing.
+        if version == 5 {
+            db.execute_batch("UPDATE game_settings_presets SET settings = json_object('values', json(settings), 'excluded', json('[]'));")?;
+        }
         // Schema 1 had no `tuning` column. Keep the old file beside the new
         // one before the first change, then add the column.
         let has_tuning = db
@@ -470,6 +486,10 @@ impl InstanceStore {
     #[must_use]
     pub fn root(&self) -> &Path {
         self.layout.root()
+    }
+
+    pub(crate) fn settings_database(&self) -> &Connection {
+        &self.db
     }
 
     #[must_use]
@@ -888,6 +908,10 @@ impl InstanceStore {
         )?;
         transaction.execute(
             "DELETE FROM world_map_annotations WHERE instance NOT IN (SELECT id FROM instances)",
+            [],
+        )?;
+        transaction.execute(
+            "DELETE FROM game_settings_bindings WHERE instance NOT IN (SELECT id FROM instances)",
             [],
         )?;
         transaction.pragma_update(None, "user_version", SCHEMA_VERSION)?;

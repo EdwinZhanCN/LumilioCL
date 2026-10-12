@@ -19,6 +19,7 @@ mod environment;
 mod fetch;
 mod forge_install;
 mod forge_meta;
+mod game_settings;
 mod history;
 mod import_game;
 mod injector;
@@ -103,6 +104,11 @@ pub use environment::{
 };
 pub use fetch::{DOCUMENT_LIMIT, FetchError, fetch_document, post_document};
 pub use forge_meta::{forge_versions, neoforge_game_version, neoforge_versions};
+pub use game_settings::{
+    GameSettingGroup, GameSettingKind, GameSettingValue, GameSettingsError, GameSettingsView,
+    InstanceOptions, OptionChange, OptionsFile, SettingChange, SettingResolution, SettingsPreset,
+    game_setting_group, game_setting_kind,
+};
 pub use history::{
     ChangeKind, HistoryEvent, HistoryLog, HistoryRead, SessionOutcome, finish_session,
     record_attempt,

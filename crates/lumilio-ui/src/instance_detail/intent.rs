@@ -14,12 +14,34 @@ pub enum Section {
     Logs,
     Files,
     Size,
+    /// The game's own options and how they relate to a preset.
+    GameOptions,
     Java,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum InstanceIntent {
     Play,
+    /// Open the dialog that chooses the preset this game follows.
+    ChoosePreset,
+    /// Open the editor of one of the game's options.
+    EditOption(String),
+    /// Change one option at once (a switch). `expected` is the state the
+    /// page showed, so a newer one is not overwritten.
+    SetOption {
+        expected: lumilio_core::GameSettingsView,
+        key: String,
+        change: lumilio_core::OptionChange,
+    },
+    /// Decide what happens to option changes made in the game.
+    ResolveOptions {
+        expected: lumilio_core::GameSettingsView,
+        selected: Vec<String>,
+        resolution: lumilio_core::SettingResolution,
+    },
+    /// The player says the game has closed after an interrupted session:
+    /// compare its options now.
+    RecoverOptions,
     Rename(String),
     SaveMemory(InstanceSettings),
     /// Save every instance setting after one dialog changed its part.

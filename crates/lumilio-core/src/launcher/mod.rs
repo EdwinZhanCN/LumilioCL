@@ -33,6 +33,7 @@ pub struct Launcher<T> {
     sources: SourceChain,
     concurrency: usize,
     spawned: Option<mpsc::UnboundedSender<()>>,
+    before_start: Option<mpsc::UnboundedSender<tokio::sync::oneshot::Sender<Result<(), String>>>>,
     /// Where to ask for a Java when none installed fits; `None` fails instead.
     java_installer: Option<mpsc::UnboundedSender<JavaRequest>>,
     /// Java downloaded during this launch, beside the request's runtimes.
@@ -51,6 +52,7 @@ where
             sources,
             concurrency,
             spawned: None,
+            before_start: None,
             java_installer: None,
             installed_java: StdMutex::new(Vec::new()),
         }
@@ -59,6 +61,14 @@ where
     /// Service-level observation starts only after the OS creates a process.
     pub(crate) fn with_spawned(mut self, sender: mpsc::UnboundedSender<()>) -> Self {
         self.spawned = Some(sender);
+        self
+    }
+
+    pub(crate) fn with_before_start(
+        mut self,
+        sender: mpsc::UnboundedSender<tokio::sync::oneshot::Sender<Result<(), String>>>,
+    ) -> Self {
+        self.before_start = Some(sender);
         self
     }
 

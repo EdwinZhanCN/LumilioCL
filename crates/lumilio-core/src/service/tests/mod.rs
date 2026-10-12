@@ -3,6 +3,7 @@ mod activity;
 mod content;
 mod diagnostics;
 mod discover;
+mod game_settings;
 mod java;
 mod launch;
 mod launch_observers;

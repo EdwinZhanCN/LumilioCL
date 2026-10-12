@@ -32,6 +32,17 @@ pub struct LiveControls {
     /// The language switch the placeholders and labels were taken in
     /// (`i18n::generation`).
     pub language: u32,
+    /// The Library search box searches a preset's options (the 预设 tab)
+    /// rather than games.
+    presets_search: bool,
+}
+
+fn library_placeholder(presets: bool) -> &'static str {
+    if presets {
+        crate::tr!("preset-search")
+    } else {
+        crate::tr!("library-search")
+    }
 }
 
 /// The text of the "no loader filter" entry.
@@ -90,6 +101,17 @@ impl LiveControls {
             library_loaders: Vec::new(),
             plugin_scroll: gpui::ScrollHandle::new(),
             language: crate::i18n::generation(),
+            presets_search: false,
+        }
+    }
+
+    /// Names what the Library search box searches on the open tab.
+    pub fn search_for(&mut self, presets: bool, window: &mut Window, cx: &mut gpui::Context<Self>) {
+        if self.presets_search != presets {
+            self.presets_search = presets;
+            self.library_filter.update(cx, |input, cx| {
+                input.set_placeholder(library_placeholder(presets), window, cx)
+            });
         }
     }
 
@@ -99,7 +121,10 @@ impl LiveControls {
     pub fn relabel(&mut self, window: &mut Window, cx: &mut gpui::Context<Self>) {
         self.language = crate::i18n::generation();
         for (input, placeholder) in [
-            (&self.library_filter, crate::tr!("library-search")),
+            (
+                &self.library_filter,
+                library_placeholder(self.presets_search),
+            ),
             (&self.discover_search, crate::tr!("discover-search")),
             (&self.version_search, crate::tr!("discover-version-search")),
         ] {
