@@ -107,9 +107,10 @@ impl<T: Transport + Clone> LauncherService<T> {
                 .save_version_as(&project, &version_id, Path::new(&path), cancel)
                 .await
                 .map(|_| ()),
-            RetryAction::InstallModpack { project } => {
-                self.install_modpack(&project, cancel).await.map(|_| ())
-            }
+            RetryAction::InstallModpack { project, version } => self
+                .install_modpack(&project, version.as_deref(), cancel)
+                .await
+                .map(|_| ()),
             RetryAction::ImportPack { path } => self
                 .import_modpack_file(Path::new(&path), cancel)
                 .await

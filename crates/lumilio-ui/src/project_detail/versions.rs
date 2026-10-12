@@ -134,7 +134,32 @@ impl ProjectDetailView {
         id: impl Into<gpui::ElementId>,
     ) -> Option<Key> {
         if project.kind == ProjectKind::Modpack {
-            return None;
+            let (handler, version_id, title) = (
+                self.handler.clone(),
+                version.id.clone(),
+                self.title.to_string(),
+            );
+            // ia[discover]: 安装整合包的指定版本 | 整合包详情页版本行「安装」 | 把这一版装成新游戏（主按钮装最新版）；后台任务，完成后 toast 可“打开”；安装中禁用
+            return Some(
+                Key::new(id)
+                    .label(tr!("discover-install"))
+                    .icon(Icon::new(UiIcon::Download))
+                    .white()
+                    .small()
+                    .loading(self.installing)
+                    .disabled(self.installing)
+                    .on_click(move |_, window, cx| {
+                        cx.stop_propagation();
+                        handler(
+                            DetailIntent::Install {
+                                version_id: Some(version_id.clone()),
+                                title: title.clone(),
+                            },
+                            window,
+                            cx,
+                        );
+                    }),
+            );
         }
         let fits = self.fits_target(project, version);
         let installed_version = self.installed_version(project);
@@ -456,8 +481,11 @@ impl ProjectDetailView {
                             );
                         })
                 });
-                let action =
-                    self.version_action(project, version, ("detail-version-install", index));
+                let action = self
+                    .version_action(project, version, ("detail-version-install", index))
+                    .map(|key| {
+                        key.debug_selector(move || format!("detail-version-install-{index}"))
+                    });
                 let published = parse_rfc3339(&version.published)
                     .map(|at| relative_time(at, now))
                     .unwrap_or_else(|| date_label(&version.published));

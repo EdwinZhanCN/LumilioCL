@@ -261,6 +261,38 @@ fn an_installed_project_offers_switching_and_the_installed_version_is_marked(
     assert!(seen.borrow().is_empty(), "nothing was installed by that");
 }
 
+#[gpui::test]
+fn a_modpack_installs_the_version_chosen_in_its_list(cx: &mut TestAppContext) {
+    let mut pack = detail();
+    pack.project.kind = ProjectKind::Modpack;
+    let mut newer = pack.versions[0].clone();
+    newer.id = "v2".to_owned();
+    newer.number = "2".to_owned();
+    newer.published = "2026-02-01T00:00:00Z".to_owned();
+    pack.versions.insert(0, newer);
+    let (view, cx, seen) = mount(cx, None, pack);
+    view.update(cx, |view, cx| view.select_tab(1, cx));
+    cx.run_until_parked();
+
+    // Each row installs its own version as a new game, not the newest.
+    for selector in ["detail-version-install-0", "detail-version-install-1"] {
+        let key = cx
+            .debug_bounds(selector)
+            .unwrap_or_else(|| panic!("{selector}: each version has an install key"));
+        cx.simulate_click(key.center(), gpui::Modifiers::none());
+    }
+    let mut asked: Vec<String> = seen
+        .borrow()
+        .iter()
+        .filter_map(|intent| match intent {
+            DetailIntent::Install { version_id, .. } => version_id.clone(),
+            _ => None,
+        })
+        .collect();
+    asked.sort();
+    assert_eq!(asked, ["v1", "v2"]);
+}
+
 /// Not a check: prints the per-frame cost of a long description.
 /// `cargo nextest run -p lumilio-ui detail_frame_cost --ignored --no-capture`
 #[gpui::test]

@@ -221,7 +221,7 @@ async fn build(service: &Service, spec: Spec) -> Result<(), ServiceError> {
         }
         println!("modpack {project}");
         let record = service
-            .install_modpack(project, CancellationToken::new())
+            .install_modpack(project, None, CancellationToken::new())
             .await?;
         install(service, &record.id, &record.name).await?;
     }

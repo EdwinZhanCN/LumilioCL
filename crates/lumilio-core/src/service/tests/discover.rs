@@ -318,7 +318,7 @@ async fn with_the_source_disabled_nothing_is_served_not_even_from_memory() {
     assert!(matches!(
         world
             .service
-            .install_modpack("cool", CancellationToken::new())
+            .install_modpack("cool", None, CancellationToken::new())
             .await,
         Err(ServiceError::NoContentSource)
     ));

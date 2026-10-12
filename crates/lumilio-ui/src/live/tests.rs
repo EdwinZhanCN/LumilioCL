@@ -391,6 +391,7 @@ fn activity_shows_running_first_and_maps_outcomes() {
                 outcome: TaskOutcome::Failed("no route".to_owned()),
                 retry: Some(lumilio_core::RetryAction::InstallModpack {
                     project: "pack".into(),
+                    version: None,
                 }),
             },
         ],

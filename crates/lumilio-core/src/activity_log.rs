@@ -62,6 +62,9 @@ pub enum RetryAction {
     },
     InstallModpack {
         project: String,
+        /// The chosen version; `None` (and older log lines) is the newest.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        version: Option<String>,
     },
     BackupInstance {
         instance: String,

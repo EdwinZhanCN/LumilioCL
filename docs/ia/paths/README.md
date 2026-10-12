@@ -9,7 +9,7 @@
 | [全局导航](navigation.md) | 9 |
 | [首页](home.md) | 13 |
 | [游戏库](library.md) | 30 |
-| [发现](discover.md) | 23 |
+| [发现](discover.md) | 24 |
 | [动态](activity.md) | 8 |
 | [账户](accounts.md) | 26 |
 | [设置](settings.md) | 56 |

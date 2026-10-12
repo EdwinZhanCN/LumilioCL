@@ -35,7 +35,7 @@ async fn explicit_cancel_unblocks_reads_and_records_cancelled_for_both_install_k
         Err(ServiceError::Cancelled)
     ));
     let cancel = CancellationToken::new();
-    let mut pack = Box::pin(world.service.install_modpack("pack", cancel.clone()));
+    let mut pack = Box::pin(world.service.install_modpack("pack", None, cancel.clone()));
     assert!(futures_util::poll!(&mut pack).is_pending());
     cancel.cancel();
     assert!(matches!(
@@ -208,11 +208,11 @@ async fn cancel_task_by_id_stops_only_that_running_task_and_expires_with_it() {
         CancellationToken::new(),
     ));
     assert!(futures_util::poll!(&mut first).is_pending());
-    let mut second = Box::pin(
-        world
-            .service
-            .install_modpack("pack", CancellationToken::new()),
-    );
+    let mut second = Box::pin(world.service.install_modpack(
+        "pack",
+        None,
+        CancellationToken::new(),
+    ));
     assert!(futures_util::poll!(&mut second).is_pending());
     let view = world.service.activity(10);
     assert_eq!(view.active.len(), 2);
