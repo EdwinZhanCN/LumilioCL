@@ -1023,6 +1023,7 @@ mod tests {
             to: [16.0, 16.0, 16.0],
             rotation: None,
             shade: true,
+            shade_direction_override: None,
             faces,
         };
 

@@ -13,9 +13,14 @@ pub struct BlockModel {
     #[serde(default)]
     pub parent: Option<String>,
 
-    /// Whether to use ambient occlusion.
-    #[serde(default = "default_ao", rename = "ambientocclusion")]
-    pub ambient_occlusion: bool,
+    /// Whether to use ambient occlusion; `None` inherits the parent's choice
+    /// (Minecraft's default is on).
+    #[serde(
+        default,
+        rename = "ambientocclusion",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub ambient_occlusion: Option<bool>,
 
     /// Texture variable definitions.
     #[serde(default)]
@@ -30,14 +35,15 @@ pub struct BlockModel {
     pub display: Option<serde_json::Value>,
 }
 
-fn default_ao() -> bool {
-    true
-}
-
 impl BlockModel {
     /// Create an empty model.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Whether this (resolved) model takes ambient occlusion.
+    pub fn uses_ambient_occlusion(&self) -> bool {
+        self.ambient_occlusion.unwrap_or(true)
     }
 
     /// Get the full parent resource location.
@@ -82,6 +88,10 @@ pub struct ModelElement {
     /// Whether this element receives shade.
     #[serde(default = "default_shade")]
     pub shade: bool,
+    /// Minecraft 26.x: light every face as if it faced this direction (plants,
+    /// torches and redstone dust use `up`, so both sides of a cross look alike).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shade_direction_override: Option<Direction>,
     /// Face definitions.
     #[serde(default)]
     pub faces: HashMap<Direction, ModelFace>,
@@ -333,6 +343,7 @@ mod tests {
             to: [16.0, 16.0, 16.0],
             rotation: None,
             shade: true,
+            shade_direction_override: None,
             faces: HashMap::new(),
         };
 
