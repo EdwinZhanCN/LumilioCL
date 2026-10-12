@@ -55,13 +55,13 @@ export const zhCN = {
       name: "世界地图",
       lede: "从存档的 Region 文件画出地表，或者只凭种子算出结构的位置。路径点能和 Xaero 小地图互通。",
       facts: ["存档底图与种子地图", "结构、区块与 Region 图层", "复制坐标与路径点分享串"],
-      shot: "世界地图的动图：平移、缩放、打开结构图层",
+      shot: "世界地图的种子预测与结构图层截图",
     },
     schematic: {
       name: "投影预览",
       lede: "打开 Litematica 投影，看材料清单，或者用游戏自己的贴图在 3D 里转着看、飞进去看。",
       facts: ["材料清单导出为 CSV", "环绕查看与第一人称飞行", "用游戏自带的贴图绘制"],
-      shot: "投影 3D 预览的动图：旋转后切到第一人称",
+      shot: "Litematica 投影的 3D 环绕预览截图",
     },
     diagnostics: {
       name: "崩溃诊断",
@@ -94,9 +94,7 @@ export const zhCN = {
       "{date}，在 {machine}（{os}）上测量。LumilioCL {us} 与 {them} {themVersion} 各启动 {runs} 次，每次启动前先退出；用 footprint 读取启动 30 秒后的物理内存（与活动监视器的「内存」一致），{them} 计入它的 WebKit 辅助进程，取中位数。",
   },
 
-  // Each point is a key that swaps the panel's picture. TODO(asset): give every
-  // point its own `shot` (a path under public/, 16:10); until then a point
-  // shows its group's `shot`, or a placeholder naming the point.
+  // Each point selects its own 16:10 screenshot through the existing keys.
   audiences: {
     title: "不管你玩了多久",
     lede: "LumilioCL 都已准备好，体验前所未有的功能丰富度和可扩展性",
@@ -108,26 +106,26 @@ export const zhCN = {
         title: "第一次玩，也不折腾",
         lede: "装好就能玩。任何环境它来准备。",
         points: [
-          { text: "自动下载，自动检测每个版本需要的 Java。", shot: null },
-          { text: "支持 Microsoft 正版账户，离线账户，以及第三方登录。", shot: null },
-          { text: "下载慢？多线程下载与网络代理为你助力。 （国内支持 BMCLAPI 镜像）", shot: null }, // 在英文中不需要提及BMCLAPI
-          { text: "把官方启动器、MultiMC、Prism 里的游戏直接搬过来", shot: null },
-          { text: "游戏崩溃时，自动分析可能的原因", shot: null },
+          { text: "自动检测 Java，也能下载推荐版本", shot: "/shots/java-runtimes.png" },
+          { text: "Microsoft、离线账户与第三方登录", shot: "/shots/accounts.png" },
+          { text: "配置下载源、镜像优先与同时下载数", shot: "/shots/download-settings.png" },
+          { text: "从其他启动器导入游戏", shot: "/shots/import-games.png" },
+          { text: "游戏崩溃时，分析可能的原因并给出建议", shot: "/shots/crash-analysis.png" },
         ],
-        shot: "/shots/home.png",
-        shotName: "首页",
+        shot: "/shots/java-runtimes.png",
+        shotName: "Java 管理页",
       },
       {
         id: "player",
         name: "进阶玩家",
-        title: "模组、整合包和存档，都在一处",
-        lede: "每个游戏各自独立。装模组、看地图、对投影，不用再开第二个工具。",
+        title: "模组、建筑与外观，都在一处",
+        lede: "装模组、看地图、对投影，也能管理角色外观。",
         points: [
-          { text: "在启动器里浏览 Modrinth 的模组、资源包、光影和整合包", shot: null },
-          { text: "导入 .mrpack 与 MultiMC / Prism 整合包", shot: null },
-          { text: "内置世界地图：集成种子地图，存档地图和 Xaero 的世界地图", shot: null },
-          { text: "Litematica 投影：材料清单，完整 3D 预览", shot: null },
-          { text: "完整备份与恢复；皮肤预览与管理", shot: null },
+          { text: "浏览和安装 Modrinth 的模组、资源包、光影和整合包", shot: "/shots/discovery.png" },
+          { text: "世界地图：种子预测、存档地图与结构图层", shot: "/shots/world-map.png" },
+          { text: "Litematica 投影：完整 3D 预览", shot: "/shots/schematic-preview.png" },
+          { text: "Litematica 投影：材料清单与 CSV 导出", shot: "/shots/schematic-materials.png" },
+          { text: "预览和管理皮肤，查看披风与鞘翅外观", shot: "/shots/skins.png" },
         ],
         shot: "/shots/discovery.png",
         shotName: "发现页",
@@ -138,15 +136,14 @@ export const zhCN = {
         title: "原生代码，开放到底",
         lede: "没有浏览器内核。每一帧由 GPU 绘制，每一行代码都在 GitHub 上。",
         points: [
-          { text: "Rust 2024 与 GPUI，不用 Electron，也不用 WebView", shot: null },
-          { text: "AGPL-3.0-only；安装包由 GitHub Actions 从公开代码构建", shot: null },
-          { text: "没有内置遥测，发现页还能排除带遥测的模组", shot: null },
-          { text: "下载地址规则随你改，官方源始终是回退", shot: null },
-          { text: `插件系统已经就位，${plannedTeasers.plugins.version} 目标为 WASM 社区插件`, shot: null },
+          { text: "Rust 2024 与 GPUI，代码以 AGPL-3.0-only 开源", shot: "/shots/source.png" },
+          { text: "自定义下载地址规则，官方源保留为回退", shot: "/shots/mirror-rules.png" },
+          { text: "选择明暗主题，调整字体与界面缩放", shot: "/shots/appearance.png" },
+          { text: "配置内置插件与 Discord 游戏状态", shot: "/shots/plugins.png" },
+          { text: "创建快照、完整备份与导出整合包", shot: "/shots/backups.png" },
         ],
-        // TODO(asset): a screenshot for this group, e.g. the diagnostics log view.
-        shot: null,
-        shotName: "诊断页",
+        shot: "/shots/source.png",
+        shotName: "项目源码",
       },
     ],
   },

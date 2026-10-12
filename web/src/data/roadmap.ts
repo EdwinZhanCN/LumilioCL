@@ -21,15 +21,16 @@ export function primaryPlans(language: DocsLanguage) {
   });
 }
 
-// These three IDs are curated positions in the logo, independent of list order.
-function teaser(id: string) {
-  const item = roadmapItems.find((entry) => entry.id === id);
-  if (!item || !item.version) throw new Error(`Missing public roadmap teaser: ${id}`);
-  return { ...item, version: item.version };
-}
+// The three grey cells in the hero, always the first three upcoming plans.
+const upcoming = roadmapItems
+  .filter((item) => item.status !== "completed" && item.version)
+  .slice(0, 3)
+  .map((item) => ({ ...item, version: item.version! }));
+
+if (upcoming.length < 3) throw new Error(`Need at least 3 upcoming roadmap teasers, got ${upcoming.length}`);
 
 export const plannedTeasers = {
-  appearance: teaser("appearance"),
-  translation: teaser("discover-translation"),
-  plugins: teaser("wasm-plugin-registry"),
-};
+  0: upcoming[0],
+  1: upcoming[1],
+  2: upcoming[2],
+} as const;

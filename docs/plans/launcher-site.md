@@ -32,11 +32,15 @@ GitHub Release 反向代理。页面用启动器自己的设计语言（铝面�
   `CLOUDFLARE_ACCOUNT_ID` 两个 secret，首次 `wrangler deploy` 绑定 `launcher.lumilio.org`（Project Maintainer做）。 (Completed)
   Acceptance: S5：`ci.yml` 排除 `web/**`、`web.yml` 检查与部署（已写）；仓库加 `CLOUDFLARE_API_TOKEN`、
   `CLOUDFLARE_ACCOUNT_ID` 两个 secret，首次 `wrangler deploy` 绑定 `launcher.lumilio.org`（Project Maintainer做）。
-- [ ] S6 — S6：Project Maintainer补截图与 GIF，按 `TODO(asset)` 注释替换占位；og:image。 (Proposed)
-  Acceptance: S6：Project Maintainer补截图与 GIF，按 `TODO(asset)` 注释替换占位；og:image。
+- [ ] S6 — S6：Project Maintainer补截图与 GIF，按 `TODO(asset)` 注释替换占位；og:image。 (InProgress)
+  Acceptance: 五个功能探索窗口与为谁的十五项使用真实截图；新素材全部为 16:10，三张 More actions 聚焦裁剪，编辑器截图轻裁，其余保留完整窗口。现有组件、样式、滚动与动画代码保持不变。网页视觉验收由 Project Maintainer 完成；og:image 与动态素材另待补充。
 
 ## Validation
 
+- 本次截图替换：just web、just docs、素材比例与路径检查、组件及样式与基线一致性检查通过。
+  Result: just web：Astro 检查 0 错误、0 警告，16 个测试通过，静态构建成功。just docs：26 个测试与 preserve_order 下 5 个计划测试通过，投影与格式检查通过。十六张引用素材均存在且宽×10＝高×16；四张裁剪结果已查看。git diff --exit-code 确认 Audiences、Explorer、原有样式、Hero、Faceplate、Stack 与 world 代码和 main 基线一致。网页视觉验收仍待 Project Maintainer。
+- Project Maintainer 验证本次图片替换和文案在现有页面中的视觉效果。
+  Result: pending
 - `just web`：astro check 0 错误、Worker 测试 9 个通过、构建通过。
   Result: pending
 - 已用无头 Chromium 截图看过：1440×900 亮 / 暗、390×844、减少动画、探索窗口、启动动画、
@@ -49,6 +53,14 @@ GitHub Release 反向代理。页面用启动器自己的设计语言（铝面�
 - 还要Project Maintainer看：真实浏览器里的滚动手感（吸附、横向段落、视差）、Safari 与 Firefox、
   首屏格子的键盘操作。
   Result: pending
+
+## Decision screenshot-refresh
+
+沿用现有图片槽位、五项功能探索窗口和为谁的三组五项。仅替换图片文件、路径和相关文案。三张 More actions 与编辑器截图按确认范围裁剪，其余素材补少量边至 16:10。
+
+Why: Project Maintainer 明确要求保留现有滚动、动画和交互。为谁各项按素材重新组织，合并技术栈与许可证介绍，以主题、内置插件与备份替换弱项；本次不宣传翻译 feature。
+
+Consequences: 不增加组件、查看原图链接或 CSS 裁剪规则。全部十六张新素材有对应展示位置；视觉验收由 Project Maintainer 完成。
 
 ## Decision migration-context
 
@@ -70,3 +82,5 @@ Consequences: 后续变更更新本 JSON，长期跨计划契约整理到设计/
 - gh-proxy（hunshcn/gh-proxy，MIT）的 Worker 实现
 - [.agents/plans/wasm-plugin-registry.json](../../.agents/plans/wasm-plugin-registry.json)
 - [.agents/plans/auto-update.json](../../.agents/plans/auto-update.json)
+
+- Lesson: 替换图片不需要新增图片组件或修改布局和交互。此前尝试增加查看原图入口与 CSS 缩放后，Project Maintainer 报告滚动失效，确切根因尚未定位。此次撤回全部组件与样式改动，裁剪直接保存到素材文件，并通过与 main 的字节比对约束变更范围。

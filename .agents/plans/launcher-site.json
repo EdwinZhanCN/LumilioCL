@@ -47,11 +47,19 @@
     {
       "id": "S6",
       "title": "S6：Project Maintainer补截图与 GIF，按 `TODO(asset)` 注释替换占位；og:image。",
-      "status": "proposed",
-      "acceptance": "S6：Project Maintainer补截图与 GIF，按 `TODO(asset)` 注释替换占位；og:image。"
+      "status": "in_progress",
+      "acceptance": "五个功能探索窗口与为谁的十五项使用真实截图；新素材全部为 16:10，三张 More actions 聚焦裁剪，编辑器截图轻裁，其余保留完整窗口。现有组件、样式、滚动与动画代码保持不变。网页视觉验收由 Project Maintainer 完成；og:image 与动态素材另待补充。"
     }
   ],
   "validation": [
+    {
+      "criterion": "本次截图替换：just web、just docs、素材比例与路径检查、组件及样式与基线一致性检查通过。",
+      "result": "just web：Astro 检查 0 错误、0 警告，16 个测试通过，静态构建成功。just docs：26 个测试与 preserve_order 下 5 个计划测试通过，投影与格式检查通过。十六张引用素材均存在且宽×10＝高×16；四张裁剪结果已查看。git diff --exit-code 确认 Audiences、Explorer、原有样式、Hero、Faceplate、Stack 与 world 代码和 main 基线一致。网页视觉验收仍待 Project Maintainer。"
+    },
+    {
+      "criterion": "Project Maintainer 验证本次图片替换和文案在现有页面中的视觉效果。",
+      "result": null
+    },
     {
       "criterion": "`just web`：astro check 0 错误、Worker 测试 9 个通过、构建通过。",
       "result": null
@@ -77,8 +85,16 @@
     ".agents/plans/auto-update.json"
   ],
   "dependencies": [],
-  "lessonsLearned": [],
+  "lessonsLearned": [
+    "替换图片不需要新增图片组件或修改布局和交互。此前尝试增加查看原图入口与 CSS 缩放后，Project Maintainer 报告滚动失效，确切根因尚未定位。此次撤回全部组件与样式改动，裁剪直接保存到素材文件，并通过与 main 的字节比对约束变更范围。"
+  ],
   "decisions": [
+    {
+      "id": "screenshot-refresh",
+      "decision": "沿用现有图片槽位、五项功能探索窗口和为谁的三组五项。仅替换图片文件、路径和相关文案。三张 More actions 与编辑器截图按确认范围裁剪，其余素材补少量边至 16:10。",
+      "rationale": "Project Maintainer 明确要求保留现有滚动、动画和交互。为谁各项按素材重新组织，合并技术栈与许可证介绍，以主题、内置插件与备份替换弱项；本次不宣传翻译 feature。",
+      "consequences": "不增加组件、查看原图链接或 CSS 裁剪规则。全部十六张新素材有对应展示位置；视觉验收由 Project Maintainer 完成。"
+    },
     {
       "id": "migration-context",
       "decision": "- 一个 Worker 同时托管静态资源和反代，不用 Pages：主站和反代同域名，一次部署。\n- 代码在本仓库 `web/`。字体、图标、截图由 `web/scripts/sync-assets.mjs` 从\n  `crates/lumilio-ui/assets/fonts`、`assets/icons`、`assets/screenshots` 复制进 `public/`，\n  不在 `web/` 里存第二份。\n- 反代照 gh-proxy：流式转发、不做边缘缓存，只放行 `EdwinZhanCN/LumilioCL` 与跳转白名单。\n- logo 九宫格的含义：黑格是已经有的功能，灰格是路线图（0.1.1 / 0.2.0 / 0.3.0），橙色圆是下载。",

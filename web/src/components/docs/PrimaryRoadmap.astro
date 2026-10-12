@@ -4,7 +4,7 @@ import { docsCatalog, type DocsLanguage } from "../../i18n/docs";
 
 const language: DocsLanguage = Astro.locals.starlightRoute.lang.startsWith("en") ? "en" : "zh-CN";
 const t = docsCatalog(language).roadmap;
-const plans = primaryPlans(language);
+const plans = primaryPlans(language).filter((p) => p.status !== "completed").slice(0, 4);
 ---
 
 {plans.length === 0 && <p>{t.empty}</p>}
