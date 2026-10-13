@@ -74,9 +74,8 @@ struct State {
     java_answered: Option<String>,
     /// Stops the Microsoft sign-in that is waiting for the browser.
     sign_in_cancel: Option<CancellationToken>,
-    /// The target game and kind `installed` was last read for; `None` when it
-    /// is out of date and should be read again.
-    /// What `installed` was read for: the game, the kind and the source.
+    /// The target game, kind and source `installed` was last read for; `None`
+    /// when it is out of date and should be read again.
     installed_key: Option<(String, ProjectKind, String)>,
     /// What the running game has printed: the instance and its newest lines.
     game_log: Option<(String, std::collections::VecDeque<String>)>,

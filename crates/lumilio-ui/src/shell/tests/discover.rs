@@ -655,3 +655,61 @@ fn choosing_another_source_searches_there_and_loads_its_filters(cx: &mut TestApp
     });
     assert_eq!(remembered.as_deref(), Some("lumilio.curseforge"));
 }
+
+#[gpui::test]
+fn a_narrow_window_gives_the_result_name_room(cx: &mut TestAppContext) {
+    use crate::live::{CardTags, DateKind, LiveIntent, SearchRow, SearchStatus};
+    use gpui::{px, size};
+    use lumilio_core::ProjectKind;
+
+    cx.update(gpui_component::init);
+    let (shell, cx) = cx.add_window_view(|_, cx| {
+        LauncherShell::new(cx).with_live(Rc::new(|_: LiveIntent, _, _| {}))
+    });
+    let row = SearchRow {
+        source: lumilio_core::DEFAULT_SOURCE.to_owned(),
+        project_id: "id".to_owned(),
+        kind: ProjectKind::Modpack,
+        slug: "p".to_owned(),
+        title: "All the Mods 10 - ATM10".to_owned(),
+        author: "someone".to_owned(),
+        summary: "A pack.".to_owned(),
+        environment: None,
+        tags: CardTags::default(),
+        downloads: "1".to_owned(),
+        follows: None,
+        date: String::new(),
+        date_kind: DateKind::Updated,
+        page_url: String::new(),
+        icon_url: None,
+        seed: 1,
+        manual_download: false,
+    };
+    shell.update(cx, |shell, cx| {
+        shell.show(Route::Discover);
+        shell.update_live(
+            |model| {
+                model.results = vec![row];
+                model.search = SearchStatus::Done { total: 1 };
+            },
+            cx,
+        );
+    });
+    cx.simulate_resize(size(px(720.), px(480.)));
+    cx.run_until_parked();
+    let spec = cx
+        .debug_bounds("live-result-spec-0")
+        .expect("the spec column");
+    let line = cx.debug_bounds("live-result-0").expect("the result line");
+    assert_eq!(spec.size.width, px(128.), "the compact spec column");
+    assert!(
+        spec.origin.x - line.origin.x > px(200.),
+        "the name keeps room before the spec column: {line:?} {spec:?}"
+    );
+    cx.simulate_resize(size(px(1400.), px(900.)));
+    cx.run_until_parked();
+    let spec = cx
+        .debug_bounds("live-result-spec-0")
+        .expect("the spec column");
+    assert_eq!(spec.size.width, px(190.));
+}

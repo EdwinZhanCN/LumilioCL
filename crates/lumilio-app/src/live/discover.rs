@@ -119,6 +119,14 @@ fn run_search(wiring: &Wiring, query: &DiscoverQuery, seq: u64, cx: &mut App) {
 /// browsed. A remembered source that is no longer on gives way to the first
 /// one that is, and the list is searched again there.
 pub(super) fn load_filters(wiring: &Wiring, cx: &mut App) {
+    // Choosing a source asks for this from inside the shell's own update,
+    // and this reads the shell: do that a moment later, as `search` does.
+    let wiring = wiring.clone();
+    cx.spawn(async move |cx| cx.update(|cx| run_load_filters(&wiring, cx)))
+        .detach();
+}
+
+fn run_load_filters(wiring: &Wiring, cx: &mut App) {
     let service = wiring.backend.service.clone();
     let wanted = wiring
         .shell

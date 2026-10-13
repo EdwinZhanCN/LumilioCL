@@ -74,6 +74,9 @@ pub fn project_icon(
     }
 }
 
+/// Below this window width a result line uses its compact layout.
+pub(super) const COMPACT_WIDTH: f32 = 1000.;
+
 /// One line of a row's spec column: a muted mono legend and its value.
 fn spec(legend: &'static str, value: String, colors: ShellColors) -> impl IntoElement {
     h_flex()
@@ -129,6 +132,7 @@ pub(super) fn install_control(
             install,
         )
         .small()
+        .debug_selector(move || format!("live-install-{index}"))
         .into_any_element();
     };
     // ia[discover]: 已安装状态 | 结果行「已安装」/「更新」 | 目标游戏已有的（按正在浏览的来源识别）显示「已安装」；有更新显示「更新」，点了用新版本替换旧文件；详情页主按钮同样变化 | 只认这个来源认得的文件
@@ -234,6 +238,9 @@ pub(super) fn result_row(index: usize, row: &SearchRow, ctx: &LiveCtx) -> impl I
         source = ctx.model.source_name(&row.source)
     );
     let copy = ctx.handler.clone();
+    // In a narrow window the icon and the spec column give the name room.
+    let compact = ctx.window_width < COMPACT_WIDTH;
+    let (icon_side, spec_width) = if compact { (48., 128.) } else { (80., 190.) };
 
     // A catalogue line: index, framed icon, name and summary, spec column.
     h_flex()
@@ -267,7 +274,12 @@ pub(super) fn result_row(index: usize, row: &SearchRow, ctx: &LiveCtx) -> impl I
                 .border_1()
                 .border_color(colors.border)
                 .bg(body.display)
-                .child(project_icon(row.icon_url.as_deref(), row.seed, 80., colors)),
+                .child(project_icon(
+                    row.icon_url.as_deref(),
+                    row.seed,
+                    icon_side,
+                    colors,
+                )),
         )
         .child(
             v_flex()
@@ -301,7 +313,8 @@ pub(super) fn result_row(index: usize, row: &SearchRow, ctx: &LiveCtx) -> impl I
         .child(
             v_flex()
                 .flex_none()
-                .w(px(190.))
+                .w(px(spec_width))
+                .debug_selector(move || format!("live-result-spec-{index}"))
                 .self_stretch()
                 .items_end()
                 .justify_between()

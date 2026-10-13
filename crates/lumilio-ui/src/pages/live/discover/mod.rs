@@ -190,13 +190,18 @@ pub fn discover(ctx: &LiveCtx) -> impl IntoElement {
                         .min_w_0()
                         .gap_4()
                         .child(
+                            // In a narrow window the pager goes to its own line
+                            // rather than under the sidebar.
                             h_flex()
                                 .w_full()
+                                .flex_wrap()
                                 .items_center()
                                 .justify_between()
                                 .gap_3()
+                                .debug_selector(|| "live-discover-refinements".into())
                                 .child(
                                     h_flex()
+                                        .flex_wrap()
                                         .gap_3()
                                         .items_center()
                                         // ia[discover]: 排序 / 显示数量 | L4 两个下拉：相关度、下载量、关注数、发布时间、更新时间（只列来源支持的）；每页 5 / 10 / 15 / 20 / 50 / 100 | 重新搜索；按发布时间排序时卡片显示发布时间，其余显示更新时间
