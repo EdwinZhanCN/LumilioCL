@@ -1,0 +1,509 @@
+/* The theme studio. The editor wears the documentation's colours (Starlight's
+   custom properties); the preview wears the edited theme's, through the
+   custom properties instrument.css reads. */
+
+.studio {
+  --studio-line: var(--sl-color-hairline);
+  --studio-muted: var(--sl-color-gray-3);
+  margin-top: 1.5rem;
+  color: var(--sl-color-text);
+  font-size: 0.9375rem;
+}
+
+.studio a {
+  color: var(--sl-color-text-accent);
+}
+
+.studio button,
+.studio input,
+.studio select {
+  font: inherit;
+  color: inherit;
+}
+
+.studio input:not([type="range"], [type="color"]),
+.studio select {
+  width: 100%;
+  min-width: 0;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--studio-line);
+  border-radius: 4px;
+  background: var(--sl-color-bg);
+}
+
+.studio input[aria-invalid="true"] {
+  border-color: var(--sl-color-red);
+}
+
+/* ---- File bar ---- */
+
+.studio__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--studio-line);
+}
+
+.studio__tabs,
+.studio__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.studio__chip,
+.studio__button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--studio-line);
+  border-radius: 6px;
+  background: var(--sl-color-bg);
+  cursor: pointer;
+}
+
+.studio__chip[aria-selected="true"] {
+  border-color: var(--sl-color-text-accent);
+  box-shadow: inset 0 0 0 1px var(--sl-color-text-accent);
+}
+
+.studio__button:hover,
+.studio__chip:hover {
+  border-color: var(--sl-color-gray-4);
+}
+
+.studio__button--primary {
+  border-color: var(--sl-color-text-accent);
+  background: var(--sl-color-text-accent);
+  color: var(--sl-color-black) !important;
+  font-weight: 600;
+}
+
+.studio__button--quiet {
+  justify-self: start;
+  color: var(--sl-color-red) !important;
+}
+
+.studio__swatch {
+  width: 0.9rem;
+  height: 0.9rem;
+  border: 3px solid;
+  border-radius: 50%;
+}
+
+.studio__tone {
+  color: var(--studio-muted);
+  font-size: 0.8em;
+}
+
+.studio__notice,
+.studio__problems {
+  margin: 0.75rem 0 0;
+  padding: 0.6rem 0.8rem;
+  border-left: 3px solid var(--sl-color-orange);
+  background: var(--sl-color-orange-low);
+}
+
+.studio__problems {
+  padding-left: 1.8rem;
+}
+
+/* ---- Body: editor beside a preview that stays in view ---- */
+
+.studio__body {
+  display: grid;
+  gap: 1.5rem;
+  margin-top: 1.25rem;
+}
+
+/* On a narrow screen the result comes first, then the controls. */
+@media (max-width: 59.99rem) {
+  .studio__side {
+    order: -1;
+  }
+}
+
+@media (min-width: 60rem) {
+  .studio__body {
+    grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+    align-items: start;
+  }
+
+  .studio__side {
+    position: sticky;
+    top: calc(var(--sl-nav-height, 4rem) + 1rem);
+  }
+}
+
+.studio__editor,
+.studio__side {
+  display: grid;
+  gap: 1.25rem;
+  min-width: 0;
+}
+
+.studio__section {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.studio__section h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.studio__field {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.studio__field > span {
+  font-weight: 500;
+}
+
+.studio__field small,
+.studio__hint {
+  margin: 0;
+  color: var(--studio-muted);
+  font-size: 0.85em;
+}
+
+.studio__inline {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.studio__inline .studio__button {
+  flex: none;
+  white-space: nowrap;
+}
+
+.studio__segments {
+  display: inline-flex;
+  width: fit-content;
+  border: 1px solid var(--studio-line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.studio__segments button {
+  padding: 0.35rem 0.9rem;
+  border: 0;
+  background: var(--sl-color-bg);
+  cursor: pointer;
+}
+
+.studio__segments button[aria-pressed="true"] {
+  background: var(--sl-color-text-accent);
+  color: var(--sl-color-black);
+  font-weight: 600;
+}
+
+/* ---- Colours ---- */
+
+.studio__group {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.studio__group legend {
+  margin-bottom: 0.25rem;
+  color: var(--studio-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.studio__color {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr) 7.5rem;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid var(--sl-color-hairline-light);
+}
+
+.studio__well {
+  position: relative;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--studio-line);
+  border-radius: 6px;
+  /* The colour over a checkerboard, so opacity shows. */
+  background:
+    linear-gradient(var(--well), var(--well)),
+    repeating-conic-gradient(#c8c8c8 0 25%, #ffffff 0 50%) 0 0 / 10px 10px;
+  overflow: hidden;
+}
+
+.studio__well input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.studio__color-name {
+  display: grid;
+  line-height: 1.25;
+}
+
+.studio__color-name code {
+  color: var(--studio-muted);
+  font-size: 0.78em;
+}
+
+.studio__color[data-inherited="true"] .studio__color-name {
+  font-style: italic;
+}
+
+.studio__hex {
+  font-family: var(--sl-font-mono, monospace) !important;
+  font-size: 0.85em !important;
+}
+
+/* ---- Contrast ---- */
+
+.studio__contrast {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.studio__contrast li {
+  display: grid;
+  grid-template-columns: 1.2rem minmax(0, 1fr) auto;
+  gap: 0.4rem;
+}
+
+.studio__contrast li[data-ok="false"] {
+  color: var(--sl-color-orange-high);
+  font-weight: 500;
+}
+
+.studio__ratio {
+  color: var(--studio-muted);
+  font-family: var(--sl-font-mono, monospace);
+  font-size: 0.85em;
+}
+
+.studio__json summary {
+  cursor: pointer;
+}
+
+.studio__json pre {
+  max-height: 22rem;
+  overflow: auto;
+  margin: 0.5rem 0 0;
+  padding: 0.75rem;
+  border: 1px solid var(--studio-line);
+  border-radius: 6px;
+  font-size: 0.8rem;
+}
+
+/* ---- Preview ---- */
+
+/* What lies behind the launcher window, so a transparent or blurred window
+   background can be seen. */
+.studio-preview {
+  padding: 1rem;
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 20% 25%, #f2b544 0 18%, transparent 19%),
+    radial-gradient(circle at 80% 70%, #3c8dde 0 22%, transparent 23%),
+    linear-gradient(135deg, #2f5fb3, #b1497f 55%, #e08a3c);
+}
+
+.studio-window {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 10px;
+  background: var(--page);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.3);
+  color: var(--ink);
+  font: 400 14px/1.4 var(--font-sans);
+}
+
+/* An opaque window has a plain backing under translucent colours. */
+.studio-preview[data-background="opaque"] .studio-window {
+  background: linear-gradient(var(--page), var(--page)), Canvas;
+}
+
+.studio-preview[data-background="blurred"] .studio-window {
+  backdrop-filter: blur(16px);
+}
+
+.studio-window p {
+  margin: 0;
+}
+
+.studio-window .mono {
+  font-family: var(--font-mono);
+}
+
+.studio-window .muted {
+  color: var(--muted);
+}
+
+.studio-face {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 14px;
+  padding: 14px;
+}
+
+.studio-face__display {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+  min-width: 112px;
+  padding: 10px 12px;
+}
+
+.studio-face__copy {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+}
+
+.studio-face__title {
+  font-size: 20px;
+  font-weight: 500;
+}
+
+.studio-face__state {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.studio-face__keys {
+  display: flex;
+  flex-wrap: wrap;
+  grid-column: 1 / -1;
+  gap: 8px;
+}
+
+.studio-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.studio-tab {
+  padding: 6px 12px;
+  border-radius: 4px;
+  background: var(--key-grey);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.studio-tab[data-open="true"] {
+  background: var(--orange);
+  color: var(--on-orange);
+}
+
+.studio-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+/* A field and a menu take the theme's `radius`. */
+.studio-field {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 9rem;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: var(--recess-shadow);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.studio-list {
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  background: var(--panel);
+}
+
+.studio-list__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+}
+
+.studio-list__row + .studio-list__row {
+  border-top: 1px solid var(--hairline);
+}
+
+.studio-danger-text {
+  color: var(--danger-text);
+  font-size: 13px;
+}
+
+/* A dialog and a notification take the theme's `radius_lg`. */
+.studio-dialog,
+.studio-toast {
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  box-shadow: var(--panel-shadow);
+}
+
+.studio-dialog {
+  display: grid;
+  gap: 8px;
+  max-width: 22rem;
+  padding: 14px;
+}
+
+.studio-dialog p {
+  font-size: 13px;
+}
+
+.studio-dialog__title {
+  font-weight: 500;
+}
+
+.studio-dialog__keys {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.key.studio-danger-key {
+  --face: var(--danger);
+  --face-hover: var(--danger);
+  --label: var(--on-orange);
+}
+
+.studio-toast {
+  display: inline-flex;
+  justify-self: end;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+}

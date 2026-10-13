@@ -83,6 +83,7 @@ description: 选择内置主题，或用 JSON 文件制作自己的主题。
 ```
 
 完整的例子见启动器自带的 [rose-pine.json](https://github.com/EdwinZhanCN/LumilioCL/blob/main/crates/lumilio-ui/themes/rose-pine.json) 和 [catppuccin.json](https://github.com/EdwinZhanCN/LumilioCL/blob/main/crates/lumilio-ui/themes/catppuccin.json)。
+不想手写 JSON 时，可以用[主题工作室](/docs/guide/theme-studio/)边改边预览，再下载文件。
 
 ### 主题字段
 
