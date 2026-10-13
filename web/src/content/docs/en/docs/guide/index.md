@@ -8,6 +8,7 @@ Each page gives the scope, the preparation, the procedure, the result, and the k
 
 | Task | Read |
 | --- | --- |
+| Change between Modrinth and CurseForge, install a CurseForge modpack, or add files that you can download only on a website | [Content sources](/en/docs/guide/content-sources/) |
 | Change the colours, corners, and fonts, or make a theme | [Themes](/en/docs/guide/themes/) |
 | Make a theme in the browser and examine it | [Theme studio](/en/docs/guide/theme-studio/) |
 

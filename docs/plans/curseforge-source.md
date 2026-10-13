@@ -2,9 +2,9 @@
 
 # CurseForge 内容源
 
-Status: InProgress
+Status: Completed
 
-2026-10-13：功能完成，Project Maintainer 在真实窗口里验收通过；just check、just web、just docs 与 PR CI 通过。验收时报告过一次「浏览 CurseForge 后切回 Modrinth 闪退」：无头窗口按正式接线复现（含当前游戏、选分类后切回）未能复现，GPUI 的动图帧号已有夹取；排查中修好一个竞态（筛选项晚到时把页面拉回旧来源），再次遇到时取终端里的 panic 输出（RUST_BACKTRACE=1）。剩下 T8：发版时更新网站首页与使用指南。
+2026-10-13：功能完成，Project Maintainer 在真实窗口里验收通过；just check、just web、just docs 与 PR CI 通过。验收时报告过一次「浏览 CurseForge 后切回 Modrinth 闪退」：无头窗口按正式接线复现（含当前游戏、选分类后切回）未能复现，GPUI 的动图帧号已有夹取；排查中修好一个竞态（筛选项晚到时把页面拉回旧来源），再次遇到时取终端里的 panic 输出（RUST_BACKTRACE=1），这一项转入 backlog。随 0.1.5 发布，网站首页与使用指南已写上 CurseForge（T8）。
 
 ## Scope
 
@@ -33,7 +33,7 @@ Status: InProgress
   Acceptance: release.yml 构建时注入 CF_API_KEY；贡献文档（中英）写明本地开发把 CF_API_KEY 放进用户级 ~/.cargo/config.toml 的 [env]；backlog 中已完成的条目删除。使用指南页移到 T8，等 web/user-guide 合入后与发版一起写。
 - [x] T7 — 验证 (Completed)
   Acceptance: just check 通过；在临时数据目录运行启动器查看发现页、CurseForge 详情与待下载面板；应用层测试 curseforge_through_the_page（默认忽略，真实 API）按正式接线点击：切到 CurseForge、搜索并安装 JEI、在整合包页签搜索并安装整合包、添加已下载的文件；Project Maintainer 在真实窗口里验收。
-- [ ] T8 — 发版时更新网站 (Proposed)
+- [x] T8 — 发版时更新网站 (Completed)
   Acceptance: 网站路线图已列出这个计划（首页「正在路上」第一格，目标 0.1.5）。发布含 CurseForge 来源的版本时：首页「发现」与进阶玩家要点写上 CurseForge（web/src/i18n/zh-cn.ts；首页只有中文），使用指南补一页内容来源（web/user-guide 合入后的 guide/）。首页功能介绍描述已发布的版本，不提前改。
 
 ## Validation
@@ -51,7 +51,9 @@ Status: InProgress
 - Project Maintainer 在真实窗口里验收。
   Result: 2026-10-13：Project Maintainer 在真实窗口里验收通过（切换来源、从 CurseForge 安装 Mod 与整合包、添加已下载的文件）。
 - 浏览 CurseForge 后切回 Modrinth 时的一次闪退查明原因或确认不再出现。
-  Result: pending
+  Result: 2026-10-13：原因未查明。无头窗口按正式接线复现（含当前游戏、选分类后切回）未能复现；排查中修好的竞态见 filters_for_a_source_left_behind_do_not_take_the_page_back。发布 0.1.5 时转入 .agents/plans/backlog.md「只有 Project Maintainer 能做」，再次遇到时用 RUST_BACKTRACE=1 运行并取终端里的 panic 输出。
+- 网站写上 CurseForge 来源。
+  Result: 2026-10-13：release-0-1-5 的发布准备 PR 修改首页「发现」介绍、游戏库与进阶玩家要点（web/src/i18n/zh-cn.ts），新增中英文使用指南页 guide/content-sources.md 并加入侧栏和使用指南概览；just web 通过。
 
 ## Decision D1
 
@@ -136,6 +138,10 @@ Consequences: ContentSource 增加 changelog()；HTML 里段落内的 <br> 由�
 - [crates/lumilio-core/src/service/recognize.rs](../../crates/lumilio-core/src/service/recognize.rs)
 - [crates/lumilio-core/src/modpack/curseforge.rs](../../crates/lumilio-core/src/modpack/curseforge.rs)
 - [crates/lumilio-core/tests/curseforge_live.rs](../../crates/lumilio-core/tests/curseforge_live.rs)
+
+## Outcome
+
+CurseForge 内容源随 0.1.5 发布：发现页可在 Modrinth 与 CurseForge 之间切换，CurseForge 整合包可从发现页安装或本地导入，只能在网站下载的文件先到 Modrinth 找、找不到的列出下载页并可添加已下载的文件，游戏内容按来源识别与更新。网站首页与使用指南已写上 CurseForge。验收时出现过一次的切换来源闪退未能复现，转入 backlog。
 
 - Lesson: 插件注册表按 ID 排序，lumilio.curseforge 会排在 lumilio.modrinth 前面，默认来源和识别顺序因此悄悄变成 CurseForge。 防护：注册表记下应用给出插件的顺序，content_sources 按它排序；the_sources_are_listed_with_modrinth_first 与应用侧 backend 测试检查 Modrinth 在前。
 

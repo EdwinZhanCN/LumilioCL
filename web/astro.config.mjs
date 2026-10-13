@@ -22,6 +22,7 @@ export default defineConfig({
       ] },
       { label: "User guide", translations: { "zh-CN": "使用指南" }, items: [
         { label: "Overview", translations: { "zh-CN": "概览" }, slug: "docs/guide" },
+        { label: "Content sources", translations: { "zh-CN": "内容来源" }, slug: "docs/guide/content-sources" },
         { label: "Themes", translations: { "zh-CN": "主题" }, slug: "docs/guide/themes" },
         { label: "Theme studio", translations: { "zh-CN": "主题工作室" }, slug: "docs/guide/theme-studio" },
       ] },

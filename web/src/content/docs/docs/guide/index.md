@@ -8,6 +8,7 @@ description: 按任务查找启动器各项功能的用法。
 
 | 任务 | 阅读 |
 | --- | --- |
+| 在 Modrinth 和 CurseForge 之间切换，安装 CurseForge 整合包，补上只能在网站下载的文件 | [内容来源](/docs/guide/content-sources/) |
 | 更换配色、圆角和字体，或制作自己的主题 | [主题](/docs/guide/themes/) |
 | 在浏览器里制作主题并预览 | [主题工作室](/docs/guide/theme-studio/) |
 
