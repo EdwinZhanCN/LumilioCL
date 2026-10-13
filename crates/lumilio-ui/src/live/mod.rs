@@ -33,7 +33,8 @@ pub use self::discover::{
     sort_label, tag_label, visible_kinds,
 };
 pub use self::home::{
-    HomePlaces, PLACE_SERVERS, PLACE_WORLDS, Place, PlaceTarget, home_places, home_presentation,
+    HomePlaces, PLACE_SERVERS, PLACE_WORLDS, Place, PlacePicture, PlaceTarget, home_places,
+    home_presentation, world_mode,
 };
 pub use self::intent::{LiveHandler, LiveIntent};
 pub use self::library::{

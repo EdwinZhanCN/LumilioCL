@@ -691,13 +691,19 @@ fn tag_labels_are_chinese_when_known_and_readable_when_not() {
 #[test]
 fn home_places_are_the_latest_readable_worlds_then_the_first_servers() {
     use super::home::{PLACE_SERVERS, PLACE_WORLDS, PlaceTarget, home_places};
-    use lumilio_core::{PackPolicy, ServerEntry, WorldInfo};
+    use lumilio_core::{GameMode, PackPolicy, ServerEntry, WorldInfo};
     let world = |folder: &str, played: Option<i64>, damaged: bool| WorldInfo {
         folder: folder.to_owned(),
         name: folder.to_uppercase(),
         last_played_ms: played,
         game_version: None,
         hardcore: folder == "hard",
+        game_mode: Some(if folder == "new" {
+            GameMode::Creative
+        } else {
+            GameMode::Survival
+        }),
+        cheats: false,
         icon: None,
         damaged,
         lock_touched_ms: None,
@@ -739,9 +745,21 @@ fn home_places_are_the_latest_readable_worlds_then_the_first_servers() {
         ]
     );
     assert_eq!(places.places.len(), PLACE_WORLDS + PLACE_SERVERS);
-    assert_eq!(places.places[0].detail, "世界 · 上次游玩 2 小时前");
-    assert_eq!(places.places[1].detail, "世界 · 上次游玩 3 天前 · 极限模式");
-    assert_eq!(places.places[3].detail, "服务器 · one.example");
+    let facts = |at: usize| {
+        let place = &places.places[at];
+        (place.mode, place.ago.as_deref())
+    };
+    assert_eq!(facts(0), (Some("创造"), Some("2 小时前")));
+    // Hardcore is survival with one life: its tag replaces the mode.
+    assert_eq!(facts(1), (Some("极限"), Some("3 天前")));
+    assert_eq!(facts(3), (None, None));
+    let seeds: std::collections::HashSet<_> =
+        places.places.iter().map(|place| place.seed).collect();
+    assert_eq!(
+        seeds.len(),
+        places.places.len(),
+        "each place has its own cover"
+    );
 
     // A version that cannot go straight into a world lists nothing to enter,
     // but keeps its record.

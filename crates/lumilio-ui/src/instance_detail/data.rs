@@ -212,12 +212,7 @@ impl InstanceDetailView {
     }
 
     /// Shows worlds or servers; the servers are read the first time.
-    pub(super) fn open_worlds_sub(
-        &mut self,
-        sub: usize,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
+    pub fn open_worlds_sub(&mut self, sub: usize, window: &mut Window, cx: &mut Context<Self>) {
         self.worlds_sub = sub.min(panels::WORLD_SUBS.len() - 1);
         if self.worlds_sub == 1 {
             if self.data.has(Section::Servers) {

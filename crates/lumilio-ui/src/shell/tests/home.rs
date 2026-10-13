@@ -243,7 +243,10 @@ fn places_of(instance: &str) -> crate::live::HomePlaces {
         places: vec![Place {
             target: PlaceTarget::World("New World".into()),
             name: "新的世界".into(),
-            detail: "世界 · 上次游玩 昨天".into(),
+            mode: Some("生存"),
+            ago: Some("昨天".into()),
+            picture: None,
+            seed: 7,
         }],
         play_seconds: 7200,
         worlds: 1,

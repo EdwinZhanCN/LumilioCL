@@ -1,6 +1,8 @@
-use super::library::{instance_meta, relative_time, world_of};
+use super::library::{instance_meta, relative_time, seed_of, world_of};
 use crate::home::{HomePresentation, RecentEntry, Subject};
-use lumilio_core::{HomeSummary, InstanceRecord, ServerEntry, WorldInfo};
+use gpui::{ImageSource, RenderImage};
+use lumilio_core::{GameMode, HomeSummary, InstanceRecord, ServerEntry, WorldInfo};
+use std::sync::Arc;
 
 /// Worlds and servers listed under Home's world, at most.
 pub const PLACE_WORLDS: usize = 3;
@@ -20,7 +22,68 @@ pub enum PlaceTarget {
 pub struct Place {
     pub target: PlaceTarget,
     pub name: String,
-    pub detail: String,
+    /// A world's mode ([`world_mode`]).
+    pub mode: Option<&'static str>,
+    /// How long ago a world was last played ("3 天前").
+    pub ago: Option<String>,
+    /// The place's own picture: a world's icon or the server's cached one.
+    pub picture: Option<PlacePicture>,
+    /// Seeds the cover drawn when there is no picture.
+    pub seed: u32,
+}
+
+/// A place's picture, read once when the places are.
+#[derive(Clone)]
+pub enum PlacePicture {
+    File(std::path::PathBuf),
+    Image(Arc<RenderImage>),
+}
+
+impl PlacePicture {
+    #[must_use]
+    pub fn source(&self) -> ImageSource {
+        match self {
+            Self::File(path) => path.clone().into(),
+            Self::Image(image) => image.clone().into(),
+        }
+    }
+}
+
+// Two images are the same only when they are the same picture.
+impl PartialEq for PlacePicture {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::File(a), Self::File(b)) => a == b,
+            (Self::Image(a), Self::Image(b)) => Arc::ptr_eq(a, b),
+            _ => false,
+        }
+    }
+}
+
+impl Eq for PlacePicture {}
+
+impl std::fmt::Debug for PlacePicture {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::File(path) => f.debug_tuple("File").field(path).finish(),
+            Self::Image(_) => f.write_str("Image"),
+        }
+    }
+}
+
+/// How a world is played, as its tag says: 极限 for a hardcore world (survival
+/// with one life), otherwise its mode; nothing when `level.dat` does not say.
+#[must_use]
+pub fn world_mode(world: &WorldInfo) -> Option<&'static str> {
+    if world.hardcore {
+        return Some(crate::tr!("world-mode-hardcore"));
+    }
+    world.game_mode.map(|mode| match mode {
+        GameMode::Survival => crate::tr!("world-mode-survival"),
+        GameMode::Creative => crate::tr!("world-mode-creative"),
+        GameMode::Adventure => crate::tr!("world-mode-adventure"),
+        GameMode::Spectator => crate::tr!("world-mode-spectator"),
+    })
 }
 
 /// Where the game Home continues left off, and its record.
@@ -45,27 +108,28 @@ pub fn home_places(
 ) -> HomePlaces {
     let mut readable: Vec<&WorldInfo> = worlds.iter().filter(|world| !world.damaged).collect();
     readable.sort_by_key(|world| std::cmp::Reverse(world.last_played_ms.unwrap_or(0)));
-    let worlds_shown = readable.into_iter().take(PLACE_WORLDS).map(|world| {
-        let mut detail = vec![crate::tr!("home-place-world").to_owned()];
-        if let Some(ms) = world.last_played_ms.filter(|ms| *ms > 0) {
-            detail.push(crate::tr!(
-                "home-place-last-played",
-                when = relative_time(ms as u64 / 1000, now)
-            ));
-        }
-        if world.hardcore {
-            detail.push(crate::tr!("home-place-hardcore").to_owned());
-        }
-        Place {
-            target: PlaceTarget::World(world.folder.clone()),
-            name: world.name.clone(),
-            detail: detail.join(" · "),
-        }
+    let worlds_shown = readable.into_iter().take(PLACE_WORLDS).map(|world| Place {
+        target: PlaceTarget::World(world.folder.clone()),
+        name: world.name.clone(),
+        mode: world_mode(world),
+        ago: world
+            .last_played_ms
+            .filter(|ms| *ms > 0)
+            .map(|ms| relative_time(ms as u64 / 1000, now)),
+        picture: world.icon.clone().map(PlacePicture::File),
+        seed: seed_of(&world.folder),
     });
     let servers_shown = servers.iter().take(PLACE_SERVERS).map(|server| Place {
         target: PlaceTarget::Server(server.address.clone()),
         name: server.name.clone(),
-        detail: crate::tr!("home-place-server", address = server.address.as_str()),
+        mode: None,
+        ago: None,
+        picture: server
+            .icon
+            .as_ref()
+            .and_then(|icon| crate::pixels::image(icon.width, icon.height, &icon.rgba))
+            .map(PlacePicture::Image),
+        seed: seed_of(&server.address),
     });
     let places = if lumilio_core::quick_play_world_unsupported(&record.game_version) {
         Vec::new()

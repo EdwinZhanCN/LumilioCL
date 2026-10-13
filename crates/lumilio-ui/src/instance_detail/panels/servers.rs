@@ -9,75 +9,73 @@ use crate::theme::ShellColors;
 use crate::toast::Toast;
 use crate::tr;
 use gpui::prelude::*;
-use gpui::{AnyElement, Context, ObjectFit, RenderImage, Window, div, img, px};
+use gpui::{AnyElement, Context, RenderImage, Window, div};
 use gpui_component::{h_flex, v_flex};
 use lumilio_core::ServerEntry;
 use std::sync::Arc;
 
-/// What a server row says under its name: where it is and how it is.
-#[must_use]
-pub fn server_detail(address: &str, state: Option<&ServerState>) -> String {
+/// A server row: its address under the name, and how it is in the form each
+/// fact takes — the version a tag, the players and the round trip readings,
+/// the message in its window. Before an answer the readings are a state.
+fn server_item(
+    row: usize,
+    server: &ServerEntry,
+    state: Option<&ServerState>,
+    colors: ShellColors,
+) -> kit::Item {
+    let item = kit::Item::new(server.name.clone()).note(server.address.clone());
+    let quiet = |word: &'static str, selector: &'static str| {
+        kit::status(word, kit::Tone::Off, colors)
+            .debug_selector(move || format!("{selector}-{row}"))
+    };
     match state {
         None | Some(ServerState::Checking) => {
-            tr!("instance-server-checking", address = address)
+            item.reading(quiet(tr!("instance-server-checking"), "server-checking"))
         }
-        Some(ServerState::Offline) => tr!("instance-server-offline", address = address),
+        Some(ServerState::Offline) => {
+            item.reading(quiet(tr!("instance-server-offline"), "server-offline"))
+        }
         Some(ServerState::Online(status)) => {
-            let mut parts = vec![address.to_owned()];
+            let mut item = item;
+            if let Some(version) = &status.version {
+                item = item.tag(version.clone(), kit::TagKind::Plain);
+            }
             if let Some(online) = status.online {
-                parts.push(match status.max {
-                    Some(max) => {
-                        tr!("instance-server-online-of", online = online, max = max)
-                    }
-                    None => tr!("instance-server-online", online = online),
-                });
+                item = item.reading(
+                    kit::count_of(u64::from(online), status.max.map(u64::from), colors)
+                        .debug_selector(move || format!("server-players-{row}")),
+                );
             }
             if let Some(ms) = status.latency_ms {
-                parts.push(format!("{ms} ms"));
+                item = item.reading(
+                    kit::signal(("server-signal", row), ms, colors)
+                        .debug_selector(move || format!("server-signal-{row}")),
+                );
             }
-            if let Some(version) = &status.version {
-                parts.push(version.clone());
+            if status.online.is_none() && status.latency_ms.is_none() {
+                item = item.reading(
+                    kit::status(tr!("instance-server-online"), kit::Tone::Ok, colors)
+                        .debug_selector(move || format!("server-online-{row}")),
+                );
             }
-            let motd = status.motd.split('\n').next().unwrap_or_default().trim();
-            if !motd.is_empty() {
-                parts.push(motd.chars().take(40).collect());
+            match kit::motd_window(&status.motd, colors) {
+                Some(window) => {
+                    item.below(window.debug_selector(move || format!("server-motd-{row}")))
+                }
+                None => item,
             }
-            parts.join(" · ")
         }
     }
 }
 
 /// A server row's leading mark: the icon the server sent or the game cached,
 /// or a procedural cover seeded by its address when there is none.
-fn icon_lead(icon: Option<&Arc<RenderImage>>, seed: u32, colors: ShellColors) -> AnyElement {
-    let tile = |inner: AnyElement| {
-        div()
-            .relative()
-            .flex_none()
-            .size(px(40.))
-            .rounded(px(4.))
-            .overflow_hidden()
-            .bg(colors.body.display)
-            .child(inner)
-            .into_any_element()
-    };
-    if let Some(image) = icon {
-        return tile(
-            img(image.clone())
-                .size_full()
-                .object_fit(ObjectFit::Cover)
-                .into_any_element(),
-        );
-    }
-    tile(
-        crate::cover::element(
-            seed,
-            crate::cover::Loader::Vanilla,
-            crate::home::WorldHint::Overworld,
-            colors.body.display,
-            px(0.),
-        )
-        .into_any_element(),
+fn icon_lead(icon: Option<&Arc<RenderImage>>, seed: u32, colors: ShellColors) -> gpui::Div {
+    kit::cover_tile(
+        icon.cloned().map(Into::into),
+        seed,
+        crate::cover::Loader::Vanilla,
+        colors,
     )
 }
 
@@ -110,8 +108,6 @@ impl InstanceDetailView {
             .iter()
             .enumerate()
             .map(|(row, server)| {
-                let detail =
-                    server_detail(&server.address, self.server_status.get(&server.address));
                 let address = server.address.clone();
                 // ia[instance.worlds]: 进入服务器 | 服务器行「进入」 | 启动并直连该服务器；1.20 以前的版本置灰并说明
                 let enter = {
@@ -219,13 +215,10 @@ impl InstanceDetailView {
                     crate::live::seed_of(&server.address),
                     colors,
                 );
-                kit::row(
-                    server.name.clone(),
-                    detail,
-                    Some(lead),
-                    Some(trail.into_any_element()),
-                    colors,
-                )
+                server_item(row, server, self.server_status.get(&server.address), colors)
+                    .lead(lead)
+                    .actions(trail)
+                    .render(colors)
             })
             .collect();
         v_flex()

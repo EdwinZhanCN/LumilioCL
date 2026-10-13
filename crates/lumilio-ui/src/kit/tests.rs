@@ -3,7 +3,7 @@ use gpui::prelude::*;
 use gpui::{IntoElement, Render, TestAppContext, Window, div};
 use gpui_component::{Theme, ThemeMode};
 
-use super::{TagKind, list, lit_bars, panel_list, tag};
+use super::{TagKind, list, lit_bars, motd_lines, motd_window, panel_list, signal_bars, tag};
 use crate::theme::{self, ShellColors};
 
 struct Sheet;
@@ -28,6 +28,10 @@ impl Render for Sheet {
                 TagKind::Orange,
                 colors,
             )))
+            .children(
+                motd_window(&lumilio_core::Motd::from_legacy("§eHello"), colors)
+                    .map(|window| window.debug_selector(|| "motd".into())),
+            )
     }
 }
 
@@ -90,7 +94,39 @@ fn a_hairline_table_has_an_ink_rule_on_top_and_hairlines_beneath(cx: &mut TestAp
                 .any(|quad| quad.background.as_solid() == Some(body.orange)),
             "{mode:?}: the orange tag fills with the signal orange"
         );
+        assert!(
+            quads(cx, "motd")
+                .iter()
+                .any(|quad| quad.background.as_solid() == Some(body.display)),
+            "{mode:?}: a server's message sits on the dark display, as in the game"
+        );
     }
+}
+
+#[test]
+fn signal_bars_follow_the_games_round_trip_steps() {
+    let steps: Vec<_> = [0, 149, 150, 299, 300, 599, 600, 999, 1000, 60_000]
+        .into_iter()
+        .map(signal_bars)
+        .collect();
+    assert_eq!(steps, [5, 5, 4, 4, 3, 3, 2, 2, 1, 1]);
+}
+
+#[test]
+fn a_message_window_shows_two_lines_without_the_space_around_them() {
+    use lumilio_core::Motd;
+    let text = |motd: &str| -> Vec<String> {
+        motd_lines(&Motd::from_legacy(motd))
+            .iter()
+            .map(|line| line.iter().map(|span| span.text.as_str()).collect())
+            .collect()
+    };
+    assert_eq!(
+        text("   §a Centered §bpart  \n second\nthird"),
+        ["Centered part", "second"]
+    );
+    assert_eq!(text("\n  only below  "), ["only below"]);
+    assert!(text(" \n  ").is_empty());
 }
 
 #[test]

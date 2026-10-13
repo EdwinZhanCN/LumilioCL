@@ -6,7 +6,8 @@ use super::controls::{LiveCtx, send};
 use super::library::card;
 use crate::home::{HomePresentation, body_label};
 use crate::kit;
-use crate::live::{HomePlaces, LibraryCard, LiveIntent};
+use crate::live::{HomePlaces, LibraryCard, LiveIntent, Place, PlacePicture, PlaceTarget};
+use crate::theme::ShellColors;
 use gpui::prelude::*;
 use gpui::{AnyElement, IntoElement, div, px};
 use gpui_component::{h_flex, v_flex};
@@ -89,6 +90,36 @@ pub fn record_readings(places: &HomePlaces) -> Vec<kit::Reading> {
     ]
 }
 
+/// A place without its key: its picture says whether it is a world or a
+/// server, a world adds its mode and when it was played, a server its address.
+fn place_item(place: &Place, loader: crate::cover::Loader, colors: ShellColors) -> kit::Item {
+    let server = match &place.target {
+        PlaceTarget::Server(address) => Some(address.clone()),
+        PlaceTarget::World(_) => None,
+    };
+    let loader = if server.is_some() {
+        crate::cover::Loader::Vanilla
+    } else {
+        loader
+    };
+    let mut item = kit::Item::new(place.name.clone()).lead(kit::cover_tile(
+        place.picture.as_ref().map(PlacePicture::source),
+        place.seed,
+        loader,
+        colors,
+    ));
+    if let Some(mode) = place.mode {
+        item = item.tag(mode, kit::TagKind::Ink);
+    }
+    if let Some(address) = server {
+        item = item.note(address);
+    }
+    if let Some(ago) = &place.ago {
+        item = item.reading(kit::reading(ago.clone(), colors));
+    }
+    item
+}
+
 /// 接着玩 beside 游戏记录. A game with no worlds or servers yet says where
 /// they will appear; one whose version cannot go straight in lists nothing.
 fn continued_group(places: &HomePlaces, can_start: bool, ctx: &LiveCtx) -> AnyElement {
@@ -107,6 +138,15 @@ fn continued_group(places: &HomePlaces, can_start: bool, ctx: &LiveCtx) -> AnyEl
                 .debug_selector(|| "home-places-empty".into()),
             ]
         } else {
+            // A world without its own icon gets the game's cover family.
+            let loader = ctx
+                .model
+                .library
+                .iter()
+                .find(|card| card.id == places.instance)
+                .map_or(crate::cover::Loader::Vanilla, |card| {
+                    crate::live::cover_loader(card.loader)
+                });
             places
                 .places
                 .iter()
@@ -124,13 +164,9 @@ fn continued_group(places: &HomePlaces, can_start: bool, ctx: &LiveCtx) -> AnyEl
                     )
                     .disabled(!can_start)
                     .debug_selector(move || format!("home-place-enter-{index}"));
-                    kit::row(
-                        place.name.clone(),
-                        place.detail.clone(),
-                        None,
-                        Some(key.into_any_element()),
-                        colors,
-                    )
+                    place_item(place, loader, colors)
+                        .actions(key)
+                        .render(colors)
                 })
                 .collect()
         };

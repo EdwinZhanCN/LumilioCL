@@ -8,7 +8,7 @@ use crate::theme::ShellColors;
 use crate::toast::Toast;
 use crate::tr;
 use gpui::prelude::*;
-use gpui::{AnyElement, Context, ObjectFit, Window, div, img, px};
+use gpui::{AnyElement, Context, Window, div, px};
 use gpui_component::IndexPath;
 use gpui_component::Sizable as _;
 use gpui_component::input::Input;
@@ -33,36 +33,59 @@ fn cover_lead(
     world: &WorldInfo,
     loader: Option<lumilio_core::Loader>,
     colors: ShellColors,
-) -> AnyElement {
-    let tile = |inner: AnyElement| {
-        div()
-            .relative()
-            .flex_none()
-            .size(px(40.))
-            .overflow_hidden()
-            .bg(colors.body.display)
-            .child(inner)
-            .into_any_element()
-    };
-    if let Some(path) = &world.icon {
-        return tile(
-            img(path.clone())
-                .size_full()
-                .object_fit(ObjectFit::Cover)
-                .into_any_element(),
-        );
-    }
-    let loader = loader.map_or(crate::cover::Loader::Vanilla, crate::live::cover_loader);
-    tile(
-        crate::cover::element(
-            crate::live::seed_of(&world.folder),
-            loader,
-            crate::home::WorldHint::Overworld,
-            colors.body.display,
-            px(0.),
-        )
-        .into_any_element(),
+) -> gpui::Div {
+    kit::cover_tile(
+        world.icon.clone().map(Into::into),
+        crate::live::seed_of(&world.folder),
+        loader.map_or(crate::cover::Loader::Vanilla, crate::live::cover_loader),
+        colors,
     )
+}
+
+/// A world's state beside its name: unreadable before being played.
+pub(super) fn world_state(world: &WorldInfo, playing: bool) -> Option<(&'static str, kit::Tone)> {
+    if world.damaged {
+        Some((tr!("instance-world-damaged"), kit::Tone::Failure))
+    } else if playing {
+        Some((tr!("instance-world-playing"), kit::Tone::Lit))
+    } else {
+        None
+    }
+}
+
+/// The tags under a world's name: how it is played, whether cheats are on,
+/// and the version that last saved it.
+pub(super) fn world_tags(world: &WorldInfo) -> Vec<(String, kit::TagKind)> {
+    let mut tags = Vec::new();
+    if let Some(mode) = crate::live::world_mode(world) {
+        tags.push((mode.to_owned(), kit::TagKind::Ink));
+    }
+    if world.cheats {
+        tags.push((tr!("world-cheats").to_owned(), kit::TagKind::Plain));
+    }
+    if let Some(version) = &world.game_version {
+        tags.push((version.clone(), kit::TagKind::Plain));
+    }
+    tags
+}
+
+/// A world row without its cover and keys. A copy keeps its name, so the
+/// folder tells the two apart, as in the game's own list.
+fn world_item(world: &WorldInfo, playing: bool, colors: ShellColors) -> kit::Item {
+    let mut item = kit::Item::new(world.name.clone());
+    if let Some((word, tone)) = world_state(world, playing) {
+        item = item.state(word, tone);
+    }
+    for (text, kind) in world_tags(world) {
+        item = item.tag(text, kind);
+    }
+    if world.folder != world.name {
+        item = item.note(world.folder.clone());
+    }
+    if let Some(played) = world.last_played_ms.filter(|ms| *ms > 0) {
+        item = item.reading(kit::reading(clock(played as u64 / 1000), colors));
+    }
+    item
 }
 
 /// The worlds that match `query` (in the name or the folder, ignoring case),
@@ -272,28 +295,6 @@ impl InstanceDetailView {
             .iter()
             .enumerate()
             .map(|(row, world)| {
-                let mut detail = Vec::new();
-                if playing == Some(world.folder.as_str()) {
-                    detail.push(tr!("instance-world-playing").to_owned());
-                }
-                if world.damaged {
-                    detail.push(tr!("instance-world-damaged").to_owned());
-                }
-                if world.hardcore {
-                    detail.push(tr!("home-place-hardcore").to_owned());
-                }
-                if let Some(version) = &world.game_version {
-                    detail.push(version.clone());
-                }
-                if let Some(played) = world.last_played_ms.filter(|ms| *ms > 0) {
-                    detail.push(tr!(
-                        "instance-world-played-at",
-                        when = clock(played as u64 / 1000)
-                    ));
-                }
-                if detail.is_empty() {
-                    detail.push(world.folder.clone());
-                }
                 let folder = world.folder.clone();
                 let too_old = self.record.as_ref().is_some_and(|record| {
                     lumilio_core::quick_play_world_unsupported(&record.game_version)
@@ -379,13 +380,10 @@ impl InstanceDetailView {
                     self.record.as_ref().map(|record| record.loader),
                     colors,
                 );
-                kit::row(
-                    world.name.clone(),
-                    detail.join(" · "),
-                    Some(lead),
-                    Some(trail.into_any_element()),
-                    colors,
-                )
+                world_item(world, playing == Some(world.folder.as_str()), colors)
+                    .lead(lead)
+                    .actions(trail)
+                    .render(colors)
             })
             .collect();
         let controls = h_flex()

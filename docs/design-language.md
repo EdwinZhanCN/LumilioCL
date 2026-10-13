@@ -178,8 +178,8 @@ layer that has nothing in it; never reorder or merge layers.
    below the tabs), sort, page size, pager, a filter sidebar.
 5. **Content** — one of:
    - a card grid (Library; instance cards are faceplates, §12);
-   - a list block (a panel with hairline rows; row actions are ghost or
-     white keys);
+   - a list block (a panel with hairline rows drawn as §12 List rows; row
+     actions are ghost or white keys);
    - settings groups (§10).
 
    Loading, empty and error states replace the content in place, never the
@@ -405,6 +405,10 @@ apart by place, not by hue alone:
   when set.
 - **Radio**: the control is an LED in a 14 px recessed socket, lit when
   chosen.
+- **Signal bars**: five rising 3 px bars for a server's round trip, lit in
+  ink by the game's own steps (five under 150 ms, then one fewer at 300,
+  600 and 1000 ms); the tooltip gives the milliseconds. They appear only
+  beside a server's player count.
 
 ### Port-label tabs
 
@@ -533,6 +537,26 @@ Tags are 20 px tall, 2 px radius, 11 px mono:
 
 A status is not a tag: it is an LED and a word ("● 可以启动").
 
+### List rows
+
+A row of a list block (worlds, servers, Home's places) never joins its facts
+into one line with "·". Each fact takes the form of what it is
+(`kit::Item`):
+- the name, with its **state** beside it as an LED and a word: lit orange
+  for what is happening now (正在游玩), green for works (在线), the failure
+  colour for cannot be used (无法读取), unlit for not known or not there
+  (正在检查, 无法连接);
+- under the name, **tags** (a mode is ink: 生存, 极限; a version or a plain
+  fact is plain: 作弊, 1.21.1) and then a **note** in muted mono (an address,
+  a folder that differs from the name);
+- on the trailing edge, **readings** in mono at a common minimum width, so
+  rows keep their keys in line: a time ("3 天前"), a count ("12/100", the
+  count in ink and the limit muted), signal bars;
+- the row's keys last.
+
+A row's leading picture is a 40 px display window (3 px corners): the
+item's own picture, or a cover seeded by its identity.
+
 ### Faceplates
 
 Instance cards are faceplates:
@@ -541,8 +565,14 @@ Instance cards are faceplates:
 - **Top**: the name (20 px light) over the loader label (orange mono).
 - **Display window**: the cover sits in it (3 px radius, no dissolve). This
   is the one place the world is framed; the navigation's instance thumbnails
-  (28 px chip, 32 px popover rows) are the same window.
-- **Bottom**: a silkscreen meta line and the favourite LED.
+  (28 px chip, 32 px popover rows) and list rows' leading pictures are the
+  same window. A server's message of the day is the one text from the game
+  that is framed: it sits in the same dark window, in mono, with the game's
+  own colours and styles (its uncoloured text is the game's grey), at most
+  two lines without the space around them. The game's colours appear
+  nowhere outside that window.
+- **Bottom**: the game version as a plain tag and, on the trailing edge,
+  when it was last played as a mono reading; then the key row.
 - Hover turns the border ink.
 
 Screw marks appear on faceplates only.
