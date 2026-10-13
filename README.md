@@ -28,16 +28,18 @@ LumilioCL 使用 Rust 开发，桌面界面基于 [GPUI](https://www.gpui.rs/) �
 [gpui-kit](https://github.com/longbridge/gpui-kit) 构建，底层组件使用本仓库维护的
 gpui-component 0.7 Fork。桌面应用不依赖 Electron 或 WebView。
 
-- **游戏库**：新建原版、Fabric 或 Quilt 游戏，用收藏、合集和搜索管理。可以导入 `.mrpack`
-  和 MultiMC / Prism 整合包，也可以把其他启动器（MultiMC、Prism、`.minecraft`）里的游戏搬
-  过来，原文件不动。
-- **发现**：浏览并安装 Modrinth 上的模组、资源包、光影和整合包，按游戏版本和加载器筛选。
+- **游戏库**：新建原版、Fabric 或 Quilt 游戏，用收藏、合集和搜索管理。可以导入 `.mrpack`、
+  CurseForge 和 MultiMC / Prism 整合包，也可以把其他启动器（MultiMC、Prism、`.minecraft`）
+  里的游戏搬过来，原文件不动。
+- **发现**：浏览并安装 Modrinth 和 CurseForge 上的模组、资源包、光影和整合包，按游戏版本和
+  加载器筛选。CurseForge 作者只允许在网站下载的文件，先找 Modrinth 上的同一文件，找不到的
+  会列出下载页。
 - **Java**：自动下载并管理每个游戏需要的 Java，不用自己装。
 - **账户**：离线账户（可以换皮肤），以及 LittleSkin 等第三方认证服务器。
 - **游戏页**：管理内容、世界和服务器，查看截图和启动历史，做完整备份和恢复。游戏崩溃时，
   诊断页会说明可能的原因。
 - **世界地图**：查看种子预测、存档地图和 Xaero 地图，叠加结构物及路径点等图层。
-- **内置插件**：崩溃分析、Litematica 投影（材料清单和 3D 预览）、Modrinth 内容源、世界地图与 Discord 状态显示（默认关闭）。社区 WASM 插件尚在规划中，当前不支持独立安装第三方插件。
+- **内置插件**：崩溃分析、Litematica 投影（材料清单和 3D 预览）、Modrinth 与 CurseForge 内容源、世界地图与 Discord 状态显示（默认关闭）。社区 WASM 插件尚在规划中，当前不支持独立安装第三方插件。
 
 > [!NOTE]
 > Microsoft 正版登录的流程已经做好，这个启动器应用注册已经通过 Mojang 审批。

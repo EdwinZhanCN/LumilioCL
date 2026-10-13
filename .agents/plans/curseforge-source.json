@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "curseforge-source",
   "title": "CurseForge 内容源",
-  "summary": "2026-10-13：功能完成，等待 just check 与 Project Maintainer 实机验收。新增 CurseForge 内容源插件；内核按来源区分发现、详情、安装、切换版本、依赖、重试与内容识别；发现页可切换来源；CurseForge 整合包可从发现页安装或本地导入，作者不允许分发的文件先到 Modrinth 按 SHA-1 找同一文件，找不到的列在游戏内容页并可添加已下载的文件。",
+  "summary": "2026-10-13：功能完成，just check、just web、just docs 通过；等 Project Maintainer 实机验收（T7），使用指南页等 web/user-guide 合入后补（T6）。新增 CurseForge 内容源插件；内核按来源区分发现、详情、安装、切换版本、依赖、重试与内容识别；发现页可切换来源；CurseForge 整合包可从发现页安装或本地导入，作者不允许分发的文件先到 Modrinth 按 SHA-1 找同一文件，找不到的列在游戏内容页并可添加已下载的文件。",
   "status": "in_progress",
   "visibility": "internal",
   "scope": {
@@ -60,7 +60,7 @@
       "id": "T7",
       "title": "验证",
       "status": "in_progress",
-      "acceptance": "just check 通过；在临时数据目录运行启动器，实际搜索、打开详情、安装模组、安装含不允许分发文件的整合包并查看结果。"
+      "acceptance": "just check 通过；在临时数据目录运行启动器查看发现页、CurseForge 详情与待下载面板（已完成）。剩下由 Project Maintainer 实机验收：切换来源、从 CurseForge 安装 Mod 与整合包、添加已下载的文件。"
     }
   ],
   "validation": [
@@ -74,7 +74,7 @@
     },
     {
       "criterion": "just check 通过。",
-      "result": null
+      "result": "2026-10-13：just check 通过（构建、1429 项测试与文档测试、clippy、fmt）；just web 与 just docs 通过。"
     },
     {
       "criterion": "真实 API 与实机查看。",

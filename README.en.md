@@ -30,10 +30,12 @@ gpui-component 0.7 for underlying components. The desktop app uses neither Elect
 and supports Simplified Chinese and English.
 
 - **Library**: create vanilla, Fabric or Quilt games and organize them with favorites, collections
-  and search. Import `.mrpack` and MultiMC / Prism modpacks, or bring games over from other
-  launchers (MultiMC, Prism, `.minecraft`) without touching the originals.
-- **Discover**: browse and install mods, resource packs, shaders and modpacks from Modrinth,
-  filtered by game version and loader.
+  and search. Import `.mrpack`, CurseForge and MultiMC / Prism modpacks, or bring games over from
+  other launchers (MultiMC, Prism, `.minecraft`) without touching the originals.
+- **Discover**: browse and install mods, resource packs, shaders and modpacks from Modrinth and
+  CurseForge, filtered by game version and loader. When a CurseForge author allows downloads only
+  on the website, the launcher looks for the same file on Modrinth, and lists the download page
+  of each file it cannot find.
 - **Java**: the right Java runtime for each game is downloaded and managed for you.
 - **Accounts**: offline accounts (with skins) and third-party auth servers such as LittleSkin.
 - **Game page**: manage content, worlds and servers; see screenshots and launch history; make full
@@ -41,7 +43,7 @@ and supports Simplified Chinese and English.
 - **World map**: explore seed predictions, save data and Xaero maps with structures and waypoint
   overlays.
 - **Built-in plugins**: crash analysis, Litematica schematics (material lists and a 3D
-  preview), Modrinth content, world exploration, and Discord presence (off by default).
+  preview), Modrinth and CurseForge content, world exploration, and Discord presence (off by default).
   Installable third-party WASM plugins are planned, not available in this release.
 
 > [!NOTE]

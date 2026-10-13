@@ -4,7 +4,7 @@
 
 Status: InProgress
 
-2026-10-13：功能完成，等待 just check 与 Project Maintainer 实机验收。新增 CurseForge 内容源插件；内核按来源区分发现、详情、安装、切换版本、依赖、重试与内容识别；发现页可切换来源；CurseForge 整合包可从发现页安装或本地导入，作者不允许分发的文件先到 Modrinth 按 SHA-1 找同一文件，找不到的列在游戏内容页并可添加已下载的文件。
+2026-10-13：功能完成，just check、just web、just docs 通过；等 Project Maintainer 实机验收（T7），使用指南页等 web/user-guide 合入后补（T6）。新增 CurseForge 内容源插件；内核按来源区分发现、详情、安装、切换版本、依赖、重试与内容识别；发现页可切换来源；CurseForge 整合包可从发现页安装或本地导入，作者不允许分发的文件先到 Modrinth 按 SHA-1 找同一文件，找不到的列在游戏内容页并可添加已下载的文件。
 
 ## Scope
 
@@ -32,7 +32,7 @@ Status: InProgress
 - [ ] T6 — 构建与文档 (InProgress)
   Acceptance: release.yml 构建时注入 CF_API_KEY；贡献文档（中英）写明本地开发把 CF_API_KEY 放进用户级 ~/.cargo/config.toml 的 [env]；backlog 中已完成的条目删除。使用指南页在 web/user-guide 分支合入（features/ 改为 guide/）后补写，避免与它冲突。
 - [ ] T7 — 验证 (InProgress)
-  Acceptance: just check 通过；在临时数据目录运行启动器，实际搜索、打开详情、安装模组、安装含不允许分发文件的整合包并查看结果。
+  Acceptance: just check 通过；在临时数据目录运行启动器查看发现页、CurseForge 详情与待下载面板（已完成）。剩下由 Project Maintainer 实机验收：切换来源、从 CurseForge 安装 Mod 与整合包、添加已下载的文件。
 
 ## Validation
 
@@ -41,7 +41,7 @@ Status: InProgress
 - 窄测试：插件、内核、界面与应用。
   Result: 2026-10-13：lumilio-plugin-curseforge 15 项；lumilio-core 全部 725 项通过，含新增的跨来源识别、Modrinth 回退、手动下载、CurseForge 整合包端到端导入、旧重试记录、查询裁剪与 Murmur2 测试向量（与 CurseForge 给 JEI 的指纹 4164405417 一致的参考实现生成）；lumilio-ui 与 lumilio-app 全部通过，含来源切换、待下载面板与按需更新日志的界面测试。守卫已验证：去掉「已识别的文件不再问下一个来源」后跨来源测试失败。
 - just check 通过。
-  Result: pending
+  Result: 2026-10-13：just check 通过（构建、1429 项测试与文档测试、clippy、fmt）；just web 与 just docs 通过。
 - 真实 API 与实机查看。
   Result: 2026-10-13：curseforge_live（默认忽略）对真实 API：搜索、筛选、JEI 详情（3854 个版本、HTML 简介）、单版本更新日志 1.3 秒内完成；安装整合包 keo optimized（1459394，26 个文件）用时约 5 秒，2 个禁止分发的文件从 Modrinth 下载，1 个光影包列为待下载并带下载页；该游戏的 Mod 识别 0.6 秒：Modrinth 20、CurseForge 3，8 个有更新。启动器实机查看了发现页（两个来源、中文分类、无关注数、分页上限）、CurseForge 详情页（HTML 简介、图片、版本列表）与游戏内容页的待下载面板。
 
