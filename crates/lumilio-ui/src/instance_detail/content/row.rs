@@ -58,7 +58,7 @@ impl InstanceDetailView {
             match &source {
                 Some(source) => {
                     let handler = self.handler.clone();
-                    let slug = source.slug.clone();
+                    let (from, slug) = (source.source.clone(), source.slug.clone());
                     div()
                         .id(("content-title", index))
                         .cursor_pointer()
@@ -67,6 +67,7 @@ impl InstanceDetailView {
                             handler(
                                 InstanceIntent::OpenProject {
                                     kind,
+                                    source: from.clone(),
                                     slug: slug.clone(),
                                 },
                                 window,
@@ -81,7 +82,7 @@ impl InstanceDetailView {
         };
         let byline = match source.as_ref().and_then(|source| source.author.clone()) {
             Some(author) => author,
-            None if source.is_some() => "Modrinth".to_owned(),
+            None if let Some(source) = &source => source.source_name.clone(),
             None => tr!("instance-content-local-file").to_owned(),
         };
 
@@ -187,10 +188,10 @@ impl InstanceDetailView {
                 )
             })
         }];
-        if let Some(source) = &source {
-            let link = lumilio_core::project_page_url(kind, &source.slug);
+        if let Some(source) = source.as_ref().filter(|source| !source.page_url.is_empty()) {
+            let link = source.page_url.clone();
             let view = view.clone();
-            // ia[instance.content]: 复制链接 | 行 ⋯ 菜单（仅已识别） | 复制 Modrinth 项目链接，toast“链接已复制”
+            // ia[instance.content]: 复制链接 | 行 ⋯ 菜单（仅已识别） | 复制项目在它来源网站上的链接，toast“链接已复制”
             more.push(kit::MenuEntry::new(
                 tr!("discover-copy-link"),
                 move |_, cx| {

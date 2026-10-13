@@ -165,11 +165,22 @@ impl<T: Transport + Clone> LauncherService<T> {
             });
         }
 
-        let sha1s: Vec<String> = hashed.iter().map(|(_, sha1, _, _)| sha1.clone()).collect();
-        let identified = match read_unless_cancelled(&cancel, self.content_client()).await {
-            Ok(client) => client.identify(&sha1s).await.ok(),
-            Err(ServiceError::Cancelled) => return Err(ServiceError::Cancelled),
-            Err(_) => None,
+        // A .mrpack links files only on Modrinth, so only a source of
+        // Modrinth's catalog can say which files it may link.
+        let sha1s: Vec<crate::discover::FileHashes> = hashed
+            .iter()
+            .map(|(_, sha1, _, _)| crate::discover::FileHashes::sha1(sha1.clone()))
+            .collect();
+        let client = read_unless_cancelled(&cancel, async {
+            Ok(self
+                .plugins
+                .catalog_client(crate::discover::Catalog::Modrinth)
+                .await)
+        })
+        .await?;
+        let identified = match client {
+            Some(client) => client.identify(&sha1s).await.ok(),
+            None => None,
         };
         let lookup_failed = identified.is_none() && !sha1s.is_empty();
         let linked = identified

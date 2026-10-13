@@ -54,8 +54,12 @@ pub fn card_tags(hit: &SearchHit, query: &DiscoverQuery, filters: &FilterModel) 
     let filtered: Vec<&str> = query
         .categories
         .iter()
-        .chain(&query.loaders)
-        .map(|pick| pick.name.as_str())
+        .map(|pick| {
+            filters
+                .category_name(hit.kind, &pick.name)
+                .unwrap_or(pick.name.as_str())
+        })
+        .chain(query.loaders.iter().map(|pick| pick.name.as_str()))
         .collect();
     let not_for_kind = filters.loaders_not_for(hit.kind);
     let hide_loaders = !query.loaders.is_empty() || matches!(hit.kind, ProjectKind::ResourcePack);

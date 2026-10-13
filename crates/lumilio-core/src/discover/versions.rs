@@ -1,4 +1,4 @@
-use super::kinds::{ProjectKind, loader_tag};
+use super::kinds::{ProjectKind, TextFormat, loader_tag};
 use crate::instance::Loader;
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -27,11 +27,23 @@ pub struct Dependency {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VersionFile {
+    /// Empty when the author lets people download the file only on the
+    /// source's site (see `download_page`).
     pub url: String,
     pub filename: String,
     pub primary: bool,
     pub size: u64,
     pub sha1: Option<String>,
+    /// The file's page on the source's site.
+    pub download_page: Option<String>,
+}
+
+impl VersionFile {
+    /// Whether a launcher may download the file itself.
+    #[must_use]
+    pub fn downloadable(&self) -> bool {
+        !self.url.is_empty()
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -48,8 +60,46 @@ pub struct Version {
     pub files: Vec<VersionFile>,
     pub dependencies: Vec<Dependency>,
     pub downloads: u64,
-    /// Markdown; empty unless asked for (`versions_with_changelog`).
+    /// Empty unless asked for (`versions_with_changelog`), and empty from
+    /// sources that give changelogs one at a time (`ContentClient::changelog`).
     pub changelog: String,
+    pub changelog_format: TextFormat,
+}
+
+/// What a file a pack names is, which decides the folder it goes into.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PackFileKind {
+    Mod,
+    ResourcePack,
+    Shader,
+    DataPack,
+    /// A type the launcher has no folder for (a world, configuration, …).
+    Other,
+}
+
+impl PackFileKind {
+    /// The game-directory folder files of this kind go into.
+    #[must_use]
+    pub const fn folder(self) -> Option<&'static str> {
+        match self {
+            Self::Mod => Some("mods"),
+            Self::ResourcePack => Some("resourcepacks"),
+            Self::Shader => Some("shaderpacks"),
+            Self::DataPack => Some("datapacks"),
+            Self::Other => None,
+        }
+    }
+}
+
+/// One file a pack names by project and version ID, as its source knows it.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ResolvedFile {
+    pub project_id: String,
+    pub version_id: String,
+    /// The project's name; empty when the source did not say.
+    pub title: String,
+    pub kind: PackFileKind,
+    pub file: VersionFile,
 }
 
 impl Version {

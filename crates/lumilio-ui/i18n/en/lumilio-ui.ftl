@@ -280,12 +280,12 @@ discover-kind-resource-pack = Resource pack
 discover-kind-shader = Shader
 discover-searching = Searching…
 discover-no-source = No content source is available
-discover-no-source-help = Turn on a content source (such as Modrinth) in Settings › Plugins, then come back
-discover-offline = You're offline, or Modrinth can't be reached
+discover-no-source-help = Turn on a content source (such as Modrinth or CurseForge) in Settings › Plugins, then come back
+discover-offline = You're offline, or { $source } can't be reached
 discover-offline-help = Connect to the network and try again
 discover-no-results = No results
 discover-no-results-help = Try another keyword or loosen the filters
-discover-browse-modrinth = Browse on Modrinth
+discover-browse-source = Browse on { $source }
 discover-search-again = Search again
 discover-page-size = Results per page
 discover-sort-relevance = Relevance
@@ -308,7 +308,15 @@ discover-install = Install
 discover-installing = Installing…
 discover-update = Update
 discover-installed = Installed
-discover-open-modrinth = Open on Modrinth
+discover-open-in = Open on { $source }
+discover-site-only = Website download only
+discover-manual-download = The author of { $file } allows downloading it only on the website
+discover-open-download-page = Open download page
+discover-modpack-missing = Installed modpack { $name }; { $count ->
+    [one] 1 file has
+   *[other] { $count } files have
+} to be downloaded on the website
+discover-needs-curseforge = To import a CurseForge modpack, turn on CurseForge in Settings › Plugins first
 discover-copy-link = Copy link
 discover-link-copied = Project link copied
 discover-install-started = Installing { $title }; progress is in Activity
@@ -714,7 +722,7 @@ project-tab-gallery = Gallery
 project-channel-release = Release
 project-channel-beta = Beta
 project-channel-alpha = Alpha
-project-offline = Can't reach Modrinth
+project-offline = Can't reach the content source
 project-offline-help = Check your network and open it again
 project-gallery-empty = This project has no gallery
 project-open-in-browser = Open in browser
@@ -975,6 +983,20 @@ instance-content-show-incompatible = Show incompatible versions
 instance-content-version-meta = { $loaders } · { $versions }
 instance-content-version-meta-incompatible = { $loaders } · { $versions } · incompatible with this game
 instance-content-no-changelog = This version has no changelog
+instance-pending-title = { $count ->
+    [one] 1 file is missing
+   *[other] { $count } files are missing
+}
+instance-pending-help = The authors allow downloading these files only on the website. Download them, then add them here; the launcher checks each file and puts it where it belongs.
+instance-pending-add = Add downloaded files…
+instance-pending-page = Download page
+instance-pending-place-yourself = { $file }: you decide where it goes
+instance-pending-added = { $count ->
+    [one] Put 1 file in place
+   *[other] Put { $count } files in place
+}
+instance-pending-not-wanted = { $file } is not one of the missing files
+instance-pending-failed = Couldn't put { $file } in place
 
 instance-world-imported = Imported "{ $name }"
 instance-world-copied = Copied as "{ $name }"
@@ -1383,7 +1405,7 @@ account-make-current = Make current account
 
 library-search = Search games
 library-all-loaders = All loaders
-discover-search = Search Modrinth, press Enter
+discover-search = Search { $source }, press Enter
 discover-version-search = Search versions
 
 ## Settings

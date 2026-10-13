@@ -187,7 +187,9 @@ just package               # package for this platform into dist/
 - `LUMILIO_PAGE` opens a page directly, e.g. `library:2`, `discover:1`, `activity`,
   `instance:1:4:1` (id, section, sub-tab; zero-based).
 - `LUMILIO_INSTANCE=<id>` (with `LUMILIO_INSTANCE_TAB`, `LUMILIO_INSTANCE_GROUP`) and
-  `LUMILIO_PROJECT=mod/sodium` open a game or a project detail.
+  `LUMILIO_PROJECT=mod/sodium` open a game or a project detail. Projects come from Modrinth;
+  `LUMILIO_PROJECT_SOURCE=lumilio.curseforge` takes them from CurseForge (use the number,
+  e.g. `mod/238222`).
 - `LUMILIO_REVIEW_APPEARANCE=light|dark`, `LUMILIO_REVIEW_MIN=1` (720×480),
   `LUMILIO_REVIEW_SIZE=1600x1000` (a fixed logical window size for recordings),
   `LUMILIO_REVIEW_STILL=1` (reduced motion).

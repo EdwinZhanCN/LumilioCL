@@ -139,6 +139,7 @@ pub(super) fn on_live_intent(
         LiveIntent::ImportPack => import_pack(wiring, cx),
         LiveIntent::OpenInstance(id) => open_instance(wiring, id, None, window, cx),
         LiveIntent::SaveVersionAs {
+            source,
             project,
             version_id,
             file_name,
@@ -169,6 +170,7 @@ pub(super) fn on_live_intent(
                         async move {
                             service
                                 .save_version_as(
+                                    &source,
                                     &project,
                                     &version_id,
                                     &target,
@@ -178,7 +180,7 @@ pub(super) fn on_live_intent(
                         },
                         move |shell, result, cx| {
                             shell.toast(
-                                outcome(
+                                super::jobs::install_outcome(
                                     result,
                                     |_| tr!("project-saved-to", path = path.display().to_string()),
                                     tr!("project-save-failed", title = title.as_str()),
@@ -193,6 +195,7 @@ pub(super) fn on_live_intent(
         }
         LiveIntent::UpdateInstalled {
             kind,
+            source,
             project,
             title,
             file_name,
@@ -218,6 +221,7 @@ pub(super) fn on_live_intent(
                             &instance,
                             kind,
                             &file_name,
+                            &source,
                             &project,
                             &version_id,
                             CancellationToken::new(),
@@ -227,7 +231,7 @@ pub(super) fn on_live_intent(
                 move |shell, result, cx| {
                     state.borrow_mut().installed_key = None;
                     shell.toast(
-                        outcome(
+                        super::jobs::install_outcome(
                             result,
                             |file| {
                                 tr!(
@@ -683,12 +687,16 @@ pub(super) fn on_live_intent(
         }
         LiveIntent::Search(query) => search(wiring, &query, cx),
         LiveIntent::LoadFilters => load_filters(wiring, cx),
-        LiveIntent::OpenProject { kind, slug } => open_project(wiring, kind, slug, window, cx),
+        LiveIntent::OpenPage(url) => cx.open_url(&url),
+        LiveIntent::OpenProject { kind, source, slug } => {
+            open_project(wiring, kind, source, slug, window, cx)
+        }
         LiveIntent::Install {
             kind,
+            source,
             slug,
             title,
             version,
-        } => install(wiring, kind, slug, title, version, window, cx),
+        } => install(wiring, kind, source, slug, title, version, window, cx),
     }
 }

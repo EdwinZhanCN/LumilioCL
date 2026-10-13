@@ -83,9 +83,15 @@ impl ContentSource for Modrinth {
                     Sort::Newest,
                     Sort::Updated,
                 ],
+                browse_url: Some(format!(
+                    "https://modrinth.com/{}s",
+                    protocol::Kind::protocol_name(kind)
+                )),
             })
             .collect(),
             fingerprints: vec![FingerprintKind::Sha1],
+            catalog: Some(Catalog::Modrinth),
+            text_format: TextFormat::Markdown,
         }
     }
 
@@ -138,6 +144,14 @@ impl ContentSource for Modrinth {
         version: &VersionRef,
     ) -> Result<Vec<Dependency>, PluginError> {
         Ok(read_version(ctx, version)?.dependencies)
+    }
+
+    fn changelog(
+        &self,
+        ctx: &dyn HostContext,
+        version: &VersionRef,
+    ) -> Result<String, PluginError> {
+        Ok(read_version(ctx, version)?.changelog)
     }
 
     fn filter_choices(&self, ctx: &dyn HostContext) -> Result<FilterChoices, PluginError> {

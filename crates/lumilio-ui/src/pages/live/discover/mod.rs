@@ -1,8 +1,8 @@
 //! The Discover page: the browse page of Modrinth App, drawn in this
-//! launcher's own language (ADR 0022). Inside a game's Content tab it browses
-//! *for that game*: an install header names it, its version and loader are
-//! provided to the search (locked until released), and tabs that cannot
-//! apply are not offered.
+//! launcher's own language (ADR 0022), over whichever content source is
+//! chosen. Inside a game's Content tab it browses *for that game*: an install
+//! header names it, its version and loader are provided to the search
+//! (locked until released), and tabs that cannot apply are not offered.
 
 mod card;
 mod sidebar;
@@ -102,11 +102,11 @@ pub fn discover(ctx: &LiveCtx) -> impl IntoElement {
             colors,
         )
         .into_any_element(),
-        // ia[discover]: 连不上 | 搜索失败的整页提示 | 说明连不上 Modrinth，附技术详情；改任何条件会再试一次
+        // ia[discover]: 连不上 | 搜索失败的整页提示 | 说明连不上正在浏览的来源，附技术详情；改任何条件会再试一次
         SearchStatus::Failed(message) => v_flex()
             .items_center()
             .child(kit::empty(
-                tr!("discover-offline"),
+                tr!("discover-offline", source = ctx.model.browsed_source_name()),
                 tr!("discover-offline-help"),
                 colors,
             ))
@@ -132,15 +132,22 @@ pub fn discover(ctx: &LiveCtx) -> impl IntoElement {
             .into_any_element(),
     };
 
-    let actions = kit::PageActions::new("live-discover-actions")
-        .more(kit::MenuEntry::new(tr!("discover-browse-modrinth"), {
-            let url = lumilio_core::browse_page_url(query.kind);
-            move |_, cx| cx.open_url(&url)
-        }))
-        .more(kit::MenuEntry::new(
-            tr!("discover-search-again"),
-            send(&ctx.handler, LiveIntent::Search(query.clone())),
+    let mut actions = kit::PageActions::new("live-discover-actions");
+    if let Some(url) = ctx.model.filters.browse_url(query.kind) {
+        let url = url.to_owned();
+        // ia[discover]: 在来源网站浏览 | L2 ⋯ 菜单「在（来源）中浏览」 | 浏览器打开这个来源当前类型的列表页
+        actions = actions.more(kit::MenuEntry::new(
+            tr!(
+                "discover-browse-source",
+                source = ctx.model.browsed_source_name()
+            ),
+            move |_, cx| cx.open_url(&url),
         ));
+    }
+    let actions = actions.more(kit::MenuEntry::new(
+        tr!("discover-search-again"),
+        send(&ctx.handler, LiveIntent::Search(query.clone())),
+    ));
 
     v_flex()
         .w_full()
@@ -165,7 +172,7 @@ pub fn discover(ctx: &LiveCtx) -> impl IntoElement {
                 .into_any_element(),
             ),
             Some(
-                // ia[discover]: 搜索 | L3 搜索框（回车确认，有清除键） | 按关键词搜索 Modrinth
+                // ia[discover]: 搜索 | L3 搜索框（回车确认，有清除键） | 按关键词搜索正在浏览的来源
                 div()
                     .debug_selector(|| "live-discover-search".into())
                     .child(kit::search_field(&ctx.controls.discover_search, colors))
@@ -192,7 +199,8 @@ pub fn discover(ctx: &LiveCtx) -> impl IntoElement {
                                     h_flex()
                                         .gap_3()
                                         .items_center()
-                                        // ia[discover]: 排序 / 显示数量 | L4 两个下拉：相关度、下载量、关注数、发布时间、更新时间；每页 5 / 10 / 15 / 20 / 50 / 100 | 重新搜索；按发布时间排序时卡片显示发布时间，其余显示更新时间
+                                        .children(source_segments(ctx))
+                                        // ia[discover]: 排序 / 显示数量 | L4 两个下拉：相关度、下载量、关注数、发布时间、更新时间（只列来源支持的）；每页 5 / 10 / 15 / 20 / 50 / 100 | 重新搜索；按发布时间排序时卡片显示发布时间，其余显示更新时间
                                         .child(toolbar_select(
                                             tr!("library-sort"),
                                             &ctx.controls.sort,
@@ -215,6 +223,36 @@ pub fn discover(ctx: &LiveCtx) -> impl IntoElement {
                 )
                 .child(sidebar::sidebar(ctx)),
         )
+}
+
+/// The content sources to browse, when more than one is on.
+fn source_segments(ctx: &LiveCtx) -> Option<impl IntoElement> {
+    let sources = &ctx.model.sources;
+    if sources.len() < 2 {
+        return None;
+    }
+    let names: Vec<String> = sources.iter().map(|source| source.name.clone()).collect();
+    let ids: Vec<String> = sources.iter().map(|source| source.id.clone()).collect();
+    let active = ids
+        .iter()
+        .position(|id| *id == ctx.model.query.source)
+        .unwrap_or(0);
+    let change = ctx.change.clone();
+    // ia[discover]: 切换来源 | L4 分段键：Modrinth / CurseForge（只开了一个来源时不显示） | 在这个来源重新搜索：搜索词、类型和游戏版本保留，加载器、分类和排序重新开始；筛选项换成这个来源的；记住下次打开的来源
+    Some(
+        div()
+            .debug_selector(|| "live-discover-sources".into())
+            .child(crate::controls::Segments::new(
+                "live-discover-source",
+                &names,
+                active,
+                move |index, window, cx| {
+                    if let Some(id) = ids.get(index) {
+                        change(DiscoverChange::Source(id.clone()), window, cx);
+                    }
+                },
+            )),
+    )
 }
 
 pub(super) fn toolbar_select(

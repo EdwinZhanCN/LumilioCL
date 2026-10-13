@@ -50,13 +50,17 @@ pub(super) fn refresh_installed(wiring: &Wiring, cx: &mut App) {
     let wanted = wiring
         .shell
         .read_with(cx, |shell, _| {
-            shell
-                .live()
-                .and_then(|model| Some((model.install_target.clone()?, model.query.kind)))
+            shell.live().and_then(|model| {
+                Some((
+                    model.install_target.clone()?,
+                    model.query.kind,
+                    model.query.source.clone(),
+                ))
+            })
         })
         .ok()
         .flatten();
-    let Some((target, kind)) = wanted else {
+    let Some((target, kind, source)) = wanted else {
         return;
     };
     if kind == ProjectKind::Modpack {
@@ -66,24 +70,27 @@ pub(super) fn refresh_installed(wiring: &Wiring, cx: &mut App) {
         });
         return;
     }
-    let key = (target.clone(), kind);
+    let key = (target.clone(), kind, source.clone());
     if wiring.state.borrow().installed_key.as_ref() == Some(&key) {
         return;
     }
     wiring.state.borrow_mut().installed_key = Some(key);
     let service = wiring.backend.service.clone();
-    let asked = target.clone();
+    let (asked, from) = (target.clone(), source.clone());
     let handle = wiring
         .backend
-        .spawn(async move { service.installed_projects(&asked, kind).await });
+        .spawn(async move { service.installed_projects(&asked, kind, &from).await });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
         let found = handle.await.ok().and_then(Result::ok).unwrap_or_default();
         let _ = wiring.shell.update(cx, |shell, cx| {
             shell.update_live(
                 |model| {
-                    // Only if still about the same game and kind.
-                    if model.install_target.as_ref() == Some(&target) && model.query.kind == kind {
+                    // Only if still about the same game, kind and source.
+                    if model.install_target.as_ref() == Some(&target)
+                        && model.query.kind == kind
+                        && model.query.source == source
+                    {
                         model.installed = found;
                     }
                 },
@@ -92,6 +99,31 @@ pub(super) fn refresh_installed(wiring: &Wiring, cx: &mut App) {
         });
     })
     .detach();
+}
+
+/// The result of an install: like [`outcome`], except that a file whose
+/// author allows downloading it only on the source's website says so and
+/// offers that page, and a CurseForge pack without the CurseForge source
+/// says where to turn it on.
+pub(super) fn install_outcome<T>(
+    result: Result<T, lumilio_core::ServiceError>,
+    ok: impl FnOnce(T) -> String,
+    failed: String,
+) -> Toast {
+    use lumilio_core::ServiceError;
+    match result {
+        Err(ServiceError::ManualDownload { file, page }) => {
+            let toast = Toast::error(tr!("discover-manual-download", file = file.as_str()));
+            match page {
+                Some(page) => toast.link(tr!("discover-open-download-page"), page),
+                None => toast,
+            }
+        }
+        Err(ServiceError::NoCatalogSource(lumilio_core::Catalog::CurseForge)) => {
+            Toast::error(tr!("discover-needs-curseforge"))
+        }
+        other => outcome(other, ok, failed),
+    }
 }
 
 /// The result of an operation: success in words, failure as one plain

@@ -258,12 +258,12 @@ discover-kind-resource-pack = 资源包
 discover-kind-shader = 光影
 discover-searching = 正在搜索…
 discover-no-source = 没有可用的内容源
-discover-no-source-help = 在 设置 › 插件 里打开一个内容源（例如 Modrinth）后再来
-discover-offline = 现在是离线的，或连不上 Modrinth
+discover-no-source-help = 在 设置 › 插件 里打开一个内容源（例如 Modrinth 或 CurseForge）后再来
+discover-offline = 现在是离线的，或连不上 { $source }
 discover-offline-help = 连上网络后再试一次
 discover-no-results = 没有结果
 discover-no-results-help = 换个关键词或放宽筛选试试
-discover-browse-modrinth = 在 Modrinth 中浏览
+discover-browse-source = 在 { $source } 中浏览
 discover-search-again = 重新搜索
 discover-page-size = 显示数量
 discover-sort-relevance = 相关度
@@ -286,7 +286,15 @@ discover-install = 安装
 discover-installing = 安装中…
 discover-update = 更新
 discover-installed = 已安装
-discover-open-modrinth = 在 Modrinth 中打开
+discover-open-in = 在 { $source } 中打开
+discover-site-only = 仅限网站下载
+discover-manual-download = { $file } 的作者只允许在网站上下载它
+discover-open-download-page = 打开下载页
+discover-modpack-missing = 已安装整合包 { $name }，还有 { $count ->
+    [one] 1 个文件
+   *[other] { $count } 个文件
+} 要到网站上下载
+discover-needs-curseforge = 导入 CurseForge 整合包需要先在 设置 › 插件 里打开 CurseForge
 discover-copy-link = 复制链接
 discover-link-copied = 已复制项目链接
 discover-install-started = 开始安装 { $title }，进度在动态里
@@ -655,7 +663,7 @@ project-tab-gallery = 画廊
 project-channel-release = 正式版
 project-channel-beta = 测试版
 project-channel-alpha = 早期版
-project-offline = 连不上 Modrinth
+project-offline = 连不上内容源
 project-offline-help = 检查网络后再打开一次
 project-gallery-empty = 这个项目没有画廊
 project-open-in-browser = 在浏览器中打开
@@ -872,6 +880,20 @@ instance-content-show-incompatible = 显示不兼容的版本
 instance-content-version-meta = { $loaders } · { $versions }
 instance-content-version-meta-incompatible = { $loaders } · { $versions } · 和这个游戏不兼容
 instance-content-no-changelog = 这个版本没有写更新日志
+instance-pending-title = 还缺 { $count ->
+    [one] 1 个文件
+   *[other] { $count } 个文件
+}
+instance-pending-help = 作者只允许在网站上下载这些文件。下载后添加，启动器会核对文件并放到该放的位置。
+instance-pending-add = 添加已下载的文件…
+instance-pending-page = 下载页
+instance-pending-place-yourself = { $file }：放在哪里由你决定
+instance-pending-added = 已放好 { $count ->
+    [one] 1 个文件
+   *[other] { $count } 个文件
+}
+instance-pending-not-wanted = { $file } 不是这个游戏缺的文件
+instance-pending-failed = 没能放好 { $file }
 
 instance-world-imported = 已导入「{ $name }」
 instance-world-copied = 已复制为「{ $name }」
@@ -1247,7 +1269,7 @@ account-make-current = 设为当前账户
 
 library-search = 搜索游戏
 library-all-loaders = 全部加载器
-discover-search = 搜索 Modrinth，回车确认
+discover-search = 搜索 { $source }，回车确认
 discover-version-search = 搜索版本
 
 ## 设置

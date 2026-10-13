@@ -81,11 +81,14 @@ fn stand_of(picks: &[lumilio_core::Pick], name: &str) -> Stand {
     }
 }
 
+/// One loader or category: `name` is what the search asks for, `label` what
+/// the row reads (both a loader's name; a category's ID and name).
 fn pick_row(
     id: (&'static str, usize),
     ctx: &LiveCtx,
     group: PickGroup,
     name: &str,
+    label: &str,
     picks: &[lumilio_core::Pick],
 ) -> impl IntoElement {
     let (include, exclude) = (name.to_owned(), name.to_owned());
@@ -99,9 +102,9 @@ fn pick_row(
     );
     kit::filter_row(
         id,
-        tag_label(name),
+        tag_label(label),
         stand_of(picks, name),
-        true,
+        ctx.model.filters.offers_exclusions(ctx.model.query.kind),
         ctx.colors,
         move |window, cx| on_include(DiscoverChange::Include(group, include.clone()), window, cx),
         move |window, cx| on_exclude(DiscoverChange::Exclude(group, exclude.clone()), window, cx),
@@ -294,6 +297,7 @@ fn loader_body(ctx: &LiveCtx) -> gpui::AnyElement {
                         ctx,
                         PickGroup::Loader,
                         name,
+                        name,
                         &query.loaders,
                     )
                 })),
@@ -325,21 +329,21 @@ fn loader_body(ctx: &LiveCtx) -> gpui::AnyElement {
 fn category_body(ctx: &LiveCtx, header: &str) -> gpui::AnyElement {
     let query = &ctx.model.query;
     let groups = ctx.model.filters.category_groups(query.kind);
-    let names: Vec<&str> = groups
+    let options: Vec<(&str, &str)> = groups
         .iter()
         .find(|(name, _)| name == header)
-        .map(|(_, names)| names.clone())
+        .map(|(_, options)| options.clone())
         .unwrap_or_default();
     v_flex()
         .border_t_1()
         .border_color(ctx.colors.foreground)
-        .children(names.into_iter().enumerate().map(|(index, name)| {
+        .children(options.into_iter().enumerate().map(|(index, (id, name))| {
             // Rows are keyed by the header too, so two groups never share an id.
             let key = (
                 "live-category",
                 index + group_of(&Section::Category(header.to_owned())) as usize * 100,
             );
-            pick_row(key, ctx, PickGroup::Category, name, &query.categories)
+            pick_row(key, ctx, PickGroup::Category, id, name, &query.categories)
         }))
         .into_any_element()
 }

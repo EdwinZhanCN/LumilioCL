@@ -57,6 +57,8 @@ struct Entry {
 #[derive(Default)]
 struct Registry {
     entries: BTreeMap<String, Arc<Entry>>,
+    /// Plugin IDs in the order the application supplied them.
+    order: Vec<String>,
     rejected: Vec<String>,
 }
 
@@ -119,7 +121,7 @@ impl PluginHost {
     }
 
     /// The tag a fresh [`Context`] should carry.
-    fn locale_tag(&self) -> Arc<str> {
+    pub(crate) fn locale_tag(&self) -> Arc<str> {
         self.locale
             .read()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -187,6 +189,7 @@ impl PluginHost {
                                     .rejected
                                     .push(format!("{}: duplicate plugin id", manifest.id));
                             } else {
+                                registry.order.push(manifest.id.clone());
                                 registry.entries.insert(
                                     manifest.id.clone(),
                                     Arc::new(Entry {
@@ -217,6 +220,16 @@ impl PluginHost {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone()
+    }
+
+    /// Where the application listed a plugin; unknown IDs come last.
+    pub(crate) async fn listed_at(&self, id: &str) -> usize {
+        let registry = self.registry().await;
+        registry
+            .order
+            .iter()
+            .position(|listed| listed == id)
+            .unwrap_or(registry.order.len())
     }
 
     pub async fn rejected(&self) -> Vec<String> {

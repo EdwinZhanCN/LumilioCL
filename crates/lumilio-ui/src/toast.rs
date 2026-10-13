@@ -30,6 +30,8 @@ pub struct Toast {
     pub technical: Option<String>,
     /// Stays until dismissed even when it is not an error.
     pub sticky: bool,
+    /// A page to open from the toast: its key label and address.
+    pub link: Option<(String, String)>,
 }
 
 impl Toast {
@@ -39,6 +41,7 @@ impl Toast {
             text: text.into(),
             technical: None,
             sticky: kind == ToastKind::Error,
+            link: None,
         }
     }
 
@@ -61,6 +64,13 @@ impl Toast {
 
     pub fn sticky(mut self) -> Self {
         self.sticky = true;
+        self
+    }
+
+    /// Offers a page in the browser from the toast (a download page), in
+    /// place of technical details.
+    pub fn link(mut self, label: impl Into<String>, url: impl Into<String>) -> Self {
+        self.link = Some((label.into(), url.into()));
         self
     }
 }
@@ -86,8 +96,17 @@ fn show(toast: Toast, window: &mut Window, cx: &mut App) {
         ToastKind::Success => Notification::success(toast.text),
         ToastKind::Error => Notification::error(toast.text),
     };
-    let note = match toast.technical {
-        Some(detail) => note.action(move |_, _, _| {
+    let note = match (toast.link, toast.technical) {
+        (Some((label, url)), _) => note.action(move |_, _, _| {
+            let (label, url) = (label.clone(), url.clone());
+            crate::theme::clickable(
+                // gpui-component's notification only accepts its own `Button`.
+                Button::new("toast-link").label(label).ghost().small(),
+                true,
+            )
+            .on_click(move |_, _, cx| cx.open_url(&url))
+        }),
+        (None, Some(detail)) => note.action(move |_, _, _| {
             let detail = detail.clone();
             crate::theme::clickable(
                 // gpui-component's notification only accepts its own `Button`.
@@ -99,7 +118,7 @@ fn show(toast: Toast, window: &mut Window, cx: &mut App) {
             )
             .on_click(move |_, window, cx| technical_dialog(detail.clone(), window, cx))
         }),
-        None => note.autohide(!toast.sticky),
+        (None, None) => note.autohide(!toast.sticky),
     };
     window.push_notification(note, cx);
 }

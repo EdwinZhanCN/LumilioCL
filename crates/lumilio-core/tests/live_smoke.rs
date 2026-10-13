@@ -29,10 +29,13 @@ async fn the_whole_spine_against_the_real_services() {
 
     // Search (Modrinth).
     let page = service
-        .search(&SearchQuery {
-            text: "sodium".to_owned(),
-            ..SearchQuery::new(ProjectKind::Mod)
-        })
+        .search(
+            lumilio_core::DEFAULT_SOURCE,
+            &SearchQuery {
+                text: "sodium".to_owned(),
+                ..SearchQuery::new(ProjectKind::Mod)
+            },
+        )
         .await
         .expect("Modrinth search");
     println!(
@@ -43,7 +46,10 @@ async fn the_whole_spine_against_the_real_services() {
     assert!(page.hits.iter().any(|hit| hit.slug == "sodium"));
 
     // Filters, paging, sorting and the detail bundle (Modrinth tags + project).
-    let filters = service.discover_filters().await.expect("tag lists");
+    let filters = service
+        .discover_filters(lumilio_core::DEFAULT_SOURCE)
+        .await
+        .expect("tag lists");
     let release = filters
         .game_versions
         .iter()
@@ -61,15 +67,18 @@ async fn the_whole_spine_against_the_real_services() {
         release.version
     );
     let filtered = service
-        .search(&SearchQuery {
-            game_versions: vec![release.version.clone()],
-            loaders: vec![lumilio_core::Pick::include("fabric").any_of()],
-            categories: vec![lumilio_core::Pick::include(optimization.name.clone())],
-            sort: lumilio_core::SortIndex::Downloads,
-            page: 1,
-            page_size: 10,
-            ..SearchQuery::new(ProjectKind::Mod)
-        })
+        .search(
+            lumilio_core::DEFAULT_SOURCE,
+            &SearchQuery {
+                game_versions: vec![release.version.clone()],
+                loaders: vec![lumilio_core::Pick::include("fabric").any_of()],
+                categories: vec![lumilio_core::Pick::include(optimization.name.clone())],
+                sort: lumilio_core::SortIndex::Downloads,
+                page: 1,
+                page_size: 10,
+                ..SearchQuery::new(ProjectKind::Mod)
+            },
+        )
         .await
         .expect("a filtered, sorted, second-page search");
     println!(
@@ -85,7 +94,7 @@ async fn the_whole_spine_against_the_real_services() {
             .all(|hit| hit.loaders.iter().any(|l| l == "fabric"))
     );
     let detail = service
-        .project_detail("sodium")
+        .project_detail(lumilio_core::DEFAULT_SOURCE, "sodium")
         .await
         .expect("project detail");
     println!(
@@ -111,6 +120,7 @@ async fn the_whole_spine_against_the_real_services() {
         .install_content(
             &fabric.id,
             ProjectKind::Mod,
+            lumilio_core::DEFAULT_SOURCE,
             "sodium",
             CancellationToken::new(),
         )

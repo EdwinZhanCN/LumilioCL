@@ -17,6 +17,7 @@ mod diagnostics;
 mod discover;
 mod environment;
 mod fetch;
+mod fingerprint;
 mod forge_install;
 mod forge_meta;
 mod game_settings;
@@ -92,12 +93,12 @@ pub use diagnostics::{
     read_crash_report, read_latest_log,
 };
 pub use discover::{
-    CategoryTag, ContentClient, DependencyKind, DiscoverError, Environment, GalleryImage,
-    GameVersionTag, GroupLabel, IntentError, KindAbilities, LoaderTag, Pick, Project, ProjectKind,
-    ProjectLinks, ProjectSummary, ReleaseChannel, SITE_BASE, SearchHit, SearchPage, SearchQuery,
-    SideSupport, SortIndex, SourceFilters, Stance, Version, VersionFile, VersionGroup,
-    browse_page_url, environment, fits as version_fits, install_request as content_install_request,
-    pick_version, project_page_url, version_groups,
+    Catalog, CategoryTag, ContentClient, DEFAULT_SOURCE, DependencyKind, DiscoverError,
+    Environment, FileHashes, GalleryImage, GameVersionTag, GroupLabel, IntentError, KindAbilities,
+    LoaderTag, PackFileKind, Pick, Project, ProjectKind, ProjectLinks, ProjectOrigin,
+    ProjectSummary, ReleaseChannel, ResolvedFile, SearchHit, SearchPage, SearchQuery, SideSupport,
+    SortIndex, SourceFilters, Stance, TextFormat, Version, VersionFile, VersionGroup, environment,
+    fits as version_fits, install_request as content_install_request, pick_version, version_groups,
 };
 pub use environment::{
     CompatibilityRule, HostProfile, MachineArchitecture, PlatformFamily, RuleDecision,
@@ -150,9 +151,9 @@ pub use microsoft::{
 pub use mirror_presets::MirrorPreset;
 pub use model_assets::{ModelAssetsError, ResourcePack};
 pub use modpack::{
-    ClientSupport, ModpackError, OVERRIDES_LIMIT, PackFile, PackIndex, extract_overrides,
-    import as import_modpack, is_trusted_source, parse_index as parse_pack_index,
-    plan as plan_modpack, read_index as read_pack_index,
+    ClientSupport, ModpackError, OVERRIDES_LIMIT, PackFile, PackIndex, PendingDownload,
+    extract_overrides, import as import_modpack, is_trusted_source,
+    parse_index as parse_pack_index, plan as plan_modpack, read_index as read_pack_index,
 };
 pub use pack_export::{ExportError, ExportReport, ExportSpec, PackFormat};
 pub mod world_map;
@@ -178,10 +179,10 @@ pub use repair::{
 pub use screenshots::{ScreenshotError, ScreenshotInfo};
 pub use servers::{PackPolicy, PingError, ProtocolVersion, ServerEntry, ServerError, ServerStatus};
 pub use service::{
-    ActivityView, AppearanceApplyResult, ContentEffect, ContentResult, DependencyNeed,
-    DependencyReport, DiscoverFilters, GameLogSource, GameLogs, InstalledProject, InstanceJava,
-    LauncherService, Library, ModelPreview, ProfileSnapshot, ProjectDetail, ServiceError,
-    ThirdPartySignIn, now as unix_now,
+    ActivityView, AddedFile, AppearanceApplyResult, ContentEffect, ContentResult,
+    ContentSourceInfo, DependencyNeed, DependencyReport, DiscoverFilters, GameLogSource, GameLogs,
+    InstalledProject, InstanceJava, LauncherService, Library, ModelPreview, ProfileSnapshot,
+    ProjectDetail, ServiceError, ThirdPartySignIn, now as unix_now,
 };
 pub use settings::{
     AccountEntry, AccountKind, AuthServerEntry, DownloadSourcePreference, LauncherSettings,

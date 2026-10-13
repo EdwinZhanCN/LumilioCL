@@ -20,6 +20,7 @@ lumilio-plugin-api.workspace = true
 lumilio-plugin-crash-analyzer.workspace = true
 lumilio-plugin-litematica.workspace = true
 lumilio-plugin-modrinth.workspace = true
+lumilio-plugin-curseforge.workspace = true
 lumilio-plugin-discord.workspace = true
 lumilio-plugin-world-explorer.workspace = true
 lumilio-ui.workspace = true

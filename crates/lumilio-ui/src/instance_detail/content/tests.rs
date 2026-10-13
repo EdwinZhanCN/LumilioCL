@@ -17,6 +17,9 @@ fn entry(name: &str, enabled: bool, title: Option<&str>, update: bool) -> Conten
         },
         sha1: Some("h".into()),
         source: title.map(|title| ContentSource {
+            source: lumilio_core::DEFAULT_SOURCE.into(),
+            source_name: "Modrinth".into(),
+            page_url: String::new(),
             project_id: "P".into(),
             slug: "p".into(),
             title: title.to_owned(),
@@ -38,6 +41,7 @@ fn entry(name: &str, enabled: bool, title: Option<&str>, update: bool) -> Conten
             dependencies: vec![],
             downloads: 0,
             changelog: String::new(),
+            changelog_format: lumilio_core::TextFormat::Markdown,
         }),
     }
 }

@@ -151,7 +151,8 @@ pub fn decode_search(bytes: &[u8]) -> Result<SearchPage, PluginError> {
                 all_categories: without_loaders(&hit.categories),
                 loaders,
                 downloads: hit.downloads,
-                follows: hit.follows,
+                follows: Some(hit.follows),
+                manual_download: false,
                 published: hit.date_created,
                 updated: hit.date_modified,
                 environment: fields

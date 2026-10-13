@@ -24,9 +24,11 @@ mod maintenance;
 mod models;
 mod modpacks;
 mod packs;
+mod pending;
 mod plugins;
 mod portability;
 mod preferences;
+mod recognize;
 mod screenshots;
 mod servers;
 mod skins;
@@ -46,10 +48,12 @@ pub use self::appearance::ProfileSnapshot;
 pub use self::error::ServiceError;
 pub use self::java::InstanceJava;
 pub use self::models::ModelPreview;
+pub use self::pending::AddedFile;
 pub use self::third_party::ThirdPartySignIn;
 pub use self::types::{
-    ActivityView, ContentEffect, ContentResult, DependencyNeed, DependencyReport, DiscoverFilters,
-    GameLogSource, GameLogs, InstalledProject, Library, ProjectDetail, now,
+    ActivityView, ContentEffect, ContentResult, ContentSourceInfo, DependencyNeed,
+    DependencyReport, DiscoverFilters, GameLogSource, GameLogs, InstalledProject, Library,
+    ProjectDetail, now,
 };
 pub use self::wardrobe::AppearanceApplyResult;
 
@@ -106,7 +110,8 @@ pub struct LauncherService<T> {
     log: ActivityLog,
     /// Replaces the conventional Java search locations (tests, portable setups).
     runtime_roots: Option<Vec<PathBuf>>,
-    filters: Mutex<Option<(String, DiscoverFilters)>>,
+    /// Filter choices per content source, for the life of the service.
+    filters: Mutex<std::collections::BTreeMap<String, DiscoverFilters>>,
     /// Where sign-in secrets live; never a file.
     credentials: Arc<dyn CredentialStore>,
     /// One refresh at a time: refresh tokens rotate, so two at once would
@@ -175,7 +180,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             operations: StdMutex::new(BTreeSet::new()),
             log,
             runtime_roots: None,
-            filters: Mutex::new(None),
+            filters: Mutex::default(),
             credentials: Arc::new(SystemCredentials),
             auth_lock: Mutex::new(()),
             wardrobe_lock: Mutex::new(()),

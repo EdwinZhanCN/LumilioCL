@@ -143,14 +143,16 @@ impl NetworkContext {
         }
         validate_request(&request)?;
         if Instant::now() >= self.deadline {
-            return Err(unavailable("plugin network deadline expired"));
+            return Err(PluginError::Transient(
+                "plugin network deadline expired".into(),
+            ));
         }
         // Only called inside spawn_blocking. Dropping a pending transport
         // future at the shared deadline also releases a timed-out worker.
         self.handle.block_on(async {
             tokio::time::timeout_at(self.deadline, self.fetch_async(manifest, request))
                 .await
-                .map_err(|_| unavailable("plugin network deadline expired"))?
+                .map_err(|_| PluginError::Transient("plugin network deadline expired".into()))?
         })
     }
 

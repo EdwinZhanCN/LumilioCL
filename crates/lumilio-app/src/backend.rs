@@ -37,7 +37,10 @@ impl Backend {
                 vec![
                     Arc::new(lumilio_plugin_crash_analyzer::CrashAnalyzer),
                     Arc::new(lumilio_plugin_litematica::Litematica),
+                    // Content sources, in the order Discover offers them; the
+                    // first is the default and recognizes installed files first.
                     Arc::new(lumilio_plugin_modrinth::Modrinth),
+                    Arc::new(lumilio_plugin_curseforge::CurseForge::default()),
                     Arc::new(lumilio_plugin_discord::Discord::default()),
                     Arc::new(lumilio_plugin_world_explorer::WorldExplorer),
                 ],

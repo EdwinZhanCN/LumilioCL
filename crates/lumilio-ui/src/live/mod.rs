@@ -64,6 +64,8 @@ pub struct LiveModel {
     pub library_loaded: bool,
     pub results: Vec<SearchRow>,
     pub search: SearchStatus,
+    /// The content sources that are on, in the launcher's order.
+    pub sources: Vec<lumilio_core::ContentSourceInfo>,
     pub query: DiscoverQuery,
     pub filters: FilterModel,
     /// Which instance Discover installs into.
@@ -103,6 +105,7 @@ impl Default for LiveModel {
             library_loaded: false,
             results: Vec::new(),
             search: SearchStatus::Idle,
+            sources: Vec::new(),
             query: DiscoverQuery::new(ProjectKind::Modpack),
             filters: FilterModel::default(),
             install_target: None,
@@ -236,17 +239,34 @@ impl LiveModel {
             }
     }
 
-    /// The projects "hide already installed" leaves out: the packs the
-    /// library was made from, or what the browsed game already has.
+    /// The projects "hide already installed" leaves out: the packs of the
+    /// browsed source the library was made from, or what the browsed game
+    /// already has of that source.
     pub fn installed_projects(&self) -> Vec<String> {
         if self.query.kind == ProjectKind::Modpack {
             return self
                 .library
                 .iter()
-                .filter_map(|card| card.source_project.clone())
+                .filter_map(|card| card.source_project.as_deref())
+                .map(lumilio_core::ProjectOrigin::parse)
+                .filter(|origin| origin.source == self.query.source)
+                .map(|origin| origin.project)
                 .collect();
         }
         self.installed.keys().cloned().collect()
+    }
+
+    /// A content source's name, by plugin ID; the ID when it is not on.
+    pub fn source_name<'a>(&'a self, id: &'a str) -> &'a str {
+        self.sources
+            .iter()
+            .find(|source| source.id == id)
+            .map_or(id, |source| source.name.as_str())
+    }
+
+    /// The name of the source Discover is browsing.
+    pub fn browsed_source_name(&self) -> &str {
+        self.source_name(&self.query.source)
     }
 
     pub fn active_tasks(&self) -> u32 {

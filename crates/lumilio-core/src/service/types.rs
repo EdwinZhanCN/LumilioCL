@@ -1,6 +1,8 @@
 use crate::activity_log::{ActiveTask, FinishedTask};
 use crate::content::ContentError;
-use crate::discover::{CategoryTag, GameVersionTag, KindAbilities, LoaderTag, Project, Version};
+use crate::discover::{
+    Catalog, CategoryTag, GameVersionTag, KindAbilities, LoaderTag, Project, Version,
+};
 use crate::instance::{Collection, InstanceRecord};
 use std::collections::BTreeSet;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -42,6 +44,18 @@ pub struct ProjectDetail {
     /// Newest first.
     pub versions: Vec<Version>,
     pub owner: Option<String>,
+    /// The content source (plugin ID) the project is from, and its name.
+    pub source: String,
+    pub source_name: String,
+}
+
+/// A content source that is on.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ContentSourceInfo {
+    /// The plugin ID; what project references name.
+    pub id: String,
+    pub name: String,
+    pub catalog: Option<Catalog>,
 }
 
 /// Seconds since the Unix epoch.

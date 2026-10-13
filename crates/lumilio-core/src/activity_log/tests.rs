@@ -84,6 +84,7 @@ fn a_log_line_from_before_retry_existed_still_reads_and_a_retry_survives_the_log
     board.set_retry(
         id,
         RetryAction::InstallModpack {
+            source: crate::discover::DEFAULT_SOURCE.into(),
             project: "pack".into(),
             version: None,
         },
@@ -97,6 +98,7 @@ fn a_log_line_from_before_retry_existed_still_reads_and_a_retry_survives_the_log
     assert_eq!(
         tasks[1].retry,
         Some(RetryAction::InstallModpack {
+            source: crate::discover::DEFAULT_SOURCE.into(),
             project: "pack".into(),
             version: None,
         })
@@ -192,4 +194,26 @@ fn torn_lines_are_skipped_and_compact_keeps_the_newest() {
     log.compact(2).unwrap();
     let labels: Vec<_> = log.read().unwrap().0.into_iter().map(|t| t.label).collect();
     assert_eq!(labels, [TaskLabel::from("t3"), TaskLabel::from("t4")]);
+}
+
+#[test]
+fn a_retry_written_before_there_were_several_sources_means_modrinth() {
+    let old =
+        r#"{"action":"install_content","instance":"g","kind":"mod","project":"P","version":null}"#;
+    let retry: RetryAction = serde_json::from_str(old).unwrap();
+    assert_eq!(
+        retry,
+        RetryAction::InstallContent {
+            instance: "g".into(),
+            kind: crate::discover::ProjectKind::Mod,
+            source: crate::discover::DEFAULT_SOURCE.into(),
+            project: "P".into(),
+            version: None,
+        }
+    );
+    let pack: RetryAction =
+        serde_json::from_str(r#"{"action":"install_modpack","project":"P"}"#).unwrap();
+    assert!(
+        matches!(pack, RetryAction::InstallModpack { source, .. } if source == "lumilio.modrinth")
+    );
 }

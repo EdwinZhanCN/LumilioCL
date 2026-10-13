@@ -210,18 +210,30 @@ pub enum InstanceIntent {
     SwitchContent {
         kind: ProjectKind,
         file_name: String,
+        /// The content source (plugin ID) the project is from.
+        source: String,
         project: String,
         version_id: String,
     },
-    /// Update several files: (file, project, version) each.
+    /// Update several files.
     UpdateContent {
         kind: ProjectKind,
-        updates: Vec<(String, String, String)>,
+        updates: Vec<ContentUpdateItem>,
     },
     /// Ask for local files and add them (P-ADD-FILES).
     ImportContent(ProjectKind),
     /// A project's versions; answer with [`InstanceDetailView::versions_arrived`].
-    LoadVersions(String),
+    LoadVersions {
+        source: String,
+        project: String,
+    },
+    /// One version's changelog, for sources that give them one at a time;
+    /// answer with [`InstanceDetailView::changelog_arrived`].
+    LoadChangelog {
+        source: String,
+        project: String,
+        version: String,
+    },
     /// Show an installed file in the file manager.
     RevealContent {
         kind: ProjectKind,
@@ -230,8 +242,14 @@ pub enum InstanceIntent {
     /// Open a project's page in Discover.
     OpenProject {
         kind: ProjectKind,
+        source: String,
         slug: String,
     },
+    /// Ask for files the person downloaded that the game is waiting for.
+    AddPendingFiles,
+    /// The files chosen after [`InstanceIntent::AddPendingFiles`]; the
+    /// application sends this to itself.
+    PendingFilesChosen(Vec<std::path::PathBuf>),
     /// Browse Discover for this kind, to add to this game.
     BrowseContent(ProjectKind),
     /// The files chosen after [`InstanceIntent::ImportContent`]; the
@@ -240,4 +258,14 @@ pub enum InstanceIntent {
         kind: ProjectKind,
         files: Vec<std::path::PathBuf>,
     },
+}
+
+/// One file of an "update all": the file and the version to put in its place.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ContentUpdateItem {
+    pub file_name: String,
+    /// The content source (plugin ID) the project is from.
+    pub source: String,
+    pub project: String,
+    pub version_id: String,
 }

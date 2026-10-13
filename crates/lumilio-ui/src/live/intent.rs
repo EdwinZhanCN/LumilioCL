@@ -24,16 +24,22 @@ pub enum LiveIntent {
     PlayPlace(String, super::PlaceTarget),
     /// Run this Discover search.
     Search(DiscoverQuery),
-    /// Fetch the category and game-version choices.
+    /// Fetch the category and game-version choices of the browsed source.
     LoadFilters,
-    /// Open a project's public page in its own window.
+    /// Open a page of a source's site in the browser (a file its author lets
+    /// people download only there).
+    OpenPage(String),
+    /// Open a project's detail.
     OpenProject {
         kind: ProjectKind,
+        /// The content source (plugin ID).
+        source: String,
         slug: String,
     },
     /// Install a project: into the chosen instance, or as a new one for a modpack.
     Install {
         kind: ProjectKind,
+        source: String,
         slug: String,
         title: String,
         /// One specific version, for mods, packs and shaders.
@@ -64,6 +70,7 @@ pub enum LiveIntent {
     /// Download one version's file where the person chooses (the application
     /// asks where).
     SaveVersionAs {
+        source: String,
         project: String,
         version_id: String,
         file_name: String,
@@ -98,6 +105,7 @@ pub enum LiveIntent {
     /// Replace an installed file with its newer version (from Discover).
     UpdateInstalled {
         kind: ProjectKind,
+        source: String,
         project: String,
         title: String,
         file_name: String,

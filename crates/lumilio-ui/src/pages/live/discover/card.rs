@@ -131,11 +131,12 @@ pub(super) fn install_control(
         .small()
         .into_any_element();
     };
-    // ia[discover]: 已安装状态 | 结果行「已安装」/「更新」 | 目标游戏已有的（按 Modrinth 识别）显示「已安装」；有更新显示「更新」，点了用新版本替换旧文件；详情页主按钮同样变化 | 只认 Modrinth 认得的文件
+    // ia[discover]: 已安装状态 | 结果行「已安装」/「更新」 | 目标游戏已有的（按正在浏览的来源识别）显示「已安装」；有更新显示「更新」，点了用新版本替换旧文件；详情页主按钮同样变化 | 只认这个来源认得的文件
     match &have.update {
         Some(version) => {
             let intent = LiveIntent::UpdateInstalled {
                 kind: row.kind,
+                source: row.source.clone(),
                 project: row.slug.clone(),
                 title: row.title.clone(),
                 file_name: have.file_name.clone(),
@@ -167,13 +168,18 @@ pub(super) fn install_control(
     }
 }
 
-/// The tags of a row: the environment, then categories and loaders as
+/// The tags of a row: whether the author allows downloads only on the
+/// source's site, the environment, then categories and loaders as
 /// `card_tags` chose, then how many more there are.
 fn tag_line(row: &SearchRow, colors: ShellColors) -> impl IntoElement {
     let plain = |text: String| kit::tag(text, kit::TagKind::Plain, colors);
     h_flex()
         .flex_wrap()
         .gap(px(6.))
+        .children(
+            row.manual_download
+                .then(|| kit::tag(tr!("discover-site-only"), kit::TagKind::Ink, colors)),
+        )
         .children(
             row.environment
                 .map(|environment| plain(environment_label(environment).to_string())),
@@ -192,13 +198,14 @@ fn tag_line(row: &SearchRow, colors: ShellColors) -> impl IntoElement {
 }
 
 // ia[discover]: 打开项目详情 | 点结果行 | 详情页（进历史）
-// ia[discover]: 结果行右键菜单 | 在 Modrinth 中打开 / 复制链接 | 浏览器打开项目页，或把项目页地址放进剪贴板并提示
+// ia[discover]: 结果行右键菜单 | 在（来源）中打开 / 复制链接 | 浏览器打开项目页，或把项目页地址放进剪贴板并提示
 pub(super) fn result_row(index: usize, row: &SearchRow, ctx: &LiveCtx) -> impl IntoElement {
     let colors = ctx.colors;
     let open = send(
         &ctx.handler,
         LiveIntent::OpenProject {
             kind: row.kind,
+            source: row.source.clone(),
             slug: row.slug.clone(),
         },
     );
@@ -206,6 +213,7 @@ pub(super) fn result_row(index: usize, row: &SearchRow, ctx: &LiveCtx) -> impl I
         let handler = ctx.handler.clone();
         let intent = LiveIntent::Install {
             kind: row.kind,
+            source: row.source.clone(),
             slug: row.slug.clone(),
             title: row.title.clone(),
             version: None,
@@ -221,6 +229,10 @@ pub(super) fn result_row(index: usize, row: &SearchRow, ctx: &LiveCtx) -> impl I
         DateKind::Updated => ("UPD", row.date.clone()),
     };
     let (menu_url, copy_url) = (row.page_url.clone(), row.page_url.clone());
+    let open_label = tr!(
+        "discover-open-in",
+        source = ctx.model.source_name(&row.source)
+    );
     let copy = ctx.handler.clone();
 
     // A catalogue line: index, framed icon, name and summary, spec column.
@@ -303,18 +315,22 @@ pub(super) fn result_row(index: usize, row: &SearchRow, ctx: &LiveCtx) -> impl I
                         .border_color(colors.border)
                         .pt(px(6.))
                         .child(spec("DL", row.downloads.clone(), colors))
-                        .child(spec("FAV", row.follows.clone(), colors))
+                        .children(
+                            row.follows
+                                .clone()
+                                .map(|follows| spec("FAV", follows, colors)),
+                        )
                         .children((!date.is_empty()).then(|| spec(date_legend, date, colors))),
                 ),
         )
         .context_menu(move |menu, _, _| {
             let (open_url, copy_url) = (menu_url.clone(), copy_url.clone());
             let copy = copy.clone();
-            menu.item(PopupMenuItem::new(tr!("discover-open-modrinth")).on_click(
-                move |_, _, cx| {
+            menu.item(
+                PopupMenuItem::new(open_label.clone()).on_click(move |_, _, cx| {
                     cx.open_url(&open_url);
-                },
-            ))
+                }),
+            )
             .item(
                 PopupMenuItem::new(tr!("discover-copy-link")).on_click(move |_, window, cx| {
                     copy(

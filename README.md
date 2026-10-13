@@ -170,7 +170,8 @@ just package               # 为当前平台打包到 dist/
 - `LUMILIO_PAGE` 直接打开某个页面，例如 `library:2`、`discover:1`、`activity`、
   `instance:1:4:1`（编号、分区、子标签，从 0 开始）。
 - `LUMILIO_INSTANCE=<id>`（配合 `LUMILIO_INSTANCE_TAB`、`LUMILIO_INSTANCE_GROUP`）和
-  `LUMILIO_PROJECT=mod/sodium` 打开某个游戏或项目详情。
+  `LUMILIO_PROJECT=mod/sodium` 打开某个游戏或项目详情；项目默认来自 Modrinth，
+  `LUMILIO_PROJECT_SOURCE=lumilio.curseforge` 改为 CurseForge（ID 写数字，如 `mod/238222`）。
 - `LUMILIO_REVIEW_APPEARANCE=light|dark`、`LUMILIO_REVIEW_MIN=1`（720×480）、
   `LUMILIO_REVIEW_SIZE=1600x1000`（固定窗口逻辑尺寸，用于录屏）、
   `LUMILIO_REVIEW_STILL=1`（减少动效）。

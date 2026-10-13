@@ -80,6 +80,7 @@ pub(super) fn version_from_raw(raw: RawVersion) -> Option<Version> {
                 primary: file.primary,
                 size: file.size,
                 sha1: file.hashes.get("sha1").cloned(),
+                download_page: None,
             })
         })
         .collect();

@@ -58,6 +58,7 @@ pub(super) fn write_instance(
                 InstanceIntent::SwitchContent {
                     kind,
                     file_name,
+                    source,
                     project,
                     version_id,
                 } => {
@@ -66,11 +67,13 @@ pub(super) fn write_instance(
                             &id,
                             kind,
                             &file_name,
+                            &source,
                             &project,
                             &version_id,
                             cancel,
                         )
-                        .await?;
+                        .await
+                        .map_err(manual_download_said)?;
                     done(
                         &tr!("instance-content-switched", name = name.as_str()),
                         vec![Section::Content(kind)],
@@ -80,19 +83,24 @@ pub(super) fn write_instance(
                     // One by one: each file stands or falls on its own.
                     let total = updates.len();
                     let mut failed = Vec::new();
-                    for (file, project, version) in updates {
+                    for update in updates {
                         if let Err(error) = service
                             .switch_content_version(
                                 &id,
                                 kind,
-                                &file,
-                                &project,
-                                &version,
+                                &update.file_name,
+                                &update.source,
+                                &update.project,
+                                &update.version_id,
                                 cancel.clone(),
                             )
                             .await
                         {
-                            failed.push(format!("{file}: {error}"));
+                            failed.push(format!(
+                                "{}: {}",
+                                update.file_name,
+                                manual_download_said(error)
+                            ));
                         }
                     }
                     if failed.is_empty() {
@@ -107,6 +115,36 @@ pub(super) fn write_instance(
                             failed = failed.len(),
                             detail = failed.join("\n")
                         )))
+                    }
+                }
+                InstanceIntent::PendingFilesChosen(files) => {
+                    let results = service.add_pending_files(&id, files).await?;
+                    let placed = results
+                        .iter()
+                        .filter(|(_, added)| matches!(added, lumilio_core::AddedFile::Placed(_)))
+                        .count();
+                    let refused: Vec<String> = results
+                        .iter()
+                        .filter_map(|(name, added)| match added {
+                            lumilio_core::AddedFile::Placed(_) => None,
+                            lumilio_core::AddedFile::NotWanted => {
+                                Some(tr!("instance-pending-not-wanted", file = name.as_str()))
+                            }
+                            lumilio_core::AddedFile::Failed(error) => Some(format!(
+                                "{}: {error}",
+                                tr!("instance-pending-failed", file = name.as_str())
+                            )),
+                        })
+                        .collect();
+                    let sections = vec![
+                        Section::Content(lumilio_core::ProjectKind::Mod),
+                        Section::Content(lumilio_core::ProjectKind::ResourcePack),
+                        Section::Content(lumilio_core::ProjectKind::Shader),
+                    ];
+                    if refused.is_empty() {
+                        done(&tr!("instance-pending-added", count = placed), sections)
+                    } else {
+                        Err(ServiceError::Remote(refused.join("\n")))
                     }
                 }
                 InstanceIntent::AddFiles { kind, files } => {
@@ -370,4 +408,19 @@ pub(super) fn write_instance(
         });
     })
     .detach();
+}
+
+/// A switch that needs a file only the source's website may hand out says
+/// so in words, with the page, instead of the raw error.
+fn manual_download_said(error: ServiceError) -> ServiceError {
+    match error {
+        ServiceError::ManualDownload { file, page } => ServiceError::Remote(match page {
+            Some(page) => format!(
+                "{}: {page}",
+                tr!("discover-manual-download", file = file.as_str())
+            ),
+            None => tr!("discover-manual-download", file = file.as_str()),
+        }),
+        other => other,
+    }
 }

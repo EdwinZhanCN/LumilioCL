@@ -57,15 +57,16 @@ impl<T: Transport + Clone> LauncherService<T> {
             RetryAction::InstallContent {
                 instance,
                 kind,
+                source,
                 project,
                 version,
             } => match version {
                 Some(version) => self
-                    .install_version(&instance, kind, &project, &version, cancel)
+                    .install_version(&instance, kind, &source, &project, &version, cancel)
                     .await
                     .map(|_| ()),
                 None => self
-                    .install_content(&instance, kind, &project, cancel)
+                    .install_content(&instance, kind, &source, &project, cancel)
                     .await
                     .map(|_| ()),
             },
@@ -73,10 +74,19 @@ impl<T: Transport + Clone> LauncherService<T> {
                 instance,
                 kind,
                 file_name,
+                source,
                 project,
                 version_id,
             } => self
-                .switch_content_version(&instance, kind, &file_name, &project, &version_id, cancel)
+                .switch_content_version(
+                    &instance,
+                    kind,
+                    &file_name,
+                    &source,
+                    &project,
+                    &version_id,
+                    cancel,
+                )
                 .await
                 .map(|_| ()),
             RetryAction::CopyInstance {
@@ -100,15 +110,20 @@ impl<T: Transport + Clone> LauncherService<T> {
                 .await
                 .map(|_| ()),
             RetryAction::SaveVersion {
+                source,
                 project,
                 version_id,
                 path,
             } => self
-                .save_version_as(&project, &version_id, Path::new(&path), cancel)
+                .save_version_as(&source, &project, &version_id, Path::new(&path), cancel)
                 .await
                 .map(|_| ()),
-            RetryAction::InstallModpack { project, version } => self
-                .install_modpack(&project, version.as_deref(), cancel)
+            RetryAction::InstallModpack {
+                source,
+                project,
+                version,
+            } => self
+                .install_modpack(&source, &project, version.as_deref(), cancel)
                 .await
                 .map(|_| ()),
             RetryAction::ImportPack { path } => self

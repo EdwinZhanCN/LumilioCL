@@ -45,7 +45,7 @@ pub(crate) fn detail() -> ProjectDetail {
             categories: vec!["magic".to_owned()],
             loaders: vec!["fabric".to_owned()],
             downloads: 10,
-            followers: 2,
+            followers: Some(2),
             published: String::new(),
             updated: "2026-01-01T00:00:00Z".to_owned(),
             client_side: SideSupport::Required,
@@ -63,6 +63,9 @@ pub(crate) fn detail() -> ProjectDetail {
             }],
             icon_url: None,
             game_versions: vec!["1.21".to_owned()],
+            page_url: "https://modrinth.com/mod/cool".to_owned(),
+            manual_download: false,
+            body_format: lumilio_core::TextFormat::Markdown,
         },
         versions: vec![Version {
             id: "v1".to_owned(),
@@ -79,12 +82,16 @@ pub(crate) fn detail() -> ProjectDetail {
                 primary: true,
                 size: 2048,
                 sha1: None,
+                download_page: None,
             }],
             dependencies: Vec::new(),
             downloads: 5,
             changelog: String::new(),
+            changelog_format: lumilio_core::TextFormat::Markdown,
         }],
         owner: Some("someone".to_owned()),
+        source: lumilio_core::DEFAULT_SOURCE.to_owned(),
+        source_name: "Modrinth".to_owned(),
     }
 }
 

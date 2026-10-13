@@ -176,6 +176,11 @@ impl LauncherShell {
             prefs.hide_installed_modpacks = *on;
         }
         let new_kind = matches!(&change, DiscoverChange::Kind(kind) if *kind != query.kind);
+        let new_source =
+            matches!(&change, DiscoverChange::Source(source) if *source != query.source);
+        if let DiscoverChange::Source(source) = &change {
+            prefs.source = Some(source.clone());
+        }
         let query = query.apply(change);
         // Advanced exclusions are remembered for the next visit.
         prefs.advanced_exclusions =
@@ -193,9 +198,17 @@ impl LauncherShell {
                 model.query = query.clone();
                 model.search = SearchStatus::Searching;
                 model.discover_prefs = prefs;
+                if new_source {
+                    // Another source's categories and loaders mean other things.
+                    model.filters = crate::live::FilterModel::default();
+                    model.installed.clear();
+                }
             },
             cx,
         );
+        if new_source {
+            handler(LiveIntent::LoadFilters, window, cx);
+        }
         if new_kind {
             // A new kind of content starts its own search (the query is
             // already fresh; the boxes follow).
@@ -287,6 +300,9 @@ impl LauncherShell {
 /// advanced exclusions that apply to the kind.
 pub(super) fn fresh_query(kind: ProjectKind, prefs: &DiscoverPreferences) -> DiscoverQuery {
     let mut query = DiscoverQuery::new(kind);
+    if let Some(source) = &prefs.source {
+        query.source = source.clone();
+    }
     query.advanced = prefs
         .advanced_exclusions
         .iter()
