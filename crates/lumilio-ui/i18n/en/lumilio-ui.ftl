@@ -711,7 +711,7 @@ new-game-create-failed = Couldn't create it; you can try again
 new-game-created-downloading = Created { $name }; downloading game files
 new-game-created = Created { $name }
 new-game-download-failed = The game files didn't finish downloading; starting the game will try again
-new-game-import-pack-prompt = Choose a modpack (.mrpack, or a MultiMC / Prism .zip)
+new-game-import-pack-prompt = Choose a modpack (.mrpack, a CurseForge .zip, or a MultiMC / Prism .zip)
 new-game-import-pack-done = Imported modpack { $name }
 
 ## Project details

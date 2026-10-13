@@ -10,6 +10,7 @@ mod discover;
 mod dispatch;
 mod game_settings;
 mod instance;
+mod instance_content;
 mod instance_plugins;
 mod instance_write;
 mod jobs;
@@ -188,12 +189,13 @@ fn open_requested_page(
             .ok()
             .and_then(|v| v.parse().ok());
         let shell = shell.clone();
-        window.defer(cx, move |_, cx| {
+        window.defer(cx, move |window, cx| {
             shell.update(cx, |shell, cx| {
                 if let Some(view) = shell.live_instance().cloned() {
                     view.update(cx, |view, cx| {
+                        // As a click on the tab: what it shows is loaded too.
                         if let Some(tab) = tab {
-                            view.select_tab(tab, cx);
+                            view.open_tab(tab, window, cx);
                         }
                         if let Some(group) = group {
                             view.select_settings_group(group, cx);

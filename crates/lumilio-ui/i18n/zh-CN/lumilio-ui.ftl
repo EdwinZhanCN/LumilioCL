@@ -652,7 +652,7 @@ new-game-create-failed = 没有创建成功，可以再试一次
 new-game-created-downloading = 已创建 { $name }，正在下载游戏文件
 new-game-created = 已创建 { $name }
 new-game-download-failed = 游戏文件没有下载完，开始游戏时会再试
-new-game-import-pack-prompt = 选择整合包（.mrpack，或 MultiMC / Prism 的 .zip）
+new-game-import-pack-prompt = 选择整合包（.mrpack、CurseForge 的 .zip，或 MultiMC / Prism 的 .zip）
 new-game-import-pack-done = 已导入整合包 { $name }
 
 ## 项目详情

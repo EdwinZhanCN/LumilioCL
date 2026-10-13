@@ -33,9 +33,7 @@ fn a_file_hashes_like_its_bytes_across_buffer_boundaries() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("big.jar");
     let bytes: Vec<u8> = (0..200_003_u32)
-        .map(|at| {
-            [b'x', b' ', b'y', b'\n', b'z'][(at % 5) as usize] ^ u8::try_from(at % 3).unwrap()
-        })
+        .map(|at| b"x y\nz"[(at % 5) as usize] ^ u8::try_from(at % 3).unwrap())
         .collect();
     std::fs::write(&path, &bytes).unwrap();
     assert_eq!(of_file(&path).unwrap(), of_bytes(&bytes));

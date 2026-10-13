@@ -199,7 +199,6 @@ pub fn discover(ctx: &LiveCtx) -> impl IntoElement {
                                     h_flex()
                                         .gap_3()
                                         .items_center()
-                                        .children(source_segments(ctx))
                                         // ia[discover]: 排序 / 显示数量 | L4 两个下拉：相关度、下载量、关注数、发布时间、更新时间（只列来源支持的）；每页 5 / 10 / 15 / 20 / 50 / 100 | 重新搜索；按发布时间排序时卡片显示发布时间，其余显示更新时间
                                         .child(toolbar_select(
                                             tr!("library-sort"),
@@ -223,36 +222,6 @@ pub fn discover(ctx: &LiveCtx) -> impl IntoElement {
                 )
                 .child(sidebar::sidebar(ctx)),
         )
-}
-
-/// The content sources to browse, when more than one is on.
-fn source_segments(ctx: &LiveCtx) -> Option<impl IntoElement> {
-    let sources = &ctx.model.sources;
-    if sources.len() < 2 {
-        return None;
-    }
-    let names: Vec<String> = sources.iter().map(|source| source.name.clone()).collect();
-    let ids: Vec<String> = sources.iter().map(|source| source.id.clone()).collect();
-    let active = ids
-        .iter()
-        .position(|id| *id == ctx.model.query.source)
-        .unwrap_or(0);
-    let change = ctx.change.clone();
-    // ia[discover]: 切换来源 | L4 分段键：Modrinth / CurseForge（只开了一个来源时不显示） | 在这个来源重新搜索：搜索词、类型和游戏版本保留，加载器、分类和排序重新开始；筛选项换成这个来源的；记住下次打开的来源
-    Some(
-        div()
-            .debug_selector(|| "live-discover-sources".into())
-            .child(crate::controls::Segments::new(
-                "live-discover-source",
-                &names,
-                active,
-                move |index, window, cx| {
-                    if let Some(id) = ids.get(index) {
-                        change(DiscoverChange::Source(id.clone()), window, cx);
-                    }
-                },
-            )),
-    )
 }
 
 pub(super) fn toolbar_select(

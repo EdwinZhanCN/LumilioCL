@@ -503,6 +503,36 @@ fn section_view(index: usize, section: &Section, ctx: &LiveCtx) -> gpui::AnyElem
 // ia[discover]: 筛选 | 右侧丝印编号筛选栏，按类型分区、可折叠：游戏版本（可搜索，可显示全部版本）、加载器（常用在前，「显示更多」）、类别、运行环境、许可证、高级排除；每个选项点一下为「要」，点 ⊘ 为「不要」 | 重新搜索；游戏提供的版本和加载器带锁
 // ia[discover]: 高级排除 | 筛选栏「高级排除」：光敏性触发、AI、广告、遥测等 | 选择会被记住；第一次选「光敏性触发」弹出提示，可选不再提示
 // ia[discover]: 隐藏已安装 | 筛选栏顶部开关（整合包页，或从游戏页进入时） | 搜索时排除已有的整合包 / 目标游戏已装的项目；整合包页的选择会被记住
+/// The content sources to browse, when more than one is on.
+pub(super) fn source_segments(ctx: &LiveCtx) -> Option<impl IntoElement> {
+    let sources = &ctx.model.sources;
+    if sources.len() < 2 {
+        return None;
+    }
+    let names: Vec<String> = sources.iter().map(|source| source.name.clone()).collect();
+    let ids: Vec<String> = sources.iter().map(|source| source.id.clone()).collect();
+    let active = ids
+        .iter()
+        .position(|id| *id == ctx.model.query.source)
+        .unwrap_or(0);
+    let change = ctx.change.clone();
+    // ia[discover]: 切换来源 | L4 筛选侧栏顶部的分段键：Modrinth / CurseForge（只开了一个来源时不显示） | 在这个来源重新搜索：搜索词、类型和游戏版本保留，加载器、分类和排序重新开始；筛选项换成这个来源的；记住下次打开的来源
+    Some(
+        div()
+            .debug_selector(|| "live-discover-sources".into())
+            .child(crate::controls::Segments::new(
+                "live-discover-source",
+                &names,
+                active,
+                move |index, window, cx| {
+                    if let Some(id) = ids.get(index) {
+                        change(DiscoverChange::Source(id.clone()), window, cx);
+                    }
+                },
+            )),
+    )
+}
+
 pub(super) fn sidebar(ctx: &LiveCtx) -> impl IntoElement {
     let colors = ctx.colors;
     let query = &ctx.model.query;
@@ -531,6 +561,7 @@ pub(super) fn sidebar(ctx: &LiveCtx) -> impl IntoElement {
         .w(px(240.))
         .flex_none()
         .gap_5()
+        .children(source_segments(ctx))
         .children(hide)
         .children(
             list.iter()

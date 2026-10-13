@@ -467,14 +467,7 @@ impl ProjectDetailView {
         } else {
             project.body.clone()
         };
-        let body = match project.body_format {
-            lumilio_core::TextFormat::Markdown => {
-                gpui_component::text::TextView::markdown("detail-body", text)
-            }
-            lumilio_core::TextFormat::Html => {
-                gpui_component::text::TextView::html("detail-body", text)
-            }
-        };
+        let body = crate::kit::rich_text("detail-body", text, project.body_format);
         div()
             .w_full()
             .debug_selector(|| "detail-description".into())

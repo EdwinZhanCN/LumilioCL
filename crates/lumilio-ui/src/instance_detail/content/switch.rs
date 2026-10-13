@@ -14,7 +14,6 @@ use gpui_component::Sizable as _;
 use gpui_component::StyledExt as _;
 use gpui_component::WindowExt as _;
 use gpui_component::input::{Input, InputEvent, InputState};
-use gpui_component::text::TextView;
 use gpui_component::{Icon, h_flex, v_flex};
 use lumilio_core::{ContentEntry, Loader, ProjectKind, Version};
 use std::rc::Rc;
@@ -580,18 +579,11 @@ impl Render for VersionSwitch {
                                 div()
                                     .debug_selector(|| "switch-changelog-text".into())
                                     .child(
-                                        match version.changelog_format {
-                                            lumilio_core::TextFormat::Markdown => {
-                                                TextView::markdown(
-                                                    "switch-changelog-text",
-                                                    version.changelog.clone(),
-                                                )
-                                            }
-                                            lumilio_core::TextFormat::Html => TextView::html(
-                                                "switch-changelog-text",
-                                                version.changelog.clone(),
-                                            ),
-                                        }
+                                        kit::rich_text(
+                                            "switch-changelog-text",
+                                            version.changelog.clone(),
+                                            version.changelog_format,
+                                        )
                                         .selectable(true),
                                     )
                                     .into_any_element()

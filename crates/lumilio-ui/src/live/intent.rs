@@ -13,7 +13,8 @@ pub enum LiveIntent {
     Preset(crate::game_settings::PresetIntent),
     /// Create an instance with the newest release.
     NewInstance,
-    /// Choose a local `.mrpack` and import it as a new instance.
+    /// Choose a local pack (`.mrpack`, a CurseForge or instance zip) and
+    /// import it as a new instance.
     ImportPack,
     ToggleFavorite(String),
     /// Open the registered instance without launching it.
@@ -26,9 +27,6 @@ pub enum LiveIntent {
     Search(DiscoverQuery),
     /// Fetch the category and game-version choices of the browsed source.
     LoadFilters,
-    /// Open a page of a source's site in the browser (a file its author lets
-    /// people download only there).
-    OpenPage(String),
     /// Open a project's detail.
     OpenProject {
         kind: ProjectKind,

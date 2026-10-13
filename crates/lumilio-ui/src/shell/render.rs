@@ -142,7 +142,7 @@ impl Render for LauncherShell {
                         } else {
                             kit::page("live-library", pages::live::library(ctx)).into_any_element()
                         };
-                        // ia[library]: 拖入整合包 | 把文件拖到页面上 | 同“导入整合包”（.mrpack，或 MultiMC/Prism/本启动器备份的 .zip）；不是的提示一句
+                        // ia[library]: 拖入整合包 | 把文件拖到页面上 | 同“导入整合包”（.mrpack、CurseForge 整合包 .zip，或 MultiMC/Prism/本启动器备份的 .zip）；不是的提示一句
                         div()
                             .id("live-library-drop")
                             .size_full()

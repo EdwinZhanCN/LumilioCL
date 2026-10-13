@@ -687,7 +687,6 @@ pub(super) fn on_live_intent(
         }
         LiveIntent::Search(query) => search(wiring, &query, cx),
         LiveIntent::LoadFilters => load_filters(wiring, cx),
-        LiveIntent::OpenPage(url) => cx.open_url(&url),
         LiveIntent::OpenProject { kind, source, slug } => {
             open_project(wiring, kind, source, slug, window, cx)
         }

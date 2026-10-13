@@ -450,7 +450,7 @@ pub fn library(ctx: &LiveCtx) -> gpui::AnyElement {
         )
         .debug_selector(|| "live-new-collection".into())
     } else {
-        // ia[library]: 导入整合包 | L2 次要 → 系统选文件（.mrpack，或 MultiMC/Prism/本启动器备份的 .zip） | 后台导入，进度在动态；完成 toast 并可点“打开”
+        // ia[library]: 导入整合包 | L2 次要 → 系统选文件（.mrpack、CurseForge 整合包 .zip，或 MultiMC/Prism/本启动器备份的 .zip） | 后台导入，进度在动态；完成 toast 并可点“打开”；CurseForge 整合包的文件由 CurseForge 来源解析，作者只允许在网站下载的先按 SHA-1 到 Modrinth 找，找不到的列在游戏的内容页 | CurseForge 整合包需要开着 CurseForge 来源
         kit::action(
             "live-import",
             tr!("library-import-pack"),

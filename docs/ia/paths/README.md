@@ -9,13 +9,13 @@
 | [全局导航](navigation.md) | 9 |
 | [首页](home.md) | 13 |
 | [游戏库](library.md) | 30 |
-| [发现](discover.md) | 24 |
+| [发现](discover.md) | 26 |
 | [动态](activity.md) | 8 |
 | [账户](accounts.md) | 26 |
 | [设置](settings.md) | 56 |
 | [游戏页（整体）](instance.md) | 21 |
 | [游戏页 · 概览](instance.overview.md) | 4 |
-| [游戏页 · 内容](instance.content.md) | 16 |
+| [游戏页 · 内容](instance.content.md) | 18 |
 | [游戏页 · 世界](instance.worlds.md) | 17 |
 | [游戏页 · 截图](instance.screenshots.md) | 6 |
 | [游戏页 · 历史](instance.history.md) | 5 |

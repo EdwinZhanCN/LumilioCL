@@ -1,5 +1,5 @@
 use super::instance::{load_instance, open_instance};
-use super::jobs::{job, outcome, reload};
+use super::jobs::{install_outcome, job, reload};
 use super::library::choose_current;
 use super::{Reload, Wiring};
 use gpui_kit::AppContext as _;
@@ -194,8 +194,9 @@ pub(super) fn install_new_game(wiring: &Wiring, id: String, cx: &mut App) {
     );
 }
 
-/// Asks for a local `.mrpack` and imports it as a new instance. Cancelling the
-/// picker does nothing.
+/// Asks for a local pack (`.mrpack`, a CurseForge or MultiMC / Prism zip, a
+/// backup) and imports it as a new instance. Cancelling the picker does
+/// nothing.
 pub(super) fn import_pack(wiring: &Wiring, cx: &mut App) {
     let picked = cx.prompt_for_paths(gpui_kit::PathPromptOptions {
         files: true,
@@ -216,7 +217,7 @@ pub(super) fn import_pack(wiring: &Wiring, cx: &mut App) {
     .detach();
 }
 
-/// Imports a chosen or dropped `.mrpack` as a new game.
+/// Imports a chosen or dropped pack as a new game.
 pub(super) fn import_pack_file(wiring: &Wiring, path: std::path::PathBuf, cx: &mut App) {
     let service = wiring.backend.service.clone();
     let name = path
@@ -233,16 +234,31 @@ pub(super) fn import_pack_file(wiring: &Wiring, path: std::path::PathBuf, cx: &m
             name = name.as_str()
         ))),
         async move {
-            service
+            let record = service
                 .import_modpack_file(&path, CancellationToken::new())
+                .await?;
+            // Files the launcher may not download are listed on the game.
+            let missing = service
+                .pending_downloads(&record.id)
                 .await
+                .map(|pending| pending.len())
+                .unwrap_or_default();
+            Ok((record, missing))
         },
         move |shell, result, cx| {
-            let toast = outcome(
-                result,
-                |record| tr!("new-game-import-pack-done", name = record.name),
-                tr!("library-import-game-failed", name = name.as_str()),
-            );
+            let toast = match result {
+                Ok((record, missing)) if missing > 0 => Toast::info(tr!(
+                    "discover-modpack-missing",
+                    name = record.name,
+                    count = missing
+                ))
+                .sticky(),
+                other => install_outcome(
+                    other,
+                    |(record, _)| tr!("new-game-import-pack-done", name = record.name),
+                    tr!("library-import-game-failed", name = name.as_str()),
+                ),
+            };
             shell.toast(toast, cx);
         },
     );

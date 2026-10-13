@@ -23,7 +23,7 @@
 | 打开游戏库文件夹 | L2 ⋯ 菜单 | 在访达中打开所有游戏所在的文件夹 |  | `lumilio-ui/src/pages/live/library.rs` |
 | 新建游戏 | L2 主要 → 新建游戏弹窗 | 创建并（可选）立即安装；成功后打开新游戏页 |  | `lumilio-ui/src/pages/live/library.rs` |
 | 合集：新建 | 合集标签 L2「新建合集」 | 弹窗取名；名称不重复 |  | `lumilio-ui/src/pages/live/library.rs` |
-| 导入整合包 | L2 次要 → 系统选文件（.mrpack，或 MultiMC/Prism/本启动器备份的 .zip） | 后台导入，进度在动态；完成 toast 并可点“打开” |  | `lumilio-ui/src/pages/live/library.rs` |
+| 导入整合包 | L2 次要 → 系统选文件（.mrpack、CurseForge 整合包 .zip，或 MultiMC/Prism/本启动器备份的 .zip） | 后台导入，进度在动态；完成 toast 并可点“打开”；CurseForge 整合包的文件由 CurseForge 来源解析，作者只允许在网站下载的先按 SHA-1 到 Modrinth 找，找不到的列在游戏的内容页 | CurseForge 整合包需要开着 CurseForge 来源 | `lumilio-ui/src/pages/live/library.rs` |
 | 搜索 | L3 搜索框 | 按名称过滤；空结果“没有匹配的游戏” |  | `lumilio-ui/src/pages/live/library.rs` |
 | 排序 / 按加载器筛选 | L4 两个下拉（排序、加载器），与发现页同一种控件 | 记在偏好设置里，下次打开还是这样；库里只有一种加载器时不显示加载器下拉 |  | `lumilio-ui/src/pages/live/library.rs` |
 | 预设：查看 | 预设 tab 左侧列表的一行（名称、共享几项、几个游戏在用；有游戏待决定时亮灯） | 右侧显示这个预设共享的选项和使用它的游戏 |  | `lumilio-ui/src/pages/live/presets.rs` |
@@ -35,4 +35,4 @@
 | 预设：修改选项 | 预设详情的选项表：开关当场切换，其他选项「编辑」→ 弹窗（滑块和数值 / 分段 / 可搜索列表） | 存进预设，使用它的游戏下次启动时收到；游戏里改过还没决定的同一项，决定时会看到冲突 |  | `lumilio-ui/src/pages/live/presets.rs` |
 | 预设：新建 | 预设 tab 的次要页面操作「新建预设…」→ 弹窗：名称、来源游戏（可搜索）、共享的选项组 | 只读来源游戏的选项文件，不改它；默认不共享画面与性能；建好后在列表中选中，不让任何游戏自动使用 |  | `lumilio-ui/src/pages/live/presets.rs` |
 | 预设：搜索选项 | 预设 tab 的 L3 搜索框 | 按名称或值过滤右侧的选项；没有匹配时说一句 |  | `lumilio-ui/src/pages/live/presets.rs` |
-| 拖入整合包 | 把文件拖到页面上 | 同“导入整合包”（.mrpack，或 MultiMC/Prism/本启动器备份的 .zip）；不是的提示一句 |  | `lumilio-ui/src/shell/render.rs` |
+| 拖入整合包 | 把文件拖到页面上 | 同“导入整合包”（.mrpack、CurseForge 整合包 .zip，或 MultiMC/Prism/本启动器备份的 .zip）；不是的提示一句 |  | `lumilio-ui/src/shell/render.rs` |

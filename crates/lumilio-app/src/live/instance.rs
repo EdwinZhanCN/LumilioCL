@@ -1,4 +1,5 @@
 use super::discover::open_project;
+use super::instance_content::{load_changelog, load_pending, load_versions, pick_pending_files};
 use super::instance_plugins::{plugin_action, plugin_model, plugin_tabs, plugin_view};
 use super::instance_write::write_instance;
 use super::jobs::{refresh_installed, reload};
@@ -198,61 +199,14 @@ pub(super) fn instance_intent(
             }
         }
         InstanceIntent::LoadVersions { source, project } => {
-            let service = wiring.backend.service.clone();
-            let (from, wanted) = (source.clone(), project.clone());
-            let handle = wiring
-                .backend
-                .spawn(async move { service.project_versions(&from, &wanted).await });
-            let wiring = wiring.clone();
-            cx.spawn(async move |cx| {
-                let result = match handle.await {
-                    Ok(result) => result.map_err(|error| error.to_string()),
-                    Err(error) => Err(error.to_string()),
-                };
-                let missing = view
-                    .update(cx, |view, cx| view.versions_arrived(&project, result, cx))
-                    .ok()
-                    .flatten();
-                // The chosen version's changelog, from a source that gives
-                // them one at a time.
-                if let Some((source, project, version)) = missing {
-                    cx.update(|cx| load_changelog(&wiring, view, source, project, version, cx));
-                }
-            })
-            .detach();
+            load_versions(wiring, view, source, project, cx)
         }
         InstanceIntent::LoadChangelog {
             source,
             project,
             version,
         } => load_changelog(wiring, view, source, project, version, cx),
-        InstanceIntent::AddPendingFiles => {
-            let picked = cx.prompt_for_paths(gpui_kit::PathPromptOptions {
-                files: true,
-                directories: false,
-                multiple: true,
-                prompt: Some(tr!("instance-pending-add").into()),
-            });
-            let wiring = wiring.clone();
-            let id = id.to_owned();
-            let handle = window.window_handle();
-            cx.spawn(async move |cx| {
-                let Ok(Ok(Some(files))) = picked.await else {
-                    return;
-                };
-                let _ = cx.update_window(handle, |_, window, cx| {
-                    write_instance(
-                        &wiring,
-                        id,
-                        view,
-                        InstanceIntent::PendingFilesChosen(files),
-                        window,
-                        cx,
-                    );
-                });
-            })
-            .detach();
-        }
+        InstanceIntent::AddPendingFiles => pick_pending_files(wiring, id, view, window, cx),
         InstanceIntent::RevealContent { kind, file_name } => {
             let folder = kind.install_folder().unwrap_or_default();
             let path = wiring
@@ -481,25 +435,6 @@ pub(super) fn instance_intent(
             .detach();
         }
     }
-}
-
-/// Reads the files the game waits for (a pack's files the launcher could
-/// not download) and hands them to the view; a failure shows none.
-pub(super) fn load_pending(
-    wiring: &Wiring,
-    id: String,
-    view: WeakEntity<InstanceDetailView>,
-    cx: &mut App,
-) {
-    let service = wiring.backend.service.clone();
-    let handle = wiring
-        .backend
-        .spawn(async move { service.pending_downloads(&id).await.unwrap_or_default() });
-    cx.spawn(async move |cx| {
-        let Ok(pending) = handle.await else { return };
-        let _ = view.update(cx, |view, cx| view.set_pending(pending, cx));
-    })
-    .detach();
 }
 
 /// Reads one section's data off the interface thread.
@@ -981,30 +916,4 @@ pub(super) fn around_the_game(
         }
         _ => {}
     }
-}
-
-/// Reads one version's changelog for the open switch-version dialog.
-fn load_changelog(
-    wiring: &Wiring,
-    view: WeakEntity<InstanceDetailView>,
-    source: String,
-    project: String,
-    version: String,
-    cx: &mut App,
-) {
-    let service = wiring.backend.service.clone();
-    let (from, wanted, which) = (source, project.clone(), version.clone());
-    let handle = wiring.backend.spawn(async move {
-        service
-            .version_changelog(&from, &wanted, &which)
-            .await
-            .map_err(|error| error.to_string())
-    });
-    cx.spawn(async move |cx| {
-        let Ok(result) = handle.await else { return };
-        let _ = view.update(cx, |view, cx| {
-            view.changelog_arrived(&project, &version, result, cx)
-        });
-    })
-    .detach();
 }
