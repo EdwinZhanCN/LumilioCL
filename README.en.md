@@ -29,7 +29,7 @@ and [gpui-kit](https://github.com/longbridge/gpui-kit), with a locally maintaine
 gpui-component 0.7 for underlying components. The desktop app uses neither Electron nor WebView
 and supports Simplified Chinese and English.
 
-- **Library**: create vanilla, Fabric or Quilt games and organize them with favorites, collections
+- **Library**: create vanilla, Fabric, Quilt, Forge or NeoForge games and organize them with favorites, collections
   and search. Import `.mrpack`, CurseForge and MultiMC / Prism modpacks, or bring games over from
   other launchers (MultiMC, Prism, `.minecraft`) without touching the originals.
 - **Discover**: browse and install mods, resource packs, shaders and modpacks from Modrinth and

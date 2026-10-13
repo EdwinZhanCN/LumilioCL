@@ -3,7 +3,7 @@
   "id": "schematic-render-parity",
   "title": "投影 3D 预览的解析与显示修正",
   "summary": "对照 schemat.io/view 公开的查看器脚本和 Minecraft 26.3 客户端，修正 Nucleation 与 Schematic-Mesher 分支里会读错文件或画错方块的地方。",
-  "status": "in_progress",
+  "status": "completed",
   "visibility": "internal",
   "scope": {
     "included": [
@@ -69,7 +69,7 @@
     {
       "id": "T9",
       "title": "在启动器里目视检查真实投影",
-      "status": "proposed",
+      "status": "completed",
       "acceptance": "Project Maintainer 用 26.3 打开含箱子、楼梯、树叶、旗帜和水的投影，确认与游戏内一致"
     }
   ],
@@ -84,7 +84,7 @@
     },
     {
       "criterion": "启动器内目视检查",
-      "result": null
+      "result": "Project Maintainer（Edwin）2026-10-13 确认 Mac 实测通过。 启动器内用真实投影目视检查 3D 预览正确。"
     }
   ],
   "decisions": [
@@ -117,5 +117,6 @@
     "uvlock 与模型 ambientocclusion 都被解析却从未使用；“能解析”不等于“生效”。守卫 uvlock、model_shading 直接比较网格输出。",
     "26.x 改贴图路径与模型格式时，兼容层把整个客户端 JAR 解压再压缩，每次打开预览都慢数秒；守卫 normalized_jars_keep_only_mesher_assets 确保只处理网格器读取的资源。",
     "litematic 调色板条目解析失败被 filter_map 丢弃，后续所有索引错位；对按索引引用的数据要保留位置。守卫见 litematic.rs 的三个损坏文件测试。"
-  ]
+  ],
+  "outcome": "投影渲染修正已合入，启动器内目视检查通过。"
 }

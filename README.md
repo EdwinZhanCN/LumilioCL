@@ -28,7 +28,7 @@ LumilioCL 使用 Rust 开发，桌面界面基于 [GPUI](https://www.gpui.rs/) �
 [gpui-kit](https://github.com/longbridge/gpui-kit) 构建，底层组件使用本仓库维护的
 gpui-component 0.7 Fork。桌面应用不依赖 Electron 或 WebView。
 
-- **游戏库**：新建原版、Fabric 或 Quilt 游戏，用收藏、合集和搜索管理。可以导入 `.mrpack`、
+- **游戏库**：新建原版、Fabric、Quilt、Forge 或 NeoForge 游戏，用收藏、合集和搜索管理。可以导入 `.mrpack`、
   CurseForge 和 MultiMC / Prism 整合包，也可以把其他启动器（MultiMC、Prism、`.minecraft`）
   里的游戏搬过来，原文件不动。
 - **发现**：浏览并安装 Modrinth 和 CurseForge 上的模组、资源包、光影和整合包，按游戏版本和

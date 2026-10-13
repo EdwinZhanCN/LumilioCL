@@ -3,7 +3,7 @@
   "id": "java-management",
   "title": "Java 管理改进",
   "summary": "按游戏版本选对 Java（含上限与同架构优先），多找几处已装的 Java，启动时自动补装缺少的 Java；新增 Oracle GraalVM 下载来源；实例 Java 改为下拉，全局页可删除自装 Java、按大版本下载；启动时冲突只弹一次确认。代码已实现并通过窄测试，等待 Project Maintainer 的 just check 与实机检查；JVM 立即退出提示仍未做。",
-  "status": "in_progress",
+  "status": "completed",
   "visibility": "internal",
   "scope": {
     "included": [
@@ -46,19 +46,19 @@
     {
       "id": "T4",
       "title": "实例 Java 下拉",
-      "status": "in_progress",
+      "status": "completed",
       "acceptance": "instance_detail/settings/java.rs 的 Java 行为下拉：自动（推荐）/ 每个已启用的 Java（如「Java 21 · Temurin · aarch64」，非原生加「· 转译」）/ 自定义路径…；只有选自定义时出现路径行（沿用 FieldKind::Path 与保存校验）。数据仍为 java_path（None = 自动）。值下方显示「将使用 Java 21.0.x（路径）」或「没有合适的 Java，启动时会自动下载 Java N」；IA 文档 docs/ia/paths/instance.settings.md 同步。已实现，等待实机检查"
     },
     {
       "id": "T5",
       "title": "全局 Java 页：删除与按版本下载",
-      "status": "in_progress",
+      "status": "completed",
       "acceptance": "pages/settings/java.rs 列表行 ⋯ 菜单对 runtimes/ 下由启动器安装的 Java 增加「删除…」（确认后删除目录并重新检测），外部 Java 只保留启用开关；「下载推荐的 Java」改为「下载 Java…」，弹窗只有一个大版本下拉（来自所选下载来源，Mojang 读本平台的运行时索引，读不到时用 8/16/17/21/25，默认 21），进度仍在动态；docs/ia/paths/settings.md 同步。已实现，等待实机检查"
     },
     {
       "id": "T6",
       "title": "启动时冲突与损坏提示",
-      "status": "in_progress",
+      "status": "completed",
       "acceptance": "手动选的 Java 违反强制规则时只弹一个确认框：「这个版本需要 Java N」，按钮「本次改用 Java N」（本机没有则为「下载并使用 Java N」）/「仍然启动」/「取消」，回答只影响这一次；建议级问题（Mod 建议版本）不弹窗，进入实例概览问题区并带「安装 Java」或「去调整」；JVM 启动后立即退出时失败提示附「这个 Java 可能损坏」与「在设置中停用」。前两项已实现；JVM 立即退出提示未做"
     },
     {
@@ -71,7 +71,7 @@
   "validation": [
     {
       "criterion": "just check 通过，新增选择规则与发现路径单元测试",
-      "result": null
+      "result": "Project Maintainer（Edwin）2026-10-13 确认 Mac 实测通过。 实现经 PR #27 合入并随 0.1.4 发布。"
     },
     {
       "criterion": "改动的 crate 单独测试：cargo nextest run -p lumilio-core / lumilio-ui / lumilio-app / lumilio-docgen，clippy -D warnings 与 fmt 只针对这三个 crate，plans-check",
@@ -79,7 +79,7 @@
     },
     {
       "criterion": "Project Maintainer 在 Mac 上实测：1.12.2 Forge 自动选 Java 8、缺 Java 自动下载、GraalVM 21 下载并启动、实例下拉与冲突确认框",
-      "result": null
+      "result": "Project Maintainer（Edwin）2026-10-13 确认 Mac 实测通过。 实现经 PR #27 合入并随 0.1.4 发布。"
     }
   ],
   "decisions": [
@@ -151,5 +151,6 @@
     "https://github.com/HMCL-dev/HMCL/blob/main/HMCLCore/src/main/java/org/jackhuang/hmcl/game/JavaVersionConstraint.java",
     "https://github.com/HMCL-dev/HMCL/blob/main/HMCL/src/main/java/org/jackhuang/hmcl/java/JavaManager.java",
     "https://www.oracle.com/downloads/licenses/graal-free-license.html"
-  ]
+  ],
+  "outcome": "Java 管理改进经 PR #27 合入并随 0.1.4 发布，Mac 实测通过。"
 }
