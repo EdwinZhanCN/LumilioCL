@@ -91,6 +91,8 @@ The built-in Aluminium theme supplies the other colours.
 ```
 
 For complete examples, read the included [rose-pine.json](https://github.com/EdwinZhanCN/LumilioCL/blob/main/crates/lumilio-ui/themes/rose-pine.json) and [catppuccin.json](https://github.com/EdwinZhanCN/LumilioCL/blob/main/crates/lumilio-ui/themes/catppuccin.json) files.
+To make a file without writing JSON, use the [theme studio](/en/docs/guide/theme-studio/).
+It shows a preview while you change the theme.
 
 ### Theme fields
 

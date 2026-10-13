@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   BUILTIN_THEMES,
   COLOR_KEYS,
+  CONTRAST_RULES,
   MAX_RADIUS,
   checkContrast,
   clampRadius,
@@ -134,5 +135,21 @@ describe("contrast rules", () => {
     const grey: ThemeSpec = { name: "Grey", appearance: "light", colors: { ink: "#d0d0d0" }, fonts: {} };
     const failed = checkContrast(resolve(grey)).filter((result) => !result.ok);
     expect(failed.map((result) => result.rule.id)).toContain("ink-page");
+  });
+});
+
+describe("studio text and grouping", () => {
+  it("groups every colour once and names every colour and rule in both languages", async () => {
+    const { COLOR_GROUPS } = await import("./groups");
+    const { studioText } = await import("../../i18n/studio");
+    const grouped = COLOR_GROUPS.flatMap((group) => [...group.keys]);
+    expect([...grouped].sort()).toEqual([...COLOR_KEYS].sort());
+    expect(new Set(grouped).size).toBe(grouped.length);
+    for (const language of ["zh-CN", "en"]) {
+      const t = studioText(language);
+      for (const key of COLOR_KEYS) expect(t.colours[key], `${language} ${key}`).toBeTruthy();
+      for (const group of COLOR_GROUPS) expect(t.groups[group.id], `${language} ${group.id}`).toBeTruthy();
+      for (const rule of CONTRAST_RULES) expect(t.rules[rule.id], `${language} ${rule.id}`).toBeTruthy();
+    }
   });
 });

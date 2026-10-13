@@ -24,25 +24,25 @@
     {
       "id": "T1",
       "title": "Export built-in themes for the website",
-      "status": "in_progress",
+      "status": "completed",
       "acceptance": "A lumilio-ui test fails when web/src/data/themes.generated.json differs from the built-in catalog, and LUMILIO_BLESS_THEMES=1 rewrites it; the file lists colour keys in launcher order"
     },
     {
       "id": "T2",
       "title": "Theme model in TypeScript with launcher parity",
-      "status": "proposed",
+      "status": "completed",
       "acceptance": "vitest covers colour parsing, radius clamping, file parsing of every built-in theme, export round trip, launcher-ignored themes, and contrast ratios"
     },
     {
       "id": "T3",
       "title": "Studio page: editor, preview, download",
-      "status": "proposed",
+      "status": "completed",
       "acceptance": "Both language pages build; a person can start from a preset or import a file, edit every field, see the preview change, and download or copy a file that parses with the launcher's rules"
     },
     {
       "id": "T4",
       "title": "Shared styles and token guard",
-      "status": "proposed",
+      "status": "completed",
       "acceptance": "The marketing page keeps its styles; the studio imports only fonts and instrument styles; a test fails when tokens.css differs from Aluminium or Night"
     },
     {
@@ -53,10 +53,22 @@
     }
   ],
   "validation": [
-    { "criterion": "Generated built-in themes stay current", "result": null },
-    { "criterion": "Model parity and export tests pass", "result": null },
-    { "criterion": "just web passes", "result": null },
-    { "criterion": "A downloaded theme loads in the launcher", "result": null }
+    {
+      "criterion": "Generated built-in themes stay current",
+      "result": "lumilio-ui theme::tests::website::the_website_has_the_current_builtin_themes passes and failed with one colour edited in the generated file; `just website-themes` rewrites it. The contrast rules are one table (theme/tests/mod.rs) that the Rust test checks the built-in bodies against and the website reads."
+    },
+    {
+      "criterion": "Model parity and export tests pass",
+      "result": "vitest model.test.ts: launcher colour-parsing cases, every bundled theme file in crates/lumilio-ui/themes parses with nothing missing, all built-in themes write and read back unchanged, one bad theme does not hide the others, fill-in, radius clamp, file names, launcher-ignored themes, built-ins meet every contrast rule, and every colour, group and rule has text in both languages. tokens.test.ts failed with one tokens.css colour changed."
+    },
+    {
+      "criterion": "just web passes",
+      "result": "just web: astro check 0 errors, 0 warnings; vitest 31 passed; 29 pages built including both studio pages. Headless Chromium screenshots of the studio at 1400 px (Chinese, English) and 390 px looked right after fixing the danger key colour, the apply button wrap and the preview order on narrow screens; the homepage renders as main does."
+    },
+    {
+      "criterion": "A downloaded theme loads in the launcher",
+      "result": null
+    }
   ],
   "decisions": [
     {
@@ -76,6 +88,18 @@
       "decision": "The preview re-colours the site's own instrument components instead of drawing a separate mock",
       "rationale": "The marketing page already draws keys, LEDs and displays after the launcher's design language from CSS variables; setting those variables on the preview gives the same look from one stylesheet.",
       "consequences": "Instrument styles move to a shared stylesheet. The preview is representative, not pixel-identical to the launcher."
+    },
+    {
+      "id": "D4",
+      "decision": "The launcher's contrast rules become one exported table",
+      "rationale": "The studio's hints must judge a theme as the launcher's own tests judge its built-in themes; a second copy in TypeScript would drift.",
+      "consequences": "Adding a rule in theme/tests/mod.rs reaches the studio after `just website-themes`; each rule id needs studio text in both languages, which model.test.ts enforces."
+    },
+    {
+      "id": "D5",
+      "decision": "radius is shown on fields and menus, radius_lg on dialogs and notifications; keys and panels keep fixed corners",
+      "rationale": "The launcher's own keys (key.rs) and panels use fixed radii; theme radii reach only gpui-component controls. The Themes guide said keys, which was wrong, and was corrected in the user-guide PR.",
+      "consequences": "The preview's keys never change shape with the radius sliders."
     }
   ],
   "references": [
@@ -84,5 +108,12 @@
     "web/src/styles/global.css",
     "web/src/content/docs/docs/guide/themes.md"
   ],
-  "roadmap": { "enabled": false, "id": "theme-studio", "name": "Theme studio", "lede": "Make a launcher theme in the browser", "targetVersion": null, "order": 0 }
+  "roadmap": {
+    "enabled": false,
+    "id": "theme-studio",
+    "name": "Theme studio",
+    "lede": "Make a launcher theme in the browser",
+    "targetVersion": null,
+    "order": 0
+  }
 }
