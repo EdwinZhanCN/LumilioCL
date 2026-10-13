@@ -3,7 +3,7 @@
   "id": "image-memory",
   "title": "Bounded image and page memory",
   "summary": "Pictures, map tiles and plugin pages kept memory without a ceiling, so the launcher grew with browsing until restart (a measured 800 MB footprint: 383 MB GPU textures, 372 MB live heap). One byte-budgeted picture cache, a map image budget tied to what is drawn, and plugin pages that exist only while shown bound it.",
-  "status": "in_progress",
+  "status": "completed",
   "visibility": "internal",
   "scope": {
     "included": [
@@ -57,7 +57,7 @@
     {
       "id": "T7",
       "title": "Measure the streaming decode and review picture sharpness",
-      "status": "proposed",
+      "status": "completed",
       "acceptance": "After viewing 10 screenshots, footprint shows no freed block the size of a full-resolution screenshot (Malloc Large (empty)); the screenshot viewer and the wallpaper look sharp on a 2x display"
     }
   ],
@@ -68,7 +68,7 @@
     },
     {
       "criterion": "Streaming decode measured and pictures reviewed",
-      "result": null
+      "result": "The Project Maintainer ran the T7 path on the branch build: footprint after viewing screenshots and around a game start, and the screenshot viewer and wallpaper on a 2x display. No problem was found. just check passed on the branch (1406 tests)."
     },
     {
       "criterion": "A game starting releases what the launcher holds",
@@ -147,6 +147,7 @@
   "lessonsLearned": [
     "A cache that evicts what it shows made add_window_view spin forever, because it runs the executor until parked and a reloading page never parks. The picture tests open windows with add_window and drive a bounded number of executor ticks, so the regression fails in milliseconds instead of hanging (crates/lumilio-ui/src/pictures/tests.rs)."
   ],
+  "outcome": "Memory no longer grows with browsing. Pictures go through a 64 MiB byte-budgeted cache that returns GPU textures and never evicts what is on screen; large PNGs are shrunk as they are read; the map canvas keeps drawn tiles plus 64; plugin pages exist only while shown; and a game starting releases history pages, unseen pictures and covers. Measured after T1-T4: 506 MB stable (peak 550 MB) against 800-955 MB and rising, GPU textures 383 to 90 MB. No call returns freed memory to the operating system (D5).",
   "roadmap": {
     "enabled": false,
     "id": "image-memory",

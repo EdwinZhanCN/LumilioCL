@@ -2,7 +2,7 @@
 
 # Bounded image and page memory
 
-Status: InProgress
+Status: Completed
 
 Pictures, map tiles and plugin pages kept memory without a ceiling, so the launcher grew with browsing until restart (a measured 800 MB footprint: 383 MB GPU textures, 372 MB live heap). One byte-budgeted picture cache, a map image budget tied to what is drawn, and plugin pages that exist only while shown bound it.
 
@@ -29,7 +29,7 @@ Pictures, map tiles and plugin pages kept memory without a ceiling, so the launc
   Acceptance: On LaunchSignal::Running the page on screen stays; game and project pages leave history (landmark pages stay, with no step that leads to the same place) and are freed; pictures not on screen and built covers are released, textures included; tests cover each
 - [x] T6 — Decode screenshots shrinking as they are read (Completed)
   Acceptance: Screenshot thumbnails and the viewer decode a PNG larger than their edge row by row into the target size, holding only the output and a few rows; tests show exact area means (an even colour stays exact at a non-integer ratio, transparency does not tint) and both callers keep their sizes
-- [ ] T7 — Measure the streaming decode and review picture sharpness (Proposed)
+- [x] T7 — Measure the streaming decode and review picture sharpness (Completed)
   Acceptance: After viewing 10 screenshots, footprint shows no freed block the size of a full-resolution screenshot (Malloc Large (empty)); the screenshot viewer and the wallpaper look sharp on a 2x display
 
 ## Validation
@@ -37,7 +37,7 @@ Pictures, map tiles and plugin pages kept memory without a ceiling, so the launc
 - PNG screenshots are shrunk as they are read
   Result: lumilio-core picture::tests (6) pass; breaking the column split or the premultiplication fails the even-colour and transparency tests. screenshots::tests thumbnail (1920x1080 to 480x270) and lumilio-ui pictures::tests (PNG and JPEG both decoded at 2048x683) pass. cargo nextest run -p lumilio-core -p lumilio-ui -p lumilio-app: 1156 passed; clippy -D warnings and cargo fmt --check clean. Measuring the effect is T7.
 - Streaming decode measured and pictures reviewed
-  Result: pending
+  Result: The Project Maintainer ran the T7 path on the branch build: footprint after viewing screenshots and around a game start, and the screenshot viewer and wallpaper on a 2x display. No problem was found. just check passed on the branch (1406 tests).
 - A game starting releases what the launcher holds
   Result: shell::tests::memory::a_game_starting_drops_the_pages_kept_for_back (the game page entity is freed), pictures::tests::a_game_starting_lets_go_of_every_picture_off_screen (within budget, still released; texture returned), cover::tests::a_game_starting_empties_the_covers and history::tests::collapsing_leaves_no_step_that_goes_nowhere pass; the first three failed with the release call, the zero-budget eviction and the cover drain removed. cargo nextest run -p lumilio-ui: 435 passed; clippy -D warnings clean.
 - Picture cache stays within its byte budget, keeps what is on screen and returns evicted textures
@@ -108,5 +108,9 @@ Consequences: Interlaced PNGs, PNGs with an EXIF orientation and pictures that a
 - [crates/lumilio-ui/src/instance_detail/plugin_tabs.rs](../../crates/lumilio-ui/src/instance_detail/plugin_tabs.rs)
 - [crates/lumilio-ui/src/shell/locations.rs](../../crates/lumilio-ui/src/shell/locations.rs)
 - https://github.com/zed-industries/zed/blob/main/crates/gpui/src/elements/img.rs
+
+## Outcome
+
+Memory no longer grows with browsing. Pictures go through a 64 MiB byte-budgeted cache that returns GPU textures and never evicts what is on screen; large PNGs are shrunk as they are read; the map canvas keeps drawn tiles plus 64; plugin pages exist only while shown; and a game starting releases history pages, unseen pictures and covers. Measured after T1-T4: 506 MB stable (peak 550 MB) against 800-955 MB and rising, GPU textures 383 to 90 MB. No call returns freed memory to the operating system (D5).
 
 - Lesson: A cache that evicts what it shows made add_window_view spin forever, because it runs the executor until parked and a reloading page never parks. The picture tests open windows with add_window and drive a bounded number of executor ticks, so the regression fails in milliseconds instead of hanging (crates/lumilio-ui/src/pictures/tests.rs).
