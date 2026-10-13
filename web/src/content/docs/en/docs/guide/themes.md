@@ -4,7 +4,7 @@ description: Select a built-in theme, or make a theme in a JSON file.
 ---
 
 A theme sets the colours of the launcher.
-It also sets the corner radius of controls and dialogs, and the interface fonts.
+It also sets the corner radius of fields and dialogs, and the interface fonts.
 The launcher uses one theme for light appearance and one theme for dark appearance.
 
 ## Select a theme
@@ -100,8 +100,8 @@ For complete examples, read the included [rose-pine.json](https://github.com/Edw
 | `appearance` | Yes | `"light"` or `"dark"`. It sets the list for the theme and the built-in theme that supplies missing colours |
 | `source` | No | The source and license of the colours. Use it when you adapt colours from a different theme |
 | `colors` | No | The colours in the table below. The built-in theme of the same appearance supplies missing colours |
-| `radius` | No | The corner radius of controls, such as keys and fields, in pixels. The default is `4` |
-| `radius_lg` | No | The corner radius of dialogs, in pixels. The default is `6` |
+| `radius` | No | The corner radius of fields, lists, and menus, in pixels. The default is `4`. The keys and panels of the launcher keep their own corners |
+| `radius_lg` | No | The corner radius of dialogs and notifications, in pixels. The default is `6` |
 | `fonts` | No | Font family names: `sans` for the interface, `mono` for monospace text, and `cjk` for Chinese text |
 | `window_background` | No | The window material behind the page: `"opaque"` (default), `"transparent"`, or `"blurred"`. You can see it only through colours with opacity |
 
