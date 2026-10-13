@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "id": "curseforge-source",
   "title": "CurseForge 内容源",
-  "summary": "2026-10-13：功能完成，Project Maintainer 在真实窗口里验收通过；just check、just web、just docs 与 PR CI 通过。验收时报告过一次「浏览 CurseForge 后切回 Modrinth 闪退」：无头窗口按正式接线复现（含当前游戏、选分类后切回）未能复现，GPUI 的动图帧号已有夹取；排查中修好一个竞态（筛选项晚到时把页面拉回旧来源），再次遇到时取终端里的 panic 输出（RUST_BACKTRACE=1）。剩下 T8：发版时更新网站首页与使用指南。",
-  "status": "in_progress",
+  "summary": "2026-10-13：功能完成，Project Maintainer 在真实窗口里验收通过；just check、just web、just docs 与 PR CI 通过。验收时报告过一次「浏览 CurseForge 后切回 Modrinth 闪退」：无头窗口按正式接线复现（含当前游戏、选分类后切回）未能复现，GPUI 的动图帧号已有夹取；排查中修好一个竞态（筛选项晚到时把页面拉回旧来源），再次遇到时取终端里的 panic 输出（RUST_BACKTRACE=1），这一项转入 backlog。随 0.1.5 发布，网站首页与使用指南已写上 CurseForge（T8）。",
+  "status": "completed",
   "visibility": "public",
   "scope": {
     "included": [
@@ -65,7 +65,7 @@
     {
       "id": "T8",
       "title": "发版时更新网站",
-      "status": "proposed",
+      "status": "completed",
       "acceptance": "网站路线图已列出这个计划（首页「正在路上」第一格，目标 0.1.5）。发布含 CurseForge 来源的版本时：首页「发现」与进阶玩家要点写上 CurseForge（web/src/i18n/zh-cn.ts；首页只有中文），使用指南补一页内容来源（web/user-guide 合入后的 guide/）。首页功能介绍描述已发布的版本，不提前改。"
     }
   ],
@@ -96,7 +96,11 @@
     },
     {
       "criterion": "浏览 CurseForge 后切回 Modrinth 时的一次闪退查明原因或确认不再出现。",
-      "result": null
+      "result": "2026-10-13：原因未查明。无头窗口按正式接线复现（含当前游戏、选分类后切回）未能复现；排查中修好的竞态见 filters_for_a_source_left_behind_do_not_take_the_page_back。发布 0.1.5 时转入 .agents/plans/backlog.md「只有 Project Maintainer 能做」，再次遇到时用 RUST_BACKTRACE=1 运行并取终端里的 panic 输出。"
+    },
+    {
+      "criterion": "网站写上 CurseForge 来源。",
+      "result": "2026-10-13：release-0-1-5 的发布准备 PR 修改首页「发现」介绍、游戏库与进阶玩家要点（web/src/i18n/zh-cn.ts），新增中英文使用指南页 guide/content-sources.md 并加入侧栏和使用指南概览；just web 通过。"
     }
   ],
   "decisions": [
@@ -173,6 +177,7 @@
     "点击来源键时，change_query 在外壳自己的更新里同步发出 LoadFilters，应用的 load_filters 立刻读外壳，GPUI 直接 panic：实际窗口里切换来源会崩溃。界面测试用的空处理函数测不出来，是按正式接线点击的端到端测试抓到的。防护：load_filters 与 search 一样推迟一帧再读外壳；choosing_a_source_by_its_key_does_not_read_the_shell_mid_update 用正式接线点击来源键（去掉推迟时失败）。",
     "用真实 Backend 的应用层界面测试少了 allow_parking，本机碰巧通过，CI 上 tokio 工作线程唤醒 GPUI 被测试调度器判为不确定而失败。防护：这类测试开头调用 cx.executor().allow_parking()（与 home_snapshot 测试一致），并在本机连跑多次。"
   ],
+  "outcome": "CurseForge 内容源随 0.1.5 发布：发现页可在 Modrinth 与 CurseForge 之间切换，CurseForge 整合包可从发现页安装或本地导入，只能在网站下载的文件先到 Modrinth 找、找不到的列出下载页并可添加已下载的文件，游戏内容按来源识别与更新。网站首页与使用指南已写上 CurseForge。验收时出现过一次的切换来源闪退未能复现，转入 backlog。",
   "roadmap": {
     "enabled": true,
     "id": "curseforge-source",

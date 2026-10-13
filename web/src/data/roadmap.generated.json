@@ -23,7 +23,7 @@
       "name": "CurseForge 来源",
       "lede": "在发现页浏览和安装 CurseForge 上的模组、整合包和光影。",
       "version": "0.1.5",
-      "status": "in_progress"
+      "status": "completed"
     },
     {
       "id": "discover-translation",

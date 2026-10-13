@@ -42,13 +42,13 @@ export const zhCN = {
     library: {
       name: "游戏库",
       lede: "新建原版、Fabric 或 Quilt 游戏，或者把 MultiMC、Prism 和 .minecraft 里的游戏搬过来，原文件不动。",
-      facts: ["导入 .mrpack 与 MultiMC / Prism 整合包", "收藏、合集和搜索", "完整备份，随时恢复"],
+      facts: ["导入 .mrpack、CurseForge 与 MultiMC / Prism 整合包", "收藏、合集和搜索", "完整备份，随时恢复"],
       shot: "游戏库页面的截图",
     },
     discover: {
       name: "发现",
-      lede: "在启动器里浏览 Modrinth 上的模组、资源包、光影和整合包，按游戏版本和加载器筛选，装进当前游戏。",
-      facts: ["模组、资源包、光影、整合包", "按版本与加载器筛选", "安装进度都在动态里"],
+      lede: "在启动器里浏览 Modrinth 和 CurseForge 上的模组、资源包、光影和整合包，按游戏版本和加载器筛选，装进当前游戏。",
+      facts: ["Modrinth 与 CurseForge 两个来源", "按版本与加载器筛选", "安装进度都在动态里"],
       shot: "发现页面的截图",
     },
     map: {
@@ -121,7 +121,7 @@ export const zhCN = {
         title: "模组、建筑与外观，都在一处",
         lede: "装模组、看地图、对投影，也能管理角色外观。",
         points: [
-          { text: "浏览和安装 Modrinth 的模组、资源包、光影和整合包", shot: "/shots/discovery.png" },
+          { text: "浏览和安装 Modrinth 与 CurseForge 的模组、资源包、光影和整合包", shot: "/shots/discovery.png" },
           { text: "世界地图：种子预测、存档地图与结构图层", shot: "/shots/world-map.png" },
           { text: "Litematica 投影：完整 3D 预览", shot: "/shots/schematic-preview.png" },
           { text: "Litematica 投影：材料清单与 CSV 导出", shot: "/shots/schematic-materials.png" },

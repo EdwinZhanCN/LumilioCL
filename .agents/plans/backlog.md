@@ -24,6 +24,7 @@
 
 ## 只有Project Maintainer能做
 
+- 发现：验收 CurseForge 来源时出现过一次「浏览 CurseForge 后切回 Modrinth 闪退」，无头窗口未能复现。再次遇到时用 `RUST_BACKTRACE=1` 运行启动器，取终端里的 panic 输出，再开修复。
 - 世界/服务器封面与账户头像：实机查看有图、无图、在线与离线状态下的外观，并确认 40px 世界/服务器前导图与行高是否合适。
 - 世界地图结构图层：实机查看 Mineshaft 标记密度；默认仍关闭该图层。
 

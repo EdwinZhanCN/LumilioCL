@@ -4,7 +4,7 @@
 
 Status: InProgress
 
-0.1.4 汇总 v0.1.3 之后合入 main 的全部改动：游戏设置预设与游戏外编辑选项、Java 管理（按规则选择、启动时自动下载、Oracle GraalVM 来源）、种子地图新增可预测内容、投影 3D 预览的解析与显示修正、更新后显示更新内容、整合包安装指定版本，以及发布说明与生成工具的改进。从这个版本起，发布说明写在 release-notes/<version>.md，启动器更新后第一次打开时显示。
+0.1.4 已于 2026-10-12 正式发布，汇总 v0.1.3 之后合入 main 的全部改动：游戏设置预设与游戏外编辑选项、Java 管理（按规则选择、启动时自动下载、Oracle GraalVM 来源）、种子地图新增可预测内容、投影 3D 预览的解析与显示修正、更新后显示更新内容、整合包安装指定版本，以及发布说明与生成工具的改进。从这个版本起，发布说明写在 release-notes/<version>.md，启动器更新后第一次打开时显示。
 
 ## Scope
 
@@ -24,11 +24,11 @@ Status: InProgress
   Acceptance: 工作区版本为 0.1.4，Cargo.lock 同步，release-0-1-3 记录已发布状态，release-notes/0.1.4.md 与 .en.md 写好，本计划与投影生成。
 - [x] R2 — 合入投影预览修复 (Completed)
   Acceptance: PR #28 的 rust、plans 检查通过后合入；启动器内目视检查留在 schematic-render-parity T9。
-- [ ] R3 — 通过 PR 合入版本更新 (InProgress)
+- [x] R3 — 通过 PR 合入版本更新 (Completed)
   Acceptance: PR 列出发布内容，rust、plans 检查通过后合入 main，合入后 main 的 CI 通过。
-- [ ] R4 — 打 v0.1.4 标签并生成三平台草稿安装包 (Proposed)
+- [x] R4 — 打 v0.1.4 标签并生成三平台草稿安装包 (Completed)
   Acceptance: v0.1.4 标签指向合入后的提交；Release 工作流成功，草稿含三平台安装包与 SHA256SUMS.txt，正文为 release-notes/0.1.4.md 加安装包小节。
-- [ ] R5 — 补全发布说明并正式发布 (Proposed)
+- [x] R5 — 补全发布说明并正式发布 (Completed)
   Acceptance: Project Maintainer 补上正文末行的 PR 编号后发布草稿。
 - [ ] R6 — 从 0.1.3 更新后显示 0.1.4 的更新内容 (Proposed)
   Acceptance: Project Maintainer 从 0.1.3 自动更新到 0.1.4，重启后第一次打开弹出「已更新到 LumilioCL 0.1.4」，关闭后再次打开不再弹出。
@@ -36,9 +36,9 @@ Status: InProgress
 ## Validation
 
 - 发布候选的本地与 PR 检查通过。
-  Result: pending
+  Result: 2026-10-12 PR #33 的 rust、plans 检查通过，合入 main 的提交为 dff6c5079b76bf015baf4a87f98c066853a4031b，合入后 main 的 CI 与 Plans 工作流通过；v0.1.4 标签指向该提交。本地检查结果未记录。
 - 三平台草稿安装包生成，下载后的产物校验通过。
-  Result: pending
+  Result: Release 工作流 38314547502 成功，草稿含 macOS arm64 DMG、Windows x64 安装器与便携 ZIP、Linux x64 deb 与 tar.gz 及 SHA256SUMS.txt；正文末行已补 PR #33，2026-10-12T22:43:39Z 正式发布。下载后的产物校验结果未记录。
 - 0.1.3 → 0.1.4 更新后显示一次更新内容。
   Result: pending
 
@@ -60,6 +60,9 @@ Consequences: 这些功能各自的计划里仍未关闭的实机验收照常进
 - https://github.com/EdwinZhanCN/LumilioCL/pull/30
 - https://github.com/EdwinZhanCN/LumilioCL/pull/31
 - https://github.com/EdwinZhanCN/LumilioCL/pull/32
+- https://github.com/EdwinZhanCN/LumilioCL/pull/33
+- https://github.com/EdwinZhanCN/LumilioCL/actions/runs/38314547502
+- https://github.com/EdwinZhanCN/LumilioCL/releases/tag/v0.1.4
 - [.agents/plans/release-0-1-3.json](../../.agents/plans/release-0-1-3.json)
 - [.agents/plans/java-management.json](../../.agents/plans/java-management.json)
 - [.agents/plans/game-settings-presets.json](../../.agents/plans/game-settings-presets.json)
