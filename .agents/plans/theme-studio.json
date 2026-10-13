@@ -3,7 +3,7 @@
   "id": "theme-studio",
   "title": "Theme studio on the website",
   "summary": "A user-guide page where a person starts from a built-in theme or their own file, edits every field of a launcher theme with a live preview drawn by the site's instrument components, sees contrast hints, and downloads a JSON file the launcher reads.",
-  "status": "in_progress",
+  "status": "completed",
   "visibility": "internal",
   "scope": {
     "included": [
@@ -48,7 +48,7 @@
     {
       "id": "T5",
       "title": "Review on desktop and mobile",
-      "status": "proposed",
+      "status": "completed",
       "acceptance": "The Project Maintainer checks the studio at desktop and phone widths and loads a downloaded theme in the launcher"
     }
   ],
@@ -67,7 +67,7 @@
     },
     {
       "criterion": "A downloaded theme loads in the launcher",
-      "result": null
+      "result": "The Project Maintainer used the studio in a real browser (editing colours, import, adding a theme, download), checked the editor in dark mode, and loaded a downloaded file from the launcher's themes folder; the launcher read it and showed it correctly."
     }
   ],
   "decisions": [
@@ -108,6 +108,7 @@
     "web/src/styles/global.css",
     "web/src/content/docs/docs/guide/themes.md"
   ],
+  "outcome": "Added the theme studio to the user guide in both languages. Built-in themes, colour keys and contrast rules reach the website through a generated file that a lumilio-ui test keeps current, and a vitest guard keeps tokens.css equal to Aluminium and Night. The Project Maintainer reviewed the studio in a browser and loaded a downloaded theme in the launcher. The change merges after the user-guide PR; no deployment was performed.",
   "roadmap": {
     "enabled": false,
     "id": "theme-studio",

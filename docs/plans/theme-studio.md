@@ -2,7 +2,7 @@
 
 # Theme studio on the website
 
-Status: InProgress
+Status: Completed
 
 A user-guide page where a person starts from a built-in theme or their own file, edits every field of a launcher theme with a live preview drawn by the site's instrument components, sees contrast hints, and downloads a JSON file the launcher reads.
 
@@ -28,7 +28,7 @@ A user-guide page where a person starts from a built-in theme or their own file,
   Acceptance: Both language pages build; a person can start from a preset or import a file, edit every field, see the preview change, and download or copy a file that parses with the launcher's rules
 - [x] T4 — Shared styles and token guard (Completed)
   Acceptance: The marketing page keeps its styles; the studio imports only fonts and instrument styles; a test fails when tokens.css differs from Aluminium or Night
-- [ ] T5 — Review on desktop and mobile (Proposed)
+- [x] T5 — Review on desktop and mobile (Completed)
   Acceptance: The Project Maintainer checks the studio at desktop and phone widths and loads a downloaded theme in the launcher
 
 ## Validation
@@ -40,7 +40,7 @@ A user-guide page where a person starts from a built-in theme or their own file,
 - just web passes
   Result: just web: astro check 0 errors, 0 warnings; vitest 31 passed; 29 pages built including both studio pages. Headless Chromium screenshots of the studio at 1400 px (Chinese, English) and 390 px looked right after fixing the danger key colour, the apply button wrap and the preview order on narrow screens; the homepage renders as main does.
 - A downloaded theme loads in the launcher
-  Result: pending
+  Result: The Project Maintainer used the studio in a real browser (editing colours, import, adding a theme, download), checked the editor in dark mode, and loaded a downloaded file from the launcher's themes folder; the launcher read it and showed it correctly.
 
 ## Decision D1
 
@@ -88,3 +88,7 @@ Consequences: The preview's keys never change shape with the radius sliders.
 - [crates/lumilio-ui/src/theme/look.rs](../../crates/lumilio-ui/src/theme/look.rs)
 - [web/src/styles/global.css](../../web/src/styles/global.css)
 - [web/src/content/docs/docs/guide/themes.md](../../web/src/content/docs/docs/guide/themes.md)
+
+## Outcome
+
+Added the theme studio to the user guide in both languages. Built-in themes, colour keys and contrast rules reach the website through a generated file that a lumilio-ui test keeps current, and a vitest guard keeps tokens.css equal to Aluminium and Night. The Project Maintainer reviewed the studio in a browser and loaded a downloaded theme in the launcher. The change merges after the user-guide PR; no deployment was performed.
