@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "id": "theme-studio",
+  "title": "Theme studio on the website",
+  "summary": "A user-guide page where a person starts from a built-in theme or their own file, edits every field of a launcher theme with a live preview drawn by the site's instrument components, sees contrast hints, and downloads a JSON file the launcher reads.",
+  "status": "in_progress",
+  "visibility": "internal",
+  "scope": {
+    "included": [
+      "Built-in themes exported from the Rust catalog to web/src/data/themes.generated.json, guarded by a lumilio-ui test",
+      "Theme studio page in both languages under docs/guide, full width",
+      "Editing: presets, import, several themes per file, colours (picker and hex with opacity), radii, fonts, window background, source",
+      "Preview with the site's instrument components re-coloured through scoped CSS variables",
+      "Validation with the launcher's rules, contrast hints, JSON download and copy, a local draft",
+      "Shared instrument and font stylesheets split out of global.css; a guard that tokens.css matches the built-in themes"
+    ],
+    "excluded": [
+      "Rendering the real launcher in the browser",
+      "Uploading or sharing themes through the website",
+      "Launcher changes to the theme format"
+    ]
+  },
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Export built-in themes for the website",
+      "status": "in_progress",
+      "acceptance": "A lumilio-ui test fails when web/src/data/themes.generated.json differs from the built-in catalog, and LUMILIO_BLESS_THEMES=1 rewrites it; the file lists colour keys in launcher order"
+    },
+    {
+      "id": "T2",
+      "title": "Theme model in TypeScript with launcher parity",
+      "status": "proposed",
+      "acceptance": "vitest covers colour parsing, radius clamping, file parsing of every built-in theme, export round trip, launcher-ignored themes, and contrast ratios"
+    },
+    {
+      "id": "T3",
+      "title": "Studio page: editor, preview, download",
+      "status": "proposed",
+      "acceptance": "Both language pages build; a person can start from a preset or import a file, edit every field, see the preview change, and download or copy a file that parses with the launcher's rules"
+    },
+    {
+      "id": "T4",
+      "title": "Shared styles and token guard",
+      "status": "proposed",
+      "acceptance": "The marketing page keeps its styles; the studio imports only fonts and instrument styles; a test fails when tokens.css differs from Aluminium or Night"
+    },
+    {
+      "id": "T5",
+      "title": "Review on desktop and mobile",
+      "status": "proposed",
+      "acceptance": "The Project Maintainer checks the studio at desktop and phone widths and loads a downloaded theme in the launcher"
+    }
+  ],
+  "validation": [
+    { "criterion": "Generated built-in themes stay current", "result": null },
+    { "criterion": "Model parity and export tests pass", "result": null },
+    { "criterion": "just web passes", "result": null },
+    { "criterion": "A downloaded theme loads in the launcher", "result": null }
+  ],
+  "decisions": [
+    {
+      "id": "D1",
+      "decision": "The studio is a full-width page in the user guide, not a separate site page",
+      "rationale": "It inherits the documentation's language switch, search and navigation, next to the Themes page that explains the file.",
+      "consequences": "The page uses Starlight's splash template; its text lives in web/src/i18n/studio.ts."
+    },
+    {
+      "id": "D2",
+      "decision": "Built-in theme values come from Rust through a generated file, never copied by hand",
+      "rationale": "The launcher's catalog is the source of truth; a copy would drift as tokens.css already can.",
+      "consequences": "Changing a built-in theme requires refreshing the generated file, which the lumilio-ui test enforces."
+    },
+    {
+      "id": "D3",
+      "decision": "The preview re-colours the site's own instrument components instead of drawing a separate mock",
+      "rationale": "The marketing page already draws keys, LEDs and displays after the launcher's design language from CSS variables; setting those variables on the preview gives the same look from one stylesheet.",
+      "consequences": "Instrument styles move to a shared stylesheet. The preview is representative, not pixel-identical to the launcher."
+    }
+  ],
+  "references": [
+    "crates/lumilio-ui/src/theme/spec.rs",
+    "crates/lumilio-ui/src/theme/look.rs",
+    "web/src/styles/global.css",
+    "web/src/content/docs/docs/guide/themes.md"
+  ],
+  "roadmap": { "enabled": false, "id": "theme-studio", "name": "Theme studio", "lede": "Make a launcher theme in the browser", "targetVersion": null, "order": 0 }
+}

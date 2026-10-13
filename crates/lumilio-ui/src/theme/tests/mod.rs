@@ -31,29 +31,67 @@ fn bodies() -> [(&'static str, Body); 2] {
     [("aluminium", Body::of(false)), ("night", Body::of(true))]
 }
 
+/// One colour that must stand out from another by a WCAG 2 contrast ratio,
+/// on a light and on a dark body (design language §9). The website's theme
+/// studio checks the same rules (`website.rs` exports them).
+#[derive(serde::Serialize)]
+pub(super) struct Rule {
+    id: &'static str,
+    fg: &'static str,
+    bg: &'static str,
+    light: f32,
+    dark: f32,
+}
+
+const fn rule(id: &'static str, fg: &'static str, bg: &'static str, light: f32, dark: f32) -> Rule {
+    Rule {
+        id,
+        fg,
+        bg,
+        light,
+        dark,
+    }
+}
+
+pub(super) const RULES: &[Rule] = &[
+    // Text reaches 4.5:1 on what it sits on.
+    rule("ink-page", "ink", "page", 4.5, 4.5),
+    rule("ink-panel", "ink", "panel", 4.5, 4.5),
+    rule("muted-page", "muted", "page", 4.5, 4.5),
+    rule("muted-panel", "muted", "panel", 4.5, 4.5),
+    rule("on-white", "on_white", "key_white", 4.5, 4.5),
+    rule("on-black", "on_black", "key_black", 4.5, 4.5),
+    // Plain tags and port tabs.
+    rule("ink-key-grey", "ink", "key_grey", 4.5, 4.5),
+    rule("orange-text-page", "orange_text", "page", 4.5, 4.5),
+    rule("orange-text-panel", "orange_text", "panel", 4.5, 4.5),
+    rule("danger-text-page", "danger_text", "page", 4.5, 4.5),
+    rule("danger-text-panel", "danger_text", "panel", 4.5, 4.5),
+    rule("on-danger", "on_orange", "danger", 4.5, 4.5),
+    rule("display-ink", "display_ink", "display", 4.5, 4.5),
+    rule("display-label", "display_label", "display", 4.5, 4.5),
+    // An ink tag.
+    rule("page-ink", "page", "ink", 4.5, 4.5),
+    // White on orange is an accepted exception (§9).
+    rule("on-orange", "on_orange", "orange", 3., 3.),
+    // A lit LED is never the only sign of state, which is why orange on
+    // aluminium may sit at 2.8:1 on the page; held to 3:1 everywhere else.
+    // Keys are identified by their labels, which the text rules cover.
+    rule("orange-page", "orange", "page", 2.7, 3.),
+    rule("orange-panel", "orange", "panel", 3., 3.),
+    // An unlit LED still shows.
+    rule("led-off-page", "led_off", "page", 1.5, 1.5),
+];
+
 #[test]
-fn text_tokens_reach_4_5_to_1_on_what_they_sit_on() {
-    for (name, b) in bodies() {
-        let pairs = [
-            ("ink on page", b.ink, b.page),
-            ("ink on panel", b.ink, b.panel),
-            ("muted on page", b.muted, b.page),
-            ("muted on panel", b.muted, b.panel),
-            ("on white key", b.on_white, b.key_white),
-            ("on black key", b.on_black, b.key_black),
-            ("ink on key grey (plain tag, port tab)", b.ink, b.key_grey),
-            ("orange text on page", b.orange_text, b.page),
-            ("orange text on panel", b.orange_text, b.panel),
-            ("danger text on page", b.danger_text, b.page),
-            ("danger text on panel", b.danger_text, b.panel),
-            ("white on danger key", b.on_orange, b.danger),
-            ("display ink on display", b.display_ink, b.display),
-            ("display label on display", b.display_label, b.display),
-            ("page on ink tag", b.page, b.ink),
-        ];
-        for (what, fg, bg) in pairs {
-            let ratio = contrast(fg, bg);
-            assert!(ratio >= 4.5, "{name}: {what} is {ratio:.2}:1");
+fn the_builtin_bodies_meet_every_contrast_rule() {
+    for (name, body) in bodies() {
+        let palette = Palette::of(body);
+        let colour = |key: &str| palette.get(key).expect("a palette colour").0;
+        for rule in RULES {
+            let ratio = contrast(colour(rule.fg), colour(rule.bg));
+            let floor = if body.dark { rule.dark } else { rule.light };
+            assert!(ratio >= floor, "{name}: {} is {ratio:.2}:1", rule.id);
         }
     }
 }
@@ -67,26 +105,6 @@ fn white_on_orange_stays_within_the_accepted_exception() {
     let dark = contrast(night.on_orange, night.orange);
     assert!((3.4..3.7).contains(&light), "aluminium: {light:.2}:1");
     assert!((3.0..3.3).contains(&dark), "night: {dark:.2}:1");
-}
-
-#[test]
-fn marks_that_stand_alone_reach_3_to_1() {
-    for (name, b) in bodies() {
-        // A lit LED is never the only sign of state (§9), which is why
-        // orange on aluminium may sit at 2.8:1 on the page; held to 3:1
-        // everywhere else. Keys are identified by their labels, which the
-        // text test covers.
-        let led = contrast(b.orange, b.page);
-        let floor = if b.dark { 3. } else { 2.7 };
-        assert!(led >= floor, "{name}: lit LED on page is {led:.2}:1");
-        let on_panel = contrast(b.orange, b.panel);
-        assert!(on_panel >= 3., "{name}: orange on panel is {on_panel:.2}:1");
-        let led_off = contrast(b.led_off, b.page);
-        assert!(
-            led_off >= 1.5,
-            "{name}: an unlit LED still shows ({led_off:.2}:1)"
-        );
-    }
 }
 
 #[gpui::test]
@@ -401,3 +419,5 @@ fn the_bundled_themes_are_complete_attributed_and_pair_light_with_dark() {
         assert!(bundled.iter().any(|entry| entry.spec.appearance == tone));
     }
 }
+
+mod website;

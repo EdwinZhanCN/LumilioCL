@@ -94,6 +94,9 @@ macro_rules! palette {
         }
 
         impl Palette {
+            /// The colour names, in the order the file and the docs list them.
+            pub const NAMES: &[&str] = &[$(stringify!($field)),+];
+
             /// Every colour of `body`, written out.
             #[must_use]
             pub fn of(body: Body) -> Self {
@@ -111,6 +114,15 @@ macro_rules! palette {
                     None => missing.push(stringify!($field)),
                 })+
                 (body, missing)
+            }
+
+            /// The colour called `name`, if the palette gives it.
+            #[must_use]
+            pub fn get(&self, name: &str) -> Option<Color> {
+                match name {
+                    $(stringify!($field) => self.$field,)+
+                    _ => None,
+                }
             }
         }
     };
