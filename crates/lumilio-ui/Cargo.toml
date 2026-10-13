@@ -10,7 +10,9 @@ rust-version.workspace = true
 gpui.workspace = true
 flate2.workspace = true
 gpui-component.workspace = true
-image.workspace = true
+futures-util = { workspace = true, features = ["io"] }
+# GPUI already builds these; named here because `pictures` decodes them itself.
+image = { workspace = true, features = ["gif", "webp"] }
 lumilio-core.workspace = true
 serde.workspace = true
 serde_json.workspace = true

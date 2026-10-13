@@ -112,7 +112,7 @@ impl LauncherShell {
             view
         });
         view.update(cx, |view, cx| view.set_game_tags(tags, cx));
-        self.visit();
+        self.visit(cx);
         self.live_instance = None;
         self.detail = Some(DetailSlot {
             view,

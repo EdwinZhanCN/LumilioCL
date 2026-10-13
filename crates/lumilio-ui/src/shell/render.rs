@@ -180,7 +180,7 @@ impl Render for LauncherShell {
                 .into_any_element()
         };
 
-        v_flex()
+        let shell = v_flex()
             .id("lumilio-shell")
             .relative()
             .size_full()
@@ -229,6 +229,9 @@ impl Render for LauncherShell {
                 self.detail
                     .as_ref()
                     .and_then(|slot| ProjectDetailView::viewer_overlay(&slot.view, cx)),
-            )
+            );
+        // Every picture loaded by path or address in the window stays within
+        // the picture budget.
+        crate::pictures::scope(cx).size_full().child(shell)
     }
 }

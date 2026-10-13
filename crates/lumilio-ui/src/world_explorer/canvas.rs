@@ -21,8 +21,11 @@ use std::time::Instant;
 /// of a tile blend in whatever neighbours it in the atlas.
 const BORDER: u32 = 1;
 const TILE: u32 = 256;
-const TILES_KEPT: usize = 700;
-const SPRITES_KEPT: usize = 256;
+/// Images kept beyond those the latest frame drew, so panning back a little
+/// does not rebuild them. Each tile image is held twice, in memory and as a
+/// GPU texture, so the map keeps no more than what it shows and this spare.
+pub(super) const SPARE_TILES: usize = 64;
+const SPARE_SPRITES: usize = 64;
 /// Grid lines drawn per axis, at most.
 const LINES: i64 = 600;
 
@@ -243,7 +246,7 @@ impl Painter {
             let _ = window.paint_image(rect, rect, Corners::default(), entry.0.clone(), 0, false);
             painted += 1;
         }
-        self.evict(window);
+        self.evict(tiles as usize, painted as usize, window);
         stats.canvas_paints.fetch_add(1, Relaxed);
         stats.canvas_tiles.fetch_add(tiles, Relaxed);
         stats.canvas_sprites.fetch_add(painted, Relaxed);
@@ -314,8 +317,9 @@ impl Painter {
         }
     }
 
-    /// Drops the images nothing drew lately, from GPUI's atlas too.
-    fn evict(&mut self, window: &mut Window) {
+    /// Drops the images nothing drew lately, from GPUI's atlas too: all but
+    /// the `tiles` and `sprites` this frame drew and the spare.
+    fn evict(&mut self, tiles: usize, sprites: usize, window: &mut Window) {
         fn prune<K: Clone + Eq + std::hash::Hash>(
             map: &mut HashMap<K, (Arc<RenderImage>, u64)>,
             keep: usize,
@@ -335,8 +339,18 @@ impl Painter {
                 }
             }
         }
-        prune(&mut self.tiles, TILES_KEPT, window);
-        prune(&mut self.sprites, SPRITES_KEPT, window);
+        prune(&mut self.tiles, tiles + SPARE_TILES, window);
+        prune(&mut self.sprites, sprites + SPARE_SPRITES, window);
+    }
+
+    #[cfg(test)]
+    pub fn tiles_held(&self) -> usize {
+        self.tiles.len()
+    }
+
+    #[cfg(test)]
+    pub fn tile(&self, id: &str) -> Option<Arc<RenderImage>> {
+        self.tiles.get(id).map(|(image, _)| image.clone())
     }
 
     /// Returns every image to GPUI when the view goes away.

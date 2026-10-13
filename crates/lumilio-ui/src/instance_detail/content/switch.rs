@@ -576,15 +576,20 @@ impl Render for VersionSwitch {
                                     .child(tr!("instance-content-no-changelog"))
                                     .into_any_element()
                             } else {
-                                div()
-                                    .debug_selector(|| "switch-changelog-text".into())
+                                // A dialog is outside the shell's picture scope.
+                                crate::pictures::scope(cx)
+                                    .w_full()
                                     .child(
-                                        kit::rich_text(
-                                            "switch-changelog-text",
-                                            version.changelog.clone(),
-                                            version.changelog_format,
-                                        )
-                                        .selectable(true),
+                                        div()
+                                            .debug_selector(|| "switch-changelog-text".into())
+                                            .child(
+                                                kit::rich_text(
+                                                    "switch-changelog-text",
+                                                    version.changelog.clone(),
+                                                    version.changelog_format,
+                                                )
+                                                .selectable(true),
+                                            ),
                                     )
                                     .into_any_element()
                             }),

@@ -1,4 +1,5 @@
 use super::super::intent::InstanceIntent;
+use super::super::plugin_tabs::PluginPage;
 use super::super::{InstanceDetailView, TAB_HISTORY, TAB_SCREENSHOTS, TAB_SETTINGS};
 use super::{click, record, rooted};
 use gpui::TestAppContext;
@@ -387,4 +388,92 @@ fn a_model_loads_in_its_modal_once_and_late_assets_do_not_enter_a_replacement(
     cx.run_until_parked();
     assert!(cx.debug_bounds("model-error").is_some());
     assert!(cx.debug_bounds("model-loading").is_none());
+}
+
+/// The plugin's first picture on the page, as GPUI holds it.
+fn first_picture(
+    view: &gpui::Entity<InstanceDetailView>,
+    cx: &mut gpui::VisualTestContext,
+) -> std::sync::Arc<gpui::RenderImage> {
+    view.read_with(cx, |view, _| match &view.plugin_pages[PLUGIN] {
+        PluginPage::Shown(_, images, _, _) => images[0].clone().expect("a valid picture"),
+        _ => panic!("the page is not shown"),
+    })
+}
+
+fn plugin_views(seen: &Rc<RefCell<Vec<InstanceIntent>>>) -> usize {
+    seen.borrow()
+        .iter()
+        .filter(|intent| matches!(intent, InstanceIntent::PluginView(_)))
+        .count()
+}
+
+#[gpui::test]
+fn a_plugin_page_lives_only_while_shown_and_returns_its_pictures(cx: &mut TestAppContext) {
+    let seen: Rc<RefCell<Vec<InstanceIntent>>> = Rc::default();
+    let (view, cx) = open(seen.clone(), cx);
+    cx.update(|window, cx| view.update(cx, |view, cx| view.open_shown(4, window, cx)));
+    view.update(cx, |view, cx| {
+        view.plugin_view_arrived(PLUGIN.into(), shown(View::Image(pixel())), cx);
+    });
+    cx.run_until_parked();
+    let first = first_picture(&view, cx);
+    assert!(cx.update(|window, _| window.has_image_atlas_entry(&first)));
+
+    // A fresh view of the same tab replaces the page and its picture.
+    view.update(cx, |view, cx| {
+        view.plugin_view_arrived(PLUGIN.into(), shown(View::Image(pixel())), cx);
+    });
+    cx.run_until_parked();
+    let second = first_picture(&view, cx);
+    cx.update(|window, _| {
+        assert!(
+            !window.has_image_atlas_entry(&first),
+            "replaced, texture returned"
+        );
+        assert!(window.has_image_atlas_entry(&second));
+    });
+
+    // Another tab: the page and its picture go.
+    cx.update(|window, cx| view.update(cx, |view, cx| view.open_tab(TAB_SCREENSHOTS, window, cx)));
+    cx.run_until_parked();
+    assert!(view.read_with(cx, |view, _| view.plugin_pages.is_empty()));
+    assert!(!cx.update(|window, _| window.has_image_atlas_entry(&second)));
+
+    // Back on the tab, the page is asked for again.
+    let before = plugin_views(&seen);
+    cx.update(|window, cx| view.update(cx, |view, cx| view.open_shown(4, window, cx)));
+    assert_eq!(plugin_views(&seen), before + 1);
+}
+
+#[gpui::test]
+fn a_page_that_leaves_the_screen_drops_its_plugin_pages_and_asks_again_when_back(
+    cx: &mut TestAppContext,
+) {
+    let seen: Rc<RefCell<Vec<InstanceIntent>>> = Rc::default();
+    let (view, cx) = open(seen.clone(), cx);
+    cx.update(|window, cx| view.update(cx, |view, cx| view.open_shown(4, window, cx)));
+    view.update(cx, |view, cx| {
+        view.plugin_view_arrived(PLUGIN.into(), shown(View::Image(pixel())), cx);
+    });
+    cx.run_until_parked();
+    let picture = first_picture(&view, cx);
+
+    view.update(cx, |view, cx| view.left_screen(cx));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(view.plugin_pages.is_empty());
+        assert_eq!(
+            view.plugin_open.as_deref(),
+            Some(PLUGIN),
+            "the tab stays chosen"
+        );
+    });
+    assert!(!cx.update(|window, _| window.has_image_atlas_entry(&picture)));
+
+    // Shown again (it renders), the open tab asks for its page.
+    let before = plugin_views(&seen);
+    view.update(cx, |_, cx| cx.notify());
+    cx.run_until_parked();
+    assert_eq!(plugin_views(&seen), before + 1);
 }

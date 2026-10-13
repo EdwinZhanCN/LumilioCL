@@ -29,6 +29,7 @@ pub mod navigation;
 pub mod new_game;
 pub mod pages;
 pub mod photosensitivity;
+pub mod pictures;
 pub mod pixels;
 pub mod placeholders;
 pub mod platform;

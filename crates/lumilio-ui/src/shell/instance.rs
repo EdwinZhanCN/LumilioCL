@@ -19,7 +19,7 @@ impl LauncherShell {
             view.update(cx, |view, cx| view.plugins_changed(enabled, cx));
         }
         cx.observe(&view, |_, _, cx| cx.notify()).detach();
-        self.visit();
+        self.visit(cx);
         self.live_instance = Some(view.clone());
         self.route = Route::Library;
         self.detail = None;

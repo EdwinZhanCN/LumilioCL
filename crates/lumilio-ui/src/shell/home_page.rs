@@ -53,6 +53,7 @@ impl LauncherShell {
     pub fn apply_launch_signal(&mut self, signal: LaunchSignal, cx: &mut Context<Self>) {
         if matches!(&signal, LaunchSignal::Running) {
             self.game_running = true;
+            self.release_for_game(cx);
         } else if matches!(
             &signal,
             LaunchSignal::Exited { .. } | LaunchSignal::Failed(_) | LaunchSignal::Cancelled

@@ -239,7 +239,7 @@ fn leading_zone(leading: Leading, colors: ShellColors) -> impl IntoElement {
                 .id("navigation-leading")
                 .debug_selector(|| "navigation-leading".into())
                 .min_w_0()
-                // ia[navigation]: 后退 / 前进 | 左段的两个图标按钮 | 回到上/下一个位置；位置 = 地标页、游戏页、项目详情；标签/筛选/滚动不进历史
+                // ia[navigation]: 后退 / 前进 | 左段的两个图标按钮 | 回到上/下一个位置；位置 = 地标页、游戏页、项目详情；标签/筛选/滚动不进历史 | 游戏启动后，历史里只留地标页：游戏页和项目详情连同不在屏幕上的图片一起释放，把内存让给游戏
                 .child(history_button(
                     "navigation-back",
                     UiIcon::Back,

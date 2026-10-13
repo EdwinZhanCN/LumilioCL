@@ -9,7 +9,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use gpui::{Bounds, Corners, Hsla, Pixels, RenderImage, Window, canvas, prelude::*};
+use gpui::{App, Bounds, Corners, Hsla, Pixels, RenderImage, Window, canvas, prelude::*};
 
 use crate::hero::noise::{bayer4, fbm2, hash2, smoothstep};
 use crate::hero::raster::{PixelGrid, Rgb};
@@ -275,6 +275,23 @@ thread_local! {
 /// The most covers kept alive; the whole cache is dropped past this.
 const CACHE_LIMIT: usize = 96;
 
+/// Lets go of every cover built so far, a game having started. A cover on
+/// screen is built again when next painted, which costs little.
+pub fn release(cx: &mut App) {
+    let covers: Vec<_> =
+        CACHE.with(|cache| cache.borrow_mut().drain().map(|(_, image)| image).collect());
+    if covers.is_empty() {
+        return;
+    }
+    // Outside any window update, so every window's atlas is reached.
+    cx.defer(move |cx| {
+        for cover in covers {
+            cx.drop_image(cover, None);
+        }
+        cx.refresh_windows();
+    });
+}
+
 fn cached(
     key: CoverKey,
     window: &mut Window,
@@ -303,6 +320,17 @@ fn cached(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[gpui::test]
+    fn a_game_starting_empties_the_covers(cx: &mut gpui::TestAppContext) {
+        let key = (1, 0, 0, 2, 2, 0, 0, 0);
+        let picture = image::RgbaImage::from_pixel(2, 2, image::Rgba([0, 0, 0, 255]));
+        let cover = Arc::new(RenderImage::new([image::Frame::new(picture)]));
+        CACHE.with(|cache| cache.borrow_mut().insert(key, cover));
+        cx.update(release);
+        cx.run_until_parked();
+        assert!(CACHE.with(|cache| cache.borrow().is_empty()));
+    }
 
     fn cover(seed: u32, loader: Loader) -> Vec<u32> {
         let page = Rgb::hex(0x101010);
