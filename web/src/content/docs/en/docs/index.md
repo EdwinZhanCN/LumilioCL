@@ -4,13 +4,14 @@ description: Install the launcher or start a project change.
 ---
 
 LumilioCL is a native Minecraft launcher.
-This documentation explains installation and project work.
+This documentation explains installation, launcher use, and project work.
 
 ## Start here
 
 | Task | Read |
 | --- | --- |
 | Install the launcher | [Install LumilioCL](/en/docs/install/) |
+| Learn to use the launcher | [User guide](/en/docs/guide/) |
 | Follow primary plans | [Roadmap](/en/docs/roadmap/) |
 | Read published changes | [Changelog](/en/docs/changelog/) |
 | Change the project | [Contribution rules](/en/docs/contribute/) |
@@ -22,7 +23,8 @@ This documentation explains installation and project work.
 The contribution pages contain the project contribution rules.
 The project does not use a separate `CONTRIBUTING.md` file.
 
-The [feature reference](/en/docs/features/) will contain procedures for each feature.
+The [user guide](/en/docs/guide/) gives the procedures for launcher functions by task.
+More pages will follow.
 The [WASM plugin reference](/en/docs/wasm/) identifies the current plugin limits.
 Installable WASM plugins are not available.
 

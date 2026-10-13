@@ -82,7 +82,9 @@ Component text uses `web/src/i18n/docs.ts`.
 Starlight interface translations use `web/src/content/i18n/`.
 Sidebar labels use Starlight's `translations` field.
 
-Use `features/` for feature procedures.
+Use the user guide in `guide/` for the procedures of launcher functions.
+Each user guide page gives the scope, the preparation, the procedure, the result, and the known limits.
+Do not use a roadmap target as evidence of implementation.
 Use `wasm/` for the future plugin contract and development procedures.
 State the implementation status before you describe an unfinished capability.
 Forwarded release notes keep their source language.
