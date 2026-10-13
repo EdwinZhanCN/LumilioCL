@@ -84,7 +84,9 @@ ASD-STE100 是英文规范，不是中文语言认证。
 Starlight 界面翻译使用 `web/src/content/i18n/`。
 侧栏标签使用 Starlight 的 `translations` 字段。
 
-功能说明放在 `features/`。
+功能的使用方法放在使用指南 `guide/`。
+使用指南的每页说明适用范围、准备工作、操作步骤、结果和已知限制。
+不要用 Roadmap 目标证明功能已经实现。
 未来的插件契约和开发流程放在 `wasm/`。
 描述未完成功能前，先说明实现状态。
 转发的 Release Notes 保留源语言，不自动翻译。

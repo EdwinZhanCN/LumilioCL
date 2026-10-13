@@ -4,13 +4,14 @@ description: 安装启动器，或开始修改项目。
 ---
 
 LumilioCL 是原生 Minecraft 启动器。
-这里提供安装说明和项目贡献规范。
+这里提供安装说明、使用指南和项目贡献规范。
 
 ## 从这里开始
 
 | 目标 | 阅读 |
 | --- | --- |
 | 安装启动器 | [安装 LumilioCL](/docs/install/) |
+| 学习使用启动器 | [使用指南](/docs/guide/) |
 | 查看主要计划 | [路线图](/docs/roadmap/) |
 | 查看已发布的更新 | [更新日志](/docs/changelog/) |
 | 修改项目 | [贡献规则](/docs/contribute/) |
@@ -22,7 +23,7 @@ LumilioCL 是原生 Minecraft 启动器。
 贡献文档是项目的贡献规范。
 项目不使用独立的 `CONTRIBUTING.md`。
 
-[功能文档](/docs/features/)将逐步补充各项功能的操作说明。
+[使用指南](/docs/guide/)按任务说明各项功能的用法，并会逐步补充。
 [WASM 插件文档](/docs/wasm/)说明当前限制。
 目前不能独立安装第三方 WASM 插件。
 

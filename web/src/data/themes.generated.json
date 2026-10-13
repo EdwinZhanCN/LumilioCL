@@ -1,0 +1,341 @@
+{
+  "colors": [
+    "page",
+    "panel",
+    "hairline",
+    "ink",
+    "muted",
+    "key_white",
+    "key_black",
+    "key_grey",
+    "on_white",
+    "on_black",
+    "orange",
+    "orange_text",
+    "on_orange",
+    "danger",
+    "danger_text",
+    "led_off",
+    "ok",
+    "display",
+    "display_ink",
+    "display_dim",
+    "display_label"
+  ],
+  "radius": 4.0,
+  "radius_lg": 6.0,
+  "max_radius": 16.0,
+  "contrast": [
+    {
+      "id": "ink-page",
+      "fg": "ink",
+      "bg": "page",
+      "light": 4.5,
+      "dark": 4.5
+    },
+    {
+      "id": "ink-panel",
+      "fg": "ink",
+      "bg": "panel",
+      "light": 4.5,
+      "dark": 4.5
+    },
+    {
+      "id": "muted-page",
+      "fg": "muted",
+      "bg": "page",
+      "light": 4.5,
+      "dark": 4.5
+    },
+    {
+      "id": "muted-panel",
+      "fg": "muted",
+      "bg": "panel",
+      "light": 4.5,
+      "dark": 4.5
+    },
+    {
+      "id": "on-white",
+      "fg": "on_white",
+      "bg": "key_white",
+      "light": 4.5,
+      "dark": 4.5
+    },
+    {
+      "id": "on-black",
+      "fg": "on_black",
+      "bg": "key_black",
+      "light": 4.5,
+      "dark": 4.5
+    },
+    {
+      "id": "ink-key-grey",
+      "fg": "ink",
+      "bg": "key_grey",
+      "light": 4.5,
+      "dark": 4.5
+    },
+    {
+      "id": "orange-text-page",
+      "fg": "orange_text",
+      "bg": "page",
+      "light": 4.5,
+      "dark": 4.5
+    },
+    {
+      "id": "orange-text-panel",
+      "fg": "orange_text",
+      "bg": "panel",
+      "light": 4.5,
+      "dark": 4.5
+    },
+    {
+      "id": "danger-text-page",
+      "fg": "danger_text",
+      "bg": "page",
+      "light": 4.5,
+      "dark": 4.5
+    },
+    {
+      "id": "danger-text-panel",
+      "fg": "danger_text",
+      "bg": "panel",
+      "light": 4.5,
+      "dark": 4.5
+    },
+    {
+      "id": "on-danger",
+      "fg": "on_orange",
+      "bg": "danger",
+      "light": 4.5,
+      "dark": 4.5
+    },
+    {
+      "id": "display-ink",
+      "fg": "display_ink",
+      "bg": "display",
+      "light": 4.5,
+      "dark": 4.5
+    },
+    {
+      "id": "display-label",
+      "fg": "display_label",
+      "bg": "display",
+      "light": 4.5,
+      "dark": 4.5
+    },
+    {
+      "id": "page-ink",
+      "fg": "page",
+      "bg": "ink",
+      "light": 4.5,
+      "dark": 4.5
+    },
+    {
+      "id": "on-orange",
+      "fg": "on_orange",
+      "bg": "orange",
+      "light": 3.0,
+      "dark": 3.0
+    },
+    {
+      "id": "orange-page",
+      "fg": "orange",
+      "bg": "page",
+      "light": 2.7,
+      "dark": 3.0
+    },
+    {
+      "id": "orange-panel",
+      "fg": "orange",
+      "bg": "panel",
+      "light": 3.0,
+      "dark": 3.0
+    },
+    {
+      "id": "led-off-page",
+      "fg": "led_off",
+      "bg": "page",
+      "light": 1.5,
+      "dark": 1.5
+    }
+  ],
+  "themes": [
+    {
+      "name": "Aluminium",
+      "appearance": "light",
+      "colors": {
+        "page": "#e4e4e1",
+        "panel": "#eeeeeb",
+        "hairline": "#bcbcb7",
+        "ink": "#121212",
+        "muted": "#666662",
+        "key_white": "#f9f9f7",
+        "key_black": "#1d1d1d",
+        "key_grey": "#d3d3cf",
+        "on_white": "#121212",
+        "on_black": "#f2f2ef",
+        "orange": "#f0520f",
+        "orange_text": "#b53c08",
+        "on_orange": "#ffffff",
+        "danger": "#c8261b",
+        "danger_text": "#b42318",
+        "led_off": "#a3a39e",
+        "ok": "#2f9a3c",
+        "display": "#141414",
+        "display_ink": "#ff6a2a",
+        "display_dim": "#3d2619",
+        "display_label": "#948479"
+      },
+      "radius": 4.0,
+      "radius_lg": 6.0,
+      "fonts": {}
+    },
+    {
+      "name": "Night",
+      "appearance": "dark",
+      "colors": {
+        "page": "#111111",
+        "panel": "#1b1b1b",
+        "hairline": "#353533",
+        "ink": "#ecebe7",
+        "muted": "#8c8b86",
+        "key_white": "#313130",
+        "key_black": "#2a2a2a",
+        "key_grey": "#262626",
+        "on_white": "#ecebe7",
+        "on_black": "#ecebe7",
+        "orange": "#ff5a1a",
+        "orange_text": "#ff5a1a",
+        "on_orange": "#ffffff",
+        "danger": "#c8261b",
+        "danger_text": "#ff5a4f",
+        "led_off": "#3a3a38",
+        "ok": "#5fd068",
+        "display": "#070707",
+        "display_ink": "#ff6a2a",
+        "display_dim": "#3a2418",
+        "display_label": "#948479"
+      },
+      "radius": 4.0,
+      "radius_lg": 6.0,
+      "fonts": {}
+    },
+    {
+      "name": "Catppuccin Latte",
+      "appearance": "light",
+      "source": "Palette by Catppuccin, https://github.com/catppuccin/catppuccin (MIT License, Copyright (c) 2021 Catppuccin). Display colours use the Mocha palette.",
+      "colors": {
+        "page": "#e6e9ef",
+        "panel": "#eff1f5",
+        "hairline": "#acb0be",
+        "ink": "#4c4f69",
+        "muted": "#6c6f85",
+        "key_white": "#eff1f5",
+        "key_black": "#4c4f69",
+        "key_grey": "#ccd0da",
+        "on_white": "#4c4f69",
+        "on_black": "#eff1f5",
+        "orange": "#8839ef",
+        "orange_text": "#8839ef",
+        "on_orange": "#eff1f5",
+        "danger": "#d20f39",
+        "danger_text": "#d20f39",
+        "led_off": "#acb0be",
+        "ok": "#40a02b",
+        "display": "#1e1e2e",
+        "display_ink": "#fab387",
+        "display_dim": "#313244",
+        "display_label": "#7f849c"
+      },
+      "fonts": {}
+    },
+    {
+      "name": "Catppuccin Mocha",
+      "appearance": "dark",
+      "source": "Palette by Catppuccin, https://github.com/catppuccin/catppuccin (MIT License, Copyright (c) 2021 Catppuccin).",
+      "colors": {
+        "page": "#181825",
+        "panel": "#1e1e2e",
+        "hairline": "#45475a",
+        "ink": "#cdd6f4",
+        "muted": "#a6adc8",
+        "key_white": "#45475a",
+        "key_black": "#11111b",
+        "key_grey": "#313244",
+        "on_white": "#cdd6f4",
+        "on_black": "#cdd6f4",
+        "orange": "#cba6f7",
+        "orange_text": "#cba6f7",
+        "on_orange": "#11111b",
+        "danger": "#f38ba8",
+        "danger_text": "#f38ba8",
+        "led_off": "#585b70",
+        "ok": "#a6e3a1",
+        "display": "#11111b",
+        "display_ink": "#fab387",
+        "display_dim": "#313244",
+        "display_label": "#7f849c"
+      },
+      "fonts": {}
+    },
+    {
+      "name": "Rosé Pine Dawn",
+      "appearance": "light",
+      "source": "Palette by Rosé Pine, https://github.com/rose-pine/rose-pine-theme (MIT License, Copyright (c) 2023 Rosé Pine). Display colours use the main palette.",
+      "colors": {
+        "page": "#f2e9e1",
+        "panel": "#faf4ed",
+        "hairline": "#cecacd",
+        "ink": "#575279",
+        "muted": "#797593",
+        "key_white": "#fffaf3",
+        "key_black": "#575279",
+        "key_grey": "#dfdad9",
+        "on_white": "#575279",
+        "on_black": "#faf4ed",
+        "orange": "#d7827e",
+        "orange_text": "#b4637a",
+        "on_orange": "#faf4ed",
+        "danger": "#b4637a",
+        "danger_text": "#b4637a",
+        "led_off": "#cecacd",
+        "ok": "#286983",
+        "display": "#191724",
+        "display_ink": "#f6c177",
+        "display_dim": "#26233a",
+        "display_label": "#6e6a86"
+      },
+      "fonts": {}
+    },
+    {
+      "name": "Rosé Pine",
+      "appearance": "dark",
+      "source": "Palette by Rosé Pine, https://github.com/rose-pine/rose-pine-theme (MIT License, Copyright (c) 2023 Rosé Pine).",
+      "colors": {
+        "page": "#191724",
+        "panel": "#1f1d2e",
+        "hairline": "#403d52",
+        "ink": "#e0def4",
+        "muted": "#908caa",
+        "key_white": "#403d52",
+        "key_black": "#26233a",
+        "key_grey": "#21202e",
+        "on_white": "#e0def4",
+        "on_black": "#e0def4",
+        "orange": "#ebbcba",
+        "orange_text": "#ebbcba",
+        "on_orange": "#191724",
+        "danger": "#eb6f92",
+        "danger_text": "#eb6f92",
+        "led_off": "#524f67",
+        "ok": "#9ccfd8",
+        "display": "#191724",
+        "display_ink": "#f6c177",
+        "display_dim": "#26233a",
+        "display_label": "#6e6a86"
+      },
+      "fonts": {}
+    }
+  ]
+}

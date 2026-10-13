@@ -67,6 +67,11 @@ plans-check:
 hardcoded-chinese:
     LUMILIO_BLESS_HARDCODED=1 cargo nextest run -p lumilio-ui --lib i18n::
 
+# Rewrite web/src/data/themes.generated.json (the theme studio's built-in
+# themes and contrast rules) from the launcher's catalog.
+website-themes:
+    LUMILIO_BLESS_THEMES=1 cargo nextest run -p lumilio-ui --lib theme::tests::website
+
 # Release packages for this platform into dist/ (assets/icons/PACKAGING.md).
 package:
     cargo xtask package

@@ -20,6 +20,11 @@ export default defineConfig({
         { label: "Documentation", translations: { "zh-CN": "文档首页" }, slug: "docs" },
         { label: "Install LumilioCL", translations: { "zh-CN": "安装 LumilioCL" }, slug: "docs/install" },
       ] },
+      { label: "User guide", translations: { "zh-CN": "使用指南" }, items: [
+        { label: "Overview", translations: { "zh-CN": "概览" }, slug: "docs/guide" },
+        { label: "Themes", translations: { "zh-CN": "主题" }, slug: "docs/guide/themes" },
+        { label: "Theme studio", translations: { "zh-CN": "主题工作室" }, slug: "docs/guide/theme-studio" },
+      ] },
       { label: "Project", translations: { "zh-CN": "项目进展" }, items: [
         { label: "Roadmap", translations: { "zh-CN": "路线图" }, slug: "docs/roadmap" },
         { label: "Changelog", translations: { "zh-CN": "更新日志" }, slug: "docs/changelog" },
@@ -32,12 +37,16 @@ export default defineConfig({
         { label: "Write documentation", translations: { "zh-CN": "编写文档" }, slug: "docs/contribute/writing" },
       ] },
       { label: "Reference", translations: { "zh-CN": "参考" }, items: [
-        { label: "Features", translations: { "zh-CN": "功能文档" }, slug: "docs/features" },
         { label: "WASM plugins", translations: { "zh-CN": "WASM 插件" }, slug: "docs/wasm" },
       ] },
       { label: "Launcher website", translations: { "zh-CN": "启动器官网" }, link: "/" },
     ],
   }), mdx()],
+  // The user guide was first published as the feature reference.
+  redirects: {
+    "/docs/features": "/docs/guide/",
+    "/en/docs/features": "/en/docs/guide/",
+  },
   devToolbar: { enabled: false },
   // Starlight owns document language routing. The marketing page selects
   // its Chinese catalog separately and retains its own HTML language.
