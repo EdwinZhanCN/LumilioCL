@@ -80,7 +80,7 @@
     },
     {
       "criterion": "just check 通过。",
-      "result": "2026-10-13：just check 通过（构建、1429 项测试与文档测试、clippy、fmt）；just web 与 just docs 通过。"
+      "result": "2026-10-13：just check 通过（构建、1431 项测试与文档测试、clippy、fmt）；just web 与 just docs 通过；PR #37 CI 见 PR。"
     },
     {
       "criterion": "真实 API 与实机查看。",
@@ -162,6 +162,7 @@
   "lessonsLearned": [
     "插件注册表按 ID 排序，lumilio.curseforge 会排在 lumilio.modrinth 前面，默认来源和识别顺序因此悄悄变成 CurseForge。 防护：注册表记下应用给出插件的顺序，content_sources 按它排序；the_sources_are_listed_with_modrinth_first 与应用侧 backend 测试检查 Modrinth 在前。",
     "插件把宿主不支持的筛选当作无效输入拒绝，而无效输入会让插件在本次运行中停用；界面的「游戏提供的筛选」不经过来源能力就会发给插件。 防护：ContentClient::search 先按来源能力裁剪查询（fit_query），a_query_is_fitted_to_what_the_source_can_answer 检查裁剪后的查询能通过插件校验。",
-    "点击来源键时，change_query 在外壳自己的更新里同步发出 LoadFilters，应用的 load_filters 立刻读外壳，GPUI 直接 panic：实际窗口里切换来源会崩溃。界面测试用的空处理函数测不出来，是按正式接线点击的端到端测试抓到的。防护：load_filters 与 search 一样推迟一帧再读外壳；choosing_a_source_by_its_key_does_not_read_the_shell_mid_update 用正式接线点击来源键（去掉推迟时失败）。"
+    "点击来源键时，change_query 在外壳自己的更新里同步发出 LoadFilters，应用的 load_filters 立刻读外壳，GPUI 直接 panic：实际窗口里切换来源会崩溃。界面测试用的空处理函数测不出来，是按正式接线点击的端到端测试抓到的。防护：load_filters 与 search 一样推迟一帧再读外壳；choosing_a_source_by_its_key_does_not_read_the_shell_mid_update 用正式接线点击来源键（去掉推迟时失败）。",
+    "用真实 Backend 的应用层界面测试少了 allow_parking，本机碰巧通过，CI 上 tokio 工作线程唤醒 GPUI 被测试调度器判为不确定而失败。防护：这类测试开头调用 cx.executor().allow_parking()（与 home_snapshot 测试一致），并在本机连跑多次。"
   ]
 }

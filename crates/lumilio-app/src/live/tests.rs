@@ -382,6 +382,8 @@ fn choosing_a_source_by_its_key_does_not_read_the_shell_mid_update(
     use lumilio_ui::route::Route;
     use std::{cell::RefCell, rc::Rc};
 
+    // The shipped backend wakes GPUI from its real tokio worker threads.
+    cx.executor().allow_parking();
     let dir = tempfile::tempdir().unwrap();
     let backend = Backend::open(dir.path().join("root")).unwrap();
     cx.update(gpui_kit::init);

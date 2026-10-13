@@ -43,7 +43,7 @@ Status: InProgress
 - 窄测试：插件、内核、界面与应用。
   Result: 2026-10-13：lumilio-plugin-curseforge 15 项；lumilio-core 全部 725 项通过，含新增的跨来源识别、Modrinth 回退、手动下载、CurseForge 整合包端到端导入、旧重试记录、查询裁剪与 Murmur2 测试向量（与 CurseForge 给 JEI 的指纹 4164405417 一致的参考实现生成）；lumilio-ui 与 lumilio-app 全部通过，含来源切换、待下载面板与按需更新日志的界面测试。守卫已验证：去掉「已识别的文件不再问下一个来源」后跨来源测试失败。
 - just check 通过。
-  Result: 2026-10-13：just check 通过（构建、1429 项测试与文档测试、clippy、fmt）；just web 与 just docs 通过。
+  Result: 2026-10-13：just check 通过（构建、1431 项测试与文档测试、clippy、fmt）；just web 与 just docs 通过；PR #37 CI 见 PR。
 - 真实 API 与实机查看。
   Result: 2026-10-13：curseforge_live（默认忽略）对真实 API：搜索、筛选、JEI 详情（3854 个版本、HTML 简介）、单版本更新日志 1.3 秒内完成；安装整合包 keo optimized（1459394，26 个文件）用时约 5 秒，2 个禁止分发的文件从 Modrinth 下载，1 个光影包列为待下载并带下载页；该游戏的 Mod 识别 0.6 秒：Modrinth 20、CurseForge 3，8 个有更新。启动器实机查看了发现页（两个来源、中文分类、无关注数、分页上限）、CurseForge 详情页（HTML 简介、图片、版本列表）与游戏内容页的待下载面板。
 - 按正式接线点击完整流程，以及窄窗口布局。
@@ -138,3 +138,5 @@ Consequences: ContentSource 增加 changelog()；HTML 里段落内的 <br> 由�
 - Lesson: 插件把宿主不支持的筛选当作无效输入拒绝，而无效输入会让插件在本次运行中停用；界面的「游戏提供的筛选」不经过来源能力就会发给插件。 防护：ContentClient::search 先按来源能力裁剪查询（fit_query），a_query_is_fitted_to_what_the_source_can_answer 检查裁剪后的查询能通过插件校验。
 
 - Lesson: 点击来源键时，change_query 在外壳自己的更新里同步发出 LoadFilters，应用的 load_filters 立刻读外壳，GPUI 直接 panic：实际窗口里切换来源会崩溃。界面测试用的空处理函数测不出来，是按正式接线点击的端到端测试抓到的。防护：load_filters 与 search 一样推迟一帧再读外壳；choosing_a_source_by_its_key_does_not_read_the_shell_mid_update 用正式接线点击来源键（去掉推迟时失败）。
+
+- Lesson: 用真实 Backend 的应用层界面测试少了 allow_parking，本机碰巧通过，CI 上 tokio 工作线程唤醒 GPUI 被测试调度器判为不确定而失败。防护：这类测试开头调用 cx.executor().allow_parking()（与 home_snapshot 测试一致），并在本机连跑多次。
