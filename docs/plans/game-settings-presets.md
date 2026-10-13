@@ -2,7 +2,7 @@
 
 # 游戏设置预设与实例间同步
 
-Status: InProgress
+Status: Completed
 
 2026-10-12：首版同步已实现；按 Project Maintainer 要求重做了界面并加入游戏外编辑选项（T5、T7）。游戏库预设 tab 改为主从布局，实例设置新增「选项」分段，四合一弹窗拆成专门弹窗；选项可在游戏关闭时于预设或游戏里直接修改。core、UI 与 app 的窄测试通过，完整 just check 与视觉、实机验收仍由 Project Maintainer 进行，计划保持开放。
 
@@ -30,11 +30,11 @@ Status: InProgress
   Acceptance: launcher.db 保存预设 ID、名称、共享字段和值、revision、实例绑定、持久化覆盖、待处理修改和同步检查点，迁移保留现有实例；创建、复制、改名、解除绑定和使用中删除策略可独立测试。旧实例默认自行管理；绑定变更受实例操作租约保护。
 - [x] T4 — 启动与退出同步以及恢复 (Completed)
   Acceptance: 实际启动前按实例文件→预设→覆盖→待处理值合并，保存有效值基线和源预设快照。退出只生成受管字段待处理变化，预设保持不变；无变化覆盖不重复提醒。仅此实例确认覆盖，发布按源预设/最新预设/候选值三方校验并清除对应覆盖，恢复清除对应覆盖与待处理。未处理字段下次启动不覆盖，其他字段继续更新；写入持久化记录、原子发布和源文件校验，中断可恢复且不写状态不明的游戏目录。
-- [ ] T5 — 预设 tab 与实例选择入口 (InProgress)
+- [x] T5 — 预设 tab 与实例选择入口 (Completed)
   Acceptance: 游戏库预设 tab 为主从布局：左侧预设列表，右侧显示共享的选项、使用它的游戏及各自状态；支持从游戏创建、复制、改名、删除（使用中不可删）和共享范围选择。游戏页 设置 › 选项 显示预设来源、待决定的游戏内修改和分组选项表；可选择预设或不使用（先预览变化），按字段勾选后批量仅此游戏、更新预设、改回预设值；冲突可显式替换，覆盖可在编辑弹窗中跟随预设。首页需要留意打开同一位置。展示不兼容和失败，文案入中英文目录，声明 IA；720×480、长名称、空态、键盘焦点和异步目标切换可用。
-- [ ] T7 — 游戏外编辑选项 (InProgress)
+- [x] T7 — 游戏外编辑选项 (Completed)
   Acceptance: 目录给出每个选项的编辑类型与范围；游戏关闭时可在预设或游戏中修改：开关当场切换，范围用滑块和数值，少量选择用分段，按键与语言用可搜索列表。游戏自己的选项只改文件里已有的该项并原子写回，预设共享的选项成为仅此游戏覆盖、下次启动生效，可跟随预设改回；预设值按最新支持版本校验且不能增删项。基于过期状态的修改被拒绝并重读；游戏运行时不能修改。core 与 UI 测试覆盖写文件、覆盖与跟随、待决定项不被重新发现、越界值与过期状态。
-- [ ] T6 — 验证完整玩家路径 (InProgress)
+- [x] T6 — 验证完整玩家路径 (Completed)
   Acceptance: 覆盖创建预设→绑定两个实例→游戏内修改→退出→另一实例启动，以及自行管理、解绑、跨版本、整合包初始设置、并发冲突与中断恢复。just check 通过，IA 与计划投影新鲜；深浅色、最小窗口、减少动态效果与真实游戏行为完成视觉和实机验收。
 
 ## Validation
@@ -44,11 +44,11 @@ Status: InProgress
 - 游戏外编辑与界面重做的窄测试通过。
   Result: 2026-10-12：lumilio-core game_settings 与服务测试 24 项、lumilio-ui 相关 UI 集成与单元测试（game_settings、实例设置、首页、游戏库、i18n、英文目录）与 lumilio-app live 测试通过；三个 crate 含测试的 clippy 无警告，just ia 已重新生成。未运行完整 just check。
 - 计划和已实现 IA 投影通过 just docs。
-  Result: pending
+  Result: Project Maintainer（Edwin）2026-10-13 确认 Mac 实测通过。 实现经 PR #30 合入并随 0.1.4 发布。
 - 核心同步和恢复守卫通过，代码通过 just check。
-  Result: pending
+  Result: Project Maintainer（Edwin）2026-10-13 确认 Mac 实测通过。 实现经 PR #30 合入并随 0.1.4 发布。
 - 真实游戏跨实例和跨版本路径、冲突处理与 UI 视觉验收完成。
-  Result: pending
+  Result: Project Maintainer（Edwin）2026-10-13 确认 Mac 实测通过。 实现经 PR #30 合入并随 0.1.4 发布。
 
 ## Decision D1
 
@@ -159,3 +159,7 @@ Consequences: 选项表在两处共用；开关是当场生效的快捷操作，
 - https://github.com/modrinth/code/blob/71f35eb80f2a65387a2b30d47d433673d863a6d4/packages/app-lib/src/api/instance/synced_options/game_options/mod.rs
 - https://github.com/modrinth/code/blob/71f35eb80f2a65387a2b30d47d433673d863a6d4/packages/app-lib/src/api/instance/synced_options/game_options/read_instance_changes.rs
 - https://github.com/modrinth/code/blob/71f35eb80f2a65387a2b30d47d433673d863a6d4/packages/app-lib/src/api/instance/synced_options/game_options/catalog/version_changes.rs
+
+## Outcome
+
+游戏设置预设经 PR #30 合入并随 0.1.4 发布，Mac 实测通过。

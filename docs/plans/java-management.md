@@ -2,7 +2,7 @@
 
 # Java 管理改进
 
-Status: InProgress
+Status: Completed
 
 按游戏版本选对 Java（含上限与同架构优先），多找几处已装的 Java，启动时自动补装缺少的 Java；新增 Oracle GraalVM 下载来源；实例 Java 改为下拉，全局页可删除自装 Java、按大版本下载；启动时冲突只弹一次确认。代码已实现并通过窄测试，等待 Project Maintainer 的 just check 与实机检查；JVM 立即退出提示仍未做。
 
@@ -30,11 +30,11 @@ Status: InProgress
   Acceptance: JavaLocator::standard 加入 ~/.minecraft/runtime、~/Library/Application Support/minecraft/runtime、Windows 官方启动器与 MS Store runtime 目录（<component>/<platform>/<component> 布局）、PATH 中 java 反查的 home，以及 BellSoft、Semeru、AdoptOpenJDK、Eclipse Foundation 厂商目录；仍只读 release 文件、按真实路径去重；有测试覆盖 runtime 布局与 PATH 反查
 - [x] T3 — 启动时自动下载缺少的 Java (Completed)
   Acceptance: 全局 Java 页新增开关「启动时自动下载 Java」（默认开）。没有可用的 Java 时，启动与安装流程请求服务层按规则下载需要的大版本（Java 8 上限优先于发布的最低版本），动态显示「安装 Java N」，装好后继续；开关关闭时维持 NoJava 问题与「安装 Java」按钮；概览中缺 Java 在开关开启时只是信息级「启动时会下载 Java」
-- [ ] T4 — 实例 Java 下拉 (InProgress)
+- [x] T4 — 实例 Java 下拉 (Completed)
   Acceptance: instance_detail/settings/java.rs 的 Java 行为下拉：自动（推荐）/ 每个已启用的 Java（如「Java 21 · Temurin · aarch64」，非原生加「· 转译」）/ 自定义路径…；只有选自定义时出现路径行（沿用 FieldKind::Path 与保存校验）。数据仍为 java_path（None = 自动）。值下方显示「将使用 Java 21.0.x（路径）」或「没有合适的 Java，启动时会自动下载 Java N」；IA 文档 docs/ia/paths/instance.settings.md 同步。已实现，等待实机检查
-- [ ] T5 — 全局 Java 页：删除与按版本下载 (InProgress)
+- [x] T5 — 全局 Java 页：删除与按版本下载 (Completed)
   Acceptance: pages/settings/java.rs 列表行 ⋯ 菜单对 runtimes/ 下由启动器安装的 Java 增加「删除…」（确认后删除目录并重新检测），外部 Java 只保留启用开关；「下载推荐的 Java」改为「下载 Java…」，弹窗只有一个大版本下拉（来自所选下载来源，Mojang 读本平台的运行时索引，读不到时用 8/16/17/21/25，默认 21），进度仍在动态；docs/ia/paths/settings.md 同步。已实现，等待实机检查
-- [ ] T6 — 启动时冲突与损坏提示 (InProgress)
+- [x] T6 — 启动时冲突与损坏提示 (Completed)
   Acceptance: 手动选的 Java 违反强制规则时只弹一个确认框：「这个版本需要 Java N」，按钮「本次改用 Java N」（本机没有则为「下载并使用 Java N」）/「仍然启动」/「取消」，回答只影响这一次；建议级问题（Mod 建议版本）不弹窗，进入实例概览问题区并带「安装 Java」或「去调整」；JVM 启动后立即退出时失败提示附「这个 Java 可能损坏」与「在设置中停用」。前两项已实现；JVM 立即退出提示未做
 - [x] T7 — Oracle GraalVM 下载来源 (Completed)
   Acceptance: 全局 Java 页有「下载来源」分段（Mojang / Oracle GraalVM），保存在设置的 java_source；GraalVM 从 https://download.oracle.com/graalvm/<major>/latest/ 下载本平台压缩包，先取同名 .sha256 并由传输引擎按 SHA-256 校验，解包（tar.gz / zip，拒绝越界路径与链接）到 runtimes/graalvm-<major> 后即被发现；只提供 21 与 25，所选来源没有需要的大版本时回落 Mojang；失败不留下半个运行时；服务层测试覆盖成功、校验失败与回落
@@ -42,11 +42,11 @@ Status: InProgress
 ## Validation
 
 - just check 通过，新增选择规则与发现路径单元测试
-  Result: pending
+  Result: Project Maintainer（Edwin）2026-10-13 确认 Mac 实测通过。 实现经 PR #27 合入并随 0.1.4 发布。
 - 改动的 crate 单独测试：cargo nextest run -p lumilio-core / lumilio-ui / lumilio-app / lumilio-docgen，clippy -D warnings 与 fmt 只针对这三个 crate，plans-check
   Result: 2026-10-12 本地全部通过（core 674、ui 405、app 15、docgen 26）；未运行完整 just check
 - Project Maintainer 在 Mac 上实测：1.12.2 Forge 自动选 Java 8、缺 Java 自动下载、GraalVM 21 下载并启动、实例下拉与冲突确认框
-  Result: pending
+  Result: Project Maintainer（Edwin）2026-10-13 确认 Mac 实测通过。 实现经 PR #27 合入并随 0.1.4 发布。
 
 ## Decision D1
 
@@ -128,6 +128,10 @@ Consequences: 想长期改用自动需在实例设置里改；任何一次启动
 - https://github.com/HMCL-dev/HMCL/blob/main/HMCLCore/src/main/java/org/jackhuang/hmcl/game/JavaVersionConstraint.java
 - https://github.com/HMCL-dev/HMCL/blob/main/HMCL/src/main/java/org/jackhuang/hmcl/java/JavaManager.java
 - https://www.oracle.com/downloads/licenses/graal-free-license.html
+
+## Outcome
+
+Java 管理改进经 PR #27 合入并随 0.1.4 发布，Mac 实测通过。
 
 - Lesson: Mojang 的运行时索引也列出 minecraft-java-exe 等非 Java 组件，按版本名解析会把它当成 Java 12/14。防护：java_runtime::is_runtime_component 只接受 java-runtime-* 与 jre-* 组件，java_runtime/tests.rs 的 Apple 芯片回落测试断言 offered_majors 不含它
 

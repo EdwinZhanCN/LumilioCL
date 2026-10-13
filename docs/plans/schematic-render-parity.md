@@ -2,7 +2,7 @@
 
 # 投影 3D 预览的解析与显示修正
 
-Status: InProgress
+Status: Completed
 
 对照 schemat.io/view 公开的查看器脚本和 Minecraft 26.3 客户端，修正 Nucleation 与 Schematic-Mesher 分支里会读错文件或画错方块的地方。
 
@@ -33,7 +33,7 @@ Status: InProgress
   Acceptance: 规范化只保留网格器读取的资源且不重新压缩贴图；26.3 客户端 JAR 加载从秒级降到约 0.1 秒；normalized_jars_keep_only_mesher_assets 对旧代码失败
 - [x] T8 — 流体表面、草方块剔除、多部件条件、区域重叠 (Completed)
   Acceptance: fluid_heights、face_culling、multipart_conditions、overlapping_regions_draw_one_block_per_cell 各自对旧代码失败、对新代码通过
-- [ ] T9 — 在启动器里目视检查真实投影 (Proposed)
+- [x] T9 — 在启动器里目视检查真实投影 (Completed)
   Acceptance: Project Maintainer 用 26.3 打开含箱子、楼梯、树叶、旗帜和水的投影，确认与游戏内一致
 
 ## Validation
@@ -43,7 +43,7 @@ Status: InProgress
 - 真实投影渲染对比
   Result: 用 26.3 客户端 JAR 渲染本机 13 个 litematic 与一个测试方块板：旗帜与附魔台书本不再是紫黑贴图，双箱不再露出黑色内部，樱花与苍白橡树叶不再被染绿，灌木与花簇茎为绿色，楼梯木纹与砖缝和相邻整块对齐；测试方块板在资源包加载改动前后逐像素一致。
 - 启动器内目视检查
-  Result: pending
+  Result: Project Maintainer（Edwin）2026-10-13 确认 Mac 实测通过。 启动器内用真实投影目视检查 3D 预览正确。
 
 ## Decision D1
 
@@ -74,6 +74,10 @@ Consequences: 预览对局部损坏的文件更宽容，对整体损坏的文件
 - https://schemat.io/view
 - [forks/README.md](../../forks/README.md)
 - [crates/lumilio-schematic-render/README.md](../../crates/lumilio-schematic-render/README.md)
+
+## Outcome
+
+投影渲染修正已合入，启动器内目视检查通过。
 
 - Lesson: 实体朝向把 Minecraft 偏航角的符号直接用于 glam 的逆时针旋转，东西对调：单个箱子不显眼，双箱和墙上旗帜才露馅。守卫 entity_facing 用质心判断朝向。
 

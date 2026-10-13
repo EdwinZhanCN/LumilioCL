@@ -2,7 +2,7 @@
 
 # 自动更新（0.1.0 带上）
 
-Status: InProgress
+Status: Completed
 
 照 Zed 的 `auto_update`：启动器自己发现最新的正式版，后台下载，下载好后左下角导航块右边出现一个「重启以更新」按钮，点了就换成新版本。不打扰，不弹窗。
 
@@ -23,13 +23,13 @@ Status: InProgress
   Acceptance: T4：设置与界面：旧设置默认开启 `auto_update`；关于页显示版本、状态、手动检查和开关；校验下载完成后，左下角导航块右边出现橙色更新键，游戏运行时禁用。中英 `.ftl` 和 IA 注释已添加。
 - [x] T5 — T5：生成 IA 路径并跑 `just check`；Project Maintainer于 2026-10-10 报告检查和界面目视验证均通过。 (Completed)
   Acceptance: T5：生成 IA 路径并跑 `just check`；Project Maintainer于 2026-10-10 报告检查和界面目视验证均通过。
-- [ ] T6 — T6：macOS 实机自动更新验收 (InProgress)
+- [x] T6 — T6：macOS 实机自动更新验收 (Completed)
   Acceptance: 从包含 restart-after-exit 修复的版本，在 macOS 上自动更新到下一正式版：后台安装完成后点击重启，窗口关闭后由固定在 Dock 上的同一个图标打开新版本，Dock 上不出现第二个 LumilioCL。0.1.2 → 0.1.3 即为这次检查（release-0-1-3 R5）。
 
 ## Validation
 
 - 原计划的实机与平台验收全部完成。
-  Result: pending
+  Result: Project Maintainer（Edwin）2026-10-13 确认 Mac 实测通过。 0.1.3 → 0.1.4 自动更新后 Dock 只有一个图标。
 
 ## Decision migration-context
 
@@ -58,5 +58,9 @@ Consequences: 可执行文件路径在启动时读取：Linux 替换文件后 `c
 ## References
 
 - https://github.com/zed-industries/zed/tree/main/crates/auto_update
+
+## Outcome
+
+自动更新已在 macOS 实机验收；0.1.3 → 0.1.4 更新只保留一个 Dock 图标。
 
 - Lesson: 2026-10-11 Project Maintainer 在 macOS 上从 0.1.0 自动更新到 0.1.1：新版本装上了，但点击后界面停顿数秒，随后 Dock 出现第二个 LumilioCL，固定的图标显示未运行。原因：安装在点击时同步执行（hdiutil + ditto），且旧进程仍在运行时就用 `open -n` 强制开新实例。修复改为下载后在后台安装，点击只调用 GPUI 的 `App::restart`（等旧进程退出再 `open`），macOS 改用 `rsync -a --delete`。Guard：`crates/lumilio-updater/src/install/tests.rs` 检查旧文件被删除、正在运行的进程仍持有旧文件、重启路径是 bundle；Linux 测试检查重启路径是替换前的可执行文件。更新由旧版本的代码执行，所以修复要从含修复的版本再往后更新时才生效。
