@@ -57,6 +57,16 @@ paths and local changes. The original licenses are preserved at
 [Schematic-Mesher/LICENSE](forks/schematic-mesher/LICENSE). Mesher's AGPL-3.0-only
 license matches LumilioCL's license. Nucleation's required notice follows.
 
+## GPUI — Apache-2.0
+
+`crates/lumilio-ui/src/pictures/decode.rs` adapts how GPUI reads and decodes
+pictures (`ImageAssetLoader` in `crates/gpui/src/elements/img.rs` and
+`decode_static_image` in `crates/gpui/src/platform.rs` of
+[zed-industries/zed](https://github.com/zed-industries/zed)), so the launcher's
+picture cache can shrink them while decoding. GPUI is licensed under Apache-2.0;
+the license text is the one preserved in
+[LICENSE-APACHE](forks/gpui-component/LICENSE-APACHE).
+
 ## Nucleation — MIT License
 
 Copyright (c) 2025 Schem-at

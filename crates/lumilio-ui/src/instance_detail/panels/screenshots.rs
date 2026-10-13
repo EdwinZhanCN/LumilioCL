@@ -234,6 +234,8 @@ impl InstanceDetailView {
     }
 
     fn shot_dialog(view: &Entity<Self>, dialog: Dialog, cx: &mut App) -> Dialog {
+        // Dialogs are drawn beside the shell, outside its picture scope.
+        let pictures = crate::pictures::pages(cx);
         let this = view.read(cx);
         let (Some(Ok(shots)), Some(file)) = (&this.data.screenshots, &this.shot_open) else {
             return dialog;
@@ -282,7 +284,12 @@ impl InstanceDetailView {
                             .rounded(px(10.))
                             .overflow_hidden()
                             .bg(colors.surface_subtle)
-                            .child(img(path).size_full().object_fit(ObjectFit::Contain)),
+                            .child(
+                                img(path)
+                                    .image_cache(&pictures)
+                                    .size_full()
+                                    .object_fit(ObjectFit::Contain),
+                            ),
                     )
                     .child(div().text_xs().text_color(colors.muted).child(format!(
                         "{} / {} · {}",

@@ -45,7 +45,56 @@ pub(super) enum PluginPage {
 
 pub(super) type PluginPages = HashMap<String, PluginPage>;
 
+/// Returns a page's pictures to GPUI. Its maps and 3D previews let go of
+/// theirs when dropped; the plugin's pictures are bare images whose textures
+/// would otherwise stay in the window's atlas.
+fn release(page: PluginPage, cx: &mut App) {
+    let PluginPage::Shown(_, images, _, _) = page else {
+        return;
+    };
+    let images: Vec<_> = images.into_iter().flatten().collect();
+    if images.is_empty() {
+        return;
+    }
+    // Outside any window update, so every window's atlas is reached.
+    cx.defer(move |cx| {
+        for image in images {
+            cx.drop_image(image, None);
+        }
+    });
+}
+
 impl InstanceDetailView {
+    /// Plugin pages exist only while shown: a map holds its tiles and a 3D
+    /// preview its renderer, in memory and on the GPU. Every page but
+    /// `keep`'s is dropped; a page shown again is asked for again, as opening
+    /// its tab always does.
+    pub(super) fn drop_plugin_pages(&mut self, keep: Option<&str>, cx: &mut App) {
+        let gone: Vec<String> = self
+            .plugin_pages
+            .keys()
+            .filter(|plugin| Some(plugin.as_str()) != keep)
+            .cloned()
+            .collect();
+        for plugin in gone {
+            if let Some(page) = self.plugin_pages.remove(&plugin) {
+                release(page, cx);
+            }
+        }
+    }
+
+    /// Another page took this one's place on screen. Its plugin pages go; an
+    /// open plugin tab asks for its page again once this page is shown.
+    pub fn left_screen(&mut self, cx: &mut Context<Self>) {
+        if self.plugin_pages.is_empty() {
+            return;
+        }
+        self.drop_plugin_pages(None, cx);
+        if self.plugin_open.is_some() {
+            self.refresh_plugin_tabs = true;
+        }
+    }
+
     /// The game ended and may have written its saves: open maps look at the
     /// world's files again.
     pub(super) fn maps_files_changed(&mut self, cx: &mut Context<Self>) {
@@ -62,7 +111,7 @@ impl InstanceDetailView {
     /// returns the page to a built-in tab.
     pub fn plugin_tabs_arrived(&mut self, tabs: Vec<PluginTab>, cx: &mut Context<Self>) {
         self.plugin_tabs = tabs;
-        self.keep_enabled_plugin_tabs();
+        self.keep_enabled_plugin_tabs(cx);
         cx.notify();
     }
 
@@ -141,7 +190,9 @@ impl InstanceDetailView {
             self.plugin_pane_scroll
                 .set_offset(gpui::point(px(0.), px(0.)));
         }
-        self.plugin_pages.insert(plugin, page);
+        if let Some(old) = self.plugin_pages.insert(plugin, page) {
+            release(old, cx);
+        }
         cx.notify();
     }
 
@@ -181,13 +232,22 @@ impl InstanceDetailView {
     }
 
     /// Drops tabs and pages of plugins that are no longer enabled.
-    pub(super) fn keep_enabled_plugin_tabs(&mut self) {
+    pub(super) fn keep_enabled_plugin_tabs(&mut self, cx: &mut App) {
         if let Some(enabled) = &self.enabled_plugins {
             self.plugin_tabs.retain(|tab| enabled.contains(&tab.plugin));
         }
         let tabs = &self.plugin_tabs;
-        self.plugin_pages
-            .retain(|plugin, _| tabs.iter().any(|tab| &tab.plugin == plugin));
+        let gone: Vec<String> = self
+            .plugin_pages
+            .keys()
+            .filter(|plugin| !tabs.iter().any(|tab| &tab.plugin == *plugin))
+            .cloned()
+            .collect();
+        for plugin in gone {
+            if let Some(page) = self.plugin_pages.remove(&plugin) {
+                release(page, cx);
+            }
+        }
         if self
             .plugin_open
             .as_ref()
@@ -263,6 +323,7 @@ impl InstanceDetailView {
             .set_offset(gpui::point(px(0.), px(0.)));
         // ia[instance]: 打开插件标签 | 游戏页「插件」标签内的左侧列表 | 读取并显示插件给的内容；插件被关闭或出错时标签消失，回到内置标签 | 插件只描述内容，版式由启动器统一
         self.plugin_open = Some(plugin.clone());
+        self.drop_plugin_pages(Some(&plugin), cx);
         (self.handler)(InstanceIntent::PluginView(plugin), window, cx);
         cx.notify();
     }

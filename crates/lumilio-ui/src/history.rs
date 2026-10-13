@@ -60,6 +60,20 @@ impl<T> History<T> {
         self.back.retain(|entry| !gone(entry));
         self.forward.retain(|entry| !gone(entry));
     }
+
+    /// Merges steps that lead to the same place, as forgetting entries can
+    /// leave behind: neither direction then takes a step that changes nothing,
+    /// counting `here`, where the person is now.
+    pub fn collapse(&mut self, here: &T, same: impl Fn(&T, &T) -> bool) {
+        self.back.dedup_by(|a, b| same(a, b));
+        self.forward.dedup_by(|a, b| same(a, b));
+        while self.back.last().is_some_and(|last| same(last, here)) {
+            self.back.pop();
+        }
+        while self.forward.last().is_some_and(|next| same(next, here)) {
+            self.forward.pop();
+        }
+    }
 }
 
 #[cfg(test)]
@@ -117,5 +131,39 @@ mod tests {
         assert_eq!(history.forward("library"), Some("discover"));
         assert_eq!(history.forward("discover"), None, "\"gone\" was skipped");
         assert_eq!(history.back("discover"), Some("library"));
+    }
+
+    #[test]
+    fn collapsing_leaves_no_step_that_goes_nowhere() {
+        let mut history = History::new(10);
+        for at in ["home", "library", "game", "library", "game"] {
+            history.visit(at);
+        }
+        // At "discover". Without the games, back would be library twice.
+        history.forget(|entry| *entry == "game");
+        history.collapse(&"discover", |a, b| a == b);
+        assert_eq!(history.back("discover"), Some("library"));
+        assert_eq!(
+            history.back("library"),
+            Some("home"),
+            "one library, not two"
+        );
+        assert_eq!(history.back("home"), None);
+
+        let mut history = History::new(10);
+        for at in ["library", "game", "library"] {
+            history.visit(at);
+        }
+        // At "discover"; walk back to the first "library".
+        assert_eq!(history.back("discover"), Some("library"));
+        assert_eq!(history.back("library"), Some("game"));
+        assert_eq!(history.back("game"), Some("library"));
+        history.forget(|entry| *entry == "game");
+        history.collapse(&"library", |a, b| a == b);
+        assert_eq!(
+            history.forward("library"),
+            Some("discover"),
+            "no step from library to library"
+        );
     }
 }

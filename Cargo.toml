@@ -62,6 +62,8 @@ lumilio-cubiomes = { path = "crates/lumilio-cubiomes" }
 lumilio-plugin-world-explorer = { path = "crates/lumilio-plugin-world-explorer" }
 lumilio-ui = { path = "crates/lumilio-ui" }
 md-5 = "0.11"
+# Already built for `image`; read row by row to shrink large PNGs (lumilio-core picture.rs).
+png = "0.18"
 regex = "1.11"
 rsa = { version = "0.9", features = ["getrandom"] }
 reqwest = { version = "0.13.4", features = ["stream"] }

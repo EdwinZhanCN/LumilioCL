@@ -8,6 +8,7 @@ mod detail;
 mod home_page;
 mod instance;
 mod locations;
+mod memory;
 mod queries;
 mod render;
 mod routing;

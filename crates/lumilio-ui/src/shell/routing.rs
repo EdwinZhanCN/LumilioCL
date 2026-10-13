@@ -34,7 +34,7 @@ impl LauncherShell {
         cx: &mut Context<Self>,
     ) {
         if !self.location().same(&Location::Page(route)) {
-            self.visit();
+            self.visit(cx);
         }
         self.route = route;
         self.detail = None;

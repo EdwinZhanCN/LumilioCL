@@ -18,6 +18,7 @@ getrandom.workspace = true
 hickory-resolver.workspace = true
 keyring.workspace = true
 md-5.workspace = true
+png.workspace = true
 regex.workspace = true
 rsa.workspace = true
 reqwest.workspace = true

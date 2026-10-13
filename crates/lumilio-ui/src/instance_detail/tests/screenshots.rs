@@ -186,3 +186,20 @@ fn the_viewer_steps_around_and_delete_asks_before_it_sends(cx: &mut TestAppConte
         Some(&InstanceIntent::DeleteScreenshot("a.png".into()))
     );
 }
+
+#[gpui::test]
+fn the_viewer_loads_the_full_picture_within_the_picture_budget(cx: &mut TestAppContext) {
+    let seen: Rc<RefCell<Vec<InstanceIntent>>> = Rc::default();
+    let (_view, cx) = open(seen, vec![shot("a.png", 1)], cx);
+    click(cx, "shot-0");
+    assert!(cx.debug_bounds("shot-viewer").is_some());
+    let full = gpui::Resource::Path(PathBuf::from("/game/screenshots/a.png").into());
+    cx.update(|_, cx| {
+        // The dialog is drawn beside the shell, so it names the cache itself.
+        assert!(crate::pictures::pages(cx).read(cx).contains(&full));
+        assert!(
+            !gpui::ImageSource::Resource(full.clone()).is_asset_cached(cx),
+            "GPUI's own table never lets a picture go"
+        );
+    });
+}

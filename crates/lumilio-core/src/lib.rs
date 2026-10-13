@@ -42,6 +42,7 @@ use lumilio_nbt as nbt;
 mod model_assets;
 mod pack_export;
 mod persist;
+mod picture;
 mod plugins;
 mod process;
 mod reclaim;
@@ -156,6 +157,7 @@ pub use modpack::{
     parse_index as parse_pack_index, plan as plan_modpack, read_index as read_pack_index,
 };
 pub use pack_export::{ExportError, ExportReport, ExportSpec, PackFormat};
+pub use picture::{PictureError, fit_within, png_within};
 pub mod world_map;
 pub use plugins::{
     MapFailure, MapProviders, PluginContentSource, PluginEffect, PluginFinding, PluginHost,

@@ -114,6 +114,7 @@ impl InstanceDetailView {
     pub fn select_tab(&mut self, tab: usize, cx: &mut Context<Self>) {
         self.tab = tab.min(TABS.len() - 1);
         self.plugin_open = None;
+        self.drop_plugin_pages(None, cx);
         self.confirm = None;
         cx.notify();
     }
@@ -392,7 +393,7 @@ impl InstanceDetailView {
         }
         self.enabled_plugins = Some(enabled);
         self.filter_plugin_results();
-        self.keep_enabled_plugin_tabs();
+        self.keep_enabled_plugin_tabs(cx);
         self.refresh_analysis = true;
         self.refresh_plugin_tabs = true;
         cx.notify();

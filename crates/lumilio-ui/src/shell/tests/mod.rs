@@ -4,6 +4,7 @@ mod chrome;
 mod discover;
 mod home;
 mod library;
+mod memory;
 mod settings;
 
 use crate::home::{HomePresentation, RecentEntry, Subject, WorldHint};
