@@ -4,7 +4,7 @@
   "title": "CurseForge 内容源",
   "summary": "2026-10-13：功能完成，just check、just web、just docs 与 PR CI 通过；按正式接线的点击流程测试跑通（切换来源、安装模组与整合包、添加已下载的文件），并因此修好了切换来源时的崩溃；等 Project Maintainer 在真实窗口里验收（T7），网站在发版时更新（T8），使用指南等 web/user-guide 合入后补（T6）。",
   "status": "in_progress",
-  "visibility": "internal",
+  "visibility": "public",
   "scope": {
     "included": [
       "CurseForge 插件：搜索、详情、版本、依赖、筛选、按指纹识别、更新、整合包文件解析、更新日志",
@@ -66,7 +66,7 @@
       "id": "T8",
       "title": "发版时更新网站",
       "status": "proposed",
-      "acceptance": "发布含 CurseForge 来源的版本时：网站首页「发现」与进阶玩家要点写上 CurseForge（web/src/i18n/zh-cn.ts、en.ts），使用指南补一页内容来源（web/user-guide 合入后的 guide/）。首页描述已发布的版本，不提前改。"
+      "acceptance": "网站路线图已列出这个计划（首页「正在路上」第一格，目标 0.1.5）。发布含 CurseForge 来源的版本时：首页「发现」与进阶玩家要点写上 CurseForge（web/src/i18n/zh-cn.ts；首页只有中文），使用指南补一页内容来源（web/user-guide 合入后的 guide/）。首页功能介绍描述已发布的版本，不提前改。"
     }
   ],
   "validation": [
@@ -164,5 +164,13 @@
     "插件把宿主不支持的筛选当作无效输入拒绝，而无效输入会让插件在本次运行中停用；界面的「游戏提供的筛选」不经过来源能力就会发给插件。 防护：ContentClient::search 先按来源能力裁剪查询（fit_query），a_query_is_fitted_to_what_the_source_can_answer 检查裁剪后的查询能通过插件校验。",
     "点击来源键时，change_query 在外壳自己的更新里同步发出 LoadFilters，应用的 load_filters 立刻读外壳，GPUI 直接 panic：实际窗口里切换来源会崩溃。界面测试用的空处理函数测不出来，是按正式接线点击的端到端测试抓到的。防护：load_filters 与 search 一样推迟一帧再读外壳；choosing_a_source_by_its_key_does_not_read_the_shell_mid_update 用正式接线点击来源键（去掉推迟时失败）。",
     "用真实 Backend 的应用层界面测试少了 allow_parking，本机碰巧通过，CI 上 tokio 工作线程唤醒 GPUI 被测试调度器判为不确定而失败。防护：这类测试开头调用 cx.executor().allow_parking()（与 home_snapshot 测试一致），并在本机连跑多次。"
-  ]
+  ],
+  "roadmap": {
+    "enabled": true,
+    "id": "curseforge-source",
+    "name": "CurseForge 来源",
+    "lede": "在发现页浏览和安装 CurseForge 上的模组、整合包和光影。",
+    "targetVersion": "0.1.5",
+    "order": 15
+  }
 }

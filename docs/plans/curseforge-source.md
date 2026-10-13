@@ -34,7 +34,7 @@ Status: InProgress
 - [ ] T7 — 验证 (InProgress)
   Acceptance: just check 通过；在临时数据目录运行启动器查看发现页、CurseForge 详情与待下载面板；用应用层测试 curseforge_through_the_page（默认忽略，真实 API）按正式接线点击：切到 CurseForge、搜索并安装 JEI、在整合包页签搜索并安装整合包、添加已下载的文件（已完成）。剩下由 Project Maintainer 在真实窗口里点一遍并验收。
 - [ ] T8 — 发版时更新网站 (Proposed)
-  Acceptance: 发布含 CurseForge 来源的版本时：网站首页「发现」与进阶玩家要点写上 CurseForge（web/src/i18n/zh-cn.ts、en.ts），使用指南补一页内容来源（web/user-guide 合入后的 guide/）。首页描述已发布的版本，不提前改。
+  Acceptance: 网站路线图已列出这个计划（首页「正在路上」第一格，目标 0.1.5）。发布含 CurseForge 来源的版本时：首页「发现」与进阶玩家要点写上 CurseForge（web/src/i18n/zh-cn.ts；首页只有中文），使用指南补一页内容来源（web/user-guide 合入后的 guide/）。首页功能介绍描述已发布的版本，不提前改。
 
 ## Validation
 
