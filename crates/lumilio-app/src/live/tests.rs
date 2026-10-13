@@ -436,3 +436,59 @@ fn choosing_a_source_by_its_key_does_not_read_the_shell_mid_update(
         );
     });
 }
+
+/// Filters that arrive after another source was chosen belong to the old
+/// one: they must not take the page back there.
+#[gpui_kit::test]
+fn filters_for_a_source_left_behind_do_not_take_the_page_back(cx: &mut gpui_kit::TestAppContext) {
+    use super::discover::run_load_filters;
+    use super::{State, Wiring};
+    use crate::backend::Backend;
+    use lumilio_core::ProjectKind;
+    use lumilio_ui::LauncherShell;
+    use lumilio_ui::live::DiscoverQuery;
+    use std::time::{Duration, Instant};
+    use std::{cell::RefCell, rc::Rc};
+
+    cx.executor().allow_parking();
+    let dir = tempfile::tempdir().unwrap();
+    let backend = Backend::open(dir.path().join("root")).unwrap();
+    cx.update(gpui_kit::init);
+    let (shell, cx) =
+        cx.add_window_view(|_, cx| LauncherShell::new(cx).with_live(Rc::new(|_, _, _| {})));
+    let wiring = Wiring {
+        backend: Rc::new(backend),
+        shell: shell.downgrade(),
+        state: Rc::new(RefCell::new(State::default())),
+    };
+    let browse =
+        |shell: &mut LauncherShell, source: &str, cx: &mut gpui_kit::Context<LauncherShell>| {
+            shell.update_live(
+                |model| {
+                    model.query = DiscoverQuery::new(ProjectKind::Mod);
+                    model.query.source = source.to_owned();
+                },
+                cx,
+            );
+        };
+    // A source that is not on: once loaded, the page would move to the first
+    // one that is. The person chooses another before that arrives.
+    shell.update(cx, |shell, cx| browse(shell, "lumilio.gone", cx));
+    cx.update(|_, cx| run_load_filters(&wiring, cx));
+    shell.update(cx, |shell, cx| browse(shell, "lumilio.chosen", cx));
+    let deadline = Instant::now() + Duration::from_secs(30);
+    while shell.read_with(cx, |shell, _| shell.live().unwrap().sources.is_empty()) {
+        assert!(Instant::now() < deadline, "the load never finished");
+        cx.run_until_parked();
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    cx.run_until_parked();
+    shell.read_with(cx, |shell, _| {
+        let model = shell.live().unwrap();
+        assert_eq!(model.query.source, "lumilio.chosen");
+        assert!(
+            !model.filters.loaded,
+            "the old source's filters were applied"
+        );
+    });
+}

@@ -126,7 +126,7 @@ pub(super) fn load_filters(wiring: &Wiring, cx: &mut App) {
         .detach();
 }
 
-fn run_load_filters(wiring: &Wiring, cx: &mut App) {
+pub(super) fn run_load_filters(wiring: &Wiring, cx: &mut App) {
     let service = wiring.backend.service.clone();
     let wanted = wiring
         .shell
@@ -137,6 +137,7 @@ fn run_load_filters(wiring: &Wiring, cx: &mut App) {
         .flatten()
         .unwrap_or_else(|| lumilio_core::DEFAULT_SOURCE.to_owned());
     let reload = wiring.clone();
+    let asked = wanted.clone();
     job(
         wiring,
         cx,
@@ -155,6 +156,15 @@ fn run_load_filters(wiring: &Wiring, cx: &mut App) {
             (sources, source, moved, filters)
         },
         move |shell, (sources, source, moved, result), cx| {
+            // Another source was chosen while these loaded; its own load is
+            // on the way, and these choices would put the old one back.
+            if shell
+                .live()
+                .is_some_and(|model| model.query.source != asked)
+            {
+                shell.update_live(|model| model.sources = sources, cx);
+                return;
+            }
             shell.update_live(
                 |model| {
                     model.sources = sources;
