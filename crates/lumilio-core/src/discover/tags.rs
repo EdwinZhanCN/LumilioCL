@@ -3,6 +3,9 @@ use super::kinds::ProjectKind;
 /// A category a project can be filed under, for one project type.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CategoryTag {
+    /// What a search asks for; the source's own ID.
+    pub id: String,
+    /// What the person reads.
     pub name: String,
     /// The source's grouping, e.g. `categories`, `features`, `resolutions`.
     pub header: String,
@@ -37,4 +40,6 @@ pub struct ProjectSummary {
     pub kind: Option<ProjectKind>,
     pub icon_url: Option<String>,
     pub author: Option<String>,
+    /// The project's page on its source's site; empty when unknown.
+    pub page_url: String,
 }

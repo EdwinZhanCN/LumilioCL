@@ -1,8 +1,11 @@
-//! Importing Modrinth modpacks (`.mrpack`).
+//! Importing modpacks: Modrinth's `.mrpack` here, CurseForge's zip in
+//! [`curseforge`]. Both become a [`PackIndex`] that is staged the same way.
 //!
-//! The format is the public Modrinth pack format: a zip with
+//! The Modrinth format is the public Modrinth pack format: a zip with
 //! `modrinth.index.json`, plus `overrides/` and `client-overrides/` folders
 //! copied into the game directory.
+
+pub mod curseforge;
 
 use std::collections::BTreeMap;
 use std::error::Error;
@@ -11,7 +14,7 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::Path;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::activity::CancellationToken;
 use crate::instance::{
@@ -58,7 +61,8 @@ pub enum ClientSupport {
 pub struct PackFile {
     /// Relative to the game directory, `/`-separated, validated.
     pub path: String,
-    pub sha1: String,
+    /// Always present in a Modrinth pack; CurseForge leaves the odd one out.
+    pub sha1: Option<String>,
     pub size: u64,
     pub downloads: Vec<String>,
     pub client: ClientSupport,
@@ -73,6 +77,26 @@ pub struct PackIndex {
     pub loader: Loader,
     pub loader_version: Option<String>,
     pub files: Vec<PackFile>,
+    /// Folders in the zip copied over the game directory, in order, each
+    /// ending in `/`; a later one wins.
+    pub overrides: Vec<String>,
+    /// Files the pack needs that the launcher may not download.
+    pub manual: Vec<PendingDownload>,
+}
+
+/// A file a game needs that the launcher may not download: its author lets
+/// people download it only on the source's site.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct PendingDownload {
+    /// The project's name, or the file's when unknown.
+    pub title: String,
+    pub file_name: String,
+    /// Where it goes, relative to the game directory (`mods/x.jar`).
+    pub path: String,
+    pub sha1: Option<String>,
+    pub size: u64,
+    /// Where the person downloads it.
+    pub page: Option<String>,
 }
 
 #[derive(Debug)]
@@ -209,11 +233,12 @@ pub fn parse_index(json: &str) -> Result<PackIndex, ModpackError> {
         if !is_safe_relative(&path) {
             return Err(ModpackError::UnsafePath(path));
         }
-        let sha1 = file
-            .hashes
-            .get("sha1")
-            .cloned()
-            .ok_or_else(|| invalid("a file has no sha1"))?;
+        let sha1 = Some(
+            file.hashes
+                .get("sha1")
+                .cloned()
+                .ok_or_else(|| invalid("a file has no sha1"))?,
+        );
         let client = match file.env.and_then(|env| env.client).as_deref() {
             Some("unsupported") => ClientSupport::Unsupported,
             Some("optional") => ClientSupport::Optional,
@@ -238,6 +263,11 @@ pub fn parse_index(json: &str) -> Result<PackIndex, ModpackError> {
         loader,
         loader_version,
         files,
+        overrides: OVERRIDE_FOLDERS
+            .iter()
+            .map(|folder| (*folder).to_owned())
+            .collect(),
+        manual: Vec::new(),
     })
 }
 
@@ -286,9 +316,9 @@ pub fn plan(
         if file.size > 0 {
             request = request.expect_size(file.size);
         }
-        request = request
-            .expect_sha1(&file.sha1)
-            .map_err(ModpackError::Transfer)?;
+        if let Some(sha1) = &file.sha1 {
+            request = request.expect_sha1(sha1).map_err(ModpackError::Transfer)?;
+        }
         requests.push(request);
     }
     Ok(requests)
@@ -298,6 +328,17 @@ pub fn plan(
 /// latter wins). Entries that would escape it are skipped. Returns how many
 /// files were written.
 pub fn extract_overrides(pack: &Path, game_dir: &Path) -> Result<usize, ModpackError> {
+    let folders: Vec<String> = OVERRIDE_FOLDERS.iter().map(|f| (*f).to_owned()).collect();
+    extract_folders(pack, game_dir, &folders)
+}
+
+/// Copies each of `folders` (in order, each ending in `/`) from the pack into
+/// the game directory.
+pub fn extract_folders(
+    pack: &Path,
+    game_dir: &Path,
+    folders: &[String],
+) -> Result<usize, ModpackError> {
     let mut archive = zip::ZipArchive::new(fs::File::open(pack)?)?;
     let mut total = 0_u64;
     for index in 0..archive.len() {
@@ -307,7 +348,7 @@ pub fn extract_overrides(pack: &Path, game_dir: &Path) -> Result<usize, ModpackE
         return Err(ModpackError::Invalid("overrides are too large".to_owned()));
     }
     let mut written = 0;
-    for folder in OVERRIDE_FOLDERS {
+    for folder in folders {
         for index in 0..archive.len() {
             let mut entry = archive.by_index(index)?;
             let Some(name) = entry.enclosed_name() else {
@@ -315,7 +356,7 @@ pub fn extract_overrides(pack: &Path, game_dir: &Path) -> Result<usize, ModpackE
             };
             let Some(relative) = name
                 .to_str()
-                .and_then(|text| text.strip_prefix(folder))
+                .and_then(|text| text.strip_prefix(folder.as_str()))
                 .filter(|relative| is_safe_relative(relative))
             else {
                 continue;
@@ -347,7 +388,7 @@ pub async fn stage_pack<T: Transport>(
 ) -> Result<(), ModpackError> {
     let requests = plan(index, game_dir, chain, allow)?;
     fs::create_dir_all(game_dir)?;
-    extract_overrides(pack, game_dir)?;
+    extract_folders(pack, game_dir, &index.overrides)?;
     if cancel.is_cancelled() {
         return Err(ModpackError::Cancelled);
     }
@@ -391,13 +432,31 @@ pub async fn import<T: Transport>(
         return Err(ModpackError::Cancelled);
     }
     let index = read_index(pack)?;
+    import_index(store, engine, chain, pack, &index, now, allow, cancel).await
+}
+
+/// Imports a pack already read into `index`, with [`import`]'s guarantees.
+#[allow(clippy::too_many_arguments)]
+pub async fn import_index<T: Transport>(
+    store: &tokio::sync::Mutex<InstanceStore>,
+    engine: &TransferEngine<T>,
+    chain: &SourceChain,
+    pack: &Path,
+    index: &PackIndex,
+    now: u64,
+    allow: fn(&str) -> bool,
+    cancel: CancellationToken,
+) -> Result<InstanceRecord, ModpackError> {
+    if cancel.is_cancelled() {
+        return Err(ModpackError::Cancelled);
+    }
     let (id, layout) = {
         let store = store.lock().await;
         (store.suggest_id(&index.name)?, Layout::new(store.root()))
     };
     let staged = Staged::begin(&layout, "import", &id)?;
     let built = stage_pack(
-        &index,
+        index,
         pack,
         &staged.game_dir(),
         engine,

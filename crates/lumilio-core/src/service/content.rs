@@ -6,7 +6,6 @@ use crate::content::{ContentError, ContentItem};
 use crate::discover::{ProjectKind, Version};
 use crate::history::{ChangeKind, HistoryEvent, HistoryLog};
 use crate::transfer::Transport;
-use std::collections::BTreeMap;
 
 impl<T: Transport + Clone> LauncherService<T> {
     /// Copies local files into an instance (IA P-ADD-FILES): one result per
@@ -44,9 +43,13 @@ impl<T: Transport + Clone> LauncherService<T> {
 
     /// Every version of a project, newest first, for choosing one to switch
     /// an installed file to (IA P-VERSION-SWITCH).
-    pub async fn project_versions(&self, project: &str) -> Result<Vec<Version>, ServiceError> {
+    pub async fn project_versions(
+        &self,
+        source: &str,
+        project: &str,
+    ) -> Result<Vec<Version>, ServiceError> {
         let mut versions = self
-            .content_client()
+            .content_client(source)
             .await?
             .versions_with_changelog(project)
             .await?;
@@ -76,87 +79,33 @@ impl<T: Transport + Clone> LauncherService<T> {
     }
 
     /// Lists one kind of content with where each file came from (IA
-    /// P-CONTENT-ITEM). Files are hashed off the async threads; Modrinth is
-    /// asked in three batches (versions by hash, projects, teams) plus one
-    /// for the newest compatible versions. If it cannot be reached the list
-    /// still comes back, marked `sources_unavailable`.
+    /// P-CONTENT-ITEM). Files are hashed off the async threads, then the
+    /// enabled sources are asked in turn (see `recognize`). If a source
+    /// cannot be reached the list still comes back, marked
+    /// `sources_unavailable`.
     pub async fn content_details(
         &self,
         id: &str,
         kind: ProjectKind,
     ) -> Result<crate::content_sources::ContentList, ServiceError> {
         let record = self.instance(id).await?;
-        let game_dir = self.layout.game(id);
-        let files = tokio::task::spawn_blocking(move || {
-            let items = scan_content(&game_dir, kind)?;
-            let folder = kind.install_folder().unwrap_or_default();
-            Ok::<_, crate::content::ContentError>(
-                items
-                    .into_iter()
-                    .map(|item| {
-                        let hash = (!item.is_directory)
-                            .then(|| {
-                                crate::content::sha1_hex(
-                                    &game_dir.join(folder).join(&item.file_name),
-                                )
-                                .ok()
-                            })
-                            .flatten();
-                        (item, hash)
-                    })
-                    .collect::<Vec<_>>(),
-            )
-        })
-        .await
-        .map_err(std::io::Error::other)?
-        .map_err(ServiceError::from)?;
-
-        let hashes: Vec<String> = files.iter().filter_map(|(_, hash)| hash.clone()).collect();
-        let enabled: Vec<String> = files
-            .iter()
-            .filter(|(item, _)| item.enabled)
-            .filter_map(|(_, hash)| hash.clone())
-            .collect();
-        let unknown = |files, note: String| crate::content_sources::ContentList {
-            entries: crate::content_sources::assemble(
-                files,
-                &BTreeMap::new(),
-                &[],
-                &BTreeMap::new(),
-            ),
-            sources_unavailable: true,
-            source_note: Some(note),
-        };
-        let client = match self.content_client().await {
-            Ok(client) => client,
-            Err(error) => return Ok(unknown(files, error.to_string())),
-        };
-        let (identified, latest) = tokio::join!(
-            client.identify(&hashes),
-            client.latest_for(&enabled, record.loader, &record.game_version)
-        );
-        let identified = match identified {
-            Ok(identified) => identified,
-            Err(error) => return Ok(unknown(files, error.to_string())),
-        };
-        let mut project_ids: Vec<String> =
-            identified.values().map(|v| v.project_id.clone()).collect();
-        project_ids.sort();
-        project_ids.dedup();
-        // Labels are decoration: a failure here leaves titles to the files.
-        let projects = client
-            .project_summaries(&project_ids)
-            .await
-            .unwrap_or_default();
+        let files = self.hashed_content(id, kind).await?;
+        let found = self
+            .recognize(&files.iter().collect::<Vec<_>>(), Some(&record))
+            .await;
+        let note = (!found.failures.is_empty()).then(|| found.failures.join("; "));
         Ok(crate::content_sources::ContentList {
             entries: crate::content_sources::assemble(
-                files,
-                &identified,
-                &projects,
-                &latest.unwrap_or_default(),
+                files
+                    .into_iter()
+                    .map(|file| (file.item, file.sha1))
+                    .collect(),
+                &found.identified,
+                &found.projects,
+                &found.latest,
             ),
-            sources_unavailable: false,
-            source_note: None,
+            sources_unavailable: note.is_some(),
+            source_note: note,
         })
     }
 

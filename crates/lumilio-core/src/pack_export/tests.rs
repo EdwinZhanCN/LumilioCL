@@ -101,10 +101,12 @@ fn version(sha1: &str, url: &str) -> Version {
             primary: true,
             size: 3,
             sha1: Some(sha1.into()),
+            download_page: None,
         }],
         dependencies: Vec::new(),
         downloads: 0,
         changelog: String::new(),
+        changelog_format: crate::discover::TextFormat::Markdown,
     }
 }
 

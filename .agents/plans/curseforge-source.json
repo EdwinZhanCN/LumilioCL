@@ -1,0 +1,184 @@
+{
+  "schemaVersion": 1,
+  "id": "curseforge-source",
+  "title": "CurseForge 内容源",
+  "summary": "2026-10-13：功能完成，Project Maintainer 在真实窗口里验收通过；just check、just web、just docs 与 PR CI 通过。验收时报告过一次「浏览 CurseForge 后切回 Modrinth 闪退」：无头窗口按正式接线复现（含当前游戏、选分类后切回）未能复现，GPUI 的动图帧号已有夹取；排查中修好一个竞态（筛选项晚到时把页面拉回旧来源），再次遇到时取终端里的 panic 输出（RUST_BACKTRACE=1）。剩下 T8：发版时更新网站首页与使用指南。",
+  "status": "in_progress",
+  "visibility": "public",
+  "scope": {
+    "included": [
+      "CurseForge 插件：搜索、详情、版本、依赖、筛选、按指纹识别、更新、整合包文件解析、更新日志",
+      "内核按来源区分：发现页、详情、安装、切换版本、依赖、重试、游戏内容识别与更新",
+      "CurseForge 整合包：从发现页安装、从本地 zip 导入、不允许分发的文件",
+      "API 密钥：发布构建注入，本地开发配置说明"
+    ],
+    "excluded": [
+      "导出 CurseForge 格式的整合包",
+      "导入 CurseForge 桌面应用的实例文件夹",
+      "跨来源合并搜索结果",
+      "整合包更新"
+    ]
+  },
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "内容源契约：目录、正文格式、仅限网页下载、更新日志、整合包文件解析",
+      "status": "completed",
+      "acceptance": "插件 API 能表达：来源说的是哪一家的 ID（catalog）、正文与更新日志是 Markdown 还是 HTML、作者只允许在来源网站下载的文件及其下载页、按需读取单个版本的更新日志、批量解析整合包里按 ID 引用的文件、浏览某类内容的网页地址。Modrinth 插件声明自己的目录与 Markdown，行为不变。"
+    },
+    {
+      "id": "T2",
+      "title": "CurseForge 插件",
+      "status": "completed",
+      "acceptance": "lumilio.curseforge 插件实现全部内容源操作；只请求 api.curseforge.com；密钥来自编译期 CF_API_KEY，没有密钥时默认关闭并在出错时说明原因；网络失败与超时报告为暂时性错误，不让插件停用；分类名随界面语言给出中文或英文；协议解码有单元测试，真实 API 冒烟测试默认忽略。"
+    },
+    {
+      "id": "T3",
+      "title": "内核按来源区分",
+      "status": "completed",
+      "acceptance": "每个项目操作都带来源；旧的重试记录与整合包实例按 Modrinth 读取；查询按来源能力裁剪后才发给插件；内容源调用有 20 秒预算；游戏内容按注册顺序逐个来源识别（Modrinth 用 SHA-1，CurseForge 用 Murmur2），未识别的文件才交给下一个来源；更新按识别它的来源检查；.mrpack 导出只用 Modrinth 目录的来源。"
+    },
+    {
+      "id": "T4",
+      "title": "CurseForge 整合包",
+      "status": "completed",
+      "acceptance": "manifest.json 解析出游戏版本、加载器和覆盖文件夹；文件按类型放进 mods、resourcepacks、shaderpacks、datapacks，作者停用的文件以停用状态安装；不允许分发的文件先按 SHA-1 在 Modrinth 找同一文件，找不到的记入实例，界面列出下载页并可添加已下载的文件；从发现页安装与从本地导入 zip 都走同一流程，失败时游戏库不变。"
+    },
+    {
+      "id": "T5",
+      "title": "界面：来源切换与来源相关的显示",
+      "status": "completed",
+      "acceptance": "发现页可在已启用的内容源之间切换，筛选、排序与可用控件随来源变化；详情页、游戏内容、依赖提示与切换版本弹窗按项目的来源请求与链接；HTML 正文和更新日志可读；只能在网页下载的项目给出下载页；文案不再写死 Modrinth；中英文目录齐全，IA 路径已更新。"
+    },
+    {
+      "id": "T6",
+      "title": "构建与文档",
+      "status": "completed",
+      "acceptance": "release.yml 构建时注入 CF_API_KEY；贡献文档（中英）写明本地开发把 CF_API_KEY 放进用户级 ~/.cargo/config.toml 的 [env]；backlog 中已完成的条目删除。使用指南页移到 T8，等 web/user-guide 合入后与发版一起写。"
+    },
+    {
+      "id": "T7",
+      "title": "验证",
+      "status": "completed",
+      "acceptance": "just check 通过；在临时数据目录运行启动器查看发现页、CurseForge 详情与待下载面板；应用层测试 curseforge_through_the_page（默认忽略，真实 API）按正式接线点击：切到 CurseForge、搜索并安装 JEI、在整合包页签搜索并安装整合包、添加已下载的文件；Project Maintainer 在真实窗口里验收。"
+    },
+    {
+      "id": "T8",
+      "title": "发版时更新网站",
+      "status": "proposed",
+      "acceptance": "网站路线图已列出这个计划（首页「正在路上」第一格，目标 0.1.5）。发布含 CurseForge 来源的版本时：首页「发现」与进阶玩家要点写上 CurseForge（web/src/i18n/zh-cn.ts；首页只有中文），使用指南补一页内容来源（web/user-guide 合入后的 guide/）。首页功能介绍描述已发布的版本，不提前改。"
+    }
+  ],
+  "validation": [
+    {
+      "criterion": "真实 API 的形状、上限与整合包情况已核对。",
+      "result": "2026-10-13：文件列表 pageSize 可到 1000（JEI 3854 个文件，每千个约 1.7 MB、0.6 秒）；搜索带关键词时 sortField=1 即相关度；文件的 gameVersions 混有加载器与运行环境，按 sortableGameVersions 的 gameVersion 是否为空区分。按下载量排名的 7 个整合包每个都有 2–29 个不允许分发的文件，其中大部分能在 Modrinth 按 SHA-1 找到（6/6、25/25、9/11、23/29、0/2、8/13、3/3）；清单只出现 classId 6、12、6552、6945；有 required:false 的文件。"
+    },
+    {
+      "criterion": "窄测试：插件、内核、界面与应用。",
+      "result": "2026-10-13：lumilio-plugin-curseforge 15 项；lumilio-core 全部 725 项通过，含新增的跨来源识别、Modrinth 回退、手动下载、CurseForge 整合包端到端导入、旧重试记录、查询裁剪与 Murmur2 测试向量（与 CurseForge 给 JEI 的指纹 4164405417 一致的参考实现生成）；lumilio-ui 与 lumilio-app 全部通过，含来源切换、待下载面板与按需更新日志的界面测试。守卫已验证：去掉「已识别的文件不再问下一个来源」后跨来源测试失败。"
+    },
+    {
+      "criterion": "just check 通过。",
+      "result": "2026-10-13：just check 通过（构建、1431 项测试与文档测试、clippy、fmt）；just web 与 just docs 通过；PR #37 CI 见 PR。"
+    },
+    {
+      "criterion": "真实 API 与实机查看。",
+      "result": "2026-10-13：curseforge_live（默认忽略）对真实 API：搜索、筛选、JEI 详情（3854 个版本、HTML 简介）、单版本更新日志 1.3 秒内完成；安装整合包 keo optimized（1459394，26 个文件）用时约 5 秒，2 个禁止分发的文件从 Modrinth 下载，1 个光影包列为待下载并带下载页；该游戏的 Mod 识别 0.6 秒：Modrinth 20、CurseForge 3，8 个有更新。启动器实机查看了发现页（两个来源、中文分类、无关注数、分页上限）、CurseForge 详情页（HTML 简介、图片、版本列表）与游戏内容页的待下载面板。"
+    },
+    {
+      "criterion": "按正式接线点击完整流程，以及窄窗口布局。",
+      "result": "2026-10-13：curseforge_through_the_page 用正式的 on_live_intent 接线和真实 API，在无头窗口里点击来源键、在搜索框输入并回车、点击结果行「安装」：JEI 装进 Fabric 1.20.1 游戏；整合包页签装好 keo optimized 并列出 ColorFull-Optimized.zip；添加已下载的文件后放进 shaderpacks，用时约 10 秒。720×480 下发现页的细化行改为可换行，结果行在窄窗口用小图标和 128px 数据列，实机截图确认不再挤出主列；a_narrow_window_gives_the_result_name_room 守住（阈值改为 0 时失败）。"
+    },
+    {
+      "criterion": "Project Maintainer 在真实窗口里验收。",
+      "result": "2026-10-13：Project Maintainer 在真实窗口里验收通过（切换来源、从 CurseForge 安装 Mod 与整合包、添加已下载的文件）。"
+    },
+    {
+      "criterion": "浏览 CurseForge 后切回 Modrinth 时的一次闪退查明原因或确认不再出现。",
+      "result": null
+    }
+  ],
+  "decisions": [
+    {
+      "id": "D1",
+      "decision": "发现页一次只看一个来源，用分段控件切换；不合并多个来源的结果。",
+      "rationale": "两边的排序、筛选与分类不同，同一模组在两边各有一份，合并会重复且分页不准。",
+      "consequences": "查询、筛选缓存与「隐藏已安装」都按来源区分；项目的来源随项目一起传到详情、安装与重试。"
+    },
+    {
+      "id": "D2",
+      "decision": "密钥在编译期从 CF_API_KEY 读取，仓库里不放；发布构建由 Repo Secret 注入，本地开发放在用户级 ~/.cargo/config.toml 的 [env]。没有密钥的构建里插件默认关闭。",
+      "rationale": "CurseForge 第三方 API 必须带 x-api-key；带凭据的请求在宿主里不走镜像，密钥不会发给 MCIM。",
+      "consequences": "CI 不注入密钥，测试不依赖密钥；没有密钥时的错误说明原因。"
+    },
+    {
+      "id": "D3",
+      "decision": "不自己拼 CDN 地址绕过作者的分发设置。不允许分发的文件先按 SHA-1 在 Modrinth 找同一个文件（Prism Launcher 的做法），找不到的交给玩家从下载页手动下载。",
+      "rationale": "这是作者的选择，也是 CurseForge 第三方 API 条款的要求；调研的热门整合包里多数被禁止的文件在 Modrinth 上有相同文件。",
+      "consequences": "整合包仍然安装，缺的文件记在实例里，界面列出下载页并可添加已下载的文件，按 SHA-1 校验后放到对应文件夹。"
+    },
+    {
+      "id": "D4",
+      "decision": "游戏内容按来源注册顺序识别，一个文件归第一个认得它的来源。",
+      "rationale": "同一文件在两边内容相同，归属任一来源都能得到正确的名称与更新；顺序固定让结果稳定，也避免为每个文件请求所有来源。",
+      "consequences": "Modrinth 在前；只有 Modrinth 不认得的文件才计算 Murmur2 并询问 CurseForge。"
+    },
+    {
+      "id": "D5",
+      "decision": "来源用 catalog 声明自己说的是哪一家的 ID；整合包格式与导出按 catalog 找来源，不按插件 ID 写死。",
+      "rationale": "CurseForge 清单按 CurseForge 的项目与文件 ID 引用文件，.mrpack 导出只认 Modrinth 的地址。",
+      "consequences": "导入 CurseForge 整合包需要启用一个 catalog 为 CurseForge 的来源；没有时给出明确错误。"
+    },
+    {
+      "id": "D6",
+      "decision": "内容源调用使用 20 秒预算；网络预算用完是暂时性错误。",
+      "rationale": "CurseForge 的版本列表要分页读取，5 秒不够；网络慢不是插件的错，不应让内容源在本次运行中停用。",
+      "consequences": "插件卡住时仍按工作线程超时停用。"
+    },
+    {
+      "id": "D7",
+      "decision": "CurseForge 整合包文件按 classId 放置：6 → mods，12 → resourcepacks，6552 → shaderpacks，6945 → datapacks；其他类型列为待下载由玩家决定位置。作者停用的文件（required: false）以停用状态安装。",
+      "rationale": "调研的热门整合包只出现这四类；数据包在这些整合包里另有一份在 overrides 里，放进 datapacks 不影响加载。",
+      "consequences": "世界、自定义配置等类型的文件不会被猜着放进 mods。"
+    },
+    {
+      "id": "D8",
+      "decision": "分类在界面里一律按来源的 ID 选择、按名字显示；CurseForge 插件按界面语言给出中文或英文分类名。",
+      "rationale": "CurseForge 的分类 ID 是数字，名字只有英文；Modrinth 的 ID 本身就是名字并由目录翻译。",
+      "consequences": "FilterModel 同时保存 ID 与名字；卡片标签按名字去掉已筛选的分类。"
+    },
+    {
+      "id": "D9",
+      "decision": "更新日志按需读取：来源可以在版本列表里不带更新日志，切换版本弹窗选中某个版本时再读那一个。",
+      "rationale": "CurseForge 每个文件的更新日志要单独请求，JEI 有数千个文件。",
+      "consequences": "ContentSource 增加 changelog()；HTML 里段落内的 <br> 由界面改写为段落分隔，因为渲染器只在块之间换行。"
+    }
+  ],
+  "references": [
+    "https://docs.curseforge.com/rest-api/",
+    "https://github.com/PrismLauncher/PrismLauncher/blob/develop/launcher/modplatform/flame/FileResolvingTask.cpp",
+    "crates/lumilio-plugin-api/src/content.rs",
+    "crates/lumilio-core/src/discover/source.rs",
+    "crates/lumilio-core/src/modpack.rs",
+    "crates/lumilio-plugin-curseforge/src/lib.rs",
+    "crates/lumilio-core/src/service/recognize.rs",
+    "crates/lumilio-core/src/modpack/curseforge.rs",
+    "crates/lumilio-core/tests/curseforge_live.rs"
+  ],
+  "dependencies": [],
+  "lessonsLearned": [
+    "插件注册表按 ID 排序，lumilio.curseforge 会排在 lumilio.modrinth 前面，默认来源和识别顺序因此悄悄变成 CurseForge。 防护：注册表记下应用给出插件的顺序，content_sources 按它排序；the_sources_are_listed_with_modrinth_first 与应用侧 backend 测试检查 Modrinth 在前。",
+    "插件把宿主不支持的筛选当作无效输入拒绝，而无效输入会让插件在本次运行中停用；界面的「游戏提供的筛选」不经过来源能力就会发给插件。 防护：ContentClient::search 先按来源能力裁剪查询（fit_query），a_query_is_fitted_to_what_the_source_can_answer 检查裁剪后的查询能通过插件校验。",
+    "点击来源键时，change_query 在外壳自己的更新里同步发出 LoadFilters，应用的 load_filters 立刻读外壳，GPUI 直接 panic：实际窗口里切换来源会崩溃。界面测试用的空处理函数测不出来，是按正式接线点击的端到端测试抓到的。防护：load_filters 与 search 一样推迟一帧再读外壳；choosing_a_source_by_its_key_does_not_read_the_shell_mid_update 用正式接线点击来源键（去掉推迟时失败）。",
+    "用真实 Backend 的应用层界面测试少了 allow_parking，本机碰巧通过，CI 上 tokio 工作线程唤醒 GPUI 被测试调度器判为不确定而失败。防护：这类测试开头调用 cx.executor().allow_parking()（与 home_snapshot 测试一致），并在本机连跑多次。"
+  ],
+  "roadmap": {
+    "enabled": true,
+    "id": "curseforge-source",
+    "name": "CurseForge 来源",
+    "lede": "在发现页浏览和安装 CurseForge 上的模组、整合包和光影。",
+    "targetVersion": "0.1.5",
+    "order": 15
+  }
+}

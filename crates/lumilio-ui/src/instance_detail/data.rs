@@ -119,7 +119,7 @@ impl InstanceDetailView {
     }
 
     /// Selecting from the page also loads what the new tab shows.
-    pub(super) fn open_tab(&mut self, tab: usize, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn open_tab(&mut self, tab: usize, window: &mut Window, cx: &mut Context<Self>) {
         self.select_tab(tab, cx);
         match self.tab {
             TAB_OVERVIEW => {

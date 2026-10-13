@@ -45,6 +45,9 @@ pub enum RetryAction {
     InstallContent {
         instance: String,
         kind: crate::discover::ProjectKind,
+        /// The content source; entries from before there were several have none.
+        #[serde(default = "default_source")]
+        source: String,
         project: String,
         version: Option<String>,
     },
@@ -52,6 +55,8 @@ pub enum RetryAction {
         instance: String,
         kind: crate::discover::ProjectKind,
         file_name: String,
+        #[serde(default = "default_source")]
+        source: String,
         project: String,
         version_id: String,
     },
@@ -61,6 +66,8 @@ pub enum RetryAction {
         include_worlds: bool,
     },
     InstallModpack {
+        #[serde(default = "default_source")]
+        source: String,
         project: String,
         /// The chosen version; `None` (and older log lines) is the newest.
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -80,6 +87,8 @@ pub enum RetryAction {
         source: crate::java_runtime::JavaSource,
     },
     SaveVersion {
+        #[serde(default = "default_source")]
+        source: String,
         project: String,
         version_id: String,
         path: String,
@@ -87,6 +96,10 @@ pub enum RetryAction {
     ImportPack {
         path: String,
     },
+}
+
+fn default_source() -> String {
+    crate::discover::DEFAULT_SOURCE.to_owned()
 }
 
 /// What a task is doing, as a type rather than a sentence: the interface

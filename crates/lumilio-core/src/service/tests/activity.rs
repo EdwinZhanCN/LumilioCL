@@ -23,6 +23,7 @@ async fn explicit_cancel_unblocks_reads_and_records_cancelled_for_both_install_k
     let mut content = Box::pin(world.service.install_content(
         &record.id,
         ProjectKind::Mod,
+        crate::discover::DEFAULT_SOURCE,
         "project",
         cancel.clone(),
     ));
@@ -35,7 +36,12 @@ async fn explicit_cancel_unblocks_reads_and_records_cancelled_for_both_install_k
         Err(ServiceError::Cancelled)
     ));
     let cancel = CancellationToken::new();
-    let mut pack = Box::pin(world.service.install_modpack("pack", None, cancel.clone()));
+    let mut pack = Box::pin(world.service.install_modpack(
+        crate::discover::DEFAULT_SOURCE,
+        "pack",
+        None,
+        cancel.clone(),
+    ));
     assert!(futures_util::poll!(&mut pack).is_pending());
     cancel.cancel();
     assert!(matches!(
@@ -103,6 +109,7 @@ async fn a_failed_download_remembers_its_input_and_runs_again_from_it() {
             .install_content(
                 &record.id,
                 ProjectKind::Mod,
+                crate::discover::DEFAULT_SOURCE,
                 "cool",
                 CancellationToken::new()
             )
@@ -117,6 +124,7 @@ async fn a_failed_download_remembers_its_input_and_runs_again_from_it() {
         RetryAction::InstallContent {
             instance: record.id.clone(),
             kind: ProjectKind::Mod,
+            source: crate::discover::DEFAULT_SOURCE.into(),
             project: "cool".into(),
             version: None,
         }
@@ -204,11 +212,13 @@ async fn cancel_task_by_id_stops_only_that_running_task_and_expires_with_it() {
     let mut first = Box::pin(world.service.install_content(
         &record.id,
         ProjectKind::Mod,
+        crate::discover::DEFAULT_SOURCE,
         "one",
         CancellationToken::new(),
     ));
     assert!(futures_util::poll!(&mut first).is_pending());
     let mut second = Box::pin(world.service.install_modpack(
+        crate::discover::DEFAULT_SOURCE,
         "pack",
         None,
         CancellationToken::new(),
@@ -260,7 +270,13 @@ async fn cancelled_transfer_leaves_nothing_behind_and_allows_retry() {
     assert!(matches!(
         world
             .service
-            .install_content(&record.id, ProjectKind::Mod, "cool", cancel)
+            .install_content(
+                &record.id,
+                ProjectKind::Mod,
+                crate::discover::DEFAULT_SOURCE,
+                "cool",
+                cancel
+            )
             .await,
         Err(ServiceError::Cancelled)
     ));
@@ -279,6 +295,7 @@ async fn cancelled_transfer_leaves_nothing_behind_and_allows_retry() {
         .install_content(
             &record.id,
             ProjectKind::Mod,
+            crate::discover::DEFAULT_SOURCE,
             "cool",
             CancellationToken::new(),
         )
@@ -308,6 +325,7 @@ async fn dropped_install_finishes_activity_and_releases_its_instance() {
     let mut install = Box::pin(world.service.install_content(
         &record.id,
         ProjectKind::Mod,
+        crate::discover::DEFAULT_SOURCE,
         "first",
         CancellationToken::new(),
     ));
@@ -328,6 +346,7 @@ async fn dropped_install_finishes_activity_and_releases_its_instance() {
     let mut retry = Box::pin(world.service.install_content(
         &record.id,
         ProjectKind::Mod,
+        crate::discover::DEFAULT_SOURCE,
         "second",
         CancellationToken::new(),
     ));

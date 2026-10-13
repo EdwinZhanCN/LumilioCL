@@ -4560,6 +4560,7 @@ dependencies = [
  "lumilio-core",
  "lumilio-plugin-api",
  "lumilio-plugin-crash-analyzer",
+ "lumilio-plugin-curseforge",
  "lumilio-plugin-discord",
  "lumilio-plugin-litematica",
  "lumilio-plugin-modrinth",
@@ -4569,6 +4570,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "sha1 0.11.0",
  "tempfile",
  "tokio",
  "winresource",
@@ -4588,6 +4590,7 @@ dependencies = [
  "keyring",
  "lumilio-nbt",
  "lumilio-plugin-api",
+ "lumilio-plugin-curseforge",
  "lumilio-plugin-discord",
  "lumilio-plugin-modrinth",
  "md-5 0.11.0",
@@ -4654,6 +4657,16 @@ version = "0.1.4"
 dependencies = [
  "lumilio-plugin-api",
  "regex",
+]
+
+[[package]]
+name = "lumilio-plugin-curseforge"
+version = "0.1.4"
+dependencies = [
+ "lumilio-plugin-api",
+ "serde",
+ "serde_json",
+ "url",
 ]
 
 [[package]]

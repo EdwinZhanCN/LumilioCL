@@ -14,7 +14,13 @@ async fn a_version_can_be_saved_where_the_person_chooses_and_can_be_retried() {
 
     let name = world
         .service
-        .save_version_as("cool", "v1", &target, CancellationToken::new())
+        .save_version_as(
+            crate::discover::DEFAULT_SOURCE,
+            "cool",
+            "v1",
+            &target,
+            CancellationToken::new(),
+        )
         .await
         .unwrap();
     assert_eq!(name, "cool.jar");
@@ -25,7 +31,13 @@ async fn a_version_can_be_saved_where_the_person_chooses_and_can_be_retried() {
     assert!(matches!(
         world
             .service
-            .save_version_as("cool", "nope", &target, CancellationToken::new())
+            .save_version_as(
+                crate::discover::DEFAULT_SOURCE,
+                "cool",
+                "nope",
+                &target,
+                CancellationToken::new()
+            )
             .await,
         Err(ServiceError::NoCompatibleVersion)
     ));
@@ -55,7 +67,13 @@ async fn required_dependencies_are_listed_nearest_first_once_and_without_what_is
 
     let need = world
         .service
-        .missing_dependencies(&record.id, ProjectKind::Mod, "cool", None)
+        .missing_dependencies(
+            &record.id,
+            ProjectKind::Mod,
+            crate::discover::DEFAULT_SOURCE,
+            "cool",
+            None,
+        )
         .await
         .unwrap();
     let ids: Vec<_> = need.iter().map(|n| n.project_id.as_str()).collect();
@@ -66,7 +84,13 @@ async fn required_dependencies_are_listed_nearest_first_once_and_without_what_is
     assert!(
         world
             .service
-            .missing_dependencies(&record.id, ProjectKind::ResourcePack, "cool", None)
+            .missing_dependencies(
+                &record.id,
+                ProjectKind::ResourcePack,
+                crate::discover::DEFAULT_SOURCE,
+                "cool",
+                None
+            )
             .await
             .unwrap()
             .is_empty()
@@ -126,7 +150,13 @@ async fn optional_mods_are_suggested_and_installed_ones_it_cannot_live_with_are_
 
     let report = world
         .service
-        .dependency_report(&record.id, ProjectKind::Mod, "cool", None)
+        .dependency_report(
+            &record.id,
+            ProjectKind::Mod,
+            crate::discover::DEFAULT_SOURCE,
+            "cool",
+            None,
+        )
         .await
         .unwrap();
     assert!(report.needs.is_empty());
@@ -184,7 +214,13 @@ async fn a_dependency_already_in_the_game_is_not_offered_and_one_without_a_fit_i
 
     let need = world
         .service
-        .missing_dependencies(&record.id, ProjectKind::Mod, "cool", None)
+        .missing_dependencies(
+            &record.id,
+            ProjectKind::Mod,
+            crate::discover::DEFAULT_SOURCE,
+            "cool",
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(need.len(), 1, "{need:?}");
@@ -207,7 +243,11 @@ fn answer_filters(world: &super::World) {
 async fn filters_are_fetched_once_and_say_what_the_source_can_do() {
     let world = world();
     answer_filters(&world);
-    let filters = world.service.discover_filters().await.unwrap();
+    let filters = world
+        .service
+        .discover_filters(crate::discover::DEFAULT_SOURCE)
+        .await
+        .unwrap();
     assert_eq!(filters.source, "Modrinth");
     assert_eq!(filters.categories.len(), 1);
     assert_eq!(filters.game_versions[0].version, "1.21.1");
@@ -225,7 +265,14 @@ async fn filters_are_fetched_once_and_say_what_the_source_can_do() {
     assert!(!packs.loaders && !packs.environment);
     // Served from memory: the network can vanish.
     world.net.forget_all();
-    assert_eq!(world.service.discover_filters().await.unwrap(), filters);
+    assert_eq!(
+        world
+            .service
+            .discover_filters(crate::discover::DEFAULT_SOURCE)
+            .await
+            .unwrap(),
+        filters
+    );
 }
 
 #[tokio::test]
@@ -241,12 +288,16 @@ async fn a_search_goes_through_the_source_and_comes_back_in_launcher_types() {
     query.text = "sodium".into();
     query.sort = crate::discover::SortIndex::Downloads;
     query.loaders = vec![crate::discover::Pick::include("fabric")];
-    let page = world.service.search(&query).await.unwrap();
+    let page = world
+        .service
+        .search(crate::discover::DEFAULT_SOURCE, &query)
+        .await
+        .unwrap();
     assert_eq!(page.total_hits, 41);
     assert_eq!(page.hits[0].slug, "sodium");
     assert_eq!(page.hits[0].title, "Sodium");
     assert_eq!(page.hits[0].kind, ProjectKind::Mod);
-    assert_eq!(page.hits[0].page_url(), "https://modrinth.com/mod/sodium");
+    assert_eq!(page.hits[0].page_url, "https://modrinth.com/mod/sodium");
     let sent = world.net.sent.lock().unwrap();
     let url = &sent.last().unwrap().url;
     assert!(
@@ -262,21 +313,35 @@ async fn a_search_goes_through_the_source_and_comes_back_in_launcher_types() {
 #[tokio::test]
 async fn an_unreachable_source_fails_that_call_and_works_again_when_the_network_is_back() {
     let world = world();
-    let error = world.service.discover_filters().await.unwrap_err();
+    let error = world
+        .service
+        .discover_filters(crate::discover::DEFAULT_SOURCE)
+        .await
+        .unwrap_err();
     assert!(
         matches!(&error, ServiceError::Remote(message) if message.contains("unreachable")),
         "{error}"
     );
     // Failures are not remembered: the same service answers once it can.
     answer_filters(&world);
-    assert!(world.service.discover_filters().await.is_ok());
+    assert!(
+        world
+            .service
+            .discover_filters(crate::discover::DEFAULT_SOURCE)
+            .await
+            .is_ok()
+    );
 }
 
 #[tokio::test]
 async fn with_the_source_disabled_nothing_is_served_not_even_from_memory() {
     let world = world();
     answer_filters(&world);
-    world.service.discover_filters().await.unwrap();
+    world
+        .service
+        .discover_filters(crate::discover::DEFAULT_SOURCE)
+        .await
+        .unwrap();
     let record = fabric_instance(&world, "1.0").await;
     world
         .net
@@ -289,18 +354,27 @@ async fn with_the_source_disabled_nothing_is_served_not_even_from_memory() {
         .await
         .unwrap();
     assert!(matches!(
-        world.service.discover_filters().await,
+        world
+            .service
+            .discover_filters(crate::discover::DEFAULT_SOURCE)
+            .await,
         Err(ServiceError::NoContentSource)
     ));
     assert!(matches!(
         world
             .service
-            .search(&crate::discover::SearchQuery::new(ProjectKind::Mod))
+            .search(
+                crate::discover::DEFAULT_SOURCE,
+                &crate::discover::SearchQuery::new(ProjectKind::Mod)
+            )
             .await,
         Err(ServiceError::NoContentSource)
     ));
     assert!(matches!(
-        world.service.project_detail("cool").await,
+        world
+            .service
+            .project_detail(crate::discover::DEFAULT_SOURCE, "cool")
+            .await,
         Err(ServiceError::NoContentSource)
     ));
     assert!(matches!(
@@ -309,6 +383,7 @@ async fn with_the_source_disabled_nothing_is_served_not_even_from_memory() {
             .install_content(
                 &record.id,
                 ProjectKind::Mod,
+                crate::discover::DEFAULT_SOURCE,
                 "cool",
                 CancellationToken::new()
             )
@@ -318,7 +393,12 @@ async fn with_the_source_disabled_nothing_is_served_not_even_from_memory() {
     assert!(matches!(
         world
             .service
-            .install_modpack("cool", None, CancellationToken::new())
+            .install_modpack(
+                crate::discover::DEFAULT_SOURCE,
+                "cool",
+                None,
+                CancellationToken::new()
+            )
             .await,
         Err(ServiceError::NoContentSource)
     ));
@@ -341,7 +421,13 @@ async fn with_the_source_disabled_nothing_is_served_not_even_from_memory() {
         .set_plugin_enabled("lumilio.modrinth", true)
         .await
         .unwrap();
-    assert!(world.service.discover_filters().await.is_ok());
+    assert!(
+        world
+            .service
+            .discover_filters(crate::discover::DEFAULT_SOURCE)
+            .await
+            .is_ok()
+    );
 }
 
 #[tokio::test]
@@ -363,7 +449,11 @@ async fn detail_bundles_project_versions_newest_first_and_survives_a_missing_own
         "/v2/project/cool",
         r##"{"id":"P","slug":"cool","title":"Cool","project_type":"mod","body":"# Hello"}"##,
     );
-    let detail = world.service.project_detail("cool").await.unwrap();
+    let detail = world
+        .service
+        .project_detail(crate::discover::DEFAULT_SOURCE, "cool")
+        .await
+        .unwrap();
     assert_eq!(detail.project.title, "Cool");
     assert_eq!(detail.project.body, "# Hello");
     let order: Vec<_> = detail.versions.iter().map(|v| v.id.as_str()).collect();
@@ -383,6 +473,7 @@ async fn a_chosen_older_version_is_installed_instead_of_the_newest() {
         .install_version(
             &record.id,
             ProjectKind::Mod,
+            crate::discover::DEFAULT_SOURCE,
             "cool",
             "v1",
             CancellationToken::new(),
@@ -407,6 +498,7 @@ async fn a_version_for_another_game_or_an_unknown_id_is_refused_before_any_downl
             .install_version(
                 &record.id,
                 ProjectKind::Mod,
+                crate::discover::DEFAULT_SOURCE,
                 "cool",
                 id,
                 CancellationToken::new(),

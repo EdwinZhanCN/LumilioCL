@@ -96,9 +96,12 @@ async fn a_chosen_pack_version_is_installed_and_retried_instead_of_the_newest() 
         format!("[{}]", versions.join(",")),
     );
     let install = |version: Option<&'static str>| {
-        world
-            .service
-            .install_modpack("pack", version, CancellationToken::new())
+        world.service.install_modpack(
+            crate::discover::DEFAULT_SOURCE,
+            "pack",
+            version,
+            CancellationToken::new(),
+        )
     };
     let options = |id: &str| {
         std::fs::read_to_string(world.service.layout.game(id).join("options.txt")).unwrap()
@@ -117,6 +120,7 @@ async fn a_chosen_pack_version_is_installed_and_retried_instead_of_the_newest() 
     assert_eq!(
         world.service.activity(10).finished[0].retry,
         Some(RetryAction::InstallModpack {
+            source: crate::discover::DEFAULT_SOURCE.into(),
             project: "pack".into(),
             version: Some("gone".into()),
         })

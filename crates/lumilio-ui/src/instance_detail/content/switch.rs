@@ -14,7 +14,6 @@ use gpui_component::Sizable as _;
 use gpui_component::StyledExt as _;
 use gpui_component::WindowExt as _;
 use gpui_component::input::{Input, InputEvent, InputState};
-use gpui_component::text::TextView;
 use gpui_component::{Icon, h_flex, v_flex};
 use lumilio_core::{ContentEntry, Loader, ProjectKind, Version};
 use std::rc::Rc;
@@ -42,6 +41,7 @@ impl InstanceDetailView {
                 SwitchTarget {
                     kind,
                     file_name: entry.item.file_name.clone(),
+                    source: source.source.clone(),
                     project: source.project_id.clone(),
                     title: title_of(entry).to_owned(),
                     current: source.version_id.clone(),
@@ -60,7 +60,10 @@ impl InstanceDetailView {
         });
         self.switch = Some(switch.clone());
         (self.handler)(
-            InstanceIntent::LoadVersions(source.project_id.clone()),
+            InstanceIntent::LoadVersions {
+                source: source.source.clone(),
+                project: source.project_id.clone(),
+            },
             window,
             cx,
         );
@@ -77,15 +80,31 @@ impl InstanceDetailView {
     }
 
     /// A project's versions arrived; only the open dialog for it takes them.
+    /// Returns the version whose changelog the dialog still needs, if any.
     pub fn versions_arrived(
         &mut self,
         project: &str,
         result: Result<Vec<Version>, String>,
         cx: &mut Context<Self>,
+    ) -> Option<(String, String, String)> {
+        let switch = self.switch.as_ref()?;
+        switch.update(cx, |switch, cx| {
+            switch.versions_arrived(project, result, cx);
+            switch.changelog_wanted()
+        })
+    }
+
+    /// A version's changelog arrived for the open dialog.
+    pub fn changelog_arrived(
+        &mut self,
+        project: &str,
+        version: &str,
+        changelog: Result<String, String>,
+        cx: &mut Context<Self>,
     ) {
         if let Some(switch) = &self.switch {
             switch.update(cx, |switch, cx| {
-                switch.versions_arrived(project, result, cx)
+                switch.changelog_arrived(project, version, changelog, cx)
             });
         }
     }
@@ -96,6 +115,8 @@ impl InstanceDetailView {
 pub struct SwitchTarget {
     pub kind: ProjectKind,
     pub file_name: String,
+    /// The content source (plugin ID) the project is from.
+    pub source: String,
     pub project: String,
     pub title: String,
     /// The installed version's id.
@@ -117,6 +138,8 @@ pub struct VersionSwitch {
     busy: bool,
     error: Option<String>,
     close: bool,
+    /// Versions whose changelog was asked for one at a time.
+    changelogs_asked: std::collections::BTreeSet<String>,
 }
 
 impl VersionSwitch {
@@ -145,6 +168,60 @@ impl VersionSwitch {
             busy: false,
             error: None,
             close: false,
+            changelogs_asked: std::collections::BTreeSet::new(),
+        }
+    }
+
+    /// The chosen version, when its changelog is missing and has not been
+    /// asked for: (source, project, version). Asking marks it asked.
+    pub(super) fn changelog_wanted(&mut self) -> Option<(String, String, String)> {
+        let version = self.chosen()?;
+        if !version.changelog.trim().is_empty() {
+            return None;
+        }
+        let id = version.id.clone();
+        self.changelogs_asked
+            .insert(id.clone())
+            .then(|| (self.target.source.clone(), self.target.project.clone(), id))
+    }
+
+    /// Asks for the chosen version's changelog if it is missing.
+    pub(super) fn ask_changelog(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some((source, project, version)) = self.changelog_wanted() {
+            let _ = self.parent.update(cx, |view, cx| {
+                view.send(
+                    InstanceIntent::LoadChangelog {
+                        source,
+                        project,
+                        version,
+                    },
+                    window,
+                    cx,
+                );
+            });
+        }
+    }
+
+    pub(super) fn changelog_arrived(
+        &mut self,
+        project: &str,
+        version: &str,
+        changelog: Result<String, String>,
+        cx: &mut Context<Self>,
+    ) {
+        // A failure leaves "no changelog"; the versions themselves are fine.
+        let (Ok(text), Some(Ok(versions))) = (changelog, &mut self.versions) else {
+            return;
+        };
+        if project != self.target.project {
+            return;
+        }
+        if let Some(found) = versions
+            .iter_mut()
+            .find(|candidate| candidate.id == version)
+        {
+            found.changelog = text;
+            cx.notify();
         }
     }
 
@@ -220,6 +297,7 @@ impl VersionSwitch {
                 InstanceIntent::SwitchContent {
                     kind: target.kind,
                     file_name: target.file_name,
+                    source: target.source,
                     project: target.project,
                     version_id: version.id,
                 },
@@ -363,10 +441,11 @@ impl Render for VersionSwitch {
                                 .cursor_pointer()
                                 .when(picked, |row| row.bg(colors.surface_active))
                                 .hover(|row| row.bg(colors.surface_subtle))
-                                .on_click(move |_, _, cx| {
+                                .on_click(move |_, window, cx| {
                                     let id = id.clone();
                                     let _ = view.update(cx, |switch, cx| {
                                         switch.selected = Some(id);
+                                        switch.ask_changelog(window, cx);
                                         cx.notify();
                                     });
                                 })
@@ -497,12 +576,17 @@ impl Render for VersionSwitch {
                                     .child(tr!("instance-content-no-changelog"))
                                     .into_any_element()
                             } else {
-                                TextView::markdown(
-                                    "switch-changelog-text",
-                                    version.changelog.clone(),
-                                )
-                                .selectable(true)
-                                .into_any_element()
+                                div()
+                                    .debug_selector(|| "switch-changelog-text".into())
+                                    .child(
+                                        kit::rich_text(
+                                            "switch-changelog-text",
+                                            version.changelog.clone(),
+                                            version.changelog_format,
+                                        )
+                                        .selectable(true),
+                                    )
+                                    .into_any_element()
                             }),
                     )
                     .into_any_element()

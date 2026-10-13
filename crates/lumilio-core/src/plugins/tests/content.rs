@@ -48,8 +48,10 @@ fn capabilities() -> Capabilities {
                 ..Default::default()
             },
             sorts: vec![Sort::Downloads, Sort::Newest, Sort::Updated],
+            browse_url: None,
         }],
         fingerprints: vec![FingerprintKind::Murmur2],
+        ..Default::default()
     }
 }
 
@@ -96,6 +98,7 @@ fn version(reference: &VersionRef) -> Version {
             primary: true,
             size: 4,
             sha1: Some("abc".into()),
+            download_page: None,
         }],
         dependencies: vec![Dependency {
             project_id: Some("42".into()),

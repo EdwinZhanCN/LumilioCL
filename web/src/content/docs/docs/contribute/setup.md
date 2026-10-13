@@ -65,6 +65,23 @@ cargo run -p lumilio-app
 启动应用前，把 `LUMILIO_HOME` 设为该目录。
 破坏性测试不要使用重要游戏数据。
 
+## 配置 CurseForge API 密钥
+
+CurseForge 内容源在构建时读取环境变量 `CF_API_KEY`。
+没有密钥时，这个来源默认关闭，其他功能照常使用。
+发布构建从仓库的 Secret 注入密钥。
+
+本地开发时，把密钥放进用户级的 `~/.cargo/config.toml`：
+
+```toml
+[env]
+CF_API_KEY = '你的密钥'
+```
+
+使用单引号，密钥里的 `$` 才会原样保留。
+不要把密钥写进仓库里的 `.cargo/config.toml`，这个文件受 Git 跟踪。
+修改密钥后，Cargo 会重新编译用到它的 crate。
+
 ## 准备网站
 
 安装 Node.js 22.12.0 或更新版本。

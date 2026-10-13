@@ -17,7 +17,7 @@ mod settings;
 #[cfg(test)]
 mod tests;
 
-pub use self::intent::{InstanceIntent, Section};
+pub use self::intent::{ContentUpdateItem, InstanceIntent, Section};
 pub use self::panels::{Arrived, ProblemAction, export_notice, problem_action, problem_text};
 pub use self::settings::{
     SETTINGS_ADVANCED, SETTINGS_GAME, SETTINGS_JAVA, SETTINGS_OPTIONS, SETTINGS_PERFORMANCE,
@@ -168,6 +168,8 @@ pub struct InstanceDetailView {
     content_filter_select: Option<content::FilterSelect>,
     selected: content::Selection,
     switch: Option<Entity<content::VersionSwitch>>,
+    /// Files the game waits for that the launcher could not download.
+    pending: Vec<lumilio_core::PendingDownload>,
     started: bool,
     /// A question the Library's menu asked of the page before it had the game.
     ask_later: Option<InstanceIntent>,
@@ -262,6 +264,7 @@ impl InstanceDetailView {
             content_filter_select: None,
             selected: content::Selection::new(),
             switch: None,
+            pending: Vec::new(),
             started: false,
             inspect: None,
             ask_later: None,

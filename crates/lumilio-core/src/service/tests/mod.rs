@@ -1,6 +1,7 @@
 mod accounts;
 mod activity;
 mod content;
+mod curseforge;
 mod diagnostics;
 mod discover;
 mod game_settings;
@@ -321,6 +322,36 @@ fn reopen(world: World, root: &std::path::Path) -> (LauncherService<Scripted>, t
 /// What the launcher ships for content: the Modrinth source.
 fn stock_plugins() -> Vec<Arc<dyn lumilio_plugin_api::Plugin>> {
     vec![Arc::new(lumilio_plugin_modrinth::Modrinth)]
+}
+
+/// A world with both content sources, Modrinth first as the launcher lists
+/// them, and a CurseForge key.
+fn two_source_world() -> World {
+    let dir = tempfile::tempdir().unwrap();
+    let server = dir.path().join("server");
+    std::fs::create_dir_all(&server).unwrap();
+    let net = Scripted::default();
+    let root = dir.path().join("launcher");
+    let secrets = Arc::new(crate::credentials::MemoryCredentials::default());
+    let service = LauncherService::open(
+        &root,
+        net.clone(),
+        vec![
+            Arc::new(lumilio_plugin_modrinth::Modrinth),
+            Arc::new(lumilio_plugin_curseforge::CurseForge::with_key(Some(
+                "test-key",
+            ))),
+        ],
+    )
+    .unwrap()
+    .with_credentials(secrets.clone());
+    World {
+        _dir: dir,
+        service,
+        net,
+        server,
+        secrets,
+    }
 }
 
 async fn is_installed(world: &World, id: &str) -> bool {

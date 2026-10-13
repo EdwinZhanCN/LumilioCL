@@ -13,7 +13,8 @@ pub enum LiveIntent {
     Preset(crate::game_settings::PresetIntent),
     /// Create an instance with the newest release.
     NewInstance,
-    /// Choose a local `.mrpack` and import it as a new instance.
+    /// Choose a local pack (`.mrpack`, a CurseForge or instance zip) and
+    /// import it as a new instance.
     ImportPack,
     ToggleFavorite(String),
     /// Open the registered instance without launching it.
@@ -24,16 +25,19 @@ pub enum LiveIntent {
     PlayPlace(String, super::PlaceTarget),
     /// Run this Discover search.
     Search(DiscoverQuery),
-    /// Fetch the category and game-version choices.
+    /// Fetch the category and game-version choices of the browsed source.
     LoadFilters,
-    /// Open a project's public page in its own window.
+    /// Open a project's detail.
     OpenProject {
         kind: ProjectKind,
+        /// The content source (plugin ID).
+        source: String,
         slug: String,
     },
     /// Install a project: into the chosen instance, or as a new one for a modpack.
     Install {
         kind: ProjectKind,
+        source: String,
         slug: String,
         title: String,
         /// One specific version, for mods, packs and shaders.
@@ -64,6 +68,7 @@ pub enum LiveIntent {
     /// Download one version's file where the person chooses (the application
     /// asks where).
     SaveVersionAs {
+        source: String,
         project: String,
         version_id: String,
         file_name: String,
@@ -98,6 +103,7 @@ pub enum LiveIntent {
     /// Replace an installed file with its newer version (from Discover).
     UpdateInstalled {
         kind: ProjectKind,
+        source: String,
         project: String,
         title: String,
         file_name: String,

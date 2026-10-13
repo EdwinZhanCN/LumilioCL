@@ -40,7 +40,7 @@ async fn pending_launch_rejects_conflicting_writes_and_drop_releases_target() {
         matches!(world.service.delete_instance(target).await, Err(ServiceError::InstanceBusy(id)) if id == *target)
     );
     assert!(
-        matches!(world.service.install_content(target, ProjectKind::Mod, "project", CancellationToken::new()).await, Err(ServiceError::InstanceBusy(id)) if id == *target)
+        matches!(world.service.install_content(target, ProjectKind::Mod, crate::discover::DEFAULT_SOURCE, "project", CancellationToken::new()).await, Err(ServiceError::InstanceBusy(id)) if id == *target)
     );
     let (updates, _receiver) = mpsc::unbounded_channel();
     assert!(

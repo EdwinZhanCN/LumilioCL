@@ -74,18 +74,43 @@ pub struct KindSupport {
     pub kind: ProjectKind,
     pub filters: FilterSupport,
     pub sorts: Vec<Sort>,
+    /// The source's own web page listing this kind, if it has one.
+    #[serde(default)]
+    pub browse_url: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum FingerprintKind {
     Sha1,
+    /// CurseForge's: MurmurHash2 (seed 1) of the file without its
+    /// whitespace bytes (tab, line feed, carriage return, space).
     Murmur2,
+}
+
+/// Whose project and version IDs a source speaks. Pack formats that name
+/// files by ID, and exports that link to one site, look for a source by this.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum Catalog {
+    Modrinth,
+    CurseForge,
+}
+
+/// How a source writes project bodies and changelogs.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub enum TextFormat {
+    #[default]
+    Markdown,
+    Html,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Capabilities {
     pub kinds: Vec<KindSupport>,
     pub fingerprints: Vec<FingerprintKind>,
+    #[serde(default)]
+    pub catalog: Option<Catalog>,
+    #[serde(default)]
+    pub text_format: TextFormat,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -186,13 +211,18 @@ pub struct SearchHit {
     pub all_categories: Vec<String>,
     pub loaders: Vec<String>,
     pub downloads: u64,
-    pub follows: u64,
+    /// `None` when the source does not count followers.
+    pub follows: Option<u64>,
     /// RFC 3339, empty when unavailable.
     pub published: String,
     pub updated: String,
     pub environment: Option<Environment>,
     pub icon_url: Option<String>,
     pub page_url: String,
+    /// The author lets people download the files only on the source's own
+    /// site; a launcher may not download them.
+    #[serde(default)]
+    pub manual_download: bool,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
@@ -231,7 +261,8 @@ pub struct Project {
     pub categories: Vec<String>,
     pub loaders: Vec<String>,
     pub downloads: u64,
-    pub followers: u64,
+    /// `None` when the source does not count followers.
+    pub followers: Option<u64>,
     pub published: String,
     pub updated: String,
     pub client_side: SideSupport,
@@ -243,6 +274,9 @@ pub struct Project {
     pub game_versions: Vec<String>,
     pub page_url: String,
     pub author: Option<String>,
+    /// See [`SearchHit::manual_download`].
+    #[serde(default)]
+    pub manual_download: bool,
 }
 
 /// Both IDs are needed by APIs whose version endpoint is below its project.
@@ -277,11 +311,16 @@ pub struct Dependency {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct VersionFile {
+    /// Empty when the author lets people download the file only on the
+    /// source's site, at `download_page`.
     pub url: String,
     pub filename: String,
     pub primary: bool,
     pub size: u64,
     pub sha1: Option<String>,
+    /// The file's page on the source's site, where a person can download it.
+    #[serde(default)]
+    pub download_page: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -360,6 +399,31 @@ pub struct ProjectSummary {
     pub kind: Option<ProjectKind>,
     pub icon_url: Option<String>,
     pub author: Option<String>,
+    /// The project's page on the source's site; empty when unknown.
+    #[serde(default)]
+    pub page_url: String,
+}
+
+/// What a file a pack names is, which decides the folder it goes into.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum PackFileKind {
+    Mod,
+    ResourcePack,
+    Shader,
+    DataPack,
+    /// A type the host has no folder for (a world, configuration, …).
+    Other,
+}
+
+/// One file a pack names by project and version ID, as its source knows it.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ResolvedFile {
+    pub project_id: String,
+    pub version_id: String,
+    /// The project's name; empty when the source did not say.
+    pub title: String,
+    pub kind: PackFileKind,
+    pub file: VersionFile,
 }
 
 /// All operations run inside the host's worker/timeout/panic boundary.
@@ -404,4 +468,22 @@ pub trait ContentSource: Send + Sync {
         ctx: &dyn HostContext,
         projects: &[String],
     ) -> Result<Vec<ProjectSummary>, PluginError>;
+    /// One version's changelog, in the source's [`TextFormat`]. For sources
+    /// that leave changelogs out of `versions` because each costs a request.
+    fn changelog(
+        &self,
+        _ctx: &dyn HostContext,
+        _version: &VersionRef,
+    ) -> Result<String, PluginError> {
+        Ok(String::new())
+    }
+    /// The files a pack in this source's [`Catalog`] names by reference.
+    /// References the source does not know are absent from the answer.
+    fn resolve_files(
+        &self,
+        _ctx: &dyn HostContext,
+        _files: &[VersionRef],
+    ) -> Result<Vec<ResolvedFile>, PluginError> {
+        Ok(Vec::new())
+    }
 }

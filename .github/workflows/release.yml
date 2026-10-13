@@ -75,6 +75,9 @@ jobs:
       MACOS_NOTARY_ISSUER: ${{ secrets.MACOS_NOTARY_ISSUER }}
       WINDOWS_CERTIFICATE_PFX: ${{ secrets.WINDOWS_CERTIFICATE_PFX }}
       WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+      # Built into the CurseForge content source (option_env! in
+      # lumilio-plugin-curseforge); without it that source starts off.
+      CF_API_KEY: ${{ secrets.CF_API_KEY }}
     steps:
       - name: Install build dependencies (Linux)
         if: matrix.os == 'linux'

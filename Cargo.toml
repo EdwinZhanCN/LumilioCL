@@ -11,6 +11,7 @@ members = [
     "crates/lumilio-plugin-crash-analyzer",
     "crates/lumilio-plugin-litematica",
     "crates/lumilio-plugin-modrinth",
+    "crates/lumilio-plugin-curseforge",
     "crates/lumilio-plugin-discord",
     "crates/lumilio-schematic-render",
     "crates/lumilio-skin-render",
@@ -49,6 +50,7 @@ lumilio-plugin-api = { path = "crates/lumilio-plugin-api" }
 lumilio-plugin-crash-analyzer = { path = "crates/lumilio-plugin-crash-analyzer" }
 lumilio-plugin-litematica = { path = "crates/lumilio-plugin-litematica" }
 lumilio-plugin-modrinth = { path = "crates/lumilio-plugin-modrinth" }
+lumilio-plugin-curseforge = { path = "crates/lumilio-plugin-curseforge" }
 lumilio-plugin-discord = { path = "crates/lumilio-plugin-discord" }
 lumilio-nbt = { path = "crates/lumilio-nbt" }
 lumilio-anvil = { path = "crates/lumilio-anvil" }

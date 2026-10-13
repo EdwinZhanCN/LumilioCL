@@ -126,3 +126,17 @@ fn a_reading_pads_to_its_display_and_never_spills_over() {
         "too large lights every segment"
     );
 }
+
+#[test]
+fn a_line_break_in_html_becomes_a_paragraph_break() {
+    use super::rich::paragraph_breaks;
+    assert_eq!(
+        paragraph_breaks("<p>One<br>Two<BR/>Three<br />Four</p>"),
+        "<p>One</p><p>Two</p><p>Three</p><p>Four</p>"
+    );
+    assert_eq!(
+        paragraph_breaks("<p>a < b <brief> <b>x</b></p>"),
+        "<p>a < b <brief> <b>x</b></p>",
+        "other tags and a bare < stay"
+    );
+}

@@ -10,6 +10,7 @@ mod discover;
 mod dispatch;
 mod game_settings;
 mod instance;
+mod instance_content;
 mod instance_plugins;
 mod instance_write;
 mod jobs;
@@ -73,9 +74,9 @@ struct State {
     java_answered: Option<String>,
     /// Stops the Microsoft sign-in that is waiting for the browser.
     sign_in_cancel: Option<CancellationToken>,
-    /// The target game and kind `installed` was last read for; `None` when it
-    /// is out of date and should be read again.
-    installed_key: Option<(String, ProjectKind)>,
+    /// The target game, kind and source `installed` was last read for; `None`
+    /// when it is out of date and should be read again.
+    installed_key: Option<(String, ProjectKind, String)>,
     /// What the running game has printed: the instance and its newest lines.
     game_log: Option<(String, std::collections::VecDeque<String>)>,
     /// Commands for the background update service.
@@ -166,12 +167,15 @@ fn open_requested_page(
     window: &mut Window,
     cx: &mut App,
 ) {
-    // `LUMILIO_PROJECT=mod/sodium` also opens that project's detail window.
+    // `LUMILIO_PROJECT=mod/sodium` also opens that project's detail window;
+    // `LUMILIO_PROJECT_SOURCE=lumilio.curseforge` takes it from that source.
     if let Ok(path) = std::env::var("LUMILIO_PROJECT")
         && let Some((kind, slug)) = path.split_once('/')
         && let Some(kind) = ProjectKind::from_protocol(kind)
     {
-        open_project(wiring, kind, slug.to_owned(), window, cx);
+        let source = std::env::var("LUMILIO_PROJECT_SOURCE")
+            .unwrap_or_else(|_| lumilio_core::DEFAULT_SOURCE.to_owned());
+        open_project(wiring, kind, source, slug.to_owned(), window, cx);
     }
     // Dev hook: `LUMILIO_INSTANCE=<id>` opens that game; `LUMILIO_INSTANCE_TAB`
     // and `LUMILIO_INSTANCE_GROUP` choose its tab and settings group.
@@ -184,12 +188,13 @@ fn open_requested_page(
             .ok()
             .and_then(|v| v.parse().ok());
         let shell = shell.clone();
-        window.defer(cx, move |_, cx| {
+        window.defer(cx, move |window, cx| {
             shell.update(cx, |shell, cx| {
                 if let Some(view) = shell.live_instance().cloned() {
                     view.update(cx, |view, cx| {
+                        // As a click on the tab: what it shows is loaded too.
                         if let Some(tab) = tab {
-                            view.select_tab(tab, cx);
+                            view.open_tab(tab, window, cx);
                         }
                         if let Some(group) = group {
                             view.select_settings_group(group, cx);

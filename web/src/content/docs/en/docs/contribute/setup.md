@@ -65,6 +65,24 @@ Use a disposable data directory for manual tests.
 Set `LUMILIO_HOME` to that directory before you start the application.
 Do not use important game data for a destructive test.
 
+## Set the CurseForge API key
+
+The CurseForge content source reads the `CF_API_KEY` environment variable when you build it.
+Without a key, that source is off by default.
+All other functions operate normally.
+Release builds get the key from a repository secret.
+
+For local development, put the key in your user-level `~/.cargo/config.toml`:
+
+```toml
+[env]
+CF_API_KEY = 'your-key'
+```
+
+Use single quotes. They keep each `$` in the key as it is.
+Do not put the key in the `.cargo/config.toml` of the repository. Git tracks that file.
+When you change the key, Cargo builds the crates that use it again.
+
 ## Prepare the website
 
 Install Node.js 22.12.0 or later.

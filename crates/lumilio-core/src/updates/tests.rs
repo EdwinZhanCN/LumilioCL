@@ -211,10 +211,12 @@ fn update_for(server: &Path, new_name: &str, new_body: &str, old: &str) -> Conte
             primary: true,
             size: 3,
             sha1: Some(sha1_of(new_body)),
+            download_page: None,
         }],
         dependencies: Vec::new(),
         downloads: 0,
         changelog: String::new(),
+        changelog_format: crate::discover::TextFormat::Markdown,
     };
     ContentUpdate {
         kind: ProjectKind::Mod,

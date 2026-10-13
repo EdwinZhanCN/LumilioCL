@@ -35,6 +35,10 @@ pub struct LiveControls {
     /// The Library search box searches a preset's options (the 预设 tab)
     /// rather than games.
     presets_search: bool,
+    /// The source Discover's search box names.
+    discover_source: String,
+    /// The sorts the Discover sort menu offers (the source's).
+    discover_sorts: Vec<lumilio_core::SortIndex>,
 }
 
 fn library_placeholder(presets: bool) -> &'static str {
@@ -56,8 +60,9 @@ impl LiveControls {
         Self {
             library_filter: cx
                 .new(|cx| InputState::new(window, cx).placeholder(crate::tr!("library-search"))),
-            discover_search: cx
-                .new(|cx| InputState::new(window, cx).placeholder(crate::tr!("discover-search"))),
+            discover_search: cx.new(|cx| {
+                InputState::new(window, cx).placeholder(crate::tr!("discover-search", source = ""))
+            }),
             sort: cx.new(|cx| {
                 let labels: Vec<String> = SORTS.iter().map(|s| sort_label(*s).to_owned()).collect();
                 SelectState::new(
@@ -102,7 +107,46 @@ impl LiveControls {
             plugin_scroll: gpui::ScrollHandle::new(),
             language: crate::i18n::generation(),
             presets_search: false,
+            discover_source: String::new(),
+            discover_sorts: SORTS.to_vec(),
         }
+    }
+
+    /// Names the source Discover's search box searches.
+    pub fn search_source(&mut self, name: &str, window: &mut Window, cx: &mut gpui::Context<Self>) {
+        if self.discover_source != name {
+            self.discover_source = name.to_owned();
+            let placeholder = crate::tr!("discover-search", source = name);
+            self.discover_search.update(cx, |input, cx| {
+                input.set_placeholder(placeholder, window, cx)
+            });
+        }
+    }
+
+    /// Offers the sorts the source has, with `chosen` selected.
+    pub fn offer_sorts(
+        &mut self,
+        sorts: Vec<lumilio_core::SortIndex>,
+        chosen: lumilio_core::SortIndex,
+        window: &mut Window,
+        cx: &mut gpui::Context<Self>,
+    ) {
+        let at = sorts.iter().position(|sort| *sort == chosen).unwrap_or(0);
+        let changed = self.discover_sorts != sorts;
+        let selected = self.sort.read(cx).selected_index(cx).map(|ix| ix.row);
+        if !changed && selected == Some(at) {
+            return;
+        }
+        if changed {
+            let labels: Vec<String> = sorts.iter().map(|s| sort_label(*s).to_owned()).collect();
+            self.sort.update(cx, |select, cx| {
+                select.set_items(SearchableVec::new(labels), window, cx)
+            });
+            self.discover_sorts = sorts;
+        }
+        self.sort.update(cx, |select, cx| {
+            select.set_selected_index(Some(IndexPath::new(at)), window, cx)
+        });
     }
 
     /// Names what the Library search box searches on the open tab.
@@ -123,10 +167,16 @@ impl LiveControls {
         for (input, placeholder) in [
             (
                 &self.library_filter,
-                library_placeholder(self.presets_search),
+                library_placeholder(self.presets_search).to_owned(),
             ),
-            (&self.discover_search, crate::tr!("discover-search")),
-            (&self.version_search, crate::tr!("discover-version-search")),
+            (
+                &self.discover_search,
+                crate::tr!("discover-search", source = self.discover_source.as_str()),
+            ),
+            (
+                &self.version_search,
+                crate::tr!("discover-version-search").to_owned(),
+            ),
         ] {
             input.update(cx, |input, cx| {
                 input.set_placeholder(placeholder, window, cx)
@@ -142,7 +192,11 @@ impl LiveControls {
                 select.set_selected_index(chosen, window, cx);
             });
         };
-        let sorts = SORTS.iter().map(|s| sort_label(*s).to_owned()).collect();
+        let sorts = self
+            .discover_sorts
+            .iter()
+            .map(|s| sort_label(*s).to_owned())
+            .collect();
         relabel(&self.sort, sorts, window, cx);
         let library_sorts = sort_labels().iter().map(|s| (*s).to_owned()).collect();
         relabel(&self.library_sort, library_sorts, window, cx);

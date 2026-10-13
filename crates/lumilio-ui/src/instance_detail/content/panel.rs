@@ -1,5 +1,5 @@
 use super::super::panels::{CONTENT_KINDS, CONTENT_LABELS};
-use super::super::{InstanceDetailView, InstanceIntent, Section};
+use super::super::{ContentUpdateItem, InstanceDetailView, InstanceIntent, Section};
 use super::model::{BAR_HEIGHT, FILTERS, filter_labels, visible};
 use crate::assets::UiIcon;
 use crate::key::Key;
@@ -9,9 +9,11 @@ use gpui::prelude::*;
 use gpui::{AnyElement, App, Context, Entity, Window, div, px};
 use gpui_component::IndexPath;
 use gpui_component::Sizable as _;
+use gpui_component::StyledExt as _;
 use gpui_component::input::{Input, InputEvent, InputState};
 use gpui_component::select::{SearchableVec, Select, SelectEvent, SelectState};
 use gpui_component::{Icon, h_flex, v_flex};
+use lumilio_core::ProjectKind;
 
 fn browse_labels() -> &'static [&'static str] {
     tr_all![
@@ -22,7 +24,7 @@ fn browse_labels() -> &'static [&'static str] {
 }
 
 impl InstanceDetailView {
-    // ia[instance.content]: 识别来源 | 进入内容标签时自动 | 按 SHA-1 查 Modrinth：图标、项目名、作者、版本、项目链接；离线时照常列出，未识别的没有切换版本键 | 识别结果不缓存
+    // ia[instance.content]: 识别来源 | 进入内容标签时自动 | 依次问已启用的内容源（先 Modrinth 按 SHA-1，没认出的再问 CurseForge 按指纹）：图标、项目名、作者、版本、项目链接；某个来源连不上时照常列出并注明，未识别的没有切换版本键 | 识别结果不缓存
     pub(in super::super) fn content_panel(
         &mut self,
         window: &mut Window,
@@ -93,8 +95,155 @@ impl InstanceDetailView {
             .w_full()
             .gap_4()
             .child(region)
+            .children(self.pending_block(kind, busy, colors))
             .child(body)
             .into_any_element()
+    }
+
+    /// Takes the files the game is waiting for (after a pack install or an
+    /// addition).
+    pub fn set_pending(
+        &mut self,
+        pending: Vec<lumilio_core::PendingDownload>,
+        cx: &mut Context<Self>,
+    ) {
+        self.pending = pending;
+        cx.notify();
+    }
+
+    /// The files the game still needs that the launcher could not download,
+    /// for this kind of content: each with its download page, and a way to
+    /// add them once downloaded. Files of no kind's folder show under mods.
+    fn pending_block(
+        &self,
+        kind: ProjectKind,
+        busy: bool,
+        colors: ShellColors,
+    ) -> Option<AnyElement> {
+        let folder = kind.install_folder()?;
+        let others = |path: &str| {
+            !CONTENT_KINDS.iter().any(|kind| {
+                kind.install_folder()
+                    .is_some_and(|folder| path.starts_with(&format!("{folder}/")))
+            })
+        };
+        let shown: Vec<&lumilio_core::PendingDownload> = self
+            .pending
+            .iter()
+            .filter(|pending| {
+                pending.path.starts_with(&format!("{folder}/"))
+                    || (kind == ProjectKind::Mod && others(&pending.path))
+            })
+            .collect();
+        if shown.is_empty() {
+            return None;
+        }
+        let add = {
+            let handler = self.handler.clone();
+            // ia[instance.content]: 添加已下载的文件 | 缺少的文件块「添加已下载的文件…」→ 选文件 | 按 SHA-1 认出是缺的哪一个，放到它该在的位置；不是缺的文件逐个说明；放好的从列表消失 | 运行中禁用
+            kit::action(
+                "content-pending-add",
+                tr!("instance-pending-add"),
+                Some(UiIcon::Plus),
+                false,
+                move |window, cx| handler(InstanceIntent::AddPendingFiles, window, cx),
+            )
+            .small()
+            .disabled(busy)
+            .debug_selector(|| "content-pending-add".into())
+        };
+        let rows: Vec<AnyElement> = shown
+            .iter()
+            .enumerate()
+            .map(|(index, pending)| {
+                let title = if pending.title.is_empty() {
+                    pending.file_name.clone()
+                } else {
+                    pending.title.clone()
+                };
+                let place = if pending.path.is_empty() {
+                    tr!(
+                        "instance-pending-place-yourself",
+                        file = pending.file_name.as_str()
+                    )
+                } else {
+                    pending.path.clone()
+                };
+                h_flex()
+                    .w_full()
+                    .px_3()
+                    .py_2()
+                    .gap_3()
+                    .items_center()
+                    .child(
+                        v_flex()
+                            .flex_1()
+                            .min_w_0()
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .font_medium()
+                                    .text_color(colors.foreground)
+                                    .truncate()
+                                    .child(title),
+                            )
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .text_color(colors.muted)
+                                    .truncate()
+                                    .child(place),
+                            ),
+                    )
+                    .children(pending.page.clone().map(|page| {
+                        // ia[instance.content]: 打开下载页 | 缺少的文件行「下载页」 | 浏览器打开这个文件在来源网站上的下载页
+                        theme::clickable(
+                            Key::new(("content-pending-page", index))
+                                .icon(Icon::new(UiIcon::External))
+                                .label(tr!("instance-pending-page"))
+                                .ghost()
+                                .small(),
+                            true,
+                        )
+                        .debug_selector(move || format!("content-pending-page-{index}"))
+                        .on_click(move |_, _, cx| cx.open_url(&page))
+                    }))
+                    .into_any_element()
+            })
+            .collect();
+        Some(
+            v_flex()
+                .w_full()
+                .gap_2()
+                .debug_selector(|| "content-pending".into())
+                .child(
+                    h_flex()
+                        .w_full()
+                        .items_center()
+                        .justify_between()
+                        .gap_3()
+                        .child(
+                            v_flex()
+                                .gap_1()
+                                .child(
+                                    div()
+                                        .text_sm()
+                                        .font_medium()
+                                        .text_color(colors.foreground)
+                                        .child(tr!("instance-pending-title", count = shown.len())),
+                                )
+                                .child(
+                                    div()
+                                        .text_xs()
+                                        .text_color(colors.muted)
+                                        .child(tr!("instance-pending-help")),
+                                ),
+                        )
+                        .child(add),
+                )
+                .child(kit::panel_list(rows, colors))
+                .into_any_element(),
+        )
     }
 
     /// The Content tab's filter dropdown, created on first use (design
@@ -159,17 +308,18 @@ impl InstanceDetailView {
         let view = cx.entity().downgrade();
         let query = self.content_query(cx);
         let shown = visible(&list.entries, &query, self.content_filter);
-        let updates: Vec<(String, String, String)> = list
+        let updates: Vec<ContentUpdateItem> = list
             .entries
             .iter()
             .filter_map(|entry| {
                 let source = entry.source.as_ref()?;
                 let newest = entry.update.as_ref()?;
-                Some((
-                    entry.item.file_name.clone(),
-                    source.project_id.clone(),
-                    newest.id.clone(),
-                ))
+                Some(ContentUpdateItem {
+                    file_name: entry.item.file_name.clone(),
+                    source: source.source.clone(),
+                    project: source.project_id.clone(),
+                    version_id: newest.id.clone(),
+                })
             })
             .collect();
 

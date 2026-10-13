@@ -1,4 +1,5 @@
 use super::discover::open_project;
+use super::instance_content::{load_changelog, load_pending, load_versions, pick_pending_files};
 use super::instance_plugins::{plugin_action, plugin_model, plugin_tabs, plugin_view};
 use super::instance_write::write_instance;
 use super::jobs::{refresh_installed, reload};
@@ -197,21 +198,15 @@ pub(super) fn instance_intent(
                 cx.reveal_path(&wiring.backend.service.game_dir(id).join(relative));
             }
         }
-        InstanceIntent::LoadVersions(project) => {
-            let service = wiring.backend.service.clone();
-            let wanted = project.clone();
-            let handle = wiring
-                .backend
-                .spawn(async move { service.project_versions(&wanted).await });
-            cx.spawn(async move |cx| {
-                let result = match handle.await {
-                    Ok(result) => result.map_err(|error| error.to_string()),
-                    Err(error) => Err(error.to_string()),
-                };
-                let _ = view.update(cx, |view, cx| view.versions_arrived(&project, result, cx));
-            })
-            .detach();
+        InstanceIntent::LoadVersions { source, project } => {
+            load_versions(wiring, view, source, project, cx)
         }
+        InstanceIntent::LoadChangelog {
+            source,
+            project,
+            version,
+        } => load_changelog(wiring, view, source, project, version, cx),
+        InstanceIntent::AddPendingFiles => pick_pending_files(wiring, id, view, window, cx),
         InstanceIntent::RevealContent { kind, file_name } => {
             let folder = kind.install_folder().unwrap_or_default();
             let path = wiring
@@ -222,7 +217,9 @@ pub(super) fn instance_intent(
                 .join(file_name);
             cx.reveal_path(&path);
         }
-        InstanceIntent::OpenProject { kind, slug } => open_project(wiring, kind, slug, window, cx),
+        InstanceIntent::OpenProject { kind, source, slug } => {
+            open_project(wiring, kind, source, slug, window, cx)
+        }
         // ia[discover]: 锁定目标（从游戏页进入） | 游戏页内容标签「浏览 Mod / 资源包 / 光影」 | 发现页进入「为这个游戏浏览」：页头写明游戏，类型预选，版本和加载器筛选锁定；安装目标换成那个游戏（右下角芯片显示）；不改变当前游戏
         // ia[instance.content]: 浏览并安装 | L4a 主要 → 发现页（类型预选） | 安装完回到本页可见
         InstanceIntent::BrowseContent(kind) => {
@@ -398,6 +395,7 @@ pub(super) fn instance_intent(
         | InstanceIntent::DeleteSnapshot(_)
         | InstanceIntent::SwitchContent { .. }
         | InstanceIntent::UpdateContent { .. }
+        | InstanceIntent::PendingFilesChosen(_)
         | InstanceIntent::AddFiles { .. } => {
             write_instance(wiring, id.to_owned(), view, intent, window, cx)
         }
@@ -447,6 +445,9 @@ pub(super) fn load_section(
     section: Section,
     cx: &mut App,
 ) {
+    if matches!(section, Section::Content(_)) {
+        load_pending(wiring, id.clone(), view.clone(), cx);
+    }
     let service = wiring.backend.service.clone();
     let handle = wiring.backend.spawn(async move {
         match section {

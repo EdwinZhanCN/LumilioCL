@@ -31,6 +31,8 @@ pub enum Lock {
 /// One change to the query made on the page.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DiscoverChange {
+    /// Browse another content source (its plugin ID).
+    Source(String),
     Kind(ProjectKind),
     Sort(SortIndex),
     PageSize(u32),
@@ -117,6 +119,8 @@ pub fn visible_kinds(game: Option<Loader>) -> Vec<ProjectKind> {
 /// refresh of the list can never disagree with the controls.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DiscoverQuery {
+    /// The content source searched (its plugin ID).
+    pub source: String,
     pub kind: ProjectKind,
     pub text: String,
     pub sort: SortIndex,
@@ -150,6 +154,7 @@ fn toggle<T: PartialEq>(list: &mut Vec<T>, item: T) {
 impl DiscoverQuery {
     pub fn new(kind: ProjectKind) -> Self {
         Self {
+            source: lumilio_core::DEFAULT_SOURCE.to_owned(),
             kind,
             text: String::new(),
             sort: SortIndex::Relevance,
@@ -172,6 +177,7 @@ impl DiscoverQuery {
     /// the version choice, the license, and the advanced exclusions.
     fn for_kind(&self, kind: ProjectKind) -> Self {
         let mut next = Self::new(kind);
+        next.source = self.source.clone();
         next.page_size = self.page_size;
         next.versions = self.versions.clone();
         next.license = self.license;
@@ -181,6 +187,16 @@ impl DiscoverQuery {
         next.unlocked = self.unlocked.clone();
         next.advanced
             .retain(|id| advanced_options(kind).iter().any(|option| option.id == *id));
+        next
+    }
+
+    /// The same search in another source: the words, the kind, the game
+    /// versions and the toggles carry over; loaders, categories and the sort
+    /// are that source's own and start again.
+    fn for_source(&self, source: String) -> Self {
+        let mut next = self.for_kind(self.kind);
+        next.source = source;
+        next.text = self.text.clone();
         next
     }
 
@@ -195,6 +211,11 @@ impl DiscoverQuery {
         }
         self.page = 0;
         match change {
+            DiscoverChange::Source(source) => {
+                if source != self.source {
+                    self = self.for_source(source);
+                }
+            }
             DiscoverChange::Kind(kind) => {
                 if kind != self.kind {
                     self = self.for_kind(kind);

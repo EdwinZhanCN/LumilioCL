@@ -5,8 +5,9 @@ use super::support::blocking_value;
 use super::types::now;
 use crate::activity::CancellationToken;
 use crate::activity_log::{RetryAction, TaskAction, TaskCategory, TaskLabel};
+use crate::discover::{Catalog, ProjectOrigin};
 use crate::instance::{InstanceRecord, NewInstance};
-use crate::modpack;
+use crate::modpack::{self, PackIndex};
 use crate::staged::Staged;
 use crate::transfer::{TransferEngine, TransferRequest, Transport};
 
@@ -111,10 +112,12 @@ impl<T: Transport + Clone> LauncherService<T> {
         Ok(record)
     }
 
-    /// Installs a modpack project as a new instance: `version` (a version id
-    /// of the project), or its newest version when `None`.
+    /// Installs a modpack project of a content source as a new instance:
+    /// `version` (a version id of the project), or its newest version when
+    /// `None`.
     pub async fn install_modpack(
         &self,
+        source: &str,
         project: &str,
         version: Option<&str>,
         cancel: CancellationToken,
@@ -130,11 +133,12 @@ impl<T: Transport + Clone> LauncherService<T> {
                 Some(&cancel),
             )
             .retrying(RetryAction::InstallModpack {
+                source: source.to_owned(),
                 project: project.to_owned(),
                 version: version.map(str::to_owned),
             });
         let result = self
-            .install_modpack_inner(task.id, project, version, cancel)
+            .install_modpack_inner(task.id, source, project, version, cancel)
             .await;
         if let Ok(record) = &result {
             task.about(&record.id);
@@ -143,8 +147,9 @@ impl<T: Transport + Clone> LauncherService<T> {
         result
     }
 
-    /// Imports a local `.mrpack` as a new instance. Same rules as installing a
-    /// downloaded pack; the file itself is never deleted or modified.
+    /// Imports a local `.mrpack` or CurseForge pack zip (or an instance or
+    /// backup zip) as a new instance. Same rules as installing a downloaded
+    /// pack; the file itself is never deleted or modified.
     pub async fn import_modpack_file(
         &self,
         pack: &std::path::Path,
@@ -176,7 +181,9 @@ impl<T: Transport + Clone> LauncherService<T> {
                 match kind {
                     PackKind::Prism => self.import_prism_zip(pack, cancel).await,
                     PackKind::Backup => self.restore_backup_inner(pack, cancel).await,
-                    PackKind::Modrinth => self.import_pack_from(task.id, pack, cancel).await,
+                    PackKind::Modrinth | PackKind::CurseForge => {
+                        self.import_pack_from(task.id, pack, cancel).await
+                    }
                 }
             }
             Ok(_) => Err(ServiceError::Install(format!("{label:?} is not a file"))),
@@ -222,41 +229,102 @@ impl<T: Transport + Clone> LauncherService<T> {
         outcome
     }
 
+    /// Imports a downloaded or chosen pack of either format.
     pub(super) async fn import_pack_from(
         &self,
         task: u64,
         pack: &std::path::Path,
         cancel: CancellationToken,
     ) -> Result<InstanceRecord, ServiceError> {
+        let kind = {
+            let pack = pack.to_owned();
+            blocking_value(move || sniff_pack(&pack)).await?
+        };
+        let (index, allow) = if kind == PackKind::CurseForge {
+            let index = read_unless_cancelled(&cancel, self.curseforge_index(pack)).await?;
+            (
+                index,
+                modpack::curseforge::is_trusted_source as fn(&str) -> bool,
+            )
+        } else {
+            let index = {
+                let pack = pack.to_owned();
+                blocking_value(move || modpack::read_index(&pack)).await??
+            };
+            (index, modpack::is_trusted_source as fn(&str) -> bool)
+        };
         let chain = self.chain().await?;
         let engine = TransferEngine::new(self.transport.clone(), self.transfer_concurrency().await)
             .map_err(|error| ServiceError::Install(error.to_string()))?;
-        self.metered(
-            task,
-            engine.subscribe(),
-            modpack::import(
-                &self.store,
-                &engine,
-                &chain,
-                pack,
-                now(),
-                modpack::is_trusted_source,
-                cancel,
-            ),
-        )
-        .await
-        .map_err(ServiceError::from)
+        let record = self
+            .metered(
+                task,
+                engine.subscribe(),
+                modpack::import_index(
+                    &self.store,
+                    &engine,
+                    &chain,
+                    pack,
+                    &index,
+                    now(),
+                    allow,
+                    cancel,
+                ),
+            )
+            .await
+            .map_err(ServiceError::from)?;
+        if !index.manual.is_empty() {
+            // The game is installed either way; the list is how the person
+            // learns what to add.
+            let _ = self.save_pending_downloads(&record.id, &index.manual).await;
+        }
+        Ok(record)
+    }
+
+    /// A CurseForge pack as an index: its files resolved by a CurseForge
+    /// source, and those the author lets people download only on
+    /// CurseForge's site looked for on Modrinth (plan curseforge-source D3).
+    async fn curseforge_index(&self, pack: &std::path::Path) -> Result<PackIndex, ServiceError> {
+        let manifest = {
+            let pack = pack.to_owned();
+            blocking_value(move || modpack::curseforge::read_manifest(&pack)).await??
+        };
+        let client = self
+            .plugins
+            .catalog_client(Catalog::CurseForge)
+            .await
+            .ok_or(ServiceError::NoCatalogSource(Catalog::CurseForge))?;
+        let references: Vec<(String, String)> = manifest
+            .files
+            .iter()
+            .map(|file| (file.project.clone(), file.file.clone()))
+            .collect();
+        let resolved = client.resolve_files(&references).await?;
+        let blocked: Vec<String> = resolved
+            .iter()
+            .filter(|file| !file.file.downloadable())
+            .filter_map(|file| file.file.sha1.clone())
+            .collect();
+        let elsewhere = if blocked.is_empty() {
+            std::collections::BTreeMap::new()
+        } else {
+            self.elsewhere(&blocked).await
+        };
+        Ok(modpack::curseforge::index(
+            &manifest, &resolved, &elsewhere,
+        )?)
     }
 
     pub(super) async fn install_modpack_inner(
         &self,
         task: u64,
+        source: &str,
         project: &str,
         wanted: Option<&str>,
         cancel: CancellationToken,
     ) -> Result<InstanceRecord, ServiceError> {
         let chain = read_unless_cancelled(&cancel, self.chain()).await?;
-        let client = read_unless_cancelled(&cancel, self.content_client()).await?;
+        let client = read_unless_cancelled(&cancel, self.content_client(source)).await?;
         let versions = read_unless_cancelled(&cancel, async {
             client.versions(project).await.map_err(ServiceError::from)
         })
@@ -276,12 +344,9 @@ impl<T: Transport + Clone> LauncherService<T> {
             )));
         }
         let pack = self.layout.root().join("downloads").join(&file.filename);
-        let mut request = TransferRequest::new(
-            format!("pack:{}", version.id),
-            chain.candidates(&file.url),
-            &pack,
-        )
-        .map_err(|error| ServiceError::Install(error.to_string()))?;
+        let sources = read_unless_cancelled(&cancel, self.file_sources(&chain, file)).await?;
+        let mut request = TransferRequest::new(format!("pack:{}", version.id), sources, &pack)
+            .map_err(|error| ServiceError::Install(error.to_string()))?;
         if file.size > 0 {
             request = request.expect_size(file.size);
         }
@@ -303,7 +368,11 @@ impl<T: Transport + Clone> LauncherService<T> {
         let _ = tokio::fs::remove_file(&pack).await;
         let mut record = record?;
         // Remembering where it came from is a convenience, not part of the install.
-        let origin = version.project_id.clone();
+        let origin = ProjectOrigin {
+            source: client.plugin_id().to_owned(),
+            project: version.project_id.clone(),
+        }
+        .stored();
         if self
             .store
             .lock()

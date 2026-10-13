@@ -27,7 +27,9 @@ pub enum DateKind {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SearchRow {
-    /// Modrinth's id, to recognise what the game already has.
+    /// The content source the project is from (its plugin ID).
+    pub source: String,
+    /// The source's id, to recognise what the game already has.
     pub project_id: String,
     pub kind: ProjectKind,
     pub slug: String,
@@ -37,7 +39,8 @@ pub struct SearchRow {
     pub environment: Option<Environment>,
     pub tags: CardTags,
     pub downloads: String,
-    pub follows: String,
+    /// `None` when the source does not count followers.
+    pub follows: Option<String>,
     pub date: String,
     pub date_kind: DateKind,
     /// The project's public page, for the context menu.
@@ -45,6 +48,8 @@ pub struct SearchRow {
     pub icon_url: Option<String>,
     /// Seeds the placeholder cover while (or instead of) the real icon.
     pub seed: u32,
+    /// The author lets people download the files only on the source's site.
+    pub manual_download: bool,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -96,6 +101,7 @@ pub fn search_row(
         DateKind::Updated => &hit.updated,
     };
     SearchRow {
+        source: query.source.clone(),
         project_id: hit.project_id.clone(),
         kind: hit.kind,
         slug: hit.slug.clone(),
@@ -105,12 +111,13 @@ pub fn search_row(
         environment: hit.environment,
         tags: card_tags(hit, query, filters),
         downloads: count_label(hit.downloads),
-        follows: count_label(hit.follows),
+        follows: hit.follows.map(count_label),
         date: parse_rfc3339(date).map_or_else(String::new, |at| relative_time(at, now)),
         date_kind,
-        page_url: hit.page_url(),
+        page_url: hit.page_url.clone(),
         icon_url: hit.icon_url.clone(),
         seed: seed_of(&hit.project_id),
+        manual_download: hit.manual_download,
     }
 }
 
@@ -158,6 +165,8 @@ pub fn parse_rfc3339(text: &str) -> Option<u64> {
 
 pub const PAGE_SIZES: [u32; 6] = [5, 10, 15, 20, 50, 100];
 
+/// Every sort Discover knows, in menu order; a source offers some of them
+/// (`FilterModel::sorts`).
 pub const SORTS: [SortIndex; 5] = [
     SortIndex::Relevance,
     SortIndex::Downloads,

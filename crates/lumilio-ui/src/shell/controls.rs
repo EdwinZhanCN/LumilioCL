@@ -22,6 +22,16 @@ impl LauncherShell {
             let presets = self.view.library_tab == crate::pages::live::PRESETS_TAB;
             controls.update(cx, |controls, cx| controls.search_for(presets, window, cx));
         }
+        if let (Some(controls), Some(model)) = (&self.live_controls, &self.live) {
+            // Discover's search box and sort menu follow the source browsed.
+            let name = model.browsed_source_name().to_owned();
+            let sorts = model.filters.sorts(model.query.kind);
+            let chosen = model.query.sort;
+            controls.update(cx, |controls, cx| {
+                controls.search_source(&name, window, cx);
+                controls.offer_sorts(sorts, chosen, window, cx);
+            });
+        }
         if self.live.is_some() && self.live_controls.is_none() {
             let controls = cx.new(|cx| LiveControls::new(window, cx));
             let (search, filter) = {

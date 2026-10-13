@@ -115,7 +115,7 @@ impl InstanceDetailView {
     pub(super) fn confirm_update_all(
         &mut self,
         kind: ProjectKind,
-        updates: Vec<(String, String, String)>,
+        updates: Vec<super::super::ContentUpdateItem>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {

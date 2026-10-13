@@ -193,10 +193,10 @@ Discover.
 | Page | Caption | Secondary | Primary | More | Tabs · search | Refinements |
 |---|---|---|---|---|---|---|
 | Library | game count | 导入整合包 | 新建 | — | 全部游戏 / 收藏 · 搜索游戏 | — |
-| Discover | one line | — | — | 在 Modrinth 中浏览 · 重新搜索 | 整合包 / Mod / 资源包 / 光影 · 搜索 Modrinth | sort, page size, pager, filter sidebar |
+| Discover | one line | — | — | 在 *source* 中浏览 · 重新搜索 | 整合包 / Mod / 资源包 / 光影 · 搜索 *source* | sort, page size, pager, filter sidebar (source segments at its top when several are on) |
 | Activity | running count | — | — | — | — | — |
 | Instance | version · loader · last played | — | 启动游戏 | 安装游戏文件 · 复制… · 删除… | 概览 / 内容 / 世界 / 历史 / 日志 / 设置 | per-tab segments |
-| Project detail | author · summary | — | 安装到 *instance* / 安装为新游戏 | 在 Modrinth 中打开 · 复制链接 · project links | 介绍 / 版本 / 图库 | version filters |
+| Project detail | author · summary | — | 安装到 *instance* / 安装为新游戏 | 在 *source* 中打开 · 复制链接 · project links | 介绍 / 版本 / 图库 | version filters |
 
 ### Covers and empty states
 

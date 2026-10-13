@@ -110,7 +110,10 @@ pub(super) fn toggle<T: PartialEq>(list: &mut Vec<T>, item: T) {
 
 pub struct ProjectDetailView {
     title: SharedString,
+    /// The project's page on its source's site, once known.
     url: SharedString,
+    /// The name of the content source the project is from, once known.
+    source_name: SharedString,
     state: DetailState,
     tab: usize,
     target: Option<InstallTarget>,
@@ -143,6 +146,7 @@ impl ProjectDetailView {
         Self {
             title: title.into(),
             url: url.into(),
+            source_name: SharedString::default(),
             state: DetailState::Loading,
             tab: 0,
             target: None,
@@ -161,6 +165,8 @@ impl ProjectDetailView {
     pub fn set_state(&mut self, state: DetailState, cx: &mut Context<Self>) {
         if let DetailState::Ready(detail) = &state {
             self.title = detail.project.title.clone().into();
+            self.url = detail.project.page_url.clone().into();
+            self.source_name = detail.source_name.clone().into();
         }
         self.state = state;
         self.prefilter();
@@ -461,11 +467,12 @@ impl ProjectDetailView {
         } else {
             project.body.clone()
         };
+        let body = crate::kit::rich_text("detail-body", text, project.body_format);
         div()
             .w_full()
             .debug_selector(|| "detail-description".into())
             .text_color(colors.foreground)
-            .child(gpui_component::text::TextView::markdown("detail-body", text).selectable(true))
+            .child(body.selectable(true))
             .into_any_element()
     }
 }

@@ -6,14 +6,16 @@ use std::path::PathBuf;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum PackKind {
     Modrinth,
+    CurseForge,
     Prism,
     /// One of this launcher's own full backups.
     Backup,
 }
 
 /// Looks at a zip's entry names: a Modrinth pack names `modrinth.index.json`,
-/// a MultiMC / Prism instance `mmc-pack.json`. Anything else is treated as a
-/// Modrinth pack so its error is the usual one.
+/// a CurseForge pack `manifest.json`, a MultiMC / Prism instance
+/// `mmc-pack.json`. Anything else is treated as a Modrinth pack so its error
+/// is the usual one.
 pub(super) fn sniff_pack(path: &std::path::Path) -> PackKind {
     let Ok(file) = std::fs::File::open(path) else {
         return PackKind::Modrinth;
@@ -31,6 +33,8 @@ pub(super) fn sniff_pack(path: &std::path::Path) -> PackKind {
         .any(|name| name.rsplit('/').next() == Some("mmc-pack.json"))
     {
         PackKind::Prism
+    } else if names.contains(&crate::modpack::curseforge::MANIFEST) {
+        PackKind::CurseForge
     } else {
         PackKind::Modrinth
     }

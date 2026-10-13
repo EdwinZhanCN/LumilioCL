@@ -1,4 +1,4 @@
-use super::jobs::{job, outcome};
+use super::jobs::{install_outcome, job};
 use super::{Reload, Wiring};
 use gpui_kit::AppContext as _;
 use gpui_kit::{App, WeakEntity, Window};
@@ -58,7 +58,8 @@ fn run_search(wiring: &Wiring, query: &DiscoverQuery, seq: u64, cx: &mut App) {
         .unwrap_or_default();
     let known_is_current = plan.known_is_current
         || plan.game.as_ref().is_some_and(|game| {
-            wiring.state.borrow().installed_key.as_ref() == Some(&(game.clone(), kind))
+            wiring.state.borrow().installed_key.as_ref()
+                == Some(&(game.clone(), kind, query.source.clone()))
         });
     let service = wiring.backend.service.clone();
     let state = wiring.state.clone();
@@ -77,14 +78,14 @@ fn run_search(wiring: &Wiring, query: &DiscoverQuery, seq: u64, cx: &mut App) {
                 hidden = plan.known;
                 if !known_is_current && let Some(game) = &plan.game {
                     hidden = service
-                        .installed_projects(game, kind)
+                        .installed_projects(game, kind, &asked.source)
                         .await
                         .map(|found| found.into_keys().collect())
                         .unwrap_or_default();
                 }
             }
             let search = asked.to_search(&plan.provided, &plan.filters, hidden);
-            service.search(&search).await
+            service.search(&asked.source, &search).await
         },
         move |shell, result, cx| {
             if state.borrow().search_seq != seq {
@@ -114,28 +115,80 @@ fn run_search(wiring: &Wiring, query: &DiscoverQuery, seq: u64, cx: &mut App) {
     );
 }
 
+/// Loads the content sources that are on and the filter choices of the one
+/// browsed. A remembered source that is no longer on gives way to the first
+/// one that is, and the list is searched again there.
 pub(super) fn load_filters(wiring: &Wiring, cx: &mut App) {
+    // Choosing a source asks for this from inside the shell's own update,
+    // and this reads the shell: do that a moment later, as `search` does.
+    let wiring = wiring.clone();
+    cx.spawn(async move |cx| cx.update(|cx| run_load_filters(&wiring, cx)))
+        .detach();
+}
+
+pub(super) fn run_load_filters(wiring: &Wiring, cx: &mut App) {
     let service = wiring.backend.service.clone();
+    let wanted = wiring
+        .shell
+        .read_with(cx, |shell, _| {
+            shell.live().map(|model| model.query.source.clone())
+        })
+        .ok()
+        .flatten()
+        .unwrap_or_else(|| lumilio_core::DEFAULT_SOURCE.to_owned());
+    let reload = wiring.clone();
+    let asked = wanted.clone();
     job(
         wiring,
         cx,
         false,
         Reload::Nothing,
         None,
-        async move { service.discover_filters().await },
-        |shell, result, cx| {
+        async move {
+            let sources = service.content_sources().await;
+            let source = sources
+                .iter()
+                .find(|source| source.id == wanted)
+                .or_else(|| sources.first())
+                .map_or(wanted.clone(), |source| source.id.clone());
+            let filters = service.discover_filters(&source).await;
+            let moved = wanted != source;
+            (sources, source, moved, filters)
+        },
+        move |shell, (sources, source, moved, result), cx| {
+            // Another source was chosen while these loaded; its own load is
+            // on the way, and these choices would put the old one back.
+            if shell
+                .live()
+                .is_some_and(|model| model.query.source != asked)
+            {
+                shell.update_live(|model| model.sources = sources, cx);
+                return;
+            }
             shell.update_live(
-                |model| match result {
-                    Ok(filters) => model.filters = FilterModel::from_core(&filters),
-                    // The page says so where the results go; no failed-filters note.
-                    Err(ServiceError::NoContentSource) => model.filters.loaded = true,
-                    Err(error) => {
-                        model.filters.loaded = true;
-                        model.filters.error = Some(error.to_string());
+                |model| {
+                    model.sources = sources;
+                    if model.query.source != source {
+                        model.query.source = source.clone();
+                    }
+                    match result {
+                        Ok(filters) => model.filters = FilterModel::from_core(&filters),
+                        // The page says so where the results go; no failed-filters note.
+                        Err(ServiceError::NoContentSource) => model.filters.loaded = true,
+                        Err(error) => {
+                            model.filters.loaded = true;
+                            model.filters.error = Some(error.to_string());
+                        }
                     }
                 },
                 cx,
             );
+            if moved {
+                let query = shell.live().map(|model| model.query.clone());
+                if let Some(query) = query {
+                    search(&reload, &query, cx);
+                }
+            }
         },
     );
 }
@@ -168,9 +221,11 @@ pub(super) fn first_search(wiring: &Wiring, cx: &mut App) {
 }
 
 /// Installs a project. `version` picks one file of a mod, pack or shader.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn install(
     wiring: &Wiring,
     kind: ProjectKind,
+    source: String,
     slug: String,
     title: String,
     version: Option<String>,
@@ -192,17 +247,32 @@ pub(super) fn install(
                 title = title.as_str()
             ))),
             async move {
-                service
-                    .install_modpack(&slug, version.as_deref(), cancel)
+                let record = service
+                    .install_modpack(&source, &slug, version.as_deref(), cancel)
+                    .await?;
+                // Files the launcher may not download are listed on the game.
+                let missing = service
+                    .pending_downloads(&record.id)
                     .await
+                    .map(|pending| pending.len())
+                    .unwrap_or_default();
+                Ok((record, missing))
             },
             move |shell, result, cx| {
                 mark_installing_in(shell, &slug_done, false, cx);
-                let toast = outcome(
-                    result,
-                    |record| tr!("discover-modpack-installed", name = record.name),
-                    tr!("discover-install-failed", title = title.as_str()),
-                );
+                let toast = match result {
+                    Ok((record, missing)) if missing > 0 => lumilio_ui::toast::Toast::info(tr!(
+                        "discover-modpack-missing",
+                        name = record.name,
+                        count = missing
+                    ))
+                    .sticky(),
+                    other => install_outcome(
+                        other,
+                        |(record, _)| tr!("discover-modpack-installed", name = record.name),
+                        tr!("discover-install-failed", title = title.as_str()),
+                    ),
+                };
                 shell.toast(toast, cx);
             },
         );
@@ -221,6 +291,7 @@ pub(super) fn install(
             instance,
             instance_name,
             kind,
+            source,
             slug,
             title,
             version,
@@ -232,10 +303,21 @@ pub(super) fn install(
     // A mod may need other mods. Not being able to find out must not stop
     // the install, so a failed check installs the mod alone.
     let check = {
-        let (instance, slug, version) = (instance.clone(), slug.clone(), version.clone());
+        let (instance, source, slug, version) = (
+            instance.clone(),
+            source.clone(),
+            slug.clone(),
+            version.clone(),
+        );
         wiring.backend.spawn(async move {
             service
-                .dependency_report(&instance, ProjectKind::Mod, &slug, version.as_deref())
+                .dependency_report(
+                    &instance,
+                    ProjectKind::Mod,
+                    &source,
+                    &slug,
+                    version.as_deref(),
+                )
                 .await
         })
     };
@@ -250,6 +332,7 @@ pub(super) fn install(
                     instance,
                     instance_name,
                     kind,
+                    source,
                     slug,
                     title,
                     version,
@@ -270,7 +353,8 @@ pub(super) fn install(
                             .collect::<Vec<_>>(),
                     );
                     let (instance, instance_name) = (instance.clone(), instance_name.clone());
-                    let (slug, title, version) = (slug.clone(), title.clone(), version.clone());
+                    let (source, slug, title, version) =
+                        (source.clone(), slug.clone(), title.clone(), version.clone());
                     DependencyPrompt::new(
                         title.clone(),
                         report,
@@ -289,6 +373,7 @@ pub(super) fn install(
                                 instance.clone(),
                                 instance_name.clone(),
                                 kind,
+                                source.clone(),
                                 slug.clone(),
                                 title.clone(),
                                 version.clone(),
@@ -306,14 +391,15 @@ pub(super) fn install(
 }
 
 /// Installs `slug` into the game, after any chosen dependencies (project,
-/// version, title), each as its own task in Activity. A dependency that fails
-/// is told, and the mod itself is still installed.
+/// version, title; of the same source), each as its own task in Activity. A
+/// dependency that fails is told, and the mod itself is still installed.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn run_install(
     wiring: &Wiring,
     instance: String,
     instance_name: String,
     kind: ProjectKind,
+    source: String,
     slug: String,
     title: String,
     version: Option<String>,
@@ -340,6 +426,7 @@ pub(super) fn run_install(
                     .install_version(
                         &instance,
                         kind,
+                        &source,
                         &project,
                         &version_id,
                         CancellationToken::new(),
@@ -353,12 +440,19 @@ pub(super) fn run_install(
             let installed = match version {
                 Some(version) => {
                     service
-                        .install_version(&instance, kind, &slug, &version, CancellationToken::new())
+                        .install_version(
+                            &instance,
+                            kind,
+                            &source,
+                            &slug,
+                            &version,
+                            CancellationToken::new(),
+                        )
                         .await
                 }
                 None => {
                     service
-                        .install_content(&instance, kind, &slug, CancellationToken::new())
+                        .install_content(&instance, kind, &source, &slug, CancellationToken::new())
                         .await
                 }
             };
@@ -368,7 +462,7 @@ pub(super) fn run_install(
             mark_installing_in(shell, &slug_done, false, cx);
             state.borrow_mut().installed_key = None;
             let installed = result.is_ok();
-            let mut toast = outcome(
+            let mut toast = install_outcome(
                 result,
                 |file| {
                     tr!(
@@ -443,6 +537,7 @@ pub(super) fn install_target(wiring: &Wiring, cx: &mut App) -> Option<(String, S
 pub(super) fn open_project(
     wiring: &Wiring,
     kind: ProjectKind,
+    source: String,
     slug: String,
     window: &mut Window,
     cx: &mut App,
@@ -451,13 +546,13 @@ pub(super) fn open_project(
     // Deferred: this may be running inside one of the shell's own updates.
     window.defer(cx, move |_, cx| {
         let project = slug.clone();
-        let _ = wiring
-            .shell
-            .update(cx, |shell, cx| shell.open_detail(kind, &project, cx));
+        let _ = wiring.shell.update(cx, |shell, cx| {
+            shell.open_detail(kind, &source, &project, cx)
+        });
         let service = wiring.backend.service.clone();
         let handle = wiring
             .backend
-            .spawn(async move { service.project_detail(&slug).await });
+            .spawn(async move { service.project_detail(&source, &slug).await });
         let shell = wiring.shell.clone();
         let project = slug_of(&shell, cx);
         cx.spawn(async move |cx| {

@@ -60,16 +60,23 @@ pub fn decode_project_summaries(bytes: &[u8]) -> Result<Vec<ProjectSummary>, Plu
         .into_iter()
         .filter_map(|raw| {
             let id = raw.id.filter(|id| !id.is_empty())?;
+            let kind = raw
+                .project_type
+                .as_deref()
+                .and_then(ProjectKind::from_protocol);
+            let slug = raw
+                .slug
+                .clone()
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| id.clone());
             Some(ProjectSummary {
-                slug: raw
-                    .slug
-                    .filter(|s| !s.is_empty())
-                    .unwrap_or_else(|| id.clone()),
+                page_url: format!(
+                    "https://modrinth.com/{}/{slug}",
+                    kind.map_or("project", |kind| kind.protocol_name())
+                ),
+                slug,
                 title: raw.title.unwrap_or_default(),
-                kind: raw
-                    .project_type
-                    .as_deref()
-                    .and_then(ProjectKind::from_protocol),
+                kind,
                 icon_url: raw.icon_url.filter(|url| !url.is_empty()),
                 author: None,
                 id,

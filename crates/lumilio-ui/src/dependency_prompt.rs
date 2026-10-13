@@ -209,6 +209,7 @@ mod tests {
             dependencies: Vec::new(),
             downloads: 0,
             changelog: String::new(),
+            changelog_format: lumilio_core::TextFormat::Markdown,
         }
     }
 

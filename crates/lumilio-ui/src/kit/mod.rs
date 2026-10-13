@@ -6,6 +6,7 @@ mod faceplate;
 mod frame;
 mod menu;
 mod meter;
+mod rich;
 mod rows;
 
 #[cfg(test)]
@@ -24,6 +25,7 @@ pub use self::frame::{
 };
 pub use self::menu::{MenuAction, MenuEntry, PageActions, more_menu, small_more_menu};
 pub use self::meter::{Reading, lit_bars, progress, reading_digits, record};
+pub use self::rich::rich_text;
 pub use self::rows::{
     empty, info, list, panel_list, row, section, section_at, section_head, section_label, setting,
     surface, technical, value_row,

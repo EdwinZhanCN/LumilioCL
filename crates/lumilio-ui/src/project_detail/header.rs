@@ -121,6 +121,7 @@ impl ProjectDetailView {
         };
         let environment = environment(project.client_side, project.server_side);
         let page_url = self.url.to_string();
+        let open_label = tr!("discover-open-in", source = self.source_name.as_ref());
         let copied = cx.entity().downgrade();
 
         let actions = kit::PageActions::new("detail-actions")
@@ -146,7 +147,7 @@ impl ProjectDetailView {
                     move |_, window, cx| install(window, cx)
                 }),
             )
-            .more(kit::MenuEntry::new(tr!("discover-open-modrinth"), {
+            .more(kit::MenuEntry::new(open_label.clone(), {
                 let url = page_url.clone();
                 move |_, cx| cx.open_url(&url)
             }))
@@ -223,6 +224,13 @@ impl ProjectDetailView {
                                         .flex_wrap()
                                         .gap(px(6.))
                                         .pt(px(2.))
+                                        .children(project.manual_download.then(|| {
+                                            kit::tag(
+                                                tr!("discover-site-only"),
+                                                kit::TagKind::Ink,
+                                                colors,
+                                            )
+                                        }))
                                         .children(project.loaders.iter().map(|l| {
                                             kit::tag(tag_label(l), kit::TagKind::Ink, colors)
                                         }))
@@ -249,7 +257,11 @@ impl ProjectDetailView {
                         .border_t_1()
                         .border_color(colors.foreground)
                         .child(spec_cell("DL", count_label(project.downloads), colors))
-                        .child(spec_cell("FAV", count_label(project.followers), colors))
+                        .children(
+                            project
+                                .followers
+                                .map(|followers| spec_cell("FAV", count_label(followers), colors)),
+                        )
                         .children(updated.map(|updated| spec_cell("UPD", updated, colors)))
                         .children(
                             project
@@ -258,7 +270,7 @@ impl ProjectDetailView {
                                 .map(|license| spec_cell("LICENSE", license, colors)),
                         ),
                 );
-        // ia[discover]: 详情页右键菜单 | 在页头上右键：安装 / 在 Modrinth 中打开 / 复制链接 | 与「⋯」菜单同效
+        // ia[discover]: 详情页右键菜单 | 在页头上右键：安装 / 在（来源）中打开 / 复制链接 | 与「⋯」菜单同效
         let (open_url, copy_url) = (page_url.clone(), page_url);
         div()
             .id("detail-header")
@@ -273,11 +285,11 @@ impl ProjectDetailView {
                         .on_click(move |_, window, cx| install(window, cx)),
                 )
                 .separator()
-                .item(PopupMenuItem::new(tr!("discover-open-modrinth")).on_click(
-                    move |_, _, cx| {
+                .item(
+                    PopupMenuItem::new(open_label.clone()).on_click(move |_, _, cx| {
                         cx.open_url(&open_url);
-                    },
-                ))
+                    }),
+                )
                 .item(
                     PopupMenuItem::new(tr!("discover-copy-link")).on_click(move |_, _, cx| {
                         cx.write_to_clipboard(ClipboardItem::new_string(copy_url.clone()));
