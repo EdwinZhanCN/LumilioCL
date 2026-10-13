@@ -56,7 +56,7 @@ It does not identify the publisher.
 
 An unsigned package can cause a security warning.
 Check the release source before you continue.
-If the system prevents the application from opening, use the [first-open instructions](https://github.com/EdwinZhanCN/LumilioCL/blob/main/README.en.md#a-warning-when-you-first-open-it).
+If the system prevents the application from opening, use the [first-launch instructions](#warnings-on-first-launch).
 
 ## Install on Windows
 
@@ -86,6 +86,45 @@ For a tar package:
 The tar installer installs for the current user.
 It does not need root permissions.
 Run `./install.sh --uninstall` to remove that installation.
+
+## Warnings on first launch
+
+First verify that the package came from this repository's GitHub Releases.
+Unsigned packages, or packages without platform reputation, can trigger macOS Gatekeeper or Windows SmartScreen warnings.
+Such a warning does not prove that the file is malicious, and it does not prove that the file is safe.
+Verify the release source and SHA-256 before you continue.
+
+### macOS
+
+1. Double-click LumilioCL in Applications. When it says “LumilioCL” Not Opened, click **Done**. Do not click Move to Trash.
+2. Open **System Settings → Privacy & Security** and scroll to the bottom. You will see “LumilioCL” was blocked.
+3. Click **Open Anyway** and enter your Mac's login password.
+4. Click **Open** in the dialog that follows.
+
+From then on, the application opens normally.
+
+On macOS 14 or earlier: Control-click (or right-click) LumilioCL in Applications, choose **Open**, then click **Open** again.
+
+### The app “is damaged and can't be opened”
+
+This warning can also mean a damaged download or a failed security check.
+Download the package again from official Releases and verify its SHA-256 first.
+Only if you trust the source and the problem is the quarantine attribute, run this command in Terminal:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/LumilioCL.app
+```
+
+Then double-click the application again.
+
+### Windows
+
+1. If your browser says the file “isn't commonly downloaded”: in Edge, click **…** next to the download → **Keep** → **Keep anyway**.
+2. If a blue “Windows protected your PC” window appears: click **More info**, then **Run anyway**.
+
+### Linux
+
+Warnings depend on your distribution and desktop environment. Install as described above.
 
 ## Keep your game data
 
