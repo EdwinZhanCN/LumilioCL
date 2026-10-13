@@ -4,7 +4,7 @@
 
 Status: InProgress
 
-2026-10-13：功能完成，just check、just web、just docs 与 PR CI 通过；按正式接线的点击流程测试跑通（切换来源、安装模组与整合包、添加已下载的文件），并因此修好了切换来源时的崩溃；等 Project Maintainer 在真实窗口里验收（T7），网站在发版时更新（T8），使用指南等 web/user-guide 合入后补（T6）。
+2026-10-13：功能完成，Project Maintainer 在真实窗口里验收通过；just check、just web、just docs 与 PR CI 通过。验收时报告过一次「浏览 CurseForge 后切回 Modrinth 闪退」：无头窗口按正式接线复现（含当前游戏、选分类后切回）未能复现，GPUI 的动图帧号已有夹取；排查中修好一个竞态（筛选项晚到时把页面拉回旧来源），再次遇到时取终端里的 panic 输出（RUST_BACKTRACE=1）。剩下 T8：发版时更新网站首页与使用指南。
 
 ## Scope
 
@@ -29,10 +29,10 @@ Status: InProgress
   Acceptance: manifest.json 解析出游戏版本、加载器和覆盖文件夹；文件按类型放进 mods、resourcepacks、shaderpacks、datapacks，作者停用的文件以停用状态安装；不允许分发的文件先按 SHA-1 在 Modrinth 找同一文件，找不到的记入实例，界面列出下载页并可添加已下载的文件；从发现页安装与从本地导入 zip 都走同一流程，失败时游戏库不变。
 - [x] T5 — 界面：来源切换与来源相关的显示 (Completed)
   Acceptance: 发现页可在已启用的内容源之间切换，筛选、排序与可用控件随来源变化；详情页、游戏内容、依赖提示与切换版本弹窗按项目的来源请求与链接；HTML 正文和更新日志可读；只能在网页下载的项目给出下载页；文案不再写死 Modrinth；中英文目录齐全，IA 路径已更新。
-- [ ] T6 — 构建与文档 (InProgress)
-  Acceptance: release.yml 构建时注入 CF_API_KEY；贡献文档（中英）写明本地开发把 CF_API_KEY 放进用户级 ~/.cargo/config.toml 的 [env]；backlog 中已完成的条目删除。使用指南页在 web/user-guide 分支合入（features/ 改为 guide/）后补写，避免与它冲突。
-- [ ] T7 — 验证 (InProgress)
-  Acceptance: just check 通过；在临时数据目录运行启动器查看发现页、CurseForge 详情与待下载面板；用应用层测试 curseforge_through_the_page（默认忽略，真实 API）按正式接线点击：切到 CurseForge、搜索并安装 JEI、在整合包页签搜索并安装整合包、添加已下载的文件（已完成）。剩下由 Project Maintainer 在真实窗口里点一遍并验收。
+- [x] T6 — 构建与文档 (Completed)
+  Acceptance: release.yml 构建时注入 CF_API_KEY；贡献文档（中英）写明本地开发把 CF_API_KEY 放进用户级 ~/.cargo/config.toml 的 [env]；backlog 中已完成的条目删除。使用指南页移到 T8，等 web/user-guide 合入后与发版一起写。
+- [x] T7 — 验证 (Completed)
+  Acceptance: just check 通过；在临时数据目录运行启动器查看发现页、CurseForge 详情与待下载面板；应用层测试 curseforge_through_the_page（默认忽略，真实 API）按正式接线点击：切到 CurseForge、搜索并安装 JEI、在整合包页签搜索并安装整合包、添加已下载的文件；Project Maintainer 在真实窗口里验收。
 - [ ] T8 — 发版时更新网站 (Proposed)
   Acceptance: 网站路线图已列出这个计划（首页「正在路上」第一格，目标 0.1.5）。发布含 CurseForge 来源的版本时：首页「发现」与进阶玩家要点写上 CurseForge（web/src/i18n/zh-cn.ts；首页只有中文），使用指南补一页内容来源（web/user-guide 合入后的 guide/）。首页功能介绍描述已发布的版本，不提前改。
 
@@ -48,6 +48,10 @@ Status: InProgress
   Result: 2026-10-13：curseforge_live（默认忽略）对真实 API：搜索、筛选、JEI 详情（3854 个版本、HTML 简介）、单版本更新日志 1.3 秒内完成；安装整合包 keo optimized（1459394，26 个文件）用时约 5 秒，2 个禁止分发的文件从 Modrinth 下载，1 个光影包列为待下载并带下载页；该游戏的 Mod 识别 0.6 秒：Modrinth 20、CurseForge 3，8 个有更新。启动器实机查看了发现页（两个来源、中文分类、无关注数、分页上限）、CurseForge 详情页（HTML 简介、图片、版本列表）与游戏内容页的待下载面板。
 - 按正式接线点击完整流程，以及窄窗口布局。
   Result: 2026-10-13：curseforge_through_the_page 用正式的 on_live_intent 接线和真实 API，在无头窗口里点击来源键、在搜索框输入并回车、点击结果行「安装」：JEI 装进 Fabric 1.20.1 游戏；整合包页签装好 keo optimized 并列出 ColorFull-Optimized.zip；添加已下载的文件后放进 shaderpacks，用时约 10 秒。720×480 下发现页的细化行改为可换行，结果行在窄窗口用小图标和 128px 数据列，实机截图确认不再挤出主列；a_narrow_window_gives_the_result_name_room 守住（阈值改为 0 时失败）。
+- Project Maintainer 在真实窗口里验收。
+  Result: 2026-10-13：Project Maintainer 在真实窗口里验收通过（切换来源、从 CurseForge 安装 Mod 与整合包、添加已下载的文件）。
+- 浏览 CurseForge 后切回 Modrinth 时的一次闪退查明原因或确认不再出现。
+  Result: pending
 
 ## Decision D1
 

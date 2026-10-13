@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "curseforge-source",
   "title": "CurseForge 内容源",
-  "summary": "2026-10-13：功能完成，just check、just web、just docs 与 PR CI 通过；按正式接线的点击流程测试跑通（切换来源、安装模组与整合包、添加已下载的文件），并因此修好了切换来源时的崩溃；等 Project Maintainer 在真实窗口里验收（T7），网站在发版时更新（T8），使用指南等 web/user-guide 合入后补（T6）。",
+  "summary": "2026-10-13：功能完成，Project Maintainer 在真实窗口里验收通过；just check、just web、just docs 与 PR CI 通过。验收时报告过一次「浏览 CurseForge 后切回 Modrinth 闪退」：无头窗口按正式接线复现（含当前游戏、选分类后切回）未能复现，GPUI 的动图帧号已有夹取；排查中修好一个竞态（筛选项晚到时把页面拉回旧来源），再次遇到时取终端里的 panic 输出（RUST_BACKTRACE=1）。剩下 T8：发版时更新网站首页与使用指南。",
   "status": "in_progress",
   "visibility": "public",
   "scope": {
@@ -53,14 +53,14 @@
     {
       "id": "T6",
       "title": "构建与文档",
-      "status": "in_progress",
-      "acceptance": "release.yml 构建时注入 CF_API_KEY；贡献文档（中英）写明本地开发把 CF_API_KEY 放进用户级 ~/.cargo/config.toml 的 [env]；backlog 中已完成的条目删除。使用指南页在 web/user-guide 分支合入（features/ 改为 guide/）后补写，避免与它冲突。"
+      "status": "completed",
+      "acceptance": "release.yml 构建时注入 CF_API_KEY；贡献文档（中英）写明本地开发把 CF_API_KEY 放进用户级 ~/.cargo/config.toml 的 [env]；backlog 中已完成的条目删除。使用指南页移到 T8，等 web/user-guide 合入后与发版一起写。"
     },
     {
       "id": "T7",
       "title": "验证",
-      "status": "in_progress",
-      "acceptance": "just check 通过；在临时数据目录运行启动器查看发现页、CurseForge 详情与待下载面板；用应用层测试 curseforge_through_the_page（默认忽略，真实 API）按正式接线点击：切到 CurseForge、搜索并安装 JEI、在整合包页签搜索并安装整合包、添加已下载的文件（已完成）。剩下由 Project Maintainer 在真实窗口里点一遍并验收。"
+      "status": "completed",
+      "acceptance": "just check 通过；在临时数据目录运行启动器查看发现页、CurseForge 详情与待下载面板；应用层测试 curseforge_through_the_page（默认忽略，真实 API）按正式接线点击：切到 CurseForge、搜索并安装 JEI、在整合包页签搜索并安装整合包、添加已下载的文件；Project Maintainer 在真实窗口里验收。"
     },
     {
       "id": "T8",
@@ -89,6 +89,14 @@
     {
       "criterion": "按正式接线点击完整流程，以及窄窗口布局。",
       "result": "2026-10-13：curseforge_through_the_page 用正式的 on_live_intent 接线和真实 API，在无头窗口里点击来源键、在搜索框输入并回车、点击结果行「安装」：JEI 装进 Fabric 1.20.1 游戏；整合包页签装好 keo optimized 并列出 ColorFull-Optimized.zip；添加已下载的文件后放进 shaderpacks，用时约 10 秒。720×480 下发现页的细化行改为可换行，结果行在窄窗口用小图标和 128px 数据列，实机截图确认不再挤出主列；a_narrow_window_gives_the_result_name_room 守住（阈值改为 0 时失败）。"
+    },
+    {
+      "criterion": "Project Maintainer 在真实窗口里验收。",
+      "result": "2026-10-13：Project Maintainer 在真实窗口里验收通过（切换来源、从 CurseForge 安装 Mod 与整合包、添加已下载的文件）。"
+    },
+    {
+      "criterion": "浏览 CurseForge 后切回 Modrinth 时的一次闪退查明原因或确认不再出现。",
+      "result": null
     }
   ],
   "decisions": [
