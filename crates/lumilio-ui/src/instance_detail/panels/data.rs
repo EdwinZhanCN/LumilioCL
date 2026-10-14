@@ -3,7 +3,7 @@ use super::CONTENT_KINDS;
 use crate::tr;
 use lumilio_core::{
     ContentList, FileEntry, GameLogs, HistoryRead, InstanceJava, InstanceOptions, Problem,
-    ProjectKind, ScreenshotInfo, ServerEntry, ServerStatus, SnapshotInfo, WorldInfo,
+    ProjectKind, ScreenshotInfo, ServerEntry, SnapshotInfo, WorldInfo,
 };
 
 pub type Loaded<T> = Option<Result<T, String>>;
@@ -112,13 +112,7 @@ impl Data {
     }
 }
 
-/// What is known of a server's state right now.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum ServerState {
-    Checking,
-    Online(ServerStatus),
-    Offline,
-}
+pub use crate::places::ServerState;
 
 /// A screenshot's thumbnail: asked for, made, or not makeable.
 #[derive(Clone, Debug, Eq, PartialEq)]

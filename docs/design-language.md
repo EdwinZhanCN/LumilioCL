@@ -545,8 +545,9 @@ A status is not a tag: it is an LED and a word ("● 可以启动").
 ### List rows
 
 A row of a list block (worlds, servers, Home's places) never joins its facts
-into one line with "·". Each fact takes the form of what it is
-(`kit::Item`):
+into one line with "·". A world or a server says the same things wherever it
+is listed: Home's 接着玩 asks its servers how they are, as the Worlds tab
+does. Each fact takes the form of what it is (`kit::Item`):
 - the name, with its **state** beside it as an LED and a word: lit orange
   for what is happening now (正在游玩), green for works (在线), the failure
   colour for cannot be used (无法读取), unlit for not known or not there

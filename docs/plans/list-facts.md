@@ -72,6 +72,14 @@ Why: 游戏的信号格是绿色；ink 色的格子看起来像一段普通读�
 
 Consequences: 绿色除了 LED，也用于信号格
 
+## Decision D5
+
+首页「接着玩」的行与世界页的行相同，服务器也会被询问
+
+Why: Project Maintainer 要求接着玩显示相同的信息；同一个世界或服务器在两处说法不同会让人以为是两样东西
+
+Consequences: 世界和服务器的行在 lumilio-ui 的 places 模块里，两处共用；首页的服务器在读入后各询问一次。首页没有游戏开始的时间，所以不显示「正在游玩」
+
 ## References
 
 - [docs/design-language.md](../../docs/design-language.md)

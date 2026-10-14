@@ -32,6 +32,7 @@ pub mod photosensitivity;
 pub mod pictures;
 pub mod pixels;
 pub mod placeholders;
+pub mod places;
 pub mod platform;
 pub mod plugin_setting_dialog;
 pub mod project_detail;

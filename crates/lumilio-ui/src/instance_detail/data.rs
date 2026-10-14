@@ -253,23 +253,13 @@ impl InstanceDetailView {
         result: Result<lumilio_core::ServerStatus, String>,
         cx: &mut Context<Self>,
     ) {
-        match result {
-            Ok(status) => {
-                // A live icon replaces the one the game cached.
-                if let Some(pixels) = status.favicon.as_ref()
-                    && let Some(image) =
-                        crate::pixels::image(pixels.width, pixels.height, &pixels.rgba)
-                {
-                    self.server_icons.insert(address.clone(), image);
-                }
-                self.server_status
-                    .insert(address, panels::ServerState::Online(status));
-            }
-            Err(_) => {
-                self.server_status
-                    .insert(address, panels::ServerState::Offline);
-            }
+        if let Ok(status) = &result
+            && let Some(image) = crate::places::favicon(status)
+        {
+            self.server_icons.insert(address.clone(), image);
         }
+        self.server_status
+            .insert(address, panels::ServerState::of(result));
         cx.notify();
     }
 

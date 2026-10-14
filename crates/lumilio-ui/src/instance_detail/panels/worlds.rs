@@ -1,6 +1,6 @@
 use super::super::{Dropdown, InstanceDetailView, InstanceIntent, Section};
 use super::data::Confirm;
-use super::helpers::{act, act_index, clock};
+use super::helpers::{act, act_index};
 use super::{WORLD_SORTS, WORLD_SUBS};
 use crate::assets::UiIcon;
 use crate::kit;
@@ -40,52 +40,6 @@ fn cover_lead(
         loader.map_or(crate::cover::Loader::Vanilla, crate::live::cover_loader),
         colors,
     )
-}
-
-/// A world's state beside its name: unreadable before being played.
-pub(super) fn world_state(world: &WorldInfo, playing: bool) -> Option<(&'static str, kit::Tone)> {
-    if world.damaged {
-        Some((tr!("instance-world-damaged"), kit::Tone::Failure))
-    } else if playing {
-        Some((tr!("instance-world-playing"), kit::Tone::Lit))
-    } else {
-        None
-    }
-}
-
-/// The tags under a world's name: how it is played, whether cheats are on,
-/// and the version that last saved it.
-pub(super) fn world_tags(world: &WorldInfo) -> Vec<(String, kit::TagKind)> {
-    let mut tags = Vec::new();
-    if let Some(mode) = crate::live::world_mode(world) {
-        tags.push((mode.to_owned(), kit::TagKind::Ink));
-    }
-    if world.cheats {
-        tags.push((tr!("world-cheats").to_owned(), kit::TagKind::Plain));
-    }
-    if let Some(version) = &world.game_version {
-        tags.push((version.clone(), kit::TagKind::Plain));
-    }
-    tags
-}
-
-/// A world row without its cover and keys. A copy keeps its name, so the
-/// folder tells the two apart, as in the game's own list.
-fn world_item(world: &WorldInfo, playing: bool, colors: ShellColors) -> kit::Item {
-    let mut item = kit::Item::new(world.name.clone());
-    if let Some((word, tone)) = world_state(world, playing) {
-        item = item.state(word, tone);
-    }
-    for (text, kind) in world_tags(world) {
-        item = item.tag(text, kind);
-    }
-    if world.folder != world.name {
-        item = item.note(world.folder.clone());
-    }
-    if let Some(played) = world.last_played_ms.filter(|ms| *ms > 0) {
-        item = item.reading(kit::reading(clock(played as u64 / 1000), colors));
-    }
-    item
 }
 
 /// The worlds that match `query` (in the name or the folder, ignoring case),
@@ -380,7 +334,7 @@ impl InstanceDetailView {
                     self.record.as_ref().map(|record| record.loader),
                     colors,
                 );
-                world_item(world, playing == Some(world.folder.as_str()), colors)
+                crate::places::world_item(world, playing == Some(world.folder.as_str()), colors)
                     .lead(lead)
                     .actions(trail)
                     .render(colors)

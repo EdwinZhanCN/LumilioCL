@@ -2,7 +2,7 @@
 
 use super::super::editors::Editor;
 use super::super::{InstanceDetailView, InstanceIntent, Section};
-use super::data::{Confirm, ServerState};
+use super::data::Confirm;
 use super::helpers::act;
 use crate::kit;
 use crate::theme::ShellColors;
@@ -13,59 +13,6 @@ use gpui::{AnyElement, Context, RenderImage, Window, div};
 use gpui_component::{h_flex, v_flex};
 use lumilio_core::ServerEntry;
 use std::sync::Arc;
-
-/// A server row: its address under the name, and how it is in the form each
-/// fact takes — the version a tag, the players and the round trip readings,
-/// the message in its own colours beside the name. Before an answer the
-/// readings are a state.
-fn server_item(
-    row: usize,
-    server: &ServerEntry,
-    state: Option<&ServerState>,
-    colors: ShellColors,
-) -> kit::Item {
-    let item = kit::Item::new(server.name.clone()).note(server.address.clone());
-    let quiet = |word: &'static str, selector: &'static str| {
-        kit::status(word, kit::Tone::Off, colors)
-            .debug_selector(move || format!("{selector}-{row}"))
-    };
-    match state {
-        None | Some(ServerState::Checking) => {
-            item.reading(quiet(tr!("instance-server-checking"), "server-checking"))
-        }
-        Some(ServerState::Offline) => {
-            item.reading(quiet(tr!("instance-server-offline"), "server-offline"))
-        }
-        Some(ServerState::Online(status)) => {
-            let mut item = item;
-            if let Some(version) = &status.version {
-                item = item.tag(version.clone(), kit::TagKind::Plain);
-            }
-            if let Some(online) = status.online {
-                item = item.reading(
-                    kit::count_of(u64::from(online), status.max.map(u64::from), colors)
-                        .debug_selector(move || format!("server-players-{row}")),
-                );
-            }
-            if let Some(ms) = status.latency_ms {
-                item = item.reading(
-                    kit::signal(("server-signal", row), ms, colors)
-                        .debug_selector(move || format!("server-signal-{row}")),
-                );
-            }
-            if status.online.is_none() && status.latency_ms.is_none() {
-                item = item.reading(
-                    kit::status(tr!("instance-server-online"), kit::Tone::Ok, colors)
-                        .debug_selector(move || format!("server-online-{row}")),
-                );
-            }
-            match kit::motd_text(&status.motd, colors) {
-                Some(text) => item.aside(text.debug_selector(move || format!("server-motd-{row}"))),
-                None => item,
-            }
-        }
-    }
-}
 
 /// A server row's leading mark: the icon the server sent or the game cached,
 /// or a procedural cover seeded by its address when there is none.
@@ -214,10 +161,15 @@ impl InstanceDetailView {
                     crate::live::seed_of(&server.address),
                     colors,
                 );
-                server_item(row, server, self.server_status.get(&server.address), colors)
-                    .lead(lead)
-                    .actions(trail)
-                    .render(colors)
+                crate::places::server_item(
+                    row,
+                    server,
+                    self.server_status.get(&server.address),
+                    colors,
+                )
+                .lead(lead)
+                .actions(trail)
+                .render(colors)
             })
             .collect();
         v_flex()

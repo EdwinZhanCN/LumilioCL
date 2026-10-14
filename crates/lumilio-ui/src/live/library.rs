@@ -67,6 +67,15 @@ pub fn world_of(id: &str) -> WorldHint {
     }
 }
 
+/// [`relative_time`] from now; `then` is in seconds since the Unix epoch.
+#[must_use]
+pub fn ago(then: u64) -> String {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |elapsed| elapsed.as_secs());
+    relative_time(then, now)
+}
+
 /// `刚刚`, `5 分钟前`, `3 小时前`, `昨天`, `4 天前`, `2 个月前`.
 pub fn relative_time(then: u64, now: u64) -> String {
     let seconds = now.saturating_sub(then);

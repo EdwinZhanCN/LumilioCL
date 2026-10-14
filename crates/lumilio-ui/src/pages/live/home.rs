@@ -6,7 +6,7 @@ use super::controls::{LiveCtx, send};
 use super::library::card;
 use crate::home::{HomePresentation, body_label};
 use crate::kit;
-use crate::live::{HomePlaces, LibraryCard, LiveIntent, Place, PlacePicture, PlaceTarget};
+use crate::live::{HomePlaces, LibraryCard, LiveIntent, Place, PlaceKind, PlacePicture};
 use crate::theme::ShellColors;
 use gpui::prelude::*;
 use gpui::{AnyElement, IntoElement, div, px};
@@ -90,34 +90,28 @@ pub fn record_readings(places: &HomePlaces) -> Vec<kit::Reading> {
     ]
 }
 
-/// A place without its key: its picture says whether it is a world or a
-/// server, a world adds its mode and when it was played, a server its address.
-fn place_item(place: &Place, loader: crate::cover::Loader, colors: ShellColors) -> kit::Item {
-    let server = match &place.target {
-        PlaceTarget::Server(address) => Some(address.clone()),
-        PlaceTarget::World(_) => None,
+/// A place without its key, as the Worlds tab shows it: a world with its
+/// mode, cheats, version and when it was played; a server with its version,
+/// address, players, round trip and message.
+fn place_item(
+    row: usize,
+    place: &Place,
+    loader: crate::cover::Loader,
+    colors: ShellColors,
+) -> kit::Item {
+    let (item, loader) = match &place.kind {
+        PlaceKind::World(world) => (crate::places::world_item(world, false, colors), loader),
+        PlaceKind::Server(server, state) => (
+            crate::places::server_item(row, server, Some(state), colors),
+            crate::cover::Loader::Vanilla,
+        ),
     };
-    let loader = if server.is_some() {
-        crate::cover::Loader::Vanilla
-    } else {
-        loader
-    };
-    let mut item = kit::Item::new(place.name.clone()).lead(kit::cover_tile(
+    item.lead(kit::cover_tile(
         place.picture.as_ref().map(PlacePicture::source),
         place.seed,
         loader,
         colors,
-    ));
-    if let Some(mode) = place.mode {
-        item = item.tag(mode, kit::TagKind::Ink);
-    }
-    if let Some(address) = server {
-        item = item.note(address);
-    }
-    if let Some(ago) = &place.ago {
-        item = item.reading(kit::reading(ago.clone(), colors));
-    }
-    item
+    ))
 }
 
 /// 接着玩 beside 游戏记录. A game with no worlds or servers yet says where
@@ -154,9 +148,9 @@ fn continued_group(places: &HomePlaces, can_start: bool, ctx: &LiveCtx) -> AnyEl
                 .map(|(index, place)| {
                     let enter = send(
                         &ctx.handler,
-                        LiveIntent::PlayPlace(places.instance.clone(), place.target.clone()),
+                        LiveIntent::PlayPlace(places.instance.clone(), place.target()),
                     );
-                    // ia[home]: 接着玩：进入世界 / 服务器 | 「接着玩」每行的「进入」（继续的游戏最近玩的 3 个世界，再是服务器列表前 2 个） | 启动并直达该世界或服务器，英雄区进入启动时刻 | 启动中和游戏中置灰；1.20 以前的版本不列出；还没有世界时这里说一句它们会出现在哪
+                    // ia[home]: 接着玩：进入世界 / 服务器 | 「接着玩」每行的「进入」（继续的游戏最近玩的 3 个世界，再是服务器列表前 2 个） | 启动并直达该世界或服务器，英雄区进入启动时刻 | 每行和世界页的行一样（世界的模式、作弊、版本、时间；服务器会被询问，显示人数、信号格和 MOTD）；启动中和游戏中置灰；1.20 以前的版本不列出；还没有世界时这里说一句它们会出现在哪
                     let key = kit::ghost(
                         ("home-place-enter", index),
                         crate::tr!("home-place-enter"),
@@ -164,7 +158,7 @@ fn continued_group(places: &HomePlaces, can_start: bool, ctx: &LiveCtx) -> AnyEl
                     )
                     .disabled(!can_start)
                     .debug_selector(move || format!("home-place-enter-{index}"));
-                    place_item(place, loader, colors)
+                    place_item(index, place, loader, colors)
                         .actions(key)
                         .render(colors)
                 })

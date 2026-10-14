@@ -318,9 +318,45 @@ fn refresh_places(wiring: &Wiring, record: lumilio_core::InstanceRecord, seq: u6
         {
             return;
         }
-        let places = home_places(&record, &worlds, &servers, unix_now());
+        let places = home_places(&record, &worlds, &servers);
+        let addresses = places.server_addresses();
         let _ = wiring.shell.update(cx, |shell, cx| {
             shell.update_live(|model| model.home_places = Some(places), cx)
+        });
+        for address in addresses {
+            cx.update(|cx| ask_place(&wiring, record.id.clone(), address, seq, cx));
+        }
+    })
+    .detach();
+}
+
+/// Asks one of Home's servers how it is, as the Worlds tab does. An answer
+/// for places Home has read again meanwhile is dropped.
+fn ask_place(wiring: &Wiring, id: String, address: String, seq: u64, cx: &mut App) {
+    let service = wiring.backend.service.clone();
+    let (instance, asked) = (id.clone(), address.clone());
+    let handle = wiring
+        .backend
+        .spawn(async move { service.server_status(&instance, &asked).await });
+    let wiring = wiring.clone();
+    cx.spawn(async move |cx| {
+        let answer = handle.await.ok().and_then(Result::ok).ok_or(());
+        if wiring.state.borrow().home_seq != seq {
+            return;
+        }
+        let _ = wiring.shell.update(cx, |shell, cx| {
+            shell.update_live(
+                |model| {
+                    if let Some(places) = model
+                        .home_places
+                        .as_mut()
+                        .filter(|places| places.instance == id)
+                    {
+                        places.server_answered(&address, answer);
+                    }
+                },
+                cx,
+            );
         });
     })
     .detach();
