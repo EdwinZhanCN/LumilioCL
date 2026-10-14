@@ -4,7 +4,7 @@ use gpui::{IntoElement, Render, TestAppContext, Window, div};
 use gpui_component::{Theme, ThemeMode};
 
 use super::motd::motd_color;
-use super::{TagKind, list, lit_bars, motd_lines, panel_list, signal, signal_bars, tag};
+use super::{Item, TagKind, list, lit_bars, motd_lines, panel_list, signal, signal_bars, tag};
 use crate::theme::{self, ShellColors};
 
 struct Sheet;
@@ -35,6 +35,66 @@ impl Render for Sheet {
                     .child(signal("signal", 120, colors)),
             )
     }
+}
+
+/// A server-like row with an aside, as many pixels wide as it holds.
+struct Row(f32);
+
+impl Render for Row {
+    fn render(&mut self, _: &mut Window, cx: &mut gpui::Context<Self>) -> impl IntoElement {
+        let colors = ShellColors::current(cx);
+        div().w(gpui::px(self.0)).child(
+            Item::new("Lumilio")
+                .tag("1.21.1", TagKind::Plain)
+                .note("play.example.org")
+                .lead(div().size(gpui::px(48.)).debug_selector(|| "lead".into()))
+                .aside(
+                    gpui_component::v_flex()
+                        .debug_selector(|| "aside".into())
+                        .child("Welcome")
+                        .child("second line"),
+                )
+                .render(colors)
+                .debug_selector(|| "row".into()),
+        )
+    }
+}
+
+/// The row, its picture and its aside at `width`.
+fn row_parts(width: f32, cx: &mut TestAppContext) -> [gpui::Bounds<gpui::Pixels>; 3] {
+    let (_, cx) = cx.add_window_view(move |_, _| Row(width));
+    cx.run_until_parked();
+    ["row", "lead", "aside"].map(|selector| cx.debug_bounds(selector).expect("drawn"))
+}
+
+#[gpui::test]
+fn a_rows_aside_sits_beside_the_name_and_goes_under_it_when_narrow(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_component::init(cx);
+        theme::tune(cx);
+    });
+    let centred = |inner: gpui::Bounds<gpui::Pixels>, outer: gpui::Bounds<gpui::Pixels>| {
+        f32::from(inner.center().y - outer.center().y).abs() < 1.
+    };
+
+    let [row, lead, aside] = row_parts(900., cx);
+    assert!(centred(lead, row), "the picture is centred in the row");
+    assert!(centred(aside, row), "the aside shares the name's line");
+    assert!(
+        f32::from(aside.left() - lead.right()) >= 280.,
+        "the aside starts after the name's width"
+    );
+
+    let [row, lead, aside] = row_parts(400., cx);
+    assert!(centred(lead, row), "the picture stays centred");
+    assert!(
+        f32::from(aside.left() - lead.right()) < 40.,
+        "a narrow row puts the aside at the name's edge"
+    );
+    assert!(
+        aside.center().y > row.center().y,
+        "under the name, not beside it"
+    );
 }
 
 fn quads(cx: &mut gpui::VisualTestContext, selector: &'static str) -> Vec<gpui::Quad> {

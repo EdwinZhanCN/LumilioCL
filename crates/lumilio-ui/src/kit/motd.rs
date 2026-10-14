@@ -1,6 +1,6 @@
 //! A server's message of the day (design language §12): the server's own
-//! words, so they keep the game's colours and styles, in the row under the
-//! address. Each colour is moved only as far as the page needs to read it.
+//! words, so they keep the game's colours and styles, beside the server's
+//! name. Each colour is moved only as far as the page needs to read it.
 
 use crate::theme::{self, ShellColors};
 use gpui::prelude::*;

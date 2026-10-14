@@ -554,19 +554,22 @@ into one line with "·". Each fact takes the form of what it is
 - under the name, **tags** (a mode is ink: 生存, 极限; a version or a plain
   fact is plain: 作弊, 1.21.1) and then a **note** in muted mono (an address,
   a folder that differs from the name);
-- under those, a server's **message of the day**: at most two lines
-  without the space around them, in the interface face with the game's
-  colours and styles. Each colour is darkened or lightened only until it
-  reads on the page at 4.5:1, so the server's red stays red; uncoloured
-  text is muted. It has no window: a dark block in a light list is heavier
-  than the message;
+- beside the name, an **aside** in the item's own words: a server's
+  message of the day, at most two lines without the space around them, in
+  the interface face with the game's colours and styles. Each colour is
+  darkened or lightened only until it reads on the page at 4.5:1, so the
+  server's red stays red; uncoloured text is muted. The name block keeps
+  280 px so asides start at one place from row to row; when the row is too
+  narrow for both, the aside goes under the name. It has no window: a dark
+  block in a light list is heavier than the message;
 - on the trailing edge, **readings** in mono at a common minimum width, so
   rows keep their keys in line: a time ("3 天前"), a count ("12/100", the
   count in ink and the limit muted), signal bars;
 - the row's keys last.
 
-A row's leading picture is a 40 px display window (3 px corners): the
-item's own picture, or a cover seeded by its identity.
+A row's leading picture is a 48 px display window (3 px corners), centred
+on the row: the item's own picture, or a cover seeded by its identity.
+Everything in a row is centred on one line.
 
 ### Faceplates
 

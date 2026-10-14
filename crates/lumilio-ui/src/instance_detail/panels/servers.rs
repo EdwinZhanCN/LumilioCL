@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 /// A server row: its address under the name, and how it is in the form each
 /// fact takes — the version a tag, the players and the round trip readings,
-/// the message in its own colours under the address. Before an answer the
+/// the message in its own colours beside the name. Before an answer the
 /// readings are a state.
 fn server_item(
     row: usize,
@@ -60,7 +60,7 @@ fn server_item(
                 );
             }
             match kit::motd_text(&status.motd, colors) {
-                Some(text) => item.below(text.debug_selector(move || format!("server-motd-{row}"))),
+                Some(text) => item.aside(text.debug_selector(move || format!("server-motd-{row}"))),
                 None => item,
             }
         }

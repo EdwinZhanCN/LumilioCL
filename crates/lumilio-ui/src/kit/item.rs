@@ -17,8 +17,14 @@ use gpui_component::{h_flex, v_flex};
 const READINGS_WIDTH: gpui::Pixels = px(88.);
 /// A tag holding free text (a server's version name) is cut here.
 const TAG_MAX_WIDTH: gpui::Pixels = px(180.);
-/// Edge of a row's leading picture.
-const LEAD_SIZE: gpui::Pixels = px(40.);
+/// Edge of a row's leading picture: a little taller than the name and the
+/// facts under it.
+const LEAD_SIZE: gpui::Pixels = px(48.);
+/// Width the name block keeps in a row with an aside, so every row's aside
+/// starts at the same place.
+const NAME_WIDTH: gpui::Pixels = px(280.);
+/// An aside narrower than this goes under the name instead.
+const ASIDE_MIN_WIDTH: gpui::Pixels = px(200.);
 
 /// How a state's LED shows.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -152,8 +158,8 @@ pub fn cover_tile(
 }
 
 /// One row of a list: the name with its state, tags and a note under it,
-/// anything that needs a line of its own below, readings on the trailing
-/// edge, then the actions. Every slot but the name is optional.
+/// an aside beside the name, readings on the trailing edge, then the
+/// actions. Every slot but the name is optional.
 #[must_use]
 pub struct Item {
     title: SharedString,
@@ -161,7 +167,7 @@ pub struct Item {
     state: Option<(SharedString, Tone)>,
     tags: Vec<(SharedString, TagKind)>,
     note: Option<SharedString>,
-    below: Option<AnyElement>,
+    aside: Option<AnyElement>,
     readings: Vec<AnyElement>,
     actions: Option<AnyElement>,
 }
@@ -174,7 +180,7 @@ impl Item {
             state: None,
             tags: Vec::new(),
             note: None,
-            below: None,
+            aside: None,
             readings: Vec::new(),
             actions: None,
         }
@@ -205,9 +211,11 @@ impl Item {
         self
     }
 
-    /// Something that needs a line of its own under the name.
-    pub fn below(mut self, element: impl IntoElement) -> Self {
-        self.below = Some(element.into_any_element());
+    /// Something the item says in its own words (a server's message),
+    /// between the name and the readings; under the name when the row is
+    /// too narrow for both.
+    pub fn aside(mut self, element: impl IntoElement) -> Self {
+        self.aside = Some(element.into_any_element());
         self
     }
 
@@ -265,25 +273,35 @@ impl Item {
                         .child(note)
                 }))
         });
-        // The picture, the name block, the readings and the keys share one
-        // line; what needs a line of its own goes under it at the name
-        // block's spacing, so a tall row keeps its picture and readings
-        // beside its name.
-        let line = h_flex()
+        let name = v_flex().min_w_0().gap(px(4.)).child(head).children(facts);
+        // The name keeps a fixed width so asides line up from row to row;
+        // when the two do not fit side by side the aside wraps under it.
+        let middle = match self.aside {
+            Some(aside) => h_flex()
+                .flex_1()
+                .min_w_0()
+                .flex_wrap()
+                .gap_x(px(24.))
+                .gap_y(px(4.))
+                .child(name.flex_basis(NAME_WIDTH))
+                .child(
+                    div()
+                        .flex_1()
+                        .flex_basis(ASIDE_MIN_WIDTH)
+                        .min_w_0()
+                        .child(aside),
+                ),
+            None => name.flex_1(),
+        };
+        h_flex()
             .w_full()
-            .min_h(LEAD_SIZE)
             .items_center()
             .gap_3()
-            .child(
-                v_flex()
-                    .flex_1()
-                    .min_w_0()
-                    .gap(px(4.))
-                    .child(head)
-                    .children(facts),
-            )
-            .when(!self.readings.is_empty(), |line| {
-                line.child(
+            .py(px(10.))
+            .children(self.lead)
+            .child(middle)
+            .when(!self.readings.is_empty(), |row| {
+                row.child(
                     h_flex()
                         .flex_none()
                         .min_w(READINGS_WIDTH)
@@ -293,20 +311,6 @@ impl Item {
                         .children(self.readings),
                 )
             })
-            .children(self.actions);
-        h_flex()
-            .w_full()
-            .items_start()
-            .gap_3()
-            .py(px(10.))
-            .children(self.lead)
-            .child(
-                v_flex()
-                    .flex_1()
-                    .min_w_0()
-                    .gap(px(4.))
-                    .child(line)
-                    .children(self.below),
-            )
+            .children(self.actions)
     }
 }
