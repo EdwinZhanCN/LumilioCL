@@ -27,17 +27,17 @@ Status: Proposed
 - [ ] T1 — P0 · lumilio-block-assets：烘焙格式与烘焙器 (Proposed)
   Acceptance: 新 crate `crates/lumilio-block-assets`（依赖 zip、serde_json、image、zstd，不依赖 nucleation 与 UI）。`BakedPack`：按版本记录数据版本与来源 jar 的 sha1；方块状态已按变体展开、multipart 条件已规范成字符串；模型已把父链压平、贴图变量解析成贴图 id、`cullface` 的 bottom/top 已归一；贴图按内容哈希去重存放；附带着色图（grass、foliage、dry_foliage）与方块实体和生物用到的 `textures/entity/` 子集。`bake(&[AssetSource]) -> BakedPack` 接受 jar、zip 或目录，后面的来源覆盖前面的。读写用 zstd 帧包一个带索引的平面容器。测试：同一方块的 1.13.2 写法与 26.3 写法（`sprite` 形式的贴图、`bottom` 剔除面、数字型 multipart 条件、搬家的实体贴图名）烘焙后得到相同的 `BakedPack`；写出再读回逐字节一致；损坏的容器报可读的错误而不是 panic。
 - [ ] T2 — P0 · xtask bake-blocks：生成 blocks.dat.z (Proposed)
-  Acceptance: `cargo xtask bake-blocks` 读 Mojang 的 version_manifest_v2，下载从 1.13.2 到最新正式版的客户端 jar（2026-10-13 的清单里恰好 49 个）到被忽略的 `target/`，按清单的 sha1 校验，烘焙成一个 `blocks.dat.z` 和一个 `blocks.json` 索引（bundle 版本号、总大小、sha256、每个版本的数据版本与 jar sha1、工具提交），并像 block-colors 一样写 `SOURCE.md` 式的来源记录。jar 与产物都不进仓库。把测得的产物大小、烘焙耗时和去重后的贴图数记进本计划的 validation；超过 D2 的阈值就按 D2 拆成逐版本切片。
+  Acceptance: `cargo xtask bake-blocks` 读 Mojang 的 version_manifest_v2，下载从 1.13.2 到最新正式版的客户端 jar（2026-10-13 的清单里恰好 49 个）到被忽略的 `target/`，按清单的 sha1 校验，烘焙成一个 `blocks.dat.z`、一个 `entities.dat.z`（T6 的导出器，1.17 及以后每个版本；混淆版本的类名来自同一清单里的 `client_mappings`，只在烘焙时读取）和一个 `blocks.json` 索引（bundle 版本号、总大小、sha256、每个版本的数据版本与 jar sha1、工具提交），并像 block-colors 一样写 `SOURCE.md` 式的来源记录。jar 与产物都不进仓库。把测得的产物大小、烘焙耗时和去重后的贴图数记进本计划的 validation；超过 D2 的阈值就按 D2 拆成逐版本切片。
 - [ ] T3 — P0 · core 的 Instance Asset Resolver (Proposed)
   Acceptance: `crates/lumilio-core/src/model_assets.rs` 改成目录模块 `schematic_assets/`：`resolve(instance, data_version) -> AssetPlan` 按 D3 的规则列出来源（本机烘焙的实例 jar、bundle 里的版本、实例 `mods/*.jar`、启用的 `resourcepacks/`），`Layout::model_cache()` 下按 jar sha1 缓存本机烘焙结果，bundle 用现有 Transport 与镜像预设下载、按索引 sha256 校验、作为 Activity 里的后台任务显示进度；没有网络但有任何已安装 jar 时本机烘焙。测试：规则表（26.x 已装、1.20.1 已装、没装、离线）各得到预期的来源列表；缓存命中不再烘焙；sha256 不符的 bundle 被拒绝并删除；没网也没 jar 时得到一句平静的说明。
 - [ ] T4 — P0 · forks 只读烘焙格式，删除手写补丁 (Proposed)
   Acceptance: Nucleation 新增 `ResourcePackSource::Baked(BakedPack)`，网格器的加载器直接用已解析的模型与贴图；删除 `forks/nucleation/src/meshing/resource_pack_compat.rs`、`ResourcePack::texture_aliases` 与 `lumilio-core` 的 `build_pack` zip 复制路径；`lumilio-schematic-render::Scene::load` 改为接受 `BakedPack`。`forks/README.md` 的本地改动清单相应增删并保留署名。守卫：face_culling、element_rotation、uvlock、multipart_conditions、model_shading、fluid_heights、coplanar_faces、undrawable_blocks 都在烘焙过的夹具上通过；schematic-render-parity 用过的测试方块板在改动前后逐像素一致；一个只有 26.3 写法的夹具不再需要任何运行时改写即可渲染。
 - [ ] T5 — P0 · 着色改成数据 (Proposed)
   Acceptance: `forks/schematic-mesher/data/tints.json`：方块 id 模式 → 着色种类（grass、foliage、dry_foliage、water、固定色、redstone、stem、lily_pad）；每个版本的着色图样本（平原的温度 0.8、湿度 0.4）由烘焙器取出放进 `BakedPack`。`tint.rs` 只剩按表查色的引擎，手写的方块名匹配删除。守卫：`block_tints` 对数据表通过；表里每条都能在 26.3 的烘焙包里找到对应方块（表格 lint 测试）。
-- [ ] T6 — P1 · Entity Model Extractor：26.x 客户端的 Java 导出器 (Proposed)
-  Acceptance: `tools/entity-dump/EntityDump.java`（源码与用 `--release 21` 编译的 class 一起入库，附重建命令）：以启动器为该实例准备的 Java 运行时和完整启动类路径运行（Windows 用 `background_command`），调用 `net.minecraft.client.model.geom.LayerDefinitions.createRoots()`，把每个 `ModelLayerLocation` 的 `MeshDefinition` 树导出成通用几何 JSON（层 id → 骨骼 {pivot、rotation、cubes{origin、size、uv、inflate、mirror}、贴图尺寸}），不碰 Mojang 代码以外的任何类。core 按 jar sha1 缓存到 `Layout::model_cache()/entities/`。只对 26.x（不混淆）的客户端运行；其他版本按 D4 复用 `entities.dat.z`。测试：解析一份夹具导出；在 26.3 客户端上导出后 chest、bed_head、bed_foot、banner、shulker、sign 的几何与 forks 里原来手抄的数值一致（回归桥，桥通过后手抄文件删除）；导出失败只让这次预览退回 `entities.dat.z`，不影响插件。
+- [ ] T6 — P1 · Entity Model Extractor：反射导出器，烘焙时与运行时共用 (Proposed)
+  Acceptance: `tools/entity-dump/EntityDump.java`（源码与用 `--release 21` 编译的 class 一起入库，附重建命令）：以一个 Java 运行时和该 jar 的完整类路径运行（Windows 用 `background_command`），调用 `net.minecraft.client.model.geom.LayerDefinitions.createRoots()`，把每个 `ModelLayerLocation` 的 `MeshDefinition` 树导出成通用几何 JSON（层 id → 骨骼 {pivot、rotation、cubes{origin、size、uv、inflate、mirror}、贴图尺寸}），不碰 Mojang 代码以外的任何类。混淆的 jar 由调用方传入从 Mojang 官方映射表（`client_mappings`，1.14.4 起）解析出的类名与方法名，导出器本身不读映射表。两个运行时机，同一份代码：烘焙时 xtask 对 1.17 及以后的每个 jar 各跑一次，结果作为 `entities.dat.z` 随清单发布；运行时 core 只对清单里没有、且不混淆的 26.x jar 跑，按 jar sha1 缓存到 `Layout::model_cache()/entities/`。1.13.2 到 1.16.5 没有 `LayerDefinitions`，复用 1.17 的几何。测试：解析一份夹具导出；在 26.3 客户端上导出后 chest、bed_head、bed_foot、banner、shulker、sign 的几何与 forks 里原来手抄的数值一致（回归桥，桥通过后手抄文件删除）；同一个 jar 在烘焙时与运行时导出的 JSON 逐字节一致；运行时导出失败只让这次预览退回 `entities.dat.z`，不影响插件。
 - [ ] T7 — P1 · 绑定表与手抄几何的删除 (Proposed)
-  Acceptance: `forks/schematic-mesher/data/entity_bindings.json`：方块或实体 id 模式 → 模型层、贴图路径模式（含颜色、木材、变体占位）、静态姿势（箱盖合上、床头床尾、告示牌挂法）。`detect_block_entity`、`detect_mob` 与 `mesher/entity/` 下 38 个几何文件改为查表加载通用几何；旗帜图案合成、告示牌文字、陶罐纹样、玩家皮肤、物品展示框的合成逻辑保留为代码但由绑定驱动。xtask `bake-blocks` 同时从最新 26.x 导出 `entities.dat.z` 随 bundle 发布，供没装游戏和老版本使用。守卫：entity_facing、block_model_entities、uvlock 仍通过；绑定表 lint：每条引用的层在 26.3 的导出里存在、贴图在烘焙包里存在。
+  Acceptance: `forks/schematic-mesher/data/entity_bindings.json`：方块或实体 id 模式 → 模型层、贴图路径模式（含颜色、木材、变体占位）、静态姿势（箱盖合上、床头床尾、告示牌挂法）。`detect_block_entity`、`detect_mob` 与 `mesher/entity/` 下 38 个几何文件改为查表加载通用几何；旗帜图案合成、告示牌文字、陶罐纹样、玩家皮肤、物品展示框的合成逻辑保留为代码但由绑定驱动。xtask `bake-blocks` 用 T6 的导出器对 1.17 及以后的每个版本各导出一次，1.13.2 到 1.16.5 指向 1.17 的几何，合成 `entities.dat.z` 随 bundle 发布；清单里有的版本一律用它，运行时导出只补清单没有的 26.x 版本。守卫：entity_facing、block_model_entities、uvlock 仍通过；绑定表 lint：每条引用的层在 26.3 的导出里存在、贴图在烘焙包里存在。
 - [ ] T8 — P1 · wgpu Entity Renderer：原版实体的完整渲染 (Proposed)
   Acceptance: 投影里的 `Entities`（Nucleation `get_entities_as_list`）按绑定表生成实例（位置、朝向、变体贴图）；gpu.rs 为每个模型层建实例缓冲，一次绘制一层的全部实例，视锥外与超过距离的实例剔除。凡导出里有层且绑定表有条目的原版实体都画出来；没有绑定的实体在「技术详情」里列出，和画不出的方块一样。验收：含 500 个盔甲架的投影，帧时间不高于不含实体时的 1.5 倍（记录测得的毫秒数）；一个含生物的真实投影在 26.3 下目视与游戏一致。
 - [ ] T9 — P2 · View::Studio 与工作室页骨架 (Proposed)
@@ -92,7 +92,7 @@ Consequences: 新 crate lumilio-block-assets 被 xtask、core 与 lumilio-schema
 
 Why: 1.13 的扁平化之后方块状态与模型格式稳定，49 个版本之间大部分贴图与模型相同，去重后一个包比 49 个包省得多，也让「没装游戏」和「老版本」走同一条路。schemat.io 只发一个基础 pack.zip 加用户覆盖层，不按版本区分；我们要跨 49 个版本转换与渲染，必须逐版本。再分发 Mojang 的方块贴图与模型改变了 ADR 0027/0028「启动器从不保存 Mojang 资源」的立场：同类工具（schemat.io、mcasset.cloud、Blockbench 的实体向导）都这样做，但这是 Project Maintainer 要确认的许可取舍。
 
-Consequences: 下载是后台任务，界面只说一句「正在准备 26.3 的方块资源」；设置里可以关掉自动下载；bundle 的许可说明放在它自己的 NOTICE 里；ATTRIBUTIONS.md 与 design-language.md 里关于「从不保存」的句子改写。
+Consequences: 下载是后台任务，界面只说一句「正在准备 26.3 的方块资源」；设置里可以关掉自动下载；bundle 的许可说明放在它自己的 NOTICE 里；ATTRIBUTIONS.md 与 design-language.md 里关于「从不保存」的句子改写。清单附带的 entities.dat.z 是从 Mojang 代码里导出的几何数据，与方块贴图同属再分发范围，一并写进 NOTICE；生成它用到的官方映射表按其许可只在烘焙时使用，不再分发。
 
 ## Decision D3
 
@@ -104,11 +104,11 @@ Consequences: core 的 schematic_assets 要能同时读本机缓存与 bundle；
 
 ## Decision D4
 
-实体几何用一个很小的 Java 导出器在启动器自己的 Java 运行时上跑，调用 LayerDefinitions.createRoots() 走反射导出，而不是在 Rust 里做字节码解释；只对 26.x 不混淆的客户端运行；bundle 附带从最新 26.x 导出的 entities.dat.z，老版本与没装游戏时复用它。
+实体几何由一个很小的 Java 反射导出器取得：调用 LayerDefinitions.createRoots() 把全部模型层导出成通用几何 JSON，不用 Vineflower 反编译再解析源码，也不在 Rust 里做字节码解释。同一份导出器有两个运行时机，输出一字不差：默认在烘焙时由 xtask 对 1.17 及以后的 49 个版本各跑一次（混淆版本经 Mojang 官方映射表换名），结果作为 entities.dat.z 随清单发布；运行时只对清单还没覆盖、且不混淆的 26.x jar 在玩家机器上跑一次并缓存。1.13.2 到 1.16.5 复用 1.17 的几何。
 
-Why: 启动器本来就管理 Java 运行时与完整的启动类路径，导出器一两百行就能得到与游戏一字不差的几何；字节码解释器要维护一个小型 JVM，收益只是省一次 JVM 启动。方块实体（箱、床、告示牌、旗帜、潜影盒、钟、陶罐）的几何自 1.14 的模型系统起基本没变，复用最新几何对老版本是可接受的近似；贴图仍取自对应版本。老版本要做到精确需要 Mojang 映射表，另开计划。
+Why: createRoots() 是无参静态方法，反射走一遍就是与游戏一字不差的数字；反编译成文本再解析要写半个编译器，遇到循环生成的部件和常量折叠就要猜。导出在哪里跑不影响渲染效果，只影响运营：烘焙时跑玩家零等待、错误在 CI 上一次暴露、49 个版本过同一套 lint；运行时跑是新版本（清单还没来得及重烘焙的 26.x 正式版与快照）的唯一出路，所以保留为逃生口而不是主路。混淆版本若在运行时处理，还要在玩家机器上再下载映射表，多一件可错的事，故只在烘焙时做。1.17 以前几何写在各模型类与渲染器的构造器里，拉起它们要渲染上下文；箱子、床、告示牌、旗帜、潜影盒的形状自 1.14 起没变过，复用是可接受的近似，贴图仍取各自版本。
 
-Consequences: tools/entity-dump 的源码与编译产物入库，附重建命令；导出失败只让当次预览退回 entities.dat.z；Windows 上必须走 background_command。
+Consequences: tools/entity-dump 的源码与编译产物入库，附重建命令；xtask 多一个 Mojang 映射表（ProGuard 格式）解析器，映射表只在烘焙时读取、不进仓库也不随清单分发；运行时导出失败只让当次预览退回 entities.dat.z；Windows 上必须走 background_command；老版本要做到精确需要另开计划。
 
 ## Decision D5
 
