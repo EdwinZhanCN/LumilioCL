@@ -22,13 +22,13 @@ Status: InProgress
   Acceptance: WorldInfo 从 level.dat 的 Data.GameType 与 Data.allowCommands 读出游戏模式和是否允许作弊；读不到时为空，不影响其他字段；有单元测试
 - [x] T2 — core：MOTD 保留颜色与样式 (Completed)
   Acceptance: ServerStatus.motd 是带颜色、粗体、斜体、下划线、删除线、乱码标记的片段；JSON 组件（含 extra 继承、数组、#RRGGBB）与 § 代码（含 §r、颜色清除样式、未知代码跳过）按游戏的规则解析；纯文字仍可取；有单元测试
-- [x] T3 — kit：分型的列表行、信号格与 MOTD 显示窗 (Completed)
+- [x] T3 — kit：分型的列表行、信号格与行内 MOTD (Completed)
   Acceptance: 列表行接收一组带类型的信息（状态、标签、读数、文字）统一排版；信号格按延迟点亮 1–5 格（绿色，同游戏）并在悬停时给出毫秒数；MOTD 在行内按片段着色，每种颜色只调到在页面上读得清（4.5:1），最多两行
 - [x] T4 — 页面迁移 (Completed)
   Acceptance: 世界、服务器、接着玩、游戏库卡片、导航切换列表不再拼接「 · 」；ia 注释与生成的路径表同步
 - [x] T5 — 设计语言与文案 (Completed)
-  Acceptance: design-language §12 写入列表行、信号格和 MOTD 显示窗；新文案在中英文目录里
-- [ ] T6 — 窗口检查 (InProgress)
+  Acceptance: design-language §12 写入列表行、信号格和行内 MOTD；新文案在中英文目录里
+- [x] T6 — 窗口检查 (Completed)
   Acceptance: 在临时数据目录里放入代表性的世界和服务器，截图检查浅色、深色、英文与 720 px 窗口；Project Maintainer 确认
 - [ ] T7 — MOTD 像素字体 (Proposed)
   Acceptance: 从已安装游戏的客户端 jar（ascii、accented、nonlatin_european）和资源索引里的 unifont 读字形，在 canvas 中画出与游戏一致的像素字；读不到字体时退回界面字体并保留颜色
@@ -36,9 +36,9 @@ Status: InProgress
 ## Validation
 
 - core 与 UI 的聚焦测试
-  Result: core 的 worlds、servers、motd 测试通过；lumilio-ui 的 kit、instance_detail、live、shell、pages、navigation、i18n 测试与英文目录测试通过。服务器行的测试在窗口里检查读数、信号格、MOTD 窗与离线、正在检查、无计数时的在线各自画出。完整 just check 由 Project Maintainer 运行。
+  Result: core 的 worlds、servers、motd 测试通过；lumilio-ui 的 kit、instance_detail、live、shell、pages、navigation、i18n 测试与英文目录测试通过。服务器行的测试在窗口里检查读数、信号格、MOTD 与离线、正在检查、无计数时的在线各自画出；行的测试检查行首图片与 MOTD 垂直居中、MOTD 在名称块之后开始、窄行里换到名称下方；首页的测试检查「接着玩」画出服务器的人数、信号格和 MOTD。完整 just check 由 Project Maintainer 运行。
 - 窗口检查
-  Result: pending
+  Result: 在临时数据目录里用代表性的世界和本机假服务器截图检查了世界页与首页的浅色、深色和 720 px 窗口：MOTD 与名称同一行，游戏颜色在两种底色上都读得清，信号格为绿色，窄窗口与首页「接着玩」里 MOTD 换到名称下方。Project Maintainer 看过后确认。
 
 ## Decision D1
 
