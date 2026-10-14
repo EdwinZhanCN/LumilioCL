@@ -89,8 +89,8 @@ pub const fn signal_bars(latency_ms: u64) -> usize {
     }
 }
 
-/// Signal bars: five rising bars, lit in ink by [`signal_bars`]. The
-/// tooltip gives the round trip in milliseconds.
+/// Signal bars: five rising bars, lit green by [`signal_bars`] as in the
+/// game. The tooltip gives the round trip in milliseconds.
 pub fn signal(
     id: impl Into<ElementId>,
     latency_ms: u64,
@@ -110,7 +110,7 @@ pub fn signal(
                 .h(px(4. + 2. * bar as f32))
                 .rounded(px(1.))
                 .bg(if bar < lit {
-                    colors.foreground
+                    colors.body.ok
                 } else {
                     colors.body.led_off
                 })
@@ -266,8 +266,9 @@ impl Item {
                 }))
         });
         // The picture, the name block, the readings and the keys share one
-        // line; what needs a line of its own goes under it, so a tall row
-        // keeps its picture beside its name.
+        // line; what needs a line of its own goes under it at the name
+        // block's spacing, so a tall row keeps its picture and readings
+        // beside its name.
         let line = h_flex()
             .w_full()
             .min_h(LEAD_SIZE)
@@ -303,7 +304,7 @@ impl Item {
                 v_flex()
                     .flex_1()
                     .min_w_0()
-                    .gap(px(8.))
+                    .gap(px(4.))
                     .child(line)
                     .children(self.below),
             )

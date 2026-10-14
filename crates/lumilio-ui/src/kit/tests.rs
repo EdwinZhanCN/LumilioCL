@@ -3,7 +3,8 @@ use gpui::prelude::*;
 use gpui::{IntoElement, Render, TestAppContext, Window, div};
 use gpui_component::{Theme, ThemeMode};
 
-use super::{TagKind, list, lit_bars, motd_lines, motd_window, panel_list, signal_bars, tag};
+use super::motd::motd_color;
+use super::{TagKind, list, lit_bars, motd_lines, panel_list, signal, signal_bars, tag};
 use crate::theme::{self, ShellColors};
 
 struct Sheet;
@@ -28,9 +29,10 @@ impl Render for Sheet {
                 TagKind::Orange,
                 colors,
             )))
-            .children(
-                motd_window(&lumilio_core::Motd::from_legacy("§eHello"), colors)
-                    .map(|window| window.debug_selector(|| "motd".into())),
+            .child(
+                div()
+                    .debug_selector(|| "signal".into())
+                    .child(signal("signal", 120, colors)),
             )
     }
 }
@@ -94,12 +96,34 @@ fn a_hairline_table_has_an_ink_rule_on_top_and_hairlines_beneath(cx: &mut TestAp
                 .any(|quad| quad.background.as_solid() == Some(body.orange)),
             "{mode:?}: the orange tag fills with the signal orange"
         );
-        assert!(
-            quads(cx, "motd")
-                .iter()
-                .any(|quad| quad.background.as_solid() == Some(body.display)),
-            "{mode:?}: a server's message sits on the dark display, as in the game"
+        let lit = quads(cx, "signal")
+            .iter()
+            .filter(|quad| quad.background.as_solid() == Some(body.ok))
+            .count();
+        assert_eq!(
+            lit, 5,
+            "{mode:?}: a quick round trip lights five green bars"
         );
+    }
+}
+
+#[test]
+fn a_message_keeps_the_games_colours_where_the_page_can_read_them() {
+    use lumilio_core::Motd;
+    for dark in [false, true] {
+        let body = theme::Body::of(dark);
+        let colors = ShellColors::of(body);
+        let spans = Motd::from_legacy("plain §fwhite §cred").spans;
+        let [plain, white, red] = spans.as_slice() else {
+            panic!("three runs: {spans:?}")
+        };
+        assert_eq!(motd_color(plain, colors), body.muted, "uncoloured is muted");
+        for span in [white, red] {
+            let shown = motd_color(span, colors);
+            assert!(theme::contrast(shown, body.page) >= 4.5, "{span:?} reads");
+        }
+        let red_hue = gpui::Hsla::from(gpui::rgb(0xff_5555)).h;
+        assert_eq!(motd_color(red, colors).h, red_hue, "red stays red");
     }
 }
 
@@ -113,7 +137,7 @@ fn signal_bars_follow_the_games_round_trip_steps() {
 }
 
 #[test]
-fn a_message_window_shows_two_lines_without_the_space_around_them() {
+fn a_message_shows_two_lines_without_the_space_around_them() {
     use lumilio_core::Motd;
     let text = |motd: &str| -> Vec<String> {
         motd_lines(&Motd::from_legacy(motd))

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "list-facts",
   "title": "世界与游戏列表的信息分型",
-  "summary": "列表不再把状态、版本、时间和数值拼成一行「文字 · 文字」；每种信息按设计语言 §12 的形式画：状态是 LED 和一个词，属性和版本是标签，时间和数值是行尾读数，延迟是信号格，服务器 MOTD 放在显示窗里用游戏颜色。",
+  "summary": "列表不再把状态、版本、时间和数值拼成一行「文字 · 文字」；每种信息按设计语言 §12 的形式画：状态是 LED 和一个词，属性和版本是标签，时间和数值是行尾读数，延迟是绿色信号格，服务器 MOTD 在行内用游戏颜色。",
   "status": "in_progress",
   "visibility": "internal",
   "scope": {
@@ -21,7 +21,7 @@
   "tasks": [
     {"id": "T1", "title": "core：世界的游戏模式与作弊", "status": "completed", "acceptance": "WorldInfo 从 level.dat 的 Data.GameType 与 Data.allowCommands 读出游戏模式和是否允许作弊；读不到时为空，不影响其他字段；有单元测试"},
     {"id": "T2", "title": "core：MOTD 保留颜色与样式", "status": "completed", "acceptance": "ServerStatus.motd 是带颜色、粗体、斜体、下划线、删除线、乱码标记的片段；JSON 组件（含 extra 继承、数组、#RRGGBB）与 § 代码（含 §r、颜色清除样式、未知代码跳过）按游戏的规则解析；纯文字仍可取；有单元测试"},
-    {"id": "T3", "title": "kit：分型的列表行、信号格与 MOTD 显示窗", "status": "completed", "acceptance": "列表行接收一组带类型的信息（状态、标签、读数、文字）统一排版；信号格按延迟点亮 0–4 格并在悬停时给出毫秒数；MOTD 显示窗用游戏颜色画在深色窗里，按片段着色，最多两行"},
+    {"id": "T3", "title": "kit：分型的列表行、信号格与 MOTD 显示窗", "status": "completed", "acceptance": "列表行接收一组带类型的信息（状态、标签、读数、文字）统一排版；信号格按延迟点亮 1–5 格（绿色，同游戏）并在悬停时给出毫秒数；MOTD 在行内按片段着色，每种颜色只调到在页面上读得清（4.5:1），最多两行"},
     {"id": "T4", "title": "页面迁移", "status": "completed", "acceptance": "世界、服务器、接着玩、游戏库卡片、导航切换列表不再拼接「 · 」；ia 注释与生成的路径表同步"},
     {"id": "T5", "title": "设计语言与文案", "status": "completed", "acceptance": "design-language §12 写入列表行、信号格和 MOTD 显示窗；新文案在中英文目录里"},
     {"id": "T6", "title": "窗口检查", "status": "in_progress", "acceptance": "在临时数据目录里放入代表性的世界和服务器，截图检查浅色、深色、英文与 720 px 窗口；Project Maintainer 确认"},
@@ -32,9 +32,10 @@
     {"criterion": "窗口检查", "result": null}
   ],
   "decisions": [
-    {"id": "D1", "decision": "MOTD 放在深色显示窗里，用游戏自己的颜色", "rationale": "MOTD 是服务器写的游戏内容，不是界面；游戏的黄字、白字按深底设计，放在铝面上看不清", "consequences": "游戏的彩色只出现在窗内，界面仍只有橙色一种强调色；§12 显示窗规则增加这一处"},
+    {"id": "D1", "decision": "MOTD 在行内显示，用游戏自己的颜色，每种颜色只调亮度到在页面上读得清", "rationale": "MOTD 是服务器写的游戏内容。第一版把它放在深色显示窗里，在浅色列表里太重，Project Maintainer 看过后改为行内。游戏的白字、黄字按黑底设计，直接放在铝面上读不清，所以按 4.5:1 调亮度，色相不变", "consequences": "游戏的颜色只出现在 MOTD 里，不算界面的强调色；未着色的文字用 muted"},
     {"id": "D2", "decision": "极限与游戏模式用 ink 标签，不用橙色", "rationale": "设计语言规定一个区域最多一个橙色标签，一个列表里可能有多个极限世界", "consequences": "橙色留给正在游玩的 LED"},
-    {"id": "D3", "decision": "像素字体分成下一步（T7）", "rationale": "需要在 core 读字形并按游戏版本缓存，单独一步更好检查；带颜色的界面字体同时是像素字体读不到时的退回", "consequences": "这一轮的 MOTD 是界面字体加游戏颜色"}
+    {"id": "D3", "decision": "像素字体分成下一步（T7）", "rationale": "需要在 core 读字形并按游戏版本缓存，单独一步更好检查；带颜色的界面字体同时是像素字体读不到时的退回", "consequences": "这一轮的 MOTD 是界面字体加游戏颜色"},
+    {"id": "D4", "decision": "信号格点亮用成功绿", "rationale": "游戏的信号格是绿色；ink 色的格子看起来像一段普通读数", "consequences": "绿色除了 LED，也用于信号格"}
   ],
   "references": [
     "docs/design-language.md",

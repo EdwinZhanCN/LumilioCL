@@ -28,7 +28,7 @@ pub use self::frame::{
 pub use self::item::{Item, Tone, count_of, cover_tile, reading, signal, signal_bars, status};
 pub use self::menu::{MenuAction, MenuEntry, PageActions, more_menu, small_more_menu};
 pub use self::meter::{Reading, lit_bars, progress, reading_digits, record};
-pub use self::motd::{motd_lines, motd_window};
+pub use self::motd::{motd_lines, motd_text};
 pub use self::rich::rich_text;
 pub use self::rows::{
     empty, info, list, panel_list, row, section, section_at, section_head, section_label, setting,

@@ -368,7 +368,12 @@ hand.
 Orange that fills something uses the fill token; orange that is read as
 text uses the text token. On night they are the same colour; on aluminium
 the bright fill reads at only 2.8:1, so text takes a deeper orange. It never fills decoration, never sets body text, and a region
-never has two orange keys. Success uses a green LED.
+never has two orange keys. Success uses a green LED and the green of
+signal bars.
+
+A server's message of the day is the one place the game's own colours
+appear (List rows, below). They are the server's words, not accents of the
+interface.
 
 **Danger** sits only 14° of hue from the signal orange, so the two are kept
 apart by place, not by hue alone:
@@ -405,10 +410,10 @@ apart by place, not by hue alone:
   when set.
 - **Radio**: the control is an LED in a 14 px recessed socket, lit when
   chosen.
-- **Signal bars**: five rising 3 px bars for a server's round trip, lit in
-  ink by the game's own steps (five under 150 ms, then one fewer at 300,
-  600 and 1000 ms); the tooltip gives the milliseconds. They appear only
-  beside a server's player count.
+- **Signal bars**: five rising 3 px bars for a server's round trip, lit
+  green as in the game by its own steps (five under 150 ms, then one fewer
+  at 300, 600 and 1000 ms); the tooltip gives the milliseconds. They appear
+  only beside a server's player count.
 
 ### Port-label tabs
 
@@ -549,6 +554,12 @@ into one line with "·". Each fact takes the form of what it is
 - under the name, **tags** (a mode is ink: 生存, 极限; a version or a plain
   fact is plain: 作弊, 1.21.1) and then a **note** in muted mono (an address,
   a folder that differs from the name);
+- under those, a server's **message of the day**: at most two lines
+  without the space around them, in the interface face with the game's
+  colours and styles. Each colour is darkened or lightened only until it
+  reads on the page at 4.5:1, so the server's red stays red; uncoloured
+  text is muted. It has no window: a dark block in a light list is heavier
+  than the message;
 - on the trailing edge, **readings** in mono at a common minimum width, so
   rows keep their keys in line: a time ("3 天前"), a count ("12/100", the
   count in ink and the limit muted), signal bars;
@@ -566,11 +577,7 @@ Instance cards are faceplates:
 - **Display window**: the cover sits in it (3 px radius, no dissolve). This
   is the one place the world is framed; the navigation's instance thumbnails
   (28 px chip, 32 px popover rows) and list rows' leading pictures are the
-  same window. A server's message of the day is the one text from the game
-  that is framed: it sits in the same dark window, in mono, with the game's
-  own colours and styles (its uncoloured text is the game's grey), at most
-  two lines without the space around them. The game's colours appear
-  nowhere outside that window.
+  same window.
 - **Bottom**: the game version as a plain tag and, on the trailing edge,
   when it was last played as a mono reading; then the key row.
 - Hover turns the border ink.
