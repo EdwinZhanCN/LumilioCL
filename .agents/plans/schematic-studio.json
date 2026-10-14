@@ -3,7 +3,7 @@
   "id": "schematic-studio",
   "title": "投影工作室：数据驱动的资源管线与工作室界面",
   "summary": "现状：投影插件只列文件、读元数据、导材料清单，3D 预览在弹窗里。渲染链路是「实例 client.jar → core 复制方块资源成 zip（model_assets）→ Nucleation 的 normalize_zip 把 26.x 的 JSON 改写成网格器 0.2 的写法 → Schematic-Mesher 用 38 个手抄的实体几何文件、手写的着色表和贴图别名表画方块 → Nucleation wgpu 渲染」。每来一个游戏版本，就在 forks/ 里再补一处补丁（schematic-render-parity 的 T2、T3、T4、T7 都是这种补丁），没装游戏就没有预览，老版本和 Mod 方块各自缺一块。本计划把它换成三段数据驱动的管线：Instance Asset Resolver（按投影的数据版本与实例情况挑资源来源：26.x 已安装的客户端本机烘焙；其他版本与没装游戏时下载预先烘焙的 blocks.dat.z，覆盖从 1.13.2 到 26.3 的 49 个正式版；实例的 Mod JAR 与资源包作为覆盖层）、Entity Model Extractor（26.x 起客户端不混淆，用启动器自己的 Java 运行时把 LayerDefinitions 导出成通用几何 JSON，本地缓存；更老的版本复用最新几何）、wgpu Entity Renderer（解析投影里的实体 NBT，按绑定表生成实例，批量绘制并剔除）。只有烘焙器认识 Mojang 的资源布局，运行时只读烘焙格式，现有的手写补丁模式整个删除。界面从弹窗改成宿主自己画的工作室页：左边投影目录树，中间常驻视口（多角度、PNG 导出、点选方块），右边检视器（方块与方块状态统计、实体统计、元数据编辑、操作历史）；按方块状态批量替换、跨版本转换、重复文件检测、操作前备份与恢复都走插件写权限与宿主的校验写入。视觉仍是仪器语言：方块是世界层，周围的面板、键、端口标签、硬线表格是界面层。",
-  "status": "proposed",
+  "status": "in_progress",
   "visibility": "internal",
   "scope": {
     "included": [
@@ -163,7 +163,7 @@
     },
     {
       "criterion": "资源再分发：D2 的许可取舍由 Project Maintainer 确认后才发布 bundle；确认记录在本计划。",
-      "result": null
+      "result": "Project Maintainer 2026-10-13 接受 D2 的许可取舍：预烘焙的 blocks.dat.z 与 entities.dat.z 可以发布，缓解措施按 D2 执行。"
     }
   ],
   "decisions": [
