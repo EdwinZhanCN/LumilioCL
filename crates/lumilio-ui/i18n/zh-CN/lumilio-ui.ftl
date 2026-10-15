@@ -738,6 +738,7 @@ model-undrawable-entities = 有 { $count } 种实体这个游戏版本画不出�
 model-read-failed = 没能读取 3D 预览
 model-assets-missing = 暂时准备不了方块资源
 model-assets-offline = 没有网络，方块资源还没下载过
+model-assets-unavailable = 方块资源服务器上还没有这份资源（网络没有问题）
 model-assets-download-off = 自动下载方块资源已关闭，方块资源还没下载过
 model-capture-unsupported = 当前窗口系统暂不支持鼠标捕获，请使用 Orbital 模式
 model-capture-failed = 没能捕获鼠标，点击画面重试

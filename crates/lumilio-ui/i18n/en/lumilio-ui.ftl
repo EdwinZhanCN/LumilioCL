@@ -806,6 +806,7 @@ model-undrawable-entities = { $count ->
 model-read-failed = Couldn't read the 3D preview
 model-assets-missing = Block assets can't be prepared right now
 model-assets-offline = No network, and the block assets aren't downloaded yet
+model-assets-unavailable = The block-asset server doesn't have these assets yet. Your network is fine.
 model-assets-download-off = Automatic block asset download is off, and the block assets aren't downloaded yet
 model-capture-unsupported = The current window system doesn't support mouse capture yet; use Orbital mode
 model-capture-failed = Couldn't capture the mouse; click the view to try again

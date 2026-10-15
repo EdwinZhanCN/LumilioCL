@@ -728,6 +728,7 @@ impl Viewer {
             self.state = State::Failed {
                 message: match preview.plan.notice {
                     Some(AssetNotice::Offline) => tr!("model-assets-offline"),
+                    Some(AssetNotice::Unavailable) => tr!("model-assets-unavailable"),
                     Some(AssetNotice::DownloadDisabled) => tr!("model-assets-download-off"),
                     Some(AssetNotice::Unreadable) => tr!("model-error-pack"),
                     None => tr!("model-assets-missing"),

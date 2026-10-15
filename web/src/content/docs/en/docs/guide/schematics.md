@@ -32,7 +32,7 @@ The bundle has every release version from 1.13.2 to the latest.
 
 - The launcher downloads the bundle one time, examines its checksum, and keeps it in the launcher data folder.
 - **Activity** shows the download as "Prepare block assets for …". The progress shows in bytes, and you can cancel the download.
-- If there is no network connection and the bundle is not downloaded, the viewport shows a message.
+- If there is no network connection and the bundle is not downloaded, the viewport shows a message. If the server answers but does not have the bundle yet, the message tells you that your network is not the problem.
 
 To stop the automatic download, turn off **Settings › Downloads & storage › Download block assets automatically**.
 The launcher then downloads nothing. A bundle that is already downloaded stays in use.

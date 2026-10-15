@@ -75,6 +75,24 @@ fn futures_block<F: std::future::Future>(future: F) -> F::Output {
     tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(future))
 }
 
+/// A host that answers without the index (here a page that is not one, as
+/// a 404 page would be) is not the network being down: the preview says the
+/// server does not have the assets.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_host_without_the_bundle_is_not_reported_as_offline() {
+    let (world, id) = world_with_schematic().await;
+    world
+        .net
+        .answer("block-assets/1/blocks.json", "<html>Not Found</html>");
+    let preview = world
+        .service
+        .plugin_model(&id, "test.builder", HOUSE)
+        .await
+        .unwrap();
+    assert!(preview.pack.is_none());
+    assert_eq!(preview.plan.notice, Some(AssetNotice::Unavailable));
+}
+
 /// D23: an installed game's jar is never baked. Offline the preview says
 /// so; online it is drawn with the bundle's pack.
 #[tokio::test(flavor = "multi_thread")]

@@ -26,6 +26,7 @@ pub fn resolve(
     let index = match bundle {
         BundleReach::Index(index) => index,
         BundleReach::Offline => return without(AssetNotice::Offline),
+        BundleReach::Unavailable => return without(AssetNotice::Unavailable),
         BundleReach::Disabled => return without(AssetNotice::DownloadDisabled),
     };
     let version = index

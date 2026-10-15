@@ -78,8 +78,11 @@ pub struct InstalledClient {
 #[derive(Clone, Copy, Debug)]
 pub enum BundleReach<'a> {
     Index(&'a BundleIndex),
-    /// No network (or the server did not answer) and nothing cached.
+    /// No network (or the host could not be reached) and nothing cached.
     Offline,
+    /// The host answered but has no usable index there (not published yet,
+    /// or a wrong address), and nothing cached.
+    Unavailable,
     /// Automatic download is turned off in settings and nothing is cached.
     Disabled,
 }
@@ -136,6 +139,9 @@ impl PlannedSource {
 pub enum AssetNotice {
     /// No network, and the bundle was never downloaded.
     Offline,
+    /// The host answered without the bundle, and it was never downloaded:
+    /// the network is fine.
+    Unavailable,
     /// Automatic download is off, and the bundle was never downloaded.
     DownloadDisabled,
     /// The sources were there but could not be read.
@@ -158,6 +164,9 @@ pub enum SchematicAssetsError {
     Index(String),
     /// The bundle could not be fetched.
     Download(String),
+    /// The host answered without the bundle (an error status, or an index
+    /// that is not one).
+    NotServed(String),
     /// The plan has no base source.
     NoBase,
     /// The entity dumper could not run or failed (the bake's test runner).
@@ -179,6 +188,9 @@ impl Display for SchematicAssetsError {
             ),
             Self::Index(reason) => write!(f, "the block-asset index is unreadable: {reason}"),
             Self::Download(reason) => write!(f, "the block assets could not be fetched: {reason}"),
+            Self::NotServed(reason) => {
+                write!(f, "the block assets are not on the server: {reason}")
+            }
             Self::NoBase => f.write_str("there are no block assets to draw with"),
             Self::EntityDump(reason) => write!(f, "the entity geometry dump failed: {reason}"),
             Self::Io(error) => write!(f, "{error}"),

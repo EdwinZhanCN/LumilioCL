@@ -176,7 +176,10 @@ impl<T: Transport + Clone> LauncherService<T> {
         store
             .fetch_index(&self.transport, &chain)
             .await
-            .map_err(|_| BundleUnreachable::Offline)
+            .map_err(|error| match error {
+                SchematicAssetsError::NotServed(_) => BundleUnreachable::Unavailable,
+                _ => BundleUnreachable::Offline,
+            })
     }
 
     /// The game's names for blocks, items and entities (plan
@@ -405,6 +408,8 @@ impl<T: Transport + Clone> LauncherService<T> {
 #[derive(Clone, Copy, Debug)]
 enum BundleUnreachable {
     Offline,
+    /// The host answered without the index.
+    Unavailable,
     Disabled,
 }
 
@@ -412,6 +417,7 @@ impl BundleUnreachable {
     const fn reach(self) -> BundleReach<'static> {
         match self {
             Self::Offline => BundleReach::Offline,
+            Self::Unavailable => BundleReach::Unavailable,
             Self::Disabled => BundleReach::Disabled,
         }
     }
@@ -420,6 +426,7 @@ impl BundleUnreachable {
         ServiceError::Install(
             match self {
                 Self::Offline => "block asset index unreachable",
+                Self::Unavailable => "block asset index not on the server",
                 Self::Disabled => "block asset download is off",
             }
             .to_owned(),

@@ -315,6 +315,10 @@ fn no_block_assets_says_why_in_one_calm_sentence(cx: &mut TestAppContext) {
     for (notice, sentence) in [
         (Some(AssetNotice::Offline), "没有网络，方块资源还没下载过"),
         (
+            Some(AssetNotice::Unavailable),
+            "方块资源服务器上还没有这份资源（网络没有问题）",
+        ),
+        (
             Some(AssetNotice::DownloadDisabled),
             "自动下载方块资源已关闭，方块资源还没下载过",
         ),

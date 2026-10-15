@@ -102,10 +102,10 @@ async fn decoding_failure_retains_each_source_reason() {
     .unwrap_err();
     assert_eq!(
         error,
-        FetchError::Exhausted(vec![
-            ("a".into(), "first".into()),
-            ("b".into(), "second".into())
-        ])
+        FetchError::Exhausted {
+            attempts: vec![("a".into(), "first".into()), ("b".into(), "second".into())],
+            answered: true,
+        }
     );
     assert_eq!(
         fetch_decoded(&web, &[] as &[&str], Ok::<_, std::convert::Infallible>).await,

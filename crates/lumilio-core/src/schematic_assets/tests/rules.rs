@@ -136,6 +136,9 @@ fn out_of_reach_is_one_calm_notice_and_no_sources_even_with_games_installed() {
     let offline = resolve(&facts, Some(5023), BundleReach::Offline);
     assert!(offline.sources.is_empty(), "{:?}", offline.sources);
     assert_eq!(offline.notice, Some(AssetNotice::Offline));
+    let unavailable = resolve(&facts, Some(5023), BundleReach::Unavailable);
+    assert!(unavailable.sources.is_empty(), "{:?}", unavailable.sources);
+    assert_eq!(unavailable.notice, Some(AssetNotice::Unavailable));
     let disabled = resolve(&facts, Some(3465), BundleReach::Disabled);
     assert!(disabled.sources.is_empty(), "{:?}", disabled.sources);
     assert_eq!(disabled.notice, Some(AssetNotice::DownloadDisabled));

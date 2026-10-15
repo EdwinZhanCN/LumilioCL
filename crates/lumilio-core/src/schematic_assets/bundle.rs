@@ -79,7 +79,13 @@ impl BundleStore {
             BundleIndex::parse(&bytes).map(|index| (index, bytes))
         })
         .await
-        .map_err(|error| SchematicAssetsError::Download(error.to_string()))?;
+        .map_err(|error| {
+            if error.answered() {
+                SchematicAssetsError::NotServed(error.to_string())
+            } else {
+                SchematicAssetsError::Download(error.to_string())
+            }
+        })?;
         let dir = self.dir.clone();
         let _ = tokio::task::spawn_blocking(move || -> std::io::Result<()> {
             fs::create_dir_all(&dir)?;
