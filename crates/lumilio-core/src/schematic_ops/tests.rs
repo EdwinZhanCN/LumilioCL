@@ -311,3 +311,44 @@ fn replace_schemes_are_kept_and_recent_targets_come_first() {
     write(&path, &schemes).unwrap();
     assert_eq!(read(&path), schemes);
 }
+
+/// T40: every kept copy is listed with the file it came from, newest
+/// first, and one that no log line names can still be put back.
+#[test]
+fn kept_backups_are_listed_and_a_loose_one_restores() {
+    let fx = fixture();
+    assert!(backups(&fx.folder).unwrap().is_empty(), "none kept yet");
+    let (_, info) = describe(&fx.target).unwrap();
+    let first = apply(
+        &fx.folder,
+        &fx.target,
+        FILE,
+        b"edited",
+        Some(&info),
+        &replace(),
+        1,
+    )
+    .unwrap();
+    let kept = backups(&fx.folder).unwrap();
+    assert_eq!(kept.len(), 1);
+    assert_eq!(Some(kept[0].path.as_str()), first.backup.as_deref());
+    assert_eq!(kept[0].file, FILE);
+    assert_eq!(kept[0].size, b"original".len() as u64);
+
+    // The log is lost; the copy is not.
+    fs::remove_file(fx.folder.join(LOG_FILE)).unwrap();
+    assert!(history(&fx.folder).unwrap().is_empty());
+    let restored = restore_backup(&fx.folder, &fx.target, FILE, &kept[0].path, 2).unwrap();
+    assert_eq!(fs::read(&fx.target).unwrap(), b"original");
+    assert_eq!(restored.operation, RESTORE);
+    assert_eq!(restored.restores, None);
+    assert_eq!(restored.summary, kept[0].path);
+    let now = backups(&fx.folder).unwrap();
+    assert_eq!(now.len(), 2, "the edited file was kept before");
+    assert!(
+        now.iter()
+            .any(|copy| Some(copy.path.as_str()) == restored.backup.as_deref())
+    );
+
+    assert!(restore_backup(&fx.folder, &fx.target, FILE, "../elsewhere", 3).is_err());
+}

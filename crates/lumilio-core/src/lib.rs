@@ -185,7 +185,7 @@ pub use schematic_assets::{
     SchematicAssetsError, SourceRole, run_dumper,
 };
 pub use schematic_ops::schemes::{ReplaceSchemes, SchemeRow};
-pub use schematic_ops::{SchematicLogEntry, SchematicOperation};
+pub use schematic_ops::{KeptBackup, SchematicLogEntry, SchematicOperation};
 pub use screenshots::{ScreenshotError, ScreenshotInfo};
 pub use servers::{PackPolicy, PingError, ProtocolVersion, ServerEntry, ServerError, ServerStatus};
 pub use service::{

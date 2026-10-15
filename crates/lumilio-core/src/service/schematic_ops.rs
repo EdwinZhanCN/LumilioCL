@@ -147,6 +147,47 @@ impl<T: Transport + Clone> LauncherService<T> {
         Ok(blocking_value(move || schematic_ops::history(&folder)).await??)
     }
 
+    /// Every copy in the instance's schematic backups, newest first (T40):
+    /// the history panel matches them to log lines and lists the rest.
+    pub async fn schematic_backups(
+        &self,
+        instance: &str,
+    ) -> Result<Vec<schematic_ops::KeptBackup>, ServiceError> {
+        self.instance(instance).await?;
+        let folder = self.layout.schematic_ops(instance);
+        Ok(blocking_value(move || schematic_ops::backups(&folder)).await??)
+    }
+
+    /// Puts the kept copy `backup` (a [`schematic_ops::KeptBackup::path`])
+    /// back over the file it is a copy of, for a copy no log line names
+    /// (T40). The file must be writable under `plugin`'s grants; the restore
+    /// is logged like any write.
+    pub async fn schematic_restore_backup(
+        &self,
+        instance: &str,
+        plugin: &str,
+        backup: String,
+    ) -> Result<SchematicLogEntry, ServiceError> {
+        self.instance(instance).await?;
+        let manifest = self.plugins.granted(plugin).await?;
+        let _lease = self.reserve_instance(instance)?;
+        let (game, folder) = (
+            self.layout.game(instance),
+            self.layout.schematic_ops(instance),
+        );
+        Ok(blocking_value(move || {
+            let kept = schematic_ops::backups(&folder)?
+                .into_iter()
+                .find(|kept| kept.path == backup)
+                .ok_or_else(|| {
+                    lumilio_plugin_api::PluginError::InvalidInput("no such backup".into())
+                })?;
+            let target = resolve_write(&game, &manifest, &kept.file)?;
+            schematic_ops::restore_backup(&folder, &target, &kept.file, &kept.path, now())
+        })
+        .await??)
+    }
+
     /// Puts back the file as it was before the operation on log line `index`,
     /// from the launcher's own backup. The restore is logged like any write.
     pub async fn schematic_restore(

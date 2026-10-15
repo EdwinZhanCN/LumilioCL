@@ -113,6 +113,59 @@ pub fn remove(
     append(folder, entry)
 }
 
+/// One copy kept in the backups folder (plan schematic-studio, T40), whether
+/// or not a log line names it.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct KeptBackup {
+    /// Relative to the schematic folder, as a log line names it
+    /// (`backups/schematics__house.litematic/1700000000000`).
+    pub path: String,
+    /// The game-relative file it is a copy of, read back from its folder's
+    /// name (`/` is kept as `__`).
+    pub file: String,
+    pub size: u64,
+    /// Seconds since the Unix epoch, from the copy's name.
+    pub time: u64,
+}
+
+/// Every copy in the backups folder, newest first. Nothing kept is empty.
+pub fn backups(folder: &Path) -> Result<Vec<KeptBackup>, PluginError> {
+    let root = folder.join(BACKUP_DIR);
+    let listing = match fs::read_dir(&root) {
+        Ok(listing) => listing,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => return Err(io_error("read", &root, &error)),
+    };
+    let mut kept = Vec::new();
+    for label in listing.flatten() {
+        let Some(name) = label.file_name().to_str().map(str::to_owned) else {
+            continue;
+        };
+        let Ok(copies) = fs::read_dir(label.path()) else {
+            continue;
+        };
+        for copy in copies.flatten() {
+            let Some(stamp) = copy.file_name().to_str().map(str::to_owned) else {
+                continue;
+            };
+            let (Ok(millis), Ok(meta)) = (stamp.parse::<u64>(), copy.metadata()) else {
+                continue;
+            };
+            if !meta.is_file() {
+                continue;
+            }
+            kept.push(KeptBackup {
+                path: format!("{BACKUP_DIR}/{name}/{stamp}"),
+                file: name.replace("__", "/"),
+                size: meta.len(),
+                time: millis / 1000,
+            });
+        }
+    }
+    kept.sort_by(|a, b| b.time.cmp(&a.time).then_with(|| b.path.cmp(&a.path)));
+    Ok(kept)
+}
+
 /// Puts the backup of `entry` back at `game_file`. What is there now is backed
 /// up first, so a restore can itself be undone, and the restore is logged.
 /// A line that made a new file (no backup) is restored by taking the file
@@ -138,6 +191,38 @@ pub fn restore(
         };
         return append(folder, restored);
     };
+    put_back(
+        folder,
+        game_file,
+        &entry.file,
+        backup,
+        Some(entry.index),
+        time,
+    )
+}
+
+/// Puts the kept copy `backup` (a [`KeptBackup::path`]) back at `game_file`,
+/// the game file `file`, as [`restore`] does for a log line: for a copy no
+/// line names (T40). What is there now is backed up first; the restore is
+/// logged with the copy in its summary.
+pub fn restore_backup(
+    folder: &Path,
+    game_file: &Path,
+    file: &str,
+    backup: &str,
+    time: u64,
+) -> Result<SchematicLogEntry, PluginError> {
+    put_back(folder, game_file, file, backup, None, time)
+}
+
+fn put_back(
+    folder: &Path,
+    game_file: &Path,
+    file: &str,
+    backup: &str,
+    restores: Option<usize>,
+    time: u64,
+) -> Result<SchematicLogEntry, PluginError> {
     let source = backup_path(folder, backup)?;
     let bytes = fs::read(&source).map_err(|error| io_error("read", &source, &error))?;
     let current = match fs::symlink_metadata(game_file) {
@@ -147,7 +232,7 @@ pub fn restore(
     };
     let copy = write_checked_keeping(
         game_file,
-        &entry.file,
+        file,
         &bytes,
         current.as_ref(),
         &folder.join(BACKUP_DIR),
@@ -157,10 +242,15 @@ pub fn restore(
         index: 0,
         time,
         operation: RESTORE.into(),
-        file: entry.file.clone(),
+        file: file.to_owned(),
         backup: copy.map(|copy| relative(folder, &copy)).transpose()?,
-        summary: String::new(),
-        restores: Some(entry.index),
+        // A line's restore names the line; a loose copy's names the copy.
+        summary: if restores.is_some() {
+            String::new()
+        } else {
+            backup.to_owned()
+        },
+        restores,
     };
     append(folder, restored)
 }
