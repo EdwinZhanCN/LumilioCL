@@ -30,7 +30,7 @@ pub type Biomes = BTreeMap<String, [u32; 3]>;
 const FACES: [&str; 10] = [
     "top", "up", "all", "end", "side", "texture", "cross", "plant", "pattern", "particle",
 ];
-const MANIFEST: &str = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
+pub(crate) const MANIFEST: &str = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
 
 fn read_entry<R: Read + Seek>(jar: &mut zip::ZipArchive<R>, name: &str) -> Option<Vec<u8>> {
     let entry = jar.by_name(name).ok()?;
@@ -356,7 +356,7 @@ pub fn source_section(
     out
 }
 
-fn curl(url: &str, to: &Path) -> Result {
+pub(crate) fn curl(url: &str, to: &Path) -> Result {
     let status = Command::new("curl")
         .args([
             "--fail",
@@ -375,7 +375,7 @@ fn curl(url: &str, to: &Path) -> Result {
         .ok_or_else(|| format!("download failed: {url}"))
 }
 
-fn sha1_of(path: &Path) -> Result<String> {
+pub(crate) fn sha1_of(path: &Path) -> Result<String> {
     use sha1::{Digest, Sha1};
     let bytes = std::fs::read(path).map_err(|error| format!("{}: {error}", path.display()))?;
     Ok(Sha1::digest(&bytes)
@@ -386,7 +386,8 @@ fn sha1_of(path: &Path) -> Result<String> {
 
 /// The commit the tool runs at, marked `-dirty` when the tool's own sources
 /// differ from it (the table would then not be reproducible from the commit).
-fn commit(root: &Path) -> String {
+/// `sources` are the folders that make up the tool.
+pub(crate) fn commit(root: &Path, sources: &[&str]) -> String {
     let git = |args: &[&str]| {
         Command::new("git")
             .args(args)
@@ -397,7 +398,9 @@ fn commit(root: &Path) -> String {
     };
     let head = git(&["rev-parse", "HEAD"])
         .map_or_else(|| "unknown".to_owned(), |text| text.trim().to_owned());
-    match git(&["status", "--porcelain", "--", "crates/lumilio-xtask"]) {
+    let mut status = vec!["status", "--porcelain", "--"];
+    status.extend_from_slice(sources);
+    match git(&status) {
         Some(changes) if !changes.trim().is_empty() => format!("{head}-dirty"),
         _ => head,
     }
@@ -468,7 +471,13 @@ pub fn run(version: &str, root: &Path, target: &Path) -> Result {
     let existing = std::fs::read_to_string(&source).unwrap_or_default();
     std::fs::write(
         &source,
-        source_section(&existing, version, &sha1, &commit(root), table.len()),
+        source_section(
+            &existing,
+            version,
+            &sha1,
+            &commit(root, &["crates/lumilio-xtask"]),
+            table.len(),
+        ),
     )
     .map_err(|error| error.to_string())?;
     println!("{version}: {} blocks, {} biomes", table.len(), biomes.len());

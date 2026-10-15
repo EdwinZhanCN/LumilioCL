@@ -3,6 +3,7 @@
 //! This module handles loading Minecraft resource packs (ZIP files or directories)
 //! and parsing their contents including blockstates, models, and textures.
 
+pub mod baked;
 pub mod blockstate;
 pub mod loader;
 pub mod model;
@@ -29,16 +30,40 @@ pub struct ResourcePack {
     /// Key: namespace, Value: map of texture_path to data.
     pub textures: HashMap<String, HashMap<String, TextureData>>,
 
-    /// Names that answer for a texture stored under another path, as full
-    /// `namespace:path` locations, consulted only when the name itself is
-    /// missing. Lets a renamed game texture keep the name the mesher asks for
-    /// without copying its pixels. (LumilioCL local change; see `forks/README.md`.)
-    pub texture_aliases: HashMap<String, String>,
+    /// Biome colormaps sampled for plains by name (`grass`, `foliage`,
+    /// `dry_foliage`), filled from a baked pack; empty for a pack loaded from
+    /// files. The tint table reads them (LumilioCL local change; see
+    /// `forks/README.md`).
+    pub colormap_samples: HashMap<String, [u8; 3]>,
+
+    /// Entity model layers by id (`minecraft:chest#main`), the game version's
+    /// geometry from `entities.dat.z`; empty unless the caller hands them in
+    /// with [`ResourcePack::with_entity_layers`]. Block entities and mobs are
+    /// drawn from these through `data/entity_bindings.json` (LumilioCL local
+    /// change; see `forks/README.md`, plan schematic-studio T7).
+    pub entity_layers: HashMap<String, lumilio_block_assets::EntityLayer>,
+
+    /// What the game version's own renderers used for each entity type
+    /// (`minecraft:bee`), from the same file; an entity without a row in the
+    /// binding table is drawn from its look when it is a living entity's
+    /// (LumilioCL local change, plan schematic-studio T34, D32).
+    pub entity_looks: HashMap<String, lumilio_block_assets::EntityLook>,
+
+    /// Painting variants by id (`minecraft:kebab`): size and picture, from
+    /// the baked pack (LumilioCL local change, plan schematic-studio T35).
+    pub paintings: HashMap<String, lumilio_block_assets::PaintingVariant>,
 }
 
 impl ResourcePack {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// This pack with `layers` as its entity geometry, replacing any it had.
+    pub fn with_entity_layers(mut self, layers: lumilio_block_assets::EntityLayers) -> Self {
+        self.entity_looks = layers.looks.clone().into_iter().collect();
+        self.entity_layers = layers.into_iter().collect();
+        self
     }
 
     /// Get a blockstate definition by full resource location (e.g., "minecraft:stone").
@@ -54,25 +79,23 @@ impl ResourcePack {
     }
 
     /// Get a texture by full resource location (e.g., "minecraft:block/stone").
+    ///
+    /// A baked pack stores every renamed game texture under its newest name
+    /// only; an older name (`entity/bat`, `entity/cat/tabby`, built by the
+    /// entity code at run time) is read through the baker's own rename table,
+    /// `lumilio_block_assets::canonical_texture`, the single list of those
+    /// renames. (LumilioCL local change; see `forks/README.md`.)
     pub fn get_texture(&self, resource_location: &str) -> Option<&TextureData> {
         let (namespace, path) = parse_resource_location(resource_location);
         self.textures
             .get(namespace)
             .and_then(|ns| ns.get(path))
             .or_else(|| {
-                let target = self.texture_aliases.get(&format!("{namespace}:{path}"))?;
-                let (namespace, path) = parse_resource_location(target);
+                let canonical =
+                    lumilio_block_assets::canonical_texture(format!("{namespace}:{path}"));
+                let (namespace, path) = parse_resource_location(&canonical);
                 self.textures.get(namespace).and_then(|ns| ns.get(path))
             })
-    }
-
-    /// Let `name` answer for the texture at `target` while `name` itself is missing.
-    pub fn alias_texture(&mut self, name: &str, target: &str) {
-        let full = |location: &str| {
-            let (namespace, path) = parse_resource_location(location);
-            format!("{namespace}:{path}")
-        };
-        self.texture_aliases.insert(full(name), full(target));
     }
 
     /// Add a blockstate definition.
@@ -143,9 +166,15 @@ impl ResourcePack {
             blockstates,
             models,
             textures,
-            texture_aliases,
+            colormap_samples,
+            entity_layers,
+            entity_looks,
+            paintings,
         } = higher;
-        self.texture_aliases.extend(texture_aliases);
+        self.colormap_samples.extend(colormap_samples);
+        self.entity_layers.extend(entity_layers);
+        self.entity_looks.extend(entity_looks);
+        self.paintings.extend(paintings);
 
         for (ns, entries) in blockstates {
             self.blockstates.entry(ns).or_default().extend(entries);

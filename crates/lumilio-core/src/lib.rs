@@ -39,7 +39,6 @@ mod microsoft;
 mod mirror_presets;
 mod modpack;
 use lumilio_nbt as nbt;
-mod model_assets;
 mod pack_export;
 mod persist;
 mod picture;
@@ -51,6 +50,8 @@ mod release;
 mod repair;
 mod resource_lock;
 mod root_lock;
+mod schematic_assets;
+mod schematic_ops;
 mod screenshots;
 mod servers;
 mod service;
@@ -144,13 +145,13 @@ pub use loader::{
     profile_url as loader_profile_url, recommended as recommended_loader,
     versions_url as loader_versions_url,
 };
+pub use lumilio_block_assets::{BakedPack, BlockCatalog, BlockNames};
 pub use lumilio_plugin_api::PluginState;
 pub use microsoft::{
     AuthError, DeviceCode, MICROSOFT_CLIENT_ID, MicrosoftClient, MinecraftLogin, OAuthTokens,
     Secret, client_id as microsoft_client_id,
 };
 pub use mirror_presets::MirrorPreset;
-pub use model_assets::{ModelAssetsError, ResourcePack};
 pub use modpack::{
     ClientSupport, ModpackError, OVERRIDES_LIMIT, PackFile, PackIndex, PendingDownload,
     extract_overrides, import as import_modpack, is_trusted_source,
@@ -159,6 +160,7 @@ pub use modpack::{
 pub use pack_export::{ExportError, ExportReport, ExportSpec, PackFormat};
 pub use picture::{PictureError, fit_within, png_within};
 pub mod world_map;
+pub use plugins::write::CONFLICT as WRITE_CONFLICT;
 pub use plugins::{
     MapFailure, MapProviders, PluginContentSource, PluginEffect, PluginFinding, PluginHost,
     PluginInfo, PluginStatus, PluginTab,
@@ -178,6 +180,12 @@ pub use repair::{
     InstallationVerifier, IntegrityIssue, RepairError, RepairExecutor, RepairFinding, RepairPlan,
     RepairReport,
 };
+pub use schematic_assets::{
+    AssetNotice, AssetPlan, BUNDLE_URL, BundleIndex, EntityGeometry, PlannedSource, ProvidedSource,
+    SchematicAssetsError, SourceRole, run_dumper,
+};
+pub use schematic_ops::schemes::{ReplaceSchemes, SchemeRow};
+pub use schematic_ops::{KeptBackup, SchematicLogEntry, SchematicOperation};
 pub use screenshots::{ScreenshotError, ScreenshotInfo};
 pub use servers::{
     Motd, MotdSpan, PackPolicy, PingError, ProtocolVersion, ServerEntry, ServerError, ServerStatus,

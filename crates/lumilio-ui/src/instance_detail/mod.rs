@@ -191,6 +191,10 @@ pub struct InstanceDetailView {
     plugin_tabs: Vec<lumilio_core::PluginTab>,
     plugin_open: Option<String>,
     plugin_pages: plugin_tabs::PluginPages,
+    /// A plugin's view that arrived before the tab list named the plugin;
+    /// shown once the list does.
+    early_plugin_views:
+        std::collections::HashMap<String, Result<Option<lumilio_plugin_api::View>, String>>,
     /// Which plugin tabs show should be asked again on the next render.
     refresh_plugin_tabs: bool,
     log_scroll: gpui::ScrollHandle,
@@ -278,6 +282,7 @@ impl InstanceDetailView {
             plugin_tabs: Vec::new(),
             plugin_open: None,
             plugin_pages: std::collections::HashMap::new(),
+            early_plugin_views: std::collections::HashMap::new(),
             refresh_plugin_tabs: false,
             log_scroll: gpui::ScrollHandle::new(),
             plugin_list_scroll: gpui::ScrollHandle::new(),

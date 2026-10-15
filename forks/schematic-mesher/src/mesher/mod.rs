@@ -24,7 +24,7 @@ pub mod liquid;
 pub mod tint;
 
 pub use geometry::{Mesh, Vertex};
-pub use tint::{TintColors, TintProvider};
+pub use tint::{tint_pattern_matches, tint_table_blocks, TintColors, TintProvider};
 
 use crate::atlas::TextureAtlas;
 use crate::error::Result;
@@ -80,6 +80,11 @@ pub struct MesherConfig {
     /// If set, skip per-chunk atlas building and use this pre-built atlas instead.
     /// UVs will be remapped to this atlas's regions. Used for global atlas workflows.
     pub pre_built_atlas: Option<TextureAtlas>,
+    /// Keep the faces between neighbours along this axis, which culling
+    /// would hide, so a slice clipped at any layer shows that layer's faces
+    /// (LumilioCL local change, plan schematic-studio T25). No block is then
+    /// skipped as enclosed: a cut can show any of them.
+    pub keep_faces_along: Option<crate::types::Axis>,
 }
 
 impl Default for MesherConfig {
@@ -99,6 +104,7 @@ impl Default for MesherConfig {
             sky_light_level: 15,
             enable_particles: true,
             pre_built_atlas: None,
+            keep_faces_along: None,
         }
     }
 }
@@ -214,7 +220,8 @@ impl MesherOutput {
 }
 
 /// Names of the blocks among `blocks` that `pack` cannot draw at all: no model
-/// resolves and no fluid, mob or block-entity geometry stands in for them.
+/// resolves and no fluid, or bound entity layers the pack has, stand in for
+/// them (an entity without geometry handed in is undrawable).
 /// Meshing skips them with only a log line, so callers can tell the user.
 /// Sorted and unique; air is never reported.
 pub fn undrawable_blocks<'a>(
@@ -225,9 +232,10 @@ pub fn undrawable_blocks<'a>(
     for block in blocks {
         if block.is_air()
             || names.contains(&block.name)
-            || entity::detect_mob(block).is_some()
             || liquid::FluidState::from_block(block).is_some()
-            || entity::detect_block_entity(block).is_some()
+            || entity::bindings::draws_nothing(&pack.entity_looks, block)
+            || entity::bindings::find_for(&pack.entity_looks, block)
+                .is_some_and(|bound| entity::bindings::draws(pack, &bound))
         {
             continue;
         }
@@ -247,14 +255,14 @@ pub struct Mesher {
 impl Mesher {
     /// Create a new mesher with default configuration.
     pub fn new(resource_pack: ResourcePack) -> Self {
-        Self {
-            resource_pack,
-            config: MesherConfig::default(),
-        }
+        Self::with_config(resource_pack, MesherConfig::default())
     }
 
     /// Create a new mesher with custom configuration.
-    pub fn with_config(resource_pack: ResourcePack, config: MesherConfig) -> Self {
+    pub fn with_config(resource_pack: ResourcePack, mut config: MesherConfig) -> Self {
+        config
+            .tint_provider
+            .sample_colormaps(&resource_pack.colormap_samples);
         Self {
             resource_pack,
             config,
@@ -349,7 +357,10 @@ impl Mesher {
         // Uses model data to determine which blocks are full opaque cubes
         let tcull = prof_now();
         let culler = if self.config.cull_hidden_faces {
-            Some(face_culler::FaceCuller::new(&self.resource_pack, &blocks))
+            Some(
+                face_culler::FaceCuller::new(&self.resource_pack, &blocks)
+                    .keeping_faces_along(self.config.keep_faces_along),
+            )
         } else {
             None
         };
@@ -543,7 +554,10 @@ impl Mesher {
         let block_map: rustc_hash::FxHashMap<BlockPosition, &InputBlock> =
             blocks.iter().map(|(pos, block)| (*pos, *block)).collect();
         let culler = if self.config.cull_hidden_faces {
-            Some(face_culler::FaceCuller::new(&self.resource_pack, &blocks))
+            Some(
+                face_culler::FaceCuller::new(&self.resource_pack, &blocks)
+                    .keeping_faces_along(self.config.keep_faces_along),
+            )
         } else {
             None
         };

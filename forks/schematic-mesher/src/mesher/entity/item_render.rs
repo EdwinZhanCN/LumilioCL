@@ -12,6 +12,13 @@ use crate::types::Direction;
 use glam::{Mat4, Vec3, Vec4};
 use std::collections::HashMap;
 
+/// A flat item's slab, as the game's generated item element lays it: one
+/// pixel thick about the model's centre, from 7.5/16 to 8.5/16 (LumilioCL
+/// local change, plan schematic-studio T33; the original ran from 7/16 to
+/// 8/16, which sank a framed item into its frame).
+const FLAT_FRONT: f32 = 8.5 / 16.0;
+const FLAT_BACK: f32 = 7.5 / 16.0;
+
 /// Display transform parsed from a model's `display.fixed` context.
 struct DisplayTransform {
     rotation: [f32; 3],    // degrees
@@ -55,18 +62,22 @@ pub fn render_item_in_frame(
     item_id: &str,
     item_rotation: u8,
     facing: &str,
+    invisible: bool,
 ) -> Option<(Vec<Vertex>, Vec<u32>, Vec<EntityFaceTexture>)> {
     let item_type = resolve_item_type(resource_pack, model_resolver, item_id)?;
+    let place = |display: &DisplayTransform| {
+        build_item_transform(display, item_rotation, facing, invisible)
+    };
 
     let (mut vertices, indices, face_textures) = match &item_type {
         ItemRenderType::Generated { layers, display } => {
-            generate_flat_item(resource_pack, layers, display, item_rotation, facing)
+            generate_flat_item(resource_pack, layers, place(display))
         }
         ItemRenderType::BlockModel {
             model,
             resolved_textures,
             display,
-        } => generate_block_item(model, resolved_textures, display, item_rotation, facing),
+        } => generate_block_item(model, resolved_textures, place(display)),
     };
 
     if vertices.is_empty() {
@@ -139,6 +150,62 @@ pub fn render_dropped_item(
     Some((vertices, indices, face_textures))
 }
 
+/// An item as `ItemRenderer` draws it in a display context (`ground`,
+/// `fixed`, `head`, …; `none` and contexts the model lacks use no
+/// transform): the model from its centre through that context's display
+/// transform, then `place` (LumilioCL local change, plan schematic-studio
+/// T35: item displays).
+pub fn render_item_in_context(
+    resource_pack: &ResourcePack,
+    model_resolver: &ModelResolver,
+    item_id: &str,
+    context: &str,
+    place: Mat4,
+) -> Option<(Vec<Vertex>, Vec<u32>, Vec<EntityFaceTexture>)> {
+    let name = bare_name(item_id);
+    let model = model_resolver
+        .resolve(&format!("minecraft:item/{name}"))
+        .or_else(|_| model_resolver.resolve(&format!("minecraft:block/{name}")))
+        .ok()?;
+    let display = parse_display_context(&model.display, context);
+    let mat = place * display_matrix(&display) * Mat4::from_translation(Vec3::splat(-0.5));
+    let resolved_textures = model_resolver.resolve_textures(&model);
+    let is_generated = model.parent.as_deref() == Some("builtin/generated")
+        || (model.elements.is_empty() && has_layer_textures(&resolved_textures));
+    let (mut vertices, indices, face_textures) = if is_generated {
+        let layers: Vec<String> = (0..4)
+            .map_while(|i| resolved_textures.get(&format!("layer{i}")).cloned())
+            .collect();
+        if layers.is_empty() {
+            return None;
+        }
+        generate_flat_item(resource_pack, &layers, mat)
+    } else if !model.elements.is_empty() {
+        let (mut vertices, mut indices, mut face_textures) = (Vec::new(), Vec::new(), Vec::new());
+        for element in &model.elements {
+            add_block_element(
+                element,
+                &resolved_textures,
+                &mut vertices,
+                &mut indices,
+                &mut face_textures,
+            );
+        }
+        transform_vertices(&mut vertices, &mat);
+        (vertices, indices, face_textures)
+    } else {
+        return None;
+    };
+    if vertices.is_empty() {
+        return None;
+    }
+    for v in &mut vertices {
+        let n = Vec3::from(v.normal).normalize_or_zero();
+        v.normal = n.into();
+    }
+    Some((vertices, indices, face_textures))
+}
+
 /// Build transform for a dropped item on the ground.
 ///
 /// Pipeline:
@@ -148,21 +215,7 @@ pub fn render_dropped_item(
 /// 4. Translate to hover position (center of block, slight hover)
 fn build_dropped_item_transform(display: &DisplayTransform, facing: &str) -> Mat4 {
     let center = Mat4::from_translation(Vec3::new(-0.5, -0.5, -0.5));
-
-    let dt_translate = Mat4::from_translation(Vec3::new(
-        display.translation[0] / 16.0,
-        display.translation[1] / 16.0,
-        display.translation[2] / 16.0,
-    ));
-    let dt_rot_y = Mat4::from_rotation_y(display.rotation[1].to_radians());
-    let dt_rot_x = Mat4::from_rotation_x(display.rotation[0].to_radians());
-    let dt_rot_z = Mat4::from_rotation_z(display.rotation[2].to_radians());
-    let dt_scale = Mat4::from_scale(Vec3::new(
-        display.scale[0],
-        display.scale[1],
-        display.scale[2],
-    ));
-    let display_mat = dt_translate * dt_rot_y * dt_rot_x * dt_rot_z * dt_scale;
+    let display_mat = display_matrix(display);
 
     // Facing rotation
     let facing_angle = match facing {
@@ -203,8 +256,8 @@ fn generate_flat_dropped(
         }
 
         let z_offset = layer_idx as f32 * 0.01;
-        let fz = 0.5 + z_offset;
-        let bz = 0.5 - z_offset - 1.0 / 16.0;
+        let fz = FLAT_FRONT + z_offset;
+        let bz = FLAT_BACK - z_offset;
 
         add_flat_face(
             &mut vertices,
@@ -386,61 +439,40 @@ fn parse_f32_array(val: Option<&serde_json::Value>, default: [f32; 3]) -> [f32; 
     }
 }
 
-/// Build the combined transform matrix for an item in a frame.
+/// An item display transform as Minecraft applies it (`ItemTransform`):
+/// translate, then turn by the X, Y and Z angles composed in that order,
+/// then scale.
+fn display_matrix(display: &DisplayTransform) -> Mat4 {
+    let [x, y, z] = display.rotation.map(f32::to_radians);
+    Mat4::from_translation(Vec3::from(display.translation) / 16.0)
+        * Mat4::from_rotation_x(x)
+        * Mat4::from_rotation_y(y)
+        * Mat4::from_rotation_z(z)
+        * Mat4::from_scale(Vec3::from(display.scale))
+}
+
+/// Where an item in a frame is drawn, block-local, in the steps Minecraft's
+/// item frame renderer takes (LumilioCL local change, plan schematic-studio
+/// T33): from the frame's [`hanging_pose`], 7/16 toward the wall (1/2 in an
+/// invisible frame, which has no back to clear), turned about the frame's
+/// normal by `item_rotation` eighths of a turn, halved, then the item
+/// model's `fixed` display transform, the model drawn from its centre.
 ///
-/// Pipeline:
-/// 1. Center at origin: translate(-0.5, -0.5, -0.5)
-/// 2. Display transform: translate(t/16) * rotY * rotX * rotZ * scale
-/// 3. Item rotation: rotZ(item_rotation * 45deg)
-/// 4. Translate to frame surface: (0.5, 0.5, 15.0/16.0)
-/// 5. Facing rotation around (0.5, 0.5, 0.5)
-fn build_item_transform(display: &DisplayTransform, item_rotation: u8, facing: &str) -> Mat4 {
-    // Step 1: center at origin
-    let center = Mat4::from_translation(Vec3::new(-0.5, -0.5, -0.5));
-
-    // Step 2: display transform
-    let dt_translate = Mat4::from_translation(Vec3::new(
-        display.translation[0] / 16.0,
-        display.translation[1] / 16.0,
-        display.translation[2] / 16.0,
-    ));
-    let dt_rot_y = Mat4::from_rotation_y(display.rotation[1].to_radians());
-    let dt_rot_x = Mat4::from_rotation_x(display.rotation[0].to_radians());
-    let dt_rot_z = Mat4::from_rotation_z(display.rotation[2].to_radians());
-    let dt_scale = Mat4::from_scale(Vec3::new(
-        display.scale[0],
-        display.scale[1],
-        display.scale[2],
-    ));
-    let display_mat = dt_translate * dt_rot_y * dt_rot_x * dt_rot_z * dt_scale;
-
-    // Step 2b: Minecraft's ItemFrameRenderer applies an additional scale(0.5) after
-    // display.fixed transforms (see RenderItemFrame.renderItem in MC source)
-    let renderer_scale = Mat4::from_scale(Vec3::splat(0.5));
-
-    // Step 3: item rotation (0-7 steps of 45 degrees around Z)
-    let item_rot_angle = (item_rotation % 8) as f32 * std::f32::consts::FRAC_PI_4;
-    let item_rot = Mat4::from_rotation_z(-item_rot_angle);
-
-    // Step 4: translate to frame center (south-facing frame surface is at z=15/16)
-    let to_frame = Mat4::from_translation(Vec3::new(0.5, 0.5, 15.0 / 16.0));
-
-    // Step 5: facing rotation around block center
-    let block_center = Vec3::new(0.5, 0.5, 0.5);
-    let rot_mat = match facing {
-        "south" => Mat4::IDENTITY,
-        "north" => Mat4::from_rotation_y(std::f32::consts::PI),
-        "east" => Mat4::from_rotation_y(-std::f32::consts::FRAC_PI_2),
-        "west" => Mat4::from_rotation_y(std::f32::consts::FRAC_PI_2),
-        "up" => Mat4::from_rotation_x(std::f32::consts::FRAC_PI_2),
-        "down" => Mat4::from_rotation_x(-std::f32::consts::FRAC_PI_2),
-        _ => Mat4::IDENTITY,
-    };
-    let facing_mat =
-        Mat4::from_translation(block_center) * rot_mat * Mat4::from_translation(-block_center);
-
-    // Combined: facing * to_frame * item_rot * renderer_scale * display * center
-    facing_mat * to_frame * item_rot * renderer_scale * display_mat * center
+/// [`hanging_pose`]: super::item_frame::hanging_pose
+fn build_item_transform(
+    display: &DisplayTransform,
+    item_rotation: u8,
+    facing: &str,
+    invisible: bool,
+) -> Mat4 {
+    let depth = if invisible { 0.5 } else { 7.0 / 16.0 };
+    let turn = f32::from(item_rotation % 8) * std::f32::consts::FRAC_PI_4;
+    super::item_frame::hanging_pose(facing)
+        * Mat4::from_translation(Vec3::new(0.0, 0.0, depth))
+        * Mat4::from_rotation_z(turn)
+        * Mat4::from_scale(Vec3::splat(0.5))
+        * display_matrix(display)
+        * Mat4::from_translation(Vec3::splat(-0.5))
 }
 
 /// Apply a transform matrix to all vertices (positions and normals).
@@ -462,9 +494,7 @@ fn transform_vertices(vertices: &mut [Vertex], mat: &Mat4) {
 fn generate_flat_item(
     resource_pack: &ResourcePack,
     layers: &[String],
-    display: &DisplayTransform,
-    item_rotation: u8,
-    facing: &str,
+    mat: Mat4,
 ) -> (Vec<Vertex>, Vec<u32>, Vec<EntityFaceTexture>) {
     let mut vertices = Vec::new();
     let mut indices = Vec::new();
@@ -485,9 +515,8 @@ fn generate_flat_item(
         // Z offset for multi-layer items to avoid z-fighting
         let z_offset = layer_idx as f32 * 0.01;
 
-        // Front face (+Z): z = 0.5 + z_offset, in [0,1] space
-        let fz = 0.5 + z_offset;
-        let bz = 0.5 - z_offset - 1.0 / 16.0; // back face slightly behind
+        let fz = FLAT_FRONT + z_offset;
+        let bz = FLAT_BACK - z_offset;
 
         // Generate front and back quads for this layer
         add_flat_face(
@@ -530,8 +559,6 @@ fn generate_flat_item(
         );
     }
 
-    // Apply item transforms
-    let mat = build_item_transform(display, item_rotation, facing);
     transform_vertices(&mut vertices, &mat);
 
     (vertices, indices, face_textures)
@@ -738,9 +765,7 @@ fn add_edge_quad(
 fn generate_block_item(
     model: &BlockModel,
     resolved_textures: &HashMap<String, String>,
-    display: &DisplayTransform,
-    item_rotation: u8,
-    facing: &str,
+    mat: Mat4,
 ) -> (Vec<Vertex>, Vec<u32>, Vec<EntityFaceTexture>) {
     let mut vertices = Vec::new();
     let mut indices = Vec::new();
@@ -756,8 +781,6 @@ fn generate_block_item(
         );
     }
 
-    // Apply item transforms
-    let mat = build_item_transform(display, item_rotation, facing);
     transform_vertices(&mut vertices, &mat);
 
     (vertices, indices, face_textures)
@@ -1050,14 +1073,16 @@ mod tests {
     #[test]
     fn test_build_item_transform_identity() {
         let display = DisplayTransform::default();
-        let mat = build_item_transform(&display, 0, "south");
-
-        // With default display and south facing, the item should be near the frame surface
-        // center (0.5,0.5,0.5) → centered at origin → scaled 0.5 → at frame z
-        let p = mat * Vec4::new(0.5, 0.5, 0.5, 1.0);
-        // After 0.5 scale, origin stays at origin, then translated to (0.5, 0.5, 15/16)
+        // A south-facing frame hangs on the block to its north: the item's
+        // centre is 7/16 from the cell's centre toward that wall, at z 1/16
+        // (LumilioCL local change, plan schematic-studio T33; this test said
+        // 15/16, the far side of the cell, before).
+        let p = build_item_transform(&display, 0, "south", false) * Vec4::new(0.5, 0.5, 0.5, 1.0);
         assert!((p.x - 0.5).abs() < 0.01);
         assert!((p.y - 0.5).abs() < 0.01);
-        assert!((p.z - 15.0 / 16.0).abs() < 0.01);
+        assert!((p.z - 1.0 / 16.0).abs() < 0.01, "{p}");
+        // Invisible, it lies on the wall itself.
+        let p = build_item_transform(&display, 0, "south", true) * Vec4::new(0.5, 0.5, 0.5, 1.0);
+        assert!(p.z.abs() < 0.01, "{p}");
     }
 }

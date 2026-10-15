@@ -148,7 +148,7 @@ impl HostContext for Context {
             .ok_or(PluginError::PermissionDenied)?;
         let full = access::resolve_write(game_dir, &self.manifest, path)?;
         let backups = self.writer.as_ref().ok_or(PluginError::PermissionDenied)?;
-        crate::world_map::write::write_checked(&full, path, bytes, expected, backups)
+        super::write::write_checked(&full, path, bytes, expected, backups)
     }
     fn fetch(&self, url: &str) -> Result<FetchResponse, PluginError> {
         self.request(FetchRequest::get(url))

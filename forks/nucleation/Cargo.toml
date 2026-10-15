@@ -110,7 +110,7 @@ world-segment = ["dep:tar", "dep:zstd"]
 # Mesh voxelization: GLB/OBJ models -> building Shapes + textured schematics
 voxelize = ["dep:gltf", "dep:image"]
 # Meshing support - generate 3D meshes from schematics
-meshing = ["schematic-mesher"]
+meshing = ["schematic-mesher", "dep:lumilio-block-assets"]
 # GPU rendering support - render schematics to images
 rendering = ["meshing", "dep:wgpu", "dep:image", "dep:pollster"]
 # Embedded scripting engines
@@ -201,6 +201,9 @@ testcontainers-modules = { version = "0.11", features = [
 # LumilioCL local fork: use the adjacent mesher, never a second Git or registry copy.
 # Upstream Cargo.toml at 51de345 (MIT; see LICENSE and ../README.md); ADR 0029.
 schematic-mesher = { version = "0.2.0", path = "../schematic-mesher", optional = true }
+# LumilioCL local change: meshing reads packs baked by the launcher
+# (plan schematic-studio, D1/D10); see ../README.md.
+lumilio-block-assets = { path = "../../crates/lumilio-block-assets", optional = true }
 
 # Rendering dependencies - optional
 wgpu = { version = "30", optional = true }

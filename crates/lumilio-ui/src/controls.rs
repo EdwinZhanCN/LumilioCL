@@ -74,12 +74,15 @@ fn focusable(
 type Toggle = Rc<dyn Fn(&mut Window, &mut App)>;
 
 /// The fader switch: a black slot, a white round cap and an LED. On means the
-/// cap sits at the trailing end and the LED is lit.
+/// cap sits at the trailing end and the LED is lit. The label is read out;
+/// it shows only with [`Fader::shown`], for a switch with no row label
+/// beside it.
 #[derive(IntoElement)]
 pub struct Fader {
     id: ElementId,
     on: bool,
     label: SharedString,
+    shown: bool,
     disabled: bool,
     on_toggle: Toggle,
 }
@@ -95,6 +98,7 @@ impl Fader {
             id: id.into(),
             on,
             label: label.into(),
+            shown: false,
             disabled: false,
             on_toggle: Rc::new(on_toggle),
         }
@@ -102,6 +106,13 @@ impl Fader {
 
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
+        self
+    }
+
+    /// Writes the label after the LED, as a checkbox writes its own; a
+    /// click on it toggles too.
+    pub fn shown(mut self) -> Self {
+        self.shown = true;
         self
     }
 }
@@ -118,6 +129,7 @@ impl RenderOnce for Fader {
         };
         let cap_id = format!("{}-cap", self.id);
         let led_id = format!("{}-led", self.id);
+        let label_id = format!("{}-label", self.id);
         let control = div()
             .id(self.id.clone())
             .rounded(px(4.))
@@ -156,7 +168,16 @@ impl RenderOnce for Fader {
                             .shadow(theme::key_shadow(body)),
                     ),
             )
-            .child(led(on, body).debug_selector(move || led_id));
+            .child(led(on, body).debug_selector(move || led_id))
+            .when(self.shown, |control| {
+                control.child(
+                    div()
+                        .debug_selector(move || label_id)
+                        .text_sm()
+                        .text_color(body.ink)
+                        .child(self.label.clone()),
+                )
+            });
         focusable(control, &self.id, !self.disabled, body, window, cx).map(|control| {
             if self.disabled {
                 control.opacity(0.5)
@@ -364,6 +385,7 @@ pub struct PortTabs {
     labels: Vec<SharedString>,
     active: usize,
     on_select: Select,
+    wrap: bool,
 }
 
 impl PortTabs {
@@ -378,14 +400,22 @@ impl PortTabs {
             labels: labels.iter().cloned().map(Into::into).collect(),
             active,
             on_select: Rc::new(on_select),
+            wrap: false,
         }
+    }
+
+    /// Lets the blocks run onto a second row in a narrow column (an
+    /// inspector) instead of being cut off; labels are never truncated.
+    pub fn wrap(mut self) -> Self {
+        self.wrap = true;
+        self
     }
 }
 
 impl RenderOnce for PortTabs {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let body = Body::current(cx);
-        let (id, active) = (self.id, self.active);
+        let (id, active, wrap) = (self.id, self.active, self.wrap);
         let tabs: Vec<Stateful<Div>> = self
             .labels
             .into_iter()
@@ -398,6 +428,7 @@ impl RenderOnce for PortTabs {
                     .id((id, index))
                     .debug_selector(move || format!("{id}-tab-{index}"))
                     .h(px(30.))
+                    .when(wrap, |tab| tab.flex_none())
                     .px(px(16.))
                     .flex()
                     .items_center()
@@ -414,7 +445,11 @@ impl RenderOnce for PortTabs {
                 focusable(tab, &ElementId::from((id, index)), true, body, window, cx)
             })
             .collect();
-        div().flex().gap(px(1.)).children(tabs)
+        div()
+            .flex()
+            .when(self.wrap, |row| row.flex_wrap())
+            .gap(px(1.))
+            .children(tabs)
     }
 }
 

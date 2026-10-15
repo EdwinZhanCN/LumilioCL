@@ -16,6 +16,7 @@ mod packs;
 mod plugin_analysis;
 mod portability;
 mod runtime;
+mod schematic_ops;
 mod screenshots;
 mod servers;
 mod settings;

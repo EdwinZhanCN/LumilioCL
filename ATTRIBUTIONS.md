@@ -42,8 +42,15 @@ The UI also maintains gpui-component 0.7.0 from Longbridge's GPUI Kit under
 notice is preserved in [LICENSE-APACHE](forks/gpui-component/LICENSE-APACHE).
 The baseline and imported paths are recorded in [fork maintenance](forks/README.md).
 
-The native preview links the following libraries (ADR 0028). It does not vendor
-Minecraft textures: a pack is built in memory from the player's installed game.
+The native preview links the following libraries (ADR 0028). The repository
+does not vendor Minecraft textures, models or entity geometry. The preview
+bakes them from the player's installed game. When the matching game is not
+installed, it downloads a pre-baked bundle (`blocks.dat.z` and `entities.dat.z`)
+from `launcher.lumilio.org`; `cargo xtask bake-blocks` makes it from Mojang's
+published client jars (plan schematic-studio, D2). Those assets belong to
+Mojang Studios and are not covered by LumilioCL's license. The bundle carries
+its own `NOTICE`. The official obfuscation mappings that the entity export
+reads are used only while baking and are not redistributed.
 
 | Library | Locked revision | License | Source used |
 | --- | --- | --- | --- |

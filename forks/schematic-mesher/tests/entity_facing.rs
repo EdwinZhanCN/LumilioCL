@@ -9,13 +9,13 @@
 
 mod common;
 
-use common::Blocks;
-use schematic_mesher::{BlockPosition, InputBlock, Mesher, ResourcePack};
+use common::{entity_pack, Blocks};
+use schematic_mesher::{BlockPosition, InputBlock, Mesher};
 
 /// Mean vertex position of one block's geometry, in block-local units.
 fn centroid(block: InputBlock) -> [f32; 3] {
     let source = Blocks(vec![(BlockPosition::new(0, 0, 0), block)]);
-    let out = Mesher::new(ResourcePack::new()).mesh(&source).unwrap();
+    let out = Mesher::new(entity_pack()).mesh(&source).unwrap();
     let mut sum = [0.0f32; 3];
     let mut n = 0.0;
     for layer in [&out.opaque_mesh, &out.cutout_mesh, &out.transparent_mesh] {

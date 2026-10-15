@@ -82,6 +82,10 @@ struct State {
     game_log: Option<(String, std::collections::VecDeque<String>)>,
     /// Commands for the background update service.
     update_commands: Option<tokio::sync::mpsc::UnboundedSender<update::UpdateCommand>>,
+    /// The open schematic studio windows, one per game and folder (plan
+    /// schematic-studio, D22). A closed window's entry is dropped on the
+    /// next look.
+    studio_windows: Vec<instance_plugins::StudioWindowEntry>,
 }
 
 /// How many lines of the running game's output are kept.
@@ -180,8 +184,38 @@ fn open_requested_page(
     }
     // Dev hook: `LUMILIO_INSTANCE=<id>` opens that game; `LUMILIO_INSTANCE_TAB`
     // chooses its tab and `LUMILIO_INSTANCE_GROUP` the tab's group (a
-    // settings group, or 1 for the Worlds tab's servers).
+    // settings group, or 1 for the Worlds tab's servers), and
+    // `LUMILIO_STUDIO=schematics/<file>` opens its schematic studio on a file
+    // (`LUMILIO_STUDIO_BLOCK=minecraft:<id>` chooses that block kind there,
+    // `LUMILIO_STUDIO_INSPECT=<x>,<y>,<z>` inspects the block at that place,
+    // `LUMILIO_STUDIO_DIALOG=replace|convert|incompatible` opens a dialog).
     if let Ok(id) = std::env::var("LUMILIO_INSTANCE") {
+        if let Ok(file) = std::env::var("LUMILIO_STUDIO") {
+            instance_plugins::open_studio_window(
+                wiring,
+                id.clone(),
+                lumilio_plugin_litematica::ID.to_owned(),
+                "schematics".to_owned(),
+                Some(file),
+                cx,
+            );
+            if let Ok(block) = std::env::var("LUMILIO_STUDIO_BLOCK") {
+                instance_plugins::studio_windows_choose(wiring, &id, &block, cx);
+            }
+            let inspect = std::env::var("LUMILIO_STUDIO_INSPECT").ok().and_then(|at| {
+                let at: Vec<i32> = at
+                    .split(',')
+                    .filter_map(|v| v.trim().parse().ok())
+                    .collect();
+                <[i32; 3]>::try_from(at).ok()
+            });
+            if let Some(position) = inspect {
+                instance_plugins::studio_windows_inspect(wiring, &id, position, cx);
+            }
+            if let Ok(which) = std::env::var("LUMILIO_STUDIO_DIALOG") {
+                instance_plugins::studio_windows_dialog(wiring, &id, &which, cx);
+            }
+        }
         open_instance(wiring, id, None, window, cx);
         let tab = std::env::var("LUMILIO_INSTANCE_TAB")
             .ok()
@@ -189,6 +223,8 @@ fn open_requested_page(
         let group = std::env::var("LUMILIO_INSTANCE_GROUP")
             .ok()
             .and_then(|v| v.parse().ok());
+        // `LUMILIO_INSTANCE_PLUGIN=<plugin id>` opens that plugin's pane.
+        let plugin = std::env::var("LUMILIO_INSTANCE_PLUGIN").ok();
         let shell = shell.clone();
         window.defer(cx, move |window, cx| {
             shell.update(cx, |shell, cx| {
@@ -204,6 +240,9 @@ fn open_requested_page(
                             }
                             Some(group) => view.select_settings_group(group, cx),
                             None => {}
+                        }
+                        if let Some(plugin) = plugin {
+                            view.open_plugin_pane(plugin, window, cx);
                         }
                     });
                 }

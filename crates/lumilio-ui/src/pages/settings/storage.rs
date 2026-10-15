@@ -224,6 +224,27 @@ pub(super) fn downloads(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
         })),
         colors,
     );
+    let block_assets = view.auto_download_block_assets;
+    // ia[settings]: 自动下载方块资源 | 下载与存储 · 开关（默认开） | 立即保存；关闭后不再下载方块资源，已经下载过的照常使用；没下载过时投影预览说明原因 | plan schematic-studio D2/T3/T21
+    let block_assets_row = row(
+        "settings-block-assets",
+        tr!("settings-block-assets"),
+        Some(tr!("settings-block-assets-help").to_owned()),
+        "",
+        Some(
+            kit::switch(
+                "settings-block-assets-switch",
+                block_assets,
+                tr!("settings-block-assets"),
+                send(
+                    handler,
+                    LiveIntent::SetAutoDownloadBlockAssets(!block_assets),
+                ),
+            )
+            .into_any_element(),
+        ),
+        colors,
+    );
     // ia[settings]: 数据目录 | 下载与存储 · 路径 + [在访达中显示] | 不可改（App State）
     let data_row = row(
         "settings-data-dir",
@@ -303,7 +324,15 @@ pub(super) fn downloads(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
             tr!("settings-section-downloads"),
             colors,
             kit::list(
-                vec![bmclapi, mcim, maven, prefer_row, rules_row, concurrency_row],
+                vec![
+                    bmclapi,
+                    mcim,
+                    maven,
+                    prefer_row,
+                    rules_row,
+                    concurrency_row,
+                    block_assets_row,
+                ],
                 colors,
             ),
         ))

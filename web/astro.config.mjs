@@ -25,6 +25,7 @@ export default defineConfig({
         { label: "Content sources", translations: { "zh-CN": "内容来源" }, slug: "docs/guide/content-sources" },
         { label: "Themes", translations: { "zh-CN": "主题" }, slug: "docs/guide/themes" },
         { label: "Theme studio", translations: { "zh-CN": "主题工作室" }, slug: "docs/guide/theme-studio" },
+        { label: "Schematic studio", translations: { "zh-CN": "投影工作室" }, slug: "docs/guide/schematics" },
       ] },
       { label: "Project", translations: { "zh-CN": "项目进展" }, items: [
         { label: "Roadmap", translations: { "zh-CN": "路线图" }, slug: "docs/roadmap" },

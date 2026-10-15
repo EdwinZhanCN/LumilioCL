@@ -5,10 +5,11 @@
 
 use wgpu::util::DeviceExt;
 
-use crate::meshing::{MeshLayer, MeshOutput};
+use crate::meshing::{EntityInstance, EntityInstances, MeshLayer, MeshOutput};
 
 use super::camera::{compute_view_proj_reversed, merged_bounds, CameraConfig};
 use super::hdri::HdriData;
+use super::instances::{self, Culling, Frustum, Sphere};
 use super::RenderError;
 
 const SHADER_SRC: &str = include_str!("shader.wgsl");
@@ -48,6 +49,121 @@ struct Uniforms {
     inv_view_proj: [[f32; 4]; 4],
     params: [f32; 4], // x = alpha_cutoff, y = hdri_enabled, z = hdri_intensity, w = ambient
     light: [f32; 4],  // xyz = world direction, w = directional intensity
+    // LumilioCL local change (plan schematic-studio T31): the focus mask's
+    // first cell and mode, its size and fade, and the colour it fades to.
+    focus: [f32; 4],
+    focus_size: [f32; 4],
+    focus_tint: [f32; 4],
+    // LumilioCL local change (plan schematic-studio T32): the outlined
+    // cell (xyz; w: 1 when there is one), its block's box (xyz) with the
+    // band's width in pixels (w of the first), and the outline's colour.
+    mark: [f32; 4],
+    mark_min: [f32; 4],
+    mark_max: [f32; 4],
+    mark_color: [f32; 4],
+    // LumilioCL local change (plan schematic-studio T25): the slice and the
+    // selection box with its colour.
+    clip: [f32; 4],
+    selection_min: [f32; 4],
+    selection_max: [f32; 4],
+    selection_color: [f32; 4],
+}
+
+/// Draw only the layers up to `layer` along `axis` (0 X, 1 Y, 2 Z): a slice
+/// (LumilioCL local change, plan schematic-studio T25).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Clip {
+    pub axis: u8,
+    pub layer: i32,
+}
+
+/// A box of cells shown as selected, both corners included, in a colour
+/// (linear RGBA) (LumilioCL local change, plan schematic-studio T25).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SelectionBox {
+    pub min: [i32; 3],
+    pub max: [i32; 3],
+    pub color: [f32; 4],
+}
+
+/// One cell the renderer outlines, as a selection (LumilioCL local change,
+/// plan schematic-studio T32): on the faces its block shows, a band along
+/// the edges of the block's box in `color`, with a rim of the background
+/// colour inside it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CellMark {
+    pub cell: [i32; 3],
+    /// The block's geometry in world space, which for a chest or a torch is
+    /// smaller than the cell.
+    pub min: [f32; 3],
+    pub max: [f32; 3],
+    /// Linear RGBA.
+    pub color: [f32; 4],
+    /// The band's width in pixels; the rim inside it is half as wide.
+    pub width: f32,
+}
+
+/// How the renderer treats blocks outside a focus mask (LumilioCL local
+/// change, plan schematic-studio T31, D30).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FocusMode {
+    /// Every block in its own colour.
+    Off,
+    /// Unfocused blocks greyed and washed toward the background.
+    Fade,
+    /// Only focused blocks drawn.
+    Hide,
+}
+
+/// One byte per cell of a box of the world, non-zero where a block is in
+/// focus: cell `(x, y, z)` is `cells[(z * size[1] + y) * size[0] + x]`.
+#[derive(Clone, Debug)]
+pub struct FocusMask {
+    pub origin: [i32; 3],
+    pub size: [u32; 3],
+    pub cells: Vec<u8>,
+}
+
+/// Three-dimensional textures larger than this per side are not portable.
+pub const MAX_FOCUS_SIDE: u32 = 2048;
+
+fn focus_texture(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    size: [u32; 3],
+    cells: &[u8],
+) -> wgpu::TextureView {
+    let extent = wgpu::Extent3d {
+        width: size[0],
+        height: size[1],
+        depth_or_array_layers: size[2],
+    };
+    let texture = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("focus_mask"),
+        size: extent,
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D3,
+        format: wgpu::TextureFormat::R8Uint,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+        view_formats: &[],
+    });
+    queue.write_texture(
+        wgpu::TexelCopyTextureInfo {
+            texture: &texture,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+            aspect: wgpu::TextureAspect::All,
+        },
+        cells,
+        wgpu::TexelCopyBufferLayout {
+            offset: 0,
+            bytes_per_row: Some(size[0]),
+            rows_per_image: Some(size[1]),
+        },
+        extent,
+    );
+    texture.create_view(&wgpu::TextureViewDescriptor::default())
 }
 
 /// Per-draw animation state, mirroring `DrawUniforms` in the shader.
@@ -372,6 +488,17 @@ struct ChunkGpuData {
     transparent: Option<LayerBuffers>,
 }
 
+/// One entity model and the buffer its kept instances are written to each
+/// frame (LumilioCL local change, plan schematic-studio T8).
+struct EntityGpu {
+    mesh: ChunkGpuData,
+    /// Room for every instance of the model, 64 bytes each.
+    instances: wgpu::Buffer,
+}
+
+/// Bytes of one instance: its column-major model matrix.
+const INSTANCE_STRIDE: u64 = 64;
+
 /// GPU renderer for schematics. Supports both headless and windowed modes.
 ///
 /// For headless rendering, use [`GpuRenderer::new`]. For windowed rendering
@@ -397,6 +524,29 @@ pub struct GpuRenderer {
     grid: std::cell::Cell<Option<super::GridConfig>>,
     gizmos: std::cell::RefCell<Vec<crate::animation::GizmoLine>>,
     chunks_gpu: Vec<ChunkGpuData>,
+    // Entity instances: pipelines with a per-instance matrix, one model per
+    // entry, the placements, and the distance past which they are skipped.
+    instanced_opaque_pipeline: wgpu::RenderPipeline,
+    instanced_cutout_pipeline: wgpu::RenderPipeline,
+    instanced_transparent_pipeline: wgpu::RenderPipeline,
+    entities_gpu: Vec<EntityGpu>,
+    entity_spheres: Vec<Sphere>,
+    entity_instances: Vec<EntityInstance>,
+    entity_distance: std::cell::Cell<Option<f32>>,
+    // LumilioCL local change (plan schematic-studio T27): draw only this
+    // mesh, so one renderer draws a batch of block icons one after another.
+    only_mesh: std::cell::Cell<Option<usize>>,
+    // LumilioCL local change (plan schematic-studio T31): the focus mask,
+    // its box and how unfocused blocks are drawn.
+    focus_view: wgpu::TextureView,
+    focus_box: ([i32; 3], [u32; 3]),
+    focus_mode: FocusMode,
+    // LumilioCL local change (plan schematic-studio T32): the outlined cell.
+    mark: Option<CellMark>,
+    // LumilioCL local change (plan schematic-studio T25): the slice and the
+    // selection.
+    clip: Option<Clip>,
+    selection: Option<SelectionBox>,
     // Headless-only (None in windowed mode)
     render_target: Option<wgpu::Texture>,
     render_target_view: Option<wgpu::TextureView>,
@@ -426,7 +576,35 @@ impl GpuRenderer {
             backend_options: Default::default(),
             display: None,
         });
-        Self::create(meshes, width, height, hdri, &instance, None).await
+        Self::create(
+            meshes,
+            &EntityInstances::default(),
+            width,
+            height,
+            hdri,
+            &instance,
+            None,
+        )
+        .await
+    }
+
+    /// Headless, with a schematic's entities drawn as instances of their
+    /// models (LumilioCL local change, plan schematic-studio T8).
+    pub async fn with_entities(
+        meshes: &[MeshOutput],
+        entities: &EntityInstances,
+        width: u32,
+        height: u32,
+        hdri: Option<&HdriData>,
+    ) -> Result<Self, RenderError> {
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+            backends: wgpu::Backends::all(),
+            flags: wgpu::InstanceFlags::default(),
+            memory_budget_thresholds: Default::default(),
+            backend_options: Default::default(),
+            display: None,
+        });
+        Self::create(meshes, entities, width, height, hdri, &instance, None).await
     }
 
     /// Windowed constructor — caller provides instance + surface.
@@ -438,11 +616,21 @@ impl GpuRenderer {
         height: u32,
         hdri: Option<&HdriData>,
     ) -> Result<Self, RenderError> {
-        Self::create(meshes, width, height, hdri, instance, Some(surface)).await
+        Self::create(
+            meshes,
+            &EntityInstances::default(),
+            width,
+            height,
+            hdri,
+            instance,
+            Some(surface),
+        )
+        .await
     }
 
     async fn create(
         meshes: &[MeshOutput],
+        entities: &EntityInstances,
         width: u32,
         height: u32,
         hdri: Option<&HdriData>,
@@ -497,17 +685,32 @@ impl GpuRenderer {
         // --- Bind group layouts ---
         let uniform_bgl = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("uniform_bgl"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
                 },
-                count: None,
-            }],
+                // The focus mask (LumilioCL local change, plan
+                // schematic-studio T31).
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Uint,
+                        view_dimension: wgpu::TextureViewDimension::D3,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+            ],
         });
+        let focus_view = focus_texture(&device, &queue, [1, 1, 1], &[0]);
 
         let texture_bgl = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("texture_bgl"),
@@ -786,50 +989,102 @@ impl GpuRenderer {
         // such as spawner cages rely on it), and depth is reversed, so tests use
         // GreaterEqual: a later face at equal depth wins, as with Minecraft's
         // LEQUAL. Opaque and cutout draw without blending.
+        // Entity instances add a per-instance model matrix after the vertex
+        // streams (LumilioCL local change, plan schematic-studio T8).
+        let instance_attributes = wgpu::vertex_attr_array![
+            4 => Float32x4, 5 => Float32x4, 6 => Float32x4, 7 => Float32x4
+        ];
+        let instanced_buffer_layouts = [
+            vertex_buffer_layouts[0].clone(),
+            vertex_buffer_layouts[1].clone(),
+            vertex_buffer_layouts[2].clone(),
+            vertex_buffer_layouts[3].clone(),
+            Some(wgpu::VertexBufferLayout {
+                array_stride: INSTANCE_STRIDE,
+                step_mode: wgpu::VertexStepMode::Instance,
+                attributes: &instance_attributes,
+            }),
+        ];
+        let make_pipeline = |label: &str,
+                             vertex_entry: &str,
+                             buffers: &[Option<wgpu::VertexBufferLayout>],
+                             fragment: &str,
+                             blend: Option<wgpu::BlendState>,
+                             depth_write: bool| {
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some(label),
+                layout: Some(&mesh_pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: Some(vertex_entry),
+                    buffers,
+                    compilation_options: Default::default(),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: Some(fragment),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: color_format,
+                        blend,
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                    compilation_options: Default::default(),
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: Some(wgpu::Face::Back),
+                    ..Default::default()
+                },
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: depth_format,
+                    depth_write_enabled: Some(depth_write),
+                    depth_compare: Some(wgpu::CompareFunction::GreaterEqual),
+                    stencil: Default::default(),
+                    bias: Default::default(),
+                }),
+                multisample: Default::default(),
+                multiview_mask: None,
+                cache: None,
+            })
+        };
         let make_mesh_pipeline =
             |label: &str, fragment: &str, blend: Option<wgpu::BlendState>, depth_write: bool| {
-                device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                    label: Some(label),
-                    layout: Some(&mesh_pipeline_layout),
-                    vertex: wgpu::VertexState {
-                        module: &shader,
-                        entry_point: Some("vs_main"),
-                        buffers: &vertex_buffer_layouts,
-                        compilation_options: Default::default(),
-                    },
-                    fragment: Some(wgpu::FragmentState {
-                        module: &shader,
-                        entry_point: Some(fragment),
-                        targets: &[Some(wgpu::ColorTargetState {
-                            format: color_format,
-                            blend,
-                            write_mask: wgpu::ColorWrites::ALL,
-                        })],
-                        compilation_options: Default::default(),
-                    }),
-                    primitive: wgpu::PrimitiveState {
-                        topology: wgpu::PrimitiveTopology::TriangleList,
-                        front_face: wgpu::FrontFace::Ccw,
-                        cull_mode: Some(wgpu::Face::Back),
-                        ..Default::default()
-                    },
-                    depth_stencil: Some(wgpu::DepthStencilState {
-                        format: depth_format,
-                        depth_write_enabled: Some(depth_write),
-                        depth_compare: Some(wgpu::CompareFunction::GreaterEqual),
-                        stencil: Default::default(),
-                        bias: Default::default(),
-                    }),
-                    multisample: Default::default(),
-                    multiview_mask: None,
-                    cache: None,
-                })
+                make_pipeline(
+                    label,
+                    "vs_main",
+                    &vertex_buffer_layouts,
+                    fragment,
+                    blend,
+                    depth_write,
+                )
+            };
+        let make_instanced_pipeline =
+            |label: &str, fragment: &str, blend: Option<wgpu::BlendState>, depth_write: bool| {
+                make_pipeline(
+                    label,
+                    "vs_instanced",
+                    &instanced_buffer_layouts,
+                    fragment,
+                    blend,
+                    depth_write,
+                )
             };
 
         let opaque_pipeline = make_mesh_pipeline("opaque", "fs_solid", None, true);
         let cutout_pipeline = make_mesh_pipeline("cutout", "fs_solid", None, true);
         let transparent_pipeline = make_mesh_pipeline(
             "transparent",
+            "fs_main",
+            Some(wgpu::BlendState::ALPHA_BLENDING),
+            false,
+        );
+        let instanced_opaque_pipeline =
+            make_instanced_pipeline("entity_opaque", "fs_solid", None, true);
+        let instanced_cutout_pipeline =
+            make_instanced_pipeline("entity_cutout", "fs_solid", None, true);
+        let instanced_transparent_pipeline = make_instanced_pipeline(
+            "entity_transparent",
             "fs_main",
             Some(wgpu::BlendState::ALPHA_BLENDING),
             false,
@@ -984,67 +1239,89 @@ impl GpuRenderer {
             })
         };
 
+        let upload_mesh = |i: &str, mesh: &MeshOutput, sort_translucent: bool| -> ChunkGpuData {
+            let atlas_size = wgpu::Extent3d {
+                width: mesh.atlas.width,
+                height: mesh.atlas.height,
+                depth_or_array_layers: 1,
+            };
+            let atlas_texture = device.create_texture(&wgpu::TextureDescriptor {
+                label: Some(&format!("atlas_{i}")),
+                size: atlas_size,
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Rgba8UnormSrgb,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                view_formats: &[],
+            });
+            queue.write_texture(
+                wgpu::TexelCopyTextureInfo {
+                    texture: &atlas_texture,
+                    mip_level: 0,
+                    origin: wgpu::Origin3d::ZERO,
+                    aspect: wgpu::TextureAspect::All,
+                },
+                &mesh.atlas.pixels,
+                wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(4 * mesh.atlas.width),
+                    rows_per_image: Some(mesh.atlas.height),
+                },
+                atlas_size,
+            );
+            let atlas_view = atlas_texture.create_view(&wgpu::TextureViewDescriptor::default());
+            let texture_bg = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some(&format!("tex_bg_{i}")),
+                layout: &texture_bgl,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(&atlas_view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(&atlas_sampler),
+                    },
+                ],
+            });
+
+            let label = format!("c{}", i);
+            ChunkGpuData {
+                texture_bg,
+                opaque: upload_layer(&mesh.opaque, &format!("{}_opaque", label), false),
+                cutout: upload_layer(&mesh.cutout, &format!("{}_cutout", label), false),
+                transparent: upload_layer(
+                    &mesh.transparent,
+                    &format!("{}_transparent", label),
+                    sort_translucent,
+                ),
+            }
+        };
         let chunks_gpu: Vec<ChunkGpuData> = meshes
             .iter()
             .enumerate()
-            .map(|(i, mesh)| {
-                let atlas_size = wgpu::Extent3d {
-                    width: mesh.atlas.width,
-                    height: mesh.atlas.height,
-                    depth_or_array_layers: 1,
-                };
-                let atlas_texture = device.create_texture(&wgpu::TextureDescriptor {
-                    label: Some(&format!("atlas_{}", i)),
-                    size: atlas_size,
-                    mip_level_count: 1,
-                    sample_count: 1,
-                    dimension: wgpu::TextureDimension::D2,
-                    format: wgpu::TextureFormat::Rgba8UnormSrgb,
-                    usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-                    view_formats: &[],
-                });
-                queue.write_texture(
-                    wgpu::TexelCopyTextureInfo {
-                        texture: &atlas_texture,
-                        mip_level: 0,
-                        origin: wgpu::Origin3d::ZERO,
-                        aspect: wgpu::TextureAspect::All,
-                    },
-                    &mesh.atlas.pixels,
-                    wgpu::TexelCopyBufferLayout {
-                        offset: 0,
-                        bytes_per_row: Some(4 * mesh.atlas.width),
-                        rows_per_image: Some(mesh.atlas.height),
-                    },
-                    atlas_size,
-                );
-                let atlas_view = atlas_texture.create_view(&wgpu::TextureViewDescriptor::default());
-                let texture_bg = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                    label: Some(&format!("tex_bg_{}", i)),
-                    layout: &texture_bgl,
-                    entries: &[
-                        wgpu::BindGroupEntry {
-                            binding: 0,
-                            resource: wgpu::BindingResource::TextureView(&atlas_view),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 1,
-                            resource: wgpu::BindingResource::Sampler(&atlas_sampler),
-                        },
-                    ],
-                });
-
-                let label = format!("c{}", i);
-                ChunkGpuData {
-                    texture_bg,
-                    opaque: upload_layer(&mesh.opaque, &format!("{}_opaque", label), false),
-                    cutout: upload_layer(&mesh.cutout, &format!("{}_cutout", label), false),
-                    transparent: upload_layer(
-                        &mesh.transparent,
-                        &format!("{}_transparent", label),
-                        true,
-                    ),
-                }
+            .map(|(i, mesh)| upload_mesh(&i.to_string(), mesh, true))
+            .collect();
+        // An entity's translucent parts keep their order; its instances are
+        // drawn farthest first instead.
+        let mut instance_counts = vec![0u64; entities.models.len()];
+        for instance in &entities.instances {
+            instance_counts[instance.model] += 1;
+        }
+        let entities_gpu: Vec<EntityGpu> = entities
+            .models
+            .iter()
+            .zip(&instance_counts)
+            .enumerate()
+            .map(|(i, (model, count))| EntityGpu {
+                mesh: upload_mesh(&format!("entity_{i}"), &model.mesh, false),
+                instances: device.create_buffer(&wgpu::BufferDescriptor {
+                    label: Some(&format!("entity_{i}_instances")),
+                    size: INSTANCE_STRIDE * (*count).max(1),
+                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                    mapped_at_creation: false,
+                }),
             })
             .collect();
 
@@ -1096,7 +1373,13 @@ impl GpuRenderer {
             (None, 0)
         };
 
-        let (bounds_min, bounds_max) = merged_bounds(meshes);
+        let (mut bounds_min, mut bounds_max) = merged_bounds(meshes);
+        if let Some((min, max)) = entities.bounds() {
+            for axis in 0..3 {
+                bounds_min[axis] = bounds_min[axis].min(min[axis]);
+                bounds_max[axis] = bounds_max[axis].max(max[axis]);
+            }
+        }
 
         // One aligned slot per mesh. Alignment comes from the device rather
         // than a hardcoded 256, so this is correct on every backend.
@@ -1105,7 +1388,8 @@ impl GpuRenderer {
             let sz = std::mem::size_of::<DrawUniforms>() as u32;
             sz.div_ceil(align) * align
         };
-        let slots = chunks_gpu.len().max(1) as u64;
+        // The last slot stays the identity: entity instances draw with it.
+        let slots = chunks_gpu.len() as u64 + 1;
         let identity = DrawUniforms::identity();
         let mut init = vec![0u8; (draw_stride as u64 * slots) as usize];
         for i in 0..slots as usize {
@@ -1150,6 +1434,20 @@ impl GpuRenderer {
             grid: std::cell::Cell::new(None),
             gizmos: std::cell::RefCell::new(Vec::new()),
             chunks_gpu,
+            instanced_opaque_pipeline,
+            instanced_cutout_pipeline,
+            instanced_transparent_pipeline,
+            entities_gpu,
+            entity_spheres: instances::spheres(entities),
+            entity_instances: entities.instances.clone(),
+            entity_distance: std::cell::Cell::new(None),
+            only_mesh: std::cell::Cell::new(None),
+            focus_view,
+            focus_box: ([0; 3], [1; 3]),
+            focus_mode: FocusMode::Off,
+            mark: None,
+            clip: None,
+            selection: None,
             render_target,
             render_target_view,
             staging_buffer,
@@ -1179,7 +1477,10 @@ impl GpuRenderer {
         // Translucent triangles back to front for this camera. Per-mesh poses
         // are not applied to the sort keys; posed translucent meshes sort by
         // their rest position.
-        for chunk in &self.chunks_gpu {
+        for (i, chunk) in self.chunks_gpu.iter().enumerate() {
+            if !self.draws_mesh(i) {
+                continue;
+            }
             if let Some(layer) = &chunk.transparent {
                 if let Some(order) = &layer.order {
                     let indices = order.back_to_front(&view_proj);
@@ -1189,9 +1490,55 @@ impl GpuRenderer {
             }
         }
 
+        // Entity instances this frame keeps, written to their buffers.
+        let entity_counts = self.write_visible_entities(camera, &view_proj, &inv_view_proj);
+
         let hdri_intensity = if self.hdri_enabled { 2.5f32 } else { 0.0 };
         let hdri_flag = if self.hdri_enabled { 1.0f32 } else { 0.0 };
 
+        let (focus_origin, focus_size) = self.focus_box;
+        let focus_mode = match self.focus_mode {
+            FocusMode::Off => 0.,
+            FocusMode::Fade => 1.,
+            FocusMode::Hide => 2.,
+        };
+        let focus_tint = camera.background.unwrap_or([1., 1., 1., 1.]);
+        let (mark, mark_min, mark_max, mark_color) = match self.mark {
+            Some(mark) => (
+                [
+                    mark.cell[0] as f32,
+                    mark.cell[1] as f32,
+                    mark.cell[2] as f32,
+                    1.,
+                ],
+                [mark.min[0], mark.min[1], mark.min[2], mark.width],
+                [mark.max[0], mark.max[1], mark.max[2], 0.],
+                mark.color,
+            ),
+            None => ([0.; 4], [0.; 4], [0.; 4], [0.; 4]),
+        };
+        // The band's width comes with the mark; a selection without one
+        // uses two pixels.
+        let mark_min = if self.mark.is_none() {
+            [0., 0., 0., 2.]
+        } else {
+            mark_min
+        };
+        let clip = self.clip.map_or([0.; 4], |clip| {
+            [f32::from(clip.axis), clip.layer as f32, 0., 1.]
+        });
+        let (selection_min, selection_max, selection_color) =
+            self.selection
+                .map_or(([0.; 4], [0.; 4], [0.; 4]), |selection| {
+                    let corner = |cell: [i32; 3], on: f32| {
+                        [cell[0] as f32, cell[1] as f32, cell[2] as f32, on]
+                    };
+                    (
+                        corner(selection.min, 1.),
+                        corner(selection.max, 0.),
+                        selection.color,
+                    )
+                });
         let make_uniforms = |alpha_cutoff: f32| -> Uniforms {
             Uniforms {
                 view_proj,
@@ -1208,6 +1555,28 @@ impl GpuRenderer {
                     camera.light_direction[2],
                     camera.directional_intensity,
                 ],
+                focus: [
+                    focus_origin[0] as f32,
+                    focus_origin[1] as f32,
+                    focus_origin[2] as f32,
+                    focus_mode,
+                ],
+                // An unfocused block keeps a quarter of its own colour.
+                focus_size: [
+                    focus_size[0] as f32,
+                    focus_size[1] as f32,
+                    focus_size[2] as f32,
+                    0.75,
+                ],
+                focus_tint,
+                mark,
+                mark_min,
+                mark_max,
+                mark_color,
+                clip,
+                selection_min,
+                selection_max,
+                selection_color,
             }
         };
 
@@ -1222,10 +1591,16 @@ impl GpuRenderer {
             let bg = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some(label),
                 layout: &self.uniform_bgl,
-                entries: &[wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: buf.as_entire_binding(),
-                }],
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: buf.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::TextureView(&self.focus_view),
+                    },
+                ],
             });
             (buf, bg)
         };
@@ -1327,7 +1702,8 @@ impl GpuRenderer {
             }
         };
 
-        for (i, chunk) in self.chunks_gpu.iter().enumerate() {
+        let drawn = |(i, _): &(usize, &ChunkGpuData)| self.draws_mesh(*i);
+        for (i, chunk) in self.chunks_gpu.iter().enumerate().filter(drawn) {
             draw_layer(
                 &mut pass,
                 &self.opaque_pipeline,
@@ -1337,7 +1713,7 @@ impl GpuRenderer {
                 i,
             );
         }
-        for (i, chunk) in self.chunks_gpu.iter().enumerate() {
+        for (i, chunk) in self.chunks_gpu.iter().enumerate().filter(drawn) {
             draw_layer(
                 &mut pass,
                 &self.cutout_pipeline,
@@ -1347,6 +1723,51 @@ impl GpuRenderer {
                 i,
             );
         }
+
+        // Each entity model's kept instances in one call per layer, with the
+        // identity draw slot after the chunks'.
+        let entity_slot = self.chunks_gpu.len() as u32 * self.draw_stride;
+        let draw_entities =
+            |pass: &mut wgpu::RenderPass,
+             pipeline: &wgpu::RenderPipeline,
+             uniform_bg: &wgpu::BindGroup,
+             layer: fn(&ChunkGpuData) -> &Option<LayerBuffers>| {
+                for (entity, &count) in self.entities_gpu.iter().zip(&entity_counts) {
+                    let Some(b) = layer(&entity.mesh) else {
+                        continue;
+                    };
+                    if count == 0 {
+                        continue;
+                    }
+                    pass.set_pipeline(pipeline);
+                    pass.set_bind_group(0, uniform_bg, &[]);
+                    pass.set_bind_group(1, &entity.mesh.texture_bg, &[]);
+                    pass.set_bind_group(2, &self.hdri_bg, &[]);
+                    pass.set_bind_group(3, &self.draw_bg, &[entity_slot]);
+                    pass.set_vertex_buffer(0, b.positions.slice(..));
+                    pass.set_vertex_buffer(1, b.normals.slice(..));
+                    pass.set_vertex_buffer(2, b.uvs.slice(..));
+                    pass.set_vertex_buffer(3, b.colors.slice(..));
+                    pass.set_vertex_buffer(
+                        4,
+                        entity.instances.slice(..count as u64 * INSTANCE_STRIDE),
+                    );
+                    pass.set_index_buffer(b.indices.slice(..), wgpu::IndexFormat::Uint32);
+                    pass.draw_indexed(0..b.index_count, 0, 0..count);
+                }
+            };
+        draw_entities(
+            &mut pass,
+            &self.instanced_opaque_pipeline,
+            &opaque_bg,
+            |mesh| &mesh.opaque,
+        );
+        draw_entities(
+            &mut pass,
+            &self.instanced_cutout_pipeline,
+            &cutout_bg,
+            |mesh| &mesh.cutout,
+        );
         // Grid after the opaque/cutout depth is laid down (so blocks occlude it)
         // but before transparent geometry (so glass blends over it).
         if let Some((buf, count)) = &world_lines {
@@ -1356,7 +1777,7 @@ impl GpuRenderer {
             pass.draw(0..*count, 0..1);
         }
 
-        for (i, chunk) in self.chunks_gpu.iter().enumerate() {
+        for (i, chunk) in self.chunks_gpu.iter().enumerate().filter(drawn) {
             draw_layer(
                 &mut pass,
                 &self.transparent_pipeline,
@@ -1366,6 +1787,133 @@ impl GpuRenderer {
                 i,
             );
         }
+        draw_entities(
+            &mut pass,
+            &self.instanced_transparent_pipeline,
+            &transparent_bg,
+            |mesh| &mesh.transparent,
+        );
+    }
+
+    /// Culls the entity instances for this view and writes the kept ones,
+    /// farthest first, to each model's instance buffer; returns how many
+    /// each model draws.
+    fn write_visible_entities(
+        &self,
+        camera: &CameraConfig,
+        view_proj: &[[f32; 4]; 4],
+        inv_view_proj: &[[f32; 4]; 4],
+    ) -> Vec<u32> {
+        if self.entities_gpu.is_empty() {
+            return Vec::new();
+        }
+        let frustum = Frustum::from_view_proj(view_proj);
+        let culling = Culling {
+            frustum: &frustum,
+            eye: instances::eye(camera.position, inv_view_proj, true),
+            max_distance: self.entity_distance.get(),
+            back: instances::back(inv_view_proj, true),
+        };
+        let kept = instances::visible(&self.entity_spheres, &self.entity_instances, &culling);
+        self.entities_gpu
+            .iter()
+            .zip(kept)
+            .map(|(entity, transforms)| {
+                if !transforms.is_empty() {
+                    self.queue.write_buffer(
+                        &entity.instances,
+                        0,
+                        bytemuck::cast_slice(&transforms),
+                    );
+                }
+                transforms.len() as u32
+            })
+            .collect()
+    }
+
+    /// Entity instances farther than `distance` blocks from the eye are not
+    /// drawn; `None` draws them at any distance. Cheap: read each frame.
+    pub fn set_entity_distance(&self, distance: Option<f32>) {
+        self.entity_distance.set(distance);
+    }
+
+    /// Draws only mesh `index` of those the renderer was made with, or all
+    /// of them with `None` (LumilioCL local change, plan schematic-studio
+    /// T27). The camera still fits the bounds of every mesh.
+    pub fn set_only_mesh(&self, index: Option<usize>) {
+        self.only_mesh.set(index);
+    }
+
+    fn draws_mesh(&self, index: usize) -> bool {
+        self.only_mesh.get().is_none_or(|only| only == index)
+    }
+
+    /// The cells in focus and how the rest are drawn (LumilioCL local
+    /// change, plan schematic-studio T31, D30): the mesh is untouched, the
+    /// fragment shader looks up the cell each surface closes. `None`, or a
+    /// mask larger than [`MAX_FOCUS_SIDE`] a side, turns focus off.
+    pub fn set_focus(&mut self, mask: Option<&FocusMask>, mode: FocusMode) {
+        let usable = mask.filter(|mask| {
+            mask.size
+                .iter()
+                .all(|&side| (1..=MAX_FOCUS_SIDE).contains(&side))
+                && mask.cells.len() as u64
+                    == u64::from(mask.size[0]) * u64::from(mask.size[1]) * u64::from(mask.size[2])
+        });
+        match usable {
+            Some(mask) if mode != FocusMode::Off => {
+                self.focus_view = focus_texture(&self.device, &self.queue, mask.size, &mask.cells);
+                self.focus_box = (mask.origin, mask.size);
+                self.focus_mode = mode;
+            }
+            _ => self.focus_mode = FocusMode::Off,
+        }
+    }
+
+    /// Outlines one cell from the next frame on, or none (LumilioCL local
+    /// change, plan schematic-studio T32). Only a uniform changes.
+    pub fn set_mark(&mut self, mark: Option<CellMark>) {
+        self.mark = mark;
+    }
+
+    /// Draws only the layers up to the clip's from the next frame on, or
+    /// every layer (LumilioCL local change, plan schematic-studio T25). For
+    /// the cut to show faces, mesh with them kept along its axis.
+    pub fn set_clip(&mut self, clip: Option<Clip>) {
+        self.clip = clip;
+    }
+
+    /// Shows a box of cells as selected, or none (LumilioCL local change,
+    /// plan schematic-studio T25).
+    pub fn set_selection(&mut self, selection: Option<SelectionBox>) {
+        self.selection = selection;
+    }
+
+    /// Fits the camera to this box instead of the meshes' bounds, so every
+    /// icon of a batch is framed alike (LumilioCL local change, plan
+    /// schematic-studio T27).
+    pub fn set_fit_bounds(&mut self, min: [f32; 3], max: [f32; 3]) {
+        self.bounds_min = min;
+        self.bounds_max = max;
+    }
+
+    /// How many entity instances each model would draw for `camera`, without
+    /// drawing: the culling the next frame does.
+    pub fn visible_entity_counts(&self, camera: &CameraConfig) -> Vec<u32> {
+        let aspect = self.width as f32 / self.height as f32;
+        let (view_proj, inv_view_proj) =
+            compute_view_proj_reversed(self.bounds_min, self.bounds_max, aspect, camera);
+        let frustum = Frustum::from_view_proj(&view_proj);
+        let culling = Culling {
+            frustum: &frustum,
+            eye: instances::eye(camera.position, &inv_view_proj, true),
+            max_distance: self.entity_distance.get(),
+            back: instances::back(&inv_view_proj, true),
+        };
+        instances::visible(&self.entity_spheres, &self.entity_instances, &culling)
+            .iter()
+            .map(|kept| kept.len() as u32)
+            .collect()
     }
 
     /// Render a single frame and return RGBA pixels. Headless mode only.

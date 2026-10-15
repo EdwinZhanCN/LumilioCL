@@ -1,5 +1,6 @@
 // launcher.lumilio.org: one Worker serving the built site (`dist/`) and,
-// for /releases/* only, the GitHub release mirror (worker/proxy.ts).
+// for /releases/* and /block-assets/* only, the GitHub release mirror
+// (worker/proxy.ts).
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "lumilio-launcher",
@@ -9,7 +10,7 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "404-page",
-    "run_worker_first": ["/releases/*"]
+    "run_worker_first": ["/releases/*", "/block-assets/*"]
   },
   "routes": [{ "pattern": "launcher.lumilio.org", "custom_domain": true }],
   "observability": { "enabled": true }

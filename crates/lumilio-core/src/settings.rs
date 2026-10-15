@@ -168,6 +168,10 @@ pub struct LauncherSettings {
     /// Whether the launcher checks for and downloads stable launcher updates.
     #[serde(default = "auto_update_default")]
     pub auto_update: bool,
+    /// Whether a schematic preview downloads the pre-baked block assets
+    /// when no installed game can supply them (plan schematic-studio, D2).
+    #[serde(default = "auto_download_block_assets_default")]
+    pub auto_download_block_assets: bool,
     /// How the game starts, for every instance that does not override it.
     pub launch: LaunchTuning,
     /// The launcher version whose release notes were last shown. New
@@ -183,6 +187,10 @@ fn auto_update_default() -> bool {
 }
 
 fn auto_install_java_default() -> bool {
+    true
+}
+
+fn auto_download_block_assets_default() -> bool {
     true
 }
 
@@ -207,6 +215,7 @@ impl Default for LauncherSettings {
             java_source: crate::java_runtime::JavaSource::default(),
             auto_install_java: true,
             auto_update: true,
+            auto_download_block_assets: true,
             launch: LaunchTuning::default(),
             release_notes_seen: Some(env!("CARGO_PKG_VERSION").to_owned()),
         }
@@ -405,6 +414,12 @@ impl SettingsStore {
     pub fn set_auto_install_java(&mut self, enabled: bool) -> Result<(), SettingsError> {
         let mut next = self.settings.clone();
         next.auto_install_java = enabled;
+        self.save(next)
+    }
+
+    pub fn set_auto_download_block_assets(&mut self, enabled: bool) -> Result<(), SettingsError> {
+        let mut next = self.settings.clone();
+        next.auto_download_block_assets = enabled;
         self.save(next)
     }
 

@@ -6,6 +6,9 @@
 //!   `dist/`, each with a `.sha256` beside it.
 //! - `block-colors VERSION`: build the block colour table of a game version from
 //!   its client jar (see `block_colors.rs`).
+//! - `bake-blocks`: bake the block assets of every release since 1.13.2 into
+//!   one bundle under `target/block-assets/` (see `bake_blocks.rs`), with
+//!   entity geometry from `tools/entity-dump` (see `entity_dump.rs`).
 //! - `release-check [TAG]`: print `version=` and `prerelease=` lines (for
 //!   `$GITHUB_OUTPUT`), failing if TAG is not `v<workspace version>`.
 //! - `worldgen-*`, `cubiomes-btree` and `cubiomes-tables`: reproduce
@@ -13,9 +16,12 @@
 //!   `forks/cubiomes/data/README.md`).
 //!   The table format comes from cubiomes (MIT, Copyright (c) 2020 Cubitect).
 
+mod bake_blocks;
 mod block_colors;
+mod entity_dump;
 mod linux;
 mod macos;
+mod proguard;
 mod release;
 mod version;
 mod windows;
@@ -26,7 +32,7 @@ use std::process::ExitCode;
 use release::{Release, Result};
 use version::Version;
 
-const USAGE: &str = "usage: cargo xtask package [--skip-build]\n       cargo xtask release-check [TAG]\n       cargo xtask block-colors VERSION\n       cargo xtask worldgen-prepare VERSION\n       cargo xtask worldgen-golden VERSION\n       cargo xtask worldgen-import VERSION\n       cargo xtask worldgen-save-read VERSION\n       cargo xtask worldgen-diff OLD NEW\n       cargo xtask cubiomes-btree INPUT OUTPUT NAME\n       cargo xtask cubiomes-tables";
+const USAGE: &str = "usage: cargo xtask package [--skip-build]\n       cargo xtask release-check [TAG]\n       cargo xtask block-colors VERSION\n       cargo xtask bake-blocks\n       cargo xtask worldgen-prepare VERSION\n       cargo xtask worldgen-golden VERSION\n       cargo xtask worldgen-import VERSION\n       cargo xtask worldgen-save-read VERSION\n       cargo xtask worldgen-diff OLD NEW\n       cargo xtask cubiomes-btree INPUT OUTPUT NAME\n       cargo xtask cubiomes-tables";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -38,6 +44,9 @@ fn main() -> ExitCode {
         ["release-check", tag] => release_check(Some(tag)),
         ["block-colors", version] => Release::detect()
             .and_then(|release| block_colors::run(version, &release.root, &release.target)),
+        ["bake-blocks"] => {
+            Release::detect().and_then(|release| bake_blocks::run(&release.root, &release.target))
+        }
         ["cubiomes-btree", input, output, name] => worldgen::btree(input, output, name),
         ["cubiomes-tables"] => Release::detect().and_then(|r| worldgen::tables(&r.root)),
         ["worldgen-prepare", version] => {

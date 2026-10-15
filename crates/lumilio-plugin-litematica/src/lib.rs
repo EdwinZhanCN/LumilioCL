@@ -34,6 +34,12 @@ impl Plugin for Litematica {
                 Permission::ReadGameFiles {
                     under: "config/litematica".into(),
                 },
+                // The studio's edits go through the host, which backs up,
+                // checks and logs every write (plan schematic-studio, D8).
+                Permission::WriteGameFiles {
+                    under: FOLDER.into(),
+                    names: "*.litematic".into(),
+                },
             ],
             settings: Vec::new(),
         }

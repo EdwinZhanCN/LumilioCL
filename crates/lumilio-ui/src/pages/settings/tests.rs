@@ -47,3 +47,15 @@ fn the_memory_help_names_the_machine_when_known() {
     assert!(memory_help(Some(16_384)).contains("8192 MB"));
     assert!(!memory_help(None).contains("本机内存"));
 }
+
+#[test]
+fn a_write_grant_names_the_files_it_may_change() {
+    let grant = lumilio_plugin_api::Permission::WriteGameFiles {
+        under: "schematics".into(),
+        names: "*.litematic".into(),
+    };
+    assert_eq!(
+        super::plugins::permission_text(&grant),
+        "修改游戏的 schematics 文件夹里名为 *.litematic 的文件（先备份，游戏运行时不写）"
+    );
+}
