@@ -1,0 +1,21 @@
+[package]
+name = "lumilio-schematic"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+# Schematic domain logic for the studio (plan schematic-studio, D10): statistics,
+# block replacement, version conversion, metadata and content fingerprints.
+# Nucleation without meshing or rendering; no GPU, no UI, no launcher core.
+# The baked block-asset format gives a backward conversion the block states
+# the target version knows (T14).
+[dependencies]
+lumilio-block-assets.workspace = true
+nucleation = { path = "../../forks/nucleation", default-features = false }
+serde_json.workspace = true
+sha2.workspace = true
+
+[lints]
+workspace = true

@@ -8,11 +8,13 @@ members = [
     "crates/lumilio-plugin-api",
     "crates/lumilio-nbt",
     "crates/lumilio-anvil",
+    "crates/lumilio-block-assets",
     "crates/lumilio-plugin-crash-analyzer",
     "crates/lumilio-plugin-litematica",
     "crates/lumilio-plugin-modrinth",
     "crates/lumilio-plugin-curseforge",
     "crates/lumilio-plugin-discord",
+    "crates/lumilio-schematic",
     "crates/lumilio-schematic-render",
     "crates/lumilio-skin-render",
     "crates/lumilio-pointer",
@@ -54,6 +56,8 @@ lumilio-plugin-curseforge = { path = "crates/lumilio-plugin-curseforge" }
 lumilio-plugin-discord = { path = "crates/lumilio-plugin-discord" }
 lumilio-nbt = { path = "crates/lumilio-nbt" }
 lumilio-anvil = { path = "crates/lumilio-anvil" }
+lumilio-block-assets = { path = "crates/lumilio-block-assets" }
+lumilio-schematic = { path = "crates/lumilio-schematic" }
 lumilio-schematic-render = { path = "crates/lumilio-schematic-render" }
 lumilio-skin-render = { path = "crates/lumilio-skin-render" }
 lumilio-pointer = { path = "crates/lumilio-pointer" }
@@ -79,6 +83,7 @@ tokio ={ version = "1.53", features = ["fs", "io-util", "macros", "net", "proces
 tempfile = "3"
 url = "2.5"
 zip = { version = "8.6", default-features = false, features = ["deflate"] }
+zstd = { version = "0.13", default-features = false }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

@@ -10,6 +10,7 @@ use crate::theme::Body;
 /// A board that owns the state each control toggles, as a page would.
 struct Board {
     fader: bool,
+    shown: bool,
     check: bool,
     segment: usize,
     tab: usize,
@@ -18,7 +19,13 @@ struct Board {
 impl Render for Board {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let entity = cx.entity();
-        let (a, b, c, d) = (entity.clone(), entity.clone(), entity.clone(), entity);
+        let (a, b, c, d, e) = (
+            entity.clone(),
+            entity.clone(),
+            entity.clone(),
+            entity.clone(),
+            entity,
+        );
         div()
             .flex()
             .flex_col()
@@ -30,6 +37,15 @@ impl Render for Board {
                     cx.notify();
                 })
             }))
+            .child(
+                Fader::new("shown", self.shown, "只看不兼容", move |_, cx| {
+                    e.update(cx, |board, cx| {
+                        board.shown = !board.shown;
+                        cx.notify();
+                    })
+                })
+                .shown(),
+            )
             .child(
                 Checkbox::new("check")
                     .checked(self.check)
@@ -77,6 +93,7 @@ fn board(
     });
     let (board, cx) = cx.add_window_view(|_, _| Board {
         fader: false,
+        shown: false,
         check: false,
         segment: 0,
         tab: 0,
@@ -134,6 +151,20 @@ fn the_fader_lights_its_led_and_moves_its_cap_together(cx: &mut TestAppContext) 
         cap_on - cap_off > 20.,
         "the cap travels to the trailing end"
     );
+}
+
+/// A fader with no row label beside it writes its own after the LED, and a
+/// click on the words toggles it; a plain fader only reads its label out.
+#[gpui::test]
+fn a_shown_fader_writes_its_label_and_the_words_toggle_it(cx: &mut TestAppContext) {
+    let (board, cx) = board(cx, ThemeMode::Light);
+    assert!(cx.debug_bounds("fader-label").is_none());
+    assert!(
+        left(cx, "shown-label") > left(cx, "shown-led"),
+        "the words follow the LED"
+    );
+    click(cx, "shown-label");
+    assert!(board.read_with(cx, |board, _| board.shown));
 }
 
 #[gpui::test]

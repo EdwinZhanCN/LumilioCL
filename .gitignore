@@ -3,3 +3,11 @@
 /.worktrees/
 .DS_Store
 3rd-party/
+
+# Files the Nucleation fork's own tests write into its folder (`just forks`).
+/forks/nucleation/*.litematic
+/forks/nucleation/*.schem
+/forks/nucleation/tests/output/
+
+# Where `just prune` keeps target/block-assets during a clean.
+/.prune-block-assets/

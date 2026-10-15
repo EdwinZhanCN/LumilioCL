@@ -106,6 +106,17 @@ fn main() {
 
 /// Parses `<width>x<height>` in logical pixels, no smaller than the window's
 /// minimum size.
+/// The window size the review hooks ask for: `LUMILIO_REVIEW_SIZE`, or the
+/// smallest window with `LUMILIO_REVIEW_MIN=1`.
+pub(crate) fn review_size_hint() -> Option<(f32, f32)> {
+    std::env::var("LUMILIO_REVIEW_SIZE")
+        .ok()
+        .and_then(|value| review_size(&value))
+        .or_else(|| {
+            (std::env::var("LUMILIO_REVIEW_MIN").as_deref() == Ok("1")).then_some((720., 480.))
+        })
+}
+
 fn review_size(value: &str) -> Option<(f32, f32)> {
     let (width, height) = value.trim().split_once(['x', 'X'])?;
     let width: f32 = width.trim().parse().ok()?;

@@ -317,6 +317,90 @@ pub(crate) fn composite_sign_with_text(
     })
 }
 
+/// How a text display lays out its text (`TextDisplayRenderer`, LumilioCL
+/// local change, plan schematic-studio T35).
+pub(crate) struct TextDisplay<'a> {
+    /// A text component as saved (`"hi"`, `{"text":"hi","color":"red"}`).
+    pub text: &'a str,
+    /// Wrapping width in font units (`line_width`, 200).
+    pub line_width: u32,
+    /// `background`, ARGB (0x40000000, a quarter-black).
+    pub background: u32,
+    /// `left`, `right` or `center`.
+    pub alignment: &'a str,
+}
+
+/// A text display's lines on its background, one font unit a texel at the
+/// font's own resolution, with the layout's size in font units: the widest
+/// line, and ten a line less one. The background runs a unit round the text
+/// on the left and top, as the game's does.
+pub(crate) fn composite_text_display(
+    rp: &ResourcePack,
+    display: &TextDisplay<'_>,
+) -> Option<(TextureData, u32, u32)> {
+    let font = load_font(rp)?;
+    let k = (font.cell_w / 8).max(1);
+    let advance = |segments: &[TextSegment]| segments_width(segments, &font, 1) / k;
+    // Lines as written, then wrapped at the line width by words.
+    let mut lines: Vec<Vec<TextSegment>> = vec![Vec::new()];
+    for segment in parse_text_component(display.text, "white") {
+        for (index, part) in segment.text.split('\n').enumerate() {
+            if index > 0 {
+                lines.push(Vec::new());
+            }
+            for word in part.split_inclusive(' ') {
+                let piece = TextSegment {
+                    text: word.to_owned(),
+                    color: segment.color.clone(),
+                };
+                let line = lines.last_mut().expect("one line");
+                let width = advance(line) + advance(std::slice::from_ref(&piece));
+                if width > display.line_width && !line.is_empty() {
+                    lines.push(vec![piece]);
+                } else {
+                    line.push(piece);
+                }
+            }
+        }
+    }
+    let widths: Vec<u32> = lines.iter().map(|line| advance(line)).collect();
+    let w = widths.iter().copied().max().unwrap_or(0);
+    let h = (lines.len() as u32 * 10).saturating_sub(1);
+    let (out_w, out_h) = ((w + 1) * k, (h + 1) * k);
+    let [a, r, g, b] = display.background.to_be_bytes();
+    let mut pixels = [r, g, b, a].repeat((out_w * out_h) as usize);
+    for (index, (line, width)) in lines.iter().zip(&widths).enumerate() {
+        let x = match display.alignment {
+            "left" => 0,
+            "right" => w - width,
+            _ => (w - width) / 2,
+        };
+        render_segments(
+            &mut pixels,
+            out_w,
+            &font,
+            1,
+            line,
+            (x + 1) * k,
+            (index as u32 * 10 + 1) * k,
+            out_w,
+            false,
+        );
+    }
+    Some((
+        TextureData {
+            width: out_w,
+            height: out_h,
+            pixels,
+            is_animated: false,
+            frame_count: 1,
+            animation: None,
+        },
+        w,
+        h,
+    ))
+}
+
 /// Render a line of text segments into the pixel buffer.
 fn render_segments(
     pixels: &mut [u8],

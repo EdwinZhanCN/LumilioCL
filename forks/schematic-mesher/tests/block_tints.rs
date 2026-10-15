@@ -70,3 +70,19 @@ fn redstone_and_stems_use_minecraft_formulas() {
     assert_eq!(tint("minecraft:attached_pumpkin_stem", 0), hex(0xE0C71C));
     assert_eq!(tint("minecraft:lily_pad", 0), hex(0x208030));
 }
+
+/// A pack's own colormaps decide the plains colors; a chosen biome keeps its own.
+#[test]
+fn plains_colors_come_from_the_packs_colormaps() {
+    let samples = [("grass".to_string(), [1, 2, 3])].into_iter().collect();
+    let mut plains = TintProvider::new();
+    plains.sample_colormaps(&samples);
+    let c = plains.get_tint(&InputBlock::new("minecraft:grass_block"), 0);
+    assert_eq!([0, 1, 2].map(|i| (c[i] * 255.0).round() as u8), [1, 2, 3]);
+    let mut swamp = TintProvider::for_biome("swamp");
+    swamp.sample_colormaps(&samples);
+    assert_eq!(
+        swamp.colors().grass,
+        TintProvider::for_biome("swamp").colors().grass
+    );
+}

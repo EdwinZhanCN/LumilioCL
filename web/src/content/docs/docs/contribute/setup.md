@@ -104,9 +104,11 @@ pnpm dev
 | 修改范围 | 迭代检查 | 交接前检查 |
 | --- | --- | --- |
 | Rust 代码 | `just test-pkg <crate> [filter]` | `just check` |
+| `forks/` 里的 fork | `just forks` | `just check` 和 `just forks` |
 | 文档或 harness | 修改计划后运行 `just plans` | `just docs` |
 | 网站或公开文档 | `just web` | `just web`；修改计划时还需 `just docs` |
 
 `just check` 依次执行构建、测试、Clippy 和格式检查。
+`just forks` 运行启动器所用 fork 自己的测试。CI 运行 `just ci`，即先 `just check` 再 `just forks`。
 `just web` 执行依赖安装、Astro 检查、网站测试和站点构建。
 命令成功结束前，不得声称检查已通过。

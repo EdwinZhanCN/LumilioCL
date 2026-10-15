@@ -1,95 +1,8 @@
-use super::{EntityCube, EntityModelDef, EntityPart, EntityPartPose};
+//! Banner textures: the base dye and the `patterns` property drawn onto the
+//! flag (schematic-mesher, AGPL-3.0-only, Schem-at). The pole, bar and flag
+//! are the game's own layers (LumilioCL local change, plan schematic-studio T7).
+
 use crate::resource_pack::{ResourcePack, TextureData};
-
-/// Banner model — 64x64 texture.
-/// From BannerModel.java + BannerFlagModel.java (MC 1.21.4).
-///
-/// Standing banner (is_standing=true):
-///   - pole: [-1,-42,-1] 2x42x2 tex(44,0)
-///   - bar: [-10,-44,-1] 20x2x2 tex(0,42)
-///   - flag: [-10,0,-2] 20x40x1 tex(0,0) offset(0,-44,0)
-///
-/// Wall banner (is_standing=false):
-///   - no pole
-///   - bar: [-10,-20.5,9.5] 20x2x2 tex(0,42)
-///   - flag: [-10,0,-2] 20x40x1 tex(0,0) offset(0,-20.5,10.5)
-pub(crate) fn banner_model(is_standing: bool, texture_path: &str) -> EntityModelDef {
-    let mut parts = Vec::new();
-
-    // Pole (standing only)
-    if is_standing {
-        parts.push(EntityPart {
-            cubes: vec![EntityCube {
-                origin: [-1.0, -42.0, -1.0],
-                dimensions: [2.0, 42.0, 2.0],
-                tex_offset: [44, 0],
-                inflate: 0.0,
-                mirror: false,
-                skip_faces: vec![],
-            }],
-            pose: Default::default(),
-            children: vec![],
-        });
-    }
-
-    // Bar (crossbar at top)
-    let bar_y = if is_standing { -44.0 } else { -20.5 };
-    let bar_z = if is_standing { -1.0 } else { 9.5 };
-    parts.push(EntityPart {
-        cubes: vec![EntityCube {
-            origin: [-10.0, bar_y, bar_z],
-            dimensions: [20.0, 2.0, 2.0],
-            tex_offset: [0, 42],
-            inflate: 0.0,
-            mirror: false,
-            skip_faces: vec![],
-        }],
-        pose: Default::default(),
-        children: vec![],
-    });
-
-    // Flag
-    let flag_offset_y = if is_standing { -44.0 } else { -20.5 };
-    let flag_offset_z = if is_standing { 0.0 } else { 10.5 };
-    parts.push(EntityPart {
-        cubes: vec![EntityCube {
-            origin: [-10.0, 0.0, -2.0],
-            dimensions: [20.0, 40.0, 1.0],
-            tex_offset: [0, 0],
-            inflate: 0.0,
-            mirror: false,
-            skip_faces: vec![],
-        }],
-        pose: EntityPartPose {
-            position: [0.0, flag_offset_y, flag_offset_z],
-            ..Default::default()
-        },
-        children: vec![],
-    });
-
-    // Root wrapper matching MC BannerRenderer's transform:
-    //   translate(0.5, 0, 0.5) · rotateY(yaw) · scale(2/3, -2/3, -2/3)
-    // The negative Y/Z in MC's scale is equivalent to RotX(π) combined with a
-    // uniform 2/3 downscale. Position Y=0 (not 24) because MC anchors the
-    // banner at the block's bottom, not its top.
-    let scale = 2.0 / 3.0;
-    let root = EntityPart {
-        cubes: vec![],
-        pose: EntityPartPose {
-            position: [8.0, 0.0, 8.0],
-            rotation: [std::f32::consts::PI, 0.0, 0.0],
-            scale: [scale, scale, scale],
-        },
-        children: parts,
-    };
-
-    EntityModelDef {
-        texture_path: texture_path.to_string(),
-        texture_size: [64, 64],
-        parts: vec![root],
-        is_opaque: false, // Banner texture has transparent regions
-    }
-}
 
 /// Composite a banner texture from base color and optional patterns.
 ///
@@ -103,8 +16,8 @@ pub(crate) fn composite_banner_texture(
     base_color: &str,
     patterns: &[(String, String)], // [(pattern_name, dye_color), ...]
 ) -> Option<TextureData> {
-    // Start with the base texture (entity/banner_base.png) for the frame/pole
-    let base_tex = resource_pack.get_texture("entity/banner_base")?;
+    // Start with the base texture (entity/banner/banner_base.png) for the frame/pole
+    let base_tex = resource_pack.get_texture("entity/banner/banner_base")?;
     let base_frame = base_tex.first_frame();
 
     let width = base_frame.width;
@@ -195,27 +108,11 @@ fn apply_pattern_mask(
     }
 }
 
-/// Standard Minecraft dye color RGB values (0-255).
+/// A dye's diffuse colour, which tints the banner's base and each pattern
+/// (LumilioCL local change, plan schematic-studio T35: this was the map
+/// colour table, which the banner renderer never used).
 fn dye_rgb(color: &str) -> [u8; 3] {
-    match color {
-        "white" => [255, 255, 255],
-        "orange" => [216, 127, 51],
-        "magenta" => [178, 76, 216],
-        "light_blue" => [102, 153, 216],
-        "yellow" => [229, 229, 51],
-        "lime" => [127, 204, 25],
-        "pink" => [242, 127, 165],
-        "gray" => [76, 76, 76],
-        "light_gray" => [153, 153, 153],
-        "cyan" => [76, 127, 153],
-        "purple" => [127, 63, 178],
-        "blue" => [51, 76, 178],
-        "brown" => [102, 76, 51],
-        "green" => [102, 127, 51],
-        "red" => [153, 51, 51],
-        "black" => [25, 25, 25],
-        _ => [255, 255, 255],
-    }
+    super::dye_diffuse(color)
 }
 
 /// Parse the "patterns" property string into (pattern_name, dye_color) pairs.

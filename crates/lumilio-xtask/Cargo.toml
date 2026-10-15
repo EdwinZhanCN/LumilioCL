@@ -16,14 +16,21 @@ path = "src/main.rs"
 image.workspace = true
 flate2.workspace = true
 lumilio-anvil = { path = "../lumilio-anvil" }
+lumilio-block-assets.workspace = true
 lumilio-nbt.workspace = true
+# The entity coverage check after a bake (plan schematic-studio T35): the
+# mesher's own rules decide what each version can draw.
+schematic-mesher = { path = "../../forks/schematic-mesher" }
 serde_json.workspace = true
 sha1.workspace = true
 sha2.workspace = true
 zip.workspace = true
 
 [dev-dependencies]
+# Only to prove the bake and the launcher's runtime dump keep the same bytes.
+lumilio-core.workspace = true
 tempfile.workspace = true
+tokio.workspace = true
 
 [lints]
 workspace = true

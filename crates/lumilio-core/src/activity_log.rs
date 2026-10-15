@@ -132,6 +132,9 @@ pub enum TaskAction {
     CopyGame,
     InstallModpack,
     ImportModpack,
+    /// Downloading the pre-baked block assets a schematic preview draws
+    /// with; the subject is the game version.
+    PrepareBlockAssets,
 }
 
 impl From<&str> for TaskLabel {

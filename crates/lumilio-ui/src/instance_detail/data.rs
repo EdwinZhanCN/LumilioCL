@@ -308,6 +308,8 @@ impl InstanceDetailView {
     pub fn game_output(&mut self, lines: Vec<String>, running: bool, cx: &mut Context<Self>) {
         if running {
             if self.live_output.is_none() {
+                // ia[plugin.litematica]: 游戏运行中禁用写入 | 工作室更多菜单与「历史」的恢复键 · 游戏启动时自动 | 改动投影的入口置灰并在提示里说明；游戏结束后恢复 | 核心在运行中也拒绝写入（T12）
+                self.studios_write_changed(cx);
                 self.game_started_ms = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .ok()

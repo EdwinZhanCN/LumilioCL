@@ -1,0 +1,49 @@
+{
+  "about": "Block tints: which color Minecraft's BlockColors.createDefault registers for a block. A block that matches no rule is drawn untinted even when its model has a tintindex (cherry, pale oak and azalea leaves, bamboo, the stonecutter saw). `blocks` are ids, where one `*` matches any run of characters; each must name a block of the newest baked pack (guard: tints_name_real_blocks). `legacy` lists older names of the same blocks that game versions before the rename still use. `tint_index` limits a rule to faces with that index. Kinds: grass, foliage and dry_foliage come from the pack's colormaps at plains; water, redstone (by power), stem (by age), lily_pad; {\"fixed\": \"#RRGGBB\"} is a color the game fixes. LumilioCL local change; see forks/README.md.",
+  "rules": [
+    {
+      "blocks": [
+        "minecraft:grass_block",
+        "minecraft:short_grass",
+        "minecraft:tall_grass",
+        "minecraft:fern",
+        "minecraft:large_fern",
+        "minecraft:potted_fern",
+        "minecraft:bush",
+        "minecraft:sugar_cane"
+      ],
+      "legacy": ["minecraft:grass"],
+      "tint": "grass"
+    },
+    {
+      "blocks": ["minecraft:pink_petals", "minecraft:wildflowers"],
+      "tint_index": 1,
+      "tint": "grass"
+    },
+    {
+      "blocks": [
+        "minecraft:oak_leaves",
+        "minecraft:jungle_leaves",
+        "minecraft:acacia_leaves",
+        "minecraft:dark_oak_leaves",
+        "minecraft:vine"
+      ],
+      "tint": "foliage"
+    },
+    { "blocks": ["minecraft:spruce_leaves"], "tint": { "fixed": "#619961" } },
+    { "blocks": ["minecraft:birch_leaves"], "tint": { "fixed": "#80A755" } },
+    { "blocks": ["minecraft:mangrove_leaves"], "tint": { "fixed": "#92C648" } },
+    { "blocks": ["minecraft:leaf_litter"], "tint": "dry_foliage" },
+    {
+      "blocks": ["minecraft:water", "minecraft:bubble_column", "minecraft:water_cauldron"],
+      "tint": "water"
+    },
+    { "blocks": ["minecraft:redstone_wire"], "tint": "redstone" },
+    { "blocks": ["minecraft:melon_stem", "minecraft:pumpkin_stem"], "tint": "stem" },
+    {
+      "blocks": ["minecraft:attached_melon_stem", "minecraft:attached_pumpkin_stem"],
+      "tint": { "fixed": "#E0C71C" }
+    },
+    { "blocks": ["minecraft:lily_pad"], "tint": "lily_pad" }
+  ]
+}

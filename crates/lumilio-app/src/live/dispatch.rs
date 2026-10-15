@@ -646,6 +646,18 @@ pub(super) fn on_live_intent(
                 cx,
             );
         }
+        LiveIntent::SetAutoDownloadBlockAssets(enabled) => {
+            let service = wiring.backend.service.clone();
+            change_setting(
+                wiring,
+                window,
+                async move { service.set_auto_download_block_assets(enabled).await },
+                tr!("settings-save-failed"),
+                None,
+                |_, _| {},
+                cx,
+            );
+        }
         LiveIntent::SetAutoInstallJava(enabled) => {
             let service = wiring.backend.service.clone();
             change_setting(

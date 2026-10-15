@@ -127,6 +127,12 @@ impl From<crate::GameSettingsError> for ServiceError {
     }
 }
 
+impl From<lumilio_plugin_api::PluginError> for ServiceError {
+    fn from(error: lumilio_plugin_api::PluginError) -> Self {
+        Self::Plugin(error)
+    }
+}
+
 impl Error for ServiceError {}
 
 impl From<crate::skin::AppearanceError> for ServiceError {

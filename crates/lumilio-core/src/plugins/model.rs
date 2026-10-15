@@ -34,4 +34,31 @@ impl PluginHost {
         .await
         .ok_or_else(|| PluginError::Unavailable("the plugin is off or failed".into()))?
     }
+
+    /// The files below `dir` (relative to the game directory), listed under
+    /// `plugin`'s `ReadGameFiles` grant: what the schematic studio's tree
+    /// shows (plan schematic-studio, D6). Paths are relative to the game
+    /// directory and sorted.
+    pub async fn list_granted(
+        &self,
+        plugin: &str,
+        game_dir: PathBuf,
+        dir: &str,
+    ) -> Result<Vec<String>, PluginError> {
+        let info = self
+            .list()
+            .await
+            .into_iter()
+            .find(|info| info.manifest.id == plugin)
+            .ok_or_else(|| PluginError::InvalidInput(format!("unknown plugin {plugin}")))?;
+        if info.status != PluginStatus::Enabled {
+            return Err(PluginError::Unavailable("the plugin is off".into()));
+        }
+        let dir = dir.to_owned();
+        self.call_in(plugin, Some(game_dir), move |_, ctx| {
+            Ok(ctx.list_files(&dir))
+        })
+        .await
+        .ok_or_else(|| PluginError::Unavailable("the plugin is off or failed".into()))?
+    }
 }

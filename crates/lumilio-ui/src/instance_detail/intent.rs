@@ -135,9 +135,23 @@ pub enum InstanceIntent {
     LoadMap {
         request: u64,
     },
+    /// Connect this schematic studio (the entity ID) to the plugin's folder;
+    /// answer with [`InstanceDetailView::plugin_studio_arrived`].
+    LoadStudio {
+        plugin: String,
+        folder: String,
+        request: u64,
+    },
     /// Open the map in a window of its own, starting from what it shows now.
     PopOutMap {
         handoff: crate::world_explorer::MapHandoff,
+    },
+    /// Open this game's schematic studio window for the plugin's folder (or
+    /// bring it forward), on `file` when there is one.
+    OpenStudioWindow {
+        plugin: String,
+        folder: String,
+        file: Option<String>,
     },
     /// Read this crash report; answer with [`InstanceDetailView::crash_arrived`].
     OpenCrash(String),

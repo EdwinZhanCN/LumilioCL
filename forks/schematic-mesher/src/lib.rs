@@ -170,6 +170,7 @@ pub use animate::{build_animated_glb, PistonAction, Timeline, TimelineEvent};
 // --- Mesher ---
 pub use mesher::undrawable_blocks;
 pub use mesher::ChunkIter;
+pub use mesher::{tint_pattern_matches, tint_table_blocks};
 pub use mesher::{Mesh, Mesher, MesherConfig, MesherOutput, TintColors, TintProvider, Vertex};
 
 // --- Canonical output types ---

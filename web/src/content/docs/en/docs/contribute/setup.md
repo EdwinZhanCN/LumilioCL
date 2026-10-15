@@ -106,9 +106,11 @@ Run these recipes from the repository root:
 | Change | During work | Before handoff |
 | --- | --- | --- |
 | Rust code | `just test-pkg <crate> [filter]` | `just check` |
+| A fork in `forks/` | `just forks` | `just check` and `just forks` |
 | Documentation or harness | `just plans` after plan changes | `just docs` |
 | Website or published documentation | `just web` | `just web`; also `just docs` for plan changes |
 
 `just check` runs build, tests, Clippy, and formatting checks in that order.
+`just forks` runs the tests of the forks the launcher builds from. CI runs `just ci`, which is `just check` and then `just forks`.
 `just web` runs dependency installation, Astro checks, website tests, and the site build.
 Do not report a check as passed until it finishes successfully.

@@ -29,6 +29,8 @@ mod plugins;
 mod portability;
 mod preferences;
 mod recognize;
+mod schematic_ops;
+mod schematic_packs;
 mod screenshots;
 mod servers;
 mod skins;

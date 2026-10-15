@@ -13,6 +13,7 @@
 pub mod camera;
 pub mod gpu;
 pub mod hdri;
+pub mod instances;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod video;
 
@@ -21,7 +22,7 @@ pub use video::{VideoCodec, VideoConfig};
 
 pub use camera::CameraConfig;
 pub use camera::Projection;
-pub use gpu::GpuRenderer;
+pub use gpu::{CellMark, Clip, FocusMask, FocusMode, GpuRenderer, SelectionBox, MAX_FOCUS_SIDE};
 pub use hdri::HdriData;
 
 use crate::meshing::MeshOutput;

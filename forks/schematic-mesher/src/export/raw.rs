@@ -97,9 +97,9 @@ mod tests {
         mesh.add_triangle(0, 1, 2);
 
         let output = MesherOutput {
-            opaque_mesh: mesh,
-            cutout_mesh: Mesh::new(),
-            transparent_mesh: Mesh::new(),
+            opaque_mesh: crate::mesh_output::mesh_to_layer(&mesh),
+            cutout_mesh: crate::mesh_output::MeshLayer::new(),
+            transparent_mesh: crate::mesh_output::MeshLayer::new(),
             atlas: TextureAtlas::empty(),
             bounds: BoundingBox::new([0.0, 0.0, 0.0], [1.0, 0.0, 1.0]),
             greedy_materials: Vec::new(),

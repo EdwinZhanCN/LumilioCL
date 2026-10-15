@@ -53,9 +53,18 @@ pub struct FaceCuller<'a> {
     pack: &'a ResourcePack,
     /// Cache of block name -> cull type results.
     cull_cache: rustc_hash::FxHashMap<String, BlockCullType>,
+    /// Faces along this axis are never culled (a sliceable mesh; LumilioCL
+    /// local change, plan schematic-studio T25).
+    keep_along: Option<crate::types::Axis>,
 }
 
 impl<'a> FaceCuller<'a> {
+    /// This culler keeping every face along `axis`, and no block enclosed.
+    pub fn keeping_faces_along(mut self, axis: Option<crate::types::Axis>) -> Self {
+        self.keep_along = axis;
+        self
+    }
+
     /// Create a face culler from a list of blocks, using model data to determine opacity.
     pub fn new(pack: &'a ResourcePack, blocks: &[(BlockPosition, &InputBlock)]) -> Self {
         // Compute bounding box (with 1-block padding for AO neighbor lookups)
@@ -94,6 +103,7 @@ impl<'a> FaceCuller<'a> {
             grid_size,
             pack,
             cull_cache: rustc_hash::FxHashMap::default(),
+            keep_along: None,
         };
 
         // Classify every block to fill the flat opacity grid. Classification
@@ -421,6 +431,9 @@ impl<'a> FaceCuller<'a> {
 
     /// Check if a face should be culled.
     pub fn should_cull(&self, pos: BlockPosition, cullface: Direction) -> bool {
+        if self.keep_along == Some(cullface.axis()) {
+            return false;
+        }
         let neighbor_pos = pos.neighbor(cullface);
         let neighbor_cell = self.grid_cell(neighbor_pos);
 
@@ -463,9 +476,10 @@ impl<'a> FaceCuller<'a> {
     /// Check if a block is fully occluded (all 6 neighbors are fully opaque).
     /// A fully occluded block can be skipped entirely during meshing.
     pub fn is_fully_occluded(&self, pos: BlockPosition) -> bool {
-        Direction::ALL
-            .iter()
-            .all(|&dir| self.is_fully_opaque_at(pos.neighbor(dir)))
+        self.keep_along.is_none()
+            && Direction::ALL
+                .iter()
+                .all(|&dir| self.is_fully_opaque_at(pos.neighbor(dir)))
     }
 
     /// Check if a position is occupied.

@@ -57,6 +57,7 @@
 | 下载源 | 下载与存储 · 分段：仅官方 / 官方优先 / 镜像优先 | 立即保存；仅官方不访问镜像，其他模式按顺序回退，MCIM 始终位于官方之后 |  | `lumilio-ui/src/pages/settings/storage.rs` |
 | 镜像规则 | 下载与存储 · 值 + [编辑] 弹窗 | 每行 官方前缀 => 镜像前缀 |  | `lumilio-ui/src/pages/settings/storage.rs` |
 | 同时下载数 | 下载与存储 · 值 + [编辑] 弹窗 | 自动 / 1–32 |  | `lumilio-ui/src/pages/settings/storage.rs` |
+| 自动下载方块资源 | 下载与存储 · 开关（默认开） | 立即保存；关闭后不再下载方块资源，已经下载过的照常使用；没下载过时投影预览说明原因 | plan schematic-studio D2/T3/T21 | `lumilio-ui/src/pages/settings/storage.rs` |
 | 数据目录 | 下载与存储 · 路径 + [在访达中显示] | 不可改（App State） |  | `lumilio-ui/src/pages/settings/storage.rs` |
 | 存储占用 | 下载与存储 · 游戏 / 共享资源 / Java / 缓存 条形图 | 后台计算后显示 |  | `lumilio-ui/src/pages/settings/storage.rs` |
 | 清除地图缓存 | 下载与存储 · 按键「清除地图缓存」 | 后台删除种子地图缓存；下次查看时重新计算 |  | `lumilio-ui/src/pages/settings/storage.rs` |

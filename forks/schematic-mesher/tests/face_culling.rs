@@ -35,7 +35,7 @@ fn at(x: i32, y: i32, z: i32) -> BlockPosition {
 /// A full cube that no transparent group names is judged by its texture.
 #[test]
 fn see_through_cubes_keep_neighbour_faces() {
-    let pack = cube_pack(&[("stone", false), ("mesh", true)]);
+    let pack = cube_pack(&[("stone", false), ("mesh", true)]).bake();
     let blocks = [
         (at(0, 0, 0), "minecraft:stone"),
         (at(1, 0, 0), "minecraft:stone"),
@@ -60,7 +60,7 @@ fn see_through_cubes_keep_neighbour_faces() {
 /// Minecraft's fancy leaves draw the faces between neighbouring leaves.
 #[test]
 fn leaves_keep_the_faces_between_them() {
-    let pack = cube_pack(&[("oak_leaves", true)]);
+    let pack = cube_pack(&[("oak_leaves", true)]).bake();
     let blocks = [
         (at(0, 0, 0), "minecraft:oak_leaves"),
         (at(1, 0, 0), "minecraft:oak_leaves"),
@@ -78,7 +78,8 @@ fn copper_grates_cull_only_their_own_block() {
         ("stone", false),
         ("copper_grate", true),
         ("exposed_copper_grate", true),
-    ]);
+    ])
+    .bake();
     let blocks = [
         (at(0, 0, 0), "minecraft:stone"),
         (at(0, 0, -1), "minecraft:copper_grate"),
@@ -110,6 +111,7 @@ fn cubes_with_overlay_elements_are_solid() {
                 {{"from":[0,0,0],"to":[16,16,16],"faces":{{"north":{face},"south":{face}}}}}]}}"#
         ),
     );
+    let pack = pack.bake();
     let blocks = [
         (at(0, 0, 0), "minecraft:dirt"),
         (at(0, 1, 0), "minecraft:grass_block"),

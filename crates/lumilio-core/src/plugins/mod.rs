@@ -10,6 +10,8 @@ mod model;
 mod native;
 mod network;
 mod tabs;
+pub(crate) mod write;
+pub(crate) use access::{read_info, resolve_write};
 pub use analysis::PluginFinding;
 pub use content::PluginContentSource;
 pub(crate) use map::SourceStamp;
@@ -220,6 +222,34 @@ impl PluginHost {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone()
+    }
+
+    /// The manifest of an enabled, working plugin, whose file grants the host
+    /// honours when it reads or writes on the plugin's behalf.
+    pub(crate) async fn granted(&self, id: &str) -> Result<Manifest, PluginError> {
+        let entry = self
+            .registry()
+            .await
+            .entries
+            .get(id)
+            .ok_or(PluginError::PermissionDenied)?;
+        let state = self
+            .preferences
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .states
+            .get(id)
+            .cloned()
+            .unwrap_or_default();
+        let failed = entry
+            .failure
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .is_some();
+        if failed || !enabled(&entry.manifest, &state) {
+            return Err(PluginError::PermissionDenied);
+        }
+        Ok(entry.manifest.clone())
     }
 
     /// Where the application listed a plugin; unknown IDs come last.

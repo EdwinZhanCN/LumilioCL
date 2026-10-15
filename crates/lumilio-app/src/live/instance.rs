@@ -138,9 +138,34 @@ pub(super) fn instance_intent(
         InstanceIntent::LoadMap { request } => {
             super::instance_plugins::plugin_map(wiring, id.to_owned(), view, request, cx)
         }
+        InstanceIntent::LoadStudio {
+            plugin,
+            folder,
+            request,
+        } => super::instance_plugins::plugin_studio(
+            wiring,
+            id.to_owned(),
+            view,
+            plugin,
+            folder,
+            request,
+            cx,
+        ),
         InstanceIntent::PopOutMap { handoff } => {
             super::instance_plugins::pop_out_map(wiring, id.to_owned(), handoff, cx)
         }
+        InstanceIntent::OpenStudioWindow {
+            plugin,
+            folder,
+            file,
+        } => super::instance_plugins::open_studio_window(
+            wiring,
+            id.to_owned(),
+            plugin,
+            folder,
+            file,
+            cx,
+        ),
         InstanceIntent::LoadModel {
             plugin,
             file,

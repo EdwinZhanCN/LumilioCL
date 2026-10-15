@@ -17,6 +17,8 @@ pub struct MenuEntry {
     pub(super) label: SharedString,
     pub(super) danger: bool,
     pub(super) disabled: bool,
+    /// Why a disabled entry cannot be chosen, shown as its tooltip.
+    pub(super) hint: Option<SharedString>,
     pub(super) on_click: MenuAction,
 }
 
@@ -29,6 +31,7 @@ impl MenuEntry {
             label: label.into(),
             danger: false,
             disabled: false,
+            hint: None,
             on_click: Rc::new(on_click),
         }
     }
@@ -41,6 +44,35 @@ impl MenuEntry {
 
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
+        self
+    }
+
+    pub fn label(&self) -> &SharedString {
+        &self.label
+    }
+
+    pub fn is_disabled(&self) -> bool {
+        self.disabled
+    }
+
+    pub fn is_danger(&self) -> bool {
+        self.danger
+    }
+
+    /// Why a disabled entry cannot be chosen, if it says.
+    pub fn hint(&self) -> Option<&SharedString> {
+        self.hint.as_ref()
+    }
+
+    /// Runs the entry as choosing it in the menu does.
+    pub fn choose(&self, window: &mut Window, cx: &mut App) {
+        (self.on_click)(window, cx);
+    }
+
+    /// Disables the entry and says why in its tooltip ("游戏运行中不能改动").
+    pub fn unavailable(mut self, why: impl Into<SharedString>) -> Self {
+        self.disabled = true;
+        self.hint = Some(why.into());
         self
     }
 }
@@ -86,13 +118,29 @@ pub(super) fn more_key(
                     menu = menu.separator();
                 }
                 let run = entry.on_click.clone();
-                let item = if entry.danger {
-                    let label = entry.label.clone();
+                let item = if let Some(hint) = entry.hint.clone() {
+                    let (label, danger, index) = (entry.label.clone(), entry.danger, index);
                     PopupMenuItem::element(move |_, _| {
-                        div().text_color(colors.danger).child(label.clone())
+                        let hint = hint.clone();
+                        div()
+                            .id(("menu-hint", index))
+                            .debug_selector(move || format!("menu-entry-{index}"))
+                            .when(danger, |item| item.text_color(colors.danger))
+                            .tooltip(move |window, cx| {
+                                gpui_component::tooltip::Tooltip::new(hint.clone())
+                                    .build(window, cx)
+                            })
+                            .child(label.clone())
                     })
                 } else {
-                    PopupMenuItem::new(entry.label.clone())
+                    // Every entry carries the same selector, enabled or not.
+                    let (label, danger) = (entry.label.clone(), entry.danger);
+                    PopupMenuItem::element(move |_, _| {
+                        div()
+                            .debug_selector(move || format!("menu-entry-{index}"))
+                            .when(danger, |item| item.text_color(colors.danger))
+                            .child(label.clone())
+                    })
                 };
                 menu = menu.item(
                     item.disabled(entry.disabled)

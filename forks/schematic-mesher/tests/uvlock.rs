@@ -9,20 +9,20 @@ mod common;
 
 use std::collections::HashMap;
 
-use common::{add_texture, cube_model, Blocks};
+use common::{add_texture, cube_model, Blocks, Fixture};
 use schematic_mesher::{BlockPosition, InputBlock, Mesher, ResourcePack};
 
 fn pack(x: i32, y: i32, uvlock: bool) -> ResourcePack {
-    let mut pack = ResourcePack::new();
-    let blockstate = serde_json::from_str(&format!(
-        r#"{{"variants":{{"":{{"model":"minecraft:block/cube","x":{x},"y":{y},"uvlock":{uvlock}}}}}}}"#
-    ))
-    .unwrap();
-    pack.add_blockstate("minecraft", "cube", blockstate);
-    let model = serde_json::from_str(&cube_model("minecraft:block/cube")).unwrap();
-    pack.add_model("minecraft", "block/cube", model);
+    let mut pack = Fixture::default();
+    pack.blockstate(
+        "cube",
+        &format!(
+            r#"{{"variants":{{"":{{"model":"minecraft:block/cube","x":{x},"y":{y},"uvlock":{uvlock}}}}}}}"#
+        ),
+    );
+    pack.model("block/cube", &cube_model("minecraft:block/cube"));
     add_texture(&mut pack, "block/cube", false);
-    pack
+    pack.bake()
 }
 
 /// UV of every vertex, keyed by its face normal and position (rounded).

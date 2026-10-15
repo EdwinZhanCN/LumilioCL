@@ -381,6 +381,8 @@ fn a_model_loads_in_its_modal_once_and_late_assets_do_not_enter_a_replacement(
             Ok(lumilio_core::ModelPreview {
                 schematic: Vec::new(),
                 pack: None,
+                plan: lumilio_core::AssetPlan::default(),
+                entities: Default::default(),
             }),
             cx,
         )
@@ -396,7 +398,7 @@ fn first_picture(
     cx: &mut gpui::VisualTestContext,
 ) -> std::sync::Arc<gpui::RenderImage> {
     view.read_with(cx, |view, _| match &view.plugin_pages[PLUGIN] {
-        PluginPage::Shown(_, images, _, _) => images[0].clone().expect("a valid picture"),
+        PluginPage::Shown(_, images, ..) => images[0].clone().expect("a valid picture"),
         _ => panic!("the page is not shown"),
     })
 }
@@ -476,4 +478,72 @@ fn a_page_that_leaves_the_screen_drops_its_plugin_pages_and_asks_again_when_back
     view.update(cx, |_, cx| cx.notify());
     cx.run_until_parked();
     assert_eq!(plugin_views(&seen), before + 1);
+}
+
+#[gpui::test]
+fn the_studio_pane_shows_the_catalogue_and_opens_the_window(cx: &mut TestAppContext) {
+    let seen: Rc<RefCell<Vec<InstanceIntent>>> = Rc::default();
+    let (view, cx) = open(seen.clone(), cx);
+    cx.simulate_resize(gpui::size(gpui::px(720.), gpui::px(480.)));
+    cx.update(|window, cx| view.update(cx, |view, cx| view.open_plugin(PLUGIN.into(), window, cx)));
+    view.update(cx, |view, cx| {
+        view.plugin_view_arrived(
+            PLUGIN.into(),
+            shown(View::Studio {
+                folder: "schematics".into(),
+            }),
+            cx,
+        )
+    });
+    cx.run_until_parked();
+    assert!(
+        seen.borrow()
+            .iter()
+            .any(|intent| matches!(intent, InstanceIntent::LoadStudio { folder, .. } if folder == "schematics")),
+        "the studio asks the application for its folder"
+    );
+    let catalogue = cx
+        .debug_bounds("studio-catalogue")
+        .expect("the catalogue is drawn (T29)");
+    let head = cx.debug_bounds("studio-head").unwrap();
+    assert!(head.bottom() <= catalogue.top());
+    assert!(
+        catalogue.right() <= gpui::px(720.) && head.right() <= gpui::px(720.),
+        "no horizontal overflow: {head:?} over {catalogue:?}"
+    );
+    assert!(cx.debug_bounds("studio-tree").is_none(), "no tree (D27)");
+    assert!(
+        cx.debug_bounds("studio-viewport").is_none()
+            && cx.debug_bounds("studio-inspector").is_none()
+            && cx.debug_bounds("studio-more").is_none(),
+        "the viewport, the inspector and the operations live in the window (D22)"
+    );
+    // The one page action opens the window; with no file chosen it opens
+    // on none.
+    click(cx, "studio-open-window");
+    assert!(
+        seen.borrow().iter().any(|intent| matches!(
+            intent,
+            InstanceIntent::OpenStudioWindow { plugin, folder, file: None }
+                if plugin == PLUGIN && folder == "schematics"
+        )),
+        "the key asks the application for the window: {:?}",
+        seen.borrow()
+    );
+    // A CSV export answers with the same view; the studio is kept.
+    let studio = |view: &InstanceDetailView| match view.plugin_pages.get(PLUGIN) {
+        Some(PluginPage::Shown(_, _, _, _, studios)) => studios[0].entity_id(),
+        _ => panic!("studio page"),
+    };
+    let before = view.read_with(cx, |view, _| studio(view));
+    view.update(cx, |view, cx| {
+        view.plugin_view_arrived(
+            PLUGIN.into(),
+            shown(View::Studio {
+                folder: "schematics".into(),
+            }),
+            cx,
+        )
+    });
+    assert_eq!(view.read_with(cx, |view, _| studio(view)), before);
 }

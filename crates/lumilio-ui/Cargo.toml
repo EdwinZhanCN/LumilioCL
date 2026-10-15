@@ -17,6 +17,7 @@ lumilio-core.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 lumilio-plugin-api.workspace = true
+lumilio-schematic.workspace = true
 lumilio-schematic-render.workspace = true
 lumilio-skin-render.workspace = true
 lumilio-pointer.workspace = true

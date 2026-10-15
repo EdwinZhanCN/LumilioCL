@@ -10,8 +10,8 @@
 
 mod common;
 
-use common::{add_block, add_texture, cube_model, Blocks};
-use schematic_mesher::{BlockPosition, InputBlock, Mesher, ResourcePack};
+use common::{add_block, add_texture, cube_model, Blocks, Fixture};
+use schematic_mesher::{BlockPosition, InputBlock, Mesher};
 
 fn at(x: i32, y: i32, z: i32) -> BlockPosition {
     BlockPosition::new(x, y, z)
@@ -20,16 +20,12 @@ fn at(x: i32, y: i32, z: i32) -> BlockPosition {
 /// The darkest vertex color of the block at the origin, with stone around the
 /// top of it so ambient occlusion would darken its upper corners.
 fn darkest_corner(plant_parent: &str) -> f32 {
-    let mut pack = ResourcePack::new();
+    let mut pack = Fixture::default();
     add_block(&mut pack, "stone", &cube_model("minecraft:block/stone"));
     add_texture(&mut pack, "block/stone", false);
     add_texture(&mut pack, "block/plant", false);
     let parent = cube_model("minecraft:block/plant").replacen('{', plant_parent, 1);
-    pack.add_model(
-        "minecraft",
-        "block/parent",
-        serde_json::from_str(&parent).unwrap(),
-    );
+    pack.model("block/parent", &parent);
     add_block(
         &mut pack,
         "plant",
@@ -39,7 +35,7 @@ fn darkest_corner(plant_parent: &str) -> f32 {
     for (x, z) in [(1, 0), (0, 1), (1, 1), (-1, 0), (0, -1)] {
         blocks.push((at(x, 1, z), InputBlock::new("minecraft:stone")));
     }
-    let out = Mesher::new(pack).mesh(&Blocks(blocks)).unwrap();
+    let out = Mesher::new(pack.bake()).mesh(&Blocks(blocks)).unwrap();
     // Faces are four consecutive vertices; the plant's faces are centred on its
     // own block, the stone's are not.
     let layer = &out.opaque_mesh;
@@ -70,11 +66,15 @@ fn shade_direction_override_lights_faces_as_if_they_faced_up() {
         )
     };
     let normals = |model: String| {
-        let mut pack = ResourcePack::new();
+        let mut pack = Fixture::default();
         add_block(&mut pack, "cross", &model);
         add_texture(&mut pack, "block/cross", false);
         let source = Blocks(vec![(at(0, 0, 0), InputBlock::new("minecraft:cross"))]);
-        Mesher::new(pack).mesh(&source).unwrap().opaque_mesh.normals
+        Mesher::new(pack.bake())
+            .mesh(&source)
+            .unwrap()
+            .opaque_mesh
+            .normals
     };
     let plain = normals(element(""));
     assert!(plain.iter().all(|n| n[1].abs() < 1e-4), "{plain:?}");

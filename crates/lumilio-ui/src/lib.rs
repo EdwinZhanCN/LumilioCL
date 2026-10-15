@@ -37,6 +37,7 @@ pub mod plugin_setting_dialog;
 pub mod project_detail;
 pub mod release_notes;
 pub mod route;
+pub mod schematic_studio;
 pub mod settings_dialog;
 pub mod settings_forms;
 pub mod shell;

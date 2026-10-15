@@ -303,120 +303,49 @@ fn short_block_state_arrays_are_rejected() {
 }
 
 #[test]
-fn the_list_shows_metadata_and_marks_broken_files_without_failing() {
+fn the_tab_is_the_hosts_studio_over_the_schematics_folder() {
+    let ctx = files(vec![("house.litematic", Vec::new())]);
+    assert_eq!(
+        Litematica.view(&ctx, &TabState::Null).unwrap(),
+        View::Studio {
+            folder: FOLDER.into()
+        }
+    );
+}
+
+#[test]
+fn reveal_and_export_name_one_file_and_become_effects() {
     let ctx = files(vec![
         (
-            "house.litematic",
-            litematic("House", (2, 1, 1), &["minecraft:stone"], &[0, 0]),
+            "farms/house.litematic",
+            litematic(
+                "House",
+                (2, 2, 1),
+                &["minecraft:air", "minecraft:stone", "minecraft:glass"],
+                &[1, 2, 2, 2],
+            ),
         ),
         ("broken.litematic", b"not nbt".to_vec()),
-        ("notes.txt", b"ignored".to_vec()),
     ]);
-    let View::List { items } = Litematica.view(&ctx, &TabState::Null).unwrap() else {
-        panic!("list");
-    };
-    assert_eq!(items.len(), 2);
-    let broken = &items[0];
-    assert_eq!(broken.title, "broken");
-    assert_eq!(broken.subtitle.as_deref(), Some("读不了"));
-    assert!(broken.open.is_none());
-    let house = &items[1];
-    assert_eq!(
-        house.title, "house",
-        "the file name, not the schematic's own name"
-    );
-    assert_eq!(house.subtitle.as_deref(), Some("Alex · 2×1×1"));
-    assert_eq!(house.value.as_deref(), Some("2 个方块"));
-    assert_eq!(
-        house.open,
-        Some(ActionId::new("open:schematics/house.litematic"))
-    );
-}
-
-#[test]
-fn an_empty_folder_says_so() {
-    let ctx = files(vec![("notes.txt", b"x".to_vec())]);
-    assert!(matches!(
-        Litematica.view(&ctx, &TabState::Null).unwrap(),
-        View::Empty { .. }
-    ));
-}
-
-#[test]
-fn detail_has_facts_a_descending_material_table_and_actions() {
-    let ctx = files(vec![(
-        "house.litematic",
-        litematic(
-            "House",
-            (2, 2, 1),
-            &["minecraft:air", "minecraft:stone", "minecraft:glass"],
-            &[1, 2, 2, 2],
-        ),
-    )]);
-    let (state, effects) = Litematica
+    let (_, effects) = Litematica
         .update(
             &ctx,
             TabState::Null,
-            ActionId::new("open:schematics/house.litematic"),
+            ActionId::new("reveal:schematics/farms/house.litematic"),
         )
-        .unwrap();
-    assert!(effects.is_empty());
-    let View::Detail {
-        title,
-        facts,
-        children,
-        ..
-    } = Litematica.view(&ctx, &state).unwrap()
-    else {
-        panic!("detail");
-    };
-    assert_eq!(title, "house");
-    assert!(facts.contains(&("投影名称".to_owned(), "House".to_owned())));
-    assert!(facts.contains(&("尺寸".to_owned(), "2 × 2 × 1".to_owned())));
-    assert!(facts.contains(&("修改时间".to_owned(), "2023-11-14 22:13".to_owned())));
-    assert_eq!(
-        children[0],
-        View::Model {
-            file: "schematics/house.litematic".into()
-        },
-        "the 3D preview comes first, then the materials"
-    );
-    let View::Section {
-        children: material, ..
-    } = &children[1]
-    else {
-        panic!("materials second");
-    };
-    let View::Table { rows, .. } = &material[0] else {
-        panic!("table");
-    };
-    assert_eq!(
-        rows,
-        &vec![
-            vec!["minecraft:glass".to_owned(), "3".to_owned()],
-            vec!["minecraft:stone".to_owned(), "1".to_owned()],
-        ]
-    );
-}
-
-#[test]
-fn reveal_and_export_become_effects_and_back_closes_the_detail() {
-    let ctx = files(vec![(
-        "house.litematic",
-        litematic("House", (2, 1, 1), &["minecraft:stone"], &[0, 0]),
-    )]);
-    let open = serde_json::json!({"open": "schematics/house.litematic"});
-    let (_, effects) = Litematica
-        .update(&ctx, open.clone(), ActionId::new("reveal"))
         .unwrap();
     assert_eq!(
         effects,
         vec![Effect::RevealGameFile {
-            path: "schematics/house.litematic".into()
+            path: "schematics/farms/house.litematic".into()
         }]
     );
     let (_, effects) = Litematica
-        .update(&ctx, open.clone(), ActionId::new("export"))
+        .update(
+            &ctx,
+            TabState::Null,
+            ActionId::new("export:schematics/farms/house.litematic"),
+        )
         .unwrap();
     let [
         Effect::SaveAs {
@@ -430,17 +359,30 @@ fn reveal_and_export_become_effects_and_back_closes_the_detail() {
     assert_eq!(suggested_name, "house-材料清单.csv");
     assert_eq!(
         String::from_utf8(bytes.clone()).unwrap(),
-        "\u{feff}方块,数量\r\nminecraft:stone,2\r\n"
+        "\u{feff}方块,数量,组数\r\nminecraft:glass,3,3\r\nminecraft:stone,1,1\r\n",
+        "most first, air left out"
     );
-    let (state, _) = Litematica
-        .update(&ctx, open, ActionId::new("back"))
+    let (_, effects) = Litematica
+        .update(
+            &ctx,
+            TabState::Null,
+            ActionId::new("export:schematics/broken.litematic"),
+        )
         .unwrap();
-    assert_eq!(state, TabState::Null);
-    assert!(
-        Litematica
-            .update(&ctx, TabState::Null, ActionId::new("open:options.txt"))
-            .is_err()
-    );
+    assert!(matches!(effects.as_slice(), [Effect::Toast(_)]));
+    for outside in [
+        "reveal:options.txt",
+        "export:schematics/notes.txt",
+        "reveal:schematics/../options.litematic",
+        "export:schematicsx/a.litematic",
+    ] {
+        assert!(
+            Litematica
+                .update(&ctx, TabState::Null, ActionId::new(outside))
+                .is_err(),
+            "{outside}"
+        );
+    }
 }
 
 #[test]
@@ -459,23 +401,33 @@ fn the_tab_appears_with_the_mod_or_with_existing_schematics() {
 }
 
 #[test]
-fn dates_are_formatted_in_utc() {
-    assert_eq!(crate::tab::date_for_tests(0), "1970-01-01 00:00");
-    assert_eq!(
-        crate::tab::date_for_tests(1_700_000_000_000),
-        "2023-11-14 22:13"
-    );
+fn only_litematic_files_in_the_schematics_folder_may_be_written() {
+    let writes: Vec<_> = Litematica
+        .manifest()
+        .permissions
+        .into_iter()
+        .filter_map(|permission| match permission {
+            lumilio_plugin_api::Permission::WriteGameFiles { under, names } => Some((under, names)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(writes, [(FOLDER.to_owned(), "*.litematic".to_owned())]);
 }
 
+/// The material list's stacks column says what the studio's materials say
+/// (plan schematic-studio T25).
 #[test]
-fn subfolders_show_as_a_tag_and_unnamed_schematics_keep_their_file_name() {
-    let ctx = files(vec![(
-        "farms/iron.litematic",
-        litematic("Unnamed", (1, 1, 1), &["minecraft:stone"], &[0]),
-    )]);
-    let View::List { items } = Litematica.view(&ctx, &TabState::Null).unwrap() else {
-        panic!("list");
-    };
-    assert_eq!(items[0].title, "iron");
-    assert_eq!(items[0].tags, ["farms"]);
+fn the_material_list_counts_stacks_as_the_studio_does() {
+    let zh = crate::text::Text::new("zh-CN");
+    let en = crate::text::Text::new("en-US");
+    for (count, chinese, english) in [
+        (22, "22", "22"),
+        (64, "1 组", "1 stack"),
+        (192, "3 组", "3 stacks"),
+        (86, "1 组 + 22", "1 stack + 22"),
+        (150, "2 组 + 22", "2 stacks + 22"),
+    ] {
+        assert_eq!(zh.stacks(count), chinese, "{count}");
+        assert_eq!(en.stacks(count), english, "{count}");
+    }
 }

@@ -679,6 +679,7 @@ java-conflict-anyway = Launch anyway
 task-copy-game = Copy { $subject }
 task-install-modpack = Install modpack { $subject }
 task-import-modpack = Import modpack { $subject }
+task-prepare-block-assets = Prepare block assets for { $subject }
 
 ## New game
 
@@ -798,8 +799,14 @@ model-undrawable = { $count ->
     [one] { $count } block type can't be drawn for this game version and is missing from the preview
    *[other] { $count } block types can't be drawn for this game version and are missing from the preview
 }
+model-undrawable-entities = { $count ->
+    [one] { $count } entity type can't be drawn for this game version and is missing from the preview
+   *[other] { $count } entity types can't be drawn for this game version and are missing from the preview
+}
 model-read-failed = Couldn't read the 3D preview
-model-needs-game = Once this game is installed, you can preview schematics with its textures
+model-assets-missing = Block assets can't be prepared right now
+model-assets-offline = No network, and the block assets aren't downloaded yet
+model-assets-download-off = Automatic block asset download is off, and the block assets aren't downloaded yet
 model-capture-unsupported = The current window system doesn't support mouse capture yet; use Orbital mode
 model-capture-failed = Couldn't capture the mouse; click the view to try again
 model-capture-ended = Mouse capture ended; click the view to re-enter
@@ -807,8 +814,431 @@ model-loading = Building the 3D preview…
 model-aria = 3D schematic preview; in Orbital mode, arrow keys rotate and plus/minus zoom; in Explore mode, click or press Enter to capture the mouse, WASD to move, Space to rise, Shift to descend, Esc to release; R resets
 model-reset = Reset view
 model-hint-orbital = Drag to rotate · Scroll to zoom · Arrow keys rotate · + / − to zoom
-model-hint-explore-captured = WASD to move · Space to rise · Shift to descend · Esc to release the mouse
+model-hint-explore-captured = WASD to move · Space to rise · Shift to descend · click to pick the block under the crosshair · Esc to release the mouse
 model-hint-explore = Click the view or press Enter to enter · WASD to move · Space to rise · Shift to descend
+model-slice = Slice
+model-slice-down = Layer below ([)
+model-slice-up = Layer above (])
+model-slice-layer = { $axis } { $layer } · { $count ->
+    [one] { $count } block
+   *[other] { $count } blocks
+}
+model-hint-orbital-pick = Click to inspect a block · Drag to rotate · Scroll to zoom · Arrow keys rotate · + / − to zoom
+model-angle = Angle
+model-angle-north = North
+model-angle-east = East
+model-angle-south = South
+model-angle-west = West
+model-angle-top = Top
+model-angle-isometric = Isometric
+model-source-bundle = { $version } · downloaded bundle
+
+## Studio viewport: block selection and PNG export
+studio-card-undrawable = This game version cannot draw this block; the picture shows a missing-texture placeholder
+studio-sources = Resource sources
+studio-sources-add = Add resource pack…
+studio-sources-prompt = Add
+studio-sources-remove = Remove
+studio-sources-pick = Select a schematic to see the resources it is drawn with
+studio-sources-loading = Reading resource sources…
+studio-sources-none = No resource sources are available
+studio-sources-failed = The resource sources did not change
+studio-source-blocks = { $count ->
+    [one] { $count } block
+   *[other] { $count } blocks
+}
+studio-source-files = { $count ->
+    [one] { $count } resource file
+   *[other] { $count } resource files
+}
+studio-source-missing = File not found
+studio-png-title = Export PNG
+studio-png-export = Export
+studio-png-width = Width (pixels)
+studio-png-height = Height (pixels)
+studio-png-size-hint = Up to 4096 pixels per side
+studio-png-size-invalid = Width and height must be whole numbers from 1 to 4096
+studio-png-background = Background
+studio-png-background-panel = Panel color
+studio-png-background-clear = Transparent
+studio-png-angle = Angle
+studio-png-angle-current = Current view
+studio-png-not-ready = The 3D preview isn't ready yet
+studio-png-failed = Couldn't draw the image
+studio-png-closed = The viewport closed, so nothing was exported
+studio-png-saved = Saved to { $path }
+studio-png-save-failed = Couldn't save the PNG
+
+## Schematic studio (plan schematic-studio, T9)
+
+studio-title = Schematics
+studio-caption = { $count ->
+    [one] { $count } schematic
+   *[other] { $count } schematics
+}
+studio-caption-version = { $version }
+studio-caption-versions = { $schematic } schematic · game { $game }
+studio-caption-schematic = { $version } schematic
+studio-compat-missing = { $count ->
+    [one] { $count } block kind { $version } does not have
+   *[other] { $count } block kinds { $version } does not have
+}
+studio-compat-convert = Convert to { $version }…
+studio-tile-missing = { $version } does not have this block
+studio-only-incompatible = Only incompatible
+studio-open-window = Open studio
+studio-open-window-tip = Open the schematic studio in its own window: the 3D viewport, the inspector and every operation
+studio-window-title = Schematic studio
+studio-tab-history = History
+studio-search-placeholder = Search schematics
+studio-blocks-placeholder = Search blocks
+studio-listing = Listing schematics…
+studio-list-failed = Couldn't list the schematics folder
+studio-list-empty = No schematics yet. Put .litematic files in the game's schematics folder and they show up here.
+studio-search-none = Nothing matches
+studio-duplicate-tip = { $count ->
+    [one] Same blocks as { $count } other schematic
+   *[other] Same blocks as { $count } other schematics
+}
+studio-viewport-empty = Choose a schematic on the left to see its 3D model here
+studio-pick-first = Choose a schematic on the left first
+studio-write-blocked = The game is running. Schematics can be changed after it closes.
+studio-menu-replace = Replace blocks…
+studio-menu-convert = Convert version…
+studio-menu-png = Export PNG…
+studio-menu-csv = Export materials (CSV)
+studio-menu-delete = Delete…
+studio-reading = Reading…
+studio-read-failed = Couldn't read this schematic
+studio-volume = Volume
+studio-block-entity-count = Block entities
+studio-regions = Regions
+studio-duplicates = Duplicates
+studio-state-default = Default state
+studio-blocks-none = This schematic holds only air
+studio-none = None
+studio-entities = Entities
+studio-meta-name = Name
+studio-meta-author = Author
+studio-meta-description = Description
+studio-meta-created = Created
+studio-meta-modified = Modified
+studio-meta-data-version = Data version
+studio-meta-file = File
+studio-history-loading = Reading history…
+studio-history-failed = Couldn't read the change history
+studio-history-empty = No schematics in this game have been changed yet. Replacements, conversions and edits are listed here, and each one can be restored.
+studio-op-replace = Replace blocks
+studio-op-convert = Convert version
+studio-op-metadata = Edit metadata
+studio-op-restore = Restore
+studio-restore = Restore
+studio-restore-made-body = This operation wrote this file. Restoring moves it into the launcher's backups; nothing is deleted, and the restore is logged too.
+studio-restore-title = Restore "{ $file }" to before this change?
+studio-restore-body = The current file is backed up first, and the restore is listed in the history too.
+studio-restored = Restored "{ $file }"
+studio-restore-failed = Couldn't restore this schematic
+studio-op-delete = Delete
+studio-op-dedupe = Keep one copy
+studio-write-busy = The last change is still being written
+studio-write-conflict = This schematic changed after it was read, so nothing was written. Select it again and retry.
+studio-write-failed = Couldn't write this schematic
+studio-edit-failed = Couldn't change this schematic
+studio-remove-failed = Couldn't move the schematic to the backups
+studio-deleted = Moved "{ $file }" to the backups
+studio-deduped = { $count ->
+    [one] Moved { $count } duplicate schematic to the backups
+   *[other] Moved { $count } duplicate schematics to the backups
+}
+studio-delete-title = Delete "{ $file }"?
+studio-delete-body = The file moves to the launcher's backups instead of being deleted. You can restore it from History.
+studio-keep-only = Keep only this
+studio-keep-title = Keep only "{ $file }"?
+studio-keep-body = { $count ->
+    [one] The { $count } other copy in this group moves to the launcher's backups instead of being deleted. You can restore it from History.
+   *[other] The { $count } other copies in this group move to the launcher's backups instead of being deleted. You can restore each from History.
+}
+studio-keep-summary = Kept "{ $file }"
+studio-replace-title = Replace blocks
+studio-replace-source = Block to replace
+studio-replace-any = Any
+studio-replace-target = Replace with
+studio-replace-scope = Scope
+studio-replace-all-regions = All regions
+studio-replace-selection = Selection { $x }×{ $y }×{ $z }
+studio-replace-waiting = Choose what each row becomes to see how many blocks are replaced
+studio-replace-counting = Counting…
+studio-replace-none = No blocks match
+studio-replace-count = { $count ->
+    [one] { $count } block will be replaced
+   *[other] { $count } blocks will be replaced
+}
+studio-replace-commit = Replace
+studio-replace-summary = { $source } → { $target } · { $count }
+studio-replace-summary-rows = { $rows } rows · { $count }
+studio-replace-summary-scheme = Scheme "{ $name }" · { $count }
+studio-replace-commit-count = { $count ->
+    [one] Replace { $count } block
+   *[other] Replace { $count } blocks
+}
+studio-replace-from = From
+studio-replace-to = To
+studio-replace-any-props = Any properties
+studio-replace-target-pick = Choose a block
+studio-replace-add-row = Add a row
+studio-replace-remove-row = Remove this row
+studio-replace-row-count = { $count }
+studio-replace-scope-slice = Current slice
+studio-replace-schemes = Schemes
+studio-replace-scheme-pick = Apply a scheme…
+studio-replace-scheme-name = Scheme name
+studio-replace-scheme-save = Save as scheme
+studio-replace-catalog-loading = Reading this version's blocks…
+studio-replace-catalog-failed = Couldn't read this version's blocks. You can only choose blocks this schematic already has, and properties are not kept.
+studio-replaced = { $count ->
+    [one] Replaced { $count } block in "{ $file }"
+   *[other] Replaced { $count } blocks in "{ $file }"
+}
+studio-convert-title = Convert version
+studio-convert-from = Current format: { $version }
+studio-convert-target = Convert to
+studio-convert-placeholder = Choose a version
+studio-convert-versions-failed = Couldn't read the version list
+studio-convert-current = Current
+studio-convert-data-version = Data version { $version }
+studio-convert-choose = Choose a version to see whether anything would be lost. Nothing is written until you confirm.
+studio-convert-checking = Trying the conversion…
+studio-convert-failed = Couldn't convert this schematic
+studio-convert-same = This schematic is already in this version's format.
+studio-convert-forward = Converting to a newer version loses nothing.
+studio-convert-backward-clean = Converting to this older version loses nothing.
+studio-convert-lossy = { $count ->
+    [one] Converting to { $version } changes { $count } thing. Nothing is written until you confirm:
+   *[other] Converting to { $version } changes { $count } things. Nothing is written until you confirm:
+}
+studio-convert-lost = Lost
+studio-convert-approximated = Approximated
+studio-convert-kept = Kept
+studio-convert-kept-note = { $version } does not know these blocks. They are written as they are and become air in that version.
+studio-convert-replace-kept = Choose replacements for these blocks…
+studio-convert-save-as = Save as "{ $file }" and keep the original
+studio-convert-overwrite = Replace the original file
+studio-convert-more = { $count } more not listed
+studio-convert-missing-block = { $count ->
+    [one] { $version } does not have this block. { $count } block is written as it is and becomes air in that version.
+   *[other] { $version } does not have this block. { $count } blocks are written as they are and become air in that version.
+}
+studio-convert-unknown-property = { $count ->
+    [one] { $version } does not know this property or value. { $count } block is written as it is and uses the block's default in that version.
+   *[other] { $version } does not know this property or value. { $count } blocks are written as they are and use the block's default in that version.
+}
+studio-convert-loss-flattening-ambiguous = Versions before 1.13 have no exact match for this block. The nearest old block is written.
+studio-convert-loss-flattening-unknown-block = { $version } does not know this block. It is written as it is.
+studio-convert-loss-item-damage = The durability or the old number of this item cannot be restored.
+studio-convert-loss-component-dropped = { $version } cannot write this item data. It is removed.
+studio-convert-loss-merge-ambiguous = Newer versions merge some entities or items into one kind. One of the old kinds is written.
+studio-convert-loss-rename-ambiguous = Newer versions give some names one new name. One of the old names is written.
+studio-convert-loss-fingerprint = Newer versions keep less detail for this data. The lost detail cannot be restored.
+studio-convert-loss-unsupported = { $version } does not have this. It is removed.
+studio-convert-loss-other = { $version } can write only an approximate value for this.
+studio-convert-unchecked = Couldn't check the blocks against { $version }. Blocks that the older version does not have are not listed here.
+studio-convert-commit = Convert
+studio-convert-anyway = Convert anyway
+studio-convert-summary = { $from } → { $to } · { $count ->
+    [one] { $count } loss
+   *[other] { $count } losses
+}
+studio-converted = Converted "{ $file }" to { $version }
+studio-converted-as = Saved "{ $file }" ({ $version })
+studio-meta-title = Edit metadata
+studio-meta-name-empty = The name can't be empty
+studio-meta-summary = Name "{ $name }"
+studio-meta-saved = Saved the metadata of "{ $file }"
+
+## Schematic studio: the workbench (plan schematic-studio, T30)
+
+studio-tab-materials = Materials
+studio-tab-info = Info
+studio-materials-summary = { $kinds ->
+    [one] { $kinds } kind
+   *[other] { $kinds } kinds
+} · { $count }
+studio-tile-tip = { $name } · { $count } · { $stacks }
+studio-scope-selection = Selection { $x }×{ $y }×{ $z } · { $count ->
+    [one] { $count } block
+   *[other] { $count } blocks
+}
+studio-scope-layer = Layer { $axis } { $layer } · { $count ->
+    [one] { $count } block
+   *[other] { $count } blocks
+}
+studio-scope-clear = Clear selection
+studio-scope-empty = Only air here
+studio-state-count = { $words } ×{ $count }
+studio-detail-copy = Copy ID
+studio-detail-replace = Replace…
+studio-detail-only = Show only these
+studio-detail-all = Show all
+studio-detail-count = { $count ->
+    [one] { $count } block
+   *[other] { $count } blocks
+} · { $stacks }
+studio-menu-metadata = Edit info…
+studio-meta-edit = Edit…
+studio-technical = Technical details
+studio-undrawable-blocks = Blocks not drawn
+studio-undrawable-entities = Entities not drawn
+studio-card-meta = { $size } · { $count ->
+    [one] { $count } block
+   *[other] { $count } blocks
+}
+studio-switch-pick = Choose a schematic
+studio-switch-tip = Open another schematic
+
+## Schematic studio: resource source switches (plan schematic-studio, T21)
+
+studio-source-switch = Draw with { $name }
+studio-source-custom = { $count ->
+    [one] { $count } model not drawn
+   *[other] { $count } models not drawn
+}
+studio-sources-off = Mods and resource packs are off until you switch them on. Then the viewport draws again with them.
+
+## Schematic studio: the inspect card (plan schematic-studio, T32)
+
+studio-inspect-copy = Copy block state
+studio-inspect-quoted = “{ $name }”
+studio-inspect-stack = { $name } ×{ $count }
+studio-inspect-stacks = { $name } ×{ $count } · { $stacks }
+studio-inspect-kind = Select this kind
+studio-inspect-kind-tip = Select this block kind in Materials
+
+## Schematic studio: stacks and block properties (plan schematic-studio, T26)
+
+studio-stacks = { $count ->
+    [one] { $count } stack
+   *[other] { $count } stacks
+}
+studio-stacks-rest = { $count ->
+    [one] { $count } stack + { $rest }
+   *[other] { $count } stacks + { $rest }
+}
+studio-prop-pair = { $key } { $value }
+studio-prop-no = no
+studio-prop-waterlogged = Waterlogged
+studio-prop-powered = Powered
+studio-prop-open = Open
+studio-prop-lit = Lit
+studio-prop-persistent = Persistent
+studio-prop-snowy = Snowy
+studio-prop-attached = Attached
+studio-prop-triggered = Triggered
+studio-prop-enabled = Enabled
+studio-prop-extended = Extended
+studio-prop-hanging = Hanging
+studio-prop-inverted = Inverted
+studio-prop-locked = Locked
+studio-prop-occupied = Occupied
+studio-prop-short = Short
+studio-prop-signal_fire = Signal fire
+studio-prop-has_book = Has a book
+studio-prop-in_wall = In a wall
+studio-prop-conditional = Conditional
+studio-prop-eye = Has an eye
+studio-prop-unstable = Unstable
+studio-prop-bottom = Bottom
+studio-prop-up = Joined up
+studio-prop-down = Joined down
+studio-prop-north = Joined north
+studio-prop-south = Joined south
+studio-prop-east = Joined east
+studio-prop-west = Joined west
+studio-prop-age = Age
+studio-prop-power = Power
+studio-prop-rotation = Rotation
+studio-prop-level = Level
+studio-prop-distance = Distance
+studio-prop-delay = Delay
+studio-prop-layers = Layers
+studio-prop-note = Note
+studio-prop-bites = Bites
+studio-prop-moisture = Moisture
+studio-prop-stage = Stage
+studio-prop-candles = Candles
+studio-prop-pickles = Pickles
+studio-prop-eggs = Eggs
+studio-prop-hatch = Hatch
+studio-prop-charges = Charges
+studio-prop-honey_level = Honey
+studio-prop-facing-north = Facing north
+studio-prop-facing-south = Facing south
+studio-prop-facing-east = Facing east
+studio-prop-facing-west = Facing west
+studio-prop-facing-up = Facing up
+studio-prop-facing-down = Facing down
+studio-prop-half-top = Top half
+studio-prop-half-bottom = Bottom half
+studio-prop-half-upper = Upper half
+studio-prop-half-lower = Lower half
+studio-prop-type-top = Top half
+studio-prop-type-bottom = Bottom half
+studio-prop-type-double = Double
+studio-prop-type-single = Single
+studio-prop-type-left = Left half
+studio-prop-type-right = Right half
+studio-prop-type-normal = Normal
+studio-prop-type-sticky = Sticky
+studio-prop-axis-x = Along X
+studio-prop-axis-y = Along Y
+studio-prop-axis-z = Along Z
+studio-prop-shape-straight = Straight
+studio-prop-shape-inner_left = Inner corner, left
+studio-prop-shape-inner_right = Inner corner, right
+studio-prop-shape-outer_left = Outer corner, left
+studio-prop-shape-outer_right = Outer corner, right
+studio-prop-shape-north_south = North–south
+studio-prop-shape-east_west = East–west
+studio-prop-shape-ascending_north = Rising north
+studio-prop-shape-ascending_south = Rising south
+studio-prop-shape-ascending_east = Rising east
+studio-prop-shape-ascending_west = Rising west
+studio-prop-shape-north_east = Curve north–east
+studio-prop-shape-north_west = Curve north–west
+studio-prop-shape-south_east = Curve south–east
+studio-prop-shape-south_west = Curve south–west
+studio-prop-hinge-left = Hinge on the left
+studio-prop-hinge-right = Hinge on the right
+studio-prop-part-head = Head
+studio-prop-part-foot = Foot
+studio-prop-face-floor = On the floor
+studio-prop-face-wall = On a wall
+studio-prop-face-ceiling = On the ceiling
+studio-prop-attachment-floor = On the floor
+studio-prop-attachment-ceiling = On the ceiling
+studio-prop-attachment-single_wall = On one wall
+studio-prop-attachment-double_wall = Between two walls
+studio-prop-mode-compare = Compare mode
+studio-prop-mode-subtract = Subtract mode
+studio-prop-north-low = Low wall north
+studio-prop-north-tall = Tall wall north
+studio-prop-south-low = Low wall south
+studio-prop-south-tall = Tall wall south
+studio-prop-east-low = Low wall east
+studio-prop-east-tall = Tall wall east
+studio-prop-west-low = Low wall west
+studio-prop-west-tall = Tall wall west
+studio-prop-north-none = Nothing north
+studio-prop-south-none = Nothing south
+studio-prop-east-none = Nothing east
+studio-prop-west-none = Nothing west
+studio-prop-north-side = Joined north
+studio-prop-south-side = Joined south
+studio-prop-east-side = Joined east
+studio-prop-west-side = Joined west
+studio-prop-north-up = Up the north side
+studio-prop-south-up = Up the south side
+studio-prop-east-up = Up the east side
+studio-prop-west-up = Up the west side
 
 ## Placeholder pages
 
@@ -1575,6 +2005,8 @@ settings-concurrency = Downloads at once
 settings-concurrency-help = How many files download at the same time, 1 to 32. Lower it on an unsteady network.
 settings-concurrency-intro = Leave empty to let the launcher decide.
 settings-concurrency-field = Count (1–32)
+settings-block-assets = Download block assets automatically
+settings-block-assets-help = Schematic previews download their block assets from launcher.lumilio.org when they first need them. When this is off, nothing is downloaded; assets that are already downloaded are still used.
 settings-data-dir = Data folder
 settings-data-dir-help = Games, shared files and settings all live here. It can't be changed.
 settings-reclaim = Check for unused game files
@@ -1615,7 +2047,7 @@ settings-license = License
 settings-plugins-none = No plugins
 settings-plugins-none-help = Core plugins appear here, and you can turn each on or off.
 settings-plugin-read-files = Read the game's { $folder } folder
-settings-plugin-write-files = Modify waypoint files in the game's { $folder } folder (backed up first, never while the game runs)
+settings-plugin-write-files = Modify { $names } files in the game's { $folder } folder (backed up first, never while the game runs)
 settings-plugin-network = Connect to { $hosts }
 settings-plugin-launch-events = Know when games start and exit
 settings-plugin-discord = Show game status in Discord on this computer

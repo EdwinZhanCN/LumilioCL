@@ -46,6 +46,13 @@ impl Layout {
         self.root.join("cache/world-map/seed")
     }
 
+    /// Baked block assets: local bakes by jar SHA-1 and the downloaded
+    /// bundle (plan schematic-studio, D2/D3). Safe to delete; rebuilt on use.
+    #[must_use]
+    pub fn model_cache(&self) -> PathBuf {
+        self.root.join("cache/block-assets")
+    }
+
     /// Map tiles drawn from one instance's saves; rebuilt when deleted.
     #[must_use]
     pub fn map_tiles(&self, instance_id: &str) -> PathBuf {
@@ -62,6 +69,13 @@ impl Layout {
     #[must_use]
     pub fn themes(&self) -> PathBuf {
         self.root.join("themes")
+    }
+
+    /// The schematic studio's saved replacement tables and recent targets,
+    /// shared by every instance (plan schematic-studio T24).
+    #[must_use]
+    pub fn replace_schemes(&self) -> PathBuf {
+        self.root.join("schematic-replace.json")
     }
 
     #[must_use]
@@ -104,6 +118,30 @@ impl Layout {
     #[must_use]
     pub fn game(&self, instance_id: &str) -> PathBuf {
         self.profile(instance_id).join("game")
+    }
+
+    /// One instance's schematic operation log and the backups it names, in
+    /// launcher data beside the game directory, never inside it
+    /// (plan schematic-studio, D8).
+    #[must_use]
+    pub fn schematic_ops(&self, instance_id: &str) -> PathBuf {
+        self.profile(instance_id).join("schematic-ops")
+    }
+
+    /// The resource packs added to one instance's schematic studio from
+    /// elsewhere: their paths only, the files are never copied
+    /// (plan schematic-studio, T17).
+    #[must_use]
+    pub fn schematic_packs(&self, instance_id: &str) -> PathBuf {
+        self.profile(instance_id).join("schematic-packs.json")
+    }
+
+    /// Which of one instance's mods and resource packs each schematic studio
+    /// folder draws with: all are off until switched on (plan
+    /// schematic-studio, T21, D23).
+    #[must_use]
+    pub fn schematic_sources(&self, instance_id: &str) -> PathBuf {
+        self.profile(instance_id).join("schematic-sources.json")
     }
 
     /// Where the authlib-injector jar is kept.

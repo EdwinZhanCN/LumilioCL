@@ -10,14 +10,14 @@
 
 mod common;
 
-use common::{add_block, add_texture, Blocks};
+use common::{add_block, add_texture, Blocks, Fixture};
 use glam::Vec3;
-use schematic_mesher::{BlockPosition, InputBlock, Mesher, ModelElement, ResourcePack};
+use schematic_mesher::{BlockPosition, InputBlock, Mesher};
 
 /// Every triangle's winding (the side the GPU draws) agrees with its normal.
 #[test]
 fn rotated_faces_keep_normals_on_their_front_side() {
-    let mut pack = ResourcePack::new();
+    let mut pack = Fixture::default();
     add_texture(&mut pack, "block/board", false);
     let face = r##"{"texture":"#t"}"##;
     add_block(
@@ -31,7 +31,7 @@ fn rotated_faces_keep_normals_on_their_front_side() {
         BlockPosition::new(0, 0, 0),
         InputBlock::new("minecraft:board"),
     )]);
-    let output = Mesher::new(pack).mesh(&source).unwrap();
+    let output = Mesher::new(pack.bake()).mesh(&source).unwrap();
     let layer = &output.opaque_mesh;
     assert!(!layer.indices.is_empty());
     for t in layer.indices.chunks_exact(3) {
@@ -41,12 +41,19 @@ fn rotated_faces_keep_normals_on_their_front_side() {
     }
 }
 
+/// The rotation of a baked one-element model written with `json`.
 fn rotation(json: &str) -> glam::Mat3 {
-    let element: ModelElement = serde_json::from_str(&format!(
-        r#"{{"from":[0,0,0],"to":[16,16,16],"rotation":{json},"faces":{{}}}}"#
-    ))
-    .unwrap();
-    element.rotation.unwrap().matrix()
+    let mut pack = Fixture::default();
+    add_block(
+        &mut pack,
+        "turned",
+        &format!(
+            r#"{{"elements":[{{"from":[0,0,0],"to":[16,16,16],"rotation":{json},"faces":{{}}}}]}}"#
+        ),
+    );
+    let pack = pack.bake();
+    let model = pack.get_model("minecraft:block/turned").unwrap();
+    model.elements[0].rotation.as_ref().unwrap().matrix()
 }
 
 #[test]

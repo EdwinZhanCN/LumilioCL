@@ -79,7 +79,7 @@ fn below(game_dir: &Path, clean: &Path) -> Result<PathBuf, PluginError> {
                 full.extend(parts.by_ref());
                 break;
             }
-            Err(error) => return Err(crate::world_map::write::io_error("inspect", &full, &error)),
+            Err(error) => return Err(crate::plugins::write::io_error("inspect", &full, &error)),
         }
     }
     Ok(full)
@@ -152,7 +152,7 @@ fn walk(game_dir: &Path, dir: &Path, depth: usize, found: &mut Vec<String>) {
 /// The absolute path of a file the plugin may write: below a `WriteGameFiles`
 /// grant, with a name the grant allows, and no link on the way. Like
 /// [`resolve`], the file itself need not exist yet.
-pub(super) fn resolve_write(
+pub(crate) fn resolve_write(
     game_dir: &Path,
     manifest: &Manifest,
     relative: &str,
@@ -174,7 +174,7 @@ pub(super) fn resolve_write(
 
 /// A readable file's bytes with the [`lumilio_plugin_api::FileInfo`] a later
 /// write must present.
-pub(super) fn read_info(
+pub(crate) fn read_info(
     game_dir: &Path,
     manifest: &Manifest,
     relative: &str,
@@ -188,7 +188,7 @@ pub(super) fn read_info(
     if meta.len() > MAX_FILE_BYTES {
         return Err(PluginError::Unavailable("file is too large".into()));
     }
-    crate::world_map::write::describe(&full)
+    crate::plugins::write::describe(&full)
 }
 
 pub(super) fn stat(
@@ -200,7 +200,7 @@ pub(super) fn stat(
     match std::fs::symlink_metadata(&full) {
         Ok(meta) if meta.is_file() => Ok(Some(lumilio_plugin_api::FileStat {
             len: meta.len(),
-            modified_ms: crate::world_map::write::millis_of(meta.modified().ok()),
+            modified_ms: crate::plugins::write::millis_of(meta.modified().ok()),
         })),
         Ok(_) => Ok(None),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),

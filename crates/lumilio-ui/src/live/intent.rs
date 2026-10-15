@@ -203,6 +203,8 @@ pub enum LiveIntent {
     RemoveJava(PathBuf),
     SetJavaSource(lumilio_core::JavaSource),
     SetAutoInstallJava(bool),
+    /// Let schematic previews download the pre-baked block assets.
+    SetAutoDownloadBlockAssets(bool),
     /// Show a file or folder in the system file manager.
     Reveal(PathBuf),
     ClearCache,

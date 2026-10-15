@@ -266,17 +266,34 @@ fn the_litematica_tab_follows_the_schematics_folder_and_its_switch() {
         assert_eq!(tabs.len(), 2);
         assert_eq!(tabs[0].plugin, lumilio_plugin_litematica::ID);
 
-        // A broken file is one row that says so; the list still shows.
+        // The tab is the host's studio over the folder; the host lists it
+        // under the plugin's grant, broken files included.
         let view = service
             .plugin_view(&record.id, lumilio_plugin_litematica::ID)
             .await
             .unwrap();
-        let Some(lumilio_plugin_api::View::List { items }) = view else {
-            panic!("expected a list");
-        };
-        assert_eq!(items[0].subtitle.as_deref(), Some("读不了"));
+        assert_eq!(
+            view,
+            Some(lumilio_plugin_api::View::Studio {
+                folder: "schematics".into()
+            })
+        );
+        assert_eq!(
+            service
+                .schematic_files(&record.id, lumilio_plugin_litematica::ID, "schematics")
+                .await
+                .unwrap(),
+            ["schematics/broken.litematic"]
+        );
+        assert!(
+            service
+                .schematic_files(&record.id, lumilio_plugin_litematica::ID, "saves")
+                .await
+                .is_err(),
+            "only under the plugin's grants"
+        );
 
-        // The detail offers a 3D preview of that file, and the host serves it.
+        // The studio's viewport asks for a 3D preview of that file, and the host serves it.
         // The host returns raw bytes; the native renderer handles parse errors.
         assert_eq!(
             service

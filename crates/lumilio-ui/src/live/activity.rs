@@ -210,6 +210,9 @@ pub fn task_label(label: &TaskLabel) -> String {
         TaskAction::CopyGame => tr!("task-copy-game", subject = subject.as_str()),
         TaskAction::InstallModpack => tr!("task-install-modpack", subject = subject.as_str()),
         TaskAction::ImportModpack => tr!("task-import-modpack", subject = subject.as_str()),
+        TaskAction::PrepareBlockAssets => {
+            tr!("task-prepare-block-assets", subject = subject.as_str())
+        }
     }
 }
 

@@ -48,6 +48,8 @@ pub struct SettingsView {
     pub java_source: JavaSource,
     /// Whether a launch without a fitting Java downloads one first.
     pub auto_install_java: bool,
+    /// Whether a schematic preview may download the pre-baked block assets.
+    pub auto_download_block_assets: bool,
     /// The majors each download source offers this machine; empty until read.
     pub java_offers: Vec<(JavaSource, Vec<u32>)>,
     /// `None` while the disk is still being measured.
@@ -96,6 +98,7 @@ pub fn settings_view(
             .collect(),
         java_source: settings.java_source,
         auto_install_java: settings.auto_install_java,
+        auto_download_block_assets: settings.auto_download_block_assets,
         java_offers: Vec::new(),
         storage,
         data_dir: data_dir.to_owned(),
