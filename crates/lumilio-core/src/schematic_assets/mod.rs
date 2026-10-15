@@ -21,6 +21,7 @@ mod index;
 mod instance;
 mod load;
 mod names;
+mod order;
 mod provided;
 mod rules;
 mod scan;
@@ -42,6 +43,7 @@ pub use index::{BundleFile, BundleIndex};
 pub(crate) use instance::instance_assets;
 pub use load::load;
 pub use names::installed_names;
+pub(crate) use order::{read_order, swapped as swapped_sources, write_order};
 pub use provided::{ProvidedSource, SourceRole, provided};
 pub use rules::resolve;
 pub use scan::Scan;
@@ -60,7 +62,8 @@ pub struct InstanceAssets {
     /// Every other installed client jar, most recently changed first.
     pub other_clients: Vec<InstalledClient>,
     /// `mods/*.jar`, the enabled resource packs and the packs added in the
-    /// studio that exist, lowest priority first: every overlay on offer.
+    /// studio that exist, lowest priority first in the order the studio
+    /// keeps (T36): every overlay on offer.
     pub overlays: Vec<PathBuf>,
     /// Every pack added in the studio, whether or not its file is there.
     pub added: Vec<PathBuf>,

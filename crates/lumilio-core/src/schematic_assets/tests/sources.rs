@@ -377,3 +377,43 @@ fn an_added_pack_is_a_path_in_launcher_data() {
     assert!(remove_pack(&list, &pack).unwrap().is_empty());
     assert!(pack.exists(), "taking it off leaves the file alone");
 }
+
+/// T36: an unpacked pack folder is added like a zip; a folder that holds
+/// no pack is refused.
+#[test]
+fn a_pack_folder_can_be_added() {
+    let dir = tempfile::tempdir().unwrap();
+    let list = dir.path().join("profile/schematic-packs.json");
+    let folder = dir.path().join("Redstone Display");
+    std::fs::create_dir_all(folder.join("assets/minecraft/textures/block")).unwrap();
+    let empty = dir.path().join("Empty");
+    std::fs::create_dir_all(&empty).unwrap();
+
+    assert!(add_pack(&list, &empty).is_err());
+    assert_eq!(
+        add_pack(&list, &folder).unwrap(),
+        std::slice::from_ref(&folder)
+    );
+}
+
+/// T36: the order decides which pack wins, and each order is its own bake:
+/// a reorder never reads the bake made in the other order.
+#[test]
+fn reordering_packs_changes_the_winner_and_the_bake() {
+    let dir = tempfile::tempdir().unwrap();
+    let cache_dir = dir.path().join("cache");
+    let cache = LocalCache::new(&cache_dir);
+    let (store, file) = downloaded_bundle(dir.path(), &cache_dir);
+    let bundle = Some((&store, &file));
+    let gems = mod_jar(&dir.path().join("gems.jar"));
+    let granite = resource_pack(&dir.path().join("granite.zip"));
+
+    let first = load(&plan(bundle_1_20(), &[&gems, &granite]), &cache, bundle).unwrap();
+    assert_eq!(stone_texture(&first.pack), "minecraft:block/granite");
+    let swapped = load(&plan(bundle_1_20(), &[&granite, &gems]), &cache, bundle).unwrap();
+    assert!(!swapped.from_cache, "the other order is baked anew");
+    assert_eq!(stone_texture(&swapped.pack), "gems:block/mossy");
+    let again = load(&plan(bundle_1_20(), &[&gems, &granite]), &cache, bundle).unwrap();
+    assert!(again.from_cache);
+    assert_eq!(stone_texture(&again.pack), "minecraft:block/granite");
+}

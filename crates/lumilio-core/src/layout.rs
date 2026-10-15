@@ -136,6 +136,13 @@ impl Layout {
         self.profile(instance_id).join("schematic-packs.json")
     }
 
+    /// The order one instance's schematic studio layers its mods and
+    /// resource packs in, lowest priority first (plan schematic-studio, T36).
+    #[must_use]
+    pub fn schematic_order(&self, instance_id: &str) -> PathBuf {
+        self.profile(instance_id).join("schematic-order.json")
+    }
+
     /// Which of one instance's mods and resource packs each schematic studio
     /// folder draws with: all are off until switched on (plan
     /// schematic-studio, T21, D23).

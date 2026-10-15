@@ -7,6 +7,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
+use super::order::{arrange, read_order};
 use super::{InstalledClient, InstanceAssets, read_added};
 use crate::instance::InstanceRecord;
 use crate::layout::Layout;
@@ -22,10 +23,11 @@ pub(crate) fn instance_assets(layout: &Layout, record: &InstanceRecord) -> Insta
     let added = read_added(&layout.schematic_packs(&record.id));
     let mut overlays = overlays(directories.game());
     for pack in &added {
-        if pack.is_file() && !overlays.contains(pack) {
+        if pack.exists() && !overlays.contains(pack) {
             overlays.push(pack.clone());
         }
     }
+    let overlays = arrange(overlays, &read_order(&layout.schematic_order(&record.id)));
     InstanceAssets {
         game_version: record.game_version.clone(),
         client,

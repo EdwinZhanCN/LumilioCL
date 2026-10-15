@@ -37,3 +37,35 @@ fn mods_by_name_come_before_the_enabled_packs() {
         ]
     );
 }
+
+/// T36: the kept order places what it names; what it does not name keeps
+/// its default order below.
+#[test]
+fn a_kept_order_places_the_sources_it_names() {
+    use super::super::order::{arrange, swapped};
+    use std::path::PathBuf;
+    let [a, b, c, d] = ["a.jar", "b.jar", "pack.zip", "new.jar"].map(PathBuf::from);
+    let default = vec![a.clone(), b.clone(), d.clone(), c.clone()];
+    assert_eq!(arrange(default.clone(), &[]), default);
+    assert_eq!(
+        arrange(default.clone(), &[c.clone(), a.clone(), b.clone()]),
+        [d.clone(), c.clone(), a.clone(), b.clone()]
+    );
+    // A source the order names that is gone is skipped.
+    assert_eq!(
+        arrange(
+            vec![a.clone(), b.clone()],
+            &[b.clone(), c.clone(), a.clone()]
+        ),
+        [b.clone(), a.clone()]
+    );
+
+    // `b` is a library mod the list does not show: `a` moves past it to `c`.
+    let list = [a.clone(), b.clone(), c.clone()];
+    assert_eq!(
+        swapped(&list, &a, &c).unwrap(),
+        [c.clone(), b.clone(), a.clone()]
+    );
+    assert_eq!(swapped(&list, &a, &a), None);
+    assert_eq!(swapped(&list, &d, &a), None, "not a source");
+}

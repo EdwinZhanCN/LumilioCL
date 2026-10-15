@@ -1,7 +1,8 @@
 //! Resource packs added to an instance's schematic studio from elsewhere
-//! (plan schematic-studio, T17): a list of paths in launcher data
-//! (`Layout::schematic_packs`). The files stay where they are; they join the
-//! instance's overlays, after its mods and enabled packs, while they exist.
+//! (plan schematic-studio, T17, T36): a list of paths in launcher data
+//! (`Layout::schematic_packs`), each a zip or an unpacked pack folder. The
+//! files stay where they are; they join the instance's overlays, after its
+//! mods and enabled packs, while they exist.
 
 use std::fs;
 use std::io;
@@ -16,15 +17,25 @@ pub(crate) fn read_added(list: &Path) -> Vec<PathBuf> {
         .unwrap_or_default()
 }
 
-/// Adds the resource-pack zip `pack` to the list; adding one twice keeps one.
+/// Whether `pack` is a resource-pack zip, or a folder holding an unpacked
+/// pack (`pack.mcmeta` or `assets/` at its top).
+pub(crate) fn is_pack(pack: &Path) -> bool {
+    let zip = pack.is_file()
+        && pack
+            .extension()
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("zip"));
+    let folder =
+        pack.is_dir() && (pack.join("pack.mcmeta").is_file() || pack.join("assets").is_dir());
+    pack.is_absolute() && (zip || folder)
+}
+
+/// Adds the resource pack `pack` (a zip or a pack folder) to the list;
+/// adding one twice keeps one.
 pub(crate) fn add(list: &Path, pack: &Path) -> io::Result<Vec<PathBuf>> {
-    let zip = pack
-        .extension()
-        .is_some_and(|extension| extension.eq_ignore_ascii_case("zip"));
-    if !pack.is_absolute() || !zip || !pack.is_file() {
+    if !is_pack(pack) {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            format!("{} is not a resource-pack zip", pack.display()),
+            format!("{} is not a resource pack", pack.display()),
         ));
     }
     let mut packs = read_added(list);

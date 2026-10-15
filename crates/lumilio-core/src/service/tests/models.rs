@@ -815,3 +815,65 @@ async fn without_bundle_or_game_there_are_no_names() {
     let names = world.service.schematic_names(&id).await.unwrap();
     assert!(names.is_empty());
 }
+
+/// T36: moving a pack past another changes the order the preview layers
+/// them in, and the order is kept; a pack added later goes on top.
+#[tokio::test(flavor = "multi_thread")]
+async fn moving_a_pack_reorders_the_stack_and_is_kept() {
+    let (world, id) = world_with_schematic().await;
+    publish_bundle(&world);
+    let elsewhere = world.service.layout().root().join("elsewhere");
+    let granite = blocks_at(&elsewhere.join("Granite.zip"), &["minecraft:granite"]);
+    let redstone = blocks_at(
+        &elsewhere.join("Redstone.zip"),
+        &["minecraft:redstone_wire"],
+    );
+    for pack in [&granite, &redstone] {
+        world
+            .service
+            .schematic_pack_add(&id, "schematics", pack.clone())
+            .await
+            .unwrap();
+    }
+    let overlays = |preview: &crate::service::ModelPreview| {
+        preview
+            .plan
+            .overlays()
+            .into_iter()
+            .map(std::path::Path::to_path_buf)
+            .collect::<Vec<_>>()
+    };
+    let preview = world
+        .service
+        .plugin_model(&id, "test.builder", HOUSE)
+        .await
+        .unwrap();
+    assert_eq!(overlays(&preview), [granite.clone(), redstone.clone()]);
+
+    assert!(
+        world
+            .service
+            .schematic_source_move(&id, granite.clone(), redstone.clone())
+            .await
+            .unwrap()
+    );
+    let preview = world
+        .service
+        .plugin_model(&id, "test.builder", HOUSE)
+        .await
+        .unwrap();
+    assert_eq!(overlays(&preview), [redstone.clone(), granite.clone()]);
+
+    let third = blocks_at(&elsewhere.join("Third.zip"), &["minecraft:stone"]);
+    world
+        .service
+        .schematic_pack_add(&id, "schematics", third.clone())
+        .await
+        .unwrap();
+    let preview = world
+        .service
+        .plugin_model(&id, "test.builder", HOUSE)
+        .await
+        .unwrap();
+    assert_eq!(overlays(&preview), [redstone, granite, third]);
+}

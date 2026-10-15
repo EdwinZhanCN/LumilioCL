@@ -215,7 +215,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// is renamed or has new metadata keeps its picture. It is kept per look
     /// too (T21): the sources switched on for the file's folder, read once,
     /// so the picture and the name it is kept under agree even when a switch
-    /// flips meanwhile. One drawn before is read back; otherwise `draw`
+    /// flips meanwhile, and in the order they are layered (T36). One drawn before is read back; otherwise `draw`
     /// makes it from the preview on a blocking thread, and it is kept.
     pub async fn schematic_thumbnail<D>(
         &self,
@@ -233,10 +233,18 @@ impl<T: Transport + Clone> LauncherService<T> {
         if !plain {
             return Err(ServiceError::Install(format!("not a thumbnail key: {key}")));
         }
-        let (list, within) = (self.layout.schematic_sources(instance), file.to_owned());
+        let record = self.instance(instance).await?;
+        let (layout, within) = (self.layout.clone(), file.to_owned());
         let (switched, look) = blocking_value(move || {
-            let on = switched_on(&list, &within);
-            let look = look(&on);
+            let on = switched_on(&layout.schematic_sources(&record.id), &within);
+            // The look is the stack in effect, in the order it is layered
+            // (T36): a reorder draws the picture again.
+            let stack: Vec<_> = instance_assets(&layout, &record)
+                .overlays
+                .into_iter()
+                .filter(|overlay| on.contains(overlay))
+                .collect();
+            let look = look(&stack);
             (on, look)
         })
         .await?;
