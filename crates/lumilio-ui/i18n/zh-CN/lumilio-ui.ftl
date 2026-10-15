@@ -2277,3 +2277,28 @@ release-notes-updated = 已更新到 LumilioCL { $version }
 release-notes-title = LumilioCL { $version } 更新内容
 release-notes-all = 全部更新日志
 release-notes-done = 知道了
+## 投影工作室：版本未知、画不出的方块
+studio-version-unknown = 版本未知
+studio-version-unknown-why = 这份投影没有记录游戏版本。按实例的游戏版本绘制，不自动转换，也不检查缺少的方块。
+studio-caption-unknown-game = 版本未知 · 游戏 { $game }
+studio-convert-unknown = 这份投影没有记录游戏版本，无法转换
+studio-undrawable-count = { $count } 种方块没有模型
+studio-convert-suggested = 建议替换为 { $block }
+## 投影工作室：资源包顺序与文件夹
+studio-sources-add-folder = 添加文件夹…
+studio-sources-path = 粘贴资源包路径（zip 或文件夹）
+studio-sources-path-add = 添加
+studio-sources-order = 排在下面的盖过上面的；用 ↑ ↓ 调整顺序
+studio-source-up = 上移：被下面的盖过
+studio-source-down = 下移：盖过上面的
+## 投影工作室：历史与备份
+studio-history-summary = { $operations } 条操作 · { $copies } 份备份 · { $size }
+studio-history-this = 这份投影
+studio-history-all = 全部
+studio-history-none-here = 这份投影还没有改动过。切到「全部」看其他投影的。
+studio-history-copy = 备份 { $size }
+studio-history-copy-gone = 备份已不在，不能恢复
+studio-history-made = 这次操作新写出的文件，没有备份
+studio-history-loose = 日志里没有的备份
+studio-history-loose-note = 备份文件夹里还有这些副本，日志没有记下它们（日志丢了或被截断）。也能放回原来的位置。
+studio-restore-loose-body = 这份副本会放回它原来的位置。现在的文件会先备份，恢复本身也会记进历史。

@@ -45,6 +45,7 @@ fn the_window_draws_the_workbench_and_opens_on_the_handed_file(cx: &mut TestAppC
         [
             Command::List,
             Command::History,
+            Command::Backups,
             Command::CanWrite,
             Command::Names,
             Command::Schemes

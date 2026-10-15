@@ -1,3 +1,4 @@
+mod history;
 mod ops;
 mod pane;
 mod sources;
@@ -172,6 +173,7 @@ fn connecting_lists_the_folder_and_asks_for_history_write_access_and_names(
         [
             Command::List,
             Command::History,
+            Command::Backups,
             Command::CanWrite,
             Command::Names,
             Command::Schemes

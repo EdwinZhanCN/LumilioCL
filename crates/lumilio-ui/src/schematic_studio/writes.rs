@@ -186,7 +186,7 @@ impl StudioView {
         if let Some(file) = select {
             self.open_file(file, cx);
         }
-        self.send(Command::History);
+        self.want_history();
         self.send(Command::CanWrite);
     }
 
@@ -247,7 +247,7 @@ impl StudioView {
             }
         }
         self.send(Command::List);
-        self.send(Command::History);
+        self.want_history();
         self.send(Command::CanWrite);
     }
 
@@ -355,8 +355,15 @@ impl StudioView {
         if self.replace_catalog.is_some() || dialog.upgrade().is_none() {
             return;
         }
-        let data_version = analysis.info.data_version;
-        let Ok(source) = u32::try_from(data_version) else {
+        // A file without a data version is drawn with the game version's
+        // assets (T39), so its blocks are named by that version's table.
+        let data_version = analysis
+            .info
+            .data_version
+            .and_then(|version| u32::try_from(version).ok())
+            .or_else(|| self.game_target().map(|(_, version)| version))
+            .or_else(|| versions.iter().map(|(_, version)| *version).max());
+        let Some(source) = data_version else {
             return;
         };
         let version = versions

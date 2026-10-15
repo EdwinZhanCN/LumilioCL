@@ -75,6 +75,23 @@ impl StudioView {
                         })),
                 )
         });
+        // ia[plugin.litematica]: 看投影版本未知 | 工作室头部说明后的橙色标签「版本未知」，悬停看说明 | 文件没有记录 MinecraftDataVersion 时不猜版本：说明写「版本未知 · 游戏 y」，按实例的游戏版本取资源绘制，不自动转换，也不和游戏版本比对缺少的方块；「转换版本…」置灰并说明 | 原来静默当作 Nucleation 的规范版本（T39）
+        let unknown = self.version_unknown().then(|| {
+            div()
+                .id("studio-version-unknown")
+                .debug_selector(|| "studio-version-unknown".into())
+                .flex_none()
+                .child(kit::tag(
+                    tr!("studio-version-unknown"),
+                    kit::TagKind::Orange,
+                    colors,
+                ))
+                .tooltip(|window, cx| {
+                    gpui_component::tooltip::Tooltip::new(tr!("studio-version-unknown-why"))
+                        .build(window, cx)
+                })
+        });
+        let undrawable = self.undrawable_tag(colors, cx);
         let blocked = self.operation_blocked();
         // ia[plugin.litematica]: 替换方块… | 工作室头部唯一的橙键 → 对话框（源方块与逐个属性的精确值或「任意」、目标方块状态、全部或某个区域） | 改动任一项都在后台重新数出会替换多少个方块，数出来且大于 0 才能确认；确认后在后台替换并经备份写入，记进历史；失败留在对话框里 | 游戏运行中或文件未读完时置灰并说明（T13、D27）
         let replace = Key::new("studio-replace")
@@ -101,6 +118,8 @@ impl StudioView {
                     .text_color(colors.muted)
                     .child(caption),
             )
+            .children(unknown)
+            .children(undrawable)
             .children(compat)
             .child(div().flex_none().child(replace))
             .child(
@@ -110,6 +129,35 @@ impl StudioView {
                     .child(kit::more_menu("studio-more", self.menu(), colors)),
             )
             .into_any_element()
+    }
+
+    /// 「N 种方块没有模型」 while the picture leaves blocks out (T38): a
+    /// click opens 信息 › 技术信息, which lists their IDs.
+    fn undrawable_tag(&self, colors: ShellColors, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let viewer = self.viewer.as_ref()?.read(cx);
+        let count = viewer.undrawable().len();
+        if !viewer.is_drawn() || count == 0 {
+            return None;
+        }
+        // ia[plugin.litematica]: 看有多少种方块画不出 | 工作室头部的标签「N 种方块没有模型」 | 视口画完后有画不出的方块才出现；点它切到「信息」并展开技术信息，那里列出这些方块的 ID | 画面里它们是缺失贴图的占位（T38）
+        Some(
+            div()
+                .id("studio-undrawable")
+                .debug_selector(|| "studio-undrawable".into())
+                .flex_none()
+                .cursor_pointer()
+                .child(kit::tag(
+                    tr!("studio-undrawable-count", count = count),
+                    kit::TagKind::Plain,
+                    colors,
+                ))
+                .on_click(cx.listener(|view, _, _, cx| {
+                    view.tab = super::InspectorTab::Info;
+                    view.technical_open = true;
+                    cx.notify();
+                }))
+                .into_any_element(),
+        )
     }
 
     /// The More menu's entries: every operation but the head's orange
@@ -141,7 +189,15 @@ impl StudioView {
         };
         vec![
             // ia[plugin.litematica]: 转换版本… | 工作室更多菜单 → 对话框里的版本选择器（方块资源包索引里的版本，默认选中游戏版本） | 选好版本就在后台试转换：向新版本无损；向旧版本把每条变化按「丢失 / 近似 / 保留」列出；确认后另存为「名 (y).litematic」并选中新文件，打开「覆盖原文件」才写回原文件；取消不写任何东西 | 版本列表读不到时选择器里说明并可重试；游戏运行中置灰（T14、T23）
-            write(tr!("studio-menu-convert"), Self::open_convert),
+            if self.version_unknown() {
+                MenuEntry::new(
+                    tr!("studio-menu-convert"),
+                    on_studio(self.this.clone(), Self::open_convert),
+                )
+                .unavailable(tr!("studio-convert-unknown"))
+            } else {
+                write(tr!("studio-menu-convert"), Self::open_convert)
+            },
             // ia[plugin.litematica]: 导出 PNG… | 工作室更多菜单 → 对话框（宽、高每边最多 4096 像素，背景面板色或透明，角度当前视角或北、东、南、西、顶、等轴） | 在视口的后台线程离屏绘制并编码，弹出保存对话框，选了位置才写入，完成后提示保存位置；预览没准备好或绘制失败时留在对话框里说明 | 切换文件会结束等待中的导出（T10）
             {
                 let entry = MenuEntry::new(
@@ -231,9 +287,11 @@ impl StudioView {
 
     /// Blocks a conversion keeps as they are (T23), to choose replacements
     /// for: the convert dialog gives way to the replace dialog on them.
+    /// `suggested` fills a row's target where it names one (T37).
     pub(crate) fn replace_kept(
         &mut self,
         ids: Vec<String>,
+        suggested: dialogs::Suggested,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
@@ -243,7 +301,9 @@ impl StudioView {
         let Some(form) = self.replace_dialog(window, cx) else {
             return;
         };
-        form.update(cx, |form, cx| form.preset_many(&ids, window, cx));
+        form.update(cx, |form, cx| {
+            form.preset_many(&ids, &suggested, window, cx)
+        });
     }
 
     pub(super) fn open_convert(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -263,8 +323,11 @@ impl StudioView {
         let (Some(opened), Inspection::Ready(analysis)) = (&self.opened, &self.inspection) else {
             return;
         };
+        // Converting needs the version the file is at (T39).
+        let Some(current) = analysis.info.data_version else {
+            return;
+        };
         let (file, bytes) = (opened.file.clone(), opened.bytes.clone());
-        let current = analysis.info.data_version;
         let studio = self.this.clone();
         let taken: std::collections::BTreeSet<String> = self.tree.files().iter().cloned().collect();
         let form = cx
@@ -321,7 +384,8 @@ impl StudioView {
                 ReviewDialog::Convert => this.open_convert(window, cx),
                 ReviewDialog::Incompatible => {
                     let ids = this.missing_blocks().to_vec();
-                    this.replace_kept(ids, window, cx);
+                    let suggested = this.missing_suggested();
+                    this.replace_kept(ids, suggested, window, cx);
                 }
             });
         });

@@ -62,3 +62,35 @@ fn an_empty_name_is_refused_and_nothing_changes() {
     assert_eq!(info.author, "Builder");
     assert_eq!(info.modified, Some(2_000));
 }
+
+/// `bytes`, a written `.litematic`, without its `MinecraftDataVersion`, as
+/// an older Litematica writes it.
+fn without_data_version(bytes: &[u8]) -> Vec<u8> {
+    use std::io::Write as _;
+    let mut root = lumilio_nbt::parse_maybe_gzip(bytes).unwrap();
+    let lumilio_nbt::Tag::Compound(map) = &mut root else {
+        panic!("a litematic's root is a compound");
+    };
+    assert!(map.remove("MinecraftDataVersion").is_some());
+    let mut gzip = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
+    gzip.write_all(&lumilio_nbt::to_bytes(&root)).unwrap();
+    gzip.finish().unwrap()
+}
+
+#[test]
+fn a_file_without_a_data_version_reads_as_unknown() {
+    let mut schematic = room();
+    schematic.metadata.mc_version = Some(3465);
+    schematic.metadata.source_data_version = Some(3465);
+    let bytes = crate::to_litematic_bytes(&schematic).unwrap();
+    assert_eq!(
+        read(&crate::load_litematic(&bytes).unwrap()).data_version,
+        Some(3465)
+    );
+
+    let unknown = crate::load_litematic(&without_data_version(&bytes)).unwrap();
+    assert_eq!(crate::convert::known_data_version(&unknown), None);
+    // Not the canonical version Nucleation would convert from.
+    assert_eq!(read(&unknown).data_version, None);
+    assert_eq!(read(&unknown).block_count, 21, "the blocks still read");
+}

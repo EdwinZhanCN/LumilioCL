@@ -20,8 +20,9 @@ pub struct Info {
     /// Milliseconds since the Unix epoch, as Litematica stores them.
     pub created: Option<u64>,
     pub modified: Option<u64>,
-    /// The Minecraft data version the content is at.
-    pub data_version: i32,
+    /// The Minecraft data version the content is at; `None` when the file
+    /// names none and the version is unknown.
+    pub data_version: Option<i32>,
 }
 
 pub fn read(schematic: &UniversalSchematic) -> Info {
@@ -36,7 +37,7 @@ pub fn read(schematic: &UniversalSchematic) -> Info {
         region_count: stats.regions.len(),
         created: metadata.created,
         modified: metadata.modified,
-        data_version: crate::convert::data_version(schematic),
+        data_version: crate::convert::known_data_version(schematic),
     }
 }
 

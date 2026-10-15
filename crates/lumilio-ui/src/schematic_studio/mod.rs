@@ -17,6 +17,7 @@
 
 mod dialogs;
 mod export;
+mod history;
 mod inspect_card;
 mod inspector;
 mod materials;
@@ -73,6 +74,11 @@ pub enum Command {
     CanWrite,
     /// Put back the file as it was before log line `index`.
     Restore { index: usize },
+    /// Every copy in the instance's schematic backups (T40).
+    Backups,
+    /// Put the kept copy `backup` (a [`lumilio_core::KeptBackup::path`]) no
+    /// log line names back over the file it came from (T40).
+    RestoreBackup { backup: String },
     /// Replace `file` with edited bytes if it still is what `expected` says;
     /// without `expected`, write `file` new, refused if one is there (T23).
     Apply {
@@ -102,14 +108,20 @@ pub enum Command {
         target: String,
         source_data_version: u32,
     },
-    /// Add the resource-pack zip at `path` to the instance's studio sources;
-    /// only the path is kept (T17).
+    /// Add the resource pack at `path` (a zip or a pack folder) to the
+    /// instance's studio sources; only the path is kept (T17, T36).
     AddPack { path: std::path::PathBuf },
     /// Take an added pack off the sources; the file stays.
     RemovePack { path: std::path::PathBuf },
     /// Switch the mod or resource pack at `path` on or off for this studio
     /// folder; every one is off until switched on (T21, D23).
     SetSource { path: std::path::PathBuf, on: bool },
+    /// Move the mod or resource pack at `path` past `past`, its neighbour
+    /// in the list, in the instance's studio order (T36).
+    MoveSource {
+        path: std::path::PathBuf,
+        past: std::path::PathBuf,
+    },
     /// The game's names for blocks, items and entities (T26).
     Names,
     /// `file`'s thumbnail, kept under `key` (its content fingerprint) once
@@ -137,6 +149,8 @@ pub enum Event {
         result: Result<(Vec<u8>, FileInfo), String>,
     },
     History(Result<Vec<SchematicLogEntry>, String>),
+    /// [`Command::Backups`]'s answer, newest first.
+    Backups(Result<Vec<lumilio_core::KeptBackup>, String>),
     CanWrite(bool),
     Restored(Result<SchematicLogEntry, String>),
     Applied {
@@ -163,6 +177,8 @@ pub enum Event {
         on: bool,
         result: Result<(), String>,
     },
+    /// The order [`Command::MoveSource`] asked for was kept, or why not.
+    SourceMoved(Result<bool, String>),
     /// The names [`Command::Names`] asked for; empty when there are none.
     Names(Result<BlockNames, String>),
     /// A thumbnail as PNG bytes, or why there is none.
@@ -270,11 +286,17 @@ pub struct StudioView {
     viewer: Option<Entity<Viewer>>,
     tab: InspectorTab,
     history: Loaded<Vec<SchematicLogEntry>>,
+    /// The copies in the backups folder, matched to the log's lines (T40).
+    backups: Loaded<Vec<lumilio_core::KeptBackup>>,
+    /// 历史 lists only the open file's lines, not every file's (T40).
+    history_this_only: bool,
     /// `false` while the game runs or another operation holds the instance.
     can_write: bool,
     restoring: bool,
     search: Option<Entity<InputState>>,
     block_search: Option<Entity<InputState>>,
+    /// A resource pack's path, typed or pasted (T36).
+    pack_path: Option<Entity<InputState>>,
     /// The block kind chosen in the materials, by id: its tile is ringed and
     /// its detail shows (D27). A click in the picture inspects one block
     /// instead (D31); its card's 选中这种 chooses its kind.
@@ -389,10 +411,13 @@ impl StudioView {
             viewer: None,
             tab: InspectorTab::Materials,
             history: Loaded::Loading,
+            backups: Loaded::Loading,
+            history_this_only: false,
             can_write: false,
             restoring: false,
             search: None,
             block_search: None,
+            pack_path: None,
             chosen: None,
             tile_hover: None,
             isolate: false,
@@ -498,7 +523,7 @@ impl StudioView {
             }
         }));
         self.send(Command::List);
-        self.send(Command::History);
+        self.want_history();
         self.send(Command::CanWrite);
         if self.placement == Placement::Window {
             self.send(Command::Names);
@@ -594,6 +619,12 @@ impl StudioView {
                     Err(detail) => Loaded::Failed(detail),
                 };
             }
+            Event::Backups(result) => {
+                self.backups = match result {
+                    Ok(backups) => Loaded::Ready(backups),
+                    Err(detail) => Loaded::Failed(detail),
+                };
+            }
             Event::CanWrite(can) => self.can_write = can,
             Event::Applied { file, result } => self.applied(file, result, cx),
             Event::Removed(result) => self.removed(result),
@@ -612,6 +643,7 @@ impl StudioView {
             Event::SourceSwitched { path, on, result } => {
                 self.source_switched(&path, on, result, cx);
             }
+            Event::SourceMoved(result) => self.source_moved(result, cx),
             // Without names the studio writes IDs; nothing to report.
             Event::Names(Ok(names)) => self.names = Rc::new(names),
             Event::Names(Err(_)) => {}
@@ -631,7 +663,7 @@ impl StudioView {
                         .toasts
                         .push(Toast::error(tr!("studio-restore-failed")).technical(detail)),
                 }
-                self.send(Command::History);
+                self.want_history();
                 self.send(Command::CanWrite);
             }
         }
@@ -763,7 +795,9 @@ impl StudioView {
             cx.new(|cx| InputState::new(window, cx).placeholder(tr!("studio-search-placeholder")));
         let blocks =
             cx.new(|cx| InputState::new(window, cx).placeholder(tr!("studio-blocks-placeholder")));
-        for input in [&search, &blocks] {
+        let pack_path =
+            cx.new(|cx| InputState::new(window, cx).placeholder(tr!("studio-sources-path")));
+        for input in [&search, &blocks, &pack_path] {
             cx.subscribe_in(input, window, |_, _, event: &InputEvent, _, cx| {
                 if matches!(event, InputEvent::Change) {
                     cx.notify();
@@ -771,8 +805,19 @@ impl StudioView {
             })
             .detach();
         }
+        cx.subscribe_in(
+            &pack_path,
+            window,
+            |this, _, event: &InputEvent, window, cx| {
+                if matches!(event, InputEvent::PressEnter { .. }) {
+                    this.add_typed(window, cx);
+                }
+            },
+        )
+        .detach();
         self.search = Some(search);
         self.block_search = Some(blocks);
+        self.pack_path = Some(pack_path);
         self.inputs_language = crate::i18n::generation();
     }
 
@@ -785,6 +830,7 @@ impl StudioView {
         for (input, text) in [
             (&self.search, tr!("studio-search-placeholder")),
             (&self.block_search, tr!("studio-blocks-placeholder")),
+            (&self.pack_path, tr!("studio-sources-path")),
         ] {
             if let Some(input) = input {
                 input.update(cx, |input, cx| input.set_placeholder(text, window, cx));

@@ -17,5 +17,11 @@ nucleation = { path = "../../forks/nucleation", default-features = false }
 serde_json.workspace = true
 sha2.workspace = true
 
+[dev-dependencies]
+# A test removes MinecraftDataVersion from a written file (an older
+# Litematica's file names none).
+flate2.workspace = true
+lumilio-nbt.workspace = true
+
 [lints]
 workspace = true

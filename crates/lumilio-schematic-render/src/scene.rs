@@ -112,6 +112,25 @@ pub struct Scene {
     selection: Option<SelectionBox>,
 }
 
+/// Converts `schematic`'s block IDs to the version `pack` was baked from, when both are known.
+/// A file that names no data version (an older Litematica's) is left as it is: converting
+/// would assume Nucleation's canonical version and could rename blocks the file never had.
+/// Returns whether it converted.
+pub(crate) fn to_pack_version(schematic: &mut UniversalSchematic, pack: &BakedPack) -> bool {
+    let known = schematic
+        .metadata
+        .source_data_version
+        .or(schematic.metadata.mc_version)
+        .is_some();
+    match pack.meta.data_version.and_then(|v| i32::try_from(v).ok()) {
+        Some(version) if known => {
+            schematic.convert_to_data_version(version);
+            true
+        }
+        _ => false,
+    }
+}
+
 impl Scene {
     /// Parses a `.litematic` and meshes it with a baked pack's models and textures, and the same
     /// game version's entity layers (`entities`, from `entities.dat.z`) for block entities and
@@ -119,7 +138,7 @@ impl Scene {
     ///
     /// When the pack was baked from a game JAR, block IDs are first converted to that game
     /// version, so a schematic saved before a rename (`chain` → `iron_chain`) still finds its
-    /// models.
+    /// models; a file that names no data version is not converted.
     pub fn load(
         schematic: &[u8],
         pack: &BakedPack,
@@ -127,9 +146,7 @@ impl Scene {
     ) -> Result<Self, SceneError> {
         let mut schematic = nucleation::formats::litematic::from_litematic(schematic)
             .map_err(|e| SceneError::Parse(e.to_string()))?;
-        if let Some(version) = pack.meta.data_version.and_then(|v| i32::try_from(v).ok()) {
-            schematic.convert_to_data_version(version);
-        }
+        to_pack_version(&mut schematic, pack);
         Self::from_schematic(schematic, pack, entities)
     }
 

@@ -94,13 +94,22 @@ impl Conversion {
     }
 }
 
-/// The data version the schematic's content is at now.
-pub fn data_version(schematic: &UniversalSchematic) -> i32 {
+/// The data version the schematic's content is at now, as its file says.
+/// `None` when the file names none (a `.litematic` without
+/// `MinecraftDataVersion`): the version is unknown, and the studio does not
+/// guess one or convert on its behalf.
+pub fn known_data_version(schematic: &UniversalSchematic) -> Option<i32> {
     schematic
         .metadata
         .source_data_version
         .or(schematic.metadata.mc_version)
-        .unwrap_or(CANONICAL_DATA_VERSION)
+}
+
+/// The data version a conversion starts from: [`known_data_version`], or
+/// Nucleation's canonical version when the file names none. Callers that
+/// show or act on a version check [`known_data_version`] first.
+pub fn data_version(schematic: &UniversalSchematic) -> i32 {
+    known_data_version(schematic).unwrap_or(CANONICAL_DATA_VERSION)
 }
 
 pub fn direction(from: i32, to: i32) -> Direction {

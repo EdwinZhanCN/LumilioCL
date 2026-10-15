@@ -3,11 +3,14 @@
 //! bundle's base version, then each mod and resource pack that holds assets
 //! and each pack added from elsewhere — with how many blocks each provides
 //! and how many of its models a custom loader draws. Every mod and pack has
-//! a switch and is off until switched on for this folder. 添加资源包… only
-//! registers a zip's path for the instance.
+//! a switch and is off until switched on for this folder. 添加资源包… and
+//! 添加文件夹… only register a zip's or pack folder's path for the instance,
+//! as does a path typed into the field. 上移 / 下移 change the order the
+//! mods and packs are layered in, kept per instance (T36).
 
 use gpui::prelude::*;
 use gpui::{AnyElement, Context, SharedString, Window, div};
+use gpui_component::input::Input;
 use gpui_component::{Sizable as _, h_flex, v_flex};
 use lumilio_core::{ProvidedSource, SourceRole};
 
@@ -43,6 +46,14 @@ pub(super) fn source_words(source: &ProvidedSource) -> (String, String) {
     (label, value)
 }
 
+/// The movable rows next to one in the list, by the file each is read from.
+struct Around {
+    /// The row above: lower priority.
+    before: Option<std::path::PathBuf>,
+    /// The row below: higher priority.
+    after: Option<std::path::PathBuf>,
+}
+
 /// The file a row's switch turns on or off: every mod and pack that is
 /// there; not the base, nor an added pack whose file is gone.
 fn switchable(source: &ProvidedSource) -> Option<&std::path::Path> {
@@ -64,13 +75,58 @@ impl StudioView {
             .ghost()
             .small()
             .debug_selector(|| "studio-sources-add".into())
-            .on_click(cx.listener(|view, _, window, cx| view.pick_pack(window, cx)));
+            .on_click(cx.listener(|view, _, window, cx| view.pick_pack(false, window, cx)));
+        // ia[plugin.litematica]: 添加资源包文件夹… | 「资源来源」顶部第二个 ghost 键 → 系统文件夹选择器 | 解压过的资源包（顶层有 pack.mcmeta 或 assets/）同 zip 一样只登记路径并在这个文件夹里打开；不是资源包时提示没有添加 | 例如红石显示材质包（T36）
+        let add_folder = Key::new("studio-sources-add-folder")
+            .label(tr!("studio-sources-add-folder"))
+            .ghost()
+            .small()
+            .debug_selector(|| "studio-sources-add-folder".into())
+            .on_click(cx.listener(|view, _, window, cx| view.pick_pack(true, window, cx)));
+        let typed = self.pack_path.as_ref().map(|input| {
+            let empty = input.read(cx).value().trim().is_empty();
+            // ia[plugin.litematica]: 按路径添加资源包 | 「资源来源」顶部的路径输入框与「添加」键（回车也行） | 粘贴 zip 或资源包文件夹的完整路径后添加，同选择器一样只登记路径；不是资源包时提示没有添加，输入框保留原文 | T36
+            h_flex()
+                .debug_selector(|| "studio-sources-path".into())
+                .w_full()
+                .gap_2()
+                .items_center()
+                .child(div().flex_1().min_w_0().child(Input::new(input).small()))
+                .child(
+                    Key::new("studio-sources-path-add")
+                        .label(tr!("studio-sources-path-add"))
+                        .ghost()
+                        .small()
+                        .disabled(empty)
+                        .debug_selector(|| "studio-sources-path-add".into())
+                        .on_click(cx.listener(|view, _, window, cx| view.add_typed(window, cx))),
+                )
+        });
         let body = match (&self.sources, &self.viewer) {
             (Some(sources), _) if !sources.is_empty() => {
+                let movable: Vec<usize> = sources
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, source)| switchable(source).is_some())
+                    .map(|(index, _)| index)
+                    .collect();
                 let rows = sources
                     .iter()
                     .enumerate()
-                    .map(|(index, source)| self.source_row(index, source, colors, cx))
+                    .map(|(index, source)| {
+                        let at = movable.iter().position(|row| *row == index);
+                        let neighbour = |row: Option<&usize>| {
+                            row.and_then(|row| switchable(&sources[*row]))
+                                .map(std::path::Path::to_path_buf)
+                        };
+                        let around = Around {
+                            before: at
+                                .and_then(|at| at.checked_sub(1))
+                                .and_then(|at| neighbour(movable.get(at))),
+                            after: at.and_then(|at| neighbour(movable.get(at + 1))),
+                        };
+                        self.source_row(index, source, around, colors, cx)
+                    })
                     .collect();
                 let list = kit::list(rows, colors).into_any_element();
                 if sources.iter().any(|source| switchable(source).is_some()) {
@@ -79,6 +135,10 @@ impl StudioView {
                         .gap_1()
                         .child(list)
                         .child(muted_line(tr!("studio-sources-off"), colors))
+                        .children(
+                            (movable.len() > 1)
+                                .then(|| muted_line(tr!("studio-sources-order"), colors)),
+                        )
                         .into_any_element()
                 } else {
                     list
@@ -96,7 +156,8 @@ impl StudioView {
                 .debug_selector(|| "studio-sources".into())
                 .w_full()
                 .gap_2()
-                .child(div().child(add))
+                .child(h_flex().gap_2().child(add).child(add_folder))
+                .children(typed)
                 .child(body),
         )
         .into_any_element()
@@ -106,6 +167,7 @@ impl StudioView {
         &self,
         index: usize,
         source: &ProvidedSource,
+        around: Around,
         colors: ShellColors,
         cx: &mut Context<Self>,
     ) -> AnyElement {
@@ -131,6 +193,33 @@ impl StudioView {
                         },
                     )),
             );
+        }
+        if let Some(path) = switchable(source) {
+            // ia[plugin.litematica]: 调整 Mod 与资源包的叠放顺序 | 「资源来源」每个 Mod 与资源包行尾的「上移」「下移」 | 和上一行或下一行换位；排在下面的盖过上面的；顺序按实例记在启动器数据里，换序后视口按新顺序重新烘焙并重画缩略图（旧顺序的烘焙缓存不会被拿来用）；保存失败时提示没有改动 | 新装的 Mod 与新启用的资源包排在已排好的上面，新添加的资源包排在最下面（T36）
+            for (key, arrow, tip, past) in [
+                ("up", "↑", tr!("studio-source-up"), around.before),
+                ("down", "↓", tr!("studio-source-down"), around.after),
+            ] {
+                let path = path.to_owned();
+                keys = keys.child(
+                    Key::new(SharedString::from(format!("studio-source-{key}-{index}")))
+                        .label(arrow)
+                        .tooltip(tip)
+                        .ghost()
+                        .small()
+                        .disabled(past.is_none())
+                        .debug_selector(move || format!("studio-source-{key}-{index}"))
+                        .on_click(cx.listener(move |view, _, _, cx| {
+                            if let Some(past) = past.clone() {
+                                view.send(Command::MoveSource {
+                                    path: path.clone(),
+                                    past,
+                                });
+                                cx.notify();
+                            }
+                        })),
+                );
+            }
         }
         if let SourceRole::Added { path, .. } = &source.role {
             let path = path.clone();
@@ -169,14 +258,49 @@ impl StudioView {
         }
     }
 
-    fn pick_pack(&mut self, _: &mut Window, cx: &mut Context<Self>) {
-        let pick = crate::platform::pick_path(cx, true, false, tr!("studio-sources-prompt"));
+    /// Asks the system for a pack zip, or with `folder` a pack folder.
+    fn pick_pack(&mut self, folder: bool, _: &mut Window, cx: &mut Context<Self>) {
+        let pick = crate::platform::pick_path(cx, !folder, folder, tr!("studio-sources-prompt"));
         cx.spawn(async move |this, cx| {
             if let Some(path) = pick.await {
                 let _ = this.update(cx, |this, _| this.send(Command::AddPack { path }));
             }
         })
         .detach();
+    }
+
+    /// Adds the pack whose path is in the field; the field is emptied once
+    /// it is sent, and the answer says whether it was a pack.
+    pub(super) fn add_typed(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(input) = self.pack_path.clone() else {
+            return;
+        };
+        let typed = input.read(cx).value().trim().trim_matches('"').to_owned();
+        if typed.is_empty() {
+            return;
+        }
+        self.send(Command::AddPack {
+            path: std::path::PathBuf::from(typed),
+        });
+        input.update(cx, |input, cx| input.set_value("", window, cx));
+        cx.notify();
+    }
+
+    /// The order was kept: the viewport bakes and draws the new stack.
+    pub(super) fn source_moved(&mut self, result: Result<bool, String>, cx: &mut Context<Self>) {
+        match result {
+            Ok(true) => {
+                self.redraw_thumbnails();
+                // The rows change places: the list waits for the new load.
+                if self.reload_sources(cx) {
+                    self.sources = None;
+                }
+            }
+            Ok(false) => {}
+            Err(detail) => self
+                .toasts
+                .push(Toast::error(tr!("studio-sources-failed")).technical(detail)),
+        }
     }
 
     /// A pack was added or taken off: on success the viewport loads again

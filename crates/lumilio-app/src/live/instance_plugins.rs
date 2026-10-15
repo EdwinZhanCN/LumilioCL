@@ -324,6 +324,15 @@ fn studio_connection(
                     StudioCommand::History => {
                         StudioEvent::History(service.schematic_history(&id).await.map_err(text))
                     }
+                    StudioCommand::Backups => {
+                        StudioEvent::Backups(service.schematic_backups(&id).await.map_err(text))
+                    }
+                    StudioCommand::RestoreBackup { backup } => StudioEvent::Restored(
+                        service
+                            .schematic_restore_backup(&id, &plugin, backup)
+                            .await
+                            .map_err(text),
+                    ),
                     StudioCommand::CanWrite => {
                         StudioEvent::CanWrite(service.schematic_can_write(&id))
                     }
@@ -395,6 +404,12 @@ fn studio_connection(
                             .map_err(text);
                         StudioEvent::SourceSwitched { path, on, result }
                     }
+                    StudioCommand::MoveSource { path, past } => StudioEvent::SourceMoved(
+                        service
+                            .schematic_source_move(&id, path, past)
+                            .await
+                            .map_err(text),
+                    ),
                     StudioCommand::Names => {
                         StudioEvent::Names(service.schematic_names(&id).await.map_err(text))
                     }

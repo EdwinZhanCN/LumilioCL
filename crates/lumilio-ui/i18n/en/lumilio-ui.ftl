@@ -2560,3 +2560,37 @@ release-notes-updated = Updated to LumilioCL { $version }
 release-notes-title = What's new in LumilioCL { $version }
 release-notes-all = All release notes
 release-notes-done = Got it
+## Schematic studio: unknown version, blocks not drawn
+studio-version-unknown = Version unknown
+studio-version-unknown-why = This schematic does not record its game version. It is drawn with the game version of the instance. It is not converted automatically, and missing blocks are not checked.
+studio-caption-unknown-game = Version unknown · game { $game }
+studio-convert-unknown = This schematic does not record its game version, so it cannot be converted
+studio-undrawable-count = { $count ->
+    [one] { $count } block type has no model
+   *[other] { $count } block types have no model
+}
+studio-convert-suggested = Suggested replacement: { $block }
+## Schematic studio: resource pack order and folders
+studio-sources-add-folder = Add folder…
+studio-sources-path = Paste a resource pack path (zip or folder)
+studio-sources-path-add = Add
+studio-sources-order = A source lower in the list covers the sources above it. Use ↑ and ↓ to change the order.
+studio-source-up = Move up: the sources below cover it
+studio-source-down = Move down: it covers the sources above
+## Schematic studio: history and backups
+studio-history-summary = { $operations ->
+    [one] { $operations } operation
+   *[other] { $operations } operations
+} · { $copies ->
+    [one] { $copies } backup
+   *[other] { $copies } backups
+} · { $size }
+studio-history-this = This schematic
+studio-history-all = All
+studio-history-none-here = This schematic has not been changed yet. Select All to see the other schematics.
+studio-history-copy = Backup { $size }
+studio-history-copy-gone = The backup is gone and cannot be restored
+studio-history-made = This operation wrote a new file, so there is no backup
+studio-history-loose = Backups not in the log
+studio-history-loose-note = The backup folder has these copies, but the log does not record them (the log was lost or cut short). You can put them back where they came from.
+studio-restore-loose-body = This copy goes back where it came from. The current file is backed up first, and the restore is recorded in the history.

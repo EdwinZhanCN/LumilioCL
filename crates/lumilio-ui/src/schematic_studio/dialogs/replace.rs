@@ -136,6 +136,9 @@ struct Row {
     any: bool,
     chips: Vec<Chip>,
     target: BlockDropdown,
+    /// A target proposed for this row (T37), chosen once the pickers list
+    /// it; the person may choose another.
+    suggested: Option<String>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -365,17 +368,27 @@ impl ReplaceDialog {
         recent.into_iter().chain(all).collect()
     }
 
-    fn refill_targets(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let targets = BlockChoice::all(&self.names, &self.targets());
+    /// Lists the targets again; a row with nothing chosen takes its
+    /// proposal once the list has it. Returns whether one was taken.
+    fn refill_targets(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        let ids = self.targets();
+        let targets = BlockChoice::all(&self.names, &ids);
+        let mut proposed = false;
         for row in &self.rows {
             let chosen = row.target.read(cx).selected_value().cloned();
+            let wanted = chosen.or_else(|| {
+                let take = row.suggested.clone().filter(|id| ids.contains(id));
+                proposed |= take.is_some();
+                take
+            });
             row.target.update(cx, |target, cx| {
                 target.set_items(SearchableVec::new(targets.clone()), window, cx);
-                if let Some(chosen) = &chosen {
-                    target.set_selected_value(chosen, window, cx);
+                if let Some(wanted) = &wanted {
+                    target.set_selected_value(wanted, window, cx);
                 }
             });
         }
+        proposed
     }
 
     /// A row starting from block `id`: with `exact` its properties match
@@ -423,6 +436,7 @@ impl ReplaceDialog {
             any: exact.is_none(),
             chips: Vec::new(),
             target,
+            suggested: None,
             _subscriptions: subscriptions,
         });
         self.set_chips(index, id, exact.unwrap_or(&[]), window, cx);
@@ -583,10 +597,12 @@ impl ReplaceDialog {
     }
 
     /// Starts from several blocks, one row each at any state, each waiting
-    /// for its target (the convert dialog's kept blocks, T23).
+    /// for its target (the convert dialog's kept blocks, T23) or starting
+    /// from the one `suggested` proposes for it (T37).
     pub(crate) fn preset_many(
         &mut self,
         ids: &[String],
+        suggested: &super::Suggested,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
@@ -600,7 +616,11 @@ impl ReplaceDialog {
         self.rows.clear();
         for id in known {
             self.add_row(id, None, window, cx);
+            if let Some(row) = self.rows.last_mut() {
+                row.suggested = suggested.get(id).cloned();
+            }
         }
+        self.refill_targets(window, cx);
         self.refresh(cx);
     }
 
@@ -778,6 +798,15 @@ impl ReplaceDialog {
         self.rows
             .iter()
             .map(|row| row.source.read(cx).selected_value().cloned())
+            .collect()
+    }
+
+    /// Each row's target id, in order.
+    #[cfg(test)]
+    pub(crate) fn chosen_targets(&self, cx: &App) -> Vec<Option<String>> {
+        self.rows
+            .iter()
+            .map(|row| row.target.read(cx).selected_value().cloned())
             .collect()
     }
 
@@ -1076,7 +1105,9 @@ impl Render for ReplaceDialog {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         if std::mem::take(&mut self.refill) {
             self.rebuild_scheme_pick(window, cx);
-            self.refill_targets(window, cx);
+            if self.refill_targets(window, cx) {
+                self.refresh(cx);
+            }
         }
         let colors = ShellColors::current(cx);
         let busy = self.status.read(cx).busy;

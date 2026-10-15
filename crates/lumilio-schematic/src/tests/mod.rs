@@ -4,6 +4,7 @@ mod inspect;
 mod metadata;
 mod replace;
 mod stats;
+mod suggest;
 
 use crate::{BlockState, Region, UniversalSchematic};
 use nucleation::Entity;

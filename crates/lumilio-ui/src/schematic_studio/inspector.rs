@@ -8,11 +8,10 @@
 use gpui::prelude::*;
 use gpui::{AnyElement, Context, Pixels, SharedString, div, px};
 use gpui_component::input::Input;
-use gpui_component::{Icon, Sizable as _, WindowExt as _, h_flex, v_flex};
-use lumilio_core::SchematicLogEntry;
+use gpui_component::{Icon, Sizable as _, h_flex, v_flex};
 
 use super::words::entity_name;
-use super::{Analysis, Command, Inspection, InspectorTab, Loaded, StudioView, muted_line, tree};
+use super::{Analysis, Inspection, InspectorTab, StudioView, muted_line, tree};
 use crate::assets::UiIcon;
 use crate::controls::PortTabs;
 use crate::key::Key;
@@ -54,12 +53,6 @@ pub(super) fn line(
 
 pub(super) fn size_text((x, y, z): (i32, i32, i32)) -> String {
     format!("{x} × {y} × {z}")
-}
-
-fn now() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |since| since.as_secs())
 }
 
 /// The history's words for an operation the core logged by name.
@@ -259,7 +252,7 @@ impl StudioView {
         let when = |millis: Option<u64>| {
             millis.map_or_else(
                 || tr!("studio-none").to_owned(),
-                |millis| crate::live::relative_time(millis / 1000, now()),
+                |millis| crate::live::relative_time(millis / 1000, super::history::now()),
             )
         };
         let rows = vec![
@@ -439,7 +432,10 @@ impl StudioView {
                 line(
                     "studio-meta-data-version",
                     tr!("studio-meta-data-version"),
-                    analysis.info.data_version.to_string(),
+                    analysis.info.data_version.map_or_else(
+                        || tr!("studio-version-unknown").to_owned(),
+                        |version| version.to_string(),
+                    ),
                     colors,
                 )
                 .into_any_element(),
@@ -483,120 +479,5 @@ impl StudioView {
         column
             .child(self.sources_section(colors, cx))
             .into_any_element()
-    }
-
-    fn history_tab(&self, colors: ShellColors, cx: &mut Context<Self>) -> AnyElement {
-        let entries = match &self.history {
-            Loaded::Loading => {
-                return muted_line(tr!("studio-history-loading"), colors).into_any_element();
-            }
-            Loaded::Failed(detail) => {
-                return v_flex()
-                    .gap_2()
-                    .child(muted_line(tr!("studio-history-failed"), colors))
-                    .child(kit::technical("studio-history-technical", detail.clone()))
-                    .into_any_element();
-            }
-            Loaded::Ready(entries) => entries,
-        };
-        if entries.is_empty() {
-            return v_flex()
-                .debug_selector(|| "studio-history-empty".into())
-                .child(muted_line(tr!("studio-history-empty"), colors))
-                .into_any_element();
-        }
-        let now = now();
-        let rows: Vec<AnyElement> = entries
-            .iter()
-            .map(|entry| self.history_row(entry, now, colors, cx))
-            .collect();
-        kit::list(rows, colors).into_any_element()
-    }
-
-    fn history_row(
-        &self,
-        entry: &SchematicLogEntry,
-        now: u64,
-        colors: ShellColors,
-        cx: &mut Context<Self>,
-    ) -> AnyElement {
-        let index = entry.index;
-        let blocked = self.write_blocked();
-        // A line with no backup made its file (a conversion saved beside
-        // its original, T23): restoring it takes the file into the backups.
-        let made = entry.backup.is_none();
-        let file = tree::stem(&entry.file).to_owned();
-        let summary = if entry.summary.is_empty() {
-            entry.file.clone()
-        } else {
-            entry.summary.clone()
-        };
-        // ia[plugin.litematica]: 恢复到操作之前 | 材料面板「历史」每行的 ghost「恢复」 | 确认后把这次操作前的备份放回原处，本身也记一行历史；那次操作新写出的文件（另存的转换）则收进备份；游戏运行中置灰并说明 | 备份与日志在启动器数据目录，不在游戏目录（T12、T23）
-        let restore = Key::new(("studio-restore", index))
-            .label(tr!("studio-restore"))
-            .ghost()
-            .small()
-            .debug_selector(move || format!("studio-restore-{index}"))
-            .disabled(blocked.is_some() || self.restoring)
-            .when_some(blocked, |key, why| key.tooltip(why))
-            .on_click(cx.listener(move |view, _, window, cx| {
-                view.ask_restore(index, file.clone(), made, window, cx);
-            }));
-        h_flex()
-            .id(("studio-history", index))
-            .w_full()
-            .py(px(6.))
-            .gap_2()
-            .items_center()
-            .child(
-                v_flex()
-                    .flex_1()
-                    .min_w_0()
-                    .gap(px(2.))
-                    .child(div().text_sm().text_color(colors.foreground).child(format!(
-                        "{} · {}",
-                        operation_label(&entry.operation),
-                        tree::stem(&entry.file)
-                    )))
-                    .child(div().text_xs().text_color(colors.muted).child(format!(
-                        "{} · {}",
-                        crate::live::relative_time(entry.time, now),
-                        summary
-                    ))),
-            )
-            .child(div().flex_none().child(restore))
-            .into_any_element()
-    }
-
-    fn ask_restore(
-        &mut self,
-        index: usize,
-        file: String,
-        made: bool,
-        window: &mut gpui::Window,
-        cx: &mut Context<Self>,
-    ) {
-        let studio = cx.entity().downgrade();
-        window.open_alert_dialog(cx, move |alert, _, _| {
-            let studio = studio.clone();
-            alert
-                .title(tr!("studio-restore-title", file = file.as_str()))
-                .description(if made {
-                    tr!("studio-restore-made-body")
-                } else {
-                    tr!("studio-restore-body")
-                })
-                .ok_text(tr!("studio-restore"))
-                .cancel_text(tr!("common-cancel"))
-                .show_cancel(true)
-                .on_ok(move |_, _, cx| {
-                    let _ = studio.update(cx, |view, cx| {
-                        view.restoring = true;
-                        view.send(Command::Restore { index });
-                        cx.notify();
-                    });
-                    true
-                })
-        });
     }
 }

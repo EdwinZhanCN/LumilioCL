@@ -15,6 +15,7 @@
 //! the older game reads them as air. Without the slice the conversion is
 //! still offered, with a note that the check could not run.
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use gpui::prelude::*;
@@ -42,6 +43,22 @@ use crate::version_picker::{Choice, Choices, PickerEvent, VersionPicker};
 /// Entries listed per severity; the rest are counted.
 const LISTED: usize = 100;
 
+/// A proposed replacement for each block a target lacks, by ID (T37).
+pub(crate) type Suggested = BTreeMap<String, String>;
+
+/// A proposal from the target's blocks for each block it lacks among
+/// `losses`.
+pub(crate) fn suggestions(losses: &[Loss], target: &BlockCatalog) -> Suggested {
+    losses
+        .iter()
+        .filter(|loss| loss.kind == MISSING_BLOCK)
+        .filter_map(|loss| {
+            let proposal = lumilio_schematic::suggest::suggest(&loss.path, target.ids())?;
+            Some((loss.path.clone(), proposal))
+        })
+        .collect()
+}
+
 pub(crate) enum Planned {
     Nothing,
     /// Waiting for the target's block states (a backward conversion).
@@ -53,6 +70,8 @@ pub(crate) enum Planned {
         bytes: Arc<Vec<u8>>,
         /// Why the block check did not run, when it did not.
         unchecked: Option<String>,
+        /// A replacement the target has for each block it lacks (T37).
+        suggested: Suggested,
     },
     Failed(String),
 }
@@ -281,12 +300,17 @@ impl ConvertDialog {
             let schematic =
                 lumilio_schematic::load_litematic(&bytes).map_err(|error| error.to_string())?;
             let target = i32::try_from(data_version).map_err(|error| error.to_string())?;
-            lumilio_schematic::convert::to_bytes_for_data_version(
+            let (bytes, conversion) = lumilio_schematic::convert::to_bytes_for_data_version(
                 &schematic,
                 target,
                 catalogs.as_ref(),
             )
-            .map_err(|error| error.to_string())
+            .map_err(|error| error.to_string())?;
+            let suggested = catalogs
+                .as_ref()
+                .map(|catalogs| suggestions(&conversion.losses, &catalogs.target))
+                .unwrap_or_default();
+            Ok::<_, String>((bytes, conversion, suggested))
         });
         cx.spawn(async move |this, cx| {
             let result = work.await;
@@ -295,11 +319,12 @@ impl ConvertDialog {
                     return;
                 }
                 this.planned = match result {
-                    Ok((bytes, conversion)) => Planned::Ready {
+                    Ok((bytes, conversion, suggested)) => Planned::Ready {
                         target: id,
                         conversion,
                         bytes: Arc::new(bytes),
                         unchecked,
+                        suggested,
                     },
                     Err(detail) => Planned::Failed(detail),
                 };
@@ -325,6 +350,7 @@ impl ConvertDialog {
         &self,
         target: &str,
         losses: &[Loss],
+        suggested: &Suggested,
         colors: ShellColors,
         cx: &mut Context<Self>,
     ) -> AnyElement {
@@ -371,6 +397,16 @@ impl ConvertDialog {
                                 None => line,
                             }
                         })
+                        // ia[plugin.litematica]: 看保留方块的替代建议 | 转换对话框「保留」组每行下面的「建议替换为 …」 | 按目标版本的方块表猜一个替代：同形状后缀（_stairs、_slab、_wall…）里材料最接近的、去掉 deepslate_ 等前缀的同名方块、优先原版 minecraft:；猜不到就不写 | 点「为这些方块选替代…」时这些建议已填进映射表，可以照用或改（T37）
+                        .children(suggested.get(&loss.path).map(|proposal| {
+                            div()
+                                .debug_selector(move || {
+                                    format!("studio-loss-{key}-{index}-suggested")
+                                })
+                                .text_xs()
+                                .text_color(colors.muted)
+                                .child(tr!("studio-convert-suggested", block = proposal.as_str()))
+                        }))
                         .into_any_element()
                 })
                 .collect();
@@ -395,6 +431,7 @@ impl ConvertDialog {
             }
             // ia[plugin.litematica]: 为保留的方块选替代 | 转换对话框「保留」组旁的「为这些方块选替代…」 | 关掉转换对话框，打开替换方块的映射表，每种保留的方块一行，等着选目标 | 目标版本不认识、原样写出的方块（T23、T24）
             let ids: Vec<String> = group.iter().map(|loss| loss.path.clone()).collect();
+            let proposals = suggested.clone();
             let studio = self.studio.clone();
             let choose = Key::new("studio-convert-replace-kept")
                 .label(tr!("studio-convert-replace-kept"))
@@ -403,7 +440,7 @@ impl ConvertDialog {
                 .debug_selector(|| "studio-convert-replace-kept".into())
                 .on_click(move |_, window, cx| {
                     let _ = studio.update(cx, |studio, cx| {
-                        studio.replace_kept(ids.clone(), window, cx);
+                        studio.replace_kept(ids.clone(), proposals.clone(), window, cx);
                     });
                 });
             column = column.child(
@@ -541,6 +578,7 @@ impl Render for ConvertDialog {
                 target,
                 conversion,
                 unchecked,
+                suggested,
                 ..
             } => match conversion.direction {
                 Direction::Same => note(tr!("studio-convert-same"), colors).into_any_element(),
@@ -567,7 +605,7 @@ impl Render for ConvertDialog {
                                 count = conversion.losses.len()
                             )),
                     )
-                    .child(self.losses(target, &conversion.losses, colors, cx))
+                    .child(self.losses(target, &conversion.losses, suggested, colors, cx))
                     .children(unchecked_note(target, unchecked.as_deref(), colors))
                     .into_any_element(),
             },

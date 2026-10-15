@@ -7,13 +7,13 @@ mod convert;
 mod metadata;
 mod replace;
 
-pub(crate) use convert::ConvertDialog;
 #[cfg(test)]
 pub(crate) use convert::Group;
 #[cfg(test)]
 pub(crate) use convert::Planned;
 #[cfg(test)]
 pub(crate) use convert::detail as loss_words;
+pub(crate) use convert::{ConvertDialog, Suggested, suggestions};
 pub(crate) use metadata::MetadataDialog;
 #[cfg(test)]
 pub(crate) use replace::BlockChoice;

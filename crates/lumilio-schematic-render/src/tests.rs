@@ -290,3 +290,19 @@ mod hanging;
 mod icons;
 mod looks;
 mod pick;
+
+/// A file that names no data version is drawn as it is: converting it to the pack's version
+/// would first assume Nucleation's canonical version (plan schematic-studio, T39).
+#[test]
+fn a_schematic_without_a_data_version_is_not_converted() {
+    let pack = cube_pack("stone", Some(3465));
+    let mut unknown = UniversalSchematic::new("unknown".into());
+    unknown.set_block_str(0, 0, 0, "minecraft:stone");
+    assert!(!crate::scene::to_pack_version(&mut unknown, &pack));
+    assert_eq!(unknown.metadata.mc_version, None);
+
+    let mut known = unknown.clone();
+    known.metadata.mc_version = Some(3337);
+    assert!(crate::scene::to_pack_version(&mut known, &pack));
+    assert_eq!(known.metadata.mc_version, Some(3465));
+}

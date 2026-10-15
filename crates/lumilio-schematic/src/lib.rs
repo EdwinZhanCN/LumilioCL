@@ -14,6 +14,7 @@ pub mod inspect;
 pub mod metadata;
 pub mod replace;
 pub mod stats;
+pub mod suggest;
 
 #[cfg(test)]
 mod tests;

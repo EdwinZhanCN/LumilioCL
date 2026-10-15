@@ -798,6 +798,92 @@ fn kept_blocks_go_to_the_replace_dialog(cx: &mut TestAppContext) {
     assert_eq!(source.as_deref(), Some("minecraft:cherry_log"));
 }
 
+/// T37: a kept block comes with a proposal from the target's blocks, and
+/// the replace dialog starts its row on it once its table lists it.
+#[gpui::test]
+fn kept_blocks_come_with_a_suggested_replacement(cx: &mut TestAppContext) {
+    let (rig, cx, _) = cherry_with_game("1.13.2", cx);
+    rig.studio
+        .update_in(cx, |studio, window, cx| studio.open_convert(window, cx));
+    cx.run_until_parked();
+    rig.answer(
+        Event::Catalogs {
+            target: "1.13.2".into(),
+            result: Ok(catalogs_1_13_2()),
+        },
+        cx,
+    );
+    assert!(
+        cx.debug_bounds("studio-loss-kept-0-suggested").is_some(),
+        "the proposal is shown under the kept block"
+    );
+    rig.sent();
+    click(cx, "studio-convert-replace-kept");
+    let dialog = replace_dialog(&rig, cx);
+    // The file's own version's table arrives; the proposal is in it.
+    let asked = rig.sent();
+    assert!(
+        asked
+            .iter()
+            .any(|command| matches!(command, Command::Catalogs { target, .. } if target == "26.3")),
+        "{asked:?}"
+    );
+    let mut table = BlockCatalog::default();
+    for id in [
+        "minecraft:cherry_log",
+        "minecraft:oak_log",
+        "minecraft:stone",
+    ] {
+        table.add_block(id);
+    }
+    rig.answer(
+        Event::Catalogs {
+            target: "26.3".into(),
+            result: Ok((table, None)),
+        },
+        cx,
+    );
+    cx.run_until_parked();
+    let targets = dialog.read_with(cx, |dialog, cx| dialog.chosen_targets(cx));
+    assert_eq!(targets, [Some("minecraft:oak_log".to_owned())]);
+}
+
+/// T39: a file that names no data version says so in the head, is not
+/// converted to check it against the game, and cannot be converted.
+#[gpui::test]
+fn a_file_without_a_version_says_so_and_is_not_converted(cx: &mut TestAppContext) {
+    let files = [(A, fixture("A", 3))];
+    let (rig, cx) = rig(cx);
+    open(&rig, cx, &files, A);
+    rig.studio.update(cx, |studio, cx| {
+        if let crate::schematic_studio::Inspection::Ready(analysis) = &mut studio.inspection {
+            analysis.info.data_version = None;
+        }
+        cx.notify();
+    });
+    cx.run_until_parked();
+    rig.sent();
+    rig.answer(Event::Versions(Ok(versions(4790))), cx);
+    rig.answer(Event::Game(Ok("1.13.2".to_owned())), cx);
+    assert!(cx.debug_bounds("studio-version-unknown").is_some());
+    assert_eq!(caption(&rig, cx), "版本未知 · 游戏 1.13.2");
+    assert!(
+        !rig.sent()
+            .iter()
+            .any(|command| matches!(command, Command::Catalogs { .. })),
+        "no block check, which would convert from a guessed version"
+    );
+    assert!(cx.debug_bounds("studio-compat").is_none());
+    let convert = rig.studio.read_with(cx, |studio, _| {
+        studio
+            .menu()
+            .into_iter()
+            .find(|entry| entry.label().as_ref() == crate::tr!("studio-menu-convert"))
+            .expect("the convert entry")
+    });
+    assert!(convert.is_disabled(), "a guessed version is not converted");
+}
+
 /// Two oak stairs facing north, one facing east, and three stone.
 fn stairs() -> Vec<u8> {
     let mut schematic = UniversalSchematic::new("Stairs".to_owned());

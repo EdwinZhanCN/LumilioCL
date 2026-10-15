@@ -717,3 +717,31 @@ fn the_inspect_card_replaces_the_inspected_state(cx: &mut TestAppContext) {
     assert!(!any, "exact");
     assert!(chips.contains(&"facing=north".to_owned()), "{chips:?}");
 }
+
+/// T38: the head says how many kinds of block the picture leaves out, and
+/// the tag opens the technical facts that list them.
+#[gpui::test]
+fn the_head_counts_the_blocks_without_a_model(cx: &mut TestAppContext) {
+    let (rig, cx) = open_b(cx);
+    viewer(&rig, cx).update(cx, |viewer, cx| viewer.set_drawn_for_test(cx));
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("studio-undrawable").is_none(), "all drawn");
+    viewer(&rig, cx).update(cx, |viewer, cx| {
+        viewer.set_undrawable_for_test(vec![
+            "minecraft:oak_stairs".into(),
+            "minecraft:stone".into(),
+        ]);
+        cx.notify();
+    });
+    rig.studio.update(cx, |_, cx| cx.notify());
+    cx.run_until_parked();
+    assert_eq!(
+        crate::tr!("studio-undrawable-count", count = 2),
+        "2 种方块没有模型"
+    );
+    click(cx, "studio-undrawable");
+    rig.studio.read_with(cx, |studio, _| {
+        assert_eq!(studio.tab, InspectorTab::Info);
+        assert!(studio.technical_open);
+    });
+}

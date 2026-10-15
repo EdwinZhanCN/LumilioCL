@@ -21,4 +21,4 @@
 | [游戏页 · 历史](instance.history.md) | 5 |
 | [游戏页 · 诊断](instance.diagnostics.md) | 11 |
 | [游戏页 · 设置](instance.settings.md) | 18 |
-| [插件 · Litematica 投影](plugin.litematica.md) | 51 |
+| [插件 · Litematica 投影](plugin.litematica.md) | 60 |

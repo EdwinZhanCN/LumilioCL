@@ -261,3 +261,64 @@ fn technical_details_list_the_sources_and_taking_a_pack_off_reloads(cx: &mut Tes
     rig.answer(Event::PacksChanged(Err("not a zip".into())), cx);
     assert!(kept.upgrade().is_some());
 }
+
+/// T36: each mod and pack row moves past its neighbour in the list; the
+/// first cannot go up nor the last down. A kept order loads the viewport
+/// again; one that is not kept says so and keeps it.
+#[gpui::test]
+fn a_source_moves_past_its_neighbour_and_reloads(cx: &mut TestAppContext) {
+    let (rig, cx) = rig(cx);
+    let request = showing(&rig, sources(), cx);
+    assert!(
+        cx.debug_bounds("studio-source-up-0").is_none(),
+        "the base stays first"
+    );
+    rig.sent();
+    click(cx, "studio-source-up-1");
+    assert!(rig.sent().is_empty(), "the lowest mod or pack cannot go up");
+    click(cx, "studio-source-down-3");
+    assert!(rig.sent().is_empty(), "the highest cannot go down");
+
+    let old = rig.viewer(cx).unwrap();
+    click(cx, "studio-source-down-1");
+    assert_eq!(
+        rig.sent(),
+        [Command::MoveSource {
+            path: PathBuf::from("/game/mods/create.jar"),
+            past: PathBuf::from("/game/resourcepacks/Faithful.zip"),
+        }]
+    );
+    rig.answer(Event::SourceMoved(Ok(true)), cx);
+    assert!(old.upgrade().is_none(), "the viewport loads again");
+    assert_ne!(rig.models.borrow().last().unwrap().1, request);
+
+    let kept = rig.viewer(cx).unwrap();
+    rig.answer(Event::SourceMoved(Err("disk full".into())), cx);
+    assert!(kept.upgrade().is_some());
+}
+
+/// T36: a path typed into the field is added like a picked one.
+#[gpui::test]
+fn a_typed_path_is_added(cx: &mut TestAppContext) {
+    let (rig, cx) = rig(cx);
+    showing(&rig, sources(), cx);
+    let input = rig
+        .studio
+        .read_with(cx, |studio, _| studio.pack_path.clone())
+        .expect("the path field");
+    cx.update(|window, cx| {
+        input.update(cx, |input, cx| {
+            input.set_value("\"/packs/Redstone Display\"", window, cx);
+        });
+    });
+    cx.run_until_parked();
+    rig.sent();
+    click(cx, "studio-sources-path-add");
+    assert_eq!(
+        rig.sent(),
+        [Command::AddPack {
+            path: PathBuf::from("/packs/Redstone Display")
+        }]
+    );
+    assert!(input.read_with(cx, |input, _| input.value().is_empty()));
+}

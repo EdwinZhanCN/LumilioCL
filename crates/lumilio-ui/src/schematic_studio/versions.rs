@@ -10,7 +10,7 @@ use gpui::Context;
 use lumilio_core::BlockCatalog;
 use lumilio_schematic::convert::{Catalogs, MISSING_BLOCK};
 
-use super::dialogs::OpenDialog;
+use super::dialogs::{OpenDialog, Suggested, suggestions};
 use super::{Inspection, Loaded, Placement, StudioView};
 use crate::tr;
 
@@ -29,6 +29,9 @@ pub(crate) enum Compat {
         file: String,
         target: String,
         missing: Vec<String>,
+        /// A replacement the game version has for each, when one is
+        /// found (T37).
+        suggested: Suggested,
     },
 }
 
@@ -63,14 +66,22 @@ impl StudioView {
     }
 
     /// `x 投影 · 游戏 y`, or one version when the two are the same; just the
-    /// file's when the game version is not known.
+    /// file's when the game version is not known. A file that names no data
+    /// version says so (T39): its version is never guessed.
     pub(super) fn version_words(&self) -> Option<String> {
-        let (Inspection::Ready(analysis), Some(Loaded::Ready(versions))) =
-            (&self.inspection, &self.versions)
-        else {
+        let Inspection::Ready(analysis) = &self.inspection else {
             return None;
         };
-        let file = version_name(versions, analysis.info.data_version);
+        let Some(data_version) = analysis.info.data_version else {
+            return Some(match self.game_version() {
+                Some(game) => tr!("studio-caption-unknown-game", game = game),
+                None => tr!("studio-version-unknown").to_owned(),
+            });
+        };
+        let Some(Loaded::Ready(versions)) = &self.versions else {
+            return None;
+        };
+        let file = version_name(versions, data_version);
         Some(match self.game_version() {
             Some(game) if game == file => tr!("studio-caption-version", version = file.as_str()),
             Some(game) => tr!(
@@ -80,6 +91,11 @@ impl StudioView {
             ),
             None => tr!("studio-caption-schematic", version = file.as_str()),
         })
+    }
+
+    /// Whether the open file names no data version (T39).
+    pub(crate) fn version_unknown(&self) -> bool {
+        matches!(&self.inspection, Inspection::Ready(analysis) if analysis.info.data_version.is_none())
     }
 
     /// The game version arrived while the convert dialog is open: it
@@ -108,6 +124,19 @@ impl StudioView {
         }
     }
 
+    /// The proposed replacements for [`Self::missing_blocks`] (T37).
+    pub(crate) fn missing_suggested(&self) -> Suggested {
+        match (&self.compat, &self.selected) {
+            (
+                Compat::Done {
+                    file, suggested, ..
+                },
+                Some(selected),
+            ) if file == selected => suggested.clone(),
+            _ => Suggested::new(),
+        }
+    }
+
     /// The game version a conversion would bring the open file to, when
     /// that version lacks some of its blocks.
     pub(crate) fn compat_target(&self) -> Option<&str> {
@@ -116,6 +145,7 @@ impl StudioView {
                 file,
                 target,
                 missing,
+                ..
             } if self.selected.as_ref() == Some(file) && !missing.is_empty() => Some(target),
             _ => None,
         }
@@ -154,12 +184,17 @@ impl StudioView {
             }
             _ => {}
         }
-        let source = analysis.info.data_version;
+        // A file that names no data version is not converted to check it
+        // (T39): the head says its version is unknown instead.
+        let Some(source) = analysis.info.data_version else {
+            return;
+        };
         if i64::from(source) <= i64::from(data_version) {
             self.compat = Compat::Done {
                 file: file.clone(),
                 target,
                 missing: Vec::new(),
+                suggested: Suggested::new(),
             };
             cx.notify();
             return;
@@ -215,13 +250,14 @@ impl StudioView {
                 lumilio_schematic::convert::convert(&mut schematic, target, Some(&catalogs));
             let mut missing: Vec<String> = conversion
                 .losses
-                .into_iter()
+                .iter()
                 .filter(|loss| loss.kind == MISSING_BLOCK && loss.path.starts_with("minecraft:"))
-                .map(|loss| loss.path)
+                .map(|loss| loss.path.clone())
                 .collect();
             missing.sort();
             missing.dedup();
-            Some(missing)
+            let suggested = suggestions(&conversion.losses, &catalogs.target);
+            Some((missing, suggested))
         });
         cx.spawn(async move |this, cx| {
             let missing = work.await;
@@ -235,10 +271,11 @@ impl StudioView {
                     return;
                 }
                 this.compat = match missing {
-                    Some(missing) => Compat::Done {
+                    Some((missing, suggested)) => Compat::Done {
                         file,
                         target,
                         missing,
+                        suggested,
                     },
                     None => Compat::Unknown,
                 };
