@@ -60,6 +60,8 @@ pub const SANS_FONT: &str = "Space Grotesk";
 pub const MONO_FONT: &str = "JetBrains Mono";
 /// Segment digits on a display, nowhere else.
 pub const LCD_FONT: &str = "DSEG7 Classic";
+/// A server's message of the day, nowhere else.
+pub const PIXEL_FONT: &str = "Monocraft";
 
 /// The monospace family in force, for the many places that name it without a
 /// context at hand. [`tune`] sets it with the rest of the look, so it is

@@ -178,6 +178,17 @@ Default player artwork is read from the player's installed client; none is
 distributed. Which default an id gets follows HMCL's `TexturesLoader.java`
 (GPL-3.0-or-later, ADR 0011).
 
+# Pixel face
+
+Servers' messages of the day are drawn in
+[Monocraft](https://github.com/IdreesInc/Monocraft) 4.2.1 by Idrees Hassan,
+embedded unmodified from the release's OTF files in
+`crates/lumilio-ui/assets/fonts/` under the SIL OFL 1.1 (no Reserved Font
+Name); its licence is kept at
+[OFL-Monocraft.txt](crates/lumilio-ui/assets/fonts/OFL-Monocraft.txt).
+Monocraft is a fan typeface drawn from its own pixel tables and contains no
+Mojang font file or asset. No Minecraft font is read or distributed.
+
 # Website and release mirror
 
 The site in `web/` uses the launcher's own fonts (Space Grotesk, JetBrains Mono
