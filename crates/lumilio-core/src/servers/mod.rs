@@ -4,9 +4,11 @@
 //! understand (the cached icon, anything a newer game adds). A file that
 //! cannot be read is reported and left alone, never overwritten.
 
+mod motd;
 mod ping;
 mod protocol;
 
+pub use self::motd::{Motd, MotdSpan};
 pub use self::ping::{PingError, ServerStatus, probe};
 pub use self::protocol::ProtocolVersion;
 

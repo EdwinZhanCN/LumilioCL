@@ -11,6 +11,9 @@ pub struct LibraryCard {
     pub favorite: bool,
     /// Never played instances say so instead of showing a time.
     pub played: String,
+    /// How long ago it was last played ("3 天前"); `None` before the first
+    /// time.
+    pub ago: Option<String>,
     /// Stable number the pixel cover is drawn from.
     pub seed: u32,
     pub loader: Loader,
@@ -64,6 +67,15 @@ pub fn world_of(id: &str) -> WorldHint {
     }
 }
 
+/// [`relative_time`] from now; `then` is in seconds since the Unix epoch.
+#[must_use]
+pub fn ago(then: u64) -> String {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |elapsed| elapsed.as_secs());
+    relative_time(then, now)
+}
+
 /// `刚刚`, `5 分钟前`, `3 小时前`, `昨天`, `4 天前`, `2 个月前`.
 pub fn relative_time(then: u64, now: u64) -> String {
     let seconds = now.saturating_sub(then);
@@ -93,6 +105,7 @@ pub fn library_card(record: &InstanceRecord, now: u64) -> LibraryCard {
             || crate::tr!("library-never-played").to_owned(),
             |at| crate::tr!("home-place-last-played", when = relative_time(at, now)),
         ),
+        ago: record.last_played.map(|at| relative_time(at, now)),
         seed: seed_of(&record.id),
         loader: record.loader,
         world: world_of(&record.id),

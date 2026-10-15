@@ -8,10 +8,7 @@ use gpui::{AnyElement, App, Context, Window};
 use gpui_component::{h_flex, v_flex};
 
 pub(in super::super) fn clock(seconds: u64) -> String {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |elapsed| elapsed.as_secs());
-    live::relative_time(seconds, now)
+    live::ago(seconds)
 }
 
 pub(super) type Act =

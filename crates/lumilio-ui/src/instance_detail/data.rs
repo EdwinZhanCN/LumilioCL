@@ -212,12 +212,7 @@ impl InstanceDetailView {
     }
 
     /// Shows worlds or servers; the servers are read the first time.
-    pub(super) fn open_worlds_sub(
-        &mut self,
-        sub: usize,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
+    pub fn open_worlds_sub(&mut self, sub: usize, window: &mut Window, cx: &mut Context<Self>) {
         self.worlds_sub = sub.min(panels::WORLD_SUBS.len() - 1);
         if self.worlds_sub == 1 {
             if self.data.has(Section::Servers) {
@@ -258,23 +253,13 @@ impl InstanceDetailView {
         result: Result<lumilio_core::ServerStatus, String>,
         cx: &mut Context<Self>,
     ) {
-        match result {
-            Ok(status) => {
-                // A live icon replaces the one the game cached.
-                if let Some(pixels) = status.favicon.as_ref()
-                    && let Some(image) =
-                        crate::pixels::image(pixels.width, pixels.height, &pixels.rgba)
-                {
-                    self.server_icons.insert(address.clone(), image);
-                }
-                self.server_status
-                    .insert(address, panels::ServerState::Online(status));
-            }
-            Err(_) => {
-                self.server_status
-                    .insert(address, panels::ServerState::Offline);
-            }
+        if let Ok(status) = &result
+            && let Some(image) = crate::places::favicon(status)
+        {
+            self.server_icons.insert(address.clone(), image);
         }
+        self.server_status
+            .insert(address, panels::ServerState::of(result));
         cx.notify();
     }
 

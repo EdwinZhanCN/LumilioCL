@@ -142,10 +142,20 @@ fn invalid_fields_are_refused_and_a_damaged_file_is_not_overwritten() {
 fn a_status_without_players_or_version_still_reads() {
     let status = read_status(br#"{"description":"Hi"}"#).unwrap();
     assert_eq!(
-        (status.motd.as_str(), status.online, status.version),
+        (status.motd.plain().as_str(), status.online, status.version),
         ("Hi", None, None)
     );
     assert!(status.favicon.is_none());
+}
+
+#[test]
+fn a_status_keeps_the_look_of_its_message() {
+    let status = read_status(
+        br#"{"description":{"text":"Hi ","extra":[{"text":"there","color":"green"}]}}"#,
+    )
+    .unwrap();
+    let colors: Vec<_> = status.motd.spans.iter().map(|span| span.color).collect();
+    assert_eq!(colors, [None, Some(0x55_FF55)]);
 }
 
 #[test]
@@ -213,7 +223,7 @@ async fn probing_reads_the_status_and_the_latency() {
     )
     .await;
     let status = probe_at("127.0.0.1", port, None).await.unwrap();
-    assert_eq!(status.motd, "Welcome");
+    assert_eq!(status.motd.plain(), "Welcome");
     assert_eq!((status.online, status.max), (Some(2), Some(10)));
     assert!(status.latency_ms.is_some());
 }
@@ -302,7 +312,7 @@ async fn a_legacy_server_is_asked_the_old_way() {
         .await
         .unwrap();
     assert_eq!(status.version.as_deref(), Some("1.6.4"));
-    assert_eq!(status.motd, "A classic");
+    assert_eq!(status.motd.plain(), "A classic");
     assert_eq!((status.online, status.max), (Some(3), Some(20)));
     // The legacy ping carries no round trip.
     assert!(status.latency_ms.is_none());
@@ -315,7 +325,7 @@ async fn an_ancient_legacy_answer_still_reads_its_motd_and_counts() {
     let status = probe_at("127.0.0.1", port, Some(ProtocolVersion::legacy(39)))
         .await
         .unwrap();
-    assert_eq!(status.motd, "Old world");
+    assert_eq!(status.motd.plain(), "Old world");
     assert_eq!((status.online, status.max), (Some(5), Some(30)));
     assert!(status.version.is_none());
 }

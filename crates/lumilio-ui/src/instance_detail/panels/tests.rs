@@ -26,6 +26,8 @@ fn world(folder: &str, name: &str, played: Option<i64>) -> WorldInfo {
         last_played_ms: played,
         game_version: None,
         hardcore: false,
+        game_mode: None,
+        cheats: false,
         icon: None,
         damaged: false,
         lock_touched_ms: None,

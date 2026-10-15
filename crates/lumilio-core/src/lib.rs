@@ -187,7 +187,9 @@ pub use schematic_assets::{
 pub use schematic_ops::schemes::{ReplaceSchemes, SchemeRow};
 pub use schematic_ops::{KeptBackup, SchematicLogEntry, SchematicOperation};
 pub use screenshots::{ScreenshotError, ScreenshotInfo};
-pub use servers::{PackPolicy, PingError, ProtocolVersion, ServerEntry, ServerError, ServerStatus};
+pub use servers::{
+    Motd, MotdSpan, PackPolicy, PingError, ProtocolVersion, ServerEntry, ServerError, ServerStatus,
+};
 pub use service::{
     ActivityView, AddedFile, AppearanceApplyResult, ContentEffect, ContentResult,
     ContentSourceInfo, DependencyNeed, DependencyReport, DiscoverFilters, GameLogSource, GameLogs,
@@ -232,7 +234,7 @@ pub use updates::{
 };
 pub use wallpaper::{WallpaperError, import_wallpaper, remove_wallpapers};
 pub use worlds::{
-    WorldError, WorldInfo, copy_name as world_copy_name, delete as delete_world,
+    GameMode, WorldError, WorldInfo, copy_name as world_copy_name, delete as delete_world,
     duplicate as duplicate_world, scan as scan_worlds, size as world_size,
 };
 pub use yggdrasil::{AuthServer, LITTLE_SKIN_URL, Profile as CharacterProfile, YggdrasilError};

@@ -7,6 +7,7 @@
 //! is untrusted, so every length is capped before memory is reserved and the
 //! whole exchange has a deadline.
 
+use super::motd::Motd;
 use super::protocol::ProtocolVersion;
 use crate::skin::Pixels;
 use base64::Engine as _;
@@ -30,8 +31,8 @@ const FAVICON_PREFIX: &str = "data:image/png;base64,";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ServerStatus {
-    /// The message of the day as plain text (colour codes removed).
-    pub motd: String,
+    /// The message of the day with its colours and styles.
+    pub motd: Motd,
     pub online: Option<u32>,
     pub max: Option<u32>,
     pub version: Option<String>,
@@ -316,7 +317,7 @@ async fn legacy_exchange(
     let online = parts.next().and_then(|text| text.parse::<u32>().ok());
     let max = parts.next().and_then(|text| text.parse::<u32>().ok());
     Ok(ServerStatus {
-        motd: strip_codes(motd.trim()),
+        motd: Motd::from_legacy(motd),
         online,
         max,
         version,
@@ -365,12 +366,11 @@ pub(super) fn read_status(json: &[u8]) -> Result<ServerStatus, PingError> {
             .and_then(Value::as_u64)
             .and_then(|n| u32::try_from(n).ok())
     };
-    let mut motd = String::new();
-    if let Some(description) = value.get("description") {
-        flatten(description, &mut motd);
-    }
     Ok(ServerStatus {
-        motd: strip_codes(motd.trim()),
+        motd: value
+            .get("description")
+            .map(Motd::from_component)
+            .unwrap_or_default(),
         online: count("online"),
         max: count("max"),
         version: value
@@ -394,23 +394,6 @@ fn favicon(value: &str) -> Option<Pixels> {
         .decode(encoded)
         .ok()?;
     super::decode_icon(&bytes)
-}
-
-/// The text of a chat component: its own `text`, then its `extra` parts.
-fn flatten(component: &Value, out: &mut String) {
-    match component {
-        Value::String(text) => out.push_str(text),
-        Value::Array(parts) => parts.iter().for_each(|part| flatten(part, out)),
-        Value::Object(map) => {
-            if let Some(Value::String(text)) = map.get("text") {
-                out.push_str(text);
-            }
-            if let Some(extra) = map.get("extra") {
-                flatten(extra, out);
-            }
-        }
-        _ => {}
-    }
 }
 
 /// Removes `§x` formatting codes.

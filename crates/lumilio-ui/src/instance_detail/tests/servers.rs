@@ -18,7 +18,7 @@ fn server(name: &str, address: &str) -> ServerEntry {
 
 fn status() -> ServerStatus {
     ServerStatus {
-        motd: "Welcome\nsecond line".into(),
+        motd: lumilio_core::Motd::from_legacy("§aWelcome\nsecond line"),
         online: Some(3),
         max: Some(20),
         version: Some("Paper 1.21".into()),
@@ -64,18 +64,47 @@ fn writes(seen: &Rc<RefCell<Vec<InstanceIntent>>>) -> Vec<InstanceIntent> {
         .collect()
 }
 
-#[test]
-fn a_row_tells_where_and_how_the_server_is() {
-    use super::super::panels::server_detail;
-    assert_eq!(server_detail("a", None), "a · 正在检查…");
-    assert_eq!(
-        server_detail("a", Some(&ServerState::Offline)),
-        "a · 无法连接"
-    );
-    assert_eq!(
-        server_detail("a", Some(&ServerState::Online(status()))),
-        "a · 3/20 在线 · 42 ms · Paper 1.21 · Welcome"
-    );
+#[gpui::test]
+fn a_row_shows_how_the_server_is_in_the_form_each_fact_takes(cx: &mut TestAppContext) {
+    let seen: Rc<RefCell<Vec<InstanceIntent>>> = Rc::default();
+    let (view, cx) = open(seen, cx);
+    let drawn = |cx: &mut gpui::VisualTestContext, selector: &'static str| {
+        cx.debug_bounds(selector).is_some()
+    };
+    assert!(drawn(cx, "server-checking-0") && drawn(cx, "server-checking-1"));
+
+    view.update(cx, |view, cx| {
+        view.server_status_arrived("a.example".into(), Ok(status()), cx);
+        view.server_status_arrived("b.example:1".into(), Err("timeout".into()), cx);
+    });
+    cx.run_until_parked();
+    for shown in [
+        "server-players-0",
+        "server-signal-0",
+        "server-motd-0",
+        "server-offline-1",
+    ] {
+        assert!(drawn(cx, shown), "{shown} is drawn");
+    }
+    for hidden in ["server-checking-0", "server-signal-1", "server-motd-1"] {
+        assert!(!drawn(cx, hidden), "{hidden} is not drawn");
+    }
+
+    // An answer with nothing to count still says the server is there; an
+    // empty message has no window.
+    let bare = ServerStatus {
+        motd: lumilio_core::Motd::default(),
+        online: None,
+        max: None,
+        latency_ms: None,
+        ..status()
+    };
+    view.update(cx, |view, cx| {
+        view.server_status_arrived("b.example:1".into(), Ok(bare), cx);
+    });
+    cx.run_until_parked();
+    assert!(drawn(cx, "server-online-1"));
+    assert!(!drawn(cx, "server-motd-1") && !drawn(cx, "server-players-1"));
 }
 
 #[gpui::test]

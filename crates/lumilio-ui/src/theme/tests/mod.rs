@@ -1,31 +1,13 @@
 //! Tests for the theme tokens and the look in force.
 
-use gpui::{Hsla, Rgba, TestAppContext};
+use gpui::TestAppContext;
 use gpui_component::{Theme, ThemeMode};
 
 use super::spec::Resolved;
 use super::{
-    Body, Catalog, Choice, Color, Entry, Origin, Palette, ShellColors, ThemeSpec, Tone, parse_file,
-    scan_dir, tune,
+    Body, Catalog, Choice, Color, Entry, Origin, Palette, ShellColors, ThemeSpec, Tone, contrast,
+    legible, parse_file, scan_dir, tune,
 };
-
-fn luminance(color: Hsla) -> f32 {
-    let rgba = Rgba::from(color);
-    let channel = |value: f32| {
-        if value <= 0.03928 {
-            value / 12.92
-        } else {
-            ((value + 0.055) / 1.055).powf(2.4)
-        }
-    };
-    0.2126 * channel(rgba.r) + 0.7152 * channel(rgba.g) + 0.0722 * channel(rgba.b)
-}
-
-/// WCAG 2 contrast ratio.
-fn contrast(a: Hsla, b: Hsla) -> f32 {
-    let (a, b) = (luminance(a), luminance(b));
-    (a.max(b) + 0.05) / (a.min(b) + 0.05)
-}
 
 fn bodies() -> [(&'static str, Body); 2] {
     [("aluminium", Body::of(false)), ("night", Body::of(true))]
@@ -392,6 +374,28 @@ fn tune_applies_the_chosen_theme_per_appearance_and_the_scale(cx: &mut TestAppCo
         tune(cx);
         assert_eq!(Theme::global(cx).font_size, gpui::px(16. * 1.3));
     });
+}
+
+#[test]
+fn a_colour_made_legible_reads_on_both_bodies_and_keeps_its_hue() {
+    for (name, body) in bodies() {
+        // The game's white, yellow, aqua, dark blue and black.
+        for rgb in [0xff_ffff, 0xff_ff55, 0x55_ffff, 0x00_00aa, 0x00_0000] {
+            let color: gpui::Hsla = gpui::rgb(rgb).into();
+            let shown = legible(color, body.page, 4.5);
+            assert!(
+                contrast(shown, body.page) >= 4.5,
+                "{name}: {rgb:06x} reads at {}",
+                contrast(shown, body.page)
+            );
+            assert_eq!((shown.h, shown.s), (color.h, color.s), "{name}: {rgb:06x}");
+        }
+        assert_eq!(
+            legible(body.ink, body.page, 4.5),
+            body.ink,
+            "{name}: a colour that already reads stays"
+        );
+    }
 }
 
 #[test]

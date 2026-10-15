@@ -236,18 +236,54 @@ fn game(id: &str) -> lumilio_core::InstanceRecord {
     }
 }
 
+/// A world, then a server that has answered.
 fn places_of(instance: &str) -> crate::live::HomePlaces {
-    use crate::live::{HomePlaces, Place, PlaceTarget};
+    use crate::live::{HomePlaces, Place, PlaceKind};
+    use crate::places::ServerState;
+    use lumilio_core::{GameMode, Motd, PackPolicy, ServerEntry, ServerStatus, WorldInfo};
+    let world = WorldInfo {
+        folder: "New World".into(),
+        name: "新的世界".into(),
+        last_played_ms: Some(1),
+        game_version: Some("1.21.1".into()),
+        hardcore: false,
+        game_mode: Some(GameMode::Survival),
+        cheats: false,
+        icon: None,
+        damaged: false,
+        lock_touched_ms: None,
+    };
+    let server = ServerEntry {
+        name: "朋友的服务器".into(),
+        address: "play.example".into(),
+        packs: PackPolicy::Ask,
+        icon: None,
+    };
+    let answer = ServerStatus {
+        motd: Motd::from_legacy("§aWelcome"),
+        online: Some(3),
+        max: Some(20),
+        version: Some("Paper 1.21".into()),
+        latency_ms: Some(42),
+        favicon: None,
+    };
     HomePlaces {
         instance: instance.to_owned(),
-        places: vec![Place {
-            target: PlaceTarget::World("New World".into()),
-            name: "新的世界".into(),
-            detail: "世界 · 上次游玩 昨天".into(),
-        }],
+        places: vec![
+            Place {
+                kind: PlaceKind::World(world),
+                picture: None,
+                seed: 7,
+            },
+            Place {
+                kind: PlaceKind::Server(server, ServerState::Online(answer)),
+                picture: None,
+                seed: 8,
+            },
+        ],
         play_seconds: 7200,
         worlds: 1,
-        servers: 0,
+        servers: 1,
     }
 }
 
@@ -297,6 +333,10 @@ fn home_enters_a_world_and_shows_recent_games_as_library_cards(cx: &mut TestAppC
         cx.debug_bounds("home-record").is_some(),
         "the record is drawn"
     );
+    // A server says here what it says on the Worlds tab.
+    for shown in ["server-players-1", "server-signal-1", "server-motd-1"] {
+        assert!(cx.debug_bounds(shown).is_some(), "{shown} is drawn");
+    }
     let enter = cx
         .debug_bounds("home-place-enter-0")
         .expect("a world to enter");

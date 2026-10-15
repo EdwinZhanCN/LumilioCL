@@ -2,9 +2,9 @@ use super::controls::{LiveCtx, send};
 use super::discover::toolbar_select;
 use crate::assets::UiIcon;
 use crate::key::Key;
+use crate::kit;
 use crate::kit::ViewIntent;
 use crate::live::{LibraryCard, LiveIntent, cover_loader};
-use crate::{kit, theme};
 use crate::{tr, tr_all};
 use gpui::prelude::*;
 use gpui::{App, ClickEvent, IntoElement, Window, div, px};
@@ -163,24 +163,24 @@ pub(super) fn card(index: usize, card: &LibraryCard, ctx: &LiveCtx) -> impl Into
             kit::faceplate_cover(card.seed, cover_loader(card.loader), card.world, colors),
             colors,
         ))
+        // The loader is the label under the name; the bottom line is the
+        // version and when it was last played.
         .child(
-            h_flex().justify_between().items_center().gap(px(8.)).child(
-                div()
-                    .min_w_0()
-                    .font_family(theme::mono_font())
-                    .text_size(crate::theme::font_px(10.))
-                    .text_color(colors.muted)
-                    .overflow_hidden()
-                    .text_ellipsis()
-                    .whitespace_nowrap()
-                    .child(card.meta.clone()),
-            ),
-        )
-        .child(
-            div()
-                .text_xs()
-                .text_color(colors.muted)
-                .child(card.played.clone()),
+            h_flex()
+                .justify_between()
+                .items_center()
+                .gap(px(8.))
+                .child(kit::tag(
+                    card.game_version.clone(),
+                    kit::TagKind::Plain,
+                    colors,
+                ))
+                .child(kit::reading(
+                    card.ago
+                        .clone()
+                        .unwrap_or_else(|| tr!("library-never-played").to_owned()),
+                    colors,
+                )),
         )
         .child(
             h_flex()
