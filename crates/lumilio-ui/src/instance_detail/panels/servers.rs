@@ -2,82 +2,26 @@
 
 use super::super::editors::Editor;
 use super::super::{InstanceDetailView, InstanceIntent, Section};
-use super::data::{Confirm, ServerState};
+use super::data::Confirm;
 use super::helpers::act;
 use crate::kit;
 use crate::theme::ShellColors;
 use crate::toast::Toast;
 use crate::tr;
 use gpui::prelude::*;
-use gpui::{AnyElement, Context, ObjectFit, RenderImage, Window, div, img, px};
+use gpui::{AnyElement, Context, RenderImage, Window, div};
 use gpui_component::{h_flex, v_flex};
 use lumilio_core::ServerEntry;
 use std::sync::Arc;
 
-/// What a server row says under its name: where it is and how it is.
-#[must_use]
-pub fn server_detail(address: &str, state: Option<&ServerState>) -> String {
-    match state {
-        None | Some(ServerState::Checking) => {
-            tr!("instance-server-checking", address = address)
-        }
-        Some(ServerState::Offline) => tr!("instance-server-offline", address = address),
-        Some(ServerState::Online(status)) => {
-            let mut parts = vec![address.to_owned()];
-            if let Some(online) = status.online {
-                parts.push(match status.max {
-                    Some(max) => {
-                        tr!("instance-server-online-of", online = online, max = max)
-                    }
-                    None => tr!("instance-server-online", online = online),
-                });
-            }
-            if let Some(ms) = status.latency_ms {
-                parts.push(format!("{ms} ms"));
-            }
-            if let Some(version) = &status.version {
-                parts.push(version.clone());
-            }
-            let motd = status.motd.split('\n').next().unwrap_or_default().trim();
-            if !motd.is_empty() {
-                parts.push(motd.chars().take(40).collect());
-            }
-            parts.join(" · ")
-        }
-    }
-}
-
 /// A server row's leading mark: the icon the server sent or the game cached,
 /// or a procedural cover seeded by its address when there is none.
-fn icon_lead(icon: Option<&Arc<RenderImage>>, seed: u32, colors: ShellColors) -> AnyElement {
-    let tile = |inner: AnyElement| {
-        div()
-            .relative()
-            .flex_none()
-            .size(px(40.))
-            .rounded(px(4.))
-            .overflow_hidden()
-            .bg(colors.body.display)
-            .child(inner)
-            .into_any_element()
-    };
-    if let Some(image) = icon {
-        return tile(
-            img(image.clone())
-                .size_full()
-                .object_fit(ObjectFit::Cover)
-                .into_any_element(),
-        );
-    }
-    tile(
-        crate::cover::element(
-            seed,
-            crate::cover::Loader::Vanilla,
-            crate::home::WorldHint::Overworld,
-            colors.body.display,
-            px(0.),
-        )
-        .into_any_element(),
+fn icon_lead(icon: Option<&Arc<RenderImage>>, seed: u32, colors: ShellColors) -> gpui::Div {
+    kit::cover_tile(
+        icon.cloned().map(Into::into),
+        seed,
+        crate::cover::Loader::Vanilla,
+        colors,
     )
 }
 
@@ -110,8 +54,6 @@ impl InstanceDetailView {
             .iter()
             .enumerate()
             .map(|(row, server)| {
-                let detail =
-                    server_detail(&server.address, self.server_status.get(&server.address));
                 let address = server.address.clone();
                 // ia[instance.worlds]: 进入服务器 | 服务器行「进入」 | 启动并直连该服务器；1.20 以前的版本置灰并说明
                 let enter = {
@@ -219,13 +161,15 @@ impl InstanceDetailView {
                     crate::live::seed_of(&server.address),
                     colors,
                 );
-                kit::row(
-                    server.name.clone(),
-                    detail,
-                    Some(lead),
-                    Some(trail.into_any_element()),
+                crate::places::server_item(
+                    row,
+                    server,
+                    self.server_status.get(&server.address),
                     colors,
                 )
+                .lead(lead)
+                .actions(trail)
+                .render(colors)
             })
             .collect();
         v_flex()

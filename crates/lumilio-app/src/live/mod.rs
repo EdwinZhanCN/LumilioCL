@@ -36,6 +36,7 @@ use gpui_kit::{App, Context, Entity, WeakEntity, Window};
 use lumilio_core::{CancellationToken, Preferences, ProjectKind};
 use lumilio_ui::LauncherShell;
 use lumilio_ui::home::HomePresentation;
+use lumilio_ui::instance_detail::TAB_WORLDS;
 use lumilio_ui::live::{LiveHandler, LiveIntent};
 use lumilio_ui::route::Route;
 use lumilio_ui::shell::{IntentHandler, ShellIntent};
@@ -178,7 +179,8 @@ fn open_requested_page(
         open_project(wiring, kind, source, slug.to_owned(), window, cx);
     }
     // Dev hook: `LUMILIO_INSTANCE=<id>` opens that game; `LUMILIO_INSTANCE_TAB`
-    // and `LUMILIO_INSTANCE_GROUP` choose its tab and settings group.
+    // chooses its tab and `LUMILIO_INSTANCE_GROUP` the tab's group (a
+    // settings group, or 1 for the Worlds tab's servers).
     if let Ok(id) = std::env::var("LUMILIO_INSTANCE") {
         open_instance(wiring, id, None, window, cx);
         let tab = std::env::var("LUMILIO_INSTANCE_TAB")
@@ -196,8 +198,12 @@ fn open_requested_page(
                         if let Some(tab) = tab {
                             view.open_tab(tab, window, cx);
                         }
-                        if let Some(group) = group {
-                            view.select_settings_group(group, cx);
+                        match group {
+                            Some(group) if tab == Some(TAB_WORLDS) => {
+                                view.open_worlds_sub(group, window, cx);
+                            }
+                            Some(group) => view.select_settings_group(group, cx),
+                            None => {}
                         }
                     });
                 }

@@ -690,14 +690,21 @@ fn tag_labels_are_chinese_when_known_and_readable_when_not() {
 
 #[test]
 fn home_places_are_the_latest_readable_worlds_then_the_first_servers() {
-    use super::home::{PLACE_SERVERS, PLACE_WORLDS, PlaceTarget, home_places};
-    use lumilio_core::{PackPolicy, ServerEntry, WorldInfo};
+    use super::home::{PLACE_SERVERS, PLACE_WORLDS, Place, PlaceKind, PlaceTarget, home_places};
+    use crate::places::ServerState;
+    use lumilio_core::{GameMode, PackPolicy, ServerEntry, ServerStatus, WorldInfo};
     let world = |folder: &str, played: Option<i64>, damaged: bool| WorldInfo {
         folder: folder.to_owned(),
         name: folder.to_uppercase(),
         last_played_ms: played,
         game_version: None,
         hardcore: folder == "hard",
+        game_mode: Some(if folder == "new" {
+            GameMode::Creative
+        } else {
+            GameMode::Survival
+        }),
+        cheats: false,
         icon: None,
         damaged,
         lock_touched_ms: None,
@@ -720,33 +727,50 @@ fn home_places_are_the_latest_readable_worlds_then_the_first_servers() {
         .collect();
     let mut game = record("a", false, None, 1);
     game.play_seconds = 4000;
-    let places = home_places(&game, &worlds, &servers, NOW);
+    let mut places = home_places(&game, &worlds, &servers);
     assert_eq!(places.instance, "a");
     assert_eq!(
         (places.play_seconds, places.worlds, places.servers),
         (4000, 5, 3)
     );
-    let targets: Vec<_> = places.places.iter().map(|place| &place.target).collect();
+    let targets: Vec<_> = places.places.iter().map(Place::target).collect();
     // Newest first, the damaged one skipped, then servers in the player's order.
     assert_eq!(
         targets,
         [
-            &PlaceTarget::World("new".to_owned()),
-            &PlaceTarget::World("hard".to_owned()),
-            &PlaceTarget::World("old".to_owned()),
-            &PlaceTarget::Server("one.example".to_owned()),
-            &PlaceTarget::Server("two.example".to_owned()),
+            PlaceTarget::World("new".to_owned()),
+            PlaceTarget::World("hard".to_owned()),
+            PlaceTarget::World("old".to_owned()),
+            PlaceTarget::Server("one.example".to_owned()),
+            PlaceTarget::Server("two.example".to_owned()),
         ]
     );
     assert_eq!(places.places.len(), PLACE_WORLDS + PLACE_SERVERS);
-    assert_eq!(places.places[0].detail, "世界 · 上次游玩 2 小时前");
-    assert_eq!(places.places[1].detail, "世界 · 上次游玩 3 天前 · 极限模式");
-    assert_eq!(places.places[3].detail, "服务器 · one.example");
+    // A world keeps all the Worlds tab knows of it.
+    assert_eq!(places.places[1].kind, PlaceKind::World(worlds[3].clone()));
+
+    // Servers are asked about once each; an answer reaches only its row.
+    assert_eq!(places.server_addresses(), ["one.example", "two.example"]);
+    let state = |places: &super::home::HomePlaces, at: usize| match &places.places[at].kind {
+        PlaceKind::Server(_, state) => state.clone(),
+        PlaceKind::World(_) => panic!("a world at {at}"),
+    };
+    assert_eq!(state(&places, 3), ServerState::Checking);
+    places.server_answered("two.example", Err::<ServerStatus, _>("timeout"));
+    assert_eq!(state(&places, 3), ServerState::Checking);
+    assert_eq!(state(&places, 4), ServerState::Offline);
+    let seeds: std::collections::HashSet<_> =
+        places.places.iter().map(|place| place.seed).collect();
+    assert_eq!(
+        seeds.len(),
+        places.places.len(),
+        "each place has its own cover"
+    );
 
     // A version that cannot go straight into a world lists nothing to enter,
     // but keeps its record.
     game.game_version = "1.19.4".to_owned();
-    let old = home_places(&game, &worlds, &servers, NOW);
+    let old = home_places(&game, &worlds, &servers);
     assert!(old.places.is_empty());
     assert_eq!(old.worlds, 5);
 }

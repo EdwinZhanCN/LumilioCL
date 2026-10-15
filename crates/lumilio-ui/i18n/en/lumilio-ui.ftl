@@ -153,10 +153,7 @@ home-record-servers = Servers
 home-places-empty = No worlds yet
 home-places-empty-help = Press "Continue" to enter the game; worlds you create will show up here
 home-place-enter = Enter
-home-place-world = World
 home-place-last-played = Last played { $when }
-home-place-hardcore = Hardcore
-home-place-server = Server · { $address }
 home-meta-last-played = { $meta } · Last played { $when }
 home-meta-never-played = { $meta } · Never played
 
@@ -1237,16 +1234,9 @@ instance-screenshots-empty = No screenshots yet
 instance-screenshots-empty-help = Press F2 in game; the pictures you take show up here
 instance-screenshot-no-preview = No preview
 instance-screenshot-copy = Copy image
-instance-server-checking = { $address } · Checking…
-instance-server-offline = { $address } · Can't connect
-instance-server-online-of = { $online }/{ $max } { $online ->
-    [one] player
-   *[other] players
-} online
-instance-server-online = { $online } { $online ->
-    [one] player
-   *[other] players
-} online
+instance-server-checking = Checking
+instance-server-offline = Can't connect
+instance-server-online = Online
 instance-servers-empty = No servers yet
 instance-servers-empty-help = Once added, it appears in the game's multiplayer list
 instance-server-move-up = Move up
@@ -1266,8 +1256,13 @@ instance-world-import = Import world
 instance-worlds-empty = No worlds yet
 instance-worlds-empty-help = Worlds you create in game show up here, and you can import a .zip
 instance-world-playing = Playing
-instance-world-damaged = Save information can't be read
-instance-world-played-at = Played { $when }
+instance-world-damaged = Unreadable
+world-mode-survival = Survival
+world-mode-creative = Creative
+world-mode-adventure = Adventure
+world-mode-spectator = Spectator
+world-mode-hardcore = Hardcore
+world-cheats = Cheats
 instance-world-enter = Enter
 instance-world-old-version = This game version can't enter the world directly; enter from the main menu
 instance-world-copy = Copy

@@ -60,6 +60,8 @@ pub const SANS_FONT: &str = "Space Grotesk";
 pub const MONO_FONT: &str = "JetBrains Mono";
 /// Segment digits on a display, nowhere else.
 pub const LCD_FONT: &str = "DSEG7 Classic";
+/// A server's message of the day, nowhere else.
+pub const PIXEL_FONT: &str = "Monocraft";
 
 /// The monospace family in force, for the many places that name it without a
 /// context at hand. [`tune`] sets it with the rest of the look, so it is
@@ -190,6 +192,53 @@ impl Body {
             None => Self::of(Theme::global(cx).mode.is_dark()),
         }
     }
+}
+
+fn luminance(color: Hsla) -> f32 {
+    let rgba = gpui::Rgba::from(color);
+    let channel = |value: f32| {
+        if value <= 0.03928 {
+            value / 12.92
+        } else {
+            ((value + 0.055) / 1.055).powf(2.4)
+        }
+    };
+    0.2126 * channel(rgba.r) + 0.7152 * channel(rgba.g) + 0.0722 * channel(rgba.b)
+}
+
+/// WCAG 2 contrast ratio.
+#[must_use]
+pub fn contrast(a: Hsla, b: Hsla) -> f32 {
+    let (a, b) = (luminance(a), luminance(b));
+    (a.max(b) + 0.05) / (a.min(b) + 0.05)
+}
+
+/// `color` with the least change of lightness that reads on `ground` at
+/// `ratio`: darker on a light ground, lighter on a dark one. Hue and
+/// saturation stay, so a red is still red.
+#[must_use]
+pub fn legible(color: Hsla, ground: Hsla, ratio: f32) -> Hsla {
+    if contrast(color, ground) >= ratio {
+        return color;
+    }
+    let black = gpui::hsla(0., 0., 0., 1.);
+    let white = gpui::hsla(0., 0., 1., 1.);
+    let toward = if contrast(black, ground) >= contrast(white, ground) {
+        0.
+    } else {
+        1.
+    };
+    // Lightness moves luminance one way only, so halving finds the edge.
+    let (mut short, mut enough) = (color.l, toward);
+    for _ in 0..16 {
+        let middle = (short + enough) / 2.;
+        if contrast(Hsla { l: middle, ..color }, ground) >= ratio {
+            enough = middle;
+        } else {
+            short = middle;
+        }
+    }
+    Hsla { l: enough, ..color }
 }
 
 /// A slightly different shade for a hovered key: lighter, or darker on
@@ -378,7 +427,10 @@ pub struct ShellColors {
 
 impl ShellColors {
     pub fn current(cx: &gpui::App) -> Self {
-        let body = Body::current(cx);
+        Self::of(Body::current(cx))
+    }
+
+    pub fn of(body: Body) -> Self {
         Self {
             body,
             background: body.page,

@@ -57,6 +57,37 @@ fn lists_worlds_newest_first_with_their_details() {
 }
 
 #[test]
+fn a_world_reports_its_game_mode_and_whether_cheats_are_allowed() {
+    let (_dir, game) = game();
+    let with = |mode: Option<i32>, commands: Option<i8>| {
+        let mut data = BTreeMap::from([("LevelName".into(), Tag::String("W".into()))]);
+        if let Some(mode) = mode {
+            data.insert("GameType".into(), Tag::Int(mode));
+        }
+        if let Some(commands) = commands {
+            data.insert("allowCommands".into(), Tag::Byte(commands));
+        }
+        let root = Tag::Compound(BTreeMap::from([("Data".into(), Tag::Compound(data))]));
+        to_bytes(&root)
+    };
+    add_world(&game, "creative", &with(Some(1), Some(1)));
+    add_world(&game, "unknown", &with(Some(9), Some(0)));
+    add_world(&game, "silent", &with(None, None));
+    let worlds = scan(&game).unwrap();
+    let find = |folder: &str| worlds.iter().find(|w| w.folder == folder).unwrap();
+    let creative = find("creative");
+    assert_eq!(
+        (creative.game_mode, creative.cheats),
+        (Some(GameMode::Creative), true)
+    );
+    let unknown = find("unknown");
+    assert_eq!((unknown.game_mode, unknown.cheats), (None, false));
+    let silent = find("silent");
+    assert_eq!((silent.game_mode, silent.cheats), (None, false));
+    assert!(!silent.damaged);
+}
+
+#[test]
 fn a_world_reports_when_its_lock_was_last_touched() {
     let (_dir, game) = game();
     add_world(&game, "idle", &level("Idle", 1, "1", 0));

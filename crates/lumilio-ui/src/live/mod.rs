@@ -33,11 +33,12 @@ pub use self::discover::{
     sort_label, tag_label, visible_kinds,
 };
 pub use self::home::{
-    HomePlaces, PLACE_SERVERS, PLACE_WORLDS, Place, PlaceTarget, home_places, home_presentation,
+    HomePlaces, PLACE_SERVERS, PLACE_WORLDS, Place, PlaceKind, PlacePicture, PlaceTarget,
+    home_places, home_presentation, world_mode,
 };
 pub use self::intent::{LiveHandler, LiveIntent};
 pub use self::library::{
-    CollectionRow, LibraryCard, attention_rows, cover_loader, instance_meta, library_card,
+    CollectionRow, LibraryCard, ago, attention_rows, cover_loader, instance_meta, library_card,
     library_cards, loader_label, relative_time, seed_of, world_of,
 };
 pub use self::settings::{JavaRow, SettingsView, java_label, settings_view};

@@ -20,8 +20,6 @@ pub(super) use self::helpers::{act, act_index, clock};
 pub use self::labels::{export_notice, size_label};
 pub use self::overview::{ProblemAction, problem_action, problem_text, problem_tone};
 pub(super) use self::screenshots::SHOTS_PAGE;
-#[cfg(test)]
-pub(super) use self::servers::server_detail;
 
 use crate::tr_all;
 use lumilio_core::ProjectKind;
