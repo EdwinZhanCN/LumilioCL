@@ -94,6 +94,16 @@ Status: InProgress
   Acceptance: 按 D32 的第二部分：EntityDump 先在 26.3 上导出实体注册表里每一种实体的 id、类层级（据此得出 T33 的类别），用一个记录用的渲染器上下文构造每种实体的渲染器，记下它要的模型层（模型集合用已导出的 createRoots 结果建，纯 CPU），对它新建的默认渲染状态取贴图；构造或取贴图失败的记下原因。先量出能自动得出外观的实体种数并写进 validation，再决定是否推广到 bundle 的全部版本；能提取的实体不再要手写绑定行，绑定表只留提取不到的与靠代码合成的。entities.dat.z 的格式号随之升级。
 - [x] T35 — P2 · 实体覆盖检查与补齐 (Completed)
   Acceptance: 按 D32 的第三部分：bundle 每个版本的实体注册表里每一种实体，必须由提取结果或手写行画出，或列入「没什么可画的」（标记、交互实体、区域效果云、闪电等），否则 `cargo xtask bake-blocks` 与测试失败，报告列出缺什么。烘焙器读游戏数据里的变体（painting_variant 等 `*_variant`）并保留 textures/painting/，画按变体的宽高贴图；靠代码合成的外观（热带鱼的花纹与两种颜色、矿车里的方块、拴绳结）各写一次。完成时 Project Maintainer 的 13 份投影在技术信息里没有画不出的实体（现在缺：僵尸猪灵 70、蜜蜂 59、画 3、热带鱼 1，漏斗矿车 8 个只画了车）。
+- [x] T36 — P3 · 资源包：文件夹、顺序与按顺序烘焙 (Completed)
+  Acceptance: 资源来源除 zip 外接受解压过的资源包文件夹（顶层有 pack.mcmeta 或 assets/），可用系统选择器（zip 与文件夹各一个键）或在路径输入框里粘贴完整路径添加，只登记路径。每个 Mod 与资源包行有开关（按文件夹记）与 ↑ ↓（与列表里相邻的一行换位，跳过不列出的库 Mod），顺序按实例记在启动器数据 `schematic-order.json`，排在下面的盖过上面的；顺序没提到的（新装的 Mod、新启用的资源包）排在已排好的上面，新添加的资源包排在最下面。叠放顺序是覆盖层烘焙缓存键的一部分，缩略图的外观键按实际叠放顺序算，所以换序、开关、增删都不会读到旧顺序的烘焙或缩略图；移除资源包时同时从顺序里去掉并丢弃用它烘焙的缓存。测试：顺序排列与换位规则、文件夹资源包添加、换序后胜出的贴图改变且另烘焙一份、服务层换序后预览按新顺序叠放且新添加的在最上、界面上换位发出命令并重新加载、输入路径添加。
+- [x] T37 — P3 · 转换时为缺失方块建议替代 (Completed)
+  Acceptance: 转换对话框「保留」组里目标版本没有的方块，每行下面写「建议替换为 …」：在目标版本的方块表里按名字猜一个替代——Mod 方块先找同路径的原版方块；去掉 deepslate_、waxed_、polished_ 等变体前缀后的同名方块；同形状后缀（_stairs、_slab、_wall、_wall_sign …）里材料词重合最多的，没有重合时取 oak_、stone_ 这类朴素材料；没有形状时取共享词最多、末词相同优先的；同分时原版 minecraft: 优先。点「为这些方块选替代…」时这些建议已填进映射表每行的目标，可以照用或改；审阅钩子打开的「游戏版本没有的方块」也带建议。规则在 `lumilio_schematic::suggest`，单元测试覆盖前缀、后缀、无形状、原版优先与不建议自己。
+- [x] T38 — P2 · 头部写画不出的方块种数 (Completed)
+  Acceptance: 视口画完且有画不出的方块时，工作室头部出现标签「N 种方块没有模型」，点它切到「信息」并展开技术信息（那里列出这些方块的 ID）。测试：全部画得出时没有标签；有时标签出现，点击后切到信息并展开。
+- [x] T39 — P2 · 投影没有记录数据版本时不猜 (Completed)
+  Acceptance: `.litematic` 没有 MinecraftDataVersion 时不再默认当作 Nucleation 的规范版本 4790：`lumilio_schematic::convert::known_data_version` 返回 None，`metadata::Info::data_version` 改为 Option。头部说明写「版本未知 · 游戏 y」并出橙色标签「版本未知」（悬停说明），技术信息的数据版本写「版本未知」；不与游戏版本做缺失方块检查（那一步要先转换），转换版本置灰并说明；渲染器只在投影版本已知时才把方块 ID 转换到资源包的版本。资源仍按实例的游戏版本选（D3 原有规则）。测试：去掉 MinecraftDataVersion 的文件读出 None 且方块照常；渲染器不转换版本未知的投影；界面上标签与说明出现、不发方块表请求、转换菜单置灰。
+- [x] T40 — P3 · 历史与备份合成一个面板 (Completed)
+  Acceptance: 「历史」把操作日志（log.jsonl）与备份文件夹（backups/）放在一处：顶部写操作条数、备份份数与共占空间，分段「这份投影 / 全部」（默认全部）；每行写备份大小、「备份已不在，不能恢复」（恢复置灰）或「新写出的文件，没有备份」；备份文件夹里有但日志没记的副本（日志丢了或被截断）列在「日志里没有的备份」下，确认后也能放回原位置（按插件写权限、先备份现有文件、记一行历史）。core 新增 `schematic_ops::backups` 与 `restore_backup`，服务层 `schematic_backups`、`schematic_restore_backup`。测试：列出副本与对应文件、日志丢失后从副本恢复并记历史、越界路径被拒；界面上备份大小与已不在、散落副本的恢复命令、筛选。
 
 ## Validation
 
@@ -171,6 +181,8 @@ Status: InProgress
   Result: 2026-10-15：lumilio-schematic 新增 Mapping / MappingRow、mapping_count（总数与每行）与 apply_mapping：每个格子取第一条与替换前状态匹配的行，各行一起生效；目标按目标方块表沿用同名属性，行上固定的值优先。对话框重写为表格：每行源方块下拉、「不限属性」开关、属性芯片（≤4 个取值为分段键，更多为下拉），目标为可搜索下拉（文件版本的方块表，studio 按文件数据版本向 app 取最近一个不更新的版本；最近用过的目标排在前面；方块表没到或取不到时只能选文件里已有的方块并说明），每行末尾写它的数量；「加一行」从下一种还没有行的方块开始；范围为全部 / 区域 / 当前切片 / 当前选区（有选区时默认选区）；确认键写「替换 n 个方块」。方案：名字输入与「存为方案」，有方案时「套用方案…」；存在启动器数据（lumilio-core schematic_ops::schemes，ReplaceSchemes 与最近 12 个目标），用方案替换时历史行写「方案「名」 · n 个」。入口：材料详情「替换…」（任意状态）、检视卡新增「替换…」（精确状态）、头部橙键、转换对话框的保留组。DialogForm 的确认键文字改为 SharedString、宽度可由表单给出（替换 640）。测试：lumilio-schematic 的 a_target_keeps_the_properties_it_shares_with_the_source（不沿用时失败）、rows_apply_at_once_and_count_what_they_change；lumilio-core 的 replace_schemes_are_kept_and_recent_targets_come_first；lumilio-ui 的 chips_match_exactly_or_any_and_the_target_keeps_shared_properties（提交时不给方块表就失败）、several_rows_write_once_with_the_counts_shown（不记最近目标时失败）、a_scheme_is_saved_and_applied_elsewhere（套用后不记方案名时失败）、the_inspect_card_replaces_the_inspected_state，英文最小窗口测试改查新的目标与芯片。已知限制：方块表只提到模型用到的属性，waterlogged 这类不沿用（D35）。需要亲眼看：640 宽的表格在 720 宽窗口里的样子、多行时对话框的高度、芯片换行。
 - T19（部分，macOS 截图）：浅色与深色、720×480 与大窗口、英文界面下的工作室窗口、替换与转换对话框。
   Result: 2026-10-15：release 构建在临时 LUMILIO_HOME 里打开流云别墅（26.2），一个 26.3 实例、一个 1.20.1 实例；工作室窗口跟随 LUMILIO_REVIEW_SIZE / LUMILIO_REVIEW_MIN，新的 LUMILIO_STUDIO_DIALOG=replace|convert|incompatible 在文件读好后打开对话框（the_review_hook_opens_replace_on_the_blocks_the_game_lacks）。看到的：头部「26.2 投影 · 游戏 26.3」；1.20.1 下橙标签「1.20.1 没有的方块：11 种」与「转换到 1.20.1…」在 720×480 也放得下（尺寸说明截断成「53 × 26 × 5…」），11 个格子带 ✕；英文头部完整；替换对话框在 720×480 占满窗口、行可滚动、按钮固定在底部，11 行时在大窗口也滚动；深色下对话框与推子清楚。发现并修好：三个开关没有字、转换对话框没有默认目标（见 lessonsLearned）；转换对话框把 Nucleation 的英文说明原样写在中文界面里，改为按它的 9 种损失类型各写一句启动器的话（两种语言），原文留在悬停提示里（every_loss_kind_is_explained_in_the_launchers_words，拼错一种类型时失败）；替换对话框的源与目标下拉写方块名、ID 作 mono 说明、按名字或 ID 搜索（block_pickers_show_names_and_find_names_and_ids）；工作室里每个方块图标放在稍大的格子里（白天键灰、夜里石墨键白），深色下黑色染色玻璃板与黑色混凝土看得见（block_slots_stand_out_from_the_panel_and_lighten_at_night，夜里用键灰时失败）。真实文件：新增被忽略的 lumilio-core tests/schematic_live.rs（LUMILIO_LIVE_SCHEMATICS），经 LauncherService 对 13 份投影的副本各做一次替换（最多的方块换成第二多的）、转换到 1.20.1 另存、两次恢复：全部通过，替换后计数与总数对得上，恢复后逐字节相同；另用独立的 Python NBT 读取器核对写出的文件：转换结果 Version 6、MinecraftDataVersion 3465，方块总数与原文件相同。首次下载：launcher.lumilio.org/block-assets/1/ 目前 404（bundle 尚未发布）；新增 LUMILIO_BLOCK_ASSETS_URL 审阅钩子（只接受 http(s) 文件夹地址，the_bundle_address_takes_only_a_folder_from_the_hook），取不到时视口写「没有网络，方块资源还没下载过」并有「重试」，格子先是空槽；Project Maintainer 允许本地网络权限后，全新的 LUMILIO_HOME 经 LUMILIO_BLOCK_ASSETS_URL 从本机服务器取 blocks.json、blocks.dat.z、entities.dat.z、names.dat.z 各一次，存下的文件与服务器上的逐字节相同，工作室随即画出模型与图标。完整的 just check 通过（1684 项测试）。发布：launcher.lumilio.org 的 Worker 新增 /block-assets/<n>/<file> → 本仓库 `block-assets-<n>` Release 资产的镜像（proxy.test.ts），bundle release 1 以该 Release 发布（不标为 latest），合并后部署才生效。仍要 Project Maintainer：替换、转换、恢复各做一次并在 Litematica 里打开结果；没装游戏的实例第一次下载 bundle；Windows 与 Linux；深色下黑色染色玻璃板、黑色混凝土、染色玻璃这类暗色或半透明的图标在面板上几乎看不见（游戏在灰色物品格上画图标）。
+- T36–T40：资源包文件夹与顺序、缺失方块的替代建议、头部画不出的方块数、版本未知、历史与备份面板。
+  Result: 2026-10-15：`cargo test -p lumilio-schematic -p lumilio-core` 825 项通过（新增 suggest 5 项、版本未知 1 项、顺序与文件夹 3 项、服务层换序 1 项、备份列出与散落恢复 1 项）；`cargo test -p lumilio-ui` 521 + 4（english）项通过（新增历史 4 项、资源来源 2 项、头部 1 项、建议与版本未知 2 项）；`cargo test -p lumilio-schematic-render` 串行 42 项通过（并行时本机软件 GPU 适配器在已有的出图测试里段错误，与本改动无关，nextest 每个测试单独进程不受影响）；touched crates 的 clippy `-D warnings` 与 `cargo fmt --check` 通过，`just ia` 已重新生成。界面只在测试里验证了元素出现与命令，窄窗口下资源来源行的按键排布与悬停说明仍需 Project Maintainer 实机看。
 
 ## Decision D1
 
@@ -451,6 +463,14 @@ Consequences: 绑定表多了 renderers 段与几个字段；覆盖检查、表 
 Why: 方块表是 bundle 里每个版本唯一现成的方块属性来源；沿用它没提到的属性会造出游戏不认识的状态（stone[waterlogged=false]）。要连 waterlogged 一起沿用，需要每个版本完整的方块状态定义，bundle 现在没有。另存不动原文件，转换的损失可以先在游戏里看，回不去的风险最小；恢复「新文件」行等于删掉它但不真删，与删除的做法一致。方案是跨投影的工作方法，不属于某个实例。
 
 Consequences: schematic_ops::apply 的 expected 改为 Option（None 新建、已存在则冲突），restore 对没有备份的行改为把文件收进备份，日志文件夹在第一次写之前创建。以后若 bundle 带上完整的方块状态定义，沿用规则可换成按定义判断，方块表只作退路。
+
+## Decision D36
+
+Mod 与资源包的叠放顺序按实例记一份（schematic-order.json），开关仍按投影文件夹记；顺序没提到的来源排在已排好的上面（优先级最低），新添加的资源包排在最下面。投影没有记录数据版本时显示「版本未知」，不猜版本、不自动转换，资源按实例的游戏版本取。
+
+Why: 同一个实例里不同文件夹要不要用某个资源包是常见区别，顺序却很少因文件夹而不同；按实例记一份最少惊讶。新装的 Mod 默认不该盖过已经手排好的资源包，新加的资源包通常就是想用它盖过别的（如红石显示材质包）。把没有版本的文件当作 26.1 去转换会在旧投影上做反向转换、改掉方块 ID，比显示「版本未知」糟得多。
+
+Consequences: 覆盖层烘焙的键与缩略图的外观键都随顺序变化，换序不复用旧烘焙，最近用过的 8 份按 LRU 留着。没有版本的投影不能在工作室里转换；以后若要支持，需要让人先指定它的版本。
 
 ## References
 
