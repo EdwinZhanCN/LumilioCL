@@ -214,6 +214,73 @@ fn a_message_shows_two_lines_without_the_space_around_them() {
 }
 
 #[test]
+fn the_pixel_face_keeps_each_glyph_pixel_whole_on_the_screen() {
+    use super::motd::pixel_size;
+    let rem = gpui::px(theme::BASE_FONT_SIZE);
+    assert_eq!(
+        pixel_size(2., rem),
+        gpui::px(13.5),
+        "Retina: three per pixel"
+    );
+    assert_eq!(pixel_size(1., rem), gpui::px(18.), "1.5 rounds up to two");
+    assert_eq!(pixel_size(1.5, rem), gpui::px(12.));
+    assert_eq!(pixel_size(2., gpui::px(20.)), gpui::px(18.), "125 % grows");
+    assert_eq!(
+        pixel_size(1., gpui::px(4.)),
+        gpui::px(9.),
+        "never under one"
+    );
+    for scale in [1., 1.25, 1.5, 1.75, 2., 2.5, 3.] {
+        for rem in [12., 14., 16., 18., 20., 24.] {
+            let screen = f32::from(pixel_size(scale, gpui::px(rem))) * scale / 9.;
+            assert!(
+                (screen - screen.round()).abs() < 1e-4,
+                "{scale}×{rem}: {screen}"
+            );
+            let wanted = 1.5 * rem / theme::BASE_FONT_SIZE * scale;
+            assert!((screen - wanted).abs() <= 0.5, "{scale}×{rem}: nearest");
+        }
+    }
+}
+
+/// A message's lines alone.
+struct Message;
+
+impl Render for Message {
+    fn render(&mut self, _: &mut Window, cx: &mut gpui::Context<Self>) -> impl IntoElement {
+        let motd = lumilio_core::Motd::from_legacy("§aWelcome §lhome\n§7second line");
+        div().w(gpui::px(400.)).child(
+            super::motd_text(&motd, ShellColors::current(cx))
+                .expect("two lines")
+                .debug_selector(|| "motd".into()),
+        )
+    }
+}
+
+#[gpui::test]
+fn a_message_takes_the_pixel_face_once_it_is_registered(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_component::init(cx);
+        theme::tune(cx);
+    });
+    let height = |cx: &mut TestAppContext| {
+        let (_, cx) = cx.add_window_view(|_, _| Message);
+        cx.run_until_parked();
+        let line = cx.update(|window, _| {
+            super::motd::pixel_size(window.scale_factor(), window.rem_size()) * (12. / 9.)
+        });
+        (cx.debug_bounds("motd").expect("drawn").size.height, line)
+    };
+
+    let (plain, line) = height(cx);
+    assert_ne!(plain, line * 2., "without the face, the interface's lines");
+
+    cx.update(crate::assets::register_fonts);
+    let (pixel, line) = height(cx);
+    assert_eq!(pixel, line * 2., "two lines of twelve glyph pixels");
+}
+
+#[test]
 fn a_faceplate_cover_does_not_dissolve_into_the_page() {
     assert_eq!(super::FACEPLATE_FADE, gpui::px(0.));
 }

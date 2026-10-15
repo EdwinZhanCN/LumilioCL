@@ -17,12 +17,13 @@ LumilioCL has two visual registers and never mixes them.
 | Motion | Discrete, at `WORLD_TICK` (20 ticks/s, the game's own rate); state changes stream in chunk by chunk | Continuous easing and springs from the motion tokens |
 | Framing | Full-bleed; meets the page through a dithered dissolve into the live theme background; never boxed in a hard-cornered card. The exception is a display window (§12): a faceplate's cover, and the navigation's instance thumbnails | Instrument shapes: keys and fields 4 px, panels and displays 6 px |
 | Appearance | Identical in light and dark; foreground on art is always light-on-dark over the scrim | The body follows the appearance (aluminium / night); keys are objects and keep their colour (§12) |
-| Type | None inside the art | Space Grotesk for Latin and figures, the system font for Chinese, JetBrains Mono for values, DSEG7 only on displays (§13) |
+| Type | None inside the art | Space Grotesk for Latin and figures, the system font for Chinese, JetBrains Mono for values, DSEG7 only on displays, Monocraft only for a server's message of the day (§13) |
 
 The world carries the Minecraft identity. The interface is an instrument
 held up to it: calm, legible, made of keys, LEDs and silkscreen (§12,
 ADR 0013). Pixel fonts are never used for UI text, because they destroy CJK
-legibility. Interface elements never imitate game GUI textures, and never
+legibility. A server's message of the day is the game's text, not the
+interface's, so it alone is set in a pixel face (§13). Interface elements never imitate game GUI textures, and never
 copy another maker's trade dress: no borrowed wordmarks, product names or
 logos.
 
@@ -557,7 +558,8 @@ does. Each fact takes the form of what it is (`kit::Item`):
   a folder that differs from the name);
 - beside the name, an **aside** in the item's own words: a server's
   message of the day, at most two lines without the space around them, in
-  the interface face with the game's colours and styles. Each colour is
+  the pixel face (§13) with the game's colours and styles; without the
+  pixel face it keeps the interface face and the colours. Each colour is
   darkened or lightened only until it reads on the page at 4.5:1, so the
   server's red stays red; uncoloured text is muted. The name block keeps
   280 px so asides start at one place from row to row; when the row is too
@@ -606,9 +608,16 @@ The skeuomorphic details listed above are the whole set.
 | Chinese | the system font, through fallback (PingFang SC on macOS, Microsoft YaHei UI on Windows, the distribution's CJK sans on Linux) | as the platform provides | every Chinese glyph; not bundled (ADR 0013) |
 | Values | JetBrains Mono | 400, 500 | versions, sizes, units, counts, tags, section indices, table values |
 | Displays | DSEG7 Classic | 400 | segment digits on a display, nowhere else |
+| Messages of the day | Monocraft | 400, 700, italic | a server's message of the day, nowhere else |
 
-- The three faces are embedded in `lumilio-ui` with their OFL licences and
+- The four faces are embedded in `lumilio-ui` with their OFL licences and
   registered from memory at start-up, so loading them reads no file.
+- The pixel face is not the game's font and is not read from the game. Its
+  em is nine glyph pixels; it is sized so each glyph pixel is a whole
+  number of screen pixels, nearest to 1.5 px at the interface scale
+  (13.5 px on a Retina screen), with lines of twelve glyph pixels and its
+  ligatures off. Characters it lacks, such as Chinese, fall back to the
+  system font.
 - Sizes:
 
   | Text | Size and weight |
