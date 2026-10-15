@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "list-facts",
   "title": "世界与游戏列表的信息分型",
-  "summary": "列表不再把状态、版本、时间和数值拼成一行「文字 · 文字」；每种信息按设计语言 §12 的形式画：状态是 LED 和一个词，属性和版本是标签，时间和数值是行尾读数，延迟是绿色信号格，服务器 MOTD 在行内用游戏颜色。",
+  "summary": "列表不再把状态、版本、时间和数值拼成一行「文字 · 文字」；每种信息按设计语言 §12 的形式画：状态是 LED 和一个词，属性和版本是标签，时间和数值是行尾读数，延迟是绿色信号格，服务器 MOTD 在行内用游戏颜色和打包的开源像素字体。",
   "status": "in_progress",
   "visibility": "internal",
   "scope": {
@@ -11,7 +11,8 @@
       "首页「接着玩」",
       "游戏库卡片（首页「最近」同一张卡片）",
       "导航的游戏切换列表",
-      "core：世界的游戏模式与作弊、MOTD 的颜色与样式"
+      "core：世界的游戏模式与作弊、MOTD 的颜色与样式",
+      "MOTD 的像素字体（打包 Monocraft，OFL）"
     ],
     "excluded": [
       "首页「需要留意」、动态、账户、历史等其他「文字 · 文字」（行组件定型后再迁）",
@@ -25,22 +26,27 @@
     {"id": "T4", "title": "页面迁移", "status": "completed", "acceptance": "世界、服务器、接着玩、游戏库卡片、导航切换列表不再拼接「 · 」；ia 注释与生成的路径表同步"},
     {"id": "T5", "title": "设计语言与文案", "status": "completed", "acceptance": "design-language §12 写入列表行、信号格和行内 MOTD；新文案在中英文目录里"},
     {"id": "T6", "title": "窗口检查", "status": "completed", "acceptance": "在临时数据目录里放入代表性的世界和服务器，截图检查浅色、深色、英文与 720 px 窗口；Project Maintainer 确认"},
-    {"id": "T7", "title": "MOTD 像素字体", "status": "proposed", "acceptance": "从已安装游戏的客户端 jar（ascii、accented、nonlatin_european）和资源索引里的 unifont 读字形，在 canvas 中画出与游戏一致的像素字；读不到字体时退回界面字体并保留颜色"}
+    {"id": "T7", "title": "MOTD 像素字体", "status": "completed", "acceptance": "MOTD 用随启动器打包、可再分发且与 AGPL 兼容的开源像素字体画（D6），不读取也不分发游戏的字体文件；每个字形像素占整数个屏幕像素；颜色、粗体、斜体、下划线、删除线保留，连字关闭；字体没有注册时退回界面字体并保留颜色；ATTRIBUTIONS 记下字体与许可；有测试"},
+    {"id": "T8", "title": "像素字体窗口检查", "status": "proposed", "acceptance": "在 macOS Retina 真机上检查世界页与首页「接着玩」的浅色、深色、720 px 窗口，以及英文 MOTD、带中文的 MOTD、带重音和粗体斜体的 MOTD：像素边缘清晰、MOTD 与名称对齐、两行不被裁切、中文退回系统字体后仍读得清；Project Maintainer 确认"}
   ],
   "validation": [
     {"criterion": "core 与 UI 的聚焦测试", "result": "core 的 worlds、servers、motd 测试通过；lumilio-ui 的 kit、instance_detail、live、shell、pages、navigation、i18n 测试与英文目录测试通过。服务器行的测试在窗口里检查读数、信号格、MOTD 与离线、正在检查、无计数时的在线各自画出；行的测试检查行首图片与 MOTD 垂直居中、MOTD 在名称块之后开始、窄行里换到名称下方；首页的测试检查「接着玩」画出服务器的人数、信号格和 MOTD。完整 just check 由 Project Maintainer 运行。"},
-    {"criterion": "窗口检查", "result": "在临时数据目录里用代表性的世界和本机假服务器截图检查了世界页与首页的浅色、深色和 720 px 窗口：MOTD 与名称同一行，游戏颜色在两种底色上都读得清，信号格为绿色，窄窗口与首页「接着玩」里 MOTD 换到名称下方。Project Maintainer 看过后确认。"}
+    {"criterion": "窗口检查", "result": "在临时数据目录里用代表性的世界和本机假服务器截图检查了世界页与首页的浅色、深色和 720 px 窗口：MOTD 与名称同一行，游戏颜色在两种底色上都读得清，信号格为绿色，窄窗口与首页「接着玩」里 MOTD 换到名称下方。Project Maintainer 看过后确认。"},
+    {"criterion": "像素字体的聚焦测试", "result": "lumilio-ui 的全部库测试通过（450 个，含 assets、kit、places、instance_detail、shell、pages、theme、i18n）。新测试检查：四个 Monocraft 字面是 OpenType 文件，name 表的字族是 theme::PIXEL_FONT、样式为 Regular、Bold、Italic、Bold-Italic；注册字体后才有 PixelFace；字号在 1–3 倍缩放与 12–24 px rem 下让每个字形像素占整数个屏幕像素且最接近 1.5 px（Retina 13.5 px，1 倍 18 px）；窗口里注册前 MOTD 用界面字体的行高，注册后两行各 12 个字形像素。把像素分支关掉时最后一项失败（39 px 对 36 px）。lumilio-ui 的 fmt 与 clippy（-D warnings）通过；没有 nextest，按 crate 跑 cargo test。完整 just check 由 Project Maintainer 运行。"},
+    {"criterion": "像素字体窗口检查（T8）", "result": null}
   ],
   "decisions": [
     {"id": "D1", "decision": "MOTD 和名称在同一行，放在名称与读数之间，用游戏自己的颜色，每种颜色只调亮度到在页面上读得清", "rationale": "MOTD 是服务器写的游戏内容。第一版把它放在名称下方的深色显示窗里，在浅色列表里太重，也空着行中间；Project Maintainer 看过后要求和名称同一行，图片放大并垂直居中。游戏的白字、黄字按黑底设计，直接放在铝面上读不清，所以按 4.5:1 调亮度，色相不变", "consequences": "名称块固定 280 px，各行 MOTD 从同一处开始；窄窗口里 MOTD 换到名称下方。行首图片 48 px、垂直居中。游戏的颜色只出现在 MOTD 里，不算界面的强调色；未着色的文字用 muted"},
     {"id": "D2", "decision": "极限与游戏模式用 ink 标签，不用橙色", "rationale": "设计语言规定一个区域最多一个橙色标签，一个列表里可能有多个极限世界", "consequences": "橙色留给正在游玩的 LED"},
     {"id": "D3", "decision": "像素字体分成下一步（T7）", "rationale": "需要在 core 读字形并按游戏版本缓存，单独一步更好检查；带颜色的界面字体同时是像素字体读不到时的退回", "consequences": "这一轮的 MOTD 是界面字体加游戏颜色"},
     {"id": "D4", "decision": "信号格点亮用成功绿", "rationale": "游戏的信号格是绿色；ink 色的格子看起来像一段普通读数", "consequences": "绿色除了 LED，也用于信号格"},
-    {"id": "D5", "decision": "首页「接着玩」的行与世界页的行相同，服务器也会被询问", "rationale": "Project Maintainer 要求接着玩显示相同的信息；同一个世界或服务器在两处说法不同会让人以为是两样东西", "consequences": "世界和服务器的行在 lumilio-ui 的 places 模块里，两处共用；首页的服务器在读入后各询问一次。首页没有游戏开始的时间，所以不显示「正在游玩」"}
+    {"id": "D5", "decision": "首页「接着玩」的行与世界页的行相同，服务器也会被询问", "rationale": "Project Maintainer 要求接着玩显示相同的信息；同一个世界或服务器在两处说法不同会让人以为是两样东西", "consequences": "世界和服务器的行在 lumilio-ui 的 places 模块里，两处共用；首页的服务器在读入后各询问一次。首页没有游戏开始的时间，所以不显示「正在游玩」"},
+    {"id": "D6", "decision": "MOTD 的像素字体用随启动器打包的 Monocraft 4.2.1（SIL OFL 1.1，无保留字体名），不从游戏的客户端 jar 或资源索引读字形；取代 D3 里在 core 读字形、按游戏版本缓存的设想", "rationale": "Project Maintainer 要求字体可再分发、与 AGPL 兼容，优先用仓库已打包或开源许可的字体，绝不复制 Mojang 资产。游戏的字体没有再分发许可；Monocraft 由它自己的像素表生成，不含游戏的字体文件，许可与仓库里的 Space Grotesk、JetBrains Mono、DSEG7 相同。打包的字体在没有安装游戏、资源还没下载时也能用，core 不用改", "consequences": "Monocraft 是等宽字体，i、l 等窄字比游戏宽；粗体是更粗的笔画，不是游戏的错开 1 像素重画；中文等它没有的字退回系统字体，不是 unifont。四个字面约 0.9 MB 编进 lumilio-ui；网站的 sync-assets 会把它们一起复制到 public/fonts，但页面不引用。字号让每个字形像素占整数个屏幕像素（Retina 上 13.5 px），所以跟窗口缩放走，在 MotdLine 渲染时取窗口的缩放和 rem"}
   ],
   "references": [
     "docs/design-language.md",
     "https://github.com/modrinth/code/tree/main/packages/app-lib/src/api/worlds.rs",
-    "forks/schematic-mesher/src/mesher/entity/sign_text.rs"
+    "forks/schematic-mesher/src/mesher/entity/sign_text.rs",
+    "https://github.com/IdreesInc/Monocraft"
   ]
 }

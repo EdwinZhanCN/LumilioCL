@@ -4,7 +4,7 @@
 
 Status: InProgress
 
-列表不再把状态、版本、时间和数值拼成一行「文字 · 文字」；每种信息按设计语言 §12 的形式画：状态是 LED 和一个词，属性和版本是标签，时间和数值是行尾读数，延迟是绿色信号格，服务器 MOTD 在行内用游戏颜色。
+列表不再把状态、版本、时间和数值拼成一行「文字 · 文字」；每种信息按设计语言 §12 的形式画：状态是 LED 和一个词，属性和版本是标签，时间和数值是行尾读数，延迟是绿色信号格，服务器 MOTD 在行内用游戏颜色和打包的开源像素字体。
 
 ## Scope
 
@@ -13,6 +13,7 @@ Status: InProgress
 - In: 游戏库卡片（首页「最近」同一张卡片）
 - In: 导航的游戏切换列表
 - In: core：世界的游戏模式与作弊、MOTD 的颜色与样式
+- In: MOTD 的像素字体（打包 Monocraft，OFL）
 - Out: 首页「需要留意」、动态、账户、历史等其他「文字 · 文字」（行组件定型后再迁）
 - Out: 世界版本与游戏版本不一致的提示
 
@@ -30,8 +31,10 @@ Status: InProgress
   Acceptance: design-language §12 写入列表行、信号格和行内 MOTD；新文案在中英文目录里
 - [x] T6 — 窗口检查 (Completed)
   Acceptance: 在临时数据目录里放入代表性的世界和服务器，截图检查浅色、深色、英文与 720 px 窗口；Project Maintainer 确认
-- [ ] T7 — MOTD 像素字体 (Proposed)
-  Acceptance: 从已安装游戏的客户端 jar（ascii、accented、nonlatin_european）和资源索引里的 unifont 读字形，在 canvas 中画出与游戏一致的像素字；读不到字体时退回界面字体并保留颜色
+- [x] T7 — MOTD 像素字体 (Completed)
+  Acceptance: MOTD 用随启动器打包、可再分发且与 AGPL 兼容的开源像素字体画（D6），不读取也不分发游戏的字体文件；每个字形像素占整数个屏幕像素；颜色、粗体、斜体、下划线、删除线保留，连字关闭；字体没有注册时退回界面字体并保留颜色；ATTRIBUTIONS 记下字体与许可；有测试
+- [ ] T8 — 像素字体窗口检查 (Proposed)
+  Acceptance: 在 macOS Retina 真机上检查世界页与首页「接着玩」的浅色、深色、720 px 窗口，以及英文 MOTD、带中文的 MOTD、带重音和粗体斜体的 MOTD：像素边缘清晰、MOTD 与名称对齐、两行不被裁切、中文退回系统字体后仍读得清；Project Maintainer 确认
 
 ## Validation
 
@@ -39,6 +42,10 @@ Status: InProgress
   Result: core 的 worlds、servers、motd 测试通过；lumilio-ui 的 kit、instance_detail、live、shell、pages、navigation、i18n 测试与英文目录测试通过。服务器行的测试在窗口里检查读数、信号格、MOTD 与离线、正在检查、无计数时的在线各自画出；行的测试检查行首图片与 MOTD 垂直居中、MOTD 在名称块之后开始、窄行里换到名称下方；首页的测试检查「接着玩」画出服务器的人数、信号格和 MOTD。完整 just check 由 Project Maintainer 运行。
 - 窗口检查
   Result: 在临时数据目录里用代表性的世界和本机假服务器截图检查了世界页与首页的浅色、深色和 720 px 窗口：MOTD 与名称同一行，游戏颜色在两种底色上都读得清，信号格为绿色，窄窗口与首页「接着玩」里 MOTD 换到名称下方。Project Maintainer 看过后确认。
+- 像素字体的聚焦测试
+  Result: lumilio-ui 的全部库测试通过（450 个，含 assets、kit、places、instance_detail、shell、pages、theme、i18n）。新测试检查：四个 Monocraft 字面是 OpenType 文件，name 表的字族是 theme::PIXEL_FONT、样式为 Regular、Bold、Italic、Bold-Italic；注册字体后才有 PixelFace；字号在 1–3 倍缩放与 12–24 px rem 下让每个字形像素占整数个屏幕像素且最接近 1.5 px（Retina 13.5 px，1 倍 18 px）；窗口里注册前 MOTD 用界面字体的行高，注册后两行各 12 个字形像素。把像素分支关掉时最后一项失败（39 px 对 36 px）。lumilio-ui 的 fmt 与 clippy（-D warnings）通过；没有 nextest，按 crate 跑 cargo test。完整 just check 由 Project Maintainer 运行。
+- 像素字体窗口检查（T8）
+  Result: pending
 
 ## Decision D1
 
@@ -80,8 +87,17 @@ Why: Project Maintainer 要求接着玩显示相同的信息；同一个世界�
 
 Consequences: 世界和服务器的行在 lumilio-ui 的 places 模块里，两处共用；首页的服务器在读入后各询问一次。首页没有游戏开始的时间，所以不显示「正在游玩」
 
+## Decision D6
+
+MOTD 的像素字体用随启动器打包的 Monocraft 4.2.1（SIL OFL 1.1，无保留字体名），不从游戏的客户端 jar 或资源索引读字形；取代 D3 里在 core 读字形、按游戏版本缓存的设想
+
+Why: Project Maintainer 要求字体可再分发、与 AGPL 兼容，优先用仓库已打包或开源许可的字体，绝不复制 Mojang 资产。游戏的字体没有再分发许可；Monocraft 由它自己的像素表生成，不含游戏的字体文件，许可与仓库里的 Space Grotesk、JetBrains Mono、DSEG7 相同。打包的字体在没有安装游戏、资源还没下载时也能用，core 不用改
+
+Consequences: Monocraft 是等宽字体，i、l 等窄字比游戏宽；粗体是更粗的笔画，不是游戏的错开 1 像素重画；中文等它没有的字退回系统字体，不是 unifont。四个字面约 0.9 MB 编进 lumilio-ui；网站的 sync-assets 会把它们一起复制到 public/fonts，但页面不引用。字号让每个字形像素占整数个屏幕像素（Retina 上 13.5 px），所以跟窗口缩放走，在 MotdLine 渲染时取窗口的缩放和 rem
+
 ## References
 
 - [docs/design-language.md](../../docs/design-language.md)
 - https://github.com/modrinth/code/tree/main/packages/app-lib/src/api/worlds.rs
 - [forks/schematic-mesher/src/mesher/entity/sign_text.rs](../../forks/schematic-mesher/src/mesher/entity/sign_text.rs)
+- https://github.com/IdreesInc/Monocraft
