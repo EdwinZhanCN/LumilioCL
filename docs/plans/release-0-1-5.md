@@ -2,7 +2,7 @@
 
 # 准备发布 0.1.5
 
-Status: InProgress
+Status: Completed
 
 0.1.5 汇总 v0.1.4 之后合入 main 的全部改动：CurseForge 内容源、图片与地图的内存限制和游戏启动时释放启动器持有的内存，以及网站的使用指南、主题指南与主题工作室。发布时按 curseforge-source T8 更新网站首页并补上「内容来源」使用指南页。2026-10-13 依次压缩合入 #37（68a0ae9）、#35（含 #36，252418a）、#34（856444e）；#34 与 #37 唯一的冲突在切换版本弹窗的更新日志，保留了两边的改动，变基后 CI 通过。
 
@@ -22,23 +22,23 @@ Status: InProgress
   Acceptance: 工作区版本为 0.1.5，Cargo.lock 同步，release-0-1-4 记录已发布状态，release-notes/0.1.5.md 与 .en.md 写好，curseforge-source T8 的网站改动完成，本计划与投影生成。
 - [x] R2 — 合入发布内容 (Completed)
   Acceptance: PR #37、#35、#34 的 rust、plans、web 检查通过后压缩合入 main；#34 与 #37 的冲突在 #34 一侧解决并重新通过检查。
-- [ ] R3 — 通过 PR 合入版本更新 (InProgress)
+- [x] R3 — 通过 PR 合入版本更新 (Completed)
   Acceptance: PR 列出发布内容，rust、plans、web 检查通过后合入 main，合入后 main 的 CI 通过。
-- [ ] R4 — 打 v0.1.5 标签并生成三平台草稿安装包 (Proposed)
+- [x] R4 — 打 v0.1.5 标签并生成三平台草稿安装包 (Completed)
   Acceptance: v0.1.5 标签指向合入后的提交；Release 工作流成功（构建注入 CF_API_KEY），草稿含三平台安装包与 SHA256SUMS.txt，正文为 release-notes/0.1.5.md 加安装包小节。
-- [ ] R5 — 补全发布说明并正式发布 (Proposed)
+- [x] R5 — 补全发布说明并正式发布 (Completed)
   Acceptance: Project Maintainer 补上正文末行的 PR 编号后发布草稿。
-- [ ] R6 — 从 0.1.4 更新后的实机检查 (Proposed)
+- [x] R6 — 从 0.1.4 更新后的实机检查 (Completed)
   Acceptance: Project Maintainer 从 0.1.4 自动更新到 0.1.5：重启后第一次打开弹出「已更新到 LumilioCL 0.1.5」；发现页出现 Modrinth / CurseForge 分段键，CurseForge 能搜索，说明正式包带上了密钥。
 
 ## Validation
 
 - 发布候选的本地与 PR 检查通过。
-  Result: pending
+  Result: PR #38 的检查通过后合入 main，提交为 31150931ea027bd404fcc617dc4aa3bedcd1bc3d，v0.1.5 标签指向该提交。
 - 三平台草稿安装包生成，下载后的产物校验通过。
-  Result: pending
+  Result: Release 工作流 38446826293 成功，2026-10-13T19:49:13Z 正式发布。正文末行的 PR 编号没有补上（仍为「PR #」），0.1.6 把模板改为可填的占位。下载后的产物校验结果未记录。
 - 0.1.4 → 0.1.5 更新后显示一次更新内容，CurseForge 来源可用。
-  Result: pending
+  Result: Edwin 2026-10-16 Mac 实测通过。
 
 ## Decision release-scope
 
@@ -61,3 +61,7 @@ Consequences: curseforge-source 随这次发布完成，路线图把它列为已
 - release-notes/0.1.5.md
 - .github/release-template.md
 - [assets/icons/PACKAGING.md](../../assets/icons/PACKAGING.md)
+
+## Outcome
+
+0.1.5 经 PR #38（3115093）于 2026-10-13 发布，Project Maintainer（Edwin）2026-10-16 在 Mac 上实测 0.1.4 → 0.1.5 更新通过。

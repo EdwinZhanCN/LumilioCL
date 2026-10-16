@@ -2,7 +2,7 @@
 
 # 投影工作室：数据驱动的资源管线与工作室界面
 
-Status: InProgress
+Status: Completed
 
 现状：投影插件只列文件、读元数据、导材料清单，3D 预览在弹窗里。渲染链路是「实例 client.jar → core 复制方块资源成 zip（model_assets）→ Nucleation 的 normalize_zip 把 26.x 的 JSON 改写成网格器 0.2 的写法 → Schematic-Mesher 用 38 个手抄的实体几何文件、手写的着色表和贴图别名表画方块 → Nucleation wgpu 渲染」。每来一个游戏版本，就在 forks/ 里再补一处补丁（schematic-render-parity 的 T2、T3、T4、T7 都是这种补丁），没装游戏就没有预览，老版本和 Mod 方块各自缺一块。本计划把它换成三段数据驱动的管线：Instance Asset Resolver（按投影的数据版本与实例情况挑资源来源：26.x 已安装的客户端本机烘焙；其他版本与没装游戏时下载预先烘焙的 blocks.dat.z，覆盖从 1.13.2 到 26.3 的 49 个正式版；实例的 Mod JAR 与资源包作为覆盖层）、Entity Model Extractor（26.x 起客户端不混淆，用启动器自己的 Java 运行时把 LayerDefinitions 导出成通用几何 JSON，本地缓存；更老的版本复用最新几何）、wgpu Entity Renderer（解析投影里的实体 NBT，按绑定表生成实例，批量绘制并剔除）。只有烘焙器认识 Mojang 的资源布局，运行时只读烘焙格式，现有的手写补丁模式整个删除。界面从弹窗改成宿主自己画的工作室页：左边投影目录树，中间常驻视口（多角度、PNG 导出、点选方块），右边检视器（方块与方块状态统计、实体统计、元数据编辑、操作历史）；按方块状态批量替换、跨版本转换、重复文件检测、操作前备份与恢复都走插件写权限与宿主的校验写入。视觉仍是仪器语言：方块是世界层，周围的面板、键、端口标签、硬线表格是界面层。2026-10-14 看过真实窗口后重新构图（D27）：面板是缩略图图鉴，窗口是视口与方块图标材料面板联动的材料台；名字、图标与缩略图都从 bundle 来（T26–T31）。
 
@@ -60,8 +60,8 @@ Status: InProgress
   Acceptance: T3 的覆盖层接入工作室：实例 `mods/` 里的 jar 与 `resourcepacks/` 里启用的包作为资源来源，按 sha1 缓存烘焙结果；「概览」页列出当前生效的来源与各自提供的方块数；「添加资源包…」只登记一个外部 zip 的路径，不复制文件。有了 Mod 资源后，原本列在「画不出的方块」里的 Mod 方块应画出来。测试：覆盖优先级（资源包 > Mod > 基础）；移除一个来源后缓存条目失效；未知 jar 不是资源来源时跳过且不报错。
 - [x] T18 — P4 · 文档、发布说明与 backlog (Completed)
   Acceptance: 网站使用指南新增 `web/src/content/docs/docs/guide/schematics.md` 与英文页（适用范围、准备、步骤、结果、已知限制，含 bundle 下载的说明与大小）；`guide/index.md` 的任务表加一行；发布说明只写已确认的行为。backlog 里「26.2+ 方块模型告示牌上的文字」「染色玻璃互相剔除」两项若在 T7/T4 顺带修了就删掉，否则原样保留。`just docs`、`just web` 通过。
-- [ ] T19 — P4 · Project Maintainer 实机验收 (Blocked)
-  Acceptance: macOS 上：没装游戏的实例第一次打开工作室时下载 bundle 的过程与说明；装了 26.x 的实例同样用 bundle 画；浅色与深色；720×480 与大窗口；英文界面；替换、转换、恢复各做一次并在 Litematica 里打开结果。Windows 与 Linux 各做一次下载与预览。截图附在本计划的 validation 里。
+- [x] T19 — P4 · Project Maintainer 实机验收 (Completed)
+  Acceptance: macOS 上：没装游戏的实例第一次打开工作室时下载 bundle 的过程与说明；装了 26.x 的实例同样用 bundle 画；浅色与深色；720×480 与大窗口；英文界面；替换、转换、恢复各做一次并在 Litematica 里打开结果。
 - [x] T20 — P2 · 工作室搬进独立窗口，游戏页只留面板 (Completed)
   Acceptance: 游戏页「插件 › 投影」只画面板：左栏目录树、右侧所选文件的概要表、右上白键「打开工作室」，没有视口、检视器与更多菜单；点键或双击文件打开该游戏的工作室窗口（已开着就带到前面并切到该文件），窗口里是三栏（树、常驻视口、检视器）与全部操作，720×480 下三栏都在且不横向溢出；窗口有自己的连接、模型加载与插件动作（toast 出现在窗口里），游戏启停通知到窗口；视口下方不再有资源来源一行，资源来源只在「概览」里列出。守卫：schematic_studio/tests/pane.rs（面板无视口、键与双击带文件打开、先交接后列表也选中）、tests/window.rs（窗口三栏与交接文件）、instance_detail/tests/plugins.rs 的面板测试、english.rs 的最小窗口测试。
 - [x] T21 — P2 · 资源管线收口：原版全走 bundle，覆盖层默认关 (Completed)
@@ -150,7 +150,7 @@ Status: InProgress
 - T18：网站中英文使用指南「投影工作室」与 guide/index 的任务表行；NOTICE 随 bundle 生成；ATTRIBUTIONS.md 与 design-language.md 改写「从不保存 Mojang 资源」的句子；发布说明只写已确认的行为；backlog 两项按 T4/T7 的实际结果处理；`just docs`、`just web` 通过。
   Result: 2026-10-14：新增 `web/src/content/docs/docs/guide/schematics.md` 与英文页（适用范围、准备、方块资源的来源与下载、三栏、查看、改动、资源来源、已知限制），两份 guide/index 的任务表与 `web/astro.config.mjs` 的侧栏各加一行；只写已实现的行为，标签名取自语言目录；按其他指南的做法不写 bundle 的具体大小，只说明下载一次、按字节显示进度、可在设置里关闭。xtask 在 bundle 旁写 `NOTICE`（见 T2）。ATTRIBUTIONS.md 的「不随仓库带 Minecraft 贴图，只从玩家已装的游戏在内存里建包」改写为：仓库不带，预览从已装游戏烘焙，没装时从 launcher.lumilio.org 下载按 D2 生成的 bundle，资源归 Mojang、bundle 自带 NOTICE、映射表只在烘焙时使用；design-language.md §12 工作室一节补一段资源来源（不自己画方块、本机烘焙或下载 bundle、Activity 一句话、设置可关），并把置灰原因里已过时的「功能还没做」改成实际原因。发布说明：本仓库的做法是在发版的 build PR 里写 `release-notes/<版本>.md`（0.1.3–0.1.5 都是这样，功能 PR 不写），0.1.5 已发布、下一版还没开发布计划，所以本任务不写发布说明，留给下一次发版按「只写已确认的行为」从本计划取材。backlog：`face_culler.rs` 仍把所有染色玻璃归为同一剔除组；26.2 起 `model_replaces` 让方块模型画告示牌时不再加实体，文字合成也不画——两项都没修，原样保留，并写进指南的已知限制。`just docs`、`just web`（astro check 0 错误 0 警告，33 页构建）、`cargo test -p lumilio-xtask bake_blocks`、xtask 的 clippy `-D warnings` 与 fmt 通过。
 - T19：Project Maintainer 实机验收清单（子任务标为「需要目视」的全部项目）。
-  Result: 待做（2026-10-14 汇总）：1）T4 像素残差已查明（见 T4 的验证：只来自重复图集位合并后的图集位置，旧网格器只换图集键即逐字节重现），不再需要单独判断，随第 11 项一起目视即可；2）T7 几何以游戏导出为准后的变化：钟体抬高 1 像素、墙上悬挂告示牌居中且横杆垂直于墙、悬挂告示牌链条、马（1.1）/村民（0.9375）/凋灵骷髅（1.2）的渲染器缩放、铁傀儡脚、蝙蝠新模型，看两种外观；3）T8 帧图 `3rd-party/assets/schematic-studio-t8/`（500 盔甲架、实体动物园与近景、村民交易所真实投影），红色羊毛偏粉（原有染料着色表）；4）T9 三栏比例与层级、目录树选中行与 ≡ 标记、窄窗口检视器标签折两行、菜单置灰提示，仪器语言没有被破坏，大文件夹扫描速度；5）T10 角度键与资源读数在 720×480 的折行、六个预设的取景、点选与画面是否对得上（非整块与半透明方块）、透明背景 PNG 的边缘暗边、保存对话框的建议文件名；6）T13–T16 三个对话框在两种外观下的排版（段键与下拉混排、损失列表滚动）、大投影替换计数的等待感、「只保留这个」在窄检视器里的样子；在真实游戏目录里各做一次替换、转换、元数据编辑、删除、只保留这个与恢复，并在 Litematica 里打开结果；7）T14 真实 bundle 下向后转换的误报（变体键不列全取值的方块状态）；8）T17 真实整合包实例（数百个 Mod）的概览长度与首次烘焙等待、Mod 方块是否画出、三种系统的文件选择器过滤；9）bundle 尚未发布：把 `target/block-assets/` 的 blocks.json、blocks.dat.z、entities.dat.z、NOTICE（与 SOURCE.md）上传到 `https://launcher.lumilio.org/block-assets/1/`，再测没装游戏的实例冷启动下载到首帧的时间（记进「bundle 度量」）；10）Windows：运行时实体导出的 CREATE_NO_WINDOW（不弹控制台）、下载与预览；Linux 下载与预览；11）26.3 实例本机烘焙与 bundle 渲染一致、浅色与深色、720×480 与大窗口、英文界面。截图附在这里。
+  Result: Edwin 2026-10-16 Mac 实测通过。只在 Mac 上验收，不再要求 Windows 与 Linux（release-0-1-6 的 release-scope）。
 - 面板与窗口的分工
   Result: lumilio-ui 的 schematic_studio 测试 34 项通过（含 pane.rs 三项与 window.rs 一项），instance_detail::tests::plugins 10 项通过，tests/english.rs 4 项通过，i18n 8 项通过；lumilio-ui 与 lumilio-app 的 clippy 无警告。真机截图留给 T19。
 - T22 视口交互
@@ -491,6 +491,10 @@ Consequences: 覆盖层烘焙的键与缩略图的外观键都随顺序变化，
 - https://www.shulkr.com/en/minecraft-schematic-viewer
 - https://www.shulkr.com/en/minecraft-schematic-planner
 - [Plan schematic-render-parity](schematic-render-parity.md)
+
+## Outcome
+
+投影工作室随 0.1.6 发布：方块资源只来自预先烘焙的 bundle（1.13.2 到 26.3），实体按渲染器画出，工作室独立窗口支持切片与框选、替换映射、跨版本转换与替代建议、资源包文件夹与顺序、历史与备份恢复。Edwin 2026-10-16 Mac 实测通过。
 
 - Lesson: 2026-10-13 T1 手写的 `texture_renames.json` 只有 23 条，用 49 个真实 jar 跑 T2 的相邻版本比对后报出 89 处漏登的 `entity/` 搬家（多数在 26.1 与 1.21.2），漏掉的那些在旧版本里会以旧名存在、绑定表按新名找不到。原因：改名表凭记忆补，而不是从 jar 里比出来。Guard：`cargo xtask bake-blocks` 每次烘焙都比对相邻版本并列出未登记的搬家；`crates/lumilio-xtask/src/tests.rs` 的 every_rename_points_at_a_final_name 保证表里每条都直接指向最新名。只比像素相同的搬家，搬家时重画了的贴图仍要靠 T7 的绑定表 lint 发现。
 

@@ -5,4 +5,4 @@
 - 安装包及签名状态见各包内的 `BUILD.txt`；下载校验值见 `SHA256SUMS.txt`。
 - 安装方式与未签名包首次打开说明见[安装文档](https://github.com/EdwinZhanCN/LumilioCL/blob/{{TAG}}/web/src/content/docs/docs/install.md)。
 
-源码提交：`{{SHA}}`（[PR #](https://github.com/EdwinZhanCN/LumilioCL/pulls?q=is%3Apr+{{SHA}})）。
+源码提交：`{{SHA}}`（[PR #<N>](https://github.com/EdwinZhanCN/LumilioCL/pulls?q=is%3Apr+{{SHA}})）。

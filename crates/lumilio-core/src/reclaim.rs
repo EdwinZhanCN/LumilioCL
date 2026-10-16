@@ -1,4 +1,5 @@
-//! Finding, and removing, shared game files that no game uses (`ADR 0017`).
+//! Finding, and removing, shared game files that no game uses (user path:
+//! `docs/ia/paths/settings.md`).
 //!
 //! Shared files live under `meta/`: version folders (a release's or loader's
 //! json and jar), natives extracted per version, libraries, and assets. A

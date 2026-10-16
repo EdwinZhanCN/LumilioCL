@@ -34,7 +34,7 @@ SOFTWARE.
 The schematic modal's scoped pointer adapter uses the existing MIT/Apache-2.0
 `core-graphics`, `objc2` and `block2` bindings on macOS and MIT/Apache-2.0 `x11rb` bindings on X11.
 Its Windows module is original Win32 API glue. No upstream source was copied
-into `crates/lumilio-pointer` (ADR 0036).
+into `crates/lumilio-pointer`.
 
 The UI also maintains gpui-component 0.7.0 from Longbridge's GPUI Kit under
 `forks/gpui-component`, with a local multi-select extension in
@@ -42,7 +42,7 @@ The UI also maintains gpui-component 0.7.0 from Longbridge's GPUI Kit under
 notice is preserved in [LICENSE-APACHE](forks/gpui-component/LICENSE-APACHE).
 The baseline and imported paths are recorded in [fork maintenance](forks/README.md).
 
-The native preview links the following libraries (ADR 0028). The repository
+The native preview links the following libraries. The repository
 does not vendor Minecraft textures, models or entity geometry. The preview
 bakes them from the player's installed game. When the matching game is not
 installed, it downloads a pre-baked bundle (`blocks.dat.z` and `entities.dat.z`)
@@ -57,7 +57,7 @@ reads are used only while baking and are not redistributed.
 | [Nucleation](https://github.com/Schem-at/Nucleation) | `51de345` | MIT, Copyright (c) 2025 Schem-at | `src/formats/litematic.rs`, `src/meshing/`, `src/rendering/{gpu,camera}.rs` |
 | [Schematic-Mesher](https://github.com/Schem-at/Schematic-Mesher) | `286323e` | AGPL-3.0-only | Block geometry, liquid and chest meshing; linked through Nucleation |
 
-Editable source snapshots are maintained under `forks/` (ADR 0029).
+Editable source snapshots are maintained under `forks/`.
 [Fork maintenance](forks/README.md) records complete baseline revisions, imported
 paths and local changes. The original licenses are preserved at
 [Nucleation/LICENSE](forks/nucleation/LICENSE) and
@@ -183,7 +183,7 @@ follow [skinview3d](https://github.com/bs-community/skinview3d)'s
 [licenses/skinview3d-MIT.txt](crates/lumilio-skin-render/licenses/skinview3d-MIT.txt).
 Default player artwork is read from the player's installed client; none is
 distributed. Which default an id gets follows HMCL's `TexturesLoader.java`
-(GPL-3.0-or-later, ADR 0011).
+(GPL-3.0-or-later).
 
 # Pixel face
 
