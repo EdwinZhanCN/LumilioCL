@@ -398,13 +398,30 @@ apart by place, not by hue alone:
 - Keys are objects. At night the white key is graphite with a lit top edge,
   as on the reference hardware: white is reserved for lit things, so a night
   key never glares against the body.
+- A ghost key has no face at rest, so its side padding would indent its
+  label from the column it starts. A ghost key that begins a line is flush
+  (`Key::flush_start`): its label starts on the column's edge and its hover
+  face reaches into the margin. Better still, a group's own action sits on
+  the trailing side of its label (`kit::section_with`).
 
 ### State: LEDs, segment keys, faders
 
 - An **LED** is a 6 px dot: orange with a soft glow when lit, LED-off grey
   when unlit. It always comes with a second sign of state (§9).
 - **Segment keys** (refinements): a row of small white keys, each with an LED
-  above it. The chosen key's LED is lit and the key sits pressed.
+  above it. The chosen key's LED is lit and the key sits pressed. They are
+  for two to four fixed options with short labels the launcher writes. The
+  keys grow with their labels and the LED band adds height, so options that
+  come from data (region, scheme or file names) and a choice repeated on
+  every row of a table are a Select instead, however few.
+- **A row that mixes segment keys with plain keys** (the studio's
+  Orbital / Explore beside 角度) aligns them on the keys' bottom edge: every
+  key stands on one line, and the LEDs above mark the keys that hold a
+  state.
+- **A value chosen in a toolbar** from a few options (the discover page's
+  排序方式, the studio's 切片) is a muted label and a small dropdown
+  (`kit::labeled_select`): the dropdown shows the value in use, so it
+  needs no LED.
 - **Fader switch**: a black 4 px slot, a white 16 px round cap, an LED beside
   it. On means the cap is at the trailing end and the LED is lit.
 - **Checkbox**: an 18 px key, white when clear, orange with a white check
@@ -425,7 +442,9 @@ open block is orange with a white medium label.
 ### Fields
 
 A field (search, dialog inputs) is a recessed panel: 4 px radius, a hairline
-border, a faint inner shade along the top.
+border, a faint inner shade along the top. A small field is as tall as a
+small key (28 px at the base font size), so a field and the key that acts on
+it line up in one row.
 
 ### Silkscreen
 
@@ -512,8 +531,14 @@ has a head and two columns.
   not done yet, or the file is still being read).
 - **Viewport** (leading, the rest of the width): the model, with no
   border (a focus ring only while it has keyboard focus), no key row above
-  it and no text under it. A tool strip floats on its bottom edge: segment
-  keys Orbital / Explore, 角度, 复位, and the key 切片. Above the strip,
+  it and no text under it. Two small tool plates float on its bottom
+  corners. The leading one holds the camera's keys: the segment keys
+  Orbital / Explore and 角度, a key whose menu holds 复位视角 and then the
+  presets. The trailing one holds what is drawn: 切片, a labelled dropdown
+  (不切片 / X 轴 / Y 轴 / Z 轴), and while slicing the layer, a number
+  field with − and +, over it. Every control stands on one line (§12). A
+  single strip of every key wrapped over the read-out at the window's
+  minimum; the two plates fit side by side there. Above the leading plate,
   a read-out plate names what the pointer is on: the block's icon, name,
   property words and position. With nothing under the pointer it gives the
   controls in one muted line. While a block is inspected, its inspect card
@@ -571,10 +596,15 @@ other.
 
 **A slice and a box narrow the picture to what is being built** (T25;
 after Litematica's render layers and area selection).
-- **切片** draws one layer and those below it, from the top layer down.
-  While slicing, the strip adds the axis as segments X / Y / Z, ghost keys
-  ‹ and › (also `[` and `]` while the viewport has focus) and a mono
-  read-out "Y 12 · 340 块". The cut shows each layer's own top faces,
+- **切片** draws one layer and those below it, from the top layer down,
+  along the axis chosen in its dropdown (X / Y / Z 轴; 不切片 ends it).
+  While slicing, the trailing plate adds the layer over the dropdown: a
+  number field (`NumberInput`) whose − and + step a layer, which takes a
+  layer typed in (past the schematic's first or last it stops there), and
+  which follows `[` and `]` while the viewport has focus. How many blocks
+  the layer holds is 材料's to say. The read-out plate and an inspect card
+  in the corner rise to clear the taller plate. Keys typed into the field
+  stay the field's: the picture's keys work only while it has focus. The cut shows each layer's own top faces,
   and a click passes through the layers above it. 材料 then counts that
   layer, under a mono line naming it.
 - **A box**: a drag with Ctrl (⌘ on macOS) from one block to another
@@ -609,18 +639,29 @@ backups.
 state of the kind), from the inspect card's ghost **替换…** (that block's
 state, every property exact), from the head's orange key and from
 conversion's kept blocks. The dialog is a table of rows, 从 → 到, 640 px
-wide: the source block, the switch **不限属性**, and one chip per property
-(a value or 任意, segment keys for up to four choices, a dropdown past
-that); a searchable picker over the file's game version's blocks with the
-targets used last first (both pickers show block names with the ID as a
-mono caption, and search either); the row's own count in mono at its end. The
-target keeps each property its blockstate names with the same value (a
-property no model reads, such as `waterlogged`, takes its default). Rows
-are added with the ghost **加一行** and match what each cell held before,
-together. The scope is 全部 / 区域 / 当前切片 / 当前选区; the commit key says
-the total ("替换 128 个方块"). Under the table, **方案**: a name and
-**存为方案**, and **套用方案…** once one is kept (launcher data, every
-instance); a write made from a 方案 names it in the history.
+wide, with no header: the arrow and the target's placeholder say which side
+is which. A row is the source block with, under it in its column, the
+switch **不限属性** and one chip per property, a line each (its name, and
+on the column's trailing edge a dropdown: a value or 任意, so the dropdowns
+stand in one column); a searchable picker over the file's game version's blocks
+with the targets used last first (both pickers show block names whole with
+the ID as a mono caption that gives way first, and search either), with the
+row's own count in mono under it; and ✕, which every row has once there are
+two. Every choice in the table is a dropdown (§12). The target picker runs
+to the table's trailing edge or to ✕, so every row's starts and ends where
+the others do. The target keeps
+each property its blockstate names with the same value (a property no
+model reads, such as `waterlogged`, takes its default). Rows are added with
+the ghost **加一行**, flush with the table, and match what each cell held
+before, together. The scope is a dropdown, 全部区域 / each region / 当前切片 /
+选区, shown when there is more than the whole file. The commit key says the
+total ("替换 128 个方块"); a line under the table speaks only when it has
+something the counts do not say (still counting, nothing matches, a row
+without a target). The 方案 act on the whole table, so they sit on the
+footer's leading side: **套用方案…**, a menu of the kept ones once there is
+one; **存为方案…**, whose popover asks for the name; then the scheme's name
+while the table is that scheme (launcher data, every instance); a write
+made from a 方案 names it in the history.
 
 **No new display.** Counts (blocks, block types, entities) are mono
 values on tiles, captions and tables, not segment digits. A display is
@@ -628,8 +669,8 @@ for progress and the play record only. If one page breaks that rule,
 displays stop meaning "something is happening".
 
 At the window's 720 × 480 minimum both columns stay visible, the grid
-keeps at least four columns, and the tool strip wraps before it
-overflows.
+keeps at least four columns, and the two tool plates still stand side
+by side, apart, while slicing too.
 
 The model is game art. Its instructions, focus border, reset key and
 failure messages are Interface. Rendering uses physical resolution, capped
@@ -640,8 +681,9 @@ supports drag to rotate, wheel to zoom, arrows and +/−. Explore is
 first-person free flight: click the picture or press Enter to capture the
 cursor, then mouse look, WASD, Space to rise and Shift to descend. Movement
 uses elapsed time and normalizes diagonals. There is no gravity or
-collision. R or the ghost reset key resets the current camera; double-click
-resets only Orbital. Esc releases capture first. Losing focus, switching
+collision. R, or 复位视角 (the modal's ghost key, the first entry of the
+studio's 角度), resets the current camera; double-click resets only
+Orbital. Esc releases capture first. Losing focus, switching
 mode, switching file or a renderer failure releases the cursor and held
 keys. Only captured first-person input schedules a frame clock; idle
 pictures stay still. Intentional camera input stays responsive under
@@ -655,8 +697,9 @@ released frames are removed from GPUI's image cache (ADR 0028). A plugin's
 `View::Model` still opens the same viewer in a modal.
 
 In the studio the viewer adds three things (plan schematic-studio, T10). A
-white 角度 key opens the presets 北、东、南、西、顶、等轴; each refits the
-orbit camera, and Explore gives way to Orbital. In Orbital a click that
+white 角度 key opens 复位视角（R）and, after a separator, the presets 北、东、
+南、西、顶、等轴; each preset refits the orbit camera, and Explore gives way
+to Orbital. In Orbital a click that
 does not drag picks the first block along the ray and chooses its tile;
 entities are not picked. 导出 PNG… in More asks
 for a size (at most 4096 per side), a background (panel colour or
@@ -678,9 +721,16 @@ packs, and packs added in the studio, are each a row in 资源来源 with a fade
 switch. All are off until switched on, so a schematic first looks as vanilla
 draws it; a pack added from the studio is on in that folder. The switches are
 kept per instance and studio folder, and each flip loads the viewport again.
-Each row says how many blocks the source provides and how many of its models
-a custom loader draws: those show as missing, so the row says so before the
-viewport does (T21).
+The list shows first what the picture is drawn with: the base and the
+sources switched on, in the order they are layered, with ↑ ↓ to change it
+once two or more are on. The sources that are off follow under 未启用, with
+only their switch: their place in the order draws nothing. A row is the
+name on one line (cut short, the whole name in its tooltip) over a mono
+caption: how many blocks the source provides and how many of its models a
+custom loader draws; those show as missing, so the row says so before the
+viewport does (T21). 添加… on the section's label offers a zip, a pack
+folder or a typed path; the path is a dialog, which stays open with the
+reason when the path is not a pack (T36).
 
 Account details use a CPU-rendered player preview alongside a wardrobe,
 inside the Accounts master–detail page rather than a

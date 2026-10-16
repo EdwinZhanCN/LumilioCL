@@ -13,13 +13,11 @@ use super::controls::{LiveCtx, send};
 use crate::assets::UiIcon;
 use crate::key::Key;
 use crate::live::{DiscoverChange, LiveIntent, PageItem, SearchStatus, page_items};
-use crate::theme::ShellColors;
 use crate::tr;
 use crate::{kit, theme};
 use gpui::prelude::*;
-use gpui::{ClickEvent, Entity, IntoElement, div, px};
+use gpui::{ClickEvent, IntoElement, div};
 use gpui_component::Sizable as _;
-use gpui_component::select::{SearchableVec, Select, SelectState};
 use gpui_component::{Icon, h_flex, v_flex};
 use lumilio_core::ProjectKind;
 
@@ -205,13 +203,13 @@ pub fn discover(ctx: &LiveCtx) -> impl IntoElement {
                                         .gap_3()
                                         .items_center()
                                         // ia[discover]: 排序 / 显示数量 | L4 两个下拉：相关度、下载量、关注数、发布时间、更新时间（只列来源支持的）；每页 5 / 10 / 15 / 20 / 50 / 100 | 重新搜索；按发布时间排序时卡片显示发布时间，其余显示更新时间
-                                        .child(toolbar_select(
+                                        .child(kit::labeled_select(
                                             tr!("library-sort"),
                                             &ctx.controls.sort,
                                             150.,
                                             colors,
                                         ))
-                                        .child(toolbar_select(
+                                        .child(kit::labeled_select(
                                             tr!("discover-page-size"),
                                             &ctx.controls.page_size,
                                             90.,
@@ -227,17 +225,4 @@ pub fn discover(ctx: &LiveCtx) -> impl IntoElement {
                 )
                 .child(sidebar::sidebar(ctx)),
         )
-}
-
-pub(super) fn toolbar_select(
-    label: &'static str,
-    state: &Entity<SelectState<SearchableVec<String>>>,
-    width: f32,
-    colors: ShellColors,
-) -> impl IntoElement {
-    h_flex()
-        .gap_2()
-        .items_center()
-        .child(div().text_sm().text_color(colors.muted).child(label))
-        .child(div().w(px(width)).child(Select::new(state).small()))
 }

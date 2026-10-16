@@ -5,6 +5,7 @@
 
 mod convert;
 mod metadata;
+mod pack_path;
 mod replace;
 
 #[cfg(test)]
@@ -15,6 +16,7 @@ pub(crate) use convert::Planned;
 pub(crate) use convert::detail as loss_words;
 pub(crate) use convert::{ConvertDialog, Suggested, suggestions};
 pub(crate) use metadata::MetadataDialog;
+pub(crate) use pack_path::PackPathDialog;
 #[cfg(test)]
 pub(crate) use replace::BlockChoice;
 #[cfg(test)]
@@ -38,6 +40,7 @@ pub(crate) enum OpenDialog {
     Replace(WeakEntity<ReplaceDialog>),
     Convert(WeakEntity<ConvertDialog>),
     Metadata(WeakEntity<MetadataDialog>),
+    PackPath(WeakEntity<PackPathDialog>),
 }
 
 /// Where a dialog's write stands. The studio moves it; the dialog draws it.
@@ -90,6 +93,11 @@ pub(crate) trait DialogForm: Render + Sized {
     fn width(&self) -> f32 {
         DIALOG_WIDTH
     }
+    /// Keys on the footer's leading side, for actions on the whole form
+    /// rather than its commit (the replace dialog's 方案); none by default.
+    fn footer_start(&mut self, _: &mut Window, _: &mut Context<Self>) -> Option<AnyElement> {
+        None
+    }
 }
 
 /// One field: its label above the control.
@@ -123,8 +131,9 @@ pub(crate) fn show<F: DialogForm + 'static>(
     window: &mut Window,
     cx: &mut App,
 ) {
-    window.open_dialog(cx, move |dialog, _, cx| {
+    window.open_dialog(cx, move |dialog, window, cx| {
         let colors = ShellColors::current(cx);
+        let start = form.update(cx, |form, cx| form.footer_start(window, cx));
         let state = form.read(cx);
         let (busy, error) = {
             let status = state.status().read(cx);
@@ -191,6 +200,8 @@ pub(crate) fn show<F: DialogForm + 'static>(
                 h_flex()
                     .w_full()
                     .gap_2()
+                    .items_center()
+                    .children(start)
                     .child(div().flex_1())
                     .child(cancel)
                     .child(commit),

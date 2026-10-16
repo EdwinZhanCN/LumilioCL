@@ -56,15 +56,19 @@ pub(crate) struct Placement {
 
 /// Over the block whose screen box is `rect` (fractions of a picture
 /// `size` big), centred on it and kept inside the picture; under it when
-/// there is little room over it and more under it (the tool strip takes the
-/// bottom). With the block out of view, at the lower left over the tool
-/// strip, where the read-out plate is.
-pub(crate) fn placement(rect: Option<[f32; 4]>, (width, height): (f32, f32)) -> Placement {
+/// there is little room over it and more under it (the tool plates take
+/// the bottom `clearance`). With the block out of view, at the lower left
+/// over the tool plates, where the read-out plate is.
+pub(crate) fn placement(
+    rect: Option<[f32; 4]>,
+    (width, height): (f32, f32),
+    clearance: f32,
+) -> Placement {
     let corner = Placement {
         left: 12.,
         top: None,
-        bottom: Some(TOOL_STRIP_CLEARANCE),
-        max_height: (height - TOOL_STRIP_CLEARANCE - GAP).clamp(0., MAX_CARD_HEIGHT),
+        bottom: Some(clearance),
+        max_height: (height - clearance - GAP).clamp(0., MAX_CARD_HEIGHT),
     };
     let Some([left, top, right, bottom]) = rect else {
         return corner;
@@ -76,7 +80,7 @@ pub(crate) fn placement(rect: Option<[f32; 4]>, (width, height): (f32, f32)) -> 
     let centre = ((left + right) / 2.).clamp(0., width);
     let card_left = (centre - CARD_WIDTH / 2.).clamp(GAP, (width - CARD_WIDTH - GAP).max(GAP));
     let over = top - 2. * GAP;
-    let under = height - TOOL_STRIP_CLEARANCE - bottom - GAP;
+    let under = height - clearance - bottom - GAP;
     if over.max(under) < SLOT * 3. {
         return corner;
     }
@@ -171,7 +175,12 @@ impl StudioView {
             .map_or((0., 0.), |size| {
                 (f32::from(size.width), f32::from(size.height))
             });
-        let place = placement(viewer.and_then(|viewer| viewer.mark_rect()), size);
+        let clearance = viewer.map_or(TOOL_STRIP_CLEARANCE, |viewer| viewer.tool_clearance());
+        let place = placement(
+            viewer.and_then(|viewer| viewer.mark_rect()),
+            size,
+            clearance,
+        );
         let (id, properties) = split_state(&inspected.picked.state);
         let [x, y, z] = inspected.picked.position;
         let state = inspected.picked.state.clone();

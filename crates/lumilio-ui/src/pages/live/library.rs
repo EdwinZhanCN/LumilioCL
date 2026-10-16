@@ -1,5 +1,4 @@
 use super::controls::{LiveCtx, send};
-use super::discover::toolbar_select;
 use crate::assets::UiIcon;
 use crate::key::Key;
 use crate::kit;
@@ -489,14 +488,14 @@ pub fn library(ctx: &LiveCtx) -> gpui::AnyElement {
                     .gap_3()
                     .items_center()
                     .flex_wrap()
-                    .child(toolbar_select(
+                    .child(kit::labeled_select(
                         tr!("library-sort"),
                         &ctx.controls.library_sort,
                         130.,
                         colors,
                     ))
                     .children((loaders.len() > 1).then(|| {
-                        toolbar_select(
+                        kit::labeled_select(
                             tr!("library-loader"),
                             &ctx.controls.library_loader,
                             150.,

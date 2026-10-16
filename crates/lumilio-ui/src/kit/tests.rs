@@ -7,6 +7,50 @@ use super::motd::motd_color;
 use super::{Item, TagKind, list, lit_bars, motd_lines, panel_list, signal, signal_bars, tag};
 use crate::theme::{self, ShellColors};
 
+/// A small field and a small key side by side.
+struct FieldRow(gpui::Entity<gpui_component::input::InputState>);
+
+impl Render for FieldRow {
+    fn render(&mut self, _: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
+        use gpui_component::Sizable as _;
+        gpui_component::h_flex()
+            .w(gpui::px(400.))
+            .items_center()
+            .gap_2()
+            .child(
+                div()
+                    .flex_1()
+                    .debug_selector(|| "field".into())
+                    .child(gpui_component::input::Input::new(&self.0).small()),
+            )
+            .child(
+                crate::key::Key::new("key")
+                    .label("添加")
+                    .white()
+                    .small()
+                    .debug_selector(|| "key".into()),
+            )
+    }
+}
+
+/// A small field (Input, Select) is as tall as a small key, so a row of
+/// both lines up: the fork's small field height (`forks/README.md`).
+#[gpui::test]
+fn a_small_field_is_as_tall_as_a_small_key(cx: &mut TestAppContext) {
+    cx.update(gpui_component::init);
+    let (_, cx) = cx.add_window_view(|window, cx| {
+        FieldRow(cx.new(|cx| gpui_component::input::InputState::new(window, cx)))
+    });
+    cx.run_until_parked();
+    let field = cx.debug_bounds("field").expect("the field");
+    let key = cx.debug_bounds("key").expect("the key");
+    assert_eq!(field.size.height, key.size.height);
+    assert_eq!(
+        key.size.height,
+        gpui::px(crate::key::KeySize::Small.height())
+    );
+}
+
 struct Sheet;
 
 impl Render for Sheet {

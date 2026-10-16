@@ -22,14 +22,13 @@ use gpui::{
     App, Bounds, Context, FocusHandle, MouseButton, ObjectFit, Pixels, Point, RenderImage,
     ScrollDelta, Task, Window, canvas, div, img, px,
 };
-use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_component::{Sizable as _, h_flex, v_flex};
 use lumilio_core::{AssetNotice, AssetPlan, ModelPreview};
 use lumilio_schematic_render::{Angle, Focus, Frame, Picked, SceneError, Slice, SliceAxis, View};
 
 use crate::{
     controls::Segments,
-    key::Key,
+    key::{Key, KeySize},
     kit,
     theme::{self, ShellColors},
     tr,
@@ -55,10 +54,14 @@ pub(crate) struct Inspected {
     pub contents: Option<lumilio_schematic::inspect::Contents>,
 }
 
-/// The height the inline tool strip takes at the picture's bottom edge
-/// (12 px margin, 55 px of segment keys with their LEDs), with a gap: what
-/// a read-out above it clears.
+/// The height the inline tool plates take at the picture's bottom edge
+/// (12 px margin, 55 px of keys with their LEDs), with a gap: what a
+/// read-out above them clears.
 pub(crate) const TOOL_STRIP_CLEARANCE: f32 = 76.;
+
+/// [`TOOL_STRIP_CLEARANCE`] while slicing: the trailing plate holds the
+/// layer stepper over its keys (36 px more).
+pub(crate) const SLICING_CLEARANCE: f32 = 112.;
 
 /// A press that moves less than this is a click, not a drag.
 const CLICK_SLOP: f32 = 4.;
@@ -69,6 +72,26 @@ const MARK_WIDTH: f32 = 2.;
 /// The outline's colour (the theme's ink in linear RGB) and its width in the
 /// frame's pixels.
 type MarkStyle = ([f32; 4], f32);
+
+/// One of the studio's floating tool plates on the picture's bottom edge:
+/// the caller pins it to a corner and fills it. Presses and the wheel on it
+/// stay off the picture, so a key never turns the model or takes the
+/// cursor.
+fn tool_plate(colors: ShellColors) -> gpui::Div {
+    h_flex()
+        .absolute()
+        .bottom_3()
+        .items_end()
+        .gap_2()
+        .p(px(6.))
+        .rounded(px(6.))
+        .bg(colors.body.panel)
+        .border_1()
+        .border_color(colors.border)
+        .shadow_sm()
+        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+        .on_scroll_wheel(|_, _, cx| cx.stop_propagation())
+}
 
 /// The words for an angle preset, in [`Angle::ALL`]'s order.
 pub(crate) fn angle_labels() -> &'static [&'static str] {
@@ -229,6 +252,10 @@ pub(crate) struct Viewer {
     /// The blocks in the slice's layer, by id.
     layer_blocks: Vec<(String, u64)>,
     slice_task: Option<Task<()>>,
+    /// 切片's dropdown and the layer field (studio only), made once a draw
+    /// has a window; `asked` while that is on its way.
+    slice_controls: Option<slice::SliceControls>,
+    slice_controls_asked: bool,
     /// The selected box of cells (T25).
     selection: Option<Cells>,
     /// The selection's colour, the theme's focus colour in linear RGB.
@@ -291,6 +318,8 @@ impl Viewer {
             slice_axis: SliceAxis::Y,
             layer_blocks: Vec::new(),
             slice_task: None,
+            slice_controls: None,
+            slice_controls_asked: false,
             selection: None,
             selection_color: [0., 0., 1., 1.],
             selection_sent: None,
@@ -831,6 +860,38 @@ impl Viewer {
         cx.notify();
     }
 
+    /// 角度's menu in the studio: 复位视角 for the current mode, then the
+    /// presets, which turn the orbit camera (Explore gives way to Orbital).
+    pub(crate) fn angle_entries(&self, cx: &mut Context<Self>) -> Vec<kit::MenuEntry> {
+        let ready = self.state == State::Ready;
+        let viewer = cx.weak_entity();
+        let mut entries = vec![
+            kit::MenuEntry::new(tr!("model-reset-key"), move |_, cx| {
+                let _ = viewer.update(cx, |viewer, cx| viewer.reset(cx));
+            })
+            .disabled(!ready),
+        ];
+        for (index, (angle, label)) in Angle::ALL.into_iter().zip(angle_labels()).enumerate() {
+            let viewer = cx.weak_entity();
+            let entry = kit::MenuEntry::new(*label, move |_, cx| {
+                let _ = viewer.update(cx, |viewer, cx| viewer.turn_to(angle, cx));
+            })
+            .disabled(!ready);
+            entries.push(if index == 0 { entry.separated() } else { entry });
+        }
+        entries
+    }
+
+    /// The room the studio's floating tools take at the picture's bottom,
+    /// which its read-out and an inspect card in the corner clear.
+    pub(crate) fn tool_clearance(&self) -> f32 {
+        if self.slice.is_some() {
+            SLICING_CLEARANCE
+        } else {
+            TOOL_STRIP_CLEARANCE
+        }
+    }
+
     fn retry(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.release_capture();
         self.capture_error = None;
@@ -1270,6 +1331,12 @@ impl Render for Viewer {
                 }),
             )
             .on_key_down(cx.listener(|this, event: &gpui::KeyDownEvent, window, cx| {
+                // The picture's keys are the picture's: a key typed into a
+                // field on its tool plates (the layer) or a menu over it
+                // reaches here too, and must not turn, zoom or reset it.
+                if !this.focus.is_focused(window) {
+                    return;
+                }
                 // ia[plugin.litematica]: 放下检视的方块 | 工作室视口聚焦时按 Esc（Explore 捕获中先释放鼠标） | 描边与检视卡消失，读数板回到跟着指针 | 也可点检视卡的关闭键或点画面空处（T32）
                 if event.keystroke.key == "escape"
                     && this.capture.is_none()
@@ -1352,17 +1419,19 @@ impl Render for Viewer {
             .child(content)
             .child(measure)
             .children(crosshair);
-        // ia[instance]: 复位 3D 投影视角 | 弹窗「复位视角」 | 当前模式回到初始视角；Orbital 可双击画面，聚焦画面后可按 R
-        let reset = Key::new("model-reset")
-            .label(tr!("model-reset"))
-            .ghost()
-            .disabled(self.state != State::Ready)
-            .on_click(cx.listener(|this, _, _, cx| this.reset(cx)));
+        // The studio's plates hold small keys; the modal's head has regular
+        // ones.
+        let size = if self.inline {
+            KeySize::Small
+        } else {
+            KeySize::Regular
+        };
         // ia[instance]: 重试 3D 投影预览 | 弹窗出错后的「重试」 | 重新读取当前投影与游戏贴图并生成预览；失败仍显示说明
         let retry = matches!(self.state, State::Failed { .. }).then(|| {
             Key::new("model-retry")
                 .label(tr!("common-retry"))
                 .ghost()
+                .size(size)
                 .on_click(cx.listener(|this, _, window, cx| this.retry(window, cx)))
         });
         let note = (self.state == State::Ready)
@@ -1406,55 +1475,53 @@ impl Render for Viewer {
                 });
             },
         );
-        let angles = self.inline.then(|| {
-            let viewer = cx.weak_entity();
-            // ia[plugin.litematica]: 换到预设角度 | 工作室视口「角度」下拉：北、东、南、西、顶、等轴 | 转到环绕视角的该方向并重新框住整个投影；在 Explore 里会先切回 Orbital | 等轴是透视下的等轴方向，不是正交投影（T10）
-            Key::new("model-angle")
-                .label(tr!("model-angle"))
-                .white()
-                .small()
-                .disabled(self.state != State::Ready)
-                .debug_selector(|| "model-angle".into())
-                .dropdown_menu(move |mut menu, _, _| {
-                    for (angle, label) in Angle::ALL.into_iter().zip(angle_labels()) {
-                        let viewer = viewer.clone();
-                        menu = menu.item(PopupMenuItem::new(*label).on_click(move |_, _, cx| {
-                            let _ = viewer.update(cx, |viewer, cx| viewer.turn_to(angle, cx));
-                        }));
-                    }
-                    menu
-                })
-        });
         if self.inline {
-            // The studio's controls float on the picture's bottom edge; its
-            // read-out (what the pointer is on, else these controls' hint)
-            // is the studio's, above them (D27).
-            let tools = h_flex()
+            // The studio's controls float on the picture's bottom corners;
+            // its read-out (what the pointer is on, else these controls'
+            // hint) is the studio's, above them (D27). Leading, keys for the
+            // camera: Orbital / Explore and 角度 (复位视角, then the
+            // presets). Trailing, what is drawn: 切片 as a dropdown with its
+            // label, as the discover page's 排序方式, and while slicing the
+            // layer field over it. Two small plates fit side by side at the
+            // window's minimum, where one strip of every key wrapped over
+            // the read-out. Every key's bottom sits on one line.
+            self.want_slice_controls(window, cx);
+            self.sync_slice_controls(window, cx);
+            // ia[plugin.litematica]: 换到预设角度 / 复位视角 | 工作室视口左下角 Orbital / Explore 旁的「角度」下拉：复位视角（R），然后北、东、南、西、顶、等轴 | 复位让当前模式回到初始视角；预设转到环绕视角的该方向并重新框住整个投影，在 Explore 里会先切回 Orbital | 也可双击画面或在视口聚焦时按 R 复位；等轴是透视下的等轴方向，不是正交投影（T10）
+            let angles = kit::with_menu(
+                Key::new("model-angle")
+                    .label(tr!("model-angle"))
+                    .white()
+                    .small()
+                    .disabled(self.state != State::Ready)
+                    .debug_selector(|| "model-angle".into()),
+                self.angle_entries(cx),
+                gpui::Anchor::BottomLeft,
+                colors,
+            );
+            let tools = tool_plate(colors)
                 .debug_selector(|| "model-tools".into())
-                .id("model-tools")
-                .absolute()
                 .left_3()
-                .bottom_3()
-                .max_w(gpui::relative(0.92))
-                .flex_wrap()
-                .items_end()
-                .gap_2()
-                .p(px(6.))
-                .rounded(px(6.))
-                .bg(colors.body.panel)
-                .border_1()
-                .border_color(colors.border)
-                .shadow_sm()
-                // Pressing a key must not turn the model or take the cursor.
-                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                .on_scroll_wheel(|_, _, cx| cx.stop_propagation())
                 .child(modes)
-                .children(angles)
-                .child(self.slice_controls(colors, cx))
-                .child(reset)
+                .child(angles)
                 .children(retry);
-            return viewport.child(tools).into_any_element();
+            let view = tool_plate(colors)
+                .debug_selector(|| "model-tools-view".into())
+                .right_3()
+                .flex_col()
+                .items_end()
+                .children(self.layer_field(colors))
+                .children(self.slice_select(colors));
+            return viewport.child(tools).child(view).into_any_element();
         }
+        // ia[instance]: 复位 3D 投影视角 | 弹窗「复位视角」 | 当前模式回到初始视角；Orbital 可双击画面，聚焦画面后可按 R
+        let reset = Key::new("model-reset")
+            .label(tr!("model-reset"))
+            .ghost()
+            .size(size)
+            .debug_selector(|| "model-reset".into())
+            .disabled(self.state != State::Ready)
+            .on_click(cx.listener(|this, _, _, cx| this.reset(cx)));
         let hint = match self.mode {
             Mode::Orbital => tr!("model-hint-orbital"),
             Mode::Explore if self.capture.is_some() => tr!("model-hint-explore-captured"),

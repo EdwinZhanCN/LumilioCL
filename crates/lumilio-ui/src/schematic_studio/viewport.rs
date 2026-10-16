@@ -12,7 +12,7 @@ use gpui_component::{h_flex, v_flex};
 
 use super::words::property_words;
 use super::{LoadModel, StudioView, muted_line};
-use crate::model_view::{TOOL_STRIP_CLEARANCE, Viewer};
+use crate::model_view::Viewer;
 use crate::theme::{self, ShellColors};
 use crate::tr;
 
@@ -71,7 +71,7 @@ impl StudioView {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let content = match &self.viewer {
-            // ia[plugin.litematica]: 观察投影 | 工作室窗口左栏常驻 3D 视口（工具条浮在画面底部：Orbital / Explore、角度、复位） | Orbital 拖拽旋转、滚轮缩放；Explore 点击捕获鼠标后 WASD 飞行；画不出的方块画成紫黑缺失贴图的整块占位，仍可点选 | 视口常驻在工作室窗口里，不是弹窗也不在游戏页内（D7、D22、D27）
+            // ia[plugin.litematica]: 观察投影 | 工作室窗口左栏常驻 3D 视口（左下角浮着 Orbital / Explore 与「角度」，右下角浮着「切片」下拉） | Orbital 拖拽旋转、滚轮缩放；Explore 点击捕获鼠标后 WASD 飞行；画不出的方块画成紫黑缺失贴图的整块占位，仍可点选 | 视口常驻在工作室窗口里，不是弹窗也不在游戏页内（D7、D22、D27）
             Some(viewer) => viewer.clone().into_any_element(),
             None => v_flex()
                 .size_full()
@@ -114,6 +114,7 @@ impl StudioView {
             return Some(self.inspect_card(&inspected, colors, cx));
         }
         let viewer = self.viewer.as_ref()?.read(cx);
+        let clearance = viewer.tool_clearance();
         let body = match viewer.pointed() {
             Some(pointed) => {
                 let (id, name, words) = self.read_out_words(&pointed.state);
@@ -156,13 +157,13 @@ impl StudioView {
                 .child(viewer.hint())
                 .into_any_element(),
         };
-        // ia[plugin.litematica]: 读数板 | 工作室视口左下、工具条上方 | 指着或飞行中看着的方块写图标、名字、属性与坐标；什么都没指时写当前模式的操作提示；检视一个方块时让位给检视卡 | 原来视口下方的提示行与右上的方块卡都并进这里（D27、T32）
+        // ia[plugin.litematica]: 读数板 | 工作室视口左下、Orbital / Explore 上方 | 指着或飞行中看着的方块写图标、名字、属性与坐标；什么都没指时写当前模式的操作提示；检视一个方块时让位给检视卡；切片时右下角多一行，读数板与角落的检视卡一起抬高让开 | 原来视口下方的提示行与右上的方块卡都并进这里（D27、T32）
         Some(
             div()
                 .debug_selector(|| "studio-read-out".into())
                 .absolute()
                 .left_3()
-                .bottom(px(TOOL_STRIP_CLEARANCE))
+                .bottom(px(clearance))
                 .max_w(gpui::relative(0.92))
                 .px_2()
                 .py_1()

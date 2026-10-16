@@ -121,7 +121,10 @@ fn replace_shows_the_count_first_and_writes_exactly_that_many(cx: &mut TestAppCo
         other => panic!("a count is shown before confirming: {other:?}"),
     };
     assert_eq!(shown, 3);
-    assert!(cx.debug_bounds("studio-replace-preview").is_some());
+    // The commit key says the total and the row its own: no third line.
+    let label = dialog.read_with(cx, |dialog, _| dialog.commit_label());
+    assert_eq!(label.as_ref(), "替换 3 个方块");
+    assert!(cx.debug_bounds("studio-replace-preview").is_none());
     assert!(
         rig.sent().is_empty(),
         "nothing is written before confirming"
@@ -998,6 +1001,69 @@ fn chips_match_exactly_or_any_and_the_target_keeps_shared_properties(cx: &mut Te
     assert!(dialog.read_with(cx, |dialog, _| dialog.chips())[0].0);
 }
 
+/// The table keeps its columns: a row's property chips are dropdowns under
+/// its source, never under its target, and its count is the target's
+/// caption; every row's target picker starts and ends where the others do;
+/// and 加一行's label starts on the table's leading edge.
+#[gpui::test]
+fn the_replace_table_keeps_its_columns(cx: &mut TestAppContext) {
+    let files = [(A, stairs())];
+    let (rig, cx) = rig(cx);
+    open(&rig, cx, &files, A);
+    let north = "minecraft:oak_stairs[facing=north,half=bottom,shape=straight,waterlogged=false]";
+    let dialog = open_replace_on(&rig, cx, Some(north));
+    click(cx, "studio-replace-add-row");
+    cx.update(|window, cx| {
+        dialog.update(cx, |dialog, cx| {
+            dialog.set_target_for_test(0, "minecraft:spruce_stairs", window, cx);
+            dialog.set_target_for_test(1, "minecraft:glass", window, cx);
+        })
+    });
+    count_now(&dialog, cx);
+    let bounds = |cx: &mut VisualTestContext, selector: &'static str| {
+        cx.debug_bounds(selector)
+            .unwrap_or_else(|| panic!("{selector} is drawn"))
+    };
+    let source = bounds(cx, "studio-replace-source-0");
+    let (first, second) = (
+        bounds(cx, "studio-replace-target-0"),
+        bounds(cx, "studio-replace-target-1"),
+    );
+    assert_eq!(
+        (first.left(), first.right()),
+        (second.left(), second.right())
+    );
+    let count = bounds(cx, "studio-replace-count-0");
+    assert!(
+        count.top() >= first.bottom() && count.left() == first.left(),
+        "{count:?} under {first:?}"
+    );
+    let chip = bounds(cx, "studio-replace-chip-0-0");
+    assert!(
+        chip.top() >= source.bottom() && chip.right() <= source.right(),
+        "{chip:?} under {source:?}"
+    );
+    // One chip a line, each dropdown on the source column's trailing edge,
+    // whatever the property names' lengths.
+    let next = bounds(cx, "studio-replace-chip-0-1");
+    assert!(next.top() >= chip.bottom());
+    assert_eq!(
+        (chip.right(), next.right()),
+        (source.right(), source.right())
+    );
+    assert_eq!(
+        chip.size.height,
+        gpui::px(crate::key::KeySize::Small.height()),
+        "a dropdown, not segment keys under an LED band"
+    );
+    let add = bounds(cx, "studio-replace-add-row");
+    assert_eq!(
+        add.left() + gpui::px(12.),
+        source.left(),
+        "flush with the table"
+    );
+}
+
 /// T24: rows replace together and the dialog says each one's count; the
 /// write changes as many as it said, in one write; the targets used come
 /// first next time.
@@ -1060,10 +1126,26 @@ fn a_scheme_is_saved_and_applied_elsewhere(cx: &mut TestAppContext) {
             dialog.set_target_for_test(0, "minecraft:spruce_stairs", window, cx)
         })
     });
+    // 存为方案… asks for the name in a popover over the footer.
+    assert!(
+        cx.debug_bounds("studio-replace-scheme-pick").is_none(),
+        "none kept yet"
+    );
+    click(cx, "studio-replace-scheme-save");
+    assert!(cx.debug_bounds("studio-replace-scheme-naming").is_some());
     let input = dialog.read_with(cx, |dialog, _| dialog.scheme_name_for_test());
     cx.update(|window, cx| input.update(cx, |input, cx| input.set_value("spruce", window, cx)));
     cx.run_until_parked();
-    click(cx, "studio-replace-scheme-save");
+    click(cx, "studio-replace-scheme-keep");
+    assert!(
+        cx.debug_bounds("studio-replace-scheme-naming").is_none(),
+        "kept: the popover closes"
+    );
+    assert!(
+        cx.debug_bounds("studio-replace-scheme-current").is_some(),
+        "the footer names the scheme the table is"
+    );
+    assert!(cx.debug_bounds("studio-replace-scheme-pick").is_some());
     let saved = rig
         .sent()
         .into_iter()
@@ -1080,9 +1162,11 @@ fn a_scheme_is_saved_and_applied_elsewhere(cx: &mut TestAppContext) {
     rig.serve(&files, cx);
     rig.sent();
     let dialog = open_replace_on(&rig, cx, None);
-    cx.update(|window, cx| {
-        dialog.update(cx, |dialog, cx| dialog.apply_scheme("spruce", window, cx))
-    });
+    // 套用方案… lists the kept schemes by name.
+    let entries = dialog.update(cx, |dialog, cx| dialog.scheme_entries(cx));
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].label().as_ref(), "spruce");
+    cx.update(|window, cx| entries[0].choose(window, cx));
     assert_eq!(count_now(&dialog, cx).0, 3);
     click(cx, "studio-dialog-commit");
     let writes = applied(&rig.sent());

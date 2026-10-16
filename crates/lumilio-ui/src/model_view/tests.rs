@@ -542,11 +542,140 @@ fn loaded_inline(
     (viewer, mailbox, cx)
 }
 
-/// T25: 切片 starts at the top layer; the keys and `[` `]` step through the
-/// layers and stop at the schematic's first and last; another axis starts
-/// at its top; each change is told to the worker.
+/// A picture this wide holding a loaded, drawn inline viewer.
+struct Picture(gpui::Entity<Viewer>, f32);
+
+impl Render for Picture {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div().w(px(self.1)).h(px(400.)).flex().child(self.0.clone())
+    }
+}
+
+/// Chooses 切片's `choice` (0 不切片, then X, Y, Z) in its dropdown, as a
+/// person's click does: the dropdown confirms it.
+fn choose_in_dropdown(
+    viewer: &gpui::Entity<Viewer>,
+    choice: usize,
+    cx: &mut gpui::VisualTestContext,
+) {
+    use gpui_component::IndexPath;
+    use gpui_component::select::SelectEvent;
+    let pick = viewer
+        .read_with(cx, |viewer, _| viewer.slice_pick_for_test())
+        .expect("切片's dropdown is made on the first draw");
+    cx.update(|window, cx| {
+        pick.update(cx, |pick, cx| {
+            pick.set_selected_index(Some(IndexPath::new(choice)), window, cx);
+            let value = pick.selected_value().cloned();
+            cx.emit(SelectEvent::Confirm(value));
+        })
+    });
+    cx.run_until_parked();
+}
+
+/// What the layer field shows.
+fn layer_text(viewer: &gpui::Entity<Viewer>, cx: &mut gpui::VisualTestContext) -> String {
+    let field = viewer
+        .read_with(cx, |viewer, _| viewer.layer_field_for_test())
+        .expect("the layer field");
+    field.read_with(cx, |field, _| field.value().to_string())
+}
+
+/// The studio's tools are two plates on the picture's bottom corners. The
+/// leading one holds the camera's keys: Orbital / Explore and 角度 (复位视角
+/// first, then the presets). The trailing one holds 切片, a labelled
+/// dropdown as the discover page's 排序方式, and while slicing the layer
+/// field over it. Every control stands on one line across both. At the
+/// narrowest picture (the 720 px window's, about 400 px) the plates stay
+/// apart and inside it: one strip of every key wrapped over the read-out
+/// there.
+#[gpui::test]
+fn the_tool_plates_keep_their_controls_on_one_line_and_apart(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_component::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let width = 396.;
+    let (picture, cx) = cx.add_window_view(|_, cx| {
+        let viewer = cx.new(|cx| Viewer::inline(Rc::new(|_, _, _| {}), Rc::new(|_| {}), cx));
+        Picture(viewer, width)
+    });
+    let viewer = picture.read_with(cx, |picture, _| picture.0.clone());
+    let _mailbox = viewer.update(cx, |viewer, _| viewer.start_idle_worker());
+    viewer.update(cx, |viewer, cx| {
+        viewer.frame_arrived(Ok(Event::Loaded {
+            undrawable: Vec::new(),
+            undrawable_entities: Vec::new(),
+            explore_position: [0., 1.62, 3.],
+            cells: ([0, 0, 0], [3, 5, 2]),
+        }));
+        viewer.frame_arrived(Ok(one_pixel_frame()));
+        cx.notify();
+    });
+    cx.run_until_parked();
+    let bounds = |cx: &mut gpui::VisualTestContext, selector: &'static str| {
+        cx.debug_bounds(selector)
+            .unwrap_or_else(|| panic!("{selector} is drawn"))
+    };
+
+    let angles = viewer.update(cx, |viewer, cx| viewer.angle_entries(cx));
+    assert_eq!(angles[0].label().as_ref(), "复位视角（R）");
+    assert_eq!(angles.len(), 7, "复位视角, then the six presets");
+    assert!(
+        cx.debug_bounds("model-slice-layer").is_none(),
+        "no layer field until slicing"
+    );
+    choose_in_dropdown(&viewer, 2, cx);
+    assert_eq!(
+        viewer.read_with(cx, |viewer, _| viewer.slice().map(|slice| slice.layer)),
+        Some(5),
+        "Y 轴 slices from the top"
+    );
+    assert_eq!(layer_text(&viewer, cx), "5");
+
+    let line = bounds(cx, "model-mode-key-1").bottom();
+    for control in ["model-mode-key-0", "model-angle", "model-slice"] {
+        let control_bounds = bounds(cx, control);
+        let off = (control_bounds.bottom() - line).abs();
+        assert!(
+            off <= theme::KEY_TRAVEL,
+            "{control} is {off:?} off the line"
+        );
+        assert_eq!(
+            control_bounds.size.height,
+            px(KeySize::Small.height()),
+            "{control}"
+        );
+    }
+    let (tools, angle) = (bounds(cx, "model-tools"), bounds(cx, "model-angle"));
+    assert!(
+        angle.left() > bounds(cx, "model-mode-key-1").right() && angle.right() <= tools.right(),
+        "角度 is beside the mode, on the leading plate"
+    );
+    assert!(
+        bounds(cx, "model-slice-layer").bottom() <= bounds(cx, "model-slice").top(),
+        "the layer field stands over 切片"
+    );
+    let (view, picture) = (bounds(cx, "model-tools-view"), bounds(cx, "model-viewport"));
+    assert!(
+        tools.right() < view.left() && view.right() <= picture.right(),
+        "apart and inside: {tools:?} {view:?} in {picture:?}"
+    );
+    let clearance = viewer.read_with(cx, |viewer, _| viewer.tool_clearance());
+    assert_eq!(clearance, SLICING_CLEARANCE);
+    assert!(
+        picture.bottom() - view.top() <= px(clearance),
+        "what the read-out clears covers the taller plate"
+    );
+}
+
+/// T25: 切片 starts at the top layer; the layer field's − and +, a layer
+/// typed into it and `[` `]` move through the layers and stop at the
+/// schematic's first and last; the field follows however the layer moved;
+/// another axis starts at its top; each change is told to the worker.
 #[gpui::test]
 fn a_slice_steps_through_the_schematic_s_layers(cx: &mut TestAppContext) {
+    use gpui_component::input::{InputEvent, NumberInputEvent, StepAction};
     use lumilio_schematic_render::{Slice, SliceAxis};
     let (viewer, mailbox, cx) = loaded_inline(cx, ([0, 0, 0], [3, 5, 2]));
     let slices = |mailbox: &Mailbox| {
@@ -558,32 +687,73 @@ fn a_slice_steps_through_the_schematic_s_layers(cx: &mut TestAppContext) {
             .collect::<Vec<_>>()
     };
     let at = |axis, layer| Some(Slice { axis, layer });
+    let layer_of = |cx: &mut gpui::VisualTestContext| {
+        viewer.read_with(cx, |viewer, _| viewer.slice().map(|slice| slice.layer))
+    };
     slices(&mailbox);
     assert!(cx.debug_bounds("model-slice-layer").is_none());
-    let at_key = cx.debug_bounds("model-slice").unwrap().center();
-    cx.simulate_click(at_key, Modifiers::none());
-    viewer.read_with(cx, |viewer, _| {
-        assert_eq!(viewer.slice(), at(SliceAxis::Y, 5))
+    choose_in_dropdown(&viewer, 2, cx);
+    assert_eq!(
+        viewer.read_with(cx, |viewer, _| viewer.slice()),
+        at(SliceAxis::Y, 5)
+    );
+    let field = viewer
+        .read_with(cx, |viewer, _| viewer.layer_field_for_test())
+        .expect("the layer field");
+    // The field's −.
+    field.update(cx, |_, cx| {
+        cx.emit(NumberInputEvent::Step(StepAction::Decrement))
     });
-    assert!(cx.debug_bounds("model-slice-layer").is_some());
-    let at_key = cx.debug_bounds("model-slice-down").unwrap().center();
-    cx.simulate_click(at_key, Modifiers::none());
+    cx.run_until_parked();
+    assert_eq!(layer_of(cx), Some(4));
+    assert_eq!(layer_text(&viewer, cx), "4");
+    // `[` and `]` on the focused picture; the field follows.
     let at_key = cx.debug_bounds("model-viewport").unwrap().center();
     cx.simulate_click(at_key, Modifiers::none());
     cx.simulate_keystrokes("[ [ ]");
-    viewer.read_with(cx, |viewer, _| {
-        assert_eq!(viewer.slice(), at(SliceAxis::Y, 3))
+    assert_eq!(layer_of(cx), Some(3));
+    assert_eq!(layer_text(&viewer, cx), "3");
+    // A layer typed in; one past the top stops at the top.
+    for (typed, layer) in [("1", 1), ("99", 5)] {
+        cx.update(|window, cx| {
+            field.update(cx, |field, cx| {
+                field.set_value(typed, window, cx);
+                cx.emit(InputEvent::Change);
+            })
+        });
+        cx.run_until_parked();
+        assert_eq!(layer_of(cx), Some(layer), "typed {typed}");
+    }
+    assert_eq!(
+        layer_text(&viewer, cx),
+        "5",
+        "the field shows the layer it stopped at"
+    );
+    // Keys typed into the field are the field's: they neither zoom, turn
+    // nor reset the picture.
+    viewer.update(cx, |viewer, _| viewer.view = viewer.view.orbit(30., 0.));
+    let view = viewer.read_with(cx, |viewer, _| viewer.view);
+    cx.update(|window, cx| {
+        use gpui::Focusable as _;
+        field.read(cx).focus_handle(cx).focus(window, cx)
     });
+    cx.simulate_keystrokes("- = r left");
+    cx.run_until_parked();
+    assert_eq!(viewer.read_with(cx, |viewer, _| viewer.view), view);
     viewer.update(cx, |viewer, cx| {
         viewer.step_layer(-10, cx);
         viewer.step_layer(-1, cx);
         assert_eq!(viewer.slice(), at(SliceAxis::Y, 0), "stops at the first");
-        viewer.slice_along(SliceAxis::X, cx);
-        assert_eq!(viewer.slice(), at(SliceAxis::X, 3), "X starts at its top");
-        viewer.step_layer(1, cx);
-        viewer.toggle_slice(cx);
-        assert_eq!(viewer.slice(), None);
     });
+    choose_in_dropdown(&viewer, 1, cx);
+    assert_eq!(
+        viewer.read_with(cx, |viewer, _| viewer.slice()),
+        at(SliceAxis::X, 3),
+        "X starts at its top"
+    );
+    choose_in_dropdown(&viewer, 0, cx);
+    assert_eq!(viewer.read_with(cx, |viewer, _| viewer.slice()), None);
+    assert!(cx.debug_bounds("model-slice-layer").is_none());
     assert_eq!(
         slices(&mailbox),
         [
@@ -592,6 +762,8 @@ fn a_slice_steps_through_the_schematic_s_layers(cx: &mut TestAppContext) {
             at(SliceAxis::Y, 3),
             at(SliceAxis::Y, 2),
             at(SliceAxis::Y, 3),
+            at(SliceAxis::Y, 1),
+            at(SliceAxis::Y, 5),
             at(SliceAxis::Y, 0),
             at(SliceAxis::X, 3),
             None,
