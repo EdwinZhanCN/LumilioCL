@@ -143,7 +143,7 @@ impl WorldSource {
         let mut archive = zip::ZipArchive::new(Cursor::new(&data))?;
         for i in 0..archive.len() {
             if let Ok(f) = archive.by_index_raw(i) {
-                let name = f.name().to_lowercase();
+                let name = f.name().unwrap_or_default().to_lowercase();
                 if name.contains("region/") && name.ends_with(".mca") {
                     found = true;
                     break;
@@ -190,9 +190,10 @@ impl WorldSource {
                 let mut archive = zip::ZipArchive::new(Cursor::new(data.as_slice()))?;
                 for i in 0..archive.len() {
                     if let Ok(f) = archive.by_index_raw(i) {
-                        let lower = f.name().to_lowercase();
+                        let name = f.name().unwrap_or_default();
+                        let lower = name.to_lowercase();
                         if lower.contains("region/") && lower.ends_with(".mca") {
-                            if let Some(pos) = parse_region_filename(f.name()) {
+                            if let Some(pos) = parse_region_filename(&name) {
                                 out.push(pos);
                             }
                         }
@@ -266,7 +267,7 @@ fn read_zip_region_entry(
     let mut entry_idx = None;
     for i in 0..archive.len() {
         if let Ok(f) = archive.by_index_raw(i) {
-            let lower = f.name().to_lowercase();
+            let lower = f.name().unwrap_or_default().to_lowercase();
             if lower.contains(&needle) && (lower.ends_with(&slash_wanted) || lower == wanted) {
                 entry_idx = Some(i);
                 break;

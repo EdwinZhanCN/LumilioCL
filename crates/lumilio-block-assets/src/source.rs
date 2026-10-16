@@ -139,7 +139,10 @@ fn read_archive(bytes: &[u8]) -> Result<ReadSource, BakeError> {
         if !file.is_file() {
             continue;
         }
-        let name = file.name().to_owned();
+        let name = file
+            .name()
+            .map_err(|error| BakeError::Archive(error.to_string()))?
+            .into_owned();
         let wanted = name == "version.json" || classify(&name).is_some();
         if !wanted {
             continue;
