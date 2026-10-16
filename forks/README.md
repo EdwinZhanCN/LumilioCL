@@ -48,6 +48,14 @@ Keep upstream license headers and API attribution when changing source.
 - Both depend on `../../crates/lumilio-block-assets` (Nucleation through its
   `meshing` feature). Schematic-Mesher's manifest has an empty `[workspace]`
   so its guards also run from a Git worktree nested in another checkout.
+- Both use `zip` 9 (upstream: 2). crates.io yanked every older release on
+  2026-10-16, after the zip 9.0 extraction advisories, and the forks' lockfiles
+  are not tracked, so `just forks` resolves afresh. zip 9 entry names are
+  fallible: a name scan treats an undecodable name as no match, and Nucleation's
+  world loader and Schematic-Mesher's pack loader return the error.
+  Nucleation's `ffmpeg-sidecar` development dependency leaves out its default
+  `download_ffmpeg` feature, which requires zip 4; `render_schematic` runs an
+  installed ffmpeg.
 - Rendering behaviour follows Minecraft's draw rules (ADR 0034). Each change
   below has a guard that was shown to fail without it; keep them through syncs.
 

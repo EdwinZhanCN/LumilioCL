@@ -508,7 +508,7 @@ mod tests {
         let mut found_atlas = false;
         for i in 0..archive.len() {
             let file = archive.by_index(i).unwrap();
-            match file.name() {
+            match file.name().unwrap().as_ref() {
                 "root.usda" => found_usda = true,
                 "textures/atlas.png" => found_atlas = true,
                 _ => {}
@@ -528,12 +528,12 @@ mod tests {
         let mut archive = zip::ZipArchive::new(cursor).unwrap();
         for i in 0..archive.len() {
             let file = archive.by_index(i).unwrap();
-            let offset = file.data_start();
+            let offset = file.data_start().unwrap();
             assert_eq!(
                 offset % 64,
                 0,
                 "File '{}' data not 64-byte aligned (offset={})",
-                file.name(),
+                file.name().unwrap(),
                 offset
             );
         }

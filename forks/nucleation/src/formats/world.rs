@@ -366,7 +366,7 @@ fn is_world_zip(data: &[u8]) -> bool {
     if let Ok(mut archive) = zip::ZipArchive::new(cursor) {
         for i in 0..archive.len() {
             if let Ok(file) = archive.by_index_raw(i) {
-                let name = file.name().to_lowercase();
+                let name = file.name().unwrap_or_default().to_lowercase();
                 if name.contains("region/") && name.ends_with(".mca") {
                     return true;
                 }
@@ -409,7 +409,7 @@ fn from_world_zip_impl(
 
     for i in 0..archive.len() {
         if let Ok(file) = archive.by_index_raw(i) {
-            let name = file.name().to_lowercase();
+            let name = file.name().unwrap_or_default().to_lowercase();
             if name.ends_with(".mca") {
                 if name.contains("region/") {
                     region_indices.push(i);
@@ -423,7 +423,7 @@ fn from_world_zip_impl(
     // Process block region files
     for idx in region_indices {
         let mut file = archive.by_index(idx)?;
-        let name = file.name().to_string();
+        let name = file.name()?.into_owned();
 
         let (rx, rz) = parse_region_filename(&name).unwrap_or((0, 0));
 
@@ -438,7 +438,7 @@ fn from_world_zip_impl(
     // Process entity region files (1.17+)
     for idx in entity_indices {
         let mut file = archive.by_index(idx)?;
-        let name = file.name().to_string();
+        let name = file.name()?.into_owned();
 
         let (rx, rz) = parse_region_filename(&name).unwrap_or((0, 0));
 

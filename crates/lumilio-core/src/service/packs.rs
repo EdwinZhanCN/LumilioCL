@@ -23,17 +23,18 @@ pub(super) fn sniff_pack(path: &std::path::Path) -> PackKind {
     let Ok(archive) = zip::ZipArchive::new(file) else {
         return PackKind::Modrinth;
     };
-    let names: Vec<&str> = archive.file_names().collect();
-    if names.contains(&"modrinth.index.json") {
+    let names: Vec<_> = archive.file_names().flatten().collect();
+    let has = |wanted: &str| names.iter().any(|name| name == wanted);
+    if has("modrinth.index.json") {
         PackKind::Modrinth
-    } else if names.contains(&"lumilio-backup.json") {
+    } else if has("lumilio-backup.json") {
         PackKind::Backup
     } else if names
         .iter()
         .any(|name| name.rsplit('/').next() == Some("mmc-pack.json"))
     {
         PackKind::Prism
-    } else if names.contains(&crate::modpack::curseforge::MANIFEST) {
+    } else if has(crate::modpack::curseforge::MANIFEST) {
         PackKind::CurseForge
     } else {
         PackKind::Modrinth

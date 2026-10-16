@@ -224,7 +224,13 @@ pub(super) fn extract_all(
                     archive: bundle.archive.clone(),
                     message: error.to_string(),
                 })?;
-            let raw_name = entry.name().to_owned();
+            let raw_name = entry
+                .name()
+                .map_err(|error| NativeError::Archive {
+                    archive: bundle.archive.clone(),
+                    message: error.to_string(),
+                })?
+                .into_owned();
             let relative =
                 strict_archive_path(&raw_name).ok_or_else(|| NativeError::UnsafePath {
                     archive: bundle.archive.clone(),

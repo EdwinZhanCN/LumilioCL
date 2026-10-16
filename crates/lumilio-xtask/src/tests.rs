@@ -199,7 +199,7 @@ fn the_portable_zip_unpacks_into_one_folder() {
     release("0.1.0").notices(&payload).unwrap();
     windows::zip_folder(&payload, "LumilioCL", &archive).unwrap();
     let zip = zip::ZipArchive::new(std::fs::File::open(&archive).unwrap()).unwrap();
-    let mut names: Vec<_> = zip.file_names().collect();
+    let mut names: Vec<_> = zip.file_names().map(|name| name.unwrap()).collect();
     names.sort_unstable();
     assert_eq!(
         names,

@@ -203,6 +203,7 @@ pub fn build_biomes<R: Read + Seek>(jar: &mut zip::ZipArchive<R>) -> Biomes {
     };
     let names: Vec<String> = jar
         .file_names()
+        .flatten()
         .filter_map(|name| {
             name.strip_prefix("data/minecraft/worldgen/biome/")?
                 .strip_suffix(".json")
@@ -250,6 +251,7 @@ pub fn data_version<R: Read + Seek>(jar: &mut zip::ZipArchive<R>) -> Option<i64>
 pub fn build_table<R: Read + Seek>(jar: &mut zip::ZipArchive<R>) -> Table {
     let states: Vec<String> = jar
         .file_names()
+        .flatten()
         .filter_map(|name| {
             name.strip_prefix("assets/minecraft/blockstates/")?
                 .strip_suffix(".json")

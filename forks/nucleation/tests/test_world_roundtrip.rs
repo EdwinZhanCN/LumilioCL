@@ -93,7 +93,12 @@ fn test_55_3x3_roundtrip() {
     let cursor = std::io::Cursor::new(&original_data);
     let mut orig_archive = zip::ZipArchive::new(cursor).unwrap();
     for i in 0..orig_archive.len() {
-        let name = orig_archive.by_index_raw(i).unwrap().name().to_string();
+        let name = orig_archive
+            .by_index_raw(i)
+            .unwrap()
+            .name()
+            .unwrap()
+            .into_owned();
         if name.ends_with("level.dat") {
             let mut file = orig_archive.by_index(i).unwrap();
             let mut orig_leveldat = Vec::new();

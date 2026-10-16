@@ -26,7 +26,7 @@ pub fn read_region_container(bytes: &[u8]) -> Result<Vec<u8>, CodecError> {
             .find(|&i| {
                 archive
                     .by_index_raw(i)
-                    .map(|f| f.name() == "region.xaero")
+                    .map(|f| f.name().is_ok_and(|name| name == "region.xaero"))
                     .unwrap_or(false)
             })
             .unwrap_or(0);
