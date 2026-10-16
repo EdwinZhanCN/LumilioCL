@@ -270,9 +270,11 @@ impl<T: Styled> StyleSized<T> for T {
         match size {
             Size::Large => self.h_11(),
             Size::Medium => self.h_8(),
-            Size::Small => self.h_6(),
+            // LumilioCL: a small field is as tall as a small key (28 px at
+            // the base font size), so the two line up in one row.
+            Size::Small => self.h_7(),
             Size::XSmall => self.h_5(),
-            _ => self.h_6(),
+            _ => self.h_7(),
         }
     }
 

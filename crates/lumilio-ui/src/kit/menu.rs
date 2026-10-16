@@ -17,6 +17,8 @@ pub struct MenuEntry {
     pub(super) label: SharedString,
     pub(super) danger: bool,
     pub(super) disabled: bool,
+    /// A separator goes before it: it starts a group of its own.
+    pub(super) separated: bool,
     /// Why a disabled entry cannot be chosen, shown as its tooltip.
     pub(super) hint: Option<SharedString>,
     pub(super) on_click: MenuAction,
@@ -31,9 +33,16 @@ impl MenuEntry {
             label: label.into(),
             danger: false,
             disabled: false,
+            separated: false,
             hint: None,
             on_click: Rc::new(on_click),
         }
+    }
+
+    /// Starts a group of its own, after a separator.
+    pub fn separated(mut self) -> Self {
+        self.separated = true;
+        self
     }
 
     /// A destructive entry: drawn in the danger colour, after a separator.
@@ -102,53 +111,68 @@ pub(super) fn more_key(
     colors: ShellColors,
     size: crate::key::KeySize,
 ) -> impl IntoElement {
+    with_menu(
+        Key::new(id)
+            .icon(Icon::new(UiIcon::More))
+            .black()
+            .size(size)
+            .tooltip(crate::tr!("common-more")),
+        entries,
+        gpui::Anchor::TopRight,
+        colors,
+    )
+}
+
+/// `key` opening `entries` as a menu anchored at `anchor`: the More key, or
+/// a labelled key for a few related commands ("添加…": a zip, a folder or a
+/// typed path). Destructive entries are sorted last, behind one separator.
+pub fn with_menu(
+    key: Key,
+    entries: Vec<MenuEntry>,
+    anchor: gpui::Anchor,
+    colors: ShellColors,
+) -> impl IntoElement {
     let (mut safe, danger): (Vec<_>, Vec<_>) = entries.into_iter().partition(|entry| !entry.danger);
     let split = safe.len();
     safe.extend(danger);
     let entries = Rc::new(safe);
-    Key::new(id)
-        .icon(Icon::new(UiIcon::More))
-        .black()
-        .size(size)
-        .tooltip(crate::tr!("common-more"))
-        .dropdown_menu_with_anchor(gpui::Anchor::TopRight, move |menu, _, _| {
-            let mut menu = menu.min_w(px(180.));
-            for (index, entry) in entries.iter().enumerate() {
-                if index == split && index > 0 {
-                    menu = menu.separator();
-                }
-                let run = entry.on_click.clone();
-                let item = if let Some(hint) = entry.hint.clone() {
-                    let (label, danger, index) = (entry.label.clone(), entry.danger, index);
-                    PopupMenuItem::element(move |_, _| {
-                        let hint = hint.clone();
-                        div()
-                            .id(("menu-hint", index))
-                            .debug_selector(move || format!("menu-entry-{index}"))
-                            .when(danger, |item| item.text_color(colors.danger))
-                            .tooltip(move |window, cx| {
-                                gpui_component::tooltip::Tooltip::new(hint.clone())
-                                    .build(window, cx)
-                            })
-                            .child(label.clone())
-                    })
-                } else {
-                    // Every entry carries the same selector, enabled or not.
-                    let (label, danger) = (entry.label.clone(), entry.danger);
-                    PopupMenuItem::element(move |_, _| {
-                        div()
-                            .debug_selector(move || format!("menu-entry-{index}"))
-                            .when(danger, |item| item.text_color(colors.danger))
-                            .child(label.clone())
-                    })
-                };
-                menu = menu.item(
-                    item.disabled(entry.disabled)
-                        .on_click(move |_, window, cx| run(window, cx)),
-                );
+    key.dropdown_menu_with_anchor(anchor, move |menu, _, _| {
+        let mut menu = menu.min_w(px(180.));
+        for (index, entry) in entries.iter().enumerate() {
+            if index > 0 && (index == split || entry.separated) {
+                menu = menu.separator();
             }
-            menu
-        })
+            let run = entry.on_click.clone();
+            let item = if let Some(hint) = entry.hint.clone() {
+                let (label, danger, index) = (entry.label.clone(), entry.danger, index);
+                PopupMenuItem::element(move |_, _| {
+                    let hint = hint.clone();
+                    div()
+                        .id(("menu-hint", index))
+                        .debug_selector(move || format!("menu-entry-{index}"))
+                        .when(danger, |item| item.text_color(colors.danger))
+                        .tooltip(move |window, cx| {
+                            gpui_component::tooltip::Tooltip::new(hint.clone()).build(window, cx)
+                        })
+                        .child(label.clone())
+                })
+            } else {
+                // Every entry carries the same selector, enabled or not.
+                let (label, danger) = (entry.label.clone(), entry.danger);
+                PopupMenuItem::element(move |_, _| {
+                    div()
+                        .debug_selector(move || format!("menu-entry-{index}"))
+                        .when(danger, |item| item.text_color(colors.danger))
+                        .child(label.clone())
+                })
+            };
+            menu = menu.item(
+                item.disabled(entry.disabled)
+                    .on_click(move |_, window, cx| run(window, cx)),
+            );
+        }
+        menu
+    })
 }
 
 /// The page actions on the header's trailing edge, always in the order

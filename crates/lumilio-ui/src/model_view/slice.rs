@@ -1,20 +1,24 @@
 //! Slicing and selecting in the studio's viewport (plan schematic-studio,
-//! T25): the tool strip's 切片 draws one layer and those below it along X, Y
-//! or Z, stepped with its keys or `[` and `]`; a drag with Ctrl (or ⌘) from
-//! one block to another selects the box between them. Both are the
-//! picture's, kept here; the studio reads them for the materials and as a
-//! replacement's scope.
+//! T25): 切片's dropdown draws one layer and those below it along X, Y or
+//! Z, and the layer field over it (or `[` and `]`) moves through the
+//! layers; a drag with Ctrl (or ⌘) from one block to another selects the
+//! box between them. Both are the picture's, kept here; the studio reads
+//! them for the materials and as a replacement's scope.
 
 use gpui::prelude::*;
-use gpui::{AnyElement, Context, Pixels, Point, div};
-use gpui_component::{Selectable as _, Sizable as _, h_flex};
+use gpui::{
+    AnyElement, Context, Entity, Focusable as _, Pixels, Point, Subscription, Window, div, px,
+};
+use gpui_component::IndexPath;
+use gpui_component::input::{InputEvent, InputState, NumberInput, NumberInputEvent, StepAction};
+use gpui_component::select::{SearchableVec, SelectEvent, SelectState};
+use gpui_component::{Sizable as _, h_flex};
 use lumilio_schematic_render::{Slice, SliceAxis};
 
+use super::Viewer;
 use super::worker::Job;
-use super::{State, Viewer};
-use crate::controls::Segments;
-use crate::key::Key;
-use crate::theme::{self, ShellColors};
+use crate::kit;
+use crate::theme::ShellColors;
 use crate::tr;
 
 /// A box of cells, its first and last corners both included.
@@ -63,18 +67,6 @@ impl Viewer {
         Some((min[axis.index()], max[axis.index()]))
     }
 
-    /// Slices along the last axis used, at its top layer, or stops slicing.
-    pub(crate) fn toggle_slice(&mut self, cx: &mut Context<Self>) {
-        let slice = match self.slice {
-            Some(_) => None,
-            None => self.layers(self.slice_axis).map(|(_, top)| Slice {
-                axis: self.slice_axis,
-                layer: top,
-            }),
-        };
-        self.set_slice(slice, cx);
-    }
-
     /// Slices along `axis`, at the same layer when it is in range, else its
     /// top.
     pub(crate) fn slice_along(&mut self, axis: SliceAxis, cx: &mut Context<Self>) {
@@ -91,13 +83,20 @@ impl Viewer {
 
     /// Moves the slice `by` layers, within the schematic.
     pub(crate) fn step_layer(&mut self, by: i32, cx: &mut Context<Self>) {
+        if let Some(slice) = self.slice {
+            self.go_to_layer(slice.layer + by, cx);
+        }
+    }
+
+    /// Slices at `layer`, within the schematic, along the axis in use.
+    pub(crate) fn go_to_layer(&mut self, layer: i32, cx: &mut Context<Self>) {
         let Some(slice) = self.slice else {
             return;
         };
         let Some((bottom, top)) = self.layers(slice.axis) else {
             return;
         };
-        let layer = (slice.layer + by).clamp(bottom, top);
+        let layer = layer.clamp(bottom, top);
         if layer != slice.layer {
             self.set_slice(Some(Slice { layer, ..slice }), cx);
         }
@@ -253,73 +252,232 @@ impl Viewer {
         }));
     }
 
-    /// The tool strip's slice controls: 切片, and while slicing the axis,
-    /// the layer keys and what the layer holds.
-    pub(super) fn slice_controls(&self, colors: ShellColors, cx: &mut Context<Self>) -> AnyElement {
-        let ready = self.state == State::Ready && self.cells.is_some();
-        let viewer = cx.weak_entity();
-        // ia[plugin.litematica]: 切片 | 工作室视口工具条「切片」（再点关闭） | 只画当前层及以下，切口露出这一层的顶面；默认从最高层开始；点不到被切掉的层 | 第一次沿某个轴切片时重新网格化一次，之后逐层只换一个 uniform（T25）
-        let toggle = Key::new("model-slice")
-            .label(tr!("model-slice"))
-            .white()
-            .small()
-            .selected(self.slice.is_some())
-            .disabled(!ready)
-            .debug_selector(|| "model-slice".into())
-            .on_click(move |_, _, cx| {
-                let _ = viewer.update(cx, |viewer, cx| viewer.toggle_slice(cx));
-            });
-        let Some(slice) = self.slice else {
-            return toggle.into_any_element();
-        };
-        let viewer = cx.weak_entity();
-        // ia[plugin.litematica]: 换切片的轴 | 切片中工具条的 X / Y / Z 分段 | 沿新轴切，层在范围内就保留，否则从最高层开始 | 每换一次轴重新网格化一次（T25）
-        let axes = Segments::new(
-            "model-slice-axis",
-            &["X", "Y", "Z"],
-            slice.axis.index(),
-            move |index, _, cx| {
-                let _ = viewer.update(cx, |viewer, cx| {
-                    viewer.slice_along(SliceAxis::ALL[index], cx);
-                });
-            },
-        );
-        let step = |id: &'static str, label: &'static str, by: i32, tip: &'static str| {
-            let viewer = cx.weak_entity();
-            Key::new(id)
-                .label(label)
-                .ghost()
-                .small()
-                .tooltip(tip)
-                .debug_selector(move || id.into())
-                .on_click(move |_, _, cx| {
-                    let _ = viewer.update(cx, |viewer, cx| viewer.step_layer(by, cx));
-                })
-        };
-        let count: u64 = self.layer_blocks.iter().map(|(_, count)| count).sum();
-        let axis = ["X", "Y", "Z"][slice.axis.index()];
-        // ia[plugin.litematica]: 逐层看切片 | 切片中工具条的 ‹ › 键，视口聚焦时按 [ 与 ] | 往下或往上一层，读数写「轴 层号 · 这一层的方块数」 | 停在投影的第一层与最后一层（T25）
-        h_flex()
-            .gap_1()
-            .items_center()
-            .child(toggle)
-            .child(axes)
-            .child(step("model-slice-down", "‹", -1, tr!("model-slice-down")))
-            .child(
-                div()
-                    .debug_selector(|| "model-slice-layer".into())
-                    .px_1()
-                    .font_family(theme::mono_font())
-                    .text_xs()
-                    .text_color(colors.foreground)
-                    .child(tr!(
-                        "model-slice-layer",
-                        axis = axis,
-                        layer = slice.layer,
-                        count = count
-                    )),
-            )
-            .child(step("model-slice-up", "›", 1, tr!("model-slice-up")))
-            .into_any_element()
+    /// Chooses 切片's `choice`, as its dropdown lists them: 0 is 不切片,
+    /// then X, Y and Z. An axis slices along it, at the same layer when it
+    /// is in range, else from the top.
+    pub(crate) fn choose_slice(&mut self, choice: usize, cx: &mut Context<Self>) {
+        match choice.checked_sub(1).and_then(|at| SliceAxis::ALL.get(at)) {
+            Some(axis) => self.slice_along(*axis, cx),
+            None => self.set_slice(None, cx),
+        }
     }
+
+    /// 切片's choice in use: 0 when not slicing, else 1 + the axis.
+    fn slice_choice(&self) -> usize {
+        self.slice.map_or(0, |slice| slice.axis.index() + 1)
+    }
+
+    /// Asks for 切片's controls once: an input state installs focus
+    /// observers, so they are made after this draw, with its window.
+    pub(super) fn want_slice_controls(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.inline || self.slice_controls_asked {
+            return;
+        }
+        self.slice_controls_asked = true;
+        let viewer = cx.weak_entity();
+        window.defer(cx, move |window, cx| {
+            let _ = viewer.update(cx, |viewer, cx| {
+                viewer.slice_controls = Some(SliceControls::new(viewer.slice_choice(), window, cx));
+                cx.notify();
+            });
+        });
+    }
+
+    /// Keeps 切片's dropdown and the layer field showing the slice, however
+    /// it changed (`[` and `]`, the field's own steps, another axis). The
+    /// field is left alone while it is being typed into.
+    pub(super) fn sync_slice_controls(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let (choice, slice) = (self.slice_choice(), self.slice);
+        let Some(controls) = self.slice_controls.as_mut() else {
+            return;
+        };
+        if controls.language != crate::i18n::generation() {
+            controls.language = crate::i18n::generation();
+            controls.pick.update(cx, |pick, cx| {
+                pick.set_items(SearchableVec::new(slice_choices()), window, cx);
+                pick.set_selected_index(Some(IndexPath::new(choice)), window, cx);
+            });
+        }
+        if controls.pick.read(cx).selected_index(cx) != Some(IndexPath::new(choice)) {
+            controls.pick.update(cx, |pick, cx| {
+                pick.set_selected_index(Some(IndexPath::new(choice)), window, cx);
+            });
+        }
+        let Some(slice) = slice else {
+            return;
+        };
+        let text = slice.layer.to_string();
+        let typing = controls.layer.read(cx).focus_handle(cx).is_focused(window);
+        if (!typing || std::mem::take(&mut controls.resync))
+            && controls.layer.read(cx).value() != text.as_str()
+        {
+            controls
+                .layer
+                .update(cx, |field, cx| field.set_value(text, window, cx));
+        }
+    }
+
+    /// The trailing plate's 切片: a label and the dropdown 不切片 / X 轴 /
+    /// Y 轴 / Z 轴, as the discover page's 排序方式. `None` until made.
+    pub(super) fn slice_select(&self, colors: ShellColors) -> Option<AnyElement> {
+        let controls = self.slice_controls.as_ref()?;
+        // ia[plugin.litematica]: 切片 / 换切片的轴 | 工作室视口右下角「切片」下拉：不切片、X 轴、Y 轴、Z 轴，框里写着正在用的 | 只画当前层及以下，切口露出这一层的顶面；第一次从最高层开始，换轴时层在范围内就保留，否则从最高层开始；点不到被切掉的层；选不切片画回整份投影 | 每沿一个轴第一次切片时重新网格化一次，之后逐层只换一个 uniform（T25）
+        Some(
+            kit::labeled_select(tr!("model-slice"), &controls.pick, SLICE_SELECT, colors)
+                .debug_selector(|| "model-slice".into())
+                .into_any_element(),
+        )
+    }
+
+    /// While slicing: the layer, a number field with − and +.
+    pub(super) fn layer_field(&self, colors: ShellColors) -> Option<AnyElement> {
+        let controls = self.slice_controls.as_ref()?;
+        self.slice?;
+        // ia[plugin.litematica]: 逐层看切片 | 切片时右下角「切片」上方的层数框：− 与 +、直接输入层号，视口聚焦时也可按 [ 与 ] | 往下或往上一层；输入的层号超出投影时停在第一层或最后一层，离开输入框后框里写回实际的层 | 这一层有多少方块写在材料里（T25）
+        Some(
+            h_flex()
+                .debug_selector(|| "model-slice-layer".into())
+                .gap_2()
+                .items_center()
+                .child(
+                    div()
+                        .text_sm()
+                        .text_color(colors.muted)
+                        .child(tr!("model-slice-layer-label")),
+                )
+                .child(
+                    div()
+                        .w(px(LAYER_FIELD))
+                        .child(NumberInput::new(&controls.layer).small()),
+                )
+                .into_any_element(),
+        )
+    }
+}
+
+/// 切片's dropdown, as wide as its longest choice.
+const SLICE_SELECT: f32 = 96.;
+
+/// The layer field: room for a three-digit layer between − and +.
+const LAYER_FIELD: f32 = 96.;
+
+/// 切片's choices, in order: 不切片, then an axis each.
+fn slice_choices() -> Vec<String> {
+    std::iter::once(tr!("model-slice-off").to_owned())
+        .chain(
+            SliceAxis::ALL
+                .into_iter()
+                .map(|axis| tr!("model-slice-along", axis = axis_name(axis))),
+        )
+        .collect()
+}
+
+/// 切片's dropdown and the layer field, made on a draw that has a window.
+pub(super) struct SliceControls {
+    pick: Entity<SelectState<SearchableVec<String>>>,
+    layer: Entity<InputState>,
+    /// The language the dropdown's words were written in: kept in its
+    /// state, they are written again after a switch.
+    language: u32,
+    /// The field shows the slice again though it has focus: a step, Enter
+    /// or leaving it.
+    resync: bool,
+    _subscriptions: Vec<Subscription>,
+}
+
+impl SliceControls {
+    fn new(choice: usize, window: &mut Window, cx: &mut Context<Viewer>) -> Self {
+        let pick = cx.new(|cx| {
+            SelectState::new(
+                SearchableVec::new(slice_choices()),
+                Some(IndexPath::new(choice)),
+                window,
+                cx,
+            )
+        });
+        let layer = cx.new(|cx| {
+            InputState::new(window, cx)
+                .validate(|text, _| text.is_empty() || text == "-" || text.parse::<i32>().is_ok())
+        });
+        let subscriptions = vec![
+            cx.subscribe_in(
+                &pick,
+                window,
+                |viewer, pick, event: &SelectEvent<SearchableVec<String>>, _, cx| {
+                    if let SelectEvent::Confirm(Some(_)) = event
+                        && let Some(choice) = pick.read(cx).selected_index(cx)
+                    {
+                        viewer.choose_slice(choice.row, cx);
+                    }
+                },
+            ),
+            cx.subscribe_in(
+                &layer,
+                window,
+                |viewer, _, event: &NumberInputEvent, _, cx| {
+                    let NumberInputEvent::Step(action) = event;
+                    viewer.step_layer(
+                        match action {
+                            StepAction::Increment => 1,
+                            StepAction::Decrement => -1,
+                        },
+                        cx,
+                    );
+                    viewer.resync_layer(cx);
+                },
+            ),
+            cx.subscribe_in(
+                &layer,
+                window,
+                |viewer, field, event: &InputEvent, _, cx| match event {
+                    InputEvent::Change => {
+                        if let Ok(layer) = field.read(cx).value().trim().parse::<i32>() {
+                            viewer.go_to_layer(layer, cx);
+                        }
+                    }
+                    InputEvent::PressEnter { .. } | InputEvent::Blur => viewer.resync_layer(cx),
+                    _ => {}
+                },
+            ),
+        ];
+        Self {
+            pick,
+            layer,
+            language: crate::i18n::generation(),
+            resync: false,
+            _subscriptions: subscriptions,
+        }
+    }
+}
+
+impl Viewer {
+    /// Shows the slice's layer in the field again on the next draw, though
+    /// the field has focus.
+    fn resync_layer(&mut self, cx: &mut Context<Self>) {
+        if let Some(controls) = self.slice_controls.as_mut() {
+            controls.resync = true;
+        }
+        cx.notify();
+    }
+
+    /// The layer field, for tests.
+    #[cfg(test)]
+    pub(crate) fn layer_field_for_test(&self) -> Option<Entity<InputState>> {
+        self.slice_controls
+            .as_ref()
+            .map(|controls| controls.layer.clone())
+    }
+
+    /// 切片's dropdown, for tests.
+    #[cfg(test)]
+    pub(crate) fn slice_pick_for_test(&self) -> Option<Entity<SelectState<SearchableVec<String>>>> {
+        self.slice_controls
+            .as_ref()
+            .map(|controls| controls.pick.clone())
+    }
+}
+
+/// An axis as the strip writes it.
+fn axis_name(axis: SliceAxis) -> &'static str {
+    ["X", "Y", "Z"][axis.index()]
 }

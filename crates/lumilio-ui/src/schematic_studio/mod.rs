@@ -295,8 +295,9 @@ pub struct StudioView {
     restoring: bool,
     search: Option<Entity<InputState>>,
     block_search: Option<Entity<InputState>>,
-    /// A resource pack's path, typed or pasted (T36).
-    pack_path: Option<Entity<InputState>>,
+    /// A pack typed into 输入路径… was sent: its answer goes to that
+    /// dialog, which stays open until it comes (T36).
+    pack_adding: Option<Entity<dialogs::Submission>>,
     /// The block kind chosen in the materials, by id: its tile is ringed and
     /// its detail shows (D27). A click in the picture inspects one block
     /// instead (D31); its card's 选中这种 chooses its kind.
@@ -417,7 +418,7 @@ impl StudioView {
             restoring: false,
             search: None,
             block_search: None,
-            pack_path: None,
+            pack_adding: None,
             chosen: None,
             tile_hover: None,
             isolate: false,
@@ -795,9 +796,7 @@ impl StudioView {
             cx.new(|cx| InputState::new(window, cx).placeholder(tr!("studio-search-placeholder")));
         let blocks =
             cx.new(|cx| InputState::new(window, cx).placeholder(tr!("studio-blocks-placeholder")));
-        let pack_path =
-            cx.new(|cx| InputState::new(window, cx).placeholder(tr!("studio-sources-path")));
-        for input in [&search, &blocks, &pack_path] {
+        for input in [&search, &blocks] {
             cx.subscribe_in(input, window, |_, _, event: &InputEvent, _, cx| {
                 if matches!(event, InputEvent::Change) {
                     cx.notify();
@@ -805,19 +804,8 @@ impl StudioView {
             })
             .detach();
         }
-        cx.subscribe_in(
-            &pack_path,
-            window,
-            |this, _, event: &InputEvent, window, cx| {
-                if matches!(event, InputEvent::PressEnter { .. }) {
-                    this.add_typed(window, cx);
-                }
-            },
-        )
-        .detach();
         self.search = Some(search);
         self.block_search = Some(blocks);
-        self.pack_path = Some(pack_path);
         self.inputs_language = crate::i18n::generation();
     }
 
@@ -830,7 +818,6 @@ impl StudioView {
         for (input, text) in [
             (&self.search, tr!("studio-search-placeholder")),
             (&self.block_search, tr!("studio-blocks-placeholder")),
-            (&self.pack_path, tr!("studio-sources-path")),
         ] {
             if let Some(input) = input {
                 input.update(cx, |input, cx| input.set_placeholder(text, window, cx));

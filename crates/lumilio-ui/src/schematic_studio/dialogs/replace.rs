@@ -6,17 +6,25 @@
 //! one region, the current slice or the current selection. What would
 //! change is counted on the background executor whenever anything changes,
 //! row by row, and the commit key says the total. A table can be kept as a
-//! named 方案 in launcher data and applied to another schematic.
+//! named 方案 in launcher data and applied to another schematic; both are
+//! on the footer's leading side, as they act on the whole table.
+//!
+//! Every choice in the table is a dropdown: a row repeats, and segment keys
+//! (their LED band, their width that follows the labels) would make each
+//! row taller and the columns ragged. The scope's options include region
+//! names, which are the file's data, so it is a dropdown too.
 
 use std::rc::Rc;
 use std::sync::Arc;
 
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, App, Context, Entity, SharedString, Subscription, Task, WeakEntity, Window, div, px,
+    Anchor, AnyElement, App, Context, Entity, Focusable as _, SharedString, Subscription, Task,
+    WeakEntity, Window, div, px,
 };
 use gpui_component::IndexPath;
 use gpui_component::input::{Input, InputEvent, InputState};
+use gpui_component::popover::Popover;
 use gpui_component::select::{SearchableVec, Select, SelectEvent, SelectItem, SelectState};
 use gpui_component::{Sizable as _, h_flex, v_flex};
 use lumilio_core::{BlockCatalog, BlockNames, ReplaceSchemes, SchematicOperation, SchemeRow};
@@ -25,8 +33,9 @@ use lumilio_schematic::replace::{Mapping, MappingRow, PropertyMatch, Scope, Stat
 use lumilio_schematic::stats::BlockCount;
 
 use super::{DialogForm, Submission, field, note};
-use crate::controls::{Fader, Segments};
-use crate::key::Key;
+use crate::controls::Fader;
+use crate::key::{Key, KeySize};
+use crate::kit::{self, MenuEntry};
 use crate::model_view::Cells;
 use crate::schematic_studio::words::block_name;
 use crate::schematic_studio::writes::Edited;
@@ -34,11 +43,20 @@ use crate::schematic_studio::{Loaded, StudioView, tree};
 use crate::theme::{self, ShellColors};
 use crate::tr;
 
-/// A choice of up to this many options is a row of segment keys; a longer
-/// one is a searchable dropdown (AGENTS.md control rules).
-const SEGMENT_LIMIT: usize = 4;
+/// A property chip's dropdown is searchable past this many values.
+const SEARCH_PAST: usize = 8;
+
+/// A property chip's dropdown: room for values such as `ascending_east`.
+const CHIP_WIDTH: f32 = 140.;
+
+/// A block picker's list: wider than half the dialog, so a name and its ID
+/// both fit.
+const BLOCK_MENU: f32 = 360.;
 
 type Dropdown = Entity<SelectState<SearchableVec<String>>>;
+
+/// The scope's dropdown.
+type ScopeDropdown = Entity<SelectState<SearchableVec<ScopeChoice>>>;
 
 /// A row's source or target picker: blocks by name, chosen by ID.
 type BlockDropdown = Entity<SelectState<SearchableVec<BlockChoice>>>;
@@ -72,18 +90,27 @@ impl SelectItem for BlockChoice {
         self.name.clone()
     }
 
+    /// The name first and whole; the ID after it gives way when the two do
+    /// not fit (D28: the name is the label, the ID a caption).
     fn render(&self, _: &mut Window, cx: &mut App) -> impl IntoElement {
         let colors = ShellColors::current(cx);
         h_flex()
             .w_full()
             .min_w_0()
-            .gap_2()
-            .justify_between()
-            .child(div().min_w_0().truncate().child(self.name.clone()))
+            .gap_3()
+            .child(
+                div()
+                    .flex_none()
+                    .max_w(gpui::relative(0.7))
+                    .truncate()
+                    .child(self.name.clone()),
+            )
             .when(self.name.as_ref() != self.id, |row| {
                 row.child(
                     div()
-                        .flex_none()
+                        .flex_1()
+                        .min_w_0()
+                        .truncate()
                         .font_family(theme::mono_font())
                         .text_xs()
                         .text_color(colors.muted)
@@ -102,25 +129,32 @@ impl SelectItem for BlockChoice {
     }
 }
 
-/// The element id of row `row`'s chip `slot`, made once per pair:
-/// [`Segments`] wants an id that lives as long as the program.
-fn chip_id(row: usize, slot: usize) -> &'static str {
-    use std::collections::HashMap;
-    use std::sync::{Mutex, OnceLock};
-    static IDS: OnceLock<Mutex<HashMap<(usize, usize), &'static str>>> = OnceLock::new();
-    let mut ids = IDS
-        .get_or_init(Mutex::default)
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
-    ids.entry((row, slot))
-        .or_insert_with(|| Box::leak(format!("studio-replace-chip-{row}-{slot}").into_boxed_str()))
+/// One scope in its dropdown, by its place in the dialog's list: two
+/// regions may share a name.
+#[derive(Clone, Debug, PartialEq)]
+struct ScopeChoice {
+    index: usize,
+    label: SharedString,
 }
 
-/// One choice among labels: segment keys for a few, a dropdown for more.
+impl SelectItem for ScopeChoice {
+    type Value = usize;
+
+    fn title(&self) -> SharedString {
+        self.label.clone()
+    }
+
+    fn value(&self) -> &usize {
+        &self.index
+    }
+}
+
+/// One property's choice: 任意 (index 0) or one of the values the file
+/// has, in a dropdown.
 struct Pick {
     labels: Vec<String>,
     chosen: usize,
-    dropdown: Option<Dropdown>,
+    dropdown: Dropdown,
 }
 
 /// One property chip of a row's source: index 0 is 任意.
@@ -175,12 +209,15 @@ pub(crate) struct ReplaceDialog {
     rows: Vec<Row>,
     scopes: Vec<(Within, String)>,
     scope: usize,
+    /// The scope's dropdown, when there is more than the whole file.
+    scope_pick: Option<ScopeDropdown>,
     scheme_name: Entity<InputState>,
-    scheme_pick: Option<Dropdown>,
+    /// 存为方案…'s popover, asking for the name, is open.
+    naming: bool,
     /// The 方案 the table came from, while it is unchanged.
     from_scheme: Option<String>,
-    /// New schemes or a block table came: the pickers are rebuilt on the
-    /// next draw, which has the window.
+    /// New recent targets or a block table came: the target pickers are
+    /// listed again on the next draw, which has the window.
     refill: bool,
     pub(crate) preview: Preview,
     generation: u64,
@@ -251,13 +288,44 @@ impl ReplaceDialog {
             .iter()
             .position(|(within, _)| matches!(within, Within::Selection(_)))
             .unwrap_or(0);
-        let scheme_name =
-            cx.new(|cx| InputState::new(window, cx).placeholder(tr!("studio-replace-scheme-name")));
-        let mut subscriptions = vec![cx.subscribe(&scheme_name, |_, _, event: &InputEvent, cx| {
-            if matches!(event, InputEvent::Change) {
-                cx.notify();
-            }
-        })];
+        let scheme_name = cx.new(|cx| InputState::new(window, cx));
+        let mut subscriptions = vec![cx.subscribe(
+            &scheme_name,
+            |this, _, event: &InputEvent, cx| match event {
+                InputEvent::Change => cx.notify(),
+                InputEvent::PressEnter { .. } => this.save_scheme(cx),
+                _ => {}
+            },
+        )];
+        let scope_pick = (scopes.len() > 1).then(|| {
+            let choices: Vec<ScopeChoice> = scopes
+                .iter()
+                .enumerate()
+                .map(|(index, (_, label))| ScopeChoice {
+                    index,
+                    label: label.clone().into(),
+                })
+                .collect();
+            let dropdown = cx.new(|cx| {
+                SelectState::new(
+                    SearchableVec::new(choices),
+                    Some(IndexPath::new(scope)),
+                    window,
+                    cx,
+                )
+            });
+            subscriptions.push(cx.subscribe_in(
+                &dropdown,
+                window,
+                |this, _, event: &SelectEvent<SearchableVec<ScopeChoice>>, _, cx| {
+                    if let SelectEvent::Confirm(Some(index)) = event {
+                        this.scope = *index;
+                        this.edited(cx);
+                    }
+                },
+            ));
+            dropdown
+        });
         let status = cx.new(|_| Submission::default());
         let parse = cx
             .background_executor()
@@ -285,8 +353,9 @@ impl ReplaceDialog {
             rows: Vec::new(),
             scopes,
             scope,
+            scope_pick,
             scheme_name,
-            scheme_pick: None,
+            naming: false,
             from_scheme: None,
             refill: false,
             preview: Preview::Waiting,
@@ -295,7 +364,6 @@ impl ReplaceDialog {
             _subscriptions: Vec::new(),
         };
         dialog.schemes = schemes;
-        dialog.rebuild_scheme_pick(window, cx);
         if let Some(first) = dialog.blocks.first().map(|block| block.id.clone()) {
             dialog.add_row(&first, None, window, cx);
         }
@@ -309,25 +377,6 @@ impl ReplaceDialog {
         self.schemes = schemes;
         self.refill = true;
         cx.notify();
-    }
-
-    fn rebuild_scheme_pick(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let names: Vec<String> = self.schemes.schemes.keys().cloned().collect();
-        self.scheme_pick = (!names.is_empty()).then(|| {
-            let dropdown = cx.new(|cx| {
-                SelectState::new(SearchableVec::new(names), None, window, cx).searchable(true)
-            });
-            self._subscriptions.push(cx.subscribe_in(
-                &dropdown,
-                window,
-                |this, _, event: &SelectEvent<SearchableVec<String>>, window, cx| {
-                    if let SelectEvent::Confirm(Some(name)) = event {
-                        this.apply_scheme(&name.clone(), window, cx);
-                    }
-                },
-            ));
-            dropdown
-        });
     }
 
     /// The file's game version's blocks arrived, or could not be had.
@@ -501,13 +550,7 @@ impl ReplaceDialog {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Pick {
-        if labels.len() <= SEGMENT_LIMIT {
-            return Pick {
-                labels,
-                chosen,
-                dropdown: None,
-            };
-        }
+        let searchable = labels.len() > SEARCH_PAST;
         let dropdown = cx.new(|cx| {
             SelectState::new(
                 SearchableVec::new(labels.clone()),
@@ -515,7 +558,7 @@ impl ReplaceDialog {
                 window,
                 cx,
             )
-            .searchable(true)
+            .searchable(searchable)
         });
         self._subscriptions.push(cx.subscribe_in(
             &dropdown,
@@ -529,7 +572,7 @@ impl ReplaceDialog {
         Pick {
             labels,
             chosen,
-            dropdown: Some(dropdown),
+            dropdown,
         }
     }
 
@@ -542,18 +585,6 @@ impl ReplaceDialog {
             && let Some(index) = pick.labels.iter().position(|label| label == value)
         {
             pick.chosen = index;
-        }
-        self.edited(cx);
-    }
-
-    fn set_chip_index(&mut self, row: usize, slot: usize, index: usize, cx: &mut Context<Self>) {
-        if let Some(pick) = self
-            .rows
-            .get_mut(row)
-            .and_then(|row| row.chips.get_mut(slot))
-            .map(|chip| &mut chip.pick)
-        {
-            pick.chosen = index.min(pick.labels.len().saturating_sub(1));
         }
         self.edited(cx);
     }
@@ -845,35 +876,62 @@ impl ReplaceDialog {
         };
         let mut schemes = self.schemes.clone();
         schemes.schemes.insert(name.clone(), rows);
+        self.schemes = schemes.clone();
         self.from_scheme = Some(name);
+        self.naming = false;
         let _ = self
             .studio
             .update(cx, |studio, _| studio.save_schemes(schemes));
+        cx.notify();
     }
 
-    fn pick_control(
-        &self,
-        pick: &Pick,
-        row: usize,
-        slot: usize,
-        cx: &mut Context<Self>,
-    ) -> AnyElement {
-        if let Some(dropdown) = &pick.dropdown {
-            return div()
-                .min_w(px(120.))
-                .child(Select::new(dropdown).small())
-                .into_any_element();
-        }
-        let this = cx.weak_entity();
-        Segments::new(
-            chip_id(row, slot),
-            &pick.labels,
-            pick.chosen,
-            move |index, _, cx| {
-                let _ = this.update(cx, |this, cx| this.set_chip_index(row, slot, index, cx));
-            },
-        )
-        .into_any_element()
+    /// Whether the table can be kept as a 方案: every row is complete.
+    fn can_save(&self, cx: &App) -> bool {
+        self.scheme_rows(cx).is_some()
+    }
+
+    /// 套用方案…'s entries: one per kept 方案, by name.
+    pub(crate) fn scheme_entries(&self, cx: &mut Context<Self>) -> Vec<MenuEntry> {
+        self.schemes
+            .schemes
+            .keys()
+            .map(|name| {
+                let (this, name) = (cx.weak_entity(), name.clone());
+                MenuEntry::new(name.clone(), move |window, cx| {
+                    let _ = this.update(cx, |this, cx| this.apply_scheme(&name, window, cx));
+                })
+            })
+            .collect()
+    }
+
+    /// 存为方案…'s popover: the name and the key that keeps it.
+    fn naming_panel(&self, cx: &mut Context<Self>) -> AnyElement {
+        let colors = ShellColors::current(cx);
+        let can_save = !self.scheme_name.read(cx).value().trim().is_empty() && self.can_save(cx);
+        v_flex()
+            .debug_selector(|| "studio-replace-scheme-naming".into())
+            .w(px(260.))
+            .gap_2()
+            .child(field(
+                tr!("studio-replace-scheme-name"),
+                div()
+                    .w_full()
+                    .debug_selector(|| "studio-replace-scheme-name".into())
+                    .child(Input::new(&self.scheme_name).small()),
+                colors,
+            ))
+            .child(
+                h_flex().w_full().justify_end().child(
+                    Key::new("studio-replace-scheme-keep")
+                        .label(tr!("studio-replace-scheme-keep"))
+                        .white()
+                        .small()
+                        .disabled(!can_save)
+                        .debug_selector(|| "studio-replace-scheme-keep".into())
+                        .on_click(cx.listener(|this, _, _, cx| this.save_scheme(cx))),
+                ),
+            )
+            .into_any_element()
     }
 
     fn row_view(
@@ -893,7 +951,7 @@ impl ReplaceDialog {
         let this = cx.weak_entity();
         let remove = (self.rows.len() > 1).then(|| {
             Key::new(("studio-replace-remove", index))
-                .label("✕")
+                .icon(gpui_component::Icon::new(crate::assets::UiIcon::Close))
                 .ghost()
                 .small()
                 .tooltip(tr!("studio-replace-remove-row"))
@@ -927,73 +985,72 @@ impl ReplaceDialog {
                 .iter()
                 .enumerate()
                 .map(|(slot, chip)| {
+                    // One line each, the name leading and the dropdown on
+                    // the column's trailing edge, so the dropdowns stand in
+                    // one column whatever the names' lengths.
                     h_flex()
-                        .gap_1()
+                        .debug_selector(move || format!("studio-replace-chip-{index}-{slot}"))
+                        .w_full()
+                        .gap_2()
                         .items_center()
                         .child(
                             div()
+                                .flex_1()
+                                .min_w_0()
+                                .truncate()
                                 .font_family(theme::mono_font())
                                 .text_xs()
                                 .text_color(colors.muted)
-                                .child(format!("{} =", chip.name)),
+                                .child(chip.name.clone()),
                         )
-                        .child(self.pick_control(&chip.pick, index, slot, cx))
+                        .child(
+                            div()
+                                .flex_none()
+                                .w(px(CHIP_WIDTH))
+                                .child(Select::new(&chip.pick.dropdown).small().disabled(busy)),
+                        )
                         .into_any_element()
                 })
                 .collect()
         };
-        v_flex()
+        // The arrow sits in a lane a small control tall, on the pickers'
+        // line. The target picker runs to the table's trailing edge, or to
+        // ✕, which every row has once there are two; the row's count is
+        // its caption, as the chips are the source's.
+        let lane = || {
+            h_flex()
+                .flex_none()
+                .h(px(KeySize::Small.height()))
+                .items_center()
+        };
+        h_flex()
             .debug_selector(move || format!("studio-replace-row-{index}"))
             .w_full()
             .gap_2()
-            .py(px(6.))
+            .items_start()
+            .py(px(8.))
+            .when(index > 0, |row| {
+                row.border_t_1().border_color(colors.border)
+            })
             .child(
-                h_flex()
-                    .w_full()
+                // The source, and under it what it matches: its properties
+                // stay in the source's column.
+                v_flex()
+                    .flex_1()
+                    .min_w_0()
                     .gap_2()
-                    .items_center()
                     .child(
                         div()
-                            .flex_1()
-                            .min_w_0()
+                            .w_full()
                             .debug_selector(move || format!("studio-replace-source-{index}"))
                             .child(
                                 Select::new(&row.source)
                                     .small()
                                     .disabled(busy)
+                                    .menu_width(px(BLOCK_MENU))
                                     .search_placeholder(tr!("studio-blocks-placeholder")),
                             ),
                     )
-                    .child(div().text_sm().text_color(colors.muted).child("→"))
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .debug_selector(move || format!("studio-replace-target-{index}"))
-                            .child(
-                                Select::new(&row.target)
-                                    .small()
-                                    .disabled(busy)
-                                    .placeholder(tr!("studio-replace-target-pick"))
-                                    .search_placeholder(tr!("studio-blocks-placeholder")),
-                            ),
-                    )
-                    .children(count.map(|count| {
-                        div()
-                            .flex_none()
-                            .font_family(theme::mono_font())
-                            .text_xs()
-                            .text_color(colors.foreground)
-                            .child(count)
-                    }))
-                    .children(remove),
-            )
-            .child(
-                h_flex()
-                    .w_full()
-                    .flex_wrap()
-                    .gap_3()
-                    .items_center()
                     .child(
                         div()
                             .debug_selector(move || format!("studio-replace-any-{index}"))
@@ -1001,6 +1058,35 @@ impl ReplaceDialog {
                     )
                     .children(chips),
             )
+            .child(lane().text_sm().text_color(colors.muted).child("→"))
+            .child(
+                v_flex()
+                    .flex_1()
+                    .min_w_0()
+                    .gap_2()
+                    .child(
+                        div()
+                            .w_full()
+                            .debug_selector(move || format!("studio-replace-target-{index}"))
+                            .child(
+                                Select::new(&row.target)
+                                    .small()
+                                    .disabled(busy)
+                                    .menu_width(px(BLOCK_MENU))
+                                    .placeholder(tr!("studio-replace-target-pick"))
+                                    .search_placeholder(tr!("studio-blocks-placeholder")),
+                            ),
+                    )
+                    .children(count.map(|count| {
+                        div()
+                            .debug_selector(move || format!("studio-replace-count-{index}"))
+                            .font_family(theme::mono_font())
+                            .text_xs()
+                            .text_color(colors.foreground)
+                            .child(count)
+                    })),
+            )
+            .children(remove)
             .into_any_element()
     }
 }
@@ -1025,6 +1111,74 @@ impl DialogForm for ReplaceDialog {
 
     fn width(&self) -> f32 {
         640.
+    }
+
+    fn footer_start(&mut self, _: &mut Window, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let colors = ShellColors::current(cx);
+        let busy = self.status.read(cx).busy;
+        // ia[plugin.litematica]: 套用方案 | 替换对话框底栏左侧「套用方案…」（存过方案时才有）→ 菜单列出方案名 | 把表格换成方案的行，这份投影没有的方块那一行不替换任何东西；底栏写「方案「名」」直到表格被改动；用方案替换时历史行写方案名 | 方案存在启动器数据里，所有实例共用（T24）
+        let apply = (!self.schemes.schemes.is_empty()).then(|| {
+            kit::with_menu(
+                Key::new("studio-replace-scheme-pick")
+                    .label(tr!("studio-replace-scheme-pick"))
+                    .white()
+                    .disabled(busy)
+                    .debug_selector(|| "studio-replace-scheme-pick".into()),
+                self.scheme_entries(cx),
+                Anchor::BottomLeft,
+                colors,
+            )
+            .into_any_element()
+        });
+        let save_key = Key::new("studio-replace-scheme-save")
+            .label(tr!("studio-replace-scheme-save"))
+            .white()
+            .debug_selector(|| "studio-replace-scheme-save".into());
+        // ia[plugin.litematica]: 存为方案 | 替换对话框底栏左侧「存为方案…」→ 弹出框里的方案名与「存」（回车也行） | 把表格存成这个名字的方案（同名覆盖），弹出框关上，底栏写「方案「名」」；之后在任何投影的替换对话框里都能套用 | 每一行都选好目标方块之前置灰并说明；每次替换也记下用过的目标方块，下次排在选择器最前（T24）
+        let save = if self.can_save(cx) && !busy {
+            let (this, panel) = (cx.weak_entity(), cx.weak_entity());
+            Popover::new("studio-replace-scheme-popover")
+                .anchor(Anchor::BottomLeft)
+                .open(self.naming)
+                .on_open_change(move |open, _, cx| {
+                    let _ = this.update(cx, |this, cx| {
+                        this.naming = *open;
+                        cx.notify();
+                    });
+                })
+                .track_focus(&self.scheme_name.read(cx).focus_handle(cx))
+                .trigger(save_key)
+                .content(move |_, _, cx| {
+                    panel
+                        .update(cx, |this, cx| this.naming_panel(cx))
+                        .unwrap_or_else(|_| div().into_any_element())
+                })
+                .into_any_element()
+        } else {
+            save_key
+                .disabled(true)
+                .tooltip(tr!("studio-replace-scheme-unready"))
+                .into_any_element()
+        };
+        let from = self.from_scheme.as_deref().map(|name| {
+            div()
+                .debug_selector(|| "studio-replace-scheme-current".into())
+                .min_w_0()
+                .truncate()
+                .text_sm()
+                .text_color(colors.muted)
+                .child(tr!("studio-replace-scheme-current", name = name))
+        });
+        Some(
+            h_flex()
+                .min_w_0()
+                .gap_2()
+                .items_center()
+                .children(apply)
+                .child(save)
+                .children(from)
+                .into_any_element(),
+        )
     }
 
     fn commit(&mut self, _: &mut Window, cx: &mut Context<Self>) {
@@ -1103,11 +1257,8 @@ impl DialogForm for ReplaceDialog {
 
 impl Render for ReplaceDialog {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        if std::mem::take(&mut self.refill) {
-            self.rebuild_scheme_pick(window, cx);
-            if self.refill_targets(window, cx) {
-                self.refresh(cx);
-            }
+        if std::mem::take(&mut self.refill) && self.refill_targets(window, cx) {
+            self.refresh(cx);
         }
         let colors = ShellColors::current(cx);
         let busy = self.status.read(cx).busy;
@@ -1123,6 +1274,7 @@ impl Render for ReplaceDialog {
             .label(tr!("studio-replace-add-row"))
             .ghost()
             .small()
+            .flush_start()
             .disabled(busy)
             .debug_selector(|| "studio-replace-add-row".into())
             .on_click(move |_, window, cx| {
@@ -1144,35 +1296,20 @@ impl Render for ReplaceDialog {
                     }
                 });
             });
-        let mut column = v_flex()
-            .w_full()
-            .gap_3()
-            .child(
-                h_flex()
-                    .w_full()
-                    .gap_2()
-                    .child(
-                        div()
-                            .flex_1()
-                            .text_sm()
-                            .text_color(colors.muted)
-                            .child(tr!("studio-replace-from")),
-                    )
-                    .child(
-                        div()
-                            .flex_1()
-                            .text_sm()
-                            .text_color(colors.muted)
-                            .child(tr!("studio-replace-to")),
-                    ),
-            )
-            .child(
-                v_flex()
-                    .debug_selector(|| "studio-replace-rows".into())
-                    .w_full()
-                    .children(rows),
-            )
-            .child(div().child(add));
+        // The table is the dialog's subject, named by its title: each row's
+        // arrow and the target's placeholder say which side is which.
+        let mut column = v_flex().w_full().gap_3().child(
+            v_flex()
+                .w_full()
+                .gap_1()
+                .child(
+                    v_flex()
+                        .debug_selector(|| "studio-replace-rows".into())
+                        .w_full()
+                        .children(rows),
+                )
+                .child(h_flex().child(add)),
+        );
         match &self.catalog {
             Loaded::Loading => {
                 column = column.child(note(tr!("studio-replace-catalog-loading"), colors));
@@ -1185,83 +1322,30 @@ impl Render for ReplaceDialog {
             }
             Loaded::Ready(_) => {}
         }
-        if self.scopes.len() > 1 {
-            let labels: Vec<String> = self.scopes.iter().map(|(_, label)| label.clone()).collect();
-            let this = cx.weak_entity();
-            // ia[plugin.litematica]: 选替换范围 | 替换对话框「范围」（全部 / 区域 / 当前切片 / 当前选区） | 计数与替换只算范围里的方块 | 有选区时默认选区；当前切片是视口正在看的那一层（T24、T25）
-            let scope = Segments::new(
-                "studio-replace-scope",
-                &labels,
-                self.scope,
-                move |index, _, cx| {
-                    let _ = this.update(cx, |this, cx| {
-                        this.scope = index;
-                        this.edited(cx);
-                    });
-                },
-            );
+        if let Some(scope) = &self.scope_pick {
+            // ia[plugin.litematica]: 选替换范围 | 替换对话框「范围」下拉（全部区域 / 各区域名 / 当前切片 / 选区） | 计数与替换只算范围里的方块 | 只有整份文件时不出现；有选区时默认选区；当前切片是视口正在看的那一层（T24、T25）
             column = column.child(field(
                 tr!("studio-replace-scope"),
                 div()
+                    .w(px(280.))
                     .debug_selector(|| "studio-replace-scope".into())
-                    .child(scope),
+                    .child(Select::new(scope).small().disabled(busy)),
                 colors,
             ));
         }
-        let this = cx.weak_entity();
-        let can_save =
-            !self.scheme_name.read(cx).value().trim().is_empty() && self.scheme_rows(cx).is_some();
-        // ia[plugin.litematica]: 存为方案 / 套用方案 | 替换对话框底部「方案」：名字输入框与「存为方案」，有存过的方案时还有「套用方案…」下拉 | 存进启动器数据（所有实例共用）；套用就把表格换成方案的行，这份投影没有的方块那一行不替换任何东西；用方案替换时历史行写方案名 | 每次替换也记下用过的目标方块，下次排在选择器最前（T24）
-        let save = Key::new("studio-replace-scheme-save")
-            .label(tr!("studio-replace-scheme-save"))
-            .white()
-            .small()
-            .disabled(!can_save || busy)
-            .debug_selector(|| "studio-replace-scheme-save".into())
-            .on_click(move |_, _, cx| {
-                let _ = this.update(cx, |this, cx| this.save_scheme(cx));
-            });
-        column = column.child(field(
-            tr!("studio-replace-schemes"),
-            h_flex()
-                .w_full()
-                .gap_2()
-                .items_center()
-                .children(self.scheme_pick.as_ref().map(|pick| {
-                    div()
-                        .w(px(180.))
-                        .debug_selector(|| "studio-replace-scheme-pick".into())
-                        .child(
-                            Select::new(pick)
-                                .small()
-                                .placeholder(tr!("studio-replace-scheme-pick")),
-                        )
-                }))
-                .child(
-                    div()
-                        .flex_1()
-                        .debug_selector(|| "studio-replace-scheme-name".into())
-                        .child(Input::new(&self.scheme_name).small().disabled(busy)),
-                )
-                .child(save),
-            colors,
-        ));
+        // What the count stands at, when the rows' counts and the commit
+        // key's total do not already say it.
         let preview = match (&self.schematic, &self.preview) {
-            (Loaded::Failed(_), _) => note(tr!("studio-read-failed"), colors),
+            (Loaded::Failed(_), _) => Some(note(tr!("studio-read-failed"), colors)),
             (Loaded::Loading, _) | (_, Preview::Counting) => {
-                note(tr!("studio-replace-counting"), colors)
+                Some(note(tr!("studio-replace-counting"), colors))
             }
-            (_, Preview::Waiting) => note(tr!("studio-replace-waiting"), colors),
-            (_, Preview::Count(0, _)) => note(tr!("studio-replace-none"), colors),
-            (_, Preview::Count(count, _)) => div()
-                .text_sm()
-                .text_color(colors.foreground)
-                .child(tr!("studio-replace-count", count = *count)),
+            (_, Preview::Waiting) => Some(note(tr!("studio-replace-waiting"), colors)),
+            (_, Preview::Count(0, _)) => Some(note(tr!("studio-replace-none"), colors)),
+            (_, Preview::Count(..)) => None,
         };
-        column.child(
-            div()
-                .debug_selector(|| "studio-replace-preview".into())
-                .child(preview),
+        column.children(
+            preview.map(|preview| preview.debug_selector(|| "studio-replace-preview".into())),
         )
     }
 }

@@ -315,11 +315,30 @@ pub fn radio(chosen: bool, body: Body) -> Div {
         )
 }
 
+/// A key that holds a state, with its LED in the band above it: how segment
+/// keys and a toggle key among them show what is on. In a row that mixes
+/// them with plain keys, align the row's items to the end so every key's
+/// bottom sits on one line and the LEDs mark the keys that hold a state.
+pub fn led_over(led: Div, key: impl IntoElement) -> Div {
+    div()
+        .flex()
+        .flex_col()
+        .items_center()
+        .gap(px(7.))
+        .child(led)
+        .child(key)
+}
+
 pub type Select = Rc<dyn Fn(usize, &mut Window, &mut App)>;
 
 /// Refinement choices: a row of small white keys, each with an LED above it.
 /// The chosen key's LED is lit, the key sits pressed and its label is
 /// semibold.
+///
+/// Only for two to four fixed options with short labels the launcher
+/// writes. Options that come from data (region, scheme or file names) and a
+/// choice repeated on every row of a table are a `Select`: the keys grow
+/// with their labels, and the LED band makes every row taller.
 #[derive(IntoElement)]
 pub struct Segments {
     id: &'static str,
@@ -355,23 +374,18 @@ impl RenderOnce for Segments {
             .children(self.labels.into_iter().enumerate().map(|(index, label)| {
                 let chosen = index == active;
                 let on_select = self.on_select.clone();
-                div()
-                    .flex()
-                    .flex_col()
-                    .items_center()
-                    .gap(px(7.))
-                    .child(led(chosen, body).debug_selector(move || format!("{id}-led-{index}")))
-                    .child(
-                        Key::new((id, index))
-                            .label(label)
-                            .white()
-                            .small()
-                            .min_w(px(64.))
-                            .bold(chosen)
-                            .selected(chosen)
-                            .debug_selector(move || format!("{id}-key-{index}"))
-                            .on_click(move |_, window, cx| on_select(index, window, cx)),
-                    )
+                led_over(
+                    led(chosen, body).debug_selector(move || format!("{id}-led-{index}")),
+                    Key::new((id, index))
+                        .label(label)
+                        .white()
+                        .small()
+                        .min_w(px(64.))
+                        .bold(chosen)
+                        .selected(chosen)
+                        .debug_selector(move || format!("{id}-key-{index}"))
+                        .on_click(move |_, window, cx| on_select(index, window, cx)),
+                )
             }))
     }
 }

@@ -10,7 +10,9 @@ use std::rc::Rc;
 
 /// A long version shares a row with the Update key and may not run
 /// underneath it. The newer version is not in the row: the Update key
-/// opens the dialog that names it.
+/// opens the dialog that names it, and its tooltip says it. The Update key
+/// is an icon key as wide as ⇆, so a row with an update keeps its version
+/// column in line with a row without one.
 #[gpui::test]
 fn a_long_version_stays_clear_of_the_update_key(cx: &mut TestAppContext) {
     let (view, cx) = rooted(cx, Rc::default());
@@ -18,20 +20,29 @@ fn a_long_version_stays_clear_of_the_update_key(cx: &mut TestAppContext) {
     fabric.loader = lumilio_core::Loader::Fabric;
     fabric.game_version = "26.3".into();
     let newest = known_version("v2", "1.11.7+26.3", "26.3");
-    let mut list = listed(vec![item("iris-fabric-1.11.4+mc26.2.jar", true)]);
-    list.entries[0].source = Some(lumilio_core::ContentSource {
+    let mut list = listed(vec![
+        item("iris-fabric-1.11.4+mc26.2.jar", true),
+        item("sodium-fabric-0.8.jar", true),
+    ]);
+    let known = |slug: &str, title: &str, number: &str| lumilio_core::ContentSource {
         source: lumilio_core::DEFAULT_SOURCE.into(),
         source_name: "Modrinth".into(),
         page_url: String::new(),
         project_id: "P".into(),
-        slug: "iris".into(),
-        title: "Iris Shaders".into(),
+        slug: slug.into(),
+        title: title.into(),
         author: Some("coderbot".into()),
         icon_url: None,
         version_id: "v1".into(),
-        version_number: "1.11.4+26.2-fabric-with-a-long-suffix".into(),
-    });
+        version_number: number.into(),
+    };
+    list.entries[0].source = Some(known(
+        "iris",
+        "Iris Shaders",
+        "1.11.4+26.2-fabric-with-a-long-suffix",
+    ));
     list.entries[0].update = Some(newest);
+    list.entries[1].source = Some(known("sodium", "Sodium", "0.8"));
     view.update(cx, |view, cx| {
         view.loaded(Ok((fabric, LauncherSettings::default())), cx);
         view.select_tab(TAB_CONTENT, cx);
@@ -52,6 +63,19 @@ fn a_long_version_stays_clear_of_the_update_key(cx: &mut TestAppContext) {
     assert!(
         version.right() <= update.left(),
         "the version column ({version:?}) ends before the Update key ({update:?})"
+    );
+    let switch = cx
+        .debug_bounds("content-switch-version-1")
+        .expect("⇆ on the row without an update");
+    assert_eq!(update.size, switch.size, "Update is as wide as ⇆");
+    assert_eq!(update.size.width, update.size.height, "an icon key");
+    let other = cx
+        .debug_bounds("content-version-1")
+        .expect("the other row's version column");
+    assert_eq!(
+        version.left(),
+        other.left(),
+        "both rows' version columns start at one place"
     );
 }
 

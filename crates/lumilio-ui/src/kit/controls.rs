@@ -33,6 +33,28 @@ pub fn segments(
     Segments::new(id, labels, active, on_select)
 }
 
+/// A muted label beside a small dropdown of `width`: the discover page's
+/// 排序方式, the library's sort and loader, the studio's 切片. One choice
+/// from a few that has a current value, in a toolbar.
+pub fn labeled_select(
+    label: impl Into<SharedString>,
+    state: &gpui::Entity<
+        gpui_component::select::SelectState<gpui_component::select::SearchableVec<String>>,
+    >,
+    width: f32,
+    colors: ShellColors,
+) -> gpui::Div {
+    h_flex()
+        .gap_2()
+        .items_center()
+        .child(div().text_sm().text_color(colors.muted).child(label.into()))
+        .child(
+            div()
+                .w(px(width))
+                .child(gpui_component::select::Select::new(state).small()),
+        )
+}
+
 /// One option of a filter list: an LED and a label on a hairline row. The
 /// chosen option lights its LED and reads in ink, semibold; the rest are muted.
 pub fn led_option(

@@ -282,7 +282,16 @@ fn in_english_the_studios_operation_dialogs_fit_the_minimum_window(cx: &mut Test
                 cx,
             );
         }
-        for key in ["studio-dialog-cancel", "studio-dialog-commit"] {
+        let footer: &[&str] = if entry == "studio-replace" {
+            &[
+                "studio-dialog-cancel",
+                "studio-dialog-commit",
+                "studio-replace-scheme-save",
+            ]
+        } else {
+            &["studio-dialog-cancel", "studio-dialog-commit"]
+        };
+        for key in footer {
             let bounds = cx.debug_bounds(key).expect("dialog key");
             inside(key, bounds);
             assert!(
@@ -293,17 +302,20 @@ fn in_english_the_studios_operation_dialogs_fit_the_minimum_window(cx: &mut Test
         inside(extra, cx.debug_bounds(extra).expect("field"));
         click("studio-dialog-cancel", cx);
     }
-    // The property chips of the stairs: segment keys on one row each, once
-    // "Any properties" is off (the head opens on any state).
+    // The property chips of the stairs: a name and a dropdown each, on one
+    // line, once "Any properties" is off (the head opens on any state).
     click("studio-replace", cx);
     click("studio-replace-any-0", cx);
-    // facing and half, each "Any" and the one value the file holds.
-    for (property, index) in [(0, 0), (0, 1), (1, 0), (1, 1)] {
+    // facing and half.
+    for property in [0, 1] {
         let selector: &'static str =
-            Box::leak(format!("studio-replace-chip-0-{property}-key-{index}").into_boxed_str());
-        let key = cx.debug_bounds(selector).expect("a segment key");
-        inside(selector, key);
-        assert!(key.size.height < px(40.), "{selector} is one line: {key:?}");
+            Box::leak(format!("studio-replace-chip-0-{property}").into_boxed_str());
+        let chip = cx.debug_bounds(selector).expect("a property chip");
+        inside(selector, chip);
+        assert!(
+            chip.size.height < px(40.),
+            "{selector} is one line: {chip:?}"
+        );
     }
     set_locale(Locale::SimplifiedChinese);
 }

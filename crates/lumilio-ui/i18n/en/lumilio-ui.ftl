@@ -811,16 +811,14 @@ model-capture-ended = Mouse capture ended; click the view to re-enter
 model-loading = Building the 3D preview…
 model-aria = 3D schematic preview; in Orbital mode, arrow keys rotate and plus/minus zoom; in Explore mode, click or press Enter to capture the mouse, WASD to move, Space to rise, Shift to descend, Esc to release; R resets
 model-reset = Reset view
+model-reset-key = Reset view (R)
 model-hint-orbital = Drag to rotate · Scroll to zoom · Arrow keys rotate · + / − to zoom
 model-hint-explore-captured = WASD to move · Space to rise · Shift to descend · click to pick the block under the crosshair · Esc to release the mouse
 model-hint-explore = Click the view or press Enter to enter · WASD to move · Space to rise · Shift to descend
 model-slice = Slice
-model-slice-down = Layer below ([)
-model-slice-up = Layer above (])
-model-slice-layer = { $axis } { $layer } · { $count ->
-    [one] { $count } block
-   *[other] { $count } blocks
-}
+model-slice-off = No slice
+model-slice-along = { $axis } axis
+model-slice-layer-label = Layer
 model-hint-orbital-pick = Click to inspect a block · Drag to rotate · Scroll to zoom · Arrow keys rotate · + / − to zoom
 model-angle = Angle
 model-angle-north = North
@@ -834,7 +832,7 @@ model-source-bundle = { $version } · downloaded bundle
 ## Studio viewport: block selection and PNG export
 studio-card-undrawable = This game version cannot draw this block; the picture shows a missing-texture placeholder
 studio-sources = Resource sources
-studio-sources-add = Add resource pack…
+studio-sources-add = Add…
 studio-sources-prompt = Add
 studio-sources-remove = Remove
 studio-sources-pick = Select a schematic to see the resources it is drawn with
@@ -964,13 +962,9 @@ studio-replace-target = Replace with
 studio-replace-scope = Scope
 studio-replace-all-regions = All regions
 studio-replace-selection = Selection { $x }×{ $y }×{ $z }
-studio-replace-waiting = Choose what each row becomes to see how many blocks are replaced
+studio-replace-waiting = Choose what each row becomes to count the blocks it replaces
 studio-replace-counting = Counting…
 studio-replace-none = No blocks match
-studio-replace-count = { $count ->
-    [one] { $count } block will be replaced
-   *[other] { $count } blocks will be replaced
-}
 studio-replace-commit = Replace
 studio-replace-summary = { $source } → { $target } · { $count }
 studio-replace-summary-rows = { $rows } rows · { $count }
@@ -979,18 +973,21 @@ studio-replace-commit-count = { $count ->
     [one] Replace { $count } block
    *[other] Replace { $count } blocks
 }
-studio-replace-from = From
-studio-replace-to = To
 studio-replace-any-props = Any properties
 studio-replace-target-pick = Choose a block
 studio-replace-add-row = Add a row
 studio-replace-remove-row = Remove this row
-studio-replace-row-count = { $count }
+studio-replace-row-count = { $count ->
+    [one] This row replaces { $count } block
+   *[other] This row replaces { $count } blocks
+}
 studio-replace-scope-slice = Current slice
-studio-replace-schemes = Schemes
 studio-replace-scheme-pick = Apply a scheme…
 studio-replace-scheme-name = Scheme name
-studio-replace-scheme-save = Save as scheme
+studio-replace-scheme-save = Save as scheme…
+studio-replace-scheme-keep = Save
+studio-replace-scheme-unready = Choose what every row becomes before you save a scheme
+studio-replace-scheme-current = Scheme "{ $name }"
 studio-replace-catalog-loading = Reading this version's blocks…
 studio-replace-catalog-failed = Couldn't read this version's blocks. You can only choose blocks this schematic already has, and properties are not kept.
 studio-replaced = { $count ->
@@ -1325,6 +1322,7 @@ instance-content-browse-shader = Browse shaders
 instance-content-empty = No { $noun } yet
 instance-content-empty-help = Choose one with "Browse", or add local files
 instance-content-refresh-tip = Read and identify again
+instance-content-update-to = Update to { $version }
 instance-content-update-all-count = Update all ({ $count ->
     [one] { $count } file
    *[other] { $count } files
@@ -2566,9 +2564,15 @@ studio-undrawable-count = { $count ->
 }
 studio-convert-suggested = Suggested replacement: { $block }
 ## Schematic studio: resource pack order and folders
-studio-sources-add-folder = Add folder…
+studio-sources-add-zip = Resource pack (zip)…
+studio-sources-add-folder = Resource pack folder…
+studio-sources-add-path = Enter a path…
+studio-sources-path-title = Add a resource pack by path
+studio-sources-path-label = Full path of a zip or a resource pack folder
 studio-sources-path = Paste a resource pack path (zip or folder)
 studio-sources-path-add = Add
+studio-sources-path-failed = Not added: this is not a resource pack, or the path cannot be read
+studio-sources-unused = Off · { $count }
 studio-sources-order = A source lower in the list covers the sources above it. Use ↑ and ↓ to change the order.
 studio-source-up = Move up: the sources below cover it
 studio-source-down = Move down: it covers the sources above

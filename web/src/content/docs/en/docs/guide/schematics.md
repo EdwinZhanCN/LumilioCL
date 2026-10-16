@@ -42,12 +42,13 @@ The launcher then downloads nothing. A bundle that is already downloaded stays i
 The mods of the game, its resource packs that are on, and the resource packs that you add show in **Info › Technical details › Resource sources**.
 Each row has a switch:
 
-- The switches are off by default. When you turn one on, the viewport draws the model again with that source on top. The priority is: added resource packs, then resource packs, then mods, then the base version.
+- The switches are off by default. When you turn one on, its row moves to the top group (the sources that the picture uses), and the viewport draws the model again with that source on top. The sources that are off show below, under **Off**.
+- The top group is in the layer order. A source lower in the group covers the sources above it. When two or more sources are on, they have the keys ↑ and ↓ to change the order. The launcher keeps the order for each game.
 - The launcher keeps the switches for each game and each schematic folder. They stay when you open the window again.
-- Each row shows how many kinds of blocks the source has, and how many models use a custom loader and cannot be drawn.
+- If a name is too long for its row, the row cuts it. Hover over the name to see all of it. Under the name, the row shows how many kinds of blocks the source has, and how many models use a custom loader and cannot be drawn.
 
-To add a resource pack that is not in the game, click **Add resource pack…** in **Resource sources**, and then select a `.zip` file.
-The launcher keeps only the path of the file. It does not copy the file.
+To add a resource pack that is not in the game, click **Add…** on the right of **Resource sources**. Then select **Resource pack (zip)…**, **Resource pack folder…**, or **Enter a path…** (paste the full path).
+The launcher keeps only the path. It does not copy the file.
 To take the pack off again, click **Remove** in its row. The file itself does not change.
 
 ## The studio window
@@ -64,8 +65,8 @@ While the game runs, you cannot change a schematic. The menu items and keys for 
 
 - **Orbital**: drag to turn the model. Use the mouse wheel to zoom. The arrow keys turn the model, and `+` / `−` zoom.
 - **Explore**: click the picture or push Enter to capture the mouse. Use WASD to move, Space to go up, and Shift to go down. Push Esc to release the mouse. While the mouse is captured, a crosshair shows at the center of the picture.
-- The **Angle** list has six presets: North, East, South, West, Top, and Isometric. If you select a preset in Explore, the viewport changes to Orbital first.
-- **Reset view** goes back to the first view.
+- **Orbital**, **Explore**, and **Angle** are at the bottom left. The **Slice** list is at the bottom right.
+- The **Angle** list starts with **Reset view (R)**, which goes back to the first view of the current mode. You can also push R. Then the list has six presets: North, East, South, West, Top, and Isometric. If you select a preset in Explore, the viewport changes to Orbital first.
 - If this version cannot draw a block, the viewport shows it as a full block with the magenta and black missing texture. The shape stays complete.
 
 ### Inspect one block
@@ -90,11 +91,11 @@ Hover over a tile to see the name and the stacks, for example "1 stack + 22".
 
 ### Slice
 
-Click **Slice** in the tool strip. The viewport then draws one layer and the layers below it. The cut shows the top faces of the layer.
+In the **Slice** list at the bottom right, select **X axis**, **Y axis**, or **Z axis**. The viewport then draws one layer and the layers below it. The cut shows the top faces of the layer.
 
-- Use **X**, **Y**, or **Z** to change the axis. Use the ‹ and › keys, or push `[` and `]` in the viewport, to go down or up one layer.
-- The read-out shows the axis, the layer number, and the number of blocks in the layer. **Materials** counts only this layer.
-- Click **Slice** again to turn it off.
+- To change the axis, use the same list. While you slice, the **Layer** field is above **Slice**. Click − or + to go down or up one layer, or enter a layer number. If the number is past the first or the last layer, the slice stops there. You can also push `[` and `]` when the viewport has focus.
+- **Materials** counts only the blocks in this layer.
+- To stop, select **No slice** in the list.
 
 ### Select a box
 
@@ -140,18 +141,18 @@ Replace blocks is a table. Each row goes from a block to a block.
    - From the orange key in the head. The first row is the kind with the most blocks.
    - From **Replace…** in the detail of a tile. The row matches each state of that kind.
    - From **Replace…** on the inspect card. The row matches the state of that block, each property exactly.
-2. On the left, select the block to replace. When **Any properties** is on, the row matches each state of the block. When it is off, select a value or **Any** for each property.
+2. On the left, select the block to replace. When **Any properties** is on, the row matches each state of the block. When it is off, each property has a list under the block. Select a value or **Any** in each list.
 3. On the right, select the block to use instead. The list has the blocks of the game version of the schematic. The blocks that you used last come first. You can search the list.
 4. To replace more kinds at the same time, click **Add a row**. All rows match the blocks as they were before the replacement. One row does not replace the result of another row.
-5. In **Scope**, select **All regions**, one region, **Current slice**, or the selection.
-6. Each row shows how many blocks it replaces. The commit key shows the total, for example "Replace 128 blocks". Click it to write the file.
+5. In the **Scope** list, select **All regions**, one region, **Current slice**, or the selection. If the schematic has one region and no slice or selection, the dialog does not show **Scope**.
+6. Under the block to use instead, each row shows how many blocks it replaces. The commit key shows the total, for example "Replace 128 blocks". Click it to write the file.
 
 The new block keeps the properties that have the same name in the old block, for example the facing of stairs.
 A block that keeps its block ID keeps its block entity data.
 
-To use the table again later, enter a name in **Schemes**, and then click **Save as scheme**.
-The launcher keeps the scheme in its data, for all games. In another schematic, select the scheme in **Apply a scheme…**.
-When you replace blocks with a scheme, **History** shows the name of the scheme.
+To use the table again later, select a block for each row first. Then click **Save as scheme…** at the bottom left of the dialog, enter a name, and click **Save**.
+The launcher keeps the scheme in its data, for all games. In another schematic, click **Apply a scheme…** at the bottom left, and then select the name of the scheme.
+While the table is the same as a scheme, the bottom left shows the name of the scheme. When you replace blocks with a scheme, **History** shows the name of the scheme too.
 
 ### Convert a version
 

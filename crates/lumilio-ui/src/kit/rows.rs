@@ -123,6 +123,29 @@ pub fn section(
         .child(body)
 }
 
+/// [`section`] whose label carries the group's own action on its trailing
+/// edge ("添加…"), so the action sits above what it changes and the body
+/// starts right under the label.
+pub fn section_with(
+    label: impl Into<SharedString>,
+    colors: ShellColors,
+    action: impl IntoElement,
+    body: impl IntoElement,
+) -> impl IntoElement {
+    v_flex()
+        .w_full()
+        .gap_3()
+        .child(
+            h_flex()
+                .w_full()
+                .gap_2()
+                .items_center()
+                .child(div().flex_1().min_w_0().child(section_label(label, colors)))
+                .child(action),
+        )
+        .child(body)
+}
+
 /// [`section`] with a numbered silkscreen index, for pages with several
 /// groups.
 pub fn section_at(

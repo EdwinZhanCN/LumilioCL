@@ -331,18 +331,24 @@ fn the_card_floats_over_the_inspected_block(cx: &mut TestAppContext) {
 
 #[test]
 fn the_card_keeps_inside_the_picture_and_falls_back_to_the_corner() {
+    use crate::model_view::{SLICING_CLEARANCE, TOOL_STRIP_CLEARANCE};
     use crate::schematic_studio::inspect_card::placement;
     let size = (800., 600.);
+    let clear = TOOL_STRIP_CLEARANCE;
     // At the picture's right edge it is pulled in.
-    let edge = placement(Some([0.97, 0.5, 1.0, 0.55]), size);
+    let edge = placement(Some([0.97, 0.5, 1.0, 0.55]), size, clear);
     assert!(edge.left + 216. <= 800. - 8., "{edge:?}");
     assert_eq!(edge.bottom, Some(600. - 300. + 8.));
     // Behind the eye or off the picture: the lower left, over the tools.
-    let corner = placement(None, size);
+    let corner = placement(None, size, clear);
     assert_eq!((corner.left, corner.top), (12., None));
-    assert_eq!(placement(Some([1.2, 0.5, 1.3, 0.6]), size), corner);
+    assert_eq!(corner.bottom, Some(clear));
+    assert_eq!(placement(Some([1.2, 0.5, 1.3, 0.6]), size, clear), corner);
     // A block filling the picture leaves no room either side.
-    assert_eq!(placement(Some([0.1, 0.01, 0.9, 0.95]), size), corner);
+    assert_eq!(placement(Some([0.1, 0.01, 0.9, 0.95]), size, clear), corner);
+    // While slicing the trailing plate is taller: the corner card clears it.
+    let slicing = placement(None, size, SLICING_CLEARANCE);
+    assert_eq!(slicing.bottom, Some(SLICING_CLEARANCE));
 }
 
 /// The card shows a container's slots as its screen lays them out, asks the
