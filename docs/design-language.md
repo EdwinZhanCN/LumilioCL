@@ -29,7 +29,7 @@ logos.
 
 ## 2. Motion tokens
 
-Defined in `crates/lumilio-ui/src/theme.rs` (`theme::motion`). Use the token,
+Defined in `crates/lumilio-ui/src/theme/mod.rs` (`theme::motion`). Use the token,
 never a literal duration.
 
 | Token | Value | Use |

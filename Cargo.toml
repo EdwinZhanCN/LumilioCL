@@ -114,6 +114,6 @@ opt-level = 3
 debug = 0
 
 # Readback colour conversion touches every pixel. Keep it vectorized in the
-# development app as well; the GPUI-facing view remains unoptimized (ADR 0028).
+# development app as well; the GPUI-facing view remains unoptimized.
 [profile.dev.package.lumilio-schematic-render]
 opt-level = 3

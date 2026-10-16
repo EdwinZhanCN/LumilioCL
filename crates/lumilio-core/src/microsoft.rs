@@ -1,5 +1,5 @@
 //! Signing in with a Microsoft account: the device code grant and the chain
-//! of tokens from it to a Minecraft session. Decisions: ADR 0020.
+//! of tokens from it to a Minecraft session.
 //!
 //! This module only speaks the protocol. Where tokens are kept is
 //! [`crate::credentials`], and what an account is lives in `settings`.

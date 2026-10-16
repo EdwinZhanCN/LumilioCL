@@ -1,4 +1,5 @@
-//! Full backups of one game (`ADR 0015`).
+//! Full backups of one game (user paths: `docs/ia/paths/instance.md` and
+//! `docs/ia/paths/library.md`).
 //!
 //! A backup is a zip: `lumilio-backup.json` describing the game, and the
 //! whole game folder under `game/` (logs and crash reports left out, links

@@ -1,4 +1,4 @@
-//! Reading games made by other launchers (`ADR 0016`).
+//! Reading games made by other launchers (user path: `docs/ia/paths/library.md`).
 //!
 //! Two layouts are understood: a MultiMC/Prism instance (`instance.cfg` and
 //! `mmc-pack.json`, game files in `.minecraft` or `minecraft`) and a plain
