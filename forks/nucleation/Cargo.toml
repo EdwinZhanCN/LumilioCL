@@ -180,7 +180,7 @@ blake3 = "1"
 ron = "0.8"
 rustfft = "6"
 bytemuck = { version = "1.23.1", features = ["derive"] }
-zip = { version = "2", default-features = false, features = ["deflate"] }
+zip = { version = "9.0.3", default-features = false, features = ["deflate"] }
 
 # Storage backend dependencies - optional, behind store-* features.
 # Networked backends use async SDKs wrapped with an internal tokio runtime.
@@ -274,7 +274,9 @@ num-complex = "0.4"
 base64 = "0.22"
 # Golden hashes for the voxelize regression fixtures (tests/voxelize_golden.rs).
 sha2 = "0.10"
-ffmpeg-sidecar = "2.4"
+# render_schematic runs an installed ffmpeg; the default download feature
+# would pull in an older zip.
+ffmpeg-sidecar = { version = "2.4", default-features = false }
 winit = "0.30"
 bincode = "1"
 # Dev-only on purpose: examples that *render* mc-tick simulations. The

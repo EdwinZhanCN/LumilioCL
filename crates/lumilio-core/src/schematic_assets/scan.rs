@@ -136,7 +136,9 @@ fn read(source: &Path) -> Result<Scan, SchematicAssetsError> {
         if entry.is_dir() {
             continue;
         }
-        let name = entry.name().to_owned();
+        let Ok(name) = entry.name().map(|name| name.into_owned()) else {
+            continue;
+        };
         count(&name, &mut || {
             let mut bytes = Vec::new();
             entry.read_to_end(&mut bytes).ok().map(|_| bytes)

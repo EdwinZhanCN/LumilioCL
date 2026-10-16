@@ -121,7 +121,7 @@ fn unpack_zip(archive: &Path, into: &Path) -> io::Result<()> {
         let mut file = zip.by_index(index).map_err(io::Error::other)?;
         let raw = file
             .enclosed_name()
-            .ok_or_else(|| refused(file.name().to_owned()))?;
+            .ok_or_else(|| refused(String::from_utf8_lossy(file.name_raw())))?;
         let Some(relative) = inner_path(&raw)? else {
             continue;
         };

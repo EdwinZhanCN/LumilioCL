@@ -14,5 +14,8 @@ lumilio-nbt.workspace = true
 serde_json.workspace = true
 xaero-core = { path = "../../vendor/xaerotools/crates/xaero-core" }
 
+[dev-dependencies]
+zip.workspace = true
+
 [lints]
 workspace = true
