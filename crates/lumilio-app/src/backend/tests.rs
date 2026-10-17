@@ -221,6 +221,8 @@ fn the_shipped_backend_registers_the_crash_analyzer_and_its_switch() {
 }
 
 /// Polls a join handle without a runtime of our own, the way GPUI awaits it.
+/// No deadline: some bodies download block assets, and CI's job timeout
+/// already ends a hang.
 fn futures_block<T>(handle: tokio::task::JoinHandle<T>) -> T {
     use std::sync::mpsc;
     use std::task::{Context, Poll, Wake, Waker};
@@ -238,7 +240,7 @@ fn futures_block<T>(handle: tokio::task::JoinHandle<T>) -> T {
         if let Poll::Ready(value) = handle.as_mut().poll(&mut cx) {
             return value.unwrap();
         }
-        rx.recv_timeout(std::time::Duration::from_secs(5)).unwrap();
+        rx.recv().unwrap();
     }
 }
 
