@@ -44,9 +44,18 @@ impl LauncherShell {
     }
 
     /// Records the current location before moving somewhere else.
-    pub(super) fn visit(&mut self) {
+    pub(super) fn visit(&mut self, cx: &mut Context<Self>) {
         let here = self.location();
+        self.leave(cx);
         self.history.visit(here);
+    }
+
+    /// The page on screen is about to be replaced. History keeps it alive,
+    /// so a game's page lets go of what only matters while it shows.
+    fn leave(&self, cx: &mut Context<Self>) {
+        if let Some(view) = &self.live_instance {
+            view.update(cx, |view, cx| view.left_screen(cx));
+        }
     }
 
     /// Shows a remembered location. A page is told it was navigated to (so
@@ -57,6 +66,7 @@ impl LauncherShell {
         window: Option<&mut Window>,
         cx: &mut Context<Self>,
     ) {
+        self.leave(cx);
         self.detail = None;
         self.live_instance = None;
         match to {

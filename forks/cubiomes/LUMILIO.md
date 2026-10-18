@@ -25,6 +25,62 @@ Omitted: `quadbase.*` (seed search and threads), `tests.c`, docs and build files
   for seed -123456789012345. Native spawn coordinates remain unchanged; the
   adapter now marks spawn estimates in every release, including 1.18+.
 
+- 2026-10-12 (plan `seed-map-prediction`): `isStrongholdBiome` excludes
+  cherry grove before 1.21.9. The original 1.20.6–1.21.8 servers leave it out
+  of `stronghold_biased_to`; the baseline counted it, which could bias
+  1.20–1.21.4 strongholds toward the wrong biome. Guard: biome-tag goldens of
+  1.19.4, 1.20.6, 1.21.1, 1.21.3 and 1.21.4 in
+  `crates/lumilio-cubiomes/src/tests/releases.rs`.
+- `Nether_Fossil` structure type (1.18+): the `nether_fossils` set (salt
+  14357921, spacing 2, separation 1); `getStructurePos` returns the fossil's
+  column, which the start chunk's structure random picks; the biome check is
+  soul sand valley at that column. Its height and whether it finds ground
+  come from the Nether's noise terrain (`terrain.c` below).
+- `terrain.c` / `terrain.h` (LumilioCL, MIT): the 1.18+ Nether's final
+  density: the old blended noise (legacy octaves seeded from the world seed),
+  the floor and ceiling slides, 4×8×4 interpolation and squeeze. A nether
+  fossil walks down from its drawn start to the first air above solid ground
+  above the lava sea; all 54 fossils saved by original 1.18.2, 1.19.2 and 26.3
+  servers have exactly the predicted height, so the structure query drops the
+  columns that find no ground and the layer is exact.
+- `decorations.c` / `decorations.h` and the generated `tables/decorations.h`
+  are LumilioCL additions under this directory's MIT license. They run a
+  placed feature's placement modifiers as the 26.3 `FeaturePlacer` does
+  (depth first), from per-release data that `cargo xtask cubiomes-tables`
+  builds out of `data/<release>/decorations.json`: decoration step and index
+  from the original `FeatureSorter`, modifiers, and the biomes listing the
+  feature. Original-server sequences of every tracked feature match exactly.
+  Decoration salts are identical from 1.19.4 to 26.3, confirming the
+  baseline's geode, desert well and End gateway salts for the new releases.
+
+- `veins.c` / `veins.h` (LumilioCL, MIT): large ore veins from 1.18. The
+  toggle, ridge and gap noises are seeded from md5 hashes of their names as
+  `RandomState` does; the toggle and ridges are interpolated over 4×8×4 noise
+  cells in the noise chunk's order (y, x, z); the per-block chances use the
+  positional random of `minecraft:ore`. 26.3 moved veins into material rules
+  with the same draws in single precision and exclusive top heights. Every
+  raw copper and raw iron block in the original servers' saved areas is the
+  rule's raw block. The fork now compiles with `-ffp-contract=off`, as Java
+  does not fuse multiply-adds.
+
+- `carvers.c` / `carvers.h` (LumilioCL, MIT): the 1.18+ canyon carver. The
+  start chance, start, thickness, distance and the ellipsoid walk follow the
+  `canyon` carver (constants unchanged 1.18–26.3); `Mth`'s sine table is
+  indexed with a float product before 1.21.11 and a double after. The blocks
+  every canyon carves near the origin match the original 26.3 carver's
+  carving masks; the trig lookups of 1.21.4 and 26.3 match their `Mth`.
+
+- `loot.c` / `loot.h` and the generated `tables/loot.h` (LumilioCL, MIT):
+  desert pyramid chests from 1.21. All four lie in the start chunk; its
+  surface-structure decoration random draws the height offset, then one loot
+  seed per chest in north, east, south, west order through the piece's random
+  facing. The pyramid's index in that step is its place among the step's
+  structures sorted by id. The first pool of the loot table is simulated from
+  the seed (rolls, weights, set_count ranges, enchanted books from the
+  `#on_random_loot` tag in order). Each of 40 chests in original 26.3 worlds
+  has the saved loot seed, and once the server fills it, exactly the predicted
+  first-pool items, counts, enchantments and levels.
+
 Sources, hashes, differences and reproduction commands are in [data](data/README.md).
 The host-owned bridge lives in `crates/lumilio-cubiomes/src/bridge.c`.
 The upstream baseline and MIT attribution are retained.

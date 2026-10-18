@@ -74,12 +74,15 @@ fn focusable(
 type Toggle = Rc<dyn Fn(&mut Window, &mut App)>;
 
 /// The fader switch: a black slot, a white round cap and an LED. On means the
-/// cap sits at the trailing end and the LED is lit.
+/// cap sits at the trailing end and the LED is lit. The label is read out;
+/// it shows only with [`Fader::shown`], for a switch with no row label
+/// beside it.
 #[derive(IntoElement)]
 pub struct Fader {
     id: ElementId,
     on: bool,
     label: SharedString,
+    shown: bool,
     disabled: bool,
     on_toggle: Toggle,
 }
@@ -95,6 +98,7 @@ impl Fader {
             id: id.into(),
             on,
             label: label.into(),
+            shown: false,
             disabled: false,
             on_toggle: Rc::new(on_toggle),
         }
@@ -102,6 +106,13 @@ impl Fader {
 
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
+        self
+    }
+
+    /// Writes the label after the LED, as a checkbox writes its own; a
+    /// click on it toggles too.
+    pub fn shown(mut self) -> Self {
+        self.shown = true;
         self
     }
 }
@@ -118,6 +129,7 @@ impl RenderOnce for Fader {
         };
         let cap_id = format!("{}-cap", self.id);
         let led_id = format!("{}-led", self.id);
+        let label_id = format!("{}-label", self.id);
         let control = div()
             .id(self.id.clone())
             .rounded(px(4.))
@@ -156,7 +168,16 @@ impl RenderOnce for Fader {
                             .shadow(theme::key_shadow(body)),
                     ),
             )
-            .child(led(on, body).debug_selector(move || led_id));
+            .child(led(on, body).debug_selector(move || led_id))
+            .when(self.shown, |control| {
+                control.child(
+                    div()
+                        .debug_selector(move || label_id)
+                        .text_sm()
+                        .text_color(body.ink)
+                        .child(self.label.clone()),
+                )
+            });
         focusable(control, &self.id, !self.disabled, body, window, cx).map(|control| {
             if self.disabled {
                 control.opacity(0.5)
@@ -294,11 +315,30 @@ pub fn radio(chosen: bool, body: Body) -> Div {
         )
 }
 
+/// A key that holds a state, with its LED in the band above it: how segment
+/// keys and a toggle key among them show what is on. In a row that mixes
+/// them with plain keys, align the row's items to the end so every key's
+/// bottom sits on one line and the LEDs mark the keys that hold a state.
+pub fn led_over(led: Div, key: impl IntoElement) -> Div {
+    div()
+        .flex()
+        .flex_col()
+        .items_center()
+        .gap(px(7.))
+        .child(led)
+        .child(key)
+}
+
 pub type Select = Rc<dyn Fn(usize, &mut Window, &mut App)>;
 
 /// Refinement choices: a row of small white keys, each with an LED above it.
 /// The chosen key's LED is lit, the key sits pressed and its label is
 /// semibold.
+///
+/// Only for two to four fixed options with short labels the launcher
+/// writes. Options that come from data (region, scheme or file names) and a
+/// choice repeated on every row of a table are a `Select`: the keys grow
+/// with their labels, and the LED band makes every row taller.
 #[derive(IntoElement)]
 pub struct Segments {
     id: &'static str,
@@ -334,23 +374,18 @@ impl RenderOnce for Segments {
             .children(self.labels.into_iter().enumerate().map(|(index, label)| {
                 let chosen = index == active;
                 let on_select = self.on_select.clone();
-                div()
-                    .flex()
-                    .flex_col()
-                    .items_center()
-                    .gap(px(7.))
-                    .child(led(chosen, body).debug_selector(move || format!("{id}-led-{index}")))
-                    .child(
-                        Key::new((id, index))
-                            .label(label)
-                            .white()
-                            .small()
-                            .min_w(px(64.))
-                            .bold(chosen)
-                            .selected(chosen)
-                            .debug_selector(move || format!("{id}-key-{index}"))
-                            .on_click(move |_, window, cx| on_select(index, window, cx)),
-                    )
+                led_over(
+                    led(chosen, body).debug_selector(move || format!("{id}-led-{index}")),
+                    Key::new((id, index))
+                        .label(label)
+                        .white()
+                        .small()
+                        .min_w(px(64.))
+                        .bold(chosen)
+                        .selected(chosen)
+                        .debug_selector(move || format!("{id}-key-{index}"))
+                        .on_click(move |_, window, cx| on_select(index, window, cx)),
+                )
             }))
     }
 }
@@ -364,6 +399,7 @@ pub struct PortTabs {
     labels: Vec<SharedString>,
     active: usize,
     on_select: Select,
+    wrap: bool,
 }
 
 impl PortTabs {
@@ -378,14 +414,22 @@ impl PortTabs {
             labels: labels.iter().cloned().map(Into::into).collect(),
             active,
             on_select: Rc::new(on_select),
+            wrap: false,
         }
+    }
+
+    /// Lets the blocks run onto a second row in a narrow column (an
+    /// inspector) instead of being cut off; labels are never truncated.
+    pub fn wrap(mut self) -> Self {
+        self.wrap = true;
+        self
     }
 }
 
 impl RenderOnce for PortTabs {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let body = Body::current(cx);
-        let (id, active) = (self.id, self.active);
+        let (id, active, wrap) = (self.id, self.active, self.wrap);
         let tabs: Vec<Stateful<Div>> = self
             .labels
             .into_iter()
@@ -398,6 +442,7 @@ impl RenderOnce for PortTabs {
                     .id((id, index))
                     .debug_selector(move || format!("{id}-tab-{index}"))
                     .h(px(30.))
+                    .when(wrap, |tab| tab.flex_none())
                     .px(px(16.))
                     .flex()
                     .items_center()
@@ -414,7 +459,11 @@ impl RenderOnce for PortTabs {
                 focusable(tab, &ElementId::from((id, index)), true, body, window, cx)
             })
             .collect();
-        div().flex().gap(px(1.)).children(tabs)
+        div()
+            .flex()
+            .when(self.wrap, |row| row.flex_wrap())
+            .gap(px(1.))
+            .children(tabs)
     }
 }
 

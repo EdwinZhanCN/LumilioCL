@@ -287,7 +287,7 @@ fn hits_carry_stats_environment_and_the_packs_own_loaders() {
         ["lightweight", "multiplayer", "optimization"]
     );
     assert_eq!(hit.loaders, ["fabric"]);
-    assert_eq!((hit.downloads, hit.follows), (17_731_400, 4886));
+    assert_eq!((hit.downloads, hit.follows), (17_731_400, Some(4886)));
     assert_eq!(hit.published, "2022-02-10T06:28:19Z");
     assert_eq!(hit.updated, "2026-09-27T10:00:00Z");
     assert_eq!(hit.environment, Some(Environment::ClientOnly));
@@ -309,7 +309,7 @@ fn a_project_decodes_gallery_links_license_and_dates() {
               {"url":"https://cdn/c.png","featured":false,"ordering":0}]}"##,
     )
     .unwrap();
-    assert_eq!(project.followers, 9);
+    assert_eq!(project.followers, Some(9));
     assert_eq!(project.license.as_deref(), Some("GNU LGPL v3"));
     assert_eq!(
         project.links.source.as_deref(),

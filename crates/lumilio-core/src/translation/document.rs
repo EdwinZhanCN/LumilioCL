@@ -1,4 +1,5 @@
 use super::TranslationError;
+use crate::discover::TextFormat;
 use html5ever::{
     LocalName, QualName, namespace_url, ns, parse_fragment, serialize, tendril::TendrilSink,
 };
@@ -24,14 +25,19 @@ fn html(text: &str) -> Result<String, TranslationError> {
 }
 
 impl Document {
-    pub(super) fn parse(original: &str) -> Result<Self, TranslationError> {
+    /// Markdown is compiled to HTML first, so the result is HTML either way.
+    pub(super) fn parse(original: &str, format: TextFormat) -> Result<Self, TranslationError> {
+        let markup = match format {
+            TextFormat::Markdown => html(original)?,
+            TextFormat::Html => original.to_owned(),
+        };
         let dom = parse_fragment(
             RcDom::default(),
             Default::default(),
             QualName::new(None, ns!(html), LocalName::from("div")),
             Vec::new(),
         )
-        .one(html(original)?);
+        .one(markup);
         let mut nodes = Vec::new();
         collect(&dom.document, false, &mut nodes);
         let parts = nodes
@@ -128,7 +134,7 @@ pub(super) fn batches(texts: &[String]) -> Vec<&[String]> {
 
 pub(super) fn safe_summary(original: &str, translated: &str) -> bool {
     let skeleton = |text: &str| {
-        let mut doc = Document::parse(text).ok()?;
+        let mut doc = Document::parse(text, TextFormat::Markdown).ok()?;
         let blanks = vec![String::new(); doc.texts().len()];
         doc.replace(&blanks).ok()
     };

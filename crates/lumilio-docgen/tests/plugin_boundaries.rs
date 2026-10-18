@@ -128,6 +128,38 @@ fn contract_problems(
                 let forbidden = match crate_name {
                     "lumilio-plugin-api" => !["serde", "serde_json"].contains(&package),
                     "lumilio-core" => ["cc", "lumilio-cubiomes"].contains(&package),
+                    // The baker runs in xtask on CI without a GPU (schematic-studio D10).
+                    "lumilio-block-assets" => {
+                        package.starts_with("gpui")
+                            || package.starts_with("lumilio-")
+                            || ["nucleation", "schematic-mesher", "wgpu"].contains(&package)
+                    }
+                    // Schematic domain logic: Nucleation without meshing or
+                    // rendering, no GPU, no UI (schematic-studio D10). The
+                    // baked block-asset format is allowed: a backward
+                    // conversion checks against its `BlockCatalog` (T14).
+                    "lumilio-schematic" => {
+                        let gpu_features = spec
+                            .get("features")
+                            .and_then(Value::as_array)
+                            .is_some_and(|features| {
+                                features.iter().any(|feature| {
+                                    ["meshing", "rendering"]
+                                        .contains(&feature.as_str().unwrap_or(""))
+                                })
+                            });
+                        package.starts_with("gpui")
+                            || (package == "nucleation" && gpu_features)
+                            || [
+                                "wgpu",
+                                "schematic-mesher",
+                                "lumilio-core",
+                                "lumilio-ui",
+                                "lumilio-app",
+                                "lumilio-schematic-render",
+                            ]
+                            .contains(&package)
+                    }
                     "lumilio-map-render" => {
                         package.starts_with("gpui")
                             || [
@@ -167,6 +199,8 @@ fn map_libraries_preserve_their_dependency_boundaries() {
         "lumilio-cubiomes",
         "lumilio-nbt",
         "lumilio-anvil",
+        "lumilio-block-assets",
+        "lumilio-schematic",
         "lumilio-map-render",
         "lumilio-plugin-api",
         "lumilio-core",
@@ -206,6 +240,28 @@ fn nbt_guard_probe() {
 #[test]
 fn anvil_guard_probe() {
     injected("lumilio-anvil", "lumilio-core");
+}
+#[test]
+fn block_assets_guard_probe() {
+    injected("lumilio-block-assets", "nucleation");
+}
+#[test]
+fn schematic_guard_probe() {
+    injected("lumilio-schematic", "wgpu");
+    injected("lumilio-schematic", "lumilio-ui");
+    let manifest: Value = toml::from_str(
+        "[dependencies]\nnucleation = { path = \"n\", default-features = false, features = [\"rendering\"] }",
+    )
+    .unwrap();
+    assert!(
+        !contract_problems(
+            manifest.as_table().unwrap(),
+            &toml::Table::new(),
+            "lumilio-schematic"
+        )
+        .is_empty(),
+        "lumilio-schematic failed to reject Nucleation's rendering feature"
+    );
 }
 #[test]
 fn renderer_guard_probe() {

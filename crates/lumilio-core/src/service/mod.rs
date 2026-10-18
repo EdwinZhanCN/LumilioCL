@@ -14,6 +14,7 @@ mod content_install;
 mod diagnostics;
 mod discover;
 mod error;
+mod game_settings;
 mod install;
 mod instances;
 mod java;
@@ -23,9 +24,13 @@ mod maintenance;
 mod models;
 mod modpacks;
 mod packs;
+mod pending;
 mod plugins;
 mod portability;
 mod preferences;
+mod recognize;
+mod schematic_ops;
+mod schematic_packs;
 mod screenshots;
 mod servers;
 mod skins;
@@ -44,11 +49,14 @@ mod tests;
 
 pub use self::appearance::ProfileSnapshot;
 pub use self::error::ServiceError;
+pub use self::java::InstanceJava;
 pub use self::models::ModelPreview;
+pub use self::pending::AddedFile;
 pub use self::third_party::ThirdPartySignIn;
 pub use self::types::{
-    ActivityView, ContentEffect, ContentResult, DependencyNeed, DependencyReport, DiscoverFilters,
-    GameLogSource, GameLogs, InstalledProject, Library, ProjectDetail, now,
+    ActivityView, ContentEffect, ContentResult, ContentSourceInfo, DependencyNeed,
+    DependencyReport, DiscoverFilters, GameLogSource, GameLogs, InstalledProject, Library,
+    ProjectDetail, now,
 };
 pub use self::wardrobe::AppearanceApplyResult;
 
@@ -88,7 +96,6 @@ const TOKEN_MARGIN_SECONDS: u64 = 300;
 const CREDENTIAL_PROBE: &str = "lumilio-store-check";
 
 pub struct LauncherService<T> {
-    translation: crate::translation::SharedTranslation,
     pub(crate) plugins: Arc<crate::plugins::PluginHost>,
     layout: Layout,
     transport: T,
@@ -100,10 +107,16 @@ pub struct LauncherService<T> {
     /// What the start-up recovery found and did.
     startup: Vec<RecoveryNote>,
     operations: StdMutex<BTreeSet<String>>,
+    /// Instances whose next launch picks its Java automatically, whatever
+    /// their settings say (the person chose 本次改用 when asked).
+    automatic_java_once: StdMutex<BTreeSet<String>>,
     log: ActivityLog,
     /// Replaces the conventional Java search locations (tests, portable setups).
     runtime_roots: Option<Vec<PathBuf>>,
-    filters: Mutex<Option<(String, DiscoverFilters)>>,
+    /// Filter choices per content source, for the life of the service.
+    filters: Mutex<std::collections::BTreeMap<String, DiscoverFilters>>,
+    /// Translated summaries and bodies, cached in their own SQLite file.
+    translation: crate::translation::SharedTranslation,
     /// Where sign-in secrets live; never a file.
     credentials: Arc<dyn CredentialStore>,
     /// One refresh at a time: refresh tokens rotate, so two at once would
@@ -156,10 +169,10 @@ impl<T: Transport + Clone> LauncherService<T> {
             // until corrected; the rest of the service remains available.
             .with_network_config(transport.clone(), settings.source_chain().ok());
         Ok(Self {
+            plugins: Arc::new(plugins),
             translation: Arc::new(crate::translation::TranslationService::new(
                 layout.root().to_owned(),
             )),
-            plugins: Arc::new(plugins),
             textures: crate::skin::cache::TextureCache::new(
                 layout.root().join("cache/skin-textures"),
             ),
@@ -170,11 +183,12 @@ impl<T: Transport + Clone> LauncherService<T> {
             settings: Mutex::new(settings),
             board: StdMutex::new(TaskBoard::default()),
             cancels: StdMutex::default(),
+            automatic_java_once: StdMutex::default(),
             startup,
             operations: StdMutex::new(BTreeSet::new()),
             log,
             runtime_roots: None,
-            filters: Mutex::new(None),
+            filters: Mutex::default(),
             credentials: Arc::new(SystemCredentials),
             auth_lock: Mutex::new(()),
             wardrobe_lock: Mutex::new(()),

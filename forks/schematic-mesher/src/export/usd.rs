@@ -391,9 +391,9 @@ mod tests {
         let v2 = mesh.add_vertex(Vertex::new([0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0]));
         mesh.add_triangle(v0, v1, v2);
         MesherOutput {
-            opaque_mesh: mesh,
-            cutout_mesh: Mesh::new(),
-            transparent_mesh: Mesh::new(),
+            opaque_mesh: crate::mesh_output::mesh_to_layer(&mesh),
+            cutout_mesh: crate::mesh_output::MeshLayer::new(),
+            transparent_mesh: crate::mesh_output::MeshLayer::new(),
             atlas: TextureAtlas::empty(),
             bounds: BoundingBox::new([0.0, 0.0, 0.0], [1.0, 0.0, 1.0]),
             greedy_materials: Vec::new(),
@@ -433,9 +433,9 @@ mod tests {
     #[test]
     fn test_export_usda_empty_fails() {
         let output = MesherOutput {
-            opaque_mesh: Mesh::new(),
-            cutout_mesh: Mesh::new(),
-            transparent_mesh: Mesh::new(),
+            opaque_mesh: crate::mesh_output::MeshLayer::new(),
+            cutout_mesh: crate::mesh_output::MeshLayer::new(),
+            transparent_mesh: crate::mesh_output::MeshLayer::new(),
             atlas: TextureAtlas::empty(),
             bounds: BoundingBox::new([0.0, 0.0, 0.0], [0.0, 0.0, 0.0]),
             greedy_materials: Vec::new(),
@@ -452,9 +452,9 @@ mod tests {
         let v2 = mesh.add_vertex(Vertex::new([0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0]));
         mesh.add_triangle(v0, v1, v2);
         let output = MesherOutput {
-            opaque_mesh: Mesh::new(),
-            cutout_mesh: Mesh::new(),
-            transparent_mesh: mesh,
+            opaque_mesh: crate::mesh_output::MeshLayer::new(),
+            cutout_mesh: crate::mesh_output::MeshLayer::new(),
+            transparent_mesh: crate::mesh_output::mesh_to_layer(&mesh),
             atlas: TextureAtlas::empty(),
             bounds: BoundingBox::new([0.0, 0.0, 0.0], [1.0, 0.0, 1.0]),
             greedy_materials: Vec::new(),
@@ -483,9 +483,9 @@ mod tests {
         );
         mesh.add_triangle(v0, v1, v2);
         let output = MesherOutput {
-            opaque_mesh: mesh,
-            cutout_mesh: Mesh::new(),
-            transparent_mesh: Mesh::new(),
+            opaque_mesh: crate::mesh_output::mesh_to_layer(&mesh),
+            cutout_mesh: crate::mesh_output::MeshLayer::new(),
+            transparent_mesh: crate::mesh_output::MeshLayer::new(),
             atlas: TextureAtlas::empty(),
             bounds: BoundingBox::new([0.0, 0.0, 0.0], [1.0, 0.0, 1.0]),
             greedy_materials: Vec::new(),
@@ -508,7 +508,7 @@ mod tests {
         let mut found_atlas = false;
         for i in 0..archive.len() {
             let file = archive.by_index(i).unwrap();
-            match file.name() {
+            match file.name().unwrap().as_ref() {
                 "root.usda" => found_usda = true,
                 "textures/atlas.png" => found_atlas = true,
                 _ => {}
@@ -528,12 +528,12 @@ mod tests {
         let mut archive = zip::ZipArchive::new(cursor).unwrap();
         for i in 0..archive.len() {
             let file = archive.by_index(i).unwrap();
-            let offset = file.data_start();
+            let offset = file.data_start().unwrap();
             assert_eq!(
                 offset % 64,
                 0,
                 "File '{}' data not 64-byte aligned (offset={})",
-                file.name(),
+                file.name().unwrap(),
                 offset
             );
         }

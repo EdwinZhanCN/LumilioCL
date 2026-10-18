@@ -65,6 +65,24 @@ Use a disposable data directory for manual tests.
 Set `LUMILIO_HOME` to that directory before you start the application.
 Do not use important game data for a destructive test.
 
+## Set the CurseForge API key
+
+The CurseForge content source reads the `CF_API_KEY` environment variable when you build it.
+Without a key, that source is off by default.
+All other functions operate normally.
+Release builds get the key from a repository secret.
+
+For local development, put the key in your user-level `~/.cargo/config.toml`:
+
+```toml
+[env]
+CF_API_KEY = 'your-key'
+```
+
+Use single quotes. They keep each `$` in the key as it is.
+Do not put the key in the `.cargo/config.toml` of the repository. Git tracks that file.
+When you change the key, Cargo builds the crates that use it again.
+
 ## Prepare the website
 
 Install Node.js 22.12.0 or later.
@@ -88,9 +106,11 @@ Run these recipes from the repository root:
 | Change | During work | Before handoff |
 | --- | --- | --- |
 | Rust code | `just test-pkg <crate> [filter]` | `just check` |
+| A fork in `forks/` | `just forks` | `just check` and `just forks` |
 | Documentation or harness | `just plans` after plan changes | `just docs` |
 | Website or published documentation | `just web` | `just web`; also `just docs` for plan changes |
 
 `just check` runs build, tests, Clippy, and formatting checks in that order.
+`just forks` runs the tests of the forks the launcher builds from. CI runs `just ci`, which is `just check` and then `just forks`.
 `just web` runs dependency installation, Astro checks, website tests, and the site build.
 Do not report a check as passed until it finishes successfully.

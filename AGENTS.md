@@ -86,8 +86,11 @@ Don't write documents that restate the code or upstream; they go stale.
   `kit`), drawn per design-language §12. Don't use gpui-component's `Button`/`Switch`/`TabBar`
   in pages.
 - Choose controls by the value being edited: many options → `Select` (searchable for long
-  lists); on/off → switch or toggle; free text/numbers → `Input`; 2–4 exclusive options →
-  `Segments`. `SettingsDialog` `Choice` is only for a few short labels; long lists must
+  lists); on/off → switch or toggle; free text/numbers → `Input`; 2–4 fixed, short
+  options the launcher writes → `Segments`. Options from data (region or file names) and a
+  choice repeated on every table row are a `Select` however few: segment keys grow with
+  their labels and their LED band, and pushed the studio's replace dialog off its column.
+  `SettingsDialog` `Choice` is only for a few short labels; long lists must
   remain reachable through a dropdown rather than overflowing a dialog.
 - A built user path is declared by a one-line comment at its code:
   `// ia[page]: 操作 | 层 / 组件 | 结果与反馈 [| 备注]` (skill `lumilio-ia-paths`).

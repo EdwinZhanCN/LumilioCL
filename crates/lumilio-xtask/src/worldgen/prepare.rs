@@ -110,7 +110,7 @@ pub(super) fn prepare(root: &Path, version: &str) -> Result<PathBuf> {
     let mut found = false;
     for i in 0..bundle.len() {
         let mut entry = bundle.by_index(i).map_err(|e| e.to_string())?;
-        let name = entry.name().to_owned();
+        let name = entry.name().map_err(|e| e.to_string())?.into_owned();
         let dest = if name.starts_with("META-INF/versions/") && name.ends_with(".jar") {
             if found {
                 return Err("multiple bundled game jars".into());
@@ -140,7 +140,7 @@ pub(super) fn prepare(root: &Path, version: &str) -> Result<PathBuf> {
     let mut data = BTreeMap::new();
     for i in 0..jar.len() {
         let mut entry = jar.by_index(i).map_err(|e| e.to_string())?;
-        let name = entry.name().to_owned();
+        let name = entry.name().map_err(|e| e.to_string())?.into_owned();
         if name.ends_with(".json")
             && (name.starts_with("data/minecraft/worldgen/")
                 || name.starts_with("data/minecraft/tags/worldgen/"))
@@ -211,7 +211,7 @@ pub(super) fn named(root: &Path, work: &Path) -> Result<PathBuf> {
     let mut out = zip::ZipWriter::new(std::fs::File::create(&output).map_err(|e| e.to_string())?);
     for i in 0..input.len() {
         let mut entry = input.by_index(i).map_err(|e| e.to_string())?;
-        let name = entry.name();
+        let name = entry.name().map_err(|e| e.to_string())?.into_owned();
         let upper = name.to_ascii_uppercase();
         if upper.starts_with("META-INF/")
             && (upper.ends_with(".SF")

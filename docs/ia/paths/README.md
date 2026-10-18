@@ -7,18 +7,18 @@
 |---|---|
 | [插件 · 世界地图](plugin.world-explorer.md) | 34 |
 | [全局导航](navigation.md) | 9 |
-| [首页](home.md) | 10 |
-| [游戏库](library.md) | 21 |
-| [发现](discover.md) | 24 |
+| [首页](home.md) | 13 |
+| [游戏库](library.md) | 30 |
+| [发现](discover.md) | 27 |
 | [动态](activity.md) | 8 |
 | [账户](accounts.md) | 26 |
-| [设置](settings.md) | 55 |
+| [设置](settings.md) | 60 |
 | [游戏页（整体）](instance.md) | 21 |
 | [游戏页 · 概览](instance.overview.md) | 4 |
-| [游戏页 · 内容](instance.content.md) | 16 |
+| [游戏页 · 内容](instance.content.md) | 18 |
 | [游戏页 · 世界](instance.worlds.md) | 17 |
 | [游戏页 · 截图](instance.screenshots.md) | 6 |
 | [游戏页 · 历史](instance.history.md) | 5 |
 | [游戏页 · 诊断](instance.diagnostics.md) | 11 |
-| [游戏页 · 设置](instance.settings.md) | 11 |
-| [插件 · Litematica 投影](plugin.litematica.md) | 5 |
+| [游戏页 · 设置](instance.settings.md) | 18 |
+| [插件 · Litematica 投影](plugin.litematica.md) | 60 |

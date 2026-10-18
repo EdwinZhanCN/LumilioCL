@@ -33,14 +33,15 @@ pub use self::discover::{
     sort_label, tag_label, visible_kinds,
 };
 pub use self::home::{
-    HomePlaces, PLACE_SERVERS, PLACE_WORLDS, Place, PlaceTarget, home_places, home_presentation,
+    HomePlaces, PLACE_SERVERS, PLACE_WORLDS, Place, PlaceKind, PlacePicture, PlaceTarget,
+    home_places, home_presentation, world_mode,
 };
 pub use self::intent::{LiveHandler, LiveIntent};
 pub use self::library::{
-    CollectionRow, LibraryCard, attention_rows, cover_loader, instance_meta, library_card,
+    CollectionRow, LibraryCard, ago, attention_rows, cover_loader, instance_meta, library_card,
     library_cards, loader_label, relative_time, seed_of, world_of,
 };
-pub use self::settings::{JavaRow, SettingsView, settings_view};
+pub use self::settings::{JavaRow, SettingsView, java_label, settings_view};
 pub use self::update::{UpdateStatus, UpdateUnavailability};
 
 use self::activity::{RateSample, next_sample};
@@ -52,6 +53,9 @@ use std::sync::Arc;
 /// Everything the live pages show.
 #[derive(Clone, Debug)]
 pub struct LiveModel {
+    pub settings_presets: Vec<lumilio_core::SettingsPreset>,
+    pub game_settings: Vec<lumilio_core::GameSettingsView>,
+    pub presets_error: Option<String>,
     pub library: Vec<LibraryCard>,
     pub collections: Vec<CollectionRow>,
     /// Games with something wrong, for Home.
@@ -61,6 +65,8 @@ pub struct LiveModel {
     pub library_loaded: bool,
     pub results: Vec<SearchRow>,
     pub search: SearchStatus,
+    /// The content sources that are on, in the launcher's order.
+    pub sources: Vec<lumilio_core::ContentSourceInfo>,
     pub query: DiscoverQuery,
     pub filters: FilterModel,
     /// Which instance Discover installs into.
@@ -90,6 +96,9 @@ pub struct LiveModel {
 impl Default for LiveModel {
     fn default() -> Self {
         Self {
+            settings_presets: Vec::new(),
+            game_settings: Vec::new(),
+            presets_error: None,
             library: Vec::new(),
             collections: Vec::new(),
             attention: Vec::new(),
@@ -97,6 +106,7 @@ impl Default for LiveModel {
             library_loaded: false,
             results: Vec::new(),
             search: SearchStatus::Idle,
+            sources: Vec::new(),
             query: DiscoverQuery::new(ProjectKind::Modpack),
             filters: FilterModel::default(),
             install_target: None,
@@ -230,17 +240,34 @@ impl LiveModel {
             }
     }
 
-    /// The projects "hide already installed" leaves out: the packs the
-    /// library was made from, or what the browsed game already has.
+    /// The projects "hide already installed" leaves out: the packs of the
+    /// browsed source the library was made from, or what the browsed game
+    /// already has of that source.
     pub fn installed_projects(&self) -> Vec<String> {
         if self.query.kind == ProjectKind::Modpack {
             return self
                 .library
                 .iter()
-                .filter_map(|card| card.source_project.clone())
+                .filter_map(|card| card.source_project.as_deref())
+                .map(lumilio_core::ProjectOrigin::parse)
+                .filter(|origin| origin.source == self.query.source)
+                .map(|origin| origin.project)
                 .collect();
         }
         self.installed.keys().cloned().collect()
+    }
+
+    /// A content source's name, by plugin ID; the ID when it is not on.
+    pub fn source_name<'a>(&'a self, id: &'a str) -> &'a str {
+        self.sources
+            .iter()
+            .find(|source| source.id == id)
+            .map_or(id, |source| source.name.as_str())
+    }
+
+    /// The name of the source Discover is browsing.
+    pub fn browsed_source_name(&self) -> &str {
+        self.source_name(&self.query.source)
     }
 
     pub fn active_tasks(&self) -> u32 {

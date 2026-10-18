@@ -19,6 +19,8 @@ on:
       - "!web/**"
       # Generated from code; a hand edit must still fail the IA test.
       - "docs/ia/**"
+      # Compiled into the launcher (lumilio-ui's build script).
+      - "release-notes/**"
   pull_request:
   workflow_dispatch:
 
@@ -32,7 +34,7 @@ jobs:
     permissions:
       pull-requests: read
     outputs:
-      run: ${{ github.event_name != 'pull_request' || steps.filter.outputs.code == 'true' || steps.filter.outputs.ia == 'true' }}
+      run: ${{ github.event_name != 'pull_request' || steps.filter.outputs.code == 'true' || steps.filter.outputs.ia == 'true' || steps.filter.outputs.notes == 'true' }}
     steps:
       - id: filter
         if: github.event_name == 'pull_request'
@@ -48,6 +50,8 @@ jobs:
               - "!web/**"
             ia:
               - "docs/ia/**"
+            notes:
+              - "release-notes/**"
 
   rust:
     needs: changes

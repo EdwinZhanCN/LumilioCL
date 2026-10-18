@@ -267,9 +267,6 @@ name = "arbitrary"
 version = "1.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3d036a3c4ab069c7b410a2ce876bd74808d2d0888a82667669f8e783a898bf1"
-dependencies = [
- "derive_arbitrary",
-]
 
 [[package]]
 name = "arc-swap"
@@ -1686,17 +1683,6 @@ name = "deranged"
 version = "0.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7cd812cc2bc1d69d4764bd80df88b4317eaef9e773c75226407d9bc0876b211c"
-
-[[package]]
-name = "derive_arbitrary"
-version = "1.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e567bd82dcff979e4b03460c307b3cdc9e96fde3d73bed1496d2bc75d9dd62a"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.119",
-]
 
 [[package]]
 name = "derive_more"
@@ -4543,7 +4529,7 @@ dependencies = [
 
 [[package]]
 name = "lumilio-anvil"
-version = "0.1.3"
+version = "0.1.6"
 dependencies = [
  "flate2",
  "lumilio-nbt",
@@ -4552,7 +4538,7 @@ dependencies = [
 
 [[package]]
 name = "lumilio-app"
-version = "0.1.3"
+version = "0.1.6"
 dependencies = [
  "async-channel",
  "futures",
@@ -4560,6 +4546,7 @@ dependencies = [
  "lumilio-core",
  "lumilio-plugin-api",
  "lumilio-plugin-crash-analyzer",
+ "lumilio-plugin-curseforge",
  "lumilio-plugin-discord",
  "lumilio-plugin-litematica",
  "lumilio-plugin-modrinth",
@@ -4569,14 +4556,29 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "sha1 0.11.0",
  "tempfile",
  "tokio",
  "winresource",
 ]
 
 [[package]]
+name = "lumilio-block-assets"
+version = "0.1.6"
+dependencies = [
+ "image 0.25.10",
+ "serde",
+ "serde_json",
+ "sha1 0.11.0",
+ "sha2 0.11.0",
+ "tempfile",
+ "zip",
+ "zstd",
+]
+
+[[package]]
 name = "lumilio-core"
-version = "0.1.3"
+version = "0.1.6"
 dependencies = [
  "base64 0.22.1",
  "chrono",
@@ -4587,13 +4589,18 @@ dependencies = [
  "html5ever",
  "image 0.25.10",
  "keyring",
+ "lumilio-block-assets",
  "lumilio-nbt",
  "lumilio-plugin-api",
+ "lumilio-plugin-curseforge",
  "lumilio-plugin-discord",
+ "lumilio-plugin-litematica",
  "lumilio-plugin-modrinth",
+ "lumilio-schematic",
  "markdown",
  "markup5ever_rcdom",
  "md-5 0.11.0",
+ "png 0.18.1",
  "regex",
  "reqwest",
  "rsa",
@@ -4603,23 +4610,24 @@ dependencies = [
  "sha1 0.10.7",
  "sha1 0.11.0",
  "sha2 0.11.0",
+ "tar",
  "tempfile",
  "tokio",
  "toml 0.9.12+spec-1.1.0",
  "url",
- "zip 8.6.0",
+ "zip",
 ]
 
 [[package]]
 name = "lumilio-cubiomes"
-version = "0.1.3"
+version = "0.1.6"
 dependencies = [
  "cc",
 ]
 
 [[package]]
 name = "lumilio-docgen"
-version = "0.1.3"
+version = "0.1.6"
 dependencies = [
  "serde",
  "serde_json",
@@ -4629,7 +4637,7 @@ dependencies = [
 
 [[package]]
 name = "lumilio-map-render"
-version = "0.1.3"
+version = "0.1.6"
 dependencies = [
  "pollster 0.4.0",
  "wgpu 30.0.1",
@@ -4637,14 +4645,14 @@ dependencies = [
 
 [[package]]
 name = "lumilio-nbt"
-version = "0.1.3"
+version = "0.1.6"
 dependencies = [
  "flate2",
 ]
 
 [[package]]
 name = "lumilio-plugin-api"
-version = "0.1.3"
+version = "0.1.6"
 dependencies = [
  "serde",
  "serde_json",
@@ -4652,22 +4660,32 @@ dependencies = [
 
 [[package]]
 name = "lumilio-plugin-crash-analyzer"
-version = "0.1.3"
+version = "0.1.6"
 dependencies = [
  "lumilio-plugin-api",
  "regex",
 ]
 
 [[package]]
+name = "lumilio-plugin-curseforge"
+version = "0.1.6"
+dependencies = [
+ "lumilio-plugin-api",
+ "serde",
+ "serde_json",
+ "url",
+]
+
+[[package]]
 name = "lumilio-plugin-discord"
-version = "0.1.3"
+version = "0.1.6"
 dependencies = [
  "lumilio-plugin-api",
 ]
 
 [[package]]
 name = "lumilio-plugin-litematica"
-version = "0.1.3"
+version = "0.1.6"
 dependencies = [
  "flate2",
  "lumilio-nbt",
@@ -4677,7 +4695,7 @@ dependencies = [
 
 [[package]]
 name = "lumilio-plugin-modrinth"
-version = "0.1.3"
+version = "0.1.6"
 dependencies = [
  "lumilio-plugin-api",
  "serde",
@@ -4687,7 +4705,7 @@ dependencies = [
 
 [[package]]
 name = "lumilio-plugin-world-explorer"
-version = "0.1.3"
+version = "0.1.6"
 dependencies = [
  "lumilio-anvil",
  "lumilio-cubiomes",
@@ -4695,11 +4713,12 @@ dependencies = [
  "lumilio-plugin-api",
  "serde_json",
  "xaero-core",
+ "zip",
 ]
 
 [[package]]
 name = "lumilio-pointer"
-version = "0.1.3"
+version = "0.1.6"
 dependencies = [
  "block2 0.6.2",
  "core-graphics 0.24.0",
@@ -4710,30 +4729,44 @@ dependencies = [
 ]
 
 [[package]]
+name = "lumilio-schematic"
+version = "0.1.6"
+dependencies = [
+ "flate2",
+ "lumilio-block-assets",
+ "lumilio-nbt",
+ "nucleation",
+ "serde_json",
+ "sha2 0.11.0",
+]
+
+[[package]]
 name = "lumilio-schematic-render"
-version = "0.1.3"
+version = "0.1.6"
 dependencies = [
  "image 0.25.10",
+ "lumilio-block-assets",
  "nucleation",
  "pollster 0.4.0",
  "serde_json",
- "zip 8.6.0",
+ "zip",
 ]
 
 [[package]]
 name = "lumilio-skin-render"
-version = "0.1.3"
+version = "0.1.6"
 dependencies = [
  "image 0.25.10",
 ]
 
 [[package]]
 name = "lumilio-ui"
-version = "0.1.3"
+version = "0.1.6"
 dependencies = [
  "async-channel",
  "flate2",
  "fluent-syntax",
+ "futures-util",
  "gpui-component",
  "gpui-pre",
  "i18n-embed",
@@ -4743,17 +4776,20 @@ dependencies = [
  "lumilio-map-render",
  "lumilio-plugin-api",
  "lumilio-pointer",
+ "lumilio-schematic",
  "lumilio-schematic-render",
  "lumilio-skin-render",
  "raw-window-handle",
  "rust-embed",
+ "semver",
  "serde",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]
 name = "lumilio-updater"
-version = "0.1.3"
+version = "0.1.6"
 dependencies = [
  "flate2",
  "futures-util",
@@ -4766,17 +4802,21 @@ dependencies = [
 
 [[package]]
 name = "lumilio-xtask"
-version = "0.1.3"
+version = "0.1.6"
 dependencies = [
  "flate2",
  "image 0.25.10",
  "lumilio-anvil",
+ "lumilio-block-assets",
+ "lumilio-core",
  "lumilio-nbt",
+ "schematic-mesher",
  "serde_json",
  "sha1 0.11.0",
  "sha2 0.11.0",
  "tempfile",
- "zip 8.6.0",
+ "tokio",
+ "zip",
 ]
 
 [[package]]
@@ -5140,6 +5180,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
 
 [[package]]
+name = "nix"
+version = "0.31.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cf20d2fde8ff38632c426f1165ed7436270b44f199fc55284c38276f9db47c3d"
+dependencies = [
+ "bitflags 2.13.1",
+ "cfg-if",
+ "cfg_aliases",
+ "libc",
+]
+
+[[package]]
 name = "no_std_io2"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5264,6 +5316,7 @@ dependencies = [
  "image 0.24.9",
  "insign",
  "log",
+ "lumilio-block-assets",
  "palette",
  "phf 0.11.3",
  "pollster 0.4.0",
@@ -5281,7 +5334,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "wgpu 30.0.1",
- "zip 2.4.2",
+ "zip",
 ]
 
 [[package]]
@@ -7391,12 +7444,13 @@ dependencies = [
  "glam",
  "gltf-json",
  "image 0.25.10",
+ "lumilio-block-assets",
  "rayon",
  "rustc-hash 2.1.3",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
- "zip 2.4.2",
+ "zip",
 ]
 
 [[package]]
@@ -8255,6 +8309,17 @@ dependencies = [
  "core-foundation-sys",
  "libc",
  "objc",
+]
+
+[[package]]
+name = "tar"
+version = "0.4.46"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f6221d9a6003c78398e3b239969f352578258df48c8eb051caadae0015bc840"
+dependencies = [
+ "filetime",
+ "libc",
+ "xattr",
 ]
 
 [[package]]
@@ -10497,7 +10562,17 @@ version = "0.5.1"
 dependencies = [
  "smallvec",
  "thiserror 2.0.20",
- "zip 8.6.0",
+ "zip",
+]
+
+[[package]]
+name = "xattr"
+version = "1.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32e45ad4206f6d2479085147f02bc2ef834ac85886624a23575ae137c8aa8156"
+dependencies = [
+ "libc",
+ "rustix",
 ]
 
 [[package]]
@@ -10904,31 +10979,15 @@ dependencies = [
 
 [[package]]
 name = "zip"
-version = "2.4.2"
+version = "9.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fabe6324e908f85a1c52063ce7aa26b68dcb7eb6dbc83a2d148403c9bc3eba50"
-dependencies = [
- "arbitrary",
- "crc32fast",
- "crossbeam-utils",
- "displaydoc",
- "flate2",
- "indexmap",
- "memchr",
- "thiserror 2.0.20",
- "zopfli",
-]
-
-[[package]]
-name = "zip"
-version = "8.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d04a6b5381502aa6087c94c669499eb1602eb9c5e8198e534de571f7154809b"
+checksum = "c2d98561b612a84ae525331a7a094429ef8a5772514ed507ff6db5f54badc971"
 dependencies = [
  "crc32fast",
  "flate2",
  "indexmap",
  "memchr",
+ "nix",
  "typed-path",
  "zopfli",
 ]
@@ -10955,6 +11014,34 @@ dependencies = [
  "crc32fast",
  "log",
  "simd-adler32",
+]
+
+[[package]]
+name = "zstd"
+version = "0.13.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e91ee311a569c327171651566e07972200e76fcfe2242a4fa446149a3881c08a"
+dependencies = [
+ "zstd-safe",
+]
+
+[[package]]
+name = "zstd-safe"
+version = "7.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "64d80649ab6db9d9f6f9c80a40becd948eda4714a0a5ac8c4d157a32231c7882"
+dependencies = [
+ "zstd-sys",
+]
+
+[[package]]
+name = "zstd-sys"
+version = "2.1.1+zstd.1.5.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aeec9eaf2dffbbd09201e23bd0ffcbaa33bb8e9266a10734fd7ed90a85eca078"
+dependencies = [
+ "cc",
+ "pkg-config",
 ]
 
 [[package]]

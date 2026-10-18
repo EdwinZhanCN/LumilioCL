@@ -224,8 +224,296 @@ fn structure_layers_follow_the_worlds_version_and_dimension() {
             )
             .is_empty()
     );
-    // 24 structure layers, spawn, slime chunks, save positions and Xaero waypoints.
-    assert_eq!(WorldExplorer.overlays().len(), 28);
+    // 25 structure layers, 3 decoration layers, the apple layer, 3
+    // underground layers, spawn, slime chunks, save positions and Xaero
+    // waypoints.
+    assert_eq!(WorldExplorer.overlays().len(), 36);
+}
+
+#[test]
+fn vein_zones_cover_the_raw_ore_an_original_server_saved() {
+    use lumilio_plugin_api::map::MapObjectKind;
+    let context = Context { cancelled: false };
+    // Raw blocks the original 26.3 server saved for seed 262
+    // (crates/lumilio-cubiomes/tests/golden/26.3-ores.txt): (x, z, iron).
+    let saved = [
+        (7, 45, true),
+        (21, 20, true),
+        (41, -2, true),
+        (34, 18, true),
+        (-981, 3133, true),
+        (-965, 3119, true),
+        (-915, 3218, false),
+        (-916, 3221, false),
+    ];
+    let heat = |overlay: &str, area: [f64; 4]| {
+        let objects = WorldExplorer
+            .objects(
+                &context,
+                &overlay_request(overlay, Dimension::Overworld, "26.3", area),
+            )
+            .unwrap();
+        objects
+            .into_iter()
+            .flat_map(|object| match object.kind {
+                MapObjectKind::Heat { cell, values } => {
+                    assert_eq!(cell, 16.);
+                    assert!(object.color.is_some() && !object.approximate);
+                    values
+                }
+                other => panic!("veins are heat, got {other:?}"),
+            })
+            .collect::<Vec<_>>()
+    };
+    for (overlay, iron) in [
+        ("underground.iron-vein", true),
+        ("underground.copper-vein", false),
+    ] {
+        let squares = heat(overlay, [-1024., -64., 64., 4032.]);
+        assert!(squares.iter().all(|(_, v)| (0.35..=1.).contains(v)));
+        for &(x, z, _) in saved.iter().filter(|(.., i)| *i == iron) {
+            let (x, z) = (f64::from(x), f64::from(z));
+            assert!(
+                squares
+                    .iter()
+                    .any(|(at, _)| (at.x..at.x + 16.).contains(&x)
+                        && (at.z..at.z + 16.).contains(&z)),
+                "{overlay} misses {x} {z}"
+            );
+        }
+    }
+    // Large veins began in 1.18, and only the Overworld has them.
+    let offered = |dimension: Dimension, version: &str| {
+        WorldExplorer
+            .overlays_for(&overlay_request("", dimension, version, [0., 0., 1., 1.]).context)
+            .into_iter()
+            .filter(|layer| layer.id.ends_with("-vein"))
+            .count()
+    };
+    assert_eq!(offered(Dimension::Overworld, "26.3"), 2);
+    assert_eq!(offered(Dimension::Overworld, "1.18.2"), 2);
+    assert_eq!(offered(Dimension::Overworld, "1.16.5"), 0);
+    assert_eq!(offered(Dimension::Nether, "26.3"), 0);
+}
+
+#[test]
+fn ravines_draw_their_start_and_walk() {
+    use lumilio_plugin_api::map::{MapIcon, MapObjectKind};
+    let context = Context { cancelled: false };
+    let objects = WorldExplorer
+        .objects(
+            &context,
+            &overlay_request(
+                "underground.ravine",
+                Dimension::Overworld,
+                "26.3",
+                [-192., -192., 192., 192.],
+            ),
+        )
+        .unwrap();
+    // The original 26.3 carver starts canyons for seed 262 in chunks (7, -11)
+    // and (-7, 11) (crates/lumilio-cubiomes/tests/golden/26.3-ravines.txt).
+    let starts: Vec<[i32; 2]> = objects
+        .iter()
+        .filter_map(|object| match &object.kind {
+            MapObjectKind::Icon { icon, at } => {
+                assert!(matches!(icon, MapIcon::Ravine | MapIcon::UnderwaterRavine));
+                Some([(at.x as i32).div_euclid(16), (at.z as i32).div_euclid(16)])
+            }
+            _ => None,
+        })
+        .collect();
+    assert!(
+        starts.contains(&[7, -11]) && starts.contains(&[-7, 11]),
+        "{starts:?}"
+    );
+    // Each start comes with its walk: 84 to 111 steps from 112-block reach.
+    let walks: Vec<usize> = objects
+        .iter()
+        .filter_map(|object| match &object.kind {
+            MapObjectKind::Polyline(points) => Some(points.len()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(walks.len(), starts.len());
+    assert!(walks.iter().all(|n| (84..112).contains(n)), "{walks:?}");
+    assert!(objects.iter().all(|o| !o.approximate && o.color.is_some()));
+}
+
+#[test]
+fn apple_layer_marks_the_pyramid_whose_chest_holds_one() {
+    use lumilio_plugin_api::map::MapObjectKind;
+    let context = Context { cancelled: false };
+    let found = |area: [f64; 4]| -> Vec<[i32; 2]> {
+        WorldExplorer
+            .objects(
+                &context,
+                &overlay_request(
+                    "feature.enchanted-golden-apple",
+                    Dimension::Overworld,
+                    "26.3",
+                    area,
+                ),
+            )
+            .unwrap()
+            .into_iter()
+            .map(|object| match object.kind {
+                MapObjectKind::Icon { at, .. } => {
+                    assert!(object.approximate);
+                    [at.x as i32, at.z as i32]
+                }
+                other => panic!("apples are icons, got {other:?}"),
+            })
+            .collect()
+    };
+    // The original 26.3 server filled a chest of seed 262's pyramid at chunk
+    // (464, 416) with an apple; the one at (432, -595) holds none
+    // (crates/lumilio-cubiomes/tests/golden/26.3-pyramid-loot.txt).
+    assert!(found([7168., 6400., 7680., 6912.]).contains(&[7434, 6666]));
+    assert!(!found([6656., -9728., 7168., -9216.]).contains(&[6922, -9510]));
+}
+
+#[test]
+fn decoration_and_nether_fossil_layers_need_their_tables() {
+    let offered = |dimension: Dimension, version: &str| -> Vec<(String, bool, Option<String>)> {
+        WorldExplorer
+            .overlays_for(&overlay_request("", dimension, version, [0., 0., 1., 1.]).context)
+            .into_iter()
+            .map(|layer| (layer.id, layer.approximate, layer.group_id))
+            .collect()
+    };
+    let features = |list: &[(String, bool, Option<String>)]| -> Vec<String> {
+        list.iter()
+            .filter(|(id, ..)| id.starts_with("feature."))
+            .map(|(id, ..)| id.clone())
+            .collect()
+    };
+    let new = offered(Dimension::Overworld, "26.3");
+    assert_eq!(
+        features(&new),
+        [
+            "feature.fossil",
+            "feature.fossil-diamond",
+            "feature.lava-lake",
+            "feature.enchanted-golden-apple"
+        ]
+    );
+    // Pyramid loot needs data-driven enchantments (1.21+).
+    let apples = |version: &str| {
+        features(&offered(Dimension::Overworld, version))
+            .contains(&"feature.enchanted-golden-apple".to_owned())
+    };
+    assert!(apples("1.21.1") && !apples("1.20.6"));
+    // Terrain decides each of them: estimated, in their own group.
+    assert!(
+        new.iter()
+            .filter(|(id, ..)| id.starts_with("feature."))
+            .all(|(_, estimated, group)| *estimated
+                && group.as_deref() == Some("map-group-features"))
+    );
+    // No original-server table before 1.19.4: nothing is offered.
+    assert!(features(&offered(Dimension::Overworld, "1.18.2")).is_empty());
+    assert!(features(&offered(Dimension::Overworld, "1.16.5")).is_empty());
+    let has_fossils = |version: &str| {
+        offered(Dimension::Nether, version)
+            .iter()
+            // Exact: the fork models the Nether's terrain the column needs.
+            .any(|(id, estimated, _)| id == "structure.nether-fossil" && !*estimated)
+    };
+    assert!(has_fossils("26.3") && has_fossils("1.18.2"));
+    assert!(!has_fossils("1.16.5"));
+}
+
+#[test]
+fn structure_objects_show_their_start_variant() {
+    use lumilio_plugin_api::map::{MapIcon, MapObjectKind};
+    let context = Context { cancelled: false };
+    let found = |overlay: &str, dimension: Dimension, area: [f64; 4]| {
+        WorldExplorer
+            .objects(&context, &overlay_request(overlay, dimension, "26.3", area))
+            .unwrap()
+            .into_iter()
+            .map(|object| match object.kind {
+                MapObjectKind::Icon { icon, at } => (
+                    [at.x as i32, at.z as i32],
+                    icon,
+                    object.label_id.unwrap_or_default(),
+                ),
+                other => panic!("structures are icons, got {other:?}"),
+            })
+            .collect::<Vec<_>>()
+    };
+    let at = |list: &[([i32; 2], MapIcon, String)], spot: [i32; 2]| {
+        list.iter()
+            .find(|(found, ..)| *found == spot)
+            .map(|(_, icon, label)| (*icon, label.clone()))
+            .unwrap_or_else(|| panic!("no structure at {spot:?} in {list:?}"))
+    };
+    // Starts saved by the original 26.3 server for seed 262
+    // (crates/lumilio-cubiomes/tests/golden/26.3-variants.txt).
+    let bastions = found(
+        "structure.bastion",
+        Dimension::Nether,
+        [-2048., -2048., 2048., 2048.],
+    );
+    for (spot, icon, label) in [
+        ([144, 1456], MapIcon::BastionHousing, "housing"),
+        ([-1520, 32], MapIcon::BastionHoglinStable, "hoglin-stable"),
+        ([256, 48], MapIcon::BastionTreasure, "treasure"),
+        ([112, -1648], MapIcon::BastionBridge, "bridge"),
+    ] {
+        assert_eq!(
+            at(&bastions, spot),
+            (icon, format!("map-structure-bastion-{label}"))
+        );
+    }
+    let igloos = found(
+        "structure.igloo",
+        Dimension::Overworld,
+        [-2048., -1024., 3072., 1536.],
+    );
+    assert_eq!(
+        at(&igloos, [-384, 800]),
+        (
+            MapIcon::IglooBasement,
+            "map-structure-igloo-basement".into()
+        )
+    );
+    assert_eq!(
+        at(&igloos, [2560, -400]),
+        (MapIcon::IglooNoBasement, "map-structure-igloo".into())
+    );
+    let cities = found(
+        "structure.end-city",
+        Dimension::End,
+        [1024., 0., 2048., 2560.],
+    );
+    assert_eq!(
+        at(&cities, [1712, 96]),
+        (MapIcon::EndCity, "map-structure-end-city-ship".into())
+    );
+    assert_eq!(
+        at(&cities, [1296, 2272]),
+        (MapIcon::EndCity, "map-structure-end-city".into())
+    );
+    // A ruined portal has its own icon in the Nether, on the layer too.
+    let portals = found(
+        "structure.ruined-portal",
+        Dimension::Nether,
+        [-1024., -1024., 1024., 1024.],
+    );
+    assert!(!portals.is_empty());
+    assert!(
+        portals
+            .iter()
+            .all(|(_, icon, _)| *icon == MapIcon::RuinedPortalNether)
+    );
+    let layer = WorldExplorer
+        .overlays_for(&overlay_request("", Dimension::Nether, "26.3", [0., 0., 1., 1.]).context)
+        .into_iter()
+        .find(|layer| layer.id == "structure.ruined-portal")
+        .unwrap();
+    assert_eq!(layer.icon, Some(MapIcon::RuinedPortalNether));
 }
 
 #[test]

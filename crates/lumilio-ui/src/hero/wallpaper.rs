@@ -9,9 +9,11 @@
 use std::path::PathBuf;
 
 use gpui::{
-    AnyElement, Bounds, Hsla, ObjectFit, Window, canvas, div, fill, img, linear_color_stop,
+    AnyElement, Bounds, Entity, Hsla, ObjectFit, Window, canvas, div, fill, img, linear_color_stop,
     linear_gradient, point, prelude::*, px,
 };
+
+use crate::pictures::PictureCache;
 
 use super::noise::{bayer4, smoothstep};
 use super::{MAX_COLUMNS, MIN_COLUMNS, TARGET_TEXEL};
@@ -21,15 +23,21 @@ use crate::theme;
 const SIDE_SHADE: f32 = 0.55;
 const BOTTOM_SHADE: f32 = 0.45;
 
-/// The Home hero showing `path`, dissolving into `page` at the bottom.
-pub(super) fn view(path: PathBuf, page: Hsla) -> AnyElement {
+/// The Home hero showing `path`, dissolving into `page` at the bottom. The
+/// picture comes through `pictures`, which keeps only the one on screen.
+pub(super) fn view(path: PathBuf, page: Hsla, pictures: &Entity<PictureCache>) -> AnyElement {
     let black = |alpha: f32| gpui::black().opacity(alpha);
     div()
         .id("home-hero")
         .relative()
         .size_full()
         .overflow_hidden()
-        .child(img(path).size_full().object_fit(ObjectFit::Cover))
+        .child(
+            img(path)
+                .image_cache(pictures)
+                .size_full()
+                .object_fit(ObjectFit::Cover),
+        )
         // Left to right, behind the copy.
         .child(div().absolute().inset_0().bg(linear_gradient(
             90.,

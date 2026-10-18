@@ -7,6 +7,7 @@
 | 操作 | 层 / 组件 | 结果与反馈 | 备注 | 实现 |
 |---|---|---|---|---|
 | 版本 | 关于 · 值 | 显示 LumilioCL 版本号 |  | `lumilio-ui/src/pages/settings/about.rs` |
+| 更新内容 | 关于 · 按键 | 打开这个版本的更新内容弹窗（新功能、改进、修复）；没有这个版本的说明时不显示按键 |  | `lumilio-ui/src/pages/settings/about.rs` |
 | 手动检查更新 | 关于 · 按键 | 检查正式版并显示进度、结果或失败原因 |  | `lumilio-ui/src/pages/settings/about.rs` |
 | 自动更新 | 关于 · 开关 | 开启时启动后与每小时静默检查并下载；关闭后只保留手动检查 |  | `lumilio-ui/src/pages/settings/about.rs` |
 | 启动器日志 | 关于 · 按键 | 在访达中显示日志目录 |  | `lumilio-ui/src/pages/settings/about.rs` |
@@ -29,19 +30,22 @@
 | 游戏参数 | 游戏默认 · 值 + [编辑] 弹窗 | 每行一项 |  | `lumilio-ui/src/pages/settings/game_defaults.rs` |
 | 环境变量 | 游戏默认 · 值 + [编辑] 弹窗 | 每行 名称=值 |  | `lumilio-ui/src/pages/settings/game_defaults.rs` |
 | 启动前 / 包装 / 退出后命令 | 游戏默认 · 值 + [编辑] 弹窗 | 以当前用户权限运行；启动前命令失败取消启动，退出后命令失败只记录 |  | `lumilio-ui/src/pages/settings/game_defaults.rs` |
-| 开启翻译 | 通用 · 开关与信息按钮 | 默认关闭；开启后自动显示 MCIM 中文简介，正文点击翻译；关闭恢复原文 |  | `lumilio-ui/src/pages/settings/general.rs` |
-| 翻译提供商 | 通用 · 下拉框 | 当前默认微软 Edge，MCIM 是简介数据来源，不列入实时提供商 |  | `lumilio-ui/src/pages/settings/general.rs` |
-| 清除翻译缓存 | 通用 · 按钮 | 删除本地 SQLite 译文，下次按原有翻译路径重新请求 |  | `lumilio-ui/src/pages/settings/general.rs` |
 | 语言 | 通用 · 分段：跟随系统 / 简体中文 / English | 立即切换并保存，组件自带的文字一起换；跟随系统时取系统语言里第一个中文或英文，都没有则用简体中文 |  | `lumilio-ui/src/pages/settings/general.rs` |
+| 开启翻译 | 通用 · 开关（默认关） | 开启后发现列表与详情页头自动显示 MCIM 中文简介，正文点击翻译；关闭立即恢复原文 |  | `lumilio-ui/src/pages/settings/general.rs` |
+| 翻译提供商 | 通用 · 下拉框 | 正文用的实时翻译；目前只有微软 Edge 并默认选中，MCIM 只供简介、不在此列 |  | `lumilio-ui/src/pages/settings/general.rs` |
+| 清除翻译缓存 | 通用 · 按钮 | 删除本地保存的译文，下次翻译重新请求；结果以提示告知 |  | `lumilio-ui/src/pages/settings/general.rs` |
 | 进入游戏后 | 通用 · 分段：保持 / 隐藏启动器 | 没有“关闭启动器”：启动器要守着游戏记录会话与游玩时间，关掉它游戏也会结束 |  | `lumilio-ui/src/pages/settings/general.rs` |
 | 游戏退出后回到前台 | 通用 · 开关（默认开） | 游戏结束时把启动器带回最前面 |  | `lumilio-ui/src/pages/settings/general.rs` |
 | 减少动效 | 通用 · 分段：跟随系统 / 减少 / 完整 | 立即生效 |  | `lumilio-ui/src/pages/settings/general.rs` |
 | Java：停用 / 启用 | Java · 列表行开关 | 停用不删除文件，之后不会被自动选中 |  | `lumilio-ui/src/pages/settings/java.rs` |
 | Java：在访达中显示 | Java · 列表行 ⋯ 菜单 | 打开并选中它所在位置 |  | `lumilio-ui/src/pages/settings/java.rs` |
+| Java：删除 | Java · 列表行 ⋯ 菜单「删除…」（只有启动器下载的 Java）→ 确认框 | 删除它的文件夹并重新检测；其它 Java 只能停用 |  | `lumilio-ui/src/pages/settings/java.rs` |
 | Java：额外搜索目录 | Java · 值 + [编辑] 弹窗 | 每行一个文件夹，检测时也会找这些位置 |  | `lumilio-ui/src/pages/settings/java.rs` |
-| Java：检测与列表 | Java · 已发现的 Java 列表 | 列出检测到的 Java（版本、发行方、架构、路径）；没有时提示添加 |  | `lumilio-ui/src/pages/settings/java.rs` |
+| Java：下载来源 | Java · 分段「Mojang / Oracle GraalVM」 | 下载与启动时自动下载都从这里取；GraalVM 只有 Java 21 和 25，其它版本仍从 Mojang 下载 |  | `lumilio-ui/src/pages/settings/java.rs` |
+| Java：启动时自动下载 | Java · 开关 | 开启时，启动或安装时没有合适的 Java 就先下载游戏需要的版本，进度在动态；关闭后提示去安装 |  | `lumilio-ui/src/pages/settings/java.rs` |
+| Java：下载 Java… | Java · 按键「下载 Java…」→ 弹窗选大版本 | 版本来自所选下载来源（Mojang 读运行时索引），默认 21；装好后出现在列表里，进度在动态 | ADR 0014 | `lumilio-ui/src/pages/settings/java.rs` |
+| Java：检测与列表 | Java · 已发现的 Java 列表 | 列出检测到的 Java（版本、发行方、架构、路径），包括官方启动器的运行时与 PATH 中的 java；没有时提示添加 |  | `lumilio-ui/src/pages/settings/java.rs` |
 | Java：重新检测 | Java · 按键「重新检测」 | 重新读取设置并检测 |  | `lumilio-ui/src/pages/settings/java.rs` |
-| Java：下载推荐的 Java | Java · 按键「下载推荐的 Java」 | 读 Mojang 的运行时索引，装好后出现在列表里；进度在动态 | ADR 0014 | `lumilio-ui/src/pages/settings/java.rs` |
 | Java：添加 | Java · 按键「添加 Java…」→ 选 java 程序或 JDK 文件夹 | 加入列表 |  | `lumilio-ui/src/pages/settings/java.rs` |
 | 打开插件 | L3 设置 tab「插件」 | 显示核心插件、权限、运行状态和各插件的声明式设置；没有插件时显示空列表 |  | `lumilio-ui/src/pages/settings/mod.rs` |
 | 选择插件 | 插件 · 左侧列表 | 右侧显示所选插件的状态、权限和设置 |  | `lumilio-ui/src/pages/settings/plugins.rs` |
@@ -56,6 +60,7 @@
 | 下载源 | 下载与存储 · 分段：仅官方 / 官方优先 / 镜像优先 | 立即保存；仅官方不访问镜像，其他模式按顺序回退，MCIM 始终位于官方之后 |  | `lumilio-ui/src/pages/settings/storage.rs` |
 | 镜像规则 | 下载与存储 · 值 + [编辑] 弹窗 | 每行 官方前缀 => 镜像前缀 |  | `lumilio-ui/src/pages/settings/storage.rs` |
 | 同时下载数 | 下载与存储 · 值 + [编辑] 弹窗 | 自动 / 1–32 |  | `lumilio-ui/src/pages/settings/storage.rs` |
+| 自动下载方块资源 | 下载与存储 · 开关（默认开） | 立即保存；关闭后不再下载方块资源，已经下载过的照常使用；没下载过时投影预览说明原因 | plan schematic-studio D2/T3/T21 | `lumilio-ui/src/pages/settings/storage.rs` |
 | 数据目录 | 下载与存储 · 路径 + [在访达中显示] | 不可改（App State） |  | `lumilio-ui/src/pages/settings/storage.rs` |
 | 存储占用 | 下载与存储 · 游戏 / 共享资源 / Java / 缓存 条形图 | 后台计算后显示 |  | `lumilio-ui/src/pages/settings/storage.rs` |
 | 清除地图缓存 | 下载与存储 · 按键「清除地图缓存」 | 后台删除种子地图缓存；下次查看时重新计算 |  | `lumilio-ui/src/pages/settings/storage.rs` |

@@ -6,15 +6,22 @@ fn main() {
     build
         .include(root)
         .warnings(false)
-        .flag_if_supported("-fwrapv");
+        .flag_if_supported("-fwrapv")
+        // The game's arithmetic rounds each step; fused multiply-adds would not.
+        .flag_if_supported("-ffp-contract=off");
     for name in [
         "biomenoise",
         "biomes",
+        "carvers",
+        "decorations",
         "finders",
         "generator",
         "layers",
+        "loot",
         "noise",
+        "terrain",
         "util",
+        "veins",
     ] {
         build.file(format!("{root}/{name}.c"));
     }

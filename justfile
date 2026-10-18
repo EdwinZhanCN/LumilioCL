@@ -19,11 +19,26 @@ prune limit="80":
     kb=$(du -sk target | cut -f1)
     if [ "$kb" -gt $(( {{limit}} * 1024 * 1024 )) ]; then
         echo "target/ is $(( kb / 1024 / 1024 )) GB (limit {{limit}} GB); cleaning"
-        cargo clean
+        # target/block-assets is a bake and its downloaded jars, not build
+        # output (cargo xtask bake-blocks); it survives the clean.
+        if [ -d target/block-assets ]; then mv target/block-assets .prune-block-assets; fi
+        status=0
+        cargo clean || status=$?
+        if [ -d .prune-block-assets ]; then mkdir -p target && mv .prune-block-assets target/block-assets; fi
+        exit "$status"
     fi
 
-# What CI runs on every push and pull request.
-ci: check
+# What CI runs on every push and pull request: the full loop and the forks' tests.
+ci: check forks
+
+# The forks under forks/ are outside the workspace, so `test` never builds
+# them; each runs in its own target directory so a workspace build cannot
+# clobber it. Tests that read the baked block bundle say so and pass without
+# it; `cargo xtask bake-blocks` runs the entity coverage check on its bundle.
+# The tests of the maintained forks the launcher builds from.
+forks:
+    CARGO_TARGET_DIR=target/forks/schematic-mesher cargo test --manifest-path forks/schematic-mesher/Cargo.toml
+    CARGO_TARGET_DIR=target/forks/nucleation cargo test --manifest-path forks/nucleation/Cargo.toml -p nucleation --no-default-features --features meshing,rendering --lib
 
 # Compile the workspace.
 build:
@@ -66,6 +81,11 @@ plans-check:
 # the other catalog tests (parsing, ids and arguments) with it.
 hardcoded-chinese:
     LUMILIO_BLESS_HARDCODED=1 cargo nextest run -p lumilio-ui --lib i18n::
+
+# Rewrite web/src/data/themes.generated.json (the theme studio's built-in
+# themes and contrast rules) from the launcher's catalog.
+website-themes:
+    LUMILIO_BLESS_THEMES=1 cargo nextest run -p lumilio-ui --lib theme::tests::website
 
 # Release packages for this platform into dist/ (assets/icons/PACKAGING.md).
 package:

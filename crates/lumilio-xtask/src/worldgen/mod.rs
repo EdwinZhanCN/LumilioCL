@@ -1,5 +1,7 @@
 //! Reproducible development tools for the maintained world generator.
 mod btree;
+mod decorations;
+mod loot;
 mod prepare;
 mod saves;
 #[cfg(test)]
@@ -15,6 +17,40 @@ use std::process::Command;
 
 pub(crate) fn btree(input: &str, output: &str, name: &str) -> Result {
     btree::run(Path::new(input), Path::new(output), name)
+}
+
+/// Rewrites the fork's generated tables from the committed release data.
+pub(crate) fn tables(root: &Path) -> Result {
+    let tables = root.join("forks/cubiomes/tables");
+    std::fs::write(tables.join("decorations.h"), decorations::render(root)?)
+        .map_err(|e| e.to_string())?;
+    std::fs::write(tables.join("loot.h"), loot::render(root)?).map_err(|e| e.to_string())
+}
+
+/// Every release directory's `name` file, ordered by release.
+fn releases(root: &Path, name: &str) -> Result<Vec<(String, Value)>> {
+    let data = root.join("forks/cubiomes/data");
+    let mut releases = vec![];
+    for entry in std::fs::read_dir(&data).map_err(|e| e.to_string())? {
+        let path = entry.map_err(|e| e.to_string())?.path();
+        let file = path.join(name);
+        if !file.exists() {
+            continue;
+        }
+        let version = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .ok_or("invalid release directory")?
+            .to_owned();
+        releases.push((version, prepare::json(&file)?));
+    }
+    releases.sort_by_key(|(version, _)| {
+        version
+            .split('.')
+            .map(|part| part.parse::<u32>().unwrap_or(0))
+            .collect::<Vec<_>>()
+    });
+    Ok(releases)
 }
 
 pub(crate) fn prepare(root: &Path, version: &str) -> Result {
@@ -71,6 +107,14 @@ pub(crate) fn import(root: &Path, version: &str) -> Result {
     )
     .map_err(|e| e.to_string())?;
     gzip.finish().map_err(|e| e.to_string())?;
+    let inputs = prepare::json(&work.join("data.json"))?;
+    prepare::write_json(
+        &data.join("decorations.json"),
+        &decorations::extract(&probe["features"], &inputs)?,
+    )?;
+    if let Some(loot) = loot::extract(&work, &inputs)? {
+        prepare::write_json(&data.join("loot.json"), &loot)?;
+    }
     let mut golden = String::new();
     for sample in probe["samples"]
         .as_array()
@@ -113,7 +157,68 @@ pub(crate) fn import(root: &Path, version: &str) -> Result {
     }
     std::fs::write(out.join(format!("{version}-structures.txt")), placements)
         .map_err(|e| e.to_string())?;
-    let inputs = prepare::json(&work.join("data.json"))?;
+    let mut candidates = String::new();
+    for row in probe["decorations"]
+        .as_array()
+        .ok_or("missing decoration candidates")?
+    {
+        let name = row["feature"].as_str().ok_or("candidate without feature")?;
+        let kind = decorations::TRACKED
+            .iter()
+            .position(|(tracked, ..)| Some(*tracked) == name.strip_prefix("minecraft:"))
+            .ok_or_else(|| format!("untracked candidate feature {name}"))?;
+        for xyz in row["positions"].as_array().ok_or("candidate positions")? {
+            writeln!(
+                candidates,
+                "{} {kind} {} {} {} {} {}",
+                row["seed"], row["cx"], row["cz"], xyz[0], xyz[1], xyz[2]
+            )
+            .unwrap();
+        }
+    }
+    std::fs::write(out.join(format!("{version}-decorations.txt")), candidates)
+        .map_err(|e| e.to_string())?;
+    // Rows `seed noise x y z value`: noise 0 ore_veininess, 1 ore_vein_a,
+    // 2 ore_vein_b, 3 ore_gap, at the block position its density function reads.
+    let mut veins = String::new();
+    for row in probe["veins"]
+        .as_array()
+        .ok_or("missing ore vein samples")?
+    {
+        writeln!(
+            veins,
+            "{} {} {} {} {} {}",
+            row["seed"], row["noise"], row["x"], row["y"], row["z"], row["value"]
+        )
+        .unwrap();
+    }
+    std::fs::write(out.join(format!("{version}-veins.txt")), veins).map_err(|e| e.to_string())?;
+    // Rows `value sin cos`: Mth's table lookups for float inputs.
+    // Probes from before these samples leave the existing goldens alone.
+    if let Some(rows) = probe["trig"].as_array() {
+        let mut trig = String::new();
+        for row in rows {
+            writeln!(trig, "{} {} {}", row["value"], row["sin"], row["cos"]).unwrap();
+        }
+        std::fs::write(out.join(format!("{version}-trig.txt")), trig).map_err(|e| e.to_string())?;
+    }
+    // Rows `seed chunk_x chunk_z blocks checksum`: each canyon start near the
+    // origin, carved by the original carver (26.x only; older carvers need
+    // a whole chunk).
+    let mut ravines = String::new();
+    for row in probe["ravines"].as_array().into_iter().flatten() {
+        let checksum = row["checksum"].as_str().ok_or("ravine checksum")?;
+        writeln!(
+            ravines,
+            "{} {} {} {} {checksum}",
+            row["seed"], row["sx"], row["sz"], row["count"]
+        )
+        .unwrap();
+    }
+    if !ravines.is_empty() {
+        std::fs::write(out.join(format!("{version}-ravines.txt")), ravines)
+            .map_err(|e| e.to_string())?;
+    }
     let mut rules = String::new();
     for (rule, tag) in [
         (-1, "stronghold_biased_to"),

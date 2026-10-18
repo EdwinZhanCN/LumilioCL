@@ -1,17 +1,21 @@
-//! The Settings tab of an Instance (`docs/ia/instance/settings.md`): five
+//! The Settings tab of an Instance (`docs/ia/instance/settings.md`): six
 //! groups of rows. Each shows the value in effect and where it comes from;
 //! anything typed is edited in a dialog, and "恢复默认" removes the override
-//! instead of copying the launcher default into the instance.
+//! instead of copying the launcher default into the instance. 选项 holds the
+//! game's own options (`options.txt`), edited while the game is closed.
 //!
 //! A child module of `instance_detail`, so it shares the view's private state.
 
 mod groups;
+mod java;
+mod options;
 mod saves;
 mod texts;
 
 #[cfg(test)]
 mod tests;
 
+pub(super) use self::java::JavaPick;
 use super::{InstanceDetailView, InstanceIntent};
 use crate::settings_dialog::{DialogSpec, SettingsDialog};
 use crate::theme::ShellColors;
@@ -32,6 +36,7 @@ impl std::ops::Deref for Subtabs {
     fn deref(&self) -> &'static [&'static str] {
         tr_all![
             "instance-settings-tab-game",
+            "instance-settings-tab-options",
             "instance-settings-tab-runtime",
             "instance-settings-tab-java",
             "instance-settings-tab-performance",
@@ -39,6 +44,14 @@ impl std::ops::Deref for Subtabs {
         ]
     }
 }
+
+/// The groups of the Settings tab, in [`SUBTABS`] order.
+pub const SETTINGS_GAME: usize = 0;
+pub const SETTINGS_OPTIONS: usize = 1;
+pub const SETTINGS_RUNTIME: usize = 2;
+pub const SETTINGS_JAVA: usize = 3;
+pub const SETTINGS_PERFORMANCE: usize = 4;
+pub const SETTINGS_ADVANCED: usize = 5;
 
 static FULLSCREEN: Fullscreen = Fullscreen;
 
@@ -133,30 +146,40 @@ impl InstanceDetailView {
     }
 
     /// The Settings tab: a second-level choice and that group's rows.
-    pub(super) fn settings_tab(&self, colors: ShellColors, cx: &mut Context<Self>) -> AnyElement {
+    pub(super) fn settings_tab(
+        &mut self,
+        window: &mut gpui::Window,
+        colors: ShellColors,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let sub = self.settings_sub.min(SUBTABS.len() - 1);
         let entity = cx.entity().downgrade();
         let segments = kit::segments(
             "instance-settings-sub",
             &SUBTABS,
             sub,
-            move |index, _, cx| {
+            move |index, window, cx| {
                 let _ = entity.update(cx, |view, cx| {
                     view.settings_sub = index;
+                    if index == SETTINGS_OPTIONS {
+                        view.request(super::Section::GameOptions, window, cx);
+                    }
                     cx.notify();
                 });
             },
         );
         let body = match sub {
-            0 => self.group_game(colors),
-            1 => self.group_runtime(colors, cx),
-            2 => self.group_java(colors),
-            3 => self.performance(colors, cx),
+            SETTINGS_GAME => self.group_game(colors),
+            SETTINGS_OPTIONS => self.group_options(colors, cx),
+            SETTINGS_RUNTIME => self.group_runtime(colors, cx),
+            SETTINGS_JAVA => self.group_java(window, colors, cx),
+            SETTINGS_PERFORMANCE => self.performance(colors, cx),
             _ => self.group_advanced(colors),
         };
         v_flex()
             .w_full()
             .gap_5()
+            // ia[instance.settings]: 选项 | 设置 tab 的分段「选项」 | 显示游戏内「选项」里的设置（按键、音量、画面、聊天、辅助功能、语言），游戏关着时可在这里改
             .child(h_flex().child(segments))
             .child(kit::entrance(body, ("instance-settings-body", sub)))
             .into_any_element()

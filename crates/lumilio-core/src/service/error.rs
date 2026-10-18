@@ -20,6 +20,7 @@ use std::path::PathBuf;
 
 #[derive(Debug)]
 pub enum ServiceError {
+    GameSettings(crate::GameSettingsError),
     Plugin(lumilio_plugin_api::PluginError),
     Store(StoreError),
     Settings(SettingsError),
@@ -27,6 +28,15 @@ pub enum ServiceError {
     Remote(String),
     /// No content source plugin is enabled (or the one that was has stopped).
     NoContentSource,
+    /// No enabled content source reads this catalog's IDs (a CurseForge
+    /// pack with the CurseForge source off).
+    NoCatalogSource(crate::discover::Catalog),
+    /// The author lets people download this file only on the source's site:
+    /// the file's name and its page there.
+    ManualDownload {
+        file: String,
+        page: Option<String>,
+    },
     NoSuchInstance(String),
     InstanceBusy(String),
     RootBusy(PathBuf),
@@ -65,11 +75,18 @@ pub enum ServiceError {
 impl Display for ServiceError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
+            Self::GameSettings(error) => error.fmt(f),
             Self::Plugin(error) => write!(f, "plugin: {error}"),
             Self::Store(error) => write!(f, "{error}"),
             Self::Settings(error) => write!(f, "{error}"),
             Self::Remote(message) => write!(f, "could not reach the service: {message}"),
             Self::NoContentSource => f.write_str("no content source is available"),
+            Self::NoCatalogSource(catalog) => {
+                write!(f, "no enabled content source reads {catalog:?} IDs")
+            }
+            Self::ManualDownload { file, .. } => {
+                write!(f, "{file} can only be downloaded on its source's website")
+            }
             Self::RootBusy(root) => write!(
                 f,
                 "launcher data at {} is already in use; close the other launcher and retry",
@@ -101,6 +118,18 @@ impl Display for ServiceError {
             Self::Snapshot(error) => write!(f, "{error}"),
             Self::Io(error) => write!(f, "{error}"),
         }
+    }
+}
+
+impl From<crate::GameSettingsError> for ServiceError {
+    fn from(error: crate::GameSettingsError) -> Self {
+        Self::GameSettings(error)
+    }
+}
+
+impl From<lumilio_plugin_api::PluginError> for ServiceError {
+    fn from(error: lumilio_plugin_api::PluginError) -> Self {
+        Self::Plugin(error)
     }
 }
 

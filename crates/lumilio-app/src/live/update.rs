@@ -1,4 +1,5 @@
 use super::Wiring;
+use gpui_kit::AppContext as _;
 use lumilio_ui::live::{UpdateStatus, UpdateUnavailability};
 use lumilio_updater::{CheckResult, Relaunch, UpdateClient, UpdateError, UpdateRestriction};
 use std::path::PathBuf;
@@ -64,6 +65,38 @@ pub(super) fn start(wiring: &Wiring, cx: &mut gpui_kit::App) {
                 }
             }
         }
+    })
+    .detach();
+}
+
+/// The first start of a new version shows its release notes once (and those
+/// of any version skipped), then remembers that they were shown. A fresh
+/// install starts as having seen them (`LauncherSettings::release_notes_seen`).
+pub(super) fn announce(wiring: &Wiring, window: gpui_kit::AnyWindowHandle, cx: &mut gpui_kit::App) {
+    use lumilio_ui::release_notes::{self, Occasion};
+    let running = release_notes::running();
+    let service = wiring.backend.service.clone();
+    let seen = wiring.backend.spawn(async move {
+        let seen = service.settings().await.release_notes_seen;
+        if seen.as_deref() == Some(running) {
+            return None;
+        }
+        if let Err(error) = service.set_release_notes_seen(running).await {
+            eprintln!("LumilioCL could not remember the shown release notes: {error}");
+        }
+        Some(seen)
+    });
+    cx.spawn(async move |cx| {
+        let Ok(Some(seen)) = seen.await else {
+            return;
+        };
+        let releases = release_notes::since(seen.as_deref(), running);
+        if releases.is_empty() {
+            return;
+        }
+        let _ = cx.update_window(window, |_, window, cx| {
+            release_notes::show(releases, Occasion::Updated, window, cx);
+        });
     })
     .detach();
 }

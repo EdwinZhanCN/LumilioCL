@@ -65,6 +65,13 @@ pub struct ListItem {
 pub enum View {
     /// The host's world explorer for this instance; no plugin-owned layout.
     Map,
+    /// The host's schematic studio over `folder` (a path relative to the game
+    /// directory, under one of the plugin's `ReadGameFiles` grants). Like
+    /// [`View::Map`], the layout, viewport, inspector and dialogs are the
+    /// host's; the plugin only names the folder (plan schematic-studio, D6).
+    Studio {
+        folder: String,
+    },
     Section {
         title: String,
         children: Vec<View>,

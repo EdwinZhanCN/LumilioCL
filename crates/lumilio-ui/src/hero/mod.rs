@@ -213,7 +213,8 @@ impl Render for HeroCarousel {
             .try_global::<theme::Wallpaper>()
             .and_then(|wallpaper| wallpaper.path.clone())
         {
-            return wallpaper::view(path, cx.theme().background).into_any_element();
+            let pictures = crate::pictures::wallpaper(cx);
+            return wallpaper::view(path, cx.theme().background, &pictures).into_any_element();
         }
         let reduce_motion = cx.reduce_motion();
         let now = Instant::now();

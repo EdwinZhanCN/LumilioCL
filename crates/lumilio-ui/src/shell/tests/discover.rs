@@ -97,23 +97,24 @@ fn a_result_the_target_already_has_shows_installed_or_offers_the_update(cx: &mut
                 model.query = crate::live::DiscoverQuery::new(lumilio_core::ProjectKind::Mod);
                 model.results = (0..3)
                     .map(|n| SearchRow {
-                        source: "lumilio.modrinth".into(),
-                        original_summary: String::new(),
+                        source: lumilio_core::DEFAULT_SOURCE.into(),
                         project_id: format!("P{n}"),
                         kind: lumilio_core::ProjectKind::Mod,
                         slug: format!("mod-{n}"),
                         title: format!("Mod {n}"),
                         author: "a".into(),
                         summary: String::new(),
+                        translated_summary: None,
                         environment: None,
                         tags: CardTags::default(),
                         downloads: "1".into(),
-                        follows: "1".into(),
+                        follows: Some("1".into()),
                         date: String::new(),
                         date_kind: DateKind::Updated,
                         page_url: String::new(),
                         icon_url: None,
                         seed: n,
+                        manual_download: false,
                     })
                     .collect();
                 model.search = SearchStatus::Done { total: 3 };
@@ -145,6 +146,7 @@ fn a_result_the_target_already_has_shows_installed_or_offers_the_update(cx: &mut
         seen.borrow().last(),
         Some(&LiveIntent::UpdateInstalled {
             kind: lumilio_core::ProjectKind::Mod,
+            source: lumilio_core::DEFAULT_SOURCE.into(),
             project: "mod-1".into(),
             title: "Mod 1".into(),
             file_name: "mod1.jar".into(),
@@ -185,7 +187,7 @@ fn a_project_opens_in_place_and_back_returns_to_the_same_list(cx: &mut TestAppCo
     cx.run_until_parked();
 
     shell.update(cx, |shell, cx| {
-        shell.open_detail(ProjectKind::Mod, "sodium", cx);
+        shell.open_detail(ProjectKind::Mod, lumilio_core::DEFAULT_SOURCE, "sodium", cx);
         shell.set_detail_state("sodium", DetailState::Failed("offline".to_owned()), cx);
     });
     cx.run_until_parked();
@@ -234,7 +236,7 @@ fn a_project_opens_in_place_and_back_returns_to_the_same_list(cx: &mut TestAppCo
 
     // Choosing another landmark also closes an open detail.
     shell.update(cx, |shell, cx| {
-        shell.open_detail(ProjectKind::Mod, "sodium", cx)
+        shell.open_detail(ProjectKind::Mod, lumilio_core::DEFAULT_SOURCE, "sodium", cx)
     });
     cx.run_until_parked();
     shell.update(cx, |shell, cx| {
@@ -281,6 +283,7 @@ fn live_with_games(cx: &mut gpui::VisualTestContext, shell: &gpui::Entity<Launch
                 );
                 model.filters = crate::live::FilterModel::from_core(&DiscoverFilters {
                     categories: vec![CategoryTag {
+                        id: "magic".into(),
                         name: "magic".into(),
                         header: "categories".into(),
                         kind: ProjectKind::Mod,
@@ -497,7 +500,7 @@ fn a_gallery_image_shown_large_is_drawn_by_the_shell_over_everything(cx: &mut Te
     shell.update(cx, |shell, cx| {
         shell.show(Route::Discover);
         shell.update_live(|_| {}, cx);
-        shell.open_detail(ProjectKind::Mod, "cool", cx);
+        shell.open_detail(ProjectKind::Mod, lumilio_core::DEFAULT_SOURCE, "cool", cx);
         shell.set_detail_state(
             "cool",
             DetailState::Ready(Box::new(crate::project_detail::tests::detail())),
@@ -534,14 +537,14 @@ fn frame_cost_of_a_full_discover_page(cx: &mut TestAppContext) {
     });
     let rows: Vec<SearchRow> = (0..20)
         .map(|n| SearchRow {
-            source: "lumilio.modrinth".into(),
-            original_summary: String::new(),
+            source: lumilio_core::DEFAULT_SOURCE.to_owned(),
             project_id: format!("id{n}"),
             kind: ProjectKind::Modpack,
             slug: format!("p{n}"),
             title: format!("Project number {n}"),
             author: "someone".to_owned(),
             summary: "A long enough summary to wrap onto a second line when the window is narrow, describing the pack.".to_owned(),
+            translated_summary: None,
             environment: Some(lumilio_core::Environment::ClientAndServer),
             tags: crate::live::CardTags {
                 shown: ["adventure", "magic", "technology", "quests"]
@@ -554,12 +557,13 @@ fn frame_cost_of_a_full_discover_page(cx: &mut TestAppContext) {
                 overflow: Vec::new(),
             },
             downloads: "12.5 万".to_owned(),
-            follows: "4886".to_owned(),
+            follows: Some("4886".to_owned()),
             date: "3 天前".to_owned(),
             date_kind: crate::live::DateKind::Updated,
             page_url: String::new(),
             icon_url: Some(format!("https://cdn.example/{n}.png")),
             seed: n,
+            manual_download: false,
         })
         .collect();
     shell.update(cx, |shell, cx| {
@@ -581,4 +585,196 @@ fn frame_cost_of_a_full_discover_page(cx: &mut TestAppContext) {
     }
     let each = start.elapsed() / frames;
     eprintln!("discover frame: {each:?} each over {frames} frames");
+}
+
+#[gpui::test]
+fn choosing_another_source_searches_there_and_loads_its_filters(cx: &mut TestAppContext) {
+    use crate::live::{DiscoverQuery, LiveIntent};
+    use lumilio_core::{ContentSourceInfo, ProjectKind};
+
+    cx.update(gpui_component::init);
+    let seen: Rc<RefCell<Vec<LiveIntent>>> = Rc::default();
+    let sink = seen.clone();
+    let (shell, cx) = cx.add_window_view(|_, cx| {
+        LauncherShell::new(cx).with_live(Rc::new(move |intent, _, _| {
+            sink.borrow_mut().push(intent);
+        }))
+    });
+    let source = |id: &str, name: &str| ContentSourceInfo {
+        id: id.to_owned(),
+        name: name.to_owned(),
+        catalog: None,
+    };
+    shell.update(cx, |shell, cx| {
+        shell.show(Route::Discover);
+        shell.update_live(
+            |model| {
+                model.query = DiscoverQuery::new(ProjectKind::Mod);
+                model.sources = vec![source(lumilio_core::DEFAULT_SOURCE, "Modrinth")];
+            },
+            cx,
+        );
+    });
+    cx.run_until_parked();
+    assert!(
+        cx.debug_bounds("live-discover-sources").is_none(),
+        "one source needs no choice"
+    );
+
+    shell.update(cx, |shell, cx| {
+        shell.update_live(
+            |model| {
+                model.sources = vec![
+                    source(lumilio_core::DEFAULT_SOURCE, "Modrinth"),
+                    source("lumilio.curseforge", "CurseForge"),
+                ];
+            },
+            cx,
+        );
+    });
+    cx.run_until_parked();
+    let key = cx
+        .debug_bounds("live-discover-source-key-1")
+        .expect("both sources are offered");
+    cx.simulate_click(key.center(), Modifiers::none());
+    cx.run_until_parked();
+    let intents = seen.borrow();
+    assert!(
+        intents.contains(&LiveIntent::LoadFilters),
+        "its own filters"
+    );
+    let searched = intents.iter().rev().find_map(|intent| match intent {
+        LiveIntent::Search(query) => Some(query.clone()),
+        _ => None,
+    });
+    assert_eq!(
+        searched.map(|query| (query.source, query.kind)),
+        Some(("lumilio.curseforge".to_owned(), ProjectKind::Mod))
+    );
+    let remembered = intents.iter().rev().find_map(|intent| match intent {
+        LiveIntent::RememberDiscover(prefs) => prefs.source.clone(),
+        _ => None,
+    });
+    assert_eq!(remembered.as_deref(), Some("lumilio.curseforge"));
+}
+
+#[gpui::test]
+fn turning_translation_off_puts_the_original_summaries_back(cx: &mut TestAppContext) {
+    use crate::live::{CardTags, DateKind, LiveIntent, SearchRow, SettingsView};
+
+    cx.update(gpui_component::init);
+    let (shell, cx) = cx.add_window_view(|_, cx| {
+        LauncherShell::new(cx).with_live(Rc::new(|_: LiveIntent, _, _| {}))
+    });
+    let mut settings = SettingsView::default();
+    settings.preferences.translation.enabled = true;
+    let row = SearchRow {
+        source: lumilio_core::DEFAULT_SOURCE.to_owned(),
+        project_id: "id".to_owned(),
+        kind: lumilio_core::ProjectKind::Mod,
+        slug: "p".to_owned(),
+        title: "Sodium".to_owned(),
+        author: "someone".to_owned(),
+        summary: "A rendering engine.".to_owned(),
+        translated_summary: Some("渲染引擎。".to_owned()),
+        environment: None,
+        tags: CardTags::default(),
+        downloads: "1".to_owned(),
+        follows: None,
+        date: String::new(),
+        date_kind: DateKind::Updated,
+        page_url: String::new(),
+        icon_url: None,
+        seed: 1,
+        manual_download: false,
+    };
+    shell.update(cx, |shell, cx| {
+        shell.update_live(
+            |model| {
+                model.settings = Some(settings);
+                model.results = vec![row];
+            },
+            cx,
+        );
+    });
+    let shown = |shell: &gpui::Entity<LauncherShell>, cx: &mut gpui::VisualTestContext| {
+        shell.read_with(cx, |shell, _| {
+            let row = &shell.live().unwrap().results[0];
+            (row.summary.clone(), row.translated_summary.clone())
+        })
+    };
+    assert_eq!(
+        shown(&shell, cx),
+        ("A rendering engine.".into(), Some("渲染引擎。".into()))
+    );
+    shell.update(cx, |shell, cx| {
+        shell.update_live(
+            |model| {
+                if let Some(settings) = &mut model.settings {
+                    settings.preferences.translation.enabled = false;
+                }
+            },
+            cx,
+        );
+    });
+    assert_eq!(shown(&shell, cx), ("A rendering engine.".into(), None));
+}
+
+#[gpui::test]
+fn a_narrow_window_gives_the_result_name_room(cx: &mut TestAppContext) {
+    use crate::live::{CardTags, DateKind, LiveIntent, SearchRow, SearchStatus};
+    use gpui::{px, size};
+    use lumilio_core::ProjectKind;
+
+    cx.update(gpui_component::init);
+    let (shell, cx) = cx.add_window_view(|_, cx| {
+        LauncherShell::new(cx).with_live(Rc::new(|_: LiveIntent, _, _| {}))
+    });
+    let row = SearchRow {
+        source: lumilio_core::DEFAULT_SOURCE.to_owned(),
+        project_id: "id".to_owned(),
+        kind: ProjectKind::Modpack,
+        slug: "p".to_owned(),
+        title: "All the Mods 10 - ATM10".to_owned(),
+        author: "someone".to_owned(),
+        summary: "A pack.".to_owned(),
+        translated_summary: None,
+        environment: None,
+        tags: CardTags::default(),
+        downloads: "1".to_owned(),
+        follows: None,
+        date: String::new(),
+        date_kind: DateKind::Updated,
+        page_url: String::new(),
+        icon_url: None,
+        seed: 1,
+        manual_download: false,
+    };
+    shell.update(cx, |shell, cx| {
+        shell.show(Route::Discover);
+        shell.update_live(
+            |model| {
+                model.results = vec![row];
+                model.search = SearchStatus::Done { total: 1 };
+            },
+            cx,
+        );
+    });
+    cx.simulate_resize(size(px(720.), px(480.)));
+    cx.run_until_parked();
+    let spec = cx
+        .debug_bounds("live-result-spec-0")
+        .expect("the spec column");
+    let line = cx.debug_bounds("live-result-0").expect("the result line");
+    assert_eq!(spec.size.width, px(128.), "the compact spec column");
+    assert!(
+        spec.origin.x - line.origin.x > px(200.),
+        "the name keeps room before the spec column: {line:?} {spec:?}"
+    );
+    cx.simulate_resize(size(px(1400.), px(900.)));
+    cx.run_until_parked();
+    let spec = cx
+        .debug_bounds("live-result-spec-0")
+        .expect("the spec column");
+    assert_eq!(spec.size.width, px(190.));
 }

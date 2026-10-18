@@ -1,7 +1,6 @@
-use super::SITE_BASE;
 use super::convert::{loader_from_api, query_to_api};
 use super::intent::{IntentError, install_request};
-use super::kinds::{ProjectKind, SortIndex, browse_page_url};
+use super::kinds::{ProjectKind, SortIndex};
 use super::query::{Pick, SearchQuery, Stance};
 use super::search::{Environment, SideSupport, environment};
 use super::versions::{
@@ -35,10 +34,12 @@ fn version(
             primary: true,
             size: 10,
             sha1: Some(SHA1.to_owned()),
+            download_page: None,
         }],
         dependencies: Vec::new(),
         downloads: 0,
         changelog: String::new(),
+        changelog_format: crate::discover::TextFormat::Markdown,
     }
 }
 
@@ -84,26 +85,6 @@ fn versions() -> Vec<Version> {
 }
 
 #[test]
-fn browse_pages_are_the_plural_listing_of_each_kind() {
-    assert_eq!(
-        browse_page_url(ProjectKind::Mod),
-        format!("{SITE_BASE}/mods")
-    );
-    assert_eq!(
-        browse_page_url(ProjectKind::Modpack),
-        format!("{SITE_BASE}/modpacks")
-    );
-    assert_eq!(
-        browse_page_url(ProjectKind::ResourcePack),
-        format!("{SITE_BASE}/resourcepacks")
-    );
-    assert_eq!(
-        browse_page_url(ProjectKind::Shader),
-        format!("{SITE_BASE}/shaders")
-    );
-}
-
-#[test]
 fn required_dependencies_are_only_the_required_ones() {
     let mut version = versions().remove(0);
     version.dependencies = vec![
@@ -130,6 +111,7 @@ fn the_primary_file_wins_over_the_first() {
         primary,
         size: 0,
         sha1: None,
+        download_page: None,
     };
     version.files = vec![file("sources.jar", false), file("mod.jar", true)];
     assert_eq!(version.install_file().unwrap().filename, "mod.jar");
@@ -367,4 +349,97 @@ fn game_versions_collapse_into_ranges_like_modrinth_app() {
     // A project with only a snapshot shows it; legacy versions follow in a range.
     assert_eq!(labels(&of(&["1.21-pre1"])), ["1.21-pre1"]);
     assert_eq!(labels(&of(&["1.20.1", "b1.8.1"])), ["1.20.1", "b1.8.1"]);
+}
+
+/// A CurseForge-like source: four versions, ten categories that must all
+/// match, five loaders of which any may match, nothing else.
+fn narrow_support() -> api::KindSupport {
+    api::KindSupport {
+        kind: api::ProjectKind::Mod,
+        filters: api::FilterSupport {
+            max_game_versions: 4,
+            categories: Some(api::PickSupport {
+                max_included: 10,
+                exclude: false,
+                any: false,
+                all: true,
+            }),
+            loaders: Some(api::PickSupport {
+                max_included: 5,
+                exclude: false,
+                any: true,
+                all: false,
+            }),
+            ..Default::default()
+        },
+        sorts: vec![api::Sort::Relevance, api::Sort::Downloads],
+        browse_url: None,
+    }
+}
+
+#[test]
+fn a_query_is_fitted_to_what_the_source_can_answer() {
+    let mut query = SearchQuery::new(ProjectKind::Mod);
+    query.sort = SortIndex::Follows;
+    query.game_versions = (1..=6).map(|minor| format!("1.2{minor}")).collect();
+    query.categories = vec![
+        Pick::include("16x").any_of(),
+        Pick::include("32x").any_of(),
+        Pick::exclude("cursed"),
+    ];
+    query.loaders = vec![
+        Pick::include("fabric"),
+        Pick::include("quilt"),
+        Pick::exclude("forge"),
+    ];
+    query.client = true;
+    query.open_source = Some(Stance::Include);
+    query.hidden_projects = vec!["P".into()];
+    query.excluded_disclosures = vec!["ads".into()];
+    let support = narrow_support();
+    let fitted = super::source::fit_query(query_to_api(&query), &support);
+    let capabilities = api::Capabilities {
+        kinds: vec![support],
+        ..Default::default()
+    };
+    assert!(fitted.validate(&capabilities).is_ok(), "{fitted:?}");
+    assert_eq!(
+        fitted.sort,
+        api::Sort::Relevance,
+        "an unknown sort falls back"
+    );
+    assert_eq!(fitted.game_versions.len(), 4);
+    assert_eq!(
+        fitted
+            .categories
+            .iter()
+            .map(|pick| (pick.name.as_str(), pick.any))
+            .collect::<Vec<_>>(),
+        vec![("16x", false), ("32x", false)],
+        "any-of becomes all-of; exclusions go"
+    );
+    assert!(
+        fitted
+            .loaders
+            .iter()
+            .all(|pick| pick.any && pick.stance == api::Stance::Include)
+    );
+    assert!(!fitted.client && fitted.open_source.is_none());
+    assert!(fitted.hidden_projects.is_empty() && fitted.excluded_disclosures.is_empty());
+}
+
+#[test]
+fn a_source_that_takes_one_pick_keeps_the_first() {
+    let mut support = narrow_support();
+    support.filters.categories = Some(api::PickSupport {
+        max_included: 1,
+        exclude: false,
+        any: false,
+        all: false,
+    });
+    let mut query = SearchQuery::new(ProjectKind::Mod);
+    query.categories = vec![Pick::include("a"), Pick::include("b")];
+    let fitted = super::source::fit_query(query_to_api(&query), &support);
+    assert_eq!(fitted.categories.len(), 1);
+    assert_eq!(fitted.categories[0].name, "a");
 }

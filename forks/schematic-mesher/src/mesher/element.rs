@@ -146,12 +146,59 @@ pub struct MeshBuilder<'a> {
     /// Dynamic textures generated at build time (banners, inventories).
     /// Keys starting with `_` are synthetic texture paths.
     dynamic_textures: HashMap<String, TextureData>,
+    /// Block names by whether a binding row could match them.
+    bindable_names: rustc_hash::FxHashMap<String, bool>,
+    /// Each composed text display texture's layout size in font units
+    /// (LumilioCL local change, plan schematic-studio T35).
+    text_sizes: HashMap<String, (u32, u32)>,
 }
 
 /// Synthetic atlas key for the fallback "unknown texture" tile. Added to every
 /// atlas so faces whose declared texture couldn't be resolved have a valid
 /// region to sample, instead of leaking into full-atlas [0,1] UVs.
 const MISSING_TEXTURE_KEY: &str = "__missing__";
+
+/// The placeholder for a block no model can draw: one full cube whose six
+/// faces sample the missing-texture tile, culled like any solid cube. The
+/// game draws unknown blocks the same way. LumilioCL local change (plan
+/// schematic-studio D24).
+fn placeholder_models() -> Vec<ResolvedModel> {
+    let faces = [
+        Direction::Down,
+        Direction::Up,
+        Direction::North,
+        Direction::South,
+        Direction::West,
+        Direction::East,
+    ]
+    .into_iter()
+    .map(|direction| {
+        (
+            direction,
+            ModelFace {
+                uv: None,
+                texture: "#missing".to_string(),
+                cullface: Some(direction),
+                rotation: 0,
+                tintindex: -1,
+            },
+        )
+    })
+    .collect();
+    let mut model = crate::resource_pack::BlockModel::new();
+    model.elements.push(ModelElement {
+        from: [0., 0., 0.],
+        to: [16., 16., 16.],
+        rotation: None,
+        shade: true,
+        shade_direction_override: None,
+        faces,
+    });
+    vec![ResolvedModel {
+        model,
+        transform: BlockTransform::default(),
+    }]
+}
 
 /// Build a 16x16 magenta/black checkerboard texture, MC-style, to mark faces
 /// whose texture couldn't be found in the resource pack.
@@ -207,6 +254,8 @@ impl<'a> MeshBuilder<'a> {
             block_map,
             light_map,
             dynamic_textures: HashMap::new(),
+            bindable_names: rustc_hash::FxHashMap::default(),
+            text_sizes: HashMap::new(),
         }
     }
 
@@ -293,9 +342,15 @@ impl<'a> MeshBuilder<'a> {
     }
 
     fn add_block_geometry(&mut self, pos: BlockPosition, block: &InputBlock) -> Result<()> {
-        // Check if this is a mob entity — generate custom geometry, bypass model resolution
-        if let Some(mob_type) = entity::detect_mob(block) {
-            return self.add_mob(pos, block, mob_type);
+        // Entities (the `entity:` namespace) are drawn from the binding table
+        // alone; they have no block model.
+        let bound = if self.may_bind(block) {
+            entity::bindings::find_for(&self.resource_pack.entity_looks, block)
+        } else {
+            None
+        };
+        if let Some(bound) = bound.as_ref().filter(|bound| bound.is_entity) {
+            return self.add_bound(pos, block, bound);
         }
 
         // Check if this is a liquid block — generate custom geometry
@@ -318,13 +373,20 @@ impl<'a> MeshBuilder<'a> {
             let rc = if let Some(cached) = self.resolve_cache.get(&cache_key) {
                 std::rc::Rc::clone(cached)
             } else {
-                // Resolve the block to models
+                // Resolve the block to models. A block nothing can draw gets
+                // the missing-texture placeholder cube (LumilioCL local
+                // change, plan schematic-studio D24): the shape stays whole
+                // and the block can be picked. Fluids and bound entities draw
+                // themselves and need no placeholder.
                 let resolved_models = match resolve_block(self.resource_pack, block) {
                     Ok(models) => models,
                     Err(e) => {
-                        // Log warning but continue (don't return — entity check below)
                         eprintln!("Warning: Failed to resolve block {}: {}", block.name, e);
-                        Vec::new()
+                        if bound.is_some() {
+                            Vec::new()
+                        } else {
+                            placeholder_models()
+                        }
                     }
                 };
                 let rc = std::rc::Rc::new(resolved_models);
@@ -343,12 +405,14 @@ impl<'a> MeshBuilder<'a> {
             self.add_model(pos, block, resolved)?;
         }
 
-        // Check for block entity — generates additive geometry
-        if let Some(entity_type) = entity::detect_block_entity(block) {
-            let model_draws_it = entity_type.replaced_by_block_model()
+        // Block entities add their bound layers to the block's own model.
+        // From 26.2 signs and beds are block models: when the model has
+        // elements it draws the block and the entity is not added.
+        if let Some(bound) = bound {
+            let model_draws_it = bound.binding.model_replaces
                 && resolved.iter().any(|r| !r.model.elements.is_empty());
             if !model_draws_it {
-                self.add_entity(pos, block, &entity_type)?;
+                self.add_bound(pos, block, &bound)?;
             }
         }
 
@@ -485,458 +549,385 @@ impl<'a> MeshBuilder<'a> {
         Ok(())
     }
 
-    /// Add entity geometry for a block entity (chest, bed, bell, sign, skull, banner).
-    fn add_entity(
+    /// Whether any binding row could match `block`'s name, remembered per
+    /// name so terrain does not walk the table (LumilioCL local change).
+    fn may_bind(&mut self, block: &InputBlock) -> bool {
+        if let Some(&known) = self.bindable_names.get(&block.name) {
+            return known;
+        }
+        let known = entity::bindings::known_for(&self.resource_pack.entity_looks, block);
+        self.bindable_names.insert(block.name.clone(), known);
+        known
+    }
+
+    /// Add a block or entity the binding table draws (LumilioCL local change,
+    /// plan schematic-studio T7; see `entity::bindings`).
+    fn add_bound(
         &mut self,
         pos: BlockPosition,
         block: &InputBlock,
-        entity_type: &entity::BlockEntityType,
+        bound: &entity::bindings::Bound,
     ) -> Result<()> {
-        // Banner: composite texture before generating geometry
-        if let entity::BlockEntityType::Banner { color, is_wall } = entity_type {
-            return self.add_banner(pos, block, color, *is_wall);
-        }
-
-        // Sign with text: composite text onto texture
-        if let entity::BlockEntityType::Sign { wood, is_wall } = entity_type {
-            if block.properties.contains_key("text1")
-                || block.properties.contains_key("text2")
-                || block.properties.contains_key("text3")
-                || block.properties.contains_key("text4")
-            {
-                return self.add_sign_with_text(pos, block, *wood, *is_wall);
+        use entity::bindings::Compose;
+        match bound.binding.compose {
+            Some(Compose::ItemFrame) => return self.add_item_frame(pos, block, bound),
+            Some(Compose::DroppedItem) => return self.add_dropped_item(pos, block, bound),
+            Some(Compose::Painting) => {
+                let place = entity::render::placement(bound, &entity::render::Look::default());
+                if let Some((vertices, indices, faces)) =
+                    entity::painting::geometry(self.resource_pack, bound, place)
+                {
+                    self.add_item_geometry(pos, &vertices, &indices, &faces);
+                }
+                return Ok(());
             }
-        }
-
-        // Hanging sign with text
-        if let entity::BlockEntityType::HangingSign { wood, is_wall } = entity_type {
-            if block.properties.contains_key("text1")
-                || block.properties.contains_key("text2")
-                || block.properties.contains_key("text3")
-                || block.properties.contains_key("text4")
-            {
-                return self.add_hanging_sign_with_text(pos, block, *wood, *is_wall);
+            Some(Compose::ItemDisplay) => {
+                let place = entity::render::placement(bound, &entity::render::Look::default());
+                let context = bound.var("item_display").unwrap_or("none");
+                let Some(item) = bound.var("item") else {
+                    return Ok(());
+                };
+                if let Some((vertices, indices, faces)) =
+                    entity::item_render::render_item_in_context(
+                        self.resource_pack,
+                        &self.model_resolver,
+                        item,
+                        context,
+                        place,
+                    )
+                {
+                    self.add_item_geometry(pos, &vertices, &indices, &faces);
+                }
+                return Ok(());
             }
+            Some(Compose::TextDisplay) => return self.add_text_display(pos, bound),
+            _ => {}
         }
-
-        // Player head: custom texture handling with dynamic skin
-        if let entity::BlockEntityType::Skull(entity::SkullType::Player) = entity_type {
-            return self.add_player_head(pos, block);
+        if let Some(sprite) = &bound.binding.sprite {
+            return self.add_sprite(pos, bound, sprite);
         }
-
-        // Decorated pot: custom per-face geometry
-        if matches!(entity_type, entity::BlockEntityType::DecoratedPot) {
-            return self.add_decorated_pot(pos, block);
+        let mut bound = bound.clone();
+        // A ridden pig or horse always shows its saddle.
+        if block.properties.contains_key("rider") {
+            bound
+                .properties
+                .insert("saddle".to_owned(), "true".to_owned());
         }
-
-        let (vertices, indices, face_textures) =
-            entity::generate_entity_geometry(block, entity_type);
-
-        if vertices.is_empty() {
+        let key = format!("{}_{}_{}", pos.x, pos.y, pos.z);
+        let geometry = self.bound_geometry(block, &bound, &key);
+        let drawn = geometry.is_some();
+        if let Some((mut vertices, indices, faces)) = geometry {
+            if !bound.is_entity {
+                self.light_block_entity(pos, &mut vertices);
+            }
+            self.add_item_geometry(pos, &vertices, &indices, &faces);
+        }
+        if let Some(carried) = &bound.binding.carries {
+            self.add_carried_block(pos, &bound, carried)?;
+        } else if !drawn {
             return Ok(());
         }
-
-        // Register entity texture
-        if let Some(ft) = face_textures.first() {
-            self.texture_refs.insert(ft.texture.clone());
-        }
-
-        // Add vertices with block position offset and optional lighting
-        let base_vertex = self.mesh.vertex_count() as u32;
-        let base_index = self.mesh.indices.len();
-
-        let is_emissive = self
-            .light_map
-            .map(|lm| lm.is_emissive(pos))
-            .unwrap_or(false);
-
-        for v in &vertices {
-            let mut vertex = *v;
-            // Offset to world position (entity geometry is in [0,1] block-local space,
-            // but regular blocks use [-0.5, 0.5] centered convention, so subtract 0.5)
-            vertex.position[0] += pos.x as f32 - 0.5;
-            vertex.position[1] += pos.y as f32 - 0.5;
-            vertex.position[2] += pos.z as f32 - 0.5;
-
-            // Apply lighting if enabled
-            if !is_emissive {
-                if let Some(lm) = self.light_map {
-                    // Use average brightness for entity (no per-face direction available yet)
-                    let brightness = lm.face_brightness(pos, Direction::Up);
-                    vertex.color[0] *= brightness;
-                    vertex.color[1] *= brightness;
-                    vertex.color[2] *= brightness;
-                }
+        if bound.is_entity {
+            if let Some(rider) = block.properties.get("rider").cloned() {
+                self.add_rider_on(pos, block, &bound, &rider)?;
             }
-
-            self.mesh.add_vertex(vertex);
         }
-
-        for &idx in &indices {
-            self.mesh.indices.push(base_vertex + idx);
-        }
-
-        // Track face texture mappings for atlas UV remapping
-        let mut idx_offset = base_index;
-        for ft in &face_textures {
-            let face_v_start = (idx_offset - base_index) as u32 / 6 * 4 + base_vertex;
-            self.face_textures.push(FaceTextureMapping {
-                vertex_start: face_v_start,
-                index_start: idx_offset,
-                texture_path: ft.texture.clone(),
-                is_transparent: ft.is_transparent,
-            });
-            idx_offset += 6;
-        }
-
         Ok(())
     }
 
-    /// Add mob entity geometry (zombie, skeleton, creeper, pig, item frames, dropped items).
-    fn add_mob(
+    /// Block entities take the light of their block, as before.
+    fn light_block_entity(&self, pos: BlockPosition, vertices: &mut [Vertex]) {
+        let Some(light) = self.light_map else {
+            return;
+        };
+        if light.is_emissive(pos) {
+            return;
+        }
+        let brightness = light.face_brightness(pos, Direction::Up);
+        for vertex in vertices {
+            for channel in &mut vertex.color[..3] {
+                *channel *= brightness;
+            }
+        }
+    }
+
+    /// The faces of `bound` with the textures its composition makes. `key`
+    /// names this block's own composed textures (skins).
+    fn bound_geometry(
+        &mut self,
+        block: &InputBlock,
+        bound: &entity::bindings::Bound,
+        key: &str,
+    ) -> Option<entity::model::Geometry> {
+        use entity::bindings::Compose;
+        use entity::sign_text::SignKind;
+        let mut look = entity::render::Look::default();
+        match bound.binding.compose {
+            Some(Compose::Banner) => {
+                look.texture = self.banner_texture(block, bound.var("color").unwrap_or("white"));
+            }
+            Some(Compose::StandingSignText) => {
+                look.texture = self.sign_texture(block, bound, SignKind::Standing);
+            }
+            Some(Compose::WallSignText) => {
+                look.texture = self.sign_texture(block, bound, SignKind::Wall);
+            }
+            Some(Compose::HangingSignText) => {
+                look.texture = self.sign_texture(block, bound, SignKind::Hanging);
+            }
+            Some(Compose::DecoratedPot) => {
+                look.bone_textures = self.pot_textures(block);
+            }
+            Some(Compose::PlayerSkin) => {
+                let prefix = if bound.is_entity {
+                    "_player"
+                } else {
+                    "_player_head"
+                };
+                look.texture = self.player_skin(block, &format!("{prefix}/{key}"));
+                look.vars.insert(
+                    "model".to_owned(),
+                    entity::skin::player_model(block, self.resource_pack).to_owned(),
+                );
+            }
+            Some(Compose::Villager) => {
+                look.texture = self.villager_texture(block);
+            }
+            Some(
+                Compose::ItemFrame
+                | Compose::DroppedItem
+                | Compose::Painting
+                | Compose::ExperienceOrb
+                | Compose::ItemDisplay
+                | Compose::TextDisplay,
+            )
+            | None => {}
+        }
+        entity::render::draw(self.resource_pack, bound, &look)
+    }
+
+    /// The banner's base colour and patterns as one texture.
+    fn banner_texture(&mut self, block: &InputBlock, color: &str) -> Option<String> {
+        let patterns = block
+            .properties
+            .get("patterns")
+            .map(|s| entity::banner::parse_patterns(s))
+            .unwrap_or_default();
+        let mut key = format!("_banner/{color}");
+        for (pattern, dye) in &patterns {
+            key.push_str(&format!("_{pattern}{dye}"));
+        }
+        if !self.dynamic_textures.contains_key(&key) {
+            let texture =
+                entity::banner::composite_banner_texture(self.resource_pack, color, &patterns)?;
+            self.dynamic_textures.insert(key.clone(), texture);
+        }
+        Some(key)
+    }
+
+    /// The sign's own texture with `text1`–`text4` drawn on; `None` without
+    /// text or without the font, which leaves the plain texture.
+    fn sign_texture(
+        &mut self,
+        block: &InputBlock,
+        bound: &entity::bindings::Bound,
+        kind: entity::sign_text::SignKind,
+    ) -> Option<String> {
+        let lines: Vec<&str> = (1..=4)
+            .filter_map(|i| {
+                block
+                    .properties
+                    .get(&format!("text{i}"))
+                    .map(String::as_str)
+            })
+            .collect();
+        if lines.is_empty() {
+            return None;
+        }
+        let base = entity::render::row_texture(self.resource_pack, bound)?;
+        let color = block
+            .properties
+            .get("color")
+            .map(String::as_str)
+            .unwrap_or("black");
+        let glowing = block.properties.get("glowing").is_some_and(|g| g == "true");
+        let mut key = format!(
+            "_sign/{base}_{color}_{}",
+            if glowing { "glow" } else { "normal" }
+        );
+        for line in &lines {
+            key.push('_');
+            key.push_str(line);
+        }
+        if !self.dynamic_textures.contains_key(&key) {
+            let texture = entity::sign_text::composite_sign_with_text(
+                self.resource_pack,
+                &base,
+                &lines,
+                color,
+                glowing,
+                kind,
+            )?;
+            self.dynamic_textures.insert(key.clone(), texture);
+        }
+        Some(key)
+    }
+
+    /// Each pot side's texture: the plain side, or its sherd's pattern drawn
+    /// over it.
+    fn pot_textures(&mut self, block: &InputBlock) -> std::collections::BTreeMap<String, String> {
+        let mut textures = std::collections::BTreeMap::new();
+        for (side, pattern) in entity::decorated_pot::SIDES
+            .into_iter()
+            .zip(entity::decorated_pot::patterns(block))
+        {
+            let key = match pattern {
+                None => entity::decorated_pot::SIDE_TEXTURE.to_owned(),
+                Some(pattern) => {
+                    let key = format!("_pot/{pattern}");
+                    if !self.dynamic_textures.contains_key(&key) {
+                        if let Some(texture) =
+                            entity::decorated_pot::composite_side(self.resource_pack, &pattern)
+                        {
+                            self.dynamic_textures.insert(key.clone(), texture);
+                        }
+                    }
+                    key
+                }
+            };
+            textures.insert(side.to_owned(), key);
+        }
+        textures
+    }
+
+    /// The skin of a player or player head, stored under `key`.
+    fn player_skin(&mut self, block: &InputBlock, key: &str) -> Option<String> {
+        if !self.dynamic_textures.contains_key(key) {
+            let skin = entity::skin::skin_of(block).or_else(|| {
+                self.resource_pack
+                    .get_texture(entity::skin::player_skin_fallback_path(
+                        block,
+                        self.resource_pack,
+                    ))
+                    .cloned()
+            })?;
+            self.dynamic_textures.insert(key.to_owned(), skin);
+        }
+        Some(key.to_owned())
+    }
+
+    /// A villager's skin with its biome and profession clothes.
+    fn villager_texture(&mut self, block: &InputBlock) -> Option<String> {
+        let biome = block
+            .properties
+            .get("biome")
+            .map(String::as_str)
+            .unwrap_or("plains");
+        let profession = block
+            .properties
+            .get("profession")
+            .map(String::as_str)
+            .unwrap_or("none");
+        let key = format!("_villager/{biome}/{profession}");
+        if !self.dynamic_textures.contains_key(&key) {
+            let texture = entity::villager_texture::composite_villager_texture(
+                self.resource_pack,
+                biome,
+                profession,
+            )?;
+            self.dynamic_textures.insert(key.clone(), texture);
+        }
+        Some(key)
+    }
+
+    /// An item frame: its block model, then the item it holds. An invisible
+    /// frame shows only the item.
+    fn add_item_frame(
         &mut self,
         pos: BlockPosition,
         block: &InputBlock,
-        mob_type: entity::MobType,
+        bound: &entity::bindings::Bound,
     ) -> Result<()> {
-        let (vertices, indices, mut face_textures) = entity::generate_mob_geometry(block, mob_type);
-
-        // Villagers render as three stacked draw passes in MC: base skin +
-        // biome overlay + profession overlay. Composite them into one texture.
-        if matches!(mob_type, entity::MobType::Villager) {
-            let biome = block
+        let facing = bound.var("facing").unwrap_or("south");
+        let invisible = block
+            .properties
+            .get("invisible")
+            .is_some_and(|v| v == "true");
+        if !invisible {
+            let (vertices, indices, faces) =
+                entity::item_frame::frame_geometry(self.resource_pack, bound.flag("glow"), facing);
+            if !vertices.is_empty() {
+                self.add_item_geometry(pos, &vertices, &indices, &faces);
+            }
+        }
+        if let Some(item_id) = block.properties.get("item") {
+            let rotation: u8 = block
                 .properties
-                .get("biome")
-                .map(|s| s.as_str())
-                .unwrap_or("plains");
-            let profession = block
-                .properties
-                .get("profession")
-                .map(|s| s.as_str())
-                .unwrap_or("none");
-            let tex_key = format!("_villager/{}/{}", biome, profession);
-
-            if !self.dynamic_textures.contains_key(&tex_key) {
-                if let Some(tex) = entity::villager_texture::composite_villager_texture(
+                .get("item_rotation")
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0);
+            if let Some((item_verts, item_indices, item_faces)) =
+                entity::item_render::render_item_in_frame(
                     self.resource_pack,
-                    biome,
-                    profession,
-                ) {
-                    self.dynamic_textures.insert(tex_key.clone(), tex);
-                }
-            }
-
-            if self.dynamic_textures.contains_key(&tex_key) {
-                for ft in face_textures.iter_mut() {
-                    if ft.texture == "entity/villager/villager" {
-                        ft.texture = tex_key.clone();
-                    }
-                }
-            }
-        }
-
-        // Add base geometry (may be empty for dropped items)
-        if !vertices.is_empty() {
-            for ft in &face_textures {
-                self.texture_refs.insert(ft.texture.clone());
-            }
-
-            let base_vertex = self.mesh.vertex_count() as u32;
-            let base_index = self.mesh.indices.len();
-
-            for v in &vertices {
-                let mut vertex = *v;
-                vertex.position[0] += pos.x as f32 - 0.5;
-                vertex.position[1] += pos.y as f32 - 0.5;
-                vertex.position[2] += pos.z as f32 - 0.5;
-                self.mesh.add_vertex(vertex);
-            }
-
-            for &idx in &indices {
-                self.mesh.indices.push(base_vertex + idx);
-            }
-
-            let mut idx_offset = base_index;
-            for ft in &face_textures {
-                let face_v_start = (idx_offset - base_index) as u32 / 6 * 4 + base_vertex;
-                self.face_textures.push(FaceTextureMapping {
-                    vertex_start: face_v_start,
-                    index_start: idx_offset,
-                    texture_path: ft.texture.clone(),
-                    is_transparent: ft.is_transparent,
-                });
-                idx_offset += 6;
-            }
-        }
-
-        // Item frames: render item inside the frame if "item" property is set
-        if matches!(
-            mob_type,
-            entity::MobType::ItemFrame | entity::MobType::GlowItemFrame
-        ) {
-            if let Some(item_id) = block.properties.get("item") {
-                let item_rotation: u8 = block
-                    .properties
-                    .get("item_rotation")
-                    .and_then(|s| s.parse().ok())
-                    .unwrap_or(0);
-                let facing = block
-                    .properties
-                    .get("facing")
-                    .map(|s| s.as_str())
-                    .unwrap_or("south");
-
-                if let Some((item_verts, item_indices, item_faces)) =
-                    entity::item_render::render_item_in_frame(
-                        self.resource_pack,
-                        &self.model_resolver,
-                        item_id,
-                        item_rotation,
-                        facing,
-                    )
-                {
-                    self.add_item_geometry(pos, &item_verts, &item_indices, &item_faces);
-                }
-            }
-        }
-
-        // Dropped items: render via item_render module
-        if matches!(mob_type, entity::MobType::DroppedItem) {
-            if let Some(item_id) = block.properties.get("item") {
-                let facing = block
-                    .properties
-                    .get("facing")
-                    .map(|s| s.as_str())
-                    .unwrap_or("south");
-
-                if let Some((item_verts, item_indices, item_faces)) =
-                    entity::item_render::render_dropped_item(
-                        self.resource_pack,
-                        &self.model_resolver,
-                        item_id,
-                        facing,
-                    )
-                {
-                    self.add_item_geometry(pos, &item_verts, &item_indices, &item_faces);
-                }
-            }
-        }
-
-        // Sheep: render wool overlay
-        if matches!(mob_type, entity::MobType::Sheep) {
-            let mut wool_model = crate::mesher::entity::sheep::sheep_wool_model();
-            // Apply baby scaling to wool overlay too (head gets same extra 2× so
-            // it tracks the base sheep's big-head proportions).
-            if block
-                .properties
-                .get("is_baby")
-                .map(|v| v == "true")
-                .unwrap_or(false)
+                    &self.model_resolver,
+                    item_id,
+                    rotation,
+                    facing,
+                    invisible,
+                )
             {
-                if let Some(root) = wool_model.parts.first_mut() {
-                    root.pose.scale = [0.5, 0.5, 0.5];
-                    root.pose.position[1] = 12.0;
-                    if let Some(head) = root.children.first_mut() {
-                        head.pose.scale[0] *= 2.0;
-                        head.pose.scale[1] *= 2.0;
-                        head.pose.scale[2] *= 2.0;
-                    }
-                }
-            }
-            let facing = block
-                .properties
-                .get("facing")
-                .map(|s| s.as_str())
-                .unwrap_or("south");
-            let facing_angle = entity::facing_rotation_rad(facing);
-            let facing_mat = glam::Mat4::from_translation(glam::Vec3::new(0.5, 0.0, 0.5))
-                * glam::Mat4::from_rotation_y(facing_angle)
-                * glam::Mat4::from_translation(glam::Vec3::new(-0.5, 0.0, -0.5));
-
-            let mut wool_verts = Vec::new();
-            let mut wool_indices = Vec::new();
-            let mut wool_faces = Vec::new();
-
-            entity::traverse_parts(
-                &wool_model.parts,
-                glam::Mat4::IDENTITY,
-                &facing_mat,
-                &wool_model,
-                &mut wool_verts,
-                &mut wool_indices,
-                &mut wool_faces,
-            );
-
-            // Apply dye color tint to wool vertices
-            let dye_color = block
-                .properties
-                .get("color")
-                .map(|c| dye_rgb(c))
-                .unwrap_or([1.0, 1.0, 1.0, 1.0]);
-            for v in &mut wool_verts {
-                v.color[0] *= dye_color[0];
-                v.color[1] *= dye_color[1];
-                v.color[2] *= dye_color[2];
-            }
-
-            if !wool_verts.is_empty() {
-                self.add_item_geometry(pos, &wool_verts, &wool_indices, &wool_faces);
+                self.add_item_geometry(pos, &item_verts, &item_indices, &item_faces);
             }
         }
-
-        // Players: dynamic skin texture + direct model generation
-        if matches!(mob_type, entity::MobType::Player) {
-            let tex_key = format!("_player/{}_{}_{}", pos.x, pos.y, pos.z);
-            if !self.dynamic_textures.contains_key(&tex_key) {
-                // Try base64 skin property first (primary path for WASM/JS callers).
-                if let Some(skin_b64) = block.properties.get("skin_base64") {
-                    if let Some(skin_tex) = entity::skull::decode_base64_skin(skin_b64) {
-                        self.dynamic_textures.insert(tex_key.clone(), skin_tex);
-                    }
-                }
-                // Then try hex skin property (legacy/inline-in-Rust path).
-                if !self.dynamic_textures.contains_key(&tex_key) {
-                    if let Some(skin_hex) = block.properties.get("skin") {
-                        if let Some(skin_tex) = entity::skull::decode_hex_skin(skin_hex) {
-                            self.dynamic_textures.insert(tex_key.clone(), skin_tex);
-                        }
-                    }
-                }
-                // Finally fall back to Steve/Alex from the resource pack.
-                if !self.dynamic_textures.contains_key(&tex_key) {
-                    let fallback = entity::skull::player_skin_fallback_path(block);
-                    if let Some(tex) = self.resource_pack.get_texture(fallback) {
-                        self.dynamic_textures.insert(tex_key.clone(), tex.clone());
-                    }
-                }
-            }
-
-            // Build player model with dynamic texture key
-            let model = entity::player::player_model(block, &tex_key);
-
-            let facing = block
-                .properties
-                .get("facing")
-                .map(|s| s.as_str())
-                .unwrap_or("south");
-            let facing_angle = entity::facing_rotation_rad(facing);
-            let facing_mat = glam::Mat4::from_translation(glam::Vec3::new(0.5, 0.0, 0.5))
-                * glam::Mat4::from_rotation_y(facing_angle)
-                * glam::Mat4::from_translation(glam::Vec3::new(-0.5, 0.0, -0.5));
-
-            let mut player_verts = Vec::new();
-            let mut player_indices = Vec::new();
-            let mut player_faces = Vec::new();
-
-            entity::traverse_parts(
-                &model.parts,
-                glam::Mat4::IDENTITY,
-                &facing_mat,
-                &model,
-                &mut player_verts,
-                &mut player_indices,
-                &mut player_faces,
-            );
-
-            if !player_verts.is_empty() {
-                self.add_item_geometry(pos, &player_verts, &player_indices, &player_faces);
-            }
-        }
-
-        // Armor stands and players: render armor overlay if armor properties are set
-        if matches!(
-            mob_type,
-            entity::MobType::ArmorStand | entity::MobType::Player
-        ) {
-            let facing = block
-                .properties
-                .get("facing")
-                .map(|s| s.as_str())
-                .unwrap_or("south");
-            let (armor_verts, armor_indices, armor_faces) =
-                entity::armor_stand::generate_armor_geometry(block, facing);
-            if !armor_verts.is_empty() {
-                self.add_item_geometry(pos, &armor_verts, &armor_indices, &armor_faces);
-            }
-        }
-
-        // Equipment overlays (saddle on pig/horse, horse armor). Rendered as a
-        // second pass over the mob's model with cubes inflated slightly.
-        if !matches!(
-            mob_type,
-            entity::MobType::Player
-                | entity::MobType::DroppedItem
-                | entity::MobType::ItemFrame
-                | entity::MobType::GlowItemFrame
-                | entity::MobType::Boat
-                | entity::MobType::ChestBoat
-        ) {
-            let base_model = entity::mob::build_mob_model(mob_type, block);
-            let overlays = entity::equipment::overlays_for(mob_type, block, &base_model);
-            if !overlays.is_empty() {
-                let facing = block
-                    .properties
-                    .get("facing")
-                    .map(|s| s.as_str())
-                    .unwrap_or("south");
-                let facing_angle = entity::facing_rotation_rad(facing);
-                let facing_mat = glam::Mat4::from_translation(glam::Vec3::new(0.5, 0.0, 0.5))
-                    * glam::Mat4::from_rotation_y(facing_angle)
-                    * glam::Mat4::from_translation(glam::Vec3::new(-0.5, 0.0, -0.5));
-                for overlay in overlays {
-                    let mut verts = Vec::new();
-                    let mut indices = Vec::new();
-                    let mut faces = Vec::new();
-                    entity::traverse_parts(
-                        &overlay.model.parts,
-                        glam::Mat4::IDENTITY,
-                        &facing_mat,
-                        &overlay.model,
-                        &mut verts,
-                        &mut indices,
-                        &mut faces,
-                    );
-                    if !verts.is_empty() {
-                        self.add_offset_geometry(pos, [0.0, 0.0, 0.0], &verts, &indices, &faces);
-                    }
-                }
-            }
-        }
-
-        // Passenger / rider — e.g. a player on a saddled pig, or a zombie on a minecart.
-        // Host mobs advertise a mount offset via `entity::rider_offset`. We generate
-        // the rider's geometry and translate it onto that saddle point. Only one level
-        // of nesting is supported (the rider's own `rider` prop is ignored).
-        if let Some(rider_name) = block.properties.get("rider").cloned() {
-            self.add_rider_on(pos, block, mob_type, &rider_name)?;
-        }
-
         Ok(())
     }
 
-    /// Generate geometry for a rider sitting on `host_mob` and add it to the mesh.
+    /// A dropped item: its sprite or block model.
+    fn add_dropped_item(
+        &mut self,
+        pos: BlockPosition,
+        block: &InputBlock,
+        bound: &entity::bindings::Bound,
+    ) -> Result<()> {
+        // The entity's own item, else the row's default (a thrown snowball
+        // that saves none is a snowball).
+        let Some(item_id) = bound.var("item").map(str::to_owned) else {
+            return Ok(());
+        };
+        let item_id = &item_id;
+        let facing = block
+            .properties
+            .get("facing")
+            .map(String::as_str)
+            .unwrap_or("south");
+        if let Some((item_verts, item_indices, item_faces)) =
+            entity::item_render::render_dropped_item(
+                self.resource_pack,
+                &self.model_resolver,
+                item_id,
+                facing,
+            )
+        {
+            self.add_item_geometry(pos, &item_verts, &item_indices, &item_faces);
+        }
+        Ok(())
+    }
+
+    /// A rider (`rider` property) sitting on the host entity at the host's
+    /// `rider_offset`. One level only: the rider's own `rider` is ignored.
     fn add_rider_on(
         &mut self,
         host_pos: BlockPosition,
-        host_block: &crate::types::InputBlock,
-        host_mob: entity::MobType,
+        host_block: &InputBlock,
+        host: &entity::bindings::Bound,
         rider_name: &str,
     ) -> Result<()> {
-        use crate::types::InputBlock;
-
         let bare = rider_name.strip_prefix("entity:").unwrap_or(rider_name);
-        let mut rider_block = InputBlock::new(&format!("entity:{}", bare));
-
-        // Rider faces the same way as the host by default, and inherits any visual
-        // props the rider's renderer needs (skin, armor, etc.).
-        let host_facing = host_block
-            .properties
-            .get("facing")
-            .map(|s| s.as_str())
-            .unwrap_or("south");
-        rider_block
-            .properties
-            .insert("facing".to_string(), host_facing.to_string());
+        let bare = bare.strip_prefix("minecraft:").unwrap_or(bare);
+        let mut rider_block = InputBlock::new(format!("entity:{bare}"));
+        let facing = host.var("facing").unwrap_or("south").to_owned();
+        rider_block.properties.insert("facing".to_owned(), facing);
+        // The rider wears what the host was told about it (skin, armor, poses).
         for key in [
             "skin",
             "skin_base64",
@@ -949,13 +940,6 @@ impl<'a> MeshBuilder<'a> {
             "color",
             "variant",
             "is_baby",
-        ] {
-            if let Some(v) = host_block.properties.get(key) {
-                rider_block.properties.insert(key.to_string(), v.clone());
-            }
-        }
-        // Copy pose properties so a riding player can have posed arms/legs.
-        for key in [
             "HeadPose",
             "BodyPose",
             "RightArmPose",
@@ -963,162 +947,199 @@ impl<'a> MeshBuilder<'a> {
             "RightLegPose",
             "LeftLegPose",
         ] {
-            if let Some(v) = host_block.properties.get(key) {
-                rider_block.properties.insert(key.to_string(), v.clone());
+            if let Some(value) = host_block.properties.get(key) {
+                rider_block.properties.insert(key.to_owned(), value.clone());
             }
         }
-
-        let rider_type = match entity::detect_mob(&rider_block) {
-            Some(t) => t,
-            None => return Ok(()),
+        let Some(rider) =
+            entity::bindings::find_for(&self.resource_pack.entity_looks, &rider_block)
+        else {
+            return Ok(());
         };
-
-        // Apply MC's default passenger sitting pose to humanoids/players, unless
-        // the host already specified leg poses. Values from HumanoidModel.setupAnim
-        // when `isPassenger`: legs bent forward ~81° and spread ±18°.
-        let is_humanoid_rider = matches!(
-            rider_type,
-            entity::MobType::Player
-                | entity::MobType::Zombie
-                | entity::MobType::Skeleton
-                | entity::MobType::Villager
-                | entity::MobType::ArmorStand
-        );
-        if is_humanoid_rider && !rider_block.properties.contains_key("RightLegPose") {
-            rider_block
-                .properties
-                .insert("RightLegPose".to_string(), "-81,18,0".to_string());
-            rider_block
-                .properties
-                .insert("LeftLegPose".to_string(), "-81,-18,0".to_string());
+        if !rider.is_entity || rider.binding.compose == Some(entity::bindings::Compose::ItemFrame) {
+            return Ok(());
         }
-
-        let saddle = entity::rider_offset(host_mob);
-
-        // Player riders use the dynamic-skin path; other mobs use the standard one.
-        if matches!(rider_type, entity::MobType::Player) {
-            let tex_key = format!("_player/{}_{}_{}_rider", host_pos.x, host_pos.y, host_pos.z);
-            if !self.dynamic_textures.contains_key(&tex_key) {
-                if let Some(skin_b64) = rider_block.properties.get("skin_base64") {
-                    if let Some(skin_tex) = entity::skull::decode_base64_skin(skin_b64) {
-                        self.dynamic_textures.insert(tex_key.clone(), skin_tex);
-                    }
-                }
-                if !self.dynamic_textures.contains_key(&tex_key) {
-                    if let Some(skin_hex) = rider_block.properties.get("skin") {
-                        if let Some(skin_tex) = entity::skull::decode_hex_skin(skin_hex) {
-                            self.dynamic_textures.insert(tex_key.clone(), skin_tex);
-                        }
-                    }
-                }
-                if !self.dynamic_textures.contains_key(&tex_key) {
-                    let fallback = entity::skull::player_skin_fallback_path(&rider_block);
-                    if let Some(tex) = self.resource_pack.get_texture(fallback) {
-                        self.dynamic_textures.insert(tex_key.clone(), tex.clone());
-                    }
-                }
-            }
-
-            let model = entity::player::player_model(&rider_block, &tex_key);
-            let facing_angle = entity::facing_rotation_rad(host_facing);
-            let facing_mat = glam::Mat4::from_translation(glam::Vec3::new(0.5, 0.0, 0.5))
-                * glam::Mat4::from_rotation_y(facing_angle)
-                * glam::Mat4::from_translation(glam::Vec3::new(-0.5, 0.0, -0.5));
-
-            let mut verts = Vec::new();
-            let mut indices = Vec::new();
-            let mut faces = Vec::new();
-            entity::traverse_parts(
-                &model.parts,
-                glam::Mat4::IDENTITY,
-                &facing_mat,
-                &model,
-                &mut verts,
-                &mut indices,
-                &mut faces,
-            );
-            self.add_offset_geometry(host_pos, saddle, &verts, &indices, &faces);
-        } else {
-            let (verts, indices, mut faces) =
-                entity::generate_mob_geometry(&rider_block, rider_type);
-
-            // Villagers need the biome+profession compositing like the top-level
-            // villager handling does; without it the rider is "naked".
-            if matches!(rider_type, entity::MobType::Villager) {
-                let biome = rider_block
-                    .properties
-                    .get("biome")
-                    .map(|s| s.as_str())
-                    .unwrap_or("plains");
-                let profession = rider_block
-                    .properties
-                    .get("profession")
-                    .map(|s| s.as_str())
-                    .unwrap_or("none");
-                let tex_key = format!("_villager/{}/{}", biome, profession);
-                if !self.dynamic_textures.contains_key(&tex_key) {
-                    if let Some(tex) = entity::villager_texture::composite_villager_texture(
-                        self.resource_pack,
-                        biome,
-                        profession,
-                    ) {
-                        self.dynamic_textures.insert(tex_key.clone(), tex);
-                    }
-                }
-                if self.dynamic_textures.contains_key(&tex_key) {
-                    for ft in faces.iter_mut() {
-                        if ft.texture == "entity/villager/villager" {
-                            ft.texture = tex_key.clone();
-                        }
-                    }
-                }
-            }
-
-            if !verts.is_empty() {
-                self.add_offset_geometry(host_pos, saddle, &verts, &indices, &faces);
-            }
+        let mut rider = rider;
+        // HumanoidModel.setupAnim while riding: legs forward about 81°, spread 18°.
+        if rider.binding.humanoid && !rider.properties.contains_key("RightLegPose") {
+            rider
+                .properties
+                .insert("RightLegPose".to_owned(), "-81,18,0".to_owned());
+            rider
+                .properties
+                .insert("LeftLegPose".to_owned(), "-81,-18,0".to_owned());
         }
-
+        let seat = host.binding.rider_offset.unwrap_or([0.0, 0.3, 0.0]);
+        let key = format!("{}_{}_{}_rider", host_pos.x, host_pos.y, host_pos.z);
+        if let Some((vertices, indices, faces)) = self.bound_geometry(&rider_block, &rider, &key) {
+            self.add_offset_geometry(host_pos, seat, &vertices, &indices, &faces);
+        }
         Ok(())
     }
 
-    /// Push entity geometry onto the mesh at `pos + extra_offset`. Used for riders.
+    /// A row's flat picture (LumilioCL local change, plan schematic-studio
+    /// T35); an experience orb shows the icon of its `value` and the colour
+    /// its renderer starts at.
+    fn add_sprite(
+        &mut self,
+        pos: BlockPosition,
+        bound: &entity::bindings::Bound,
+        sprite: &entity::bindings::Sprite,
+    ) -> Result<()> {
+        let Some(texture) = bound.expand(&sprite.texture) else {
+            return Ok(());
+        };
+        let place = entity::render::placement(bound, &entity::render::Look::default());
+        let orb = bound.binding.compose == Some(entity::bindings::Compose::ExperienceOrb);
+        let uv = if orb {
+            // `ExperienceOrb.getIcon`: sixteen icons of 16 pixels on a 64
+            // pixel sheet, by the orb's value.
+            const STEPS: [i64; 10] = [2477, 1237, 617, 307, 149, 73, 37, 17, 7, 3];
+            let value: i64 = bound.var("value").and_then(|v| v.parse().ok()).unwrap_or(0);
+            let icon = STEPS
+                .iter()
+                .position(|&step| value >= step)
+                .map_or(0, |at| 10 - at) as f32;
+            let (u0, v0) = ((icon % 4.0) * 0.25, (icon / 4.0).floor() * 0.25);
+            [u0, v0, u0 + 0.25, v0 + 0.25]
+        } else {
+            sprite.uv.unwrap_or([0.0, 0.0, 1.0, 1.0])
+        };
+        let mut out = (Vec::new(), Vec::new(), Vec::new());
+        entity::painting::flat(&mut out, place, sprite.from, sprite.to, uv, &texture, orb);
+        if orb {
+            // The colour at age 0, half see-through.
+            for vertex in &mut out.0 {
+                vertex.color = [127.0 / 255.0, 1.0, 3.0 / 255.0, 128.0 / 255.0];
+            }
+        }
+        self.add_item_geometry(pos, &out.0, &out.1, &out.2);
+        Ok(())
+    }
+
+    /// A text display's lines on their background, laid out as the game's
+    /// renderer lays them out, 1/40 block a font unit (T35).
+    fn add_text_display(
+        &mut self,
+        pos: BlockPosition,
+        bound: &entity::bindings::Bound,
+    ) -> Result<()> {
+        let Some(text) = bound.var("text") else {
+            return Ok(());
+        };
+        let line_width = bound
+            .var("line_width")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(200);
+        let background = bound
+            .var("background")
+            .and_then(|v| v.parse::<i64>().ok())
+            .map_or(0x4000_0000, |v| v as u32);
+        let alignment = bound.var("alignment").unwrap_or("center");
+        let key = format!("_text/{line_width}_{background:08x}_{alignment}_{text}");
+        let size = match self.text_sizes.get(&key) {
+            Some(&size) => size,
+            None => {
+                let display = entity::sign_text::TextDisplay {
+                    text,
+                    line_width,
+                    background,
+                    alignment,
+                };
+                let Some((texture, w, h)) =
+                    entity::sign_text::composite_text_display(self.resource_pack, &display)
+                else {
+                    return Ok(());
+                };
+                self.dynamic_textures.insert(key.clone(), texture);
+                self.text_sizes.insert(key.clone(), (w, h));
+                (w, h)
+            }
+        };
+        let (w, h) = (size.0 as f32, size.1 as f32);
+        let unit = 0.025;
+        let place = entity::render::placement(bound, &entity::render::Look::default());
+        let mut out = (Vec::new(), Vec::new(), Vec::new());
+        // The game draws text without culling: seen from behind, mirrored.
+        for side in [
+            place,
+            place * glam::Mat4::from_scale(Vec3::new(1.0, 1.0, -1.0)),
+        ] {
+            entity::painting::flat(
+                &mut out,
+                side,
+                [-unit * w / 2.0, 0.0],
+                [unit * (w / 2.0 + 1.0), unit * (h + 1.0)],
+                [0.0, 0.0, 1.0, 1.0],
+                &key,
+                true,
+            );
+        }
+        self.add_item_geometry(pos, &out.0, &out.1, &out.2);
+        Ok(())
+    }
+
+    /// The block a row carries (LumilioCL local change, plan schematic-studio
+    /// T35): meshed at `pos` as the schematic's blocks are (a chest in a
+    /// minecart is the chest's own model), then moved by the row's facing
+    /// and the block's steps. Air draws nothing.
+    fn add_carried_block(
+        &mut self,
+        pos: BlockPosition,
+        bound: &entity::bindings::Bound,
+        carried: &entity::bindings::CarriedBlock,
+    ) -> Result<()> {
+        let Some(state) = bound.expand(&carried.state) else {
+            return Ok(());
+        };
+        let block = entity::bindings::parse_state(&state);
+        if block.is_air() {
+            return Ok(());
+        }
+        let lift: f32 = carried
+            .lift
+            .as_deref()
+            .and_then(|pattern| bound.expand(pattern))
+            .and_then(|text| text.trim().parse().ok())
+            .unwrap_or(0.0);
+        let place = entity::render::facing(bound)
+            * entity::render::steps_matrix(&carried.steps)
+            * glam::Mat4::from_translation(Vec3::new(0.0, lift / 16.0, 0.0))
+            * entity::render::steps_matrix(&carried.then);
+        let first = self.mesh.vertex_count();
+        self.add_block_geometry(pos, &block)?;
+        let corner = Vec3::new(pos.x as f32 - 0.5, pos.y as f32 - 0.5, pos.z as f32 - 0.5);
+        for vertex in &mut self.mesh.vertices[first..] {
+            let local = Vec3::from(vertex.position) - corner;
+            vertex.position = (place.transform_point3(local) + corner).into();
+            vertex.normal = place
+                .transform_vector3(Vec3::from(vertex.normal))
+                .normalize_or_zero()
+                .into();
+        }
+        Ok(())
+    }
+
+    /// Push entity geometry onto the mesh at `pos + extra`. Used for riders.
     fn add_offset_geometry(
         &mut self,
         pos: BlockPosition,
         extra: [f32; 3],
-        vertices: &[crate::mesher::Vertex],
+        vertices: &[Vertex],
         indices: &[u32],
         face_textures: &[entity::EntityFaceTexture],
     ) {
-        for ft in face_textures {
-            self.texture_refs.insert(ft.texture.clone());
-        }
-        let base_vertex = self.mesh.vertex_count() as u32;
-        let base_index = self.mesh.indices.len();
-
-        for v in vertices {
-            let mut vertex = *v;
-            vertex.position[0] += pos.x as f32 - 0.5 + extra[0];
-            vertex.position[1] += pos.y as f32 - 0.5 + extra[1];
-            vertex.position[2] += pos.z as f32 - 0.5 + extra[2];
-            self.mesh.add_vertex(vertex);
-        }
-        for &idx in indices {
-            self.mesh.indices.push(base_vertex + idx);
-        }
-
-        let mut idx_offset = base_index;
-        for ft in face_textures {
-            let face_v_start = (idx_offset - base_index) as u32 / 6 * 4 + base_vertex;
-            self.face_textures.push(FaceTextureMapping {
-                vertex_start: face_v_start,
-                index_start: idx_offset,
-                texture_path: ft.texture.clone(),
-                is_transparent: ft.is_transparent,
-            });
-            idx_offset += 6;
-        }
+        let moved: Vec<Vertex> = vertices
+            .iter()
+            .map(|v| {
+                let mut v = *v;
+                for (axis, offset) in extra.iter().enumerate() {
+                    v.position[axis] += offset;
+                }
+                v
+            })
+            .collect();
+        self.add_item_geometry(pos, &moved, indices, face_textures);
     }
 
     /// Add inventory hologram above a container block.
@@ -1248,378 +1269,6 @@ impl<'a> MeshBuilder<'a> {
         Ok(())
     }
 
-    /// Add banner entity geometry with composited texture.
-    fn add_banner(
-        &mut self,
-        pos: BlockPosition,
-        block: &InputBlock,
-        base_color: &str,
-        is_wall: bool,
-    ) -> Result<()> {
-        // Parse pattern property
-        let patterns = block
-            .properties
-            .get("patterns")
-            .map(|s| entity::banner::parse_patterns(s))
-            .unwrap_or_default();
-
-        // Create a cache key for this banner's texture
-        let mut tex_key = format!("_banner/{}", base_color);
-        for (p, c) in &patterns {
-            tex_key.push_str(&format!("_{}{}", p, c));
-        }
-
-        // Composite the texture if not already cached
-        if !self.dynamic_textures.contains_key(&tex_key) {
-            if let Some(tex) =
-                entity::banner::composite_banner_texture(self.resource_pack, base_color, &patterns)
-            {
-                self.dynamic_textures.insert(tex_key.clone(), tex);
-            }
-        }
-
-        // Build the banner model with the composited texture path
-        let model = entity::banner::banner_model(!is_wall, &tex_key);
-
-        // Compute facing
-        let facing = entity::get_facing(block);
-        let facing_angle = if !is_wall {
-            entity::standing_rotation_rad(block)
-        } else {
-            entity::facing_rotation_rad(facing)
-        };
-        let facing_mat = glam::Mat4::from_translation(glam::Vec3::new(0.5, 0.0, 0.5))
-            * glam::Mat4::from_rotation_y(facing_angle)
-            * glam::Mat4::from_translation(glam::Vec3::new(-0.5, 0.0, -0.5));
-
-        let mut vertices = Vec::new();
-        let mut indices = Vec::new();
-        let mut face_textures = Vec::new();
-
-        entity::traverse_parts(
-            &model.parts,
-            glam::Mat4::IDENTITY,
-            &facing_mat,
-            &model,
-            &mut vertices,
-            &mut indices,
-            &mut face_textures,
-        );
-
-        if vertices.is_empty() {
-            return Ok(());
-        }
-
-        self.add_item_geometry(pos, &vertices, &indices, &face_textures);
-
-        Ok(())
-    }
-
-    /// Add sign entity with text composited onto the texture.
-    fn add_sign_with_text(
-        &mut self,
-        pos: BlockPosition,
-        block: &InputBlock,
-        wood: entity::SignWood,
-        is_wall: bool,
-    ) -> Result<()> {
-        let base_texture = entity::sign::sign_texture_path(wood);
-        let color = block
-            .properties
-            .get("color")
-            .map(|s| s.as_str())
-            .unwrap_or("black");
-        let glowing = block
-            .properties
-            .get("glowing")
-            .map(|s| s == "true")
-            .unwrap_or(false);
-
-        let lines: Vec<&str> = (1..=4)
-            .filter_map(|i| {
-                block
-                    .properties
-                    .get(&format!("text{}", i))
-                    .map(|s| s.as_str())
-            })
-            .collect();
-
-        // Generate unique texture key (includes glowing flag)
-        let mut tex_key = format!(
-            "_sign/{}_{}_{}",
-            base_texture,
-            color,
-            if glowing { "glow" } else { "normal" }
-        );
-        for line in &lines {
-            tex_key.push('_');
-            tex_key.push_str(line);
-        }
-
-        // Composite texture if not cached
-        let kind = if is_wall {
-            entity::sign_text::SignKind::Wall
-        } else {
-            entity::sign_text::SignKind::Standing
-        };
-        if !self.dynamic_textures.contains_key(&tex_key) {
-            if let Some(tex) = entity::sign_text::composite_sign_with_text(
-                self.resource_pack,
-                base_texture,
-                &lines,
-                color,
-                glowing,
-                kind,
-            ) {
-                self.dynamic_textures.insert(tex_key.clone(), tex);
-            } else {
-                // Fallback to normal sign rendering (no font available)
-                let (vertices, indices, face_textures) = entity::generate_entity_geometry(
-                    block,
-                    &entity::BlockEntityType::Sign { wood, is_wall },
-                );
-                if !vertices.is_empty() {
-                    self.add_item_geometry(pos, &vertices, &indices, &face_textures);
-                }
-                return Ok(());
-            }
-        }
-
-        // Build sign model with custom texture (4x upscaled)
-        let model = entity::sign::sign_model_upscaled(&tex_key, is_wall);
-
-        // Compute facing
-        let facing_angle = if !is_wall {
-            entity::standing_rotation_rad(block)
-        } else {
-            entity::facing_rotation_rad(entity::get_facing(block))
-        };
-        let facing_mat = glam::Mat4::from_translation(glam::Vec3::new(0.5, 0.0, 0.5))
-            * glam::Mat4::from_rotation_y(facing_angle)
-            * glam::Mat4::from_translation(glam::Vec3::new(-0.5, 0.0, -0.5));
-
-        let mut vertices = Vec::new();
-        let mut indices = Vec::new();
-        let mut face_textures = Vec::new();
-
-        entity::traverse_parts(
-            &model.parts,
-            glam::Mat4::IDENTITY,
-            &facing_mat,
-            &model,
-            &mut vertices,
-            &mut indices,
-            &mut face_textures,
-        );
-
-        if !vertices.is_empty() {
-            self.add_item_geometry(pos, &vertices, &indices, &face_textures);
-        }
-
-        Ok(())
-    }
-
-    /// Add decorated pot with per-face sherd textures.
-    fn add_decorated_pot(&mut self, pos: BlockPosition, block: &InputBlock) -> Result<()> {
-        let (vertices, indices, mut face_textures) =
-            entity::decorated_pot::generate_decorated_pot_geometry(block);
-
-        if vertices.is_empty() {
-            return Ok(());
-        }
-
-        // Pattern (sherd) textures are transparent around the pot silhouette —
-        // rendering them directly leaves "holes" where the pattern doesn't cover.
-        // MC renders patterns on top of an opaque `decorated_pot_side` texture.
-        // We composite each unique pattern onto the side texture and swap the
-        // face texture to point at the composite.
-        for ft in face_textures.iter_mut() {
-            if let Some(pat) = ft
-                .texture
-                .strip_prefix("entity/decorated_pot/")
-                .and_then(|s| s.strip_suffix("_pottery_pattern"))
-            {
-                let key = format!("_pot/{}", pat);
-                if !self.dynamic_textures.contains_key(&key) {
-                    if let Some(tex) = composite_pot_side(self.resource_pack, pat) {
-                        self.dynamic_textures.insert(key.clone(), tex);
-                    }
-                }
-                if self.dynamic_textures.contains_key(&key) {
-                    ft.texture = key;
-                    // Composite is fully opaque — route through the solid mesh
-                    // so we don't get alpha-cutout artifacts.
-                    ft.is_transparent = false;
-                }
-            }
-        }
-
-        self.add_item_geometry(pos, &vertices, &indices, &face_textures);
-
-        Ok(())
-    }
-
-    /// Add player head entity with skin texture support.
-    fn add_player_head(&mut self, pos: BlockPosition, block: &InputBlock) -> Result<()> {
-        let block_id = block.block_id();
-        let is_wall = block_id.contains("wall");
-
-        // Determine texture key
-        let tex_key = format!("_player_head/{}_{}_{}", pos.x, pos.y, pos.z);
-
-        // Prefer base64 skin (the WASM/JS-friendly path), then hex, then fallback.
-        if !self.dynamic_textures.contains_key(&tex_key) {
-            if let Some(skin_b64) = block.properties.get("skin_base64") {
-                if let Some(skin_tex) = entity::skull::decode_base64_skin(skin_b64) {
-                    self.dynamic_textures.insert(tex_key.clone(), skin_tex);
-                }
-            }
-            if !self.dynamic_textures.contains_key(&tex_key) {
-                if let Some(skin_hex) = block.properties.get("skin") {
-                    if let Some(skin_tex) = entity::skull::decode_hex_skin(skin_hex) {
-                        self.dynamic_textures.insert(tex_key.clone(), skin_tex);
-                    }
-                }
-            }
-            // If no skin decoded, load fallback from resource pack
-            if !self.dynamic_textures.contains_key(&tex_key) {
-                let fallback_path = entity::skull::player_skin_fallback_path(block);
-                if let Some(fallback_tex) = self.resource_pack.get_texture(fallback_path) {
-                    self.dynamic_textures
-                        .insert(tex_key.clone(), fallback_tex.clone());
-                }
-            }
-        }
-
-        // Build player skull model with the texture key
-        let model = entity::skull::player_skull_model(&tex_key);
-
-        // Compute facing/rotation (same logic as regular skulls)
-        let facing_angle = if is_wall {
-            entity::facing_rotation_rad(entity::get_facing(block))
-        } else {
-            entity::standing_rotation_rad(block)
-        };
-        let facing_mat = glam::Mat4::from_translation(glam::Vec3::new(0.5, 0.0, 0.5))
-            * glam::Mat4::from_rotation_y(facing_angle)
-            * glam::Mat4::from_translation(glam::Vec3::new(-0.5, 0.0, -0.5));
-
-        let mut vertices = Vec::new();
-        let mut indices = Vec::new();
-        let mut face_textures = Vec::new();
-
-        entity::traverse_parts(
-            &model.parts,
-            glam::Mat4::IDENTITY,
-            &facing_mat,
-            &model,
-            &mut vertices,
-            &mut indices,
-            &mut face_textures,
-        );
-
-        if !vertices.is_empty() {
-            self.add_item_geometry(pos, &vertices, &indices, &face_textures);
-        }
-
-        Ok(())
-    }
-
-    /// Add hanging sign entity with text composited onto the texture.
-    fn add_hanging_sign_with_text(
-        &mut self,
-        pos: BlockPosition,
-        block: &InputBlock,
-        wood: entity::SignWood,
-        is_wall: bool,
-    ) -> Result<()> {
-        let base_texture = entity::hanging_sign::hanging_sign_texture_path(wood);
-        let color = block
-            .properties
-            .get("color")
-            .map(|s| s.as_str())
-            .unwrap_or("black");
-        let glowing = block
-            .properties
-            .get("glowing")
-            .map(|s| s == "true")
-            .unwrap_or(false);
-
-        let lines: Vec<&str> = (1..=4)
-            .filter_map(|i| {
-                block
-                    .properties
-                    .get(&format!("text{}", i))
-                    .map(|s| s.as_str())
-            })
-            .collect();
-
-        let mut tex_key = format!(
-            "_hanging_sign/{}_{}_{}",
-            base_texture,
-            color,
-            if glowing { "glow" } else { "normal" }
-        );
-        for line in &lines {
-            tex_key.push('_');
-            tex_key.push_str(line);
-        }
-
-        if !self.dynamic_textures.contains_key(&tex_key) {
-            if let Some(tex) = entity::sign_text::composite_sign_with_text(
-                self.resource_pack,
-                base_texture,
-                &lines,
-                color,
-                glowing,
-                entity::sign_text::SignKind::Hanging,
-            ) {
-                self.dynamic_textures.insert(tex_key.clone(), tex);
-            } else {
-                // Fallback to normal hanging sign rendering (no font available)
-                let (vertices, indices, face_textures) = entity::generate_entity_geometry(
-                    block,
-                    &entity::BlockEntityType::HangingSign { wood, is_wall },
-                );
-                if !vertices.is_empty() {
-                    self.add_item_geometry(pos, &vertices, &indices, &face_textures);
-                }
-                return Ok(());
-            }
-        }
-
-        let model = entity::hanging_sign::hanging_sign_model_upscaled(&tex_key, is_wall);
-
-        let facing_angle = if !is_wall {
-            entity::standing_rotation_rad(block)
-        } else {
-            entity::facing_rotation_rad(entity::get_facing(block))
-        };
-        let facing_mat = glam::Mat4::from_translation(glam::Vec3::new(0.5, 0.0, 0.5))
-            * glam::Mat4::from_rotation_y(facing_angle)
-            * glam::Mat4::from_translation(glam::Vec3::new(-0.5, 0.0, -0.5));
-
-        let mut vertices = Vec::new();
-        let mut indices = Vec::new();
-        let mut face_textures = Vec::new();
-
-        entity::traverse_parts(
-            &model.parts,
-            glam::Mat4::IDENTITY,
-            &facing_mat,
-            &model,
-            &mut vertices,
-            &mut indices,
-            &mut face_textures,
-        );
-
-        if !vertices.is_empty() {
-            self.add_item_geometry(pos, &vertices, &indices, &face_textures);
-        }
-
-        Ok(())
-    }
-
     /// Add pre-transformed item/overlay geometry at a world position.
     fn add_item_geometry(
         &mut self,
@@ -1689,6 +1338,7 @@ impl<'a> MeshBuilder<'a> {
                 transform,
                 &resolved_textures,
                 single_element,
+                model.uses_ambient_occlusion(),
             )?;
         }
 
@@ -1754,12 +1404,19 @@ impl<'a> MeshBuilder<'a> {
         transform: &BlockTransform,
         resolved_textures: &std::collections::HashMap<String, String>,
         single_element: bool,
+        model_ambient_occlusion: bool,
     ) -> Result<()> {
         // Compute lighting factor for this block position
         let is_emissive = self
             .light_map
             .map(|lm| lm.is_emissive(pos))
             .unwrap_or(false);
+        // Ambient occlusion darkens this element only if the config, the block's
+        // light, the element and its model (`ambientocclusion`) all allow it.
+        let takes_ao = self.config.ambient_occlusion
+            && !is_emissive
+            && element.shade
+            && model_ambient_occlusion;
 
         // Process each face. Iterate the fixed Direction::ALL order (not the
         // model's `faces` HashMap, whose iteration order is hash-random) so the
@@ -1793,7 +1450,7 @@ impl<'a> MeshBuilder<'a> {
                 STAT_TOTAL_FACES.fetch_add(1, Relaxed);
                 if single_element && self.is_greedy_eligible(element, face, transform) {
                     STAT_CUBE_FACES.fetch_add(1, Relaxed);
-                    let lit = !(self.config.ambient_occlusion && !is_emissive && element.shade)
+                    let lit = !takes_ao
                         || self
                             .culler
                             .map(|c| c.calculate_ao(pos, world_direction))
@@ -1840,7 +1497,7 @@ impl<'a> MeshBuilder<'a> {
                 && self.is_greedy_eligible(element, face, transform)
             {
                 // Compute per-vertex AO; only fully-lit faces are eligible to merge.
-                let ao = if self.config.ambient_occlusion && !is_emissive && element.shade {
+                let ao = if takes_ao {
                     self.culler
                         .map(|c| c.calculate_ao(pos, world_direction))
                         .unwrap_or([3, 3, 3, 3])
@@ -1890,7 +1547,7 @@ impl<'a> MeshBuilder<'a> {
 
             // Calculate AO if enabled (use world direction for neighbor checks)
             // Skip AO for emissive blocks and elements with shade: false
-            let ao_values = if self.config.ambient_occlusion && !is_emissive && element.shade {
+            let ao_values = if takes_ao {
                 self.culler.map(|c| c.calculate_ao(pos, world_direction))
             } else {
                 None
@@ -1966,6 +1623,14 @@ impl<'a> MeshBuilder<'a> {
 
         // Generate the 4 vertices for this face
         let (positions, uvs) = self.generate_face_vertices(direction, from, to, uv, face.rotation);
+        // A uvlock variant keeps the texture aligned to the world, not the model.
+        let uvs = match transform.uvlock_matrix(direction) {
+            Some(lock) => uvs.map(|[u, v]| {
+                let p = lock * Vec3::new(u - 0.5, v - 0.5, 0.0);
+                [p.x + 0.5, p.y + 0.5]
+            }),
+            None => uvs,
+        };
 
         // Apply element rotation if present. The normal turns with the face (inverse
         // transpose, as rescale is not uniform), so a face rotated past 90° — the
@@ -1979,6 +1644,12 @@ impl<'a> MeshBuilder<'a> {
         } else {
             (positions, normal)
         };
+
+        // A 26.x shade override lights the face as if it faced that direction;
+        // the renderer shades by the vertex normal (winding still decides culling).
+        let normal = element
+            .shade_direction_override
+            .map_or(normal, |shade| shade.normal());
 
         // Apply block transform rotation
         let positions = self.apply_block_transform(&positions, transform);
@@ -2943,77 +2614,6 @@ fn bake_ao_into_tile(
     bytes
 }
 
-/// Standard Minecraft dye color RGB values.
-fn dye_rgb(color: &str) -> [f32; 4] {
-    match color {
-        "white" => [1.0, 1.0, 1.0, 1.0],
-        "orange" => [0.85, 0.52, 0.18, 1.0],
-        "magenta" => [0.70, 0.33, 0.85, 1.0],
-        "light_blue" => [0.40, 0.60, 0.85, 1.0],
-        "yellow" => [0.96, 0.86, 0.26, 1.0],
-        "lime" => [0.50, 0.80, 0.10, 1.0],
-        "pink" => [0.95, 0.55, 0.65, 1.0],
-        "gray" => [0.37, 0.42, 0.46, 1.0],
-        "light_gray" => [0.60, 0.60, 0.55, 1.0],
-        "cyan" => [0.10, 0.55, 0.60, 1.0],
-        "purple" => [0.50, 0.25, 0.70, 1.0],
-        "blue" => [0.20, 0.25, 0.70, 1.0],
-        "brown" => [0.50, 0.32, 0.20, 1.0],
-        "green" => [0.35, 0.45, 0.14, 1.0],
-        "red" => [0.70, 0.20, 0.20, 1.0],
-        "black" => [0.10, 0.10, 0.13, 1.0],
-        _ => [1.0, 1.0, 1.0, 1.0],
-    }
-}
-
-/// Composite a pottery sherd pattern on top of the opaque `decorated_pot_side`
-/// texture. Mirrors MC's DecoratedPotRenderer, which draws the pattern as a
-/// second pass over the side. Returns an opaque texture suitable for rendering
-/// directly on a pot's side face without alpha holes.
-fn composite_pot_side(pack: &ResourcePack, pattern: &str) -> Option<TextureData> {
-    let side = pack.get_texture("entity/decorated_pot/decorated_pot_side")?;
-    let side_frame = side.first_frame();
-    let mut pixels = side_frame.pixels.clone();
-    let w = side_frame.width;
-    let h = side_frame.height;
-
-    let pat_path = format!("entity/decorated_pot/{}_pottery_pattern", pattern);
-    if let Some(pat) = pack.get_texture(&pat_path) {
-        let pat_frame = pat.first_frame();
-        let pw = pat_frame.width.min(w);
-        let ph = pat_frame.height.min(h);
-        for y in 0..ph {
-            for x in 0..pw {
-                let src = ((y * pat_frame.width + x) * 4) as usize;
-                let dst = ((y * w + x) * 4) as usize;
-                if src + 3 >= pat_frame.pixels.len() || dst + 3 >= pixels.len() {
-                    continue;
-                }
-                let sa = pat_frame.pixels[src + 3] as f32 / 255.0;
-                if sa < 0.01 {
-                    continue;
-                }
-                for c in 0..3 {
-                    let sv = pat_frame.pixels[src + c] as f32;
-                    let dv = pixels[dst + c] as f32;
-                    pixels[dst + c] = (sv * sa + dv * (1.0 - sa)).min(255.0) as u8;
-                }
-                // Output stays fully opaque — pot side is solid pottery.
-                pixels[dst + 3] = 255;
-            }
-        }
-    }
-
-    Some(TextureData {
-        width: w,
-        height: h,
-        pixels,
-        is_animated: false,
-        frame_count: 1,
-        animation: None,
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3047,6 +2647,7 @@ mod tests {
             to: [16.0, 16.0, 16.0],
             rotation: None,
             shade: true,
+            shade_direction_override: None,
             faces: HashMap::new(),
         }
     }
@@ -3086,6 +2687,7 @@ mod tests {
             to: [16.0, 8.0, 16.0],
             rotation: None,
             shade: true,
+            shade_direction_override: None,
             faces: HashMap::new(),
         };
         let face = full_face();
@@ -3161,6 +2763,7 @@ mod tests {
                 false,
             )),
             shade: true,
+            shade_direction_override: None,
             faces: HashMap::new(),
         };
         let face = full_face();

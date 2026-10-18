@@ -21,7 +21,7 @@ impl LauncherShell {
             .map(|card| InstanceChoice {
                 id: card.id.clone(),
                 name: card.name.clone().into(),
-                meta: card.meta.clone().into(),
+                version: card.game_version.clone().into(),
                 seed: card.seed,
                 loader: crate::live::cover_loader(card.loader),
                 world: card.world,

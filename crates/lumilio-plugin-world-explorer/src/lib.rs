@@ -13,6 +13,7 @@ mod landmarks;
 mod save;
 mod structures;
 mod text;
+mod underground;
 mod xaero;
 
 pub const ID: &str = "lumilio.world-explorer";
@@ -60,6 +61,7 @@ impl Plugin for WorldExplorer {
 impl OverlayProvider for WorldExplorer {
     fn overlays(&self) -> Vec<OverlayInfo> {
         let mut layers = structures::catalog();
+        layers.extend(underground::catalog());
         layers.extend(landmarks::catalog());
         layers.extend(save::positions::catalog());
         layers.extend(xaero::overlay::catalog());
@@ -67,6 +69,7 @@ impl OverlayProvider for WorldExplorer {
     }
     fn overlays_for(&self, context: &WorldContext) -> Vec<OverlayInfo> {
         let mut layers = structures::catalog_for(context);
+        layers.extend(underground::catalog_for(context));
         layers.extend(landmarks::catalog_for(context));
         layers.extend(save::positions::catalog_for(context));
         layers.extend(xaero::overlay::catalog_for(context));
@@ -84,6 +87,8 @@ impl OverlayProvider for WorldExplorer {
             save::positions::objects(ctx, request)
         } else if landmarks::is_landmark(&request.overlay) {
             landmarks::objects(request)
+        } else if underground::is_layer(&request.overlay) {
+            underground::objects(ctx, request)
         } else if xaero::overlay::is_layer(&request.overlay) {
             xaero::overlay::objects(ctx, request)
         } else {

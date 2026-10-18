@@ -1,0 +1,680 @@
+{
+  "schemaVersion": 1,
+  "id": "schematic-studio",
+  "title": "投影工作室：数据驱动的资源管线与工作室界面",
+  "summary": "现状：投影插件只列文件、读元数据、导材料清单，3D 预览在弹窗里。渲染链路是「实例 client.jar → core 复制方块资源成 zip（model_assets）→ Nucleation 的 normalize_zip 把 26.x 的 JSON 改写成网格器 0.2 的写法 → Schematic-Mesher 用 38 个手抄的实体几何文件、手写的着色表和贴图别名表画方块 → Nucleation wgpu 渲染」。每来一个游戏版本，就在 forks/ 里再补一处补丁（schematic-render-parity 的 T2、T3、T4、T7 都是这种补丁），没装游戏就没有预览，老版本和 Mod 方块各自缺一块。本计划把它换成三段数据驱动的管线：Instance Asset Resolver（按投影的数据版本与实例情况挑资源来源：26.x 已安装的客户端本机烘焙；其他版本与没装游戏时下载预先烘焙的 blocks.dat.z，覆盖从 1.13.2 到 26.3 的 49 个正式版；实例的 Mod JAR 与资源包作为覆盖层）、Entity Model Extractor（26.x 起客户端不混淆，用启动器自己的 Java 运行时把 LayerDefinitions 导出成通用几何 JSON，本地缓存；更老的版本复用最新几何）、wgpu Entity Renderer（解析投影里的实体 NBT，按绑定表生成实例，批量绘制并剔除）。只有烘焙器认识 Mojang 的资源布局，运行时只读烘焙格式，现有的手写补丁模式整个删除。界面从弹窗改成宿主自己画的工作室页：左边投影目录树，中间常驻视口（多角度、PNG 导出、点选方块），右边检视器（方块与方块状态统计、实体统计、元数据编辑、操作历史）；按方块状态批量替换、跨版本转换、重复文件检测、操作前备份与恢复都走插件写权限与宿主的校验写入。视觉仍是仪器语言：方块是世界层，周围的面板、键、端口标签、硬线表格是界面层。2026-10-14 看过真实窗口后重新构图（D27）：面板是缩略图图鉴，窗口是视口与方块图标材料面板联动的材料台；名字、图标与缩略图都从 bundle 来（T26–T31）。",
+  "status": "completed",
+  "outcome": "投影工作室随 0.1.6 发布：方块资源只来自预先烘焙的 bundle（1.13.2 到 26.3），实体按渲染器画出，工作室独立窗口支持切片与框选、替换映射、跨版本转换与替代建议、资源包文件夹与顺序、历史与备份恢复。Edwin 2026-10-16 Mac 实测通过。",
+  "visibility": "internal",
+  "scope": {
+    "included": [
+      "新 crate lumilio-block-assets：烘焙格式（BakedPack）、烘焙器、读写；xtask bake-blocks 生成 49 个正式版的 blocks.dat.z 与索引",
+      "core 的资源解析器：来源规则、下载与校验、本机烘焙缓存、Mod JAR 与资源包覆盖层",
+      "forks/ 改为只读烘焙格式：删除 resource_pack_compat、texture_aliases、手抄实体几何与手写着色表；着色改成数据",
+      "实体模型导出：26.x 客户端上的 Java 导出器、通用几何 JSON、绑定表、原版实体的批量渲染",
+      "插件 API 的 View::Studio 与宿主的投影工作室页：目录树、常驻视口、检视器、多角度与 PNG 导出、点选方块",
+      "操作：按方块状态批量替换、跨版本转换、元数据编辑、重复文件检测、备份、恢复与操作日志",
+      "新 crate lumilio-schematic：以上操作的领域逻辑，基于 Nucleation，不含 GPU 与 UI",
+      "design-language.md §12 的「Native model preview」改写为工作室；IA 路径、语言目录、网站使用指南"
+    ],
+    "excluded": [
+      "更老的混淆版本（1.13.2–1.21.x）的实体几何导出：需要 Mojang 映射表，本计划复用最新 26.x 导出的几何",
+      "资源包的动画贴图、着色器与自定义模型实体（CEM）",
+      "在工作室里逐方块编辑或画方块（放置、删除）；本计划的编辑只有批量替换与元数据",
+      "Wayland 的指针锁定（仍在 backlog）",
+      "社区 WASM 插件自己画工作室：View::Studio 只是一个视图节点，布局归宿主"
+    ]
+  },
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "P0 · lumilio-block-assets：烘焙格式与烘焙器",
+      "status": "completed",
+      "acceptance": "新 crate `crates/lumilio-block-assets`（依赖 zip、serde_json、image、zstd，不依赖 nucleation 与 UI）。`BakedPack`：按版本记录数据版本与来源 jar 的 sha1；方块状态已按变体展开、multipart 条件已规范成字符串；模型已把父链压平、贴图变量解析成贴图 id、`cullface` 的 bottom/top 已归一；贴图按内容哈希去重存放；附带着色图（grass、foliage、dry_foliage）与方块实体和生物用到的 `textures/entity/` 子集。`bake(&[AssetSource]) -> BakedPack` 接受 jar、zip 或目录，后面的来源覆盖前面的。读写用 zstd 帧包一个带索引的平面容器。测试：同一方块的 1.13.2 写法与 26.3 写法（`sprite` 形式的贴图、`bottom` 剔除面、数字型 multipart 条件、搬家的实体贴图名）烘焙后得到相同的 `BakedPack`；写出再读回逐字节一致；损坏的容器报可读的错误而不是 panic。"
+    },
+    {
+      "id": "T2",
+      "title": "P0 · xtask bake-blocks：生成 blocks.dat.z",
+      "status": "completed",
+      "acceptance": "`cargo xtask bake-blocks` 读 Mojang 的 version_manifest_v2，下载从 1.13.2 到最新正式版的客户端 jar（2026-10-13 的清单里恰好 49 个）到被忽略的 `target/`，按清单的 sha1 校验，烘焙成一个 `blocks.dat.z`、一个 `entities.dat.z`（T6 的导出器，1.17 及以后每个版本；混淆版本的类名来自同一清单里的 `client_mappings`，只在烘焙时读取）和一个 `blocks.json` 索引（bundle 版本号、总大小、sha256、每个版本的数据版本与 jar sha1、工具提交），并像 block-colors 一样写 `SOURCE.md` 式的来源记录。jar 与产物都不进仓库。烘焙时对照 `crates/lumilio-block-assets/data/texture_renames.json`：相邻版本之间像素相同、名字不同的 `entity/` 贴图若不在表里就报出来，表按 D11 补全。把测得的产物大小、烘焙耗时和去重后的贴图数记进本计划的 validation；超过 D2 的阈值就按 D2 拆成逐版本切片。"
+    },
+    {
+      "id": "T3",
+      "title": "P0 · core 的 Instance Asset Resolver",
+      "status": "completed",
+      "acceptance": "`crates/lumilio-core/src/model_assets.rs` 改成目录模块 `schematic_assets/`：`resolve(instance, data_version) -> AssetPlan` 按 D3 的规则列出来源（本机烘焙的实例 jar、bundle 里的版本、实例 `mods/*.jar`、启用的 `resourcepacks/`），`Layout::model_cache()` 下按 jar sha1 缓存本机烘焙结果，bundle 用现有 Transport 与镜像预设下载、按索引 sha256 校验、作为 Activity 里的后台任务显示进度；没有网络但有任何已安装 jar 时本机烘焙。测试：规则表（26.x 已装、1.20.1 已装、没装、离线）各得到预期的来源列表；缓存命中不再烘焙；sha256 不符的 bundle 被拒绝并删除；没网也没 jar 时得到一句平静的说明。"
+    },
+    {
+      "id": "T4",
+      "title": "P0 · forks 只读烘焙格式，删除手写补丁",
+      "status": "completed",
+      "acceptance": "Nucleation 新增 `ResourcePackSource::Baked(BakedPack)`，网格器的加载器直接用已解析的模型与贴图；删除 `forks/nucleation/src/meshing/resource_pack_compat.rs`、`ResourcePack::texture_aliases` 与 `lumilio-core` 的 `build_pack` zip 复制路径；`lumilio-schematic-render::Scene::load` 改为接受 `BakedPack`。`forks/README.md` 的本地改动清单相应增删并保留署名。守卫：face_culling、element_rotation、uvlock、multipart_conditions、model_shading、fluid_heights、coplanar_faces、undrawable_blocks 都在烘焙过的夹具上通过；schematic-render-parity 用过的测试方块板在改动前后逐像素一致；一个只有 26.3 写法的夹具不再需要任何运行时改写即可渲染。"
+    },
+    {
+      "id": "T5",
+      "title": "P0 · 着色改成数据",
+      "status": "completed",
+      "acceptance": "`forks/schematic-mesher/data/tints.json`：方块 id 模式 → 着色种类（grass、foliage、dry_foliage、water、固定色、redstone、stem、lily_pad）；每个版本的着色图样本（平原的温度 0.8、湿度 0.4）由烘焙器取出放进 `BakedPack`。`tint.rs` 只剩按表查色的引擎，手写的方块名匹配删除。守卫：`block_tints` 对数据表通过；表里每条都能在 26.3 的烘焙包里找到对应方块（表格 lint 测试）。"
+    },
+    {
+      "id": "T6",
+      "title": "P1 · Entity Model Extractor：反射导出器，烘焙时与运行时共用",
+      "status": "completed",
+      "acceptance": "`tools/entity-dump/EntityDump.java`（源码与用 `--release 21` 编译的 class 一起入库，附重建命令）：以一个 Java 运行时和该 jar 的完整类路径运行（Windows 用 `background_command`），调用 `net.minecraft.client.model.geom.LayerDefinitions.createRoots()`，把每个 `ModelLayerLocation` 的 `MeshDefinition` 树导出成通用几何 JSON（层 id → 骨骼 {pivot、rotation、cubes{origin、size、uv、inflate、mirror}、贴图尺寸}），不碰 Mojang 代码以外的任何类。混淆的 jar 由调用方传入从 Mojang 官方映射表（`client_mappings`，1.14.4 起）解析出的类名与方法名，导出器本身不读映射表。两个运行时机，同一份代码：烘焙时 xtask 对 1.17 及以后的每个 jar 各跑一次，结果作为 `entities.dat.z` 随清单发布；运行时 core 只对清单里没有、且不混淆的 26.x jar 跑，按 jar sha1 缓存到 `Layout::model_cache()/entities/`。1.13.2 到 1.16.5 没有 `LayerDefinitions`，复用 1.17 的几何。测试：解析一份夹具导出；在 26.3 客户端上导出后 chest、bed_head、bed_foot、banner、shulker、sign 的几何与 forks 里原来手抄的数值一致（回归桥，桥通过后手抄文件删除）；同一个 jar 在烘焙时与运行时导出的 JSON 逐字节一致；运行时导出失败只让这次预览退回 `entities.dat.z`，不影响插件。"
+    },
+    {
+      "id": "T7",
+      "title": "P1 · 绑定表与手抄几何的删除",
+      "status": "completed",
+      "acceptance": "`forks/schematic-mesher/data/entity_bindings.json`：方块或实体 id 模式 → 模型层、贴图路径模式（含颜色、木材、变体占位）、静态姿势（箱盖合上、床头床尾、告示牌挂法）。`detect_block_entity`、`detect_mob` 与 `mesher/entity/` 下 38 个几何文件改为查表加载通用几何；旗帜图案合成、告示牌文字、陶罐纹样、玩家皮肤、物品展示框的合成逻辑保留为代码但由绑定驱动。xtask `bake-blocks` 用 T6 的导出器对 1.17 及以后的每个版本各导出一次，1.13.2 到 1.16.5 指向 1.17 的几何，合成 `entities.dat.z` 随 bundle 发布；清单里有的版本一律用它，运行时导出只补清单没有的 26.x 版本。守卫：entity_facing、block_model_entities、uvlock 仍通过；绑定表 lint：每条引用的层在 26.3 的导出里存在、贴图在烘焙包里存在。"
+    },
+    {
+      "id": "T8",
+      "title": "P1 · wgpu Entity Renderer：原版实体的完整渲染",
+      "status": "completed",
+      "acceptance": "投影里的 `Entities`（Nucleation `get_entities_as_list`）按绑定表生成实例（位置、朝向、变体贴图）；gpu.rs 为每个模型层建实例缓冲，一次绘制一层的全部实例，视锥外与超过距离的实例剔除。凡导出里有层且绑定表有条目的原版实体都画出来；没有绑定的实体在「技术详情」里列出，和画不出的方块一样。验收：含 500 个盔甲架的投影，帧时间不高于不含实体时的 1.5 倍（记录测得的毫秒数）；一个含生物的真实投影在 26.3 下目视与游戏一致。"
+    },
+    {
+      "id": "T9",
+      "title": "P2 · View::Studio 与工作室页骨架",
+      "status": "completed",
+      "acceptance": "插件 API 新增 `View::Studio { folder }`（像 `View::Map`，布局归宿主）；投影插件的 `view` 直接返回它，`appears`、权限、CSV 导出保留。宿主新模块 `crates/lumilio-ui/src/schematic_studio/`（mod.rs 公开面；tree.rs、viewport.rs、inspector.rs、ops.rs、tests/），在游戏页的「投影」端口标签里占满高度，与世界探索同一骨架（`kit::fixed_page`）。三栏：左栏目录树（递归扫描 `schematics/`，文件夹可折叠，搜索字段，重复标记），中栏视口，右栏检视器端口标签 概览 / 方块 / 实体 / 元数据 / 历史。页面操作按 §7：没有主键；更多菜单里是 替换方块…、转换版本…、导出 PNG…、导出材料清单（CSV）、在访达中显示、删除…（危险色，最后）。design-language.md §12 的「Native model preview」改写为「Schematic studio」并说明为什么不加新的显示屏；每个入口带 `// ia[plugin.litematica]` 注释，`just ia` 重新生成；文案进语言目录并补英文。GPUI 测试：720×480 下三栏可见且没有横向溢出；英文下菜单与标签不被截断。"
+    },
+    {
+      "id": "T10",
+      "title": "P2 · 常驻视口：多角度、PNG 导出、点选方块",
+      "status": "completed",
+      "acceptance": "现有 `model_view::Viewer` 搬进视口，不再是弹窗：Orbital / Explore 分段、视角复位、技术详情与画不出的方块说明照旧；新增角度预设（北、东、南、西、顶、等轴）与资源来源读数（用的是哪个版本、来自本机 jar 还是 bundle、哪些覆盖层）。「导出 PNG…」对话框：尺寸（最大每边 4096）、背景（面板色或透明）、角度；在工作线程用 `Scene::render` 离屏绘制，经宿主保存对话框写出。点选：在投影网格上做 CPU 射线步进（DDA）得到被点的方块与坐标，检视器显示其方块状态。测试：射线步进单元测试（命中、穿过空气、越界）；导出得到请求尺寸的 PNG；切换文件时旧视口的帧与 worker 被释放（像现在关闭弹窗一样）。"
+    },
+    {
+      "id": "T11",
+      "title": "P2 · 统计检视器",
+      "status": "completed",
+      "acceptance": "新 crate `crates/lumilio-schematic`（基于 Nucleation，不含 GPU 与 UI）提供 `stats`：方块按 id 计数并可展开到方块状态组合，实体与方块实体按类型计数，按区域分组，含总方块数与体积。检视器「方块」页是硬线表格，可搜索，可展开状态；「实体」页列实体与方块实体；材料 CSV 导出复用现有逻辑。测试：夹具的计数与状态分组；含多区域重叠时每格只计一次（与 overlapping_regions 守卫一致）。"
+    },
+    {
+      "id": "T12",
+      "title": "P3 · 写路径：权限、备份、日志、恢复",
+      "status": "completed",
+      "acceptance": "插件声明 `WriteGameFiles { under: \"schematics\", names: \"*.litematic\" }`；`world_map::write::write_checked` 抽到 `plugins::write` 供两处共用。每次操作先把原文件复制到 `Layout` 下的备份目录，再校验写入，再在该实例的投影操作日志（启动器数据目录，不写进游戏目录）追加一行（时间、操作、文件、备份路径、参数摘要）；游戏运行中拒绝写入并在界面禁用入口。检视器「历史」页列出操作，每行可「恢复」（把备份复制回去，本身也记一行）。测试：写之前备份已存在；恢复后字节一致；文件被外部改过则拒绝；运行中的实例不发出写入。"
+    },
+    {
+      "id": "T13",
+      "title": "P3 · 按方块状态批量替换",
+      "status": "completed",
+      "acceptance": "「替换方块…」对话框：源方块状态（属性可逐个匹配或通配）、目标方块状态、作用范围（全部或某区域）、替换前显示将影响的数量；确认后在工作线程用 Nucleation 的 iter_blocks / set_block_in_region 执行，id 相同的方块实体保留，写入走 T12。测试：只匹配指定属性；通配匹配全部状态；方块实体保留；计数与预览一致。"
+    },
+    {
+      "id": "T14",
+      "title": "P3 · 跨版本转换",
+      "status": "completed",
+      "acceptance": "「转换版本…」对话框用 P-VERSION 的选择器列 bundle 索引里的版本；向前转换无损直接写；向后转换先用 `convert_to_data_version` 得到 LossReport，把每条损失按严重度列在对话框里，确认后用 `to_litematic_for_data_version` 写出（T12）。测试：夹具向前再向后往返与原文件一致（无损部分）；有损条目出现在界面；取消不写。"
+    },
+    {
+      "id": "T15",
+      "title": "P3 · 元数据编辑",
+      "status": "completed",
+      "acceptance": "检视器「元数据」页只读显示名称、作者、描述、尺寸、方块数、区域数、修改时间、文件；行尾 ghost「编辑」打开一个对话框编辑名称、作者、描述（§10 的对话框形状），保存走 T12 并更新 TimeModified。测试：只改元数据不动方块数据；空名称被拒绝并留在对话框里。"
+    },
+    {
+      "id": "T16",
+      "title": "P3 · 重复文件检测",
+      "status": "completed",
+      "acceptance": "`lumilio-schematic::fingerprint`：对每个区域规范化后的方块数据（调色板按名排序、索引重编、方块实体与实体按位置排序）取哈希，不看文件字节与元数据。目录树里内容相同的文件带同一个标记，概览页有「重复」一节按组列出；「只保留这个」把其余移到备份目录（T12 的路径，可恢复），绝不自动删除。测试：元数据不同内容相同判为重复；只差一个方块不判；标记与分组稳定。"
+    },
+    {
+      "id": "T17",
+      "title": "P3 · 客户端与 Mod JAR 资源导入",
+      "status": "completed",
+      "acceptance": "T3 的覆盖层接入工作室：实例 `mods/` 里的 jar 与 `resourcepacks/` 里启用的包作为资源来源，按 sha1 缓存烘焙结果；「概览」页列出当前生效的来源与各自提供的方块数；「添加资源包…」只登记一个外部 zip 的路径，不复制文件。有了 Mod 资源后，原本列在「画不出的方块」里的 Mod 方块应画出来。测试：覆盖优先级（资源包 > Mod > 基础）；移除一个来源后缓存条目失效；未知 jar 不是资源来源时跳过且不报错。"
+    },
+    {
+      "id": "T18",
+      "title": "P4 · 文档、发布说明与 backlog",
+      "status": "completed",
+      "acceptance": "网站使用指南新增 `web/src/content/docs/docs/guide/schematics.md` 与英文页（适用范围、准备、步骤、结果、已知限制，含 bundle 下载的说明与大小）；`guide/index.md` 的任务表加一行；发布说明只写已确认的行为。backlog 里「26.2+ 方块模型告示牌上的文字」「染色玻璃互相剔除」两项若在 T7/T4 顺带修了就删掉，否则原样保留。`just docs`、`just web` 通过。"
+    },
+    {
+      "id": "T19",
+      "title": "P4 · Project Maintainer 实机验收",
+      "status": "completed",
+      "acceptance": "macOS 上：没装游戏的实例第一次打开工作室时下载 bundle 的过程与说明；装了 26.x 的实例同样用 bundle 画；浅色与深色；720×480 与大窗口；英文界面；替换、转换、恢复各做一次并在 Litematica 里打开结果。"
+    },
+    {
+      "id": "T20",
+      "title": "P2 · 工作室搬进独立窗口，游戏页只留面板",
+      "status": "completed",
+      "acceptance": "游戏页「插件 › 投影」只画面板：左栏目录树、右侧所选文件的概要表、右上白键「打开工作室」，没有视口、检视器与更多菜单；点键或双击文件打开该游戏的工作室窗口（已开着就带到前面并切到该文件），窗口里是三栏（树、常驻视口、检视器）与全部操作，720×480 下三栏都在且不横向溢出；窗口有自己的连接、模型加载与插件动作（toast 出现在窗口里），游戏启停通知到窗口；视口下方不再有资源来源一行，资源来源只在「概览」里列出。守卫：schematic_studio/tests/pane.rs（面板无视口、键与双击带文件打开、先交接后列表也选中）、tests/window.rs（窗口三栏与交接文件）、instance_detail/tests/plugins.rs 的面板测试、english.rs 的最小窗口测试。"
+    },
+    {
+      "id": "T21",
+      "title": "P2 · 资源管线收口：原版全走 bundle，覆盖层默认关",
+      "status": "completed",
+      "acceptance": "删除本机烘焙客户端 jar 与运行时 Java 实体导出两条路径及其缓存（schematic_assets/instance.rs、entities.rs 的运行时部分、EntityDump 的运行时安装）；resolve 只在 bundle 与「离线且无 bundle」之间选择，离线时给出说明而不是退回本机 jar。实例的 mods/*.jar、resourcepacks/ 与添加的 zip 仍列在「资源来源」里，但默认关闭，每个来源一个开关（记在启动器数据里，按实例与文件夹），旁边写它提供的方块数与因自定义加载器没法烘焙的模型数；打开后视口重新加载。测试：resolve 对「装了 26.x 客户端」也选 bundle；关闭的来源不进 AssetPlan；开关状态重开窗口后保留。"
+    },
+    {
+      "id": "T22",
+      "title": "P2 · 视口交互：方块卡、Explore 准星与 Esc、缺失贴图占位",
+      "status": "completed",
+      "acceptance": "Orbital 单击方块后视口右下浮出方块卡（id、属性表、坐标、所在区域），卡上两个 ghost 键：「替换这种方块…」预填源方块与全部属性打开替换对话框；「在方块表里定位」切到「方块」表并以该 id 筛选展开。Explore 画面中心有准星，底部读数板实时写视线中心的方块与坐标，单击出同一张卡；按 Esc 释放鼠标（现在没有这个分支）。画不出的方块改为紫黑缺失贴图的整块占位，形状完整，可点，卡上写明「这个游戏版本画不出」。测试：Explore 捕获后 Esc 释放；点选后卡片出现且键各自生效；占位方块进入网格并可被点选；视线读数在移动后更新。"
+    },
+    {
+      "id": "T23",
+      "title": "P2 · 版本事实与转换对话框重做",
+      "status": "completed",
+      "acceptance": "读入文件时把数据版本映射成游戏版本名，头部 caption 写「x 投影 · 游戏 y」（相同只写一个）；用目标版本目录做兼容检查，有缺失方块时头部出橙色标签「y 没有的方块：n 种」与白键「转换到 y…」；材料格子里这些方块带 ✕ 角标并可「只看不兼容」（T30）。转换对话框：目标默认为游戏版本；结果分「丢失 / 近似 / 保留（目标不认识、原样写出）」三组，第三组旁有「为这些方块选替代…」跳到替换的映射表模式并预填；默认另存为「名 (y).litematic」，勾选才覆盖。测试：三组归类对夹具正确且「保留」组出现；另存不动原文件；标签与键只在有缺失方块时出现。"
+    },
+    {
+      "id": "T24",
+      "title": "P3 · 替换对话框重做与映射表方案",
+      "status": "completed",
+      "acceptance": "「从 → 到」两栏：源方块 id 与属性芯片（= 值 / 任意，顶部「不限属性」开关），从视口进来默认精确、从方块表进来默认任意；目标是可搜索的方块选择器（目标版本目录，最近用过在前），属性默认沿用源方块同名属性；范围：全部 / 区域 / 当前切片 / 当前选区；实时计数，确认键写「替换 n 个方块」。可加行成映射表，映射表可存为方案（启动器数据，按名字）并在其他投影套用；历史行写明方案名。入口：材料详情的「替换…」、头部橙键「替换方块…」、转换对话框（D27）。测试：芯片匹配语义；同名属性沿用；方案存取；多行映射一次写入且计数一致。"
+    },
+    {
+      "id": "T25",
+      "title": "P3 · Slicer 与选区、材料图标与组数",
+      "status": "completed",
+      "acceptance": "视口工具条上的「切片」：选轴 X/Y/Z，[ ] 逐层，只画当前层及以下；Ctrl 拖拽框选，材料面板显示选区尺寸与选区里的材料，选区可作替换范围。材料图标与组数已移到 T27 与 T30；CSV 加组数列。测试：切片层数与方块数；选区材料计数。"
+    },
+    {
+      "id": "T26",
+      "title": "P2 · 方块与实体的名字进 bundle",
+      "status": "completed",
+      "acceptance": "`cargo xtask bake-blocks` 从每个版本的客户端 jar 取 `assets/minecraft/lang/en_us.json`，从同一版本资源索引里的 `minecraft/lang/zh_cn.json` 取中文（按清单 sha1 校验），只留 `block.minecraft.*`、`item.minecraft.*`、`entity.minecraft.*` 三类键，按语言合成一份「最新版本优先、旧版本独有的键保留」的名字表，写进 bundle 的 `names.dat.z`（blocks.json 索引记大小与 sha256，NOTICE 写明来源）。core 像索引一样安静地下载并校验它（不起 Activity 任务）；拿不到 bundle 时从已安装游戏自己的语言文件读（jar 里的 en_us、资源对象里的 zh_cn），`BlockNames::name(id, locale)` 按 block → item → entity 的键依次查，查不到返回 None。界面凡是方块与实体出现的地方都写名字，id 只作等宽小字、提示与「复制 id」；常见属性（facing、half、type、axis、shape、waterlogged、powered、open、lit 等）的键与值进语言目录（`studio-prop-*`），值为默认 false 的布尔属性不显示。测试：名字表合并（同一个键较新版本的名字压过旧版本的，`minecraft:grass` 这种只在旧版本有的 id 仍有名字）；查不到时界面退回 id；属性词条两种语言齐全（i18n 测试）。"
+    },
+    {
+      "id": "T27",
+      "title": "P2 · 方块图标",
+      "status": "completed",
+      "acceptance": "`lumilio-schematic-render::icons(pack, entities, &[state], size) -> Vec<Option<Frame>>`：物品模型是平面贴图的（火把、红石粉、花、门）直接取烘焙贴图按最近邻放大，草、藤蔓这类按 `block_items.json` 的着色种类乘平原的色样；其余把方块单独网格化、用正交相机从东南上方画（台阶、楼梯、栅栏是放置后的样子），一批共用一个渲染器，靠 Nucleation 的 `set_only_mesh` 逐个画、`set_fit_bounds` 统一取景。方块与物品 id 不同的（`wall_torch` → `torch`、`redstone_wire` → `redstone`、作物、墙上告示牌与旗帜、花盆）写在 `crates/lumilio-block-assets/data/block_items.json`，表格 lint 对 26.3 的 bundle 检查每条的物品模型存在。图标在视口的 worker 上用画面同一个包画，打开文件、场景与统计都到了之后一次要齐这个文件的全部方块种类；换文件时旧图标从 GPUI 的图像缓存里释放。空气没有图标；画不出的方块是紫黑缺失贴图的方块。测试：平面物品走贴图路径且不建渲染器；一批里每个方块单独画（关掉 `set_only_mesh` 时失败）；空气没有图标；表格 lint。"
+    },
+    {
+      "id": "T28",
+      "title": "P2 · 投影缩略图",
+      "status": "completed",
+      "acceptance": "每个投影一张等轴缩略图（透明背景，320 × 240 物理像素），用画视口的同一套方块资源画。工作室在算出一个文件的内容指纹后请求它（`Command::Thumbnail { file, key }`，key 是指纹），一次只请求一张；应用先查 core 的 `schematic_thumbnail(key)`（`Layout::model_cache()/thumbnails/<指纹>-<bundle release>.png`，key 只收十六进制），没有就取 `plugin_model`、在阻塞线程里用 `lumilio_ui::schematic_studio::render_thumbnail` 网格化并离屏绘制，存进缓存再交回。只改元数据的文件指纹不变，直接命中；写过方块的文件指纹被忘掉，重读后按新指纹再请求。没有资源或画不出时卡片保留面板色方块，不再重复请求，不报错。测试：core 按 key 存取、非十六进制的 key 碰不到文件；界面一次一张、key 等于指纹、画好后有图、失败的不再请求。"
+    },
+    {
+      "id": "T29",
+      "title": "P2 · 游戏页面板改为图鉴",
+      "status": "completed",
+      "acceptance": "「插件 › 投影」面板（D27）：头部是「投影」、文件数 caption、搜索字段与白键「打开工作室」；下面是可滚动的缩略图卡片，按文件夹分节（节名是文件夹路径，根目录在最前、不写节名），卡片是 T28 的缩略图（没画好时是面板色，画好后淡入）、文件名（两行截断）、等宽的「尺寸 · 方块数」（取自文件自己的元数据），内容重复的在缩略图右上角带 `≡n`。单击选中卡片（描边），双击或「打开工作室」在窗口里打开它；没有概要表，也没有目录树。卡片定宽 176 px、按面板宽度换行。版本标签留给 T23。测试：每个文件一张卡、根目录一节在前；选中后没有视口、材料栏与 More；搜索只留匹配的卡；游戏页里面板在 720 px 下不横向溢出；双击开窗与打开工作室键（沿用 T20 的测试）。"
+    },
+    {
+      "id": "T30",
+      "title": "P2 · 工作室窗口改为材料台",
+      "status": "completed",
+      "acceptance": "窗口（D27）只有两栏：视口与材料面板，没有目录树。头部一行：文件切换键（缩略图位、文件名、箭头，弹出带搜索、文件夹与 ≡ 编号的文件列表）、等宽的尺寸；尾端是唯一的橙键「替换方块…」与 More（转换版本…、导出 PNG…、编辑信息…、导出材料清单、在访达中显示、删除…）。视口占满左栏，没有强调色边框（只有键盘聚焦时描边）；底部浮一条工具条（Orbital / Explore、角度、复位）；工具条上方一块读数板：指着（或飞行中看着）的方块写「图标 名字 · 属性词 · 坐标」，什么都没指时写操作提示；原来视口上方的键行、下方的提示行与右上的方块卡删除。材料面板是端口标签 材料 / 信息 / 历史：「材料」顶部是搜索（按名字或 id）与「35 种 · 1743 个」，下面是方块格子（图标、数量，悬停提示名字、数量与组数），按数量排序；选中一格时面板底部固定一块详情：大图标、名字、等宽 id 与复制、数量与组数、按状态的分布芯片（属性词）、ghost「替换…」（源是这种方块、属性不限）。在视口里点一个方块等于选中它那一格并切到「材料」。「信息」是名称、作者、描述、时间（编辑…）、多区域时的区域、实体（名字与数量）、重复与只保留这个、折叠的「技术信息」（体积、方块实体、数据版本、文件、画不出的方块与实体、资源来源与添加资源包）。720 × 480 下两栏都在、格子至少 4 列、不横向溢出。测试：窗口没有目录树；点视口方块选中格子、出现详情并切到「材料」，详情的替换不锁属性；读数板写游戏的名字而不是 id（查不到名字时退回 id）、在工具条之上；格子按名字与 id 筛选；技术信息默认折叠；720 × 480 与英文下头部三件与标签不截断。版本标签与「转换到 y…」留给 T23，缩略图留给 T28，「只看这种」留给 T31。"
+    },
+    {
+      "id": "T31",
+      "title": "P2 · 视口按方块种类高亮",
+      "status": "completed",
+      "acceptance": "悬停材料格子时视口里这种方块保持原色、其余方块去饱和并淡到约四分之一（向背景色混合），移开恢复；选中一格时高亮保持，详情里「只看这种」只画这种方块，再点「显示全部」恢复，换一种方块或关掉详情也恢复。实现按 D30：worker 从投影网格生成每格一字节的三维遮罩（投影包围盒，每边上限 2048，超过就不高亮），Nucleation 的片元着色器按世界坐标退半格、沿法线退一点找到所在格子查遮罩，不改顶点格式、不重新网格化；视口只在高亮变化时把遮罩交给 worker，worker 换遮罩后重画当前这一帧，换尺寸新建的渲染器沿用遮罩。实体按所站的格子算，通常随其余方块变淡。没有过渡动画：高亮跟着指针，下一帧就换。测试：渲染端夹具里被高亮的石头像素与不高亮时完全相同、泥土不再是蓝色但仍画出、换尺寸后仍生效、隐藏模式下只剩背景与石头、恢复后与原图一致；界面端选中、悬停另一格、移开、只看这种、显示全部、关掉详情各自给视口正确的高亮。"
+    },
+    {
+      "id": "T32",
+      "title": "P2 · 在视口里检视单个方块",
+      "status": "completed",
+      "acceptance": "按 D31：在视口里单击（Explore 捕获中是准星）检视那一个方块，不改材料面板的选中与标签。画面只给这一格描边：Nucleation 的片元着色器在这一格露出的每个面上，沿这个方块自身几何的包围盒（箱子、火把比格子小；由中心沿法线退一点落在这一格里的三角形算出，邻居朝它的面不算）画一圈主题墨色的带、内侧一圈背景色，任何贴图上都看得清；带宽 2 个逻辑像素，按窗口缩放换成画面像素；朝向轴不算边，半砖的顶面也是一整圈；只换 uniform，不重新网格化，换尺寸新建的渲染器沿用描边。检视卡浮在被检视的方块正上方（worker 每画一帧就把方块包围盒投到画面上，卡片随视角移动；上方空间不够且下方更多时在下方，方块不在画面里时在视口左下，读数板此时让位），取最紧凑的形式：图标、名字与复制完整方块状态、关闭；一行等宽的 id 与位置；属性是标签（启动器的说法，含水为 false 也列出写「含水 否」，悬停看原文 key=value）；容器按游戏界面的格子排（箱子、木桶、潜影盒 9 × 3，漏斗 5，发射器、投掷器、合成器 3 × 3，熔炉 3……表外的按 9 列补行），每格是物品贴图（平面物品取贴图，方块物品画方块，两者都没有的不画替身）与数量，悬停看名字与组数；方块实体的名称、告示牌正反面与命令方块的文字；其余数据（排好序的 SNBT）在「技术详情」里。卡片最高 320 像素且不超过方块上方的空间，超出就在卡内滚动。卡底的 ghost「选中这种」是从检视到材料唯一的桥。点画面空处、按 Esc（捕获中先释放鼠标）或卡上的关闭键放下检视。「只看这种」时拾取穿过被藏起的方块。物品读 1.20.5 前后两种存法（Count / count），文字读 JSON 字符串与 NBT 两种。测试：渲染端描边只改这一格边上的像素（少于这一格露出面积的三分之二）、换尺寸仍在、放下后与原图逐字节相同；下半砖的包围盒止于格子一半、旁边整块朝它的面不算进它、空格子退回格子本身；「只看这种」时盖在前面的泥土点不到、后面的石头点得到，「变淡」时仍点得到（去掉过滤后测试失败）；渲染端投到画面上的方块包围盒包含被点的像素、只有一格大，放下后没有；物品图标里火把是贴图、石头是方块、盾牌没有图标；lumilio-schematic 读出箱子的名称与按槽位排序的物品、告示牌两面与旧版文字、命令、唱片机的唱片、空容器、存盘再读后的位置，各种容器的格子排法与表外槽位补行；界面端单击检视不改选中与标签、方块位置未知时检视卡在左下工具条之上并取代读数板、知道位置时浮在方块上方并居中、靠近画面顶部时改到下方、始终在画面内、方块填满画面时退回左下；箱子画 27 格、每行 9 格且放得下、每种物品只向 worker 要一次贴图；「选中这种」选中种类且卡片保留、空处与关闭键放下、名称与文字、技术详情键。"
+    },
+    {
+      "id": "T33",
+      "title": "P2 · 实体按类别读状态与摆放，先做挂在方块上的",
+      "status": "completed",
+      "acceptance": "按 D32 的第一部分：挂在方块上的实体由基类的存档字段识别（存了所在方块 TileX/TileY/TileZ 或 block_pos，并存了朝向），不按 id 列表；朝向取存档（`Facing` 是六向的三维编号，`facing` 是画的水平四向编号），不再从偏航角推。展示框与荧光展示框照游戏的 ItemFrameRenderer 摆放：模型在格子 +z 一侧，水平朝向绕 Y 转 180° 减朝向的偏航角，朝上朝下先绕 X 转 ∓90° 再绕 Y 转 180°，于是贴在所挂方块的那一面、正面朝外；框内物品前移 7/16（隐形框 1/2）、按 ItemRotation 每格 45° 绕框的法线转、缩半、用 fixed 显示变换；隐形框只画物品。生物、矿车、船仍按偏航角摆放（T34 起由导出的类层级决定类别）。画与拴绳结属于这一类，它们的外观在 T35。测试：用游戏存档的写法（Pos 在方块中心沿朝向反方向退 15/32、Facing、TileX/Y/Z）造六个朝向的展示框，网格化并按实例摆放后都贴在所挂方块的那一面、厚度不超过 1/16、正面朝外；框内物品在框前并随 ItemRotation 转；隐形框不画框只画物品；Project Maintainer 的自启动合成器里朝上的三个展示框在截图里平贴在地面上、能看见框里的物品。"
+    },
+    {
+      "id": "T34",
+      "title": "P2 · 导出器提取实体注册表、类层级、模型层与贴图",
+      "status": "completed",
+      "acceptance": "按 D32 的第二部分：EntityDump 先在 26.3 上导出实体注册表里每一种实体的 id、类层级（据此得出 T33 的类别），用一个记录用的渲染器上下文构造每种实体的渲染器，记下它要的模型层（模型集合用已导出的 createRoots 结果建，纯 CPU），对它新建的默认渲染状态取贴图；构造或取贴图失败的记下原因。先量出能自动得出外观的实体种数并写进 validation，再决定是否推广到 bundle 的全部版本；能提取的实体不再要手写绑定行，绑定表只留提取不到的与靠代码合成的。entities.dat.z 的格式号随之升级。"
+    },
+    {
+      "id": "T35",
+      "title": "P2 · 实体覆盖检查与补齐",
+      "status": "completed",
+      "acceptance": "按 D32 的第三部分：bundle 每个版本的实体注册表里每一种实体，必须由提取结果或手写行画出，或列入「没什么可画的」（标记、交互实体、区域效果云、闪电等），否则 `cargo xtask bake-blocks` 与测试失败，报告列出缺什么。烘焙器读游戏数据里的变体（painting_variant 等 `*_variant`）并保留 textures/painting/，画按变体的宽高贴图；靠代码合成的外观（热带鱼的花纹与两种颜色、矿车里的方块、拴绳结）各写一次。完成时 Project Maintainer 的 13 份投影在技术信息里没有画不出的实体（现在缺：僵尸猪灵 70、蜜蜂 59、画 3、热带鱼 1，漏斗矿车 8 个只画了车）。"
+    },
+    {
+      "id": "T36",
+      "title": "P3 · 资源包：文件夹、顺序与按顺序烘焙",
+      "status": "completed",
+      "acceptance": "资源来源除 zip 外接受解压过的资源包文件夹（顶层有 pack.mcmeta 或 assets/），可用系统选择器（zip 与文件夹各一个键）或在路径输入框里粘贴完整路径添加，只登记路径。每个 Mod 与资源包行有开关（按文件夹记）与 ↑ ↓（与列表里相邻的一行换位，跳过不列出的库 Mod），顺序按实例记在启动器数据 `schematic-order.json`，排在下面的盖过上面的；顺序没提到的（新装的 Mod、新启用的资源包）排在已排好的上面，新添加的资源包排在最下面。叠放顺序是覆盖层烘焙缓存键的一部分，缩略图的外观键按实际叠放顺序算，所以换序、开关、增删都不会读到旧顺序的烘焙或缩略图；移除资源包时同时从顺序里去掉并丢弃用它烘焙的缓存。测试：顺序排列与换位规则、文件夹资源包添加、换序后胜出的贴图改变且另烘焙一份、服务层换序后预览按新顺序叠放且新添加的在最上、界面上换位发出命令并重新加载、输入路径添加。"
+    },
+    {
+      "id": "T37",
+      "title": "P3 · 转换时为缺失方块建议替代",
+      "status": "completed",
+      "acceptance": "转换对话框「保留」组里目标版本没有的方块，每行下面写「建议替换为 …」：在目标版本的方块表里按名字猜一个替代——Mod 方块先找同路径的原版方块；去掉 deepslate_、waxed_、polished_ 等变体前缀后的同名方块；同形状后缀（_stairs、_slab、_wall、_wall_sign …）里材料词重合最多的，没有重合时取 oak_、stone_ 这类朴素材料；没有形状时取共享词最多、末词相同优先的；同分时原版 minecraft: 优先。点「为这些方块选替代…」时这些建议已填进映射表每行的目标，可以照用或改；审阅钩子打开的「游戏版本没有的方块」也带建议。规则在 `lumilio_schematic::suggest`，单元测试覆盖前缀、后缀、无形状、原版优先与不建议自己。"
+    },
+    {
+      "id": "T38",
+      "title": "P2 · 头部写画不出的方块种数",
+      "status": "completed",
+      "acceptance": "视口画完且有画不出的方块时，工作室头部出现标签「N 种方块没有模型」，点它切到「信息」并展开技术信息（那里列出这些方块的 ID）。测试：全部画得出时没有标签；有时标签出现，点击后切到信息并展开。"
+    },
+    {
+      "id": "T39",
+      "title": "P2 · 投影没有记录数据版本时不猜",
+      "status": "completed",
+      "acceptance": "`.litematic` 没有 MinecraftDataVersion 时不再默认当作 Nucleation 的规范版本 4790：`lumilio_schematic::convert::known_data_version` 返回 None，`metadata::Info::data_version` 改为 Option。头部说明写「版本未知 · 游戏 y」并出橙色标签「版本未知」（悬停说明），技术信息的数据版本写「版本未知」；不与游戏版本做缺失方块检查（那一步要先转换），转换版本置灰并说明；渲染器只在投影版本已知时才把方块 ID 转换到资源包的版本。资源仍按实例的游戏版本选（D3 原有规则）。测试：去掉 MinecraftDataVersion 的文件读出 None 且方块照常；渲染器不转换版本未知的投影；界面上标签与说明出现、不发方块表请求、转换菜单置灰。"
+    },
+    {
+      "id": "T40",
+      "title": "P3 · 历史与备份合成一个面板",
+      "status": "completed",
+      "acceptance": "「历史」把操作日志（log.jsonl）与备份文件夹（backups/）放在一处：顶部写操作条数、备份份数与共占空间，分段「这份投影 / 全部」（默认全部）；每行写备份大小、「备份已不在，不能恢复」（恢复置灰）或「新写出的文件，没有备份」；备份文件夹里有但日志没记的副本（日志丢了或被截断）列在「日志里没有的备份」下，确认后也能放回原位置（按插件写权限、先备份现有文件、记一行历史）。core 新增 `schematic_ops::backups` 与 `restore_backup`，服务层 `schematic_backups`、`schematic_restore_backup`。测试：列出副本与对应文件、日志丢失后从副本恢复并记历史、越界路径被拒；界面上备份大小与已不在、散落副本的恢复命令、筛选。"
+    }
+  ],
+  "validation": [
+    {
+      "criterion": "T1：同一方块的 1.13.2 与 26.3 写法烘焙结果相同；写出再读回逐字节一致；损坏的容器报可读的错误。",
+      "result": "`cargo test -p lumilio-block-assets` 8 项通过：spellings_of_1_13_2_and_26_3_bake_alike（`sprite` 贴图、`bottom` 剔除面、数字与布尔 multipart 条件、单轴与欧拉旋转、banner_base 与 pig 的搬家贴图，两种 PNG 压缩共用一张图）、a_pack_reads_back_equal_and_writes_the_same_bytes、a_damaged_file_is_a_readable_error（空文件、非 zstd、截断、魔数、新格式号、索引越界、像素被改共 9 种）、覆盖顺序、同源新旧贴图名、坏条目跳过并记名、非归档报错、bundle 跨版本去重。把 `bottom` 别名去掉后等价测试失败，守卫有效。`plugin_boundaries` 新增 lumilio-block-assets 的依赖边界（不得依赖 gpui、nucleation、schematic-mesher、wgpu 与任何 lumilio crate）。"
+    },
+    {
+      "criterion": "T2：`cargo xtask bake-blocks` 从 Mojang 清单下载 1.13.2 到最新正式版的 jar、按 sha1 校验、烘焙成一个 blocks.dat.z 与 blocks.json 索引和 SOURCE.md；相邻版本间像素相同、名字不同的 `entity/` 贴图都已进改名表。",
+      "result": "2026-10-13 在 macOS（Apple Silicon）实测：清单里 1.13.2 到 26.3 共 49 个正式版，jar 缓存在 `target/block-assets/versions/`，第二次运行按 sha1 跳过下载。blocks.dat.z 2,191,067 字节（2.1 MiB，远低于 D2 的 40 MB，不拆切片），去重后 3162 张图（Bundle::image_count），49 个版本 skipped 全为 0；烘焙加写包 9 秒（8 线程），首次下载 142 秒，峰值内存约 1.5 GB。首轮报出 89 处未登记的 `entity/` 搬家（1.15 iron_golem、1.17 squid、1.20 饰纹陶片、1.21.2 盔甲与鞘翅进 `equipment/`、1.21.5 炽足兽鞍、26.1 大批改名），全部按最新名补进 `texture_renames.json`（23 → 112 条），重跑 0 处；另查过 49 个 jar 没有任何一个同时含某条的旧名与新名（否则烘焙会丢掉旧名那张）。1.13.2 的 jar 没有 version.json，数据版本按 Mojang 公布的 1631 补上。`cargo test -p lumilio-xtask -p lumilio-block-assets` 34 项通过（新增清单筛选、搬家检测、改名表指向最终名、索引与 SOURCE.md 四项），两个 crate 的 clippy `-D warnings` 与 fmt 通过。2026-10-13 T6 接入后：同一次 `cargo xtask bake-blocks` 还写出 entities.dat.z（28,630 字节），blocks.json 多了 `entities` 段（格式、文件、大小、sha256、去重层数、49 个版本及 1.13.2–1.16.5 的 `geometry_from: 1.17`），SOURCE.md 多了实体几何一节（每个版本用哪个 Java 导出、映射表只在烘焙时读取不再分发）。T4/T5 改了烘焙内容后同一次运行测得 blocks.dat.z 3,654,508 字节（3.5 MiB）、去重后 4755 张图、烘焙 28 秒（jar 已缓存）。冷启动下载到首帧的时间属于 T3 的度量，记在「bundle 度量」一项。 2026-10-14 T7 按要求重跑 `cargo xtask bake-blocks`（jar 与库已缓存）：blocks.dat.z 3,654,508 字节、去重后 4755 张图、49 个版本 0 处未登记搬家，烘焙 24 秒；entities.dat.z 28,630 字节、478 个不同层、sha256 仍为 4726d698…，导出 59 秒、0 个失败，与 T4/T5 之后那次运行一致，现有产物不是过期的。 2026-10-14 T18 在 T17（D21，`BAKE_REVISION` 2，烘焙器保留父模型模板）之后重跑（jar 与库已缓存）：blocks.dat.z 3,983,085 字节（3.8 MiB，比 T7 那次多 328,577 字节，仍远低于 40 MB），去重后 4755 张图，0 处未登记搬家，烘焙 28 秒；entities.dat.z 28,630 字节、478 层、sha256 仍为 4726d698…，导出 63 秒、0 个失败。临时探针读回 bundle：1.13.2 有 450 个父模型模板、1.20.1 有 755 个、26.3 有 214 个，都含 `minecraft:block/cube_all`。blocks.json 的 `format` 仍为 1、`file` 仍为 blocks.dat.z，与 core 的 `BUNDLE_FORMAT` 和 `INDEX_FILE` 一致；`BUNDLE_RELEASE` 保持 \"1\"：release 1 从未发布（launcher.lumilio.org 上还没有任何 bundle），第一次发布就用这次带模板的产物，D21 说的「需要新的 bundle release」因此不必加一；发布之后烘焙内容再变才升 release。xtask 现在在同一目录写出 `NOTICE`（D2：Mojang 资源与实体几何的许可说明、非官方声明、映射表不再分发），新增测试 the_notice_names_mojangs_assets_and_the_mappings_left_out。"
+    },
+    {
+      "criterion": "T3：`schematic_assets/` 按 D3 列出来源；本机烘焙按 jar sha1 缓存在 `Layout::model_cache()`；bundle 经 Transport 与镜像链下载、按索引 sha256 校验、作为 Activity 任务；离线有 jar 时本机烘焙；规则表、缓存命中、sha256 不符、没网也没 jar 四类测试。",
+      "result": "2026-10-14：`crates/lumilio-core/src/model_assets.rs` 改为目录模块 `schematic_assets/`（mod.rs 公开面；rules、index、bundle、cache、load、instance、data_version 各一个文件；tests/ 下 bake、rules、cache、bundle、overlays、data_version）。`resolve(&InstanceAssets, data_version, BundleReach) -> AssetPlan`；数据版本从投影 NBT 读（Litematica `MinecraftDataVersion`、Sponge v2/v3 与结构文件 `DataVersion`），经 blocks.json 映射到版本（同数据版本，否则最旧的更新版本，否则最新）。本机烘焙缓存为 `cache/block-assets/local/<容器格式>-<烘焙修订>-<sha1>.dat.z`（`BakedPack::to_bytes`）；bundle 在 `cache/block-assets/bundle/1/`，地址常量 `BUNDLE_URL = https://launcher.lumilio.org/block-assets/1/`（blocks.json 与它列出的文件，尚未发布）；下载走 `TransferEngine` 的 `expect_sha256`，失败时连同旧文件一起删除，读取时再整文件校验一次，不符即删除。下载是 `TaskAction::PrepareBlockAssets`（「准备 26.3 的方块资源」）的 Activity 任务并按字节显示进度、可取消；索引按 release 缓存，第二次预览不再联网。设置新增 `auto_download_block_assets`（默认开，`LauncherService::set_auto_download_block_assets`）；关掉且本机没有 bundle 也没有 jar 时说明换成「自动下载方块资源已关闭」。`ModelPreview` 多了 `plan: AssetPlan`（来源列表与 `AssetNotice`），预览弹窗按 notice 显示一句话（Offline / DownloadDisabled / Unreadable）。测试：`cargo test -p lumilio-core schematic_assets` 16 项（规则表 9 种情形含 26.x 已装在线与离线、1.20.1 已装无覆盖层/有 Mod/投影来自 26.3、没装按数据版本与按实例版本、离线回退本机与其他已装 jar；没网也没 jar 与关闭下载两种说明；缓存命中返回植入的缓存条目而不重新烘焙；sha256 不符的下载被拒绝且目录里不留任何文件、读取时被改动的文件被删除；覆盖层叠在 bundle 包上且第二次命中缓存；options.txt 只取 `file/` 包并保持顺序），`models` 6 项（没装游戏时从脚本化 Transport 取 bundle、Activity 里有一条成功的准备任务、第二次预览断网仍出图且不再起任务；没网没 jar 与关闭下载的说明），`cargo test -p lumilio-ui model_view` 13 项（两种说明各一句），lumilio-ui 的 i18n、instance_detail、activity 通过。未验证：bundle 尚未发布，真实网络下的冷启动下载到首帧时间仍记在「bundle 度量」；设置页的开关留给 T9。"
+    },
+    {
+      "criterion": "烘焙格式等价：同一方块在 1.13.2 与 26.3 写法下烘焙结果相同；测试方块板在 T4 前后逐像素一致；13 个本地 litematic 在 26.3 下用本机烘焙与用 bundle 切片渲染逐像素一致。",
+      "result": "部分（2026-10-14）：第一句由 T1 的 spellings_of_1_13_2_and_26_3_bake_alike 覆盖。第二句：测试方块板与 13 个 litematic 的前后差别经重放证明只来自图集位置（见 T4 的验证），无实体的 42 种方块板前后 0 像素差别。第三句（本机烘焙与 bundle 切片对比）未做，在 T19 第 11 项。"
+    },
+    {
+      "criterion": "bundle 度量：49 个版本的 blocks.dat.z 的大小、去重后的贴图数、烘焙耗时、冷启动下载到首帧的时间；超过 D2 的阈值则记录改用逐版本切片。",
+      "result": "2026-10-14（T18 的烘焙，macOS Apple Silicon，jar 已缓存）：blocks.dat.z 3,983,085 字节（3.8 MiB）、去重后 4755 张图、烘焙 28 秒；entities.dat.z 28,630 字节。远低于 D2 的 40 MB，不拆切片。未测：冷启动下载到首帧的时间——bundle 还没有发布到 launcher.lumilio.org，留给 T19。"
+    },
+    {
+      "criterion": "实体回归桥：26.3 导出的 chest、bed、banner、shulker、sign 几何与原手抄数值一致；桥通过后手抄几何删除且 entity_facing、block_model_entities 仍通过；含 500 个盔甲架的投影帧时间记录在案。",
+      "result": "2026-10-14（T7）：回归桥 `baked_geometry_matches_the_hand_copied_models` 在删除手抄文件前后都通过（chest、double_chest_left/right、shulker、standing/wall banner 取 26.3，bed_head/foot、standing/wall sign 取 26.1.2），它的数值写在桥自己的测试里，不依赖 forks 里的文件；之后 `forks/schematic-mesher/src/mesher/entity/` 的 28 个手抄几何文件删除，entity_facing、block_model_entities、uvlock 仍通过。未完成：含 500 个盔甲架的投影帧时间属于 T8 的实例化渲染，尚未测量。"
+    },
+    {
+      "criterion": "工作室界面：GPUI 测试覆盖三栏布局、720×480、英文宽度、切换文件释放旧视口；Project Maintainer 目视两种外观并确认仪器语言没有被破坏。",
+      "result": "2026-10-14：插件 API 新增 `View::Studio { folder }`，Litematica 的 `view` 直接返回它；列表与详情视图删除，插件只保留出现条件、权限与按 `export:<路径>` / `reveal:<路径>` 动作生成 CSV 与「在访达中显示」（只接受 schematics/ 下的 .litematic）。core 新增 `PluginHost::list_granted` 与 `LauncherService::schematic_files`（经插件的 ReadGameFiles 授权列出文件夹）。宿主模块 `crates/lumilio-ui/src/schematic_studio/`（mod.rs 公开面与连接；tree.rs、viewport.rs、inspector.rs、ops.rs、tests/）在插件窗格里占满高度：左栏搜索字段、可折叠目录树与 `≡n` 重复标记（后台逐个读文件，用 `lumilio_schematic::fingerprint`）；中栏内嵌 `model_view::Viewer`（新增 inline 模式：填满栏高、不抢焦点、键行可折行），换文件时旧视口连同 worker 与帧一起释放；右栏端口标签 概览 / 方块 / 实体 / 元数据 / 历史（`PortTabs::wrap` 让窄栏里折成两行），统计与元数据在后台用 `lumilio_schematic::{stats, metadata}` 算出，放在硬线表格里。更多菜单按 §7 排列：替换方块…、转换版本…、导出 PNG…、删除… 暂时置灰并在提示里说明（新的 `MenuEntry::unavailable`），导出材料清单（CSV）与在访达中显示可用；没有主键。插件动作之后应用重取同一个 `View::Studio` 时保留已打开的工作室。应用为每个工作室建一条 Connection（List / Read / History / CanWrite / Restore → schematic_files / schematic_read / schematic_history / schematic_can_write / schematic_restore）。设置 › 下载与存储新增「自动下载方块资源」开关（`LiveIntent::SetAutoDownloadBlockAssets`）。design-language.md §12 的「Native model preview」改写为「Schematic studio」，写明不加显示屏的理由。`just ia` 重新生成 docs/ia/paths（plugin.litematica 17 条路径、settings 1 条）。测试：`cargo test -p lumilio-ui schematic_studio` 12 项（目录树分组、折叠、搜索展开、重复编号；选文件后检视器读出方块表；换文件后旧 Viewer 实体已释放——把旧视口 `mem::forget` 后此测试失败，守卫有效；迟到的旧视口资源被丢弃；元数据不同内容相同的两份文件同组、差一个方块的不同组；菜单只把 CSV 与显示交给页面、删除在最后且为危险色；游戏运行中恢复键不开确认框、可写时开确认框且确认前不发写入；空历史一句话；游戏启动时先关掉写入再问应用），instance_detail 新增 the_studio_fills_the_plugin_pane_with_three_columns_at_the_minimum_window（720×480 下三栏宽高可见、互不重叠、不超出窗口、视口至少 136 px 容得下 Orbital / Explore 两键、五个检视器标签都在检视器内、插件动作后工作室不重建），`tests/english.rs` 新增 in_english_the_studios_tabs_and_menu_are_not_cut_off（英文下五个标签单行且在栏内、更多菜单六项单行且在窗口内；去掉 `.wrap()` 后失败，守卫有效）。`cargo test -p lumilio-ui` 全部通过（lib 455 项），`-p lumilio-plugin-api -p lumilio-plugin-litematica`、`-p lumilio-app litematica`、`-p lumilio-docgen --test plugin_boundaries` 通过；五个 crate 的 clippy `-D warnings` 与 fmt 通过。未验证、需要 Project Maintainer 目视：两种外观下三栏的比例与层级、目录树选中行与 ≡ 标记的观感、窄窗口里检视器标签折两行的样子、菜单置灰项的提示，以及仪器语言没有被破坏；真实游戏目录里的大文件夹扫描速度也没有度量。"
+    },
+    {
+      "criterion": "操作安全：每种写操作都有「写之前已备份」「外部改动被拒绝」「运行中拒绝」「恢复后字节一致」四个测试；重复检测与跨版本转换的有损提示有界面测试。",
+      "result": "2026-10-14（界面部分）：检视器「历史」列出 core 的操作日志，每行 ghost「恢复」先弹确认框再发 Restore；没有备份的行与游戏运行中置灰并在提示里说明，游戏启动时工作室先关掉写入再问 `schematic_can_write`；界面测试覆盖运行中不开确认框、确认前不写入。四类写操作测试在 core 的 schematic_ops 里（见 T12）；重复检测已有界面测试，跨版本转换的有损提示随 T14 的对话框补上。"
+    },
+    {
+      "criterion": "资源再分发：D2 的许可取舍由 Project Maintainer 确认后才发布 bundle；确认记录在本计划。",
+      "result": "Project Maintainer 2026-10-13 接受 D2 的许可取舍：预烘焙的 blocks.dat.z 与 entities.dat.z 可以发布，缓解措施按 D2 执行。"
+    },
+    {
+      "criterion": "T4：Nucleation 与网格器只读 BakedPack；resource_pack_compat、texture_aliases、with_mesher_texture_aliases 与 core 的 build_pack 删除；守卫在烘焙夹具上通过；只有 26.3 写法的夹具无需运行时改写即可渲染；测试方块板改动前后逐像素一致。",
+      "result": "2026-10-13：网格器新增 `ResourcePack::from_baked`（`forks/schematic-mesher/src/resource_pack/baked.rs`），Nucleation 新增 `ResourcePackSource::from_baked`，`Scene::load` 接受 `&BakedPack`，core 的 `model_assets::bake_client` 用 `lumilio_block_assets::bake` 烘焙实例 jar（`ModelPreview.pack: Option<BakedPack>`，UI worker 直接接收）。`resource_pack_compat.rs`、`texture_aliases`/`alias_texture`、`with_mesher_texture_aliases` 与 zip 复制的 `build_pack` 已删除；网格器实体代码改用烘焙器的最新贴图名，运行时拼出的旧名经 `canonical_texture` 读同一张改名表。`tests/common` 改为把夹具写成资源文件再烘焙，face_culling、element_rotation、uvlock、multipart_conditions（新增 26.x 布尔写法）、model_shading、fluid_heights、coplanar_faces、undrawable_blocks、block_model_entities、entity_facing、block_tints、build_glb 全部通过；新增 baked_spellings（只有 26.3 写法）与 Nucleation 的 a_baked_pack_answers_for_renamed_entity_textures；`cargo test -p lumilio-schematic-render` 12 项、`-p lumilio-core model` 11 项、Nucleation `--lib meshing` 40 项通过，四个工作区 crate 的 clippy `-D warnings` 通过。像素对比：用本机 26.3 jar 渲染 13 个本地 litematic 与一块 42 种方块的测试板（1800×1200），改动前后 14 张中 2 张字节一致，其余每张 1–8 个像素不同（最大 8/2,160,000），全部在方块轮廓边缘、色差不超过 81/255；网格转储显示顶点位置、法线与颜色作为多重集合完全相同，差别只在贴图在图集里的位置（贴图键现在一律带命名空间、搬家的实体贴图用新名）与同一方块内面的顺序。当时未完成：严格的逐像素一致没有达到；T2 现有的 blocks.dat.z 在本任务给烘焙器加入物品模型与粒子、字体、容器贴图之前生成，需要重跑 `cargo xtask bake-blocks`（T7 已重跑）。 2026-10-14 收尾：残差的原因已确定，验收按本意达成。在临时 worktree 里用 c3ff397（改动前）的代码渲染上次的同一组 14 个输入（13 个 litematic 与测试板 board.litematic，26.3 jar，1800×1200）：两次运行字节一致，也与 10-13 保存的改动前图字节一致，改动前的管线可复现、没有哈希顺序带来的随机性；当前的烘焙管线两次运行同样字节一致。然后只改改动前网格器的图集键（同一张贴图的 `block/x` 与 `minecraft:block/x` 两种写法合成一个 `minecraft:block/x`，三张搬家的实体贴图 armorstand、enchanting_table_book、minecart 用新名），其余代码不动（面序仍是旧的）：14 张渲染与 10-13 保存的改动后图全部字节一致。所以 T4 的残差全部来自图集键：旧网格器按写法建键，原版模型对同一张贴图有两种写法时它占两个图集位，挤动后面贴图的位置；烘焙后每张贴图只有一个位。面序的差别不影响像素。变化的像素都取了相邻像素的颜色，是图集位置变了以后最近邻采样在纹素边界上取整不同；图集每张贴图四周有 1 像素的边缘复制填充，读不到别的贴图，不是渗色，所以没有改填充。要让新管线逐像素等于旧管线，只能把重复的图集位造回来，等于恢复旧的缺陷，因此不这样做；「改动不改变画出来的东西」由上面的重放证明：几何、贴图、颜色都相同，只有图集位置不同。守卫：`forks/schematic-mesher/tests/baked_spellings.rs` 新增 a_texture_written_with_and_without_its_namespace_is_one_atlas_slot（把烘焙器 `bake/model.rs` 解析贴图时的 `namespaced` 去掉时失败）与 meshing_the_same_blocks_twice_gives_the_same_atlas_and_buffers（把图集打包里按路径排序的次级键去掉时失败）。当前树（已含 T7/T8）对改动前：6 张与 10-13 的改动后图字节一致（自循环蜂蜜机 0 像素，其余 1–7 像素，即上面的图集残差）；8 张另有 T7/T8 的实体变化（实体按绑定表与实例绘制、钟与告示牌几何），由 T7/T8 与 T19 目视负责；另做的一块 42 种无实体方块板在改动前与当前树之间 0 像素差别。`cargo test --manifest-path forks/schematic-mesher/Cargo.toml --test baked_spellings` 3 项与 `cargo test -p lumilio-schematic-render` 20 项通过，测试文件 clippy 无告警、fmt 通过。"
+    },
+    {
+      "criterion": "T5：tints.json 把方块 id 模式映射到着色种类；烘焙器取出每个版本平原（温度 0.8、湿度 0.4）的着色图样本放进 BakedPack；tint.rs 只按表查色；block_tints 对数据表通过；表格 lint 在 26.3 烘焙包里找到每条方块。",
+      "result": "2026-10-13：`forks/schematic-mesher/data/tints.json` 12 条规则（grass、foliage、dry_foliage、water、redstone、stem、lily_pad 与固定色；`legacy` 记旧名 `minecraft:grass`，`tint_index` 限定花簇茎）；`tint.rs` 的手写方块名匹配删除，只剩查表与按 power/age 取色。`BakedAssets.tint_samples` 按 Minecraft `ColorMapColorUtil` 的取法采样每张 256×256 着色图（第 50 列、第 173 行），空表不写入容器，写出再读回逐字节一致（colormaps_are_sampled_where_plains_reads_them）；`Mesher::with_config` 用包里的样本替换平原默认色，选了生物群系或显式给色时不替换。block_tints 4 项通过（新增 plains_colors_come_from_the_packs_colormaps）；tint_table 读 T2 的真实 bundle（`target/block-assets/blocks.dat.z`，没有时说明并跳过）：表里每个 id 都是 26.3 的方块、26.3 的样本正是 #91BD59、#77AB2F、#A37546、网格器源码里写死的每个 `entity/` 贴图名都能在 26.3 找到（26.2 起用方块模型的告示牌除外）。往表里加入 `minecraft:grass` 后 lint 失败，守卫有效。"
+    },
+    {
+      "criterion": "T6（烘焙时部分）：tools/entity-dump 的反射导出器对 1.17 及以后每个正式版导出全部模型层，混淆版本经 client_mappings 换名；entities.dat.z 与索引、来源记录；解析夹具、映射表解析器与回归桥测试。",
+      "result": "2026-10-13 在 macOS（Apple Silicon）实测：`tools/entity-dump/EntityDump.java` 与 `--release 21` 编译的 `lumilio/entitydump/EntityDump.class` 入库（README 附重建命令）。导出器先调用游戏的 `SharedConstants.tryDetectVersion()` 与 `Bootstrap.bootStrap()`（不调用时 1.17 起的船、告示牌木材等层在注册表上报 Not bootstrapped），再调用 `LayerDefinitions.createRoots()`；类放在自己的包里，因为混淆 jar 带签名、类都在无名包，无签名的类加入同一包会被拒绝。xtask 下载每个版本的库（按 sha1 校验，缓存在 `target/block-assets/libraries/`）与 client_mappings，Rust 写的 ProGuard 解析器把需要的类、字段、方法换成混淆名后作为名字文件交给导出器。运行时按版本 JSON 的 javaVersion 与 21 取较大者，挑本机最小的够用 JDK（JAVA_HOME、java_home -V、启动器 runtimes 目录、PATH）：1.17–1.21.11 用 Java 21，26.x 用 Java 25。结果：1.17 到 26.3 共 34 个版本全部导出，0 个失败（每版 169–431 层，26.3 为 361 层），1.13.2–1.16.5 共 15 个版本指向 1.17；去重后 478 个不同层，entities.dat.z 28,630 字节，导出阶段 52–62 秒（4 个 JVM 并行，库已缓存；首次下载库的那次 366 秒）。同一 jar 用 Java 21 与 Java 25 导出的 JSON 逐字节一致（1.19.2、26.3 已比对）。两次完整烘焙得到的 entities.dat.z sha256 相同（4726d698…）。导出器在各版本缓存目录里运行，游戏日志写的 `logs/` 不会落进仓库根目录。回归桥 `baked_geometry_matches_the_hand_copied_models` 读 `target/block-assets/entities.dat.z`（缺失时打印跳过原因）：chest、double_chest_left/right、shulker_box、standing/wall banner 取 26.3，bed_head、bed_foot、standing/wall sign 取 26.1.2（26.2 起床与告示牌改成方块模型，没有实体层），按世界空间逐盒比较（手抄文件把渲染器变换并进部件时给导出结果套同样的外壳），全部一致；把手抄的箱锁 z 改 1 后测试失败，守卫有效。`cargo test -p lumilio-xtask -p lumilio-block-assets` 45 项通过，两个 crate 的 clippy `-D warnings` 与 fmt 通过。未完成（运行时部分，随 T3 实现）：core 对清单没有、且不混淆的 26.x jar 用 `background_command` 跑同一导出器并按 jar sha1 缓存到 `Layout::model_cache()/entities/`；烘焙与运行时逐字节一致的测试；运行时失败退回 entities.dat.z。手抄几何的删除属于 T7。"
+    },
+    {
+      "criterion": "T11/T13/T14/T15/T16（领域部分）：新 crate `lumilio-schematic` 提供 stats、replace、convert、metadata、fingerprint，只依赖不带 meshing/rendering 的 Nucleation；各自的领域测试通过。",
+      "result": "2026-10-14：`crates/lumilio-schematic` 入工作区（成员与 workspace 依赖），依赖 Nucleation（`default-features = false`）与 sha2。`plugin_boundaries` 的 map 库列表加入它：不得依赖 gpui*、wgpu、schematic-mesher、lumilio-core/ui/app、lumilio-schematic-render，也不得给 Nucleation 开 meshing/rendering；新增 schematic_guard_probe。重叠区域按 Nucleation 的优先序（默认区域，再按名字）只归第一个持有非空气方块的区域，与渲染器的 overlapping_regions 守卫一致。`cargo test -p lumilio-schematic` 17 项通过：stats——夹具（内存与写出再读回两种）的 id 计数、楼梯两种状态的分组、实体与方块实体按类型、区域体积与总数，三区域重叠时每格只计一次且各区域之和等于总数；replace——只按 facing 匹配、通配匹配全部状态、同 id 保留方块实体而换 id 时删除、只作用于指定区域、目标等于源时为 0，每次都断言 apply 改动数等于 preview_count；convert——1.16.5 夹具向前到 4790 无损且内容确有变化，再向后回到 2586 后每格方块状态与原件一致；4790 的 cherry_log 回到 1.12.2 报出损失条目（按严重度排序）；`to_bytes_for_data_version` 不改输入、读回为目标版本；metadata——读名称/作者/描述/尺寸/方块数/区域数/时间，编辑后写出再读回方块、方块实体、实体与指纹不变，TimeModified 更新、TimeCreated 保留，空白名称被拒绝且不改任何字段；fingerprint——元数据不同、文件字节不同的两份相同内容指纹相同，多一个方块或改方块实体 NBT 后不同，多次计算与两次写出再读回稳定，调色板顺序无关（读回时 litematic 读取器塞进方块实体 NBT 的 Id/Pos/x/y/z 不计入，否则同一文件内存与读回的指纹不同——这个测试先失败过）。去掉重叠去重或去掉同 id 保留后对应测试失败，守卫有效。clippy `-D warnings` 与 fmt 通过；`cargo test -p lumilio-docgen --test plugin_boundaries` 11 项通过。未完成：检视器「方块」「实体」「元数据」页与 CSV（T11 的 UI 部分）、各对话框、写入与备份（T12）、目录树重复标记与分组界面、取消不写与有损条目上界面的测试。"
+    },
+    {
+      "criterion": "T12（core/宿主部分）：Litematica 声明 `WriteGameFiles { under: \"schematics\", names: \"*.litematic\" }`；`write_checked` 抽到 `plugins::write` 两处共用；备份→校验写入→追加日志；运行中拒绝；history/restore；测试覆盖备份先于写入、恢复字节一致、外部改动拒绝、运行中不写、日志行格式。",
+      "result": "2026-10-14：`world_map/write.rs` 移到 `crates/lumilio-core/src/plugins/write.rs`（world_map 不再导出 write），新增 `write_checked_keeping` 返回备份路径并可不轮换；Xaero 的插件写入仍走 `write_checked`（保留 10 份）。新模块 `schematic_ops`（apply/restore/history/entry，阻塞 I/O）与 `service/schematic_ops.rs`（`schematic_can_write`、`schematic_read`、`schematic_apply`、`schematic_history`、`schematic_restore`，都在 spawn_blocking 里做文件操作，写入与恢复持有实例租约——运行中的游戏持有同一租约）。`Layout::schematic_ops` 在启动器数据的 profile 目录里，不在 game 目录。Litematica 清单加上写权限，设置 › 插件的授权说明改为带文件名（`settings-plugin-write-files` 多了 `$names`，中英两份目录同步）。测试：`cargo test -p lumilio-core --lib -- schematic_ops plugins:: world_map map_edit` 96 项通过（新增 9 项：备份先于写入——让临时文件名被目录占住使写入失败，备份已在且原文件未变、未记日志；恢复字节一致且自身记一行、可再恢复；外部改动返回 map-edit-conflict 且不备份不记日志；日志行逐字比对；被截断的行跳过但保留行号；日志里指向备份目录外的路径被拒绝；服务层运行中 apply/restore 均为 InstanceBusy、文件与日志都没动；越出授权的文件名/路径、未知插件、关掉的插件都被拒绝）。去掉 `schematic_apply` 的租约后 `a_running_game_keeps_every_schematic_write_out` 失败（InstanceBusy 断言处），守卫有效。`cargo test -p lumilio-plugin-litematica -p lumilio-plugin-api`、`lumilio-ui` 的 `a_write_grant_names_the_files_it_may_change`、`cargo test -p lumilio-docgen` 通过；lumilio-core/plugin-litematica/plugin-api/ui 的 clippy `-D warnings` 与 fmt 通过。未完成（留给工作室界面 T9 时期）：检视器「历史」页列出与每行「恢复」、游戏运行中禁用写入口（core 已提供 `schematic_can_write`），所以 T12 仍为 in_progress。"
+    },
+    {
+      "criterion": "T6（运行时部分）：core 只对清单没有、且不混淆的 26.x jar 用 `background_command` 跑同一导出器，用启动器管理的 Java 与实例的库类路径，按 jar sha1 缓存到 `Layout::model_cache()/entities/`；AssetPlan 给出实体几何来源；烘焙与运行时同一 jar 的 JSON 逐字节一致；运行时失败只让预览退回 entities.dat.z。",
+      "result": "2026-10-14：`lumilio-block-assets` 新增 `entity/dumper.rs`：`DUMPER_CLASS`（`include_bytes!` 入库的 class）、`install_dumper`、`dumper_arguments`、`dumper_failure`、`read_dump` 与 `EntityDump::to_json`（规范 JSON）；xtask 的 `run_dumper` 改用这些并把规范 JSON 写回 `entities.json`，不再从 tools/ 读 class。core 新增 `schematic_assets/entities.rs`：`EntityGeometry`（None / Bundle / LocalDump{fallback}）进 `AssetPlan.entities`，`resolve` 按 D4 决定（清单 `entities.versions` 覆盖 → Bundle；不覆盖且 26.x → LocalDump，fallback 为清单里最新的版本；其余 None）；`BundleIndex` 读 `entities` 段并校验文件名与 sha256；`EntityDumps` 以 `<jar sha1>-<class sha1 前 12 位>.json` 缓存、`.log` 存 stdout/stderr、失败写 `.failed` 不再重跑，类路径缺文件或 jar 没有 `LayerDefinitions` 时不起 JVM 也不记失败；`run_dumper` 走 `background_command`、180 秒上限、工作目录在 `entities/work/`。服务层：26.x 也取索引；`ModelPreview.entities: EntityLayers`，导出失败或没 Java（不为预览安装 Java）时 `plan.entities` 改成回退来源，bundle 的 entities.dat.z 经同一 Activity 任务下载与 sha256 校验；从不让插件报错。`ReleaseManifest::class_path` 只算类路径（`build_launch_plan` 要求 auth 等启动参数，见 lessonsLearned）。测试：`cargo test -p lumilio-core --lib -- schematic_assets service::tests::models launch` 111 项通过（新增规则表 6 种情形+有 Mod 的 1.20.1+无 entities 段、实体文件名越界被拒、缓存命中不再起 JVM、失败带日志且被记住、混淆 jar 与缺库不起 JVM；服务层 26.3 用实例自己的库与 Java 25 导出一次、第二次不再起 JVM，失败退回 26.2 的 entities.dat.z 且方块包照常、离线退回 None）；`cargo test -p lumilio-xtask -p lumilio-block-assets` 48 项通过（新增 xtask 与 `lumilio_core::run_dumper` 对同一夹具输出逐字节一致、规范 JSON 是不动点、class 为 Java 21 字节码）；`lumilio-ui` 的 model_view 与 instance_detail plugins 通过；三个 crate 的 clippy `-D warnings` 与 fmt 通过。去掉 `.failed` 记录或让本机导出结果不被采用后对应测试失败，守卫有效。实测（macOS Apple Silicon，Zulu 25）：被忽略的 `real_26_3_dump_matches_the_bake` 用 core 运行时路径对 `target/block-assets/versions/26.3/client.jar` 与 `target/block-assets/libraries/` 导出 361 层，与 entities.dat.z 的 26.3 条目完全相同，规范 JSON 449,962 字节，与烘焙时留下的 entities.json 规范化后逐字节一致，约 4 秒。未验证：Windows 上 CREATE_NO_WINDOW 的实际效果（无 Windows 机器）；预览里使用 `ModelPreview.entities` 属于 T7。"
+    },
+    {
+      "criterion": "T7：`data/entity_bindings.json` 把方块与实体 id 模式映射到模型层、贴图模式与静态姿势；`detect_block_entity`、`detect_mob` 与手抄几何改为查表加载通用几何；合成逻辑由绑定驱动；entity_facing、block_model_entities、uvlock 通过；绑定表 lint 在 26.3（床与告示牌 26.1.2）的导出与烘焙包里找到每条引用。",
+      "result": "2026-10-14：绑定表 71 行（另有 10 个共享的渲染器摆放），`mesher/entity/` 删去 bat、bed、bell、blaze、boat、book、cat、chest、chicken、cow、enderman、equipment、ghast、hanging_sign、horse、iron_golem、magma_cube、minecart、mob、sheep、shulker、sign、slime、spider、villager、wolf、player、armor_stand 共 28 个文件，skull.rs 收成 skin.rs，banner.rs、decorated_pot.rs 只剩合成，item_frame.rs 改为读包里的 `item_frame` 方块模型；新增 bindings.rs（读表与匹配）、layers.rs（层转部件与姿势）、model.rs（原 mod.rs 的盒展开与面序）、render.rs（摆放、叠加层、盔甲、幼体）。几何经 `ResourcePack::with_entity_layers` 交给网格器：Nucleation `ResourcePackSource::from_baked(pack, entities)`、`Scene::load(schematic, pack, entities)`、UI worker 接收 core 的 `ModelPreview.entities`（T3 已按 D4 从 entities.dat.z 或运行时导出取得）。删除前用一个临时对照测试把旧手抄几何与新绑定逐面比较（世界坐标与 UV 取到 1/1000）：chest、立式与墙上告示牌、头颅（骷髅、僵尸）、潜影盒、两种旗帜、讲台与附魔台的书、僵尸、苦力怕、矿车、史莱姆、岩浆怪、两种船完全一致；双箱、猪、鸡、牛、狼、猫、蜘蛛、末影人、烈焰人、盔甲架、骷髅包围盒一致，差别在游戏省掉的接缝面、镜像 UV 与骷髅的帽子层；其余以游戏数据为准（见 lessonsLearned）。`cargo test --manifest-path forks/schematic-mesher/Cargo.toml` 的 17 个集成测试目标全部通过，其中新增 entity_layers 7 项（面数、叠加层、盔甲的槽位层与旧共享层、幼体缩放、姿势属性、缺层不画、渲染器缩放只算一次）、entity_bindings 7 项、entity_binding_lint 2 项（对真实 bundle：每行主层在 26.3 导出、床与告示牌在 26.1.2，其余引用的层在某个版本，每行贴图在该版本烘焙包；改错一个层名、贴图名或 id 模式时 lint 报出，守卫有效）；把潜影盒的 hide_faces 去掉、或让渲染器缩放无条件生效时对应测试失败。测试读 `tests/fixtures/entity_layers.json`（从真实导出挑出的 28 个层，21 KB），不需要 target/。Nucleation `--features meshing --lib meshing` 41 项（新增 block_entities_draw_from_the_entity_layers_handed_in）、`cargo test -p lumilio-schematic-render` 12 项、`-p lumilio-block-assets` 17 项通过；lumilio-block-assets 与 lumilio-schematic-render 的 clippy `-D warnings` 与 fmt 通过（lumilio-ui 的 clippy 报错在并行进行中的 schematic_studio 文件里，model_view 无告警）。未做：真实投影的前后像素对比与目视，需要 Project Maintainer 在启动器里看两种外观；D11 说的把烘焙包里的 `entity/` 收窄到绑定用到的子集留作后续。"
+    },
+    {
+      "criterion": "T8：投影里的 Entities 按绑定表生成实例（位置、朝向、变体贴图）；gpu.rs 每个模型一个实例缓冲、一次绘制一个模型的全部实例，剔除视锥外与超过距离的实例；有层且有绑定的原版实体都画出来，没有绑定或没有层的实体列在「技术详情」；500 个盔甲架的帧时间不高于不含实体时的 1.5 倍；含生物的真实投影在 26.3 下目视与游戏一致。",
+      "result": "2026-10-14：Nucleation `UniversalSchematic::to_mesh_with_entity_instances` 先不带实体网格化方块，再用同一个 Mesher 把每种实体外观（id 加全部属性，不含位置与偏航）在原点网格化一次（`forks/nucleation/src/meshing/entity_instances/`）；每个实体成为该模型的一个实例：绑定行的 facing 是 horizontal 或 boat（`Facing::turns_with_yaw`）时放在精确位置并按 `Rotation[0]` 转向，其余（物品展示框、掉落物、无绑定）仍放在所在方块。NBT 的 `variant`、马的 `Variant`、旧版猫的 `CatType` 与 `VillagerData` 转成绑定表读的属性。`GpuRenderer::with_entities` 为每个模型建实例缓冲，`vs_instanced` 读每实例矩阵，每层（不透明、镂空、半透明）每个模型一次 `draw_indexed`；每帧按视锥（`rendering/instances.rs` 的 `Frustum`，反向深度的无穷远平面自动略去）与 `set_entity_distance` 剔除，剩下的由远到近写入。`Scene` 在第一人称时距离上限 `ENTITY_DISTANCE` = 96 格，环绕视角整栋建筑都在画面内所以不按距离剔除；`Scene::undrawable_entities` 列出没有绑定行或本版本没有层的实体 id，model_view 在「技术详情」旁另起一句（`model-undrawable-entities`，中英文目录）。测试：Nucleation `--lib entity_instances` 5 项与 `rendering::instances` 5 项（偏航转向方向、绑定实体按偏航而其余留在方块、位置与偏航不拆外观而姿势会、无绑定与缺层被报出不画、各版本 NBT 的变体、视锥四边与近平面、正交的远平面、距离按球面算、按模型分组由远到近），`--lib meshing` 46 项与 `--lib rendering` 32 项通过；schematic-mesher 的 entity_layers、entity_bindings、entity_binding_lint、entity_facing、block_model_entities、undrawable_blocks 通过；`cargo test -p lumilio-schematic-render` 14 项通过（新增 GPU 像素测试：3 个盔甲架画出、狐狸列为无法绘制、不给层时盔甲架也被列出且画面里没有它；只有实体没有方块的投影也有画面；把实例绘制改成 0 个实例时两项失败，守卫有效）；lumilio-ui model_view 与 english 目录测试通过；lumilio-schematic-render clippy `-D warnings`、lumilio-ui lib（test cfg）clippy 与改动文件的 fmt 通过。实测（macOS Apple Silicon，release，`five_hundred_armor_stands_frame_time`，26.3 真实 bundle，48×48 石砖地面加一排木板，1800×1200，`Scene::render` 含读回，60 帧平均）：无实体 1.76 ms，500 个盔甲架（每 5 个穿全套铁甲，2 种外观）1.89 ms，比值 1.08，满足 ≤1.5。目视待 Project Maintainer：`3rd-party/assets/schematic-studio-t8/`（gitignored）下 `t8-500-armor-stands.png`、`t8-entity-zoo.png` 与左右两张近景（表中 23 种有绑定的实体面向镜头，另放一只狐狸应缺席）、`t8-real-schematic.png` 与 `t8-real-schematic-close.png`（`3rd-party/promo` 里的村民交易所投影，1 个僵尸、8 个村民，全部画出）；由 `entity_review_frames` 以 `LUMILIO_FRAME_DIR`、`LUMILIO_SCHEMATIC` 生成。我看到的：实体朝向镜头、村民在交易位上、变体贴图生效；红色羊毛偏粉来自原有的染料着色表，不是本任务的改动。未做：半透明实体部件不在模型内逐三角形排序（只按实例由远到近）；lumilio-ui 全部目标的 clippy 被并行任务的 `tests/english.rs` 与 lumilio-core `service/models.rs` 的告警挡住，未改它们。"
+    },
+    {
+      "criterion": "T13–T16（界面部分）：替换对话框先显示数量且写入数等于预览；转换对话框列出有损条目、取消不写；元数据空名称留在对话框；只保留这个把其余移进备份并出现在历史；英文 720×480 下对话框与段键不截断。",
+      "result": "2026-10-14：更多菜单里的 替换方块… / 转换版本… / 删除… 与「元数据」页的 ghost「编辑」点亮，游戏运行中、上一项写入未完成或文件还没读完时置灰并在提示里说明原因；概览「重复」一节每行加 ghost「只保留这个」（键的点击不再冒泡成选中该行——第一次跑测试时正是这样把 B 选中并多发了一次 Read）。新文件：`schematic_studio/writes.rs`（提交、应答、删除与只保留这个的确认框）、`dialogs/`（§10 外框 `show` 与 `Submission` 状态；replace.rs、convert.rs、metadata.rs）。core：`plugins::write::remove_checked_keeping`、`schematic_ops::remove`、`LauncherService::schematic_remove` 与 `schematic_versions`，`lumilio_core::WRITE_CONFLICT` 导出；应用的工作室连接多了 Apply / Remove / Versions，并把 InstanceBusy 与 map-edit-conflict 映射成 `WriteFailure`。测试：`cargo test -p lumilio-ui --lib schematic_studio` 20 项（新增 tests/ops.rs 8 项：替换先显示 3、写出的字节里正好 3 个玻璃且没有石头、对话框等写入应答、成功关闭并重读历史；冲突时错误留在对话框；有损转换在界面列出条目、取消后没有 Apply；向前转换确认后写出目标数据版本；空白名称留在对话框且不发写入、改名后指纹不变；只保留这个先问、确认后只把同组另一份以 dedupe 移走、历史出现可恢复的一行、重复分组消失；删除先问再以 delete 移走；游戏运行中三个菜单项、只保留这个与编辑都不打开对话框也不发命令）。把成功时关闭对话框的那一行注释掉后替换测试在「success closes the dialog」失败，守卫有效。`tests/english.rs` 新增 in_english_the_studios_operation_dialogs_fit_the_minimum_window（英文 720×480 下替换与转换对话框的取消 / 确认键单行且在窗口内，楼梯两个属性的段键单行在窗内）。`cargo test -p lumilio-ui` 全部通过（lib 464 项、english 4 项）；`cargo test -p lumilio-core --lib schematic` 34 项（新增：移进备份后原处没有文件、备份字节一致、记一行、恢复后回来；读后被改则不移动不备份不记日志；服务层运行中拒绝、越出授权拒绝、移走后历史即返回值且可恢复）；`cargo test -p lumilio-schematic` 17 项、`-p lumilio-app litematica`、`lumilio-docgen --test plugin_boundaries` 通过；lumilio-core/ui/app 的 clippy `-D warnings` 与 fmt 通过；`just ia` 重新生成（plugin.litematica 新增只保留这个，替换 / 转换 / 删除 / 编辑元数据四行改写）。发现：26.3 的 cherry_log 转到 1.13.2（数据版本 1631，bundle 能列出的最旧版本）时 Nucleation 的 LossReport 是空的，只有转到扁平化之前（1343）才报损失——新方块在没有它的旧版本里不会被列成损失，界面会说「没有发现损失」。界面测试因此用 1343 作有损目标。2026-10-14（缺口补上）：向后转换先向应用要目标版本的方块表（`Command::Catalogs` → `LauncherService::schematic_catalogs`：bundle 里目标版本的切片，加上数据版本最接近源文件的那个版本的切片，只解析 blockstates、不解码图片；`lumilio_block_assets::BlockCatalog` 与 `Bundle::catalog`），`lumilio_schematic::convert` 拿转换后的每种方块状态比对：目标没有的方块 id 记「丢失」（`missing_block`，按 id 合并并计数），目标变体键里没有的取值、或目标没提到而源版本提到的属性记「近似」（`unknown_property`），再与 Nucleation 的 LossReport 合并、按严重度排序。写出的内容照 Nucleation 的做法原样保留这些方块与属性；对话框照实说「在那个版本里读入时会变成空气 / 用默认值」。拿不到方块表时仍可转换，对话框多一句「没能按 X 的方块表检查」并附技术细节。`lumilio-schematic` 新依赖 lumilio-block-assets（plugin_boundaries 的规则允许，注释已说明）。测试：`cargo test -p lumilio-schematic` 21 项（新增：cherry_log 26.3 → 1.13.2 报一条丢失且计数为 2、写出的仍是 cherry_log；两版都有、属性相同的方块与无人提及的 waterlogged/distance 不报；悬挂灯笼与未知取值各报一条近似；向前转换不检查）；`-p lumilio-block-assets` 22 项（新增 bundle 的方块表）；`-p lumilio-core --lib schematic` 35 项（新增 schematic_catalogs 来自目标切片、未知版本报错）；`-p lumilio-ui --lib schematic_studio::tests::ops` 9 项（有损转换改用 1.13.2：先发 Catalogs、夹具方块表答复后列出 cherry_log 一条丢失；拿不到方块表时出现「没能检查」且仍可写出）。把方块 id 检查改成恒假后领域测试失败、把对话框改成不要方块表后两项界面测试失败，守卫有效。未验证：真实 bundle 下各版本方块表的误报率（例如某些方块状态文件变体键不列全取值）需要 Project Maintainer 用真实投影目视。未验证、需要 Project Maintainer 目视：三个对话框在两种外观下的排版（段键与下拉混排、损失列表的滚动区）、替换在大投影上的计数等待感、只保留这个键挤在窄检视器里的样子；真实游戏目录里写入、移进备份与恢复的端到端过程没有手动跑过。"
+    },
+    {
+      "criterion": "T10：视口保留 Orbital / Explore、复位与技术详情，新增角度预设与资源来源读数；导出 PNG… 对话框（每边最大 4096、面板色或透明、角度）在工作线程用 `Scene::render` 离屏绘制并经宿主保存对话框写出；CPU 射线步进点选方块，检视器显示方块状态；射线步进、导出尺寸与透明、切换文件释放视口的测试。",
+      "result": "2026-10-14：`lumilio-schematic-render` 新增 `pick.rs`：`march(Ray, Grid, solid)` 是 Amanatides–Woo 体素步进（先做包围盒 slab 求交，只问网格内的格子），`camera_ray` 用与渲染相同的 `CameraConfig` 和 `compute_view_proj_reversed` 反投影近平面与 0.5 深度两点，并按网格器「方块 n 在 n−0.5..n+0.5」平移半格；`Scene` 保留解析后的 `UniversalSchematic`，`Scene::pick` 跳过 air / cave_air / void_air / structure_void，返回坐标与 `BlockState` 文本（不选实体）；`View::at(Angle)` 给出北（yaw 180）、东（90）、南（0）、西（270）、顶（MAX_PITCH）、等轴（45°, 35.26°，透视）。`model_view` 的 worker 在帧请求之外加了 `Job::Pick` / `Job::Export` 队列（先于下一帧，各带一个回复通道；关闭邮箱即清空队列，等待者收到断开）。内嵌视口：白色小键「角度」下拉六个预设（Explore 先切回 Orbital）；Orbital 下按下与抬起相距不到 4 px 的单击在 worker 上点选，结果回调让工作室把检视器切到「概览」并显示「选中的方块」（坐标、方块状态）；画面下一行 mono 读数「版本 · 本机游戏 jar / 下载的 bundle · 覆盖层：…」。更多菜单的「导出 PNG…」点亮：新模块 `schematic_studio/export.rs` 的 §10 对话框（宽、高输入，1–4096 整数否则置灰并提示；背景段键 面板色 / 透明；角度下拉 当前视角 + 六个预设），提交后在视口 worker 上 `Scene::render`，后台执行器编码 PNG（保留 alpha），关闭对话框后用 `platform::pick_save_path` 选位置，再在后台执行器写文件并出 toast；预览没准备好、绘制失败或视口在等待中被换掉时留在对话框里说明。文案进中英目录（model-angle-*、model-source-*、studio-png-*、studio-picked-*）；`just ia` 新增 点选方块、换到预设角度、查看资源来源、选择 PNG 背景 四行并改写 导出 PNG…；design-language.md §12 Schematic studio 补一段。测试：`cargo test -p lumilio-schematic-render` 20 项通过（新增 pick 6 项：命中第一个方块、穿过空气逐格且顺序正确、越界/背向/空网格/不问网格外格子、六个预设的画面中心射线落在对应的面；GPU：顶视点选得到地板方块与状态、角落为空；透明背景导出 300×200、角落 alpha 0 而方块 alpha 255；本机有 GPU，未跳过）；把 DDA 步长改成 2 时两项失败。`cargo test -p lumilio-ui --lib -- schematic_studio model_view i18n` 56 项通过（新增：任务先于帧且关闭后回复断开；资源读数两种来源；角度预设离开 Explore；点选回调与清除；工作室：边长 1–4096、导出视图取角度与透明背景、帧编码为同尺寸 PNG 且保留 alpha、菜单打开对话框→5000 被拒→640×300 顶视透明的导出任务到达 worker→保存对话框出现前不写文件→选路径后写出 640×300 PNG 且角落 alpha 0、未就绪时留在对话框、换文件后旧 worker 邮箱关闭且等待中的导出结束、点选后概览显示坐标与状态）；把 Worker 的 Drop 不关闭邮箱时切换文件的测试失败。`--test english` 通过；lumilio-schematic-render 与 lumilio-ui（lib+tests）clippy `-D warnings` 与改动文件 fmt 通过。目视待 Project Maintainer：角度键与读数在 720×480 的窄视口里的折行；六个预设的取景；点选与画面是否对得上（尤其非整块方块与半透明方块，射线按整格判定）；导出的 PNG 在透明背景下边缘是否有暗边；保存对话框的建议文件名。未做：点选只在 Orbital（Explore 单击用于捕获鼠标）；不在画面上高亮被选方块；`studio-coming-later` 文案已无代码使用。"
+    },
+    {
+      "criterion": "T17：Mod jar 与启用资源包作为覆盖层，缓存，概览列出来源与方块数，添加资源包只登记路径；测试覆盖优先级、移除来源后缓存失效、无资源的 jar 静默跳过、bundle 基础上继承原版父模型的 Mod 模型有几何。",
+      "result": "2026-10-14：见 D21。`cargo test -p lumilio-block-assets` 22 项（新增 tests/over.rs 4 项：容器读回的基础包上 Mod 矿石继承 cube_all 得到元素与自身贴图、单独烘焙时没有元素（旧行为，守卫可失败）、继承非模板原版模型、与 jar 一起烘焙结果相同、只替换原版模型的包进入图层、不是 zip 与无资源 jar 跳过且 stamp 标明；容器往返仍字节一致且包含模板）。`cargo test -p lumilio-core --lib schematic_assets` 27 项（新增 tests/sources.rs 6 项：本机与 bundle 两种基础上 资源包 > Mod > 基础；bundle 上 Mod 方块有几何；删除资源包后带它的条目被删、forget 删除条目；坏 jar 与库 jar 不报错且概览不列；概览按序列出基础、Mod、添加的包与找不到的包及计数；添加只记路径、拒绝非 zip 与相对路径、去重、移出不动文件）；`-p lumilio-core service` 174 项通过。`-p lumilio-ui schematic_studio` 30 项（新增 tests/sources.rs：来源文字、模型到达后概览列出四行、只有添加的包有「移除」、移除发 RemovePack、PacksChanged 成功后旧视口释放并重新请求、失败保留视口），model_view 18 项、i18n 与 --test english 通过；资源读数与来源列表共用 `model_view::base_label` / `file_label`；删掉不再使用的 studio-coming-later。core/ui/app/block-assets clippy `-D warnings` 与 fmt 通过；`just ia` 重新生成（新增 添加资源包…、移除添加的资源包、查看各资源来源提供的方块）。未验证、需 Project Maintainer 目视：真实整合包实例（数百个 Mod）里概览的长度与首次烘焙等待；原先「画不出的方块」里的 Mod 方块在本机 jar 基础上是否都画出；bundle 基础上要等 bundle 用新烘焙器重发后才生效；文件选择器在三种系统上的过滤（目前接受任意文件，非 zip 由 core 拒绝并提示）。"
+    },
+    {
+      "criterion": "T18：网站中英文使用指南「投影工作室」与 guide/index 的任务表行；NOTICE 随 bundle 生成；ATTRIBUTIONS.md 与 design-language.md 改写「从不保存 Mojang 资源」的句子；发布说明只写已确认的行为；backlog 两项按 T4/T7 的实际结果处理；`just docs`、`just web` 通过。",
+      "result": "2026-10-14：新增 `web/src/content/docs/docs/guide/schematics.md` 与英文页（适用范围、准备、方块资源的来源与下载、三栏、查看、改动、资源来源、已知限制），两份 guide/index 的任务表与 `web/astro.config.mjs` 的侧栏各加一行；只写已实现的行为，标签名取自语言目录；按其他指南的做法不写 bundle 的具体大小，只说明下载一次、按字节显示进度、可在设置里关闭。xtask 在 bundle 旁写 `NOTICE`（见 T2）。ATTRIBUTIONS.md 的「不随仓库带 Minecraft 贴图，只从玩家已装的游戏在内存里建包」改写为：仓库不带，预览从已装游戏烘焙，没装时从 launcher.lumilio.org 下载按 D2 生成的 bundle，资源归 Mojang、bundle 自带 NOTICE、映射表只在烘焙时使用；design-language.md §12 工作室一节补一段资源来源（不自己画方块、本机烘焙或下载 bundle、Activity 一句话、设置可关），并把置灰原因里已过时的「功能还没做」改成实际原因。发布说明：本仓库的做法是在发版的 build PR 里写 `release-notes/<版本>.md`（0.1.3–0.1.5 都是这样，功能 PR 不写），0.1.5 已发布、下一版还没开发布计划，所以本任务不写发布说明，留给下一次发版按「只写已确认的行为」从本计划取材。backlog：`face_culler.rs` 仍把所有染色玻璃归为同一剔除组；26.2 起 `model_replaces` 让方块模型画告示牌时不再加实体，文字合成也不画——两项都没修，原样保留，并写进指南的已知限制。`just docs`、`just web`（astro check 0 错误 0 警告，33 页构建）、`cargo test -p lumilio-xtask bake_blocks`、xtask 的 clippy `-D warnings` 与 fmt 通过。"
+    },
+    {
+      "criterion": "T19：Project Maintainer 实机验收清单（子任务标为「需要目视」的全部项目）。",
+      "result": "Edwin 2026-10-16 Mac 实测通过。只在 Mac 上验收，不再要求 Windows 与 Linux（release-0-1-6 的 release-scope）。"
+    },
+    {
+      "criterion": "面板与窗口的分工",
+      "result": "lumilio-ui 的 schematic_studio 测试 34 项通过（含 pane.rs 三项与 window.rs 一项），instance_detail::tests::plugins 10 项通过，tests/english.rs 4 项通过，i18n 8 项通过；lumilio-ui 与 lumilio-app 的 clippy 无警告。真机截图留给 T19。"
+    },
+    {
+      "criterion": "T22 视口交互",
+      "result": "schematic_studio 36 项通过（新增 a_picked_block_floats_a_card_that_locates_and_replaces_it、a_block_the_pack_cannot_draw_says_so_on_its_card、a_state_splits_into_its_id_and_properties）；Schematic-Mesher 守卫 undrawable_blocks 新增 an_undrawable_block_is_drawn_as_a_missing_texture_cube（旧代码 24 个顶点、新代码 48 个）；model_view 17 项、i18n 8 项、english 4 项通过。Esc 释放、准星与视线读数、Explore 捕获中单击选方块依赖原生鼠标捕获，无头测试里建不出捕获，留给 T19 真机验收。"
+    },
+    {
+      "criterion": "T26、T27、T30（D27 重新构图的名字、图标与材料台）：名字表合并与退回 id；图标的两条路径与一批一个渲染器；窗口是视口加材料面板，点方块选中格子，读数板写名字，720 × 480 两栏都在。",
+      "result": "2026-10-14：`cargo xtask bake-blocks` 实测写出 names.dat.z 31,545 字节（en_us 2053 条、zh_cn 2059 条，下载 2 秒），blocks.dat.z 3,983,085 字节与 entities.dat.z 28,630 字节不变；blocks.json 多 `names` 段，SOURCE.md 多「Names」一节，NOTICE 写明语言文件来自 Mojang。测试：lumilio-block-assets 的 names 4 项（只留三段键、新版本压过旧版本且旧 id 保留、方块退到物品与语言退到英文、读写与损坏文件）与 block_items 2 项（对照表与对 26.3 bundle 的 lint，全部物品模型都在）；lumilio-xtask 的 bake 6 项（索引与 SOURCE.md 的 names 段、NOTICE）；lumilio-core 的 names 4 项（bundle 安静下载且不起任务、断网后读缓存；sha256 不符不留文件；没有 bundle 时从装好的游戏读 en_us 与资源对象里的 zh_cn；都没有时为空）；lumilio-schematic-render 的 icons 2 项（平面物品按贴图最近邻放大、不建渲染器；一批三个状态里空气无图标、石头与泥土各自单独画——把 `set_only_mesh(Some(..))` 换成 `None` 后此项失败，已恢复）；lumilio-ui 全部 492 项通过，其中工作室新增或改写：窗口没有目录树、头部切换键与橙键与 More 在一行内、格子至少 4 列、视口 ≥ 380 px（720 × 480）；点视口方块选中格子、详情在材料栏内、替换不锁属性；读数板写「橡木楼梯」而不是 id、查不到时退回 id、在工具条之上（第一次跑时读数板与 55 px 高的工具条重叠，`TOOL_STRIP_CLEARANCE` 由 58 改为 76 后通过）；格子按名字或 id 筛选；技术信息默认折叠；英文 720 × 480 下三个标签与头部不截断。lumilio-app 编译通过。未验证：真机画面（字号、格子密度、图标观感、读数板遮挡）待截图，见 T19。"
+    },
+    {
+      "criterion": "T28、T29：缩略图按指纹缓存且只改元数据不重画；面板是图鉴网格。",
+      "result": "2026-10-14：lumilio-core 的 thumbnails_are_kept_by_their_key 通过；lumilio-ui 494 项通过，新增 thumbnails_are_asked_one_at_a_time_by_content 与 the_catalogue_is_a_card_per_file_without_a_viewport，改写 instance_detail 的 the_studio_pane_shows_the_catalogue_and_opens_the_window 与 tree 的两项分节测试（目录树的折叠逻辑随面板一起删除）。新增审阅钩子 `LUMILIO_INSTANCE_PLUGIN`、`LUMILIO_STUDIO`、`LUMILIO_STUDIO_BLOCK`。未验证：大文件夹第一次画缩略图的总耗时、Windows 与 Linux 上的离屏绘制。"
+    },
+    {
+      "criterion": "T31：高亮只换遮罩、不重新网格化；悬停、选中、只看这种各自生效。",
+      "result": "2026-10-14：lumilio-schematic-render 23 项通过，新增 a_focused_kind_keeps_its_colour_and_the_rest_fade_or_hide（第一次跑时三分之一的石头像素被当成不在焦点：网格器把方块 n 放在 n−0.5..n+0.5，着色器漏了这半格，与拾取 `camera_ray` 的同一换算对齐后通过——这次失败也说明该测试能抓到格子算错）；图标与拾取、实体的既有测试在新着色器下仍通过。lumilio-ui 493 项通过，新增 the_picture_follows_the_chosen_and_hovered_tiles；接线时视口回调里直接选中方块会在视口更新中再次更新视口（GPUI 报重入），回调改为 `cx.defer` 后通过。「不重新网格化」由结构保证（`Scene::set_focus` 只建遮罩并交给渲染器），没有专门的计数测试。未验证：真机上淡化的观感、大投影（数十万格）建遮罩的耗时。"
+    },
+    {
+      "criterion": "T32：视口单击检视一个方块（描边与检视卡），材料面板的选中不变；「只看这种」时点不到被藏起的方块。",
+      "result": "2026-10-14：lumilio-schematic-render 26 项通过，新增 a_marked_block_is_outlined_and_nothing_else_changes、an_outline_follows_the_shape_of_its_block 与 a_pick_passes_through_blocks_the_focus_hides（把拾取的过滤临时去掉后最后一项失败，证明守卫有效）；第一次跑描边测试时 192 × 128 的画面里一格只有约 20 像素宽，边带占满整格，改到 480 × 320 后按「少于露出面积三分之二」断言。审阅截图里第一版按格子边描，箱子缩进 1/16，带几乎落空，只剩一条细线；改为按方块自身几何的包围盒、宽度按逻辑像素后，箱子的顶面与正面一整圈清楚可见。同日 Project Maintainer 看过左下角的卡片后改为浮在方块上方、最紧凑、容器按格子显示物品贴图：渲染端 27 项、lumilio-schematic inspect 5 项、工作室与视口 61 项通过，新增 the_card_floats_over_the_inspected_block、the_card_keeps_inside_the_picture_and_falls_back_to_the_corner、an_item_is_its_texture_or_its_block_and_nothing_else、slots_are_laid_out_as_the_game_shows_them；截图里卡片浮在箱子上方，9 × 3 的格子显示金锭贴图与数量。lumilio-schematic 新增 inspect 的 4 项。lumilio-ui 的工作室与视口测试 59 项通过，改写 a_click_inspects_one_block_and_leaves_the_chosen_kind_alone、the_inspect_card_shows_what_a_block_entity_holds、an_inspected_block_is_outlined_until_let_go，原来「点视口方块选中格子」的测试改为点格子。新增审阅钩子 `LUMILIO_STUDIO_INSPECT=<x>,<y>,<z>`。未验证：鼠标真实点击（审阅时用钩子代替）、Windows 与 Linux 上的着色器。"
+    },
+    {
+      "criterion": "T33：挂在方块上的实体按存档的朝向、贴着所挂方块的那一面画出，框内物品在框上并随 ItemRotation 转。",
+      "result": "2026-10-14：先用 26.3 客户端里的 template_item_frame 确认游戏的框模型在格子 +z 一侧（背板 15.5–16，框条 15–16）、朝 −z；网格器原来当成在 −z 一侧，所以墙上的框都画在格子的另一侧，地面与天花板的框又因为朝向只从偏航角推而立着。lumilio-schematic-render 新增 tests/hanging.rs 三项（按游戏存档写法造的六个朝向的展示框都贴在所挂方块那一面、厚度不超过 1/16、在框 12/16 的方块内；隐形框只画物品且物品贴在墙上，可见框里物品在框前；物品顺时针转且不镜像），全部 30 项通过；把南向的转向临时改回原来的写法后三项都失败。第一次跑时「物品在框前」失败：平面物品原来从 7/16 厚到 8/16，游戏的生成元素是 7.5/16 到 8.5/16，改正后通过。Nucleation 新增 a_hung_entity_faces_as_saved_and_others_are_not_hung，实体实例 6 项通过；Schematic-Mesher 的 entity_facing、entity_bindings、entity_binding_lint、entity_layers、block_model_entities 通过（它的库内单元测试因 export/gltf.rs 的旧测试在基线上就编译不过，与本次无关）。Project Maintainer 在审阅窗口里看了自启动合成器：三个朝上的展示框平躺在箱子顶上，框与箱盖之间有 2 像素的缝；读 26.3 客户端的字节码确认这是游戏本来的样子：ItemFrame.calculateBoundingBox 只用框自己所在的格子与朝向（Vec3.atCenterOf(pos).relative(direction, -0.46875)），ItemFrameRenderer 的偏移（0.46875、−0.5、0.4375 或隐形时 0.5、每格 360/8）也不看所挂方块的形状，箱子只有 14/16 高，所以框浮在箱盖上方。"
+    },
+    {
+      "criterion": "T34 原型：在普通 JVM 里构造游戏自己的实体渲染器，能自动得出多少种实体的外观。",
+      "result": "2026-10-14：用临时探针（不进仓库）对 26.3 客户端：启动注册表后，渲染器上下文用 Unsafe 分配、只填模型集合，模型集合的层表换成一个记录每次查询的 Map（EntityModelSet 的构造参数就是 java.util.Map，不需要编译期依赖游戏类）。注册表 161 种实体：158 个渲染器构造成功，1 个失败（画：要贴图图集，它的外观本来就来自 painting_variant 数据），2 个不在渲染器表里（玩家与人体模型，由另一张表建）；132 个记下了要用的模型层（含幼体、盔甲槽、叠加层，如僵尸猪灵 12 层、热带鱼两种体型各带花纹层），其中 93 个从新建的渲染状态取到默认贴图；另 39 个（船 20、矿车 7、木筏、风弹、末影龙、末地水晶等）的贴图存在渲染器实例或类的 Identifier 字段里，下一步按字段统一读；26 个没有模型层的是画物品、方块或什么都不画的（掉落物、展示实体、投射物、下落方块、TNT、展示框、闪电、标记、交互实体等）。本次投影里缺的蜜蜂、僵尸猪灵、热带鱼都在可提取之列。发现：EntityType.getBaseClass() 在 26.3 对全部类型都返回 Entity，类层级要改从渲染器的泛型父类读出实体类。未做：写进 EntityDump、旧版本（1.21.2 之前没有渲染状态，取贴图要实体实例）。"
+    },
+    {
+      "criterion": "T34：导出器在 bundle 的每个版本里构造游戏的渲染器，没有手写行的生物按渲染器用到的外观画出。",
+      "result": "2026-10-14：EntityDump 写 format 2，多一个 entities 段（renderer 与 entity 两条类链、按请求顺序的模型层、默认与幼体贴图、存在字段里的贴图、构造失败的原因），整个段失败时只写 entities_error，几何照旧；为了仍是单个 class 文件，记录用的 Map 是 Proxy。实体类从渲染器的泛型父类解出（26.3 的 getBaseClass 全是 Entity）。混淆版本：xtask 的 names 文件加上全部类与这一段要用的成员（同名方法按名字取），导出器在混淆 jar 里按名字与参数个数找方法时还核对返回与参数类型（第一次没核对，1.21.2–1.21.11 一个贴图都没取到：短名字被许多方法共用）。lumilio-block-assets：EntityLook、EntityLayers 改成带 looks 的结构（解引用到层表，原有用法不变）、EntityDump::into_layers（core 的运行时导出原来只取了层，会丢掉外观）、borrow_textures（1.21.2 之前从更新版本借贴图；1.19.4–1.21.1 盔甲层要盔甲纹饰图集而构造失败的 12–13 个人形生物借更新版本的整个外观、只留本版本有的层；都要本版本的包里有那张贴图）、borrowed_looks（1.17 之前随几何借 1.17 的外观）。Schematic-Mesher：ResourcePack::entity_looks，bindings::find_for/known_for 在表之后用外观生成一行（主层、默认贴图、mob 变换、随偏航角转、幼体层与幼体贴图），每种外观只生成一次；表的行优先。重新烘焙：49 个版本都有外观，有贴图的生物 1.13.2 52 种、1.17 69、1.21.2 79、26.3 90。测试：lumilio-block-assets 外观随版本走、format 1 仍读、借贴图与借整个外观（含只留本版本的层）；lumilio-schematic-render tests/looks.rs 两项（没有行的蜜蜂按外观画出并随偏航角转、幼体用自己更小的层、没有外观时报画不出、僵尸的手写行优先于会画不出的外观；关掉外观回退后两项都失败）；Schematic-Mesher 集成测试除 atlas_uv_regression（基线上就编译不过：引用了不存在的 MeshLayer.vertices）外全部通过，entity_binding_lint 读新烘焙的 bundle 通过；core、xtask、ui、app 测试通过，clippy 无警告。真实数据：26.3 上 Project Maintainer 的自循环蜂蜜机 59 只蜜蜂全部画出、不报画不出；1.20.1（这份投影自己的版本）同样 59 只全部画出，评审图里蜜蜂用借来的贴图画在动物队列末尾；大叔牌地狱猪人塔（1.20.1）89 个实体（含 70 只僵尸猪灵）全部画出、不报画不出，评审图里僵尸猪灵借了 26.x 的外观、只用 1.20.1 自己有的层。仍是手写行的生物（僵尸、牛、猪……）照旧由行画出：行能写变体、叠加层、骑乘位置，外观说不出这些；哪些手写行已多余，留给 T35 一起核对。entities.dat.z 的格式号没有升：新增的 looks 是可选字段，旧读者照样能读。"
+    },
+    {
+      "criterion": "T21：原版方块与实体几何只来自 bundle；实例的模组、资源包与添加的包默认关闭、每个一个开关，重开后保留。",
+      "result": "2026-10-15：删去本机烘焙客户端 jar（PlannedSource::LocalBake、bake_client、Keyed::Content 缓存键）与运行时 Java 实体导出（EntityGeometry::LocalDump 及其缓存、ReleaseManifest::class_path）；resolve 只在 bundle 与「离线 / 已关闭自动下载且没下载过」之间选，后者只给说明。ProvidedSource 加 enabled 与 custom_models，数字来自不烘焙的扫描（model_cache/local/scan-*.json，来源变了重扫）。工作室每个模组与包一行一个 Fader，拨动立刻显示并发 SetSource，保留后视口重新加载，失败时拨回并出提示。测试：core 的 an_installed_twenty_six_client_still_takes_the_bundle、an_installed_26_x_client_takes_the_bundle_and_is_never_dumped（假 Java 25 从未启动，离线时只有说明）、an_overlay_switched_off_is_left_out_of_the_plan、a_source_switched_off_is_listed_but_not_drawn、a_mod_is_off_until_switched_on_and_stays_on_after_reopening（丢掉服务、在同一份数据上新开一个）与三项扫描、三项开关存储；ui 的 each_mod_and_pack_has_a_switch_and_flipping_one_reloads、a_reopened_studio_shows_the_kept_switches。去掉 resolve 的开关过滤时三项失败，开关不写入时两项失败。之后补上：缩略图按样子存（a_switched_source_gives_thumbnails_a_new_look，样子不进文件名时失败；画图时换成空的开关列表也失败）、开关保留后缩略图重新要（a_kept_switch_asks_for_the_thumbnails_again，去掉重画或正在画那张的重要时各自失败）、覆盖层缓存只留最近用过的 8 份（only_the_most_recently_used_bakes_are_kept，读到时不更新修改时间就失败）；提示文字不再说「装好的游戏」。core 749 项、ui 工作室 48 项通过，core / ui / app clippy 无警告。需要亲眼看：开关与数字在行里是否对齐，长计数的显示，切换后视口重载的样子。"
+    },
+    {
+      "criterion": "T25：切片只画当前层及以下且切口看得见；Ctrl 拖拽框选，材料面板数选区，选区可作替换范围；CSV 有组数列。",
+      "result": "2026-10-15：Schematic-Mesher 新增 MesherConfig.keep_faces_along（沿该轴不剔除相邻面、不跳过被包住的方块），Nucleation 的 MeshConfig 带过去；着色器加 clip 与选区 uniform：丢弃该轴上大于当前层的格子，选区内略染焦点色、沿长方体的边画一条焦点色的带。Scene::set_slice 第一次沿某轴切片时重新网格化一次，之后逐层只换 uniform，拾取跳过切掉的层；Scene::blocks_in 数一个长方体里的方块。视口工具条「切片」（再点关闭，从最高层开始），切片中加 X/Y/Z 分段、‹ › 键与 [ ]，读数「Y 12 · 340 块」；Ctrl（macOS 上 ⌘）从一个方块拖到另一个方块框选，Esc 清除；材料面板在有选区时数选区（「选区 4×3×6 · 52 块」与「清除选区」），切片时数当前层；替换对话框有选区时范围默认「选区 宽×高×长」（replace::Scope::Cells，跨区域）。测试：render 的 a_slice_shows_its_layer_from_above_and_clicks_land_on_it（网格不保留面时失败：中间层顶面被上一层剔掉）、a_selection_draws_a_band_around_its_box（着色器的选区开关改坏时失败）；ui 的 a_slice_steps_through_the_schematic_s_layers（去掉层号夹取时失败）、a_ctrl_drag_selects_the_box_between_two_blocks（去掉 Ctrl 分支时失败）、a_selection_scopes_the_materials_and_the_replacement（材料不按范围数、或替换范围默认不选选区时各自失败）；lumilio-schematic 的 a_box_of_cells_limits_the_replacement（去掉格子过滤时失败）；litematica 插件的 CSV 组数列。render 34 项、ui 496 项、lumilio-schematic 27 项通过。需要亲眼看：切口与选区的带在真实投影上的样子、工具条在窄视口里放不放得下切片的控件。"
+    },
+    {
+      "criterion": "T35：bundle 每个版本注册表里的每种实体都被画出或明确标为没什么可画，否则烘焙与测试失败；用户的 13 份投影没有画不出的实体。",
+      "result": "2026-10-15：覆盖检查最初列出 26 种（箭、三叉戟、凋灵之首、末地水晶、末影龙、唤魔者尖牙、羊驼唾沫、潜影贝弹、两种风弹、拴绳结、龙息弹、经验球、浮漂、下落方块、TNT、三种展示实体、画、1.17–1.21.11 的兔子、人体模型、creaking_transient、坐垫、僵尸鹦鹉螺）；javap 读 26.3 各渲染器的姿态栈与存档字段后：按渲染器类写行（箭/三叉戟/唾沫/潜影贝弹按 aim 的偏航与俯仰符号与起点，凋灵之首按 dangerous 换贴图，末地水晶按 age 0 的 60° 斜轴姿态与 ShowBottom，末影龙 rotY(-yaw)·T(0,0,1)·S(-1,-1,1)·T(0,-1.501,0)，坐垫、兔子按 RabbitType 与 Toast、热带鱼按打包的 Variant 拆体型/花纹/两种染料并着色、僵尸鹦鹉螺按变体、creaking）；下落方块、TNT、方块展示与各种矿车的内容按 CarriedBlock 用方块本身的模型画（箱子矿车里是箱子），矿车按种类的默认方块与 DisplayOffset；画按 painting_variant 数据（1.21 起，模组也能加）或原版画像素 /16 定尺寸，背面贴墙、正面离墙 1/16；物品展示按 item_display 上下文；文字展示按游戏的排版（每行 10、宽 0.025 格一单位、背景多出一单位）画成一张贴图、两面可见；经验球按 Value 选图标、龙息弹为平面图，二者与非固定的展示实体每帧朝向镜头；展示实体的 transformation（四部分或 16 个数）在转向之内。1.21.2 之前箭由代码画：烘焙时同一渲染器类的旧版本借新版本的 arrow 层（borrow_layers）；1.21.9 起画的渲染器构造失败：借最近一个能构造的版本的类链，仍按出错算作未构造（借贴图照旧）。26.x 改名的兔子贴图进了改名表。染料色改为游戏 DyeColor 的 diffuse 值（旗帜原来用的是地图色），羊毛按 ColorLerper 的 0.75 与白 0xE6E6E6；默认皮肤按 DefaultPlayerSkin.get 的 UUID 哈希（人体模型没有档案时是 NIL，即苗条 Alex）。结果：cargo xtask bake-blocks 输出「every entity type of every version is drawn」；Schematic-Mesher 的 entity_coverage、entity_binding_lint（含按类的行与多余行，自测里拼错的类名、层、贴图与一条多余行都被报告）通过；lumilio-schematic-render tests/coverage.rs 七项通过，分别把箭的俯仰符号、画的高、billboard、transformation、鱼的染色、矿车内容的 0.75 改坏时各自失败；lumilio-block-assets 新增三项（画的尺寸来源、兔子改名、借层与借类链），把「按出错算未构造」或画的贴图回退改坏时各自失败；Nucleation 990 项、Schematic-Mesher 库内 180 项（含默认皮肤）与全部集成测试通过。用户的 13 份投影（profiles/instance）按各自的游戏版本与 26.3 各加载一次，实体全部画出、没有画不出的（大叔牌地狱猪人塔 89、自循环蜂蜜机 59、矿车多物品 47、红石元件合成站 25、流云别墅 13 含 3 幅画与 1 条热带鱼与 3 个漏斗矿车……）。用 26.3 客户端贴图渲染了一张各类实体的测试图看过：画贴墙、箱子在矿车里、漏斗矿车露出漏斗顶面、下落的红沙与 TNT 站在地上、末地水晶悬浮（底座按字节码在地面以下）、兔子与热带鱼的花色、物品展示的剑、文字从正面读得通。需要亲眼看：真实投影里矿车内容的朝向、文字展示的大小与背景、经验球的颜色。"
+    },
+    {
+      "criterion": "T23：头部写「x 投影 · 游戏 y」，游戏版本缺方块时出橙标签与「转换到 y…」，材料格子带 ✕ 并可只看不兼容；转换对话框默认游戏版本、分丢失/近似/保留三组、保留组可选替代、默认另存。",
+      "result": "2026-10-15：studio 新增 Command::Game / Event::Game（app 读实例的 game_version）；打开文件时在后台取版本列表与游戏版本，比游戏新的投影转一份副本并按游戏版本的方块表检查，只把 minecraft 命名空间里游戏没有的方块算作不兼容（模组方块不算）。头部说明写尺寸与版本（相同只写一个），有不兼容方块时出橙色 kit::tag 与白键；材料格子右上角橙色 ✕（悬停「y 没有这种方块」），「只看不兼容」开关只在有不兼容方块时出现。转换对话框在版本列表到达时直接选中游戏版本；损失按 Group::of 分三组（MISSING_BLOCK 归「保留」），保留组下有「为这些方块选替代…」：关掉转换对话框、在替换对话框里每种保留的方块一行。确认默认另存为同一文件夹的「名 (y).litematic」（重名加编号）并选中新文件，「覆盖原文件」开关打开才写回。core：apply 的 expected 改为 Option，restore 对新写出的文件把它收进备份，log 文件夹在第一次写前创建。测试：lumilio-ui 的 the_head_names_both_versions_and_flags_blocks_the_game_lacks、the_same_version_gets_one_name_and_no_tag、losses_fall_into_lost_approximated_and_kept、a_conversion_is_saved_beside_and_the_original_stays、kept_blocks_go_to_the_replace_dialog（把不兼容结果清空、总是覆盖、保留归丢失、相同版本也写两个时各自失败）；lumilio-core 的 a_new_file_is_written_beside_and_restoring_takes_it_out。需要亲眼看：头部在窄窗口里放不放得下标签与白键，✕ 角标与数量的位置。"
+    },
+    {
+      "criterion": "T24：替换对话框「从 → 到」、属性芯片与不限属性、可搜索目标（目标版本、最近用过在前）、同名属性沿用、四种范围、实时计数与「替换 n 个方块」、多行映射、方案存取与历史行写方案名、三个入口。",
+      "result": "2026-10-15：lumilio-schematic 新增 Mapping / MappingRow、mapping_count（总数与每行）与 apply_mapping：每个格子取第一条与替换前状态匹配的行，各行一起生效；目标按目标方块表沿用同名属性，行上固定的值优先。对话框重写为表格：每行源方块下拉、「不限属性」开关、属性芯片（≤4 个取值为分段键，更多为下拉），目标为可搜索下拉（文件版本的方块表，studio 按文件数据版本向 app 取最近一个不更新的版本；最近用过的目标排在前面；方块表没到或取不到时只能选文件里已有的方块并说明），每行末尾写它的数量；「加一行」从下一种还没有行的方块开始；范围为全部 / 区域 / 当前切片 / 当前选区（有选区时默认选区）；确认键写「替换 n 个方块」。方案：名字输入与「存为方案」，有方案时「套用方案…」；存在启动器数据（lumilio-core schematic_ops::schemes，ReplaceSchemes 与最近 12 个目标），用方案替换时历史行写「方案「名」 · n 个」。入口：材料详情「替换…」（任意状态）、检视卡新增「替换…」（精确状态）、头部橙键、转换对话框的保留组。DialogForm 的确认键文字改为 SharedString、宽度可由表单给出（替换 640）。测试：lumilio-schematic 的 a_target_keeps_the_properties_it_shares_with_the_source（不沿用时失败）、rows_apply_at_once_and_count_what_they_change；lumilio-core 的 replace_schemes_are_kept_and_recent_targets_come_first；lumilio-ui 的 chips_match_exactly_or_any_and_the_target_keeps_shared_properties（提交时不给方块表就失败）、several_rows_write_once_with_the_counts_shown（不记最近目标时失败）、a_scheme_is_saved_and_applied_elsewhere（套用后不记方案名时失败）、the_inspect_card_replaces_the_inspected_state，英文最小窗口测试改查新的目标与芯片。已知限制：方块表只提到模型用到的属性，waterlogged 这类不沿用（D35）。需要亲眼看：640 宽的表格在 720 宽窗口里的样子、多行时对话框的高度、芯片换行。"
+    },
+    {
+      "criterion": "T19（部分，macOS 截图）：浅色与深色、720×480 与大窗口、英文界面下的工作室窗口、替换与转换对话框。",
+      "result": "2026-10-15：release 构建在临时 LUMILIO_HOME 里打开流云别墅（26.2），一个 26.3 实例、一个 1.20.1 实例；工作室窗口跟随 LUMILIO_REVIEW_SIZE / LUMILIO_REVIEW_MIN，新的 LUMILIO_STUDIO_DIALOG=replace|convert|incompatible 在文件读好后打开对话框（the_review_hook_opens_replace_on_the_blocks_the_game_lacks）。看到的：头部「26.2 投影 · 游戏 26.3」；1.20.1 下橙标签「1.20.1 没有的方块：11 种」与「转换到 1.20.1…」在 720×480 也放得下（尺寸说明截断成「53 × 26 × 5…」），11 个格子带 ✕；英文头部完整；替换对话框在 720×480 占满窗口、行可滚动、按钮固定在底部，11 行时在大窗口也滚动；深色下对话框与推子清楚。发现并修好：三个开关没有字、转换对话框没有默认目标（见 lessonsLearned）；转换对话框把 Nucleation 的英文说明原样写在中文界面里，改为按它的 9 种损失类型各写一句启动器的话（两种语言），原文留在悬停提示里（every_loss_kind_is_explained_in_the_launchers_words，拼错一种类型时失败）；替换对话框的源与目标下拉写方块名、ID 作 mono 说明、按名字或 ID 搜索（block_pickers_show_names_and_find_names_and_ids）；工作室里每个方块图标放在稍大的格子里（白天键灰、夜里石墨键白），深色下黑色染色玻璃板与黑色混凝土看得见（block_slots_stand_out_from_the_panel_and_lighten_at_night，夜里用键灰时失败）。真实文件：新增被忽略的 lumilio-core tests/schematic_live.rs（LUMILIO_LIVE_SCHEMATICS），经 LauncherService 对 13 份投影的副本各做一次替换（最多的方块换成第二多的）、转换到 1.20.1 另存、两次恢复：全部通过，替换后计数与总数对得上，恢复后逐字节相同；另用独立的 Python NBT 读取器核对写出的文件：转换结果 Version 6、MinecraftDataVersion 3465，方块总数与原文件相同。首次下载：launcher.lumilio.org/block-assets/1/ 目前 404（bundle 尚未发布）；新增 LUMILIO_BLOCK_ASSETS_URL 审阅钩子（只接受 http(s) 文件夹地址，the_bundle_address_takes_only_a_folder_from_the_hook），取不到时视口写「没有网络，方块资源还没下载过」并有「重试」，格子先是空槽；Project Maintainer 允许本地网络权限后，全新的 LUMILIO_HOME 经 LUMILIO_BLOCK_ASSETS_URL 从本机服务器取 blocks.json、blocks.dat.z、entities.dat.z、names.dat.z 各一次，存下的文件与服务器上的逐字节相同，工作室随即画出模型与图标。完整的 just check 通过（1684 项测试）。发布：launcher.lumilio.org 的 Worker 新增 /block-assets/<n>/<file> → 本仓库 `block-assets-<n>` Release 资产的镜像（proxy.test.ts），bundle release 1 以该 Release 发布（不标为 latest），合并后部署才生效。仍要 Project Maintainer：替换、转换、恢复各做一次并在 Litematica 里打开结果；没装游戏的实例第一次下载 bundle；Windows 与 Linux；深色下黑色染色玻璃板、黑色混凝土、染色玻璃这类暗色或半透明的图标在面板上几乎看不见（游戏在灰色物品格上画图标）。"
+    },
+    {
+      "criterion": "T36–T40：资源包文件夹与顺序、缺失方块的替代建议、头部画不出的方块数、版本未知、历史与备份面板。",
+      "result": "2026-10-15：`cargo test -p lumilio-schematic -p lumilio-core` 825 项通过（新增 suggest 5 项、版本未知 1 项、顺序与文件夹 3 项、服务层换序 1 项、备份列出与散落恢复 1 项）；`cargo test -p lumilio-ui` 521 + 4（english）项通过（新增历史 4 项、资源来源 2 项、头部 1 项、建议与版本未知 2 项）；`cargo test -p lumilio-schematic-render` 串行 42 项通过（并行时本机软件 GPU 适配器在已有的出图测试里段错误，与本改动无关，nextest 每个测试单独进程不受影响）；touched crates 的 clippy `-D warnings` 与 `cargo fmt --check` 通过，`just ia` 已重新生成。界面只在测试里验证了元素出现与命令，窄窗口下资源来源行的按键排布与悬停说明仍需 Project Maintainer 实机看。"
+    }
+  ],
+  "decisions": [
+    {
+      "id": "D1",
+      "decision": "只有烘焙器认识 Mojang 的资源布局；运行时（网格器、渲染器）只读 BakedPack。现有的手写补丁模式（resource_pack_compat、texture_aliases、手抄实体几何、手写着色表、build_pack 的 zip 复制）整个删除，而不是继续增补。",
+      "rationale": "schematic-render-parity 的四条 lessonsLearned 都是同一种失败：每个新版本在运行时多一处改写，且「能解析」不等于「生效」。把版本差异收口到一个离线步骤，差异在烘焙时就被消化，运行时没有版本分支可错。",
+      "consequences": "新 crate lumilio-block-assets 被 xtask、core 与 lumilio-schematic-render 共用；forks/README.md 的本地改动清单变短；网格器语义上的修正（剔除、uvlock、旋转、流体、共面）仍留在 forks 并保留守卫。"
+    },
+    {
+      "id": "D2",
+      "decision": "预先烘焙一个 blocks.dat.z 覆盖 1.13.2 到最新正式版的全部正式版（现在是 49 个），贴图按内容去重，zstd 压缩；由 `cargo xtask bake-blocks` 从 Mojang 发布的 jar 生成并记录来源，不进 Git；发布为独立的数据版本（不随启动器版本号），放在启动器官网或 Release 资产上，由启动器在第一次需要时下载、按 sha256 校验、缓存在数据目录。产物超过 40 MB 就改为每个版本一个切片，索引不变。",
+      "rationale": "1.13 的扁平化之后方块状态与模型格式稳定，49 个版本之间大部分贴图与模型相同，去重后一个包比 49 个包省得多，也让「没装游戏」和「老版本」走同一条路。schemat.io 只发一个基础 pack.zip 加用户覆盖层，不按版本区分；我们要跨 49 个版本转换与渲染，必须逐版本。再分发 Mojang 的方块贴图与模型改变了 ADR 0027/0028「启动器从不保存 Mojang 资源」的立场：同类工具（schemat.io、mcasset.cloud、Blockbench 的实体向导）都这样做，但这是 Project Maintainer 要确认的许可取舍。",
+      "consequences": "下载是后台任务，界面只说一句「正在准备 26.3 的方块资源」；设置里可以关掉自动下载；bundle 的许可说明放在它自己的 NOTICE 里；ATTRIBUTIONS.md 与 design-language.md 里关于「从不保存」的句子改写。清单附带的 entities.dat.z 是从 Mojang 代码里导出的几何数据，与方块贴图同属再分发范围，一并写进 NOTICE；生成它用到的官方映射表按其许可只在烘焙时使用，不再分发。"
+    },
+    {
+      "id": "D3",
+      "decision": "资源来源规则：投影的数据版本决定要哪个游戏版本的资源。实例装了 26.x 客户端 → 本机烘焙那个 jar（同时导出实体几何），按 jar sha1 缓存；其他版本或没装游戏 → bundle 里对应版本的切片；离线而本机有任何已安装 jar → 本机烘焙它作为退路。实例的 mods/*.jar 与启用的 resourcepacks/ 永远作为覆盖层叠在上面。",
+      "rationale": "这是 Project Maintainer 给出的规则；本机烘焙让 26.x 用户离线也能用且实体几何来自同一个 jar；bundle 让老版本与没装游戏的人不必先下载整个游戏。离线退路是本计划加的假设：没网时宁可用本机资源也不要一张灰图。",
+      "consequences": "core 的 schematic_assets 要能同时读本机缓存与 bundle；视口显示资源来源读数，让人知道看到的是哪一套资源。"
+    },
+    {
+      "id": "D4",
+      "decision": "实体几何由一个很小的 Java 反射导出器取得：调用 LayerDefinitions.createRoots() 把全部模型层导出成通用几何 JSON，不用 Vineflower 反编译再解析源码，也不在 Rust 里做字节码解释。同一份导出器有两个运行时机，输出一字不差：默认在烘焙时由 xtask 对 1.17 及以后的 49 个版本各跑一次（混淆版本经 Mojang 官方映射表换名），结果作为 entities.dat.z 随清单发布；运行时只对清单还没覆盖、且不混淆的 26.x jar 在玩家机器上跑一次并缓存。1.13.2 到 1.16.5 复用 1.17 的几何。",
+      "rationale": "createRoots() 是无参静态方法，反射走一遍就是与游戏一字不差的数字；反编译成文本再解析要写半个编译器，遇到循环生成的部件和常量折叠就要猜。导出在哪里跑不影响渲染效果，只影响运营：烘焙时跑玩家零等待、错误在 CI 上一次暴露、49 个版本过同一套 lint；运行时跑是新版本（清单还没来得及重烘焙的 26.x 正式版与快照）的唯一出路，所以保留为逃生口而不是主路。混淆版本若在运行时处理，还要在玩家机器上再下载映射表，多一件可错的事，故只在烘焙时做。1.17 以前几何写在各模型类与渲染器的构造器里，拉起它们要渲染上下文；箱子、床、告示牌、旗帜、潜影盒的形状自 1.14 起没变过，复用是可接受的近似，贴图仍取各自版本。",
+      "consequences": "tools/entity-dump 的源码与编译产物入库，附重建命令；xtask 多一个 Mojang 映射表（ProGuard 格式）解析器，映射表只在烘焙时读取、不进仓库也不随清单分发；运行时导出失败只让当次预览退回 entities.dat.z；Windows 上必须走 background_command；老版本要做到精确需要另开计划。"
+    },
+    {
+      "id": "D5",
+      "decision": "「哪个方块用哪个模型层与贴图」是绑定表（数据），不再是 detect_block_entity 里的 match；合成逻辑（旗帜图案、告示牌文字、陶罐纹样、皮肤、物品展示框）保留为代码但由绑定驱动。",
+      "rationale": "绑定关系来自 Minecraft 的渲染器类，不是可以从数据里走出来的，所以必须有人写；但写成一张有 lint 的表比写成 38 个几何文件加几个 match 更容易对照与审核。",
+      "consequences": "表格 lint 测试要求每条引用的层与贴图都存在；新增一种实体是加一行而不是加一个文件。"
+    },
+    {
+      "id": "D6",
+      "decision": "工作室归宿主：插件 API 新增 View::Studio { folder }，像 View::Map 一样只说「这里是一个投影目录」；布局、视口、检视器与操作对话框都在 lumilio-ui 的 schematic_studio 模块里；领域逻辑在新 crate lumilio-schematic。插件保持薄：权限、何时出现、CSV。",
+      "rationale": "插件 API 的视图树有意不让插件拥有布局（世界探索已经这样做）；工作室要的三栏、视口、点选与对话框都不是视图树能表达的；把重活放在宿主也让未来的 WASM 插件（wasm-plugin-registry）继续只发视图节点。",
+      "consequences": "lumilio-plugin-litematica 变得更小；lumilio-ui 多一个与 world_explorer 同量级的模块，按 800 行规则拆目录。"
+    },
+    {
+      "id": "D7",
+      "decision": "视口常驻在页内，不再是弹窗；仍是「方块是世界层、周围是界面层」。不新增显示屏：§12 规定显示屏只用于启动进度、动态与游戏记录，统计数字用硬线表格里的橙色实时值表示。",
+      "rationale": "工作室的核心是「一直看着模型做事」，弹窗每次都要重新加载；显示屏的克制是设计语言明确写下的规则，为一个页面破例会让仪器语言失去边界。",
+      "consequences": "design-language.md §12 的「Native model preview」整段改写；切换文件时旧视口像关闭弹窗一样释放 worker 与帧；视口高度随窗口，720×480 下仍能看到三栏。"
+    },
+    {
+      "id": "D8",
+      "decision": "所有写操作走插件 WriteGameFiles 权限与宿主的校验写入：先备份到启动器数据目录，再校验文件未被外部改动，再写，再记日志；游戏运行中拒绝；恢复只从启动器自己的备份恢复。",
+      "rationale": "Xaero 路径点编辑已经证明了这条路（world_map::write），抽出来共用比再写一套更省；投影文件是玩家花很多时间做出来的东西，操作前备份与可恢复是底线。",
+      "consequences": "检视器多一个「历史」页；备份目录会增长，清理策略在设置里按保留天数处理，默认不自动删。"
+    },
+    {
+      "id": "D9",
+      "decision": "重复检测比较规范化后的内容哈希，不比较文件字节或元数据；只标记与分组，「只保留这个」把其余移进备份，绝不自动删除。",
+      "rationale": "同一份投影常被另存成不同名字或改过描述，字节不同但内容相同；反过来只差一个方块也不该判重。",
+      "consequences": "lumilio-schematic::fingerprint 有独立测试；目录树的重复标记依赖后台扫描，扫描中显示进度而不阻塞。"
+    },
+    {
+      "id": "D10",
+      "decision": "新 crate 的分层：lumilio-block-assets（烘焙格式与烘焙器，不依赖 nucleation）、lumilio-schematic（统计、替换、转换、指纹，依赖 nucleation，不依赖 GPU 与 UI）、lumilio-schematic-render（渲染，依赖以上两者）。core 依赖 lumilio-block-assets 做解析与缓存；UI 依赖三者。",
+      "rationale": "AGENTS.md 的依赖方向（app → ui → core）与「core 不依赖 UI」不变；把烘焙器与渲染拆开，xtask 才能在没有 GPU 的 CI 上生成 bundle。",
+      "consequences": "forks 的 Nucleation 多一个 Baked 来源变体，改动带署名记进 forks/README.md。"
+    },
+    {
+      "id": "D11",
+      "decision": "BakedPack 的具体取舍：贴图存解码后的 RGBA8，按「宽、高、像素」的 SHA-256 去重；「按变体展开」指状态键按属性名排序、单个与数组统一成列表，不展开成属性的笛卡尔积；元素旋转的单轴与欧拉两种写法都存成绕 X/Y/Z 的角度；`force_translucent` 丢弃（运行时按像素判断半透明，与现状相同）；`textures/entity/` 暂时整目录保留；只有代码会点名的实体贴图，按 `data/texture_renames.json` 统一成最新版本的名字。容器是一个 zstd 帧（级别 19），内含魔数、格式号、JSON 索引与平面数据；一个文件可装多个版本，读取时只解出请求的版本并逐张核对哈希。",
+      "rationale": "按像素去重让不同版本、不同 PNG 压缩的同一张图只存一次，运行时也不必解 PNG；属性的完整取值域只在游戏代码里，资源里推不出来，强行展开会猜；改名表是数据，新增一次搬家是加一行。",
+      "consequences": "T2 用真实 jar 校对改名表（见 T2 验收）；T7 的绑定表 lint 落地后再把 `entity/` 收窄到绑定用到的子集；T4 把 Rotation 的角度转回网格器的写法；容器格式号变化时旧启动器给出「格式 N 无法读取」的说明而不是崩溃。"
+    },
+    {
+      "id": "D12",
+      "decision": "烘焙器除方块状态用到的模型外，还保留全部 `item/` 模型及其显示变换（BakedModel.display，按情境继承），以及 `particle/` 目录、`font/ascii` 与 `gui/container/generic_54` 贴图；网格器读旧贴图名时经 `canonical_texture` 查烘焙器的同一张改名表，而不是在 forks 里另留别名。",
+      "rationale": "T4 前后对比渲染发现：只留方块模型时，物品展示框里的方块物品失去 `display.fixed` 变成整块，火把火焰失去粒子贴图变成紫黑块；这些都是网格器按名字取的资源，不是方块模型引用的。改名表只在一处，运行时拼出的旧名（如 `entity/bat`）与新名都能取到，网格器不再需要知道哪个版本改了什么。",
+      "consequences": "bundle 多出物品模型与物品贴图，需要重跑 `cargo xtask bake-blocks` 并重测大小；新增一种按名取的贴图要加进 `bake/mod.rs` 的 KEPT_TEXTURES，tint_table 的 entity_texture_names_resolve 会报出漏掉的实体贴图。"
+    },
+    {
+      "id": "D13",
+      "decision": "D3 的落地细则：覆盖层叠在 bundle 包上时，覆盖层单独烘焙再按 id 覆盖到 bundle 包上；但实例有覆盖层且装好的 jar 正是 bundle 要选的那个版本时，改为本机把 jar 与覆盖层一起烘焙。离线回退先用实例自己的 jar，再用其他已安装 jar 中修改时间最新的一个。缓存键：客户端 jar 用内容 sha1；Mod jar 与资源包用「路径、大小、修改时间」的 sha1（目录逐个文件）；文件名带容器格式号与 core 的 `BAKE_REVISION`。bundle 发布在 `https://launcher.lumilio.org/block-assets/<bundle release>/`，同一 release 下文件不变，索引第一次取到后即缓存。",
+      "rationale": "bundle 里的模型已展开父模型，覆盖层里继承 `minecraft:block/cube_all` 之类原版父模型的 Mod 模型单独烘焙时找不到父模型、没有元素；有原版 jar 时一起烘焙才对。按内容给两百个 Mod jar 算 sha1 意味着每次预览读几百 MB；客户端 jar 只有一个，按内容算以免同名不同内容。",
+      "consequences": "没装游戏或装的版本与投影不同、又有 Mod 时，继承原版父模型的 Mod 方块画不出来；要根治需要 bundle 携带原版父模型模板（或烘焙器接受已烘焙的基础包作父模型来源），留作后续。改了烘焙器输出而容器格式不变时要把 `BAKE_REVISION` 加一。"
+    },
+    {
+      "id": "D14",
+      "decision": "T12 的写路径在 core 里只收「改好的字节」：`LauncherService::schematic_read` 返回字节与 FileInfo，界面用 lumilio-schematic 算出新字节后交给 `schematic_apply(instance, plugin, file, bytes, expected, SchematicOperation { kind, summary })`；core 不依赖 lumilio-schematic/Nucleation。文件只经插件的授权到达（`PluginHost::granted` 要求插件开着且未失败，再用 access 的 resolve_write/read_info 同一套路径规则）。备份放 `Layout::schematic_ops(instance)/backups/<路径拍平>/<毫秒>`，全部保留不轮换（Xaero 仍保留最近 10 份）；日志是同目录的 `log.jsonl`，一行一个 JSON（time 秒、operation、file、backup 相对路径、summary，恢复另有 restores），条目编号就是行号；恢复先备份当前文件再写回，自己也记一行，所以恢复可以再恢复。",
+      "rationale": "让 core 保持不带 Nucleation，与 D6/D10 的分层一致，也让 Xaero 与投影共用同一个 `plugins::write::write_checked_keeping`；日志只追加，行号就是稳定 id，不需要另存序号；被日志引用的备份若被轮换删掉，历史页的「恢复」就会失效，所以投影备份不轮换，清理按 D8 交给设置里的保留天数。",
+      "consequences": "界面负责把操作参数写成 summary 的文字；备份目录随操作增长，直到保留天数设置落地；读入上限沿用插件读取的 32 MiB。"
+    },
+    {
+      "id": "D15",
+      "decision": "运行时导出器随启动器分发的方式：编译好的 EntityDump.class 由 `lumilio-block-assets` 以 `include_bytes!` 嵌入，运行前写到 `Layout::model_cache()/entities/dumper/`（内容相同则不写）；xtask 也从同一份字节安装，不再读 tools/ 下的文件。缓存键是 jar sha1 加 class sha1，失败按同一键记录并不再重跑；类路径缺文件或 jar 混淆时不起 JVM、不记失败；预览从不为导出去安装 Java；导出结果统一经 `EntityDump::to_json` 规范化。",
+      "rationale": "嵌入让烘焙与运行时用的是同一份字节而不是两份可能分叉的拷贝，也不需要安装包多带文件；class 变化自动让旧缓存失效，免去手动修订号。同一 jar 与 class 的导出是确定的，失败重跑只会让每次预览多等一个 JVM。缺库属于实例没装完，装完后应能导出，所以不记失败。为一次预览下载几十 MB 的 Java 不划算，退回 entities.dat.z 已够用。Java 自己的浮点写法与 serde 不同，统一规范化后两条路径才能逐字节比较。",
+      "consequences": "改 EntityDump.java 并重编译后，所有本机导出缓存自然失效；清理失败记录需要删除 `entities/*.failed`（或换 class）；xtask 的测试依赖 lumilio-core（仅 dev-dependency）以比对两条路径。"
+    },
+    {
+      "id": "D16",
+      "decision": "绑定表的写法（T7）：一行是 `block:`/`entity:` id 模式（`{name}` 捕获变量）、`when` 条件、主层、贴图候选（取包里第一个有的）、渲染器摆放（共享的 `transforms` 加 `facing` 种类）、静态姿势与按条件的姿势、叠加层、各盔甲槽的层候选（新版槽位层，旧版共享盔甲层只画指定骨骼）、幼体（有自己的层就用，否则按 BabyModelTransform 缩放成人模型）、`renderer_scale`（1.21.2 之前层的根骨骼不带渲染器缩放时才补上）与 `model_replaces`（26.2 起方块模型有元素就不画实体）。变量依次取 id 捕获、行的固定值、方块属性、行的默认值。合成种类（旗帜、三种告示牌文字、陶罐、皮肤、村民、物品展示框、掉落物）是代码里的枚举，由行的 `compose` 选择。几何与旧手抄不同的地方一律以游戏导出为准；只有恶魂保留旧的抬高（触手尖落地），摆放写成数据。陶罐的 `sherds` 按 Minecraft PotDecorations 的顺序（后、左、右、前）读，接受纹样名或陶片物品 id。物品展示框改画包里的 `item_frame` 方块模型。",
+      "rationale": "D5 要求「新增一种实体是加一行」：变量捕获、候选与按版本的退路让同一行覆盖 1.17 到 26.3 的命名与结构变化（cow 的冷暖变体、boat 的木材、1.21.2 把渲染器缩放烘进层、26.x 的盔甲槽位层），而不必在代码里分版本。渲染器的摆放与转向是渲染器类里的常数，不在导出里，所以必须写；写成命名的共享步骤后，lint 与对照测试能逐行核对。",
+      "consequences": "新实体：加一行，lint 会检查层与贴图；需要新的转向方式或合成才动代码。网格器依赖调用方交来的实体几何：没有几何时实体不画，`undrawable_blocks` 会把绑定了却没有层的实体列出来。Nucleation 不再把带木材的船 id 改成 `boat`。"
+    },
+    {
+      "id": "D17",
+      "decision": "Litematica 插件在 View::Studio 之下只保留两条按文件的动作：`export:<路径>`（材料 CSV，经宿主保存对话框）与 `reveal:<路径>`（在文件管理器里显示），路径必须是 schematics/ 下的 .litematic；应用在插件动作后重取视图时，若仍是同一个 `View::Studio { folder }`，宿主保留已打开的工作室实体。工作室还没做好的操作（替换、转换、导出 PNG、删除、元数据编辑）在菜单里置灰并用提示说明原因，而不是隐藏。",
+      "rationale": "CSV 的格式与文案属于插件，搬进宿主会让插件失去它唯一的输出；而插件动作的固定流程是「执行效果再重取视图」，不保留实体就会在每次导出后丢掉选中的文件、视口与检视器。置灰加原因让入口位置从一开始就固定，后续任务只需要把它们点亮（§7 的菜单顺序也一次定下）。",
+      "consequences": "`MenuEntry::unavailable(why)` 成为 kit 的通用能力；T10/T13/T14/T15 完成时把对应条目从 unavailable 改成真正的动作。插件的 `format::Metadata` 与列表/详情视图删除，名称、尺寸等改由宿主用 lumilio-schematic 读取。"
+    },
+    {
+      "id": "D18",
+      "decision": "实体实例（T8）按「实体外观」分组：一个外观是网格器的 `entity:<id>` 加全部属性（姿势、盔甲、变体、颜色），不含位置与偏航；每个外观在原点网格化一次，拥有自己的图集与一组顶点缓冲，所有同外观实体共用它，GPU 每层每个外观一次实例化绘制。只有绑定行 facing 为 horizontal 或 boat 的实体按偏航连续转向并放在精确位置；其余实体（物品展示框、掉落物）保持原来放在所在方块的位置与朝向。剔除：视锥总是剔除；距离只在第一人称时剔除（96 格），环绕视角看的是整栋建筑。",
+      "rationale": "一个实体由主层、叠加层、盔甲层与合成贴图组成，按「模型层」分组会把一只羊拆成几次绘制并要求每层自己的变换与贴图；按外观分组保持网格器已有的完整画法（D16 的绑定行），同时 500 个相同的盔甲架只是一次绘制。外观网格化复用方块所用的 Mesher 与包，不复制资源。只有 horizontal 与 boat 的渲染器按实体偏航转向，其余种类的朝向来自别的状态，沿用旧放置不会改变它们的样子。",
+      "consequences": "外观越多绘制次数与小图集越多（每个玩家皮肤、每种姿势一个）；投影里实体种类通常很少。半透明部件只按实例由远到近，不在模型内排序。需要新的转向方式时改 `Facing::turns_with_yaw` 并加测试。"
+    },
+    {
+      "id": "D19",
+      "decision": "工作室的写操作统一走一条路：界面在后台用 lumilio-schematic 从「选中文件读入时的字节」算出新字节，连同读入时的 FileInfo 发 `Command::Apply`，应用调用 `schematic_apply`；对话框在等待时保持打开并禁用，失败（`WriteFailure::Busy / Conflict / Other`）作为一句话留在字段下面，成功才关闭并出 toast。删除…与「只保留这个」不删除任何文件：core 新增 `plugins::write::remove_checked_keeping` 与 `schematic_ops::remove`，把文件按校验后的样子复制进备份再移走，并记一行（operation 为 delete / dedupe）；服务层 `schematic_remove` 在一次实例租约里按顺序处理多份文件。转换的目标版本来自 `LauncherService::schematic_versions`（方块资源索引里的版本，新到旧），用 P-VERSION 的 `VersionPicker` 列出。替换对话框里每个属性与范围按选项数选控件：含「任意」不超过 4 个用段键，更多用可搜索下拉；目标方块用文字输入。",
+      "rationale": "字节由界面算、core 只收字节是 D14 定下的分层；读入时的 FileInfo 让「读后被改」在 core 里统一拒绝，不需要界面再比一次。把删除做成移进备份，「历史」里的恢复就同时是撤销删除，不必另造回收站；几份文件共用一次租约，避免并发请求互相报 InstanceBusy。",
+      "consequences": "`Event::Read` 多带 FileInfo；工作室多一个 `infos` 表，只保留这个要求同组每份文件都已被扫描读过（否则键置灰并说「正在读取」）。kit 的更多菜单给每一项都加了 `menu-entry-n` 选择器（启用项改用 element 绘制，样子不变），英文测试才能点到可用项。"
+    },
+    {
+      "id": "D20",
+      "decision": "点选与导出都在视口已有的 worker 上做，不另开场景：`Scene` 保留解析后的投影网格，`Scene::pick` 用与绘制相同的相机反投影出射线再做 CPU 体素步进；导出是 worker 队列里的一项，用 `Scene::render` 按请求尺寸离屏绘制。角度预设是视口键行里的一个「角度」下拉而不是六个键；导出对话框的角度包括「当前视角」。",
+      "rationale": "场景（网格、图集、GPU 渲染器）已在 worker 里，另开会再网格化一次并占双份显存；射线用同一 `CameraConfig` 才能和画面对上。窄视口里六个键会挤掉 Orbital / Explore 与复位，预设是一次性动作而非持久选择，所以不用段键。",
+      "consequences": "worker 邮箱多了任务队列，关闭时清空，等待中的导出随视口一起结束；导出会让渲染器按导出尺寸重建一次，下一帧视口再重建回来（约 13 ms）。点选按整格判定，不按模型形状；实体不可选。"
+    },
+    {
+      "id": "D21",
+      "decision": "D13 的后续根治：烘焙器在每个包里保留「被别的模型当作父模型」的模型原样模板（`BakedAssets::parents`，`ParentModel`：父 id 已加命名空间、贴图 id 已规范化、`#name` 引用保留、元素与 display 已解析成一种写法），容器字段为空时不写出，格式号仍是 1；新增 `bake_over(base, overlays)`：覆盖层的模型沿父链缺什么就向基础包借——先借模板，没有模板时借已展开的模型；覆盖层替换了基础包已有的模型 id 时也重新烘焙它。bundle 基础上的覆盖层改为 `bake_over` 后再按 id 叠上，缓存键带 bundle 文件 sha256 与版本。每个来源的 stamp 记方块数与资源文件数，读不了的覆盖层（不是 zip 的 jar）记为 unreadable 跳过而不报错；`BAKE_REVISION` 升到 2。工作室「添加资源包…」只把 zip 的绝对路径记进 `profiles/<id>/schematic-packs.json`，排在实例 Mod 与启用资源包之后；缓存条目旁写 `.sources`，来源删除或改动后下次烘焙删除该条目，移出列表时 `forget` 删除用它烘焙的条目。",
+      "rationale": "只保留被继承的模板而不是全部原始模型：几百个小 JSON，不显著增大 bundle；借已展开模型兜底覆盖 Mod 继承 `minecraft:block/glass` 之类非模板父模型的情况。模板用解析后的统一写法存，使 1.13.2 与 26.x 的同一方块仍烘焙出相同的 assets（既有测试守着）。保留 D13「同版本已装 jar 且有覆盖层就本机一起烘焙」的规则：资源包替换模板（如 cube_all）时只有原始 jar 才能传到所有子模型。",
+      "consequences": "BAKE_REVISION 2 起 bundle 带模板；release 1 尚未发布，首次上传即用这次重烘的产物（T18 已核对每个版本都有 cube_all 等模板）。今后若 bundle 内容再变，需以新的 bundle release 发布。覆盖层替换模板不会传到 bundle 里已展开的子模型。"
+    },
+    {
+      "id": "D22",
+      "decision": "工作室是同一个 StudioView 的两种放置：游戏页插件面板里只画目录树、所选文件的概要与「打开工作室」键；三栏（树、常驻视口、检视器）与全部操作放进每个游戏一个的独立窗口，和地图的独立窗口走同一套机制（gpui_kit::open_window、窗口自有连接、WindowOptions 与 follow_system_appearance）。",
+      "rationale": "游戏页已经叠了页面标签、插件列表和插件面板三层；再塞进带目录树、视口和五个端口标签的工作室，任何窗口宽度下视口都只剩约 400 px，长的资源来源一行在窄列里逐字折行溢出到导航后面。独立窗口给工具应有的空间，面板保留不开窗口就能看的事实；复用地图的窗口机制而不是另写一套。",
+      "consequences": "StudioView::new 多一个 Placement 参数，面板的 open_window 回调经 InstanceIntent::OpenStudioWindow 到应用；应用在 State.studio_windows 登记窗口（按游戏与文件夹），再次打开只激活并切文件；窗口的模型加载与插件动作不经过游戏页实体，toast 走 ToastSink 落在发起的窗口；游戏启停由 launch.rs 通知窗口里的工作室；视口的资源来源读数删除，model-source 三条文案随之删除；设计语言 §12「Schematic studio」改写为面板与窗口。D7 的「视口常驻、不是弹窗」仍成立，常驻的地方从页内改为窗口。"
+    },
+    {
+      "id": "D23",
+      "decision": "原版方块与实体几何永远来自 bundle：删除本机烘焙与运行时 Java 导出。Mod 与资源包覆盖层保留但默认关闭，按来源开关。",
+      "rationale": "本机烘焙与 Java 导出各有一条会静默失败的路径（T6 的 MissingVariable），覆盖层里带自定义加载器或代码生成的模型只能猜；渲染质量不该取决于用户机器上装了什么。bundle 离线生成、确定性、可测。",
+      "consequences": "新快照到 bundle 更新之间用最近正式版的资源画；EntityDump 只在 xtask 烘焙时运行；「资源来源」从只读列表变成开关列表；D3、D13、D15 的本机路径作废。"
+    },
+    {
+      "id": "D24",
+      "decision": "视口是操作的起点：点到的方块以浮动卡片就地显示并带动作；画不出的方块画成缺失贴图占位而不是省略。",
+      "rationale": "参考 shulkr 查看器：信息出现在你看的地方，未知方块可见可点。把「画不出」从隐藏的技术详情变成一个能动手的对象。",
+      "consequences": "检视器不再被动切标签；替换的主要入口从菜单移到卡片与表格行；技术详情里的列表保留作为汇总。"
+    },
+    {
+      "id": "D25",
+      "decision": "版本是头部事实：投影版本与游戏版本并列显示，缺失方块以橙色标签与「转换到 y…」提示；转换默认另存，结果分丢失 / 近似 / 保留三组。",
+      "rationale": "投影与游戏版本不一致是最常见的失败来源，现在只在挑资源时用到、界面不提示；Nucleation 对目标版本不认识的方块原样写出，不列出就是静默损坏。",
+      "consequences": "读入文件时多一次目录对照；转换对话框重做；「保留」组接到替换的映射表。"
+    },
+    {
+      "id": "D26",
+      "decision": "替换从方块出发，对话框是「从 → 到」两栏，可加行成映射表并存为方案。",
+      "rationale": "空表单加下拉选源方块不符合直觉；给 Mod 找原版替代、给版本转换补缺都是多条映射，手工一条条换不可复用。",
+      "consequences": "方案存在启动器数据里按名字管理；历史记录方案名；属性匹配语义（= 值 / 任意、沿用同名属性）成为 lumilio-schematic 的 API。"
+    },
+    {
+      "id": "D27",
+      "decision": "工作室重新构图：游戏页面板是「图鉴」（缩略图卡片网格，负责看看有什么），窗口是「材料台」（视口 + 方块图标格子组成的材料面板，两者联动，负责动手）。方块是一切操作的单位：在视口点方块等于在格子里选中它那一种，方块卡（D24）取消；五个端口标签收成 材料 / 信息 / 历史；资源来源、体积、方块实体进折叠的「技术信息」。保留主题色板、字体与键的样子，换的是构图：画面与图标为主，名字代替 id。",
+      "rationale": "2026-10-14 Project Maintainer 在真实投影上看了 T22 之后的窗口：文件名出现三次、尺寸两次；视口被拆成键行、带边框的画面、提示行三条，方块卡挡住约四分之一画面，七行字说一个方块；方块全是 `minecraft:` id 与 `type bottom` 这类属性原文；资源来源的 jar 文件名占了检视器一半；最有用的材料清单藏在第二个标签。比较过「画布铺满、控件浮在上面」（浮层与模型抢同一块像素，720 × 480 下解决不了）、「先图鉴再详情」（浏览最好，但操作离入口远）与「材料台」，选了面板用图鉴、窗口用材料台：正好对上 D22 的两种放置，一边浏览一边动手，各自不挤。玩家拿投影最常做的事——看要备多少材料、找某种方块在哪、换掉它——都从材料格子出发。",
+      "consequences": "T30 删掉窗口的目录树（换文件改成头部的文件切换列表）和视口下方的提示行；T22 的方块卡由读数板与材料详情取代；替换对话框的入口改为材料详情、头部橙键与 More；design-language.md §12 的「Schematic studio」整节改写，§12 的显示屏规则（D7）不变；T29 的面板需要 T28 的缩略图，T30 需要 T26 的名字与 T27 的图标。"
+    },
+    {
+      "id": "D28",
+      "decision": "方块、物品与实体的名字来自游戏自己的语言文件，在烘焙时并进 bundle（en_us 在客户端 jar 里，zh_cn 在资源索引里），按语言合成一份最新版本优先的名字表；属性的键与值不在游戏语言文件里，由启动器的语言目录提供。",
+      "rationale": "id 是给程序看的；游戏里玩家认的是「平滑石台阶」。名字随版本有小改动（Grass → Short Grass），界面写最新的叫法即可，旧版本独有的 id 仍要有名字。语言文件与方块贴图同属 Mojang 资源，D2 已确认随 bundle 分发；只取三类键，表很小。bundle release 1 还没发布，加一个文件不需要升 release。",
+      "consequences": "blocks.json 多一项 names；NOTICE 写明语言文件的来源；界面查不到名字时退回 id，不报错；属性词条随语言目录维护。"
+    },
+    {
+      "id": "D29",
+      "decision": "方块图标与投影缩略图都由同一个离屏渲染器从 bundle 画出，缩略图按「内容指纹、bundle release」缓存在启动器数据目录；图标在视口的 worker 上随文件一次画齐，不落盘。平面物品取物品贴图，方块物品按 `gui` 显示变换用正交相机画；方块与物品 id 不同的写成数据表。",
+      "rationale": "烘焙包已经保留全部 `item/` 模型和显示变换（D12），渲染器已有正交相机与离屏出图（T10 的导出 PNG），不需要自己画图标或另找素材；物品栏的样子是玩家最熟悉的方块图像。方块与物品的对应关系在游戏代码里，不在资源里，和绑定表（D16）一样只能写成有 lint 的表。缩略图要为整个文件夹的投影各网格化一次，按内容缓存让重开面板与改名不会重画；图标只有几十个、每个是一格方块，一个渲染器一批画完不到一秒，落盘反而多一种失效。",
+      "consequences": "lumilio-schematic-render 多两个离屏入口；Layout::model_cache() 下多 thumbnails/ 一个目录，随清理设置一起管理；图标一批共用一个渲染器（Nucleation 的 set_only_mesh 与 set_fit_bounds），避免每个图标约 100 ms 的管线创建。"
+    },
+    {
+      "id": "D30",
+      "decision": "视口高亮用格子遮罩：worker 从投影网格生成每格一字节的三维遮罩，片元着色器按世界坐标（沿法线往里退一点）取所在格子查遮罩，决定原色、变淡或丢弃；不改网格器的顶点格式，也不重新网格化。",
+      "rationale": "顶点里没有方块种类，给每个顶点加种类编号要改网格器和全部守卫；按种类重新网格化又太慢。顶点已经是世界坐标，格子坐标在着色器里就能算出来；遮罩只在高亮种类变化时上传，大小等于投影体积（常见投影不到 1 MB）。",
+      "consequences": "forks/nucleation 的 shader.wgsl 与 gpu.rs 多一个绑定组，forks/README.md 记下这项本地改动；体积超过三维纹理上限（每边 2048）的投影不高亮并在技术信息里说明。"
+    },
+    {
+      "id": "D31",
+      "decision": "视口里的单击与材料面板里的单击是两种意思：材料格子选中一种方块（高亮这一种、详情在面板底部）；视口单击检视那一个方块（只给这一格描边、检视卡在视口左下），像 Litematica 的信息叠层（I 键）。两者互不改动，检视卡的「选中这种」是唯一的桥。取代 D27 里「在视口点方块等于在格子里选中它那一种」。",
+      "rationale": "Project Maintainer 看过 T30 后指出：在画面里点的是一个具体的方块，想知道的是它自己的朝向、方块实体里装了什么，而不是同类在哪；问同类在哪是材料面板的事。把两种问题分给两个地方，各自的结果也待在提问的地方（画面里描边与卡片、面板里高亮与详情）。描边沿用 D30 的做法在着色器里按格子算，不需要线框几何，带宽按像素算，任何缩放都看得见。",
+      "consequences": "Nucleation 着色器多两个 uniform（描边的格子与颜色），forks/README.md 记下；worker 多「检视」与「描边」两种任务；lumilio-schematic 多 inspect 模块读方块实体；视口回调不再带拾取结果，工作室从视口读检视的方块；「只看这种」时拾取要跳过被藏起的方块，否则点到看不见的东西。"
+    },
+    {
+      "id": "D32",
+      "decision": "实体不按缺口逐个补，分三层根治：其一，读状态与摆放按游戏实体类层级的类别各实现一次（挂在方块上、生物、矿车、船、展示实体、掉落物……），类别由基类的存档字段（挂在方块上的实体都存所在方块与朝向）或导出器读出的类层级决定，不写 id 列表；其二，外观（模型层、默认贴图）由导出器在游戏里构造渲染器时记录，变体读游戏数据（`*_variant`），只有真正靠代码合成的外观留手写；其三，bundle 每个版本注册表里的每种实体都必须被画出或明确标为没什么可画，否则烘焙与测试失败。",
+      "rationale": "Project Maintainer 指出按这次碰到的缺口补绑定行就是打补丁：一份投影里的缺口只是样本。展示框也不是缺数据，而是「挂在方块上」这一类的摆放整个没实现：朝向只从偏航角推（地面与天花板上的框画成立着的），模型放在格子的另一侧（游戏的模型在 +z 一侧，网格器当成在 −z 一侧，所以墙上的框离开了墙），框内物品不随 ItemRotation 转。游戏里这些规则按类别只写一次，照类别实现就一次修好整类。外观知识在游戏代码里，导出器已经能在普通 JVM 里启动注册表、调用模型层定义，让它多记录渲染器的调用，比手抄便宜，也不会随版本过时；做不到的由覆盖检查列出，让新版本的缺口在烘焙时暴露，而不是在用户打开投影时。",
+      "consequences": "Nucleation 的实体转换与 Schematic-Mesher 的展示框摆放按类别重写，forks/README.md 记下；EntityDump 多导出注册表、类层级、渲染器的模型层与默认贴图，构造渲染器在普通 JVM 里能走多远先在 26.3 上验证（T34），走不通的退回手写行并由覆盖检查列出；烘焙器读 `*_variant` 数据与 textures/painting/；entities.dat.z 格式号升级，所以排在发布 bundle 之前。"
+    },
+    {
+      "id": "D33",
+      "decision": "资源来源的开关按实例与投影文件夹记在启动器数据（profiles/<id>/schematic-sources.json），一个文件用包含它的最深的那个文件夹的开关；从工作室添加的包在添加它的文件夹里打开，移除时在所有文件夹里关掉。缩略图按内容指纹与「样子」（这个文件夹打开的来源各自的戳）存，开关读一次、按它画、按它存；覆盖层的烘焙缓存每种开关组合一份，只留最近用过的 8 份。",
+      "rationale": "开关跟着文件夹走，plugin_model(instance, plugin, file) 不必多一个参数，实例页的加载路径照旧。缩略图原来只按内容存，打开一个模组后旧图仍在；开关在画的时候被拨动，若存的时候再读一次开关，旧来源画的图会存到新样子下，所以只读一次。每种组合都烘焙一份覆盖层，原来只删来源变了或不在了的，会无限长。",
+      "consequences": "core 的 schematic_thumbnail 收下画图的闭包，读、画、存在一处完成；工作室在开关保留后让所有缩略图重新要一次，正在画的那张的回答丢掉再要。LocalCache 读到条目时更新它的修改时间，写入后按修改时间删去多余的。"
+    },
+    {
+      "id": "D34",
+      "decision": "没有自己那一行的实体，先按渲染器的类找行（表里的 renderers：ArrowRenderer 一行画箭与光灵箭），再退到由外观生成的行；行能写朝向与俯仰的符号（aim）、带的方块（carries）、平面图（sprite）、朝向镜头（billboard）。静态画面里按存档能确定的都画；游戏只在动画或客户端事件里才有的不画：唤魔者尖牙（攻击开始前不显示）、浮漂（要有玩家拉着）不算缺口；潜影贝弹的外层光晕、TNT 的膨胀与闪白、末地水晶的光束、风弹的旋转、展示实体的插值、药箭的颜色（1.20.5 起按游戏写法本来就不着色）不画。",
+      "rationale": "同一个渲染器画的实体放法相同，按类写一次就覆盖它画的每一种，新版本里同一个渲染器的新实体不用再加行；按 id 写会回到打补丁。静态画面没有时间，按 age 0 的姿态画才与游戏在那一刻一致；靠客户端事件才出现的东西，存档里本来就没有。",
+      "consequences": "绑定表多了 renderers 段与几个字段；覆盖检查、表 lint 同时检查按类的行；lint 还报告「每个版本的外观都画得一样」的手写行，删掉了六行（苦力怕、蜘蛛、岩浆怪、烈焰人、铁傀儡、蝙蝠）。"
+    },
+    {
+      "id": "D35",
+      "decision": "替换的目标沿用被替换方块的同名属性，以目标版本方块表（blockstates）提到的属性与取值为准；方块表没提到的属性（没有模型用到的，如 waterlogged）不沿用，取默认值。转换默认另存为「名 (y).litematic」（重名加编号）并选中新文件，只有打开「覆盖原文件」才写回；新写出的文件也记一行历史，恢复那一行把它收进备份。方案与最近用过的目标存在启动器数据（schematic-replace.json），所有实例共用。",
+      "rationale": "方块表是 bundle 里每个版本唯一现成的方块属性来源；沿用它没提到的属性会造出游戏不认识的状态（stone[waterlogged=false]）。要连 waterlogged 一起沿用，需要每个版本完整的方块状态定义，bundle 现在没有。另存不动原文件，转换的损失可以先在游戏里看，回不去的风险最小；恢复「新文件」行等于删掉它但不真删，与删除的做法一致。方案是跨投影的工作方法，不属于某个实例。",
+      "consequences": "schematic_ops::apply 的 expected 改为 Option（None 新建、已存在则冲突），restore 对没有备份的行改为把文件收进备份，日志文件夹在第一次写之前创建。以后若 bundle 带上完整的方块状态定义，沿用规则可换成按定义判断，方块表只作退路。"
+    },
+    {
+      "id": "D36",
+      "decision": "Mod 与资源包的叠放顺序按实例记一份（schematic-order.json），开关仍按投影文件夹记；顺序没提到的来源排在已排好的上面（优先级最低），新添加的资源包排在最下面。投影没有记录数据版本时显示「版本未知」，不猜版本、不自动转换，资源按实例的游戏版本取。",
+      "rationale": "同一个实例里不同文件夹要不要用某个资源包是常见区别，顺序却很少因文件夹而不同；按实例记一份最少惊讶。新装的 Mod 默认不该盖过已经手排好的资源包，新加的资源包通常就是想用它盖过别的（如红石显示材质包）。把没有版本的文件当作 26.1 去转换会在旧投影上做反向转换、改掉方块 ID，比显示「版本未知」糟得多。",
+      "consequences": "覆盖层烘焙的键与缩略图的外观键都随顺序变化，换序不复用旧烘焙，最近用过的 8 份按 LRU 留着。没有版本的投影不能在工作室里转换；以后若要支持，需要让人先指定它的版本。"
+    }
+  ],
+  "references": [
+    ".agents/plans/schematic-render-parity.json",
+    ".agents/plans/world-explorer.json",
+    ".agents/plans/wasm-plugin-registry.json",
+    "crates/lumilio-schematic-render/README.md",
+    "forks/README.md",
+    "forks/nucleation/src/dataconverter/README.md",
+    "crates/lumilio-xtask/src/block_colors.rs",
+    "crates/lumilio-plugin-world-explorer/data/block-colors/SOURCE.md",
+    "docs/design-language.md",
+    "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json",
+    "https://schemat.io/view",
+    "https://github.com/modrinth/code/tree/main/packages/app-lib",
+    "https://github.com/HMCL-dev/HMCL",
+    "https://github.com/PaperMC/DataConverter",
+    "https://www.shulkr.com/en/minecraft-schematic-viewer",
+    "https://www.shulkr.com/en/minecraft-schematic-planner"
+  ],
+  "dependencies": [
+    "schematic-render-parity"
+  ],
+  "lessonsLearned": [
+    "2026-10-13 T1 手写的 `texture_renames.json` 只有 23 条，用 49 个真实 jar 跑 T2 的相邻版本比对后报出 89 处漏登的 `entity/` 搬家（多数在 26.1 与 1.21.2），漏掉的那些在旧版本里会以旧名存在、绑定表按新名找不到。原因：改名表凭记忆补，而不是从 jar 里比出来。Guard：`cargo xtask bake-blocks` 每次烘焙都比对相邻版本并列出未登记的搬家；`crates/lumilio-xtask/src/tests.rs` 的 every_rename_points_at_a_final_name 保证表里每条都直接指向最新名。只比像素相同的搬家，搬家时重画了的贴图仍要靠 T7 的绑定表 lint 发现。",
+    "2026-10-13 T4 的烘焙器只保留方块状态引用的模型与 block/、colormap/、entity/ 贴图，所有守卫都通过，但前后对比渲染里物品展示框的方块物品变成整块、火把火焰变成紫黑块：网格器还按名字取物品模型、粒子、字体与容器贴图，夹具里没有这些。原因：守卫只覆盖方块模型的语义，没有覆盖「运行时按名取的资源」这一类。Guard：`lumilio-block-assets` 的 item_models_keep_their_display_transforms；`forks/schematic-mesher/tests/tint_table.rs` 的 entity_texture_names_resolve 对真实 26.3 包检查源码里写死的实体贴图名；格式变动后用 `preview_timings` 的 `LUMILIO_FRAME_PATH` 对本地投影做前后像素对比。",
+    "2026-10-14 T6 运行时导出的服务层测试用的版本 json 没有启动参数，`build_launch_plan` 取类路径一路通过；对真实 26.3 版本 json 实测时报 `MissingVariable(\"auth_player_name\")`，导出永远不会跑、预览静静退回 entities.dat.z。原因：夹具比真实元数据少了会失败的那一部分。Guard：新增只算类路径的 `ReleaseManifest::class_path`；服务层夹具的版本 json 加上带 `${auth_player_name}` 的 arguments，改回 `build_launch_plan` 后两个服务层测试失败；被忽略的 `real_26_3_dump_matches_the_bake` 对真实缓存再跑一次。",
+    "2026-10-14 T7 删除手抄几何前，用临时对照测试把它与 26.3（床、告示牌为 26.1.2）的导出逐面比较，发现手抄文件里一直没被守卫抓到的错：钟体整体低 1 像素；墙上悬挂告示牌贴在墙边，而 HangingSignRenderer 把它放在方块中心、横杆垂直于墙；悬挂告示牌的链条与猪灵头、龙头只是近似的方块；马、村民、凋灵骷髅缺渲染器缩放（1.1、0.9375、1.2）；铁傀儡脚低于地面 3 像素；蝙蝠是 1.20.3 之前的旧模型。原因：几何靠人从某个旧版本抄进代码，没有任何东西拿它和游戏比。对照时还险些把 1.21.2 起已烘进层根骨骼的缩放（猫 0.8、恶魂 4.5 等）再乘一次。Guard：手抄文件整个删除，几何只来自导出；entity_binding_lint 对真实 bundle 检查每行的层与贴图；entity_layers 的 a_renderer_scale_is_applied_once 保证缩放只算一次（让它无条件生效时失败）。",
+    "2026-10-14 T16 概览「重复」一节的行本身可点（选中该文件），行尾新加的「只保留这个」键的点击冒泡到行上，第一次跑界面测试时点键把 B 选中、多发了一次读取，确认框之前就有命令发出。原因：kit 的 Key 不阻止冒泡，嵌在可点行里的键都会同时触发行。Guard：键与外层槽位都 `stop_propagation`；tests/ops.rs 的 keeping_one_moves_the_others_to_the_backups_and_history_lists_it 断言确认前没有任何命令（去掉阻止冒泡时在这里失败）。",
+    "2026-10-14 T14 以为「向后转换的损失都会出现在 LossReport 里」，界面测试用 26.3 的 cherry_log 转到 1.13.2 却得到空报告：Nucleation 只在倒推有转换器的版本步时记损失，一个旧版本根本没有的新方块原样写出、不算损失。原因：领域测试只测了扁平化之前（1343）的目标，没有测 bundle 实际列出的版本范围。Guard：`lumilio-schematic` 的 a_block_the_target_does_not_have_is_a_loss 用 1.13.2 的方块表夹具断言 cherry_log 报为丢失（并断言只靠 Nucleation 时报告为空），界面测试改用 bundle 列出的 1.13.2；去掉方块表检查后两处测试都失败。另：方块状态文件只写模型用到的属性（楼梯的 waterlogged 不在里面），所以「目标没提到的属性」只在源版本的方块状态提到它时才算损失，否则会把每个含水方块都误报。",
+    "2026-10-14 T17 写优先级测试时发现：bundle 基础上，一个只替换 `minecraft:block/stone` 模型、不带方块状态文件的资源包完全不起作用——覆盖层单独烘焙只烘焙自己方块状态引用的模型，替换的原版模型从未进入图层。原因：D13 的「单独烘焙再按 id 叠上」只测了带方块状态的覆盖层。Guard：`bake_over` 把覆盖层里与基础包同 id 的模型也加入烘焙；block-assets 的 a_replaced_base_model_is_baked_into_the_layer 与 core 的 a_resource_pack_wins_over_a_mod_which_wins_over_the_base（bundle 分支）在去掉这一步时失败。",
+    "2026-10-14 T4 的前后像素残差在 10-13 被归为「图集位置或面序」两个候选并交给目视，挂了一天；其实在改动前代码的临时 worktree 里只改一个变量（图集键的写法）重放，14 张渲染当场与改动后逐字节一致，面序无关、也不是渗色。原因：只看网格转储的差别清单，没有做单变量重放。Guard：baked_spellings 的 a_texture_written_with_and_without_its_namespace_is_one_atlas_slot 与 meshing_the_same_blocks_twice_gives_the_same_atlas_and_buffers；做法：前后对比有残差时，先确认两边各自可复现（各跑两次），再在旧代码上逐个套用新管线的差别，直到字节一致，再判断哪一个是有意的改动。",
+    "2026-10-14 T9 把三栏工作室塞进游戏页的插件面板，所有版式测试（720 px 下三栏可见、标签不截断）都通过，真机截图却是视口约 400 px、资源来源一行逐字折行溢出到底部导航后面。原因：测试只断言「有没有」「不超出」，没有断言主内容拿到应有的份额，也没有用真实长度的覆盖层列表。守卫：T20 改为独立窗口；tests/window.rs 断言视口至少 240 px；长文本不再以行内读数出现，统一进硬线表格。",
+    "2026-10-14 T9–T22 的界面任务都按验收完成、测试全过，Project Maintainer 第一次在真实投影上看窗口就判为太乱：全是文字和 id，没有一张图，几层信息挤在画面上。原因：验收只写了「有哪些信息、放在哪」，没写「第一眼看到什么」；资源管线里没有名字和图标数据，界面只能把 id 原样写出来。守卫：D27 起界面任务的验收写明主画面与第一眼的内容；T26 把名字放进 bundle，T30 的测试断言材料格子与读数板写的是名字而不是 `minecraft:` id（把名字查询换成直接用 id 时失败）。",
+    "2026-10-15 forks/ 在 workspace 之外，just check 从不构建它们的测试：Schematic-Mesher 的库内测试因 MeshOutput 改成 MeshLayer 早已编译不过，没有任何检查报出来，T35 新写的单元测试一开始也跑不了。守卫：justfile 新增 just forks（各自独立的 target 目录跑两个 fork 的测试），just ci 在 just check 之后运行它；修好了导出测试，atlas_uv_regression 缺上游的 pack.zip 时说明并通过。",
+    "2026-10-15 T23、T24 的三个开关（只看不兼容、覆盖原文件、不限属性）在真实窗口里只有推子没有字：Fader 的 label 只用于读屏，放在没有行标签的地方就什么也不写；测试只查开关在不在。守卫：Fader::shown() 把标签写在 LED 后、点字也切换，三处改用它；controls 的 a_shown_fader_writes_its_label_and_the_words_toggle_it 与 studio 的版本测试查 `-label`（不画标签时两项都失败）。",
+    "2026-10-15 从「更多」打开转换版本时，游戏版本还没到就没有默认目标，之后也不再补上：测试的夹具总是先给游戏版本再开对话框。守卫：Event::Game 到达时 game_to_dialog 把它交给开着的转换对话框（prefer + set_versions，已选过版本时不动）；the_convert_dialog_takes_the_game_version_when_it_arrives 先开对话框再给版本（去掉这一步时失败）。",
+    "2026-10-15 T24 的替换对话框在下拉里写 `minecraft:` ID，违背了 T30 那条教训（界面写名字不写 ID）：那次的守卫只查材料格子和读数板，新的界面没有被它覆盖。守卫：源与目标下拉改用 BlockChoice（名字为标签、ID 为值并作说明、两者都能搜），block_pickers_show_names_and_find_names_and_ids 在标签退回 ID 时失败；以后新加的方块下拉也用 BlockChoice。",
+    "2026-10-15 just check 的 prune 在 target/ 超过 80 GB 时 cargo clean，把 target/block-assets（烘焙结果与下好的 Mojang jar）一起删了，发布前只能重新烘焙。守卫：prune 清理前把 target/block-assets 挪到 .prune-block-assets（已忽略）、清理后无论成败都挪回，在一个能清理和一个清理失败的临时 crate 上都试过。"
+  ]
+}

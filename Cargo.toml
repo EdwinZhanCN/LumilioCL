@@ -8,10 +8,13 @@ members = [
     "crates/lumilio-plugin-api",
     "crates/lumilio-nbt",
     "crates/lumilio-anvil",
+    "crates/lumilio-block-assets",
     "crates/lumilio-plugin-crash-analyzer",
     "crates/lumilio-plugin-litematica",
     "crates/lumilio-plugin-modrinth",
+    "crates/lumilio-plugin-curseforge",
     "crates/lumilio-plugin-discord",
+    "crates/lumilio-schematic",
     "crates/lumilio-schematic-render",
     "crates/lumilio-skin-render",
     "crates/lumilio-pointer",
@@ -27,7 +30,7 @@ exclude = ["forks/nucleation", "forks/schematic-mesher", "forks/gpui-component",
 gpui-component = { path = "forks/gpui-component" }
 
 [workspace.package]
-version = "0.1.3"
+version = "0.1.6"
 edition = "2024"
 publish = false
 rust-version = "1.95"
@@ -49,9 +52,12 @@ lumilio-plugin-api = { path = "crates/lumilio-plugin-api" }
 lumilio-plugin-crash-analyzer = { path = "crates/lumilio-plugin-crash-analyzer" }
 lumilio-plugin-litematica = { path = "crates/lumilio-plugin-litematica" }
 lumilio-plugin-modrinth = { path = "crates/lumilio-plugin-modrinth" }
+lumilio-plugin-curseforge = { path = "crates/lumilio-plugin-curseforge" }
 lumilio-plugin-discord = { path = "crates/lumilio-plugin-discord" }
 lumilio-nbt = { path = "crates/lumilio-nbt" }
 lumilio-anvil = { path = "crates/lumilio-anvil" }
+lumilio-block-assets = { path = "crates/lumilio-block-assets" }
+lumilio-schematic = { path = "crates/lumilio-schematic" }
 lumilio-schematic-render = { path = "crates/lumilio-schematic-render" }
 lumilio-skin-render = { path = "crates/lumilio-skin-render" }
 lumilio-pointer = { path = "crates/lumilio-pointer" }
@@ -60,6 +66,8 @@ lumilio-cubiomes = { path = "crates/lumilio-cubiomes" }
 lumilio-plugin-world-explorer = { path = "crates/lumilio-plugin-world-explorer" }
 lumilio-ui = { path = "crates/lumilio-ui" }
 md-5 = "0.11"
+# Already built for `image`; read row by row to shrink large PNGs (lumilio-core picture.rs).
+png = "0.18"
 regex = "1.11"
 rsa = { version = "0.9", features = ["getrandom"] }
 reqwest = { version = "0.13.4", features = ["stream"] }
@@ -69,11 +77,13 @@ serde_json = "1"
 sha1 = "0.11"
 sha1-legacy = { package = "sha1", version = "0.10", features = ["oid"] }
 sha2 = "0.11"
+tar = "0.4.46"
 toml = "0.9"
-tokio = { version = "1.53", features = ["fs", "io-util", "macros", "net", "process", "rt-multi-thread", "sync", "time"] }
+tokio ={ version = "1.53", features = ["fs", "io-util", "macros", "net", "process", "rt-multi-thread", "sync", "time"] }
 tempfile = "3"
 url = "2.5"
-zip = { version = "8.6", default-features = false, features = ["deflate"] }
+zip = { version = "9.0.3", default-features = false, features = ["deflate"] }
+zstd = { version = "0.13", default-features = false }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
@@ -104,6 +114,6 @@ opt-level = 3
 debug = 0
 
 # Readback colour conversion touches every pixel. Keep it vectorized in the
-# development app as well; the GPUI-facing view remains unoptimized (ADR 0028).
+# development app as well; the GPUI-facing view remains unoptimized.
 [profile.dev.package.lumilio-schematic-render]
 opt-level = 3

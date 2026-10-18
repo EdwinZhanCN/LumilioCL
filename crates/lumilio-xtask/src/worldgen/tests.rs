@@ -49,6 +49,53 @@ fn original_1_21_4_export_reconstructs_every_upstream_node() {
 }
 
 #[test]
+fn checked_in_generated_tables_are_reproducible() {
+    let root = root();
+    for (table, rendered) in [
+        ("decorations.h", decorations::render(&root).unwrap()),
+        ("loot.h", loot::render(&root).unwrap()),
+    ] {
+        assert_eq!(
+            rendered,
+            std::fs::read_to_string(root.join("forks/cubiomes/tables").join(table)).unwrap(),
+            "{table}"
+        );
+    }
+}
+
+#[test]
+fn decoration_modifiers_the_fork_cannot_evaluate_are_refused() {
+    let ids = serde_json::from_str(include_str!("biome-ids.json")).unwrap();
+    let release = |placement: Value| {
+        vec![(
+            "26.3".to_owned(),
+            serde_json::json!({
+                "dimensions": {"overworld": {"min_y": -64, "height": 384}},
+                "features": [{"name": "fossil_upper", "dimension": "overworld",
+                    "step": 3, "index": 0, "placement": placement, "biomes": ["desert"]}],
+            }),
+        )]
+    };
+    let table = decorations::table(
+        &release(
+            serde_json::json!([{"type": "minecraft:rarity_filter", "chance": 64},
+            {"type": "minecraft:in_square"}, {"type": "minecraft:biome"}]),
+        ),
+        &ids,
+    )
+    .unwrap();
+    assert!(table.contains("{ MC_26_3, DIM_OVERWORLD, Deco_Fossil_Upper, 30000, -64, 384,"));
+    assert!(table.contains("{DP_RARITY, 64, 0, 0, 0}, {DP_IN_SQUARE, 0, 0, 0, 0}"));
+    // A modifier that draws random numbers unknown to the fork would shift
+    // every later draw: the generator stops instead of guessing.
+    let unknown = decorations::table(
+        &release(serde_json::json!([{"type": "minecraft:noise_based_count"}])),
+        &ids,
+    );
+    assert!(unknown.unwrap_err().contains("noise_based_count"));
+}
+
+#[test]
 fn checked_in_new_trees_are_reproducible_and_shared_only_when_equal() {
     let root = root();
     let ids = serde_json::from_str(include_str!("biome-ids.json")).unwrap();

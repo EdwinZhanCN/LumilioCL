@@ -1,11 +1,13 @@
 //! Conversions between the launcher's content types and the plugin API's.
 
-use super::kinds::{ProjectKind, SortIndex};
+use super::kinds::{Catalog, ProjectKind, SortIndex, TextFormat};
 use super::project::{GalleryImage, Project, ProjectLinks};
 use super::query::{Pick, SearchQuery, Stance};
 use super::search::{Environment, SearchHit, SearchPage, SideSupport};
 use super::tags::{CategoryTag, GameVersionTag, LoaderTag, ProjectSummary};
-use super::versions::{Dependency, DependencyKind, ReleaseChannel, Version, VersionFile};
+use super::versions::{
+    Dependency, DependencyKind, PackFileKind, ReleaseChannel, ResolvedFile, Version, VersionFile,
+};
 use lumilio_plugin_api::content as api;
 
 pub(super) fn kind_to_api(kind: ProjectKind) -> api::ProjectKind {
@@ -109,13 +111,11 @@ fn environment_from_api(environment: api::Environment) -> Environment {
 
 pub(super) fn page_from_api(page: api::SearchPage) -> SearchPage {
     SearchPage {
-        source: String::new(),
         total_hits: page.total_hits,
         hits: page
             .hits
             .into_iter()
             .map(|hit| SearchHit {
-                page_url: hit.page_url,
                 project_id: hit.project_id,
                 slug: hit.slug,
                 title: hit.title,
@@ -131,18 +131,35 @@ pub(super) fn page_from_api(page: api::SearchPage) -> SearchPage {
                 updated: hit.updated,
                 environment: hit.environment.map(environment_from_api),
                 icon_url: hit.icon_url,
+                page_url: hit.page_url,
+                manual_download: hit.manual_download,
             })
             .collect(),
     }
 }
 
+pub(super) fn format_from_api(format: api::TextFormat) -> TextFormat {
+    match format {
+        api::TextFormat::Markdown => TextFormat::Markdown,
+        api::TextFormat::Html => TextFormat::Html,
+    }
+}
+
+pub(super) fn catalog_from_api(catalog: api::Catalog) -> Catalog {
+    match catalog {
+        api::Catalog::Modrinth => Catalog::Modrinth,
+        api::Catalog::CurseForge => Catalog::CurseForge,
+    }
+}
+
 /// The project and the author the source named for it, if any.
-pub(super) fn project_from_api(project: api::Project) -> (Project, Option<String>) {
+pub(super) fn project_from_api(
+    project: api::Project,
+    format: TextFormat,
+) -> (Project, Option<String>) {
     let author = project.author;
     (
         Project {
-            source: String::new(),
-            page_url: project.page_url,
             id: project.id,
             slug: project.slug,
             title: project.title,
@@ -179,12 +196,15 @@ pub(super) fn project_from_api(project: api::Project) -> (Project, Option<String
                 .collect(),
             icon_url: project.icon_url,
             game_versions: project.game_versions,
+            page_url: project.page_url,
+            manual_download: project.manual_download,
+            body_format: format,
         },
         author,
     )
 }
 
-pub(super) fn version_from_api(version: api::Version) -> Version {
+pub(super) fn version_from_api(version: api::Version, format: TextFormat) -> Version {
     Version {
         id: version.id,
         project_id: version.project_id,
@@ -198,17 +218,7 @@ pub(super) fn version_from_api(version: api::Version) -> Version {
         game_versions: version.game_versions,
         loaders: version.loaders,
         published: version.published,
-        files: version
-            .files
-            .into_iter()
-            .map(|file| VersionFile {
-                url: file.url,
-                filename: file.filename,
-                primary: file.primary,
-                size: file.size,
-                sha1: file.sha1,
-            })
-            .collect(),
+        files: version.files.into_iter().map(file_from_api).collect(),
         dependencies: version
             .dependencies
             .into_iter()
@@ -226,11 +236,13 @@ pub(super) fn version_from_api(version: api::Version) -> Version {
             .collect(),
         downloads: version.downloads,
         changelog: version.changelog,
+        changelog_format: format,
     }
 }
 
 pub(super) fn category_from_api(tag: api::CategoryTag) -> CategoryTag {
     CategoryTag {
+        id: tag.id,
         name: tag.name,
         header: tag.header,
         kind: kind_from_api(tag.kind),
@@ -266,5 +278,33 @@ pub(super) fn summary_from_api(summary: api::ProjectSummary) -> ProjectSummary {
         kind: summary.kind.map(kind_from_api),
         icon_url: summary.icon_url,
         author: summary.author,
+        page_url: summary.page_url,
+    }
+}
+
+fn file_from_api(file: api::VersionFile) -> VersionFile {
+    VersionFile {
+        url: file.url,
+        filename: file.filename,
+        primary: file.primary,
+        size: file.size,
+        sha1: file.sha1,
+        download_page: file.download_page,
+    }
+}
+
+pub(super) fn resolved_from_api(file: api::ResolvedFile) -> ResolvedFile {
+    ResolvedFile {
+        project_id: file.project_id,
+        version_id: file.version_id,
+        title: file.title,
+        kind: match file.kind {
+            api::PackFileKind::Mod => PackFileKind::Mod,
+            api::PackFileKind::ResourcePack => PackFileKind::ResourcePack,
+            api::PackFileKind::Shader => PackFileKind::Shader,
+            api::PackFileKind::DataPack => PackFileKind::DataPack,
+            api::PackFileKind::Other => PackFileKind::Other,
+        },
+        file: file_from_api(file.file),
     }
 }

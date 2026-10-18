@@ -32,13 +32,6 @@ impl<T: Transport + Clone> LauncherService<T> {
         cancel: CancellationToken,
     ) -> Result<(), ServiceError> {
         match action {
-            RetryAction::FromContentSource { source, operation } => {
-                self.from_content_source(
-                    Some(source),
-                    Box::pin(self.retry_task(*operation, updates, cancel)),
-                )
-                .await
-            }
             RetryAction::InstallInstance { instance } => {
                 self.install_instance(&instance, updates, cancel).await
             }
@@ -64,15 +57,16 @@ impl<T: Transport + Clone> LauncherService<T> {
             RetryAction::InstallContent {
                 instance,
                 kind,
+                source,
                 project,
                 version,
             } => match version {
                 Some(version) => self
-                    .install_version(&instance, kind, &project, &version, cancel)
+                    .install_version(&instance, kind, &source, &project, &version, cancel)
                     .await
                     .map(|_| ()),
                 None => self
-                    .install_content(&instance, kind, &project, cancel)
+                    .install_content(&instance, kind, &source, &project, cancel)
                     .await
                     .map(|_| ()),
             },
@@ -80,10 +74,19 @@ impl<T: Transport + Clone> LauncherService<T> {
                 instance,
                 kind,
                 file_name,
+                source,
                 project,
                 version_id,
             } => self
-                .switch_content_version(&instance, kind, &file_name, &project, &version_id, cancel)
+                .switch_content_version(
+                    &instance,
+                    kind,
+                    &file_name,
+                    &source,
+                    &project,
+                    &version_id,
+                    cancel,
+                )
                 .await
                 .map(|_| ()),
             RetryAction::CopyInstance {
@@ -102,20 +105,27 @@ impl<T: Transport + Clone> LauncherService<T> {
                 .restore_backup(Path::new(&path), cancel)
                 .await
                 .map(|_| ()),
-            RetryAction::InstallJava { major } => {
-                self.install_java(major, cancel).await.map(|_| ())
-            }
+            RetryAction::InstallJava { major, source } => self
+                .install_java_from(source, major, cancel)
+                .await
+                .map(|_| ()),
             RetryAction::SaveVersion {
+                source,
                 project,
                 version_id,
                 path,
             } => self
-                .save_version_as(&project, &version_id, Path::new(&path), cancel)
+                .save_version_as(&source, &project, &version_id, Path::new(&path), cancel)
                 .await
                 .map(|_| ()),
-            RetryAction::InstallModpack { project } => {
-                self.install_modpack(&project, cancel).await.map(|_| ())
-            }
+            RetryAction::InstallModpack {
+                source,
+                project,
+                version,
+            } => self
+                .install_modpack(&source, &project, version.as_deref(), cancel)
+                .await
+                .map(|_| ()),
             RetryAction::ImportPack { path } => self
                 .import_modpack_file(Path::new(&path), cancel)
                 .await

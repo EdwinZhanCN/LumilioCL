@@ -26,34 +26,6 @@ pub(super) fn apply_preferences(
     apply_wallpaper(wiring, preferences.look.wallpaper.clone(), cx);
     platform::apply_motion(preferences.motion, cx);
     lumilio_ui::i18n::apply_language(preferences.language, cx);
-    let translation = preferences.translation.clone();
-    let changed = wiring.state.borrow().preferences.translation != translation;
-    let _ = wiring.shell.update(cx, |shell, cx| {
-        shell.update_live(
-            |model| {
-                if let Some(settings) = &mut model.settings {
-                    settings.preferences.translation = translation;
-                }
-            },
-            cx,
-        )
-    });
-    if changed {
-        super::discover::request_detail_summary(wiring, cx);
-        let query = wiring
-            .shell
-            .read_with(cx, |shell, _| {
-                shell
-                    .live()
-                    .filter(|model| !model.results.is_empty())
-                    .map(|model| model.query.clone())
-            })
-            .ok()
-            .flatten();
-        if let Some(query) = query {
-            super::discover::search(wiring, &query, cx);
-        }
-    }
     // Plugin text is the plugin's own; tell the host which tag to read it in
     // without blocking the UI thread.
     let service = wiring.backend.service.clone();
@@ -303,6 +275,33 @@ pub(super) fn change_setting(
     .detach();
 }
 
+/// Reads which Java majors each download source offers, for the 下载 Java…
+/// dialog. Mojang's list needs the network; until it arrives (or when it
+/// cannot) the dialog offers a fallback.
+fn load_java_offers(wiring: &Wiring, cx: &mut App) {
+    let service = wiring.backend.service.clone();
+    let handle = wiring
+        .backend
+        .spawn(async move { service.java_offers().await });
+    let wiring = wiring.clone();
+    cx.spawn(async move |cx| {
+        let Ok(offers) = handle.await else {
+            return;
+        };
+        let _ = wiring.shell.update(cx, |shell, cx| {
+            shell.update_live(
+                |model| {
+                    if let Some(view) = &mut model.settings {
+                        view.java_offers = offers;
+                    }
+                },
+                cx,
+            );
+        });
+    })
+    .detach();
+}
+
 /// Reads the settings, the Java list and then the disk use for the Settings page.
 pub(super) fn load_settings(wiring: &Wiring, cx: &mut App) {
     let service = wiring.backend.service.clone();
@@ -325,20 +324,47 @@ pub(super) fn load_settings(wiring: &Wiring, cx: &mut App) {
             return;
         };
         wiring.state.borrow_mut().preferences = settings.preferences.clone();
+        let mut offers_known = false;
+        let mut translation_on = false;
         let _ = wiring.shell.update(cx, |shell, cx| {
             shell.plugins_changed(&plugins, cx);
             shell.update_live(
                 |model| {
+                    let was = model
+                        .settings
+                        .as_ref()
+                        .is_some_and(|view| view.preferences.translation.enabled);
+                    translation_on = !was && settings.preferences.translation.enabled;
                     let storage = model.settings.as_ref().and_then(|view| view.storage);
+                    let offers = model
+                        .settings
+                        .as_ref()
+                        .map(|view| view.java_offers.clone())
+                        .unwrap_or_default();
+                    offers_known = offers
+                        .iter()
+                        .all(|(_, majors): &(_, Vec<u32>)| !majors.is_empty())
+                        && !offers.is_empty();
                     model.settings = Some(settings_view(&settings, &java, storage, &root, memory));
                     if let Some(view) = &mut model.settings {
                         view.plugins = plugins;
+                        view.java_offers = offers;
                     }
                 },
                 cx,
             );
         });
-        cx.update(|cx| super::discover::request_detail_summary(&wiring, cx));
+        if !offers_known {
+            cx.update(|cx| load_java_offers(&wiring, cx));
+        }
+        // Translation just came on (or was on at start-up): what is shown
+        // gets its summaries now; turning it off already showed the originals.
+        if translation_on {
+            cx.update(|cx| {
+                super::translation::request_shown_summaries(&wiring, cx);
+                super::translation::request_detail_summary(&wiring, cx);
+            });
+        }
         let service = wiring.backend.service.clone();
         let Ok(usage) = wiring
             .backend
@@ -569,13 +595,23 @@ pub(super) fn export_diagnostics(wiring: &Wiring, cx: &mut App) {
     .detach();
 }
 
-/// Downloads Java into the launcher, showing progress in Activity, and
-/// refreshes the Settings Java list when done.
-pub(super) fn install_java(wiring: &Wiring, major: Option<u32>, cx: &mut App) {
+/// Downloads Java into the launcher (from `source`, else the source in the
+/// settings), showing progress in Activity, and refreshes the Settings Java
+/// list when done.
+pub(super) fn install_java(
+    wiring: &Wiring,
+    source: Option<lumilio_core::JavaSource>,
+    major: Option<u32>,
+    cx: &mut App,
+) {
     let service = wiring.backend.service.clone();
-    let handle = wiring
-        .backend
-        .spawn(async move { service.install_java(major, CancellationToken::new()).await });
+    let handle = wiring.backend.spawn(async move {
+        let cancel = CancellationToken::new();
+        match source {
+            Some(source) => service.install_java_from(source, major, cancel).await,
+            None => service.install_java(major, cancel).await,
+        }
+    });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
         let _ = wiring.shell.update(cx, |shell, cx| {

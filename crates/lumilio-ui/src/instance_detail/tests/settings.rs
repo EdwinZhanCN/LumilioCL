@@ -1,7 +1,10 @@
-use super::super::TAB_SETTINGS;
 use super::super::editors::Editor;
 use super::super::forms::memory_draft;
 use super::super::intent::{InstanceIntent, Section};
+use super::super::{
+    SETTINGS_ADVANCED, SETTINGS_GAME, SETTINGS_JAVA, SETTINGS_PERFORMANCE, SETTINGS_RUNTIME,
+    TAB_SETTINGS,
+};
 use super::{click, record, rooted};
 use gpui::TestAppContext;
 use lumilio_core::{LauncherSettings, Loader};
@@ -39,7 +42,7 @@ fn memory_is_read_only_on_the_page_and_edited_in_a_dialog(cx: &mut TestAppContex
     view.update(cx, |view, cx| {
         view.loaded(Ok((record(), LauncherSettings::default())), cx);
         view.select_tab(TAB_SETTINGS, cx);
-        view.settings_sub = 3;
+        view.settings_sub = SETTINGS_PERFORMANCE;
     });
     cx.run_until_parked();
     assert!(
@@ -133,17 +136,20 @@ fn the_settings_groups_show_effective_values_and_restoring_removes_the_override(
     // Every group's rows are there.
     for (sub, selectors) in [
         (
-            0,
+            SETTINGS_GAME,
             &["isettings-window", "isettings-after", "isettings-quick"][..],
         ),
         (
-            1,
+            SETTINGS_RUNTIME,
             &["isettings-version", "isettings-loader", "isettings-files"][..],
         ),
-        (2, &["isettings-java", "isettings-jvm"][..]),
-        (3, &["instance-memory-edit", "isettings-machine-memory"][..]),
+        (SETTINGS_JAVA, &["isettings-java", "isettings-jvm"][..]),
         (
-            4,
+            SETTINGS_PERFORMANCE,
+            &["instance-memory-edit", "isettings-machine-memory"][..],
+        ),
+        (
+            SETTINGS_ADVANCED,
             &["isettings-game-args", "isettings-env", "isettings-commands"][..],
         ),
     ] {
@@ -162,7 +168,7 @@ fn the_settings_groups_show_effective_values_and_restoring_removes_the_override(
 
     // The window row follows the defaults for size and shows its own fullscreen.
     view.update(cx, |view, cx| {
-        view.settings_sub = 0;
+        view.settings_sub = SETTINGS_GAME;
         cx.notify();
     });
     cx.run_until_parked();
@@ -171,7 +177,12 @@ fn the_settings_groups_show_effective_values_and_restoring_removes_the_override(
         cx.debug_bounds("settings-save").is_some(),
         "the dialog opened"
     );
-    assert_eq!(seen.borrow().len(), 3, "only the overview's loads so far");
+    assert_eq!(
+        seen.borrow().len(),
+        4,
+        "only the overview's loads and the Java group's so far"
+    );
+    assert!(seen.borrow().contains(&InstanceIntent::Load(Section::Java)));
 
     // Restoring defaults sends the settings with the override removed.
     click(cx, "settings-reset");
@@ -224,7 +235,7 @@ fn the_runtime_group_offers_a_change_and_a_repair(cx: &mut TestAppContext) {
     view.update(cx, |view, cx| {
         view.loaded(Ok((record(), LauncherSettings::default())), cx);
         view.select_tab(TAB_SETTINGS, cx);
-        view.settings_sub = 1;
+        view.settings_sub = SETTINGS_RUNTIME;
     });
     cx.run_until_parked();
     click(cx, "isettings-version-change");
@@ -257,9 +268,140 @@ fn the_java_dialog_can_browse_the_disk_for_a_path(cx: &mut TestAppContext) {
     view.update(cx, |view, cx| {
         view.loaded(Ok((record(), LauncherSettings::default())), cx);
         view.select_tab(TAB_SETTINGS, cx);
-        view.select_settings_group(2, cx);
+        view.select_settings_group(SETTINGS_JAVA, cx);
     });
     cx.run_until_parked();
     click(cx, "isettings-java-edit");
     assert!(cx.debug_bounds("settings-browse").is_some());
+}
+
+/// A game that follows a preset: it changed the volume in the game, keeps its
+/// own render distance, and owns the mouse inversion the preset does not share.
+fn options() -> lumilio_core::InstanceOptions {
+    use lumilio_core::GameSettingValue::{Boolean, Decimal, Integer};
+    let preset: lumilio_core::SettingsPreset = serde_json::from_value(serde_json::json!({
+        "id": 1, "name": "Daily", "revision": 1,
+        "values": {
+            "soundCategory_master": {"Decimal": "0.8"},
+            "renderDistance": {"Integer": 16}
+        }
+    }))
+    .unwrap();
+    let mut options = lumilio_core::InstanceOptions::default();
+    options.game_version = "1.21.1".into();
+    options.file = lumilio_core::OptionsFile::Ready;
+    options.view.instance = "survival".into();
+    options.view.preset = Some(preset);
+    options
+        .view
+        .overrides
+        .insert("renderDistance".into(), Integer(12));
+    options.view.pending = vec![
+        serde_json::from_value(serde_json::json!({
+            "setting": "soundCategory_master",
+            "before": {"Decimal": "0.8"},
+            "value": {"Decimal": "0.4"},
+            "shared_before": {"Decimal": "0.8"}
+        }))
+        .unwrap(),
+    ];
+    options
+        .values
+        .insert("soundCategory_master".into(), Decimal("0.4".into()));
+    options.values.insert("renderDistance".into(), Integer(12));
+    options.values.insert("invertYMouse".into(), Boolean(false));
+    options
+}
+
+#[gpui::test]
+fn options_are_edited_outside_the_game_and_game_changes_are_decided_together(
+    cx: &mut TestAppContext,
+) {
+    use super::super::panels::Arrived;
+    use super::super::{Operated, SETTINGS_OPTIONS};
+    use lumilio_core::{GameSettingValue, OptionChange, SettingResolution};
+    let seen: Rc<RefCell<Vec<InstanceIntent>>> = Rc::default();
+    let (view, cx) = rooted(cx, seen.clone());
+    view.update(cx, |view, cx| {
+        view.loaded(Ok((record(), LauncherSettings::default())), cx);
+        view.select_settings_group(SETTINGS_OPTIONS, cx);
+        view.select_tab(TAB_SETTINGS, cx);
+    });
+    cx.run_until_parked();
+    assert!(
+        seen.borrow()
+            .contains(&InstanceIntent::Load(Section::GameOptions)),
+        "opening the group reads the game's options"
+    );
+    view.update(cx, |view, cx| {
+        view.arrived(Arrived::GameOptions(Ok(Box::new(options()))), cx)
+    });
+    click(cx, "options-preset-change");
+    click(cx, "options-renderDistance-edit");
+    // Changes made in the game are selected, then decided together.
+    assert!(cx.debug_bounds("options-resolve-local").is_none());
+    click(cx, "options-review-check-soundCategory_master-box");
+    click(cx, "options-resolve-local");
+    view.update(cx, |view, cx| {
+        view.operated(
+            Operated {
+                notice: String::new(),
+                technical: None,
+                refresh: Vec::new(),
+            },
+            cx,
+        );
+    });
+    // An option the game owns switches at once.
+    click(cx, "options-invertYMouse-switch-cap");
+    let writes: Vec<_> = seen
+        .borrow()
+        .iter()
+        .filter(|intent| !matches!(intent, InstanceIntent::Load(_)))
+        .cloned()
+        .collect();
+    let expected = options().view;
+    assert_eq!(
+        writes,
+        [
+            InstanceIntent::ChoosePreset,
+            InstanceIntent::EditOption("renderDistance".into()),
+            InstanceIntent::ResolveOptions {
+                expected: expected.clone(),
+                selected: vec!["soundCategory_master".into()],
+                resolution: SettingResolution::Instance,
+            },
+            InstanceIntent::SetOption {
+                expected,
+                key: "invertYMouse".into(),
+                change: OptionChange::Set(GameSettingValue::Boolean(true)),
+            },
+        ]
+    );
+}
+
+#[gpui::test]
+fn a_running_game_keeps_its_options_still(cx: &mut TestAppContext) {
+    use super::super::SETTINGS_OPTIONS;
+    use super::super::panels::Arrived;
+    let seen: Rc<RefCell<Vec<InstanceIntent>>> = Rc::default();
+    let (view, cx) = rooted(cx, seen.clone());
+    let mut running = options();
+    running.view.is_busy = true;
+    view.update(cx, |view, cx| {
+        view.loaded(Ok((record(), LauncherSettings::default())), cx);
+        view.select_settings_group(SETTINGS_OPTIONS, cx);
+        view.select_tab(TAB_SETTINGS, cx);
+        view.arrived(Arrived::GameOptions(Ok(Box::new(running))), cx);
+    });
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("options-running").is_some());
+    click(cx, "options-renderDistance-edit");
+    click(cx, "options-preset-change");
+    assert!(
+        seen.borrow()
+            .iter()
+            .all(|intent| matches!(intent, InstanceIntent::Load(_))),
+        "nothing is asked of a running game"
+    );
 }

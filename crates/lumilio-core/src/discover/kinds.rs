@@ -1,4 +1,3 @@
-use super::SITE_BASE;
 use crate::instance::Loader;
 use serde::{Deserialize, Serialize};
 
@@ -57,16 +56,19 @@ pub enum SortIndex {
     Updated,
 }
 
-/// The public web page of a project — what the webview shows.
-#[must_use]
-pub fn project_page_url(kind: ProjectKind, slug_or_id: &str) -> String {
-    format!("{SITE_BASE}/{}/{slug_or_id}", kind.protocol_name())
+/// Whose project and version IDs a content source speaks.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Catalog {
+    Modrinth,
+    CurseForge,
 }
 
-/// The public listing of every project of a kind, e.g. `…/mods`.
-#[must_use]
-pub fn browse_page_url(kind: ProjectKind) -> String {
-    format!("{SITE_BASE}/{}s", kind.protocol_name())
+/// How a source writes project bodies and changelogs.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum TextFormat {
+    #[default]
+    Markdown,
+    Html,
 }
 
 pub(super) fn loader_tag(loader: Loader) -> Option<&'static str> {

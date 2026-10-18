@@ -18,6 +18,14 @@
       "status": "completed"
     },
     {
+      "id": "curseforge-source",
+      "planId": "curseforge-source",
+      "name": "CurseForge 来源",
+      "lede": "在发现页浏览和安装 CurseForge 上的模组、整合包和光影。",
+      "version": "0.1.5",
+      "status": "completed"
+    },
+    {
       "id": "discover-translation",
       "planId": "discover-translation",
       "name": "发现页翻译",

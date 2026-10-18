@@ -2,7 +2,7 @@
 
 # 主页快速准备与后台诊断
 
-Status: InProgress
+Status: Completed
 
 启动先显示已保存的游戏与当前选择，后台补充健康检查；切换游戏不再等待完整文件校验。
 
@@ -22,7 +22,7 @@ Status: InProgress
   Acceptance: 主页先显示快照，诊断只补充需要留意；切换游戏不触发诊断
 - [x] T2 — 回归验证 (Completed)
   Acceptance: 完整诊断仍报告损坏文件；主页不读取校验文件；旧请求不能覆盖新选择；just check 通过
-- [ ] T3 — 真实窗口体验验收 (Proposed)
+- [x] T3 — 真实窗口体验验收 (Completed)
   Acceptance: Project Maintainer 在真实窗口确认启动、连续切换与最小窗口；在代表性游戏库计时
 
 ## Validation
@@ -30,7 +30,7 @@ Status: InProgress
 - 回归测试与完整检查
   Result: just check 通过：1292 项测试通过，15 项跳过；doctests、Clippy、格式检查通过。macOS 更新器磁盘镜像测试在沙箱内失败，在允许 hdiutil 的环境下通过完整检查。核心回归测试曾临时恢复主页完整校验并按预期失败，恢复修复后通过。应用回归覆盖初始主页快照、连续选择、保存的当前游戏和安装目标一致；快照不会调用分析插件，后台诊断仍提供分析结果。
 - 窗口检查
-  Result: pending
+  Result: Project Maintainer（Edwin）2026-10-13 确认 Mac 实测通过。 主页先显示游戏列表，诊断在后台补充。
 
 ## Decision D1
 
@@ -47,4 +47,4 @@ Consequences: 文件损坏通过显式诊断与修复发现；后台检查仍报
 
 ## Outcome
 
-代码实现与自动化验证完成。临时数据目录启动的原生应用未能完成目视检查：电脑控制工具未获准访问测试应用。保留 T3，尚未测得代表性游戏库的准备耗时；不宣称视觉验收或性能倍率。
+主页先显示游戏、诊断后台补充，随 0.1.3 发布并通过窗口检查。

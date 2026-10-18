@@ -1,0 +1,890 @@
+{
+  "format": 1,
+  "transforms": {
+    "mob": [{ "translate": [8, 24, 8] }, { "rotate": [180, 0, 0] }],
+    "skull": [{ "translate": [8, 0, 8] }, { "rotate": [180, 0, 0] }],
+    "banner": [{ "translate": [8, 0, 8] }, { "rotate": [180, 0, 0] }, { "scale": [0.6666667, 0.6666667, 0.6666667] }],
+    "standing_sign": [{ "translate": [8, 8, 8] }, { "rotate": [180, 0, 0] }, { "scale": [0.6666667, 0.6666667, 0.6666667] }],
+    "wall_sign": [{ "translate": [8, 3, 15] }, { "rotate": [180, 0, 0] }, { "scale": [0.6666667, 0.6666667, 0.6666667] }],
+    "hanging_sign": [{ "translate": [8, 10, 8] }, { "rotate": [180, 0, 0] }],
+    "bed": [{ "translate": [0, 9, 0] }, { "rotate": [90, 0, 0] }],
+    "lectern_book": [{ "translate": [8, 17, 8] }, { "rotate": [0, -90, 0] }, { "rotate": [0, 0, 67.5] }, { "translate": [0, -2, 0] }],
+    "enchanting_table_book": [{ "translate": [8, 13.6, 8] }, { "rotate": [0, 0, 80] }],
+    "decorated_pot": [{ "translate": [8, 0, 8] }, { "rotate": [0, 180, 0] }, { "translate": [-8, 0, -8] }]
+  },
+  "nothing": ["lightning_bolt", "evoker_fangs", "fishing_bobber"],
+  "renderers": {
+    "ArrowRenderer": [
+      { "layers": ["minecraft:arrow#main"], "texture": "{look_texture}", "transform": [{ "translate": [8, 8, 8] }, { "rotate": [0, -90, 0] }], "aim": { "yaw": 1, "pitch": -1 }, "opaque": false }
+    ],
+    "ThrownTridentRenderer": [
+      { "layers": ["minecraft:trident#main"], "texture": "{look_texture}", "transform": [{ "translate": [8, 8, 8] }, { "rotate": [0, -90, 0] }, { "rotate": [0, 0, 90] }], "aim": { "yaw": 1, "pitch": -1 } }
+    ],
+    "LlamaSpitRenderer": [
+      { "layers": ["minecraft:llama_spit#main"], "texture": "{look_texture}", "transform": [{ "translate": [8, 8, 8] }, { "rotate": [0, -90, 0] }], "aim": { "yaw": 1, "pitch": -1, "origin": [0, 0.15, 0] }, "opaque": false }
+    ],
+    "ShulkerBulletRenderer": [
+      { "layers": ["minecraft:shulker_bullet#main"], "texture": "{look_texture}", "transform": [{ "translate": [8, 8, 8] }, { "rotate": [0, 180, 0] }, { "scale": [0.5, 0.5, 0.5] }], "aim": { "yaw": 1, "pitch": -1, "origin": [0, 0.15, 0] }, "opaque": false }
+    ],
+    "WitherSkullRenderer": [
+      { "when": { "dangerous": "true" }, "layers": ["minecraft:wither_skull#main"], "texture": "entity/wither/wither_invulnerable", "transform": [{ "translate": [8, 8, 8] }, { "rotate": [0, 0, 180] }], "aim": { "yaw": -1, "pitch": -1 }, "opaque": false },
+      { "layers": ["minecraft:wither_skull#main"], "texture": "{look_texture}", "transform": [{ "translate": [8, 8, 8] }, { "rotate": [0, 0, 180] }], "aim": { "yaw": -1, "pitch": -1 }, "opaque": false }
+    ],
+    "WindChargeRenderer": [
+      { "layers": ["minecraft:wind_charge#main"], "texture": "{look_texture}", "transform": [{ "translate": [8, 8, 8] }], "aim": {}, "opaque": false }
+    ],
+    "EndCrystalRenderer": [
+      {
+        "layers": ["minecraft:end_crystal#main"],
+        "texture": "{look_texture}",
+        "transform": [{ "translate": [8, 8, 8] }, { "scale": [2, 2, 2] }, { "translate": [0, -8, 0] }],
+        "aim": {},
+        "opaque": false,
+        "pose": {
+          "outer_glass": { "pivot": [0, 15.2, 0], "rotation": [39.23152, -14.47751, 39.23152] },
+          "inner_glass": { "rotation": [39.23152, -14.47751, 39.23152] },
+          "cube": { "rotation": [39.23152, -14.47751, 39.23152] }
+        },
+        "pose_when": [{ "when": { "show_bottom": "false" }, "pose": { "base": { "visible": false } } }]
+      }
+    ],
+    "LeashKnotRenderer": [
+      { "layers": ["minecraft:leash_knot#main"], "texture": "{look_texture}", "transform": [{ "translate": [8, 8, 8] }, { "rotate": [0, 0, 180] }], "aim": {} }
+    ],
+    "EnderDragonRenderer": [
+      {
+        "layers": ["minecraft:ender_dragon#main"],
+        "texture": "entity/enderdragon/dragon",
+        "transform": [{ "translate": [8, 24, 24] }, { "rotate": [0, 0, 180] }],
+        "facing": "horizontal",
+        "overlays": [{ "layers": ["minecraft:ender_dragon#main"], "texture": "entity/enderdragon/dragon_eyes" }]
+      }
+    ],
+    "CushionRenderer": [
+      {
+        "defaults": { "color": "white" },
+        "layers": ["minecraft:cushion#main"],
+        "texture": "entity/cushion/{color}_cushion",
+        "transform": [{ "translate": [8, 0, 8] }, { "rotate": [0, 180, 0] }, { "rotate": [180, 0, 0] }, { "translate": [0, -4, 0] }],
+        "facing": "horizontal"
+      }
+    ],
+    "RabbitRenderer": [
+      {
+        "defaults": { "variant": "brown" },
+        "layers": ["minecraft:rabbit#main"],
+        "texture": "entity/rabbit/rabbit_{variant}",
+        "transform": "mob",
+        "facing": "horizontal",
+        "opaque": false,
+        "baby": { "layers": ["minecraft:rabbit_baby#main"], "texture": "entity/rabbit/rabbit_{variant}_baby" }
+      }
+    ],
+    "TropicalFishRenderer": [
+      {
+        "when": { "size": "large" },
+        "layers": ["minecraft:tropical_fish_large#main"],
+        "texture": "entity/fish/tropical_b",
+        "tint": "dye:base_color",
+        "transform": "mob",
+        "facing": "horizontal",
+        "opaque": false,
+        "overlays": [{ "layers": ["minecraft:tropical_fish_large#pattern"], "texture": "entity/fish/tropical_b_pattern_{pattern}", "tint": "dye:pattern_color" }]
+      },
+      {
+        "defaults": { "pattern": "1" },
+        "layers": ["minecraft:tropical_fish_small#main"],
+        "texture": "entity/fish/tropical_a",
+        "tint": "dye:base_color",
+        "transform": "mob",
+        "facing": "horizontal",
+        "opaque": false,
+        "overlays": [{ "layers": ["minecraft:tropical_fish_small#pattern"], "texture": "entity/fish/tropical_a_pattern_{pattern}", "tint": "dye:pattern_color" }]
+      }
+    ],
+    "ZombieNautilusRenderer": [
+      { "when": { "variant": "warm" }, "layers": ["minecraft:zombie_nautilus_coral#main"], "texture": "entity/nautilus/zombie_nautilus_coral", "transform": "mob", "facing": "horizontal", "opaque": false },
+      { "layers": ["minecraft:zombie_nautilus#main"], "texture": "entity/nautilus/zombie_nautilus", "transform": "mob", "facing": "horizontal", "opaque": false }
+    ],
+    "CreakingRenderer": [
+      { "layers": ["minecraft:creaking#main"], "texture": "entity/creaking/creaking", "transform": "mob", "facing": "horizontal", "opaque": false }
+    ],
+    "FallingBlockRenderer": [
+      { "defaults": { "block": "minecraft:sand" }, "layers": [], "carries": { "state": "{block}", "steps": [{ "translate": [0, 8, 0] }] }, "aim": {} }
+    ],
+    "TntRenderer": [
+      { "defaults": { "block": "minecraft:tnt" }, "layers": [], "carries": { "state": "{block}", "steps": [{ "translate": [0, 8, 0] }] }, "aim": {} }
+    ],
+    "PaintingRenderer": [
+      { "layers": [], "compose": "painting", "transform": [{ "translate": [8, 8, 8] }, { "rotate": [0, 180, 0] }], "aim": { "yaw": -1 } }
+    ],
+    "ExperienceOrbRenderer": [
+      { "layers": [], "compose": "experience_orb", "sprite": { "texture": "{look_texture}", "from": [-0.5, -0.25], "to": [0.5, 0.75] }, "transform": [{ "translate": [8, 8, 8] }, { "scale": [0.3, 0.3, 0.3] }], "aim": { "origin": [0, 0.1, 0] }, "billboard": "center" }
+    ],
+    "DragonFireballRenderer": [
+      { "layers": [], "sprite": { "texture": "{look_texture}", "from": [-0.5, -0.25], "to": [0.5, 0.75] }, "transform": [{ "translate": [8, 8, 8] }, { "scale": [2, 2, 2] }], "aim": {}, "billboard": "center" }
+    ],
+    "BlockDisplayRenderer": [
+      { "defaults": { "block": "minecraft:air" }, "layers": [], "carries": { "state": "{block}", "steps": [{ "translate": [8, 8, 8] }] }, "aim": { "yaw": -1, "pitch": 1 } }
+    ],
+    "ItemDisplayRenderer": [
+      { "layers": [], "compose": "item_display", "transform": [{ "translate": [8, 8, 8] }, { "rotate": [0, 180, 0] }], "aim": { "yaw": -1, "pitch": 1 } }
+    ],
+    "TextDisplayRenderer": [
+      { "layers": [], "compose": "text_display", "transform": [{ "translate": [8, 8, 8] }], "aim": { "yaw": -1, "pitch": 1 } }
+    ]
+  },
+  "bindings": [
+    {
+      "match": ["block:chest"],
+      "when": { "type": "left" },
+      "vars": { "variant": "normal" },
+      "layers": ["minecraft:double_chest_left#main"],
+      "texture": "entity/chest/{variant}_left",
+      "facing": "horizontal"
+    },
+    {
+      "match": ["block:chest"],
+      "when": { "type": "right" },
+      "vars": { "variant": "normal" },
+      "layers": ["minecraft:double_chest_right#main"],
+      "texture": "entity/chest/{variant}_right",
+      "facing": "horizontal"
+    },
+    {
+      "match": ["block:chest"],
+      "vars": { "variant": "normal" },
+      "layers": ["minecraft:chest#main"],
+      "texture": "entity/chest/{variant}",
+      "facing": "horizontal"
+    },
+    {
+      "match": ["block:trapped_chest"],
+      "when": { "type": "left" },
+      "vars": { "variant": "trapped" },
+      "layers": ["minecraft:double_chest_left#main"],
+      "texture": "entity/chest/{variant}_left",
+      "facing": "horizontal"
+    },
+    {
+      "match": ["block:trapped_chest"],
+      "when": { "type": "right" },
+      "vars": { "variant": "trapped" },
+      "layers": ["minecraft:double_chest_right#main"],
+      "texture": "entity/chest/{variant}_right",
+      "facing": "horizontal"
+    },
+    {
+      "match": ["block:trapped_chest"],
+      "vars": { "variant": "trapped" },
+      "layers": ["minecraft:chest#main"],
+      "texture": "entity/chest/{variant}",
+      "facing": "horizontal"
+    },
+    {
+      "match": ["block:copper_chest", "block:waxed_copper_chest", "block:waxed_{age}_copper_chest", "block:{age}_copper_chest"],
+      "when": { "type": "left" },
+      "defaults": { "age": "" },
+      "layers": ["minecraft:double_chest_left#main"],
+      "texture": ["entity/chest/copper_{age}_left", "entity/chest/copper_left"],
+      "facing": "horizontal"
+    },
+    {
+      "match": ["block:copper_chest", "block:waxed_copper_chest", "block:waxed_{age}_copper_chest", "block:{age}_copper_chest"],
+      "when": { "type": "right" },
+      "defaults": { "age": "" },
+      "layers": ["minecraft:double_chest_right#main"],
+      "texture": ["entity/chest/copper_{age}_right", "entity/chest/copper_right"],
+      "facing": "horizontal"
+    },
+    {
+      "match": ["block:copper_chest", "block:waxed_copper_chest", "block:waxed_{age}_copper_chest", "block:{age}_copper_chest"],
+      "defaults": { "age": "" },
+      "layers": ["minecraft:chest#main"],
+      "texture": ["entity/chest/copper_{age}", "entity/chest/copper"],
+      "facing": "horizontal"
+    },
+    {
+      "match": ["block:ender_chest"],
+      "layers": ["minecraft:chest#main"],
+      "texture": "entity/chest/ender",
+      "facing": "horizontal"
+    },
+    {
+      "match": ["block:{color}_bed"],
+      "when": { "part": "head" },
+      "layers": ["minecraft:bed_head#main"],
+      "texture": "entity/bed/{color}",
+      "transform": "bed",
+      "facing": "horizontal",
+      "model_replaces": true
+    },
+    {
+      "match": ["block:{color}_bed"],
+      "defaults": { "part": "foot" },
+      "layers": ["minecraft:bed_foot#main"],
+      "texture": "entity/bed/{color}",
+      "transform": "bed",
+      "facing": "horizontal",
+      "model_replaces": true
+    },
+    {
+      "match": ["block:bell"],
+      "layers": ["minecraft:bell#main"],
+      "texture": "entity/bell/bell_body",
+      "facing": "horizontal"
+    },
+    {
+      "match": ["block:{wood}_wall_hanging_sign"],
+      "layers": ["minecraft:hanging_sign/{wood}/wall#main"],
+      "texture": "entity/signs/hanging/{wood}",
+      "transform": "hanging_sign",
+      "facing": "horizontal",
+      "compose": "hanging_sign_text",
+      "model_replaces": true
+    },
+    {
+      "match": ["block:{wood}_hanging_sign"],
+      "when": { "attached": "true" },
+      "layers": ["minecraft:hanging_sign/{wood}/ceiling_middle#main"],
+      "texture": "entity/signs/hanging/{wood}",
+      "transform": "hanging_sign",
+      "facing": "rotation16",
+      "compose": "hanging_sign_text",
+      "model_replaces": true
+    },
+    {
+      "match": ["block:{wood}_hanging_sign"],
+      "layers": ["minecraft:hanging_sign/{wood}/ceiling#main"],
+      "texture": "entity/signs/hanging/{wood}",
+      "transform": "hanging_sign",
+      "facing": "rotation16",
+      "compose": "hanging_sign_text",
+      "model_replaces": true
+    },
+    {
+      "match": ["block:{wood}_wall_sign", "block:wall_{wood}_sign"],
+      "layers": ["minecraft:sign/wall/{wood}#main"],
+      "texture": "entity/signs/{wood}",
+      "transform": "wall_sign",
+      "facing": "horizontal",
+      "compose": "wall_sign_text",
+      "model_replaces": true
+    },
+    {
+      "match": ["block:{wood}_sign"],
+      "layers": ["minecraft:sign/standing/{wood}#main"],
+      "texture": "entity/signs/{wood}",
+      "transform": "standing_sign",
+      "facing": "rotation16",
+      "compose": "standing_sign_text",
+      "model_replaces": true
+    },
+    {
+      "match": ["block:skeleton_wall_skull"],
+      "layers": ["minecraft:skeleton_skull#main"],
+      "texture": "entity/skeleton/skeleton",
+      "transform": "skull",
+      "facing": "wall_skull"
+    },
+    {
+      "match": ["block:skeleton_skull"],
+      "layers": ["minecraft:skeleton_skull#main"],
+      "texture": "entity/skeleton/skeleton",
+      "transform": "skull",
+      "facing": "skull"
+    },
+    {
+      "match": ["block:wither_skeleton_wall_skull"],
+      "layers": ["minecraft:wither_skeleton_skull#main"],
+      "texture": "entity/skeleton/wither_skeleton",
+      "transform": "skull",
+      "facing": "wall_skull"
+    },
+    {
+      "match": ["block:wither_skeleton_skull"],
+      "layers": ["minecraft:wither_skeleton_skull#main"],
+      "texture": "entity/skeleton/wither_skeleton",
+      "transform": "skull",
+      "facing": "skull"
+    },
+    {
+      "match": ["block:zombie_wall_head"],
+      "layers": ["minecraft:zombie_head#main"],
+      "texture": "entity/zombie/zombie",
+      "transform": "skull",
+      "facing": "wall_skull",
+      "opaque": false
+    },
+    {
+      "match": ["block:zombie_head"],
+      "layers": ["minecraft:zombie_head#main"],
+      "texture": "entity/zombie/zombie",
+      "transform": "skull",
+      "facing": "skull",
+      "opaque": false
+    },
+    {
+      "match": ["block:creeper_wall_head"],
+      "layers": ["minecraft:creeper_head#main"],
+      "texture": "entity/creeper/creeper",
+      "transform": "skull",
+      "facing": "wall_skull"
+    },
+    {
+      "match": ["block:creeper_head"],
+      "layers": ["minecraft:creeper_head#main"],
+      "texture": "entity/creeper/creeper",
+      "transform": "skull",
+      "facing": "skull"
+    },
+    {
+      "match": ["block:piglin_wall_head"],
+      "layers": ["minecraft:piglin_head#main"],
+      "texture": "entity/piglin/piglin",
+      "transform": "skull",
+      "facing": "wall_skull",
+      "opaque": false
+    },
+    {
+      "match": ["block:piglin_head"],
+      "layers": ["minecraft:piglin_head#main"],
+      "texture": "entity/piglin/piglin",
+      "transform": "skull",
+      "facing": "skull",
+      "opaque": false
+    },
+    {
+      "match": ["block:dragon_wall_head"],
+      "layers": ["minecraft:dragon_skull#main"],
+      "texture": "entity/enderdragon/dragon",
+      "transform": "skull",
+      "facing": "wall_skull"
+    },
+    {
+      "match": ["block:dragon_head"],
+      "layers": ["minecraft:dragon_skull#main"],
+      "texture": "entity/enderdragon/dragon",
+      "transform": "skull",
+      "facing": "skull"
+    },
+    {
+      "match": ["block:player_wall_head"],
+      "layers": ["minecraft:player_head#main"],
+      "texture": "entity/player/wide/steve",
+      "transform": "skull",
+      "facing": "wall_skull",
+      "compose": "player_skin",
+      "opaque": false
+    },
+    {
+      "match": ["block:player_head"],
+      "layers": ["minecraft:player_head#main"],
+      "texture": "entity/player/wide/steve",
+      "transform": "skull",
+      "facing": "skull",
+      "compose": "player_skin",
+      "opaque": false
+    },
+    {
+      "match": ["block:shulker_box"],
+      "layers": ["minecraft:shulker_box#main"],
+      "texture": "entity/shulker/shulker",
+      "transform": "mob",
+      "facing": "six",
+      "defaults": { "facing": "up" },
+      "pose": { "base": { "hide_faces": ["down"] }, "lid": { "hide_faces": ["up"] } },
+      "opaque": false
+    },
+    {
+      "match": ["block:{color}_shulker_box"],
+      "layers": ["minecraft:shulker_box#main"],
+      "texture": "entity/shulker/shulker_{color}",
+      "transform": "mob",
+      "facing": "six",
+      "defaults": { "facing": "up" },
+      "pose": { "base": { "hide_faces": ["down"] }, "lid": { "hide_faces": ["up"] } },
+      "opaque": false
+    },
+    {
+      "match": ["block:{color}_wall_banner"],
+      "layers": ["minecraft:wall_banner#main", "minecraft:wall_banner#flag"],
+      "texture": "entity/banner/banner_base",
+      "transform": "banner",
+      "facing": "horizontal",
+      "compose": "banner",
+      "opaque": false
+    },
+    {
+      "match": ["block:{color}_banner"],
+      "layers": ["minecraft:standing_banner#main", "minecraft:standing_banner#flag"],
+      "texture": "entity/banner/banner_base",
+      "transform": "banner",
+      "facing": "rotation16",
+      "compose": "banner",
+      "opaque": false
+    },
+    {
+      "match": ["block:decorated_pot"],
+      "layers": [
+        { "layer": "minecraft:decorated_pot_base#main", "texture": "entity/decorated_pot/decorated_pot_base" },
+        { "layer": "minecraft:decorated_pot_sides#main" }
+      ],
+      "texture": "entity/decorated_pot/decorated_pot_side",
+      "transform": "decorated_pot",
+      "facing": "horizontal",
+      "compose": "decorated_pot"
+    },
+    {
+      "match": ["block:lectern"],
+      "when": { "has_book": "true" },
+      "layers": ["minecraft:book#main"],
+      "texture": "entity/enchantment/enchanting_table_book",
+      "transform": "lectern_book",
+      "facing": "horizontal",
+      "pose": {
+        "left_lid": { "rotation": [0, 251.61972, 0] },
+        "right_lid": { "rotation": [0, -71.61972, 0] },
+        "left_pages": { "pivot": [0.9489846, 0, 0], "rotation": [0, 71.61972, 0] },
+        "right_pages": { "pivot": [0.9489846, 0, 0], "rotation": [0, -71.61972, 0] },
+        "flip_page1": { "pivot": [0.9489846, 0, 0], "rotation": [0, 57.29578, 0] },
+        "flip_page2": { "pivot": [0.9489846, 0, 0], "rotation": [0, -57.29578, 0] }
+      },
+      "opaque": false
+    },
+    {
+      "match": ["block:enchanting_table"],
+      "layers": ["minecraft:book#main"],
+      "texture": "entity/enchantment/enchanting_table_book",
+      "transform": "enchanting_table_book",
+      "pose": {
+        "left_lid": { "rotation": [0, 251.61972, 0] },
+        "right_lid": { "rotation": [0, -71.61972, 0] },
+        "left_pages": { "pivot": [0.9489846, 0, 0], "rotation": [0, 71.61972, 0] },
+        "right_pages": { "pivot": [0.9489846, 0, 0], "rotation": [0, -71.61972, 0] },
+        "flip_page1": { "pivot": [0.9489846, 0, 0], "rotation": [0, 57.29578, 0] },
+        "flip_page2": { "pivot": [0.9489846, 0, 0], "rotation": [0, -57.29578, 0] }
+      },
+      "opaque": false
+    },
+
+    {
+      "match": ["entity:zombie"],
+      "layers": ["minecraft:zombie#main"],
+      "texture": "entity/zombie/zombie",
+      "transform": "mob",
+      "facing": "horizontal",
+      "opaque": false,
+      "humanoid": true,
+      "pose_properties": { "HeadPose": "head", "BodyPose": "body", "RightArmPose": "right_arm", "LeftArmPose": "left_arm", "RightLegPose": "right_leg", "LeftLegPose": "left_leg" },
+      "baby": {
+        "layers": ["minecraft:zombie_baby#main"],
+        "texture": ["entity/zombie/zombie_baby", "entity/zombie/zombie"],
+        "steps": [{ "translate": [0, 12, 0] }, { "scale": [0.5, 0.5, 0.5] }],
+        "bone_scale": { "head": 1.5 }
+      }
+    },
+    {
+      "match": ["entity:skeleton"],
+      "layers": ["minecraft:skeleton#main"],
+      "texture": "entity/skeleton/skeleton",
+      "transform": "mob",
+      "facing": "horizontal",
+      "opaque": false,
+      "humanoid": true,
+      "pose_properties": { "HeadPose": "head", "BodyPose": "body", "RightArmPose": "right_arm", "LeftArmPose": "left_arm", "RightLegPose": "right_leg", "LeftLegPose": "left_leg" }
+    },
+    {
+      "match": ["entity:wither_skeleton"],
+      "layers": ["minecraft:wither_skeleton#main"],
+      "texture": "entity/skeleton/wither_skeleton",
+      "transform": "mob",
+      "renderer_scale": 1.2,
+      "facing": "horizontal",
+      "opaque": false,
+      "humanoid": true
+    },
+    {
+      "match": ["entity:pig"],
+      "when": { "variant": ["cold"] },
+      "layers": ["minecraft:cold_pig#main"],
+      "texture": "entity/pig/pig_cold",
+      "transform": "mob",
+      "facing": "horizontal",
+      "rider_offset": [0, 0.25, 0],
+      "overlays": [
+        { "when": { "saddle": "true" }, "layers": ["minecraft:pig#saddle"], "texture": "entity/equipment/pig_saddle/saddle" }
+      ],
+      "baby": {
+        "layers": ["minecraft:cold_pig_baby#main"],
+        "texture": ["entity/pig/pig_cold_baby", "entity/pig/pig_cold"],
+        "steps": [{ "translate": [0, 12, 0] }, { "scale": [0.5, 0.5, 0.5] }],
+        "bone_scale": { "head": 2.0 }
+      }
+    },
+    {
+      "match": ["entity:pig"],
+      "defaults": { "variant": "temperate" },
+      "layers": ["minecraft:pig#main"],
+      "texture": ["entity/pig/pig_{variant}", "entity/pig/pig_temperate"],
+      "transform": "mob",
+      "facing": "horizontal",
+      "rider_offset": [0, 0.25, 0],
+      "overlays": [
+        { "when": { "saddle": "true" }, "layers": ["minecraft:pig#saddle"], "texture": "entity/equipment/pig_saddle/saddle" }
+      ],
+      "baby": {
+        "layers": ["minecraft:pig_baby#main"],
+        "texture": ["entity/pig/pig_{variant}_baby", "entity/pig/pig_temperate_baby", "entity/pig/pig_{variant}", "entity/pig/pig_temperate"],
+        "steps": [{ "translate": [0, 12, 0] }, { "scale": [0.5, 0.5, 0.5] }],
+        "bone_scale": { "head": 2.0 }
+      }
+    },
+    {
+      "match": ["entity:chicken"],
+      "when": { "variant": ["cold"] },
+      "layers": ["minecraft:cold_chicken#main"],
+      "texture": "entity/chicken/chicken_cold",
+      "transform": "mob",
+      "facing": "horizontal",
+      "opaque": false,
+      "baby": {
+        "layers": ["minecraft:chicken_baby#main"],
+        "texture": ["entity/chicken/chicken_cold_baby", "entity/chicken/chicken_cold"],
+        "steps": [{ "translate": [0, 12, 0] }, { "scale": [0.5, 0.5, 0.5] }],
+        "bone_scale": { "head": 2.0 }
+      }
+    },
+    {
+      "match": ["entity:chicken"],
+      "defaults": { "variant": "temperate" },
+      "layers": ["minecraft:chicken#main"],
+      "texture": ["entity/chicken/chicken_{variant}", "entity/chicken/chicken_temperate"],
+      "transform": "mob",
+      "facing": "horizontal",
+      "opaque": false,
+      "baby": {
+        "layers": ["minecraft:chicken_baby#main"],
+        "texture": ["entity/chicken/chicken_{variant}_baby", "entity/chicken/chicken_temperate_baby", "entity/chicken/chicken_{variant}", "entity/chicken/chicken_temperate"],
+        "steps": [{ "translate": [0, 12, 0] }, { "scale": [0.5, 0.5, 0.5] }],
+        "bone_scale": { "head": 2.0 }
+      }
+    },
+    {
+      "match": ["entity:cow"],
+      "when": { "variant": ["cold", "warm"] },
+      "layers": ["minecraft:{variant}_cow#main"],
+      "texture": "entity/cow/cow_{variant}",
+      "transform": "mob",
+      "facing": "horizontal",
+      "rider_offset": [0, 0.35, 0],
+      "baby": {
+        "layers": ["minecraft:{variant}_cow_baby#main"],
+        "texture": ["entity/cow/cow_{variant}_baby", "entity/cow/cow_{variant}"],
+        "steps": [{ "translate": [0, 12, 0] }, { "scale": [0.5, 0.5, 0.5] }],
+        "bone_scale": { "head": 2.0 }
+      }
+    },
+    {
+      "match": ["entity:cow"],
+      "layers": ["minecraft:cow#main"],
+      "texture": "entity/cow/cow_temperate",
+      "transform": "mob",
+      "facing": "horizontal",
+      "rider_offset": [0, 0.35, 0],
+      "baby": {
+        "layers": ["minecraft:cow_baby#main"],
+        "texture": ["entity/cow/cow_temperate_baby", "entity/cow/cow_temperate"],
+        "steps": [{ "translate": [0, 12, 0] }, { "scale": [0.5, 0.5, 0.5] }],
+        "bone_scale": { "head": 2.0 }
+      }
+    },
+    {
+      "match": ["entity:sheep"],
+      "defaults": { "color": "white", "is_baby": "false" },
+      "layers": ["minecraft:sheep#main"],
+      "texture": "entity/sheep/sheep",
+      "transform": "mob",
+      "facing": "horizontal",
+      "rider_offset": [0, 0.35, 0],
+      "overlays": [
+        { "when": { "is_baby": "false" }, "layers": ["minecraft:sheep#wool", "minecraft:sheep#fur"], "texture": "entity/sheep/sheep_wool", "tint": "wool" },
+        { "when": { "is_baby": "true" }, "layers": ["minecraft:sheep_baby#wool", "minecraft:sheep#wool", "minecraft:sheep#fur"], "texture": ["entity/sheep/sheep_wool_baby", "entity/sheep/sheep_wool"], "tint": "wool" }
+      ],
+      "baby": {
+        "layers": ["minecraft:sheep_baby#main"],
+        "texture": ["entity/sheep/sheep_baby", "entity/sheep/sheep"],
+        "steps": [{ "translate": [0, 12, 0] }, { "scale": [0.5, 0.5, 0.5] }],
+        "bone_scale": { "head": 2.0 }
+      }
+    },
+    {
+      "match": ["entity:villager"],
+      "layers": ["minecraft:villager#main"],
+      "texture": "entity/villager/villager",
+      "transform": "mob",
+      "renderer_scale": 0.9375,
+      "facing": "horizontal",
+      "compose": "villager",
+      "opaque": false,
+      "humanoid": true,
+      "baby": {
+        "layers": ["minecraft:villager_baby#main"],
+        "steps": [{ "translate": [0, 12, 0] }, { "scale": [0.5, 0.5, 0.5] }]
+      }
+    },
+    {
+      "match": ["entity:armor_stand"],
+      "layers": [{ "layer": "minecraft:armor_stand#main", "pose": { "hat": { "visible": false } } }],
+      "texture": "entity/armorstand/armorstand",
+      "transform": "mob",
+      "facing": "horizontal",
+      "humanoid": true,
+      "pose_properties": { "HeadPose": "head", "BodyPose": "body", "RightArmPose": "right_arm", "LeftArmPose": "left_arm", "RightLegPose": "right_leg", "LeftLegPose": "left_leg" },
+      "armor": {
+        "helmet": ["minecraft:armor_stand#helmet", { "layer": "minecraft:armor_stand#outer_armor", "bones": ["head", "hat"] }],
+        "chestplate": ["minecraft:armor_stand#chestplate", { "layer": "minecraft:armor_stand#outer_armor", "bones": ["body", "right_arm", "left_arm"] }],
+        "leggings": ["minecraft:armor_stand#leggings", { "layer": "minecraft:armor_stand#inner_armor", "bones": ["body", "right_leg", "left_leg"] }],
+        "boots": ["minecraft:armor_stand#boots", { "layer": "minecraft:armor_stand#outer_armor", "bones": ["right_leg", "left_leg"] }]
+      }
+    },
+    {
+      "match": ["entity:player", "entity:mannequin"],
+      "defaults": { "model": "player" },
+      "layers": ["minecraft:{model}#main"],
+      "texture": "entity/player/wide/steve",
+      "transform": "mob",
+      "facing": "horizontal",
+      "compose": "player_skin",
+      "opaque": false,
+      "humanoid": true,
+      "pose_properties": { "HeadPose": "head", "BodyPose": "body", "RightArmPose": "right_arm", "LeftArmPose": "left_arm", "RightLegPose": "right_leg", "LeftLegPose": "left_leg" },
+      "armor": {
+        "helmet": ["minecraft:{model}#helmet", { "layer": "minecraft:{model}#outer_armor", "bones": ["head", "hat"] }],
+        "chestplate": ["minecraft:{model}#chestplate", { "layer": "minecraft:{model}#outer_armor", "bones": ["body", "right_arm", "left_arm"] }],
+        "leggings": ["minecraft:{model}#leggings", { "layer": "minecraft:{model}#inner_armor", "bones": ["body", "right_leg", "left_leg"] }],
+        "boots": ["minecraft:{model}#boots", { "layer": "minecraft:{model}#outer_armor", "bones": ["right_leg", "left_leg"] }]
+      }
+    },
+    {
+      "match": ["entity:chest_minecart"],
+      "defaults": { "block": "minecraft:chest[facing=north,type=single]", "block_offset": "8" },
+      "layers": ["minecraft:minecart#main"],
+      "texture": "entity/minecart/minecart",
+      "transform": [{ "translate": [8, 6, 8] }, { "rotate": [180, 90, 0] }],
+      "facing": "horizontal",
+      "carries": { "state": "{block}", "steps": [{ "translate": [8, 6, 8] }, { "rotate": [0, 270, 0] }, { "scale": [0.75, 0.75, 0.75] }, { "translate": [-8, -8, 8] }], "lift": "{block_offset}", "then": [{ "rotate": [0, 90, 0] }] },
+      "rider_offset": [0, 0, 0]
+    },
+    {
+      "match": ["entity:furnace_minecart"],
+      "defaults": { "block": "minecraft:furnace[facing=north,lit=false]", "block_offset": "6" },
+      "layers": ["minecraft:minecart#main"],
+      "texture": "entity/minecart/minecart",
+      "transform": [{ "translate": [8, 6, 8] }, { "rotate": [180, 90, 0] }],
+      "facing": "horizontal",
+      "carries": { "state": "{block}", "steps": [{ "translate": [8, 6, 8] }, { "rotate": [0, 270, 0] }, { "scale": [0.75, 0.75, 0.75] }, { "translate": [-8, -8, 8] }], "lift": "{block_offset}", "then": [{ "rotate": [0, 90, 0] }] },
+      "rider_offset": [0, 0, 0]
+    },
+    {
+      "match": ["entity:hopper_minecart"],
+      "defaults": { "block": "minecraft:hopper[enabled=true,facing=down]", "block_offset": "1" },
+      "layers": ["minecraft:minecart#main"],
+      "texture": "entity/minecart/minecart",
+      "transform": [{ "translate": [8, 6, 8] }, { "rotate": [180, 90, 0] }],
+      "facing": "horizontal",
+      "carries": { "state": "{block}", "steps": [{ "translate": [8, 6, 8] }, { "rotate": [0, 270, 0] }, { "scale": [0.75, 0.75, 0.75] }, { "translate": [-8, -8, 8] }], "lift": "{block_offset}", "then": [{ "rotate": [0, 90, 0] }] },
+      "rider_offset": [0, 0, 0]
+    },
+    {
+      "match": ["entity:tnt_minecart"],
+      "defaults": { "block": "minecraft:tnt", "block_offset": "6" },
+      "layers": ["minecraft:minecart#main"],
+      "texture": "entity/minecart/minecart",
+      "transform": [{ "translate": [8, 6, 8] }, { "rotate": [180, 90, 0] }],
+      "facing": "horizontal",
+      "carries": { "state": "{block}", "steps": [{ "translate": [8, 6, 8] }, { "rotate": [0, 270, 0] }, { "scale": [0.75, 0.75, 0.75] }, { "translate": [-8, -8, 8] }], "lift": "{block_offset}", "then": [{ "rotate": [0, 90, 0] }] },
+      "rider_offset": [0, 0, 0]
+    },
+    {
+      "match": ["entity:spawner_minecart"],
+      "defaults": { "block": "minecraft:spawner", "block_offset": "6" },
+      "layers": ["minecraft:minecart#main"],
+      "texture": "entity/minecart/minecart",
+      "transform": [{ "translate": [8, 6, 8] }, { "rotate": [180, 90, 0] }],
+      "facing": "horizontal",
+      "carries": { "state": "{block}", "steps": [{ "translate": [8, 6, 8] }, { "rotate": [0, 270, 0] }, { "scale": [0.75, 0.75, 0.75] }, { "translate": [-8, -8, 8] }], "lift": "{block_offset}", "then": [{ "rotate": [0, 90, 0] }] },
+      "rider_offset": [0, 0, 0]
+    },
+    {
+      "match": ["entity:command_block_minecart"],
+      "defaults": { "block": "minecraft:command_block[conditional=false,facing=north]", "block_offset": "6" },
+      "layers": ["minecraft:minecart#main"],
+      "texture": "entity/minecart/minecart",
+      "transform": [{ "translate": [8, 6, 8] }, { "rotate": [180, 90, 0] }],
+      "facing": "horizontal",
+      "carries": { "state": "{block}", "steps": [{ "translate": [8, 6, 8] }, { "rotate": [0, 270, 0] }, { "scale": [0.75, 0.75, 0.75] }, { "translate": [-8, -8, 8] }], "lift": "{block_offset}", "then": [{ "rotate": [0, 90, 0] }] },
+      "rider_offset": [0, 0, 0]
+    },
+    {
+      "match": ["entity:minecart", "entity:{kind}_minecart"],
+      "defaults": { "block": "minecraft:air", "block_offset": "6" },
+      "layers": ["minecraft:minecart#main"],
+      "texture": "entity/minecart/minecart",
+      "transform": [{ "translate": [8, 6, 8] }, { "rotate": [180, 90, 0] }],
+      "facing": "horizontal",
+      "carries": { "state": "{block}", "steps": [{ "translate": [8, 6, 8] }, { "rotate": [0, 270, 0] }, { "scale": [0.75, 0.75, 0.75] }, { "translate": [-8, -8, 8] }], "lift": "{block_offset}", "then": [{ "rotate": [0, 90, 0] }] },
+      "rider_offset": [0, 0, 0]
+    },
+    {
+      "match": ["entity:{wood}_chest_boat", "entity:{wood}_chest_raft", "entity:chest_boat"],
+      "defaults": { "wood": "oak" },
+      "layers": ["minecraft:chest_boat/{wood}#main"],
+      "texture": "entity/chest_boat/{wood}",
+      "facing": "boat",
+      "pose": {
+        "left_paddle": { "rotation": [-37.5, 37.880356, 11.25] },
+        "right_paddle": { "rotation": [-37.5, 142.11964, 11.25] }
+      },
+      "rider_offset": [0, 0.3, 0]
+    },
+    {
+      "match": ["entity:{wood}_boat", "entity:{wood}_raft", "entity:boat"],
+      "defaults": { "wood": "oak" },
+      "layers": ["minecraft:boat/{wood}#main"],
+      "texture": "entity/boat/{wood}",
+      "facing": "boat",
+      "pose": {
+        "left_paddle": { "rotation": [-37.5, 37.880356, 11.25] },
+        "right_paddle": { "rotation": [-37.5, 142.11964, 11.25] }
+      },
+      "rider_offset": [0, 0.3, 0]
+    },
+    {
+      "match": ["entity:item_frame"],
+      "layers": [],
+      "facing": "six",
+      "compose": "item_frame"
+    },
+    {
+      "match": ["entity:glow_item_frame"],
+      "vars": { "glow": "true" },
+      "layers": [],
+      "facing": "six",
+      "compose": "item_frame"
+    },
+    {
+      "match": ["entity:item"],
+      "layers": [],
+      "compose": "dropped_item"
+    },
+    {
+      "match": ["entity:wolf"],
+      "layers": ["minecraft:wolf#main"],
+      "texture": "entity/wolf/wolf",
+      "transform": "mob",
+      "facing": "horizontal",
+      "rider_offset": [0, 0.15, 0],
+      "baby": {
+        "layers": ["minecraft:wolf_baby#main"],
+        "texture": ["entity/wolf/wolf_baby", "entity/wolf/wolf"],
+        "steps": [{ "translate": [0, 12, 0] }, { "scale": [0.5, 0.5, 0.5] }],
+        "bone_scale": { "head": 2.0 }
+      }
+    },
+    {
+      "match": ["entity:cat"],
+      "defaults": { "variant": "tabby" },
+      "layers": ["minecraft:cat#main"],
+      "texture": ["entity/cat/cat_{variant}", "entity/cat/cat_tabby"],
+      "transform": "mob",
+      "renderer_scale": 0.8,
+      "facing": "horizontal",
+      "baby": {
+        "layers": ["minecraft:cat_baby#main"],
+        "texture": ["entity/cat/cat_{variant}_baby", "entity/cat/cat_tabby_baby", "entity/cat/cat_{variant}"],
+        "steps": [{ "translate": [0, 12, 0] }, { "scale": [0.5, 0.5, 0.5] }],
+        "bone_scale": { "head": 2.0 }
+      }
+    },
+    {
+      "match": ["entity:horse"],
+      "defaults": { "variant": "brown", "saddle": "false", "is_baby": "false" },
+      "layers": ["minecraft:horse#main"],
+      "texture": ["entity/horse/horse_{variant}", "entity/horse/horse_brown"],
+      "transform": "mob",
+      "renderer_scale": 1.1,
+      "facing": "horizontal",
+      "rider_offset": [0, 0.65, -0.05],
+      "pose_when": [
+        {
+          "when": { "saddle": "false" },
+          "pose": {
+            "saddle": { "visible": false }, "head_saddle": { "visible": false }, "mouth_saddle_wrap": { "visible": false },
+            "left_saddle_mouth": { "visible": false }, "right_saddle_mouth": { "visible": false },
+            "left_saddle_line": { "visible": false }, "right_saddle_line": { "visible": false }
+          }
+        },
+        {
+          "when": { "is_baby": "false" },
+          "pose": {
+            "left_front_baby_leg": { "visible": false }, "right_front_baby_leg": { "visible": false },
+            "left_hind_baby_leg": { "visible": false }, "right_hind_baby_leg": { "visible": false }
+          }
+        },
+        {
+          "when": { "is_baby": "true" },
+          "pose": {
+            "left_front_leg": { "visible": false }, "right_front_leg": { "visible": false },
+            "left_hind_leg": { "visible": false }, "right_hind_leg": { "visible": false }
+          }
+        }
+      ],
+      "overlays": [
+        { "when": { "saddle": "true" }, "layers": ["minecraft:horse#saddle"], "texture": "entity/equipment/horse_saddle/saddle" },
+        { "when": { "is_baby": "false", "horse_armor": ["leather", "iron", "gold", "diamond", "copper", "netherite"] }, "layers": ["minecraft:horse_armor#main"], "texture": "entity/equipment/horse_body/{horse_armor}" }
+      ],
+      "baby": {
+        "layers": ["minecraft:horse_baby#main"],
+        "texture": ["entity/horse/horse_{variant}_baby", "entity/horse/horse_brown_baby", "entity/horse/horse_{variant}"],
+        "steps": [{ "translate": [0, 12, 0] }, { "scale": [0.5, 0.5, 0.5] }],
+        "bone_scale": { "head_parts": 1.1 }
+      }
+    },
+    {
+      "match": ["entity:enderman"],
+      "layers": ["minecraft:enderman#main"],
+      "texture": "entity/enderman/enderman",
+      "transform": [{ "translate": [8, 25, 8] }, { "rotate": [180, 0, 0] }],
+      "facing": "horizontal",
+      "opaque": false
+    },
+    {
+      "match": ["entity:slime"],
+      "layers": ["minecraft:slime#main"],
+      "texture": "entity/slime/slime",
+      "transform": "mob",
+      "facing": "horizontal",
+      "opaque": false,
+      "overlays": [
+        { "layers": ["minecraft:slime#outer"], "texture": "entity/slime/slime" }
+      ]
+    },
+    {
+      "match": ["entity:ghast"],
+      "layers": ["minecraft:ghast#main"],
+      "texture": "entity/ghast/ghast",
+      "transform": [{ "translate": [8, 85.2, 8] }, { "rotate": [180, 0, 0] }],
+      "renderer_scale": 4.5,
+      "facing": "horizontal"
+    },
+    {
+      "match": ["entity:happy_ghast"],
+      "layers": ["minecraft:happy_ghast#main"],
+      "texture": "entity/ghast/happy_ghast",
+      "transform": "mob",
+      "renderer_scale": 4.0,
+      "facing": "horizontal"
+    }
+  ]
+}

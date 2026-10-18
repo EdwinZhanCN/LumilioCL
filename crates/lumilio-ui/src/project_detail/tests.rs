@@ -8,6 +8,17 @@ fn sizes_read_naturally() {
     assert_eq!(size_label(3 * 1024 * 1024 * 1024), "3.0 GB");
 }
 
+fn translated(text: &str) -> lumilio_core::TranslatedDocument {
+    lumilio_core::TranslatedDocument {
+        text: text.into(),
+        partial: false,
+    }
+}
+
+fn shows_translation(view: &gpui::Entity<ProjectDetailView>, cx: &gpui::VisualTestContext) -> bool {
+    view.read_with(cx, |view, _| view.shown_translation().is_some())
+}
+
 #[gpui::test]
 fn translation_requires_the_setting_and_a_click_and_ignores_disabled_late_results(
     cx: &mut TestAppContext,
@@ -36,29 +47,22 @@ fn translation_requires_the_setting_and_a_click_and_ignores_disabled_late_result
             source,
             project,
             original,
+            format,
             request,
         } => {
-            assert_eq!(source, "lumilio.modrinth");
+            assert_eq!(source, lumilio_core::DEFAULT_SOURCE);
             assert_eq!(project, "P");
-            assert!(!original.is_empty());
+            assert_eq!(original, "# Hello");
+            assert_eq!(*format, lumilio_core::TextFormat::Markdown);
             *request
         }
         _ => panic!("translation button must emit translation intent"),
     };
     view.update(cx, |view, cx| {
-        view.set_translation(
-            request,
-            Ok(lumilio_core::TranslatedDocument {
-                text: "<p>中文</p>".into(),
-                partial: false,
-            }),
-            cx,
-        )
+        view.set_translation(request, Ok(translated("<p>中文</p>")), cx)
     });
-    view.read_with(cx, |view, _| {
-        assert!(view.show_translation);
-        assert_eq!(view.title(), "Cool");
-    });
+    assert!(shows_translation(&view, cx));
+    view.read_with(cx, |view, _| assert_eq!(view.title(), "Cool"));
     cx.run_until_parked();
     let bounds = cx.debug_bounds("detail-translate").unwrap();
     cx.simulate_mouse_move(
@@ -82,25 +86,33 @@ fn translation_requires_the_setting_and_a_click_and_ignores_disabled_late_result
     });
     let button = cx.debug_bounds("detail-translate").unwrap();
     cx.simulate_click(button.center(), gpui::Modifiers::none());
-    view.read_with(cx, |view, _| assert!(!view.show_translation));
+    assert!(!shows_translation(&view, cx));
     cx.run_until_parked();
     let button = cx.debug_bounds("detail-translate").unwrap();
     cx.simulate_click(button.center(), gpui::Modifiers::none());
     let pending = view.read_with(cx, |view, _| view.translation_request().unwrap());
     view.update(cx, |view, cx| {
         view.set_translation_enabled(false, cx);
-        view.set_translation(
-            pending,
-            Ok(lumilio_core::TranslatedDocument {
-                text: "late".into(),
-                partial: false,
-            }),
-            cx,
-        );
+        view.set_translation(pending, Ok(translated("late")), cx);
     });
-    view.read_with(cx, |view, _| {
-        assert!(!view.show_translation && view.translation_request().is_none())
-    });
+    assert!(!shows_translation(&view, cx));
+    view.read_with(cx, |view, _| assert!(view.translation_request().is_none()));
+}
+
+#[gpui::test]
+fn an_html_body_is_sent_as_html(cx: &mut TestAppContext) {
+    let mut html = detail();
+    html.project.body = "<p>Hello</p>".into();
+    html.project.body_format = lumilio_core::TextFormat::Html;
+    let (view, cx, seen) = mount(cx, None, html);
+    view.update(cx, |view, cx| view.set_translation_enabled(true, cx));
+    cx.run_until_parked();
+    let button = cx.debug_bounds("detail-translate").unwrap();
+    cx.simulate_click(button.center(), gpui::Modifiers::none());
+    assert!(matches!(
+        seen.borrow().last(),
+        Some(DetailIntent::Translate { format, .. }) if *format == lumilio_core::TextFormat::Html
+    ));
 }
 
 #[gpui::test]
@@ -109,42 +121,33 @@ fn detail_summary_uses_mcim_without_mutating_original_and_rejects_old_settings_r
 ) {
     let (view, cx, _) = mount(cx, None, detail());
     view.update(cx, |view, cx| view.set_translation_enabled(true, cx));
-    let (source, project, original, revision) =
-        view.read_with(cx, |view, _| view.summary_query().unwrap());
+    let asked = view.read_with(cx, |view, _| view.summary_query().unwrap());
+    assert_eq!(asked.source, lumilio_core::DEFAULT_SOURCE);
     view.update(cx, |view, cx| {
-        view.set_summary_translation(
-            revision,
-            &source,
-            &project,
-            &original,
-            Some("中文简介".into()),
-            cx,
-        )
+        view.set_summary_translation(&asked, Some("中文简介".into()), cx)
     });
     view.read_with(cx, |view, _| {
-        assert_eq!(view.summary_translation.as_deref(), Some("中文简介"));
         let DetailState::Ready(detail) = view.state() else {
             panic!("ready")
         };
+        assert_eq!(view.summary_text(&detail.project), "中文简介");
         assert_eq!(detail.project.description, "summary");
-        assert!(
-            !view.show_translation,
-            "summary does not opt the body into translation"
-        );
     });
+    assert!(
+        !shows_translation(&view, cx),
+        "summary does not opt the body into translation"
+    );
     view.update(cx, |view, cx| {
         view.set_translation_enabled(false, cx);
         view.set_translation_enabled(true, cx);
-        view.set_summary_translation(
-            revision,
-            &source,
-            &project,
-            &original,
-            Some("late".into()),
-            cx,
-        );
+        view.set_summary_translation(&asked, Some("late".into()), cx);
     });
-    view.read_with(cx, |view, _| assert!(view.summary_translation.is_none()));
+    view.read_with(cx, |view, _| {
+        let DetailState::Ready(detail) = view.state() else {
+            panic!("ready")
+        };
+        assert_eq!(view.summary_text(&detail.project), "summary");
+    });
 }
 
 #[test]
@@ -175,8 +178,6 @@ use lumilio_core::{GalleryImage, ProjectLinks, SideSupport, VersionFile};
 pub(crate) fn detail() -> ProjectDetail {
     ProjectDetail {
         project: Project {
-            source: "lumilio.modrinth".into(),
-            page_url: String::new(),
             id: "P".to_owned(),
             slug: "cool".to_owned(),
             title: "Cool".to_owned(),
@@ -186,7 +187,7 @@ pub(crate) fn detail() -> ProjectDetail {
             categories: vec!["magic".to_owned()],
             loaders: vec!["fabric".to_owned()],
             downloads: 10,
-            followers: 2,
+            followers: Some(2),
             published: String::new(),
             updated: "2026-01-01T00:00:00Z".to_owned(),
             client_side: SideSupport::Required,
@@ -204,6 +205,9 @@ pub(crate) fn detail() -> ProjectDetail {
             }],
             icon_url: None,
             game_versions: vec!["1.21".to_owned()],
+            page_url: "https://modrinth.com/mod/cool".to_owned(),
+            manual_download: false,
+            body_format: lumilio_core::TextFormat::Markdown,
         },
         versions: vec![Version {
             id: "v1".to_owned(),
@@ -220,12 +224,16 @@ pub(crate) fn detail() -> ProjectDetail {
                 primary: true,
                 size: 2048,
                 sha1: None,
+                download_page: None,
             }],
             dependencies: Vec::new(),
             downloads: 5,
             changelog: String::new(),
+            changelog_format: lumilio_core::TextFormat::Markdown,
         }],
         owner: Some("someone".to_owned()),
+        source: lumilio_core::DEFAULT_SOURCE.to_owned(),
+        source_name: "Modrinth".to_owned(),
     }
 }
 
@@ -400,6 +408,38 @@ fn an_installed_project_offers_switching_and_the_installed_version_is_marked(
         "switch version goes to the list"
     );
     assert!(seen.borrow().is_empty(), "nothing was installed by that");
+}
+
+#[gpui::test]
+fn a_modpack_installs_the_version_chosen_in_its_list(cx: &mut TestAppContext) {
+    let mut pack = detail();
+    pack.project.kind = ProjectKind::Modpack;
+    let mut newer = pack.versions[0].clone();
+    newer.id = "v2".to_owned();
+    newer.number = "2".to_owned();
+    newer.published = "2026-02-01T00:00:00Z".to_owned();
+    pack.versions.insert(0, newer);
+    let (view, cx, seen) = mount(cx, None, pack);
+    view.update(cx, |view, cx| view.select_tab(1, cx));
+    cx.run_until_parked();
+
+    // Each row installs its own version as a new game, not the newest.
+    for selector in ["detail-version-install-0", "detail-version-install-1"] {
+        let key = cx
+            .debug_bounds(selector)
+            .unwrap_or_else(|| panic!("{selector}: each version has an install key"));
+        cx.simulate_click(key.center(), gpui::Modifiers::none());
+    }
+    let mut asked: Vec<String> = seen
+        .borrow()
+        .iter()
+        .filter_map(|intent| match intent {
+            DetailIntent::Install { version_id, .. } => version_id.clone(),
+            _ => None,
+        })
+        .collect();
+    asked.sort();
+    assert_eq!(asked, ["v1", "v2"]);
 }
 
 /// Not a check: prints the per-frame cost of a long description.

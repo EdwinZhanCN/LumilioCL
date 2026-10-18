@@ -8,12 +8,12 @@
 
 mod common;
 
-use common::{add_block, add_texture, Blocks};
-use schematic_mesher::{BlockPosition, InputBlock, Mesher, ResourcePack};
+use common::{add_block, add_texture, Blocks, Fixture};
+use schematic_mesher::{BlockPosition, InputBlock, Mesher};
 
 /// Distinct Z of every north-facing vertex for a block made of `elements`.
 fn north_planes(elements: &str) -> Vec<f32> {
-    let mut pack = ResourcePack::new();
+    let mut pack = Fixture::default();
     add_texture(&mut pack, "block/base", false);
     add_texture(&mut pack, "block/overlay", false);
     add_block(
@@ -27,7 +27,7 @@ fn north_planes(elements: &str) -> Vec<f32> {
         BlockPosition::new(0, 0, 0),
         InputBlock::new("minecraft:layered"),
     )]);
-    let output = Mesher::new(pack).mesh(&source).unwrap();
+    let output = Mesher::new(pack.bake()).mesh(&source).unwrap();
     let layer = &output.opaque_mesh;
     let mut planes: Vec<f32> = layer
         .positions

@@ -16,15 +16,14 @@ export type Cell =
 // Row-major, as in the icon.
 export const CELLS: readonly Cell[] = [
   { kind: "feature", id: "library", scene: "dawn", index: 1, shot: "/shots/game-library.png" },
-  { kind: "planned", id: "appearance" },
+  { kind: "planned", id: 0 },
   { kind: "launch" },
   { kind: "feature", id: "discover", scene: "portal", index: 2, shot: "/shots/discovery.png" },
-  { kind: "planned", id: "translation" },
-  { kind: "planned", id: "plugins" },
-  // TODO(asset): screenshots or GIFs for these three, described in the catalog's `shot`.
-  { kind: "feature", id: "map", scene: "map", index: 3, shot: null },
-  { kind: "feature", id: "schematic", scene: "redstone", index: 4, shot: null },
-  { kind: "feature", id: "diagnostics", scene: "caves", index: 5, shot: null },
+  { kind: "planned", id: 1 },
+  { kind: "planned", id: 2 },
+  { kind: "feature", id: "map", scene: "map", index: 3, shot: "/shots/world-map.png" },
+  { kind: "feature", id: "schematic", scene: "redstone", index: 4, shot: "/shots/schematic-preview.png" },
+  { kind: "feature", id: "diagnostics", scene: "caves", index: 5, shot: "/shots/crash-analysis.png" },
 ];
 
 export const FEATURE_COUNT = CELLS.filter((cell) => cell.kind === "feature").length;

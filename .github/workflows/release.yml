@@ -75,6 +75,9 @@ jobs:
       MACOS_NOTARY_ISSUER: ${{ secrets.MACOS_NOTARY_ISSUER }}
       WINDOWS_CERTIFICATE_PFX: ${{ secrets.WINDOWS_CERTIFICATE_PFX }}
       WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+      # Built into the CurseForge content source (option_env! in
+      # lumilio-plugin-curseforge); without it that source starts off.
+      CF_API_KEY: ${{ secrets.CF_API_KEY }}
     steps:
       - name: Install build dependencies (Linux)
         if: matrix.os == 'linux'
@@ -158,6 +161,12 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: |
+            .github/release-template.md
+            release-notes/
+          sparse-checkout-cone-mode: false
       - uses: actions/download-artifact@v4
         with:
           path: dist
@@ -176,12 +185,13 @@ jobs:
           VERSION: ${{ needs.version.outputs.version }}
           PRERELEASE: ${{ needs.version.outputs.prerelease }}
         run: |
+          # The version's notes, which the launcher also shows after updating,
+          # then the package details every release repeats (PACKAGING.md §5).
           {
-            echo "Built from ${GITHUB_SHA}."
+            cat "release-notes/$VERSION.md"
             echo
-            echo "Each package's BUILD.txt records its version, platform, commit and signature;"
-            echo "SHA256SUMS.txt lists the checksum of every file here."
+            sed -e "s|{{TAG}}|$TAG|g" -e "s|{{SHA}}|$GITHUB_SHA|g" .github/release-template.md
           } > notes.md
-          flags=(--draft --verify-tag --generate-notes --title "LumilioCL $VERSION" --notes-file notes.md)
+          flags=(--draft --verify-tag --title "LumilioCL $VERSION" --notes-file notes.md)
           if [ "$PRERELEASE" = true ]; then flags+=(--prerelease); fi
           gh release create "$TAG" "${flags[@]}" dist/*

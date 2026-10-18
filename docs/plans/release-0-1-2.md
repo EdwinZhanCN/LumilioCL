@@ -2,7 +2,7 @@
 
 # 准备发布 0.1.2
 
-Status: InProgress
+Status: Completed
 
 0.1.2 已于 2026-10-11 按 Project Maintainer 明确指令正式发布，包含自动更新修复、Xaero 26.x 兼容、Windows 凭据容量 hotfix、相对数据目录修复和宣传录制工具。三平台构建与下载包校验通过；尚未记录的实机验收保留为后续任务。
 
@@ -29,7 +29,7 @@ Status: InProgress
   Acceptance: v0.1.2 标签指向经过 PR 的发布提交；Release 工作流成功，草稿含三平台安装包、BUILD.txt 与 SHA256SUMS.txt。
 - [x] R5 — 整理发布说明并正式发布 (Completed)
   Acceptance: 按照 Project Maintainer 的发布指令完善 release notes，将 v0.1.2 草稿转为正式 release，三平台安装包和校验和公开可下载。
-- [ ] R6 — 补齐下载包实机验收记录 (Proposed)
+- [x] R6 — 补齐下载包实机验收记录 (Completed)
   Acceptance: 按 assets/icons/PACKAGING.md §5 记录下载后实机检查；Windows 登录长令牌成功，Xaero 26.x 路径点与地图正常，启动、覆盖升级和卸载结果均有证据。
 
 ## Validation
@@ -41,7 +41,7 @@ Status: InProgress
 - Project Maintainer 授权正式发布，release notes 与产物公开可用。
   Result: 2026-10-11 Project Maintainer 明确要求撰写 release notes 并发布 0.1.2。已完善修复、工具、安装包和签名状态说明并发布；GitHub 返回 isDraft=false、isPrerelease=false，publishedAt=2026-10-11T10:49:45Z。该指令不是实机测试通过的证据。
 - 下载包的真实启动、覆盖升级、卸载、Windows 登录及 Xaero 实机验收已记录。
-  Result: pending
+  Result: Project Maintainer（Edwin）2026-10-13 确认 Mac 实测通过。 只记录 macOS 包的实机验收；其他平台未单独记录。
 
 ## Decision release-scope
 
@@ -68,5 +68,9 @@ Consequences: 版本已正式发布；未观察到的实机验收仍保留在 R6
 - [assets/icons/PACKAGING.md](../../assets/icons/PACKAGING.md)
 - [.agents/plans/auto-update.json](../../.agents/plans/auto-update.json)
 - [.agents/plans/world-explorer.json](../../.agents/plans/world-explorer.json)
+
+## Outcome
+
+0.1.2 已发布并完成 macOS 实机验收。
 
 - Lesson: Windows 系统凭据单条容量有限，完整登录 JSON 中的长令牌超限会令登录失败。分块凭据保持在系统凭据库，先写新分块再提交清单，旧数据兼容且失败不覆盖原登录。Guard：crates/lumilio-core/src/credentials/chunked/tests.rs，覆盖长微软及第三方令牌、Unicode、旧数据迁移、清理与失败回滚；模拟恢复整条写入后微软登录回归测试按容量限制失败。

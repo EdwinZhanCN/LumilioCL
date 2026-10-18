@@ -498,6 +498,9 @@ pub struct DiscoverPreferences {
     /// The photosensitivity warning was dismissed for good.
     pub photosensitivity_warning_dismissed: bool,
     pub hide_installed_modpacks: bool,
+    /// The content source (plugin ID) Discover last browsed; `None` is the
+    /// first one that is on.
+    pub source: Option<String>,
 }
 
 impl Preferences {

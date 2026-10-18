@@ -1,4 +1,5 @@
 use super::super::intent::InstanceIntent;
+use super::super::plugin_tabs::PluginPage;
 use super::super::{InstanceDetailView, TAB_HISTORY, TAB_SCREENSHOTS, TAB_SETTINGS};
 use super::{click, record, rooted};
 use gpui::TestAppContext;
@@ -380,6 +381,8 @@ fn a_model_loads_in_its_modal_once_and_late_assets_do_not_enter_a_replacement(
             Ok(lumilio_core::ModelPreview {
                 schematic: Vec::new(),
                 pack: None,
+                plan: lumilio_core::AssetPlan::default(),
+                entities: Default::default(),
             }),
             cx,
         )
@@ -387,4 +390,160 @@ fn a_model_loads_in_its_modal_once_and_late_assets_do_not_enter_a_replacement(
     cx.run_until_parked();
     assert!(cx.debug_bounds("model-error").is_some());
     assert!(cx.debug_bounds("model-loading").is_none());
+}
+
+/// The plugin's first picture on the page, as GPUI holds it.
+fn first_picture(
+    view: &gpui::Entity<InstanceDetailView>,
+    cx: &mut gpui::VisualTestContext,
+) -> std::sync::Arc<gpui::RenderImage> {
+    view.read_with(cx, |view, _| match &view.plugin_pages[PLUGIN] {
+        PluginPage::Shown(_, images, ..) => images[0].clone().expect("a valid picture"),
+        _ => panic!("the page is not shown"),
+    })
+}
+
+fn plugin_views(seen: &Rc<RefCell<Vec<InstanceIntent>>>) -> usize {
+    seen.borrow()
+        .iter()
+        .filter(|intent| matches!(intent, InstanceIntent::PluginView(_)))
+        .count()
+}
+
+#[gpui::test]
+fn a_plugin_page_lives_only_while_shown_and_returns_its_pictures(cx: &mut TestAppContext) {
+    let seen: Rc<RefCell<Vec<InstanceIntent>>> = Rc::default();
+    let (view, cx) = open(seen.clone(), cx);
+    cx.update(|window, cx| view.update(cx, |view, cx| view.open_shown(4, window, cx)));
+    view.update(cx, |view, cx| {
+        view.plugin_view_arrived(PLUGIN.into(), shown(View::Image(pixel())), cx);
+    });
+    cx.run_until_parked();
+    let first = first_picture(&view, cx);
+    assert!(cx.update(|window, _| window.has_image_atlas_entry(&first)));
+
+    // A fresh view of the same tab replaces the page and its picture.
+    view.update(cx, |view, cx| {
+        view.plugin_view_arrived(PLUGIN.into(), shown(View::Image(pixel())), cx);
+    });
+    cx.run_until_parked();
+    let second = first_picture(&view, cx);
+    cx.update(|window, _| {
+        assert!(
+            !window.has_image_atlas_entry(&first),
+            "replaced, texture returned"
+        );
+        assert!(window.has_image_atlas_entry(&second));
+    });
+
+    // Another tab: the page and its picture go.
+    cx.update(|window, cx| view.update(cx, |view, cx| view.open_tab(TAB_SCREENSHOTS, window, cx)));
+    cx.run_until_parked();
+    assert!(view.read_with(cx, |view, _| view.plugin_pages.is_empty()));
+    assert!(!cx.update(|window, _| window.has_image_atlas_entry(&second)));
+
+    // Back on the tab, the page is asked for again.
+    let before = plugin_views(&seen);
+    cx.update(|window, cx| view.update(cx, |view, cx| view.open_shown(4, window, cx)));
+    assert_eq!(plugin_views(&seen), before + 1);
+}
+
+#[gpui::test]
+fn a_page_that_leaves_the_screen_drops_its_plugin_pages_and_asks_again_when_back(
+    cx: &mut TestAppContext,
+) {
+    let seen: Rc<RefCell<Vec<InstanceIntent>>> = Rc::default();
+    let (view, cx) = open(seen.clone(), cx);
+    cx.update(|window, cx| view.update(cx, |view, cx| view.open_shown(4, window, cx)));
+    view.update(cx, |view, cx| {
+        view.plugin_view_arrived(PLUGIN.into(), shown(View::Image(pixel())), cx);
+    });
+    cx.run_until_parked();
+    let picture = first_picture(&view, cx);
+
+    view.update(cx, |view, cx| view.left_screen(cx));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(view.plugin_pages.is_empty());
+        assert_eq!(
+            view.plugin_open.as_deref(),
+            Some(PLUGIN),
+            "the tab stays chosen"
+        );
+    });
+    assert!(!cx.update(|window, _| window.has_image_atlas_entry(&picture)));
+
+    // Shown again (it renders), the open tab asks for its page.
+    let before = plugin_views(&seen);
+    view.update(cx, |_, cx| cx.notify());
+    cx.run_until_parked();
+    assert_eq!(plugin_views(&seen), before + 1);
+}
+
+#[gpui::test]
+fn the_studio_pane_shows_the_catalogue_and_opens_the_window(cx: &mut TestAppContext) {
+    let seen: Rc<RefCell<Vec<InstanceIntent>>> = Rc::default();
+    let (view, cx) = open(seen.clone(), cx);
+    cx.simulate_resize(gpui::size(gpui::px(720.), gpui::px(480.)));
+    cx.update(|window, cx| view.update(cx, |view, cx| view.open_plugin(PLUGIN.into(), window, cx)));
+    view.update(cx, |view, cx| {
+        view.plugin_view_arrived(
+            PLUGIN.into(),
+            shown(View::Studio {
+                folder: "schematics".into(),
+            }),
+            cx,
+        )
+    });
+    cx.run_until_parked();
+    assert!(
+        seen.borrow()
+            .iter()
+            .any(|intent| matches!(intent, InstanceIntent::LoadStudio { folder, .. } if folder == "schematics")),
+        "the studio asks the application for its folder"
+    );
+    let catalogue = cx
+        .debug_bounds("studio-catalogue")
+        .expect("the catalogue is drawn (T29)");
+    let head = cx.debug_bounds("studio-head").unwrap();
+    assert!(head.bottom() <= catalogue.top());
+    assert!(
+        catalogue.right() <= gpui::px(720.) && head.right() <= gpui::px(720.),
+        "no horizontal overflow: {head:?} over {catalogue:?}"
+    );
+    assert!(cx.debug_bounds("studio-tree").is_none(), "no tree (D27)");
+    assert!(
+        cx.debug_bounds("studio-viewport").is_none()
+            && cx.debug_bounds("studio-inspector").is_none()
+            && cx.debug_bounds("studio-more").is_none(),
+        "the viewport, the inspector and the operations live in the window (D22)"
+    );
+    // The one page action opens the window; with no file chosen it opens
+    // on none.
+    click(cx, "studio-open-window");
+    assert!(
+        seen.borrow().iter().any(|intent| matches!(
+            intent,
+            InstanceIntent::OpenStudioWindow { plugin, folder, file: None }
+                if plugin == PLUGIN && folder == "schematics"
+        )),
+        "the key asks the application for the window: {:?}",
+        seen.borrow()
+    );
+    // A CSV export answers with the same view; the studio is kept.
+    let studio = |view: &InstanceDetailView| match view.plugin_pages.get(PLUGIN) {
+        Some(PluginPage::Shown(_, _, _, _, studios)) => studios[0].entity_id(),
+        _ => panic!("studio page"),
+    };
+    let before = view.read_with(cx, |view, _| studio(view));
+    view.update(cx, |view, cx| {
+        view.plugin_view_arrived(
+            PLUGIN.into(),
+            shown(View::Studio {
+                folder: "schematics".into(),
+            }),
+            cx,
+        )
+    });
+    assert_eq!(view.read_with(cx, |view, _| studio(view)), before);
 }

@@ -12,7 +12,6 @@ use crate::theme::ShellColors;
 use crate::tr;
 use gpui::prelude::*;
 use gpui::{App, ClipboardItem, Context, IntoElement, Window, div, px};
-use gpui_component::Selectable as _;
 use gpui_component::menu::{ContextMenuExt as _, PopupMenuItem};
 use gpui_component::{Icon, h_flex, v_flex};
 use lumilio_core::{Project, ProjectKind, environment};
@@ -122,9 +121,14 @@ impl ProjectDetailView {
         };
         let environment = environment(project.client_side, project.server_side);
         let page_url = self.url.to_string();
+        let open_label = tr!("discover-open-in", source = self.source_name.as_ref());
         let copied = cx.entity().downgrade();
 
-        let mut actions = kit::PageActions::new("detail-actions")
+        let mut actions = kit::PageActions::new("detail-actions");
+        if let Some(translate) = self.translate_key(cx) {
+            actions = actions.secondary(translate);
+        }
+        let actions = actions
             .primary(
                 crate::theme::clickable(
                     Key::new("detail-install")
@@ -147,7 +151,7 @@ impl ProjectDetailView {
                     move |_, window, cx| install(window, cx)
                 }),
             )
-            .more(kit::MenuEntry::new(tr!("discover-open-modrinth"), {
+            .more(kit::MenuEntry::new(open_label.clone(), {
                 let url = page_url.clone();
                 move |_, cx| cx.open_url(&url)
             }))
@@ -164,36 +168,6 @@ impl ProjectDetailView {
                     });
                 }
             }));
-
-        if self.translation_enabled {
-            let entity = cx.entity();
-            let active = self.show_translation || self.translation_loading;
-            // ia[discover]: 翻译 / 显示原文 | 详情页安装按钮左侧 · Languages 图标开关 | 开启时使用主题强调色；再次点击恢复正文原文，简介自动使用 MCIM，标题不翻译
-            actions = actions.secondary(
-                Key::new("detail-translate")
-                    .icon(Icon::new(UiIcon::Languages))
-                    .kind(if active {
-                        crate::key::KeyKind::Orange
-                    } else {
-                        crate::key::KeyKind::White
-                    })
-                    .selected(active)
-                    .loading(self.translation_loading)
-                    .tooltip(if self.translation_loading {
-                        tr!("translation-loading")
-                    } else if self.show_translation {
-                        tr!("translation-original")
-                    } else if self.translation_error {
-                        tr!("translation-retry")
-                    } else {
-                        tr!("translation-action")
-                    })
-                    .debug_selector(|| "detail-translate".into())
-                    .on_click(move |_, window, cx| {
-                        entity.update(cx, |view, cx| view.toggle_translation(window, cx))
-                    }),
-            );
-        }
 
         let body = colors.body;
         let updated =
@@ -248,19 +222,20 @@ impl ProjectDetailView {
                                         .text_sm()
                                         .text_color(colors.muted)
                                         .debug_selector(|| "detail-summary".into())
-                                        .child(gpui_component::text::TextView::markdown(
-                                            "detail-summary-text",
-                                            self.summary_translation
-                                                .as_ref()
-                                                .unwrap_or(&project.description)
-                                                .clone(),
-                                        )),
+                                        .child(self.summary_text(project)),
                                 )
                                 .child(
                                     h_flex()
                                         .flex_wrap()
                                         .gap(px(6.))
                                         .pt(px(2.))
+                                        .children(project.manual_download.then(|| {
+                                            kit::tag(
+                                                tr!("discover-site-only"),
+                                                kit::TagKind::Ink,
+                                                colors,
+                                            )
+                                        }))
                                         .children(project.loaders.iter().map(|l| {
                                             kit::tag(tag_label(l), kit::TagKind::Ink, colors)
                                         }))
@@ -287,7 +262,11 @@ impl ProjectDetailView {
                         .border_t_1()
                         .border_color(colors.foreground)
                         .child(spec_cell("DL", count_label(project.downloads), colors))
-                        .child(spec_cell("FAV", count_label(project.followers), colors))
+                        .children(
+                            project
+                                .followers
+                                .map(|followers| spec_cell("FAV", count_label(followers), colors)),
+                        )
                         .children(updated.map(|updated| spec_cell("UPD", updated, colors)))
                         .children(
                             project
@@ -296,7 +275,7 @@ impl ProjectDetailView {
                                 .map(|license| spec_cell("LICENSE", license, colors)),
                         ),
                 );
-        // ia[discover]: 详情页右键菜单 | 在页头上右键：安装 / 在 Modrinth 中打开 / 复制链接 | 与「⋯」菜单同效
+        // ia[discover]: 详情页右键菜单 | 在页头上右键：安装 / 在（来源）中打开 / 复制链接 | 与「⋯」菜单同效
         let (open_url, copy_url) = (page_url.clone(), page_url);
         div()
             .id("detail-header")
@@ -311,11 +290,11 @@ impl ProjectDetailView {
                         .on_click(move |_, window, cx| install(window, cx)),
                 )
                 .separator()
-                .item(PopupMenuItem::new(tr!("discover-open-modrinth")).on_click(
-                    move |_, _, cx| {
+                .item(
+                    PopupMenuItem::new(open_label.clone()).on_click(move |_, _, cx| {
                         cx.open_url(&open_url);
-                    },
-                ))
+                    }),
+                )
                 .item(
                     PopupMenuItem::new(tr!("discover-copy-link")).on_click(move |_, _, cx| {
                         cx.write_to_clipboard(ClipboardItem::new_string(copy_url.clone()));

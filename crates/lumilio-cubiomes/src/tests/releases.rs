@@ -225,7 +225,9 @@ fn regional_placements_and_changed_biome_tags_match_each_original_release() {
             );
             count += 1;
         }
-        assert_eq!(count, if name == "26.3" { 1350 } else { 1275 });
+        // 18 structure sets, the camp only in 26.3, and the nether fossils'
+        // two-chunk grid: 25 regions × 3 seeds each.
+        assert_eq!(count, if name == "26.3" { 1425 } else { 1350 });
         for line in rules.lines() {
             let fields: Vec<i32> = line
                 .split_whitespace()
@@ -306,6 +308,97 @@ fn every_release_matches_its_own_original_server_samples() {
     for unknown in [4326, 4904, 5022, 5024] {
         assert_eq!(Version::from_data_version(unknown), Err(Error::Unsupported));
     }
+}
+
+/// Upstream releases before the maintained tables, checked against their own
+/// original servers with the same probe: biome samples, regional placements
+/// and the biome tags the probe records.
+const OLDER: &[(&str, &str, &str, &str)] = &[
+    (
+        "1.19.4",
+        include_str!("../../tests/golden/1.19.4.txt"),
+        include_str!("../../tests/golden/1.19.4-structures.txt"),
+        include_str!("../../tests/golden/1.19.4-rules.txt"),
+    ),
+    (
+        "1.20.6",
+        include_str!("../../tests/golden/1.20.6.txt"),
+        include_str!("../../tests/golden/1.20.6-structures.txt"),
+        include_str!("../../tests/golden/1.20.6-rules.txt"),
+    ),
+    (
+        "1.21.1",
+        include_str!("../../tests/golden/1.21.1.txt"),
+        include_str!("../../tests/golden/1.21.1-structures.txt"),
+        include_str!("../../tests/golden/1.21.1-rules.txt"),
+    ),
+    (
+        "1.21.3",
+        include_str!("../../tests/golden/1.21.3.txt"),
+        include_str!("../../tests/golden/1.21.3-structures.txt"),
+        include_str!("../../tests/golden/1.21.3-rules.txt"),
+    ),
+    // Biome samples are also in RELEASES; its placements and tags only here.
+    (
+        "1.21.4",
+        include_str!("../../tests/golden/1.21.4.txt"),
+        include_str!("../../tests/golden/1.21.4-structures.txt"),
+        include_str!("../../tests/golden/1.21.4-rules.txt"),
+    ),
+];
+
+#[test]
+fn upstream_releases_match_their_own_original_server_samples() {
+    let mut failures = vec![];
+    for &(name, samples, placements, rules) in OLDER {
+        let version = Version::from_name(name).unwrap();
+        for line in samples.lines() {
+            let fields: Vec<i64> = line
+                .split_whitespace()
+                .map(|v| v.parse().unwrap())
+                .collect();
+            let [seed, dim, x, y, z, expected] = fields.as_slice() else {
+                panic!("invalid sample")
+            };
+            let dimension = match dim {
+                -1 => Dimension::Nether,
+                0 => Dimension::Overworld,
+                1 => Dimension::End,
+                _ => panic!("bad dimension"),
+            };
+            let got = ffi::sample(version, *seed, dimension, [*x as i32, *y as i32, *z as i32]);
+            if got != *expected as i32 {
+                failures.push(format!("{name} biome {line}: {got}"));
+            }
+        }
+        for line in placements.lines() {
+            let fields: Vec<i64> = line
+                .split_whitespace()
+                .map(|v| v.parse().unwrap())
+                .collect();
+            let [seed, kind, rx, rz, x, z] = fields.as_slice() else {
+                panic!("invalid placement")
+            };
+            let kind = Structure::ALL[*kind as usize];
+            let got = ffi::placement(version, *seed, kind, [*rx as i32, *rz as i32]);
+            if got != Ok([*x as i32, *z as i32]) {
+                failures.push(format!("{name} {kind:?} {line}: {got:?}"));
+            }
+        }
+        for line in rules.lines() {
+            let fields: Vec<i32> = line
+                .split_whitespace()
+                .map(|v| v.parse().unwrap())
+                .collect();
+            let [rule, id, expected] = fields.as_slice() else {
+                panic!("invalid biome rule")
+            };
+            if ffi::biome_rule(version, *rule, *id) != (*expected != 0) {
+                failures.push(format!("{name} rule {line}"));
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
 #[test]

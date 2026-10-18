@@ -2,9 +2,9 @@
 
 # 准备发布 0.1.3
 
-Status: InProgress
+Status: Completed
 
-0.1.3 汇总 v0.1.2 之后合入 main 的修复：主页先显示游戏、后台补充诊断，Windows 后台进程不再弹出控制台窗口，macOS 更新 rsync 排除 Finder 图标文件并防止 `open -n`，以及网站路线图生命周期显示。0.1.2 → 0.1.3 是第一次由包含退出后重启修复的版本执行的 macOS 自动更新，用作 auto-update T6 与 release-0-1-2 R6 的实机检查。
+0.1.3 已于 2026-10-11 正式发布，汇总 v0.1.2 之后合入 main 的修复：主页先显示游戏、后台补充诊断，Windows 后台进程不再弹出控制台窗口，macOS 更新 rsync 排除 Finder 图标文件并防止 `open -n`，以及网站路线图生命周期显示。0.1.2 → 0.1.3 是第一次由包含退出后重启修复的版本执行的 macOS 自动更新，用作 auto-update T6 与 release-0-1-2 R6 的实机检查。
 
 ## Scope
 
@@ -20,21 +20,21 @@ Status: InProgress
 
 - [x] R1 — 更新版本与计划 (Completed)
   Acceptance: 工作区版本为 0.1.3，Cargo.lock 同步，本计划与投影生成。
-- [ ] R2 — 通过 PR 合入 main (InProgress)
+- [x] R2 — 通过 PR 合入 main (Completed)
   Acceptance: PR 列出发布内容，rust、plans 检查通过，由 Project Maintainer 审阅后合入。
-- [ ] R3 — 打 v0.1.3 标签并生成三平台草稿安装包 (Proposed)
+- [x] R3 — 打 v0.1.3 标签并生成三平台草稿安装包 (Completed)
   Acceptance: v0.1.3 标签指向合入后的提交；Release 工作流成功，草稿含三平台安装包、BUILD.txt 与 SHA256SUMS.txt。
-- [ ] R4 — 整理发布说明并正式发布 (Proposed)
+- [x] R4 — 整理发布说明并正式发布 (Completed)
   Acceptance: Project Maintainer 发布草稿；release notes 即网站更新日志内容。
-- [ ] R5 — macOS 从 0.1.2 自动更新到 0.1.3 (Proposed)
+- [x] R5 — macOS 从 0.1.2 自动更新到 0.1.3 (Completed)
   Acceptance: Project Maintainer 在自己的 Mac 上从 0.1.2 自动更新：后台安装后点击重启，窗口关闭后由 Dock 上同一个图标打开 0.1.3，不出现第二个 LumilioCL 图标。结果同时记入 auto-update T6 与 release-0-1-2 R6。
 
 ## Validation
 
 - 发布候选的本地与 PR 检查通过。
-  Result: pending
+  Result: 2026-10-11 PR #23 的 rust、plans 检查通过，合入 main 的提交为 f75c5afcc87d56c632cc8444fa8e1c5870422367；v0.1.3 标签指向该提交。Release 工作流 38172561811 成功，草稿含 macOS arm64 DMG、Windows x64 安装器与便携 ZIP、Linux x64 deb 与 tar.gz 及 SHA256SUMS.txt；2026-10-11T21:00:32Z 正式发布。本地检查结果未记录。
 - macOS 0.1.2 → 0.1.3 自动更新只有一个 Dock 图标。
-  Result: pending
+  Result: Project Maintainer（Edwin）2026-10-13 确认 Mac 实测通过。 macOS 自动更新只有一个 Dock 图标。
 
 ## Decision macos-update-check
 
@@ -50,5 +50,12 @@ Consequences: auto-update T6 在 R5 完成前保持开放。
 - https://github.com/EdwinZhanCN/LumilioCL/pull/20
 - https://github.com/EdwinZhanCN/LumilioCL/pull/21
 - https://github.com/EdwinZhanCN/LumilioCL/pull/22
+- https://github.com/EdwinZhanCN/LumilioCL/pull/23
+- https://github.com/EdwinZhanCN/LumilioCL/actions/runs/38172561811
+- https://github.com/EdwinZhanCN/LumilioCL/releases/tag/v0.1.3
 - [.agents/plans/auto-update.json](../../.agents/plans/auto-update.json)
 - [.agents/plans/release-0-1-2.json](../../.agents/plans/release-0-1-2.json)
+
+## Outcome
+
+0.1.3 已于 2026-10-11 发布，macOS 自动更新验收通过。

@@ -28,6 +28,11 @@ pub struct WorldInfo {
     pub last_played_ms: Option<i64>,
     pub game_version: Option<String>,
     pub hardcore: bool,
+    /// The mode a player joins the world in; `None` when `level.dat` does not
+    /// say or says something unknown.
+    pub game_mode: Option<GameMode>,
+    /// Commands are allowed ("Allow Cheats").
+    pub cheats: bool,
     /// The world's cover, when the player chose one in the game
     /// (`saves/<folder>/icon.png`).
     pub icon: Option<PathBuf>,
@@ -37,6 +42,29 @@ pub struct WorldInfo {
     /// A game writes it when it opens the world, so while a game runs, the
     /// world with the newest one is the one being played.
     pub lock_touched_ms: Option<i64>,
+}
+
+/// A world's game mode, as `level.dat` stores it in `Data.GameType`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum GameMode {
+    Survival,
+    Creative,
+    Adventure,
+    Spectator,
+}
+
+impl GameMode {
+    /// The mode for the game's number (0 survival … 3 spectator).
+    #[must_use]
+    pub const fn from_id(id: i64) -> Option<Self> {
+        match id {
+            0 => Some(Self::Survival),
+            1 => Some(Self::Creative),
+            2 => Some(Self::Adventure),
+            3 => Some(Self::Spectator),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -120,6 +148,10 @@ pub fn scan(game_dir: &Path) -> Result<Vec<WorldInfo>, WorldError> {
                 .and_then(|tag| tag.as_str())
                 .map(str::to_owned),
             hardcore: field(&["hardcore"]).and_then(nbt::Tag::as_i64) == Some(1),
+            game_mode: field(&["GameType"])
+                .and_then(nbt::Tag::as_i64)
+                .and_then(GameMode::from_id),
+            cheats: field(&["allowCommands"]).and_then(nbt::Tag::as_i64) == Some(1),
             icon: icon.is_file().then_some(icon),
             damaged: data.is_none(),
             lock_touched_ms: fs::metadata(path.join(LOCK_FILE))

@@ -136,14 +136,20 @@ impl Render for LauncherShell {
                     (Route::Discover, Some(slot)) => slot.view.clone().into_any_element(),
                     (Route::Library, _) => {
                         let handler = ctx.handler.clone();
-                        // ia[library]: 拖入整合包 | 把文件拖到页面上 | 同“导入整合包”（.mrpack，或 MultiMC/Prism/本启动器备份的 .zip）；不是的提示一句
+                        // The presets tab is master–detail: its panes scroll, the page does not.
+                        let page = if ctx.state.library_tab == pages::live::PRESETS_TAB {
+                            pages::live::presets(ctx)
+                        } else {
+                            kit::page("live-library", pages::live::library(ctx)).into_any_element()
+                        };
+                        // ia[library]: 拖入整合包 | 把文件拖到页面上 | 同“导入整合包”（.mrpack、CurseForge 整合包 .zip，或 MultiMC/Prism/本启动器备份的 .zip）；不是的提示一句
                         div()
                             .id("live-library-drop")
                             .size_full()
                             .on_drop::<gpui::ExternalPaths>(move |paths, window, cx| {
                                 handler(LiveIntent::DropFiles(paths.paths().to_vec()), window, cx)
                             })
-                            .child(kit::page("live-library", pages::live::library(ctx)))
+                            .child(page)
                             .into_any_element()
                     }
                     // Settings frames itself: its header and tabs stay put.
@@ -174,7 +180,7 @@ impl Render for LauncherShell {
                 .into_any_element()
         };
 
-        v_flex()
+        let shell = v_flex()
             .id("lumilio-shell")
             .relative()
             .size_full()
@@ -223,6 +229,9 @@ impl Render for LauncherShell {
                 self.detail
                     .as_ref()
                     .and_then(|slot| ProjectDetailView::viewer_overlay(&slot.view, cx)),
-            )
+            );
+        // Every picture loaded by path or address in the window stays within
+        // the picture budget.
+        crate::pictures::scope(cx).size_full().child(shell)
     }
 }

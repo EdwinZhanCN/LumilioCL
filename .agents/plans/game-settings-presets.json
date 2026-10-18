@@ -1,0 +1,181 @@
+{
+  "schemaVersion": 1,
+  "id": "game-settings-presets",
+  "title": "游戏设置预设与实例间同步",
+  "summary": "2026-10-12：首版同步已实现；按 Project Maintainer 要求重做了界面并加入游戏外编辑选项（T5、T7）。游戏库预设 tab 改为主从布局，实例设置新增「选项」分段，四合一弹窗拆成专门弹窗；选项可在游戏关闭时于预设或游戏里直接修改。core、UI 与 app 的窄测试通过，完整 just check 与视觉、实机验收仍由 Project Maintainer 进行，计划保持开放。",
+  "status": "completed",
+  "visibility": "internal",
+  "scope": {
+    "included": [
+      "游戏库增加预设 tab；从已有实例创建、重命名、复制预设，查看共享范围与绑定实例。",
+      "实例选择一个预设或自行管理；初次绑定展示将变化的受管设置；解除绑定保留实例现有游戏设置。",
+      "原生 options.txt 的已知字段目录、规范化值和明确的版本编码；按组选择共享范围，并允许排除具体字段。",
+      "实例级覆盖与待处理修改；启动前合并，退出后语义比较并在需要留意中处理，绝不自动回写预设。",
+      "持久化实际应用基线、源预设快照、字段冲突与恢复记录；逐字段选择和勾选后批量处理。",
+      "游戏外编辑目录中已验证的选项：在预设里改预设值，在游戏里改这个游戏的值（自己的选项写入 options.txt，共享选项成为仅此游戏的覆盖）。",
+      "核心独立测试、UI 交互与中英文文案、IA 投影，以及完整检查和视觉验收。"
+    ],
+    "excluded": [
+      "云同步、跨设备同步和预设市场。",
+      "Java、内存、JVM 参数、启动命令等启动器配置预设。",
+      "mod 配置目录、未知 options.txt 字段、资源包启用列表与文件、服务器列表、快捷栏及存档同步。",
+      "首版实时文件监听、预设继承、多预设叠加和完整复刻 Minecraft 设置编辑器。"
+    ]
+  },
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "调研并提出产品与同步契约",
+      "status": "completed",
+      "acceptance": "核对现有实例设置、实例隔离目录、启动生命周期与操作租约，并核对 Modrinth 发布的字段同步源码；建议、范围和待定选择写入本计划。"
+    },
+    {
+      "id": "T2",
+      "title": "原生设置文档与版本目录",
+      "status": "completed",
+      "acceptance": "独立解析 UTF-8 options.txt，只改受管字段，保留未知字段、未选字段、BOM 与换行；文件大小、NUL、重复键、源文件变化与语义等价有测试。首版覆盖上游目录核对的 1.16–1.21.11 与 26.1–26.3 稳定原生字段，FOV 规范化为角度、滑块忽略 f32 序列化尾差；版本新增字段有边界夹具。未知版本、历史数字按键、重命名画质档位及未知字段不猜测。"
+    },
+    {
+      "id": "T3",
+      "title": "预设持久化与绑定服务",
+      "status": "completed",
+      "acceptance": "launcher.db 保存预设 ID、名称、共享字段和值、revision、实例绑定、持久化覆盖、待处理修改和同步检查点，迁移保留现有实例；创建、复制、改名、解除绑定和使用中删除策略可独立测试。旧实例默认自行管理；绑定变更受实例操作租约保护。"
+    },
+    {
+      "id": "T4",
+      "title": "启动与退出同步以及恢复",
+      "status": "completed",
+      "acceptance": "实际启动前按实例文件→预设→覆盖→待处理值合并，保存有效值基线和源预设快照。退出只生成受管字段待处理变化，预设保持不变；无变化覆盖不重复提醒。仅此实例确认覆盖，发布按源预设/最新预设/候选值三方校验并清除对应覆盖，恢复清除对应覆盖与待处理。未处理字段下次启动不覆盖，其他字段继续更新；写入持久化记录、原子发布和源文件校验，中断可恢复且不写状态不明的游戏目录。"
+    },
+    {
+      "id": "T5",
+      "title": "预设 tab 与实例选择入口",
+      "status": "completed",
+      "acceptance": "游戏库预设 tab 为主从布局：左侧预设列表，右侧显示共享的选项、使用它的游戏及各自状态；支持从游戏创建、复制、改名、删除（使用中不可删）和共享范围选择。游戏页 设置 › 选项 显示预设来源、待决定的游戏内修改和分组选项表；可选择预设或不使用（先预览变化），按字段勾选后批量仅此游戏、更新预设、改回预设值；冲突可显式替换，覆盖可在编辑弹窗中跟随预设。首页需要留意打开同一位置。展示不兼容和失败，文案入中英文目录，声明 IA；720×480、长名称、空态、键盘焦点和异步目标切换可用。"
+    },
+    {
+      "id": "T7",
+      "title": "游戏外编辑选项",
+      "status": "completed",
+      "acceptance": "目录给出每个选项的编辑类型与范围；游戏关闭时可在预设或游戏中修改：开关当场切换，范围用滑块和数值，少量选择用分段，按键与语言用可搜索列表。游戏自己的选项只改文件里已有的该项并原子写回，预设共享的选项成为仅此游戏覆盖、下次启动生效，可跟随预设改回；预设值按最新支持版本校验且不能增删项。基于过期状态的修改被拒绝并重读；游戏运行时不能修改。core 与 UI 测试覆盖写文件、覆盖与跟随、待决定项不被重新发现、越界值与过期状态。"
+    },
+    {
+      "id": "T6",
+      "title": "验证完整玩家路径",
+      "status": "completed",
+      "acceptance": "覆盖创建预设→绑定两个实例→游戏内修改→退出→另一实例启动，以及自行管理、解绑、跨版本、整合包初始设置、并发冲突与中断恢复。just check 通过，IA 与计划投影新鲜；深浅色、最小窗口、减少动态效果与真实游戏行为完成视觉和实机验收。"
+    }
+  ],
+  "validation": [
+    {
+      "criterion": "现状及上游证据已核对。",
+      "result": "2026-10-11：InstanceSettings 现为 Java/内存/启动参数；Layout 为实例提供独立 game 目录；LauncherService::launch_with 持有实例租约并处理进程退出。Modrinth commit 71f35eb80f2a65387a2b30d47d433673d863a6d4 的 game_options/mod.rs、read_instance_changes.rs 与 catalog/version_changes.rs 已从发布的 raw.githubusercontent.com URL 核对。"
+    },
+    {
+      "criterion": "游戏外编辑与界面重做的窄测试通过。",
+      "result": "2026-10-12：lumilio-core game_settings 与服务测试 24 项、lumilio-ui 相关 UI 集成与单元测试（game_settings、实例设置、首页、游戏库、i18n、英文目录）与 lumilio-app live 测试通过；三个 crate 含测试的 clippy 无警告，just ia 已重新生成。未运行完整 just check。"
+    },
+    {
+      "criterion": "计划和已实现 IA 投影通过 just docs。",
+      "result": "Project Maintainer（Edwin）2026-10-13 确认 Mac 实测通过。 实现经 PR #30 合入并随 0.1.4 发布。"
+    },
+    {
+      "criterion": "核心同步和恢复守卫通过，代码通过 just check。",
+      "result": "Project Maintainer（Edwin）2026-10-13 确认 Mac 实测通过。 实现经 PR #30 合入并随 0.1.4 发布。"
+    },
+    {
+      "criterion": "真实游戏跨实例和跨版本路径、冲突处理与 UI 视觉验收完成。",
+      "result": "Project Maintainer（Edwin）2026-10-13 确认 Mac 实测通过。 实现经 PR #30 合入并随 0.1.4 发布。"
+    }
+  ],
+  "decisions": [
+    {
+      "id": "D1",
+      "decision": "已确认：每个实例绑定零个或一个预设；预设是受管原生设置的共享权威值，options.txt 是实例自己的运行文件。",
+      "rationale": "游戏库中的多个预设符合玩家按玩法维护习惯的需求；完整文件共享会混入版本标记、整合包设置与实例专属内容。",
+      "consequences": "在现有 launcher.db 保存预设和关系，不为功能新建 crate 或第二份 JSON 权威数据。与 InstanceSettings 的启动配置语义分开；有效原生设置由实例文件叠加预设受管字段产生。"
+    },
+    {
+      "id": "D2",
+      "decision": "建议：从实例创建预设，按组选择共享范围；常用个人偏好优先，性能与画面组由玩家明确选择。",
+      "rationale": "按键、鼠标、音量、语言、聊天和辅助功能通常随玩家走；画面、视距与 GUI 比例可能因整合包和玩法变化。",
+      "consequences": "只允许目录中验证过的原生字段；未知字段留在实例。资源包及不兼容包列表、version、教程/运行状态和设备专属项不进入首版。先提供值预览和游戏内修改回收，完整原生设置编辑器后续按需求增加。"
+    },
+    {
+      "id": "D3",
+      "decision": "已确认：游戏修改不自动回写；退出生成待处理变化，通过需要留意按字段决定归属；首版不用实时 watcher。",
+      "rationale": "Project Maintainer 要求玩家明确决定修改的共享范围；临时修改不能影响其他实例。",
+      "consequences": "持久化实际有效值基线、源预设值/revision 和操作身份。未处理值优先于预设但只保护对应字段；其他字段继续更新。提醒称检测到设置变化，不臆断玩家操作；已知格式迁移和运行字段不提醒。"
+    },
+    {
+      "id": "D4",
+      "decision": "建议：按字段三方合并，保留冲突，不采用整份文件最后退出者获胜。",
+      "rationale": "A 和 B 同时运行时，B 的未改旧值不能撤销 A 已发布的变化；同字段双方都改过需要可见决策。",
+      "consequences": "检测比较当前值与包含覆盖的实际应用基线；发布比较原预设值 B、候选值 L、当前预设值 P：P=B 或 P=L 可提交，其余保留冲突并由玩家决定。提交校验 revision；有损转换不作为可靠发布来源。发布成功清除所选字段覆盖并恢复跟随；未处理项不得静默丢失。"
+    },
+    {
+      "id": "D5",
+      "decision": "建议：只对明确支持的版本和字段做转换；缺失或不可表达的值不删除预设中的设置。",
+      "rationale": "原生设置在版本间有键名、类型、枚举和按键编码变化，旧版不能成为新设置被清空的来源。",
+      "consequences": "目录记录稳定字段、类型、版本范围和编解码；仅合并目标文件实际存在且验证可表示的字段，其余跳过并提示。首次没有 options.txt 时先等待游戏生成，下一次启动再合并，避免注入无 version 标记的现代按键。首版范围见 T2，更早版本和快照列入 backlog，不承诺全历史兼容。"
+    },
+    {
+      "id": "D6",
+      "decision": "建议：绑定前预览影响；解除绑定保留当前实例值；首版拒绝直接删除仍被使用的预设。",
+      "rationale": "玩家需要知道哪些设置将改变，解除关联不能意外重置游戏；删除规则应保持引用完整。",
+      "consequences": "新旧实例默认自行管理，不自动绑定。创建预设只读取来源实例；绑定在空闲时变更，实际设置在启动前应用。解绑是独立的关系操作，不是处理单字段变化的主要选择；解绑前保留本地设置并清除关联状态，存在待处理项时不能静默换预设。复制产生独立 ID 与值。"
+    },
+    {
+      "id": "D7",
+      "decision": "建议：实现集中于 lumilio-core/game_settings 领域模块、service 编排和 lumilio-ui 预设功能；所有文件工作在后台执行。",
+      "rationale": "原生文件解析、版本转换和冲突判断不依赖 GPUI；现有租约、SQLite、恢复和 UI intent 路径可以承载功能。",
+      "consequences": "在真正的进程启动边界协调安装、启动钩子与原生设置应用，避免仅构建 LaunchRequest 时过早写入。现有强制全屏等启动参数的所有权需在 T4 核对；被启动器覆盖的字段排除回收。预设界面归 Interface register，沿用 kit/controls/Key 和 motion token，无持续动画。"
+    },
+    {
+      "id": "D8",
+      "decision": "已确认：第一版支持持久化实例覆盖、待处理项与勾选字段后批量处理。",
+      "rationale": "一个字段需要不同不应迫使整个实例解绑；三种状态必须分开，避免将未决定归属的修改当作持久化覆盖。",
+      "consequences": "仅此实例保存覆盖但继续共享其他字段；恢复共享设置清除所选覆盖和待处理；完整设置编辑器、实时监听、模组配置与更多版本适配放入 backlog。"
+    },
+    {
+      "id": "D9",
+      "decision": "共享范围用独立的 excluded 集合表达，取消共享不删除预设中的值；创建时保留来源的支持字段，再按选中组启用共享。",
+      "rationale": "玩家应能重新勾选恢复共享；把范围选择实现成删值会让设置不可逆地从编辑表单消失。",
+      "consequences": "SQLite schema 6 保存值与排除列表，并迁移首个 schema 5 开发实现。范围变更与绑定基线裁剪事务提交；正在运行的关联游戏和受影响待处理项要先结束或处理。保留已有实例覆盖，未共享字段不触发提醒。"
+    },
+    {
+      "id": "D10",
+      "decision": "Project Maintainer 承担视觉与真实游戏验收，T5/T6 在反馈到达前保持开放。",
+      "rationale": "Project Maintainer 明确要求自行做视觉验证；自动检查不能证明原生界面和真实 Minecraft 行为符合预期。",
+      "consequences": "交付代码与检查证据，但不把计划标成 completed。重点验收深浅色、720×480、键盘焦点、长名称，以及两个实例共享、覆盖、待处理、冲突与崩溃恢复路径。"
+    },
+    {
+      "id": "D11",
+      "decision": "建议：游戏外编辑的位置就是范围。预设里改的是预设，使用它的游戏下次启动收到；游戏里改的只是这个游戏：自己的选项当场写入 options.txt，预设共享的选项成为仅此游戏的覆盖，下次启动生效，编辑弹窗可跟随预设改回。",
+      "rationale": "Project Maintainer 要求增加游戏外编辑。沿用 D3 让玩家明确共享范围：位置已说明范围，不必每次再选；共享选项不立即写文件，避免下次启动把它误认为游戏内修改。",
+      "consequences": "core 新增编辑类型目录、InstanceOptions 读取和单项编辑，编辑持有实例租约并以看到的状态为前提，过期即拒绝。只写文件里已有、目录验证过的项；预设值按最新支持版本校验且不能增删项。按键用可搜索列表而非按键录制，目录外的选项不提供编辑；D2 所说的完整原生设置编辑器仍在 backlog。"
+    },
+    {
+      "id": "D12",
+      "decision": "建议：游戏库预设 tab 用账户页的主从布局；实例设置新增「选项」分段（游戏 / 选项 / 运行时 / Java / 性能 / 高级）承载预设来源、待决定修改和选项表；四合一弹窗拆为新建、改名/复制、共享范围、选择预设和单项编辑弹窗。",
+      "rationale": "首版把选择、预览、待处理、冲突和关闭堆在一个弹窗里，说明文字铺在控件下，删除没有确认，入口是设置页顶部一个幽灵按钮。重做后让对象（预设、游戏的选项）在页面上可见，操作就近，符合 design-language §7、§10 与 P-BULK。",
+      "consequences": "选项表在两处共用；开关是当场生效的快捷操作，其余值在弹窗中编辑。预设对话框的结果保留手动关闭的持久 toast；表里可见的值变化不再弹提示。游戏库搜索框在预设 tab 改为搜索选项；首页需要留意与预设详情的「打开」都进入 设置 › 选项。"
+    }
+  ],
+  "references": [
+    "crates/lumilio-core/src/instance.rs",
+    "crates/lumilio-core/src/layout.rs",
+    "crates/lumilio-core/src/service/launch.rs",
+    "crates/lumilio-core/src/service/mod.rs",
+    "crates/lumilio-core/src/launcher/phases.rs",
+    "crates/lumilio-core/src/recovery.rs",
+    "crates/lumilio-ui/src/pages/live/library.rs",
+    "docs/design-language.md",
+    "https://github.com/modrinth/code/blob/71f35eb80f2a65387a2b30d47d433673d863a6d4/packages/app-lib/src/api/instance/synced_options/game_options/mod.rs",
+    "https://github.com/modrinth/code/blob/71f35eb80f2a65387a2b30d47d433673d863a6d4/packages/app-lib/src/api/instance/synced_options/game_options/read_instance_changes.rs",
+    "https://github.com/modrinth/code/blob/71f35eb80f2a65387a2b30d47d433673d863a6d4/packages/app-lib/src/api/instance/synced_options/game_options/catalog/version_changes.rs"
+  ],
+  "dependencies": [],
+  "lessonsLearned": [],
+  "outcome": "游戏设置预设经 PR #30 合入并随 0.1.4 发布，Mac 实测通过。"
+}

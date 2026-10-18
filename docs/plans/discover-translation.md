@@ -4,7 +4,7 @@
 
 Status: InProgress
 
-设置 → 通用中开启翻译后，MCIM 自动提供发现列表中文简介，详情正文点击「翻译」后调用所选提供商。当前目标仅简体中文，下拉仅微软 Edge 且默认选中；标题始终原文。MCIM 仅在信息按钮说明，不列入实时提供商。已实现 SQLite 七天缓存、HTML / Markdown 结构翻译、批量及有限重试；未命中或失败保留原文，不切换镜像路由。内容操作及重试绑定发起源。自动化验证已覆盖缓存、格式、批量、正文点击及源隔离；应用内检查由 Project Maintainer 执行，大陆直连验收仍待完成，计划保持进行中。
+设置 → 通用中开启翻译后，MCIM 自动提供发现列表与详情页头的中文简介，详情正文点击「翻译」后调用所选提供商。当前目标仅简体中文，下拉仅微软 Edge 且默认选中；标题始终原文。已实现 SQLite 七天缓存、HTML / Markdown 结构翻译、批量及有限重试；未命中或失败保留原文，不切换镜像路由。2026-10-17 合入 0.1.6 之后的 main：来源身份改用 CurseForge 内容源已有的显式来源参数（D13），MCIM 平台按来源的 catalog 选择，CurseForge 的 HTML 正文按 HTML 解析。应用内检查（T11）与大陆直连验收（T6）仍由 Project Maintainer 完成，计划保持进行中。
 
 ## Scope
 
@@ -32,7 +32,7 @@ Status: InProgress
 - [ ] T6 — 完成 MCIM 与微软的大陆网络实测。 (InProgress)
   Acceptance: 按 D8 验收 MCIM 查询与微软实时翻译；D6 的其他候选只保留调查结论。由 Project Maintainer 在明确禁用代理的大陆网络执行真实请求，记录日期、地区、运营商、接口域名、客户端版本、HTTP 状态、业务结果、耗时和成功次数；首轮一个代表性网络，发布前再扩大到电信 / 联通 / 移动和跨日期低频重复请求。MCIM 检查单条、批量、缺失和原文一致性；微软检查短简介、包含中文 / emoji 的临界长度分段、长正文分段及内容顺序。DNS / TLS 成功或网页可打开不能代替业务成功。代理结果单列，失败区分网络与反自动化。原型工作不必等待三网全部完成，但不得宣称未经验证的大陆可用性；若不能满足直连目标，记录缺口，不默认接入其他公共中转。
 - [x] T7 — 补齐发现页的源限定身份与链接传递。 (Completed)
-  Acceptance: 服务、搜索结果与详情持有源 plugin_id 和源内 project_id；详情与后续请求使用打开时的源，不能再次选择第一个启用源。保留 ContentSource 返回的 page_url，打开项目不按 Modrinth 拼地址。使用两个脚本化内容源返回同名 / 同 id 项目的夹具，证明链接、翻译缓存、版本请求与迟到结果互不串源；不要求实现 CurseForge。安装路径中的源身份一并审查，禁止将另一源版本交给当前默认源。
+  Acceptance: 服务、搜索结果与详情持有源 plugin_id 和源内 project_id；详情与后续请求使用打开时的源，不能再次选择第一个启用源。保留 ContentSource 返回的 page_url，打开项目不按 Modrinth 拼地址。使用两个脚本化内容源返回同名 / 同 id 项目的夹具，证明链接、翻译缓存、版本请求与迟到结果互不串源；不要求实现 CurseForge。安装路径中的源身份一并审查，禁止将另一源版本交给当前默认源。2026-10-17：main 已由 curseforge-source T3 / D1 按来源区分（显式 source 参数、ProjectDetail.source、源给出的 page_url），本计划的实现改用它，见 D13；翻译缓存键仍含源 plugin_id。
 - [x] T8 — 接入 MCIM 预翻译简介的自动查询。 (Completed)
   Acceptance: 通用翻译开关开启后自动查询可见项目的中文简介，不依赖界面语言；通过显式平台映射识别 Modrinth / CurseForge 的规范 id，不猜测其他插件的 id。用 POST 批量查询，按返回 project_id / modid 关联，不依赖数组位置；缺失、重复、未知 id、空译文和 original 不一致均不得显示错误译文。未命中或失败保留原文，不调用微软补齐简介。缓存包含平台、id、当前简介 hash、中文目标与来源，并设有效期以重新获取修订译文；404 短期负缓存，服务失败不永久缓存。MCIM 仅在信息按钮说明，不进入提供商下拉；仅查询翻译端点，不切换内容下载源。脚本化服务器覆盖乱序 / 少项、过期原文、关闭功能不请求及未命中不调用微软；不需要 CurseForge 插件才能完成协议测试。
 - [x] T9 — 建立 SQLite 七天缓存并验证失效和清除行为。 (Completed)
@@ -59,13 +59,15 @@ Status: InProgress
 - SQLite 缓存跨重启有效，默认保存成功译文 7 天；到期边界、原文变化和手动清除使缓存失效，读取不续期。
   Result: core SQLite 测试验证成功写入后七天边界、读取不续期、重新打开数据库仍命中、清除后迟到写入不复活，以及重建 TranslationService 后正文不再次出网、清除后再次出网。缓存有 10000 条 / 64 MiB 译文容量约束。期限测试使用需求中的独立七天值；临时将实现 TTL 改为八天时，在七天到期断言处观察到 Some(译文) != None 的预期失败，恢复七天后完整验证。
 - 缓存隔离两个内容源的同 id 项目；原文变化失效；清除后迟到结果不能重新写入。
-  Result: cache_identity 测试隔离源、内容和提供商；SQLite clear generation 拒绝迟到写入。两个脚本化源并发返回相同 id / 标题，断言各自 source 与 page_url 不串且作用域不泄漏；安装、依赖、保存、版本切换及整合包操作绑定发起源，Activity 重试输入保留该源并验证序列化，源关闭后重试不回退默认源。
+  Result: cache_identity 测试隔离源、内容和提供商；SQLite clear generation 拒绝迟到写入。两个脚本化源并发返回相同 id / 标题，断言各自 source 与 page_url 不串且作用域不泄漏；安装、依赖、保存、版本切换及整合包操作绑定发起源，Activity 重试输入保留该源并验证序列化，源关闭后重试不回退默认源。2026-10-17：两源夹具与 scoped retry 测试随 D12 移除（D13）；cache_identity 与 SQLite generation 测试保留并通过。
 - 标题、作者名、文件名、版本号保持原文；只有列表简介自动译为中文，详情正文必须点击后才显示中文，MCIM 未命中不调用微软。
   Result: GPUI 交互测试通过真实按钮点击验证：默认无正文翻译按钮，开启后不自动发正文请求，点击才发 Translate 意图，标题原样、译文可切回原文，关闭后迟到结果被拒绝。MCIM 只查询简介端点，未命中保留原文；正文只提取文本节点，代码和链接属性保持原样。实际外观及真实长正文体验由 T11 验收。
 - 大陆三网真实翻译验收按 T6 记录；实机英文项目译成中文，失败仍可打开和安装；代理结果独立记录。
   Result: pending
 - 计划变更通过 just docs；公开路线图投影变化通过 just web；实现交付前通过 just check。
   Result: 调查阶段 plans validate、just plans、just docs 与 just web 已通过。实现阶段九项 core translation 测试、GPUI 点击测试、并发源隔离及重试源持久化测试通过。最终 just check 在获准的沙盒外完整通过：build、1305 项测试（15 项按既有配置跳过）、Clippy、fmt 均通过。默认沙盒中现有 macOS 更新器 hdiutil 测试失败，沙盒外单项及完整检查均通过，未修改该测试。IA 已重新生成，国际化目录完整性八项测试通过。视觉检查交由 T11，大陆网络交由 T6。
+- 合入 main 后，CurseForge 的 HTML 正文与 catalog 映射有测试，原有行为测试仍通过。
+  Result: 2026-10-17：core translation 十一项测试通过，新增 html_bodies_are_read_as_html_not_as_markdown（临时让 HTML 走 Markdown 转换时在提取文本处按预期失败，恢复后通过）与 curseforge_summaries_ask_by_numeric_mod_id。界面新增 an_html_body_is_sent_as_html 与 turning_translation_off_puts_the_original_summaries_back（临时去掉 update_live 的清除时按预期失败）；project_detail、shell discover / settings、live discover 与 i18n 共 60 项、English 目录 4 项、lumilio-app 17 项、core activity / content / translation 26 项通过；三个 crate 的 Clippy（-D warnings）与 fmt 通过，IA 已重新生成。完整 just check 由 Project Maintainer 运行。
 
 ## Decision D1
 
@@ -161,10 +163,19 @@ Consequences: T9、T10 为新增验收任务，补充 T1、T3、T4、T8。七天
 
 Why: 翻译缓存必须区分同 id 的不同源；打开详情后再安装、查依赖、保存文件或切版本，也不能重新选择默认源。任务作用域沿同一异步操作传递身份，保持现有安装公共 API 可用，并隔离并发操作与不同启动器根目录。
 
-Consequences: from_content_source 只影响其 future；内容源关闭时请求失败而非换源。重试记录 FromContentSource 包装并保留序列化身份，旧记录继续按原 API 读取。两个源同 id / 标题的并发夹具和 scoped retry 测试验证边界；缓存仍由独立翻译服务维护，未接入 CurseForge 插件或 MCIM 镜像路由。
+Consequences: from_content_source 只影响其 future；内容源关闭时请求失败而非换源。重试记录 FromContentSource 包装并保留序列化身份，旧记录继续按原 API 读取。两个源同 id / 标题的并发夹具和 scoped retry 测试验证边界；缓存仍由独立翻译服务维护，未接入 CurseForge 插件或 MCIM 镜像路由。由 D13 取代。
+
+## Decision D13
+
+合入 main（0.1.6 之后）时，删去 D12 的任务作用域 CONTENT_ORIGIN、from_content_source 与 RetryAction::FromContentSource，来源身份全部使用 curseforge-source D1 已有的显式 source 参数。MCIM 平台按来源声明的 catalog 选择（curseforge-source D5），不按插件 ID 写死；正文按来源的 TextFormat 解析，HTML 正文不经 Markdown 转换。列表译文存于 SearchRow.translated_summary，不覆盖原简介。
+
+Why: CurseForge 内容源（PR #37）先合入，搜索、详情、安装、版本和 Activity 重试已经逐个调用带来源，两套机制并存只会让同一身份有两个来源。旧映射只认 lumilio.modrinth / lumilio.curseforge 两个 ID，任何声明 Modrinth 或 CurseForge catalog 的其他来源都拿不到简介。CurseForge 正文是 HTML：交给 Markdown 解析时，空行后缩进的 HTML 会变成代码块而不被翻译。
+
+Consequences: service::translate_summaries 先取来源的 catalog，没有 catalog 的来源不查询 MCIM；translate_body 与 DetailIntent::Translate 携带 TextFormat，缓存字段区分 Markdown / HTML 正文。界面译文一律按 HTML 显示。开启翻译时只为已显示的结果和详情补查简介，不重新搜索；关闭时 update_live 清掉 translated_summary。PR 原有的同 id 双源夹具与 scoped retry 测试随 D12 一起移除；main 的两源测试（service/tests/curseforge.rs）不含同 id 项目，翻译这一侧的隔离由 cache_identity 测试（缓存键含源 plugin_id）保证。
 
 ## References
 
+- [.agents/plans/curseforge-source.json](../../.agents/plans/curseforge-source.json)
 - https://github.com/mcmod-info-mirror/mcim-rust-api
 - https://github.com/mcmod-info-mirror/mcim-rust-api/blob/main/src/routes/modrinth.rs
 - https://github.com/mcmod-info-mirror/mcim-rust-api/blob/main/src/routes/curseforge.rs

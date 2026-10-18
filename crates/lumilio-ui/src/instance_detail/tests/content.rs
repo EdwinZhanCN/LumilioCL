@@ -10,7 +10,9 @@ use std::rc::Rc;
 
 /// A long version shares a row with the Update key and may not run
 /// underneath it. The newer version is not in the row: the Update key
-/// opens the dialog that names it.
+/// opens the dialog that names it, and its tooltip says it. The Update key
+/// is an icon key as wide as ⇆, so a row with an update keeps its version
+/// column in line with a row without one.
 #[gpui::test]
 fn a_long_version_stays_clear_of_the_update_key(cx: &mut TestAppContext) {
     let (view, cx) = rooted(cx, Rc::default());
@@ -18,17 +20,29 @@ fn a_long_version_stays_clear_of_the_update_key(cx: &mut TestAppContext) {
     fabric.loader = lumilio_core::Loader::Fabric;
     fabric.game_version = "26.3".into();
     let newest = known_version("v2", "1.11.7+26.3", "26.3");
-    let mut list = listed(vec![item("iris-fabric-1.11.4+mc26.2.jar", true)]);
-    list.entries[0].source = Some(lumilio_core::ContentSource {
+    let mut list = listed(vec![
+        item("iris-fabric-1.11.4+mc26.2.jar", true),
+        item("sodium-fabric-0.8.jar", true),
+    ]);
+    let known = |slug: &str, title: &str, number: &str| lumilio_core::ContentSource {
+        source: lumilio_core::DEFAULT_SOURCE.into(),
+        source_name: "Modrinth".into(),
+        page_url: String::new(),
         project_id: "P".into(),
-        slug: "iris".into(),
-        title: "Iris Shaders".into(),
+        slug: slug.into(),
+        title: title.into(),
         author: Some("coderbot".into()),
         icon_url: None,
         version_id: "v1".into(),
-        version_number: "1.11.4+26.2-fabric-with-a-long-suffix".into(),
-    });
+        version_number: number.into(),
+    };
+    list.entries[0].source = Some(known(
+        "iris",
+        "Iris Shaders",
+        "1.11.4+26.2-fabric-with-a-long-suffix",
+    ));
     list.entries[0].update = Some(newest);
+    list.entries[1].source = Some(known("sodium", "Sodium", "0.8"));
     view.update(cx, |view, cx| {
         view.loaded(Ok((fabric, LauncherSettings::default())), cx);
         view.select_tab(TAB_CONTENT, cx);
@@ -50,6 +64,19 @@ fn a_long_version_stays_clear_of_the_update_key(cx: &mut TestAppContext) {
         version.right() <= update.left(),
         "the version column ({version:?}) ends before the Update key ({update:?})"
     );
+    let switch = cx
+        .debug_bounds("content-switch-version-1")
+        .expect("⇆ on the row without an update");
+    assert_eq!(update.size, switch.size, "Update is as wide as ⇆");
+    assert_eq!(update.size.width, update.size.height, "an icon key");
+    let other = cx
+        .debug_bounds("content-version-1")
+        .expect("the other row's version column");
+    assert_eq!(
+        version.left(),
+        other.left(),
+        "both rows' version columns start at one place"
+    );
 }
 
 #[gpui::test]
@@ -64,6 +91,9 @@ fn an_identified_file_switches_version_in_a_dialog_and_bulk_acts_on_the_selectio
     let newest = known_version("v2", "3.0.11", "26.3");
     let mut list = listed(vec![item("apple.jar", true), item("mine.jar", true)]);
     list.entries[0].source = Some(lumilio_core::ContentSource {
+        source: lumilio_core::DEFAULT_SOURCE.into(),
+        source_name: "Modrinth".into(),
+        page_url: String::new(),
         project_id: "P".into(),
         slug: "appleskin".into(),
         title: "AppleSkin".into(),
@@ -86,7 +116,10 @@ fn an_identified_file_switches_version_in_a_dialog_and_bulk_acts_on_the_selectio
     click(cx, "content-switch-version-0");
     assert_eq!(
         seen.borrow().last(),
-        Some(&InstanceIntent::LoadVersions("P".into()))
+        Some(&InstanceIntent::LoadVersions {
+            source: lumilio_core::DEFAULT_SOURCE.into(),
+            project: "P".into(),
+        })
     );
     view.update(cx, |view, cx| {
         view.versions_arrived(
@@ -107,6 +140,7 @@ fn an_identified_file_switches_version_in_a_dialog_and_bulk_acts_on_the_selectio
         Some(&InstanceIntent::SwitchContent {
             kind: ProjectKind::Mod,
             file_name: "apple.jar".into(),
+            source: lumilio_core::DEFAULT_SOURCE.into(),
             project: "P".into(),
             version_id: "v2".into(),
         })
@@ -209,4 +243,117 @@ fn content_switches_send_one_change_and_a_failure_keeps_the_list(cx: &mut TestAp
             "the failure floats up; the page keeps its list"
         );
     });
+}
+
+fn pending(path: &str) -> lumilio_core::PendingDownload {
+    lumilio_core::PendingDownload {
+        title: "Corail Tombstone".into(),
+        file_name: "tombstone.jar".into(),
+        path: path.into(),
+        sha1: Some("aa".into()),
+        size: 7,
+        page: Some("https://www.curseforge.com/minecraft/mc-mods/tombstone/files/1".into()),
+    }
+}
+
+#[gpui::test]
+fn files_only_the_website_hands_out_are_listed_with_a_way_to_add_them(cx: &mut TestAppContext) {
+    let seen: Rc<RefCell<Vec<InstanceIntent>>> = Rc::default();
+    let (view, cx) = rooted(cx, seen.clone());
+    view.update(cx, |view, cx| {
+        view.loaded(Ok((record(), LauncherSettings::default())), cx);
+        view.select_tab(TAB_CONTENT, cx);
+        view.arrived(
+            Arrived::Content(ProjectKind::Mod, Ok(listed(vec![item("a.jar", true)]))),
+            cx,
+        );
+        view.set_pending(
+            vec![
+                pending("mods/tombstone.jar"),
+                pending("resourcepacks/x.zip"),
+            ],
+            cx,
+        );
+    });
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("content-pending").is_some());
+    assert!(
+        cx.debug_bounds("content-pending-page-0").is_some(),
+        "its download page"
+    );
+    assert!(
+        cx.debug_bounds("content-pending-page-1").is_none(),
+        "a resource pack waits on its own tab"
+    );
+    click(cx, "content-pending-add");
+    assert_eq!(seen.borrow().last(), Some(&InstanceIntent::AddPendingFiles));
+
+    view.update(cx, |view, cx| view.set_pending(Vec::new(), cx));
+    cx.run_until_parked();
+    assert!(
+        cx.debug_bounds("content-pending").is_none(),
+        "nothing left to add"
+    );
+}
+
+#[gpui::test]
+fn a_changelog_given_one_at_a_time_is_asked_for_and_shown(cx: &mut TestAppContext) {
+    let seen: Rc<RefCell<Vec<InstanceIntent>>> = Rc::default();
+    let (view, cx) = rooted(cx, seen.clone());
+    let mut fabric = record();
+    fabric.loader = lumilio_core::Loader::Fabric;
+    fabric.game_version = "26.3".into();
+    let mut list = listed(vec![item("apple.jar", true)]);
+    list.entries[0].source = Some(lumilio_core::ContentSource {
+        source: "lumilio.curseforge".into(),
+        source_name: "CurseForge".into(),
+        page_url: String::new(),
+        project_id: "P".into(),
+        slug: "P".into(),
+        title: "AppleSkin".into(),
+        author: None,
+        icon_url: None,
+        version_id: "v1".into(),
+        version_number: "3.0.10".into(),
+    });
+    view.update(cx, |view, cx| {
+        view.loaded(Ok((fabric, LauncherSettings::default())), cx);
+        view.select_tab(TAB_CONTENT, cx);
+        view.arrived(Arrived::Content(ProjectKind::Mod, Ok(list)), cx);
+    });
+    click(cx, "content-switch-version-0");
+    assert_eq!(
+        seen.borrow().last(),
+        Some(&InstanceIntent::LoadVersions {
+            source: "lumilio.curseforge".into(),
+            project: "P".into(),
+        })
+    );
+    let mut quiet = known_version("v1", "3.0.10", "26.3");
+    quiet.changelog = String::new();
+    quiet.changelog_format = lumilio_core::TextFormat::Html;
+    let wanted = view.update(cx, |view, cx| {
+        view.versions_arrived("P", Ok(vec![quiet]), cx)
+    });
+    assert_eq!(
+        wanted,
+        Some(("lumilio.curseforge".into(), "P".into(), "v1".into())),
+        "the chosen version's changelog is asked for"
+    );
+    let again = view.update(cx, |view, cx| {
+        let mut quiet = known_version("v1", "3.0.10", "26.3");
+        quiet.changelog = String::new();
+        view.versions_arrived("P", Ok(vec![quiet]), cx)
+    });
+    assert_eq!(again, None, "once");
+    cx.run_until_parked();
+    assert!(
+        cx.debug_bounds("switch-changelog-text").is_none(),
+        "none yet"
+    );
+    view.update(cx, |view, cx| {
+        view.changelog_arrived("P", "v1", Ok("<p>Fixed crash</p>".into()), cx)
+    });
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("switch-changelog-text").is_some());
 }

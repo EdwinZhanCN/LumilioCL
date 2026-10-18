@@ -21,13 +21,12 @@ describe("public plan projection", () => {
     }
     expect(english.find((plan) => plan.planId === "appearance")?.name).toBe("Themes and appearance");
   });
-  it("keeps the three curated logo cells linked to stable public plan IDs", () => {
-    expect(plannedTeasers.appearance.planId).toBe("appearance");
-    expect(plannedTeasers.translation.planId).toBe("discover-translation");
-    expect(plannedTeasers.plugins.planId).toBe("wasm-plugin-registry");
+  it("keeps the three hero teasers linked to upcoming public plans", () => {
+    expect(Object.keys(plannedTeasers)).toHaveLength(3);
     for (const teaser of Object.values(plannedTeasers)) {
       expect(roadmapItems.some((item) => item.id === teaser.id)).toBe(true);
       expect(teaser.version).toBeTruthy();
+      expect(teaser.status).not.toBe("completed");
     }
   });
 });

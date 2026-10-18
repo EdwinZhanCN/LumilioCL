@@ -53,9 +53,18 @@ pub struct FaceCuller<'a> {
     pack: &'a ResourcePack,
     /// Cache of block name -> cull type results.
     cull_cache: rustc_hash::FxHashMap<String, BlockCullType>,
+    /// Faces along this axis are never culled (a sliceable mesh; LumilioCL
+    /// local change, plan schematic-studio T25).
+    keep_along: Option<crate::types::Axis>,
 }
 
 impl<'a> FaceCuller<'a> {
+    /// This culler keeping every face along `axis`, and no block enclosed.
+    pub fn keeping_faces_along(mut self, axis: Option<crate::types::Axis>) -> Self {
+        self.keep_along = axis;
+        self
+    }
+
     /// Create a face culler from a list of blocks, using model data to determine opacity.
     pub fn new(pack: &'a ResourcePack, blocks: &[(BlockPosition, &InputBlock)]) -> Self {
         // Compute bounding box (with 1-block padding for AO neighbor lookups)
@@ -94,6 +103,7 @@ impl<'a> FaceCuller<'a> {
             grid_size,
             pack,
             cull_cache: rustc_hash::FxHashMap::default(),
+            keep_along: None,
         };
 
         // Classify every block to fill the flat opacity grid. Classification
@@ -297,11 +307,12 @@ impl<'a> FaceCuller<'a> {
                 Err(_) => return BlockCullType::NonSolid, // Can't resolve model = non-solid
             };
 
-            // Check if this model is a full opaque cube
-            if !self.is_full_opaque_cube(&model) {
+            // The model must fill its cell with one full cube; other elements
+            // are overlays on it (the grass block's tinted sides).
+            let Some(cube) = self.full_cube_element(&model) else {
                 return BlockCullType::NonSolid;
-            }
-            see_through |= self.has_see_through_face(&model_resolver, &model);
+            };
+            see_through |= self.has_see_through_face(&model_resolver, &model, cube);
         }
 
         // All variants are full cubes
@@ -321,9 +332,10 @@ impl<'a> FaceCuller<'a> {
         &self,
         resolver: &ModelResolver,
         model: &crate::resource_pack::BlockModel,
+        cube: &crate::resource_pack::ModelElement,
     ) -> bool {
         let textures = resolver.resolve_textures(model);
-        model.elements[0].faces.values().any(|face| {
+        cube.faces.values().any(|face| {
             let path = match face.texture.strip_prefix('#') {
                 Some(key) => textures.get(key).map(String::as_str).unwrap_or_default(),
                 None => face.texture.as_str(),
@@ -396,47 +408,32 @@ impl<'a> FaceCuller<'a> {
         None
     }
 
-    /// Check if a resolved model is a full cube with all six faces.
-    fn is_full_opaque_cube(&self, model: &crate::resource_pack::BlockModel) -> bool {
-        // Must have exactly one element
-        if model.elements.len() != 1 {
-            return false;
-        }
-
-        let element = &model.elements[0];
-
-        // Element must span the full block (0-16 on each axis)
+    /// The element of a resolved model that is a full, unrotated cube with all
+    /// six faces, if any. A model with more elements counts when one of them
+    /// fills the cell, like the grass block's base cube under its side overlay;
+    /// it used to be treated as hollow, so its neighbours kept hidden faces and
+    /// took no ambient occlusion from it. (LumilioCL local change; see
+    /// `forks/README.md`.)
+    fn full_cube_element<'m>(
+        &self,
+        model: &'m crate::resource_pack::BlockModel,
+    ) -> Option<&'m crate::resource_pack::ModelElement> {
         const EPSILON: f32 = 0.001;
-        if element.from[0].abs() > EPSILON
-            || element.from[1].abs() > EPSILON
-            || element.from[2].abs() > EPSILON
-        {
-            return false;
-        }
-        if (element.to[0] - 16.0).abs() > EPSILON
-            || (element.to[1] - 16.0).abs() > EPSILON
-            || (element.to[2] - 16.0).abs() > EPSILON
-        {
-            return false;
-        }
-
-        // Must have all 6 faces defined
-        if element.faces.len() != 6 {
-            return false;
-        }
-
-        // All faces must exist
-        for direction in Direction::ALL.iter() {
-            if !element.faces.contains_key(direction) {
-                return false;
-            }
-        }
-
-        true
+        model.elements.iter().find(|element| {
+            element.rotation.is_none()
+                && element.from.iter().all(|v| v.abs() <= EPSILON)
+                && element.to.iter().all(|v| (v - 16.0).abs() <= EPSILON)
+                && Direction::ALL
+                    .iter()
+                    .all(|direction| element.faces.contains_key(direction))
+        })
     }
 
     /// Check if a face should be culled.
     pub fn should_cull(&self, pos: BlockPosition, cullface: Direction) -> bool {
+        if self.keep_along == Some(cullface.axis()) {
+            return false;
+        }
         let neighbor_pos = pos.neighbor(cullface);
         let neighbor_cell = self.grid_cell(neighbor_pos);
 
@@ -479,9 +476,10 @@ impl<'a> FaceCuller<'a> {
     /// Check if a block is fully occluded (all 6 neighbors are fully opaque).
     /// A fully occluded block can be skipped entirely during meshing.
     pub fn is_fully_occluded(&self, pos: BlockPosition) -> bool {
-        Direction::ALL
-            .iter()
-            .all(|&dir| self.is_fully_opaque_at(pos.neighbor(dir)))
+        self.keep_along.is_none()
+            && Direction::ALL
+                .iter()
+                .all(|&dir| self.is_fully_opaque_at(pos.neighbor(dir)))
     }
 
     /// Check if a position is occupied.

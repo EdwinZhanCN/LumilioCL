@@ -52,6 +52,9 @@ fn the_settings_page_shows_each_tab_and_edits_open_a_dialog(cx: &mut TestAppCont
         "settings-foreground",
         "settings-motion",
         "settings-language",
+        "settings-translation",
+        "settings-translation-provider",
+        "settings-translation-cache",
     ] {
         assert!(cx.debug_bounds(selector).is_some(), "{selector} on 通用");
     }

@@ -17,18 +17,19 @@ LumilioCL has two visual registers and never mixes them.
 | Motion | Discrete, at `WORLD_TICK` (20 ticks/s, the game's own rate); state changes stream in chunk by chunk | Continuous easing and springs from the motion tokens |
 | Framing | Full-bleed; meets the page through a dithered dissolve into the live theme background; never boxed in a hard-cornered card. The exception is a display window (§12): a faceplate's cover, and the navigation's instance thumbnails | Instrument shapes: keys and fields 4 px, panels and displays 6 px |
 | Appearance | Identical in light and dark; foreground on art is always light-on-dark over the scrim | The body follows the appearance (aluminium / night); keys are objects and keep their colour (§12) |
-| Type | None inside the art | Space Grotesk for Latin and figures, the system font for Chinese, JetBrains Mono for values, DSEG7 only on displays (§13) |
+| Type | None inside the art | Space Grotesk for Latin and figures, the system font for Chinese, JetBrains Mono for values, DSEG7 only on displays, Monocraft only for a server's message of the day (§13) |
 
 The world carries the Minecraft identity. The interface is an instrument
 held up to it: calm, legible, made of keys, LEDs and silkscreen (§12,
 ADR 0013). Pixel fonts are never used for UI text, because they destroy CJK
-legibility. Interface elements never imitate game GUI textures, and never
+legibility. A server's message of the day is the game's text, not the
+interface's, so it alone is set in a pixel face (§13). Interface elements never imitate game GUI textures, and never
 copy another maker's trade dress: no borrowed wordmarks, product names or
 logos.
 
 ## 2. Motion tokens
 
-Defined in `crates/lumilio-ui/src/theme.rs` (`theme::motion`). Use the token,
+Defined in `crates/lumilio-ui/src/theme/mod.rs` (`theme::motion`). Use the token,
 never a literal duration.
 
 | Token | Value | Use |
@@ -178,8 +179,8 @@ layer that has nothing in it; never reorder or merge layers.
    below the tabs), sort, page size, pager, a filter sidebar.
 5. **Content** — one of:
    - a card grid (Library; instance cards are faceplates, §12);
-   - a list block (a panel with hairline rows; row actions are ghost or
-     white keys);
+   - a list block (a panel with hairline rows drawn as §12 List rows; row
+     actions are ghost or white keys);
    - settings groups (§10).
 
    Loading, empty and error states replace the content in place, never the
@@ -193,10 +194,10 @@ Discover.
 | Page | Caption | Secondary | Primary | More | Tabs · search | Refinements |
 |---|---|---|---|---|---|---|
 | Library | game count | 导入整合包 | 新建 | — | 全部游戏 / 收藏 · 搜索游戏 | — |
-| Discover | one line | — | — | 在 Modrinth 中浏览 · 重新搜索 | 整合包 / Mod / 资源包 / 光影 · 搜索 Modrinth | sort, page size, pager, filter sidebar |
+| Discover | one line | — | — | 在 *source* 中浏览 · 重新搜索 | 整合包 / Mod / 资源包 / 光影 · 搜索 *source* | sort, page size, pager, filter sidebar (source segments at its top when several are on) |
 | Activity | running count | — | — | — | — | — |
 | Instance | version · loader · last played | — | 启动游戏 | 安装游戏文件 · 复制… · 删除… | 概览 / 内容 / 世界 / 历史 / 日志 / 设置 | per-tab segments |
-| Project detail | author · summary | — | 安装到 *instance* / 安装为新游戏 | 在 Modrinth 中打开 · 复制链接 · project links | 介绍 / 版本 / 图库 | version filters |
+| Project detail | author · summary | — | 安装到 *instance* / 安装为新游戏 | 在 *source* 中打开 · 复制链接 · project links | 介绍 / 版本 / 图库 | version filters |
 
 ### Covers and empty states
 
@@ -368,7 +369,12 @@ hand.
 Orange that fills something uses the fill token; orange that is read as
 text uses the text token. On night they are the same colour; on aluminium
 the bright fill reads at only 2.8:1, so text takes a deeper orange. It never fills decoration, never sets body text, and a region
-never has two orange keys. Success uses a green LED.
+never has two orange keys. Success uses a green LED and the green of
+signal bars.
+
+A server's message of the day is the one place the game's own colours
+appear (List rows, below). They are the server's words, not accents of the
+interface.
 
 **Danger** sits only 14° of hue from the signal orange, so the two are kept
 apart by place, not by hue alone:
@@ -392,19 +398,40 @@ apart by place, not by hue alone:
 - Keys are objects. At night the white key is graphite with a lit top edge,
   as on the reference hardware: white is reserved for lit things, so a night
   key never glares against the body.
+- A ghost key has no face at rest, so its side padding would indent its
+  label from the column it starts. A ghost key that begins a line is flush
+  (`Key::flush_start`): its label starts on the column's edge and its hover
+  face reaches into the margin. Better still, a group's own action sits on
+  the trailing side of its label (`kit::section_with`).
 
 ### State: LEDs, segment keys, faders
 
 - An **LED** is a 6 px dot: orange with a soft glow when lit, LED-off grey
   when unlit. It always comes with a second sign of state (§9).
 - **Segment keys** (refinements): a row of small white keys, each with an LED
-  above it. The chosen key's LED is lit and the key sits pressed.
+  above it. The chosen key's LED is lit and the key sits pressed. They are
+  for two to four fixed options with short labels the launcher writes. The
+  keys grow with their labels and the LED band adds height, so options that
+  come from data (region, scheme or file names) and a choice repeated on
+  every row of a table are a Select instead, however few.
+- **A row that mixes segment keys with plain keys** (the studio's
+  Orbital / Explore beside 角度) aligns them on the keys' bottom edge: every
+  key stands on one line, and the LEDs above mark the keys that hold a
+  state.
+- **A value chosen in a toolbar** from a few options (the discover page's
+  排序方式, the studio's 切片) is a muted label and a small dropdown
+  (`kit::labeled_select`): the dropdown shows the value in use, so it
+  needs no LED.
 - **Fader switch**: a black 4 px slot, a white 16 px round cap, an LED beside
   it. On means the cap is at the trailing end and the LED is lit.
 - **Checkbox**: an 18 px key, white when clear, orange with a white check
   when set.
 - **Radio**: the control is an LED in a 14 px recessed socket, lit when
   chosen.
+- **Signal bars**: five rising 3 px bars for a server's round trip, lit
+  green as in the game by its own steps (five under 150 ms, then one fewer
+  at 300, 600 and 1000 ms); the tooltip gives the milliseconds. They appear
+  only beside a server's player count.
 
 ### Port-label tabs
 
@@ -415,7 +442,9 @@ open block is orange with a white medium label.
 ### Fields
 
 A field (search, dialog inputs) is a recessed panel: 4 px radius, a hairline
-border, a faint inner shade along the top.
+border, a faint inner shade along the top. A small field is as tall as a
+small key (28 px at the base font size), so a field and the key that acts on
+it line up in one row.
 
 ### Silkscreen
 
@@ -443,37 +472,265 @@ not progress, so it has readings (a label in the legend colour over segment
 digits and a mono unit) and no meter, and nothing on it moves. Nothing else is
 a display.
 
-### Native model preview
+### Schematic studio
 
-The projection detail places the “打开 3D 预览” key and its other actions inline
-with the title. The material table shares the detail pane's scroll rather than
-owning a nested scroll region. A floating “返回顶部” key stays at the pane's
-lower right and returns that shared scroll to the title immediately.
-It opens the same modal family as the screenshot viewer and loads assets only
-for that modal session. Width and viewport height follow the available window,
-including the 720×480 minimum. Rendering uses physical resolution, capped
-proportionally at 4096 pixels per axis to bound GPU readback memory. Its clear
-colour comes from the current panel token.
+A plugin that names a schematics folder (`View::Studio`) gets the host's
+studio (plan schematic-studio, D6). The studio is one view with two
+placements (D22): a **catalogue** in the game page's plugin pane, and a
+**workbench** in a window of its own, as the world map has. The catalogue
+is for seeing what is there; the workbench is for working on one file
+(D27). The page already stacks the page tabs, the plugin list and its own
+pane, so a 3D viewport only fits in the window.
 
-The model is game art; its surrounding instructions, focus border, reset key
-and failure messages are Interface. A pair of segment keys selects Orbital or
-Explore and preserves each mode's camera independently. Orbital supports drag
-to rotate, wheel to zoom, arrows and +/−. Explore is first-person free flight:
-click the picture or press Enter to capture the cursor, then mouse look, WASD,
-Space to rise and Shift to descend. Movement uses elapsed time and normalizes
-diagonals; there is no gravity or collision. R or the ghost reset key resets the
-current camera; double-click resets only Orbital. Esc releases capture first,
-then closes the modal and returns focus to its entry key. Closing, switching
-mode, losing focus or a renderer failure releases the cursor and held keys.
-Only captured first-person input schedules a frame clock; idle pictures remain
-still. Intentional camera input stays responsive under reduced motion. Animated
-blocks remain still. Native capture supports macOS, Windows and X11; Wayland
-shows a calm unsupported explanation and retains Orbital (ADR 0036).
-Loading and failure occupy the same viewport. Missing game assets and no GPU
-receive a calm explanation; other errors offer 技术详情. When the game's assets
-cannot draw some blocks, one muted sentence under the viewport says how many,
-with their IDs behind 技术详情 (ADR 0034). Replaced and released frames are
-explicitly removed from GPUI's image cache (ADR 0028).
+Three rules hold in both placements. They replaced a first studio that
+was all tables and IDs (D27):
+- **Pictures before words.** A schematic is shown by its thumbnail and a
+  block by its icon, both drawn from the block assets (D29). Text says
+  what a picture cannot: a name, a count.
+- **Names, not IDs.** Blocks, items and entities carry the game's own
+  names in the launcher's language (D28). An ID is a mono caption, a
+  tooltip and a copy action, never the label. Block-state properties use
+  the launcher's words (下半, 朝东), and a boolean that is false is not
+  shown, except in the inspect card, which lists every property.
+- **One fact, one place.** The file's name sits in the head only, and its
+  size appears once. Facts for troubleshooting (the asset sources, volume,
+  block entities, blocks that cannot be drawn) are folded under
+  **技术信息**.
+
+**The catalogue** fills the plugin pane's height. Its head holds 投影, a
+mono caption with the file count, a search field and a white
+**打开工作室** key with the maximize icon. Below it is a grid of cards in
+sections by folder; the section label is the folder's name, and the root
+has none. A card is:
+- the thumbnail;
+- the file name, two lines at most;
+- a mono line with the size and the block count;
+- a `≡n` mark when another file has the same blocks (a symbol and a
+  number, never colour alone; the tooltip says how many files match);
+- a plain version tag when the schematic's game version differs from the
+  game's.
+
+A click chooses a card (an ink ring). A double click or 打开工作室 opens
+it in the window, or brings the open window forward on it. Card width
+follows the pane: at least two columns at the 720 px window, never a
+horizontal scroll. A thumbnail not yet drawn holds a panel-coloured place
+and fades in (QUICK) when it is ready. The catalogue has no More and no
+primary key: nothing is operated on here.
+
+**The workbench** is one window per game and folder, 1120 × 760 by
+default and 720 × 480 at least, under its own title bar (投影工作室). It
+has a head and two columns.
+- **Head**: the file switcher (a key with the 28 px thumbnail, the file
+  name and a chevron, which opens a searchable list of the folder's files
+  with thumbnails), then the size and the versions in one mono caption.
+  On the trailing
+  edge: the one orange key **替换方块…**, then More with 转换版本…,
+  导出 PNG…, 导出材料清单, 编辑信息…, the reveal item the system names,
+  and 删除… last in the danger colour (§7). An entry that cannot run now
+  is disabled, and its tooltip says why (the game is running, a write is
+  not done yet, or the file is still being read).
+- **Viewport** (leading, the rest of the width): the model, with no
+  border (a focus ring only while it has keyboard focus), no key row above
+  it and no text under it. Two small tool plates float on its bottom
+  corners. The leading one holds the camera's keys: the segment keys
+  Orbital / Explore and 角度, a key whose menu holds 复位视角 and then the
+  presets. The trailing one holds what is drawn: 切片, a labelled dropdown
+  (不切片 / X 轴 / Y 轴 / Z 轴), and while slicing the layer, a number
+  field with − and +, over it. Every control stands on one line (§12). A
+  single strip of every key wrapped over the read-out at the window's
+  minimum; the two plates fit side by side there. Above the leading plate,
+  a read-out plate names what the pointer is on: the block's icon, name,
+  property words and position. With nothing under the pointer it gives the
+  controls in one muted line. While a block is inspected, its inspect card
+  takes the plate's place.
+- **Materials** (trailing, a share of the width within bounds): a search
+  field and the summary ("35 种 · 1,743 个") over port tabs 材料 / 信息 /
+  历史.
+  - **材料** is a grid of block tiles, the most numerous first: the icon
+    over the count in mono. Every block icon in the studio sits in a slot
+    a little larger than it (key grey by day, the graphite key white by
+    night), as the game draws items on inventory slots, so black and
+    see-through blocks stay visible on a dark panel. The tooltip gives the name and the stacks
+    ("1 组 + 22"). Choosing a tile pins a detail block to the column's
+    bottom: the large icon, the name, the ID in mono with a copy key, the
+    count and stacks, one chip per block state (its property words) with
+    its count, and the ghost key **替换…** (the replace dialog on this kind,
+    any state).
+  - **信息** holds the file's name, author, description and times with a
+    ghost **编辑…**, its entities (icon, name and count), its duplicates
+    with **只保留这个**, and 技术信息 folded at the end.
+  - **历史** lists the operations. Each line can be restored after a
+    confirmation.
+
+Writes go through the launcher's backup and log. The window has no
+floating navigation: closing it is the way back, and its toasts appear in
+it. A game starting or ending reaches the open windows as it reaches the
+page. Choosing another file releases the old viewport's worker and
+frames, as closing a modal does.
+
+**A tile chooses a kind; a click in the picture inspects one block**
+(D30, D31; after the Shulkr viewer and Litematica's info overlay: the
+answer appears where the question was asked). The two never change each
+other.
+- **A kind**: hovering a tile keeps those blocks in colour and fades the
+  rest to a quarter, desaturated; choosing the tile keeps the highlight,
+  and the detail's **只看这种** hides the rest. A click passes through the
+  hidden blocks.
+- **One block**: a click on a block in Orbital, or on the crosshair's
+  block while flying in Explore, outlines that block alone: a band of ink
+  along the edges of the faces it shows, with a rim of the background
+  inside it, so it reads on any texture. Its **inspect card** floats right
+  over the block and moves with it as the camera turns (under it when the
+  room over it is small, at the lower left when the block is out of view).
+  It is as small as it can be: the icon and name with copy and close keys;
+  the ID and position in one mono line; every property as a tag in the
+  launcher's words, with `key=value` in the tooltip; for a container, its
+  slots as the game's screen lays them out (rows of nine, a hopper's five,
+  a dropper's three by three), each with its item's picture and count and
+  the name and stacks in the tooltip; the given name and the text of a
+  sign or command block. The rest of the block entity's data is behind
+  技术详情. A card higher than the room over the block scrolls. The ghost
+  key **选中这种** is the one way from the card to the kind. A click on
+  empty space, Esc (after Esc releases a captured cursor) or the card's
+  close key lets the block go.
+
+**A slice and a box narrow the picture to what is being built** (T25;
+after Litematica's render layers and area selection).
+- **切片** draws one layer and those below it, from the top layer down,
+  along the axis chosen in its dropdown (X / Y / Z 轴; 不切片 ends it).
+  While slicing, the trailing plate adds the layer over the dropdown: a
+  number field (`NumberInput`) whose − and + step a layer, which takes a
+  layer typed in (past the schematic's first or last it stops there), and
+  which follows `[` and `]` while the viewport has focus. How many blocks
+  the layer holds is 材料's to say. The read-out plate and an inspect card
+  in the corner rise to clear the taller plate. Keys typed into the field
+  stay the field's: the picture's keys work only while it has focus. The cut shows each layer's own top faces,
+  and a click passes through the layers above it. 材料 then counts that
+  layer, under a mono line naming it.
+- **A box**: a drag with Ctrl (⌘ on macOS) from one block to another
+  selects every cell between them. The box's cells are washed a little
+  toward the focus colour and a band of it runs along the box's edges, so
+  it reads apart from the inspected block's ink. 材料 counts the box under
+  the line "选区 4×3×6 · 52 块" with a ghost **清除选区**; Esc also clears
+  it. 替换… opened with a box starts limited to it.
+
+The fade and the outline change at once, with the next frame: they follow
+the pointer, so an ease would only lag behind it. Blocks the game version
+cannot draw are drawn as whole blocks in the missing texture (magenta and
+black) and have a missing-texture tile, so the shape is complete and the
+block can be chosen; their detail says so and offers the replacement.
+
+**Versions are head facts.** The head names the schematic's game
+version beside the game's own when they differ ("1.20.1 投影 · 游戏
+26.2"). When the game's version lacks blocks the file has, the head shows
+the region's one orange tag ("26.2 没有的方块：3 种") and a white
+**转换到 26.2…** key; those tiles carry an orange ✕ (its tooltip
+"26.2 没有这种方块") and the switch **只看不兼容** above them shows only
+them. Conversion starts on the game's version and lists its result in
+three groups, 丢失 / 近似 / 保留 (blocks the target does not know,
+written as they are); under 保留 a ghost **为这些方块选替代…** hands those
+blocks to the replace dialog. It saves to a new file beside the original
+by default ("另存为「名 (26.2).litematic」，原文件不动", numbered when the
+name is taken) and chooses it; the switch **覆盖原文件** writes over the
+original instead. Restoring a new file's history line takes it into the
+backups.
+
+**Replacement starts from a block.** It opens from a tile's detail (any
+state of the kind), from the inspect card's ghost **替换…** (that block's
+state, every property exact), from the head's orange key and from
+conversion's kept blocks. The dialog is a table of rows, 从 → 到, 640 px
+wide, with no header: the arrow and the target's placeholder say which side
+is which. A row is the source block with, under it in its column, the
+switch **不限属性** and one chip per property, a line each (its name, and
+on the column's trailing edge a dropdown: a value or 任意, so the dropdowns
+stand in one column); a searchable picker over the file's game version's blocks
+with the targets used last first (both pickers show block names whole with
+the ID as a mono caption that gives way first, and search either), with the
+row's own count in mono under it; and ✕, which every row has once there are
+two. Every choice in the table is a dropdown (§12). The target picker runs
+to the table's trailing edge or to ✕, so every row's starts and ends where
+the others do. The target keeps
+each property its blockstate names with the same value (a property no
+model reads, such as `waterlogged`, takes its default). Rows are added with
+the ghost **加一行**, flush with the table, and match what each cell held
+before, together. The scope is a dropdown, 全部区域 / each region / 当前切片 /
+选区, shown when there is more than the whole file. The commit key says the
+total ("替换 128 个方块"); a line under the table speaks only when it has
+something the counts do not say (still counting, nothing matches, a row
+without a target). The 方案 act on the whole table, so they sit on the
+footer's leading side: **套用方案…**, a menu of the kept ones once there is
+one; **存为方案…**, whose popover asks for the name; then the scheme's name
+while the table is that scheme (launcher data, every instance); a write
+made from a 方案 names it in the history.
+
+**No new display.** Counts (blocks, block types, entities) are mono
+values on tiles, captions and tables, not segment digits. A display is
+for progress and the play record only. If one page breaks that rule,
+displays stop meaning "something is happening".
+
+At the window's 720 × 480 minimum both columns stay visible, the grid
+keeps at least four columns, and the two tool plates still stand side
+by side, apart, while slicing too.
+
+The model is game art. Its instructions, focus border, reset key and
+failure messages are Interface. Rendering uses physical resolution, capped
+proportionally at 4096 pixels per axis to bound GPU readback memory. Its
+clear colour comes from the current panel token. A pair of segment keys
+selects Orbital or Explore, and each mode keeps its own camera. Orbital
+supports drag to rotate, wheel to zoom, arrows and +/−. Explore is
+first-person free flight: click the picture or press Enter to capture the
+cursor, then mouse look, WASD, Space to rise and Shift to descend. Movement
+uses elapsed time and normalizes diagonals. There is no gravity or
+collision. R, or 复位视角 (the modal's ghost key, the first entry of the
+studio's 角度), resets the current camera; double-click resets only
+Orbital. Esc releases capture first. Losing focus, switching
+mode, switching file or a renderer failure releases the cursor and held
+keys. Only captured first-person input schedules a frame clock; idle
+pictures stay still. Intentional camera input stays responsive under
+reduced motion. Animated blocks stay still. Native capture supports macOS,
+Windows and X11. Wayland shows a calm unsupported explanation and keeps
+Orbital (ADR 0036). Loading and failure occupy the viewport. Missing game
+assets and no GPU get a calm explanation; other errors offer 技术详情. When
+the assets cannot draw some blocks, one muted sentence under the viewport
+says how many, with their IDs behind 技术详情 (ADR 0034). Replaced and
+released frames are removed from GPUI's image cache (ADR 0028). A plugin's
+`View::Model` still opens the same viewer in a modal.
+
+In the studio the viewer adds three things (plan schematic-studio, T10). A
+white 角度 key opens 复位视角（R）and, after a separator, the presets 北、东、
+南、西、顶、等轴; each preset refits the orbit camera, and Explore gives way
+to Orbital. In Orbital a click that
+does not drag picks the first block along the ray and chooses its tile;
+entities are not picked. 导出 PNG… in More asks
+for a size (at most 4096 per side), a background (panel colour or
+transparent) and an angle. The viewport's worker draws the picture
+offscreen, and the host's save dialog decides where it goes. The picture's
+resources (the bundle's game version and the overlays switched on) are
+named once, in the 资源来源 list under 技术信息, not under the picture: a
+long overlay list wrapped under the viewport and the same facts were
+already in the list (D22).
+
+The block art comes from the game itself, never from drawings of our own
+(plan schematic-studio, D2/D3/D23). Vanilla blocks and entity geometry always
+come from a pre-baked bundle of Mojang's assets that the launcher downloads
+once from its own site, checks and keeps in its data folder; an installed
+game is never baked, whatever its version. The bundle carries its own NOTICE.
+Its download is a background task in Activity with one sentence, and
+自动下载方块资源 in Settings turns it off. The instance's mods and resource
+packs, and packs added in the studio, are each a row in 资源来源 with a fader
+switch. All are off until switched on, so a schematic first looks as vanilla
+draws it; a pack added from the studio is on in that folder. The switches are
+kept per instance and studio folder, and each flip loads the viewport again.
+The list shows first what the picture is drawn with: the base and the
+sources switched on, in the order they are layered, with ↑ ↓ to change it
+once two or more are on. The sources that are off follow under 未启用, with
+only their switch: their place in the order draws nothing. A row is the
+name on one line (cut short, the whole name in its tooltip) over a mono
+caption: how many blocks the source provides and how many of its models a
+custom loader draws; those show as missing, so the row says so before the
+viewport does (T21). 添加… on the section's label offers a zip, a pack
+folder or a typed path; the path is a dialog, which stays open with the
+reason when the path is not a pack (T36).
 
 Account details use a CPU-rendered player preview alongside a wardrobe,
 inside the Accounts master–detail page rather than a
@@ -533,6 +790,37 @@ Tags are 20 px tall, 2 px radius, 11 px mono:
 
 A status is not a tag: it is an LED and a word ("● 可以启动").
 
+### List rows
+
+A row of a list block (worlds, servers, Home's places) never joins its facts
+into one line with "·". A world or a server says the same things wherever it
+is listed: Home's 接着玩 asks its servers how they are, as the Worlds tab
+does. Each fact takes the form of what it is (`kit::Item`):
+- the name, with its **state** beside it as an LED and a word: lit orange
+  for what is happening now (正在游玩), green for works (在线), the failure
+  colour for cannot be used (无法读取), unlit for not known or not there
+  (正在检查, 无法连接);
+- under the name, **tags** (a mode is ink: 生存, 极限; a version or a plain
+  fact is plain: 作弊, 1.21.1) and then a **note** in muted mono (an address,
+  a folder that differs from the name);
+- beside the name, an **aside** in the item's own words: a server's
+  message of the day, at most two lines without the space around them, in
+  the pixel face (§13) with the game's colours and styles; without the
+  pixel face it keeps the interface face and the colours. Each colour is
+  darkened or lightened only until it reads on the page at 4.5:1, so the
+  server's red stays red; uncoloured text is muted. The name block keeps
+  280 px so asides start at one place from row to row; when the row is too
+  narrow for both, the aside goes under the name. It has no window: a dark
+  block in a light list is heavier than the message;
+- on the trailing edge, **readings** in mono at a common minimum width, so
+  rows keep their keys in line: a time ("3 天前"), a count ("12/100", the
+  count in ink and the limit muted), signal bars;
+- the row's keys last.
+
+A row's leading picture is a 48 px display window (3 px corners), centred
+on the row: the item's own picture, or a cover seeded by its identity.
+Everything in a row is centred on one line.
+
 ### Faceplates
 
 Instance cards are faceplates:
@@ -541,8 +829,10 @@ Instance cards are faceplates:
 - **Top**: the name (20 px light) over the loader label (orange mono).
 - **Display window**: the cover sits in it (3 px radius, no dissolve). This
   is the one place the world is framed; the navigation's instance thumbnails
-  (28 px chip, 32 px popover rows) are the same window.
-- **Bottom**: a silkscreen meta line and the favourite LED.
+  (28 px chip, 32 px popover rows) and list rows' leading pictures are the
+  same window.
+- **Bottom**: the game version as a plain tag and, on the trailing edge,
+  when it was last played as a mono reading; then the key row.
 - Hover turns the border ink.
 
 Screw marks appear on faceplates only.
@@ -565,9 +855,16 @@ The skeuomorphic details listed above are the whole set.
 | Chinese | the system font, through fallback (PingFang SC on macOS, Microsoft YaHei UI on Windows, the distribution's CJK sans on Linux) | as the platform provides | every Chinese glyph; not bundled (ADR 0013) |
 | Values | JetBrains Mono | 400, 500 | versions, sizes, units, counts, tags, section indices, table values |
 | Displays | DSEG7 Classic | 400 | segment digits on a display, nowhere else |
+| Messages of the day | Monocraft | 400, 700, italic | a server's message of the day, nowhere else |
 
-- The three faces are embedded in `lumilio-ui` with their OFL licences and
+- The four faces are embedded in `lumilio-ui` with their OFL licences and
   registered from memory at start-up, so loading them reads no file.
+- The pixel face is not the game's font and is not read from the game. Its
+  em is nine glyph pixels; it is sized so each glyph pixel is a whole
+  number of screen pixels, nearest to 1.5 px at the interface scale
+  (13.5 px on a Retina screen), with lines of twelve glyph pixels and its
+  ligatures off. Characters it lacks, such as Chinese, fall back to the
+  system font.
 - Sizes:
 
   | Text | Size and weight |

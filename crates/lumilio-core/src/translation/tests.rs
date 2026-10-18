@@ -50,7 +50,7 @@ async fn sqlite_ttl_is_seven_days_without_read_renewal_and_survives_reopen() {
 #[test]
 fn structured_html_and_markdown_preserve_links_attributes_and_code() {
     let source = "# About\n\n**Hello** [world](https://example.com/a?q=1)\n\n```sh\njava -jar server.jar\n```\n\n<p class=\"note\">Hello <em>world</em> <img src=\"a.png\"></p>";
-    let mut doc = document::Document::parse(source).unwrap();
+    let mut doc = document::Document::parse(source, TextFormat::Markdown).unwrap();
     let texts = doc.texts();
     assert!(!texts.iter().any(|text| text.contains("java")));
     let result = doc
@@ -71,6 +71,23 @@ fn structured_html_and_markdown_preserve_links_attributes_and_code() {
         "<p>Hello <b>world</b></p>",
         "你好世界"
     ));
+}
+
+#[test]
+fn html_bodies_are_read_as_html_not_as_markdown() {
+    // CurseForge writes HTML. Read as Markdown, the indented paragraph after
+    // the blank line becomes a code block and is never translated.
+    let source = "<div>\n\n    <p>Indented <a href=\"https://example.com\">link</a></p>\n</div>";
+    let as_markdown = document::Document::parse(source, TextFormat::Markdown)
+        .unwrap()
+        .texts();
+    assert!(!as_markdown.iter().any(|text| text == "Indented "));
+    let mut doc = document::Document::parse(source, TextFormat::Html).unwrap();
+    let texts = doc.texts();
+    assert_eq!(texts, ["Indented ", "link"]);
+    let result = doc.replace(&["缩进 ".into(), "链接".into()]).unwrap();
+    assert!(result.contains("<p>缩进 <a href=\"https://example.com\">链接</a></p>"));
+    assert!(!result.contains("<pre>"));
 }
 
 #[tokio::test(start_paused = true)]
@@ -116,7 +133,7 @@ async fn body_cache_reuses_success_across_service_restart_and_clear_requests_aga
     };
     let service = TranslationService::new(root.path().to_owned());
     let first = service
-        .body(&transport, "source", "1", "Hello")
+        .body(&transport, "source", "1", "Hello", TextFormat::Markdown)
         .await
         .unwrap();
     assert!(first.text.contains("你好"));
@@ -124,7 +141,7 @@ async fn body_cache_reuses_success_across_service_restart_and_clear_requests_aga
     let reopened = TranslationService::new(root.path().to_owned());
     assert_eq!(
         reopened
-            .body(&transport, "source", "1", "Hello")
+            .body(&transport, "source", "1", "Hello", TextFormat::Markdown)
             .await
             .unwrap(),
         first
@@ -132,7 +149,7 @@ async fn body_cache_reuses_success_across_service_restart_and_clear_requests_aga
     assert_eq!(*transport.calls.lock().unwrap(), 1);
     reopened.clear().await.unwrap();
     reopened
-        .body(&transport, "source", "1", "Hello")
+        .body(&transport, "source", "1", "Hello", TextFormat::Markdown)
         .await
         .unwrap();
     assert_eq!(*transport.calls.lock().unwrap(), 2);
@@ -159,23 +176,77 @@ async fn mcim_batch_is_correlated_by_id_and_rejects_stale_or_structurally_differ
     ];
     assert_eq!(
         service
-            .summaries(&transport, "lumilio.modrinth", &items)
+            .summaries(
+                &transport,
+                Some(Catalog::Modrinth),
+                "lumilio.modrinth",
+                &items
+            )
             .await,
         BTreeMap::from([("a".to_owned(), "你好".to_owned())])
     );
     assert!(
         service
-            .summaries(&transport, "other", &items)
+            .summaries(&transport, None, "other", &items)
             .await
             .is_empty()
     );
     assert_eq!(*transport.calls.lock().unwrap(), 1);
 }
 
+#[tokio::test]
+async fn curseforge_summaries_ask_by_numeric_mod_id() {
+    struct Recording {
+        sent: StdMutex<Vec<HttpRequest>>,
+    }
+    impl Transport for Recording {
+        fn get<'a>(&'a self, _: &'a str) -> TransportFuture<'a> {
+            unreachable!()
+        }
+        fn send<'a>(&'a self, request: HttpRequest) -> TransportFuture<'a> {
+            self.sent.lock().unwrap().push(request);
+            Box::pin(async {
+                Ok(TransportResponse::from_bytes(
+                    200,
+                    serde_json::to_vec(&serde_json::json!([
+                        {"modid": 238222, "original": "View items", "translated": "查看物品"}
+                    ]))
+                    .unwrap(),
+                ))
+            })
+        }
+    }
+    let root = tempfile::tempdir().unwrap();
+    let transport = Recording {
+        sent: StdMutex::new(Vec::new()),
+    };
+    let service = TranslationService::new(root.path().to_owned());
+    let items = vec![("238222".to_owned(), "View items".to_owned())];
+    assert_eq!(
+        service
+            .summaries(
+                &transport,
+                Some(Catalog::CurseForge),
+                "lumilio.curseforge",
+                &items
+            )
+            .await,
+        BTreeMap::from([("238222".to_owned(), "查看物品".to_owned())])
+    );
+    let sent = transport.sent.lock().unwrap();
+    assert_eq!(sent.len(), 1);
+    assert_eq!(
+        sent[0].url,
+        "https://mod.mcimirror.top/translate/curseforge"
+    );
+    let body: serde_json::Value = serde_json::from_slice(sent[0].body.as_ref().unwrap()).unwrap();
+    assert_eq!(body, serde_json::json!({"modids": [238222]}));
+}
+
 #[test]
 fn unicode_segmentation_respects_utf16_limits_without_splitting_emoji() {
     let original = "🎮中文".repeat(4000);
-    let doc = document::Document::parse(&original).unwrap();
+    let doc = document::Document::parse(&original, TextFormat::Markdown).unwrap();
     let texts = doc.texts();
     assert_eq!(texts.concat(), original);
     for batch in document::batches(&texts) {
@@ -200,13 +271,13 @@ async fn partial_failure_keeps_original_and_retry_only_requests_failed_segments(
     let service = TranslationService::new(root.path().to_owned());
     let original = format!("{}\n\nb", "a".repeat(4000));
     let partial = service
-        .body(&transport, "source", "1", &original)
+        .body(&transport, "source", "1", &original, TextFormat::Markdown)
         .await
         .unwrap();
     assert!(partial.partial && partial.text.contains("<p>b</p>"));
     assert_eq!(*transport.calls.lock().unwrap(), 2);
     let retried = service
-        .body(&transport, "source", "1", &original)
+        .body(&transport, "source", "1", &original, TextFormat::Markdown)
         .await
         .unwrap();
     assert!(!retried.partial && !retried.text.contains("<p>b</p>"));
@@ -247,6 +318,7 @@ async fn invalidating_preferences_cancels_an_inflight_translation() {
                 "source",
                 "1",
                 "Hello",
+                TextFormat::Markdown,
             )
             .await
     });

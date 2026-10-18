@@ -10,17 +10,21 @@ rust-version.workspace = true
 gpui.workspace = true
 flate2.workspace = true
 gpui-component.workspace = true
-image.workspace = true
+futures-util = { workspace = true, features = ["io"] }
+# GPUI already builds these; named here because `pictures` decodes them itself.
+image = { workspace = true, features = ["gif", "webp"] }
 lumilio-core.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 lumilio-plugin-api.workspace = true
+lumilio-schematic.workspace = true
 lumilio-schematic-render.workspace = true
 lumilio-skin-render.workspace = true
 lumilio-pointer.workspace = true
 lumilio-map-render.workspace = true
 raw-window-handle = "0.6"
 async-channel = "2"
+semver.workspace = true
 i18n-embed = { version = "0.16", features = ["fluent-system", "desktop-requester"] }
 i18n-embed-fl = "0.10"
 # `debug-embed` compiles the catalogs in debug builds too, so editing one
@@ -30,6 +34,7 @@ rust-embed = { version = "8", features = ["debug-embed"] }
 [dev-dependencies]
 gpui = { workspace = true, features = ["test-support"] }
 fluent-syntax = "0.12"
+tempfile.workspace = true
 
 [lints]
 workspace = true

@@ -5,6 +5,7 @@ mod protocol;
 #[cfg(test)]
 mod tests;
 
+use crate::discover::{Catalog, TextFormat};
 use crate::transfer::Transport;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -89,13 +90,14 @@ impl TranslationService {
         source: &str,
         project: &str,
         original: &str,
+        format: TextFormat,
     ) -> Result<TranslatedDocument, TranslationError> {
         let cancel = self
             .cancel
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone();
-        tokio::select! { () = cancel.cancelled() => Err(TranslationError::Disabled), result = self.body_inner(transport, source, project, original) => result }
+        tokio::select! { () = cancel.cancelled() => Err(TranslationError::Disabled), result = self.body_inner(transport, source, project, original, format) => result }
     }
 
     async fn body_inner<T: Transport>(
@@ -104,13 +106,18 @@ impl TranslationService {
         source: &str,
         project: &str,
         original: &str,
+        format: TextFormat,
     ) -> Result<TranslatedDocument, TranslationError> {
         if original.len() > 2 * 1024 * 1024 {
             return Err(TranslationError::TooLarge);
         }
         let _guard = self.gate.lock().await;
         let generation = self.cache.generation();
-        let identity = key(source, project, "body", "edge", original);
+        let field = match format {
+            TextFormat::Markdown => "body",
+            TextFormat::Html => "body-html",
+        };
+        let identity = key(source, project, field, "edge", original);
         if let Some(text) = self
             .cache
             .get(identity.clone(), crate::service::now())
@@ -121,7 +128,7 @@ impl TranslationService {
                 partial: false,
             });
         }
-        let parts = document::Document::parse(original)?.texts();
+        let parts = document::Document::parse(original, format)?.texts();
         let mut translated = Vec::with_capacity(parts.len());
         let mut partial = false;
         for batch in document::batches(&parts) {
@@ -173,7 +180,7 @@ impl TranslationService {
                 return Err(TranslationError::TooLarge);
             }
         }
-        let text = document::Document::parse(original)?.replace(&translated)?;
+        let text = document::Document::parse(original, format)?.replace(&translated)?;
         if !partial {
             self.cache
                 .put(identity, text.clone(), crate::service::now(), generation)
@@ -182,9 +189,12 @@ impl TranslationService {
         Ok(TranslatedDocument { text, partial })
     }
 
+    /// `catalog` is whose IDs the source speaks; MCIM only knows those two,
+    /// so a source that declares none gets no summaries.
     pub(crate) async fn summaries<T: Transport>(
         &self,
         transport: &T,
+        catalog: Option<Catalog>,
         source: &str,
         items: &[(String, String)],
     ) -> BTreeMap<String, String> {
@@ -193,19 +203,20 @@ impl TranslationService {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone();
-        tokio::select! { () = cancel.cancelled() => BTreeMap::new(), result = self.summaries_inner(transport, source, items) => result }
+        tokio::select! { () = cancel.cancelled() => BTreeMap::new(), result = self.summaries_inner(transport, catalog, source, items) => result }
     }
 
     async fn summaries_inner<T: Transport>(
         &self,
         transport: &T,
+        catalog: Option<Catalog>,
         source: &str,
         items: &[(String, String)],
     ) -> BTreeMap<String, String> {
-        let platform = match source {
-            "lumilio.modrinth" => "modrinth",
-            "lumilio.curseforge" => "curseforge",
-            _ => return BTreeMap::new(),
+        let platform = match catalog {
+            Some(Catalog::Modrinth) => "modrinth",
+            Some(Catalog::CurseForge) => "curseforge",
+            None => return BTreeMap::new(),
         };
         let _guard = self.gate.lock().await;
         let generation = self.cache.generation();

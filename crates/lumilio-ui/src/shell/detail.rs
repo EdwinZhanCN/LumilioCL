@@ -13,6 +13,8 @@ use std::rc::Rc;
 pub(super) struct DetailSlot {
     pub(super) view: Entity<ProjectDetailView>,
     pub(super) kind: ProjectKind,
+    /// The content source (plugin ID) the project is from.
+    pub(super) source: String,
     pub(super) slug: String,
 }
 
@@ -37,33 +39,26 @@ impl LauncherShell {
 
     /// Opens a project's detail in place of the Discover list. It starts as
     /// "loading"; [`Self::set_detail_state`] fills it in.
-    pub fn open_detail(&mut self, kind: ProjectKind, slug: &str, cx: &mut Context<Self>) {
+    pub fn open_detail(
+        &mut self,
+        kind: ProjectKind,
+        source: &str,
+        slug: &str,
+        cx: &mut Context<Self>,
+    ) {
         let Some(live) = self.live_handler.clone() else {
             return;
         };
         let project = slug.to_owned();
+        let from = source.to_owned();
         let handler: DetailHandler = Rc::new(move |intent, window, cx| match intent {
-            DetailIntent::Translate {
-                source,
-                project,
-                original,
-                request,
-            } => live(
-                LiveIntent::TranslateBody {
-                    source,
-                    project,
-                    original,
-                    request,
-                },
-                window,
-                cx,
-            ),
             DetailIntent::SaveAs {
                 version_id,
                 file_name,
                 title,
             } => live(
                 LiveIntent::SaveVersionAs {
+                    source: from.clone(),
                     project: project.clone(),
                     version_id,
                     file_name,
@@ -79,6 +74,7 @@ impl LauncherShell {
             } => live(
                 LiveIntent::UpdateInstalled {
                     kind,
+                    source: from.clone(),
                     project: project.clone(),
                     title,
                     file_name,
@@ -90,6 +86,7 @@ impl LauncherShell {
             DetailIntent::Install { version_id, title } => live(
                 LiveIntent::Install {
                     kind,
+                    source: from.clone(),
                     slug: project.clone(),
                     title,
                     version: version_id,
@@ -97,8 +94,26 @@ impl LauncherShell {
                 window,
                 cx,
             ),
+            DetailIntent::Translate {
+                source,
+                project,
+                original,
+                format,
+                request,
+            } => live(
+                LiveIntent::TranslateBody {
+                    source,
+                    project,
+                    original,
+                    format,
+                    request,
+                },
+                window,
+                cx,
+            ),
         });
-        let url = lumilio_core::project_page_url(kind, slug);
+        // The page's address comes with the project.
+        let url = String::new();
         let target = self.live.as_ref().and_then(|model| {
             let id = model.install_target.clone()?;
             install_target_of(model, &id)
@@ -113,20 +128,17 @@ impl LauncherShell {
             view.set_target_quiet(target);
             view
         });
-        let enabled = self
-            .live
-            .as_ref()
-            .and_then(|model| model.settings.as_ref())
-            .is_some_and(|settings| settings.preferences.translation.enabled);
+        let translation = self.translation_enabled();
         view.update(cx, |view, cx| {
             view.set_game_tags(tags, cx);
-            view.set_translation_enabled(enabled, cx);
+            view.set_translation_enabled(translation, cx);
         });
-        self.visit();
+        self.visit(cx);
         self.live_instance = None;
         self.detail = Some(DetailSlot {
             view,
             kind,
+            source: source.to_owned(),
             slug: slug.to_owned(),
         });
         self.route = Route::Discover;
@@ -168,8 +180,23 @@ impl LauncherShell {
             .map(|slot| (slot.kind, slot.slug.as_str()))
     }
 
+    /// The content source of the project open on Discover, if any.
+    pub fn detail_source(&self) -> Option<&str> {
+        self.detail.as_ref().map(|slot| slot.source.as_str())
+    }
+
+    /// The page of the project open on Discover, for answers that belong to
+    /// it (translations); compare it to tell whether the page changed since.
     pub fn detail_view(&self) -> Option<Entity<ProjectDetailView>> {
         self.detail.as_ref().map(|slot| slot.view.clone())
+    }
+
+    /// Translation is on in Settings (off until the settings are read).
+    pub(super) fn translation_enabled(&self) -> bool {
+        self.live
+            .as_ref()
+            .and_then(|model| model.settings.as_ref())
+            .is_some_and(|settings| settings.preferences.translation.enabled)
     }
 }
 

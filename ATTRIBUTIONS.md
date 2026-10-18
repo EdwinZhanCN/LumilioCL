@@ -34,7 +34,7 @@ SOFTWARE.
 The schematic modal's scoped pointer adapter uses the existing MIT/Apache-2.0
 `core-graphics`, `objc2` and `block2` bindings on macOS and MIT/Apache-2.0 `x11rb` bindings on X11.
 Its Windows module is original Win32 API glue. No upstream source was copied
-into `crates/lumilio-pointer` (ADR 0036).
+into `crates/lumilio-pointer`.
 
 The UI also maintains gpui-component 0.7.0 from Longbridge's GPUI Kit under
 `forks/gpui-component`, with a local multi-select extension in
@@ -42,20 +42,37 @@ The UI also maintains gpui-component 0.7.0 from Longbridge's GPUI Kit under
 notice is preserved in [LICENSE-APACHE](forks/gpui-component/LICENSE-APACHE).
 The baseline and imported paths are recorded in [fork maintenance](forks/README.md).
 
-The native preview links the following libraries (ADR 0028). It does not vendor
-Minecraft textures: a pack is built in memory from the player's installed game.
+The native preview links the following libraries. The repository
+does not vendor Minecraft textures, models or entity geometry. The preview
+bakes them from the player's installed game. When the matching game is not
+installed, it downloads a pre-baked bundle (`blocks.dat.z` and `entities.dat.z`)
+from `launcher.lumilio.org`; `cargo xtask bake-blocks` makes it from Mojang's
+published client jars (plan schematic-studio, D2). Those assets belong to
+Mojang Studios and are not covered by LumilioCL's license. The bundle carries
+its own `NOTICE`. The official obfuscation mappings that the entity export
+reads are used only while baking and are not redistributed.
 
 | Library | Locked revision | License | Source used |
 | --- | --- | --- | --- |
 | [Nucleation](https://github.com/Schem-at/Nucleation) | `51de345` | MIT, Copyright (c) 2025 Schem-at | `src/formats/litematic.rs`, `src/meshing/`, `src/rendering/{gpu,camera}.rs` |
 | [Schematic-Mesher](https://github.com/Schem-at/Schematic-Mesher) | `286323e` | AGPL-3.0-only | Block geometry, liquid and chest meshing; linked through Nucleation |
 
-Editable source snapshots are maintained under `forks/` (ADR 0029).
+Editable source snapshots are maintained under `forks/`.
 [Fork maintenance](forks/README.md) records complete baseline revisions, imported
 paths and local changes. The original licenses are preserved at
 [Nucleation/LICENSE](forks/nucleation/LICENSE) and
 [Schematic-Mesher/LICENSE](forks/schematic-mesher/LICENSE). Mesher's AGPL-3.0-only
 license matches LumilioCL's license. Nucleation's required notice follows.
+
+## GPUI — Apache-2.0
+
+`crates/lumilio-ui/src/pictures/decode.rs` adapts how GPUI reads and decodes
+pictures (`ImageAssetLoader` in `crates/gpui/src/elements/img.rs` and
+`decode_static_image` in `crates/gpui/src/platform.rs` of
+[zed-industries/zed](https://github.com/zed-industries/zed)), so the launcher's
+picture cache can shrink them while decoding. GPUI is licensed under Apache-2.0;
+the license text is the one preserved in
+[LICENSE-APACHE](forks/gpui-component/LICENSE-APACHE).
 
 ## Nucleation — MIT License
 
@@ -166,7 +183,18 @@ follow [skinview3d](https://github.com/bs-community/skinview3d)'s
 [licenses/skinview3d-MIT.txt](crates/lumilio-skin-render/licenses/skinview3d-MIT.txt).
 Default player artwork is read from the player's installed client; none is
 distributed. Which default an id gets follows HMCL's `TexturesLoader.java`
-(GPL-3.0-or-later, ADR 0011).
+(GPL-3.0-or-later).
+
+# Pixel face
+
+Servers' messages of the day are drawn in
+[Monocraft](https://github.com/IdreesInc/Monocraft) 4.2.1 by Idrees Hassan,
+embedded unmodified from the release's OTF files in
+`crates/lumilio-ui/assets/fonts/` under the SIL OFL 1.1 (no Reserved Font
+Name); its licence is kept at
+[OFL-Monocraft.txt](crates/lumilio-ui/assets/fonts/OFL-Monocraft.txt).
+Monocraft is a fan typeface drawn from its own pixel tables and contains no
+Mojang font file or asset. No Minecraft font is read or distributed.
 
 # Website and release mirror
 

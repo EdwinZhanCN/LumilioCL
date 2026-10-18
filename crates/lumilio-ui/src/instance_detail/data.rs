@@ -2,7 +2,7 @@ use super::intent::{InstanceIntent, Section};
 use super::panels::{Arrived, Confirm};
 use super::{
     CrashRead, InstanceDetailView, Operated, TAB_CONTENT, TAB_DIAGNOSTICS, TAB_HISTORY,
-    TAB_OVERVIEW, TAB_SCREENSHOTS, TAB_WORLDS, TABS, panels, settings,
+    TAB_OVERVIEW, TAB_SCREENSHOTS, TAB_SETTINGS, TAB_WORLDS, TABS, panels, settings,
 };
 use crate::toast::Toast;
 use crate::tr;
@@ -21,6 +21,7 @@ impl InstanceDetailView {
                 self.record = Some(record);
                 self.defaults = defaults;
                 self.sync_fields = 3;
+                self.refresh_java = true;
                 self.error = None;
                 self.load_technical = None;
             }
@@ -113,12 +114,13 @@ impl InstanceDetailView {
     pub fn select_tab(&mut self, tab: usize, cx: &mut Context<Self>) {
         self.tab = tab.min(TABS.len() - 1);
         self.plugin_open = None;
+        self.drop_plugin_pages(None, cx);
         self.confirm = None;
         cx.notify();
     }
 
     /// Selecting from the page also loads what the new tab shows.
-    pub(super) fn open_tab(&mut self, tab: usize, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn open_tab(&mut self, tab: usize, window: &mut Window, cx: &mut Context<Self>) {
         self.select_tab(tab, cx);
         match self.tab {
             TAB_OVERVIEW => {
@@ -141,6 +143,10 @@ impl InstanceDetailView {
                 self.ask_thumbs = true;
             }
             TAB_DIAGNOSTICS => self.open_diagnostics(window, cx),
+            // Read again each time: a preset may have changed on another page.
+            TAB_SETTINGS if self.settings_sub == settings::SETTINGS_OPTIONS => {
+                self.request(Section::GameOptions, window, cx);
+            }
             TAB_HISTORY => {
                 let section = if self.history_sub == 2 {
                     Section::Snapshots
@@ -185,6 +191,18 @@ impl InstanceDetailView {
             self.ping_servers = true;
         }
         let screenshots = matches!(arrived, Arrived::Screenshots(_));
+        if let Arrived::GameOptions(Ok(options)) = &arrived {
+            // Only changes that still wait can stay selected or in conflict.
+            let waiting = |key: &String| {
+                options
+                    .view
+                    .pending
+                    .iter()
+                    .any(|change| change.setting == *key)
+            };
+            self.options_selected.retain(waiting);
+            self.options_conflicts.retain(waiting);
+        }
         self.data.store(arrived);
         self.filter_plugin_results();
         if screenshots {
@@ -194,12 +212,7 @@ impl InstanceDetailView {
     }
 
     /// Shows worlds or servers; the servers are read the first time.
-    pub(super) fn open_worlds_sub(
-        &mut self,
-        sub: usize,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
+    pub fn open_worlds_sub(&mut self, sub: usize, window: &mut Window, cx: &mut Context<Self>) {
         self.worlds_sub = sub.min(panels::WORLD_SUBS.len() - 1);
         if self.worlds_sub == 1 {
             if self.data.has(Section::Servers) {
@@ -240,23 +253,20 @@ impl InstanceDetailView {
         result: Result<lumilio_core::ServerStatus, String>,
         cx: &mut Context<Self>,
     ) {
-        match result {
-            Ok(status) => {
-                // A live icon replaces the one the game cached.
-                if let Some(pixels) = status.favicon.as_ref()
-                    && let Some(image) =
-                        crate::pixels::image(pixels.width, pixels.height, &pixels.rgba)
-                {
-                    self.server_icons.insert(address.clone(), image);
-                }
-                self.server_status
-                    .insert(address, panels::ServerState::Online(status));
-            }
-            Err(_) => {
-                self.server_status
-                    .insert(address, panels::ServerState::Offline);
-            }
+        if let Ok(status) = &result
+            && let Some(image) = crate::places::favicon(status)
+        {
+            self.server_icons.insert(address.clone(), image);
         }
+        self.server_status
+            .insert(address, panels::ServerState::of(result));
+        cx.notify();
+    }
+
+    /// Sharing these option changes was refused: the preset changed them too.
+    /// They stay selected and show the preset's value until decided.
+    pub fn options_conflicted(&mut self, keys: Vec<String>, cx: &mut Context<Self>) {
+        self.options_conflicts = keys;
         cx.notify();
     }
 
@@ -283,6 +293,8 @@ impl InstanceDetailView {
     pub fn game_output(&mut self, lines: Vec<String>, running: bool, cx: &mut Context<Self>) {
         if running {
             if self.live_output.is_none() {
+                // ia[plugin.litematica]: 游戏运行中禁用写入 | 工作室更多菜单与「历史」的恢复键 · 游戏启动时自动 | 改动投影的入口置灰并在提示里说明；游戏结束后恢复 | 核心在运行中也拒绝写入（T12）
+                self.studios_write_changed(cx);
                 self.game_started_ms = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .ok()
@@ -304,6 +316,10 @@ impl InstanceDetailView {
             self.maps_files_changed(cx);
             if self.data.has(Section::Worlds) {
                 self.refresh_worlds = true;
+            }
+            // Leaving the game is when its option changes are found.
+            if self.data.has(Section::GameOptions) {
+                self.refresh_options = true;
             }
             // The game may have taken pictures.
             if self.data.has(Section::Screenshots) {
@@ -364,7 +380,7 @@ impl InstanceDetailView {
         }
         self.enabled_plugins = Some(enabled);
         self.filter_plugin_results();
-        self.keep_enabled_plugin_tabs();
+        self.keep_enabled_plugin_tabs(cx);
         self.refresh_analysis = true;
         self.refresh_plugin_tabs = true;
         cx.notify();
@@ -405,11 +421,14 @@ impl InstanceDetailView {
                 None => Toast::success(done.notice),
             });
         } else if !self.editor_result(failure, cx) {
-            let toast = match done.technical {
-                Some(detail) => Toast::error(done.notice).technical(detail),
-                None => Toast::success(done.notice),
-            };
-            self.toasts.push(toast);
+            match done.technical {
+                Some(detail) => self
+                    .toasts
+                    .push(Toast::error(done.notice).technical(detail)),
+                // A change the page shows itself (a switch) needs no notice.
+                None if done.notice.is_empty() => {}
+                None => self.toasts.push(Toast::success(done.notice)),
+            }
         }
         // Writes feed the change history and can change what is wrong.
         let mut stale = done.refresh;

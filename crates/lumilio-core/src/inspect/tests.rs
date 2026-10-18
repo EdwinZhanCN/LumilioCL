@@ -53,7 +53,8 @@ async fn home_checks_keep_setup_problems_but_leave_file_damage_to_explicit_diagn
     let settings = LauncherSettings::default();
     let home = kinds(inspect_home_instance(store.layout(), &settings, &[], record).await);
     assert!(home.contains(&ProblemKind::NoAccount));
-    assert!(home.contains(&ProblemKind::NoJava { required: Some(21) }));
+    // The next launch downloads the missing Java by default.
+    assert!(home.contains(&ProblemKind::JavaWillDownload { major: Some(21) }));
     assert!(
         !home
             .iter()
@@ -69,7 +70,13 @@ async fn a_fresh_instance_reports_the_setup_gaps() {
     let kinds =
         kinds(inspect_instance(store.layout(), &LauncherSettings::default(), &[], &record).await);
     assert!(kinds.contains(&ProblemKind::NoAccount));
-    assert!(kinds.contains(&ProblemKind::NoJava { required: None }));
+    // Without a release the major depends on the host (Java 8 for old
+    // versions on 64-bit Linux).
+    assert!(
+        kinds
+            .iter()
+            .any(|kind| matches!(kind, ProblemKind::JavaWillDownload { .. }))
+    );
     assert!(kinds.contains(&ProblemKind::NotInstalled));
 }
 
@@ -88,6 +95,7 @@ async fn an_installed_manifest_supplies_the_java_requirement_and_a_damage_count(
         ..Default::default()
     });
     settings.selected_account = Some("Steve".into());
+    settings.auto_install_java = false;
 
     // Java 17 is too old for the manifest's Java 21; the client jar is missing.
     let home = dir.path().join("jdk17");

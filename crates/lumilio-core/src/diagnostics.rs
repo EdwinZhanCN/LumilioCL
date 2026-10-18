@@ -13,9 +13,10 @@ pub use lumilio_plugin_api::Severity;
 
 use crate::content::{ContentItem, ModMetadata};
 use crate::discover::is_safe_file_name;
+use crate::environment::HostProfile;
 use crate::history::SessionOutcome;
 use crate::instance::{InstanceRecord, Loader};
-use crate::java::JavaRuntime;
+use crate::java::{JavaNeeds, JavaRuntime, choose, install_major};
 
 /// Below this maximum heap (MB) the game is likely to run out of memory.
 pub const LOW_MEMORY_MB: u32 = 1024;
@@ -25,8 +26,26 @@ pub enum ProblemKind {
     /// Nothing installed yet; the first launch will install.
     NotInstalled,
     LoaderUnsupported(Loader),
+    /// No installed Java may run the game; `required` is the one to install.
     NoJava {
         required: Option<u32>,
+    },
+    /// No installed Java may run the game, and the next launch downloads
+    /// `major` (the recommended one when `None`).
+    JavaWillDownload {
+        major: Option<u32>,
+    },
+    /// The Java chosen in the instance settings breaks a rule the game
+    /// cannot start without; it needs `needed`.
+    JavaMismatch {
+        chosen: u32,
+        needed: u32,
+    },
+    /// The Java in use starts the game, but `advised` is the one it is
+    /// tested on.
+    JavaAdvice {
+        advised: u32,
+        chosen_by_user: bool,
     },
     NoAccount,
     /// Files of the game installation are missing or damaged.
@@ -60,8 +79,12 @@ pub struct Facts<'a> {
     /// Loaders the launcher can currently start.
     pub launchable_loaders: &'a [Loader],
     pub runtimes: &'a [JavaRuntime],
-    /// The Java major the game needs, if known (once its release is known).
-    pub required_java: Option<u32>,
+    /// What decides the Java the game runs on (its release's requirement
+    /// once the release is known).
+    pub java_needs: JavaNeeds,
+    /// Whether a launch downloads a missing Java by itself.
+    pub auto_install_java: bool,
+    pub host: &'a HostProfile,
     pub has_account: bool,
     /// Missing/damaged installation files, if a scan was done.
     pub damaged_files: Option<usize>,
@@ -96,18 +119,36 @@ pub fn diagnose(facts: &Facts<'_>) -> Vec<Problem> {
     if !facts.has_account {
         add(Severity::Error, ProblemKind::NoAccount);
     }
-    let java_ok = facts.runtimes.iter().any(|runtime| {
-        facts
-            .required_java
-            .is_none_or(|required| runtime.major() >= required)
-    });
-    if !java_ok {
-        add(
-            Severity::Error,
-            ProblemKind::NoJava {
-                required: facts.required_java,
-            },
-        );
+    let preferred = facts.instance.settings.java_path.as_deref();
+    match choose(facts.runtimes, &facts.java_needs, preferred, facts.host) {
+        None => {
+            let required = install_major(&facts.java_needs, facts.host);
+            if facts.auto_install_java {
+                add(
+                    Severity::Info,
+                    ProblemKind::JavaWillDownload { major: required },
+                );
+            } else {
+                add(Severity::Error, ProblemKind::NoJava { required });
+            }
+        }
+        Some(choice) => match choice.advised_major() {
+            Some(needed) if choice.breaks_required() => add(
+                Severity::Warning,
+                ProblemKind::JavaMismatch {
+                    chosen: choice.runtime.major(),
+                    needed,
+                },
+            ),
+            Some(advised) => add(
+                Severity::Info,
+                ProblemKind::JavaAdvice {
+                    advised,
+                    chosen_by_user: choice.chosen_by_user,
+                },
+            ),
+            None => {}
+        },
     }
     if !facts.instance.installed {
         add(Severity::Info, ProblemKind::NotInstalled);

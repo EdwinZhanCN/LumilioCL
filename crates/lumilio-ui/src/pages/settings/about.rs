@@ -32,6 +32,29 @@ pub(super) fn about(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
             colors,
         ),
         row(
+            "settings-release-notes",
+            tr!("settings-release-notes"),
+            Some(tr!("settings-release-notes-help").to_owned()),
+            "",
+            crate::release_notes::current().map(|notes| {
+                // ia[settings]: 更新内容 | 关于 · 按键 | 打开这个版本的更新内容弹窗（新功能、改进、修复）；没有这个版本的说明时不显示按键
+                kit::ghost(
+                    "settings-release-notes-open",
+                    tr!("settings-release-notes-open"),
+                    move |window, cx| {
+                        crate::release_notes::show(
+                            vec![notes],
+                            crate::release_notes::Occasion::Asked,
+                            window,
+                            cx,
+                        );
+                    },
+                )
+                .into_any_element()
+            }),
+            colors,
+        ),
+        row(
             "settings-update-status",
             tr!("settings-update-status"),
             None,

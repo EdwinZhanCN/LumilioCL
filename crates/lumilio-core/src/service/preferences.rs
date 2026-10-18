@@ -70,6 +70,31 @@ impl<T: Transport + Clone> LauncherService<T> {
         Ok(self.settings.lock().await.set_auto_update(enabled)?)
     }
 
+    /// Remembers that the release notes of `version` were shown.
+    pub async fn set_release_notes_seen(&self, version: &str) -> Result<(), ServiceError> {
+        Ok(self.settings.lock().await.set_release_notes_seen(version)?)
+    }
+
+    pub async fn set_java_source(
+        &self,
+        source: crate::java_runtime::JavaSource,
+    ) -> Result<(), ServiceError> {
+        Ok(self.settings.lock().await.set_java_source(source)?)
+    }
+
+    pub async fn set_auto_install_java(&self, enabled: bool) -> Result<(), ServiceError> {
+        Ok(self.settings.lock().await.set_auto_install_java(enabled)?)
+    }
+
+    /// Turns the automatic block-asset download of schematic previews on or off.
+    pub async fn set_auto_download_block_assets(&self, enabled: bool) -> Result<(), ServiceError> {
+        Ok(self
+            .settings
+            .lock()
+            .await
+            .set_auto_download_block_assets(enabled)?)
+    }
+
     /// Turns a Java installation off (or back on) by its home folder.
     pub async fn set_java_disabled(&self, home: &Path, disabled: bool) -> Result<(), ServiceError> {
         let mut settings = self.settings.lock().await;

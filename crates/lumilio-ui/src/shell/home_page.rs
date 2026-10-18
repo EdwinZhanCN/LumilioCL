@@ -53,6 +53,7 @@ impl LauncherShell {
     pub fn apply_launch_signal(&mut self, signal: LaunchSignal, cx: &mut Context<Self>) {
         if matches!(&signal, LaunchSignal::Running) {
             self.game_running = true;
+            self.release_for_game(cx);
         } else if matches!(
             &signal,
             LaunchSignal::Exited { .. } | LaunchSignal::Failed(_) | LaunchSignal::Cancelled
@@ -75,7 +76,14 @@ impl LauncherShell {
             attention: self
                 .live
                 .as_ref()
-                .map(|model| model.attention.clone())
+                .map(|model| {
+                    let mut rows = model.attention.clone();
+                    rows.extend(crate::game_settings::attention_rows(
+                        &model.game_settings,
+                        &model.library,
+                    ));
+                    rows
+                })
                 .unwrap_or_default(),
             on_open: Some(Rc::new(move |id, window, cx| {
                 open(LiveIntent::OpenInstance(id), window, cx)

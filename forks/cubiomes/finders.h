@@ -40,6 +40,7 @@ enum StructureType
     Trail_Ruins,
     Trial_Chambers,
     Abandoned_Camp,
+    Nether_Fossil, // LumilioCL: 1.18+, the fossil's column, not the chunk origin
     FEATURE_NUM
 };
 

@@ -133,6 +133,8 @@ pub struct Key {
     /// Held down: a menu key whose menu is open stays pressed.
     held: bool,
     bold: bool,
+    /// Pulled back by its side padding: see [`Key::flush_start`].
+    flush: bool,
     tooltip: Option<SharedString>,
     on_click: Option<ClickHandler>,
     /// A handle the owner keeps, so it can give focus back to this key.
@@ -155,6 +157,7 @@ impl Key {
             loading: false,
             held: false,
             bold: false,
+            flush: false,
             tooltip: None,
             on_click: None,
             focus: None,
@@ -238,6 +241,14 @@ impl Key {
     /// A semibold label: the chosen key of a segment row.
     pub fn bold(mut self, bold: bool) -> Self {
         self.bold = bold;
+        self
+    }
+
+    /// For a ghost key that begins a line: its label lines up with the
+    /// column's leading edge, and its hover face reaches into the margin
+    /// instead of indenting the label by the side padding.
+    pub fn flush_start(mut self) -> Self {
+        self.flush = true;
         self
     }
 
@@ -333,6 +344,14 @@ impl RenderOnce for Key {
                 .clone()
         });
         let tall = matches!(self.size, KeySize::Regular | KeySize::Large);
+        let side = if square {
+            0.
+        } else if tall {
+            16.
+        } else {
+            12.
+        };
+        let flush = self.flush;
         let icon_size = if tall { px(14.) } else { px(13.) };
         let resting = if raised {
             theme::key_shadow(body)
@@ -363,9 +382,10 @@ impl RenderOnce for Key {
                 if square {
                     key.w(px(height))
                 } else {
-                    key.px(px(if tall { 16. } else { 12. }))
+                    key.px(px(side))
                 }
             })
+            .when(flush, |key| key.ml(px(-side)))
             .rounded(px(4.))
             .bg(face)
             .text_color(text)

@@ -30,10 +30,6 @@ pub enum TaskOutcome {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(tag = "action", rename_all = "snake_case")]
 pub enum RetryAction {
-    FromContentSource {
-        source: String,
-        operation: Box<RetryAction>,
-    },
     InstallInstance {
         instance: String,
     },
@@ -49,6 +45,9 @@ pub enum RetryAction {
     InstallContent {
         instance: String,
         kind: crate::discover::ProjectKind,
+        /// The content source; entries from before there were several have none.
+        #[serde(default = "default_source")]
+        source: String,
         project: String,
         version: Option<String>,
     },
@@ -56,6 +55,8 @@ pub enum RetryAction {
         instance: String,
         kind: crate::discover::ProjectKind,
         file_name: String,
+        #[serde(default = "default_source")]
+        source: String,
         project: String,
         version_id: String,
     },
@@ -65,7 +66,12 @@ pub enum RetryAction {
         include_worlds: bool,
     },
     InstallModpack {
+        #[serde(default = "default_source")]
+        source: String,
         project: String,
+        /// The chosen version; `None` (and older log lines) is the newest.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        version: Option<String>,
     },
     BackupInstance {
         instance: String,
@@ -76,8 +82,13 @@ pub enum RetryAction {
     },
     InstallJava {
         major: Option<u32>,
+        /// Absent in entries written before there was a choice.
+        #[serde(default)]
+        source: crate::java_runtime::JavaSource,
     },
     SaveVersion {
+        #[serde(default = "default_source")]
+        source: String,
         project: String,
         version_id: String,
         path: String,
@@ -85,6 +96,10 @@ pub enum RetryAction {
     ImportPack {
         path: String,
     },
+}
+
+fn default_source() -> String {
+    crate::discover::DEFAULT_SOURCE.to_owned()
 }
 
 /// What a task is doing, as a type rather than a sentence: the interface
@@ -117,6 +132,9 @@ pub enum TaskAction {
     CopyGame,
     InstallModpack,
     ImportModpack,
+    /// Downloading the pre-baked block assets a schematic preview draws
+    /// with; the subject is the game version.
+    PrepareBlockAssets,
 }
 
 impl From<&str> for TaskLabel {

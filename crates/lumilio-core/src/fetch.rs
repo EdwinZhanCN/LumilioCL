@@ -22,14 +22,28 @@ pub enum FetchError {
     /// No source was supplied.
     NoSources,
     /// Every source failed; one `(source, reason)` pair per attempt.
-    Exhausted(Vec<(String, String)>),
+    /// `answered` says whether any source answered (an error status, or a
+    /// body that would not do) rather than being out of reach.
+    Exhausted {
+        attempts: Vec<(String, String)>,
+        answered: bool,
+    },
+}
+
+impl FetchError {
+    /// Whether some source answered: what was asked for is not there, as
+    /// opposed to the network or the host being down.
+    #[must_use]
+    pub const fn answered(&self) -> bool {
+        matches!(self, Self::Exhausted { answered: true, .. })
+    }
 }
 
 impl Display for FetchError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::NoSources => f.write_str("no source to fetch from"),
-            Self::Exhausted(attempts) => {
+            Self::Exhausted { attempts, .. } => {
                 f.write_str("every source failed")?;
                 for (source, reason) in attempts {
                     write!(f, "; {source}: {reason}")?;
@@ -67,18 +81,24 @@ where
     if sources.is_empty() {
         return Err(FetchError::NoSources);
     }
-    let mut attempts = Vec::new();
+    let (mut attempts, mut answered) = (Vec::new(), false);
     for source in sources {
         let source = source.as_ref();
         match read_one(transport, source).await {
             Ok(bytes) => match decode(bytes) {
                 Ok(value) => return Ok(value),
-                Err(error) => attempts.push((source.to_owned(), error.to_string())),
+                Err(error) => {
+                    answered = true;
+                    attempts.push((source.to_owned(), error.to_string()));
+                }
             },
-            Err(reason) => attempts.push((source.to_owned(), reason)),
+            Err(failure) => {
+                answered |= failure.answered;
+                attempts.push((source.to_owned(), failure.reason));
+            }
         }
     }
-    Err(FetchError::Exhausted(attempts))
+    Err(FetchError::Exhausted { attempts, answered })
 }
 
 /// Sends `body` as JSON to one address and reads the answer whole, with the
@@ -92,31 +112,63 @@ pub async fn post_document<T: Transport + ?Sized>(
     let response = transport
         .post_json(source, body)
         .await
-        .map_err(|error| FetchError::Exhausted(vec![(source.to_owned(), error.to_string())]))?;
+        .map_err(|error| Failure::unreached(error.to_string()).into_error(source))?;
     read_response(response)
         .await
-        .map_err(|reason| FetchError::Exhausted(vec![(source.to_owned(), reason)]))
+        .map_err(|failure| failure.into_error(source))
 }
 
-async fn read_one<T: Transport + ?Sized>(transport: &T, source: &str) -> Result<Vec<u8>, String> {
+/// Why one source gave nothing, and whether it answered at all.
+struct Failure {
+    reason: String,
+    answered: bool,
+}
+
+impl Failure {
+    const fn unreached(reason: String) -> Self {
+        Self {
+            reason,
+            answered: false,
+        }
+    }
+
+    const fn answered(reason: String) -> Self {
+        Self {
+            reason,
+            answered: true,
+        }
+    }
+
+    fn into_error(self, source: &str) -> FetchError {
+        FetchError::Exhausted {
+            attempts: vec![(source.to_owned(), self.reason)],
+            answered: self.answered,
+        }
+    }
+}
+
+async fn read_one<T: Transport + ?Sized>(transport: &T, source: &str) -> Result<Vec<u8>, Failure> {
     let response = transport
         .get(source)
         .await
-        .map_err(|error| error.to_string())?;
+        .map_err(|error| Failure::unreached(error.to_string()))?;
     read_response(response).await
 }
 
-async fn read_response(response: crate::transfer::TransportResponse) -> Result<Vec<u8>, String> {
+async fn read_response(response: crate::transfer::TransportResponse) -> Result<Vec<u8>, Failure> {
     let status = response.status();
     if !(200..300).contains(&status) {
-        return Err(format!("HTTP {status}"));
+        return Err(Failure::answered(format!("HTTP {status}")));
     }
     let mut body = response.into_body();
     let mut bytes = Vec::new();
     while let Some(chunk) = body.next().await {
-        let chunk = chunk.map_err(|error| error.to_string())?;
+        // A body cut off on the way is the connection's failure.
+        let chunk = chunk.map_err(|error| Failure::unreached(error.to_string()))?;
         if bytes.len() + chunk.len() > DOCUMENT_LIMIT {
-            return Err("document is larger than the limit".to_owned());
+            return Err(Failure::answered(
+                "document is larger than the limit".to_owned(),
+            ));
         }
         bytes.extend_from_slice(&chunk);
     }
@@ -155,11 +207,30 @@ mod tests {
         let error = fetch_document(&Scripted, &["down://a", "gone://a"])
             .await
             .unwrap_err();
-        let FetchError::Exhausted(attempts) = error else {
+        let FetchError::Exhausted { attempts, .. } = error else {
             panic!("expected exhaustion");
         };
         assert_eq!(attempts.len(), 2);
         assert_eq!(attempts[1].1, "HTTP 404");
+    }
+
+    /// A source that answers without the document is told apart from one
+    /// that cannot be reached: the first means it is not there, the second
+    /// that the network or the host is down.
+    #[tokio::test]
+    async fn an_answer_without_the_document_is_not_being_offline() {
+        let gone = fetch_document(&Scripted, &["down://a", "gone://a"])
+            .await
+            .unwrap_err();
+        assert!(gone.answered());
+        let down = fetch_document(&Scripted, &["down://a", "down://b"])
+            .await
+            .unwrap_err();
+        assert!(!down.answered());
+        let undecodable = fetch_decoded(&Scripted, &["ok://a"], |_| Err::<(), _>("not json"))
+            .await
+            .unwrap_err();
+        assert!(undecodable.answered());
     }
 
     #[tokio::test]

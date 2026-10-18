@@ -189,14 +189,24 @@ async fn build(service: &Service, spec: Spec) -> Result<(), ServiceError> {
             (ProjectKind::Shader, &game.shaders),
             (ProjectKind::ResourcePack, &game.resourcepacks),
         ] {
-            let installed = service.installed_projects(&id, kind).await?;
+            let installed = service
+                .installed_projects(&id, kind, lumilio_core::DEFAULT_SOURCE)
+                .await?;
             for project in projects {
-                let detail = service.project_detail(project).await?;
+                let detail = service
+                    .project_detail(lumilio_core::DEFAULT_SOURCE, project)
+                    .await?;
                 if installed.contains_key(&detail.project.id) {
                     continue;
                 }
                 let file = service
-                    .install_content(&id, kind, project, CancellationToken::new())
+                    .install_content(
+                        &id,
+                        kind,
+                        lumilio_core::DEFAULT_SOURCE,
+                        project,
+                        CancellationToken::new(),
+                    )
                     .await?;
                 println!("  + {file}");
             }
@@ -210,7 +220,11 @@ async fn build(service: &Service, spec: Spec) -> Result<(), ServiceError> {
         install(service, &id, &game.name).await?;
     }
     for project in &spec.modpacks {
-        let id = service.project_detail(project).await?.project.id;
+        let id = service
+            .project_detail(lumilio_core::DEFAULT_SOURCE, project)
+            .await?
+            .project
+            .id;
         let made = service.library().await.instances.into_iter().any(|game| {
             game.source_project
                 .is_some_and(|source| source == id || source == *project)
@@ -221,7 +235,12 @@ async fn build(service: &Service, spec: Spec) -> Result<(), ServiceError> {
         }
         println!("modpack {project}");
         let record = service
-            .install_modpack(project, CancellationToken::new())
+            .install_modpack(
+                lumilio_core::DEFAULT_SOURCE,
+                project,
+                None,
+                CancellationToken::new(),
+            )
             .await?;
         install(service, &record.id, &record.name).await?;
     }

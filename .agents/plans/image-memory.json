@@ -1,0 +1,159 @@
+{
+  "schemaVersion": 1,
+  "id": "image-memory",
+  "title": "Bounded image and page memory",
+  "summary": "Pictures, map tiles and plugin pages kept memory without a ceiling, so the launcher grew with browsing until restart (a measured 800 MB footprint: 383 MB GPU textures, 372 MB live heap). One byte-budgeted picture cache, a map image budget tied to what is drawn, and plugin pages that exist only while shown bound it.",
+  "status": "completed",
+  "visibility": "internal",
+  "scope": {
+    "included": [
+      "A lumilio-ui picture cache for every picture loaded by path or address (screenshots, thumbnails, Discover icons, gallery, Markdown pictures, wallpaper): budgeted by decoded bytes, evicts least recently used, returns GPU textures, decodes no larger than the screen needs",
+      "World map canvas: keeps the tile images the latest frame drew and a small spare",
+      "Plugin pages (maps, 3D previews, plugin pictures) exist only while shown, also for game pages kept in navigation history"
+    ],
+    "excluded": [
+      "The 3D preview renderer's per-resize rebuild (separate renderer work)",
+      "Instance cover cache (small and already bounded)",
+      "Changes to GPUI or gpui-component"
+    ]
+  },
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Byte-budgeted picture cache for path and address pictures",
+      "status": "completed",
+      "acceptance": "Every img(path|url) in the launcher window and its picture dialogs goes through one cache; tests show the decoded bytes stay within the budget, evicted pictures leave the window's atlas, pictures on screen are never evicted, and large pictures are decoded at most at the cap edge"
+    },
+    {
+      "id": "T2",
+      "title": "Map canvas image budget",
+      "status": "completed",
+      "acceptance": "The canvas keeps the tile images its latest frame drew plus SPARE_TILES, and evicted tiles leave the atlas; a test covers both"
+    },
+    {
+      "id": "T3",
+      "title": "Plugin pages exist only while shown",
+      "status": "completed",
+      "acceptance": "Switching away from a plugin tab, or leaving the game page through navigation, drops its plugin pages and returns their pictures to GPUI; a replaced page returns its pictures; Back to the page asks for the open plugin page again; tests cover each"
+    },
+    {
+      "id": "T4",
+      "title": "Measure the running app",
+      "status": "completed",
+      "acceptance": "footprint before and after a fixed path (open 10 screenshots in the viewer, pan the world map, enter and leave a game page with the map open 5 times) is recorded in validation"
+    },
+    {
+      "id": "T5",
+      "title": "Release what the launcher holds when a game starts",
+      "status": "completed",
+      "acceptance": "On LaunchSignal::Running the page on screen stays; game and project pages leave history (landmark pages stay, with no step that leads to the same place) and are freed; pictures not on screen and built covers are released, textures included; tests cover each"
+    },
+    {
+      "id": "T6",
+      "title": "Decode screenshots shrinking as they are read",
+      "status": "completed",
+      "acceptance": "Screenshot thumbnails and the viewer decode a PNG larger than their edge row by row into the target size, holding only the output and a few rows; tests show exact area means (an even colour stays exact at a non-integer ratio, transparency does not tint) and both callers keep their sizes"
+    },
+    {
+      "id": "T7",
+      "title": "Measure the streaming decode and review picture sharpness",
+      "status": "completed",
+      "acceptance": "After viewing 10 screenshots, footprint shows no freed block the size of a full-resolution screenshot (Malloc Large (empty)); the screenshot viewer and the wallpaper look sharp on a 2x display"
+    }
+  ],
+  "validation": [
+    {
+      "criterion": "PNG screenshots are shrunk as they are read",
+      "result": "lumilio-core picture::tests (6) pass; breaking the column split or the premultiplication fails the even-colour and transparency tests. screenshots::tests thumbnail (1920x1080 to 480x270) and lumilio-ui pictures::tests (PNG and JPEG both decoded at 2048x683) pass. cargo nextest run -p lumilio-core -p lumilio-ui -p lumilio-app: 1156 passed; clippy -D warnings and cargo fmt --check clean. Measuring the effect is T7."
+    },
+    {
+      "criterion": "Streaming decode measured and pictures reviewed",
+      "result": "The Project Maintainer ran the T7 path on the branch build: footprint after viewing screenshots and around a game start, and the screenshot viewer and wallpaper on a 2x display. No problem was found. just check passed on the branch (1406 tests)."
+    },
+    {
+      "criterion": "A game starting releases what the launcher holds",
+      "result": "shell::tests::memory::a_game_starting_drops_the_pages_kept_for_back (the game page entity is freed), pictures::tests::a_game_starting_lets_go_of_every_picture_off_screen (within budget, still released; texture returned), cover::tests::a_game_starting_empties_the_covers and history::tests::collapsing_leaves_no_step_that_goes_nowhere pass; the first three failed with the release call, the zero-budget eviction and the cover drain removed. cargo nextest run -p lumilio-ui: 435 passed; clippy -D warnings clean."
+    },
+    {
+      "criterion": "Picture cache stays within its byte budget, keeps what is on screen and returns evicted textures",
+      "result": "pictures::tests (4) pass. Shown failing first: without drop_image the evicted texture stays in the atlas; without on-screen protection the cache reloads what it shows (bounded executor ticks report it); without notifying waiting views the picture is never drawn."
+    },
+    {
+      "criterion": "Window, viewer and wallpaper pictures reach the budgeted caches, not GPUI's keep-forever table",
+      "result": "shell::tests::memory (thumbnail in a game page, wallpaper) and instance_detail::tests::screenshots viewer test pass; each failed with its wiring removed."
+    },
+    {
+      "criterion": "Map canvas keeps only drawn tiles and the spare",
+      "result": "world_explorer::tests::the_canvas_keeps_the_tiles_it_draws_and_a_few_more failed on the previous 700-image cap (240 kept for 12 drawn) and passes with 12 + 64."
+    },
+    {
+      "criterion": "Plugin pages exist only while shown",
+      "result": "instance_detail::tests::plugins (two new tests) and shell::tests::memory navigation test pass; each failed with release, the tab-switch drop or the shell's leave call removed."
+    },
+    {
+      "criterion": "Narrow checks on the touched crates",
+      "result": "cargo nextest run -p lumilio-ui: 431 passed. cargo clippy -p lumilio-ui -p lumilio-app --all-targets -D warnings and cargo fmt --check are clean. The full just check is left to the Project Maintainer."
+    },
+    {
+      "criterion": "Measured footprint along the fixed path no longer grows with each repetition",
+      "result": "After the fixed path the footprint settles at 506 MB and stays there (peak 550 MB), against 800-955 MB and rising before. GPU textures 383 -> 90 MB. Of the remaining heap only 121.7 MB is live (about 60 MB of it pictures shrunk to 2048 px in the picture cache); 140 MB is freed large blocks (about 35 MB each, the size of a full-resolution screenshot decode) that macOS malloc keeps for reuse, and the small zones are 28% fragmented."
+    }
+  ],
+  "decisions": [
+    {
+      "id": "D1",
+      "decision": "One cache mounted at the window root instead of per-page fixes",
+      "rationale": "GPUI's fallback for img() is the app-wide asset table, which only remove_asset clears, and atlas textures only leave on drop_image. Every page with pictures had the same unbounded retention, holding each picture twice (decoded, and as a texture).",
+      "consequences": "New pages get the bound by default. Dialogs and sheets are drawn by the window root beside the shell, so one that shows pictures wraps them in pictures::scope or names the cache."
+    },
+    {
+      "id": "D2",
+      "decision": "A picture asked for in a window's latest frame is never evicted; the budget only limits the rest",
+      "rationale": "Evicting a picture still on screen removes its texture from a scene GPUI may present again and makes the page reload it every frame.",
+      "consequences": "A page whose own pictures exceed the budget keeps them while it shows. Frame ends are observed through on_next_frame, which wakes the frame source once without redrawing."
+    },
+    {
+      "id": "D3",
+      "decision": "Decode at most 2048 px on the long edge for page pictures, 3840 px for the wallpaper; an animation over 32 MiB decoded keeps its first frame",
+      "rationale": "The largest page surface is an 880 pt dialog on a 2x display; the wallpaper fills the window. A 4K screenshot drops from about 33 MB to 9 MB, and a long GIF no longer decodes hundreds of megabytes.",
+      "consequences": "A picture's natural size is capped at the edge; every current use sizes pictures explicitly."
+    },
+    {
+      "id": "D4",
+      "decision": "Plugin pages live only while shown, instead of capping the number of live detail pages in history",
+      "rationale": "Opening a plugin tab already replaces its page and builds a new map, so dropping pages that leave the screen loses nothing the tab kept before. Capping history would have needed an application round trip to reopen old entries and would lose their tab and scroll state.",
+      "consequences": "History entries stay cheap and Back keeps tab and scroll. Back to a game page with a map open asks for the map again and its camera starts fresh, as reopening the tab does."
+    },
+    {
+      "id": "D5",
+      "decision": "When a game starts the launcher releases only what it holds itself; no call asks the system allocator to return freed memory",
+      "rationale": "Returning freed memory needs malloc_zone_pressure_relief, malloc_trim or HeapCompact through unsafe FFI, which the workspace forbids outside an audited crate. The Project Maintainer chose to wait for user reports before adding one.",
+      "consequences": "Released memory goes back to the allocator for the launcher to reuse; how much of it the operating system takes back, and when, depends on its allocator. Back no longer leads to game or project pages visited before the game started."
+    },
+    {
+      "id": "D6",
+      "decision": "Shrink PNGs with an exact area mean while reading rows, in lumilio-core, and leave other formats to the image crate",
+      "rationale": "The measured residue after T1-T4 was 140 MB of freed blocks about the size of a full-resolution screenshot decode, which macOS malloc keeps for reuse. Minecraft writes screenshots as PNG, the png crate is already built for image, and row-by-row reading means the full picture is never allocated. Core owns it so the thumbnailer and the viewer share one implementation.",
+      "consequences": "Interlaced PNGs, PNGs with an EXIF orientation and pictures that already fit take the usual decode. JPEG and WebP from the web are still decoded whole before shrinking. In debug builds core is unoptimised, so a 4K thumbnail takes a few hundred milliseconds there."
+    }
+  ],
+  "references": [
+    "crates/lumilio-ui/src/pictures/mod.rs",
+    "crates/lumilio-ui/src/world_explorer/canvas.rs",
+    "crates/lumilio-ui/src/instance_detail/plugin_tabs.rs",
+    "crates/lumilio-ui/src/shell/locations.rs",
+    "https://github.com/zed-industries/zed/blob/main/crates/gpui/src/elements/img.rs"
+  ],
+  "lessonsLearned": [
+    "A cache that evicts what it shows made add_window_view spin forever, because it runs the executor until parked and a reloading page never parks. The picture tests open windows with add_window and drive a bounded number of executor ticks, so the regression fails in milliseconds instead of hanging (crates/lumilio-ui/src/pictures/tests.rs)."
+  ],
+  "outcome": "Memory no longer grows with browsing. Pictures go through a 64 MiB byte-budgeted cache that returns GPU textures and never evicts what is on screen; large PNGs are shrunk as they are read; the map canvas keeps drawn tiles plus 64; plugin pages exist only while shown; and a game starting releases history pages, unseen pictures and covers. Measured after T1-T4: 506 MB stable (peak 550 MB) against 800-955 MB and rising, GPU textures 383 to 90 MB. No call returns freed memory to the operating system (D5).",
+  "roadmap": {
+    "enabled": false,
+    "id": "image-memory",
+    "name": "Bounded memory",
+    "lede": "Memory stays bounded while browsing",
+    "targetVersion": null,
+    "order": 0
+  }
+}

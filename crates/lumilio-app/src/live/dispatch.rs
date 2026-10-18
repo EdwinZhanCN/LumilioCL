@@ -21,12 +21,45 @@ use gpui_kit::{App, Window};
 use lumilio_core::CancellationToken;
 use lumilio_ui::home::HomeIntent;
 use lumilio_ui::instance_detail::InstanceIntent;
+use lumilio_ui::java_conflict::{self, JavaConflict, JavaConflictAnswer};
 use lumilio_ui::live::{LiveIntent, PlaceTarget, account_failure, account_rows};
 use lumilio_ui::platform;
 use lumilio_ui::route::Route;
 use lumilio_ui::shell::ShellIntent;
 use lumilio_ui::toast::Toast;
 use lumilio_ui::tr;
+
+/// Asks about a Java that cannot run the game. An answer starts the launch
+/// again (with the automatic Java this once, or as chosen); cancelling drops
+/// the world or server the launch was headed for.
+fn ask_java(wiring: &Wiring, conflict: &JavaConflict, window: &mut Window, cx: &mut App) {
+    let targets = {
+        let mut state = wiring.state.borrow_mut();
+        (state.next_world.take(), state.next_server.take())
+    };
+    let wiring = wiring.clone();
+    java_conflict::ask(
+        conflict,
+        std::rc::Rc::new(move |answer, window, cx| {
+            let Some(id) = wiring.state.borrow().continue_id.clone() else {
+                return;
+            };
+            if answer == JavaConflictAnswer::Switch {
+                wiring.backend.service.launch_next_with_automatic_java(&id);
+            }
+            {
+                let mut state = wiring.state.borrow_mut();
+                state.java_answered = Some(id);
+                (state.next_world, state.next_server) = targets.clone();
+            }
+            let _ = wiring
+                .shell
+                .update(cx, |shell, cx| shell.request_continue(window, cx));
+        }),
+        window,
+        cx,
+    );
+}
 
 pub(super) fn on_shell_intent(
     wiring: &Wiring,
@@ -39,22 +72,41 @@ pub(super) fn on_shell_intent(
             // Asked of the service, not the page: an account added a moment ago
             // may not have reached the page's model yet.
             let service = wiring.backend.service.clone();
+            let answered = wiring.state.borrow_mut().java_answered.take();
+            let check_java = wiring
+                .state
+                .borrow()
+                .continue_id
+                .clone()
+                .filter(|id| answered.as_ref() != Some(id));
             let work = wiring.backend.spawn(async move {
-                account_rows(&service.settings().await)
+                let has_account = account_rows(&service.settings().await)
                     .iter()
-                    .any(|row| row.selected)
+                    .any(|row| row.selected);
+                let conflict = match check_java {
+                    Some(id) => service
+                        .instance_java(&id)
+                        .await
+                        .ok()
+                        .and_then(|java| JavaConflict::of(&java)),
+                    None => None,
+                };
+                (has_account, conflict)
             });
             let wiring = wiring.clone();
             let window = window.window_handle();
             cx.spawn(async move |cx| {
-                if work.await.unwrap_or(true) {
+                let (has_account, conflict) = work.await.unwrap_or((true, None));
+                if has_account && conflict.is_none() {
                     cx.update(|cx| start_launch(&wiring, window, cx));
                     return;
                 }
-                // No account: ask for one, then start where the person left off.
                 let _ = wiring.shell.update(cx, |shell, cx| shell.abort_launch(cx));
-                let _ = cx.update_window(window, |_, window, cx| {
-                    open_add_account(&wiring, true, window, cx);
+                let _ = cx.update_window(window, |_, window, cx| match conflict {
+                    // The chosen Java cannot run the game: ask once, then start.
+                    Some(conflict) if has_account => ask_java(&wiring, &conflict, window, cx),
+                    // No account: ask for one, then start where the person left off.
+                    _ => open_add_account(&wiring, true, window, cx),
                 });
             })
             .detach();
@@ -83,15 +135,16 @@ pub(super) fn on_live_intent(
 ) {
     match intent {
         LiveIntent::NewInstance => open_new_game(wiring, window, cx),
+        LiveIntent::Preset(intent) => super::game_settings::preset(wiring, intent, window, cx),
         LiveIntent::ImportPack => import_pack(wiring, cx),
         LiveIntent::OpenInstance(id) => open_instance(wiring, id, None, window, cx),
         LiveIntent::SaveVersionAs {
+            source,
             project,
             version_id,
             file_name,
             title,
         } => {
-            let source = super::discover::source_of(wiring, &project, cx);
             let start = std::env::var_os("HOME")
                 .or_else(|| std::env::var_os("USERPROFILE"))
                 .map(std::path::PathBuf::from)
@@ -116,20 +169,18 @@ pub(super) fn on_live_intent(
                         ))),
                         async move {
                             service
-                                .from_content_source(
-                                    source,
-                                    service.save_version_as(
-                                        &project,
-                                        &version_id,
-                                        &target,
-                                        CancellationToken::new(),
-                                    ),
+                                .save_version_as(
+                                    &source,
+                                    &project,
+                                    &version_id,
+                                    &target,
+                                    CancellationToken::new(),
                                 )
                                 .await
                         },
                         move |shell, result, cx| {
                             shell.toast(
-                                outcome(
+                                super::jobs::install_outcome(
                                     result,
                                     |_| tr!("project-saved-to", path = path.display().to_string()),
                                     tr!("project-save-failed", title = title.as_str()),
@@ -144,6 +195,7 @@ pub(super) fn on_live_intent(
         }
         LiveIntent::UpdateInstalled {
             kind,
+            source,
             project,
             title,
             file_name,
@@ -154,7 +206,6 @@ pub(super) fn on_live_intent(
             };
             let service = wiring.backend.service.clone();
             let state = wiring.state.clone();
-            let source = super::discover::source_of(wiring, &project, cx);
             job(
                 wiring,
                 cx,
@@ -166,23 +217,21 @@ pub(super) fn on_live_intent(
                 ))),
                 async move {
                     service
-                        .from_content_source(
-                            source,
-                            service.switch_content_version(
-                                &instance,
-                                kind,
-                                &file_name,
-                                &project,
-                                &version_id,
-                                CancellationToken::new(),
-                            ),
+                        .switch_content_version(
+                            &instance,
+                            kind,
+                            &file_name,
+                            &source,
+                            &project,
+                            &version_id,
+                            CancellationToken::new(),
                         )
                         .await
                 },
                 move |shell, result, cx| {
                     state.borrow_mut().installed_key = None;
                     shell.toast(
-                        outcome(
+                        super::jobs::install_outcome(
                             result,
                             |file| {
                                 tr!(
@@ -569,7 +618,58 @@ pub(super) fn on_live_intent(
             );
         }
         LiveIntent::AddJava => add_java(wiring, cx),
-        LiveIntent::InstallJava(major) => install_java(wiring, major, cx),
+        LiveIntent::InstallJava(major) => install_java(wiring, None, major, cx),
+        LiveIntent::DownloadJava { source, major } => {
+            install_java(wiring, Some(source), Some(major), cx);
+        }
+        LiveIntent::RemoveJava(home) => {
+            let service = wiring.backend.service.clone();
+            change_setting(
+                wiring,
+                window,
+                async move { service.remove_java(&home).await },
+                tr!("settings-java-remove-failed"),
+                Some(tr!("settings-java-removed")),
+                |_, _| {},
+                cx,
+            );
+        }
+        LiveIntent::SetJavaSource(source) => {
+            let service = wiring.backend.service.clone();
+            change_setting(
+                wiring,
+                window,
+                async move { service.set_java_source(source).await },
+                tr!("settings-java-save-failed"),
+                None,
+                |_, _| {},
+                cx,
+            );
+        }
+        LiveIntent::SetAutoDownloadBlockAssets(enabled) => {
+            let service = wiring.backend.service.clone();
+            change_setting(
+                wiring,
+                window,
+                async move { service.set_auto_download_block_assets(enabled).await },
+                tr!("settings-save-failed"),
+                None,
+                |_, _| {},
+                cx,
+            );
+        }
+        LiveIntent::SetAutoInstallJava(enabled) => {
+            let service = wiring.backend.service.clone();
+            change_setting(
+                wiring,
+                window,
+                async move { service.set_auto_install_java(enabled).await },
+                tr!("settings-java-save-failed"),
+                None,
+                |_, _| {},
+                cx,
+            );
+        }
         LiveIntent::OpenGamesFolder => {
             cx.reveal_path(&wiring.backend.service.layout().profiles());
         }
@@ -603,35 +703,21 @@ pub(super) fn on_live_intent(
             source,
             project,
             original,
+            format,
             request,
-        } => super::discover::translate_body(wiring, source, project, original, request, cx),
-        LiveIntent::ClearTranslationCache => {
-            let service = wiring.backend.service.clone();
-            job(
-                wiring,
-                cx,
-                false,
-                Reload::Nothing,
-                None,
-                async move { service.clear_translation_cache().await },
-                |shell, result, cx| {
-                    shell.toast(
-                        outcome(
-                            result,
-                            |()| tr!("translation-cache-cleared").to_owned(),
-                            tr!("translation-cache-clear-failed").to_owned(),
-                        ),
-                        cx,
-                    )
-                },
-            );
+        } => super::translation::translate_body(
+            wiring, source, project, original, format, request, cx,
+        ),
+        LiveIntent::ClearTranslationCache => super::translation::clear_cache(wiring, cx),
+        LiveIntent::OpenProject { kind, source, slug } => {
+            open_project(wiring, kind, source, slug, window, cx)
         }
-        LiveIntent::OpenProject { kind, slug } => open_project(wiring, kind, slug, window, cx),
         LiveIntent::Install {
             kind,
+            source,
             slug,
             title,
             version,
-        } => install(wiring, kind, slug, title, version, window, cx),
+        } => install(wiring, kind, source, slug, title, version, window, cx),
     }
 }

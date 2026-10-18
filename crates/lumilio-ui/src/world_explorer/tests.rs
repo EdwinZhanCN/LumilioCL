@@ -2508,3 +2508,74 @@ fn after_the_game_exits_visible_tiles_are_asked_again_and_keep_showing_meanwhile
         assert_eq!(view.tiles[&key].rgba.as_ref().unwrap()[0], 200);
     });
 }
+
+/// Paints one frame of tiles through a bare `Painter`, as the map does.
+struct PaintedTiles {
+    painter: std::rc::Rc<std::cell::RefCell<canvas::Painter>>,
+    tiles: Vec<lumilio_map_render::Tile>,
+}
+
+impl Render for PaintedTiles {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        let frame = canvas::Frame {
+            camera: lumilio_map_render::Camera {
+                x: 512.,
+                z: 384.,
+                blocks_per_pixel: 1.,
+            },
+            tiles: self.tiles.clone(),
+            sprites: vec![],
+            grid: Grid {
+                chunks: false,
+                regions: false,
+            },
+            fills: vec![],
+        };
+        let painter = self.painter.clone();
+        let stats = Arc::new(stats::Stats::default());
+        gpui::canvas(
+            |_, _, _| (),
+            move |bounds, (), window, _| painter.borrow_mut().paint(window, bounds, &frame, &stats),
+        )
+        .size_full()
+    }
+}
+
+#[gpui::test]
+fn the_canvas_keeps_the_tiles_it_draws_and_a_few_more(cx: &mut TestAppContext) {
+    // Twelve tiles fill the window; each frame draws twelve new ones.
+    let frame = |n: usize| -> Vec<lumilio_map_render::Tile> {
+        (0..12)
+            .map(|k| {
+                let mut tile = flat_tile(k % 4, k / 4, 0);
+                tile.id = format!("frame{n}-{k}");
+                tile
+            })
+            .collect()
+    };
+    let painter = std::rc::Rc::new(std::cell::RefCell::new(canvas::Painter::default()));
+    let (view, cx) = cx.add_window_view(|_, _| PaintedTiles {
+        painter: painter.clone(),
+        tiles: frame(0),
+    });
+    cx.simulate_resize(gpui::size(px(1024.), px(768.)));
+    cx.run_until_parked();
+    let first = painter.borrow().tile("frame0-0").expect("drawn");
+    for n in 1..20 {
+        view.update(cx, |view, cx| {
+            view.tiles = frame(n);
+            cx.notify();
+        });
+        cx.run_until_parked();
+    }
+    assert_eq!(
+        painter.borrow().tiles_held(),
+        12 + canvas::SPARE_TILES,
+        "this frame's tiles and the spare, not every tile ever drawn"
+    );
+    let last = painter.borrow().tile("frame19-0").expect("drawn");
+    cx.update(|window, _| {
+        assert!(!window.has_image_atlas_entry(&first), "texture returned");
+        assert!(window.has_image_atlas_entry(&last));
+    });
+}

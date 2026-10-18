@@ -1,3 +1,8 @@
+# LumilioCL: its own workspace root, so the fork's guards also run from a Git
+# worktree nested inside another LumilioCL checkout (Cargo would otherwise keep
+# searching upward past the launcher workspace that excludes this package).
+[workspace]
+
 [package]
 name = "schematic-mesher"
 version = "0.2.0"
@@ -33,7 +38,7 @@ serde_json = "1.0"
 thiserror = "1.0"
 
 # ZIP archive support
-zip = { version = "2.0", default-features = false, features = ["deflate"] }
+zip = { version = "9.0.3", default-features = false, features = ["deflate"] }
 
 # Image processing
 image = { version = "0.25", default-features = false, features = ["png"] }
@@ -43,6 +48,10 @@ gltf-json = { version = "1.4", features = ["extras"] }
 
 # Math utilities
 glam = "0.27"
+
+# LumilioCL local change: the baked block-asset format (plan schematic-studio,
+# D1). The mesher reads packs the baker settled; see forks/README.md.
+lumilio-block-assets = { path = "../../crates/lumilio-block-assets" }
 
 # Fast non-cryptographic hashing for the hot per-block maps (BlockPosition keys).
 rustc-hash = "2"

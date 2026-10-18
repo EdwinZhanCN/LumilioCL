@@ -37,6 +37,7 @@ pub(super) enum PluginPage {
         Vec<Option<Arc<RenderImage>>>,
         Vec<Entity<crate::model_view::ModelView>>,
         Vec<Entity<crate::world_explorer::MapView>>,
+        Vec<Entity<crate::schematic_studio::StudioView>>,
     ),
     /// The plugin was switched off or failed while the page was open.
     Unavailable,
@@ -45,14 +46,78 @@ pub(super) enum PluginPage {
 
 pub(super) type PluginPages = HashMap<String, PluginPage>;
 
+/// Returns a page's pictures to GPUI. Its maps and 3D previews let go of
+/// theirs when dropped; the plugin's pictures are bare images whose textures
+/// would otherwise stay in the window's atlas.
+fn release(page: PluginPage, cx: &mut App) {
+    let PluginPage::Shown(_, images, ..) = page else {
+        return;
+    };
+    let images: Vec<_> = images.into_iter().flatten().collect();
+    if images.is_empty() {
+        return;
+    }
+    // Outside any window update, so every window's atlas is reached.
+    cx.defer(move |cx| {
+        for image in images {
+            cx.drop_image(image, None);
+        }
+    });
+}
+
 impl InstanceDetailView {
+    /// Plugin pages exist only while shown: a map holds its tiles and a 3D
+    /// preview its renderer, in memory and on the GPU. Every page but
+    /// `keep`'s is dropped; a page shown again is asked for again, as opening
+    /// its tab always does.
+    pub(super) fn drop_plugin_pages(&mut self, keep: Option<&str>, cx: &mut App) {
+        let gone: Vec<String> = self
+            .plugin_pages
+            .keys()
+            .filter(|plugin| Some(plugin.as_str()) != keep)
+            .cloned()
+            .collect();
+        for plugin in gone {
+            if let Some(page) = self.plugin_pages.remove(&plugin) {
+                release(page, cx);
+            }
+        }
+    }
+
+    /// Another page took this one's place on screen. Its plugin pages go; an
+    /// open plugin tab asks for its page again once this page is shown.
+    pub fn left_screen(&mut self, cx: &mut Context<Self>) {
+        if self.plugin_pages.is_empty() {
+            return;
+        }
+        self.drop_plugin_pages(None, cx);
+        if self.plugin_open.is_some() {
+            self.refresh_plugin_tabs = true;
+        }
+    }
+
     /// The game ended and may have written its saves: open maps look at the
-    /// world's files again.
+    /// world's files again, and open studios at their folder (and whether
+    /// they may write).
     pub(super) fn maps_files_changed(&mut self, cx: &mut Context<Self>) {
         for page in self.plugin_pages.values() {
-            if let PluginPage::Shown(_, _, _, maps) = page {
+            if let PluginPage::Shown(_, _, _, maps, studios) = page {
                 for map in maps {
                     map.update(cx, |map, cx| map.files_changed(cx));
+                }
+                for studio in studios {
+                    studio.update(cx, |studio, cx| studio.files_changed(cx));
+                }
+            }
+        }
+    }
+
+    /// The game started: open studios ask again whether they may write.
+    pub(super) fn studios_write_changed(&mut self, cx: &mut Context<Self>) {
+        for page in self.plugin_pages.values() {
+            if let PluginPage::Shown(_, _, _, _, studios) = page {
+                for studio in studios {
+                    studio.update(cx, |studio, cx| studio.write_access_changed(cx));
                 }
             }
         }
@@ -62,7 +127,18 @@ impl InstanceDetailView {
     /// returns the page to a built-in tab.
     pub fn plugin_tabs_arrived(&mut self, tabs: Vec<PluginTab>, cx: &mut Context<Self>) {
         self.plugin_tabs = tabs;
-        self.keep_enabled_plugin_tabs();
+        self.keep_enabled_plugin_tabs(cx);
+        let early: Vec<String> = self
+            .early_plugin_views
+            .keys()
+            .filter(|plugin| self.plugin_tabs.iter().any(|tab| &tab.plugin == *plugin))
+            .cloned()
+            .collect();
+        for plugin in early {
+            if let Some(result) = self.early_plugin_views.remove(&plugin) {
+                self.plugin_view_arrived(plugin, result, cx);
+            }
+        }
         cx.notify();
     }
 
@@ -74,6 +150,23 @@ impl InstanceDetailView {
         cx: &mut Context<Self>,
     ) {
         if !self.plugin_tabs.iter().any(|tab| tab.plugin == plugin) {
+            // The page was opened before the tab list came (the review
+            // hook, a quick click after opening the game): keep the answer
+            // for the list.
+            if self.plugin_open.as_deref() == Some(plugin.as_str()) {
+                self.early_plugin_views.insert(plugin, result);
+            }
+            return;
+        }
+        // A studio answers a plugin action (a CSV export) with the same view;
+        // the open studio keeps its file, viewport and inspector.
+        if let (
+            Ok(Some(View::Studio { folder })),
+            Some(PluginPage::Shown(View::Studio { folder: open }, ..)),
+        ) = (&result, self.plugin_pages.get(&plugin))
+            && folder == open
+        {
+            cx.notify();
             return;
         }
         let page = match result {
@@ -132,7 +225,11 @@ impl InstanceDetailView {
                         ))
                     }));
                 }
-                PluginPage::Shown(view, rendered, models, maps)
+                let mut studios = Vec::new();
+                if let View::Studio { folder } = &view {
+                    studios.push(self.new_studio(&plugin, folder, cx));
+                }
+                PluginPage::Shown(view, rendered, models, maps, studios)
             }
             Ok(None) => PluginPage::Unavailable,
             Err(detail) => PluginPage::Failed(detail),
@@ -141,7 +238,9 @@ impl InstanceDetailView {
             self.plugin_pane_scroll
                 .set_offset(gpui::point(px(0.), px(0.)));
         }
-        self.plugin_pages.insert(plugin, page);
+        if let Some(old) = self.plugin_pages.insert(plugin, page) {
+            release(old, cx);
+        }
         cx.notify();
     }
 
@@ -152,16 +251,123 @@ impl InstanceDetailView {
         result: Result<lumilio_core::ModelPreview, String>,
         cx: &mut Context<Self>,
     ) {
+        let mut result = Some(result);
         for page in self.plugin_pages.values() {
-            if let PluginPage::Shown(_, _, models, _) = page
-                && let Some(model) = models
+            if let PluginPage::Shown(_, _, models, _, studios) = page {
+                if let Some(model) = models
                     .iter()
                     .find(|model| model.read(cx).request_id() == Some(request))
+                {
+                    let result = result.take().expect("answered once");
+                    model.update(cx, |model, cx| model.assets(result, cx));
+                    return;
+                }
+                for studio in studios {
+                    let asked = studio.read(cx).viewport_request() == Some(request);
+                    if asked {
+                        let result = result.take().expect("answered once");
+                        studio.update(cx, |studio, cx| studio.model_arrived(request, result, cx));
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    /// A studio's connection to the application arrived.
+    pub fn plugin_studio_arrived(
+        &mut self,
+        request: u64,
+        connection: crate::schematic_studio::Connection,
+        cx: &mut Context<Self>,
+    ) {
+        for page in self.plugin_pages.values() {
+            if let PluginPage::Shown(_, _, _, _, studios) = page
+                && let Some(studio) = studios
+                    .iter()
+                    .find(|studio| studio.entity_id().as_u64() == request)
             {
-                model.update(cx, |model, cx| model.assets(result, cx));
+                studio.update(cx, |studio, cx| studio.connect(connection, cx));
                 return;
             }
         }
+    }
+
+    fn new_studio(
+        &self,
+        plugin: &str,
+        folder: &str,
+        cx: &mut Context<Self>,
+    ) -> Entity<crate::schematic_studio::StudioView> {
+        use crate::schematic_studio::{Placement, StudioAction, StudioView};
+        let (load, load_model, act, open) = (
+            self.handler.clone(),
+            self.handler.clone(),
+            self.handler.clone(),
+            self.handler.clone(),
+        );
+        let (for_load, for_model, for_act, for_open) = (
+            plugin.to_owned(),
+            plugin.to_owned(),
+            plugin.to_owned(),
+            plugin.to_owned(),
+        );
+        let (folder_name, folder_open) = (folder.to_owned(), folder.to_owned());
+        cx.new(|cx| {
+            StudioView::new(
+                plugin.to_owned(),
+                folder.to_owned(),
+                Placement::Pane,
+                std::rc::Rc::new(move |request, window, cx| {
+                    load(
+                        InstanceIntent::LoadStudio {
+                            plugin: for_load.clone(),
+                            folder: folder_name.clone(),
+                            request,
+                        },
+                        window,
+                        cx,
+                    )
+                }),
+                std::rc::Rc::new(move |file, request, window, cx| {
+                    load_model(
+                        InstanceIntent::LoadModel {
+                            plugin: for_model.clone(),
+                            file,
+                            request,
+                        },
+                        window,
+                        cx,
+                    )
+                }),
+                std::rc::Rc::new(move |action, window, cx| {
+                    let action = match action {
+                        StudioAction::Reveal(file) => format!("reveal:{file}"),
+                        StudioAction::ExportCsv(file) => format!("export:{file}"),
+                    };
+                    act(
+                        InstanceIntent::PluginAction {
+                            plugin: for_act.clone(),
+                            action: ActionId::new(action),
+                        },
+                        window,
+                        cx,
+                    )
+                }),
+                cx,
+            )
+            .on_open_window(std::rc::Rc::new(move |file, window, cx| {
+                open(
+                    InstanceIntent::OpenStudioWindow {
+                        plugin: for_open.clone(),
+                        folder: folder_open.clone(),
+                        file,
+                    },
+                    window,
+                    cx,
+                )
+            }))
+        })
     }
 
     pub fn plugin_map_arrived(
@@ -171,7 +377,7 @@ impl InstanceDetailView {
         cx: &mut Context<Self>,
     ) {
         for page in self.plugin_pages.values() {
-            if let PluginPage::Shown(_, _, _, maps) = page
+            if let PluginPage::Shown(_, _, _, maps, _) = page
                 && let Some(map) = maps.iter().find(|map| map.entity_id().as_u64() == request)
             {
                 map.update(cx, |map, cx| map.connect(connection, cx));
@@ -181,13 +387,22 @@ impl InstanceDetailView {
     }
 
     /// Drops tabs and pages of plugins that are no longer enabled.
-    pub(super) fn keep_enabled_plugin_tabs(&mut self) {
+    pub(super) fn keep_enabled_plugin_tabs(&mut self, cx: &mut App) {
         if let Some(enabled) = &self.enabled_plugins {
             self.plugin_tabs.retain(|tab| enabled.contains(&tab.plugin));
         }
         let tabs = &self.plugin_tabs;
-        self.plugin_pages
-            .retain(|plugin, _| tabs.iter().any(|tab| &tab.plugin == plugin));
+        let gone: Vec<String> = self
+            .plugin_pages
+            .keys()
+            .filter(|plugin| !tabs.iter().any(|tab| &tab.plugin == *plugin))
+            .cloned()
+            .collect();
+        for plugin in gone {
+            if let Some(page) = self.plugin_pages.remove(&plugin) {
+                release(page, cx);
+            }
+        }
         if self
             .plugin_open
             .as_ref()
@@ -252,6 +467,17 @@ impl InstanceDetailView {
         }
     }
 
+    /// Opens `plugin`'s pane as its entry in the 插件 list does; the
+    /// application's review hook (`LUMILIO_INSTANCE_PLUGIN`) uses it.
+    pub fn open_plugin_pane(
+        &mut self,
+        plugin: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.open_plugin(plugin, window, cx);
+    }
+
     pub(super) fn open_plugin(
         &mut self,
         plugin: String,
@@ -263,6 +489,7 @@ impl InstanceDetailView {
             .set_offset(gpui::point(px(0.), px(0.)));
         // ia[instance]: 打开插件标签 | 游戏页「插件」标签内的左侧列表 | 读取并显示插件给的内容；插件被关闭或出错时标签消失，回到内置标签 | 插件只描述内容，版式由启动器统一
         self.plugin_open = Some(plugin.clone());
+        self.drop_plugin_pages(Some(&plugin), cx);
         (self.handler)(InstanceIntent::PluginView(plugin), window, cx);
         cx.notify();
     }
@@ -273,7 +500,7 @@ impl InstanceDetailView {
         };
         let full_map = matches!(
             self.plugin_pages.get(plugin),
-            Some(PluginPage::Shown(View::Map, ..))
+            Some(PluginPage::Shown(View::Map | View::Studio { .. }, ..))
         );
         let content = match self.plugin_pages.get(plugin) {
             None => kit::empty(tr!("library-loading"), "", colors).into_any_element(),
@@ -296,13 +523,15 @@ impl InstanceDetailView {
                         .child(kit::technical("plugin-technical", detail.clone())),
                 )
                 .into_any_element(),
-            Some(PluginPage::Shown(view, images, models, maps)) => {
+            Some(PluginPage::Shown(view, images, models, maps, studios)) => {
                 let mut paint = Paint {
                     plugin,
                     images,
                     models,
                     maps,
+                    studios,
                     next_map: 0,
+                    next_studio: 0,
                     next_table: 0,
                     next_model: 0,
                     next_image: 0,
@@ -442,6 +671,7 @@ fn collect_images<'a>(view: &'a View, out: &mut Vec<&'a ImageData>) {
         }
         View::Image(image) => out.push(image),
         View::Map
+        | View::Studio { .. }
         | View::Model { .. }
         | View::Table { .. }
         | View::Empty { .. }
@@ -475,7 +705,9 @@ struct Paint<'a> {
     images: &'a [Option<Arc<RenderImage>>],
     models: &'a [Entity<crate::model_view::ModelView>],
     maps: &'a [Entity<crate::world_explorer::MapView>],
+    studios: &'a [Entity<crate::schematic_studio::StudioView>],
     next_map: usize,
+    next_studio: usize,
     next_model: usize,
     next_table: usize,
     next_image: usize,
@@ -664,6 +896,14 @@ impl Paint<'_> {
                 map.map_or_else(
                     || div().into_any_element(),
                     |map| map.clone().into_any_element(),
+                )
+            }
+            View::Studio { .. } => {
+                let studio = self.studios.get(self.next_studio);
+                self.next_studio += 1;
+                studio.map_or_else(
+                    || div().into_any_element(),
+                    |studio| studio.clone().into_any_element(),
                 )
             }
             View::Model { .. } => {

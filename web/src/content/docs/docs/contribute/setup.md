@@ -65,6 +65,23 @@ cargo run -p lumilio-app
 启动应用前，把 `LUMILIO_HOME` 设为该目录。
 破坏性测试不要使用重要游戏数据。
 
+## 配置 CurseForge API 密钥
+
+CurseForge 内容源在构建时读取环境变量 `CF_API_KEY`。
+没有密钥时，这个来源默认关闭，其他功能照常使用。
+发布构建从仓库的 Secret 注入密钥。
+
+本地开发时，把密钥放进用户级的 `~/.cargo/config.toml`：
+
+```toml
+[env]
+CF_API_KEY = '你的密钥'
+```
+
+使用单引号，密钥里的 `$` 才会原样保留。
+不要把密钥写进仓库里的 `.cargo/config.toml`，这个文件受 Git 跟踪。
+修改密钥后，Cargo 会重新编译用到它的 crate。
+
 ## 准备网站
 
 安装 Node.js 22.12.0 或更新版本。
@@ -87,9 +104,11 @@ pnpm dev
 | 修改范围 | 迭代检查 | 交接前检查 |
 | --- | --- | --- |
 | Rust 代码 | `just test-pkg <crate> [filter]` | `just check` |
+| `forks/` 里的 fork | `just forks` | `just check` 和 `just forks` |
 | 文档或 harness | 修改计划后运行 `just plans` | `just docs` |
 | 网站或公开文档 | `just web` | `just web`；修改计划时还需 `just docs` |
 
 `just check` 依次执行构建、测试、Clippy 和格式检查。
+`just forks` 运行启动器所用 fork 自己的测试。CI 运行 `just ci`，即先 `just check` 再 `just forks`。
 `just web` 执行依赖安装、Astro 检查、网站测试和站点构建。
 命令成功结束前，不得声称检查已通过。

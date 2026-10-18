@@ -657,7 +657,7 @@ fn extract_block_tags(server_jar: &Path) -> Result<HashMap<String, BTreeSet<Stri
     let mut raw: HashMap<String, Vec<String>> = HashMap::new();
     for i in 0..jar.len() {
         let mut entry = jar.by_index(i)?;
-        let path = entry.name().to_string();
+        let path = entry.name()?.into_owned();
         let Some(tag_name) = path
             .strip_prefix(PREFIX)
             .and_then(|p| p.strip_suffix(".json"))

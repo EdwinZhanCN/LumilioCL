@@ -183,13 +183,26 @@ pub fn thumbnail(
     let mut reader = ImageReader::open(&source)?
         .with_guessed_format()
         .map_err(|error| ScreenshotError::Unreadable(error.to_string()))?;
-    let mut limits = image::Limits::default();
-    limits.max_alloc = Some(DECODE_LIMIT);
-    reader.limits(limits);
-    let picture = reader
-        .decode()
-        .map_err(|error| ScreenshotError::Unreadable(error.to_string()))?;
-    let small = picture.resize(THUMBNAIL_EDGE, THUMBNAIL_EDGE, FilterType::Triangle);
+    // A PNG (what the game writes) is shrunk as it is read, so the full-size
+    // picture is never held; anything else is decoded whole first.
+    let streamed = if reader.format() == Some(image::ImageFormat::Png) {
+        crate::png_within(io::BufReader::new(fs::File::open(&source)?), THUMBNAIL_EDGE)
+            .map_err(|error| ScreenshotError::Unreadable(error.to_string()))?
+    } else {
+        None
+    };
+    let small = match streamed {
+        Some(small) => image::DynamicImage::ImageRgba8(small),
+        None => {
+            let mut limits = image::Limits::default();
+            limits.max_alloc = Some(DECODE_LIMIT);
+            reader.limits(limits);
+            let picture = reader
+                .decode()
+                .map_err(|error| ScreenshotError::Unreadable(error.to_string()))?;
+            picture.resize(THUMBNAIL_EDGE, THUMBNAIL_EDGE, FilterType::Triangle)
+        }
+    };
     fs::create_dir_all(cache_dir)?;
     // Written whole, then renamed in: a half-written file is never taken for a thumbnail.
     let temporary = target.with_extension("png.tmp");

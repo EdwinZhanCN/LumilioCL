@@ -84,6 +84,8 @@ fn world(folder: &str) -> lumilio_core::WorldInfo {
         last_played_ms: None,
         game_version: None,
         hardcore: false,
+        game_mode: None,
+        cheats: false,
         icon: None,
         damaged: false,
         lock_touched_ms: None,
@@ -138,9 +140,11 @@ fn known_version(id: &str, number: &str, game: &str) -> lumilio_core::Version {
             primary: true,
             size: 1,
             sha1: Some("new".into()),
+            download_page: None,
         }],
         dependencies: Vec::new(),
         downloads: 0,
         changelog: "Updated for 26.3".into(),
+        changelog_format: lumilio_core::TextFormat::Markdown,
     }
 }

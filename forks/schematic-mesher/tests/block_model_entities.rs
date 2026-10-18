@@ -9,7 +9,7 @@
 
 mod common;
 
-use common::{add_block, add_texture, cube_model, Blocks};
+use common::{add_block, add_texture, cube_model, entity_layers, Blocks, Fixture};
 use schematic_mesher::{BlockPosition, InputBlock, Mesher, ResourcePack};
 
 const BLOCKS: [&str; 4] = [
@@ -21,6 +21,7 @@ const BLOCKS: [&str; 4] = [
 
 fn vertices(pack: ResourcePack, block: &str) -> usize {
     let source = Blocks(vec![(BlockPosition::new(0, 0, 0), InputBlock::new(block))]);
+    let pack = pack.with_entity_layers(entity_layers());
     Mesher::new(pack).mesh(&source).unwrap().total_vertices()
 }
 
@@ -28,11 +29,11 @@ fn vertices(pack: ResourcePack, block: &str) -> usize {
 fn block_models_replace_legacy_sign_and_bed_entities() {
     for block in BLOCKS {
         let id = block.trim_start_matches("minecraft:");
-        let mut pack = ResourcePack::new();
+        let mut pack = Fixture::default();
         add_block(&mut pack, id, &cube_model(&format!("minecraft:block/{id}")));
         add_texture(&mut pack, &format!("block/{id}"), false);
         // One cube: six faces of four vertices, nothing from the entity.
-        assert_eq!(vertices(pack, block), 24, "{block}");
+        assert_eq!(vertices(pack.bake(), block), 24, "{block}");
     }
 }
 
@@ -40,12 +41,12 @@ fn block_models_replace_legacy_sign_and_bed_entities() {
 fn models_without_elements_keep_the_entity() {
     for block in BLOCKS {
         let id = block.trim_start_matches("minecraft:");
-        let mut pack = ResourcePack::new();
+        let mut pack = Fixture::default();
         add_block(
             &mut pack,
             id,
             r#"{"textures":{"particle":"minecraft:block/oak_planks"}}"#,
         );
-        assert!(vertices(pack, block) > 0, "{block}");
+        assert!(vertices(pack.bake(), block) > 0, "{block}");
     }
 }

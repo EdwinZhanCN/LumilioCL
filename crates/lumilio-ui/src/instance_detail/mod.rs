@@ -17,8 +17,12 @@ mod settings;
 #[cfg(test)]
 mod tests;
 
-pub use self::intent::{InstanceIntent, Section};
+pub use self::intent::{ContentUpdateItem, InstanceIntent, Section};
 pub use self::panels::{Arrived, ProblemAction, export_notice, problem_action, problem_text};
+pub use self::settings::{
+    SETTINGS_ADVANCED, SETTINGS_GAME, SETTINGS_JAVA, SETTINGS_OPTIONS, SETTINGS_PERFORMANCE,
+    SETTINGS_RUNTIME,
+};
 
 use self::editors::Editor;
 use self::forms::Fields;
@@ -136,6 +140,18 @@ pub struct InstanceDetailView {
     analysis_serial: u64,
     log_analysis: Option<(u64, String, Option<CrashRead>)>,
     settings_sub: usize,
+    /// 选项: the changes made in the game that are selected for a decision,
+    /// and those whose preset value also changed (shown after a refusal).
+    options_selected: std::collections::BTreeSet<String>,
+    options_conflicts: Vec<String>,
+    /// The game stopped: read its options again on the next render.
+    refresh_options: bool,
+    /// The Java dropdown, created once the view has a window, and the
+    /// entries it shows.
+    java_select: Option<Dropdown>,
+    java_picks: Vec<(settings::JavaPick, String)>,
+    /// The record changed: read what the next launch's Java is again.
+    refresh_java: bool,
     /// The machine's memory in MB, for the memory hint; unknown until told.
     machine_memory_mb: Option<u64>,
     confirm: Option<Confirm>,
@@ -152,6 +168,8 @@ pub struct InstanceDetailView {
     content_filter_select: Option<content::FilterSelect>,
     selected: content::Selection,
     switch: Option<Entity<content::VersionSwitch>>,
+    /// Files the game waits for that the launcher could not download.
+    pending: Vec<lumilio_core::PendingDownload>,
     started: bool,
     /// A question the Library's menu asked of the page before it had the game.
     ask_later: Option<InstanceIntent>,
@@ -173,6 +191,10 @@ pub struct InstanceDetailView {
     plugin_tabs: Vec<lumilio_core::PluginTab>,
     plugin_open: Option<String>,
     plugin_pages: plugin_tabs::PluginPages,
+    /// A plugin's view that arrived before the tab list named the plugin;
+    /// shown once the list does.
+    early_plugin_views:
+        std::collections::HashMap<String, Result<Option<lumilio_plugin_api::View>, String>>,
     /// Which plugin tabs show should be asked again on the next render.
     refresh_plugin_tabs: bool,
     log_scroll: gpui::ScrollHandle,
@@ -230,6 +252,12 @@ impl InstanceDetailView {
             analysis_serial: 0,
             log_analysis: None,
             settings_sub: 0,
+            options_selected: std::collections::BTreeSet::new(),
+            options_conflicts: Vec::new(),
+            refresh_options: false,
+            java_select: None,
+            java_picks: Vec::new(),
+            refresh_java: false,
             machine_memory_mb: None,
             confirm: None,
             editor: None,
@@ -240,6 +268,7 @@ impl InstanceDetailView {
             content_filter_select: None,
             selected: content::Selection::new(),
             switch: None,
+            pending: Vec::new(),
             started: false,
             inspect: None,
             ask_later: None,
@@ -253,6 +282,7 @@ impl InstanceDetailView {
             plugin_tabs: Vec::new(),
             plugin_open: None,
             plugin_pages: std::collections::HashMap::new(),
+            early_plugin_views: std::collections::HashMap::new(),
             refresh_plugin_tabs: false,
             log_scroll: gpui::ScrollHandle::new(),
             plugin_list_scroll: gpui::ScrollHandle::new(),

@@ -458,14 +458,24 @@ pub(super) fn game_facts(
 ) -> GameFacts {
     use crate::instance::Loader;
     let directories = layout.launch_directories(record);
-    let required = record.release_id().and_then(|id| {
-        std::fs::read_to_string(directories.versions().join(&id).join(format!("{id}.json")))
-            .ok()
-            .and_then(|text| crate::release::ReleaseManifest::decode_json(&text).ok())
-            .and_then(|release| release.java_requirement().map(|java| java.major()))
-    });
-    let java_major = crate::java::choose(runtimes, required, record.settings.java_path.as_deref())
-        .map(|java| java.major());
+    let needs = record
+        .release_id()
+        .and_then(|id| {
+            std::fs::read_to_string(directories.versions().join(&id).join(format!("{id}.json")))
+                .ok()
+        })
+        .and_then(|text| crate::release::ReleaseManifest::decode_json(&text).ok())
+        .map_or_else(
+            || crate::java::JavaNeeds::new(&record.game_version, record.loader, None),
+            |release| crate::java::JavaNeeds::of_release(record, &release),
+        );
+    let java_major = crate::java::choose(
+        runtimes,
+        &needs,
+        record.settings.java_path.as_deref(),
+        &crate::environment::HostProfile::current(),
+    )
+    .map(|choice| choice.runtime.major());
     let mods = crate::content::scan(directories.game(), crate::discover::ProjectKind::Mod)
         .unwrap_or_default()
         .into_iter()

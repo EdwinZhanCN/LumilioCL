@@ -7,7 +7,7 @@ use std::path::Path;
 use crate::activity::CancellationToken;
 use crate::content::{self, ContentError};
 use crate::discover::{
-    ContentClient, DiscoverError, IntentError, ProjectKind, Version, install_request,
+    ContentClient, DiscoverError, FileHashes, IntentError, ProjectKind, Version, install_request,
 };
 use crate::instance::Loader;
 use crate::transfer::{TransferEngine, TransferError, Transport};
@@ -24,9 +24,9 @@ pub struct ContentUpdate {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct UpdateReport {
     pub updates: Vec<ContentUpdate>,
-    /// Files Modrinth knows that are already the newest compatible version.
+    /// Files the source knows that are already the newest compatible version.
     pub up_to_date: usize,
-    /// Enabled files Modrinth does not know (hand-installed or from elsewhere).
+    /// Enabled files the source does not know (hand-installed or from elsewhere).
     pub unknown: Vec<String>,
 }
 
@@ -88,15 +88,23 @@ pub async fn check(
 ) -> Result<UpdateReport, UpdateError> {
     let folder = kind.install_folder().ok_or(ContentError::NotAFileKind)?;
     let mut by_hash: Vec<(String, String)> = Vec::new();
+    let mut hashes: Vec<FileHashes> = Vec::new();
     for item in content::scan(game_dir, kind)? {
         if !item.enabled || item.is_directory {
             continue;
         }
-        if let Ok(hash) = content::sha1_hex(&game_dir.join(folder).join(&item.file_name)) {
+        let path = game_dir.join(folder).join(&item.file_name);
+        if let Ok(hash) = content::sha1_hex(&path) {
+            hashes.push(FileHashes {
+                sha1: hash.clone(),
+                murmur2: client
+                    .wants_murmur2()
+                    .then(|| crate::fingerprint::of_file(&path).ok())
+                    .flatten(),
+            });
             by_hash.push((hash, item.file_name));
         }
     }
-    let hashes: Vec<String> = by_hash.iter().map(|(hash, _)| hash.clone()).collect();
     let known = client.identify(&hashes).await?;
     let latest = client.latest_for(&hashes, loader, game_version).await?;
 

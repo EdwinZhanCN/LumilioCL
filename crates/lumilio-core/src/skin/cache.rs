@@ -1,5 +1,6 @@
 //! Validated Mojang textures are reused by normalized URL for a bounded time
-//! on disk and in memory (ADR 0039). Concurrent reads share one download.
+//! on disk (a day) and in memory (an hour), so repeated reads do not ask
+//! Mojang again. Concurrent reads share one download.
 //! No account credentials enter.
 use super::{AppearanceError, PICTURE_LIMIT, mojang::texture_url};
 use crate::transfer::Transport;

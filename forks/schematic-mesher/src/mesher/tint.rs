@@ -3,6 +3,8 @@
 //! In Minecraft, certain blocks have their textures tinted with colors that can
 //! depend on biome, block state, or other factors.
 
+use serde::Deserialize;
+
 use crate::types::InputBlock;
 
 /// Tint colors for different block categories.
@@ -22,25 +24,37 @@ pub struct TintColors {
     pub lily_pad: [f32; 4],
     /// Potion/cauldron water color
     pub cauldron_water: [f32; 4],
+    /// Dry foliage tint (leaf litter, 1.21.5+).
+    pub dry_foliage: [f32; 4],
+}
+
+/// An opaque `0xRRGGBB` color as linear-blend RGBA factors.
+const fn rgb(hex: u32) -> [f32; 4] {
+    [
+        ((hex >> 16) & 0xFF) as f32 / 255.0,
+        ((hex >> 8) & 0xFF) as f32 / 255.0,
+        (hex & 0xFF) as f32 / 255.0,
+        1.0,
+    ]
 }
 
 impl Default for TintColors {
     fn default() -> Self {
         Self {
-            // Default grass color (plains biome approximate)
-            grass: [0.56, 0.74, 0.35, 1.0],
-            // Default foliage color (plains biome approximate)
-            foliage: [0.47, 0.66, 0.23, 1.0],
-            // Default water color (light blue)
-            water: [0.247, 0.463, 0.894, 1.0],
+            // Plains: the grass, foliage and dry-foliage colormaps sampled at
+            // temperature 0.8, downfall 0.4, as Minecraft does for that biome.
+            grass: rgb(0x91BD59),
+            foliage: rgb(0x77AB2F),
+            water: rgb(0x3F76E4),
             // Redstone dust colors from power 0 to 15
             redstone: Self::default_redstone_colors(),
             // Stem colors from stage 0 to 7
             stem: Self::default_stem_colors(),
-            // Lily pad has a darker green
-            lily_pad: [0.13, 0.55, 0.13, 1.0],
+            // A placed lily pad's fixed color.
+            lily_pad: rgb(0x208030),
             // Cauldron water (same as regular water by default)
-            cauldron_water: [0.247, 0.463, 0.894, 1.0],
+            cauldron_water: rgb(0x3F76E4),
+            dry_foliage: rgb(0xA37546),
         }
     }
 }
@@ -126,31 +140,26 @@ impl TintColors {
         colors
     }
 
-    /// Generate default redstone colors for power levels 0-15.
+    /// Redstone dust colors for power levels 0-15 (Minecraft's
+    /// `RedStoneWireBlock.getColorForPower`).
     fn default_redstone_colors() -> [[f32; 4]; 16] {
         let mut colors = [[0.0; 4]; 16];
-        for power in 0..16 {
-            // Minecraft redstone color formula (approximation)
-            // At power 0: dim red, at power 15: bright red
-            let brightness = (power as f32) / 15.0;
-            let r = 0.3 + brightness * 0.7;
-            let g = brightness * 0.1;
-            let b = brightness * 0.1;
-            colors[power] = [r, g, b, 1.0];
+        for (power, color) in colors.iter_mut().enumerate() {
+            let f = power as f32 / 15.0;
+            let r = f * 0.6 + if f > 0.0 { 0.4 } else { 0.3 };
+            let g = (f * f * 0.7 - 0.5).clamp(0.0, 1.0);
+            let b = (f * f * 0.6 - 0.7).clamp(0.0, 1.0);
+            *color = [r, g, b, 1.0];
         }
         colors
     }
 
-    /// Generate default stem colors for growth stages 0-7.
+    /// Stem colors for growth stages 0-7 (Minecraft: `age * 32, 255 - age * 8, age * 4`).
     fn default_stem_colors() -> [[f32; 4]; 8] {
         let mut colors = [[0.0; 4]; 8];
-        for stage in 0..8 {
-            // Young stems are green, mature stems are yellow/orange
-            let t = stage as f32 / 7.0;
-            let r = 0.2 + t * 0.6;
-            let g = 0.7 - t * 0.2;
-            let b = 0.1;
-            colors[stage] = [r, g, b, 1.0];
+        for (age, color) in colors.iter_mut().enumerate() {
+            let age = age as u32;
+            *color = rgb((age * 32) << 16 | (255 - age * 8) << 8 | age * 4);
         }
         colors
     }
@@ -161,6 +170,9 @@ impl TintColors {
 pub struct TintProvider {
     /// Base tint colors.
     colors: TintColors,
+    /// Whether `colors` are the plains defaults, which a pack's own colormap
+    /// samples replace (see [`TintProvider::sample_colormaps`]).
+    plains: bool,
 }
 
 impl TintProvider {
@@ -168,18 +180,42 @@ impl TintProvider {
     pub fn new() -> Self {
         Self {
             colors: TintColors::default(),
+            plains: true,
         }
     }
 
     /// Create a tint provider with specific colors.
     pub fn with_colors(colors: TintColors) -> Self {
-        Self { colors }
+        Self {
+            colors,
+            plains: false,
+        }
     }
 
     /// Create a tint provider for a specific biome.
     pub fn for_biome(biome: &str) -> Self {
         Self {
             colors: TintColors::for_biome(biome),
+            plains: false,
+        }
+    }
+
+    /// Take the plains grass, foliage and dry-foliage colors from a pack's
+    /// own colormaps (`ResourcePack::colormap_samples`), so each game version
+    /// tints with its own maps. Colors chosen for a biome or given explicitly
+    /// are kept. (LumilioCL local change; see `forks/README.md`.)
+    pub fn sample_colormaps(&mut self, samples: &std::collections::HashMap<String, [u8; 3]>) {
+        if !self.plains {
+            return;
+        }
+        for (name, slot) in [
+            ("grass", &mut self.colors.grass),
+            ("foliage", &mut self.colors.foliage),
+            ("dry_foliage", &mut self.colors.dry_foliage),
+        ] {
+            if let Some(&[r, g, b]) = samples.get(name) {
+                *slot = rgb(u32::from(r) << 16 | u32::from(g) << 8 | u32::from(b));
+            }
         }
     }
 
@@ -189,92 +225,22 @@ impl TintProvider {
         if tint_index < 0 {
             return [1.0, 1.0, 1.0, 1.0];
         }
-
-        let block_id = block.block_id();
-
-        // Determine tint category based on block name
-        match self.categorize_block(block_id) {
-            TintCategory::Grass => self.colors.grass,
-            TintCategory::Foliage => self.colors.foliage,
-            TintCategory::Water => self.colors.water,
-            TintCategory::Redstone => self.get_redstone_tint(block),
-            TintCategory::Stem => self.get_stem_tint(block),
-            TintCategory::LilyPad => self.colors.lily_pad,
-            TintCategory::None => [1.0, 1.0, 1.0, 1.0],
+        match table().kind(&block.name, tint_index) {
+            Some(TintKind::Grass) => self.colors.grass,
+            Some(TintKind::Foliage) => self.colors.foliage,
+            Some(TintKind::DryFoliage) => self.colors.dry_foliage,
+            Some(TintKind::Water) => self.colors.water,
+            Some(TintKind::Redstone) => self.get_redstone_tint(block),
+            Some(TintKind::Stem) => self.get_stem_tint(block),
+            Some(TintKind::LilyPad) => self.colors.lily_pad,
+            Some(TintKind::Fixed(color)) => color,
+            None => [1.0, 1.0, 1.0, 1.0],
         }
     }
 
     /// Get the tint colors reference for direct access.
     pub fn colors(&self) -> &TintColors {
         &self.colors
-    }
-
-    /// Categorize a block by its tinting behavior.
-    fn categorize_block(&self, block_id: &str) -> TintCategory {
-        // Grass-colored blocks
-        if matches!(
-            block_id,
-            "grass_block"
-                | "grass"
-                | "tall_grass"
-                | "fern"
-                | "large_fern"
-                | "potted_fern"
-                | "short_grass"
-        ) {
-            return TintCategory::Grass;
-        }
-
-        // Foliage-colored blocks (leaves, vines)
-        if block_id.ends_with("_leaves") && !block_id.starts_with("azalea") {
-            return TintCategory::Foliage;
-        }
-        if matches!(
-            block_id,
-            "vine"
-                | "oak_leaves"
-                | "jungle_leaves"
-                | "acacia_leaves"
-                | "dark_oak_leaves"
-                | "mangrove_leaves"
-        ) {
-            return TintCategory::Foliage;
-        }
-
-        // Water-colored blocks
-        if matches!(block_id, "water" | "bubble_column") {
-            return TintCategory::Water;
-        }
-
-        // Cauldron with water
-        if block_id == "water_cauldron" {
-            return TintCategory::Water;
-        }
-
-        // Redstone
-        if block_id == "redstone_wire" || block_id == "redstone_dust" {
-            return TintCategory::Redstone;
-        }
-
-        // Stems
-        if matches!(
-            block_id,
-            "melon_stem" | "pumpkin_stem" | "attached_melon_stem" | "attached_pumpkin_stem"
-        ) {
-            return TintCategory::Stem;
-        }
-
-        // Lily pad
-        if block_id == "lily_pad" {
-            return TintCategory::LilyPad;
-        }
-
-        // Sugar cane has a slight green tint in some conditions
-        if block_id == "sugar_cane" {
-            return TintCategory::Grass;
-        }
-
-        TintCategory::None
     }
 
     /// Get redstone tint based on power level.
@@ -290,13 +256,6 @@ impl TintProvider {
 
     /// Get stem tint based on growth stage.
     fn get_stem_tint(&self, block: &InputBlock) -> [f32; 4] {
-        let block_id = block.block_id();
-
-        // Attached stems are fully grown
-        if block_id.starts_with("attached_") {
-            return self.colors.stem[7];
-        }
-
         let age = block
             .properties
             .get("age")
@@ -313,28 +272,118 @@ impl Default for TintProvider {
     }
 }
 
-/// Categories of block tinting.
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum TintCategory {
-    /// Grass/greenery tinting (biome-dependent)
+// The tint table: data, not code (LumilioCL local change; see
+// `forks/README.md`). Adding a tinted block is a line in `data/tints.json`.
+
+static TINTS_JSON: &str = include_str!("../../data/tints.json");
+
+/// How a block is tinted, as `data/tints.json` names it.
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum TintKind {
     Grass,
-    /// Foliage tinting for leaves (biome-dependent)
     Foliage,
-    /// Water tinting (biome-dependent)
+    DryFoliage,
     Water,
-    /// Redstone dust tinting (power-level dependent)
+    /// By the block's `power` (Minecraft's `RedStoneWireBlock.getColorForPower`).
     Redstone,
-    /// Stem tinting (growth-stage dependent)
+    /// By the block's `age`.
     Stem,
-    /// Lily pad specific tinting
     LilyPad,
-    /// No tinting
-    None,
+    #[serde(deserialize_with = "fixed_color")]
+    Fixed([f32; 4]),
+}
+
+fn fixed_color<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<[f32; 4], D::Error> {
+    let text = String::deserialize(deserializer)?;
+    text.strip_prefix('#')
+        .filter(|hex| hex.len() == 6)
+        .and_then(|hex| u32::from_str_radix(hex, 16).ok())
+        .map(rgb)
+        .ok_or_else(|| serde::de::Error::custom(format!("`{text}` is not a #RRGGBB color")))
+}
+
+#[derive(Debug, Deserialize)]
+struct TintRule {
+    blocks: Vec<String>,
+    #[serde(default)]
+    legacy: Vec<String>,
+    #[serde(default)]
+    tint_index: Option<i32>,
+    tint: TintKind,
+}
+
+#[derive(Debug, Deserialize)]
+struct TintTable {
+    rules: Vec<TintRule>,
+}
+
+impl TintTable {
+    /// The first rule naming `block` (namespaced or not) for this tint index.
+    fn kind(&self, block: &str, tint_index: i32) -> Option<TintKind> {
+        let name = if block.contains(':') {
+            std::borrow::Cow::Borrowed(block)
+        } else {
+            std::borrow::Cow::Owned(format!("minecraft:{block}"))
+        };
+        self.rules
+            .iter()
+            .filter(|rule| rule.tint_index.is_none_or(|index| index == tint_index))
+            .find(|rule| {
+                rule.blocks
+                    .iter()
+                    .chain(&rule.legacy)
+                    .any(|pattern| pattern_matches(pattern, &name))
+            })
+            .map(|rule| rule.tint)
+    }
+}
+
+/// `pattern` is an id where one `*` matches any run of characters.
+fn pattern_matches(pattern: &str, id: &str) -> bool {
+    match pattern.split_once('*') {
+        Some((head, tail)) => {
+            id.len() >= head.len() + tail.len() && id.starts_with(head) && id.ends_with(tail)
+        }
+        None => pattern == id,
+    }
+}
+
+fn table() -> &'static TintTable {
+    static TABLE: std::sync::OnceLock<TintTable> = std::sync::OnceLock::new();
+    TABLE.get_or_init(|| {
+        // Checked by the unit test `the_table_reads`; an unreadable table
+        // tints nothing rather than failing every mesh.
+        serde_json::from_str(TINTS_JSON).unwrap_or(TintTable { rules: Vec::new() })
+    })
+}
+
+/// Every block pattern the tint table names (not its `legacy` names), for the
+/// table lint that checks them against a baked pack.
+pub fn tint_table_blocks() -> Vec<&'static str> {
+    table()
+        .rules
+        .iter()
+        .flat_map(|rule| rule.blocks.iter().map(String::as_str))
+        .collect()
+}
+
+/// Whether a table `pattern` names the block `id`.
+pub fn tint_pattern_matches(pattern: &str, id: &str) -> bool {
+    pattern_matches(pattern, id)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_table_reads() {
+        let table: TintTable = serde_json::from_str(TINTS_JSON).unwrap();
+        assert!(!table.rules.is_empty());
+        assert!(pattern_matches("minecraft:*_stem", "minecraft:melon_stem"));
+        assert!(!pattern_matches("minecraft:*_stem", "minecraft:stem"));
+    }
 
     #[test]
     fn test_default_tint_provider() {

@@ -5,7 +5,9 @@
 //! each kind has and in what order, which loaders come first, how categories
 //! are grouped and ordered, and the advanced exclusions.
 
-use lumilio_core::{DiscoverFilters, GameVersionTag, KindAbilities, LoaderTag, ProjectKind};
+use lumilio_core::{
+    DiscoverFilters, GameVersionTag, KindAbilities, LoaderTag, ProjectKind, SortIndex,
+};
 
 /// The photosensitivity exclusion, which asks for a warning the first time.
 pub const EPILEPSY_TRIGGERS: &str = "epilepsy_triggers";
@@ -138,6 +140,16 @@ fn fallback_loaders(kind: ProjectKind) -> &'static [&'static str] {
     }
 }
 
+/// A category the sidebar offers: what a search asks for (`id`) and what
+/// the person reads (`name`, which may still be a catalog key).
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct CategoryOption {
+    kind: ProjectKind,
+    header: String,
+    id: String,
+    name: String,
+}
+
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct FilterModel {
     pub loaded: bool,
@@ -145,7 +157,7 @@ pub struct FilterModel {
     /// Game versions newest first, with whether each is a full release.
     versions: Vec<(String, bool)>,
     tags: Vec<GameVersionTag>,
-    categories: Vec<(ProjectKind, String, String)>,
+    categories: Vec<CategoryOption>,
     loaders: Vec<LoaderTag>,
     /// What the content source can filter by; empty until it has said, which
     /// offers everything.
@@ -167,7 +179,12 @@ impl FilterModel {
             categories: filters
                 .categories
                 .iter()
-                .map(|tag| (tag.kind, tag.header.clone(), tag.name.clone()))
+                .map(|tag| CategoryOption {
+                    kind: tag.kind,
+                    header: tag.header.clone(),
+                    id: tag.id.clone(),
+                    name: tag.name.clone(),
+                })
                 .collect(),
             loaders: filters.loaders.clone(),
         }
@@ -190,6 +207,50 @@ impl FilterModel {
             Section::Advanced => ability.advanced,
             Section::Category(_) => ability.categories,
         }
+    }
+
+    /// The sorts the source offers for a kind, in menu order; every sort
+    /// until it has said.
+    pub fn sorts(&self, kind: ProjectKind) -> Vec<SortIndex> {
+        let offered = self
+            .abilities
+            .iter()
+            .find(|ability| ability.kind == kind)
+            .map(|ability| ability.sorts.clone());
+        super::SORTS
+            .iter()
+            .copied()
+            .filter(|sort| {
+                offered
+                    .as_ref()
+                    .is_none_or(|offered| offered.is_empty() || offered.contains(sort))
+            })
+            .collect()
+    }
+
+    /// Whether a picked category or loader can be turned into "leave out".
+    pub fn offers_exclusions(&self, kind: ProjectKind) -> bool {
+        self.abilities.is_empty()
+            || self
+                .abilities
+                .iter()
+                .any(|ability| ability.kind == kind && ability.exclusions)
+    }
+
+    /// The source's own page listing this kind, if it said.
+    pub fn browse_url(&self, kind: ProjectKind) -> Option<&str> {
+        self.abilities
+            .iter()
+            .find(|ability| ability.kind == kind)
+            .and_then(|ability| ability.browse_url.as_deref())
+    }
+
+    /// The name of a category by the ID a search asks for.
+    pub fn category_name(&self, kind: ProjectKind, id: &str) -> Option<&str> {
+        self.categories
+            .iter()
+            .find(|option| option.kind == kind && option.id == id)
+            .map(|option| option.name.as_str())
     }
 
     /// Whether the source can leave out what the game already has.
@@ -221,37 +282,39 @@ impl FilterModel {
         self.versions.iter().any(|(name, _)| name == version)
     }
 
-    /// The category groups of a kind: groups by header (alphabetical), each
-    /// ordered the way Modrinth's `sortedCategories` does.
-    pub fn category_groups(&self, kind: ProjectKind) -> Vec<(String, Vec<&str>)> {
+    /// The category groups of a kind, as (ID, name) pairs: groups by header
+    /// (alphabetical), each ordered by name the way Modrinth's
+    /// `sortedCategories` does.
+    pub fn category_groups(&self, kind: ProjectKind) -> Vec<(String, Vec<(&str, &str)>)> {
         let mut headers: Vec<&str> = self
             .categories
             .iter()
-            .filter(|(tag_kind, _, _)| *tag_kind == kind)
-            .map(|(_, header, _)| header.as_str())
+            .filter(|option| option.kind == kind)
+            .map(|option| option.header.as_str())
             .collect();
         headers.sort_unstable();
         headers.dedup();
         headers
             .into_iter()
             .map(|header| {
-                let mut names: Vec<&str> = self
+                let mut options: Vec<(&str, &str)> = self
                     .categories
                     .iter()
-                    .filter(|(tag_kind, tag_header, _)| *tag_kind == kind && tag_header == header)
-                    .map(|(_, _, name)| name.as_str())
+                    .filter(|option| option.kind == kind && option.header == header)
+                    .map(|option| (option.id.as_str(), option.name.as_str()))
                     .collect();
-                names.sort_by(|a, b| category_order(header, a, b));
-                (header.to_owned(), names)
+                options.sort_by(|a, b| category_order(header, a.1, b.1));
+                (header.to_owned(), options)
             })
             .collect()
     }
 
-    /// Whether picking this category means "any of the group" (resolutions).
-    pub fn any_of(&self, kind: ProjectKind, name: &str) -> bool {
-        self.categories.iter().any(|(tag_kind, header, tag)| {
-            *tag_kind == kind && tag == name && header == "resolutions"
-        })
+    /// Whether picking this category (by ID) means "any of the group"
+    /// (resolutions).
+    pub fn any_of(&self, kind: ProjectKind, id: &str) -> bool {
+        self.categories
+            .iter()
+            .any(|option| option.kind == kind && option.id == id && option.header == "resolutions")
     }
 
     /// The loaders to list for a kind, the usual ones first.

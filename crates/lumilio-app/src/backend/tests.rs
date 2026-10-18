@@ -150,20 +150,38 @@ fn the_shipped_backend_registers_the_crash_analyzer_and_its_switch() {
     let service = backend.service.clone();
     futures_block(backend.spawn(async move {
         let plugins = service.plugins().await;
-        assert_eq!(plugins.len(), 5);
+        assert_eq!(plugins.len(), 6);
         let id = &plugins[0].manifest.id;
         assert_eq!(id, lumilio_plugin_crash_analyzer::ID);
-        assert_eq!(plugins[1].manifest.id, lumilio_plugin_discord::ID);
-        assert_eq!(plugins[1].status, lumilio_core::PluginStatus::Disabled);
-        assert_eq!(plugins[2].manifest.id, lumilio_plugin_litematica::ID);
-        assert_eq!(plugins[3].manifest.id, lumilio_plugin_modrinth::ID);
-        assert_eq!(plugins[4].manifest.id, lumilio_plugin_world_explorer::ID);
-        assert_eq!(plugins[4].status, lumilio_core::PluginStatus::Enabled);
+        assert_eq!(plugins[1].manifest.id, lumilio_plugin_curseforge::ID);
+        // Without a key in this build CurseForge refuses every request, so
+        // it starts off; a release build has one.
+        let keyed = lumilio_plugin_curseforge::CurseForge::default().has_key();
+        assert_eq!(
+            plugins[1].status,
+            if keyed {
+                lumilio_core::PluginStatus::Enabled
+            } else {
+                lumilio_core::PluginStatus::Disabled
+            }
+        );
+        assert_eq!(plugins[2].manifest.id, lumilio_plugin_discord::ID);
+        assert_eq!(plugins[2].status, lumilio_core::PluginStatus::Disabled);
+        assert_eq!(plugins[3].manifest.id, lumilio_plugin_litematica::ID);
+        assert_eq!(plugins[4].manifest.id, lumilio_plugin_modrinth::ID);
+        assert_eq!(plugins[5].manifest.id, lumilio_plugin_world_explorer::ID);
+        assert_eq!(plugins[5].status, lumilio_core::PluginStatus::Enabled);
         // Discover has its source from the first start, with no setup.
         assert_eq!(
-            plugins[3].status,
+            plugins[4].status,
             lumilio_core::PluginStatus::Enabled,
             "Modrinth is on by default"
+        );
+        let sources = service.content_sources().await;
+        assert_eq!(
+            sources[0].id,
+            lumilio_plugin_modrinth::ID,
+            "Modrinth is the first source"
         );
         let record = service
             .create_instance("Report", Some("1.0"), lumilio_core::Loader::Vanilla, None)
@@ -203,6 +221,8 @@ fn the_shipped_backend_registers_the_crash_analyzer_and_its_switch() {
 }
 
 /// Polls a join handle without a runtime of our own, the way GPUI awaits it.
+/// No deadline: some bodies download block assets, and CI's job timeout
+/// already ends a hang.
 fn futures_block<T>(handle: tokio::task::JoinHandle<T>) -> T {
     use std::sync::mpsc;
     use std::task::{Context, Poll, Wake, Waker};
@@ -220,7 +240,7 @@ fn futures_block<T>(handle: tokio::task::JoinHandle<T>) -> T {
         if let Poll::Ready(value) = handle.as_mut().poll(&mut cx) {
             return value.unwrap();
         }
-        rx.recv_timeout(std::time::Duration::from_secs(5)).unwrap();
+        rx.recv().unwrap();
     }
 }
 
@@ -248,17 +268,34 @@ fn the_litematica_tab_follows_the_schematics_folder_and_its_switch() {
         assert_eq!(tabs.len(), 2);
         assert_eq!(tabs[0].plugin, lumilio_plugin_litematica::ID);
 
-        // A broken file is one row that says so; the list still shows.
+        // The tab is the host's studio over the folder; the host lists it
+        // under the plugin's grant, broken files included.
         let view = service
             .plugin_view(&record.id, lumilio_plugin_litematica::ID)
             .await
             .unwrap();
-        let Some(lumilio_plugin_api::View::List { items }) = view else {
-            panic!("expected a list");
-        };
-        assert_eq!(items[0].subtitle.as_deref(), Some("读不了"));
+        assert_eq!(
+            view,
+            Some(lumilio_plugin_api::View::Studio {
+                folder: "schematics".into()
+            })
+        );
+        assert_eq!(
+            service
+                .schematic_files(&record.id, lumilio_plugin_litematica::ID, "schematics")
+                .await
+                .unwrap(),
+            ["schematics/broken.litematic"]
+        );
+        assert!(
+            service
+                .schematic_files(&record.id, lumilio_plugin_litematica::ID, "saves")
+                .await
+                .is_err(),
+            "only under the plugin's grants"
+        );
 
-        // The detail offers a 3D preview of that file, and the host serves it.
+        // The studio's viewport asks for a 3D preview of that file, and the host serves it.
         // The host returns raw bytes; the native renderer handles parse errors.
         assert_eq!(
             service

@@ -58,7 +58,10 @@ async fn java_is_installed_whole_found_by_discovery_and_a_bad_file_leaves_nothin
     assert!(matches!(failed.outcome, TaskOutcome::Failed(_)));
     assert_eq!(
         failed.retry,
-        Some(RetryAction::InstallJava { major: Some(21) })
+        Some(RetryAction::InstallJava {
+            major: Some(21),
+            source: crate::java_runtime::JavaSource::Mojang,
+        })
     );
 
     publish_java(&world, false);
@@ -98,6 +101,237 @@ async fn java_is_installed_whole_found_by_discovery_and_a_bad_file_leaves_nothin
             .await,
         Err(ServiceError::Install(_))
     ));
+}
+
+/// Answers Oracle's checksum and archive addresses with a fake GraalVM 21.
+/// A wrong checksum stands for a damaged download.
+fn publish_graalvm(world: &super::World, wrong_checksum: bool) {
+    use sha2::{Digest, Sha256};
+    use std::io::Write as _;
+    let mut builder = tar::Builder::new(Vec::new());
+    for (path, body, mode) in [
+        (
+            "graalvm-jdk-21.0.8+12.1/release",
+            &b"JAVA_VERSION=\"21.0.8\"\nIMPLEMENTOR=\"Oracle Corporation\"\n"[..],
+            0o644,
+        ),
+        (
+            "graalvm-jdk-21.0.8+12.1/bin/java",
+            &b"#!/bin/sh\n"[..],
+            0o755,
+        ),
+    ] {
+        let mut header = tar::Header::new_gnu();
+        header.set_size(body.len() as u64);
+        header.set_mode(mode);
+        builder.append_data(&mut header, path, body).unwrap();
+    }
+    let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
+    encoder.write_all(&builder.into_inner().unwrap()).unwrap();
+    let archive = encoder.finish().unwrap();
+    let digest: String = Sha256::digest(if wrong_checksum {
+        &b"other"[..]
+    } else {
+        &archive
+    })
+    .iter()
+    .map(|byte| format!("{byte:02x}"))
+    .collect();
+    world.net.forget_all();
+    // The checksum's address contains the archive's: it must be answered first.
+    world
+        .net
+        .answer(".sha256", format!("{digest}  graalvm-jdk-21_bin.tar.gz\n"));
+    world.net.answer("graalvm/21/latest/", archive);
+}
+
+#[tokio::test]
+async fn graalvm_comes_from_its_archive_and_a_bad_checksum_leaves_nothing() {
+    use crate::java_runtime::JavaSource;
+    let world = world();
+    world
+        .service
+        .set_java_source(JavaSource::OracleGraalVm)
+        .await
+        .unwrap();
+    let runtimes = world.service.layout.runtimes();
+
+    publish_graalvm(&world, true);
+    assert!(
+        world
+            .service
+            .install_java(Some(21), CancellationToken::new())
+            .await
+            .is_err()
+    );
+    assert!(!runtimes.join("graalvm-21").exists());
+    let leftovers: Vec<_> = std::fs::read_dir(&runtimes)
+        .map(|entries| entries.flatten().map(|entry| entry.file_name()).collect())
+        .unwrap_or_default();
+    assert!(leftovers.is_empty(), "{leftovers:?}");
+    let failed = world.service.activity(5).finished.remove(0);
+    assert_eq!(
+        failed.retry,
+        Some(RetryAction::InstallJava {
+            major: Some(21),
+            source: JavaSource::OracleGraalVm,
+        })
+    );
+
+    publish_graalvm(&world, false);
+    let java = world
+        .service
+        .install_java(Some(21), CancellationToken::new())
+        .await
+        .unwrap();
+    assert_eq!(java.home(), runtimes.join("graalvm-21"));
+    assert_eq!((java.major(), java.vendor()), (21, Some("Oracle")));
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = std::fs::metadata(java.executable())
+            .unwrap()
+            .permissions()
+            .mode();
+        assert_eq!(mode & 0o111, 0o111, "the launcher is executable");
+    }
+    // Java 8 is not offered by GraalVM: the download falls back to Mojang.
+    publish_java(&world, false);
+    assert!(matches!(
+        world
+            .service
+            .install_java(Some(8), CancellationToken::new())
+            .await,
+        Err(ServiceError::Install(why)) if why.contains("Java 8")
+    ));
+    let offers = world.service.java_offers().await;
+    assert_eq!(offers[1], (JavaSource::OracleGraalVm, vec![21, 25]));
+
+    // The launcher's own Java can be deleted; anything else only turned off.
+    world
+        .service
+        .set_java_disabled(java.home(), true)
+        .await
+        .unwrap();
+    world.service.remove_java(java.home()).await.unwrap();
+    assert!(!runtimes.join("graalvm-21").exists());
+    assert!(world.service.settings().await.disabled_java.is_empty());
+    let elsewhere = world._dir.path().join("jdks/zulu-17");
+    std::fs::create_dir_all(elsewhere.join("bin")).unwrap();
+    std::fs::write(elsewhere.join("release"), "JAVA_VERSION=\"17.0.9\"\n").unwrap();
+    std::fs::write(elsewhere.join("bin/java"), "").unwrap();
+    assert!(matches!(
+        world.service.remove_java(&elsewhere).await,
+        Err(ServiceError::NoJavaAt(_))
+    ));
+    assert!(elsewhere.exists());
+    assert!(world.service.remove_java(&runtimes).await.is_err());
+}
+
+#[tokio::test]
+async fn a_launch_without_a_fitting_java_downloads_one_unless_turned_off() {
+    let world = world();
+    publish_release(&world);
+    publish_java(&world, false);
+    let record = world
+        .service
+        .create_instance("Run", None, Loader::Vanilla, None)
+        .await
+        .unwrap();
+
+    world.service.set_auto_install_java(false).await.unwrap();
+    let error = launch_to_end(&world, &record.id).await.unwrap_err();
+    assert!(
+        matches!(
+            error,
+            ServiceError::Launch(crate::launcher::LaunchServiceError::NoJava {
+                required: Some(21)
+            })
+        ),
+        "{error}"
+    );
+    assert!(
+        !world
+            .service
+            .layout
+            .runtimes()
+            .join("java-runtime-delta")
+            .exists()
+    );
+
+    world.service.set_auto_install_java(true).await.unwrap();
+    launch_to_end(&world, &record.id).await.unwrap();
+    assert!(
+        world
+            .service
+            .layout
+            .runtimes()
+            .join("java-runtime-delta/bin/java")
+            .is_file()
+    );
+    let tasks = world.service.activity(10).finished;
+    assert!(tasks.iter().any(|task| matches!(
+        task.retry,
+        Some(RetryAction::InstallJava {
+            major: Some(21),
+            ..
+        })
+    ) && matches!(task.outcome, TaskOutcome::Succeeded)));
+}
+
+#[tokio::test]
+async fn a_launch_can_once_set_the_chosen_java_aside_for_the_automatic_one() {
+    use std::os::unix::fs::PermissionsExt;
+    let world = world();
+    publish_release(&world);
+    fake_java(&world, super::ECHO_ARGS);
+    // The person's own Java 17 cannot run a game that needs 21.
+    let mine = world._dir.path().join("jdks/old");
+    std::fs::create_dir_all(mine.join("bin")).unwrap();
+    std::fs::write(mine.join("release"), "JAVA_VERSION=\"17.0.9\"\n").unwrap();
+    std::fs::write(mine.join("bin/java"), "#!/bin/sh\nexit 3\n").unwrap();
+    std::fs::set_permissions(
+        mine.join("bin/java"),
+        std::fs::Permissions::from_mode(0o755),
+    )
+    .unwrap();
+    let record = world
+        .service
+        .create_instance("Run", None, Loader::Vanilla, None)
+        .await
+        .unwrap();
+    let mut settings = record.settings.clone();
+    settings.java_path = Some(mine.clone());
+    world
+        .service
+        .update_instance_settings(&record.id, settings)
+        .await
+        .unwrap();
+    let args = world.service.layout.game(&record.id).join("args.txt");
+    let _ = launch_to_end(&world, &record.id).await;
+    assert!(!args.exists(), "the person's choice wins by default");
+    // Installed now, the release says what it needs.
+    let java = world.service.instance_java(&record.id).await.unwrap();
+    let chosen = java.choice.unwrap();
+    assert!(chosen.chosen_by_user && chosen.breaks_required());
+    assert_eq!(java.automatic.unwrap().runtime.major(), 21);
+
+    world.service.launch_next_with_automatic_java(&record.id);
+    launch_to_end(&world, &record.id).await.unwrap();
+    assert!(args.exists(), "this once, the automatic Java ran");
+    std::fs::remove_file(&args).unwrap();
+    let _ = launch_to_end(&world, &record.id).await;
+    assert!(!args.exists(), "only once");
+    assert_eq!(
+        world
+            .service
+            .instance(&record.id)
+            .await
+            .unwrap()
+            .settings
+            .java_path,
+        Some(mine),
+        "the setting itself is unchanged"
+    );
 }
 
 #[tokio::test]

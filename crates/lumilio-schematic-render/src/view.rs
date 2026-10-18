@@ -68,6 +68,57 @@ impl View {
     }
 }
 
+/// A fixed orbit angle (plan schematic-studio T10). A compass angle puts the camera on that side
+/// of the build, level with its middle, looking at that face.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Angle {
+    North,
+    East,
+    South,
+    West,
+    /// From above; as steep as the orbit allows, so dragging still turns it.
+    Top,
+    /// Three faces equally foreshortened (yaw 45°, pitch atan(1/√2)), in perspective.
+    Isometric,
+}
+
+impl Angle {
+    pub const ALL: [Self; 6] = [
+        Self::North,
+        Self::East,
+        Self::South,
+        Self::West,
+        Self::Top,
+        Self::Isometric,
+    ];
+
+    /// Yaw and pitch in the renderer's orbit convention: yaw 0 puts the eye on +Z (south),
+    /// 90 on +X (east); positive pitch looks down.
+    pub fn yaw_pitch(self) -> (f32, f32) {
+        match self {
+            Self::South => (0.0, 0.0),
+            Self::East => (90.0, 0.0),
+            Self::North => (180.0, 0.0),
+            Self::West => (270.0, 0.0),
+            Self::Top => (0.0, View::MAX_PITCH),
+            Self::Isometric => (45.0, 35.264_39),
+        }
+    }
+}
+
+impl View {
+    /// The orbit view from `angle`, fitted to the whole build, keeping the background.
+    pub fn at(self, angle: Angle) -> Self {
+        let (yaw_deg, pitch_deg) = angle.yaw_pitch();
+        Self {
+            yaw_deg,
+            pitch_deg,
+            background: self.background,
+            ..Self::new()
+        }
+    }
+}
+
 impl Default for View {
     fn default() -> Self {
         Self::new()

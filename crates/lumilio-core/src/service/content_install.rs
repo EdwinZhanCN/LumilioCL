@@ -5,13 +5,14 @@ use super::types::{DependencyNeed, DependencyReport, InstalledProject, now};
 use crate::activity::CancellationToken;
 use crate::activity_log::{RetryAction, TaskAction, TaskCategory, TaskLabel};
 use crate::content::ContentError;
-use crate::content::scan as scan_content;
-use crate::discover::{ProjectKind, Version, fits, install_request, pick_version};
+use crate::discover::{
+    Catalog, FileHashes, ProjectKind, Version, VersionFile, fits, install_request, pick_version,
+};
 use crate::history::{ChangeKind, HistoryEvent, HistoryLog};
 use crate::instance::InstanceRecord;
-use crate::transfer::{TransferEngine, TransferRequest, Transport};
+use crate::transfer::{SourceChain, TransferEngine, TransferRequest, Transport};
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 impl<T: Transport + Clone> LauncherService<T> {
     /// Downloads one version's file to a place the person chose, instead of
@@ -19,6 +20,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// (the person was asked by the save dialog).
     pub async fn save_version_as(
         &self,
+        source: &str,
         project: &str,
         version_id: &str,
         destination: &Path,
@@ -34,13 +36,14 @@ impl<T: Transport + Clone> LauncherService<T> {
                 None,
                 Some(&cancel),
             )
-            .retrying(self.content_retry(RetryAction::SaveVersion {
+            .retrying(RetryAction::SaveVersion {
+                source: source.to_owned(),
                 project: project.to_owned(),
                 version_id: version_id.to_owned(),
                 path: destination.display().to_string(),
-            }));
+            });
         let result = self
-            .save_version_inner(task.id, project, version_id, destination, cancel)
+            .save_version_inner(task.id, source, project, version_id, destination, cancel)
             .await;
         self.end(task, &result);
         result
@@ -49,13 +52,14 @@ impl<T: Transport + Clone> LauncherService<T> {
     pub(super) async fn save_version_inner(
         &self,
         task: u64,
+        source: &str,
         project: &str,
         version_id: &str,
         destination: &Path,
         cancel: CancellationToken,
     ) -> Result<String, ServiceError> {
         let chain = read_unless_cancelled(&cancel, self.chain()).await?;
-        let client = read_unless_cancelled(&cancel, self.content_client()).await?;
+        let client = read_unless_cancelled(&cancel, self.content_client(source)).await?;
         let versions = read_unless_cancelled(&cancel, async {
             client.versions(project).await.map_err(ServiceError::from)
         })
@@ -67,9 +71,10 @@ impl<T: Transport + Clone> LauncherService<T> {
         let file = version
             .install_file()
             .ok_or_else(|| ServiceError::Install("this version has no file".to_owned()))?;
+        let sources = read_unless_cancelled(&cancel, self.file_sources(&chain, file)).await?;
         let mut request = TransferRequest::new(
             format!("save:{}:{}", version.project_id, version.id),
-            chain.candidates(&file.url),
+            sources,
             destination,
         )
         .map_err(|error| ServiceError::Install(error.to_string()))?;
@@ -89,31 +94,65 @@ impl<T: Transport + Clone> LauncherService<T> {
         Ok(file.filename.clone())
     }
 
-    /// What of this kind the game already has, by Modrinth project: the file
-    /// and, if a newer compatible version exists, its version id. Files
-    /// Modrinth does not know are not listed. Needs the network.
+    /// What of this kind the game already has, by project of one source:
+    /// the file and, if a newer compatible version exists, its version id.
+    /// Every file is asked about, whichever source the content list names
+    /// for it; files the source does not know are not listed. Needs the
+    /// network.
     pub async fn installed_projects(
         &self,
         instance_id: &str,
         kind: ProjectKind,
+        source: &str,
     ) -> Result<BTreeMap<String, InstalledProject>, ServiceError> {
-        let list = self.content_details(instance_id, kind).await?;
-        if list.sources_unavailable {
-            return Err(ServiceError::Remote(
-                "the content source could not be asked which files are known".to_owned(),
-            ));
-        }
-        Ok(list
-            .entries
+        let client = self.content_client(source).await?;
+        let record = self.instance(instance_id).await?;
+        let files = self.hashed_content(instance_id, kind).await?;
+        let asked: Vec<(String, PathBuf)> = files
+            .iter()
+            .filter_map(|file| Some((file.sha1.clone()?, file.path.clone())))
+            .collect();
+        let hashes = Self::file_hashes(&client, &asked).await;
+        let identified = client.identify(&hashes).await.map_err(|error| {
+            ServiceError::Remote(format!(
+                "{} could not be asked which files are known: {error}",
+                client.name()
+            ))
+        })?;
+        let enabled: Vec<FileHashes> = hashes
             .into_iter()
-            .filter_map(|entry| {
-                let source = entry.source?;
+            .filter(|hash| identified.contains_key(&hash.sha1))
+            .filter(|hash| {
+                files
+                    .iter()
+                    .any(|file| file.item.enabled && file.sha1.as_ref() == Some(&hash.sha1))
+            })
+            .collect();
+        let latest = client
+            .latest_for(&enabled, record.loader, &record.game_version)
+            .await
+            .unwrap_or_default();
+        Ok(files
+            .into_iter()
+            .filter_map(|file| {
+                let sha1 = file.sha1?;
+                let version = identified.get(&sha1)?;
+                let update = latest
+                    .get(&sha1)
+                    .filter(|newest| {
+                        file.item.enabled
+                            && !newest
+                                .files
+                                .iter()
+                                .any(|candidate| candidate.sha1.as_deref() == Some(sha1.as_str()))
+                    })
+                    .map(|newest| newest.id.clone());
                 Some((
-                    source.project_id,
+                    version.project_id.clone(),
                     InstalledProject {
-                        file_name: entry.item.file_name,
-                        version_id: source.version_id,
-                        update: entry.update.map(|version| version.id),
+                        file_name: file.item.file_name,
+                        version_id: version.id.clone(),
+                        update,
                     },
                 ))
             })
@@ -125,11 +164,12 @@ impl<T: Transport + Clone> LauncherService<T> {
         &self,
         instance_id: &str,
         kind: ProjectKind,
+        source: &str,
         project: &str,
         version_id: Option<&str>,
     ) -> Result<Vec<DependencyNeed>, ServiceError> {
         Ok(self
-            .dependency_report(instance_id, kind, project, version_id)
+            .dependency_report(instance_id, kind, source, project, version_id)
             .await?
             .needs)
     }
@@ -145,6 +185,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         &self,
         instance_id: &str,
         kind: ProjectKind,
+        source: &str,
         project: &str,
         version_id: Option<&str>,
     ) -> Result<DependencyReport, ServiceError> {
@@ -153,7 +194,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             return Ok(DependencyReport::default());
         }
         let record = self.instance(instance_id).await?;
-        let client = self.content_client().await?;
+        let client = self.content_client(source).await?;
         let versions = client.versions(project).await?;
         let root = match version_id {
             Some(id) => versions
@@ -164,23 +205,16 @@ impl<T: Transport + Clone> LauncherService<T> {
         }
         .ok_or(ServiceError::NoCompatibleVersion)?;
 
-        // What the game already has, by project (files Modrinth does not know
-        // cannot be matched, so a dependency they satisfy is offered anyway).
-        let game_dir = self.layout.game(instance_id);
-        let hashes = blocking(move || {
-            let mut hashes = Vec::new();
-            for item in scan_content(&game_dir, ProjectKind::Mod).unwrap_or_default() {
-                if item.enabled
-                    && !item.is_directory
-                    && let Ok(hash) =
-                        crate::content::sha1_hex(&game_dir.join("mods").join(&item.file_name))
-                {
-                    hashes.push(hash);
-                }
-            }
-            Ok(hashes)
-        })
-        .await?;
+        // What the game already has, by this source's projects (files it
+        // does not know cannot be matched, so a dependency they satisfy is
+        // offered anyway).
+        let files = self.hashed_content(instance_id, ProjectKind::Mod).await?;
+        let asked: Vec<(String, PathBuf)> = files
+            .iter()
+            .filter(|file| file.item.enabled)
+            .filter_map(|file| Some((file.sha1.clone()?, file.path.clone())))
+            .collect();
+        let hashes = Self::file_hashes(&client, &asked).await;
         let installed: BTreeSet<String> = client
             .identify(&hashes)
             .await
@@ -273,6 +307,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         &self,
         instance_id: &str,
         kind: ProjectKind,
+        source: &str,
         project: &str,
         version_id: Option<&str>,
         cancel: CancellationToken,
@@ -295,30 +330,33 @@ impl<T: Transport + Clone> LauncherService<T> {
                 Some(instance_id.to_owned()),
                 Some(&cancel),
             )
-            .retrying(self.content_retry(RetryAction::InstallContent {
+            .retrying(RetryAction::InstallContent {
                 instance: instance_id.to_owned(),
                 kind,
+                source: source.to_owned(),
                 project: project.to_owned(),
                 version: version_id.map(str::to_owned),
-            }));
+            });
         let result = self
-            .install_content_inner(task.id, &record, kind, project, version_id, cancel)
+            .install_content_inner(task.id, &record, kind, source, project, version_id, cancel)
             .await;
         self.end(task, &result);
         result
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(super) async fn install_content_inner(
         &self,
         task: u64,
         record: &InstanceRecord,
         kind: ProjectKind,
+        source: &str,
         project: &str,
         version_id: Option<&str>,
         cancel: CancellationToken,
     ) -> Result<String, ServiceError> {
         let chain = read_unless_cancelled(&cancel, self.chain()).await?;
-        let client = read_unless_cancelled(&cancel, self.content_client()).await?;
+        let client = read_unless_cancelled(&cancel, self.content_client(source)).await?;
         let versions = read_unless_cancelled(&cancel, async {
             client.versions(project).await.map_err(ServiceError::from)
         })
@@ -332,8 +370,10 @@ impl<T: Transport + Clone> LauncherService<T> {
         }
         .ok_or(ServiceError::NoCompatibleVersion)?;
         let game_dir = self.layout.game(&record.id);
-        let file = version.install_file().map(|file| file.url.clone());
-        let sources = file.map(|url| chain.candidates(&url)).unwrap_or_default();
+        let sources = match version.install_file() {
+            Some(file) => read_unless_cancelled(&cancel, self.file_sources(&chain, file)).await?,
+            None => Vec::new(),
+        };
         let request: TransferRequest = install_request(kind, version, &game_dir, sources)
             .map_err(|error| ServiceError::Install(error.to_string()))?;
         let name = request
@@ -378,11 +418,13 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// operation). The new file is downloaded and verified first; only then is
     /// the old one removed. A disabled file stays disabled. A different file
     /// already using the new name is never overwritten (`Conflict`).
+    #[allow(clippy::too_many_arguments)]
     pub async fn switch_content_version(
         &self,
         instance_id: &str,
         kind: ProjectKind,
         file_name: &str,
+        source: &str,
         project: &str,
         version_id: &str,
         cancel: CancellationToken,
@@ -399,19 +441,21 @@ impl<T: Transport + Clone> LauncherService<T> {
                 Some(instance_id.to_owned()),
                 Some(&cancel),
             )
-            .retrying(self.content_retry(RetryAction::SwitchContent {
+            .retrying(RetryAction::SwitchContent {
                 instance: instance_id.to_owned(),
                 kind,
                 file_name: file_name.to_owned(),
+                source: source.to_owned(),
                 project: project.to_owned(),
                 version_id: version_id.to_owned(),
-            }));
+            });
         let result = self
             .switch_inner(
                 task.id,
                 instance_id,
                 kind,
                 file_name,
+                source,
                 project,
                 version_id,
                 cancel,
@@ -428,12 +472,13 @@ impl<T: Transport + Clone> LauncherService<T> {
         instance_id: &str,
         kind: ProjectKind,
         file_name: &str,
+        source: &str,
         project: &str,
         version_id: &str,
         cancel: CancellationToken,
     ) -> Result<String, ServiceError> {
         let chain = read_unless_cancelled(&cancel, self.chain()).await?;
-        let client = read_unless_cancelled(&cancel, self.content_client()).await?;
+        let client = read_unless_cancelled(&cancel, self.content_client(source)).await?;
         let versions = read_unless_cancelled(&cancel, async {
             client.versions(project).await.map_err(ServiceError::from)
         })
@@ -468,10 +513,10 @@ impl<T: Transport + Clone> LauncherService<T> {
             let path = folder.join(file_name);
             blocking(move || crate::content::sha1_hex(&path)).await?
         };
-        let sources = version
-            .install_file()
-            .map(|file| chain.candidates(&file.url))
-            .unwrap_or_default();
+        let sources = match version.install_file() {
+            Some(file) => read_unless_cancelled(&cancel, self.file_sources(&chain, file)).await?,
+            None => Vec::new(),
+        };
         let update = crate::updates::ContentUpdate {
             kind,
             file_name: file_name.to_owned(),
@@ -494,5 +539,58 @@ impl<T: Transport + Clone> LauncherService<T> {
         }
         self.record_change(instance_id, ChangeKind::ContentUpdated, &written);
         Ok(written)
+    }
+
+    /// Where a file can be downloaded from: its own address (with mirrors),
+    /// or, when the author lets people download it only on the source's
+    /// site, the same file (by SHA-1) where the author also published it
+    /// (plan curseforge-source D3). Otherwise the person has to download it
+    /// by hand, and is told where.
+    pub(super) async fn file_sources(
+        &self,
+        chain: &SourceChain,
+        file: &VersionFile,
+    ) -> Result<Vec<String>, ServiceError> {
+        if file.downloadable() {
+            return Ok(chain.candidates(&file.url));
+        }
+        if let Some(sha1) = &file.sha1
+            && let Some(url) = self
+                .elsewhere(std::slice::from_ref(sha1))
+                .await
+                .remove(sha1)
+        {
+            return Ok(chain.candidates(&url));
+        }
+        Err(ServiceError::ManualDownload {
+            file: file.filename.clone(),
+            page: file.download_page.clone(),
+        })
+    }
+
+    /// The same files, by SHA-1, on a Modrinth-catalog source that lets
+    /// launchers download them: their addresses by SHA-1. Asking is best
+    /// effort; files it does not have are absent.
+    pub(super) async fn elsewhere(&self, sha1s: &[String]) -> BTreeMap<String, String> {
+        let Some(client) = self.plugins.catalog_client(Catalog::Modrinth).await else {
+            return BTreeMap::new();
+        };
+        let hashes: Vec<FileHashes> = sha1s.iter().map(FileHashes::sha1).collect();
+        let Ok(found) = client.identify(&hashes).await else {
+            return BTreeMap::new();
+        };
+        found
+            .into_iter()
+            .filter_map(|(sha1, version)| {
+                let file = version.files.iter().find(|file| {
+                    file.downloadable()
+                        && file
+                            .sha1
+                            .as_deref()
+                            .is_some_and(|candidate| candidate.eq_ignore_ascii_case(&sha1))
+                })?;
+                Some((sha1, file.url.clone()))
+            })
+            .collect()
     }
 }

@@ -26,13 +26,14 @@ impl LauncherShell {
     pub fn update_live(&mut self, change: impl FnOnce(&mut LiveModel), cx: &mut Context<Self>) {
         if let Some(model) = &mut self.live {
             change(model);
-            if model
+            let translation = model
                 .settings
                 .as_ref()
-                .is_none_or(|settings| !settings.preferences.translation.enabled)
-            {
+                .is_some_and(|settings| settings.preferences.translation.enabled);
+            // Turning translation off shows the originals at once.
+            if !translation {
                 for row in &mut model.results {
-                    row.summary.clone_from(&row.original_summary);
+                    row.translated_summary = None;
                 }
             }
             self.activity = ActivitySummary::new(model.active_tasks());
@@ -44,13 +45,7 @@ impl LauncherShell {
                     view.set_installed(installed, cx);
                     view.set_installing(installing, cx);
                     view.set_game_tags(tags, cx);
-                    view.set_translation_enabled(
-                        model
-                            .settings
-                            .as_ref()
-                            .is_some_and(|settings| settings.preferences.translation.enabled),
-                        cx,
-                    );
+                    view.set_translation_enabled(translation, cx);
                 });
             }
             cx.notify();
@@ -192,6 +187,11 @@ impl LauncherShell {
             prefs.hide_installed_modpacks = *on;
         }
         let new_kind = matches!(&change, DiscoverChange::Kind(kind) if *kind != query.kind);
+        let new_source =
+            matches!(&change, DiscoverChange::Source(source) if *source != query.source);
+        if let DiscoverChange::Source(source) = &change {
+            prefs.source = Some(source.clone());
+        }
         let query = query.apply(change);
         // Advanced exclusions are remembered for the next visit.
         prefs.advanced_exclusions =
@@ -209,9 +209,17 @@ impl LauncherShell {
                 model.query = query.clone();
                 model.search = SearchStatus::Searching;
                 model.discover_prefs = prefs;
+                if new_source {
+                    // Another source's categories and loaders mean other things.
+                    model.filters = crate::live::FilterModel::default();
+                    model.installed.clear();
+                }
             },
             cx,
         );
+        if new_source {
+            handler(LiveIntent::LoadFilters, window, cx);
+        }
         if new_kind {
             // A new kind of content starts its own search (the query is
             // already fresh; the boxes follow).
@@ -303,6 +311,9 @@ impl LauncherShell {
 /// advanced exclusions that apply to the kind.
 pub(super) fn fresh_query(kind: ProjectKind, prefs: &DiscoverPreferences) -> DiscoverQuery {
     let mut query = DiscoverQuery::new(kind);
+    if let Some(source) = &prefs.source {
+        query.source = source.clone();
+    }
     query.advanced = prefs
         .advanced_exclusions
         .iter()

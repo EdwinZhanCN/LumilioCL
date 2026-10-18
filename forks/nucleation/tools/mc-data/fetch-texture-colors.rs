@@ -110,7 +110,7 @@ fn main() -> Result<()> {
     let mut extracted = 0usize;
     for i in 0..archive.len() {
         let mut entry = archive.by_index(i)?;
-        let entry_name = entry.name().to_string();
+        let entry_name = entry.name()?.into_owned();
         if let Some(file_name) = entry_name.strip_prefix("assets/minecraft/textures/block/") {
             if file_name.ends_with(".png") && !file_name.contains('/') {
                 let mut buf = Vec::with_capacity(entry.size() as usize);

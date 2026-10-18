@@ -9,6 +9,7 @@ const en = {
     plans: {
       "release-0-1-0": { name: "First release", lede: "Packages for three platforms with automatic updates." },
       appearance: { name: "Themes and appearance", lede: "More themes, interface fonts, and text sizes." },
+      "curseforge-source": { name: "CurseForge source", lede: "Find and install mods, packs, and shaders from CurseForge in the Discover page." },
       "discover-translation": { name: "Project translation", lede: "Translate project descriptions and release notes into the interface language." },
       "wasm-plugin-registry": { name: "Community plugins", lede: "WASM plugins and a plugin directory with review controls." },
       "terracotta-multiplayer": { name: "Terracotta multiplayer plugin", lede: "Use Terracotta multiplayer from the launcher." },

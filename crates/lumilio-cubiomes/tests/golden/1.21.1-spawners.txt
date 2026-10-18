@@ -1,0 +1,6 @@
+262 0 -991 -28 3141 minecraft:skeleton
+9876543210 0 44 -2 -30 minecraft:skeleton
+9876543210 0 -2211 -44 -2737 minecraft:spider
+-123456789012345 0 42 -9 -18 minecraft:skeleton
+-123456789012345 0 -645 -12 627 minecraft:zombie
+-123456789012345 0 -581 11 609 minecraft:spider

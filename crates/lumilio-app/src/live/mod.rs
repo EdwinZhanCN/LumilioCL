@@ -8,7 +8,9 @@
 mod accounts;
 mod discover;
 mod dispatch;
+mod game_settings;
 mod instance;
+mod instance_content;
 mod instance_plugins;
 mod instance_write;
 mod jobs;
@@ -17,6 +19,7 @@ mod library;
 mod logs;
 mod new_game;
 mod settings;
+mod translation;
 mod update;
 mod wardrobe;
 
@@ -34,6 +37,7 @@ use gpui_kit::{App, Context, Entity, WeakEntity, Window};
 use lumilio_core::{CancellationToken, Preferences, ProjectKind};
 use lumilio_ui::LauncherShell;
 use lumilio_ui::home::HomePresentation;
+use lumilio_ui::instance_detail::TAB_WORLDS;
 use lumilio_ui::live::{LiveHandler, LiveIntent};
 use lumilio_ui::route::Route;
 use lumilio_ui::shell::{IntentHandler, ShellIntent};
@@ -67,15 +71,22 @@ struct State {
     next_world: Option<String>,
     /// A server address the next launch goes straight onto, once.
     next_server: Option<String>,
+    /// The game whose Java conflict the person just answered: its next
+    /// Continue starts without asking again.
+    java_answered: Option<String>,
     /// Stops the Microsoft sign-in that is waiting for the browser.
     sign_in_cancel: Option<CancellationToken>,
-    /// The target game and kind `installed` was last read for; `None` when it
-    /// is out of date and should be read again.
-    installed_key: Option<(String, ProjectKind)>,
+    /// The target game, kind and source `installed` was last read for; `None`
+    /// when it is out of date and should be read again.
+    installed_key: Option<(String, ProjectKind, String)>,
     /// What the running game has printed: the instance and its newest lines.
     game_log: Option<(String, std::collections::VecDeque<String>)>,
     /// Commands for the background update service.
     update_commands: Option<tokio::sync::mpsc::UnboundedSender<update::UpdateCommand>>,
+    /// The open schematic studio windows, one per game and folder (plan
+    /// schematic-studio, D22). A closed window's entry is dropped on the
+    /// next look.
+    studio_windows: Vec<instance_plugins::StudioWindowEntry>,
 }
 
 /// How many lines of the running game's output are kept.
@@ -145,6 +156,7 @@ pub fn build(backend: Backend, window: &mut Window, cx: &mut App) -> Entity<Laun
     update::start(&wiring, cx);
     reload(&wiring, Reload::All, cx);
     apply_saved_preferences(&wiring, window.window_handle(), cx);
+    update::announce(&wiring, window.window_handle(), cx);
     open_requested_page(&wiring, &shell, window, cx);
     // What start-up recovery did is told once, in words; details are in stderr.
     if let Some(text) = lumilio_ui::live::recovery_message(wiring.backend.service.startup_notes()) {
@@ -161,16 +173,50 @@ fn open_requested_page(
     window: &mut Window,
     cx: &mut App,
 ) {
-    // `LUMILIO_PROJECT=mod/sodium` also opens that project's detail window.
+    // `LUMILIO_PROJECT=mod/sodium` also opens that project's detail window;
+    // `LUMILIO_PROJECT_SOURCE=lumilio.curseforge` takes it from that source.
     if let Ok(path) = std::env::var("LUMILIO_PROJECT")
         && let Some((kind, slug)) = path.split_once('/')
         && let Some(kind) = ProjectKind::from_protocol(kind)
     {
-        open_project(wiring, kind, slug.to_owned(), window, cx);
+        let source = std::env::var("LUMILIO_PROJECT_SOURCE")
+            .unwrap_or_else(|_| lumilio_core::DEFAULT_SOURCE.to_owned());
+        open_project(wiring, kind, source, slug.to_owned(), window, cx);
     }
     // Dev hook: `LUMILIO_INSTANCE=<id>` opens that game; `LUMILIO_INSTANCE_TAB`
-    // and `LUMILIO_INSTANCE_GROUP` choose its tab and settings group.
+    // chooses its tab and `LUMILIO_INSTANCE_GROUP` the tab's group (a
+    // settings group, or 1 for the Worlds tab's servers), and
+    // `LUMILIO_STUDIO=schematics/<file>` opens its schematic studio on a file
+    // (`LUMILIO_STUDIO_BLOCK=minecraft:<id>` chooses that block kind there,
+    // `LUMILIO_STUDIO_INSPECT=<x>,<y>,<z>` inspects the block at that place,
+    // `LUMILIO_STUDIO_DIALOG=replace|convert|incompatible` opens a dialog).
     if let Ok(id) = std::env::var("LUMILIO_INSTANCE") {
+        if let Ok(file) = std::env::var("LUMILIO_STUDIO") {
+            instance_plugins::open_studio_window(
+                wiring,
+                id.clone(),
+                lumilio_plugin_litematica::ID.to_owned(),
+                "schematics".to_owned(),
+                Some(file),
+                cx,
+            );
+            if let Ok(block) = std::env::var("LUMILIO_STUDIO_BLOCK") {
+                instance_plugins::studio_windows_choose(wiring, &id, &block, cx);
+            }
+            let inspect = std::env::var("LUMILIO_STUDIO_INSPECT").ok().and_then(|at| {
+                let at: Vec<i32> = at
+                    .split(',')
+                    .filter_map(|v| v.trim().parse().ok())
+                    .collect();
+                <[i32; 3]>::try_from(at).ok()
+            });
+            if let Some(position) = inspect {
+                instance_plugins::studio_windows_inspect(wiring, &id, position, cx);
+            }
+            if let Ok(which) = std::env::var("LUMILIO_STUDIO_DIALOG") {
+                instance_plugins::studio_windows_dialog(wiring, &id, &which, cx);
+            }
+        }
         open_instance(wiring, id, None, window, cx);
         let tab = std::env::var("LUMILIO_INSTANCE_TAB")
             .ok()
@@ -178,16 +224,26 @@ fn open_requested_page(
         let group = std::env::var("LUMILIO_INSTANCE_GROUP")
             .ok()
             .and_then(|v| v.parse().ok());
+        // `LUMILIO_INSTANCE_PLUGIN=<plugin id>` opens that plugin's pane.
+        let plugin = std::env::var("LUMILIO_INSTANCE_PLUGIN").ok();
         let shell = shell.clone();
-        window.defer(cx, move |_, cx| {
+        window.defer(cx, move |window, cx| {
             shell.update(cx, |shell, cx| {
                 if let Some(view) = shell.live_instance().cloned() {
                     view.update(cx, |view, cx| {
+                        // As a click on the tab: what it shows is loaded too.
                         if let Some(tab) = tab {
-                            view.select_tab(tab, cx);
+                            view.open_tab(tab, window, cx);
                         }
-                        if let Some(group) = group {
-                            view.select_settings_group(group, cx);
+                        match group {
+                            Some(group) if tab == Some(TAB_WORLDS) => {
+                                view.open_worlds_sub(group, window, cx);
+                            }
+                            Some(group) => view.select_settings_group(group, cx),
+                            None => {}
+                        }
+                        if let Some(plugin) = plugin {
+                            view.open_plugin_pane(plugin, window, cx);
                         }
                     });
                 }

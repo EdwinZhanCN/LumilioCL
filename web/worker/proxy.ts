@@ -6,6 +6,8 @@
 // host inside the Worker, and stream the body straight back. Unlike
 // gh-proxy it is not an open proxy: only this repository's release
 // downloads are served, and redirects may only lead to GitHub's own hosts.
+// The launcher's block-asset bundle (/block-assets/<n>/, plan
+// schematic-studio D13) is the release tagged `block-assets-<n>` here.
 // Nothing is cached at the edge and nothing is verified here; the launcher
 // and the checksums file verify what arrives.
 
@@ -22,6 +24,8 @@ export const MAX_HOPS = 5;
 
 // Release tags are SemVer with a leading v (PACKAGING.md §5).
 const TAG = /^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
+// A block-asset bundle release: a whole number, as the launcher asks for it.
+const BUNDLE = /^[1-9]\d{0,5}$/;
 // One path segment of letters, digits, dots, dashes and underscores.
 const FILE = /^[0-9A-Za-z][0-9A-Za-z._-]*$/;
 
@@ -65,6 +69,12 @@ export function resolve(pathname: string): Upstream | null {
     const file = parts[3];
     if (!isFile(file)) return null;
     return { url: `https://github.com/${REPO}/releases/latest/download/${file}`, maxAge: 60 };
+  }
+  // /block-assets/<n>/<file>: bundle release n; its files never change.
+  if (parts.length === 3 && parts[0] === "block-assets") {
+    const [, release, file] = parts;
+    if (!BUNDLE.test(release) || !isFile(file)) return null;
+    return { url: `https://github.com/${REPO}/releases/download/block-assets-${release}/${file}`, maxAge: 86400 };
   }
   return null;
 }

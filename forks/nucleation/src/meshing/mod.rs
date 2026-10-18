@@ -64,14 +64,19 @@ use schematic_mesher::{
 };
 
 pub mod cache;
+mod entity_instances;
 pub mod item_model;
-mod resource_pack_compat;
+
+pub use entity_instances::{
+    aimed_at, multiply, transform_point, turned_at, Billboard, BillboardKind, EntityInstance,
+    EntityInstances, EntityModel, Transform, MODEL_FEET,
+};
 
 // Re-export the real MeshOutput and MeshLayer types from schematic-mesher.
 pub use item_model::{
     build_resource_pack, ItemModelConfig, ItemModelResult, ItemModelScale, ItemModelStats,
 };
-pub use schematic_mesher::{MeshLayer, MeshOutput};
+pub use schematic_mesher::{Axis, MeshLayer, MeshOutput};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
@@ -100,60 +105,19 @@ pub struct ResourcePackSource {
 }
 
 impl ResourcePackSource {
-    fn with_mesher_texture_aliases(mut pack: ResourcePack) -> Self {
-        // schematic-mesher 0.2 names this texture `wood`, while vanilla packs
-        // ship it as `armorstand.png`. Preserve an explicitly supplied legacy
-        // override; otherwise alias the canonical texture so the entity enters
-        // the atlas instead of using the missing-texture tile.
-        if pack.get_texture("entity/armorstand/wood").is_none() {
-            if let Some(texture) = pack.get_texture("entity/armorstand/armorstand").cloned() {
-                pack.add_texture("minecraft", "entity/armorstand/wood", texture);
-            }
+    /// The pack the launcher baked (`lumilio-block-assets`): every game
+    /// version's spelling is already settled, so nothing is rewritten or
+    /// aliased here. `entities` is the same version's entity model layers
+    /// (`entities.dat.z`); block entities and mobs are drawn from them, and
+    /// without them they are not drawn. (LumilioCL local change; see
+    /// `forks/README.md`, plan schematic-studio T7.)
+    pub fn from_baked(
+        baked: &lumilio_block_assets::BakedPack,
+        entities: lumilio_block_assets::EntityLayers,
+    ) -> Self {
+        Self {
+            pack: ResourcePack::from_baked(baked).with_entity_layers(entities),
         }
-        // schematic-mesher's minecart model reads `entity/minecart`, but the
-        // client jar moved the texture to `entity/minecart/minecart.png` in
-        // 1.21.x. Alias it so carts get their hull texture instead of the
-        // missing-texture tile.
-        if pack.get_texture("entity/minecart").is_none() {
-            if let Some(texture) = pack.get_texture("entity/minecart/minecart").cloned() {
-                pack.add_texture("minecraft", "entity/minecart", texture);
-            }
-        }
-        // More renames between the names schematic-mesher 0.2 asks for and
-        // what the current client jar ships: the 1.21.5 mob-variant split
-        // named files `<mob>/temperate_<mob>.png`, and 26.2 flipped them to
-        // `<mob>/<mob>_temperate.png`; the bat moved into a folder; the cat
-        // breeds gained a `cat_` prefix. Alias each canonical name the mesher
-        // reads to whichever spelling the pack actually has, so these mobs
-        // render with their skins instead of the missing-texture tile.
-        for (wanted, candidates) in [
-            (
-                "entity/pig/temperate_pig",
-                ["entity/pig/pig_temperate", "entity/pig/pig"],
-            ),
-            (
-                "entity/cow/temperate_cow",
-                ["entity/cow/cow_temperate", "entity/cow/cow"],
-            ),
-            (
-                "entity/chicken/temperate_chicken",
-                ["entity/chicken/chicken_temperate", "entity/chicken/chicken"],
-            ),
-            (
-                "entity/cat/tabby",
-                ["entity/cat/cat_tabby", "entity/cat/tabby"],
-            ),
-            ("entity/bat", ["entity/bat/bat", "entity/bat"]),
-            ("entity/blaze", ["entity/blaze/blaze", "entity/blaze"]),
-        ] {
-            if pack.get_texture(wanted).is_some() {
-                continue;
-            }
-            if let Some(texture) = candidates.iter().find_map(|c| pack.get_texture(c).cloned()) {
-                pack.add_texture("minecraft", wanted, texture);
-            }
-        }
-        Self { pack }
     }
 
     /// Load a resource pack from a file path (ZIP or directory).
@@ -163,17 +127,14 @@ impl ResourcePackSource {
         }
         let pack = schematic_mesher::load_resource_pack(path)
             .map_err(|e| MeshError::ResourcePack(e.to_string()))?;
-        Ok(Self::with_mesher_texture_aliases(pack))
+        Ok(Self { pack })
     }
 
     /// Load a resource pack from bytes (for WASM compatibility).
     pub fn from_bytes(data: &[u8]) -> Result<Self> {
-        let normalized =
-            resource_pack_compat::normalize_zip(data).map_err(MeshError::ResourcePack)?;
-        let bytes = normalized.as_deref().unwrap_or(data);
-        let pack = schematic_mesher::load_resource_pack_from_bytes(bytes)
+        let pack = schematic_mesher::load_resource_pack_from_bytes(data)
             .map_err(|e| MeshError::ResourcePack(e.to_string()))?;
-        Ok(Self::with_mesher_texture_aliases(pack))
+        Ok(Self { pack })
     }
 
     /// Load multiple resource packs from file paths in priority order.
@@ -190,7 +151,7 @@ impl ResourcePackSource {
         for path in paths {
             pack.overlay(Self::from_file(path)?.pack);
         }
-        Ok(Self::with_mesher_texture_aliases(pack))
+        Ok(Self { pack })
     }
 
     /// Load multiple resource packs from in-memory byte buffers in priority
@@ -204,12 +165,12 @@ impl ResourcePackSource {
         for data in datas {
             pack.overlay(Self::from_bytes(data.as_ref())?.pack);
         }
-        Ok(Self::with_mesher_texture_aliases(pack))
+        Ok(Self { pack })
     }
 
     /// Create a ResourcePackSource from an already-loaded ResourcePack.
     pub fn from_resource_pack(pack: ResourcePack) -> Self {
-        Self::with_mesher_texture_aliases(pack)
+        Self { pack }
     }
 
     /// Get a reference to the underlying ResourcePack.
@@ -355,6 +316,10 @@ pub struct MeshConfig {
     pub cull_occluded_blocks: bool,
     /// Merge adjacent coplanar faces into larger quads (reduces triangle count).
     pub greedy_meshing: bool,
+    /// Keep the faces between neighbours along this axis, so a slice clipped
+    /// at any layer shows that layer's faces (LumilioCL local change, plan
+    /// schematic-studio T25).
+    pub keep_faces_along: Option<schematic_mesher::Axis>,
 }
 
 impl Default for MeshConfig {
@@ -367,6 +332,7 @@ impl Default for MeshConfig {
             atlas_max_size: 4096,
             cull_occluded_blocks: true,
             greedy_meshing: false,
+            keep_faces_along: None,
         }
     }
 }
@@ -427,6 +393,7 @@ impl MeshConfig {
         config.atlas_max_size = self.atlas_max_size;
         config.cull_occluded_blocks = self.cull_occluded_blocks;
         config.greedy_meshing = self.greedy_meshing;
+        config.keep_faces_along = self.keep_faces_along;
         if let Some(biome) = &self.biome {
             config = config.with_biome(biome);
         }
@@ -699,22 +666,18 @@ fn entity_to_input_block(entity: &Entity) -> InputBlock {
     // Strip "minecraft:" prefix and add "entity:" prefix
     let entity_id = entity.id.strip_prefix("minecraft:").unwrap_or(&entity.id);
 
-    // Map specific Minecraft entity types to mesher-supported types
-    let mesher_id = match entity_id {
-        "furnace_minecart"
-        | "chest_minecart"
-        | "tnt_minecart"
-        | "hopper_minecart"
-        | "spawner_minecart"
-        | "command_block_minecart" => "minecart",
-        // Wood-specific boat ids all render the one boat model; the mesher
-        // keys on the plain names.
-        id if id.ends_with("_chest_boat") || id.ends_with("_chest_raft") => "chest_boat",
-        id if id.ends_with("_boat") || id.ends_with("_raft") => "boat",
-        id => id,
-    };
+    // Ids pass through: the binding table reads a boat's wood
+    // (`oak_boat`, `bamboo_chest_raft`) and a minecart's kind
+    // (`hopper_minecart`, whose contents it draws) from the id itself
+    // (LumilioCL local change, plan schematic-studio T7, T35).
+    let mesher_id = entity_id;
 
     let mut input = InputBlock::new(format!("entity:{}", mesher_id));
+
+    // Before 1.21.2 one `boat` entity carried its wood as `Type`.
+    if let Some(NbtValue::String(wood)) = entity.nbt.get("Type") {
+        input.properties.insert("wood".to_string(), wood.clone());
+    }
 
     // Extract facing from Rotation NBT (Rotation is a list of 2 floats: [yaw, pitch])
     if let Some(NbtValue::List(rotation)) = entity.nbt.get("Rotation") {
@@ -727,15 +690,48 @@ fn entity_to_input_block(entity: &Entity) -> InputBlock {
         }
     }
 
+    // An entity hung on a block faces the way its save says, not its yaw:
+    // floor and ceiling frames have no yaw of their own (LumilioCL local
+    // change, plan schematic-studio T33, D32).
+    if let Some(facing) = entity_instances::hung_facing(&entity.nbt) {
+        input
+            .properties
+            .insert("facing".to_string(), facing.to_string());
+    }
+    if let Some(NbtValue::Byte(turn)) = entity.nbt.get("ItemRotation") {
+        input
+            .properties
+            .insert("item_rotation".to_string(), turn.to_string());
+    }
+    if let Some(NbtValue::Byte(1)) = entity.nbt.get("Invisible") {
+        input
+            .properties
+            .insert("invisible".to_string(), "true".to_string());
+    }
+
     // A dropped item's sprite: the mesher's `entity:item` path reads the item
     // id from an `item` property. Carried through from the entity's own
     // `Item.id` tag — this is also how fireballs render, since vanilla draws
     // them as exactly these item sprites (`fire_charge`, `dragon_fireball`).
-    if let Some(NbtValue::Compound(item)) = entity.nbt.get("Item") {
-        if let Some(NbtValue::String(id)) = item.get("id") {
-            input.properties.insert("item".to_string(), id.clone());
-        }
+    // Others carry theirs as `item` (the ominous item spawner, item
+    // displays) or `FireworksItem` (LumilioCL local change, plan
+    // schematic-studio T35).
+    let carried =
+        ["Item", "item", "FireworksItem"]
+            .iter()
+            .find_map(|key| match entity.nbt.get(*key) {
+                Some(NbtValue::Compound(item)) => match item.get("id") {
+                    Some(NbtValue::String(id)) => Some(id.clone()),
+                    _ => None,
+                },
+                _ => None,
+            });
+    if let Some(id) = carried {
+        input.properties.insert("item".to_string(), id);
     }
+
+    // Variant textures the binding table reads (`variant`, villager clothes).
+    entity_instances::add_variants(mesher_id, &entity.nbt, &mut input);
 
     // Pass through relevant NBT as properties for the mesher
     // Baby entities
@@ -994,6 +990,22 @@ impl UniversalSchematic {
         pack: &ResourcePackSource,
         config: &MeshConfig,
     ) -> Result<MesherOutput> {
+        let t0 = prof_now();
+        let mesher_config = config.to_mesher_config();
+        let mesher = Mesher::with_config(pack.pack.clone(), mesher_config);
+        if std::env::var("NUCLEATION_MESH_PROFILE").is_ok() {
+            if let Some(t) = t0 {
+                eprintln!("PROFILE\tconfig+pack_clone\t{}", t.elapsed().as_micros());
+            }
+        }
+        self.mesh_with(&mesher, true)
+    }
+
+    /// The schematic's blocks through `mesher`; its entities too, as blocks
+    /// at their floored positions, when `with_entities`. (LumilioCL local
+    /// change, plan schematic-studio T8: the entity instance path meshes the
+    /// blocks without them, with the same mesher.)
+    fn mesh_with(&self, mesher: &Mesher, with_entities: bool) -> Result<MesherOutput> {
         let _prof = std::env::var("NUCLEATION_MESH_PROFILE").is_ok();
         macro_rules! phase {
             ($t:expr, $label:expr) => {
@@ -1004,11 +1016,16 @@ impl UniversalSchematic {
                 }
             };
         }
-
-        let t0 = prof_now();
-        let mesher_config = config.to_mesher_config();
-        let mesher = Mesher::with_config(pack.pack.clone(), mesher_config);
-        phase!(t0, "config+pack_clone");
+        let collect = |region: &Region,
+                       blocks: &mut Vec<(MesherBlockPosition, u32)>,
+                       palette: &mut Vec<InputBlock>,
+                       min: &mut [f32; 3],
+                       max: &mut [f32; 3]| {
+            collect_region_cells(region, blocks, palette, min, max);
+            if with_entities {
+                collect_region_entities(region, blocks, palette, min, max);
+            }
+        };
 
         // Collect all blocks from all regions into a flat, palette-indexed Vec
         // (not a HashMap): the mesher only iterates the source, and storing palette
@@ -1020,7 +1037,7 @@ impl UniversalSchematic {
         let mut max = [f32::MIN; 3];
 
         // Process default region
-        collect_region_blocks(
+        collect(
             &self.default_region,
             &mut all_blocks,
             &mut palette,
@@ -1028,14 +1045,42 @@ impl UniversalSchematic {
             &mut max,
         );
 
-        // Process other regions
-        for region in self.other_regions.values() {
-            collect_region_blocks(region, &mut all_blocks, &mut palette, &mut min, &mut max);
+        // Process other regions in a fixed order (they live in a hash map). Where
+        // regions overlap, the block collected first keeps the cell: drawing
+        // both stacked two blocks in one place, in a different order each
+        // load. (LumilioCL local change; see `forks/README.md`.)
+        let mut others: Vec<&Region> = self.other_regions.values().collect();
+        others.sort_by(|a, b| a.name.cmp(&b.name));
+        for region in &others {
+            collect(region, &mut all_blocks, &mut palette, &mut min, &mut max);
+        }
+        let boxes: Vec<_> = std::iter::once(&self.default_region)
+            .chain(others.iter().copied())
+            .map(Region::get_bounding_box)
+            .collect();
+        let overlap = boxes.iter().enumerate().any(|(i, a)| {
+            boxes[i + 1..].iter().any(|b| {
+                a.min.0 <= b.max.0
+                    && b.min.0 <= a.max.0
+                    && a.min.1 <= b.max.1
+                    && b.min.1 <= a.max.1
+                    && a.min.2 <= b.max.2
+                    && b.min.2 <= a.max.2
+            })
+        });
+        if overlap {
+            let mut seen = rustc_hash::FxHashSet::default();
+            all_blocks.retain(|(pos, _)| seen.insert(*pos));
         }
         phase!(t1, "collect_region_blocks");
 
         if all_blocks.is_empty() {
-            return Err(MeshError::Meshing("No blocks to mesh".to_string()));
+            if with_entities {
+                return Err(MeshError::Meshing("No blocks to mesh".to_string()));
+            }
+            // Only entities: they are drawn as instances, the blocks are none.
+            min = [0.0; 3];
+            max = [0.0; 3];
         }
 
         let t2 = prof_now();
@@ -1688,6 +1733,19 @@ fn collect_region_blocks(
     min: &mut [f32; 3],
     max: &mut [f32; 3],
 ) {
+    collect_region_cells(region, blocks, palette, min, max);
+    // Also collect entities as entity: blocks
+    collect_region_entities(region, blocks, palette, min, max);
+}
+
+/// The region's blocks, without its entities.
+fn collect_region_cells(
+    region: &Region,
+    blocks: &mut Vec<(MesherBlockPosition, u32)>,
+    palette: &mut Vec<InputBlock>,
+    min: &mut [f32; 3],
+    max: &mut [f32; 3],
+) {
     use rayon::prelude::*;
     let _prof = std::env::var("NUCLEATION_MESH_PROFILE").is_ok();
 
@@ -1742,9 +1800,6 @@ fn collect_region_blocks(
             eprintln!("PROFILE\t  vec_push\t{}", t.elapsed().as_micros());
         }
     }
-
-    // Also collect entities as entity: blocks
-    collect_region_entities(region, blocks, palette, min, max);
 }
 
 /// Helper function to collect blocks and entities from a region into chunk buckets.
@@ -2109,26 +2164,123 @@ mod tests {
         assert!(result.is_err());
     }
 
+    /// A baked pack keeps only the newest name of a texture the game renamed;
+    /// the entity mesher's older names (`entity/armorstand/wood`,
+    /// `entity/banner_base`) find it through the baker's rename table, with
+    /// no aliasing here.
     #[test]
-    fn resource_pack_aliases_the_vanilla_armor_stand_texture_for_the_entity_mesher() {
+    fn a_baked_pack_answers_for_renamed_entity_textures() {
+        use lumilio_block_assets::{BakedPack, BakedTexture, Image};
+
+        let mut baked = BakedPack::default();
+        for (id, red) in [
+            ("minecraft:entity/armorstand/armorstand", 1u8),
+            ("minecraft:entity/banner/banner_base", 2),
+            ("minecraft:entity/enchantment/enchanting_table_book", 3),
+        ] {
+            let image = Image {
+                width: 1,
+                height: 1,
+                rgba: vec![red, 0, 0, 255],
+            };
+            let hash = image.hash();
+            baked.assets.images.insert(hash, image);
+            baked.assets.textures.insert(
+                id.to_owned(),
+                BakedTexture {
+                    image: hash,
+                    animation: None,
+                },
+            );
+        }
+        let source = ResourcePackSource::from_baked(&baked, Default::default());
+        let red = |name: &str| source.get_texture_pixels(name).map(|p| p[0]);
+        assert_eq!(red("entity/armorstand/armorstand"), Some(1));
+        assert_eq!(red("entity/armorstand/wood"), Some(1));
+        assert_eq!(red("entity/banner_base"), Some(2));
+        assert_eq!(red("entity/enchanting_table_book"), Some(3));
+        assert_eq!(red("entity/bat"), None);
+    }
+
+    /// Block entities are drawn from the entity layers handed in beside the
+    /// baked pack, and not at all without them (plan schematic-studio T7).
+    #[test]
+    fn block_entities_draw_from_the_entity_layers_handed_in() {
+        use lumilio_block_assets::{BakedPack, Bone, Cube, EntityLayer};
+
+        let cube = |origin: [f32; 3], size: [f32; 3]| Cube {
+            origin,
+            size,
+            uv: [0.0, 0.0],
+            uv_scale: [1.0; 2],
+            inflate: [0.0; 3],
+            mirror: false,
+            faces: None,
+        };
+        let mut root = Bone {
+            pivot: [0.0; 3],
+            rotation: [0.0; 3],
+            scale: [1.0; 3],
+            cubes: Vec::new(),
+            children: Default::default(),
+        };
+        root.cubes.push(cube([1.0, 0.0, 1.0], [14.0, 10.0, 14.0]));
+        let chest = EntityLayer {
+            texture_size: [64, 64],
+            root,
+        };
+        let layers = [("minecraft:chest#main".to_owned(), chest)].into();
+
+        let mut schematic = UniversalSchematic::new("chest".to_string());
+        schematic.set_block(0, 0, 0, &BlockState::new("minecraft:chest".to_string()));
+        let config = MeshConfig::default();
+        let baked = BakedPack::default();
+        let with = ResourcePackSource::from_baked(&baked, layers);
+        let without = ResourcePackSource::from_baked(&baked, Default::default());
+        let drawn = schematic.to_mesh(&with, &config).unwrap();
+        assert_eq!(drawn.total_vertices(), 24, "one box, six faces");
+        let bare = schematic.to_mesh(&without, &config).unwrap();
+        assert_eq!(bare.total_vertices(), 0);
+    }
+
+    /// Two Litematica regions may overlap. Drawing both stacked two cubes in
+    /// one cell; the region collected first keeps it.
+    #[test]
+    fn overlapping_regions_draw_one_block_per_cell() {
         use schematic_mesher::resource_pack::TextureData;
 
         let mut pack = ResourcePack::new();
+        pack.add_blockstate(
+            "minecraft",
+            "stone",
+            serde_json::from_str(r#"{"variants":{"":{"model":"minecraft:block/stone"}}}"#).unwrap(),
+        );
+        let face = r##"{"texture":"#all"}"##;
+        pack.add_model(
+            "minecraft",
+            "block/stone",
+            serde_json::from_str(&format!(
+                r#"{{"textures":{{"all":"minecraft:block/stone"}},"elements":[{{"from":[0,0,0],"to":[16,16,16],"faces":{{"down":{face},"up":{face},"north":{face},"south":{face},"west":{face},"east":{face}}}}}]}}"#
+            ))
+            .unwrap(),
+        );
         pack.add_texture(
             "minecraft",
-            "entity/armorstand/armorstand",
-            TextureData::new(1, 1, vec![120, 80, 40, 255]),
+            "block/stone",
+            TextureData::new(1, 1, vec![9, 9, 9, 255]),
         );
+        let pack = ResourcePackSource::from_resource_pack(pack);
 
-        let source = ResourcePackSource::from_resource_pack(pack);
-
-        assert!(
-            source
-                .pack()
-                .get_texture("entity/armorstand/wood")
-                .is_some(),
-            "schematic-mesher's armor stand model currently requests the legacy wood alias"
-        );
+        let stone = BlockState::new("minecraft:stone".to_string());
+        let mut schematic = UniversalSchematic::new("overlap".to_string());
+        schematic.set_block(0, 0, 0, &stone);
+        for name in ["b", "c"] {
+            let mut region = Region::new(name.to_string(), (0, 0, 0), (1, 1, 1));
+            region.set_block(0, 0, 0, &stone);
+            schematic.add_region(region);
+        }
+        let mesh = schematic.to_mesh(&pack, &MeshConfig::default()).unwrap();
+        assert_eq!(mesh.total_vertices(), 24, "one cube, six faces");
     }
 
     #[test]

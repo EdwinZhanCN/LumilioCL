@@ -1,8 +1,7 @@
-use super::kinds::{ProjectKind, project_page_url};
+use super::kinds::ProjectKind;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SearchHit {
-    pub page_url: String,
     pub project_id: String,
     pub slug: String,
     pub title: String,
@@ -19,13 +18,18 @@ pub struct SearchHit {
     /// those of the pack, not the pack format.
     pub loaders: Vec<String>,
     pub downloads: u64,
-    pub follows: u64,
+    /// `None` when the source does not count followers.
+    pub follows: Option<u64>,
     /// RFC 3339 time the project was published.
     pub published: String,
     /// RFC 3339 time of the last change.
     pub updated: String,
     pub environment: Option<Environment>,
     pub icon_url: Option<String>,
+    /// The project's page on its source's site.
+    pub page_url: String,
+    /// The author lets people download the files only on the source's site.
+    pub manual_download: bool,
 }
 
 /// Whether a project runs on one side of the connection.
@@ -63,20 +67,8 @@ pub fn environment(client: SideSupport, server: SideSupport) -> Option<Environme
     }
 }
 
-impl SearchHit {
-    #[must_use]
-    pub fn page_url(&self) -> String {
-        if self.page_url.is_empty() {
-            project_page_url(self.kind, &self.slug)
-        } else {
-            self.page_url.clone()
-        }
-    }
-}
-
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct SearchPage {
-    pub source: String,
     pub hits: Vec<SearchHit>,
     pub total_hits: u64,
 }

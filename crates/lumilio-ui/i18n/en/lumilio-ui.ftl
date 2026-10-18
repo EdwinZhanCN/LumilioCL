@@ -4,20 +4,6 @@
 ## Common
 
 common-none = None
-settings-translation = Translation
-settings-translation-help = When enabled, Discover uses Chinese summaries from MCIM where available; click Translate to send the description to the selected provider. Only Simplified Chinese is supported, and titles stay unchanged.
-settings-translation-provider = Translation provider
-settings-translation-cache = Translation cache
-settings-translation-cache-help = Successful translations are stored locally for 7 days. After you clear the cache, the next translation sends a new request.
-translation-clear = Clear
-translation-action = Translate
-translation-loading = Translating…
-translation-original = Show original
-translation-retry = Retry translation
-translation-failed = Translation failed. The original text is kept. You can retry.
-translation-partial = Some text could not be translated. The original text is kept. Translate again to retry.
-translation-cache-cleared = Translation cache cleared
-translation-cache-clear-failed = Could not clear the translation cache
 common-not-set = Not set
 common-edit = Edit
 common-edit-more = Edit…
@@ -167,10 +153,7 @@ home-record-servers = Servers
 home-places-empty = No worlds yet
 home-places-empty-help = Press "Continue" to enter the game; worlds you create will show up here
 home-place-enter = Enter
-home-place-world = World
 home-place-last-played = Last played { $when }
-home-place-hardcore = Hardcore
-home-place-server = Server · { $address }
 home-meta-last-played = { $meta } · Last played { $when }
 home-meta-never-played = { $meta } · Never played
 
@@ -294,12 +277,12 @@ discover-kind-resource-pack = Resource pack
 discover-kind-shader = Shader
 discover-searching = Searching…
 discover-no-source = No content source is available
-discover-no-source-help = Turn on a content source (such as Modrinth) in Settings › Plugins, then come back
-discover-offline = You're offline, or Modrinth can't be reached
+discover-no-source-help = Turn on a content source (such as Modrinth or CurseForge) in Settings › Plugins, then come back
+discover-offline = You're offline, or { $source } can't be reached
 discover-offline-help = Connect to the network and try again
 discover-no-results = No results
 discover-no-results-help = Try another keyword or loosen the filters
-discover-browse-modrinth = Browse on Modrinth
+discover-browse-source = Browse on { $source }
 discover-search-again = Search again
 discover-page-size = Results per page
 discover-sort-relevance = Relevance
@@ -322,7 +305,15 @@ discover-install = Install
 discover-installing = Installing…
 discover-update = Update
 discover-installed = Installed
-discover-open-modrinth = Open on Modrinth
+discover-open-in = Open on { $source }
+discover-site-only = Website download only
+discover-manual-download = The author of { $file } allows downloading it only on the website
+discover-open-download-page = Open download page
+discover-modpack-missing = Installed modpack { $name }; { $count ->
+    [one] 1 file has
+   *[other] { $count } files have
+} to be downloaded on the website
+discover-needs-curseforge = To import a CurseForge modpack, turn on CurseForge in Settings › Plugins first
 discover-copy-link = Copy link
 discover-link-copied = Project link copied
 discover-install-started = Installing { $title }; progress is in Activity
@@ -676,9 +667,16 @@ task-backup-game = Back up { $subject }
 task-restore-backup = Restore backup { $subject }
 task-install-java = Install Java { $subject }
 task-install-java-any = Install Java
+java-translated = translated
+java-conflict-title = This version needs Java { $needed }
+java-conflict-body = This game's settings choose Java { $chosen }, which will most likely fail to start it. Switching affects this launch only and doesn't change the game's settings.
+java-conflict-switch = Use Java { $major } this time
+java-conflict-download = Download and use Java { $major }
+java-conflict-anyway = Launch anyway
 task-copy-game = Copy { $subject }
 task-install-modpack = Install modpack { $subject }
 task-import-modpack = Import modpack { $subject }
+task-prepare-block-assets = Prepare block assets for { $subject }
 
 ## New game
 
@@ -711,7 +709,7 @@ new-game-create-failed = Couldn't create it; you can try again
 new-game-created-downloading = Created { $name }; downloading game files
 new-game-created = Created { $name }
 new-game-download-failed = The game files didn't finish downloading; starting the game will try again
-new-game-import-pack-prompt = Choose a modpack (.mrpack, or a MultiMC / Prism .zip)
+new-game-import-pack-prompt = Choose a modpack (.mrpack, a CurseForge .zip, or a MultiMC / Prism .zip)
 new-game-import-pack-done = Imported modpack { $name }
 
 ## Project details
@@ -722,7 +720,7 @@ project-tab-gallery = Gallery
 project-channel-release = Release
 project-channel-beta = Beta
 project-channel-alpha = Alpha
-project-offline = Can't reach Modrinth
+project-offline = Can't reach the content source
 project-offline-help = Check your network and open it again
 project-gallery-empty = This project has no gallery
 project-open-in-browser = Open in browser
@@ -750,6 +748,12 @@ project-group-alpha-beta = All alpha and beta versions
 project-group-alpha = All alpha versions
 project-group-beta = All beta versions
 project-group-pre-alpha = All pre-alpha versions
+translation-action = Translate
+translation-loading = Translating…
+translation-original = Show original
+translation-retry = Retry translation
+translation-failed = Translation failed. The original text is kept. You can retry.
+translation-partial = Some text could not be translated. The original text is kept. Translate again to retry.
 
 ## Dependencies
 
@@ -798,17 +802,444 @@ model-undrawable = { $count ->
     [one] { $count } block type can't be drawn for this game version and is missing from the preview
    *[other] { $count } block types can't be drawn for this game version and are missing from the preview
 }
+model-undrawable-entities = { $count ->
+    [one] { $count } entity type can't be drawn for this game version and is missing from the preview
+   *[other] { $count } entity types can't be drawn for this game version and are missing from the preview
+}
 model-read-failed = Couldn't read the 3D preview
-model-needs-game = Once this game is installed, you can preview schematics with its textures
+model-assets-missing = Block assets can't be prepared right now
+model-assets-offline = No network, and the block assets aren't downloaded yet
+model-assets-unavailable = The block-asset server doesn't have these assets yet. Your network is fine.
+model-assets-download-off = Automatic block asset download is off, and the block assets aren't downloaded yet
 model-capture-unsupported = The current window system doesn't support mouse capture yet; use Orbital mode
 model-capture-failed = Couldn't capture the mouse; click the view to try again
 model-capture-ended = Mouse capture ended; click the view to re-enter
 model-loading = Building the 3D preview…
 model-aria = 3D schematic preview; in Orbital mode, arrow keys rotate and plus/minus zoom; in Explore mode, click or press Enter to capture the mouse, WASD to move, Space to rise, Shift to descend, Esc to release; R resets
 model-reset = Reset view
+model-reset-key = Reset view (R)
 model-hint-orbital = Drag to rotate · Scroll to zoom · Arrow keys rotate · + / − to zoom
-model-hint-explore-captured = WASD to move · Space to rise · Shift to descend · Esc to release the mouse
+model-hint-explore-captured = WASD to move · Space to rise · Shift to descend · click to pick the block under the crosshair · Esc to release the mouse
 model-hint-explore = Click the view or press Enter to enter · WASD to move · Space to rise · Shift to descend
+model-slice = Slice
+model-slice-off = No slice
+model-slice-along = { $axis } axis
+model-slice-layer-label = Layer
+model-hint-orbital-pick = Click to inspect a block · Drag to rotate · Scroll to zoom · Arrow keys rotate · + / − to zoom
+model-angle = Angle
+model-angle-north = North
+model-angle-east = East
+model-angle-south = South
+model-angle-west = West
+model-angle-top = Top
+model-angle-isometric = Isometric
+model-source-bundle = { $version } · downloaded bundle
+
+## Studio viewport: block selection and PNG export
+studio-card-undrawable = This game version cannot draw this block; the picture shows a missing-texture placeholder
+studio-sources = Resource sources
+studio-sources-add = Add…
+studio-sources-prompt = Add
+studio-sources-remove = Remove
+studio-sources-pick = Select a schematic to see the resources it is drawn with
+studio-sources-loading = Reading resource sources…
+studio-sources-none = No resource sources are available
+studio-sources-failed = The resource sources did not change
+studio-source-blocks = { $count ->
+    [one] { $count } block
+   *[other] { $count } blocks
+}
+studio-source-files = { $count ->
+    [one] { $count } resource file
+   *[other] { $count } resource files
+}
+studio-source-missing = File not found
+studio-png-title = Export PNG
+studio-png-export = Export
+studio-png-width = Width (pixels)
+studio-png-height = Height (pixels)
+studio-png-size-hint = Up to 4096 pixels per side
+studio-png-size-invalid = Width and height must be whole numbers from 1 to 4096
+studio-png-background = Background
+studio-png-background-panel = Panel color
+studio-png-background-clear = Transparent
+studio-png-angle = Angle
+studio-png-angle-current = Current view
+studio-png-not-ready = The 3D preview isn't ready yet
+studio-png-failed = Couldn't draw the image
+studio-png-closed = The viewport closed, so nothing was exported
+studio-png-saved = Saved to { $path }
+studio-png-save-failed = Couldn't save the PNG
+
+## Schematic studio (plan schematic-studio, T9)
+
+studio-title = Schematics
+studio-caption = { $count ->
+    [one] { $count } schematic
+   *[other] { $count } schematics
+}
+studio-caption-version = { $version }
+studio-caption-versions = { $schematic } schematic · game { $game }
+studio-caption-schematic = { $version } schematic
+studio-compat-missing = { $count ->
+    [one] { $count } block kind { $version } does not have
+   *[other] { $count } block kinds { $version } does not have
+}
+studio-compat-convert = Convert to { $version }…
+studio-tile-missing = { $version } does not have this block
+studio-only-incompatible = Only incompatible
+studio-open-window = Open studio
+studio-open-window-tip = Open the schematic studio in its own window: the 3D viewport, the inspector and every operation
+studio-window-title = Schematic studio
+studio-tab-history = History
+studio-search-placeholder = Search schematics
+studio-blocks-placeholder = Search blocks
+studio-listing = Listing schematics…
+studio-list-failed = Couldn't list the schematics folder
+studio-list-empty = No schematics yet. Put .litematic files in the game's schematics folder and they show up here.
+studio-search-none = Nothing matches
+studio-duplicate-tip = { $count ->
+    [one] Same blocks as { $count } other schematic
+   *[other] Same blocks as { $count } other schematics
+}
+studio-viewport-empty = Choose a schematic on the left to see its 3D model here
+studio-pick-first = Choose a schematic on the left first
+studio-write-blocked = The game is running. Schematics can be changed after it closes.
+studio-menu-replace = Replace blocks…
+studio-menu-convert = Convert version…
+studio-menu-png = Export PNG…
+studio-menu-csv = Export materials (CSV)
+studio-menu-delete = Delete…
+studio-reading = Reading…
+studio-read-failed = Couldn't read this schematic
+studio-volume = Volume
+studio-block-entity-count = Block entities
+studio-regions = Regions
+studio-duplicates = Duplicates
+studio-state-default = Default state
+studio-blocks-none = This schematic holds only air
+studio-none = None
+studio-entities = Entities
+studio-meta-name = Name
+studio-meta-author = Author
+studio-meta-description = Description
+studio-meta-created = Created
+studio-meta-modified = Modified
+studio-meta-data-version = Data version
+studio-meta-file = File
+studio-history-loading = Reading history…
+studio-history-failed = Couldn't read the change history
+studio-history-empty = No schematics in this game have been changed yet. Replacements, conversions and edits are listed here, and each one can be restored.
+studio-op-replace = Replace blocks
+studio-op-convert = Convert version
+studio-op-metadata = Edit metadata
+studio-op-restore = Restore
+studio-restore = Restore
+studio-restore-made-body = This operation wrote this file. Restoring moves it into the launcher's backups; nothing is deleted, and the restore is logged too.
+studio-restore-title = Restore "{ $file }" to before this change?
+studio-restore-body = The current file is backed up first, and the restore is listed in the history too.
+studio-restored = Restored "{ $file }"
+studio-restore-failed = Couldn't restore this schematic
+studio-op-delete = Delete
+studio-op-dedupe = Keep one copy
+studio-write-busy = The last change is still being written
+studio-write-conflict = This schematic changed after it was read, so nothing was written. Select it again and retry.
+studio-write-failed = Couldn't write this schematic
+studio-edit-failed = Couldn't change this schematic
+studio-remove-failed = Couldn't move the schematic to the backups
+studio-deleted = Moved "{ $file }" to the backups
+studio-deduped = { $count ->
+    [one] Moved { $count } duplicate schematic to the backups
+   *[other] Moved { $count } duplicate schematics to the backups
+}
+studio-delete-title = Delete "{ $file }"?
+studio-delete-body = The file moves to the launcher's backups instead of being deleted. You can restore it from History.
+studio-keep-only = Keep only this
+studio-keep-title = Keep only "{ $file }"?
+studio-keep-body = { $count ->
+    [one] The { $count } other copy in this group moves to the launcher's backups instead of being deleted. You can restore it from History.
+   *[other] The { $count } other copies in this group move to the launcher's backups instead of being deleted. You can restore each from History.
+}
+studio-keep-summary = Kept "{ $file }"
+studio-replace-title = Replace blocks
+studio-replace-source = Block to replace
+studio-replace-any = Any
+studio-replace-target = Replace with
+studio-replace-scope = Scope
+studio-replace-all-regions = All regions
+studio-replace-selection = Selection { $x }×{ $y }×{ $z }
+studio-replace-waiting = Choose what each row becomes to count the blocks it replaces
+studio-replace-counting = Counting…
+studio-replace-none = No blocks match
+studio-replace-commit = Replace
+studio-replace-summary = { $source } → { $target } · { $count }
+studio-replace-summary-rows = { $rows } rows · { $count }
+studio-replace-summary-scheme = Scheme "{ $name }" · { $count }
+studio-replace-commit-count = { $count ->
+    [one] Replace { $count } block
+   *[other] Replace { $count } blocks
+}
+studio-replace-any-props = Any properties
+studio-replace-target-pick = Choose a block
+studio-replace-add-row = Add a row
+studio-replace-remove-row = Remove this row
+studio-replace-row-count = { $count ->
+    [one] This row replaces { $count } block
+   *[other] This row replaces { $count } blocks
+}
+studio-replace-scope-slice = Current slice
+studio-replace-scheme-pick = Apply a scheme…
+studio-replace-scheme-name = Scheme name
+studio-replace-scheme-save = Save as scheme…
+studio-replace-scheme-keep = Save
+studio-replace-scheme-unready = Choose what every row becomes before you save a scheme
+studio-replace-scheme-current = Scheme "{ $name }"
+studio-replace-catalog-loading = Reading this version's blocks…
+studio-replace-catalog-failed = Couldn't read this version's blocks. You can only choose blocks this schematic already has, and properties are not kept.
+studio-replaced = { $count ->
+    [one] Replaced { $count } block in "{ $file }"
+   *[other] Replaced { $count } blocks in "{ $file }"
+}
+studio-convert-title = Convert version
+studio-convert-from = Current format: { $version }
+studio-convert-target = Convert to
+studio-convert-placeholder = Choose a version
+studio-convert-versions-failed = Couldn't read the version list
+studio-convert-current = Current
+studio-convert-data-version = Data version { $version }
+studio-convert-choose = Choose a version to see whether anything would be lost. Nothing is written until you confirm.
+studio-convert-checking = Trying the conversion…
+studio-convert-failed = Couldn't convert this schematic
+studio-convert-same = This schematic is already in this version's format.
+studio-convert-forward = Converting to a newer version loses nothing.
+studio-convert-backward-clean = Converting to this older version loses nothing.
+studio-convert-lossy = { $count ->
+    [one] Converting to { $version } changes { $count } thing. Nothing is written until you confirm:
+   *[other] Converting to { $version } changes { $count } things. Nothing is written until you confirm:
+}
+studio-convert-lost = Lost
+studio-convert-approximated = Approximated
+studio-convert-kept = Kept
+studio-convert-kept-note = { $version } does not know these blocks. They are written as they are and become air in that version.
+studio-convert-replace-kept = Choose replacements for these blocks…
+studio-convert-save-as = Save as "{ $file }" and keep the original
+studio-convert-overwrite = Replace the original file
+studio-convert-more = { $count } more not listed
+studio-convert-missing-block = { $count ->
+    [one] { $version } does not have this block. { $count } block is written as it is and becomes air in that version.
+   *[other] { $version } does not have this block. { $count } blocks are written as they are and become air in that version.
+}
+studio-convert-unknown-property = { $count ->
+    [one] { $version } does not know this property or value. { $count } block is written as it is and uses the block's default in that version.
+   *[other] { $version } does not know this property or value. { $count } blocks are written as they are and use the block's default in that version.
+}
+studio-convert-loss-flattening-ambiguous = Versions before 1.13 have no exact match for this block. The nearest old block is written.
+studio-convert-loss-flattening-unknown-block = { $version } does not know this block. It is written as it is.
+studio-convert-loss-item-damage = The durability or the old number of this item cannot be restored.
+studio-convert-loss-component-dropped = { $version } cannot write this item data. It is removed.
+studio-convert-loss-merge-ambiguous = Newer versions merge some entities or items into one kind. One of the old kinds is written.
+studio-convert-loss-rename-ambiguous = Newer versions give some names one new name. One of the old names is written.
+studio-convert-loss-fingerprint = Newer versions keep less detail for this data. The lost detail cannot be restored.
+studio-convert-loss-unsupported = { $version } does not have this. It is removed.
+studio-convert-loss-other = { $version } can write only an approximate value for this.
+studio-convert-unchecked = Couldn't check the blocks against { $version }. Blocks that the older version does not have are not listed here.
+studio-convert-commit = Convert
+studio-convert-anyway = Convert anyway
+studio-convert-summary = { $from } → { $to } · { $count ->
+    [one] { $count } loss
+   *[other] { $count } losses
+}
+studio-converted = Converted "{ $file }" to { $version }
+studio-converted-as = Saved "{ $file }" ({ $version })
+studio-meta-title = Edit metadata
+studio-meta-name-empty = The name can't be empty
+studio-meta-summary = Name "{ $name }"
+studio-meta-saved = Saved the metadata of "{ $file }"
+
+## Schematic studio: the workbench (plan schematic-studio, T30)
+
+studio-tab-materials = Materials
+studio-tab-info = Info
+studio-materials-summary = { $kinds ->
+    [one] { $kinds } kind
+   *[other] { $kinds } kinds
+} · { $count }
+studio-tile-tip = { $name } · { $count } · { $stacks }
+studio-scope-selection = Selection { $x }×{ $y }×{ $z } · { $count ->
+    [one] { $count } block
+   *[other] { $count } blocks
+}
+studio-scope-layer = Layer { $axis } { $layer } · { $count ->
+    [one] { $count } block
+   *[other] { $count } blocks
+}
+studio-scope-clear = Clear selection
+studio-scope-empty = Only air here
+studio-state-count = { $words } ×{ $count }
+studio-detail-copy = Copy ID
+studio-detail-replace = Replace…
+studio-detail-only = Show only these
+studio-detail-all = Show all
+studio-detail-count = { $count ->
+    [one] { $count } block
+   *[other] { $count } blocks
+} · { $stacks }
+studio-menu-metadata = Edit info…
+studio-meta-edit = Edit…
+studio-technical = Technical details
+studio-undrawable-blocks = Blocks not drawn
+studio-undrawable-entities = Entities not drawn
+studio-card-meta = { $size } · { $count ->
+    [one] { $count } block
+   *[other] { $count } blocks
+}
+studio-switch-pick = Choose a schematic
+studio-switch-tip = Open another schematic
+
+## Schematic studio: resource source switches (plan schematic-studio, T21)
+
+studio-source-switch = Draw with { $name }
+studio-source-custom = { $count ->
+    [one] { $count } model not drawn
+   *[other] { $count } models not drawn
+}
+studio-sources-off = Mods and resource packs are off until you switch them on. Then the viewport draws again with them.
+
+## Schematic studio: the inspect card (plan schematic-studio, T32)
+
+studio-inspect-copy = Copy block state
+studio-inspect-quoted = “{ $name }”
+studio-inspect-stack = { $name } ×{ $count }
+studio-inspect-stacks = { $name } ×{ $count } · { $stacks }
+studio-inspect-kind = Select this kind
+studio-inspect-kind-tip = Select this block kind in Materials
+
+## Schematic studio: stacks and block properties (plan schematic-studio, T26)
+
+studio-stacks = { $count ->
+    [one] { $count } stack
+   *[other] { $count } stacks
+}
+studio-stacks-rest = { $count ->
+    [one] { $count } stack + { $rest }
+   *[other] { $count } stacks + { $rest }
+}
+studio-prop-pair = { $key } { $value }
+studio-prop-no = no
+studio-prop-waterlogged = Waterlogged
+studio-prop-powered = Powered
+studio-prop-open = Open
+studio-prop-lit = Lit
+studio-prop-persistent = Persistent
+studio-prop-snowy = Snowy
+studio-prop-attached = Attached
+studio-prop-triggered = Triggered
+studio-prop-enabled = Enabled
+studio-prop-extended = Extended
+studio-prop-hanging = Hanging
+studio-prop-inverted = Inverted
+studio-prop-locked = Locked
+studio-prop-occupied = Occupied
+studio-prop-short = Short
+studio-prop-signal_fire = Signal fire
+studio-prop-has_book = Has a book
+studio-prop-in_wall = In a wall
+studio-prop-conditional = Conditional
+studio-prop-eye = Has an eye
+studio-prop-unstable = Unstable
+studio-prop-bottom = Bottom
+studio-prop-up = Joined up
+studio-prop-down = Joined down
+studio-prop-north = Joined north
+studio-prop-south = Joined south
+studio-prop-east = Joined east
+studio-prop-west = Joined west
+studio-prop-age = Age
+studio-prop-power = Power
+studio-prop-rotation = Rotation
+studio-prop-level = Level
+studio-prop-distance = Distance
+studio-prop-delay = Delay
+studio-prop-layers = Layers
+studio-prop-note = Note
+studio-prop-bites = Bites
+studio-prop-moisture = Moisture
+studio-prop-stage = Stage
+studio-prop-candles = Candles
+studio-prop-pickles = Pickles
+studio-prop-eggs = Eggs
+studio-prop-hatch = Hatch
+studio-prop-charges = Charges
+studio-prop-honey_level = Honey
+studio-prop-facing-north = Facing north
+studio-prop-facing-south = Facing south
+studio-prop-facing-east = Facing east
+studio-prop-facing-west = Facing west
+studio-prop-facing-up = Facing up
+studio-prop-facing-down = Facing down
+studio-prop-half-top = Top half
+studio-prop-half-bottom = Bottom half
+studio-prop-half-upper = Upper half
+studio-prop-half-lower = Lower half
+studio-prop-type-top = Top half
+studio-prop-type-bottom = Bottom half
+studio-prop-type-double = Double
+studio-prop-type-single = Single
+studio-prop-type-left = Left half
+studio-prop-type-right = Right half
+studio-prop-type-normal = Normal
+studio-prop-type-sticky = Sticky
+studio-prop-axis-x = Along X
+studio-prop-axis-y = Along Y
+studio-prop-axis-z = Along Z
+studio-prop-shape-straight = Straight
+studio-prop-shape-inner_left = Inner corner, left
+studio-prop-shape-inner_right = Inner corner, right
+studio-prop-shape-outer_left = Outer corner, left
+studio-prop-shape-outer_right = Outer corner, right
+studio-prop-shape-north_south = North–south
+studio-prop-shape-east_west = East–west
+studio-prop-shape-ascending_north = Rising north
+studio-prop-shape-ascending_south = Rising south
+studio-prop-shape-ascending_east = Rising east
+studio-prop-shape-ascending_west = Rising west
+studio-prop-shape-north_east = Curve north–east
+studio-prop-shape-north_west = Curve north–west
+studio-prop-shape-south_east = Curve south–east
+studio-prop-shape-south_west = Curve south–west
+studio-prop-hinge-left = Hinge on the left
+studio-prop-hinge-right = Hinge on the right
+studio-prop-part-head = Head
+studio-prop-part-foot = Foot
+studio-prop-face-floor = On the floor
+studio-prop-face-wall = On a wall
+studio-prop-face-ceiling = On the ceiling
+studio-prop-attachment-floor = On the floor
+studio-prop-attachment-ceiling = On the ceiling
+studio-prop-attachment-single_wall = On one wall
+studio-prop-attachment-double_wall = Between two walls
+studio-prop-mode-compare = Compare mode
+studio-prop-mode-subtract = Subtract mode
+studio-prop-north-low = Low wall north
+studio-prop-north-tall = Tall wall north
+studio-prop-south-low = Low wall south
+studio-prop-south-tall = Tall wall south
+studio-prop-east-low = Low wall east
+studio-prop-east-tall = Tall wall east
+studio-prop-west-low = Low wall west
+studio-prop-west-tall = Tall wall west
+studio-prop-north-none = Nothing north
+studio-prop-south-none = Nothing south
+studio-prop-east-none = Nothing east
+studio-prop-west-none = Nothing west
+studio-prop-north-side = Joined north
+studio-prop-south-side = Joined south
+studio-prop-east-side = Joined east
+studio-prop-west-side = Joined west
+studio-prop-north-up = Up the north side
+studio-prop-south-up = Up the south side
+studio-prop-east-up = Up the east side
+studio-prop-west-up = Up the west side
 
 ## Placeholder pages
 
@@ -897,6 +1328,7 @@ instance-content-browse-shader = Browse shaders
 instance-content-empty = No { $noun } yet
 instance-content-empty-help = Choose one with "Browse", or add local files
 instance-content-refresh-tip = Read and identify again
+instance-content-update-to = Update to { $version }
 instance-content-update-all-count = Update all ({ $count ->
     [one] { $count } file
    *[other] { $count } files
@@ -983,6 +1415,20 @@ instance-content-show-incompatible = Show incompatible versions
 instance-content-version-meta = { $loaders } · { $versions }
 instance-content-version-meta-incompatible = { $loaders } · { $versions } · incompatible with this game
 instance-content-no-changelog = This version has no changelog
+instance-pending-title = { $count ->
+    [one] 1 file is missing
+   *[other] { $count } files are missing
+}
+instance-pending-help = The authors allow downloading these files only on the website. Download them, then add them here; the launcher checks each file and puts it where it belongs.
+instance-pending-add = Add downloaded files…
+instance-pending-page = Download page
+instance-pending-place-yourself = { $file }: you decide where it goes
+instance-pending-added = { $count ->
+    [one] Put 1 file in place
+   *[other] Put { $count } files in place
+}
+instance-pending-not-wanted = { $file } is not one of the missing files
+instance-pending-failed = Couldn't put { $file } in place
 
 instance-world-imported = Imported "{ $name }"
 instance-world-copied = Copied as "{ $name }"
@@ -1108,6 +1554,7 @@ instance-section-read-failed = Couldn't read this section
 instance-section-retry-help = You can try again
 instance-action-install = Install
 instance-action-install-java = Install Java
+instance-action-download-java-now = Download now
 instance-action-add-account = Add one
 instance-action-repair = Repair
 instance-action-change = Change…
@@ -1121,6 +1568,13 @@ instance-problem-loader-unsupported-help = This loader isn't supported yet; swit
 instance-problem-no-java = No usable Java found
 instance-problem-java-required = This version needs Java { $major }
 instance-problem-install-java-help = Install Java and try again
+instance-problem-java-will-download = Java downloads on launch
+instance-problem-java-will-download-help = No installed Java fits; Java { $major } is downloaded before the next launch
+instance-problem-java-will-download-any = No Java found; one is downloaded before the next launch
+instance-problem-java-mismatch = The chosen Java can't run this version
+instance-problem-java-mismatch-help = Java { $chosen } is chosen; this version needs Java { $needed }
+instance-problem-java-advice = Java { $advised } is recommended
+instance-problem-java-advice-help = The current Java can start the game, but this version's loader is tested on Java { $advised }
 instance-problem-no-account = No account chosen yet
 instance-problem-no-account-help = Offline play needs a player name
 instance-problem-damaged = Some game files are missing or damaged
@@ -1215,16 +1669,9 @@ instance-screenshots-empty = No screenshots yet
 instance-screenshots-empty-help = Press F2 in game; the pictures you take show up here
 instance-screenshot-no-preview = No preview
 instance-screenshot-copy = Copy image
-instance-server-checking = { $address } · Checking…
-instance-server-offline = { $address } · Can't connect
-instance-server-online-of = { $online }/{ $max } { $online ->
-    [one] player
-   *[other] players
-} online
-instance-server-online = { $online } { $online ->
-    [one] player
-   *[other] players
-} online
+instance-server-checking = Checking
+instance-server-offline = Can't connect
+instance-server-online = Online
 instance-servers-empty = No servers yet
 instance-servers-empty-help = Once added, it appears in the game's multiplayer list
 instance-server-move-up = Move up
@@ -1244,8 +1691,13 @@ instance-world-import = Import world
 instance-worlds-empty = No worlds yet
 instance-worlds-empty-help = Worlds you create in game show up here, and you can import a .zip
 instance-world-playing = Playing
-instance-world-damaged = Save information can't be read
-instance-world-played-at = Played { $when }
+instance-world-damaged = Unreadable
+world-mode-survival = Survival
+world-mode-creative = Creative
+world-mode-adventure = Adventure
+world-mode-spectator = Spectator
+world-mode-hardcore = Hardcore
+world-cheats = Cheats
 instance-world-enter = Enter
 instance-world-old-version = This game version can't enter the world directly; enter from the main menu
 instance-world-copy = Copy
@@ -1279,11 +1731,20 @@ instance-settings-loader-help = Installed mods may not be compatible with the ne
 instance-settings-game-files = Game files
 instance-settings-files-help = Checks each game file one by one and redownloads missing or damaged ones; worlds, mods and settings aren't changed.
 instance-settings-not-downloaded = Not downloaded
-instance-settings-java-help = Automatic picks one of the discovered Java versions that this game needs; you can also specify one.
-instance-settings-java-auto = Automatic
-instance-settings-java-intro = Empty means automatic. When specifying, enter the path to a Java program or a JDK folder; discovered Java versions are in Settings › Java.
+instance-settings-java-help = Automatic picks a discovered Java of the version this game needs; turned-off Java isn't listed here.
+instance-settings-java-intro = Enter the path to a Java program or JDK folder. Restore defaults switches back to automatic.
 instance-settings-path = Path
 instance-settings-java-pick = Choose a Java program or JDK folder
+instance-settings-java-automatic = Automatic (recommended)
+instance-settings-java-custom = Custom path…
+instance-settings-java-search = Search Java
+instance-settings-java-reading = Detecting Java…
+instance-settings-java-uses = Uses { $java } ({ $path })
+instance-settings-java-will-download = No suitable Java; Java { $major } downloads on launch
+instance-settings-java-will-download-any = No Java found; one downloads on launch
+instance-settings-java-none-fits = No suitable Java; Java { $major } is needed
+instance-settings-java-path-placeholder = /Library/Java/JavaVirtualMachines/…/bin/java
+instance-settings-java-path-empty = Enter the path to a Java program or JDK folder
 instance-settings-jvm-help = Setting this replaces the launcher's default Java arguments; leave it empty to follow the default.
 instance-settings-jvm-intro = One argument per line. Leave it empty to follow the launcher default.
 instance-settings-args = Arguments
@@ -1312,6 +1773,7 @@ instance-settings-quick-world-invalid = That world name isn't a valid save folde
 instance-settings-quick-host-invalid = The server address isn't a valid host name
 instance-settings-quick-port-invalid = The port must be a number from 1 to 65535
 instance-settings-tab-game = Game
+instance-settings-tab-options = Options
 instance-settings-tab-runtime = Runtime
 instance-settings-tab-java = Java
 instance-settings-tab-performance = Performance
@@ -1373,7 +1835,7 @@ account-make-current = Make current account
 
 library-search = Search games
 library-all-loaders = All loaders
-discover-search = Search Modrinth, press Enter
+discover-search = Search { $source }, press Enter
 discover-version-search = Search versions
 
 ## Settings
@@ -1436,6 +1898,14 @@ settings-motion-reduce = Reduce
 settings-motion-full = Full
 settings-language = Language
 settings-language-help = The language of the launcher. Game logs and project descriptions stay as written.
+settings-translation = Translation
+settings-translation-help = When on, Discover uses Chinese summaries from MCIM where it has them (only the platform and project ID go to MCIM); other summaries stay as written. Choose Translate on a project page to send its description to the selected provider. Only Simplified Chinese for now, and titles stay as written.
+settings-translation-provider = Translation provider
+settings-translation-cache = Translation cache
+settings-translation-cache-help = Translations are kept on this computer for 7 days. After you clear them, the next translation asks again.
+translation-clear = Clear
+translation-cache-cleared = Translation cache cleared
+translation-cache-clear-failed = Could not clear the translation cache
 
 settings-memory = Memory
 settings-memory-value = Min { $min } · Max { $max }
@@ -1499,8 +1969,22 @@ settings-java-roots-count = { $count ->
 }
 settings-java-found = Java found
 settings-java-rescan = Detect again
-settings-java-install = Download recommended Java
+settings-java-install = Download Java…
 settings-java-add = Add Java…
+settings-java-source = Download source
+settings-java-source-help = Oracle GraalVM has Java 21 and 25 only; other versions still come from Mojang. Downloads on launch use this source too.
+settings-java-source-mojang = Mojang
+settings-java-source-graalvm = Oracle GraalVM
+settings-java-auto-install = Download Java on launch
+settings-java-auto-install-help = When no installed Java fits, the version the game needs is downloaded before it starts or installs.
+settings-java-download-title = Download Java
+settings-java-download-intro-mojang = Downloads the Java the official launcher uses, from Mojang. Change the source under Download source.
+settings-java-download-intro-graalvm = Downloads GraalVM from Oracle, under the GraalVM Free Terms and Conditions (GFTC). Change the source under Download source.
+settings-java-download-version = Version
+settings-java-download-pick = Choose a version
+settings-java-remove = Delete…
+settings-java-remove-title = Delete { $title }?
+settings-java-remove-body = The folder of this Java the launcher downloaded is deleted. You can download it again when needed.
 
 settings-storage-games = Games
 settings-storage-shared = Shared files
@@ -1529,6 +2013,8 @@ settings-concurrency = Downloads at once
 settings-concurrency-help = How many files download at the same time, 1 to 32. Lower it on an unsteady network.
 settings-concurrency-intro = Leave empty to let the launcher decide.
 settings-concurrency-field = Count (1–32)
+settings-block-assets = Download block assets automatically
+settings-block-assets-help = Schematic previews download their block assets from launcher.lumilio.org when they first need them. When this is off, nothing is downloaded; assets that are already downloaded are still used.
 settings-data-dir = Data folder
 settings-data-dir-help = Games, shared files and settings all live here. It can't be changed.
 settings-reclaim = Check for unused game files
@@ -1545,6 +2031,9 @@ settings-update-check-help = Stable releases are checked at startup and every ho
 settings-update-check-now = Check now
 settings-auto-update = Automatic updates
 settings-auto-update-help = Downloads updates in the background. Turn this off to check manually.
+settings-release-notes = What's new
+settings-release-notes-help = New features, improvements and fixes in this version.
+settings-release-notes-open = View
 settings-update-not-checked = Not checked yet
 settings-update-checking = Checking for updates…
 settings-update-downloading = Downloading { $version }…
@@ -1566,7 +2055,7 @@ settings-license = License
 settings-plugins-none = No plugins
 settings-plugins-none-help = Core plugins appear here, and you can turn each on or off.
 settings-plugin-read-files = Read the game's { $folder } folder
-settings-plugin-write-files = Modify waypoint files in the game's { $folder } folder (backed up first, never while the game runs)
+settings-plugin-write-files = Modify { $names } files in the game's { $folder } folder (backed up first, never while the game runs)
 settings-plugin-network = Connect to { $hosts }
 settings-plugin-launch-events = Know when games start and exit
 settings-plugin-discord = Show game status in Discord on this computer
@@ -1625,6 +2114,8 @@ settings-mirrors-save-failed = Couldn't save the mirror settings
 settings-download-source-save-failed = Couldn't save the download source setting
 settings-java-roots-save-failed = Couldn't save the search folders
 settings-java-save-failed = Couldn't save the Java settings
+settings-java-removed = Java deleted
+settings-java-remove-failed = Couldn't delete Java
 settings-plugin-save-failed = Couldn't save the plugin settings
 settings-plugin-reset-failed = Couldn't restore the plugin defaults
 ## World map
@@ -1707,13 +2198,14 @@ map-notices = Messages
 map-notices-empty = No messages.
 map-group-structures = Structures
 map-estimated = Estimated
-map-estimated-note = Estimated layers have exact positions, but whether the terrain there allows the structure is guessed from biomes, because since 1.18 it depends on terrain height.
+map-estimated-note = Estimated layers have exact positions, but whether the terrain there has room for them (ground height, nearby blocks) is guessed from biomes.
 map-structures-hidden = Structures are hidden when zoomed out.
 map-structure-village = Village
 map-structure-desert-pyramid = Desert temple
 map-structure-jungle-temple = Jungle temple
 map-structure-swamp-hut = Witch hut
 map-structure-igloo = Igloo
+map-structure-igloo-basement = Igloo with basement
 map-structure-outpost = Pillager outpost
 map-structure-monument = Ocean monument
 map-structure-mansion = Woodland mansion
@@ -1732,7 +2224,23 @@ map-structure-end-gateway = End gateway
 map-structure-stronghold = Stronghold
 map-structure-fortress = Nether fortress
 map-structure-bastion = Bastion remnant
+map-structure-bastion-housing = Bastion remnant (housing units)
+map-structure-bastion-hoglin-stable = Bastion remnant (hoglin stables)
+map-structure-bastion-treasure = Bastion remnant (treasure room)
+map-structure-bastion-bridge = Bastion remnant (bridge)
 map-structure-end-city = End city
+map-structure-end-city-ship = End city with ship
+map-structure-nether-fossil = Nether fossil
+map-group-features = Features
+map-feature-fossil = Fossil
+map-feature-fossil-diamond = Deep fossil (diamond ore)
+map-feature-lava-lake = Lava lake
+map-feature-enchanted-golden-apple = Enchanted golden apple (desert pyramid)
+map-group-underground = Underground
+map-underground-copper-vein = Copper vein (Y 0 to 50)
+map-underground-iron-vein = Iron vein (Y −60 to −8)
+map-underground-ravine = Ravine
+map-underground-underwater-ravine = Underwater ravine
 map-group-world = World
 map-litematica-placements = Litematica placements
 map-litematica-unreadable = A Litematica placement or schematic file cannot be read.
@@ -1778,3 +2286,324 @@ map-edit-initials-invalid = Initials are at most 2 characters and cannot contain
 map-edit-unlinked = This world is not linked to Xaero's Minimap data.
 map-edit-unsupported = This layer cannot be edited.
 map-chunks-hidden = Chunk lines are hidden when zoomed out.
+
+## Game options and presets
+library-tab-presets = Presets
+preset-count = { $count ->
+    [one] { $count } preset
+   *[other] { $count } presets
+    }
+preset-search = Search options
+preset-new = New preset…
+preset-create-title = New preset
+preset-create = Create
+preset-name = Name
+preset-name-placeholder = For example: Everyday
+preset-source = Read options from
+preset-source-none = No games yet
+preset-share = Share
+preset-group-controls-detail = Key bindings, mouse sensitivity, auto-jump, toggle sneak and sprint
+preset-group-sound-detail = Master volume and every sound category
+preset-group-video-detail = Render distance, frame rate, FOV, brightness, GUI scale; often differ by modpack
+preset-group-chat-detail = Chat visibility, colors, size and opacity
+preset-group-accessibility-detail = Subtitles, high contrast, screen and FOV effects
+preset-group-general-detail = Game language
+preset-rename-title = Rename preset
+preset-copy-title = Copy preset
+preset-copy-name = { $name } copy
+preset-copy-commit = Copy
+preset-scope-title = Shared options
+preset-scope-help = Cleared options stop syncing, and each game keeps its own. The preset keeps their values, so you can share them again later.
+preset-scope = Shared options…
+preset-rename = Rename…
+preset-copy = Copy…
+preset-delete = Delete…
+preset-delete-title = Delete “{ $name }”?
+preset-delete-body = The preset’s options are deleted with it. Games keep their own options.
+preset-list-detail = { $options ->
+    [one] { $options } option
+   *[other] { $options } options
+    } · { $games ->
+    [one] { $games } game
+   *[other] { $games } games
+    }
+preset-detail-facts = { $options ->
+    [one] Shares { $options } option
+   *[other] Shares { $options } options
+    } · { $games ->
+    [one] used by { $games } game
+   *[other] used by { $games } games
+    }
+preset-games = Games using it
+preset-games-help = Changes here reach these games the next time they launch. Options changed in a game never go back into the preset on their own; you decide in that game’s Settings › Options.
+preset-games-none = No game uses it yet. Choose this preset in a game’s Settings › Options.
+preset-game-open = Open
+preset-left-out = { $count ->
+    [one] { $count } more option is not shared; its value stays in the preset.
+   *[other] { $count } more options are not shared; their values stay in the preset.
+    }
+preset-empty = No presets yet
+preset-empty-help = A preset keeps in-game options such as key bindings and volume in sync across games. Start from a game you have played.
+preset-load-failed = Couldn’t read the presets.
+preset-fields = { $count ->
+    [one] Shares { $count } option
+   *[other] Shares { $count } options
+    }
+preset-on = On
+preset-off = Off
+preset-group-controls = Keys and mouse
+preset-group-sound = Volume
+preset-group-general = Language
+preset-group-chat = Chat
+preset-group-accessibility = Accessibility
+preset-group-video = Graphics and performance
+preset-created = Created “{ $name }”.
+preset-renamed = Renamed to “{ $name }”.
+preset-copied = Copied as “{ $name }”.
+preset-scope-saved = Shared options saved. Games get them on their next launch.
+preset-deleted = Preset deleted.
+preset-stale = The preset just changed somewhere else and has been read again. Try again.
+preset-save-failed-detail = Couldn’t save.
+    { $detail }
+preset-delete-failed-detail = Couldn’t delete the preset.
+    { $detail }
+preset-load-failed-detail = Couldn’t read the presets.
+    { $detail }
+preset-attention = Options changed in the game
+preset-attention-help = { $count ->
+    [one] { $count } change waits for you to decide whether to share it.
+   *[other] { $count } changes wait for you to decide whether to share them.
+    }
+preset-attention-review = Review…
+preset-attention-recovery = Confirm the game has closed
+preset-attention-error = Options couldn’t sync
+preset-attention-error-help = The game’s own options are unchanged. Open Settings › Options to see why.
+options-loading = Reading options…
+options-load-failed = Couldn’t read this game’s options.
+options-busy = The game is running. Options can be changed after it closes.
+options-preset = Preset
+options-preset-help = A game that uses a preset receives the preset’s shared options before each launch. Without a preset, the game uses only its own options.
+options-preset-none = No preset
+options-preset-none-detail = The game manages all of its options
+options-preset-change = Change…
+options-recovery-help = The game did not close normally last time. Once it has closed, check its options. Don’t confirm while it is still open.
+options-recover = Game has closed
+options-sync-failed = Options couldn’t sync last time. The game’s own options are unchanged.
+options-skipped = { $count ->
+    [one] { $count } preset option was not applied
+   *[other] { $count } preset options were not applied
+    }
+options-skipped-help = This game’s options file doesn’t have them, or its version doesn’t support them. The game writes its options on its first launch; the preset applies from the launch after.
+options-missing = No options yet
+options-missing-help = Launch the game once, then change its options here.
+options-unsupported = Options of { $version } can’t be changed here yet
+options-unsupported-help = Change them in the game.
+options-unreadable = Couldn’t read this game’s options file.
+options-none = No options can be changed here.
+options-no-match = No matching options
+options-following = From preset · { $value }
+options-override = This game only · { $value }
+options-pending = Undecided · { $value }
+options-follow = Use preset value ({ $value })
+options-note-shared = Preset “{ $preset }” shares this option. Saving here changes only this game; the preset and other games stay as they are.
+options-out-of-range = Enter a whole number from { $min } to { $max }.
+options-change = { $before } → { $after }
+options-chunks = { $count ->
+    [one] { $count } chunk
+   *[other] { $count } chunks
+    }
+options-unlimited = Unlimited
+options-auto = Auto
+options-choice-chatvisibility-0 = Shown
+options-choice-chatvisibility-1 = Commands only
+options-choice-chatvisibility-2 = Hidden
+options-key-unbound = Not bound
+options-key-space = Space
+options-key-left = Left { $key }
+options-key-right = Right { $key }
+options-key-keypad = Keypad { $key }
+options-key-mouse-left = Left mouse button
+options-key-mouse-right = Right mouse button
+options-key-mouse-middle = Middle mouse button
+options-key-mouse = Mouse button { $button }
+options-bind-title = Choose preset
+options-bind-no-presets = No presets yet. Make one from a game in Library › Presets.
+options-bind-commit = Use preset
+options-unbind-commit = Stop using
+options-bind-recovery = Confirm the last game has closed before changing the preset.
+options-bind-pending = Decide on the options changed in the game before changing the preset.
+options-bind-none-preview = Options stop syncing. This game keeps its current options.
+options-bind-first-launch = The game has no options file yet. It writes one on its first launch, and the preset applies from the launch after.
+options-bind-same = This game’s options already match the preset.
+options-bind-changes = { $count ->
+    [one] The next launch changes { $count } option:
+   *[other] The next launch changes { $count } options:
+    }
+options-bind-missing = { $count ->
+    [one] { $count } more option isn’t in this game and won’t be applied.
+   *[other] { $count } more options aren’t in this game and won’t be applied.
+    }
+options-bound = Now uses “{ $name }”. Applies on the next launch.
+options-unbound = No longer uses a preset. The game keeps its current options.
+options-review-title = { $count ->
+    [one] { $count } option changed in the game
+   *[other] { $count } options changed in the game
+    }
+options-review-help = The preset shares these options. “This game only” keeps the change here; “Update preset” gives it to other games on their next launch; “Use preset value” restores the preset’s value on the next launch.
+options-review-none-selected = Select the options to decide on
+options-review-selected = { $count } selected
+options-keep-here = This game only
+options-share = Update preset
+options-restore = Use preset value
+options-review-conflict = The preset changed it to { $value } too
+options-review-conflict-help = The preset also changed the selected options.
+options-review-replace = Replace with this game’s values…
+options-replace-title = { $count ->
+    [one] Replace { $count } preset option with this game’s value?
+   *[other] Replace { $count } preset options with this game’s values?
+    }
+options-replace-body = The preset’s new values are replaced. Other games that use this preset get this game’s values on their next launch.
+options-replace = Replace
+options-resolved = { $count ->
+    [one] Decided { $count } option. Applies on the next launch.
+   *[other] Decided { $count } options. Applies on the next launch.
+    }
+options-checked = Options checked.
+options-conflict = { $count ->
+    [one] The preset also changed { $count } of them. Review before deciding.
+   *[other] The preset also changed { $count } of them. Review before deciding.
+    }
+options-stale = The options just changed somewhere else and have been read again. Try again.
+options-save-failed = Couldn’t save the options.
+options-status-busy = Running
+options-status-recovery = Confirm it has closed
+options-status-error = Couldn’t sync
+options-status-pending = { $count } undecided
+options-status-overrides = { $count ->
+    [one] { $count } kept for this game
+   *[other] { $count } kept for this game
+    }
+options-status-following = Follows the preset
+preset-setting-soundcategory-master = Master volume
+preset-setting-soundcategory-music = Music
+preset-setting-soundcategory-record = Jukeboxes and note blocks
+preset-setting-soundcategory-weather = Weather
+preset-setting-soundcategory-block = Blocks
+preset-setting-soundcategory-hostile = Hostile creatures
+preset-setting-soundcategory-neutral = Friendly creatures
+preset-setting-soundcategory-player = Players
+preset-setting-soundcategory-ambient = Ambient
+preset-setting-soundcategory-voice = Voice
+preset-setting-soundcategory-ui = UI sounds
+preset-setting-fov = Field of view
+preset-setting-gamma = Brightness
+preset-setting-renderdistance = Render distance
+preset-setting-simulationdistance = Simulation distance
+preset-setting-maxfps = Frame rate limit
+preset-setting-guiscale = GUI scale
+preset-setting-mipmaplevels = Mipmap levels
+preset-setting-entityshadows = Entity shadows
+preset-setting-bobview = View bobbing
+preset-setting-mousesensitivity = Mouse sensitivity
+preset-setting-invertymouse = Invert mouse
+preset-setting-autojump = Auto jump
+preset-setting-rawmouseinput = Raw mouse input
+preset-setting-togglecrouch = Toggle crouch
+preset-setting-togglesprint = Toggle sprint
+preset-setting-lang = Language
+preset-setting-subtitles = Subtitles
+preset-setting-highcontrast = High contrast
+preset-setting-darknesseffectscale = Darkness effect
+preset-setting-damagetiltstrength = Damage tilt
+preset-setting-screeneffectscale = Screen effects
+preset-setting-foveffectscale = FOV effects
+preset-setting-chatvisibility = Chat visibility
+preset-setting-chatcolors = Chat colors
+preset-setting-chatlinks = Chat links
+preset-setting-chatlinksprompt = Ask before opening links
+preset-setting-chatopacity = Chat opacity
+preset-setting-chatscale = Chat scale
+preset-setting-chatwidth = Chat width
+preset-setting-chatheightfocused = Focused chat height
+preset-setting-chatheightunfocused = Unfocused chat height
+preset-setting-chatbackgroundopacity = Chat background opacity
+preset-setting-chatlinespacing = Chat line spacing
+preset-setting-key-forward = Move forward
+preset-setting-key-left = Strafe left
+preset-setting-key-back = Move backward
+preset-setting-key-right = Strafe right
+preset-setting-key-jump = Jump
+preset-setting-key-sneak = Sneak
+preset-setting-key-sprint = Sprint
+preset-setting-key-inventory = Inventory
+preset-setting-key-swapoffhand = Swap offhand item
+preset-setting-key-drop = Drop item
+preset-setting-key-use = Use item
+preset-setting-key-attack = Attack
+preset-setting-key-pickitem = Pick block
+preset-setting-key-chat = Open chat
+preset-setting-key-playerlist = Player list
+preset-setting-key-command = Command
+preset-setting-key-screenshot = Screenshot
+preset-setting-key-toggleperspective = Toggle perspective
+preset-setting-key-smoothcamera = Smooth camera
+preset-setting-key-fullscreen = Toggle fullscreen
+preset-setting-key-spectatoroutlines = Spectator outlines
+preset-setting-key-advancements = Advancements
+preset-setting-key-savetoolbaractivator = Save hotbar
+preset-setting-key-loadtoolbaractivator = Load hotbar
+preset-setting-key-hotbar-1 = Hotbar 1
+preset-setting-key-hotbar-2 = Hotbar 2
+preset-setting-key-hotbar-3 = Hotbar 3
+preset-setting-key-hotbar-4 = Hotbar 4
+preset-setting-key-hotbar-5 = Hotbar 5
+preset-setting-key-hotbar-6 = Hotbar 6
+preset-setting-key-hotbar-7 = Hotbar 7
+preset-setting-key-hotbar-8 = Hotbar 8
+preset-setting-key-hotbar-9 = Hotbar 9
+
+## Release notes
+release-notes-updated = Updated to LumilioCL { $version }
+release-notes-title = What's new in LumilioCL { $version }
+release-notes-all = All release notes
+release-notes-done = Got it
+## Schematic studio: unknown version, blocks not drawn
+studio-version-unknown = Version unknown
+studio-version-unknown-why = This schematic does not record its game version. It is drawn with the game version of the instance. It is not converted automatically, and missing blocks are not checked.
+studio-caption-unknown-game = Version unknown · game { $game }
+studio-convert-unknown = This schematic does not record its game version, so it cannot be converted
+studio-undrawable-count = { $count ->
+    [one] { $count } block type has no model
+   *[other] { $count } block types have no model
+}
+studio-convert-suggested = Suggested replacement: { $block }
+## Schematic studio: resource pack order and folders
+studio-sources-add-zip = Resource pack (zip)…
+studio-sources-add-folder = Resource pack folder…
+studio-sources-add-path = Enter a path…
+studio-sources-path-title = Add a resource pack by path
+studio-sources-path-label = Full path of a zip or a resource pack folder
+studio-sources-path = Paste a resource pack path (zip or folder)
+studio-sources-path-add = Add
+studio-sources-path-failed = Not added: this is not a resource pack, or the path cannot be read
+studio-sources-unused = Off · { $count }
+studio-sources-order = A source lower in the list covers the sources above it. Use ↑ and ↓ to change the order.
+studio-source-up = Move up: the sources below cover it
+studio-source-down = Move down: it covers the sources above
+## Schematic studio: history and backups
+studio-history-summary = { $operations ->
+    [one] { $operations } operation
+   *[other] { $operations } operations
+} · { $copies ->
+    [one] { $copies } backup
+   *[other] { $copies } backups
+} · { $size }
+studio-history-this = This schematic
+studio-history-all = All
+studio-history-none-here = This schematic has not been changed yet. Select All to see the other schematics.
+studio-history-copy = Backup { $size }
+studio-history-copy-gone = The backup is gone and cannot be restored
+studio-history-made = This operation wrote a new file, so there is no backup
+studio-history-loose = Backups not in the log
+studio-history-loose-note = The backup folder has these copies, but the log does not record them (the log was lost or cut short). You can put them back where they came from.
+studio-restore-loose-body = This copy goes back where it came from. The current file is backed up first, and the restore is recorded in the history.

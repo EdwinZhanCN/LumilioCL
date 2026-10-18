@@ -1,4 +1,4 @@
-use super::kinds::{ProjectKind, project_page_url};
+use super::kinds::{ProjectKind, TextFormat};
 use super::search::SideSupport;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -25,8 +25,6 @@ pub struct ProjectLinks {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Project {
-    pub source: String,
-    pub page_url: String,
     pub id: String,
     pub slug: String,
     pub title: String,
@@ -37,7 +35,8 @@ pub struct Project {
     pub categories: Vec<String>,
     pub loaders: Vec<String>,
     pub downloads: u64,
-    pub followers: u64,
+    /// `None` when the source does not count followers.
+    pub followers: Option<u64>,
     pub published: String,
     pub updated: String,
     pub client_side: SideSupport,
@@ -48,15 +47,9 @@ pub struct Project {
     pub gallery: Vec<GalleryImage>,
     pub icon_url: Option<String>,
     pub game_versions: Vec<String>,
-}
-
-impl Project {
-    #[must_use]
-    pub fn page_url(&self) -> String {
-        if self.page_url.is_empty() {
-            project_page_url(self.kind, &self.slug)
-        } else {
-            self.page_url.clone()
-        }
-    }
+    /// The project's page on its source's site.
+    pub page_url: String,
+    /// The author lets people download the files only on the source's site.
+    pub manual_download: bool,
+    pub body_format: TextFormat,
 }

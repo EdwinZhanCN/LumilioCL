@@ -9,16 +9,12 @@ use std::rc::Rc;
 /// What a live page asks the application to do.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum LiveIntent {
-    TranslateBody {
-        source: String,
-        project: String,
-        original: String,
-        request: u64,
-    },
-    ClearTranslationCache,
+    /// Something on the Library's preset page.
+    Preset(crate::game_settings::PresetIntent),
     /// Create an instance with the newest release.
     NewInstance,
-    /// Choose a local `.mrpack` and import it as a new instance.
+    /// Choose a local pack (`.mrpack`, a CurseForge or instance zip) and
+    /// import it as a new instance.
     ImportPack,
     ToggleFavorite(String),
     /// Open the registered instance without launching it.
@@ -29,16 +25,30 @@ pub enum LiveIntent {
     PlayPlace(String, super::PlaceTarget),
     /// Run this Discover search.
     Search(DiscoverQuery),
-    /// Fetch the category and game-version choices.
+    /// Fetch the category and game-version choices of the browsed source.
     LoadFilters,
-    /// Open a project's public page in its own window.
+    /// Translate the open project's body; `request` lets the detail drop a
+    /// result it no longer waits for.
+    TranslateBody {
+        source: String,
+        project: String,
+        original: String,
+        format: lumilio_core::TextFormat,
+        request: u64,
+    },
+    /// Forget every saved translation.
+    ClearTranslationCache,
+    /// Open a project's detail.
     OpenProject {
         kind: ProjectKind,
+        /// The content source (plugin ID).
+        source: String,
         slug: String,
     },
     /// Install a project: into the chosen instance, or as a new one for a modpack.
     Install {
         kind: ProjectKind,
+        source: String,
         slug: String,
         title: String,
         /// One specific version, for mods, packs and shaders.
@@ -69,6 +79,7 @@ pub enum LiveIntent {
     /// Download one version's file where the person chooses (the application
     /// asks where).
     SaveVersionAs {
+        source: String,
         project: String,
         version_id: String,
         file_name: String,
@@ -95,9 +106,15 @@ pub enum LiveIntent {
     OpenGamesFolder,
     /// Download Java into the launcher (the major version, if wanted).
     InstallJava(Option<u32>),
+    /// Download this major from this source (the 下载 Java… dialog).
+    DownloadJava {
+        source: lumilio_core::JavaSource,
+        major: u32,
+    },
     /// Replace an installed file with its newer version (from Discover).
     UpdateInstalled {
         kind: ProjectKind,
+        source: String,
         project: String,
         title: String,
         file_name: String,
@@ -192,6 +209,13 @@ pub enum LiveIntent {
     },
     /// Choose a Java (executable or home folder) to add.
     AddJava,
+    /// Delete a Java the launcher installed (by its home folder), after the
+    /// person confirmed.
+    RemoveJava(PathBuf),
+    SetJavaSource(lumilio_core::JavaSource),
+    SetAutoInstallJava(bool),
+    /// Let schematic previews download the pre-baked block assets.
+    SetAutoDownloadBlockAssets(bool),
     /// Show a file or folder in the system file manager.
     Reveal(PathBuf),
     ClearCache,

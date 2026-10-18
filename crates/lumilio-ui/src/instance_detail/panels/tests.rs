@@ -26,6 +26,8 @@ fn world(folder: &str, name: &str, played: Option<i64>) -> WorldInfo {
         last_played_ms: played,
         game_version: None,
         hardcore: false,
+        game_mode: None,
+        cheats: false,
         icon: None,
         damaged: false,
         lock_touched_ms: None,
@@ -137,7 +139,7 @@ fn every_problem_with_something_to_do_names_it() {
         ),
         (
             ProblemKind::LowMemory { max_mb: 512 },
-            ProblemAction::Settings(3),
+            ProblemAction::Settings(crate::instance_detail::SETTINGS_PERFORMANCE),
         ),
         (
             ProblemKind::LastSessionFailed(SessionOutcome::Crashed),

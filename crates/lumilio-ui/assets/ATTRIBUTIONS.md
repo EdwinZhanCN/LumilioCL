@@ -85,8 +85,8 @@ the other Lucide icons listed above.
 
 ## Fonts
 
-The interface's brand typefaces (design language §13) are embedded from
-`assets/fonts/` and registered from memory at start-up. All three are licensed
+The interface's typefaces (design language §13) are embedded from
+`assets/fonts/` and registered from memory at start-up. All four are licensed
 under the [SIL Open Font License 1.1](https://openfontlicense.org); each licence
 file sits beside the fonts.
 
@@ -98,6 +98,12 @@ file sits beside the fonts.
   Copyright 2020 The JetBrains Mono Project Authors. `OFL-JetBrainsMono.txt`.
 - **DSEG7 Classic** (Regular), [keshikan/DSEG](https://github.com/keshikan/DSEG).
   Copyright (c) 2017 keshikan, Reserved Font Name "DSEG". `OFL-DSEG.txt`.
+- **Monocraft** 4.2.1 (Regular, Bold, Italic, Bold-Italic; the release's OTF
+  files, unmodified), [IdreesInc/Monocraft](https://github.com/IdreesInc/Monocraft).
+  Copyright (c) 2022 Idrees Hassan, no Reserved Font Name. `OFL-Monocraft.txt`.
+  It draws servers' messages of the day. It is a fan typeface built from its
+  own pixel tables; it contains no Mojang font file or asset, and neither
+  Monocraft nor LumilioCL is affiliated with Mojang.
 
 Chinese text is not bundled; it falls back to the platform's system font.
 

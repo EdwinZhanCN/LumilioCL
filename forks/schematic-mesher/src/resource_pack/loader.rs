@@ -35,7 +35,7 @@ pub fn load_from_bytes(data: &[u8]) -> Result<ResourcePack> {
     // Iterate through all files in the archive
     for i in 0..archive.len() {
         let mut file = archive.by_index(i)?;
-        let file_path = file.name().to_string();
+        let file_path = file.name()?.into_owned();
 
         // Skip directories
         if file.is_dir() {

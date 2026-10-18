@@ -11,6 +11,7 @@ fn query() -> DiscoverQuery {
 
 fn category(kind: ProjectKind, header: &str, name: &str) -> CategoryTag {
     CategoryTag {
+        id: name.to_owned(),
         name: name.to_owned(),
         header: header.to_owned(),
         kind,
@@ -78,6 +79,8 @@ fn the_sidebar_offers_only_what_the_source_can_filter_by() {
         open_source: true,
         hide_installed: true,
         advanced: true,
+        exclusions: true,
+        browse_url: None,
     };
     let mut model = filters();
     let before = sections(ProjectKind::Mod, &model);
@@ -422,22 +425,36 @@ fn sections_follow_the_apps_order_per_kind() {
 #[test]
 fn categories_group_by_header_and_sort_like_modrinth() {
     let filters = filters();
+    let names = |groups: Vec<(String, Vec<(&str, &str)>)>| -> Vec<(String, Vec<String>)> {
+        groups
+            .into_iter()
+            .map(|(header, options)| {
+                (
+                    header,
+                    options
+                        .into_iter()
+                        .map(|(_, name)| name.to_owned())
+                        .collect(),
+                )
+            })
+            .collect()
+    };
     assert_eq!(
-        filters.category_groups(ProjectKind::Mod),
+        names(filters.category_groups(ProjectKind::Mod)),
         [
-            ("categories".to_owned(), vec!["magic", "technology"]),
-            ("features".to_owned(), vec!["multiplayer"]),
+            (
+                "categories".to_owned(),
+                vec!["magic".to_owned(), "technology".to_owned()]
+            ),
+            ("features".to_owned(), vec!["multiplayer".to_owned()]),
         ]
     );
     // Numbers sort as numbers, not as text.
-    let packs = filters.category_groups(ProjectKind::ResourcePack);
-    assert_eq!(
-        packs[1],
-        ("resolutions".to_owned(), vec!["8x-", "16x", "128x"])
-    );
+    let packs = names(filters.category_groups(ProjectKind::ResourcePack));
+    assert_eq!(packs[1].1, ["8x-", "16x", "128x"]);
     // Performance impact goes by weight.
     assert_eq!(
-        filters.category_groups(ProjectKind::Shader)[0].1,
+        names(filters.category_groups(ProjectKind::Shader))[0].1,
         ["potato", "medium", "high"]
     );
     assert!(filters.any_of(ProjectKind::ResourcePack, "16x"));
@@ -478,7 +495,6 @@ fn the_version_list_shows_releases_unless_all_are_asked_for() {
 
 fn hit(categories: &[&str], loaders: &[&str]) -> SearchHit {
     SearchHit {
-        page_url: String::new(),
         project_id: "P".to_owned(),
         slug: "fo".to_owned(),
         title: "FO".to_owned(),
@@ -489,11 +505,13 @@ fn hit(categories: &[&str], loaders: &[&str]) -> SearchHit {
         all_categories: categories.iter().map(|name| (*name).to_owned()).collect(),
         loaders: loaders.iter().map(|name| (*name).to_owned()).collect(),
         downloads: 17_731_400,
-        follows: 4886,
+        follows: Some(4886),
         published: "2026-01-01T10:00:00Z".to_owned(),
         updated: "2026-09-27T10:00:00Z".to_owned(),
         environment: Some(Environment::ClientOnly),
         icon_url: Some("https://cdn/x.png".to_owned()),
+        page_url: "https://modrinth.com/mod/fo".to_owned(),
+        manual_download: false,
     }
 }
 
@@ -562,7 +580,7 @@ fn rows_show_counts_environment_and_the_date_the_sort_asks_for() {
     let now = parse_rfc3339("2026-09-30T10:00:00Z").unwrap();
     let row = search_row(&hit, now, &query(), &filters);
     assert_eq!(row.downloads, "1773.1 万");
-    assert_eq!(row.follows, "4886");
+    assert_eq!(row.follows.as_deref(), Some("4886"));
     assert_eq!(
         (row.date.as_str(), row.date_kind),
         ("3 天前", DateKind::Updated)
@@ -676,4 +694,144 @@ fn hide_installed_is_offered_for_packs_and_inside_a_game_and_reads_the_right_lis
     );
     model.query.hide_installed = true;
     assert!(model.hiding_installed());
+}
+
+#[test]
+fn another_source_keeps_the_words_kind_and_versions_and_drops_its_picks() {
+    let browsed = DiscoverQuery::new(ProjectKind::ResourcePack)
+        .apply(DiscoverChange::ToggleVersion("1.21.1".into()))
+        .apply(DiscoverChange::Include(PickGroup::Category, "16x".into()))
+        .apply(DiscoverChange::Sort(SortIndex::Follows))
+        .apply(DiscoverChange::Page(3));
+    let mut browsed = browsed;
+    browsed.text = "faithful".into();
+    let moved = browsed
+        .clone()
+        .apply(DiscoverChange::Source("lumilio.curseforge".into()));
+    assert_eq!(moved.source, "lumilio.curseforge");
+    assert_eq!(moved.kind, ProjectKind::ResourcePack);
+    assert_eq!(moved.text, "faithful");
+    assert_eq!(moved.versions, ["1.21.1"]);
+    assert!(
+        moved.categories.is_empty(),
+        "another source's categories mean other things"
+    );
+    assert_eq!(moved.sort, SortIndex::Relevance);
+    assert_eq!(moved.page, 0);
+    let same = browsed
+        .clone()
+        .apply(DiscoverChange::Source(lumilio_core::DEFAULT_SOURCE.into()));
+    assert_eq!(
+        same.categories, browsed.categories,
+        "the same source changes nothing"
+    );
+    let kind = moved.apply(DiscoverChange::Kind(ProjectKind::Mod));
+    assert_eq!(
+        kind.source, "lumilio.curseforge",
+        "a new kind stays in the source"
+    );
+}
+
+/// A CurseForge-like answer: categories by number, named in the interface
+/// language, and fewer sorts, no exclusions.
+fn curseforge_filters() -> FilterModel {
+    use lumilio_core::KindAbilities;
+    FilterModel::from_core(&DiscoverFilters {
+        abilities: vec![KindAbilities {
+            kind: ProjectKind::Mod,
+            sorts: vec![
+                SortIndex::Relevance,
+                SortIndex::Downloads,
+                SortIndex::Updated,
+            ],
+            game_versions: true,
+            categories: true,
+            loaders: true,
+            environment: false,
+            open_source: false,
+            hide_installed: false,
+            advanced: false,
+            exclusions: false,
+            browse_url: Some("https://www.curseforge.com/minecraft/mc-mods".into()),
+        }],
+        categories: vec![
+            CategoryTag {
+                id: "423".into(),
+                name: "地图与信息".into(),
+                header: "categories".into(),
+                kind: ProjectKind::Mod,
+            },
+            CategoryTag {
+                id: "412".into(),
+                name: "科技".into(),
+                header: "categories".into(),
+                kind: ProjectKind::Mod,
+            },
+        ],
+        ..Default::default()
+    })
+}
+
+#[test]
+fn a_source_offers_its_own_sorts_exclusions_and_listing() {
+    let filters = curseforge_filters();
+    assert_eq!(
+        filters.sorts(ProjectKind::Mod),
+        [
+            SortIndex::Relevance,
+            SortIndex::Downloads,
+            SortIndex::Updated
+        ],
+        "menu order, only what the source has"
+    );
+    assert!(!filters.offers_exclusions(ProjectKind::Mod));
+    assert_eq!(
+        filters.browse_url(ProjectKind::Mod),
+        Some("https://www.curseforge.com/minecraft/mc-mods")
+    );
+    assert_eq!(
+        filters.category_name(ProjectKind::Mod, "423"),
+        Some("地图与信息")
+    );
+    let groups = filters.category_groups(ProjectKind::Mod);
+    assert!(
+        groups[0].1.contains(&("423", "地图与信息")),
+        "a search asks for the ID, the row reads the name"
+    );
+    assert_eq!(
+        FilterModel::default().sorts(ProjectKind::Mod),
+        SORTS,
+        "everything until the source has said"
+    );
+}
+
+#[test]
+fn a_card_leaves_out_a_category_picked_by_id() {
+    let filters = curseforge_filters();
+    let query = query().apply(DiscoverChange::Include(PickGroup::Category, "423".into()));
+    let tags = card_tags(&hit(&["地图与信息", "科技"], &["forge"]), &query, &filters);
+    assert_eq!(names(&tags), ["科技", "forge"]);
+}
+
+#[test]
+fn a_row_without_followers_shows_none_and_says_where_to_download() {
+    let mut found = hit(&[], &[]);
+    found.follows = None;
+    found.manual_download = true;
+    let row = search_row(&found, 0, &query(), &filters());
+    assert_eq!(row.follows, None);
+    assert!(row.manual_download);
+    assert_eq!(row.source, lumilio_core::DEFAULT_SOURCE);
+}
+
+#[test]
+fn packs_installed_from_another_source_are_not_this_ones() {
+    let mut model = model_with(&[
+        ("a", Loader::Fabric, Some("1KVo5zza")),
+        ("b", Loader::Fabric, Some("lumilio.curseforge/285109")),
+    ]);
+    model.query = DiscoverQuery::new(ProjectKind::Modpack);
+    assert_eq!(model.installed_projects(), ["1KVo5zza"]);
+    model.query.source = "lumilio.curseforge".into();
+    assert_eq!(model.installed_projects(), ["285109"]);
 }

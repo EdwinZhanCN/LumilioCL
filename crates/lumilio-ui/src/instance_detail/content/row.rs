@@ -58,7 +58,7 @@ impl InstanceDetailView {
             match &source {
                 Some(source) => {
                     let handler = self.handler.clone();
-                    let slug = source.slug.clone();
+                    let (from, slug) = (source.source.clone(), source.slug.clone());
                     div()
                         .id(("content-title", index))
                         .cursor_pointer()
@@ -67,6 +67,7 @@ impl InstanceDetailView {
                             handler(
                                 InstanceIntent::OpenProject {
                                     kind,
+                                    source: from.clone(),
                                     slug: slug.clone(),
                                 },
                                 window,
@@ -81,7 +82,7 @@ impl InstanceDetailView {
         };
         let byline = match source.as_ref().and_then(|source| source.author.clone()) {
             Some(author) => author,
-            None if source.is_some() => "Modrinth".to_owned(),
+            None if let Some(source) = &source => source.source_name.clone(),
             None => tr!("instance-content-local-file").to_owned(),
         };
 
@@ -95,14 +96,21 @@ impl InstanceDetailView {
             let entry = entry.clone();
             let view = view.clone();
             let update = entry.update.is_some();
-            // ia[instance.content]: 更新单个 | 行内「更新」→ 切换版本弹窗，默认选最新兼容 | 下载 → 校验 → 替换旧文件 → 重扫 → 写历史；停用的保持停用
+            // ia[instance.content]: 更新单个 | 行内橙色 ↻ 图标键（悬停写「更新到 新版本号」）→ 切换版本弹窗，默认选最新兼容 | 下载 → 校验 → 替换旧文件 → 重扫 → 写历史；停用的保持停用 | 与 ⇆ 同宽，有更新的行与没有的行版本列对齐
             // ia[instance.content]: 切换版本 | 行内 ⇆ → 版本弹窗（仅已识别的文件） | 下载所选版本 → 校验 → 替换旧文件 → 重扫 → 写历史；停用的保持停用
-            let button = if update {
+            // Both are square, icon-only keys of one size: a labelled Update
+            // key was wider than ⇆ and pushed its row's version column out of
+            // line with the rows without one. The orange and the tooltip say
+            // what the label said.
+            let button = if let Some(newest) = &entry.update {
                 Key::new(("content-update", index))
                     .icon(Icon::new(UiIcon::Refresh))
-                    .label(tr!("discover-update"))
                     .primary()
                     .small()
+                    .tooltip(tr!(
+                        "instance-content-update-to",
+                        version = newest.number.as_str()
+                    ))
             } else {
                 Key::new(("content-switch-version", index))
                     .icon(Icon::new(UiIcon::Switch))
@@ -187,10 +195,10 @@ impl InstanceDetailView {
                 )
             })
         }];
-        if let Some(source) = &source {
-            let link = lumilio_core::project_page_url(kind, &source.slug);
+        if let Some(source) = source.as_ref().filter(|source| !source.page_url.is_empty()) {
+            let link = source.page_url.clone();
             let view = view.clone();
-            // ia[instance.content]: 复制链接 | 行 ⋯ 菜单（仅已识别） | 复制 Modrinth 项目链接，toast“链接已复制”
+            // ia[instance.content]: 复制链接 | 行 ⋯ 菜单（仅已识别） | 复制项目在它来源网站上的链接，toast“链接已复制”
             more.push(kit::MenuEntry::new(
                 tr!("discover-copy-link"),
                 move |_, cx| {
@@ -263,8 +271,9 @@ impl InstanceDetailView {
                     .gap_1()
                     .items_center()
                     .justify_end()
-                    // Sized by its keys, never narrower than the common case, so a
-                    // row with an Update key cannot spill into the version column.
+                    // Never narrower than a row with every key, so a row without
+                    // ⇆ (a local file) keeps the version column where the others
+                    // have it.
                     .min_w(px(176.))
                     .debug_selector(move || format!("content-actions-{index}"))
                     .children(switch_button)

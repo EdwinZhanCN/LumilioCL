@@ -1,4 +1,5 @@
-use super::jobs::{job, outcome};
+use super::jobs::{install_outcome, job};
+use super::translation::{request_detail_summary, request_summaries};
 use super::{Reload, Wiring};
 use gpui_kit::AppContext as _;
 use gpui_kit::{App, WeakEntity, Window};
@@ -58,12 +59,13 @@ fn run_search(wiring: &Wiring, query: &DiscoverQuery, seq: u64, cx: &mut App) {
         .unwrap_or_default();
     let known_is_current = plan.known_is_current
         || plan.game.as_ref().is_some_and(|game| {
-            wiring.state.borrow().installed_key.as_ref() == Some(&(game.clone(), kind))
+            wiring.state.borrow().installed_key.as_ref()
+                == Some(&(game.clone(), kind, query.source.clone()))
         });
     let service = wiring.backend.service.clone();
     let state = wiring.state.clone();
     let asked = query.clone();
-    let translated_wiring = wiring.clone();
+    let (summaries, source) = (wiring.clone(), query.source.clone());
     job(
         wiring,
         cx,
@@ -78,20 +80,28 @@ fn run_search(wiring: &Wiring, query: &DiscoverQuery, seq: u64, cx: &mut App) {
                 hidden = plan.known;
                 if !known_is_current && let Some(game) = &plan.game {
                     hidden = service
-                        .installed_projects(game, kind)
+                        .installed_projects(game, kind, &asked.source)
                         .await
                         .map(|found| found.into_keys().collect())
                         .unwrap_or_default();
                 }
             }
             let search = asked.to_search(&plan.provided, &plan.filters, hidden);
-            service.search(&search).await
+            service.search(&asked.source, &search).await
         },
         move |shell, result, cx| {
             if state.borrow().search_seq != seq {
                 return;
             }
             let now = unix_now();
+            if let Ok(page) = &result {
+                let items = page
+                    .hits
+                    .iter()
+                    .map(|hit| (hit.project_id.clone(), hit.description.clone()))
+                    .collect();
+                request_summaries(&summaries, seq, source, items, cx);
+            }
             shell.update_live(
                 |model| match result {
                     Ok(page) => {
@@ -111,33 +121,84 @@ fn run_search(wiring: &Wiring, query: &DiscoverQuery, seq: u64, cx: &mut App) {
                 },
                 cx,
             );
-            request_summaries(&translated_wiring, seq, cx);
         },
     );
 }
 
+/// Loads the content sources that are on and the filter choices of the one
+/// browsed. A remembered source that is no longer on gives way to the first
+/// one that is, and the list is searched again there.
 pub(super) fn load_filters(wiring: &Wiring, cx: &mut App) {
+    // Choosing a source asks for this from inside the shell's own update,
+    // and this reads the shell: do that a moment later, as `search` does.
+    let wiring = wiring.clone();
+    cx.spawn(async move |cx| cx.update(|cx| run_load_filters(&wiring, cx)))
+        .detach();
+}
+
+pub(super) fn run_load_filters(wiring: &Wiring, cx: &mut App) {
     let service = wiring.backend.service.clone();
+    let wanted = wiring
+        .shell
+        .read_with(cx, |shell, _| {
+            shell.live().map(|model| model.query.source.clone())
+        })
+        .ok()
+        .flatten()
+        .unwrap_or_else(|| lumilio_core::DEFAULT_SOURCE.to_owned());
+    let reload = wiring.clone();
+    let asked = wanted.clone();
     job(
         wiring,
         cx,
         false,
         Reload::Nothing,
         None,
-        async move { service.discover_filters().await },
-        |shell, result, cx| {
+        async move {
+            let sources = service.content_sources().await;
+            let source = sources
+                .iter()
+                .find(|source| source.id == wanted)
+                .or_else(|| sources.first())
+                .map_or(wanted.clone(), |source| source.id.clone());
+            let filters = service.discover_filters(&source).await;
+            let moved = wanted != source;
+            (sources, source, moved, filters)
+        },
+        move |shell, (sources, source, moved, result), cx| {
+            // Another source was chosen while these loaded; its own load is
+            // on the way, and these choices would put the old one back.
+            if shell
+                .live()
+                .is_some_and(|model| model.query.source != asked)
+            {
+                shell.update_live(|model| model.sources = sources, cx);
+                return;
+            }
             shell.update_live(
-                |model| match result {
-                    Ok(filters) => model.filters = FilterModel::from_core(&filters),
-                    // The page says so where the results go; no failed-filters note.
-                    Err(ServiceError::NoContentSource) => model.filters.loaded = true,
-                    Err(error) => {
-                        model.filters.loaded = true;
-                        model.filters.error = Some(error.to_string());
+                |model| {
+                    model.sources = sources;
+                    if model.query.source != source {
+                        model.query.source = source.clone();
+                    }
+                    match result {
+                        Ok(filters) => model.filters = FilterModel::from_core(&filters),
+                        // The page says so where the results go; no failed-filters note.
+                        Err(ServiceError::NoContentSource) => model.filters.loaded = true,
+                        Err(error) => {
+                            model.filters.loaded = true;
+                            model.filters.error = Some(error.to_string());
+                        }
                     }
                 },
                 cx,
             );
+            if moved {
+                let query = shell.live().map(|model| model.query.clone());
+                if let Some(query) = query {
+                    search(&reload, &query, cx);
+                }
+            }
         },
     );
 }
@@ -170,9 +231,11 @@ pub(super) fn first_search(wiring: &Wiring, cx: &mut App) {
 }
 
 /// Installs a project. `version` picks one file of a mod, pack or shader.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn install(
     wiring: &Wiring,
     kind: ProjectKind,
+    source: String,
     slug: String,
     title: String,
     version: Option<String>,
@@ -181,7 +244,6 @@ pub(super) fn install(
 ) {
     let service = wiring.backend.service.clone();
     let cancel = CancellationToken::new();
-    let source = source_of(wiring, &slug, cx);
     if kind == ProjectKind::Modpack {
         mark_installing(wiring, &slug, true, cx);
         let slug_done = slug.clone();
@@ -195,17 +257,32 @@ pub(super) fn install(
                 title = title.as_str()
             ))),
             async move {
-                service
-                    .from_content_source(source, service.install_modpack(&slug, cancel))
+                let record = service
+                    .install_modpack(&source, &slug, version.as_deref(), cancel)
+                    .await?;
+                // Files the launcher may not download are listed on the game.
+                let missing = service
+                    .pending_downloads(&record.id)
                     .await
+                    .map(|pending| pending.len())
+                    .unwrap_or_default();
+                Ok((record, missing))
             },
             move |shell, result, cx| {
                 mark_installing_in(shell, &slug_done, false, cx);
-                let toast = outcome(
-                    result,
-                    |record| tr!("discover-modpack-installed", name = record.name),
-                    tr!("discover-install-failed", title = title.as_str()),
-                );
+                let toast = match result {
+                    Ok((record, missing)) if missing > 0 => lumilio_ui::toast::Toast::info(tr!(
+                        "discover-modpack-missing",
+                        name = record.name,
+                        count = missing
+                    ))
+                    .sticky(),
+                    other => install_outcome(
+                        other,
+                        |(record, _)| tr!("discover-modpack-installed", name = record.name),
+                        tr!("discover-install-failed", title = title.as_str()),
+                    ),
+                };
                 shell.toast(toast, cx);
             },
         );
@@ -224,11 +301,11 @@ pub(super) fn install(
             instance,
             instance_name,
             kind,
+            source,
             slug,
             title,
             version,
             Vec::new(),
-            source,
             cx,
         );
         return;
@@ -236,18 +313,20 @@ pub(super) fn install(
     // A mod may need other mods. Not being able to find out must not stop
     // the install, so a failed check installs the mod alone.
     let check = {
-        let (instance, slug, version) = (instance.clone(), slug.clone(), version.clone());
-        let source = source.clone();
+        let (instance, source, slug, version) = (
+            instance.clone(),
+            source.clone(),
+            slug.clone(),
+            version.clone(),
+        );
         wiring.backend.spawn(async move {
             service
-                .from_content_source(
-                    source,
-                    service.dependency_report(
-                        &instance,
-                        ProjectKind::Mod,
-                        &slug,
-                        version.as_deref(),
-                    ),
+                .dependency_report(
+                    &instance,
+                    ProjectKind::Mod,
+                    &source,
+                    &slug,
+                    version.as_deref(),
                 )
                 .await
         })
@@ -263,11 +342,11 @@ pub(super) fn install(
                     instance,
                     instance_name,
                     kind,
+                    source,
                     slug,
                     title,
                     version,
                     Vec::new(),
-                    source.clone(),
                     cx,
                 );
                 return;
@@ -284,7 +363,8 @@ pub(super) fn install(
                             .collect::<Vec<_>>(),
                     );
                     let (instance, instance_name) = (instance.clone(), instance_name.clone());
-                    let (slug, title, version) = (slug.clone(), title.clone(), version.clone());
+                    let (source, slug, title, version) =
+                        (source.clone(), slug.clone(), title.clone(), version.clone());
                     DependencyPrompt::new(
                         title.clone(),
                         report,
@@ -303,11 +383,11 @@ pub(super) fn install(
                                 instance.clone(),
                                 instance_name.clone(),
                                 kind,
+                                source.clone(),
                                 slug.clone(),
                                 title.clone(),
                                 version.clone(),
                                 extra,
-                                source.clone(),
                                 cx,
                             );
                         }),
@@ -321,19 +401,19 @@ pub(super) fn install(
 }
 
 /// Installs `slug` into the game, after any chosen dependencies (project,
-/// version, title), each as its own task in Activity. A dependency that fails
-/// is told, and the mod itself is still installed.
+/// version, title; of the same source), each as its own task in Activity. A
+/// dependency that fails is told, and the mod itself is still installed.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn run_install(
     wiring: &Wiring,
     instance: String,
     instance_name: String,
     kind: ProjectKind,
+    source: String,
     slug: String,
     title: String,
     version: Option<String>,
     dependencies: Vec<(String, String, String)>,
-    source: Option<String>,
     cx: &mut App,
 ) {
     let service = wiring.backend.service.clone();
@@ -350,51 +430,49 @@ pub(super) fn run_install(
             title = title.as_str()
         ))),
         async move {
-            service
-                .from_content_source(source, async {
-                    let mut failed = Vec::new();
-                    for (project, version_id, name) in dependencies {
-                        if service
-                            .install_version(
-                                &instance,
-                                kind,
-                                &project,
-                                &version_id,
-                                CancellationToken::new(),
-                            )
-                            .await
-                            .is_err()
-                        {
-                            failed.push(name);
-                        }
-                    }
-                    let installed = match version {
-                        Some(version) => {
-                            service
-                                .install_version(
-                                    &instance,
-                                    kind,
-                                    &slug,
-                                    &version,
-                                    CancellationToken::new(),
-                                )
-                                .await
-                        }
-                        None => {
-                            service
-                                .install_content(&instance, kind, &slug, CancellationToken::new())
-                                .await
-                        }
-                    };
-                    (installed, failed)
-                })
-                .await
+            let mut failed = Vec::new();
+            for (project, version_id, name) in dependencies {
+                if service
+                    .install_version(
+                        &instance,
+                        kind,
+                        &source,
+                        &project,
+                        &version_id,
+                        CancellationToken::new(),
+                    )
+                    .await
+                    .is_err()
+                {
+                    failed.push(name);
+                }
+            }
+            let installed = match version {
+                Some(version) => {
+                    service
+                        .install_version(
+                            &instance,
+                            kind,
+                            &source,
+                            &slug,
+                            &version,
+                            CancellationToken::new(),
+                        )
+                        .await
+                }
+                None => {
+                    service
+                        .install_content(&instance, kind, &source, &slug, CancellationToken::new())
+                        .await
+                }
+            };
+            (installed, failed)
         },
         move |shell, (result, failed), cx| {
             mark_installing_in(shell, &slug_done, false, cx);
             state.borrow_mut().installed_key = None;
             let installed = result.is_ok();
-            let mut toast = outcome(
+            let mut toast = install_outcome(
                 result,
                 |file| {
                     tr!(
@@ -469,6 +547,7 @@ pub(super) fn install_target(wiring: &Wiring, cx: &mut App) -> Option<(String, S
 pub(super) fn open_project(
     wiring: &Wiring,
     kind: ProjectKind,
+    source: String,
     slug: String,
     window: &mut Window,
     cx: &mut App,
@@ -477,37 +556,15 @@ pub(super) fn open_project(
     // Deferred: this may be running inside one of the shell's own updates.
     window.defer(cx, move |_, cx| {
         let project = slug.clone();
-        let _ = wiring
-            .shell
-            .update(cx, |shell, cx| shell.open_detail(kind, &project, cx));
-        let service = wiring.backend.service.clone();
-        let source = wiring
-            .shell
-            .read_with(cx, |shell, _| {
-                shell.live().and_then(|model| {
-                    model
-                        .results
-                        .iter()
-                        .find(|row| row.slug == slug)
-                        .map(|row| row.source.clone())
-                })
-            })
-            .ok()
-            .flatten();
-        let handle = wiring.backend.spawn(async move {
-            match source {
-                Some(source) if !source.is_empty() => {
-                    service.project_detail_from(&source, &slug).await
-                }
-                _ => service.project_detail(&slug).await,
-            }
+        let _ = wiring.shell.update(cx, |shell, cx| {
+            shell.open_detail(kind, &source, &project, cx)
         });
+        let service = wiring.backend.service.clone();
+        let handle = wiring
+            .backend
+            .spawn(async move { service.project_detail(&source, &slug).await });
         let shell = wiring.shell.clone();
         let project = slug_of(&shell, cx);
-        let opened_view = shell
-            .read_with(cx, |shell, _| shell.detail_view())
-            .ok()
-            .flatten();
         cx.spawn(async move |cx| {
             let Ok(result) = handle.await else { return };
             let state = match result {
@@ -516,9 +573,6 @@ pub(super) fn open_project(
             };
             if let Some(project) = project {
                 let _ = shell.update(cx, |shell, cx| {
-                    if shell.detail_view() != opened_view {
-                        return;
-                    }
                     shell.set_detail_state(&project, state, cx);
                     // Dev hook: `LUMILIO_DETAIL_TAB=1|2` starts on Versions / Gallery.
                     if let Some(tab) = std::env::var("LUMILIO_DETAIL_TAB")
@@ -528,8 +582,8 @@ pub(super) fn open_project(
                         shell.select_detail_tab(tab, cx);
                     }
                 });
+                cx.update(|cx| request_detail_summary(&wiring, cx));
             }
-            cx.update(|cx| request_detail_summary(&wiring, cx));
         })
         .detach();
     });
@@ -543,168 +597,4 @@ pub(super) fn slug_of(shell: &WeakEntity<LauncherShell>, cx: &mut App) -> Option
         })
         .ok()
         .flatten()
-}
-
-pub(super) fn source_of(wiring: &Wiring, project: &str, cx: &mut App) -> Option<String> {
-    wiring
-        .shell
-        .read_with(cx, |shell, cx| {
-            if let Some(view) = shell.detail_view()
-                && let DetailState::Ready(detail) = view.read(cx).state()
-                && (detail.project.slug == project || detail.project.id == project)
-            {
-                return Some(detail.project.source.clone());
-            }
-            shell
-                .live()?
-                .results
-                .iter()
-                .find(|row| row.slug == project || row.project_id == project)
-                .map(|row| row.source.clone())
-        })
-        .ok()
-        .flatten()
-        .filter(|source| !source.is_empty())
-}
-
-pub(super) fn request_detail_summary(wiring: &Wiring, cx: &mut App) {
-    let pending = wiring
-        .shell
-        .read_with(cx, |shell, cx| {
-            let view = shell.detail_view()?;
-            let query = view.read(cx).summary_query()?;
-            Some((view, query))
-        })
-        .ok()
-        .flatten();
-    let Some((view, (source, project, original, revision))) = pending else {
-        return;
-    };
-    let service = wiring.backend.service.clone();
-    let (asked_source, asked_project, asked_original) =
-        (source.clone(), project.clone(), original.clone());
-    let handle = wiring.backend.spawn(async move {
-        service
-            .translate_summaries(&asked_source, &[(asked_project.clone(), asked_original)])
-            .await
-            .remove(&asked_project)
-    });
-    let shell = wiring.shell.clone();
-    cx.spawn(async move |cx| {
-        let Ok(translated) = handle.await else { return };
-        let current = shell
-            .read_with(cx, |shell, _| shell.detail_view())
-            .ok()
-            .flatten();
-        if current != Some(view.clone()) {
-            return;
-        }
-        view.update(cx, |view, cx| {
-            view.set_summary_translation(revision, &source, &project, &original, translated, cx)
-        });
-    })
-    .detach();
-}
-
-fn request_summaries(wiring: &Wiring, seq: u64, cx: &mut gpui_kit::Context<LauncherShell>) {
-    let wiring = wiring.clone();
-    cx.spawn(async move |_, cx| {
-        cx.update(|cx| {
-            let rows = wiring
-                .shell
-                .read_with(cx, |shell, _| {
-                    shell.live().map(|model| model.results.clone())
-                })
-                .ok()
-                .flatten()
-                .unwrap_or_default();
-            let Some(source) = rows.first().map(|row| row.source.clone()) else {
-                return;
-            };
-            let items = rows
-                .iter()
-                .map(|row| (row.project_id.clone(), row.original_summary.clone()))
-                .collect::<Vec<_>>();
-            let service = wiring.backend.service.clone();
-            let state = wiring.state.clone();
-            let asked_source = source.clone();
-            job(
-                &wiring,
-                cx,
-                false,
-                Reload::Nothing,
-                None,
-                async move { service.translate_summaries(&source, &items).await },
-                move |shell, translations, cx| {
-                    if state.borrow().search_seq != seq {
-                        return;
-                    }
-                    shell.update_live(
-                        |model| {
-                            if model
-                                .settings
-                                .as_ref()
-                                .is_some_and(|settings| settings.preferences.translation.enabled)
-                            {
-                                for row in &mut model.results {
-                                    if row.source == asked_source
-                                        && let Some(text) = translations.get(&row.project_id)
-                                    {
-                                        row.summary.clone_from(text);
-                                    }
-                                }
-                            }
-                        },
-                        cx,
-                    );
-                },
-            );
-        });
-    })
-    .detach();
-}
-
-pub(super) fn translate_body(
-    wiring: &Wiring,
-    source: String,
-    project: String,
-    original: String,
-    request: u64,
-    cx: &mut App,
-) {
-    let wiring = wiring.clone();
-    cx.spawn(async move |cx| {
-        let view = cx.update(|cx| {
-            wiring
-                .shell
-                .read_with(cx, |shell, _| shell.detail_view())
-                .ok()
-                .flatten()
-        });
-        let Some(view) = view else { return };
-        let service = wiring.backend.service.clone();
-        let handle = wiring
-            .backend
-            .spawn(async move { service.translate_body(&source, &project, &original).await });
-        while !handle.is_finished() {
-            cx.background_executor().timer(super::POLL).await;
-            let current = cx.update(|cx| {
-                wiring
-                    .shell
-                    .read_with(cx, |shell, _| shell.detail_view())
-                    .ok()
-                    .flatten()
-                    == Some(view.clone())
-                    && view.read(cx).translation_request() == Some(request)
-            });
-            if !current {
-                handle.abort();
-                return;
-            }
-        }
-        if let Ok(result) = handle.await {
-            view.update(cx, |view, cx| view.set_translation(request, result, cx));
-        }
-    })
-    .detach();
 }

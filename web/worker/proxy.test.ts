@@ -15,6 +15,23 @@ describe("resolve", () => {
     expect(resolve("/releases/download/v0.2.0-beta.1/SHA256SUMS.txt")?.url).toContain("/v0.2.0-beta.1/");
   });
 
+  it("maps a block-asset bundle file to its block-assets-<n> release", () => {
+    expect(resolve("/block-assets/1/blocks.dat.z")).toEqual({
+      url: "https://github.com/EdwinZhanCN/LumilioCL/releases/download/block-assets-1/blocks.dat.z",
+      maxAge: 86400,
+    });
+    for (const path of [
+      "/block-assets/0/blocks.json",
+      "/block-assets/01/blocks.json",
+      "/block-assets/v1/blocks.json",
+      "/block-assets/1/a/b",
+      "/block-assets/1/",
+      "/block-assets/1/%2e%2e",
+      "/block-assets/blocks.json",
+    ])
+      expect(resolve(path), path).toBeNull();
+  });
+
   it("gives the moving latest alias a short lifetime", () => {
     expect(resolve("/releases/latest/download/latest.json")?.maxAge).toBe(60);
   });

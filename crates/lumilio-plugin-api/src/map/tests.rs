@@ -55,6 +55,9 @@ fn map_contracts_round_trip_without_launcher_types() {
         });
     }
     round_trip(crate::View::Map);
+    round_trip(crate::View::Studio {
+        folder: "schematics".into(),
+    });
     round_trip(TileReply::Partial {
         image: ImageData {
             width: 1,

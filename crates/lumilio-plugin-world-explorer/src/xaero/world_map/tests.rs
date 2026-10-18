@@ -85,6 +85,23 @@ fn a_26_3_region_renders_with_known_block_colours() {
     }
 }
 
+/// The vendored reader finds `region.xaero` by name (patched for zip 9's
+/// fallible entry names, `vendor/xaerotools/LUMILIO.md`), not by position.
+#[test]
+fn a_region_container_reads_the_region_entry_after_another_one() {
+    use std::io::Write;
+    let mut bytes = std::io::Cursor::new(Vec::new());
+    let mut zip = zip::ZipWriter::new(&mut bytes);
+    let options = zip::write::SimpleFileOptions::default();
+    zip.start_file("notes.txt", options).unwrap();
+    zip.write_all(b"not a region").unwrap();
+    zip.start_file("region.xaero", options).unwrap();
+    zip.write_all(b"region stream").unwrap();
+    zip.finish().unwrap();
+    let stream = xaero_core::read_region_container(bytes.get_ref()).unwrap();
+    assert_eq!(stream, b"region stream");
+}
+
 #[test]
 fn codec_rejects_a_future_region_version() {
     let stream = [0xff, 0, 9, 0, 0];

@@ -1,6 +1,6 @@
 use super::super::{Dropdown, InstanceDetailView, InstanceIntent, Section};
 use super::data::Confirm;
-use super::helpers::{act, act_index, clock};
+use super::helpers::{act, act_index};
 use super::{WORLD_SORTS, WORLD_SUBS};
 use crate::assets::UiIcon;
 use crate::kit;
@@ -8,7 +8,7 @@ use crate::theme::ShellColors;
 use crate::toast::Toast;
 use crate::tr;
 use gpui::prelude::*;
-use gpui::{AnyElement, Context, ObjectFit, Window, div, img, px};
+use gpui::{AnyElement, Context, Window, div, px};
 use gpui_component::IndexPath;
 use gpui_component::Sizable as _;
 use gpui_component::input::Input;
@@ -33,35 +33,12 @@ fn cover_lead(
     world: &WorldInfo,
     loader: Option<lumilio_core::Loader>,
     colors: ShellColors,
-) -> AnyElement {
-    let tile = |inner: AnyElement| {
-        div()
-            .relative()
-            .flex_none()
-            .size(px(40.))
-            .overflow_hidden()
-            .bg(colors.body.display)
-            .child(inner)
-            .into_any_element()
-    };
-    if let Some(path) = &world.icon {
-        return tile(
-            img(path.clone())
-                .size_full()
-                .object_fit(ObjectFit::Cover)
-                .into_any_element(),
-        );
-    }
-    let loader = loader.map_or(crate::cover::Loader::Vanilla, crate::live::cover_loader);
-    tile(
-        crate::cover::element(
-            crate::live::seed_of(&world.folder),
-            loader,
-            crate::home::WorldHint::Overworld,
-            colors.body.display,
-            px(0.),
-        )
-        .into_any_element(),
+) -> gpui::Div {
+    kit::cover_tile(
+        world.icon.clone().map(Into::into),
+        crate::live::seed_of(&world.folder),
+        loader.map_or(crate::cover::Loader::Vanilla, crate::live::cover_loader),
+        colors,
     )
 }
 
@@ -272,28 +249,6 @@ impl InstanceDetailView {
             .iter()
             .enumerate()
             .map(|(row, world)| {
-                let mut detail = Vec::new();
-                if playing == Some(world.folder.as_str()) {
-                    detail.push(tr!("instance-world-playing").to_owned());
-                }
-                if world.damaged {
-                    detail.push(tr!("instance-world-damaged").to_owned());
-                }
-                if world.hardcore {
-                    detail.push(tr!("home-place-hardcore").to_owned());
-                }
-                if let Some(version) = &world.game_version {
-                    detail.push(version.clone());
-                }
-                if let Some(played) = world.last_played_ms.filter(|ms| *ms > 0) {
-                    detail.push(tr!(
-                        "instance-world-played-at",
-                        when = clock(played as u64 / 1000)
-                    ));
-                }
-                if detail.is_empty() {
-                    detail.push(world.folder.clone());
-                }
                 let folder = world.folder.clone();
                 let too_old = self.record.as_ref().is_some_and(|record| {
                     lumilio_core::quick_play_world_unsupported(&record.game_version)
@@ -379,13 +334,10 @@ impl InstanceDetailView {
                     self.record.as_ref().map(|record| record.loader),
                     colors,
                 );
-                kit::row(
-                    world.name.clone(),
-                    detail.join(" · "),
-                    Some(lead),
-                    Some(trail.into_any_element()),
-                    colors,
-                )
+                crate::places::world_item(world, playing == Some(world.folder.as_str()), colors)
+                    .lead(lead)
+                    .actions(trail)
+                    .render(colors)
             })
             .collect();
         let controls = h_flex()

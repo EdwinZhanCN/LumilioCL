@@ -1,10 +1,9 @@
 use super::controls::{LiveCtx, send};
-use super::discover::toolbar_select;
 use crate::assets::UiIcon;
 use crate::key::Key;
+use crate::kit;
 use crate::kit::ViewIntent;
 use crate::live::{LibraryCard, LiveIntent, cover_loader};
-use crate::{kit, theme};
 use crate::{tr, tr_all};
 use gpui::prelude::*;
 use gpui::{App, ClickEvent, IntoElement, Window, div, px};
@@ -16,11 +15,14 @@ pub fn library_tabs() -> &'static [&'static str] {
     tr_all![
         "library-tab-all",
         "library-tab-favorites",
-        "library-tab-collections"
+        "library-tab-collections",
+        "library-tab-presets"
     ]
 }
 /// The tab that shows the person's collections.
 pub const COLLECTIONS_TAB: usize = 2;
+/// The tab that shows the game option presets; it frames itself.
+pub const PRESETS_TAB: usize = 3;
 
 /// View-state groups of the Library's ordering and loader filter.
 pub const LIBRARY_SORT: u8 = 210;
@@ -160,24 +162,24 @@ pub(super) fn card(index: usize, card: &LibraryCard, ctx: &LiveCtx) -> impl Into
             kit::faceplate_cover(card.seed, cover_loader(card.loader), card.world, colors),
             colors,
         ))
+        // The loader is the label under the name; the bottom line is the
+        // version and when it was last played.
         .child(
-            h_flex().justify_between().items_center().gap(px(8.)).child(
-                div()
-                    .min_w_0()
-                    .font_family(theme::mono_font())
-                    .text_size(crate::theme::font_px(10.))
-                    .text_color(colors.muted)
-                    .overflow_hidden()
-                    .text_ellipsis()
-                    .whitespace_nowrap()
-                    .child(card.meta.clone()),
-            ),
-        )
-        .child(
-            div()
-                .text_xs()
-                .text_color(colors.muted)
-                .child(card.played.clone()),
+            h_flex()
+                .justify_between()
+                .items_center()
+                .gap(px(8.))
+                .child(kit::tag(
+                    card.game_version.clone(),
+                    kit::TagKind::Plain,
+                    colors,
+                ))
+                .child(kit::reading(
+                    card.ago
+                        .clone()
+                        .unwrap_or_else(|| tr!("library-never-played").to_owned()),
+                    colors,
+                )),
         )
         .child(
             h_flex()
@@ -348,7 +350,37 @@ pub(super) fn collections_body(ctx: &LiveCtx, needle: &str) -> gpui::AnyElement 
         .into_any_element()
 }
 
-pub fn library(ctx: &LiveCtx) -> impl IntoElement {
+/// The Library's page actions with the tab's own secondary key; every tab
+/// shares the primary and the More menu.
+pub(super) fn page_actions(secondary: Key, ctx: &LiveCtx) -> kit::PageActions {
+    // ia[library]: 导入其他启动器的游戏 | L2 ⋯ 菜单 → 选文件夹（MultiMC/Prism 实例、.minecraft）→ 有多个时勾选 | 后台导入，复制玩家文件，原文件不动；CurseForge 格式不支持 | ADR 0016
+    // ia[library]: 从备份恢复 | L2 ⋯ 菜单 → 选备份 .zip | 后台恢复成新游戏，不覆盖已有的 | ADR 0015
+    // ia[library]: 打开游戏库文件夹 | L2 ⋯ 菜单 | 在访达中打开所有游戏所在的文件夹
+    kit::PageActions::new("live-library-actions")
+        .secondary(secondary)
+        .more(kit::MenuEntry::new(
+            tr!("library-import-game"),
+            send(&ctx.handler, LiveIntent::ImportGame),
+        ))
+        .more(kit::MenuEntry::new(
+            tr!("library-restore"),
+            send(&ctx.handler, LiveIntent::RestoreBackup),
+        ))
+        .more(kit::MenuEntry::new(
+            tr!("library-open-folder"),
+            send(&ctx.handler, LiveIntent::OpenGamesFolder),
+        ))
+        // ia[library]: 新建游戏 | L2 主要 → 新建游戏弹窗 | 创建并（可选）立即安装；成功后打开新游戏页
+        .primary(kit::action(
+            "live-new",
+            tr!("library-new-game"),
+            Some(UiIcon::Plus),
+            true,
+            send(&ctx.handler, LiveIntent::NewInstance),
+        ))
+}
+
+pub fn library(ctx: &LiveCtx) -> gpui::AnyElement {
     let colors = ctx.colors;
     let tab = ctx.state.library_tab.min(library_tabs().len() - 1);
     let needle = ctx.filter.to_lowercase();
@@ -406,53 +438,27 @@ pub fn library(ctx: &LiveCtx) -> impl IntoElement {
             .into_any_element()
     };
 
-    let mut actions = kit::PageActions::new("live-library-actions");
-    if tab == COLLECTIONS_TAB {
+    let secondary = if tab == COLLECTIONS_TAB {
         // ia[library]: 合集：新建 | 合集标签 L2「新建合集」 | 弹窗取名；名称不重复
-        actions = actions.secondary(
-            kit::action(
-                "live-new-collection",
-                tr!("library-collection-new"),
-                Some(UiIcon::Plus),
-                false,
-                send(&ctx.handler, LiveIntent::NewCollection),
-            )
-            .debug_selector(|| "live-new-collection".into()),
-        );
+        kit::action(
+            "live-new-collection",
+            tr!("library-collection-new"),
+            Some(UiIcon::Plus),
+            false,
+            send(&ctx.handler, LiveIntent::NewCollection),
+        )
+        .debug_selector(|| "live-new-collection".into())
     } else {
-        // ia[library]: 导入整合包 | L2 次要 → 系统选文件（.mrpack，或 MultiMC/Prism/本启动器备份的 .zip） | 后台导入，进度在动态；完成 toast 并可点“打开”
-        actions = actions.secondary(kit::action(
+        // ia[library]: 导入整合包 | L2 次要 → 系统选文件（.mrpack、CurseForge 整合包 .zip，或 MultiMC/Prism/本启动器备份的 .zip） | 后台导入，进度在动态；完成 toast 并可点“打开”；CurseForge 整合包的文件由 CurseForge 来源解析，作者只允许在网站下载的先按 SHA-1 到 Modrinth 找，找不到的列在游戏的内容页 | CurseForge 整合包需要开着 CurseForge 来源
+        kit::action(
             "live-import",
             tr!("library-import-pack"),
             Some(UiIcon::Download),
             false,
             send(&ctx.handler, LiveIntent::ImportPack),
-        ));
-    }
-    // ia[library]: 导入其他启动器的游戏 | L2 ⋯ 菜单 → 选文件夹（MultiMC/Prism 实例、.minecraft）→ 有多个时勾选 | 后台导入，复制玩家文件，原文件不动；CurseForge 格式不支持 | ADR 0016
-    // ia[library]: 从备份恢复 | L2 ⋯ 菜单 → 选备份 .zip | 后台恢复成新游戏，不覆盖已有的 | ADR 0015
-    // ia[library]: 打开游戏库文件夹 | L2 ⋯ 菜单 | 在访达中打开所有游戏所在的文件夹
-    let actions = actions
-        .more(kit::MenuEntry::new(
-            tr!("library-import-game"),
-            send(&ctx.handler, LiveIntent::ImportGame),
-        ))
-        .more(kit::MenuEntry::new(
-            tr!("library-restore"),
-            send(&ctx.handler, LiveIntent::RestoreBackup),
-        ))
-        .more(kit::MenuEntry::new(
-            tr!("library-open-folder"),
-            send(&ctx.handler, LiveIntent::OpenGamesFolder),
-        ))
-        // ia[library]: 新建游戏 | L2 主要 → 新建游戏弹窗 | 创建并（可选）立即安装；成功后打开新游戏页
-        .primary(kit::action(
-            "live-new",
-            tr!("library-new-game"),
-            Some(UiIcon::Plus),
-            true,
-            send(&ctx.handler, LiveIntent::NewInstance),
-        ));
+        )
+    };
+    let actions = page_actions(secondary, ctx);
 
     v_flex()
         .w_full()
@@ -482,14 +488,14 @@ pub fn library(ctx: &LiveCtx) -> impl IntoElement {
                     .gap_3()
                     .items_center()
                     .flex_wrap()
-                    .child(toolbar_select(
+                    .child(kit::labeled_select(
                         tr!("library-sort"),
                         &ctx.controls.library_sort,
                         130.,
                         colors,
                     ))
                     .children((loaders.len() > 1).then(|| {
-                        toolbar_select(
+                        kit::labeled_select(
                             tr!("library-loader"),
                             &ctx.controls.library_loader,
                             150.,
@@ -499,4 +505,5 @@ pub fn library(ctx: &LiveCtx) -> impl IntoElement {
             }),
         )
         .child(kit::entrance(body, ("live-library-body", tab)))
+        .into_any_element()
 }

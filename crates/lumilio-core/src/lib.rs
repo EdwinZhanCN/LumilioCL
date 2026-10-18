@@ -17,8 +17,10 @@ mod diagnostics;
 mod discover;
 mod environment;
 mod fetch;
+mod fingerprint;
 mod forge_install;
 mod forge_meta;
+mod game_settings;
 mod history;
 mod import_game;
 mod injector;
@@ -37,9 +39,9 @@ mod microsoft;
 mod mirror_presets;
 mod modpack;
 use lumilio_nbt as nbt;
-mod model_assets;
 mod pack_export;
 mod persist;
+mod picture;
 mod plugins;
 mod process;
 mod reclaim;
@@ -48,6 +50,8 @@ mod release;
 mod repair;
 mod resource_lock;
 mod root_lock;
+mod schematic_assets;
+mod schematic_ops;
 mod screenshots;
 mod servers;
 mod service;
@@ -92,18 +96,23 @@ pub use diagnostics::{
     read_crash_report, read_latest_log,
 };
 pub use discover::{
-    CategoryTag, ContentClient, DependencyKind, DiscoverError, Environment, GalleryImage,
-    GameVersionTag, GroupLabel, IntentError, KindAbilities, LoaderTag, Pick, Project, ProjectKind,
-    ProjectLinks, ProjectSummary, ReleaseChannel, SITE_BASE, SearchHit, SearchPage, SearchQuery,
-    SideSupport, SortIndex, SourceFilters, Stance, Version, VersionFile, VersionGroup,
-    browse_page_url, environment, fits as version_fits, install_request as content_install_request,
-    pick_version, project_page_url, version_groups,
+    Catalog, CategoryTag, ContentClient, DEFAULT_SOURCE, DependencyKind, DiscoverError,
+    Environment, FileHashes, GalleryImage, GameVersionTag, GroupLabel, IntentError, KindAbilities,
+    LoaderTag, PackFileKind, Pick, Project, ProjectKind, ProjectLinks, ProjectOrigin,
+    ProjectSummary, ReleaseChannel, ResolvedFile, SearchHit, SearchPage, SearchQuery, SideSupport,
+    SortIndex, SourceFilters, Stance, TextFormat, Version, VersionFile, VersionGroup, environment,
+    fits as version_fits, install_request as content_install_request, pick_version, version_groups,
 };
 pub use environment::{
     CompatibilityRule, HostProfile, MachineArchitecture, PlatformFamily, RuleDecision,
 };
 pub use fetch::{DOCUMENT_LIMIT, FetchError, fetch_document, post_document};
 pub use forge_meta::{forge_versions, neoforge_game_version, neoforge_versions};
+pub use game_settings::{
+    GameSettingGroup, GameSettingKind, GameSettingValue, GameSettingsError, GameSettingsView,
+    InstanceOptions, OptionChange, OptionsFile, SettingChange, SettingResolution, SettingsPreset,
+    game_setting_group, game_setting_kind,
+};
 pub use history::{
     ChangeKind, HistoryEvent, HistoryLog, HistoryRead, SessionOutcome, finish_session,
     record_attempt,
@@ -118,7 +127,12 @@ pub use install::{
 pub use instance::{
     Collection, InstanceRecord, InstanceSettings, InstanceStore, Loader, NewInstance, StoreError,
 };
-pub use java::{JavaLocator, JavaRuntime, choose as choose_java, parse_major as parse_java_major};
+pub use java::{
+    JavaChoice, JavaLocator, JavaNeeds, JavaRule, JavaRuntime, RuleStrength, choose as choose_java,
+    install_major as java_install_major, parse_major as parse_java_major,
+};
+pub use java_runtime::JavaSource;
+pub use java_runtime::graalvm::LICENSE_URL as GRAALVM_LICENSE_URL;
 pub use launch::{
     LaunchContext, LaunchDirectories, LaunchError, LaunchPlan, NativeArchive, RequiredDownload,
 };
@@ -132,23 +146,25 @@ pub use loader::{
     profile_url as loader_profile_url, recommended as recommended_loader,
     versions_url as loader_versions_url,
 };
+pub use lumilio_block_assets::{BakedPack, BlockCatalog, BlockNames};
 pub use lumilio_plugin_api::PluginState;
 pub use microsoft::{
     AuthError, DeviceCode, MICROSOFT_CLIENT_ID, MicrosoftClient, MinecraftLogin, OAuthTokens,
     Secret, client_id as microsoft_client_id,
 };
 pub use mirror_presets::MirrorPreset;
-pub use model_assets::{ModelAssetsError, ResourcePack};
 pub use modpack::{
-    ClientSupport, ModpackError, OVERRIDES_LIMIT, PackFile, PackIndex, extract_overrides,
-    import as import_modpack, is_trusted_source, parse_index as parse_pack_index,
-    plan as plan_modpack, read_index as read_pack_index,
+    ClientSupport, ModpackError, OVERRIDES_LIMIT, PackFile, PackIndex, PendingDownload,
+    extract_overrides, import as import_modpack, is_trusted_source,
+    parse_index as parse_pack_index, plan as plan_modpack, read_index as read_pack_index,
 };
 pub use pack_export::{ExportError, ExportReport, ExportSpec, PackFormat};
+pub use picture::{PictureError, fit_within, png_within};
 pub use translation::{
     TranslatedDocument, TranslationError, TranslationPreferences, TranslationProvider,
 };
 pub mod world_map;
+pub use plugins::write::CONFLICT as WRITE_CONFLICT;
 pub use plugins::{
     MapFailure, MapProviders, PluginContentSource, PluginEffect, PluginFinding, PluginHost,
     PluginInfo, PluginStatus, PluginTab,
@@ -168,13 +184,21 @@ pub use repair::{
     InstallationVerifier, IntegrityIssue, RepairError, RepairExecutor, RepairFinding, RepairPlan,
     RepairReport,
 };
+pub use schematic_assets::{
+    AssetNotice, AssetPlan, BUNDLE_URL, BundleIndex, EntityGeometry, PlannedSource, ProvidedSource,
+    SchematicAssetsError, SourceRole, run_dumper,
+};
+pub use schematic_ops::schemes::{ReplaceSchemes, SchemeRow};
+pub use schematic_ops::{KeptBackup, SchematicLogEntry, SchematicOperation};
 pub use screenshots::{ScreenshotError, ScreenshotInfo};
-pub use servers::{PackPolicy, PingError, ProtocolVersion, ServerEntry, ServerError, ServerStatus};
+pub use servers::{
+    Motd, MotdSpan, PackPolicy, PingError, ProtocolVersion, ServerEntry, ServerError, ServerStatus,
+};
 pub use service::{
-    ActivityView, AppearanceApplyResult, ContentEffect, ContentResult, DependencyNeed,
-    DependencyReport, DiscoverFilters, GameLogSource, GameLogs, InstalledProject, LauncherService,
-    Library, ModelPreview, ProfileSnapshot, ProjectDetail, ServiceError, ThirdPartySignIn,
-    now as unix_now,
+    ActivityView, AddedFile, AppearanceApplyResult, ContentEffect, ContentResult,
+    ContentSourceInfo, DependencyNeed, DependencyReport, DiscoverFilters, GameLogSource, GameLogs,
+    InstalledProject, InstanceJava, LauncherService, Library, ModelPreview, ProfileSnapshot,
+    ProjectDetail, ServiceError, ThirdPartySignIn, now as unix_now,
 };
 pub use settings::{
     AccountEntry, AccountKind, AuthServerEntry, DownloadSourcePreference, LauncherSettings,
@@ -197,10 +221,11 @@ pub use storage::{
 };
 pub use transfer::USER_AGENT;
 pub use transfer::{
-    ByteStream, DefaultTransport, FileTransport, HttpMethod, HttpRequest, HttpTransport,
-    OfficialSource, PrefixMirror, RetryPolicy, SourceChain, SourceFailure, SourceProvider,
-    TransferBatchReport, TransferEngine, TransferError, TransferEvent, TransferOutcome,
-    TransferRequest, Transport, TransportError, TransportFuture, TransportResponse,
+    ByteStream, ContentDigest, DefaultTransport, FileTransport, HttpMethod, HttpRequest,
+    HttpTransport, OfficialSource, PrefixMirror, RetryPolicy, SourceChain, SourceFailure,
+    SourceProvider, TransferBatchReport, TransferEngine, TransferError, TransferEvent,
+    TransferOutcome, TransferRequest, Transport, TransportError, TransportFuture,
+    TransportResponse,
 };
 pub use tuning::{
     AfterLaunch, Appearance, DOWNLOAD_CONCURRENCY, DiscoverPreferences, EnvVar, FONT_SCALE_PERCENT,
@@ -213,7 +238,7 @@ pub use updates::{
 };
 pub use wallpaper::{WallpaperError, import_wallpaper, remove_wallpapers};
 pub use worlds::{
-    WorldError, WorldInfo, copy_name as world_copy_name, delete as delete_world,
+    GameMode, WorldError, WorldInfo, copy_name as world_copy_name, delete as delete_world,
     duplicate as duplicate_world, scan as scan_worlds, size as world_size,
 };
 pub use yggdrasil::{AuthServer, LITTLE_SKIN_URL, Profile as CharacterProfile, YggdrasilError};

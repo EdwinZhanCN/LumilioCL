@@ -1,18 +1,19 @@
 use std::io::Write;
 
+use lumilio_block_assets::{AssetSource, BakedPack, EntityLayers, bake};
 use nucleation::UniversalSchematic;
 
-use crate::scene::{game_data_version, rgba_to_bgra};
+use crate::scene::rgba_to_bgra;
 use crate::{Scene, SceneError, View};
 
 /// A pack with one block, `minecraft:stone`, a flat red cube.
-fn tiny_pack() -> Vec<u8> {
+pub(super) fn tiny_pack() -> BakedPack {
     cube_pack("stone", None)
 }
 
 /// A pack whose only block, `minecraft:<block>`, is a flat red cube. With a data version it
-/// carries a client JAR's `version.json`.
-fn cube_pack(block: &str, data_version: Option<i32>) -> Vec<u8> {
+/// carries a client JAR's `version.json`. Baked as the launcher bakes a jar.
+fn cube_pack(block: &str, data_version: Option<i32>) -> BakedPack {
     let mut png = Vec::new();
     let red = image::RgbaImage::from_pixel(16, 16, image::Rgba([255, 0, 0, 255]));
     image::DynamicImage::ImageRgba8(red)
@@ -47,17 +48,16 @@ fn cube_pack(block: &str, data_version: Option<i32>) -> Vec<u8> {
         zip.start_file(name, options).unwrap();
         zip.write_all(bytes).unwrap();
     }
-    zip.finish().unwrap().into_inner()
+    bake(&[AssetSource::ArchiveBytes(
+        zip.finish().unwrap().into_inner(),
+    )])
+    .unwrap()
 }
 
 #[test]
 fn a_client_jar_names_its_data_version() {
-    assert_eq!(
-        game_data_version(&cube_pack("stone", Some(5023))),
-        Some(5023)
-    );
-    assert_eq!(game_data_version(&tiny_pack()), None);
-    assert_eq!(game_data_version(b"not a zip"), None);
+    assert_eq!(cube_pack("stone", Some(5023)).meta.data_version, Some(5023));
+    assert_eq!(tiny_pack().meta.data_version, None);
 }
 
 /// `minecraft:chain` became `minecraft:iron_chain` in data version 4541. A schematic saved
@@ -77,7 +77,7 @@ fn renamed_blocks_are_converted_or_reported() {
             &["minecraft:chain".to_string()][..],
         ),
     ] {
-        match Scene::load(&litematic, &pack) {
+        match Scene::load(&litematic, &pack, EntityLayers::new()) {
             Ok(scene) => assert_eq!(scene.undrawable_blocks(), expected),
             Err(SceneError::NoGpu) => {
                 eprintln!("skipped: no graphics adapter on this machine");
@@ -179,7 +179,11 @@ fn a_bad_pack_is_rejected_before_adapter_creation() {
     let mut schematic = UniversalSchematic::new("test".into());
     schematic.fill_cuboid_str((0, 0, 0), (1, 1, 1), "minecraft:stone");
     assert!(matches!(
-        Scene::from_schematic(&schematic, b"not a zip"),
+        Scene::from_schematic(
+            schematic.clone(),
+            &BakedPack::default(),
+            EntityLayers::new()
+        ),
         Err(SceneError::Pack(_))
     ));
 }
@@ -187,7 +191,7 @@ fn a_bad_pack_is_rejected_before_adapter_creation() {
 #[test]
 fn a_file_that_is_not_a_schematic_is_a_parse_error() {
     assert!(matches!(
-        Scene::load(b"not a schematic", &tiny_pack()),
+        Scene::load(b"not a schematic", &tiny_pack(), EntityLayers::new()),
         Err(SceneError::Parse(_))
     ));
 }
@@ -196,14 +200,15 @@ fn a_file_that_is_not_a_schematic_is_a_parse_error() {
 fn a_cube_renders_red_pixels_in_the_middle() {
     let mut schematic = UniversalSchematic::new("test".into());
     schematic.fill_cuboid_str((0, 0, 0), (3, 3, 3), "minecraft:stone");
-    let mut scene = match Scene::from_schematic(&schematic, &tiny_pack()) {
-        Ok(scene) => scene,
-        Err(SceneError::NoGpu) => {
-            eprintln!("skipped: no graphics adapter on this machine");
-            return;
-        }
-        Err(e) => panic!("{e}"),
-    };
+    let mut scene =
+        match Scene::from_schematic(schematic.clone(), &tiny_pack(), EntityLayers::new()) {
+            Ok(scene) => scene,
+            Err(SceneError::NoGpu) => {
+                eprintln!("skipped: no graphics adapter on this machine");
+                return;
+            }
+            Err(e) => panic!("{e}"),
+        };
     let frame = scene.render(&View::new(), 64, 48).unwrap();
     assert_eq!((frame.width, frame.height), (64, 48));
     assert_eq!(frame.bgra.len(), 64 * 48 * 4);
@@ -231,13 +236,22 @@ fn preview_timings() {
     let started = Instant::now();
     let mut scene = if let Ok(path) = std::env::var("LUMILIO_SCHEMATIC") {
         let schematic = std::fs::read(path).unwrap();
-        let pack =
-            std::fs::read(std::env::var("LUMILIO_PACK").expect("resource pack path")).unwrap();
-        Scene::load(&schematic, &pack).unwrap()
+        let pack = std::env::var("LUMILIO_PACK").expect("client jar or resource pack path");
+        let pack = bake(&[AssetSource::at(pack)]).unwrap();
+        // `entities.dat.z` from `cargo xtask bake-blocks`, read for the pack's game version.
+        let entities = std::env::var("LUMILIO_ENTITIES")
+            .map(|path| {
+                let bundle =
+                    lumilio_block_assets::EntityBundle::read(&std::fs::read(path).unwrap())
+                        .unwrap();
+                bundle.layers_of(pack.meta.game_version.as_deref().unwrap_or_default())
+            })
+            .unwrap_or_default();
+        Scene::load(&schematic, &pack, entities).unwrap()
     } else {
         let mut schematic = UniversalSchematic::new("timing fixture".into());
         schematic.fill_cuboid_str((0, 0, 0), (15, 15, 15), "minecraft:stone");
-        Scene::from_schematic(&schematic, &tiny_pack()).unwrap()
+        Scene::from_schematic(schematic.clone(), &tiny_pack(), EntityLayers::new()).unwrap()
     };
     eprintln!(
         "load (inputs/parse/mesh/GPU combined): {:?}",
@@ -267,4 +281,28 @@ fn preview_timings() {
         rgba_to_bgra(std::hint::black_box(&mut pixels));
     }
     eprintln!("BGRA only: {:?}", started.elapsed() / 100);
+}
+
+mod coverage;
+mod entities;
+mod focus;
+mod hanging;
+mod icons;
+mod looks;
+mod pick;
+
+/// A file that names no data version is drawn as it is: converting it to the pack's version
+/// would first assume Nucleation's canonical version (plan schematic-studio, T39).
+#[test]
+fn a_schematic_without_a_data_version_is_not_converted() {
+    let pack = cube_pack("stone", Some(3465));
+    let mut unknown = UniversalSchematic::new("unknown".into());
+    unknown.set_block_str(0, 0, 0, "minecraft:stone");
+    assert!(!crate::scene::to_pack_version(&mut unknown, &pack));
+    assert_eq!(unknown.metadata.mc_version, None);
+
+    let mut known = unknown.clone();
+    known.metadata.mc_version = Some(3337);
+    assert!(crate::scene::to_pack_version(&mut known, &pack));
+    assert_eq!(known.metadata.mc_version, Some(3465));
 }
