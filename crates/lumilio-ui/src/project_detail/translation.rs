@@ -202,7 +202,7 @@ impl ProjectDetailView {
         }
         let entity = cx.entity();
         let active = translation.shown || translation.loading;
-        // ia[discover]: 翻译 / 显示原文 | 详情页安装键左侧 · Languages 图标键 | 开启与翻译中用主题强调色；再按恢复正文原文；简介自动用 MCIM，标题不翻译
+        // ia[discover]: 翻译 / 显示原文 | 详情页安装键左侧 · Languages 图标键 | 开启与翻译中用主题强调色；再按恢复正文原文；简介自动用 MCIM，没有时用 launcher.lumilio.org，标题不翻译
         Some(
             Key::new("detail-translate")
                 .icon(Icon::new(UiIcon::Languages))

@@ -1,6 +1,9 @@
 // launcher.lumilio.org: one Worker serving the built site (`dist/`) and,
 // for /releases/* and /block-assets/* only, the GitHub release mirror
-// (worker/proxy.ts).
+// (worker/proxy.ts); /translate/* is Discover's summary translation
+// (worker/translate.ts). Its CurseForge requests need the CF_API_KEY secret,
+// which the `deploy` job of .github/workflows/web.yml uploads with each
+// deployment from the repository secret of the same name.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "lumilio-launcher",
@@ -10,8 +13,20 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "404-page",
-    "run_worker_first": ["/releases/*", "/block-assets/*"]
+    "run_worker_first": ["/releases/*", "/block-assets/*", "/translate/*"]
   },
+  "ai": { "binding": "AI" },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "lumilio-translations",
+      // From `wrangler d1 create lumilio-translations` (plan translation-fallback T3).
+      "database_id": "2a88fc8b-7385-400a-81d3-bb7e3df6105a",
+      // Apply with `wrangler d1 migrations apply lumilio-translations --remote`
+      // before deploying a Worker that needs a new table.
+      "migrations_dir": "migrations"
+    }
+  ],
   "routes": [{ "pattern": "launcher.lumilio.org", "custom_domain": true }],
   "observability": { "enabled": true }
 }

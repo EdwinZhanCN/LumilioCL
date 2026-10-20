@@ -113,6 +113,24 @@ fn a_count_chooses_its_english_plural() {
     );
 }
 
+/// UTF-8 saved again as Latin-1 turns Chinese into C1 control characters
+/// (U+0080–U+009F), which no catalog writes on purpose.
+#[test]
+fn catalogs_hold_no_mojibake() {
+    for locale in [Locale::SimplifiedChinese, Locale::English] {
+        let path = format!("{}/{DOMAIN}.ftl", locale.tag());
+        let file = Catalogs::get(&path).unwrap_or_else(|| panic!("{path} is compiled in"));
+        let source = std::str::from_utf8(&file.data).expect("catalogs are UTF-8");
+        for (number, line) in source.lines().enumerate() {
+            assert!(
+                !line.chars().any(|c| ('\u{80}'..='\u{9f}').contains(&c)),
+                "{path}:{} is mojibake: {line}",
+                number + 1
+            );
+        }
+    }
+}
+
 #[test]
 fn arguments_carry_no_isolation_marks() {
     let shown = english().get_args_concrete(
