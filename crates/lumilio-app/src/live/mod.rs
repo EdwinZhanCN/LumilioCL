@@ -19,6 +19,7 @@ mod library;
 mod logs;
 mod new_game;
 mod settings;
+mod translation;
 mod update;
 mod wardrobe;
 

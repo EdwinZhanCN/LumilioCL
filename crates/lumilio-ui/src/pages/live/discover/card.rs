@@ -306,7 +306,12 @@ pub(super) fn result_row(index: usize, row: &SearchRow, ctx: &LiveCtx) -> impl I
                         .text_sm()
                         .text_color(colors.muted)
                         .line_clamp(2)
-                        .child(row.summary.clone()),
+                        .child(
+                            row.translated_summary
+                                .as_ref()
+                                .unwrap_or(&row.summary)
+                                .clone(),
+                        ),
                 )
                 .child(div().pt(px(2.)).child(tag_line(row, colors))),
         )

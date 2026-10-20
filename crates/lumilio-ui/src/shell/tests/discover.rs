@@ -104,6 +104,7 @@ fn a_result_the_target_already_has_shows_installed_or_offers_the_update(cx: &mut
                         title: format!("Mod {n}"),
                         author: "a".into(),
                         summary: String::new(),
+                        translated_summary: None,
                         environment: None,
                         tags: CardTags::default(),
                         downloads: "1".into(),
@@ -543,6 +544,7 @@ fn frame_cost_of_a_full_discover_page(cx: &mut TestAppContext) {
             title: format!("Project number {n}"),
             author: "someone".to_owned(),
             summary: "A long enough summary to wrap onto a second line when the window is narrow, describing the pack.".to_owned(),
+            translated_summary: None,
             environment: Some(lumilio_core::Environment::ClientAndServer),
             tags: crate::live::CardTags {
                 shown: ["adventure", "magic", "technology", "quests"]
@@ -657,6 +659,68 @@ fn choosing_another_source_searches_there_and_loads_its_filters(cx: &mut TestApp
 }
 
 #[gpui::test]
+fn turning_translation_off_puts_the_original_summaries_back(cx: &mut TestAppContext) {
+    use crate::live::{CardTags, DateKind, LiveIntent, SearchRow, SettingsView};
+
+    cx.update(gpui_component::init);
+    let (shell, cx) = cx.add_window_view(|_, cx| {
+        LauncherShell::new(cx).with_live(Rc::new(|_: LiveIntent, _, _| {}))
+    });
+    let mut settings = SettingsView::default();
+    settings.preferences.translation.enabled = true;
+    let row = SearchRow {
+        source: lumilio_core::DEFAULT_SOURCE.to_owned(),
+        project_id: "id".to_owned(),
+        kind: lumilio_core::ProjectKind::Mod,
+        slug: "p".to_owned(),
+        title: "Sodium".to_owned(),
+        author: "someone".to_owned(),
+        summary: "A rendering engine.".to_owned(),
+        translated_summary: Some("渲染引擎。".to_owned()),
+        environment: None,
+        tags: CardTags::default(),
+        downloads: "1".to_owned(),
+        follows: None,
+        date: String::new(),
+        date_kind: DateKind::Updated,
+        page_url: String::new(),
+        icon_url: None,
+        seed: 1,
+        manual_download: false,
+    };
+    shell.update(cx, |shell, cx| {
+        shell.update_live(
+            |model| {
+                model.settings = Some(settings);
+                model.results = vec![row];
+            },
+            cx,
+        );
+    });
+    let shown = |shell: &gpui::Entity<LauncherShell>, cx: &mut gpui::VisualTestContext| {
+        shell.read_with(cx, |shell, _| {
+            let row = &shell.live().unwrap().results[0];
+            (row.summary.clone(), row.translated_summary.clone())
+        })
+    };
+    assert_eq!(
+        shown(&shell, cx),
+        ("A rendering engine.".into(), Some("渲染引擎。".into()))
+    );
+    shell.update(cx, |shell, cx| {
+        shell.update_live(
+            |model| {
+                if let Some(settings) = &mut model.settings {
+                    settings.preferences.translation.enabled = false;
+                }
+            },
+            cx,
+        );
+    });
+    assert_eq!(shown(&shell, cx), ("A rendering engine.".into(), None));
+}
+
+#[gpui::test]
 fn a_narrow_window_gives_the_result_name_room(cx: &mut TestAppContext) {
     use crate::live::{CardTags, DateKind, LiveIntent, SearchRow, SearchStatus};
     use gpui::{px, size};
@@ -674,6 +738,7 @@ fn a_narrow_window_gives_the_result_name_room(cx: &mut TestAppContext) {
         title: "All the Mods 10 - ATM10".to_owned(),
         author: "someone".to_owned(),
         summary: "A pack.".to_owned(),
+        translated_summary: None,
         environment: None,
         tags: CardTags::default(),
         downloads: "1".to_owned(),

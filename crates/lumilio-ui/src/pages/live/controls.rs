@@ -26,6 +26,8 @@ pub struct LiveControls {
     pub library_loader: Entity<SelectState<SearchableVec<String>>>,
     /// The loader codes behind the loader list's entries after "全部".
     pub library_loaders: Vec<usize>,
+    /// The Settings translation provider; Microsoft Edge is the only one.
+    pub translation_provider: Entity<SelectState<SearchableVec<String>>>,
     /// The Settings plugin list's scroll, so it keeps the wheel while it can
     /// scroll.
     pub plugin_scroll: gpui::ScrollHandle,
@@ -104,6 +106,14 @@ impl LiveControls {
                 )
             }),
             library_loaders: Vec::new(),
+            translation_provider: cx.new(|cx| {
+                SelectState::new(
+                    SearchableVec::new(vec!["Microsoft Edge".to_owned()]),
+                    Some(IndexPath::default()),
+                    window,
+                    cx,
+                )
+            }),
             plugin_scroll: gpui::ScrollHandle::new(),
             language: crate::i18n::generation(),
             presets_search: false,

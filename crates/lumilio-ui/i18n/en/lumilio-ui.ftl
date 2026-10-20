@@ -748,6 +748,12 @@ project-group-alpha-beta = All alpha and beta versions
 project-group-alpha = All alpha versions
 project-group-beta = All beta versions
 project-group-pre-alpha = All pre-alpha versions
+translation-action = Translate
+translation-loading = Translating…
+translation-original = Show original
+translation-retry = Retry translation
+translation-failed = Translation failed. The original text is kept. You can retry.
+translation-partial = Some text could not be translated. The original text is kept. Translate again to retry.
 
 ## Dependencies
 
@@ -1892,6 +1898,14 @@ settings-motion-reduce = Reduce
 settings-motion-full = Full
 settings-language = Language
 settings-language-help = The language of the launcher. Game logs and project descriptions stay as written.
+settings-translation = Translation
+settings-translation-help = When on, Discover uses Chinese summaries from MCIM where it has them (only the platform and project ID go to MCIM); other summaries stay as written. Choose Translate on a project page to send its description to the selected provider. Only Simplified Chinese for now, and titles stay as written.
+settings-translation-provider = Translation provider
+settings-translation-cache = Translation cache
+settings-translation-cache-help = Translations are kept on this computer for 7 days. After you clear them, the next translation asks again.
+translation-clear = Clear
+translation-cache-cleared = Translation cache cleared
+translation-cache-clear-failed = Could not clear the translation cache
 
 settings-memory = Memory
 settings-memory-value = Min { $min } · Max { $max }

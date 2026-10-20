@@ -94,6 +94,23 @@ impl LauncherShell {
                 window,
                 cx,
             ),
+            DetailIntent::Translate {
+                source,
+                project,
+                original,
+                format,
+                request,
+            } => live(
+                LiveIntent::TranslateBody {
+                    source,
+                    project,
+                    original,
+                    format,
+                    request,
+                },
+                window,
+                cx,
+            ),
         });
         // The page's address comes with the project.
         let url = String::new();
@@ -111,7 +128,11 @@ impl LauncherShell {
             view.set_target_quiet(target);
             view
         });
-        view.update(cx, |view, cx| view.set_game_tags(tags, cx));
+        let translation = self.translation_enabled();
+        view.update(cx, |view, cx| {
+            view.set_game_tags(tags, cx);
+            view.set_translation_enabled(translation, cx);
+        });
         self.visit(cx);
         self.live_instance = None;
         self.detail = Some(DetailSlot {
@@ -162,6 +183,20 @@ impl LauncherShell {
     /// The content source of the project open on Discover, if any.
     pub fn detail_source(&self) -> Option<&str> {
         self.detail.as_ref().map(|slot| slot.source.as_str())
+    }
+
+    /// The page of the project open on Discover, for answers that belong to
+    /// it (translations); compare it to tell whether the page changed since.
+    pub fn detail_view(&self) -> Option<Entity<ProjectDetailView>> {
+        self.detail.as_ref().map(|slot| slot.view.clone())
+    }
+
+    /// Translation is on in Settings (off until the settings are read).
+    pub(super) fn translation_enabled(&self) -> bool {
+        self.live
+            .as_ref()
+            .and_then(|model| model.settings.as_ref())
+            .is_some_and(|settings| settings.preferences.translation.enabled)
     }
 }
 

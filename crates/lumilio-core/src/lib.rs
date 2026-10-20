@@ -61,6 +61,7 @@ mod snapshots;
 mod staged;
 mod storage;
 mod transfer;
+mod translation;
 mod tuning;
 mod updates;
 mod wallpaper;
@@ -159,6 +160,9 @@ pub use modpack::{
 };
 pub use pack_export::{ExportError, ExportReport, ExportSpec, PackFormat};
 pub use picture::{PictureError, fit_within, png_within};
+pub use translation::{
+    TranslatedDocument, TranslationError, TranslationPreferences, TranslationProvider,
+};
 pub mod world_map;
 pub use plugins::write::CONFLICT as WRITE_CONFLICT;
 pub use plugins::{

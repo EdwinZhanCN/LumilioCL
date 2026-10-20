@@ -325,10 +325,16 @@ pub(super) fn load_settings(wiring: &Wiring, cx: &mut App) {
         };
         wiring.state.borrow_mut().preferences = settings.preferences.clone();
         let mut offers_known = false;
+        let mut translation_on = false;
         let _ = wiring.shell.update(cx, |shell, cx| {
             shell.plugins_changed(&plugins, cx);
             shell.update_live(
                 |model| {
+                    let was = model
+                        .settings
+                        .as_ref()
+                        .is_some_and(|view| view.preferences.translation.enabled);
+                    translation_on = !was && settings.preferences.translation.enabled;
                     let storage = model.settings.as_ref().and_then(|view| view.storage);
                     let offers = model
                         .settings
@@ -350,6 +356,14 @@ pub(super) fn load_settings(wiring: &Wiring, cx: &mut App) {
         });
         if !offers_known {
             cx.update(|cx| load_java_offers(&wiring, cx));
+        }
+        // Translation just came on (or was on at start-up): what is shown
+        // gets its summaries now; turning it off already showed the originals.
+        if translation_on {
+            cx.update(|cx| {
+                super::translation::request_shown_summaries(&wiring, cx);
+                super::translation::request_detail_summary(&wiring, cx);
+            });
         }
         let service = wiring.backend.service.clone();
         let Ok(usage) = wiring

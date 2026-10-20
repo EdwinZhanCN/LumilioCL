@@ -1,4 +1,5 @@
 use super::jobs::{install_outcome, job};
+use super::translation::{request_detail_summary, request_summaries};
 use super::{Reload, Wiring};
 use gpui_kit::AppContext as _;
 use gpui_kit::{App, WeakEntity, Window};
@@ -64,6 +65,7 @@ fn run_search(wiring: &Wiring, query: &DiscoverQuery, seq: u64, cx: &mut App) {
     let service = wiring.backend.service.clone();
     let state = wiring.state.clone();
     let asked = query.clone();
+    let (summaries, source) = (wiring.clone(), query.source.clone());
     job(
         wiring,
         cx,
@@ -92,6 +94,14 @@ fn run_search(wiring: &Wiring, query: &DiscoverQuery, seq: u64, cx: &mut App) {
                 return;
             }
             let now = unix_now();
+            if let Ok(page) = &result {
+                let items = page
+                    .hits
+                    .iter()
+                    .map(|hit| (hit.project_id.clone(), hit.description.clone()))
+                    .collect();
+                request_summaries(&summaries, seq, source, items, cx);
+            }
             shell.update_live(
                 |model| match result {
                     Ok(page) => {
@@ -572,6 +582,7 @@ pub(super) fn open_project(
                         shell.select_detail_tab(tab, cx);
                     }
                 });
+                cx.update(|cx| request_detail_summary(&wiring, cx));
             }
         })
         .detach();

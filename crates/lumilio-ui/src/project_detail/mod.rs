@@ -8,7 +8,10 @@
 
 mod gallery;
 mod header;
+mod translation;
 mod versions;
+
+pub use translation::SummaryQuery;
 
 use std::rc::Rc;
 
@@ -43,6 +46,14 @@ pub enum DetailIntent {
         file_name: String,
         version_id: String,
         title: String,
+    },
+    /// Translate the body; the answer goes to `set_translation` with `request`.
+    Translate {
+        source: String,
+        project: String,
+        original: String,
+        format: lumilio_core::TextFormat,
+        request: u64,
     },
 }
 
@@ -133,6 +144,7 @@ pub struct ProjectDetailView {
     viewer: Option<usize>,
     /// The game version picker of the versions list, made on first use.
     version_picker: Option<versions::Picker>,
+    translation: translation::DetailTranslation,
 }
 
 pub const VERSIONS_PER_PAGE: usize = 20;
@@ -159,10 +171,12 @@ impl ProjectDetailView {
             prefiltered: false,
             viewer: None,
             version_picker: None,
+            translation: translation::DetailTranslation::default(),
         }
     }
 
     pub fn set_state(&mut self, state: DetailState, cx: &mut Context<Self>) {
+        self.forget_translation();
         if let DetailState::Ready(detail) = &state {
             self.title = detail.project.title.clone().into();
             self.url = detail.project.page_url.clone().into();
@@ -467,11 +481,26 @@ impl ProjectDetailView {
         } else {
             project.body.clone()
         };
-        let body = crate::kit::rich_text("detail-body", text, project.body_format);
-        div()
+        let translated = self.shown_translation();
+        // A translation is HTML whatever the source wrote.
+        let body = match translated {
+            Some(translated) => crate::kit::rich_text(
+                "detail-body-translated",
+                translated.text.clone(),
+                lumilio_core::TextFormat::Html,
+            ),
+            None => crate::kit::rich_text("detail-body", text, project.body_format),
+        };
+        v_flex()
             .w_full()
             .debug_selector(|| "detail-description".into())
             .text_color(colors.foreground)
+            .children(translated.filter(|translated| translated.partial).map(|_| {
+                div()
+                    .text_sm()
+                    .text_color(colors.muted)
+                    .child(tr!("translation-partial"))
+            }))
             .child(body.selectable(true))
             .into_any_element()
     }

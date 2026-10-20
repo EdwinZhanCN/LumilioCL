@@ -699,6 +699,16 @@ pub(super) fn on_live_intent(
         }
         LiveIntent::Search(query) => search(wiring, &query, cx),
         LiveIntent::LoadFilters => load_filters(wiring, cx),
+        LiveIntent::TranslateBody {
+            source,
+            project,
+            original,
+            format,
+            request,
+        } => super::translation::translate_body(
+            wiring, source, project, original, format, request, cx,
+        ),
+        LiveIntent::ClearTranslationCache => super::translation::clear_cache(wiring, cx),
         LiveIntent::OpenProject { kind, source, slug } => {
             open_project(wiring, kind, source, slug, window, cx)
         }

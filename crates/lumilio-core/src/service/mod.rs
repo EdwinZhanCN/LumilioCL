@@ -38,6 +38,7 @@ mod snapshots;
 mod support;
 mod third_party;
 mod tracking;
+mod translation;
 mod types;
 mod wardrobe;
 mod world_map;
@@ -114,6 +115,8 @@ pub struct LauncherService<T> {
     runtime_roots: Option<Vec<PathBuf>>,
     /// Filter choices per content source, for the life of the service.
     filters: Mutex<std::collections::BTreeMap<String, DiscoverFilters>>,
+    /// Translated summaries and bodies, cached in their own SQLite file.
+    translation: crate::translation::SharedTranslation,
     /// Where sign-in secrets live; never a file.
     credentials: Arc<dyn CredentialStore>,
     /// One refresh at a time: refresh tokens rotate, so two at once would
@@ -167,6 +170,9 @@ impl<T: Transport + Clone> LauncherService<T> {
             .with_network_config(transport.clone(), settings.source_chain().ok());
         Ok(Self {
             plugins: Arc::new(plugins),
+            translation: Arc::new(crate::translation::TranslationService::new(
+                layout.root().to_owned(),
+            )),
             textures: crate::skin::cache::TextureCache::new(
                 layout.root().join("cache/skin-textures"),
             ),

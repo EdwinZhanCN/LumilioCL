@@ -29,9 +29,9 @@
       "id": "discover-translation",
       "planId": "discover-translation",
       "name": "发现页翻译",
-      "lede": "简介和更新日志翻译成界面语言。",
+      "lede": "简介自动显示中文，详情正文点击翻译，标题保留原文。",
       "version": "0.2.0",
-      "status": "proposed"
+      "status": "in_progress"
     },
     {
       "id": "wasm-plugin-registry",

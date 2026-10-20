@@ -36,6 +36,9 @@ pub struct SearchRow {
     pub title: String,
     pub author: String,
     pub summary: String,
+    /// MCIM's Chinese summary, shown instead of `summary` while translation
+    /// is on; `summary` itself always stays as the source wrote it.
+    pub translated_summary: Option<String>,
     pub environment: Option<Environment>,
     pub tags: CardTags,
     pub downloads: String,
@@ -108,6 +111,7 @@ pub fn search_row(
         title: hit.title.clone(),
         author: hit.author.clone(),
         summary: hit.description.clone(),
+        translated_summary: None,
         environment: hit.environment,
         tags: card_tags(hit, query, filters),
         downloads: count_label(hit.downloads),

@@ -3,7 +3,8 @@ use super::rows::{preference_row, row, send, with_preferences};
 use crate::kit;
 use crate::live::SettingsView;
 use crate::{tr, tr_all};
-use gpui::{AnyElement, IntoElement};
+use gpui::{AnyElement, IntoElement, div, prelude::*, px};
+use gpui_component::{Sizable as _, select::Select};
 use lumilio_core::{AfterLaunch, Language, MotionPreference};
 
 pub(super) fn general(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
@@ -50,6 +51,63 @@ pub(super) fn general(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
                 }
             },
             ctx,
+        ),
+        // ia[settings]: 开启翻译 | 通用 · 开关（默认关） | 开启后发现列表与详情页头自动显示 MCIM 中文简介，正文点击翻译；关闭立即恢复原文
+        row(
+            "settings-translation",
+            tr!("settings-translation"),
+            Some(tr!("settings-translation-help").to_owned()),
+            "",
+            Some(
+                kit::switch(
+                    "settings-translation-switch",
+                    prefs.translation.enabled,
+                    tr!("settings-translation"),
+                    send(
+                        &ctx.handler,
+                        with_preferences(view, {
+                            let enabled = prefs.translation.enabled;
+                            move |prefs| prefs.translation.enabled = !enabled
+                        }),
+                    ),
+                )
+                .into_any_element(),
+            ),
+            colors,
+        ),
+        // ia[settings]: 翻译提供商 | 通用 · 下拉框 | 正文用的实时翻译；目前只有微软 Edge 并默认选中，MCIM 只供简介、不在此列
+        row(
+            "settings-translation-provider",
+            tr!("settings-translation-provider"),
+            None,
+            "",
+            Some(
+                div()
+                    .w(px(180.))
+                    .child(
+                        Select::new(&ctx.controls.translation_provider)
+                            .small()
+                            .disabled(!prefs.translation.enabled),
+                    )
+                    .into_any_element(),
+            ),
+            colors,
+        ),
+        // ia[settings]: 清除翻译缓存 | 通用 · 按钮 | 删除本地保存的译文，下次翻译重新请求；结果以提示告知
+        row(
+            "settings-translation-cache",
+            tr!("settings-translation-cache"),
+            Some(tr!("settings-translation-cache-help").to_owned()),
+            "",
+            Some(
+                kit::ghost(
+                    "settings-translation-clear",
+                    tr!("translation-clear"),
+                    send(&ctx.handler, crate::live::LiveIntent::ClearTranslationCache),
+                )
+                .into_any_element(),
+            ),
+            colors,
         ),
         // ia[settings]: 进入游戏后 | 通用 · 分段：保持 / 隐藏启动器 | 没有“关闭启动器”：启动器要守着游戏记录会话与游玩时间，关掉它游戏也会结束
         preference_row(

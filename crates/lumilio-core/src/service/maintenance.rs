@@ -52,6 +52,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// system will not delete a file a running game still holds, this reports
     /// the error and the rest stays as it was.
     pub async fn clear_cache(&self) -> Result<u64, ServiceError> {
+        self.translation.invalidate();
         let layout = self.layout.clone();
         let freed = tokio::task::spawn_blocking(move || crate::storage::clear_cache(&layout))
             .await

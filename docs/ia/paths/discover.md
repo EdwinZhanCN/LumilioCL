@@ -28,6 +28,7 @@
 | 安装整合包 | 详情页主按钮「安装为新游戏」 | 新建游戏，完成后 toast 可“打开” |  | `lumilio-ui/src/project_detail/header.rs` |
 | 详情页安装按钮 | 主按钮：安装 / 安装中 / 更新 / 切换版本（已装且在介绍页）/ 已安装（已装且在版本页） | 目标游戏已有的才出现后几种；「切换版本」带你去版本页 |  | `lumilio-ui/src/project_detail/header.rs` |
 | 详情页右键菜单 | 在页头上右键：安装 / 在（来源）中打开 / 复制链接 | 与「⋯」菜单同效 |  | `lumilio-ui/src/project_detail/header.rs` |
+| 翻译 / 显示原文 | 详情页安装键左侧 · Languages 图标键 | 开启与翻译中用主题强调色；再按恢复正文原文；简介自动用 MCIM，标题不翻译 |  | `lumilio-ui/src/project_detail/translation.rs` |
 | 安装指定版本 | 详情页版本行「安装」/「切换」/「已安装」 | 后台任务；已装的这一版显示已安装，已装别的版本显示切换（换成这一版）；与目标游戏不兼容的版本禁用 |  | `lumilio-ui/src/project_detail/versions.rs` |
 | 安装整合包的指定版本 | 整合包详情页版本行「安装」 | 把这一版装成新游戏（主按钮装最新版）；后台任务，完成后 toast 可“打开”；安装中禁用 |  | `lumilio-ui/src/project_detail/versions.rs` |
 | 版本筛选 | 版本页签顶部一行：发布渠道（正式 / 测试 / 早期）、加载器、添加游戏版本（可搜索），已选的游戏版本是可点掉的标签 | 列表即时过滤；从游戏页进入时默认筛到这个游戏的版本和加载器 |  | `lumilio-ui/src/project_detail/versions.rs` |

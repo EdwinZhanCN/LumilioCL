@@ -8,6 +8,148 @@ fn sizes_read_naturally() {
     assert_eq!(size_label(3 * 1024 * 1024 * 1024), "3.0 GB");
 }
 
+fn translated(text: &str) -> lumilio_core::TranslatedDocument {
+    lumilio_core::TranslatedDocument {
+        text: text.into(),
+        partial: false,
+    }
+}
+
+fn shows_translation(view: &gpui::Entity<ProjectDetailView>, cx: &gpui::VisualTestContext) -> bool {
+    view.read_with(cx, |view, _| view.shown_translation().is_some())
+}
+
+#[gpui::test]
+fn translation_requires_the_setting_and_a_click_and_ignores_disabled_late_results(
+    cx: &mut TestAppContext,
+) {
+    let (view, cx, seen) = mount(cx, None, detail());
+    assert!(cx.debug_bounds("detail-translate").is_none());
+    view.update(cx, |view, cx| view.set_translation_enabled(true, cx));
+    cx.run_until_parked();
+    assert!(
+        seen.borrow().is_empty(),
+        "enabling does not translate a body"
+    );
+    let button = cx.debug_bounds("detail-translate").unwrap();
+    let install = cx.debug_bounds("detail-install").unwrap();
+    assert!(
+        button.origin.x + button.size.width <= install.origin.x,
+        "translation toggle precedes install"
+    );
+    assert!(
+        (f32::from(button.origin.y) - f32::from(install.origin.y)).abs() < 1.5,
+        "translation belongs to the same header action row"
+    );
+    cx.simulate_click(button.center(), gpui::Modifiers::none());
+    let request = match seen.borrow().last().unwrap() {
+        DetailIntent::Translate {
+            source,
+            project,
+            original,
+            format,
+            request,
+        } => {
+            assert_eq!(source, lumilio_core::DEFAULT_SOURCE);
+            assert_eq!(project, "P");
+            assert_eq!(original, "# Hello");
+            assert_eq!(*format, lumilio_core::TextFormat::Markdown);
+            *request
+        }
+        _ => panic!("translation button must emit translation intent"),
+    };
+    view.update(cx, |view, cx| {
+        view.set_translation(request, Ok(translated("<p>中文</p>")), cx)
+    });
+    assert!(shows_translation(&view, cx));
+    view.read_with(cx, |view, _| assert_eq!(view.title(), "Cool"));
+    cx.run_until_parked();
+    let bounds = cx.debug_bounds("detail-translate").unwrap();
+    cx.simulate_mouse_move(
+        gpui::point(gpui::px(0.), gpui::px(0.)),
+        None,
+        gpui::Modifiers::none(),
+    );
+    cx.run_until_parked();
+    cx.update(|window, cx| {
+        let color = crate::theme::Body::current(cx).orange;
+        let scale = window.scale_factor();
+        assert!(
+            window
+                .painted_quads()
+                .iter()
+                .any(|quad| (quad.background.as_solid() == Some(color)
+                    || quad.background.as_solid() == Some(crate::theme::nudge(color)))
+                    && (quad.bounds.origin.x.0 / scale - f32::from(bounds.origin.x)).abs() < 1.5),
+            "enabled translation toggle uses the theme accent, including its hover shade"
+        );
+    });
+    let button = cx.debug_bounds("detail-translate").unwrap();
+    cx.simulate_click(button.center(), gpui::Modifiers::none());
+    assert!(!shows_translation(&view, cx));
+    cx.run_until_parked();
+    let button = cx.debug_bounds("detail-translate").unwrap();
+    cx.simulate_click(button.center(), gpui::Modifiers::none());
+    let pending = view.read_with(cx, |view, _| view.translation_request().unwrap());
+    view.update(cx, |view, cx| {
+        view.set_translation_enabled(false, cx);
+        view.set_translation(pending, Ok(translated("late")), cx);
+    });
+    assert!(!shows_translation(&view, cx));
+    view.read_with(cx, |view, _| assert!(view.translation_request().is_none()));
+}
+
+#[gpui::test]
+fn an_html_body_is_sent_as_html(cx: &mut TestAppContext) {
+    let mut html = detail();
+    html.project.body = "<p>Hello</p>".into();
+    html.project.body_format = lumilio_core::TextFormat::Html;
+    let (view, cx, seen) = mount(cx, None, html);
+    view.update(cx, |view, cx| view.set_translation_enabled(true, cx));
+    cx.run_until_parked();
+    let button = cx.debug_bounds("detail-translate").unwrap();
+    cx.simulate_click(button.center(), gpui::Modifiers::none());
+    assert!(matches!(
+        seen.borrow().last(),
+        Some(DetailIntent::Translate { format, .. }) if *format == lumilio_core::TextFormat::Html
+    ));
+}
+
+#[gpui::test]
+fn detail_summary_uses_mcim_without_mutating_original_and_rejects_old_settings_results(
+    cx: &mut TestAppContext,
+) {
+    let (view, cx, _) = mount(cx, None, detail());
+    view.update(cx, |view, cx| view.set_translation_enabled(true, cx));
+    let asked = view.read_with(cx, |view, _| view.summary_query().unwrap());
+    assert_eq!(asked.source, lumilio_core::DEFAULT_SOURCE);
+    view.update(cx, |view, cx| {
+        view.set_summary_translation(&asked, Some("中文简介".into()), cx)
+    });
+    view.read_with(cx, |view, _| {
+        let DetailState::Ready(detail) = view.state() else {
+            panic!("ready")
+        };
+        assert_eq!(view.summary_text(&detail.project), "中文简介");
+        assert_eq!(detail.project.description, "summary");
+    });
+    assert!(
+        !shows_translation(&view, cx),
+        "summary does not opt the body into translation"
+    );
+    view.update(cx, |view, cx| {
+        view.set_translation_enabled(false, cx);
+        view.set_translation_enabled(true, cx);
+        view.set_summary_translation(&asked, Some("late".into()), cx);
+    });
+    view.read_with(cx, |view, _| {
+        let DetailState::Ready(detail) = view.state() else {
+            panic!("ready")
+        };
+        assert_eq!(view.summary_text(&detail.project), "summary");
+    });
+}
+
 #[test]
 fn dates_are_days_or_nothing() {
     assert_eq!(date_label("2024-01-05T10:00:00Z"), "2024-01-05");

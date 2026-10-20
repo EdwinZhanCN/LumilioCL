@@ -27,6 +27,17 @@ pub enum LiveIntent {
     Search(DiscoverQuery),
     /// Fetch the category and game-version choices of the browsed source.
     LoadFilters,
+    /// Translate the open project's body; `request` lets the detail drop a
+    /// result it no longer waits for.
+    TranslateBody {
+        source: String,
+        project: String,
+        original: String,
+        format: lumilio_core::TextFormat,
+        request: u64,
+    },
+    /// Forget every saved translation.
+    ClearTranslationCache,
     /// Open a project's detail.
     OpenProject {
         kind: ProjectKind,

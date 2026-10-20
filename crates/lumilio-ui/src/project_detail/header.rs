@@ -124,7 +124,11 @@ impl ProjectDetailView {
         let open_label = tr!("discover-open-in", source = self.source_name.as_ref());
         let copied = cx.entity().downgrade();
 
-        let actions = kit::PageActions::new("detail-actions")
+        let mut actions = kit::PageActions::new("detail-actions");
+        if let Some(translate) = self.translate_key(cx) {
+            actions = actions.secondary(translate);
+        }
+        let actions = actions
             .primary(
                 crate::theme::clickable(
                     Key::new("detail-install")
@@ -217,7 +221,8 @@ impl ProjectDetailView {
                                     div()
                                         .text_sm()
                                         .text_color(colors.muted)
-                                        .child(project.description.clone()),
+                                        .debug_selector(|| "detail-summary".into())
+                                        .child(self.summary_text(project)),
                                 )
                                 .child(
                                     h_flex()

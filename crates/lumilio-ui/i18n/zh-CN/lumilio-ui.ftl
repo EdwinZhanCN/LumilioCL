@@ -689,6 +689,12 @@ project-group-alpha-beta = 所有 Alpha 和 Beta 版本
 project-group-alpha = 所有 Alpha 版本
 project-group-beta = 所有 Beta 版本
 project-group-pre-alpha = 所有 Pre-alpha 版本
+translation-action = 翻译
+translation-loading = 正在翻译…
+translation-original = 显示原文
+translation-retry = 重试翻译
+translation-failed = 翻译失败，已保留原文。可以重试。
+translation-partial = 部分内容未能翻译，已保留对应原文。再次翻译时会重试。
 
 ## 依赖提示
 
@@ -1690,6 +1696,14 @@ settings-motion-reduce = 减少
 settings-motion-full = 完整
 settings-language = 语言
 settings-language-help = 启动器界面的语言。游戏日志和项目介绍保持原文。
+settings-translation = 翻译
+settings-translation-help = 开启后，发现页简介自动使用 MCIM 的中文译文（只向 MCIM 发送平台和项目 ID），没有译文时保留原文；详情正文点击“翻译”后发送给所选提供商。目前只翻译成简体中文，标题不翻译。
+settings-translation-provider = 翻译提供商
+settings-translation-cache = 翻译缓存
+settings-translation-cache-help = 成功的译文保存在本地 7 天。清除后，下次翻译会重新请求。
+translation-clear = 清除
+translation-cache-cleared = 翻译缓存已清除
+translation-cache-clear-failed = 无法清除翻译缓存
 
 settings-memory = 内存
 settings-memory-value = 最小 { $min } · 最大 { $max }

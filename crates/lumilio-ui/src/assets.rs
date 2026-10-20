@@ -39,6 +39,9 @@ impl AssetSource for Assets {
                 include_bytes!("../assets/icons/lucide/refresh-cw.svg").as_slice()
             }
             "icons/lucide/info.svg" => include_bytes!("../assets/icons/lucide/info.svg").as_slice(),
+            "icons/lucide/languages.svg" => {
+                include_bytes!("../assets/icons/lucide/languages.svg").as_slice()
+            }
             "icons/lucide/arrow-right.svg" => {
                 include_bytes!("../assets/icons/lucide/arrow-right.svg").as_slice()
             }
@@ -94,7 +97,7 @@ impl AssetSource for Assets {
     }
 
     fn list(&self, path: &str) -> Result<Vec<SharedString>> {
-        const ASSETS: [&str; 31] = [
+        const ASSETS: [&str; 32] = [
             "icons/phosphor/house.svg",
             "icons/phosphor/books.svg",
             "icons/phosphor/compass.svg",
@@ -104,6 +107,7 @@ impl AssetSource for Assets {
             "icons/lucide/play.svg",
             "icons/lucide/refresh-cw.svg",
             "icons/lucide/info.svg",
+            "icons/lucide/languages.svg",
             "icons/lucide/arrow-right.svg",
             "icons/lucide/x.svg",
             "icons/lucide/square.svg",
@@ -207,6 +211,7 @@ pub enum UiIcon {
     Lock,
     Collapse,
     Maximize,
+    Languages,
 }
 
 impl IconNamed for UiIcon {
@@ -235,6 +240,7 @@ impl IconNamed for UiIcon {
             Self::Lock => "icons/lucide/lock.svg",
             Self::Collapse => "icons/lucide/chevron-up.svg",
             Self::Maximize => "icons/lucide/maximize.svg",
+            Self::Languages => "icons/lucide/languages.svg",
         }
         .into()
     }
