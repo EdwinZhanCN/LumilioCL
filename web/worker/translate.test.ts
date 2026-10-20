@@ -1,12 +1,17 @@
+import { readdirSync, readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { type Ai, type Database, DAILY_NEURONS, MAX_IDS, MODEL, readIds, resetSchema, translate } from "./translate";
+import { describe, expect, it, vi } from "vitest";
+import { type Ai, type Database, DAILY_NEURONS, MAX_IDS, MODEL, readIds, translate } from "./translate";
 
 const SITE = "https://launcher.lumilio.org";
 
-/** A D1 binding over an in-memory SQLite database. */
+const MIGRATIONS = new URL("../migrations/", import.meta.url);
+
+/** A D1 binding over an in-memory SQLite database, with the migrations applied. */
 function d1(): Database & { sqlite: DatabaseSync } {
   const sqlite = new DatabaseSync(":memory:");
+  for (const file of readdirSync(MIGRATIONS).filter((name) => name.endsWith(".sql")).sort())
+    sqlite.exec(readFileSync(new URL(file, MIGRATIONS), "utf8"));
   const statement = (query: string, values: unknown[] = []) => ({
     bind: (...next: unknown[]) => statement(query, next),
     all: async <T>() => ({ results: sqlite.prepare(query).all(...(values as never[])) as T[] }),
@@ -41,8 +46,6 @@ const modrinth = (projects: Record<string, string>) =>
 
 const post = (platform: string, body: unknown) =>
   new Request(`${SITE}/translate/${platform}`, { method: "POST", body: JSON.stringify(body) });
-
-beforeEach(() => resetSchema());
 
 describe("readIds", () => {
   it("accepts MCIM's two request shapes only", () => {
@@ -131,7 +134,6 @@ describe("translate", () => {
       { response: "Sure! Here you go.", usage: {} },
       { choices: [{ message: { content: '["a", 2]' } }] },
     ]) {
-      resetSchema();
       const env = { DB: d1(), AI: model(() => answer) };
       const response = await translate(
         post("modrinth", { project_ids: ["AANobbMI", "P7dR8mSH"] }),

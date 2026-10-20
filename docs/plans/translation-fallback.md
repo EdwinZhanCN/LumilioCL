@@ -4,7 +4,7 @@
 
 Status: InProgress
 
-MCIM 没有某个项目的中文简介、简介已过期或 MCIM 不可达时，启动器再向 launcher.lumilio.org 的 Worker 查询。Worker 只收平台与项目 ID，自己向 Modrinth / CurseForge 取当前简介，用 Workers AI 免费额度翻译并存入 D1；响应沿用 MCIM 的行格式，启动器复用原有的原文一致与结构校验。依赖 discover-translation（PR #25）。 T1、T2 已实现并有测试；部署前需 Project Maintainer 创建 D1 数据库并填入 web/wrangler.jsonc 的 database_id、设置 CF_API_KEY（T3）。
+MCIM 没有某个项目的中文简介、简介已过期或 MCIM 不可达时，启动器再向 launcher.lumilio.org 的 Worker 查询。Worker 只收平台与项目 ID，自己向 Modrinth / CurseForge 取当前简介，用 Workers AI 免费额度翻译并存入 D1；响应沿用 MCIM 的行格式，启动器复用原有的原文一致与结构校验。依赖 discover-translation（PR #25）。 T1、T2 已实现并有测试；合入前需 Project Maintainer 创建 D1 数据库、把 database_id 填入 web/wrangler.jsonc 并对远程库执行迁移（T3）：main 每次推送都会部署，占位 id 会让部署失败。CF_API_KEY 由 web.yml 的 deploy 从同名仓库机密随部署上传（D4）。
 
 ## Scope
 
@@ -21,14 +21,14 @@ MCIM 没有某个项目的中文简介、简介已过期或 MCIM 不可达时，
 - [x] T2 — 启动器在 MCIM 之后回退到 Worker。 (Completed)
   Acceptance: MCIM 命中且原文一致时不请求 Worker；MCIM 未命中、原文不一致或请求失败的 ID 才批量发给 https://launcher.lumilio.org/translate/{platform}。两处结果用同一行解析、原文一致与 safe_summary 校验，缓存提供商分别为 mcim / lumilio，未命中各自短期负缓存。设置说明的中英文写明只向 MCIM 与 launcher.lumilio.org 发送平台和项目 ID。core 测试用脚本化传输验证请求顺序与只发送未解决的 ID。
 - [ ] T3 — Project Maintainer 创建 Cloudflare 资源并部署。 (Proposed)
-  Acceptance: 创建 D1 数据库 lumilio-translations，把 database_id 填入 web/wrangler.jsonc；用 wrangler secret put CF_API_KEY 设置 CurseForge Key；部署后对一个 Modrinth 与一个 CurseForge 项目 ID 实际请求返回中文行，再次请求命中缓存。服务端使用 CurseForge Key 前核对 CurseForge 的条款。
+  Acceptance: 合入 main 之前：创建 D1 数据库 lumilio-translations，把 database_id 填入 web/wrangler.jsonc 替换占位值，执行 wrangler d1 migrations apply lumilio-translations --remote 建表。CF_API_KEY 不必手动设置，deploy 任务用 --secrets-file 从仓库机密 CF_API_KEY 上传。部署后对一个 Modrinth 与一个 CurseForge 项目 ID 实际请求返回中文行，再次请求命中缓存。服务端使用 CurseForge Key 前核对 CurseForge 的条款。
 - [ ] T4 — 检查译文质量与每日用量。 (Proposed)
   Acceptance: 部署后抽查 Modrinth 与 CurseForge 各若干条译文的术语（模组、整合包、下界、末地等）与专有名词保留；在 Cloudflare 面板核对一天的 neuron 用量与 Worker 内的累计接近，且未超过免费额度。
 
 ## Validation
 
 - Worker 路由的形状、缓存、预算和模型输出校验有测试，能拒绝错误输入。
-  Result: 2026-10-19：web/worker/translate.test.ts 九项通过（vitest，D1 由 node:sqlite 内存库模拟）：两种请求形状及 50 个上限、缓存命中不再调用模型、原文变化重新翻译、CurseForge 带 x-api-key 且无 Key 时返回空数组、当日预算用尽只回缓存行、按 usage 计 neuron、模型条数不符 / 空串 / 非数组 / 非字符串均不写缓存、上游失败与按 slug 返回的其他 ID 不翻译、错误方法 / 平台 / 形状与缺少 D1。临时删去预算检查与只保留所请求 ID 的过滤时，对应两项按预期失败。pnpm check、pnpm build 与 wrangler deploy --dry-run（绑定 DB / AI / ASSETS）通过。
+  Result: 2026-10-19：web/worker/translate.test.ts 九项通过（vitest，D1 由 node:sqlite 内存库模拟）：两种请求形状及 50 个上限、缓存命中不再调用模型、原文变化重新翻译、CurseForge 带 x-api-key 且无 Key 时返回空数组、当日预算用尽只回缓存行、按 usage 计 neuron、模型条数不符 / 空串 / 非数组 / 非字符串均不写缓存、上游失败与按 slug 返回的其他 ID 不翻译、错误方法 / 平台 / 形状与缺少 D1。临时删去预算检查与只保留所请求 ID 的过滤时，对应两项按预期失败。pnpm check、pnpm build 与 wrangler deploy --dry-run（绑定 DB / AI / ASSETS）通过。2026-10-20：表结构移入 web/migrations/0001_translations.sql，测试的内存库执行该目录全部迁移；临时把迁移中的 created 列改名时五项按预期失败。wrangler d1 migrations apply --local 成功；带假 Key 的 deploy --dry-run --secrets-file 列出隐藏的 CF_API_KEY 绑定。
 - 启动器只把 MCIM 未解决的 ID 发给 Worker，两处结果都经原文一致校验。
   Result: 2026-10-19：core translation 十三项通过，新增 the_fallback_only_hears_of_what_mcim_could_not_answer（MCIM 命中 a、b 原文过期、c 缺失时 Worker 只收到 b、c；第二次只因 b 再问 MCIM）与 with_mcim_unreachable_every_summary_is_asked_of_the_fallback。临时让 Worker 收到全部 ID 时，该测试与 curseforge_summaries_ask_by_numeric_mod_id 按预期失败。lumilio-core Clippy（-D warnings）、fmt 与 i18n 八项通过，IA 已重新生成。
 - 部署后的真实请求、缓存命中与每日用量。
@@ -56,11 +56,23 @@ Consequences: MCIM 正常时 Worker 请求很少；MCIM 整体不可达时所有
 
 Why: 2026-10-19 Workers AI 价格页：免费每日 10,000 neurons；该模型输入 4,625、输出 30,475 neurons / 百万 token，一条简介约 2 neurons，每天约可译数千条。Qwen3 为 Apache-2.0，中文较好。m2m100 输出更贵且术语更差。KV 免费每日只有 1,000 次写入，D1 有 100,000 次。
 
-Consequences: 模型名与单价是 Worker 内的常量，价格变化时一起改。表在首次请求时用 CREATE TABLE IF NOT EXISTS 建立，部署不需要单独的迁移步骤。
+Consequences: 模型名与单价是 Worker 内的常量，价格变化时一起改。表结构见 D4（覆盖此前首次请求时建表的做法）。
+
+## Decision D4
+
+D1 表结构放在 web/migrations（wrangler d1 迁移格式），Worker 不再在请求时建表；CF_API_KEY 由 web.yml 的 deploy 任务以 wrangler deploy --secrets-file 从同名仓库机密上传。
+
+Why: 迁移是唯一的表结构来源，测试执行同一批文件，查询与表不会悄悄分叉，也省去每个 isolate 的建表请求。release.yml 已用仓库机密 CF_API_KEY；随部署上传不需要手动 secret put，也不会删除其他机密。步骤内的环境变量不能叫 CF_API_KEY，wrangler 4 把它当作 Cloudflare 全局 Key 的旧名。
+
+Consequences: 新表或改表要加一个迁移文件，并在部署依赖它的 Worker 之前对远程库执行 migrations apply；部署任务不自动迁移。仓库机密为空时不上传 CF_API_KEY，Worker 的 CurseForge 路由返回空数组。
 
 ## References
 
 - [.agents/plans/discover-translation.json](../../.agents/plans/discover-translation.json)
+- [web/migrations/0001_translations.sql](../../web/migrations/0001_translations.sql)
+- .github/workflows/web.yml
+- https://developers.cloudflare.com/d1/reference/migrations/
+- https://developers.cloudflare.com/workers/configuration/secrets/
 - https://developers.cloudflare.com/workers-ai/platform/pricing/
 - https://developers.cloudflare.com/workers-ai/models/qwen3-30b-a3b-fp8/
 - https://developers.cloudflare.com/d1/platform/pricing/

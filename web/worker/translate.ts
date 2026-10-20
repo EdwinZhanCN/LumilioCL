@@ -48,28 +48,7 @@ The input is a JSON array of strings. Answer with only a JSON array of the same 
 
 type Row = { id: string; original: string; translated: string };
 
-let ready: Promise<unknown> | null = null;
-
-/** Creates the tables once per isolate; the statements are idempotent. */
-function schema(db: Database): Promise<unknown> {
-  ready ??= db
-    .batch([
-      db.prepare(
-        "CREATE TABLE IF NOT EXISTS summaries (platform TEXT NOT NULL, id TEXT NOT NULL, hash TEXT NOT NULL, translated TEXT NOT NULL, created INTEGER NOT NULL, PRIMARY KEY (platform, id, hash))",
-      ),
-      db.prepare("CREATE TABLE IF NOT EXISTS budget (day TEXT PRIMARY KEY, neurons REAL NOT NULL)"),
-    ])
-    .catch((error) => {
-      ready = null;
-      throw error;
-    });
-  return ready;
-}
-
-/** Forgets that the tables exist; tests start from a fresh database. */
-export function resetSchema() {
-  ready = null;
-}
+// The tables (summaries, budget) are in migrations/0001_translations.sql.
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -182,7 +161,6 @@ export async function translate(
   if (!ids) return json({ error: "bad request" }, 400);
 
   const db = env.DB;
-  await schema(db);
   const originals = await summaries(platform, ids, env, fetcher);
   const wanted = [...originals].filter(([, text]) => text.trim() !== "" && text.length <= MAX_SUMMARY);
   const hashes = new Map(await Promise.all(wanted.map(async ([id, text]) => [id, await sha256(text)] as const)));
