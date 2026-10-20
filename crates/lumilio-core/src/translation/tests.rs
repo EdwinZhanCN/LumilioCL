@@ -191,7 +191,132 @@ async fn mcim_batch_is_correlated_by_id_and_rejects_stale_or_structurally_differ
             .await
             .is_empty()
     );
-    assert_eq!(*transport.calls.lock().unwrap(), 1);
+    // MCIM, then the fallback for the three it could not answer.
+    assert_eq!(*transport.calls.lock().unwrap(), 2);
+}
+
+/// Answers by host: what each summary service has, and whether it is up.
+struct Services {
+    mcim: Option<serde_json::Value>,
+    lumilio: serde_json::Value,
+    sent: StdMutex<Vec<(String, serde_json::Value)>>,
+}
+impl Transport for Services {
+    fn get<'a>(&'a self, _: &'a str) -> TransportFuture<'a> {
+        unreachable!()
+    }
+    fn send<'a>(&'a self, request: HttpRequest) -> TransportFuture<'a> {
+        let body = serde_json::from_slice(request.body.as_ref().unwrap()).unwrap();
+        self.sent.lock().unwrap().push((request.url.clone(), body));
+        let answer = if request.url.starts_with("https://mod.mcimirror.top/") {
+            self.mcim.clone()
+        } else {
+            assert!(
+                request
+                    .url
+                    .starts_with("https://launcher.lumilio.org/translate/")
+            );
+            Some(self.lumilio.clone())
+        };
+        Box::pin(async move {
+            Ok(match answer {
+                Some(answer) => {
+                    TransportResponse::from_bytes(200, serde_json::to_vec(&answer).unwrap())
+                }
+                // Not retried: the request fails as a refused service would.
+                None => TransportResponse::from_bytes(403, Vec::new()),
+            })
+        })
+    }
+}
+
+#[tokio::test]
+async fn the_fallback_only_hears_of_what_mcim_could_not_answer() {
+    let root = tempfile::tempdir().unwrap();
+    let transport = Services {
+        mcim: Some(serde_json::json!([
+            {"project_id":"a","original":"Hello","translated":"你好"},
+            {"project_id":"b","original":"Old text","translated":"旧文本"}
+        ])),
+        lumilio: serde_json::json!([
+            {"project_id":"b","original":"New text","translated":"新文本"},
+            {"project_id":"c","original":"Third","translated":"第三"}
+        ]),
+        sent: StdMutex::new(Vec::new()),
+    };
+    let service = TranslationService::new(root.path().to_owned());
+    let items = vec![
+        ("a".to_owned(), "Hello".to_owned()),
+        ("b".to_owned(), "New text".to_owned()),
+        ("c".to_owned(), "Third".to_owned()),
+    ];
+    let expected = BTreeMap::from([
+        ("a".to_owned(), "你好".to_owned()),
+        ("b".to_owned(), "新文本".to_owned()),
+        ("c".to_owned(), "第三".to_owned()),
+    ]);
+    let ask = || {
+        service.summaries(
+            &transport,
+            Some(Catalog::Modrinth),
+            "lumilio.modrinth",
+            &items,
+        )
+    };
+    assert_eq!(ask().await, expected);
+    assert_eq!(
+        *transport.sent.lock().unwrap(),
+        [
+            (
+                "https://mod.mcimirror.top/translate/modrinth".to_owned(),
+                serde_json::json!({"project_ids": ["a", "b", "c"]})
+            ),
+            (
+                "https://launcher.lumilio.org/translate/modrinth".to_owned(),
+                serde_json::json!({"project_ids": ["b", "c"]})
+            ),
+        ]
+    );
+    // Both answers are kept; c is known missing at MCIM for a while.
+    transport.sent.lock().unwrap().clear();
+    assert_eq!(ask().await, expected);
+    assert_eq!(
+        *transport.sent.lock().unwrap(),
+        [(
+            "https://mod.mcimirror.top/translate/modrinth".to_owned(),
+            serde_json::json!({"project_ids": ["b"]})
+        )]
+    );
+}
+
+#[tokio::test]
+async fn with_mcim_unreachable_every_summary_is_asked_of_the_fallback() {
+    let root = tempfile::tempdir().unwrap();
+    let transport = Services {
+        mcim: None,
+        lumilio: serde_json::json!([{"modid": 238222, "original": "View items", "translated": "查看物品"}]),
+        sent: StdMutex::new(Vec::new()),
+    };
+    let service = TranslationService::new(root.path().to_owned());
+    let items = vec![("238222".to_owned(), "View items".to_owned())];
+    assert_eq!(
+        service
+            .summaries(
+                &transport,
+                Some(Catalog::CurseForge),
+                "lumilio.curseforge",
+                &items
+            )
+            .await,
+        BTreeMap::from([("238222".to_owned(), "查看物品".to_owned())])
+    );
+    let sent = transport.sent.lock().unwrap();
+    assert_eq!(sent.len(), 2);
+    assert_eq!(
+        sent[1].0,
+        "https://launcher.lumilio.org/translate/curseforge"
+    );
+    assert_eq!(sent[1].1, serde_json::json!({"modids": [238222]}));
 }
 
 #[tokio::test]

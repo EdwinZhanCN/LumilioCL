@@ -135,8 +135,19 @@ pub(super) async fn edge<T: Transport>(
         .collect()
 }
 
-pub(super) async fn mcim<T: Transport>(
+/// Where translated summaries are asked for, in order: MCIM, then our own
+/// Worker for what MCIM could not answer (plan translation-fallback). Both
+/// speak MCIM's `/translate/{platform}` protocol.
+pub(super) const SUMMARY_SERVICES: [(&str, &str); 2] = [
+    ("mcim", "https://mod.mcimirror.top"),
+    ("lumilio", "https://launcher.lumilio.org"),
+];
+
+/// One batch of `(original, translated)` summaries by ID from a service in
+/// [`SUMMARY_SERVICES`]; IDs it has nothing for are left out.
+pub(super) async fn summaries<T: Transport>(
     transport: &T,
+    base: &str,
     platform: &str,
     ids: &[String],
 ) -> Result<BTreeMap<String, (String, String)>, TranslationError> {
@@ -147,12 +158,7 @@ pub(super) async fn mcim<T: Transport>(
         }
         _ => return Err(TranslationError::Protocol),
     };
-    let answer = request(
-        transport,
-        &format!("https://mod.mcimirror.top/translate/{platform}"),
-        body,
-    )
-    .await?;
+    let answer = request(transport, &format!("{base}/translate/{platform}"), body).await?;
     let rows = answer.as_array().ok_or(TranslationError::Protocol)?;
     let mut result = BTreeMap::new();
     let mut seen = BTreeSet::new();

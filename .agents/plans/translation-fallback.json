@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "id": "translation-fallback",
+  "title": "发现页简介翻译的自有回退",
+  "summary": "MCIM 没有某个项目的中文简介、简介已过期或 MCIM 不可达时，启动器再向 launcher.lumilio.org 的 Worker 查询。Worker 只收平台与项目 ID，自己向 Modrinth / CurseForge 取当前简介，用 Workers AI 免费额度翻译并存入 D1；响应沿用 MCIM 的行格式，启动器复用原有的原文一致与结构校验。依赖 discover-translation（PR #25）。 T1、T2 已实现并有测试；部署前需 Project Maintainer 创建 D1 数据库并填入 web/wrangler.jsonc 的 database_id、设置 CF_API_KEY（T3）。",
+  "status": "in_progress",
+  "visibility": "internal",
+  "scope": {
+    "included": [
+      "Worker 路由 POST /translate/modrinth 与 /translate/curseforge，请求与响应形状同 MCIM。",
+      "D1 缓存（平台、ID、原文 hash）与按 UTC 日计的 neuron 预算；接近免费额度时只返回缓存。",
+      "启动器在 MCIM 之后对未解决的 ID 查询 Worker，单独缓存，设置说明写明两处服务。"
+    ],
+    "excluded": [
+      "正文翻译（仍是点击后由微软 Edge 处理）、任意文本翻译、其他目标语言。",
+      "付费 Workers AI 用量、人工审校译文、替换 MCIM 为首选来源。"
+    ]
+  },
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Worker 提供只收 ID 的简介翻译路由。",
+      "status": "completed",
+      "acceptance": "只接受 POST JSON：Modrinth {\"project_ids\": [string]}，CurseForge {\"modids\": [int]}，最多 50 个 ID，其他形状 400。Worker 一次批量请求取当前简介（Modrinth /v2/projects?ids=，CurseForge POST /v1/mods，需 CF_API_KEY 机密，缺失时该平台返回空数组）。命中 D1（平台、ID、原文 SHA-256）直接返回；未命中且当日预算未用尽时批量交 Workers AI，要求按序返回同样条数的 JSON 字符串数组，条数不符或非字符串整批丢弃。响应只含有译文的行：{project_id | modid, original, translated}。按返回的 usage 累计 neuron，达到上限后不再调用模型。vitest 用假的 AI / D1 / fetch 覆盖：形状校验、缓存命中不调用模型、预算用尽只回缓存、模型条数不符不写缓存、上游失败返回空数组。"
+    },
+    {
+      "id": "T2",
+      "title": "启动器在 MCIM 之后回退到 Worker。",
+      "status": "completed",
+      "acceptance": "MCIM 命中且原文一致时不请求 Worker；MCIM 未命中、原文不一致或请求失败的 ID 才批量发给 https://launcher.lumilio.org/translate/{platform}。两处结果用同一行解析、原文一致与 safe_summary 校验，缓存提供商分别为 mcim / lumilio，未命中各自短期负缓存。设置说明的中英文写明只向 MCIM 与 launcher.lumilio.org 发送平台和项目 ID。core 测试用脚本化传输验证请求顺序与只发送未解决的 ID。"
+    },
+    {
+      "id": "T3",
+      "title": "Project Maintainer 创建 Cloudflare 资源并部署。",
+      "status": "proposed",
+      "acceptance": "创建 D1 数据库 lumilio-translations，把 database_id 填入 web/wrangler.jsonc；用 wrangler secret put CF_API_KEY 设置 CurseForge Key；部署后对一个 Modrinth 与一个 CurseForge 项目 ID 实际请求返回中文行，再次请求命中缓存。服务端使用 CurseForge Key 前核对 CurseForge 的条款。"
+    },
+    {
+      "id": "T4",
+      "title": "检查译文质量与每日用量。",
+      "status": "proposed",
+      "acceptance": "部署后抽查 Modrinth 与 CurseForge 各若干条译文的术语（模组、整合包、下界、末地等）与专有名词保留；在 Cloudflare 面板核对一天的 neuron 用量与 Worker 内的累计接近，且未超过免费额度。"
+    }
+  ],
+  "validation": [
+    {
+      "criterion": "Worker 路由的形状、缓存、预算和模型输出校验有测试，能拒绝错误输入。",
+      "result": "2026-10-19：web/worker/translate.test.ts 九项通过（vitest，D1 由 node:sqlite 内存库模拟）：两种请求形状及 50 个上限、缓存命中不再调用模型、原文变化重新翻译、CurseForge 带 x-api-key 且无 Key 时返回空数组、当日预算用尽只回缓存行、按 usage 计 neuron、模型条数不符 / 空串 / 非数组 / 非字符串均不写缓存、上游失败与按 slug 返回的其他 ID 不翻译、错误方法 / 平台 / 形状与缺少 D1。临时删去预算检查与只保留所请求 ID 的过滤时，对应两项按预期失败。pnpm check、pnpm build 与 wrangler deploy --dry-run（绑定 DB / AI / ASSETS）通过。"
+    },
+    {
+      "criterion": "启动器只把 MCIM 未解决的 ID 发给 Worker，两处结果都经原文一致校验。",
+      "result": "2026-10-19：core translation 十三项通过，新增 the_fallback_only_hears_of_what_mcim_could_not_answer（MCIM 命中 a、b 原文过期、c 缺失时 Worker 只收到 b、c；第二次只因 b 再问 MCIM）与 with_mcim_unreachable_every_summary_is_asked_of_the_fallback。临时让 Worker 收到全部 ID 时，该测试与 curseforge_summaries_ask_by_numeric_mod_id 按预期失败。lumilio-core Clippy（-D warnings）、fmt 与 i18n 八项通过，IA 已重新生成。"
+    },
+    {
+      "criterion": "部署后的真实请求、缓存命中与每日用量。",
+      "result": null
+    }
+  ],
+  "decisions": [
+    {
+      "id": "D1",
+      "decision": "Worker 只收平台与项目 ID，原文由 Worker 自己从 Modrinth / CurseForge 取得。",
+      "rationale": "接受文本的端点等于公开的免费翻译接口，任何人都能耗尽每日额度。只收 ID 时，能翻译的只有公开目录里的简介，每条在原文变化前只翻译一次。",
+      "consequences": "每个请求有一次上游批量子请求；启动器手里的简介与 Worker 取得的不同时，原文一致校验会丢弃该行，等下次缓存过期再查。"
+    },
+    {
+      "id": "D2",
+      "decision": "MCIM 仍为首选，Worker 只补 MCIM 未解决的 ID。",
+      "rationale": "MCIM 已覆盖大量项目，且不消耗本项目的额度；回退只填补未收录、过期或不可达的情况。",
+      "consequences": "MCIM 正常时 Worker 请求很少；MCIM 整体不可达时所有可见项目都会回退到 Worker，由每日预算兜底。"
+    },
+    {
+      "id": "D3",
+      "decision": "模型用 @cf/qwen/qwen3-30b-a3b-fp8，关闭思考，批量输出 JSON 字符串数组；缓存用 D1，不用 KV。",
+      "rationale": "2026-10-19 Workers AI 价格页：免费每日 10,000 neurons；该模型输入 4,625、输出 30,475 neurons / 百万 token，一条简介约 2 neurons，每天约可译数千条。Qwen3 为 Apache-2.0，中文较好。m2m100 输出更贵且术语更差。KV 免费每日只有 1,000 次写入，D1 有 100,000 次。",
+      "consequences": "模型名与单价是 Worker 内的常量，价格变化时一起改。表在首次请求时用 CREATE TABLE IF NOT EXISTS 建立，部署不需要单独的迁移步骤。"
+    }
+  ],
+  "references": [
+    ".agents/plans/discover-translation.json",
+    "https://developers.cloudflare.com/workers-ai/platform/pricing/",
+    "https://developers.cloudflare.com/workers-ai/models/qwen3-30b-a3b-fp8/",
+    "https://developers.cloudflare.com/d1/platform/pricing/",
+    "https://docs.modrinth.com/api/operations/getprojects/",
+    "https://docs.curseforge.com/rest-api/#get-mods"
+  ],
+  "dependencies": [
+    "discover-translation"
+  ],
+  "lessonsLearned": [],
+  "roadmap": {
+    "enabled": false,
+    "id": "translation-fallback",
+    "name": "简介翻译回退",
+    "lede": "MCIM 没有译文时由自有服务补上。",
+    "targetVersion": null,
+    "order": 0
+  }
+}

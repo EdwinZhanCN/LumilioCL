@@ -1697,7 +1697,7 @@ settings-motion-full = 完整
 settings-language = 语言
 settings-language-help = 启动器界面的语言。游戏日志和项目介绍保持原文。
 settings-translation = 翻译
-settings-translation-help = 开启后，发现页简介自动使用 MCIM 的中文译文（只向 MCIM 发送平台和项目 ID），没有译文时保留原文；详情正文点击“翻译”后发送给所选提供商。目前只翻译成简体中文，标题不翻译。
+settings-translation-help = å¼å¯åï¼åç°é¡µç®ä»èªå¨ä½¿ç¨ MCIM çä¸­æè¯æï¼MCIM æ²¡ææ¶æ¹ç¨ launcher.lumilio.orgï¼LumilioCL èªå·±çæºå¨ç¿»è¯ï¼ï¼åªåè¿ä¸¤å¤åéå¹³å°åé¡¹ç® IDï¼é½æ²¡æè¯ææ¶ä¿çåæãè¯¦ææ­£æç¹å»âç¿»è¯âååéç»æéæä¾åãç®ååªç¿»è¯æç®ä½ä¸­æï¼æ é¢ä¸ç¿»è¯ã
 settings-translation-provider = 翻译提供商
 settings-translation-cache = 翻译缓存
 settings-translation-cache-help = 成功的译文保存在本地 7 天。清除后，下次翻译会重新请求。

@@ -189,8 +189,8 @@ impl TranslationService {
         Ok(TranslatedDocument { text, partial })
     }
 
-    /// `catalog` is whose IDs the source speaks; MCIM only knows those two,
-    /// so a source that declares none gets no summaries.
+    /// `catalog` is whose IDs the source speaks; MCIM and our fallback only
+    /// know those two, so a source that declares none gets no summaries.
     pub(crate) async fn summaries<T: Transport>(
         &self,
         transport: &T,
@@ -221,55 +221,68 @@ impl TranslationService {
         let _guard = self.gate.lock().await;
         let generation = self.cache.generation();
         let mut result = BTreeMap::new();
-        let mut missing = Vec::new();
-        for (id, original) in items {
-            if let Some(text) = self
-                .cache
-                .get(
-                    key(source, id, "summary", "mcim", original),
-                    crate::service::now(),
-                )
-                .await
-            {
-                if !text.is_empty() {
-                    result.insert(id.clone(), text);
-                }
-            } else {
-                missing.push((id.clone(), original.clone()));
-            }
-        }
-        for batch in missing.chunks(50) {
-            let ids: Vec<String> = batch.iter().map(|(id, _)| id.clone()).collect();
-            let Ok(found) = protocol::mcim(transport, platform, &ids).await else {
-                continue;
-            };
-            for (id, original) in batch {
-                if !found.contains_key(id) {
-                    self.cache
-                        .put_for(
-                            key(source, id, "summary", "mcim", original),
-                            String::new(),
-                            crate::service::now(),
-                            generation,
-                            10 * 60,
-                        )
-                        .await;
-                }
-                if let Some((remote_original, translated)) = found.get(id)
-                    && remote_original == original
-                    && !translated.trim().is_empty()
-                    && document::safe_summary(original, translated)
+        // What no service has answered yet; each service only hears of these.
+        let mut unresolved = items.to_vec();
+        for (provider, base) in protocol::SUMMARY_SERVICES {
+            let mut ask = Vec::new();
+            let mut next = Vec::new();
+            for (id, original) in unresolved {
+                match self
+                    .cache
+                    .get(
+                        key(source, &id, "summary", provider, &original),
+                        crate::service::now(),
+                    )
+                    .await
                 {
-                    self.cache
-                        .put(
-                            key(source, id, "summary", "mcim", original),
-                            translated.clone(),
-                            crate::service::now(),
-                            generation,
-                        )
-                        .await;
-                    result.insert(id.clone(), translated.clone());
+                    Some(text) if !text.is_empty() => {
+                        result.insert(id, text);
+                    }
+                    // Lately known to have nothing here.
+                    Some(_) => next.push((id, original)),
+                    None => ask.push((id, original)),
                 }
+            }
+            for batch in ask.chunks(50) {
+                let ids: Vec<String> = batch.iter().map(|(id, _)| id.clone()).collect();
+                let Ok(found) = protocol::summaries(transport, base, platform, &ids).await else {
+                    next.extend_from_slice(batch);
+                    continue;
+                };
+                for (id, original) in batch {
+                    if !found.contains_key(id) {
+                        self.cache
+                            .put_for(
+                                key(source, id, "summary", provider, original),
+                                String::new(),
+                                crate::service::now(),
+                                generation,
+                                10 * 60,
+                            )
+                            .await;
+                    }
+                    if let Some((remote_original, translated)) = found.get(id)
+                        && remote_original == original
+                        && !translated.trim().is_empty()
+                        && document::safe_summary(original, translated)
+                    {
+                        self.cache
+                            .put(
+                                key(source, id, "summary", provider, original),
+                                translated.clone(),
+                                crate::service::now(),
+                                generation,
+                            )
+                            .await;
+                        result.insert(id.clone(), translated.clone());
+                    } else {
+                        next.push((id.clone(), original.clone()));
+                    }
+                }
+            }
+            unresolved = next;
+            if unresolved.is_empty() {
+                break;
             }
         }
         result

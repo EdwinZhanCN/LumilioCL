@@ -52,7 +52,7 @@ pub(super) fn general(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
             },
             ctx,
         ),
-        // ia[settings]: 开启翻译 | 通用 · 开关（默认关） | 开启后发现列表与详情页头自动显示 MCIM 中文简介，正文点击翻译；关闭立即恢复原文
+        // ia[settings]: 开启翻译 | 通用 · 开关（默认关） | 开启后发现列表与详情页头自动显示中文简介（先 MCIM，再 launcher.lumilio.org），正文点击翻译；关闭立即恢复原文
         row(
             "settings-translation",
             tr!("settings-translation"),
