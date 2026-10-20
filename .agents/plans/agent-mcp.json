@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 1,
+  "id": "agent-mcp",
+  "title": "Agent 接口：启动器以 MCP 暴露能力",
+  "summary": "实验性功能，不进 roadmap。启动器成为一个 Model Context Protocol 服务器：实例、投影等能力只以 MCP 的 tools / resources / prompts 暴露，内置 agent 与外置 agent（Claude Code、Claude Desktop 等）走同一条协议路径，没有私有工具通道。第一阶段只做服务端和只读的核心工具，内置 UI 与 LLM provider 明确排除。",
+  "status": "in_progress",
+  "visibility": "internal",
+  "scope": {
+    "included": [
+      "新 crate `lumilio-agent`：围绕一个 `LauncherService` 的 MCP 服务器，依赖 core 不依赖 UI",
+      "stdio 传输与 `lumiliocl mcp` 子命令，供外置 agent 以子进程方式连接",
+      "只读工具：实例列表与详情、投影列表与内容摘要",
+      "进程内 MCP 客户端测试：与外置 agent 同一条协议路径"
+    ],
+    "excluded": [
+      "启动器内的聊天面板与任何 UI",
+      "LLM provider 与 agent loop",
+      "红石设计、仿真与编译",
+      "有副作用的工具（启动、写文件）及其审批"
+    ]
+  },
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "`lumilio-agent` crate：`LauncherMcp` 服务器、工具路由按领域分文件相加、`serve_stdio`",
+      "status": "completed",
+      "acceptance": "进程内客户端完成握手后能读到服务器说明并列出全部工具（`just test-pkg lumilio-agent`）"
+    },
+    {
+      "id": "T2",
+      "title": "实例工具 `list_instances`、`get_instance`",
+      "status": "completed",
+      "acceptance": "测试库里的实例以结构化 JSON 返回 id、名称、版本、加载器与游戏目录；不存在的 id 返回带 isError 的工具错误而不是协议错误"
+    },
+    {
+      "id": "T3",
+      "title": "投影工具 `list_schematics`、`read_schematic`，经 Litematica 插件的读权限访问",
+      "status": "completed",
+      "acceptance": "列出 `schematics/` 下的 `.litematic`；读取返回元数据、尺寸、区域和按 id 计数的方块、实体、方块实体"
+    },
+    {
+      "id": "T4",
+      "title": "`lumiliocl mcp` 子命令：不开窗口，用 stdio 服务到客户端断开",
+      "status": "completed",
+      "acceptance": "Project Maintainer 或 agent 用外部 MCP 客户端（Claude Code `claude mcp add`，或向进程写 JSON-RPC）连上，`tools/list` 与 `tools/call` 得到与测试一致的结果"
+    },
+    {
+      "id": "T5",
+      "title": "插件贡献工具：`Plugin` trait 增加与 rmcp 无关的工具描述符，`lumilio-agent` 适配为 ToolRouter，权限沿用 `Permission`",
+      "status": "proposed",
+      "acceptance": "Litematica 与 world-explorer 各自声明的工具出现在 `tools/list` 中，关闭插件后消失"
+    },
+    {
+      "id": "T6",
+      "title": "运行中的启动器也能被连接：localhost streamable HTTP（一次性 token、只绑回环、校验 Origin）与 stdio 代理；副作用工具经 elicitation 审批",
+      "status": "proposed",
+      "acceptance": "启动器开着时外置 agent 能连上同一份数据；需要确认的动作在启动器里弹出确认"
+    },
+    {
+      "id": "T7",
+      "title": "内置 agent：进程内 duplex 传输的 MCP 客户端、自写 tool_use 循环、Anthropic 与 OpenAI 兼容两个 provider",
+      "status": "proposed",
+      "acceptance": "内置 agent 与 Claude Code 调用同一个工具得到同一结果；provider 只住在客户端侧"
+    }
+  ],
+  "validation": [
+    {
+      "criterion": "自动：`just test-pkg lumilio-agent`（握手与工具列表、经库读投影、缺失实例是工具错误）",
+      "result": "2026-10-19：`just test-pkg lumilio-agent` 3 项通过；`cargo nextest run -p lumilio-app --test mcp`（子进程 stdio）通过；`cargo nextest run -p lumilio-docgen` 31 项通过，含新增的 `agent_guard_probe`（`lumilio-agent` 不得依赖 UI）。"
+    },
+    {
+      "criterion": "Project Maintainer 或 agent 实机：`LUMILIO_HOME` 指向一个含投影的数据目录，外部 MCP 客户端连 `lumiliocl mcp`，`tools/call read_schematic` 返回方块计数",
+      "result": "2026-10-19 agent 实机：`cargo run -p lumilio-agent --example fixture_home -- <目录>` 建库后，一个独立的 Python 客户端向 `lumiliocl mcp` 写 JSON-RPC：initialize 返回 LumilioCL 0.1.6、协议 2025-06-18 与说明；tools/list 列出 4 个工具；read_schematic 返回 3x3.litematic 的 27 个方块（netherite_block 13、quartz_block 13、sea_lantern 1）；get_instance(nope) 是 isError 工具错误；stdin 关闭后进程以 0 退出，stderr 为空。"
+    }
+  ],
+  "decisions": [
+    {
+      "id": "D1",
+      "decision": "MCP-only：启动器的能力只以 MCP 暴露，内置 agent 不走任何私有通道。",
+      "rationale": "内置与外置 agent 行为一致，外置 agent 不需要启动器持有任何 API key；UI 的状态变化来自服务端事件而不是聊天记录。",
+      "consequences": "内置 agent 也是一个 MCP 客户端（进程内 duplex 传输）；每个新能力都先设计成工具或资源。"
+    },
+    {
+      "id": "D2",
+      "decision": "MCP 层用官方 `rmcp`（Apache-2.0，3.x）；agent loop 与 provider 以后自己写，不引入 rig 等框架。",
+      "rationale": "rmcp 是 MCP 官方 SDK；agent loop 在 MCP-only 之下只剩 provider、循环与会话状态，几百行可控，而通用框架 API 变动快，gpui-component 的 fork 经历不想再来一次。",
+      "consequences": "工具用 `#[tool_router]` 按领域分文件、以 `+` 相加；provider 先做 Anthropic Messages 与 OpenAI 兼容两种。"
+    },
+    {
+      "id": "D3",
+      "decision": "投影工具经 Litematica 插件的 `ReadGameFiles` 授权读文件，不直接读文件系统。",
+      "rationale": "agent 看到的与工作室看到的完全一致，权限边界只有一套；关掉插件工具就不可用。",
+      "consequences": "工具依赖 `lumilio-plugin-litematica::ID`；T5 把工具归还给插件自己声明。"
+    },
+    {
+      "id": "D4",
+      "decision": "`lumilio-agent` 只依赖 core；传输由 `lumilio-app` 接线。工具的领域失败作为带 `isError` 的工具结果返回，协议错误只留给畸形请求。",
+      "rationale": "与 `lumilio-app → lumilio-ui → lumilio-core` 的方向一致；MCP 规范建议执行失败放进结果让模型能自我纠正。",
+      "consequences": "工具返回 `Result<Json<T>, String>`；UI 以后只依赖本 crate 渲染面板。"
+    },
+    {
+      "id": "D5",
+      "decision": "第一阶段 `lumiliocl mcp` 以子进程独占数据目录（RootLock）运行，启动器开着时连不上；Windows 发布构建的 `windows_subsystem = \"windows\"` 没有 stdio。",
+      "rationale": "实验阶段先验证协议与工具；两条限制都由 T6 的运行中传输解决。",
+      "consequences": "测试与实机验证用 `LUMILIO_HOME` 指向独立数据目录。"
+    }
+  ],
+  "references": [
+    "crates/lumilio-agent/src/{lib.rs,server.rs,tools/mod.rs,tools/instances.rs,tools/schematics.rs,tests.rs}",
+    "crates/lumilio-app/src/{main.rs,backend.rs}",
+    "crates/lumilio-core/src/service/{library.rs,schematic_ops.rs}",
+    "https://github.com/modelcontextprotocol/rust-sdk",
+    "https://modelcontextprotocol.io/specification/2026-07-28"
+  ],
+  "dependencies": [],
+  "lessonsLearned": [],
+  "roadmap": {
+    "enabled": false,
+    "id": "agent-mcp",
+    "name": "Agent 接口",
+    "lede": "启动器以 MCP 暴露能力。",
+    "targetVersion": null,
+    "order": 90
+  }
+}

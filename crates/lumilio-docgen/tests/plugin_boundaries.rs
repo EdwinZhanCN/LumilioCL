@@ -170,6 +170,12 @@ fn contract_problems(
                             ]
                             .contains(&package)
                     }
+                    // The agent surface wraps core and nothing above it (plan
+                    // agent-mcp, D4): the application hosts its transports.
+                    "lumilio-agent" => {
+                        package.starts_with("gpui")
+                            || ["lumilio-ui", "lumilio-app"].contains(&package)
+                    }
                     _ => {
                         package.starts_with("gpui")
                             || ["lumilio-core", "lumilio-ui", "lumilio-app"].contains(&package)
@@ -204,6 +210,7 @@ fn map_libraries_preserve_their_dependency_boundaries() {
         "lumilio-map-render",
         "lumilio-plugin-api",
         "lumilio-core",
+        "lumilio-agent",
     ] {
         let manifest: Value = toml::from_str(
             &fs::read_to_string(root.join("crates").join(name).join("Cargo.toml")).unwrap(),
@@ -236,6 +243,10 @@ fn cubiomes_guard_probe() {
 #[test]
 fn nbt_guard_probe() {
     injected("lumilio-nbt", "gpui-pre");
+}
+#[test]
+fn agent_guard_probe() {
+    injected("lumilio-agent", "lumilio-ui");
 }
 #[test]
 fn anvil_guard_probe() {

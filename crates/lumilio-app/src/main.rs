@@ -36,6 +36,15 @@ fn main() {
             std::process::exit(1);
         }
     };
+    // `lumiliocl mcp`: no window. The launcher serves its tools over stdin
+    // and stdout to the agent that started it (plan agent-mcp).
+    if std::env::args().nth(1).as_deref() == Some("mcp") {
+        if let Err(error) = backend.block_on(lumilio_agent::serve_stdio(backend.service.clone())) {
+            eprintln!("LumilioCL MCP server stopped: {error}");
+            std::process::exit(1);
+        }
+        return;
+    }
     let mut app = gpui_kit::application().with_assets(assets::AppAssets);
     match images::ImageClient::new() {
         Ok(client) => app = app.with_http_client(client),
