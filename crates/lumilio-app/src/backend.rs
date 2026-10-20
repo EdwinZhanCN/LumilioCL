@@ -62,6 +62,11 @@ impl Backend {
     {
         self.runtime.spawn(work)
     }
+
+    /// Runs `work` to completion on the worker runtime, blocking this thread.
+    pub fn block_on<F: Future>(&self, work: F) -> F::Output {
+        self.runtime.block_on(work)
+    }
 }
 
 /// Where the launcher keeps its data. `LUMILIO_HOME` overrides the platform

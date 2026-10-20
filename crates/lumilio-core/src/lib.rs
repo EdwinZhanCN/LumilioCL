@@ -201,8 +201,9 @@ pub use service::{
     ProjectDetail, ServiceError, ThirdPartySignIn, now as unix_now,
 };
 pub use settings::{
-    AccountEntry, AccountKind, AuthServerEntry, DownloadSourcePreference, LauncherSettings,
-    MAX_MEMORY_MB, MirrorRule, SettingsError, SettingsStore,
+    AccountEntry, AccountKind, AgentSettings, AuthServerEntry, DEFAULT_AGENT_PORT,
+    DownloadSourcePreference, LauncherSettings, MAX_MEMORY_MB, MirrorRule, SettingsError,
+    SettingsStore,
 };
 pub use skin::{
     AccountLook, AppearanceChange, AppearanceError, AppearanceUpdate, LITTLE_SKIN_CSL, LibrarySkin,

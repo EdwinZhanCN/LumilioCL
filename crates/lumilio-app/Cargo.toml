@@ -15,6 +15,7 @@ path = "src/main.rs"
 [dependencies]
 async-channel = "2"
 gpui-kit.workspace = true
+lumilio-agent.workspace = true
 lumilio-core.workspace = true
 lumilio-plugin-api.workspace = true
 lumilio-plugin-crash-analyzer.workspace = true

@@ -36,6 +36,8 @@ fn main() {
             std::process::exit(1);
         }
     };
+    // Listens for the life of the window; dropping it closes every session.
+    let _agents = serve_agents(&backend);
     let mut app = gpui_kit::application().with_assets(assets::AppAssets);
     match images::ImageClient::new() {
         Ok(client) => app = app.with_http_client(client),
@@ -102,6 +104,38 @@ fn main() {
 
         cx.activate(true);
     });
+}
+
+/// Agents connect over loopback HTTP (plan agent-mcp): when the settings say
+/// so, or with `LUMILIO_MCP=1` while Settings has no switch yet. A port that
+/// moved because the configured one was busy is kept, so an agent's saved
+/// address stays valid next time.
+fn serve_agents(backend: &backend::Backend) -> Option<lumilio_agent::Running> {
+    let settings = backend.block_on(backend.service.settings());
+    let enabled = settings.agent.enabled || std::env::var("LUMILIO_MCP").as_deref() == Ok("1");
+    if !enabled {
+        return None;
+    }
+    let service = backend.service.clone();
+    match backend.block_on(lumilio_agent::serve(service, settings.agent.port)) {
+        Ok(running) => {
+            if running.port() != settings.agent.port {
+                let moved = lumilio_core::AgentSettings {
+                    port: running.port(),
+                    ..settings.agent
+                };
+                if let Err(error) = backend.block_on(backend.service.set_agent_settings(moved)) {
+                    eprintln!("LumilioCL could not keep the agent port: {error}");
+                }
+            }
+            eprintln!("LumilioCL agents connect at {}", running.url());
+            Some(running)
+        }
+        Err(error) => {
+            eprintln!("LumilioCL agents cannot connect: {error}");
+            None
+        }
+    }
 }
 
 /// Parses `<width>x<height>` in logical pixels, no smaller than the window's
