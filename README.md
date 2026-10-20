@@ -51,3 +51,6 @@ just package               # 为当前平台打包到 dist/
 ## 许可证与致谢
 
 以 [AGPL-3.0-only](LICENSE) 发布。部分代码改编自 [Modrinth App](https://github.com/modrinth/code)（GPL-3.0-only）和 [HMCL](https://github.com/HMCL-dev/HMCL)（GPL-3.0-or-later），投影渲染基于 [Nucleation](https://github.com/Schem-at/Nucleation)（MIT）和 [Schematic-Mesher](https://github.com/Schem-at/Schematic-Mesher)（AGPL-3.0-only），来源记在对应文件的注释里。字体、图标和渲染依赖的许可证见 [`ATTRIBUTIONS.md`](ATTRIBUTIONS.md) 与 [`crates/lumilio-ui/assets/ATTRIBUTIONS.md`](crates/lumilio-ui/assets/ATTRIBUTIONS.md)。LumilioCL 没有使用 Modrinth 的品牌。
+LumilioCL is an independent, open-source Minecraft launcher.
+
+NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.
