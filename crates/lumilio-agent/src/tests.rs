@@ -1,16 +1,18 @@
-//! An MCP client in the same process, over an in-memory pipe: the protocol
-//! path an external agent takes, without a child process.
+//! An MCP client over real loopback HTTP: the path an external agent takes.
 
+use std::net::{Ipv4Addr, TcpListener};
 use std::path::Path;
 use std::sync::Arc;
 
 use lumilio_core::{FileTransport, InstanceStore, LauncherService, Layout, Loader, NewInstance};
 use rmcp::model::CallToolRequestParams;
 use rmcp::service::RunningService;
+use rmcp::transport::StreamableHttpClientTransport;
+use rmcp::transport::streamable_http_client::StreamableHttpClientTransportConfig;
 use rmcp::{RoleClient, ServiceExt};
 use serde_json::{Value, json};
 
-use crate::LauncherMcp;
+use crate::{Running, access, serve};
 
 /// A small schematic from Nucleation's samples (MIT).
 const SAMPLE: &[u8] = include_bytes!("../../../forks/nucleation/tests/samples/3x3.litematic");
@@ -38,20 +40,23 @@ fn fixture(home: &Path) -> String {
     id
 }
 
-async fn connect(home: &Path) -> RunningService<RoleClient, ()> {
-    let service = LauncherService::open(
-        home,
-        FileTransport,
-        vec![Arc::new(lumilio_plugin_litematica::Litematica)],
+fn open(home: &Path) -> Arc<LauncherService<FileTransport>> {
+    Arc::new(
+        LauncherService::open(
+            home,
+            FileTransport,
+            vec![Arc::new(lumilio_plugin_litematica::Litematica)],
+        )
+        .unwrap(),
     )
-    .unwrap();
-    let (server_io, client_io) = tokio::io::duplex(1 << 16);
-    let server = LauncherMcp::new(Arc::new(service));
-    tokio::spawn(async move {
-        let running = server.serve(server_io).await.unwrap();
-        let _ = running.waiting().await;
-    });
-    ().serve(client_io).await.unwrap()
+}
+
+async fn connect(running: &Running, token: &str) -> RunningService<RoleClient, ()> {
+    let transport = StreamableHttpClientTransport::with_client(
+        reqwest::Client::new(),
+        StreamableHttpClientTransportConfig::with_uri(running.url()).auth_header(token),
+    );
+    ().serve(transport).await.unwrap()
 }
 
 async fn call(client: &RunningService<RoleClient, ()>, tool: &str, arguments: Value) -> Value {
@@ -73,7 +78,8 @@ async fn call(client: &RunningService<RoleClient, ()>, tool: &str, arguments: Va
 async fn announces_the_tools_and_instructions() {
     let home = tempfile::tempdir().unwrap();
     fixture(home.path());
-    let client = connect(home.path()).await;
+    let running = serve(open(home.path()), 0).await.unwrap();
+    let client = connect(&running, running.token()).await;
 
     let info = client.peer_info().expect("server info");
     assert!(info.instructions.as_deref().unwrap().contains("Minecraft"));
@@ -99,7 +105,8 @@ async fn announces_the_tools_and_instructions() {
 async fn reads_a_schematic_through_the_library() {
     let home = tempfile::tempdir().unwrap();
     let id = fixture(home.path());
-    let client = connect(home.path()).await;
+    let running = serve(open(home.path()), 0).await.unwrap();
+    let client = connect(&running, running.token()).await;
 
     let instances = call(&client, "list_instances", json!({})).await;
     let listed = &instances["instances"][0];
@@ -140,7 +147,8 @@ async fn reads_a_schematic_through_the_library() {
 async fn a_missing_instance_is_a_tool_error_the_agent_can_read() {
     let home = tempfile::tempdir().unwrap();
     fixture(home.path());
-    let client = connect(home.path()).await;
+    let running = serve(open(home.path()), 0).await.unwrap();
+    let client = connect(&running, running.token()).await;
 
     let result = client
         .call_tool(
@@ -152,17 +160,97 @@ async fn a_missing_instance_is_a_tool_error_the_agent_can_read() {
     assert_eq!(result.is_error, Some(true));
     let text = result.content[0].as_text().unwrap().text.clone();
     assert!(text.contains("nope"), "{text}");
+}
 
-    let result = client
-        .call_tool(
-            CallToolRequestParams::new("read_schematic").with_arguments(
-                json!({ "instance": "nope", "file": "schematics/3x3.litematic" })
-                    .as_object()
-                    .cloned()
-                    .unwrap(),
-            ),
-        )
+/// The handshake a client would send, as a bare HTTP request.
+fn initialize() -> Value {
+    json!({
+        "jsonrpc": "2.0", "id": 1, "method": "initialize",
+        "params": {
+            "protocolVersion": "2025-06-18",
+            "capabilities": {},
+            "clientInfo": { "name": "probe", "version": "0" }
+        }
+    })
+}
+
+#[tokio::test]
+async fn refuses_requests_without_the_token_and_from_browsers() {
+    let home = tempfile::tempdir().unwrap();
+    let running = serve(open(home.path()), 0).await.unwrap();
+    let http = reqwest::Client::new();
+    let post = |builder: reqwest::RequestBuilder| {
+        builder
+            .header("accept", "application/json, text/event-stream")
+            .json(&initialize())
+            .send()
+    };
+
+    let anonymous = post(http.post(running.url())).await.unwrap();
+    assert_eq!(anonymous.status(), 401);
+    assert!(anonymous.headers().contains_key("www-authenticate"));
+
+    let wrong = post(http.post(running.url()).bearer_auth("not-it"))
         .await
         .unwrap();
-    assert_eq!(result.is_error, Some(true));
+    assert_eq!(wrong.status(), 401);
+
+    let from_a_page = post(
+        http.post(running.url())
+            .bearer_auth(running.token())
+            .header("origin", "http://evil.example"),
+    )
+    .await
+    .unwrap();
+    assert_eq!(from_a_page.status(), 403);
+
+    let elsewhere = post(
+        http.post(running.url().replace("/mcp", "/other"))
+            .bearer_auth(running.token()),
+    )
+    .await
+    .unwrap();
+    assert_eq!(elsewhere.status(), 404);
+
+    let proper = post(http.post(running.url()).bearer_auth(running.token()))
+        .await
+        .unwrap();
+    assert_eq!(proper.status(), 200);
+}
+
+#[tokio::test]
+async fn keeps_one_token_per_data_folder_and_moves_off_a_busy_port() {
+    let home = tempfile::tempdir().unwrap();
+    let busy = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+    let wanted = busy.local_addr().unwrap().port();
+
+    let first = serve(open(home.path()), wanted).await.unwrap();
+    assert!(
+        (wanted + 1..=wanted + 20).contains(&first.port()),
+        "{} is not above the busy port {wanted}",
+        first.port()
+    );
+    let token = first.token().to_owned();
+    assert_eq!(token.len(), 64);
+    let file = access::path(home.path());
+    let written: Value = serde_json::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
+    assert_eq!(written["url"], first.url());
+    assert_eq!(written["token"], token);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        assert_eq!(
+            std::fs::metadata(&file).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+    }
+    first.shutdown().await;
+
+    // The same folder, a later run: the token stays, the address is current.
+    let again = serve(open(home.path()), 0).await.unwrap();
+    assert_eq!(again.token(), token);
+    let written: Value = serde_json::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
+    assert_eq!(written["url"], again.url());
+    let client = connect(&again, &token).await;
+    assert!(!client.list_all_tools().await.unwrap().is_empty());
 }

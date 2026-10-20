@@ -4,12 +4,17 @@
 //! the launcher's own or an external one such as Claude Code: there is no
 //! private tool channel, so both see the same tools and the same results.
 //! The server wraps one [`LauncherService`](lumilio_core::LauncherService)
-//! and exposes read-only tools over its instances and schematics. Transports
-//! are the host's choice; [`serve_stdio`] is the one for a child process.
+//! and exposes read-only tools over its instances and schematics. The one
+//! transport is streamable HTTP on the loopback interface ([`serve`]), which
+//! the running launcher hosts.
 
+mod access;
+mod http;
 mod server;
 #[cfg(test)]
 mod tests;
 mod tools;
 
-pub use server::{LauncherMcp, ServeError, serve_stdio};
+pub use access::Connection;
+pub use http::{PATH, Running, ServeError, serve};
+pub use server::LauncherMcp;

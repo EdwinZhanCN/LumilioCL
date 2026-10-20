@@ -1,12 +1,13 @@
 //! Makes a launcher data folder with one game and one schematic, for trying
-//! `lumiliocl mcp` by hand:
+//! the agent endpoint by hand without touching the real library:
 //!
 //! ```text
 //! cargo run -p lumilio-agent --example fixture_home -- /tmp/lumilio-home
-//! LUMILIO_HOME=/tmp/lumilio-home target/debug/lumiliocl mcp
+//! LUMILIO_HOME=/tmp/lumilio-home LUMILIO_MCP=1 target/debug/lumiliocl
 //! ```
 //!
-//! The folder must not exist yet; nothing of the real library is touched.
+//! The launcher then prints the address; the bearer token is in
+//! `/tmp/lumilio-home/agent/mcp.json`. The folder must not exist yet.
 
 use std::path::PathBuf;
 

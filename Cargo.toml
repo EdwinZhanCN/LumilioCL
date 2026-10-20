@@ -73,8 +73,15 @@ png = "0.18"
 regex = "1.11"
 rsa = { version = "0.9", features = ["getrandom"] }
 reqwest = { version = "0.13.4", features = ["stream"] }
-# The official MCP SDK (Apache-2.0); the launcher's agent surface (plan agent-mcp).
+# The official MCP SDK (Apache-2.0); the launcher's agent surface (plan agent-mcp),
+# hosted on hyper, which reqwest already builds.
 rmcp = { version = "3.5.1", default-features = false, features = ["server", "macros"] }
+bytes = "1"
+http = "1"
+http-body-util = "0.1"
+hyper = { version = "1", features = ["server", "http1", "http2"] }
+hyper-util = { version = "0.1", features = ["server-auto", "tokio"] }
+tokio-util = "0.7"
 schemars = "1"
 semver = "1"
 serde = { version = "1", features = ["derive"] }

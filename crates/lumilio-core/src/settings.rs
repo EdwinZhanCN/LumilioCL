@@ -180,6 +180,32 @@ pub struct LauncherSettings {
     /// start after updating shows them.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub release_notes_seen: Option<String>,
+    /// Whether and where agents may connect to the launcher (plan agent-mcp).
+    pub agent: AgentSettings,
+}
+
+/// The loopback port agents try first.
+pub const DEFAULT_AGENT_PORT: u16 = 27315;
+
+/// How agents reach the launcher's MCP server. The token they present is
+/// not here: it lives in `agent/mcp.json`, which is never shared for support.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(default)]
+pub struct AgentSettings {
+    /// Whether the launcher listens for agents at all.
+    pub enabled: bool,
+    /// The loopback port tried first; when it is busy, the next free one is
+    /// kept here so an agent's saved address stays valid.
+    pub port: u16,
+}
+
+impl Default for AgentSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            port: DEFAULT_AGENT_PORT,
+        }
+    }
 }
 
 fn auto_update_default() -> bool {
@@ -218,6 +244,7 @@ impl Default for LauncherSettings {
             auto_download_block_assets: true,
             launch: LaunchTuning::default(),
             release_notes_seen: Some(env!("CARGO_PKG_VERSION").to_owned()),
+            agent: AgentSettings::default(),
         }
     }
 }
@@ -390,6 +417,12 @@ impl SettingsStore {
     pub fn set_auto_update(&mut self, enabled: bool) -> Result<(), SettingsError> {
         let mut next = self.settings.clone();
         next.auto_update = enabled;
+        self.save(next)
+    }
+
+    pub fn set_agent(&mut self, agent: AgentSettings) -> Result<(), SettingsError> {
+        let mut next = self.settings.clone();
+        next.agent = agent;
         self.save(next)
     }
 

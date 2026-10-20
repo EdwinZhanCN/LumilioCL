@@ -64,6 +64,14 @@ impl<T: Transport + Clone> LauncherService<T> {
         Ok(self.settings.lock().await.set_auto_update(enabled)?)
     }
 
+    /// Whether and where agents may connect (plan agent-mcp).
+    pub async fn set_agent_settings(
+        &self,
+        agent: crate::settings::AgentSettings,
+    ) -> Result<(), ServiceError> {
+        Ok(self.settings.lock().await.set_agent(agent)?)
+    }
+
     /// Remembers that the release notes of `version` were shown.
     pub async fn set_release_notes_seen(&self, version: &str) -> Result<(), ServiceError> {
         Ok(self.settings.lock().await.set_release_notes_seen(version)?)
