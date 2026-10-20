@@ -66,6 +66,14 @@ Why: 迁移是唯一的表结构来源，测试执行同一批文件，查询与
 
 Consequences: 新表或改表要加一个迁移文件，并在部署依赖它的 Worker 之前对远程库执行 migrations apply；部署任务不自动迁移。仓库机密为空时不上传 CF_API_KEY，Worker 的 CurseForge 路由返回空数组。
 
+## Decision D5
+
+CurseForge 简介的译文可以存入 D1；D1 只存平台、项目 ID、原文 SHA-256、自有译文与时间，不存 API 返回的任何数据。
+
+Why: CurseForge 3rd Party API Terms（2024-08-14 版）§3.1(e) 禁止 save or cache any data obtained through the API。Worker 取得的原文只在请求内用于翻译与求 hash，不写入 D1、日志或 Cache API；存下的是本项目生成的译文。Key 只在 Worker 的 secret 中使用，不交给用户（§2.2）。
+
+Consequences: summaries 表不得加入原文、标题或其他上游字段，Worker 不得记录上游响应。若 Overwolf 提出异议，清空 Worker 的 CF_API_KEY 即停用 CurseForge 回退，启动器显示原文，无需发版。
+
 ## References
 
 - [.agents/plans/discover-translation.json](../../.agents/plans/discover-translation.json)

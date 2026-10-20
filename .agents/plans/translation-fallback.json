@@ -80,6 +80,12 @@
       "decision": "D1 表结构放在 web/migrations（wrangler d1 迁移格式），Worker 不再在请求时建表；CF_API_KEY 由 web.yml 的 deploy 任务以 wrangler deploy --secrets-file 从同名仓库机密上传。",
       "rationale": "迁移是唯一的表结构来源，测试执行同一批文件，查询与表不会悄悄分叉，也省去每个 isolate 的建表请求。release.yml 已用仓库机密 CF_API_KEY；随部署上传不需要手动 secret put，也不会删除其他机密。步骤内的环境变量不能叫 CF_API_KEY，wrangler 4 把它当作 Cloudflare 全局 Key 的旧名。",
       "consequences": "新表或改表要加一个迁移文件，并在部署依赖它的 Worker 之前对远程库执行 migrations apply；部署任务不自动迁移。仓库机密为空时不上传 CF_API_KEY，Worker 的 CurseForge 路由返回空数组。"
+    },
+    {
+      "id": "D5",
+      "decision": "CurseForge 简介的译文可以存入 D1；D1 只存平台、项目 ID、原文 SHA-256、自有译文与时间，不存 API 返回的任何数据。",
+      "rationale": "CurseForge 3rd Party API Terms（2024-08-14 版）§3.1(e) 禁止 save or cache any data obtained through the API。Worker 取得的原文只在请求内用于翻译与求 hash，不写入 D1、日志或 Cache API；存下的是本项目生成的译文。Key 只在 Worker 的 secret 中使用，不交给用户（§2.2）。",
+      "consequences": "summaries 表不得加入原文、标题或其他上游字段，Worker 不得记录上游响应。若 Overwolf 提出异议，清空 Worker 的 CF_API_KEY 即停用 CurseForge 回退，启动器显示原文，无需发版。"
     }
   ],
   "references": [
