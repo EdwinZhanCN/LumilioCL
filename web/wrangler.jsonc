@@ -20,9 +20,8 @@
     {
       "binding": "DB",
       "database_name": "lumilio-translations",
-      // From `wrangler d1 create lumilio-translations` (plan translation-fallback
-      // T3). Paste it before this reaches main: main deploys on every push.
-      "database_id": "TODO-run-wrangler-d1-create",
+      // From `wrangler d1 create lumilio-translations` (plan translation-fallback T3).
+      "database_id": "2a88fc8b-7385-400a-81d3-bb7e3df6105a",
       // Apply with `wrangler d1 migrations apply lumilio-translations --remote`
       // before deploying a Worker that needs a new table.
       "migrations_dir": "migrations"
