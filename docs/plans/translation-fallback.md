@@ -20,7 +20,7 @@ MCIM 没有某个项目的中文简介、简介已过期或 MCIM 不可达时，
   Acceptance: 只接受 POST JSON：Modrinth {"project_ids": [string]}，CurseForge {"modids": [int]}，最多 50 个 ID，其他形状 400。Worker 一次批量请求取当前简介（Modrinth /v2/projects?ids=，CurseForge POST /v1/mods，需 CF_API_KEY 机密，缺失时该平台返回空数组）。命中 D1（平台、ID、原文 SHA-256）直接返回；未命中且当日预算未用尽时批量交 Workers AI，要求按序返回同样条数的 JSON 字符串数组，条数不符或非字符串整批丢弃。响应只含有译文的行：{project_id | modid, original, translated}。按返回的 usage 累计 neuron，达到上限后不再调用模型。vitest 用假的 AI / D1 / fetch 覆盖：形状校验、缓存命中不调用模型、预算用尽只回缓存、模型条数不符不写缓存、上游失败返回空数组。
 - [x] T2 — 启动器在 MCIM 之后回退到 Worker。 (Completed)
   Acceptance: MCIM 命中且原文一致时不请求 Worker；MCIM 未命中、原文不一致或请求失败的 ID 才批量发给 https://launcher.lumilio.org/translate/{platform}。两处结果用同一行解析、原文一致与 safe_summary 校验，缓存提供商分别为 mcim / lumilio，未命中各自短期负缓存。设置说明的中英文写明只向 MCIM 与 launcher.lumilio.org 发送平台和项目 ID。core 测试用脚本化传输验证请求顺序与只发送未解决的 ID。
-- [ ] T3 — Project Maintainer 创建 Cloudflare 资源并部署。 (InProgress)
+- [x] T3 — Project Maintainer 创建 Cloudflare 资源并部署。 (Completed)
   Acceptance: 合入 main 之前：创建 D1 数据库 lumilio-translations，把 database_id 填入 web/wrangler.jsonc 替换占位值，执行 wrangler d1 migrations apply lumilio-translations --remote 建表。CF_API_KEY 不必手动设置，deploy 任务用 --secrets-file 从仓库机密 CF_API_KEY 上传。部署后对一个 Modrinth 与一个 CurseForge 项目 ID 实际请求返回中文行，再次请求命中缓存。服务端使用 CurseForge Key 前核对 CurseForge 的条款。
 - [ ] T4 — 检查译文质量与每日用量。 (Proposed)
   Acceptance: 部署后抽查 Modrinth 与 CurseForge 各若干条译文的术语（模组、整合包、下界、末地等）与专有名词保留；在 Cloudflare 面板核对一天的 neuron 用量与 Worker 内的累计接近，且未超过免费额度。
@@ -32,7 +32,7 @@ MCIM 没有某个项目的中文简介、简介已过期或 MCIM 不可达时，
 - 启动器只把 MCIM 未解决的 ID 发给 Worker，两处结果都经原文一致校验。
   Result: 2026-10-19：core translation 十三项通过，新增 the_fallback_only_hears_of_what_mcim_could_not_answer（MCIM 命中 a、b 原文过期、c 缺失时 Worker 只收到 b、c；第二次只因 b 再问 MCIM）与 with_mcim_unreachable_every_summary_is_asked_of_the_fallback。临时让 Worker 收到全部 ID 时，该测试与 curseforge_summaries_ask_by_numeric_mod_id 按预期失败。lumilio-core Clippy（-D warnings）、fmt 与 i18n 八项通过，IA 已重新生成。
 - 部署后的真实请求、缓存命中与每日用量。
-  Result: pending
+  Result: 2026-10-20：D1 lumilio-translations 已创建并在远端执行 0001_translations.sql（budget、d1_migrations、summaries）。#49 合入后 web.yml 的 deploy 成功。POST /translate/modrinth {"project_ids":["AANobbMI"]} 与 /translate/curseforge {"modids":[238222]} 均返回 200 和中文行；再次请求时 budget 当日 neuron 不变，确认命中缓存。summaries 只有 platform、id、hash、translated、created（D5）。每日用量与译文质量待 T4。
 
 ## Decision D1
 
