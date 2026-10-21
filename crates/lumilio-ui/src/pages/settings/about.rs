@@ -8,7 +8,7 @@ use gpui::{AnyElement, IntoElement};
 pub(super) fn about(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
     let colors = ctx.colors;
     let handler = &ctx.handler;
-    let log = view.data_dir.join("activity.jsonl");
+    let log = lumilio_core::Layout::new(&view.data_dir).launcher_log();
     let update_status = update_status_text(&ctx.model.update_status);
     let update_detail = match &ctx.model.update_status {
         UpdateStatus::Failed { detail } => Some(detail.clone()),
@@ -96,7 +96,7 @@ pub(super) fn about(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
             ),
             colors,
         ),
-        // ia[settings]: 启动器日志 | 关于 · 按键 | 在访达中显示日志目录
+        // ia[settings]: 启动器日志 | 关于 · 按键 | 在访达中显示启动器日志（警告与错误、启动与游戏结束，满 1 MB 换新文件并保留上一个）
         row(
             "settings-logs",
             tr!("settings-logs"),
@@ -112,7 +112,7 @@ pub(super) fn about(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
             ),
             colors,
         ),
-        // ia[settings]: 导出诊断包 | 关于 · 按键 | 打包版本、设置摘要、Java 列表和各游戏最近日志；玩家名、UUID、路径脱敏
+        // ia[settings]: 导出诊断包 | 关于 · 按键 | 打包版本、设置摘要、Java 列表、启动器日志和各游戏最近日志；玩家名、UUID、路径脱敏
         row(
             "settings-diagnostics",
             tr!("settings-diagnostics"),

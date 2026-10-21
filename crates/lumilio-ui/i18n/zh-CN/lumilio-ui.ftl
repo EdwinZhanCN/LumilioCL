@@ -1860,9 +1860,9 @@ settings-update-portable = 便携版请从发布页下载新版
 settings-update-package-managed = 请用系统包管理器更新此版本
 settings-update-unsupported-install = 此安装位置不支持自动更新
 settings-logs = 启动器日志
-settings-logs-help = 下载与安装的记录。
+settings-logs-help = 启动器遇到的警告和错误，出了问题时可以看这里。
 settings-diagnostics = 诊断包
-settings-diagnostics-help = 打包版本、设置摘要、Java 列表和各游戏的最近日志；玩家名、UUID 和你的文件夹路径会被替换，启动前/包装/退出后命令只记录有没有填。
+settings-diagnostics-help = 打包版本、设置摘要、Java 列表、启动器日志和各游戏的最近日志；玩家名、UUID 和你的文件夹路径会被替换，启动前/包装/退出后命令只记录有没有填。
 settings-diagnostics-export = 导出…
 settings-license = 开源许可
 

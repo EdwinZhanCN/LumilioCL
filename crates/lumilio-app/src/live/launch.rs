@@ -73,6 +73,7 @@ pub(super) fn start_launch(wiring: &Wiring, window: gpui_kit::AnyWindowHandle, c
                 unsent = true;
             }
             if let LaunchUpdate::Signal(signal) = update {
+                log_signal(&instance, &signal);
                 around_the_game(&wiring, window, &signal, after, cx);
                 if wiring
                     .shell
@@ -90,6 +91,7 @@ pub(super) fn start_launch(wiring: &Wiring, window: gpui_kit::AnyWindowHandle, c
             && !matches!(error, ServiceError::Launch(_))
         {
             let signal = LaunchSignal::Failed(error.launch_failure());
+            log_signal(&instance, &signal);
             let _ = wiring
                 .shell
                 .update(cx, |shell, cx| shell.apply_launch_signal(signal, cx));
@@ -100,6 +102,25 @@ pub(super) fn start_launch(wiring: &Wiring, window: gpui_kit::AnyWindowHandle, c
         cx.update(|cx| reload(&wiring, Reload::Lists, cx));
     })
     .detach();
+}
+
+/// Keeps how a launch went wrong, or how the game ended, in the launcher log.
+fn log_signal(instance: &str, signal: &LaunchSignal) {
+    match signal {
+        LaunchSignal::Running => log::info!("{instance}: the game is running"),
+        LaunchSignal::Exited { code: Some(0) } => log::info!("{instance}: the game quit"),
+        LaunchSignal::Exited { code } => {
+            log::warn!("{instance}: the game ended unexpectedly (exit code {code:?})");
+        }
+        LaunchSignal::Failed(LaunchFailure::Step { message, .. }) => {
+            log::warn!("{instance}: the launch failed: {message}");
+        }
+        LaunchSignal::Failed(LaunchFailure::ExitedEarly { code }) => {
+            log::warn!("{instance}: the game quit while starting (exit code {code:?})");
+        }
+        LaunchSignal::Cancelled => log::info!("{instance}: the launch or game was stopped"),
+        LaunchSignal::Phase(_) | LaunchSignal::Progress { .. } => {}
+    }
 }
 
 /// Dev hook: `LUMILIO_HOME_RECOVERY=failed|details|crashed|crashed-details|away`

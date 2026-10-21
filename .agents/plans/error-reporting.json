@@ -52,8 +52,8 @@
     {
       "id": "T4",
       "title": "启动器日志文件。",
-      "status": "proposed",
-      "acceptance": "启动器把自身的警告与错误写入数据目录下按大小轮换的日志文件，eprintln! 改为日志；设置或诊断页可以打开日志所在文件夹、复制最近的日志。错误的技术详情包含原因链（例如 reqwest 的 DNS、TLS、超时原因）。"
+      "status": "completed",
+      "acceptance": "启动器把自身的警告与错误写入数据目录下按大小轮换的日志文件（logs/launcher.log，满 1 MB 换成 launcher.1.log），eprintln! 改为日志；界面上弹出的每条错误连同技术详情、启动失败与游戏非正常结束都写入日志。设置 › 关于的「启动器日志」在访达中显示该文件，诊断包附上两份日志（脱敏）。网络错误的技术详情包含原因链（例如 reqwest 的 DNS、TLS、连接被拒、超时原因）。"
     },
     {
       "id": "T5",
@@ -79,7 +79,7 @@
     },
     {
       "criterion": "启动器的错误与 panic 留在用户能找到的日志或 crash 文件中。",
-      "result": null
+      "result": "2026-10-21（T4，panic 待 T5）：app logging::tests 两项通过：自己的 info 以上与第三方库的 warn 以上写入、其余不写；写满上限后换新文件并保留上一个，临时把改名换成删除时按预期失败。ui a_failure_shown_is_also_kept_in_the_launcher_log：弹出的错误 toast 连同技术详情写入日志、成功提示不写，临时去掉 toast.rs 的记录时按预期失败。core the_diagnostics_bundle_hides_the_player_the_folders_and_commands 断言诊断包含 launcher/launcher.log 与 launcher.1.log 且已脱敏；error_text::tests 证明原因链逐层写出不重复，对真实 reqwest 的连接被拒比 reqwest 自己的一行更长。在临时 LUMILIO_HOME 中运行开发版：日志只有启动一行和恢复钩子产生的错误一行，GPUI 没有写入噪声。"
     }
   ],
   "decisions": [

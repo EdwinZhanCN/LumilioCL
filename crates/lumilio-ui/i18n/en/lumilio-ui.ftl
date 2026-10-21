@@ -2068,9 +2068,9 @@ settings-update-portable = Download a new ZIP from the releases page to update t
 settings-update-package-managed = Update this version with your system package manager
 settings-update-unsupported-install = Automatic updates are unavailable for this install location
 settings-logs = Launcher logs
-settings-logs-help = A record of downloads and installs.
+settings-logs-help = The warnings and errors the launcher ran into. Look here when something goes wrong.
 settings-diagnostics = Diagnostics
-settings-diagnostics-help = Packs the version, a settings summary, the Java list and each game's recent logs. Player names, UUIDs and your folder paths are replaced; for the before, wrapper and after-exit commands it only records whether they are set.
+settings-diagnostics-help = Packs the version, a settings summary, the Java list, the launcher log and each game's recent logs. Player names, UUIDs and your folder paths are replaced; for the before, wrapper and after-exit commands it only records whether they are set.
 settings-diagnostics-export = Export…
 settings-license = License
 

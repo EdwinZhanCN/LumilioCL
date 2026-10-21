@@ -10,8 +10,8 @@
 | 更新内容 | 关于 · 按键 | 打开这个版本的更新内容弹窗（新功能、改进、修复）；没有这个版本的说明时不显示按键 |  | `lumilio-ui/src/pages/settings/about.rs` |
 | 手动检查更新 | 关于 · 按键 | 检查正式版并显示进度、结果或失败原因 |  | `lumilio-ui/src/pages/settings/about.rs` |
 | 自动更新 | 关于 · 开关 | 开启时启动后与每小时静默检查并下载；关闭后只保留手动检查 |  | `lumilio-ui/src/pages/settings/about.rs` |
-| 启动器日志 | 关于 · 按键 | 在访达中显示日志目录 |  | `lumilio-ui/src/pages/settings/about.rs` |
-| 导出诊断包 | 关于 · 按键 | 打包版本、设置摘要、Java 列表和各游戏最近日志；玩家名、UUID、路径脱敏 |  | `lumilio-ui/src/pages/settings/about.rs` |
+| 启动器日志 | 关于 · 按键 | 在访达中显示启动器日志（警告与错误、启动与游戏结束，满 1 MB 换新文件并保留上一个） |  | `lumilio-ui/src/pages/settings/about.rs` |
+| 导出诊断包 | 关于 · 按键 | 打包版本、设置摘要、Java 列表、启动器日志和各游戏最近日志；玩家名、UUID、路径脱敏 |  | `lumilio-ui/src/pages/settings/about.rs` |
 | 开源许可 | 关于 · 值 | 显示 AGPL-3.0-only |  | `lumilio-ui/src/pages/settings/about.rs` |
 | 明暗 | 外观 · 分段：跟随系统 / 浅色 / 深色 | 立即生效并保存 |  | `lumilio-ui/src/pages/settings/appearance.rs` |
 | 浅色主题 | 外观 · 值 + 更改 → 对话框里可搜索的主题列表 | 立即切换并保存；“恢复默认”回到内置的铝 |  | `lumilio-ui/src/pages/settings/appearance.rs` |

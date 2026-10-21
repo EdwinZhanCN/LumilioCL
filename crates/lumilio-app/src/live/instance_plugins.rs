@@ -167,7 +167,7 @@ pub(super) fn open_studio_window(
                     studio,
                 });
         }
-        Err(reason) => eprintln!("LumilioCL could not open the studio window: {reason}"),
+        Err(reason) => log::error!("could not open the studio window: {reason}"),
     }
 }
 
@@ -458,7 +458,7 @@ pub(super) fn pop_out_map(wiring: &Wiring, id: String, handoff: MapHandoff, cx: 
         cx.new(|cx| MapWindow::new(handoff, connection, cx))
     });
     if let Err(reason) = opened {
-        eprintln!("LumilioCL could not open the map window: {reason}");
+        log::error!("could not open the map window: {reason}");
     }
 }
 

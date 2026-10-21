@@ -439,6 +439,20 @@ impl<T: Transport + Clone> LauncherService<T> {
                 files.push((format!("logs/{}-latest.log", record.id), latest));
             }
         }
+        // The launcher's own log, and the one before it once that filled up.
+        for path in [
+            self.layout.launcher_log(),
+            self.layout.earlier_launcher_log(),
+        ] {
+            if let Ok(bytes) = tokio::fs::read(&path).await
+                && let Some(name) = path.file_name()
+            {
+                files.push((
+                    format!("launcher/{}", name.to_string_lossy()),
+                    String::from_utf8_lossy(&bytes).into_owned(),
+                ));
+            }
+        }
         for (_, text) in &mut files {
             *text = redactor.apply(text);
         }

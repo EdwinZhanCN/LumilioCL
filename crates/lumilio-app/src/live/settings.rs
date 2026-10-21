@@ -564,13 +564,11 @@ pub(super) fn export_diagnostics(wiring: &Wiring, cx: &mut App) {
         };
         let service = wiring.backend.service.clone();
         let target = path.clone();
-        let Ok(result) = wiring
+        let result = wiring
             .backend
             .spawn(async move { service.export_diagnostics(&target).await })
             .await
-        else {
-            return;
-        };
+            .unwrap_or_else(|e| Err(e.into()));
         let _ = wiring.shell.update(cx, |shell, cx| {
             shell.toast(
                 match result {
