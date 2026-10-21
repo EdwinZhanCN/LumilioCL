@@ -37,7 +37,7 @@ Status: InProgress
   Acceptance: core 发布运行会话（游戏 id 与阶段）；首页能否开始、导航「重启以更新」、游戏页的游戏输出、投影工作室窗口从会话读取；「恢复并继续」重试失败那次启动自己的游戏（按 D8，恢复界面只在它是当前游戏时出现）；卡片 ▶ 按 D4。T1 中恢复的测试通过；从卡片启动后芯片、首页与 core 指向同一个游戏。
 - [x] T7 — 统一设计语言与 IA 契约 (Completed)
   Acceptance: docs/design-language.md §6 与 §10，以及 navigation.rs（切换当前游戏）、home/launching.rs（继续）、lumilio-app live/instance.rs（浏览锁定）、pages/live/library.rs 与 instance_detail/actions.rs（设为当前游戏）的 ia 注释写成同一语义；nav-current-game 等中英文案与之一致；just ia 没有漂移。
-- [ ] T8 — Project Maintainer 在 Mac 上实机检查 (Proposed)
+- [x] T8 — Project Maintainer 在 Mac 上实机检查 (Completed)
   Acceptance: Project Maintainer 按 #55 的复现步骤和 T1 的六个场景实机检查，并看手感：「需要留意」出现时的淡入上移、变空时立即消失是否突兀；改 Java 或插件设置后「检查中」的时机与停留；芯片在保存后才变，等待能否察觉，是否需要 D1 的「被点的那一行保持按下」；从游戏页浏览后芯片与「继续」一起换，在芯片换游戏时退出锁定并重新搜索是否顺畅；卡片 ▶ 先设当前游戏再启动有无多余停顿；启动中导航「重启以更新」变灰；启动失败后换了当前游戏，首页改为继续新的游戏，失败出现在「需要留意」（D8）。结果记入本计划的 validation。
 - [ ] T9 — 合入、关闭 #55 并恢复 0.2.0 发布 (Proposed)
   Acceptance: PR 引用 #55，合入后 #55 关闭；0.2.0 的发布计划加上本计划为依赖，发布说明补上本计划带来的用户可见变化。
@@ -55,7 +55,7 @@ Status: InProgress
 - just check 通过（由 Project Maintainer 运行）。
   Result: pending
 - Project Maintainer 在 Mac 上实机检查通过（T8）。
-  Result: pending
+  Result: 2026-10-21：Project Maintainer 在 Mac 上用临时数据目录与三个会失败的假游戏检查通过。检查中提出两处改动，均已完成：换了当前游戏后恢复界面消失、失败留在「需要留意」（D8）；首页移除「最近」。另把启动阶段的失败标题改为「上次启动没有成功」，游玩中崩溃仍为「上一次游玩没有顺利结束」。游戏真正运行时的样子与启动中「重启以更新」变灰在开发版里看不到，由测试覆盖。
 
 ## Decision D1
 
