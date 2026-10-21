@@ -463,7 +463,15 @@ fn the_bundled_themes_are_complete_attributed_and_pair_light_with_dark() {
     let bundled: Vec<_> = catalog
         .entries
         .iter()
-        .filter(|entry| ![super::ALUMINIUM, super::NIGHT].contains(&entry.spec.name.as_str()))
+        .filter(|entry| {
+            ![
+                super::ALUMINIUM,
+                super::NIGHT,
+                super::GLASS,
+                super::TINTED_GLASS,
+            ]
+            .contains(&entry.spec.name.as_str())
+        })
         .collect();
     assert!(bundled.len() >= 4, "{} bundled themes", bundled.len());
     for entry in &bundled {
@@ -512,4 +520,35 @@ fn the_root_paints_the_window_with_the_page_colour(cx: &mut TestAppContext) {
         fills.contains(&gpui::hsla(0.6, 0.2, 0.5, 0.5)),
         "the root paints {fills:?}"
     );
+}
+
+/// The glass themes meet every contrast rule over a desktop of their own
+/// tone: Glass over white, Tinted Glass over black (plan translucent-themes,
+/// D6). Each translucent colour is judged as it is seen: the page over the
+/// desktop, a panel over that page.
+#[test]
+fn glass_meets_every_contrast_rule_over_a_desktop_of_its_tone() {
+    use super::spec::over;
+    for (name, dark) in [(super::GLASS, false), (super::TINTED_GLASS, true)] {
+        let theme = Catalog::default().resolve(Some(name), Tone::of(dark));
+        assert_eq!(theme.name, name);
+        assert_eq!(theme.window_background, super::WindowBackground::Blurred);
+        assert!(theme.body.page.a < 1. && theme.body.panel.a < 1.);
+        let desktop = if dark { gpui::black() } else { gpui::white() };
+        let page = over(theme.body.page, desktop);
+        let panel = over(theme.body.panel, page);
+        let palette = Palette::of(theme.body);
+        let colour = |key: &str| match key {
+            "page" => page,
+            "panel" => panel,
+            _ => palette.get(key).expect("a palette colour").0,
+        };
+        for rule in RULES {
+            let bg = colour(rule.bg);
+            let fg = over(palette.get(rule.fg).expect("a palette colour").0, bg);
+            let ratio = contrast(fg, bg);
+            let floor = if dark { rule.dark } else { rule.light };
+            assert!(ratio >= floor, "{name}: {} is {ratio:.2}:1", rule.id);
+        }
+    }
 }

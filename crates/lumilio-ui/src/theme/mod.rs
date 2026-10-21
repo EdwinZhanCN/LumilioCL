@@ -8,7 +8,8 @@ mod spec;
 mod tests;
 
 pub use look::{
-    ALUMINIUM, Catalog, Choice, Entry, Look, NIGHT, Origin, Rejected, Wallpaper, scan_dir,
+    ALUMINIUM, Catalog, Choice, Entry, GLASS, Look, NIGHT, Origin, Rejected, TINTED_GLASS,
+    Wallpaper, scan_dir,
 };
 pub use spec::{
     Color, Fonts, Palette, Resolved, ThemeSpec, Tone, WindowBackground, can_blur, parse_file,

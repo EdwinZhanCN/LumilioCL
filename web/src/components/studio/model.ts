@@ -44,6 +44,9 @@ export const BUILTIN_THEMES: readonly ThemeSpec[] = generated.themes.map((theme)
   ...theme,
   appearance: theme.appearance as Tone,
   colors: theme.colors as Record<string, string>,
+  window_background: (theme as { window_background?: string }).window_background as
+    | WindowBackground
+    | undefined,
 }));
 
 /** The launcher's own themes, which fill what another theme leaves out. */

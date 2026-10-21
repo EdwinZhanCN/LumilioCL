@@ -1874,6 +1874,7 @@ settings-theme-solid = This theme gives { $count ->
     [one] { $count } colour
    *[other] { $count } colours
     } with opacity, but only the page, panels and lines can be translucent; they show as opaque.
+settings-theme-glass = A translucent theme is clearest over a desktop as light or dark as the theme. With No wallpaper on Home, the most of the desktop shows through.
 settings-theme-local = Local themes
 settings-theme-local-help = Put .json theme files in this folder, then choose Reload.
 settings-theme-reload = Reload

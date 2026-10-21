@@ -81,6 +81,16 @@ pub(super) fn appearance(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
             ctx,
         ));
     }
+    if ctx
+        .look
+        .is_some_and(|look| look.theme.window_background == crate::theme::WindowBackground::Blurred)
+    {
+        rows.push(note(
+            "settings-theme-glass-note",
+            tr!("settings-theme-glass").to_owned(),
+            ctx,
+        ));
+    }
     if let Some(solid) = ctx
         .look
         .map(|look| look.theme.solid.len())

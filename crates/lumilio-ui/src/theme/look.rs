@@ -8,13 +8,17 @@ use std::path::{Path, PathBuf};
 use gpui::{App, Global};
 use lumilio_core::LookPreferences;
 
-use super::spec::{Resolved, ThemeSpec, Tone, parse_file};
+use super::spec::{Resolved, ThemeSpec, Tone, WindowBackground, parse_file};
 use super::{Body, MONO_FONT, SANS_FONT};
 
 /// Name of the built-in light theme.
 pub const ALUMINIUM: &str = "Aluminium";
 /// Name of the built-in dark theme.
 pub const NIGHT: &str = "Night";
+/// Name of the built-in translucent light theme.
+pub const GLASS: &str = "Glass";
+/// Name of the built-in translucent dark theme.
+pub const TINTED_GLASS: &str = "Tinted Glass";
 
 /// Where a theme came from.
 #[derive(Clone, Debug, PartialEq)]
@@ -107,6 +111,8 @@ fn builtin() -> Vec<Entry> {
     let own = [
         ThemeSpec::of_body(ALUMINIUM, Body::of(false)),
         ThemeSpec::of_body(NIGHT, Body::of(true)),
+        glass(GLASS, false),
+        glass(TINTED_GLASS, true),
     ];
     let bundled = BUNDLED.iter().flat_map(|text| {
         parse_file(text)
@@ -252,3 +258,22 @@ impl Look {
         }
     }
 }
+
+/// Aluminium or Night as glass: the page, panels and lines let the blurred
+/// desktop through (plan translucent-themes, D6), everything on them stays
+/// as it was.
+fn glass(name: &str, dark: bool) -> ThemeSpec {
+    let mut body = Body::of(dark);
+    body.page = body.page.opacity(GLASS_PAGE);
+    body.panel = body.panel.opacity(GLASS_PANEL);
+    body.hairline = body.hairline.opacity(GLASS_PAGE);
+    ThemeSpec {
+        window_background: Some(WindowBackground::Blurred),
+        ..ThemeSpec::of_body(name, body)
+    }
+}
+
+/// How opaque glass is: the page and its lines, and the panels on it, which
+/// stay a little firmer so lists and fields read as surfaces (D6).
+pub const GLASS_PAGE: f32 = 0.75;
+pub const GLASS_PANEL: f32 = 0.8;
