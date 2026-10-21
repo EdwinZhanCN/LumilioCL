@@ -53,6 +53,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         }
         // The deletion is committed; leftovers are retried by recovery.
         let _ = blocking(move || deletion.finish()).await;
+        self.settle_current().await;
         Ok(())
     }
 
@@ -67,19 +68,38 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// Background Continue / Recent / Needs Attention checks for Home.
     /// Full content verification remains in explicit diagnostics and repair.
     pub async fn home(&self) -> (Vec<InstanceRecord>, HomeSummary) {
+        let (instances, checks) = self.home_checks().await;
+        let summary = self.home_from(&instances, &checks).await;
+        (instances, summary)
+    }
+
+    /// The disk half of [`Self::home`]: each recently played game's own
+    /// problems, without those that depend on the account.
+    pub async fn home_checks(&self) -> (Vec<InstanceRecord>, crate::attention::HomeChecks) {
         let instances = self.store.lock().await.instances().to_vec();
         let (settings, runtimes) = self.environment().await;
         let mut recent: Vec<&InstanceRecord> = instances.iter().collect();
         recent.sort_by_key(|record| std::cmp::Reverse(record.last_played));
-        let mut problems: BTreeMap<String, Vec<Problem>> = BTreeMap::new();
+        let mut checks: BTreeMap<String, Vec<Problem>> = BTreeMap::new();
         for record in recent.into_iter().take(DIAGNOSED_LIMIT) {
-            let found = self
+            let mut found = self
                 .inspect_with_analysis(&settings, &runtimes, record, false)
                 .await;
-            problems.insert(record.id.clone(), found);
+            found.retain(|problem| problem.kind != crate::diagnostics::ProblemKind::NoAccount);
+            checks.insert(record.id.clone(), found);
         }
-        let summary = summarize(&instances, &problems, RECENT_LIMIT);
-        (instances, summary)
+        (instances, checks)
+    }
+
+    /// Home from checks already made and the account now; reads no disk.
+    pub async fn home_from(
+        &self,
+        instances: &[InstanceRecord],
+        checks: &crate::attention::HomeChecks,
+    ) -> HomeSummary {
+        let has_account = crate::inspect::account_usable(self.settings.lock().await.get());
+        let problems = crate::attention::with_account(checks, has_account);
+        summarize(instances, &problems, RECENT_LIMIT)
     }
 
     /// Creates an instance. A missing game version means the newest release;
@@ -122,17 +142,22 @@ impl<T: Transport + Clone> LauncherService<T> {
                 Some(chosen.version.clone())
             }
         };
-        let mut store = self.store.lock().await;
-        let record = store.create(
-            NewInstance {
-                name: name.to_owned(),
-                game_version,
-                loader,
-                loader_version,
-            },
-            now(),
-        )?;
-        Ok(record.clone())
+        let record = self
+            .store
+            .lock()
+            .await
+            .create(
+                NewInstance {
+                    name: name.to_owned(),
+                    game_version,
+                    loader,
+                    loader_version,
+                },
+                now(),
+            )?
+            .clone();
+        self.settle_current().await;
+        Ok(record)
     }
 
     /// Every game version the catalog lists, newest first, for choosing one

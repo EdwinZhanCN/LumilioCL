@@ -60,8 +60,9 @@ async fn explicit_cancel_unblocks_reads_and_records_cancelled_for_both_install_k
             .all(|task| task.outcome == TaskOutcome::Cancelled)
     );
     assert!(!world.service.layout.game(&record.id).exists());
-    world.service.delete_instance(&record.id).await.unwrap();
+    // Deleting the current game saves its replacement, so settings are free again.
     drop(defaults);
+    world.service.delete_instance(&record.id).await.unwrap();
 }
 
 #[tokio::test]

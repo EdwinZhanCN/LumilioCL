@@ -1,6 +1,7 @@
 mod accounts;
 mod activity;
 mod content;
+mod context;
 mod curseforge;
 mod diagnostics;
 mod discover;

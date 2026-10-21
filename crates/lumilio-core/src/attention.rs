@@ -5,8 +5,40 @@
 
 use std::collections::BTreeMap;
 
-use crate::diagnostics::{Problem, Severity};
+use crate::diagnostics::{Problem, ProblemKind, Severity};
 use crate::instance::InstanceRecord;
+
+/// Each diagnosed game's own problems, by id, without those that depend on
+/// the account: those are added when Home is summarized, so a change of
+/// account needs no new look at the disk (plan global-context, D7).
+pub type HomeChecks = BTreeMap<String, Vec<Problem>>;
+
+/// The checks with the account applied: without a usable account, every
+/// diagnosed game also cannot start for that reason.
+#[must_use]
+pub fn with_account(checks: &HomeChecks, has_account: bool) -> BTreeMap<String, Vec<Problem>> {
+    checks
+        .iter()
+        .map(|(id, problems)| {
+            let mut problems = problems.clone();
+            if !has_account {
+                // Where diagnosis reports it: right after an unsupported loader.
+                let at = problems
+                    .iter()
+                    .take_while(|problem| matches!(problem.kind, ProblemKind::LoaderUnsupported(_)))
+                    .count();
+                problems.insert(
+                    at,
+                    Problem {
+                        severity: Severity::Error,
+                        kind: ProblemKind::NoAccount,
+                    },
+                );
+            }
+            (id.clone(), problems)
+        })
+        .collect()
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AttentionItem {

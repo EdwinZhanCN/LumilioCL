@@ -101,6 +101,8 @@ pub struct LauncherService<T> {
     transport: T,
     store: Mutex<InstanceStore>,
     settings: Mutex<SettingsStore>,
+    /// Published by both stores on every save (plan global-context).
+    context: crate::context::ContextHub,
     board: StdMutex<TaskBoard>,
     /// Cancellation tokens of running tasks, by task id.
     cancels: StdMutex<BTreeMap<u64, CancellationToken>>,
@@ -159,10 +161,16 @@ impl<T: Transport + Clone> LauncherService<T> {
     ) -> Result<Self, ServiceError> {
         let layout = Layout::new(std::path::absolute(root.into())?);
         let root_lock = crate::root_lock::RootLock::acquire(layout.root())?;
-        let store = InstanceStore::open(layout.root())?;
-        let settings = SettingsStore::open(layout.root())?;
+        let mut store = InstanceStore::open(layout.root())?;
+        let mut settings = SettingsStore::open(layout.root())?;
         let log = ActivityLog::open(layout.root());
         let startup = recovery::startup_notes(&layout, &store, &settings, &log);
+        // A saved current game that is gone is replaced before anything reads
+        // it; a failed save leaves it to read as none.
+        let _ = preferences::settle_current(store.instances(), &mut settings);
+        let context = crate::context::ContextHub::new(settings.get());
+        store.publish_to(context.clone());
+        settings.publish_to(context.clone());
         let plugins = crate::plugins::PluginHost::new_core(plugins, settings.get().plugins.clone())
             // Invalid hand-edited mirrors must not make plugin initialization
             // prevent the launcher from opening. Network calls fail locally
@@ -181,6 +189,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             transport,
             store: Mutex::new(store),
             settings: Mutex::new(settings),
+            context,
             board: StdMutex::new(TaskBoard::default()),
             cancels: StdMutex::default(),
             automatic_java_once: StdMutex::default(),
