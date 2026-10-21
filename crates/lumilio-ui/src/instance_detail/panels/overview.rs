@@ -161,8 +161,15 @@ pub fn problem_text(problem: &Problem) -> (String, String) {
             tr!("instance-problem-low-memory").into(),
             tr!("instance-problem-low-memory-help", max = *max_mb),
         ),
+        // A launch that never reached the game was not a session played.
         ProblemKind::LastSessionFailed(outcome) => (
-            tr!("instance-problem-last-session").into(),
+            match outcome {
+                SessionOutcome::FailedToStart | SessionOutcome::FailedToPrepare => {
+                    tr!("instance-problem-last-launch")
+                }
+                _ => tr!("instance-problem-last-session"),
+            }
+            .into(),
             outcome_label(*outcome).into(),
         ),
         ProblemKind::Finding(result) => {

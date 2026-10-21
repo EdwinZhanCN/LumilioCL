@@ -1415,6 +1415,7 @@ instance-problem-duplicate-mods = 同一个 Mod 装了不止一份
 instance-problem-low-memory = 最大内存偏低
 instance-problem-low-memory-help = 当前上限 { $max } MB，游戏可能因内存不足而崩溃
 instance-problem-last-session = 上一次游玩没有顺利结束
+instance-problem-last-launch = 上次启动没有成功
 instance-history-view-all = 查看全部
 instance-overview-recent-changes = 最近变更
 instance-problems-status = 状态

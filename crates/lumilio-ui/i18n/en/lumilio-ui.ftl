@@ -1593,6 +1593,7 @@ instance-problem-duplicate-mods = The same mod is installed more than once
 instance-problem-low-memory = The maximum memory is low
 instance-problem-low-memory-help = The current limit is { $max } MB; the game may crash from running out of memory
 instance-problem-last-session = The last session didn't end cleanly
+instance-problem-last-launch = The last launch didn't succeed
 instance-history-view-all = View all
 instance-overview-recent-changes = Recent changes
 instance-problems-status = Status
