@@ -13,7 +13,7 @@
 | 空库：导入 | 首次使用的「把原来的游戏带过来」 | 同游戏库的导入其他启动器的游戏 |  | `lumilio-ui/src/home/lists.rs` |
 | 空库：新建 | 首次使用的「新建」 | 同游戏库的新建游戏 |  | `lumilio-ui/src/home/lists.rs` |
 | 需要留意：解决 | 每个有问题的游戏一行（游戏名 · 最严重的问题 · 另有几个）和一个按钮（安装/修复/更换…/去设置/去添加/查看日志…） | 点后先打开游戏页再执行 |  | `lumilio-ui/src/home/lists.rs` |
-| 恢复并继续 | 启动失败后的「恢复并继续」 | 重试失败的那个游戏；之后换过当前游戏时，先把它设回当前游戏 | global-context T6 | `lumilio-ui/src/home/recovery.rs` |
+| 恢复并继续 | 启动失败后的「恢复并继续」 | 重试失败的那个游戏；恢复界面只在它是当前游戏时出现，换了当前游戏后失败留在「需要留意」 | global-context T6 | `lumilio-ui/src/home/recovery.rs` |
 | 技术详情 | 启动失败后的「技术详情」 | 失败原因弹窗 |  | `lumilio-ui/src/home/recovery.rs` |
 | 启动前的 Java 确认 | 继续 / 开始游戏后的弹窗 | 游戏设置里选的 Java 不能运行这个版本时问一次：「本次改用 Java N」（本机没有合适的则「下载并使用 Java N」）/「仍然启动」/「取消」；只影响这一次，不改游戏设置 | java-management T6 | `lumilio-ui/src/java_conflict.rs` |
 | 打开最近的游戏 | 「最近」里的游戏库同款卡片 | 点卡片进游戏页；卡片上的启动、收藏和 ⋯ 菜单与游戏库相同 |  | `lumilio-ui/src/pages/live/home.rs` |

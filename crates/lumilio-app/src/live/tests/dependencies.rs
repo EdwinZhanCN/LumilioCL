@@ -4,8 +4,9 @@
 use super::super::context::{Stale, stale};
 use lumilio_core::{Context, Session, SessionPhase};
 
-/// Each kind of change core publishes, by name.
-fn changes() -> Vec<(&'static str, Context)> {
+/// Each kind of change core publishes, by name, as what was seen before and
+/// what is published now.
+fn changes() -> Vec<(&'static str, Context, Context)> {
     let base = Context::default();
     let mut current = base.clone();
     current.current_instance = Some("other".into());
@@ -16,29 +17,35 @@ fn changes() -> Vec<(&'static str, Context)> {
         instance: "other".into(),
         phase: SessionPhase::Preparing,
     });
+    let mut playing = base.clone();
+    playing.session = Some(Session {
+        instance: "other".into(),
+        phase: SessionPhase::Playing,
+    });
     let with = |bump: fn(&mut Context)| {
         let mut next = base.clone();
         bump(&mut next);
         next
     };
+    let from_base = |name, now| (name, base.clone(), now);
     vec![
-        ("current game", current),
-        ("current account", account),
-        ("library", with(|c| c.revisions.library += 1)),
-        ("accounts", with(|c| c.revisions.accounts += 1)),
-        ("java", with(|c| c.revisions.java += 1)),
-        ("plugins", with(|c| c.revisions.plugins += 1)),
-        ("session", session),
+        from_base("current game", current),
+        from_base("current account", account),
+        from_base("library", with(|c| c.revisions.library += 1)),
+        from_base("accounts", with(|c| c.revisions.accounts += 1)),
+        from_base("java", with(|c| c.revisions.java += 1)),
+        from_base("plugins", with(|c| c.revisions.plugins += 1)),
+        from_base("session", session),
+        ("launch ended", playing, base.clone()),
     ]
 }
 
 /// The changes that make `derived` out of date.
 fn made_stale_by(derived: fn(Stale) -> bool) -> Vec<&'static str> {
-    let base = Context::default();
     changes()
         .into_iter()
-        .filter(|(_, now)| derived(stale(Some(&base), now)))
-        .map(|(name, _)| name)
+        .filter(|(_, before, now)| derived(stale(Some(before), now)))
+        .map(|(name, _, _)| name)
         .collect()
 }
 
@@ -59,15 +66,25 @@ fn the_chip_continue_and_continue_playing_follow_the_game_and_the_library() {
 }
 
 #[test]
-fn each_games_checks_follow_the_library_java_and_plugins() {
-    assert_eq!(made_stale_by(|s| s.checks), ["library", "java", "plugins"]);
+fn each_games_checks_follow_the_library_java_plugins_and_ended_launches() {
+    assert_eq!(
+        made_stale_by(|s| s.checks),
+        ["library", "java", "plugins", "launch ended"]
+    );
 }
 
 #[test]
 fn needs_attention_follows_the_checks_and_the_account() {
     assert_eq!(
         made_stale_by(|s| s.attention),
-        ["current account", "library", "accounts", "java", "plugins"]
+        [
+            "current account",
+            "library",
+            "accounts",
+            "java",
+            "plugins",
+            "launch ended"
+        ]
     );
 }
 
@@ -91,5 +108,5 @@ fn sources_and_plugin_tabs_follow_the_plugins() {
 
 #[test]
 fn starting_games_restart_and_studio_writes_follow_the_session() {
-    assert_eq!(made_stale_by(|s| s.session), ["session"]);
+    assert_eq!(made_stale_by(|s| s.session), ["session", "launch ended"]);
 }

@@ -58,7 +58,7 @@ pub(super) fn render_recovery(
             h_flex()
                 .mt(px(12.))
                 .gap_3()
-                // ia[home]: 恢复并继续 | 启动失败后的「恢复并继续」 | 重试失败的那个游戏；之后换过当前游戏时，先把它设回当前游戏 | global-context T6
+                // ia[home]: 恢复并继续 | 启动失败后的「恢复并继续」 | 重试失败的那个游戏；恢复界面只在它是当前游戏时出现，换了当前游戏后失败留在「需要留意」 | global-context T6
                 .child(art_button(
                     "home-recover",
                     tr!("home-recover"),

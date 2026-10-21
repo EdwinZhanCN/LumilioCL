@@ -431,11 +431,12 @@ fn deleting_the_current_game_saves_its_replacement(cx: &mut TestAppContext) {
     );
 }
 
-/// 恢复并继续 retries the launch that failed, even when another game was
-/// chosen since: that game becomes current again, as ▶ does (D4).
+/// Home explains a failed launch only while its game is current: choosing
+/// another game makes Home continue that one, and the failure stays in
+/// 需要留意, which checks the games again once a launch ends.
 #[gpui_kit::test]
-fn recovering_retries_the_failed_game_after_another_was_chosen(cx: &mut TestAppContext) {
-    let (_shell, wiring, cx) = open(cx);
+fn choosing_another_game_leaves_a_failed_launch_to_needs_attention(cx: &mut TestAppContext) {
+    let (shell, wiring, cx) = open(cx);
     let a = game(&wiring, "A", "lumilio-test-none-a");
     let b = game(&wiring, "B", "lumilio-test-none-b");
     ask(&wiring, |service| async move {
@@ -443,30 +444,48 @@ fn recovering_retries_the_failed_game_after_another_was_chosen(cx: &mut TestAppC
     })
     .unwrap();
     cx.update(|_, cx| follow(&wiring, cx));
-    until(cx, "the library", |cx| {
-        cx.update(|_, cx| install_target(&wiring, cx)).is_some()
+    until(cx, "Home's first check", |cx| {
+        shell.read_with(cx, |shell, _| shell.live().unwrap().library_loaded)
+            && attention_in_full(&shell, cx) == attention_now_in_full(&wiring)
     });
+    let before = attention_in_full(&shell, cx);
 
     cx.update(|window, cx| play(&wiring, b.clone(), window, cx));
-    until(cx, "B's launch to fail", |_| {
-        failed_attempts(&wiring, &b) == 1
+    until(cx, "Home to explain B's failure", |cx| {
+        shell.read_with(cx, |shell, _| match shell.home() {
+            HomePresentation::Recovery { subject, .. } => subject.id.as_deref() == Some(&b),
+            _ => false,
+        })
     });
-    until(cx, "the launch to be over", |_| {
-        wiring.state.borrow().cancel.is_none()
+    until(cx, "需要留意 to list B's failed launch", |cx| {
+        let now = attention_in_full(&shell, cx);
+        now != before && now == attention_now_in_full(&wiring)
     });
+
     cx.update(|window, cx| {
         on_live_intent(&wiring, LiveIntent::InstallTarget(a.clone()), window, cx)
     });
-    until(cx, "A to be the saved current game", |_| {
-        saved_current(&wiring).as_deref() == Some(a.as_str())
+    until(cx, "Home to continue A instead of explaining B", |cx| {
+        continue_subject(&shell, cx).as_deref() == Some(a.as_str())
     });
+    assert!(
+        attention(&shell, cx).iter().any(|(game, _)| game == &b),
+        "B's failure left 需要留意"
+    );
+}
 
-    cx.update(|window, cx| {
-        on_shell_intent(&wiring, ShellIntent::Home(HomeIntent::Recover), window, cx)
-    });
-    until(cx, "the second attempt", |_| {
-        failed_attempts(&wiring, &a) + failed_attempts(&wiring, &b) == 2
-    });
-    assert_eq!(failed_attempts(&wiring, &a), 0, "恢复并继续 started A");
-    assert_eq!(saved_current(&wiring).as_deref(), Some(b.as_str()));
+/// Home's 需要留意 rows, with how many more problems each game has.
+fn attention_in_full(
+    shell: &Entity<LauncherShell>,
+    cx: &mut VisualTestContext,
+) -> Vec<lumilio_ui::home::AttentionRow> {
+    shell.read_with(cx, |shell, _| shell.live().unwrap().attention.clone())
+}
+
+fn attention_now_in_full(wiring: &Wiring) -> Vec<lumilio_ui::home::AttentionRow> {
+    let (records, summary) = ask(wiring, |service| async move { service.home().await });
+    attention_rows(
+        &summary.needs_attention,
+        &library_cards(&records, lumilio_core::unix_now()),
+    )
 }

@@ -68,10 +68,11 @@ pub(super) fn on_shell_intent(
     cx: &mut App,
 ) {
     match intent {
-        ShellIntent::Home(HomeIntent::Continue) => {
+        // Home explains a failure only while its game is current, so
+        // recovering retries that game.
+        ShellIntent::Home(HomeIntent::Continue | HomeIntent::Recover) => {
             continue_launch(wiring, window.window_handle(), cx);
         }
-        ShellIntent::Home(HomeIntent::Recover) => recover(wiring, window.window_handle(), cx),
         ShellIntent::Home(HomeIntent::CancelLaunch | HomeIntent::StopGame) => {
             if let Some(cancel) = wiring.state.borrow().cancel.clone() {
                 cancel.cancel();
@@ -128,37 +129,6 @@ fn continue_launch(wiring: &Wiring, window: gpui_kit::AnyWindowHandle, cx: &mut 
             // No account: ask for one, then start where the person left off.
             _ => open_add_account(&wiring, true, window, cx),
         });
-    })
-    .detach();
-}
-
-/// Retries the launch that failed: its game becomes the current game first
-/// (as ▶ does, decision D4), so Recover never starts another one.
-fn recover(wiring: &Wiring, window: gpui_kit::AnyWindowHandle, cx: &mut App) {
-    let context = wiring.backend.service.context();
-    let failed = context
-        .session
-        .filter(|session| !session.is_active())
-        .map(|session| session.instance)
-        .filter(|id| context.current_instance.as_ref() != Some(id));
-    let Some(failed) = failed else {
-        continue_launch(wiring, window, cx);
-        return;
-    };
-    let saved = super::library::save_current(wiring, failed);
-    let wiring = wiring.clone();
-    cx.spawn(async move |cx| match saved.await {
-        Ok(Ok(())) => cx.update(|cx| continue_launch(&wiring, window, cx)),
-        Ok(Err(error)) => {
-            let _ = wiring.shell.update(cx, |shell, cx| {
-                shell.abort_launch(cx);
-                shell.toast(
-                    Toast::error(tr!("library-current-save-failed")).technical(error.to_string()),
-                    cx,
-                );
-            });
-        }
-        Err(_) => {}
     })
     .detach();
 }

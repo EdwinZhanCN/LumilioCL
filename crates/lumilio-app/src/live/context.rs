@@ -6,7 +6,7 @@
 use super::Wiring;
 use super::jobs::refresh_installed;
 use gpui_kit::App;
-use lumilio_core::{Context, HomeChecks, InstanceRecord, unix_now};
+use lumilio_core::{Context, HomeChecks, InstanceRecord, Session, unix_now};
 use lumilio_ui::home::HomePresentation;
 use lumilio_ui::live::{
     account_rows, attention_rows, home_places, home_presentation, library_cards,
@@ -19,7 +19,8 @@ pub(super) struct Stale {
     /// The library cards, the chip, Continue and 接着玩 ← the current game,
     /// the library.
     pub home: bool,
-    /// Each game's own checks, read from disk ← the library, Java, plugins.
+    /// Each game's own checks, read from disk ← the library, Java, plugins,
+    /// a launch that ended.
     pub checks: bool,
     /// 需要留意 ← the checks and the account.
     pub attention: bool,
@@ -53,7 +54,10 @@ pub(super) fn stale(before: Option<&Context>, now: &Context) -> Stale {
     let current = before.current_instance != now.current_instance;
     let library = was.library != is.library;
     let accounts = was.accounts != is.accounts || before.current_account != now.current_account;
-    let checks = library || was.java != is.java || was.plugins != is.plugins;
+    // A launch that ended wrote how it went to the game's history.
+    let active = |context: &Context| context.session.as_ref().is_some_and(Session::is_active);
+    let ended = active(before) && !active(now);
+    let checks = library || ended || was.java != is.java || was.plugins != is.plugins;
     Stale {
         home: current || library,
         checks,
@@ -195,14 +199,15 @@ fn refresh_home(wiring: &Wiring, cx: &mut App) {
             .cloned();
         let cards = library_cards(&records, now);
         let _ = wiring.shell.update(cx, |shell, cx| {
-            // A launch in progress, or a failure being explained, keeps Home.
-            if matches!(
-                shell.home(),
-                HomePresentation::Loading
-                    | HomePresentation::Ambient
-                    | HomePresentation::FirstUse
-                    | HomePresentation::Continue { .. }
-            ) {
+            // A launch in progress keeps Home. A failure is explained only
+            // while its game is current: choosing another one leaves it to
+            // 需要留意.
+            let keep = match shell.home() {
+                HomePresentation::Launching { .. } | HomePresentation::Playing { .. } => true,
+                HomePresentation::Recovery { subject, .. } => subject.id.as_deref() == current,
+                _ => false,
+            };
+            if !keep {
                 shell.set_home(home, cx);
             }
             shell.update_live(
