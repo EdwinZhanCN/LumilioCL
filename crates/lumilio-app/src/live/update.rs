@@ -82,7 +82,7 @@ pub(super) fn announce(wiring: &Wiring, window: gpui_kit::AnyWindowHandle, cx: &
             return None;
         }
         if let Err(error) = service.set_release_notes_seen(running).await {
-            eprintln!("LumilioCL could not remember the shown release notes: {error}");
+            log::warn!("could not remember the shown release notes: {error}");
         }
         Some(seen)
     });
@@ -295,7 +295,7 @@ fn report_failure(events: &mpsc::UnboundedSender<UpdateEvent>, error: UpdateErro
     if manual {
         publish(events, failed(error));
     } else {
-        eprintln!("LumilioCL automatic update check failed: {error}");
+        log::warn!("automatic update check failed: {error}");
     }
 }
 

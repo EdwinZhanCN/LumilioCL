@@ -17,6 +17,7 @@ mod deletion;
 mod diagnostics;
 mod discover;
 mod environment;
+mod error_text;
 mod fetch;
 mod fingerprint;
 mod forge_install;
@@ -110,6 +111,7 @@ pub use discover::{
 pub use environment::{
     CompatibilityRule, HostProfile, MachineArchitecture, PlatformFamily, RuleDecision,
 };
+pub use error_text::with_causes;
 pub use fetch::{DOCUMENT_LIMIT, FetchError, fetch_document, post_document};
 pub use forge_meta::{forge_versions, neoforge_game_version, neoforge_versions};
 pub use game_settings::{

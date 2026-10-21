@@ -173,7 +173,7 @@ impl gpui::Global for PixelFace {}
 pub fn register_fonts(cx: &mut gpui::App) {
     let fonts = FONTS.iter().map(|data| Cow::Borrowed(*data)).collect();
     if let Err(reason) = cx.text_system().add_fonts(fonts) {
-        eprintln!("LumilioCL could not register its typefaces: {reason}");
+        log::error!("could not register its typefaces: {reason}");
     }
     let pixel = PIXEL_FONTS
         .iter()
@@ -181,7 +181,7 @@ pub fn register_fonts(cx: &mut gpui::App) {
         .collect();
     match cx.text_system().add_fonts(pixel) {
         Ok(()) => cx.set_global(PixelFace),
-        Err(reason) => eprintln!("LumilioCL could not register its pixel face: {reason}"),
+        Err(reason) => log::error!("could not register its pixel face: {reason}"),
     }
 }
 

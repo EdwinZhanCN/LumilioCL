@@ -121,6 +121,16 @@ pub fn flush(queue: &mut Vec<Toast>, window: &mut Window, cx: &mut App) {
 }
 
 fn show(toast: Toast, window: &mut Window, cx: &mut App) {
+    // What failed is also kept in the launcher log, with its raw cause.
+    if toast.kind == ToastKind::Error {
+        match &toast.technical {
+            Some(cause) => {
+                let said = toast.text.trim_end_matches(['。', '.']);
+                log::error!("{said}: {cause}");
+            }
+            None => log::error!("{}", toast.text),
+        }
+    }
     let note = match toast.kind {
         ToastKind::Info => Notification::info(toast.text),
         ToastKind::Success => Notification::success(toast.text),

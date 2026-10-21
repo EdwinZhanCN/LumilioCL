@@ -41,6 +41,43 @@ fn messages_float_as_toasts_and_never_take_room_in_the_page(cx: &mut TestAppCont
 }
 
 #[gpui::test]
+fn a_failure_shown_is_also_kept_in_the_launcher_log(cx: &mut TestAppContext) {
+    use crate::toast::Toast;
+    use gpui::AppContext as _;
+    use std::sync::Mutex;
+    static LINES: Mutex<Vec<String>> = Mutex::new(Vec::new());
+    struct Keep;
+    impl log::Log for Keep {
+        fn enabled(&self, _: &log::Metadata) -> bool {
+            true
+        }
+        fn log(&self, record: &log::Record) {
+            LINES.lock().unwrap().push(record.args().to_string());
+        }
+        fn flush(&self) {}
+    }
+    // Each test runs in its own process, so this logger is only this test's.
+    log::set_logger(&Keep).unwrap();
+    log::set_max_level(log::LevelFilter::Info);
+    cx.update(|cx| {
+        gpui_component::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let (shell, cx) = cx.add_window_view(|window, cx| {
+        let shell = cx.new(|cx| LauncherShell::new(cx).with_live(Rc::new(|_, _, _| {})));
+        gpui_component::Root::new(shell, window, cx)
+    });
+    let _ = shell;
+    cx.update(|_, cx| {
+        crate::toast::post(Toast::success("已安装 Sodium"), cx);
+        crate::toast::post(Toast::error("没有装上 Sodium").technical("disk full"), cx);
+    });
+    cx.update(|window, cx| window.draw(cx).clear(cx));
+    let lines = LINES.lock().unwrap().clone();
+    assert_eq!(lines, vec!["没有装上 Sodium: disk full".to_owned()]);
+}
+
+#[gpui::test]
 fn a_result_for_a_page_no_longer_shown_still_floats_up(cx: &mut TestAppContext) {
     use crate::toast::Toast;
     use gpui::{AppContext as _, Entity};
