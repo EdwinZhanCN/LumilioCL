@@ -416,3 +416,47 @@ fn a_bare_home_puts_its_title_at_the_top(cx: &mut TestAppContext) {
         "over the world the title sits at its foot ({on_world} vs {bare})"
     );
 }
+
+/// The veil under the navigation is drawn on a solid page only: on a
+/// translucent one it would stack into a dark band over the glass.
+#[gpui::test]
+fn the_navigation_veil_is_left_out_on_a_translucent_page(cx: &mut TestAppContext) {
+    let veiled = |cx: &mut TestAppContext, glass: bool| {
+        cx.update(|cx| {
+            gpui_component::init(cx);
+            let local = glass.then(|| crate::theme::Entry {
+                spec: crate::theme::parse_file(
+                    r##"{"themes":[{"name":"Glass","appearance":"light","colors":{"page":"#e4e4e1bf"}}]}"##,
+                )
+                .unwrap()
+                .remove(0)
+                .unwrap(),
+                origin: crate::theme::Origin::Local("glass.json".into()),
+            });
+            cx.set_global(crate::theme::Catalog::with_local(
+                local.into_iter().collect(),
+                Vec::new(),
+            ));
+            cx.set_global(crate::theme::Choice(lumilio_core::LookPreferences {
+                light_theme: glass.then(|| "Glass".into()),
+                ..Default::default()
+            }));
+            gpui_component::Theme::change(gpui_component::ThemeMode::Light, None, cx);
+            crate::theme::tune(cx);
+        });
+        let (_shell, cx) = cx.add_window_view(|_, cx| {
+            LauncherShell::new(cx)
+                .with_home(continuing(), cx)
+                .with_intent_handler(Rc::new(|_, _, _| {}))
+        });
+        settle(cx);
+        cx.debug_bounds("nav-veil").is_some()
+    };
+    assert!(veiled(cx, false), "a solid page has the veil");
+    // Where the system cannot blur, the translucent page is made solid (D3).
+    assert_eq!(
+        veiled(cx, true),
+        !crate::theme::can_blur(),
+        "a translucent page has no veil"
+    );
+}

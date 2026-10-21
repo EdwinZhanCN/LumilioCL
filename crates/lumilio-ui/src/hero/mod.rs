@@ -165,10 +165,15 @@ fn rasterize(frame: FrameSpec, columns: usize, rows: usize, framing: Framing) ->
     grid
 }
 
+/// `clear` is the first row of the bottom dissolve and the page colour: on a
+/// translucent page the dissolved texels are left out instead of painted, so
+/// the world breaks up into the glass behind it rather than into a solid band
+/// of the page colour (plan translucent-themes, T3).
 pub(crate) fn paint_grid(
     bounds: Bounds<Pixels>,
     grid: &PixelGrid,
     texel: (f32, f32),
+    clear: Option<(usize, u32)>,
     window: &mut Window,
 ) {
     let origin = bounds.origin;
@@ -176,7 +181,7 @@ pub(crate) fn paint_grid(
     // The rects never overlap, so they share one draw order in a single layer
     // instead of each being placed in the scene's bounds tree.
     window.paint_layer(bounds, |window| {
-        for rect in grid.rects() {
+        for rect in painted(grid, clear) {
             let left = origin.x + px(rect.start as f32 * tw);
             let right = origin.x + px((rect.start + rect.len) as f32 * tw);
             let top = origin.y + px(rect.row as f32 * th);
@@ -195,6 +200,18 @@ pub(crate) fn paint_grid(
     });
 }
 
+/// The rects `paint_grid` paints: all of them, less the dissolved texels of
+/// the bottom band when they are to be `clear`.
+pub(crate) fn painted(grid: &PixelGrid, clear: Option<(usize, u32)>) -> Vec<raster::Rect> {
+    let cleared = |rect: &raster::Rect| {
+        clear.is_some_and(|(first, page)| rect.row >= first && rect.color == page)
+    };
+    grid.rects()
+        .into_iter()
+        .filter(|rect| !cleared(rect))
+        .collect()
+}
+
 pub fn accent(scene: Scene) -> Hsla {
     gpui::rgb(match scene {
         Scene::Dawn => 0xffc35c,
@@ -207,14 +224,17 @@ pub fn accent(scene: Scene) -> Hsla {
 }
 
 impl Render for HeroCarousel {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         // A chosen picture replaces the world, scenes and their copy with it.
         if let Some(path) = cx
             .try_global::<theme::Wallpaper>()
             .and_then(|wallpaper| wallpaper.path.clone())
         {
             let pictures = crate::pictures::wallpaper(cx);
-            return wallpaper::view(path, cx.theme().background, &pictures).into_any_element();
+            let height = theme::world_height(window);
+            let scale = window.scale_factor();
+            return wallpaper::view(path, cx.theme().background, height, scale, &pictures)
+                .into_any_element();
         }
         let reduce_motion = cx.reduce_motion();
         let now = Instant::now();
@@ -234,6 +254,7 @@ impl Render for HeroCarousel {
         let dwell = self.director.showcase().dwell_progress();
         let white = gpui::white();
         let mono = cx.theme().mono_font_family.clone();
+        let translucent = cx.theme().background.a < 1.;
         let page = cx.theme().background.to_rgb();
         let page = Rgb::new(page.r, page.g, page.b);
 
@@ -244,9 +265,12 @@ impl Render for HeroCarousel {
                 let fade_rows = ((f32::from(theme::HERO_FADE) / th).round() as usize).min(rows / 3);
                 let framing = Framing { fade_rows, page };
                 grid_size.set((columns as i32, scene_rows(rows, framing) as i32));
-                (rasterize(frame, columns, rows, framing), (tw, th))
+                let clear = translucent.then(|| (rows.saturating_sub(fade_rows), page.pack()));
+                (rasterize(frame, columns, rows, framing), (tw, th), clear)
             },
-            move |bounds, (grid, texel), window, _| paint_grid(bounds, &grid, texel, window),
+            move |bounds, (grid, texel, clear), window, _| {
+                paint_grid(bounds, &grid, texel, clear, window)
+            },
         )
         .absolute()
         .top_0()

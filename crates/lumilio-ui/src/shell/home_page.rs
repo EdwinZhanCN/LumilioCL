@@ -175,12 +175,7 @@ impl LauncherShell {
 
     /// The world with Home's title over it, dissolving into the page.
     fn render_world(&self, overlay: Option<gpui::Div>, window: &Window) -> AnyElement {
-        // The world is as tall as its share of the window, so it is sized in
-        // pixels: the whole page scrolls and the world scrolls away with it.
-        let world_height = px(
-            (f32::from(window.viewport_size().height) * theme::HERO_SHARE)
-                .max(f32::from(theme::HERO_MIN_HEIGHT)),
-        );
+        let world_height = theme::world_height(window);
         div()
             .relative()
             .w_full()

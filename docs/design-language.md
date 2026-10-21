@@ -146,6 +146,12 @@ and the navigation's zones. Where the system cannot blur,
 the translucent body is laid over the built-in page of its tone, so the
 desktop's own text never shows through ours.
 
+On a translucent body Home's wallpaper fades into the glass, not into a band
+of the page colour: the world's dissolved texels are left out, and a picture
+fades out in thin nested layers. The veil under the navigation is left out
+too; over glass it would only stack into a dark band, and the navigation's
+zones are solid.
+
 ## 6. Navigation
 
 The navigation bar floats at the bottom of every page, Home included, as

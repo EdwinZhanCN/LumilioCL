@@ -206,8 +206,12 @@ impl Render for LauncherShell {
                     .child(TitleBar::new().bg(gpui::transparent_black()).border_b_0()),
             )
             // A veil in the page colour under the capsule: content scrolling
-            // behind it fades out instead of colliding with the icons.
-            .child(veil(colors.background))
+            // behind it fades out instead of colliding with the icons. On a
+            // translucent page it would only stack into a dark band, and the
+            // capsule is solid there anyway: content passes behind the glass.
+            .when(colors.background.a >= 1., |shell| {
+                shell.child(veil(colors.background))
+            })
             .child(navigation::render(
                 self.route,
                 self.activity.active_tasks,
@@ -245,6 +249,7 @@ fn veil(page: gpui::Hsla) -> impl IntoElement {
         )
     };
     div()
+        .debug_selector(|| "nav-veil".into())
         .absolute()
         .left_0()
         .right_0()

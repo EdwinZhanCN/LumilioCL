@@ -10,7 +10,9 @@ mod tests;
 pub use look::{
     ALUMINIUM, Catalog, Choice, Entry, Look, NIGHT, Origin, Rejected, Wallpaper, scan_dir,
 };
-pub use spec::{Color, Fonts, Palette, Resolved, ThemeSpec, Tone, WindowBackground, parse_file};
+pub use spec::{
+    Color, Fonts, Palette, Resolved, ThemeSpec, Tone, WindowBackground, can_blur, parse_file,
+};
 
 use gpui::{BoxShadow, Hsla, Pixels, px};
 use gpui_component::Theme;
@@ -31,6 +33,12 @@ pub const HERO_FADE: Pixels = px(88.);
 /// The Home world's share of the window height, and its floor.
 pub const HERO_SHARE: f32 = 0.56;
 pub const HERO_MIN_HEIGHT: Pixels = px(330.);
+
+/// How tall Home's world is: its share of the window, sized in pixels, so the
+/// whole page scrolls and the world scrolls away with it.
+pub fn world_height(window: &gpui::Window) -> Pixels {
+    px((f32::from(window.viewport_size().height) * HERO_SHARE).max(f32::from(HERO_MIN_HEIGHT)))
+}
 
 /// Every enabled, clickable control shows the pointing hand; disabled ones
 /// keep the default arrow (design language §9). gpui-component buttons default
