@@ -207,19 +207,7 @@ impl Render for LauncherShell {
             )
             // A veil in the page colour under the capsule: content scrolling
             // behind it fades out instead of colliding with the icons.
-            .child(
-                div()
-                    .absolute()
-                    .left_0()
-                    .right_0()
-                    .bottom_0()
-                    .h(theme::NAV_VEIL)
-                    .bg(gpui::linear_gradient(
-                        180.,
-                        gpui::linear_color_stop(colors.background.opacity(0.), 0.),
-                        gpui::linear_color_stop(colors.background.opacity(0.94), 0.62),
-                    )),
-            )
+            .child(veil(colors.background))
             .child(navigation::render(
                 self.route,
                 self.activity.active_tasks,
@@ -242,4 +230,34 @@ impl Render for LauncherShell {
         // the picture budget.
         crate::pictures::scope(cx).size_full().child(shell)
     }
+}
+
+/// The veil under the navigation: it eases in, starting slowly over its full
+/// height and closing over the lower half, so it has no edge where it begins
+/// and no band where it ends. One straight ramp shows both on a translucent
+/// page. Together the two ramps reach 94 % of the page colour at the bottom.
+fn veil(page: gpui::Hsla) -> impl IntoElement {
+    let ramp = |to: f32| {
+        gpui::linear_gradient(
+            180.,
+            gpui::linear_color_stop(page.opacity(0.), 0.),
+            gpui::linear_color_stop(page.opacity(to), 1.),
+        )
+    };
+    div()
+        .absolute()
+        .left_0()
+        .right_0()
+        .bottom_0()
+        .h(theme::NAV_VEIL)
+        .bg(ramp(0.5))
+        .child(
+            div()
+                .absolute()
+                .left_0()
+                .right_0()
+                .bottom_0()
+                .h(theme::NAV_VEIL / 2.)
+                .bg(ramp(0.88)),
+        )
 }

@@ -27,7 +27,18 @@ pub(crate) fn sync_appearance(window: &mut Window, cx: &mut App) {
     let background = cx
         .try_global::<theme::Look>()
         .map_or_else(Default::default, |look| look.theme.window_background);
-    window.set_background_appearance(background.to_gpui());
+    let blurred = background == theme::WindowBackground::Blurred;
+    let dark = Theme::global(cx).mode.is_dark();
+    // GPUI's own blur shows what is behind the window sharp on current macOS;
+    // where our backdrop takes over, the window itself is only transparent.
+    let ours = raw_window_handle::HasWindowHandle::window_handle(&*window)
+        .is_ok_and(|handle| lumilio_backdrop::set_blur(handle.as_raw(), blurred, dark));
+    let material = if blurred && ours {
+        theme::WindowBackground::Transparent
+    } else {
+        background
+    };
+    window.set_background_appearance(material.to_gpui());
 }
 
 /// Builds the window content. The caller mounts it under the framework `Root`

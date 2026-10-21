@@ -23,7 +23,7 @@ Status: InProgress
 - [x] T2 — 半透明机身与兜底 (Completed)
   Acceptance: 主题文件中只有机身类颜色（page、panel、hairline 等，按 D1 列出）可以带透明度，按键、显示屏、标签、LED 的透明度被忽略并在主题检查里报告。窗口拿不到模糊时，带透明度的机身颜色按 D3 合成为不透明的近似色。各平台的实际材质在 T6 实机检查。
 - [ ] T3 — 玻璃与遮光玻璃 (Proposed)
-  Acceptance: 两套内置半透明主题，以铝白与夜黑为底，窗口材质为 blurred，强调色为信号橙。墨色与机身在最透的情况下（白底与黑底桌面）对比度仍达到 design-language §9 的要求，由主题测试检查。
+  Acceptance: 两套内置半透明主题，以铝白与夜黑为底，窗口材质为 blurred，强调色为信号橙，透明度按 D6（页面约 75%、面板约 80%）。对比度按 D6 在同色调的桌面上（玻璃对白色、遮光玻璃对黑色）达到 design-language §9 的要求，由主题测试检查。
 - [ ] T4 — 白桦与深板岩 (Proposed)
   Acceptance: 先在网站主题编辑器里调色并定稿，再作为内置主题加入，强调色为信号橙（D4）。每套颜色通过现有主题测试的对比度检查；网站的内置主题导出同步。
 - [ ] T5 — 文档 (Proposed)
@@ -72,6 +72,22 @@ Why: 名字与启动器的气质一致，玻璃与遮光玻璃正好对应亮暗
 
 Consequences: 以后加入其他强调色的主题时，同样核对它与危险红的距离和作为文字的对比度。
 
+## Decision D5
+
+macOS 的模糊由启动器自己的系统效果视图（lumilio-backdrop，FullScreenUI 材质，随主题明暗）提供，GPUI 的窗口只设为透明。
+
+Why: GPUI 的 blurred 为了让效果视图无色，会移除它的着色与饱和度图层；在当前 macOS 上这把模糊也一起去掉了，窗口后面的桌面文字清晰可见（T6 前的实机检查中 Project Maintainer 指出窗口叠放时背景非常清晰）。几种系统材质中 FullScreenUI 着色最轻，桌面的颜色能透过来，由主题的页面色负责着色。
+
+Consequences: 原生调用放在只允许审计过的 unsafe 的 lumilio-backdrop 中，界面 crate 仍禁止 unsafe。Windows 与 Linux 不变：Windows 用 GPUI 的材质，Linux 按 D3 合成为不透明。
+
+## Decision D6
+
+玻璃与遮光玻璃按方案二：页面约 75%、面板约 80% 不透明，对比度只在同色调的桌面上检查。
+
+Why: Project Maintainer 实机比较了两种方案：约 90%–95% 的方案几乎看不出是玻璃，约 75% 的观感明显更好。在相反色调的桌面上（亮玻璃叠黑桌面），任何明显透明的亮主题都过不了橙色与说明文字的对比度，只有接近不透明才行。
+
+Consequences: 主题说明提示玻璃适合亮色桌面、遮光玻璃适合暗色桌面；想要更透或更实的可以用本地主题。浮在页面上的对话框、菜单、通知和导航按 D1 始终不透明。
+
 ## References
 
 - [.agents/plans/appearance.json](../../.agents/plans/appearance.json)
@@ -82,3 +98,5 @@ Consequences: 以后加入其他强调色的主题时，同样核对它与危险
 - [crates/lumilio-ui/src/theme/look.rs](../../crates/lumilio-ui/src/theme/look.rs)
 - [crates/lumilio-core/src/tuning.rs](../../crates/lumilio-core/src/tuning.rs)
 - [Plan global-context](global-context.md)
+
+- Lesson: 半透明主题从未真正透出窗口：框架的根节点用 tokens.background（主题没有设置，保持默认的不透明色）铺满窗口，外壳又铺了一层页面色；原有测试只检查主题里的颜色值，没检查实际画到窗口上的颜色，直到实机比较方案时才发现。另外 GPUI 在当前 macOS 上的 blurred 没有模糊。防护：the_root_paints_the_window_with_the_page_colour 检查根节点画出的颜色（去掉 fork 的改动时失败）；a_translucent_page_colour_and_the_window_material_reach_the_window 检查对话框、菜单、通知与导航的颜色不透明（临时让菜单用半透明面板色时失败）。模糊无法在无界面测试里检查，由 T6 实机检查。

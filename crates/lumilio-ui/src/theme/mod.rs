@@ -20,7 +20,7 @@ pub const NAV_OFFSET: Pixels = px(22.);
 pub const BOTTOM_SAFE_AREA: Pixels = px(96.);
 /// Height of the page-coloured veil under the capsule, so content passing
 /// behind it fades out instead of colliding with the icons.
-pub const NAV_VEIL: Pixels = px(120.);
+pub const NAV_VEIL: Pixels = px(150.);
 
 /// One content column shared by hero copy, overlays, and page content, so
 /// text over art and text on the page line up (design language §5).
@@ -192,6 +192,21 @@ impl Body {
             None => Self::of(Theme::global(cx).mode.is_dark()),
         }
     }
+
+    /// This body with a translucent page, panel and hairline laid over the
+    /// built-in page of its tone. Surfaces that float over the page (dialogs,
+    /// menus, toasts, the navigation) are drawn with it, so nothing behind
+    /// them shows through (plan translucent-themes, D1).
+    #[must_use]
+    pub fn solid(self) -> Self {
+        let base = Self::of(self.dark).page;
+        Self {
+            page: spec::over(self.page, base),
+            panel: spec::over(self.panel, base),
+            hairline: spec::over(self.hairline, base),
+            ..self
+        }
+    }
 }
 
 fn luminance(color: Hsla) -> f32 {
@@ -332,6 +347,7 @@ pub fn tune(cx: &mut gpui::App) {
     let look = Look::resolve(cx, tone);
     cx.set_global(look.clone());
     let body = look.theme.body;
+    let solid = body.solid();
     let theme = Theme::global_mut(cx);
 
     if let Ok(mut family) = MONO_FAMILY.write() {
@@ -355,10 +371,10 @@ pub fn tune(cx: &mut gpui::App) {
         gpui::hsla(0., 0., 0., 0.28)
     };
 
+    // The page may be translucent: the framework's root paints the window
+    // with it. The token is the opaque surface dialogs and sheets paint with.
     theme.background = body.page;
-    // The framework's root paints the window from the token, under every
-    // page: left stock, it hides a translucent page behind an opaque one.
-    theme.tokens.background = body.page.into();
+    theme.tokens.background = solid.page.into();
     theme.foreground = body.ink;
     theme.border = body.hairline;
     theme.input = body.hairline;
@@ -374,9 +390,9 @@ pub fn tune(cx: &mut gpui::App) {
     theme.primary_active = nudge(body.orange);
     theme.primary_foreground = body.on_orange;
 
-    // Dialogs sit on the raised surface (see `dialog`).
-    theme.secondary = body.panel;
-    theme.secondary_hover = nudge(body.panel);
+    // Dialogs sit on the raised surface (see `dialog`), solid on any body.
+    theme.secondary = solid.panel;
+    theme.secondary_hover = nudge(solid.panel);
     theme.secondary_active = body.key_grey;
     theme.secondary_foreground = body.ink;
 
@@ -384,7 +400,8 @@ pub fn tune(cx: &mut gpui::App) {
     theme.muted_foreground = body.muted;
     theme.accent = body.key_grey;
     theme.accent_foreground = body.ink;
-    theme.popover = body.panel;
+    theme.popover = solid.panel;
+    theme.tokens.popover = solid.panel.into();
     theme.popover_foreground = body.ink;
 
     theme.danger = body.danger;
@@ -418,6 +435,9 @@ pub struct ShellColors {
     pub surface: Hsla,
     pub surface_active: Hsla,
     pub surface_subtle: Hsla,
+    /// Surfaces that float over the page, such as the navigation's zones:
+    /// the panel, solid even on a translucent body.
+    pub raised: Hsla,
     pub foreground: Hsla,
     pub muted: Hsla,
     pub border: Hsla,
@@ -440,6 +460,7 @@ impl ShellColors {
             surface: body.panel,
             surface_active: body.key_grey,
             surface_subtle: body.key_grey,
+            raised: body.solid().panel,
             foreground: body.ink,
             muted: body.muted,
             border: body.hairline,

@@ -21,6 +21,7 @@ lumilio-schematic.workspace = true
 lumilio-schematic-render.workspace = true
 lumilio-skin-render.workspace = true
 lumilio-pointer.workspace = true
+lumilio-backdrop.workspace = true
 lumilio-map-render.workspace = true
 raw-window-handle = "0.6"
 async-channel = "2"

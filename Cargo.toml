@@ -18,6 +18,7 @@ members = [
     "crates/lumilio-schematic-render",
     "crates/lumilio-skin-render",
     "crates/lumilio-pointer",
+    "crates/lumilio-backdrop",
     "crates/lumilio-cubiomes",
     "crates/lumilio-map-render",
     "crates/lumilio-plugin-world-explorer",
@@ -61,6 +62,7 @@ lumilio-schematic = { path = "crates/lumilio-schematic" }
 lumilio-schematic-render = { path = "crates/lumilio-schematic-render" }
 lumilio-skin-render = { path = "crates/lumilio-skin-render" }
 lumilio-pointer = { path = "crates/lumilio-pointer" }
+lumilio-backdrop = { path = "crates/lumilio-backdrop" }
 lumilio-map-render = { path = "crates/lumilio-map-render" }
 lumilio-cubiomes = { path = "crates/lumilio-cubiomes" }
 lumilio-plugin-world-explorer = { path = "crates/lumilio-plugin-world-explorer" }

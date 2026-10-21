@@ -310,14 +310,7 @@ impl Resolved {
         if self.window_background != WindowBackground::Blurred {
             return self;
         }
-        let base = Body::of(self.tone.is_dark()).page;
-        for color in [
-            &mut self.body.page,
-            &mut self.body.panel,
-            &mut self.body.hairline,
-        ] {
-            *color = over(*color, base);
-        }
+        self.body = self.body.solid();
         self.window_background = WindowBackground::Opaque;
         self
     }
@@ -331,7 +324,7 @@ pub const fn can_blur() -> bool {
 }
 
 /// `top` laid over an opaque `bottom`.
-fn over(top: Hsla, bottom: Hsla) -> Hsla {
+pub(super) fn over(top: Hsla, bottom: Hsla) -> Hsla {
     let (top, bottom) = (Rgba::from(top), Rgba::from(bottom));
     let mix = |a: f32, b: f32| a * top.a + b * (1. - top.a);
     Rgba {

@@ -318,7 +318,7 @@ fn a_translucent_page_colour_and_the_window_material_reach_the_window(cx: &mut T
     let glass = Entry {
         spec: one(
             r##"{"themes":[{"name":"Glass","appearance":"dark","window_background":"blurred",
-                "colors":{"page":"#10203080"}}]}"##,
+                "colors":{"page":"#10203080","panel":"#20304080"}}]}"##,
         ),
         origin: Origin::Local("glass.json".into()),
     };
@@ -335,10 +335,18 @@ fn a_translucent_page_colour_and_the_window_material_reach_the_window(cx: &mut T
         crate::platform::apply_appearance(lumilio_core::Appearance::Dark, window, cx);
         let look = cx.global::<super::Look>();
         let theme = Theme::global(cx);
-        // The page colour reaches the component theme, and the root that
-        // paints the window under every page.
-        let (page, root) = (theme.background, theme.tokens.background.color);
-        assert_eq!(root, page);
+        let page = theme.background;
+        // What floats over the page is solid on any body: dialogs and sheets
+        // (the token), the dialogs' raised surface, menus and toasts.
+        for (name, color) in [
+            ("tokens.background", theme.tokens.background.color),
+            ("secondary", theme.secondary),
+            ("popover", theme.popover),
+            ("tokens.popover", theme.tokens.popover.color),
+        ] {
+            assert_eq!(color.a, 1., "{name} lets the window show through");
+        }
+        assert_eq!(ShellColors::current(cx).raised.a, 1.);
         if super::spec::can_blur() {
             assert_eq!(
                 look.theme.window_background,
@@ -476,3 +484,32 @@ fn the_bundled_themes_are_complete_attributed_and_pair_light_with_dark() {
 }
 
 mod website;
+
+/// The framework's root paints the window with the page colour, which may be
+/// translucent, not with the opaque token dialogs paint with (the local change
+/// to `forks/gpui-component/src/root.rs`).
+#[gpui::test]
+fn the_root_paints_the_window_with_the_page_colour(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_component::init(cx);
+        let theme = Theme::global_mut(cx);
+        theme.background = gpui::hsla(0.6, 0.2, 0.5, 0.5);
+        theme.tokens.background = gpui::hsla(0.6, 0.2, 0.5, 1.).into();
+    });
+    let (_, cx) = cx.add_window_view(|window, cx| {
+        let host = gpui::AppContext::new(cx, |_| gpui::Empty);
+        gpui_component::Root::new(host, window, cx)
+    });
+    cx.run_until_parked();
+    let fills: Vec<gpui::Hsla> = cx.update(|window, _| {
+        window
+            .painted_quads()
+            .into_iter()
+            .filter_map(|quad| quad.background.as_solid())
+            .collect()
+    });
+    assert!(
+        fills.contains(&gpui::hsla(0.6, 0.2, 0.5, 0.5)),
+        "the root paints {fills:?}"
+    );
+}

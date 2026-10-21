@@ -139,8 +139,10 @@ same objects. What the world said about the game is said by what is already
 there: the square and words beside the title, and the launch's segment bar.
 
 A theme may make the body translucent: `page`, `panel` and `hairline` may
-carry opacity, and the window behind them is blurred. Keys, displays, tags
-and LEDs are objects on the body and stay solid. Where the system cannot blur,
+carry opacity, and the desktop behind them is blurred, so text behind the
+window never reads through ours. Keys, displays, tags
+and LEDs are objects on the body and stay solid. So do the surfaces that float over it: dialogs, menus, toasts
+and the navigation's zones. Where the system cannot blur,
 the translucent body is laid over the built-in page of its tone, so the
 desktop's own text never shows through ours.
 

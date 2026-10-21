@@ -21,7 +21,7 @@
   "tasks": [
     { "id": "T1", "title": "无壁纸选项", "status": "completed", "acceptance": "外观设置的壁纸可选「方块世界」「图片」「无壁纸」，保存在 LookPreferences，旧设置读出来仍是原来的选择。无壁纸时首页顶部不画世界，高度收缩到标题与「继续」，文字用主题墨色，按键不变；启动中仍有分段进度条，游戏中与启动失败由标题旁的 LED 与文字表达（D2）。UI 测试覆盖有世界与无壁纸时首页标题的位置。" },
     { "id": "T2", "title": "半透明机身与兜底", "status": "completed", "acceptance": "主题文件中只有机身类颜色（page、panel、hairline 等，按 D1 列出）可以带透明度，按键、显示屏、标签、LED 的透明度被忽略并在主题检查里报告。窗口拿不到模糊时，带透明度的机身颜色按 D3 合成为不透明的近似色。各平台的实际材质在 T6 实机检查。" },
-    { "id": "T3", "title": "玻璃与遮光玻璃", "status": "proposed", "acceptance": "两套内置半透明主题，以铝白与夜黑为底，窗口材质为 blurred，强调色为信号橙。墨色与机身在最透的情况下（白底与黑底桌面）对比度仍达到 design-language §9 的要求，由主题测试检查。" },
+    { "id": "T3", "title": "玻璃与遮光玻璃", "status": "proposed", "acceptance": "两套内置半透明主题，以铝白与夜黑为底，窗口材质为 blurred，强调色为信号橙，透明度按 D6（页面约 75%、面板约 80%）。对比度按 D6 在同色调的桌面上（玻璃对白色、遮光玻璃对黑色）达到 design-language §9 的要求，由主题测试检查。" },
     { "id": "T4", "title": "白桦与深板岩", "status": "proposed", "acceptance": "先在网站主题编辑器里调色并定稿，再作为内置主题加入，强调色为信号橙（D4）。每套颜色通过现有主题测试的对比度检查；网站的内置主题导出同步。" },
     { "id": "T5", "title": "文档", "status": "proposed", "acceptance": "design-language §5「Appearance」写明无壁纸首页与半透明规则，§12 的颜色表说明哪些令牌可以透明；网站中英主题文档写明新增字段规则与内置主题；just ia、just plans、just docs 通过。" },
     { "id": "T6", "title": "Project Maintainer 实机检查", "status": "proposed", "acceptance": "在 Mac 上检查四套主题与三种壁纸的组合：毛玻璃下文字与面板的可读性，实心零件在透明机身上是否协调，无壁纸首页各状态是否清楚。结果记入 validation。" }
@@ -65,9 +65,23 @@
       "decision": "新的内置主题用 Minecraft 方块命名，每套一种强调色；第一批四套都用信号橙。",
       "rationale": "名字与启动器的气质一致，玻璃与遮光玻璃正好对应亮暗两种半透明。主题本来就可以换强调色（Catppuccin、Rosé Pine 已经这样做），第一批保持橙色是为了与铝白、夜黑成为同一家族。",
       "consequences": "以后加入其他强调色的主题时，同样核对它与危险红的距离和作为文字的对比度。"
+    },
+    {
+      "id": "D5",
+      "decision": "macOS 的模糊由启动器自己的系统效果视图（lumilio-backdrop，FullScreenUI 材质，随主题明暗）提供，GPUI 的窗口只设为透明。",
+      "rationale": "GPUI 的 blurred 为了让效果视图无色，会移除它的着色与饱和度图层；在当前 macOS 上这把模糊也一起去掉了，窗口后面的桌面文字清晰可见（T6 前的实机检查中 Project Maintainer 指出窗口叠放时背景非常清晰）。几种系统材质中 FullScreenUI 着色最轻，桌面的颜色能透过来，由主题的页面色负责着色。",
+      "consequences": "原生调用放在只允许审计过的 unsafe 的 lumilio-backdrop 中，界面 crate 仍禁止 unsafe。Windows 与 Linux 不变：Windows 用 GPUI 的材质，Linux 按 D3 合成为不透明。"
+    },
+    {
+      "id": "D6",
+      "decision": "玻璃与遮光玻璃按方案二：页面约 75%、面板约 80% 不透明，对比度只在同色调的桌面上检查。",
+      "rationale": "Project Maintainer 实机比较了两种方案：约 90%–95% 的方案几乎看不出是玻璃，约 75% 的观感明显更好。在相反色调的桌面上（亮玻璃叠黑桌面），任何明显透明的亮主题都过不了橙色与说明文字的对比度，只有接近不透明才行。",
+      "consequences": "主题说明提示玻璃适合亮色桌面、遮光玻璃适合暗色桌面；想要更透或更实的可以用本地主题。浮在页面上的对话框、菜单、通知和导航按 D1 始终不透明。"
     }
   ],
-  "lessonsLearned": [],
+  "lessonsLearned": [
+    "半透明主题从未真正透出窗口：框架的根节点用 tokens.background（主题没有设置，保持默认的不透明色）铺满窗口，外壳又铺了一层页面色；原有测试只检查主题里的颜色值，没检查实际画到窗口上的颜色，直到实机比较方案时才发现。另外 GPUI 在当前 macOS 上的 blurred 没有模糊。防护：the_root_paints_the_window_with_the_page_colour 检查根节点画出的颜色（去掉 fork 的改动时失败）；a_translucent_page_colour_and_the_window_material_reach_the_window 检查对话框、菜单、通知与导航的颜色不透明（临时让菜单用半透明面板色时失败）。模糊无法在无界面测试里检查，由 T6 实机检查。"
+  ],
   "roadmap": {
     "enabled": false,
     "id": "translucent-themes",
