@@ -29,7 +29,7 @@ Status: InProgress
   Acceptance: LauncherService 持有上下文并按 D5 发布快照；set_current_instance、select_account、delete_instance、remove_account、remove_auth_server 在同一操作里回退、保存并发布；游戏库、账户、Java、插件的每条写入路径只递增自己的修订号。core 测试证明：每条写入路径对应一个修订号；回退值已写入 settings.json，重新打开服务读到同一个；订阅者看到的修订号不倒退。core 不依赖 gpui、gpui-kit 或 gpui-component。
 - [x] T3 — 首页诊断按依赖拆开 (Completed)
   Acceptance: 按 D7：home_checks 只读磁盘、得出每个游戏自身的问题（不含账户），home_from 把当前账户加进去再汇总、不读磁盘，home 等于两者相连。core 测试证明：检查结果不含「没有账户」；删掉账户后用同一份检查汇总，首页出现该游戏，且与重新检查的结果相同。何时重做检查由 T4 的依赖表决定。游戏页概览仍然显示「没有账户」。
-- [ ] T4 — app 订阅取代调用点刷新 (Proposed)
+- [x] T4 — app 订阅取代调用点刷新 (Completed)
   Acceptance: 一个订阅循环把 core 的变化写入 UI 镜像，并按 D6 的依赖表重算推导结果；State 去掉 continue_id、selection_seq 与 selection_save；账户、Java、插件的处理器不再选择 Reload 变体。首页「需要留意」等区块因推送增删时按设计语言的动效出现与消失，不突然跳动；Java、插件或游戏库变化后实例检查重做期间显示「检查中」，不继续显示旧结论。T1 中首页与诊断的测试通过；home_snapshot_and_rapid_selection_keep_the_last_game 按新语义通过；依赖表每一行有一项测试。
 - [ ] T5 — UI 只读镜像与推导的安装目标 (Proposed)
   Acceptance: UI 用一个只读镜像保存上下文（Entity 或 Global，按 gpui-kit 指南选择），页面拿不到写入它的方法；芯片、首页、发现页、游戏页从镜像渲染；LiveModel.install_target 删除，安装目标就是当前游戏（D3），set_library 不再选择目标，ProjectDetailView 的目标也从推导值来；芯片的选择只发意图。T1 中芯片与发现页的测试通过。
@@ -45,13 +45,13 @@ Status: InProgress
 ## Validation
 
 - T1 的六个验收测试在当前 main 上按预期失败，完成后全部通过。
-  Result: 2026-10-21：crates/lumilio-app/src/live/tests/global_context.rs 六项在 34d5889 上全部按预期失败，失败之前的准备步骤都通过：home_attention_follows_the_current_account 移除账户后 10 秒内首页没有出现该游戏（#55）；home_attention_follows_the_java_settings 关闭自动下载 Java 后首页没有出现该游戏；browsing_for_a_game_makes_it_the_current_game 浏览后保存的当前游戏仍不是 X；choosing_another_game_while_browsing_ends_the_browsing 换成 Z 后 browsing_for 仍是 X；recovering_a_failed_launch_retries_the_same_game 卡片 ▶ 后保存的当前游戏不是 B，临时跳过这一步时「恢复并继续」启动了 A（A 一次、B 零次额外尝试）；deleting_the_current_game_saves_its_replacement 删除后 settings.json 仍是 A。测试用空的 Java 搜索目录与不存在的游戏版本，不下载任何东西；搜索与发现页首次搜索不发出。完成后全部通过：待定。
+  Result: 2026-10-21：crates/lumilio-app/src/live/tests/global_context.rs 六项在 34d5889 上全部按预期失败，失败之前的准备步骤都通过：home_attention_follows_the_current_account 移除账户后 10 秒内首页没有出现该游戏（#55）；home_attention_follows_the_java_settings 关闭自动下载 Java 后首页没有出现该游戏；browsing_for_a_game_makes_it_the_current_game 浏览后保存的当前游戏仍不是 X；choosing_another_game_while_browsing_ends_the_browsing 换成 Z 后 browsing_for 仍是 X；recovering_a_failed_launch_retries_the_same_game 卡片 ▶ 后保存的当前游戏不是 B，临时跳过这一步时「恢复并继续」启动了 A（A 一次、B 零次额外尝试）；deleting_the_current_game_saves_its_replacement 删除后 settings.json 仍是 A。测试用空的 Java 搜索目录与不存在的游戏版本，不下载任何东西；搜索与发现页首次搜索不发出。T4 之后四项通过：首页与账户、首页与 Java 设置（#55）、删除当前游戏，以及恢复（卡片 ▶ 先把游戏设为当前游戏再启动，「恢复并继续」就重试同一个游戏）；芯片与发现页两项留给 T5。
 - core 测试证明写入路径与修订号一一对应，删除当前游戏或账户后的回退已持久化。
   Result: 2026-10-21：lumilio-core service::tests::context 三项通过。each_kind_of_write_publishes_only_its_own_change：新建游戏与收藏只动 library，增删选账户只动 accounts，Java 设置只动 java，插件开关只动 plugins，偏好不动任何修订号；the_current_game_always_exists_and_is_saved：第一个游戏成为当前游戏，删除当前游戏后回退已写入 settings.json，重新打开服务读到同一个；a_late_subscriber_reads_only_the_newest_state：落后的订阅者只看到最新值。临时去掉 InstanceStore::save 的发布与删除后的回退时三项按预期失败，恢复后通过。发布点只有两处：SettingsStore::save 比较前后设置，InstanceStore::save 递增 library；安装与删除 Java 运行时另外递增 java。
 - 依赖表每一行有测试；切换账户不重做实例检查。
-  Result: 切换账户不重做实例检查的前提已具备（T3）：home_applies_the_account_to_checks_already_made 通过，临时让 with_account 忽略账户时按预期失败。依赖表各行的测试待 T4。
+  Result: 2026-10-21：切换账户不重做实例检查（T3）：home_applies_the_account_to_checks_already_made 通过，临时让 with_account 忽略账户时按预期失败。依赖表在 crates/lumilio-app/src/live/context.rs 的 stale 中实现，crates/lumilio-app/src/live/tests/dependencies.rs 每个推导结果一项测试（芯片与继续、实例检查、需要留意、账户列表、已安装标记、内容来源与插件标签），另有一项检查初次全部重算、无变化不重算。临时从「需要留意」的依赖里去掉账户时，表的测试与 home_attention_follows_the_current_account 都按预期失败。
 - 原有 app 与 UI 测试通过，或按新语义改写并在此列出。
-  Result: pending
+  Result: 2026-10-21（T4 之后）：lumilio-app 与 lumilio-ui 共 580 项，578 项通过，失败的两项是留给 T5 的芯片与发现页验收测试。按新语义改写：home_snapshot_and_rapid_selection_keep_the_last_game 改为启动订阅，去掉对 continue_id 的断言，连续两次选择按顺序保存、最后一次留下；service::tests::settings 中当前游戏的测试改为删除后回退到另一个游戏；内存设置的测试中，直接写进游戏库的游戏在重新打开后成为当前游戏；activity 的取消测试先放开设置锁再删除当前游戏，因为删除要保存回退结果。「需要留意」新的结论按 §2 的 QUICK 淡入并上移进入，消失为立即移除（退出短于进入），待 T8 实机检查。
 - just check 通过（由 Project Maintainer 运行）。
   Result: pending
 - Project Maintainer 在 Mac 上实机检查通过（T8）。

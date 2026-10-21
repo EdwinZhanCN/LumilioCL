@@ -1,4 +1,4 @@
-use super::jobs::{job, outcome, refresh_installed, reload};
+use super::jobs::{job, outcome};
 use super::{Reload, Wiring};
 use gpui_kit::AppContext as _;
 use gpui_kit::{App, Window};
@@ -9,52 +9,57 @@ use lumilio_ui::toast::Toast;
 use lumilio_ui::tr;
 use std::rc::Rc;
 
-/// Makes `id` the current instance everywhere at once and remembers it for
-/// the next start.
+/// Asks core to make `id` the current instance; everything showing it
+/// follows when core publishes the choice. A failed save leaves it as it was.
 pub(super) fn choose_current(wiring: &Wiring, id: String, cx: &mut App) {
     let _ = wiring
         .shell
         .update(cx, |shell, cx| shell.set_install_target(id.clone(), cx));
-    let service = wiring.backend.service.clone();
-    let seq = {
-        let mut state = wiring.state.borrow_mut();
-        state.selection_seq += 1;
-        state.reload_seq += 1;
-        state.home_seq += 1;
-        if let Some(task) = state.selection_save.take() {
-            task.abort();
-        }
-        if let Some(task) = state.home_diagnostics.take() {
-            task.abort();
-        }
-        state.selection_seq
-    };
-    let handle = wiring
-        .backend
-        .spawn(async move { service.set_current_instance(&id).await });
-    wiring.state.borrow_mut().selection_save = Some(handle.abort_handle());
+    let saved = save_current(wiring, id);
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let Ok(result) = handle.await else { return };
-        if wiring.state.borrow().selection_seq != seq {
-            return;
-        }
-        wiring.state.borrow_mut().selection_save = None;
-        if let Err(error) = result {
-            let _ = wiring.shell.update(cx, |shell, cx| {
-                shell.toast(
-                    Toast::error(tr!("library-current-save-failed")).technical(error.to_string()),
-                    cx,
-                );
-            });
-        }
-        cx.update(|cx| {
-            reload(&wiring, Reload::Selection, cx);
-            refresh_installed(&wiring, cx);
+        let Ok(Err(error)) = saved.await else { return };
+        let _ = wiring.shell.update(cx, |shell, cx| {
+            shell.toast(
+                Toast::error(tr!("library-current-save-failed")).technical(error.to_string()),
+                cx,
+            );
         });
     })
     .detach();
 }
+
+/// The answer to one choice of the current game.
+pub(super) type Saved = tokio::sync::oneshot::Receiver<Result<(), lumilio_core::ServiceError>>;
+
+/// Saves choices of the current game one after another, in the order they
+/// were made, so the last choice is the one that stays.
+pub(super) fn save_current(wiring: &Wiring, id: String) -> Saved {
+    let (answer, saved) = tokio::sync::oneshot::channel();
+    let queue = wiring
+        .state
+        .borrow_mut()
+        .choices
+        .get_or_insert_with(|| {
+            let (queue, mut choices) = tokio::sync::mpsc::unbounded_channel::<Choice>();
+            let service = wiring.backend.service.clone();
+            drop(wiring.backend.spawn(async move {
+                while let Some((id, answer)) = choices.recv().await {
+                    let _ = answer.send(service.set_current_instance(&id).await);
+                }
+            }));
+            queue
+        })
+        .clone();
+    let _ = queue.send((id, answer));
+    saved
+}
+
+/// A game to make current, and where to tell how that went.
+pub(super) type Choice = (
+    String,
+    tokio::sync::oneshot::Sender<Result<(), lumilio_core::ServiceError>>,
+);
 
 /// The names of the collections the library page shows.
 pub(super) fn collection_names(wiring: &Wiring, cx: &mut App) -> Vec<String> {
@@ -242,7 +247,7 @@ pub(super) fn import_game(wiring: &Wiring, window: &mut Window, cx: &mut App) {
                         &wiring,
                         cx,
                         true,
-                        Reload::All,
+                        Reload::Lists,
                         Some(Toast::info(tr!(
                             "library-import-game-started",
                             name = name.as_str()
@@ -298,7 +303,7 @@ pub(super) fn restore_backup(wiring: &Wiring, cx: &mut App) {
                 &wiring,
                 cx,
                 true,
-                Reload::All,
+                Reload::Lists,
                 Some(Toast::info(tr!("library-restore-started"))),
                 async move {
                     service

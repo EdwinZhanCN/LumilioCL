@@ -45,11 +45,7 @@ pub fn render_body(
         HomePresentation::Ambient => div().into_any_element(),
         other => v_flex()
             .gap_6()
-            .children(render_attention(
-                &links.attention,
-                links.on_act.clone(),
-                colors,
-            ))
+            .children(render_attention(links, colors))
             .children(live.or_else(|| {
                 (!other.recent().is_empty()).then(|| {
                     render_recent(other.recent(), links.on_open.clone(), colors).into_any_element()

@@ -70,6 +70,11 @@ pub type ActHandler =
 #[derive(Clone, Default)]
 pub struct HomeLinks {
     pub attention: Vec<AttentionRow>,
+    /// The games are being checked again: their earlier rows are left out
+    /// and the section says so.
+    pub checking: bool,
+    /// Changes whenever the rows do, so the section enters again.
+    pub revision: usize,
     pub on_open: Option<OpenHandler>,
     pub on_act: Option<ActHandler>,
 }

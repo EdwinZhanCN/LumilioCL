@@ -60,6 +60,10 @@ pub struct LiveModel {
     pub collections: Vec<CollectionRow>,
     /// Games with something wrong, for Home.
     pub attention: Vec<crate::home::AttentionRow>,
+    /// The games are being checked again; `attention` is the last answer.
+    pub attention_checking: bool,
+    /// Counts changes to `attention`, so Home's section enters again.
+    pub attention_revision: usize,
     /// Worlds and servers of the game Home continues, and its record.
     pub home_places: Option<HomePlaces>,
     pub library_loaded: bool,
@@ -102,6 +106,8 @@ impl Default for LiveModel {
             library: Vec::new(),
             collections: Vec::new(),
             attention: Vec::new(),
+            attention_checking: false,
+            attention_revision: 0,
             home_places: None,
             library_loaded: false,
             results: Vec::new(),

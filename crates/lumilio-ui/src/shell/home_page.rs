@@ -72,12 +72,22 @@ impl LauncherShell {
         };
         let open = handler.clone();
         let act = handler;
+        // An answer from before the change is not shown while games are
+        // checked again; with nothing shown before, there is nothing to replace.
+        let checking = self
+            .live
+            .as_ref()
+            .is_some_and(|model| model.attention_checking && !model.attention.is_empty());
         home::HomeLinks {
             attention: self
                 .live
                 .as_ref()
                 .map(|model| {
-                    let mut rows = model.attention.clone();
+                    let mut rows = if checking {
+                        Vec::new()
+                    } else {
+                        model.attention.clone()
+                    };
                     rows.extend(crate::game_settings::attention_rows(
                         &model.game_settings,
                         &model.library,
@@ -85,6 +95,11 @@ impl LauncherShell {
                     rows
                 })
                 .unwrap_or_default(),
+            checking,
+            revision: self
+                .live
+                .as_ref()
+                .map_or(0, |model| model.attention_revision),
             on_open: Some(Rc::new(move |id, window, cx| {
                 open(LiveIntent::OpenInstance(id), window, cx)
             })),
@@ -116,7 +131,8 @@ impl LauncherShell {
                 .max(f32::from(theme::HERO_MIN_HEIGHT)),
         );
         let links = self.home_links();
-        let has_attention = !links.attention.is_empty() && self.home.recent_is_instances();
+        let has_attention =
+            (!links.attention.is_empty() || links.checking) && self.home.recent_is_instances();
         let sections = live.and_then(|ctx| pages::live::home_sections(ctx, &self.home));
         let body = (self.home.has_body() || has_attention || sections.is_some())
             .then(|| home::render_body(&self.home, home_handler, &links, colors, sections));

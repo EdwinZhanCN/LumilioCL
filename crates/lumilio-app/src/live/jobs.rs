@@ -2,11 +2,7 @@ use super::{ACTIVITY_LIMIT, POLL, Reload, Wiring};
 use gpui_kit::{App, Context};
 use lumilio_core::{CancellationToken, ProjectKind, unix_now};
 use lumilio_ui::LauncherShell;
-use lumilio_ui::home::HomePresentation;
-use lumilio_ui::live::{
-    CollectionRow, account_rows, activity_rows, attention_rows, home_places, home_presentation,
-    library_cards,
-};
+use lumilio_ui::live::{CollectionRow, account_rows, activity_rows, library_cards};
 use lumilio_ui::toast::Toast;
 use lumilio_ui::tr;
 use std::future::Future;
@@ -139,40 +135,26 @@ pub(super) fn outcome<T, E: std::fmt::Display>(
     }
 }
 
-/// Reloads the library, Activity and (optionally) Home from the service.
+/// Reloads the library, Activity, accounts and game settings from the
+/// service. Home and what follows the current game are kept up to date by
+/// [`super::context::follow`].
 pub(super) fn reload(wiring: &Wiring, what: Reload, cx: &mut App) {
     if what == Reload::Nothing {
         return;
     }
-    let full = matches!(what, Reload::All | Reload::Selection);
-    let (seq, home_seq) = {
+    let seq = {
         let mut state = wiring.state.borrow_mut();
         state.reload_seq += 1;
-        if full {
-            state.home_seq += 1;
-            if let Some(task) = state.home_diagnostics.take() {
-                task.abort();
-            }
-        }
-        (state.reload_seq, state.home_seq)
+        state.reload_seq
     };
     let service = wiring.backend.service.clone();
     let handle = wiring.backend.spawn(async move {
-        // Saved records suffice to offer Continue. Disk diagnostics arrive
-        // separately and must never hold the first usable Home hostage.
-        let (records, summary) = if full {
-            let (records, summary) = service.home_snapshot().await;
-            (records, Some(summary))
-        } else {
-            (service.library().await.instances, None)
-        };
+        let library = service.library().await;
         (
-            records,
-            summary,
+            library.instances,
+            library.collections,
             service.activity(ACTIVITY_LIMIT),
             service.settings().await,
-            service.current_instance().await,
-            service.library().await.collections,
             async {
                 Ok::<_, lumilio_core::ServiceError>((
                     service.settings_presets().await?,
@@ -184,54 +166,18 @@ pub(super) fn reload(wiring: &Wiring, what: Reload, cx: &mut App) {
     });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let Ok((records, summary, activity, settings, current, collections, presets)) =
-            handle.await
-        else {
+        let Ok((records, collections, activity, settings, presets)) = handle.await else {
             return;
         };
-        if (full && wiring.state.borrow().home_seq != home_seq)
-            || (!full && wiring.state.borrow().reload_seq != seq)
-        {
+        if wiring.state.borrow().reload_seq != seq {
             return;
         }
         let now = unix_now();
         let cards = library_cards(&records, now);
         let rows = activity_rows(&activity, now);
         let accounts = account_rows(&settings);
-        let home =
-            summary.map(|summary| home_presentation(&records, &summary, current.as_deref(), now));
-        let hint = match &home {
-            Some((_, id)) => {
-                wiring.state.borrow_mut().continue_id.clone_from(id);
-                id.clone()
-            }
-            None => {
-                // The current instance is what Continue starts.
-                if let Some(id) = &current {
-                    wiring.state.borrow_mut().continue_id = Some(id.clone());
-                }
-                wiring.state.borrow().continue_id.clone()
-            }
-        };
-        let hint = current.or(hint);
-        let continued = home
-            .as_ref()
-            .and_then(|(_, id)| id.as_ref())
-            .and_then(|id| records.iter().find(|record| &record.id == id))
-            .cloned();
+        let current = wiring.backend.service.context().current_instance;
         let _ = wiring.shell.update(cx, |shell, cx| {
-            // A launch in progress, or a failure being explained, keeps Home.
-            if let Some((home, _)) = home
-                && matches!(
-                    shell.home(),
-                    HomePresentation::Loading
-                        | HomePresentation::Ambient
-                        | HomePresentation::FirstUse
-                        | HomePresentation::Continue { .. }
-                )
-            {
-                shell.set_home(home, cx);
-            }
             shell.update_live(
                 |model| {
                     match presets {
@@ -242,13 +188,7 @@ pub(super) fn reload(wiring: &Wiring, what: Reload, cx: &mut App) {
                         }
                         Err(error) => model.presets_error = Some(error.to_string()),
                     }
-                    model.set_library(cards, hint);
-                    model
-                        .attention
-                        .retain(|row| records.iter().any(|record| record.id == row.instance));
-                    if full {
-                        model.home_places = None;
-                    }
+                    model.set_library(cards, current);
                     model.collections = collections
                         .into_iter()
                         .map(|collection| CollectionRow {
@@ -258,102 +198,6 @@ pub(super) fn reload(wiring: &Wiring, what: Reload, cx: &mut App) {
                         .collect();
                     model.set_activity(rows, unix_millis());
                     model.set_accounts(accounts);
-                },
-                cx,
-            );
-        });
-        if let Some(record) = continued {
-            cx.update(|cx| refresh_places(&wiring, record, home_seq, cx));
-        }
-        if what == Reload::All {
-            cx.update(|cx| refresh_attention(&wiring, home_seq, cx));
-        }
-    })
-    .detach();
-}
-
-/// Only the attention rows depend on background diagnostics; the current
-/// game's identity stays owned by the saved selection and fast snapshot.
-fn refresh_attention(wiring: &Wiring, seq: u64, cx: &mut App) {
-    let service = wiring.backend.service.clone();
-    let handle = wiring.backend.spawn(async move { service.home().await });
-    wiring.state.borrow_mut().home_diagnostics = Some(handle.abort_handle());
-    let wiring = wiring.clone();
-    cx.spawn(async move |cx| {
-        let Ok((records, summary)) = handle.await else {
-            return;
-        };
-        if wiring.state.borrow().home_seq != seq {
-            return;
-        }
-        wiring.state.borrow_mut().home_diagnostics = None;
-        let cards = library_cards(&records, unix_now());
-        let attention = attention_rows(&summary.needs_attention, &cards);
-        let _ = wiring.shell.update(cx, |shell, cx| {
-            shell.update_live(|model| model.attention = attention, cx);
-        });
-    })
-    .detach();
-}
-
-/// Reads the worlds and servers of the game Home continues. A game that
-/// cannot be read just lists nothing; an answer for a game Home has moved
-/// away from meanwhile is dropped.
-fn refresh_places(wiring: &Wiring, record: lumilio_core::InstanceRecord, seq: u64, cx: &mut App) {
-    let service = wiring.backend.service.clone();
-    let id = record.id.clone();
-    let handle = wiring.backend.spawn(async move {
-        (
-            service.worlds(&id).await.unwrap_or_default(),
-            service.servers(&id).await.unwrap_or_default(),
-        )
-    });
-    let wiring = wiring.clone();
-    cx.spawn(async move |cx| {
-        let Ok((worlds, servers)) = handle.await else {
-            return;
-        };
-        if wiring.state.borrow().home_seq != seq
-            || wiring.state.borrow().continue_id.as_ref() != Some(&record.id)
-        {
-            return;
-        }
-        let places = home_places(&record, &worlds, &servers);
-        let addresses = places.server_addresses();
-        let _ = wiring.shell.update(cx, |shell, cx| {
-            shell.update_live(|model| model.home_places = Some(places), cx)
-        });
-        for address in addresses {
-            cx.update(|cx| ask_place(&wiring, record.id.clone(), address, seq, cx));
-        }
-    })
-    .detach();
-}
-
-/// Asks one of Home's servers how it is, as the Worlds tab does. An answer
-/// for places Home has read again meanwhile is dropped.
-fn ask_place(wiring: &Wiring, id: String, address: String, seq: u64, cx: &mut App) {
-    let service = wiring.backend.service.clone();
-    let (instance, asked) = (id.clone(), address.clone());
-    let handle = wiring
-        .backend
-        .spawn(async move { service.server_status(&instance, &asked).await });
-    let wiring = wiring.clone();
-    cx.spawn(async move |cx| {
-        let answer = handle.await.ok().and_then(Result::ok).ok_or(());
-        if wiring.state.borrow().home_seq != seq {
-            return;
-        }
-        let _ = wiring.shell.update(cx, |shell, cx| {
-            shell.update_live(
-                |model| {
-                    if let Some(places) = model
-                        .home_places
-                        .as_mut()
-                        .filter(|places| places.instance == id)
-                    {
-                        places.server_answered(&address, answer);
-                    }
                 },
                 cx,
             );
@@ -371,7 +215,7 @@ pub(super) fn retry_task(wiring: &Wiring, action: lumilio_core::RetryAction, cx:
         wiring,
         cx,
         true,
-        Reload::All,
+        Reload::Lists,
         Some(Toast::info(tr!("activity-retry-started"))),
         async move {
             // Progress lives in Activity; the channel only has to drain.

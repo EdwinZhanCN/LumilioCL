@@ -1,5 +1,4 @@
-use super::jobs::reload;
-use super::{Reload, Wiring};
+use super::Wiring;
 use gpui_kit::AppContext as _;
 use gpui_kit::{App, WeakEntity, Window};
 use lumilio_core::{CancellationToken, ServiceError, ThirdPartySignIn};
@@ -110,7 +109,6 @@ pub(super) fn start_microsoft_sign_in(
                 let _ = wiring.shell.update(cx, |shell, cx| {
                     shell.toast(Toast::success(tr!("account-signed-in", name = name)), cx)
                 });
-                cx.update(|cx| reload(&wiring, Reload::Lists, cx));
             }
             // The person cancelled: the dialog is already gone.
             Err(ServiceError::Auth(lumilio_core::AuthError::Cancelled)) => {}
@@ -154,9 +152,8 @@ pub(super) fn add_account(
                 cx,
             );
         });
-        cx.update(|cx| reload(&wiring, Reload::Lists, cx));
         if then_launch {
-            // The model learns of the account on the reload above; give it a beat.
+            // The model learns of the account once core publishes it; give it a beat.
             let _ = cx.update_window(window, |_, window, cx| {
                 let wiring = wiring.clone();
                 window.defer(cx, move |window, cx| {
@@ -265,7 +262,6 @@ fn third_party_intent(
                 let _ = wiring.shell.update(cx, |shell, cx| {
                     shell.toast(Toast::success(tr!("account-signed-in", name = name)), cx)
                 });
-                cx.update(|cx| reload(&wiring, Reload::Lists, cx));
             }
             Ok(ThirdPartySignIn::Choose {
                 pending,
@@ -391,8 +387,6 @@ fn finish_server_change(
                 let _ = wiring
                     .shell
                     .update(cx, |shell, cx| shell.toast(Toast::success(notice), cx));
-                // Removing a server removes its accounts too.
-                cx.update(|cx| reload(&wiring, Reload::Lists, cx));
             }
             Err(error) => {
                 let _ = dialog.update(cx, |dialog, cx| dialog.failed(account_failure(&error), cx));
@@ -505,7 +499,6 @@ fn save_skin(wiring: &Wiring, dialog: WeakEntity<SkinDialog>, intent: SkinIntent
                 let _ = wiring.shell.update(cx, |shell, cx| {
                     shell.toast(Toast::success(tr!("account-skin-saved")), cx)
                 });
-                cx.update(|cx| reload(&wiring, Reload::Lists, cx));
             }
             Err(error) => {
                 let _ = dialog.update(cx, |dialog, cx| {

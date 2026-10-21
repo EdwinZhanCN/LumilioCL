@@ -41,7 +41,7 @@ fn ask_java(wiring: &Wiring, conflict: &JavaConflict, window: &mut Window, cx: &
     java_conflict::ask(
         conflict,
         std::rc::Rc::new(move |answer, window, cx| {
-            let Some(id) = wiring.state.borrow().continue_id.clone() else {
+            let Some(id) = wiring.backend.service.context().current_instance else {
                 return;
             };
             if answer == JavaConflictAnswer::Switch {
@@ -74,10 +74,10 @@ pub(super) fn on_shell_intent(
             let service = wiring.backend.service.clone();
             let answered = wiring.state.borrow_mut().java_answered.take();
             let check_java = wiring
-                .state
-                .borrow()
-                .continue_id
-                .clone()
+                .backend
+                .service
+                .context()
+                .current_instance
                 .filter(|id| answered.as_ref() != Some(id));
             let work = wiring.backend.spawn(async move {
                 let has_account = account_rows(&service.settings().await)
@@ -284,7 +284,10 @@ pub(super) fn on_live_intent(
         LiveIntent::ExportPackOf(id) => {
             open_instance(wiring, id, Some(InstanceIntent::ExportPack), window, cx)
         }
-        LiveIntent::Refresh => reload(wiring, Reload::All, cx),
+        LiveIntent::Refresh => {
+            reload(wiring, Reload::Lists, cx);
+            super::context::check_again(wiring, cx);
+        }
         LiveIntent::ToggleFavorite(id) => {
             let service = wiring.backend.service.clone();
             job(
@@ -361,7 +364,7 @@ pub(super) fn on_live_intent(
                 wiring,
                 cx,
                 false,
-                Reload::Lists,
+                Reload::Nothing,
                 None,
                 async move { service.refresh_account(&key).await },
                 |shell, result, cx| {
@@ -384,7 +387,7 @@ pub(super) fn on_live_intent(
                 wiring,
                 cx,
                 false,
-                Reload::Lists,
+                Reload::Nothing,
                 None,
                 async move { service.select_account(&name).await },
                 |shell, result, cx| {
@@ -404,7 +407,7 @@ pub(super) fn on_live_intent(
                 wiring,
                 cx,
                 false,
-                Reload::Lists,
+                Reload::Nothing,
                 None,
                 async move { service.remove_account(&name).await },
                 move |shell, result, cx| {
@@ -437,14 +440,13 @@ pub(super) fn on_live_intent(
         LiveIntent::ApplyUpdate => update::apply(wiring),
         LiveIntent::SetPluginEnabled { id, enabled } => {
             let service = wiring.backend.service.clone();
-            let changed = wiring.clone();
             change_setting(
                 wiring,
                 window,
                 async move { service.set_plugin_enabled(&id, enabled).await },
                 tr!("settings-plugin-save-failed"),
                 None,
-                move |_, cx| reload(&changed, Reload::All, cx),
+                |_, _| {},
                 cx,
             );
         }
@@ -462,14 +464,13 @@ pub(super) fn on_live_intent(
         }
         LiveIntent::ResetPlugin(id) => {
             let service = wiring.backend.service.clone();
-            let changed = wiring.clone();
             change_setting(
                 wiring,
                 window,
                 async move { service.reset_plugin(&id).await },
                 tr!("settings-plugin-reset-failed"),
                 None,
-                move |_, cx| reload(&changed, Reload::All, cx),
+                |_, _| {},
                 cx,
             );
         }

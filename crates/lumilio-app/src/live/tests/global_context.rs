@@ -6,12 +6,12 @@
 //! automatic-download setting; game versions that do not exist keep a
 //! launch from downloading anything.
 
+use super::super::context::follow;
 use super::super::discover::install_target;
 use super::super::dispatch::{on_live_intent, on_shell_intent};
 use super::super::instance::open_instance;
-use super::super::jobs::reload;
 use super::super::launch::play;
-use super::super::{Reload, State, Wiring};
+use super::super::{State, Wiring};
 use crate::backend::{Backend, Service};
 use gpui_kit::{Entity, TestAppContext, VisualTestContext};
 use lumilio_core::{HistoryEvent, Loader, ProjectKind, SessionOutcome};
@@ -187,7 +187,7 @@ fn home_attention_follows_the_current_account(cx: &mut TestAppContext) {
         service.add_account("Steve", None).await
     })
     .unwrap();
-    cx.update(|_, cx| reload(&wiring, Reload::All, cx));
+    cx.update(|_, cx| follow(&wiring, cx));
     until(cx, "Home's first check", |cx| {
         shell.read_with(cx, |shell, _| shell.live().unwrap().library_loaded)
             && attention(&shell, cx) == attention_now(&wiring)
@@ -242,7 +242,7 @@ fn home_attention_follows_the_java_settings(cx: &mut TestAppContext) {
         service.add_account("Steve", None).await
     })
     .unwrap();
-    cx.update(|_, cx| reload(&wiring, Reload::All, cx));
+    cx.update(|_, cx| follow(&wiring, cx));
     until(cx, "Home's first check", |cx| {
         shell.read_with(cx, |shell, _| shell.live().unwrap().library_loaded)
             && attention(&shell, cx) == attention_now(&wiring)
@@ -276,7 +276,7 @@ fn browsing_for_a_game_makes_it_the_current_game(cx: &mut TestAppContext) {
         move |service| async move { service.set_current_instance(&a).await }
     })
     .unwrap();
-    cx.update(|_, cx| reload(&wiring, Reload::All, cx));
+    cx.update(|_, cx| follow(&wiring, cx));
     until(cx, "Home to continue A", |cx| {
         continue_subject(&shell, cx).as_deref() == Some(a.as_str())
     });
@@ -324,7 +324,7 @@ fn choosing_another_game_while_browsing_ends_the_browsing(cx: &mut TestAppContex
     let (shell, wiring, cx) = open(cx);
     let x = game(&wiring, "X", "1.20.1");
     let z = game(&wiring, "Z", "1.21.1");
-    cx.update(|_, cx| reload(&wiring, Reload::All, cx));
+    cx.update(|_, cx| follow(&wiring, cx));
     until(cx, "the library", |cx| {
         shell.read_with(cx, |shell, _| shell.live().unwrap().library.len() == 2)
     });
@@ -379,7 +379,7 @@ fn recovering_a_failed_launch_retries_the_same_game(cx: &mut TestAppContext) {
         }
     })
     .unwrap();
-    cx.update(|_, cx| reload(&wiring, Reload::All, cx));
+    cx.update(|_, cx| follow(&wiring, cx));
     until(cx, "Home to continue A", |cx| {
         continue_subject(&shell, cx).as_deref() == Some(a.as_str())
     });

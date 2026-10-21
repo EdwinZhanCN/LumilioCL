@@ -251,7 +251,7 @@ pub(super) fn install(
             wiring,
             cx,
             true,
-            Reload::All,
+            Reload::Lists,
             Some(Toast::info(tr!(
                 "discover-install-started",
                 title = title.as_str()

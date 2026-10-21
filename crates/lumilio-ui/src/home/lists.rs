@@ -1,6 +1,6 @@
 use super::buttons::{LocalActionIcon, page_button};
 use super::render::{ShellHomeColors, body_label};
-use super::{ActHandler, AttentionRow, HomeIntent, HomeIntentHandler, OpenHandler, RecentEntry};
+use super::{HomeIntent, HomeIntentHandler, HomeLinks, OpenHandler, RecentEntry};
 use crate::key::Key;
 use gpui::prelude::*;
 use gpui::{AnyElement, ClickEvent, IntoElement, div, px};
@@ -62,13 +62,12 @@ pub(super) fn render_first_use(
         .child(h_flex().gap_3().child(primary).child(secondary))
 }
 
-/// Games with something wrong, one row each with its first remedy.
-pub(super) fn render_attention(
-    rows: &[AttentionRow],
-    on_act: Option<ActHandler>,
-    colors: ShellHomeColors,
-) -> Option<AnyElement> {
-    if rows.is_empty() {
+/// Games with something wrong, one row each with its first remedy. While
+/// the games are checked again the section says so instead of showing the
+/// earlier answer; a new answer enters as route content does (§2).
+pub(super) fn render_attention(links: &HomeLinks, colors: ShellHomeColors) -> Option<AnyElement> {
+    let (rows, on_act) = (&links.attention, links.on_act.clone());
+    if rows.is_empty() && !links.checking {
         return None;
     }
     // ia[home]: 需要留意：解决 | 每个有问题的游戏一行（游戏名 · 最严重的问题 · 另有几个）和一个按钮（安装/修复/更换…/去设置/去添加/查看日志…） | 点后先打开游戏页再执行
@@ -121,13 +120,20 @@ pub(super) fn render_attention(
             )
             .children(button)
     });
-    Some(
+    let checking = links.checking.then(|| {
+        div()
+            .text_xs()
+            .text_color(colors.muted)
+            .child(crate::tr!("home-attention-checking"))
+    });
+    Some(crate::kit::entrance(
         v_flex()
             .gap_2()
             .child(body_label(crate::tr!("home-attention"), colors.muted))
-            .child(v_flex().w_full().children(list))
-            .into_any_element(),
-    )
+            .children(checking)
+            .child(v_flex().w_full().children(list)),
+        ("home-attention-section", links.revision),
+    ))
 }
 
 pub(super) fn render_recent(

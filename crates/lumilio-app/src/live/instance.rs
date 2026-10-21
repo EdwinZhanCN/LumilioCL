@@ -455,7 +455,7 @@ pub(super) fn instance_intent(
                         view.saved(memory, result, cx);
                     }
                 });
-                cx.update(|cx| reload(&wiring, Reload::All, cx));
+                cx.update(|cx| reload(&wiring, Reload::Lists, cx));
             })
             .detach();
         }
