@@ -26,11 +26,11 @@ pub use self::activity::{
     rate_text, recovery_message,
 };
 pub use self::discover::{
-    AdvancedOption, CardTag, CardTags, DateKind, DiscoverChange, DiscoverQuery, EPILEPSY_TRIGGERS,
-    FilterModel, Lock, PAGE_SIZES, PageItem, PickGroup, Provided, SORTS, SearchRow, SearchStatus,
-    Section, Side, advanced_options, card_tags, count_label, default_loaders, environment_label,
-    is_type_exclusion, page_items, parse_rfc3339, search_row, search_rows, section_title, sections,
-    sort_label, tag_label, visible_kinds,
+    AdvancedOption, CardTag, CardTags, CountKind, DateKind, DiscoverChange, DiscoverQuery,
+    EPILEPSY_TRIGGERS, FilterModel, Lock, PAGE_SIZES, PageItem, PickGroup, Provided, SORTS,
+    SearchRow, SearchStatus, Section, Side, advanced_options, card_tags, count_label,
+    default_loaders, environment_label, is_type_exclusion, page_items, parse_rfc3339, search_row,
+    search_rows, section_title, sections, sort_label, tag_label, visible_kinds,
 };
 pub use self::home::{
     HomePlaces, PLACE_SERVERS, PLACE_WORLDS, Place, PlaceKind, PlacePicture, PlaceTarget,

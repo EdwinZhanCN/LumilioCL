@@ -2,13 +2,14 @@
 //!
 //! Which tags show and in what order follows Modrinth App's project card
 //! (`live::card_tags`); the date is the publishing date when the list is
-//! sorted by newest, else the last update.
+//! sorted by newest, else the last update, and the count is followers when
+//! the list is sorted by them, else downloads.
 
 use super::super::controls::{LiveCtx, send};
 use crate::assets::UiIcon;
 use crate::cover::Loader;
 use crate::home::WorldHint;
-use crate::live::{DateKind, LiveIntent, SearchRow, environment_label, tag_label};
+use crate::live::{CountKind, DateKind, LiveIntent, SearchRow, environment_label, tag_label};
 use crate::theme::ShellColors;
 use crate::tr;
 use crate::{kit, theme};
@@ -74,8 +75,17 @@ pub fn project_icon(
     }
 }
 
-/// Below this window width a result line uses its compact layout.
-pub(super) const COMPACT_WIDTH: f32 = 1000.;
+/// Edge of a result's icon: a list row's 48 px display window (§12).
+const ICON_SIDE: f32 = 48.;
+/// The readings column is at least this wide, so a short count and a long
+/// date keep the keys after them in line.
+const READINGS_WIDTH: f32 = 112.;
+/// The key slot is as wide as the widest of its states (安装中…), so the
+/// readings before it line up from row to row.
+const KEY_WIDTH: f32 = 96.;
+/// The narrowest list a result row reads well in: the index, the icon,
+/// about 280 px for the name and summary, the readings and the key.
+pub(super) const ROW_MIN_WIDTH: f32 = 624.;
 
 /// One line of a row's spec column: a muted mono legend and its value.
 fn spec(legend: &'static str, value: String, colors: ShellColors) -> impl IntoElement {
@@ -174,10 +184,15 @@ pub(super) fn install_control(
 
 /// The tags of a row: whether the author allows downloads only on the
 /// source's site, the environment, then categories and loaders as
-/// `card_tags` chose, then how many more there are.
+/// `card_tags` chose, then how many more there are. They keep to one line:
+/// a tag the line has no room for wraps out of sight whole rather than
+/// being cut, and the count stays after the ones that show.
 fn tag_line(row: &SearchRow, colors: ShellColors) -> impl IntoElement {
     let plain = |text: String| kit::tag(text, kit::TagKind::Plain, colors);
-    h_flex()
+    let tags = h_flex()
+        .min_w_0()
+        .h(px(20.))
+        .overflow_hidden()
         .flex_wrap()
         .gap(px(6.))
         .children(
@@ -195,10 +210,10 @@ fn tag_line(row: &SearchRow, colors: ShellColors) -> impl IntoElement {
                 kit::TagKind::Plain
             };
             kit::tag(tag_label(&tag.name), kind, colors)
-        }))
-        .children(
-            (!row.tags.overflow.is_empty()).then(|| plain(format!("+{}", row.tags.overflow.len()))),
-        )
+        }));
+    h_flex().min_w_0().gap(px(6.)).child(tags).children(
+        (!row.tags.overflow.is_empty()).then(|| plain(format!("+{}", row.tags.overflow.len()))),
+    )
 }
 
 // ia[discover]: 打开项目详情 | 点结果行 | 详情页（进历史）
@@ -238,18 +253,21 @@ pub(super) fn result_row(index: usize, row: &SearchRow, ctx: &LiveCtx) -> impl I
         source = ctx.model.source_name(&row.source)
     );
     let copy = ctx.handler.clone();
-    // In a narrow window the icon and the spec column give the name room.
-    let compact = ctx.window_width < COMPACT_WIDTH;
-    let (icon_side, spec_width) = if compact { (48., 128.) } else { (80., 190.) };
+    let count_legend = match row.count_kind {
+        CountKind::Downloads => "DL",
+        CountKind::Follows => "FAV",
+    };
 
-    // A catalogue line: index, framed icon, name and summary, spec column.
+    // A list row (§12): index, framed icon, then the name with its author,
+    // a one-line summary and the tags; readings and the key on the trailing
+    // edge. Everything is centred on the row.
     h_flex()
         .id(("live-result", index))
         .w_full()
-        .gap_4()
-        .py(px(16.))
+        .gap_3()
+        .py(px(10.))
         .px(px(4.))
-        .items_start()
+        .items_center()
         .border_b_1()
         .border_color(colors.border)
         .cursor_pointer()
@@ -260,7 +278,6 @@ pub(super) fn result_row(index: usize, row: &SearchRow, ctx: &LiveCtx) -> impl I
             div()
                 .flex_none()
                 .w(px(24.))
-                .pt(px(4.))
                 .font_family(theme::mono_font())
                 .text_xs()
                 .text_color(body.orange_text)
@@ -277,7 +294,7 @@ pub(super) fn result_row(index: usize, row: &SearchRow, ctx: &LiveCtx) -> impl I
                 .child(project_icon(
                     row.icon_url.as_deref(),
                     row.seed,
-                    icon_side,
+                    ICON_SIDE,
                     colors,
                 )),
         )
@@ -285,27 +302,47 @@ pub(super) fn result_row(index: usize, row: &SearchRow, ctx: &LiveCtx) -> impl I
             v_flex()
                 .flex_1()
                 .min_w_0()
-                .gap(px(6.))
+                .debug_selector(move || format!("live-result-name-{index}"))
                 .child(
-                    div()
-                        .text_size(crate::theme::font_px(20.))
-                        .line_height(px(26.))
-                        .font_weight(gpui::FontWeight::LIGHT)
-                        .text_color(colors.foreground)
-                        .child(row.title.clone()),
-                )
-                .child(
-                    div()
-                        .font_family(theme::mono_font())
-                        .text_size(crate::theme::font_px(11.))
-                        .text_color(colors.muted)
-                        .child(row.author.to_uppercase()),
+                    // The author gives way first; the name is cut only
+                    // when it alone is wider than the line.
+                    h_flex()
+                        .min_w_0()
+                        .gap(px(10.))
+                        .items_baseline()
+                        .child(
+                            div()
+                                .flex_shrink_0()
+                                .max_w_full()
+                                .text_size(crate::theme::font_px(20.))
+                                .line_height(px(26.))
+                                .font_weight(gpui::FontWeight::LIGHT)
+                                .text_color(colors.foreground)
+                                .overflow_hidden()
+                                .text_ellipsis()
+                                .whitespace_nowrap()
+                                .child(row.title.clone()),
+                        )
+                        .child(
+                            div()
+                                .flex_1()
+                                .min_w_0()
+                                .font_family(theme::mono_font())
+                                .text_size(crate::theme::font_px(11.))
+                                .text_color(colors.muted)
+                                .overflow_hidden()
+                                .text_ellipsis()
+                                .whitespace_nowrap()
+                                .child(row.author.to_uppercase()),
+                        ),
                 )
                 .child(
                     div()
                         .text_sm()
                         .text_color(colors.muted)
-                        .line_clamp(2)
+                        .overflow_hidden()
+                        .text_ellipsis()
+                        .whitespace_nowrap()
                         .child(
                             row.translated_summary
                                 .as_ref()
@@ -313,33 +350,24 @@ pub(super) fn result_row(index: usize, row: &SearchRow, ctx: &LiveCtx) -> impl I
                                 .clone(),
                         ),
                 )
-                .child(div().pt(px(2.)).child(tag_line(row, colors))),
+                .child(div().pt(px(6.)).child(tag_line(row, colors))),
         )
         .child(
             v_flex()
                 .flex_none()
-                .w(px(spec_width))
-                .debug_selector(move || format!("live-result-spec-{index}"))
-                .self_stretch()
+                .min_w(px(READINGS_WIDTH))
+                .debug_selector(move || format!("live-result-readings-{index}"))
                 .items_end()
-                .justify_between()
-                .gap_2()
-                .child(install_control(index, row, ctx, install))
-                .child(
-                    v_flex()
-                        .w_full()
-                        .gap(px(3.))
-                        .border_t_1()
-                        .border_color(colors.border)
-                        .pt(px(6.))
-                        .child(spec("DL", row.downloads.clone(), colors))
-                        .children(
-                            row.follows
-                                .clone()
-                                .map(|follows| spec("FAV", follows, colors)),
-                        )
-                        .children((!date.is_empty()).then(|| spec(date_legend, date, colors))),
-                ),
+                .gap(px(3.))
+                .child(spec(count_legend, row.count.clone(), colors))
+                .children((!date.is_empty()).then(|| spec(date_legend, date, colors))),
+        )
+        .child(
+            h_flex()
+                .flex_none()
+                .min_w(px(KEY_WIDTH))
+                .justify_end()
+                .child(install_control(index, row, ctx, install)),
         )
         .context_menu(move |menu, _, _| {
             let (open_url, copy_url) = (menu_url.clone(), copy_url.clone());

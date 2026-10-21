@@ -320,13 +320,20 @@ impl DiscoverQuery {
 
     /// Whether the person has narrowed the search themselves.
     pub fn filtered(&self) -> bool {
-        !(self.versions.is_empty()
-            && self.loaders.is_empty()
-            && self.categories.is_empty()
-            && !self.client
-            && !self.server
-            && self.license.is_none()
-            && self.advanced.is_empty())
+        self.filter_count() > 0
+    }
+
+    /// How many filters the person picked: each version, loader, category,
+    /// side, license stance and advanced exclusion counts once. What the
+    /// game provides is not theirs and does not count.
+    pub fn filter_count(&self) -> usize {
+        self.versions.len()
+            + self.loaders.len()
+            + self.categories.len()
+            + usize::from(self.client)
+            + usize::from(self.server)
+            + usize::from(self.license.is_some())
+            + self.advanced.len()
     }
 
     /// The request for the core. `hidden` is the projects to leave out when

@@ -301,6 +301,7 @@ discover-advanced-remembered = Your choices here are remembered and still apply 
 discover-hide-installed = Hide installed
 discover-filters-not-loaded = Filters didn't load
 discover-clear-filters = Clear filters
+discover-filters = Filters
 discover-install = Install
 discover-installing = Installing…
 discover-update = Update

@@ -230,6 +230,25 @@ fn clearing_filters_keeps_text_sort_and_the_hide_toggle() {
 }
 
 #[test]
+fn the_filter_count_is_each_pick_once_and_not_the_sort_or_the_hide_toggle() {
+    let q = query()
+        .apply(DiscoverChange::Sort(SortIndex::Follows))
+        .apply(DiscoverChange::HideInstalled(true))
+        .apply(DiscoverChange::Include(PickGroup::Category, "x".to_owned()))
+        .apply(DiscoverChange::Exclude(PickGroup::Category, "y".to_owned()))
+        .apply(DiscoverChange::Include(
+            PickGroup::Loader,
+            "fabric".to_owned(),
+        ))
+        .apply(DiscoverChange::ToggleVersion("1.0".to_owned()))
+        .apply(DiscoverChange::ToggleSide(Side::Client))
+        .apply(DiscoverChange::License(Stance::Include))
+        .apply(DiscoverChange::Advanced("archived".to_owned()));
+    assert_eq!(q.filter_count(), 7);
+    assert_eq!(q.apply(DiscoverChange::ClearFilters).filter_count(), 0);
+}
+
+#[test]
 fn advanced_options_replace_their_parent_or_children() {
     let q = query().apply(DiscoverChange::Advanced("ai_content_code".to_owned()));
     assert_eq!(q.advanced, ["ai_content_code"]);
@@ -579,8 +598,10 @@ fn rows_show_counts_environment_and_the_date_the_sort_asks_for() {
     let hit = hit(&["magic"], &["fabric"]);
     let now = parse_rfc3339("2026-09-30T10:00:00Z").unwrap();
     let row = search_row(&hit, now, &query(), &filters);
-    assert_eq!(row.downloads, "1773.1 万");
-    assert_eq!(row.follows.as_deref(), Some("4886"));
+    assert_eq!(
+        (row.count.as_str(), row.count_kind),
+        ("1773.1 万", CountKind::Downloads)
+    );
     assert_eq!(
         (row.date.as_str(), row.date_kind),
         ("3 天前", DateKind::Updated)
@@ -593,6 +614,13 @@ fn rows_show_counts_environment_and_the_date_the_sort_asks_for() {
     let row = search_row(&hit, now, &newest, &filters);
     assert_eq!(row.date_kind, DateKind::Published);
     assert_ne!(row.date, "3 天前");
+    // Sorted by followers, the card counts them instead of downloads.
+    let by_follows = query().apply(DiscoverChange::Sort(SortIndex::Follows));
+    let row = search_row(&hit, now, &by_follows, &filters);
+    assert_eq!(
+        (row.count.as_str(), row.count_kind),
+        ("4886", CountKind::Follows)
+    );
     let unknown = SearchHit {
         updated: String::new(),
         ..hit
@@ -814,12 +842,13 @@ fn a_card_leaves_out_a_category_picked_by_id() {
 }
 
 #[test]
-fn a_row_without_followers_shows_none_and_says_where_to_download() {
+fn a_row_without_followers_counts_downloads_and_says_where_to_download() {
     let mut found = hit(&[], &[]);
     found.follows = None;
     found.manual_download = true;
-    let row = search_row(&found, 0, &query(), &filters());
-    assert_eq!(row.follows, None);
+    let by_follows = query().apply(DiscoverChange::Sort(SortIndex::Follows));
+    let row = search_row(&found, 0, &by_follows, &filters());
+    assert_eq!(row.count_kind, CountKind::Downloads);
     assert!(row.manual_download);
     assert_eq!(row.source, lumilio_core::DEFAULT_SOURCE);
 }

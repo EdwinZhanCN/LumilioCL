@@ -11,6 +11,7 @@ To turn a source on or off, select it in **Settings › Plugins**, and then use 
 ## Change the source
 
 When the two sources are on, the top of the Discover filter bar shows two segment keys: **Modrinth** and **CurseForge**.
+If the window is narrow, the filter bar is not on the page. Click the **Filters** key, to the left of **Sort by**, to open it.
 Click a segment key.
 The Discover page then searches again in that source:
 

@@ -21,6 +21,8 @@ pub struct LiveControls {
     pub version_search: Entity<InputState>,
     /// The version list's scroll, so it keeps the wheel while it can scroll.
     pub version_scroll: gpui::ScrollHandle,
+    /// The scroll of the filters panel a narrow window opens from its key.
+    pub filters_scroll: gpui::ScrollHandle,
     /// The Library's ordering and loader filter.
     pub library_sort: Entity<SelectState<SearchableVec<String>>>,
     pub library_loader: Entity<SelectState<SearchableVec<String>>>,
@@ -88,6 +90,7 @@ impl LiveControls {
                 InputState::new(window, cx).placeholder(crate::tr!("discover-version-search"))
             }),
             version_scroll: gpui::ScrollHandle::new(),
+            filters_scroll: gpui::ScrollHandle::new(),
             library_sort: cx.new(|cx| {
                 let labels: Vec<String> = sort_labels().iter().map(|s| (*s).to_owned()).collect();
                 SelectState::new(
@@ -234,8 +237,9 @@ pub struct LiveCtx<'a> {
     pub filter: String,
     /// What is typed in the sidebar's version search.
     pub version_filter: String,
-    /// The window's width, for layouts that change with the room they have.
+    /// The window's size, for layouts that change with the room they have.
     pub window_width: f32,
+    pub window_height: f32,
     /// The look preview of the account the Accounts detail shows.
     pub account_viewer: Option<&'a gpui::Entity<crate::skin_view::SkinViewer>>,
     /// Its look area (the preview beside the skins), unless it is read-only.
