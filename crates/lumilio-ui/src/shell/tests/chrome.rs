@@ -48,11 +48,15 @@ fn a_failure_shown_is_also_kept_in_the_launcher_log(cx: &mut TestAppContext) {
     static LINES: Mutex<Vec<String>> = Mutex::new(Vec::new());
     struct Keep;
     impl log::Log for Keep {
-        fn enabled(&self, _: &log::Metadata) -> bool {
-            true
+        // Only the toasts' lines: the platform may note its own (a missing
+        // font on Linux).
+        fn enabled(&self, metadata: &log::Metadata) -> bool {
+            metadata.target() == "lumilio_ui::toast"
         }
         fn log(&self, record: &log::Record) {
-            LINES.lock().unwrap().push(record.args().to_string());
+            if self.enabled(record.metadata()) {
+                LINES.lock().unwrap().push(record.args().to_string());
+            }
         }
         fn flush(&self) {}
     }
