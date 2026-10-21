@@ -22,11 +22,11 @@ Status: InProgress
   Acceptance: Backend::spawn 的结果在 app 中不再以 `let Ok(..) = handle.await else { return }` 丢弃：job() 把 JoinError 当作该任务的失败交给 done（Discover 卡片不再停在安装中，toast 显示失败与技术详情）；其余等待处经同一个帮助函数，panic 时 Shell 显示错误 toast，主动 abort 的任务保持安静。启动任务 panic 时 Home 进入恢复面板，不再停在启动中。app 测试用会 panic 的任务证明 job() 运行 done 并留下错误 toast。
 - [x] T2 — 主窗口只有一个 toast 队列。 (Completed)
   Acceptance: 实例详情、项目详情与游戏设置表单的 toast 进入主窗口的共享队列，由总是渲染的 Shell 显示；视图离开屏幕或被移出历史后结果仍然出现（含删除游戏成功的提示）。投影工作室在自己的窗口，保留自己的队列。UI 测试：实例页不在屏幕上时它的 toast 由 Shell 显示。
-- [ ] T3 — 启动失败说清原因。 (InProgress)
+- [x] T3 — 启动失败说清原因。 (Completed)
   Acceptance: 恢复面板的「技术详情」：准备步骤失败时打开失败原因对话框（可复制）；启动时退出、游戏崩溃或上次未正常结束时打开该游戏的诊断页。被启动器停止的游戏不算崩溃；Unix 上没有退出代码、不是被启动器停止的退出显示崩溃恢复面板，与历史记录的 Crashed 一致。启动失败或游戏崩溃时若不在 Home，Shell 另弹一条错误 toast。core 与 UI 测试覆盖信号退出与停止的区别。
 - [x] T8 — 恢复面板说出能处理的失败原因。 (Completed)
   Acceptance: LaunchFailure::Step 带类型化的 LaunchProblem（需要重新登录、账户登录失败、没有能用的 Java、下载 Java 失败、启动前命令失败、找不到世界），core 只给类型；恢复面板说明在有原因时说原因，没有时仍说停在哪一步；技术详情只放原始原因。崩溃面板说明不再重复标题，只加退出代码。测试：ui a_known_cause_is_told_instead_of_the_step、a_crash_caption_does_not_repeat_its_headline；core 缺 Java 的启动测试断言 NoJava(Some(21)) 经真实启动路径到达会话。
-- [ ] T7 — Project Maintainer 在真实启动器上看一次 T1–T3。 (Proposed)
+- [ ] T7 — Project Maintainer 在真实启动器上看一次 T1–T3。 (InProgress)
   Acceptance: 行为已由模拟测试覆盖（见验证）。真实窗口用开发钩子 LUMILIO_HOME_RECOVERY=failed|details|crashed|crashed-details|away 在临时 LUMILIO_HOME 中截图，Project Maintainer 看过截图后确认样子。剩下 Windows 上运行中点停止回到继续：CI 只有 Ubuntu，Windows 只由 killed 标记的单元测试覆盖。
 - [x] T4 — 启动器日志文件。 (Completed)
   Acceptance: 启动器把自身的警告与错误写入数据目录下按大小轮换的日志文件（logs/launcher.log，满 1 MB 换成 launcher.1.log），eprintln! 改为日志；界面上弹出的每条错误连同技术详情、启动失败与游戏非正常结束都写入日志。设置 › 关于的「启动器日志」在访达中显示该文件，诊断包附上两份日志（脱敏）。网络错误的技术详情包含原因链（例如 reqwest 的 DNS、TLS、连接被拒、超时原因）。
@@ -39,6 +39,8 @@ Status: InProgress
 
 - panic 的后台任务、离开屏幕的视图与启动失败都在界面上留下可见的结果，且有能失败的测试守护。
   Result: 2026-10-21：lumilio-core、lumilio-ui、lumilio-app 全部 1383 项测试通过，lumilio-ui english 4 项通过，三个 crate 的 clippy（-D warnings）通过。新增守护：app work_that_panics_is_told_and_not_left_hanging（job 中 panic 仍运行 done 并给出带 panic 消息的错误 toast；answer() 对 panic 发 toast、对 abort 保持安静），把 job 改回 `let Ok(..) else { return }` 时按预期失败（0 条 toast）；ui a_result_for_a_page_no_longer_shown_still_floats_up（实例页 toast 后被移出历史，Shell 仍显示 1 条通知），实例页 toast 不进共享队列时按预期失败；ui a_game_stopped_by_the_launcher_continues_and_a_signal_death_is_a_crash 与 a_failure_away_from_home_floats_up_as_a_toast，恢复旧的 `None | Some(0)` 规则或去掉 Home 外 toast 时按预期失败；core a_game_the_launcher_stopped_was_cancelled_whatever_its_code。T7 的情形另做了模拟：core 真实进程测试中假 java 脚本 `kill -SEGV $$` 得到无退出代码、非 killed 的 Exited{None}，sleep 30 被取消得到 Cancelled（Unix）；app technical_details_after_a_failed_launch_explain_it 在带 Root 的真实窗口中经出货接线点击：准备步骤失败弹出对话框且「复制」写入完整原因，崩溃打开真实实例的诊断页（TAB_DIAGNOSTICS），在资料库页时启动失败绘出 1 条通知；把「技术详情」改回空操作时该测试按预期失败。三个 crate 共 1385 项测试通过。
+- T1–T3、T8 合入 main，真实窗口的样子经 Project Maintainer 确认（T7）。
+  Result: 2026-10-21：#62 合并 main（含 global-context 的 #59）后 squash 合入。Project Maintainer 运行的 just check 通过（1784 项测试）。合并后在临时 LUMILIO_HOME 中用 LUMILIO_HOME_RECOVERY 重拍 failed、details、crashed、crashed-details、away 五种情形，Project Maintainer 看过确认：失败说原因不说步骤，崩溃说明不重复标题，技术详情弹出可复制的原始原因或打开诊断页，在游戏库时失败浮出 toast。T7 剩下 Windows 上运行中点停止回到继续。
 - 启动器的错误与 panic 留在用户能找到的日志或 crash 文件中。
   Result: 2026-10-21（T4，panic 待 T5）：app logging::tests 两项通过：自己的 info 以上与第三方库的 warn 以上写入、其余不写；写满上限后换新文件并保留上一个，临时把改名换成删除时按预期失败。ui a_failure_shown_is_also_kept_in_the_launcher_log：弹出的错误 toast 连同技术详情写入日志、成功提示不写，临时去掉 toast.rs 的记录时按预期失败。core the_diagnostics_bundle_hides_the_player_the_folders_and_commands 断言诊断包含 launcher/launcher.log 与 launcher.1.log 且已脱敏；error_text::tests 证明原因链逐层写出不重复，对真实 reqwest 的连接被拒比 reqwest 自己的一行更长。在临时 LUMILIO_HOME 中运行开发版：日志只有启动一行和恢复钩子产生的错误一行，GPUI 没有写入噪声。
 
@@ -79,3 +81,5 @@ Consequences: 新的可处理原因要在 LaunchProblem 加一个变体、在 La
 - Lesson: 2026-10-21 审查发现：app 中约 25 处以 `let Ok(x) = handle.await else { return }` 等待工作线程，把 panic 当成「没有结果」。Discover 的安装卡片因此可能永远停在安装中，启动可能停在启动中，且 panic 消息只写到发布版看不到的 stderr。Guard：job() 把 JoinError 交给 done，其他等待处用 jobs::answer()；测试 work_that_panics_is_told_and_not_left_hanging。
 
 - Lesson: 2026-10-21 审查发现：实例页等视图的 toast 只在视图渲染时显示，离开页面或视图被移出历史后结果丢失（删除游戏成功的提示从未显示）。Guard：主窗口共享 toast::Posted 队列由 Shell 显示；测试 a_result_for_a_page_no_longer_shown_still_floats_up。
+
+- Lesson: 2026-10-21：T3 的工作已随 #62 合入，计划里仍是 in_progress，合并后列剩余任务时才发现。Guard：合并 PR 前按 lumilio-exec-plan 逐项核对本计划任务的状态与验证，在同一个 PR 里更新。
