@@ -86,12 +86,7 @@ fn failures_land_in_recovery_with_a_plain_reason() {
     let failed = continuing()
         .begin_launch()
         .on_launch_signal(LaunchSignal::Phase(LaunchPhase::Assets), now)
-        .on_launch_signal(
-            LaunchSignal::Failed(LaunchFailure::Step {
-                message: "checksum".into(),
-            }),
-            now,
-        );
+        .on_launch_signal(LaunchSignal::Failed(LaunchFailure::step("checksum")), now);
     let HomePresentation::Recovery { detail, .. } = &failed else {
         panic!("expected recovery, got {failed:?}");
     };
@@ -112,6 +107,85 @@ fn failures_land_in_recovery_with_a_plain_reason() {
     assert!(matches!(
         crashed.begin_launch(),
         HomePresentation::Launching { .. }
+    ));
+}
+
+/// A cause the person can act on is told in place of the step; the raw
+/// message stays behind 技术详情 either way.
+#[test]
+fn a_known_cause_is_told_instead_of_the_step() {
+    use lumilio_core::LaunchProblem;
+    let told = |problem| {
+        recovery_sentence(&RecoveryDetail::Failed {
+            phase: LaunchPhase::Verifying,
+            failure: LaunchFailure::Step {
+                message: "raw cause".into(),
+                problem: Some(problem),
+            },
+        })
+    };
+    assert_eq!(
+        told(LaunchProblem::SignInRequired("Steve".into())),
+        "账户 Steve 需要重新登录。"
+    );
+    assert_eq!(
+        told(LaunchProblem::NoJava(Some(21))),
+        "这个游戏需要 Java 21，还没有装。"
+    );
+    assert_eq!(
+        told(LaunchProblem::BeforeLaunch(Some(3))),
+        "启动前命令没有成功（退出代码 3）。"
+    );
+    for problem in [
+        LaunchProblem::Account(lumilio_core::AuthError::Network("dns".into())),
+        LaunchProblem::NoJava(None),
+        LaunchProblem::JavaDownload,
+        LaunchProblem::BeforeLaunch(None),
+        LaunchProblem::WorldMissing("New World".into()),
+    ] {
+        let sentence = told(problem);
+        assert!(sentence.ends_with('。') && !sentence.contains("raw cause"));
+    }
+    assert_eq!(
+        recovery_sentence(&RecoveryDetail::Failed {
+            phase: LaunchPhase::Verifying,
+            failure: LaunchFailure::step("raw cause"),
+        }),
+        "在「检查」这一步停了下来。",
+        "without a known cause, the step"
+    );
+}
+
+#[test]
+fn a_crash_caption_does_not_repeat_its_headline() {
+    use super::recovery::recovery_caption;
+    let crashed = |code| recovery_caption(&subject(), &RecoveryDetail::Crashed { code });
+    assert_eq!(crashed(Some(1)), "我的世界 · 退出代码 1");
+    assert_eq!(crashed(None), "我的世界");
+    assert_eq!(
+        recovery_caption(&subject(), &RecoveryDetail::Interrupted),
+        "我的世界 · 上次没有正常结束。"
+    );
+}
+
+#[test]
+fn a_game_stopped_by_the_launcher_continues_and_a_signal_death_is_a_crash() {
+    let now = Instant::now();
+    let playing = || {
+        continuing()
+            .begin_launch()
+            .on_launch_signal(LaunchSignal::Running, now)
+    };
+    assert_eq!(
+        playing().on_launch_signal(LaunchSignal::Cancelled, now),
+        continuing()
+    );
+    assert!(matches!(
+        playing().on_launch_signal(LaunchSignal::Exited { code: None }, now),
+        HomePresentation::Recovery {
+            detail: RecoveryDetail::Crashed { code: None },
+            ..
+        }
     ));
 }
 

@@ -14,7 +14,6 @@ impl Render for InstanceDetailView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.ensure_fields(window, cx);
         self.settle_editor(window, cx);
-        crate::toast::flush(&mut self.toasts, window, cx);
         if self.record.is_some()
             && let Some(question) = self.ask_later.take()
         {

@@ -108,6 +108,269 @@ fn a_failed_operation_says_it_plainly_and_keeps_the_cause_behind_details() {
     assert_eq!(done, Toast::success("已装好 sodium.jar"));
 }
 
+/// Work that panics on the worker runtime fails like any other: the job's
+/// `done` still runs (and clears what it marked busy) with the panic behind
+/// 技术详情, and other waits tell it on the shell. Aborted work stays quiet.
+#[gpui_kit::test]
+fn work_that_panics_is_told_and_not_left_hanging(cx: &mut gpui_kit::TestAppContext) {
+    cx.executor().allow_parking();
+    use super::jobs::{answer, job};
+    use super::{Reload, State, Wiring};
+    use crate::backend::Backend;
+    use gpui_kit::AppContext as _;
+    use lumilio_core::ServiceError;
+    use lumilio_ui::LauncherShell;
+    use lumilio_ui::toast::ToastKind;
+    use std::cell::{Cell, RefCell};
+    use std::rc::Rc;
+    use std::time::{Duration, Instant};
+
+    let dir = tempfile::tempdir().unwrap();
+    let backend = Backend::open(dir.path().join("root")).unwrap();
+    cx.update(gpui_kit::init);
+    let shell = cx.new(|cx| LauncherShell::new(cx).with_live(Rc::new(|_, _, _| {})));
+    let wiring = Wiring {
+        backend: Rc::new(backend),
+        shell: shell.downgrade(),
+        state: Rc::new(RefCell::new(State::default())),
+    };
+    let toasts = |cx: &mut gpui_kit::TestAppContext, count: usize| {
+        let until = Instant::now() + Duration::from_secs(5);
+        loop {
+            cx.run_until_parked();
+            let shown = shell.read_with(cx, |shell, cx| shell.pending_toasts(cx).to_vec());
+            if shown.len() >= count {
+                return shown;
+            }
+            assert!(Instant::now() < until, "only {} toasts", shown.len());
+            std::thread::sleep(Duration::from_millis(1));
+        }
+    };
+
+    let finished = Rc::new(Cell::new(false));
+    let seen = finished.clone();
+    cx.update(|cx| {
+        job(
+            &wiring,
+            cx,
+            false,
+            Reload::Nothing,
+            None,
+            async {
+                if true {
+                    panic!("index out of bounds");
+                }
+                Ok::<(), ServiceError>(())
+            },
+            move |shell, result, cx| {
+                seen.set(true);
+                shell.toast(
+                    super::jobs::outcome(result, |()| String::new(), "没有装上".to_owned()),
+                    cx,
+                );
+            },
+        )
+    });
+    let shown = toasts(cx, 1);
+    assert!(finished.get(), "done ran");
+    assert_eq!(shown[0].kind, ToastKind::Error);
+    assert_eq!(shown[0].text, "没有装上");
+    assert!(
+        shown[0]
+            .technical
+            .as_deref()
+            .is_some_and(|detail| detail.contains("index out of bounds")),
+        "the panic is behind 技术详情: {:?}",
+        shown[0].technical
+    );
+
+    let lost = wiring.backend.spawn(async {
+        if true {
+            panic!("lost on the way");
+        }
+    });
+    let stopped = wiring.backend.spawn(std::future::pending::<()>());
+    stopped.abort();
+    let (asking, answered) = (wiring.clone(), Rc::new(RefCell::new(Vec::new())));
+    let into = answered.clone();
+    cx.spawn(async move |mut cx| {
+        let first = answer(&asking, stopped, &mut cx).await;
+        let second = answer(&asking, lost, &mut cx).await;
+        into.borrow_mut()
+            .extend([first.is_some(), second.is_some()]);
+    })
+    .detach();
+    let shown = toasts(cx, 2);
+    assert_eq!(*answered.borrow(), [false, false]);
+    assert_eq!(shown.len(), 2, "the abort said nothing");
+    assert_eq!(shown[1].kind, ToastKind::Error);
+    assert!(
+        shown[1]
+            .technical
+            .as_deref()
+            .is_some_and(|detail| detail.contains("lost on the way"))
+    );
+}
+
+/// 技术详情 on Home's recovery, clicked in a real window through the shipped
+/// wiring: a failed step opens its cause to copy; a crash opens the game's
+/// Diagnostics tab; a failure while another page is open floats up there.
+#[gpui_kit::test]
+fn technical_details_after_a_failed_launch_explain_it(cx: &mut gpui_kit::TestAppContext) {
+    use super::dispatch::{on_live_intent, on_shell_intent};
+    use super::{State, Wiring};
+    use crate::backend::Backend;
+    use gpui_kit::component::WindowExt as _;
+    use gpui_kit::{AppContext as _, Entity, Modifiers};
+    use lumilio_core::{LaunchFailure, LaunchPhase, LaunchSignal};
+    use lumilio_ui::LauncherShell;
+    use lumilio_ui::home::{HomePresentation, RecoveryDetail, Subject};
+    use lumilio_ui::instance_detail::TAB_DIAGNOSTICS;
+    use lumilio_ui::route::Route;
+    use std::time::{Duration, Instant};
+    use std::{cell::RefCell, rc::Rc};
+
+    cx.executor().allow_parking();
+    let dir = tempfile::tempdir().unwrap();
+    let backend = Backend::open(dir.path().join("root")).unwrap();
+    let service = backend.service.clone();
+    let game = futures::executor::block_on(backend.spawn(async move {
+        service
+            .create_instance("Crashy", Some("1.0"), lumilio_core::Loader::Vanilla, None)
+            .await
+            .unwrap()
+            .id
+    }))
+    .unwrap();
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let cell: Rc<RefCell<Option<Wiring>>> = Rc::default();
+    let (on_shell, on_live) = {
+        let (shell_cell, live_cell) = (cell.clone(), cell.clone());
+        (
+            Rc::new(
+                move |intent, window: &mut gpui_kit::Window, cx: &mut gpui_kit::App| {
+                    let wiring = shell_cell.borrow().clone();
+                    if let Some(wiring) = wiring {
+                        on_shell_intent(&wiring, intent, window, cx);
+                    }
+                },
+            ),
+            Rc::new(
+                move |intent, window: &mut gpui_kit::Window, cx: &mut gpui_kit::App| {
+                    let wiring = live_cell.borrow().clone();
+                    if let Some(wiring) = wiring {
+                        on_live_intent(&wiring, intent, window, cx);
+                    }
+                },
+            ),
+        )
+    };
+    let slot: Rc<RefCell<Option<Entity<LauncherShell>>>> = Rc::default();
+    let keep = slot.clone();
+    let (_, cx) = cx.add_window_view(|window, cx| {
+        let shell = cx.new(|cx| {
+            LauncherShell::new(cx)
+                .with_intent_handler(on_shell)
+                .with_live(on_live)
+        });
+        *keep.borrow_mut() = Some(shell.clone());
+        gpui_kit::component::Root::new(shell, window, cx)
+    });
+    let shell = slot.borrow().clone().expect("shell");
+    *cell.borrow_mut() = Some(Wiring {
+        backend: Rc::new(backend),
+        shell: shell.downgrade(),
+        state: Rc::new(RefCell::new(State::default())),
+    });
+    let subject = |id: Option<&str>| Subject {
+        id: id.map(str::to_owned),
+        title: "Crashy".into(),
+        metadata: String::new(),
+        world: Default::default(),
+    };
+    let recovery = |id: Option<&str>, detail| HomePresentation::Recovery {
+        subject: subject(id),
+        recent: Vec::new(),
+        detail,
+    };
+    let click = |cx: &mut gpui_kit::VisualTestContext, selector: &'static str| {
+        cx.run_until_parked();
+        let bounds = cx
+            .debug_bounds(selector)
+            .unwrap_or_else(|| panic!("{selector} is not on screen"));
+        cx.simulate_click(bounds.center(), Modifiers::none());
+        cx.run_until_parked();
+    };
+
+    // A step that failed: its raw cause, in a dialog to copy.
+    let failure = lumilio_core::ServiceError::SignInRequired("Steve".into()).launch_failure();
+    let LaunchFailure::Step { message: cause, .. } = failure.clone() else {
+        unreachable!("a service error fails a step");
+    };
+    shell.update(cx, |shell, cx| {
+        shell.set_home(
+            recovery(
+                None,
+                RecoveryDetail::Failed {
+                    phase: LaunchPhase::Verifying,
+                    failure,
+                },
+            ),
+            cx,
+        )
+    });
+    click(cx, "home-details");
+    assert!(cx.update(|window, cx| window.has_active_dialog(cx)));
+    click(cx, "technical-copy");
+    let copied = cx.read(|cx| cx.read_from_clipboard().and_then(|item| item.text()));
+    assert_eq!(copied, Some(cause));
+    cx.update(|window, cx| window.close_dialog(cx));
+
+    // A crash: the game's Diagnostics tab, where its logs and reports are.
+    shell.update(cx, |shell, cx| {
+        shell.set_home(
+            recovery(Some(&game), RecoveryDetail::Crashed { code: None }),
+            cx,
+        )
+    });
+    click(cx, "home-details");
+    let until = Instant::now() + Duration::from_secs(5);
+    let opened = loop {
+        cx.run_until_parked();
+        let page = shell.read_with(cx, |shell, cx| {
+            shell
+                .live_instance()
+                .map(|view| (view.read(cx).id().to_owned(), view.read(cx).tab()))
+        });
+        if let Some(page) = page {
+            break page;
+        }
+        assert!(Instant::now() < until, "the game's page did not open");
+        std::thread::sleep(Duration::from_millis(1));
+    };
+    assert_eq!(opened, (game.clone(), TAB_DIAGNOSTICS));
+
+    // Away from Home, a failure floats up over the page that is open.
+    shell.update(cx, |shell, cx| {
+        shell.show(Route::Library);
+        shell.set_home(
+            HomePresentation::Continue {
+                subject: subject(Some(&game)),
+                recent: Vec::new(),
+            }
+            .begin_launch(),
+            cx,
+        );
+        shell.apply_launch_signal(LaunchSignal::Failed(LaunchFailure::step("no Java")), cx);
+    });
+    cx.run_until_parked();
+    cx.update(|window, cx| window.draw(cx).clear(cx));
+    assert_eq!(cx.update(|window, cx| window.notifications(cx).len()), 1);
+}
+
 /// The CurseForge source through the shipped wiring, by clicks on the real
 /// page: switch the source, search, install a mod into a game, install a
 /// pack, and add a file the pack was waiting for. Talks to the real APIs and

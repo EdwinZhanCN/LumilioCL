@@ -31,9 +31,9 @@ use crate::live::{LiveHandler, LiveModel};
 use crate::pages::ViewState;
 use crate::pages::live::LiveControls;
 use crate::route::Route;
-use crate::toast::Toast;
+use crate::toast::{self, Toast};
 use gpui::prelude::*;
-use gpui::{App, Context, Entity, FocusHandle, Task, Window};
+use gpui::{App, Context, Entity, FocusHandle, Subscription, Task, Window};
 use std::rc::Rc;
 
 type Labels = gpui_component::select::SearchableVec<String>;
@@ -91,8 +91,8 @@ pub struct LauncherShell {
     live_instance: Option<Entity<InstanceDetailView>>,
     /// Where back and forward lead (design language §6).
     history: History<Location>,
-    /// Messages waiting for the next render to float up (§11).
-    toasts: Vec<Toast>,
+    /// Draws again when a view posts a toast, so it floats up (§11).
+    _posted: Subscription,
 }
 
 impl LauncherShell {
@@ -116,19 +116,18 @@ impl LauncherShell {
             detail: None,
             live_instance: None,
             history: History::new(HISTORY_LIMIT),
-            toasts: Vec::new(),
+            _posted: cx.observe_global::<toast::Posted>(|_, cx| cx.notify()),
         }
     }
 
     /// Tells what just happened, as a toast over whatever page is showing.
     pub fn toast(&mut self, toast: Toast, cx: &mut Context<Self>) {
-        self.toasts.push(toast);
-        cx.notify();
+        toast::post(toast, cx);
     }
 
     /// Toasts not shown yet (a window without the framework `Root` keeps them).
-    pub fn pending_toasts(&self) -> &[Toast] {
-        &self.toasts
+    pub fn pending_toasts<'a>(&self, cx: &'a App) -> &'a [Toast] {
+        toast::posted(cx)
     }
 
     pub fn with_home(mut self, home: HomePresentation, cx: &mut Context<Self>) -> Self {

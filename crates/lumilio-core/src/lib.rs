@@ -137,7 +137,9 @@ pub use launch::{
     LaunchContext, LaunchDirectories, LaunchError, LaunchPlan, NativeArchive, RequiredDownload,
 };
 pub use launch_readiness::{LaunchReadiness, LaunchRequirement};
-pub use launch_session::{LaunchFailure, LaunchPhase, LaunchSession, LaunchSignal, LaunchStatus};
+pub use launch_session::{
+    LaunchFailure, LaunchPhase, LaunchProblem, LaunchSession, LaunchSignal, LaunchStatus,
+};
 pub use launcher::{LaunchRequest, LaunchServiceError, LaunchUpdate, Launcher, runtimes_root};
 pub use layout::Layout;
 pub use loader::{

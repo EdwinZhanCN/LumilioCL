@@ -1,4 +1,4 @@
-use super::jobs::reload;
+use super::jobs::{answer, reload};
 use super::{Reload, Wiring};
 use gpui_kit::AppContext as _;
 use gpui_kit::{App, WeakEntity, Window};
@@ -104,7 +104,7 @@ pub(super) fn start_microsoft_sign_in(
     cx.spawn(async move |cx| {
         let result = match handle.await {
             Ok(result) => result,
-            Err(error) => Err(ServiceError::Remote(error.to_string())),
+            Err(error) => Err(error.into()),
         };
         wiring.state.borrow_mut().sign_in_cancel = None;
         match result {
@@ -144,7 +144,7 @@ pub(super) fn add_account(
     cx.spawn(async move |cx| {
         let result = match handle.await {
             Ok(result) => result,
-            Err(error) => Err(ServiceError::Remote(error.to_string())),
+            Err(error) => Err(error.into()),
         };
         if let Err(error) = result {
             let _ = form.update(cx, |form, cx| form.saved(Err(account_failure(&error)), cx));
@@ -204,7 +204,9 @@ pub(super) fn open_third_party_sign_in(wiring: &Wiring, window: &mut Window, cx:
         .spawn(async move { service.auth_servers().await });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let Ok(servers) = servers.await else { return };
+        let Some(servers) = answer(&wiring, servers, cx).await else {
+            return;
+        };
         let _ = cx.update_window(handle, |_, window, cx| {
             let dialog = cx.new(|cx| {
                 let weak: WeakEntity<ThirdPartyDialog> = cx.weak_entity();
@@ -260,7 +262,7 @@ fn third_party_intent(
     cx.spawn(async move |cx| {
         let result = match handle.await {
             Ok(result) => result,
-            Err(error) => Err(ServiceError::Remote(error.to_string())),
+            Err(error) => Err(error.into()),
         };
         match result {
             Ok(ThirdPartySignIn::Done { name, .. }) => {
@@ -294,7 +296,9 @@ pub(super) fn open_auth_servers(wiring: &Wiring, window: &mut Window, cx: &mut A
             .backend
             .spawn(async move { server_rows(&service).await });
         cx.spawn(async move |cx| {
-            let Ok(rows) = rows.await else { return };
+            let Some(rows) = answer(&wiring, rows, cx).await else {
+                return;
+            };
             let _ = cx.update_window(handle, |_, window, cx| {
                 let dialog = cx.new(|cx| {
                     let weak: WeakEntity<ServersDialog> = cx.weak_entity();
@@ -332,7 +336,7 @@ fn server_intent(
             cx.spawn(async move |cx| {
                 let result = match work.await {
                     Ok(result) => result,
-                    Err(error) => Err(ServiceError::Remote(error.to_string())),
+                    Err(error) => Err(error.into()),
                 };
                 let _ = dialog.update(cx, |dialog, cx| {
                     dialog.located(result.map_err(|e| account_failure(&e)), cx)
@@ -384,7 +388,7 @@ fn finish_server_change(
     cx.spawn(async move |cx| {
         let result = match work.await {
             Ok(result) => result,
-            Err(error) => Err(ServiceError::Remote(error.to_string())),
+            Err(error) => Err(error.into()),
         };
         match result {
             Ok(rows) => {
@@ -500,7 +504,7 @@ fn save_skin(wiring: &Wiring, dialog: WeakEntity<SkinDialog>, intent: SkinIntent
     cx.spawn(async move |cx| {
         let result = match work.await {
             Ok(result) => result,
-            Err(error) => Err(ServiceError::Remote(error.to_string())),
+            Err(error) => Err(error.into()),
         };
         match result {
             Ok(()) => {

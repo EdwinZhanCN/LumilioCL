@@ -4,8 +4,8 @@ use super::accounts::{
 };
 use super::discover::{first_search, install, install_target, load_filters, open_project, search};
 use super::instance::open_instance;
-use super::jobs::{job, outcome, reload, retry_task};
-use super::launch::{play, start_launch};
+use super::jobs::{answer, failed_only, job, outcome, reload, retry_task};
+use super::launch::{play, start_launch, technical_details};
 use super::library::{
     ask_collection_name, ask_collections_of, choose_current, import_game, restore_backup,
 };
@@ -96,7 +96,8 @@ pub(super) fn on_shell_intent(
             let wiring = wiring.clone();
             let window = window.window_handle();
             cx.spawn(async move |cx| {
-                let (has_account, conflict) = work.await.unwrap_or((true, None));
+                let (has_account, conflict) =
+                    answer(&wiring, work, cx).await.unwrap_or((true, None));
                 if has_account && conflict.is_none() {
                     cx.update(|cx| start_launch(&wiring, window, cx));
                     return;
@@ -122,8 +123,8 @@ pub(super) fn on_shell_intent(
             reload(wiring, Reload::Lists, cx)
         }
         ShellIntent::Navigate(Route::Discover) => first_search(wiring, cx),
-        ShellIntent::Navigate(Route::Home)
-        | ShellIntent::Home(HomeIntent::Import | HomeIntent::TechnicalDetails) => {}
+        ShellIntent::Home(HomeIntent::TechnicalDetails) => technical_details(wiring, window, cx),
+        ShellIntent::Navigate(Route::Home) | ShellIntent::Home(HomeIntent::Import) => {}
     }
 }
 
@@ -294,7 +295,7 @@ pub(super) fn on_live_intent(
                 Reload::Lists,
                 None,
                 async move { service.toggle_favorite(&id).await },
-                |_, _, _| {},
+                |shell, result, cx| failed_only(shell, result, tr!("library-favorite-failed"), cx),
             );
         }
         LiveIntent::CancelTask(id) => {
@@ -311,7 +312,7 @@ pub(super) fn on_live_intent(
                 Reload::Lists,
                 None,
                 async move { service.clear_finished() },
-                |_, _, _| {},
+                |shell, result, cx| failed_only(shell, result, tr!("activity-clear-failed"), cx),
             );
         }
         LiveIntent::NewCollection => ask_collection_name(wiring, None, window, cx),

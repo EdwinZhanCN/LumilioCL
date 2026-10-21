@@ -16,7 +16,7 @@ pub use self::types::{JavaRequest, LaunchRequest, LaunchServiceError, LaunchUpda
 
 use crate::activity::CancellationToken;
 use crate::java::JavaRuntime;
-use crate::launch_session::{LaunchFailure, LaunchSignal};
+use crate::launch_session::LaunchSignal;
 use crate::process::GameExit;
 use crate::transfer::{SourceChain, Transport};
 use std::sync::Mutex as StdMutex;
@@ -117,11 +117,7 @@ where
                 let _ = updates.send(LaunchUpdate::Signal(LaunchSignal::Cancelled));
             }
             Err(error) => {
-                let _ = updates.send(LaunchUpdate::Signal(LaunchSignal::Failed(
-                    LaunchFailure::Step {
-                        message: error.to_string(),
-                    },
-                )));
+                let _ = updates.send(LaunchUpdate::Signal(LaunchSignal::Failed(error.failure())));
             }
         }
         result
@@ -143,11 +139,7 @@ where
                 let _ = updates.send(LaunchUpdate::Signal(LaunchSignal::Cancelled));
             }
             Err(error) => {
-                let _ = updates.send(LaunchUpdate::Signal(LaunchSignal::Failed(
-                    LaunchFailure::Step {
-                        message: error.to_string(),
-                    },
-                )));
+                let _ = updates.send(LaunchUpdate::Signal(LaunchSignal::Failed(error.failure())));
             }
         }
         result

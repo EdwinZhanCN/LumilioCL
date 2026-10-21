@@ -132,8 +132,6 @@ pub struct ProjectDetailView {
     installed: std::collections::BTreeMap<String, lumilio_core::InstalledProject>,
     /// This project is being installed right now.
     installing: bool,
-    /// Messages waiting for the next render to float up (§11).
-    toasts: Vec<crate::toast::Toast>,
     handler: DetailHandler,
     /// Modrinth's game version list, for showing versions as ranges.
     game_tags: Vec<GameVersionTag>,
@@ -164,7 +162,6 @@ impl ProjectDetailView {
             target: None,
             installed: std::collections::BTreeMap::new(),
             installing: false,
-            toasts: Vec::new(),
             handler,
             game_tags: Vec::new(),
             filters: VersionFilters::default(),
@@ -239,9 +236,10 @@ impl ProjectDetailView {
         self.target = target;
     }
 
+    /// Tells what just happened, as a toast over the window: still told when
+    /// the page was left meanwhile.
     pub fn toast(&mut self, toast: crate::toast::Toast, cx: &mut Context<Self>) {
-        self.toasts.push(toast);
-        cx.notify();
+        crate::toast::post(toast, cx);
     }
 
     pub fn title(&self) -> &str {
@@ -399,7 +397,6 @@ impl ProjectDetailView {
 
 impl Render for ProjectDetailView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        crate::toast::flush(&mut self.toasts, window, cx);
         let colors = ShellColors::current(cx);
         let body = match self.state.clone() {
             DetailState::Loading => {

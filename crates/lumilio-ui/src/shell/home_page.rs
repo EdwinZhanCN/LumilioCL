@@ -1,12 +1,14 @@
+use super::locations::Location;
 use super::{LauncherShell, ShellIntent};
-use crate::home::{HomeIntent, HomePresentation, ShellHomeColors};
+use crate::home::{HomeIntent, HomePresentation, RecoveryDetail, ShellHomeColors};
 use crate::live::LiveIntent;
 use crate::route::Route;
+use crate::toast::Toast;
 use crate::{home, pages, theme};
 use gpui::prelude::*;
 use gpui::{AnyElement, Context, Window, div, px};
 use gpui_component::v_flex;
-use lumilio_core::LaunchSignal;
+use lumilio_core::{LaunchFailure, LaunchSignal};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
@@ -60,7 +62,26 @@ impl LauncherShell {
         ) {
             self.game_running = false;
         }
+        let was_recovering = matches!(self.home, HomePresentation::Recovery { .. });
         let home = std::mem::take(&mut self.home).on_launch_signal(signal, Instant::now());
+        // Home explains a failure in place; anywhere else it would wait
+        // unseen until the person went back.
+        if let HomePresentation::Recovery {
+            subject, detail, ..
+        } = &home
+            && !was_recovering
+            && !matches!(self.location(), Location::Page(Route::Home))
+        {
+            let text = format!("{} · {}", subject.title, home::recovery_sentence(detail));
+            let toast = match detail {
+                RecoveryDetail::Failed {
+                    failure: LaunchFailure::Step { message, .. },
+                    ..
+                } => Toast::error(text).technical(message.clone()),
+                _ => Toast::error(text),
+            };
+            self.toast(toast, cx);
+        }
         self.set_home(home, cx);
     }
 

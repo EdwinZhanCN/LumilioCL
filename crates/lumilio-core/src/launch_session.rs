@@ -79,10 +79,42 @@ impl LaunchPhase {
 /// Why a launch did not reach a running game.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum LaunchFailure {
-    /// A preparation step failed; the message is diagnostic detail.
-    Step { message: String },
+    /// A preparation step failed; the message is diagnostic detail, and the
+    /// problem what the person can act on, when the launcher knows it.
+    Step {
+        message: String,
+        problem: Option<LaunchProblem>,
+    },
     /// The game process ended before it finished starting.
     ExitedEarly { code: Option<i32> },
+}
+
+impl LaunchFailure {
+    /// A step that failed for a reason only its message tells.
+    pub fn step(message: impl Into<String>) -> Self {
+        Self::Step {
+            message: message.into(),
+            problem: None,
+        }
+    }
+}
+
+/// What stopped a launch, when it is something the person can act on. The
+/// UI words it; any other failure is told by the step it stopped at.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum LaunchProblem {
+    /// The selected Microsoft account must sign in again (its name).
+    SignInRequired(String),
+    /// Signing in to the selected account failed.
+    Account(crate::AuthError),
+    /// No installed Java runs this game (the major it needs, when known).
+    NoJava(Option<u32>),
+    /// No Java fitted and downloading one failed.
+    JavaDownload,
+    /// The command set to run before launch failed (its exit code).
+    BeforeLaunch(Option<i32>),
+    /// The world to start in is not among the saves (its folder).
+    WorldMissing(String),
 }
 
 /// Input to a [`LaunchSession`].
@@ -127,9 +159,9 @@ impl LaunchSignal {
                 })
             }
             InstallEvent::StageCompleted { .. } | InstallEvent::Completed { .. } => None,
-            InstallEvent::StageFailed { message, .. } => Some(Self::Failed(LaunchFailure::Step {
-                message: message.clone(),
-            })),
+            InstallEvent::StageFailed { message, .. } => {
+                Some(Self::Failed(LaunchFailure::step(message.clone())))
+            }
         }
     }
 }

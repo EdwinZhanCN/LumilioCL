@@ -246,15 +246,20 @@ pub enum GameEvent {
     Exited {
         code: Option<i32>,
         ran_for: Duration,
+        /// The launcher stopped it through the cancellation token.
+        killed: bool,
     },
 }
 
 impl GameEvent {
-    /// The launch signal this event means, if any.
+    /// The launch signal this event means, if any. A game the launcher
+    /// stopped was cancelled, whatever its exit code; any other end without
+    /// a code (a Unix signal: a JVM crash, the OOM killer) is not clean.
     #[must_use]
     pub fn signal(&self, was_running: bool) -> Option<LaunchSignal> {
         match self {
             Self::Running => Some(LaunchSignal::Running),
+            Self::Exited { killed: true, .. } => Some(LaunchSignal::Cancelled),
             Self::Exited { code, .. } if was_running => Some(LaunchSignal::Exited { code: *code }),
             Self::Exited { code, .. } => Some(LaunchSignal::Failed(LaunchFailure::ExitedEarly {
                 code: *code,
@@ -400,7 +405,11 @@ pub async fn run_with_environment(
 
     let code = status.ok().and_then(|status| status.code());
     let ran_for = started.elapsed();
-    let _ = events.send(GameEvent::Exited { code, ran_for });
+    let _ = events.send(GameEvent::Exited {
+        code,
+        ran_for,
+        killed,
+    });
     Ok(GameExit {
         code,
         ran_for,

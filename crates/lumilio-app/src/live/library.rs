@@ -1,4 +1,4 @@
-use super::jobs::{job, outcome, refresh_installed, reload};
+use super::jobs::{answer, job, outcome, refresh_installed, reload};
 use super::{Reload, Wiring};
 use gpui_kit::AppContext as _;
 use gpui_kit::{App, Window};
@@ -35,7 +35,9 @@ pub(super) fn choose_current(wiring: &Wiring, id: String, cx: &mut App) {
     wiring.state.borrow_mut().selection_save = Some(handle.abort_handle());
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let Ok(result) = handle.await else { return };
+        let Some(result) = answer(&wiring, handle, cx).await else {
+            return;
+        };
         if wiring.state.borrow().selection_seq != seq {
             return;
         }

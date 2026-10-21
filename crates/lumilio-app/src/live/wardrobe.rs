@@ -61,11 +61,7 @@ fn list_with_profile(
     cx.spawn(async move |cx| {
         let (library, profile, warning) = match work.await {
             Ok(answer) => answer,
-            Err(error) => (
-                Err(account_failure(&ServiceError::Remote(error.to_string()))),
-                None,
-                None,
-            ),
+            Err(error) => (Err(account_failure(&ServiceError::from(error))), None, None),
         };
         let owned = profile
             .as_ref()
@@ -373,9 +369,7 @@ pub(super) fn run(
                 let profile = service.refresh_account_profile(&target).await?;
                 verified(&service, profile, pending).await
             });
-            let answer = work
-                .await
-                .unwrap_or_else(|error| Err(ServiceError::Remote(error.to_string())));
+            let answer = work.await.unwrap_or_else(|error| Err(error.into()));
             let refresh_ok = answer.is_ok();
             let (profile, matches) = match answer {
                 Ok((profile, matches)) => (Ok(profile), matches),

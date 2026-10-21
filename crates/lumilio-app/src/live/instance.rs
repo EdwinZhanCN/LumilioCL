@@ -63,6 +63,28 @@ pub(super) fn open_instance(
     });
 }
 
+/// Opens a game's page on one of its tabs, as a click on the tab would.
+pub(super) fn open_instance_on(
+    wiring: &Wiring,
+    id: String,
+    tab: usize,
+    window: &mut Window,
+    cx: &mut App,
+) {
+    open_instance(wiring, id, None, window, cx);
+    let shell = wiring.shell.clone();
+    // After the page is up, which is deferred as well.
+    window.defer(cx, move |window, cx| {
+        let view = shell
+            .read_with(cx, |shell, _| shell.live_instance().cloned())
+            .ok()
+            .flatten();
+        if let Some(view) = view {
+            view.update(cx, |view, cx| view.open_tab(tab, window, cx));
+        }
+    });
+}
+
 pub(super) fn target_id(view: &Entity<InstanceDetailView>, cx: &App) -> String {
     view.read(cx).id().to_owned()
 }

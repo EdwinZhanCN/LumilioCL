@@ -173,6 +173,12 @@ fn open_requested_page(
     window: &mut Window,
     cx: &mut App,
 ) {
+    // `LUMILIO_HOME_RECOVERY=failed|details|crashed|crashed-details|away` shows a launch of
+    // the current game going wrong (`launch::review_recovery`).
+    if let Ok(which) = std::env::var("LUMILIO_HOME_RECOVERY") {
+        launch::review_recovery(wiring, which, window.window_handle(), cx);
+        return;
+    }
     // `LUMILIO_PROJECT=mod/sodium` also opens that project's detail window;
     // `LUMILIO_PROJECT_SOURCE=lumilio.curseforge` takes it from that source.
     if let Ok(path) = std::env::var("LUMILIO_PROJECT")

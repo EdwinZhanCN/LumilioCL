@@ -1,10 +1,11 @@
-use super::instance::around_the_game;
-use super::jobs::reload;
+use super::instance::{around_the_game, open_instance_on};
+use super::jobs::{answer, reload};
 use super::{GAME_LOG_FLUSH, GAME_LOG_LINES, Reload, Wiring};
+use gpui_kit::AppContext as _;
 use gpui_kit::{App, Window};
 use lumilio_core::{CancellationToken, LaunchFailure, LaunchSignal, LaunchUpdate, ServiceError};
-use lumilio_ui::home::{HomePresentation, Subject};
-use lumilio_ui::live::account_failure;
+use lumilio_ui::home::{HomePresentation, RecoveryDetail, Subject};
+use lumilio_ui::instance_detail::TAB_DIAGNOSTICS;
 use lumilio_ui::toast::Toast;
 use lumilio_ui::tr;
 
@@ -35,7 +36,7 @@ pub(super) fn start_launch(wiring: &Wiring, window: gpui_kit::AnyWindowHandle, c
     });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let after = after.await.unwrap_or_default();
+        let after = answer(&wiring, after, cx).await.unwrap_or_default();
         let instance = wiring
             .state
             .borrow()
@@ -90,18 +91,12 @@ pub(super) fn start_launch(wiring: &Wiring, window: gpui_kit::AnyWindowHandle, c
             }
         }
         // Launcher errors already ended the session with a signal of their own;
-        // anything earlier (unknown instance, no catalog) has not.
-        if let Ok(Err(error)) = handle.await
+        // anything earlier (unknown instance, no catalog) has not, and neither
+        // has work that panicked on the way.
+        if let Err(error) = handle.await.unwrap_or_else(|error| Err(error.into()))
             && !matches!(error, ServiceError::Launch(_))
         {
-            // Sign-in trouble is told in words, not as the raw cause.
-            let message = match &error {
-                ServiceError::Auth(_) | ServiceError::SignInRequired(_) => {
-                    account_failure(&error).0
-                }
-                _ => error.to_string(),
-            };
-            let signal = LaunchSignal::Failed(LaunchFailure::Step { message });
+            let signal = LaunchSignal::Failed(error.launch_failure());
             let _ = wiring
                 .shell
                 .update(cx, |shell, cx| shell.apply_launch_signal(signal, cx));
@@ -117,6 +112,106 @@ pub(super) fn start_launch(wiring: &Wiring, window: gpui_kit::AnyWindowHandle, c
         cx.update(|cx| reload(&wiring, Reload::All, cx));
     })
     .detach();
+}
+
+/// Dev hook: `LUMILIO_HOME_RECOVERY=failed|details|crashed|crashed-details|away`
+/// puts the current game through a launch that goes wrong, by the same
+/// signals a real one sends, so Recovery can be reviewed without starting a
+/// game: `failed` stops at a step (the account must sign in again),
+/// `crashed` quits while playing without an exit code, `away` fails while
+/// Library is open, and the `details` cases also press 技术详情.
+pub(super) fn review_recovery(
+    wiring: &Wiring,
+    which: String,
+    window: gpui_kit::AnyWindowHandle,
+    cx: &mut App,
+) {
+    let service = wiring.backend.service.clone();
+    let handle = wiring.backend.spawn(async move {
+        (
+            service.library().await.instances,
+            service.current_instance().await,
+        )
+    });
+    let wiring = wiring.clone();
+    cx.spawn(async move |cx| {
+        let Some((records, current)) = answer(&wiring, handle, cx).await else {
+            return;
+        };
+        let cards = lumilio_ui::live::library_cards(&records, lumilio_core::unix_now());
+        let Some(card) = cards
+            .iter()
+            .find(|card| Some(&card.id) == current.as_ref())
+            .or(cards.first())
+            .cloned()
+        else {
+            return;
+        };
+        wiring.state.borrow_mut().continue_id = Some(card.id.clone());
+        let signals = match which.as_str() {
+            "crashed" | "crashed-details" => {
+                vec![LaunchSignal::Running, LaunchSignal::Exited { code: None }]
+            }
+            _ => vec![
+                LaunchSignal::Phase(lumilio_core::LaunchPhase::Verifying),
+                LaunchSignal::Failed(ServiceError::SignInRequired("Steve".into()).launch_failure()),
+            ],
+        };
+        let _ = wiring.shell.update(cx, |shell, cx| {
+            if which == "away" {
+                shell.show(lumilio_ui::route::Route::Library);
+            }
+            shell.set_home(
+                HomePresentation::Continue {
+                    subject: Subject {
+                        id: Some(card.id),
+                        title: card.name,
+                        metadata: format!("{} · {}", card.meta, card.played),
+                        world: card.world,
+                    },
+                    recent: Vec::new(),
+                }
+                .begin_launch(),
+                cx,
+            );
+            for signal in signals {
+                shell.apply_launch_signal(signal, cx);
+            }
+        });
+        if which.ends_with("details") {
+            let _ = cx.update_window(window, |_, window, cx| {
+                technical_details(&wiring, window, cx)
+            });
+        }
+    })
+    .detach();
+}
+
+/// 技术详情 on Home's recovery: why a preparation step failed, in a dialog
+/// to read and copy; for a game that quit or a session that did not end
+/// cleanly, that game's Diagnostics tab, where its logs and crash reports are.
+pub(super) fn technical_details(wiring: &Wiring, window: &mut Window, cx: &mut App) {
+    let wiring = wiring.clone();
+    // Deferred: this runs inside one of the shell's own updates.
+    window.defer(cx, move |window, cx| {
+        let Ok(HomePresentation::Recovery {
+            subject, detail, ..
+        }) = wiring.shell.read_with(cx, |shell, _| shell.home().clone())
+        else {
+            return;
+        };
+        match detail {
+            RecoveryDetail::Failed {
+                failure: LaunchFailure::Step { message, .. },
+                ..
+            } => lumilio_ui::toast::technical_dialog(message, window, cx),
+            _ => {
+                if let Some(id) = subject.id {
+                    open_instance_on(&wiring, id, TAB_DIAGNOSTICS, window, cx);
+                }
+            }
+        }
+    });
 }
 
 /// Shows the game's output so far on the open page of that game.

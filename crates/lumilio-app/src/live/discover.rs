@@ -1,4 +1,4 @@
-use super::jobs::{install_outcome, job};
+use super::jobs::{answer, install_outcome, job};
 use super::translation::{request_detail_summary, request_summaries};
 use super::{Reload, Wiring};
 use gpui_kit::AppContext as _;
@@ -163,9 +163,22 @@ pub(super) fn run_load_filters(wiring: &Wiring, cx: &mut App) {
                 .map_or(wanted.clone(), |source| source.id.clone());
             let filters = service.discover_filters(&source).await;
             let moved = wanted != source;
-            (sources, source, moved, filters)
+            Ok::<_, ServiceError>((sources, source, moved, filters))
         },
-        move |shell, (sources, source, moved, result), cx| {
+        move |shell, loaded, cx| {
+            let (sources, source, moved, result) = match loaded {
+                Ok(loaded) => loaded,
+                Err(error) => {
+                    shell.update_live(
+                        |model| {
+                            model.filters.loaded = true;
+                            model.filters.error = Some(error.to_string());
+                        },
+                        cx,
+                    );
+                    return;
+                }
+            };
             // Another source was chosen while these loaded; its own load is
             // on the way, and these choices would put the old one back.
             if shell
@@ -334,7 +347,10 @@ pub(super) fn install(
     let wiring = wiring.clone();
     let window_handle = window.window_handle();
     cx.spawn(async move |cx| {
-        let report = check.await.ok().and_then(Result::ok).unwrap_or_default();
+        let report = answer(&wiring, check, cx)
+            .await
+            .and_then(Result::ok)
+            .unwrap_or_default();
         cx.update(|cx| {
             if !DependencyPrompt::worth_showing(&report) {
                 run_install(
@@ -432,7 +448,7 @@ pub(super) fn run_install(
         async move {
             let mut failed = Vec::new();
             for (project, version_id, name) in dependencies {
-                if service
+                if let Err(error) = service
                     .install_version(
                         &instance,
                         kind,
@@ -442,9 +458,8 @@ pub(super) fn run_install(
                         CancellationToken::new(),
                     )
                     .await
-                    .is_err()
                 {
-                    failed.push(name);
+                    failed.push((name, error.to_string()));
                 }
             }
             let installed = match version {
@@ -466,12 +481,16 @@ pub(super) fn run_install(
                         .await
                 }
             };
-            (installed, failed)
+            // Under a failed install the dependencies are not the news.
+            installed.map(|file| (file, failed))
         },
-        move |shell, (result, failed), cx| {
+        move |shell, result, cx| {
             mark_installing_in(shell, &slug_done, false, cx);
             state.borrow_mut().installed_key = None;
-            let installed = result.is_ok();
+            let (result, failed) = match result {
+                Ok((file, failed)) => (Ok(file), failed),
+                Err(error) => (Err(error), Vec::new()),
+            };
             let mut toast = install_outcome(
                 result,
                 |file| {
@@ -485,12 +504,18 @@ pub(super) fn run_install(
             );
             // A failed install already says so; a dependency that failed
             // under a successful one is the news.
-            if installed && !failed.is_empty() {
+            if !failed.is_empty() {
+                let names: Vec<&str> = failed.iter().map(|(name, _)| name.as_str()).collect();
+                let causes: Vec<String> = failed
+                    .iter()
+                    .map(|(name, cause)| format!("{name}: {cause}"))
+                    .collect();
                 toast = Toast::error(tr!(
                     "discover-dependencies-failed",
-                    dependencies = failed.join(tr!("common-list-separator")),
+                    dependencies = names.join(tr!("common-list-separator")),
                     title = title.as_str()
-                ));
+                ))
+                .technical(causes.join("\n"));
             }
             shell.toast(toast, cx);
         },
@@ -566,7 +591,7 @@ pub(super) fn open_project(
         let shell = wiring.shell.clone();
         let project = slug_of(&shell, cx);
         cx.spawn(async move |cx| {
-            let Ok(result) = handle.await else { return };
+            let result = handle.await.unwrap_or_else(|error| Err(error.into()));
             let state = match result {
                 Ok(detail) => DetailState::Ready(Box::new(detail)),
                 Err(error) => DetailState::Failed(error.to_string()),
