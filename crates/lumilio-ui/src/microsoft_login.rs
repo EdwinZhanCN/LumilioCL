@@ -40,6 +40,7 @@ enum Phase {
         code: String,
         address: String,
     },
+    Cancelled,
     Failed(Failure),
 }
 
@@ -76,20 +77,25 @@ impl SignInDialog {
 
     fn cancel(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.active() {
+            self.phase = Phase::Cancelled;
             (self.handler)(SignInIntent::Cancel, window, cx);
         }
         window.close_dialog(cx);
     }
 
-    /// The code to type, and the address to type it at.
-    pub fn code_arrived(&mut self, code: &str, address: &str, cx: &mut Context<Self>) {
-        if self.phase == Phase::Requesting {
-            self.phase = Phase::Waiting {
-                code: code.to_owned(),
-                address: address.to_owned(),
-            };
-            cx.notify();
+    /// The code to type, and the address to type it at. Returns whether this
+    /// sign-in still accepts the code, so its browser can open.
+    pub fn code_arrived(&mut self, code: &str, address: &str, cx: &mut Context<Self>) -> bool {
+        if self.close || self.phase != Phase::Requesting {
+            return false;
         }
+        self.phase = Phase::Waiting {
+            code: code.to_owned(),
+            address: address.to_owned(),
+        };
+        crate::toast::copy_text(code, cx);
+        cx.notify();
+        true
     }
 
     /// The sign-in did not work; the dialog says why and offers a retry.
@@ -193,6 +199,7 @@ impl Render for SignInDialog {
                 .text_color(colors.muted)
                 .child(tr!("account-microsoft-requesting"))
                 .into_any_element(),
+            Phase::Cancelled => div().into_any_element(),
             Phase::Waiting { code, address } => {
                 let (copy_code, open_address) = (code.clone(), address.clone());
                 v_flex()
@@ -314,9 +321,14 @@ mod tests {
         assert_eq!(seen.borrow().as_slice(), [SignInIntent::Start]);
 
         // The code shows with its helpers, and the dialog can only be left by cancelling.
-        form.update(cx, |form, cx| {
+        cx.update(|_, cx| crate::toast::copy_text("previous clipboard text", cx));
+        assert!(form.update(cx, |form, cx| {
             form.code_arrived("AB12CD", "https://www.microsoft.com/link", cx)
-        });
+        }));
+        assert_eq!(
+            cx.read(|cx| cx.read_from_clipboard().and_then(|item| item.text())),
+            Some("AB12CD".to_owned()),
+        );
         cx.run_until_parked();
         cx.update(|window, cx| window.draw(cx).clear(cx));
         for selector in ["signin-code", "signin-copy", "signin-open"] {
@@ -342,6 +354,13 @@ mod tests {
         // Cancelling while it waits tells the application and closes the dialog.
         click(cx, "signin-cancel");
         assert_eq!(seen.borrow().last(), Some(&SignInIntent::Cancel));
+        assert!(!form.update(cx, |form, cx| {
+            form.code_arrived("TOO-LATE", "https://www.microsoft.com/link", cx)
+        }));
+        assert_eq!(
+            cx.read(|cx| cx.read_from_clipboard().and_then(|item| item.text())),
+            Some("AB12CD".to_owned()),
+        );
         cx.update(|window, cx| window.draw(cx).clear(cx));
         cx.run_until_parked();
         assert!(cx.debug_bounds("dialog-layer").is_none(), "closed");
@@ -362,10 +381,15 @@ mod tests {
         let form = cx.update(|_, cx| cx.new(|_| SignInDialog::new(Rc::new(|_, _, _| {}))));
         cx.update(|window, cx| SignInDialog::open(form.clone(), window, cx));
         cx.run_until_parked();
-        form.update(cx, |form, cx| {
-            form.failed(("x".into(), "y".into()), cx);
-            form.code_arrived("LATE", "https://x", cx);
-        });
+        cx.update(|_, cx| crate::toast::copy_text("keep this", cx));
+        form.update(cx, |form, cx| form.failed(("x".into(), "y".into()), cx));
+        assert!(!form.update(cx, |form, cx| {
+            form.code_arrived("LATE", "https://x", cx)
+        }));
+        assert_eq!(
+            cx.read(|cx| cx.read_from_clipboard().and_then(|item| item.text())),
+            Some("keep this".to_owned()),
+        );
         form.read_with(cx, |form, _| {
             assert!(
                 matches!(form.phase, Phase::Failed(_)),

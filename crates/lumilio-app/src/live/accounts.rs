@@ -91,8 +91,11 @@ pub(super) fn start_microsoft_sign_in(
     });
     let shown = dialog.clone();
     cx.spawn(async move |cx| {
-        if let Some((code, address)) = code_rx.recv().await {
-            let _ = shown.update(cx, |dialog, cx| dialog.code_arrived(&code, &address, cx));
+        if let Some((code, address)) = code_rx.recv().await
+            && shown
+                .update(cx, |dialog, cx| dialog.code_arrived(&code, &address, cx))
+                .unwrap_or(false)
+        {
             cx.update(|cx| platform::open_address(&address, cx));
         }
     })

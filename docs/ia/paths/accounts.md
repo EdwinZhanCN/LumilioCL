@@ -13,7 +13,7 @@
 | 设为当前 | 详情页头「设为当前账户」 | 之后的启动使用该身份；导航芯片也跟着换 |  | `lumilio-ui/src/pages/live/accounts.rs` |
 | 在皮肤站修改 | 第三方账户人物旁的「在皮肤站修改」 | 打开服务器公布的主页（LittleSkin 打开其网站）；皮肤与披风只从会话档案预览 |  | `lumilio-ui/src/pages/live/accounts.rs` |
 | 添加离线账户 | L2 次要「添加离线账户」→ 弹窗（可自定义 UUID） | 列表新增；UUID 只在添加时可设 |  | `lumilio-ui/src/pages/live/accounts.rs` |
-| Microsoft 登录 | L2 主要「登录 Microsoft」→ 设备码弹窗 | 登录后出现在列表和导航芯片里，启动用真实的玩家名和令牌 | ADR 0020 | `lumilio-ui/src/pages/live/accounts.rs` |
+| Microsoft 登录 | L2 主要「登录 Microsoft」→ 设备码弹窗 | 收到验证码后自动复制并打开验证页面；登录后出现在列表和导航芯片里，启动用真实的玩家名和令牌 | ADR 0020 | `lumilio-ui/src/pages/live/accounts.rs` |
 | 第三方登录 | 页头 ⋯ 菜单「第三方登录…」→ 弹窗 | 选认证服务器（内置 LittleSkin）、输入账号密码；多个角色时选一个；登录后出现在列表里，启动时自动加载 authlib-injector | ADR 0024 | `lumilio-ui/src/pages/live/accounts.rs` |
 | 管理认证服务器 | 页头 ⋯ 菜单「认证服务器…」→ 弹窗 | 添加（输入地址，先看到名称，http 有警告）、移除（会一并移除该服务器上的账户）；LittleSkin 内置 |  | `lumilio-ui/src/pages/live/accounts.rs` |
 | 披风 / 鞘翅预览 | 立体预览右下角的「鞘翅」键（有披风时） | 同一贴图在披风与鞘翅形态间切换，保留相机；只改变预览，不改变账户穿戴 |  | `lumilio-ui/src/skin_view/mod.rs` |

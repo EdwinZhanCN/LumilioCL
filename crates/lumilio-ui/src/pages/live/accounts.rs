@@ -305,7 +305,7 @@ pub fn accounts(ctx: &LiveCtx) -> impl IntoElement {
         false,
         send(&ctx.handler, LiveIntent::NewAccount),
     );
-    // ia[accounts]: Microsoft 登录 | L2 主要「登录 Microsoft」→ 设备码弹窗 | 登录后出现在列表和导航芯片里，启动用真实的玩家名和令牌 | ADR 0020
+    // ia[accounts]: Microsoft 登录 | L2 主要「登录 Microsoft」→ 设备码弹窗 | 收到验证码后自动复制并打开验证页面；登录后出现在列表和导航芯片里，启动用真实的玩家名和令牌 | ADR 0020
     let microsoft = kit::action(
         "account-microsoft",
         tr!("account-sign-in-microsoft"),
