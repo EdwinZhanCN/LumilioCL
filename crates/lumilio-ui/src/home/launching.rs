@@ -17,7 +17,7 @@ pub(super) fn render_continue(
     on_hover: Option<HoverHandler>,
     art: ArtButtons,
 ) -> AnyElement {
-    // ia[home]: 继续 | 英雄区主按钮「继续」 | 启动当前游戏，英雄区进入启动时刻；跟随当前游戏（导航右下角芯片）
+    // ia[home]: 继续 | 英雄区主按钮「继续」 | 启动当前游戏（与导航右下角芯片是同一个），英雄区进入启动时刻
     let button = art_button(
         "home-continue",
         crate::tr!("home-continue"),

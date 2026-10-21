@@ -10,6 +10,7 @@ mod bundle;
 mod catalog;
 mod content;
 mod content_sources;
+mod context;
 mod copy;
 mod credentials;
 mod deletion;
@@ -79,7 +80,9 @@ pub use activity_log::{
     TaskCategory, TaskLabel, TaskOutcome,
 };
 pub use artifact::{CoordinateError, PackageCoordinate};
-pub use attention::{AttentionItem, HomeSummary, summarize as summarize_home};
+pub use attention::{
+    AttentionItem, HomeChecks, HomeSummary, summarize as summarize_home, with_account,
+};
 pub use bundle::{Redactor, write_bundle};
 pub use catalog::{
     CatalogEntry, CatalogError, OFFICIAL_CATALOG_URL, VersionCatalog, VersionChannel, VersionKind,
@@ -89,6 +92,7 @@ pub use content::{
     scan as scan_content, set_enabled as set_content_enabled, sha1_hex,
 };
 pub use content_sources::{ContentEntry, ContentList, ContentSource};
+pub use context::{Context, Revisions, Session, SessionPhase};
 pub use credentials::{CredentialStore, MemoryCredentials, StoredLogin, SystemCredentials};
 pub use diagnostics::{
     CrashReport, Facts, FileEntry, LOW_MEMORY_MB, LogLevel, LogLine, Problem, ProblemKind,

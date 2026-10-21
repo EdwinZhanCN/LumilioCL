@@ -112,6 +112,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             staged.discard();
             return Err(error.into());
         }
+        self.settle_current().await;
         Ok(record)
     }
 
@@ -276,6 +277,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             staged.discard();
             return Err(error.into());
         }
+        self.settle_current().await;
         Ok(record)
     }
 }

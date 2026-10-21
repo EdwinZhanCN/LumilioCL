@@ -104,12 +104,7 @@ async fn inspect(
         java_needs,
         auto_install_java: settings.auto_install_java,
         host: &host,
-        has_account: settings.selected_account.as_deref().is_some_and(|key| {
-            settings
-                .accounts
-                .iter()
-                .any(|entry| entry.key() == key && entry.profile_id().is_ok())
-        }),
+        has_account: account_usable(settings),
         damaged_files,
         mods: &mods,
         max_memory_mb: record
@@ -119,6 +114,16 @@ async fn inspect(
         last_session: last_session.filter(|outcome| *outcome != SessionOutcome::Clean),
     };
     diagnose(&facts)
+}
+
+/// Whether a game could start with the selected account.
+pub(crate) fn account_usable(settings: &LauncherSettings) -> bool {
+    settings.selected_account.as_deref().is_some_and(|key| {
+        settings
+            .accounts
+            .iter()
+            .any(|entry| entry.key() == key && entry.profile_id().is_ok())
+    })
 }
 
 fn mods_with_metadata(game_dir: &Path) -> Vec<(ContentItem, Option<ModMetadata>)> {

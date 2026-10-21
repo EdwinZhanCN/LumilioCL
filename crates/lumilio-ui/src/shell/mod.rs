@@ -9,6 +9,7 @@ mod home_page;
 mod instance;
 mod locations;
 mod memory;
+mod mirror;
 mod queries;
 mod render;
 mod routing;
@@ -72,7 +73,6 @@ pub struct LauncherShell {
     home: HomePresentation,
     hero: Entity<HeroCarousel>,
     activity: ActivitySummary,
-    game_running: bool,
     focus_handle: FocusHandle,
     intent_handler: Option<IntentHandler>,
     last_intent: Option<ShellIntent>,
@@ -93,6 +93,8 @@ pub struct LauncherShell {
     history: History<Location>,
     /// Messages waiting for the next render to float up (§11).
     toasts: Vec<Toast>,
+    /// What core last published (see `mirror`).
+    context: lumilio_core::Context,
 }
 
 impl LauncherShell {
@@ -102,7 +104,6 @@ impl LauncherShell {
             home: home::initial_presentation(),
             hero: cx.new(HeroCarousel::new),
             activity: ActivitySummary::new(0),
-            game_running: false,
             focus_handle: cx.focus_handle(),
             intent_handler: None,
             last_intent: None,
@@ -117,6 +118,7 @@ impl LauncherShell {
             live_instance: None,
             history: History::new(HISTORY_LIMIT),
             toasts: Vec::new(),
+            context: lumilio_core::Context::default(),
         }
     }
 

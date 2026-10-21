@@ -404,7 +404,7 @@ pub(super) fn write_instance(
                 let shell = wiring.shell.clone();
                 let _ = shell.update(cx, |shell, cx| shell.forget_instance(&id, cx));
             }
-            reload(&wiring, Reload::All, cx);
+            reload(&wiring, Reload::Lists, cx);
         });
     })
     .detach();

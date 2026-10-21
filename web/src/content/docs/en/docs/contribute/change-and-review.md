@@ -84,6 +84,11 @@ Use more detail for a complex change.
 A pull request must explain the final implementation.
 Do not make a reviewer reconstruct the conversation.
 
+Keep the description of a pull request that links to an issue short and clear.
+Link the issue at the start (for example, `Closes #55`).
+In a few sentences, tell what the user sees that is different and how the change does it.
+Keep the details in the plan and the code.
+
 When the task authorizes submission:
 
 1. Commit the verified change to its branch.

@@ -60,6 +60,10 @@ pub struct LiveModel {
     pub collections: Vec<CollectionRow>,
     /// Games with something wrong, for Home.
     pub attention: Vec<crate::home::AttentionRow>,
+    /// The games are being checked again; `attention` is the last answer.
+    pub attention_checking: bool,
+    /// Counts changes to `attention`, so Home's section enters again.
+    pub attention_revision: usize,
     /// Worlds and servers of the game Home continues, and its record.
     pub home_places: Option<HomePlaces>,
     pub library_loaded: bool,
@@ -69,11 +73,9 @@ pub struct LiveModel {
     pub sources: Vec<lumilio_core::ContentSourceInfo>,
     pub query: DiscoverQuery,
     pub filters: FilterModel,
-    /// Which instance Discover installs into.
-    pub install_target: Option<String>,
     /// The game Discover was opened from (its Content tab): the page then
     /// browses for that game, with its version and loader locked in. `None`
-    /// is plain browsing, installing into `install_target`.
+    /// is plain browsing. Either way installs go into the current game.
     pub browsing_for: Option<String>,
     /// What Discover remembers between visits.
     pub discover_prefs: lumilio_core::DiscoverPreferences,
@@ -102,6 +104,8 @@ impl Default for LiveModel {
             library: Vec::new(),
             collections: Vec::new(),
             attention: Vec::new(),
+            attention_checking: false,
+            attention_revision: 0,
             home_places: None,
             library_loaded: false,
             results: Vec::new(),
@@ -109,7 +113,6 @@ impl Default for LiveModel {
             sources: Vec::new(),
             query: DiscoverQuery::new(ProjectKind::Modpack),
             filters: FilterModel::default(),
-            install_target: None,
             browsing_for: None,
             discover_prefs: lumilio_core::DiscoverPreferences::default(),
             installing: std::collections::BTreeSet::new(),
@@ -280,14 +283,8 @@ impl LiveModel {
         .unwrap_or(u32::MAX)
     }
 
-    /// Sets the library and keeps the install target valid: the previous
-    /// choice if it still exists, else the most recently played instance.
-    pub fn set_library(&mut self, library: Vec<LibraryCard>, target_hint: Option<String>) {
-        let exists = |id: &String| library.iter().any(|card| &card.id == id);
-        let keep = self.install_target.clone().filter(exists);
-        self.install_target = keep
-            .or(target_hint.filter(exists))
-            .or_else(|| library.first().map(|card| card.id.clone()));
+    /// Sets the library. Which game is current is core's to say.
+    pub fn set_library(&mut self, library: Vec<LibraryCard>) {
         self.library = library;
         self.library_loaded = true;
     }

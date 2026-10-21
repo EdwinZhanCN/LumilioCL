@@ -67,7 +67,7 @@ route-settings = 设置
 nav-back = 后退
 nav-forward = 前进
 nav-update-ready = 新版本 { $version } 已就绪，点击重启并更新
-nav-update-game-running = 游戏正在运行，结束后才能重启更新
+nav-update-game-running = 游戏正在启动或运行，结束后才能重启更新
 nav-add-account = 添加账户
 nav-add-account-help = 添加一个离线账户才能进游戏
 # 窗口窄时，没有账户的芯片只是一个带 + 的空头像，字都在这条提示里。
@@ -129,7 +129,8 @@ home-recover = 恢复并继续
 home-attention = 需要留意
 # 一条提醒，后面还有更多问题时。
 home-attention-more = { $detail }（另有 { $more } 个问题）
-home-recent = 最近
+# 游戏库、Java 或插件变了，正在重新检查各个游戏。
+home-attention-checking = 检查中…
 home-continued = 接着玩
 home-record = 游戏记录
 home-record-play-time = 游玩时间
@@ -1414,6 +1415,7 @@ instance-problem-duplicate-mods = 同一个 Mod 装了不止一份
 instance-problem-low-memory = 最大内存偏低
 instance-problem-low-memory-help = 当前上限 { $max } MB，游戏可能因内存不足而崩溃
 instance-problem-last-session = 上一次游玩没有顺利结束
+instance-problem-last-launch = 上次启动没有成功
 instance-history-view-all = 查看全部
 instance-overview-recent-changes = 最近变更
 instance-problems-status = 状态

@@ -71,7 +71,15 @@ fn a_deleted_instance_drops_out_of_history_and_the_chip_retargets(cx: &mut TestA
     shell.update(cx, |shell, cx| {
         shell.show(Route::Library);
         let cards = vec![library_card(&record("a"), 1), library_card(&record("b"), 1)];
-        shell.update_live(|model| model.set_library(cards, Some("a".into())), cx);
+        shell.update_live(|model| model.set_library(cards), cx);
+        // Core names the current game; the chip shows what it says.
+        shell.follow_context(
+            lumilio_core::Context {
+                current_instance: Some("a".into()),
+                ..lumilio_core::Context::default()
+            },
+            cx,
+        );
     });
     cx.run_until_parked();
     for id in ["a", "b"] {

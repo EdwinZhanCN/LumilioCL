@@ -1,6 +1,6 @@
 use super::buttons::{LocalActionIcon, page_button};
 use super::render::{ShellHomeColors, body_label};
-use super::{ActHandler, AttentionRow, HomeIntent, HomeIntentHandler, OpenHandler, RecentEntry};
+use super::{HomeIntent, HomeIntentHandler, HomeLinks};
 use crate::key::Key;
 use gpui::prelude::*;
 use gpui::{AnyElement, ClickEvent, IntoElement, div, px};
@@ -62,13 +62,12 @@ pub(super) fn render_first_use(
         .child(h_flex().gap_3().child(primary).child(secondary))
 }
 
-/// Games with something wrong, one row each with its first remedy.
-pub(super) fn render_attention(
-    rows: &[AttentionRow],
-    on_act: Option<ActHandler>,
-    colors: ShellHomeColors,
-) -> Option<AnyElement> {
-    if rows.is_empty() {
+/// Games with something wrong, one row each with its first remedy. While
+/// the games are checked again the section says so instead of showing the
+/// earlier answer; a new answer enters as route content does (§2).
+pub(super) fn render_attention(links: &HomeLinks, colors: ShellHomeColors) -> Option<AnyElement> {
+    let (rows, on_act) = (&links.attention, links.on_act.clone());
+    if rows.is_empty() && !links.checking {
         return None;
     }
     // ia[home]: 需要留意：解决 | 每个有问题的游戏一行（游戏名 · 最严重的问题 · 另有几个）和一个按钮（安装/修复/更换…/去设置/去添加/查看日志…） | 点后先打开游戏页再执行
@@ -121,59 +120,18 @@ pub(super) fn render_attention(
             )
             .children(button)
     });
-    Some(
+    let checking = links.checking.then(|| {
+        div()
+            .text_xs()
+            .text_color(colors.muted)
+            .child(crate::tr!("home-attention-checking"))
+    });
+    Some(crate::kit::entrance(
         v_flex()
             .gap_2()
             .child(body_label(crate::tr!("home-attention"), colors.muted))
-            .child(v_flex().w_full().children(list))
-            .into_any_element(),
-    )
-}
-
-pub(super) fn render_recent(
-    recent: &[RecentEntry],
-    on_open: Option<OpenHandler>,
-    colors: ShellHomeColors,
-) -> impl IntoElement {
-    // Without the library (a Home drawn from a snapshot) the recent games are
-    // plain cards; the live Home uses the Library's faceplates.
-    let cards = recent.iter().enumerate().map(|(index, entry)| {
-        let open = entry.id.clone().zip(on_open.clone());
-        v_flex()
-            .id(("home-recent", index))
-            .w(px(232.))
-            .gap(px(4.))
-            .px(px(14.))
-            .py(px(12.))
-            .rounded(px(6.))
-            .border_1()
-            .border_color(colors.border)
-            .bg(colors.surface)
-            // A card that opens a game says so (design language §9); one that
-            // does not stays still.
-            .when_some(open, |card, (id, open)| {
-                card.cursor_pointer()
-                    .hover(move |card| card.border_color(colors.foreground))
-                    .debug_selector(move || format!("home-recent-{index}"))
-                    .on_click(move |_, window, cx| open(id.clone(), window, cx))
-            })
-            .child(
-                div()
-                    .text_sm()
-                    .font_semibold()
-                    .text_color(colors.foreground)
-                    .child(entry.title.clone()),
-            )
-            .child(
-                div()
-                    .text_xs()
-                    .text_color(colors.muted)
-                    .child(entry.metadata.clone()),
-            )
-    });
-
-    v_flex()
-        .gap_3()
-        .child(body_label(crate::tr!("home-recent"), colors.muted))
-        .child(h_flex().flex_wrap().gap_3().children(cards))
+            .children(checking)
+            .child(v_flex().w_full().children(list)),
+        ("home-attention-section", links.revision),
+    ))
 }

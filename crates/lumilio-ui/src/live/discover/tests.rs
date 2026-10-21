@@ -664,7 +664,7 @@ fn model_with(games: &[(&str, Loader, Option<&str>)]) -> LiveModel {
         .iter()
         .map(|(id, loader, source)| library_card(&record(id, *loader, *source), 100))
         .collect();
-    model.set_library(cards, None);
+    model.set_library(cards);
     model
 }
 

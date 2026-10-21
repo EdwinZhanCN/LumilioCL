@@ -301,7 +301,7 @@ fn leading_zone(leading: Leading, colors: ShellColors) -> impl IntoElement {
         )
         .children(leading.update.map(|update| {
             let on_apply = update.on_apply;
-            // ia[navigation]: 重启以更新 | 左侧导航块右边的橙色按键 | 安装已校验的新版本并重启；游戏运行时禁用
+            // ia[navigation]: 重启以更新 | 左侧导航块右边的橙色按键 | 安装已校验的新版本并重启；游戏启动中或运行时禁用
             Key::new("navigation-update")
                 .icon(Icon::new(UiIcon::Refresh))
                 .primary()
@@ -572,7 +572,7 @@ fn trailing_zone(current: CurrentInstance, compact: bool, colors: ShellColors) -
         .id("navigation-instance")
         .debug_selector(|| "navigation-instance".into())
         .child(
-            // ia[navigation]: 切换当前游戏 | 右段芯片（窗口窄时只有封面和 ⇅，名字在提示里）点开的 Popover 列表：封面、名称，名称下是版本标签和加载器标签；当前项高亮；游戏多时顶部出现搜索 | 主页从已保存数据更新，不等待文件校验；之后的“开始游戏”和发现页安装都指向它；旧异步结果不覆盖新选择；保存失败提示；重启后保持，被删除时回落到剩余第一个
+            // ia[navigation]: 切换当前游戏 | 右段芯片（窗口窄时只有封面和 ⇅，名字在提示里）点开的 Popover 列表：封面、名称，名称下是版本标签和加载器标签；当前项高亮；游戏多时顶部出现搜索 | 当前游戏换成它，启动器保存后芯片才变：首页「继续」、发现页的安装目标和之后的启动都指向它；正在为别的游戏浏览时退出锁定；连续选择以最后一次为准；保存失败提示且芯片不变；重启后保持，被删除时回落到最近玩过的游戏 | global-context D1、D3
             Popover::new("navigation-instance-popover")
                 .anchor(Anchor::BottomRight)
                 .trigger(trigger)

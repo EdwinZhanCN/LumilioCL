@@ -1,5 +1,5 @@
 use super::launching::{render_continue, render_launching, render_playing};
-use super::lists::{render_attention, render_first_use, render_recent};
+use super::lists::{render_attention, render_first_use};
 use super::recovery::render_recovery;
 use super::{HomeIntentHandler, HomeLinks, HomePresentation, HoverHandler, WorldHint};
 use crate::key::KeyKind;
@@ -26,8 +26,7 @@ pub struct ShellHomeColors {
 
 /// Page content below the world. Uses theme colours only, so it is correct
 /// in light and dark appearance alike. `live` is what the library knows about
-/// the game (its worlds, record and recent cards); without it the recent
-/// entries are drawn plainly.
+/// the game (its worlds and record).
 pub fn render_body(
     presentation: &HomePresentation,
     intent_handler: Option<HomeIntentHandler>,
@@ -43,18 +42,10 @@ pub fn render_body(
             .into_any_element(),
         HomePresentation::FirstUse => render_first_use(intent_handler, colors).into_any_element(),
         HomePresentation::Ambient => div().into_any_element(),
-        other => v_flex()
+        _ => v_flex()
             .gap_6()
-            .children(render_attention(
-                &links.attention,
-                links.on_act.clone(),
-                colors,
-            ))
-            .children(live.or_else(|| {
-                (!other.recent().is_empty()).then(|| {
-                    render_recent(other.recent(), links.on_open.clone(), colors).into_any_element()
-                })
-            }))
+            .children(render_attention(links, colors))
+            .children(live)
             .into_any_element(),
     }
 }
@@ -96,7 +87,7 @@ pub fn render_overlay(
     )
 }
 
-/// The small heading over each group below the world ("需要留意", "最近").
+/// The small heading over each group below the world ("需要留意", "接着玩").
 pub fn body_label(text: impl Into<SharedString>, muted: Hsla) -> impl IntoElement {
     div()
         .text_xs()

@@ -53,7 +53,8 @@ impl LauncherShell {
     }
 
     /// Opens Discover for one game's Content tab: the page browses *for that
-    /// game*, from a fresh search of that kind.
+    /// game*, from a fresh search of that kind. The caller makes it the
+    /// current game too (decision D3).
     pub fn browse_for(
         &mut self,
         game: String,
@@ -61,7 +62,6 @@ impl LauncherShell {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        self.set_install_target(game.clone(), cx);
         self.select_route(Route::Discover, window, cx);
         self.update_live(
             |model| {

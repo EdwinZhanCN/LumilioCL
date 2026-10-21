@@ -35,7 +35,7 @@ impl InstanceDetailView {
             )
             .debug_selector(|| "instance-stop".into())
         } else {
-            // ia[instance]: 开始游戏 | 页头主按钮「启动游戏」 | 首页启动时刻接管
+            // ia[instance]: 开始游戏 | 页头主按钮「启动游戏」 | 先设为当前游戏，再由首页启动时刻接管
             kit::action(
                 "instance-play",
                 tr!("instance-play"),
@@ -59,7 +59,7 @@ impl InstanceDetailView {
             );
         }
         actions
-            // ia[instance]: 设为当前游戏 | 页头 ⋯ 菜单 | 导航右段芯片跟着换；之后的启动指向它
+            // ia[instance]: 设为当前游戏 | 页头 ⋯ 菜单 | 当前游戏换成它：芯片、首页「继续」和发现页的安装目标跟着换；之后的启动指向它
             .more(kit::MenuEntry::new(
                 tr!("library-menu-make-current"),
                 with_view(|view, window, cx| {

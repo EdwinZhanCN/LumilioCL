@@ -7,7 +7,8 @@ use gpui::Context;
 use std::rc::Rc;
 
 impl LauncherShell {
-    /// The trailing zone: the live install target.
+    /// The trailing zone: the current game, as core published it. Choosing
+    /// one only asks; the chip changes when core says so (D1).
     pub(super) fn current_instance(&self, cx: &mut Context<Self>) -> Option<CurrentInstance> {
         let empty = cx.listener(|shell, _: &(), window, cx| {
             shell.select_route(Route::Library, window, cx);
@@ -27,10 +28,9 @@ impl LauncherShell {
                 world: card.world,
             })
             .collect();
-        let current = model
-            .install_target
-            .as_ref()
-            .and_then(|id| choices.iter().find(|choice| &choice.id == id))
+        let current = self
+            .install_target()
+            .and_then(|id| choices.iter().find(|choice| choice.id == id))
             .cloned();
         Some(CurrentInstance {
             current,

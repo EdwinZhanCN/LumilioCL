@@ -6,6 +6,7 @@
 //! updates: results always arrive from a spawned task.
 
 mod accounts;
+mod context;
 mod discover;
 mod dispatch;
 mod game_settings;
@@ -53,14 +54,14 @@ const POLL: Duration = Duration::from_millis(600);
 
 #[derive(Default)]
 struct State {
-    /// Older snapshots and diagnostics cannot replace a newer request.
+    /// An older list snapshot cannot replace a newer request.
     reload_seq: u64,
-    home_seq: u64,
+    /// The background checks of Home's games now running.
     home_diagnostics: Option<tokio::task::AbortHandle>,
-    selection_seq: u64,
-    selection_save: Option<tokio::task::AbortHandle>,
-    /// The instance Home's Continue launches.
-    continue_id: Option<String>,
+    /// Each game's last checks, for Home's 需要留意.
+    home_checks: Option<context::Checked>,
+    /// Choices of the current game, saved in order.
+    choices: Option<tokio::sync::mpsc::UnboundedSender<library::Choice>>,
     /// Stops the launch or the running game.
     cancel: Option<CancellationToken>,
     /// Numbers searches so a slow answer cannot replace a newer one.
@@ -101,16 +102,14 @@ struct Wiring {
     state: Rc<RefCell<State>>,
 }
 
-/// What to reload once a job finishes.
+/// What to reload once a job finishes. What follows the current game, the
+/// library, accounts, Java and plugins is not chosen here: core publishes
+/// those changes and [`context::follow`] works them out again.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Reload {
     Nothing,
-    /// Library and Activity.
+    /// Activity, with the lists beside it.
     Lists,
-    /// Current game and Home from saved data, without rerunning diagnostics.
-    Selection,
-    /// Everything, including Home.
-    All,
 }
 
 /// Builds the production shell from stores opened before the UI loop starts.
@@ -154,7 +153,8 @@ pub fn build(backend: Backend, window: &mut Window, cx: &mut App) -> Entity<Laun
         state,
     };
     update::start(&wiring, cx);
-    reload(&wiring, Reload::All, cx);
+    context::follow(&wiring, cx);
+    reload(&wiring, Reload::Lists, cx);
     apply_saved_preferences(&wiring, window.window_handle(), cx);
     update::announce(&wiring, window.window_handle(), cx);
     open_requested_page(&wiring, &shell, window, cx);

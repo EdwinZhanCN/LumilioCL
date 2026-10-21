@@ -301,9 +301,15 @@ pub struct SettingsStore {
     settings: LauncherSettings,
     recovered: bool,
     preserved: Option<PathBuf>,
+    /// Where saves are published (plan global-context).
+    hub: Option<crate::context::ContextHub>,
 }
 
 impl SettingsStore {
+    pub(crate) fn publish_to(&mut self, hub: crate::context::ContextHub) {
+        self.hub = Some(hub);
+    }
+
     pub fn set_plugin(
         &mut self,
         id: String,
@@ -322,6 +328,7 @@ impl SettingsStore {
             settings: loaded.value,
             recovered: loaded.recovered,
             preserved: loaded.preserved,
+            hub: None,
         })
     }
 
@@ -343,7 +350,10 @@ impl SettingsStore {
 
     fn save(&mut self, mut next: LauncherSettings) -> Result<(), SettingsError> {
         persist::save(&self.path, &mut next, SCHEMA_VERSION)?;
-        self.settings = next;
+        let before = std::mem::replace(&mut self.settings, next);
+        if let Some(hub) = &self.hub {
+            hub.settings_saved(&before, &self.settings);
+        }
         Ok(())
     }
 

@@ -1,66 +1,29 @@
 //! Home's groups below the world that need the library (design language §5):
-//! where the continued game left off, its record, and the recent games as
-//! the Library's own faceplates.
+//! where the continued game left off, and its record.
 
 use super::controls::{LiveCtx, send};
-use super::library::card;
 use crate::home::{HomePresentation, body_label};
 use crate::kit;
-use crate::live::{HomePlaces, LibraryCard, LiveIntent, Place, PlaceKind, PlacePicture};
+use crate::live::{HomePlaces, LiveIntent, Place, PlaceKind, PlacePicture};
 use crate::theme::ShellColors;
 use gpui::prelude::*;
-use gpui::{AnyElement, IntoElement, div, px};
+use gpui::{AnyElement, IntoElement, px};
 use gpui_component::{h_flex, v_flex};
 
-/// Recent games on Home: one row of faceplates at the full column.
-pub const HOME_RECENT: usize = 4;
-
 /// What the library adds under the world, or `None` when it knows nothing
-/// about the game Home is about (Home then draws its recent entries plainly).
-pub fn home_sections(ctx: &LiveCtx, home: &HomePresentation) -> Option<AnyElement> {
+/// about the game Home is about.
+pub fn home_sections(
+    ctx: &LiveCtx,
+    home: &HomePresentation,
+    can_start: bool,
+) -> Option<AnyElement> {
     let subject = home.subject()?;
-    let colors = ctx.colors;
     // Only the game Home is about: another game's worlds never sit under it.
-    let continued = ctx
-        .model
+    ctx.model
         .home_places
         .as_ref()
         .filter(|places| subject.id.as_deref() == Some(places.instance.as_str()))
-        .map(|places| continued_group(places, home.can_start(), ctx));
-    let cards: Vec<&LibraryCard> = home
-        .recent()
-        .iter()
-        .filter_map(|entry| entry.id.as_deref())
-        .filter_map(|id| ctx.model.library.iter().find(|card| card.id == id))
-        .take(HOME_RECENT)
-        .collect();
-    // ia[home]: 打开最近的游戏 | 「最近」里的游戏库同款卡片 | 点卡片进游戏页；卡片上的启动、收藏和 ⋯ 菜单与游戏库相同
-    let recent = (!cards.is_empty()).then(|| {
-        v_flex()
-            .gap_3()
-            .child(body_label(crate::tr!("home-recent"), colors.muted))
-            .child(
-                h_flex()
-                    .flex_wrap()
-                    .gap_4()
-                    .children(cards.iter().enumerate().map(|(index, item)| {
-                        div()
-                            .debug_selector(move || format!("home-recent-{index}"))
-                            .child(card(index, item, ctx))
-                    })),
-            )
-    });
-    if continued.is_none() && recent.is_none() {
-        return None;
-    }
-    Some(
-        v_flex()
-            .w_full()
-            .gap_6()
-            .children(continued)
-            .children(recent)
-            .into_any_element(),
-    )
+        .map(|places| continued_group(places, can_start, ctx))
 }
 
 /// The game's record as display readings: play time in hours (minutes

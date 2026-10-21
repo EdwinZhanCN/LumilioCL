@@ -207,7 +207,9 @@ async fn instance_memory_overrides_are_validated_and_can_resume_inheritance() {
     ));
     assert!(!world.service.layout().game(&record.id).exists());
     let expected_library = world.service.library().await;
-    let expected_settings = world.service.settings().await;
+    let mut expected_settings = world.service.settings().await;
+    // The game went into the store directly; opening makes it the current game.
+    expected_settings.current_instance = Some(record.id.clone());
     let root = world.service.layout().root().to_path_buf();
     drop(world.service);
     let reopened = LauncherService::open(root, world.net.clone(), super::stock_plugins()).unwrap();
@@ -393,7 +395,7 @@ async fn the_window_follows_the_instance_choice_then_the_preference() {
 }
 
 #[tokio::test]
-async fn the_current_instance_persists_and_reads_as_none_once_deleted() {
+async fn the_current_instance_persists_and_moves_on_once_deleted() {
     let world = world();
     publish_release(&world);
     let a = world
@@ -406,7 +408,8 @@ async fn the_current_instance_persists_and_reads_as_none_once_deleted() {
         .create_instance("B", None, Loader::Vanilla, None)
         .await
         .unwrap();
-    assert_eq!(world.service.current_instance().await, None);
+    // The first game made is current until another is chosen.
+    assert_eq!(world.service.current_instance().await, Some(a.id.clone()));
     assert!(matches!(
         world.service.set_current_instance("ghost").await,
         Err(ServiceError::NoSuchInstance(_))
@@ -414,7 +417,7 @@ async fn the_current_instance_persists_and_reads_as_none_once_deleted() {
     world.service.set_current_instance(&b.id).await.unwrap();
     assert_eq!(world.service.current_instance().await, Some(b.id.clone()));
     world.service.delete_instance(&b.id).await.unwrap();
-    assert_eq!(world.service.current_instance().await, None);
-    world.service.set_current_instance(&a.id).await.unwrap();
     assert_eq!(world.service.current_instance().await, Some(a.id.clone()));
+    world.service.delete_instance(&a.id).await.unwrap();
+    assert_eq!(world.service.current_instance().await, None);
 }

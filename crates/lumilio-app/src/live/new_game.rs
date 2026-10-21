@@ -144,7 +144,7 @@ pub(super) fn create_game(
             );
         });
         cx.update(|cx| {
-            reload(&wiring, Reload::All, cx);
+            reload(&wiring, Reload::Lists, cx);
             if request.install {
                 install_new_game(&wiring, id.clone(), cx);
             }
@@ -228,7 +228,7 @@ pub(super) fn import_pack_file(wiring: &Wiring, path: std::path::PathBuf, cx: &m
         wiring,
         cx,
         true,
-        Reload::All,
+        Reload::Lists,
         Some(Toast::info(tr!(
             "library-import-game-started",
             name = name.as_str()
