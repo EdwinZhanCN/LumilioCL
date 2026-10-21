@@ -70,6 +70,8 @@ nav-update-ready = 新版本 { $version } 已就绪，点击重启并更新
 nav-update-game-running = 游戏正在运行，结束后才能重启更新
 nav-add-account = 添加账户
 nav-add-account-help = 添加一个离线账户才能进游戏
+# 窗口窄时，没有账户的芯片只是一个带 + 的空头像，字都在这条提示里。
+nav-add-account-tip = 还没有账户，添加一个离线账户才能进游戏
 nav-current-account = 当前账户：{ $name }
 nav-switch-account = 切换账户
 nav-manage-accounts = 账户详情
@@ -77,7 +79,9 @@ nav-manage-accounts = 账户详情
 nav-account-needs-sign-in = { $kind } · 需要重新登录
 nav-no-game = 还没有游戏
 nav-no-game-help = 去游戏库新建一个
-nav-current-game = 当前游戏：启动和安装都用它
+# 窗口窄时，没有游戏的芯片只是一个带 + 的空封面，字都在这条提示里。
+nav-no-game-tip = 还没有游戏，去游戏库新建一个
+nav-current-game = 当前游戏：{ $name }，启动和安装都用它
 nav-switch-game = 切换当前游戏
 detail-title-modpack = 整合包详情
 detail-title-mod = Mod 详情

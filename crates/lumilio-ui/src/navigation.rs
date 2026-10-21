@@ -1,6 +1,6 @@
 //! The floating navigation bar (design language §6): history and the current
 //! location on the leading side, the landmark capsule in the centre, the
-//! current instance on the trailing side.
+//! current account and instance on the trailing side.
 
 use std::rc::Rc;
 use std::sync::Arc;
@@ -85,7 +85,23 @@ pub struct CurrentAccount {
     pub on_add: CloseHandler,
 }
 
+/// The trailing zone: who plays, and in which instance.
+pub struct Trailing {
+    pub account: Option<CurrentAccount>,
+    pub instance: Option<CurrentInstance>,
+}
+
 const ZONE_RADIUS: gpui::Pixels = px(8.);
+/// Between the leading zone, the capsule and the trailing zone.
+const ZONE_GAP: gpui::Pixels = px(12.);
+/// The widest the instance's name gets on its chip.
+const NAME_MAX_WIDTH: f32 = 140.;
+/// The narrowest window whose trailing zone, at its widest (an account and a
+/// name of `NAME_MAX_WIDTH`), fits beside the centred capsule a full
+/// `ZONE_GAP` away. Narrower windows get the compact trailing zone: pictures
+/// only, the words in the tooltips. It is the window, not the name, that
+/// decides, so switching instances never changes the bar.
+const FULL_FROM_WIDTH: f32 = 1000.;
 
 /// One floating surface of the bar. It takes the pointer, or clicks and hover
 /// would reach the page underneath; the gaps between zones do not.
@@ -109,9 +125,10 @@ pub fn render(
     colors: ShellColors,
     on_route: RouteHandler,
     leading: Leading,
-    current: Option<CurrentInstance>,
-    account: Option<CurrentAccount>,
+    trailing: Trailing,
+    window_width: f32,
 ) -> impl IntoElement {
+    let compact = window_width < FULL_FROM_WIDTH;
     div()
         .absolute()
         .left_0()
@@ -122,7 +139,7 @@ pub fn render(
                 h_flex()
                     .w_full()
                     .items_center()
-                    .gap_3()
+                    .gap(ZONE_GAP)
                     .child(
                         h_flex()
                             .flex_1()
@@ -137,8 +154,16 @@ pub fn render(
                             .min_w_0()
                             .justify_end()
                             .gap_2()
-                            .children(account.map(|account| account_zone(account, colors)))
-                            .children(current.map(|current| trailing_zone(current, colors))),
+                            .children(
+                                trailing
+                                    .account
+                                    .map(|account| account_zone(account, compact, colors)),
+                            )
+                            .children(
+                                trailing
+                                    .instance
+                                    .map(|current| trailing_zone(current, compact, colors)),
+                            ),
                     ),
             ),
         )
@@ -326,7 +351,31 @@ fn thumb(choice: &InstanceChoice, size: f32, colors: ShellColors) -> impl IntoEl
         ))
 }
 
-fn account_zone(account: CurrentAccount, colors: ShellColors) -> AnyElement {
+/// An empty display window where a face or a cover goes, with a + on it: the
+/// compact chip's way of saying there is none yet.
+fn blank(round: bool, size: f32, colors: ShellColors) -> impl IntoElement {
+    div()
+        .flex()
+        .flex_none()
+        .items_center()
+        .justify_center()
+        .size(px(size))
+        .map(|blank| {
+            if round {
+                blank.rounded_full()
+            } else {
+                blank.rounded(px(3.))
+            }
+        })
+        .bg(colors.body.display)
+        .child(
+            Icon::new(UiIcon::Plus)
+                .size(px(14.))
+                .text_color(colors.body.display_label),
+        )
+}
+
+fn account_zone(account: CurrentAccount, compact: bool, colors: ShellColors) -> AnyElement {
     let Some(chosen) = account
         .choices
         .iter()
@@ -334,18 +383,24 @@ fn account_zone(account: CurrentAccount, colors: ShellColors) -> AnyElement {
         .cloned()
     else {
         let add = account.on_add;
+        // ia[navigation]: 没有账户时 | 芯片显示“添加账户”（窗口窄时是带 + 的空头像，字在提示里） | 打开账户页的添加离线账户弹窗
+        let key = Key::new("navigation-account-empty")
+            .on_click(move |_: &ClickEvent, window, cx| add(window, cx));
+        let key = if compact {
+            key.white()
+                .large()
+                .tooltip(tr!("nav-add-account-tip"))
+                .child(blank(true, 30., colors))
+        } else {
+            key.label(tr!("nav-add-account"))
+                .ghost()
+                .small()
+                .tooltip(tr!("nav-add-account-help"))
+        };
         return zone(colors)
             .id("navigation-account")
             .debug_selector(|| "navigation-account".into())
-            .child(
-                // ia[navigation]: 没有账户时 | 芯片显示“添加账户” | 打开账户页的添加离线账户弹窗
-                Key::new("navigation-account-empty")
-                    .label(tr!("nav-add-account"))
-                    .ghost()
-                    .small()
-                    .tooltip(tr!("nav-add-account-help"))
-                    .on_click(move |_: &ClickEvent, window, cx| add(window, cx)),
-            )
+            .child(key)
             .into_any_element();
     };
     let trigger = Key::new("navigation-account-trigger")
@@ -455,21 +510,27 @@ fn account_zone(account: CurrentAccount, colors: ShellColors) -> AnyElement {
         .into_any_element()
 }
 
-fn trailing_zone(current: CurrentInstance, colors: ShellColors) -> AnyElement {
+fn trailing_zone(current: CurrentInstance, compact: bool, colors: ShellColors) -> AnyElement {
     let Some(chosen) = current.current.clone() else {
         let open = current.on_empty;
+        // ia[navigation]: 没有游戏时点芯片 | 右段文字按钮“还没有游戏”（窗口窄时是带 + 的空封面，字在提示里） | 打开游戏库
+        let key = Key::new("navigation-instance-empty")
+            .on_click(move |_: &ClickEvent, window, cx| open(window, cx));
+        let key = if compact {
+            key.white()
+                .large()
+                .tooltip(tr!("nav-no-game-tip"))
+                .child(blank(false, 28., colors))
+        } else {
+            key.label(tr!("nav-no-game"))
+                .ghost()
+                .small()
+                .tooltip(tr!("nav-no-game-help"))
+        };
         return zone(colors)
             .id("navigation-instance")
             .debug_selector(|| "navigation-instance".into())
-            .child(
-                // ia[navigation]: 没有游戏时点芯片 | 右段文字按钮“还没有游戏” | 打开游戏库
-                Key::new("navigation-instance-empty")
-                    .label(tr!("nav-no-game"))
-                    .ghost()
-                    .small()
-                    .tooltip(tr!("nav-no-game-help"))
-                    .on_click(move |_: &ClickEvent, window, cx| open(window, cx)),
-            )
+            .child(key)
             .into_any_element();
     };
 
@@ -477,22 +538,25 @@ fn trailing_zone(current: CurrentInstance, colors: ShellColors) -> AnyElement {
         Key::new("navigation-instance-trigger")
             .white()
             .large()
-            .tooltip(tr!("nav-current-game"))
+            .tooltip(tr!("nav-current-game", name = chosen.name.to_string()))
             .child(
                 h_flex()
                     .gap_2()
                     .items_center()
                     .child(thumb(&chosen, 28., colors))
-                    .child(
-                        div()
-                            .max_w(px(140.))
-                            .overflow_hidden()
-                            .text_ellipsis()
-                            .whitespace_nowrap()
-                            .text_sm()
-                            .font_medium()
-                            .child(chosen.name.clone()),
-                    )
+                    .when(!compact, |chip| {
+                        chip.child(
+                            div()
+                                .debug_selector(|| "navigation-instance-name".into())
+                                .max_w(px(NAME_MAX_WIDTH))
+                                .overflow_hidden()
+                                .text_ellipsis()
+                                .whitespace_nowrap()
+                                .text_sm()
+                                .font_medium()
+                                .child(chosen.name.clone()),
+                        )
+                    })
                     .child(
                         Icon::new(UiIcon::Switch)
                             .size(px(14.))
@@ -508,7 +572,7 @@ fn trailing_zone(current: CurrentInstance, colors: ShellColors) -> AnyElement {
         .id("navigation-instance")
         .debug_selector(|| "navigation-instance".into())
         .child(
-            // ia[navigation]: 切换当前游戏 | 右段 Popover 列表：封面、名称，名称下是版本标签和加载器标签；当前项高亮；游戏多时顶部出现搜索 | 主页从已保存数据更新，不等待文件校验；之后的“开始游戏”和发现页安装都指向它；旧异步结果不覆盖新选择；保存失败提示；重启后保持，被删除时回落到剩余第一个
+            // ia[navigation]: 切换当前游戏 | 右段芯片（窗口窄时只有封面和 ⇅，名字在提示里）点开的 Popover 列表：封面、名称，名称下是版本标签和加载器标签；当前项高亮；游戏多时顶部出现搜索 | 主页从已保存数据更新，不等待文件校验；之后的“开始游戏”和发现页安装都指向它；旧异步结果不覆盖新选择；保存失败提示；重启后保持，被删除时回落到剩余第一个
             Popover::new("navigation-instance-popover")
                 .anchor(Anchor::BottomRight)
                 .trigger(trigger)
@@ -619,12 +683,27 @@ mod tests {
     use gpui::{Modifiers, Render, TestAppContext, point};
     use std::cell::Cell;
 
+    fn no_history(title: &str) -> Leading {
+        Leading {
+            title: title.to_owned().into(),
+            can_back: false,
+            can_forward: false,
+            on_back: Rc::new(|_, _| {}),
+            on_forward: Rc::new(|_, _| {}),
+            update: None,
+        }
+    }
+
     struct Page {
         clicks: Rc<Cell<u32>>,
     }
 
     impl Render for Page {
-        fn render(&mut self, _: &mut Window, cx: &mut gpui::Context<Self>) -> impl IntoElement {
+        fn render(
+            &mut self,
+            window: &mut Window,
+            cx: &mut gpui::Context<Self>,
+        ) -> impl IntoElement {
             let clicks = self.clicks.clone();
             div()
                 .size_full()
@@ -640,17 +719,120 @@ mod tests {
                     0,
                     ShellColors::current(cx),
                     Rc::new(|_, _, _| {}),
-                    Leading {
-                        title: "首页".into(),
-                        can_back: false,
-                        can_forward: false,
-                        on_back: Rc::new(|_, _| {}),
-                        on_forward: Rc::new(|_, _| {}),
-                        update: None,
+                    no_history("首页"),
+                    Trailing {
+                        account: None,
+                        instance: None,
                     },
-                    None,
-                    None,
+                    f32::from(window.viewport_size().width),
                 ))
+        }
+    }
+
+    /// The bar alone: an account and a game with a long name, or neither.
+    struct Bar {
+        empty: bool,
+    }
+
+    const LONG_NAME: &str = "Ed's Vanilla 26.2 with Friends and Far Too Many Words";
+
+    impl Render for Bar {
+        fn render(
+            &mut self,
+            window: &mut Window,
+            cx: &mut gpui::Context<Self>,
+        ) -> impl IntoElement {
+            let game = InstanceChoice {
+                id: "a".into(),
+                name: LONG_NAME.into(),
+                version: "26.2".into(),
+                seed: 1,
+                loader: crate::cover::Loader::Vanilla,
+                world: WorldHint::Overworld,
+            };
+            let player = AccountChoice {
+                key: "a".into(),
+                name: "Steve".into(),
+                detail: "Offline".into(),
+                selected: true,
+                face: None,
+            };
+            let (games, players) = if self.empty {
+                (Vec::new(), Vec::new())
+            } else {
+                (vec![game], vec![player])
+            };
+            let trailing = Trailing {
+                account: Some(CurrentAccount {
+                    choices: players,
+                    on_choose: Rc::new(|_, _, _| {}),
+                    on_manage: Rc::new(|_, _| {}),
+                    on_add: Rc::new(|_, _| {}),
+                }),
+                instance: Some(CurrentInstance {
+                    current: games.first().cloned(),
+                    choices: games,
+                    on_choose: Rc::new(|_, _, _| {}),
+                    on_empty: Rc::new(|_, _| {}),
+                }),
+            };
+            div().size_full().relative().child(render(
+                Route::Library,
+                0,
+                ShellColors::current(cx),
+                Rc::new(|_, _, _| {}),
+                // On an instance's page the location is the instance's name.
+                no_history(LONG_NAME),
+                trailing,
+                f32::from(window.viewport_size().width),
+            ))
+        }
+    }
+
+    #[gpui::test]
+    fn the_zones_keep_their_gaps_and_a_narrow_window_shows_only_pictures(cx: &mut TestAppContext) {
+        use gpui::size;
+        cx.update(|cx| {
+            gpui_component::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        for empty in [false, true] {
+            let (_view, cx) = cx.add_window_view(|_, _| Bar { empty });
+            for (width, full) in [
+                (720., false),
+                (FULL_FROM_WIDTH - 1., false),
+                (FULL_FROM_WIDTH, true),
+                (1440., true),
+            ] {
+                cx.simulate_resize(size(px(width), px(480.)));
+                cx.run_until_parked();
+                let case = format!("{width} px wide, empty: {empty}");
+                let leading = cx.debug_bounds("navigation-leading").expect("leading");
+                let capsule = cx.debug_bounds("navigation-capsule").expect("capsule");
+                let account = cx.debug_bounds("navigation-account").expect("account");
+                let instance = cx.debug_bounds("navigation-instance").expect("instance");
+                // Each zone stays in its own place: the full gap either side
+                // of the capsule, nothing pushed past the window's edge.
+                assert!(
+                    capsule.left() - leading.right() >= ZONE_GAP
+                        && account.left() - capsule.right() >= ZONE_GAP
+                        && account.right() <= instance.left()
+                        && instance.right() <= px(width),
+                    "{case}: {leading:?} {capsule:?} {account:?} {instance:?}"
+                );
+                let centre = f32::from(capsule.center().x);
+                assert!(
+                    (centre - width / 2.).abs() < 1.,
+                    "{case}: the capsule stays centred: {capsule:?}"
+                );
+                if !empty {
+                    assert_eq!(
+                        cx.debug_bounds("navigation-instance-name").is_some(),
+                        full,
+                        "{case}: the name shows only when the window is wide enough"
+                    );
+                }
+            }
         }
     }
 
