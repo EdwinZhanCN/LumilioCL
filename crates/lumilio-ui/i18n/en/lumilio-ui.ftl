@@ -85,6 +85,8 @@ nav-update-ready = Version { $version } is ready. Restart to update
 nav-update-game-running = A game is running. Close it before restarting to update
 nav-add-account = Add account
 nav-add-account-help = Add an offline account to play
+# In a narrow window the chip with no account is only an empty face with a +; all its words are in this tooltip.
+nav-add-account-tip = No account yet. Add an offline account to play
 nav-current-account = Current account: { $name }
 nav-switch-account = Switch account
 nav-manage-accounts = Account details
@@ -92,7 +94,9 @@ nav-manage-accounts = Account details
 nav-account-needs-sign-in = { $kind } · Sign in again
 nav-no-game = No game yet
 nav-no-game-help = Create one in the Library
-nav-current-game = Current game: launches and installs use it
+# In a narrow window the chip with no game is only an empty cover with a +; all its words are in this tooltip.
+nav-no-game-tip = No game yet. Create one in the Library
+nav-current-game = Current game: { $name }. Launches and installs use it
 nav-switch-game = Switch current game
 detail-title-modpack = Modpack details
 detail-title-mod = Mod details

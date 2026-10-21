@@ -222,8 +222,11 @@ impl Render for LauncherShell {
                 colors,
                 Rc::new(route_callback),
                 leading,
-                current_instance,
-                current_account,
+                navigation::Trailing {
+                    account: current_account,
+                    instance: current_instance,
+                },
+                f32::from(window.viewport_size().width),
             ))
             // A gallery image shown large covers everything, the navigation too.
             .children(

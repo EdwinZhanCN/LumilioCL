@@ -133,14 +133,15 @@ page it dissolves into does.
 ## 6. Navigation
 
 The navigation bar floats at the bottom of every page, Home included, as
-three zones on one line (ADR 0012). Each zone is its own floating surface on
-the content column; the landmark capsule stays centred in the window.
+three zones on one line. Each zone is its own floating surface on the content
+column; the landmark capsule stays centred in the window, with the same gap on
+either side.
 
 | Zone | Shows | Rules |
 |---|---|---|
 | Leading | ‹ › and the current location's name | Browser-style history of *locations*: a landmark page, an Instance, a project detail. Tabs, filters and scroll position are view state, not history. A direction with nowhere to go is disabled (muted, arrow cursor), never hidden, so the name does not jump. A verified stable launcher update adds an orange restart key beside this zone; it is disabled while a game runs. Shortcuts: ⌘[ / ⌘], and Esc goes back from a detail. |
 | Centre | The landmark capsule: Home, Library, Discover, Activity; Accounts and Settings join when their pages exist | Choosing a landmark opens a new location (and clears what was ahead). Icon-only keys; the open landmark sits pressed with its LED lit (§12); tooltip with label and shortcut. Activity carries the running-task badge: a lit LED with a mono count. |
-| Trailing | The current instance: its cover, name and a ⇅ mark | The instance that play and Discover installs target. Clicking opens a popover list to switch (a quick action, §10). Switching never retargets an operation already started. With no instances it reads "还没有游戏" and opens Library. The cover sits in a display window (§12), the same one a faceplate uses. |
+| Trailing | The current account's face; the current instance: its cover, name and a ⇅ mark | Each chip opens a popover list to switch (a quick action, §10): the account who plays, the instance that play and Discover installs target. Switching never retargets an operation already started. With no account the chip reads "添加账户"; with no instances it reads "还没有游戏" and opens Library. The cover sits in a display window (§12), the same one a faceplate uses. A window too narrow for the widest trailing zone (a face and a full-length name) beside the centred capsule gets the compact zone: pictures only. The instance chip keeps its cover and ⇅; an empty chip is an empty face or cover with a +. Their words move into the tooltips. The window width decides, not the name, so switching instances never changes the bar. |
 
 Location names: a landmark's label; an Instance's own name; a project detail
 by its kind — "整合包详情", "Mod 详情", "资源包详情", "光影详情". Long names
