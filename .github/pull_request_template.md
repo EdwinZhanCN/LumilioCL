@@ -2,6 +2,7 @@
 Handoff report: see /docs/contribute/change-and-review/ (中文)
 or /en/docs/contribute/change-and-review/ (English).
 Write the final implementation, not the history of the work.
+Linked to an issue? Put "Closes #N" first and keep it short and clear.
 -->
 
 ## Problem and behavior / 问题与最终行为
