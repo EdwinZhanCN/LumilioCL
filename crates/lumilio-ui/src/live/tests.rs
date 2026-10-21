@@ -119,12 +119,11 @@ fn home_offers_the_newest_instance_until_something_was_played() {
     let records = [record("a", false, None, 1), record("b", false, None, 5)];
     let (home, id) = home_presentation(&records, &HomeSummary::default(), None, NOW);
     assert_eq!(id.as_deref(), Some("b"));
-    let HomePresentation::Continue { subject, recent } = home else {
+    let HomePresentation::Continue { subject } = home else {
         panic!("expected Continue");
     };
     assert_eq!(subject.title, "B");
     assert!(subject.metadata.contains("还没玩过"));
-    assert!(recent.is_empty());
 }
 
 #[test]
@@ -136,22 +135,18 @@ fn home_follows_the_summary() {
     ];
     let summary = HomeSummary {
         continue_with: Some("b".to_owned()),
-        recent: vec!["c".to_owned(), "a".to_owned(), "ghost".to_owned()],
         needs_attention: Vec::<AttentionItem>::new(),
     };
     let (home, id) = home_presentation(&records, &summary, None, NOW);
     assert_eq!(id.as_deref(), Some("b"));
-    let HomePresentation::Continue { subject, recent } = home else {
+    let HomePresentation::Continue { subject } = home else {
         panic!("expected Continue");
     };
     assert!(subject.metadata.contains("上次游玩于"));
-    // A stale id in the summary is skipped, not shown.
-    let titles: Vec<_> = recent.iter().map(|entry| entry.title.as_str()).collect();
-    assert_eq!(titles, ["C", "A"]);
 }
 
 #[test]
-fn home_continues_with_the_current_instance_and_does_not_list_it_twice() {
+fn home_continues_with_the_current_instance() {
     let records = [
         record("a", false, Some(100), 1),
         record("b", false, Some(900_000), 2),
@@ -159,17 +154,14 @@ fn home_continues_with_the_current_instance_and_does_not_list_it_twice() {
     ];
     let summary = HomeSummary {
         continue_with: Some("b".to_owned()),
-        recent: vec!["c".to_owned(), "a".to_owned()],
         needs_attention: Vec::<AttentionItem>::new(),
     };
     let (home, id) = home_presentation(&records, &summary, Some("c"), NOW);
     assert_eq!(id.as_deref(), Some("c"));
-    let HomePresentation::Continue { subject, recent } = home else {
+    let HomePresentation::Continue { subject } = home else {
         panic!("expected Continue");
     };
     assert_eq!(subject.title, "C");
-    let titles: Vec<_> = recent.iter().map(|entry| entry.title.as_str()).collect();
-    assert_eq!(titles, ["A"]);
     // A current instance that no longer exists is ignored.
     let (_, id) = home_presentation(&records, &summary, Some("ghost"), NOW);
     assert_eq!(id.as_deref(), Some("b"));

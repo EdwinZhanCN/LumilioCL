@@ -53,8 +53,6 @@ pub struct AttentionItem {
 pub struct HomeSummary {
     /// The instance the Continue button resumes, if any.
     pub continue_with: Option<String>,
-    /// Other recently played instances, newest first.
-    pub recent: Vec<String>,
     pub needs_attention: Vec<AttentionItem>,
 }
 
@@ -62,8 +60,6 @@ pub struct HomeSummary {
 ///
 /// - *Continue* is the most recently played instance that has no error-level
 ///   problem; an instance that cannot launch is not offered as "continue".
-/// - *Recent* lists played instances other than Continue's, newest first, up to
-///   `recent_limit`. Never-played instances are not "recent".
 /// - *Needs attention* lists instances with any warning or error problem,
 ///   errors first, then most recently played first; info-level problems
 ///   (such as "not installed yet") do not count.
@@ -71,7 +67,6 @@ pub struct HomeSummary {
 pub fn summarize(
     instances: &[InstanceRecord],
     problems: &BTreeMap<String, Vec<Problem>>,
-    recent_limit: usize,
 ) -> HomeSummary {
     let has_error = |id: &str| {
         problems
@@ -92,12 +87,6 @@ pub fn summarize(
         .iter()
         .find(|record| !has_error(&record.id))
         .map(|r| r.id.clone());
-    let recent = played
-        .iter()
-        .filter(|record| Some(&record.id) != continue_with.as_ref())
-        .take(recent_limit)
-        .map(|record| record.id.clone())
-        .collect();
 
     let mut needs_attention: Vec<(Option<u64>, AttentionItem)> = instances
         .iter()
@@ -129,7 +118,6 @@ pub fn summarize(
 
     HomeSummary {
         continue_with,
-        recent,
         needs_attention: needs_attention.into_iter().map(|(_, item)| item).collect(),
     }
 }
@@ -163,12 +151,12 @@ mod tests {
 
     #[test]
     fn nothing_played_means_nothing_to_continue() {
-        let summary = summarize(&[record("a", None)], &BTreeMap::new(), 5);
+        let summary = summarize(&[record("a", None)], &BTreeMap::new());
         assert_eq!(summary, HomeSummary::default());
     }
 
     #[test]
-    fn continue_is_the_latest_launchable_and_recent_excludes_it() {
+    fn continue_is_the_latest_launchable() {
         let instances = [
             record("a", Some(10)),
             record("b", Some(30)),
@@ -180,18 +168,9 @@ mod tests {
             "b".to_owned(),
             vec![problem(Severity::Error, ProblemKind::NoAccount)],
         );
-        let summary = summarize(&instances, &problems, 5);
+        let summary = summarize(&instances, &problems);
         // b is newest but cannot launch, so Continue falls to c.
         assert_eq!(summary.continue_with.as_deref(), Some("c"));
-        assert_eq!(summary.recent, ["b", "a"]);
-    }
-
-    #[test]
-    fn recent_is_limited() {
-        let instances: Vec<_> = (1..=6).map(|n| record(&format!("i{n}"), Some(n))).collect();
-        let summary = summarize(&instances, &BTreeMap::new(), 2);
-        assert_eq!(summary.continue_with.as_deref(), Some("i6"));
-        assert_eq!(summary.recent, ["i5", "i4"]);
     }
 
     #[test]
@@ -218,7 +197,7 @@ mod tests {
             "info".to_owned(),
             vec![problem(Severity::Info, ProblemKind::NotInstalled)],
         );
-        let summary = summarize(&instances, &problems, 5);
+        let summary = summarize(&instances, &problems);
         let order: Vec<_> = summary
             .needs_attention
             .iter()
@@ -244,7 +223,7 @@ mod tests {
                 problem(Severity::Error, ProblemKind::NoJava { required: None }),
             ],
         );
-        let summary = summarize(&instances, &problems, 5);
+        let summary = summarize(&instances, &problems);
         assert_eq!(
             summary.needs_attention[0].headline.kind,
             ProblemKind::NoAccount

@@ -7,7 +7,7 @@ mod library;
 mod memory;
 mod settings;
 
-use crate::home::{HomePresentation, RecentEntry, Subject, WorldHint};
+use crate::home::{HomePresentation, Subject, WorldHint};
 
 fn continuing() -> HomePresentation {
     HomePresentation::Continue {
@@ -17,11 +17,6 @@ fn continuing() -> HomePresentation {
             metadata: "1.21.1 · Fabric".into(),
             world: WorldHint::Underground,
         },
-        recent: vec![RecentEntry {
-            id: None,
-            title: "空岛".into(),
-            metadata: "昨天".into(),
-        }],
     }
 }
 

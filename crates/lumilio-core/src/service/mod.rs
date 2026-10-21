@@ -84,8 +84,6 @@ fn loader_text(loader: Loader, version: Option<&str>) -> String {
     }
 }
 
-/// How many recently played instances Home lists next to Continue.
-const RECENT_LIMIT: usize = 4;
 /// Instances diagnosed for Home: verifying files is not free, so only the
 /// ones a person is likely to care about right now.
 const DIAGNOSED_LIMIT: usize = 8;

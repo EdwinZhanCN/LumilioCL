@@ -150,7 +150,6 @@ home-attention-more = { $detail } ({ $more } more { $more ->
 })
 # The library, Java or plugins changed, and each game is checked again.
 home-attention-checking = Checking…
-home-recent = Recent
 home-continued = Continue playing
 home-record = Play history
 home-record-play-time = Play time

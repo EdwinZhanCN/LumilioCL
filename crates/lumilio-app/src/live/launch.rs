@@ -185,7 +185,6 @@ fn play_now(wiring: &Wiring, id: String, window: &mut Window, cx: &mut App) {
                             metadata: format!("{} · {}", card.meta, card.played),
                             world: card.world,
                         },
-                        recent: Vec::new(),
                     },
                     cx,
                 );

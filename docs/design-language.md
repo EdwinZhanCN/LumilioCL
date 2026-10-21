@@ -95,8 +95,10 @@ top to bottom:
 - what needs attention;
 - **接着玩**: the continued game's latest worlds and first servers, a list
   block whose rows go straight in (Quick Play), beside its **游戏记录**, a
-  record display (§12);
-- the recent games as the Library's own faceplates, one row.
+  record display (§12).
+
+Home lists no other game: switching is the chip's job, browsing the
+Library's, and another game's problem shows under what needs attention.
 
 Below the world is where Home stops being empty for a person with one game,
 so every group there is something to enter, never decoration.
@@ -256,7 +258,7 @@ Discover.
 - Every enabled, clickable control shows the pointing-hand cursor; disabled
   controls keep the arrow. Use `theme::clickable` for gpui-component buttons,
   which default to the arrow; plain clickable `div`s use `.cursor_pointer()`.
-  Non-interactive surfaces (e.g. recent cards without an action) keep the
+  Non-interactive surfaces (e.g. a card without an action) keep the
   arrow.
 - Focus is always visible (`theme.ring`); carousels are operable without a
   pointer.

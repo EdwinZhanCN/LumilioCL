@@ -1,5 +1,5 @@
 use super::library::{instance_meta, relative_time, seed_of, world_of};
-use crate::home::{HomePresentation, RecentEntry, Subject};
+use crate::home::{HomePresentation, Subject};
 use crate::places::ServerState;
 use gpui::{ImageSource, RenderImage};
 use lumilio_core::{GameMode, HomeSummary, InstanceRecord, ServerEntry, ServerStatus, WorldInfo};
@@ -220,27 +220,9 @@ pub fn home_presentation(
     let Some(chosen) = chosen else {
         return (HomePresentation::FirstUse, None);
     };
-    let recent = summary
-        .recent
-        .iter()
-        .filter_map(|id| find(id))
-        .filter(|record| record.id != chosen.id)
-        .map(|record| RecentEntry {
-            id: Some(record.id.clone()),
-            title: record.name.clone(),
-            metadata: format!(
-                "{} · {}",
-                instance_meta(record),
-                record
-                    .last_played
-                    .map_or_else(String::new, |at| relative_time(at, now))
-            ),
-        })
-        .collect();
     (
         HomePresentation::Continue {
             subject: subject_of(chosen),
-            recent,
         },
         Some(chosen.id.clone()),
     )

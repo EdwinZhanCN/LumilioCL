@@ -1,7 +1,7 @@
 use super::error::ServiceError;
 use super::support::blocking;
 use super::types::now;
-use super::{DIAGNOSED_LIMIT, LauncherService, RECENT_LIMIT};
+use super::{DIAGNOSED_LIMIT, LauncherService};
 use crate::attention::{HomeSummary, summarize};
 use crate::catalog::VersionCatalog;
 use crate::deletion::Deletion;
@@ -63,11 +63,11 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// The application uses this before supplementing Home with `home`.
     pub async fn home_snapshot(&self) -> (Vec<InstanceRecord>, HomeSummary) {
         let instances = self.store.lock().await.instances().to_vec();
-        let summary = summarize(&instances, &BTreeMap::new(), RECENT_LIMIT);
+        let summary = summarize(&instances, &BTreeMap::new());
         (instances, summary)
     }
 
-    /// Background Continue / Recent / Needs Attention checks for Home.
+    /// Background Continue / Needs Attention checks for Home.
     /// Full content verification remains in explicit diagnostics and repair.
     pub async fn home(&self) -> (Vec<InstanceRecord>, HomeSummary) {
         let (instances, checks) = self.home_checks().await;
@@ -101,7 +101,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     ) -> HomeSummary {
         let has_account = crate::inspect::account_usable(self.settings.lock().await.get());
         let problems = crate::attention::with_account(checks, has_account);
-        summarize(instances, &problems, RECENT_LIMIT)
+        summarize(instances, &problems)
     }
 
     /// Creates an instance. A missing game version means the newest release;

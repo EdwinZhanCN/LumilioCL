@@ -131,7 +131,6 @@ home-attention = 需要留意
 home-attention-more = { $detail }（另有 { $more } 个问题）
 # 游戏库、Java 或插件变了，正在重新检查各个游戏。
 home-attention-checking = 检查中…
-home-recent = 最近
 home-continued = 接着玩
 home-record = 游戏记录
 home-record-play-time = 游玩时间

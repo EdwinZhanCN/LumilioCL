@@ -1,6 +1,6 @@
 use super::buttons::{LocalActionIcon, page_button};
 use super::render::{ShellHomeColors, body_label};
-use super::{HomeIntent, HomeIntentHandler, HomeLinks, OpenHandler, RecentEntry};
+use super::{HomeIntent, HomeIntentHandler, HomeLinks};
 use crate::key::Key;
 use gpui::prelude::*;
 use gpui::{AnyElement, ClickEvent, IntoElement, div, px};
@@ -134,52 +134,4 @@ pub(super) fn render_attention(links: &HomeLinks, colors: ShellHomeColors) -> Op
             .child(v_flex().w_full().children(list)),
         ("home-attention-section", links.revision),
     ))
-}
-
-pub(super) fn render_recent(
-    recent: &[RecentEntry],
-    on_open: Option<OpenHandler>,
-    colors: ShellHomeColors,
-) -> impl IntoElement {
-    // Without the library (a Home drawn from a snapshot) the recent games are
-    // plain cards; the live Home uses the Library's faceplates.
-    let cards = recent.iter().enumerate().map(|(index, entry)| {
-        let open = entry.id.clone().zip(on_open.clone());
-        v_flex()
-            .id(("home-recent", index))
-            .w(px(232.))
-            .gap(px(4.))
-            .px(px(14.))
-            .py(px(12.))
-            .rounded(px(6.))
-            .border_1()
-            .border_color(colors.border)
-            .bg(colors.surface)
-            // A card that opens a game says so (design language §9); one that
-            // does not stays still.
-            .when_some(open, |card, (id, open)| {
-                card.cursor_pointer()
-                    .hover(move |card| card.border_color(colors.foreground))
-                    .debug_selector(move || format!("home-recent-{index}"))
-                    .on_click(move |_, window, cx| open(id.clone(), window, cx))
-            })
-            .child(
-                div()
-                    .text_sm()
-                    .font_semibold()
-                    .text_color(colors.foreground)
-                    .child(entry.title.clone()),
-            )
-            .child(
-                div()
-                    .text_xs()
-                    .text_color(colors.muted)
-                    .child(entry.metadata.clone()),
-            )
-    });
-
-    v_flex()
-        .gap_3()
-        .child(body_label(crate::tr!("home-recent"), colors.muted))
-        .child(h_flex().flex_wrap().gap_3().children(cards))
 }

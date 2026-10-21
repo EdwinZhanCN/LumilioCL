@@ -38,15 +38,6 @@ pub enum HomeIntent {
     StopGame,
 }
 
-/// A quiet item in the recent list. It carries presentation data only.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct RecentEntry {
-    /// The game it opens, when it is a real one.
-    pub id: Option<String>,
-    pub title: String,
-    pub metadata: String,
-}
-
 /// One game with something wrong, and what to do about it first.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AttentionRow {
@@ -138,21 +129,17 @@ pub enum HomePresentation {
     FirstUse,
     Continue {
         subject: Subject,
-        recent: Vec<RecentEntry>,
     },
     Launching {
         subject: Subject,
-        recent: Vec<RecentEntry>,
         session: LaunchSession,
     },
     Playing {
         subject: Subject,
-        recent: Vec<RecentEntry>,
         since: Instant,
     },
     Recovery {
         subject: Subject,
-        recent: Vec<RecentEntry>,
         detail: RecoveryDetail,
     },
 }
@@ -180,12 +167,8 @@ impl HomePresentation {
     /// Continue or Recovery → Launching with a fresh session.
     pub fn begin_launch(self) -> Self {
         match self {
-            Self::Continue { subject, recent }
-            | Self::Recovery {
-                subject, recent, ..
-            } => Self::Launching {
+            Self::Continue { subject } | Self::Recovery { subject, .. } => Self::Launching {
                 subject,
-                recent,
                 session: LaunchSession::new(),
             },
             other => other,
@@ -195,9 +178,7 @@ impl HomePresentation {
     /// Launching → Continue, as soon as the person asks.
     pub fn cancel_launch(self) -> Self {
         match self {
-            Self::Launching {
-                subject, recent, ..
-            } => Self::Continue { subject, recent },
+            Self::Launching { subject, .. } => Self::Continue { subject },
             other => other,
         }
     }
@@ -208,49 +189,33 @@ impl HomePresentation {
         match self {
             Self::Launching {
                 subject,
-                recent,
                 mut session,
             } => {
                 session.apply(signal);
                 match session.status().clone() {
-                    LaunchStatus::Preparing(_) => Self::Launching {
-                        subject,
-                        recent,
-                        session,
-                    },
+                    LaunchStatus::Preparing(_) => Self::Launching { subject, session },
                     LaunchStatus::Running => Self::Playing {
                         subject,
-                        recent,
                         since: now,
                     },
                     LaunchStatus::Exited { .. } | LaunchStatus::Cancelled => {
-                        Self::Continue { subject, recent }
+                        Self::Continue { subject }
                     }
                     LaunchStatus::Failed { phase, failure } => Self::Recovery {
                         subject,
-                        recent,
                         detail: RecoveryDetail::Failed { phase, failure },
                     },
                 }
             }
-            Self::Playing {
-                subject,
-                recent,
-                since,
-            } => match signal {
+            Self::Playing { subject, since } => match signal {
                 LaunchSignal::Exited {
                     code: None | Some(0),
-                } => Self::Continue { subject, recent },
+                } => Self::Continue { subject },
                 LaunchSignal::Exited { code } => Self::Recovery {
                     subject,
-                    recent,
                     detail: RecoveryDetail::Crashed { code },
                 },
-                _ => Self::Playing {
-                    subject,
-                    recent,
-                    since,
-                },
+                _ => Self::Playing { subject, since },
             },
             other => other,
         }
@@ -301,34 +266,11 @@ impl HomePresentation {
         !matches!(self, Self::Launching { .. } | Self::Playing { .. })
     }
 
-    pub fn recent(&self) -> &[RecentEntry] {
-        match self {
-            Self::Continue { recent, .. }
-            | Self::Launching { recent, .. }
-            | Self::Playing { recent, .. }
-            | Self::Recovery { recent, .. } => recent,
-            _ => &[],
-        }
-    }
-
-    /// Whether this state has anything to show below the hero.
-    /// Whether Home shows instance cards below the world (Continue, Launching,
-    /// Playing, Recovery), as opposed to first-use copy.
-    pub fn recent_is_instances(&self) -> bool {
-        matches!(
-            self,
-            Self::Continue { .. }
-                | Self::Launching { .. }
-                | Self::Playing { .. }
-                | Self::Recovery { .. }
-        )
-    }
-
     pub fn has_body(&self) -> bool {
         match self {
             Self::Ambient => false,
             Self::Loading | Self::FirstUse => true,
-            _ => !self.recent().is_empty(),
+            _ => false,
         }
     }
 }

@@ -126,7 +126,7 @@ impl LauncherShell {
         );
         let links = self.home_links();
         let has_attention =
-            (!links.attention.is_empty() || links.checking) && self.home.recent_is_instances();
+            (!links.attention.is_empty() || links.checking) && self.home.subject().is_some();
         let sections =
             live.and_then(|ctx| pages::live::home_sections(ctx, &self.home, self.can_start()));
         let body = (self.home.has_body() || has_attention || sections.is_some())
