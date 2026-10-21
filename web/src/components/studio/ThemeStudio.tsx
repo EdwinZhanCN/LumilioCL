@@ -213,6 +213,7 @@ export default function ThemeStudio({ lang, guide }: Props) {
 
           <Section title={t.sections.colours} help={t.colourHelp}>
             {resolved.missing.length > 0 && <p className="studio__hint">{t.missing(resolved.missing.length)}</p>}
+            {resolved.solid.length > 0 && <p className="studio__hint">{t.solid(resolved.solid.length)}</p>}
             {COLOR_GROUPS.map((group) => (
               <fieldset key={group.id} className="studio__group">
                 <legend>{t.groups[group.id]}</legend>

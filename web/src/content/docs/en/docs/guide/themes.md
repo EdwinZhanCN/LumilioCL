@@ -105,12 +105,13 @@ It shows a preview while you change the theme.
 | `radius` | No | The corner radius of fields, lists, and menus, in pixels. The default is `4`. The keys and panels of the launcher keep their own corners |
 | `radius_lg` | No | The corner radius of dialogs and notifications, in pixels. The default is `6` |
 | `fonts` | No | Font family names: `sans` for the interface, `mono` for monospace text, and `cjk` for Chinese text |
-| `window_background` | No | The window material behind the page: `"opaque"` (default), `"transparent"`, or `"blurred"`. You can see it only through colours with opacity |
+| `window_background` | No | The window material behind the page: `"opaque"` (default), `"transparent"`, or `"blurred"`. You can see it only through colours with opacity. If the system cannot blur (most Linux desktops), a `"blurred"` theme shows its colours on the built-in page colour, and the window is opaque |
 
 ### Colours
 
 Write each colour as `#rrggbb`, or as `#rrggbbaa` for a colour with opacity.
 The `#` is optional.
+Only `page`, `panel` and `hairline` can have opacity. The launcher shows other colours with opacity as opaque, because buttons, displays and tags must stay easy to read.
 The colour names come from the default colours.
 For example, `orange` is the accent colour, but its value can be any colour.
 

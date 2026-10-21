@@ -7,7 +7,7 @@ use std::path::Path;
 
 use serde::Serialize;
 
-use super::super::spec::{DEFAULT_RADIUS, DEFAULT_RADIUS_LG, MAX_RADIUS};
+use super::super::spec::{DEFAULT_RADIUS, DEFAULT_RADIUS_LG, MAX_RADIUS, TRANSLUCENT};
 use super::super::{Catalog, Palette, ThemeSpec};
 use super::{RULES, Rule};
 
@@ -17,6 +17,8 @@ const FILE: &str = "../../web/src/data/themes.generated.json";
 struct Website {
     /// Colour names in the order the file and the docs list them.
     colors: &'static [&'static str],
+    /// The colours that may carry opacity; the rest are drawn solid.
+    translucent: &'static [&'static str],
     radius: f32,
     radius_lg: f32,
     max_radius: f32,
@@ -33,6 +35,7 @@ fn website() -> String {
         .collect();
     let website = Website {
         colors: Palette::NAMES,
+        translucent: TRANSLUCENT,
         radius: DEFAULT_RADIUS,
         radius_lg: DEFAULT_RADIUS_LG,
         max_radius: MAX_RADIUS,

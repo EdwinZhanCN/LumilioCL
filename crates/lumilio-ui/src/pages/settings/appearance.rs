@@ -81,6 +81,17 @@ pub(super) fn appearance(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
             ctx,
         ));
     }
+    if let Some(solid) = ctx
+        .look
+        .map(|look| look.theme.solid.len())
+        .filter(|n| *n > 0)
+    {
+        rows.push(note(
+            "settings-theme-solid-note",
+            tr!("settings-theme-solid", count = solid),
+            ctx,
+        ));
+    }
     let themes = view.data_dir.join("themes");
     rows.push(local_row(&themes, ctx));
     for (index, rejected) in ctx

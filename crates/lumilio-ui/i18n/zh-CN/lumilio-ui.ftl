@@ -1668,6 +1668,7 @@ settings-theme-light = 浅色主题
 settings-theme-dark = 深色主题
 settings-theme-pick-help = 浅色和深色各选一套；“跟随系统”时按系统的明暗切换。
 settings-theme-missing = 这套主题缺少 { $count } 项颜色，缺的已用默认补齐。
+settings-theme-solid = 这套主题有 { $count } 项颜色带透明度，但只有页面、面板和分隔线可以半透明，这些颜色按不透明显示。
 settings-theme-local = 本地主题
 settings-theme-local-help = 把 .json 主题文件放进这个文件夹，再点“重新读取”。
 settings-theme-reload = 重新读取

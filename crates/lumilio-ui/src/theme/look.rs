@@ -217,6 +217,11 @@ impl Look {
             Some(catalog) => catalog.resolve(name, tone),
             None => Catalog::default().resolve(name, tone),
         };
+        let theme = if super::spec::can_blur() {
+            theme
+        } else {
+            theme.without_blur()
+        };
         let wanted =
             |own: &Option<String>, theme: &Option<String>| own.clone().or_else(|| theme.clone());
         let sans = wanted(&choice.sans_font, &theme.fonts.sans);

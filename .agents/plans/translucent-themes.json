@@ -3,7 +3,7 @@
   "id": "translucent-themes",
   "title": "半透明主题、无壁纸首页与新配色",
   "summary": "首页壁纸增加「无壁纸」；主题的机身可以半透明，按键与显示屏保持实心；内置白桦、深板岩、玻璃、遮光玻璃四套主题。依赖 global-context 合入（首页结构已改）。",
-  "status": "proposed",
+  "status": "in_progress",
   "visibility": "internal",
   "scope": {
     "included": [
@@ -20,14 +20,14 @@
   },
   "tasks": [
     { "id": "T1", "title": "无壁纸选项", "status": "proposed", "acceptance": "外观设置的壁纸可选「方块世界」「图片」「无壁纸」，保存在 LookPreferences，旧设置读出来仍是原来的选择。无壁纸时首页顶部不画世界，高度收缩到标题与「继续」，文字用主题墨色，按键不变；启动中仍有分段进度条，游戏中与启动失败由标题旁的 LED 与文字表达（D2）。UI 测试覆盖三种壁纸下首页各状态的布局。" },
-    { "id": "T2", "title": "半透明机身与兜底", "status": "proposed", "acceptance": "主题文件中只有机身类颜色（page、panel、hairline 等，按 D1 列出）可以带透明度，按键、显示屏、标签、LED 的透明度被忽略并在主题检查里报告。窗口拿不到模糊时，带透明度的机身颜色按 D3 合成为不透明的近似色。macOS 毛玻璃实机可用；Windows 与 Linux 的实际材质记入 validation。" },
+    { "id": "T2", "title": "半透明机身与兜底", "status": "completed", "acceptance": "主题文件中只有机身类颜色（page、panel、hairline 等，按 D1 列出）可以带透明度，按键、显示屏、标签、LED 的透明度被忽略并在主题检查里报告。窗口拿不到模糊时，带透明度的机身颜色按 D3 合成为不透明的近似色。各平台的实际材质在 T6 实机检查。" },
     { "id": "T3", "title": "玻璃与遮光玻璃", "status": "proposed", "acceptance": "两套内置半透明主题，以铝白与夜黑为底，窗口材质为 blurred，强调色为信号橙。墨色与机身在最透的情况下（白底与黑底桌面）对比度仍达到 design-language §9 的要求，由主题测试检查。" },
     { "id": "T4", "title": "白桦与深板岩", "status": "proposed", "acceptance": "先在网站主题编辑器里调色并定稿，再作为内置主题加入，强调色为信号橙（D4）。每套颜色通过现有主题测试的对比度检查；网站的内置主题导出同步。" },
     { "id": "T5", "title": "文档", "status": "proposed", "acceptance": "design-language §5「Appearance」写明无壁纸首页与半透明规则，§12 的颜色表说明哪些令牌可以透明；网站中英主题文档写明新增字段规则与内置主题；just ia、just plans、just docs 通过。" },
     { "id": "T6", "title": "Project Maintainer 实机检查", "status": "proposed", "acceptance": "在 Mac 上检查四套主题与三种壁纸的组合：毛玻璃下文字与面板的可读性，实心零件在透明机身上是否协调，无壁纸首页各状态是否清楚。结果记入 validation。" }
   ],
   "validation": [
-    { "criterion": "T1–T5 的测试通过，并各自证明能失败。", "result": null },
+    { "criterion": "T1–T5 的测试通过，并各自证明能失败。", "result": "2026-10-21（T2）：theme::tests 的 only_the_body_may_be_translucent 与 a_blurred_theme_turns_opaque_where_the_system_cannot_blur 通过，临时去掉 solidify 或让 without_blur 总是返回原样时分别按预期失败；tune_applies_the_chosen_theme_per_appearance_and_the_scale 原先断言半透明的强调色原样传到界面，按 D1 改为不透明。网站主题编辑器从 themes.generated.json 读到同一份可透明颜色表，model.test.ts 新增对应用例，pnpm check 无错误。" },
     { "criterion": "just check 通过（由 Project Maintainer 运行）。", "result": null },
     { "criterion": "Project Maintainer 实机检查通过（T6）。", "result": null }
   ],
@@ -40,7 +40,7 @@
     "crates/lumilio-ui/src/theme/look.rs",
     "crates/lumilio-core/src/tuning.rs"
   ],
-  "dependencies": [],
+  "dependencies": ["global-context"],
   "decisions": [
     {
       "id": "D1",
@@ -58,7 +58,7 @@
       "id": "D3",
       "decision": "窗口拿不到模糊时（多数 Linux 合成器，以及不支持的 Windows 版本），带透明度的机身颜色与主题声明的底色合成为不透明的颜色。",
       "rationale": "没有模糊的透明会直接透出桌面上的文字，比不透明更难读。",
-      "consequences": "主题文件可以声明合成用的底色，缺省为同色调内置主题的 page。"
+      "consequences": "合成用的底色固定为同色调内置主题的 page，与网站主题编辑器计算对比度时用的底色一致，不另设字段。判断按平台：macOS 与 Windows 视为可以模糊，Linux 一律合成；KDE 等能模糊的 Linux 桌面暂时也得到不透明窗口。"
     },
     {
       "id": "D4",

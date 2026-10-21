@@ -274,6 +274,44 @@ fn a_theme_may_ask_for_a_transparent_or_blurred_window_and_defaults_to_opaque() 
     assert_eq!(Opaque.to_gpui(), gpui::WindowBackgroundAppearance::Opaque);
 }
 
+/// Only the body lets the window show through; a key or a display given
+/// opacity is drawn solid, and the settings can say how many were.
+#[test]
+fn only_the_body_may_be_translucent() {
+    let theme = Resolved::new(&one(
+        r##"{"themes":[{"name":"Glass","appearance":"light","colors":
+            {"page":"#ffffff80","panel":"#eeeeeb99","orange":"#f0520f80","display":"#14141440"}}]}"##,
+    ));
+    assert!((theme.body.page.a - 0.5).abs() < 0.01);
+    assert!((theme.body.panel.a - 0.6).abs() < 0.01);
+    assert_eq!(theme.body.orange.a, 1.);
+    assert_eq!(theme.body.display.a, 1.);
+    assert_eq!(theme.solid, ["orange", "display"]);
+}
+
+/// Without blur, a blurred body is laid over the built-in page of its tone
+/// and the window turns opaque; other themes are left as they are.
+#[test]
+fn a_blurred_theme_turns_opaque_where_the_system_cannot_blur() {
+    use super::WindowBackground::{Blurred, Opaque, Transparent};
+    let glass = |background: &str| {
+        Resolved::new(&one(&format!(
+            r##"{{"themes":[{{"name":"Glass","appearance":"dark","window_background":"{background}",
+                "colors":{{"page":"#ffffff80"}}}}]}}"##
+        )))
+    };
+    let flat = glass("blurred").without_blur();
+    assert_eq!(flat.window_background, Opaque);
+    assert_eq!(flat.body.page.a, 1.);
+    // Half white over night's #111111.
+    let page = gpui::Rgba::from(flat.body.page);
+    assert!((page.r - (1. + 0x11 as f32 / 255.) / 2.).abs() < 0.01);
+    let clear = glass("transparent").without_blur();
+    assert_eq!(clear.window_background, Transparent);
+    assert!((clear.body.page.a - 0.5).abs() < 0.01);
+    assert_eq!(glass("blurred").window_background, Blurred);
+}
+
 #[gpui::test]
 fn a_translucent_page_colour_and_the_window_material_reach_the_window(cx: &mut TestAppContext) {
     cx.update(gpui_component::init);
@@ -355,7 +393,8 @@ fn tune_applies_the_chosen_theme_per_appearance_and_the_scale(cx: &mut TestAppCo
         tune(cx);
         let theme = Theme::global(cx);
         assert_eq!(Color(theme.background).to_hex(), "#102030");
-        assert_eq!(Color(theme.primary).to_hex(), "#ff00ff80");
+        // The accent is a key's colour, so its opacity is dropped.
+        assert_eq!(Color(theme.primary).to_hex(), "#ff00ff");
         assert_eq!(theme.radius, gpui::px(2.));
         assert_eq!(theme.font_size, gpui::px(20.));
         assert_eq!(theme.mono_font_size, gpui::px(13. * 1.25));

@@ -2,7 +2,7 @@
 
 # 半透明主题、无壁纸首页与新配色
 
-Status: Proposed
+Status: InProgress
 
 首页壁纸增加「无壁纸」；主题的机身可以半透明，按键与显示屏保持实心；内置白桦、深板岩、玻璃、遮光玻璃四套主题。依赖 global-context 合入（首页结构已改）。
 
@@ -20,8 +20,8 @@ Status: Proposed
 
 - [ ] T1 — 无壁纸选项 (Proposed)
   Acceptance: 外观设置的壁纸可选「方块世界」「图片」「无壁纸」，保存在 LookPreferences，旧设置读出来仍是原来的选择。无壁纸时首页顶部不画世界，高度收缩到标题与「继续」，文字用主题墨色，按键不变；启动中仍有分段进度条，游戏中与启动失败由标题旁的 LED 与文字表达（D2）。UI 测试覆盖三种壁纸下首页各状态的布局。
-- [ ] T2 — 半透明机身与兜底 (Proposed)
-  Acceptance: 主题文件中只有机身类颜色（page、panel、hairline 等，按 D1 列出）可以带透明度，按键、显示屏、标签、LED 的透明度被忽略并在主题检查里报告。窗口拿不到模糊时，带透明度的机身颜色按 D3 合成为不透明的近似色。macOS 毛玻璃实机可用；Windows 与 Linux 的实际材质记入 validation。
+- [x] T2 — 半透明机身与兜底 (Completed)
+  Acceptance: 主题文件中只有机身类颜色（page、panel、hairline 等，按 D1 列出）可以带透明度，按键、显示屏、标签、LED 的透明度被忽略并在主题检查里报告。窗口拿不到模糊时，带透明度的机身颜色按 D3 合成为不透明的近似色。各平台的实际材质在 T6 实机检查。
 - [ ] T3 — 玻璃与遮光玻璃 (Proposed)
   Acceptance: 两套内置半透明主题，以铝白与夜黑为底，窗口材质为 blurred，强调色为信号橙。墨色与机身在最透的情况下（白底与黑底桌面）对比度仍达到 design-language §9 的要求，由主题测试检查。
 - [ ] T4 — 白桦与深板岩 (Proposed)
@@ -34,7 +34,7 @@ Status: Proposed
 ## Validation
 
 - T1–T5 的测试通过，并各自证明能失败。
-  Result: pending
+  Result: 2026-10-21（T2）：theme::tests 的 only_the_body_may_be_translucent 与 a_blurred_theme_turns_opaque_where_the_system_cannot_blur 通过，临时去掉 solidify 或让 without_blur 总是返回原样时分别按预期失败；tune_applies_the_chosen_theme_per_appearance_and_the_scale 原先断言半透明的强调色原样传到界面，按 D1 改为不透明。网站主题编辑器从 themes.generated.json 读到同一份可透明颜色表，model.test.ts 新增对应用例，pnpm check 无错误。
 - just check 通过（由 Project Maintainer 运行）。
   Result: pending
 - Project Maintainer 实机检查通过（T6）。
@@ -62,7 +62,7 @@ Consequences: 首页布局有两种顶部；design-language §5 写明两种。
 
 Why: 没有模糊的透明会直接透出桌面上的文字，比不透明更难读。
 
-Consequences: 主题文件可以声明合成用的底色，缺省为同色调内置主题的 page。
+Consequences: 合成用的底色固定为同色调内置主题的 page，与网站主题编辑器计算对比度时用的底色一致，不另设字段。判断按平台：macOS 与 Windows 视为可以模糊，Linux 一律合成；KDE 等能模糊的 Linux 桌面暂时也得到不透明窗口。
 
 ## Decision D4
 
@@ -81,3 +81,4 @@ Consequences: 以后加入其他强调色的主题时，同样核对它与危险
 - [crates/lumilio-ui/src/theme/spec.rs](../../crates/lumilio-ui/src/theme/spec.rs)
 - [crates/lumilio-ui/src/theme/look.rs](../../crates/lumilio-ui/src/theme/look.rs)
 - [crates/lumilio-core/src/tuning.rs](../../crates/lumilio-core/src/tuning.rs)
+- [Plan global-context](global-context.md)

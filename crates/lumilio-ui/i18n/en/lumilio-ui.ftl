@@ -1870,6 +1870,10 @@ settings-theme-missing = This theme leaves out { $count ->
     [one] { $count } colour
    *[other] { $count } colours
     }; the defaults fill in.
+settings-theme-solid = This theme gives { $count ->
+    [one] { $count } colour
+   *[other] { $count } colours
+    } with opacity, but only the page, panels and lines can be translucent; they show as opaque.
 settings-theme-local = Local themes
 settings-theme-local-help = Put .json theme files in this folder, then choose Reload.
 settings-theme-reload = Reload

@@ -34,6 +34,8 @@ export interface ContrastRule {
 }
 
 export const COLOR_KEYS: readonly string[] = generated.colors;
+/** The colours that may carry opacity; the launcher draws the rest solid. */
+export const TRANSLUCENT: readonly string[] = generated.translucent;
 export const DEFAULT_RADIUS: number = generated.radius;
 export const DEFAULT_RADIUS_LG: number = generated.radius_lg;
 export const MAX_RADIUS: number = generated.max_radius;
@@ -107,6 +109,8 @@ export interface Resolved {
   colors: Record<string, string>;
   /** Colours the theme does not give, filled from the built-in theme. */
   missing: string[];
+  /** Colours given with opacity where only the body may have it; drawn solid. */
+  solid: string[];
   radius: number;
   radiusLg: number;
   fonts: Fonts;
@@ -123,9 +127,14 @@ export function resolve(theme: ThemeSpec): Resolved {
   const base = BASE[theme.appearance];
   const colors: Record<string, string> = {};
   const missing: string[] = [];
+  const solid: string[] = [];
   for (const key of COLOR_KEYS) {
     const own = theme.colors[key];
-    if (own) colors[key] = own;
+    const color = own && parseColor(own);
+    if (color && color.a < 255 && !TRANSLUCENT.includes(key)) {
+      colors[key] = formatColor({ ...color, a: 255 });
+      solid.push(key);
+    } else if (own) colors[key] = own;
     else {
       colors[key] = base.colors[key];
       missing.push(key);
@@ -135,6 +144,7 @@ export function resolve(theme: ThemeSpec): Resolved {
     tone: theme.appearance,
     colors,
     missing,
+    solid,
     radius: clampRadius(theme.radius, DEFAULT_RADIUS),
     radiusLg: clampRadius(theme.radius_lg, DEFAULT_RADIUS_LG),
     fonts: theme.fonts,
