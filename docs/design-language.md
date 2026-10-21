@@ -384,6 +384,15 @@ hand.
 | display ink / dim | `#FF6A2A` / `#3D2619` | `#FF6A2A` / `#3A2418` | lit and unlit segments and bars |
 | display label | `#948479` | `#948479` | legends and units on a display (4.5:1 or better) |
 
+Only `page`, `panel` and `hairline` may carry opacity; the theme's window
+material decides what shows through them (§5, Appearance). Every other token
+is drawn solid.
+The launcher's own themes are three pairs of bodies around the same signal
+orange: Aluminium and Night; Birch and Deepslate, a warm cream and a cool
+slate; Glass and Tinted Glass, Aluminium and Night made translucent. A theme
+file may change the accent too (the bundled Catppuccin and Rosé Pine do); it
+then keeps the rules below for whatever colour it takes.
+
 **Signal orange** is the only accent. It marks:
 - the primary key;
 - the open port tab;

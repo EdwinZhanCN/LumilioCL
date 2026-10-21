@@ -463,15 +463,7 @@ fn the_bundled_themes_are_complete_attributed_and_pair_light_with_dark() {
     let bundled: Vec<_> = catalog
         .entries
         .iter()
-        .filter(|entry| {
-            ![
-                super::ALUMINIUM,
-                super::NIGHT,
-                super::GLASS,
-                super::TINTED_GLASS,
-            ]
-            .contains(&entry.spec.name.as_str())
-        })
+        .filter(|entry| !super::OWN.contains(&entry.spec.name.as_str()))
         .collect();
     assert!(bundled.len() >= 4, "{} bundled themes", bundled.len());
     for entry in &bundled {
@@ -550,5 +542,33 @@ fn glass_meets_every_contrast_rule_over_a_desktop_of_its_tone() {
             let floor = if dark { rule.dark } else { rule.light };
             assert!(ratio >= floor, "{name}: {} is {ratio:.2}:1", rule.id);
         }
+    }
+}
+
+/// Birch and Deepslate give every colour and meet every contrast rule, as
+/// the launcher's two bodies do (plan translucent-themes, T4).
+#[test]
+fn the_own_palettes_are_complete_and_meet_every_contrast_rule() {
+    for (name, tone) in [(super::BIRCH, Tone::Light), (super::DEEPSLATE, Tone::Dark)] {
+        let theme = Catalog::default().resolve(Some(name), tone);
+        assert_eq!(theme.name, name);
+        assert!(
+            theme.missing.is_empty(),
+            "{name} misses {:?}",
+            theme.missing
+        );
+        let palette = Palette::of(theme.body);
+        let colour = |key: &str| palette.get(key).expect("a palette colour").0;
+        for rule in RULES {
+            let ratio = contrast(colour(rule.fg), colour(rule.bg));
+            let floor = if tone.is_dark() {
+                rule.dark
+            } else {
+                rule.light
+            };
+            assert!(ratio >= floor, "{name}: {} is {ratio:.2}:1", rule.id);
+        }
+        // The signal stays the launcher's orange (D4).
+        assert_eq!(theme.body.orange, super::Body::of(tone.is_dark()).orange);
     }
 }

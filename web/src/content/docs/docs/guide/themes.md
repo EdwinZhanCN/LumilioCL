@@ -24,6 +24,8 @@ description: 选择内置主题，或用 JSON 文件制作自己的主题。
 | Night | 深色 | 启动器默认 |
 | Glass | 浅色 | 启动器自带，半透明：模糊的桌面上铺一层 Aluminium，在浅色桌面上最清楚 |
 | Tinted Glass | 深色 | 启动器自带，半透明：模糊的桌面上铺一层 Night，在深色桌面上最清楚 |
+| Birch | 浅色 | 启动器自带：暖色的米白机身 |
+| Deepslate | 深色 | 启动器自带：偏冷的石板灰机身 |
 | Catppuccin Latte | 浅色 | [Catppuccin](https://github.com/catppuccin/catppuccin)，MIT 许可 |
 | Catppuccin Mocha | 深色 | [Catppuccin](https://github.com/catppuccin/catppuccin)，MIT 许可 |
 | Rosé Pine Dawn | 浅色 | [Rosé Pine](https://github.com/rose-pine/rose-pine-theme)，MIT 许可 |

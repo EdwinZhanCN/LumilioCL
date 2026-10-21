@@ -19,6 +19,12 @@ pub const NIGHT: &str = "Night";
 pub const GLASS: &str = "Glass";
 /// Name of the built-in translucent dark theme.
 pub const TINTED_GLASS: &str = "Tinted Glass";
+/// Name of the launcher's warm light theme.
+pub const BIRCH: &str = "Birch";
+/// Name of the launcher's cool dark theme.
+pub const DEEPSLATE: &str = "Deepslate";
+/// The launcher's own themes, as against the bundled palettes of others.
+pub const OWN: [&str; 6] = [ALUMINIUM, NIGHT, GLASS, TINTED_GLASS, BIRCH, DEEPSLATE];
 
 /// Where a theme came from.
 #[derive(Clone, Debug, PartialEq)]
@@ -98,6 +104,10 @@ impl Catalog {
     }
 }
 
+/// The launcher's own palettes beyond its two bodies, named after blocks
+/// (plan translucent-themes, D4).
+const OWN_FILES: [&str; 1] = [include_str!("../../themes/lumilio.json")];
+
 /// Theme files shipped with the launcher: other people's palettes, kept as
 /// they published them. Each theme names its source and licence.
 const BUNDLED: [&str; 2] = [
@@ -114,7 +124,7 @@ fn builtin() -> Vec<Entry> {
         glass(GLASS, false),
         glass(TINTED_GLASS, true),
     ];
-    let bundled = BUNDLED.iter().flat_map(|text| {
+    let bundled = OWN_FILES.iter().chain(BUNDLED.iter()).flat_map(|text| {
         parse_file(text)
             .expect("bundled theme files are valid (tested)")
             .into_iter()

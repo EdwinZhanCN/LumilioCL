@@ -27,6 +27,8 @@ The launcher includes these themes:
 | Night | Dark | Launcher default |
 | Glass | Light | Launcher, translucent: Aluminium over the blurred desktop. Clearest over a light desktop |
 | Tinted Glass | Dark | Launcher, translucent: Night over the blurred desktop. Clearest over a dark desktop |
+| Birch | Light | Launcher: a warm cream body |
+| Deepslate | Dark | Launcher: a cool slate body |
 | Catppuccin Latte | Light | [Catppuccin](https://github.com/catppuccin/catppuccin), MIT License |
 | Catppuccin Mocha | Dark | [Catppuccin](https://github.com/catppuccin/catppuccin), MIT License |
 | Rosé Pine Dawn | Light | [Rosé Pine](https://github.com/rose-pine/rose-pine-theme), MIT License |
