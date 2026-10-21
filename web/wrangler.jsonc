@@ -29,7 +29,7 @@
   ],
   // /translate/* queues the summaries it has no rows for, and this Worker's
   // queue() translates them (plan translation-fallback D6). One message per
-  // invocation: a message is at most two model calls of up to two minutes.
+  // invocation: a message is at most five model calls of under a minute.
   // Create once with `wrangler queues create lumilio-translate`.
   "queues": {
     "producers": [{ "binding": "QUEUE", "queue": "lumilio-translate" }],

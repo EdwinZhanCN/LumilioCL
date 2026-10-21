@@ -47,11 +47,12 @@ export const VERSION = `${MODEL} prompt-2`;
 /** Below the free 10,000 a day, so one late batch cannot run over. */
 export const DAILY_NEURONS = 9000;
 export const MAX_IDS = 50;
-// Summaries per model call, and the longest summary worth sending.
-const BATCH = 25;
+// Summaries per model call, and the longest summary worth sending. A call is
+// cut off at about two minutes; ten summaries took 18–56 s, 25 up to 122 s.
+const BATCH = 10;
 const MAX_SUMMARY = 1000;
-// Reasoning took about 4,000 tokens for 25 summaries.
-const MAX_TOKENS = 16000;
+// Reasoning took up to about 3,000 tokens for ten summaries.
+const MAX_TOKENS = 8000;
 /** How long a queued summary keeps other requests from queueing it again. */
 export const CLAIM_SECONDS = 15 * 60;
 

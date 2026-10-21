@@ -36,7 +36,7 @@ MCIM 没有某个项目的中文简介、简介已过期或 MCIM 不可达时，
 - 部署后的真实请求、缓存命中与每日用量。
   Result: 2026-10-20：D1 lumilio-translations 已创建并在远端执行 0001_translations.sql（budget、d1_migrations、summaries）。#49 合入后 web.yml 的 deploy 成功。POST /translate/modrinth {"project_ids":["AANobbMI"]} 与 /translate/curseforge {"modids":[238222]} 均返回 200 和中文行；再次请求时 budget 当日 neuron 不变，确认命中缓存。summaries 只有 platform、id、hash、translated、created（D5）。每日用量与译文质量待 T4。
 - 模型选择有同一批原文的对照，队列、认领与版本 hash 有测试。
-  Result: 2026-10-21：同一提示词下对 Modrinth 33 条、CurseForge 28 条（共 61 条）用 wrangler dev 直接调用 Workers AI 对照。Qwen3-30B 关闭思考：每批 2–5 s，把 Farmer's Delight 意译、写成《我的世界》、无中英文空格。GLM-4.7-Flash 关闭思考（chat_template_kwargs.enable_thinking=false）：Nether Portals 译成末地传送门、overhaul 未译；无 response_format 时六批有三批 JSON 损坏。Qwen 开思考：约 2 neuron/条，改善有限。GLM 开思考加 JSON Schema：上述误译全部消失，名称与空格保留，六批全部可解析，约 6.3 neuron/条，每批 35–110 s。reasoning_effort=low 对两者的输出 token 均无明显影响。GLM-5.3-Flash 不在 Workers Free 计费内且不能关闭思考，未测。web/worker/translate.test.ts 十五项通过；临时把认领改为覆盖、去掉中文判断、hash 不含 VERSION 时，对应三项按预期失败。just web、wrangler d1 migrations apply --local 与 deploy --dry-run（列出 QUEUE / DB / AI / ASSETS）通过。
+  Result: 2026-10-21：同一提示词下对 Modrinth 33 条、CurseForge 28 条（共 61 条）用 wrangler dev 直接调用 Workers AI 对照。Qwen3-30B 关闭思考：每批 2–5 s，把 Farmer's Delight 意译、写成《我的世界》、无中英文空格。GLM-4.7-Flash 关闭思考（chat_template_kwargs.enable_thinking=false）：Nether Portals 译成末地传送门、overhaul 未译；无 response_format 时六批有三批 JSON 损坏。Qwen 开思考：约 2 neuron/条，改善有限。GLM 开思考加 JSON Schema：上述误译全部消失，名称与空格保留，六批全部可解析，约 6.3 neuron/条，每批 35–110 s。reasoning_effort=low 对两者的输出 token 均无明显影响。加入术语表与写法规则（prompt-2）后，25 条一批有一批在约 122 s 时以 Network connection lost 失败；改为 10 条一批，七批 18–56 s 全部可解析，约 9 neuron/条；物品栏、路径追踪、附属模组、重制、原版+ 按术语表输出，没有书名号、我的世界或您，仍有 Entities 译作生物、一处 Version 未译。GLM-5.3-Flash 不在 Workers Free 计费内且不能关闭思考，未测。web/worker/translate.test.ts 十五项通过；临时把认领改为覆盖、去掉中文判断、hash 不含 VERSION 时，对应三项按预期失败。just web、wrangler d1 migrations apply --local 与 deploy --dry-run（列出 QUEUE / DB / AI / ASSETS）通过。
 
 ## Decision D1
 
@@ -90,9 +90,9 @@ Consequences: 消息只含平台与 ID，消费者重新取简介，队列里不
 
 模型改用 @cf/zai-org/glm-4.7-flash，保留默认思考，以 JSON Schema response_format 约束输出；提示词加入术语表与写法规则。覆盖 D3 的模型选择，D1 缓存不变。
 
-Why: 61 条对照（见验证）中只有 GLM 开思考同时避免了误译、意译名称与中英文混排问题；关闭思考或不加 Schema 都有误译或损坏的 JSON。约 6.3 neuron/条，每日预算约可译 1,400 条；每条只翻译一次，足够。
+Why: 61 条对照（见验证）中只有 GLM 开思考同时避免了误译、意译名称与中英文混排问题；关闭思考或不加 Schema 都有误译或损坏的 JSON。每次调用约两分钟会被切断，所以每批 10 条，约 9 neuron/条，每日预算约可译 1,000 条；每条只翻译一次，足够。
 
-Consequences: hash 含 VERSION（模型与提示词版本），换模型或改提示词时提高版本，旧行自动重译并在写入时删除。单价常量按 GLM 的 5,500 / 36,400 neuron 每百万 token 计，含思考 token。
+Consequences: hash 含 VERSION（模型与提示词版本），换模型或改提示词时提高版本，旧行自动重译并在写入时删除。改提示词后若单批变慢，先减小 BATCH。单价常量按 GLM 的 5,500 / 36,400 neuron 每百万 token 计，含思考 token。
 
 ## References
 
