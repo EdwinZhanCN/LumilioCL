@@ -24,6 +24,8 @@ MCIM 没有某个项目的中文简介、简介已过期或 MCIM 不可达时，
   Acceptance: 合入 main 之前：创建 D1 数据库 lumilio-translations，把 database_id 填入 web/wrangler.jsonc 替换占位值，执行 wrangler d1 migrations apply lumilio-translations --remote 建表。CF_API_KEY 不必手动设置，deploy 任务用 --secrets-file 从仓库机密 CF_API_KEY 上传。部署后对一个 Modrinth 与一个 CurseForge 项目 ID 实际请求返回中文行，再次请求命中缓存。服务端使用 CurseForge Key 前核对 CurseForge 的条款。
 - [ ] T4 — 检查译文质量与每日用量。 (Proposed)
   Acceptance: 部署后抽查 Modrinth 与 CurseForge 各若干条译文的术语（模组、整合包、下界、末地等）与专有名词保留；在 Cloudflare 面板核对一天的 neuron 用量与 Worker 内的累计接近，且未超过免费额度。
+- [ ] T5 — 换用 GLM-4.7-Flash（开思考），译文改由队列在后台完成。 (InProgress)
+  Acceptance: 请求只返回 D1 已有行，缺的 ID 经 queued 表认领后发一条只含平台与 ID 的 Queue 消息；同一摘要在 CLAIM_SECONDS 内只排队一次。消费者重新取简介，用 GLM-4.7-Flash（默认思考）与 JSON Schema response_format 翻译，写入后删除旧 hash 行与认领。hash 含模型与提示词版本，旧 Qwen 行不再返回。主要为汉字的简介不送模型。合入前由 Project Maintainer 执行 wrangler queues create lumilio-translate 与 d1 migrations apply --remote（0002_queued.sql）；部署后对未翻译的 ID 请求一次，十分钟内再请求得到中文行。
 
 ## Validation
 
@@ -33,6 +35,8 @@ MCIM 没有某个项目的中文简介、简介已过期或 MCIM 不可达时，
   Result: 2026-10-19：core translation 十三项通过，新增 the_fallback_only_hears_of_what_mcim_could_not_answer（MCIM 命中 a、b 原文过期、c 缺失时 Worker 只收到 b、c；第二次只因 b 再问 MCIM）与 with_mcim_unreachable_every_summary_is_asked_of_the_fallback。临时让 Worker 收到全部 ID 时，该测试与 curseforge_summaries_ask_by_numeric_mod_id 按预期失败。lumilio-core Clippy（-D warnings）、fmt 与 i18n 八项通过，IA 已重新生成。
 - 部署后的真实请求、缓存命中与每日用量。
   Result: 2026-10-20：D1 lumilio-translations 已创建并在远端执行 0001_translations.sql（budget、d1_migrations、summaries）。#49 合入后 web.yml 的 deploy 成功。POST /translate/modrinth {"project_ids":["AANobbMI"]} 与 /translate/curseforge {"modids":[238222]} 均返回 200 和中文行；再次请求时 budget 当日 neuron 不变，确认命中缓存。summaries 只有 platform、id、hash、translated、created（D5）。每日用量与译文质量待 T4。
+- 模型选择有同一批原文的对照，队列、认领与版本 hash 有测试。
+  Result: 2026-10-21：同一提示词下对 Modrinth 33 条、CurseForge 28 条（共 61 条）用 wrangler dev 直接调用 Workers AI 对照。Qwen3-30B 关闭思考：每批 2–5 s，把 Farmer's Delight 意译、写成《我的世界》、无中英文空格。GLM-4.7-Flash 关闭思考（chat_template_kwargs.enable_thinking=false）：Nether Portals 译成末地传送门、overhaul 未译；无 response_format 时六批有三批 JSON 损坏。Qwen 开思考：约 2 neuron/条，改善有限。GLM 开思考加 JSON Schema：上述误译全部消失，名称与空格保留，六批全部可解析，约 6.3 neuron/条，每批 35–110 s。reasoning_effort=low 对两者的输出 token 均无明显影响。GLM-5.3-Flash 不在 Workers Free 计费内且不能关闭思考，未测。web/worker/translate.test.ts 十五项通过；临时把认领改为覆盖、去掉中文判断、hash 不含 VERSION 时，对应三项按预期失败。just web、wrangler d1 migrations apply --local 与 deploy --dry-run（列出 QUEUE / DB / AI / ASSETS）通过。
 
 ## Decision D1
 
@@ -74,6 +78,22 @@ Why: CurseForge 3rd Party API Terms（2024-08-14 版）§3.1(e) 禁止 save or c
 
 Consequences: summaries 表不得加入原文、标题或其他上游字段，Worker 不得记录上游响应。若 Overwolf 提出异议，清空 Worker 的 CF_API_KEY 即停用 CurseForge 回退，启动器显示原文，无需发版。
 
+## Decision D6
+
+/translate 只返回已有译文；缺的摘要由 Cloudflare Queue 的消费者（同一 Worker 的 queue()）翻译并存入 D1。
+
+Why: 启动器等 Worker 20 秒（crates/lumilio-core/src/translation/protocol.rs），开思考的模型一批要 35–110 秒；客户端断开会取消请求，译文存不下。ctx.waitUntil 在响应后最多再运行 30 秒。Queues 在 Workers Free 计费内（每日 10,000 次操作），消费者每次可运行 15 分钟。启动器把未命中缓存 10 分钟后再问，所以新译文在下一次查询时出现。
+
+Consequences: 消息只含平台与 ID，消费者重新取简介，队列里不留上游数据（D5）。queued 表防止排队中的摘要被重复排队；失败的批次不重试，认领过期后由后来的请求重新排队。新部署前要先创建队列 lumilio-translate。
+
+## Decision D7
+
+模型改用 @cf/zai-org/glm-4.7-flash，保留默认思考，以 JSON Schema response_format 约束输出；提示词加入术语表与写法规则。覆盖 D3 的模型选择，D1 缓存不变。
+
+Why: 61 条对照（见验证）中只有 GLM 开思考同时避免了误译、意译名称与中英文混排问题；关闭思考或不加 Schema 都有误译或损坏的 JSON。约 6.3 neuron/条，每日预算约可译 1,400 条；每条只翻译一次，足够。
+
+Consequences: hash 含 VERSION（模型与提示词版本），换模型或改提示词时提高版本，旧行自动重译并在写入时删除。单价常量按 GLM 的 5,500 / 36,400 neuron 每百万 token 计，含思考 token。
+
 ## References
 
 - [.agents/plans/discover-translation.json](../../.agents/plans/discover-translation.json)
@@ -83,6 +103,11 @@ Consequences: summaries 表不得加入原文、标题或其他上游字段，Wo
 - https://developers.cloudflare.com/workers/configuration/secrets/
 - https://developers.cloudflare.com/workers-ai/platform/pricing/
 - https://developers.cloudflare.com/workers-ai/models/qwen3-30b-a3b-fp8/
+- https://developers.cloudflare.com/workers-ai/models/glm-4.7-flash/
+- https://developers.cloudflare.com/workers/runtime-apis/context/
+- https://developers.cloudflare.com/queues/platform/limits/
+- https://developers.cloudflare.com/queues/platform/pricing/
+- [web/migrations/0002_queued.sql](../../web/migrations/0002_queued.sql)
 - https://developers.cloudflare.com/d1/platform/pricing/
 - https://docs.modrinth.com/api/operations/getprojects/
 - https://docs.curseforge.com/rest-api/#get-mods

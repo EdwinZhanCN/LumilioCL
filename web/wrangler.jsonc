@@ -27,6 +27,14 @@
       "migrations_dir": "migrations"
     }
   ],
+  // /translate/* queues the summaries it has no rows for, and this Worker's
+  // queue() translates them (plan translation-fallback D6). One message per
+  // invocation: a message is at most two model calls of up to two minutes.
+  // Create once with `wrangler queues create lumilio-translate`.
+  "queues": {
+    "producers": [{ "binding": "QUEUE", "queue": "lumilio-translate" }],
+    "consumers": [{ "queue": "lumilio-translate", "max_batch_size": 1, "max_concurrency": 2, "max_retries": 2 }]
+  },
   "routes": [{ "pattern": "launcher.lumilio.org", "custom_domain": true }],
   "observability": { "enabled": true }
 }
