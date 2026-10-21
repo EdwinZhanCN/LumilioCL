@@ -41,7 +41,7 @@ fn ask_java(wiring: &Wiring, conflict: &JavaConflict, window: &mut Window, cx: &
     java_conflict::ask(
         conflict,
         std::rc::Rc::new(move |answer, window, cx| {
-            let Some(id) = wiring.state.borrow().continue_id.clone() else {
+            let Some(id) = wiring.backend.service.context().current_instance else {
                 return;
             };
             if answer == JavaConflictAnswer::Switch {
@@ -68,49 +68,10 @@ pub(super) fn on_shell_intent(
     cx: &mut App,
 ) {
     match intent {
+        // Home explains a failure only while its game is current, so
+        // recovering retries that game.
         ShellIntent::Home(HomeIntent::Continue | HomeIntent::Recover) => {
-            // Asked of the service, not the page: an account added a moment ago
-            // may not have reached the page's model yet.
-            let service = wiring.backend.service.clone();
-            let answered = wiring.state.borrow_mut().java_answered.take();
-            let check_java = wiring
-                .state
-                .borrow()
-                .continue_id
-                .clone()
-                .filter(|id| answered.as_ref() != Some(id));
-            let work = wiring.backend.spawn(async move {
-                let has_account = account_rows(&service.settings().await)
-                    .iter()
-                    .any(|row| row.selected);
-                let conflict = match check_java {
-                    Some(id) => service
-                        .instance_java(&id)
-                        .await
-                        .ok()
-                        .and_then(|java| JavaConflict::of(&java)),
-                    None => None,
-                };
-                (has_account, conflict)
-            });
-            let wiring = wiring.clone();
-            let window = window.window_handle();
-            cx.spawn(async move |cx| {
-                let (has_account, conflict) =
-                    answer(&wiring, work, cx).await.unwrap_or((true, None));
-                if has_account && conflict.is_none() {
-                    cx.update(|cx| start_launch(&wiring, window, cx));
-                    return;
-                }
-                let _ = wiring.shell.update(cx, |shell, cx| shell.abort_launch(cx));
-                let _ = cx.update_window(window, |_, window, cx| match conflict {
-                    // The chosen Java cannot run the game: ask once, then start.
-                    Some(conflict) if has_account => ask_java(&wiring, &conflict, window, cx),
-                    // No account: ask for one, then start where the person left off.
-                    _ => open_add_account(&wiring, true, window, cx),
-                });
-            })
-            .detach();
+            continue_launch(wiring, window.window_handle(), cx);
         }
         ShellIntent::Home(HomeIntent::CancelLaunch | HomeIntent::StopGame) => {
             if let Some(cancel) = wiring.state.borrow().cancel.clone() {
@@ -126,6 +87,50 @@ pub(super) fn on_shell_intent(
         ShellIntent::Home(HomeIntent::TechnicalDetails) => technical_details(wiring, window, cx),
         ShellIntent::Navigate(Route::Home) | ShellIntent::Home(HomeIntent::Import) => {}
     }
+}
+
+/// Starts the current game, once there is an account and its Java can run it.
+fn continue_launch(wiring: &Wiring, window: gpui_kit::AnyWindowHandle, cx: &mut App) {
+    // Asked of the service, not the page: an account added a moment ago
+    // may not have reached the page's model yet.
+    let service = wiring.backend.service.clone();
+    let answered = wiring.state.borrow_mut().java_answered.take();
+    let check_java = wiring
+        .backend
+        .service
+        .context()
+        .current_instance
+        .filter(|id| answered.as_ref() != Some(id));
+    let work = wiring.backend.spawn(async move {
+        let has_account = account_rows(&service.settings().await)
+            .iter()
+            .any(|row| row.selected);
+        let conflict = match check_java {
+            Some(id) => service
+                .instance_java(&id)
+                .await
+                .ok()
+                .and_then(|java| JavaConflict::of(&java)),
+            None => None,
+        };
+        (has_account, conflict)
+    });
+    let wiring = wiring.clone();
+    cx.spawn(async move |cx| {
+        let (has_account, conflict) = answer(&wiring, work, cx).await.unwrap_or((true, None));
+        if has_account && conflict.is_none() {
+            cx.update(|cx| start_launch(&wiring, window, cx));
+            return;
+        }
+        let _ = wiring.shell.update(cx, |shell, cx| shell.abort_launch(cx));
+        let _ = cx.update_window(window, |_, window, cx| match conflict {
+            // The chosen Java cannot run the game: ask once, then start.
+            Some(conflict) if has_account => ask_java(&wiring, &conflict, window, cx),
+            // No account: ask for one, then start where the person left off.
+            _ => open_add_account(&wiring, true, window, cx),
+        });
+    })
+    .detach();
 }
 
 pub(super) fn on_live_intent(
@@ -285,7 +290,10 @@ pub(super) fn on_live_intent(
         LiveIntent::ExportPackOf(id) => {
             open_instance(wiring, id, Some(InstanceIntent::ExportPack), window, cx)
         }
-        LiveIntent::Refresh => reload(wiring, Reload::All, cx),
+        LiveIntent::Refresh => {
+            reload(wiring, Reload::Lists, cx);
+            super::context::check_again(wiring, cx);
+        }
         LiveIntent::ToggleFavorite(id) => {
             let service = wiring.backend.service.clone();
             job(
@@ -362,7 +370,7 @@ pub(super) fn on_live_intent(
                 wiring,
                 cx,
                 false,
-                Reload::Lists,
+                Reload::Nothing,
                 None,
                 async move { service.refresh_account(&key).await },
                 |shell, result, cx| {
@@ -385,7 +393,7 @@ pub(super) fn on_live_intent(
                 wiring,
                 cx,
                 false,
-                Reload::Lists,
+                Reload::Nothing,
                 None,
                 async move { service.select_account(&name).await },
                 |shell, result, cx| {
@@ -405,7 +413,7 @@ pub(super) fn on_live_intent(
                 wiring,
                 cx,
                 false,
-                Reload::Lists,
+                Reload::Nothing,
                 None,
                 async move { service.remove_account(&name).await },
                 move |shell, result, cx| {
@@ -438,14 +446,13 @@ pub(super) fn on_live_intent(
         LiveIntent::ApplyUpdate => update::apply(wiring),
         LiveIntent::SetPluginEnabled { id, enabled } => {
             let service = wiring.backend.service.clone();
-            let changed = wiring.clone();
             change_setting(
                 wiring,
                 window,
                 async move { service.set_plugin_enabled(&id, enabled).await },
                 tr!("settings-plugin-save-failed"),
                 None,
-                move |_, cx| reload(&changed, Reload::All, cx),
+                |_, _| {},
                 cx,
             );
         }
@@ -463,14 +470,13 @@ pub(super) fn on_live_intent(
         }
         LiveIntent::ResetPlugin(id) => {
             let service = wiring.backend.service.clone();
-            let changed = wiring.clone();
             change_setting(
                 wiring,
                 window,
                 async move { service.reset_plugin(&id).await },
                 tr!("settings-plugin-reset-failed"),
                 None,
-                move |_, cx| reload(&changed, Reload::All, cx),
+                |_, _| {},
                 cx,
             );
         }

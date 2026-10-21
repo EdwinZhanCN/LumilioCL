@@ -9,6 +9,7 @@ mod home_page;
 mod instance;
 mod locations;
 mod memory;
+mod mirror;
 mod queries;
 mod render;
 mod routing;
@@ -72,7 +73,6 @@ pub struct LauncherShell {
     home: HomePresentation,
     hero: Entity<HeroCarousel>,
     activity: ActivitySummary,
-    game_running: bool,
     focus_handle: FocusHandle,
     intent_handler: Option<IntentHandler>,
     last_intent: Option<ShellIntent>,
@@ -93,6 +93,8 @@ pub struct LauncherShell {
     history: History<Location>,
     /// Draws again when a view posts a toast, so it floats up (§11).
     _posted: Subscription,
+    /// What core last published (see `mirror`).
+    context: lumilio_core::Context,
 }
 
 impl LauncherShell {
@@ -102,7 +104,6 @@ impl LauncherShell {
             home: home::initial_presentation(),
             hero: cx.new(HeroCarousel::new),
             activity: ActivitySummary::new(0),
-            game_running: false,
             focus_handle: cx.focus_handle(),
             intent_handler: None,
             last_intent: None,
@@ -117,6 +118,7 @@ impl LauncherShell {
             live_instance: None,
             history: History::new(HISTORY_LIMIT),
             _posted: cx.observe_global::<toast::Posted>(|_, cx| cx.notify()),
+            context: lumilio_core::Context::default(),
         }
     }
 

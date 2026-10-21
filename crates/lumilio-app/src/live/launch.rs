@@ -10,7 +10,8 @@ use lumilio_ui::toast::Toast;
 use lumilio_ui::tr;
 
 pub(super) fn start_launch(wiring: &Wiring, window: gpui_kit::AnyWindowHandle, cx: &mut App) {
-    let Some(id) = wiring.state.borrow().continue_id.clone() else {
+    // Continue starts the current game, which core owns.
+    let Some(id) = wiring.backend.service.context().current_instance else {
         return;
     };
     let cancel = CancellationToken::new();
@@ -27,6 +28,7 @@ pub(super) fn start_launch(wiring: &Wiring, window: gpui_kit::AnyWindowHandle, c
         let mut state = wiring.state.borrow_mut();
         (state.next_world.take(), state.next_server.take())
     };
+    let instance = id.clone();
     let handle = wiring.backend.spawn(async move {
         match (world, server) {
             (Some(world), _) => service.launch_world(&id, &world, tx, cancel).await,
@@ -37,18 +39,9 @@ pub(super) fn start_launch(wiring: &Wiring, window: gpui_kit::AnyWindowHandle, c
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
         let after = answer(&wiring, after, cx).await.unwrap_or_default();
-        let instance = wiring
-            .state
-            .borrow()
-            .continue_id
-            .clone()
-            .unwrap_or_default();
         wiring.state.borrow_mut().game_log = Some((instance.clone(), Default::default()));
         // The page can tell the game is on its way before it prints anything.
         push_game_log(&wiring, true, cx);
-        cx.update(|cx| {
-            super::instance_plugins::studio_windows_game_changed(&wiring, &instance, true, cx)
-        });
         let mut unsent = false;
         // The channel closes when the launch is over, so this ends with it.
         loop {
@@ -103,13 +96,8 @@ pub(super) fn start_launch(wiring: &Wiring, window: gpui_kit::AnyWindowHandle, c
         }
         wiring.state.borrow_mut().cancel = None;
         push_game_log(&wiring, false, cx);
-        let ended = wiring.state.borrow_mut().game_log.take().map(|(id, _)| id);
-        if let Some(id) = ended {
-            cx.update(|cx| {
-                super::instance_plugins::studio_windows_game_changed(&wiring, &id, false, cx)
-            });
-        }
-        cx.update(|cx| reload(&wiring, Reload::All, cx));
+        wiring.state.borrow_mut().game_log = None;
+        cx.update(|cx| reload(&wiring, Reload::Lists, cx));
     })
     .detach();
 }
@@ -126,28 +114,24 @@ pub(super) fn review_recovery(
     window: gpui_kit::AnyWindowHandle,
     cx: &mut App,
 ) {
+    // Home explains a failure only for the current game (D8).
+    let current = wiring.backend.service.context().current_instance;
     let service = wiring.backend.service.clone();
-    let handle = wiring.backend.spawn(async move {
-        (
-            service.library().await.instances,
-            service.current_instance().await,
-        )
-    });
+    let handle = wiring
+        .backend
+        .spawn(async move { service.library().await.instances });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let Some((records, current)) = answer(&wiring, handle, cx).await else {
+        let Some(records) = answer(&wiring, handle, cx).await else {
             return;
         };
         let cards = lumilio_ui::live::library_cards(&records, lumilio_core::unix_now());
         let Some(card) = cards
-            .iter()
+            .into_iter()
             .find(|card| Some(&card.id) == current.as_ref())
-            .or(cards.first())
-            .cloned()
         else {
             return;
         };
-        wiring.state.borrow_mut().continue_id = Some(card.id.clone());
         let signals = match which.as_str() {
             "crashed" | "crashed-details" => {
                 vec![LaunchSignal::Running, LaunchSignal::Exited { code: None }]
@@ -169,7 +153,6 @@ pub(super) fn review_recovery(
                         metadata: format!("{} · {}", card.meta, card.played),
                         world: card.world,
                     },
-                    recent: Vec::new(),
                 }
                 .begin_launch(),
                 cx,
@@ -230,47 +213,84 @@ pub(super) fn push_game_log(wiring: &Wiring, running: bool, cx: &mut gpui_kit::A
         .update(cx, |shell, cx| shell.game_output(&id, lines, running, cx));
 }
 
-/// Launches a chosen instance through Home's launch moment.
+/// Launches a chosen instance through Home's launch moment. It becomes the
+/// current game first (decision D4), so Continue, the chip and the next
+/// start agree on what is playing.
 pub(super) fn play(wiring: &Wiring, id: String, window: &mut Window, cx: &mut App) {
     let wiring = wiring.clone();
     // Deferred: this may be running inside one of the shell's own updates.
-    window.defer(cx, move |window, cx| {
-        let state = wiring.state.clone();
+    window.defer(cx, move |window, cx| play_now(&wiring, id, window, cx));
+}
+
+fn play_now(wiring: &Wiring, id: String, window: &mut Window, cx: &mut App) {
+    let can_start = wiring
+        .shell
+        .read_with(cx, |shell, _| shell.can_start())
+        .unwrap_or(false);
+    if !can_start {
         // A world or server asked for with a launch that does not happen must
         // not carry over to the next one.
-        let forget_target = || {
-            let mut state = state.borrow_mut();
-            state.next_world = None;
-            state.next_server = None;
-        };
+        forget_target(wiring);
         let _ = wiring.shell.update(cx, |shell, cx| {
-            if !shell.home().can_start() {
-                forget_target();
-                shell.toast(Toast::info(tr!("launch-already-running")), cx);
-                return;
-            }
-            let Some(card) = shell
-                .live()
-                .and_then(|model| model.library.iter().find(|card| card.id == id))
-                .cloned()
-            else {
-                forget_target();
-                return;
-            };
-            state.borrow_mut().continue_id = Some(id.clone());
-            shell.set_home(
-                HomePresentation::Continue {
-                    subject: Subject {
-                        id: Some(id),
-                        title: card.name,
-                        metadata: format!("{} · {}", card.meta, card.played),
-                        world: card.world,
-                    },
-                    recent: Vec::new(),
-                },
-                cx,
-            );
-            shell.request_continue(window, cx);
+            shell.toast(Toast::info(tr!("launch-already-running")), cx)
         });
-    });
+        return;
+    }
+    let saved = super::library::save_current(wiring, id.clone());
+    let wiring = wiring.clone();
+    let window = window.window_handle();
+    cx.spawn(async move |cx| {
+        let failed = match saved.await {
+            Ok(Ok(())) => None,
+            Ok(Err(error)) => Some(error.to_string()),
+            // The saving worker stopped without answering.
+            Err(_) => Some(tr!("common-work-stopped").to_owned()),
+        };
+        if let Some(cause) = failed {
+            forget_target(&wiring);
+            let _ = wiring.shell.update(cx, |shell, cx| {
+                shell.toast(
+                    Toast::error(tr!("library-current-save-failed")).technical(cause),
+                    cx,
+                );
+            });
+            return;
+        }
+        let _ = cx.update_window(window, |_, window, cx| {
+            let _ = wiring.shell.update(cx, |shell, cx| {
+                // Another launch began while the choice was saved.
+                if !shell.can_start() {
+                    forget_target(&wiring);
+                    return;
+                }
+                let Some(card) = shell
+                    .live()
+                    .and_then(|model| model.library.iter().find(|card| card.id == id))
+                    .cloned()
+                else {
+                    forget_target(&wiring);
+                    return;
+                };
+                shell.set_home(
+                    HomePresentation::Continue {
+                        subject: Subject {
+                            id: Some(id),
+                            title: card.name,
+                            metadata: format!("{} · {}", card.meta, card.played),
+                            world: card.world,
+                        },
+                    },
+                    cx,
+                );
+                shell.request_continue(window, cx);
+            });
+        });
+    })
+    .detach();
+}
+
+fn forget_target(wiring: &Wiring) {
+    let mut state = wiring.state.borrow_mut();
+    state.next_world = None;
+    state.next_server = None;
 }

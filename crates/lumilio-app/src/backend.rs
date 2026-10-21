@@ -21,6 +21,20 @@ pub struct Backend {
 
 impl Backend {
     pub fn open(root: PathBuf) -> Result<Self, String> {
+        Self::build(root, |service| service)
+    }
+
+    /// Opens with `adjust` applied to the service first (tests: where Java
+    /// is searched for).
+    #[cfg(test)]
+    pub(crate) fn open_with(
+        root: PathBuf,
+        adjust: impl FnOnce(Service) -> Service,
+    ) -> Result<Self, String> {
+        Self::build(root, adjust)
+    }
+
+    fn build(root: PathBuf, adjust: impl FnOnce(Service) -> Service) -> Result<Self, String> {
         let runtime = Builder::new_multi_thread()
             .worker_threads(2)
             .thread_name("lumilio-worker")
@@ -45,7 +59,8 @@ impl Backend {
                     Arc::new(lumilio_plugin_world_explorer::WorldExplorer),
                 ],
             )
-            .map_err(|error| error.to_string())?
+            .map_err(|error| error.to_string())
+            .map(adjust)?
         };
         Ok(Self {
             runtime,

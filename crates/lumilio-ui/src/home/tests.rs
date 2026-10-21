@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 use lumilio_core::{LaunchFailure, LaunchPhase, LaunchSignal};
 
 use super::{
-    BAR_SEGMENTS, HomeIntent, HomePresentation, RecentEntry, RecoveryDetail, Subject, WorldHint,
+    BAR_SEGMENTS, HomeIntent, HomePresentation, RecoveryDetail, Subject, WorldHint,
     filled_segments, play_minutes, recovery_sentence,
 };
 use crate::hero::{HeroMode, Landmark, Scene};
@@ -18,14 +18,7 @@ fn subject() -> Subject {
 }
 
 fn continuing() -> HomePresentation {
-    HomePresentation::Continue {
-        subject: subject(),
-        recent: vec![RecentEntry {
-            id: None,
-            title: "空岛".into(),
-            metadata: "昨天".into(),
-        }],
-    }
+    HomePresentation::Continue { subject: subject() }
 }
 
 #[test]

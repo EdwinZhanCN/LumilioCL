@@ -228,9 +228,15 @@ pub struct InstanceStore {
     index: Index,
     recovered: bool,
     preserved: Option<PathBuf>,
+    /// Where saves are published (plan global-context).
+    hub: Option<crate::context::ContextHub>,
 }
 
 impl InstanceStore {
+    pub(crate) fn publish_to(&mut self, hub: crate::context::ContextHub) {
+        self.hub = Some(hub);
+    }
+
     /// Opens the library under `root`, creating `launcher.db` when missing.
     ///
     /// A database that is not readable is preserved as `launcher.db.broken`
@@ -257,6 +263,7 @@ impl InstanceStore {
             index: Index::default(),
             recovered,
             preserved,
+            hub: None,
         };
         store.load()?;
         Ok(store)
@@ -917,6 +924,9 @@ impl InstanceStore {
         transaction.pragma_update(None, "user_version", SCHEMA_VERSION)?;
         transaction.commit()?;
         self.index = next;
+        if let Some(hub) = &self.hub {
+            hub.bump(crate::context::Change::Library);
+        }
         Ok(())
     }
 }

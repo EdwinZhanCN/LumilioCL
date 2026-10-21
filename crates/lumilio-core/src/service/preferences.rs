@@ -30,6 +30,34 @@ impl<T: Transport + Clone> LauncherService<T> {
         exists.then_some(saved)
     }
 
+    /// The current game and account, and how often shared state has changed
+    /// (plan global-context).
+    pub fn context(&self) -> crate::context::Context {
+        self.context.get()
+    }
+
+    /// Every later change of [`Self::context`]; only the newest is kept.
+    pub fn subscribe_context(&self) -> tokio::sync::watch::Receiver<crate::context::Context> {
+        self.context.subscribe()
+    }
+
+    /// Keeps the saved current game one that exists: when it is missing or
+    /// gone, the fallback becomes current and is saved. A save that fails
+    /// leaves the old choice, which reads as `None` until the next change.
+    pub(super) async fn settle_current(&self) {
+        let records = self.store.lock().await.instances().to_vec();
+        // The published choice still names a game: the settings stay untouched.
+        if self
+            .context
+            .get()
+            .current_instance
+            .is_some_and(|id| records.iter().any(|record| record.id == id))
+        {
+            return;
+        }
+        let _ = settle_current(&records, &mut *self.settings.lock().await);
+    }
+
     /// Remembers the current instance. It must exist.
     pub async fn set_current_instance(&self, id: &str) -> Result<(), ServiceError> {
         if self.store.lock().await.get(id).is_none() {
@@ -212,4 +240,23 @@ impl<T: Transport + Clone> LauncherService<T> {
         )?;
         Ok(self.store.lock().await.update_settings(id, settings)?)
     }
+}
+
+/// See [`LauncherService::settle_current`]; also run once on opening.
+pub(super) fn settle_current(
+    records: &[crate::instance::InstanceRecord],
+    settings: &mut crate::settings::SettingsStore,
+) -> Result<(), crate::settings::SettingsError> {
+    let saved = settings.get().current_instance.clone();
+    if saved
+        .as_deref()
+        .is_some_and(|id| records.iter().any(|record| record.id == id))
+    {
+        return Ok(());
+    }
+    let next = crate::context::fallback_instance(records).map(str::to_owned);
+    if next == saved {
+        return Ok(());
+    }
+    settings.set_current_instance(next)
 }

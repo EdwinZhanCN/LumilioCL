@@ -8,9 +8,9 @@
 |---|---|---|---|---|
 | 出现「投影」标签 | 游戏页「插件」标签内的左侧列表 | 装了 Litematica 或 schematics 文件夹里已有文件时出现；在设置 → 插件里关掉就消失 | 空的 schematics 文件夹不算（插件只能列出文件） | `lumilio-plugin-litematica/src/lib.rs` |
 | 结束游戏 | 本启动器启动的游戏运行时，页头主按钮变「结束游戏」 | 终止进程，会话写入历史 |  | `lumilio-ui/src/instance_detail/actions.rs` |
-| 开始游戏 | 页头主按钮「启动游戏」 | 首页启动时刻接管 |  | `lumilio-ui/src/instance_detail/actions.rs` |
+| 开始游戏 | 页头主按钮「启动游戏」 | 先设为当前游戏，再由首页启动时刻接管 |  | `lumilio-ui/src/instance_detail/actions.rs` |
 | 安装游戏文件 | 页头 ⋯ 菜单（游戏还没装好时才有） | 后台任务，动态可见；完成 toast |  | `lumilio-ui/src/instance_detail/actions.rs` |
-| 设为当前游戏 | 页头 ⋯ 菜单 | 导航右段芯片跟着换；之后的启动指向它 |  | `lumilio-ui/src/instance_detail/actions.rs` |
+| 设为当前游戏 | 页头 ⋯ 菜单 | 当前游戏换成它：芯片、首页「继续」和发现页的安装目标跟着换；之后的启动指向它 |  | `lumilio-ui/src/instance_detail/actions.rs` |
 | 修复游戏文件 | 页头 ⋯ 菜单 | 核对并补齐/重下损坏文件，后台任务，动态可见 | 运行中或没装好时禁用 | `lumilio-ui/src/instance_detail/actions.rs` |
 | 创建快照 | 页头 ⋯ 菜单 → 弹窗（备注可空；范围＝全部或某个世界） | 后台创建，历史·快照可见 |  | `lumilio-ui/src/instance_detail/actions.rs` |
 | 在访达中显示 | 页头 ⋯ 菜单 | 打开游戏目录 |  | `lumilio-ui/src/instance_detail/actions.rs` |

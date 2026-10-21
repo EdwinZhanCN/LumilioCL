@@ -119,12 +119,11 @@ fn home_offers_the_newest_instance_until_something_was_played() {
     let records = [record("a", false, None, 1), record("b", false, None, 5)];
     let (home, id) = home_presentation(&records, &HomeSummary::default(), None, NOW);
     assert_eq!(id.as_deref(), Some("b"));
-    let HomePresentation::Continue { subject, recent } = home else {
+    let HomePresentation::Continue { subject } = home else {
         panic!("expected Continue");
     };
     assert_eq!(subject.title, "B");
     assert!(subject.metadata.contains("还没玩过"));
-    assert!(recent.is_empty());
 }
 
 #[test]
@@ -136,22 +135,18 @@ fn home_follows_the_summary() {
     ];
     let summary = HomeSummary {
         continue_with: Some("b".to_owned()),
-        recent: vec!["c".to_owned(), "a".to_owned(), "ghost".to_owned()],
         needs_attention: Vec::<AttentionItem>::new(),
     };
     let (home, id) = home_presentation(&records, &summary, None, NOW);
     assert_eq!(id.as_deref(), Some("b"));
-    let HomePresentation::Continue { subject, recent } = home else {
+    let HomePresentation::Continue { subject } = home else {
         panic!("expected Continue");
     };
     assert!(subject.metadata.contains("上次游玩于"));
-    // A stale id in the summary is skipped, not shown.
-    let titles: Vec<_> = recent.iter().map(|entry| entry.title.as_str()).collect();
-    assert_eq!(titles, ["C", "A"]);
 }
 
 #[test]
-fn home_continues_with_the_current_instance_and_does_not_list_it_twice() {
+fn home_continues_with_the_current_instance() {
     let records = [
         record("a", false, Some(100), 1),
         record("b", false, Some(900_000), 2),
@@ -159,17 +154,14 @@ fn home_continues_with_the_current_instance_and_does_not_list_it_twice() {
     ];
     let summary = HomeSummary {
         continue_with: Some("b".to_owned()),
-        recent: vec!["c".to_owned(), "a".to_owned()],
         needs_attention: Vec::<AttentionItem>::new(),
     };
     let (home, id) = home_presentation(&records, &summary, Some("c"), NOW);
     assert_eq!(id.as_deref(), Some("c"));
-    let HomePresentation::Continue { subject, recent } = home else {
+    let HomePresentation::Continue { subject } = home else {
         panic!("expected Continue");
     };
     assert_eq!(subject.title, "C");
-    let titles: Vec<_> = recent.iter().map(|entry| entry.title.as_str()).collect();
-    assert_eq!(titles, ["A"]);
     // A current instance that no longer exists is ignored.
     let (_, id) = home_presentation(&records, &summary, Some("ghost"), NOW);
     assert_eq!(id.as_deref(), Some("b"));
@@ -509,7 +501,7 @@ fn set_activity_gives_running_rows_a_speed_names_the_game_and_forgets_finished_t
     };
     let card = |id: &str| library_card(&record(id, false, None, 1), NOW);
     let mut model = LiveModel::default();
-    model.set_library(vec![card("a")], None);
+    model.set_library(vec![card("a")]);
     model.set_activity(vec![running(100)], 1_000);
     assert_eq!(model.activity[0].rate, None);
     assert_eq!(model.activity[0].detail, "A", "the game's name, not its id");
@@ -559,7 +551,7 @@ fn an_activity_tab_shows_only_its_category_and_all_shows_everything() {
 fn a_collection_lists_its_games_that_still_exist_and_marks_membership() {
     let card = |id: &str| library_card(&record(id, false, None, 1), NOW);
     let mut model = LiveModel::default();
-    model.set_library(vec![card("a"), card("b"), card("c")], None);
+    model.set_library(vec![card("a"), card("b"), card("c")]);
     model.collections = vec![
         CollectionRow {
             name: "生存".into(),
@@ -603,23 +595,6 @@ fn unknown_progress_is_not_a_fraction() {
         retry: None,
     };
     assert_eq!(active_row(&task, false).fraction, None);
-}
-
-#[test]
-fn the_install_target_survives_refreshes_and_falls_back_when_deleted() {
-    let card = |id: &str| library_card(&record(id, false, None, 1), NOW);
-    let mut model = LiveModel::default();
-    model.set_library(vec![card("a"), card("b")], Some("b".to_owned()));
-    assert_eq!(model.install_target.as_deref(), Some("b"));
-    // The person's own choice wins over later hints.
-    model.install_target = Some("a".to_owned());
-    model.set_library(vec![card("a"), card("b")], Some("b".to_owned()));
-    assert_eq!(model.install_target.as_deref(), Some("a"));
-    // The chosen instance was deleted: fall back rather than dangle.
-    model.set_library(vec![card("b")], None);
-    assert_eq!(model.install_target.as_deref(), Some("b"));
-    model.set_library(Vec::new(), None);
-    assert_eq!(model.install_target, None);
 }
 
 fn shown(current: u32, pages: u32) -> String {

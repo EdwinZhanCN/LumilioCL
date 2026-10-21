@@ -1,6 +1,6 @@
 use super::super::{ActivitySummary, LauncherShell, ShellIntent};
 use super::{continuing, fill, painted_at, settle};
-use crate::home::{HomeIntent, HomePresentation, RecentEntry, Subject, WorldHint};
+use crate::home::{HomeIntent, HomePresentation, Subject, WorldHint};
 use gpui::{Modifiers, TestAppContext};
 use lumilio_core::{LaunchPhase, LaunchSignal};
 use std::cell::RefCell;
@@ -177,7 +177,7 @@ fn home_scrolls_under_the_wheel(cx: &mut TestAppContext) {
     cx.update(gpui_component::init);
     let (_shell, cx) = cx.add_window_view(|_, cx| {
         LauncherShell::new(cx)
-            .with_home(continuing(), cx)
+            .with_home(HomePresentation::FirstUse, cx)
             .with_intent_handler(Rc::new(|_, _, _| {}))
     });
     cx.simulate_resize(gpui::size(px(1080.), px(500.)));
@@ -211,7 +211,7 @@ fn activity_summary_formats_a_bounded_badge() {
 }
 
 #[gpui::test]
-fn home_lists_what_needs_attention_with_one_remedy_and_recent_games_open(cx: &mut TestAppContext) {
+fn home_lists_what_needs_attention_with_one_remedy(cx: &mut TestAppContext) {
     use crate::home::AttentionRow;
     use crate::instance_detail::ProblemAction;
     use crate::live::LiveIntent;
@@ -233,11 +233,6 @@ fn home_lists_what_needs_attention_with_one_remedy_and_recent_games_open(cx: &mu
                     metadata: "1.21.1 · Fabric".into(),
                     world: WorldHint::Underground,
                 },
-                recent: vec![RecentEntry {
-                    id: Some("sky".into()),
-                    title: "空岛".into(),
-                    metadata: "昨天".into(),
-                }],
             },
             cx,
         );
@@ -262,12 +257,6 @@ fn home_lists_what_needs_attention_with_one_remedy_and_recent_games_open(cx: &mu
     assert_eq!(
         seen.borrow().last(),
         Some(&LiveIntent::Resolve("sky".into(), ProblemAction::Repair))
-    );
-    let card = cx.debug_bounds("home-recent-0").expect("recent card");
-    cx.simulate_click(card.center(), Modifiers::none());
-    assert_eq!(
-        seen.borrow().last(),
-        Some(&LiveIntent::OpenInstance("sky".into()))
     );
 }
 
@@ -340,9 +329,10 @@ fn places_of(instance: &str) -> crate::live::HomePlaces {
 }
 
 /// Under the world: the continued game's worlds go straight in, its record
-/// sits on a display, and the recent games are the Library's faceplates.
+/// sits on a display, and no other game is listed: Home is about the current
+/// game only (plan global-context, D8).
 #[gpui::test]
-fn home_enters_a_world_and_shows_recent_games_as_library_cards(cx: &mut TestAppContext) {
+fn home_enters_a_world_and_lists_no_other_game(cx: &mut TestAppContext) {
     use crate::live::{LiveIntent, PlaceTarget, library_card};
 
     cx.update(gpui_component::init);
@@ -360,11 +350,6 @@ fn home_enters_a_world_and_shows_recent_games_as_library_cards(cx: &mut TestAppC
             metadata: "1.21.1 · Fabric".into(),
             world: WorldHint::Overworld,
         },
-        recent: vec![RecentEntry {
-            id: Some("sky".into()),
-            title: "空岛".into(),
-            metadata: "昨天".into(),
-        }],
     };
     shell.update(cx, |shell, cx| {
         shell.set_home(home.clone(), cx);
@@ -401,14 +386,8 @@ fn home_enters_a_world_and_shows_recent_games_as_library_cards(cx: &mut TestAppC
         ))
     );
     assert!(
-        cx.debug_bounds("live-card-more-0").is_some(),
-        "a recent game is the Library's faceplate"
-    );
-    let card = cx.debug_bounds("home-recent-0").expect("recent card");
-    cx.simulate_click(card.center(), Modifiers::none());
-    assert_eq!(
-        seen.borrow().last(),
-        Some(&LiveIntent::OpenInstance("sky".into()))
+        cx.debug_bounds("live-card-more-0").is_none(),
+        "another game's Library faceplate is on Home"
     );
 
     // While a game is on its way nothing else starts from here.

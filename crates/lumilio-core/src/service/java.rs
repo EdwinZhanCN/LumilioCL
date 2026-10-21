@@ -85,6 +85,9 @@ impl<T: Transport + Clone> LauncherService<T> {
             }
         };
         self.end(task, &result);
+        if result.is_ok() {
+            self.context.bump(crate::context::Change::Java);
+        }
         result
     }
 
@@ -156,6 +159,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             .filter(|folder| Self::runtime_in(folder).is_some())
             .ok_or_else(|| ServiceError::NoJavaAt(home.to_owned()))?;
         blocking(move || std::fs::remove_dir_all(&folder)).await?;
+        self.context.bump(crate::context::Change::Java);
         let mut settings = self.settings.lock().await;
         let mut disabled = settings.get().disabled_java.clone();
         if disabled.iter().any(|saved| saved == home) {

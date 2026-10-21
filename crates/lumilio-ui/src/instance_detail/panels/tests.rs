@@ -237,6 +237,15 @@ fn problems_name_their_cause_without_raw_debug_text() {
     assert!(detail.contains('3'));
     let (title, _) = text(ProblemKind::LastSessionFailed(SessionOutcome::Crashed));
     assert!(!title.contains("Crashed"));
+    // A launch that failed before the game ran is not called a session.
+    let (launch, _) = text(ProblemKind::LastSessionFailed(
+        SessionOutcome::FailedToPrepare,
+    ));
+    assert_ne!(launch, title);
+    let (started, _) = text(ProblemKind::LastSessionFailed(
+        SessionOutcome::FailedToStart,
+    ));
+    assert_eq!(started, launch);
 }
 
 #[test]

@@ -626,7 +626,7 @@ pub(super) fn install_java(
             )
         });
         cx.update(|cx| {
-            reload(&wiring, Reload::All, cx);
+            reload(&wiring, Reload::Lists, cx);
             load_settings(&wiring, cx);
         });
     })

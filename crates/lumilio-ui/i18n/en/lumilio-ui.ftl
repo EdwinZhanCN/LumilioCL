@@ -84,7 +84,7 @@ route-settings = Settings
 nav-back = Back
 nav-forward = Forward
 nav-update-ready = Version { $version } is ready. Restart to update
-nav-update-game-running = A game is running. Close it before restarting to update
+nav-update-game-running = A game is starting or running. Close it before restarting to update
 nav-add-account = Add account
 nav-add-account-help = Add an offline account to play
 # In a narrow window the chip with no account is only an empty face with a +; all its words are in this tooltip.
@@ -161,7 +161,8 @@ home-attention-more = { $detail } ({ $more } more { $more ->
     [one] issue
    *[other] issues
 })
-home-recent = Recent
+# The library, Java or plugins changed, and each game is checked again.
+home-attention-checking = Checking…
 home-continued = Continue playing
 home-record = Play history
 home-record-play-time = Play time
@@ -1607,6 +1608,7 @@ instance-problem-duplicate-mods = The same mod is installed more than once
 instance-problem-low-memory = The maximum memory is low
 instance-problem-low-memory-help = The current limit is { $max } MB; the game may crash from running out of memory
 instance-problem-last-session = The last session didn't end cleanly
+instance-problem-last-launch = The last launch didn't succeed
 instance-history-view-all = View all
 instance-overview-recent-changes = Recent changes
 instance-problems-status = Status

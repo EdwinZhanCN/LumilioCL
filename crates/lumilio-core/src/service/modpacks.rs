@@ -109,6 +109,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             staged.discard();
             return Err(error.into());
         }
+        self.settle_current().await;
         Ok(record)
     }
 
@@ -278,6 +279,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             // learns what to add.
             let _ = self.save_pending_downloads(&record.id, &index.manual).await;
         }
+        self.settle_current().await;
         Ok(record)
     }
 

@@ -69,7 +69,7 @@ impl Render for LauncherShell {
                         let handler = self.live_handler.clone()?;
                         Some(ReadyUpdate {
                             version: version.to_owned().into(),
-                            game_running: self.game_running,
+                            game_running: self.game_active(),
                             on_apply: Rc::new(move |window, cx| {
                                 handler(LiveIntent::ApplyUpdate, window, cx)
                             }),

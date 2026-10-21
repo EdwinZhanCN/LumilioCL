@@ -7,7 +7,7 @@
 |---|---|
 | [插件 · 世界地图](plugin.world-explorer.md) | 34 |
 | [全局导航](navigation.md) | 9 |
-| [首页](home.md) | 13 |
+| [首页](home.md) | 12 |
 | [游戏库](library.md) | 30 |
 | [发现](discover.md) | 28 |
 | [动态](activity.md) | 8 |

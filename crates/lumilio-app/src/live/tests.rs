@@ -1,3 +1,6 @@
+mod dependencies;
+mod global_context;
+
 use super::jobs::outcome;
 use lumilio_ui::toast::Toast;
 
@@ -5,7 +8,7 @@ use lumilio_ui::toast::Toast;
 fn home_snapshot_and_rapid_selection_keep_the_last_game(cx: &mut gpui_kit::TestAppContext) {
     // The shipped backend wakes GPUI from its real tokio worker threads.
     cx.executor().allow_parking();
-    use super::{Reload, State, Wiring, jobs::reload, library::choose_current};
+    use super::{State, Wiring, context::follow, library::choose_current};
     use crate::backend::Backend;
     use gpui_kit::AppContext as _;
     use lumilio_ui::{LauncherShell, home::HomePresentation};
@@ -42,7 +45,7 @@ fn home_snapshot_and_rapid_selection_keep_the_last_game(cx: &mut gpui_kit::TestA
         shell: shell.downgrade(),
         state: Rc::new(RefCell::new(State::default())),
     };
-    cx.update(|cx| reload(&wiring, Reload::All, cx));
+    cx.update(|cx| follow(&wiring, cx));
     let wait = |cx: &mut gpui_kit::TestAppContext, wanted: &str| {
         let until = Instant::now() + Duration::from_secs(5);
         loop {
@@ -60,7 +63,6 @@ fn home_snapshot_and_rapid_selection_keep_the_last_game(cx: &mut gpui_kit::TestA
     };
     wait(cx, &b);
     cx.update(|cx| {
-        reload(&wiring, Reload::All, cx);
         choose_current(&wiring, b.clone(), cx);
         choose_current(&wiring, a.clone(), cx);
     });
@@ -77,11 +79,7 @@ fn home_snapshot_and_rapid_selection_keep_the_last_game(cx: &mut gpui_kit::TestA
         Some(a.as_str())
     );
     cx.run_until_parked();
-    assert_eq!(
-        wiring.state.borrow().continue_id.as_deref(),
-        Some(a.as_str())
-    );
-    let latest = shell.read_with(cx, |shell, _| shell.live().unwrap().install_target.clone());
+    let latest = shell.read_with(cx, |shell, _| shell.install_target().map(str::to_owned));
     assert_eq!(latest.as_deref(), Some(a.as_str()));
 }
 
@@ -293,7 +291,6 @@ fn technical_details_after_a_failed_launch_explain_it(cx: &mut gpui_kit::TestApp
     };
     let recovery = |id: Option<&str>, detail| HomePresentation::Recovery {
         subject: subject(id),
-        recent: Vec::new(),
         detail,
     };
     let click = |cx: &mut gpui_kit::VisualTestContext, selector: &'static str| {
@@ -359,7 +356,6 @@ fn technical_details_after_a_failed_launch_explain_it(cx: &mut gpui_kit::TestApp
         shell.set_home(
             HomePresentation::Continue {
                 subject: subject(Some(&game)),
-                recent: Vec::new(),
             }
             .begin_launch(),
             cx,
@@ -381,9 +377,7 @@ fn technical_details_after_a_failed_launch_explain_it(cx: &mut gpui_kit::TestApp
 fn curseforge_through_the_page(cx: &mut gpui_kit::TestAppContext) {
     use super::dispatch::on_live_intent;
     use super::instance_write::write_instance;
-    use super::{
-        Reload, State, Wiring, discover::first_search, jobs::reload, library::choose_current,
-    };
+    use super::{State, Wiring, context::follow, discover::first_search, library::choose_current};
     use crate::backend::Backend;
     use gpui_kit::{AppContext as _, Modifiers, VisualTestContext};
     use lumilio_core::{Loader, ProjectKind};
@@ -482,14 +476,12 @@ fn curseforge_through_the_page(cx: &mut gpui_kit::TestAppContext) {
 
     // The game to install into, and Discover's first search.
     cx.update(|_, cx| {
-        reload(&wiring, Reload::All, cx);
+        follow(&wiring, cx);
         choose_current(&wiring, game.id.clone(), cx);
     });
     let id = game.id.clone();
     until(cx, "the install target", 10, &|cx| {
-        shell.read_with(cx, |shell, _| {
-            shell.live().unwrap().install_target.as_deref() == Some(id.as_str())
-        })
+        shell.read_with(cx, |shell, _| shell.install_target() == Some(id.as_str()))
     });
     shell.update(cx, |shell, cx| {
         shell.show(Route::Discover);

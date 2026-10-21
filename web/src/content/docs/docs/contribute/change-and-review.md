@@ -84,6 +84,11 @@ UI 修改前，阅读 GPUI skills 和 `docs/design-language.md`。
 Pull request 应说明最终实现。
 不要要求评审者重建对话过程。
 
+链接到 issue 的 pull request，描述要简短、易懂：
+在开头链接 issue（例如 `Closes #55`），
+用几句话说明用户能看到的变化和改动方式，
+细节留给计划和代码。
+
 任务授权提交时：
 
 1. 把已验证的修改提交到工作分支。

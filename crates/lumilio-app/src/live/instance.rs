@@ -45,13 +45,20 @@ pub(super) fn open_instance(
             return;
         };
         let id = target_id(&view, cx);
-        // A game already running has printed things the page should show.
+        // A game on its way or running has printed things the page should
+        // show; which game that is, core's session says.
+        let active = wiring
+            .backend
+            .service
+            .context()
+            .session
+            .is_some_and(|session| session.is_active() && session.instance == id);
         let running = wiring
             .state
             .borrow()
             .game_log
             .as_ref()
-            .filter(|(running_id, _)| *running_id == id)
+            .filter(|(running_id, _)| active && *running_id == id)
             .map(|(_, lines)| lines.iter().cloned().collect::<Vec<_>>());
         if let Some(lines) = running {
             view.update(cx, |view, cx| view.game_output(lines, true, cx));
@@ -225,11 +232,11 @@ pub(super) fn instance_intent(
         InstanceIntent::Stop => {
             // Stops the launch or the running game, if it is this one.
             let this_one = wiring
-                .state
-                .borrow()
-                .game_log
-                .as_ref()
-                .is_some_and(|(running, _)| running == id);
+                .backend
+                .service
+                .context()
+                .session
+                .is_some_and(|session| session.is_active() && session.instance == id);
             if this_one && let Some(cancel) = wiring.state.borrow().cancel.clone() {
                 cancel.cancel();
             }
@@ -267,13 +274,15 @@ pub(super) fn instance_intent(
         InstanceIntent::OpenProject { kind, source, slug } => {
             open_project(wiring, kind, source, slug, window, cx)
         }
-        // ia[discover]: 锁定目标（从游戏页进入） | 游戏页内容标签「浏览 Mod / 资源包 / 光影」 | 发现页进入「为这个游戏浏览」：页头写明游戏，类型预选，版本和加载器筛选锁定；安装目标换成那个游戏（右下角芯片显示）；不改变当前游戏
+        // ia[discover]: 锁定目标（从游戏页进入） | 游戏页内容标签「浏览 Mod / 资源包 / 光影」 | 发现页进入「为这个游戏浏览」：页头写明游戏，类型预选，版本和加载器筛选锁定；那个游戏成为当前游戏（芯片、继续与下次启动一致）；在芯片里换成别的游戏就退出锁定
         // ia[instance.content]: 浏览并安装 | L4a 主要 → 发现页（类型预选） | 安装完回到本页可见
         InstanceIntent::BrowseContent(kind) => {
             let shell = wiring.shell.clone();
             let target = id.to_owned();
             let wiring = wiring.clone();
             window.defer(cx, move |window, cx| {
+                // The game browsed for is the game installs go into (D3).
+                choose_current(&wiring, target.clone(), cx);
                 let _ = shell.update(cx, |shell, cx| shell.browse_for(target, kind, window, cx));
                 refresh_installed(&wiring, cx);
             });
@@ -477,7 +486,7 @@ pub(super) fn instance_intent(
                         view.saved(memory, result, cx);
                     }
                 });
-                cx.update(|cx| reload(&wiring, Reload::All, cx));
+                cx.update(|cx| reload(&wiring, Reload::Lists, cx));
             })
             .detach();
         }
