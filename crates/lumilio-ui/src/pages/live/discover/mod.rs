@@ -16,10 +16,22 @@ use crate::live::{DiscoverChange, LiveIntent, PageItem, SearchStatus, page_items
 use crate::tr;
 use crate::{kit, theme};
 use gpui::prelude::*;
-use gpui::{ClickEvent, IntoElement, div};
+use gpui::{ClickEvent, IntoElement, div, px};
 use gpui_component::Sizable as _;
 use gpui_component::{Icon, h_flex, v_flex};
 use lumilio_core::ProjectKind;
+
+/// The gap between the result list and the filter column.
+const LIST_GAP: f32 = 16.;
+
+/// Whether the filter column fits beside the list: the window's content
+/// column must hold it, its gap and a result row at its narrowest. Below
+/// that the filters fold into a key above the list.
+fn filters_docked(window_width: f32) -> bool {
+    let content = window_width.min(f32::from(theme::CONTENT_MAX_WIDTH))
+        - 2. * f32::from(theme::CONTENT_PADDING_X);
+    content - sidebar::SIDEBAR_WIDTH - LIST_GAP >= card::ROW_MIN_WIDTH
+}
 
 /// The tab label of a kind.
 pub fn kind_label(kind: ProjectKind) -> &'static str {
@@ -88,6 +100,7 @@ pub fn discover(ctx: &LiveCtx) -> impl IntoElement {
         .position(|kind| *kind == query.kind)
         .unwrap_or(0);
     let labels: Vec<&'static str> = kinds.iter().map(|kind| kind_label(*kind)).collect();
+    let docked = filters_docked(ctx.window_width);
 
     let body = match &ctx.model.search {
         SearchStatus::Idle | SearchStatus::Searching if ctx.model.results.is_empty() => {
@@ -181,7 +194,7 @@ pub fn discover(ctx: &LiveCtx) -> impl IntoElement {
             h_flex()
                 .w_full()
                 .items_start()
-                .gap_4()
+                .gap(px(LIST_GAP))
                 .child(
                     v_flex()
                         .flex_1()
@@ -202,7 +215,8 @@ pub fn discover(ctx: &LiveCtx) -> impl IntoElement {
                                         .flex_wrap()
                                         .gap_3()
                                         .items_center()
-                                        // ia[discover]: 排序 / 显示数量 | L4 两个下拉：相关度、下载量、关注数、发布时间、更新时间（只列来源支持的）；每页 5 / 10 / 15 / 20 / 50 / 100 | 重新搜索；按发布时间排序时卡片显示发布时间，其余显示更新时间
+                                        .children((!docked).then(|| sidebar::filters_key(ctx)))
+                                        // ia[discover]: 排序 / 显示数量 | L4 两个下拉：相关度、下载量、关注数、发布时间、更新时间（只列来源支持的）；每页 5 / 10 / 15 / 20 / 50 / 100 | 重新搜索；按发布时间排序时结果行显示发布时间，其余显示更新时间；按关注数排序时显示关注数，其余显示下载量
                                         .child(kit::labeled_select(
                                             tr!("library-sort"),
                                             &ctx.controls.sort,
@@ -223,6 +237,6 @@ pub fn discover(ctx: &LiveCtx) -> impl IntoElement {
                             ("live-discover-body", query.page as usize),
                         )),
                 )
-                .child(sidebar::sidebar(ctx)),
+                .children(docked.then(|| sidebar::sidebar(ctx))),
         )
 }

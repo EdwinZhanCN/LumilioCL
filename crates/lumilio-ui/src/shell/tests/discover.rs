@@ -107,8 +107,8 @@ fn a_result_the_target_already_has_shows_installed_or_offers_the_update(cx: &mut
                         translated_summary: None,
                         environment: None,
                         tags: CardTags::default(),
-                        downloads: "1".into(),
-                        follows: Some("1".into()),
+                        count: "1".into(),
+                        count_kind: crate::live::CountKind::Downloads,
                         date: String::new(),
                         date_kind: DateKind::Updated,
                         page_url: String::new(),
@@ -556,8 +556,8 @@ fn frame_cost_of_a_full_discover_page(cx: &mut TestAppContext) {
                     .collect(),
                 overflow: Vec::new(),
             },
-            downloads: "12.5 万".to_owned(),
-            follows: Some("4886".to_owned()),
+            count: "12.5 万".to_owned(),
+            count_kind: crate::live::CountKind::Downloads,
             date: "3 天前".to_owned(),
             date_kind: crate::live::DateKind::Updated,
             page_url: String::new(),
@@ -679,8 +679,8 @@ fn turning_translation_off_puts_the_original_summaries_back(cx: &mut TestAppCont
         translated_summary: Some("渲染引擎。".to_owned()),
         environment: None,
         tags: CardTags::default(),
-        downloads: "1".to_owned(),
-        follows: None,
+        count: "1".to_owned(),
+        count_kind: crate::live::CountKind::Downloads,
         date: String::new(),
         date_kind: DateKind::Updated,
         page_url: String::new(),
@@ -721,8 +721,8 @@ fn turning_translation_off_puts_the_original_summaries_back(cx: &mut TestAppCont
 }
 
 #[gpui::test]
-fn a_narrow_window_gives_the_result_name_room(cx: &mut TestAppContext) {
-    use crate::live::{CardTags, DateKind, LiveIntent, SearchRow, SearchStatus};
+fn result_rows_stay_short_and_a_narrow_window_folds_the_filters(cx: &mut TestAppContext) {
+    use crate::live::{CardTag, CardTags, DateKind, LiveIntent, SearchRow, SearchStatus};
     use gpui::{px, size};
     use lumilio_core::ProjectKind;
 
@@ -730,20 +730,33 @@ fn a_narrow_window_gives_the_result_name_room(cx: &mut TestAppContext) {
     let (shell, cx) = cx.add_window_view(|_, cx| {
         LauncherShell::new(cx).with_live(Rc::new(|_: LiveIntent, _, _| {}))
     });
+    // A long name, a summary that would take several lines and a full set
+    // of tags: everything that used to make a row tall.
     let row = SearchRow {
         source: lumilio_core::DEFAULT_SOURCE.to_owned(),
         project_id: "id".to_owned(),
         kind: ProjectKind::Modpack,
         slug: "p".to_owned(),
-        title: "All the Mods 10 - ATM10".to_owned(),
-        author: "someone".to_owned(),
-        summary: "A pack.".to_owned(),
+        title: "All the Mods 10 - ATM10 - To the Sky and Beyond".to_owned(),
+        author: "ATMTeam".to_owned(),
+        summary: "A kitchen-sink pack with hundreds of mods, quests that guide you through \
+                  every one of them and a long road to the star at the end."
+            .to_owned(),
         translated_summary: None,
-        environment: None,
-        tags: CardTags::default(),
-        downloads: "1".to_owned(),
-        follows: None,
-        date: String::new(),
+        environment: Some(lumilio_core::Environment::ClientAndServer),
+        tags: CardTags {
+            shown: ["adventure", "kitchen-sink", "magic", "technology"]
+                .into_iter()
+                .map(|name| CardTag {
+                    name: name.into(),
+                    loader: false,
+                })
+                .collect(),
+            overflow: vec!["quests".into(), "multiplayer".into()],
+        },
+        count: "1905.7 万".to_owned(),
+        count_kind: crate::live::CountKind::Downloads,
+        date: "10 个月前".to_owned(),
         date_kind: DateKind::Updated,
         page_url: String::new(),
         icon_url: None,
@@ -760,21 +773,49 @@ fn a_narrow_window_gives_the_result_name_room(cx: &mut TestAppContext) {
             cx,
         );
     });
+    let short = |cx: &mut gpui::VisualTestContext, window: &str| {
+        let line = cx.debug_bounds("live-result-0").expect("the result line");
+        assert!(
+            line.size.height <= px(100.),
+            "a {window} row stays one short line: {line:?}"
+        );
+        cx.debug_bounds("live-result-name-0")
+            .expect("the name column")
+            .size
+            .width
+    };
+
+    // The default window keeps the filter column beside the list.
+    cx.simulate_resize(size(px(1080.), px(720.)));
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("live-discover-sidebar").is_some());
+    assert!(cx.debug_bounds("live-discover-filters").is_none());
+    let name = short(cx, "default");
+    assert!(name >= px(380.), "the name keeps its room: {name:?}");
+
+    // The smallest window folds the column into a key, so the name has room.
     cx.simulate_resize(size(px(720.), px(480.)));
     cx.run_until_parked();
-    let spec = cx
-        .debug_bounds("live-result-spec-0")
-        .expect("the spec column");
-    let line = cx.debug_bounds("live-result-0").expect("the result line");
-    assert_eq!(spec.size.width, px(128.), "the compact spec column");
     assert!(
-        spec.origin.x - line.origin.x > px(200.),
-        "the name keeps room before the spec column: {line:?} {spec:?}"
+        cx.debug_bounds("live-discover-sidebar").is_none(),
+        "no column beside the list"
     );
-    cx.simulate_resize(size(px(1400.), px(900.)));
+    let name = short(cx, "smallest");
+    assert!(name >= px(280.), "the name keeps its room: {name:?}");
+
+    // The key opens the same filters in a panel.
+    let key = cx
+        .debug_bounds("live-discover-filters")
+        .expect("the filters key");
+    assert!(cx.debug_bounds("live-filter-panel").is_none());
+    cx.simulate_click(key.center(), Modifiers::none());
     cx.run_until_parked();
-    let spec = cx
-        .debug_bounds("live-result-spec-0")
-        .expect("the spec column");
-    assert_eq!(spec.size.width, px(190.));
+    assert!(
+        cx.debug_bounds("live-filter-panel").is_some(),
+        "the key opens the panel"
+    );
+    assert!(
+        cx.debug_bounds("live-section-0").is_some(),
+        "the panel holds the filter sections"
+    );
 }

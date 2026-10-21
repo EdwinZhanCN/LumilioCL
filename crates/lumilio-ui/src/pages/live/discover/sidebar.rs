@@ -1,5 +1,7 @@
 //! The filter column of Discover: hide-installed, then the sections of the
-//! kind, each an accordion whose open state is part of the view state.
+//! kind, each an accordion whose open state is part of the view state. A
+//! window too narrow for the column folds it into a key that opens the same
+//! filters in a panel.
 //!
 //! Sections, their order, what opens by default, the locked-by-game boxes with
 //! their unlock and sync buttons, and the advanced exclusions follow Modrinth
@@ -9,23 +11,38 @@
 use super::super::controls::LiveCtx;
 use crate::assets::UiIcon;
 use crate::controls::Checkbox;
+use crate::key::Key;
 use crate::kit::{self, Stand, ViewIntent};
 use crate::live::{
     DiscoverChange, Lock, PickGroup, Section, Side, advanced_options, default_loaders,
     section_title, sections, tag_label,
 };
-use crate::tr;
+use crate::{theme, tr};
 use gpui::prelude::*;
-use gpui::{App, Window, div, px};
+use gpui::{Anchor, App, Window, div, px};
 use gpui_component::input::Input;
+use gpui_component::popover::Popover;
 use gpui_component::{Icon, h_flex, v_flex};
 use gpui_component::{Sizable as _, StyledExt as _};
 use lumilio_core::Stance;
 
+/// The filter column's width beside the list.
+pub(super) const SIDEBAR_WIDTH: f32 = 240.;
+/// How far down the window the filters panel's content starts when the page
+/// is not scrolled: the key's bottom edge, the gap and the panel's padding.
+/// The panel is no taller than the room below that, so it opens under its
+/// key instead of being pushed up over it; scrolling only gives it more.
+const PANEL_TOP: f32 = 256.;
+
 /// View-state group for a section's open state (0 default, 1 open, 2 closed).
+/// Each section kind takes five groups from here ([`group_of`]).
 const SECTION_GROUP: u8 = 100;
 /// View-state group for a loader list's "show more" (0 fewer, 1 more).
-const MORE_GROUP: u8 = 120;
+const MORE_GROUP: u8 = 130;
+/// View-state group for the filters panel of a narrow window (1 open).
+const PANEL_GROUP: u8 = 131;
+// The groups above follow every section's: six section kinds of five each.
+const _: () = assert!(MORE_GROUP >= SECTION_GROUP + 6 * 5 && PANEL_GROUP > MORE_GROUP);
 
 const fn slot(section: &Section) -> u8 {
     match section {
@@ -533,7 +550,63 @@ pub(super) fn source_segments(ctx: &LiveCtx) -> Option<impl IntoElement> {
     )
 }
 
+/// The filter column beside the list.
 pub(super) fn sidebar(ctx: &LiveCtx) -> impl IntoElement {
+    filters(ctx)
+        .w(px(SIDEBAR_WIDTH))
+        .flex_none()
+        .debug_selector(|| "live-discover-sidebar".into())
+}
+
+/// In a window too narrow for the column: a key that opens the same filters
+/// in a panel, with how many the person picked beside its label.
+pub(super) fn filters_key(ctx: &LiveCtx) -> impl IntoElement {
+    let colors = ctx.colors;
+    let open = ctx.state.choice(PANEL_GROUP, 0) == 1;
+    let count = ctx.model.query.filter_count();
+    let emit = ctx.emit.clone();
+    // ia[discover]: 窄窗口里的筛选 | L4 排序方式左边的「筛选」键（窗口窄到放不下筛选栏时，筛选栏收进这里；键上的数字是选了几项） | 弹出面板，内容和筛选栏一样，太长时在面板里滚动；点面板外面或按 Esc 关闭
+    let key = Key::new("live-discover-filters")
+        .label(tr!("discover-filters"))
+        .small()
+        .debug_selector(|| "live-discover-filters".into())
+        .children((count > 0).then(|| {
+            div()
+                .font_family(theme::mono_font())
+                .text_color(colors.body.orange_text)
+                .child(count.to_string())
+        }));
+    let height = (ctx.window_height - PANEL_TOP).max(160.);
+    // Built only while it shows, so a closed panel costs no frame time.
+    let panel = open.then(|| {
+        kit::keep_wheel(
+            div()
+                .id("live-filter-panel")
+                .debug_selector(|| "live-filter-panel".into())
+                .max_h(px(height))
+                .overflow_y_scroll()
+                .track_scroll(&ctx.controls.filters_scroll),
+            &ctx.controls.filters_scroll,
+        )
+        .child(filters(ctx).w(px(SIDEBAR_WIDTH)))
+    });
+    Popover::new("live-discover-filters-popover")
+        .anchor(Anchor::TopLeft)
+        .open(open)
+        .on_open_change(move |open, window, cx| {
+            emit(
+                ViewIntent::Choose(PANEL_GROUP, usize::from(*open)),
+                window,
+                cx,
+            )
+        })
+        .trigger(key)
+        .children(panel)
+}
+
+/// The filters: the sources, hide-installed, the sections of the kind, then
+/// a word when they did not load and the key that clears them.
+fn filters(ctx: &LiveCtx) -> gpui::Div {
     let colors = ctx.colors;
     let query = &ctx.model.query;
     let hide = ctx.model.can_hide_installed().then(|| {
@@ -558,8 +631,6 @@ pub(super) fn sidebar(ctx: &LiveCtx) -> impl IntoElement {
     });
     let list = sections(query.kind, &ctx.model.filters);
     v_flex()
-        .w(px(240.))
-        .flex_none()
         .gap_5()
         .children(source_segments(ctx))
         .children(hide)

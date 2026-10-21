@@ -194,7 +194,7 @@ Discover.
 | Page | Caption | Secondary | Primary | More | Tabs · search | Refinements |
 |---|---|---|---|---|---|---|
 | Library | game count | 导入整合包 | 新建 | — | 全部游戏 / 收藏 · 搜索游戏 | — |
-| Discover | one line | — | — | 在 *source* 中浏览 · 重新搜索 | 整合包 / Mod / 资源包 / 光影 · 搜索 *source* | sort, page size, pager, filter sidebar (source segments at its top when several are on) |
+| Discover | one line | — | — | 在 *source* 中浏览 · 重新搜索 | 整合包 / Mod / 资源包 / 光影 · 搜索 *source* | sort, page size, pager, filter sidebar (source segments at its top when several are on); a window whose content column cannot hold the sidebar beside a result row at its narrowest folds the sidebar into a **筛选** key before sort, with the number of picked filters in orange mono, that opens the same filters in a popover |
 | Activity | running count | — | — | — | — | — |
 | Instance | version · loader · last played | — | 启动游戏 | 安装游戏文件 · 复制… · 删除… | 概览 / 内容 / 世界 / 历史 / 日志 / 设置 | per-tab segments |
 | Project detail | author · summary | — | 安装到 *instance* / 安装为新游戏 | 在 *source* 中打开 · 复制链接 · project links | 介绍 / 版本 / 图库 | version filters |
@@ -820,6 +820,18 @@ does. Each fact takes the form of what it is (`kit::Item`):
 A row's leading picture is a 48 px display window (3 px corners), centred
 on the row: the item's own picture, or a cover seeded by its identity.
 Everything in a row is centred on one line.
+
+A Discover result is the same kind of row, whatever the window size, so
+the list shows as many results as the window can hold:
+- an orange mono index, then the project's icon in its display window;
+- the name (20 px light) with the author after it in muted mono on one
+  line, the author cut first; one line of summary; one line of tags, where
+  a tag with no room drops whole and the `+N` count stays;
+- two readings stacked on the trailing edge with silkscreen legends: a count
+  (FAV when the list is sorted by followers, else DL) and a date (PUB when
+  sorted by newest, else UPD);
+- the install key last, in a slot as wide as its widest state, so the
+  readings line up from row to row.
 
 ### Faceplates
 

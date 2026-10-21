@@ -25,6 +25,14 @@ pub enum DateKind {
     Updated,
 }
 
+/// Which count a card shows: followers when the list is sorted by them and
+/// the source counts them, downloads otherwise.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CountKind {
+    Downloads,
+    Follows,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SearchRow {
     /// The content source the project is from (its plugin ID).
@@ -41,9 +49,8 @@ pub struct SearchRow {
     pub translated_summary: Option<String>,
     pub environment: Option<Environment>,
     pub tags: CardTags,
-    pub downloads: String,
-    /// `None` when the source does not count followers.
-    pub follows: Option<String>,
+    pub count: String,
+    pub count_kind: CountKind,
     pub date: String,
     pub date_kind: DateKind,
     /// The project's public page, for the context menu.
@@ -103,6 +110,10 @@ pub fn search_row(
         DateKind::Published => &hit.published,
         DateKind::Updated => &hit.updated,
     };
+    let (count_kind, count) = match (query.sort, hit.follows) {
+        (SortIndex::Follows, Some(follows)) => (CountKind::Follows, follows),
+        _ => (CountKind::Downloads, hit.downloads),
+    };
     SearchRow {
         source: query.source.clone(),
         project_id: hit.project_id.clone(),
@@ -114,8 +125,8 @@ pub fn search_row(
         translated_summary: None,
         environment: hit.environment,
         tags: card_tags(hit, query, filters),
-        downloads: count_label(hit.downloads),
-        follows: hit.follows.map(count_label),
+        count: count_label(count),
+        count_kind,
         date: parse_rfc3339(date).map_or_else(String::new, |at| relative_time(at, now)),
         date_kind,
         page_url: hit.page_url.clone(),

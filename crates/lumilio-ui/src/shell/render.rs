@@ -117,6 +117,7 @@ impl Render for LauncherShell {
                     version_filter,
                     account_viewer: self.account_viewer.as_ref().map(|viewer| &viewer.view),
                     window_width: f32::from(window.viewport_size().width),
+                    window_height: f32::from(window.viewport_size().height),
                     wardrobe: self
                         .account_viewer
                         .as_ref()

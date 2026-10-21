@@ -279,6 +279,7 @@ discover-advanced-remembered = 这里的选择会被记住，下次发现时仍�
 discover-hide-installed = 隐藏已安装
 discover-filters-not-loaded = 筛选项没有加载
 discover-clear-filters = 清除筛选
+discover-filters = 筛选
 discover-install = 安装
 discover-installing = 安装中…
 discover-update = 更新
