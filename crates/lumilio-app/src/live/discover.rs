@@ -528,15 +528,14 @@ pub(super) fn install_target(wiring: &Wiring, cx: &mut App) -> Option<(String, S
     wiring
         .shell
         .read_with(cx, |shell, _| {
-            shell.live().and_then(|model| {
-                let id = model.install_target.clone()?;
-                let name = model
-                    .library
-                    .iter()
-                    .find(|card| card.id == id)
-                    .map(|card| card.name.clone())?;
-                Some((id, name))
-            })
+            let id = shell.install_target()?;
+            let name = shell
+                .live()?
+                .library
+                .iter()
+                .find(|card| card.id == id)
+                .map(|card| card.name.clone())?;
+            Some((id.to_owned(), name))
         })
         .ok()
         .flatten()

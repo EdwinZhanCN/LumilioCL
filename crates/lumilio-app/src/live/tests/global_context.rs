@@ -349,13 +349,12 @@ fn choosing_another_game_while_browsing_ends_the_browsing(cx: &mut TestAppContex
     until(cx, "Z to be the saved current game", |_| {
         saved_current(&wiring).as_deref() == Some(z.as_str())
     });
-    shell.read_with(cx, |shell, _| {
-        assert_eq!(
-            shell.live().unwrap().browsing_for,
-            None,
-            "still locked to X's version and loader while installing into Z"
-        );
-    });
+    // The page follows once core publishes the choice (decision D1).
+    until(
+        cx,
+        "browsing for X to end: its version and loader must not apply to Z",
+        |cx| shell.read_with(cx, |shell, _| shell.live().unwrap().browsing_for.is_none()),
+    );
     let target = cx
         .update(|_, cx| install_target(&wiring, cx))
         .map(|(id, _)| id);

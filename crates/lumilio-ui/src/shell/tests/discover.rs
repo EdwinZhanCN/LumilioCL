@@ -34,13 +34,10 @@ fn discover_leaves_naming_the_target_game_to_the_corner_chip(cx: &mut TestAppCon
         shell.show(Route::Discover);
         shell.update_live(
             |model| {
-                model.set_library(
-                    vec![
-                        library_card(&record("main"), 1),
-                        library_card(&record("side"), 1),
-                    ],
-                    Some("main".into()),
-                );
+                model.set_library(vec![
+                    library_card(&record("main"), 1),
+                    library_card(&record("side"), 1),
+                ]);
                 model.query = crate::live::DiscoverQuery::new(lumilio_core::ProjectKind::Mod);
             },
             cx,
@@ -52,13 +49,43 @@ fn discover_leaves_naming_the_target_game_to_the_corner_chip(cx: &mut TestAppCon
         "the corner already names the game; Discover adds no banner"
     );
 
-    shell.update(cx, |shell, cx| shell.set_install_target("side".into(), cx));
-    cx.run_until_parked();
-    shell.update(cx, |shell, _| {
-        assert_eq!(
-            shell.live().unwrap().install_target.as_deref(),
-            Some("side")
-        );
+    // The target is the game core says is current, once the library has it.
+    shell.update(cx, |shell, cx| {
+        assert_eq!(shell.install_target(), None);
+        shell.follow_context(current("ghost"), cx);
+        assert_eq!(shell.install_target(), None, "not a game in the library");
+        shell.follow_context(current("side"), cx);
+        assert_eq!(shell.install_target(), Some("side"));
+    });
+}
+
+/// What core publishes when `id` is the current game.
+fn current(id: &str) -> lumilio_core::Context {
+    lumilio_core::Context {
+        current_instance: Some(id.to_owned()),
+        ..lumilio_core::Context::default()
+    }
+}
+
+/// Decision D3: another current game ends browsing for a game, whoever
+/// chose it; the game browsed for becoming current keeps it.
+#[gpui::test]
+fn another_current_game_ends_browsing_for_a_game(cx: &mut TestAppContext) {
+    use lumilio_core::ProjectKind;
+
+    cx.update(gpui_component::init);
+    let (shell, cx) =
+        cx.add_window_view(|_, cx| LauncherShell::new(cx).with_live(Rc::new(|_, _, _| {})));
+    live_with_games(cx, &shell);
+    shell.update_in(cx, |shell, window, cx| {
+        shell.follow_context(current("van"), cx);
+        shell.browse_for("fab".into(), ProjectKind::Mod, window, cx);
+        assert!(!shell.follow_context(current("fab"), cx), "its own game");
+        assert_eq!(shell.live().unwrap().browsing_for.as_deref(), Some("fab"));
+        assert!(!shell.follow_context(current("fab"), cx), "nothing moved");
+        assert!(shell.follow_context(current("van"), cx));
+        assert_eq!(shell.live().unwrap().browsing_for, None);
+        assert_eq!(shell.install_target(), Some("van"));
     });
 }
 
@@ -93,7 +120,7 @@ fn a_result_the_target_already_has_shows_installed_or_offers_the_update(cx: &mut
         shell.show(Route::Discover);
         shell.update_live(
             |model| {
-                model.set_library(vec![library_card(&record, 1)], Some("main".into()));
+                model.set_library(vec![library_card(&record, 1)]);
                 model.query = crate::live::DiscoverQuery::new(lumilio_core::ProjectKind::Mod);
                 model.results = (0..3)
                     .map(|n| SearchRow {
@@ -274,13 +301,10 @@ fn live_with_games(cx: &mut gpui::VisualTestContext, shell: &gpui::Entity<Launch
         shell.show(Route::Discover);
         shell.update_live(
             |model| {
-                model.set_library(
-                    vec![
-                        library_card(&record("fab", Loader::Fabric), 1),
-                        library_card(&record("van", Loader::Vanilla), 1),
-                    ],
-                    Some("fab".into()),
-                );
+                model.set_library(vec![
+                    library_card(&record("fab", Loader::Fabric), 1),
+                    library_card(&record("van", Loader::Vanilla), 1),
+                ]);
                 model.filters = crate::live::FilterModel::from_core(&DiscoverFilters {
                     categories: vec![CategoryTag {
                         id: "magic".into(),
@@ -327,12 +351,14 @@ fn browsing_for_a_game_shows_its_header_locks_its_filters_and_trims_the_tabs(
     live_with_games(cx, &shell);
 
     shell.update_in(cx, |shell, window, cx| {
-        shell.browse_for("fab".into(), ProjectKind::Mod, window, cx)
+        shell.browse_for("fab".into(), ProjectKind::Mod, window, cx);
+        // The app makes it the current game, and core says so.
+        shell.follow_context(current("fab"), cx);
     });
     cx.run_until_parked();
     shell.read_with(cx, |shell, _| {
         let model = shell.live().unwrap();
-        assert_eq!(model.install_target.as_deref(), Some("fab"));
+        assert_eq!(shell.install_target(), Some("fab"));
         assert_eq!(model.browsing_for.as_deref(), Some("fab"));
         assert_eq!(model.query.kind, ProjectKind::Mod);
         assert_eq!(
@@ -377,7 +403,7 @@ fn browsing_for_a_game_shows_its_header_locks_its_filters_and_trims_the_tabs(
         let model = shell.live().unwrap();
         assert_eq!(model.browsing_for, None);
         assert_eq!(
-            model.install_target.as_deref(),
+            shell.install_target(),
             Some("fab"),
             "the chip keeps its game"
         );

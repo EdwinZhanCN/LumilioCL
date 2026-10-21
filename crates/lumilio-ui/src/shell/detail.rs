@@ -19,22 +19,18 @@ pub(super) struct DetailSlot {
 }
 
 impl LauncherShell {
-    /// Chooses the instance play and installs target, everywhere at once.
-    pub fn set_install_target(&mut self, id: String, cx: &mut Context<Self>) {
-        let target = self
-            .live
-            .as_ref()
-            .and_then(|model| install_target_of(model, &id));
+    /// The open project's target follows the current game.
+    pub(super) fn retarget_detail(&mut self, cx: &mut Context<Self>) {
+        let target = self.detail_target();
         if let (Some(slot), Some(target)) = (&self.detail, target) {
             slot.view
                 .update(cx, |view, cx| view.set_target(Some(target), cx));
         }
-        self.update_live(
-            |model| {
-                model.install_target = Some(id);
-            },
-            cx,
-        );
+    }
+
+    fn detail_target(&self) -> Option<InstallTarget> {
+        let id = self.install_target()?;
+        install_target_of(self.live.as_ref()?, id)
     }
 
     /// Opens a project's detail in place of the Discover list. It starts as
@@ -114,10 +110,7 @@ impl LauncherShell {
         });
         // The page's address comes with the project.
         let url = String::new();
-        let target = self.live.as_ref().and_then(|model| {
-            let id = model.install_target.clone()?;
-            install_target_of(model, &id)
-        });
+        let target = self.detail_target();
         let tags = self
             .live
             .as_ref()

@@ -78,7 +78,11 @@ pub(super) fn follow(wiring: &Wiring, cx: &mut App) {
         loop {
             let now = changes.borrow_and_update().clone();
             let what = stale(seen.as_ref(), &now);
-            cx.update(|cx| apply(&wiring, what, cx));
+            let mirrored = now.clone();
+            cx.update(|cx| {
+                mirror(&wiring, mirrored, cx);
+                apply(&wiring, what, cx);
+            });
             seen = Some(now);
             if changes.changed().await.is_err() {
                 return;
@@ -86,6 +90,25 @@ pub(super) fn follow(wiring: &Wiring, cx: &mut App) {
         }
     })
     .detach();
+}
+
+/// Writes the interface's copy first, so everything worked out below reads
+/// the new choice. Browsing for a game that is no longer current ends, and
+/// the list is searched again without its locks (D3).
+fn mirror(wiring: &Wiring, context: Context, cx: &mut App) {
+    let query = wiring
+        .shell
+        .update(cx, |shell, cx| {
+            shell
+                .follow_context(context, cx)
+                .then(|| shell.live().map(|model| model.query.clone()))
+                .flatten()
+        })
+        .ok()
+        .flatten();
+    if let Some(query) = query {
+        super::discover::search(wiring, &query, cx);
+    }
 }
 
 fn apply(wiring: &Wiring, what: Stale, cx: &mut App) {
@@ -136,8 +159,8 @@ fn refresh_home(wiring: &Wiring, cx: &mut App) {
             return;
         }
         let now = unix_now();
-        let current = asked.current_instance;
-        let (home, continued) = home_presentation(&records, &summary, current.as_deref(), now);
+        let current = asked.current_instance.as_deref();
+        let (home, continued) = home_presentation(&records, &summary, current, now);
         let continued = continued
             .and_then(|id| records.iter().find(|record| record.id == id))
             .cloned();
@@ -155,7 +178,7 @@ fn refresh_home(wiring: &Wiring, cx: &mut App) {
             }
             shell.update_live(
                 |model| {
-                    model.set_library(cards, current);
+                    model.set_library(cards);
                     let before = model.attention.len();
                     model
                         .attention

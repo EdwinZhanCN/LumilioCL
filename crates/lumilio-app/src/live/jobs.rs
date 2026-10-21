@@ -46,13 +46,10 @@ pub(super) fn refresh_installed(wiring: &Wiring, cx: &mut App) {
     let wanted = wiring
         .shell
         .read_with(cx, |shell, _| {
-            shell.live().and_then(|model| {
-                Some((
-                    model.install_target.clone()?,
-                    model.query.kind,
-                    model.query.source.clone(),
-                ))
-            })
+            let target = shell.install_target()?.to_owned();
+            shell
+                .live()
+                .map(|model| (target, model.query.kind, model.query.source.clone()))
         })
         .ok()
         .flatten();
@@ -80,13 +77,11 @@ pub(super) fn refresh_installed(wiring: &Wiring, cx: &mut App) {
     cx.spawn(async move |cx| {
         let found = handle.await.ok().and_then(Result::ok).unwrap_or_default();
         let _ = wiring.shell.update(cx, |shell, cx| {
+            // Only if still about the same game, kind and source.
+            let same_game = shell.install_target() == Some(target.as_str());
             shell.update_live(
                 |model| {
-                    // Only if still about the same game, kind and source.
-                    if model.install_target.as_ref() == Some(&target)
-                        && model.query.kind == kind
-                        && model.query.source == source
-                    {
+                    if same_game && model.query.kind == kind && model.query.source == source {
                         model.installed = found;
                     }
                 },
@@ -176,7 +171,6 @@ pub(super) fn reload(wiring: &Wiring, what: Reload, cx: &mut App) {
         let cards = library_cards(&records, now);
         let rows = activity_rows(&activity, now);
         let accounts = account_rows(&settings);
-        let current = wiring.backend.service.context().current_instance;
         let _ = wiring.shell.update(cx, |shell, cx| {
             shell.update_live(
                 |model| {
@@ -188,7 +182,7 @@ pub(super) fn reload(wiring: &Wiring, what: Reload, cx: &mut App) {
                         }
                         Err(error) => model.presets_error = Some(error.to_string()),
                     }
-                    model.set_library(cards, current);
+                    model.set_library(cards);
                     model.collections = collections
                         .into_iter()
                         .map(|collection| CollectionRow {

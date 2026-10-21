@@ -52,7 +52,7 @@ fn a_failed_task_offers_retry_and_open_and_a_game_that_is_gone_offers_no_open(
         shell.show(Route::Activity);
         shell.update_live(
             |model| {
-                model.set_library(vec![library_card(&record, 10)], None);
+                model.set_library(vec![library_card(&record, 10)]);
                 model.set_activity(vec![failed("here"), failed("gone")], 1_000);
             },
             cx,

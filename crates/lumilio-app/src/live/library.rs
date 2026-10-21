@@ -12,9 +12,6 @@ use std::rc::Rc;
 /// Asks core to make `id` the current instance; everything showing it
 /// follows when core publishes the choice. A failed save leaves it as it was.
 pub(super) fn choose_current(wiring: &Wiring, id: String, cx: &mut App) {
-    let _ = wiring
-        .shell
-        .update(cx, |shell, cx| shell.set_install_target(id.clone(), cx));
     let saved = save_current(wiring, id);
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {

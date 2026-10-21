@@ -509,7 +509,7 @@ fn set_activity_gives_running_rows_a_speed_names_the_game_and_forgets_finished_t
     };
     let card = |id: &str| library_card(&record(id, false, None, 1), NOW);
     let mut model = LiveModel::default();
-    model.set_library(vec![card("a")], None);
+    model.set_library(vec![card("a")]);
     model.set_activity(vec![running(100)], 1_000);
     assert_eq!(model.activity[0].rate, None);
     assert_eq!(model.activity[0].detail, "A", "the game's name, not its id");
@@ -559,7 +559,7 @@ fn an_activity_tab_shows_only_its_category_and_all_shows_everything() {
 fn a_collection_lists_its_games_that_still_exist_and_marks_membership() {
     let card = |id: &str| library_card(&record(id, false, None, 1), NOW);
     let mut model = LiveModel::default();
-    model.set_library(vec![card("a"), card("b"), card("c")], None);
+    model.set_library(vec![card("a"), card("b"), card("c")]);
     model.collections = vec![
         CollectionRow {
             name: "生存".into(),
@@ -603,23 +603,6 @@ fn unknown_progress_is_not_a_fraction() {
         retry: None,
     };
     assert_eq!(active_row(&task, false).fraction, None);
-}
-
-#[test]
-fn the_install_target_survives_refreshes_and_falls_back_when_deleted() {
-    let card = |id: &str| library_card(&record(id, false, None, 1), NOW);
-    let mut model = LiveModel::default();
-    model.set_library(vec![card("a"), card("b")], Some("b".to_owned()));
-    assert_eq!(model.install_target.as_deref(), Some("b"));
-    // The person's own choice wins over later hints.
-    model.install_target = Some("a".to_owned());
-    model.set_library(vec![card("a"), card("b")], Some("b".to_owned()));
-    assert_eq!(model.install_target.as_deref(), Some("a"));
-    // The chosen instance was deleted: fall back rather than dangle.
-    model.set_library(vec![card("b")], None);
-    assert_eq!(model.install_target.as_deref(), Some("b"));
-    model.set_library(Vec::new(), None);
-    assert_eq!(model.install_target, None);
 }
 
 fn shown(current: u32, pages: u32) -> String {

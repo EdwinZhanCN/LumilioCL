@@ -33,7 +33,7 @@ fn live_library_cards_manage_and_explicit_play_is_independent(cx: &mut TestAppCo
     shell.update(cx, |shell, cx| {
         shell.show(Route::Library);
         shell.update_live(
-            |model| model.set_library(vec![library_card(&record, 10)], None),
+            |model| model.set_library(vec![library_card(&record, 10)]),
             cx,
         );
     });
@@ -112,13 +112,10 @@ fn the_collections_tab_shows_each_collection_and_the_card_menu_does_not_open_the
         shell.show_tab(Route::Library, crate::pages::live::COLLECTIONS_TAB);
         shell.update_live(
             |model| {
-                model.set_library(
-                    vec![
-                        library_card(&record("a"), 10),
-                        library_card(&record("b"), 10),
-                    ],
-                    None,
-                );
+                model.set_library(vec![
+                    library_card(&record("a"), 10),
+                    library_card(&record("b"), 10),
+                ]);
                 model.collections = vec![CollectionRow {
                     name: "生存".into(),
                     members: vec!["b".into()],
@@ -229,13 +226,10 @@ fn the_library_sorts_and_filters_from_dropdowns_that_follow_what_is_remembered(
         shell.show(Route::Library);
         shell.update_live(
             |model| {
-                model.set_library(
-                    vec![
-                        library_card(&record("a", Loader::Fabric), 1),
-                        library_card(&record("b", Loader::Vanilla), 1),
-                    ],
-                    None,
-                );
+                model.set_library(vec![
+                    library_card(&record("a", Loader::Fabric), 1),
+                    library_card(&record("b", Loader::Vanilla), 1),
+                ]);
             },
             cx,
         );

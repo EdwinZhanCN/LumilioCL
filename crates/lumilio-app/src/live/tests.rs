@@ -79,7 +79,7 @@ fn home_snapshot_and_rapid_selection_keep_the_last_game(cx: &mut gpui_kit::TestA
         Some(a.as_str())
     );
     cx.run_until_parked();
-    let latest = shell.read_with(cx, |shell, _| shell.live().unwrap().install_target.clone());
+    let latest = shell.read_with(cx, |shell, _| shell.install_target().map(str::to_owned));
     assert_eq!(latest.as_deref(), Some(a.as_str()));
 }
 
@@ -220,9 +220,7 @@ fn curseforge_through_the_page(cx: &mut gpui_kit::TestAppContext) {
     });
     let id = game.id.clone();
     until(cx, "the install target", 10, &|cx| {
-        shell.read_with(cx, |shell, _| {
-            shell.live().unwrap().install_target.as_deref() == Some(id.as_str())
-        })
+        shell.read_with(cx, |shell, _| shell.install_target() == Some(id.as_str()))
     });
     shell.update(cx, |shell, cx| {
         shell.show(Route::Discover);
