@@ -18,8 +18,8 @@ Status: InProgress
 
 ## Tasks
 
-- [ ] T1 — 无壁纸选项 (Proposed)
-  Acceptance: 外观设置的壁纸可选「方块世界」「图片」「无壁纸」，保存在 LookPreferences，旧设置读出来仍是原来的选择。无壁纸时首页顶部不画世界，高度收缩到标题与「继续」，文字用主题墨色，按键不变；启动中仍有分段进度条，游戏中与启动失败由标题旁的 LED 与文字表达（D2）。UI 测试覆盖三种壁纸下首页各状态的布局。
+- [x] T1 — 无壁纸选项 (Completed)
+  Acceptance: 外观设置的壁纸可选「方块世界」「图片」「无壁纸」，保存在 LookPreferences，旧设置读出来仍是原来的选择。无壁纸时首页顶部不画世界，高度收缩到标题与「继续」，文字用主题墨色，按键不变；启动中仍有分段进度条，游戏中与启动失败由标题旁的 LED 与文字表达（D2）。UI 测试覆盖有世界与无壁纸时首页标题的位置。
 - [x] T2 — 半透明机身与兜底 (Completed)
   Acceptance: 主题文件中只有机身类颜色（page、panel、hairline 等，按 D1 列出）可以带透明度，按键、显示屏、标签、LED 的透明度被忽略并在主题检查里报告。窗口拿不到模糊时，带透明度的机身颜色按 D3 合成为不透明的近似色。各平台的实际材质在 T6 实机检查。
 - [ ] T3 — 玻璃与遮光玻璃 (Proposed)
@@ -34,7 +34,7 @@ Status: InProgress
 ## Validation
 
 - T1–T5 的测试通过，并各自证明能失败。
-  Result: 2026-10-21（T2）：theme::tests 的 only_the_body_may_be_translucent 与 a_blurred_theme_turns_opaque_where_the_system_cannot_blur 通过，临时去掉 solidify 或让 without_blur 总是返回原样时分别按预期失败；tune_applies_the_chosen_theme_per_appearance_and_the_scale 原先断言半透明的强调色原样传到界面，按 D1 改为不透明。网站主题编辑器从 themes.generated.json 读到同一份可透明颜色表，model.test.ts 新增对应用例，pnpm check 无错误。
+  Result: 2026-10-21（T2）：theme::tests 的 only_the_body_may_be_translucent 与 a_blurred_theme_turns_opaque_where_the_system_cannot_blur 通过，临时去掉 solidify 或让 without_blur 总是返回原样时分别按预期失败；tune_applies_the_chosen_theme_per_appearance_and_the_scale 原先断言半透明的强调色原样传到界面，按 D1 改为不透明。网站主题编辑器从 themes.generated.json 读到同一份可透明颜色表，model.test.ts 新增对应用例，pnpm check 无错误。 2026-10-21（T1）：core 的 the_wallpaper_reads_settings_from_before_bare_home 检查壁纸仍按原来的文件名写入，旧设置读出原选择，三种选择写入后读回相同；无壁纸写作 "bare"，存下的图片总以 wallpaper- 开头，不会撞名。UI 的 a_bare_home_puts_its_title_at_the_top 检查无壁纸时标题在顶部、有世界时在世界底部，临时让无壁纸也画世界时按预期失败。lumilio-core、lumilio-ui、lumilio-app 共 1404 项通过，clippy 无警告。
 - just check 通过（由 Project Maintainer 运行）。
   Result: pending
 - Project Maintainer 实机检查通过（T6）。

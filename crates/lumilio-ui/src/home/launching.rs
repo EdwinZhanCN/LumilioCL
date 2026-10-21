@@ -1,5 +1,5 @@
 use super::buttons::{LocalActionIcon, art_button};
-use super::render::{ArtButtons, caption, eyebrow, headline, on_art, world_accent};
+use super::render::{ArtButtons, caption, eyebrow, headline, world_accent};
 use super::{HomeIntent, HomeIntentHandler, HoverHandler, Subject};
 use crate::theme::motion;
 use gpui::AnimationExt as _;
@@ -31,11 +31,12 @@ pub(super) fn render_continue(
         .items_start()
         .gap(px(6.))
         .child(eyebrow(
+            art,
             crate::tr!("home-continue-eyebrow"),
             world_accent(subject.world),
         ))
-        .child(headline(subject.title.clone()))
-        .child(caption(subject.metadata.clone()))
+        .child(headline(art, subject.title.clone()))
+        .child(caption(art, subject.metadata.clone()))
         .child(
             div()
                 .id("home-continue-hover")
@@ -176,16 +177,16 @@ pub(super) fn render_launching(
         let label = div().text_xs();
         if step < phase {
             label
-                .text_color(on_art().opacity(0.62))
+                .text_color(art.text.opacity(0.62))
                 .child(format!("✓ {}", phase_label(step)))
         } else if step == phase {
             label
                 .font_semibold()
-                .text_color(on_art())
+                .text_color(art.text)
                 .child(phase_label(step))
         } else {
             label
-                .text_color(on_art().opacity(0.36))
+                .text_color(art.text.opacity(0.36))
                 .child(phase_label(step))
         }
     });
@@ -194,10 +195,11 @@ pub(super) fn render_launching(
         .items_start()
         .gap(px(6.))
         .child(eyebrow(
+            art,
             crate::tr!("home-entering", title = subject.title.to_string()),
             world_accent(subject.world),
         ))
-        .child(headline(phase_headline(phase)))
+        .child(headline(art, phase_headline(phase)))
         .child(div().mt(px(8.)).child(morph))
         .child(
             h_flex()
@@ -237,14 +239,15 @@ pub(super) fn render_playing(
         .items_start()
         .gap(px(6.))
         .child(eyebrow(
+            art,
             crate::tr!("home-playing-eyebrow"),
             world_accent(subject.world),
         ))
-        .child(headline(subject.title.clone()))
-        .child(caption(crate::tr!(
-            "home-playing-caption",
-            minutes = minutes
-        )))
+        .child(headline(art, subject.title.clone()))
+        .child(caption(
+            art,
+            crate::tr!("home-playing-caption", minutes = minutes),
+        ))
         .child(
             div()
                 .mt(px(12.))

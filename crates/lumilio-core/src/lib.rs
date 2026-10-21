@@ -234,7 +234,7 @@ pub use transfer::{
 pub use tuning::{
     AfterLaunch, Appearance, DOWNLOAD_CONCURRENCY, DiscoverPreferences, EnvVar, FONT_SCALE_PERCENT,
     InstanceLaunch, Language, LaunchTuning, LookPreferences, MAX_WINDOW_SIDE, MotionPreference,
-    Preferences, QuickPlay, QuickPlayProblem, TuningError, quick_play_problem,
+    Preferences, QuickPlay, QuickPlayProblem, TuningError, WallpaperChoice, quick_play_problem,
     quick_play_world_unsupported, split_words,
 };
 pub use updates::{

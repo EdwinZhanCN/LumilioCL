@@ -76,7 +76,7 @@ fn the_wallpaper_keeps_to_its_own_cache(cx: &mut TestAppContext) {
         gpui_component::init(cx);
         cx.set_global(crate::theme::Wallpaper {
             path: Some(path.clone()),
-            missing: false,
+            ..Default::default()
         });
     });
     let (_shell, cx) = cx.add_window_view(|_, cx| {

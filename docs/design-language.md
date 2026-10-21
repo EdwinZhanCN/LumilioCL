@@ -132,6 +132,18 @@ The launcher follows the system appearance, at start and live
 (`follow_system_appearance`). World art does not change with appearance; the
 page it dissolves into does.
 
+Home's wallpaper is the world, a picture, or nothing. Without one there is
+no art: the title, its caption and Continue sit on the body at the top of the
+content column, as tall as they need, in the theme's ink. The keys stay the
+same objects. What the world said about the game is said by what is already
+there: the square and words beside the title, and the launch's segment bar.
+
+A theme may make the body translucent: `page`, `panel` and `hairline` may
+carry opacity, and the window behind them is blurred. Keys, displays, tags
+and LEDs are objects on the body and stay solid. Where the system cannot blur,
+the translucent body is laid over the built-in page of its tone, so the
+desktop's own text never shows through ours.
+
 ## 6. Navigation
 
 The navigation bar floats at the bottom of every page, Home included, as

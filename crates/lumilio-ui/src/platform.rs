@@ -39,10 +39,14 @@ pub fn apply_look(look: &LookPreferences, window: &mut Window, cx: &mut App) {
     crate::shell::sync_appearance(window, cx);
 }
 
-/// Shows the picture behind Home (`path`), or the procedural world for
-/// `None`. `missing` says a chosen picture was not found.
-pub fn apply_wallpaper(path: Option<std::path::PathBuf>, missing: bool, cx: &mut App) {
-    let next = crate::theme::Wallpaper { path, missing };
+/// Shows the picture behind Home (`path`), nothing for a `bare` Home, or the
+/// procedural world. `missing` says a chosen picture was not found.
+pub fn apply_wallpaper(path: Option<std::path::PathBuf>, bare: bool, missing: bool, cx: &mut App) {
+    let next = crate::theme::Wallpaper {
+        path,
+        bare,
+        missing,
+    };
     if cx.try_global::<crate::theme::Wallpaper>() != Some(&next) {
         cx.set_global(next);
         cx.refresh_windows();

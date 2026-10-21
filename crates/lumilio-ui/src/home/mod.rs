@@ -18,7 +18,7 @@ pub use self::launching::{
     BAR_SEGMENTS, filled_segments, phase_headline, phase_label, play_minutes,
 };
 pub use self::recovery::recovery_sentence;
-pub use self::render::{ShellHomeColors, body_label, render_body, render_overlay};
+pub use self::render::{ShellHomeColors, body_label, on_art, render_body, render_overlay};
 
 use crate::hero::{HeroMode, Landmark, Scene};
 use gpui::{App, Window};

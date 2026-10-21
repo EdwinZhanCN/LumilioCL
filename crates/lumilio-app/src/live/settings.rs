@@ -3,7 +3,8 @@ use super::{POLL, Reload, Wiring};
 use gpui_kit::AppContext as _;
 use gpui_kit::{App, Window};
 use lumilio_core::{
-    CancellationToken, Preferences, ServiceError, import_wallpaper, remove_wallpapers,
+    CancellationToken, Preferences, ServiceError, WallpaperChoice, import_wallpaper,
+    remove_wallpapers,
 };
 use lumilio_ui::live::settings_view;
 use lumilio_ui::platform;
@@ -37,13 +38,14 @@ pub(super) fn apply_preferences(
     );
 }
 
-/// Shows the chosen wallpaper once its file is found, off the UI thread. No
-/// choice puts the world back and clears the stored pictures; a choice whose
-/// file is gone shows the world and says so on the Appearance tab.
-fn apply_wallpaper(wiring: &Wiring, chosen: Option<String>, cx: &mut App) {
+/// Shows the chosen wallpaper once its file is found, off the UI thread. The
+/// world or a bare Home clears the stored pictures; a picture whose file is
+/// gone shows the world and says so on the Appearance tab.
+fn apply_wallpaper(wiring: &Wiring, chosen: WallpaperChoice, cx: &mut App) {
     let dir = wiring.backend.service.layout().themes();
+    let bare = chosen == WallpaperChoice::Bare;
     let check = wiring.backend.spawn(async move {
-        let Some(name) = chosen else {
+        let WallpaperChoice::Picture(name) = chosen else {
             let cleared = dir.clone();
             let _ = tokio::task::spawn_blocking(move || remove_wallpapers(&cleared, None)).await;
             return (None, false);
@@ -63,7 +65,7 @@ fn apply_wallpaper(wiring: &Wiring, chosen: Option<String>, cx: &mut App) {
     });
     cx.spawn(async move |cx| {
         if let Ok((path, missing)) = check.await {
-            cx.update(|cx| platform::apply_wallpaper(path, missing, cx));
+            cx.update(|cx| platform::apply_wallpaper(path, bare, missing, cx));
         }
     })
     .detach();
@@ -87,7 +89,7 @@ pub(super) fn set_wallpaper(
         let failure = match import.await {
             Ok(Ok(Ok(name))) => {
                 let mut next = wiring.state.borrow().preferences.clone();
-                next.look.wallpaper = Some(name);
+                next.look.wallpaper = WallpaperChoice::Picture(name);
                 let _ = cx.update_window(window, |_, window, cx| {
                     super::dispatch::on_live_intent(
                         &wiring,

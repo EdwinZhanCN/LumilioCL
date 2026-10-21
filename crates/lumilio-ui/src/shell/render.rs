@@ -168,7 +168,10 @@ impl Render for LauncherShell {
         } else if let Some(page) = live_page {
             page
         } else if self.route == Route::Home {
-            self.render_home(home_colors, home_handler, live_ctx.as_ref(), window)
+            let bare = cx
+                .try_global::<theme::Wallpaper>()
+                .is_some_and(|wallpaper| wallpaper.bare);
+            self.render_home(home_colors, home_handler, live_ctx.as_ref(), bare, window)
         } else {
             v_flex()
                 .size_full()

@@ -177,6 +177,8 @@ impl Global for Choice {}
 pub struct Wallpaper {
     /// The file to show; `None` shows the procedural world.
     pub path: Option<PathBuf>,
+    /// Home shows nothing behind its title.
+    pub bare: bool,
     /// A picture was chosen but its file is gone.
     pub missing: bool,
 }
