@@ -109,12 +109,64 @@ fn pressing_continue_plays_the_launch_moment_through_every_state(cx: &mut TestAp
     cx.run_until_parked();
     assert!(matches!(home(cx), HomePresentation::Recovery { .. }));
     assert!(cx.debug_bounds("home-overlay").is_some());
+    shell.read_with(cx, |shell, cx| {
+        assert!(
+            shell.pending_toasts(cx).is_empty(),
+            "Home explains it in place"
+        )
+    });
 
     shell.update(cx, |shell, cx| {
         shell.set_home(HomePresentation::FirstUse, cx)
     });
     cx.run_until_parked();
     assert!(cx.debug_bounds("home-overlay").is_none());
+}
+
+/// A launch that fails or a game that crashes while another page is open is
+/// told there too, once, with the failed step's cause behind 技术详情.
+#[gpui::test]
+fn a_failure_away_from_home_floats_up_as_a_toast(cx: &mut TestAppContext) {
+    use crate::route::Route;
+    use crate::toast::ToastKind;
+    use lumilio_core::LaunchFailure;
+
+    cx.update(gpui_component::init);
+    let (shell, cx) = cx.add_window_view(|_, cx| {
+        LauncherShell::new(cx)
+            .with_home(continuing(), cx)
+            .with_intent_handler(Rc::new(|_, _, _| {}))
+    });
+    let toasts = |cx: &mut gpui::VisualTestContext| {
+        shell.read_with(cx, |shell, cx| shell.pending_toasts(cx).to_vec())
+    };
+    shell.update(cx, |shell, cx| {
+        shell.set_home(continuing().begin_launch(), cx);
+        shell.show(Route::Library);
+        shell.apply_launch_signal(LaunchSignal::Phase(LaunchPhase::Assets), cx);
+        shell.apply_launch_signal(
+            LaunchSignal::Failed(LaunchFailure::step("checksum mismatch")),
+            cx,
+        );
+        // Stray signals after the failure say nothing more.
+        shell.apply_launch_signal(LaunchSignal::Cancelled, cx);
+    });
+    let shown = toasts(cx);
+    assert_eq!(shown.len(), 1);
+    assert_eq!(shown[0].kind, ToastKind::Error);
+    assert!(
+        shown[0]
+            .text
+            .contains(&continuing().subject().unwrap().title)
+    );
+    assert_eq!(shown[0].technical.as_deref(), Some("checksum mismatch"));
+
+    shell.update(cx, |shell, cx| {
+        shell.set_home(continuing().begin_launch(), cx);
+        shell.apply_launch_signal(LaunchSignal::Running, cx);
+        shell.apply_launch_signal(LaunchSignal::Exited { code: Some(3) }, cx);
+    });
+    assert_eq!(toasts(cx).len(), 2, "a crash is told too");
 }
 
 /// The whole Home page scrolls, world included.

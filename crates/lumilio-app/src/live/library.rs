@@ -15,13 +15,16 @@ pub(super) fn choose_current(wiring: &Wiring, id: String, cx: &mut App) {
     let saved = save_current(wiring, id);
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let Ok(Err(error)) = saved.await else { return };
-        let _ = wiring.shell.update(cx, |shell, cx| {
-            shell.toast(
-                Toast::error(tr!("library-current-save-failed")).technical(error.to_string()),
-                cx,
-            );
-        });
+        let toast = match saved.await {
+            Ok(Ok(())) => return,
+            Ok(Err(error)) => {
+                Toast::error(tr!("library-current-save-failed")).technical(error.to_string())
+            }
+            // The saving worker stopped without answering.
+            Err(_) => Toast::error(tr!("library-current-save-failed"))
+                .technical(tr!("common-work-stopped")),
+        };
+        let _ = wiring.shell.update(cx, |shell, cx| shell.toast(toast, cx));
     })
     .detach();
 }

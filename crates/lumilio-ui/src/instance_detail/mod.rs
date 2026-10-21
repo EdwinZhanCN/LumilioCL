@@ -27,7 +27,6 @@ pub use self::settings::{
 use self::editors::Editor;
 use self::forms::Fields;
 use self::panels::{Confirm, Data};
-use crate::toast::Toast;
 use crate::{tr, tr_all};
 use gpui::{App, Entity, RenderImage, Window};
 use lumilio_core::{InstanceRecord, LauncherSettings, PluginFinding};
@@ -92,8 +91,6 @@ pub struct InstanceDetailView {
     error: Option<String>,
     /// Why the instance could not be read, behind 技术详情.
     load_technical: Option<String>,
-    /// Messages waiting for the next render to float up (§11).
-    toasts: Vec<Toast>,
     handler: InstanceHandler,
     sync_fields: u8,
     data: Data,
@@ -217,7 +214,6 @@ impl InstanceDetailView {
             busy: false,
             error: None,
             load_technical: None,
-            toasts: Vec::new(),
             handler,
             sync_fields: 0,
             data: Data::default(),

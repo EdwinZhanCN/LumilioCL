@@ -4,7 +4,7 @@ use crate::install::InstallError;
 use crate::instance::{InstanceRecord, Loader};
 use crate::java::JavaRuntime;
 use crate::launch::{LaunchDirectories, LaunchError};
-use crate::launch_session::LaunchSignal;
+use crate::launch_session::{LaunchFailure, LaunchProblem, LaunchSignal};
 use crate::process::{LogStream, ProcessError};
 use crate::release::ReleaseError;
 use crate::tuning::{LaunchTuning, QuickPlay};
@@ -147,3 +147,28 @@ impl Display for LaunchServiceError {
 }
 
 impl Error for LaunchServiceError {}
+
+impl LaunchServiceError {
+    /// What the person can act on, when this is something they can.
+    pub fn problem(&self) -> Option<LaunchProblem> {
+        match self {
+            Self::NoJava { required } => Some(LaunchProblem::NoJava(*required)),
+            Self::JavaInstall(_) => Some(LaunchProblem::JavaDownload),
+            Self::Hook {
+                when: "before launch",
+                code,
+                ..
+            } => Some(LaunchProblem::BeforeLaunch(*code)),
+            Self::QuickPlayWorldMissing(world) => Some(LaunchProblem::WorldMissing(world.clone())),
+            _ => None,
+        }
+    }
+
+    /// This error as the failed step of a launch.
+    pub fn failure(&self) -> LaunchFailure {
+        LaunchFailure::Step {
+            message: self.to_string(),
+            problem: self.problem(),
+        }
+    }
+}

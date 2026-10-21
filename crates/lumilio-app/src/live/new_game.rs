@@ -111,10 +111,7 @@ pub(super) fn create_game(
     });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let result = match handle.await {
-            Ok(result) => result,
-            Err(error) => Err(ServiceError::Remote(error.to_string())),
-        };
+        let result = handle.await.unwrap_or_else(|error| Err(error.into()));
         let record = match result {
             Ok(record) => record,
             Err(error) => {

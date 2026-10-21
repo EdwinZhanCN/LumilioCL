@@ -329,8 +329,13 @@ async fn a_missing_java_fails_with_a_clear_reason_and_a_terminal_signal() {
     ));
     assert!(matches!(
         session_of(&updates).status(),
-        LaunchStatus::Failed { failure: LaunchFailure::Step { message }, .. }
-            if message.contains("Java 21")
+        LaunchStatus::Failed {
+            failure: LaunchFailure::Step {
+                message,
+                problem: Some(crate::LaunchProblem::NoJava(Some(21))),
+            },
+            ..
+        } if message.contains("Java 21")
     ));
 }
 

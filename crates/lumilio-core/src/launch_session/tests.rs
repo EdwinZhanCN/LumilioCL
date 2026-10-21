@@ -121,9 +121,9 @@ fn install_events_map_onto_phases_without_claiming_early_completion() {
             stage: InstallStage::AssetTransfers,
             message: "checksum mismatch".into(),
         }),
-        Some(LaunchSignal::Failed(LaunchFailure::Step {
-            message: "checksum mismatch".into()
-        }))
+        Some(LaunchSignal::Failed(LaunchFailure::step(
+            "checksum mismatch"
+        )))
     );
     assert_eq!(
         LaunchSignal::from_install(&InstallEvent::Completed {

@@ -3,7 +3,7 @@
 //! the person asks. Every answer is checked against what is shown when it
 //! arrives, and dropped if the page has moved on.
 
-use super::jobs::{job, outcome};
+use super::jobs::{answer, job, outcome};
 use super::{POLL, Reload, Wiring};
 use gpui_kit::App;
 use lumilio_core::TextFormat;
@@ -26,9 +26,12 @@ pub(super) fn request_summaries(
     let handle = wiring
         .backend
         .spawn(async move { service.translate_summaries(&asked, &items).await });
+    let wiring = wiring.clone();
     let (shell, state) = (wiring.shell.clone(), wiring.state.clone());
     cx.spawn(async move |cx| {
-        let Ok(found) = handle.await else { return };
+        let Some(found) = answer(&wiring, handle, cx).await else {
+            return;
+        };
         if found.is_empty() || state.borrow().search_seq != seq {
             return;
         }
@@ -95,9 +98,12 @@ pub(super) fn request_detail_summary(wiring: &Wiring, cx: &mut App) {
             .await
             .remove(&asked.project)
     });
+    let wiring = wiring.clone();
     let shell = wiring.shell.clone();
     cx.spawn(async move |cx| {
-        let Ok(translated) = handle.await else { return };
+        let Some(translated) = answer(&wiring, handle, cx).await else {
+            return;
+        };
         let current = shell
             .read_with(cx, |shell, _| shell.detail_view())
             .ok()
@@ -158,7 +164,7 @@ pub(super) fn translate_body(
                 return;
             }
         }
-        if let Ok(result) = handle.await {
+        if let Some(result) = answer(&wiring, handle, cx).await {
             view.update(cx, |view, cx| view.set_translation(request, result, cx));
         }
     })
@@ -173,8 +179,12 @@ pub(super) fn clear_cache(wiring: &Wiring, cx: &mut App) {
         false,
         Reload::Nothing,
         None,
-        async move { service.clear_translation_cache().await },
+        // Wrapped so that work which panicked fails like a refused clear.
+        async move { Ok::<_, lumilio_core::ServiceError>(service.clear_translation_cache().await) },
         |shell, result, cx| {
+            let result = result
+                .map_err(|error| error.to_string())
+                .and_then(|cleared| cleared.map_err(|error| error.to_string()));
             shell.toast(
                 outcome(
                     result,

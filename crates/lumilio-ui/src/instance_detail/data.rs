@@ -111,6 +111,11 @@ impl InstanceDetailView {
         cx.notify();
     }
 
+    /// The tab on show (`TAB_*`).
+    pub fn tab(&self) -> usize {
+        self.tab
+    }
+
     pub fn select_tab(&mut self, tab: usize, cx: &mut Context<Self>) {
         self.tab = tab.min(TABS.len() - 1);
         self.plugin_open = None;
@@ -270,15 +275,10 @@ impl InstanceDetailView {
         cx.notify();
     }
 
-    /// Tells what just happened, as a toast over the page.
+    /// Tells what just happened, as a toast over the window: still told when
+    /// the page was left meanwhile.
     pub fn toast(&mut self, toast: Toast, cx: &mut Context<Self>) {
-        self.toasts.push(toast);
-        cx.notify();
-    }
-
-    /// Toasts not shown yet (a window without the framework `Root` keeps them).
-    pub fn pending_toasts(&self) -> &[Toast] {
-        &self.toasts
+        crate::toast::post(toast, cx);
     }
 
     /// Asks the question `intent` stands for (copy or delete) as soon as the
@@ -416,18 +416,17 @@ impl InstanceDetailView {
             if failure.is_none() {
                 self.switch = None;
             }
-            self.toasts.push(match &done.technical {
+            let toast = match &done.technical {
                 Some(detail) => Toast::error(done.notice).technical(detail.clone()),
                 None => Toast::success(done.notice),
-            });
+            };
+            self.toast(toast, cx);
         } else if !self.editor_result(failure, cx) {
             match done.technical {
-                Some(detail) => self
-                    .toasts
-                    .push(Toast::error(done.notice).technical(detail)),
+                Some(detail) => self.toast(Toast::error(done.notice).technical(detail), cx),
                 // A change the page shows itself (a switch) needs no notice.
                 None if done.notice.is_empty() => {}
-                None => self.toasts.push(Toast::success(done.notice)),
+                None => self.toast(Toast::success(done.notice), cx),
             }
         }
         // Writes feed the change history and can change what is wrong.

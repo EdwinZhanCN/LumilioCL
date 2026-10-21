@@ -137,9 +137,10 @@ impl ProjectDetailView {
             Err(error) => {
                 translation.failed = true;
                 translation.shown = false;
-                self.toasts.push(
+                self.toast(
                     crate::toast::Toast::error(tr!("translation-failed"))
                         .technical(error.to_string()),
+                    cx,
                 );
             }
         }

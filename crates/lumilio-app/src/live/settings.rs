@@ -1,4 +1,4 @@
-use super::jobs::{job, outcome, reload};
+use super::jobs::{answer, job, outcome, reload};
 use super::{POLL, Reload, Wiring};
 use gpui_kit::AppContext as _;
 use gpui_kit::{App, Window};
@@ -146,7 +146,7 @@ pub(super) fn edit_plugin_setting(
     let wiring = wiring.clone();
     let window = window.window_handle();
     cx.spawn(async move |cx| {
-        let Ok(Some((field, value))) = lookup.await else {
+        let Some(Some((field, value))) = answer(&wiring, lookup, cx).await else {
             return;
         };
         let _ = cx.update_window(window, |_, window, cx| {
@@ -210,7 +210,7 @@ pub(super) fn apply_saved_preferences(
     reload_themes(wiring, window, cx);
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let Ok(preferences) = handle.await else {
+        let Some(preferences) = answer(&wiring, handle, cx).await else {
             return;
         };
         wiring.state.borrow_mut().preferences = preferences.clone();
@@ -251,10 +251,7 @@ pub(super) fn change_setting(
     let wiring = wiring.clone();
     let window = window.window_handle();
     cx.spawn(async move |cx| {
-        let result = match handle.await {
-            Ok(result) => result,
-            Err(error) => Err(ServiceError::Remote(error.to_string())),
-        };
+        let result = handle.await.unwrap_or_else(|error| Err(error.into()));
         match result {
             Ok(()) => {
                 if let Some(notice) = notice {
@@ -285,7 +282,7 @@ fn load_java_offers(wiring: &Wiring, cx: &mut App) {
         .spawn(async move { service.java_offers().await });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let Ok(offers) = handle.await else {
+        let Some(offers) = answer(&wiring, handle, cx).await else {
             return;
         };
         let _ = wiring.shell.update(cx, |shell, cx| {
@@ -320,7 +317,8 @@ pub(super) fn load_settings(wiring: &Wiring, cx: &mut App) {
     });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let Ok((settings, plugins, java, memory, root)) = handle.await else {
+        let Some((settings, plugins, java, memory, root)) = answer(&wiring, handle, cx).await
+        else {
             return;
         };
         wiring.state.borrow_mut().preferences = settings.preferences.clone();
@@ -366,11 +364,10 @@ pub(super) fn load_settings(wiring: &Wiring, cx: &mut App) {
             });
         }
         let service = wiring.backend.service.clone();
-        let Ok(usage) = wiring
+        let handle = wiring
             .backend
-            .spawn(async move { service.storage_usage().await })
-            .await
-        else {
+            .spawn(async move { service.storage_usage().await });
+        let Some(usage) = answer(&wiring, handle, cx).await else {
             return;
         };
         let _ = wiring.shell.update(cx, |shell, cx| {
@@ -395,13 +392,11 @@ pub(super) fn add_java(wiring: &Wiring, cx: &mut App) {
             return;
         };
         let service = wiring.backend.service.clone();
-        let Ok(result) = wiring
+        let result = wiring
             .backend
             .spawn(async move { service.add_java(&path).await })
             .await
-        else {
-            return;
-        };
+            .unwrap_or_else(|error| Err(error.into()));
         let _ = wiring.shell.update(cx, |shell, cx| {
             shell.toast(
                 match result {
@@ -430,9 +425,7 @@ pub(super) fn check_reclaimable(wiring: &Wiring, window: &mut Window, cx: &mut A
     let wiring = wiring.clone();
     let window = window.window_handle();
     cx.spawn(async move |cx| {
-        let Ok(result) = handle.await else {
-            return;
-        };
+        let result = handle.await.unwrap_or_else(|error| Err(error.into()));
         match result {
             Err(error) => {
                 let _ = wiring.shell.update(cx, |shell, cx| {
@@ -621,9 +614,7 @@ pub(super) fn install_java(
             cx.background_executor().timer(POLL).await;
             cx.update(|cx| reload(&wiring, Reload::Lists, cx));
         }
-        let Ok(result) = handle.await else {
-            return;
-        };
+        let result = handle.await.unwrap_or_else(|error| Err(error.into()));
         let _ = wiring.shell.update(cx, |shell, cx| {
             shell.toast(
                 outcome(

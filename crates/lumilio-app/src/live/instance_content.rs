@@ -4,6 +4,7 @@
 
 use super::Wiring;
 use super::instance_write::write_instance;
+use super::jobs::answer;
 use gpui_kit::AppContext as _;
 use gpui_kit::{App, WeakEntity, Window};
 use lumilio_ui::instance_detail::{InstanceDetailView, InstanceIntent};
@@ -58,7 +59,7 @@ pub(super) fn load_changelog(
             .map_err(|error| error.to_string())
     });
     cx.spawn(async move |cx| {
-        let Ok(result) = handle.await else { return };
+        let result = handle.await.unwrap_or_else(|error| Err(error.to_string()));
         let _ = view.update(cx, |view, cx| {
             view.changelog_arrived(&project, &version, result, cx)
         });
@@ -78,8 +79,11 @@ pub(super) fn load_pending(
     let handle = wiring
         .backend
         .spawn(async move { service.pending_downloads(&id).await.unwrap_or_default() });
+    let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let Ok(pending) = handle.await else { return };
+        let Some(pending) = answer(&wiring, handle, cx).await else {
+            return;
+        };
         let _ = view.update(cx, |view, cx| view.set_pending(pending, cx));
     })
     .detach();
