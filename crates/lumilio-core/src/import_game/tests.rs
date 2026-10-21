@@ -38,37 +38,248 @@ fn a_prism_instance_is_read_with_its_name_game_and_loader() {
     assert!(matches!(detect(&bare), Err(ImportError::Unreadable(_))));
 }
 
+type Reading = Option<(String, Loader, Option<String>)>;
+
+/// Writes `versions/<name>/<name>.json` and reads that version back.
+fn version(versions: &Path, name: &str, json: &str) -> Reading {
+    write(&versions.join(name).join(format!("{name}.json")), json);
+    profile::read(versions, name)
+}
+
+fn modded(game: &str, loader: Loader, version: &str) -> Reading {
+    Some((game.into(), loader, Some(version.into())))
+}
+
+fn vanilla(game: &str) -> Reading {
+    Some((game.into(), Loader::Vanilla, None))
+}
+
+/// A game jar that names its version in `version.json`, as 1.14 and later do.
+fn jar(path: &Path, id: &str) {
+    use std::io::Write as _;
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    let mut writer = zip::ZipWriter::new(fs::File::create(path).unwrap());
+    writer
+        .start_file("version.json", zip::write::SimpleFileOptions::default())
+        .unwrap();
+    write!(writer, r#"{{"id":"{id}","name":"{id}"}}"#).unwrap();
+    writer.finish().unwrap();
+}
+
 #[test]
-fn version_ids_of_the_common_loaders_are_taken_apart() {
-    let read = |id: &str, from: Option<&str>| read_version(id, from);
+fn the_loader_comes_from_the_libraries_whatever_the_version_is_called() {
+    let dir = tempfile::tempdir().unwrap();
+    let versions = dir.path();
+    // PCL (issue #58): a merged json, a display name for an id, no inheritsFrom.
     assert_eq!(
-        read("fabric-loader-0.15.7-1.20.1", Some("1.20.1")),
-        Some(("1.20.1".into(), Loader::Fabric, Some("0.15.7".into())))
+        version(
+            versions,
+            "26.3-Fabric 0.19.5",
+            r#"{"id":"26.3-Fabric 0.19.5","clientVersion":"26.3",
+                "mainClass":"net.fabricmc.loader.impl.launch.knot.KnotClient",
+                "libraries":[{"name":"org.ow2.asm:asm:9.8"},
+                             {"name":"net.fabricmc:fabric-loader:0.19.5"}]}"#,
+        ),
+        modded("26.3", Loader::Fabric, "0.19.5")
+    );
+    // HMCL: merged too, the game and the loader kept as patches.
+    assert_eq!(
+        version(
+            versions,
+            "我的整合包",
+            r#"{"id":"我的整合包","mainClass":"cpw.mods.bootstraplauncher.BootstrapLauncher",
+                "patches":[{"id":"game","version":"1.20.1"},{"id":"forge","version":"47.2.0"}],
+                "libraries":[{"name":"net.minecraftforge:fmlloader:1.20.1-47.2.0"}]}"#,
+        ),
+        modded("1.20.1", Loader::Forge, "47.2.0")
+    );
+    // The official installers: inheritsFrom names the game.
+    assert_eq!(
+        version(
+            versions,
+            "fabric-loader-0.16.0-1.21.1",
+            r#"{"id":"fabric-loader-0.16.0-1.21.1","inheritsFrom":"1.21.1",
+                "mainClass":"net.fabricmc.loader.impl.launch.knot.KnotClient",
+                "libraries":[{"name":"net.fabricmc:intermediary:1.21.1"},
+                             {"name":"net.fabricmc:fabric-loader:0.16.0"}]}"#,
+        ),
+        modded("1.21.1", Loader::Fabric, "0.16.0")
     );
     assert_eq!(
-        read("quilt-loader-0.26.0-1.21.1", Some("1.21.1")),
-        Some(("1.21.1".into(), Loader::Quilt, Some("0.26.0".into())))
+        version(
+            versions,
+            "quilt-loader-0.26.0-1.21.1",
+            r#"{"id":"quilt-loader-0.26.0-1.21.1","inheritsFrom":"1.21.1",
+                "libraries":[{"name":"org.quiltmc:quilt-loader:0.26.0"},
+                             {"name":"net.fabricmc:intermediary:1.21.1"}]}"#,
+        ),
+        modded("1.21.1", Loader::Quilt, "0.26.0")
     );
     assert_eq!(
-        read("1.20.1-forge-47.2.0", Some("1.20.1")),
-        Some(("1.20.1".into(), Loader::Forge, Some("47.2.0".into())))
+        version(
+            versions,
+            "1.20.1-forge-47.2.0",
+            r#"{"id":"1.20.1-forge-47.2.0","inheritsFrom":"1.20.1",
+                "mainClass":"cpw.mods.bootstraplauncher.BootstrapLauncher",
+                "arguments":{"game":["--launchTarget","forgeclient",
+                    "--fml.forgeVersion","47.2.0","--fml.mcVersion","1.20.1"]},
+                "libraries":[{"name":"net.minecraftforge:fmlloader:1.20.1-47.2.0"}]}"#,
+        ),
+        modded("1.20.1", Loader::Forge, "47.2.0")
+    );
+    // A renamed NeoForge, its version only in the arguments.
+    assert_eq!(
+        version(
+            versions,
+            "NeoForge 生存",
+            r#"{"id":"NeoForge 生存","mainClass":"cpw.mods.bootstraplauncher.BootstrapLauncher",
+                "arguments":{"game":["--fml.neoForgeVersion","21.1.50","--fml.mcVersion","1.21.1"]},
+                "libraries":[{"name":"net.neoforged.fancymodloader:loader:4.0.24"},
+                             {"name":"net.minecraftforge:forgespi:7.1.0"}]}"#,
+        ),
+        modded("1.21.1", Loader::NeoForge, "21.1.50")
+    );
+    // An old merged Forge: the library names both the game and the build.
+    assert_eq!(
+        version(
+            versions,
+            "1.12.2-Forge",
+            r#"{"id":"1.12.2-Forge","mainClass":"net.minecraft.launchwrapper.Launch",
+                "minecraftArguments":"--username ${auth_player_name} --tweakClass net.minecraftforge.fml.common.launcher.FMLTweaker",
+                "libraries":[{"name":"net.minecraftforge:forge:1.12.2-14.23.5.2860"}]}"#,
+        ),
+        modded("1.12.2", Loader::Forge, "14.23.5.2860")
+    );
+}
+
+#[test]
+fn version_jsons_written_by_pcl_and_hmcl_are_read() {
+    // Real launcher output; sources and licenses in tests/data/import-game/README.md.
+    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/import-game");
+    let found: Vec<_> = detect(&folder)
+        .unwrap()
+        .into_iter()
+        .map(|game| {
+            (
+                game.name,
+                game.game_version,
+                game.loader,
+                game.loader_version.unwrap_or_default(),
+            )
+        })
+        .collect();
+    let expected = [
+        ("1.20.1-Forge", "1.20.1", Loader::Forge, "47.3.11"),
+        ("1.20.4-Fabric 0.16.10", "1.20.4", Loader::Fabric, "0.16.10"),
+        ("BACraft", "1.20.1", Loader::Forge, "47.4.0"),
+        ("Bunker Server AOT", "1.21.1", Loader::Fabric, "0.18.4"),
+        ("HereBeDragons", "1.21.1", Loader::NeoForge, "21.1.193"),
+        ("WizardryCraft", "1.21.1", Loader::NeoForge, "21.1.251"),
+    ]
+    .map(|(name, game, loader, version)| (name.into(), game.into(), loader, version.into()));
+    assert_eq!(found, expected);
+}
+
+#[test]
+fn a_version_without_a_loader_is_vanilla_wherever_its_game_version_is_written() {
+    let dir = tempfile::tempdir().unwrap();
+    let versions = dir.path();
+    let main = r#""mainClass":"net.minecraft.client.main.Main""#;
+    assert_eq!(
+        version(versions, "1.21.1", &format!(r#"{{"id":"1.21.1",{main}}}"#)),
+        vanilla("1.21.1")
     );
     assert_eq!(
-        read("neoforge-21.1.50", Some("1.21.1")),
-        Some(("1.21.1".into(), Loader::NeoForge, Some("21.1.50".into())))
+        version(versions, "24w14a", &format!(r#"{{"id":"24w14a",{main}}}"#)),
+        vanilla("24w14a")
     );
     assert_eq!(
-        read("1.21.1", None),
-        Some(("1.21.1".into(), Loader::Vanilla, None))
+        version(
+            versions,
+            "生存服",
+            &format!(r#"{{"id":"生存服","clientVersion":"1.21.1",{main}}}"#)
+        ),
+        vanilla("1.21.1")
+    );
+    // Nothing in the json: the game jar says which game it is.
+    jar(&versions.join("整合包/整合包.jar"), "1.14 / 5a1b2c");
+    assert_eq!(
+        version(versions, "整合包", &format!(r#"{{"id":"整合包",{main}}}"#)),
+        vanilla("1.14")
     );
     assert_eq!(
-        read("23w31a", None),
-        Some(("23w31a".into(), Loader::Vanilla, None))
-    );
-    assert_eq!(
-        read("optifine-thing", Some("1.12.2")),
+        version(versions, "随便", &format!(r#"{{"id":"随便",{main}}}"#)),
         None,
-        "unnameable mods are not guessed"
+        "a game version is never made up from a name"
+    );
+}
+
+#[test]
+fn an_inherited_json_is_read_with_its_parents_and_unnameable_mods_are_left_out() {
+    let dir = tempfile::tempdir().unwrap();
+    let versions = dir.path();
+    // The parent is a renamed vanilla; the loader json only inherits from it.
+    write(
+        &versions.join("原版/原版.json"),
+        r#"{"id":"原版","clientVersion":"1.20.1","mainClass":"net.minecraft.client.main.Main"}"#,
+    );
+    assert_eq!(
+        version(
+            versions,
+            "Fabric",
+            r#"{"id":"Fabric","inheritsFrom":"原版",
+                "libraries":[{"name":"net.fabricmc:fabric-loader:0.15.7"}]}"#,
+        ),
+        modded("1.20.1", Loader::Fabric, "0.15.7")
+    );
+    // OptiFine alone, Legacy Fabric and a loader without a library are not
+    // turned into vanilla.
+    assert_eq!(
+        version(
+            versions,
+            "1.12.2-OptiFine",
+            r#"{"id":"1.12.2-OptiFine","inheritsFrom":"1.12.2",
+                "minecraftArguments":"--tweakClass optifine.OptiFineTweaker",
+                "libraries":[{"name":"optifine:OptiFine:1.12.2_HD_U_G5"},
+                             {"name":"optifine:launchwrapper-of:2.2"}]}"#,
+        ),
+        None
+    );
+    assert_eq!(
+        version(
+            versions,
+            "legacy",
+            r#"{"id":"legacy","clientVersion":"1.8.9",
+                "libraries":[{"name":"net.fabricmc:fabric-loader:0.15.7"},
+                             {"name":"net.legacyfabric:intermediary:1.8.9"}]}"#,
+        ),
+        None
+    );
+    assert_eq!(
+        version(
+            versions,
+            "odd",
+            r#"{"id":"odd","clientVersion":"1.21.1",
+                "mainClass":"net.fabricmc.loader.impl.launch.knot.KnotClient"}"#,
+        ),
+        None
+    );
+    assert_eq!(
+        version(
+            versions,
+            "child",
+            r#"{"id":"child","inheritsFrom":"1.21.1"}"#
+        ),
+        None
+    );
+    // A loop of inheritsFrom ends.
+    write(
+        &versions.join("a/a.json"),
+        r#"{"id":"a","inheritsFrom":"b"}"#,
+    );
+    assert_eq!(
+        version(versions, "b", r#"{"id":"b","inheritsFrom":"a"}"#),
+        None
     );
 }
 
@@ -82,7 +293,8 @@ fn a_minecraft_folder_lists_each_readable_version_and_finds_isolated_files() {
     );
     write(
         &root.join("versions/fab/fab.json"),
-        r#"{"id":"fabric-loader-0.16.0-1.21.1","inheritsFrom":"1.21.1"}"#,
+        r#"{"id":"fabric-loader-0.16.0-1.21.1","inheritsFrom":"1.21.1",
+            "libraries":[{"name":"net.fabricmc:fabric-loader:0.16.0"}]}"#,
     );
     write(&root.join("versions/fab/mods/a.jar"), "mod");
     write(&root.join("versions/junk/junk.json"), "not json");

@@ -2,8 +2,10 @@
 //!
 //! Two layouts are understood: a MultiMC/Prism instance (`instance.cfg` and
 //! `mmc-pack.json`, game files in `.minecraft` or `minecraft`) and a plain
-//! `.minecraft` folder (the game and loader read from `versions/*/*.json`).
-//! Reading never modifies the source.
+//! `.minecraft` folder (the game and loader read from `versions/*/*.json`,
+//! see `profile.rs`). Reading never modifies the source.
+
+mod profile;
 
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
@@ -125,55 +127,6 @@ fn read_prism(folder: &Path) -> Result<FoundGame, ImportError> {
     })
 }
 
-#[derive(Deserialize)]
-struct VersionJson {
-    id: String,
-    #[serde(rename = "inheritsFrom", default)]
-    inherits_from: Option<String>,
-}
-
-/// The game and loader a version id stands for, given what it inherits from.
-fn read_version(id: &str, inherits: Option<&str>) -> Option<(String, Loader, Option<String>)> {
-    if let Some(rest) = id.strip_prefix("fabric-loader-") {
-        // fabric-loader-<loader>-<game>
-        let game = inherits
-            .map(str::to_owned)
-            .or_else(|| rest.rsplit_once('-').map(|(_, g)| g.to_owned()))?;
-        let loader = rest.strip_suffix(&format!("-{game}"))?.to_owned();
-        return Some((game, Loader::Fabric, Some(loader)));
-    }
-    if let Some(rest) = id.strip_prefix("quilt-loader-") {
-        let game = inherits
-            .map(str::to_owned)
-            .or_else(|| rest.rsplit_once('-').map(|(_, g)| g.to_owned()))?;
-        let loader = rest.strip_suffix(&format!("-{game}"))?.to_owned();
-        return Some((game, Loader::Quilt, Some(loader)));
-    }
-    if let Some(version) = id.strip_prefix("neoforge-") {
-        return Some((
-            inherits?.to_owned(),
-            Loader::NeoForge,
-            Some(version.to_owned()),
-        ));
-    }
-    if let Some((game, version)) = id.split_once("-forge-") {
-        return Some((game.to_owned(), Loader::Forge, Some(version.to_owned())));
-    }
-    if inherits.is_some() {
-        // Modded in a way we cannot name.
-        return None;
-    }
-    // A vanilla version id is a game version (release, snapshot, old).
-    id.chars()
-        .next()
-        .filter(char::is_ascii_digit)
-        .map(|_| (id.to_owned(), Loader::Vanilla, None))
-        .or_else(|| {
-            id.contains('w')
-                .then(|| (id.to_owned(), Loader::Vanilla, None))
-        })
-}
-
 fn read_plain(folder: &Path) -> Result<Vec<FoundGame>, ImportError> {
     let versions = folder.join("versions");
     let mut found = Vec::new();
@@ -184,15 +137,7 @@ fn read_plain(folder: &Path) -> Result<Vec<FoundGame>, ImportError> {
         let Some(name) = dir.file_name().map(|n| n.to_string_lossy().into_owned()) else {
             continue;
         };
-        let Ok(text) = fs::read_to_string(dir.join(format!("{name}.json"))) else {
-            continue;
-        };
-        let Ok(version) = serde_json::from_str::<VersionJson>(&text) else {
-            continue;
-        };
-        let Some((game_version, loader, loader_version)) =
-            read_version(&version.id, version.inherits_from.as_deref())
-        else {
+        let Some((game_version, loader, loader_version)) = profile::read(&versions, &name) else {
             continue;
         };
         // Some launchers keep a version's own mods and saves beside its json.
