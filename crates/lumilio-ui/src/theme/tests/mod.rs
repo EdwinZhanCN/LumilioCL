@@ -334,13 +334,25 @@ fn a_translucent_page_colour_and_the_window_material_reach_the_window(cx: &mut T
         // The person's choice of dark wins over what the test window reports.
         crate::platform::apply_appearance(lumilio_core::Appearance::Dark, window, cx);
         let look = cx.global::<super::Look>();
-        assert_eq!(
-            look.theme.window_background,
-            super::WindowBackground::Blurred
-        );
-        // The page colour keeps its opacity all the way to the component theme.
-        let page = Theme::global(cx).background;
-        assert!((page.a - 128. / 255.).abs() < 0.005, "alpha {}", page.a);
+        let theme = Theme::global(cx);
+        // The page colour reaches the component theme, and the root that
+        // paints the window under every page.
+        let (page, root) = (theme.background, theme.tokens.background.color);
+        assert_eq!(root, page);
+        if super::spec::can_blur() {
+            assert_eq!(
+                look.theme.window_background,
+                super::WindowBackground::Blurred
+            );
+            assert!((page.a - 128. / 255.).abs() < 0.005, "alpha {}", page.a);
+        } else {
+            // Without blur the body is made opaque (plan translucent-themes, D3).
+            assert_eq!(
+                look.theme.window_background,
+                super::WindowBackground::Opaque
+            );
+            assert_eq!(page.a, 1.);
+        }
     });
 }
 

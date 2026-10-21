@@ -191,7 +191,8 @@ impl Render for LauncherShell {
             .key_context("lumilio-shell")
             .track_focus(&self.focus_handle)
             .on_key_down(cx.listener(Self::handle_shortcut))
-            .bg(colors.background)
+            // The framework's root paints the page under the shell; painting it
+            // again would stack a translucent page into an opaque one.
             .text_color(colors.foreground)
             .child(body)
             // The title bar is transparent and floats over everything, so on

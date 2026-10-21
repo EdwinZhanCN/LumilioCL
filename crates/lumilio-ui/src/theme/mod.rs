@@ -356,6 +356,9 @@ pub fn tune(cx: &mut gpui::App) {
     };
 
     theme.background = body.page;
+    // The framework's root paints the window from the token, under every
+    // page: left stock, it hides a translucent page behind an opaque one.
+    theme.tokens.background = body.page.into();
     theme.foreground = body.ink;
     theme.border = body.hairline;
     theme.input = body.hairline;
