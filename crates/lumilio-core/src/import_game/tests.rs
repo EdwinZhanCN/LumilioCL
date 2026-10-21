@@ -153,6 +153,34 @@ fn the_loader_comes_from_the_libraries_whatever_the_version_is_called() {
 }
 
 #[test]
+fn version_jsons_written_by_pcl_and_hmcl_are_read() {
+    // Real launcher output; sources and licenses in tests/data/import-game/README.md.
+    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/import-game");
+    let found: Vec<_> = detect(&folder)
+        .unwrap()
+        .into_iter()
+        .map(|game| {
+            (
+                game.name,
+                game.game_version,
+                game.loader,
+                game.loader_version.unwrap_or_default(),
+            )
+        })
+        .collect();
+    let expected = [
+        ("1.20.1-Forge", "1.20.1", Loader::Forge, "47.3.11"),
+        ("1.20.4-Fabric 0.16.10", "1.20.4", Loader::Fabric, "0.16.10"),
+        ("BACraft", "1.20.1", Loader::Forge, "47.4.0"),
+        ("Bunker Server AOT", "1.21.1", Loader::Fabric, "0.18.4"),
+        ("HereBeDragons", "1.21.1", Loader::NeoForge, "21.1.193"),
+        ("WizardryCraft", "1.21.1", Loader::NeoForge, "21.1.251"),
+    ]
+    .map(|(name, game, loader, version)| (name.into(), game.into(), loader, version.into()));
+    assert_eq!(found, expected);
+}
+
+#[test]
 fn a_version_without_a_loader_is_vanilla_wherever_its_game_version_is_written() {
     let dir = tempfile::tempdir().unwrap();
     let versions = dir.path();
