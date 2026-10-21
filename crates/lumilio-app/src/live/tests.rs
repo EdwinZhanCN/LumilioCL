@@ -1,3 +1,5 @@
+mod global_context;
+
 use super::jobs::outcome;
 use lumilio_ui::toast::Toast;
 
