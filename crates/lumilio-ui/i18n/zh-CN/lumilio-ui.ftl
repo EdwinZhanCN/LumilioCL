@@ -67,7 +67,7 @@ route-settings = 设置
 nav-back = 后退
 nav-forward = 前进
 nav-update-ready = 新版本 { $version } 已就绪，点击重启并更新
-nav-update-game-running = 游戏正在运行，结束后才能重启更新
+nav-update-game-running = 游戏正在启动或运行，结束后才能重启更新
 nav-add-account = 添加账户
 nav-add-account-help = 添加一个离线账户才能进游戏
 # 窗口窄时，没有账户的芯片只是一个带 + 的空头像，字都在这条提示里。

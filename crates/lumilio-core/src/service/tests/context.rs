@@ -186,3 +186,47 @@ async fn home_applies_the_account_to_checks_already_made() {
         "the same as checking again"
     );
 }
+
+/// Plan global-context T6: a launch publishes its session while it is on its
+/// way; a launch that fails stays published as the one to recover, and one
+/// that is abandoned, or whose game is deleted, leaves none.
+#[tokio::test]
+async fn a_launch_publishes_its_session_until_it_is_over() {
+    use crate::context::{Session, SessionPhase};
+    let world = world();
+    let service = &world.service;
+    let game = service
+        .create_instance("A", Some("1.0"), Loader::Vanilla, None)
+        .await
+        .unwrap();
+    let session = |phase| {
+        Some(Session {
+            instance: game.id.clone(),
+            phase,
+        })
+    };
+
+    // Paused where it reads the settings: on its way.
+    let defaults = service.settings.lock().await;
+    let (updates, _receiver) = tokio::sync::mpsc::unbounded_channel();
+    let mut launch = Box::pin(service.launch(&game.id, updates, crate::CancellationToken::new()));
+    assert!(futures_util::poll!(&mut launch).is_pending());
+    assert_eq!(service.context().session, session(SessionPhase::Preparing));
+    drop(launch);
+    drop(defaults);
+    assert_eq!(service.context().session, None, "an abandoned launch");
+
+    // There is no catalog to install from: the launch fails.
+    let (updates, _receiver) = tokio::sync::mpsc::unbounded_channel();
+    assert!(
+        service
+            .launch(&game.id, updates, crate::CancellationToken::new())
+            .await
+            .is_err()
+    );
+    assert_eq!(service.context().session, session(SessionPhase::Failed));
+    assert!(!service.context().session.unwrap().is_active());
+
+    service.delete_instance(&game.id).await.unwrap();
+    assert_eq!(service.context().session, None, "nothing left to recover");
+}

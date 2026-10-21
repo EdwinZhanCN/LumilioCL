@@ -106,7 +106,7 @@ pub(super) fn card_menu(card: &LibraryCard, ctx: &LiveCtx) -> Vec<kit::MenuEntry
     };
     // ia[library]: 菜单：开始游戏 | 卡片 ⋯ 菜单 | 与卡片上的「启动」相同
     // ia[library]: 菜单：打开 | 卡片 ⋯ 菜单 | 游戏页（进历史）
-    // ia[library]: 设为当前游戏 | 卡片 ⋯ 菜单 | 首页、发现页的安装目标和右下角芯片跟着换
+    // ia[library]: 设为当前游戏 | 卡片 ⋯ 菜单 | 当前游戏换成它：右下角芯片、首页「继续」和发现页的安装目标跟着换
     // ia[library]: 合集：加入 / 移出 | 卡片 ⋯ 菜单「加入合集…」→ 多选列表 | 勾选即加入或移出，可顺手新建；合集是标签，不移动文件
     // ia[library]: 复制游戏 | 卡片 ⋯ 菜单 → 复制弹窗（名称、是否复制存档） | 先打开游戏页再弹窗，之后同游戏页
     // ia[library]: 在访达中显示 | 卡片 ⋯ 菜单 | 打开游戏目录
@@ -184,7 +184,7 @@ pub(super) fn card(index: usize, card: &LibraryCard, ctx: &LiveCtx) -> impl Into
         .child(
             h_flex()
                 .gap_2()
-                // ia[library]: 直接启动 | 卡片按键行里的「启动」 | 首页启动时刻接管；不打开游戏页
+                // ia[library]: 直接启动 | 卡片按键行里的「启动」 | 先设为当前游戏（芯片和「继续」跟着换），再由首页启动时刻接管；不打开游戏页 | global-context D4
                 .child(
                     kit::action(
                         ("live-play", index),

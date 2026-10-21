@@ -68,49 +68,10 @@ pub(super) fn on_shell_intent(
     cx: &mut App,
 ) {
     match intent {
-        ShellIntent::Home(HomeIntent::Continue | HomeIntent::Recover) => {
-            // Asked of the service, not the page: an account added a moment ago
-            // may not have reached the page's model yet.
-            let service = wiring.backend.service.clone();
-            let answered = wiring.state.borrow_mut().java_answered.take();
-            let check_java = wiring
-                .backend
-                .service
-                .context()
-                .current_instance
-                .filter(|id| answered.as_ref() != Some(id));
-            let work = wiring.backend.spawn(async move {
-                let has_account = account_rows(&service.settings().await)
-                    .iter()
-                    .any(|row| row.selected);
-                let conflict = match check_java {
-                    Some(id) => service
-                        .instance_java(&id)
-                        .await
-                        .ok()
-                        .and_then(|java| JavaConflict::of(&java)),
-                    None => None,
-                };
-                (has_account, conflict)
-            });
-            let wiring = wiring.clone();
-            let window = window.window_handle();
-            cx.spawn(async move |cx| {
-                let (has_account, conflict) = work.await.unwrap_or((true, None));
-                if has_account && conflict.is_none() {
-                    cx.update(|cx| start_launch(&wiring, window, cx));
-                    return;
-                }
-                let _ = wiring.shell.update(cx, |shell, cx| shell.abort_launch(cx));
-                let _ = cx.update_window(window, |_, window, cx| match conflict {
-                    // The chosen Java cannot run the game: ask once, then start.
-                    Some(conflict) if has_account => ask_java(&wiring, &conflict, window, cx),
-                    // No account: ask for one, then start where the person left off.
-                    _ => open_add_account(&wiring, true, window, cx),
-                });
-            })
-            .detach();
+        ShellIntent::Home(HomeIntent::Continue) => {
+            continue_launch(wiring, window.window_handle(), cx);
         }
+        ShellIntent::Home(HomeIntent::Recover) => recover(wiring, window.window_handle(), cx),
         ShellIntent::Home(HomeIntent::CancelLaunch | HomeIntent::StopGame) => {
             if let Some(cancel) = wiring.state.borrow().cancel.clone() {
                 cancel.cancel();
@@ -125,6 +86,81 @@ pub(super) fn on_shell_intent(
         ShellIntent::Navigate(Route::Home)
         | ShellIntent::Home(HomeIntent::Import | HomeIntent::TechnicalDetails) => {}
     }
+}
+
+/// Starts the current game, once there is an account and its Java can run it.
+fn continue_launch(wiring: &Wiring, window: gpui_kit::AnyWindowHandle, cx: &mut App) {
+    // Asked of the service, not the page: an account added a moment ago
+    // may not have reached the page's model yet.
+    let service = wiring.backend.service.clone();
+    let answered = wiring.state.borrow_mut().java_answered.take();
+    let check_java = wiring
+        .backend
+        .service
+        .context()
+        .current_instance
+        .filter(|id| answered.as_ref() != Some(id));
+    let work = wiring.backend.spawn(async move {
+        let has_account = account_rows(&service.settings().await)
+            .iter()
+            .any(|row| row.selected);
+        let conflict = match check_java {
+            Some(id) => service
+                .instance_java(&id)
+                .await
+                .ok()
+                .and_then(|java| JavaConflict::of(&java)),
+            None => None,
+        };
+        (has_account, conflict)
+    });
+    let wiring = wiring.clone();
+    cx.spawn(async move |cx| {
+        let (has_account, conflict) = work.await.unwrap_or((true, None));
+        if has_account && conflict.is_none() {
+            cx.update(|cx| start_launch(&wiring, window, cx));
+            return;
+        }
+        let _ = wiring.shell.update(cx, |shell, cx| shell.abort_launch(cx));
+        let _ = cx.update_window(window, |_, window, cx| match conflict {
+            // The chosen Java cannot run the game: ask once, then start.
+            Some(conflict) if has_account => ask_java(&wiring, &conflict, window, cx),
+            // No account: ask for one, then start where the person left off.
+            _ => open_add_account(&wiring, true, window, cx),
+        });
+    })
+    .detach();
+}
+
+/// Retries the launch that failed: its game becomes the current game first
+/// (as ▶ does, decision D4), so Recover never starts another one.
+fn recover(wiring: &Wiring, window: gpui_kit::AnyWindowHandle, cx: &mut App) {
+    let context = wiring.backend.service.context();
+    let failed = context
+        .session
+        .filter(|session| !session.is_active())
+        .map(|session| session.instance)
+        .filter(|id| context.current_instance.as_ref() != Some(id));
+    let Some(failed) = failed else {
+        continue_launch(wiring, window, cx);
+        return;
+    };
+    let saved = super::library::save_current(wiring, failed);
+    let wiring = wiring.clone();
+    cx.spawn(async move |cx| match saved.await {
+        Ok(Ok(())) => cx.update(|cx| continue_launch(&wiring, window, cx)),
+        Ok(Err(error)) => {
+            let _ = wiring.shell.update(cx, |shell, cx| {
+                shell.abort_launch(cx);
+                shell.toast(
+                    Toast::error(tr!("library-current-save-failed")).technical(error.to_string()),
+                    cx,
+                );
+            });
+        }
+        Err(_) => {}
+    })
+    .detach();
 }
 
 pub(super) fn on_live_intent(

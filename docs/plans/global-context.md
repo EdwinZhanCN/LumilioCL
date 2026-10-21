@@ -33,12 +33,12 @@ Status: InProgress
   Acceptance: 一个订阅循环把 core 的变化写入 UI 镜像，并按 D6 的依赖表重算推导结果；State 去掉 continue_id、selection_seq 与 selection_save；账户、Java、插件的处理器不再选择 Reload 变体。首页「需要留意」等区块因推送增删时按设计语言的动效出现与消失，不突然跳动；Java、插件或游戏库变化后实例检查重做期间显示「检查中」，不继续显示旧结论。T1 中首页与诊断的测试通过；home_snapshot_and_rapid_selection_keep_the_last_game 按新语义通过；依赖表每一行有一项测试。
 - [x] T5 — UI 只读镜像与推导的安装目标 (Completed)
   Acceptance: UI 用一个只读镜像保存上下文（Entity 或 Global，按 gpui-kit 指南选择），页面拿不到写入它的方法；芯片、首页、发现页、游戏页从镜像渲染；LiveModel.install_target 删除，安装目标就是当前游戏（D3），set_library 不再选择目标，ProjectDetailView 的目标也从推导值来；芯片的选择只发意图。T1 中芯片与发现页的测试通过。
-- [ ] T6 — 运行会话进入上下文 (Proposed)
+- [x] T6 — 运行会话进入上下文 (Completed)
   Acceptance: core 发布运行会话（游戏 id 与阶段）；首页能否开始、导航「重启以更新」、游戏页的游戏输出、投影工作室窗口从会话读取；「恢复并继续」重试失败那次启动自己的游戏；卡片 ▶ 按 D4。T1 中恢复的测试通过；从卡片启动后芯片、首页与 core 指向同一个游戏。
-- [ ] T7 — 统一设计语言与 IA 契约 (Proposed)
+- [x] T7 — 统一设计语言与 IA 契约 (Completed)
   Acceptance: docs/design-language.md §6 与 §10，以及 navigation.rs（切换当前游戏）、home/launching.rs（继续）、lumilio-app live/instance.rs（浏览锁定）、pages/live/library.rs 与 instance_detail/actions.rs（设为当前游戏）的 ia 注释写成同一语义；nav-current-game 等中英文案与之一致；just ia 没有漂移。
 - [ ] T8 — Project Maintainer 在 Mac 上实机检查 (Proposed)
-  Acceptance: Project Maintainer 按 #55 的复现步骤和 T1 的六个场景实机检查，结果记入本计划的 validation。
+  Acceptance: Project Maintainer 按 #55 的复现步骤和 T1 的六个场景实机检查，并看手感：「需要留意」出现时的淡入上移、变空时立即消失是否突兀；改 Java 或插件设置后「检查中」的时机与停留；芯片在保存后才变，等待能否察觉，是否需要 D1 的「被点的那一行保持按下」；从游戏页浏览后芯片与「继续」一起换，在芯片换游戏时退出锁定并重新搜索是否顺畅；卡片 ▶ 先设当前游戏再启动有无多余停顿；启动中导航「重启以更新」变灰；启动失败后换过当前游戏再点「恢复并继续」重试的是失败的那个。结果记入本计划的 validation。
 - [ ] T9 — 合入、关闭 #55 并恢复 0.2.0 发布 (Proposed)
   Acceptance: PR 引用 #55，合入后 #55 关闭；0.2.0 的发布计划加上本计划为依赖，发布说明补上本计划带来的用户可见变化。
 
@@ -51,7 +51,7 @@ Status: InProgress
 - 依赖表每一行有测试；切换账户不重做实例检查。
   Result: 2026-10-21：切换账户不重做实例检查（T3）：home_applies_the_account_to_checks_already_made 通过，临时让 with_account 忽略账户时按预期失败。依赖表在 crates/lumilio-app/src/live/context.rs 的 stale 中实现，crates/lumilio-app/src/live/tests/dependencies.rs 每个推导结果一项测试（芯片与继续、实例检查、需要留意、账户列表、已安装标记、内容来源与插件标签），另有一项检查初次全部重算、无变化不重算。临时从「需要留意」的依赖里去掉账户时，表的测试与 home_attention_follows_the_current_account 都按预期失败。
 - 原有 app 与 UI 测试通过，或按新语义改写并在此列出。
-  Result: 2026-10-21（T4 之后）：lumilio-app 与 lumilio-ui 共 580 项，578 项通过，失败的两项是留给 T5 的芯片与发现页验收测试。按新语义改写：home_snapshot_and_rapid_selection_keep_the_last_game 改为启动订阅，去掉对 continue_id 的断言，连续两次选择按顺序保存、最后一次留下；service::tests::settings 中当前游戏的测试改为删除后回退到另一个游戏；内存设置的测试中，直接写进游戏库的游戏在重新打开后成为当前游戏；activity 的取消测试先放开设置锁再删除当前游戏，因为删除要保存回退结果。「需要留意」新的结论按 §2 的 QUICK 淡入并上移进入，消失为立即移除（退出短于进入），待 T8 实机检查。2026-10-21（T5 之后）：580 项全部通过，clippy 无警告。上下文的界面副本是 LauncherShell 的私有字段：页面只能读 context() 与 install_target()，写入只有 follow_context，由 app 的订阅调用；没有用 Global，因为 Global 任何拿到 App 的代码都能改写。LiveModel.install_target 与 set_library 的目标提示已删除，安装目标就是镜像里的当前游戏且游戏库里有它。按新语义改写：the_install_target_survives_refreshes_and_falls_back_when_deleted 删除（回退由 core 的 the_current_game_always_exists_and_is_saved 覆盖）；发现页与导航的 UI 测试改为先 follow_context 再断言；新增 another_current_game_ends_browsing_for_a_game。临时让 follow_context 不结束浏览、或让游戏页「浏览」不设当前游戏时，对应的 UI 与 app 测试按预期失败。D1 中「等待期间被点的那一行保持按下状态」尚未做：保存很快，留待 T8 实机看是否需要。
+  Result: 2026-10-21（T4 之后）：lumilio-app 与 lumilio-ui 共 580 项，578 项通过，失败的两项是留给 T5 的芯片与发现页验收测试。按新语义改写：home_snapshot_and_rapid_selection_keep_the_last_game 改为启动订阅，去掉对 continue_id 的断言，连续两次选择按顺序保存、最后一次留下；service::tests::settings 中当前游戏的测试改为删除后回退到另一个游戏；内存设置的测试中，直接写进游戏库的游戏在重新打开后成为当前游戏；activity 的取消测试先放开设置锁再删除当前游戏，因为删除要保存回退结果。「需要留意」新的结论按 §2 的 QUICK 淡入并上移进入，消失为立即移除（退出短于进入），待 T8 实机检查。2026-10-21（T5 之后）：580 项全部通过，clippy 无警告。上下文的界面副本是 LauncherShell 的私有字段：页面只能读 context() 与 install_target()，写入只有 follow_context，由 app 的订阅调用；没有用 Global，因为 Global 任何拿到 App 的代码都能改写。LiveModel.install_target 与 set_library 的目标提示已删除，安装目标就是镜像里的当前游戏且游戏库里有它。按新语义改写：the_install_target_survives_refreshes_and_falls_back_when_deleted 删除（回退由 core 的 the_current_game_always_exists_and_is_saved 覆盖）；发现页与导航的 UI 测试改为先 follow_context 再断言；新增 another_current_game_ends_browsing_for_a_game。临时让 follow_context 不结束浏览、或让游戏页「浏览」不设当前游戏时，对应的 UI 与 app 测试按预期失败。D1 中「等待期间被点的那一行保持按下状态」尚未做：保存很快，留待 T8 实机看是否需要。2026-10-21（T6、T7 之后）：lumilio-core、lumilio-app、lumilio-ui 共 1398 项全部通过，clippy 无警告。T6：Context 增加 session（游戏与阶段：准备中、游戏中、失败），由 launch_with 发布，中途放弃的启动由守卫清除，失败一直保留到下次启动或该游戏被删除；core 测试 a_launch_publishes_its_session_until_it_is_over，临时让守卫不清除时按预期失败。首页能否开始与导航「重启以更新」读镜像里的会话（启动中也禁用重启），游戏页的游戏输出与「结束游戏」只认会话里的游戏，投影工作室窗口随会话变化开关写入；依赖表加一行。「恢复并继续」重试失败的那个游戏，期间换过当前游戏时先把它设回当前游戏：新增 recovering_retries_the_failed_game_after_another_was_chosen，临时让恢复只启动当前游戏时按预期失败；recovering_a_failed_launch_retries_the_same_game 加上卡片 ▶ 后芯片指向 B 的检查。T7：design-language §6 写明当前游戏只有一个及哪些操作会改变它，§10 增加「共享选择在保存后才变」；navigation.rs、home/launching.rs、home/recovery.rs、pages/live/library.rs、instance_detail/actions.rs 与 app live/instance.rs 的 ia 注释改成同一语义，just ia 已重新生成；nav-update-game-running 中英文案改为「启动或运行」。
 - just check 通过（由 Project Maintainer 运行）。
   Result: pending
 - Project Maintainer 在 Mac 上实机检查通过（T8）。

@@ -17,7 +17,11 @@ pub const HOME_RECENT: usize = 4;
 
 /// What the library adds under the world, or `None` when it knows nothing
 /// about the game Home is about (Home then draws its recent entries plainly).
-pub fn home_sections(ctx: &LiveCtx, home: &HomePresentation) -> Option<AnyElement> {
+pub fn home_sections(
+    ctx: &LiveCtx,
+    home: &HomePresentation,
+    can_start: bool,
+) -> Option<AnyElement> {
     let subject = home.subject()?;
     let colors = ctx.colors;
     // Only the game Home is about: another game's worlds never sit under it.
@@ -26,7 +30,7 @@ pub fn home_sections(ctx: &LiveCtx, home: &HomePresentation) -> Option<AnyElemen
         .home_places
         .as_ref()
         .filter(|places| subject.id.as_deref() == Some(places.instance.as_str()))
-        .map(|places| continued_group(places, home.can_start(), ctx));
+        .map(|places| continued_group(places, can_start, ctx));
     let cards: Vec<&LibraryCard> = home
         .recent()
         .iter()

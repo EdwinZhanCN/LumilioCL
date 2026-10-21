@@ -26,6 +26,20 @@ impl LauncherShell {
             .then_some(id)
     }
 
+    /// Whether core says a launch is on its way or a game runs.
+    pub fn game_active(&self) -> bool {
+        self.context
+            .session
+            .as_ref()
+            .is_some_and(lumilio_core::Session::is_active)
+    }
+
+    /// Whether a game can be started now: no session is active, and Home
+    /// has not begun a launch core has yet to publish.
+    pub fn can_start(&self) -> bool {
+        !self.game_active() && self.home.can_start()
+    }
+
     /// Takes what core published. Another current game ends browsing for a
     /// different one, so its version and loader no longer apply (D3), and
     /// becomes the project detail's target. Returns whether browsing ended,

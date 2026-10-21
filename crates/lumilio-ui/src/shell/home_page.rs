@@ -52,13 +52,7 @@ impl LauncherShell {
     /// Feeds one launch signal into the Home launch moment.
     pub fn apply_launch_signal(&mut self, signal: LaunchSignal, cx: &mut Context<Self>) {
         if matches!(&signal, LaunchSignal::Running) {
-            self.game_running = true;
             self.release_for_game(cx);
-        } else if matches!(
-            &signal,
-            LaunchSignal::Exited { .. } | LaunchSignal::Failed(_) | LaunchSignal::Cancelled
-        ) {
-            self.game_running = false;
         }
         let home = std::mem::take(&mut self.home).on_launch_signal(signal, Instant::now());
         self.set_home(home, cx);
@@ -133,7 +127,8 @@ impl LauncherShell {
         let links = self.home_links();
         let has_attention =
             (!links.attention.is_empty() || links.checking) && self.home.recent_is_instances();
-        let sections = live.and_then(|ctx| pages::live::home_sections(ctx, &self.home));
+        let sections =
+            live.and_then(|ctx| pages::live::home_sections(ctx, &self.home, self.can_start()));
         let body = (self.home.has_body() || has_attention || sections.is_some())
             .then(|| home::render_body(&self.home, home_handler, &links, colors, sections));
 

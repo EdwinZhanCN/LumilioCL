@@ -42,9 +42,6 @@ pub(super) fn start_launch(wiring: &Wiring, window: gpui_kit::AnyWindowHandle, c
         wiring.state.borrow_mut().game_log = Some((instance.clone(), Default::default()));
         // The page can tell the game is on its way before it prints anything.
         push_game_log(&wiring, true, cx);
-        cx.update(|cx| {
-            super::instance_plugins::studio_windows_game_changed(&wiring, &instance, true, cx)
-        });
         let mut unsent = false;
         // The channel closes when the launch is over, so this ends with it.
         loop {
@@ -105,12 +102,7 @@ pub(super) fn start_launch(wiring: &Wiring, window: gpui_kit::AnyWindowHandle, c
         }
         wiring.state.borrow_mut().cancel = None;
         push_game_log(&wiring, false, cx);
-        let ended = wiring.state.borrow_mut().game_log.take().map(|(id, _)| id);
-        if let Some(id) = ended {
-            cx.update(|cx| {
-                super::instance_plugins::studio_windows_game_changed(&wiring, &id, false, cx)
-            });
-        }
+        wiring.state.borrow_mut().game_log = None;
         cx.update(|cx| reload(&wiring, Reload::Lists, cx));
     })
     .detach();
@@ -144,7 +136,7 @@ pub(super) fn play(wiring: &Wiring, id: String, window: &mut Window, cx: &mut Ap
 fn play_now(wiring: &Wiring, id: String, window: &mut Window, cx: &mut App) {
     let can_start = wiring
         .shell
-        .read_with(cx, |shell, _| shell.home().can_start())
+        .read_with(cx, |shell, _| shell.can_start())
         .unwrap_or(false);
     if !can_start {
         // A world or server asked for with a launch that does not happen must
@@ -173,7 +165,7 @@ fn play_now(wiring: &Wiring, id: String, window: &mut Window, cx: &mut App) {
         let _ = cx.update_window(window, |_, window, cx| {
             let _ = wiring.shell.update(cx, |shell, cx| {
                 // Another launch began while the choice was saved.
-                if !shell.home().can_start() {
+                if !shell.can_start() {
                     forget_target(&wiring);
                     return;
                 }

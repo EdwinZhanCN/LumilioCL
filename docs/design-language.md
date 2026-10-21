@@ -139,9 +139,9 @@ either side.
 
 | Zone | Shows | Rules |
 |---|---|---|
-| Leading | ‹ › and the current location's name | Browser-style history of *locations*: a landmark page, an Instance, a project detail. Tabs, filters and scroll position are view state, not history. A direction with nowhere to go is disabled (muted, arrow cursor), never hidden, so the name does not jump. A verified stable launcher update adds an orange restart key beside this zone; it is disabled while a game runs. Shortcuts: ⌘[ / ⌘], and Esc goes back from a detail. |
+| Leading | ‹ › and the current location's name | Browser-style history of *locations*: a landmark page, an Instance, a project detail. Tabs, filters and scroll position are view state, not history. A direction with nowhere to go is disabled (muted, arrow cursor), never hidden, so the name does not jump. A verified stable launcher update adds an orange restart key beside this zone; it is disabled while a game starts or runs. Shortcuts: ⌘[ / ⌘], and Esc goes back from a detail. |
 | Centre | The landmark capsule: Home, Library, Discover, Activity; Accounts and Settings join when their pages exist | Choosing a landmark opens a new location (and clears what was ahead). Icon-only keys; the open landmark sits pressed with its LED lit (§12); tooltip with label and shortcut. Activity carries the running-task badge: a lit LED with a mono count. |
-| Trailing | The current account's face; the current instance: its cover, name and a ⇅ mark | Each chip opens a popover list to switch (a quick action, §10): the account who plays, the instance that play and Discover installs target. Switching never retargets an operation already started. With no account the chip reads "添加账户"; with no instances it reads "还没有游戏" and opens Library. The cover sits in a display window (§12), the same one a faceplate uses. A window too narrow for the widest trailing zone (a face and a full-length name) beside the centred capsule gets the compact zone: pictures only. The instance chip keeps its cover and ⇅; an empty chip is an empty face or cover with a +. Their words move into the tooltips. The window width decides, not the name, so switching instances never changes the bar. |
+| Trailing | The current account's face; the current instance: its cover, name and a ⇅ mark | Each chip opens a popover list to switch (a quick action, §10): the account who plays, and the current game. There is one current game, kept by the launcher: Continue starts it, Discover installs into it, and the chip shows it. Choosing it here, setting a game as current, browsing from a game's Content tab, and starting a game from its card or page all make that game current; a different current game ends browsing for another one. The chip changes once the choice is saved (§10). Switching never retargets an operation already started. With no account the chip reads "添加账户"; with no instances it reads "还没有游戏" and opens Library. The cover sits in a display window (§12), the same one a faceplate uses. A window too narrow for the widest trailing zone (a face and a full-length name) beside the centred capsule gets the compact zone: pictures only. The instance chip keeps its cover and ⇅; an empty chip is an empty face or cover with a +. Their words move into the tooltips. The window width decides, not the name, so switching instances never changes the bar. |
 
 Location names: a landmark's label; an Instance's own name; a project detail
 by its kind — "整合包详情", "Mod 详情", "资源包详情", "光影详情". Long names
@@ -284,6 +284,10 @@ The page surface shows values and offers **quick actions**; it is not a form.
 - **Quick actions stay on the page**: fader switch, Select / dropdown, LED
   radio or segment keys, a single-shot key, the More menu (§12). Choosing from a
   rich list (the current instance) is a popover anchored to its trigger.
+- **Shared choices follow the launcher**: a choice the whole launcher shares
+  (the current game, the current account) changes on every page once it is
+  saved, not when it is clicked. A failed save leaves it as it was and says
+  so in a toast.
 - **Free-form edits open a dialog**: text, numbers, paths, argument lists,
   and multi-input flows such as copying an instance. The page row shows the
   current value read-only with a ghost **编辑** on its trailing side. One

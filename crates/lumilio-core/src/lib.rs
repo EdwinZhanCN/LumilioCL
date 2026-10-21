@@ -92,7 +92,7 @@ pub use content::{
     scan as scan_content, set_enabled as set_content_enabled, sha1_hex,
 };
 pub use content_sources::{ContentEntry, ContentList, ContentSource};
-pub use context::{Context, Revisions};
+pub use context::{Context, Revisions, Session, SessionPhase};
 pub use credentials::{CredentialStore, MemoryCredentials, StoredLogin, SystemCredentials};
 pub use diagnostics::{
     CrashReport, Facts, FileEntry, LOW_MEMORY_MB, LogLevel, LogLine, Problem, ProblemKind,

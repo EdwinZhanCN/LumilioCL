@@ -30,6 +30,9 @@ pub(super) struct Stale {
     pub installed: bool,
     /// Discover's sources and the open game's plugin tabs ← plugins.
     pub plugins: bool,
+    /// Whether Home can start a game, the navigation's restart, and the
+    /// open studio windows' writes ← the session.
+    pub session: bool,
 }
 
 /// What `now` makes out of date after `before`; everything when nothing was
@@ -43,6 +46,7 @@ pub(super) fn stale(before: Option<&Context>, now: &Context) -> Stale {
             accounts: true,
             installed: true,
             plugins: true,
+            session: true,
         };
     };
     let (was, is) = (before.revisions, now.revisions);
@@ -57,6 +61,7 @@ pub(super) fn stale(before: Option<&Context>, now: &Context) -> Stale {
         accounts,
         installed: current || library,
         plugins: was.plugins != is.plugins,
+        session: before.session != now.session,
     }
 }
 
@@ -82,6 +87,9 @@ pub(super) fn follow(wiring: &Wiring, cx: &mut App) {
             cx.update(|cx| {
                 mirror(&wiring, mirrored, cx);
                 apply(&wiring, what, cx);
+                if what.session {
+                    session_moved(&wiring, seen.as_ref(), &now, cx);
+                }
             });
             seen = Some(now);
             if changes.changed().await.is_err() {
@@ -130,6 +138,27 @@ fn apply(wiring: &Wiring, what: Stale, cx: &mut App) {
     }
     if what.plugins {
         refresh_plugins(wiring, cx);
+    }
+}
+
+/// The game whose session became active, or stopped being active: its
+/// studio windows shut their writes, or list their folder again.
+fn session_moved(wiring: &Wiring, before: Option<&Context>, now: &Context, cx: &mut App) {
+    let active = |context: Option<&Context>| {
+        context
+            .and_then(|context| context.session.as_ref())
+            .filter(|session| session.is_active())
+            .map(|session| session.instance.clone())
+    };
+    let (was, is) = (active(before), active(Some(now)));
+    if was == is {
+        return;
+    }
+    if let Some(id) = was {
+        super::instance_plugins::studio_windows_game_changed(wiring, &id, false, cx);
+    }
+    if let Some(id) = is {
+        super::instance_plugins::studio_windows_game_changed(wiring, &id, true, cx);
     }
 }
 

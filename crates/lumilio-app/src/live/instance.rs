@@ -45,13 +45,20 @@ pub(super) fn open_instance(
             return;
         };
         let id = target_id(&view, cx);
-        // A game already running has printed things the page should show.
+        // A game on its way or running has printed things the page should
+        // show; which game that is, core's session says.
+        let active = wiring
+            .backend
+            .service
+            .context()
+            .session
+            .is_some_and(|session| session.is_active() && session.instance == id);
         let running = wiring
             .state
             .borrow()
             .game_log
             .as_ref()
-            .filter(|(running_id, _)| *running_id == id)
+            .filter(|(running_id, _)| active && *running_id == id)
             .map(|(_, lines)| lines.iter().cloned().collect::<Vec<_>>());
         if let Some(lines) = running {
             view.update(cx, |view, cx| view.game_output(lines, true, cx));
@@ -203,11 +210,11 @@ pub(super) fn instance_intent(
         InstanceIntent::Stop => {
             // Stops the launch or the running game, if it is this one.
             let this_one = wiring
-                .state
-                .borrow()
-                .game_log
-                .as_ref()
-                .is_some_and(|(running, _)| running == id);
+                .backend
+                .service
+                .context()
+                .session
+                .is_some_and(|session| session.is_active() && session.instance == id);
             if this_one && let Some(cancel) = wiring.state.borrow().cancel.clone() {
                 cancel.cancel();
             }

@@ -82,7 +82,7 @@ route-settings = Settings
 nav-back = Back
 nav-forward = Forward
 nav-update-ready = Version { $version } is ready. Restart to update
-nav-update-game-running = A game is running. Close it before restarting to update
+nav-update-game-running = A game is starting or running. Close it before restarting to update
 nav-add-account = Add account
 nav-add-account-help = Add an offline account to play
 # In a narrow window the chip with no account is only an empty face with a +; all its words are in this tooltip.

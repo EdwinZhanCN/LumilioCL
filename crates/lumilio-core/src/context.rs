@@ -18,7 +18,35 @@ pub struct Context {
     pub current_instance: Option<String>,
     /// The key of the account games start with.
     pub current_account: Option<String>,
+    /// The launch on its way, the game running, or the launch that failed
+    /// last; `None` once a game ended normally or was stopped.
+    pub session: Option<Session>,
     pub revisions: Revisions,
+}
+
+/// One launch of one game (plan global-context, T6).
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Session {
+    pub instance: String,
+    pub phase: SessionPhase,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SessionPhase {
+    /// Checking, downloading and starting, before the game's process exists.
+    Preparing,
+    /// The game's process runs.
+    Playing,
+    /// The launch failed or the game crashed: recovering retries this game.
+    Failed,
+}
+
+impl Session {
+    /// Whether a launch is on its way or a game runs.
+    #[must_use]
+    pub fn is_active(&self) -> bool {
+        self.phase != SessionPhase::Failed
+    }
 }
 
 /// How many times each kind of state has changed. Each only grows.
@@ -50,6 +78,7 @@ impl ContextHub {
         let (sender, _) = watch::channel(Context {
             current_instance: settings.current_instance.clone(),
             current_account: settings.selected_account.clone(),
+            session: None,
             revisions: Revisions::default(),
         });
         Self(Arc::new(sender))
@@ -67,6 +96,26 @@ impl ContextHub {
         self.0.send_modify(|context| match change {
             Change::Library => context.revisions.library += 1,
             Change::Java => context.revisions.java += 1,
+        });
+    }
+
+    /// Publishes the session of `instance`: `None` ends it, unless another
+    /// game's session has replaced it meanwhile.
+    pub(crate) fn session(&self, instance: &str, phase: Option<SessionPhase>) {
+        self.0.send_if_modified(|context| {
+            let next = phase.map(|phase| Session {
+                instance: instance.to_owned(),
+                phase,
+            });
+            let theirs = context
+                .session
+                .as_ref()
+                .is_some_and(|session| session.instance != instance);
+            if (next.is_none() && theirs) || context.session == next {
+                return false;
+            }
+            context.session = next;
+            true
         });
     }
 

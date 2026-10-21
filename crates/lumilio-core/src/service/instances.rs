@@ -53,6 +53,8 @@ impl<T: Transport + Clone> LauncherService<T> {
         }
         // The deletion is committed; leftovers are retried by recovery.
         let _ = blocking(move || deletion.finish()).await;
+        // A failure of the deleted game has nothing left to recover.
+        self.context.session(id, None);
         self.settle_current().await;
         Ok(())
     }
