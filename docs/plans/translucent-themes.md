@@ -22,7 +22,7 @@ Status: InProgress
   Acceptance: 外观设置的壁纸可选「方块世界」「图片」「无壁纸」，保存在 LookPreferences，旧设置读出来仍是原来的选择。无壁纸时首页顶部不画世界，高度收缩到标题与「继续」，文字用主题墨色，按键不变；启动中仍有分段进度条，游戏中与启动失败由标题旁的 LED 与文字表达（D2）。UI 测试覆盖有世界与无壁纸时首页标题的位置。
 - [x] T2 — 半透明机身与兜底 (Completed)
   Acceptance: 主题文件中只有机身类颜色（page、panel、hairline 等，按 D1 列出）可以带透明度，按键、显示屏、标签、LED 的透明度被忽略并在主题检查里报告。窗口拿不到模糊时，带透明度的机身颜色按 D3 合成为不透明的近似色。各平台的实际材质在 T6 实机检查。
-- [ ] T3 — 玻璃与遮光玻璃 (Proposed)
+- [x] T3 — 玻璃与遮光玻璃 (Completed)
   Acceptance: 两套内置半透明主题，以铝白与夜黑为底，窗口材质为 blurred，强调色为信号橙，透明度按 D6（页面约 75%、面板约 80%）。对比度按 D6 在同色调的桌面上（玻璃对白色、遮光玻璃对黑色）达到 design-language §9 的要求，由主题测试检查。
 - [ ] T4 — 白桦与深板岩 (Proposed)
   Acceptance: 先在网站主题编辑器里调色并定稿，再作为内置主题加入，强调色为信号橙（D4）。每套颜色通过现有主题测试的对比度检查；网站的内置主题导出同步。
@@ -34,7 +34,7 @@ Status: InProgress
 ## Validation
 
 - T1–T5 的测试通过，并各自证明能失败。
-  Result: 2026-10-21（T2）：theme::tests 的 only_the_body_may_be_translucent 与 a_blurred_theme_turns_opaque_where_the_system_cannot_blur 通过，临时去掉 solidify 或让 without_blur 总是返回原样时分别按预期失败；tune_applies_the_chosen_theme_per_appearance_and_the_scale 原先断言半透明的强调色原样传到界面，按 D1 改为不透明。网站主题编辑器从 themes.generated.json 读到同一份可透明颜色表，model.test.ts 新增对应用例，pnpm check 无错误。 2026-10-21（T1）：core 的 the_wallpaper_reads_settings_from_before_bare_home 检查壁纸仍按原来的文件名写入，旧设置读出原选择，三种选择写入后读回相同；无壁纸写作 "bare"，存下的图片总以 wallpaper- 开头，不会撞名。UI 的 a_bare_home_puts_its_title_at_the_top 检查无壁纸时标题在顶部、有世界时在世界底部，临时让无壁纸也画世界时按预期失败。lumilio-core、lumilio-ui、lumilio-app 共 1404 项通过，clippy 无警告。
+  Result: 2026-10-21（T2）：theme::tests 的 only_the_body_may_be_translucent 与 a_blurred_theme_turns_opaque_where_the_system_cannot_blur 通过，临时去掉 solidify 或让 without_blur 总是返回原样时分别按预期失败；tune_applies_the_chosen_theme_per_appearance_and_the_scale 原先断言半透明的强调色原样传到界面，按 D1 改为不透明。网站主题编辑器从 themes.generated.json 读到同一份可透明颜色表，model.test.ts 新增对应用例，pnpm check 无错误。 2026-10-21（T1）：core 的 the_wallpaper_reads_settings_from_before_bare_home 检查壁纸仍按原来的文件名写入，旧设置读出原选择，三种选择写入后读回相同；无壁纸写作 "bare"，存下的图片总以 wallpaper- 开头，不会撞名。UI 的 a_bare_home_puts_its_title_at_the_top 检查无壁纸时标题在顶部、有世界时在世界底部，临时让无壁纸也画世界时按预期失败。lumilio-core、lumilio-ui、lumilio-app 共 1404 项通过，clippy 无警告。 2026-10-21（T3）：内置 Glass 与 Tinted Glass 由 Aluminium、Night 按 D6 生成（页面与细线 75%，面板 80%，blurred）。glass_meets_every_contrast_rule_over_a_desktop_of_its_tone 把页面叠在同色调桌面上、面板叠在页面上，逐条检查对比度规则，临时把页面降到 30% 时按预期失败。外观设置在选中半透明主题时提示同色调桌面与「不用壁纸」；网站主题数据与中英主题文档列出两套主题，pnpm check、vitest 与 build 通过。lumilio-core、lumilio-ui、lumilio-app、lumilio-backdrop 共 1409 项通过，clippy 无警告。
 - just check 通过（由 Project Maintainer 运行）。
   Result: pending
 - Project Maintainer 实机检查通过（T6）。
