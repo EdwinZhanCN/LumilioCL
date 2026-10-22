@@ -197,7 +197,10 @@ layer that has nothing in it; never reorder or merge layers.
 3. **Toolbar** — one row: the view tabs (port labels, §12; the page's
    first level) on the leading side and search on the trailing edge (240 px; the placeholder
    names what is searched). A page without tabs still puts search on the
-   trailing edge. Search never gets a row of its own.
+   trailing edge. Search never gets a row of its own. A page without search
+   may put live readings about its whole content there instead, each a muted
+   legend and a mono value (Activity: the speed of all downloads and the
+   connections they hold, shown only while something downloads).
 4. **Refinements** (optional) — controls that narrow or order the content
    without changing what it is: segment keys with LEDs (§12; the level
    below the tabs), sort, page size, pager, a filter sidebar.
@@ -219,7 +222,7 @@ Discover.
 |---|---|---|---|---|---|---|
 | Library | game count | 导入整合包 | 新建 | — | 全部游戏 / 收藏 · 搜索游戏 | — |
 | Discover | one line | — | — | 在 *source* 中浏览 · 重新搜索 | 整合包 / Mod / 资源包 / 光影 · 搜索 *source* | sort, page size, pager, filter sidebar (source segments at its top when several are on); a window whose content column cannot hold the sidebar beside a result row at its narrowest folds the sidebar into a **筛选** key before sort, with the number of picked filters in orange mono, that opens the same filters in a popover |
-| Activity | running count | — | — | — | — | — |
+| Activity | running count | 清除已完成 | — | — | 全部 / 下载 / 安装 / 更新 / 修复 · speed and connection readings | — |
 | Instance | version · loader · last played | — | 启动游戏 | 安装游戏文件 · 复制… · 删除… | 概览 / 内容 / 世界 / 历史 / 日志 / 设置 | per-tab segments |
 | Project detail | author · summary | — | 安装到 *instance* / 安装为新游戏 | 在 *source* 中打开 · 复制链接 · project links | 介绍 / 版本 / 图库 | version filters |
 
@@ -872,6 +875,16 @@ the list shows as many results as the window can hold:
   sorted by newest, else UPD);
 - the install key last, in a slot as wide as its widest state, so the
   readings line up from row to row.
+
+A running task in Activity is a row as well. Under its title sit the game,
+the speed and the time left (or "● 已暂停") and **详情**, so the title keeps
+its room in a narrow window; the trailing edge holds the display, then
+**暂停** / **继续** once the task downloads, and **取消**. **详情** opens
+what it downloads under the title, one line per file: the name, the attempt
+and the connections as plain tags when they say something ("第 2 次尝试",
+"8 个连接"), then the source's host and the amount as mono readings. Under
+the files come how often it retried and each source given up ("A 失败，已改用
+B"), with the raw reasons behind **技术详情**.
 
 ### Faceplates
 

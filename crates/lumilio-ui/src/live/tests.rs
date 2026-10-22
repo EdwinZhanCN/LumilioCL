@@ -362,8 +362,11 @@ fn activity_shows_running_first_and_maps_outcomes() {
             progress: Some((50, 200)),
             unit: lumilio_core::ProgressUnit::Items,
             retry: None,
+            downloads: None,
         }],
         cancellable: [1].into(),
+        paused: Default::default(),
+        traffic: lumilio_core::Traffic::default(),
         finished: vec![
             FinishedTask {
                 category: TaskCategory::Install,
@@ -432,6 +435,8 @@ fn a_finished_row_keeps_what_it_needs_to_be_retried_or_opened() {
     let view = ActivityView {
         active: Vec::new(),
         cancellable: Default::default(),
+        paused: Default::default(),
+        traffic: lumilio_core::Traffic::default(),
         finished: vec![FinishedTask {
             category: TaskCategory::Install,
             label: TaskLabel::Text("bad".to_owned()),
@@ -498,6 +503,9 @@ fn set_activity_gives_running_rows_a_speed_names_the_game_and_forgets_finished_t
         fraction: None,
         state: ActivityState::Running,
         cancel: None,
+        pause: None,
+        paused: false,
+        downloads: None,
     };
     let card = |id: &str| library_card(&record(id, false, None, 1), NOW);
     let mut model = LiveModel::default();
@@ -530,6 +538,9 @@ fn an_activity_tab_shows_only_its_category_and_all_shows_everything() {
         fraction: None,
         state: ActivityState::Done,
         cancel: None,
+        pause: None,
+        paused: false,
+        downloads: None,
     };
     let rows = vec![
         row(TaskCategory::Download, "d"),
@@ -593,8 +604,9 @@ fn unknown_progress_is_not_a_fraction() {
         progress: Some((0, 0)),
         unit: lumilio_core::ProgressUnit::Items,
         retry: None,
+        downloads: None,
     };
-    assert_eq!(active_row(&task, false).fraction, None);
+    assert_eq!(active_row(&task, false, false).fraction, None);
 }
 
 fn shown(current: u32, pages: u32) -> String {
@@ -748,4 +760,94 @@ fn home_places_are_the_latest_readable_worlds_then_the_first_servers() {
     let old = home_places(&game, &worlds, &servers);
     assert!(old.places.is_empty());
     assert_eq!(old.worlds, 5);
+}
+
+fn downloading(id: u64) -> ActiveTask {
+    ActiveTask {
+        id,
+        category: TaskCategory::Install,
+        label: TaskLabel::Text(String::new()),
+        instance_id: None,
+        started: 0,
+        progress: Some((10, 100)),
+        unit: lumilio_core::ProgressUnit::Bytes,
+        retry: None,
+        downloads: None,
+    }
+}
+
+#[test]
+fn a_running_task_can_be_paused_once_it_downloads_and_says_when_it_is() {
+    let waiting = downloading(1);
+    assert_eq!(active_row(&waiting, true, false).pause, None);
+    let started = ActiveTask {
+        downloads: Some(lumilio_core::TaskDownloads::default()),
+        ..downloading(2)
+    };
+    assert_eq!(active_row(&started, true, false).pause, Some(2));
+    assert_eq!(
+        active_row(&started, false, false).pause,
+        None,
+        "a task that cannot be stopped cannot be held"
+    );
+    assert!(active_row(&started, true, true).paused);
+}
+
+#[test]
+fn a_paused_task_shows_no_speed() {
+    let mut model = LiveModel::default();
+    let row = |done, paused| ActivityRow {
+        amount: Some((done, 100)),
+        paused,
+        ..active_row(
+            &ActiveTask {
+                downloads: Some(lumilio_core::TaskDownloads::default()),
+                ..downloading(3)
+            },
+            true,
+            paused,
+        )
+    };
+    model.set_activity(vec![row(10, false)], 1_000);
+    model.set_activity(vec![row(50, false)], 2_000);
+    assert!(model.activity[0].rate.is_some());
+    model.set_activity(vec![row(50, true)], 3_000);
+    assert_eq!(model.activity[0].rate, None);
+}
+
+#[test]
+fn the_traffic_speed_comes_from_two_readings_and_ends_with_the_connections() {
+    use lumilio_core::Traffic;
+    let mut model = LiveModel::default();
+    let traffic = |open, received| Traffic {
+        open,
+        limit: 16,
+        received,
+    };
+    model.set_traffic(traffic(2, 0), 1_000);
+    assert_eq!(model.traffic.rate, None, "one reading is no speed");
+    model.set_traffic(traffic(2, 2_000), 2_000);
+    assert_eq!(model.traffic.rate, Some(2_000.));
+    assert_eq!((model.traffic.open, model.traffic.limit), (2, 16));
+    model.set_traffic(traffic(0, 2_000), 3_000);
+    assert_eq!(model.traffic.rate, None);
+}
+
+#[test]
+fn file_amounts_and_sources_read_short() {
+    use super::activity::{file_amount, source_host};
+    assert_eq!(
+        file_amount(1024 * 1024, Some(4 * 1024 * 1024)),
+        "1.0 MB / 4.0 MB"
+    );
+    assert_eq!(file_amount(2048, None), "2 KB");
+    assert_eq!(
+        source_host("https://bmclapi2.bangbang93.com/maven/a.jar?x=1"),
+        "bmclapi2.bangbang93.com"
+    );
+    assert_eq!(
+        source_host("https://user@mirror.test:8443/a"),
+        "mirror.test:8443"
+    );
+    assert_eq!(source_host("file:///tmp/a.jar"), "file:///tmp/a.jar");
 }

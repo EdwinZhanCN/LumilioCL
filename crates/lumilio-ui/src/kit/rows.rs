@@ -178,6 +178,22 @@ pub fn row(
     trail: Option<AnyElement>,
     colors: ShellColors,
 ) -> gpui::Div {
+    let detail = div()
+        .text_xs()
+        .text_color(colors.muted)
+        .child(detail.into());
+    row_with(title, detail.into_any_element(), lead, trail, colors)
+}
+
+/// [`row`] whose line under the title is an element of its own, such as
+/// the detail with a key that acts on the row.
+pub fn row_with(
+    title: impl Into<SharedString>,
+    detail: AnyElement,
+    lead: Option<AnyElement>,
+    trail: Option<AnyElement>,
+    colors: ShellColors,
+) -> gpui::Div {
     h_flex()
         .w_full()
         .items_center()
@@ -196,12 +212,7 @@ pub fn row(
                         .text_color(colors.foreground)
                         .child(title.into()),
                 )
-                .child(
-                    div()
-                        .text_xs()
-                        .text_color(colors.muted)
-                        .child(detail.into()),
-                ),
+                .child(detail),
         )
         .children(trail)
 }

@@ -31,7 +31,7 @@ pub use self::meter::{Reading, lit_bars, progress, reading_digits, record};
 pub use self::motd::{motd_lines, motd_text};
 pub use self::rich::rich_text;
 pub use self::rows::{
-    empty, info, list, panel_list, row, section, section_at, section_head, section_label,
+    empty, info, list, panel_list, row, row_with, section, section_at, section_head, section_label,
     section_with, setting, surface, technical, value_row,
 };
 
@@ -44,6 +44,8 @@ use std::rc::Rc;
 pub enum ViewIntent {
     LibraryTab(usize),
     ActivityTab(usize),
+    /// Show or hide what this running task downloads.
+    TaskDetail(u64),
     /// Choose one of a small set, keyed by (group, index).
     Choose(u8, usize),
 }

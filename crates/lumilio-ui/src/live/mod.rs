@@ -22,8 +22,8 @@ pub use self::accounts::{
     yggdrasil_message,
 };
 pub use self::activity::{
-    ACTIVITY_CATEGORIES, ActivityRow, ActivityState, activity_in_tab, activity_rows, eta_text,
-    rate_text, recovery_message,
+    ACTIVITY_CATEGORIES, ActivityRow, ActivityState, TrafficReading, activity_in_tab,
+    activity_rows, bytes_text, eta_text, file_amount, rate_text, recovery_message, source_host,
 };
 pub use self::discover::{
     AdvancedOption, CardTag, CardTags, CountKind, DateKind, DiscoverChange, DiscoverQuery,
@@ -86,6 +86,8 @@ pub struct LiveModel {
     pub activity: Vec<ActivityRow>,
     /// The last reading of each running task, for its speed.
     rates: BTreeMap<u64, RateSample>,
+    /// How all downloads use their shared connections.
+    pub traffic: TrafficReading,
     pub accounts: Vec<AccountRow>,
     pub accounts_loaded: bool,
     /// Each account's skin face, by key. `Some(None)` is "asked, no face",
@@ -119,6 +121,7 @@ impl Default for LiveModel {
             installed: BTreeMap::new(),
             activity: Vec::new(),
             rates: BTreeMap::new(),
+            traffic: TrafficReading::default(),
             accounts: Vec::new(),
             accounts_loaded: false,
             faces: HashMap::new(),
@@ -146,11 +149,17 @@ impl LiveModel {
                 continue;
             };
             let sample = next_sample(self.rates.get(&task).copied(), done, now_ms);
-            row.rate = sample.per_sec.filter(|rate| *rate > 0.);
+            // A held task is not moving, whatever the smoothing remembers.
+            row.rate = sample.per_sec.filter(|rate| *rate > 0. && !row.paused);
             next.insert(task, sample);
         }
         self.rates = next;
         self.activity = rows;
+    }
+
+    /// Takes a new reading of the shared connections at `now_ms`.
+    pub fn set_traffic(&mut self, traffic: lumilio_core::Traffic, now_ms: u64) {
+        self.traffic = self.traffic.next(traffic, now_ms);
     }
 
     /// The games of one collection that are still in the library.

@@ -7,10 +7,13 @@
 | 操作 | 层 / 组件 | 结果与反馈 | 备注 | 实现 |
 |---|---|---|---|---|
 | 导航角标 | 中段「动态」地标上的数字 | 运行中的任务数（超过 99 显示 99+） |  | `lumilio-ui/src/navigation.rs` |
-| 失败重试 | 失败或已取消任务行的「重试」 | 用当时的输入重新发起，作为新任务出现，旧条目保留 | 升级前的旧记录没有输入，不显示 | `lumilio-ui/src/pages/live/activity.rs` |
+| 失败重试 | 失败或已取消任务行的「重试」 | 用当时的输入重新发起，作为新任务出现，旧条目保留；中途停下的下载接着已下载的部分继续 | 升级前的旧记录没有输入，不显示 | `lumilio-ui/src/pages/live/activity.rs` |
 | 打开结果 | 完成或失败任务行的「打开」 | 任务关联到仍在游戏库里的游戏时跳到游戏页；整合包安装/导入完成后关联到新建的游戏 |  | `lumilio-ui/src/pages/live/activity.rs` |
-| 看进度 | 任务行右侧进度条和百分比 | 实时进度；速度和剩余时间在有两次读数后出现（下载按字节，安装/修复按文件个数） |  | `lumilio-ui/src/pages/live/activity.rs` |
-| 取消 | 运行中任务行的「取消」 | 任务停止，状态“已取消” |  | `lumilio-ui/src/pages/live/activity.rs` |
-| 技术详情 | 失败任务行的技术详情 | 失败原因弹窗 |  | `lumilio-ui/src/pages/live/activity.rs` |
+| 暂停 / 继续 | 正在下载的任务行的「暂停」「继续」 | 暂停后放开连接、保留已下载的部分，行上显示“已暂停”；继续后从已下载处接着下 | 任务开始下载后才出现 | `lumilio-ui/src/pages/live/activity.rs` |
+| 看下载详情 | 运行中任务行标题下的「详情」「收起」 | 展开列出正在下载的文件：来源、第几次尝试、几个连接、已下载多少；下面是重试次数和“某来源失败，已改用另一个”，失败原因在技术详情里 | 任务开始下载后才出现 | `lumilio-ui/src/pages/live/activity.rs` |
+| 看进度 | 任务行右侧进度条和百分比，标题下的速度和剩余时间 | 实时进度；速度和剩余时间在有两次读数后出现（下载按字节，安装/修复按文件个数）；暂停时那里显示“已暂停” |  | `lumilio-ui/src/pages/live/activity.rs` |
+| 取消 | 运行中任务行的「取消」 | 任务停止，状态“已取消”；已下载的部分留到下次重试时继续 | 留下的部分启动时清理超过 7 天的 | `lumilio-ui/src/pages/live/activity.rs` |
+| 技术详情 | 失败任务行的技术详情 | 失败原因弹窗；下载失败写明每个试过的来源和它的原因 |  | `lumilio-ui/src/pages/live/activity.rs` |
+| 看总速度 | L3 工具栏右侧的速度与连接读数 | 所有下载加起来的速度，和正在用的连接数 / 上限（设置里的同时下载数） | 有下载时才出现 | `lumilio-ui/src/pages/live/activity.rs` |
 | 清除已完成 | L2 次要「清除已完成」 | 清空结束的条目；没有结束的条目时禁用 |  | `lumilio-ui/src/pages/live/activity.rs` |
 | 分类筛选 | L3 标签：全部 / 下载 / 安装 / 更新 / 修复 | 按任务类别过滤 |  | `lumilio-ui/src/pages/live/activity.rs` |

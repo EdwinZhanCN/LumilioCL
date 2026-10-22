@@ -1,12 +1,21 @@
 use super::controls::{LiveCtx, send};
 use crate::kit;
-use crate::kit::ViewIntent;
-use crate::live::{ActivityRow, ActivityState, LiveHandler, LiveIntent};
+use crate::kit::{Emit, ViewIntent};
+use crate::live::{
+    ActivityRow, ActivityState, LiveHandler, LiveIntent, TrafficReading, file_amount, source_host,
+};
 use crate::theme::ShellColors;
 use crate::{tr, tr_all};
 use gpui::prelude::*;
-use gpui::{IntoElement, div, px};
+use gpui::{AnyElement, IntoElement, div, px};
 use gpui_component::{h_flex, v_flex};
+use lumilio_core::{FileDownload, SourceSwitch, TaskDownloads};
+
+/// A task's open detail lists this many files; the rest are counted.
+const FILES_SHOWN: usize = 8;
+/// The open detail starts under the title: past the row's state dot and the
+/// gap after it.
+const DETAIL_INDENT: f32 = 8. + 12.;
 
 /// The Activity tabs, as translated labels.
 #[allow(non_snake_case)]
@@ -21,7 +30,7 @@ pub fn ACTIVITY_TABS() -> &'static [&'static str] {
 }
 
 /// 「重试」 for a finished task that remembers its input.
-// ia[activity]: 失败重试 | 失败或已取消任务行的「重试」 | 用当时的输入重新发起，作为新任务出现，旧条目保留 | 升级前的旧记录没有输入，不显示
+// ia[activity]: 失败重试 | 失败或已取消任务行的「重试」 | 用当时的输入重新发起，作为新任务出现，旧条目保留；中途停下的下载接着已下载的部分继续 | 升级前的旧记录没有输入，不显示
 pub(super) fn retry_button(
     index: usize,
     row: &ActivityRow,
@@ -57,8 +66,14 @@ pub(super) fn open_button(
     )
 }
 
-/// How fast a running task goes and how long is left, when that is known.
-pub(super) fn speed_line(row: &ActivityRow, colors: ShellColors) -> Option<gpui::Div> {
+/// How fast a running task goes and how long is left, when that is known;
+/// a paused one says so instead.
+pub(super) fn speed_line(row: &ActivityRow, colors: ShellColors) -> Option<AnyElement> {
+    if row.paused {
+        return Some(
+            kit::status(tr!("activity-status-paused"), kit::Tone::Off, colors).into_any_element(),
+        );
+    }
     let rate = row.rate?;
     let mut parts = vec![crate::live::rate_text(row.unit, rate)];
     if let Some((done, total)) = row.amount
@@ -70,24 +85,236 @@ pub(super) fn speed_line(row: &ActivityRow, colors: ShellColors) -> Option<gpui:
         div()
             .text_xs()
             .text_color(colors.muted)
-            .child(parts.join(" · ")),
+            .child(parts.join(" · "))
+            .into_any_element(),
     )
+}
+
+/// 「暂停」 or 「继续」 for a running task that downloads.
+fn pause_button(
+    index: usize,
+    row: &ActivityRow,
+    handler: &LiveHandler,
+) -> Option<impl IntoElement> {
+    let task = row.pause?;
+    let (label, intent) = if row.paused {
+        (tr!("activity-resume"), LiveIntent::ResumeTask(task))
+    } else {
+        (tr!("activity-pause"), LiveIntent::PauseTask(task))
+    };
+    // ia[activity]: 暂停 / 继续 | 正在下载的任务行的「暂停」「继续」 | 暂停后放开连接、保留已下载的部分，行上显示“已暂停”；继续后从已下载处接着下 | 任务开始下载后才出现
+    Some(
+        kit::ghost(("live-pause", index), label, send(handler, intent))
+            .debug_selector(move || format!("live-pause-{index}")),
+    )
+}
+
+/// The line under a running task's title: its game, how fast it goes (or
+/// that it is paused), and 「详情」 when it has downloads to show. They sit
+/// here rather than on the trailing edge, so the title keeps its room in a
+/// narrow window.
+fn running_detail(
+    index: usize,
+    row: &ActivityRow,
+    emit: &Emit,
+    open: bool,
+    colors: ShellColors,
+) -> AnyElement {
+    let toggle = row.task.filter(|_| row.downloads.is_some()).map(|task| {
+        let emit = emit.clone();
+        let label = if open {
+            tr!("activity-hide-files")
+        } else {
+            tr!("activity-show-files")
+        };
+        // ia[activity]: 看下载详情 | 运行中任务行标题下的「详情」「收起」 | 展开列出正在下载的文件：来源、第几次尝试、几个连接、已下载多少；下面是重试次数和“某来源失败，已改用另一个”，失败原因在技术详情里 | 任务开始下载后才出现
+        kit::ghost(("live-task-detail", index), label, move |window, cx| {
+            emit(ViewIntent::TaskDetail(task), window, cx);
+        })
+        .flush_start()
+        .debug_selector(move || format!("live-task-detail-{index}"))
+    });
+    // A narrow window puts 「详情」 on a line of its own instead of under the
+    // keys beside it.
+    h_flex()
+        .flex_wrap()
+        .gap_x_2()
+        .gap_y(px(2.))
+        .items_center()
+        .min_w_0()
+        .when(!row.detail.is_empty(), |line| {
+            line.child(
+                div()
+                    .text_xs()
+                    .text_color(colors.muted)
+                    .truncate()
+                    .child(row.detail.clone()),
+            )
+        })
+        .children(speed_line(row, colors))
+        .children(toggle)
+        .into_any_element()
+}
+
+/// One file on its way: its name, where it comes from, the attempt and the
+/// connections when they say something, and how far it got.
+fn file_line(file: &FileDownload, colors: ShellColors) -> gpui::Div {
+    let mut line = h_flex().w_full().gap_3().items_center().child(
+        div()
+            .flex_1()
+            .min_w_0()
+            .truncate()
+            .text_xs()
+            .text_color(colors.foreground)
+            // A download staged under a hidden name is still that file.
+            .child(file.name.trim_start_matches('.').to_owned()),
+    );
+    let Some(source) = &file.source else {
+        return line.child(kit::status(
+            tr!("activity-file-waiting"),
+            kit::Tone::Off,
+            colors,
+        ));
+    };
+    if file.attempt > 1 {
+        line = line.child(kit::tag(
+            tr!("activity-file-attempt", attempt = file.attempt),
+            kit::TagKind::Plain,
+            colors,
+        ));
+    }
+    if file.connections > 1 {
+        line = line.child(kit::tag(
+            tr!("activity-file-connections", count = file.connections),
+            kit::TagKind::Plain,
+            colors,
+        ));
+    }
+    line.child(kit::reading(source_host(source), colors)).child(
+        kit::reading(file_amount(file.done, file.total), colors)
+            .min_w(px(132.))
+            .flex()
+            .justify_end(),
+    )
+}
+
+/// A source given up: which one, and which took its place.
+fn switch_line(switch: &SourceSwitch, colors: ShellColors) -> gpui::Div {
+    let from = source_host(&switch.from);
+    match &switch.to {
+        Some(to) => kit::status(
+            tr!(
+                "activity-source-switched",
+                from = from,
+                to = source_host(to)
+            ),
+            kit::Tone::Off,
+            colors,
+        ),
+        None => kit::status(
+            tr!("activity-source-exhausted", from = from),
+            kit::Tone::Failure,
+            colors,
+        ),
+    }
+}
+
+/// The raw reasons behind the sources given up, for 技术详情.
+fn switch_reasons(switches: &[SourceSwitch]) -> String {
+    switches
+        .iter()
+        .map(|switch| {
+            format!(
+                "{}: {} -> {}: {}",
+                switch.file,
+                switch.from,
+                switch.to.as_deref().unwrap_or("-"),
+                switch.reason
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// What an open running task downloads.
+fn downloads_detail(index: usize, downloads: &TaskDownloads, colors: ShellColors) -> gpui::Div {
+    let mut detail = v_flex()
+        .w_full()
+        .gap(px(6.))
+        .pl(px(DETAIL_INDENT))
+        .pb(px(11.));
+    if downloads.files.is_empty() {
+        detail = detail.child(
+            div()
+                .text_xs()
+                .text_color(colors.muted)
+                .child(tr!("activity-files-none")),
+        );
+    }
+    detail = detail.children(
+        downloads
+            .files
+            .iter()
+            .take(FILES_SHOWN)
+            .map(|file| file_line(file, colors)),
+    );
+    let more = downloads.files.len().saturating_sub(FILES_SHOWN);
+    if more > 0 {
+        detail = detail.child(
+            div()
+                .text_xs()
+                .text_color(colors.muted)
+                .child(tr!("activity-files-more", count = more)),
+        );
+    }
+    if downloads.retries > 0 {
+        detail = detail.child(
+            div()
+                .text_xs()
+                .text_color(colors.muted)
+                .child(tr!("activity-retries", count = downloads.retries)),
+        );
+    }
+    if !downloads.switches.is_empty() {
+        detail = detail.child(
+            h_flex()
+                .gap_3()
+                .items_start()
+                .child(
+                    v_flex().flex_1().min_w_0().gap(px(4.)).children(
+                        downloads
+                            .switches
+                            .iter()
+                            .map(|switch| switch_line(switch, colors)),
+                    ),
+                )
+                .child(kit::technical(
+                    ("live-switch-technical", index),
+                    switch_reasons(&downloads.switches),
+                )),
+        );
+    }
+    detail.debug_selector(move || format!("live-task-files-{index}"))
 }
 
 pub(super) fn activity_row(
     index: usize,
     row: &ActivityRow,
-    handler: &LiveHandler,
-    colors: ShellColors,
+    ctx: &LiveCtx,
     opens: bool,
 ) -> gpui::Div {
+    let (handler, colors) = (&ctx.handler, ctx.colors);
     let (tone, trail) = match &row.state {
         ActivityState::Running => (
-            colors.foreground,
+            if row.paused {
+                colors.muted
+            } else {
+                colors.foreground
+            },
             h_flex()
                 .gap_3()
                 .items_center()
-                // ia[activity]: 看进度 | 任务行右侧进度条和百分比 | 实时进度；速度和剩余时间在有两次读数后出现（下载按字节，安装/修复按文件个数）
+                // ia[activity]: 看进度 | 任务行右侧进度条和百分比，标题下的速度和剩余时间 | 实时进度；速度和剩余时间在有两次读数后出现（下载按字节，安装/修复按文件个数）；暂停时那里显示“已暂停”
                 .child(match row.fraction {
                     Some(fraction) => h_flex()
                         .gap_3()
@@ -105,8 +332,8 @@ pub(super) fn activity_row(
                         kit::chip(tr!("activity-status-running"), None, colors).into_any_element()
                     }
                 })
-                .children(speed_line(row, colors))
-                // ia[activity]: 取消 | 运行中任务行的「取消」 | 任务停止，状态“已取消”
+                .children(pause_button(index, row, handler))
+                // ia[activity]: 取消 | 运行中任务行的「取消」 | 任务停止，状态“已取消”；已下载的部分留到下次重试时继续 | 留下的部分启动时清理超过 7 天的
                 .children(row.cancel.map(|id| {
                     kit::ghost(
                         ("live-cancel", index),
@@ -134,7 +361,7 @@ pub(super) fn activity_row(
             h_flex()
                 .gap_2()
                 .items_center()
-                // ia[activity]: 技术详情 | 失败任务行的技术详情 | 失败原因弹窗
+                // ia[activity]: 技术详情 | 失败任务行的技术详情 | 失败原因弹窗；下载失败写明每个试过的来源和它的原因
                 .child(kit::technical(
                     ("live-task-technical", index),
                     message.clone(),
@@ -158,19 +385,85 @@ pub(super) fn activity_row(
                 .into_any_element(),
         ),
     };
-    let detail = row.detail.clone();
-    kit::row(
+    let lead = Some(
+        div()
+            .size(px(8.))
+            .rounded_full()
+            .bg(tone)
+            .into_any_element(),
+    );
+    if row.state != ActivityState::Running {
+        return kit::row(
+            row.title.clone(),
+            row.detail.clone(),
+            lead,
+            Some(trail),
+            colors,
+        );
+    }
+    let open = row
+        .task
+        .is_some_and(|task| ctx.state.activity_open.contains(&task));
+    let line = kit::row_with(
         row.title.clone(),
-        detail,
-        Some(
-            div()
-                .size(px(8.))
-                .rounded_full()
-                .bg(tone)
-                .into_any_element(),
-        ),
+        running_detail(index, row, &ctx.emit, open, colors),
+        lead,
         Some(trail),
         colors,
+    );
+    match row.downloads.as_ref().filter(|_| open) {
+        Some(downloads) => v_flex()
+            .w_full()
+            .child(line)
+            .child(downloads_detail(index, downloads, colors)),
+        None => line,
+    }
+}
+
+/// The speed of all downloads together and the connections they hold, on
+/// the toolbar's trailing edge while anything downloads.
+fn traffic_readings(traffic: TrafficReading, colors: ShellColors) -> Option<AnyElement> {
+    if traffic.open == 0 && traffic.rate.is_none() {
+        return None;
+    }
+    let legend = |text: &'static str| {
+        div()
+            .text_xs()
+            .text_color(colors.muted)
+            .whitespace_nowrap()
+            .child(text)
+    };
+    // ia[activity]: 看总速度 | L3 工具栏右侧的速度与连接读数 | 所有下载加起来的速度，和正在用的连接数 / 上限（设置里的同时下载数） | 有下载时才出现
+    Some(
+        h_flex()
+            .gap_3()
+            .items_center()
+            .children(traffic.rate.map(|rate| {
+                h_flex()
+                    .gap(px(6.))
+                    .items_center()
+                    .child(legend(tr!("activity-traffic-rate")))
+                    .child(
+                        kit::reading(
+                            crate::live::rate_text(lumilio_core::ProgressUnit::Bytes, rate),
+                            colors,
+                        )
+                        .text_color(colors.foreground),
+                    )
+            }))
+            .child(
+                h_flex()
+                    .gap(px(6.))
+                    .items_center()
+                    .child(legend(tr!("activity-traffic-connections")))
+                    .child(kit::count_of(
+                        traffic.open as u64,
+                        Some(traffic.limit as u64),
+                        colors,
+                    )),
+            )
+            .debug_selector(|| "live-traffic".to_owned())
+            .into_any_element(),
     )
 }
 
@@ -205,7 +498,7 @@ pub fn activity(ctx: &LiveCtx) -> impl IntoElement {
                         .instance
                         .as_ref()
                         .is_some_and(|id| ctx.model.library.iter().any(|card| &card.id == id));
-                    activity_row(index, row, &ctx.handler, colors, opens)
+                    activity_row(index, row, ctx, opens)
                 })
                 .collect(),
             colors,
@@ -244,7 +537,7 @@ pub fn activity(ctx: &LiveCtx) -> impl IntoElement {
                 })
                 .into_any_element(),
             ),
-            None,
+            traffic_readings(ctx.model.traffic, colors),
         ))
         .child(kit::entrance(body, ("live-activity-body", tab)))
 }

@@ -27,6 +27,63 @@ pub struct ActivityRow {
     pub instance: Option<String>,
     /// How to run it again, if it can be.
     pub retry: Option<lumilio_core::RetryAction>,
+    /// The task id to pause or resume with, once a running, stoppable task
+    /// has begun to download.
+    pub pause: Option<u64>,
+    /// Its downloads are held.
+    pub paused: bool,
+    /// What it downloads, while it runs (plan download-engine T5).
+    pub downloads: Option<lumilio_core::TaskDownloads>,
+}
+
+/// How the connections all downloads share are used, for the Activity
+/// toolbar.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct TrafficReading {
+    pub open: usize,
+    pub limit: usize,
+    /// Bytes per second over all downloads, once two readings exist.
+    pub rate: Option<f64>,
+    pub(super) sample: Option<RateSample>,
+}
+
+impl TrafficReading {
+    /// The next reading from the service's counters at `now_ms`.
+    #[must_use]
+    pub fn next(self, traffic: lumilio_core::Traffic, now_ms: u64) -> Self {
+        let sample = next_sample(self.sample, traffic.received, now_ms);
+        Self {
+            open: traffic.open,
+            limit: traffic.limit,
+            // Nothing open is no speed, whatever the smoothing remembers.
+            rate: sample.per_sec.filter(|rate| *rate > 0. && traffic.open > 0),
+            sample: Some(sample),
+        }
+    }
+}
+
+/// How far a file got: "12.3 MB / 40.0 MB", or what arrived while its size is
+/// not known.
+#[must_use]
+pub fn file_amount(done: u64, total: Option<u64>) -> String {
+    match total {
+        Some(total) => format!("{} / {}", bytes_text(done as f64), bytes_text(total as f64)),
+        None => bytes_text(done as f64),
+    }
+}
+
+/// The host a source is on, which is what tells two sources apart; the whole
+/// address when it has none.
+#[must_use]
+pub fn source_host(source: &str) -> String {
+    let rest = source.split_once("://").map_or(source, |(_, rest)| rest);
+    let host = rest.split(['/', '?', '#']).next().unwrap_or(rest);
+    let host = host.rsplit_once('@').map_or(host, |(_, host)| host);
+    if host.is_empty() {
+        source.to_owned()
+    } else {
+        host.to_owned()
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -75,7 +132,8 @@ pub(super) fn next_sample(previous: Option<RateSample>, done: u64, now_ms: u64) 
 }
 
 /// `3.2 MB`, `850 KB`.
-pub(super) fn bytes_text(bytes: f64) -> String {
+#[must_use]
+pub fn bytes_text(bytes: f64) -> String {
     const KB: f64 = 1024.;
     if bytes >= KB * KB * KB {
         format!("{:.1} GB", bytes / (KB * KB * KB))
@@ -216,8 +274,11 @@ pub fn task_label(label: &TaskLabel) -> String {
     }
 }
 
-pub(super) fn active_row(task: &ActiveTask, cancellable: bool) -> ActivityRow {
+pub(super) fn active_row(task: &ActiveTask, cancellable: bool, paused: bool) -> ActivityRow {
     ActivityRow {
+        pause: (cancellable && task.downloads.is_some()).then_some(task.id),
+        paused,
+        downloads: task.downloads.clone(),
         task: Some(task.id),
         amount: task.progress.filter(|(_, total)| *total > 0),
         unit: task.unit,
@@ -243,6 +304,9 @@ pub(super) fn finished_row(task: &FinishedTask, now: u64) -> ActivityRow {
         TaskOutcome::Cancelled => ActivityState::Cancelled,
     };
     ActivityRow {
+        pause: None,
+        paused: false,
+        downloads: None,
         task: None,
         amount: None,
         unit: lumilio_core::ProgressUnit::Items,
@@ -262,7 +326,13 @@ pub(super) fn finished_row(task: &FinishedTask, now: u64) -> ActivityRow {
 pub fn activity_rows(view: &ActivityView, now: u64) -> Vec<ActivityRow> {
     view.active
         .iter()
-        .map(|task| active_row(task, view.cancellable.contains(&task.id)))
+        .map(|task| {
+            active_row(
+                task,
+                view.cancellable.contains(&task.id),
+                view.paused.contains(&task.id),
+            )
+        })
         .chain(view.finished.iter().map(|task| finished_row(task, now)))
         .collect()
 }

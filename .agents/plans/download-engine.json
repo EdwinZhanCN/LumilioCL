@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "download-engine",
   "title": "统一下载引擎：全局连接池、续传、分段与下载中心",
-  "summary": "所有下载走同一个引擎。现状：core 里 10 处各自 TransferEngine::new，各有自己的信号量，「同时下载数」实际是每个任务的上限，且自动值不一致（启动/安装 16，内容、整合包与 Java 4）；元数据经 fetch_decoded 直接读进内存，不受并发上限；lumilio-updater 自带 reqwest 下载、失败从零重下；下载失败一律删除 .part 从零重试。按 T1→T5 分别成 PR：先把 transfer 拆成独立 crate 并由服务持有一个全局连接池，再做 Range 续传与暂停、大文件分段、元数据与更新器接入，最后翻新下载中心。",
+  "summary": "所有下载走同一个引擎。起点：core 里 10 处各自 TransferEngine::new，各有自己的信号量，「同时下载数」实际是每个任务的上限，且自动值不一致（启动/安装 16，内容、整合包与 Java 4）；元数据经 fetch_decoded 直接读进内存，不受并发上限；lumilio-updater 自带 reqwest 下载、失败从零重下；下载失败一律删除 .part 从零重试。T1（拆出 lumilio-transfer 与全局连接池）已在 #79 合并；T2–T5（续传与暂停、大文件分段、元数据与更新器接入、下载中心）在同一个 PR 中完成（D5）。现状：T2–T4 完成；T5 已实现，等 Project Maintainer 截图验收。",
   "status": "in_progress",
   "visibility": "internal",
   "scope": {
@@ -30,34 +30,34 @@
     {
       "id": "T2",
       "title": "Range 断点续传与暂停、继续。",
-      "status": "in_progress",
-      "acceptance": "重试时保留已写入的 .part，带 Range 与 If-Range（ETag 或 Last-Modified）续传；服务器回 200 时从零开始，Content-Range 不符或 416 时丢弃已下载部分。续传先对已有字节计算哈希再接着流式计算，仍是校验通过才改名；校验失败的已下载部分丢弃后重下。取消或全部来源失败时，服务的下载保留已下载部分并在 partial-downloads/ 记一条说明，同一目标的下一次传输（动态页「重试」）接着下载；启动时清理超过 7 天的残留（D4）。下载中心可暂停运行中的下载任务并继续，继续后从已下载字节处开始。假 transport 覆盖：中断后续传、忽略 Range 回 200、校验器变化、续传后哈希不符、取消后由新引擎续传、无说明目录时取消不留文件、按时间清理。"
+      "status": "completed",
+      "acceptance": "重试时保留已写入的 .part，带 Range 与 If-Range（ETag 或 Last-Modified）续传；服务器回 200 时从零开始，Content-Range 不符或 416 时丢弃已下载部分。续传先对已有字节计算哈希再接着流式计算，仍是校验通过才改名；校验失败的已下载部分丢弃后重下。取消或全部来源失败时，服务的下载保留已下载部分并在 partial-downloads/ 记一条说明，同一目标的下一次传输（动态页「重试」）接着下载；启动时清理超过 7 天的残留（D4）。下载中心可暂停运行中的下载任务并继续：暂停时放开连接、保留已下载部分，继续后从已下载字节处开始（D6）。假 transport 覆盖：中断后续传、忽略 Range 回 200、校验器变化、续传后哈希不符、取消后由新引擎续传、无说明目录时取消不留文件、按时间清理、暂停放开连接并续传、暂停中取消、开始前暂停不占连接。"
     },
     {
       "id": "T3",
       "title": "大文件分段下载。",
-      "status": "proposed",
-      "acceptance": "已知大小不小于阈值且来源支持 Range 时，用 try_acquire 拿到的空闲许可并发下载区间，空闲连接可再拆最大的未完成区间；批量下载占满许可时不分段。同一文件的分段固定一个来源（最终重定向地址），一段失败按现有重试与换源整体处理。不支持 Range、回 200、file:// 来源全部回到单连接。测试证明总连接数仍不超过池上限。"
+      "status": "completed",
+      "acceptance": "已知大小不小于阈值且来源支持 Range 时，用 try_acquire 拿到的空闲许可并发下载区间，空闲连接可再拆最大的未完成区间；批量下载占满许可时不分段，单连接开始的大文件在有连接空出后中途交接、再分段（D7）。同一文件的分段固定一个来源（最终重定向地址），一段失败按现有重试与换源整体处理，已写区间记入说明供下次续传。不支持 Range、回 200、file:// 来源全部回到单连接。测试证明总连接数仍不超过池上限。"
     },
     {
       "id": "T4",
       "title": "元数据与启动器更新包接入引擎。",
-      "status": "proposed",
-      "acceptance": "fetch_decoded 经引擎的内存目标下载：占连接池许可、复用重试与换源，不显示在下载中心。lumilio-updater 依赖 lumilio-transfer 下载更新包，获得续传与分段，校验仍以 SHA256SUMS 为准。"
+      "status": "completed",
+      "acceptance": "fetch_decoded 经引擎的内存目标下载：占连接池许可、复用重试与换源，不显示在下载中心（D8）。lumilio-updater 依赖 lumilio-transfer、在服务的连接池上下载更新包，获得续传与分段，校验仍以 SHA256SUMS 为准。"
     },
     {
       "id": "T5",
       "title": "下载中心翻新。",
-      "status": "proposed",
+      "status": "in_progress",
       "acceptance": "动态页的下载任务可展开查看正在下载的文件、所用来源、重试次数与是否分段；显示全局速度与当前连接数；运行中的下载可暂停与继续；失败说明写明失败的来源与已切换到的来源。界面按 docs/design-language.md 设计并声明 ia 路径；截图由 Project Maintainer 验收。"
     }
   ],
   "validation": [
     { "criterion": "T1：共享连接池的上限测试与每任务进度测试通过；lumilio-core 公开路径不变（lumilio-app、lumilio-ui 无需改 use）。", "result": "crates/lumilio-transfer/src/budget_tests.rs：两个引擎共享上限 2 时最大在途请求为 2；大批次与后到的小批次轮流使用连接（去掉每批上限后该测试失败，已验证）；扩容立即生效、缩容随连接结束生效。lumilio-core 829 个测试通过（每个引擎事件独立，任务进度测试不变）；lumilio-app、lumilio-ui 未改 use，clippy 无告警。" },
-    { "criterion": "T2：续传与回退的假 transport 测试通过。", "result": "crates/lumilio-transfer/src/resume_tests.rs 7 个测试与 user_agent_tests 中 Range/If-Range 请求头测试通过；变异验证：总从零开始（4 个失败）、不发 If-Range（3 个失败）、校验失败后保留说明（1 个失败）。lumilio-core 829 个测试通过。暂停与继续的界面待定。" },
-    { "criterion": "T3：分段、回退与连接上限测试通过。", "result": null },
-    { "criterion": "T4：元数据与更新器经引擎下载的测试通过。", "result": null },
-    { "criterion": "T5：Project Maintainer 截图验收下载中心。", "result": null }
+    { "criterion": "T2：续传与回退的假 transport 测试通过。", "result": "crates/lumilio-transfer/src/resume_tests.rs 7 个测试、pause_tests.rs 3 个测试与 user_agent_tests 中 Range/If-Range 请求头测试通过；crates/lumilio-core/src/service/tests/activity.rs 的 a_paused_task_lets_its_connections_go_and_finishes_once_resumed 经服务暂停一个内容安装、看到连接数归零后继续并装好。变异验证：总从零开始（4 个失败）、不发 If-Range（3 个失败）、校验失败后保留说明（1 个失败）、暂停时不放开连接（2 个失败）、传输中不理会暂停（2 个失败）、服务的 pause_task 不暂停（1 个失败）。" },
+    { "criterion": "T3：分段、回退与连接上限测试通过。", "result": "crates/lumilio-transfer/src/parallel_tests.rs 7 个测试与 pieces_tests.rs 7 个测试通过，连续 25 次运行稳定：空闲连接加入并都向最终地址要区间、与批次并行时最大在途不超过池上限、来源把区间回成 200 时第一次尝试仍完成、无 Range 与池满时单连接、池满开始的大文件在连接空出后分段、取消后新引擎从已写区间续传。变异验证：加入的连接绕过连接池（1–2 个失败）、从不分段（2 个失败）、加入的连接改向原始来源（1 个失败）、取消后不记已写区间（1 个失败）、不中途交接（1 个失败）。" },
+    { "criterion": "T4：元数据与更新器经引擎下载的测试通过。", "result": "crates/lumilio-transfer/src/memory_tests.rs 5 个测试：内存读取等待连接池许可、繁忙来源重试一次且不发事件、404 不重试、不可达来源算未应答、超限拒收。core 的 fetch、catalog、loader、injector、skin、方块资源包测试改为经引擎后通过。crates/lumilio-updater/src/download_tests.rs 3 个测试：站点失败时从 GitHub 取更新包与 SHA256SUMS、哈希不符的包被拒且不留文件。" },
+    { "criterion": "T5：Project Maintainer 截图验收下载中心。", "result": "已实现并由测试覆盖：crates/lumilio-ui/src/shell/tests/activity.rs 点「详情」展开文件、「暂停」「继续」发出对应意图、工具栏显示速度与连接读数；live/tests.rs 覆盖可暂停条件、暂停时无速度、总速度读数、文件与来源的读法；core 的 a_task_shows_its_files_their_sources_and_the_sources_given_up 覆盖文件、连接数与换源记录。开发钩子 LUMILIO_ACTIVITY=java|graalvm（LUMILIO_ACTIVITY_DETAIL、LUMILIO_ACTIVITY_PAUSE）可在临时数据目录里打开真实下载的动态页。截图验收待 Project Maintainer。" }
   ],
   "decisions": [
     {
@@ -82,11 +82,39 @@
       "id": "D4",
       "decision": "未完成的下载以固定名 .<文件名>.lumilio.part 留在目标旁，来源、校验器与期望哈希记在 partial-downloads/ 下按目标路径哈希命名的说明里；有期望哈希时可从任一来源续传，否则只在同一来源且有校验器时续传；启动时清理超过 7 天的残留。",
       "rationale": "留在目标旁才能校验后原子改名；说明集中在一处，清理不必遍历游戏与库目录。启动器的大部分下载带 SHA-1，哈希兜底使换源续传安全。说明不放在 cache/，清除缓存不会留下找不到的残留。",
-      "consequences": "未配置说明目录的引擎（测试、尚未接入的更新器）只在同一次传输的重试之间续传，结束时照旧删除。"
+      "consequences": "未配置说明目录的引擎（测试）只在同一次传输的重试之间续传，结束时照旧删除。更新器也把说明记在 partial-downloads/。多连接写下的部分文件与内容等长，说明另记长度与已写区间；已写区间只在各连接 flush 之后写入说明。"
+    },
+    {
+      "id": "D5",
+      "decision": "T2–T5 在同一个 PR 中完成，T1 已单独合并。",
+      "rationale": "Project Maintainer 要求一次完成。四项共用引擎的事件、说明格式与任务控制：暂停需要下载中心的按钮，下载中心需要分段与换源事件，更新器与元数据接入改动同一个引擎接口。",
+      "consequences": "PR 较大；每项仍有各自的验收与测试，提交按引擎、更新器、core 任务、界面分开。"
+    },
+    {
+      "id": "D6",
+      "decision": "暂停是任务 CancellationToken 的第二种状态：暂停时正在进行的尝试停下并放开连接，已下载部分留在 .part 与内存说明里；继续后同一次尝试从已下载处接着下，不计入重试次数。取消优先于暂停。只有下载会停，安装中的其他步骤照常进行。",
+      "rationale": "每个任务已经有一个取消令牌并传到所有引擎、启动器与安装器；把暂停放在同一令牌上，不必给几十处调用新增参数。放开连接让其他任务在暂停期间用上它。",
+      "consequences": "LauncherService::pause_task / resume_task 用与 cancel_task 相同的令牌表；ActivityView.paused 列出暂停的任务。动态页只在任务开始下载后显示「暂停」。"
+    },
+    {
+      "id": "D7",
+      "decision": "分段由「自己的连接 + 借来的连接」完成：自己的连接读首个应答并可读入紧随其后、被放开的区间，从不让出；借来的连接用 try_acquire 拿到（有下载在排队时拿不到），只向首个应答的最终地址要有界区间，每个数据块之间看到有下载在排队就让出。单连接开始的大文件每 250 ms 看一次是否有空闲连接，有就把正在读的应答交给分段继续。来源把区间回成整份时不再加入连接，自己的连接跳到所需位置读下去。默认阈值 8 MiB、最小区间 1 MiB、每文件最多 8 个连接。",
+      "rationale": "批次总在占满连接时开始大文件，只在开始时判断会让 client.jar、Java 的 modules 等从不分段；让借来的连接随时让出，保证 D3 的轮流不被一个大文件拖住。",
+      "consequences": "分段文件的哈希在全部写完后对整个文件重算；首个尝试的说明在转入分段前 flush。每文件连接上限只是礼貌值，不是设置项。"
+    },
+    {
+      "id": "D8",
+      "decision": "元数据经 TransferEngine::fetch 读入内存：每个来源最多 2 次、间隔 250 ms，再换下一个来源；不发事件。更新器下载更新包每个来源 2 次。",
+      "rationale": "元数据原本每个来源只试一次；默认的 5 次退避会让离线时的换源慢上数秒。更新包哈希不符时反复重下同一个包没有意义。",
+      "consequences": "fetch_decoded 的调用方改为传引擎（服务用不加锁的 fetcher()，启动器用自己的引擎）；post_document 仍直接走 transport，写请求不重试。"
     }
   ],
+  "lessonsLearned": [
+    "2026-10-22 分段的第一版只在传输开始时看有没有空闲连接。真实安装里大文件总在批次占满连接时开始，于是从不分段（Mojang Java 的 modules 一直用一个连接）。修复：单连接下载每 250 ms 看一次空闲连接，把正在读的应答交给分段（D7）。Guard：crates/lumilio-transfer/src/parallel_tests.rs 的 a_large_file_started_on_a_full_budget_splits_once_a_connection_frees，去掉中途交接后失败。"
+  ],
   "references": [
-    "crates/lumilio-core/src/transfer/engine.rs",
+    "crates/lumilio-transfer/src/engine.rs",
+    "crates/lumilio-transfer/src/parallel.rs",
     "crates/lumilio-core/src/service/tracking.rs",
     "https://github.com/fast-down/core",
     "https://github.com/modrinth/code/tree/main/packages/app-lib"

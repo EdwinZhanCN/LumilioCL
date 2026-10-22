@@ -631,6 +631,30 @@ activity-status-running = In progress
 activity-status-done = Done
 activity-status-failed = Failed
 activity-status-cancelled = Cancelled
+activity-status-paused = Paused
+activity-pause = Pause
+activity-resume = Resume
+activity-show-files = Details
+activity-hide-files = Hide details
+activity-file-waiting = Waiting for a connection
+activity-file-attempt = Attempt { $attempt }
+activity-file-connections = { $count ->
+    [one] { $count } connection
+   *[other] { $count } connections
+}
+activity-files-more = { $count ->
+    [one] { $count } more file
+   *[other] { $count } more files
+}
+activity-files-none = Nothing is downloading right now
+activity-retries = { $count ->
+    [one] Retried once
+   *[other] Retried { $count } times
+}
+activity-source-switched = { $from } failed, now using { $to }
+activity-source-exhausted = { $from } failed, and no other source is left
+activity-traffic-rate = Speed
+activity-traffic-connections = Connections
 activity-empty-title = No activity yet
 activity-empty-help = Downloads and installs show up here
 activity-tab-empty = Nothing in this category

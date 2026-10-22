@@ -257,6 +257,12 @@ fn open_requested_page(
         });
         return;
     }
+    // `LUMILIO_ACTIVITY=java|graalvm` downloads Java 21 from that source, as
+    // 重试 would, so Activity shows a real download; `LUMILIO_ACTIVITY_DETAIL=1`
+    // opens its files and `LUMILIO_ACTIVITY_PAUSE=<seconds>` pauses it then.
+    if let Ok(which) = std::env::var("LUMILIO_ACTIVITY") {
+        review_download(wiring, shell, &which, cx);
+    }
     let route = match std::env::var("LUMILIO_PAGE").as_deref() {
         Ok("library") => Route::Library,
         Ok("discover") => Route::Discover,
@@ -267,4 +273,42 @@ fn open_requested_page(
     };
     shell.update(cx, |shell, _| shell.show(route));
     on_shell_intent(wiring, ShellIntent::Navigate(route), window, cx);
+}
+
+/// The dev hook `LUMILIO_ACTIVITY` (see [`open_requested_page`]).
+fn review_download(wiring: &Wiring, shell: &Entity<LauncherShell>, which: &str, cx: &mut App) {
+    use lumilio_core::{JavaSource, RetryAction};
+    let source = match which {
+        "graalvm" => JavaSource::OracleGraalVm,
+        _ => JavaSource::Mojang,
+    };
+    jobs::retry_task(
+        wiring,
+        RetryAction::InstallJava {
+            major: Some(21),
+            source,
+            build: lumilio_core::JavaBuild::default(),
+        },
+        cx,
+    );
+    // The first task the service starts has id 1.
+    if std::env::var("LUMILIO_ACTIVITY_DETAIL").is_ok() {
+        shell.update(cx, |shell, cx| {
+            shell.apply_view_intent(lumilio_ui::kit::ViewIntent::TaskDetail(1), cx);
+        });
+    }
+    if let Some(seconds) = std::env::var("LUMILIO_ACTIVITY_PAUSE")
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+    {
+        let wiring = wiring.clone();
+        cx.spawn(async move |cx| {
+            cx.background_executor()
+                .timer(std::time::Duration::from_secs(seconds))
+                .await;
+            wiring.backend.service.pause_task(1);
+            cx.update(|cx| reload(&wiring, Reload::Lists, cx));
+        })
+        .detach();
+    }
 }

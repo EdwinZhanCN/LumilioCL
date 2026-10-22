@@ -214,6 +214,7 @@ pub(super) fn reload(wiring: &Wiring, what: Reload, cx: &mut App) {
         let now = unix_now();
         let cards = library_cards(&records, now);
         let rows = activity_rows(&activity, now);
+        let traffic = activity.traffic;
         let accounts = account_rows(&settings);
         let _ = wiring.shell.update(cx, |shell, cx| {
             shell.update_live(
@@ -234,7 +235,9 @@ pub(super) fn reload(wiring: &Wiring, what: Reload, cx: &mut App) {
                             members: collection.members,
                         })
                         .collect();
-                    model.set_activity(rows, unix_millis());
+                    let now_ms = unix_millis();
+                    model.set_activity(rows, now_ms);
+                    model.set_traffic(traffic, now_ms);
                     model.set_accounts(accounts);
                 },
                 cx,
