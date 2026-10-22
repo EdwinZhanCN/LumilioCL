@@ -35,6 +35,20 @@ pub fn crash_for_session(
         .min_by_key(|report| report.modified.abs_diff(end))
 }
 
+/// The launcher's record of what the game printed, when it is from this
+/// session. It holds only the last launch, so the session must be the last
+/// one (and no game running now), and the record written since it began: a
+/// launch that failed before the game started wrote none.
+pub fn output_for_session(
+    files: &[FileEntry],
+    started: u64,
+    last_launch: bool,
+) -> Option<&FileEntry> {
+    files.iter().find(|file| {
+        last_launch && file.name == lumilio_core::GAME_OUTPUT_LOG && file.modified >= started
+    })
+}
+
 /// `folder` and `name` as one path below the game directory.
 pub fn join_path(folder: &str, name: &str) -> String {
     if folder.is_empty() {

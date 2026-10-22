@@ -254,7 +254,8 @@ pub enum GameEvent {
 impl GameEvent {
     /// The launch signal this event means, if any. A game the launcher
     /// stopped was cancelled, whatever its exit code; any other end without
-    /// a code (a Unix signal: a JVM crash, the OOM killer) is not clean.
+    /// a code (a Unix signal: a JVM crash, the OOM killer) is not clean. An
+    /// early exit carries no output here; whoever kept the lines adds them.
     #[must_use]
     pub fn signal(&self, was_running: bool) -> Option<LaunchSignal> {
         match self {
@@ -263,6 +264,7 @@ impl GameEvent {
             Self::Exited { code, .. } if was_running => Some(LaunchSignal::Exited { code: *code }),
             Self::Exited { code, .. } => Some(LaunchSignal::Failed(LaunchFailure::ExitedEarly {
                 code: *code,
+                output: Vec::new(),
             })),
             Self::Spawned { .. } | Self::Line { .. } => None,
         }

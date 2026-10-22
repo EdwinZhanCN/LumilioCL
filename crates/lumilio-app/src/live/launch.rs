@@ -115,20 +115,26 @@ fn log_signal(instance: &str, signal: &LaunchSignal) {
         LaunchSignal::Failed(LaunchFailure::Step { message, .. }) => {
             log::warn!("{instance}: the launch failed: {message}");
         }
-        LaunchSignal::Failed(LaunchFailure::ExitedEarly { code }) => {
-            log::warn!("{instance}: the game quit while starting (exit code {code:?})");
+        LaunchSignal::Failed(failure @ LaunchFailure::ExitedEarly { code, .. }) => {
+            match failure.technical_detail() {
+                Some(output) => log::warn!(
+                    "{instance}: the game quit while starting (exit code {code:?}), printing:\n{output}"
+                ),
+                None => log::warn!("{instance}: the game quit while starting (exit code {code:?})"),
+            }
         }
         LaunchSignal::Cancelled => log::info!("{instance}: the launch or game was stopped"),
         LaunchSignal::Phase(_) | LaunchSignal::Progress { .. } => {}
     }
 }
 
-/// Dev hook: `LUMILIO_HOME_RECOVERY=failed|details|crashed|crashed-details|away`
+/// Dev hook: `LUMILIO_HOME_RECOVERY=failed|details|crashed|crashed-details|exited|exited-details|away`
 /// puts the current game through a launch that goes wrong, by the same
 /// signals a real one sends, so Recovery can be reviewed without starting a
 /// game: `failed` stops at a step (the account must sign in again),
-/// `crashed` quits while playing without an exit code, `away` fails while
-/// Library is open, and the `details` cases also press 技术详情.
+/// `crashed` quits while playing without an exit code, `exited` quits while
+/// starting after printing a Java error, `away` fails while Library is open,
+/// and the `details` cases also press 技术详情.
 pub(super) fn review_recovery(
     wiring: &Wiring,
     which: String,
@@ -157,6 +163,19 @@ pub(super) fn review_recovery(
             "crashed" | "crashed-details" => {
                 vec![LaunchSignal::Running, LaunchSignal::Exited { code: None }]
             }
+            "exited" | "exited-details" => vec![
+                LaunchSignal::Phase(lumilio_core::LaunchPhase::Starting),
+                LaunchSignal::Failed(LaunchFailure::ExitedEarly {
+                    code: Some(1),
+                    output: [
+                        "Exception in thread \"main\" java.lang.IllegalStateException: Module named org.objectweb.asm was already on the JVMs module path loaded from /launcher/meta/libraries/org/ow2/asm/asm/9.8/asm-9.8.jar but class-path contains it at location /launcher/meta/libraries/org/ow2/asm/asm/9.6/asm-9.6.jar",
+                        "\tat cpw.mods.bootstraplauncher@2.0.2/cpw.mods.bootstraplauncher.BootstrapLauncher.run(BootstrapLauncher.java:139)",
+                        "\tat cpw.mods.bootstraplauncher@2.0.2/cpw.mods.bootstraplauncher.BootstrapLauncher.main(BootstrapLauncher.java:69)",
+                    ]
+                    .map(str::to_owned)
+                    .to_vec(),
+                }),
+            ],
             _ => vec![
                 LaunchSignal::Phase(lumilio_core::LaunchPhase::Verifying),
                 LaunchSignal::Failed(ServiceError::SignInRequired("Steve".into()).launch_failure()),
@@ -191,9 +210,10 @@ pub(super) fn review_recovery(
     .detach();
 }
 
-/// 技术详情 on Home's recovery: why a preparation step failed, in a dialog
-/// to read and copy; for a game that quit or a session that did not end
-/// cleanly, that game's Diagnostics tab, where its logs and crash reports are.
+/// 技术详情 on Home's recovery: why a preparation step failed, or what a
+/// game that quit while starting printed, in a dialog to read and copy; for
+/// a game that crashed, quit silently or did not end cleanly, that game's
+/// Diagnostics tab, where its logs and crash reports are.
 pub(super) fn technical_details(wiring: &Wiring, window: &mut Window, cx: &mut App) {
     let wiring = wiring.clone();
     // Deferred: this runs inside one of the shell's own updates.
@@ -204,12 +224,13 @@ pub(super) fn technical_details(wiring: &Wiring, window: &mut Window, cx: &mut A
         else {
             return;
         };
-        match detail {
-            RecoveryDetail::Failed {
-                failure: LaunchFailure::Step { message, .. },
-                ..
-            } => lumilio_ui::toast::technical_dialog(message, window, cx),
-            _ => {
+        let technical = match &detail {
+            RecoveryDetail::Failed { failure, .. } => failure.technical_detail(),
+            _ => None,
+        };
+        match technical {
+            Some(text) => lumilio_ui::toast::technical_dialog(text, window, cx),
+            None => {
                 if let Some(id) = subject.id {
                     open_instance_on(&wiring, id, TAB_DIAGNOSTICS, window, cx);
                 }

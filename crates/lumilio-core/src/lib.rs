@@ -146,7 +146,9 @@ pub use launch_readiness::{LaunchReadiness, LaunchRequirement};
 pub use launch_session::{
     LaunchFailure, LaunchPhase, LaunchProblem, LaunchSession, LaunchSignal, LaunchStatus,
 };
-pub use launcher::{LaunchRequest, LaunchServiceError, LaunchUpdate, Launcher, runtimes_root};
+pub use launcher::{
+    GAME_OUTPUT_LOG, LaunchRequest, LaunchServiceError, LaunchUpdate, Launcher, runtimes_root,
+};
 pub use layout::Layout;
 pub use loader::{
     LAUNCHABLE_LOADERS, LoaderError, LoaderVersion, decode_versions as decode_loader_versions,

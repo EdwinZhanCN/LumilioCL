@@ -1,10 +1,10 @@
 use super::Launcher;
-use super::progress::runtimes_root;
+use super::progress::{GameForwarder, runtimes_root};
 use super::types::{LaunchRequest, LaunchServiceError, LaunchUpdate};
 use crate::activity::CancellationToken;
 use crate::instance::Loader;
 use crate::launch_session::{LaunchFailure, LaunchPhase, LaunchSignal};
-use crate::process::GameExit;
+use crate::process::{GameEvent, GameExit};
 use crate::transfer::SourceChain;
 use crate::tuning::LaunchTuning;
 use std::path::PathBuf;
@@ -431,17 +431,101 @@ async fn a_missing_java_fails_with_a_clear_reason_and_a_terminal_signal() {
 }
 
 #[tokio::test]
-async fn a_game_that_dies_at_once_fails_the_session() {
-    let world = world("echo crash >&2\nexit 1");
+async fn a_game_that_dies_at_once_fails_the_session_with_what_it_printed() {
+    let world = world("echo 'Exception in thread \"main\"' >&2\necho '\tat Main' >&2\nexit 1");
     let (result, updates) = run_to_end(&launcher(), world.request.clone()).await;
     assert_eq!(result.unwrap().code, Some(1));
-    assert!(matches!(
-        session_of(&updates).status(),
-        LaunchStatus::Failed {
-            failure: LaunchFailure::ExitedEarly { code: Some(1) },
-            ..
+    let LaunchStatus::Failed { failure, .. } = session_of(&updates).status().clone() else {
+        panic!("the session did not fail");
+    };
+    assert_eq!(
+        failure,
+        LaunchFailure::ExitedEarly {
+            code: Some(1),
+            output: vec![
+                "Exception in thread \"main\"".to_owned(),
+                "\tat Main".to_owned()
+            ],
         }
-    ));
+    );
+    assert_eq!(
+        failure.technical_detail().as_deref(),
+        Some("Exception in thread \"main\"\n\tat Main")
+    );
+}
+
+#[tokio::test]
+async fn the_games_output_stays_in_its_logs_folder() {
+    let world = world("echo 'Setting user: Steve'\necho playing >&2\nexit 0");
+    let (result, _) = run_to_end(&launcher(), world.request.clone()).await;
+    assert_eq!(result.unwrap().code, Some(0));
+    let record = std::fs::read_to_string(
+        world
+            .request
+            .directories
+            .game()
+            .join("logs")
+            .join(crate::GAME_OUTPUT_LOG),
+    )
+    .unwrap();
+    let lines: Vec<_> = record.lines().collect();
+    assert!(lines[0].starts_with("# LumilioCL "), "{record}");
+    assert!(
+        lines[1].starts_with("# Minecraft 1.0 · Java 21"),
+        "{record}"
+    );
+    assert!(lines.contains(&"Setting user: Steve") && lines.contains(&"playing"));
+    assert!(
+        lines
+            .last()
+            .unwrap()
+            .starts_with("# The game ended with exit code 0 after "),
+        "{record}"
+    );
+}
+
+#[test]
+fn an_early_exit_keeps_only_the_last_lines_and_a_running_game_none() {
+    let line = |text: String| GameEvent::Line {
+        stream: crate::process::LogStream::Stderr,
+        text,
+    };
+    let exit = GameEvent::Exited {
+        code: Some(1),
+        ran_for: std::time::Duration::ZERO,
+        killed: false,
+    };
+    let output_of = |events: Vec<GameEvent>| {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let mut forwarder = GameForwarder::default();
+        for event in &events {
+            forwarder.forward(event, &tx);
+        }
+        drop(tx);
+        let mut signals = Vec::new();
+        while let Ok(update) = rx.try_recv() {
+            if let LaunchUpdate::Signal(signal) = update {
+                signals.push(signal);
+            }
+        }
+        signals.pop()
+    };
+
+    let mut early: Vec<_> = (0..60).map(|n| line(format!("line {n}"))).collect();
+    early.push(exit.clone());
+    let Some(LaunchSignal::Failed(LaunchFailure::ExitedEarly { output, .. })) = output_of(early)
+    else {
+        panic!("not an early exit");
+    };
+    assert_eq!(output.len(), 50);
+    assert_eq!(output.first().map(String::as_str), Some("line 10"));
+    assert_eq!(output.last().map(String::as_str), Some("line 59"));
+
+    let started = vec![line("before".to_owned()), GameEvent::Running, exit];
+    assert_eq!(
+        output_of(started),
+        Some(LaunchSignal::Exited { code: Some(1) })
+    );
 }
 
 #[tokio::test]

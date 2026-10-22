@@ -275,6 +275,7 @@ impl ReleaseManifest {
         let mut classpath = Vec::new();
         let mut seen_classpath = HashSet::new();
         let mut seen_downloads = HashSet::new();
+        let mut seen_artifacts = HashSet::new();
         let mut native_archives = Vec::new();
         let mut required_downloads = Vec::new();
 
@@ -283,6 +284,21 @@ impl ReleaseManifest {
                 continue;
             }
             let resolved = library.resolve_file(&context.host);
+            // A loader lists its libraries before the game's, which can bring an
+            // older version of the same one (Minecraft 1.21.4 has ASM 9.6,
+            // NeoForge 21.4 has 9.8). Only the first launches: with both on the
+            // classpath BootstrapLauncher quits before the game writes a log.
+            // Modrinth's daedalus `merge_partial_version` skips them the same way.
+            let coordinate = library.coordinate();
+            if !seen_artifacts.insert((
+                coordinate.namespace(),
+                coordinate.component(),
+                coordinate.variant(),
+                coordinate.extension(),
+                resolved.native,
+            )) {
+                continue;
+            }
             let destination =
                 join_relative(context.directories.libraries(), &resolved.relative_path)?;
             // Files the loader's installer makes are on the classpath but
