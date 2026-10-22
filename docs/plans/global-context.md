@@ -2,7 +2,7 @@
 
 # 全局上下文：当前游戏、当前账户与运行会话只存一份
 
-Status: InProgress
+Status: Completed
 
 「当前游戏」现在有四份：UI 的 install_target（导航芯片）、app 的 continue_id（继续）、core 的 current_instance（settings.json）和首页的 Subject.id，只在 reload 时按各自的回退规则对齐；从它们推导的结果（首页「需要留意」、发现页来源与已安装标记等）由每个调用点自己挑 Reload 变体来刷新。#55（换账户后首页诊断不更新）、Java 改动后诊断不重算、芯片与「继续」分叉、为某个游戏浏览时换芯片会装进另一个游戏、卡片 ▶ 启动失败后「恢复并继续」启动另一个游戏，都是这个结构的症状（读代码推出，T1 用测试确认）。本计划让 core 成为当前游戏、当前账户和运行会话的唯一所有者并发布变化，UI 只保留只读镜像，推导结果按依赖表跟随变化。0.2.0 的发布等本计划合入后继续。
 
@@ -39,7 +39,7 @@ Status: InProgress
   Acceptance: docs/design-language.md §6 与 §10，以及 navigation.rs（切换当前游戏）、home/launching.rs（继续）、lumilio-app live/instance.rs（浏览锁定）、pages/live/library.rs 与 instance_detail/actions.rs（设为当前游戏）的 ia 注释写成同一语义；nav-current-game 等中英文案与之一致；just ia 没有漂移。
 - [x] T8 — Project Maintainer 在 Mac 上实机检查 (Completed)
   Acceptance: Project Maintainer 按 #55 的复现步骤和 T1 的六个场景实机检查，并看手感：「需要留意」出现时的淡入上移、变空时立即消失是否突兀；改 Java 或插件设置后「检查中」的时机与停留；芯片在保存后才变，等待能否察觉，是否需要 D1 的「被点的那一行保持按下」；从游戏页浏览后芯片与「继续」一起换，在芯片换游戏时退出锁定并重新搜索是否顺畅；卡片 ▶ 先设当前游戏再启动有无多余停顿；启动中导航「重启以更新」变灰；启动失败后换了当前游戏，首页改为继续新的游戏，失败出现在「需要留意」（D8）。结果记入本计划的 validation。
-- [ ] T9 — 合入、关闭 #55 并恢复 0.2.0 发布 (Proposed)
+- [x] T9 — 合入、关闭 #55 并恢复 0.2.0 发布 (Completed)
   Acceptance: PR 引用 #55，合入后 #55 关闭；0.2.0 的发布计划加上本计划为依赖，发布说明补上本计划带来的用户可见变化。
 
 ## Validation
@@ -142,5 +142,9 @@ Consequences: 启动结束（会话从启动中或游戏中变为失败或没有
 - [crates/lumilio-ui/src/shell/chips.rs](../../crates/lumilio-ui/src/shell/chips.rs)
 - [crates/lumilio-ui/src/shell/detail.rs](../../crates/lumilio-ui/src/shell/detail.rs)
 - [crates/lumilio-ui/src/shell/queries.rs](../../crates/lumilio-ui/src/shell/queries.rs)
+
+## Outcome
+
+#59 合入（b12f83d），#55 已关闭。core 只存一份当前游戏、当前账户与运行会话并发布变化，界面跟随；实机检查后首页只讲当前游戏（D8）。0.2.0 发布计划以本计划为依赖，发布说明已补上用户可见的变化。
 
 - Lesson: 修「恢复重试了错的游戏」时只补了重试的目标（先设回失败的游戏），没有问恢复界面在换了当前游戏之后还该不该出现，结果和「只有一个当前游戏」相矛盾，到 T8 实机检查才被发现。防护：choosing_another_game_leaves_a_failed_launch_to_needs_attention 检查换当前游戏后首页继续新游戏、失败出现在「需要留意」；临时让首页一直保留恢复界面、或让启动结束不重做检查时，该测试分别按预期失败。
