@@ -21,8 +21,8 @@ Status: InProgress
 - In: 版本号、计划、release-notes/0.2.0.md 与 .en.md。
 - Out: 大陆直连可用性（discover-translation T6）未实测，发布说明不宣称大陆可用。
 - Out: translation-fallback T4 的译文质量与每日用量检查不阻塞发布。
-- Out: error-reporting T5（panic 记录）、T6（启动阶段对话框）未做；T7 剩下的 Windows 停止游戏实机检查不阻塞发布。
-- Out: translucent-themes T6 的实机检查随 R4 在 Mac 上进行。
+- Out: error-reporting T5（panic 记录）、T6（启动阶段对话框）未做。
+- Out: Windows 上的实机检查交给社区反馈。
 - Out: 实验性 MCP 服务（PR #48）未合入。
 - Out: 不改变签名与公证状态：macOS 仍为 ad hoc 签名，Windows 未签名。
 
@@ -35,7 +35,7 @@ Status: InProgress
 - [ ] R3 — 打 v0.2.0 标签并发布 (Proposed)
   Acceptance: 合入提交在 main 上的 CI 通过后再打标签；v0.2.0 指向该提交，Release 工作流生成草稿；Project Maintainer 在正文末行填上 PR 编号后发布。
 - [ ] R4 — 从 0.1.6 更新后在 Mac 上检查 (Proposed)
-  Acceptance: 从 0.1.6 自动更新到 0.2.0，重启后弹出一次「已更新到 LumilioCL 0.2.0」；开启翻译后发现列表简介显示中文，项目正文点翻译键能译成中文；半透明主题按 translucent-themes T6 检查。
+  Acceptance: 从 0.1.6 自动更新到 0.2.0，重启后弹出一次「已更新到 LumilioCL 0.2.0」；开启翻译后发现列表简介显示中文，项目正文点翻译键能译成中文。
 - [ ] R5 — 发布后关闭 discover-translation (Proposed)
   Acceptance: discover-translation 记下 0.2.0 的发布结果并关闭，T6 的大陆直连验收留在 backlog；网站路线图的投影随之重新生成。
 
