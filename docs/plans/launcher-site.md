@@ -2,7 +2,7 @@
 
 # 宣传网站与下载入口 launcher.lumilio.org
 
-Status: InProgress
+Status: Completed
 
 `launcher.lumilio.org` 是 LumilioCL 的主站：一个静态宣传页，加上同一个 Cloudflare Worker 里的
 GitHub Release 反向代理。页面用启动器自己的设计语言（铝面板、按键、LED、显示屏、步进的像素
@@ -12,7 +12,7 @@ GitHub Release 反向代理。页面用启动器自己的设计语言（铝面�
 
 - In: In：`web/` 下的 Astro + React 站点（i18n 结构，先只写中文）；首屏「logo 面板」探索视窗；视差与横向滚动
   （版块之间不做滚动吸附，Project Maintainer试过，手感别扭）；下载区；Worker 的 `/releases/*` 镜像；部署 workflow。
-- Out: 英文文案、插件目录托管与启动器内自动更新；WASM/社区目录由 wasm-plugin-registry 计划负责，自动更新由 auto-update 计划负责。截图与 GIF 由Project Maintainer提供，S6 继续待验收。
+- Out: 英文文案、插件目录托管与启动器内自动更新；WASM/社区目录由 wasm-plugin-registry 计划负责，自动更新由 auto-update 计划负责。截图与 GIF 由Project Maintainer提供；og:image、动态素材与按新界面重拍的截图记在 backlog。
 
 ## Tasks
 
@@ -32,27 +32,27 @@ GitHub Release 反向代理。页面用启动器自己的设计语言（铝面�
   `CLOUDFLARE_ACCOUNT_ID` 两个 secret，首次 `wrangler deploy` 绑定 `launcher.lumilio.org`（Project Maintainer做）。 (Completed)
   Acceptance: S5：`ci.yml` 排除 `web/**`、`web.yml` 检查与部署（已写）；仓库加 `CLOUDFLARE_API_TOKEN`、
   `CLOUDFLARE_ACCOUNT_ID` 两个 secret，首次 `wrangler deploy` 绑定 `launcher.lumilio.org`（Project Maintainer做）。
-- [ ] S6 — S6：Project Maintainer补截图与 GIF，按 `TODO(asset)` 注释替换占位；og:image。 (InProgress)
-  Acceptance: 五个功能探索窗口与为谁的十五项使用真实截图；新素材全部为 16:10，三张 More actions 聚焦裁剪，编辑器截图轻裁，其余保留完整窗口。现有组件、样式、滚动与动画代码保持不变。网页视觉验收由 Project Maintainer 完成；og:image 与动态素材另待补充。
+- [x] S6 — S6：Project Maintainer补截图与 GIF，按 `TODO(asset)` 注释替换占位；og:image。 (Completed)
+  Acceptance: 五个功能探索窗口与为谁的十五项使用真实截图；新素材全部为 16:10，三张 More actions 聚焦裁剪，编辑器截图轻裁，其余保留完整窗口。现有组件、样式、滚动与动画代码保持不变。网页视觉验收由 Project Maintainer 完成；og:image 与动态素材记在 backlog。
 
 ## Validation
 
 - 本次截图替换：just web、just docs、素材比例与路径检查、组件及样式与基线一致性检查通过。
   Result: just web：Astro 检查 0 错误、0 警告，16 个测试通过，静态构建成功。just docs：26 个测试与 preserve_order 下 5 个计划测试通过，投影与格式检查通过。十六张引用素材均存在且宽×10＝高×16；四张裁剪结果已查看。git diff --exit-code 确认 Audiences、Explorer、原有样式、Hero、Faceplate、Stack 与 world 代码和 main 基线一致。网页视觉验收仍待 Project Maintainer。
 - Project Maintainer 验证本次图片替换和文案在现有页面中的视觉效果。
-  Result: pending
+  Result: 2026-10-21：Project Maintainer 确认已检查。
 - `just web`：astro check 0 错误、Worker 测试 9 个通过、构建通过。
-  Result: pending
+  Result: 2026-10-21：#63 的 CI web 作业（just web）通过。
 - 已用无头 Chromium 截图看过：1440×900 亮 / 暗、390×844、减少动画、探索窗口、启动动画、
   下载区（用 `LUMILIO_RELEASE_FIXTURE` 假数据看了有安装包时的样子）。
-  Result: pending
+  Result: 条件中写明的检查已完成。
 - 反代：`wrangler dev` 本地验证了路由分流（静态 / `/releases/*`）、405、非法 tag；一次性测试
   经真实 GitHub 跳转流式取回别的仓库的资源（200 与 Range 206）。本仓库还没有 Release，
   所以没有拿 LumilioCL 自己的安装包实测过。
-  Result: pending
+  Result: 条件中写明的检查已完成；此后 v0.1.0–v0.1.6 已在本仓库发布。
 - 还要Project Maintainer看：真实浏览器里的滚动手感（吸附、横向段落、视差）、Safari 与 Firefox、
   首屏格子的键盘操作。
-  Result: pending
+  Result: 2026-10-21：Project Maintainer 确认已检查。
 
 ## Decision screenshot-refresh
 
@@ -82,5 +82,9 @@ Consequences: 后续变更更新本 JSON，长期跨计划契约整理到设计/
 - gh-proxy（hunshcn/gh-proxy，MIT）的 Worker 实现
 - [.agents/plans/wasm-plugin-registry.json](../../.agents/plans/wasm-plugin-registry.json)
 - [.agents/plans/auto-update.json](../../.agents/plans/auto-update.json)
+
+## Outcome
+
+launcher.lumilio.org 已上线：宣传页、下载区与 GitHub Release 反代在同一个 Worker 里；功能探索窗口与为谁的十五项使用真实截图，Project Maintainer 已检查。og:image、动态素材与按 0.2.0 界面重拍发现页和外观设置截图记在 backlog。
 
 - Lesson: 替换图片不需要新增图片组件或修改布局和交互。此前尝试增加查看原图入口与 CSS 缩放后，Project Maintainer 报告滚动失效，确切根因尚未定位。此次撤回全部组件与样式改动，裁剪直接保存到素材文件，并通过与 main 的字节比对约束变更范围。
