@@ -20,7 +20,7 @@ use crate::activity::CancellationToken;
 use crate::java::JavaRuntime;
 use crate::launch_session::LaunchSignal;
 use crate::process::GameExit;
-use crate::transfer::{SourceChain, Transport};
+use crate::transfer::{ConnectionBudget, SourceChain, TransferEngine, TransferError, Transport};
 use std::sync::Mutex as StdMutex;
 use tokio::sync::mpsc;
 
@@ -34,6 +34,8 @@ pub struct Launcher<T> {
     transport: T,
     sources: SourceChain,
     concurrency: usize,
+    /// Connections shared with other work; `None` keeps them to this launcher.
+    budget: Option<ConnectionBudget>,
     spawned: Option<mpsc::UnboundedSender<()>>,
     before_start: Option<mpsc::UnboundedSender<tokio::sync::oneshot::Sender<Result<(), String>>>>,
     /// Where to ask for a Java when none installed fits; `None` fails instead.
@@ -53,6 +55,7 @@ where
             transport,
             sources,
             concurrency,
+            budget: None,
             spawned: None,
             before_start: None,
             java_installer: None,
@@ -99,6 +102,24 @@ where
             self.concurrency = count as usize;
         }
         self
+    }
+
+    /// Downloads on connections shared with other work, which replaces any
+    /// concurrency of its own.
+    #[must_use]
+    pub fn with_budget(mut self, budget: ConnectionBudget) -> Self {
+        self.budget = Some(budget);
+        self
+    }
+
+    fn transfer_engine(&self) -> Result<TransferEngine<T>, TransferError> {
+        match &self.budget {
+            Some(budget) => Ok(TransferEngine::with_budget(
+                self.transport.clone(),
+                budget.clone(),
+            )),
+            None => TransferEngine::new(self.transport.clone(), self.concurrency),
+        }
     }
 
     /// Prepares and starts the game, returning how the process ended.

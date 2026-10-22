@@ -69,7 +69,7 @@ use crate::layout::Layout;
 use crate::recovery;
 use crate::recovery::RecoveryNote;
 use crate::settings::SettingsStore;
-use crate::transfer::Transport;
+use crate::transfer::{ConnectionBudget, Transport};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -87,7 +87,9 @@ fn loader_text(loader: Loader, version: Option<&str>) -> String {
 /// Instances diagnosed for Home: verifying files is not free, so only the
 /// ones a person is likely to care about right now.
 const DIAGNOSED_LIMIT: usize = 8;
-const TRANSFER_CONCURRENCY: usize = 4;
+/// Connections all downloads share when the setting is automatic (plan
+/// download-engine D2).
+const TRANSFER_CONCURRENCY: usize = 16;
 /// A Minecraft token with less than this left is refreshed before a launch.
 const TOKEN_MARGIN_SECONDS: u64 = 300;
 /// A key that is never an account, used to see whether the store works.
@@ -102,6 +104,8 @@ pub struct LauncherService<T> {
     /// Published by both stores on every save (plan global-context).
     context: crate::context::ContextHub,
     board: StdMutex<TaskBoard>,
+    /// Every download's connections, sized by the download setting.
+    connections: ConnectionBudget,
     /// Cancellation tokens of running tasks, by task id.
     cancels: StdMutex<BTreeMap<u64, CancellationToken>>,
     /// What the start-up recovery found and did.
@@ -189,6 +193,8 @@ impl<T: Transport + Clone> LauncherService<T> {
             settings: Mutex::new(settings),
             context,
             board: StdMutex::new(TaskBoard::default()),
+            connections: ConnectionBudget::new(TRANSFER_CONCURRENCY)
+                .map_err(|error| ServiceError::Install(error.to_string()))?,
             cancels: StdMutex::default(),
             automatic_java_once: StdMutex::default(),
             startup,

@@ -104,7 +104,6 @@ impl<T: Transport + Clone> LauncherService<T> {
             default_max_memory_mb: settings.default_max_memory_mb,
             default_min_memory_mb: settings.default_min_memory_mb,
             tuning: settings.launch.clone(),
-            download_concurrency: settings.download_concurrency,
             // `None` asks for the instance's own choice; `Some(None)` for the menu.
             quick_play: quick_play.unwrap_or(own_quick_play),
         };
@@ -220,7 +219,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             let (launcher, java_requests) = self
                 .with_java_installer(
                     Launcher::new(self.transport.clone(), chain)
-                        .with_concurrency(request.download_concurrency)
+                        .with_budget(self.connections().await)
                         .with_spawned(spawned)
                         .with_before_start(before_start),
                 )

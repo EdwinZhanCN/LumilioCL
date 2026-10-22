@@ -91,7 +91,10 @@ impl<T: Transport + Clone> LauncherService<T> {
     }
 
     pub async fn set_download_concurrency(&self, count: Option<u32>) -> Result<(), ServiceError> {
-        Ok(self.settings.lock().await.set_download_concurrency(count)?)
+        self.settings.lock().await.set_download_concurrency(count)?;
+        // Running downloads take the new size from their next connection.
+        self.connections().await;
+        Ok(())
     }
 
     pub async fn set_auto_update(&self, enabled: bool) -> Result<(), ServiceError> {

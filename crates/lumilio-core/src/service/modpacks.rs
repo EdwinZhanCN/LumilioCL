@@ -9,7 +9,7 @@ use crate::discover::{Catalog, ProjectOrigin};
 use crate::instance::{InstanceRecord, NewInstance};
 use crate::modpack::{self, PackIndex};
 use crate::staged::Staged;
-use crate::transfer::{TransferEngine, TransferRequest, Transport};
+use crate::transfer::{TransferRequest, Transport};
 
 impl<T: Transport + Clone> LauncherService<T> {
     /// Copies an instance under a new name. The copy is built and checked in a
@@ -255,8 +255,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             (index, modpack::is_trusted_source as fn(&str) -> bool)
         };
         let chain = self.chain().await?;
-        let engine = TransferEngine::new(self.transport.clone(), self.transfer_concurrency().await)
-            .map_err(|error| ServiceError::Install(error.to_string()))?;
+        let engine = self.transfer_engine().await;
         let record = self
             .metered(
                 task,
@@ -357,8 +356,7 @@ impl<T: Transport + Clone> LauncherService<T> {
                 .expect_sha1(sha1)
                 .map_err(|error| ServiceError::Install(error.to_string()))?;
         }
-        let engine = TransferEngine::new(self.transport.clone(), self.transfer_concurrency().await)
-            .map_err(|error| ServiceError::Install(error.to_string()))?;
+        let engine = self.transfer_engine().await;
         self.metered(
             task,
             engine.subscribe(),

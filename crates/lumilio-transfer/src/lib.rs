@@ -1,16 +1,28 @@
+//! Downloads for the launcher and its updater: sources, verification and
+//! publication of files, independent of the launcher domain.
+
+mod budget;
+mod cancel;
 mod engine;
+mod error_text;
 mod files;
 mod http;
 mod request;
+pub mod resource_lock;
 mod sources;
 mod transport;
 
+#[cfg(test)]
+mod budget_tests;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
 mod user_agent_tests;
 
+pub use self::budget::ConnectionBudget;
+pub use self::cancel::CancellationToken;
 pub use self::engine::{TransferBatchReport, TransferEngine};
+pub use self::error_text::with_causes;
 pub use self::http::{DefaultTransport, FileTransport, HttpTransport};
 pub use self::request::{
     ContentDigest, RetryPolicy, SourceFailure, TransferError, TransferEvent, TransferOutcome,

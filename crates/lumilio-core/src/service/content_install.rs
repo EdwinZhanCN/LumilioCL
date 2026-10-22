@@ -10,7 +10,7 @@ use crate::discover::{
 };
 use crate::history::{ChangeKind, HistoryEvent, HistoryLog};
 use crate::instance::InstanceRecord;
-use crate::transfer::{SourceChain, TransferEngine, TransferRequest, Transport};
+use crate::transfer::{SourceChain, TransferRequest, Transport};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
@@ -86,8 +86,7 @@ impl<T: Transport + Clone> LauncherService<T> {
                 .expect_sha1(sha1)
                 .map_err(|error| ServiceError::Install(error.to_string()))?;
         }
-        let engine = TransferEngine::new(self.transport.clone(), self.transfer_concurrency().await)
-            .map_err(|error| ServiceError::Install(error.to_string()))?;
+        let engine = self.transfer_engine().await;
         self.metered(task, engine.subscribe(), engine.transfer(request, cancel))
             .await
             .map_err(ServiceError::from)?;
@@ -400,8 +399,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         if in_the_way {
             return Err(ContentError::Conflict(name).into());
         }
-        let engine = TransferEngine::new(self.transport.clone(), self.transfer_concurrency().await)
-            .map_err(|error| ServiceError::Install(error.to_string()))?;
+        let engine = self.transfer_engine().await;
         self.metered(task, engine.subscribe(), engine.transfer(request, cancel))
             .await
             .map_err(ServiceError::from)?;
@@ -523,8 +521,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             current_sha1,
             latest: version,
         };
-        let engine = TransferEngine::new(self.transport.clone(), self.transfer_concurrency().await)
-            .map_err(|error| ServiceError::Install(error.to_string()))?;
+        let engine = self.transfer_engine().await;
         let written = self
             .metered(
                 task,

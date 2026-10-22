@@ -32,8 +32,6 @@ pub struct LaunchRequest {
     /// How the game starts (launcher defaults; the instance's own JVM
     /// arguments are applied on top).
     pub tuning: LaunchTuning,
-    /// Files downloaded at once; `None` leaves it to the source chain.
-    pub download_concurrency: Option<u32>,
     /// Where to go once the game is up; `None` is the main menu.
     pub quick_play: Option<QuickPlay>,
 }

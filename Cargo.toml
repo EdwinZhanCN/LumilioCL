@@ -5,6 +5,7 @@ members = [
     "crates/lumilio-docgen",
     "crates/lumilio-ui",
     "crates/lumilio-updater",
+    "crates/lumilio-transfer",
     "crates/lumilio-plugin-api",
     "crates/lumilio-nbt",
     "crates/lumilio-anvil",
@@ -51,6 +52,7 @@ keyring = "4.2"
 log = "0.4.34"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 lumilio-core = { path = "crates/lumilio-core" }
+lumilio-transfer = { path = "crates/lumilio-transfer" }
 lumilio-plugin-api = { path = "crates/lumilio-plugin-api" }
 lumilio-plugin-crash-analyzer = { path = "crates/lumilio-plugin-crash-analyzer" }
 lumilio-plugin-litematica = { path = "crates/lumilio-plugin-litematica" }

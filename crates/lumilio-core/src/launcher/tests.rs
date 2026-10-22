@@ -94,7 +94,6 @@ fn world(java_script: &str) -> World {
             default_max_memory_mb: Some(1024),
             default_min_memory_mb: None,
             tuning: LaunchTuning::default(),
-            download_concurrency: None,
             quick_play: None,
         },
         root,

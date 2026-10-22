@@ -4609,6 +4609,7 @@ dependencies = [
  "lumilio-plugin-litematica",
  "lumilio-plugin-modrinth",
  "lumilio-schematic",
+ "lumilio-transfer",
  "markdown",
  "markup5ever_rcdom",
  "md-5 0.11.0",
@@ -4769,6 +4770,19 @@ name = "lumilio-skin-render"
 version = "0.2.1"
 dependencies = [
  "image 0.25.10",
+]
+
+[[package]]
+name = "lumilio-transfer"
+version = "0.2.1"
+dependencies = [
+ "futures-util",
+ "reqwest",
+ "sha1 0.11.0",
+ "sha2 0.11.0",
+ "tempfile",
+ "tokio",
+ "url",
 ]
 
 [[package]]

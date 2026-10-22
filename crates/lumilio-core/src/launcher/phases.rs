@@ -18,7 +18,7 @@ use crate::loader::{LAUNCHABLE_LOADERS, normalize_profile};
 use crate::process::{GameExit, GameOptions, LogStream};
 use crate::release::{ReleaseManifest, ReleaseSet};
 use crate::repair::InstallationVerifier;
-use crate::transfer::{TransferEngine, TransferEvent, TransferRequest, Transport};
+use crate::transfer::{TransferEvent, TransferRequest, Transport};
 use crate::tuning::QuickPlay;
 use crate::{forge_install, process};
 use tokio::sync::{broadcast, mpsc};
@@ -203,7 +203,8 @@ where
             requests.push(transfer);
         }
         if !requests.is_empty() {
-            let engine = TransferEngine::new(self.transport.clone(), self.concurrency)
+            let engine = self
+                .transfer_engine()
                 .map_err(|error| LaunchServiceError::Install(InstallError::from(error)))?;
             let report = engine.transfer_batch(requests, cancel.clone()).await;
             if cancel.is_cancelled() {
@@ -668,7 +669,8 @@ where
         updates: &mpsc::UnboundedSender<LaunchUpdate>,
         cancel: &CancellationToken,
     ) -> Result<(), LaunchServiceError> {
-        let engine = TransferEngine::new(self.transport.clone(), self.concurrency)
+        let engine = self
+            .transfer_engine()
             .map_err(|error| LaunchServiceError::Install(InstallError::from(error)))?;
         let mut transfers = engine.subscribe();
         let installer = Installer::new(engine);

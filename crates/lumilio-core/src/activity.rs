@@ -5,53 +5,12 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 
-use tokio::sync::{broadcast, watch};
+pub use lumilio_transfer::CancellationToken;
+use tokio::sync::broadcast;
 use tokio::task::JoinSet;
 
 type ActivityFuture = Pin<Box<dyn Future<Output = Result<(), String>> + Send>>;
 type ActivityAction = Arc<dyn Fn(ActivityContext) -> ActivityFuture + Send + Sync>;
-
-#[derive(Clone, Debug)]
-pub struct CancellationToken {
-    cancelled: Arc<watch::Sender<bool>>,
-}
-
-impl CancellationToken {
-    #[must_use]
-    pub fn new() -> Self {
-        let (sender, _receiver) = watch::channel(false);
-        Self {
-            cancelled: Arc::new(sender),
-        }
-    }
-
-    pub fn cancel(&self) {
-        self.cancelled.send_replace(true);
-    }
-
-    #[must_use]
-    pub fn is_cancelled(&self) -> bool {
-        *self.cancelled.borrow()
-    }
-
-    pub async fn cancelled(&self) {
-        if self.is_cancelled() {
-            return;
-        }
-        let mut receiver = self.cancelled.subscribe();
-        while !*receiver.borrow() {
-            if receiver.changed().await.is_err() {
-                return;
-            }
-        }
-    }
-}
-
-impl Default for CancellationToken {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ActivityState {

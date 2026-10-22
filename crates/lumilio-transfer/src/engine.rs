@@ -6,19 +6,22 @@ use super::request::{
     SourceFailure, TransferError, TransferEvent, TransferOutcome, TransferRequest,
 };
 use super::transport::Transport;
-use crate::activity::CancellationToken;
+use crate::CancellationToken;
+use crate::budget::ConnectionBudget;
 use futures_util::stream::StreamExt;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fmt::Debug;
 use std::sync::Arc;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
-use tokio::sync::{Semaphore, broadcast};
+use tokio::sync::broadcast;
 use tokio::task::JoinSet;
 
+/// Downloads files under a [`ConnectionBudget`]. Engines made with one
+/// budget share its connections; each reports only its own transfers.
 pub struct TransferEngine<T> {
     pub(super) transport: Arc<T>,
-    pub(super) concurrency: Arc<Semaphore>,
+    pub(super) budget: ConnectionBudget,
     pub(super) events: broadcast::Sender<TransferEvent>,
 }
 
@@ -26,7 +29,7 @@ impl<T> Clone for TransferEngine<T> {
     fn clone(&self) -> Self {
         Self {
             transport: self.transport.clone(),
-            concurrency: self.concurrency.clone(),
+            budget: self.budget.clone(),
             events: self.events.clone(),
         }
     }
@@ -36,18 +39,22 @@ impl<T> TransferEngine<T>
 where
     T: Transport,
 {
+    /// An engine with a budget of its own.
     pub fn new(transport: T, concurrency: usize) -> Result<Self, TransferError> {
-        if concurrency == 0 {
-            return Err(TransferError::InvalidRequest(
-                "transfer concurrency must be positive".to_owned(),
-            ));
-        }
+        Ok(Self::with_budget(
+            transport,
+            ConnectionBudget::new(concurrency)?,
+        ))
+    }
+
+    #[must_use]
+    pub fn with_budget(transport: T, budget: ConnectionBudget) -> Self {
         let (events, _) = broadcast::channel(512);
-        Ok(Self {
+        Self {
             transport: Arc::new(transport),
-            concurrency: Arc::new(Semaphore::new(concurrency)),
+            budget,
             events,
-        })
+        }
     }
 
     #[must_use]
@@ -80,7 +87,7 @@ where
 
         let permit = tokio::select! {
             () = cancellation.cancelled() => return self.finish_error(&id, TransferError::Cancelled),
-            permit = self.concurrency.acquire() => permit.map_err(|error| {
+            permit = self.budget.acquire() => permit.map_err(|error| {
                 TransferError::InvalidRequest(format!("transfer scheduler is closed: {error}"))
             })?,
         };
@@ -342,7 +349,7 @@ where
         }
 
         let mut results = BTreeMap::new();
-        let mut join_set = JoinSet::new();
+        let mut pending = VecDeque::new();
         for request in requests {
             if duplicate_ids.contains(&request.id) {
                 results.insert(
@@ -354,13 +361,25 @@ where
                 );
                 continue;
             }
-            let id = request.id.clone();
-            let engine = self.clone();
-            let cancellation = cancellation.clone();
-            join_set.spawn(async move { (id, engine.transfer(request, cancellation).await) });
+            pending.push_back(request);
         }
 
-        while let Some(joined) = join_set.join_next().await {
+        // A batch queues no more transfers than the budget has connections,
+        // so batches sharing a budget take turns instead of one waiting for
+        // all of another's files.
+        let mut join_set = JoinSet::new();
+        loop {
+            while join_set.len() < self.budget.size()
+                && let Some(request) = pending.pop_front()
+            {
+                let id = request.id.clone();
+                let engine = self.clone();
+                let cancellation = cancellation.clone();
+                join_set.spawn(async move { (id, engine.transfer(request, cancellation).await) });
+            }
+            let Some(joined) = join_set.join_next().await else {
+                break;
+            };
             match joined {
                 Ok((id, result)) => {
                     results.insert(id, result);
