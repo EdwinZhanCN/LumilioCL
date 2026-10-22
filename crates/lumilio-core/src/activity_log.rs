@@ -85,6 +85,9 @@ pub enum RetryAction {
         /// Absent in entries written before there was a choice.
         #[serde(default)]
         source: crate::java_runtime::JavaSource,
+        /// Absent in entries written before Intel-only downloads.
+        #[serde(default)]
+        build: crate::java_runtime::JavaBuild,
     },
     SaveVersion {
         #[serde(default = "default_source")]

@@ -225,6 +225,11 @@ impl LibraryDependency {
         self.extract.as_ref()
     }
 
+    /// The native variants it names per system (`natives-osx`, …).
+    pub(crate) fn native_classifiers(&self) -> impl Iterator<Item = &str> {
+        self.natives.values().map(String::as_str)
+    }
+
     pub(crate) fn resolve_file(&self, host: &HostProfile) -> ResolvedLibraryFile {
         let native_variant = self.native_variant(host);
         let raw = self.downloads.as_ref().and_then(|downloads| {

@@ -175,3 +175,69 @@ fn native_means_the_hosts_own_architecture() {
     assert!(arm.installed_under(dir.path()));
     assert!(!arm.installed_under(&dir.path().join("elsewhere")));
 }
+
+#[test]
+fn only_apple_silicon_without_rosetta_lacks_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let installed = dir.path().join("libRosettaRuntime");
+    fs::write(&installed, "").unwrap();
+    let missing = dir.path().join("none");
+    let mac_arm = HostProfile::new(PlatformFamily::MacOs, MachineArchitecture::Arm64, "");
+    let mac_intel = HostProfile::new(PlatformFamily::MacOs, MachineArchitecture::X86_64, "");
+    let windows_arm = HostProfile::new(PlatformFamily::Windows, MachineArchitecture::Arm64, "");
+    assert!(rosetta_missing_at(&mac_arm, &missing));
+    assert!(!rosetta_missing_at(&mac_arm, &installed));
+    assert!(!rosetta_missing_at(&mac_intel, &missing));
+    assert!(!rosetta_missing_at(&windows_arm, &missing));
+}
+
+#[test]
+fn without_os_arch_the_executable_header_tells_the_architecture() {
+    let dir = tempfile::tempdir().unwrap();
+    let with_launcher = |name: &str, launcher: &[u8]| {
+        let home = dir.path().join(name);
+        fs::create_dir_all(home.join("bin")).unwrap();
+        fs::write(home.join("bin/java"), launcher).unwrap();
+        fs::write(home.join("release"), "JAVA_VERSION=\"17.0.15\"\n").unwrap();
+        JavaRuntime::inspect(&home).unwrap()
+    };
+    let mach_o = |cpu: u32| [&[0xcf, 0xfa, 0xed, 0xfe][..], &cpu.to_le_bytes()].concat();
+    let elf = |machine: u16| {
+        let mut header = vec![0x7f, b'E', b'L', b'F', 2, 1];
+        header.resize(18, 0);
+        header.extend(machine.to_le_bytes());
+        header
+    };
+    let pe = |machine: u16| {
+        let mut header = b"MZ".to_vec();
+        header.resize(0x3c, 0);
+        header.extend(0x80_u32.to_le_bytes());
+        header.resize(0x80, 0);
+        header.extend(b"PE\0\0");
+        header.extend(machine.to_le_bytes());
+        header
+    };
+    let universal = [0xca, 0xfe, 0xba, 0xbe, 0, 0, 0, 2];
+    for (launcher, expected) in [
+        (mach_o(0x0100_0007), Some("x86_64")),
+        (mach_o(0x0100_000c), Some("aarch64")),
+        (elf(0x3e), Some("x86_64")),
+        (elf(0xb7), Some("aarch64")),
+        (pe(0x8664), Some("x86_64")),
+        (pe(0xaa64), Some("aarch64")),
+        (pe(0x014c), Some("x86")),
+        (universal.to_vec(), None),
+        (b"#!/bin/sh\n".to_vec(), None),
+        (Vec::new(), None),
+    ] {
+        let runtime = with_launcher(&format!("{expected:?}-{}", launcher.len()), &launcher);
+        assert_eq!(runtime.architecture(), expected, "{launcher:02x?}");
+    }
+    // The release file still wins when it says.
+    let home = install_as(dir.path(), "said", "21", "x", "x86_64");
+    fs::write(home.join("bin/java"), mach_o(0x0100_000c)).unwrap();
+    assert_eq!(
+        JavaRuntime::inspect(&home).unwrap().architecture(),
+        Some("x86_64")
+    );
+}

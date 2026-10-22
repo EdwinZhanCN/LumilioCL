@@ -311,7 +311,7 @@ pub(super) fn write_instance(
                     )
                 }
                 InstanceIntent::InstallJava(major) => {
-                    service.install_java(major, cancel).await?;
+                    service.install_instance_java(&id, major, cancel).await?;
                     done(
                         tr!("instance-java-installed"),
                         vec![Section::Problems, Section::Java],

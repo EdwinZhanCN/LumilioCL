@@ -85,16 +85,18 @@ fn apple_silicon_falls_back_to_the_intel_runtime_only_where_no_native_one_exists
     let arm = HostProfile::new(PlatformFamily::MacOs, MachineArchitecture::Arm64, "");
     assert_eq!(platform_keys(&arm), ["mac-os-arm64", "mac-os"]);
     assert_eq!(
-        choose_for_host(&index, &arm, Some(8)).unwrap().component,
+        choose_for_host(&index, &arm, Some(8), JavaBuild::Any)
+            .unwrap()
+            .component,
         "jre-legacy"
     );
-    let native = choose_for_host(&index, &arm, Some(21)).unwrap();
+    let native = choose_for_host(&index, &arm, Some(21), JavaBuild::Any).unwrap();
     assert_eq!(
         native.manifest.url,
         "https://launchermeta.mojang.com/21.0.7"
     );
     assert_eq!(
-        choose_for_host(&index, &arm, Some(17)),
+        choose_for_host(&index, &arm, Some(17), JavaBuild::Any),
         Err(JavaRuntimeError::NoSuchRuntime(Some(17)))
     );
     // The launcher helper in the index is not a Java.
@@ -107,7 +109,72 @@ fn apple_silicon_falls_back_to_the_intel_runtime_only_where_no_native_one_exists
         "",
     );
     assert_eq!(
-        choose_for_host(&index, &riscv, Some(21)),
+        choose_for_host(&index, &riscv, Some(21), JavaBuild::Any),
+        Err(JavaRuntimeError::UnsupportedPlatform)
+    );
+}
+
+#[test]
+fn an_intel_build_comes_only_from_the_intel_runtimes_into_its_own_folder() {
+    let entry = |platform: &str, name: &str| {
+        format!(
+            r#"[{{"manifest":{{"url":"https://launchermeta.mojang.com/{platform}/{name}","sha1":"aa","size":1}},"version":{{"name":"{name}"}}}}]"#
+        )
+    };
+    let index = format!(
+        r#"{{"mac-os-arm64":{{"java-runtime-gamma":{arm_gamma},"java-runtime-delta":{arm_delta}}},
+           "mac-os":{{"jre-legacy":{legacy},"java-runtime-gamma":{gamma},"java-runtime-delta":{delta}}},
+           "windows-arm64":{{"java-runtime-gamma":{arm_gamma}}},
+           "windows-x64":{{"java-runtime-gamma":{win_gamma}}}}}"#,
+        arm_gamma = entry("mac-os-arm64", "17.0.15"),
+        arm_delta = entry("mac-os-arm64", "21.0.7"),
+        legacy = entry("mac-os", "1.8.0_74"),
+        gamma = entry("mac-os", "17.0.15"),
+        delta = entry("mac-os", "21.0.7"),
+        win_gamma = entry("windows-x64", "17.0.15"),
+    );
+    let mac_arm = HostProfile::new(PlatformFamily::MacOs, MachineArchitecture::Arm64, "");
+    let pick = |host: &HostProfile, wanted, build| {
+        choose_for_host(&index, host, wanted, build)
+            .map(|choice| (choice.manifest.url.clone(), choice.folder(host)))
+            .unwrap()
+    };
+    let at =
+        |platform: &str, name: &str| format!("https://launchermeta.mojang.com/{platform}/{name}");
+    // Java 17 exists for both: Any takes the native one, Intel the other,
+    // and the two do not share a folder.
+    assert_eq!(
+        pick(&mac_arm, Some(17), JavaBuild::Any),
+        (
+            at("mac-os-arm64", "17.0.15"),
+            "java-runtime-gamma".to_owned()
+        )
+    );
+    assert_eq!(
+        pick(&mac_arm, Some(17), JavaBuild::Intel),
+        (
+            at("mac-os", "17.0.15"),
+            "java-runtime-gamma-mac-os".to_owned()
+        )
+    );
+    assert_eq!(
+        pick(&mac_arm, Some(8), JavaBuild::Intel),
+        (at("mac-os", "1.8.0_74"), "jre-legacy-mac-os".to_owned())
+    );
+    let windows_arm = HostProfile::new(PlatformFamily::Windows, MachineArchitecture::Arm64, "");
+    assert_eq!(
+        pick(&windows_arm, Some(17), JavaBuild::Intel).0,
+        at("windows-x64", "17.0.15")
+    );
+    // On an Intel Mac the Intel runtime is the native one.
+    let mac_intel = HostProfile::new(PlatformFamily::MacOs, MachineArchitecture::X86_64, "");
+    assert_eq!(
+        pick(&mac_intel, Some(17), JavaBuild::Intel),
+        (at("mac-os", "17.0.15"), "java-runtime-gamma".to_owned())
+    );
+    let linux_arm = HostProfile::new(PlatformFamily::Linux, MachineArchitecture::Arm64, "");
+    assert_eq!(
+        choose_for_host(&index, &linux_arm, Some(17), JavaBuild::Intel),
         Err(JavaRuntimeError::UnsupportedPlatform)
     );
 }

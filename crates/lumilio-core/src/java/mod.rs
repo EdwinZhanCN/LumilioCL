@@ -9,7 +9,9 @@ use std::path::{Path, PathBuf};
 
 use crate::environment::HostProfile;
 
-pub use self::choice::{JavaChoice, JavaNeeds, JavaRule, RuleStrength, choose, install_major};
+pub use self::choice::{
+    JavaChoice, JavaNeeds, JavaRule, RuleStrength, choose, install_build, install_major,
+};
 pub use self::locator::JavaLocator;
 
 /// A Java installation the launcher can start the game with.
@@ -40,13 +42,17 @@ impl JavaRuntime {
             .find(|path| path.is_file())?;
         Some(Self {
             home: home.to_owned(),
-            executable,
             major,
             version,
             vendor: properties
                 .get("IMPLEMENTOR")
                 .and_then(|vendor| normalize_vendor(vendor)),
-            architecture: properties.get("OS_ARCH").cloned(),
+            // Mojang's runtimes other than Java 8 do not say.
+            architecture: properties
+                .get("OS_ARCH")
+                .cloned()
+                .or_else(|| executable_architecture(&executable).map(str::to_owned)),
+            executable,
         })
     }
 
@@ -109,6 +115,23 @@ impl JavaRuntime {
     }
 }
 
+/// Rosetta 2's runtime, installed with it.
+const ROSETTA_RUNTIME: &str = "/Library/Apple/usr/libexec/oah/libRosettaRuntime";
+
+/// Whether `host` is Apple silicon without Rosetta 2, so an Intel Java
+/// cannot start there.
+#[must_use]
+pub fn rosetta_missing(host: &HostProfile) -> bool {
+    rosetta_missing_at(host, Path::new(ROSETTA_RUNTIME))
+}
+
+fn rosetta_missing_at(host: &HostProfile, runtime: &Path) -> bool {
+    use crate::environment::{MachineArchitecture, PlatformFamily};
+    *host.platform() == PlatformFamily::MacOs
+        && *host.architecture() == MachineArchitecture::Arm64
+        && !runtime.is_file()
+}
+
 /// The feature-release number of a Java version string.
 ///
 /// Versions before 9 are written `1.<major>.…` (`1.8.0_412` is 8); later ones
@@ -120,6 +143,50 @@ pub fn parse_major(version: &str) -> Option<u32> {
     let rest = version.strip_prefix("1.").unwrap_or(version);
     let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
     digits.parse().ok()
+}
+
+/// The architecture a `java` executable is built for, from its Mach-O, PE or
+/// ELF header: `x86_64`, `aarch64` or `x86`. `None` for a universal binary,
+/// which runs natively, and for anything unreadable.
+fn executable_architecture(executable: &Path) -> Option<&'static str> {
+    use std::io::Read;
+    let mut header = Vec::new();
+    fs::File::open(executable)
+        .ok()?
+        .take(1024)
+        .read_to_end(&mut header)
+        .ok()?;
+    let u16_at = |at: usize| Some(u16::from_le_bytes(header.get(at..at + 2)?.try_into().ok()?));
+    let u32_at = |at: usize| Some(u32::from_le_bytes(header.get(at..at + 4)?.try_into().ok()?));
+    match header.get(..4)? {
+        // 64-bit Mach-O: the CPU type follows the magic.
+        [0xcf, 0xfa, 0xed, 0xfe] => match u32_at(4)? {
+            0x0100_0007 => Some("x86_64"),
+            0x0100_000c => Some("aarch64"),
+            _ => None,
+        },
+        // Little-endian ELF: the machine is at 18.
+        [0x7f, b'E', b'L', b'F'] if header.get(5) == Some(&1) => match u16_at(18)? {
+            0x03 => Some("x86"),
+            0x3e => Some("x86_64"),
+            0xb7 => Some("aarch64"),
+            _ => None,
+        },
+        // PE: 0x3c holds where "PE\0\0" starts; the machine follows it.
+        [b'M', b'Z', ..] => {
+            let pe = usize::try_from(u32_at(0x3c)?).ok()?;
+            if header.get(pe..pe + 4)? != b"PE\0\0" {
+                return None;
+            }
+            match u16_at(pe + 4)? {
+                0x014c => Some("x86"),
+                0x8664 => Some("x86_64"),
+                0xaa64 => Some("aarch64"),
+                _ => None,
+            }
+        }
+        _ => None,
+    }
 }
 
 /// Parses the `KEY="value"` lines of a JDK `release` file.

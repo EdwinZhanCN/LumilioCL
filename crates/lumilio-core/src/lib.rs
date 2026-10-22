@@ -137,8 +137,8 @@ pub use java::{
     JavaChoice, JavaLocator, JavaNeeds, JavaRule, JavaRuntime, RuleStrength, choose as choose_java,
     install_major as java_install_major, parse_major as parse_java_major,
 };
-pub use java_runtime::JavaSource;
 pub use java_runtime::graalvm::LICENSE_URL as GRAALVM_LICENSE_URL;
+pub use java_runtime::{JavaBuild, JavaSource};
 pub use launch::{
     LaunchContext, LaunchDirectories, LaunchError, LaunchPlan, NativeArchive, RequiredDownload,
 };

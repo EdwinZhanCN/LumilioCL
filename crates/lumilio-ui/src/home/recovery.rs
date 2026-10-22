@@ -73,6 +73,7 @@ fn problem_sentence(problem: &LaunchProblem) -> String {
         }
         LaunchProblem::NoJava(None) => tr!("home-recovery-no-java").to_owned(),
         LaunchProblem::JavaDownload => tr!("home-recovery-java-download").to_owned(),
+        LaunchProblem::RosettaMissing => tr!("home-recovery-rosetta-missing").to_owned(),
         LaunchProblem::BeforeLaunch(Some(code)) => {
             tr!("home-recovery-before-launch-code", code = code.to_string())
         }

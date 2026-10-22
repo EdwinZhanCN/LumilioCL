@@ -135,6 +135,7 @@ home-recovery-reason = { $reason }。
 home-recovery-no-java = 没有能运行这个游戏的 Java。
 home-recovery-no-java-major = 这个游戏需要 Java { $major }，还没有装。
 home-recovery-java-download = 没能下载 Java。
+home-recovery-rosetta-missing = 这个版本要用 Intel 版 Java，需要 Rosetta 2：在「终端」里运行 softwareupdate --install-rosetta 安装后再试。
 home-recovery-before-launch = 启动前命令没有成功。
 home-recovery-before-launch-code = 启动前命令没有成功（退出代码 { $code }）。
 home-recovery-world-missing = 找不到世界「{ $world }」。

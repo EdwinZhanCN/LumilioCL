@@ -151,6 +151,7 @@ home-recovery-reason = { $reason }.
 home-recovery-no-java = No installed Java can run this game.
 home-recovery-no-java-major = This game needs Java { $major }, which isn't installed.
 home-recovery-java-download = Java couldn't be downloaded.
+home-recovery-rosetta-missing = This version needs an Intel Java, which needs Rosetta 2. Run softwareupdate --install-rosetta in Terminal, then try again.
 home-recovery-before-launch = The before-launch command didn't succeed.
 home-recovery-before-launch-code = The before-launch command didn't succeed (exit code { $code }).
 home-recovery-world-missing = Can't find the world “{ $world }”.

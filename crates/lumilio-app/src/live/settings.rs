@@ -600,9 +600,14 @@ pub(super) fn install_java(
     let service = wiring.backend.service.clone();
     let handle = wiring.backend.spawn(async move {
         let cancel = CancellationToken::new();
+        let build = lumilio_core::JavaBuild::Any;
         match source {
-            Some(source) => service.install_java_from(source, major, cancel).await,
-            None => service.install_java(major, cancel).await,
+            Some(source) => {
+                service
+                    .install_java_from(source, major, build, cancel)
+                    .await
+            }
+            None => service.install_java(major, build, cancel).await,
         }
     });
     let wiring = wiring.clone();
