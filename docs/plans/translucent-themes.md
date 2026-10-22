@@ -2,7 +2,7 @@
 
 # 半透明主题、无壁纸首页与新配色
 
-Status: InProgress
+Status: Completed
 
 首页壁纸增加「无壁纸」；主题的机身可以半透明，按键与显示屏保持实心；内置白桦、深板岩、玻璃、遮光玻璃四套主题。依赖 global-context 合入（首页结构已改）。
 
@@ -28,7 +28,7 @@ Status: InProgress
   Acceptance: 作为启动器自己的主题文件（themes/lumilio.json）内置，名称 Birch 与 Deepslate，强调色为信号橙（D4）。每套颜色给全并通过现有主题测试的对比度检查；网站的内置主题导出同步。
 - [x] T5 — 文档 (Completed)
   Acceptance: design-language §5「Appearance」写明无壁纸首页与半透明规则，§12 的颜色表说明哪些令牌可以透明；网站中英主题文档写明新增字段规则与内置主题；just ia、just plans、just docs 通过。
-- [ ] T6 — Project Maintainer 实机检查 (Proposed)
+- [x] T6 — Project Maintainer 实机检查 (Completed)
   Acceptance: 合入 main 并随 0.2.0 发布前，在 Mac 上检查四套主题与三种壁纸的组合：毛玻璃下文字与面板的可读性，实心零件在透明机身上是否协调，无壁纸首页各状态是否清楚。结果记入 validation。
 
 ## Validation
@@ -36,9 +36,9 @@ Status: InProgress
 - T1–T5 的测试通过，并各自证明能失败。
   Result: 2026-10-21（T2）：theme::tests 的 only_the_body_may_be_translucent 与 a_blurred_theme_turns_opaque_where_the_system_cannot_blur 通过，临时去掉 solidify 或让 without_blur 总是返回原样时分别按预期失败；tune_applies_the_chosen_theme_per_appearance_and_the_scale 原先断言半透明的强调色原样传到界面，按 D1 改为不透明。网站主题编辑器从 themes.generated.json 读到同一份可透明颜色表，model.test.ts 新增对应用例，pnpm check 无错误。 2026-10-21（T1）：core 的 the_wallpaper_reads_settings_from_before_bare_home 检查壁纸仍按原来的文件名写入，旧设置读出原选择，三种选择写入后读回相同；无壁纸写作 "bare"，存下的图片总以 wallpaper- 开头，不会撞名。UI 的 a_bare_home_puts_its_title_at_the_top 检查无壁纸时标题在顶部、有世界时在世界底部，临时让无壁纸也画世界时按预期失败。lumilio-core、lumilio-ui、lumilio-app 共 1404 项通过，clippy 无警告。 2026-10-21（T3）：内置 Glass 与 Tinted Glass 由 Aluminium、Night 按 D6 生成（页面与细线 75%，面板 80%，blurred）。glass_meets_every_contrast_rule_over_a_desktop_of_its_tone 把页面叠在同色调桌面上、面板叠在页面上，逐条检查对比度规则，临时把页面降到 30% 时按预期失败。外观设置在选中半透明主题时提示同色调桌面与「不用壁纸」；网站主题数据与中英主题文档列出两套主题，pnpm check、vitest 与 build 通过。lumilio-core、lumilio-ui、lumilio-app、lumilio-backdrop 共 1409 项通过，clippy 无警告。 2026-10-21（T4、T5）：Birch（暖色米白）与 Deepslate（偏冷石板灰）写在 crates/lumilio-ui/themes/lumilio.json，颜色先按对比度规则计算定稿，再由 the_own_palettes_are_complete_and_meet_every_contrast_rule 检查完整与对比度、强调色仍为信号橙；临时把 Birch 的说明文字调浅时按预期失败（muted-page 2.39:1）。白字在橙色上 3.55:1 与 3.12:1，在既有例外范围内。没有先在网站编辑器里调色：颜色由规则直接算出，网站导出与中英主题文档同步。design-language §5 写明无壁纸首页、半透明规则与壁纸融进玻璃，§12 写明只有 page、panel、hairline 可带透明度以及三对自有主题。
 - just check 通过（由 Project Maintainer 运行）。
-  Result: pending
+  Result: 2026-10-21：Project Maintainer 没有在本地运行；#63 合并 main 后的 b0e9958 上 CI 的 rust 作业（just ci，包含 just check）通过。
 - Project Maintainer 实机检查通过（T6）。
-  Result: pending
+  Result: 2026-10-21：Project Maintainer 实机看过半透明主题的效果，确认满意。
 
 ## Decision D1
 
@@ -98,5 +98,9 @@ Consequences: 主题说明提示玻璃适合亮色桌面、遮光玻璃适合暗
 - [crates/lumilio-ui/src/theme/look.rs](../../crates/lumilio-ui/src/theme/look.rs)
 - [crates/lumilio-core/src/tuning.rs](../../crates/lumilio-core/src/tuning.rs)
 - [Plan global-context](global-context.md)
+
+## Outcome
+
+#63 合入 main（b140179），在 0.2.0 发布 PR #66 的范围里。只有机身（page、panel、hairline）可以半透明，能模糊的系统透出背景模糊，其余零件与不能模糊的系统保持不透明；主页可以不用壁纸；内置 Glass、Tinted Glass、Birch、Deepslate。
 
 - Lesson: 半透明主题从未真正透出窗口：框架的根节点用 tokens.background（主题没有设置，保持默认的不透明色）铺满窗口，外壳又铺了一层页面色；原有测试只检查主题里的颜色值，没检查实际画到窗口上的颜色，直到实机比较方案时才发现。另外 GPUI 在当前 macOS 上的 blurred 没有模糊。防护：the_root_paints_the_window_with_the_page_colour 检查根节点画出的颜色（去掉 fork 的改动时失败）；a_translucent_page_colour_and_the_window_material_reach_the_window 检查对话框、菜单、通知与导航的颜色不透明（临时让菜单用半透明面板色时失败）。模糊无法在无界面测试里检查，由 T6 实机检查。

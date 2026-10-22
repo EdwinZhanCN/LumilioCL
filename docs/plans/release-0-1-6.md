@@ -2,7 +2,7 @@
 
 # 准备发布 0.1.6
 
-Status: InProgress
+Status: Completed
 
 0.1.6 汇总 v0.1.5 之后合入 main 的全部改动：投影工作室、世界与游戏列表按信息类型显示（MOTD 用 Monocraft 像素字体）、工作室控件与布局整理、zip 9.0.3，以及精简的 README 和官网首次打开提示。Project Maintainer 只在自己的 Mac 上实测。
 
@@ -21,19 +21,19 @@ Status: InProgress
 
 - [x] R1 — 更新版本、计划与发布说明 (Completed)
   Acceptance: 工作区版本为 0.1.6，Cargo.lock 同步，release-0-1-5、schematic-studio、list-facts 记下实测结果，release-notes/0.1.6.md 写好，本计划与投影生成。
-- [ ] R2 — 通过 PR 合入版本更新 (Proposed)
+- [x] R2 — 通过 PR 合入版本更新 (Completed)
   Acceptance: rust、plans 检查通过后合入 main，合入后 main 的 CI 通过。
-- [ ] R3 — 打 v0.1.6 标签并发布 (Proposed)
+- [x] R3 — 打 v0.1.6 标签并发布 (Completed)
   Acceptance: v0.1.6 标签指向合入后的提交，Release 工作流生成草稿；Project Maintainer 在正文末行填上 PR 编号后发布。
-- [ ] R4 — 从 0.1.5 更新后在 Mac 上检查 (Proposed)
+- [x] R4 — 从 0.1.5 更新后在 Mac 上检查 (Completed)
   Acceptance: 从 0.1.5 自动更新到 0.1.6，重启后弹出一次「已更新到 LumilioCL 0.1.6」，投影工作室能下载方块资源并预览。
 
 ## Validation
 
 - 版本更新的本地与 PR 检查通过。
-  Result: pending
+  Result: PR #45 与英文发布说明 PR #46 的检查通过后合入 main；v0.1.6 标签指向 #46 的提交 40a02dfd579bfadc6071e65568b6182acc694290。该提交在 main 上的 CI 的 rust 作业失败：后端测试的 5 秒限时在下载方块资源的测试上超时，PR #47 去掉限时后 main 恢复通过。Release 工作流 38971374403 成功，2026-10-16 正式发布，正文末行填上了 PR #46。
 - 0.1.5 → 0.1.6 在 Mac 上更新后显示一次更新内容，工作室可用。
-  Result: pending
+  Result: Project Maintainer 已在 Mac 上从 0.1.5 更新到 0.1.6，确认发布完成。
 
 ## Decision release-scope
 
@@ -56,4 +56,10 @@ Consequences: schematic-studio T19 不再要求 Windows 与 Linux 各做一次�
 - release-notes/0.1.6.md
 - .github/release-template.md
 
+## Outcome
+
+v0.1.6 于 2026-10-16 正式发布，Project Maintainer 已在 Mac 上更新到 0.1.6。
+
 - Lesson: v0.1.5 正文末行的「PR #」没有补上编号就发布了：模板里空的「PR #」看起来像已经写完。防护：.github/release-template.md 改为「PR #<N>」占位，没填时一眼可见。
+
+- Lesson: v0.1.6 标签在合入提交的 main CI 结束前就推送了，那次 CI 因后端测试的 5 秒限时超时而失败，发布却照常完成。原因由 PR #47 修正；防护：release-0-2-0 R3 要求合入提交在 main 上的 CI 通过后再打标签。

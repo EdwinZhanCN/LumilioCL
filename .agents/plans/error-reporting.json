@@ -46,8 +46,8 @@
     {
       "id": "T7",
       "title": "Project Maintainer 在真实启动器上看一次 T1–T3。",
-      "status": "in_progress",
-      "acceptance": "行为已由模拟测试覆盖（见验证）。真实窗口用开发钩子 LUMILIO_HOME_RECOVERY=failed|details|crashed|crashed-details|away 在临时 LUMILIO_HOME 中截图，Project Maintainer 看过截图后确认样子。剩下 Windows 上运行中点停止回到继续：CI 只有 Ubuntu，Windows 只由 killed 标记的单元测试覆盖。"
+      "status": "completed",
+      "acceptance": "行为已由模拟测试覆盖（见验证）。真实窗口用开发钩子 LUMILIO_HOME_RECOVERY=failed|details|crashed|crashed-details|away 在临时 LUMILIO_HOME 中截图，Project Maintainer 看过截图后确认样子。Windows 上运行中点停止回到继续交给社区反馈：CI 只有 Ubuntu，Windows 由 killed 标记的单元测试覆盖。"
     },
     {
       "id": "T4",
@@ -75,7 +75,7 @@
     },
     {
       "criterion": "T1–T3、T8 合入 main，真实窗口的样子经 Project Maintainer 确认（T7）。",
-      "result": "2026-10-21：#62 合并 main（含 global-context 的 #59）后 squash 合入。Project Maintainer 运行的 just check 通过（1784 项测试）。合并后在临时 LUMILIO_HOME 中用 LUMILIO_HOME_RECOVERY 重拍 failed、details、crashed、crashed-details、away 五种情形，Project Maintainer 看过确认：失败说原因不说步骤，崩溃说明不重复标题，技术详情弹出可复制的原始原因或打开诊断页，在游戏库时失败浮出 toast。T7 剩下 Windows 上运行中点停止回到继续。"
+      "result": "2026-10-21：#62 合并 main（含 global-context 的 #59）后 squash 合入。Project Maintainer 运行的 just check 通过（1784 项测试）。合并后在临时 LUMILIO_HOME 中用 LUMILIO_HOME_RECOVERY 重拍 failed、details、crashed、crashed-details、away 五种情形，Project Maintainer 看过确认：失败说原因不说步骤，崩溃说明不重复标题，技术详情弹出可复制的原始原因或打开诊断页，在游戏库时失败浮出 toast。Windows 上运行中点停止回到继续交给社区反馈，T7 完成。"
     },
     {
       "criterion": "启动器的错误与 panic 留在用户能找到的日志或 crash 文件中。",

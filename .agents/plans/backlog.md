@@ -24,6 +24,7 @@
 | 恢复 | 恢复模式界面、数据迁移、未完成安装/更新的恢复、进程失联接管、跨卷删除 | 需分别明确恢复边界与验收条件 |
 | 界面语言 | 系统语言与所选语言不同时，启动时先按系统语言生成并存进状态的文字（如游戏库卡片的「1 year ago」）在读到保存的语言后不重新生成 | 原因未复现确认；先写失败的测试，再让这些文字在语言切换后重新生成（`i18n::generation()`） |
 | 外观 | 主题的间距密度；Gruvbox、Tokyo Night 内置主题；Windows 11 的 Mica 窗口材质 | 页面间距是 rem 写死的，要先有统一的间距档位 |
+| 网站 | og:image（1200×630，首屏方块板与标题，见 `web/src/layouts/Base.astro` 的 `TODO(asset)`）；功能探索窗口的动态素材（GIF）；按 0.2.0 界面重拍 `discovery.png`（紧凑列表行）与 `appearance.png`（新主题与「不用壁纸」） | 截图在 `assets/screenshots/`，构建时复制到 `web/public/shots/`；按 launcher-site 的 screenshot-refresh 只换图片文件，不改组件与样式 |
 
 ## 只有Project Maintainer能做
 
@@ -31,5 +32,5 @@
 - 世界/服务器封面与账户头像：实机查看有图、无图、在线与离线状态下的外观，并确认 40px 世界/服务器前导图与行高是否合适。
 - 世界地图结构图层：实机查看 Mineshaft 标记密度；默认仍关闭该图层。
 
-- Litematica 原生预览：Windows/Linux 和更老游戏版本的兼容检查；本机原生预览与绘制规则已由Project Maintainer验收。
+- Litematica 原生预览：更老游戏版本的兼容检查（Windows/Linux 交给社区反馈）；本机原生预览与绘制规则已由Project Maintainer验收。
 - 投影工作室：发布新的方块资源 bundle，用户才拿得到画的尺寸、借来的箭模型和改名后的兔子贴图（schematic-studio T35）。
