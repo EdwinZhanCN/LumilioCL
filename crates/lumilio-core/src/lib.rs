@@ -17,7 +17,6 @@ mod deletion;
 mod diagnostics;
 mod discover;
 mod environment;
-mod error_text;
 mod fetch;
 mod fingerprint;
 mod forge_install;
@@ -50,7 +49,7 @@ mod reclaim;
 mod recovery;
 mod release;
 mod repair;
-mod resource_lock;
+use lumilio_transfer::resource_lock;
 mod root_lock;
 mod schematic_assets;
 mod schematic_ops;
@@ -62,7 +61,7 @@ mod skin;
 mod snapshots;
 mod staged;
 mod storage;
-mod transfer;
+use lumilio_transfer as transfer;
 mod translation;
 mod tuning;
 mod updates;
@@ -111,7 +110,6 @@ pub use discover::{
 pub use environment::{
     CompatibilityRule, HostProfile, MachineArchitecture, PlatformFamily, RuleDecision,
 };
-pub use error_text::with_causes;
 pub use fetch::{DOCUMENT_LIMIT, FetchError, fetch_document, post_document};
 pub use forge_meta::{forge_versions, neoforge_game_version, neoforge_versions};
 pub use game_settings::{
@@ -158,6 +156,7 @@ pub use loader::{
 };
 pub use lumilio_block_assets::{BakedPack, BlockCatalog, BlockNames};
 pub use lumilio_plugin_api::PluginState;
+pub use lumilio_transfer::with_causes;
 pub use microsoft::{
     AuthError, DeviceCode, MICROSOFT_CLIENT_ID, MicrosoftClient, MinecraftLogin, OAuthTokens,
     Secret, client_id as microsoft_client_id,

@@ -7,7 +7,7 @@ use crate::environment::HostProfile;
 use crate::java::JavaLocator;
 use crate::java_runtime::{JavaBuild, JavaSource};
 use crate::launcher::{JavaRequest, Launcher};
-use crate::transfer::{TransferEngine, TransferRequest, Transport};
+use crate::transfer::{TransferRequest, Transport};
 use std::future::Future;
 use std::path::{Path, PathBuf};
 use tokio::sync::mpsc;
@@ -352,8 +352,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         )
         .and_then(|request| request.expect_sha256(&checksum))
         .map_err(|error| fail(error.to_string()))?;
-        let engine = TransferEngine::new(self.transport.clone(), 1)
-            .map_err(|error| fail(error.to_string()))?;
+        let engine = self.transfer_engine().await;
         let report = self
             .metered(
                 task,
@@ -491,8 +490,7 @@ impl<T: Transport + Clone> LauncherService<T> {
                 requests.push(request);
             }
         }
-        let engine = TransferEngine::new(self.transport.clone(), self.transfer_concurrency().await)
-            .map_err(|error| fail(error.to_string()))?;
+        let engine = self.transfer_engine().await;
         let report = self
             .metered(
                 task,

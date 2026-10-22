@@ -2053,7 +2053,7 @@ settings-mirrors-count = { $count ->
    *[other] { $count } rules
 }
 settings-concurrency = Downloads at once
-settings-concurrency-help = How many files download at the same time, 1 to 32. Lower it on an unsteady network.
+settings-concurrency-help = How many files download at the same time across all tasks, 1 to 32. Lower it on an unsteady network.
 settings-concurrency-intro = Leave empty to let the launcher decide.
 settings-concurrency-field = Count (1–32)
 settings-block-assets = Download block assets automatically

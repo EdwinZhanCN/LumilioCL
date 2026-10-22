@@ -5,19 +5,28 @@ use super::{LauncherService, TRANSFER_CONCURRENCY};
 use crate::activity::CancellationToken;
 use crate::activity_log::{TaskBoard, TaskCategory, TaskLabel, TaskOutcome};
 use crate::launcher::{LaunchRequest, LaunchServiceError, LaunchUpdate, Launcher};
-use crate::transfer::Transport;
+use crate::transfer::{ConnectionBudget, TransferEngine, Transport};
 use std::sync::Mutex as StdMutex;
 use tokio::sync::mpsc;
 
 impl<T: Transport + Clone> LauncherService<T> {
-    /// Files downloaded at once for content and installs.
-    pub(super) async fn transfer_concurrency(&self) -> usize {
-        self.settings
+    /// The connections every download shares, sized by the current setting.
+    pub(super) async fn connections(&self) -> ConnectionBudget {
+        let size = self
+            .settings
             .lock()
             .await
             .get()
             .download_concurrency
-            .map_or(TRANSFER_CONCURRENCY, |count| count as usize)
+            .map_or(TRANSFER_CONCURRENCY, |count| count as usize);
+        // The setting is validated as positive; a zero keeps the old size.
+        let _ = self.connections.resize(size);
+        self.connections.clone()
+    }
+
+    /// An engine for one task's downloads, on the shared connections.
+    pub(super) async fn transfer_engine(&self) -> TransferEngine<T> {
+        TransferEngine::with_budget(self.transport.clone(), self.connections().await)
     }
 
     /// [`Self::install_tracked`] through a new launcher that may download the
@@ -32,8 +41,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     ) -> Result<(), ServiceError> {
         let (launcher, java_requests) = self
             .with_java_installer(
-                Launcher::new(self.transport.clone(), chain)
-                    .with_concurrency(request.download_concurrency),
+                Launcher::new(self.transport.clone(), chain).with_budget(self.connections().await),
             )
             .await;
         let watch = cancel.clone();

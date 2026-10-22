@@ -1842,7 +1842,7 @@ settings-mirrors-intro = 每行一条，写成 官方前缀 => 镜像前缀。
 settings-mirrors-field = 规则
 settings-mirrors-count = { $count } 条
 settings-concurrency = 同时下载数
-settings-concurrency-help = 同时下载的文件个数，1 到 32。网络不稳时调小。
+settings-concurrency-help = 所有任务合计同时下载的文件个数，1 到 32。网络不稳时调小。
 settings-concurrency-intro = 留空则由启动器决定。
 settings-concurrency-field = 个数（1–32）
 settings-block-assets = 自动下载方块资源

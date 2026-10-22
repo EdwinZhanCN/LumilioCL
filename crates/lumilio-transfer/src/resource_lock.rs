@@ -33,7 +33,7 @@ async fn key(path: &Path) -> io::Result<PathBuf> {
     }
 }
 
-pub(crate) async fn acquire(paths: &[PathBuf]) -> io::Result<Vec<OwnedMutexGuard<()>>> {
+pub async fn acquire(paths: &[PathBuf]) -> io::Result<Vec<OwnedMutexGuard<()>>> {
     let mut keys = Vec::new();
     for path in paths {
         keys.push(key(path).await?);

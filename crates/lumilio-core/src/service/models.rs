@@ -11,7 +11,7 @@ use crate::schematic_assets::{
     EntityGeometry, InstanceAssets, LocalCache, PlannedSource, SchematicAssetsError,
     installed_names, instance_assets, load, look, provided, resolve, switched_on,
 };
-use crate::transfer::{TransferEngine, Transport};
+use crate::transfer::Transport;
 use lumilio_block_assets::{BakedPack, BlockCatalog, BlockNames, EntityLayers};
 
 /// Everything the viewer is served.
@@ -387,26 +387,21 @@ impl<T: Transport + Clone> LauncherService<T> {
             None,
             Some(&cancel),
         );
-        let result = match TransferEngine::new(self.transport.clone(), 1) {
-            Ok(engine) => {
-                self.metered(
-                    task.id,
-                    engine.subscribe(),
-                    store.download(&engine, &chain, file, cancel.clone()),
-                )
-                .await
-            }
-            Err(error) => Err(crate::schematic_assets::SchematicAssetsError::Download(
-                error.to_string(),
-            )),
-        }
-        .map_err(|error| {
-            if cancel.is_cancelled() {
-                ServiceError::Cancelled
-            } else {
-                ServiceError::Install(error.to_string())
-            }
-        });
+        let engine = self.transfer_engine().await;
+        let result = self
+            .metered(
+                task.id,
+                engine.subscribe(),
+                store.download(&engine, &chain, file, cancel.clone()),
+            )
+            .await
+            .map_err(|error| {
+                if cancel.is_cancelled() {
+                    ServiceError::Cancelled
+                } else {
+                    ServiceError::Install(error.to_string())
+                }
+            });
         self.end(task, &result);
         result.map(|_| ()).map_err(|_| BundleUnreachable::Offline)
     }
