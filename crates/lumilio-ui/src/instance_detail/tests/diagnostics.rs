@@ -186,6 +186,53 @@ fn a_crashed_session_leads_to_the_log_and_a_clean_one_does_not(cx: &mut TestAppC
 }
 
 #[gpui::test]
+fn a_last_launch_without_a_crash_report_opens_what_the_game_printed(cx: &mut TestAppContext) {
+    let seen: Rc<RefCell<Vec<InstanceIntent>>> = Rc::default();
+    let (view, cx) = rooted(cx, seen.clone());
+    view.update(cx, |view, cx| {
+        view.loaded(Ok((record(), LauncherSettings::default())), cx);
+        view.select_tab(TAB_HISTORY, cx);
+        view.history_sub = 1;
+        view.arrived(
+            Arrived::History(Ok(lumilio_core::HistoryRead {
+                events: vec![lumilio_core::HistoryEvent::Session {
+                    started: 100,
+                    seconds: 0,
+                    exit_code: Some(1),
+                    outcome: lumilio_core::SessionOutcome::FailedToStart,
+                }],
+                skipped: 0,
+            })),
+            cx,
+        );
+    });
+    cx.run_until_parked();
+    click(cx, "session-inspect");
+    view.update(cx, |view, cx| {
+        view.arrived(
+            Arrived::Logs(Ok(lumilio_core::GameLogs {
+                latest: None,
+                files: vec![lumilio_core::FileEntry {
+                    name: lumilio_core::GAME_OUTPUT_LOG.into(),
+                    is_dir: false,
+                    size: 120,
+                    modified: 130,
+                }],
+                crashes: Vec::new(),
+            })),
+            cx,
+        )
+    });
+    cx.run_until_parked();
+    let output = lumilio_core::GameLogSource::File(lumilio_core::GAME_OUTPUT_LOG.into());
+    assert_eq!(
+        seen.borrow().last(),
+        Some(&InstanceIntent::OpenGameLog(output.clone()))
+    );
+    view.read_with(cx, |view, _| assert_eq!(view.log_source, output));
+}
+
+#[gpui::test]
 fn the_log_tab_loads_once_and_shows_only_the_report_last_asked_for(cx: &mut TestAppContext) {
     cx.update(|cx| {
         gpui_component::init(cx);

@@ -49,7 +49,7 @@ impl InstanceDetailView {
     }
 
     // ia[instance.history]: 看变更 | 历史 · 变更分段 | 只读时间线（内容、世界、设置、安装等）
-    // ia[instance.history]: 看游玩记录 | 历史 · 游玩记录分段 | 只读；崩溃或没能启动的会话有「查看日志」，跳到诊断·日志，崩溃报告按时间对应（会话开始到结束后 2 分钟内写下、离结束最近的那份），找到就直接打开
+    // ia[instance.history]: 看游玩记录 | 历史 · 游玩记录分段 | 只读；崩溃或没能启动的会话有「查看日志」，跳到诊断·日志，崩溃报告按时间对应（会话开始到结束后 2 分钟内写下、离结束最近的那份），找到就直接打开；没有崩溃报告时打开同一时段的「上次启动的输出」 | error-reporting T10
     pub(super) fn events_body(
         &self,
         sessions: bool,
