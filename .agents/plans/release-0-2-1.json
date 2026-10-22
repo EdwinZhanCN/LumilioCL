@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "id": "release-0-2-1",
+  "title": "准备发布 0.2.1",
+  "summary": "0.2.0 以预发布发出后，修好了从 .minecraft 多选导入时名字相近的游戏有一个失败（#67），以及游戏目录在启动器外被删后会悄悄启动空游戏（#68）。0.2.1 作为正式版取代 0.2.0：发布说明是 0.2.0 的全部内容加上这两项修复，0.2.1 是 0.1.6 之后第一个推给自动更新的版本。Project Maintainer 只在自己的 Mac 上实测。",
+  "status": "in_progress",
+  "visibility": "internal",
+  "scope": {
+    "included": [
+      "0.2.0 的全部改动（见 release-0-2-0）。",
+      "PR #67：选 id 与建暂存目录在库锁内一步完成，同时导入、复制、导入整合包或恢复备份名字得出同一 id 的游戏各得其所。",
+      "PR #68：新建游戏即有游戏目录，目录不见时诊断与「需要留意」说明、启动前先问，不再启动空游戏（game-folder-missing）。",
+      "版本号、计划、release-notes/0.2.1.md 与 .en.md；删去 0.2.0 的说明，免得应用的更新内容重复显示。"
+    ],
+    "excluded": [
+      "大陆直连可用性（discover-translation T6）未实测，发布说明不宣称大陆可用。",
+      "translation-fallback T4 的译文质量与每日用量检查不阻塞发布。",
+      "error-reporting T5（panic 记录）、T6（启动阶段对话框）未做。",
+      "Windows 上的实机检查交给社区反馈。",
+      "实验性 MCP 服务（PR #48）未合入。",
+      "不改变签名与公证状态：macOS 仍为 ad hoc 签名，Windows 未签名。"
+    ]
+  },
+  "tasks": [
+    { "id": "R1", "title": "更新版本、计划与发布说明", "status": "completed", "acceptance": "工作区版本为 0.2.1，Cargo.lock 同步；release-notes/0.2.1.md 与 .en.md 是 0.2.0 的说明加上 #67、#68 两项修复，小节和条目数一致；release-notes/0.2.0.* 删去；release-0-2-0 记下结果并关闭，本计划与投影生成。" },
+    { "id": "R2", "title": "通过 PR 合入版本更新", "status": "proposed", "acceptance": "rust、plans 检查通过后合入 main，合入后 main 的 CI 通过。" },
+    { "id": "R3", "title": "打标签前检查游戏目录提示", "status": "proposed", "acceptance": "Project Maintainer 完成 game-folder-missing 的 T5：删掉一个玩过的游戏的目录后，「需要留意」与概览显示目录不见了；按继续出现确认弹窗，三个选项各自生效；新建游戏后 profiles 下立即有它的目录。" },
+    { "id": "R4", "title": "打 v0.2.1 标签并发布为正式版", "status": "proposed", "acceptance": "合入提交在 main 上的 CI 通过、R3 完成后再打标签；v0.2.1 指向该提交，Release 工作流生成草稿；Project Maintainer 在正文末行填上 PR 编号后发布为正式版（Latest）。v0.2.0 保持预发布。" },
+    { "id": "R5", "title": "更新后在 Mac 上检查", "status": "proposed", "acceptance": "从 0.2.0 或 0.1.6 自动更新到 0.2.1，重启后弹出一次「已更新到 LumilioCL 0.2.1」，更新内容只有 0.2.1 一份；开启翻译后发现列表简介显示中文，项目正文点翻译键能译成中文。" },
+    { "id": "R6", "title": "发布后关闭相关计划", "status": "proposed", "acceptance": "discover-translation 与 game-folder-missing 记下 0.2.1 的发布结果并关闭，discover-translation T6 的大陆直连验收留在 backlog；网站路线图的投影随之重新生成。" }
+  ],
+  "validation": [
+    { "criterion": "版本更新的本地与 PR 检查通过。", "result": null },
+    { "criterion": "游戏目录不见时的提示与确认在 Mac 上看过（R3）。", "result": null },
+    { "criterion": "更新到 0.2.1 后在 Mac 上只显示一次、一份更新内容，发现页翻译可用。", "result": null }
+  ],
+  "references": [
+    "https://github.com/EdwinZhanCN/LumilioCL/pull/67",
+    "https://github.com/EdwinZhanCN/LumilioCL/pull/68",
+    "https://github.com/EdwinZhanCN/LumilioCL/releases/tag/v0.2.0",
+    ".agents/plans/release-0-2-0.json",
+    ".agents/plans/game-folder-missing.json",
+    ".agents/plans/discover-translation.json",
+    "release-notes/0.2.1.md",
+    "release-notes/0.2.1.en.md",
+    ".github/release-template.md"
+  ],
+  "dependencies": ["release-0-2-0", "game-folder-missing", "discover-translation"],
+  "decisions": [
+    {
+      "id": "notes-carry-0-2-0",
+      "decision": "0.2.1 的发布说明写 0.1.6 之后的全部改动，不只写两项修复。",
+      "rationale": "0.2.0 是预发布，只有 Project Maintainer 下载过；大家从 0.1.6 直接更新到 0.2.1，GitHub 上的正式版与应用里的更新内容都应完整说明这次带来的变化。",
+      "consequences": "release-notes/0.2.0.* 删去（见 release-0-2-0 的 superseded-by-0-2-1），应用里只显示 0.2.1 一份。"
+    }
+  ],
+  "lessonsLearned": []
+}
