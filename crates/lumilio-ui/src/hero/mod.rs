@@ -8,6 +8,7 @@
 //! live HUD chip, and slide indicators are ordinary GPUI elements on top.
 
 mod director;
+pub(crate) mod dissolve;
 pub(crate) mod noise;
 pub(crate) mod raster;
 mod scenes;
@@ -28,7 +29,8 @@ use gpui_component::{ActiveTheme as _, StyledExt as _, TITLE_BAR_HEIGHT, h_flex,
 use crate::theme::{self, motion};
 use director::Director;
 pub use director::HeroMode;
-use raster::{PixelGrid, Rgb};
+use dissolve::PageDissolve;
+use raster::PixelGrid;
 pub use scenes::{Landmark, Scene};
 
 /// Preferred on-screen texel size in logical pixels.
@@ -113,13 +115,6 @@ struct FrameSpec {
     flare: f32,
 }
 
-/// How the world meets the page: the band that dissolves, and into what.
-#[derive(Clone, Copy, Debug, PartialEq)]
-struct Framing {
-    fade_rows: usize,
-    page: Rgb,
-}
-
 /// Grid columns/rows and the exact texel size for a canvas of this size.
 fn grid_layout(width: f32, height: f32) -> (usize, usize, f32, f32) {
     let width = width.max(1.);
@@ -139,12 +134,15 @@ fn grid_layout(width: f32, height: f32) -> (usize, usize, f32, f32) {
 
 /// Rows the scene composes for: half the fade band hangs below it as the
 /// scene's last row extended, so no scene content moves into the dissolve.
-fn scene_rows(rows: usize, framing: Framing) -> usize {
-    rows.saturating_sub(framing.fade_rows / 2).max(8).min(rows)
+fn scene_rows(rows: usize, dissolve: PageDissolve) -> usize {
+    rows.saturating_sub(dissolve.bottom_rows / 2)
+        .max(8)
+        .min(rows)
 }
 
-fn rasterize(frame: FrameSpec, columns: usize, rows: usize, framing: Framing) -> PixelGrid {
-    let scene_rows = scene_rows(rows, framing);
+/// The world meets the page through `dissolve`: its bottom band, and into what.
+fn rasterize(frame: FrameSpec, columns: usize, rows: usize, dissolve: PageDissolve) -> PixelGrid {
+    let scene_rows = scene_rows(rows, dissolve);
     let mut grid = PixelGrid::new(columns, scene_rows);
     frame.scene.render(&mut grid, frame.age, frame.flare);
     if let Some((scene, age, progress)) = frame.leaving {
@@ -161,19 +159,17 @@ fn rasterize(frame: FrameSpec, columns: usize, rows: usize, framing: Framing) ->
     }
     grid.apply_scrim(SCRIM_STRENGTH);
     grid.extend_to(rows);
-    grid.fade_bottom(framing.fade_rows, framing.page);
+    dissolve.apply(&mut grid);
     grid
 }
 
-/// `clear` is the first row of the bottom dissolve and the page colour: on a
-/// translucent page the dissolved texels are left out instead of painted, so
-/// the world breaks up into the glass behind it rather than into a solid band
-/// of the page colour (plan translucent-themes, T3).
+/// Paints `grid`, less the texels `dissolve` leaves to the glass behind a
+/// translucent page.
 pub(crate) fn paint_grid(
     bounds: Bounds<Pixels>,
     grid: &PixelGrid,
     texel: (f32, f32),
-    clear: Option<(usize, u32)>,
+    dissolve: PageDissolve,
     window: &mut Window,
 ) {
     let origin = bounds.origin;
@@ -181,7 +177,7 @@ pub(crate) fn paint_grid(
     // The rects never overlap, so they share one draw order in a single layer
     // instead of each being placed in the scene's bounds tree.
     window.paint_layer(bounds, |window| {
-        for rect in painted(grid, clear) {
+        for rect in dissolve.painted(grid) {
             let left = origin.x + px(rect.start as f32 * tw);
             let right = origin.x + px((rect.start + rect.len) as f32 * tw);
             let top = origin.y + px(rect.row as f32 * th);
@@ -198,18 +194,6 @@ pub(crate) fn paint_grid(
             ));
         }
     });
-}
-
-/// The rects `paint_grid` paints: all of them, less the dissolved texels of
-/// the bottom band when they are to be `clear`.
-pub(crate) fn painted(grid: &PixelGrid, clear: Option<(usize, u32)>) -> Vec<raster::Rect> {
-    let cleared = |rect: &raster::Rect| {
-        clear.is_some_and(|(first, page)| rect.row >= first && rect.color == page)
-    };
-    grid.rects()
-        .into_iter()
-        .filter(|rect| !cleared(rect))
-        .collect()
 }
 
 pub fn accent(scene: Scene) -> Hsla {
@@ -254,22 +238,23 @@ impl Render for HeroCarousel {
         let dwell = self.director.showcase().dwell_progress();
         let white = gpui::white();
         let mono = cx.theme().mono_font_family.clone();
-        let translucent = cx.theme().background.a < 1.;
-        let page = cx.theme().background.to_rgb();
-        let page = Rgb::new(page.r, page.g, page.b);
+        let page = PageDissolve::of(cx.theme().background);
 
         let art = canvas(
             move |bounds, _, _| {
                 let (columns, rows, tw, th) =
                     grid_layout(f32::from(bounds.size.width), f32::from(bounds.size.height));
                 let fade_rows = ((f32::from(theme::HERO_FADE) / th).round() as usize).min(rows / 3);
-                let framing = Framing { fade_rows, page };
-                grid_size.set((columns as i32, scene_rows(rows, framing) as i32));
-                let clear = translucent.then(|| (rows.saturating_sub(fade_rows), page.pack()));
-                (rasterize(frame, columns, rows, framing), (tw, th), clear)
+                let dissolve = page.bottom(fade_rows);
+                grid_size.set((columns as i32, scene_rows(rows, dissolve) as i32));
+                (
+                    rasterize(frame, columns, rows, dissolve),
+                    (tw, th),
+                    dissolve,
+                )
             },
-            move |bounds, (grid, texel, clear), window, _| {
-                paint_grid(bounds, &grid, texel, clear, window)
+            move |bounds, (grid, texel, dissolve), window, _| {
+                paint_grid(bounds, &grid, texel, dissolve, window)
             },
         )
         .absolute()
