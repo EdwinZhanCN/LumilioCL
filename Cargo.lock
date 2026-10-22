@@ -4529,7 +4529,7 @@ dependencies = [
 
 [[package]]
 name = "lumilio-anvil"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "flate2",
  "lumilio-nbt",
@@ -4538,7 +4538,7 @@ dependencies = [
 
 [[package]]
 name = "lumilio-app"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-channel",
  "chrono",
@@ -4566,7 +4566,7 @@ dependencies = [
 
 [[package]]
 name = "lumilio-backdrop"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "objc2 0.6.4",
  "objc2-app-kit 0.3.2",
@@ -4576,7 +4576,7 @@ dependencies = [
 
 [[package]]
 name = "lumilio-block-assets"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "image 0.25.10",
  "serde",
@@ -4590,7 +4590,7 @@ dependencies = [
 
 [[package]]
 name = "lumilio-core"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "base64 0.22.1",
  "chrono",
@@ -4632,14 +4632,14 @@ dependencies = [
 
 [[package]]
 name = "lumilio-cubiomes"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "cc",
 ]
 
 [[package]]
 name = "lumilio-docgen"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -4649,7 +4649,7 @@ dependencies = [
 
 [[package]]
 name = "lumilio-map-render"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "pollster 0.4.0",
  "wgpu 30.0.1",
@@ -4657,14 +4657,14 @@ dependencies = [
 
 [[package]]
 name = "lumilio-nbt"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "flate2",
 ]
 
 [[package]]
 name = "lumilio-plugin-api"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -4672,7 +4672,7 @@ dependencies = [
 
 [[package]]
 name = "lumilio-plugin-crash-analyzer"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "lumilio-plugin-api",
  "regex",
@@ -4680,7 +4680,7 @@ dependencies = [
 
 [[package]]
 name = "lumilio-plugin-curseforge"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "lumilio-plugin-api",
  "serde",
@@ -4690,14 +4690,14 @@ dependencies = [
 
 [[package]]
 name = "lumilio-plugin-discord"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "lumilio-plugin-api",
 ]
 
 [[package]]
 name = "lumilio-plugin-litematica"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "flate2",
  "lumilio-nbt",
@@ -4707,7 +4707,7 @@ dependencies = [
 
 [[package]]
 name = "lumilio-plugin-modrinth"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "lumilio-plugin-api",
  "serde",
@@ -4717,7 +4717,7 @@ dependencies = [
 
 [[package]]
 name = "lumilio-plugin-world-explorer"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "lumilio-anvil",
  "lumilio-cubiomes",
@@ -4730,7 +4730,7 @@ dependencies = [
 
 [[package]]
 name = "lumilio-pointer"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "block2 0.6.2",
  "core-graphics 0.24.0",
@@ -4742,7 +4742,7 @@ dependencies = [
 
 [[package]]
 name = "lumilio-schematic"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "flate2",
  "lumilio-block-assets",
@@ -4754,7 +4754,7 @@ dependencies = [
 
 [[package]]
 name = "lumilio-schematic-render"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "image 0.25.10",
  "lumilio-block-assets",
@@ -4766,14 +4766,14 @@ dependencies = [
 
 [[package]]
 name = "lumilio-skin-render"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "image 0.25.10",
 ]
 
 [[package]]
 name = "lumilio-ui"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-channel",
  "flate2",
@@ -4803,7 +4803,7 @@ dependencies = [
 
 [[package]]
 name = "lumilio-updater"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "flate2",
  "futures-util",
@@ -4816,7 +4816,7 @@ dependencies = [
 
 [[package]]
 name = "lumilio-xtask"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "flate2",
  "image 0.25.10",

@@ -2,7 +2,7 @@
 
 # 准备发布 0.2.0
 
-Status: InProgress
+Status: Completed
 
 0.2.0 汇总 v0.1.6 之后合入 main 的全部改动，主体是路线图里 0.2.0 的发现页翻译：MCIM 中文简介、MCIM 没有时由 launcher.lumilio.org 的 Worker 在后台补译，以及微软 Edge 正文翻译。另有当前游戏与当前账户只存一份（global-context）、半透明主题与新配色（translucent-themes）、启动失败说清原因与启动器日志（error-reporting T1–T4、T8）、发现页紧凑列表行与窄窗口的「筛选」键、窄窗口导航条的紧凑右段、Microsoft 设备码自动复制，以及导入 .minecraft 时按库文件识别加载器。中英发布说明这次在同一个 PR 里写好。Project Maintainer 只在自己的 Mac 上实测。
 
@@ -30,21 +30,21 @@ Status: InProgress
 
 - [x] R1 — 更新版本、计划与发布说明 (Completed)
   Acceptance: 工作区版本为 0.2.0，Cargo.lock 同步，release-0-1-6 记下发布结果，release-notes/0.2.0.md 与 .en.md 小节和条目数一致，本计划与投影生成。
-- [ ] R2 — 通过 PR 合入版本更新 (Proposed)
+- [x] R2 — 通过 PR 合入版本更新 (Completed)
   Acceptance: rust、plans 检查通过后合入 main，合入后 main 的 CI 通过。
-- [ ] R3 — 打 v0.2.0 标签并发布 (Proposed)
+- [x] R3 — 打 v0.2.0 标签并发布 (Completed)
   Acceptance: 合入提交在 main 上的 CI 通过后再打标签；v0.2.0 指向该提交，Release 工作流生成草稿；Project Maintainer 在正文末行填上 PR 编号后发布。
-- [ ] R4 — 从 0.1.6 更新后在 Mac 上检查 (Proposed)
+- [ ] R4 — 从 0.1.6 更新后在 Mac 上检查 (Cancelled)
   Acceptance: 从 0.1.6 自动更新到 0.2.0，重启后弹出一次「已更新到 LumilioCL 0.2.0」；开启翻译后发现列表简介显示中文，项目正文点翻译键能译成中文。
-- [ ] R5 — 发布后关闭 discover-translation (Proposed)
+- [ ] R5 — 发布后关闭 discover-translation (Cancelled)
   Acceptance: discover-translation 记下 0.2.0 的发布结果并关闭，T6 的大陆直连验收留在 backlog；网站路线图的投影随之重新生成。
 
 ## Validation
 
 - 版本更新的本地与 PR 检查通过。
-  Result: pending
+  Result: PR #66 的检查通过后合入 main（64456cf），该提交在 main 上的 CI 通过。v0.2.0 标签指向 64456cf，Release 工作流 39704358487 成功，2026-10-21（美东）以预发布发出。
 - 0.1.6 → 0.2.0 在 Mac 上更新后显示一次更新内容，发现页翻译可用。
-  Result: pending
+  Result: 未做：0.2.0 是预发布，自动更新只取正式版，0.1.6 不会更新到它。改由 release-0-2-1 的 R4 检查 0.1.6 → 0.2.1。
 
 ## Decision release-scope
 
@@ -53,6 +53,14 @@ Status: InProgress
 Why: 发现页翻译已由 Project Maintainer 完成应用内检查（discover-translation T11），Worker 回退已在线上验证（translation-fallback T3、T5）；Windows 与 Linux 没有实机可测。
 
 Consequences: 发布说明只写已合入并验证过的改动，不写大陆可用性和译文质量的判断；安装包、签名、BUILD.txt、SHA256SUMS.txt、安装文档和源码提交由 .github/release-template.md 接在正文后面。
+
+## Decision superseded-by-0-2-1
+
+0.2.0 保持预发布，由 0.2.1 作为正式版取代；0.2.0 的发布说明并入 0.2.1，release-notes/0.2.0.md 与 .en.md 删去。
+
+Why: 预发布后发现两个问题：从 .minecraft 多选导入时，名字得出同一 id 的两个游戏有一个失败（#67）；游戏目录在启动器外被删后会悄悄启动空游戏（#68）。只有 Project Maintainer 下载过 0.2.0。应用的更新内容会列出上次看过之后的每一份说明，两份都留着时 0.1.6 的用户会看到同样的内容两遍。
+
+Consequences: GitHub 上的 v0.2.0 标签与预发布保留，正文仍是原来的说明；应用里不再有 0.2.0 的说明，从 0.2.0 更新的人只看到 0.2.1 的一份。
 
 ## References
 
@@ -72,11 +80,15 @@ Consequences: 发布说明只写已合入并验证过的改动，不写大陆可
 - [.agents/plans/release-0-1-6.json](../../.agents/plans/release-0-1-6.json)
 - [.agents/plans/discover-translation.json](../../.agents/plans/discover-translation.json)
 - [.agents/plans/translation-fallback.json](../../.agents/plans/translation-fallback.json)
-- release-notes/0.2.0.md
-- release-notes/0.2.0.en.md
+- https://github.com/EdwinZhanCN/LumilioCL/releases/tag/v0.2.0
+- [.agents/plans/release-0-2-1.json](../../.agents/plans/release-0-2-1.json)
 - .github/release-template.md
 - [Plan discover-translation](discover-translation.md)
 - [Plan translation-fallback](translation-fallback.md)
 - [Plan global-context](global-context.md)
 - [Plan translucent-themes](translucent-themes.md)
 - [Plan error-reporting](error-reporting.md)
+
+## Outcome
+
+v0.2.0 于 2026-10-21（美东）以预发布发出，只有 Project Maintainer 下载过；由 0.2.1 取代，从 0.1.6 更新的检查与关闭 discover-translation 移到 release-0-2-1。
