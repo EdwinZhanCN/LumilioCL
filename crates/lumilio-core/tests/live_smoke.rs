@@ -166,7 +166,11 @@ async fn a_java_runtime_installs_from_the_real_index_and_runs() {
     let service =
         LauncherService::open(&home, DefaultTransport::new().unwrap(), Vec::new()).unwrap();
     let java = service
-        .install_java(Some(17), CancellationToken::new())
+        .install_java(
+            Some(17),
+            lumilio_core::JavaBuild::Any,
+            CancellationToken::new(),
+        )
         .await
         .expect("Java 17 from Mojang");
     println!("installed {} at {}", java.version(), java.home().display());

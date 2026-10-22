@@ -13,6 +13,7 @@ use std::path::Path;
 use super::JavaRuntime;
 use crate::environment::{HostProfile, MachineArchitecture, PlatformFamily};
 use crate::instance::{InstanceRecord, Loader};
+use crate::java_runtime::JavaBuild;
 use crate::launch::LaunchPlan;
 use crate::release::{JavaRequirement, ReleaseManifest};
 
@@ -30,6 +31,9 @@ pub struct JavaNeeds {
     pub forge_like: bool,
     /// Starts through LaunchWrapper before 1.13 (old Forge, LiteLoader).
     pub launch_wrapper: bool,
+    /// The variants of its native libraries, for every system (`osx`,
+    /// `macos-arm64`, `windows-${arch}`…).
+    pub natives: Vec<String>,
 }
 
 impl JavaNeeds {
@@ -40,6 +44,7 @@ impl JavaNeeds {
             game_version: game_version.to_owned(),
             forge_like: matches!(loader, Loader::Forge | Loader::NeoForge),
             launch_wrapper: false,
+            natives: Vec::new(),
         }
     }
 
@@ -53,12 +58,23 @@ impl JavaNeeds {
             .map(|path| path.to_string_lossy().into_owned())
             .collect();
         let libraries: Vec<&str> = classpath.iter().map(String::as_str).collect();
+        let archives: Vec<String> = plan
+            .native_archives()
+            .iter()
+            .map(|archive| archive.path().to_string_lossy().into_owned())
+            .collect();
         Self::new(
             &record.game_version,
             record.loader,
             plan.java_requirement().map(JavaRequirement::major),
         )
         .with_start(plan.main_class(), &libraries)
+        .with_natives(
+            libraries
+                .iter()
+                .copied()
+                .chain(archives.iter().map(String::as_str)),
+        )
     }
 
     /// What an installed release of `record` needs, before any launch.
@@ -76,6 +92,32 @@ impl JavaNeeds {
             release.java_requirement().map(JavaRequirement::major),
         )
         .with_start(release.main_class().unwrap_or_default(), &libraries)
+        .with_natives(
+            libraries.iter().copied().chain(
+                release
+                    .libraries()
+                    .iter()
+                    .flat_map(|library| library.native_classifiers()),
+            ),
+        )
+    }
+
+    /// Notes the native variants among library file names
+    /// (`lwjgl-platform-2.9.0-natives-osx.jar`), coordinates
+    /// (`org.lwjgl:lwjgl:3.3.1:natives-macos-arm64`) or classifiers
+    /// (`natives-osx`).
+    #[must_use]
+    pub fn with_natives<'a>(mut self, names: impl IntoIterator<Item = &'a str>) -> Self {
+        for name in names {
+            let file = name.rsplit(['/', '\\']).next().unwrap_or(name);
+            if let Some((_, variant)) = file.rsplit_once("natives-") {
+                let variant = variant.strip_suffix(".jar").unwrap_or(variant);
+                if !self.natives.iter().any(|known| known == variant) {
+                    self.natives.push(variant.to_owned());
+                }
+            }
+        }
+        self
     }
 
     /// Notes LaunchWrapper from the main class and the libraries (file
@@ -125,23 +167,33 @@ pub enum JavaRule {
     LegacyLinux,
     /// Forge and NeoForge are tested on this major for the game version.
     ModLoader(u32),
+    /// Its native libraries are Intel builds only (before 1.19), which Apple
+    /// silicon and Windows on Arm run under translation with an Intel Java.
+    /// The major is the one to download.
+    IntelNatives(u32),
 }
 
 impl JavaRule {
     #[must_use]
     pub const fn strength(self) -> RuleStrength {
         match self {
-            Self::Minimum(_) | Self::LaunchWrapper | Self::LegacyLinux => RuleStrength::Required,
+            Self::Minimum(_) | Self::LaunchWrapper | Self::LegacyLinux | Self::IntelNatives(_) => {
+                RuleStrength::Required
+            }
             Self::ModLoader(_) => RuleStrength::Suggested,
         }
     }
 
     #[must_use]
-    pub const fn allows(self, major: u32) -> bool {
+    pub fn allows(self, runtime: &JavaRuntime) -> bool {
+        let major = runtime.major();
         match self {
             Self::Minimum(minimum) => major >= minimum,
             Self::LaunchWrapper | Self::LegacyLinux => major <= 8,
             Self::ModLoader(advised) => major == advised,
+            Self::IntelNatives(_) => runtime
+                .architecture()
+                .is_some_and(|name| MachineArchitecture::X86_64.matches_name(name)),
         }
     }
 
@@ -149,7 +201,7 @@ impl JavaRule {
     #[must_use]
     pub const fn advised_major(self) -> u32 {
         match self {
-            Self::Minimum(major) | Self::ModLoader(major) => major,
+            Self::Minimum(major) | Self::ModLoader(major) | Self::IntelNatives(major) => major,
             Self::LaunchWrapper | Self::LegacyLinux => 8,
         }
     }
@@ -157,11 +209,31 @@ impl JavaRule {
     /// The highest major it allows, if it caps them.
     const fn ceiling(self) -> Option<u32> {
         match self {
-            Self::Minimum(_) => None,
+            Self::Minimum(_) | Self::IntelNatives(_) => None,
             Self::LaunchWrapper | Self::LegacyLinux => Some(8),
             Self::ModLoader(major) => Some(major),
         }
     }
+}
+
+/// Whether `natives` hold builds for `host`'s system and none of them for
+/// Arm, on an Arm host that runs Intel code translated: Apple silicon
+/// (Rosetta 2) and Windows on Arm. Mojang ships `natives-macos-arm64` and
+/// `natives-windows-arm64` from 1.19 on.
+fn intel_natives_only(natives: &[String], host: &HostProfile) -> bool {
+    let systems: &[&str] = match (host.platform(), host.architecture()) {
+        (PlatformFamily::MacOs, MachineArchitecture::Arm64) => &["osx", "macos"],
+        (PlatformFamily::Windows, MachineArchitecture::Arm64) => &["windows"],
+        _ => return false,
+    };
+    let here: Vec<&String> = natives
+        .iter()
+        .filter(|variant| systems.iter().any(|system| variant.starts_with(system)))
+        .collect();
+    !here.is_empty()
+        && !here
+            .iter()
+            .any(|variant| variant.contains("arm64") || variant.contains("aarch64"))
 }
 
 /// `1.12.2` → `[1, 12, 2]`; `1.20.5-pre1` → `[1, 20, 5]`; alpha, beta and
@@ -195,6 +267,10 @@ fn version_parts(version: &str) -> Vec<u32> {
 #[must_use]
 pub fn rules(needs: &JavaNeeds, host: &HostProfile) -> Vec<JavaRule> {
     let mut rules: Vec<JavaRule> = needs.required.map(JavaRule::Minimum).into_iter().collect();
+    if intel_natives_only(&needs.natives, host) {
+        // Without a requirement the game is old enough for Java 8.
+        rules.push(JavaRule::IntelNatives(needs.required.unwrap_or(8)));
+    }
     let Some(version) = release_number(&needs.game_version) else {
         return rules;
     };
@@ -264,7 +340,7 @@ fn broken(rules: &[JavaRule], runtime: &JavaRuntime) -> Vec<JavaRule> {
     rules
         .iter()
         .copied()
-        .filter(|rule| !rule.allows(runtime.major()))
+        .filter(|rule| !rule.allows(runtime))
         .collect()
 }
 
@@ -332,8 +408,8 @@ pub fn choose(
 }
 
 /// The major to download when no installed Java may run the game: Java 8
-/// when a rule caps it there, else the release's minimum. `None` leaves it
-/// to the recommended one.
+/// when a rule caps it there, else the release's minimum, else Java 8 for
+/// Intel-only natives. `None` leaves it to the recommended one.
 #[must_use]
 pub fn install_major(needs: &JavaNeeds, host: &HostProfile) -> Option<u32> {
     let rules = rules(needs, host);
@@ -343,6 +419,23 @@ pub fn install_major(needs: &JavaNeeds, host: &HostProfile) -> Option<u32> {
         .filter_map(|rule| rule.ceiling())
         .min()
         .or(needs.required)
+        .or_else(|| {
+            rules.iter().find_map(|rule| match rule {
+                JavaRule::IntelNatives(major) => Some(*major),
+                _ => None,
+            })
+        })
+}
+
+/// Which build that download must be: Intel when the game's native
+/// libraries have no other for this system.
+#[must_use]
+pub fn install_build(needs: &JavaNeeds, host: &HostProfile) -> JavaBuild {
+    if intel_natives_only(&needs.natives, host) {
+        JavaBuild::Intel
+    } else {
+        JavaBuild::Any
+    }
 }
 
 #[cfg(test)]

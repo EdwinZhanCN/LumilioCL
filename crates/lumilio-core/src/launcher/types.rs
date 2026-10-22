@@ -39,11 +39,12 @@ pub struct LaunchRequest {
 }
 
 /// A launch asking for a Java to be downloaded because none installed may
-/// run the game: the major (`None` for the recommended one), answered with
-/// the installed runtime or why it could not be installed.
+/// run the game: the major (`None` for the recommended one) and build,
+/// answered with the installed runtime or why it could not be installed.
 #[derive(Debug)]
 pub struct JavaRequest {
     pub major: Option<u32>,
+    pub build: crate::java_runtime::JavaBuild,
     pub reply: tokio::sync::oneshot::Sender<Result<JavaRuntime, String>>,
 }
 
@@ -72,6 +73,9 @@ pub enum LaunchServiceError {
     },
     /// No installed Java fitted and downloading one failed.
     JavaInstall(String),
+    /// The game needs an Intel Java and this Apple silicon Mac has no
+    /// Rosetta 2 to run it.
+    RosettaMissing,
     Process(ProcessError),
     /// This game version cannot start in a world or on a server directly.
     QuickPlayUnsupported {
@@ -117,6 +121,9 @@ impl Display for LaunchServiceError {
             Self::JavaInstall(why) => {
                 write!(f, "the Java this game needs could not be downloaded: {why}")
             }
+            Self::RosettaMissing => f.write_str(
+                "this game needs an Intel Java, which runs only under Rosetta 2; install it with softwareupdate --install-rosetta",
+            ),
             Self::Process(error) => write!(f, "{error}"),
             Self::QuickPlayUnsupported { mode } => write!(
                 f,
@@ -154,6 +161,7 @@ impl LaunchServiceError {
         match self {
             Self::NoJava { required } => Some(LaunchProblem::NoJava(*required)),
             Self::JavaInstall(_) => Some(LaunchProblem::JavaDownload),
+            Self::RosettaMissing => Some(LaunchProblem::RosettaMissing),
             Self::Hook {
                 when: "before launch",
                 code,

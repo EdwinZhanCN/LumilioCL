@@ -33,6 +33,7 @@ fn only_a_chosen_java_that_cannot_run_the_game_is_asked_about() {
         choice: Some(picked(&java17, vec![JavaRule::LaunchWrapper], true)),
         automatic: Some(picked(&java8, Vec::new(), false)),
         needed: Some(8),
+        build: lumilio_core::JavaBuild::Any,
         auto_install: true,
     };
     assert_eq!(

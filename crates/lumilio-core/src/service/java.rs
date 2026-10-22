@@ -5,7 +5,7 @@ use crate::activity::CancellationToken;
 use crate::activity_log::{RetryAction, TaskAction, TaskCategory, TaskLabel};
 use crate::environment::HostProfile;
 use crate::java::JavaLocator;
-use crate::java_runtime::JavaSource;
+use crate::java_runtime::{JavaBuild, JavaSource};
 use crate::launcher::{JavaRequest, Launcher};
 use crate::transfer::{TransferEngine, TransferRequest, Transport};
 use std::future::Future;
@@ -26,6 +26,8 @@ pub struct InstanceJava {
     pub automatic: Option<crate::java::JavaChoice>,
     /// When none fits: the major to download (`None` for the recommended one).
     pub needed: Option<u32>,
+    /// Which build that download must be.
+    pub build: JavaBuild,
     /// Whether the launch downloads it by itself.
     pub auto_install: bool,
 }
@@ -34,32 +36,61 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// Downloads a Java for this system into the launcher's own `runtimes`
     /// folder (ADR 0014) and returns it, from the download source in the
     /// settings when it offers `required`, else from Mojang. `required` is the
-    /// Java major a game needs; without it, the recommended one.
+    /// Java major a game needs; without it, the recommended one. An Intel
+    /// `build` always comes from Mojang.
     pub async fn install_java(
         &self,
         required: Option<u32>,
+        build: JavaBuild,
         cancel: CancellationToken,
     ) -> Result<crate::java::JavaRuntime, ServiceError> {
-        let preferred = self.settings.lock().await.get().java_source;
-        let source = crate::java_runtime::source_for(preferred, &HostProfile::current(), required);
-        self.install_java_from(source, required, cancel).await
+        let source = match build {
+            JavaBuild::Any => {
+                let preferred = self.settings.lock().await.get().java_source;
+                crate::java_runtime::source_for(preferred, &HostProfile::current(), required)
+            }
+            JavaBuild::Intel => JavaSource::Mojang,
+        };
+        self.install_java_from(source, required, build, cancel)
+            .await
+    }
+
+    /// Downloads the Java instance `id` would need, as its settings page and
+    /// problems offer: `required`, in the build its game needs.
+    pub async fn install_instance_java(
+        &self,
+        id: &str,
+        required: Option<u32>,
+        cancel: CancellationToken,
+    ) -> Result<crate::java::JavaRuntime, ServiceError> {
+        let build = self.instance_java(id).await?.build;
+        self.install_java(required, build, cancel).await
     }
 
     /// Downloads a Java from `source`. Nothing is touched until every file
     /// has arrived and checked out; an installed runtime is returned as it
-    /// is. It is an Activity task and can be cancelled.
+    /// is. It is an Activity task and can be cancelled. `build` applies to
+    /// Mojang's runtimes.
     pub async fn install_java_from(
         &self,
         source: JavaSource,
         required: Option<u32>,
+        build: JavaBuild,
         cancel: CancellationToken,
     ) -> Result<crate::java::JavaRuntime, ServiceError> {
-        let subject = match (source, required) {
+        let mut subject = match (source, required) {
             (JavaSource::Mojang, None) => String::new(),
             (JavaSource::Mojang, Some(major)) => major.to_string(),
             (other, None) => other.name().to_owned(),
             (other, Some(major)) => format!("{major} · {}", other.name()),
         };
+        if build == JavaBuild::Intel {
+            subject = [subject.as_str(), "Intel"]
+                .into_iter()
+                .filter(|part| !part.is_empty())
+                .collect::<Vec<_>>()
+                .join(" · ");
+        }
         let task = self
             .begin(
                 TaskCategory::Install,
@@ -73,11 +104,18 @@ impl<T: Transport + Clone> LauncherService<T> {
             .retrying(RetryAction::InstallJava {
                 major: required,
                 source,
+                build,
             });
         let result = match source {
             JavaSource::Mojang => {
-                self.install_java_inner(task.id, required, Self::java_manifest_allowed(), cancel)
-                    .await
+                self.install_java_inner(
+                    task.id,
+                    required,
+                    build,
+                    Self::java_manifest_allowed(),
+                    cancel,
+                )
+                .await
             }
             JavaSource::OracleGraalVm => {
                 self.install_graalvm(task.id, required, Self::graalvm_allowed(), cancel)
@@ -131,12 +169,14 @@ impl<T: Transport + Clone> LauncherService<T> {
                 &host,
             );
             let needed = crate::java::install_major(&needs, &host);
+            let build = crate::java::install_build(&needs, &host);
             let automatic = crate::java::choose(&runtimes, &needs, None, &host);
             InstanceJava {
                 runtimes,
                 choice,
                 automatic,
                 needed,
+                build,
                 auto_install,
             }
         })
@@ -199,7 +239,7 @@ impl<T: Transport + Clone> LauncherService<T> {
                 result = &mut work => return result,
                 Some(request) = requests.recv() => {
                     let installed = self
-                        .install_java(request.major, cancel.clone())
+                        .install_java(request.major, request.build, cancel.clone())
                         .await
                         .map_err(|error| error.to_string());
                     let _ = request.reply.send(installed);
@@ -360,6 +400,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         &self,
         task: u64,
         required: Option<u32>,
+        build: JavaBuild,
         allow: fn(&str) -> bool,
         cancel: CancellationToken,
     ) -> Result<crate::java::JavaRuntime, ServiceError> {
@@ -379,7 +420,7 @@ impl<T: Transport + Clone> LauncherService<T> {
                 |bytes| {
                     let index =
                         String::from_utf8(bytes).map_err(|error| fail(error.to_string()))?;
-                    runtime::choose_for_host(&index, &host, required)
+                    runtime::choose_for_host(&index, &host, required, build)
                         .map_err(|error| fail(error.to_string()))
                 },
             )
@@ -389,7 +430,8 @@ impl<T: Transport + Clone> LauncherService<T> {
         .await?;
 
         let runtimes = self.layout.runtimes();
-        let folder = runtimes.join(&choice.component);
+        let name = choice.folder(&host);
+        let folder = runtimes.join(&name);
         if let Some(found) = Self::runtime_in(&folder) {
             return Ok(found);
         }
@@ -409,7 +451,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         })
         .await?;
 
-        let staging = runtimes.join(format!(".{}.installing", choice.component));
+        let staging = runtimes.join(format!(".{name}.installing"));
         let prepared = {
             let staging = staging.clone();
             let layout: Vec<(String, bool)> = entries
@@ -435,7 +477,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         for (path, entry) in &entries {
             if let runtime::Entry::File { download, .. } = entry {
                 let mut request = TransferRequest::new(
-                    format!("java:{}:{path}", choice.component),
+                    format!("java:{name}:{path}"),
                     chain.candidates(&download.url),
                     runtime::place(&staging, path),
                 )

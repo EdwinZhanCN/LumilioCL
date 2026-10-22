@@ -212,6 +212,7 @@ mod java_dropdown {
             choice: None,
             automatic: None,
             needed: Some(21),
+            build: lumilio_core::JavaBuild::Any,
             auto_install: true,
         };
         let picks = java_picks(Some(&java), &mac());

@@ -111,6 +111,8 @@ pub enum LaunchProblem {
     NoJava(Option<u32>),
     /// No Java fitted and downloading one failed.
     JavaDownload,
+    /// The game needs an Intel Java and Rosetta 2 is not installed.
+    RosettaMissing,
     /// The command set to run before launch failed (its exit code).
     BeforeLaunch(Option<i32>),
     /// The world to start in is not among the saves (its folder).

@@ -7,7 +7,10 @@ use crate::fetch::{FetchError, fetch_decoded, fetch_document};
 use crate::forge_install::ForgeError;
 use crate::install::{InstallError, InstallationPlan, Installer};
 use crate::instance::Loader;
-use crate::java::{JavaChoice, JavaNeeds, JavaRuntime, choose, install_major};
+use crate::java::{
+    JavaChoice, JavaNeeds, JavaRuntime, choose, install_build, install_major, rosetta_missing,
+};
+use crate::java_runtime::JavaBuild;
 use crate::launch::{LaunchContext, LaunchPlan};
 use crate::launch_session::{LaunchPhase, LaunchSignal};
 use crate::loader::{LAUNCHABLE_LOADERS, normalize_profile};
@@ -467,15 +470,28 @@ where
             runtimes.extend(installed.iter().cloned());
             choose(&runtimes, &needs, preferred, &host)
         };
+        // An Intel Java on Apple silicon starts only under Rosetta 2.
+        let rosetta_missing = rosetta_missing(&host);
+        let startable = |choice: JavaChoice| {
+            if rosetta_missing && !choice.runtime.is_native(&host) {
+                Err(LaunchServiceError::RosettaMissing)
+            } else {
+                Ok(choice)
+            }
+        };
         let installed = self
             .installed_java
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone();
         if let Some(choice) = known(&installed) {
-            return Ok(choice);
+            return startable(choice);
         }
         let required = install_major(&needs, &host);
+        let build = install_build(&needs, &host);
+        if rosetta_missing && build == JavaBuild::Intel {
+            return Err(LaunchServiceError::RosettaMissing);
+        }
         let Some(installer) = &self.java_installer else {
             return Err(LaunchServiceError::NoJava { required });
         };
@@ -490,6 +506,7 @@ where
         if installer
             .send(JavaRequest {
                 major: required,
+                build,
                 reply,
             })
             .is_err()
@@ -511,7 +528,7 @@ where
             .installed_java
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner) = installed;
-        Ok(choice)
+        startable(choice)
     }
 
     /// The release for the instance's version: the installed copy when there

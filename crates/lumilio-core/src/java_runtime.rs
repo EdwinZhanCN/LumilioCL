@@ -55,6 +55,18 @@ impl JavaSource {
     }
 }
 
+/// Which builds a download may be.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum JavaBuild {
+    /// Any that runs here, native first.
+    #[default]
+    Any,
+    /// Intel only, for a game whose native libraries have no other; Apple
+    /// silicon and Windows on Arm run it translated.
+    Intel,
+}
+
 /// The source a download of `major` uses: the preferred one when it offers
 /// that major to this system, else Mojang, which has every major a game
 /// needs. Without a wanted major any source with something to offer fits.
@@ -156,13 +168,29 @@ pub fn platform_keys(host: &HostProfile) -> Vec<&'static str> {
     keys
 }
 
-/// [`choose_component`] over every platform that runs here, native first.
+/// The index's name for this system's Intel runtimes, if it runs them.
+fn intel_platform_key(host: &HostProfile) -> Option<&'static str> {
+    use MachineArchitecture::{Arm64, X86_64};
+    Some(match (host.platform(), host.architecture()) {
+        (PlatformFamily::Linux, X86_64) => "linux",
+        (PlatformFamily::MacOs, X86_64 | Arm64) => "mac-os",
+        (PlatformFamily::Windows, X86_64 | Arm64) => "windows-x64",
+        _ => return None,
+    })
+}
+
+/// [`choose_component`] over every platform that runs here and gives
+/// `build`, native first.
 pub fn choose_for_host(
     index: &str,
     host: &HostProfile,
     wanted: Option<u32>,
+    build: JavaBuild,
 ) -> Result<RuntimeChoice, JavaRuntimeError> {
-    let keys = platform_keys(host);
+    let keys = match build {
+        JavaBuild::Any => platform_keys(host),
+        JavaBuild::Intel => intel_platform_key(host).into_iter().collect(),
+    };
     if keys.is_empty() {
         return Err(JavaRuntimeError::UnsupportedPlatform);
     }
@@ -217,10 +245,26 @@ pub struct Download {
 pub struct RuntimeChoice {
     /// Mojang's name for it, e.g. `java-runtime-gamma`.
     pub component: String,
+    /// The index's name for the system it is built for, e.g. `mac-os`.
+    pub platform: String,
     pub major: u32,
     /// The version it reports, e.g. `17.0.8`.
     pub version: String,
     pub manifest: Download,
+}
+
+impl RuntimeChoice {
+    /// The folder below `runtimes/` it is installed in: the component, with
+    /// the platform added when it is not `host`'s own, so an Intel
+    /// `java-runtime-gamma` does not take the native one's place.
+    #[must_use]
+    pub fn folder(&self, host: &HostProfile) -> String {
+        if platform_key(host) == Some(self.platform.as_str()) {
+            self.component.clone()
+        } else {
+            format!("{}-{}", self.component, self.platform)
+        }
+    }
 }
 
 #[derive(Deserialize)]
@@ -261,6 +305,7 @@ pub fn choose_component(
             let entry = entries.first()?;
             Some(RuntimeChoice {
                 component: component.clone(),
+                platform: platform.to_owned(),
                 major: major_of(&entry.version.name)?,
                 version: entry.version.name.clone(),
                 manifest: entry.manifest.clone(),

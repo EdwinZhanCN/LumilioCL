@@ -3,6 +3,7 @@ use super::{fake_java, launch_to_end, publish_java, publish_release, world};
 use crate::activity::CancellationToken;
 use crate::activity_log::{RetryAction, TaskOutcome};
 use crate::instance::Loader;
+use crate::java_runtime::JavaBuild;
 
 #[tokio::test]
 async fn java_metadata_falls_back_from_bad_index_and_manifest() {
@@ -32,7 +33,7 @@ async fn java_metadata_falls_back_from_bad_index_and_manifest() {
         .unwrap();
     let java = world
         .service
-        .install_java(Some(21), CancellationToken::new())
+        .install_java(Some(21), JavaBuild::Any, CancellationToken::new())
         .await
         .unwrap();
     assert_eq!(java.major(), 21);
@@ -47,7 +48,7 @@ async fn java_is_installed_whole_found_by_discovery_and_a_bad_file_leaves_nothin
     assert!(
         world
             .service
-            .install_java(Some(21), CancellationToken::new())
+            .install_java(Some(21), JavaBuild::Any, CancellationToken::new())
             .await
             .is_err()
     );
@@ -61,13 +62,14 @@ async fn java_is_installed_whole_found_by_discovery_and_a_bad_file_leaves_nothin
         Some(RetryAction::InstallJava {
             major: Some(21),
             source: crate::java_runtime::JavaSource::Mojang,
+            build: JavaBuild::Any,
         })
     );
 
     publish_java(&world, false);
     let java = world
         .service
-        .install_java(Some(21), CancellationToken::new())
+        .install_java(Some(21), JavaBuild::Any, CancellationToken::new())
         .await
         .unwrap();
     assert_eq!(java.major(), 21);
@@ -90,14 +92,14 @@ async fn java_is_installed_whole_found_by_discovery_and_a_bad_file_leaves_nothin
     );
     let again = world
         .service
-        .install_java(Some(21), CancellationToken::new())
+        .install_java(Some(21), JavaBuild::Any, CancellationToken::new())
         .await
         .unwrap();
     assert_eq!(again.home(), java.home());
     assert!(matches!(
         world
             .service
-            .install_java(Some(99), CancellationToken::new())
+            .install_java(Some(99), JavaBuild::Any, CancellationToken::new())
             .await,
         Err(ServiceError::Install(_))
     ));
@@ -160,7 +162,7 @@ async fn graalvm_comes_from_its_archive_and_a_bad_checksum_leaves_nothing() {
     assert!(
         world
             .service
-            .install_java(Some(21), CancellationToken::new())
+            .install_java(Some(21), JavaBuild::Any, CancellationToken::new())
             .await
             .is_err()
     );
@@ -175,13 +177,14 @@ async fn graalvm_comes_from_its_archive_and_a_bad_checksum_leaves_nothing() {
         Some(RetryAction::InstallJava {
             major: Some(21),
             source: JavaSource::OracleGraalVm,
+            build: JavaBuild::Any,
         })
     );
 
     publish_graalvm(&world, false);
     let java = world
         .service
-        .install_java(Some(21), CancellationToken::new())
+        .install_java(Some(21), JavaBuild::Any, CancellationToken::new())
         .await
         .unwrap();
     assert_eq!(java.home(), runtimes.join("graalvm-21"));
@@ -199,7 +202,7 @@ async fn graalvm_comes_from_its_archive_and_a_bad_checksum_leaves_nothing() {
     assert!(matches!(
         world
             .service
-            .install_java(Some(8), CancellationToken::new())
+            .install_java(Some(8), JavaBuild::Any, CancellationToken::new())
             .await,
         Err(ServiceError::Install(why)) if why.contains("Java 8")
     ));
