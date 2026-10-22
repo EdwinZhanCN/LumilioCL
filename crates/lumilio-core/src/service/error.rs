@@ -38,6 +38,8 @@ pub enum ServiceError {
         page: Option<String>,
     },
     NoSuchInstance(String),
+    /// The game's own folder is not on disk (the path it should be at).
+    GameFolderMissing(PathBuf),
     InstanceBusy(String),
     RootBusy(PathBuf),
     /// The project has no file that fits the instance.
@@ -97,6 +99,9 @@ impl Display for ServiceError {
             ),
             Self::InstanceBusy(id) => write!(f, "instance {id:?} has an operation in progress"),
             Self::NoSuchInstance(id) => write!(f, "no instance {id:?}"),
+            Self::GameFolderMissing(path) => {
+                write!(f, "the game's folder is missing: {}", path.display())
+            }
             Self::NoCompatibleVersion => f.write_str("no version fits this instance"),
             Self::Launch(error) => write!(f, "{error}"),
             Self::Cancelled => f.write_str("operation was cancelled"),
@@ -146,6 +151,7 @@ impl ServiceError {
         let problem = match self {
             Self::SignInRequired(name) => Some(crate::LaunchProblem::SignInRequired(name.clone())),
             Self::Auth(error) => Some(crate::LaunchProblem::Account(error.clone())),
+            Self::GameFolderMissing(_) => Some(crate::LaunchProblem::GameFolderMissing),
             Self::Launch(error) => error.problem(),
             _ => None,
         };

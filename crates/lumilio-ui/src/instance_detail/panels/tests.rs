@@ -115,6 +115,7 @@ fn a_confirmation_names_what_it_will_remove_and_tolerates_a_list_not_loaded() {
 fn every_problem_with_something_to_do_names_it() {
     use lumilio_core::Loader;
     let cases = [
+        (ProblemKind::GameFolderMissing, ProblemAction::NewGameFolder),
         (ProblemKind::NotInstalled, ProblemAction::Install),
         (
             ProblemKind::LoaderUnsupported(Loader::Forge),

@@ -78,7 +78,8 @@ pub enum RecoveryNote {
 }
 
 /// Gathers the notes for a freshly opened root: interrupted deletions are
-/// settled first, then damaged files are reported.
+/// settled first, games never started get their folder, then damaged files
+/// are reported.
 pub(crate) fn startup_notes(
     layout: &Layout,
     store: &InstanceStore,
@@ -102,6 +103,7 @@ pub(crate) fn startup_notes(
             }),
     );
     notes.extend(crate::staged::recover(layout, store));
+    give_unstarted_games_folders(layout, store);
     notes.extend(settle_sessions(layout, store));
     if let Some(preserved) = store.preserved_original() {
         notes.push(RecoveryNote::LibraryRecovered {
@@ -120,6 +122,19 @@ pub(crate) fn startup_notes(
         notes.push(RecoveryNote::ActivityLogSkipped { count: skipped });
     }
     notes
+}
+
+/// Games made before creating one made their folder, and never started since,
+/// have none: they get an empty one, so that from here on a missing folder
+/// means it was moved or deleted (plan game-folder-missing, D2). A game that
+/// was played is left for diagnostics to report.
+fn give_unstarted_games_folders(layout: &Layout, store: &InstanceStore) {
+    for record in store.instances() {
+        let game = layout.game(&record.id);
+        if record.last_played.is_none() && !game.exists() {
+            let _ = std::fs::create_dir_all(game);
+        }
+    }
 }
 
 /// Profile folders on disk that the library has no record of, sorted.

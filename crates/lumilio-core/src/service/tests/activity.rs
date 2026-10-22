@@ -59,7 +59,8 @@ async fn explicit_cancel_unblocks_reads_and_records_cancelled_for_both_install_k
             .iter()
             .all(|task| task.outcome == TaskOutcome::Cancelled)
     );
-    assert!(!world.service.layout.game(&record.id).exists());
+    let game = world.service.layout.game(&record.id);
+    assert!(std::fs::read_dir(game).unwrap().next().is_none());
     // Deleting the current game saves its replacement, so settings are free again.
     drop(defaults);
     world.service.delete_instance(&record.id).await.unwrap();

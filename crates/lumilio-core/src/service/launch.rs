@@ -187,6 +187,13 @@ impl<T: Transport + Clone> LauncherService<T> {
         }
         let session = Published::begin(&self.context, id);
         let result = async {
+            // A folder moved or deleted outside the launcher is not quietly
+            // replaced by an empty one (plan game-folder-missing).
+            let game = self.layout.game(id);
+            if !game.is_dir() {
+                let error = ServiceError::GameFolderMissing(game);
+                return Err(self.note_attempt(id, started, error));
+            }
             // Dropped on every way out; only the launcher dying leaves it behind.
             let _marker = SessionMarker::place(&self.layout, id, started)?;
             let prepared = self.launch_request(id, quick_play, &cancel).await;

@@ -13,7 +13,7 @@ use super::super::instance::open_instance;
 use super::super::launch::play;
 use super::super::{State, Wiring};
 use crate::backend::{Backend, Service};
-use gpui_kit::{Entity, TestAppContext, VisualTestContext};
+use gpui_kit::{AppContext as _, Entity, TestAppContext, VisualTestContext};
 use lumilio_core::{HistoryEvent, Loader, ProjectKind, SessionOutcome};
 use lumilio_ui::home::{HomeIntent, HomePresentation};
 use lumilio_ui::instance_detail::InstanceIntent;
@@ -28,10 +28,13 @@ use std::time::{Duration, Instant};
 
 const WAIT: Duration = Duration::from_secs(10);
 
-/// The shell, wired to the shipped handlers. Searches and Discover's first
-/// search are not sent: these tests are about which game is meant, and must
-/// not reach the network for results nobody looks at.
-fn open(cx: &mut TestAppContext) -> (Entity<LauncherShell>, Wiring, &mut VisualTestContext) {
+/// The shell, wired to the shipped handlers, in a window that can show
+/// dialogs. Searches and Discover's first search are not sent: these tests
+/// are about which game is meant, and must not reach the network for results
+/// nobody looks at.
+pub(super) fn open(
+    cx: &mut TestAppContext,
+) -> (Entity<LauncherShell>, Wiring, &mut VisualTestContext) {
     cx.executor().allow_parking();
     let dir = tempfile::tempdir().unwrap();
     let java = dir.path().join("no-java");
@@ -70,12 +73,19 @@ fn open(cx: &mut TestAppContext) -> (Entity<LauncherShell>, Wiring, &mut VisualT
             },
         )
     };
-    let (shell, cx) = cx.add_window_view(|_, cx| {
-        LauncherShell::new(cx)
-            .with_home(HomePresentation::Loading, cx)
-            .with_live(live)
-            .with_intent_handler(shell_intents)
+    let slot: Rc<RefCell<Option<Entity<LauncherShell>>>> = Rc::default();
+    let keep = slot.clone();
+    let (_, cx) = cx.add_window_view(|window, cx| {
+        let shell = cx.new(|cx| {
+            LauncherShell::new(cx)
+                .with_home(HomePresentation::Loading, cx)
+                .with_live(live)
+                .with_intent_handler(shell_intents)
+        });
+        *keep.borrow_mut() = Some(shell.clone());
+        gpui_kit::component::Root::new(shell, window, cx)
     });
+    let shell = slot.borrow().clone().expect("shell");
     let wiring = Wiring {
         backend: Rc::new(backend),
         shell: shell.downgrade(),
@@ -86,7 +96,7 @@ fn open(cx: &mut TestAppContext) -> (Entity<LauncherShell>, Wiring, &mut VisualT
 }
 
 /// Runs `work` on the service and waits for its answer.
-fn ask<R, F>(wiring: &Wiring, work: impl FnOnce(Arc<Service>) -> F) -> R
+pub(super) fn ask<R, F>(wiring: &Wiring, work: impl FnOnce(Arc<Service>) -> F) -> R
 where
     F: Future<Output = R> + Send + 'static,
     R: Send + 'static,
@@ -95,7 +105,11 @@ where
     futures::executor::block_on(wiring.backend.spawn(work(service))).unwrap()
 }
 
-fn until(cx: &mut VisualTestContext, what: &str, done: impl Fn(&mut VisualTestContext) -> bool) {
+pub(super) fn until(
+    cx: &mut VisualTestContext,
+    what: &str,
+    done: impl Fn(&mut VisualTestContext) -> bool,
+) {
     let deadline = Instant::now() + WAIT;
     loop {
         cx.run_until_parked();
@@ -107,7 +121,7 @@ fn until(cx: &mut VisualTestContext, what: &str, done: impl Fn(&mut VisualTestCo
     }
 }
 
-fn game(wiring: &Wiring, name: &'static str, version: &'static str) -> String {
+pub(super) fn game(wiring: &Wiring, name: &'static str, version: &'static str) -> String {
     ask(wiring, move |service| async move {
         service
             .create_instance(name, Some(version), Loader::Vanilla, None)
@@ -146,14 +160,17 @@ fn attention_now(wiring: &Wiring) -> Vec<(String, String)> {
     .collect()
 }
 
-fn continue_subject(shell: &Entity<LauncherShell>, cx: &mut VisualTestContext) -> Option<String> {
+pub(super) fn continue_subject(
+    shell: &Entity<LauncherShell>,
+    cx: &mut VisualTestContext,
+) -> Option<String> {
     shell.read_with(cx, |shell, _| match shell.home() {
         HomePresentation::Continue { subject, .. } => subject.id.clone(),
         _ => None,
     })
 }
 
-fn failed_attempts(wiring: &Wiring, id: &str) -> usize {
+pub(super) fn failed_attempts(wiring: &Wiring, id: &str) -> usize {
     let id = id.to_owned();
     let history = ask(
         wiring,

@@ -77,6 +77,101 @@ async fn failed_launch_does_not_leave_an_instance_reserved() {
 }
 
 #[tokio::test]
+async fn a_game_whose_folder_was_deleted_is_not_started_as_an_empty_one() {
+    let world = world();
+    publish_release(&world);
+    fake_java(&world, "echo \"Setting user: x\"");
+    let record = world
+        .service
+        .create_instance("Run", None, Loader::Vanilla, None)
+        .await
+        .unwrap();
+    let game = world.service.layout.game(&record.id);
+    assert!(game.is_dir(), "a new game has its folder at once");
+    launch_to_end(&world, &record.id).await.unwrap();
+    std::fs::remove_dir_all(world.service.layout.profile(&record.id)).unwrap();
+
+    let missing = crate::diagnostics::Problem {
+        severity: crate::diagnostics::Severity::Error,
+        kind: crate::diagnostics::ProblemKind::GameFolderMissing,
+    };
+    assert!(
+        world
+            .service
+            .problems(&record.id)
+            .await
+            .unwrap()
+            .contains(&missing)
+    );
+    let refused = launch_to_end(&world, &record.id).await.unwrap_err();
+    assert!(matches!(&refused, ServiceError::GameFolderMissing(path) if *path == game));
+    assert!(matches!(
+        refused.launch_failure(),
+        crate::LaunchFailure::Step {
+            problem: Some(crate::LaunchProblem::GameFolderMissing),
+            ..
+        }
+    ));
+    assert!(!game.exists(), "no empty folder was made in its place");
+    assert_eq!(world.service.library().await.instances.len(), 1);
+
+    world.service.new_game_folder(&record.id).await.unwrap();
+    assert!(
+        !world
+            .service
+            .problems(&record.id)
+            .await
+            .unwrap()
+            .contains(&missing)
+    );
+    assert_eq!(
+        launch_to_end(&world, &record.id).await.unwrap().code,
+        Some(0)
+    );
+}
+
+#[tokio::test]
+async fn opening_gives_a_game_never_started_its_folder_but_not_one_that_was_played() {
+    let world = world();
+    publish_release(&world);
+    fake_java(&world, "echo \"Setting user: x\"");
+    let mut ids = Vec::new();
+    for name in ["Played", "Fresh"] {
+        let record = world
+            .service
+            .create_instance(name, Some("1.0"), Loader::Vanilla, None)
+            .await
+            .unwrap();
+        ids.push(record.id);
+    }
+    launch_to_end(&world, &ids[0]).await.unwrap();
+    // As a launcher that made folders only on first launch left them.
+    for id in &ids {
+        std::fs::remove_dir_all(world.service.layout.profile(id)).unwrap();
+    }
+    let root = world.service.layout.root().to_owned();
+    let (service, _dir) = reopen(world, &root);
+    assert!(!service.layout.game(&ids[0]).exists());
+    assert!(service.layout.game(&ids[1]).is_dir());
+}
+
+#[tokio::test]
+async fn a_game_whose_folder_cannot_be_made_is_not_added() {
+    let world = world();
+    let profiles = world.service.layout.profiles();
+    std::fs::create_dir_all(profiles.parent().unwrap()).unwrap();
+    std::fs::write(&profiles, b"not a folder").unwrap();
+    assert!(
+        world
+            .service
+            .create_instance("Run", Some("1.0"), Loader::Vanilla, None)
+            .await
+            .is_err()
+    );
+    assert!(world.service.library().await.instances.is_empty());
+}
+
+#[tokio::test]
 async fn launching_installs_runs_records_and_then_works_offline() {
     let world = world();
     publish_release(&world);

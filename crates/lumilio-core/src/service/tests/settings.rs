@@ -143,6 +143,9 @@ async fn instance_memory_overrides_are_validated_and_can_resume_inheritance() {
         )
         .unwrap()
         .clone();
+    // Made beside the record, as creating a game does.
+    let game = world.service.layout().game(&record.id);
+    std::fs::create_dir_all(&game).unwrap();
     world
         .service
         .set_default_memory(Some(512), Some(2048))
@@ -205,7 +208,7 @@ async fn instance_memory_overrides_are_validated_and_can_resume_inheritance() {
             .await,
         Err(ServiceError::Settings(SettingsError::InvalidMemory))
     ));
-    assert!(!world.service.layout().game(&record.id).exists());
+    assert!(std::fs::read_dir(&game).unwrap().next().is_none());
     let expected_library = world.service.library().await;
     let mut expected_settings = world.service.settings().await;
     // The game went into the store directly; opening makes it the current game.

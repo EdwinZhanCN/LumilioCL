@@ -113,6 +113,7 @@ static MAC: std::sync::LazyLock<HostProfile> = std::sync::LazyLock::new(|| {
 fn healthy<'a>(instance: &'a InstanceRecord, runtimes: &'a [JavaRuntime]) -> Facts<'a> {
     Facts {
         instance,
+        has_game_folder: true,
         launchable_loaders: &[Loader::Vanilla, Loader::Fabric],
         runtimes,
         java_needs: JavaNeeds::new(&instance.game_version, instance.loader, Some(21)),
@@ -154,6 +155,23 @@ fn blocking_problems_are_errors_and_sort_first() {
     assert!(kinds.contains(&(Severity::Info, ProblemKind::NotInstalled)));
     assert!(kinds.contains(&(Severity::Warning, ProblemKind::DamagedFiles { count: 3 })));
     assert!(problems.windows(2).all(|w| w[0].severity >= w[1].severity));
+}
+
+#[test]
+fn a_game_whose_folder_is_gone_says_so_first() {
+    let instance = record(Loader::Vanilla, true);
+    let runtimes = [java(21)];
+    let mut facts = healthy(&instance, &runtimes);
+    facts.has_game_folder = false;
+    facts.damaged_files = Some(2);
+    let problems = diagnose(&facts);
+    assert_eq!(
+        problems[0],
+        Problem {
+            severity: Severity::Error,
+            kind: ProblemKind::GameFolderMissing
+        }
+    );
 }
 
 #[test]

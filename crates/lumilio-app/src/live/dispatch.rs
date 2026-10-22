@@ -23,6 +23,7 @@ use lumilio_ui::home::HomeIntent;
 use lumilio_ui::instance_detail::InstanceIntent;
 use lumilio_ui::java_conflict::{self, JavaConflict, JavaConflictAnswer};
 use lumilio_ui::live::{LiveIntent, PlaceTarget, account_failure, account_rows};
+use lumilio_ui::missing_folder::{self, MissingFolderAnswer};
 use lumilio_ui::platform;
 use lumilio_ui::route::Route;
 use lumilio_ui::shell::ShellIntent;
@@ -89,19 +90,71 @@ pub(super) fn on_shell_intent(
     }
 }
 
-/// Starts the current game, once there is an account and its Java can run it.
+/// Asks about a game whose folder was moved or deleted (plan
+/// game-folder-missing). Playing it with an empty folder makes one and starts
+/// again; viewing opens its page. The world or server the launch was headed
+/// for is dropped: an empty folder has no worlds.
+fn ask_missing_folder(wiring: &Wiring, id: String, name: &str, window: &mut Window, cx: &mut App) {
+    {
+        let mut state = wiring.state.borrow_mut();
+        state.next_world = None;
+        state.next_server = None;
+    }
+    let wiring = wiring.clone();
+    missing_folder::ask(
+        name,
+        std::rc::Rc::new(move |choice, window, cx| match choice {
+            MissingFolderAnswer::ViewGame => open_instance(&wiring, id.clone(), None, window, cx),
+            MissingFolderAnswer::StartEmpty => {
+                let service = wiring.backend.service.clone();
+                let id = id.clone();
+                let made = wiring
+                    .backend
+                    .spawn(async move { service.new_game_folder(&id).await });
+                let (wiring, window) = (wiring.clone(), window.window_handle());
+                cx.spawn(async move |cx| {
+                    let Some(made) = answer(&wiring, made, cx).await else {
+                        return;
+                    };
+                    if let Err(error) = made {
+                        let toast =
+                            Toast::error(tr!("missing-folder-failed")).technical(error.to_string());
+                        let _ = wiring.shell.update(cx, |shell, cx| shell.toast(toast, cx));
+                        return;
+                    }
+                    let _ = cx.update_window(window, |_, window, cx| {
+                        let _ = wiring
+                            .shell
+                            .update(cx, |shell, cx| shell.request_continue(window, cx));
+                    });
+                })
+                .detach();
+            }
+        }),
+        window,
+        cx,
+    );
+}
+
+/// Starts the current game, once its folder is there, there is an account
+/// and its Java can run it.
 fn continue_launch(wiring: &Wiring, window: gpui_kit::AnyWindowHandle, cx: &mut App) {
     // Asked of the service, not the page: an account added a moment ago
     // may not have reached the page's model yet.
     let service = wiring.backend.service.clone();
+    let current = wiring.backend.service.context().current_instance;
     let answered = wiring.state.borrow_mut().java_answered.take();
-    let check_java = wiring
-        .backend
-        .service
-        .context()
-        .current_instance
-        .filter(|id| answered.as_ref() != Some(id));
+    let check_java = current.clone().filter(|id| answered.as_ref() != Some(id));
     let work = wiring.backend.spawn(async move {
+        // Whether to play this game at all comes before account and Java.
+        let missing = match current {
+            Some(id) if !service.game_dir(&id).is_dir() => service
+                .instance(&id)
+                .await
+                .ok()
+                .map(|record| (record.id, record.name)),
+            _ => None,
+        };
         let has_account = account_rows(&service.settings().await)
             .iter()
             .any(|row| row.selected);
@@ -113,19 +166,22 @@ fn continue_launch(wiring: &Wiring, window: gpui_kit::AnyWindowHandle, cx: &mut 
                 .and_then(|java| JavaConflict::of(&java)),
             None => None,
         };
-        (has_account, conflict)
+        (missing, has_account, conflict)
     });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let (has_account, conflict) = answer(&wiring, work, cx).await.unwrap_or((true, None));
-        if has_account && conflict.is_none() {
+        let (missing, has_account, conflict) = answer(&wiring, work, cx)
+            .await
+            .unwrap_or((None, true, None));
+        if missing.is_none() && has_account && conflict.is_none() {
             cx.update(|cx| start_launch(&wiring, window, cx));
             return;
         }
         let _ = wiring.shell.update(cx, |shell, cx| shell.abort_launch(cx));
-        let _ = cx.update_window(window, |_, window, cx| match conflict {
+        let _ = cx.update_window(window, |_, window, cx| match (missing, conflict) {
+            (Some((id, name)), _) => ask_missing_folder(&wiring, id, &name, window, cx),
             // The chosen Java cannot run the game: ask once, then start.
-            Some(conflict) if has_account => ask_java(&wiring, &conflict, window, cx),
+            (None, Some(conflict)) if has_account => ask_java(&wiring, &conflict, window, cx),
             // No account: ask for one, then start where the person left off.
             _ => open_add_account(&wiring, true, window, cx),
         });
