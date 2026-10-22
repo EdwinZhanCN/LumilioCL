@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "error-reporting",
   "title": "启动器错误及时告诉用户",
-  "summary": "启动器有 Shell 级 toast（错误常驻、带技术详情），但很多失败到不了它：后台任务 panic 被当成「没有结果」，界面停在进行中；实例页等视图的结果只进各自的队列，视图离开屏幕后就看不到；启动失败的恢复面板不显示原因，「技术详情」按钮是空操作；Unix 上被信号杀死的游戏算正常退出。启动器自己没有日志文件，也不处理 panic，启动阶段的失败只写 stderr 后退出。本计划先让已有的 toast 与恢复面板收到这些失败（T1–T3），再补日志、panic 记录与启动阶段的提示（T4–T6）。",
+  "summary": "启动器有 Shell 级 toast（错误常驻、带技术详情），但很多失败到不了它：后台任务 panic 被当成「没有结果」，界面停在进行中；实例页等视图的结果只进各自的队列，视图离开屏幕后就看不到；启动失败的恢复面板不显示原因，「技术详情」按钮是空操作；Unix 上被信号杀死的游戏算正常退出。启动器自己没有日志文件，也不处理 panic，启动阶段的失败只写 stderr 后退出。本计划先让已有的 toast 与恢复面板收到这些失败（T1–T3），再补日志、panic 记录与启动阶段的提示（T4–T6）；游戏在写日志之前就退出时，它自己打印的错误也要报出来（T9）。",
   "status": "in_progress",
   "visibility": "internal",
   "scope": {
@@ -44,6 +44,12 @@
       "acceptance": "LaunchFailure::Step 带类型化的 LaunchProblem（需要重新登录、账户登录失败、没有能用的 Java、下载 Java 失败、启动前命令失败、找不到世界），core 只给类型；恢复面板说明在有原因时说原因，没有时仍说停在哪一步；技术详情只放原始原因。崩溃面板说明不再重复标题，只加退出代码。测试：ui a_known_cause_is_told_instead_of_the_step、a_crash_caption_does_not_repeat_its_headline；core 缺 Java 的启动测试断言 NoJava(Some(21)) 经真实启动路径到达会话。"
     },
     {
+      "id": "T9",
+      "title": "游戏启动时退出，报出它自己打印的错误。",
+      "status": "completed",
+      "acceptance": "LaunchFailure::ExitedEarly 带游戏起来之前最后打印的至多 50 行（stdout 与 stderr 按到达顺序）。恢复面板的「技术详情」有这些行时弹出可复制的对话框，没有时仍打开诊断页；不在 Home 时的错误 toast 带同样的技术详情；启动器日志的「the game quit while starting」一行附上这些输出。游戏起来之后不再保留输出。"
+    },
+    {
       "id": "T7",
       "title": "Project Maintainer 在真实启动器上看一次 T1–T3。",
       "status": "completed",
@@ -76,6 +82,10 @@
     {
       "criterion": "T1–T3、T8 合入 main，真实窗口的样子经 Project Maintainer 确认（T7）。",
       "result": "2026-10-21：#62 合并 main（含 global-context 的 #59）后 squash 合入。Project Maintainer 运行的 just check 通过（1784 项测试）。合并后在临时 LUMILIO_HOME 中用 LUMILIO_HOME_RECOVERY 重拍 failed、details、crashed、crashed-details、away 五种情形，Project Maintainer 看过确认：失败说原因不说步骤，崩溃说明不重复标题，技术详情弹出可复制的原始原因或打开诊断页，在游戏库时失败浮出 toast。Windows 上运行中点停止回到继续交给社区反馈，T7 完成。"
+    },
+    {
+      "criterion": "游戏在写日志之前就退出时，它打印的错误在技术详情与启动器日志中可读（T9）。",
+      "result": "2026-10-22：core a_game_that_dies_at_once_fails_the_session_with_what_it_printed 让假 java 脚本向 stderr 打印两行后以 1 退出，经真实启动路径断言会话为 ExitedEarly { code: Some(1), output: 这两行 }，technical_detail 按行连接；an_early_exit_keeps_only_the_last_lines_and_a_running_game_none 断言 60 行只留最后 50 行、游戏起来后的退出是普通 Exited。临时去掉填入输出的一行时两项按预期失败。app technical_details_after_a_failed_launch_explain_it 在真实窗口中点「技术详情」，启动即退出弹出对话框，「复制」写入游戏输出；只给 Step 弹对话框的旧规则下按预期失败。ui a_failure_away_from_home_floats_up_as_a_toast 断言启动即退出的 toast 带游戏输出，旧规则下按预期失败。"
     },
     {
       "criterion": "启动器的错误与 panic 留在用户能找到的日志或 crash 文件中。",
@@ -115,7 +125,8 @@
   "lessonsLearned": [
     "2026-10-21 审查发现：app 中约 25 处以 `let Ok(x) = handle.await else { return }` 等待工作线程，把 panic 当成「没有结果」。Discover 的安装卡片因此可能永远停在安装中，启动可能停在启动中，且 panic 消息只写到发布版看不到的 stderr。Guard：job() 把 JoinError 交给 done，其他等待处用 jobs::answer()；测试 work_that_panics_is_told_and_not_left_hanging。",
     "2026-10-21 审查发现：实例页等视图的 toast 只在视图渲染时显示，离开页面或视图被移出历史后结果丢失（删除游戏成功的提示从未显示）。Guard：主窗口共享 toast::Posted 队列由 Shell 显示；测试 a_result_for_a_page_no_longer_shown_still_floats_up。",
-    "2026-10-21：T3 的工作已随 #62 合入，计划里仍是 in_progress，合并后列剩余任务时才发现。Guard：合并 PR 前按 lumilio-exec-plan 逐项核对本计划任务的状态与验证，在同一个 PR 里更新。"
+    "2026-10-21：T3 的工作已随 #62 合入，计划里仍是 in_progress，合并后列剩余任务时才发现。Guard：合并 PR 前按 lumilio-exec-plan 逐项核对本计划任务的状态与验证，在同一个 PR 里更新。",
+    "2026-10-22：一个 NeoForge 1.21.4 整合包一启动就以退出码 1 退出，游戏目录里没有日志，恢复面板的技术详情打开的诊断页也是空的。原因（ASM 两个版本同在 classpath，另由 #72 修复）只在游戏的 stderr 里，启动器只在游戏运行时显示输出，退出时就丢掉了，只能手动拼启动命令重现。Guard：T9 的 ExitedEarly 带最后的输出；测试 a_game_that_dies_at_once_fails_the_session_with_what_it_printed、technical_details_after_a_failed_launch_explain_it。"
   ],
   "roadmap": {
     "enabled": false,

@@ -65,7 +65,10 @@ fn an_exit_before_running_is_a_failure_in_the_current_phase() {
         session.status(),
         &LaunchStatus::Failed {
             phase: LaunchPhase::Starting,
-            failure: LaunchFailure::ExitedEarly { code: Some(1) },
+            failure: LaunchFailure::ExitedEarly {
+                code: Some(1),
+                output: Vec::new(),
+            },
         }
     );
     assert!(session.is_finished());

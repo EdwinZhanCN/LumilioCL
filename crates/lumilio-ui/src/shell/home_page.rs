@@ -8,7 +8,7 @@ use crate::{home, pages, theme};
 use gpui::prelude::*;
 use gpui::{AnyElement, Context, Window, div, px};
 use gpui_component::{TITLE_BAR_HEIGHT, v_flex};
-use lumilio_core::{LaunchFailure, LaunchSignal};
+use lumilio_core::LaunchSignal;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
@@ -66,15 +66,22 @@ impl LauncherShell {
             && !was_recovering
             && !matches!(self.location(), Location::Page(Route::Home))
         {
-            let text = format!("{} · {}", subject.title, home::recovery_sentence(detail));
-            let toast = match detail {
-                RecoveryDetail::Failed {
-                    failure: LaunchFailure::Step { message, .. },
-                    ..
-                } => Toast::error(text).technical(message.clone()),
-                _ => Toast::error(text),
+            let toast = Toast::error(format!(
+                "{} · {}",
+                subject.title,
+                home::recovery_sentence(detail)
+            ));
+            let technical = match detail {
+                RecoveryDetail::Failed { failure, .. } => failure.technical_detail(),
+                _ => None,
             };
-            self.toast(toast, cx);
+            self.toast(
+                match technical {
+                    Some(cause) => toast.technical(cause),
+                    None => toast,
+                },
+                cx,
+            );
         }
         self.set_home(home, cx);
     }
