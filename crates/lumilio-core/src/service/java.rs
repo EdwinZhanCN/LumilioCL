@@ -255,7 +255,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         let host = HostProfile::current();
         let mojang = match self.chain().await {
             Ok(chain) => crate::fetch::fetch_decoded(
-                &self.transport,
+                &self.fetcher(),
                 &chain.candidates(crate::java_runtime::INDEX_URL),
                 |bytes| {
                     let index = String::from_utf8(bytes).map_err(|error| error.to_string())?;
@@ -332,7 +332,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         let chain = read_unless_cancelled(&cancel, self.chain()).await?;
         let checksum = read_unless_cancelled(&cancel, async {
             crate::fetch::fetch_decoded(
-                &self.transport,
+                &self.fetcher(),
                 &chain.candidates(&wanted.checksum_url),
                 |bytes| {
                     let text = String::from_utf8(bytes).map_err(|error| error.to_string())?;
@@ -414,7 +414,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         let chain = read_unless_cancelled(&cancel, self.chain()).await?;
         let choice = read_unless_cancelled(&cancel, async {
             crate::fetch::fetch_decoded(
-                &self.transport,
+                &self.fetcher(),
                 &chain.candidates(runtime::INDEX_URL),
                 |bytes| {
                     let index =
@@ -436,7 +436,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         }
         let entries = read_unless_cancelled(&cancel, async {
             crate::fetch::fetch_decoded(
-                &self.transport,
+                &self.fetcher(),
                 &chain.candidates(&choice.manifest.url),
                 |bytes| {
                     let manifest =

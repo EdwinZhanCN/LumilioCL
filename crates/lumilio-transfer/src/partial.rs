@@ -6,6 +6,7 @@
 use super::files::encode_lower_hex;
 use super::request::ContentDigest;
 use sha2::{Digest, Sha256};
+use std::ops::Range;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 use tokio::fs;
@@ -29,6 +30,43 @@ pub(super) struct Note {
     /// The response's `ETag` or `Last-Modified`, sent back as `If-Range`.
     pub(super) validator: Option<String>,
     pub(super) digest: Option<ContentDigest>,
+    /// `None`: the part file is a prefix of the content. `Some`: it has the
+    /// content's full length and only some ranges are written, as left by a
+    /// download over several connections.
+    pub(super) written: Option<Written>,
+}
+
+/// The written ranges of a part file as long as the whole content.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(super) struct Written {
+    pub(super) length: u64,
+    pub(super) ranges: Vec<Range<u64>>,
+}
+
+impl Written {
+    fn encode(&self) -> String {
+        self.ranges
+            .iter()
+            .map(|range| format!("{}-{}", range.start, range.end))
+            .collect::<Vec<_>>()
+            .join(",")
+    }
+
+    /// Sorted ranges inside `0..length` that neither overlap nor touch, or
+    /// `None`.
+    fn decode(length: u64, text: &str) -> Option<Self> {
+        let mut ranges: Vec<Range<u64>> = Vec::new();
+        for range in text.split(',').filter(|range| !range.is_empty()) {
+            let (start, end) = range.split_once('-')?;
+            let (start, end) = (start.parse().ok()?, end.parse().ok()?);
+            let after_previous = ranges.last().is_none_or(|last| last.end < start);
+            if start >= end || end > length || !after_previous {
+                return None;
+            }
+            ranges.push(start..end);
+        }
+        Some(Self { length, ranges })
+    }
 }
 
 impl Note {
@@ -45,14 +83,21 @@ impl Note {
     /// One `key<TAB>value` line per field; `None` when a value would break
     /// that shape.
     fn encode(&self) -> Option<String> {
-        let mut fields = vec![("part", self.part.to_str()?), ("source", &self.source)];
+        let mut fields = vec![
+            ("part", self.part.to_str()?.to_owned()),
+            ("source", self.source.clone()),
+        ];
         if let Some(validator) = &self.validator {
-            fields.push(("validator", validator));
+            fields.push(("validator", validator.clone()));
         }
         match &self.digest {
-            Some(ContentDigest::Sha1(hex)) => fields.push(("sha1", hex)),
-            Some(ContentDigest::Sha256(hex)) => fields.push(("sha256", hex)),
+            Some(ContentDigest::Sha1(hex)) => fields.push(("sha1", hex.clone())),
+            Some(ContentDigest::Sha256(hex)) => fields.push(("sha256", hex.clone())),
             None => {}
+        }
+        if let Some(written) = &self.written {
+            fields.push(("length", written.length.to_string()));
+            fields.push(("written", written.encode()));
         }
         if fields
             .iter()
@@ -73,6 +118,8 @@ impl Note {
         let mut source = None;
         let mut validator = None;
         let mut digest = None;
+        let mut length = None;
+        let mut written = None;
         for line in text.lines() {
             let (key, value) = line.split_once('\t')?;
             match key {
@@ -81,14 +128,22 @@ impl Note {
                 "validator" => validator = Some(value.to_owned()),
                 "sha1" => digest = ContentDigest::parse(value.to_owned(), false).ok(),
                 "sha256" => digest = ContentDigest::parse(value.to_owned(), true).ok(),
+                "length" => length = Some(value.parse().ok()?),
+                "written" => written = Some(value.to_owned()),
                 _ => {}
             }
         }
+        let written = match (length, written) {
+            (Some(length), Some(written)) => Some(Written::decode(length, &written)?),
+            (None, None) => None,
+            _ => return None,
+        };
         Some(Self {
             part: part?,
             source: source?,
             validator,
             digest,
+            written,
         })
     }
 }

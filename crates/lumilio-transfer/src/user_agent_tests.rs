@@ -30,32 +30,54 @@ async fn http_requests_identify_the_launcher() {
     assert!(USER_AGENT.starts_with("LumilioCL/"));
 }
 
-#[tokio::test]
-async fn a_continued_download_asks_for_the_rest_if_unchanged() {
+/// Answers one request with `answer` and returns the request's head.
+fn serve_once(answer: &'static [u8]) -> (String, std::thread::JoinHandle<String>) {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let address = listener.local_addr().unwrap();
     let server = std::thread::spawn(move || {
         let (mut stream, _) = listener.accept().unwrap();
         let mut buffer = [0_u8; 4096];
         let read = stream.read(&mut buffer).unwrap();
-        stream
-            .write_all(
-                b"HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 40-41/42\r\n\
-                  Content-Length: 2\r\nConnection: close\r\n\r\nok",
-            )
-            .unwrap();
+        stream.write_all(answer).unwrap();
         String::from_utf8_lossy(&buffer[..read]).into_owned()
     });
+    (format!("http://{address}/"), server)
+}
+
+#[tokio::test]
+async fn a_continued_download_asks_for_the_rest_if_unchanged() {
+    let (url, server) = serve_once(
+        b"HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 40-41/42\r\n\
+          Content-Length: 2\r\nConnection: close\r\n\r\nok",
+    );
     let transport = HttpTransport::new().unwrap();
     let response = transport
-        .get_from(&format!("http://{address}/"), 40, Some("\"v1\""))
+        .get_range(&url, 40, None, Some("\"v1\""))
         .await
         .unwrap();
     assert_eq!(response.status(), 206);
     assert_eq!(response.header("content-range"), Some("bytes 40-41/42"));
+    assert_eq!(response.url(), Some(url.as_str()));
     let head = server.join().unwrap().to_ascii_lowercase();
-    assert!(head.contains("range: bytes=40-"), "{head}");
+    assert!(head.contains("range: bytes=40-\r\n"), "{head}");
     assert!(head.contains("if-range: \"v1\""), "{head}");
+}
+
+#[tokio::test]
+async fn a_range_with_an_end_names_its_last_byte() {
+    let (url, server) = serve_once(
+        b"HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 10-19/42\r\n\
+          Content-Length: 10\r\nConnection: close\r\n\r\n0123456789",
+    );
+    let response = HttpTransport::new()
+        .unwrap()
+        .get_range(&url, 10, Some(20), None)
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 206);
+    let head = server.join().unwrap().to_ascii_lowercase();
+    assert!(head.contains("range: bytes=10-19\r\n"), "{head}");
+    assert!(!head.contains("if-range"), "{head}");
 }
 
 #[tokio::test]

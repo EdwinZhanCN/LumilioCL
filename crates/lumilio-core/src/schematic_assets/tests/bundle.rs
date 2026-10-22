@@ -75,12 +75,20 @@ async fn the_index_is_fetched_once_and_kept() {
     );
     let store = BundleStore::new(&dir.path().join("cache")).with_url(URL);
     assert!(store.cached_index().is_none());
-    let fetched = store.fetch_index(&net, &chain()).await.unwrap();
+    let fetched = store
+        .fetch_index(&TransferEngine::new(net.clone(), 1).unwrap(), &chain())
+        .await
+        .unwrap();
     assert_eq!(store.cached_index(), Some(fetched));
 
     let offline = BundleStore::new(&dir.path().join("elsewhere")).with_url(URL);
     assert!(matches!(
-        offline.fetch_index(&Served::default(), &chain()).await,
+        offline
+            .fetch_index(
+                &TransferEngine::new(Served::default(), 1).unwrap(),
+                &chain()
+            )
+            .await,
         Err(SchematicAssetsError::Download(_))
     ));
 }

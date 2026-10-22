@@ -69,13 +69,13 @@ impl BundleStore {
     }
 
     /// Fetches the index and keeps it: a release's index never changes.
-    pub async fn fetch_index<T: Transport + ?Sized>(
+    pub async fn fetch_index<T: Transport>(
         &self,
-        transport: &T,
+        engine: &TransferEngine<T>,
         chain: &SourceChain,
     ) -> Result<BundleIndex, SchematicAssetsError> {
         let sources = chain.candidates(&format!("{}{INDEX_FILE}", self.url));
-        let (index, bytes) = fetch_decoded(transport, &sources, |bytes| {
+        let (index, bytes) = fetch_decoded(engine, &sources, |bytes| {
             BundleIndex::parse(&bytes).map(|index| (index, bytes))
         })
         .await
@@ -162,15 +162,15 @@ impl BundleStore {
 
     /// Fetches a small `file` (the names) without an Activity task, as the
     /// index is fetched, and keeps it once it matches its SHA-256.
-    pub async fn fetch_small<T: Transport + ?Sized>(
+    pub async fn fetch_small<T: Transport>(
         &self,
-        transport: &T,
+        engine: &TransferEngine<T>,
         chain: &SourceChain,
         file: &BundleFile,
     ) -> Result<(), SchematicAssetsError> {
         let sources = chain.candidates(&format!("{}{}", self.url, file.name));
         let expected = file.sha256.clone();
-        let bytes = fetch_decoded(transport, &sources, |bytes| {
+        let bytes = fetch_decoded(engine, &sources, |bytes| {
             if sha256_hex(&bytes).eq_ignore_ascii_case(&expected) {
                 Ok(bytes)
             } else {

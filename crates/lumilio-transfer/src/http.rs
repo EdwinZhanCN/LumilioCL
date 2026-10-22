@@ -60,6 +60,7 @@ impl HttpTransport {
         })?;
         let status = response.status().as_u16();
         let content_length = response.content_length();
+        let url = response.url().to_string();
         let headers = response
             .headers()
             .iter()
@@ -72,7 +73,11 @@ impl HttpTransport {
                 .map(|bytes| bytes.to_vec())
                 .map_err(|error| TransportError::transient(crate::with_causes(&error)))
         });
-        Ok(TransportResponse::new(status, content_length, Box::pin(body)).with_headers(headers))
+        Ok(
+            TransportResponse::new(status, content_length, Box::pin(body))
+                .with_headers(headers)
+                .with_url(url),
+        )
     }
 }
 
@@ -101,17 +106,20 @@ impl Transport for HttpTransport {
         Box::pin(async move { Self::respond(self.client.get(source).send().await) })
     }
 
-    fn get_from<'a>(
+    fn get_range<'a>(
         &'a self,
         source: &'a str,
-        offset: u64,
+        start: u64,
+        end: Option<u64>,
         validator: Option<&'a str>,
     ) -> TransportFuture<'a> {
         Box::pin(async move {
-            let mut builder = self
-                .client
-                .get(source)
-                .header("range", format!("bytes={offset}-"));
+            // HTTP ranges name their last byte, not the one after it.
+            let last = end.map(|end| end.saturating_sub(1).to_string());
+            let mut builder = self.client.get(source).header(
+                "range",
+                format!("bytes={start}-{}", last.as_deref().unwrap_or("")),
+            );
             if let Some(validator) = validator {
                 builder = builder.header("if-range", validator);
             }
@@ -227,16 +235,17 @@ impl Transport for DefaultTransport {
         }
     }
 
-    fn get_from<'a>(
+    fn get_range<'a>(
         &'a self,
         source: &'a str,
-        offset: u64,
+        start: u64,
+        end: Option<u64>,
         validator: Option<&'a str>,
     ) -> TransportFuture<'a> {
         if Url::parse(source).is_ok_and(|url| url.scheme() == "file") {
             self.file.get(source)
         } else {
-            self.http.get_from(source, offset, validator)
+            self.http.get_range(source, start, end, validator)
         }
     }
 

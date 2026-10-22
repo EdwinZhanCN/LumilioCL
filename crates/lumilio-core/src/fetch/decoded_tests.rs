@@ -35,13 +35,13 @@ async fn catalog_falls_back_from_http_200_with_bad_json_structure_or_encoding() 
         b"{\"error\":\"unavailable\"}".to_vec(),
         vec![0xff],
     ] {
-        let web = Web {
+        let web = Arc::new(Web {
             documents: BTreeMap::from([
                 (mirror.to_owned(), bad),
                 (OFFICIAL_CATALOG_URL.to_owned(), br#"{"latest":{"release":"1.21","snapshot":"1.21"},"versions":[{"id":"1.21","type":"release","url":"https://official.test/1.21.json","releaseTime":"2024-01-01"}]}"#.to_vec()),
             ]),
             ..Web::default()
-        };
+        });
         let sources = SourceChain::new(vec![
             Arc::new(
                 PrefixMirror::new(
@@ -54,7 +54,10 @@ async fn catalog_falls_back_from_http_200_with_bad_json_structure_or_encoding() 
             Arc::new(OfficialSource),
         ])
         .unwrap();
-        let catalog = VersionCatalog::fetch(&web, &sources).await.unwrap();
+        let catalog =
+            VersionCatalog::fetch(&TransferEngine::new(web.clone(), 1).unwrap(), &sources)
+                .await
+                .unwrap();
         assert_eq!(catalog.entries()[0].id(), "1.21");
         assert_eq!(*web.asked.lock().unwrap(), [mirror, OFFICIAL_CATALOG_URL]);
     }
@@ -69,18 +72,21 @@ async fn loader_falls_back_from_wrong_shape_but_accepts_a_valid_empty_list() {
         ),
         (b"[]".as_slice(), vec!["mirror"]),
     ] {
-        let web = Web {
+        let web = Arc::new(Web {
             documents: BTreeMap::from([
                 ("mirror".to_owned(), first.to_vec()),
                 ("official".to_owned(), b"[]".to_vec()),
             ]),
             ..Web::default()
-        };
+        });
         assert!(
-            loader::fetch_versions(&web, &["mirror".to_owned(), "official".to_owned()])
-                .await
-                .unwrap()
-                .is_empty()
+            loader::fetch_versions(
+                &TransferEngine::new(web.clone(), 1).unwrap(),
+                &["mirror".to_owned(), "official".to_owned()]
+            )
+            .await
+            .unwrap()
+            .is_empty()
         );
         assert_eq!(*web.asked.lock().unwrap(), expected_requests);
     }
@@ -88,16 +94,18 @@ async fn loader_falls_back_from_wrong_shape_but_accepts_a_valid_empty_list() {
 
 #[tokio::test]
 async fn decoding_failure_retains_each_source_reason() {
-    let web = Web {
+    let web = Arc::new(Web {
         documents: BTreeMap::from([
             ("a".to_owned(), b"first".to_vec()),
             ("b".to_owned(), b"second".to_vec()),
         ]),
         ..Web::default()
-    };
-    let error = fetch_decoded(&web, &["a", "b"], |bytes| {
-        Err::<(), _>(String::from_utf8(bytes).unwrap())
-    })
+    });
+    let error = fetch_decoded(
+        &TransferEngine::new(web.clone(), 1).unwrap(),
+        &["a", "b"],
+        |bytes| Err::<(), _>(String::from_utf8(bytes).unwrap()),
+    )
     .await
     .unwrap_err();
     assert_eq!(
@@ -108,7 +116,12 @@ async fn decoding_failure_retains_each_source_reason() {
         }
     );
     assert_eq!(
-        fetch_decoded(&web, &[] as &[&str], Ok::<_, std::convert::Infallible>).await,
+        fetch_decoded(
+            &TransferEngine::new(web.clone(), 1).unwrap(),
+            &[] as &[&str],
+            Ok::<_, std::convert::Infallible>
+        )
+        .await,
         Err(FetchError::NoSources)
     );
 }

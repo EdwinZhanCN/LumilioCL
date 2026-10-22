@@ -76,9 +76,10 @@ impl<T: Transport + Clone> LauncherService<T> {
         let manifest_url = if all_ready {
             None
         } else {
+            let fetcher = self.fetcher();
             let fetched = tokio::select! {
                 () = cancel.cancelled() => return Err(ServiceError::Cancelled),
-                fetched = VersionCatalog::fetch(&self.transport, &chain) => fetched,
+                fetched = VersionCatalog::fetch(&fetcher, &chain) => fetched,
             };
             match fetched {
                 Ok(catalog) => catalog

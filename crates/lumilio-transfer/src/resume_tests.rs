@@ -1,120 +1,13 @@
 use super::engine::TransferEngine;
 use super::partial::{part_path, sweep_partials};
 use super::request::{RetryPolicy, TransferError, TransferEvent, TransferRequest};
-use super::transport::{ByteStream, Transport, TransportError, TransportFuture, TransportResponse};
+use super::test_server::{Ending, Server};
 use crate::CancellationToken;
-use futures_util::stream::{self, StreamExt};
 use sha1::{Digest, Sha1};
-use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 const SOURCE: &str = "https://example.invalid/file";
-
-/// How the next answer ends after the bytes it was asked for start.
-#[derive(Clone, Copy)]
-enum Ending {
-    Whole,
-    /// A network error after this many bytes.
-    BreakAfter(usize),
-    /// No more bytes until cancelled, after this many.
-    StallAfter(usize),
-}
-
-#[derive(Default)]
-struct State {
-    content: Vec<u8>,
-    etag: Option<String>,
-    ranges: bool,
-    endings: VecDeque<Ending>,
-    /// Each request's starting byte and `If-Range`.
-    asked: Vec<(u64, Option<String>)>,
-}
-
-#[derive(Clone, Default)]
-struct Server(Arc<Mutex<State>>);
-
-impl Server {
-    fn new(content: &[u8], etag: Option<&str>, ranges: bool) -> Self {
-        let server = Self::default();
-        {
-            let mut state = server.state();
-            state.content = content.to_vec();
-            state.etag = etag.map(str::to_owned);
-            state.ranges = ranges;
-        }
-        server
-    }
-
-    fn state(&self) -> std::sync::MutexGuard<'_, State> {
-        self.0
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-    }
-
-    fn then(&self, ending: Ending) -> &Self {
-        self.state().endings.push_back(ending);
-        self
-    }
-
-    fn asked(&self) -> Vec<(u64, Option<String>)> {
-        self.state().asked.clone()
-    }
-
-    fn answer(&self, offset: u64, validator: Option<&str>) -> TransportResponse {
-        let mut state = self.state();
-        state.asked.push((offset, validator.map(str::to_owned)));
-        let fresh = validator.is_none_or(|validator| state.etag.as_deref() == Some(validator));
-        let start = if offset > 0 && state.ranges && fresh {
-            offset as usize
-        } else {
-            0
-        };
-        let length = state.content.len();
-        let rest = state.content[start..].to_vec();
-        let ending = state.endings.pop_front().unwrap_or(Ending::Whole);
-        let body: ByteStream = match ending {
-            Ending::Whole => Box::pin(stream::iter([Ok(rest.clone())])),
-            Ending::BreakAfter(count) => Box::pin(stream::iter([
-                Ok(rest[..count].to_vec()),
-                Err(TransportError::transient("connection reset")),
-            ])),
-            Ending::StallAfter(count) => {
-                Box::pin(stream::iter([Ok(rest[..count].to_vec())]).chain(stream::pending()))
-            }
-        };
-        let mut headers = Vec::new();
-        if let Some(etag) = &state.etag {
-            headers.push(("etag".to_owned(), etag.clone()));
-        }
-        let status = if start > 0 {
-            headers.push((
-                "content-range".to_owned(),
-                format!("bytes {start}-{}/{length}", length - 1),
-            ));
-            206
-        } else {
-            200
-        };
-        TransportResponse::new(status, Some(rest.len() as u64), body).with_headers(headers)
-    }
-}
-
-impl Transport for Server {
-    fn get<'a>(&'a self, _source: &'a str) -> TransportFuture<'a> {
-        Box::pin(async move { Ok(self.answer(0, None)) })
-    }
-
-    fn get_from<'a>(
-        &'a self,
-        _source: &'a str,
-        offset: u64,
-        validator: Option<&'a str>,
-    ) -> TransportFuture<'a> {
-        Box::pin(async move { Ok(self.answer(offset, validator)) })
-    }
-}
 
 fn content() -> Vec<u8> {
     (0..100_u8).collect()

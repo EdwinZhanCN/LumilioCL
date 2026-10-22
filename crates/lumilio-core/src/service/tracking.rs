@@ -30,6 +30,13 @@ impl<T: Transport + Clone> LauncherService<T> {
             .keeping_partials(self.layout.partial_downloads())
     }
 
+    /// An engine for documents read into memory, on the shared connections
+    /// as they are sized now. It takes no lock, so callers holding the
+    /// settings may use it.
+    pub(super) fn fetcher(&self) -> TransferEngine<T> {
+        TransferEngine::with_budget(self.transport.clone(), self.connections.clone())
+    }
+
     /// [`Self::install_tracked`] through a new launcher that may download the
     /// Java a Forge or NeoForge installer runs on.
     pub(super) async fn install_serving_java(

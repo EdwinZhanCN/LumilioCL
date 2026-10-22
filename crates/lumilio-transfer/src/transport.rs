@@ -33,17 +33,19 @@ pub struct HttpRequest {
 pub trait Transport: Send + Sync + 'static {
     fn get<'a>(&'a self, source: &'a str) -> TransportFuture<'a>;
 
-    /// Asks for the content from byte `offset` on (`206`), unless it no
-    /// longer matches `validator` (an `ETag` or `Last-Modified`). Any other
-    /// answer, such as the whole content with `200`, makes the caller start
-    /// over; transports that cannot ask keep this default, which does that.
-    fn get_from<'a>(
+    /// Asks for the bytes `start..end` of the content (`206`), to its end when
+    /// `end` is `None`, unless it no longer matches `validator` (an `ETag` or
+    /// `Last-Modified`). Any other answer, such as the whole content with
+    /// `200`, makes the caller start over; transports that cannot ask keep
+    /// this default, which does that.
+    fn get_range<'a>(
         &'a self,
         source: &'a str,
-        offset: u64,
+        start: u64,
+        end: Option<u64>,
         validator: Option<&'a str>,
     ) -> TransportFuture<'a> {
-        let _ = (offset, validator);
+        let _ = (start, end, validator);
         self.get(source)
     }
 
@@ -82,12 +84,44 @@ pub trait Transport: Send + Sync + 'static {
     }
 }
 
+/// A shared transport, so its owner can still see it once an engine holds
+/// it (a plugin host's, a test's).
+impl<T: Transport + ?Sized> Transport for std::sync::Arc<T> {
+    fn get<'a>(&'a self, source: &'a str) -> TransportFuture<'a> {
+        (**self).get(source)
+    }
+
+    fn get_range<'a>(
+        &'a self,
+        source: &'a str,
+        start: u64,
+        end: Option<u64>,
+        validator: Option<&'a str>,
+    ) -> TransportFuture<'a> {
+        (**self).get_range(source, start, end, validator)
+    }
+
+    fn send_no_redirect<'a>(&'a self, request: HttpRequest) -> TransportFuture<'a> {
+        (**self).send_no_redirect(request)
+    }
+
+    fn send<'a>(&'a self, request: HttpRequest) -> TransportFuture<'a> {
+        (**self).send(request)
+    }
+
+    fn post_json<'a>(&'a self, source: &'a str, body: Vec<u8>) -> TransportFuture<'a> {
+        (**self).post_json(source, body)
+    }
+}
+
 pub struct TransportResponse {
     pub(super) status: u16,
     pub(super) content_length: Option<u64>,
     pub(super) body: ByteStream,
     /// Response headers, names in lower case.
     pub(super) headers: Vec<(String, String)>,
+    /// Where the answer came from after redirects, if the transport knows.
+    pub(super) url: Option<String>,
 }
 
 impl TransportResponse {
@@ -98,7 +132,21 @@ impl TransportResponse {
             content_length,
             body,
             headers: Vec::new(),
+            url: None,
         }
+    }
+
+    /// The same answer, as served from `url` after redirects.
+    #[must_use]
+    pub fn with_url(mut self, url: impl Into<String>) -> Self {
+        self.url = Some(url.into());
+        self
+    }
+
+    /// Where the answer came from after redirects, if the transport knows.
+    #[must_use]
+    pub fn url(&self) -> Option<&str> {
+        self.url.as_deref()
     }
 
     /// The same answer with its headers (names are lower-cased).

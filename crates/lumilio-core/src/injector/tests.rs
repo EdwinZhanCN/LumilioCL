@@ -84,31 +84,36 @@ impl Transport for Web {
     }
 }
 
+/// An engine of its own over `web`, which the test keeps to look at.
+fn net<T: Transport>(web: &Arc<T>) -> TransferEngine<Arc<T>> {
+    TransferEngine::new(web.clone(), 1).unwrap()
+}
+
 fn official() -> SourceChain {
     SourceChain::new([Arc::new(OfficialSource) as Arc<dyn SourceProvider>]).unwrap()
 }
 
 #[tokio::test]
 async fn the_first_use_downloads_a_checked_jar_and_later_uses_the_file() {
-    let (web, dir) = (Web::default(), tempfile::tempdir().unwrap());
+    let (web, dir) = (Arc::new(Web::default()), tempfile::tempdir().unwrap());
     let bytes = jar("authlib-injector", 54);
     web.index(54, Some(sha256(&bytes)), JAR_URL);
     web.serve(JAR_URL, bytes);
 
-    let found = ensure(&web, &official(), dir.path()).await.unwrap();
+    let found = ensure(&net(&web), &official(), dir.path()).await.unwrap();
     assert_eq!((found.build_number, found.version.as_str()), (54, "1.2.54"));
     assert!(found.path.starts_with(dir.path()));
     assert_eq!(web.asked().len(), 2);
 
     // Nothing is asked of the network again while the file is there.
-    let again = ensure(&web, &official(), dir.path()).await.unwrap();
+    let again = ensure(&net(&web), &official(), dir.path()).await.unwrap();
     assert_eq!(again, found);
     assert_eq!(web.asked().len(), 2);
 }
 
 #[tokio::test]
 async fn injector_metadata_falls_back_from_a_missing_checksum() {
-    let web = Web::default();
+    let web = Arc::new(Web::default());
     let mirror = "https://mirror.test/latest.json";
     web.index(54, Some("a".repeat(64)), JAR_URL);
     web.serve(mirror, serde_json::json!({"build_number":54,"version":"1.2.54","download_url":JAR_URL,"checksums":{}}).to_string().into_bytes());
@@ -117,7 +122,7 @@ async fn injector_metadata_falls_back_from_a_missing_checksum() {
         Arc::new(OfficialSource),
     ])
     .unwrap();
-    assert_eq!(latest(&web, &chain).await.unwrap().build_number, 54);
+    assert_eq!(latest(&net(&web), &chain).await.unwrap().build_number, 54);
     assert_eq!(web.asked(), [mirror, LATEST_URL]);
 }
 
@@ -125,27 +130,31 @@ async fn injector_metadata_falls_back_from_a_missing_checksum() {
 async fn a_jar_that_does_not_match_or_is_not_the_agent_is_never_kept() {
     let dir = tempfile::tempdir().unwrap();
 
-    let tampered = Web::default();
+    let tampered = Arc::new(Web::default());
     tampered.index(54, Some(sha256(b"what the index promised")), JAR_URL);
     tampered.serve(JAR_URL, jar("authlib-injector", 54));
     assert!(matches!(
-        ensure(&tampered, &official(), dir.path()).await,
+        ensure(&net(&tampered), &official(), dir.path()).await,
         Err(InjectorError::Unavailable(why)) if why.contains("checksum")
     ));
 
-    let other = Web::default();
+    let other = Arc::new(Web::default());
     let not_it = jar("something-else", 54);
     other.index(54, Some(sha256(&not_it)), JAR_URL);
     other.serve(JAR_URL, not_it);
     assert!(matches!(
-        ensure(&other, &official(), dir.path()).await,
+        ensure(&net(&other), &official(), dir.path()).await,
         Err(InjectorError::Unavailable(why)) if why.contains("not authlib-injector")
     ));
 
-    let unsigned = Web::default();
+    let unsigned = Arc::new(Web::default());
     unsigned.index(54, None, JAR_URL);
     unsigned.serve(JAR_URL, jar("authlib-injector", 54));
-    assert!(ensure(&unsigned, &official(), dir.path()).await.is_err());
+    assert!(
+        ensure(&net(&unsigned), &official(), dir.path())
+            .await
+            .is_err()
+    );
 
     assert!(installed(dir.path()).is_none());
     assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 0, "no leftovers");
@@ -153,22 +162,22 @@ async fn a_jar_that_does_not_match_or_is_not_the_agent_is_never_kept() {
 
 #[tokio::test]
 async fn refreshing_replaces_only_with_a_newer_build_and_a_failure_keeps_the_old_one() {
-    let (web, dir) = (Web::default(), tempfile::tempdir().unwrap());
+    let (web, dir) = (Arc::new(Web::default()), tempfile::tempdir().unwrap());
     let old = jar("authlib-injector", 54);
     web.index(54, Some(sha256(&old)), JAR_URL);
     web.serve(JAR_URL, old);
-    ensure(&web, &official(), dir.path()).await.unwrap();
+    ensure(&net(&web), &official(), dir.path()).await.unwrap();
 
     // Same build: nothing downloaded.
     let before = web.asked().len();
-    refresh(&web, &official(), dir.path()).await.unwrap();
+    refresh(&net(&web), &official(), dir.path()).await.unwrap();
     assert_eq!(web.asked().len(), before + 1, "only the index");
 
     let newer = jar("authlib-injector", 55);
     web.index(55, Some(sha256(&newer)), JAR_URL);
     web.serve(JAR_URL, newer);
     assert_eq!(
-        refresh(&web, &official(), dir.path())
+        refresh(&net(&web), &official(), dir.path())
             .await
             .unwrap()
             .build_number,
@@ -178,13 +187,13 @@ async fn refreshing_replaces_only_with_a_newer_build_and_a_failure_keeps_the_old
 
     // A broken index leaves the working jar alone.
     web.serve(LATEST_URL, b"nonsense".to_vec());
-    assert!(refresh(&web, &official(), dir.path()).await.is_err());
+    assert!(refresh(&net(&web), &official(), dir.path()).await.is_err());
     assert_eq!(installed(dir.path()).unwrap().build_number, 55);
 }
 
 #[tokio::test]
 async fn mirrors_are_tried_in_the_order_the_chain_says() {
-    let (web, dir) = (Web::default(), tempfile::tempdir().unwrap());
+    let (web, dir) = (Arc::new(Web::default()), tempfile::tempdir().unwrap());
     let bytes = jar("authlib-injector", 54);
     let mirror = PrefixMirror::new(
         "https://authlib-injector.yushi.moe",
@@ -209,7 +218,7 @@ async fn mirrors_are_tried_in_the_order_the_chain_says() {
         "https://mirror.example/authlib-injector/artifact/54/authlib-injector-1.2.54.jar",
         bytes,
     );
-    ensure(&web, &chain, dir.path()).await.unwrap();
+    ensure(&net(&web), &chain, dir.path()).await.unwrap();
     assert!(
         web.asked()
             .iter()
@@ -249,7 +258,7 @@ async fn an_unreachable_index_is_unavailable_not_a_panic() {
     }
     let dir = tempfile::tempdir().unwrap();
     assert!(matches!(
-        ensure(&Down, &official(), dir.path()).await,
+        ensure(&net(&Arc::new(Down)), &official(), dir.path()).await,
         Err(InjectorError::Unavailable(_))
     ));
 }

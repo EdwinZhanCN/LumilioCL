@@ -39,7 +39,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 use crate::fetch::fetch_document;
-use crate::transfer::Transport;
+use crate::transfer::{TransferEngine, Transport};
 
 /// LittleSkin's CustomSkinLoader API, built in.
 pub const LITTLE_SKIN_CSL: &str = "https://littleskin.cn/csl";
@@ -236,12 +236,12 @@ fn plain_hash(hash: &str) -> Result<&str, SkinError> {
 }
 
 async fn fetch_picture(
-    transport: &(impl Transport + ?Sized),
+    engine: &TransferEngine<impl Transport>,
     api: &str,
     hash: &str,
 ) -> Result<Texture, SkinError> {
     let url = format!("{api}/textures/{}", plain_hash(hash)?);
-    let bytes = fetch_document(transport, &[url])
+    let bytes = fetch_document(engine, &[url])
         .await
         .map_err(|error| SkinError::Network(error.to_string()))?;
     Texture::from_picture(&bytes)
@@ -250,11 +250,11 @@ async fn fetch_picture(
 /// The skin a CustomSkinLoader API has for `player` (none when it has no
 /// profile by that name).
 async fn load_csl(
-    transport: &(impl Transport + ?Sized),
+    engine: &TransferEngine<impl Transport>,
     api: &str,
     player: &str,
 ) -> Result<LoadedSkin, SkinError> {
-    let document = fetch_document(transport, &[format!("{api}/{player}.json")])
+    let document = fetch_document(engine, &[format!("{api}/{player}.json")])
         .await
         .map_err(|error| SkinError::Network(error.to_string()))?;
     let profile: Value = serde_json::from_slice(&document)
@@ -276,11 +276,11 @@ async fn load_csl(
     };
     let cape_hash = in_textures("cape").or_else(|| text_of(&profile, "cape"));
     let skin = match skin_hash {
-        Some(hash) => Some(fetch_picture(transport, api, hash).await?),
+        Some(hash) => Some(fetch_picture(engine, api, hash).await?),
         None => None,
     };
     let cape = match cape_hash {
-        Some(hash) => Some(fetch_picture(transport, api, hash).await?),
+        Some(hash) => Some(fetch_picture(engine, api, hash).await?),
         None => None,
     };
     Ok(LoadedSkin { model, skin, cape })
@@ -288,7 +288,7 @@ async fn load_csl(
 
 /// Loads what `choice` shows for the player called `player`.
 pub async fn load(
-    transport: &(impl Transport + ?Sized),
+    engine: &TransferEngine<impl Transport>,
     choice: &SkinChoice,
     player: &str,
 ) -> Result<LoadedSkin, SkinError> {
@@ -301,8 +301,8 @@ pub async fn load(
                 cape: read(cape)?,
             })
         }
-        SkinChoice::LittleSkin => load_csl(transport, LITTLE_SKIN_CSL, player).await,
-        SkinChoice::Csl { api } => load_csl(transport, &normalize_api(api)?, player).await,
+        SkinChoice::LittleSkin => load_csl(engine, LITTLE_SKIN_CSL, player).await,
+        SkinChoice::Csl { api } => load_csl(engine, &normalize_api(api)?, player).await,
     }
 }
 
