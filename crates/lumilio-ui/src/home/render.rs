@@ -51,12 +51,14 @@ pub fn render_body(
 }
 
 /// Foreground placed on the world for states that are about one instance.
+/// `text` is [`on_art`] over the world, or the body's ink without one.
 pub fn render_overlay(
     presentation: &HomePresentation,
     intent_handler: Option<HomeIntentHandler>,
     on_continue_hover: Option<HoverHandler>,
+    text: Hsla,
 ) -> Option<AnyElement> {
-    let art = ArtButtons::new();
+    let art = ArtButtons::new(text);
     let (key, content): (usize, _) = match presentation {
         HomePresentation::Continue { subject, .. } => (
             0,
@@ -97,8 +99,10 @@ pub fn body_label(text: impl Into<SharedString>, muted: Hsla) -> impl IntoElemen
 }
 
 /// Foreground on world art is always light-on-dark, whatever the theme; the
-/// scrim behind it guarantees the contrast.
-pub(super) fn on_art() -> Hsla {
+/// scrim behind it guarantees the contrast. Without a wallpaper the text sits
+/// on the body and takes its ink instead.
+#[must_use]
+pub fn on_art() -> Hsla {
     gpui::white()
 }
 
@@ -109,6 +113,8 @@ pub(super) struct ArtStyle(pub(super) KeyKind);
 
 #[derive(Clone, Copy)]
 pub(super) struct ArtButtons {
+    /// The colour of words over the world, or over the body without one.
+    pub(super) text: Hsla,
     /// The orange key: the one bright thing on the art.
     pub(super) primary: ArtStyle,
     /// The black key: secondary actions over the world.
@@ -116,15 +122,20 @@ pub(super) struct ArtButtons {
 }
 
 impl ArtButtons {
-    pub(super) fn new() -> Self {
+    pub(super) fn new(text: Hsla) -> Self {
         Self {
+            text,
             primary: ArtStyle(KeyKind::Orange),
             glass: ArtStyle(KeyKind::Black),
         }
     }
 }
 
-pub(super) fn eyebrow(label: impl Into<SharedString>, accent: Hsla) -> impl IntoElement {
+pub(super) fn eyebrow(
+    art: ArtButtons,
+    label: impl Into<SharedString>,
+    accent: Hsla,
+) -> impl IntoElement {
     h_flex()
         .gap(px(8.))
         .items_center()
@@ -133,24 +144,24 @@ pub(super) fn eyebrow(label: impl Into<SharedString>, accent: Hsla) -> impl Into
             div()
                 .text_xs()
                 .font_semibold()
-                .text_color(on_art().opacity(0.78))
+                .text_color(art.text.opacity(0.78))
                 .child(label.into()),
         )
 }
 
-pub(super) fn headline(text: impl Into<SharedString>) -> impl IntoElement {
+pub(super) fn headline(art: ArtButtons, text: impl Into<SharedString>) -> impl IntoElement {
     div()
         .text_size(crate::theme::font_px(30.))
         .line_height(px(38.))
         .font_semibold()
-        .text_color(on_art())
+        .text_color(art.text)
         .child(text.into())
 }
 
-pub(super) fn caption(text: impl Into<SharedString>) -> impl IntoElement {
+pub(super) fn caption(art: ArtButtons, text: impl Into<SharedString>) -> impl IntoElement {
     div()
         .text_sm()
-        .text_color(on_art().opacity(0.74))
+        .text_color(art.text.opacity(0.74))
         .child(text.into())
 }
 

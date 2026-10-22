@@ -7,7 +7,7 @@ use crate::toast::Toast;
 use crate::{home, pages, theme};
 use gpui::prelude::*;
 use gpui::{AnyElement, Context, Window, div, px};
-use gpui_component::v_flex;
+use gpui_component::{TITLE_BAR_HEIGHT, v_flex};
 use lumilio_core::{LaunchFailure, LaunchSignal};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
@@ -126,25 +126,46 @@ impl LauncherShell {
 
     /// Home: the world runs full-bleed from the top of the window and
     /// dissolves into the page; everything else sits on the content column.
+    /// A `bare` Home has no world: its title sits on the body, as tall as it
+    /// needs (plan translucent-themes, D2).
     pub(super) fn render_home(
         &self,
         colors: ShellHomeColors,
         home_handler: Option<home::HomeIntentHandler>,
         live: Option<&pages::live::LiveCtx>,
+        bare: bool,
         window: &Window,
     ) -> AnyElement {
         let hero = self.hero.clone();
         let on_continue_hover: home::HoverHandler = Rc::new(move |hovered, _, cx| {
             hero.update(cx, |hero, cx| hero.set_flare(hovered, cx));
         });
-        let overlay =
-            home::render_overlay(&self.home, home_handler.clone(), Some(on_continue_hover));
-        // The world is as tall as its share of the window, so it is sized in
-        // pixels: the whole page scrolls and the world scrolls away with it.
-        let world_height = px(
-            (f32::from(window.viewport_size().height) * theme::HERO_SHARE)
-                .max(f32::from(theme::HERO_MIN_HEIGHT)),
-        );
+        let text = if bare {
+            colors.foreground
+        } else {
+            home::on_art()
+        };
+        let overlay = home::render_overlay(
+            &self.home,
+            home_handler.clone(),
+            (!bare).then_some(on_continue_hover),
+            text,
+        )
+        .map(|overlay| {
+            div()
+                .debug_selector(|| "home-overlay".into())
+                .child(overlay)
+        });
+        let top = if bare {
+            theme::content_column()
+                .debug_selector(|| "home-overlay-column".into())
+                .pt(TITLE_BAR_HEIGHT + px(40.))
+                .pb(px(32.))
+                .children(overlay)
+                .into_any_element()
+        } else {
+            self.render_world(overlay, window)
+        };
         let links = self.home_links();
         let has_attention =
             (!links.attention.is_empty() || links.checking) && self.home.subject().is_some();
@@ -161,35 +182,7 @@ impl LauncherShell {
                 v_flex()
                     .w_full()
                     .items_center()
-                    .child(
-                        div()
-                            .relative()
-                            .w_full()
-                            .h(world_height)
-                            .flex_none()
-                            .child(
-                                div()
-                                    .absolute()
-                                    .top_0()
-                                    .left_0()
-                                    .size_full()
-                                    .child(self.hero.clone()),
-                            )
-                            .child(
-                                div().absolute().inset_0().flex().justify_center().child(
-                                    theme::content_column()
-                                        .debug_selector(|| "home-overlay-column".into())
-                                        .h_full()
-                                        .justify_end()
-                                        .pb(theme::HERO_FADE)
-                                        .children(overlay.map(|overlay| {
-                                            div()
-                                                .debug_selector(|| "home-overlay".into())
-                                                .child(overlay)
-                                        })),
-                                ),
-                            ),
-                    )
+                    .child(top)
                     .children(body.map(|body| {
                         theme::content_column()
                             .debug_selector(|| "home-body".into())
@@ -197,6 +190,35 @@ impl LauncherShell {
                             .pb(theme::BOTTOM_SAFE_AREA)
                             .child(body)
                     })),
+            )
+            .into_any_element()
+    }
+
+    /// The world with Home's title over it, dissolving into the page.
+    fn render_world(&self, overlay: Option<gpui::Div>, window: &Window) -> AnyElement {
+        let world_height = theme::world_height(window);
+        div()
+            .relative()
+            .w_full()
+            .h(world_height)
+            .flex_none()
+            .child(
+                div()
+                    .absolute()
+                    .top_0()
+                    .left_0()
+                    .size_full()
+                    .child(self.hero.clone()),
+            )
+            .child(
+                div().absolute().inset_0().flex().justify_center().child(
+                    theme::content_column()
+                        .debug_selector(|| "home-overlay-column".into())
+                        .h_full()
+                        .justify_end()
+                        .pb(theme::HERO_FADE)
+                        .children(overlay),
+                ),
             )
             .into_any_element()
     }

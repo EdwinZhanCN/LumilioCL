@@ -168,7 +168,10 @@ impl Render for LauncherShell {
         } else if let Some(page) = live_page {
             page
         } else if self.route == Route::Home {
-            self.render_home(home_colors, home_handler, live_ctx.as_ref(), window)
+            let bare = cx
+                .try_global::<theme::Wallpaper>()
+                .is_some_and(|wallpaper| wallpaper.bare);
+            self.render_home(home_colors, home_handler, live_ctx.as_ref(), bare, window)
         } else {
             v_flex()
                 .size_full()
@@ -188,7 +191,8 @@ impl Render for LauncherShell {
             .key_context("lumilio-shell")
             .track_focus(&self.focus_handle)
             .on_key_down(cx.listener(Self::handle_shortcut))
-            .bg(colors.background)
+            // The framework's root paints the page under the shell; painting it
+            // again would stack a translucent page into an opaque one.
             .text_color(colors.foreground)
             .child(body)
             // The title bar is transparent and floats over everything, so on
@@ -202,20 +206,12 @@ impl Render for LauncherShell {
                     .child(TitleBar::new().bg(gpui::transparent_black()).border_b_0()),
             )
             // A veil in the page colour under the capsule: content scrolling
-            // behind it fades out instead of colliding with the icons.
-            .child(
-                div()
-                    .absolute()
-                    .left_0()
-                    .right_0()
-                    .bottom_0()
-                    .h(theme::NAV_VEIL)
-                    .bg(gpui::linear_gradient(
-                        180.,
-                        gpui::linear_color_stop(colors.background.opacity(0.), 0.),
-                        gpui::linear_color_stop(colors.background.opacity(0.94), 0.62),
-                    )),
-            )
+            // behind it fades out instead of colliding with the icons. On a
+            // translucent page it would only stack into a dark band, and the
+            // capsule is solid there anyway: content passes behind the glass.
+            .when(colors.background.a >= 1., |shell| {
+                shell.child(veil(colors.background))
+            })
             .child(navigation::render(
                 self.route,
                 self.activity.active_tasks,
@@ -238,4 +234,35 @@ impl Render for LauncherShell {
         // the picture budget.
         crate::pictures::scope(cx).size_full().child(shell)
     }
+}
+
+/// The veil under the navigation: it eases in, starting slowly over its full
+/// height and closing over the lower half, so it has no edge where it begins
+/// and no band where it ends. One straight ramp shows both on a translucent
+/// page. Together the two ramps reach 94 % of the page colour at the bottom.
+fn veil(page: gpui::Hsla) -> impl IntoElement {
+    let ramp = |to: f32| {
+        gpui::linear_gradient(
+            180.,
+            gpui::linear_color_stop(page.opacity(0.), 0.),
+            gpui::linear_color_stop(page.opacity(to), 1.),
+        )
+    };
+    div()
+        .debug_selector(|| "nav-veil".into())
+        .absolute()
+        .left_0()
+        .right_0()
+        .bottom_0()
+        .h(theme::NAV_VEIL)
+        .bg(ramp(0.5))
+        .child(
+            div()
+                .absolute()
+                .left_0()
+                .right_0()
+                .bottom_0()
+                .h(theme::NAV_VEIL / 2.)
+                .bg(ramp(0.88)),
+        )
 }

@@ -178,3 +178,58 @@ fn a_chosen_picture_ends_exactly_in_the_page_colour_and_breaks_up_on_the_way() {
     assert!((0..rows).any(|band| (1..columns).contains(&page_cells(band))));
     assert!((0..rows).all(|band| veil(band, rows) <= 0.65 + f32::EPSILON));
 }
+
+/// On a translucent page a picture fades out through nested layers: stacked,
+/// they give every strip of the band its eased opacity, from almost the whole
+/// picture at the top to nothing of it at the bottom.
+#[test]
+fn a_picture_fades_into_the_glass_strip_by_strip() {
+    let strips = 44;
+    let layers = super::wallpaper::fade_layers(strips);
+    assert_eq!(layers.len(), strips);
+    let shown: Vec<f32> = (0..strips)
+        .map(|j| 1. - layers[j..].iter().map(|alpha| 1. - alpha).product::<f32>())
+        .collect();
+    for (j, shown) in shown.iter().enumerate() {
+        let t = (j as f32 + 0.5) / strips as f32;
+        let wanted = 1. - super::noise::smoothstep(0., 1., t);
+        assert!(
+            (shown - wanted).abs() < 1e-4,
+            "strip {j}: {shown} vs {wanted}"
+        );
+    }
+    assert!(
+        shown.windows(2).all(|pair| pair[0] > pair[1]),
+        "it only fades"
+    );
+    assert!(shown[0] > 0.95 && shown[strips - 1] < 0.05);
+}
+
+/// On a translucent page the world's dissolved texels are left out instead of
+/// painted, so it breaks up into the glass; on a solid page all are painted.
+#[test]
+fn the_world_dissolves_into_the_glass_on_a_translucent_page() {
+    let page = Rgb::hex(0xe4e4e1);
+    let mut grid = super::raster::PixelGrid::new(8, 10);
+    for y in 0..10 {
+        for x in 0..8 {
+            grid.set(x, y, Rgb::hex(0x203040));
+        }
+    }
+    grid.fade_bottom(6, page);
+    let band = 10 - 6;
+    let solid = super::painted(&grid, None);
+    let glass = super::painted(&grid, Some((band, page.pack())));
+    let page_in_band = |rects: &[super::raster::Rect]| {
+        rects
+            .iter()
+            .filter(|rect| rect.row >= band && rect.color == page.pack())
+            .count()
+    };
+    assert!(page_in_band(&solid) > 0, "a solid page paints the dissolve");
+    assert_eq!(page_in_band(&glass), 0, "the glass shows through it");
+    assert!(
+        glass.iter().any(|rect| rect.row >= band),
+        "the surviving texels of the band are still painted"
+    );
+}

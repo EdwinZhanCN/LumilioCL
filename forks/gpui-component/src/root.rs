@@ -442,7 +442,10 @@ impl gpui_base::RootPlugin for WindowState {
         surface.style().refine(
             &gpui::StyleRefinement::default()
                 .font_family(cx.theme().font_family.clone())
-                .bg(cx.theme().tokens.background)
+                // LumilioCL: the window takes the page colour, which a theme may make
+                // translucent; `tokens.background` stays the opaque surface that
+                // dialogs, sheets and tabs paint with.
+                .bg(cx.theme().background)
                 .text_color(cx.theme().foreground),
         );
         let fallbacks = &cx.theme().font_fallbacks;

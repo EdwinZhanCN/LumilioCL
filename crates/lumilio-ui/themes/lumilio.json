@@ -1,0 +1,58 @@
+{
+  "themes": [
+    {
+      "name": "Birch",
+      "appearance": "light",
+      "colors": {
+        "page": "#e8e2d2",
+        "panel": "#f1ece0",
+        "hairline": "#c2b9a4",
+        "ink": "#1d1913",
+        "muted": "#635b4d",
+        "key_white": "#faf7ef",
+        "key_black": "#221f1a",
+        "key_grey": "#d9d1bf",
+        "on_white": "#1d1913",
+        "on_black": "#f3eee3",
+        "orange": "#f0520f",
+        "orange_text": "#a63807",
+        "on_orange": "#ffffff",
+        "danger": "#c8261b",
+        "danger_text": "#a81f14",
+        "led_off": "#a59c87",
+        "ok": "#2f8a38",
+        "display": "#17140f",
+        "display_ink": "#ff6a2a",
+        "display_dim": "#3d2619",
+        "display_label": "#9a8a78"
+      }
+    },
+    {
+      "name": "Deepslate",
+      "appearance": "dark",
+      "colors": {
+        "page": "#16181c",
+        "panel": "#1f2228",
+        "hairline": "#373b44",
+        "ink": "#e5e8ec",
+        "muted": "#8e94a0",
+        "key_white": "#323640",
+        "key_black": "#272a31",
+        "key_grey": "#262930",
+        "on_white": "#e5e8ec",
+        "on_black": "#e5e8ec",
+        "orange": "#ff5a1a",
+        "orange_text": "#ff6a2e",
+        "on_orange": "#ffffff",
+        "danger": "#c8261b",
+        "danger_text": "#ff5c52",
+        "led_off": "#3d414b",
+        "ok": "#5fd068",
+        "display": "#08090b",
+        "display_ink": "#ff6a2a",
+        "display_dim": "#3a2418",
+        "display_label": "#948479"
+      }
+    }
+  ]
+}

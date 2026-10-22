@@ -274,13 +274,51 @@ fn a_theme_may_ask_for_a_transparent_or_blurred_window_and_defaults_to_opaque() 
     assert_eq!(Opaque.to_gpui(), gpui::WindowBackgroundAppearance::Opaque);
 }
 
+/// Only the body lets the window show through; a key or a display given
+/// opacity is drawn solid, and the settings can say how many were.
+#[test]
+fn only_the_body_may_be_translucent() {
+    let theme = Resolved::new(&one(
+        r##"{"themes":[{"name":"Glass","appearance":"light","colors":
+            {"page":"#ffffff80","panel":"#eeeeeb99","orange":"#f0520f80","display":"#14141440"}}]}"##,
+    ));
+    assert!((theme.body.page.a - 0.5).abs() < 0.01);
+    assert!((theme.body.panel.a - 0.6).abs() < 0.01);
+    assert_eq!(theme.body.orange.a, 1.);
+    assert_eq!(theme.body.display.a, 1.);
+    assert_eq!(theme.solid, ["orange", "display"]);
+}
+
+/// Without blur, a blurred body is laid over the built-in page of its tone
+/// and the window turns opaque; other themes are left as they are.
+#[test]
+fn a_blurred_theme_turns_opaque_where_the_system_cannot_blur() {
+    use super::WindowBackground::{Blurred, Opaque, Transparent};
+    let glass = |background: &str| {
+        Resolved::new(&one(&format!(
+            r##"{{"themes":[{{"name":"Glass","appearance":"dark","window_background":"{background}",
+                "colors":{{"page":"#ffffff80"}}}}]}}"##
+        )))
+    };
+    let flat = glass("blurred").without_blur();
+    assert_eq!(flat.window_background, Opaque);
+    assert_eq!(flat.body.page.a, 1.);
+    // Half white over night's #111111.
+    let page = gpui::Rgba::from(flat.body.page);
+    assert!((page.r - (1. + 0x11 as f32 / 255.) / 2.).abs() < 0.01);
+    let clear = glass("transparent").without_blur();
+    assert_eq!(clear.window_background, Transparent);
+    assert!((clear.body.page.a - 0.5).abs() < 0.01);
+    assert_eq!(glass("blurred").window_background, Blurred);
+}
+
 #[gpui::test]
 fn a_translucent_page_colour_and_the_window_material_reach_the_window(cx: &mut TestAppContext) {
     cx.update(gpui_component::init);
     let glass = Entry {
         spec: one(
             r##"{"themes":[{"name":"Glass","appearance":"dark","window_background":"blurred",
-                "colors":{"page":"#10203080"}}]}"##,
+                "colors":{"page":"#10203080","panel":"#20304080"}}]}"##,
         ),
         origin: Origin::Local("glass.json".into()),
     };
@@ -296,13 +334,33 @@ fn a_translucent_page_colour_and_the_window_material_reach_the_window(cx: &mut T
         // The person's choice of dark wins over what the test window reports.
         crate::platform::apply_appearance(lumilio_core::Appearance::Dark, window, cx);
         let look = cx.global::<super::Look>();
-        assert_eq!(
-            look.theme.window_background,
-            super::WindowBackground::Blurred
-        );
-        // The page colour keeps its opacity all the way to the component theme.
-        let page = Theme::global(cx).background;
-        assert!((page.a - 128. / 255.).abs() < 0.005, "alpha {}", page.a);
+        let theme = Theme::global(cx);
+        let page = theme.background;
+        // What floats over the page is solid on any body: dialogs and sheets
+        // (the token), the dialogs' raised surface, menus and toasts.
+        for (name, color) in [
+            ("tokens.background", theme.tokens.background.color),
+            ("secondary", theme.secondary),
+            ("popover", theme.popover),
+            ("tokens.popover", theme.tokens.popover.color),
+        ] {
+            assert_eq!(color.a, 1., "{name} lets the window show through");
+        }
+        assert_eq!(ShellColors::current(cx).raised.a, 1.);
+        if super::spec::can_blur() {
+            assert_eq!(
+                look.theme.window_background,
+                super::WindowBackground::Blurred
+            );
+            assert!((page.a - 128. / 255.).abs() < 0.005, "alpha {}", page.a);
+        } else {
+            // Without blur the body is made opaque (plan translucent-themes, D3).
+            assert_eq!(
+                look.theme.window_background,
+                super::WindowBackground::Opaque
+            );
+            assert_eq!(page.a, 1.);
+        }
     });
 }
 
@@ -355,7 +413,8 @@ fn tune_applies_the_chosen_theme_per_appearance_and_the_scale(cx: &mut TestAppCo
         tune(cx);
         let theme = Theme::global(cx);
         assert_eq!(Color(theme.background).to_hex(), "#102030");
-        assert_eq!(Color(theme.primary).to_hex(), "#ff00ff80");
+        // The accent is a key's colour, so its opacity is dropped.
+        assert_eq!(Color(theme.primary).to_hex(), "#ff00ff");
         assert_eq!(theme.radius, gpui::px(2.));
         assert_eq!(theme.font_size, gpui::px(20.));
         assert_eq!(theme.mono_font_size, gpui::px(13. * 1.25));
@@ -404,7 +463,7 @@ fn the_bundled_themes_are_complete_attributed_and_pair_light_with_dark() {
     let bundled: Vec<_> = catalog
         .entries
         .iter()
-        .filter(|entry| ![super::ALUMINIUM, super::NIGHT].contains(&entry.spec.name.as_str()))
+        .filter(|entry| !super::OWN.contains(&entry.spec.name.as_str()))
         .collect();
     assert!(bundled.len() >= 4, "{} bundled themes", bundled.len());
     for entry in &bundled {
@@ -425,3 +484,91 @@ fn the_bundled_themes_are_complete_attributed_and_pair_light_with_dark() {
 }
 
 mod website;
+
+/// The framework's root paints the window with the page colour, which may be
+/// translucent, not with the opaque token dialogs paint with (the local change
+/// to `forks/gpui-component/src/root.rs`).
+#[gpui::test]
+fn the_root_paints_the_window_with_the_page_colour(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_component::init(cx);
+        let theme = Theme::global_mut(cx);
+        theme.background = gpui::hsla(0.6, 0.2, 0.5, 0.5);
+        theme.tokens.background = gpui::hsla(0.6, 0.2, 0.5, 1.).into();
+    });
+    let (_, cx) = cx.add_window_view(|window, cx| {
+        let host = gpui::AppContext::new(cx, |_| gpui::Empty);
+        gpui_component::Root::new(host, window, cx)
+    });
+    cx.run_until_parked();
+    let fills: Vec<gpui::Hsla> = cx.update(|window, _| {
+        window
+            .painted_quads()
+            .into_iter()
+            .filter_map(|quad| quad.background.as_solid())
+            .collect()
+    });
+    assert!(
+        fills.contains(&gpui::hsla(0.6, 0.2, 0.5, 0.5)),
+        "the root paints {fills:?}"
+    );
+}
+
+/// The glass themes meet every contrast rule over a desktop of their own
+/// tone: Glass over white, Tinted Glass over black (plan translucent-themes,
+/// D6). Each translucent colour is judged as it is seen: the page over the
+/// desktop, a panel over that page.
+#[test]
+fn glass_meets_every_contrast_rule_over_a_desktop_of_its_tone() {
+    use super::spec::over;
+    for (name, dark) in [(super::GLASS, false), (super::TINTED_GLASS, true)] {
+        let theme = Catalog::default().resolve(Some(name), Tone::of(dark));
+        assert_eq!(theme.name, name);
+        assert_eq!(theme.window_background, super::WindowBackground::Blurred);
+        assert!(theme.body.page.a < 1. && theme.body.panel.a < 1.);
+        let desktop = if dark { gpui::black() } else { gpui::white() };
+        let page = over(theme.body.page, desktop);
+        let panel = over(theme.body.panel, page);
+        let palette = Palette::of(theme.body);
+        let colour = |key: &str| match key {
+            "page" => page,
+            "panel" => panel,
+            _ => palette.get(key).expect("a palette colour").0,
+        };
+        for rule in RULES {
+            let bg = colour(rule.bg);
+            let fg = over(palette.get(rule.fg).expect("a palette colour").0, bg);
+            let ratio = contrast(fg, bg);
+            let floor = if dark { rule.dark } else { rule.light };
+            assert!(ratio >= floor, "{name}: {} is {ratio:.2}:1", rule.id);
+        }
+    }
+}
+
+/// Birch and Deepslate give every colour and meet every contrast rule, as
+/// the launcher's two bodies do (plan translucent-themes, T4).
+#[test]
+fn the_own_palettes_are_complete_and_meet_every_contrast_rule() {
+    for (name, tone) in [(super::BIRCH, Tone::Light), (super::DEEPSLATE, Tone::Dark)] {
+        let theme = Catalog::default().resolve(Some(name), tone);
+        assert_eq!(theme.name, name);
+        assert!(
+            theme.missing.is_empty(),
+            "{name} misses {:?}",
+            theme.missing
+        );
+        let palette = Palette::of(theme.body);
+        let colour = |key: &str| palette.get(key).expect("a palette colour").0;
+        for rule in RULES {
+            let ratio = contrast(colour(rule.fg), colour(rule.bg));
+            let floor = if tone.is_dark() {
+                rule.dark
+            } else {
+                rule.light
+            };
+            assert!(ratio >= floor, "{name}: {} is {ratio:.2}:1", rule.id);
+        }
+        // The signal stays the launcher's orange (D4).
+        assert_eq!(theme.body.orange, super::Body::of(tone.is_dark()).orange);
+    }
+}

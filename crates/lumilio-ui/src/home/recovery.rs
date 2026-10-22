@@ -95,11 +95,12 @@ pub(super) fn render_recovery(
         .items_start()
         .gap(px(6.))
         .child(eyebrow(
+            art,
             tr!("home-recovery-eyebrow"),
             world_accent(subject.world),
         ))
-        .child(headline(title))
-        .child(caption(recovery_caption(subject, detail)))
+        .child(headline(art, title))
+        .child(caption(art, recovery_caption(subject, detail)))
         .child(
             h_flex()
                 .mt(px(12.))

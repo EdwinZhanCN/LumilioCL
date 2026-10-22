@@ -12,7 +12,7 @@
 | [发现](discover.md) | 28 |
 | [动态](activity.md) | 8 |
 | [账户](accounts.md) | 26 |
-| [设置](settings.md) | 60 |
+| [设置](settings.md) | 61 |
 | [游戏页（整体）](instance.md) | 21 |
 | [游戏页 · 概览](instance.overview.md) | 4 |
 | [游戏页 · 内容](instance.content.md) | 18 |

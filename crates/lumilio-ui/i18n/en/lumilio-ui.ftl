@@ -1885,6 +1885,11 @@ settings-theme-missing = This theme leaves out { $count ->
     [one] { $count } colour
    *[other] { $count } colours
     }; the defaults fill in.
+settings-theme-solid = This theme gives { $count ->
+    [one] { $count } colour
+   *[other] { $count } colours
+    } with opacity, but only the page, panels and lines can be translucent; they show as opaque.
+settings-theme-glass = A translucent theme is clearest over a desktop as light or dark as the theme. With No wallpaper on Home, the most of the desktop shows through.
 settings-theme-local = Local themes
 settings-theme-local-help = Put .json theme files in this folder, then choose Reload.
 settings-theme-reload = Reload
@@ -1903,9 +1908,11 @@ settings-scale-100 = 100%
 settings-scale-115 = 115%
 settings-scale-130 = 130%
 settings-wallpaper = Home wallpaper
-settings-wallpaper-help = Replaces Home's pixel world with your own picture. The picture is scaled down and kept in the launcher's folder, so the original can move.
+settings-wallpaper-help = Replaces Home's pixel world with your own picture, or with nothing, so a translucent theme shows the desktop. The picture is scaled down and kept in the launcher's folder, so the original can move.
 settings-wallpaper-default = Default world
 settings-wallpaper-chosen = Your picture
+settings-wallpaper-bare = No wallpaper
+settings-wallpaper-bare-choose = No wallpaper
 settings-wallpaper-choose = Choose picture…
 settings-wallpaper-prompt = Choose a wallpaper
 settings-wallpaper-missing = The wallpaper file is missing; Home shows the default world for now.

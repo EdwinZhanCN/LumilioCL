@@ -115,7 +115,7 @@ fn zone(colors: ShellColors) -> gpui::Div {
         .rounded(ZONE_RADIUS)
         .border_1()
         .border_color(colors.border)
-        .bg(colors.surface)
+        .bg(colors.raised)
         .shadow_lg()
 }
 

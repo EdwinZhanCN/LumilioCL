@@ -90,6 +90,19 @@ describe("theme files", () => {
     expect(resolved.missing).toEqual(COLOR_KEYS.filter((key) => key !== "page"));
   });
 
+  it("lets only the body be translucent, as the launcher does", () => {
+    const theme: ThemeSpec = {
+      name: "Glass",
+      appearance: "light",
+      colors: { page: "#ffffff80", orange: "#f0520f80" },
+      fonts: {},
+    };
+    const resolved = resolve(theme);
+    expect(resolved.colors.page).toBe("#ffffff80");
+    expect(resolved.colors.orange).toBe("#f0520f");
+    expect(resolved.solid).toEqual(["orange"]);
+  });
+
   it("holds radii where the launcher holds them", () => {
     expect(clampRadius(40, 4)).toBe(MAX_RADIUS);
     expect(clampRadius(-2, 4)).toBe(0);

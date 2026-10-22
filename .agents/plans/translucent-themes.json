@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "id": "translucent-themes",
+  "title": "半透明主题、无壁纸首页与新配色",
+  "summary": "首页壁纸增加「无壁纸」；主题的机身可以半透明，按键与显示屏保持实心；内置白桦、深板岩、玻璃、遮光玻璃四套主题。依赖 global-context 合入（首页结构已改）。",
+  "status": "in_progress",
+  "visibility": "internal",
+  "scope": {
+    "included": [
+      "首页壁纸的第三个选项「无壁纸」，以及没有世界时首页顶部的样子与各状态的表达。",
+      "半透明的规则：哪些颜色可以带透明度，窗口材质拿不到模糊时的兜底。",
+      "内置主题：白桦（亮）、深板岩（暗）、玻璃（亮，半透明）、遮光玻璃（暗，半透明）。",
+      "design-language 与网站主题文档（中英）同步。"
+    ],
+    "excluded": [
+      "Gruvbox、Tokyo Night 等编辑器配色移植（仍在 backlog）。",
+      "间距密度。",
+      "首页世界本身的画面。"
+    ]
+  },
+  "tasks": [
+    { "id": "T1", "title": "无壁纸选项", "status": "completed", "acceptance": "外观设置的壁纸可选「方块世界」「图片」「无壁纸」，保存在 LookPreferences，旧设置读出来仍是原来的选择。无壁纸时首页顶部不画世界，高度收缩到标题与「继续」，文字用主题墨色，按键不变；启动中仍有分段进度条，游戏中与启动失败由标题旁的 LED 与文字表达（D2）。UI 测试覆盖有世界与无壁纸时首页标题的位置。" },
+    { "id": "T2", "title": "半透明机身与兜底", "status": "completed", "acceptance": "主题文件中只有机身类颜色（page、panel、hairline 等，按 D1 列出）可以带透明度，按键、显示屏、标签、LED 的透明度被忽略并在主题检查里报告。窗口拿不到模糊时，带透明度的机身颜色按 D3 合成为不透明的近似色。各平台的实际材质在 T6 实机检查。" },
+    { "id": "T3", "title": "玻璃与遮光玻璃", "status": "completed", "acceptance": "两套内置半透明主题，以铝白与夜黑为底，窗口材质为 blurred，强调色为信号橙，透明度按 D6（页面约 75%、面板约 80%）。对比度按 D6 在同色调的桌面上（玻璃对白色、遮光玻璃对黑色）达到 design-language §9 的要求，由主题测试检查。" },
+    { "id": "T4", "title": "白桦与深板岩", "status": "completed", "acceptance": "作为启动器自己的主题文件（themes/lumilio.json）内置，名称 Birch 与 Deepslate，强调色为信号橙（D4）。每套颜色给全并通过现有主题测试的对比度检查；网站的内置主题导出同步。" },
+    { "id": "T5", "title": "文档", "status": "completed", "acceptance": "design-language §5「Appearance」写明无壁纸首页与半透明规则，§12 的颜色表说明哪些令牌可以透明；网站中英主题文档写明新增字段规则与内置主题；just ia、just plans、just docs 通过。" },
+    { "id": "T6", "title": "Project Maintainer 实机检查", "status": "proposed", "acceptance": "合入 main 并随 0.2.0 发布前，在 Mac 上检查四套主题与三种壁纸的组合：毛玻璃下文字与面板的可读性，实心零件在透明机身上是否协调，无壁纸首页各状态是否清楚。结果记入 validation。" }
+  ],
+  "validation": [
+    { "criterion": "T1–T5 的测试通过，并各自证明能失败。", "result": "2026-10-21（T2）：theme::tests 的 only_the_body_may_be_translucent 与 a_blurred_theme_turns_opaque_where_the_system_cannot_blur 通过，临时去掉 solidify 或让 without_blur 总是返回原样时分别按预期失败；tune_applies_the_chosen_theme_per_appearance_and_the_scale 原先断言半透明的强调色原样传到界面，按 D1 改为不透明。网站主题编辑器从 themes.generated.json 读到同一份可透明颜色表，model.test.ts 新增对应用例，pnpm check 无错误。 2026-10-21（T1）：core 的 the_wallpaper_reads_settings_from_before_bare_home 检查壁纸仍按原来的文件名写入，旧设置读出原选择，三种选择写入后读回相同；无壁纸写作 \"bare\"，存下的图片总以 wallpaper- 开头，不会撞名。UI 的 a_bare_home_puts_its_title_at_the_top 检查无壁纸时标题在顶部、有世界时在世界底部，临时让无壁纸也画世界时按预期失败。lumilio-core、lumilio-ui、lumilio-app 共 1404 项通过，clippy 无警告。 2026-10-21（T3）：内置 Glass 与 Tinted Glass 由 Aluminium、Night 按 D6 生成（页面与细线 75%，面板 80%，blurred）。glass_meets_every_contrast_rule_over_a_desktop_of_its_tone 把页面叠在同色调桌面上、面板叠在页面上，逐条检查对比度规则，临时把页面降到 30% 时按预期失败。外观设置在选中半透明主题时提示同色调桌面与「不用壁纸」；网站主题数据与中英主题文档列出两套主题，pnpm check、vitest 与 build 通过。lumilio-core、lumilio-ui、lumilio-app、lumilio-backdrop 共 1409 项通过，clippy 无警告。 2026-10-21（T4、T5）：Birch（暖色米白）与 Deepslate（偏冷石板灰）写在 crates/lumilio-ui/themes/lumilio.json，颜色先按对比度规则计算定稿，再由 the_own_palettes_are_complete_and_meet_every_contrast_rule 检查完整与对比度、强调色仍为信号橙；临时把 Birch 的说明文字调浅时按预期失败（muted-page 2.39:1）。白字在橙色上 3.55:1 与 3.12:1，在既有例外范围内。没有先在网站编辑器里调色：颜色由规则直接算出，网站导出与中英主题文档同步。design-language §5 写明无壁纸首页、半透明规则与壁纸融进玻璃，§12 写明只有 page、panel、hairline 可带透明度以及三对自有主题。" },
+    { "criterion": "just check 通过（由 Project Maintainer 运行）。", "result": null },
+    { "criterion": "Project Maintainer 实机检查通过（T6）。", "result": null }
+  ],
+  "references": [
+    ".agents/plans/appearance.json",
+    ".agents/plans/theme-studio.json",
+    ".agents/plans/global-context.json",
+    "docs/design-language.md",
+    "crates/lumilio-ui/src/theme/spec.rs",
+    "crates/lumilio-ui/src/theme/look.rs",
+    "crates/lumilio-core/src/tuning.rs"
+  ],
+  "dependencies": ["global-context"],
+  "decisions": [
+    {
+      "id": "D1",
+      "decision": "只有机身透明：页面底色、面板、列表块、细线可以带透明度；按键、显示屏、标签、LED 永远实心。",
+      "rationale": "界面是一台仪器，透明的是外壳，零件是实物。橙色按键和数码显示屏透出桌面后会发灰，读数的对比度也无法保证。",
+      "consequences": "主题解析按令牌区分；主题编辑器只给机身类颜色开放透明度。"
+    },
+    {
+      "id": "D2",
+      "decision": "无壁纸时首页顶部收缩到内容高度，标题与「继续」放在机身上；世界表达的状态改由已有的进度条、LED 与文字表达。",
+      "rationale": "世界在首页不是装饰，它表达启动进度、游戏中和失败；启动进度另有分段进度条，所以去掉世界只少了方块加载的动画。半透明时大片空白透出桌面，看起来像没有加载出来。",
+      "consequences": "首页布局有两种顶部；design-language §5 写明两种。"
+    },
+    {
+      "id": "D3",
+      "decision": "窗口拿不到模糊时（多数 Linux 合成器，以及不支持的 Windows 版本），带透明度的机身颜色与主题声明的底色合成为不透明的颜色。",
+      "rationale": "没有模糊的透明会直接透出桌面上的文字，比不透明更难读。",
+      "consequences": "合成用的底色固定为同色调内置主题的 page，与网站主题编辑器计算对比度时用的底色一致，不另设字段。判断按平台：macOS 与 Windows 视为可以模糊，Linux 一律合成；KDE 等能模糊的 Linux 桌面暂时也得到不透明窗口。"
+    },
+    {
+      "id": "D4",
+      "decision": "新的内置主题用 Minecraft 方块命名，每套一种强调色；第一批四套都用信号橙。",
+      "rationale": "名字与启动器的气质一致，玻璃与遮光玻璃正好对应亮暗两种半透明。主题本来就可以换强调色（Catppuccin、Rosé Pine 已经这样做），第一批保持橙色是为了与铝白、夜黑成为同一家族。",
+      "consequences": "以后加入其他强调色的主题时，同样核对它与危险红的距离和作为文字的对比度。"
+    },
+    {
+      "id": "D5",
+      "decision": "macOS 的模糊由启动器自己的系统效果视图（lumilio-backdrop，FullScreenUI 材质，随主题明暗）提供，GPUI 的窗口只设为透明。",
+      "rationale": "GPUI 的 blurred 为了让效果视图无色，会移除它的着色与饱和度图层；在当前 macOS 上这把模糊也一起去掉了，窗口后面的桌面文字清晰可见（T6 前的实机检查中 Project Maintainer 指出窗口叠放时背景非常清晰）。几种系统材质中 FullScreenUI 着色最轻，桌面的颜色能透过来，由主题的页面色负责着色。",
+      "consequences": "原生调用放在只允许审计过的 unsafe 的 lumilio-backdrop 中，界面 crate 仍禁止 unsafe。Windows 与 Linux 不变：Windows 用 GPUI 的材质，Linux 按 D3 合成为不透明。"
+    },
+    {
+      "id": "D6",
+      "decision": "玻璃与遮光玻璃按方案二：页面约 75%、面板约 80% 不透明，对比度只在同色调的桌面上检查。",
+      "rationale": "Project Maintainer 实机比较了两种方案：约 90%–95% 的方案几乎看不出是玻璃，约 75% 的观感明显更好。在相反色调的桌面上（亮玻璃叠黑桌面），任何明显透明的亮主题都过不了橙色与说明文字的对比度，只有接近不透明才行。",
+      "consequences": "主题说明提示玻璃适合亮色桌面、遮光玻璃适合暗色桌面；想要更透或更实的可以用本地主题。浮在页面上的对话框、菜单、通知和导航按 D1 始终不透明。壁纸在半透明机身上融进玻璃而不是不透明的页面色：方块世界溶解掉的像素不画，图片在 44 层 2px 的嵌套层里淡出（GPUI 没有透明度遮罩；11 层时台阶可见，并排的条带会在裁剪边缘留下亮线）；导航下的遮罩在半透明机身上省去，它在玻璃上只会叠成一条黑带。"
+    }
+  ],
+  "lessonsLearned": [
+    "半透明主题从未真正透出窗口：框架的根节点用 tokens.background（主题没有设置，保持默认的不透明色）铺满窗口，外壳又铺了一层页面色；原有测试只检查主题里的颜色值，没检查实际画到窗口上的颜色，直到实机比较方案时才发现。另外 GPUI 在当前 macOS 上的 blurred 没有模糊。防护：the_root_paints_the_window_with_the_page_colour 检查根节点画出的颜色（去掉 fork 的改动时失败）；a_translucent_page_colour_and_the_window_material_reach_the_window 检查对话框、菜单、通知与导航的颜色不透明（临时让菜单用半透明面板色时失败）。模糊无法在无界面测试里检查，由 T6 实机检查。"
+  ],
+  "roadmap": {
+    "enabled": false,
+    "id": "translucent-themes",
+    "name": "半透明主题",
+    "lede": "半透明机身、无壁纸首页与新配色。",
+    "targetVersion": null,
+    "order": 0
+  }
+}

@@ -430,3 +430,85 @@ fn home_enters_a_world_and_lists_no_other_game(cx: &mut TestAppContext) {
     assert!(cx.debug_bounds("home-record").is_some());
     assert!(cx.debug_bounds("home-place-enter-0").is_none());
 }
+
+/// Without a wallpaper Home draws no world: its title and Continue sit near
+/// the top of the window instead of at the foot of the world (plan
+/// translucent-themes, D2).
+#[gpui::test]
+fn a_bare_home_puts_its_title_at_the_top(cx: &mut TestAppContext) {
+    let overlay_top = |cx: &mut TestAppContext, bare: bool| {
+        cx.update(|cx| {
+            gpui_component::init(cx);
+            cx.set_global(crate::theme::Wallpaper {
+                bare,
+                ..Default::default()
+            });
+        });
+        let (_shell, cx) = cx.add_window_view(|_, cx| {
+            LauncherShell::new(cx)
+                .with_home(continuing(), cx)
+                .with_intent_handler(Rc::new(|_, _, _| {}))
+        });
+        cx.simulate_resize(gpui::size(gpui::px(1080.), gpui::px(800.)));
+        settle(cx);
+        assert!(
+            cx.debug_bounds("home-continue").is_some(),
+            "Continue is drawn"
+        );
+        f32::from(cx.debug_bounds("home-overlay").expect("the title").origin.y)
+    };
+    let on_world = overlay_top(cx, false);
+    let bare = overlay_top(cx, true);
+    assert!(
+        bare < 100.,
+        "a bare Home starts its title near the top ({bare})"
+    );
+    assert!(
+        on_world > bare + 100.,
+        "over the world the title sits at its foot ({on_world} vs {bare})"
+    );
+}
+
+/// The veil under the navigation is drawn on a solid page only: on a
+/// translucent one it would stack into a dark band over the glass.
+#[gpui::test]
+fn the_navigation_veil_is_left_out_on_a_translucent_page(cx: &mut TestAppContext) {
+    let veiled = |cx: &mut TestAppContext, glass: bool| {
+        cx.update(|cx| {
+            gpui_component::init(cx);
+            let local = glass.then(|| crate::theme::Entry {
+                spec: crate::theme::parse_file(
+                    r##"{"themes":[{"name":"Glass","appearance":"light","colors":{"page":"#e4e4e1bf"}}]}"##,
+                )
+                .unwrap()
+                .remove(0)
+                .unwrap(),
+                origin: crate::theme::Origin::Local("glass.json".into()),
+            });
+            cx.set_global(crate::theme::Catalog::with_local(
+                local.into_iter().collect(),
+                Vec::new(),
+            ));
+            cx.set_global(crate::theme::Choice(lumilio_core::LookPreferences {
+                light_theme: glass.then(|| "Glass".into()),
+                ..Default::default()
+            }));
+            gpui_component::Theme::change(gpui_component::ThemeMode::Light, None, cx);
+            crate::theme::tune(cx);
+        });
+        let (_shell, cx) = cx.add_window_view(|_, cx| {
+            LauncherShell::new(cx)
+                .with_home(continuing(), cx)
+                .with_intent_handler(Rc::new(|_, _, _| {}))
+        });
+        settle(cx);
+        cx.debug_bounds("nav-veil").is_some()
+    };
+    assert!(veiled(cx, false), "a solid page has the veil");
+    // Where the system cannot blur, the translucent page is made solid (D3).
+    assert_eq!(
+        veiled(cx, true),
+        !crate::theme::can_blur(),
+        "a translucent page has no veil"
+    );
+}

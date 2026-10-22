@@ -8,13 +8,23 @@ use std::path::{Path, PathBuf};
 use gpui::{App, Global};
 use lumilio_core::LookPreferences;
 
-use super::spec::{Resolved, ThemeSpec, Tone, parse_file};
+use super::spec::{Resolved, ThemeSpec, Tone, WindowBackground, parse_file};
 use super::{Body, MONO_FONT, SANS_FONT};
 
 /// Name of the built-in light theme.
 pub const ALUMINIUM: &str = "Aluminium";
 /// Name of the built-in dark theme.
 pub const NIGHT: &str = "Night";
+/// Name of the built-in translucent light theme.
+pub const GLASS: &str = "Glass";
+/// Name of the built-in translucent dark theme.
+pub const TINTED_GLASS: &str = "Tinted Glass";
+/// Name of the launcher's warm light theme.
+pub const BIRCH: &str = "Birch";
+/// Name of the launcher's cool dark theme.
+pub const DEEPSLATE: &str = "Deepslate";
+/// The launcher's own themes, as against the bundled palettes of others.
+pub const OWN: [&str; 6] = [ALUMINIUM, NIGHT, GLASS, TINTED_GLASS, BIRCH, DEEPSLATE];
 
 /// Where a theme came from.
 #[derive(Clone, Debug, PartialEq)]
@@ -94,6 +104,10 @@ impl Catalog {
     }
 }
 
+/// The launcher's own palettes beyond its two bodies, named after blocks
+/// (plan translucent-themes, D4).
+const OWN_FILES: [&str; 1] = [include_str!("../../themes/lumilio.json")];
+
 /// Theme files shipped with the launcher: other people's palettes, kept as
 /// they published them. Each theme names its source and licence.
 const BUNDLED: [&str; 2] = [
@@ -107,8 +121,10 @@ fn builtin() -> Vec<Entry> {
     let own = [
         ThemeSpec::of_body(ALUMINIUM, Body::of(false)),
         ThemeSpec::of_body(NIGHT, Body::of(true)),
+        glass(GLASS, false),
+        glass(TINTED_GLASS, true),
     ];
-    let bundled = BUNDLED.iter().flat_map(|text| {
+    let bundled = OWN_FILES.iter().chain(BUNDLED.iter()).flat_map(|text| {
         parse_file(text)
             .expect("bundled theme files are valid (tested)")
             .into_iter()
@@ -177,6 +193,8 @@ impl Global for Choice {}
 pub struct Wallpaper {
     /// The file to show; `None` shows the procedural world.
     pub path: Option<PathBuf>,
+    /// Home shows nothing behind its title.
+    pub bare: bool,
     /// A picture was chosen but its file is gone.
     pub missing: bool,
 }
@@ -217,6 +235,11 @@ impl Look {
             Some(catalog) => catalog.resolve(name, tone),
             None => Catalog::default().resolve(name, tone),
         };
+        let theme = if super::spec::can_blur() {
+            theme
+        } else {
+            theme.without_blur()
+        };
         let wanted =
             |own: &Option<String>, theme: &Option<String>| own.clone().or_else(|| theme.clone());
         let sans = wanted(&choice.sans_font, &theme.fonts.sans);
@@ -245,3 +268,22 @@ impl Look {
         }
     }
 }
+
+/// Aluminium or Night as glass: the page, panels and lines let the blurred
+/// desktop through (plan translucent-themes, D6), everything on them stays
+/// as it was.
+fn glass(name: &str, dark: bool) -> ThemeSpec {
+    let mut body = Body::of(dark);
+    body.page = body.page.opacity(GLASS_PAGE);
+    body.panel = body.panel.opacity(GLASS_PANEL);
+    body.hairline = body.hairline.opacity(GLASS_PAGE);
+    ThemeSpec {
+        window_background: Some(WindowBackground::Blurred),
+        ..ThemeSpec::of_body(name, body)
+    }
+}
+
+/// How opaque glass is: the page and its lines, and the panels on it, which
+/// stay a little firmer so lists and fields read as surfaces (D6).
+pub const GLASS_PAGE: f32 = 0.75;
+pub const GLASS_PANEL: f32 = 0.8;

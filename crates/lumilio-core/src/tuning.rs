@@ -466,9 +466,47 @@ pub struct LookPreferences {
     pub cjk_font: Option<String>,
     /// Interface scale in percent; `None` is 100.
     pub font_scale: Option<u16>,
-    /// The Home wallpaper: a file name inside the launcher's `themes`
-    /// folder. `None` is the procedural world.
-    pub wallpaper: Option<String>,
+    /// What Home shows behind its title.
+    pub wallpaper: WallpaperChoice,
+}
+
+/// What Home shows behind its title.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub enum WallpaperChoice {
+    /// The procedural world.
+    #[default]
+    World,
+    /// A picture: a file name inside the launcher's `themes` folder.
+    Picture(String),
+    /// Nothing: the title sits on the body, and a translucent theme shows
+    /// the desktop through (plan translucent-themes, T1).
+    Bare,
+}
+
+/// How [`WallpaperChoice::Bare`] is written. Stored pictures are always
+/// named `wallpaper-…`, so it never names one.
+const BARE_WALLPAPER: &str = "bare";
+
+// Written as the file name it always was, so earlier settings read the same:
+// absent is the world, a name is a picture.
+impl Serialize for WallpaperChoice {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::World => serializer.serialize_none(),
+            Self::Picture(name) => serializer.serialize_some(name),
+            Self::Bare => serializer.serialize_some(BARE_WALLPAPER),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for WallpaperChoice {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        Ok(match Option::<String>::deserialize(deserializer)? {
+            None => Self::World,
+            Some(name) if name == BARE_WALLPAPER => Self::Bare,
+            Some(name) => Self::Picture(name),
+        })
+    }
 }
 
 impl LookPreferences {

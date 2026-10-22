@@ -11,7 +11,7 @@ use crate::theme::{ALUMINIUM, NIGHT, Tone};
 use crate::{tr, tr_all};
 use gpui::prelude::*;
 use gpui::{AnyElement, App, IntoElement};
-use lumilio_core::{Appearance, LookPreferences};
+use lumilio_core::{Appearance, LookPreferences, WallpaperChoice};
 use std::rc::Rc;
 
 /// The scales offered, in percent; the labels are `settings-scale-*`.
@@ -78,6 +78,27 @@ pub(super) fn appearance(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
         rows.push(note(
             "settings-theme-missing-note",
             tr!("settings-theme-missing", count = missing),
+            ctx,
+        ));
+    }
+    if ctx
+        .look
+        .is_some_and(|look| look.theme.window_background == crate::theme::WindowBackground::Blurred)
+    {
+        rows.push(note(
+            "settings-theme-glass-note",
+            tr!("settings-theme-glass").to_owned(),
+            ctx,
+        ));
+    }
+    if let Some(solid) = ctx
+        .look
+        .map(|look| look.theme.solid.len())
+        .filter(|n| *n > 0)
+    {
+        rows.push(note(
+            "settings-theme-solid-note",
+            tr!("settings-theme-solid", count = solid),
             ctx,
         ));
     }
@@ -186,7 +207,7 @@ pub(super) fn appearance(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
 }
 
 fn wallpaper_row(view: &SettingsView, ctx: &LiveCtx) -> gpui::Stateful<gpui::Div> {
-    let chosen = view.preferences.look.wallpaper.is_some();
+    let chosen = &view.preferences.look.wallpaper;
     let handler = ctx.handler.clone();
     let mut control = gpui_component::h_flex().gap_2().child(
         // ia[settings]: 主页壁纸 | 外观 · 按键「选择图片…」→ 系统文件选择器 | 图片缩小后存进启动器文件夹，主页换成这张图，底部仍溶解进页面；不是图片就提示，当前壁纸不变
@@ -215,7 +236,20 @@ fn wallpaper_row(view: &SettingsView, ctx: &LiveCtx) -> gpui::Stateful<gpui::Div
             },
         ),
     );
-    if chosen {
+    if *chosen != WallpaperChoice::Bare {
+        control = control.child(
+            // ia[settings]: 不用壁纸 | 外观 · 按键「不用壁纸」 | 主页不画世界，标题与「继续」直接放在页面上，半透明主题透出桌面；存下的图片一并删除 | translucent-themes T1
+            kit::ghost(
+                "settings-wallpaper-bare",
+                tr!("settings-wallpaper-bare-choose"),
+                send(
+                    &handler,
+                    with_preferences(view, |prefs| prefs.look.wallpaper = WallpaperChoice::Bare),
+                ),
+            ),
+        );
+    }
+    if *chosen != WallpaperChoice::World {
         control = control.child(
             // ia[settings]: 恢复默认壁纸 | 外观 · 按键 | 主页回到默认的像素世界，存下的图片一并删除
             kit::ghost(
@@ -223,15 +257,15 @@ fn wallpaper_row(view: &SettingsView, ctx: &LiveCtx) -> gpui::Stateful<gpui::Div
                 tr!("common-restore-defaults"),
                 send(
                     &handler,
-                    with_preferences(view, |prefs| prefs.look.wallpaper = None),
+                    with_preferences(view, |prefs| prefs.look.wallpaper = WallpaperChoice::World),
                 ),
             ),
         );
     }
-    let value = if chosen {
-        tr!("settings-wallpaper-chosen")
-    } else {
-        tr!("settings-wallpaper-default")
+    let value = match chosen {
+        WallpaperChoice::World => tr!("settings-wallpaper-default"),
+        WallpaperChoice::Picture(_) => tr!("settings-wallpaper-chosen"),
+        WallpaperChoice::Bare => tr!("settings-wallpaper-bare"),
     };
     row(
         "settings-wallpaper",

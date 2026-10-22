@@ -22,6 +22,10 @@ description: 选择内置主题，或用 JSON 文件制作自己的主题。
 | --- | --- | --- |
 | Aluminium | 浅色 | 启动器默认 |
 | Night | 深色 | 启动器默认 |
+| Glass | 浅色 | 启动器自带，半透明：模糊的桌面上铺一层 Aluminium，在浅色桌面上最清楚 |
+| Tinted Glass | 深色 | 启动器自带，半透明：模糊的桌面上铺一层 Night，在深色桌面上最清楚 |
+| Birch | 浅色 | 启动器自带：暖色的米白机身 |
+| Deepslate | 深色 | 启动器自带：偏冷的石板灰机身 |
 | Catppuccin Latte | 浅色 | [Catppuccin](https://github.com/catppuccin/catppuccin)，MIT 许可 |
 | Catppuccin Mocha | 深色 | [Catppuccin](https://github.com/catppuccin/catppuccin)，MIT 许可 |
 | Rosé Pine Dawn | 浅色 | [Rosé Pine](https://github.com/rose-pine/rose-pine-theme)，MIT 许可 |
@@ -96,11 +100,12 @@ description: 选择内置主题，或用 JSON 文件制作自己的主题。
 | `radius` | 否 | 输入框、下拉框和弹出菜单的圆角，单位为像素，默认 `4`。启动器自己的按键和面板圆角固定，不受影响 |
 | `radius_lg` | 否 | 对话框和通知的圆角，单位为像素，默认 `6` |
 | `fonts` | 否 | 字体族名：`sans` 是界面字体，`mono` 是等宽字体，`cjk` 是中文字体 |
-| `window_background` | 否 | 窗口背后的材质：`"opaque"`（默认）、`"transparent"` 或 `"blurred"`。颜色带透明度时才看得到 |
+| `window_background` | 否 | 窗口背后的材质：`"opaque"`（默认）、`"transparent"` 或 `"blurred"`。颜色带透明度时才看得到。系统不支持模糊时（多数 Linux 桌面），`"blurred"` 的主题把颜色叠在内置主题的页面底色上，窗口不透明 |
 
 ### 颜色
 
 颜色写成 `#rrggbb`，或带透明度的 `#rrggbbaa`；`#` 可以省略。
+只有 `page`、`panel` 和 `hairline` 可以带透明度；其他颜色带透明度时按不透明显示，因为按键、显示屏和标签要保持清楚。
 颜色名沿用默认配色的叫法，例如 `orange` 是强调色，值可以是任何颜色。
 
 | 颜色 | 用在哪里 |

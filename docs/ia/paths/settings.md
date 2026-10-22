@@ -21,6 +21,7 @@
 | 中文字体 | 外观 · 值 + 更改 → 对话框里可搜索的已装字体 | 汉字优先用它；没装就回退系统中文字体并在这里说明，不会用拉丁字体画汉字 |  | `lumilio-ui/src/pages/settings/appearance.rs` |
 | 界面缩放 | 外观 · 分段：85% / 100% / 115% / 130% | 文字和间距一起缩放，立即生效并保存；范围有上下限，防止破版 |  | `lumilio-ui/src/pages/settings/appearance.rs` |
 | 主页壁纸 | 外观 · 按键「选择图片…」→ 系统文件选择器 | 图片缩小后存进启动器文件夹，主页换成这张图，底部仍溶解进页面；不是图片就提示，当前壁纸不变 |  | `lumilio-ui/src/pages/settings/appearance.rs` |
+| 不用壁纸 | 外观 · 按键「不用壁纸」 | 主页不画世界，标题与「继续」直接放在页面上，半透明主题透出桌面；存下的图片一并删除 | translucent-themes T1 | `lumilio-ui/src/pages/settings/appearance.rs` |
 | 恢复默认壁纸 | 外观 · 按键 | 主页回到默认的像素世界，存下的图片一并删除 |  | `lumilio-ui/src/pages/settings/appearance.rs` |
 | 重新读取本地主题 | 外观 · 按键 | 重新扫描 themes 文件夹；能用的出现在上面的列表里，不能用的在下面说明原因 |  | `lumilio-ui/src/pages/settings/appearance.rs` |
 | 打开主题文件夹 | 外观 · 按键 | 在系统文件管理器里显示 themes 文件夹，没有就先建好 |  | `lumilio-ui/src/pages/settings/appearance.rs` |

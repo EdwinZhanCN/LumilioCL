@@ -132,6 +132,26 @@ The launcher follows the system appearance, at start and live
 (`follow_system_appearance`). World art does not change with appearance; the
 page it dissolves into does.
 
+Home's wallpaper is the world, a picture, or nothing. Without one there is
+no art: the title, its caption and Continue sit on the body at the top of the
+content column, as tall as they need, in the theme's ink. The keys stay the
+same objects. What the world said about the game is said by what is already
+there: the square and words beside the title, and the launch's segment bar.
+
+A theme may make the body translucent: `page`, `panel` and `hairline` may
+carry opacity, and the desktop behind them is blurred, so text behind the
+window never reads through ours. Keys, displays, tags
+and LEDs are objects on the body and stay solid. So do the surfaces that float over it: dialogs, menus, toasts
+and the navigation's zones. Where the system cannot blur,
+the translucent body is laid over the built-in page of its tone, so the
+desktop's own text never shows through ours.
+
+On a translucent body Home's wallpaper fades into the glass, not into a band
+of the page colour: the world's dissolved texels are left out, and a picture
+fades out in thin nested layers. The veil under the navigation is left out
+too; over glass it would only stack into a dark band, and the navigation's
+zones are solid.
+
 ## 6. Navigation
 
 The navigation bar floats at the bottom of every page, Home included, as
@@ -366,6 +386,15 @@ hand.
 | display | `#141414` | `#070707` | display windows |
 | display ink / dim | `#FF6A2A` / `#3D2619` | `#FF6A2A` / `#3A2418` | lit and unlit segments and bars |
 | display label | `#948479` | `#948479` | legends and units on a display (4.5:1 or better) |
+
+Only `page`, `panel` and `hairline` may carry opacity; the theme's window
+material decides what shows through them (§5, Appearance). Every other token
+is drawn solid.
+The launcher's own themes are three pairs of bodies around the same signal
+orange: Aluminium and Night; Birch and Deepslate, a warm cream and a cool
+slate; Glass and Tinted Glass, Aluminium and Night made translucent. A theme
+file may change the accent too (the bundled Catppuccin and Rosé Pine do); it
+then keeps the rules below for whatever colour it takes.
 
 **Signal orange** is the only accent. It marks:
 - the primary key;

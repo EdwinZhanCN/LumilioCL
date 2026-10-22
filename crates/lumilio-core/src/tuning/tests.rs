@@ -227,3 +227,33 @@ fn quick_play_targets_are_checked() {
         assert!(server(bad).is_some(), "{bad:?}");
     }
 }
+
+/// The wallpaper is written as the file name it always was, so settings
+/// saved before there was a bare Home read the same, and back.
+#[test]
+fn the_wallpaper_reads_settings_from_before_bare_home() {
+    let read = |json: &str| {
+        serde_json::from_str::<LookPreferences>(json)
+            .unwrap()
+            .wallpaper
+    };
+    assert_eq!(read("{}"), WallpaperChoice::World);
+    assert_eq!(read(r#"{"wallpaper":null}"#), WallpaperChoice::World);
+    assert_eq!(
+        read(r#"{"wallpaper":"wallpaper-1a2b.png"}"#),
+        WallpaperChoice::Picture("wallpaper-1a2b.png".into())
+    );
+    assert_eq!(read(r#"{"wallpaper":"bare"}"#), WallpaperChoice::Bare);
+    for choice in [
+        WallpaperChoice::World,
+        WallpaperChoice::Picture("wallpaper-1a2b.png".into()),
+        WallpaperChoice::Bare,
+    ] {
+        let look = LookPreferences {
+            wallpaper: choice.clone(),
+            ..LookPreferences::default()
+        };
+        let written = serde_json::to_string(&look).unwrap();
+        assert_eq!(read(&written), choice);
+    }
+}

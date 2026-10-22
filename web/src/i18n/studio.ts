@@ -101,6 +101,8 @@ const en = {
   },
   missing: (count: number) =>
     `${count} ${count === 1 ? "colour comes" : "colours come"} from the built-in theme.`,
+  solid: (count: number) =>
+    `${count} ${count === 1 ? "colour has" : "colours have"} opacity, but only page, panel and hairline can be translucent. The launcher shows ${count === 1 ? "it" : "them"} as opaque.`,
   install: "To use the file, put it in the launcher's themes folder and choose Reload in Settings › Appearance.",
   installLink: "How to add a local theme",
 
@@ -232,6 +234,7 @@ const zhCN: typeof en = {
     duplicate: "文件里前面已有同名、同明暗的主题；启动器会忽略这一套。",
   },
   missing: (count: number) => `有 ${count} 项颜色沿用内置主题。`,
+  solid: (count: number) => `有 ${count} 项颜色带透明度，但只有 page、panel 和 hairline 可以半透明，启动器会按不透明显示。`,
   install: "把文件放进启动器的 themes 文件夹，再在 设置 › 外观 里点“重新读取”。",
   installLink: "如何添加本地主题",
 

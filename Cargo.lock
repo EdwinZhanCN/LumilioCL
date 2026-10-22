@@ -4565,6 +4565,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "lumilio-backdrop"
+version = "0.1.6"
+dependencies = [
+ "objc2 0.6.4",
+ "objc2-app-kit 0.3.2",
+ "objc2-foundation 0.3.2",
+ "raw-window-handle",
+]
+
+[[package]]
 name = "lumilio-block-assets"
 version = "0.1.6"
 dependencies = [
@@ -4775,6 +4785,7 @@ dependencies = [
  "i18n-embed-fl",
  "image 0.25.10",
  "log",
+ "lumilio-backdrop",
  "lumilio-core",
  "lumilio-map-render",
  "lumilio-plugin-api",

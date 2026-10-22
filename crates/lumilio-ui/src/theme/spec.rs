@@ -82,6 +82,11 @@ impl<'de> Deserialize<'de> for Color {
     }
 }
 
+/// The body's colours, the only ones that may let the window show through
+/// (plan translucent-themes, D1). Keys, displays, tags and LEDs are objects
+/// on the body and stay solid.
+pub const TRANSLUCENT: &[&str] = &["page", "panel", "hairline"];
+
 /// Declares [`Palette`] from the colour fields of [`Body`], so a colour is
 /// named once and the file, the fill-in and the built-in export cannot drift.
 macro_rules! palette {
@@ -114,6 +119,20 @@ macro_rules! palette {
                     None => missing.push(stringify!($field)),
                 })+
                 (body, missing)
+            }
+
+            /// Makes every colour outside [`TRANSLUCENT`] opaque, and names
+            /// those that were not.
+            pub fn solidify(&mut self) -> Vec<&'static str> {
+                let mut solid = Vec::new();
+                $(if let Some(color) = self.$field.as_mut()
+                    && color.0.a < 1.
+                    && !TRANSLUCENT.contains(&stringify!($field))
+                {
+                    color.0.a = 1.;
+                    solid.push(stringify!($field));
+                })+
+                solid
             }
 
             /// The colour called `name`, if the palette gives it.
@@ -252,12 +271,17 @@ pub struct Resolved {
     pub window_background: WindowBackground,
     /// The colours the file did not give, filled from the built-in body.
     pub missing: Vec<&'static str>,
+    /// The colours the file gave with opacity where only the body may have
+    /// it; they are drawn solid.
+    pub solid: Vec<&'static str>,
 }
 
 impl Resolved {
     #[must_use]
     pub fn new(spec: &ThemeSpec) -> Self {
-        let (body, missing) = spec.colors.fill(Body::of(spec.appearance.is_dark()));
+        let mut colors = spec.colors.clone();
+        let solid = colors.solidify();
+        let (body, missing) = colors.fill(Body::of(spec.appearance.is_dark()));
         let radius = |value: Option<f32>, default: f32| {
             px(value
                 .filter(|value| value.is_finite())
@@ -273,8 +297,43 @@ impl Resolved {
             fonts: spec.fonts.clone(),
             window_background: spec.window_background.unwrap_or_default(),
             missing,
+            solid,
         }
     }
+
+    /// The theme on a system that cannot blur what is behind the window:
+    /// a blurred body is laid over the built-in page of its tone instead,
+    /// because plain see-through would show the desktop's text under ours
+    /// (plan translucent-themes, D3).
+    #[must_use]
+    pub fn without_blur(mut self) -> Self {
+        if self.window_background != WindowBackground::Blurred {
+            return self;
+        }
+        self.body = self.body.solid();
+        self.window_background = WindowBackground::Opaque;
+        self
+    }
+}
+
+/// Whether this system blurs what is behind a window. macOS and Windows do;
+/// on Linux it depends on the compositor, and most do not.
+#[must_use]
+pub const fn can_blur() -> bool {
+    cfg!(any(target_os = "macos", target_os = "windows"))
+}
+
+/// `top` laid over an opaque `bottom`.
+pub(super) fn over(top: Hsla, bottom: Hsla) -> Hsla {
+    let (top, bottom) = (Rgba::from(top), Rgba::from(bottom));
+    let mix = |a: f32, b: f32| a * top.a + b * (1. - top.a);
+    Rgba {
+        r: mix(top.r, bottom.r),
+        g: mix(top.g, bottom.g),
+        b: mix(top.b, bottom.b),
+        a: 1.,
+    }
+    .into()
 }
 
 /// Reads a theme file. The outer error is a file that is not a theme file at
