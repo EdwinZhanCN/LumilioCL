@@ -28,6 +28,8 @@ common-name = Name
 common-expand = Expand
 common-browse = Browse…
 common-restore-defaults = Restore defaults
+# Background work stopped unexpectedly (a launcher bug); the cause is in the technical details.
+common-work-stopped = This stopped unexpectedly and did not finish
 # Opens the folder with the item selected, named as each system names it.
 common-reveal-macos = Show in Finder
 common-reveal-windows = Show in File Explorer
@@ -141,6 +143,17 @@ home-recovery-exited-early-code = The game exited while starting (exit code { $c
 home-recovery-stopped-at = It stopped at the “{ $phase }” step.
 home-recovery-crashed = The game quit unexpectedly.
 home-recovery-crashed-code = The game quit unexpectedly (exit code { $code }).
+# The line under a crash's headline, which already says the game quit.
+home-recovery-exit-code = Exit code { $code }
+# Replaces "It stopped at the step" when the launcher knows a cause the person can act on.
+# reason is a whole sentence (such as an account that must sign in again); this only ends it.
+home-recovery-reason = { $reason }.
+home-recovery-no-java = No installed Java can run this game.
+home-recovery-no-java-major = This game needs Java { $major }, which isn't installed.
+home-recovery-java-download = Java couldn't be downloaded.
+home-recovery-before-launch = The before-launch command didn't succeed.
+home-recovery-before-launch-code = The before-launch command didn't succeed (exit code { $code }).
+home-recovery-world-missing = Can't find the world “{ $world }”.
 home-recover = Recover and continue
 home-attention = Needs attention
 # One notice, when more problems follow.
@@ -213,6 +226,7 @@ library-never-played = Never played
 library-play = Play
 library-favorite = Add to favorites
 library-unfavorite = Remove from favorites
+library-favorite-failed = Couldn't change the favorite
 library-menu-play = Play
 library-menu-open = Open
 library-menu-make-current = Make current game
@@ -619,6 +633,7 @@ activity-empty-title = No activity yet
 activity-empty-help = Downloads and installs show up here
 activity-tab-empty = Nothing in this category
 activity-clear-finished = Clear finished
+activity-clear-failed = Couldn't clear finished activity
 activity-none-running = Nothing is running right now
 activity-running-count = { $count ->
     [one] { $count } thing in progress
@@ -2060,9 +2075,9 @@ settings-update-portable = Download a new ZIP from the releases page to update t
 settings-update-package-managed = Update this version with your system package manager
 settings-update-unsupported-install = Automatic updates are unavailable for this install location
 settings-logs = Launcher logs
-settings-logs-help = A record of downloads and installs.
+settings-logs-help = The warnings and errors the launcher ran into. Look here when something goes wrong.
 settings-diagnostics = Diagnostics
-settings-diagnostics-help = Packs the version, a settings summary, the Java list and each game's recent logs. Player names, UUIDs and your folder paths are replaced; for the before, wrapper and after-exit commands it only records whether they are set.
+settings-diagnostics-help = Packs the version, a settings summary, the Java list, the launcher log and each game's recent logs. Player names, UUIDs and your folder paths are replaced; for the before, wrapper and after-exit commands it only records whether they are set.
 settings-diagnostics-export = Export…
 settings-license = License
 

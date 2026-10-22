@@ -56,6 +56,25 @@ impl std::fmt::Display for UpdateError {
 
 impl std::error::Error for UpdateError {}
 
+impl UpdateError {
+    /// A failed request with each cause behind it (DNS, TLS, refused, timed
+    /// out), as lumilio-core's `with_causes` words it; reqwest's own words
+    /// name only the URL.
+    fn request(error: &reqwest::Error) -> Self {
+        let mut text = error.to_string();
+        let mut cause = std::error::Error::source(error);
+        while let Some(next) = cause {
+            let words = next.to_string();
+            if !words.is_empty() && !text.contains(&words) {
+                text.push_str(": ");
+                text.push_str(&words);
+            }
+            cause = next.source();
+        }
+        Self::Request(text)
+    }
+}
+
 impl From<std::io::Error> for UpdateError {
     fn from(error: std::io::Error) -> Self {
         Self::Io(error)
@@ -206,10 +225,10 @@ impl UpdateClient {
             .send()
             .await
             .and_then(reqwest::Response::error_for_status)
-            .map_err(|error| UpdateError::Request(error.to_string()))?
+            .map_err(|error| UpdateError::request(&error))?
             .text()
             .await
-            .map_err(|error| UpdateError::Request(error.to_string()))
+            .map_err(|error| UpdateError::request(&error))
     }
 
     async fn download_from(
@@ -230,12 +249,12 @@ impl UpdateClient {
                 .send()
                 .await
                 .and_then(reqwest::Response::error_for_status)
-                .map_err(|error| UpdateError::Request(error.to_string()))?;
+                .map_err(|error| UpdateError::request(&error))?;
             let mut stream = response.bytes_stream();
             let mut file = tokio::fs::File::create(partial).await?;
             let mut hasher = Sha256::new();
             while let Some(chunk) = stream.next().await {
-                let chunk = chunk.map_err(|error| UpdateError::Request(error.to_string()))?;
+                let chunk = chunk.map_err(|error| UpdateError::request(&error))?;
                 hasher.update(&chunk);
                 file.write_all(&chunk).await?;
             }

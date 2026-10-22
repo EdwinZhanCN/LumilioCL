@@ -14,7 +14,7 @@ use std::rc::Rc;
 
 impl Render for LauncherShell {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        toast::flush(&mut self.toasts, window, cx);
+        toast::flush_posted(window, cx);
         let colors = ShellColors::current(cx);
         let home_colors = ShellHomeColors {
             foreground: colors.foreground,

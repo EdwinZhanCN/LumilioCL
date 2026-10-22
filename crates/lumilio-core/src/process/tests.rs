@@ -79,6 +79,7 @@ fn events_map_to_launch_signals() {
     let exit = GameEvent::Exited {
         code: Some(1),
         ran_for: Duration::ZERO,
+        killed: false,
     };
     assert_eq!(
         exit.signal(true),
@@ -91,6 +92,30 @@ fn events_map_to_launch_signals() {
         }))
     );
     assert_eq!(GameEvent::Spawned { pid: None }.signal(false), None);
+}
+
+#[test]
+fn a_game_the_launcher_stopped_was_cancelled_whatever_its_code() {
+    // Windows reports a killed process with exit code 1, Unix with none.
+    for code in [Some(1), None] {
+        let stopped = GameEvent::Exited {
+            code,
+            ran_for: Duration::ZERO,
+            killed: true,
+        };
+        assert_eq!(stopped.signal(true), Some(LaunchSignal::Cancelled));
+        assert_eq!(stopped.signal(false), Some(LaunchSignal::Cancelled));
+    }
+    // Ended by a signal the launcher did not send: still an exit, not a stop.
+    let crashed = GameEvent::Exited {
+        code: None,
+        ran_for: Duration::ZERO,
+        killed: false,
+    };
+    assert_eq!(
+        crashed.signal(true),
+        Some(LaunchSignal::Exited { code: None })
+    );
 }
 
 #[cfg(unix)]
@@ -236,7 +261,37 @@ mod supervised {
         canceller.await.unwrap();
         assert!(exit.killed && exit.was_running);
         assert!(exit.ran_for < Duration::from_secs(10));
-        assert!(collect(rx).await.contains(&GameEvent::Running));
+        let events = collect(rx).await;
+        assert!(events.contains(&GameEvent::Running));
+        // A stop is not a crash, whatever code the system gave the process.
+        assert_eq!(
+            events.last().unwrap().signal(exit.was_running),
+            Some(LaunchSignal::Cancelled)
+        );
+    }
+
+    /// A game killed by a signal the launcher did not send (a JVM crash, the
+    /// OOM killer) has no exit code and still ends as an exit, not a stop.
+    #[tokio::test]
+    async fn a_game_killed_by_a_signal_of_its_own_is_an_exit_without_a_code() {
+        let dir = tempfile::tempdir().unwrap();
+        let line = script(dir.path(), "echo 'Setting user: Steve'\nkill -SEGV $$");
+        let (tx, rx) = mpsc::unbounded_channel();
+        let exit = run(
+            &line,
+            dir.path(),
+            tx,
+            Duration::from_secs(30),
+            &CancellationToken::new(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(exit.code, None);
+        assert!(exit.was_running && !exit.killed);
+        assert_eq!(
+            collect(rx).await.last().unwrap().signal(exit.was_running),
+            Some(LaunchSignal::Exited { code: None })
+        );
     }
 
     #[tokio::test]

@@ -10,6 +10,7 @@
 //!     game/ history.jsonl snapshots/
 //!   runtimes/            Java runtimes the launcher owns
 //!   state/operations/    recoverable operation journals (deletion)
+//!   logs/                the launcher's own warnings and errors
 //! ```
 //!
 //! Game files (client jars, loader profiles, libraries, assets) sit in `meta/`
@@ -40,6 +41,18 @@ impl Layout {
     #[must_use]
     pub fn database(&self) -> PathBuf {
         self.root.join("launcher.db")
+    }
+
+    /// The launcher's own warnings and errors (the app writes them).
+    #[must_use]
+    pub fn launcher_log(&self) -> PathBuf {
+        self.root.join("logs/launcher.log")
+    }
+
+    /// The launcher log before the current one filled up.
+    #[must_use]
+    pub fn earlier_launcher_log(&self) -> PathBuf {
+        self.root.join("logs/launcher.1.log")
     }
 
     pub fn map_cache(&self) -> PathBuf {

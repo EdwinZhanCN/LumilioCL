@@ -234,11 +234,11 @@ fn content_switches_send_one_change_and_a_failure_keeps_the_list(cx: &mut TestAp
             cx,
         )
     });
-    view.read_with(cx, |view, _| {
+    view.read_with(cx, |view, cx| {
         assert!(!view.busy);
         assert!(matches!(&view.data.content[0], Some(Ok(list)) if list.entries.len() == 2));
         assert_eq!(
-            view.pending_toasts(),
+            crate::toast::posted(cx),
             [Toast::error("没有成功").technical("disk full")],
             "the failure floats up; the page keeps its list"
         );

@@ -61,11 +61,7 @@ fn list_with_profile(
     cx.spawn(async move |cx| {
         let (library, profile, warning) = match work.await {
             Ok(answer) => answer,
-            Err(error) => (
-                Err(account_failure(&ServiceError::Remote(error.to_string()))),
-                None,
-                None,
-            ),
+            Err(error) => (Err(account_failure(&ServiceError::from(error))), None, None),
         };
         let owned = profile
             .as_ref()
@@ -271,9 +267,7 @@ pub(super) fn run(
     });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let result = work
-            .await
-            .unwrap_or_else(|e| Err(ServiceError::Remote(e.to_string())));
+        let result = work.await.unwrap_or_else(|e| Err(e.into()));
         let online = result.as_ref().is_ok_and(|outcome| outcome.online);
         let success = result.is_ok();
         let refresh = matches!(action, WardrobeAction::Reload);
@@ -341,9 +335,7 @@ pub(super) fn run(
                     result = verified(&service, profile, pending) => result,
                 }
             });
-            let answer = confirm
-                .await
-                .unwrap_or_else(|e| Err(ServiceError::Remote(e.to_string())));
+            let answer = confirm.await.unwrap_or_else(|e| Err(e.into()));
             if matches!(answer, Err(ServiceError::Cancelled)) {
                 return;
             }
@@ -373,9 +365,7 @@ pub(super) fn run(
                 let profile = service.refresh_account_profile(&target).await?;
                 verified(&service, profile, pending).await
             });
-            let answer = work
-                .await
-                .unwrap_or_else(|error| Err(ServiceError::Remote(error.to_string())));
+            let answer = work.await.unwrap_or_else(|error| Err(error.into()));
             let refresh_ok = answer.is_ok();
             let (profile, matches) = match answer {
                 Ok((profile, matches)) => (Ok(profile), matches),
@@ -414,9 +404,7 @@ pub(super) fn save_offline(wiring: &Wiring, revision: u64, intent: SkinIntent, c
         .spawn(async move { service.set_account_skin(&target, intent.choice).await });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let result = work
-            .await
-            .unwrap_or_else(|e| Err(ServiceError::Remote(e.to_string())));
+        let result = work.await.unwrap_or_else(|e| Err(e.into()));
         let success = result.is_ok();
         let _ = wiring.shell.update(cx, |shell, cx| {
             shell.inline_skin_saved(&key, revision, result.map_err(|e| account_failure(&e)), cx)

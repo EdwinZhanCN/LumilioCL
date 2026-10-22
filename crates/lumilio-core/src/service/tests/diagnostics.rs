@@ -418,6 +418,18 @@ async fn the_diagnostics_bundle_hides_the_player_the_folders_and_commands() {
         ),
     )
     .unwrap();
+    let layout = world.service.layout();
+    std::fs::create_dir_all(layout.launcher_log().parent().unwrap()).unwrap();
+    std::fs::write(
+        layout.earlier_launcher_log(),
+        "WARN could not save the current game for Steve\n",
+    )
+    .unwrap();
+    std::fs::write(
+        layout.launcher_log(),
+        format!("ERROR could not read {}\n", layout.root().display()),
+    )
+    .unwrap();
     let path = world._dir.path().join("diagnostics.zip");
     world.service.export_diagnostics(&path).await.unwrap();
 
@@ -430,6 +442,11 @@ async fn the_diagnostics_bundle_hides_the_player_the_folders_and_commands() {
             .read_to_string(&mut all)
             .unwrap();
     }
+    for name in ["launcher/launcher.log", "launcher/launcher.1.log"] {
+        assert!(archive.by_name(name).is_ok(), "{name} is in the bundle");
+    }
+    assert!(all.contains("ERROR could not read <launcher>"), "{all}");
+    assert!(all.contains("current game for <player>"), "{all}");
     assert!(all.contains("LumilioCL"), "{all}");
     assert!(all.contains("<player> joined from <launcher>"), "{all}");
     assert!(!all.contains("Steve"), "{all}");

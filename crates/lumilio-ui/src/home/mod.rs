@@ -208,9 +208,11 @@ impl HomePresentation {
                 }
             }
             Self::Playing { subject, since } => match signal {
-                LaunchSignal::Exited {
-                    code: None | Some(0),
-                } => Self::Continue { subject },
+                // Stopped by the person, or quit cleanly. An exit without a
+                // code that the launcher did not cause is a crash.
+                LaunchSignal::Cancelled | LaunchSignal::Exited { code: Some(0) } => {
+                    Self::Continue { subject }
+                }
                 LaunchSignal::Exited { code } => Self::Recovery {
                     subject,
                     detail: RecoveryDetail::Crashed { code },

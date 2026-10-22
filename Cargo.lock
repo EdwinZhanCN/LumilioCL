@@ -4541,8 +4541,10 @@ name = "lumilio-app"
 version = "0.1.6"
 dependencies = [
  "async-channel",
+ "chrono",
  "futures",
  "gpui-kit",
+ "log",
  "lumilio-core",
  "lumilio-plugin-api",
  "lumilio-plugin-crash-analyzer",
@@ -4782,6 +4784,7 @@ dependencies = [
  "i18n-embed",
  "i18n-embed-fl",
  "image 0.25.10",
+ "log",
  "lumilio-backdrop",
  "lumilio-core",
  "lumilio-map-render",

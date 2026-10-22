@@ -4,7 +4,7 @@
 //! what the pages show of it arrives here, whoever made the change.
 
 use super::Wiring;
-use super::jobs::refresh_installed;
+use super::jobs::{answer, refresh_installed};
 use gpui_kit::App;
 use lumilio_core::{Context, HomeChecks, InstanceRecord, Session, unix_now};
 use lumilio_ui::home::HomePresentation;
@@ -181,7 +181,7 @@ fn refresh_home(wiring: &Wiring, cx: &mut App) {
         .spawn(async move { service.home_snapshot().await });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let Ok((records, summary)) = handle.await else {
+        let Some((records, summary)) = answer(&wiring, handle, cx).await else {
             return;
         };
         // A newer change is followed on its own.
@@ -252,7 +252,7 @@ fn recheck(wiring: &Wiring, cx: &mut App) {
     wiring.state.borrow_mut().home_diagnostics = Some(handle.abort_handle());
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let Ok((records, checks)) = handle.await else {
+        let Some((records, checks)) = answer(&wiring, handle, cx).await else {
             return;
         };
         let same = |was: &Context, now: &Context| {
@@ -298,7 +298,7 @@ fn summarize(wiring: &Wiring, cx: &mut App) {
     });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let Ok((records, summary)) = handle.await else {
+        let Some((records, summary)) = answer(&wiring, handle, cx).await else {
             return;
         };
         // Newer checks or another account change summarize again.
@@ -338,7 +338,9 @@ fn refresh_accounts(wiring: &Wiring, cx: &mut App) {
         .spawn(async move { service.settings().await });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let Ok(settings) = handle.await else { return };
+        let Some(settings) = answer(&wiring, handle, cx).await else {
+            return;
+        };
         let rows = account_rows(&settings);
         let _ = wiring.shell.update(cx, |shell, cx| {
             shell.update_live(|model| model.set_accounts(rows), cx);
@@ -383,7 +385,7 @@ fn refresh_places(wiring: &Wiring, record: InstanceRecord, library: u64, cx: &mu
     });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let Ok((worlds, servers)) = handle.await else {
+        let Some((worlds, servers)) = answer(&wiring, handle, cx).await else {
             return;
         };
         let current = |now: &Context| {
@@ -414,7 +416,10 @@ fn ask_place(wiring: &Wiring, id: String, address: String, library: u64, cx: &mu
         .spawn(async move { service.server_status(&instance, &asked).await });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let answer = handle.await.ok().and_then(Result::ok).ok_or(());
+        let answer = answer(&wiring, handle, cx)
+            .await
+            .and_then(Result::ok)
+            .ok_or(());
         if !still(&wiring, |now| now.revisions.library == library) {
             return;
         }

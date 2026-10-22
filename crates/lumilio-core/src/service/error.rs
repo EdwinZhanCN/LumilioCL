@@ -70,6 +70,9 @@ pub enum ServiceError {
     Export(crate::pack_export::ExportError),
     Snapshot(SnapshotError),
     Io(std::io::Error),
+    /// The work stopped without an answer because it panicked: a launcher
+    /// bug, with the panic's message.
+    Panicked(String),
 }
 
 impl Display for ServiceError {
@@ -117,6 +120,7 @@ impl Display for ServiceError {
             Self::Export(error) => write!(f, "{error}"),
             Self::Snapshot(error) => write!(f, "{error}"),
             Self::Io(error) => write!(f, "{error}"),
+            Self::Panicked(message) => write!(f, "the work stopped unexpectedly: {message}"),
         }
     }
 }
@@ -134,6 +138,23 @@ impl From<lumilio_plugin_api::PluginError> for ServiceError {
 }
 
 impl Error for ServiceError {}
+
+impl ServiceError {
+    /// This error as the failed step of a launch, with what the person can
+    /// act on when there is something.
+    pub fn launch_failure(&self) -> crate::LaunchFailure {
+        let problem = match self {
+            Self::SignInRequired(name) => Some(crate::LaunchProblem::SignInRequired(name.clone())),
+            Self::Auth(error) => Some(crate::LaunchProblem::Account(error.clone())),
+            Self::Launch(error) => error.problem(),
+            _ => None,
+        };
+        crate::LaunchFailure::Step {
+            message: self.to_string(),
+            problem,
+        }
+    }
+}
 
 impl From<crate::skin::AppearanceError> for ServiceError {
     fn from(error: crate::skin::AppearanceError) -> Self {
@@ -231,6 +252,23 @@ impl From<LaunchServiceError> for ServiceError {
 impl From<std::io::Error> for ServiceError {
     fn from(error: std::io::Error) -> Self {
         Self::Io(error)
+    }
+}
+
+/// Awaited work that did not finish: aborting it was a cancellation, a panic
+/// is a failure of its own that the person must hear about.
+impl From<tokio::task::JoinError> for ServiceError {
+    fn from(error: tokio::task::JoinError) -> Self {
+        if error.is_cancelled() {
+            return Self::Cancelled;
+        }
+        let panic = error.into_panic();
+        let message = panic
+            .downcast_ref::<&str>()
+            .map(|text| (*text).to_owned())
+            .or_else(|| panic.downcast_ref::<String>().cloned())
+            .unwrap_or_else(|| "no message".to_owned());
+        Self::Panicked(message)
     }
 }
 

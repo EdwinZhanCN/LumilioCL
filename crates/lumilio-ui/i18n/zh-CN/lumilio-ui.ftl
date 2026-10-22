@@ -28,6 +28,8 @@ common-name = 名称
 common-expand = 展开
 common-browse = 浏览…
 common-restore-defaults = 恢复默认
+# 后台工作意外中断（启动器自身的问题），原因在技术详情里。
+common-work-stopped = 这项操作意外中断了，没有完成
 
 ## 时间
 
@@ -125,6 +127,17 @@ home-recovery-exited-early-code = 游戏在启动时退出了（退出代码 { $
 home-recovery-stopped-at = 在「{ $phase }」这一步停了下来。
 home-recovery-crashed = 游戏意外退出了。
 home-recovery-crashed-code = 游戏意外退出了（退出代码 { $code }）。
+# 崩溃时标题下的一行，标题已经说了游戏意外退出。
+home-recovery-exit-code = 退出代码 { $code }
+# 启动器知道失败原因、且是用户能处理的事时，代替「在某一步停了下来」。
+# reason 是一整句话（例如账户需要重新登录），这里只补上句号。
+home-recovery-reason = { $reason }。
+home-recovery-no-java = 没有能运行这个游戏的 Java。
+home-recovery-no-java-major = 这个游戏需要 Java { $major }，还没有装。
+home-recovery-java-download = 没能下载 Java。
+home-recovery-before-launch = 启动前命令没有成功。
+home-recovery-before-launch-code = 启动前命令没有成功（退出代码 { $code }）。
+home-recovery-world-missing = 找不到世界「{ $world }」。
 home-recover = 恢复并继续
 home-attention = 需要留意
 # 一条提醒，后面还有更多问题时。
@@ -191,6 +204,7 @@ library-never-played = 还没玩过
 library-play = 启动
 library-favorite = 收藏游戏
 library-unfavorite = 取消收藏
+library-favorite-failed = 没有改好收藏
 library-menu-play = 开始游戏
 library-menu-open = 打开
 library-menu-make-current = 设为当前游戏
@@ -573,6 +587,7 @@ activity-empty-title = 还没有动态
 activity-empty-help = 下载和安装会出现在这里
 activity-tab-empty = 这一类里没有动态
 activity-clear-finished = 清除已完成
+activity-clear-failed = 没有清除已完成的动态
 activity-none-running = 现在没有进行中的事情
 activity-running-count = { $count } 件事正在进行
 # 启动时恢复档的说明，最要紧的一条在前。
@@ -1849,9 +1864,9 @@ settings-update-portable = 便携版请从发布页下载新版
 settings-update-package-managed = 请用系统包管理器更新此版本
 settings-update-unsupported-install = 此安装位置不支持自动更新
 settings-logs = 启动器日志
-settings-logs-help = 下载与安装的记录。
+settings-logs-help = 启动器遇到的警告和错误，出了问题时可以看这里。
 settings-diagnostics = 诊断包
-settings-diagnostics-help = 打包版本、设置摘要、Java 列表和各游戏的最近日志；玩家名、UUID 和你的文件夹路径会被替换，启动前/包装/退出后命令只记录有没有填。
+settings-diagnostics-help = 打包版本、设置摘要、Java 列表、启动器日志和各游戏的最近日志；玩家名、UUID 和你的文件夹路径会被替换，启动前/包装/退出后命令只记录有没有填。
 settings-diagnostics-export = 导出…
 settings-license = 开源许可
 

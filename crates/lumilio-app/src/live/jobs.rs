@@ -1,24 +1,29 @@
 use super::{ACTIVITY_LIMIT, POLL, Reload, Wiring};
-use gpui_kit::{App, Context};
+use gpui_kit::{App, AsyncApp, Context};
 use lumilio_core::{CancellationToken, ProjectKind, unix_now};
 use lumilio_ui::LauncherShell;
 use lumilio_ui::live::{CollectionRow, account_rows, activity_rows, library_cards};
 use lumilio_ui::toast::Toast;
 use lumilio_ui::tr;
 use std::future::Future;
+use tokio::task::{JoinError, JoinHandle};
 
 /// Runs `work` on the worker runtime, then hands the result to `done` on the
 /// interface thread and reloads what changed. `started` floats up when it
-/// begins; `poll` keeps Activity fresh meanwhile.
-pub(super) fn job<R: Send + 'static>(
+/// begins; `poll` keeps Activity fresh meanwhile. Work that panics fails like
+/// any other, so `done` still runs and says so.
+pub(super) fn job<T, E>(
     wiring: &Wiring,
     cx: &mut App,
     poll: bool,
     then: Reload,
     started: Option<Toast>,
-    work: impl Future<Output = R> + Send + 'static,
-    done: impl FnOnce(&mut LauncherShell, R, &mut Context<LauncherShell>) + 'static,
-) {
+    work: impl Future<Output = Result<T, E>> + Send + 'static,
+    done: impl FnOnce(&mut LauncherShell, Result<T, E>, &mut Context<LauncherShell>) + 'static,
+) where
+    T: Send + 'static,
+    E: From<JoinError> + Send + 'static,
+{
     let handle = wiring.backend.spawn(work);
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
@@ -29,7 +34,7 @@ pub(super) fn job<R: Send + 'static>(
             cx.background_executor().timer(POLL).await;
             cx.update(|cx| reload(&wiring, Reload::Lists, cx));
         }
-        let Ok(output) = handle.await else { return };
+        let output = handle.await.unwrap_or_else(|error| Err(E::from(error)));
         let _ = wiring.shell.update(cx, |shell, cx| done(shell, output, cx));
         cx.update(|cx| {
             reload(&wiring, then, cx);
@@ -37,6 +42,27 @@ pub(super) fn job<R: Send + 'static>(
         });
     })
     .detach();
+}
+
+/// Waits for work on the worker runtime. Work that panicked is told on the
+/// shell, whatever page is open; work aborted on purpose says nothing. Either
+/// way there is no answer.
+pub(super) async fn answer<T>(
+    wiring: &Wiring,
+    handle: JoinHandle<T>,
+    cx: &mut AsyncApp,
+) -> Option<T> {
+    match handle.await {
+        Ok(output) => Some(output),
+        Err(error) => {
+            let error = lumilio_core::ServiceError::from(error);
+            if matches!(error, lumilio_core::ServiceError::Panicked(_)) {
+                let toast = Toast::error(tr!("common-work-stopped")).technical(error.to_string());
+                let _ = wiring.shell.update(cx, |shell, cx| shell.toast(toast, cx));
+            }
+            None
+        }
+    }
 }
 
 /// Reads again what the target game already has of the searched kind, when
@@ -75,7 +101,10 @@ pub(super) fn refresh_installed(wiring: &Wiring, cx: &mut App) {
         .spawn(async move { service.installed_projects(&asked, kind, &from).await });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let found = handle.await.ok().and_then(Result::ok).unwrap_or_default();
+        let found = answer(&wiring, handle, cx)
+            .await
+            .and_then(Result::ok)
+            .unwrap_or_default();
         let _ = wiring.shell.update(cx, |shell, cx| {
             // Only if still about the same game, kind and source.
             let same_game = shell.install_target() == Some(target.as_str());
@@ -130,6 +159,19 @@ pub(super) fn outcome<T, E: std::fmt::Display>(
     }
 }
 
+/// The result of a quick change whose success shows by itself (a star, a
+/// shorter list): only a failure is told.
+pub(super) fn failed_only<T, E: std::fmt::Display>(
+    shell: &mut LauncherShell,
+    result: Result<T, E>,
+    failed: &str,
+    cx: &mut Context<LauncherShell>,
+) {
+    if let Err(error) = result {
+        shell.toast(Toast::error(failed).technical(error.to_string()), cx);
+    }
+}
+
 /// Reloads the library, Activity, accounts and game settings from the
 /// service. Home and what follows the current game are kept up to date by
 /// [`super::context::follow`].
@@ -161,7 +203,9 @@ pub(super) fn reload(wiring: &Wiring, what: Reload, cx: &mut App) {
     });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let Ok((records, collections, activity, settings, presets)) = handle.await else {
+        let Some((records, collections, activity, settings, presets)) =
+            answer(&wiring, handle, cx).await
+        else {
             return;
         };
         if wiring.state.borrow().reload_seq != seq {

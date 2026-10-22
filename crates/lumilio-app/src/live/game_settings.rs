@@ -1,7 +1,8 @@
 //! Game options and presets: opens their dialogs with fresh data, runs what
 //! they decide off the interface thread, and answers the dialog and the page.
 use super::instance::load_section;
-use super::{Reload, Wiring, jobs::reload};
+use super::jobs::{answer, reload};
+use super::{Reload, Wiring};
 use gpui_kit::{App, AppContext as _, AsyncApp, Context, WeakEntity, Window};
 use lumilio_core::{
     GameSettingsError, InstanceOptions, OptionChange, ServiceError, SettingsPreset,
@@ -35,8 +36,11 @@ fn run<R: Send + 'static>(
 ) {
     let handle = wiring.backend.spawn(work);
     let window = window.window_handle();
+    let wiring = wiring.clone();
     cx.spawn(async move |cx: &mut AsyncApp| {
-        let Ok(output) = handle.await else { return };
+        let Some(output) = answer(&wiring, handle, cx).await else {
+            return;
+        };
         let _ = cx.update_window(window, |_, window, cx| then(output, window, cx));
     })
     .detach();
@@ -548,10 +552,7 @@ pub(super) fn write_option(
     let handle = wiring.backend.spawn(work);
     let wiring = wiring.clone();
     cx.spawn(async move |cx: &mut AsyncApp| {
-        let result = match handle.await {
-            Ok(result) => result,
-            Err(error) => Err(ServiceError::Remote(error.to_string())),
-        };
+        let result = handle.await.unwrap_or_else(|error| Err(error.into()));
         let conflicts = match &result {
             Err(ServiceError::GameSettings(GameSettingsError::Conflict(keys))) => keys.clone(),
             _ => Vec::new(),

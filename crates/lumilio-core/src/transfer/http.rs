@@ -22,12 +22,12 @@ impl HttpTransport {
         let client = Client::builder()
             .user_agent(USER_AGENT)
             .build()
-            .map_err(|error| TransportError::permanent(error.to_string()))?;
+            .map_err(|error| TransportError::permanent(crate::with_causes(&error)))?;
         let plugin_client = Client::builder()
             .user_agent(USER_AGENT)
             .redirect(reqwest::redirect::Policy::none())
             .build()
-            .map_err(|error| TransportError::permanent(error.to_string()))?;
+            .map_err(|error| TransportError::permanent(crate::with_causes(&error)))?;
         Ok(Self {
             client,
             plugin_client: Some(plugin_client),
@@ -53,9 +53,9 @@ impl HttpTransport {
     ) -> Result<TransportResponse, TransportError> {
         let response = result.map_err(|error| {
             if error.is_timeout() || error.is_connect() {
-                TransportError::transient(error.to_string())
+                TransportError::transient(crate::with_causes(&error))
             } else {
-                TransportError::permanent(error.to_string())
+                TransportError::permanent(crate::with_causes(&error))
             }
         })?;
         let status = response.status().as_u16();
@@ -70,7 +70,7 @@ impl HttpTransport {
         let body = response.bytes_stream().map(|chunk| {
             chunk
                 .map(|bytes| bytes.to_vec())
-                .map_err(|error| TransportError::transient(error.to_string()))
+                .map_err(|error| TransportError::transient(crate::with_causes(&error)))
         });
         Ok(TransportResponse::new(status, content_length, Box::pin(body)).with_headers(headers))
     }
@@ -139,8 +139,8 @@ pub struct FileTransport;
 impl Transport for FileTransport {
     fn get<'a>(&'a self, source: &'a str) -> TransportFuture<'a> {
         Box::pin(async move {
-            let url =
-                Url::parse(source).map_err(|error| TransportError::permanent(error.to_string()))?;
+            let url = Url::parse(source)
+                .map_err(|error| TransportError::permanent(crate::with_causes(&error)))?;
             if url.scheme() != "file" {
                 return Err(TransportError::permanent(format!(
                     "unsupported local source scheme: {}",
@@ -152,11 +152,11 @@ impl Transport for FileTransport {
                 .map_err(|()| TransportError::permanent("invalid file URL"))?;
             let file = File::open(&path)
                 .await
-                .map_err(|error| TransportError::permanent(error.to_string()))?;
+                .map_err(|error| TransportError::permanent(crate::with_causes(&error)))?;
             let content_length = file
                 .metadata()
                 .await
-                .map_err(|error| TransportError::permanent(error.to_string()))?
+                .map_err(|error| TransportError::permanent(crate::with_causes(&error)))?
                 .len();
             let body = stream::unfold(Some(file), |state| async move {
                 let mut file = state?;
@@ -167,7 +167,10 @@ impl Transport for FileTransport {
                         buffer.truncate(read);
                         Some((Ok(buffer), Some(file)))
                     }
-                    Err(error) => Some((Err(TransportError::permanent(error.to_string())), None)),
+                    Err(error) => Some((
+                        Err(TransportError::permanent(crate::with_causes(&error))),
+                        None,
+                    )),
                 }
             });
             Ok(TransportResponse::new(

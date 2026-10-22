@@ -346,8 +346,11 @@ Every piece of feedback has one home, and none of them is the page column.
 | State of the page — loading, empty, could not load | The content area, in place of the content (§7) | One sentence, **重试** where it helps, **技术详情** beside it. |
 
 Raw error text is never a headline and never page copy: it opens from
-**技术详情** in a dialog that can copy it. Views queue toasts where results
-arrive and show them on their next render (`lumilio-ui::toast`).
+**技术详情** in a dialog that can copy it. Views of the main window post
+toasts where results arrive and the shell shows them, whatever page is on
+screen, so a result that arrives after its page was left is still told
+(`lumilio-ui::toast`). A window of its own (the schematic studio) shows its
+own.
 
 The crash-analysis dialog is itself a technical reading surface: evidence and
 analysis failures appear inline under **技术详情**, alongside the findings,

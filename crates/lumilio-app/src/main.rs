@@ -5,6 +5,7 @@ mod assets;
 mod backend;
 mod images;
 mod live;
+mod logging;
 
 use gpui_kit::{App, WindowBounds, WindowOptions, px, size};
 use lumilio_ui::tr;
@@ -20,26 +21,30 @@ const APP_ID: &str = if cfg!(debug_assertions) {
 };
 
 fn main() {
-    let opened = backend::data_root(|name| std::env::var(name).ok())
+    let root = backend::data_root(|name| std::env::var(name).ok());
+    if let Some(root) = &root {
+        logging::install(root);
+    }
+    log::info!("LumilioCL {} starting", env!("CARGO_PKG_VERSION"));
+    let opened = root
         .ok_or_else(|| "no data folder could be determined".to_owned())
         .and_then(backend::Backend::open);
     let backend = match opened {
         Ok(backend) => {
-            // Until Diagnostics shows them, recovery results go to stderr.
             for note in backend.service.startup_notes() {
-                eprintln!("LumilioCL start-up recovery: {note:?}");
+                log::info!("start-up recovery: {note:?}");
             }
             backend
         }
         Err(reason) => {
-            eprintln!("LumilioCL could not open its data folder: {reason}");
+            log::error!("could not open the data folder: {reason}");
             std::process::exit(1);
         }
     };
     let mut app = gpui_kit::application().with_assets(assets::AppAssets);
     match images::ImageClient::new() {
         Ok(client) => app = app.with_http_client(client),
-        Err(reason) => eprintln!("pictures from the web will not load: {reason}"),
+        Err(reason) => log::warn!("pictures from the web will not load: {reason}"),
     }
     app.run(move |cx: &mut App| {
         cx.set_app_identity(APP_ID, "LumilioCL");

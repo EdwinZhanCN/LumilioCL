@@ -167,7 +167,7 @@ pub(super) fn open_studio_window(
                     studio,
                 });
         }
-        Err(reason) => eprintln!("LumilioCL could not open the studio window: {reason}"),
+        Err(reason) => log::error!("could not open the studio window: {reason}"),
     }
 }
 
@@ -458,7 +458,7 @@ pub(super) fn pop_out_map(wiring: &Wiring, id: String, handoff: MapHandoff, cx: 
         cx.new(|cx| MapWindow::new(handoff, connection, cx))
     });
     if let Err(reason) = opened {
-        eprintln!("LumilioCL could not open the map window: {reason}");
+        log::error!("could not open the map window: {reason}");
     }
 }
 
@@ -599,9 +599,13 @@ pub(super) fn plugin_tabs(
     let handle = wiring
         .backend
         .spawn(async move { service.plugin_tabs(&id).await });
+    let wiring = wiring.clone();
     cx.spawn(async move |cx| {
         // A game that cannot be read has no plugin tabs; the page reports that itself.
-        let tabs = handle.await.ok().and_then(Result::ok).unwrap_or_default();
+        let tabs = super::jobs::answer(&wiring, handle, cx)
+            .await
+            .and_then(Result::ok)
+            .unwrap_or_default();
         let _ = view.update(cx, |view, cx| view.plugin_tabs_arrived(tabs, cx));
     })
     .detach();
