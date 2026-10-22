@@ -13,6 +13,7 @@ mod selects;
 #[cfg(test)]
 mod tests;
 
+use self::helpers::output_for_session;
 pub use self::helpers::{crash_for_session, diagnostic_labels};
 
 use super::panels::{act_index, problem_text, problem_tone};
@@ -53,7 +54,8 @@ impl InstanceDetailView {
     }
 
     /// Opens the crash report that belongs to the session being inspected,
-    /// when the reports are known. Called again when they arrive.
+    /// or without one the launcher's record of what the game printed then,
+    /// when the logs are known. Called again when they arrive.
     pub(super) fn open_inspected_crash(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some((started, seconds)) = self.inspect else {
             return;
@@ -68,7 +70,32 @@ impl InstanceDetailView {
             self.crash = Some((file.clone(), None));
             cx.notify();
             (self.handler)(InstanceIntent::OpenCrash(file), window, cx);
+        } else if let Some(output) =
+            output_for_session(&logs.files, started, self.is_last_launch(started))
+        {
+            let source = lumilio_core::GameLogSource::File(output.name.clone());
+            self.log_source = source.clone();
+            self.crash = Some((output.name.clone(), None));
+            cx.notify();
+            (self.handler)(InstanceIntent::OpenGameLog(source), window, cx);
         }
+    }
+
+    /// Whether the session that began at `started` is the newest in the
+    /// history and no game of this instance is running now.
+    fn is_last_launch(&self, started: u64) -> bool {
+        let newest = self
+            .data
+            .history
+            .as_ref()
+            .and_then(|read| read.as_ref().ok())
+            .and_then(|read| {
+                read.events.iter().rev().find_map(|event| match event {
+                    lumilio_core::HistoryEvent::Session { started, .. } => Some(*started),
+                    _ => None,
+                })
+            });
+        newest == Some(started) && self.live_output.is_none()
     }
 
     /// Lists another folder of the game directory; one request at a time.

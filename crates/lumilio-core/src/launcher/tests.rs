@@ -363,6 +363,36 @@ async fn a_game_that_dies_at_once_fails_the_session_with_what_it_printed() {
     );
 }
 
+#[tokio::test]
+async fn the_games_output_stays_in_its_logs_folder() {
+    let world = world("echo 'Setting user: Steve'\necho playing >&2\nexit 0");
+    let (result, _) = run_to_end(&launcher(), world.request.clone()).await;
+    assert_eq!(result.unwrap().code, Some(0));
+    let record = std::fs::read_to_string(
+        world
+            .request
+            .directories
+            .game()
+            .join("logs")
+            .join(crate::GAME_OUTPUT_LOG),
+    )
+    .unwrap();
+    let lines: Vec<_> = record.lines().collect();
+    assert!(lines[0].starts_with("# LumilioCL "), "{record}");
+    assert!(
+        lines[1].starts_with("# Minecraft 1.0 · Java 21"),
+        "{record}"
+    );
+    assert!(lines.contains(&"Setting user: Steve") && lines.contains(&"playing"));
+    assert!(
+        lines
+            .last()
+            .unwrap()
+            .starts_with("# The game ended with exit code 0 after "),
+        "{record}"
+    );
+}
+
 #[test]
 fn an_early_exit_keeps_only_the_last_lines_and_a_running_game_none() {
     let line = |text: String| GameEvent::Line {

@@ -1,3 +1,4 @@
+use super::output::OutputFile;
 use super::types::LaunchUpdate;
 use crate::install::{AssetIndex, InstallEvent, InstallStage, InstallationPlan};
 use crate::instance::Loader;
@@ -85,16 +86,25 @@ pub(super) fn asset_object_count(plan: &InstallationPlan) -> u64 {
 /// How many of its last lines a game that quits while starting shows.
 const EARLY_OUTPUT_LINES: usize = 50;
 
-/// Passes the game's events on as launch updates. Until the game is up it
-/// keeps the last lines it printed, which an early exit carries to technical
-/// details: a game that quits that soon may not have written a log.
+/// Passes the game's events on as launch updates, and into the launch's
+/// output file when there is one. Until the game is up it keeps the last
+/// lines it printed, which an early exit carries to technical details: a
+/// game that quits that soon may not have written a log.
 #[derive(Default)]
 pub(super) struct GameForwarder {
     running: bool,
     early_output: VecDeque<String>,
+    file: Option<OutputFile>,
 }
 
 impl GameForwarder {
+    pub(super) fn recording(file: Option<OutputFile>) -> Self {
+        Self {
+            file,
+            ..Self::default()
+        }
+    }
+
     pub(super) fn forward(
         &mut self,
         event: &GameEvent,
@@ -112,12 +122,24 @@ impl GameForwarder {
                     }
                     self.early_output.push_back(text.clone());
                 }
+                if let Some(file) = &mut self.file {
+                    file.line(text);
+                }
                 let _ = updates.send(LaunchUpdate::Log {
                     stream: *stream,
                     text: text.clone(),
                 });
             }
-            GameEvent::Spawned { .. } | GameEvent::Exited { .. } => {}
+            GameEvent::Exited {
+                code,
+                ran_for,
+                killed,
+            } => {
+                if let Some(file) = &mut self.file {
+                    file.ended(*code, *ran_for, *killed);
+                }
+            }
+            GameEvent::Spawned { .. } => {}
         }
         if let Some(mut signal) = event.signal(self.running) {
             if let LaunchSignal::Failed(LaunchFailure::ExitedEarly { output, .. }) = &mut signal {

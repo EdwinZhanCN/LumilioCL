@@ -1,3 +1,4 @@
+use super::output::{self, GAME_OUTPUT_LOG, OutputFile};
 use super::progress::{GameForwarder, ItemProgress, handle_stage, uses_installer};
 use super::types::{JavaRequest, LaunchRequest, LaunchServiceError, LaunchUpdate};
 use super::{LAUNCHER_NAME, Launcher, QUICK_PLAY_LOG};
@@ -376,7 +377,27 @@ where
             return Err(LaunchServiceError::Cancelled);
         }
 
+        // This launch's output stays on disk after the launcher closes; a
+        // folder that takes no file is told, and the game starts anyway.
+        let mut file = match OutputFile::create(
+            request.directories.game(),
+            &output::heading(&request, &java),
+        ) {
+            Ok(file) => Some(file),
+            Err(error) => {
+                let _ = updates.send(LaunchUpdate::Log {
+                    stream: LogStream::Stderr,
+                    text: format!(
+                        "could not keep the game's output in logs/{GAME_OUTPUT_LOG}: {error}"
+                    ),
+                });
+                None
+            }
+        };
         for note in request.session.notes() {
+            if let Some(file) = &mut file {
+                file.note(note);
+            }
             let _ = updates.send(LaunchUpdate::Log {
                 stream: LogStream::Stderr,
                 text: note.clone(),
@@ -394,7 +415,7 @@ where
             cancel,
         );
         tokio::pin!(game);
-        let mut forwarder = GameForwarder::default();
+        let mut forwarder = GameForwarder::recording(file);
         let exit = loop {
             tokio::select! {
                 result = &mut game => break result.map_err(LaunchServiceError::Process)?,

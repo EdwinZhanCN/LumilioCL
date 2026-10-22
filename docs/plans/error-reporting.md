@@ -4,7 +4,7 @@
 
 Status: InProgress
 
-启动器有 Shell 级 toast（错误常驻、带技术详情），但很多失败到不了它：后台任务 panic 被当成「没有结果」，界面停在进行中；实例页等视图的结果只进各自的队列，视图离开屏幕后就看不到；启动失败的恢复面板不显示原因，「技术详情」按钮是空操作；Unix 上被信号杀死的游戏算正常退出。启动器自己没有日志文件，也不处理 panic，启动阶段的失败只写 stderr 后退出。本计划先让已有的 toast 与恢复面板收到这些失败（T1–T3），再补日志、panic 记录与启动阶段的提示（T4–T6）；游戏在写日志之前就退出时，它自己打印的错误也要报出来（T9）。
+启动器有 Shell 级 toast（错误常驻、带技术详情），但很多失败到不了它：后台任务 panic 被当成「没有结果」，界面停在进行中；实例页等视图的结果只进各自的队列，视图离开屏幕后就看不到；启动失败的恢复面板不显示原因，「技术详情」按钮是空操作；Unix 上被信号杀死的游戏算正常退出。启动器自己没有日志文件，也不处理 panic，启动阶段的失败只写 stderr 后退出。本计划先让已有的 toast 与恢复面板收到这些失败（T1–T3），再补日志、panic 记录与启动阶段的提示（T4–T6）；游戏在写日志之前就退出时，它自己打印的错误也要报出来（T9），每次启动的全部输出留在游戏的 logs 文件夹里（T10）。
 
 ## Scope
 
@@ -28,6 +28,8 @@ Status: InProgress
   Acceptance: LaunchFailure::Step 带类型化的 LaunchProblem（需要重新登录、账户登录失败、没有能用的 Java、下载 Java 失败、启动前命令失败、找不到世界），core 只给类型；恢复面板说明在有原因时说原因，没有时仍说停在哪一步；技术详情只放原始原因。崩溃面板说明不再重复标题，只加退出代码。测试：ui a_known_cause_is_told_instead_of_the_step、a_crash_caption_does_not_repeat_its_headline；core 缺 Java 的启动测试断言 NoJava(Some(21)) 经真实启动路径到达会话。
 - [x] T9 — 游戏启动时退出，报出它自己打印的错误。 (Completed)
   Acceptance: LaunchFailure::ExitedEarly 带游戏起来之前最后打印的至多 50 行（stdout 与 stderr 按到达顺序）。恢复面板的「技术详情」有这些行时弹出可复制的对话框，没有时仍打开诊断页；不在 Home 时的错误 toast 带同样的技术详情；启动器日志的「the game quit while starting」一行附上这些输出。游戏起来之后不再保留输出。
+- [x] T10 — 每次启动的游戏输出留在游戏的 logs 文件夹里。 (Completed)
+  Acceptance: 启动时在游戏目录写 logs/lumilio-output.log，覆盖上一次：开头是启动器版本、开始时间、游戏版本、加载器与 Java，随后是账户提示与游戏打印的每一行，结尾说游戏怎样结束（退出代码、被启动器停止或没有退出代码）与运行了多久；超过 32 MiB 后只记一句说明和结尾；建不了文件时在实时输出里说一句，游戏照常启动。诊断 · 日志的来源里它叫「上次启动的输出」；历史里没能启动或崩溃的会话没有崩溃报告时，若它是最近一次会话、游戏没在运行且文件写于会话开始之后，「查看日志」打开这份记录。诊断包带上每个游戏的这份记录（脱敏）。
 - [x] T7 — Project Maintainer 在真实启动器上看一次 T1–T3。 (Completed)
   Acceptance: 行为已由模拟测试覆盖（见验证）。真实窗口用开发钩子 LUMILIO_HOME_RECOVERY=failed|details|crashed|crashed-details|away 在临时 LUMILIO_HOME 中截图，Project Maintainer 看过截图后确认样子。Windows 上运行中点停止回到继续交给社区反馈：CI 只有 Ubuntu，Windows 由 killed 标记的单元测试覆盖。
 - [x] T4 — 启动器日志文件。 (Completed)
@@ -45,6 +47,8 @@ Status: InProgress
   Result: 2026-10-21：#62 合并 main（含 global-context 的 #59）后 squash 合入。Project Maintainer 运行的 just check 通过（1784 项测试）。合并后在临时 LUMILIO_HOME 中用 LUMILIO_HOME_RECOVERY 重拍 failed、details、crashed、crashed-details、away 五种情形，Project Maintainer 看过确认：失败说原因不说步骤，崩溃说明不重复标题，技术详情弹出可复制的原始原因或打开诊断页，在游戏库时失败浮出 toast。Windows 上运行中点停止回到继续交给社区反馈，T7 完成。
 - 游戏在写日志之前就退出时，它打印的错误在技术详情与启动器日志中可读（T9）。
   Result: 2026-10-22：core a_game_that_dies_at_once_fails_the_session_with_what_it_printed 让假 java 脚本向 stderr 打印两行后以 1 退出，经真实启动路径断言会话为 ExitedEarly { code: Some(1), output: 这两行 }，technical_detail 按行连接；an_early_exit_keeps_only_the_last_lines_and_a_running_game_none 断言 60 行只留最后 50 行、游戏起来后的退出是普通 Exited。临时去掉填入输出的一行时两项按预期失败。app technical_details_after_a_failed_launch_explain_it 在真实窗口中点「技术详情」，启动即退出弹出对话框，「复制」写入游戏输出；只给 Step 弹对话框的旧规则下按预期失败。ui a_failure_away_from_home_floats_up_as_a_toast 断言启动即退出的 toast 带游戏输出，旧规则下按预期失败。
+- 游戏的输出在启动器关闭后仍能在诊断里读到（T10）。
+  Result: 2026-10-22：core launcher::output::tests 断言再次启动覆盖上一份记录、结尾说出退出代码与被停止，超过上限后只留说明和结尾；the_games_output_stays_in_its_logs_folder 经真实启动路径（假 java 打印启动标记与一行 stderr 后以 0 退出）断言记录有开头两行、两行输出与「exit code 0」结尾，临时不写游戏行时按预期失败；the_diagnostics_bundle_hides_the_player_the_folders_and_commands 断言诊断包里有这份记录且玩家名已替换。ui the_launch_output_belongs_only_to_the_session_that_wrote_it 覆盖最近一次会话、更早的会话与启动前就失败的情形；a_last_launch_without_a_crash_report_opens_what_the_game_printed 在真实视图中点「查看日志」，日志列表到达后打开这份记录，去掉回退时按预期失败。lumilio-core service/launcher/process/diagnostics 237 项、lumilio-ui english 4 项通过。
 - 启动器的错误与 panic 留在用户能找到的日志或 crash 文件中。
   Result: 2026-10-21（T4，panic 待 T5）：app logging::tests 两项通过：自己的 info 以上与第三方库的 warn 以上写入、其余不写；写满上限后换新文件并保留上一个，临时把改名换成删除时按预期失败。ui a_failure_shown_is_also_kept_in_the_launcher_log：弹出的错误 toast 连同技术详情写入日志、成功提示不写，临时去掉 toast.rs 的记录时按预期失败。core the_diagnostics_bundle_hides_the_player_the_folders_and_commands 断言诊断包含 launcher/launcher.log 与 launcher.1.log 且已脱敏；error_text::tests 证明原因链逐层写出不重复，对真实 reqwest 的连接被拒比 reqwest 自己的一行更长。在临时 LUMILIO_HOME 中运行开发版：日志只有启动一行和恢复钩子产生的错误一行，GPUI 没有写入噪声。
 
@@ -71,6 +75,14 @@ Consequences: Shell 只在队列非空时可变访问 Global，避免观察者�
 Why: 只给账户失败开特例会让规则只能从代码里猜。安装 toast（install_outcome）已经是「已知原因说具体的话，其他说通用的话，原始原因放技术详情」，这里沿用同一模式；core 不写句子，符合 i18n 约定。
 
 Consequences: 新的可处理原因要在 LaunchProblem 加一个变体、在 LaunchServiceError::problem 或 ServiceError::launch_failure 中分类，并在 recovery.rs 给出中英文句子；match 是穷尽的，漏写措辞不能编译。
+
+## Decision D4
+
+游戏输出记在游戏自己的 logs/lumilio-output.log，只留最近一次启动；不记启动命令；历史会话只在它是最近一次、游戏没在运行且文件写于会话开始之后才对应这份记录。
+
+Why: Modrinth App 的 logs/launcher_log.txt 同样放在游戏的 logs 里，诊断的日志列表、导出与复制、迁移时跳过 logs 的规则都直接适用；名字跟 quickPlay/lumilio.json 一样带 lumilio，不与 latest.log、debug.log 及其滚动的 .log.gz 相撞。启动命令含访问令牌，不能落盘。会话的 started 是开始启动的时刻、seconds 只是游戏进程的运行时间，首次安装可能让文件写在 started + seconds 之后很久，按时间窗口对应会认错或认不到；文件只有最近一次，所以用「最近一次会话」判断。
+
+Consequences: 更早的会话只能看崩溃报告和 Minecraft 自己滚动的日志；要保留多次启动的输出需改成按会话命名并清理旧文件。
 
 ## References
 
