@@ -76,8 +76,8 @@ pub use activity::{
     ProgressSnapshot,
 };
 pub use activity_log::{
-    ActiveTask, ActivityLog, FinishedTask, ProgressUnit, RetryAction, TaskAction, TaskBoard,
-    TaskCategory, TaskLabel, TaskOutcome,
+    ActiveTask, ActivityLog, FileDownload, FinishedTask, ProgressUnit, RetryAction, SourceSwitch,
+    TaskAction, TaskBoard, TaskCategory, TaskDownloads, TaskLabel, TaskOutcome,
 };
 pub use artifact::{CoordinateError, PackageCoordinate};
 pub use attention::{
@@ -207,7 +207,7 @@ pub use service::{
     ActivityView, AddedFile, AppearanceApplyResult, ContentEffect, ContentResult,
     ContentSourceInfo, DependencyNeed, DependencyReport, DiscoverFilters, GameLogSource, GameLogs,
     InstalledProject, InstanceJava, LauncherService, Library, ModelPreview, ProfileSnapshot,
-    ProjectDetail, ServiceError, ThirdPartySignIn, now as unix_now,
+    ProjectDetail, ServiceError, ThirdPartySignIn, Traffic, now as unix_now,
 };
 pub use settings::{
     AccountEntry, AccountKind, AuthServerEntry, DownloadSourcePreference, LauncherSettings,

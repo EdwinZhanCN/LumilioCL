@@ -56,7 +56,7 @@ pub use self::third_party::ThirdPartySignIn;
 pub use self::types::{
     ActivityView, ContentEffect, ContentResult, ContentSourceInfo, DependencyNeed,
     DependencyReport, DiscoverFilters, GameLogSource, GameLogs, InstalledProject, Library,
-    ProjectDetail, now,
+    ProjectDetail, Traffic, now,
 };
 pub use self::wardrobe::AppearanceApplyResult;
 

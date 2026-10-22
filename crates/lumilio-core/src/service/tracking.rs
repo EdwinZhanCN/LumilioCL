@@ -1,5 +1,5 @@
 use super::error::ServiceError;
-use super::support::{TaskLease, meter_bytes};
+use super::support::{Meter, TaskLease, watch_transfers};
 use super::types::now;
 use super::{LauncherService, TRANSFER_CONCURRENCY};
 use crate::activity::CancellationToken;
@@ -47,20 +47,22 @@ impl<T: Transport + Clone> LauncherService<T> {
         updates: mpsc::UnboundedSender<LaunchUpdate>,
         cancel: CancellationToken,
     ) -> Result<(), ServiceError> {
+        let (watcher, events) = tokio::sync::broadcast::channel(1024);
         let (launcher, java_requests) = self
             .with_java_installer(
                 Launcher::new(self.transport.clone(), chain)
                     .with_budget(self.connections().await)
-                    .keeping_partials(self.layout.partial_downloads()),
+                    .keeping_partials(self.layout.partial_downloads())
+                    .watched_by(watcher),
             )
             .await;
         let watch = cancel.clone();
-        self.serving_java(
+        let install = self.serving_java(
             java_requests,
             &watch,
             Self::install_tracked(&self.board, task, &launcher, request, updates, cancel),
-        )
-        .await
+        );
+        self.watching(task, events, Meter::Files, install).await
     }
 
     /// Installs through `launcher`, passing its updates on while showing their
@@ -94,20 +96,52 @@ impl<T: Transport + Clone> LauncherService<T> {
     }
 
     /// Runs `work` while the byte progress of the engine behind `events` is
-    /// shown as the progress of task `task`.
+    /// shown as the progress of task `task`, with the files it downloads.
     pub(super) async fn metered<R>(
         &self,
         task: u64,
         events: tokio::sync::broadcast::Receiver<crate::transfer::TransferEvent>,
         work: impl std::future::Future<Output = R>,
     ) -> R {
-        let meter = meter_bytes(&self.board, task, events);
+        self.watching(task, events, Meter::Bytes, work).await
+    }
+
+    /// Runs `work` while the transfers behind `events` are recorded as task
+    /// `task`'s downloads.
+    async fn watching<R>(
+        &self,
+        task: u64,
+        events: tokio::sync::broadcast::Receiver<crate::transfer::TransferEvent>,
+        meter: Meter,
+        work: impl std::future::Future<Output = R>,
+    ) -> R {
+        let watch = watch_transfers(&self.board, task, events, meter);
         tokio::pin!(work);
-        tokio::pin!(meter);
+        tokio::pin!(watch);
         tokio::select! {
             result = &mut work => result,
-            () = &mut meter => work.await,
+            () = &mut watch => work.await,
         }
+    }
+
+    /// Holds the downloads of a running task until [`Self::resume_task`]:
+    /// they let go of their connections and keep their bytes. `false` when
+    /// the task is unknown, finished or cannot be stopped.
+    pub fn pause_task(&self, id: u64) -> bool {
+        self.task_control(id).map(|token| token.pause()).is_some()
+    }
+
+    /// Lets a paused task's downloads continue from the bytes they kept.
+    pub fn resume_task(&self, id: u64) -> bool {
+        self.task_control(id).map(|token| token.resume()).is_some()
+    }
+
+    pub(super) fn task_control(&self, id: u64) -> Option<CancellationToken> {
+        self.cancels
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get(&id)
+            .cloned()
     }
 
     pub(super) fn begin(
