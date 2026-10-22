@@ -70,6 +70,23 @@ fn staging_refuses_unknown_kinds_odd_ids_and_an_unsettled_earlier_attempt() {
 }
 
 #[test]
+fn an_id_being_staged_is_passed_over_until_it_is_given_up() {
+    let mut s = setup();
+    let first = Staged::claim(&s.store, "import", "26.3").unwrap();
+    let second = Staged::claim(&s.store, "copy", "红石生电优化26.3").unwrap();
+    assert_eq!((first.id(), second.id()), ("26-3", "26-3-2"));
+    // A game made by hand meanwhile does not take an id an import will publish as.
+    let made = s.store.create(request("26 3"), 1).unwrap().id.clone();
+    assert_eq!(made, "26-3-3");
+    first.discard();
+    assert_eq!(s.store.suggest_id("26.3").unwrap(), "26-3");
+    assert!(matches!(
+        Staged::claim(&s.store, "import", " "),
+        Err(StoreError::InvalidName)
+    ));
+}
+
+#[test]
 fn recovery_settles_every_state_a_crash_can_leave() {
     let mut s = setup();
     // Never marked ready: nothing was published, silently removed.

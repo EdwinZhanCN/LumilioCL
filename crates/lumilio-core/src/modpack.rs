@@ -450,11 +450,14 @@ pub async fn import_index<T: Transport>(
     if cancel.is_cancelled() {
         return Err(ModpackError::Cancelled);
     }
-    let (id, layout) = {
+    let (staged, layout) = {
         let store = store.lock().await;
-        (store.suggest_id(&index.name)?, Layout::new(store.root()))
+        (
+            Staged::claim(&store, "import", &index.name)?,
+            Layout::new(store.root()),
+        )
     };
-    let staged = Staged::begin(&layout, "import", &id)?;
+    let id = staged.id().to_owned();
     let built = stage_pack(
         index,
         pack,

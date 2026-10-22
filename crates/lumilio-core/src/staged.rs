@@ -9,7 +9,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use crate::instance::InstanceStore;
+use crate::instance::{InstanceStore, StoreError};
 use crate::layout::Layout;
 use crate::recovery::RecoveryNote;
 
@@ -25,16 +25,26 @@ pub(crate) struct Staged {
 }
 
 impl Staged {
+    /// Picks the id for a new instance called `name` and opens its staging
+    /// folder in one step. `store` comes from the library's lock, so no other
+    /// operation picks an id in between, and while the folder exists
+    /// [`InstanceStore::suggest_id`] passes its id over: games staged at once
+    /// whose names give the same id each get their own.
+    pub(crate) fn claim(store: &InstanceStore, kind: &str, name: &str) -> Result<Self, StoreError> {
+        let id = store.suggest_id(name)?;
+        Ok(Self::begin(store.layout(), kind, &id)?)
+    }
+
     /// Opens a fresh staging folder. An existing one (an unsettled earlier
     /// attempt for the same id) is never reused or deleted here.
-    pub(crate) fn begin(layout: &Layout, kind: &str, id: &str) -> io::Result<Self> {
+    fn begin(layout: &Layout, kind: &str, id: &str) -> io::Result<Self> {
         if !KINDS.contains(&kind) || !is_plain(id) {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "staging needs a known kind and a plain instance id",
             ));
         }
-        let dir = layout.operations().join(format!("{kind}-{id}"));
+        let dir = folder(layout, kind, id);
         fs::create_dir_all(layout.operations())?;
         fs::create_dir(&dir)?;
         fs::create_dir(dir.join(GAME))?;
@@ -42,6 +52,11 @@ impl Staged {
             dir,
             id: id.to_owned(),
         })
+    }
+
+    /// The id the game will be published under.
+    pub(crate) fn id(&self) -> &str {
+        &self.id
     }
 
     /// Where the game files are built.
@@ -76,6 +91,15 @@ impl Staged {
 
 fn is_plain(id: &str) -> bool {
     !id.is_empty() && id.chars().all(|ch| ch.is_ascii_alphanumeric() || ch == '-')
+}
+
+fn folder(layout: &Layout, kind: &str, id: &str) -> PathBuf {
+    layout.operations().join(format!("{kind}-{id}"))
+}
+
+/// Whether an operation is building a game folder to publish as `id`.
+pub(crate) fn holds(layout: &Layout, id: &str) -> bool {
+    KINDS.iter().any(|kind| folder(layout, kind, id).exists())
 }
 
 /// Settles staging folders an earlier run left behind:
