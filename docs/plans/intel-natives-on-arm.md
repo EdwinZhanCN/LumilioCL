@@ -34,7 +34,7 @@ Status: InProgress
 - lumilio-core 窄测试、clippy 与 fmt 通过，T1–T4 的单元测试能在退回改动时失败
   Result: 2026-10-22 本地：lumilio-core 834 个测试全部通过，lumilio-ui 的 Java 与恢复界面测试通过；core、ui、app 的 clippy -D warnings 与 fmt 通过。去掉 Intel 本地库判断时 intel_only_natives_take_an_intel_java_on_arm 失败（选中 arm64 的 Java 8）。头部常量与 Mojang 的 arm64 Java 21、Intel Java 8 的可执行文件一致。未运行完整 just check
 - Project Maintainer 运行 just check
-  Result: pending
+  Result: 2026-10-22：合入含 #71 的 main 后，PR CI 的 rust 任务（just ci，含 just check）在 Linux 上通过；本地 lumilio-core 840 个测试、clippy 与 fmt 通过
 - T5 实机验证
   Result: pending
 
