@@ -111,6 +111,14 @@ where
         if !up_to_date {
             self.run_installer(&install_plan, updates, cancel).await?;
         }
+        // Only the installed catalog tells whether `${game_assets}` is its
+        // by-name copy.
+        let launch_plan = match install_plan.virtual_assets_directory().await {
+            Some(directory) => release
+                .build_launch_plan(&context.with_value("game_assets", directory.to_string_lossy()))
+                .map_err(LaunchServiceError::Launch)?,
+            None => launch_plan,
+        };
         if uses_installer(request.instance.loader) {
             self.finish_loader(request, &launch_plan, updates, cancel)
                 .await?;

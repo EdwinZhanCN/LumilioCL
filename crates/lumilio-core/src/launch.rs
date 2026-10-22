@@ -97,6 +97,12 @@ impl LaunchContext {
             "assets_root".to_owned(),
             directories.assets.to_string_lossy().into_owned(),
         );
+        // Versions up to 1.7.2 name their assets `${game_assets}`; a virtual
+        // catalog moves it to the by-name copy once installed.
+        values.insert(
+            "game_assets".to_owned(),
+            directories.assets.to_string_lossy().into_owned(),
+        );
         values.insert(
             "game_directory".to_owned(),
             directories.game.to_string_lossy().into_owned(),

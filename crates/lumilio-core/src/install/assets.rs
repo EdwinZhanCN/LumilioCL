@@ -113,9 +113,13 @@ impl AssetIndex {
             .collect()
     }
 
+    /// Whether the files are also copied by name to `assets/virtual/<id>`.
+    /// Pre-1.6 catalogs only say `map_to_resources` and get the copy too,
+    /// as in HMCL (`HMCLCore/src/main/java/org/jackhuang/hmcl/game/AssetIndex.java`,
+    /// Copyright (C) 2020 huangyuhui and contributors, GPL-3.0-or-later).
     #[must_use]
     pub const fn uses_virtual_layout(&self) -> bool {
-        self.virtual_layout
+        self.virtual_layout || self.map_to_resources
     }
 
     #[must_use]
