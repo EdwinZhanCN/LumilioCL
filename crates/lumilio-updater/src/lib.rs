@@ -9,6 +9,8 @@ mod install;
 mod manifest;
 
 #[cfg(test)]
+mod download_tests;
+#[cfg(test)]
 mod tests;
 
 pub use self::client::{

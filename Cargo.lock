@@ -4820,8 +4820,7 @@ name = "lumilio-updater"
 version = "0.2.1"
 dependencies = [
  "flate2",
- "futures-util",
- "reqwest",
+ "lumilio-transfer",
  "semver",
  "sha2 0.11.0",
  "tempfile",

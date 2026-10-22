@@ -258,4 +258,11 @@ impl<T: Transport + Clone> LauncherService<T> {
     pub const fn layout(&self) -> &Layout {
         &self.layout
     }
+
+    /// The connections every download shares, so the launcher's own update
+    /// downloads on them too (plan download-engine T4).
+    #[must_use]
+    pub fn connection_budget(&self) -> ConnectionBudget {
+        self.connections.clone()
+    }
 }

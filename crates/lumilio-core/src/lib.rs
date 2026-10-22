@@ -230,10 +230,10 @@ pub use storage::{
 };
 pub use transfer::USER_AGENT;
 pub use transfer::{
-    ByteStream, ContentDigest, DefaultTransport, FileTransport, HttpMethod, HttpRequest,
-    HttpTransport, OfficialSource, PrefixMirror, RetryPolicy, SourceChain, SourceFailure,
-    SourceProvider, TransferBatchReport, TransferEngine, TransferError, TransferEvent,
-    TransferOutcome, TransferRequest, Transport, TransportError, TransportFuture,
+    ByteStream, ConnectionBudget, ContentDigest, DefaultTransport, FileTransport, HttpMethod,
+    HttpRequest, HttpTransport, OfficialSource, PrefixMirror, RetryPolicy, SourceChain,
+    SourceFailure, SourceProvider, TransferBatchReport, TransferEngine, TransferError,
+    TransferEvent, TransferOutcome, TransferRequest, Transport, TransportError, TransportFuture,
     TransportResponse,
 };
 pub use tuning::{

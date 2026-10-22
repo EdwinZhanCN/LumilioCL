@@ -35,7 +35,13 @@ pub(super) fn start(wiring: &Wiring, cx: &mut gpui_kit::App) {
 
     let service = wiring.backend.service.clone();
     let data_dir = service.layout().root().to_owned();
-    let client = UpdateClient::from_build(data_dir);
+    let client = match UpdateClient::from_build(data_dir, service.connection_budget()) {
+        Ok(client) => client.keeping_partials(service.layout().partial_downloads()),
+        Err(error) => {
+            log::warn!("updates are unavailable: {error}");
+            return;
+        }
+    };
     wiring.backend.spawn(async move {
         let auto_update = service.settings().await.auto_update;
         run(client, auto_update, command_rx, event_tx).await;
