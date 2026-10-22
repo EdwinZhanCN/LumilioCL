@@ -2,7 +2,7 @@
 
 # 游戏目录不见时如实告知
 
-Status: InProgress
+Status: Completed
 
 在 profiles/ 里手动删掉或移走一个游戏的目录后，库里的记录不变，启动时 process.rs 悄悄建出空目录，游戏像新的一样启动，模组、存档和设置都不见了，也没有任何提示。新建游戏原本不建目录（要等第一次启动），所以代码分不清「还没建」和「被删了」。本计划让每条记录都有自己的目录，目录不见时在诊断与「需要留意」里说明，启动前先问，不再自动启动一个空游戏。
 
@@ -27,7 +27,7 @@ Status: InProgress
   Acceptance: 游戏诊断页与「需要留意」显示「游戏目录不见了」及说明，按钮「新建空目录」调用 T2 的方法并刷新；Home 的启动失败一句话说明目录不见了。中英文目录同步，ia 路径注释与 docs/ia/paths 重新生成。UI 测试覆盖问题文字与按钮映射、恢复句子。
 - [x] T4 — 启动前确认目录。 (Completed)
   Acceptance: 继续 / 开始游戏时，若当前游戏的目录不在，启动时刻退回，弹窗说明并给出「作为空游戏启动」（新建空目录后启动）、「查看游戏」（打开它的概览，那里可新建空目录或删除）与「取消」；目录在时不弹窗。app 测试覆盖目录不在时不开始启动。
-- [ ] T5 — Project Maintainer 实机检查。 (Proposed)
+- [x] T5 — Project Maintainer 实机检查。 (Completed)
   Acceptance: 删掉一个玩过的游戏的目录后打开启动器：「需要留意」与诊断页显示目录不见了；按继续出现确认弹窗，三个选项各自如上；新建一个游戏后 profiles 下立即有它的目录。
 
 ## Validation
@@ -37,7 +37,7 @@ Status: InProgress
 - UI 与 app 测试覆盖问题文字、恢复句子与启动前确认。
   Result: 2026-10-21：lumilio-ui 与 lumilio-app 共 602 项通过，lumilio-ui english 4 项通过。every_problem_with_something_to_do_names_it 加入 GameFolderMissing → NewGameFolder；a_known_cause_is_told_instead_of_the_step 断言「这个游戏的目录不见了。」。app 新增 live::tests::missing_folder：删掉当前游戏的目录后按继续，弹窗出现且没有任何启动记录，点「作为空游戏启动」后目录被新建并开始启动；临时跳过 continue_launch 的目录检查时该测试按预期超时失败。global_context 测试的窗口改为套在 Root 里，才能打开弹窗。三个 crate 的 clippy（-D warnings）与 fmt 通过，ia 已重新生成。界面外观未经人眼确认。
 - 实机检查（T5）。
-  Result: pending
+  Result: 2026-10-22：Project Maintainer 在 Mac 上检查通过：删掉一个玩过的游戏的目录后，「需要留意」与诊断页说明目录不见了；按继续出现确认弹窗，三个选项各自生效；新建游戏后 profiles 下立即有它的目录。
 
 ## Decision D1
 
@@ -70,3 +70,7 @@ Consequences: 启动守卫仍保留，覆盖确认之后、启动之前目录才
 - [crates/lumilio-ui/src/java_conflict.rs](../../crates/lumilio-ui/src/java_conflict.rs)
 - https://github.com/modrinth/code/blob/main/packages/app-lib/src/state/instances/commands/create_instance.rs
 - https://github.com/modrinth/code/blob/main/packages/app-lib/src/launcher/mod.rs
+
+## Outcome
+
+#68 合入 main，随 v0.2.1（2026-10-22 发布为正式版）发布。新建游戏即有自己的目录；目录被删或移走时，诊断与「需要留意」说明，启动前先问，不再悄悄启动空游戏。Project Maintainer 已在 Mac 上实测（T5，即 release-0-2-1 的 R3）；Windows 交给社区反馈。

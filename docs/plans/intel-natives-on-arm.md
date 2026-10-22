@@ -2,7 +2,7 @@
 
 # ARM 主机上的旧版本改用 Intel Java
 
-Status: InProgress
+Status: Completed
 
 1.19 之前的版本只带 Intel 的本地库，在 Apple 芯片上用 arm64 Java 启动会因 liblwjgl 架构不符立即退出。照官方启动器的做法：这些版本只用 Intel Java，在 Rosetta 2（Windows on Arm 为 x64 仿真）下运行；没有就从 Mojang 下载 Intel 运行时，没装 Rosetta 时说明怎么装。
 
@@ -26,7 +26,7 @@ Status: InProgress
   Acceptance: java_runtime::JavaBuild 区分「任意」与「仅 Intel」；启动时的 JavaRequest、实例页的安装（install_instance_java）与 RetryAction::InstallJava 都带上它，仅 Intel 时只从 Mojang 的 Intel 平台键选择，不在宿主平台键下的组件装到 <组件>-<平台> 目录。java_runtime/tests.rs 覆盖 Apple 芯片上同有原生与 Intel Java 17 时两种构建各取各的、目录不重名，以及 Intel Mac、Windows on Arm 与 Linux arm64；启动器按当前宿主取构建，CI 是 Linux，Apple 芯片上的整条路径由 T5 实机验证
 - [x] T4 — 没装 Rosetta 2 时说明 (Completed)
   Acceptance: Apple 芯片上要用或要下载 Intel Java 而 Rosetta 2（/Library/Apple/usr/libexec/oah/libRosettaRuntime）不在时，选 Java 这一步失败，不下载 Java、不启动游戏，提示 softwareupdate --install-rosetta；中英文案在语言目录里。java/tests.rs 用替代路径覆盖判断
-- [ ] T5 — 实机验证 (Proposed)
+- [x] T5 — 实机验证 (Completed)
   Acceptance: Project Maintainer 在 Apple 芯片 Mac 上启动 1.6.4 与一个 1.13–1.18 的版本能进入游戏；1.19 以上仍用原生 Java
 
 ## Validation
@@ -36,7 +36,7 @@ Status: InProgress
 - Project Maintainer 运行 just check
   Result: 2026-10-22：合入含 #71 的 main 后，PR CI 的 rust 任务（just ci，含 just check）在 Linux 上通过；本地 lumilio-core 840 个测试、clippy 与 fmt 通过
 - T5 实机验证
-  Result: pending
+  Result: 2026-10-22：Project Maintainer 在 Apple 芯片 Mac 上用合入 #74 后的 main 构建检查通过：1.6.4 与一个 1.13–1.18 的版本以 Intel Java 启动并进入游戏，1.19 以上仍用原生 Java，没装 Rosetta 2 时的说明也看过。
 
 ## Decision D1
 
@@ -72,5 +72,9 @@ Consequences: 通用二进制与读不懂的格式仍视为原生
 - https://launchermeta.mojang.com/v1/products/java-runtime/2ec0cc96c44e5a76b9c8b7c39df7210883d12871/all.json
 - https://github.com/HMCL-dev/HMCL/blob/main/HMCL/src/main/java/org/jackhuang/hmcl/util/NativePatcher.java
 - [Plan java-management](java-management.md)
+
+## Outcome
+
+#74 合入 main（892174c），尚未随正式版发布。Apple 芯片上 1.19 之前的版本只用 Intel Java，在 Rosetta 2 下运行，缺少时从 Mojang 下载 Intel 运行时，没装 Rosetta 2 时说明怎么装；1.19 以上仍用原生 Java。Project Maintainer 已在 Mac 上实测（T5）。Windows on Arm 的 x64 仿真未实测，交给社区反馈。
 
 - Lesson: Mojang 的 Java 运行时只有 jre-legacy 在 release 文件里写 OS_ARCH，其它都被当作原生；Apple 芯片上装过的 Intel Java 16/17 因此会排在原生之前或被错认。防护：java/tests.rs 的 without_os_arch_the_executable_header_tells_the_architecture

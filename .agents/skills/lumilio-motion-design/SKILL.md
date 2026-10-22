@@ -60,12 +60,12 @@ details behind **技术详情**, no raw error strings as headlines. Domain types
   (or the on-art button styles) rather than fixed colours.
 - Layout regressions are testable: give the element a `.debug_selector(..)`
   and assert its `debug_bounds` in a `#[gpui::test]` (see the Continue width
-  assertion in `shell.rs`).
+  assertion in `crates/lumilio-ui/src/shell/tests/home.rs`).
 - Styled chrome is testable too: `Window::painted_quads()` (gpui
   `test-support`) returns what was painted. Assert colours, borders, and hover
   changes, not only bounds — a fill and its border arrive as separate quads.
   Wait for real-time entrance animations before measuring (see `settle` in
-  `shell.rs`).
+  `crates/lumilio-ui/src/shell/tests/mod.rs`).
 - Do not trust a component's styling API by its name: gpui-component's
   `ButtonCustomVariant` rests at 20 % of its colour and has no border outside
   outline mode. Read the component source or assert the

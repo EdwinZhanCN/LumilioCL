@@ -3,7 +3,7 @@
   "id": "intel-natives-on-arm",
   "title": "ARM 主机上的旧版本改用 Intel Java",
   "summary": "1.19 之前的版本只带 Intel 的本地库，在 Apple 芯片上用 arm64 Java 启动会因 liblwjgl 架构不符立即退出。照官方启动器的做法：这些版本只用 Intel Java，在 Rosetta 2（Windows on Arm 为 x64 仿真）下运行；没有就从 Mojang 下载 Intel 运行时，没装 Rosetta 时说明怎么装。",
-  "status": "in_progress",
+  "status": "completed",
   "visibility": "internal",
   "scope": {
     "included": [
@@ -47,7 +47,7 @@
     {
       "id": "T5",
       "title": "实机验证",
-      "status": "proposed",
+      "status": "completed",
       "acceptance": "Project Maintainer 在 Apple 芯片 Mac 上启动 1.6.4 与一个 1.13–1.18 的版本能进入游戏；1.19 以上仍用原生 Java"
     }
   ],
@@ -57,7 +57,7 @@
       "result": "2026-10-22 本地：lumilio-core 834 个测试全部通过，lumilio-ui 的 Java 与恢复界面测试通过；core、ui、app 的 clippy -D warnings 与 fmt 通过。去掉 Intel 本地库判断时 intel_only_natives_take_an_intel_java_on_arm 失败（选中 arm64 的 Java 8）。头部常量与 Mojang 的 arm64 Java 21、Intel Java 8 的可执行文件一致。未运行完整 just check"
     },
     { "criterion": "Project Maintainer 运行 just check", "result": "2026-10-22：合入含 #71 的 main 后，PR CI 的 rust 任务（just ci，含 just check）在 Linux 上通过；本地 lumilio-core 840 个测试、clippy 与 fmt 通过" },
-    { "criterion": "T5 实机验证", "result": null }
+    { "criterion": "T5 实机验证", "result": "2026-10-22：Project Maintainer 在 Apple 芯片 Mac 上用合入 #74 后的 main 构建检查通过：1.6.4 与一个 1.13–1.18 的版本以 Intel Java 启动并进入游戏，1.19 以上仍用原生 Java，没装 Rosetta 2 时的说明也看过。" }
   ],
   "decisions": [
     {
@@ -79,6 +79,7 @@
       "consequences": "通用二进制与读不懂的格式仍视为原生"
     }
   ],
+  "outcome": "#74 合入 main（892174c），尚未随正式版发布。Apple 芯片上 1.19 之前的版本只用 Intel Java，在 Rosetta 2 下运行，缺少时从 Mojang 下载 Intel 运行时，没装 Rosetta 2 时说明怎么装；1.19 以上仍用原生 Java。Project Maintainer 已在 Mac 上实测（T5）。Windows on Arm 的 x64 仿真未实测，交给社区反馈。",
   "lessonsLearned": [
     "Mojang 的 Java 运行时只有 jre-legacy 在 release 文件里写 OS_ARCH，其它都被当作原生；Apple 芯片上装过的 Intel Java 16/17 因此会排在原生之前或被错认。防护：java/tests.rs 的 without_os_arch_the_executable_header_tells_the_architecture"
   ],

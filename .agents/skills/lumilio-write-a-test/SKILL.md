@@ -24,7 +24,7 @@ reaching a handler, a state actually drawing — use a `#[gpui::test]` with
 `add_window_view`, mark the target with `.debug_selector(..)` (compiled out of
 release builds), and drive it with `debug_bounds` + `simulate_click`. The
 reference is `pressing_continue_plays_the_launch_moment_through_every_state`
-in `crates/lumilio-ui/src/shell.rs`.
+in `crates/lumilio-ui/src/shell/tests/home.rs`.
 
 Keep tests beside the layer they characterize. If a UI test needs complex
 domain setup, extract and test that logic in core instead of making core know

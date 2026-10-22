@@ -2,7 +2,7 @@
 
 # 准备发布 0.2.1
 
-Status: InProgress
+Status: Completed
 
 0.2.0 以预发布发出后，修好了从 .minecraft 多选导入时名字相近的游戏有一个失败（#67），以及游戏目录在启动器外被删后会悄悄启动空游戏（#68）。0.2.1 作为正式版取代 0.2.0：发布说明是 0.2.0 的全部内容加上这两项修复，0.2.1 是 0.1.6 之后第一个推给自动更新的版本。Project Maintainer 只在自己的 Mac 上实测。
 
@@ -23,25 +23,29 @@ Status: InProgress
 
 - [x] R1 — 更新版本、计划与发布说明 (Completed)
   Acceptance: 工作区版本为 0.2.1，Cargo.lock 同步；release-notes/0.2.1.md 与 .en.md 是 0.2.0 的说明加上 #67、#68 两项修复，小节和条目数一致；release-notes/0.2.0.* 删去；release-0-2-0 记下结果并关闭，本计划与投影生成。
-- [ ] R2 — 通过 PR 合入版本更新 (Proposed)
+- [x] R2 — 通过 PR 合入版本更新 (Completed)
   Acceptance: rust、plans 检查通过后合入 main，合入后 main 的 CI 通过。
-- [ ] R3 — 打标签前检查游戏目录提示 (Proposed)
+- [x] R3 — 打标签前检查游戏目录提示 (Completed)
   Acceptance: Project Maintainer 完成 game-folder-missing 的 T5：删掉一个玩过的游戏的目录后，「需要留意」与概览显示目录不见了；按继续出现确认弹窗，三个选项各自生效；新建游戏后 profiles 下立即有它的目录。
-- [ ] R4 — 打 v0.2.1 标签并发布为正式版 (Proposed)
+- [x] R4 — 打 v0.2.1 标签并发布为正式版 (Completed)
   Acceptance: 合入提交在 main 上的 CI 通过、R3 完成后再打标签；v0.2.1 指向该提交，Release 工作流生成草稿；Project Maintainer 在正文末行填上 PR 编号后发布为正式版（Latest）。v0.2.0 保持预发布。
-- [ ] R5 — 更新后在 Mac 上检查 (Proposed)
+- [x] R5 — 更新后在 Mac 上检查 (Completed)
   Acceptance: 从 0.2.0 或 0.1.6 自动更新到 0.2.1，重启后弹出一次「已更新到 LumilioCL 0.2.1」，更新内容只有 0.2.1 一份；开启翻译后发现列表简介显示中文，项目正文点翻译键能译成中文。
-- [ ] R6 — 发布后关闭相关计划 (Proposed)
-  Acceptance: discover-translation 与 game-folder-missing 记下 0.2.1 的发布结果并关闭，discover-translation T6 的大陆直连验收留在 backlog；网站路线图的投影随之重新生成。
+- [x] R6 — 发布后关闭相关计划 (Completed)
+  Acceptance: game-folder-missing、intel-natives-on-arm 与 translation-fallback 记下结果并关闭；discover-translation 记下 0.2.1 的发布结果，按 keep-discover-translation-open 暂不关闭；discover-translation T6 的大陆直连验收留在 backlog；网站路线图的投影随之重新生成。
 
 ## Validation
 
 - 版本更新的本地与 PR 检查通过。
-  Result: pending
+  Result: 2026-10-21：#69 的 rust、plans 检查通过后 squash 合入 main（edf5c5a）；合入提交在 main 上的 CI、Plans 与 Release 工作流通过（R2）。
 - 游戏目录不见时的提示与确认在 Mac 上看过（R3）。
-  Result: pending
+  Result: 2026-10-22：Project Maintainer 完成 game-folder-missing 的 T5，提示、确认弹窗的三个选项与新建游戏即有目录均符合 R3。
+- v0.2.1 指向合入提交并发布为正式版（R4）。
+  Result: 2026-10-22：v0.2.1 指向 edf5c5a，Release 工作流生成草稿，Project Maintainer 发布为正式版（Latest）；v0.2.0 保持预发布。
 - 更新到 0.2.1 后在 Mac 上只显示一次、一份更新内容，发现页翻译可用。
-  Result: pending
+  Result: 2026-10-22：Project Maintainer 在 Mac 上自动更新到 0.2.1，重启后弹出一次「已更新到 LumilioCL 0.2.1」，更新内容只有 0.2.1 一份；开启翻译后发现列表简介显示中文，项目正文点翻译键译成中文（R5）。
+- 相关计划记下结果（R6）。
+  Result: 2026-10-22：game-folder-missing、intel-natives-on-arm、translation-fallback 关闭；discover-translation 记下发布结果后保持进行中（keep-discover-translation-open）；just plans 重新生成文档与路线图投影。
 
 ## Decision notes-carry-0-2-0
 
@@ -50,6 +54,14 @@ Status: InProgress
 Why: 0.2.0 是预发布，只有 Project Maintainer 下载过；大家从 0.1.6 直接更新到 0.2.1，GitHub 上的正式版与应用里的更新内容都应完整说明这次带来的变化。
 
 Consequences: release-notes/0.2.0.* 删去（见 release-0-2-0 的 superseded-by-0-2-1），应用里只显示 0.2.1 一份。
+
+## Decision keep-discover-translation-open
+
+发布后 discover-translation 暂不关闭，R6 改为只关闭其余相关计划。
+
+Why: web/src/data/roadmap.ts 在网站路线图少于三个带目标版本、未完成的公开计划时让构建失败；discover-translation 关闭后只剩 wasm-plugin-registry 与 terracotta-multiplayer。不为此降低检查的门槛。
+
+Consequences: 网站上发现页翻译仍显示为进行中。有新的公开计划带目标版本进入路线图后，再关闭 discover-translation 并写下 outcome。
 
 ## References
 
@@ -65,3 +77,7 @@ Consequences: release-notes/0.2.0.* 删去（见 release-0-2-0 的 superseded-by
 - [Plan release-0-2-0](release-0-2-0.md)
 - [Plan game-folder-missing](game-folder-missing.md)
 - [Plan discover-translation](discover-translation.md)
+
+## Outcome
+
+v0.2.1 于 2026-10-22 发布为正式版（Latest），指向 edf5c5a，取代预发布的 0.2.0，是 0.1.6 之后第一个推给自动更新的版本。发布说明包含 0.2.0 的全部内容和 #67、#68 两项修复。Project Maintainer 在 Mac 上检查了游戏目录提示（R3）和从旧版本自动更新（R5）。game-folder-missing、intel-natives-on-arm、translation-fallback 已关闭；discover-translation 因网站路线图的三项下限暂时保持进行中。Windows 上的检查和大陆直连验收交给社区反馈。
