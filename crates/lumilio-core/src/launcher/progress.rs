@@ -1,8 +1,9 @@
 use super::types::LaunchUpdate;
 use crate::install::{AssetIndex, InstallEvent, InstallStage, InstallationPlan};
 use crate::instance::Loader;
-use crate::launch_session::{LaunchPhase, LaunchSignal};
+use crate::launch_session::{LaunchFailure, LaunchPhase, LaunchSignal};
 use crate::process::GameEvent;
+use std::collections::VecDeque;
 use std::path::PathBuf;
 use tokio::sync::mpsc;
 
@@ -81,22 +82,49 @@ pub(super) fn asset_object_count(plan: &InstallationPlan) -> u64 {
         .map_or(0, |index| index.unique_objects().len() as u64)
 }
 
-pub(super) fn forward_game_event(
-    event: &GameEvent,
-    running: &mut bool,
-    updates: &mpsc::UnboundedSender<LaunchUpdate>,
-) {
-    if matches!(event, GameEvent::Running) {
-        *running = true;
-    }
-    if let GameEvent::Line { stream, text } = event {
-        let _ = updates.send(LaunchUpdate::Log {
-            stream: *stream,
-            text: text.clone(),
-        });
-    }
-    if let Some(signal) = event.signal(*running) {
-        let _ = updates.send(LaunchUpdate::Signal(signal));
+/// How many of its last lines a game that quits while starting shows.
+const EARLY_OUTPUT_LINES: usize = 50;
+
+/// Passes the game's events on as launch updates. Until the game is up it
+/// keeps the last lines it printed, which an early exit carries to technical
+/// details: a game that quits that soon may not have written a log.
+#[derive(Default)]
+pub(super) struct GameForwarder {
+    running: bool,
+    early_output: VecDeque<String>,
+}
+
+impl GameForwarder {
+    pub(super) fn forward(
+        &mut self,
+        event: &GameEvent,
+        updates: &mpsc::UnboundedSender<LaunchUpdate>,
+    ) {
+        match event {
+            GameEvent::Running => {
+                self.running = true;
+                self.early_output.clear();
+            }
+            GameEvent::Line { stream, text } => {
+                if !self.running {
+                    if self.early_output.len() == EARLY_OUTPUT_LINES {
+                        self.early_output.pop_front();
+                    }
+                    self.early_output.push_back(text.clone());
+                }
+                let _ = updates.send(LaunchUpdate::Log {
+                    stream: *stream,
+                    text: text.clone(),
+                });
+            }
+            GameEvent::Spawned { .. } | GameEvent::Exited { .. } => {}
+        }
+        if let Some(mut signal) = event.signal(self.running) {
+            if let LaunchSignal::Failed(LaunchFailure::ExitedEarly { output, .. }) = &mut signal {
+                *output = std::mem::take(&mut self.early_output).into();
+            }
+            let _ = updates.send(LaunchUpdate::Signal(signal));
+        }
     }
 }
 

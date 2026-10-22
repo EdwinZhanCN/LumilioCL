@@ -167,6 +167,24 @@ fn a_failure_away_from_home_floats_up_as_a_toast(cx: &mut TestAppContext) {
         shell.apply_launch_signal(LaunchSignal::Exited { code: Some(3) }, cx);
     });
     assert_eq!(toasts(cx).len(), 2, "a crash is told too");
+
+    // A game that quit while starting brings what it printed.
+    shell.update(cx, |shell, cx| {
+        shell.set_home(continuing().begin_launch(), cx);
+        shell.apply_launch_signal(
+            LaunchSignal::Failed(LaunchFailure::ExitedEarly {
+                code: Some(1),
+                output: vec!["Error: could not find main class".into()],
+            }),
+            cx,
+        );
+    });
+    let shown = toasts(cx);
+    assert_eq!(shown.len(), 3);
+    assert_eq!(
+        shown[2].technical.as_deref(),
+        Some("Error: could not find main class")
+    );
 }
 
 /// The whole Home page scrolls, world included.

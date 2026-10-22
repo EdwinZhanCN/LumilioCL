@@ -88,7 +88,8 @@ fn events_map_to_launch_signals() {
     assert_eq!(
         exit.signal(false),
         Some(LaunchSignal::Failed(LaunchFailure::ExitedEarly {
-            code: Some(1)
+            code: Some(1),
+            output: Vec::new(),
         }))
     );
     assert_eq!(GameEvent::Spawned { pid: None }.signal(false), None);
@@ -239,7 +240,8 @@ mod supervised {
         assert_eq!(
             last.signal(exit.was_running),
             Some(LaunchSignal::Failed(LaunchFailure::ExitedEarly {
-                code: Some(1)
+                code: Some(1),
+                output: Vec::new(),
             }))
         );
     }

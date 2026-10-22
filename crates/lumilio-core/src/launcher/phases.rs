@@ -1,4 +1,4 @@
-use super::progress::{ItemProgress, forward_game_event, handle_stage, uses_installer};
+use super::progress::{GameForwarder, ItemProgress, handle_stage, uses_installer};
 use super::types::{JavaRequest, LaunchRequest, LaunchServiceError, LaunchUpdate};
 use super::{LAUNCHER_NAME, Launcher, QUICK_PLAY_LOG};
 use crate::activity::CancellationToken;
@@ -394,20 +394,20 @@ where
             cancel,
         );
         tokio::pin!(game);
-        let mut running = false;
+        let mut forwarder = GameForwarder::default();
         let exit = loop {
             tokio::select! {
                 result = &mut game => break result.map_err(LaunchServiceError::Process)?,
                 Some(event) = game_events.recv() => {
                     self.note_spawned(&event);
-                    forward_game_event(&event, &mut running, updates);
+                    forwarder.forward(&event, updates);
                 }
             }
         };
         // The process ended; deliver whatever it still had queued.
         while let Ok(event) = game_events.try_recv() {
             self.note_spawned(&event);
-            forward_game_event(&event, &mut running, updates);
+            forwarder.forward(&event, updates);
         }
 
         // A command after the game runs on its own; its failure is only told.

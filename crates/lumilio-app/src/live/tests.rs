@@ -212,8 +212,9 @@ fn work_that_panics_is_told_and_not_left_hanging(cx: &mut gpui_kit::TestAppConte
 }
 
 /// 技术详情 on Home's recovery, clicked in a real window through the shipped
-/// wiring: a failed step opens its cause to copy; a crash opens the game's
-/// Diagnostics tab; a failure while another page is open floats up there.
+/// wiring: a failed step opens its cause to copy, a game that quit while
+/// starting what it printed; a crash opens the game's Diagnostics tab; a
+/// failure while another page is open floats up there.
 #[gpui_kit::test]
 fn technical_details_after_a_failed_launch_explain_it(cx: &mut gpui_kit::TestAppContext) {
     use super::dispatch::{on_live_intent, on_shell_intent};
@@ -325,6 +326,32 @@ fn technical_details_after_a_failed_launch_explain_it(cx: &mut gpui_kit::TestApp
     click(cx, "technical-copy");
     let copied = cx.read(|cx| cx.read_from_clipboard().and_then(|item| item.text()));
     assert_eq!(copied, Some(cause));
+    cx.update(|window, cx| window.close_dialog(cx));
+
+    // A game that quit while starting: what it printed, in the same dialog.
+    shell.update(cx, |shell, cx| {
+        shell.set_home(
+            recovery(
+                Some(&game),
+                RecoveryDetail::Failed {
+                    phase: LaunchPhase::Starting,
+                    failure: LaunchFailure::ExitedEarly {
+                        code: Some(1),
+                        output: vec!["Exception in thread \"main\"".into(), "\tat Main".into()],
+                    },
+                },
+            ),
+            cx,
+        )
+    });
+    click(cx, "home-details");
+    assert!(cx.update(|window, cx| window.has_active_dialog(cx)));
+    click(cx, "technical-copy");
+    let copied = cx.read(|cx| cx.read_from_clipboard().and_then(|item| item.text()));
+    assert_eq!(
+        copied.as_deref(),
+        Some("Exception in thread \"main\"\n\tat Main")
+    );
     cx.update(|window, cx| window.close_dialog(cx));
 
     // A crash: the game's Diagnostics tab, where its logs and reports are.
