@@ -323,6 +323,10 @@ pub(super) fn write_instance(
                     service.repair_instance(&id, tx, cancel).await?;
                     done(tr!("instance-files-repaired"), Vec::new())
                 }
+                InstanceIntent::NewGameFolder => {
+                    service.new_game_folder(&id).await?;
+                    done(tr!("instance-game-folder-made"), vec![Section::Problems])
+                }
                 InstanceIntent::ChangeRuntime {
                     loader,
                     game_version,

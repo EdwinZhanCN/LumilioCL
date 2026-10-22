@@ -23,6 +23,9 @@ pub const LOW_MEMORY_MB: u32 = 1024;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ProblemKind {
+    /// The game's own folder (mods, saves, options) is not on disk: it was
+    /// moved or deleted outside the launcher. Plan game-folder-missing.
+    GameFolderMissing,
     /// Nothing installed yet; the first launch will install.
     NotInstalled,
     LoaderUnsupported(Loader),
@@ -76,6 +79,8 @@ pub struct Problem {
 /// Everything [`diagnose`] needs, gathered by the caller.
 pub struct Facts<'a> {
     pub instance: &'a InstanceRecord,
+    /// Whether the game's own folder is on disk.
+    pub has_game_folder: bool,
     /// Loaders the launcher can currently start.
     pub launchable_loaders: &'a [Loader],
     pub runtimes: &'a [JavaRuntime],
@@ -110,6 +115,9 @@ pub fn diagnose(facts: &Facts<'_>) -> Vec<Problem> {
     let mut problems = Vec::new();
     let mut add = |severity, kind| problems.push(Problem { severity, kind });
 
+    if !facts.has_game_folder {
+        add(Severity::Error, ProblemKind::GameFolderMissing);
+    }
     if !facts.launchable_loaders.contains(&facts.instance.loader) {
         add(
             Severity::Error,

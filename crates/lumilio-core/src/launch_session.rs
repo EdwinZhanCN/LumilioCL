@@ -115,6 +115,8 @@ pub enum LaunchProblem {
     BeforeLaunch(Option<i32>),
     /// The world to start in is not among the saves (its folder).
     WorldMissing(String),
+    /// The game's own folder was moved or deleted outside the launcher.
+    GameFolderMissing,
 }
 
 /// Input to a [`LaunchSession`].

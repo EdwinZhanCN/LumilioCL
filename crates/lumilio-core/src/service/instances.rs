@@ -158,8 +158,25 @@ impl<T: Transport + Clone> LauncherService<T> {
                 now(),
             )?
             .clone();
+        // Made at once, so a missing folder later means it was moved or
+        // deleted, not that the game was never started.
+        if let Err(error) = std::fs::create_dir_all(self.layout.game(&record.id)) {
+            let _ = self.store.lock().await.remove(&record.id);
+            return Err(error.into());
+        }
         self.settle_current().await;
         Ok(record)
+    }
+
+    /// Gives a game whose folder was moved or deleted a new, empty one: it
+    /// starts again with no mods, worlds or options of its own.
+    pub async fn new_game_folder(&self, id: &str) -> Result<(), ServiceError> {
+        self.instance(id).await?;
+        let game = self.layout.game(id);
+        tokio::task::spawn_blocking(move || std::fs::create_dir_all(game))
+            .await
+            .map_err(std::io::Error::other)??;
+        Ok(())
     }
 
     /// Every game version the catalog lists, newest first, for choosing one

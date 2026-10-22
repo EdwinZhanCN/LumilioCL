@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "id": "game-folder-missing",
+  "title": "游戏目录不见时如实告知",
+  "summary": "在 profiles/ 里手动删掉或移走一个游戏的目录后，库里的记录不变，启动时 process.rs 悄悄建出空目录，游戏像新的一样启动，模组、存档和设置都不见了，也没有任何提示。新建游戏原本不建目录（要等第一次启动），所以代码分不清「还没建」和「被删了」。本计划让每条记录都有自己的目录，目录不见时在诊断与「需要留意」里说明，启动前先问，不再自动启动一个空游戏。",
+  "status": "in_progress",
+  "visibility": "internal",
+  "scope": {
+    "included": [
+      "新建游戏时建好 profiles/<id>/game；打开数据根时为从没启动过、还没有目录的旧记录补建空目录。",
+      "诊断问题「游戏目录不见了」（错误级），出现在游戏的诊断页与 Home 的「需要留意」，按钮新建空目录。",
+      "启动守卫：目录不在时不安装、不建目录，启动失败并说明原因。",
+      "启动前确认：继续 / 开始游戏时目录不在，问一次：作为空游戏启动、查看这个游戏或取消。"
+    ],
+    "excluded": [
+      "按目录自动删除或隐藏库里的记录（D1）。",
+      "运行中实时监视 profiles/ 的变化；只在打开启动器、诊断与启动时检查。",
+      "安装模组等写入操作对缺失目录的处理：它们会建出子目录，之后诊断不再报目录不见。",
+      "整个数据根不在（外置硬盘未挂载等）。"
+    ]
+  },
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "每条记录都有自己的游戏目录。",
+      "status": "completed",
+      "acceptance": "create_instance 返回时 profiles/<id>/game 已存在；目录建不出来时不留下记录。打开数据根时，last_played 为空且没有游戏目录的记录得到空目录，玩过的不补建。core 测试覆盖这三种情况。"
+    },
+    {
+      "id": "T2",
+      "title": "诊断与启动守卫认出目录不见了。",
+      "status": "completed",
+      "acceptance": "游戏目录不是目录时 diagnose 报 ProblemKind::GameFolderMissing（Error），inspect 与 Home 检查都带上它。launch 在安装与建目录之前以 ServiceError::GameFolderMissing 失败，launch_failure 给出 LaunchProblem::GameFolderMissing，目录仍不存在。服务提供新建空游戏目录的方法。core 测试覆盖诊断、启动失败后目录仍不存在、新建后可以诊断通过。"
+    },
+    {
+      "id": "T3",
+      "title": "界面说明目录不见了并能新建空目录。",
+      "status": "completed",
+      "acceptance": "游戏诊断页与「需要留意」显示「游戏目录不见了」及说明，按钮「新建空目录」调用 T2 的方法并刷新；Home 的启动失败一句话说明目录不见了。中英文目录同步，ia 路径注释与 docs/ia/paths 重新生成。UI 测试覆盖问题文字与按钮映射、恢复句子。"
+    },
+    {
+      "id": "T4",
+      "title": "启动前确认目录。",
+      "status": "completed",
+      "acceptance": "继续 / 开始游戏时，若当前游戏的目录不在，启动时刻退回，弹窗说明并给出「作为空游戏启动」（新建空目录后启动）、「查看游戏」（打开它的概览，那里可新建空目录或删除）与「取消」；目录在时不弹窗。app 测试覆盖目录不在时不开始启动。"
+    },
+    {
+      "id": "T5",
+      "title": "Project Maintainer 实机检查。",
+      "status": "proposed",
+      "acceptance": "删掉一个玩过的游戏的目录后打开启动器：「需要留意」与诊断页显示目录不见了；按继续出现确认弹窗，三个选项各自如上；新建一个游戏后 profiles 下立即有它的目录。"
+    }
+  ],
+  "validation": [
+    {
+      "criterion": "core 测试覆盖新建、补建、诊断、启动守卫与新建空目录，且去掉守卫时对应测试失败。",
+      "result": "2026-10-21：lumilio-core 827 项通过。新增 a_game_whose_folder_was_deleted_is_not_started_as_an_empty_one（新建即有目录；删目录后 problems 含 GameFolderMissing，launch 以 GameFolderMissing 失败、launch_failure 带 LaunchProblem::GameFolderMissing、目录仍不存在、记录仍在；new_game_folder 后问题消失并能启动）、opening_gives_a_game_never_started_its_folder_but_not_one_that_was_played、a_game_whose_folder_cannot_be_made_is_not_added 与 diagnostics 的 a_game_whose_folder_is_gone_says_so_first。临时去掉启动守卫与打开时补建时，前两项按预期失败。两项旧测试原本断言新游戏没有目录，改为断言目录为空：取消的安装与内存校验失败都不写入任何文件。"
+    },
+    {
+      "criterion": "UI 与 app 测试覆盖问题文字、恢复句子与启动前确认。",
+      "result": "2026-10-21：lumilio-ui 与 lumilio-app 共 602 项通过，lumilio-ui english 4 项通过。every_problem_with_something_to_do_names_it 加入 GameFolderMissing → NewGameFolder；a_known_cause_is_told_instead_of_the_step 断言「这个游戏的目录不见了。」。app 新增 live::tests::missing_folder：删掉当前游戏的目录后按继续，弹窗出现且没有任何启动记录，点「作为空游戏启动」后目录被新建并开始启动；临时跳过 continue_launch 的目录检查时该测试按预期超时失败。global_context 测试的窗口改为套在 Root 里，才能打开弹窗。三个 crate 的 clippy（-D warnings）与 fmt 通过，ia 已重新生成。界面外观未经人眼确认。"
+    },
+    {
+      "criterion": "实机检查（T5）。",
+      "result": null
+    }
+  ],
+  "decisions": [
+    {
+      "id": "D1",
+      "decision": "目录不见时保留记录，不自动删除。",
+      "rationale": "目录不见不等于想删：外置硬盘未挂载、同步盘腾空、临时移走都会出现。记录里有游玩时间、设置与合集，删了找不回来。Modrinth App 也保留数据库行，启动时 canonicalize 实例路径失败而报错（packages/app-lib/src/launcher/mod.rs）；HMCL 没有这些附加数据，才以 versions/ 目录为准。",
+      "consequences": "移除只经用户确认：游戏页面的删除照常可用，Deletion::quarantine 把目录不存在当作正常。"
+    },
+    {
+      "id": "D2",
+      "decision": "新建时就建游戏目录，旧的未启动记录在打开时补建，此后目录不存在只意味着被外部删除或移走。",
+      "rationale": "否则从没启动过的新游戏和被删目录的游戏无法区分，诊断与启动前确认都会误报。",
+      "consequences": "导入、复制、恢复备份经 Staged 发布本来就有目录；补建只看 last_played 为空，玩过的游戏不会被悄悄补上空目录。"
+    },
+    {
+      "id": "D3",
+      "decision": "启动前问，而不是只在启动后报失败。",
+      "rationale": "Home 的「恢复并继续」只会重试，目录不在时重试仍会失败；与 Java 冲突的启动前确认（java_conflict）同一位置、同一种做法。",
+      "consequences": "启动守卫仍保留，覆盖确认之后、启动之前目录才不见的情况，此时 Home 的失败句子说明原因。"
+    }
+  ],
+  "references": [
+    "crates/lumilio-core/src/process.rs",
+    "crates/lumilio-core/src/deletion.rs",
+    "crates/lumilio-ui/src/java_conflict.rs",
+    "https://github.com/modrinth/code/blob/main/packages/app-lib/src/state/instances/commands/create_instance.rs",
+    "https://github.com/modrinth/code/blob/main/packages/app-lib/src/launcher/mod.rs"
+  ],
+  "dependencies": [],
+  "lessonsLearned": [],
+  "roadmap": {
+    "enabled": false,
+    "id": "game-folder-missing",
+    "name": "游戏目录不见时告知",
+    "lede": "目录被删或移走时说明，而不是启动一个空游戏。",
+    "targetVersion": null,
+    "order": 0
+  }
+}

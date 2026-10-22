@@ -80,7 +80,8 @@ async fn inspect(
     let game = directories.game().to_owned();
     let root = layout.root().to_owned();
     let id = record.id.clone();
-    let (mods, last_session) = tokio::task::spawn_blocking(move || {
+    let (has_game_folder, mods, last_session) = tokio::task::spawn_blocking(move || {
+        let has_game_folder = game.is_dir();
         let mods = mods_with_metadata(&game);
         let last_session = HistoryLog::for_instance(&root, &id)
             .sessions()
@@ -91,14 +92,16 @@ async fn inspect(
                     HistoryEvent::Change { .. } => None,
                 })
             });
-        (mods, last_session)
+        (has_game_folder, mods, last_session)
     })
     .await
-    .unwrap_or_default();
+    // A worker that never answered must not report the folder gone.
+    .unwrap_or((true, Vec::new(), None));
 
     let host = HostProfile::current();
     let facts = Facts {
         instance: record,
+        has_game_folder,
         launchable_loaders: &LAUNCHABLE_LOADERS,
         runtimes,
         java_needs,

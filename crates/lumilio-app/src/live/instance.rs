@@ -428,6 +428,7 @@ pub(super) fn instance_intent(
         }
         InstanceIntent::Install
         | InstanceIntent::Repair
+        | InstanceIntent::NewGameFolder
         | InstanceIntent::ChangeRuntime { .. }
         | InstanceIntent::Copy { .. }
         | InstanceIntent::Delete

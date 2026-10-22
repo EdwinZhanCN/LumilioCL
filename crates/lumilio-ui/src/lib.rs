@@ -24,6 +24,7 @@ pub mod kit;
 pub mod live;
 mod map_icons;
 pub mod microsoft_login;
+pub mod missing_folder;
 pub mod model_view;
 pub mod navigation;
 pub mod new_game;

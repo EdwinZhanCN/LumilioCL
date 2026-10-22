@@ -205,6 +205,8 @@ pub enum InstanceIntent {
     InstallJava(Option<u32>),
     /// Check every game file and fetch what is missing or damaged again.
     Repair,
+    /// Give a game whose folder was moved or deleted a new, empty one.
+    NewGameFolder,
     /// Open the dialog that changes the game version and loader.
     OpenRuntimeChange,
     /// Change to this game version and loader (from that dialog).

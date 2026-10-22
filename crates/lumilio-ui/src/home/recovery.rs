@@ -78,6 +78,7 @@ fn problem_sentence(problem: &LaunchProblem) -> String {
         LaunchProblem::WorldMissing(world) => {
             tr!("home-recovery-world-missing", world = world.as_str())
         }
+        LaunchProblem::GameFolderMissing => tr!("home-recovery-game-folder-missing").to_owned(),
     }
 }
 

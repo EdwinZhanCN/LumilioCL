@@ -129,6 +129,10 @@ fn a_known_cause_is_told_instead_of_the_step() {
         told(LaunchProblem::BeforeLaunch(Some(3))),
         "启动前命令没有成功（退出代码 3）。"
     );
+    assert_eq!(
+        told(LaunchProblem::GameFolderMissing),
+        "这个游戏的目录不见了。"
+    );
     for problem in [
         LaunchProblem::Account(lumilio_core::AuthError::Network("dns".into())),
         LaunchProblem::NoJava(None),

@@ -48,6 +48,8 @@ pub fn recent_changes(read: &HistoryRead, count: usize) -> Vec<(u64, ChangeKind,
 pub enum ProblemAction {
     Install,
     Repair,
+    /// Give the game a new, empty folder in place of the missing one.
+    NewGameFolder,
     /// Download the Java a game needs (the major version, if known).
     InstallJava(Option<u32>),
     ChangeRuntime,
@@ -62,6 +64,10 @@ pub enum ProblemAction {
 #[must_use]
 pub fn problem_action(kind: &ProblemKind) -> Option<(ProblemAction, &'static str)> {
     Some(match kind {
+        ProblemKind::GameFolderMissing => (
+            ProblemAction::NewGameFolder,
+            tr!("instance-action-new-game-folder"),
+        ),
         ProblemKind::NotInstalled => (ProblemAction::Install, tr!("instance-action-install")),
         ProblemKind::LoaderUnsupported(_) => {
             (ProblemAction::ChangeRuntime, tr!("instance-action-change"))
@@ -104,6 +110,10 @@ pub fn problem_action(kind: &ProblemKind) -> Option<(ProblemAction, &'static str
 /// One line per problem; the headline is calm, the cause stays short.
 pub fn problem_text(problem: &Problem) -> (String, String) {
     match &problem.kind {
+        ProblemKind::GameFolderMissing => (
+            tr!("instance-problem-game-folder-missing").into(),
+            tr!("instance-problem-game-folder-missing-help").into(),
+        ),
         ProblemKind::NotInstalled => (
             tr!("instance-problem-not-installed").into(),
             tr!("instance-problem-not-installed-help").into(),
@@ -219,6 +229,7 @@ impl InstanceDetailView {
         match action {
             ProblemAction::Install => self.send(InstanceIntent::Install, window, cx),
             ProblemAction::Repair => self.send(InstanceIntent::Repair, window, cx),
+            ProblemAction::NewGameFolder => self.send(InstanceIntent::NewGameFolder, window, cx),
             ProblemAction::InstallJava(major) => {
                 self.send(InstanceIntent::InstallJava(major), window, cx)
             }
@@ -325,7 +336,7 @@ impl InstanceDetailView {
         )
     }
 
-    // ia[instance.overview]: 解决问题 | 概览「需要留意」里每个问题行的按钮 | 安装/修复/更换版本，或跳到设置·Java、设置·性能、内容、账户、诊断·日志
+    // ia[instance.overview]: 解决问题 | 概览「需要留意」里每个问题行的按钮 | 安装/修复/更换版本/游戏目录不见时新建空目录，或跳到设置·Java、设置·性能、内容、账户、诊断·日志
     pub(in super::super) fn problems_block(
         &self,
         colors: ShellColors,
