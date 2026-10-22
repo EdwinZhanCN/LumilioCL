@@ -21,6 +21,7 @@ use crate::java::JavaRuntime;
 use crate::launch_session::LaunchSignal;
 use crate::process::GameExit;
 use crate::transfer::{ConnectionBudget, SourceChain, TransferEngine, TransferError, Transport};
+use std::path::PathBuf;
 use std::sync::Mutex as StdMutex;
 use tokio::sync::mpsc;
 
@@ -36,6 +37,8 @@ pub struct Launcher<T> {
     concurrency: usize,
     /// Connections shared with other work; `None` keeps them to this launcher.
     budget: Option<ConnectionBudget>,
+    /// Where stopped downloads are noted; `None` discards them.
+    partials: Option<PathBuf>,
     spawned: Option<mpsc::UnboundedSender<()>>,
     before_start: Option<mpsc::UnboundedSender<tokio::sync::oneshot::Sender<Result<(), String>>>>,
     /// Where to ask for a Java when none installed fits; `None` fails instead.
@@ -56,6 +59,7 @@ where
             sources,
             concurrency,
             budget: None,
+            partials: None,
             spawned: None,
             before_start: None,
             java_installer: None,
@@ -112,14 +116,23 @@ where
         self
     }
 
+    /// Keeps stopped downloads for the next launch to continue, noted in
+    /// `folder`.
+    #[must_use]
+    pub fn keeping_partials(mut self, folder: PathBuf) -> Self {
+        self.partials = Some(folder);
+        self
+    }
+
     fn transfer_engine(&self) -> Result<TransferEngine<T>, TransferError> {
-        match &self.budget {
-            Some(budget) => Ok(TransferEngine::with_budget(
-                self.transport.clone(),
-                budget.clone(),
-            )),
-            None => TransferEngine::new(self.transport.clone(), self.concurrency),
-        }
+        let engine = match &self.budget {
+            Some(budget) => TransferEngine::with_budget(self.transport.clone(), budget.clone()),
+            None => TransferEngine::new(self.transport.clone(), self.concurrency)?,
+        };
+        Ok(match &self.partials {
+            Some(folder) => engine.keeping_partials(folder.clone()),
+            None => engine,
+        })
     }
 
     /// Prepares and starts the game, returning how the process ended.

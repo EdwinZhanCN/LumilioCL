@@ -76,7 +76,7 @@ pub enum ContentDigest {
 
 impl ContentDigest {
     /// Checks the hex length for the algorithm and lowercases it.
-    fn parse(digest: String, sha256: bool) -> Result<Self, TransferError> {
+    pub(super) fn parse(digest: String, sha256: bool) -> Result<Self, TransferError> {
         let (length, name) = if sha256 {
             (64, "SHA-256")
         } else {

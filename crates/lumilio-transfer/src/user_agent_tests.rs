@@ -31,6 +31,34 @@ async fn http_requests_identify_the_launcher() {
 }
 
 #[tokio::test]
+async fn a_continued_download_asks_for_the_rest_if_unchanged() {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = listener.local_addr().unwrap();
+    let server = std::thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        let mut buffer = [0_u8; 4096];
+        let read = stream.read(&mut buffer).unwrap();
+        stream
+            .write_all(
+                b"HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 40-41/42\r\n\
+                  Content-Length: 2\r\nConnection: close\r\n\r\nok",
+            )
+            .unwrap();
+        String::from_utf8_lossy(&buffer[..read]).into_owned()
+    });
+    let transport = HttpTransport::new().unwrap();
+    let response = transport
+        .get_from(&format!("http://{address}/"), 40, Some("\"v1\""))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 206);
+    assert_eq!(response.header("content-range"), Some("bytes 40-41/42"));
+    let head = server.join().unwrap().to_ascii_lowercase();
+    assert!(head.contains("range: bytes=40-"), "{head}");
+    assert!(head.contains("if-range: \"v1\""), "{head}");
+}
+
+#[tokio::test]
 async fn post_json_sends_the_body_with_a_json_content_type() {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let address = listener.local_addr().unwrap();

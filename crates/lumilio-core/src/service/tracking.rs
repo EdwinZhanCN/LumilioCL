@@ -27,6 +27,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// An engine for one task's downloads, on the shared connections.
     pub(super) async fn transfer_engine(&self) -> TransferEngine<T> {
         TransferEngine::with_budget(self.transport.clone(), self.connections().await)
+            .keeping_partials(self.layout.partial_downloads())
     }
 
     /// [`Self::install_tracked`] through a new launcher that may download the
@@ -41,7 +42,9 @@ impl<T: Transport + Clone> LauncherService<T> {
     ) -> Result<(), ServiceError> {
         let (launcher, java_requests) = self
             .with_java_installer(
-                Launcher::new(self.transport.clone(), chain).with_budget(self.connections().await),
+                Launcher::new(self.transport.clone(), chain)
+                    .with_budget(self.connections().await)
+                    .keeping_partials(self.layout.partial_downloads()),
             )
             .await;
         let watch = cancel.clone();

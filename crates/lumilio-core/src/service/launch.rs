@@ -220,6 +220,7 @@ impl<T: Transport + Clone> LauncherService<T> {
                 .with_java_installer(
                     Launcher::new(self.transport.clone(), chain)
                         .with_budget(self.connections().await)
+                        .keeping_partials(self.layout.partial_downloads())
                         .with_spawned(spawned)
                         .with_before_start(before_start),
                 )

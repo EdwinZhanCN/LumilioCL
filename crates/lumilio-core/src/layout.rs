@@ -59,6 +59,14 @@ impl Layout {
         self.root.join("cache/world-map/seed")
     }
 
+    /// Notes on downloads stopped part-way, whose bytes wait beside their
+    /// destination for the next attempt (plan download-engine T2). Outside
+    /// `cache/` so clearing the cache cannot orphan those bytes.
+    #[must_use]
+    pub fn partial_downloads(&self) -> PathBuf {
+        self.root.join("partial-downloads")
+    }
+
     /// Baked block assets: local bakes by jar SHA-1 and the downloaded
     /// bundle (plan schematic-studio, D2/D3). Safe to delete; rebuilt on use.
     #[must_use]

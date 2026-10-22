@@ -22,8 +22,8 @@ Status: InProgress
 
 - [x] T1 — transfer 拆成 lumilio-transfer，服务持有全局连接池。 (Completed)
   Acceptance: crates/lumilio-transfer 含原 transfer 模块、CancellationToken、resource_lock 与 with_causes，不依赖 lumilio-core；lumilio_core 的公开路径不变。LauncherService 持有一个连接池，启动、Forge 处理器库、Java、内容安装、整合包与方块资源包的引擎都从它取许可；两个任务同时下载时总并发不超过设置值（测试：两个批次共享上限为 2 的池，假 transport 记录的最大在途请求数为 2）。设置「同时下载数」修改后不重启即对新许可生效；自动值统一（D2）。每个任务的进度只统计自己的传输。
-- [ ] T2 — Range 断点续传与暂停、继续。 (Proposed)
-  Acceptance: 重试同一来源时保留已写入的 .part，带 Range 与 If-Range（ETag 或 Last-Modified）续传；服务器回 200、Content-Range 不符或校验器变化时从零开始。哈希在写完后对整个文件计算，仍是校验通过才改名。下载中心可暂停运行中的下载任务并继续，继续后从已下载字节处开始。假 transport 覆盖：206 续传、忽略 Range 回 200、校验器变化、续传后哈希不符。
+- [ ] T2 — Range 断点续传与暂停、继续。 (InProgress)
+  Acceptance: 重试时保留已写入的 .part，带 Range 与 If-Range（ETag 或 Last-Modified）续传；服务器回 200 时从零开始，Content-Range 不符或 416 时丢弃已下载部分。续传先对已有字节计算哈希再接着流式计算，仍是校验通过才改名；校验失败的已下载部分丢弃后重下。取消或全部来源失败时，服务的下载保留已下载部分并在 partial-downloads/ 记一条说明，同一目标的下一次传输（动态页「重试」）接着下载；启动时清理超过 7 天的残留（D4）。下载中心可暂停运行中的下载任务并继续，继续后从已下载字节处开始。假 transport 覆盖：中断后续传、忽略 Range 回 200、校验器变化、续传后哈希不符、取消后由新引擎续传、无说明目录时取消不留文件、按时间清理。
 - [ ] T3 — 大文件分段下载。 (Proposed)
   Acceptance: 已知大小不小于阈值且来源支持 Range 时，用 try_acquire 拿到的空闲许可并发下载区间，空闲连接可再拆最大的未完成区间；批量下载占满许可时不分段。同一文件的分段固定一个来源（最终重定向地址），一段失败按现有重试与换源整体处理。不支持 Range、回 200、file:// 来源全部回到单连接。测试证明总连接数仍不超过池上限。
 - [ ] T4 — 元数据与启动器更新包接入引擎。 (Proposed)
@@ -36,7 +36,7 @@ Status: InProgress
 - T1：共享连接池的上限测试与每任务进度测试通过；lumilio-core 公开路径不变（lumilio-app、lumilio-ui 无需改 use）。
   Result: crates/lumilio-transfer/src/budget_tests.rs：两个引擎共享上限 2 时最大在途请求为 2；大批次与后到的小批次轮流使用连接（去掉每批上限后该测试失败，已验证）；扩容立即生效、缩容随连接结束生效。lumilio-core 829 个测试通过（每个引擎事件独立，任务进度测试不变）；lumilio-app、lumilio-ui 未改 use，clippy 无告警。
 - T2：续传与回退的假 transport 测试通过。
-  Result: pending
+  Result: crates/lumilio-transfer/src/resume_tests.rs 7 个测试与 user_agent_tests 中 Range/If-Range 请求头测试通过；变异验证：总从零开始（4 个失败）、不发 If-Range（3 个失败）、校验失败后保留说明（1 个失败）。lumilio-core 829 个测试通过。暂停与继续的界面待定。
 - T3：分段、回退与连接上限测试通过。
   Result: pending
 - T4：元数据与更新器经引擎下载的测试通过。
@@ -67,6 +67,14 @@ Consequences: 设置说明改写为全局含义；并行的多个任务分享同
 Why: tokio 信号量先到先得；批次一次排入全部请求时，启动游戏补文件要等正在安装的整合包把几百个文件下完。每批只排连接数那么多，多个批次就轮流拿连接；事件分开则每个任务的进度只算自己的文件。
 
 Consequences: 多个任务平分连接而非按优先级；启动补文件优先于后台安装留给 T5 的队列与优先级。
+
+## Decision D4
+
+未完成的下载以固定名 .<文件名>.lumilio.part 留在目标旁，来源、校验器与期望哈希记在 partial-downloads/ 下按目标路径哈希命名的说明里；有期望哈希时可从任一来源续传，否则只在同一来源且有校验器时续传；启动时清理超过 7 天的残留。
+
+Why: 留在目标旁才能校验后原子改名；说明集中在一处，清理不必遍历游戏与库目录。启动器的大部分下载带 SHA-1，哈希兜底使换源续传安全。说明不放在 cache/，清除缓存不会留下找不到的残留。
+
+Consequences: 未配置说明目录的引擎（测试、尚未接入的更新器）只在同一次传输的重试之间续传，结束时照旧删除。
 
 ## References
 

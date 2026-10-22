@@ -90,6 +90,9 @@ const DIAGNOSED_LIMIT: usize = 8;
 /// Connections all downloads share when the setting is automatic (plan
 /// download-engine D2).
 const TRANSFER_CONCURRENCY: usize = 16;
+/// A download stopped part-way is continued if started again within this
+/// long; after it, its bytes are removed when the launcher opens.
+const PARTIAL_DOWNLOAD_AGE: std::time::Duration = std::time::Duration::from_secs(7 * 24 * 3600);
 /// A Minecraft token with less than this left is refreshed before a launch.
 const TOKEN_MARGIN_SECONDS: u64 = 300;
 /// A key that is never an account, used to see whether the store works.
@@ -167,6 +170,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         let mut settings = SettingsStore::open(layout.root())?;
         let log = ActivityLog::open(layout.root());
         let startup = recovery::startup_notes(&layout, &store, &settings, &log);
+        crate::transfer::sweep_partials(&layout.partial_downloads(), PARTIAL_DOWNLOAD_AGE);
         // A saved current game that is gone is replaced before anything reads
         // it; a failed save leaves it to read as none.
         let _ = preferences::settle_current(store.instances(), &mut settings);

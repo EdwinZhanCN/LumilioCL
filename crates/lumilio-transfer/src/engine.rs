@@ -1,19 +1,16 @@
-use super::files::{
-    AttemptFailure, ContentHasher, copy_verified_candidate, create_temporary_sibling,
-    file_system_error, publish_temporary, verify_file,
-};
+use super::files::{AttemptFailure, copy_verified_candidate, verify_file};
+use super::partial::{Note, Partials, part_path};
 use super::request::{
     SourceFailure, TransferError, TransferEvent, TransferOutcome, TransferRequest,
 };
 use super::transport::Transport;
 use crate::CancellationToken;
 use crate::budget::ConnectionBudget;
-use futures_util::stream::StreamExt;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fmt::Debug;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::fs;
-use tokio::io::AsyncWriteExt;
 use tokio::sync::broadcast;
 use tokio::task::JoinSet;
 
@@ -23,6 +20,9 @@ pub struct TransferEngine<T> {
     pub(super) transport: Arc<T>,
     pub(super) budget: ConnectionBudget,
     pub(super) events: broadcast::Sender<TransferEvent>,
+    /// Where notes on downloads kept part-way live; `None` keeps the bytes
+    /// only between the attempts of one transfer.
+    pub(super) partials: Option<Partials>,
 }
 
 impl<T> Clone for TransferEngine<T> {
@@ -31,6 +31,7 @@ impl<T> Clone for TransferEngine<T> {
             transport: self.transport.clone(),
             budget: self.budget.clone(),
             events: self.events.clone(),
+            partials: self.partials.clone(),
         }
     }
 }
@@ -54,7 +55,19 @@ where
             transport: Arc::new(transport),
             budget,
             events,
+            partials: None,
         }
+    }
+
+    /// Keeps the bytes of a cancelled or failed download, noted in `folder`,
+    /// so the next transfer to the same destination continues them. Clear
+    /// old ones with [`crate::sweep_partials`].
+    #[must_use]
+    pub fn keeping_partials(mut self, folder: impl Into<PathBuf>) -> Self {
+        self.partials = Some(Partials {
+            folder: folder.into(),
+        });
+        self
     }
 
     #[must_use]
@@ -155,6 +168,40 @@ where
             }
         }
 
+        let part = part_path(&request.destination);
+        let mut note = match &self.partials {
+            Some(partials) => partials.read(&request.destination).await,
+            None => None,
+        };
+        let result = self
+            .download_from_sources(request, &part, &mut note, cancellation)
+            .await;
+        // Bytes a later attempt may continue are kept only where a note can
+        // find them again; a failed write or publication keeps nothing.
+        let keep = self.partials.is_some()
+            && note.is_some()
+            && matches!(
+                result,
+                Err(TransferError::Cancelled | TransferError::AllSourcesFailed { .. })
+            );
+        if !keep {
+            if result.is_err() {
+                let _ = fs::remove_file(&part).await;
+            }
+            if let Some(partials) = &self.partials {
+                partials.forget(&request.destination).await;
+            }
+        }
+        result
+    }
+
+    async fn download_from_sources(
+        &self,
+        request: &TransferRequest,
+        part: &Path,
+        note: &mut Option<Note>,
+        cancellation: &CancellationToken,
+    ) -> Result<TransferOutcome, TransferError> {
         let mut failures = Vec::new();
         let mut total_attempts = 0;
         for source in &request.sources {
@@ -163,7 +210,10 @@ where
                     return Err(TransferError::Cancelled);
                 }
                 total_attempts += 1;
-                match self.download_once(request, source, cancellation).await {
+                match self
+                    .download_once(request, source, part, note, cancellation)
+                    .await
+                {
                     Ok(bytes) => {
                         return Ok(TransferOutcome::Downloaded {
                             source: source.clone(),
@@ -205,134 +255,6 @@ where
             id: request.id.clone(),
             failures,
         })
-    }
-
-    pub(super) async fn download_once(
-        &self,
-        request: &TransferRequest,
-        source: &str,
-        cancellation: &CancellationToken,
-    ) -> Result<u64, AttemptFailure> {
-        let response = tokio::select! {
-            () = cancellation.cancelled() => return Err(AttemptFailure::Cancelled),
-            response = self.transport.get(source) => response.map_err(|error| AttemptFailure::Source {
-                reason: error.message,
-                retryable: error.retryable,
-            })?,
-        };
-        let status = response.status();
-        if !(200..300).contains(&status) {
-            let retryable = status == 408 || status == 429 || status >= 500;
-            return Err(AttemptFailure::Source {
-                reason: format!("HTTP status {status}"),
-                retryable,
-            });
-        }
-
-        let response_length = response.content_length();
-        let (temporary_path, mut temporary_file) = create_temporary_sibling(&request.destination)
-            .await
-            .map_err(AttemptFailure::Fatal)?;
-        let result = async {
-            let mut body = response.into_body();
-            let mut bytes_written = 0_u64;
-            let mut digest = request
-                .expected_digest
-                .as_ref()
-                .map(ContentHasher::for_digest);
-            loop {
-                let chunk = tokio::select! {
-                    () = cancellation.cancelled() => {
-                        return Err(AttemptFailure::Cancelled);
-                    }
-                    chunk = body.next() => chunk,
-                };
-                let Some(chunk) = chunk else {
-                    break;
-                };
-                let chunk = chunk.map_err(|error| AttemptFailure::Source {
-                    reason: error.message,
-                    retryable: error.retryable,
-                })?;
-                temporary_file.write_all(&chunk).await.map_err(|error| {
-                    AttemptFailure::Fatal(file_system_error(
-                        "write temporary file",
-                        &temporary_path,
-                        error,
-                    ))
-                })?;
-                if let Some(digest) = &mut digest {
-                    digest.update(&chunk);
-                }
-                bytes_written = bytes_written.saturating_add(chunk.len() as u64);
-                let _ = self.events.send(TransferEvent::Progress {
-                    id: request.id.clone(),
-                    completed: bytes_written,
-                    total: request
-                        .expected_size
-                        .or(response_length)
-                        .filter(|total| bytes_written <= *total),
-                });
-            }
-
-            if let Some(response_length) = response_length
-                && bytes_written != response_length
-            {
-                return Err(AttemptFailure::source(format!(
-                    "response length was {bytes_written}, expected {response_length}"
-                )));
-            }
-            if let Some(expected_size) = request.expected_size
-                && bytes_written != expected_size
-            {
-                return Err(AttemptFailure::source(format!(
-                    "file size was {bytes_written}, expected {expected_size}"
-                )));
-            }
-            if let (Some(expected), Some(digest)) = (&request.expected_digest, digest) {
-                let actual = digest.finish_hex();
-                if !actual.eq_ignore_ascii_case(expected.hex()) {
-                    return Err(AttemptFailure::source(format!(
-                        "{} was {actual}, expected {}",
-                        expected.algorithm(),
-                        expected.hex()
-                    )));
-                }
-            }
-
-            temporary_file.flush().await.map_err(|error| {
-                AttemptFailure::Fatal(file_system_error(
-                    "flush temporary file",
-                    &temporary_path,
-                    error,
-                ))
-            })?;
-            temporary_file.sync_all().await.map_err(|error| {
-                AttemptFailure::Fatal(file_system_error(
-                    "sync temporary file",
-                    &temporary_path,
-                    error,
-                ))
-            })?;
-            Ok(bytes_written)
-        }
-        .await;
-
-        drop(temporary_file);
-        match result {
-            Ok(bytes_written) => {
-                if let Err(error) = publish_temporary(&temporary_path, &request.destination).await {
-                    let _ = fs::remove_file(&temporary_path).await;
-                    Err(AttemptFailure::Fatal(error))
-                } else {
-                    Ok(bytes_written)
-                }
-            }
-            Err(error) => {
-                let _ = fs::remove_file(&temporary_path).await;
-                Err(error)
-            }
-        }
     }
 
     pub async fn transfer_batch(

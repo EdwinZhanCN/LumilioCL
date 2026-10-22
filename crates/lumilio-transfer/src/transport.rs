@@ -33,6 +33,20 @@ pub struct HttpRequest {
 pub trait Transport: Send + Sync + 'static {
     fn get<'a>(&'a self, source: &'a str) -> TransportFuture<'a>;
 
+    /// Asks for the content from byte `offset` on (`206`), unless it no
+    /// longer matches `validator` (an `ETag` or `Last-Modified`). Any other
+    /// answer, such as the whole content with `200`, makes the caller start
+    /// over; transports that cannot ask keep this default, which does that.
+    fn get_from<'a>(
+        &'a self,
+        source: &'a str,
+        offset: u64,
+        validator: Option<&'a str>,
+    ) -> TransportFuture<'a> {
+        let _ = (offset, validator);
+        self.get(source)
+    }
+
     /// Sends exactly one HTTP hop, without following redirects. The plugin
     /// host checks each destination. Never fall back to `send` here.
     fn send_no_redirect<'a>(&'a self, request: HttpRequest) -> TransportFuture<'a> {

@@ -101,6 +101,24 @@ impl Transport for HttpTransport {
         Box::pin(async move { Self::respond(self.client.get(source).send().await) })
     }
 
+    fn get_from<'a>(
+        &'a self,
+        source: &'a str,
+        offset: u64,
+        validator: Option<&'a str>,
+    ) -> TransportFuture<'a> {
+        Box::pin(async move {
+            let mut builder = self
+                .client
+                .get(source)
+                .header("range", format!("bytes={offset}-"));
+            if let Some(validator) = validator {
+                builder = builder.header("if-range", validator);
+            }
+            Self::respond(builder.send().await)
+        })
+    }
+
     fn post_json<'a>(&'a self, source: &'a str, body: Vec<u8>) -> TransportFuture<'a> {
         Box::pin(async move {
             Self::respond(
@@ -206,6 +224,19 @@ impl Transport for DefaultTransport {
             self.file.get(source)
         } else {
             self.http.get(source)
+        }
+    }
+
+    fn get_from<'a>(
+        &'a self,
+        source: &'a str,
+        offset: u64,
+        validator: Option<&'a str>,
+    ) -> TransportFuture<'a> {
+        if Url::parse(source).is_ok_and(|url| url.scheme() == "file") {
+            self.file.get(source)
+        } else {
+            self.http.get_from(source, offset, validator)
         }
     }
 
