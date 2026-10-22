@@ -13,7 +13,7 @@ use super::files::{AttemptFailure, ContentHasher, file_system_error, publish_tem
 use super::partial::{Note, Written};
 use super::pieces::Pieces;
 use super::request::{TransferEvent, TransferRequest};
-use super::transport::{ByteStream, Transport, TransportResponse};
+use super::transport::{ByteStream, Transport};
 use crate::CancellationToken;
 use futures_util::stream::StreamExt;
 use std::io::SeekFrom;
@@ -48,7 +48,7 @@ impl Default for Split {
 }
 
 /// How often the attempt looks for free connections to join.
-const JOIN_INTERVAL: Duration = Duration::from_millis(250);
+pub(super) const JOIN_INTERVAL: Duration = Duration::from_millis(250);
 
 /// What an attempt continues from, as its first answer showed.
 pub(super) struct Plan {
@@ -96,7 +96,7 @@ where
         source: &str,
         part: &Path,
         note: &mut Option<Note>,
-        first: TransportResponse,
+        (url, first): (String, ByteStream),
         plan: Plan,
         helper: Option<Connection>,
         cancellation: &CancellationToken,
@@ -132,7 +132,7 @@ where
         }
         let shared = Arc::new(Shared {
             transport: self.transport.clone(),
-            url: first.url().unwrap_or(source).to_owned(),
+            url,
             validator: plan.validator,
             part: part.to_owned(),
             length: plan.length,
@@ -299,7 +299,7 @@ async fn allocate(part: &Path, length: u64) -> std::io::Result<()> {
 async fn work<T: Transport>(
     shared: Arc<Shared<T>>,
     worker: usize,
-    first: Option<(TransportResponse, u64)>,
+    first: Option<(ByteStream, u64)>,
     helper: Option<Connection>,
 ) -> (usize, Result<(), AttemptFailure>) {
     let result = match OpenOptions::new().write(true).open(&shared.part).await {
@@ -328,7 +328,7 @@ async fn work<T: Transport>(
 async fn write_ranges<T: Transport>(
     shared: &Shared<T>,
     worker: usize,
-    mut first: Option<(TransportResponse, u64)>,
+    mut first: Option<(ByteStream, u64)>,
     borrowed: bool,
     file: &mut File,
 ) -> Result<(), AttemptFailure> {
@@ -340,7 +340,7 @@ async fn write_ranges<T: Transport>(
         let mut skip = 0;
         let (body, start) = match first.take() {
             // Its range was claimed when the attempt began.
-            Some((response, start)) => (response.into_body(), start),
+            Some((body, start)) => (body, start),
             None => {
                 let Some(range) = shared.pieces().take(worker) else {
                     return Ok(());

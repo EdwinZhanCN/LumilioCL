@@ -5,7 +5,7 @@
 
 use super::engine::TransferEngine;
 use super::files::{AttemptFailure, ContentHasher, file_system_error, publish_temporary};
-use super::parallel::Plan;
+use super::parallel::{JOIN_INTERVAL, Plan};
 use super::partial::Note;
 use super::pieces::gaps;
 use super::request::{TransferEvent, TransferRequest};
@@ -15,6 +15,7 @@ use futures_util::stream::StreamExt;
 use std::io::SeekFrom;
 use std::ops::Range;
 use std::path::Path;
+use std::time::Instant;
 use tokio::fs::{self, File, OpenOptions};
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 
@@ -100,10 +101,12 @@ where
             || response
                 .header("accept-ranges")
                 .is_some_and(|value| value.trim().eq_ignore_ascii_case("bytes"));
-        let whole_length = length.filter(|length| {
-            response_length.is_none_or(|response_length| start + response_length == *length)
+        // The file's length, when its source would split it.
+        let splittable = length.filter(|length| {
+            serves_ranges
+                && response_length.is_none_or(|response_length| start + response_length == *length)
         });
-        if let (true, Some(length)) = (serves_ranges, whole_length) {
+        if let Some(length) = splittable {
             let left = length
                 - written
                     .iter()
@@ -121,13 +124,14 @@ where
                     length,
                     validator,
                 };
+                let url = response.url().unwrap_or(source).to_owned();
                 return self
                     .download_pieces(
                         request,
                         source,
                         part,
                         note,
-                        response,
+                        (url, response.into_body()),
                         plan,
                         helper,
                         cancellation,
@@ -145,27 +149,35 @@ where
             source,
             part,
             note,
-            response,
-            start,
-            validator,
+            Sequential {
+                response,
+                start,
+                validator,
+                splittable,
+            },
             cancellation,
         )
         .await
     }
 
-    /// Writes the answer into `part` after its first `start` bytes.
-    #[allow(clippy::too_many_arguments)]
+    /// Writes the answer into `part` after its first `start` bytes. When a
+    /// connection comes free and enough of a splittable file is left, the
+    /// answer is handed on to be read beside others.
     async fn download_sequentially(
         &self,
         request: &TransferRequest,
         source: &str,
         part: &Path,
         note: &mut Option<Note>,
-        response: TransportResponse,
-        start: u64,
-        validator: Option<String>,
+        Sequential {
+            response,
+            start,
+            validator,
+            splittable,
+        }: Sequential,
         cancellation: &CancellationToken,
     ) -> Result<u64, AttemptFailure> {
+        let url = response.url().unwrap_or(source).to_owned();
         let response_length = response.content_length();
         let mut file = open_part(part, start).await.map_err(|error| {
             AttemptFailure::Fatal(file_system_error("open partial download", part, error))
@@ -196,6 +208,7 @@ where
             .or(response_length.map(|length| start + length));
         let mut body = response.into_body();
         let mut received = 0_u64;
+        let mut looked = Instant::now();
         let streamed = loop {
             let chunk = tokio::select! {
                 biased;
@@ -204,7 +217,7 @@ where
                 chunk = body.next() => chunk,
             };
             let Some(chunk) = chunk else {
-                break Ok(());
+                break Ok(None);
             };
             let chunk = match chunk {
                 Ok(chunk) => chunk,
@@ -233,13 +246,47 @@ where
                 completed,
                 total: total.filter(|total| completed <= *total),
             });
+            if let Some(length) = splittable
+                && looked.elapsed() >= JOIN_INTERVAL
+            {
+                looked = Instant::now();
+                if length.saturating_sub(completed) >= self.split.threshold
+                    && let Some(helper) = self.budget.try_acquire()
+                {
+                    break Ok(Some((helper, length)));
+                }
+            }
         };
         // What was written stays a prefix the next attempt can measure.
         let flushed = file.flush().await;
-        streamed?;
+        let handover = streamed?;
         flushed.map_err(|error| {
             AttemptFailure::Fatal(file_system_error("flush partial download", part, error))
         })?;
+        if let Some((helper, length)) = handover {
+            drop(file);
+            let at = start + received;
+            let plan = Plan {
+                written: std::iter::once(0..at)
+                    .filter(|range| !range.is_empty())
+                    .collect(),
+                start: at,
+                length,
+                validator: note.as_ref().and_then(|note| note.validator.clone()),
+            };
+            return self
+                .download_pieces(
+                    request,
+                    source,
+                    part,
+                    note,
+                    (url, body),
+                    plan,
+                    Some(helper),
+                    cancellation,
+                )
+                .await;
+        }
 
         let size = start + received;
         if let Some(response_length) = response_length
@@ -265,6 +312,16 @@ where
         *note = None;
         Ok(size)
     }
+}
+
+/// A single connection's answer, where it starts and what it may become.
+struct Sequential {
+    response: TransportResponse,
+    /// Bytes of the part file already written before the answer.
+    start: u64,
+    validator: Option<String>,
+    /// The file's length, when its source would split it.
+    splittable: Option<u64>,
 }
 
 /// A source's answer that is no file: worth asking again when the server

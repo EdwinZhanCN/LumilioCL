@@ -164,6 +164,38 @@ async fn a_full_budget_leaves_a_large_file_to_one_connection() {
 }
 
 #[tokio::test]
+async fn a_large_file_started_on_a_full_budget_splits_once_a_connection_frees() {
+    let dir = tempfile::tempdir().unwrap();
+    let destination = dir.path().join("large");
+    let server = server(true);
+    // Slow enough that much is left when the first look for help comes.
+    server.state().delay = Duration::from_millis(10);
+    let budget = ConnectionBudget::new(3).unwrap();
+    // A batch holds the other connections as the file starts.
+    let held = (
+        budget.acquire().await.unwrap(),
+        budget.acquire().await.unwrap(),
+    );
+    let release = async {
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        drop(held);
+    };
+
+    let engine = engine(&server, &budget);
+    let (outcome, ()) = tokio::join!(
+        engine.transfer(request(&destination), CancellationToken::new()),
+        release,
+    );
+
+    outcome.unwrap();
+    assert_eq!(std::fs::read(&destination).unwrap(), content());
+    let requests = server.requests();
+    assert!(requests.len() > 1, "it never split: {requests:?}");
+    assert!(requests[1..].iter().all(|asked| asked.url == FINAL));
+    assert!(server.most_open() <= 3);
+}
+
+#[tokio::test]
 async fn a_cancelled_download_over_several_connections_is_continued_later() {
     let dir = tempfile::tempdir().unwrap();
     let destination = dir.path().join("large");
