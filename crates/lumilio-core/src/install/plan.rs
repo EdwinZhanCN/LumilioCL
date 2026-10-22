@@ -289,6 +289,20 @@ impl InstallationPlan {
             .find(|artifact| artifact.kind == ArtifactKind::AssetCatalog)
     }
 
+    /// Where an installed virtual catalog's by-name copy lives; `None` when
+    /// the catalog is hashed only, missing or unreadable.
+    pub async fn virtual_assets_directory(&self) -> Option<PathBuf> {
+        let catalog_id = self.asset_catalog_id.as_deref()?;
+        let catalog = self.asset_catalog_artifact()?;
+        let json = tokio::fs::read_to_string(catalog.request.destination())
+            .await
+            .ok()?;
+        AssetIndex::decode_json(&json)
+            .ok()?
+            .uses_virtual_layout()
+            .then(|| self.directories.assets().join("virtual").join(catalog_id))
+    }
+
     pub fn asset_artifacts(
         &self,
         index: &AssetIndex,

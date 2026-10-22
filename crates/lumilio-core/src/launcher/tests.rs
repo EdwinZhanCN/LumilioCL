@@ -1,10 +1,10 @@
 use super::Launcher;
-use super::progress::runtimes_root;
+use super::progress::{GameForwarder, runtimes_root};
 use super::types::{LaunchRequest, LaunchServiceError, LaunchUpdate};
 use crate::activity::CancellationToken;
 use crate::instance::Loader;
 use crate::launch_session::{LaunchFailure, LaunchPhase, LaunchSignal};
-use crate::process::GameExit;
+use crate::process::{GameEvent, GameExit};
 use crate::transfer::SourceChain;
 use crate::tuning::LaunchTuning;
 use std::path::PathBuf;
@@ -302,6 +302,97 @@ async fn a_damaged_client_is_repaired_on_the_next_launch() {
 }
 
 #[tokio::test]
+async fn releases_up_to_1_7_2_get_the_assets_folder_their_catalog_lays_out() {
+    // (catalog flags, `${game_assets}` is the by-name copy, game folder gets `resources/`)
+    for (flags, by_name, resources) in [
+        // 1.6 to 1.7.2
+        (r#""virtual": true,"#, true, false),
+        // c0.0.11a to 1.5.2
+        (r#""map_to_resources": true,"#, true, true),
+        ("", false, false),
+    ] {
+        let world = world("");
+        let server = world._dir.path().join("server");
+        let sound = b"pretend sound";
+        let hash = sha1_hex(sound);
+        let object = server.join("objects").join(&hash[..2]).join(&hash);
+        std::fs::create_dir_all(object.parent().unwrap()).unwrap();
+        std::fs::write(&object, sound).unwrap();
+        let catalog = format!(
+            r#"{{{flags} "objects": {{"sound/step.ogg": {{"hash": "{hash}", "size": {}}}}}}}"#,
+            sound.len()
+        );
+        std::fs::write(server.join("legacy.json"), &catalog).unwrap();
+        let manifest_path = server.join("1.0.json");
+        let mut manifest: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&manifest_path).unwrap()).unwrap();
+        manifest["minecraftArguments"] =
+            "--gameDir ${game_directory} --assetsDir ${game_assets}".into();
+        manifest["assetIndex"] = serde_json::json!({
+            "id": "legacy",
+            "url": url::Url::from_file_path(server.join("legacy.json")).unwrap().as_str(),
+            "sha1": sha1_hex(catalog.as_bytes()),
+            "size": catalog.len(),
+        });
+        std::fs::write(&manifest_path, manifest.to_string()).unwrap();
+        let arguments = world._dir.path().join("arguments");
+        std::fs::write(
+            world.root.join("runtimes/jdk-21/bin/java"),
+            format!(
+                "#!/bin/sh\nprintf '%s\\n' \"$@\" > '{}'\necho \"Setting user: x\"\n",
+                arguments.display()
+            ),
+        )
+        .unwrap();
+        let objects = url::Url::from_directory_path(server.join("objects")).unwrap();
+        let chain = SourceChain::new([
+            Arc::new(
+                crate::transfer::PrefixMirror::new(
+                    "https://resources.download.minecraft.net/",
+                    objects.as_str(),
+                    16,
+                )
+                .unwrap(),
+            ) as Arc<dyn crate::transfer::SourceProvider>,
+            Arc::new(OfficialSource),
+        ])
+        .unwrap();
+
+        run_to_end(&Launcher::new(FileTransport, chain), world.request.clone())
+            .await
+            .0
+            .unwrap();
+
+        let arguments = std::fs::read_to_string(&arguments).unwrap();
+        let mut arguments = arguments.lines();
+        arguments.find(|argument| *argument == "--assetsDir");
+        let assets = world.request.directories.assets();
+        let expected = if by_name {
+            assets.join("virtual/legacy")
+        } else {
+            assets.to_owned()
+        };
+        assert_eq!(arguments.next(), expected.to_str(), "{flags}");
+        if by_name {
+            assert_eq!(
+                std::fs::read(expected.join("sound/step.ogg")).unwrap(),
+                sound
+            );
+        }
+        assert_eq!(
+            world
+                .request
+                .directories
+                .game()
+                .join("resources/sound/step.ogg")
+                .is_file(),
+            resources,
+            "{flags}"
+        );
+    }
+}
+
+#[tokio::test]
 async fn progress_reports_item_counts_for_the_download_phase() {
     let world = world("echo \"Setting user: x\"");
     let (_, updates) = run_to_end(&launcher(), world.request.clone()).await;
@@ -340,17 +431,101 @@ async fn a_missing_java_fails_with_a_clear_reason_and_a_terminal_signal() {
 }
 
 #[tokio::test]
-async fn a_game_that_dies_at_once_fails_the_session() {
-    let world = world("echo crash >&2\nexit 1");
+async fn a_game_that_dies_at_once_fails_the_session_with_what_it_printed() {
+    let world = world("echo 'Exception in thread \"main\"' >&2\necho '\tat Main' >&2\nexit 1");
     let (result, updates) = run_to_end(&launcher(), world.request.clone()).await;
     assert_eq!(result.unwrap().code, Some(1));
-    assert!(matches!(
-        session_of(&updates).status(),
-        LaunchStatus::Failed {
-            failure: LaunchFailure::ExitedEarly { code: Some(1) },
-            ..
+    let LaunchStatus::Failed { failure, .. } = session_of(&updates).status().clone() else {
+        panic!("the session did not fail");
+    };
+    assert_eq!(
+        failure,
+        LaunchFailure::ExitedEarly {
+            code: Some(1),
+            output: vec![
+                "Exception in thread \"main\"".to_owned(),
+                "\tat Main".to_owned()
+            ],
         }
-    ));
+    );
+    assert_eq!(
+        failure.technical_detail().as_deref(),
+        Some("Exception in thread \"main\"\n\tat Main")
+    );
+}
+
+#[tokio::test]
+async fn the_games_output_stays_in_its_logs_folder() {
+    let world = world("echo 'Setting user: Steve'\necho playing >&2\nexit 0");
+    let (result, _) = run_to_end(&launcher(), world.request.clone()).await;
+    assert_eq!(result.unwrap().code, Some(0));
+    let record = std::fs::read_to_string(
+        world
+            .request
+            .directories
+            .game()
+            .join("logs")
+            .join(crate::GAME_OUTPUT_LOG),
+    )
+    .unwrap();
+    let lines: Vec<_> = record.lines().collect();
+    assert!(lines[0].starts_with("# LumilioCL "), "{record}");
+    assert!(
+        lines[1].starts_with("# Minecraft 1.0 · Java 21"),
+        "{record}"
+    );
+    assert!(lines.contains(&"Setting user: Steve") && lines.contains(&"playing"));
+    assert!(
+        lines
+            .last()
+            .unwrap()
+            .starts_with("# The game ended with exit code 0 after "),
+        "{record}"
+    );
+}
+
+#[test]
+fn an_early_exit_keeps_only_the_last_lines_and_a_running_game_none() {
+    let line = |text: String| GameEvent::Line {
+        stream: crate::process::LogStream::Stderr,
+        text,
+    };
+    let exit = GameEvent::Exited {
+        code: Some(1),
+        ran_for: std::time::Duration::ZERO,
+        killed: false,
+    };
+    let output_of = |events: Vec<GameEvent>| {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let mut forwarder = GameForwarder::default();
+        for event in &events {
+            forwarder.forward(event, &tx);
+        }
+        drop(tx);
+        let mut signals = Vec::new();
+        while let Ok(update) = rx.try_recv() {
+            if let LaunchUpdate::Signal(signal) = update {
+                signals.push(signal);
+            }
+        }
+        signals.pop()
+    };
+
+    let mut early: Vec<_> = (0..60).map(|n| line(format!("line {n}"))).collect();
+    early.push(exit.clone());
+    let Some(LaunchSignal::Failed(LaunchFailure::ExitedEarly { output, .. })) = output_of(early)
+    else {
+        panic!("not an early exit");
+    };
+    assert_eq!(output.len(), 50);
+    assert_eq!(output.first().map(String::as_str), Some("line 10"));
+    assert_eq!(output.last().map(String::as_str), Some("line 59"));
+
+    let started = vec![line("before".to_owned()), GameEvent::Running, exit];
+    assert_eq!(
+        output_of(started),
+        Some(LaunchSignal::Exited { code: Some(1) })
+    );
 }
 
 #[tokio::test]

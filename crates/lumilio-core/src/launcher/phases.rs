@@ -1,4 +1,5 @@
-use super::progress::{ItemProgress, forward_game_event, handle_stage, uses_installer};
+use super::output::{self, GAME_OUTPUT_LOG, OutputFile};
+use super::progress::{GameForwarder, ItemProgress, handle_stage, uses_installer};
 use super::types::{JavaRequest, LaunchRequest, LaunchServiceError, LaunchUpdate};
 use super::{LAUNCHER_NAME, Launcher, QUICK_PLAY_LOG};
 use crate::activity::CancellationToken;
@@ -114,6 +115,14 @@ where
         if !up_to_date {
             self.run_installer(&install_plan, updates, cancel).await?;
         }
+        // Only the installed catalog tells whether `${game_assets}` is its
+        // by-name copy.
+        let launch_plan = match install_plan.virtual_assets_directory().await {
+            Some(directory) => release
+                .build_launch_plan(&context.with_value("game_assets", directory.to_string_lossy()))
+                .map_err(LaunchServiceError::Launch)?,
+            None => launch_plan,
+        };
         if uses_installer(request.instance.loader) {
             self.finish_loader(request, &launch_plan, updates, cancel)
                 .await?;
@@ -379,7 +388,27 @@ where
             return Err(LaunchServiceError::Cancelled);
         }
 
+        // This launch's output stays on disk after the launcher closes; a
+        // folder that takes no file is told, and the game starts anyway.
+        let mut file = match OutputFile::create(
+            request.directories.game(),
+            &output::heading(&request, &java),
+        ) {
+            Ok(file) => Some(file),
+            Err(error) => {
+                let _ = updates.send(LaunchUpdate::Log {
+                    stream: LogStream::Stderr,
+                    text: format!(
+                        "could not keep the game's output in logs/{GAME_OUTPUT_LOG}: {error}"
+                    ),
+                });
+                None
+            }
+        };
         for note in request.session.notes() {
+            if let Some(file) = &mut file {
+                file.note(note);
+            }
             let _ = updates.send(LaunchUpdate::Log {
                 stream: LogStream::Stderr,
                 text: note.clone(),
@@ -397,20 +426,20 @@ where
             cancel,
         );
         tokio::pin!(game);
-        let mut running = false;
+        let mut forwarder = GameForwarder::recording(file);
         let exit = loop {
             tokio::select! {
                 result = &mut game => break result.map_err(LaunchServiceError::Process)?,
                 Some(event) = game_events.recv() => {
                     self.note_spawned(&event);
-                    forward_game_event(&event, &mut running, updates);
+                    forwarder.forward(&event, updates);
                 }
             }
         };
         // The process ended; deliver whatever it still had queued.
         while let Ok(event) = game_events.try_recv() {
             self.note_spawned(&event);
-            forward_game_event(&event, &mut running, updates);
+            forwarder.forward(&event, updates);
         }
 
         // A command after the game runs on its own; its failure is only told.

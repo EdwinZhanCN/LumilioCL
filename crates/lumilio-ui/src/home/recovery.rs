@@ -14,11 +14,13 @@ pub fn recovery_sentence(detail: &RecoveryDetail) -> String {
     match detail {
         RecoveryDetail::Interrupted => tr!("home-recovery-interrupted").to_owned(),
         RecoveryDetail::Failed {
-            failure: LaunchFailure::ExitedEarly { code: Some(code) },
+            failure: LaunchFailure::ExitedEarly {
+                code: Some(code), ..
+            },
             ..
         } => tr!("home-recovery-exited-early-code", code = code.to_string()),
         RecoveryDetail::Failed {
-            failure: LaunchFailure::ExitedEarly { code: None },
+            failure: LaunchFailure::ExitedEarly { code: None, .. },
             ..
         } => tr!("home-recovery-exited-early").to_owned(),
         // The cause, when the launcher knows one the person can act on;
@@ -116,7 +118,7 @@ pub(super) fn render_recovery(
                     art.primary,
                     intent_handler.clone(),
                 ))
-                // ia[home]: 技术详情 | 启动失败后的「技术详情」 | 准备步骤失败时弹出失败原因，可复制；游戏崩溃、启动时退出或上次未正常结束时打开该游戏的诊断页
+                // ia[home]: 技术详情 | 启动失败后的「技术详情」 | 准备步骤失败时弹出失败原因，启动时退出时弹出游戏最后输出的至多 50 行，均可复制；游戏崩溃、上次未正常结束或启动时退出却什么也没输出时打开该游戏的诊断页 | error-reporting T9
                 .child(
                     art_button(
                         "home-details",

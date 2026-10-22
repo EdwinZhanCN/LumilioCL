@@ -7,7 +7,7 @@ use gpui_component::Sizable as _;
 use gpui_component::input::Input;
 use gpui_component::select::Select;
 use gpui_component::{h_flex, v_flex};
-use lumilio_core::{GameLogSource, LogLevel, LogLine, filter_log, log_lines};
+use lumilio_core::{GAME_OUTPUT_LOG, GameLogSource, LogLevel, LogLine, filter_log, log_lines};
 use std::rc::Rc;
 
 impl InstanceDetailView {
@@ -58,6 +58,9 @@ impl InstanceDetailView {
             }
             .to_owned(),
             GameLogSource::Latest => "latest.log".into(),
+            GameLogSource::File(name) if name == GAME_OUTPUT_LOG => {
+                tr!("instance-log-output", name = name.as_str())
+            }
             GameLogSource::File(name) => name.clone(),
             GameLogSource::Crash(name) => tr!("instance-log-crash", name = name.as_str()),
         }
@@ -88,14 +91,13 @@ impl InstanceDetailView {
             sources.push((GameLogSource::Latest, "latest.log".into()));
         }
         sources.extend(logs.files.iter().map(|file| {
-            (
-                GameLogSource::File(file.name.clone()),
-                tr!(
-                    "instance-log-file-meta",
-                    name = file.name.as_str(),
-                    time = clock(file.modified)
-                ),
-            )
+            let (name, time) = (file.name.as_str(), clock(file.modified));
+            let label = if name == GAME_OUTPUT_LOG {
+                tr!("instance-log-output-meta", name = name, time = time)
+            } else {
+                tr!("instance-log-file-meta", name = name, time = time)
+            };
+            (GameLogSource::File(file.name.clone()), label)
         }));
         sources.extend(logs.crashes.iter().map(|file| {
             (
@@ -108,7 +110,7 @@ impl InstanceDetailView {
             )
         }));
         let (source_select, level_select) = self.log_selects(sources, window, cx);
-        // ia[instance.diagnostics]: 选择日志来源 | 日志工具栏 · 搜索框右侧单选下拉 | 实时输出、latest.log、历史日志（含 .log.gz）、崩溃报告共用一个阅读区；可搜索来源；选择文件后显示加载或读取失败
+        // ia[instance.diagnostics]: 选择日志来源 | 日志工具栏 · 搜索框右侧单选下拉 | 实时输出、latest.log、上次启动的输出（启动器记下的游戏全部输出，游戏没写日志就退出时也有）、历史日志（含 .log.gz）、崩溃报告共用一个阅读区；可搜索来源；选择文件后显示加载或读取失败 | error-reporting T10
         let source = div()
             .w(px(180.))
             .flex_none()

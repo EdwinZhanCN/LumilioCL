@@ -442,9 +442,11 @@ async fn the_diagnostics_bundle_hides_the_player_the_folders_and_commands() {
             .read_to_string(&mut all)
             .unwrap();
     }
-    for name in ["launcher/launcher.log", "launcher/launcher.1.log"] {
+    let output = format!("logs/{}-{}", record.id, crate::GAME_OUTPUT_LOG);
+    for name in ["launcher/launcher.log", "launcher/launcher.1.log", &output] {
         assert!(archive.by_name(name).is_ok(), "{name} is in the bundle");
     }
+    assert!(all.contains("\nSetting user: <player>\n"), "{all}");
     assert!(all.contains("ERROR could not read <launcher>"), "{all}");
     assert!(all.contains("current game for <player>"), "{all}");
     assert!(all.contains("LumilioCL"), "{all}");

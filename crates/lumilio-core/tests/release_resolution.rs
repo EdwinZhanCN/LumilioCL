@@ -351,3 +351,56 @@ fn repeated_and_blocked_libraries_do_not_duplicate_launch_inputs() {
     assert_eq!(plan.classpath().len(), 2);
     assert_eq!(plan.required_downloads().len(), 1);
 }
+
+#[test]
+fn a_loader_library_replaces_the_games_version_of_the_same_artifact() {
+    // NeoForge 21.4 brings ASM 9.8 and Minecraft 1.21.4 ASM 9.6; with both on
+    // the classpath BootstrapLauncher quits before the game writes a log.
+    let parent = ReleaseManifest::decode_json(
+        r#"{
+          "id": "1.21.4",
+          "mainClass": "net.minecraft.client.main.Main",
+          "arguments": { "jvm": [], "game": [] },
+          "libraries": [
+            { "name": "org.lwjgl:lwjgl:3.3.3" },
+            { "name": "org.lwjgl:lwjgl:3.3.3:natives-macos-arm64" },
+            { "name": "org.ow2.asm:asm:9.6" }
+          ]
+        }"#,
+    )
+    .expect("parent");
+    let child = ReleaseManifest::decode_json(
+        r#"{
+          "id": "neoforge",
+          "inheritsFrom": "1.21.4",
+          "mainClass": "cpw.mods.bootstraplauncher.BootstrapLauncher",
+          "libraries": [{ "name": "org.ow2.asm:asm:9.8" }]
+        }"#,
+    )
+    .expect("child");
+    let mut releases = ReleaseSet::new();
+    releases.insert(parent);
+    releases.insert(child);
+
+    let plan = releases
+        .resolve("neoforge")
+        .expect("resolved release")
+        .build_launch_plan(&LaunchContext::new(
+            mac_host(),
+            LaunchDirectories::under("/launcher"),
+        ))
+        .expect("launch plan");
+
+    assert_eq!(
+        plan.classpath(),
+        [
+            PathBuf::from("/launcher/libraries/org/ow2/asm/asm/9.8/asm-9.8.jar"),
+            PathBuf::from("/launcher/libraries/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3.jar"),
+            PathBuf::from(
+                "/launcher/libraries/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-macos-arm64.jar"
+            ),
+            PathBuf::from("/launcher/versions/neoforge/neoforge.jar"),
+        ]
+    );
+    assert_eq!(plan.required_downloads().len(), 3);
+}

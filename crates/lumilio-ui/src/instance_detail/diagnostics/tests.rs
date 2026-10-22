@@ -1,8 +1,33 @@
 use super::helpers::crash_for_session;
 use super::helpers::files_matching;
 use super::helpers::join_path;
+use super::helpers::output_for_session;
 use super::helpers::parent_path;
 use lumilio_core::FileEntry;
+
+#[test]
+fn the_launch_output_belongs_only_to_the_session_that_wrote_it() {
+    let entry = |name: &str, modified| FileEntry {
+        name: name.into(),
+        is_dir: false,
+        size: 0,
+        modified,
+    };
+    let files = [
+        entry("debug.log", 150),
+        entry(lumilio_core::GAME_OUTPUT_LOG, 700),
+    ];
+    // The last launch began at 100 and installed for ten minutes first.
+    assert_eq!(
+        output_for_session(&files, 100, true).map(|file| file.name.as_str()),
+        Some(lumilio_core::GAME_OUTPUT_LOG)
+    );
+    // An earlier session: the file has been written over since.
+    assert!(output_for_session(&files, 10, false).is_none());
+    // The last launch failed before the game started; the file is older.
+    assert!(output_for_session(&files, 800, true).is_none());
+    assert!(output_for_session(&files[..1], 100, true).is_none());
+}
 
 #[test]
 fn paths_join_and_climb_one_folder_at_a_time() {

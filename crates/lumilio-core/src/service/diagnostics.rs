@@ -438,6 +438,15 @@ impl<T: Transport + Clone> LauncherService<T> {
             {
                 files.push((format!("logs/{}-latest.log", record.id), latest));
             }
+            // What the game printed in its last launch, also when it quit
+            // before writing a log of its own.
+            let output = super::types::GameLogSource::File(crate::GAME_OUTPUT_LOG.to_owned());
+            if let Ok(text) = self.game_log(&record.id, output).await {
+                files.push((
+                    format!("logs/{}-{}", record.id, crate::GAME_OUTPUT_LOG),
+                    text,
+                ));
+            }
         }
         // The launcher's own log, and the one before it once that filled up.
         for path in [

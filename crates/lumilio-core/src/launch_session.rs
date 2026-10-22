@@ -85,8 +85,12 @@ pub enum LaunchFailure {
         message: String,
         problem: Option<LaunchProblem>,
     },
-    /// The game process ended before it finished starting.
-    ExitedEarly { code: Option<i32> },
+    /// The game process ended before it finished starting, with the last
+    /// lines it printed: it may have quit before writing a log of its own.
+    ExitedEarly {
+        code: Option<i32>,
+        output: Vec<String>,
+    },
 }
 
 impl LaunchFailure {
@@ -95,6 +99,17 @@ impl LaunchFailure {
         Self::Step {
             message: message.into(),
             problem: None,
+        }
+    }
+
+    /// The raw cause behind technical details: the step's message, or what
+    /// the game printed before it quit. `None` when the game printed nothing.
+    #[must_use]
+    pub fn technical_detail(&self) -> Option<String> {
+        match self {
+            Self::Step { message, .. } => Some(message.clone()),
+            Self::ExitedEarly { output, .. } if output.is_empty() => None,
+            Self::ExitedEarly { output, .. } => Some(output.join("\n")),
         }
     }
 }
@@ -270,7 +285,10 @@ impl LaunchSession {
                 LaunchSignal::Exited { code } => {
                     self.status = LaunchStatus::Failed {
                         phase: current,
-                        failure: LaunchFailure::ExitedEarly { code },
+                        failure: LaunchFailure::ExitedEarly {
+                            code,
+                            output: Vec::new(),
+                        },
                     };
                 }
                 LaunchSignal::Failed(failure) => {
