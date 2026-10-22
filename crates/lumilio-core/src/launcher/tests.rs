@@ -302,6 +302,97 @@ async fn a_damaged_client_is_repaired_on_the_next_launch() {
 }
 
 #[tokio::test]
+async fn releases_up_to_1_7_2_get_the_assets_folder_their_catalog_lays_out() {
+    // (catalog flags, `${game_assets}` is the by-name copy, game folder gets `resources/`)
+    for (flags, by_name, resources) in [
+        // 1.6 to 1.7.2
+        (r#""virtual": true,"#, true, false),
+        // c0.0.11a to 1.5.2
+        (r#""map_to_resources": true,"#, true, true),
+        ("", false, false),
+    ] {
+        let world = world("");
+        let server = world._dir.path().join("server");
+        let sound = b"pretend sound";
+        let hash = sha1_hex(sound);
+        let object = server.join("objects").join(&hash[..2]).join(&hash);
+        std::fs::create_dir_all(object.parent().unwrap()).unwrap();
+        std::fs::write(&object, sound).unwrap();
+        let catalog = format!(
+            r#"{{{flags} "objects": {{"sound/step.ogg": {{"hash": "{hash}", "size": {}}}}}}}"#,
+            sound.len()
+        );
+        std::fs::write(server.join("legacy.json"), &catalog).unwrap();
+        let manifest_path = server.join("1.0.json");
+        let mut manifest: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&manifest_path).unwrap()).unwrap();
+        manifest["minecraftArguments"] =
+            "--gameDir ${game_directory} --assetsDir ${game_assets}".into();
+        manifest["assetIndex"] = serde_json::json!({
+            "id": "legacy",
+            "url": url::Url::from_file_path(server.join("legacy.json")).unwrap().as_str(),
+            "sha1": sha1_hex(catalog.as_bytes()),
+            "size": catalog.len(),
+        });
+        std::fs::write(&manifest_path, manifest.to_string()).unwrap();
+        let arguments = world._dir.path().join("arguments");
+        std::fs::write(
+            world.root.join("runtimes/jdk-21/bin/java"),
+            format!(
+                "#!/bin/sh\nprintf '%s\\n' \"$@\" > '{}'\necho \"Setting user: x\"\n",
+                arguments.display()
+            ),
+        )
+        .unwrap();
+        let objects = url::Url::from_directory_path(server.join("objects")).unwrap();
+        let chain = SourceChain::new([
+            Arc::new(
+                crate::transfer::PrefixMirror::new(
+                    "https://resources.download.minecraft.net/",
+                    objects.as_str(),
+                    16,
+                )
+                .unwrap(),
+            ) as Arc<dyn crate::transfer::SourceProvider>,
+            Arc::new(OfficialSource),
+        ])
+        .unwrap();
+
+        run_to_end(&Launcher::new(FileTransport, chain), world.request.clone())
+            .await
+            .0
+            .unwrap();
+
+        let arguments = std::fs::read_to_string(&arguments).unwrap();
+        let mut arguments = arguments.lines();
+        arguments.find(|argument| *argument == "--assetsDir");
+        let assets = world.request.directories.assets();
+        let expected = if by_name {
+            assets.join("virtual/legacy")
+        } else {
+            assets.to_owned()
+        };
+        assert_eq!(arguments.next(), expected.to_str(), "{flags}");
+        if by_name {
+            assert_eq!(
+                std::fs::read(expected.join("sound/step.ogg")).unwrap(),
+                sound
+            );
+        }
+        assert_eq!(
+            world
+                .request
+                .directories
+                .game()
+                .join("resources/sound/step.ogg")
+                .is_file(),
+            resources,
+            "{flags}"
+        );
+    }
+}
+
+#[tokio::test]
 async fn progress_reports_item_counts_for_the_download_phase() {
     let world = world("echo \"Setting user: x\"");
     let (_, updates) = run_to_end(&launcher(), world.request.clone()).await;
