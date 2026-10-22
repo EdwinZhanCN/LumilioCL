@@ -51,3 +51,11 @@ just package               # 为当前平台打包到 dist/
 ## 许可证与致谢
 
 以 [AGPL-3.0-only](LICENSE) 发布。部分代码改编自 [Modrinth App](https://github.com/modrinth/code)（GPL-3.0-only）和 [HMCL](https://github.com/HMCL-dev/HMCL)（GPL-3.0-or-later），投影渲染基于 [Nucleation](https://github.com/Schem-at/Nucleation)（MIT）和 [Schematic-Mesher](https://github.com/Schem-at/Schematic-Mesher)（AGPL-3.0-only），来源记在对应文件的注释里。字体、图标和渲染依赖的许可证见 [`ATTRIBUTIONS.md`](ATTRIBUTIONS.md) 与 [`crates/lumilio-ui/assets/ATTRIBUTIONS.md`](crates/lumilio-ui/assets/ATTRIBUTIONS.md)。LumilioCL 没有使用 Modrinth 的品牌。
+
+## 免责声明
+
+1. **非官方产品声明**：**LumilioCL** 是一个独立的第三方开源项目，**并非** Minecraft 官方产品，未获 Mojang Studios、Microsoft 或网易（NetEase）的批准、授权或与其存在任何关联。
+2. **零托管与纯工具属性**：本项目仅作为本地客户端辅助工具（用于管理本地文件、配置 JVM 参数及引导启动）。LumilioCL **不存储、不托管、也不直接分发**任何 Minecraft 游戏本体文件、官方资源或受版权保护的商业资产。所有游戏核心文件均由用户在本地通过客户端直接从 Mojang 官方接口或用户自行选择的第三方公开镜像源获取。
+3. **正版验证与合规使用**：请支持正版游戏。使用本启动器下载或运行游戏需拥有合法的 Minecraft 正版账号，并严格遵守 [Minecraft 最终用户许可协议 (EULA)](https://www.minecraft.net/eula)。开发者不对任何绕过正版验证、修改游戏文件或违反官方条款的行为负责。
+4. **第三方资源与服务免责**：本软件可能支持调用第三方 API 或镜像服务（如 BMCLAPI、CurseForge、Modrinth 等）。这些服务及其提供的内容（包括但不限于 Mod、整合包、材质包、光影）均由各自独立平台及原作者所有并承担责任。LumilioCL 不对第三方服务的可用性、安全性或内容的合法性作任何担保。
+5. **无担保声明**：本软件按“原样”（"AS IS"）提供，不附带任何明示或暗示的担保。在任何情况下，项目贡献者均不对因使用或无法使用本软件而导致的任何数据丢失、账号异常或直接/间接损失承担责任。
