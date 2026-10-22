@@ -184,6 +184,40 @@ async fn a_game_from_another_launcher_becomes_a_new_one_and_the_source_stays_as_
 }
 
 #[tokio::test]
+async fn games_imported_at_once_whose_names_give_one_id_each_get_their_own() {
+    let world = world();
+    // Both names give the id `26-3`, as two versions of one HMCL folder did.
+    let found = |name: &str| {
+        let dir = world._dir.path().join("source").join(name);
+        std::fs::create_dir_all(dir.join("mods")).unwrap();
+        std::fs::write(dir.join("mods/a.jar"), name).unwrap();
+        crate::import_game::FoundGame {
+            name: name.to_owned(),
+            game_version: "26.3".to_owned(),
+            loader: Loader::Vanilla,
+            loader_version: None,
+            game_dir: dir,
+            origin: crate::import_game::GameOrigin::MinecraftFolder,
+        }
+    };
+    let (plain, renamed) = (found("26.3"), found("红石生电优化26.3"));
+    let (a, b) = tokio::join!(
+        world.service.import_game(plain, CancellationToken::new()),
+        world.service.import_game(renamed, CancellationToken::new()),
+    );
+    let (a, b) = (a.unwrap(), b.unwrap());
+    assert_ne!(a.id, b.id);
+    for (record, name) in [(&a, "26.3"), (&b, "红石生电优化26.3")] {
+        assert_eq!(record.name, name);
+        let there = world.service.layout.game(&record.id);
+        assert_eq!(
+            std::fs::read(there.join("mods/a.jar")).unwrap(),
+            name.as_bytes()
+        );
+    }
+}
+
+#[tokio::test]
 async fn a_game_exported_as_a_prism_zip_comes_back_in_through_the_pack_importer() {
     let world = world();
     let record = world

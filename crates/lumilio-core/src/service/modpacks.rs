@@ -28,7 +28,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     ) -> Result<InstanceRecord, ServiceError> {
         let _lease = self.reserve_instance(source_id)?;
         let source = self.instance(source_id).await?;
-        let id = self.store.lock().await.suggest_id(new_name)?;
+        let staged = Staged::claim(&*self.store.lock().await, "copy", new_name)?;
         let task = self
             .begin(
                 TaskCategory::Install,
@@ -45,7 +45,7 @@ impl<T: Transport + Clone> LauncherService<T> {
                 include_worlds,
             });
         let result = self
-            .copy_staged(&source, new_name, &id, include_worlds, cancel)
+            .copy_staged(&source, new_name, staged, include_worlds, cancel)
             .await;
         self.end(task, &result);
         result
@@ -55,11 +55,11 @@ impl<T: Transport + Clone> LauncherService<T> {
         &self,
         source: &InstanceRecord,
         new_name: &str,
-        id: &str,
+        staged: Staged,
         include_worlds: bool,
         cancel: CancellationToken,
     ) -> Result<InstanceRecord, ServiceError> {
-        let staged = Staged::begin(&self.layout, "copy", id)?;
+        let id = staged.id().to_owned();
         let (from, to) = (self.layout.game(&source.id), staged.game_dir());
         let token = cancel.clone();
         let copied = tokio::task::spawn_blocking(move || {
@@ -85,7 +85,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             .lock()
             .await
             .create_as(
-                id,
+                &id,
                 NewInstance {
                     name: new_name.to_owned(),
                     game_version: source.game_version.clone(),

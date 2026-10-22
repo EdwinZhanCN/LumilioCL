@@ -59,8 +59,8 @@ impl<T: Transport + Clone> LauncherService<T> {
                 "the game's loader version could not be told".to_owned(),
             ));
         }
-        let id = self.store.lock().await.suggest_id(&game.name)?;
-        let staged = Staged::begin(&self.layout, "import", &id)?;
+        let staged = Staged::claim(&*self.store.lock().await, "import", &game.name)?;
+        let id = staged.id().to_owned();
         let (source, into, token) = (game.clone(), staged.game_dir(), cancel.clone());
         let copied =
             blocking_value(move || crate::import_game::copy_game_files(&source, &into, &token))
@@ -209,7 +209,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         })
         .await?
         .map_err(backup_failure)?;
-        let (id, name) = {
+        let (staged, name) = {
             let store = self.store.lock().await;
             let base = meta.name.trim();
             let taken = |candidate: &str| {
@@ -230,9 +230,9 @@ impl<T: Transport + Clone> LauncherService<T> {
             } else {
                 base.to_owned()
             };
-            (store.suggest_id(&name)?, name)
+            (Staged::claim(&store, "import", &name)?, name)
         };
-        let staged = Staged::begin(&self.layout, "import", &id)?;
+        let id = staged.id().to_owned();
         let (into, token) = (staged.game_dir(), cancel.clone());
         let extracted = blocking_value(move || crate::backup::restore(&source, &into, &token))
             .await

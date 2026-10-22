@@ -557,7 +557,8 @@ impl InstanceStore {
     }
 
     /// The id a new instance of this name would get right now: unused in the
-    /// library and with no profile folder already on disk.
+    /// library, with no profile folder already on disk and no game being
+    /// staged for it.
     pub fn suggest_id(&self, name: &str) -> Result<String, StoreError> {
         let name = name.trim();
         if name.is_empty() {
@@ -815,6 +816,9 @@ impl InstanceStore {
     }
 
     fn unique_id(&self, name: &str) -> String {
+        // ASCII on purpose: the id names the game's folder, and other
+        // characters in a game path can break launching (HMCL warns before
+        // installing a pack under such a name). The display name keeps them.
         let slug: String = name
             .chars()
             .map(|ch| {
@@ -836,8 +840,12 @@ impl InstanceStore {
         let mut candidate = base.clone();
         let mut counter = 2;
         // A profile folder already on disk (an orphan, or one being deleted)
-        // is somebody's data: a new instance must not adopt it.
-        while self.get(&candidate).is_some() || self.layout.profile(&candidate).exists() {
+        // is somebody's data: a new instance must not adopt it. A staged
+        // game (an import or copy still running) will be published as its id.
+        while self.get(&candidate).is_some()
+            || self.layout.profile(&candidate).exists()
+            || crate::staged::holds(&self.layout, &candidate)
+        {
             candidate = format!("{base}-{counter}");
             counter += 1;
         }
