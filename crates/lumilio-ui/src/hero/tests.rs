@@ -1,16 +1,9 @@
-use super::{
-    FrameSpec, Framing, Landmark, MAX_COLUMNS, MIN_COLUMNS, Scene, grid_layout, rasterize,
-};
+use super::{FrameSpec, Landmark, MAX_COLUMNS, MIN_COLUMNS, Scene, grid_layout, rasterize};
+use crate::hero::dissolve::PageDissolve;
 use crate::hero::raster::Rgb;
 
-const DARK_PAGE: Framing = Framing {
-    fade_rows: 12,
-    page: Rgb::new(0.07, 0.07, 0.08),
-};
-const LIGHT_PAGE: Framing = Framing {
-    fade_rows: 12,
-    page: Rgb::new(1., 1., 1.),
-};
+const DARK_PAGE: PageDissolve = PageDissolve::solid(Rgb::new(0.07, 0.07, 0.08)).bottom(12);
+const LIGHT_PAGE: PageDissolve = PageDissolve::solid(Rgb::new(1., 1., 1.)).bottom(12);
 
 #[test]
 fn grid_layout_tiles_the_canvas_exactly_and_caps_the_cost() {
@@ -203,33 +196,4 @@ fn a_picture_fades_into_the_glass_strip_by_strip() {
         "it only fades"
     );
     assert!(shown[0] > 0.95 && shown[strips - 1] < 0.05);
-}
-
-/// On a translucent page the world's dissolved texels are left out instead of
-/// painted, so it breaks up into the glass; on a solid page all are painted.
-#[test]
-fn the_world_dissolves_into_the_glass_on_a_translucent_page() {
-    let page = Rgb::hex(0xe4e4e1);
-    let mut grid = super::raster::PixelGrid::new(8, 10);
-    for y in 0..10 {
-        for x in 0..8 {
-            grid.set(x, y, Rgb::hex(0x203040));
-        }
-    }
-    grid.fade_bottom(6, page);
-    let band = 10 - 6;
-    let solid = super::painted(&grid, None);
-    let glass = super::painted(&grid, Some((band, page.pack())));
-    let page_in_band = |rects: &[super::raster::Rect]| {
-        rects
-            .iter()
-            .filter(|rect| rect.row >= band && rect.color == page.pack())
-            .count()
-    };
-    assert!(page_in_band(&solid) > 0, "a solid page paints the dissolve");
-    assert_eq!(page_in_band(&glass), 0, "the glass shows through it");
-    assert!(
-        glass.iter().any(|rect| rect.row >= band),
-        "the surviving texels of the band are still painted"
-    );
 }

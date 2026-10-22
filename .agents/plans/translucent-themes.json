@@ -81,7 +81,8 @@
     }
   ],
   "lessonsLearned": [
-    "半透明主题从未真正透出窗口：框架的根节点用 tokens.background（主题没有设置，保持默认的不透明色）铺满窗口，外壳又铺了一层页面色；原有测试只检查主题里的颜色值，没检查实际画到窗口上的颜色，直到实机比较方案时才发现。另外 GPUI 在当前 macOS 上的 blurred 没有模糊。防护：the_root_paints_the_window_with_the_page_colour 检查根节点画出的颜色（去掉 fork 的改动时失败）；a_translucent_page_colour_and_the_window_material_reach_the_window 检查对话框、菜单、通知与导航的颜色不透明（临时让菜单用半透明面板色时失败）。模糊无法在无界面测试里检查，由 T6 实机检查。"
+    "半透明主题从未真正透出窗口：框架的根节点用 tokens.background（主题没有设置，保持默认的不透明色）铺满窗口，外壳又铺了一层页面色；原有测试只检查主题里的颜色值，没检查实际画到窗口上的颜色，直到实机比较方案时才发现。另外 GPUI 在当前 macOS 上的 blurred 没有模糊。防护：the_root_paints_the_window_with_the_page_colour 检查根节点画出的颜色（去掉 fork 的改动时失败）；a_translucent_page_colour_and_the_window_material_reach_the_window 检查对话框、菜单、通知与导航的颜色不透明（临时让菜单用半透明面板色时失败）。模糊无法在无界面测试里检查，由 T6 实机检查。",
+    "实例页头部的封面没有融进玻璃：#63 只让首页世界在半透明页面上不画溶解掉的像素，实例页的封面（cover::corner）另有一份溶解，仍把页面色去掉透明度后不透明地画出，在玻璃主题上成了一块比页面亮、左边和下边有硬边的矩形；测试只覆盖首页。防护：首页世界与封面改用同一个 hero::dissolve::PageDissolve；cover 的 a_corner_cover_dissolves_into_the_glass 检查玻璃上封面溶解掉的像素透明、角上保留画面（临时让 rasterize 不跳过 clears 的像素时失败）。"
   ],
   "roadmap": {
     "enabled": false,

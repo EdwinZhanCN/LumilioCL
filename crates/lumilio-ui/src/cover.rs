@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use gpui::{App, Bounds, Corners, Hsla, Pixels, RenderImage, Window, canvas, prelude::*};
 
+use crate::hero::dissolve::PageDissolve;
 use crate::hero::noise::{bayer4, fbm2, hash2, smoothstep};
 use crate::hero::raster::{PixelGrid, Rgb};
 use crate::home::WorldHint;
@@ -77,7 +78,7 @@ fn palette(loader: Loader, world: WorldHint) -> Palette {
 
 /// Which edges of a cover dissolve into the surface it sits on.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Dissolve {
+pub enum Edges {
     /// The last rows, the way a card or a page cover meets what is below it.
     Bottom,
     /// The leading columns as well as the last rows: a cover anchored to the
@@ -85,18 +86,14 @@ pub enum Dissolve {
     Corner,
 }
 
-/// Rasterises one cover. The last `fade_rows` dissolve into `page`, and a
-/// `Corner` cover also dissolves its leading `fade_cols`.
-#[allow(clippy::too_many_arguments)]
+/// Rasterises one cover, its edges dissolving into the page by `dissolve`.
 pub fn render(
     seed: u32,
     loader: Loader,
     world: WorldHint,
     columns: usize,
     rows: usize,
-    fade_rows: usize,
-    fade_cols: usize,
-    page: Rgb,
+    dissolve: PageDissolve,
 ) -> PixelGrid {
     let colors = palette(loader, world);
     let mut grid = PixelGrid::new(columns, rows);
@@ -151,13 +148,13 @@ pub fn render(
         }
     }
 
-    grid.fade_bottom(fade_rows.min(rows / 2), page);
-    grid.fade_left(fade_cols, page);
+    dissolve.apply(&mut grid);
     grid
 }
 
 /// A cover element filling its parent. `page` is the surface it dissolves
-/// into, so the art meets the card without a hard edge.
+/// into, so the art meets the card without a hard edge; on a translucent
+/// surface the dissolved texels are left to what is behind it.
 pub fn element(
     seed: u32,
     loader: Loader,
@@ -165,7 +162,7 @@ pub fn element(
     page: Hsla,
     fade: Pixels,
 ) -> impl IntoElement {
-    painted(seed, loader, world, page, fade, Dissolve::Bottom)
+    painted(seed, loader, world, page, fade, Edges::Bottom)
 }
 
 /// A header's backdrop: the cover fills its parent, dissolving on the left
@@ -178,7 +175,7 @@ pub fn corner(
     page: Hsla,
     fade: Pixels,
 ) -> impl IntoElement {
-    painted(seed, loader, world, page, fade, Dissolve::Corner)
+    painted(seed, loader, world, page, fade, Edges::Corner)
 }
 
 fn painted(
@@ -187,10 +184,9 @@ fn painted(
     world: WorldHint,
     page: Hsla,
     fade: Pixels,
-    dissolve: Dissolve,
+    edges: Edges,
 ) -> impl IntoElement {
-    let page = page.to_rgb();
-    let page = Rgb::new(page.r, page.g, page.b);
+    let dissolve = PageDissolve::of(page);
     canvas(
         |_, _, _| (),
         move |bounds: Bounds<Pixels>, _, window, _| {
@@ -210,24 +206,25 @@ fn painted(
                 px_w,
                 px_h,
                 (f32::from(fade) * scale).round() as u32,
-                dissolve as u8,
-                Rgb::new(page.r, page.g, page.b).pack(),
+                edges as u8,
+                dissolve.page.pack(),
+                dissolve.translucent,
             );
             let image = cached(key, window, || {
                 let columns = ((width / TEXEL).round() as usize).clamp(8, 200);
                 let texel = width / columns as f32;
                 let rows = ((height / texel).round() as usize).max(4);
                 let fade_rows = (f32::from(fade) / (height / rows as f32)).round() as usize;
-                let fade_cols = match dissolve {
-                    Dissolve::Bottom => 0,
+                let fade_rows = fade_rows.min(rows / 2);
+                let fade_cols = match edges {
+                    Edges::Bottom => 0,
                     // Most of the width, so the left edge is the page and the
                     // text over it never meets busy art.
-                    Dissolve::Corner => columns * 9 / 10,
+                    Edges::Corner => columns * 9 / 10,
                 };
-                let grid = render(
-                    seed, loader, world, columns, rows, fade_rows, fade_cols, page,
-                );
-                let bytes = rasterize(&grid, px_w as usize, px_h as usize);
+                let dissolve = dissolve.bottom(fade_rows).left(fade_cols);
+                let grid = render(seed, loader, world, columns, rows, dissolve);
+                let bytes = rasterize(&grid, dissolve, px_w as usize, px_h as usize);
                 let buffer = image::RgbaImage::from_raw(px_w, px_h, bytes)?;
                 Some(Arc::new(RenderImage::new([image::Frame::new(buffer)])))
             });
@@ -246,13 +243,19 @@ fn painted(
 
 /// A cover rasterised at device resolution: BGRA, as GPUI's sprite atlas
 /// expects, with each texel mapped to a whole block of device pixels so the
-/// art stays crisp instead of being smoothed by the sampler.
-fn rasterize(grid: &PixelGrid, width: usize, height: usize) -> Vec<u8> {
+/// art stays crisp instead of being smoothed by the sampler. The texels
+/// `dissolve` leaves to the glass are transparent.
+fn rasterize(grid: &PixelGrid, dissolve: PageDissolve, width: usize, height: usize) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(width * height * 4);
     for y in 0..height {
         let row = y * grid.height() / height;
         for x in 0..width {
-            let color = grid.get(x * grid.width() / width, row).pack();
+            let column = x * grid.width() / width;
+            let color = grid.get(column, row).pack();
+            if dissolve.clears(column, row, grid.height(), color) {
+                bytes.extend_from_slice(&[0; 4]);
+                continue;
+            }
             bytes.extend_from_slice(&[
                 (color & 0xff) as u8,
                 ((color >> 8) & 0xff) as u8,
@@ -264,7 +267,7 @@ fn rasterize(grid: &PixelGrid, width: usize, height: usize) -> Vec<u8> {
     bytes
 }
 
-type CoverKey = (u32, u8, u8, u32, u32, u32, u8, u32);
+type CoverKey = (u32, u8, u8, u32, u32, u32, u8, u32, bool);
 
 thread_local! {
     /// Covers already uploaded, so a repaint reuses the same atlas entry
@@ -323,7 +326,7 @@ mod tests {
 
     #[gpui::test]
     fn a_game_starting_empties_the_covers(cx: &mut gpui::TestAppContext) {
-        let key = (1, 0, 0, 2, 2, 0, 0, 0);
+        let key = (1, 0, 0, 2, 2, 0, 0, 0, false);
         let picture = image::RgbaImage::from_pixel(2, 2, image::Rgba([0, 0, 0, 255]));
         let cover = Arc::new(RenderImage::new([image::Frame::new(picture)]));
         CACHE.with(|cache| cache.borrow_mut().insert(key, cover));
@@ -334,7 +337,8 @@ mod tests {
 
     fn cover(seed: u32, loader: Loader) -> Vec<u32> {
         let page = Rgb::hex(0x101010);
-        let grid = render(seed, loader, WorldHint::Overworld, 40, 20, 6, 0, page);
+        let dissolve = PageDissolve::solid(page).bottom(6);
+        let grid = render(seed, loader, WorldHint::Overworld, 40, 20, dissolve);
         (0..20)
             .flat_map(|y| (0..40).map(move |x| (x, y)))
             .map(|(x, y)| grid.get(x, y).pack())
@@ -353,7 +357,7 @@ mod tests {
         let mut grid = PixelGrid::new(2, 1);
         grid.set(0, 0, Rgb::hex(0x102030));
         grid.set(1, 0, Rgb::hex(0xa0b0c0));
-        let bytes = rasterize(&grid, 4, 2);
+        let bytes = rasterize(&grid, PageDissolve::solid(Rgb::BLACK), 4, 2);
         assert_eq!(bytes.len(), 4 * 2 * 4);
         // Blue, green, red, opaque: the first texel covers two device pixels.
         assert_eq!(&bytes[0..4], &[0x30, 0x20, 0x10, 0xff]);
@@ -365,7 +369,8 @@ mod tests {
     #[test]
     fn the_last_row_is_exactly_the_page() {
         let page = Rgb::hex(0x101010);
-        let grid = render(9, Loader::Quilt, WorldHint::Nether, 40, 20, 6, 0, page);
+        let dissolve = PageDissolve::solid(page).bottom(6);
+        let grid = render(9, Loader::Quilt, WorldHint::Nether, 40, 20, dissolve);
         for x in 0..40 {
             assert_eq!(grid.get(x, 19).pack(), page.pack());
         }
@@ -374,9 +379,35 @@ mod tests {
     #[test]
     fn a_corner_cover_also_ends_on_the_page_at_its_leading_edge() {
         let page = Rgb::hex(0x101010);
-        let grid = render(9, Loader::Quilt, WorldHint::Nether, 40, 20, 6, 36, page);
+        let dissolve = PageDissolve::solid(page).bottom(6).left(36);
+        let grid = render(9, Loader::Quilt, WorldHint::Nether, 40, 20, dissolve);
         for y in 0..20 {
             assert_eq!(grid.get(0, y).pack(), page.pack());
         }
+    }
+
+    /// The Instance header's cover on a translucent page: the texels that
+    /// dissolved into the page are transparent, so the glass shows through
+    /// instead of a block of the page colour; the corner keeps its art. On a
+    /// solid page every texel is painted.
+    #[test]
+    fn a_corner_cover_dissolves_into_the_glass() {
+        let alphas = |page: Hsla| {
+            let dissolve = PageDissolve::of(page).bottom(6).left(36);
+            let grid = render(9, Loader::Fabric, WorldHint::Overworld, 40, 20, dissolve);
+            rasterize(&grid, dissolve, 40, 20)
+                .chunks(4)
+                .map(|pixel| pixel[3])
+                .collect::<Vec<_>>()
+        };
+        let page = gpui::hsla(0.17, 0.04, 0.89, 1.);
+        assert!(alphas(page).iter().all(|&alpha| alpha == 0xff));
+        let glass = alphas(page.opacity(0.75));
+        assert!((0..20).all(|y| glass[y * 40] == 0), "the leading edge");
+        assert!((0..40).all(|x| glass[19 * 40 + x] == 0), "the last row");
+        assert!(
+            (0..14).all(|y| (36..40).all(|x| glass[y * 40 + x] == 0xff)),
+            "the corner keeps its art"
+        );
     }
 }

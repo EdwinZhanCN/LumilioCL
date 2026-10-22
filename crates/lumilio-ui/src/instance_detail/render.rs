@@ -172,7 +172,9 @@ impl Render for InstanceDetailView {
         };
         // The cover is the header's backdrop: anchored to the top-right under
         // the page actions and dissolving left and down, so it costs no height
-        // and never sits behind the title (design language §6, §12).
+        // and never sits behind the title (design language §6, §12). It
+        // dissolves like Home's world: into the page, or into the glass of a
+        // translucent page (`hero::dissolve::PageDissolve`).
         let cover = self.record.as_ref().map(|record| {
             div()
                 .absolute()
