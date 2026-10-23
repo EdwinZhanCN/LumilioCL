@@ -121,7 +121,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         let chain = self.chain().await?;
         let game_version = match game_version {
             Some(version) => version.to_owned(),
-            None => VersionCatalog::fetch(&self.transport, &chain)
+            None => VersionCatalog::fetch(&self.fetcher(), &chain)
                 .await
                 .map_err(|error| ServiceError::Remote(error.to_string()))?
                 .latest_release()
@@ -135,7 +135,7 @@ impl<T: Transport + Clone> LauncherService<T> {
                 let url = loader::versions_url(loader, &game_version)
                     .ok_or_else(|| ServiceError::Remote("no loader source".to_owned()))?;
                 let sources = chain.candidates(&url);
-                let versions = loader::fetch_versions(&self.transport, &sources)
+                let versions = loader::fetch_versions(&self.fetcher(), &sources)
                     .await
                     .map_err(|error| ServiceError::Remote(error.to_string()))?;
                 let chosen = loader::recommended(&versions).ok_or_else(|| {
@@ -184,7 +184,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// replaced by a guess.
     pub async fn game_versions(&self) -> Result<Vec<crate::catalog::CatalogEntry>, ServiceError> {
         let chain = self.chain().await?;
-        let catalog = VersionCatalog::fetch(&self.transport, &chain)
+        let catalog = VersionCatalog::fetch(&self.fetcher(), &chain)
             .await
             .map_err(|error| ServiceError::Remote(error.to_string()))?;
         Ok(catalog.entries().to_vec())
@@ -205,13 +205,13 @@ impl<T: Transport + Clone> LauncherService<T> {
             Loader::Fabric | Loader::Quilt => {
                 let url = loader::versions_url(loader, game_version)
                     .ok_or_else(|| ServiceError::Remote("no loader source".to_owned()))?;
-                loader::fetch_versions(&self.transport, &chain.candidates(&url))
+                loader::fetch_versions(&self.fetcher(), &chain.candidates(&url))
                     .await
                     .map_err(decode)
             }
             Loader::Forge => {
                 let metadata = fetch_decoded(
-                    &self.transport,
+                    &self.fetcher(),
                     &chain.candidates(forge_meta::FORGE_METADATA_URL),
                     |bytes| {
                         forge_meta::forge_versions(&bytes, None, game_version)?;
@@ -222,7 +222,7 @@ impl<T: Transport + Clone> LauncherService<T> {
                 .map_err(remote)?;
                 // Promotions only mark the recommended build; the list stands without them.
                 let promotions = fetch_decoded(
-                    &self.transport,
+                    &self.fetcher(),
                     &chain.candidates(forge_meta::FORGE_PROMOTIONS_URL),
                     |bytes| {
                         forge_meta::forge_versions(&metadata, Some(&bytes), game_version)?;
@@ -236,7 +236,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             }
             Loader::NeoForge => {
                 let modern = fetch_decoded(
-                    &self.transport,
+                    &self.fetcher(),
                     &chain.candidates(forge_meta::NEOFORGE_VERSIONS_URL),
                     |bytes| {
                         forge_meta::neoforge_versions(&bytes, None, game_version)?;
@@ -248,7 +248,7 @@ impl<T: Transport + Clone> LauncherService<T> {
                 let legacy = if game_version == forge_meta::NEOFORGE_LEGACY_GAME {
                     Some(
                         fetch_decoded(
-                            &self.transport,
+                            &self.fetcher(),
                             &chain.candidates(forge_meta::NEOFORGE_LEGACY_VERSIONS_URL),
                             |bytes| {
                                 forge_meta::neoforge_versions(&modern, Some(&bytes), game_version)?;

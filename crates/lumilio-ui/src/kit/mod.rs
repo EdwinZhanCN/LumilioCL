@@ -27,7 +27,10 @@ pub use self::frame::{
 };
 pub use self::item::{Item, Tone, count_of, cover_tile, reading, signal, signal_bars, status};
 pub use self::menu::{MenuAction, MenuEntry, PageActions, more_menu, small_more_menu, with_menu};
-pub use self::meter::{Reading, lit_bars, progress, reading_digits, record};
+pub use self::meter::{
+    ROW_METER_BARS, Reading, TransferDisplay, connection_cells, lit_bars, reading_digits, record,
+    row_meter, speed_digits, transfer_display,
+};
 pub use self::motd::{motd_lines, motd_text};
 pub use self::rich::rich_text;
 pub use self::rows::{
@@ -44,6 +47,8 @@ use std::rc::Rc;
 pub enum ViewIntent {
     LibraryTab(usize),
     ActivityTab(usize),
+    /// Show or hide what this running task downloads.
+    TaskDetail(u64),
     /// Choose one of a small set, keyed by (group, index).
     Choose(u8, usize),
 }

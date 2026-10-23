@@ -20,7 +20,7 @@ use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
 use crate::fetch::{fetch_decoded, fetch_document};
-use crate::transfer::{SourceChain, Transport};
+use crate::transfer::{SourceChain, TransferEngine, Transport};
 
 /// The index of the latest build.
 pub const LATEST_URL: &str = "https://authlib-injector.yushi.moe/artifact/latest.json";
@@ -110,10 +110,10 @@ pub fn installed(dir: &Path) -> Option<Injector> {
 }
 
 async fn latest(
-    transport: &(impl Transport + ?Sized),
+    engine: &TransferEngine<impl Transport>,
     chain: &SourceChain,
 ) -> Result<LatestWire, InjectorError> {
-    fetch_decoded(transport, &chain.candidates(LATEST_URL), |bytes| {
+    fetch_decoded(engine, &chain.candidates(LATEST_URL), |bytes| {
         let latest: LatestWire = serde_json::from_slice(&bytes).map_err(|error| {
             InjectorError::Unavailable(format!("the index is not understood: {error}"))
         })?;
@@ -131,11 +131,11 @@ async fn latest(
 /// Downloads the latest build into `dir`, unless `dir` already has it or a
 /// newer one.
 async fn update(
-    transport: &(impl Transport + ?Sized),
+    engine: &TransferEngine<impl Transport>,
     chain: &SourceChain,
     dir: &Path,
 ) -> Result<Injector, InjectorError> {
-    let latest = latest(transport, chain).await?;
+    let latest = latest(engine, chain).await?;
     if let Some(local) = installed(dir)
         && local.build_number >= latest.build_number
     {
@@ -145,7 +145,7 @@ async fn update(
         .checksums
         .get("sha256")
         .ok_or_else(|| InjectorError::Unavailable("the index has no checksum".to_owned()))?;
-    let bytes = fetch_document(transport, &chain.candidates(&latest.download_url))
+    let bytes = fetch_document(engine, &chain.candidates(&latest.download_url))
         .await
         .map_err(|error| InjectorError::Unavailable(error.to_string()))?;
     if bytes.len() > JAR_LIMIT {
@@ -181,24 +181,24 @@ async fn update(
 
 /// The jar to launch with: the one on disk, or the latest, downloaded now.
 pub async fn ensure(
-    transport: &(impl Transport + ?Sized),
+    engine: &TransferEngine<impl Transport>,
     chain: &SourceChain,
     dir: &Path,
 ) -> Result<Injector, InjectorError> {
     match installed(dir) {
         Some(local) => Ok(local),
-        None => update(transport, chain, dir).await,
+        None => update(engine, chain, dir).await,
     }
 }
 
 /// Looks for a newer build and keeps it. A failure changes nothing: the jar on
 /// disk keeps working.
 pub async fn refresh(
-    transport: &(impl Transport + ?Sized),
+    engine: &TransferEngine<impl Transport>,
     chain: &SourceChain,
     dir: &Path,
 ) -> Result<Injector, InjectorError> {
-    update(transport, chain, dir).await
+    update(engine, chain, dir).await
 }
 
 /// The JVM arguments that load the agent against `api_root`; `prefetched` is

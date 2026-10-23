@@ -96,38 +96,56 @@ impl Drop for TaskLease<'_> {
     }
 }
 
-/// Sums the bytes of all the engine's transfers into one task's progress.
-/// A transfer of unknown length makes the whole total unknown (shown as
+/// What a task's progress counts while its transfers are watched.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum Meter {
+    /// The bytes of all its transfers, summed.
+    Bytes,
+    /// Something else (files, from the launcher's signals): only what it
+    /// downloads is recorded.
+    Files,
+}
+
+/// Records what task `task` downloads from the events of its engines. With
+/// [`Meter::Bytes`] the bytes of all its transfers are also its progress; a
+/// transfer of unknown length makes the whole total unknown (shown as
 /// "working", not as a percentage).
-pub(super) async fn meter_bytes(
+pub(super) async fn watch_transfers(
     board: &StdMutex<TaskBoard>,
     task: u64,
     mut events: tokio::sync::broadcast::Receiver<crate::transfer::TransferEvent>,
+    meter: Meter,
 ) {
     use crate::transfer::TransferEvent;
     use tokio::sync::broadcast::error::RecvError;
     let mut seen: BTreeMap<String, (u64, Option<u64>)> = BTreeMap::new();
     loop {
-        match events.recv().await {
-            Ok(TransferEvent::Progress {
+        let event = match events.recv().await {
+            Ok(event) => event,
+            Err(RecvError::Lagged(_)) => continue,
+            Err(RecvError::Closed) => return,
+        };
+        let mut board = board
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        board.record_transfer(task, &event);
+        if let (
+            Meter::Bytes,
+            TransferEvent::Progress {
                 id,
                 completed,
                 total,
-            }) => {
-                seen.insert(id, (completed, total));
-                let done: u64 = seen.values().map(|(done, _)| *done).sum();
-                let total = seen
-                    .values()
-                    .map(|(_, total)| *total)
-                    .try_fold(0_u64, |sum, total| total.map(|total| sum + total))
-                    .unwrap_or(0);
-                board
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .progress_bytes(task, done, total);
-            }
-            Ok(_) | Err(RecvError::Lagged(_)) => {}
-            Err(RecvError::Closed) => return,
+            },
+        ) = (meter, event)
+        {
+            seen.insert(id, (completed, total));
+            let done: u64 = seen.values().map(|(done, _)| *done).sum();
+            let total = seen
+                .values()
+                .map(|(_, total)| *total)
+                .try_fold(0_u64, |sum, total| total.map(|total| sum + total))
+                .unwrap_or(0);
+            board.progress_bytes(task, done, total);
         }
     }
 }

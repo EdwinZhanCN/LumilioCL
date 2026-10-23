@@ -174,7 +174,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         }
         let chain = self.chain().await.map_err(|_| BundleUnreachable::Offline)?;
         store
-            .fetch_index(&self.transport, &chain)
+            .fetch_index(&self.fetcher(), &chain)
             .await
             .map_err(|error| match error {
                 SchematicAssetsError::NotServed(_) => BundleUnreachable::Unavailable,
@@ -288,7 +288,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             return false;
         };
         store
-            .fetch_small(&self.transport, &chain, file)
+            .fetch_small(&self.fetcher(), &chain, file)
             .await
             .is_ok()
     }

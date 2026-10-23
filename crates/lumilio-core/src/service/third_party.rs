@@ -260,9 +260,9 @@ impl<T: Transport + Clone> LauncherService<T> {
         if self.injector_checked.swap(true, Ordering::SeqCst) {
             return;
         }
-        let (transport, chain, dir) = (self.transport.clone(), chain.clone(), dir.to_owned());
+        let (engine, chain, dir) = (self.fetcher(), chain.clone(), dir.to_owned());
         tokio::spawn(async move {
-            let _ = injector::refresh(&transport, &chain, &dir).await;
+            let _ = injector::refresh(&engine, &chain, &dir).await;
         });
     }
 
@@ -339,7 +339,7 @@ impl<T: Transport + Clone> LauncherService<T> {
                     .map_err(ServiceError::from)
             },
             async {
-                injector::ensure(&self.transport, &chain, &dir)
+                injector::ensure(&self.fetcher(), &chain, &dir)
                     .await
                     .map_err(ServiceError::from)
             },

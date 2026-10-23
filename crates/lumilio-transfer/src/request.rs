@@ -76,7 +76,7 @@ pub enum ContentDigest {
 
 impl ContentDigest {
     /// Checks the hex length for the algorithm and lowercases it.
-    fn parse(digest: String, sha256: bool) -> Result<Self, TransferError> {
+    pub(super) fn parse(digest: String, sha256: bool) -> Result<Self, TransferError> {
         let (length, name) = if sha256 {
             (64, "SHA-256")
         } else {
@@ -332,8 +332,24 @@ impl Display for TransferError {
             ),
             Self::AllSourcesFailed { id, failures } => {
                 write!(formatter, "all sources failed for {id}")?;
-                if let Some(last) = failures.last() {
-                    write!(formatter, ": {} ({})", last.source, last.reason)?;
+                // Each source once, with the reason its last attempt gave.
+                let mut sources: Vec<&SourceFailure> = Vec::new();
+                for failure in failures {
+                    match sources
+                        .iter_mut()
+                        .find(|seen| seen.source == failure.source)
+                    {
+                        Some(seen) => *seen = failure,
+                        None => sources.push(failure),
+                    }
+                }
+                for (index, failure) in sources.iter().enumerate() {
+                    let separator = if index == 0 { ": " } else { "; " };
+                    write!(
+                        formatter,
+                        "{separator}{} ({})",
+                        failure.source, failure.reason
+                    )?;
                 }
                 Ok(())
             }
@@ -349,15 +365,33 @@ pub enum TransferEvent {
         id: String,
         destination: PathBuf,
     },
+    /// An attempt at `source` began; `attempt` counts from 1 per source.
+    Downloading {
+        id: String,
+        source: String,
+        attempt: usize,
+    },
     Progress {
         id: String,
         completed: u64,
         total: Option<u64>,
     },
+    /// The file now downloads over this many connections at once.
+    Connections {
+        id: String,
+        count: usize,
+    },
     Retrying {
         id: String,
         source: String,
         next_attempt: usize,
+    },
+    /// `source` was given up after `reason`; `next` is the one tried now.
+    SourceFailed {
+        id: String,
+        source: String,
+        reason: String,
+        next: Option<String>,
     },
     Completed {
         id: String,

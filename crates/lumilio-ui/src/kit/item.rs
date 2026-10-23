@@ -168,6 +168,7 @@ pub struct Item {
     tags: Vec<(SharedString, TagKind)>,
     note: Option<SharedString>,
     aside: Option<AnyElement>,
+    meter: Option<AnyElement>,
     readings: Vec<AnyElement>,
     actions: Option<AnyElement>,
 }
@@ -181,9 +182,17 @@ impl Item {
             tags: Vec::new(),
             note: None,
             aside: None,
+            meter: None,
             readings: Vec::new(),
             actions: None,
         }
+    }
+
+    /// How far the item's work got ([`super::row_meter`]), under its name
+    /// and facts.
+    pub fn meter(mut self, meter: impl IntoElement) -> Self {
+        self.meter = Some(meter.into_any_element());
+        self
     }
 
     /// A cover or icon before the name.
@@ -273,7 +282,15 @@ impl Item {
                         .child(note)
                 }))
         });
-        let name = v_flex().min_w_0().gap(px(4.)).child(head).children(facts);
+        let name = v_flex()
+            .min_w_0()
+            .gap(px(4.))
+            .child(head)
+            .children(facts)
+            .children(
+                self.meter
+                    .map(|meter| div().w_full().pt(px(4.)).child(meter)),
+            );
         // The name keeps a fixed width so asides line up from row to row;
         // when the two do not fit side by side the aside wraps under it.
         let middle = match self.aside {

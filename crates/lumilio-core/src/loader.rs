@@ -9,7 +9,7 @@ use url::Url;
 
 use crate::fetch::{FetchError, fetch_decoded};
 use crate::instance::Loader;
-use crate::transfer::Transport;
+use crate::transfer::{TransferEngine, Transport};
 
 /// Loaders the launcher can install and start.
 pub const LAUNCHABLE_LOADERS: [Loader; 5] = [
@@ -117,11 +117,11 @@ pub fn decode_versions(bytes: &[u8]) -> Result<Vec<LoaderVersion>, LoaderError> 
 }
 
 /// The loader versions available for `game_version`.
-pub async fn fetch_versions<T: Transport + ?Sized>(
-    transport: &T,
+pub async fn fetch_versions<T: Transport>(
+    engine: &TransferEngine<T>,
     sources: &[String],
 ) -> Result<Vec<LoaderVersion>, LoaderError> {
-    Ok(fetch_decoded(transport, sources, |bytes| decode_versions(&bytes)).await?)
+    Ok(fetch_decoded(engine, sources, |bytes| decode_versions(&bytes)).await?)
 }
 
 /// The newest stable loader version, else the newest of any kind.

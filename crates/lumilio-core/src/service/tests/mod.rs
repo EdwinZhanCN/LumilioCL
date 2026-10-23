@@ -51,6 +51,8 @@ type Replies = BTreeMap<String, std::collections::VecDeque<(u16, String, Vec<(St
 struct Scripted {
     answers: Arc<StdMutex<Vec<Answer>>>,
     cancel_on_file: Arc<StdMutex<Option<CancellationToken>>>,
+    /// When set, the next `file:` request never answers.
+    stall_next_file: Arc<StdMutex<bool>>,
     /// When set, answers that exist are held until this is notified.
     gate: Arc<StdMutex<Option<Arc<tokio::sync::Notify>>>>,
     /// Answers to `send`, by exact address; the last one repeats.
@@ -141,6 +143,10 @@ impl Transport for Scripted {
             && let Some(cancel) = self.cancel_on_file.lock().unwrap().take()
         {
             cancel.cancel();
+            return Box::pin(std::future::pending());
+        }
+        if source.starts_with("file:") && std::mem::take(&mut *self.stall_next_file.lock().unwrap())
+        {
             return Box::pin(std::future::pending());
         }
         let found = self

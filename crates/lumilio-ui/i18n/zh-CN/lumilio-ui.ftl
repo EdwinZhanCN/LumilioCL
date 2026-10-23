@@ -574,8 +574,6 @@ account-remove-failed = 没能移除账户
 ## 动态
 
 # 任务进行速度，例如「3.2 MB/秒」。
-activity-rate-bytes = { $rate }/秒
-activity-rate-files = { $rate } 个文件/秒
 activity-eta-under-minute = 不到 1 分钟
 activity-eta-minutes = 约 { $count } 分钟
 activity-eta-hours-minutes = 约 { $hours } 小时 { $minutes } 分钟
@@ -585,6 +583,23 @@ activity-status-running = 进行中
 activity-status-done = 已完成
 activity-status-failed = 失败
 activity-status-cancelled = 已取消
+activity-status-paused = 已暂停
+activity-status-downloading = 下载中
+activity-status-waiting = 等待连接
+activity-amount-files = { $done } / { $total } 个文件
+activity-pause = 暂停
+activity-resume = 继续
+activity-show-files = 详情
+activity-hide-files = 收起
+activity-file-attempt = 第 { $attempt } 次尝试
+activity-files-more = 还有 { $count } 个文件
+activity-files-queued = 另有 { $count } 个在排队
+activity-files-none = 现在没有正在下载的文件
+activity-retries = 已重试 { $count } 次
+activity-source-switched = { $from } 失败，已改用 { $to }
+activity-source-exhausted = { $from } 失败，没有别的来源了
+activity-traffic-rate = 速度
+activity-traffic-connections = 连接
 activity-empty-title = 还没有动态
 activity-empty-help = 下载和安装会出现在这里
 activity-tab-empty = 这一类里没有动态

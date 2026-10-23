@@ -90,7 +90,7 @@ async fn local_files_load_with_their_model_and_a_bad_file_says_so() {
         cape: Some(cape),
     };
     assert!(check(&choice).is_ok());
-    let loaded = load(&Down, &choice, "Edwin").await.unwrap();
+    let loaded = load(&net(&Arc::new(Down)), &choice, "Edwin").await.unwrap();
     assert_eq!(loaded.model, SkinModel::Slim);
     assert!(loaded.skin.is_some() && loaded.cape.is_some());
 
@@ -102,7 +102,7 @@ async fn local_files_load_with_their_model_and_a_bad_file_says_so() {
         cape: None,
     };
     assert!(matches!(check(&bad), Err(SkinError::Picture(_))));
-    assert!(load(&Down, &bad, "Edwin").await.is_err());
+    assert!(load(&net(&Arc::new(Down)), &bad, "Edwin").await.is_err());
     let missing = SkinChoice::Local {
         model: SkinModel::Wide,
         skin: Some(dir.path().join("gone.png")),
@@ -144,9 +144,14 @@ impl Transport for Site {
     }
 }
 
+/// An engine of its own over `site`, which the test keeps to look at.
+fn net<T: Transport>(site: &Arc<T>) -> TransferEngine<Arc<T>> {
+    TransferEngine::new(site.clone(), 1).unwrap()
+}
+
 #[tokio::test]
 async fn a_csl_profile_gives_the_model_of_the_skin_it_has_and_its_cape() {
-    let site = Site::default();
+    let site = Arc::new(Site::default());
     let api = "https://skin.example/csl";
     site.serve(
         &format!("{api}/Edwin.json"),
@@ -160,7 +165,7 @@ async fn a_csl_profile_gives_the_model_of_the_skin_it_has_and_its_cape() {
     let choice = SkinChoice::Csl {
         api: format!("{api}/"),
     };
-    let loaded = load(&site, &choice, "Edwin").await.unwrap();
+    let loaded = load(&net(&site), &choice, "Edwin").await.unwrap();
     // Slim wins when the profile has both, as in HMCL.
     assert_eq!(loaded.model, SkinModel::Slim);
     assert_eq!(
@@ -182,7 +187,7 @@ async fn a_csl_profile_gives_the_model_of_the_skin_it_has_and_its_cape() {
 
 #[tokio::test]
 async fn csl_profiles_without_a_name_or_with_odd_answers_are_handled() {
-    let site = Site::default();
+    let site = Arc::new(Site::default());
     let api = "https://skin.example/csl";
     // No such player: the site answers a profile with no name.
     site.serve(
@@ -193,7 +198,7 @@ async fn csl_profiles_without_a_name_or_with_odd_answers_are_handled() {
         api: api.to_owned(),
     };
     assert_eq!(
-        load(&site, &choice, "Nobody").await.unwrap(),
+        load(&net(&site), &choice, "Nobody").await.unwrap(),
         LoadedSkin::default()
     );
 
@@ -203,7 +208,7 @@ async fn csl_profiles_without_a_name_or_with_odd_answers_are_handled() {
         br#"{"username":"Old","skin":"abc"}"#.to_vec(),
     );
     site.serve(&format!("{api}/textures/abc"), png(64, 32, [5, 5, 5, 255]));
-    let old = load(&site, &choice, "Old").await.unwrap();
+    let old = load(&net(&site), &choice, "Old").await.unwrap();
     assert_eq!(old.model, SkinModel::Wide);
     assert!(old.skin.is_some() && old.cape.is_none());
 
@@ -213,23 +218,23 @@ async fn csl_profiles_without_a_name_or_with_odd_answers_are_handled() {
         br#"{"username":"Evil","textures":{"default":"../../x"}}"#.to_vec(),
     );
     assert!(matches!(
-        load(&site, &choice, "Evil").await,
+        load(&net(&site), &choice, "Evil").await,
         Err(SkinError::Malformed(_))
     ));
     site.serve(&format!("{api}/Junk.json"), b"<html>".to_vec());
     assert!(matches!(
-        load(&site, &choice, "Junk").await,
+        load(&net(&site), &choice, "Junk").await,
         Err(SkinError::Malformed(_))
     ));
     assert!(matches!(
-        load(&Down, &choice, "Edwin").await,
+        load(&net(&Arc::new(Down)), &choice, "Edwin").await,
         Err(SkinError::Network(_))
     ));
 }
 
 #[tokio::test]
 async fn littleskin_uses_its_own_csl_address() {
-    let site = Site::default();
+    let site = Arc::new(Site::default());
     site.serve(
         "https://littleskin.cn/csl/Edwin.json",
         br#"{"username":"Edwin","textures":{"default":"abc"}}"#.to_vec(),
@@ -238,7 +243,9 @@ async fn littleskin_uses_its_own_csl_address() {
         "https://littleskin.cn/csl/textures/abc",
         png(64, 64, [7, 7, 7, 255]),
     );
-    let loaded = load(&site, &SkinChoice::LittleSkin, "Edwin").await.unwrap();
+    let loaded = load(&net(&site), &SkinChoice::LittleSkin, "Edwin")
+        .await
+        .unwrap();
     assert!(loaded.skin.is_some());
 }
 

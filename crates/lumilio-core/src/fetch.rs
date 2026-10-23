@@ -1,14 +1,18 @@
-//! Small-document retrieval over a [`Transport`] with ordered source fallback.
+//! Small-document retrieval with ordered source fallback.
 //!
 //! Metadata documents (version catalogs, API answers) are small and are read
-//! whole; large files go through the transfer engine instead.
+//! whole, through the transfer engine's memory target: each takes one of the
+//! shared connections and is asked again when its source is busy, but no
+//! task shows it (plan download-engine T4).
 
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
+use std::sync::LazyLock;
+use std::time::Duration;
 
 use futures_util::StreamExt;
 
-use crate::transfer::Transport;
+use crate::transfer::{RetryPolicy, TransferEngine, Transport};
 
 #[cfg(test)]
 mod decoded_tests;
@@ -16,6 +20,13 @@ mod decoded_tests;
 /// Upper bound for a document read whole, so a misbehaving source cannot
 /// exhaust memory.
 pub const DOCUMENT_LIMIT: usize = 32 * 1024 * 1024;
+
+/// A document source that is busy or out of reach is asked once more before
+/// the next source; a long wait would only delay that fallback.
+static DOCUMENT_RETRY: LazyLock<RetryPolicy> = LazyLock::new(|| {
+    RetryPolicy::fixed(2, Duration::from_millis(250), Duration::from_millis(250))
+        .expect("two attempts with a fixed delay is a valid policy")
+});
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum FetchError {
@@ -58,23 +69,26 @@ impl Error for FetchError {}
 
 /// Reads the first source that answers with a 2xx status and a body within
 /// [`DOCUMENT_LIMIT`].
-pub async fn fetch_document<T, S>(transport: &T, sources: &[S]) -> Result<Vec<u8>, FetchError>
+pub async fn fetch_document<T, S>(
+    engine: &TransferEngine<T>,
+    sources: &[S],
+) -> Result<Vec<u8>, FetchError>
 where
-    T: Transport + ?Sized,
+    T: Transport,
     S: AsRef<str>,
 {
-    fetch_decoded(transport, sources, Ok::<_, std::convert::Infallible>).await
+    fetch_decoded(engine, sources, Ok::<_, std::convert::Infallible>).await
 }
 
 /// Decode each candidate before accepting it. Unusable metadata is a source
 /// failure even when the response has a 2xx status.
 pub async fn fetch_decoded<T, S, V, E>(
-    transport: &T,
+    engine: &TransferEngine<T>,
     sources: &[S],
     mut decode: impl FnMut(Vec<u8>) -> Result<V, E>,
 ) -> Result<V, FetchError>
 where
-    T: Transport + ?Sized,
+    T: Transport,
     S: AsRef<str>,
     E: Display,
 {
@@ -84,7 +98,7 @@ where
     let (mut attempts, mut answered) = (Vec::new(), false);
     for source in sources {
         let source = source.as_ref();
-        match read_one(transport, source).await {
+        match engine.fetch(source, DOCUMENT_LIMIT, &DOCUMENT_RETRY).await {
             Ok(bytes) => match decode(bytes) {
                 Ok(value) => return Ok(value),
                 Err(error) => {
@@ -93,8 +107,8 @@ where
                 }
             },
             Err(failure) => {
-                answered |= failure.answered;
-                attempts.push((source.to_owned(), failure.reason));
+                answered |= failure.answered();
+                attempts.push((source.to_owned(), failure.reason().to_owned()));
             }
         }
     }
@@ -147,14 +161,6 @@ impl Failure {
     }
 }
 
-async fn read_one<T: Transport + ?Sized>(transport: &T, source: &str) -> Result<Vec<u8>, Failure> {
-    let response = transport
-        .get(source)
-        .await
-        .map_err(|error| Failure::unreached(error.to_string()))?;
-    read_response(response).await
-}
-
 async fn read_response(response: crate::transfer::TransportResponse) -> Result<Vec<u8>, Failure> {
     let status = response.status();
     if !(200..300).contains(&status) {
@@ -194,17 +200,22 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    /// Unreachable sources are asked twice; the paused clock skips the wait.
+    fn scripted() -> TransferEngine<Scripted> {
+        TransferEngine::new(Scripted, 1).unwrap()
+    }
+
+    #[tokio::test(start_paused = true)]
     async fn falls_through_failing_sources_to_the_first_answer() {
-        let bytes = fetch_document(&Scripted, &["down://a", "gone://a", "ok://a"])
+        let bytes = fetch_document(&scripted(), &["down://a", "gone://a", "ok://a"])
             .await
             .unwrap();
         assert_eq!(bytes, b"hello");
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn reports_every_attempt_when_all_fail() {
-        let error = fetch_document(&Scripted, &["down://a", "gone://a"])
+        let error = fetch_document(&scripted(), &["down://a", "gone://a"])
             .await
             .unwrap_err();
         let FetchError::Exhausted { attempts, .. } = error else {
@@ -217,27 +228,27 @@ mod tests {
     /// A source that answers without the document is told apart from one
     /// that cannot be reached: the first means it is not there, the second
     /// that the network or the host is down.
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn an_answer_without_the_document_is_not_being_offline() {
-        let gone = fetch_document(&Scripted, &["down://a", "gone://a"])
+        let gone = fetch_document(&scripted(), &["down://a", "gone://a"])
             .await
             .unwrap_err();
         assert!(gone.answered());
-        let down = fetch_document(&Scripted, &["down://a", "down://b"])
+        let down = fetch_document(&scripted(), &["down://a", "down://b"])
             .await
             .unwrap_err();
         assert!(!down.answered());
-        let undecodable = fetch_decoded(&Scripted, &["ok://a"], |_| Err::<(), _>("not json"))
+        let undecodable = fetch_decoded(&scripted(), &["ok://a"], |_| Err::<(), _>("not json"))
             .await
             .unwrap_err();
         assert!(undecodable.answered());
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn rejects_an_empty_source_list() {
         let none: [&str; 0] = [];
         assert_eq!(
-            fetch_document(&Scripted, &none).await.unwrap_err(),
+            fetch_document(&scripted(), &none).await.unwrap_err(),
             FetchError::NoSources
         );
     }

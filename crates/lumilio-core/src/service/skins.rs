@@ -66,7 +66,7 @@ impl<T: Transport + Clone> LauncherService<T> {
                 .await
                 .map_err(ServiceError::Skin)?
         } else if let Some(choice) = entry.skin.as_ref() {
-            let loaded = skin::load(&self.transport, choice, &entry.name)
+            let loaded = skin::load(&self.fetcher(), choice, &entry.name)
                 .await
                 .map_err(ServiceError::Skin)?;
             tokio::task::spawn_blocking(move || AccountLook::from_loaded(&loaded))
@@ -148,7 +148,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         choice: &SkinChoice,
     ) -> Result<AuthSession, ServiceError> {
         let mut notes = Vec::new();
-        let skin = match skin::load(&self.transport, choice, profile.name()).await {
+        let skin = match skin::load(&self.fetcher(), choice, profile.name()).await {
             Ok(skin) => skin,
             Err(error) => {
                 notes.push(format!("the skin was not loaded: {error}"));
@@ -157,7 +157,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         };
         let signer = self.skin_signer().await?;
         let chain = self.chain().await?;
-        let jar = injector::ensure(&self.transport, &chain, &self.layout.injector()).await?;
+        let jar = injector::ensure(&self.fetcher(), &chain, &self.layout.injector()).await?;
         let server = LocalSkinServer::start(
             Character {
                 id: profile.id(),

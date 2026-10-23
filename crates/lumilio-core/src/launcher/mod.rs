@@ -20,9 +20,12 @@ use crate::activity::CancellationToken;
 use crate::java::JavaRuntime;
 use crate::launch_session::LaunchSignal;
 use crate::process::GameExit;
-use crate::transfer::{ConnectionBudget, SourceChain, TransferEngine, TransferError, Transport};
+use crate::transfer::{
+    ConnectionBudget, SourceChain, TransferEngine, TransferError, TransferEvent, Transport,
+};
+use std::path::PathBuf;
 use std::sync::Mutex as StdMutex;
-use tokio::sync::mpsc;
+use tokio::sync::{broadcast, mpsc};
 
 /// Shown in the game's debug screen as the launcher brand.
 /// Where the game may record how a direct start went, inside the game folder.
@@ -36,6 +39,10 @@ pub struct Launcher<T> {
     concurrency: usize,
     /// Connections shared with other work; `None` keeps them to this launcher.
     budget: Option<ConnectionBudget>,
+    /// Where stopped downloads are noted; `None` discards them.
+    partials: Option<PathBuf>,
+    /// Hears every transfer of every engine the launcher makes.
+    watcher: Option<broadcast::Sender<TransferEvent>>,
     spawned: Option<mpsc::UnboundedSender<()>>,
     before_start: Option<mpsc::UnboundedSender<tokio::sync::oneshot::Sender<Result<(), String>>>>,
     /// Where to ask for a Java when none installed fits; `None` fails instead.
@@ -56,6 +63,8 @@ where
             sources,
             concurrency,
             budget: None,
+            partials: None,
+            watcher: None,
             spawned: None,
             before_start: None,
             java_installer: None,
@@ -112,14 +121,40 @@ where
         self
     }
 
+    /// Keeps stopped downloads for the next launch to continue, noted in
+    /// `folder`.
+    #[must_use]
+    pub fn keeping_partials(mut self, folder: PathBuf) -> Self {
+        self.partials = Some(folder);
+        self
+    }
+
+    /// Reports every transfer to `watcher` as well, so the task this launch
+    /// runs under can show its files.
+    #[must_use]
+    pub(crate) fn watched_by(mut self, watcher: broadcast::Sender<TransferEvent>) -> Self {
+        self.watcher = Some(watcher);
+        self
+    }
+
     fn transfer_engine(&self) -> Result<TransferEngine<T>, TransferError> {
-        match &self.budget {
-            Some(budget) => Ok(TransferEngine::with_budget(
-                self.transport.clone(),
-                budget.clone(),
-            )),
-            None => TransferEngine::new(self.transport.clone(), self.concurrency),
+        let mut engine = match &self.budget {
+            Some(budget) => TransferEngine::with_budget(self.transport.clone(), budget.clone()),
+            None => TransferEngine::new(self.transport.clone(), self.concurrency)?,
+        };
+        if let Some(folder) = &self.partials {
+            engine = engine.keeping_partials(folder.clone());
         }
+        if let Some(watcher) = &self.watcher {
+            engine = engine.watched_by(watcher.clone());
+        }
+        Ok(engine)
+    }
+
+    /// An engine for the documents a launch reads into memory.
+    fn fetcher(&self) -> Result<TransferEngine<T>, LaunchServiceError> {
+        self.transfer_engine()
+            .map_err(|error| LaunchServiceError::ManifestUnavailable(error.to_string()))
     }
 
     /// Prepares and starts the game, returning how the process ended.

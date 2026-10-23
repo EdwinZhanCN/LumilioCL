@@ -76,8 +76,8 @@ pub use activity::{
     ProgressSnapshot,
 };
 pub use activity_log::{
-    ActiveTask, ActivityLog, FinishedTask, ProgressUnit, RetryAction, TaskAction, TaskBoard,
-    TaskCategory, TaskLabel, TaskOutcome,
+    ActiveTask, ActivityLog, FileDownload, FinishedTask, ProgressUnit, RetryAction, SourceSwitch,
+    TaskAction, TaskBoard, TaskCategory, TaskDownloads, TaskLabel, TaskOutcome,
 };
 pub use artifact::{CoordinateError, PackageCoordinate};
 pub use attention::{
@@ -207,7 +207,7 @@ pub use service::{
     ActivityView, AddedFile, AppearanceApplyResult, ContentEffect, ContentResult,
     ContentSourceInfo, DependencyNeed, DependencyReport, DiscoverFilters, GameLogSource, GameLogs,
     InstalledProject, InstanceJava, LauncherService, Library, ModelPreview, ProfileSnapshot,
-    ProjectDetail, ServiceError, ThirdPartySignIn, now as unix_now,
+    ProjectDetail, ServiceError, ThirdPartySignIn, Traffic, now as unix_now,
 };
 pub use settings::{
     AccountEntry, AccountKind, AuthServerEntry, DownloadSourcePreference, LauncherSettings,
@@ -230,11 +230,11 @@ pub use storage::{
 };
 pub use transfer::USER_AGENT;
 pub use transfer::{
-    ByteStream, ContentDigest, DefaultTransport, FileTransport, HttpMethod, HttpRequest,
-    HttpTransport, OfficialSource, PrefixMirror, RetryPolicy, SourceChain, SourceFailure,
-    SourceProvider, TransferBatchReport, TransferEngine, TransferError, TransferEvent,
-    TransferOutcome, TransferRequest, Transport, TransportError, TransportFuture,
-    TransportResponse,
+    ByteStream, CONNECTIONS_PER_FILE, ConnectionBudget, ContentDigest, DefaultTransport,
+    FileTransport, HttpMethod, HttpRequest, HttpTransport, OfficialSource, PrefixMirror,
+    RetryPolicy, SourceChain, SourceFailure, SourceProvider, TransferBatchReport, TransferEngine,
+    TransferError, TransferEvent, TransferOutcome, TransferRequest, Transport, TransportError,
+    TransportFuture, TransportResponse,
 };
 pub use tuning::{
     AfterLaunch, Appearance, DOWNLOAD_CONCURRENCY, DiscoverPreferences, EnvVar, FONT_SCALE_PERCENT,

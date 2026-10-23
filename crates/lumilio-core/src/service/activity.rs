@@ -1,6 +1,6 @@
 use super::LauncherService;
 use super::error::ServiceError;
-use super::types::ActivityView;
+use super::types::{ActivityView, Traffic};
 use crate::activity::CancellationToken;
 use crate::activity_log::RetryAction;
 use crate::launcher::LaunchUpdate;
@@ -13,13 +13,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// finished, or not cancellable; the task's own outcome is still decided by
     /// the work itself.
     pub fn cancel_task(&self, id: u64) -> bool {
-        let token = self
-            .cancels
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .get(&id)
-            .cloned();
-        token.map(|token| token.cancel()).is_some()
+        self.task_control(id).map(|token| token.cancel()).is_some()
     }
 
     /// Runs a task again from the input it was started with (its
@@ -161,17 +155,30 @@ impl<T: Transport + Clone> LauncherService<T> {
         }
         finished.sort_by_key(|task| std::cmp::Reverse(task.finished));
         finished.truncate(finished_limit);
-        let cancellable = self
-            .cancels
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .keys()
-            .copied()
-            .collect();
+        let (cancellable, paused) = {
+            let cancels = self
+                .cancels
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            (
+                cancels.keys().copied().collect(),
+                cancels
+                    .iter()
+                    .filter(|(_, token)| token.is_paused())
+                    .map(|(id, _)| *id)
+                    .collect(),
+            )
+        };
         ActivityView {
             active,
             cancellable,
+            paused,
             finished,
+            traffic: Traffic {
+                open: self.connections.open(),
+                limit: self.connections.size(),
+                received: self.connections.received(),
+            },
         }
     }
 

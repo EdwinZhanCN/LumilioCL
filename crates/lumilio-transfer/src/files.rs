@@ -11,8 +11,13 @@ use tokio::io::AsyncReadExt;
 
 #[derive(Debug)]
 pub(super) enum AttemptFailure {
-    Source { reason: String, retryable: bool },
+    Source {
+        reason: String,
+        retryable: bool,
+    },
     Cancelled,
+    /// Stopped for a pause; the same attempt runs again once resumed.
+    Paused,
     Fatal(TransferError),
 }
 

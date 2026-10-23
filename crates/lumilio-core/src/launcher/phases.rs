@@ -265,7 +265,7 @@ where
         let url = url.ok_or_else(|| {
             LaunchServiceError::ManifestUnavailable("no installer address is known".to_owned())
         })?;
-        let bytes = fetch_document(&self.transport, &self.sources.candidates(url))
+        let bytes = fetch_document(&self.fetcher()?, &self.sources.candidates(url))
             .await
             .map_err(|error: FetchError| {
                 LaunchServiceError::ManifestUnavailable(error.to_string())
@@ -608,7 +608,7 @@ where
                 .version_json
         } else {
             let sources = self.sources.candidates(url);
-            fetch_decoded(&self.transport, &sources, |bytes| {
+            fetch_decoded(&self.fetcher()?, &sources, |bytes| {
                 let profile = normalize_profile(&bytes, &id, game)?;
                 let manifest = ReleaseManifest::decode_json(&profile)
                     .map_err(|error| crate::loader::LoaderError::Decode(error.to_string()))?;
@@ -651,7 +651,7 @@ where
             ))
         })?;
         let sources = self.sources.candidates(url);
-        fetch_decoded(&self.transport, &sources, |bytes| {
+        fetch_decoded(&self.fetcher()?, &sources, |bytes| {
             let text = String::from_utf8(bytes)
                 .map_err(|error| LaunchServiceError::ManifestUnavailable(error.to_string()))?;
             ReleaseManifest::decode_json(&text).map_err(LaunchServiceError::Release)?;

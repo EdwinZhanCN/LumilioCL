@@ -56,6 +56,10 @@ pub enum LiveIntent {
     },
     /// Stop this running task (by the service's task id).
     CancelTask(u64),
+    /// Hold this running task's downloads; they keep what they have.
+    PauseTask(u64),
+    /// Let a held task's downloads go on from what they kept.
+    ResumeTask(u64),
     /// Forget every finished task on the Activity page.
     ClearFinished,
     /// Run a failed or cancelled task again from its original input.

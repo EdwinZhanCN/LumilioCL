@@ -9,6 +9,10 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+mod downloads;
+
+pub use self::downloads::{FileDownload, SourceSwitch, TaskDownloads};
+
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskCategory {
@@ -200,6 +204,8 @@ pub struct ActiveTask {
     pub progress: Option<(u64, u64)>,
     pub unit: ProgressUnit,
     pub retry: Option<RetryAction>,
+    /// What it downloads; `None` until its first download starts.
+    pub downloads: Option<TaskDownloads>,
 }
 
 /// Running tasks. Not thread-safe by itself; share it behind a lock.
@@ -229,8 +235,16 @@ impl TaskBoard {
             progress: None,
             unit: ProgressUnit::Items,
             retry: None,
+            downloads: None,
         });
         self.next_id
+    }
+
+    /// Follows one of a task's transfers into what it shows it downloading.
+    pub fn record_transfer(&mut self, id: u64, event: &crate::transfer::TransferEvent) {
+        if let Some(task) = self.active.iter_mut().find(|task| task.id == id) {
+            task.downloads.get_or_insert_default().apply(event);
+        }
     }
 
     /// Remembers how to run a task again if it fails.

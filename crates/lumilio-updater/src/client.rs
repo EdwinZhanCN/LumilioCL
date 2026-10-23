@@ -1,15 +1,26 @@
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
+use std::time::Duration;
 
-use futures_util::StreamExt as _;
-use reqwest::Client;
+use lumilio_transfer::{
+    CancellationToken, ConnectionBudget, HttpTransport, RetryPolicy, TransferEngine, TransferError,
+    TransferRequest,
+};
 use semver::Version;
-use sha2::{Digest as _, Sha256};
-use tokio::io::AsyncWriteExt as _;
 
 use crate::manifest::{AssetTarget, find_asset};
 
 const WORKER: &str = "https://launcher.lumilio.org";
 const GITHUB: &str = "https://github.com/EdwinZhanCN/LumilioCL";
+/// The release manifest lists one line per package; more is not one.
+const MANIFEST_LIMIT: usize = 1024 * 1024;
+
+/// A package that does not match its checksum is fetched once more before
+/// the next source: downloading it again and again would not change it.
+static UPDATE_RETRY: LazyLock<RetryPolicy> = LazyLock::new(|| {
+    RetryPolicy::fixed(2, Duration::from_millis(500), Duration::from_secs(2))
+        .expect("two attempts with a short delay is a valid policy")
+});
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum UpdateRestriction {
@@ -56,22 +67,12 @@ impl std::fmt::Display for UpdateError {
 
 impl std::error::Error for UpdateError {}
 
-impl UpdateError {
-    /// A failed request with each cause behind it (DNS, TLS, refused, timed
-    /// out), as lumilio-core's `with_causes` words it; reqwest's own words
-    /// name only the URL.
-    fn request(error: &reqwest::Error) -> Self {
-        let mut text = error.to_string();
-        let mut cause = std::error::Error::source(error);
-        while let Some(next) = cause {
-            let words = next.to_string();
-            if !words.is_empty() && !text.contains(&words) {
-                text.push_str(": ");
-                text.push_str(&words);
-            }
-            cause = next.source();
+impl From<TransferError> for UpdateError {
+    fn from(error: TransferError) -> Self {
+        match error {
+            TransferError::FileSystem { .. } => Self::Io(std::io::Error::other(error.to_string())),
+            other => Self::Request(other.to_string()),
         }
-        Self::Request(text)
     }
 }
 
@@ -117,17 +118,28 @@ pub enum Relaunch {
 
 #[derive(Clone)]
 pub struct UpdateClient {
-    http: Client,
+    /// Downloads on the launcher's shared connections, kept part-way like
+    /// any download (plan download-engine T4).
+    engine: TransferEngine<HttpTransport>,
     updates_dir: PathBuf,
     current: Version,
     /// Read at startup: on Linux, once the file is replaced, the running
     /// process's `current_exe` ends in " (deleted)".
     executable: Option<PathBuf>,
     restriction: Option<UpdateRestriction>,
+    /// The launcher site, then GitHub.
+    bases: [String; 2],
 }
 
 impl UpdateClient {
-    pub fn from_build(data_dir: impl Into<PathBuf>) -> Self {
+    /// A client for this build, downloading over `budget`. Fails only when no
+    /// HTTP client can be made (no TLS backend).
+    pub fn from_build(
+        data_dir: impl Into<PathBuf>,
+        budget: ConnectionBudget,
+    ) -> Result<Self, UpdateError> {
+        let transport =
+            HttpTransport::new().map_err(|error| UpdateError::Request(error.to_string()))?;
         let executable = std::env::current_exe().ok();
         let restriction = if cfg!(debug_assertions) {
             Some(UpdateRestriction::DebugBuild)
@@ -136,14 +148,37 @@ impl UpdateClient {
                 .map(UpdateRestriction::from_build_value)
                 .or_else(|| runtime_restriction(executable.as_deref()))
         };
-        Self {
-            http: Client::new(),
+        Ok(Self {
+            engine: TransferEngine::with_budget(transport, budget),
             updates_dir: data_dir.into().join("updates"),
             current: Version::parse(env!("CARGO_PKG_VERSION"))
                 .expect("workspace package version is SemVer"),
             executable,
             restriction,
+            bases: [WORKER.to_owned(), GITHUB.to_owned()],
+        })
+    }
+
+    /// A client that may update, asking `bases` instead of the launcher site
+    /// and GitHub.
+    #[cfg(test)]
+    pub(crate) fn for_test(updates_dir: PathBuf, bases: [String; 2]) -> Self {
+        Self {
+            engine: TransferEngine::new(HttpTransport::new().unwrap(), 2).unwrap(),
+            updates_dir,
+            current: Version::new(0, 0, 1),
+            executable: None,
+            restriction: None,
+            bases,
         }
+    }
+
+    /// Keeps a download stopped part-way for the next try to continue,
+    /// noted in `folder` as the launcher notes its own.
+    #[must_use]
+    pub fn keeping_partials(mut self, folder: impl Into<PathBuf>) -> Self {
+        self.engine = self.engine.keeping_partials(folder);
+        self
     }
 
     pub fn restriction(&self) -> Option<UpdateRestriction> {
@@ -155,8 +190,9 @@ impl UpdateClient {
             return Err(UpdateError::Restricted(reason));
         }
         let target = AssetTarget::current()?;
-        let primary = self.fetch_manifest(WORKER).await;
-        let manifest = with_fallback(primary, self.fetch_manifest(GITHUB)).await?;
+        let [site, github] = &self.bases;
+        let primary = self.fetch_manifest(site).await;
+        let manifest = with_fallback(primary, self.fetch_manifest(github)).await?;
         let release = find_asset(&manifest, &target)?;
         if release.version <= self.current {
             Ok(CheckResult::UpToDate)
@@ -165,36 +201,32 @@ impl UpdateClient {
         }
     }
 
+    /// Downloads `release` from the launcher site, else from GitHub, and
+    /// checks it against the release's SHA256SUMS. A package already here
+    /// that matches is used as it is.
     pub async fn download(&self, release: &UpdateRelease) -> Result<PathBuf, UpdateError> {
         if let Some(reason) = self.restriction() {
             return Err(UpdateError::Restricted(reason));
         }
         tokio::fs::create_dir_all(&self.updates_dir).await?;
         let destination = self.updates_dir.join(&release.file_name);
-        if destination.is_file() {
-            if hash_file(&destination)
-                .await
-                .is_ok_and(|hash| hash == release.sha256)
-            {
-                return Ok(destination);
-            }
-            let _ = tokio::fs::remove_file(&destination).await;
-        }
-        let partial = destination.with_extension(format!(
-            "{}.part",
-            destination
-                .extension()
-                .and_then(|extension| extension.to_str())
-                .unwrap_or("update")
-        ));
-        let primary = self
-            .download_from(WORKER, release, &partial, &destination)
-            .await;
-        with_fallback(
-            primary,
-            self.download_from(GITHUB, release, &partial, &destination),
+        let sources = self.bases.clone().map(|base| {
+            format!(
+                "{base}/releases/download/v{}/{}",
+                release.version, release.file_name
+            )
+        });
+        let request = TransferRequest::new(
+            format!("update:{}", release.file_name),
+            sources,
+            &destination,
         )
-        .await?;
+        .and_then(|request| request.expect_sha256(&release.sha256))
+        .map_err(|error| UpdateError::Manifest(error.to_string()))?
+        .with_retry_policy(UPDATE_RETRY.clone());
+        self.engine
+            .transfer(request, CancellationToken::new())
+            .await?;
         Ok(destination)
     }
 
@@ -220,62 +252,12 @@ impl UpdateClient {
 
     async fn fetch_manifest(&self, base: &str) -> Result<String, UpdateError> {
         let url = format!("{base}/releases/latest/download/SHA256SUMS.txt");
-        self.http
-            .get(url)
-            .send()
+        let bytes = self
+            .engine
+            .fetch(&url, MANIFEST_LIMIT, &UPDATE_RETRY)
             .await
-            .and_then(reqwest::Response::error_for_status)
-            .map_err(|error| UpdateError::request(&error))?
-            .text()
-            .await
-            .map_err(|error| UpdateError::request(&error))
-    }
-
-    async fn download_from(
-        &self,
-        base: &str,
-        release: &UpdateRelease,
-        partial: &Path,
-        destination: &Path,
-    ) -> Result<(), UpdateError> {
-        let url = format!(
-            "{base}/releases/download/v{}/{}",
-            release.version, release.file_name
-        );
-        let result = async {
-            let response = self
-                .http
-                .get(url)
-                .send()
-                .await
-                .and_then(reqwest::Response::error_for_status)
-                .map_err(|error| UpdateError::request(&error))?;
-            let mut stream = response.bytes_stream();
-            let mut file = tokio::fs::File::create(partial).await?;
-            let mut hasher = Sha256::new();
-            while let Some(chunk) = stream.next().await {
-                let chunk = chunk.map_err(|error| UpdateError::request(&error))?;
-                hasher.update(&chunk);
-                file.write_all(&chunk).await?;
-            }
-            file.flush().await?;
-            file.sync_all().await?;
-            let digest = hex_digest(&hasher.finalize());
-            if digest != release.sha256 {
-                return Err(UpdateError::Manifest(format!(
-                    "checksum mismatch for {}",
-                    release.file_name
-                )));
-            }
-            drop(file);
-            tokio::fs::rename(partial, destination).await?;
-            Ok(())
-        }
-        .await;
-        if result.is_err() {
-            let _ = tokio::fs::remove_file(partial).await;
-        }
-        result
+            .map_err(|failure| UpdateError::Request(format!("{url}: {failure}")))?;
+        String::from_utf8(bytes).map_err(|error| UpdateError::Manifest(error.to_string()))
     }
 }
 
@@ -338,25 +320,6 @@ async fn with_fallback<T>(
             ))
         }),
     }
-}
-
-async fn hash_file(path: &Path) -> Result<String, UpdateError> {
-    use tokio::io::AsyncReadExt as _;
-    let mut file = tokio::fs::File::open(path).await?;
-    let mut hasher = Sha256::new();
-    let mut buffer = vec![0; 64 * 1024];
-    loop {
-        let read = file.read(&mut buffer).await?;
-        if read == 0 {
-            break;
-        }
-        hasher.update(&buffer[..read]);
-    }
-    Ok(hex_digest(&hasher.finalize()))
-}
-
-fn hex_digest(bytes: &[u8]) -> String {
-    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
 #[cfg(test)]

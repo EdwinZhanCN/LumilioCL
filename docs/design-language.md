@@ -219,7 +219,7 @@ Discover.
 |---|---|---|---|---|---|---|
 | Library | game count | 导入整合包 | 新建 | — | 全部游戏 / 收藏 · 搜索游戏 | — |
 | Discover | one line | — | — | 在 *source* 中浏览 · 重新搜索 | 整合包 / Mod / 资源包 / 光影 · 搜索 *source* | sort, page size, pager, filter sidebar (source segments at its top when several are on); a window whose content column cannot hold the sidebar beside a result row at its narrowest folds the sidebar into a **筛选** key before sort, with the number of picked filters in orange mono, that opens the same filters in a popover |
-| Activity | running count | — | — | — | — | — |
+| Activity | running count | 清除已完成 | — | — | 全部 / 下载 / 安装 / 更新 / 修复 · — | — |
 | Instance | version · loader · last played | — | 启动游戏 | 安装游戏文件 · 复制… · 删除… | 概览 / 内容 / 世界 / 历史 / 日志 / 设置 | per-tab segments |
 | Project detail | author · summary | — | 安装到 *instance* / 安装为新游戏 | 在 *source* 中打开 · 复制链接 · project links | 介绍 / 版本 / 图库 | version filters |
 
@@ -506,11 +506,23 @@ shows:
   mono;
 - a bar meter of 4 px bars that light one whole bar at a time.
 
-Displays follow the progress rules in §3. Home's launch moment and Activity
-use them for progress. The one other display is Home's **游戏记录**: a record,
-not progress, so it has readings (a label in the legend colour over segment
-digits and a mono unit) and no meter, and nothing on it moves. Nothing else is
-a display.
+Displays follow the progress rules in §3. Home's launch moment uses one for
+progress. Home's **游戏记录** is a record, not progress, so it has readings (a
+label in the legend colour over segment digits and a mono unit) and no meter,
+and nothing on it moves. Activity has one display, above its list while a
+task downloads (`kit::transfer_display`): the speed of all downloads in
+segment digits with its unit, one cell per connection the 同时下载数 setting
+allows (lit while held, with "8/16" in mono beside them), and the counts of
+running and paused tasks as readings. Its tasks carry no display of their
+own. Nothing else is a display.
+
+Off a display, the same marks keep their meaning in the signal orange:
+- a **row meter** (`kit::row_meter`) is a 3 px strip under a running task's
+  name that lights whole bars, orange while it moves and muted while it is
+  paused, LED-off where it has not reached; a narrow one takes fewer bars so
+  each stays a bar;
+- **connection cells** (`kit::connection_cells`) are 4 px cells, one per
+  connection a file may use, orange while held.
 
 ### Schematic studio
 
@@ -872,6 +884,32 @@ the list shows as many results as the window can hold:
   sorted by newest, else UPD);
 - the install key last, in a slot as wide as its widest state, so the
   readings line up from row to row.
+
+A task in Activity is the same kind of row (`kit::Item`), running or
+finished:
+- the lead is the key that opens what a running task downloads (▸, ▾ when
+  open; its tooltip says **详情** / **收起**), or the same room empty, so
+  every name starts in one column;
+- beside the name, its state: 下载中 lit, 等待连接 and 已暂停 unlit, 进行中
+  lit while it does something other than download; 已完成, 失败 and 已取消
+  once it ended;
+- under the name, the game as a plain tag, then a running task's row meter;
+- on the trailing edge one reading: for a running task the amount done over
+  the amount there is in one unit ("40.5 / 99.4 MB", or files for an install
+  counted in files) in ink, with the time left under it in muted mono; for
+  a finished one when it ended. No percentage: the meter already says what
+  share;
+- the keys last: **暂停** / **继续** in one place once the task downloads,
+  then **取消**; 技术详情, 重试 and 打开 once it ended.
+
+The open detail sits under the name, a table of the files on their way, one
+line each: the name (with "第 2 次尝试" as a plain tag when it is not the
+first), the source's host in muted mono that gives way before the name, the
+file's connection cells, a short row meter and the amount. A source given up
+for a file is a line under it ("A 失败，已改用 B", an unlit LED; the failure
+LED when no source is left). Under the table: how many more files wait for a
+connection (counted, not listed), how often downloads were retried, and
+**技术详情** with the raw reasons for every source given up.
 
 ### Faceplates
 

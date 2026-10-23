@@ -1,5 +1,5 @@
 use super::super::error::ServiceError;
-use super::super::support::meter_bytes;
+use super::super::support::{Meter, watch_transfers};
 use super::{change_subjects, mod_version, world};
 use crate::activity::CancellationToken;
 use crate::activity_log::{
@@ -177,7 +177,7 @@ async fn the_bytes_of_all_transfers_add_up_to_one_task_and_an_unknown_length_hid
     events.send(progress("b", 5, Some(50))).unwrap();
     events.send(progress("a", 40, Some(100))).unwrap();
     drop(events);
-    meter_bytes(&board, task, receiver).await;
+    watch_transfers(&board, task, receiver, Meter::Bytes).await;
     let shown = board.lock().unwrap().active()[0].clone();
     assert_eq!(shown.unit, crate::ProgressUnit::Bytes);
     assert_eq!(shown.progress, Some((45, 150)));
@@ -190,7 +190,7 @@ async fn the_bytes_of_all_transfers_add_up_to_one_task_and_an_unknown_length_hid
     events.send(progress("c", 7, None)).unwrap();
     events.send(progress("d", 3, Some(30))).unwrap();
     drop(events);
-    meter_bytes(&board, task, receiver).await;
+    watch_transfers(&board, task, receiver, Meter::Bytes).await;
     let shown = board
         .lock()
         .unwrap()
@@ -200,6 +200,143 @@ async fn the_bytes_of_all_transfers_add_up_to_one_task_and_an_unknown_length_hid
         .cloned()
         .unwrap();
     assert_eq!(shown.progress, Some((10, 0)), "total 0 means unknown");
+}
+
+#[tokio::test]
+async fn a_task_shows_its_files_their_sources_and_the_sources_given_up() {
+    use crate::transfer::{TransferEvent, TransferOutcome};
+    let board = StdMutex::new(TaskBoard::default());
+    let task = board
+        .lock()
+        .unwrap()
+        .start(TaskCategory::Install, "x", None, 1);
+    let (events, receiver) = tokio::sync::broadcast::channel(16);
+    let id = || "lib".to_owned();
+    for event in [
+        TransferEvent::Started {
+            id: id(),
+            destination: "libraries/a/lib.jar".into(),
+        },
+        TransferEvent::Started {
+            id: "done".to_owned(),
+            destination: "done.jar".into(),
+        },
+        TransferEvent::Downloading {
+            id: id(),
+            source: "https://mirror.test/lib.jar".to_owned(),
+            attempt: 1,
+        },
+        TransferEvent::SourceFailed {
+            id: id(),
+            source: "https://mirror.test/lib.jar".to_owned(),
+            reason: "HTTP status 404".to_owned(),
+            next: Some("https://official.test/lib.jar".to_owned()),
+        },
+        TransferEvent::Downloading {
+            id: id(),
+            source: "https://official.test/lib.jar".to_owned(),
+            attempt: 1,
+        },
+        TransferEvent::Connections { id: id(), count: 3 },
+        TransferEvent::Progress {
+            id: id(),
+            completed: 40,
+            total: Some(100),
+        },
+        TransferEvent::Completed {
+            id: "done".to_owned(),
+            outcome: TransferOutcome::ReusedExisting,
+        },
+    ] {
+        events.send(event).unwrap();
+    }
+    drop(events);
+    watch_transfers(&board, task, receiver, Meter::Files).await;
+
+    let shown = board.lock().unwrap().active()[0].clone();
+    assert_eq!(shown.progress, None, "files are counted by the launcher");
+    let downloads = shown.downloads.unwrap();
+    assert_eq!(downloads.files.len(), 1);
+    let file = &downloads.files[0];
+    assert_eq!(file.name, "lib.jar");
+    assert_eq!(
+        file.source.as_deref(),
+        Some("https://official.test/lib.jar")
+    );
+    assert_eq!(
+        (file.connections, file.done, file.total),
+        (3, 40, Some(100))
+    );
+    assert_eq!(downloads.switches.len(), 1);
+    assert_eq!(downloads.switches[0].file, "lib.jar");
+    assert_eq!(
+        downloads.switches[0].to.as_deref(),
+        Some("https://official.test/lib.jar")
+    );
+}
+
+/// Drives `work` until `done` holds, for at most two seconds.
+async fn drive_until<F: std::future::Future + Unpin>(work: &mut F, done: impl Fn() -> bool) {
+    let wait = async {
+        for _ in 0..200 {
+            if done() {
+                return;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+        panic!("the condition never held");
+    };
+    tokio::select! {
+        _ = work => panic!("the work ended first"),
+        () = wait => {}
+    }
+}
+
+#[tokio::test]
+async fn a_paused_task_lets_its_connections_go_and_finishes_once_resumed() {
+    let world = world();
+    let record = world
+        .service
+        .create_instance("Mods", Some("1.0"), Loader::Fabric, Some("0.16.0"))
+        .await
+        .unwrap();
+    world
+        .net
+        .answer("/v2/project/cool/version", mod_version(&world));
+    *world.net.stall_next_file.lock().unwrap() = true;
+    let mut install = Box::pin(world.service.install_content(
+        &record.id,
+        ProjectKind::Mod,
+        crate::discover::DEFAULT_SOURCE,
+        "cool",
+        CancellationToken::new(),
+    ));
+    let downloading = || {
+        let view = world.service.activity(10);
+        view.traffic.open == 1
+            && view.active.iter().any(|task| {
+                task.downloads.as_ref().is_some_and(|downloads| {
+                    downloads.files.iter().any(|file| file.source.is_some())
+                })
+            })
+    };
+    drive_until(&mut install, downloading).await;
+    let id = world.service.activity(10).active[0].id;
+
+    assert!(!world.service.pause_task(id + 100));
+    assert!(world.service.pause_task(id));
+    drive_until(&mut install, || {
+        let view = world.service.activity(10);
+        view.traffic.open == 0 && view.paused.contains(&id)
+    })
+    .await;
+
+    assert!(world.service.resume_task(id));
+    install.await.unwrap();
+    let target = world.service.layout.game(&record.id).join("mods/cool.jar");
+    assert_eq!(std::fs::read(target).unwrap(), b"a mod");
+    let view = world.service.activity(10);
+    assert!(view.active.is_empty() && view.paused.is_empty());
 }
 
 #[tokio::test]

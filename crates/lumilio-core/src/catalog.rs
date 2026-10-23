@@ -9,7 +9,7 @@ use std::fmt::{self, Display, Formatter};
 use serde::Deserialize;
 
 use crate::fetch::{FetchError, fetch_decoded};
-use crate::transfer::{SourceChain, Transport};
+use crate::transfer::{SourceChain, TransferEngine, Transport};
 
 /// Where the official catalog lives.
 pub const OFFICIAL_CATALOG_URL: &str =
@@ -213,12 +213,12 @@ impl VersionCatalog {
     }
 
     /// Fetches the catalog from the first source that answers.
-    pub async fn fetch<T: Transport + ?Sized>(
-        transport: &T,
+    pub async fn fetch<T: Transport>(
+        engine: &TransferEngine<T>,
         chain: &SourceChain,
     ) -> Result<Self, CatalogError> {
         let sources = chain.candidates(OFFICIAL_CATALOG_URL);
-        Ok(fetch_decoded(transport, &sources, |bytes| {
+        Ok(fetch_decoded(engine, &sources, |bytes| {
             let text = String::from_utf8(bytes)
                 .map_err(|error| CatalogError::Decode(error.utf8_error().to_string()))?;
             Self::decode_json(&text)
@@ -376,7 +376,10 @@ mod tests {
             std::sync::Arc::new(OfficialSource),
         ])
         .unwrap();
-        let catalog = VersionCatalog::fetch(&FileTransport, &chain).await.unwrap();
+        let catalog =
+            VersionCatalog::fetch(&TransferEngine::new(FileTransport, 1).unwrap(), &chain)
+                .await
+                .unwrap();
         assert_eq!(catalog.entries().len(), 5);
     }
 }
