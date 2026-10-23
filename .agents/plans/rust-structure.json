@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "rust-structure",
   "title": "Structural pass against the Google Rust style guide",
-  "summary": "Google's Rust style guide (https://google.github.io/styleguide/rustguide.html) was read in full and compared with the workspace. Formatting that rustfmt and clippy already cover is out of scope. The gaps that cost maintenance are: non-leaf modules that still hold the implementation, a handful of files past the repo's own ~800 non-test-line rule, and error types that store another error but do not expose it through Error::source. Chromium-only rules (flat crate layout, no async, no std threads, tiny crates) do not fit this Cargo project and are not adopted. This plan is the record of that judgment. It does not change launcher behavior.",
+  "summary": "Google's Rust style guide (https://google.github.io/styleguide/rustguide.html) was read in full and compared with the workspace. Formatting that rustfmt and clippy already cover is out of scope. The gaps that cost maintenance are: non-leaf modules that still hold the implementation, a handful of files past the repo's own ~800 non-test-line rule, error types that store another error but do not expose it through Error::source, and unit tests that still sit in the implementation file or under a second file name. Chromium-only rules (flat crate layout, no async, no std threads, tiny crates, rust_gtest_interop) do not fit this Cargo project and are not adopted. This plan is the record of that judgment. It does not change launcher behavior. Order: land T1 and T10 first (gates, no moves). T11 next, and before T6, so settings.rs and fetch.rs are each edited once. T12, T13, and T14 then empty the inline-test allowlist and can land separately. T2, T3, T4, T5, T7, T8, and T9 do not move tests.",
   "status": "proposed",
   "visibility": "internal",
   "scope": {
@@ -10,7 +10,8 @@
       "A shrinking allowlist so non-test Rust files under crates/ stop growing past about 800 lines.",
       "Error::source on variants that already store another error, without changing Display text.",
       "Splits of non-leaf modules that still implement the API: model_view, world_explorer, schematic_studio.",
-      "Splits where one file already has two concerns: settings (accounts and launcher settings), the replace dialog, the instance intent router, and plugin-tab rendering."
+      "Splits where one file already has two concerns: settings (accounts and launcher settings), the replace dialog, the instance intent router, and plugin-tab rendering.",
+      "Moving inline unit-test bodies into tests.rs or tests/<theme>.rs, and renaming cfg(test) modules that are not named tests, behind a shrinking allowlist."
     ],
     "excluded": [
       "Behavior changes, copy changes, and IA path changes. Moved // ia comments stay byte-for-byte; just ia must not rewrite docs/ia/paths.",
@@ -18,7 +19,11 @@
       "UI-thread unwrap and expect cleanup. That stays on error-reporting T5.",
       "Splitting InstanceStore (crates/lumilio-core/src/instance.rs) or the release manifest (crates/lumilio-core/src/release.rs) only to hit a line count.",
       "New crates, a flat Chromium layout, workspace missing_docs, unwrap_used, or blanket #[non_exhaustive].",
-      "forks/, vendor/, and tools/entity-dump (the Java dumper is one class beside its Rust reader and is not a Rust-style target)."
+      "forks/, vendor/, and tools/entity-dump (the Java dumper is one class beside its Rust reader and is not a Rust-style target).",
+      "Cargo integration tests under crates/<crate>/tests/ (13 files). They are not inline unit tests.",
+      "Converting foo.rs + foo/ to foo/mod.rs, including the 6 implementation hybrids and the 9 tests/mod.rs modules (decision D8).",
+      "Adopting rust_gtest_interop or another harness. #[test], nextest, and gpui::test stay.",
+      "Renaming backdrop.rs. It stays the rejected visual experiment (decision D5), not a unit test."
     ]
   },
   "tasks": [
@@ -56,7 +61,7 @@
       "id": "T6",
       "title": "Split accounts out of settings.rs.",
       "status": "proposed",
-      "acceptance": "crates/lumilio-core/src/settings.rs becomes a directory module. Account types and account mutations live in one file; launcher preferences, mirrors, and SettingsStore live in another. lumilio_core::AccountEntry and the other names re-exported from lib.rs do not change. settings.json field names and schema version do not change. just test-pkg lumilio-core settings passes. Both files are at or under 800 non-test lines and settings.rs leaves the allowlist. just check stays green."
+      "acceptance": "crates/lumilio-core/src/settings.rs becomes a directory module. Account types and account mutations live in one file; launcher preferences, mirrors, and SettingsStore live in another. lumilio_core::AccountEntry and the other names re-exported from lib.rs do not change. settings.json field names and schema version do not change. just test-pkg lumilio-core settings passes. Both files are at or under 800 non-test lines and settings.rs leaves the allowlist. just check stays green. Do not add a *_tests.rs file. Download-source tests stay settings/tests/download_source.rs, declared from settings/tests.rs. If T11 has not landed, this task does that rename and drops mod download_source_tests from settings.rs; if it has, leave the theme file where T11 put it."
     },
     {
       "id": "T7",
@@ -75,6 +80,36 @@
       "title": "Split plugin-tab rendering from arrival.",
       "status": "proposed",
       "acceptance": "crates/lumilio-ui/src/instance_detail/plugin_tabs.rs keeps the arrival methods on InstanceDetailView. The view-tree render (plugin_panel and the helpers from about line 660) moves to a sibling file. just test-pkg lumilio-ui instance_detail passes. Each file is at or under 800 non-test lines and plugin_tabs.rs leaves the allowlist. just check stays green."
+    },
+    {
+      "id": "T10",
+      "title": "Stop inline test bodies and oddly named test files from growing.",
+      "status": "proposed",
+      "acceptance": "A lumilio-docgen test, sibling to the T1 size test, scans crates/**/src/**/*.rs. It ignores comments and string literals, so the raw string and the comparison in crates/lumilio-ui/src/i18n/tests.rs that contain the text of an inline module are not offenders. An inline body is a test-only mod tests item written with braces rather than a semicolon. Test-only means the cfg requires test, including #[cfg(test)] and #[cfg(all(test, unix))]; #[cfg(any(target_os = \"windows\", test))] on credentials/chunked.rs is not test-only and must not match. #[cfg(test)] on a function, field, or use must not match. The scanned set must equal a committed allowlist, and the list may only shrink: its length stays <= 48. Starting entries, measured 2026-10-23 (2980 lines from the mod line through the closing brace): lumilio-core account.rs, activity.rs, artifact.rs, attention.rs, backup.rs, bundle.rs, catalog.rs, copy.rs, credentials.rs, environment.rs, fetch.rs, forge_meta.rs, launch.rs, launch_readiness.rs, layout.rs, loader.rs, persist.rs, release.rs, root_lock.rs, storage.rs; lumilio-ui assets.rs, collections.rs, cover.rs, dependency_prompt.rs, game_picker.rs, hero/noise.rs, hero/raster.rs, hero/scenes/caves.rs, hero/scenes/dawn.rs, hero/scenes/hearth.rs, hero/scenes/mod.rs, hero/scenes/portal.rs, hero/scenes/redstone.rs, hero/timeline.rs, hero/transition.rs, history.rs, microsoft_login.rs, navigation.rs, pages/mod.rs, route.rs, settings_forms.rs, theme/mod.rs, toast.rs, version_picker.rs, wardrobe/editor.rs; lumilio-app assets.rs and images.rs; lumilio-docgen src/lib.rs. A second allowlist, length <= 12, is the cfg(test) modules under src/ whose name is not tests, excluding backdrop.rs: fetch/decoded_tests.rs, settings/download_source_tests.rs, lumilio-transfer budget_tests.rs, memory_tests.rs, parallel_tests.rs, pause_tests.rs, pieces_tests.rs, resume_tests.rs, user_agent_tests.rs, test_server.rs, lumilio-updater download_tests.rs, and lumilio-ui world_explorer/perf.rs. The same equality rule applies. Crate-root tests/ integration tests are out of scope. just test-pkg lumilio-docgen passes, then just check stays green. No production file moves in this task."
+    },
+    {
+      "id": "T11",
+      "title": "Rename cfg(test) modules that are not named tests.",
+      "status": "proposed",
+      "acceptance": "Land before T6. Each of the 12 T10 naming entries becomes a tests/<theme>.rs file declared from the module's existing tests.rs, and the old mod declaration is removed. lumilio-transfer (tests.rs is 14 lines) gains tests/budget.rs, memory.rs, parallel.rs, pause.rs, pieces.rs, resume.rs, user_agent.rs, and server.rs (test_server.rs is the helper, not a *_tests.rs file). lumilio-updater download_tests.rs becomes tests/download.rs declared from its tests.rs. settings/download_source_tests.rs becomes settings/tests/download_source.rs declared from settings/tests.rs. fetch.rs is edited once: its inline body (71 lines, 185–255) moves to fetch/tests.rs, and decoded_tests.rs (149 lines) becomes fetch/tests/decoded.rs declared from that tests.rs, so fetch.rs leaves both allowlists. world_explorer/perf.rs (160 lines, the ignored drag_pipeline measurement) becomes world_explorer/tests/perf.rs declared from world_explorer/tests.rs; it stays ignored and does not become a pass/fail test. Behavior and assertions stay the same. just test-pkg lumilio-transfer, lumilio-updater, lumilio-core, and lumilio-ui world_explorer pass, then just check stays green. The naming allowlist loses those 12 paths."
+    },
+    {
+      "id": "T12",
+      "title": "Move lumilio-core inline tests into tests.rs.",
+      "status": "proposed",
+      "acceptance": "The 19 lumilio-core files still on the T10 inline allowlist after T11 (every core entry except fetch.rs) replace the inline body with a test-only mod tests; and a sibling tests.rs. root_lock.rs keeps #[cfg(all(test, unix))] on that declaration so the tests stay unix-only. release.rs stays on the T1 size allowlist: its test body is 54 lines (878–931) of 931, and the non-test remainder stays above 800. Assertions stay the same. Each file leaves the inline allowlist. just test-pkg lumilio-core passes, then just check stays green."
+    },
+    {
+      "id": "T13",
+      "title": "Move lumilio-ui inline tests into tests.rs.",
+      "status": "proposed",
+      "acceptance": "The 25 lumilio-ui files on the T10 inline allowlist replace the inline body with #[cfg(test)] mod tests; and a sibling tests.rs. theme/mod.rs already has theme/tests/ for the module's own tests; the 8-line body inside pub mod motion (lines 505–512) becomes theme/motion/tests.rs, declared from inside mod motion, and theme/tests/ stays. pages/mod.rs and hero/scenes/mod.rs gain tests.rs beside the directory module. // ia comments are not part of these test bodies; if a move touches one, it stays byte-for-byte and just ia does not rewrite docs/ia/paths. world_explorer/perf.rs is T11, not this task. Each file leaves the inline allowlist. just test-pkg lumilio-ui passes, then just check stays green."
+    },
+    {
+      "id": "T14",
+      "title": "Move lumilio-app and lumilio-docgen inline tests into tests.rs.",
+      "status": "proposed",
+      "acceptance": "lumilio-app assets.rs (28 lines, 29–56) and images.rs (69 lines, 82–150), and lumilio-docgen src/lib.rs (88 lines, 310–397), replace the inline body with #[cfg(test)] mod tests; and a sibling tests.rs under src/. The 13 Cargo integration tests under crates/<crate>/tests/ stay where they are. Each file leaves the inline allowlist, which is then empty. just test-pkg lumilio-app and just test-pkg lumilio-docgen pass, then just check stays green."
     }
   ],
   "validation": [
@@ -83,7 +118,7 @@
       "result": null
     },
     {
-      "criterion": "After T1–T9, just check is green, docs/ia/paths is unchanged, and the allowlist is only instance.rs, release.rs, and backdrop.rs.",
+      "criterion": "After T1–T14, just check is green, docs/ia/paths is unchanged, the size allowlist is only instance.rs, release.rs, and backdrop.rs, and both test-layout allowlists are empty. backdrop.rs stays a permanent exception and is not a test-layout entry.",
       "result": null
     }
   ],
@@ -123,6 +158,18 @@
       "decision": "Leave unsafe where it is.",
       "rationale": "The workspace forbids unsafe_code. lumilio-cubiomes, lumilio-pointer, and lumilio-backdrop opt into deny and keep the unsafe in ffi.rs, macos.rs, and windows.rs, with SAFETY comments. That is the guide's isolation rule. The Java entity dumper is not Rust.",
       "consequences": "No task moves FFI. New unsafe still has to live in one of those crates or justify a new one."
+    },
+    {
+      "id": "D7",
+      "decision": "Unit tests live in tests.rs or tests/<theme>.rs, declared with a test-only mod tests;. Inline mod tests { ... } bodies and *_tests.rs names are not the convention. Do not adopt rust_gtest_interop.",
+      "rationale": "The guide's test-framework section names Chrome's rust_gtest_interop and Fuchsia's #[fuchsia::test]. This repo already uses #[test], nextest, and gpui::test, which is its harness. The guide's non-leaf rule allows mod test as a leaf submodule. A separate tests.rs declared with #[cfg(test)] mod tests; is that leaf. The guide does not require the body to sit in the parent, and it does not name files. AGENTS.md is the stricter rule, and the English contribute page repeats it: unit tests go in a sibling tests.rs or tests/ module, not inline. Measured on 2026-10-23, 130 files already declare mod tests; that way (119 tests.rs files, 111 files under tests/ directories, 9 of them tests/mod.rs, and 5 tests.rs files that also declare tests/<theme>.rs; no tests.rs sits beside tests/mod.rs). The gap is 48 inline bodies, 2980 lines from the mod line through the closing brace: lumilio-core 20, lumilio-ui 25, lumilio-app 2, lumilio-docgen 1. navigation.rs is the largest, lines 680–867 (188 lines) of an 867-line file. Forty-seven bodies are #[cfg(test)]; root_lock.rs is #[cfg(all(test, unix))], 19 lines (39–57). Twelve further cfg(test) modules are not named tests: ten *_tests.rs files (decoded 149, download_source 89, transfer budget 133, memory 118, parallel 294, pause 146, pieces 89, resume 220, user_agent 317, updater download 119), plus test_server.rs (221) and world_explorer/perf.rs (160). A text search also hits crates/lumilio-ui/src/i18n/tests.rs twice; both hits are inside the scanner fixture (a comparison and a raw string), not a module.",
+      "consequences": "T10 is the gate, with two shrinking allowlists (caps 48 and 12). T11–T14 empty them. backdrop.rs is not on either list. New unit tests use tests.rs or tests/<theme>.rs. A #[cfg(test)] on a function, field, or use is not a violation."
+    },
+    {
+      "id": "D8",
+      "decision": "Keep both foo.rs + foo/ and foo/mod.rs. New implementation splits use name/mod.rs. Do not add a task that converts one shape to the other.",
+      "rationale": "AGENTS.md says a split past about 800 non-test lines uses name/mod.rs for the public surface. 52 implementation modules already do, and none of them also have a sibling name.rs. Rust 2018 also allows foo.rs plus a foo/ directory. Of the 70 such pairs measured on 2026-10-23, 59 are an implementation file whose directory holds only test files (tests.rs, and in fetch/ and settings/ also a *_tests.rs), and 5 are the documented theme layout (tests.rs plus tests/<theme>.rs in schematic-render, cubiomes, plugin-modrinth, core plugins, and app live). The other 6 are small implementation submodules: modpack/curseforge.rs, credentials/chunked.rs, import_game/profile.rs, activity_log/downloads.rs, java_runtime/archive.rs and graalvm.rs, and world_map/store/annotations.rs. credentials/chunked.rs is #[cfg(any(target_os = \"windows\", test))]; it is production code on Windows, not a test module. The guide does not choose between the two file shapes. Converting the 6 hybrids, or the 9 tests/mod.rs modules, would move files and not change behavior.",
+      "consequences": "T3–T9 keep using name/mod.rs. The test gate does not fail either shape. No later task in this plan unifies them."
     }
   ],
   "references": [
@@ -132,7 +179,9 @@
     ".agents/plans/wasm-plugin-registry.json",
     "crates/lumilio-core/src/lib.rs",
     "crates/lumilio-core/src/service/error.rs",
-    "crates/lumilio-transfer/src/error_text.rs"
+    "crates/lumilio-transfer/src/error_text.rs",
+    "web/src/content/docs/en/docs/contribute/change-and-review.md",
+    "crates/lumilio-ui/src/i18n/tests.rs"
   ],
   "roadmap": {
     "enabled": false,
