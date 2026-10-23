@@ -23,7 +23,7 @@ pub use self::accounts::{
 };
 pub use self::activity::{
     ACTIVITY_CATEGORIES, ActivityRow, ActivityState, TrafficReading, activity_in_tab,
-    activity_rows, bytes_text, eta_text, file_amount, rate_text, recovery_message, source_host,
+    activity_rows, bytes_text, eta_text, file_amount, recovery_message, source_host,
 };
 pub use self::discover::{
     AdvancedOption, CardTag, CardTags, CountKind, DateKind, DiscoverChange, DiscoverQuery,
@@ -137,13 +137,16 @@ impl LiveModel {
     pub fn set_activity(&mut self, mut rows: Vec<ActivityRow>, now_ms: u64) {
         let mut next = BTreeMap::new();
         for row in &mut rows {
-            if let Some(name) = self
+            match self
                 .library
                 .iter()
                 .find(|card| card.id == row.detail)
                 .map(|card| card.name.clone())
             {
-                row.detail = name;
+                Some(name) => row.detail = name,
+                // A game that is gone (or not made yet) has no name to show,
+                // and its id is no name either.
+                None => row.detail.clear(),
             }
             let (Some(task), Some((done, _))) = (row.task, row.amount) else {
                 continue;

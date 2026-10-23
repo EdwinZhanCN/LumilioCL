@@ -12,7 +12,11 @@ pub struct ActivityRow {
     pub task: Option<u64>,
     pub category: TaskCategory,
     pub title: String,
+    /// The game it concerns, by name once the library is known; empty when
+    /// it concerns none or the game is gone.
     pub detail: String,
+    /// When a finished task ended, in words ("2 分钟前").
+    pub when: Option<String>,
     /// `None` while running with unknown progress.
     pub fraction: Option<f32>,
     pub state: ActivityState,
@@ -62,13 +66,22 @@ impl TrafficReading {
     }
 }
 
-/// How far a file got: "12.3 MB / 40.0 MB", or what arrived while its size is
-/// not known.
+/// How far a file got, both in the unit of its size: "12.3 / 40.0 MB"; what
+/// arrived while its size is not known.
 #[must_use]
 pub fn file_amount(done: u64, total: Option<u64>) -> String {
-    match total {
-        Some(total) => format!("{} / {}", bytes_text(done as f64), bytes_text(total as f64)),
-        None => bytes_text(done as f64),
+    const KB: f64 = 1024.;
+    let Some(total) = total else {
+        return bytes_text(done as f64);
+    };
+    let (done, total) = (done as f64, total as f64);
+    if total >= KB * KB * KB {
+        let gb = KB * KB * KB;
+        format!("{:.1} / {:.1} GB", done / gb, total / gb)
+    } else if total >= KB * KB {
+        format!("{:.1} / {:.1} MB", done / (KB * KB), total / (KB * KB))
+    } else {
+        format!("{:.0} / {:.0} KB", done / KB, (total / KB).max(1.))
     }
 }
 
@@ -141,22 +154,6 @@ pub fn bytes_text(bytes: f64) -> String {
         format!("{:.1} MB", bytes / (KB * KB))
     } else {
         format!("{:.0} KB", (bytes / KB).max(1.))
-    }
-}
-
-/// How fast a task goes, in words.
-#[must_use]
-pub fn rate_text(unit: lumilio_core::ProgressUnit, per_sec: f64) -> String {
-    match unit {
-        lumilio_core::ProgressUnit::Bytes => {
-            tr!("activity-rate-bytes", rate = bytes_text(per_sec))
-        }
-        lumilio_core::ProgressUnit::Items if per_sec >= 10. => {
-            tr!("activity-rate-files", rate = format!("{per_sec:.0}"))
-        }
-        lumilio_core::ProgressUnit::Items => {
-            tr!("activity-rate-files", rate = format!("{per_sec:.1}"))
-        }
     }
 }
 
@@ -288,6 +285,7 @@ pub(super) fn active_row(task: &ActiveTask, cancellable: bool, paused: bool) -> 
         category: task.category,
         title: task_label(&task.label),
         detail: task.instance_id.clone().unwrap_or_default(),
+        when: None,
         fraction: task
             .progress
             .filter(|(_, total)| *total > 0)
@@ -315,7 +313,8 @@ pub(super) fn finished_row(task: &FinishedTask, now: u64) -> ActivityRow {
         retry: task.retry.clone(),
         category: task.category,
         title: task_label(&task.label),
-        detail: relative_time(task.finished, now),
+        detail: task.instance_id.clone().unwrap_or_default(),
+        when: Some(relative_time(task.finished, now)),
         fraction: None,
         state,
         cancel: None,

@@ -611,8 +611,6 @@ account-remove-failed = Couldn't remove the account
 ## Activity
 
 # Task speed, as in "3.2 MB/s".
-activity-rate-bytes = { $rate }/s
-activity-rate-files = { $rate } files/s
 activity-eta-under-minute = Under a minute
 activity-eta-minutes = { $count ->
     [one] About { $count } minute
@@ -632,20 +630,22 @@ activity-status-done = Done
 activity-status-failed = Failed
 activity-status-cancelled = Cancelled
 activity-status-paused = Paused
+activity-status-downloading = Downloading
+activity-status-waiting = Waiting for a connection
+activity-amount-files = { $done } / { $total } { $total ->
+    [one] file
+   *[other] files
+}
 activity-pause = Pause
 activity-resume = Resume
 activity-show-files = Details
 activity-hide-files = Hide details
-activity-file-waiting = Waiting for a connection
 activity-file-attempt = Attempt { $attempt }
-activity-file-connections = { $count ->
-    [one] { $count } connection
-   *[other] { $count } connections
-}
 activity-files-more = { $count ->
     [one] { $count } more file
    *[other] { $count } more files
 }
+activity-files-queued = { $count } more waiting for a connection
 activity-files-none = Nothing is downloading right now
 activity-retries = { $count ->
     [one] Retried once

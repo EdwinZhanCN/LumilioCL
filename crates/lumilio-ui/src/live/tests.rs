@@ -2,7 +2,7 @@ use super::LiveModel;
 use super::accounts::{account_failure, account_rows};
 use super::activity::{
     ActivityRow, ActivityState, active_row, activity_in_tab, activity_rows, eta_text, next_sample,
-    rate_text, recovery_message,
+    recovery_message,
 };
 use super::discover::{PageItem, SearchStatus, count_label, page_items, parse_rfc3339, tag_label};
 use super::home::home_presentation;
@@ -398,7 +398,7 @@ fn activity_shows_running_first_and_maps_outcomes() {
     assert_eq!(rows[0].cancel, Some(1));
     assert!(rows[1..].iter().all(|row| row.cancel.is_none()));
     assert_eq!(rows[1].state, ActivityState::Done);
-    assert_eq!(rows[1].detail, "2 分钟前");
+    assert_eq!(rows[1].when.as_deref(), Some("2 分钟前"));
     assert_eq!(rows[2].state, ActivityState::Failed("no route".to_owned()));
     let model = LiveModel {
         activity: rows,
@@ -476,12 +476,7 @@ fn speed_is_the_smoothed_change_between_readings_and_ignores_noise() {
 }
 
 #[test]
-fn speed_and_time_left_read_naturally() {
-    use lumilio_core::ProgressUnit::{Bytes, Items};
-    assert_eq!(rate_text(Bytes, 3.2 * 1024. * 1024.), "3.2 MB/秒");
-    assert_eq!(rate_text(Bytes, 900. * 1024.), "900 KB/秒");
-    assert_eq!(rate_text(Items, 42.4), "42 个文件/秒");
-    assert_eq!(rate_text(Items, 2.46), "2.5 个文件/秒");
+fn time_left_reads_naturally() {
     assert_eq!(eta_text(100, 10.).as_deref(), Some("不到 1 分钟"));
     assert_eq!(eta_text(900, 10.).as_deref(), Some("约 2 分钟"));
     assert_eq!(eta_text(36_000, 5.).as_deref(), Some("约 2 小时 0 分钟"));
@@ -500,6 +495,7 @@ fn set_activity_gives_running_rows_a_speed_names_the_game_and_forgets_finished_t
         category: TaskCategory::Download,
         title: "t".into(),
         detail: "a".into(),
+        when: None,
         fraction: None,
         state: ActivityState::Running,
         cancel: None,
@@ -535,6 +531,7 @@ fn an_activity_tab_shows_only_its_category_and_all_shows_everything() {
         category,
         title: title.to_owned(),
         detail: String::new(),
+        when: None,
         fraction: None,
         state: ActivityState::Done,
         cancel: None,
@@ -838,8 +835,9 @@ fn file_amounts_and_sources_read_short() {
     use super::activity::{file_amount, source_host};
     assert_eq!(
         file_amount(1024 * 1024, Some(4 * 1024 * 1024)),
-        "1.0 MB / 4.0 MB"
+        "1.0 / 4.0 MB"
     );
+    assert_eq!(file_amount(512, Some(300 * 1024)), "0 / 300 KB");
     assert_eq!(file_amount(2048, None), "2 KB");
     assert_eq!(
         source_host("https://bmclapi2.bangbang93.com/maven/a.jar?x=1"),
@@ -850,4 +848,30 @@ fn file_amounts_and_sources_read_short() {
         "mirror.test:8443"
     );
     assert_eq!(source_host("file:///tmp/a.jar"), "file:///tmp/a.jar");
+}
+
+#[test]
+fn a_finished_row_names_its_game_and_says_when_it_ended() {
+    let finished = |instance: &str| FinishedTask {
+        category: TaskCategory::Install,
+        label: TaskLabel::Text("t".to_owned()),
+        instance_id: Some(instance.to_owned()),
+        started: 0,
+        finished: NOW - 120,
+        outcome: TaskOutcome::Succeeded,
+        retry: None,
+    };
+    let view = ActivityView {
+        finished: vec![finished("a"), finished("gone")],
+        ..ActivityView::default()
+    };
+    let mut model = LiveModel::default();
+    model.set_library(vec![library_card(&record("a", false, None, 1), NOW)]);
+    model.set_activity(activity_rows(&view, NOW), 1_000);
+    assert_eq!(model.activity[0].detail, "A");
+    assert_eq!(model.activity[0].when.as_deref(), Some("2 分钟前"));
+    assert_eq!(
+        model.activity[1].detail, "",
+        "a game that is gone is not named by its id"
+    );
 }

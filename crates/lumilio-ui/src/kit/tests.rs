@@ -4,7 +4,9 @@ use gpui::{IntoElement, Render, TestAppContext, Window, div};
 use gpui_component::{Theme, ThemeMode};
 
 use super::motd::motd_color;
-use super::{Item, TagKind, list, lit_bars, motd_lines, panel_list, signal, signal_bars, tag};
+use super::{
+    Item, TagKind, list, lit_bars, motd_lines, panel_list, signal, signal_bars, speed_digits, tag,
+};
 use crate::theme::{self, ShellColors};
 
 /// A small field and a small key side by side.
@@ -369,5 +371,20 @@ fn a_line_break_in_html_becomes_a_paragraph_break() {
         paragraph_breaks("<p>a < b <brief> <b>x</b></p>"),
         "<p>a < b <brief> <b>x</b></p>",
         "other tags and a bare < stay"
+    );
+}
+
+#[test]
+fn a_speed_fills_five_digit_places_with_one_decimal() {
+    assert_eq!(
+        speed_digits(21.1 * 1024. * 1024.),
+        ("!21.1".to_owned(), "MB/s")
+    );
+    assert_eq!(speed_digits(900. * 1024.), ("900.0".to_owned(), "KB/s"));
+    assert_eq!(speed_digits(0.), ("!!0.0".to_owned(), "KB/s"));
+    assert_eq!(
+        speed_digits(5_000. * 1024. * 1024.),
+        ("999.9".to_owned(), "MB/s"),
+        "a speed past the display stops at its largest number"
     );
 }

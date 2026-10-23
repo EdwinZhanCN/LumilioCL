@@ -42,7 +42,7 @@ Status: InProgress
 - T4：元数据与更新器经引擎下载的测试通过。
   Result: crates/lumilio-transfer/src/memory_tests.rs 5 个测试：内存读取等待连接池许可、繁忙来源重试一次且不发事件、404 不重试、不可达来源算未应答、超限拒收。core 的 fetch、catalog、loader、injector、skin、方块资源包测试改为经引擎后通过。crates/lumilio-updater/src/download_tests.rs 3 个测试：站点失败时从 GitHub 取更新包与 SHA256SUMS、哈希不符的包被拒且不留文件。
 - T5：Project Maintainer 截图验收下载中心。
-  Result: 已实现并由测试覆盖：crates/lumilio-ui/src/shell/tests/activity.rs 点「详情」展开文件、「暂停」「继续」发出对应意图、工具栏显示速度与连接读数；live/tests.rs 覆盖可暂停条件、暂停时无速度、总速度读数、文件与来源的读法；core 的 a_task_shows_its_files_their_sources_and_the_sources_given_up 覆盖文件、连接数与换源记录。开发钩子 LUMILIO_ACTIVITY=java|graalvm（LUMILIO_ACTIVITY_DETAIL、LUMILIO_ACTIVITY_PAUSE）可在临时数据目录里打开真实下载的动态页。截图验收待 Project Maintainer。
+  Result: 已按 D9 实现并由测试覆盖：crates/lumilio-ui/src/shell/tests/activity.rs 点行首展开键列出文件、「暂停」「继续」发出对应意图、有下载时出现下载显示屏；live/tests.rs 覆盖可暂停条件、暂停时无剩余时间、总速度读数、已下载量与来源的读法、结束的任务写出游戏与时间；kit/tests.rs 覆盖显示屏上的速度数字；core 的 a_task_shows_its_files_their_sources_and_the_sources_given_up 覆盖文件、连接数与换源记录。开发钩子 LUMILIO_ACTIVITY=java|graalvm（LUMILIO_ACTIVITY_DETAIL、LUMILIO_ACTIVITY_PAUSE）可在临时数据目录里打开真实下载的动态页；中文 1200×800（浅色、夜间）与英文 720×480 已在真实窗口里看过。截图验收待 Project Maintainer。
 
 ## Decision D1
 
@@ -108,6 +108,14 @@ Why: 元数据原本每个来源只试一次；默认的 5 次退避会让离线
 
 Consequences: fetch_decoded 的调用方改为传引擎（服务用不加锁的 fetcher()，启动器用自己的引擎）；post_document 仍直接走 transport，写请求不重试。
 
+## Decision D9
+
+下载中心只有一块显示屏：动态页列表上方、有任务在下载时出现，段码显示总速度，每格一条连接（格数是「同时下载数」），读数是进行中与已暂停的任务数。任务行（运行中与已结束的）都用 kit::Item：行首是展开键或同宽空位，名字旁是 LED 加一个词，名字下是游戏标签与行进度条，右侧一个读数（已下载 / 总量，其下剩余时间；结束的写何时结束），最后是键。展开后是文件表：名字、来源、连接格、短进度条、已下载量，换源写在对应文件下，排队的文件只数个数。
+
+Why: 第一版的同一件事说了几遍：每行一块显示屏加一个百分比文字、标题下的速度、工具栏右侧的速度与连接数、文件行的「N 个连接」标签；几个任务并行时右侧是一列黑块。设计语言 §12 里显示屏是仪器上的那一块屏，行是表格。
+
+Consequences: docs/design-language.md §12 写明 Activity 的唯一显示屏、行进度条与连接格；行不再显示各自的速度，也不再有百分比。安装、修复任务的读数按文件个数（它们不知道总字节数），下载类任务按字节。kit::progress 与工具栏读数删除。
+
 ## References
 
 - [crates/lumilio-transfer/src/engine.rs](../../crates/lumilio-transfer/src/engine.rs)
@@ -117,3 +125,5 @@ Consequences: fetch_decoded 的调用方改为传引擎（服务用不加锁的 
 - https://github.com/modrinth/code/tree/main/packages/app-lib
 
 - Lesson: 2026-10-22 分段的第一版只在传输开始时看有没有空闲连接。真实安装里大文件总在批次占满连接时开始，于是从不分段（Mojang Java 的 modules 一直用一个连接）。修复：单连接下载每 250 ms 看一次空闲连接，把正在读的应答交给分段（D7）。Guard：crates/lumilio-transfer/src/parallel_tests.rs 的 a_large_file_started_on_a_full_budget_splits_once_a_connection_frees，去掉中途交接后失败。
+
+- Lesson: 2026-10-22 加了中途交接后 Mojang 的大文件仍然一加入就退回一条连接。piston-data 的 ETag 不带引号（etag: 0x8DD…），引擎把它原样放进 If-Range；不带引号的值不是实体标签，服务器按日期解析失败，把每个区间都回成整份 200，借来的连接据此认定来源不肯分段。修复：If-Range 只用强 ETag（带引号、非 W/），否则用 Last-Modified，都没有就不作校验器（attempt.rs 的 range_validator）。Guard：parallel_tests.rs 的 only_a_strong_tag_or_a_date_guards_a_range 与 a_source_whose_tag_has_no_quotes_still_splits_by_its_date（假服务器按 HTTP 规则解析 If-Range），换回旧规则后失败。

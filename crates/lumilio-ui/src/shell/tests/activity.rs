@@ -44,6 +44,7 @@ fn a_failed_task_offers_retry_and_open_and_a_game_that_is_gone_offers_no_open(
         category: TaskCategory::Repair,
         title: "修复".into(),
         detail: String::new(),
+        when: None,
         fraction: None,
         state: ActivityState::Failed("no route".into()),
         cancel: None,
@@ -109,6 +110,7 @@ fn a_downloading_task_shows_its_files_and_pauses_from_its_row(cx: &mut TestAppCo
         category: TaskCategory::Install,
         title: "安装".into(),
         detail: String::new(),
+        when: None,
         fraction: Some(0.4),
         state: ActivityState::Running,
         cancel: Some(7),
@@ -152,7 +154,7 @@ fn a_downloading_task_shows_its_files_and_pauses_from_its_row(cx: &mut TestAppCo
     });
     cx.run_until_parked();
 
-    assert!(cx.debug_bounds("live-traffic").is_some());
+    assert!(cx.debug_bounds("live-transfer-display").is_some());
     assert!(cx.debug_bounds("live-task-files-0").is_none());
     let detail = cx.debug_bounds("live-task-detail-0").expect("details key");
     cx.simulate_click(detail.center(), Modifiers::none());
