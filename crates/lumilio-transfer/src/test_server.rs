@@ -25,12 +25,15 @@ pub(super) struct Asked {
     pub(super) start: u64,
     pub(super) end: Option<u64>,
     pub(super) validator: Option<String>,
+    /// Whether the answer was the range asked for (`206`).
+    pub(super) ranged: bool,
 }
 
 #[derive(Default)]
 pub(super) struct State {
     pub(super) content: Vec<u8>,
     pub(super) etag: Option<String>,
+    pub(super) last_modified: Option<String>,
     /// Whether a range is answered with `206`, else with the whole `200`.
     pub(super) ranges: bool,
     /// Whether a whole answer says `Accept-Ranges: bytes`.
@@ -99,15 +102,21 @@ impl Server {
     ) -> TransportResponse {
         let (start, end) = range.unwrap_or((0, None));
         let mut state = self.state();
+        let length = state.content.len();
+        // As HTTP reads `If-Range`: a quoted tag that matches, or the date;
+        // anything else is a date it cannot parse, so the file changed.
+        let fresh = validator.is_none_or(|validator| {
+            (validator.starts_with('"') && state.etag.as_deref() == Some(validator))
+                || state.last_modified.as_deref() == Some(validator)
+        });
+        let ranged = range.is_some() && state.ranges && fresh;
         state.asked.push(Asked {
             url: url.to_owned(),
             start,
             end,
             validator: validator.map(str::to_owned),
+            ranged,
         });
-        let length = state.content.len();
-        let fresh = validator.is_none_or(|validator| state.etag.as_deref() == Some(validator));
-        let ranged = range.is_some() && state.ranges && fresh;
         let (from, to) = if ranged {
             (
                 start as usize,
@@ -123,6 +132,9 @@ impl Server {
         let mut headers = Vec::new();
         if let Some(etag) = &state.etag {
             headers.push(("etag".to_owned(), etag.clone()));
+        }
+        if let Some(date) = &state.last_modified {
+            headers.push(("last-modified".to_owned(), date.clone()));
         }
         let status = if ranged {
             headers.push((

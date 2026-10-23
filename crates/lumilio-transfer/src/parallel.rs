@@ -26,6 +26,9 @@ use tokio::fs::{self, File, OpenOptions};
 use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 use tokio::task::JoinSet;
 
+/// The most connections one file downloads over at once, its own included.
+pub const CONNECTIONS_PER_FILE: usize = 8;
+
 /// When a free connection may join a file, and how finely it may be split.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Split {
@@ -42,7 +45,7 @@ impl Default for Split {
         Self {
             threshold: 8 * 1024 * 1024,
             smallest: 1024 * 1024,
-            connections: 8,
+            connections: CONNECTIONS_PER_FILE,
         }
     }
 }

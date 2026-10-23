@@ -50,6 +50,7 @@ async fn a_paused_download_lets_its_connection_go_and_continues_when_resumed() {
     let paused = TransferEngine::with_budget(server.clone(), budget.clone());
     let other = TransferEngine::with_budget(server.clone(), budget.clone());
     let control = CancellationToken::new();
+    let mut reported = paused.subscribe();
 
     let first = {
         let paused = paused.clone();
@@ -63,6 +64,13 @@ async fn a_paused_download_lets_its_connection_go_and_continues_when_resumed() {
     };
     pause_after_first_bytes(&paused, control.clone()).await;
     eventually(|| budget.open() == 0).await;
+    let mut connections = None;
+    while let Ok(event) = reported.try_recv() {
+        if let TransferEvent::Connections { count, .. } = event {
+            connections = Some(count);
+        }
+    }
+    assert_eq!(connections, Some(0), "a paused file says it holds none");
 
     // While it is paused, the only connection serves another download.
     other

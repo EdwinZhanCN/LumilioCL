@@ -42,6 +42,7 @@ pub use self::engine::{TransferBatchReport, TransferEngine};
 pub use self::error_text::with_causes;
 pub use self::http::{DefaultTransport, FileTransport, HttpTransport};
 pub use self::memory::FetchFailure;
+pub use self::parallel::CONNECTIONS_PER_FILE;
 pub use self::partial::sweep_partials;
 pub use self::request::{
     ContentDigest, RetryPolicy, SourceFailure, TransferError, TransferEvent, TransferOutcome,

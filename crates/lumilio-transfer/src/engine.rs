@@ -289,10 +289,17 @@ where
                     source: source.clone(),
                     attempt,
                 });
-                let failure = match self
+                let result = self
                     .download_once(request, source, part, note, cancellation)
-                    .await
-                {
+                    .await;
+                if result.is_err() {
+                    // Between attempts, and while paused, it holds none.
+                    self.events.send(TransferEvent::Connections {
+                        id: request.id.clone(),
+                        count: 0,
+                    });
+                }
+                let failure = match result {
                     Ok(bytes) => {
                         return Ok(TransferOutcome::Downloaded {
                             source: source.clone(),

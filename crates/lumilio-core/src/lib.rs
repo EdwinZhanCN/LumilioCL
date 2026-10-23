@@ -230,11 +230,11 @@ pub use storage::{
 };
 pub use transfer::USER_AGENT;
 pub use transfer::{
-    ByteStream, ConnectionBudget, ContentDigest, DefaultTransport, FileTransport, HttpMethod,
-    HttpRequest, HttpTransport, OfficialSource, PrefixMirror, RetryPolicy, SourceChain,
-    SourceFailure, SourceProvider, TransferBatchReport, TransferEngine, TransferError,
-    TransferEvent, TransferOutcome, TransferRequest, Transport, TransportError, TransportFuture,
-    TransportResponse,
+    ByteStream, CONNECTIONS_PER_FILE, ConnectionBudget, ContentDigest, DefaultTransport,
+    FileTransport, HttpMethod, HttpRequest, HttpTransport, OfficialSource, PrefixMirror,
+    RetryPolicy, SourceChain, SourceFailure, SourceProvider, TransferBatchReport, TransferEngine,
+    TransferError, TransferEvent, TransferOutcome, TransferRequest, Transport, TransportError,
+    TransportFuture, TransportResponse,
 };
 pub use tuning::{
     AfterLaunch, Appearance, DOWNLOAD_CONCURRENCY, DiscoverPreferences, EnvVar, FONT_SCALE_PERCENT,

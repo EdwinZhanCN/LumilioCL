@@ -163,6 +163,63 @@ async fn a_full_budget_leaves_a_large_file_to_one_connection() {
     assert_eq!(server.requests().len(), 1);
 }
 
+#[test]
+fn only_a_strong_tag_or_a_date_guards_a_range() {
+    use super::attempt::range_validator;
+    use super::transport::TransportResponse;
+    let answer = |headers: &[(&str, &str)]| {
+        TransportResponse::from_bytes(200, Vec::new()).with_headers(
+            headers
+                .iter()
+                .map(|(name, value)| ((*name).to_owned(), (*value).to_owned()))
+                .collect(),
+        )
+    };
+    let date = "Mon, 19 May 2025 08:31:05 GMT";
+    assert_eq!(
+        range_validator(&answer(&[("etag", "\"v1\""), ("last-modified", date)])).as_deref(),
+        Some("\"v1\"")
+    );
+    assert_eq!(
+        range_validator(&answer(&[
+            ("etag", "0x8DD96AF7F64D50E"),
+            ("last-modified", date)
+        ]))
+        .as_deref(),
+        Some(date)
+    );
+    assert_eq!(range_validator(&answer(&[("etag", "W/\"v1\"")])), None);
+    assert_eq!(
+        range_validator(&answer(&[("etag", "0x8DD96AF7F64D50E")])),
+        None
+    );
+}
+
+#[tokio::test]
+async fn a_source_whose_tag_has_no_quotes_still_splits_by_its_date() {
+    let dir = tempfile::tempdir().unwrap();
+    let destination = dir.path().join("large");
+    let server = server(true);
+    {
+        let mut state = server.state();
+        state.etag = Some("0x8DD96AF7F64D50E".to_owned());
+        state.last_modified = Some("Mon, 19 May 2025 08:31:05 GMT".to_owned());
+    }
+    let budget = ConnectionBudget::new(4).unwrap();
+
+    engine(&server, &budget)
+        .transfer(request(&destination), CancellationToken::new())
+        .await
+        .unwrap();
+
+    assert_eq!(std::fs::read(&destination).unwrap(), content());
+    let requests = server.requests();
+    assert!(
+        requests[1..].iter().any(|asked| asked.ranged),
+        "every range came back whole: {requests:?}"
+    );
+}
+
 #[tokio::test]
 async fn a_large_file_started_on_a_full_budget_splits_once_a_connection_frees() {
     let dir = tempfile::tempdir().unwrap();

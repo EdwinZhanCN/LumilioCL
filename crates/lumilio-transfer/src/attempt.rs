@@ -86,11 +86,7 @@ where
         } else {
             (Vec::new(), 0)
         };
-        let validator = response
-            .header("etag")
-            .or_else(|| response.header("last-modified"))
-            .map(str::to_owned)
-            .or(if continued { validator } else { None });
+        let validator = range_validator(&response).or(if continued { validator } else { None });
 
         let response_length = response.content_length();
         let length = request
@@ -397,6 +393,21 @@ async fn kept_bytes(
             }
         }
     }
+}
+
+/// What `If-Range` may carry for this answer: a strong `ETag`, else its
+/// `Last-Modified`. A weak or unquoted tag is no tag to `If-Range`: a server
+/// reads it as a date it cannot parse and answers a range with the whole
+/// file (piston-data sends `etag: 0x8DD…` without quotes).
+pub(super) fn range_validator(response: &TransportResponse) -> Option<String> {
+    let strong = response
+        .header("etag")
+        .map(str::trim)
+        .filter(|tag| tag.len() >= 2 && tag.starts_with('"') && tag.ends_with('"'));
+    strong
+        .or_else(|| response.header("last-modified").map(str::trim))
+        .filter(|validator| !validator.is_empty())
+        .map(str::to_owned)
 }
 
 /// Whether `ranges` is exactly `range`.
