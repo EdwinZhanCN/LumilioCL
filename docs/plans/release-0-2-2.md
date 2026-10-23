@@ -4,7 +4,7 @@
 
 Status: InProgress
 
-0.2.1 之后合入了统一下载引擎（续传、暂停、大文件分段与新的下载中心）、启动即退出时显示游戏输出、每次启动的输出留在游戏的 logs 文件夹，以及 NeoForge 1.21.4、Apple 芯片上 1.19 之前的版本、1.7.2 及更早版本的启动修复。0.2.2 的更新器改经新下载引擎下载更新包，而它第一次真正被用到是在下一个版本，所以打标签前先用本地测试包在 Mac 上走一遍自动更新（R2）。Project Maintainer 只在自己的 Mac 上实测。
+0.2.1 之后合入了统一下载引擎（续传、暂停、大文件分段与新的下载中心）、启动即退出时显示游戏输出、每次启动的输出留在游戏的 logs 文件夹，以及 NeoForge 1.21.4、Apple 芯片上 1.19 之前的版本、1.7.2 及更早版本的启动修复；发布前又加上第一次打开时同意免责声明与 Minecraft EULA（terms-consent）。0.2.2 的更新器改经新下载引擎下载更新包，而它第一次真正被用到是在下一个版本，所以打标签前先用本地测试包在 Mac 上走一遍自动更新（R2）。Project Maintainer 只在自己的 Mac 上实测。
 
 ## Scope
 
@@ -14,6 +14,7 @@ Status: InProgress
 - In: PR #74：Apple 芯片上 1.19 之前的版本改用 Intel Java（intel-natives-on-arm）。
 - In: PR #71：1.7.2 及更早的版本不再报 game_assets 缺失（#70）。
 - In: PR #77：玻璃主题下实例页封面融进背景（translucent-themes）。
+- In: PR #82：第一次打开时同意免责声明与 Minecraft EULA，设置 › 关于可再看，添加离线账户前确认拥有正版账户（terms-consent）。
 - In: 版本号、计划、release-notes/0.2.2.md 与 .en.md。
 - Out: error-reporting T5（panic 记录）、T6（启动阶段对话框）未做。
 - Out: 下载中心的换源只由测试覆盖，真实下载中没有触发过（download-engine T5）。
@@ -31,9 +32,9 @@ Status: InProgress
 - [ ] R3 — 通过 PR 合入版本更新 (Proposed)
   Acceptance: rust、plans 检查通过后合入 main，合入后 main 的 CI 通过。
 - [ ] R4 — 打 v0.2.2 标签并发布为正式版 (Proposed)
-  Acceptance: 合入提交在 main 上的 CI 通过、R2 完成后再打标签；v0.2.2 指向该提交，Release 工作流生成草稿；Project Maintainer 在正文末行填上 PR 编号后发布为正式版（Latest）。
+  Acceptance: 合入提交在 main 上的 CI 通过、R2 与 terms-consent 的 T5（Project Maintainer 看过免责声明、关于和离线账户弹窗）完成后再打标签；v0.2.2 指向该提交，Release 工作流生成草稿；Project Maintainer 在正文末行填上 PR 编号后发布为正式版（Latest）。
 - [ ] R5 — 更新后在 Mac 上检查并关闭计划 (Proposed)
-  Acceptance: 从 0.2.1 自动更新到 0.2.2，重启后弹出一次「已更新到 LumilioCL 0.2.2」，更新内容只有 0.2.2 一份；动态页能看到下载详情。记下结果后关闭本计划。
+  Acceptance: 从 0.2.1 自动更新到 0.2.2，重启后先弹出免责声明，同意后弹出一次「已更新到 LumilioCL 0.2.2」，更新内容只有 0.2.2 一份；动态页能看到下载详情。记下结果后关闭本计划。
 
 ## Validation
 
@@ -66,6 +67,8 @@ Consequences: R2 用 ad hoc 签名的本地包与真实的 v0.2.1 发布资产�
 - https://github.com/EdwinZhanCN/LumilioCL/pull/77
 - https://github.com/EdwinZhanCN/LumilioCL/pull/79
 - https://github.com/EdwinZhanCN/LumilioCL/pull/80
+- https://github.com/EdwinZhanCN/LumilioCL/pull/82
+- [.agents/plans/terms-consent.json](../../.agents/plans/terms-consent.json)
 - [.agents/plans/download-engine.json](../../.agents/plans/download-engine.json)
 - [.agents/plans/error-reporting.json](../../.agents/plans/error-reporting.json)
 - [.agents/plans/intel-natives-on-arm.json](../../.agents/plans/intel-natives-on-arm.json)
@@ -78,3 +81,4 @@ Consequences: R2 用 ad hoc 签名的本地包与真实的 v0.2.1 发布资产�
 - [Plan error-reporting](error-reporting.md)
 - [Plan intel-natives-on-arm](intel-natives-on-arm.md)
 - [Plan translucent-themes](translucent-themes.md)
+- [Plan terms-consent](terms-consent.md)
