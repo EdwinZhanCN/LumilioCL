@@ -1,0 +1,145 @@
+{
+  "schemaVersion": 1,
+  "id": "rust-structure",
+  "title": "Structural pass against the Google Rust style guide",
+  "summary": "Google's Rust style guide (https://google.github.io/styleguide/rustguide.html) was read in full and compared with the workspace. Formatting that rustfmt and clippy already cover is out of scope. The gaps that cost maintenance are: non-leaf modules that still hold the implementation, a handful of files past the repo's own ~800 non-test-line rule, and error types that store another error but do not expose it through Error::source. Chromium-only rules (flat crate layout, no async, no std threads, tiny crates) do not fit this Cargo project and are not adopted. This plan is the record of that judgment. It does not change launcher behavior.",
+  "status": "proposed",
+  "visibility": "internal",
+  "scope": {
+    "included": [
+      "A shrinking allowlist so non-test Rust files under crates/ stop growing past about 800 lines.",
+      "Error::source on variants that already store another error, without changing Display text.",
+      "Splits of non-leaf modules that still implement the API: model_view, world_explorer, schematic_studio.",
+      "Splits where one file already has two concerns: settings (accounts and launcher settings), the replace dialog, the instance intent router, and plugin-tab rendering."
+    ],
+    "excluded": [
+      "Behavior changes, copy changes, and IA path changes. Moved // ia comments stay byte-for-byte; just ia must not rewrite docs/ia/paths.",
+      "A thiserror or anyhow migration, and retyping ServiceError::Install(String) or ServiceError::Remote(String).",
+      "UI-thread unwrap and expect cleanup. That stays on error-reporting T5.",
+      "Splitting InstanceStore (crates/lumilio-core/src/instance.rs) or the release manifest (crates/lumilio-core/src/release.rs) only to hit a line count.",
+      "New crates, a flat Chromium layout, workspace missing_docs, unwrap_used, or blanket #[non_exhaustive].",
+      "forks/, vendor/, and tools/entity-dump (the Java dumper is one class beside its Rust reader and is not a Rust-style target)."
+    ]
+  },
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Stop oversized files from growing.",
+      "status": "proposed",
+      "acceptance": "A lumilio-docgen test counts lines outside #[cfg(test)] modules in crates/**/src/**/*.rs, skipping tests.rs, *tests.rs, and tests/ directories. A file over 800 lines must be on a committed allowlist, and the allowlist must equal that set. The list may only shrink: its length stays <= 10, the size it has on the day the test lands. Starting entries, with non-test lines measured on 2026-10-23: model_view/mod.rs 1539, world_explorer/mod.rs 1519, schematic_studio/dialogs/replace.rs 1351, instance_detail/plugin_tabs.rs 1003, lumilio-app live/instance.rs 976, lumilio-core instance.rs 941, schematic_studio/mod.rs 902, lumilio-core release.rs 876, lumilio-ui backdrop.rs 857, lumilio-core settings.rs 824. just test-pkg lumilio-docgen passes, then just check stays green. No production file moves in this task."
+    },
+    {
+      "id": "T2",
+      "title": "Forward Error::source where an error is already stored.",
+      "status": "proposed",
+      "acceptance": "Every variant that already holds a type implementing Error returns it from source(). Display text is unchanged, so existing string assertions still pass. The known holes are the 54 empty impl Error for … {} bodies; the ones that store another error include ServiceError (Store, Settings, Auth, Io, Launch, and the other typed arms), StoreError::Io, PersistError::Io, UpdateError (Content, Discover, Intent, Transfer), ModpackError (Io, Store, Transfer), LaunchServiceError (Release, Launch, Install, Process), and AnnotationError (Database, Json). ReleaseError, RepairError, PictureError, AssetIndexError, and InstallError already implement source and stay as they are. String variants stay strings (decision D4). A core test builds ServiceError::Store(StoreError::Io) and asserts source() walks to the io::Error. with_causes still does not repeat a sentence Display already contains. just test-pkg lumilio-core and just test-pkg lumilio-transfer pass, then just check stays green."
+    },
+    {
+      "id": "T3",
+      "title": "Move Viewer out of model_view/mod.rs.",
+      "status": "proposed",
+      "acceptance": "crates/lumilio-ui/src/model_view/mod.rs keeps module declarations and re-exports. Viewer, its state, and its Render impl move into sibling files. // ia comments move unchanged. just ia leaves docs/ia/paths identical. The render tree is unchanged. just test-pkg lumilio-ui model_view passes. Each new file is at or under 800 non-test lines, model_view/mod.rs leaves the T1 allowlist, and just check stays green."
+    },
+    {
+      "id": "T4",
+      "title": "Move MapView out of world_explorer/mod.rs.",
+      "status": "proposed",
+      "acceptance": "crates/lumilio-ui/src/world_explorer/mod.rs keeps module declarations and re-exports. MapView and its Render impl move into a sibling file. // ia comments move unchanged and just ia leaves docs/ia/paths identical. just test-pkg lumilio-ui world_explorer passes. The file leaves the T1 allowlist at or under 800 non-test lines. just check stays green."
+    },
+    {
+      "id": "T5",
+      "title": "Move StudioView out of schematic_studio/mod.rs.",
+      "status": "proposed",
+      "acceptance": "crates/lumilio-ui/src/schematic_studio/mod.rs keeps module declarations and re-exports. StudioView and its Render impl move into a sibling file. Public paths (StudioView, StudioWindow, Command, Connection) stay. just test-pkg lumilio-ui schematic_studio passes. The file leaves the T1 allowlist at or under 800 non-test lines. just check stays green. This file has no // ia comments."
+    },
+    {
+      "id": "T6",
+      "title": "Split accounts out of settings.rs.",
+      "status": "proposed",
+      "acceptance": "crates/lumilio-core/src/settings.rs becomes a directory module. Account types and account mutations live in one file; launcher preferences, mirrors, and SettingsStore live in another. lumilio_core::AccountEntry and the other names re-exported from lib.rs do not change. settings.json field names and schema version do not change. just test-pkg lumilio-core settings passes. Both files are at or under 800 non-test lines and settings.rs leaves the allowlist. just check stays green."
+    },
+    {
+      "id": "T7",
+      "title": "Split the replace dialog by concern.",
+      "status": "proposed",
+      "acceptance": "crates/lumilio-ui/src/schematic_studio/dialogs/replace.rs becomes a directory module: select-item types in one file, saved schemes in another, ReplaceDialog and its render in a third. // ia comments move unchanged and just ia leaves docs/ia/paths identical. just test-pkg lumilio-ui schematic_studio passes. Each file is at or under 800 non-test lines and replace.rs leaves the allowlist. just check stays green."
+    },
+    {
+      "id": "T8",
+      "title": "Split the instance intent router.",
+      "status": "proposed",
+      "acceptance": "crates/lumilio-app/src/live/instance.rs (976 lines) splits along the functions it already has: opening and loading an instance, instance_intent (today one function from about line 126 to 498), and the screenshot, server, export, and crash helpers. pub(super) names used by sibling live modules stay. just test-pkg lumilio-app live passes. Each file is at or under 800 non-test lines and live/instance.rs leaves the allowlist. just check stays green."
+    },
+    {
+      "id": "T9",
+      "title": "Split plugin-tab rendering from arrival.",
+      "status": "proposed",
+      "acceptance": "crates/lumilio-ui/src/instance_detail/plugin_tabs.rs keeps the arrival methods on InstanceDetailView. The view-tree render (plugin_panel and the helpers from about line 660) moves to a sibling file. just test-pkg lumilio-ui instance_detail passes. Each file is at or under 800 non-test lines and plugin_tabs.rs leaves the allowlist. just check stays green."
+    }
+  ],
+  "validation": [
+    {
+      "criterion": "just plans-check accepts this record and its generated Markdown.",
+      "result": null
+    },
+    {
+      "criterion": "After T1–T9, just check is green, docs/ia/paths is unchanged, and the allowlist is only instance.rs, release.rs, and backdrop.rs.",
+      "result": null
+    }
+  ],
+  "decisions": [
+    {
+      "id": "D1",
+      "decision": "Keep the Cargo layout and the current crate split. Do not flatten sources into one directory per crate, and do not break lumilio-core or lumilio-ui into smaller crates for style.",
+      "rationale": "The guide marks flat layout and tiny crates as Chromium rules. They exist for a GN build graph, not for Cargo. This repo already has many small crates (transfer, nbt, anvil, plugin-api, one crate per plugin). lumilio-core is about 77k lines and lumilio-ui about 86k because AGENTS.md puts domain logic in core and pages in ui. lib.rs is 253 lines and 64 pub use lines: the root already re-exports the public surface and keeps child modules private, which is the part of the guide worth keeping.",
+      "consequences": "Compile times and dependency direction stay as they are. A new crate still needs a dependency-direction reason, not a style reason."
+    },
+    {
+      "id": "D2",
+      "decision": "Keep async, tokio, std::thread workers, Arc, and Rc. Keep catch_unwind around plugin calls and the schematic preview worker.",
+      "rationale": "The guide's bans on async and std threads are Chromium rules. The launcher is a tokio app; GPUI callbacks are not Send, so Rc is the honest tool; shared download and plugin state is Arc. catch_unwind in crates/lumilio-core/src/plugins/mod.rs and crates/lumilio-ui/src/model_view/worker.rs is the guide's own defense-in-depth exception: a plugin or a mesher panic must not kill the process. Google forbids relying on it for correctness. This code does not: the panic becomes Fault or a failed preview.",
+      "consequences": "No task replaces these. A new catch_unwind still needs the same isolation reason."
+    },
+    {
+      "id": "D3",
+      "decision": "Do not enable missing_docs, unwrap_used, non_exhaustive, or rustfmt imports_granularity for the workspace. Do not rename domain abbreviations.",
+      "rationale": "publish is false and one team owns every crate. missing_docs would demand comments the guide itself says to omit when the name is enough. unwrap in production is mostly inside #[cfg(test)] modules that share a file with the code; the UI-thread cases are already error-reporting T5. non_exhaustive matters across teams. Plugins are in-tree; API_VERSION is 1. If wasm-plugin-registry ships external plugins, that plan owns stability attributes. imports_granularity is formatting. Nbt, Motd, and similar names are the domain's names.",
+      "consequences": "plugin-api stays an ordinary Rust API until an external plugin boundary exists. Clippy stays at the workspace denies (dbg_macro, todo, unimplemented) plus rustfmt."
+    },
+    {
+      "id": "D4",
+      "decision": "Do not adopt thiserror. Do not retype stringly service errors. Do implement source() for stored errors.",
+      "rationale": "Display strings are the sentences people read. A derive migration would move that copy for no behavior change, and error-reporting already left a thiserror migration out. ServiceError::Install(String) and Remote(String) are the boundary where TransferError, ModpackError, and most DiscoverError values become one sentence; callers match Cancelled and the typed variants and print to_string(). TransportError is already a string because http.rs runs with_causes before wrapping, which is how DNS and TLS text is kept. Empty impl Error for … {} still drops the chain wherever a typed error is stored: ServiceError::source is empty, so a walk stops at the service even when StoreError holds an io::Error.",
+      "consequences": "T2 is additive and display-neutral. A later caller that must branch on install failures changes the enum in that feature's plan, not in this one."
+    },
+    {
+      "id": "D5",
+      "decision": "Leave three files on the allowlist after the splits: instance.rs, release.rs, and backdrop.rs.",
+      "rationale": "instance.rs is one InstanceStore (schema version 6). release.rs is one manifest model plus inheritance, and it is already named after that item. backdrop.rs is the rejected visual experiment compiled only under cfg(test). Cutting them up would not separate a second concern. The other eight files are either non-leaf modules full of implementation (the guide's rule, and the 800-line rule) or already mix two concerns.",
+      "consequences": "T1's list shrinks to those three paths and no further. A new oversized file fails the test instead of joining the list."
+    },
+    {
+      "id": "D6",
+      "decision": "Leave unsafe where it is.",
+      "rationale": "The workspace forbids unsafe_code. lumilio-cubiomes, lumilio-pointer, and lumilio-backdrop opt into deny and keep the unsafe in ffi.rs, macos.rs, and windows.rs, with SAFETY comments. That is the guide's isolation rule. The Java entity dumper is not Rust.",
+      "consequences": "No task moves FFI. New unsafe still has to live in one of those crates or justify a new one."
+    }
+  ],
+  "references": [
+    "https://google.github.io/styleguide/rustguide.html",
+    "AGENTS.md",
+    ".agents/plans/error-reporting.json",
+    ".agents/plans/wasm-plugin-registry.json",
+    "crates/lumilio-core/src/lib.rs",
+    "crates/lumilio-core/src/service/error.rs",
+    "crates/lumilio-transfer/src/error_text.rs"
+  ],
+  "roadmap": {
+    "enabled": false,
+    "id": "rust-structure",
+    "name": "Rust structure",
+    "lede": "Internal maintenance. Not a user-facing roadmap item.",
+    "targetVersion": null,
+    "order": 0
+  }
+}
