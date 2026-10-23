@@ -2,7 +2,7 @@
 
 # 准备发布 0.2.2
 
-Status: InProgress
+Status: Completed
 
 0.2.1 之后合入了统一下载引擎（续传、暂停、大文件分段与新的下载中心）、启动即退出时显示游戏输出、每次启动的输出留在游戏的 logs 文件夹，以及 NeoForge 1.21.4、Apple 芯片上 1.19 之前的版本、1.7.2 及更早版本的启动修复；发布前又加上第一次打开时同意免责声明与 Minecraft EULA（terms-consent）。0.2.2 的更新器改经新下载引擎下载更新包，而它第一次真正被用到是在下一个版本，所以打标签前先用本地测试包在 Mac 上走一遍自动更新（R2）。Project Maintainer 只在自己的 Mac 上实测。
 
@@ -29,11 +29,11 @@ Status: InProgress
   Acceptance: 工作区版本为 0.2.2，Cargo.lock 同步；release-notes/0.2.2.md 与 .en.md 写 0.2.1 之后的改动，小节和条目数一致；0.2.1 的说明保留；本计划与投影生成。
 - [x] R2 — 打标签前在 Mac 上检查新的更新器 (Completed)
   Acceptance: 用 origin/main 构建、版本号临时改为 0.2.0 的测试包（just package，不提交），从临时目录、临时 LUMILIO_HOME 启动：自动检查发现 0.2.1，经新下载引擎从 launcher.lumilio.org 下载 dmg，按 SHA256SUMS 校验后装进运行中的 bundle，bundle 的 Info.plist 变为 0.2.1，再在同一数据目录启动后显示 0.2.1 的更新内容一次。下载中途断开网络时保留已下载部分并在 partial-downloads/ 记下说明；再次启动后从已下载处续传，校验通过并装好。
-- [ ] R3 — 通过 PR 合入版本更新 (Proposed)
+- [x] R3 — 通过 PR 合入版本更新 (Completed)
   Acceptance: rust、plans 检查通过后合入 main，合入后 main 的 CI 通过。
-- [ ] R4 — 打 v0.2.2 标签并发布为正式版 (Proposed)
+- [x] R4 — 打 v0.2.2 标签并发布为正式版 (Completed)
   Acceptance: 合入提交在 main 上的 CI 通过、R2 与 terms-consent 的 T5（Project Maintainer 看过免责声明、关于和离线账户弹窗）完成后再打标签；v0.2.2 指向该提交，Release 工作流生成草稿；Project Maintainer 在正文末行填上 PR 编号后发布为正式版（Latest）。
-- [ ] R5 — 更新后在 Mac 上检查并关闭计划 (Proposed)
+- [x] R5 — 更新后在 Mac 上检查并关闭计划 (Completed)
   Acceptance: 从 0.2.1 自动更新到 0.2.2，重启后先弹出免责声明，同意后弹出一次「已更新到 LumilioCL 0.2.2」，更新内容只有 0.2.2 一份；动态页能看到下载详情。记下结果后关闭本计划。
 
 ## Validation
@@ -43,11 +43,11 @@ Status: InProgress
 - 0.2.2 的更新器在 Mac 上下载、校验并装好更新，断网后能续传（R2）。
   Result: 2026-10-22：用 cfab279 构建、版本号临时改为 0.2.0 的 ad hoc 签名包，在 Apple 芯片 Mac 的临时目录与临时 LUMILIO_HOME 中运行，经本地 CONNECT 代理限速。第一次运行自动检查发现 0.2.1，从 launcher.lumilio.org 分 8 段下载 dmg；代理在约 12 MB 时断开所有连接并停止监听，两个来源都连接被拒，只记一条 automatic update check failed 警告；updates/ 里留下 .LumilioCL-0.2.1-macos-arm64.dmg.lumilio.part，partial-downloads/ 的说明记有来源、ETag、期望哈希、长度与已写区间（11938066 字节）。第二次运行经代理只下载 22998383 字节（余下 22440568 字节加协议开销，不是整个 34378634 字节），.part 改名为 dmg、说明删除，dmg 的 SHA256 与 GitHub 上 v0.2.1 的 SHA256SUMS.txt 一致；随即装进运行中的 bundle：Info.plist 变为 0.2.1，codesign --verify --deep --strict 通过，导航条出现重启更新键。第三次在同一数据目录直接启动该 bundle：日志为 LumilioCL 0.2.1 starting，弹出一次「已更新到 LumilioCL 0.2.1」，只有 0.2.1 一份更新内容，release_notes_seen 变为 0.2.1。未按重启键（见 probe-updater-before-tag）。
 - 合入后 main 的 CI 通过（R3）。
-  Result: pending
+  Result: 2026-10-22：#81 在 #82 之后 rebase，rust、plans 检查通过后 squash 合入 main（3712999）；合入提交在 main 上的 CI 与 Plans 通过。
 - v0.2.2 指向合入提交并发布为正式版（R4）。
-  Result: pending
+  Result: 2026-10-23：v0.2.2 指向 3712999，Release 工作流生成草稿，含五个安装包与 SHA256SUMS.txt，正文末行填上 PR #81；Project Maintainer 看过 terms-consent 的 T5 后发布为正式版（Latest）。launcher.lumilio.org 与 GitHub 的 releases/latest 给出同一份 SHA256SUMS.txt。
 - 从 0.2.1 更新到 0.2.2 后在 Mac 上只显示一次、一份更新内容（R5）。
-  Result: pending
+  Result: 2026-10-23：从 GitHub 下载 v0.2.1 的 macOS dmg（SHA256 与 v0.2.1 的 SHA256SUMS.txt 一致），把其中的 LumilioCL.app 拷到临时目录，在 release_notes_seen 为 0.2.1、没有同意记录的临时 LUMILIO_HOME 中运行。0.2.1 的自动检查经 launcher.lumilio.org 发现 0.2.2，下载的 dmg 与 v0.2.2 的 SHA256SUMS.txt 一致，装进运行中的 bundle：Info.plist 变为 0.2.2，codesign --verify --deep --strict 通过，导航条出现重启更新键。在同一数据目录直接启动该 bundle：日志为 LumilioCL 0.2.2 starting，先弹出免责声明，更新内容没有同时弹出。原生窗口里无法点按，于是把「同意并继续」写入的 terms_accepted（TERMS_VERSION 1）直接写进 settings.json 再启动；点按本身由 terms-consent 的 T5 与 live::tests::terms 覆盖。随后弹出一次「已更新到 LumilioCL 0.2.2」，正文是 0.2.2 的说明，release_notes_seen 变为 0.2.2；第三次启动不再弹窗。动态页下载 GraalVM 时显示总速度、连接数、任务行进度，以及正在下载的文件与来源。未按重启键（见 probe-updater-before-tag）。
 
 ## Decision probe-updater-before-tag
 
@@ -82,3 +82,7 @@ Consequences: R2 用 ad hoc 签名的本地包与真实的 v0.2.1 发布资产�
 - [Plan intel-natives-on-arm](intel-natives-on-arm.md)
 - [Plan translucent-themes](translucent-themes.md)
 - [Plan terms-consent](terms-consent.md)
+
+## Outcome
+
+v0.2.2 于 2026-10-23 发布为正式版（Latest），指向 3712999。它带来统一下载引擎（续传、暂停、大文件分段与下载中心）、启动即退出时显示游戏输出、每次启动的输出留在 logs 文件夹、NeoForge 1.21.4 与旧版本的启动修复，以及第一次打开时同意免责声明与 Minecraft EULA（terms-consent，已关闭）。打标签前用本地测试包检查了 0.2.2 的更新器，包括断网后续传（R2）；发布后检查了从 0.2.1 自动更新，先出免责声明、同意后才显示一次更新内容（R5）。Windows 上的检查交给社区反馈。

@@ -3,7 +3,7 @@
   "id": "terms-consent",
   "title": "启动器内的免责声明与 Minecraft EULA 同意",
   "summary": "免责声明以前只在 README 里。现在第一次打开启动器（以及条款版本提高后）先弹出免责声明，同意遵守 Minecraft EULA 才能使用，不同意只能退出；设置 › 关于可以再看；添加离线账户时要勾选「我拥有正版 Minecraft 账户」，只在弹窗里确认，不记录。随 0.2.2 发布。",
-  "status": "in_progress",
+  "status": "completed",
   "visibility": "internal",
   "scope": {
     "included": [
@@ -46,7 +46,7 @@
     {
       "id": "T5",
       "title": "Project Maintainer 在 Mac 上看过。",
-      "status": "proposed",
+      "status": "completed",
       "acceptance": "在临时数据目录里第一次打开显示免责声明，中英文排版正常；同意后进入启动器，有未看的更新内容时随后显示；退出关闭启动器；再次打开不再询问；关于里能再看；添加离线账户需要先勾选。"
     }
   ],
@@ -57,7 +57,7 @@
     },
     {
       "criterion": "Project Maintainer 在 Mac 上看过（T5）。",
-      "result": null
+      "result": "2026-10-23：Project Maintainer 在 Mac 上看过启动时的免责声明、设置 › 关于里的「免责声明」与添加离线账户的复选框，都符合预期。"
     }
   ],
   "references": [
@@ -87,5 +87,6 @@
       "consequences": "每次添加离线账户都要勾选一次；已有的离线账户不受影响。"
     }
   ],
-  "lessonsLearned": []
+  "lessonsLearned": [],
+  "outcome": "随 0.2.2 于 2026-10-23 发布：第一次打开启动器（以及 TERMS_VERSION 提高后）先显示免责声明，同意遵守 Minecraft EULA 后才能使用，不同意只能退出，同意后才显示更新内容；设置 › 关于可以再看；添加离线账户前要勾选「我拥有正版 Minecraft 账户」，只在弹窗里确认。Project Maintainer 在 Mac 上看过三处弹窗。中文段落里全角标点有时排在行首，原因在 GPUI 的换行规则，记在 backlog。Windows 与 Linux 上的检查交给社区反馈。"
 }
