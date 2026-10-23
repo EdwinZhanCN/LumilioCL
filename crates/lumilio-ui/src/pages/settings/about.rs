@@ -128,6 +128,24 @@ pub(super) fn about(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
             ),
             colors,
         ),
+        row(
+            "settings-disclaimer",
+            tr!("settings-disclaimer"),
+            Some(tr!("settings-disclaimer-help").to_owned()),
+            "",
+            Some(
+                // ia[settings]: 免责声明 | 关于 · 按键 | 打开第一次打开时同意的免责声明，只读；「阅读 Minecraft EULA」在浏览器打开 EULA
+                kit::ghost(
+                    "settings-disclaimer-open",
+                    tr!("settings-disclaimer-open"),
+                    |window, cx| {
+                        crate::terms::show(crate::terms::Occasion::Read, window, cx);
+                    },
+                )
+                .into_any_element(),
+            ),
+            colors,
+        ),
         // ia[settings]: 开源许可 | 关于 · 值 | 显示 AGPL-3.0-only
         row(
             "settings-license",

@@ -1,10 +1,12 @@
 //! The add-offline-account dialog (IA `accounts.md`): a name checked as it is
-//! typed, and an advanced profile id. It holds no business logic: saving goes
-//! through an [`AccountRequest`] and the answer comes back through
-//! [`AccountForm::saved`].
+//! typed, an advanced profile id, and the person's word that they have a
+//! legitimate Minecraft account (plan terms-consent; asked here, not kept).
+//! It holds no business logic: saving goes through an [`AccountRequest`] and
+//! the answer comes back through [`AccountForm::saved`].
 
 use std::rc::Rc;
 
+use crate::controls::Checkbox;
 use crate::key::Key;
 use gpui::{App, Context, Entity, IntoElement, Render, WeakEntity, Window, div, prelude::*, px};
 use gpui_component::dialog::Dialog;
@@ -71,6 +73,8 @@ pub struct AccountForm {
     name: Entity<InputState>,
     uuid: Entity<InputState>,
     advanced: bool,
+    /// Ticked "I have a legitimate Minecraft account"; Add waits for it.
+    owns_game: bool,
     /// The first account becomes the current one; the dialog says so.
     first: bool,
     busy: bool,
@@ -109,6 +113,7 @@ impl AccountForm {
             name,
             uuid,
             advanced: false,
+            owns_game: false,
             first,
             busy: false,
             error: None,
@@ -125,6 +130,9 @@ impl AccountForm {
 
     /// The finished request, or `None` while something is missing or wrong.
     pub fn request(&self, cx: &App) -> Option<AccountRequest> {
+        if !self.owns_game {
+            return None;
+        }
         let (name, uuid) = self.typed(cx);
         request_from(&name, &uuid, self.advanced)
     }
@@ -248,6 +256,17 @@ impl Render for AccountForm {
                     });
                 })
         };
+        // ia[accounts]: 确认拥有正版账户 | 添加离线账户弹窗 · 复选框「我拥有正版 Minecraft 账户」 | 勾选后「添加」才可用；只在这个弹窗里确认，不记录
+        let owns_game = Checkbox::new("account-own-game")
+            .checked(self.owns_game)
+            .disabled(busy)
+            .label(tr!("account-own-game"))
+            .on_click(move |_, _, cx| {
+                let _ = entity.update(cx, |form, cx| {
+                    form.owns_game = !form.owns_game;
+                    cx.notify();
+                });
+            });
         v_flex()
             .id("account-form")
             .w_full()
@@ -295,6 +314,7 @@ impl Render for AccountForm {
                         })),
                 )
             })
+            .child(h_flex().child(owns_game))
             .children(self.error.clone().map(|(message, technical)| {
                 h_flex()
                     .gap_2()

@@ -22,6 +22,7 @@
 | 游戏页·投影观察 | Wayland 原生相对指针与鼠标锁定 | 接入 GPUI 的 relative-pointer / pointer-constraints 协议；当前明确提示不支持捕获，Orbital 可用 |
 | 整合包 | 整合包更新（识别包管理文件）；整合包内容单独更新时的提示 | — |
 | 恢复 | 恢复模式界面、数据迁移、未完成安装/更新的恢复、进程失联接管、跨卷删除 | 需分别明确恢复边界与验收条件 |
+| 界面语言 | 中文段落换行时，全角的「，。、；：）」』》」可能落在行首（免责声明、更新内容都见过） | GPUI 的 `LineWrapper::is_word_char`（gpui-pre 0.3.7 `text_system/line_wrapper.rs`）只让 ASCII 的收尾标点跟着前一个字；在上游补上全角收尾标点并加测试，或在 `forks/` 维护 gpui 后修 |
 | 界面语言 | 系统语言与所选语言不同时，启动时先按系统语言生成并存进状态的文字（如游戏库卡片的「1 year ago」）在读到保存的语言后不重新生成 | 原因未复现确认；先写失败的测试，再让这些文字在语言切换后重新生成（`i18n::generation()`） |
 | 外观 | 主题的间距密度；Gruvbox、Tokyo Night 内置主题；Windows 11 的 Mica 窗口材质 | 页面间距是 rem 写死的，要先有统一的间距档位 |
 | 网站 | og:image（1200×630，首屏方块板与标题，见 `web/src/layouts/Base.astro` 的 `TODO(asset)`）；功能探索窗口的动态素材（GIF）；按 0.2.0 界面重拍 `discovery.png`（紧凑列表行）与 `appearance.png`（新主题与「不用壁纸」） | 截图在 `assets/screenshots/`，构建时复制到 `web/public/shots/`；按 launcher-site 的 screenshot-refresh 只换图片文件，不改组件与样式 |

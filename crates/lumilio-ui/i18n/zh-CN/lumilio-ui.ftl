@@ -461,6 +461,8 @@ account-uuid-help = 游戏用它认出你，存档里的玩家数据也按它保
 account-uuid-problem = UUID 需要 32 位十六进制数字（可带横线）
 account-advanced-expand = 高级选项
 account-advanced-collapse = 收起高级选项
+# 勾选后「添加」才可用；只在这个弹窗里确认，不记录。
+account-own-game = 我拥有正版 Minecraft 账户
 
 # 离线账户的皮肤对话框。
 account-skin-title = { $name } 的皮肤
@@ -1897,6 +1899,9 @@ settings-logs-help = 启动器遇到的警告和错误，出了问题时可以�
 settings-diagnostics = 诊断包
 settings-diagnostics-help = 打包版本、设置摘要、Java 列表、启动器日志和各游戏的最近日志；玩家名、UUID 和你的文件夹路径会被替换，启动前/包装/退出后命令只记录有没有填。
 settings-diagnostics-export = 导出…
+settings-disclaimer = 免责声明
+settings-disclaimer-help = 第一次打开时同意的声明，以及 Minecraft EULA。
+settings-disclaimer-open = 查看
 settings-license = 开源许可
 
 settings-plugins-none = 暂无插件
@@ -2348,6 +2353,18 @@ release-notes-updated = 已更新到 LumilioCL { $version }
 release-notes-title = LumilioCL { $version } 更新内容
 release-notes-all = 全部更新日志
 release-notes-done = 知道了
+## 免责声明
+# 与 README 的「免责声明」同一组要点。第一次打开时（以及条款更新后）要同意才能使用，设置 › 关于里可以再看。
+terms-title = 免责声明
+terms-unofficial = **非官方产品**：LumilioCL 是独立的第三方开源项目，不是 Minecraft 官方产品，未获 Mojang Studios、Microsoft 或网易（NetEase）的批准或授权，也与它们没有任何关联。
+terms-no-hosting = **只是本地工具**：LumilioCL 在你的电脑上管理文件、设置 Java 参数并启动游戏，不存储、不托管、也不直接分发任何 Minecraft 游戏文件、官方资源或其他受版权保护的商业内容。游戏文件由启动器在你的电脑上直接从 Mojang 官方接口，或你选择的公开镜像源下载。
+terms-genuine = **正版与合规使用**：请支持正版。用 LumilioCL 下载或运行游戏，需要拥有合法的 Minecraft 正版账户，并遵守 Minecraft 最终用户许可协议（EULA）。开发者不对任何绕过正版验证、修改游戏文件或违反官方条款的行为负责。
+terms-third-party = **第三方资源与服务**：LumilioCL 可能用到 BMCLAPI、CurseForge、Modrinth 等第三方接口和镜像。这些服务及其内容（包括但不限于模组、整合包、资源包、光影）归各自的平台和原作者所有，并由他们负责。LumilioCL 不担保它们的可用性、安全性或内容是否合法。
+terms-no-warranty = **无担保**：LumilioCL 按“原样”提供，不附带任何明示或暗示的担保。因使用或无法使用 LumilioCL 造成的数据丢失、账户异常或任何直接、间接损失，项目贡献者都不承担责任。
+terms-agree-note = 点「同意并继续」，表示你已阅读以上声明，并同意遵守 Minecraft EULA。
+terms-eula = 阅读 Minecraft EULA
+terms-agree = 同意并继续
+terms-quit = 退出
 ## 投影工作室：版本未知、画不出的方块
 studio-version-unknown = 版本未知
 studio-version-unknown-why = 这份投影没有记录游戏版本。按实例的游戏版本绘制，不自动转换，也不检查缺少的方块。

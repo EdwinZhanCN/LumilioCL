@@ -95,9 +95,18 @@ fn the_dialog_checks_as_you_type_saves_once_and_keeps_the_draft_on_failure(
     cx.simulate_click(add.center(), Modifiers::none());
     assert!(seen.borrow().is_empty());
 
-    // A good name saves once, however often the button is pressed.
+    // A good name waits for the person's word that they own the game.
     type_name(cx, "Steve");
     assert!(cx.debug_bounds("account-name-problem").is_none());
+    let add = cx.debug_bounds("account-add").unwrap();
+    cx.simulate_click(add.center(), Modifiers::none());
+    assert!(seen.borrow().is_empty(), "not confirmed yet");
+    let owns_game = cx.debug_bounds("account-own-game-box").expect("checkbox");
+    cx.simulate_click(owns_game.center(), Modifiers::none());
+    cx.run_until_parked();
+    cx.update(|window, cx| window.draw(cx).clear(cx));
+
+    // Then it saves once, however often the button is pressed.
     let add = cx.debug_bounds("account-add").unwrap();
     cx.simulate_click(add.center(), Modifiers::none());
     cx.simulate_click(add.center(), Modifiers::none());

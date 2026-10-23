@@ -85,6 +85,24 @@ fn a_new_install_has_seen_its_own_notes_and_an_older_file_has_seen_none() {
 }
 
 #[test]
+fn the_terms_are_asked_until_agreed_and_again_when_they_change() {
+    let (dir, mut store) = store();
+    assert!(store.get().terms_pending(), "a new install is asked");
+    store.accept_terms().unwrap();
+    let reopened = SettingsStore::open(dir.path()).unwrap();
+    assert_eq!(reopened.get().terms_accepted, Some(TERMS_VERSION));
+    assert!(!reopened.get().terms_pending());
+
+    std::fs::write(dir.path().join(FILE), r#"{"schema":1}"#).unwrap();
+    let older = SettingsStore::open(dir.path()).unwrap();
+    assert!(older.get().terms_pending(), "a file from before the terms");
+
+    let mut changed = older.get().clone();
+    changed.terms_accepted = Some(TERMS_VERSION - 1);
+    assert!(changed.terms_pending(), "agreed to an earlier version");
+}
+
+#[test]
 fn automatic_update_preference_defaults_on_and_persists() {
     let (dir, mut store) = store();
     assert!(store.get().auto_update);

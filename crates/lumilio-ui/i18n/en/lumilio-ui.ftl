@@ -492,6 +492,7 @@ account-uuid-help = The game uses it to recognize you, and player data in saves 
 account-uuid-problem = UUID needs 32 hexadecimal digits (hyphens allowed)
 account-advanced-expand = Advanced options
 account-advanced-collapse = Hide advanced options
+account-own-game = I have a legitimate Minecraft account
 
 # The offline account skin dialog.
 account-skin-title = { $name }'s skin
@@ -2117,6 +2118,9 @@ settings-logs-help = The warnings and errors the launcher ran into. Look here wh
 settings-diagnostics = Diagnostics
 settings-diagnostics-help = Packs the version, a settings summary, the Java list, the launcher log and each game's recent logs. Player names, UUIDs and your folder paths are replaced; for the before, wrapper and after-exit commands it only records whether they are set.
 settings-diagnostics-export = Export…
+settings-disclaimer = Disclaimer
+settings-disclaimer-help = The disclaimer you agreed to when you first opened the launcher, and the Minecraft EULA.
+settings-disclaimer-open = View
 settings-license = License
 
 settings-plugins-none = No plugins
@@ -2634,6 +2638,17 @@ release-notes-updated = Updated to LumilioCL { $version }
 release-notes-title = What's new in LumilioCL { $version }
 release-notes-all = All release notes
 release-notes-done = Got it
+## Disclaimer
+terms-title = Disclaimer
+terms-unofficial = **Not an official product**: LumilioCL is an independent, third-party open-source project. It is not an official Minecraft product, and it is not approved by, endorsed by or affiliated with Mojang Studios, Microsoft or NetEase.
+terms-no-hosting = **A local tool only**: LumilioCL manages files, sets Java arguments and starts the game on your computer. It does not store, host or directly distribute Minecraft game files, official resources or other copyrighted commercial content. The launcher downloads the game files on your computer, directly from Mojang's official services or from a public mirror that you select.
+terms-genuine = **Genuine accounts and lawful use**: Please support the official game. To download or play the game with LumilioCL, you need a legitimate Minecraft account, and you must obey the Minecraft End User License Agreement (EULA). The developers are not responsible for any attempt to bypass account verification, modify game files or break the official terms.
+terms-third-party = **Third-party resources and services**: LumilioCL can use third-party APIs and mirrors, such as BMCLAPI, CurseForge and Modrinth. These services and their content (including, but not limited to, mods, modpacks, resource packs and shaders) belong to their platforms and original authors, who are responsible for them. LumilioCL gives no warranty for their availability or security, or for the legality of their content.
+terms-no-warranty = **No warranty**: LumilioCL is provided "as is", without warranty of any kind, express or implied. The project contributors are not liable for any data loss, account problems, or direct or indirect damages that come from the use of, or the inability to use, LumilioCL.
+terms-agree-note = When you click Agree and continue, you confirm that you read this disclaimer and that you agree to obey the Minecraft EULA.
+terms-eula = Read the Minecraft EULA
+terms-agree = Agree and continue
+terms-quit = Quit
 ## Schematic studio: unknown version, blocks not drawn
 studio-version-unknown = Version unknown
 studio-version-unknown-why = This schematic does not record its game version. It is drawn with the game version of the instance. It is not converted automatically, and missing blocks are not checked.

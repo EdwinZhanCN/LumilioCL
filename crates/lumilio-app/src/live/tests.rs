@@ -1,6 +1,7 @@
 mod dependencies;
 mod global_context;
 mod missing_folder;
+mod terms;
 
 use super::jobs::outcome;
 use lumilio_ui::toast::Toast;
