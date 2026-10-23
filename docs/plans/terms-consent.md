@@ -2,7 +2,7 @@
 
 # 启动器内的免责声明与 Minecraft EULA 同意
 
-Status: InProgress
+Status: Completed
 
 免责声明以前只在 README 里。现在第一次打开启动器（以及条款版本提高后）先弹出免责声明，同意遵守 Minecraft EULA 才能使用，不同意只能退出；设置 › 关于可以再看；添加离线账户时要勾选「我拥有正版 Minecraft 账户」，只在弹窗里确认，不记录。随 0.2.2 发布。
 
@@ -26,7 +26,7 @@ Status: InProgress
   Acceptance: 关于里有「免责声明」行，按「查看」只读打开同一份声明，没有同意说明、「退出」和「同意并继续」；「知道了」与 Esc 关闭。
 - [x] T4 — 添加离线账户前确认拥有正版账户。 (Completed)
   Acceptance: 添加离线账户弹窗有复选框「我拥有正版 Minecraft 账户」，默认不勾选；不勾选时即使名称有效「添加」也不发出请求；勾选后照常添加。确认不写进设置。
-- [ ] T5 — Project Maintainer 在 Mac 上看过。 (Proposed)
+- [x] T5 — Project Maintainer 在 Mac 上看过。 (Completed)
   Acceptance: 在临时数据目录里第一次打开显示免责声明，中英文排版正常；同意后进入启动器，有未看的更新内容时随后显示；退出关闭启动器；再次打开不再询问；关于里能再看；添加离线账户需要先勾选。
 
 ## Validation
@@ -34,7 +34,7 @@ Status: InProgress
 - T1–T4 的测试通过，去掉守卫时按预期失败。
   Result: 2026-10-22：core settings::tests::the_terms_are_asked_until_agreed_and_again_when_they_change 覆盖新装、旧文件、同意后重开与低于 TERMS_VERSION 的记录；lumilio-core 832 项通过。ui terms::tests 两项：同意时 720×480 里按键在窗口内、Esc 不关闭、「退出」只调用退出、「同意并继续」调用后关闭；只读时没有同意说明与两个键，Esc 与「知道了」关闭。临时让同意弹窗响应 Esc 时第一项在「still open」失败。accounts::tests 的弹窗测试在名称有效但未勾选时不发出请求，勾选后只保存一次；去掉 owns_game 判断时在「not confirmed yet」失败。app live::tests::terms 经真实启动路径：设置里看过的更新内容是旧版本时先出免责声明、更新内容等待，「同意并继续」后写入 TERMS_VERSION 再显示更新内容，再次启动不再询问；临时在弹出免责声明时同时显示更新内容，该测试在「the notes wait」失败。core、ui、app 的 clippy -D warnings 与 fmt 通过，just ia 重新生成。未运行完整 just check。
 - Project Maintainer 在 Mac 上看过（T5）。
-  Result: pending
+  Result: 2026-10-23：Project Maintainer 在 Mac 上看过启动时的免责声明、设置 › 关于里的「免责声明」与添加离线账户的复选框，都符合预期。
 
 ## Decision D1
 
@@ -66,3 +66,7 @@ Consequences: 每次添加离线账户都要勾选一次；已有的离线账户
 - README.en.md
 - https://www.minecraft.net/eula
 - [.agents/plans/release-0-2-2.json](../../.agents/plans/release-0-2-2.json)
+
+## Outcome
+
+随 0.2.2 于 2026-10-23 发布：第一次打开启动器（以及 TERMS_VERSION 提高后）先显示免责声明，同意遵守 Minecraft EULA 后才能使用，不同意只能退出，同意后才显示更新内容；设置 › 关于可以再看；添加离线账户前要勾选「我拥有正版 Minecraft 账户」，只在弹窗里确认。Project Maintainer 在 Mac 上看过三处弹窗。中文段落里全角标点有时排在行首，原因在 GPUI 的换行规则，记在 backlog。Windows 与 Linux 上的检查交给社区反馈。
