@@ -106,6 +106,11 @@ impl<T: Transport + Clone> LauncherService<T> {
         Ok(self.settings.lock().await.set_release_notes_seen(version)?)
     }
 
+    /// Remembers that the person agreed to the current terms.
+    pub async fn accept_terms(&self) -> Result<(), ServiceError> {
+        Ok(self.settings.lock().await.accept_terms()?)
+    }
+
     pub async fn set_java_source(
         &self,
         source: crate::java_runtime::JavaSource,

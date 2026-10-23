@@ -45,6 +45,7 @@ pub mod settings_forms;
 pub mod shell;
 pub mod skin_dialog;
 pub mod skin_view;
+pub mod terms;
 pub mod theme;
 pub mod third_party_login;
 pub mod toast;

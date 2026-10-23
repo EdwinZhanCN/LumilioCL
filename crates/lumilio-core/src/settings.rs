@@ -23,6 +23,11 @@ const SCHEMA_VERSION: u32 = 1;
 /// produce a launch that cannot start.
 pub const MAX_MEMORY_MB: u32 = 1024 * 1024;
 
+/// The terms the launcher asks a person to agree to before it can be used:
+/// its disclaimer and the Minecraft EULA. A change to their meaning raises
+/// it, so everyone is asked again (plan terms-consent).
+pub const TERMS_VERSION: u32 = 1;
+
 /// Shared validation for stored defaults, instance overrides and resolved launches.
 pub(crate) fn validate_memory(min: Option<u32>, max: Option<u32>) -> Result<(), SettingsError> {
     let in_range = |value: Option<u32>| value.is_none_or(|v| (1..=MAX_MEMORY_MB).contains(&v));
@@ -180,6 +185,10 @@ pub struct LauncherSettings {
     /// start after updating shows them.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub release_notes_seen: Option<String>,
+    /// The [`TERMS_VERSION`] the person agreed to. A new install and a file
+    /// from before the terms have none, so both are asked.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub terms_accepted: Option<u32>,
 }
 
 fn auto_update_default() -> bool {
@@ -218,6 +227,7 @@ impl Default for LauncherSettings {
             auto_download_block_assets: true,
             launch: LaunchTuning::default(),
             release_notes_seen: Some(env!("CARGO_PKG_VERSION").to_owned()),
+            terms_accepted: None,
         }
     }
 }
@@ -239,6 +249,13 @@ impl LauncherSettings {
         } else {
             DownloadSourcePreference::OfficialFirst
         })
+    }
+
+    /// Whether the person still has to agree to the current terms.
+    #[must_use]
+    pub fn terms_pending(&self) -> bool {
+        self.terms_accepted
+            .is_none_or(|accepted| accepted < TERMS_VERSION)
     }
 }
 
@@ -409,6 +426,16 @@ impl SettingsStore {
         }
         let mut next = self.settings.clone();
         next.release_notes_seen = Some(version.to_owned());
+        self.save(next)
+    }
+
+    /// Remembers that the person agreed to the current terms.
+    pub fn accept_terms(&mut self) -> Result<(), SettingsError> {
+        if !self.settings.terms_pending() {
+            return Ok(());
+        }
+        let mut next = self.settings.clone();
+        next.terms_accepted = Some(TERMS_VERSION);
         self.save(next)
     }
 

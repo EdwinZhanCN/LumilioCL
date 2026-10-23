@@ -6,6 +6,7 @@
 
 | 操作 | 层 / 组件 | 结果与反馈 | 备注 | 实现 |
 |---|---|---|---|---|
+| 确认拥有正版账户 | 添加离线账户弹窗 · 复选框「我拥有正版 Minecraft 账户」 | 勾选后「添加」才可用；只在这个弹窗里确认，不记录 |  | `lumilio-ui/src/accounts.rs` |
 | 查看账户 | 左侧列表的一行 | 右侧显示该账户的详情与外观；不改变当前账户 |  | `lumilio-ui/src/pages/live/accounts.rs` |
 | 复制 UUID | 详情 ⋯ 菜单 | 复制到剪贴板，toast“已复制 UUID” |  | `lumilio-ui/src/pages/live/accounts.rs` |
 | 刷新登录 | 已登录账户详情 ⋯ 菜单「刷新登录」 | 失效的登录显示“需要重新登录”，刷新后恢复 |  | `lumilio-ui/src/pages/live/accounts.rs` |

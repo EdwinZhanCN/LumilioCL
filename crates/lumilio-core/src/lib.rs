@@ -211,7 +211,7 @@ pub use service::{
 };
 pub use settings::{
     AccountEntry, AccountKind, AuthServerEntry, DownloadSourcePreference, LauncherSettings,
-    MAX_MEMORY_MB, MirrorRule, SettingsError, SettingsStore,
+    MAX_MEMORY_MB, MirrorRule, SettingsError, SettingsStore, TERMS_VERSION,
 };
 pub use skin::{
     AccountLook, AppearanceChange, AppearanceError, AppearanceUpdate, LITTLE_SKIN_CSL, LibrarySkin,
