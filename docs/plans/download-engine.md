@@ -2,9 +2,9 @@
 
 # 统一下载引擎：全局连接池、续传、分段与下载中心
 
-Status: InProgress
+Status: Completed
 
-所有下载走同一个引擎。起点：core 里 10 处各自 TransferEngine::new，各有自己的信号量，「同时下载数」实际是每个任务的上限，且自动值不一致（启动/安装 16，内容、整合包与 Java 4）；元数据经 fetch_decoded 直接读进内存，不受并发上限；lumilio-updater 自带 reqwest 下载、失败从零重下；下载失败一律删除 .part 从零重试。T1（拆出 lumilio-transfer 与全局连接池）已在 #79 合并；T2–T5（续传与暂停、大文件分段、元数据与更新器接入、下载中心）在同一个 PR 中完成（D5）。现状：T2–T4 完成；T5 已实现，等 Project Maintainer 截图验收。
+所有下载走同一个引擎。起点：core 里 10 处各自 TransferEngine::new，各有自己的信号量，「同时下载数」实际是每个任务的上限，且自动值不一致（启动/安装 16，内容、整合包与 Java 4）；元数据经 fetch_decoded 直接读进内存，不受并发上限；lumilio-updater 自带 reqwest 下载、失败从零重下；下载失败一律删除 .part 从零重试。T1（拆出 lumilio-transfer 与全局连接池）已在 #79 合并；T2–T5（续传与暂停、大文件分段、元数据与更新器接入、下载中心）在同一个 PR #80 中完成（D5）。五项均已验收。
 
 ## Scope
 
@@ -28,7 +28,7 @@ Status: InProgress
   Acceptance: 已知大小不小于阈值且来源支持 Range 时，用 try_acquire 拿到的空闲许可并发下载区间，空闲连接可再拆最大的未完成区间；批量下载占满许可时不分段，单连接开始的大文件在有连接空出后中途交接、再分段（D7）。同一文件的分段固定一个来源（最终重定向地址），一段失败按现有重试与换源整体处理，已写区间记入说明供下次续传。不支持 Range、回 200、file:// 来源全部回到单连接。测试证明总连接数仍不超过池上限。
 - [x] T4 — 元数据与启动器更新包接入引擎。 (Completed)
   Acceptance: fetch_decoded 经引擎的内存目标下载：占连接池许可、复用重试与换源，不显示在下载中心（D8）。lumilio-updater 依赖 lumilio-transfer、在服务的连接池上下载更新包，获得续传与分段，校验仍以 SHA256SUMS 为准。
-- [ ] T5 — 下载中心翻新。 (InProgress)
+- [x] T5 — 下载中心翻新。 (Completed)
   Acceptance: 动态页的下载任务可展开查看正在下载的文件、所用来源、重试次数与是否分段；显示全局速度与当前连接数；运行中的下载可暂停与继续；失败说明写明失败的来源与已切换到的来源。界面按 docs/design-language.md 设计并声明 ia 路径；截图由 Project Maintainer 验收。
 
 ## Validation
@@ -42,7 +42,7 @@ Status: InProgress
 - T4：元数据与更新器经引擎下载的测试通过。
   Result: crates/lumilio-transfer/src/memory_tests.rs 5 个测试：内存读取等待连接池许可、繁忙来源重试一次且不发事件、404 不重试、不可达来源算未应答、超限拒收。core 的 fetch、catalog、loader、injector、skin、方块资源包测试改为经引擎后通过。crates/lumilio-updater/src/download_tests.rs 3 个测试：站点失败时从 GitHub 取更新包与 SHA256SUMS、哈希不符的包被拒且不留文件。
 - T5：Project Maintainer 截图验收下载中心。
-  Result: 已按 D9 实现并由测试覆盖：crates/lumilio-ui/src/shell/tests/activity.rs 点行首展开键列出文件、「暂停」「继续」发出对应意图、有下载时出现下载显示屏；live/tests.rs 覆盖可暂停条件、暂停时无剩余时间、总速度读数、已下载量与来源的读法、结束的任务写出游戏与时间；kit/tests.rs 覆盖显示屏上的速度数字；core 的 a_task_shows_its_files_their_sources_and_the_sources_given_up 覆盖文件、连接数与换源记录。开发钩子 LUMILIO_ACTIVITY=java|graalvm（LUMILIO_ACTIVITY_DETAIL、LUMILIO_ACTIVITY_PAUSE）可在临时数据目录里打开真实下载的动态页；中文 1200×800（浅色、夜间）与英文 720×480 已在真实窗口里看过。截图验收待 Project Maintainer。
+  Result: 已按 D9 实现并由测试覆盖：crates/lumilio-ui/src/shell/tests/activity.rs 点行首展开键列出文件、「暂停」「继续」发出对应意图、有下载时出现下载显示屏；live/tests.rs 覆盖可暂停条件、暂停时无剩余时间、总速度读数、已下载量与来源的读法、结束的任务写出游戏与时间；kit/tests.rs 覆盖显示屏上的速度数字；core 的 a_task_shows_its_files_their_sources_and_the_sources_given_up 覆盖文件、连接数与换源记录。开发钩子 LUMILIO_ACTIVITY=java|graalvm（LUMILIO_ACTIVITY_DETAIL、LUMILIO_ACTIVITY_PAUSE）可在临时数据目录里打开真实下载的动态页；中文 1200×800（浅色、夜间）与英文 720×480 已在真实窗口里看过。2026-10-22 Project Maintainer 实际下载整合包与 Java 验收了下载中心与各项操作，并跑过 `just check`，无报错。换源一项没能在真实下载中触发，只由测试覆盖。
 
 ## Decision D1
 
@@ -123,6 +123,10 @@ Consequences: docs/design-language.md §12 写明 Activity 的唯一显示屏、
 - [crates/lumilio-core/src/service/tracking.rs](../../crates/lumilio-core/src/service/tracking.rs)
 - https://github.com/fast-down/core
 - https://github.com/modrinth/code/tree/main/packages/app-lib
+
+## Outcome
+
+所有下载共用一个连接池（#79）。中断、取消或失败的下载会续传，任务可以暂停、继续；大文件在有空闲连接时分段，批次占满连接时开始的文件在连接空出后中途交接；元数据和启动器更新包也走同一个引擎。动态页改为一块下载显示屏加任务表，可展开查看文件、来源、连接与换源（#80）。Project Maintainer 用真实的整合包与 Java 下载验收；换源只由测试覆盖。
 
 - Lesson: 2026-10-22 分段的第一版只在传输开始时看有没有空闲连接。真实安装里大文件总在批次占满连接时开始，于是从不分段（Mojang Java 的 modules 一直用一个连接）。修复：单连接下载每 250 ms 看一次空闲连接，把正在读的应答交给分段（D7）。Guard：crates/lumilio-transfer/src/parallel_tests.rs 的 a_large_file_started_on_a_full_budget_splits_once_a_connection_frees，去掉中途交接后失败。
 

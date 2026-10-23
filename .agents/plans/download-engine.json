@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "id": "download-engine",
   "title": "统一下载引擎：全局连接池、续传、分段与下载中心",
-  "summary": "所有下载走同一个引擎。起点：core 里 10 处各自 TransferEngine::new，各有自己的信号量，「同时下载数」实际是每个任务的上限，且自动值不一致（启动/安装 16，内容、整合包与 Java 4）；元数据经 fetch_decoded 直接读进内存，不受并发上限；lumilio-updater 自带 reqwest 下载、失败从零重下；下载失败一律删除 .part 从零重试。T1（拆出 lumilio-transfer 与全局连接池）已在 #79 合并；T2–T5（续传与暂停、大文件分段、元数据与更新器接入、下载中心）在同一个 PR 中完成（D5）。现状：T2–T4 完成；T5 已实现，等 Project Maintainer 截图验收。",
-  "status": "in_progress",
+  "summary": "所有下载走同一个引擎。起点：core 里 10 处各自 TransferEngine::new，各有自己的信号量，「同时下载数」实际是每个任务的上限，且自动值不一致（启动/安装 16，内容、整合包与 Java 4）；元数据经 fetch_decoded 直接读进内存，不受并发上限；lumilio-updater 自带 reqwest 下载、失败从零重下；下载失败一律删除 .part 从零重试。T1（拆出 lumilio-transfer 与全局连接池）已在 #79 合并；T2–T5（续传与暂停、大文件分段、元数据与更新器接入、下载中心）在同一个 PR #80 中完成（D5）。五项均已验收。",
+  "status": "completed",
   "visibility": "internal",
   "scope": {
     "included": [
@@ -48,7 +48,7 @@
     {
       "id": "T5",
       "title": "下载中心翻新。",
-      "status": "in_progress",
+      "status": "completed",
       "acceptance": "动态页的下载任务可展开查看正在下载的文件、所用来源、重试次数与是否分段；显示全局速度与当前连接数；运行中的下载可暂停与继续；失败说明写明失败的来源与已切换到的来源。界面按 docs/design-language.md 设计并声明 ia 路径；截图由 Project Maintainer 验收。"
     }
   ],
@@ -57,7 +57,7 @@
     { "criterion": "T2：续传与回退的假 transport 测试通过。", "result": "crates/lumilio-transfer/src/resume_tests.rs 7 个测试、pause_tests.rs 3 个测试与 user_agent_tests 中 Range/If-Range 请求头测试通过；crates/lumilio-core/src/service/tests/activity.rs 的 a_paused_task_lets_its_connections_go_and_finishes_once_resumed 经服务暂停一个内容安装、看到连接数归零后继续并装好。变异验证：总从零开始（4 个失败）、不发 If-Range（3 个失败）、校验失败后保留说明（1 个失败）、暂停时不放开连接（2 个失败）、传输中不理会暂停（2 个失败）、服务的 pause_task 不暂停（1 个失败）。" },
     { "criterion": "T3：分段、回退与连接上限测试通过。", "result": "crates/lumilio-transfer/src/parallel_tests.rs 7 个测试与 pieces_tests.rs 7 个测试通过，连续 25 次运行稳定：空闲连接加入并都向最终地址要区间、与批次并行时最大在途不超过池上限、来源把区间回成 200 时第一次尝试仍完成、无 Range 与池满时单连接、池满开始的大文件在连接空出后分段、取消后新引擎从已写区间续传。变异验证：加入的连接绕过连接池（1–2 个失败）、从不分段（2 个失败）、加入的连接改向原始来源（1 个失败）、取消后不记已写区间（1 个失败）、不中途交接（1 个失败）。" },
     { "criterion": "T4：元数据与更新器经引擎下载的测试通过。", "result": "crates/lumilio-transfer/src/memory_tests.rs 5 个测试：内存读取等待连接池许可、繁忙来源重试一次且不发事件、404 不重试、不可达来源算未应答、超限拒收。core 的 fetch、catalog、loader、injector、skin、方块资源包测试改为经引擎后通过。crates/lumilio-updater/src/download_tests.rs 3 个测试：站点失败时从 GitHub 取更新包与 SHA256SUMS、哈希不符的包被拒且不留文件。" },
-    { "criterion": "T5：Project Maintainer 截图验收下载中心。", "result": "已按 D9 实现并由测试覆盖：crates/lumilio-ui/src/shell/tests/activity.rs 点行首展开键列出文件、「暂停」「继续」发出对应意图、有下载时出现下载显示屏；live/tests.rs 覆盖可暂停条件、暂停时无剩余时间、总速度读数、已下载量与来源的读法、结束的任务写出游戏与时间；kit/tests.rs 覆盖显示屏上的速度数字；core 的 a_task_shows_its_files_their_sources_and_the_sources_given_up 覆盖文件、连接数与换源记录。开发钩子 LUMILIO_ACTIVITY=java|graalvm（LUMILIO_ACTIVITY_DETAIL、LUMILIO_ACTIVITY_PAUSE）可在临时数据目录里打开真实下载的动态页；中文 1200×800（浅色、夜间）与英文 720×480 已在真实窗口里看过。截图验收待 Project Maintainer。" }
+    { "criterion": "T5：Project Maintainer 截图验收下载中心。", "result": "已按 D9 实现并由测试覆盖：crates/lumilio-ui/src/shell/tests/activity.rs 点行首展开键列出文件、「暂停」「继续」发出对应意图、有下载时出现下载显示屏；live/tests.rs 覆盖可暂停条件、暂停时无剩余时间、总速度读数、已下载量与来源的读法、结束的任务写出游戏与时间；kit/tests.rs 覆盖显示屏上的速度数字；core 的 a_task_shows_its_files_their_sources_and_the_sources_given_up 覆盖文件、连接数与换源记录。开发钩子 LUMILIO_ACTIVITY=java|graalvm（LUMILIO_ACTIVITY_DETAIL、LUMILIO_ACTIVITY_PAUSE）可在临时数据目录里打开真实下载的动态页；中文 1200×800（浅色、夜间）与英文 720×480 已在真实窗口里看过。2026-10-22 Project Maintainer 实际下载整合包与 Java 验收了下载中心与各项操作，并跑过 `just check`，无报错。换源一项没能在真实下载中触发，只由测试覆盖。" }
   ],
   "decisions": [
     {
@@ -126,6 +126,7 @@
     "https://github.com/fast-down/core",
     "https://github.com/modrinth/code/tree/main/packages/app-lib"
   ],
+  "outcome": "所有下载共用一个连接池（#79）。中断、取消或失败的下载会续传，任务可以暂停、继续；大文件在有空闲连接时分段，批次占满连接时开始的文件在连接空出后中途交接；元数据和启动器更新包也走同一个引擎。动态页改为一块下载显示屏加任务表，可展开查看文件、来源、连接与换源（#80）。Project Maintainer 用真实的整合包与 Java 下载验收；换源只由测试覆盖。",
   "roadmap": {
     "enabled": false,
     "id": "download-engine",
