@@ -39,6 +39,8 @@ Status: Completed
   Result: 2026-10-21：Project Maintainer 没有在本地运行；#63 合并 main 后的 b0e9958 上 CI 的 rust 作业（just ci，包含 just check）通过。
 - Project Maintainer 实机检查通过（T6）。
   Result: 2026-10-21：Project Maintainer 实机看过半透明主题的效果，确认满意。
+- #77 修复后，玻璃主题上实例页头部的封面融进背景（见 lessonsLearned）。
+  Result: 2026-10-22：Project Maintainer 在 Mac 上检查通过：玻璃与遮光玻璃主题下实例页右上角没有浅色矩形和硬边，实色主题下实例封面与首页 hero 不变，Retina 屏上边缘清晰。
 
 ## Decision D1
 

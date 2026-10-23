@@ -3,7 +3,7 @@
   "id": "game-folder-missing",
   "title": "游戏目录不见时如实告知",
   "summary": "在 profiles/ 里手动删掉或移走一个游戏的目录后，库里的记录不变，启动时 process.rs 悄悄建出空目录，游戏像新的一样启动，模组、存档和设置都不见了，也没有任何提示。新建游戏原本不建目录（要等第一次启动），所以代码分不清「还没建」和「被删了」。本计划让每条记录都有自己的目录，目录不见时在诊断与「需要留意」里说明，启动前先问，不再自动启动一个空游戏。",
-  "status": "in_progress",
+  "status": "completed",
   "visibility": "internal",
   "scope": {
     "included": [
@@ -47,7 +47,7 @@
     {
       "id": "T5",
       "title": "Project Maintainer 实机检查。",
-      "status": "proposed",
+      "status": "completed",
       "acceptance": "删掉一个玩过的游戏的目录后打开启动器：「需要留意」与诊断页显示目录不见了；按继续出现确认弹窗，三个选项各自如上；新建一个游戏后 profiles 下立即有它的目录。"
     }
   ],
@@ -62,7 +62,7 @@
     },
     {
       "criterion": "实机检查（T5）。",
-      "result": null
+      "result": "2026-10-22：Project Maintainer 在 Mac 上检查通过：删掉一个玩过的游戏的目录后，「需要留意」与诊断页说明目录不见了；按继续出现确认弹窗，三个选项各自生效；新建游戏后 profiles 下立即有它的目录。"
     }
   ],
   "decisions": [
@@ -93,6 +93,7 @@
     "https://github.com/modrinth/code/blob/main/packages/app-lib/src/launcher/mod.rs"
   ],
   "dependencies": [],
+  "outcome": "#68 合入 main，随 v0.2.1（2026-10-22 发布为正式版）发布。新建游戏即有自己的目录；目录被删或移走时，诊断与「需要留意」说明，启动前先问，不再悄悄启动空游戏。Project Maintainer 已在 Mac 上实测（T5，即 release-0-2-1 的 R3）；Windows 交给社区反馈。",
   "lessonsLearned": [],
   "roadmap": {
     "enabled": false,

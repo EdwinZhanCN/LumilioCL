@@ -2,7 +2,7 @@
 
 # 发现页简介翻译的自有回退
 
-Status: InProgress
+Status: Completed
 
 MCIM 没有某个项目的中文简介、简介已过期或 MCIM 不可达时，启动器再向 launcher.lumilio.org 的 Worker 查询。Worker 只收平台与项目 ID，自己向 Modrinth / CurseForge 取当前简介，用 Workers AI 免费额度翻译并存入 D1；响应沿用 MCIM 的行格式，启动器复用原有的原文一致与结构校验。依赖 discover-translation（PR #25）。 T1、T2 已实现并有测试；合入前需 Project Maintainer 创建 D1 数据库、把 database_id 填入 web/wrangler.jsonc 并对远程库执行迁移（T3）：main 每次推送都会部署，占位 id 会让部署失败。CF_API_KEY 由 web.yml 的 deploy 从同名仓库机密随部署上传（D4）。
 
@@ -22,7 +22,7 @@ MCIM 没有某个项目的中文简介、简介已过期或 MCIM 不可达时，
   Acceptance: MCIM 命中且原文一致时不请求 Worker；MCIM 未命中、原文不一致或请求失败的 ID 才批量发给 https://launcher.lumilio.org/translate/{platform}。两处结果用同一行解析、原文一致与 safe_summary 校验，缓存提供商分别为 mcim / lumilio，未命中各自短期负缓存。设置说明的中英文写明只向 MCIM 与 launcher.lumilio.org 发送平台和项目 ID。core 测试用脚本化传输验证请求顺序与只发送未解决的 ID。
 - [x] T3 — Project Maintainer 创建 Cloudflare 资源并部署。 (Completed)
   Acceptance: 合入 main 之前：创建 D1 数据库 lumilio-translations，把 database_id 填入 web/wrangler.jsonc 替换占位值，执行 wrangler d1 migrations apply lumilio-translations --remote 建表。CF_API_KEY 不必手动设置，deploy 任务用 --secrets-file 从仓库机密 CF_API_KEY 上传。部署后对一个 Modrinth 与一个 CurseForge 项目 ID 实际请求返回中文行，再次请求命中缓存。服务端使用 CurseForge Key 前核对 CurseForge 的条款。
-- [ ] T4 — 检查译文质量与每日用量。 (Proposed)
+- [x] T4 — 检查译文质量与每日用量。 (Completed)
   Acceptance: 部署后抽查 Modrinth 与 CurseForge 各若干条译文的术语（模组、整合包、下界、末地等）与专有名词保留；在 Cloudflare 面板核对一天的 neuron 用量与 Worker 内的累计接近，且未超过免费额度。
 - [x] T5 — 换用 GLM-4.7-Flash（开思考），译文改由队列在后台完成。 (Completed)
   Acceptance: 请求只返回 D1 已有行，缺的 ID 经 queued 表认领后发一条只含平台与 ID 的 Queue 消息；同一摘要在 CLAIM_SECONDS 内只排队一次。消费者重新取简介，用 GLM-4.7-Flash（默认思考）与 JSON Schema response_format 翻译，写入后删除旧 hash 行与认领。hash 含模型与提示词版本，旧 Qwen 行不再返回。主要为汉字的简介不送模型。合入前由 Project Maintainer 执行 wrangler queues create lumilio-translate 与 d1 migrations apply --remote（0002_queued.sql）；部署后对未翻译的 ID 请求一次，十分钟内再请求得到中文行。
@@ -37,6 +37,8 @@ MCIM 没有某个项目的中文简介、简介已过期或 MCIM 不可达时，
   Result: 2026-10-20：D1 lumilio-translations 已创建并在远端执行 0001_translations.sql（budget、d1_migrations、summaries）。#49 合入后 web.yml 的 deploy 成功。POST /translate/modrinth {"project_ids":["AANobbMI"]} 与 /translate/curseforge {"modids":[238222]} 均返回 200 和中文行；再次请求时 budget 当日 neuron 不变，确认命中缓存。summaries 只有 platform、id、hash、translated、created（D5）。每日用量与译文质量待 T4。
 - 模型选择有同一批原文的对照，队列、认领与版本 hash 有测试。
   Result: 2026-10-21：同一提示词下对 Modrinth 33 条、CurseForge 28 条（共 61 条）用 wrangler dev 直接调用 Workers AI 对照。Qwen3-30B 关闭思考：每批 2–5 s，把 Farmer's Delight 意译、写成《我的世界》、无中英文空格。GLM-4.7-Flash 关闭思考（chat_template_kwargs.enable_thinking=false）：Nether Portals 译成末地传送门、overhaul 未译；无 response_format 时六批有三批 JSON 损坏。Qwen 开思考：约 2 neuron/条，改善有限。GLM 开思考加 JSON Schema：上述误译全部消失，名称与空格保留，六批全部可解析，约 6.3 neuron/条，每批 35–110 s。reasoning_effort=low 对两者的输出 token 均无明显影响。加入术语表与写法规则（prompt-2）后，25 条一批有一批在约 122 s 时以 Network connection lost 失败；改为 10 条一批，七批 18–56 s 全部可解析，约 9 neuron/条；物品栏、路径追踪、附属模组、重制、原版+ 按术语表输出，没有书名号、我的世界或您，仍有 Entities 译作生物、一处 Version 未译。2026-10-21：队列 lumilio-translate 已创建，远端已执行 0002_queued.sql；#52 合入后 deploy 成功。对 AANobbMI、P7dR8mSH（只有旧 Qwen 行）首次请求返回 [] 并在 queued 登记两条；消费者随后写入新 hash 的 GLM 译文，旧行被删除，queued 清空，budget 增加约 40 neuron；再次请求 200 返回两条中文行。P7dR8mSH 的译文仍把 mod 写作 mod 而非模组。GLM-5.3-Flash 不在 Workers Free 计费内且不能关闭思考，未测。web/worker/translate.test.ts 十五项通过；临时把认领改为覆盖、去掉中文判断、hash 不含 VERSION 时，对应三项按预期失败。just web、wrangler d1 migrations apply --local 与 deploy --dry-run（列出 QUEUE / DB / AI / ASSETS）通过。
+- 部署后的译文质量与一天的用量（T4）。
+  Result: 2026-10-22：Project Maintainer 在 0.2.1 上抽查译文，质量不错。Cloudflare 面板显示当天 Workers AI 用量为 287.88 neuron（免费额度每天 10,000），模型为 @cf/zai-org/glm-4.7-flash，与 web/worker/translate.ts 的 MODEL 一致，也远低于 Worker 自己的 DAILY_NEURONS 上限 9,000。MCIM 几乎覆盖全部简介，回退只在少数情况（如网络问题）才会用到。面板用量未与 D1 budget 表的当日累计逐项对照。
 
 ## Decision D1
 
@@ -112,3 +114,7 @@ Consequences: hash 含 VERSION（模型与提示词版本），换模型或改�
 - https://docs.modrinth.com/api/operations/getprojects/
 - https://docs.curseforge.com/rest-api/#get-mods
 - [Plan discover-translation](discover-translation.md)
+
+## Outcome
+
+#49、#52 合入 main 并部署到 launcher.lumilio.org，随 v0.2.1 发布。MCIM 没有译文、译文过期或不可达时，启动器把剩下的 ID 发给 Worker；Worker 只收平台与项目 ID，用 Workers AI（GLM-4.7-Flash，开思考，JSON Schema）在队列里翻译并存入 D1，每天最多 9,000 neuron。2026-10-22 实际用量 287.88 neuron，因为 MCIM 几乎覆盖全部简介，回退很少用到。
