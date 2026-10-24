@@ -7,8 +7,8 @@ use lumilio_plugin_api::{
     PluginError, SettingValue, TabState, View,
 };
 
-use crate::format::{self, pack};
-use crate::{FOLDER, Litematica};
+use crate::format::pack;
+use crate::{FOLDER, Litematica, format};
 
 #[test]
 fn placement_overlay_uses_world_config_and_schematic_region_bounds() {

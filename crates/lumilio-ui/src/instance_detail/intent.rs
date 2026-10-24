@@ -1,5 +1,6 @@
-use super::panels::ProblemAction;
 use lumilio_core::{InstanceSettings, ProjectKind, ServerEntry};
+
+use super::panels::ProblemAction;
 
 /// A piece of data the sections load on demand.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -47,7 +48,7 @@ pub enum InstanceIntent {
     /// Save every instance setting after one dialog changed its part.
     SaveSettings(InstanceSettings),
     Reload,
-    /// Fetch this data and answer with [`InstanceDetailView::arrived`].
+    /// Fetch this data and answer with [`super::InstanceDetailView::arrived`].
     Load(Section),
     SetContent {
         kind: ProjectKind,
@@ -103,21 +104,21 @@ pub enum InstanceIntent {
         to: usize,
     },
     /// Ask this server how it is; answer with
-    /// [`InstanceDetailView::server_status_arrived`].
+    /// [`super::InstanceDetailView::server_status_arrived`].
     PingServer(String),
     /// Start the game and go straight onto this server.
     PlayServer(String),
     /// Make this screenshot's thumbnail; answer with
-    /// [`InstanceDetailView::thumbnail_arrived`].
+    /// [`super::InstanceDetailView::thumbnail_arrived`].
     Thumbnail(String),
     /// Put this screenshot on the clipboard as a picture.
     CopyScreenshot(String),
     DeleteScreenshot(String),
     /// Which plugin tabs show for this game; answer with
-    /// [`InstanceDetailView::plugin_tabs_arrived`].
+    /// [`super::InstanceDetailView::plugin_tabs_arrived`].
     PluginTabs,
     /// What this plugin's tab shows; answer with
-    /// [`InstanceDetailView::plugin_view_arrived`].
+    /// [`super::InstanceDetailView::plugin_view_arrived`].
     PluginView(String),
     /// Run one action of a plugin's tab. The application performs the effects
     /// the plugin asks for and answers with the tab's new view.
@@ -136,7 +137,7 @@ pub enum InstanceIntent {
         request: u64,
     },
     /// Connect this schematic studio (the entity ID) to the plugin's folder;
-    /// answer with [`InstanceDetailView::plugin_studio_arrived`].
+    /// answer with [`super::InstanceDetailView::plugin_studio_arrived`].
     LoadStudio {
         plugin: String,
         folder: String,
@@ -153,7 +154,7 @@ pub enum InstanceIntent {
         folder: String,
         file: Option<String>,
     },
-    /// Read this crash report; answer with [`InstanceDetailView::crash_arrived`].
+    /// Read this crash report; answer with [`super::InstanceDetailView::crash_arrived`].
     OpenCrash(String),
     OpenGameLog(lumilio_core::GameLogSource),
     AnalyzeGameLog {
@@ -166,7 +167,7 @@ pub enum InstanceIntent {
         live: String,
     },
     /// List this folder of the game directory (`""` is the directory itself);
-    /// answer with [`Arrived::Files`].
+    /// answer with [`super::Arrived::Files`].
     OpenFolder(String),
     /// Open the Accounts page.
     OpenAccounts,
@@ -238,13 +239,13 @@ pub enum InstanceIntent {
     },
     /// Ask for local files and add them (P-ADD-FILES).
     ImportContent(ProjectKind),
-    /// A project's versions; answer with [`InstanceDetailView::versions_arrived`].
+    /// A project's versions; answer with [`super::InstanceDetailView::versions_arrived`].
     LoadVersions {
         source: String,
         project: String,
     },
     /// One version's changelog, for sources that give them one at a time;
-    /// answer with [`InstanceDetailView::changelog_arrived`].
+    /// answer with [`super::InstanceDetailView::changelog_arrived`].
     LoadChangelog {
         source: String,
         project: String,

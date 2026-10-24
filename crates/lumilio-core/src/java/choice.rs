@@ -11,11 +11,11 @@ use std::cmp::Reverse;
 use std::path::Path;
 
 use super::JavaRuntime;
-use crate::environment::{HostProfile, MachineArchitecture, PlatformFamily};
-use crate::instance::{InstanceRecord, Loader};
-use crate::java_runtime::JavaBuild;
-use crate::launch::LaunchPlan;
-use crate::release::{JavaRequirement, ReleaseManifest};
+use crate::instances::{InstanceRecord, Loader};
+use crate::java::downloads::JavaBuild;
+use lumilio_minecraft::LaunchPlan;
+use lumilio_minecraft::{HostProfile, MachineArchitecture, PlatformFamily};
+use lumilio_minecraft::{JavaRequirement, ReleaseManifest};
 
 /// The class LaunchWrapper starts the game through.
 const LAUNCH_WRAPPER_MAIN: &str = "net.minecraft.launchwrapper.Launch";

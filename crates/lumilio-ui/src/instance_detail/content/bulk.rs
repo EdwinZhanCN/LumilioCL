@@ -1,19 +1,17 @@
+use std::rc::Rc;
+
+use gpui::prelude::*;
+use gpui::{AnyElement, Context, Window, div, px};
+use gpui_component::{Icon, Sizable as _, StyledExt as _, WindowExt as _, h_flex};
+use lumilio_core::ProjectKind;
+
 use super::super::panels::CONTENT_KINDS;
 use super::super::{InstanceDetailView, InstanceIntent};
 use super::model::{BAR_HEIGHT, BulkAction};
 use crate::assets::UiIcon;
 use crate::key::Key;
-use crate::theme;
 use crate::theme::ShellColors;
-use crate::tr;
-use gpui::prelude::*;
-use gpui::{AnyElement, Context, Window, div, px};
-use gpui_component::Sizable as _;
-use gpui_component::StyledExt as _;
-use gpui_component::WindowExt as _;
-use gpui_component::{Icon, h_flex};
-use lumilio_core::ProjectKind;
-use std::rc::Rc;
+use crate::{theme, tr};
 
 impl InstanceDetailView {
     /// P-BULK: what can be done to every selected file at once.

@@ -1,8 +1,10 @@
 //! Biomes of a chunk. From 1.18 each section has its own palette of biome
 //! names over a 4×4×4 grid; before that the chunk held numeric ids, 256 of
 //! them (one per column, before 1.15) or 1024 (4×4×4 cells, 1.15–1.17).
-use crate::Error;
+
 use lumilio_nbt::Tag;
+
+use crate::Error;
 
 /// A section's biomes: a palette and one index per 4×4×4 cell, or `None`
 /// when the whole section is `palette[0]`.

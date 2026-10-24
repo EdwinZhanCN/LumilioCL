@@ -16,9 +16,8 @@ use gpui_component::{Selectable as _, Sizable as _, v_flex};
 use lumilio_skin_render::{Arms, BackEquipment, Camera, Player, Texture, render};
 
 use crate::key::Key;
-use crate::kit;
 use crate::theme::ShellColors;
-use crate::tr;
+use crate::{kit, tr};
 
 #[cfg(test)]
 mod tests;

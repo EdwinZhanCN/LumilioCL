@@ -5,14 +5,13 @@
 
 use gpui::prelude::*;
 use gpui::{App, Context, Entity, WeakEntity, Window, div};
-use gpui_component::IndexPath;
 use gpui_component::input::{Input, InputEvent, InputState};
 use gpui_component::select::{SearchableVec, Select, SelectEvent, SelectState};
-use gpui_component::{h_flex, v_flex};
+use gpui_component::{IndexPath, h_flex, v_flex};
 use lumilio_schematic_render::{Angle, Frame, View};
 
-use super::dialogs::{self, DialogForm, Submission, field, note};
-use super::{StudioView, tree};
+use super::dialogs::{DialogForm, Submission, field, note};
+use super::{StudioView, dialogs, tree};
 use crate::controls::Segments;
 use crate::model_view::{Viewer, angle_labels};
 use crate::theme::ShellColors;

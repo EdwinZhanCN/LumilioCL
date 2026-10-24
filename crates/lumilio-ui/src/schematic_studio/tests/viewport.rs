@@ -4,6 +4,7 @@
 
 use gpui::{TestAppContext, VisualTestContext};
 use lumilio_schematic::inspect::{Contents, Grid, Stack};
+use lumilio_schematic::replace::PropertyMatch;
 use lumilio_schematic_render::{Angle, Frame, Picked, View};
 
 use super::{A, B, Rig, choose, click, fixture, rig};
@@ -12,7 +13,6 @@ use crate::schematic_studio::dialogs::{DialogForm as _, OpenDialog};
 use crate::schematic_studio::export::{MAX_SIDE, encode_png, export_view, side};
 use crate::schematic_studio::viewport::split_state;
 use crate::schematic_studio::{Event, InspectorTab};
-use lumilio_schematic::replace::PropertyMatch;
 
 fn open_b(cx: &mut TestAppContext) -> (Rig, &mut VisualTestContext) {
     let (rig, cx) = rig(cx);

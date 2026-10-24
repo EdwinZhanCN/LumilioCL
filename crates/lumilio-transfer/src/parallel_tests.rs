@@ -1,12 +1,14 @@
+use std::path::Path;
+use std::time::Duration;
+
+use sha1::{Digest, Sha1};
+
 use super::budget::ConnectionBudget;
 use super::engine::TransferEngine;
 use super::partial::part_path;
 use super::request::{RetryPolicy, TransferEvent, TransferRequest};
 use super::test_server::Server;
 use crate::CancellationToken;
-use sha1::{Digest, Sha1};
-use std::path::Path;
-use std::time::Duration;
 
 const SOURCE: &str = "https://example.invalid/large";
 const FINAL: &str = "https://cdn.example.invalid/large?signed";

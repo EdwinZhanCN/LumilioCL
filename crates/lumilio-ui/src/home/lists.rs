@@ -1,11 +1,11 @@
+use gpui::prelude::*;
+use gpui::{AnyElement, ClickEvent, IntoElement, div, px};
+use gpui_component::{StyledExt as _, h_flex, v_flex};
+
 use super::buttons::{LocalActionIcon, page_button};
 use super::render::{ShellHomeColors, body_label};
 use super::{HomeIntent, HomeIntentHandler, HomeLinks};
 use crate::key::Key;
-use gpui::prelude::*;
-use gpui::{AnyElement, ClickEvent, IntoElement, div, px};
-use gpui_component::StyledExt as _;
-use gpui_component::{h_flex, v_flex};
 
 pub(super) fn render_first_use(
     intent_handler: Option<HomeIntentHandler>,

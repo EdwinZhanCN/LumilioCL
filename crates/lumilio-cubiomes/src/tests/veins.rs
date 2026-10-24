@@ -1,6 +1,7 @@
 //! Ore veins against original servers: every raw ore block a saved world
 //! holds in its fully generated areas (rows `seed x y z kind`, 1 copper,
 //! 2 iron; only veins place these blocks) must be the vein rule's raw block.
+
 use crate::{Version, ffi};
 
 macro_rules! ore_golden {

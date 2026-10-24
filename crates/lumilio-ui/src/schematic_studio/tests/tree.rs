@@ -1,6 +1,7 @@
+use lumilio_schematic::fingerprint::Fingerprint;
+
 use super::super::materials_width;
 use super::super::tree::Tree;
-use lumilio_schematic::fingerprint::Fingerprint;
 
 fn tree(files: &[&str]) -> Tree {
     let mut tree = Tree::default();

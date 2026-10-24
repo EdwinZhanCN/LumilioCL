@@ -49,8 +49,9 @@ impl Render for Host {
 fn the_dialog_checks_as_you_type_saves_once_and_keeps_the_draft_on_failure(
     cx: &mut gpui::TestAppContext,
 ) {
-    use gpui::Modifiers;
     use std::cell::RefCell;
+
+    use gpui::Modifiers;
     cx.update(|cx| {
         gpui_component::init(cx);
         cx.set_reduce_motion(true);

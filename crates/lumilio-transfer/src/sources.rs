@@ -1,7 +1,8 @@
-use super::request::TransferError;
 use std::collections::BTreeSet;
 use std::fmt::Debug;
 use std::sync::Arc;
+
+use super::request::TransferError;
 
 pub trait SourceProvider: Send + Sync + 'static {
     fn candidates(&self, original: &str) -> Vec<String>;

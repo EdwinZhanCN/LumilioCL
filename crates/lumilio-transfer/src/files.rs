@@ -1,13 +1,15 @@
-use super::TEMPORARY_FILE_SEQUENCE;
-use super::request::{ContentDigest, TransferError, TransferRequest};
-use sha1::{Digest, Sha1};
-use sha2::Sha256;
 use std::fmt::Debug;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
+
+use sha1::{Digest, Sha1};
+use sha2::Sha256;
 use tokio::fs;
 use tokio::fs::{File, OpenOptions};
 use tokio::io::AsyncReadExt;
+
+use super::TEMPORARY_FILE_SEQUENCE;
+use super::request::{ContentDigest, TransferError, TransferRequest};
 
 #[derive(Debug)]
 pub(super) enum AttemptFailure {

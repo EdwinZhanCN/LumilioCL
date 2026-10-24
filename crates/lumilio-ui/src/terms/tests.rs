@@ -1,6 +1,8 @@
-use super::*;
-use gpui::{Context, Modifiers, Render, TestAppContext, VisualTestContext, size};
 use std::cell::Cell;
+
+use gpui::{Context, Modifiers, Render, TestAppContext, VisualTestContext, size};
+
+use super::*;
 
 struct Host;
 

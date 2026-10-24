@@ -37,7 +37,7 @@ For a regression test:
 1. Introduce the smallest version of the regression.
 2. Run the focused test and observe it fail for the intended reason.
 3. Revert the regression and keep the test.
-4. Run the focused test again, then the full four-command loop.
+4. Run the focused test again, then the full verification loop.
 
 Assert externally observable behavior. Do not make a test pass by checking an
 internal self-report, a log keyword, or an unverified mock call.

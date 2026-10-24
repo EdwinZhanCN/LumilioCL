@@ -1,5 +1,6 @@
-use super::*;
 use serde_json::{Value, json};
+
+use super::*;
 
 const EXAMPLE: &str = include_str!("../../../../.agents/schemas/examples/proposed.json");
 

@@ -1,8 +1,10 @@
-use super::request::TransferError;
 use std::fmt::Debug;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex};
+
 use tokio::sync::{AcquireError, OwnedSemaphorePermit, Semaphore};
+
+use super::request::TransferError;
 
 /// How many downloads may hold a connection at once, shared by every engine
 /// made with it. A larger size applies at once; a smaller one as running
@@ -121,7 +123,7 @@ impl ConnectionBudget {
         self.inner
             .state
             .lock()
-            .unwrap_or_else(PoisonError::into_inner)
+            .expect("connection budget lock was poisoned")
     }
 }
 

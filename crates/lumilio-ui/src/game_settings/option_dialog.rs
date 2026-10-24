@@ -1,19 +1,23 @@
 //! Editing one option outside the game. The control follows the value
 //! (AGENTS.md): a slider with a typed number for a range, segment keys for a
 //! few choices, a searchable list for keys and languages.
-use super::choices::{key_label, key_tokens, language_codes, language_label};
-use super::form::{self, Form, Sending};
-use super::labels::{choice_label, number_label, setting_label, shown_percent, value_label};
-use crate::controls::Segments;
-use crate::key::Key;
-use crate::theme::ShellColors;
-use crate::{theme, tr};
-use gpui::{App, Context, Entity, IntoElement, Render, Window, div, prelude::*, px};
+
+use gpui::prelude::*;
+use gpui::{App, Context, Entity, IntoElement, Render, Window, div, px};
 use gpui_component::input::{Input, InputEvent, InputState};
 use gpui_component::select::{SearchableVec, Select, SelectEvent, SelectState};
 use gpui_component::slider::{Slider, SliderEvent, SliderState};
 use gpui_component::{IndexPath, h_flex, v_flex};
 use lumilio_core::{GameSettingKind, GameSettingValue, OptionChange, game_setting_kind};
+
+use super::choices::{key_label, key_tokens, language_codes, language_label};
+use super::form;
+use super::form::{Form, Sending};
+use super::labels::{choice_label, number_label, setting_label, shown_percent, value_label};
+use crate::controls::Segments;
+use crate::key::Key;
+use crate::theme::ShellColors;
+use crate::{theme, tr};
 
 /// Where a decided change goes. The application runs it and answers with
 /// [`OptionDialog::finished`].

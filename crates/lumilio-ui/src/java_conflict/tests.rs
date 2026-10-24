@@ -1,5 +1,6 @@
-use super::*;
 use lumilio_core::{JavaChoice, JavaRule, JavaRuntime};
+
+use super::*;
 
 fn runtime(root: &std::path::Path, name: &str, version: &str) -> JavaRuntime {
     let home = root.join(name);

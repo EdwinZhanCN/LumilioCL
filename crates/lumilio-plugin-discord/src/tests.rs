@@ -1,5 +1,6 @@
-use super::*;
 use lumilio_plugin_api::{FetchResponse, LaunchOutcome};
+
+use super::*;
 
 struct Context {
     id: u64,

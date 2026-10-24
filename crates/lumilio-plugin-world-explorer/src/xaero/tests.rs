@@ -1,13 +1,15 @@
-use super::naming::*;
-use super::overlay;
-use super::waypoints::*;
-use crate::WorldExplorer;
+use std::collections::BTreeMap;
+
 use lumilio_plugin_api::map::{
     Dimension, MapBounds, MapIcon, MapObjectKind, MapPoint, OverlayProvider, OverlayRequest,
     SourceLink, WorldContext, WorldId,
 };
 use lumilio_plugin_api::{FetchResponse, HostContext, PluginError, SettingValue};
-use std::collections::BTreeMap;
+
+use super::naming::*;
+use super::overlay;
+use super::waypoints::*;
+use crate::WorldExplorer;
 
 const OVERWORLD: &str = include_str!("../../tests/data/xaero/synthetic/dim%0/mw$default_1.txt");
 const NETHER: &str = include_str!("../../tests/data/xaero/synthetic/dim%-1/mw$default_1.txt");
@@ -94,10 +96,10 @@ fn replacing_a_waypoint_changes_only_its_line_and_keeps_the_ending() {
 fn colours_are_the_sixteen_text_colours_then_the_four_extra_ones() {
     assert_eq!(color_rgb(0), [0, 0, 0]);
     assert_eq!(color_rgb(15), [255, 255, 255]);
-    assert_eq!(color_rgb(19), [0xF3, 0x8B, 0xAA]);
+    assert_eq!(color_rgb(19), [0xf3, 0x8b, 0xaa]);
     assert_eq!(
         color_rgb(200),
-        [0xAA, 0xAA, 0xAA],
+        [0xaa, 0xaa, 0xaa],
         "unknown indices show grey"
     );
     assert_eq!(CHOOSABLE_COLORS, 16);
@@ -387,11 +389,14 @@ fn damaged_waypoint_files_make_the_layer_unavailable_instead_of_partial() {
 }
 
 mod editing {
-    use super::*;
-    use crate::xaero::edit::{self, INITIALS_MAX, NAME_MAX};
+    use std::sync::Mutex;
+
     use lumilio_plugin_api::map::{EditAction, ObjectEdit};
     use lumilio_plugin_api::{FileInfo, SettingValue};
-    use std::sync::Mutex;
+
+    use super::*;
+    use crate::xaero::edit;
+    use crate::xaero::edit::{INITIALS_MAX, NAME_MAX};
 
     /// A game directory in memory that also takes writes, as the host would:
     /// a write needs the `FileInfo` of the last read.

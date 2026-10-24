@@ -1,23 +1,25 @@
+use std::path::{Path, PathBuf};
+
+use lumilio_core::{
+    ActiveTask, ActivityView, AttentionItem, FinishedTask, HomeSummary, InstanceRecord,
+    InstanceSettings, LauncherSettings, Loader, TaskCategory, TaskLabel, TaskOutcome,
+};
+
 use super::LiveModel;
 use super::accounts::{account_failure, account_rows};
 use super::activity::{
     ActivityRow, ActivityState, active_row, activity_in_tab, activity_rows, eta_text, next_sample,
     recovery_message,
 };
-use super::discover::{PageItem, SearchStatus, count_label, page_items, parse_rfc3339, tag_label};
 use super::home::home_presentation;
 use super::library::{
     CollectionRow, attention_rows, library_card, library_cards, relative_time, seed_of, world_of,
 };
 use super::settings::settings_view;
-use crate::home::HomePresentation;
-use lumilio_core::{
-    ActiveTask, ActivityView, FinishedTask, HomeSummary, InstanceRecord, LauncherSettings, Loader,
-    TaskCategory, TaskLabel, TaskOutcome,
+use crate::features::discover::model::{
+    PageItem, count_label, page_items, parse_rfc3339, tag_label,
 };
-use std::path::{Path, PathBuf};
-
-use lumilio_core::{AttentionItem, InstanceSettings};
+use crate::home::HomePresentation;
 
 fn record(id: &str, favorite: bool, last_played: Option<u64>, created_at: u64) -> InstanceRecord {
     InstanceRecord {
@@ -635,19 +637,6 @@ fn the_pager_shows_ends_and_neighbours() {
 }
 
 #[test]
-fn pages_follow_the_total_and_the_page_size() {
-    let mut model = LiveModel::default();
-    assert_eq!(model.pages(), 0);
-    model.search = SearchStatus::Done { total: 41 };
-    model.query.page_size = 20;
-    assert_eq!(model.pages(), 3);
-    model.query.page_size = 50;
-    assert_eq!(model.pages(), 1);
-    model.search = SearchStatus::Done { total: 0 };
-    assert_eq!(model.pages(), 0);
-}
-
-#[test]
 fn timestamps_parse_with_fractions_and_offsets() {
     assert_eq!(parse_rfc3339("1970-01-01T00:00:00Z"), Some(0));
     assert_eq!(parse_rfc3339("2000-03-01T00:00:00Z"), Some(951_868_800));
@@ -674,9 +663,10 @@ fn tag_labels_are_chinese_when_known_and_readable_when_not() {
 
 #[test]
 fn home_places_are_the_latest_readable_worlds_then_the_first_servers() {
+    use lumilio_core::{GameMode, PackPolicy, ServerEntry, ServerStatus, WorldInfo};
+
     use super::home::{PLACE_SERVERS, PLACE_WORLDS, Place, PlaceKind, PlaceTarget, home_places};
     use crate::places::ServerState;
-    use lumilio_core::{GameMode, PackPolicy, ServerEntry, ServerStatus, WorldInfo};
     let world = |folder: &str, played: Option<i64>, damaged: bool| WorldInfo {
         folder: folder.to_owned(),
         name: folder.to_uppercase(),

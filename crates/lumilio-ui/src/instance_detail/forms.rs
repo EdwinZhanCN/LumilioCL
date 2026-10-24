@@ -1,11 +1,12 @@
-use super::InstanceDetailView;
-use super::editors::Editor;
-use super::intent::InstanceIntent;
-use crate::{kit, theme, tr};
 use gpui::prelude::*;
 use gpui::{Context, Entity, Window};
 use gpui_component::input::InputState;
 use lumilio_core::{InstanceSettings, LauncherSettings};
+
+use super::InstanceDetailView;
+use super::editors::Editor;
+use super::intent::InstanceIntent;
+use crate::{kit, theme, tr};
 
 pub(super) struct Fields {
     pub(super) name: Entity<InputState>,

@@ -7,11 +7,13 @@
 //! name or with another description has the same fingerprint, and one changed
 //! block gives a different one.
 
-use crate::{BlockState, Region, UniversalSchematic};
-use nucleation::nbt::{NbtMap, NbtValue};
-use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::fmt;
+
+use nucleation::nbt::{NbtMap, NbtValue};
+use sha2::{Digest, Sha256};
+
+use crate::{BlockState, Region, UniversalSchematic};
 
 /// A SHA-256 over normalized content.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]

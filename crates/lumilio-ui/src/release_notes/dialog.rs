@@ -1,16 +1,18 @@
 //! The release-notes dialog: the summary, then each section's items, for one
 //! release or for every release skipped since the notes were last shown.
 
-use super::ReleaseNotes;
-use super::text::{self, Notes, Section};
-use crate::i18n::{self, Locale};
-use crate::key::Key;
-use crate::kit::{self, TagKind};
-use crate::theme::{self, ShellColors};
-use crate::tr;
-use gpui::{App, Window, div, prelude::*, px};
+use gpui::prelude::*;
+use gpui::{App, Window, div, px};
 use gpui_component::text::TextView;
 use gpui_component::{WindowExt as _, h_flex, v_flex};
+
+use super::text::{Notes, Section};
+use super::{ReleaseNotes, text};
+use crate::i18n::Locale;
+use crate::key::Key;
+use crate::kit::TagKind;
+use crate::theme::ShellColors;
+use crate::{i18n, kit, theme, tr};
 
 const DIALOG_WIDTH: f32 = 520.;
 

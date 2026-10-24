@@ -36,6 +36,8 @@ mod tests;
 #[cfg(test)]
 mod user_agent_tests;
 
+use std::sync::atomic::AtomicU64;
+
 pub use self::budget::ConnectionBudget;
 pub use self::cancel::CancellationToken;
 pub use self::engine::{TransferBatchReport, TransferEngine};
@@ -53,8 +55,6 @@ pub use self::transport::{
     ByteStream, HttpMethod, HttpRequest, Transport, TransportError, TransportFuture,
     TransportResponse,
 };
-
-use std::sync::atomic::AtomicU64;
 
 /// Identifies the launcher to servers; some APIs (Modrinth) reject anonymous
 /// clients.

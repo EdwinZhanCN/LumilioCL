@@ -1,6 +1,7 @@
-use super::*;
 use std::cell::RefCell;
 use std::task::{Poll, Waker};
+
+use super::*;
 
 struct Host;
 impl Render for Host {

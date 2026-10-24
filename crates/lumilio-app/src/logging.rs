@@ -4,11 +4,12 @@
 //! the file passes [`LIMIT`] it becomes `launcher.1.log` (replacing the one
 //! before) and a new one starts. Lines also go to stderr for development.
 
-use log::{Level, LevelFilter, Log, Metadata, Record};
 use std::fs::{File, OpenOptions};
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+
+use log::{Level, LevelFilter, Log, Metadata, Record};
 
 /// How large one log file grows before the next one starts.
 pub(crate) const LIMIT: u64 = 1024 * 1024;

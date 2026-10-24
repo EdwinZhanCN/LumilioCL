@@ -31,7 +31,7 @@ its check when a pull request does not touch its paths; keep those filters in sy
   `just test-pkg lumilio-ui project_detail`.
 - **Docs and harness only** (`docs/**`, `.agents/**`, `*.md`): run `just docs` locally.
   Plan/harness inputs and generated plan output are also checked by `plans.yml`.
-- **Before handing off a code change**: `just check` (build → test → clippy → fmt, in that order).
+- **Before handing off a code change**: `just check` (build → test → clippy → fmt → Rustdoc links).
 
 Green checks do not prove a UI change looks right: state what the tests verified and what still
 needs eyes.
@@ -59,6 +59,17 @@ needs eyes.
 Don't write documents that restate the code or upstream; they go stale.
 
 ## Structure
+
+- Follow the general [Google Rust style guide](https://google.github.io/styleguide/rustguide.html)
+  in its application-code context. Chromium/Fuchsia build and runtime rules do not apply.
+  Keep Cargo directory modules and the existing runtime/crate boundaries.
+- Module boundaries contain declarations and deliberate re-exports. Shared types/constants
+  and small platform/startup dispatch are permitted; implementation belongs in named leaf modules.
+  Import groups contain items from one module. Production glob imports are limited to
+  `gpui::prelude::*` and locally scoped enum variants; `super::*` is reserved for tests.
+- Match recoverable failures; use `expect` with the invariant when a panic is necessary.
+  Do not continue with state from a poisoned lock. The docgen structure tests check these
+  measurable rules, adjacent tests and production file size across every crate.
 
 - Rust edition 2024. The development toolchain is pinned to **1.98.1** in
   `rust-toolchain.toml`; `Cargo.toml` declares **1.95** as the minimum Rust version.
@@ -133,7 +144,7 @@ Escaped failures and their guards go in the plan's `lessonsLearned`.
 ## Hardening
 
 - Windows background console processes (game Java, launch hooks, wrappers and installer
-  processors) must use `crates/lumilio-core/src/process.rs`'s `background_command`, which
+  processors) must use `crates/lumilio-core/src/launching/process.rs`'s `background_command`, which
   sets `CREATE_NO_WINDOW`. Piped output and the launcher's `windows_subsystem` attribute
   do not prevent child console windows; preserve stdout/stderr capture for launcher logs.
 

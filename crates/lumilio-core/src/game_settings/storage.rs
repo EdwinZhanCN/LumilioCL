@@ -1,8 +1,10 @@
-use super::{Binding, GameSettingsError, SettingsPreset, Values};
-use crate::instance::InstanceStore;
+use std::collections::BTreeSet;
+
 use rusqlite::{OptionalExtension, params};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
+
+use super::{Binding, GameSettingsError, SettingsPreset, Values};
+use crate::instances::InstanceStore;
 
 #[derive(Deserialize, Serialize)]
 struct PresetFields {

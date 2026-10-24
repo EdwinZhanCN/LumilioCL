@@ -1,17 +1,19 @@
 //! What the window holds on to: pictures within their budget, and pages that
 //! leave the screen letting go of their plugin pages.
 
-use super::super::LauncherShell;
-use super::continuing;
-use crate::instance_detail::{Arrived, InstanceIntent, TAB_SCREENSHOTS};
+use std::cell::RefCell;
+use std::path::PathBuf;
+use std::rc::Rc;
+
 use gpui::{App, ImageSource, Resource, TestAppContext};
 use lumilio_core::{
     InstanceRecord, InstanceSettings, LauncherSettings, Loader, PluginTab, ScreenshotInfo,
 };
 use lumilio_plugin_api::{ImageData, View, Words};
-use std::cell::RefCell;
-use std::path::PathBuf;
-use std::rc::Rc;
+
+use super::super::LauncherShell;
+use super::continuing;
+use crate::instance_detail::{Arrived, InstanceIntent, TAB_SCREENSHOTS};
 
 /// Whether GPUI's own table holds it: that table never lets a picture go.
 fn kept_forever(resource: &Resource, cx: &App) -> bool {

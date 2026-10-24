@@ -7,10 +7,12 @@
 //! again what grew; a watch channel keeps only the newest snapshot, so a slow
 //! subscriber never acts on an older one after a newer one.
 
-use crate::instance::InstanceRecord;
-use crate::settings::LauncherSettings;
 use std::sync::Arc;
+
 use tokio::sync::watch;
+
+use crate::instances::InstanceRecord;
+use crate::settings::LauncherSettings;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Context {

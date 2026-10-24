@@ -2,8 +2,10 @@
 //! modifiers (`Probe.java`, imported by `cargo xtask worldgen-import`; rows
 //! `seed kind chunk_x chunk_z x y z` in placement order). The probe passes the
 //! filters that read the world, so the rows are the raw random sequence.
-use crate::{Dimension, Version, ffi};
+
 use std::collections::BTreeMap;
+
+use crate::{Dimension, Version, ffi};
 
 macro_rules! decoration_golden {
     ($version:literal) => {

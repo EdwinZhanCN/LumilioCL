@@ -1,9 +1,10 @@
-use crate::protocol::Kind;
-use crate::protocol::decode;
 use lumilio_plugin_api::PluginError;
-use lumilio_plugin_api::content::ProjectKind;
-use lumilio_plugin_api::content::{CategoryTag, GameVersionTag, LoaderTag, ProjectSummary};
+use lumilio_plugin_api::content::{
+    CategoryTag, GameVersionTag, LoaderTag, ProjectKind, ProjectSummary,
+};
 use serde::Deserialize;
+
+use crate::protocol::{Kind, decode};
 
 #[derive(Deserialize)]
 pub(super) struct RawCategory {

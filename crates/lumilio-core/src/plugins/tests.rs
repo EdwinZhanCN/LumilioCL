@@ -1,6 +1,8 @@
-use super::*;
-use lumilio_plugin_api::{Permission, SettingField, SettingKind, SettingValue, Words};
 use std::sync::atomic::{AtomicUsize, Ordering};
+
+use lumilio_plugin_api::{Permission, SettingField, SettingKind, SettingValue, Words};
+
+use super::*;
 
 #[path = "tests/analysis.rs"]
 mod analysis;

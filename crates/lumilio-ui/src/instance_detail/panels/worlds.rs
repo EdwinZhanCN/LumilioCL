@@ -1,20 +1,18 @@
+use gpui::prelude::*;
+use gpui::{AnyElement, Context, Window, div, px};
+use gpui_component::input::Input;
+use gpui_component::select::{SearchableVec, Select, SelectEvent, SelectState};
+use gpui_component::{Icon, IndexPath, Sizable as _, h_flex, v_flex};
+use lumilio_core::WorldInfo;
+
 use super::super::{Dropdown, InstanceDetailView, InstanceIntent, Section};
 use super::data::Confirm;
 use super::helpers::{act, act_index};
 use super::{WORLD_SORTS, WORLD_SUBS};
 use crate::assets::UiIcon;
-use crate::kit;
 use crate::theme::ShellColors;
 use crate::toast::Toast;
-use crate::tr;
-use gpui::prelude::*;
-use gpui::{AnyElement, Context, Window, div, px};
-use gpui_component::IndexPath;
-use gpui_component::Sizable as _;
-use gpui_component::input::Input;
-use gpui_component::select::{SearchableVec, Select, SelectEvent, SelectState};
-use gpui_component::{Icon, h_flex, v_flex};
-use lumilio_core::WorldInfo;
+use crate::{kit, tr};
 
 /// The world a running game most likely has open: the one whose lock file was
 /// touched after the game started, the newest of them.

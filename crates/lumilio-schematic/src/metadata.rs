@@ -3,8 +3,9 @@
 //! Edits touch only name, author, description and the modified time; block
 //! data stays as it was.
 
-use crate::UniversalSchematic;
 use std::fmt;
+
+use crate::UniversalSchematic;
 
 /// What the inspector's metadata page shows.
 #[derive(Debug, Clone, PartialEq, Eq)]

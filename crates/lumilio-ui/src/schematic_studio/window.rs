@@ -3,10 +3,11 @@
 //! game and folder, hands it the file the pane showed, and gives it a
 //! connection that belongs to this window alone.
 
+use std::rc::Rc;
+
 use gpui::prelude::*;
 use gpui::{Context, Entity, IntoElement, Render, Window, div, px};
 use gpui_component::{ActiveTheme as _, TitleBar, v_flex};
-use std::rc::Rc;
 
 use super::{Act, Connection, LoadModel, Placement, StudioView};
 use crate::tr;

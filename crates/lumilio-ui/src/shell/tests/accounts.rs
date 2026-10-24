@@ -1,7 +1,9 @@
-use super::super::{LauncherShell, Route};
-use gpui::{Modifiers, TestAppContext, point};
 use std::cell::RefCell;
 use std::rc::Rc;
+
+use gpui::{Modifiers, TestAppContext, point};
+
+use super::super::{LauncherShell, Route};
 
 pub(super) fn account(name: &str, selected: bool) -> crate::live::AccountRow {
     crate::live::AccountRow {

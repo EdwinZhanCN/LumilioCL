@@ -4,7 +4,7 @@
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use lumilio_docgen::{generate, scan, stale, validate, write};
+use lumilio_docgen as ia;
 
 /// The checkout `cargo run` runs the tool in. Cargo also sets
 /// `CARGO_MANIFEST_DIR` at run time; the build-time value names the checkout
@@ -31,8 +31,8 @@ fn main() -> ExitCode {
             }
         };
     }
-    let (paths, mut problems) = scan(&root);
-    problems.extend(validate(&paths));
+    let (paths, mut problems) = ia::scan(&root);
+    problems.extend(ia::validate(&paths));
     if !problems.is_empty() {
         for problem in &problems {
             eprintln!("{problem}");
@@ -41,16 +41,16 @@ fn main() -> ExitCode {
     }
     match args.first().map(String::as_str) {
         Some("ia") => {
-            let files = generate(&paths);
+            let files = ia::generate(&paths);
             if args.iter().any(|arg| arg == "--check") {
-                let stale = stale(&root, &files);
+                let stale = ia::stale(&root, &files);
                 if stale.is_empty() {
                     return ExitCode::SUCCESS;
                 }
                 eprintln!("stale: {stale:?}; run `cargo run -p lumilio-docgen -- ia`");
                 return ExitCode::FAILURE;
             }
-            if let Err(error) = write(&root, &files) {
+            if let Err(error) = ia::write(&root, &files) {
                 eprintln!("could not write docs/ia/paths: {error}");
                 return ExitCode::FAILURE;
             }

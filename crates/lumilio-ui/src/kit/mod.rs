@@ -8,11 +8,14 @@ mod item;
 mod menu;
 mod meter;
 mod motd;
+mod project_icon;
 mod rich;
 mod rows;
 
 #[cfg(test)]
 mod tests;
+
+pub use intent::{Emit, ViewIntent};
 
 pub use self::controls::{
     Stand, TagKind, action, avatar, chip, filter_row, ghost, labeled_select, led_option, segments,
@@ -32,25 +35,11 @@ pub use self::meter::{
     row_meter, speed_digits, transfer_display,
 };
 pub use self::motd::{motd_lines, motd_text};
+pub use self::project_icon::project_icon;
 pub use self::rich::rich_text;
 pub use self::rows::{
     empty, info, list, panel_list, row, section, section_at, section_head, section_label,
     section_with, setting, surface, technical, value_row,
 };
 
-use gpui::{App, Window};
-use std::rc::Rc;
-
-/// Something a page asked the shell to do. Pages stay stateless: they render
-/// from the shell's view state and report clicks as intents.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum ViewIntent {
-    LibraryTab(usize),
-    ActivityTab(usize),
-    /// Show or hide what this running task downloads.
-    TaskDetail(u64),
-    /// Choose one of a small set, keyed by (group, index).
-    Choose(u8, usize),
-}
-
-pub type Emit = Rc<dyn Fn(ViewIntent, &mut Window, &mut App)>;
+mod intent;

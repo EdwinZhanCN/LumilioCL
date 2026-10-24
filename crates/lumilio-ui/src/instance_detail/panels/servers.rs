@@ -1,18 +1,19 @@
 //! 世界 › 服务器: the instance's multiplayer list (`servers.dat`).
 
-use super::super::editors::Editor;
-use super::super::{InstanceDetailView, InstanceIntent, Section};
-use super::data::Confirm;
-use super::helpers::act;
-use crate::kit;
-use crate::theme::ShellColors;
-use crate::toast::Toast;
-use crate::tr;
+use std::sync::Arc;
+
 use gpui::prelude::*;
 use gpui::{AnyElement, Context, RenderImage, Window, div};
 use gpui_component::{h_flex, v_flex};
 use lumilio_core::ServerEntry;
-use std::sync::Arc;
+
+use super::super::editors::Editor;
+use super::super::{InstanceDetailView, InstanceIntent, Section};
+use super::data::Confirm;
+use super::helpers::act;
+use crate::theme::ShellColors;
+use crate::toast::Toast;
+use crate::{kit, tr};
 
 /// A server row's leading mark: the icon the server sent or the game cached,
 /// or a procedural cover seeded by its address when there is none.

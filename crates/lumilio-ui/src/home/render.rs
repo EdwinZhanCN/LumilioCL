@@ -1,14 +1,16 @@
+use gpui::prelude::*;
+use gpui::{
+    Animation, AnimationExt as _, AnyElement, Hsla, IntoElement, SharedString, div, ease_out_quint,
+    px,
+};
+use gpui_component::{StyledExt as _, h_flex, v_flex};
+
 use super::launching::{render_continue, render_launching, render_playing};
 use super::lists::{render_attention, render_first_use};
 use super::recovery::render_recovery;
 use super::{HomeIntentHandler, HomeLinks, HomePresentation, HoverHandler, WorldHint};
 use crate::key::KeyKind;
 use crate::theme::motion;
-use gpui::AnimationExt as _;
-use gpui::prelude::*;
-use gpui::{Animation, AnyElement, Hsla, IntoElement, SharedString, div, ease_out_quint, px};
-use gpui_component::StyledExt as _;
-use gpui_component::{h_flex, v_flex};
 
 /// Colors passed from the shell keep this module's copy and layout independent
 /// from gpui-component's global theme shape.

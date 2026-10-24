@@ -1,10 +1,7 @@
-use super::library::arranged;
-use super::library::loader_code;
-use super::library::present_loaders;
-use crate::live::LibraryCard;
-
-use crate::live::library_card;
 use lumilio_core::{InstanceRecord, InstanceSettings};
+
+use super::library::{arranged, loader_code, present_loaders};
+use crate::live::{LibraryCard, library_card};
 
 fn card(id: &str, name: &str, loader: lumilio_core::Loader, created: u64) -> LibraryCard {
     library_card(

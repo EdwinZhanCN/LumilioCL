@@ -1,15 +1,20 @@
 //! The map in a window of its own: the key that opens it, what the person was
 //! looking at (carried over), and the window's content.
+
+use std::collections::{BTreeMap, BTreeSet};
+use std::rc::Rc;
+
+use gpui::prelude::*;
+use gpui::{App, Context, Entity, IntoElement, Render, Window, div, px};
+use gpui_component::{ActiveTheme as _, Icon, Sizable as _, TitleBar, v_flex};
+use lumilio_plugin_api::map::{Dimension, WorldContext, WorldId};
+
 use super::camera::Camera;
 use super::layers::Layers;
 use super::{Connection, MapView};
 use crate::assets::UiIcon;
-use crate::{key::Key, tr};
-use gpui::{App, Context, Entity, IntoElement, Render, Window, div, prelude::*, px};
-use gpui_component::{ActiveTheme as _, Icon, Sizable as _, TitleBar, v_flex};
-use lumilio_plugin_api::map::{Dimension, WorldContext, WorldId};
-use std::collections::{BTreeMap, BTreeSet};
-use std::rc::Rc;
+use crate::key::Key;
+use crate::tr;
 
 /// What the person was looking at, so the map in its own window opens on the
 /// same world, dimension, place and layers. Opaque outside this module; the

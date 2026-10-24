@@ -3,8 +3,8 @@
 //! name, in a pixel face like the game's. Each colour is moved only as far
 //! as the page needs to read it.
 
-use crate::assets::PixelFace;
-use crate::theme::{self, ShellColors};
+use std::sync::Arc;
+
 use gpui::prelude::*;
 use gpui::{
     App, FontFeatures, FontStyle, FontWeight, HighlightStyle, Hsla, Pixels, StrikethroughStyle,
@@ -12,7 +12,10 @@ use gpui::{
 };
 use gpui_component::v_flex;
 use lumilio_core::{Motd, MotdSpan};
-use std::sync::Arc;
+
+use crate::assets::PixelFace;
+use crate::theme;
+use crate::theme::ShellColors;
 
 /// The game's server list shows two lines.
 const LINES: usize = 2;

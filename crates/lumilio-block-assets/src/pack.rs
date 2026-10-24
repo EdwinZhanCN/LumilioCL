@@ -2,7 +2,8 @@
 //! with every version difference already settled by the baker.
 
 use std::collections::BTreeMap;
-use std::fmt::{self, Display, Formatter};
+use std::fmt;
+use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};

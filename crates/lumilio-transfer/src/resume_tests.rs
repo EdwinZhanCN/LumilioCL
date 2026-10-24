@@ -1,11 +1,13 @@
+use std::path::{Path, PathBuf};
+use std::time::Duration;
+
+use sha1::{Digest, Sha1};
+
 use super::engine::TransferEngine;
 use super::partial::{part_path, sweep_partials};
 use super::request::{RetryPolicy, TransferError, TransferEvent, TransferRequest};
 use super::test_server::{Ending, Server};
 use crate::CancellationToken;
-use sha1::{Digest, Sha1};
-use std::path::{Path, PathBuf};
-use std::time::Duration;
 
 const SOURCE: &str = "https://example.invalid/file";
 

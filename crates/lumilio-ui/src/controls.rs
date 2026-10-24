@@ -4,15 +4,16 @@
 
 use std::rc::Rc;
 
+use gpui::prelude::*;
 use gpui::{
-    App, BoxShadow, ClickEvent, Div, ElementId, FontWeight, InteractiveElement as _, IntoElement,
-    ParentElement as _, RenderOnce, SharedString, Stateful, StatefulInteractiveElement as _,
-    Styled as _, Window, div, point, prelude::*, px,
+    App, BoxShadow, ClickEvent, Div, ElementId, FontWeight, IntoElement, RenderOnce, SharedString,
+    Stateful, Window, div, point, px,
 };
 use gpui_component::{Icon, IconName, Selectable as _, Sizable as _};
 
 use crate::key::{ClickHandler, Key};
-use crate::theme::{self, Body};
+use crate::theme;
+use crate::theme::Body;
 
 /// A 6 px LED: orange with a soft glow when lit, LED-off grey when not.
 pub fn led(on: bool, body: Body) -> Div {

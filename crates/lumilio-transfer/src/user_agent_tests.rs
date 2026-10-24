@@ -1,10 +1,11 @@
+use std::io::{Read, Write};
+use std::net::TcpListener;
+
+use futures_util::stream::StreamExt;
+
 use super::USER_AGENT;
 use super::http::{FileTransport, HttpTransport};
 use super::transport::{HttpMethod, HttpRequest, Transport};
-use futures_util::stream::StreamExt;
-
-use std::io::{Read, Write};
-use std::net::TcpListener;
 
 #[tokio::test]
 async fn http_requests_identify_the_launcher() {

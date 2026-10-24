@@ -1,13 +1,17 @@
 //! Editing Xaero waypoints: which fields the host's dialog offers, turning the
 //! confirmed values into a waypoint, and the write-back (plan W7, W10).
-use super::naming::{self, MINIMAP_ROOT};
-use super::overlay::{self, LAYER};
-use super::waypoints::{CHOOSABLE_COLORS, DEFAULT_SET, Waypoint, WaypointFile};
+
+use std::collections::BTreeMap;
+
 use lumilio_plugin_api::map::{Dimension, EditAction, MapPoint, ObjectEdit, WorldContext};
 use lumilio_plugin_api::{
     HostContext, PluginError, SettingField, SettingKind, SettingValue, Words,
 };
-use std::collections::BTreeMap;
+
+use super::naming::MINIMAP_ROOT;
+use super::overlay::LAYER;
+use super::waypoints::{CHOOSABLE_COLORS, DEFAULT_SET, Waypoint, WaypointFile};
+use super::{naming, overlay};
 
 /// Longest name Xaero's own dialog accepts, in characters.
 pub(crate) const NAME_MAX: usize = 32;

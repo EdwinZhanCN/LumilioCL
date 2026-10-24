@@ -16,15 +16,15 @@ use gpui::{Anchor, AnyElement, Context, Entity, SharedString, Window, div, px};
 use gpui_component::{Sizable as _, h_flex, v_flex};
 use lumilio_core::{ProvidedSource, SourceRole};
 
-use super::dialogs::{self, OpenDialog, PackPathDialog, Submission};
-use super::{Command, Placement, StudioView, muted_line, viewport};
+use super::dialogs::{OpenDialog, PackPathDialog, Submission};
+use super::{Command, Placement, StudioView, dialogs, muted_line, viewport};
 use crate::controls::Fader;
 use crate::key::Key;
-use crate::kit::{self, MenuEntry};
+use crate::kit::MenuEntry;
 use crate::model_view::{base_label, file_label};
-use crate::theme::{self, ShellColors};
+use crate::theme::ShellColors;
 use crate::toast::Toast;
-use crate::tr;
+use crate::{kit, theme, tr};
 
 /// The row's label and its caption: what the source provides.
 pub(super) fn source_words(source: &ProvidedSource) -> (String, String) {

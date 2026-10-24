@@ -2,11 +2,14 @@
 //! optional `ETag`, honours ranges if told to, can break or stall an answer,
 //! and records what it was asked and how many answers were open at once.
 
-use super::transport::{ByteStream, Transport, TransportError, TransportFuture, TransportResponse};
-use futures_util::stream::{self, StreamExt};
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
+
+use futures_util::stream;
+use futures_util::stream::StreamExt;
+
+use super::transport::{ByteStream, Transport, TransportError, TransportFuture, TransportResponse};
 
 /// How the next answer ends after the bytes it was asked for start.
 #[derive(Clone, Copy, Debug)]

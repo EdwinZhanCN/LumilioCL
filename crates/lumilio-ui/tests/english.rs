@@ -4,10 +4,11 @@
 
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
-use gpui::{Context, Entity, IntoElement, Render, TestAppContext, Window, div, prelude::*};
+use gpui::prelude::*;
+use gpui::{Context, Entity, IntoElement, Render, TestAppContext, Window, div};
 use gpui_component::IndexPath;
+use lumilio_ui::features::discover::model::{count_label, tag_label};
 use lumilio_ui::i18n::{Locale, generation, locale, set_locale};
-use lumilio_ui::live::{count_label, tag_label};
 use lumilio_ui::pages::live::LiveControls;
 use lumilio_ui::pages::settings::{list_text, memory_text, tabs};
 
@@ -112,8 +113,9 @@ impl Render for Pane {
 
 #[gpui::test]
 fn in_english_the_studios_tabs_and_menu_are_not_cut_off(cx: &mut TestAppContext) {
-    use gpui::{Modifiers, px, size};
     use std::rc::Rc;
+
+    use gpui::{Modifiers, px, size};
     let _turn = language_turn();
     set_locale(Locale::English);
     cx.update(gpui_component::init);
@@ -178,10 +180,11 @@ fn in_english_the_studios_tabs_and_menu_are_not_cut_off(cx: &mut TestAppContext)
 
 #[gpui::test]
 fn in_english_the_studios_operation_dialogs_fit_the_minimum_window(cx: &mut TestAppContext) {
+    use std::rc::Rc;
+
     use gpui::{Bounds, Modifiers, Pixels, px, size};
     use lumilio_schematic::{BlockState, Region, UniversalSchematic};
     use lumilio_ui::schematic_studio::{Command, Connection, Event, StudioView};
-    use std::rc::Rc;
     let _turn = language_turn();
     set_locale(Locale::English);
     cx.update(|cx| {

@@ -1,5 +1,6 @@
 //! Large ore veins of the 1.18+ Overworld (the fork's `veins.c`): where the
 //! vein toggle noise runs copper veins (Y 0–50) and iron veins (Y −60 to −8).
+
 use crate::{Error, Version, ffi};
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]

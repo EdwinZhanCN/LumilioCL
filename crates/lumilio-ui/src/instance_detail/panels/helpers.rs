@@ -1,11 +1,12 @@
+use gpui::prelude::*;
+use gpui::{AnyElement, App, Context, Window};
+use gpui_component::{h_flex, v_flex};
+
 use super::super::{InstanceDetailView, Section};
 use super::data::{Confirm, Loaded};
 use crate::assets::UiIcon;
 use crate::theme::ShellColors;
 use crate::{kit, live, tr};
-use gpui::prelude::*;
-use gpui::{AnyElement, App, Context, Window};
-use gpui_component::{h_flex, v_flex};
 
 pub(in super::super) fn clock(seconds: u64) -> String {
     live::ago(seconds)

@@ -468,13 +468,13 @@ fn a_tropical_fish_takes_its_two_dyes() {
         .flat_map(|layer| layer.colors.iter().copied())
         .collect();
     let has = |rgb: u32| {
-        let want = [(rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF].map(|c| c as f32 / 255.0);
+        let want = [(rgb >> 16) & 0xff, (rgb >> 8) & 0xff, rgb & 0xff].map(|c| c as f32 / 255.0);
         colors
             .iter()
             .any(|c| (0..3).all(|i| (c[i] - want[i]).abs() < 0.02))
     };
-    assert!(has(0xB02E26), "the red body");
-    assert!(has(0x3C44AA), "the blue pattern");
+    assert!(has(0xb02e26), "the red body");
+    assert!(has(0x3c44aa), "the blue pattern");
 }
 
 #[test]

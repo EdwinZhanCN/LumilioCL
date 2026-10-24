@@ -1,10 +1,11 @@
+use gpui::Context;
+use gpui::prelude::*;
+use gpui_component::v_flex;
+
 use super::editors::Editor;
 use super::{InstanceDetailView, editors, panels};
 use crate::theme::ShellColors;
 use crate::{kit, live, tr};
-use gpui::Context;
-use gpui::prelude::*;
-use gpui_component::v_flex;
 
 impl InstanceDetailView {
     pub(super) fn overview(&self, colors: ShellColors, cx: &mut Context<Self>) -> gpui::AnyElement {

@@ -1,4 +1,5 @@
-use std::io::{self, Write};
+use std::io;
+use std::io::Write;
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 

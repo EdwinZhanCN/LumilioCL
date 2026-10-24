@@ -1,10 +1,18 @@
 //! The look area of an account's detail, in two layers (after Modrinth's
 //! `Skins.vue`): the figure with one place to act under it, beside a grid of
 //! skin pictures. Editing replaces the grid; nothing else is on the page.
-use super::*;
-use crate::{assets::UiIcon, theme};
+
+use gpui::prelude::*;
 use gpui::{AnyElement, ElementId};
-use gpui_component::{Icon, IconName};
+use gpui_component::{Icon, IconName, Sizable as _, StyledExt as _};
+
+use super::{
+    App, Arc, Context, IntoElement, Key, LibrarySkin, MojangProfile, ObjectFit, Render,
+    RenderImage, SKIN_THUMB, ShellColors, Wardrobe, WardrobeAction, WeakEntity, Window, div,
+    h_flex, img, kit, px, tr, v_flex,
+};
+use crate::assets::UiIcon;
+use crate::theme;
 
 /// The narrowest window in which the preview stays put beside a grid that
 /// scrolls on its own: the account list, the preview and three pictures,

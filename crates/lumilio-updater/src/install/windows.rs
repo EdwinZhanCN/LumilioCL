@@ -1,6 +1,7 @@
-use crate::Relaunch;
 use std::path::Path;
 use std::process::Command;
+
+use crate::Relaunch;
 
 /// Starts the installer, which closes the launcher, installs silently and
 /// opens the new version.

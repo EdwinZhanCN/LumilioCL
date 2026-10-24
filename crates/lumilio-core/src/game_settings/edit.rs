@@ -1,12 +1,12 @@
 //! Launcher-side edits of one option while the game is closed. The edit's
 //! location is its scope: a game's edit never changes the preset it follows.
+
+use super::document::Document;
 use super::{
     Binding, GameSettingValue, GameSettingsError, InstanceOptions, OptionChange, OptionsFile,
-    binding, catalog,
-    document::{self, Document},
-    save_binding, storage, view,
+    binding, catalog, document, save_binding, storage, view,
 };
-use crate::instance::InstanceStore;
+use crate::instances::InstanceStore;
 
 pub(crate) fn options(
     store: &InstanceStore,

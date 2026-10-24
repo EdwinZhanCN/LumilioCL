@@ -1,14 +1,18 @@
 //! The "Xaero waypoints" layer: the waypoints of the Minimap world directory a
 //! world is linked to, in the dimension on screen.
-use super::naming::{self, MINIMAP_ROOT};
-use super::waypoints::{DEFAULT_SET, Waypoint, WaypointFile, color_rgb, share_string};
+
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
+
 use lumilio_plugin_api::map::{
     Dimension, MapIcon, MapObject, MapObjectKind, MapPoint, OverlayInfo, OverlayRequest,
     SourceLink, WorldContext,
 };
 use lumilio_plugin_api::{HostContext, PluginError};
-use std::sync::{Mutex, PoisonError};
-use std::time::{Duration, Instant};
+
+use super::naming;
+use super::naming::MINIMAP_ROOT;
+use super::waypoints::{DEFAULT_SET, Waypoint, WaypointFile, color_rgb, share_string};
 
 pub(crate) const GROUP: &str = "map-group-xaero";
 pub(crate) const LAYER: &str = "xaero.waypoints";
@@ -58,7 +62,9 @@ const REUSE: Duration = Duration::from_secs(1);
 
 /// Drops the reused read; called after the files change.
 pub(crate) fn forget_recent() {
-    *RECENT.lock().unwrap_or_else(PoisonError::into_inner) = None;
+    *RECENT
+        .lock()
+        .expect("Xaero overlay cache lock was poisoned") = None;
 }
 
 /// Each waypoint file of the world's directory in this dimension, read and
@@ -72,7 +78,7 @@ fn read_files(
     let key = (dir.to_owned(), dimension.clone());
     if let Some((known, at, files)) = RECENT
         .lock()
-        .unwrap_or_else(PoisonError::into_inner)
+        .expect("Xaero overlay cache lock was poisoned")
         .as_ref()
         && *known == key
         && at.elapsed() < REUSE
@@ -80,7 +86,9 @@ fn read_files(
         return Ok(files.clone());
     }
     let files = read_uncached(ctx, dir, dimension)?;
-    *RECENT.lock().unwrap_or_else(PoisonError::into_inner) =
+    *RECENT
+        .lock()
+        .expect("Xaero overlay cache lock was poisoned") =
         Some((key, Instant::now(), files.clone()));
     Ok(files)
 }

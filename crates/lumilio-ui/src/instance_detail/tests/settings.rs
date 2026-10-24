@@ -1,3 +1,9 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
+use gpui::TestAppContext;
+use lumilio_core::{LauncherSettings, Loader};
+
 use super::super::editors::Editor;
 use super::super::forms::memory_draft;
 use super::super::intent::{InstanceIntent, Section};
@@ -6,10 +12,6 @@ use super::super::{
     TAB_SETTINGS,
 };
 use super::{click, record, rooted};
-use gpui::TestAppContext;
-use lumilio_core::{LauncherSettings, Loader};
-use std::cell::RefCell;
-use std::rc::Rc;
 
 #[test]
 fn memory_form_preserves_other_overrides_and_uses_core_validation() {
@@ -317,9 +319,10 @@ fn options() -> lumilio_core::InstanceOptions {
 fn options_are_edited_outside_the_game_and_game_changes_are_decided_together(
     cx: &mut TestAppContext,
 ) {
+    use lumilio_core::{GameSettingValue, OptionChange, SettingResolution};
+
     use super::super::panels::Arrived;
     use super::super::{Operated, SETTINGS_OPTIONS};
-    use lumilio_core::{GameSettingValue, OptionChange, SettingResolution};
     let seen: Rc<RefCell<Vec<InstanceIntent>>> = Rc::default();
     let (view, cx) = rooted(cx, seen.clone());
     view.update(cx, |view, cx| {

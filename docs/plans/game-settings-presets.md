@@ -148,7 +148,7 @@ Consequences: 选项表在两处共用；开关是当场生效的快捷操作，
 
 ## References
 
-- [crates/lumilio-core/src/instance.rs](../../crates/lumilio-core/src/instance.rs)
+- [crates/lumilio-core/src/instance/mod.rs](../../crates/lumilio-core/src/instance/mod.rs)
 - [crates/lumilio-core/src/layout.rs](../../crates/lumilio-core/src/layout.rs)
 - [crates/lumilio-core/src/service/launch.rs](../../crates/lumilio-core/src/service/launch.rs)
 - [crates/lumilio-core/src/service/mod.rs](../../crates/lumilio-core/src/service/mod.rs)

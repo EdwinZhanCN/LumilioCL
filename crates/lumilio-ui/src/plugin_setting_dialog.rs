@@ -1,12 +1,17 @@
 //! Host-owned text and number drafts, retained until asynchronous persistence succeeds.
-use crate::theme::ShellColors;
-use crate::tr;
-use crate::{kit, theme};
-use gpui::{App, Context, Entity, IntoElement, Render, Window, div, prelude::*};
+
+use std::future::Future;
+use std::pin::Pin;
+use std::rc::Rc;
+
+use gpui::prelude::*;
+use gpui::{App, Context, Entity, IntoElement, Render, Window, div};
 use gpui_component::input::{Input, InputState};
 use gpui_component::{WindowExt as _, h_flex, v_flex};
 use lumilio_plugin_api::{SettingField, SettingKind, SettingValue};
-use std::{future::Future, pin::Pin, rc::Rc};
+
+use crate::theme::ShellColors;
+use crate::{kit, theme, tr};
 
 pub type SaveSetting =
     Rc<dyn Fn(SettingValue) -> Pin<Box<dyn Future<Output = Result<(), String>>>>>;

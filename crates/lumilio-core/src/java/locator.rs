@@ -12,7 +12,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use super::JavaRuntime;
-use crate::environment::{HostProfile, PlatformFamily};
+use lumilio_minecraft::{HostProfile, PlatformFamily};
 
 /// Folders below Program Files (and the local app data) vendors install into.
 const WINDOWS_VENDORS: [&str; 11] = [

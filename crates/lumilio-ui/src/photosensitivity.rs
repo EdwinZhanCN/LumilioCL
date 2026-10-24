@@ -3,10 +3,12 @@
 //! (GPL-3.0-only; ADR 0022): the filter depends on what authors disclose, so
 //! it is a help, not a guarantee.
 
+use gpui::prelude::*;
+use gpui::{App, Window, div, px};
+use gpui_component::{ActiveTheme as _, WindowExt as _, h_flex};
+
 use crate::key::Key;
 use crate::tr;
-use gpui::{App, Window, div, prelude::*, px};
-use gpui_component::{ActiveTheme as _, WindowExt as _, h_flex};
 
 // ia[discover]: 光敏性提示 | 第一次选「高级排除 · 光敏性触发」时的弹窗 | 说明这个筛选只依据作者的声明，不能保证安全；可选「知道了，不再提示」
 pub fn warn(

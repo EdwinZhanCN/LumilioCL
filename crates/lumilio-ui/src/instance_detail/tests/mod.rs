@@ -8,13 +8,15 @@ mod settings;
 mod view;
 mod worlds;
 
-use super::InstanceDetailView;
-use super::intent::InstanceIntent;
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use gpui::prelude::*;
 use gpui::{Entity, Modifiers, TestAppContext};
 use lumilio_core::{InstanceRecord, InstanceSettings, Loader};
-use std::cell::RefCell;
-use std::rc::Rc;
+
+use super::InstanceDetailView;
+use super::intent::InstanceIntent;
 
 fn record() -> InstanceRecord {
     InstanceRecord {

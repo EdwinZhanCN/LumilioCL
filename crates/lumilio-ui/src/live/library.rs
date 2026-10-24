@@ -1,5 +1,6 @@
-use crate::home::WorldHint;
 use lumilio_core::{AttentionItem, InstanceRecord, Loader};
+
+use crate::home::WorldHint;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LibraryCard {

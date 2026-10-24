@@ -1,17 +1,17 @@
+use gpui::prelude::*;
+use gpui::{AnyElement, IntoElement, div, px};
+use gpui_component::{Icon, Sizable as _, h_flex, v_flex};
+use lumilio_core::{CONNECTIONS_PER_FILE, FileDownload, SourceSwitch, TaskDownloads};
+
 use super::controls::{LiveCtx, send};
 use crate::assets::UiIcon;
 use crate::key::Key;
-use crate::kit;
 use crate::kit::{TagKind, Tone, ViewIntent};
 use crate::live::{
     ActivityRow, ActivityState, LiveHandler, LiveIntent, eta_text, file_amount, source_host,
 };
 use crate::theme::ShellColors;
-use crate::{tr, tr_all};
-use gpui::prelude::*;
-use gpui::{AnyElement, IntoElement, div, px};
-use gpui_component::{Icon, Sizable as _, h_flex, v_flex};
-use lumilio_core::{CONNECTIONS_PER_FILE, FileDownload, SourceSwitch, TaskDownloads};
+use crate::{kit, tr, tr_all};
 
 /// A task's open detail lists this many files; the rest are counted.
 const FILES_SHOWN: usize = 8;

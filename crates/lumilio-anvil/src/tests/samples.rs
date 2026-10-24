@@ -1,7 +1,9 @@
 //! Regions written by the vanilla server, trimmed to 4×4 chunks; how they were
 //! made is in `tests/data/README.md`.
-use crate::{Chunk, Error, Heightmap, Region, Source, columns, region_coords};
+
 use std::path::PathBuf;
+
+use crate::{Chunk, Error, Heightmap, Region, Source, columns, region_coords};
 
 struct File(Vec<u8>);
 

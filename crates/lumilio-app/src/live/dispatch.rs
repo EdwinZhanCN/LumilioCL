@@ -1,10 +1,20 @@
+use gpui_kit::{App, AppContext as _, Window};
+use lumilio_ui::home::HomeIntent;
+use lumilio_ui::instance_detail::InstanceIntent;
+use lumilio_ui::java_conflict::{JavaConflict, JavaConflictAnswer};
+use lumilio_ui::live::{LiveIntent, PlaceTarget, account_failure, account_rows};
+use lumilio_ui::missing_folder::MissingFolderAnswer;
+use lumilio_ui::route::Route;
+use lumilio_ui::shell::ShellIntent;
+use lumilio_ui::toast::Toast;
+use lumilio_ui::{java_conflict, missing_folder, platform, tr};
+
 use super::accounts::{
     load_account_face, load_account_look, open_add_account, open_auth_servers,
     open_microsoft_sign_in, open_skin_dialog, open_third_party_sign_in,
 };
-use super::discover::{first_search, install, install_target, load_filters, open_project, search};
 use super::instance::open_instance;
-use super::jobs::{answer, failed_only, job, outcome, reload, retry_task};
+use super::jobs::{failed_only, job, outcome, reload, retry_task};
 use super::launch::{play, start_launch, technical_details};
 use super::library::{
     ask_collection_name, ask_collections_of, choose_current, import_game, restore_backup,
@@ -14,21 +24,7 @@ use super::settings::{
     add_java, apply_preferences, change_setting, check_reclaimable, clear_cache,
     export_diagnostics, install_java, load_settings, reclaim, reload_themes, set_wallpaper,
 };
-use super::update;
-use super::{Reload, Wiring};
-use gpui_kit::AppContext as _;
-use gpui_kit::{App, Window};
-use lumilio_core::CancellationToken;
-use lumilio_ui::home::HomeIntent;
-use lumilio_ui::instance_detail::InstanceIntent;
-use lumilio_ui::java_conflict::{self, JavaConflict, JavaConflictAnswer};
-use lumilio_ui::live::{LiveIntent, PlaceTarget, account_failure, account_rows};
-use lumilio_ui::missing_folder::{self, MissingFolderAnswer};
-use lumilio_ui::platform;
-use lumilio_ui::route::Route;
-use lumilio_ui::shell::ShellIntent;
-use lumilio_ui::toast::Toast;
-use lumilio_ui::tr;
+use super::{Reload, Wiring, update};
 
 /// Asks about a Java that cannot run the game. An answer starts the launch
 /// again (with the automatic Java this once, or as chosen); cancelling drops
@@ -84,9 +80,10 @@ pub(super) fn on_shell_intent(
         ShellIntent::Navigate(Route::Library | Route::Activity | Route::Accounts) => {
             reload(wiring, Reload::Lists, cx)
         }
-        ShellIntent::Navigate(Route::Discover) => first_search(wiring, cx),
         ShellIntent::Home(HomeIntent::TechnicalDetails) => technical_details(wiring, window, cx),
-        ShellIntent::Navigate(Route::Home) | ShellIntent::Home(HomeIntent::Import) => {}
+        // Discover loads its own first page (the shell tells it it was shown).
+        ShellIntent::Navigate(Route::Home | Route::Discover)
+        | ShellIntent::Home(HomeIntent::Import) => {}
     }
 }
 
@@ -113,7 +110,7 @@ fn ask_missing_folder(wiring: &Wiring, id: String, name: &str, window: &mut Wind
                     .spawn(async move { service.new_game_folder(&id).await });
                 let (wiring, window) = (wiring.clone(), window.window_handle());
                 cx.spawn(async move |cx| {
-                    let Some(made) = answer(&wiring, made, cx).await else {
+                    let Some(made) = lumilio_ui::runtime::answer(made, cx).await else {
                         return;
                     };
                     if let Err(error) = made {
@@ -170,7 +167,7 @@ fn continue_launch(wiring: &Wiring, window: gpui_kit::AnyWindowHandle, cx: &mut 
     });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let (missing, has_account, conflict) = answer(&wiring, work, cx)
+        let (missing, has_account, conflict) = lumilio_ui::runtime::answer(work, cx)
             .await
             .unwrap_or((None, true, None));
         if missing.is_none() && has_account && conflict.is_none() {
@@ -200,115 +197,6 @@ pub(super) fn on_live_intent(
         LiveIntent::Preset(intent) => super::game_settings::preset(wiring, intent, window, cx),
         LiveIntent::ImportPack => import_pack(wiring, cx),
         LiveIntent::OpenInstance(id) => open_instance(wiring, id, None, window, cx),
-        LiveIntent::SaveVersionAs {
-            source,
-            project,
-            version_id,
-            file_name,
-            title,
-        } => {
-            let start = std::env::var_os("HOME")
-                .or_else(|| std::env::var_os("USERPROFILE"))
-                .map(std::path::PathBuf::from)
-                .unwrap_or_else(|| wiring.backend.service.layout().root().to_owned());
-            let chosen = platform::pick_save_path(cx, &start, &file_name);
-            let wiring = wiring.clone();
-            cx.spawn(async move |cx| {
-                let Some(path) = chosen.await else {
-                    return;
-                };
-                cx.update(|cx| {
-                    let service = wiring.backend.service.clone();
-                    let target = path.clone();
-                    job(
-                        &wiring,
-                        cx,
-                        true,
-                        Reload::Lists,
-                        Some(Toast::info(tr!(
-                            "project-save-started",
-                            title = title.as_str()
-                        ))),
-                        async move {
-                            service
-                                .save_version_as(
-                                    &source,
-                                    &project,
-                                    &version_id,
-                                    &target,
-                                    CancellationToken::new(),
-                                )
-                                .await
-                        },
-                        move |shell, result, cx| {
-                            shell.toast(
-                                super::jobs::install_outcome(
-                                    result,
-                                    |_| tr!("project-saved-to", path = path.display().to_string()),
-                                    tr!("project-save-failed", title = title.as_str()),
-                                ),
-                                cx,
-                            )
-                        },
-                    );
-                });
-            })
-            .detach();
-        }
-        LiveIntent::UpdateInstalled {
-            kind,
-            source,
-            project,
-            title,
-            file_name,
-            version_id,
-        } => {
-            let Some((instance, instance_name)) = install_target(wiring, cx) else {
-                return;
-            };
-            let service = wiring.backend.service.clone();
-            let state = wiring.state.clone();
-            job(
-                wiring,
-                cx,
-                true,
-                Reload::Lists,
-                Some(Toast::info(tr!(
-                    "project-update-started",
-                    title = title.as_str()
-                ))),
-                async move {
-                    service
-                        .switch_content_version(
-                            &instance,
-                            kind,
-                            &file_name,
-                            &source,
-                            &project,
-                            &version_id,
-                            CancellationToken::new(),
-                        )
-                        .await
-                },
-                move |shell, result, cx| {
-                    state.borrow_mut().installed_key = None;
-                    shell.toast(
-                        super::jobs::install_outcome(
-                            result,
-                            |file| {
-                                tr!(
-                                    "project-updated-to",
-                                    file = file,
-                                    instance = instance_name.as_str()
-                                )
-                            },
-                            tr!("project-update-failed", title = title.as_str()),
-                        ),
-                        cx,
-                    )
-                },
-            );
-        }
         LiveIntent::Resolve(id, action) => open_instance(
             wiring,
             id,
@@ -562,20 +450,6 @@ pub(super) fn on_live_intent(
                     .spawn(async move { service.set_preferences(preferences).await }),
             );
         }
-        LiveIntent::RememberDiscover(discover) => {
-            let preferences = {
-                let mut state = wiring.state.borrow_mut();
-                state.preferences.discover = discover;
-                state.preferences.clone()
-            };
-            // Quiet, like the Library's order: not worth a message when it fails.
-            let service = wiring.backend.service.clone();
-            drop(
-                wiring
-                    .backend
-                    .spawn(async move { service.set_preferences(preferences).await }),
-            );
-        }
         LiveIntent::ReloadThemes => reload_themes(wiring, window.window_handle(), cx),
         LiveIntent::SetWallpaper(path) => set_wallpaper(wiring, path, window, cx),
         LiveIntent::SetPreferences(preferences) => {
@@ -768,27 +642,6 @@ pub(super) fn on_live_intent(
             drop(state);
             play(wiring, id, window, cx);
         }
-        LiveIntent::Search(query) => search(wiring, &query, cx),
-        LiveIntent::LoadFilters => load_filters(wiring, cx),
-        LiveIntent::TranslateBody {
-            source,
-            project,
-            original,
-            format,
-            request,
-        } => super::translation::translate_body(
-            wiring, source, project, original, format, request, cx,
-        ),
-        LiveIntent::ClearTranslationCache => super::translation::clear_cache(wiring, cx),
-        LiveIntent::OpenProject { kind, source, slug } => {
-            open_project(wiring, kind, source, slug, window, cx)
-        }
-        LiveIntent::Install {
-            kind,
-            source,
-            slug,
-            title,
-            version,
-        } => install(wiring, kind, source, slug, title, version, window, cx),
+        LiveIntent::ClearTranslationCache => super::settings::clear_cache(wiring, cx),
     }
 }

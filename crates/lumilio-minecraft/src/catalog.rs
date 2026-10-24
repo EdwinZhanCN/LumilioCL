@@ -1,0 +1,239 @@
+//! The official Minecraft version catalog.
+//!
+//! The catalog lists every downloadable game version with its kind, release
+//! time, and the address of its release manifest.
+
+use std::error::Error;
+use std::fmt;
+use std::fmt::{Display, Formatter};
+
+use serde::Deserialize;
+
+/// Where the official catalog lives.
+pub const OFFICIAL_CATALOG_URL: &str =
+    "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum VersionKind {
+    Release,
+    Snapshot,
+    /// Historic alpha/beta builds.
+    Old,
+    /// Anything the catalog names that this build does not know.
+    Other,
+}
+
+impl VersionKind {
+    fn from_protocol(name: &str) -> Self {
+        match name {
+            "release" => Self::Release,
+            "snapshot" => Self::Snapshot,
+            "old_beta" | "old_alpha" => Self::Old,
+            _ => Self::Other,
+        }
+    }
+}
+
+/// How a version is presented to someone choosing one: the catalog calls
+/// pre-releases and release candidates "snapshots", but people tell them
+/// apart. Display and filtering only; [`VersionKind`] stays authoritative.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum VersionChannel {
+    Release,
+    Snapshot,
+    PreRelease,
+    Candidate,
+    /// Historic alpha/beta builds.
+    Old,
+}
+
+impl VersionChannel {
+    /// The channel a non-release version id names, by the conventions the
+    /// game has used: `26.3-rc-1`, `1.16-rc1`, `1.14 Pre-Release 1`,
+    /// `26.3-pre-2`, `26.4-snapshot-1`, `25w14a`.
+    #[must_use]
+    pub fn of_unreleased(id: &str) -> Self {
+        let lower = id.to_ascii_lowercase();
+        if lower.contains("-rc") || lower.contains("release candidate") {
+            Self::Candidate
+        } else if lower.contains("-pre") || lower.contains("pre-release") {
+            Self::PreRelease
+        } else {
+            Self::Snapshot
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CatalogEntry {
+    id: String,
+    kind: VersionKind,
+    release_time: String,
+    url: String,
+    sha1: Option<String>,
+}
+
+impl CatalogEntry {
+    #[must_use]
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    #[must_use]
+    pub const fn kind(&self) -> VersionKind {
+        self.kind
+    }
+
+    #[must_use]
+    pub fn channel(&self) -> VersionChannel {
+        match self.kind {
+            VersionKind::Release => VersionChannel::Release,
+            VersionKind::Old => VersionChannel::Old,
+            VersionKind::Snapshot | VersionKind::Other => VersionChannel::of_unreleased(&self.id),
+        }
+    }
+
+    /// RFC 3339 timestamp, as published.
+    #[must_use]
+    pub fn release_time(&self) -> &str {
+        &self.release_time
+    }
+
+    /// Address of this version's release manifest.
+    #[must_use]
+    pub fn manifest_url(&self) -> &str {
+        &self.url
+    }
+
+    #[must_use]
+    pub fn manifest_sha1(&self) -> Option<&str> {
+        self.sha1.as_deref()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct RawCatalog {
+    #[serde(default)]
+    latest: RawLatest,
+    versions: Option<Vec<RawEntry>>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct RawLatest {
+    release: Option<String>,
+    snapshot: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RawEntry {
+    id: Option<String>,
+    #[serde(rename = "type")]
+    kind: Option<String>,
+    #[serde(rename = "releaseTime")]
+    release_time: Option<String>,
+    time: Option<String>,
+    url: Option<String>,
+    sha1: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct VersionCatalog {
+    entries: Vec<CatalogEntry>,
+    latest_release: Option<String>,
+    latest_snapshot: Option<String>,
+}
+
+#[derive(Debug)]
+pub enum CatalogError {
+    Decode(String),
+}
+
+impl Display for CatalogError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Decode(message) => write!(f, "invalid version catalog: {message}"),
+        }
+    }
+}
+
+impl Error for CatalogError {}
+
+impl VersionCatalog {
+    /// Decodes a catalog document.
+    ///
+    /// Entries without an id or manifest address are dropped rather than
+    /// failing the whole catalog; a document with no `versions` list is
+    /// rejected. Duplicate ids keep the first occurrence. Entries end up
+    /// newest first by release time.
+    pub fn decode_json(json: &str) -> Result<Self, CatalogError> {
+        let raw: RawCatalog =
+            serde_json::from_str(json).map_err(|error| CatalogError::Decode(error.to_string()))?;
+        let versions = raw
+            .versions
+            .ok_or_else(|| CatalogError::Decode("missing versions list".to_owned()))?;
+        let mut entries: Vec<CatalogEntry> = Vec::with_capacity(versions.len());
+        for entry in versions {
+            let (Some(id), Some(url)) = (
+                entry.id.filter(|id| !id.trim().is_empty()),
+                entry.url.filter(|url| !url.trim().is_empty()),
+            ) else {
+                continue;
+            };
+            if entries.iter().any(|known| known.id == id) {
+                continue;
+            }
+            entries.push(CatalogEntry {
+                id,
+                kind: entry
+                    .kind
+                    .as_deref()
+                    .map_or(VersionKind::Other, VersionKind::from_protocol),
+                release_time: entry.release_time.or(entry.time).unwrap_or_default(),
+                url,
+                sha1: entry.sha1,
+            });
+        }
+        // Stable, so entries published with equal times keep catalog order.
+        entries.sort_by(|a, b| b.release_time.cmp(&a.release_time));
+        Ok(Self {
+            entries,
+            latest_release: raw.latest.release,
+            latest_snapshot: raw.latest.snapshot,
+        })
+    }
+
+    #[must_use]
+    pub fn entries(&self) -> &[CatalogEntry] {
+        &self.entries
+    }
+
+    /// Entries of the given kinds, newest first.
+    pub fn of_kinds<'a>(
+        &'a self,
+        kinds: &'a [VersionKind],
+    ) -> impl Iterator<Item = &'a CatalogEntry> + 'a {
+        self.entries
+            .iter()
+            .filter(move |entry| kinds.contains(&entry.kind))
+    }
+
+    #[must_use]
+    pub fn get(&self, id: &str) -> Option<&CatalogEntry> {
+        self.entries.iter().find(|entry| entry.id == id)
+    }
+
+    #[must_use]
+    pub fn latest_release(&self) -> Option<&CatalogEntry> {
+        let id = self.latest_release.as_deref()?;
+        self.get(id)
+    }
+
+    #[must_use]
+    pub fn latest_snapshot(&self) -> Option<&CatalogEntry> {
+        let id = self.latest_snapshot.as_deref()?;
+        self.get(id)
+    }
+}
+
+#[cfg(test)]
+mod tests;

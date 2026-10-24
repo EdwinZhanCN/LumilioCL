@@ -1,5 +1,6 @@
-use super::*;
 use lumilio_plugin_api::map::{TileKey, WorldContext};
+
+use super::*;
 
 fn request(tx: i32, tz: i32) -> TileRequest {
     let world = WorldId::Save {

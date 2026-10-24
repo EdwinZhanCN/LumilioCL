@@ -1,13 +1,16 @@
 //! Overworld landmarks that come from the seed rather than a structure grid:
 //! the world spawn and the slime chunks.
-use crate::structures::world_version;
+
+use std::sync::Mutex;
+
 use lumilio_cubiomes::Version;
 use lumilio_plugin_api::PluginError;
 use lumilio_plugin_api::map::{
     Dimension, MapBounds, MapIcon, MapObject, MapObjectKind, MapPoint, OverlayInfo, OverlayRequest,
     WorldContext, WorldId,
 };
-use std::sync::Mutex;
+
+use crate::structures::world_version;
 
 pub(crate) const GROUP: &str = "map-group-world";
 pub(crate) const SPAWN: &str = "world.spawn";
@@ -73,9 +76,7 @@ const SPAWN_WORLDS: usize = 8;
 
 fn spawn(version: Version, seed: i64) -> lumilio_cubiomes::Spawn {
     let key = (seed, version.index());
-    let mut cache = SPAWNS
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let mut cache = SPAWNS.lock().expect("landmark cache lock was poisoned");
     if let Some((_, found)) = cache.iter().find(|(known, _)| *known == key) {
         return *found;
     }

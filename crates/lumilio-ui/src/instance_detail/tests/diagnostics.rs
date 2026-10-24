@@ -1,11 +1,13 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
+use gpui::{Entity, Modifiers, TestAppContext};
+use lumilio_core::{LauncherSettings, PluginFinding};
+
 use super::super::intent::{InstanceIntent, Section};
 use super::super::panels::Arrived;
 use super::super::{InstanceDetailView, TAB_DIAGNOSTICS, TAB_HISTORY};
 use super::{click, record, rooted};
-use gpui::{Entity, Modifiers, TestAppContext};
-use lumilio_core::{LauncherSettings, PluginFinding};
-use std::cell::RefCell;
-use std::rc::Rc;
 
 fn finding() -> PluginFinding {
     PluginFinding {

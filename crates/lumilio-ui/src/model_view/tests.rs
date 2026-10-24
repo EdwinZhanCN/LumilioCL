@@ -1,7 +1,8 @@
-use super::*;
 use gpui::{Modifiers, TestAppContext, point};
 use gpui_component::WindowExt as _;
 use worker::Mailbox;
+
+use super::*;
 
 #[test]
 fn retina_frames_use_physical_pixels_and_large_frames_keep_their_aspect() {
@@ -472,8 +473,9 @@ fn explore_before_loading_uses_the_scene_spawn_and_headless_capture_fails_visibl
 
 #[gpui::test]
 fn opening_is_lazy_escape_closes_and_reopening_uses_a_new_asset_request(cx: &mut TestAppContext) {
-    use gpui_component::Root;
     use std::cell::RefCell;
+
+    use gpui_component::Root;
     cx.update(|cx| {
         gpui_component::init(cx);
         cx.set_reduce_motion(true);

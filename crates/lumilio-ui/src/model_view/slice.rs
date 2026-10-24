@@ -9,17 +9,15 @@ use gpui::prelude::*;
 use gpui::{
     AnyElement, Context, Entity, Focusable as _, Pixels, Point, Subscription, Window, div, px,
 };
-use gpui_component::IndexPath;
 use gpui_component::input::{InputEvent, InputState, NumberInput, NumberInputEvent, StepAction};
 use gpui_component::select::{SearchableVec, SelectEvent, SelectState};
-use gpui_component::{Sizable as _, h_flex};
+use gpui_component::{IndexPath, Sizable as _, h_flex};
 use lumilio_schematic_render::{Slice, SliceAxis};
 
 use super::Viewer;
 use super::worker::Job;
-use crate::kit;
 use crate::theme::ShellColors;
-use crate::tr;
+use crate::{kit, tr};
 
 /// A box of cells, its first and last corners both included.
 pub(crate) type Cells = ([i32; 3], [i32; 3]);

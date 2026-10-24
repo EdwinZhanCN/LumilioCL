@@ -1,5 +1,6 @@
-use crate::Relaunch;
 use std::path::Path;
+
+use crate::Relaunch;
 
 #[cfg(target_os = "linux")]
 mod linux;

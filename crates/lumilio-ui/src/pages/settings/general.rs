@@ -1,11 +1,13 @@
+use gpui::prelude::*;
+use gpui::{AnyElement, IntoElement, div, px};
+use gpui_component::Sizable as _;
+use gpui_component::select::Select;
+use lumilio_core::{AfterLaunch, Language, MotionPreference};
+
 use super::super::live::LiveCtx;
 use super::rows::{preference_row, row, send, with_preferences};
-use crate::kit;
 use crate::live::SettingsView;
-use crate::{tr, tr_all};
-use gpui::{AnyElement, IntoElement, div, prelude::*, px};
-use gpui_component::{Sizable as _, select::Select};
-use lumilio_core::{AfterLaunch, Language, MotionPreference};
+use crate::{kit, tr, tr_all};
 
 pub(super) fn general(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
     let colors = ctx.colors;

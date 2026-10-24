@@ -1,4 +1,5 @@
 //! The top block of every column of a chunk.
+
 use crate::chunk::{Chunk, Heightmap, is_air};
 
 const WATER: &str = "minecraft:water";

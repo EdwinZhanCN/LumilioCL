@@ -1,3 +1,9 @@
+use std::rc::Rc;
+
+use gpui::prelude::*;
+use gpui::{AnyElement, Context, Window};
+use lumilio_core::{AfterLaunch, EnvVar, LauncherSettings, QuickPlay, recommended_memory_mb};
+
 use super::super::{InstanceDetailView, InstanceIntent};
 use super::saves::{
     after_launch, cleared, commands, environment, game_arguments, jvm_arguments, quick_play, window,
@@ -8,13 +14,8 @@ use super::texts::{
 use super::{AFTER_LAUNCH, FOLLOW_OR_OWN, FULLSCREEN, QUICK_PLAY};
 use crate::pages::settings::{bytes_text, list_text};
 use crate::settings_dialog::{DialogSpec, FieldKind, FieldSpec};
-use crate::settings_forms as shared;
 use crate::theme::ShellColors;
-use crate::{kit, live, tr};
-use gpui::prelude::*;
-use gpui::{AnyElement, Context, Window};
-use lumilio_core::{AfterLaunch, EnvVar, LauncherSettings, QuickPlay, recommended_memory_mb};
-use std::rc::Rc;
+use crate::{kit, live, settings_forms as shared, tr};
 
 impl InstanceDetailView {
     pub(super) fn group_game(&self, colors: ShellColors) -> AnyElement {
@@ -456,9 +457,15 @@ impl InstanceDetailView {
             let current = own.clone();
             let value = tr!(
                 "instance-settings-commands-value",
-                pre = command_text(own.launch.pre_launch.as_ref(), defaults.pre_launch.as_ref()),
-                wrapper = command_text(own.launch.wrapper.as_ref(), defaults.wrapper.as_ref()),
-                post = command_text(own.launch.post_exit.as_ref(), defaults.post_exit.as_ref()),
+                pre = command_text(
+                    own.launch.pre_launch.as_deref(),
+                    defaults.pre_launch.as_deref()
+                ),
+                wrapper = command_text(own.launch.wrapper.as_deref(), defaults.wrapper.as_deref()),
+                post = command_text(
+                    own.launch.post_exit.as_deref(),
+                    defaults.post_exit.as_deref()
+                ),
             );
             // ia[instance.settings]: 启动前 / 包装 / 退出后命令 | 设置 · 高级组，值 + [编辑] 弹窗 | 三个输入：留空跟随默认，填 - 表示这个游戏不使用；说明可用变量
             self.setting_row(

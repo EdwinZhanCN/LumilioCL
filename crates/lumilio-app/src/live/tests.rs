@@ -3,22 +3,27 @@ mod global_context;
 mod missing_folder;
 mod terms;
 
-use super::jobs::outcome;
 use lumilio_ui::toast::Toast;
+
+use super::jobs::outcome;
 
 #[gpui_kit::test]
 fn home_snapshot_and_rapid_selection_keep_the_last_game(cx: &mut gpui_kit::TestAppContext) {
     // The shipped backend wakes GPUI from its real tokio worker threads.
     cx.executor().allow_parking();
-    use super::{State, Wiring, context::follow, library::choose_current};
-    use crate::backend::Backend;
+
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    use std::time::{Duration, Instant};
+
     use gpui_kit::AppContext as _;
-    use lumilio_ui::{LauncherShell, home::HomePresentation};
-    use std::{
-        cell::RefCell,
-        rc::Rc,
-        time::{Duration, Instant},
-    };
+    use lumilio_ui::LauncherShell;
+    use lumilio_ui::home::HomePresentation;
+
+    use super::context::follow;
+    use super::library::choose_current;
+    use super::{State, Wiring};
+    use crate::backend::Backend;
 
     let dir = tempfile::tempdir().unwrap();
     let backend = Backend::open(dir.path().join("root")).unwrap();
@@ -114,16 +119,18 @@ fn a_failed_operation_says_it_plainly_and_keeps_the_cause_behind_details() {
 #[gpui_kit::test]
 fn work_that_panics_is_told_and_not_left_hanging(cx: &mut gpui_kit::TestAppContext) {
     cx.executor().allow_parking();
-    use super::jobs::{answer, job};
-    use super::{Reload, State, Wiring};
-    use crate::backend::Backend;
+    use std::cell::{Cell, RefCell};
+    use std::rc::Rc;
+    use std::time::{Duration, Instant};
+
     use gpui_kit::AppContext as _;
     use lumilio_core::ServiceError;
     use lumilio_ui::LauncherShell;
     use lumilio_ui::toast::ToastKind;
-    use std::cell::{Cell, RefCell};
-    use std::rc::Rc;
-    use std::time::{Duration, Instant};
+
+    use super::jobs::job;
+    use super::{Reload, State, Wiring};
+    use crate::backend::Backend;
 
     let dir = tempfile::tempdir().unwrap();
     let backend = Backend::open(dir.path().join("root")).unwrap();
@@ -191,11 +198,11 @@ fn work_that_panics_is_told_and_not_left_hanging(cx: &mut gpui_kit::TestAppConte
     });
     let stopped = wiring.backend.spawn(std::future::pending::<()>());
     stopped.abort();
-    let (asking, answered) = (wiring.clone(), Rc::new(RefCell::new(Vec::new())));
+    let answered = Rc::new(RefCell::new(Vec::new()));
     let into = answered.clone();
     cx.spawn(async move |mut cx| {
-        let first = answer(&asking, stopped, &mut cx).await;
-        let second = answer(&asking, lost, &mut cx).await;
+        let first = lumilio_ui::runtime::answer(stopped, &mut cx).await;
+        let second = lumilio_ui::runtime::answer(lost, &mut cx).await;
         into.borrow_mut()
             .extend([first.is_some(), second.is_some()]);
     })
@@ -218,9 +225,10 @@ fn work_that_panics_is_told_and_not_left_hanging(cx: &mut gpui_kit::TestAppConte
 /// failure while another page is open floats up there.
 #[gpui_kit::test]
 fn technical_details_after_a_failed_launch_explain_it(cx: &mut gpui_kit::TestAppContext) {
-    use super::dispatch::{on_live_intent, on_shell_intent};
-    use super::{State, Wiring};
-    use crate::backend::Backend;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    use std::time::{Duration, Instant};
+
     use gpui_kit::component::WindowExt as _;
     use gpui_kit::{AppContext as _, Entity, Modifiers};
     use lumilio_core::{LaunchFailure, LaunchPhase, LaunchSignal};
@@ -228,8 +236,10 @@ fn technical_details_after_a_failed_launch_explain_it(cx: &mut gpui_kit::TestApp
     use lumilio_ui::home::{HomePresentation, RecoveryDetail, Subject};
     use lumilio_ui::instance_detail::TAB_DIAGNOSTICS;
     use lumilio_ui::route::Route;
-    use std::time::{Duration, Instant};
-    use std::{cell::RefCell, rc::Rc};
+
+    use super::dispatch::{on_live_intent, on_shell_intent};
+    use super::{State, Wiring};
+    use crate::backend::Backend;
 
     cx.executor().allow_parking();
     let dir = tempfile::tempdir().unwrap();
@@ -404,22 +414,25 @@ fn technical_details_after_a_failed_launch_explain_it(cx: &mut gpui_kit::TestApp
 #[gpui_kit::test]
 #[ignore = "talks to the real CurseForge and Modrinth APIs"]
 fn curseforge_through_the_page(cx: &mut gpui_kit::TestAppContext) {
-    use super::dispatch::on_live_intent;
-    use super::instance_write::write_instance;
-    use super::{State, Wiring, context::follow, discover::first_search, library::choose_current};
-    use crate::backend::Backend;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    use std::time::{Duration, Instant};
+
     use gpui_kit::{AppContext as _, Modifiers, VisualTestContext};
     use lumilio_core::{Loader, ProjectKind};
     use lumilio_ui::LauncherShell;
+    use lumilio_ui::features::discover::model::{DiscoverQuery, SearchStatus};
     use lumilio_ui::instance_detail::{InstanceDetailView, InstanceIntent};
-    use lumilio_ui::live::{DiscoverQuery, LiveIntent, SearchStatus};
+    use lumilio_ui::live::LiveIntent;
     use lumilio_ui::route::Route;
     use sha1::{Digest, Sha1};
-    use std::{
-        cell::RefCell,
-        rc::Rc,
-        time::{Duration, Instant},
-    };
+
+    use super::context::follow;
+    use super::dispatch::on_live_intent;
+    use super::instance_write::write_instance;
+    use super::library::choose_current;
+    use super::{State, Wiring};
+    use crate::backend::Backend;
 
     if !lumilio_plugin_curseforge::CurseForge::default().has_key() {
         println!("this build has no CurseForge key; nothing to check");
@@ -452,7 +465,12 @@ fn curseforge_through_the_page(cx: &mut gpui_kit::TestAppContext) {
             },
         )
     };
-    let (shell, cx) = cx.add_window_view(|_, cx| LauncherShell::new(cx).with_live(handler));
+    let worker = backend.worker();
+    let (shell, cx) = cx.add_window_view(|_, cx| {
+        LauncherShell::new(cx)
+            .with_live(handler)
+            .with_worker(worker, cx)
+    });
     let wiring = Wiring {
         backend: Rc::new(backend),
         shell: shell.downgrade(),
@@ -490,8 +508,8 @@ fn curseforge_through_the_page(cx: &mut gpui_kit::TestAppContext) {
         cx.simulate_keystrokes("enter");
     };
     let row_of = |cx: &mut VisualTestContext, project: &str| {
-        shell.read_with(cx, |shell, _| {
-            let model = shell.live().unwrap();
+        shell.read_with(cx, |shell, cx| {
+            let model = shell.discover().read(cx).state();
             (model.search != SearchStatus::Searching)
                 .then(|| {
                     model
@@ -514,15 +532,17 @@ fn curseforge_through_the_page(cx: &mut gpui_kit::TestAppContext) {
     });
     shell.update(cx, |shell, cx| {
         shell.show(Route::Discover);
-        shell.update_live(
-            |model| model.query = DiscoverQuery::new(ProjectKind::Mod),
-            cx,
-        );
+        shell.discover().clone().update(cx, |page, cx| {
+            page.edit_state(
+                |state| state.query = DiscoverQuery::new(ProjectKind::Mod),
+                cx,
+            );
+            page.shown(cx);
+        });
     });
-    cx.update(|_, cx| first_search(&wiring, cx));
     until(cx, "both sources and Modrinth's results", 30, &|cx| {
-        shell.read_with(cx, |shell, _| {
-            let model = shell.live().unwrap();
+        shell.read_with(cx, |shell, cx| {
+            let model = shell.discover().read(cx).state();
             model.sources.len() == 2 && matches!(model.search, SearchStatus::Done { .. })
         })
     });
@@ -530,8 +550,8 @@ fn curseforge_through_the_page(cx: &mut gpui_kit::TestAppContext) {
     // Switch to CurseForge by its key.
     click(cx, "live-discover-source-key-1");
     until(cx, "CurseForge's results", 30, &|cx| {
-        shell.read_with(cx, |shell, _| {
-            let model = shell.live().unwrap();
+        shell.read_with(cx, |shell, cx| {
+            let model = shell.discover().read(cx).state();
             model.query.source == CF
                 && matches!(model.search, SearchStatus::Done { .. })
                 && !model.results.is_empty()
@@ -559,8 +579,8 @@ fn curseforge_through_the_page(cx: &mut gpui_kit::TestAppContext) {
     // The pack tab: install a small pack with a file only the website hands out.
     click(cx, "live-discover-tabs-tab-0");
     until(cx, "CurseForge's packs", 30, &|cx| {
-        shell.read_with(cx, |shell, _| {
-            let model = shell.live().unwrap();
+        shell.read_with(cx, |shell, cx| {
+            let model = shell.discover().read(cx).state();
             model.query.kind == ProjectKind::Modpack
                 && matches!(model.search, SearchStatus::Done { .. })
         })
@@ -648,131 +668,4 @@ fn curseforge_through_the_page(cx: &mut gpui_kit::TestAppContext) {
         b"the file from the website"
     );
     println!("added the downloaded file at {}", target.display());
-}
-
-/// Choosing a source asks the application for the source's filters from
-/// inside the shell's own update; reading the shell there at once panicked.
-#[gpui_kit::test]
-fn choosing_a_source_by_its_key_does_not_read_the_shell_mid_update(
-    cx: &mut gpui_kit::TestAppContext,
-) {
-    use super::dispatch::on_live_intent;
-    use super::{State, Wiring};
-    use crate::backend::Backend;
-    use gpui_kit::Modifiers;
-    use lumilio_core::{ContentSourceInfo, ProjectKind};
-    use lumilio_ui::LauncherShell;
-    use lumilio_ui::live::{DiscoverQuery, LiveIntent};
-    use lumilio_ui::route::Route;
-    use std::{cell::RefCell, rc::Rc};
-
-    // The shipped backend wakes GPUI from its real tokio worker threads.
-    cx.executor().allow_parking();
-    let dir = tempfile::tempdir().unwrap();
-    let backend = Backend::open(dir.path().join("root")).unwrap();
-    cx.update(gpui_kit::init);
-    let cell: Rc<RefCell<Option<Wiring>>> = Rc::default();
-    let handler = {
-        let cell = cell.clone();
-        Rc::new(
-            move |intent: LiveIntent, window: &mut gpui_kit::Window, cx: &mut gpui_kit::App| {
-                let wiring = cell.borrow().clone();
-                if let Some(wiring) = wiring {
-                    on_live_intent(&wiring, intent, window, cx);
-                }
-            },
-        )
-    };
-    let (shell, cx) = cx.add_window_view(|_, cx| LauncherShell::new(cx).with_live(handler));
-    *cell.borrow_mut() = Some(Wiring {
-        backend: Rc::new(backend),
-        shell: shell.downgrade(),
-        state: Rc::new(RefCell::new(State::default())),
-    });
-    let source = |id: &str, name: &str| ContentSourceInfo {
-        id: id.to_owned(),
-        name: name.to_owned(),
-        catalog: None,
-    };
-    shell.update(cx, |shell, cx| {
-        shell.show(Route::Discover);
-        shell.update_live(
-            |model| {
-                model.query = DiscoverQuery::new(ProjectKind::Mod);
-                model.sources = vec![
-                    source(lumilio_core::DEFAULT_SOURCE, "Modrinth"),
-                    source(lumilio_plugin_curseforge::ID, "CurseForge"),
-                ];
-            },
-            cx,
-        );
-    });
-    cx.run_until_parked();
-    let key = cx
-        .debug_bounds("live-discover-source-key-1")
-        .expect("the CurseForge key");
-    cx.simulate_click(key.center(), Modifiers::none());
-    cx.run_until_parked();
-    shell.read_with(cx, |shell, _| {
-        assert_eq!(
-            shell.live().unwrap().query.source,
-            lumilio_plugin_curseforge::ID
-        );
-    });
-}
-
-/// Filters that arrive after another source was chosen belong to the old
-/// one: they must not take the page back there.
-#[gpui_kit::test]
-fn filters_for_a_source_left_behind_do_not_take_the_page_back(cx: &mut gpui_kit::TestAppContext) {
-    use super::discover::run_load_filters;
-    use super::{State, Wiring};
-    use crate::backend::Backend;
-    use lumilio_core::ProjectKind;
-    use lumilio_ui::LauncherShell;
-    use lumilio_ui::live::DiscoverQuery;
-    use std::time::{Duration, Instant};
-    use std::{cell::RefCell, rc::Rc};
-
-    cx.executor().allow_parking();
-    let dir = tempfile::tempdir().unwrap();
-    let backend = Backend::open(dir.path().join("root")).unwrap();
-    cx.update(gpui_kit::init);
-    let (shell, cx) =
-        cx.add_window_view(|_, cx| LauncherShell::new(cx).with_live(Rc::new(|_, _, _| {})));
-    let wiring = Wiring {
-        backend: Rc::new(backend),
-        shell: shell.downgrade(),
-        state: Rc::new(RefCell::new(State::default())),
-    };
-    let browse =
-        |shell: &mut LauncherShell, source: &str, cx: &mut gpui_kit::Context<LauncherShell>| {
-            shell.update_live(
-                |model| {
-                    model.query = DiscoverQuery::new(ProjectKind::Mod);
-                    model.query.source = source.to_owned();
-                },
-                cx,
-            );
-        };
-    // A source that is not on: once loaded, the page would move to the first
-    // one that is. The person chooses another before that arrives.
-    shell.update(cx, |shell, cx| browse(shell, "lumilio.gone", cx));
-    cx.update(|_, cx| run_load_filters(&wiring, cx));
-    shell.update(cx, |shell, cx| browse(shell, "lumilio.chosen", cx));
-    let deadline = Instant::now() + Duration::from_secs(30);
-    while shell.read_with(cx, |shell, _| shell.live().unwrap().sources.is_empty()) {
-        assert!(Instant::now() < deadline, "the load never finished");
-        cx.run_until_parked();
-        std::thread::sleep(Duration::from_millis(5));
-    }
-    cx.run_until_parked();
-    shell.read_with(cx, |shell, _| {
-        let model = shell.live().unwrap();
-        assert_eq!(model.query.source, "lumilio.chosen");
-        assert!(
-            !model.filters.loaded,
-            "the old source's filters were applied"
-        );
-    });
 }

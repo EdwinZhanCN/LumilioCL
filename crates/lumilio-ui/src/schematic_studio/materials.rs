@@ -17,9 +17,9 @@ use super::words::{block_name, property_words, stacks};
 use super::{Inspection, InspectorTab, StudioView, muted_line};
 use crate::assets::UiIcon;
 use crate::key::Key;
-use crate::kit::{self, TagKind};
-use crate::theme::{self, ShellColors};
-use crate::tr;
+use crate::kit::TagKind;
+use crate::theme::ShellColors;
+use crate::{kit, theme, tr};
 
 /// A tile's side; four fit the narrowest column.
 const TILE: f32 = 60.;

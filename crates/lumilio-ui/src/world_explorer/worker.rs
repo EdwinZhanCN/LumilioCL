@@ -1,8 +1,11 @@
-use super::stats::{Stats, add};
-use lumilio_map_render::{Camera, Error, Frame, Grid, Scene, Sprite, Tile};
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Instant;
+
+use lumilio_map_render::{Camera, Error, Frame, Grid, Scene, Sprite, Tile};
+
+use super::stats::{Stats, add};
+
 pub(super) struct Request {
     pub serial: u64,
     /// When the view asked for this frame, for latency statistics.
@@ -33,7 +36,10 @@ impl Mailbox {
         }
     }
     pub fn put(&self, request: Request) {
-        let mut pending = self.pending.lock().unwrap();
+        let mut pending = self
+            .pending
+            .lock()
+            .expect("map worker mailbox lock was poisoned");
         if !pending.closed {
             self.stats.requested.fetch_add(1, Relaxed);
             if pending.request.replace(request).is_some() {
@@ -43,7 +49,10 @@ impl Mailbox {
         }
     }
     fn take(&self) -> Option<Request> {
-        let mut pending = self.pending.lock().unwrap();
+        let mut pending = self
+            .pending
+            .lock()
+            .expect("map worker mailbox lock was poisoned");
         loop {
             if pending.closed {
                 return None;
@@ -51,11 +60,17 @@ impl Mailbox {
             if let Some(request) = pending.request.take() {
                 return Some(request);
             }
-            pending = self.ready.wait(pending).unwrap();
+            pending = self
+                .ready
+                .wait(pending)
+                .expect("map worker mailbox lock was poisoned");
         }
     }
     pub fn close(&self) {
-        self.pending.lock().unwrap().closed = true;
+        self.pending
+            .lock()
+            .expect("map worker mailbox lock was poisoned")
+            .closed = true;
         self.ready.notify_one();
     }
 }

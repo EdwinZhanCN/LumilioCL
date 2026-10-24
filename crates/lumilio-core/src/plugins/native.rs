@@ -52,7 +52,7 @@ impl Native {
         let mut workers = self
             .workers
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+            .expect("Discord worker registry lock was poisoned");
         if let Some(sender) = workers.get(id) {
             sender.send_replace(activity);
         } else if activity.is_some() {
@@ -264,7 +264,7 @@ impl Access {
         let preferences = self
             .preferences
             .read()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+            .expect("Discord worker registry lock was poisoned");
         let state = preferences
             .states
             .get(&entry.manifest.id)
@@ -286,7 +286,7 @@ impl Access {
             || entry
                 .failure
                 .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .expect("Discord worker registry lock was poisoned")
                 .is_some()
         {
             return Err(PluginError::PermissionDenied);

@@ -15,9 +15,8 @@ use super::{Analysis, Inspection, InspectorTab, StudioView, muted_line, tree};
 use crate::assets::UiIcon;
 use crate::controls::PortTabs;
 use crate::key::Key;
-use crate::kit;
-use crate::theme::{self, ShellColors};
-use crate::tr;
+use crate::theme::ShellColors;
+use crate::{kit, theme, tr};
 
 /// One line of a hairline table: the label leading, the value trailing in mono.
 pub(super) fn line(

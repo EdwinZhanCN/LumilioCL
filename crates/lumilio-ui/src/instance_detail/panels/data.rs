@@ -1,10 +1,12 @@
-use super::super::Section;
-use super::CONTENT_KINDS;
-use crate::tr;
 use lumilio_core::{
     ContentList, FileEntry, GameLogs, HistoryRead, InstanceJava, InstanceOptions, Problem,
     ProjectKind, ScreenshotInfo, ServerEntry, SnapshotInfo, WorldInfo,
 };
+
+use super::super::Section;
+use super::CONTENT_KINDS;
+pub use crate::places::ServerState;
+use crate::tr;
 
 pub type Loaded<T> = Option<Result<T, String>>;
 
@@ -111,8 +113,6 @@ impl Data {
         }
     }
 }
-
-pub use crate::places::ServerState;
 
 /// A screenshot's thumbnail: asked for, made, or not makeable.
 #[derive(Clone, Debug, Eq, PartialEq)]

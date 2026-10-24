@@ -1,9 +1,10 @@
-use crate::protocol::decode;
 use lumilio_plugin_api::PluginError;
 use lumilio_plugin_api::content::{
     Dependency, DependencyKind, ReleaseChannel, Version, VersionFile,
 };
 use serde::Deserialize;
+
+use crate::protocol::decode;
 
 #[derive(Debug, Deserialize)]
 pub(super) struct RawVersion {

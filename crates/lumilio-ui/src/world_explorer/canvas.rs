@@ -7,14 +7,17 @@
 //! composed-and-read-back path. What it gives up: GPUI samples images
 //! bilinearly (our scene used nearest), and opacity is baked into a sprite's
 //! alpha because `paint_image` has no opacity parameter.
-use super::stats::{Stats, add};
-use gpui::{Bounds, Corners, PathBuilder, Pixels, RenderImage, Window, fill, point, px};
-use lumilio_map_render::{Camera, Grid, Sprite, Tile, scale_to};
-use lumilio_plugin_api::map::MapPoint;
+
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::Ordering::Relaxed;
 use std::time::Instant;
+
+use gpui::{Bounds, Corners, PathBuilder, Pixels, RenderImage, Window, fill, point, px};
+use lumilio_map_render::{Camera, Grid, Sprite, Tile, scale_to};
+use lumilio_plugin_api::map::MapPoint;
+
+use super::stats::{Stats, add};
 
 /// Texels of edge-replicated border around each tile. GPUI filters bilinearly
 /// and its atlas packs tiles side by side, so without a border the edge pixels
@@ -65,7 +68,7 @@ pub(super) fn paint_routes(
         if let Ok(path) = line.build() {
             window.paint_path(
                 path,
-                gpui::rgba(u32::from(*r) << 24 | u32::from(*g) << 16 | u32::from(*b) << 8 | 0xDF),
+                gpui::rgba(u32::from(*r) << 24 | u32::from(*g) << 16 | u32::from(*b) << 8 | 0xdf),
             );
         }
     }

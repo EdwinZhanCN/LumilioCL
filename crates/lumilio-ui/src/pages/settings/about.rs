@@ -1,9 +1,9 @@
+use gpui::{AnyElement, IntoElement};
+
 use super::super::live::LiveCtx;
 use super::rows::{row, send};
-use crate::kit;
 use crate::live::{LiveIntent, SettingsView, UpdateStatus, UpdateUnavailability};
-use crate::tr;
-use gpui::{AnyElement, IntoElement};
+use crate::{kit, tr};
 
 pub(super) fn about(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
     let colors = ctx.colors;

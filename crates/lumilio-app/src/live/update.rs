@@ -1,10 +1,12 @@
-use super::Wiring;
+use std::path::PathBuf;
+use std::time::Duration;
+
 use gpui_kit::AppContext as _;
 use lumilio_ui::live::{UpdateStatus, UpdateUnavailability};
 use lumilio_updater::{CheckResult, Relaunch, UpdateClient, UpdateError, UpdateRestriction};
-use std::path::PathBuf;
-use std::time::Duration;
 use tokio::sync::mpsc;
+
+use super::Wiring;
 
 const UPDATE_INTERVAL: Duration = Duration::from_secs(60 * 60);
 
@@ -79,7 +81,8 @@ pub(super) fn start(wiring: &Wiring, cx: &mut gpui_kit::App) {
 /// of any version skipped), then remembers that they were shown. A fresh
 /// install starts as having seen them (`LauncherSettings::release_notes_seen`).
 pub(super) fn announce(wiring: &Wiring, window: gpui_kit::AnyWindowHandle, cx: &mut gpui_kit::App) {
-    use lumilio_ui::release_notes::{self, Occasion};
+    use lumilio_ui::release_notes;
+    use lumilio_ui::release_notes::Occasion;
     let running = release_notes::running();
     let service = wiring.backend.service.clone();
     let seen = wiring.backend.spawn(async move {
@@ -92,9 +95,8 @@ pub(super) fn announce(wiring: &Wiring, window: gpui_kit::AnyWindowHandle, cx: &
         }
         Some(seen)
     });
-    let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let Some(Some(seen)) = super::jobs::answer(&wiring, seen, cx).await else {
+        let Some(Some(seen)) = lumilio_ui::runtime::answer(seen, cx).await else {
             return;
         };
         let releases = release_notes::since(seen.as_deref(), running);

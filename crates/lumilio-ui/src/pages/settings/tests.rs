@@ -1,12 +1,7 @@
-use super::text::bytes_text;
-use super::text::commands_text;
-use super::text::list_text;
-use super::text::memory_help;
-use super::text::memory_text;
-use super::text::window_text;
-use crate::live::SettingsView;
-
 use lumilio_core::LaunchTuning;
+
+use super::text::{bytes_text, commands_text, list_text, memory_help, memory_text, window_text};
+use crate::live::SettingsView;
 
 #[test]
 fn values_read_in_plain_words() {

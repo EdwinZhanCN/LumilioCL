@@ -14,9 +14,8 @@ use gpui_component::{Icon, Sizable as _, h_flex, v_flex};
 use super::{Loaded, StudioView, muted_line, tree};
 use crate::assets::UiIcon;
 use crate::key::Key;
-use crate::kit;
-use crate::theme::{self, ShellColors, motion};
-use crate::tr;
+use crate::theme::{ShellColors, motion};
+use crate::{kit, theme, tr};
 
 /// A card's width; the pane fits as many as it can on a row.
 const CARD_WIDTH: f32 = 176.;

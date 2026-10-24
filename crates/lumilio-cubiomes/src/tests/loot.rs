@@ -1,7 +1,9 @@
 //! Structure chests against the unopened chests original servers saved
 //! (rows `seed chunk_x chunk_z x y z loot_seed`).
-use crate::{Version, ffi};
+
 use std::collections::BTreeMap;
+
+use crate::{Version, ffi};
 
 macro_rules! chest_golden {
     ($version:literal) => {

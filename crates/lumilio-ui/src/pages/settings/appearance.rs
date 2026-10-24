@@ -2,17 +2,18 @@
 //! which fonts it uses and how large it is. Long lists (themes, installed
 //! fonts) are picked in a dialog with a searchable list (design language §10).
 
-use super::super::live::LiveCtx;
-use super::rows::{preference_row, row, send, with_preferences};
-use crate::kit;
-use crate::live::{LiveHandler, LiveIntent, SettingsView};
-use crate::settings_dialog::{DialogSpec, FieldKind, FieldSpec, SettingsDialog};
-use crate::theme::{ALUMINIUM, NIGHT, Tone};
-use crate::{tr, tr_all};
+use std::rc::Rc;
+
 use gpui::prelude::*;
 use gpui::{AnyElement, App, IntoElement};
 use lumilio_core::{Appearance, LookPreferences, WallpaperChoice};
-use std::rc::Rc;
+
+use super::super::live::LiveCtx;
+use super::rows::{preference_row, row, send, with_preferences};
+use crate::live::{LiveHandler, LiveIntent, SettingsView};
+use crate::settings_dialog::{DialogSpec, FieldKind, FieldSpec, SettingsDialog};
+use crate::theme::{ALUMINIUM, NIGHT, Tone};
+use crate::{kit, tr, tr_all};
 
 /// The scales offered, in percent; the labels are `settings-scale-*`.
 const SCALES: [u16; 4] = [85, 100, 115, 130];

@@ -1,8 +1,9 @@
-use crate::Relaunch;
 use std::fs;
 use std::os::unix::fs::PermissionsExt as _;
 use std::path::Path;
 use std::process::Command;
+
+use crate::Relaunch;
 
 /// Atomically replaces the executable. The running process keeps the old
 /// file open; the new version starts on the next launch.

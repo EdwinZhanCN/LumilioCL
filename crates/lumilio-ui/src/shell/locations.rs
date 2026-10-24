@@ -1,8 +1,9 @@
+use gpui::{App, Context, Entity, SharedString, Window};
+
 use super::detail::{DetailSlot, detail_title};
 use super::{LauncherShell, ShellIntent};
 use crate::instance_detail::InstanceDetailView;
 use crate::route::Route;
-use gpui::{App, Context, Entity, SharedString, Window};
 
 /// A place the navigation can return to. Detail views stay alive in history,
 /// so going back is instant and keeps their tab and scroll.

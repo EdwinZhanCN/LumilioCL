@@ -1,11 +1,13 @@
-use super::form::{Form, submit};
-use super::*;
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use gpui::{Entity, TestAppContext, VisualTestContext, WeakEntity, Window};
 use gpui_component::input::InputEvent;
 use gpui_component::slider::{SliderEvent, SliderValue};
 use lumilio_core::{GameSettingKind, OptionChange, OptionsFile, SettingChange};
-use std::cell::RefCell;
-use std::rc::Rc;
+
+use super::form::{Form, submit};
+use super::*;
 
 fn preset() -> SettingsPreset {
     serde_json::from_value(serde_json::json!({

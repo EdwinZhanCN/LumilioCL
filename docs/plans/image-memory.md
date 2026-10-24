@@ -105,7 +105,7 @@ Consequences: Interlaced PNGs, PNGs with an EXIF orientation and pictures that a
 
 - [crates/lumilio-ui/src/pictures/mod.rs](../../crates/lumilio-ui/src/pictures/mod.rs)
 - [crates/lumilio-ui/src/world_explorer/canvas.rs](../../crates/lumilio-ui/src/world_explorer/canvas.rs)
-- [crates/lumilio-ui/src/instance_detail/plugin_tabs.rs](../../crates/lumilio-ui/src/instance_detail/plugin_tabs.rs)
+- [crates/lumilio-ui/src/instance_detail/plugin_tabs/mod.rs](../../crates/lumilio-ui/src/instance_detail/plugin_tabs/mod.rs)
 - [crates/lumilio-ui/src/shell/locations.rs](../../crates/lumilio-ui/src/shell/locations.rs)
 - https://github.com/zed-industries/zed/blob/main/crates/gpui/src/elements/img.rs
 

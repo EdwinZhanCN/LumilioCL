@@ -1,9 +1,8 @@
-use super::helpers::crash_for_session;
-use super::helpers::files_matching;
-use super::helpers::join_path;
-use super::helpers::output_for_session;
-use super::helpers::parent_path;
 use lumilio_core::FileEntry;
+
+use super::helpers::{
+    crash_for_session, files_matching, join_path, output_for_session, parent_path,
+};
 
 #[test]
 fn the_launch_output_belongs_only_to_the_session_that_wrote_it() {

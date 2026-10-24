@@ -6,16 +6,17 @@
 
 use std::rc::Rc;
 
+use gpui::prelude::*;
 use gpui::{
     AnyElement, App, BoxShadow, ClickEvent, Div, ElementId, FocusHandle, FontWeight, Hsla,
     InteractiveElement, Interactivity, IntoElement, ParentElement, RenderOnce, SharedString,
-    Stateful, StatefulInteractiveElement as _, StyleRefinement, Styled, Window, div, hsla, point,
-    prelude::*, px,
+    Stateful, StyleRefinement, Styled, Window, div, hsla, point, px,
 };
 use gpui_component::spinner::Spinner;
 use gpui_component::{Icon, Sizable};
 
-use crate::theme::{self, Body};
+use crate::theme;
+use crate::theme::Body;
 
 /// Which key it is. The kind decides the face, not the position on the page.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

@@ -1,13 +1,13 @@
-use super::super::live::LiveCtx;
-use crate::kit;
-use crate::live::{LiveHandler, LiveIntent, SettingsView};
-use crate::settings_dialog::{DialogSpec, SettingsDialog};
-use crate::theme::ShellColors;
-use crate::tr;
 use gpui::prelude::*;
 use gpui::{AnyElement, App, IntoElement, SharedString, Window};
 use gpui_component::h_flex;
 use lumilio_core::Preferences;
+
+use super::super::live::LiveCtx;
+use crate::live::{LiveHandler, LiveIntent, SettingsView};
+use crate::settings_dialog::{DialogSpec, SettingsDialog};
+use crate::theme::ShellColors;
+use crate::{kit, tr};
 
 pub(super) fn send(
     handler: &LiveHandler,
@@ -17,7 +17,7 @@ pub(super) fn send(
     move |window, cx| handler(intent.clone(), window, cx)
 }
 
-/// An [编辑] button that opens a dialog built when it is pressed.
+/// An `编辑` button that opens a dialog built when it is pressed.
 pub(super) fn edit(
     id: &'static str,
     handler: &LiveHandler,

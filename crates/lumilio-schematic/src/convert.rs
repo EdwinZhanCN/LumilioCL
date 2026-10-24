@@ -12,13 +12,13 @@
 
 use std::collections::BTreeMap;
 
-use crate::stats::stats;
-use crate::{Error, UniversalSchematic};
+pub use lumilio_block_assets::BlockCatalog;
 use nucleation::dataconverter::{
     CANONICAL_DATA_VERSION, LossReport, Severity as NucleationSeverity,
 };
 
-pub use lumilio_block_assets::BlockCatalog;
+use crate::stats::stats;
+use crate::{Error, UniversalSchematic};
 
 /// [`Loss::kind`] of a block the target version does not have. The block is
 /// written as it is; the older game reads it as air.

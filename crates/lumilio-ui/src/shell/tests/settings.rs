@@ -1,14 +1,17 @@
-use super::super::{LauncherShell, Route};
-use gpui::{Modifiers, TestAppContext};
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use gpui::{Modifiers, TestAppContext};
+
+use super::super::{LauncherShell, Route};
+
 #[gpui::test]
 fn the_settings_page_shows_each_tab_and_edits_open_a_dialog(cx: &mut TestAppContext) {
+    use gpui::{AppContext as _, Entity};
+
     use crate::kit::ViewIntent;
     use crate::live::{LiveIntent, SettingsView};
     use crate::pages::settings::TAB_GROUP;
-    use gpui::{AppContext as _, Entity};
     cx.update(|cx| {
         gpui_component::init(cx);
         cx.set_reduce_motion(true);
@@ -264,11 +267,12 @@ fn the_settings_page_shows_each_tab_and_edits_open_a_dialog(cx: &mut TestAppCont
 /// scroll on their own, and scrolling one never moves the other or the tabs.
 #[gpui::test]
 fn the_plugin_list_stays_put_while_its_detail_scrolls(cx: &mut TestAppContext) {
+    use gpui::{ScrollDelta, ScrollWheelEvent, TouchPhase, point, px};
+    use lumilio_plugin_api::Permission;
+
     use crate::kit::ViewIntent;
     use crate::live::SettingsView;
     use crate::pages::settings::TAB_GROUP;
-    use gpui::{ScrollDelta, ScrollWheelEvent, TouchPhase, point, px};
-    use lumilio_plugin_api::Permission;
 
     cx.update(|cx| {
         gpui_component::init(cx);

@@ -1,6 +1,7 @@
+use lumilio_core::{GameMode, WorldInfo};
+
 use super::{world_state, world_tags};
 use crate::kit::{TagKind, Tone};
-use lumilio_core::{GameMode, WorldInfo};
 
 #[test]
 fn a_world_row_names_its_state_and_tags_in_their_own_forms() {

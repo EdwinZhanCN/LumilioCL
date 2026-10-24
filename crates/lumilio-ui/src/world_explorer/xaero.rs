@@ -1,10 +1,15 @@
 //! Linking a save to its Xaero Minimap directory. A same-named directory is
 //! only suggested; the person confirms it here, and the link is saved.
-use super::{Command, MapView};
-use crate::{key::Key, tr};
-use gpui::{Anchor, AnyElement, Context, div, prelude::*, px};
-use gpui_component::{Sizable as _, popover::Popover, v_flex};
+
+use gpui::prelude::*;
+use gpui::{Anchor, AnyElement, Context, div, px};
+use gpui_component::popover::Popover;
+use gpui_component::{Sizable as _, v_flex};
 use lumilio_plugin_api::map::{Dimension, SourceLink, WorldId};
+
+use super::{Command, MapView};
+use crate::key::Key;
+use crate::tr;
 
 impl MapView {
     pub(super) fn xaero_map_ids(&self) -> Vec<String> {

@@ -115,7 +115,10 @@ pub(crate) struct Mailbox {
 
 impl Mailbox {
     pub fn put(&self, request: Request) {
-        let mut pending = self.pending.lock().unwrap();
+        let mut pending = self
+            .pending
+            .lock()
+            .expect("model worker mailbox lock was poisoned");
         if !pending.closed {
             pending.latest = Some(request);
             self.ready.notify_one();
@@ -123,7 +126,10 @@ impl Mailbox {
     }
 
     pub fn queue(&self, job: Job) {
-        let mut pending = self.pending.lock().unwrap();
+        let mut pending = self
+            .pending
+            .lock()
+            .expect("model worker mailbox lock was poisoned");
         if !pending.closed {
             pending.jobs.push_back(job);
             self.ready.notify_one();
@@ -132,7 +138,10 @@ impl Mailbox {
 
     /// The next job, else the latest frame request; `None` once closed.
     pub fn take(&self) -> Option<Work> {
-        let mut pending = self.pending.lock().unwrap();
+        let mut pending = self
+            .pending
+            .lock()
+            .expect("model worker mailbox lock was poisoned");
         loop {
             if pending.closed {
                 return None;
@@ -143,13 +152,19 @@ impl Mailbox {
             if let Some(request) = pending.latest.take() {
                 return Some(Work::Frame(request));
             }
-            pending = self.ready.wait(pending).unwrap();
+            pending = self
+                .ready
+                .wait(pending)
+                .expect("model worker mailbox lock was poisoned");
         }
     }
 
     /// Stops the worker; waiting jobs are dropped, which ends their replies.
     pub fn close(&self) {
-        let mut pending = self.pending.lock().unwrap();
+        let mut pending = self
+            .pending
+            .lock()
+            .expect("model worker mailbox lock was poisoned");
         pending.closed = true;
         pending.jobs.clear();
         self.ready.notify_one();

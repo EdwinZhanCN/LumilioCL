@@ -1,8 +1,10 @@
-use super::{Catalogs, DOMAIN, Locale, loader, text};
-use fluent_syntax::ast::{Entry, Expression, InlineExpression, Pattern, PatternElement};
-use i18n_embed::fluent::FluentLanguageLoader;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
+
+use fluent_syntax::ast::{Entry, Expression, InlineExpression, Pattern, PatternElement};
+use i18n_embed::fluent::FluentLanguageLoader;
+
+use super::{Catalogs, DOMAIN, Locale, loader, text};
 
 /// Every message id of one catalog, with the arguments it uses.
 fn catalog(locale: Locale) -> BTreeMap<String, BTreeSet<String>> {

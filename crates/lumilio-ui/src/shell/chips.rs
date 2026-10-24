@@ -1,10 +1,12 @@
+use std::rc::Rc;
+
+use gpui::Context;
+
 use super::LauncherShell;
 use crate::live::LiveIntent;
 use crate::navigation;
 use crate::navigation::{AccountChoice, CurrentAccount, CurrentInstance, InstanceChoice};
 use crate::route::Route;
-use gpui::Context;
-use std::rc::Rc;
 
 impl LauncherShell {
     /// The trailing zone: the current game, as core published it. Choosing

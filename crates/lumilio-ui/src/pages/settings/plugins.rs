@@ -1,14 +1,17 @@
-use super::super::live::LiveCtx;
-use super::rows::send;
-use crate::kit::ViewIntent;
-use crate::live::{LiveIntent, SettingsView};
-use crate::tr;
-use crate::{controls::Fader, key::Key, kit, theme};
-use gpui::{AnyElement, IntoElement, SharedString, div, prelude::*, px};
+use gpui::prelude::*;
+use gpui::{AnyElement, IntoElement, SharedString, div, px};
 use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_component::{Sizable as _, h_flex, v_flex};
 use lumilio_core::{PluginInfo, PluginStatus};
 use lumilio_plugin_api::{NativeCapability, Permission, SettingField, SettingKind, SettingValue};
+
+use super::super::live::LiveCtx;
+use super::rows::send;
+use crate::controls::Fader;
+use crate::key::Key;
+use crate::kit::ViewIntent;
+use crate::live::{LiveIntent, SettingsView};
+use crate::{kit, theme, tr};
 
 /// The view-state group that remembers the chosen plugin.
 pub(super) const PLUGIN_GROUP: u8 = 202;

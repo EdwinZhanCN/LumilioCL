@@ -1,12 +1,14 @@
 //! Overlay objects for the viewport, fetched in fixed block cells so a pan
 //! reuses what it already has. Cells are keyed by layer and world, requested
 //! nearest first with a small in-flight limit, and dropped when they leave view.
+
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
+
 use lumilio_core::CancellationToken;
 use lumilio_plugin_api::map::{
     Dimension, MapBounds, MapObject, MapObjectKind, MapPoint, OverlayInfo, OverlayRequest,
     WorldContext, WorldId,
 };
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 /// Cell edge in blocks. Structure search cost grows with area, and a cell this
 /// size holds a few dozen candidates per kind.

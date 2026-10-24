@@ -7,7 +7,8 @@
 
 use std::collections::BTreeMap;
 use std::error::Error;
-use std::fmt::{self, Display, Formatter};
+use std::fmt;
+use std::fmt::{Display, Formatter};
 use std::io::Read;
 
 use flate2::read::{GzDecoder, ZlibDecoder};

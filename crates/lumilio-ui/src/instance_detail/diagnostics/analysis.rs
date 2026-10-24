@@ -1,13 +1,12 @@
-use super::super::{InstanceDetailView, InstanceIntent};
-use crate::{
-    kit,
-    theme::{self, ShellColors},
-    tr,
-};
 use gpui::prelude::*;
 use gpui::{App, Context, Entity, Window, div, px};
-use gpui_component::{WindowExt as _, dialog::Dialog, h_flex, v_flex};
+use gpui_component::dialog::Dialog;
+use gpui_component::{WindowExt as _, h_flex, v_flex};
 use lumilio_core::GameLogSource;
+
+use super::super::{InstanceDetailView, InstanceIntent};
+use crate::theme::ShellColors;
+use crate::{kit, theme, tr};
 
 impl InstanceDetailView {
     pub(super) fn open_log_analysis(&mut self, window: &mut Window, cx: &mut Context<Self>) {

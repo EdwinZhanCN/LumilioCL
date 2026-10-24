@@ -1,3 +1,6 @@
+use gpui::{Context, Window};
+use lumilio_core::{InstanceRecord, LauncherSettings};
+
 use super::intent::{InstanceIntent, Section};
 use super::panels::{Arrived, Confirm};
 use super::{
@@ -6,8 +9,6 @@ use super::{
 };
 use crate::toast::Toast;
 use crate::tr;
-use gpui::{Context, Window};
-use lumilio_core::{InstanceRecord, LauncherSettings};
 
 impl InstanceDetailView {
     /// A response for a different target never becomes this view's data.

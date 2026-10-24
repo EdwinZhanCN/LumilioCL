@@ -1,4 +1,5 @@
 //! Structures, strongholds, spawn and slime chunks on top of cubiomes' finders.
+
 use crate::{Dimension, Error, Version, ffi};
 
 /// Structures placed on a region grid, in the order the C bridge indexes them.

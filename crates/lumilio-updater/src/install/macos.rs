@@ -1,7 +1,8 @@
-use crate::Relaunch;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+
+use crate::Relaunch;
 
 /// Replaces the running bundle with the one in the disk image. The launcher
 /// keeps running; the new version starts on the next launch.

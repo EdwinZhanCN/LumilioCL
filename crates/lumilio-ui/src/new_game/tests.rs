@@ -28,8 +28,9 @@ fn catalog() -> Vec<CatalogEntry> {
 
 #[gpui::test]
 fn the_dialog_asks_for_what_it_shows_and_creates_once(cx: &mut gpui::TestAppContext) {
-    use gpui::Modifiers;
     use std::cell::RefCell;
+
+    use gpui::Modifiers;
     cx.update(|cx| {
         gpui_component::init(cx);
         cx.set_reduce_motion(true);
@@ -191,8 +192,9 @@ fn a_handler_may_finish_the_form_it_was_called_from(cx: &mut gpui::TestAppContex
 fn changing_a_game_starts_on_what_it_is_on_and_only_a_different_choice_can_be_sent(
     cx: &mut gpui::TestAppContext,
 ) {
-    use gpui::Modifiers;
     use std::cell::{Cell, RefCell};
+
+    use gpui::Modifiers;
     cx.update(|cx| {
         gpui_component::init(cx);
         cx.set_reduce_motion(true);

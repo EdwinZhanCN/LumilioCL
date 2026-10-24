@@ -2,11 +2,13 @@
 //! the Minecraft EULA (plan terms-consent). The release notes of an update
 //! wait until then, so the two dialogs never stack.
 
-use super::Wiring;
-use gpui_kit::AppContext as _;
-use gpui_kit::{AnyWindowHandle, App, Window};
-use lumilio_ui::terms::{self, Occasion};
 use std::rc::Rc;
+
+use gpui_kit::{AnyWindowHandle, App, AppContext as _, Window};
+use lumilio_ui::terms;
+use lumilio_ui::terms::Occasion;
+
+use super::Wiring;
 
 /// Asks for the terms when they are not agreed to yet, then shows what the
 /// update brought. Quitting the dialog quits the launcher.
@@ -17,7 +19,7 @@ pub(super) fn ask(wiring: &Wiring, window: AnyWindowHandle, cx: &mut App) {
         .spawn(async move { service.settings().await.terms_pending() });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let Some(pending) = super::jobs::answer(&wiring, pending, cx).await else {
+        let Some(pending) = lumilio_ui::runtime::answer(pending, cx).await else {
             return;
         };
         if !pending {
@@ -45,7 +47,7 @@ fn accept(wiring: &Wiring, window: AnyWindowHandle, cx: &mut App) {
         .spawn(async move { service.accept_terms().await });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        if let Some(Err(error)) = super::jobs::answer(&wiring, saved, cx).await {
+        if let Some(Err(error)) = lumilio_ui::runtime::answer(saved, cx).await {
             log::warn!("could not remember that the terms were agreed to: {error}");
         }
         cx.update(|cx| super::update::announce(&wiring, window, cx));

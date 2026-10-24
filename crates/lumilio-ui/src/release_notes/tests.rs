@@ -1,6 +1,8 @@
+use gpui::prelude::*;
+use gpui::{Context, Modifiers, Render, Window, div, px, size};
+
 use super::text::{Notes, Section, parse};
 use super::*;
-use gpui::{Context, Modifiers, Render, Window, div, prelude::*, px, size};
 
 #[test]
 fn notes_split_into_a_summary_and_sections_of_items() {

@@ -1,11 +1,13 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
+use gpui::{Modifiers, TestAppContext};
+use lumilio_core::LauncherSettings;
+
 use super::super::intent::{InstanceIntent, Section};
 use super::super::panels::{Arrived, Confirm};
 use super::super::{InstanceDetailView, Operated, TAB_WORLDS};
 use super::{click, record, rooted, world};
-use gpui::{Modifiers, TestAppContext};
-use lumilio_core::LauncherSettings;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 #[gpui::test]
 fn a_world_can_be_entered_directly_unless_the_version_is_too_old(cx: &mut TestAppContext) {

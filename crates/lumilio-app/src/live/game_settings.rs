@@ -1,8 +1,9 @@
 //! Game options and presets: opens their dialogs with fresh data, runs what
 //! they decide off the interface thread, and answers the dialog and the page.
-use super::instance::load_section;
-use super::jobs::{answer, reload};
-use super::{Reload, Wiring};
+
+use std::future::Future;
+use std::rc::Rc;
+
 use gpui_kit::{App, AppContext as _, AsyncApp, Context, WeakEntity, Window};
 use lumilio_core::{
     GameSettingsError, InstanceOptions, OptionChange, ServiceError, SettingsPreset,
@@ -14,9 +15,12 @@ use lumilio_ui::game_settings::{
 use lumilio_ui::instance_detail::{InstanceDetailView, InstanceIntent, Operated, Section};
 use lumilio_ui::kit::ViewIntent;
 use lumilio_ui::pages::live::PRESET_GROUP;
-use lumilio_ui::{LauncherShell, toast::Toast, tr};
-use std::future::Future;
-use std::rc::Rc;
+use lumilio_ui::toast::Toast;
+use lumilio_ui::{LauncherShell, tr};
+
+use super::instance::load_section;
+use super::jobs::reload;
+use super::{Reload, Wiring};
 
 /// A preset dialog's failure, as its persistent toast says it.
 fn preset_failure(error: &ServiceError) -> String {
@@ -36,9 +40,8 @@ fn run<R: Send + 'static>(
 ) {
     let handle = wiring.backend.spawn(work);
     let window = window.window_handle();
-    let wiring = wiring.clone();
     cx.spawn(async move |cx: &mut AsyncApp| {
-        let Some(output) = answer(&wiring, handle, cx).await else {
+        let Some(output) = lumilio_ui::runtime::answer(handle, cx).await else {
             return;
         };
         let _ = cx.update_window(window, |_, window, cx| then(output, window, cx));

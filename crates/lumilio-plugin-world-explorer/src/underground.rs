@@ -1,13 +1,15 @@
 //! Underground layers of the Overworld seed map: where large ore veins and
 //! ravines run. Both come from the seed alone, so they are exact; which
 //! blocks they leave as ore or open as air depends on the terrain there.
-use crate::structures::world_version;
+
 use lumilio_cubiomes::{Vein, Version};
 use lumilio_plugin_api::map::{
     Dimension, MapBounds, MapIcon, MapObject, MapObjectKind, MapPoint, OverlayInfo, OverlayRequest,
     WorldContext,
 };
 use lumilio_plugin_api::{HostContext, PluginError};
+
+use crate::structures::world_version;
 
 pub(crate) const GROUP: &str = "map-group-underground";
 const SOURCE: &str = crate::ID;

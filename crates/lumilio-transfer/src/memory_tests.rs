@@ -1,11 +1,13 @@
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::Duration;
+
+use futures_util::FutureExt;
+
 use super::budget::ConnectionBudget;
 use super::engine::TransferEngine;
 use super::request::RetryPolicy;
 use super::transport::{Transport, TransportError, TransportFuture, TransportResponse};
-use futures_util::FutureExt;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::time::Duration;
 
 /// Fails the first `failures` requests the way `failure` says, then answers
 /// with a small document.

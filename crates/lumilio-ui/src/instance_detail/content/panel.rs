@@ -1,3 +1,10 @@
+use gpui::prelude::*;
+use gpui::{AnyElement, App, Context, Entity, Window, div, px};
+use gpui_component::input::{Input, InputEvent, InputState};
+use gpui_component::select::{SearchableVec, Select, SelectEvent, SelectState};
+use gpui_component::{Icon, IndexPath, Sizable as _, StyledExt as _, h_flex, v_flex};
+use lumilio_core::ProjectKind;
+
 use super::super::panels::{CONTENT_KINDS, CONTENT_LABELS};
 use super::super::{ContentUpdateItem, InstanceDetailView, InstanceIntent, Section};
 use super::model::{BAR_HEIGHT, FILTERS, filter_labels, visible};
@@ -5,15 +12,6 @@ use crate::assets::UiIcon;
 use crate::key::Key;
 use crate::theme::ShellColors;
 use crate::{kit, theme, tr, tr_all};
-use gpui::prelude::*;
-use gpui::{AnyElement, App, Context, Entity, Window, div, px};
-use gpui_component::IndexPath;
-use gpui_component::Sizable as _;
-use gpui_component::StyledExt as _;
-use gpui_component::input::{Input, InputEvent, InputState};
-use gpui_component::select::{SearchableVec, Select, SelectEvent, SelectState};
-use gpui_component::{Icon, h_flex, v_flex};
-use lumilio_core::ProjectKind;
 
 fn browse_labels() -> &'static [&'static str] {
     tr_all![

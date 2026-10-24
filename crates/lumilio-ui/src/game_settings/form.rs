@@ -2,16 +2,20 @@
 //! footer, the disabled state while a write runs, and the result. A finished
 //! write closes the dialog; a failure keeps the draft open. Results are
 //! persistent toasts that the person closes (Project Maintainer, 2026-10-12).
+
+use std::rc::Rc;
+
+use gpui::prelude::*;
+use gpui::{App, Entity, Render, WeakEntity, Window, div, px};
+use gpui_component::{WindowExt as _, h_flex};
+
 use crate::key::Key;
 use crate::toast::Toast;
 use crate::{theme, tr};
-use gpui::{App, Entity, Render, WeakEntity, Window, div, prelude::*, px};
-use std::rc::Rc;
 
 /// Where a dialog hands its draft: the application runs the write and answers
 /// the dialog (by its handle) with `finished`.
 pub type Submit<T, F> = Rc<dyn Fn(T, WeakEntity<F>, &mut Window, &mut App)>;
-use gpui_component::{WindowExt as _, h_flex};
 
 /// A dialog's body and its commit.
 pub trait Form: Render + Sized {

@@ -1,10 +1,11 @@
 //! Acceptance of plan terms-consent (T2): the terms are agreed to before the
 //! launcher is used, and the release notes of an update wait for them.
 
-use super::super::terms::ask as ask_terms;
-use super::global_context::{ask, open, until};
 use gpui_kit::component::WindowExt as _;
 use gpui_kit::{Modifiers, TestAppContext, VisualTestContext};
+
+use super::super::terms::ask as ask_terms;
+use super::global_context::{ask, open, until};
 
 fn on_screen(cx: &mut VisualTestContext, selector: &'static str) -> bool {
     cx.update(|window, cx| window.draw(cx).clear(cx));

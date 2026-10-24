@@ -1,8 +1,9 @@
+use gpui::{ClickEvent, SharedString};
+use gpui_component::Icon;
+
 use super::render::ArtStyle;
 use super::{HomeIntent, HomeIntentHandler};
 use crate::key::Key;
-use gpui::{ClickEvent, SharedString};
-use gpui_component::Icon;
 
 /// A key on the page: orange when primary, white otherwise.
 pub(super) fn page_button(

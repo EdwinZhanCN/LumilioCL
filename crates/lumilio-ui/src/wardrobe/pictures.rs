@@ -1,4 +1,7 @@
-use super::*;
+use super::{
+    AccountLook, Arc, Arms, Camera, Context, HashMap, Player, RenderImage, SkinModel, Texture,
+    Wardrobe, render,
+};
 
 /// A skin picture's size in the list, and a cape's.
 pub(super) const SKIN_THUMB: (f32, f32) = (112., 168.);

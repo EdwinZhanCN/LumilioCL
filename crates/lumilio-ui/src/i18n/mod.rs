@@ -6,17 +6,16 @@
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU8, AtomicU32, Ordering};
-use std::sync::{LazyLock, PoisonError, RwLock};
+use std::sync::{LazyLock, RwLock};
 
 use gpui::App;
 use i18n_embed::fluent::FluentLanguageLoader;
 use i18n_embed::unic_langid::LanguageIdentifier;
 use i18n_embed::{DesktopLanguageRequester, LanguageLoader};
-use lumilio_core::Language;
-use rust_embed::RustEmbed;
-
 #[doc(hidden)]
 pub use i18n_embed_fl::fl as __fl;
+use lumilio_core::Language;
+use rust_embed::RustEmbed;
 
 #[cfg(test)]
 mod tests;
@@ -159,7 +158,7 @@ pub fn text(id: &'static str) -> &'static str {
     let key = (locale(), id);
     if let Some(text) = TEXTS
         .read()
-        .unwrap_or_else(PoisonError::into_inner)
+        .expect("language catalog lock was poisoned")
         .get(&key)
     {
         return text;
@@ -167,7 +166,7 @@ pub fn text(id: &'static str) -> &'static str {
     let text: &'static str = LOADER.get(id).leak();
     TEXTS
         .write()
-        .unwrap_or_else(PoisonError::into_inner)
+        .expect("language catalog lock was poisoned")
         .entry(key)
         .or_insert(text)
 }
@@ -188,7 +187,7 @@ pub fn texts(ids: &'static [&'static str]) -> &'static [&'static str] {
     let key = (locale(), ids);
     if let Some(texts) = LISTS
         .read()
-        .unwrap_or_else(PoisonError::into_inner)
+        .expect("language catalog lock was poisoned")
         .get(&key)
     {
         return texts;
@@ -196,7 +195,7 @@ pub fn texts(ids: &'static [&'static str]) -> &'static [&'static str] {
     let texts: &'static [&'static str] = ids.iter().map(|id| text(id)).collect::<Vec<_>>().leak();
     LISTS
         .write()
-        .unwrap_or_else(PoisonError::into_inner)
+        .expect("language catalog lock was poisoned")
         .entry(key)
         .or_insert(texts)
 }

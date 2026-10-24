@@ -1,3 +1,7 @@
+use gpui::prelude::*;
+use gpui::{Context, IntoElement, Render, Window, div, px};
+use gpui_component::{TITLE_BAR_HEIGHT, h_flex, v_flex};
+
 use super::editors::Editor;
 use super::intent::{InstanceIntent, Section};
 use super::{
@@ -6,9 +10,6 @@ use super::{
 };
 use crate::theme::ShellColors;
 use crate::{kit, live, theme, tr};
-use gpui::prelude::*;
-use gpui::{Context, IntoElement, Render, Window, div, px};
-use gpui_component::{TITLE_BAR_HEIGHT, h_flex, v_flex};
 
 impl Render for InstanceDetailView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {

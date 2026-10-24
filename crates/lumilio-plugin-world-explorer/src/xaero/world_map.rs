@@ -2,13 +2,16 @@
 //! MIT-licensed XaeroTools `crates/xaero-core/src/{codec,model}` snapshot at
 //! `66694bf5a3d13ba55bd35d9045832353063422eb` (see ATTRIBUTIONS.md).
 //! Color lookup uses LumilioCL's generated versioned block tables.
-use crate::save::colors;
+
+use std::collections::BTreeSet;
+
 use lumilio_plugin_api::map::{
     BaseMapInfo, Dimension, SourceLink, TILE_PIXELS, TileReply, TileRequest, WorldId,
 };
 use lumilio_plugin_api::{HostContext, ImageData, PluginError};
-use std::collections::BTreeSet;
 use xaero_core::model::{BiomeRef, DecodedRegion, Pixel};
+
+use crate::save::colors;
 
 #[cfg(test)]
 mod tests;
@@ -83,7 +86,12 @@ pub(crate) fn sources(
     let Some(dir) = region_dir(request)? else {
         return Ok(Some(vec![]));
     };
-    let scale = i64::from(request.key.blocks_per_pixel().unwrap());
+    let scale = i64::from(
+        request
+            .key
+            .blocks_per_pixel()
+            .expect("valid_request checked the tile scale"),
+    );
     let span = 256 * scale;
     let x0 = i64::from(request.key.tx) * span;
     let z0 = i64::from(request.key.tz) * span;

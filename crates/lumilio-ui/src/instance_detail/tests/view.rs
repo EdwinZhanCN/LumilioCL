@@ -1,13 +1,15 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
+use gpui::TestAppContext;
+use gpui::prelude::*;
+use lumilio_core::LauncherSettings;
+
 use super::super::editors::Editor;
 use super::super::intent::{InstanceIntent, Section};
 use super::super::panels::Arrived;
 use super::super::{InstanceDetailView, TAB_HISTORY, TAB_OVERVIEW, TAB_WORLDS};
 use super::{click, record, rooted, world};
-use gpui::TestAppContext;
-use gpui::prelude::*;
-use lumilio_core::LauncherSettings;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 #[gpui::test]
 fn tabs_load_their_data_once_and_ignore_a_second_request_while_pending(cx: &mut TestAppContext) {

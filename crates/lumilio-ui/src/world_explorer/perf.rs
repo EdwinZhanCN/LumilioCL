@@ -2,12 +2,16 @@
 //! pass/fail test: `cargo nextest run -p lumilio-ui drag_pipeline --ignored --no-capture`.
 //! `LUMILIO_PERF_RATIO` sets the pixel ratio (1 = the logical-size frames the
 //! map used before HiDPI, 2 = a Retina frame); `LUMILIO_PERF_HZ` the event rate.
+
+use std::sync::Arc;
+use std::sync::atomic::AtomicU64;
+use std::sync::atomic::Ordering::Relaxed;
+use std::time::{Duration, Instant};
+
+use lumilio_map_render::{Camera, Grid, Sprite, Tile};
+
 use super::stats::Snapshot;
 use super::worker::{Request, Worker};
-use lumilio_map_render::{Camera, Grid, Sprite, Tile};
-use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
-use std::time::{Duration, Instant};
 
 fn env(name: &str, default: f64) -> f64 {
     std::env::var(name)

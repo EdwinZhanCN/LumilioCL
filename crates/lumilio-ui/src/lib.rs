@@ -6,8 +6,8 @@ pub mod auth_servers;
 pub mod collections;
 pub mod controls;
 pub mod cover;
-pub mod dependency_prompt;
 pub mod export_form;
+pub mod features;
 // Preserved as a rejected visual experiment; excluded from production builds.
 #[cfg(test)]
 pub mod backdrop;
@@ -36,9 +36,9 @@ pub mod placeholders;
 pub mod places;
 pub mod platform;
 pub mod plugin_setting_dialog;
-pub mod project_detail;
 pub mod release_notes;
 pub mod route;
+pub mod runtime;
 pub mod schematic_studio;
 pub mod settings_dialog;
 pub mod settings_forms;

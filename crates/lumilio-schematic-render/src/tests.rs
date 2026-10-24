@@ -143,10 +143,8 @@ fn first_person_diagonal_speed_matches_straight_speed_and_mouse_look_clamps() {
 
 #[test]
 fn first_person_projection_uses_the_eye_and_ignores_model_bounds_and_orbit_zoom() {
-    use nucleation::rendering::{
-        CameraConfig,
-        camera::{compute_view_proj_reversed, project_point},
-    };
+    use nucleation::rendering::CameraConfig;
+    use nucleation::rendering::camera::{compute_view_proj_reversed, project_point};
     let camera = CameraConfig {
         yaw_deg: 0.,
         pitch_deg: 0.,

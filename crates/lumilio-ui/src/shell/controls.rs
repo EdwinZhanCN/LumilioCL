@@ -1,12 +1,12 @@
-use super::{Labels, LauncherShell};
-use crate::kit::ViewIntent;
-use crate::live::{DiscoverChange, PAGE_SIZES, SORTS, sort_label};
-use crate::pages;
-use crate::pages::live::LiveControls;
 use gpui::prelude::*;
 use gpui::{App, Context, Entity, Window};
 use gpui_component::input::InputEvent;
 use gpui_component::select::SelectEvent;
+
+use super::{Labels, LauncherShell};
+use crate::kit::ViewIntent;
+use crate::pages;
+use crate::pages::live::LiveControls;
 
 impl LauncherShell {
     /// Builds the Library and Discover controls the first time the live pages show,
@@ -22,76 +22,10 @@ impl LauncherShell {
             let presets = self.view.library_tab == crate::pages::live::PRESETS_TAB;
             controls.update(cx, |controls, cx| controls.search_for(presets, window, cx));
         }
-        if let (Some(controls), Some(model)) = (&self.live_controls, &self.live) {
-            // Discover's search box and sort menu follow the source browsed.
-            let name = model.browsed_source_name().to_owned();
-            let sorts = model.filters.sorts(model.query.kind);
-            let chosen = model.query.sort;
-            controls.update(cx, |controls, cx| {
-                controls.search_source(&name, window, cx);
-                controls.offer_sorts(sorts, chosen, window, cx);
-            });
-        }
         if self.live.is_some() && self.live_controls.is_none() {
             let controls = cx.new(|cx| LiveControls::new(window, cx));
-            let (search, filter) = {
-                let read = controls.read(cx);
-                (read.discover_search.clone(), read.library_filter.clone())
-            };
-            cx.subscribe_in(
-                &search,
-                window,
-                |this, _, event: &InputEvent, window, cx| {
-                    match event {
-                        InputEvent::PressEnter { .. } => this.submit_search(window, cx),
-                        // The clear button empties the box: search again, as the app does.
-                        InputEvent::Change if this.discover_text_was_cleared(cx) => {
-                            this.submit_search(window, cx)
-                        }
-                        _ => {}
-                    }
-                },
-            )
-            .detach();
+            let filter = controls.read(cx).library_filter.clone();
             cx.subscribe(&filter, |_, _, event: &InputEvent, cx| {
-                if matches!(event, InputEvent::Change) {
-                    cx.notify();
-                }
-            })
-            .detach();
-            let (sort, size, version_search) = {
-                let read = controls.read(cx);
-                (
-                    read.sort.clone(),
-                    read.page_size.clone(),
-                    read.version_search.clone(),
-                )
-            };
-            cx.subscribe_in(
-                &sort,
-                window,
-                |this, _, event: &SelectEvent<Labels>, window, cx| {
-                    if let SelectEvent::Confirm(Some(label)) = event
-                        && let Some(sort) = SORTS.iter().find(|sort| sort_label(**sort) == label)
-                    {
-                        this.change_query(DiscoverChange::Sort(*sort), window, cx);
-                    }
-                },
-            )
-            .detach();
-            cx.subscribe_in(
-                &size,
-                window,
-                |this, _, event: &SelectEvent<Labels>, window, cx| {
-                    if let SelectEvent::Confirm(Some(text)) = event
-                        && let Some(size) = PAGE_SIZES.iter().find(|size| size.to_string() == *text)
-                    {
-                        this.change_query(DiscoverChange::PageSize(*size), window, cx);
-                    }
-                },
-            )
-            .detach();
-            cx.subscribe(&version_search, |_, _, event: &InputEvent, cx| {
                 if matches!(event, InputEvent::Change) {
                     cx.notify();
                 }

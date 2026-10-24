@@ -8,9 +8,11 @@
 //! (data version 2529) an index never spans two longs; before that it could.
 //! Heightmaps use the same packing, 256 entries of 9 bits or so; biomes are
 //! in `biome.rs`.
-use crate::Error;
-use crate::biome::{self, SectionBiomes};
+
 use lumilio_nbt::Tag;
+
+use crate::biome::SectionBiomes;
+use crate::{Error, biome};
 
 /// The first data version after block names replaced numeric ids (1.13).
 const FLATTENED: i32 = 1451;

@@ -1,12 +1,15 @@
-use super::super::{LauncherShell, Route};
-use gpui::{Modifiers, TestAppContext};
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use gpui::{Modifiers, TestAppContext};
+
+use super::super::{LauncherShell, Route};
+
 #[gpui::test]
 fn live_library_cards_manage_and_explicit_play_is_independent(cx: &mut TestAppContext) {
-    use crate::live::{LiveIntent, library_card};
     use lumilio_core::{InstanceRecord, InstanceSettings, Loader};
+
+    use crate::live::{LiveIntent, library_card};
 
     cx.update(gpui_component::init);
     let seen: Rc<RefCell<Vec<LiveIntent>>> = Rc::default();
@@ -82,8 +85,9 @@ fn live_library_cards_manage_and_explicit_play_is_independent(cx: &mut TestAppCo
 fn the_collections_tab_shows_each_collection_and_the_card_menu_does_not_open_the_game(
     cx: &mut TestAppContext,
 ) {
-    use crate::live::{CollectionRow, LiveIntent, library_card};
     use lumilio_core::{InstanceRecord, InstanceSettings, Loader};
+
+    use crate::live::{CollectionRow, LiveIntent, library_card};
 
     cx.update(gpui_component::init);
     let seen: Rc<RefCell<Vec<LiveIntent>>> = Rc::default();
@@ -191,11 +195,12 @@ fn changing_the_library_order_or_loader_is_reported_so_it_can_be_remembered(
 fn the_library_sorts_and_filters_from_dropdowns_that_follow_what_is_remembered(
     cx: &mut TestAppContext,
 ) {
+    use gpui_component::select::SelectEvent;
+    use lumilio_core::{InstanceRecord, InstanceSettings, Loader};
+
     use crate::kit::ViewIntent;
     use crate::live::{LiveIntent, library_card};
     use crate::pages::live::{LIBRARY_LOADER, LIBRARY_SORT, loader_code};
-    use gpui_component::select::SelectEvent;
-    use lumilio_core::{InstanceRecord, InstanceSettings, Loader};
 
     cx.update(|cx| {
         gpui_component::init(cx);

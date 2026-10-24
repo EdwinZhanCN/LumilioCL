@@ -1,12 +1,14 @@
+use std::sync::{Arc, Mutex};
+
+use lumilio_plugin_api::PluginState;
+use lumilio_plugin_api::content::{ProjectKind, SearchQuery, Sort};
+use lumilio_plugin_modrinth::{ID, Modrinth};
+
 use crate::plugins::{PluginHost, PluginStatus};
 use crate::transfer::{
     HttpRequest, OfficialSource, SourceChain, SourceProvider, Transport, TransportFuture,
     TransportResponse,
 };
-use lumilio_plugin_api::PluginState;
-use lumilio_plugin_api::content::{ProjectKind, SearchQuery, Sort};
-use lumilio_plugin_modrinth::{ID, Modrinth};
-use std::sync::{Arc, Mutex};
 
 #[derive(Clone)]
 struct Api {

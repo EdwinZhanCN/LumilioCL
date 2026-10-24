@@ -1,8 +1,9 @@
 //! The dependency table of plan global-context (D6): which change makes
 //! which derived result out of date. One test per derived result.
 
-use super::super::context::{Stale, stale};
 use lumilio_core::{Context, Session, SessionPhase};
+
+use super::super::context::{Stale, stale};
 
 /// Each kind of change core publishes, by name, as what was seen before and
 /// what is published now.

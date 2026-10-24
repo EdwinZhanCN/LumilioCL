@@ -228,8 +228,9 @@ fn inno_paths_strip_windows_verbatim_prefixes() {
 }
 
 mod block_colors {
-    use crate::block_colors::*;
     use std::io::{Cursor, Write};
+
+    use crate::block_colors::*;
 
     fn png(width: u32, height: u32, pixel: impl Fn(u32, u32) -> [u8; 4]) -> Vec<u8> {
         let image = image::RgbaImage::from_fn(width, height, |x, y| image::Rgba(pixel(x, y)));
@@ -551,10 +552,11 @@ mod block_colors {
 mod bake_blocks {
     use std::collections::BTreeMap;
 
-    use crate::bake_blocks::*;
-    use crate::entity_dump::EntityBake;
     use lumilio_block_assets::{BUNDLE_FORMAT, BakedTexture, ContentHash};
     use serde_json::{Value, json};
+
+    use crate::bake_blocks::*;
+    use crate::entity_dump::EntityBake;
 
     fn entry(id: &str, kind: &str, time: &str) -> Value {
         json!({

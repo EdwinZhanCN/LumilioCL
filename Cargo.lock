@@ -4602,6 +4602,7 @@ dependencies = [
  "image 0.25.10",
  "keyring",
  "lumilio-block-assets",
+ "lumilio-minecraft",
  "lumilio-nbt",
  "lumilio-plugin-api",
  "lumilio-plugin-curseforge",
@@ -4642,8 +4643,10 @@ dependencies = [
 name = "lumilio-docgen"
 version = "0.2.2"
 dependencies = [
+ "proc-macro2",
  "serde",
  "serde_json",
+ "syn 2.0.119",
  "tempfile",
  "toml 0.9.12+spec-1.1.0",
 ]
@@ -4654,6 +4657,15 @@ version = "0.2.2"
 dependencies = [
  "pollster 0.4.0",
  "wgpu 30.0.1",
+]
+
+[[package]]
+name = "lumilio-minecraft"
+version = "0.2.2"
+dependencies = [
+ "regex",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -4813,6 +4825,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+ "tokio",
 ]
 
 [[package]]

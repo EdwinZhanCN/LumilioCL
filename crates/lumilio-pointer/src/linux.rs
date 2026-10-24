@@ -1,13 +1,18 @@
 //! X11 uses a scoped pointer grab and an invisible cursor. Wayland deliberately
 //! rejects capture until GPUI exposes its relative-pointer/constraints protocols.
-use super::CaptureError;
-use raw_window_handle::RawWindowHandle;
+
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
-use x11rb::{
-    CURRENT_TIME, NONE, connection::Connection as _, protocol::xproto::*,
-    rust_connection::RustConnection,
+
+use raw_window_handle::RawWindowHandle;
+use x11rb::connection::Connection as _;
+use x11rb::protocol::xproto::{
+    ConnectionExt as _, CreateGCAux, EventMask, GrabMode, GrabStatus, Rectangle,
 };
+use x11rb::rust_connection::RustConnection;
+use x11rb::{CURRENT_TIME, NONE};
+
+use super::CaptureError;
 
 fn unavailable<T>(_: T) -> CaptureError {
     CaptureError::Unavailable
@@ -49,15 +54,27 @@ impl Capture {
             .name("schematic-pointer".into())
             .spawn(move || {
                 let Ok(mut native) = X11Capture::new(window, offset, scale) else {
-                    worker.motion.lock().unwrap().failed = true;
+                    worker
+                        .motion
+                        .lock()
+                        .expect("pointer motion lock was poisoned")
+                        .failed = true;
                     return;
                 };
                 loop {
-                    if worker.motion.lock().unwrap().stopped {
+                    if worker
+                        .motion
+                        .lock()
+                        .expect("pointer motion lock was poisoned")
+                        .stopped
+                    {
                         break;
                     }
                     let delta = native.sample();
-                    let mut motion = worker.motion.lock().unwrap();
+                    let mut motion = worker
+                        .motion
+                        .lock()
+                        .expect("pointer motion lock was poisoned");
                     match delta {
                         Ok(delta) => {
                             motion.delta[0] += delta[0];
@@ -72,7 +89,7 @@ impl Capture {
                     let (motion, _) = worker
                         .wake
                         .wait_timeout(motion, Duration::from_millis(16))
-                        .unwrap();
+                        .expect("pointer motion lock was poisoned");
                     if motion.stopped {
                         break;
                     }
@@ -83,7 +100,11 @@ impl Capture {
     }
 
     pub(super) fn sample(&mut self) -> Result<[f32; 2], CaptureError> {
-        let mut motion = self.shared.motion.lock().unwrap();
+        let mut motion = self
+            .shared
+            .motion
+            .lock()
+            .expect("pointer motion lock was poisoned");
         if motion.failed {
             return Err(CaptureError::Unavailable);
         }
@@ -93,7 +114,11 @@ impl Capture {
 
 impl Drop for Capture {
     fn drop(&mut self) {
-        self.shared.motion.lock().unwrap().stopped = true;
+        self.shared
+            .motion
+            .lock()
+            .expect("pointer motion lock was poisoned")
+            .stopped = true;
         self.shared.wake.notify_one();
     }
 }

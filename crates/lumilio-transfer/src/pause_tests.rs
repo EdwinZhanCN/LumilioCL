@@ -1,11 +1,13 @@
+use std::path::Path;
+use std::time::Duration;
+
+use sha1::{Digest, Sha1};
+
 use super::budget::ConnectionBudget;
 use super::engine::TransferEngine;
 use super::request::{RetryPolicy, TransferError, TransferEvent, TransferRequest};
 use super::test_server::{Ending, Server};
 use crate::CancellationToken;
-use sha1::{Digest, Sha1};
-use std::path::Path;
-use std::time::Duration;
 
 fn content() -> Vec<u8> {
     (0..100_u8).collect()

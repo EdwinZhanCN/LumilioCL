@@ -3,6 +3,16 @@
 //! once it is verified. A large file whose source serves ranges is written
 //! over several connections when one is free to help ([`super::parallel`]).
 
+use std::io::SeekFrom;
+use std::ops::Range;
+use std::path::Path;
+use std::time::Instant;
+
+use futures_util::stream::StreamExt;
+use tokio::fs;
+use tokio::fs::{File, OpenOptions};
+use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
+
 use super::engine::TransferEngine;
 use super::files::{AttemptFailure, ContentHasher, file_system_error, publish_temporary};
 use super::parallel::{JOIN_INTERVAL, Plan};
@@ -11,13 +21,6 @@ use super::pieces::gaps;
 use super::request::{TransferEvent, TransferRequest};
 use super::transport::{Transport, TransportResponse};
 use crate::CancellationToken;
-use futures_util::stream::StreamExt;
-use std::io::SeekFrom;
-use std::ops::Range;
-use std::path::Path;
-use std::time::Instant;
-use tokio::fs::{self, File, OpenOptions};
-use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 
 impl<T> TransferEngine<T>
 where

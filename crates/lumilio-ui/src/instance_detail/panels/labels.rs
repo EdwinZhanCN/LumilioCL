@@ -1,5 +1,6 @@
-use crate::tr;
 use lumilio_core::{ChangeKind, SessionOutcome};
+
+use crate::tr;
 
 pub fn change_label(kind: ChangeKind) -> &'static str {
     match kind {

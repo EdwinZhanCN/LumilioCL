@@ -1,5 +1,6 @@
-use super::FileLog;
 use log::{Level, Log, Record};
+
+use super::FileLog;
 
 fn line(log: &FileLog, level: Level, target: &str, text: &str) {
     log.log(

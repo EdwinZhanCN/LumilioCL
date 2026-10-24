@@ -1,0 +1,222 @@
+use gpui::prelude::*;
+use gpui::{AnyElement, Context, Window, div, px};
+use gpui_component::{h_flex, v_flex};
+use lumilio_core::log_lines;
+
+use super::super::panels::{act_index, problem_text, problem_tone};
+use super::super::{InstanceDetailView, InstanceIntent, Section};
+use super::helpers::{crash_for_session, diagnostic_labels, output_for_session};
+use crate::theme::ShellColors;
+use crate::{kit, tr};
+
+impl InstanceDetailView {
+    /// Opening the tab loads what its current part shows.
+    pub(in super::super) fn open_diagnostics(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let section = match self.diag_sub {
+            0 => Section::Problems,
+            1 => Section::Logs,
+            _ => Section::Files,
+        };
+        self.ensure(section, window, cx);
+    }
+
+    /// Opens 诊断 on its log part for a session that went wrong. If the game
+    /// left a crash report from that time, it is opened too (once the list of
+    /// reports is known).
+    pub(in super::super) fn inspect_session(
+        &mut self,
+        started: u64,
+        seconds: u64,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.diag_sub = 1;
+        self.inspect = Some((started, seconds));
+        self.open_tab(super::super::TAB_DIAGNOSTICS, window, cx);
+        self.open_inspected_crash(window, cx);
+    }
+
+    /// Opens the crash report that belongs to the session being inspected,
+    /// or without one the launcher's record of what the game printed then,
+    /// when the logs are known. Called again when they arrive.
+    pub(in super::super) fn open_inspected_crash(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some((started, seconds)) = self.inspect else {
+            return;
+        };
+        let Some(Ok(logs)) = &self.data.logs else {
+            return;
+        };
+        self.inspect = None;
+        if let Some(report) = crash_for_session(&logs.crashes, started, seconds) {
+            let file = report.file_name.clone();
+            self.log_source = lumilio_core::GameLogSource::Crash(file.clone());
+            self.crash = Some((file.clone(), None));
+            cx.notify();
+            (self.handler)(InstanceIntent::OpenCrash(file), window, cx);
+        } else if let Some(output) =
+            output_for_session(&logs.files, started, self.is_last_launch(started))
+        {
+            let source = lumilio_core::GameLogSource::File(output.name.clone());
+            self.log_source = source.clone();
+            self.crash = Some((output.name.clone(), None));
+            cx.notify();
+            (self.handler)(InstanceIntent::OpenGameLog(source), window, cx);
+        }
+    }
+
+    /// Whether the session that began at `started` is the newest in the
+    /// history and no game of this instance is running now.
+    pub(super) fn is_last_launch(&self, started: u64) -> bool {
+        let newest = self
+            .data
+            .history
+            .as_ref()
+            .and_then(|read| read.as_ref().ok())
+            .and_then(|read| {
+                read.events.iter().rev().find_map(|event| match event {
+                    lumilio_core::HistoryEvent::Session { started, .. } => Some(*started),
+                    _ => None,
+                })
+            });
+        newest == Some(started) && self.live_output.is_none()
+    }
+
+    /// Lists another folder of the game directory; one request at a time.
+    pub(in super::super) fn open_folder(
+        &mut self,
+        path: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.data.pending.contains(&Section::Files) {
+            return;
+        }
+        self.data.pending.push(Section::Files);
+        (self.handler)(InstanceIntent::OpenFolder(path), window, cx);
+    }
+
+    pub(super) fn log_query(&self, cx: &gpui::App) -> String {
+        self.fields
+            .as_ref()
+            .map(|fields| fields.log_search.read(cx).value().to_string())
+            .unwrap_or_default()
+    }
+
+    /// The log being read: the game's own output while it runs, else the tail
+    /// of `latest.log`.
+    pub(in super::super) fn log_text(&self) -> Option<std::borrow::Cow<'_, str>> {
+        if let Some((_, read)) = &self.crash {
+            return read
+                .as_ref()
+                .and_then(|result| result.as_ref().ok())
+                .map(|(text, _)| std::borrow::Cow::Borrowed(text.as_str()));
+        }
+        if matches!(
+            self.log_source,
+            lumilio_core::GameLogSource::File(_) | lumilio_core::GameLogSource::Crash(_)
+        ) {
+            return None;
+        }
+        if self.log_source == lumilio_core::GameLogSource::Live
+            && let Some(live) = &self.live_output
+        {
+            return Some(std::borrow::Cow::Owned(live.join("\n")));
+        }
+        let Some(Ok(logs)) = &self.data.logs else {
+            return None;
+        };
+        logs.latest.as_deref().map(std::borrow::Cow::Borrowed)
+    }
+
+    /// The log lines that match the level and search, as one text.
+    pub(in super::super) fn visible_log(&self, cx: &gpui::App) -> Option<String> {
+        let text = self.log_text()?;
+        let lines = log_lines(&text);
+        let shown = self.filtered_lines(&lines, cx);
+        Some(
+            shown
+                .iter()
+                .map(|line| line.text)
+                .collect::<Vec<_>>()
+                .join("\n"),
+        )
+    }
+
+    pub(in super::super) fn diagnostics_panel(
+        &mut self,
+        window: &mut Window,
+        colors: ShellColors,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let sub = self.diag_sub.min(diagnostic_labels().len() - 1);
+        let segments = kit::segments(
+            "instance-diagnostic-parts",
+            diagnostic_labels(),
+            sub,
+            act_index(cx, |view, index: usize, window, cx| {
+                view.diag_sub = index;
+                cx.notify();
+                view.open_diagnostics(window, cx);
+            }),
+        );
+        let body = match sub {
+            0 => self.problems_body(colors, cx),
+            1 => self.logs_body(window, colors, cx),
+            _ => self.files_body(colors, cx),
+        };
+        v_flex()
+            .w_full()
+            .when(sub == 1, |view| view.h_full().min_h_0())
+            .gap_4()
+            .child(h_flex().flex_none().child(segments))
+            .child(body)
+            .into_any_element()
+    }
+
+    // ia[instance.diagnostics]: 看问题、执行修复 | 诊断 · 问题分段 | 每个问题一个操作（与概览相同）
+    pub(super) fn problems_body(&self, colors: ShellColors, cx: &mut Context<Self>) -> AnyElement {
+        if let Some(status) = self.status(&self.data.problems, colors, Section::Problems, cx) {
+            return status;
+        }
+        let Some(Ok(problems)) = &self.data.problems else {
+            return div().into_any_element();
+        };
+        if problems.is_empty() {
+            return kit::empty(
+                tr!("instance-problems-none"),
+                tr!("instance-problems-none-help"),
+                colors,
+            )
+            .into_any_element();
+        }
+        let rows: Vec<_> = problems
+            .iter()
+            .enumerate()
+            .map(|(row, problem)| {
+                let (title, detail) = problem_text(problem);
+                kit::row(
+                    title,
+                    detail,
+                    Some(
+                        div()
+                            .size(px(8.))
+                            .rounded_full()
+                            .bg(problem_tone(problem.severity, colors))
+                            .into_any_element(),
+                    ),
+                    self.problem_button(row, &problem.kind, cx),
+                    colors,
+                )
+            })
+            .collect();
+        kit::list(rows, colors).into_any_element()
+    }
+}

@@ -1,10 +1,11 @@
+use gpui::prelude::*;
+use gpui::{App, Context, Window};
+
 use super::InstanceDetailView;
 use super::editors::Editor;
 use super::intent::InstanceIntent;
 use crate::theme::ShellColors;
 use crate::{kit, theme, tr};
-use gpui::prelude::*;
-use gpui::{App, Context, Window};
 
 impl InstanceDetailView {
     /// Primary 启动游戏; everything else in More (design language §7).

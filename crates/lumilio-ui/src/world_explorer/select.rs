@@ -1,10 +1,14 @@
 //! Picking an overlay object on the map and showing what it is.
-use super::{ICON, MAX_ICONS, MapView, canvas};
-use crate::{key::Key, tr};
-use gpui::{AnyElement, ClipboardItem, Context, Pixels, Point, div, prelude::*, px};
+
+use gpui::prelude::*;
+use gpui::{AnyElement, ClipboardItem, Context, Pixels, Point, div, px};
 use gpui_component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use lumilio_core::world_map::store::annotations::portal_coordinates;
 use lumilio_plugin_api::map::{Dimension, MapObject, MapObjectKind, MapPoint};
+
+use super::{ICON, MAX_ICONS, MapView, canvas};
+use crate::key::Key;
+use crate::tr;
 
 /// A press that moves less than this many pixels before release is a click,
 /// not the start of a pan.

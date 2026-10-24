@@ -1,4 +1,5 @@
 //! Structure chests whose loot the seed alone decides (the fork's `loot.c`).
+
 use crate::{Position, Version, ffi};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

@@ -4,9 +4,10 @@
 //! Choosing a game only sends an intent, and the chip changes when core
 //! says so.
 
-use super::LauncherShell;
 use gpui::Context;
 use lumilio_core::Context as CoreContext;
+
+use super::LauncherShell;
 
 impl LauncherShell {
     /// What core last published.
@@ -40,28 +41,15 @@ impl LauncherShell {
         !self.game_active() && self.home.can_start()
     }
 
-    /// Takes what core published. Another current game ends browsing for a
-    /// different one, so its version and loader no longer apply (D3), and
-    /// becomes the project detail's target. Returns whether browsing ended,
-    /// so the caller searches again without the lock.
-    pub fn follow_context(&mut self, context: CoreContext, cx: &mut Context<Self>) -> bool {
+    /// Takes what core published. Another current game is the one Discover
+    /// installs into; Discover ends browsing for a different one (D3).
+    pub fn follow_context(&mut self, context: CoreContext, cx: &mut Context<Self>) {
         let moved = self.context.current_instance != context.current_instance;
         self.context = context;
         if !moved {
-            return false;
+            return;
         }
-        let current = self.context.current_instance.clone();
-        let ended = self.live.as_ref().is_some_and(|model| {
-            model
-                .browsing_for
-                .as_ref()
-                .is_some_and(|game| Some(game) != current.as_ref())
-        });
-        if ended {
-            self.update_live(|model| model.browsing_for = None, cx);
-        }
-        self.retarget_detail(cx);
+        self.sync_discover(cx);
         cx.notify();
-        ended
     }
 }

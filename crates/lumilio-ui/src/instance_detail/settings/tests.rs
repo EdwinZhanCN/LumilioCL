@@ -1,19 +1,13 @@
-use super::super::InstanceIntent;
-use super::saves::Saved;
-use super::saves::after_launch;
-use super::saves::commands;
-use super::saves::environment;
-use super::saves::game_arguments;
-use super::saves::java;
-use super::saves::jvm_arguments;
-use super::saves::quick_play;
-use super::saves::window;
-use super::texts::command_text;
-use super::texts::followed;
-use super::texts::quick_play_text;
-use super::texts::window_text;
-use lumilio_core::{AfterLaunch, InstanceSettings, QuickPlay};
 use std::path::PathBuf;
+
+use lumilio_core::{AfterLaunch, InstanceSettings, QuickPlay};
+
+use super::super::InstanceIntent;
+use super::saves::{
+    Saved, after_launch, commands, environment, game_arguments, java, jvm_arguments, quick_play,
+    window,
+};
+use super::texts::{command_text, followed, quick_play_text, window_text};
 
 fn saved(result: Saved) -> InstanceSettings {
     match result.unwrap() {
@@ -39,14 +33,8 @@ fn rows_say_where_a_value_comes_from() {
         quick_play_text(Some(&QuickPlay::World("My World".into()))),
         "世界 · My World"
     );
-    assert_eq!(
-        command_text(Some(&String::new()), Some(&"nice".to_owned())),
-        "不使用"
-    );
-    assert_eq!(
-        command_text(None, Some(&"nice".to_owned())),
-        "跟随默认 · nice"
-    );
+    assert_eq!(command_text(Some(""), Some("nice")), "不使用");
+    assert_eq!(command_text(None, Some("nice")), "跟随默认 · nice");
     assert_eq!(command_text(None, None), "跟随默认 · 无");
 }
 
@@ -177,11 +165,13 @@ fn java_and_after_launch_can_be_set_and_cleared() {
 }
 
 mod java_dropdown {
-    use super::super::java::{JavaPick, java_picks, java_summary, picked};
+    use std::path::{Path, PathBuf};
+
     use lumilio_core::{
         HostProfile, InstanceJava, JavaChoice, JavaRuntime, MachineArchitecture, PlatformFamily,
     };
-    use std::path::{Path, PathBuf};
+
+    use super::super::java::{JavaPick, java_picks, java_summary, picked};
 
     fn runtime(root: &Path, name: &str, version: &str, arch: &str) -> JavaRuntime {
         let home = root.join(name);

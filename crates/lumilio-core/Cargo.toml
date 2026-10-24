@@ -9,6 +9,7 @@ rust-version.workspace = true
 [dependencies]
 lumilio-plugin-api.workspace = true
 lumilio-block-assets.workspace = true
+lumilio-minecraft.workspace = true
 lumilio-nbt.workspace = true
 lumilio-transfer.workspace = true
 base64.workspace = true

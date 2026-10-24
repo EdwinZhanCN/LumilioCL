@@ -1,7 +1,8 @@
-use super::*;
 use lumilio_plugin_api::{
     AnalysisInput, AnalysisSource, Analyzer, Finding, GameFacts, Severity, Words,
 };
+
+use super::*;
 
 enum Behavior {
     Good,

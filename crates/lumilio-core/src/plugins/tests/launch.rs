@@ -1,7 +1,8 @@
-use super::*;
 use lumilio_plugin_api::{
     DiscordActivity, LaunchEvent, LaunchObserver, LaunchOutcome, NativeCapability, Words,
 };
+
+use super::*;
 
 struct Observer {
     id: &'static str,

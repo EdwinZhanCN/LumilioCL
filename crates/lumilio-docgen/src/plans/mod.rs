@@ -1,8 +1,10 @@
 //! Versioned plan contracts and deterministic, explicitly public projections.
-use serde::{Deserialize, Serialize};
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
+
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

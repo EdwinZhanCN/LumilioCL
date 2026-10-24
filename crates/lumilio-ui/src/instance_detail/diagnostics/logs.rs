@@ -1,14 +1,17 @@
-use super::super::panels::{act, clock};
-use super::super::{InstanceDetailView, InstanceIntent, Section};
-use crate::{kit, theme::ShellColors, toast::Toast, tr};
+use std::rc::Rc;
+
 use gpui::prelude::*;
 use gpui::{AnyElement, Context, ScrollStrategy, Window, div, px, uniform_list};
-use gpui_component::Sizable as _;
 use gpui_component::input::Input;
 use gpui_component::select::Select;
-use gpui_component::{h_flex, v_flex};
+use gpui_component::{Sizable as _, h_flex, v_flex};
 use lumilio_core::{GAME_OUTPUT_LOG, GameLogSource, LogLevel, LogLine, filter_log, log_lines};
-use std::rc::Rc;
+
+use super::super::panels::{act, clock};
+use super::super::{InstanceDetailView, InstanceIntent, Section};
+use crate::theme::ShellColors;
+use crate::toast::Toast;
+use crate::{kit, tr};
 
 impl InstanceDetailView {
     pub(super) fn filtered_lines<'a>(

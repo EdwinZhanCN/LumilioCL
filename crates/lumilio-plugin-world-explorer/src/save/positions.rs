@@ -1,5 +1,6 @@
 //! The 「存档位置」 layer: where a single-player save's `level.dat` says the
 //! world spawn is, and where its player last stood.
+
 use lumilio_nbt::Tag;
 use lumilio_plugin_api::map::{
     Dimension, MapIcon, MapObject, MapObjectKind, MapPoint, OverlayInfo, OverlayRequest,

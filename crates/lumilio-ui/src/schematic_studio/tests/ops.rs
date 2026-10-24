@@ -623,8 +623,9 @@ fn the_same_version_gets_one_name_and_no_tag(cx: &mut TestAppContext) {
 /// does not know is kept, written as it is.
 #[test]
 fn losses_fall_into_lost_approximated_and_kept() {
-    use crate::schematic_studio::dialogs::Group;
     use lumilio_schematic::convert::{Loss, MISSING_BLOCK, Severity, UNKNOWN_PROPERTY};
+
+    use crate::schematic_studio::dialogs::Group;
     let loss = |kind: &'static str, severity| Loss {
         severity,
         kind,
@@ -649,8 +650,9 @@ fn losses_fall_into_lost_approximated_and_kept() {
 /// name is its ID (D28).
 #[test]
 fn block_pickers_show_names_and_find_names_and_ids() {
-    use crate::schematic_studio::dialogs::BlockChoice;
     use gpui_component::select::SelectItem as _;
+
+    use crate::schematic_studio::dialogs::BlockChoice;
     let mut names = lumilio_core::BlockNames::default();
     names.add(
         "zh_cn",
@@ -671,8 +673,9 @@ fn block_pickers_show_names_and_find_names_and_ids() {
 /// later gets the general one.
 #[test]
 fn every_loss_kind_is_explained_in_the_launchers_words() {
-    use crate::schematic_studio::dialogs::loss_words;
     use lumilio_schematic::convert::{Loss, Severity};
+
+    use crate::schematic_studio::dialogs::loss_words;
     let loss = |kind: &'static str| Loss {
         severity: Severity::Lost,
         kind,

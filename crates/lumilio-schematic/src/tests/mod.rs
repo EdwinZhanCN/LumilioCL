@@ -6,10 +6,11 @@ mod replace;
 mod stats;
 mod suggest;
 
-use crate::{BlockState, Region, UniversalSchematic};
 use nucleation::Entity;
 use nucleation::block_entity::BlockEntity;
 use nucleation::nbt::NbtValue;
+
+use crate::{BlockState, Region, UniversalSchematic};
 
 pub(super) fn state(text: &str) -> BlockState {
     BlockState::from_block_string(text).unwrap()

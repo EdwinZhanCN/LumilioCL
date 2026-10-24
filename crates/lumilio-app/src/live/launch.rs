@@ -1,13 +1,13 @@
-use super::instance::{around_the_game, open_instance_on};
-use super::jobs::{answer, reload};
-use super::{GAME_LOG_FLUSH, GAME_LOG_LINES, Reload, Wiring};
-use gpui_kit::AppContext as _;
-use gpui_kit::{App, Window};
+use gpui_kit::{App, AppContext as _, Window};
 use lumilio_core::{CancellationToken, LaunchFailure, LaunchSignal, LaunchUpdate, ServiceError};
 use lumilio_ui::home::{HomePresentation, RecoveryDetail, Subject};
 use lumilio_ui::instance_detail::TAB_DIAGNOSTICS;
 use lumilio_ui::toast::Toast;
 use lumilio_ui::tr;
+
+use super::instance::{around_the_game, open_instance_on};
+use super::jobs::reload;
+use super::{GAME_LOG_FLUSH, GAME_LOG_LINES, Reload, Wiring};
 
 pub(super) fn start_launch(wiring: &Wiring, window: gpui_kit::AnyWindowHandle, cx: &mut App) {
     // Continue starts the current game, which core owns.
@@ -38,7 +38,9 @@ pub(super) fn start_launch(wiring: &Wiring, window: gpui_kit::AnyWindowHandle, c
     });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let after = answer(&wiring, after, cx).await.unwrap_or_default();
+        let after = lumilio_ui::runtime::answer(after, cx)
+            .await
+            .unwrap_or_default();
         wiring.state.borrow_mut().game_log = Some((instance.clone(), Default::default()));
         // The page can tell the game is on its way before it prints anything.
         push_game_log(&wiring, true, cx);
@@ -149,7 +151,7 @@ pub(super) fn review_recovery(
         .spawn(async move { service.library().await.instances });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let Some(records) = answer(&wiring, handle, cx).await else {
+        let Some(records) = lumilio_ui::runtime::answer(handle, cx).await else {
             return;
         };
         let cards = lumilio_ui::live::library_cards(&records, lumilio_core::unix_now());

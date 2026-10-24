@@ -1,8 +1,9 @@
+use nucleation::block_position::BlockPosition;
+
 use super::{cells, room, state};
 use crate::replace::{PropertyMatch, Replacement, Scope, StateMatcher, apply, preview_count};
 use crate::stats::stats;
 use crate::{Region, UniversalSchematic};
-use nucleation::block_position::BlockPosition;
 
 const NORTH: &str =
     "minecraft:oak_stairs[facing=north,half=bottom,shape=straight,waterlogged=false]";

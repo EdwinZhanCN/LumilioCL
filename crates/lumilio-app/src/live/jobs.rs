@@ -1,12 +1,15 @@
-use super::{ACTIVITY_LIMIT, POLL, Reload, Wiring};
-use gpui_kit::{App, AsyncApp, Context};
-use lumilio_core::{CancellationToken, ProjectKind, unix_now};
-use lumilio_ui::LauncherShell;
-use lumilio_ui::live::{CollectionRow, account_rows, activity_rows, library_cards};
-use lumilio_ui::toast::Toast;
-use lumilio_ui::tr;
 use std::future::Future;
-use tokio::task::{JoinError, JoinHandle};
+
+use gpui_kit::{App, Context};
+use lumilio_core::{CancellationToken, unix_now};
+use lumilio_ui::live::{CollectionRow, account_rows, activity_rows, library_cards};
+use lumilio_ui::runtime::answer;
+use lumilio_ui::toast::Toast;
+pub(super) use lumilio_ui::toast::{install_outcome, outcome};
+use lumilio_ui::{LauncherShell, tr};
+use tokio::task::JoinError;
+
+use super::{ACTIVITY_LIMIT, POLL, Reload, Wiring};
 
 /// Runs `work` on the worker runtime, then hands the result to `done` on the
 /// interface thread and reloads what changed. `started` floats up when it
@@ -44,118 +47,25 @@ pub(super) fn job<T, E>(
     .detach();
 }
 
-/// Waits for work on the worker runtime. Work that panicked is told on the
-/// shell, whatever page is open; work aborted on purpose says nothing. Either
-/// way there is no answer.
-pub(super) async fn answer<T>(
-    wiring: &Wiring,
-    handle: JoinHandle<T>,
-    cx: &mut AsyncApp,
-) -> Option<T> {
-    match handle.await {
-        Ok(output) => Some(output),
-        Err(error) => {
-            let error = lumilio_core::ServiceError::from(error);
-            if matches!(error, lumilio_core::ServiceError::Panicked(_)) {
-                let toast = Toast::error(tr!("common-work-stopped")).technical(error.to_string());
-                let _ = wiring.shell.update(cx, |shell, cx| shell.toast(toast, cx));
-            }
-            None
-        }
-    }
-}
-
-/// Reads again what the target game already has of the searched kind, when
-/// the game or the kind changed or something was installed. Failing to ask
-/// just shows nothing as installed.
+/// Reads again what the game installs go into already has of what Discover
+/// lists, if that may have changed.
 pub(super) fn refresh_installed(wiring: &Wiring, cx: &mut App) {
-    let wanted = wiring
+    if let Ok(discover) = wiring
         .shell
-        .read_with(cx, |shell, _| {
-            let target = shell.install_target()?.to_owned();
-            shell
-                .live()
-                .map(|model| (target, model.query.kind, model.query.source.clone()))
-        })
-        .ok()
-        .flatten();
-    let Some((target, kind, source)) = wanted else {
-        return;
-    };
-    if kind == ProjectKind::Modpack {
-        wiring.state.borrow_mut().installed_key = None;
-        let _ = wiring.shell.update(cx, |shell, cx| {
-            shell.update_live(|model| model.installed.clear(), cx)
-        });
-        return;
-    }
-    let key = (target.clone(), kind, source.clone());
-    if wiring.state.borrow().installed_key.as_ref() == Some(&key) {
-        return;
-    }
-    wiring.state.borrow_mut().installed_key = Some(key);
-    let service = wiring.backend.service.clone();
-    let (asked, from) = (target.clone(), source.clone());
-    let handle = wiring
-        .backend
-        .spawn(async move { service.installed_projects(&asked, kind, &from).await });
-    let wiring = wiring.clone();
-    cx.spawn(async move |cx| {
-        let found = answer(&wiring, handle, cx)
-            .await
-            .and_then(Result::ok)
-            .unwrap_or_default();
-        let _ = wiring.shell.update(cx, |shell, cx| {
-            // Only if still about the same game, kind and source.
-            let same_game = shell.install_target() == Some(target.as_str());
-            shell.update_live(
-                |model| {
-                    if same_game && model.query.kind == kind && model.query.source == source {
-                        model.installed = found;
-                    }
-                },
-                cx,
-            )
-        });
-    })
-    .detach();
-}
-
-/// The result of an install: like [`outcome`], except that a file whose
-/// author allows downloading it only on the source's website says so and
-/// offers that page, and a CurseForge pack without the CurseForge source
-/// says where to turn it on.
-pub(super) fn install_outcome<T>(
-    result: Result<T, lumilio_core::ServiceError>,
-    ok: impl FnOnce(T) -> String,
-    failed: String,
-) -> Toast {
-    use lumilio_core::ServiceError;
-    match result {
-        Err(ServiceError::ManualDownload { file, page }) => {
-            let toast = Toast::error(tr!("discover-manual-download", file = file.as_str()));
-            match page {
-                Some(page) => toast.link(tr!("discover-open-download-page"), page),
-                None => toast,
-            }
-        }
-        Err(ServiceError::NoCatalogSource(lumilio_core::Catalog::CurseForge)) => {
-            Toast::error(tr!("discover-needs-curseforge"))
-        }
-        other => outcome(other, ok, failed),
+        .read_with(cx, |shell, _| shell.discover().clone())
+    {
+        discover.update(cx, |discover, cx| discover.refresh_installed(cx));
     }
 }
 
-/// The result of an operation: success in words, failure as one plain
-/// sentence with the raw cause behind 技术详情 (design language §8, §11).
-pub(super) fn outcome<T, E: std::fmt::Display>(
-    result: Result<T, E>,
-    ok: impl FnOnce(T) -> String,
-    failed: String,
-) -> Toast {
-    match result {
-        Ok(value) => Toast::success(ok(value)),
-        Err(error) => Toast::error(failed).technical(error.to_string()),
+/// What the game installs go into has changed outside Discover: it reads that
+/// again.
+pub(super) fn installed_changed(wiring: &Wiring, cx: &mut App) {
+    if let Ok(discover) = wiring
+        .shell
+        .read_with(cx, |shell, _| shell.discover().clone())
+    {
+        discover.update(cx, |discover, cx| discover.invalidate_installed(cx));
     }
 }
 
@@ -203,8 +113,7 @@ pub(super) fn reload(wiring: &Wiring, what: Reload, cx: &mut App) {
     });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let Some((records, collections, activity, settings, presets)) =
-            answer(&wiring, handle, cx).await
+        let Some((records, collections, activity, settings, presets)) = answer(handle, cx).await
         else {
             return;
         };
@@ -251,7 +160,7 @@ pub(super) fn reload(wiring: &Wiring, what: Reload, cx: &mut App) {
 /// task of its own in Activity; the old entry stays.
 pub(super) fn retry_task(wiring: &Wiring, action: lumilio_core::RetryAction, cx: &mut App) {
     let service = wiring.backend.service.clone();
-    let state = wiring.state.clone();
+    let after = wiring.clone();
     job(
         wiring,
         cx,
@@ -267,7 +176,6 @@ pub(super) fn retry_task(wiring: &Wiring, action: lumilio_core::RetryAction, cx:
                 .await
         },
         move |shell, result, cx| {
-            state.borrow_mut().installed_key = None;
             shell.toast(
                 outcome(
                     result,
@@ -275,7 +183,9 @@ pub(super) fn retry_task(wiring: &Wiring, action: lumilio_core::RetryAction, cx:
                     tr!("activity-retry-failed").to_owned(),
                 ),
                 cx,
-            )
+            );
+            // A retried install may have changed what the game has.
+            cx.defer(move |cx| installed_changed(&after, cx));
         },
     );
 }

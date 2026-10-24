@@ -1,7 +1,9 @@
 //! Ravines and the noises behind veins against original servers' runtime
 //! (`Probe.java`, imported by `cargo xtask worldgen-import`).
-use crate::{Version, ffi};
+
 use std::collections::BTreeMap;
+
+use crate::{Version, ffi};
 
 /// Rows `seed chunk_x chunk_z blocks checksum`: every canyon starting in the
 /// chunks [-12, 12)² of the three seeds, carved by the original 26.x carver

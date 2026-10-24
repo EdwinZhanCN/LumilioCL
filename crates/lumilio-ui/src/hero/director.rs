@@ -4,10 +4,9 @@
 //! so every mode change, the launch unload/reload, and the eased chunk reveal
 //! are tested without a window.
 
-use super::FrameSpec;
 use super::scenes::Scene;
 use super::timeline::{TRANSITION_SECONDS, Timeline};
-use super::transition;
+use super::{FrameSpec, transition};
 
 /// A focused scene replays itself (through a chunk reload) this often.
 const FOCUS_DWELL: f32 = 12.;

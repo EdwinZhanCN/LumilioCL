@@ -28,7 +28,7 @@ Three fields separated by `|`, plus an optional fourth:
 | 备注 (optional) | A caveat, a plan reference, or a limit ("运行中禁用") |
 
 No `|` inside a field. Page keys are the `PAGES` table in
-`crates/lumilio-docgen/src/lib.rs`: `navigation`, `home`, `library`, `discover`,
+`crates/lumilio-docgen/src/ia.rs`: `navigation`, `home`, `library`, `discover`,
 `activity`, `accounts`, `settings`, `instance`, `instance.overview`,
 `instance.content`, `instance.worlds`, `instance.screenshots`, `instance.history`,
 `instance.diagnostics`, `instance.settings`. A new page is a new row there.

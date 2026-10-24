@@ -7,17 +7,17 @@
 
 use std::rc::Rc;
 
-use crate::key::Key;
-use gpui::{App, Context, Entity, IntoElement, Render, Window, div, prelude::*, px};
+use gpui::prelude::*;
+use gpui::{App, Context, Entity, IntoElement, Render, Window, div, px};
 use gpui_component::dialog::Dialog;
 use gpui_component::input::{Input, InputEvent, InputState};
 use gpui_component::{Sizable as _, StyledExt as _, WindowExt as _, h_flex, v_flex};
 use lumilio_core::{AuthServer, CharacterProfile, ProfileId};
 
-use crate::kit;
+use crate::key::Key;
 use crate::new_game::Failure;
-use crate::theme::{self, ShellColors};
-use crate::tr;
+use crate::theme::ShellColors;
+use crate::{kit, theme, tr};
 
 const DIALOG_WIDTH: f32 = 460.;
 

@@ -1,7 +1,8 @@
 pub(crate) mod build {
+    use std::io::Write;
+
     use flate2::Compression;
     use flate2::write::GzEncoder;
-    use std::io::Write;
 
     pub fn name(out: &mut Vec<u8>, text: &str) {
         out.extend((text.len() as u16).to_be_bytes());
@@ -42,8 +43,9 @@ pub(crate) mod build {
     }
 }
 
-use super::*;
 use build::*;
+
+use super::*;
 
 fn sample() -> Vec<u8> {
     let mut out = Vec::new();

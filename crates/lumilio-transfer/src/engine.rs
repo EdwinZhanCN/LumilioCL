@@ -1,3 +1,12 @@
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::fmt::Debug;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
+use tokio::fs;
+use tokio::sync::broadcast;
+use tokio::task::JoinSet;
+
 use super::budget::Connection;
 use super::files::{AttemptFailure, copy_verified_candidate, verify_file};
 use super::parallel::Split;
@@ -8,13 +17,6 @@ use super::request::{
 use super::transport::Transport;
 use crate::CancellationToken;
 use crate::budget::ConnectionBudget;
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
-use std::fmt::Debug;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use tokio::fs;
-use tokio::sync::broadcast;
-use tokio::task::JoinSet;
 
 /// Where an engine's events go: its own subscribers, and whoever watches
 /// the work it belongs to.

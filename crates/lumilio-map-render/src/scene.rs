@@ -1,6 +1,8 @@
-use crate::{Camera, Error, Frame, Grid, Sprite, Tile, Timings};
 use std::collections::BTreeMap;
+
 use wgpu::util::DeviceExt;
+
+use crate::{Camera, Error, Frame, Grid, Sprite, Tile, Timings};
 
 struct Cached {
     texture: wgpu::Texture,
@@ -275,7 +277,9 @@ impl Scene {
         }
         self.clock += 1;
         for tile in tiles {
-            if !self.textures.contains_key(&tile.id) {
+            if let Some(cached) = self.textures.get_mut(&tile.id) {
+                cached.used = self.clock;
+            } else {
                 let texture = self.texture(
                     256,
                     256,
@@ -309,11 +313,12 @@ impl Scene {
                     },
                 );
             }
-            self.textures.get_mut(&tile.id).unwrap().used = self.clock;
         }
         for sprite in sprites {
             let name = sprite_name(sprite);
-            if !self.textures.contains_key(&name) {
+            if let Some(cached) = self.textures.get_mut(&name) {
+                cached.used = self.clock;
+            } else {
                 let size = sprite.size;
                 let pixels = scale_to(&sprite.rgba, sprite.width, sprite.height, size);
                 let texture = self.texture(
@@ -349,7 +354,6 @@ impl Scene {
                     },
                 );
             }
-            self.textures.get_mut(&name).unwrap().used = self.clock;
         }
         let target = self.texture(
             width,
@@ -560,12 +564,14 @@ impl Scene {
         staging.unmap();
         let copied = copying.elapsed();
         while self.textures.len() * 256 * 256 * 4 > self.limit {
-            let oldest = self
+            let Some(oldest) = self
                 .textures
                 .iter()
                 .min_by_key(|(_, entry)| entry.used)
                 .map(|(id, _)| id.clone())
-                .unwrap();
+            else {
+                break;
+            };
             self.textures.remove(&oldest);
         }
         Ok(Frame {

@@ -1,7 +1,9 @@
 //! How options and their values read: in the units and words the game uses.
+
+use lumilio_core::{GameSettingGroup, GameSettingKind, GameSettingValue, game_setting_kind};
+
 use super::choices::{key_label, language_label};
 use crate::tr;
-use lumilio_core::{GameSettingGroup, GameSettingKind, GameSettingValue, game_setting_kind};
 
 /// The groups in the order a player meets them in the game's own menus.
 pub const GROUPS: &[GameSettingGroup] = &[

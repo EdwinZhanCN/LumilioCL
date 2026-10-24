@@ -3,13 +3,15 @@
 //! where they came from, so a later attempt continues instead of starting
 //! over, and so leftovers can be found and removed.
 
-use super::files::encode_lower_hex;
-use super::request::ContentDigest;
-use sha2::{Digest, Sha256};
 use std::ops::Range;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
+
+use sha2::{Digest, Sha256};
 use tokio::fs;
+
+use super::files::encode_lower_hex;
+use super::request::ContentDigest;
 
 /// Where a download keeps its bytes until they are verified.
 pub(super) fn part_path(destination: &Path) -> PathBuf {

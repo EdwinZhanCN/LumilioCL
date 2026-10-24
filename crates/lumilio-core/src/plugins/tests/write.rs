@@ -1,6 +1,7 @@
+use lumilio_plugin_api::{API_VERSION, FileInfo, Manifest, Permission, PluginState, Words};
+
 use super::*;
 use crate::plugins::write::{KEEP_BACKUPS, describe, write_checked};
-use lumilio_plugin_api::{API_VERSION, FileInfo, Manifest, Permission, PluginState, Words};
 
 fn manifest() -> Manifest {
     Manifest {

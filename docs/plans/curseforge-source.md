@@ -133,7 +133,7 @@ Consequences: ContentSource 增加 changelog()；HTML 里段落内的 <br> 由�
 - https://github.com/PrismLauncher/PrismLauncher/blob/develop/launcher/modplatform/flame/FileResolvingTask.cpp
 - [crates/lumilio-plugin-api/src/content.rs](../../crates/lumilio-plugin-api/src/content.rs)
 - [crates/lumilio-core/src/discover/source.rs](../../crates/lumilio-core/src/discover/source.rs)
-- [crates/lumilio-core/src/modpack.rs](../../crates/lumilio-core/src/modpack.rs)
+- [crates/lumilio-core/src/modpack/mod.rs](../../crates/lumilio-core/src/modpack/mod.rs)
 - [crates/lumilio-plugin-curseforge/src/lib.rs](../../crates/lumilio-plugin-curseforge/src/lib.rs)
 - [crates/lumilio-core/src/service/recognize.rs](../../crates/lumilio-core/src/service/recognize.rs)
 - [crates/lumilio-core/src/modpack/curseforge.rs](../../crates/lumilio-core/src/modpack/curseforge.rs)

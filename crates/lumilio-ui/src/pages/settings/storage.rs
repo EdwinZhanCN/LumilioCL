@@ -1,19 +1,18 @@
+use std::rc::Rc;
+
+use gpui::prelude::*;
+use gpui::{AnyElement, IntoElement, div, px};
+use gpui_component::{Sizable as _, h_flex, v_flex};
+use lumilio_core::{DownloadSourcePreference, MirrorPreset, StorageUsage};
+
 use super::super::live::LiveCtx;
 use super::rows::{edit, row, send};
 use super::text::bytes_text;
 use crate::key::Key;
 use crate::live::{LiveIntent, SettingsView};
 use crate::settings_dialog::{DialogSpec, FieldKind, FieldSpec};
-use crate::settings_forms as forms;
 use crate::theme::ShellColors;
-use crate::{kit, theme};
-use crate::{tr, tr_all};
-use gpui::prelude::*;
-use gpui::{AnyElement, IntoElement, div, px};
-use gpui_component::Sizable as _;
-use gpui_component::{h_flex, v_flex};
-use lumilio_core::{DownloadSourcePreference, MirrorPreset, StorageUsage};
-use std::rc::Rc;
+use crate::{kit, settings_forms as forms, theme, tr, tr_all};
 
 pub(super) fn storage_bar(usage: &StorageUsage, colors: ShellColors) -> AnyElement {
     let total = usage.total().max(1) as f32;
