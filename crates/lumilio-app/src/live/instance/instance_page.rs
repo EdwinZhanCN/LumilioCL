@@ -6,13 +6,12 @@ use lumilio_ui::instance_detail::{Arrived, InstanceDetailView, InstanceIntent, S
 use lumilio_ui::route::Route;
 use lumilio_ui::{platform, tr};
 
-use super::super::discover::open_project;
 use super::super::instance_content::{
     load_changelog, load_pending, load_versions, pick_pending_files,
 };
 use super::super::instance_plugins::{plugin_action, plugin_model, plugin_tabs, plugin_view};
 use super::super::instance_write::write_instance;
-use super::super::jobs::{refresh_installed, reload};
+use super::super::jobs::reload;
 use super::super::launch::play;
 use super::super::library::choose_current;
 use super::super::{Reload, Wiring};
@@ -274,7 +273,11 @@ pub(in super::super) fn instance_intent(
             cx.reveal_path(&path);
         }
         InstanceIntent::OpenProject { kind, source, slug } => {
-            open_project(wiring, kind, source, slug, window, cx)
+            // Deferred: this may be running inside one of the shell's own updates.
+            let shell = wiring.shell.clone();
+            window.defer(cx, move |_, cx| {
+                let _ = shell.update(cx, |shell, cx| shell.open_project(kind, &source, &slug, cx));
+            });
         }
         // ia[discover]: 锁定目标（从游戏页进入） | 游戏页内容标签「浏览 Mod / 资源包 / 光影」 | 发现页进入「为这个游戏浏览」：页头写明游戏，类型预选，版本和加载器筛选锁定；那个游戏成为当前游戏（芯片、继续与下次启动一致）；在芯片里换成别的游戏就退出锁定
         // ia[instance.content]: 浏览并安装 | L4a 主要 → 发现页（类型预选） | 安装完回到本页可见
@@ -286,7 +289,6 @@ pub(in super::super) fn instance_intent(
                 // The game browsed for is the game installs go into (D3).
                 choose_current(&wiring, target.clone(), cx);
                 let _ = shell.update(cx, |shell, cx| shell.browse_for(target, kind, window, cx));
-                refresh_installed(&wiring, cx);
             });
         }
         InstanceIntent::ImportContent(kind) => {

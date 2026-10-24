@@ -1,141 +1,36 @@
-use std::rc::Rc;
-
-use gpui::prelude::*;
-use gpui::{Context, Entity};
+use gpui::Context;
 use lumilio_core::ProjectKind;
 
 use super::LauncherShell;
-use crate::live::{LiveIntent, LiveModel};
-use crate::project_detail::{
-    DetailHandler, DetailIntent, DetailState, InstallTarget, ProjectDetailView,
-};
+use crate::features::discover::OpenedProject;
+use crate::features::discover::detail::{DetailState, ProjectDetailView};
 use crate::route::Route;
 
-#[derive(Clone)]
-pub(super) struct DetailSlot {
-    pub(super) view: Entity<ProjectDetailView>,
-    pub(super) kind: ProjectKind,
-    /// The content source (plugin ID) the project is from.
-    pub(super) source: String,
-    pub(super) slug: String,
-}
+/// A project detail on screen or in history.
+pub(super) type DetailSlot = OpenedProject;
 
 impl LauncherShell {
-    /// The open project's target follows the current game.
-    pub(super) fn retarget_detail(&mut self, cx: &mut Context<Self>) {
-        let target = self.detail_target();
-        if let (Some(slot), Some(target)) = (&self.detail, target) {
-            slot.view
-                .update(cx, |view, cx| view.set_target(Some(target), cx));
-        }
-    }
-
-    fn detail_target(&self) -> Option<InstallTarget> {
-        let id = self.install_target()?;
-        install_target_of(self.live.as_ref()?, id)
-    }
-
     /// Opens a project's detail in place of the Discover list. It starts as
-    /// "loading"; [`Self::set_detail_state`] fills it in.
-    pub fn open_detail(
+    /// "loading" and fills in when the project arrives.
+    pub fn open_project(
         &mut self,
         kind: ProjectKind,
         source: &str,
         slug: &str,
         cx: &mut Context<Self>,
     ) {
-        let Some(live) = self.live_handler.clone() else {
-            return;
-        };
-        let project = slug.to_owned();
-        let from = source.to_owned();
-        let handler: DetailHandler = Rc::new(move |intent, window, cx| match intent {
-            DetailIntent::SaveAs {
-                version_id,
-                file_name,
-                title,
-            } => live(
-                LiveIntent::SaveVersionAs {
-                    source: from.clone(),
-                    project: project.clone(),
-                    version_id,
-                    file_name,
-                    title,
-                },
-                window,
-                cx,
-            ),
-            DetailIntent::Update {
-                file_name,
-                version_id,
-                title,
-            } => live(
-                LiveIntent::UpdateInstalled {
-                    kind,
-                    source: from.clone(),
-                    project: project.clone(),
-                    title,
-                    file_name,
-                    version_id,
-                },
-                window,
-                cx,
-            ),
-            DetailIntent::Install { version_id, title } => live(
-                LiveIntent::Install {
-                    kind,
-                    source: from.clone(),
-                    slug: project.clone(),
-                    title,
-                    version: version_id,
-                },
-                window,
-                cx,
-            ),
-            DetailIntent::Translate {
-                source,
-                project,
-                original,
-                format,
-                request,
-            } => live(
-                LiveIntent::TranslateBody {
-                    source,
-                    project,
-                    original,
-                    format,
-                    request,
-                },
-                window,
-                cx,
-            ),
+        let (source, slug) = (source.to_owned(), slug.to_owned());
+        let opened = self.discover.update(cx, |discover, cx| {
+            discover.open_project(kind, source, slug, cx)
         });
-        // The page's address comes with the project.
-        let url = String::new();
-        let target = self.detail_target();
-        let tags = self
-            .live
-            .as_ref()
-            .map(|model| model.filters.game_tags().to_vec())
-            .unwrap_or_default();
-        let view = cx.new(|_| {
-            let mut view = ProjectDetailView::new(slug.to_owned(), url, handler);
-            view.set_target_quiet(target);
-            view
-        });
-        let translation = self.translation_enabled();
-        view.update(cx, |view, cx| {
-            view.set_game_tags(tags, cx);
-            view.set_translation_enabled(translation, cx);
-        });
+        self.show_project(opened, cx);
+    }
+
+    /// Shows a detail Discover opened, recording where the window was.
+    pub(super) fn show_project(&mut self, opened: OpenedProject, cx: &mut Context<Self>) {
         self.visit(cx);
         self.live_instance = None;
-        self.detail = Some(DetailSlot {
-            view,
-            kind,
-            source: source.to_owned(),
-            slug: slug.to_owned(),
-        });
+        self.detail = Some(opened);
         self.route = Route::Discover;
         cx.notify();
     }
@@ -180,18 +75,10 @@ impl LauncherShell {
         self.detail.as_ref().map(|slot| slot.source.as_str())
     }
 
-    /// The page of the project open on Discover, for answers that belong to
-    /// it (translations); compare it to tell whether the page changed since.
-    pub fn detail_view(&self) -> Option<Entity<ProjectDetailView>> {
+    /// The page of the project open on Discover; compare it to tell whether
+    /// the page changed since.
+    pub fn detail_view(&self) -> Option<gpui::Entity<ProjectDetailView>> {
         self.detail.as_ref().map(|slot| slot.view.clone())
-    }
-
-    /// Translation is on in Settings (off until the settings are read).
-    pub(super) fn translation_enabled(&self) -> bool {
-        self.live
-            .as_ref()
-            .and_then(|model| model.settings.as_ref())
-            .is_some_and(|settings| settings.preferences.translation.enabled)
     }
 }
 
@@ -203,15 +90,4 @@ pub(super) fn detail_title(kind: ProjectKind) -> &'static str {
         ProjectKind::ResourcePack => crate::tr!("detail-title-resource-pack"),
         ProjectKind::Shader => crate::tr!("detail-title-shader"),
     }
-}
-
-/// The game installs go into, as the detail page needs to know it.
-fn install_target_of(model: &LiveModel, id: &str) -> Option<InstallTarget> {
-    let card = model.library.iter().find(|card| card.id == id)?;
-    Some(InstallTarget {
-        name: card.name.clone(),
-        game_version: card.game_version.clone(),
-        loader: card.loader,
-        from_game: model.browsing_for.as_deref() == Some(id),
-    })
 }

@@ -11,12 +11,14 @@ use super::activity::{
     ActivityRow, ActivityState, active_row, activity_in_tab, activity_rows, eta_text, next_sample,
     recovery_message,
 };
-use super::discover::{PageItem, SearchStatus, count_label, page_items, parse_rfc3339, tag_label};
 use super::home::home_presentation;
 use super::library::{
     CollectionRow, attention_rows, library_card, library_cards, relative_time, seed_of, world_of,
 };
 use super::settings::settings_view;
+use crate::features::discover::model::{
+    PageItem, count_label, page_items, parse_rfc3339, tag_label,
+};
 use crate::home::HomePresentation;
 
 fn record(id: &str, favorite: bool, last_played: Option<u64>, created_at: u64) -> InstanceRecord {
@@ -632,19 +634,6 @@ fn the_pager_shows_ends_and_neighbours() {
     assert_eq!(shown(0, 3), "1 2 3");
     assert_eq!(shown(9, 4), "1 2 3 4", "an out-of-range page is clamped");
     assert_eq!(shown(0, 0), "");
-}
-
-#[test]
-fn pages_follow_the_total_and_the_page_size() {
-    let mut model = LiveModel::default();
-    assert_eq!(model.pages(), 0);
-    model.search = SearchStatus::Done { total: 41 };
-    model.query.page_size = 20;
-    assert_eq!(model.pages(), 3);
-    model.query.page_size = 50;
-    assert_eq!(model.pages(), 1);
-    model.search = SearchStatus::Done { total: 0 };
-    assert_eq!(model.pages(), 0);
 }
 
 #[test]

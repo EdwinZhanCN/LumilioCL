@@ -10,9 +10,10 @@ use lumilio_core::{Project, ProjectKind, environment};
 
 use super::{DetailIntent, ProjectDetailView, pill, spec_cell};
 use crate::assets::UiIcon;
+use crate::features::discover::model::{count_label, environment_label, parse_rfc3339, tag_label};
 use crate::key::Key;
-use crate::live::{count_label, environment_label, parse_rfc3339, relative_time, tag_label};
-use crate::pages::live::project_icon;
+use crate::kit::project_icon;
+use crate::live::relative_time;
 use crate::theme::ShellColors;
 use crate::{kit, tr};
 

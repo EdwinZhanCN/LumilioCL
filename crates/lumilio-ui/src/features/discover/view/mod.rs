@@ -4,11 +4,10 @@
 //! header names it, its version and loader are provided to the search
 //! (locked until released), and tabs that cannot apply are not offered.
 
+pub(super) use context::{ChangeHandler, DiscoverCtx, DiscoverHandler, DiscoverIntent};
+pub(super) use results::discover;
+
 mod card;
-mod sidebar;
-
-pub use results::{discover, kind_label};
-
-pub use self::card::project_icon;
-
+mod context;
 mod results;
+mod sidebar;

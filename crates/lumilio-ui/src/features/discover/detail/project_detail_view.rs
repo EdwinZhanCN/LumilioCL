@@ -9,7 +9,7 @@ use lumilio_core::{
 };
 
 use super::{translation, versions};
-use crate::live::parse_rfc3339;
+use crate::features::discover::model::parse_rfc3339;
 use crate::theme::ShellColors;
 use crate::{kit, tr};
 

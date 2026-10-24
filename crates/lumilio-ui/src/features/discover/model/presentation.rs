@@ -1,9 +1,9 @@
 use lumilio_core::{Environment, ProjectKind, SearchHit, SearchPage, SortIndex};
 
-use super::super::library::{relative_time, seed_of};
 use super::card::{CardTags, card_tags};
 use super::filters::FilterModel;
 use super::query::DiscoverQuery;
+use crate::live::{relative_time, seed_of};
 
 /// Which date a card shows: when the project came out, or when it last
 /// changed (the first when the list is sorted by newest).

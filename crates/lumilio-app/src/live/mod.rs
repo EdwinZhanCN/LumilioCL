@@ -7,7 +7,6 @@
 
 mod accounts;
 mod context;
-mod discover;
 mod dispatch;
 mod game_settings;
 mod instance;
@@ -21,7 +20,6 @@ mod logs;
 mod new_game;
 mod settings;
 mod terms;
-mod translation;
 mod update;
 mod wardrobe;
 

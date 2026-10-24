@@ -3,11 +3,11 @@ use gpui::{ClickEvent, IntoElement, div, px};
 use gpui_component::{Icon, Sizable as _, h_flex, v_flex};
 use lumilio_core::ProjectKind;
 
-use super::super::controls::{LiveCtx, send};
+use super::super::model::{DiscoverChange, PageItem, SearchStatus, page_items};
+use super::context::{DiscoverCtx, DiscoverIntent, send};
 use super::{card, sidebar};
 use crate::assets::UiIcon;
 use crate::key::Key;
-use crate::live::{DiscoverChange, LiveIntent, PageItem, SearchStatus, page_items};
 use crate::{kit, theme, tr};
 
 /// The gap between the result list and the filter column.
@@ -33,7 +33,7 @@ pub fn kind_label(kind: ProjectKind) -> &'static str {
 }
 
 // ia[discover]: 分页 | 列表上方的页码键 | 翻页并回到列表顶部的第一行
-pub(in super::super) fn pager(ctx: &LiveCtx) -> impl IntoElement {
+pub(super) fn pager(ctx: &DiscoverCtx) -> impl IntoElement {
     let colors = ctx.colors;
     let pages = ctx.model.pages();
     let current = ctx.model.query.page;
@@ -80,7 +80,7 @@ pub(in super::super) fn pager(ctx: &LiveCtx) -> impl IntoElement {
         }))
 }
 
-pub fn discover(ctx: &LiveCtx) -> impl IntoElement {
+pub fn discover(ctx: &DiscoverCtx) -> impl IntoElement {
     let colors = ctx.colors;
     let query = &ctx.model.query;
     let kinds = ctx.model.discover_kinds();
@@ -146,7 +146,7 @@ pub fn discover(ctx: &LiveCtx) -> impl IntoElement {
     }
     let actions = actions.more(kit::MenuEntry::new(
         tr!("discover-search-again"),
-        send(&ctx.handler, LiveIntent::Search(query.clone())),
+        send(&ctx.handler, DiscoverIntent::SearchAgain),
     ));
 
     v_flex()
@@ -175,7 +175,7 @@ pub fn discover(ctx: &LiveCtx) -> impl IntoElement {
                 // ia[discover]: 搜索 | L3 搜索框（回车确认，有清除键） | 按关键词搜索正在浏览的来源
                 div()
                     .debug_selector(|| "live-discover-search".into())
-                    .child(kit::search_field(&ctx.controls.discover_search, colors))
+                    .child(kit::search_field(&ctx.controls.search, colors))
                     .into_any_element(),
             ),
         ))

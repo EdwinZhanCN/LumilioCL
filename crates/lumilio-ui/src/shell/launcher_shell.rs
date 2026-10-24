@@ -6,6 +6,7 @@ use gpui::{App, Context, Entity, FocusHandle, Subscription, Task, Window};
 use super::account_view::AccountViewer;
 use super::detail::DetailSlot;
 use super::locations::{HISTORY_LIMIT, Location};
+use crate::features::discover::{Discover, DiscoverEvent};
 use crate::hero::HeroCarousel;
 use crate::history::History;
 use crate::home::{HomeIntent, HomePresentation};
@@ -64,6 +65,8 @@ pub struct LauncherShell {
     /// The look preview of the account the Accounts detail shows.
     pub(super) account_viewer: Option<AccountViewer>,
     pub(super) account_revision: u64,
+    /// The Discover page; its project details show here in place of it.
+    pub(super) discover: Entity<Discover>,
     /// The project open on Discover, in place of the list.
     pub(super) detail: Option<DetailSlot>,
     pub(super) live_instance: Option<Entity<InstanceDetailView>>,
@@ -71,12 +74,20 @@ pub struct LauncherShell {
     pub(super) history: History<Location>,
     /// Draws again when a view posts a toast, so it floats up (§11).
     pub(super) _posted: Subscription,
+    /// Shows the project details Discover opens.
+    pub(super) _discover_events: Subscription,
     /// What core last published (see `mirror`).
     pub(super) context: lumilio_core::Context,
 }
 
 impl LauncherShell {
     pub fn new(cx: &mut Context<Self>) -> Self {
+        let discover = cx.new(|_| Discover::new(None));
+        let discover_events = cx.subscribe(&discover, |shell, _, event: &DiscoverEvent, cx| {
+            if let DiscoverEvent::ProjectOpened(opened) = event {
+                shell.show_project(opened.clone(), cx);
+            }
+        });
         Self {
             route: Route::Home,
             home: home::initial_presentation(),
@@ -92,10 +103,12 @@ impl LauncherShell {
             live_controls: None,
             account_viewer: None,
             account_revision: 0,
+            discover,
             detail: None,
             live_instance: None,
             history: History::new(HISTORY_LIMIT),
             _posted: cx.observe_global::<toast::Posted>(|_, cx| cx.notify()),
+            _discover_events: discover_events,
             context: lumilio_core::Context::default(),
         }
     }
@@ -113,6 +126,18 @@ impl LauncherShell {
     pub fn with_home(mut self, home: HomePresentation, cx: &mut Context<Self>) -> Self {
         self.set_home(home, cx);
         self
+    }
+
+    /// Lets the pages that ask the launcher themselves do so.
+    pub fn with_worker(self, worker: crate::runtime::Worker, cx: &mut Context<Self>) -> Self {
+        self.discover
+            .update(cx, |discover, _| discover.set_worker(worker));
+        self
+    }
+
+    /// The Discover page, for the application to follow its events.
+    pub fn discover(&self) -> &Entity<Discover> {
+        &self.discover
     }
 
     pub fn with_activity(mut self, activity: ActivitySummary) -> Self {

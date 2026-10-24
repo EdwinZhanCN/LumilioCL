@@ -171,6 +171,44 @@ pub fn copy_text(text: impl Into<String>, cx: &mut App) {
     cx.write_to_clipboard(ClipboardItem::new_string(text.into()));
 }
 
+/// The result of an operation: success in words, failure as one plain
+/// sentence with the raw cause behind 技术详情 (design language §8, §11).
+pub fn outcome<T, E: std::fmt::Display>(
+    result: Result<T, E>,
+    ok: impl FnOnce(T) -> String,
+    failed: String,
+) -> Toast {
+    match result {
+        Ok(value) => Toast::success(ok(value)),
+        Err(error) => Toast::error(failed).technical(error.to_string()),
+    }
+}
+
+/// The result of an install: like [`outcome`], except that a file whose
+/// author allows downloading it only on the source's website says so and
+/// offers that page, and a CurseForge pack without the CurseForge source
+/// says where to turn it on.
+pub fn install_outcome<T>(
+    result: Result<T, lumilio_core::ServiceError>,
+    ok: impl FnOnce(T) -> String,
+    failed: String,
+) -> Toast {
+    use lumilio_core::ServiceError;
+    match result {
+        Err(ServiceError::ManualDownload { file, page }) => {
+            let toast = Toast::error(crate::tr!("discover-manual-download", file = file.as_str()));
+            match page {
+                Some(page) => toast.link(crate::tr!("discover-open-download-page"), page),
+                None => toast,
+            }
+        }
+        Err(ServiceError::NoCatalogSource(lumilio_core::Catalog::CurseForge)) => {
+            Toast::error(crate::tr!("discover-needs-curseforge"))
+        }
+        other => outcome(other, ok, failed),
+    }
+}
+
 pub fn technical_dialog(detail: impl Into<SharedString>, window: &mut Window, cx: &mut App) {
     let detail: SharedString = detail.into();
     window.open_dialog(cx, move |dialog, _, cx| {

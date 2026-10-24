@@ -5,11 +5,11 @@ use gpui::{App, Context, IntoElement, Render, Window, div};
 use gpui_component::{TITLE_BAR_HEIGHT, TitleBar, v_flex};
 
 use super::{LauncherShell, ShellIntent};
+use crate::features::discover::detail::ProjectDetailView;
 use crate::home::{HomeIntent, ShellHomeColors};
 use crate::kit::{Emit, ViewIntent};
-use crate::live::{DiscoverChange, LiveIntent};
+use crate::live::LiveIntent;
 use crate::navigation::{Leading, ReadyUpdate};
-use crate::project_detail::ProjectDetailView;
 use crate::route::Route;
 use crate::theme::ShellColors;
 use crate::{home, kit, navigation, pages, placeholders, theme, toast};
@@ -86,24 +86,18 @@ impl Render for LauncherShell {
         self.ensure_account_viewer(window, cx);
         self.ensure_account_faces(window, cx);
         self.sync_library_dropdowns(window, cx);
-        let change_callback = cx.listener(|this, change: &DiscoverChange, window, cx| {
-            this.change_query(change.clone(), window, cx);
-        });
-        let change_handler: pages::live::DiscoverChangeHandler =
-            Rc::new(move |change, window: &mut Window, app: &mut App| {
-                change_callback(&change, window, app)
-            });
+        // Discover's answers belong to the detail on screen, if any.
+        let shown_detail = match self.location() {
+            super::locations::Location::Project(slot) => Some(slot.view.entity_id()),
+            _ => None,
+        };
+        self.discover
+            .update(cx, |discover, _| discover.set_shown_detail(shown_detail));
         let live_ctx = match (&self.live, &self.live_controls, &self.live_handler) {
             (Some(model), Some(controls), Some(handler)) => {
                 let filter = controls
                     .read(cx)
                     .library_filter
-                    .read(cx)
-                    .value()
-                    .to_string();
-                let version_filter = controls
-                    .read(cx)
-                    .version_search
                     .read(cx)
                     .value()
                     .to_string();
@@ -113,10 +107,8 @@ impl Render for LauncherShell {
                     state: &self.view,
                     emit: emit_view.clone(),
                     handler: handler.clone(),
-                    change: change_handler.clone(),
                     controls: controls.read(cx),
                     filter,
-                    version_filter,
                     account_viewer: self.account_viewer.as_ref().map(|viewer| &viewer.view),
                     window_width: f32::from(window.viewport_size().width),
                     window_height: f32::from(window.viewport_size().height),
@@ -158,9 +150,7 @@ impl Render for LauncherShell {
                     // Settings frames itself: its header and tabs stay put.
                     (Route::Settings, _) => pages::settings::render(ctx).into_any_element(),
                     (Route::Accounts, _) => pages::live::accounts(ctx).into_any_element(),
-                    (Route::Discover, None) => {
-                        kit::page("live-discover", pages::live::discover(ctx)).into_any_element()
-                    }
+                    (Route::Discover, None) => self.discover.clone().into_any_element(),
                     _ => kit::page("live-activity", pages::live::activity(ctx)).into_any_element(),
                 }
             });

@@ -11,7 +11,7 @@ use lumilio_ui::theme::{Catalog, scan_dir};
 use lumilio_ui::toast::Toast;
 use lumilio_ui::{platform, tr};
 
-use super::jobs::{answer, job, outcome, reload};
+use super::jobs::{job, outcome, reload};
 use super::{POLL, Reload, Wiring};
 
 /// Applies what the saved preferences say about the look, the motion and
@@ -148,7 +148,7 @@ pub(super) fn edit_plugin_setting(
     let wiring = wiring.clone();
     let window = window.window_handle();
     cx.spawn(async move |cx| {
-        let Some(Some((field, value))) = answer(&wiring, lookup, cx).await else {
+        let Some(Some((field, value))) = lumilio_ui::runtime::answer(lookup, cx).await else {
             return;
         };
         let _ = cx.update_window(window, |_, window, cx| {
@@ -212,7 +212,7 @@ pub(super) fn apply_saved_preferences(
     reload_themes(wiring, window, cx);
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let Some(preferences) = answer(&wiring, handle, cx).await else {
+        let Some(preferences) = lumilio_ui::runtime::answer(handle, cx).await else {
             return;
         };
         wiring.state.borrow_mut().preferences = preferences.clone();
@@ -284,7 +284,7 @@ fn load_java_offers(wiring: &Wiring, cx: &mut App) {
         .spawn(async move { service.java_offers().await });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let Some(offers) = answer(&wiring, handle, cx).await else {
+        let Some(offers) = lumilio_ui::runtime::answer(handle, cx).await else {
             return;
         };
         let _ = wiring.shell.update(cx, |shell, cx| {
@@ -319,22 +319,17 @@ pub(super) fn load_settings(wiring: &Wiring, cx: &mut App) {
     });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let Some((settings, plugins, java, memory, root)) = answer(&wiring, handle, cx).await
+        let Some((settings, plugins, java, memory, root)) =
+            lumilio_ui::runtime::answer(handle, cx).await
         else {
             return;
         };
         wiring.state.borrow_mut().preferences = settings.preferences.clone();
         let mut offers_known = false;
-        let mut translation_on = false;
         let _ = wiring.shell.update(cx, |shell, cx| {
             shell.plugins_changed(&plugins, cx);
             shell.update_live(
                 |model| {
-                    let was = model
-                        .settings
-                        .as_ref()
-                        .is_some_and(|view| view.preferences.translation.enabled);
-                    translation_on = !was && settings.preferences.translation.enabled;
                     let storage = model.settings.as_ref().and_then(|view| view.storage);
                     let offers = model
                         .settings
@@ -357,19 +352,11 @@ pub(super) fn load_settings(wiring: &Wiring, cx: &mut App) {
         if !offers_known {
             cx.update(|cx| load_java_offers(&wiring, cx));
         }
-        // Translation just came on (or was on at start-up): what is shown
-        // gets its summaries now; turning it off already showed the originals.
-        if translation_on {
-            cx.update(|cx| {
-                super::translation::request_shown_summaries(&wiring, cx);
-                super::translation::request_detail_summary(&wiring, cx);
-            });
-        }
         let service = wiring.backend.service.clone();
         let handle = wiring
             .backend
             .spawn(async move { service.storage_usage().await });
-        let Some(usage) = answer(&wiring, handle, cx).await else {
+        let Some(usage) = lumilio_ui::runtime::answer(handle, cx).await else {
             return;
         };
         let _ = wiring.shell.update(cx, |shell, cx| {

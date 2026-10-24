@@ -68,6 +68,11 @@ impl Backend {
         })
     }
 
+    /// The service and the runtime, for the interface's features.
+    pub fn worker(&self) -> lumilio_ui::runtime::Worker {
+        lumilio_ui::runtime::Worker::new(self.service.clone(), self.runtime.handle().clone())
+    }
+
     /// Runs `work` on the worker runtime. The handle can be awaited from any
     /// executor, including GPUI's.
     pub fn spawn<F>(&self, work: F) -> tokio::task::JoinHandle<F::Output>

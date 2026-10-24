@@ -27,6 +27,7 @@ raw-window-handle = "0.6"
 async-channel = "2"
 semver.workspace = true
 log.workspace = true
+tokio.workspace = true
 i18n-embed = { version = "0.16", features = ["fluent-system", "desktop-requester"] }
 i18n-embed-fl = "0.10"
 # `debug-embed` compiles the catalogs in debug builds too, so editing one

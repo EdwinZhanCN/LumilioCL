@@ -7,7 +7,6 @@
 
 mod accounts;
 mod activity;
-mod discover;
 mod home;
 mod intent;
 mod library;
@@ -26,13 +25,6 @@ pub use self::accounts::{
 pub use self::activity::{
     ACTIVITY_CATEGORIES, ActivityRow, ActivityState, TrafficReading, activity_in_tab,
     activity_rows, bytes_text, eta_text, file_amount, recovery_message, source_host,
-};
-pub use self::discover::{
-    AdvancedOption, CardTag, CardTags, CountKind, DateKind, DiscoverChange, DiscoverQuery,
-    EPILEPSY_TRIGGERS, FilterModel, Lock, PAGE_SIZES, PageItem, PickGroup, Provided, SORTS,
-    SearchRow, SearchStatus, Section, Side, advanced_options, card_tags, count_label,
-    default_loaders, environment_label, is_type_exclusion, page_items, parse_rfc3339, search_row,
-    search_rows, section_title, sections, sort_label, tag_label, visible_kinds,
 };
 pub use self::home::{
     HomePlaces, PLACE_SERVERS, PLACE_WORLDS, Place, PlaceKind, PlacePicture, PlaceTarget,

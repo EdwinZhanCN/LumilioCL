@@ -21,7 +21,6 @@ use lumilio_ui::route::Route;
 use lumilio_ui::{LauncherShell, ShellIntent};
 
 use super::super::context::follow;
-use super::super::discover::install_target;
 use super::super::dispatch::{on_live_intent, on_shell_intent};
 use super::super::instance::open_instance;
 use super::super::launch::play;
@@ -29,6 +28,22 @@ use super::super::{State, Wiring};
 use crate::backend::{Backend, Service};
 
 const WAIT: Duration = Duration::from_secs(10);
+
+/// The game the corner chip names: the one installs go into.
+fn chip(wiring: &Wiring, cx: &mut VisualTestContext) -> Option<String> {
+    cx.update(|_, cx| {
+        wiring
+            .shell
+            .read_with(cx, |shell, _| shell.install_target().map(str::to_owned))
+            .ok()
+            .flatten()
+    })
+}
+
+/// The game Discover browses for, if any.
+fn browsing_for(shell: &LauncherShell, cx: &gpui_kit::App) -> Option<String> {
+    shell.discover().read(cx).state().browsing_for.clone()
+}
 
 /// The shell, wired to the shipped handlers, in a window that can show
 /// dialogs. Searches and Discover's first search are not sent: these tests
@@ -53,9 +68,6 @@ pub(super) fn open(
         let cell = cell.clone();
         Rc::new(
             move |intent: LiveIntent, window: &mut gpui_kit::Window, cx: &mut gpui_kit::App| {
-                if matches!(intent, LiveIntent::Search(_) | LiveIntent::LoadFilters) {
-                    return;
-                }
                 if let Some(wiring) = cell.borrow().clone() {
                     on_live_intent(&wiring, intent, window, cx);
                 }
@@ -310,8 +322,8 @@ fn browsing_for_a_game_makes_it_the_current_game(cx: &mut TestAppContext) {
         )
     });
     until(cx, "Discover to browse for X", |cx| {
-        shell.read_with(cx, |shell, _| {
-            shell.live().unwrap().browsing_for.as_deref() == Some(x.as_str())
+        shell.read_with(cx, |shell, cx| {
+            browsing_for(shell, cx).as_deref() == Some(x.as_str())
         })
     });
     until(cx, "X to be the saved current game", |_| {
@@ -325,9 +337,7 @@ fn browsing_for_a_game_makes_it_the_current_game(cx: &mut TestAppContext) {
         cx,
         "the chip, Continue and the saved choice to agree on X",
         |cx| {
-            let chip = cx
-                .update(|_, cx| install_target(&wiring, cx))
-                .map(|(id, _)| id);
+            let chip = chip(&wiring, cx);
             chip.as_deref() == Some(x.as_str())
                 && continue_subject(&shell, cx).as_deref() == Some(x.as_str())
                 && saved_current(&wiring).as_deref() == Some(x.as_str())
@@ -357,8 +367,8 @@ fn choosing_another_game_while_browsing_ends_the_browsing(cx: &mut TestAppContex
         )
     });
     until(cx, "Discover to browse for X", |cx| {
-        shell.read_with(cx, |shell, _| {
-            shell.live().unwrap().browsing_for.as_deref() == Some(x.as_str())
+        shell.read_with(cx, |shell, cx| {
+            browsing_for(shell, cx).as_deref() == Some(x.as_str())
         })
     });
 
@@ -372,11 +382,9 @@ fn choosing_another_game_while_browsing_ends_the_browsing(cx: &mut TestAppContex
     until(
         cx,
         "browsing for X to end: its version and loader must not apply to Z",
-        |cx| shell.read_with(cx, |shell, _| shell.live().unwrap().browsing_for.is_none()),
+        |cx| shell.read_with(cx, |shell, cx| browsing_for(shell, cx).is_none()),
     );
-    let target = cx
-        .update(|_, cx| install_target(&wiring, cx))
-        .map(|(id, _)| id);
+    let target = chip(&wiring, cx);
     assert_eq!(target.as_deref(), Some(z.as_str()));
 }
 
@@ -413,9 +421,7 @@ fn recovering_a_failed_launch_retries_the_same_game(cx: &mut TestAppContext) {
         saved_current(&wiring).as_deref() == Some(b.as_str())
     });
     until(cx, "the chip to show B", |cx| {
-        cx.update(|_, cx| install_target(&wiring, cx))
-            .map(|(id, _)| id)
-            == Some(b.clone())
+        chip(&wiring, cx) == Some(b.clone())
     });
 
     cx.update(|window, cx| {

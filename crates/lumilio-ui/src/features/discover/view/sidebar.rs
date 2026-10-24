@@ -15,15 +15,15 @@ use gpui_component::popover::Popover;
 use gpui_component::{Icon, Sizable as _, StyledExt as _, h_flex, v_flex};
 use lumilio_core::Stance;
 
-use super::super::controls::LiveCtx;
+use super::super::model::{
+    DiscoverChange, Lock, PickGroup, Section, Side, advanced_options, default_loaders,
+    section_title, sections, tag_label,
+};
+use super::context::DiscoverCtx;
 use crate::assets::UiIcon;
 use crate::controls::Checkbox;
 use crate::key::Key;
 use crate::kit::{Stand, ViewIntent};
-use crate::live::{
-    DiscoverChange, Lock, PickGroup, Section, Side, advanced_options, default_loaders,
-    section_title, sections, tag_label,
-};
 use crate::{kit, theme, tr};
 
 /// The filter column's width beside the list.
@@ -72,7 +72,7 @@ fn group_of(section: &Section) -> u8 {
 /// Whether a section starts open: the app opens categories, environment and
 /// license; a filter the game provides; and advanced exclusions when the
 /// person left them open.
-fn open_by_default(section: &Section, ctx: &LiveCtx) -> bool {
+fn open_by_default(section: &Section, ctx: &DiscoverCtx) -> bool {
     let provided = ctx.model.provided();
     match section {
         Section::Category(_) | Section::Environment | Section::License => true,
@@ -82,7 +82,7 @@ fn open_by_default(section: &Section, ctx: &LiveCtx) -> bool {
     }
 }
 
-fn is_open(section: &Section, ctx: &LiveCtx) -> bool {
+fn is_open(section: &Section, ctx: &DiscoverCtx) -> bool {
     match ctx.state.choice(group_of(section), 0) {
         1 => true,
         2 => false,
@@ -102,7 +102,7 @@ fn stand_of(picks: &[lumilio_core::Pick], name: &str) -> Stand {
 /// the row reads (both a loader's name; a category's ID and name).
 fn pick_row(
     id: (&'static str, usize),
-    ctx: &LiveCtx,
+    ctx: &DiscoverCtx,
     group: PickGroup,
     name: &str,
     label: &str,
@@ -131,7 +131,12 @@ fn pick_row(
 
 /// What a filter the game provides looks like: a dashed box that says whose
 /// choice it is, warns about unlocking, and has the unlock button.
-fn locked_box(ctx: &LiveCtx, lock: Lock, what: &'static str, value: String) -> impl IntoElement {
+fn locked_box(
+    ctx: &DiscoverCtx,
+    lock: Lock,
+    what: &'static str,
+    value: String,
+) -> impl IntoElement {
     let colors = ctx.colors;
     let change = ctx.change.clone();
     v_flex()
@@ -173,7 +178,7 @@ fn locked_box(ctx: &LiveCtx, lock: Lock, what: &'static str, value: String) -> i
 }
 
 /// "Sync with the game": take the game's value back and forget the person's.
-fn sync_button(ctx: &LiveCtx, lock: Lock) -> impl IntoElement {
+fn sync_button(ctx: &DiscoverCtx, lock: Lock) -> impl IntoElement {
     let change = ctx.change.clone();
     kit::ghost(
         match lock {
@@ -192,7 +197,7 @@ fn sync_button(ctx: &LiveCtx, lock: Lock) -> impl IntoElement {
     })
 }
 
-fn version_body(ctx: &LiveCtx) -> gpui::AnyElement {
+fn version_body(ctx: &DiscoverCtx) -> gpui::AnyElement {
     let query = &ctx.model.query;
     let provided = ctx.model.provided();
     if let (true, Some(version)) = (query.version_locked(&provided), &provided.version) {
@@ -274,7 +279,7 @@ fn version_body(ctx: &LiveCtx) -> gpui::AnyElement {
         .into_any_element()
 }
 
-fn loader_body(ctx: &LiveCtx) -> gpui::AnyElement {
+fn loader_body(ctx: &DiscoverCtx) -> gpui::AnyElement {
     let query = &ctx.model.query;
     let provided = ctx.model.provided();
     if let (true, Some(loader)) = (query.loader_locked(&provided), &provided.loader) {
@@ -343,7 +348,7 @@ fn loader_body(ctx: &LiveCtx) -> gpui::AnyElement {
         .into_any_element()
 }
 
-fn category_body(ctx: &LiveCtx, header: &str) -> gpui::AnyElement {
+fn category_body(ctx: &DiscoverCtx, header: &str) -> gpui::AnyElement {
     let query = &ctx.model.query;
     let groups = ctx.model.filters.category_groups(query.kind);
     let options: Vec<(&str, &str)> = groups
@@ -365,7 +370,7 @@ fn category_body(ctx: &LiveCtx, header: &str) -> gpui::AnyElement {
         .into_any_element()
 }
 
-fn side_row(ctx: &LiveCtx, side: Side, label: &'static str, on: bool) -> impl IntoElement {
+fn side_row(ctx: &DiscoverCtx, side: Side, label: &'static str, on: bool) -> impl IntoElement {
     let change = ctx.change.clone();
     kit::led_option(
         match side {
@@ -379,7 +384,7 @@ fn side_row(ctx: &LiveCtx, side: Side, label: &'static str, on: bool) -> impl In
     )
 }
 
-fn environment_body(ctx: &LiveCtx) -> gpui::AnyElement {
+fn environment_body(ctx: &DiscoverCtx) -> gpui::AnyElement {
     let query = &ctx.model.query;
     v_flex()
         .border_t_1()
@@ -399,7 +404,7 @@ fn environment_body(ctx: &LiveCtx) -> gpui::AnyElement {
         .into_any_element()
 }
 
-fn license_body(ctx: &LiveCtx) -> gpui::AnyElement {
+fn license_body(ctx: &DiscoverCtx) -> gpui::AnyElement {
     let colors = ctx.colors;
     let stand = match ctx.model.query.license {
         Some(Stance::Include) => Stand::Include,
@@ -424,7 +429,7 @@ fn license_body(ctx: &LiveCtx) -> gpui::AnyElement {
 
 /// The advanced exclusions: only "leave out" makes sense, so a row is lit
 /// when its exclusion is on. A note says they are remembered.
-fn advanced_body(ctx: &LiveCtx) -> gpui::AnyElement {
+fn advanced_body(ctx: &DiscoverCtx) -> gpui::AnyElement {
     let colors = ctx.colors;
     let query = &ctx.model.query;
     v_flex()
@@ -465,7 +470,7 @@ fn advanced_body(ctx: &LiveCtx) -> gpui::AnyElement {
         .into_any_element()
 }
 
-fn section_view(index: usize, section: &Section, ctx: &LiveCtx) -> gpui::AnyElement {
+fn section_view(index: usize, section: &Section, ctx: &DiscoverCtx) -> gpui::AnyElement {
     let colors = ctx.colors;
     let open = is_open(section, ctx);
     let group = group_of(section);
@@ -521,7 +526,7 @@ fn section_view(index: usize, section: &Section, ctx: &LiveCtx) -> gpui::AnyElem
 // ia[discover]: 高级排除 | 筛选栏「高级排除」：光敏性触发、AI、广告、遥测等 | 选择会被记住；第一次选「光敏性触发」弹出提示，可选不再提示
 // ia[discover]: 隐藏已安装 | 筛选栏顶部开关（整合包页，或从游戏页进入时） | 搜索时排除已有的整合包 / 目标游戏已装的项目；整合包页的选择会被记住
 /// The content sources to browse, when more than one is on.
-pub(super) fn source_segments(ctx: &LiveCtx) -> Option<impl IntoElement> {
+pub(super) fn source_segments(ctx: &DiscoverCtx) -> Option<impl IntoElement> {
     let sources = &ctx.model.sources;
     if sources.len() < 2 {
         return None;
@@ -551,7 +556,7 @@ pub(super) fn source_segments(ctx: &LiveCtx) -> Option<impl IntoElement> {
 }
 
 /// The filter column beside the list.
-pub(super) fn sidebar(ctx: &LiveCtx) -> impl IntoElement {
+pub(super) fn sidebar(ctx: &DiscoverCtx) -> impl IntoElement {
     filters(ctx)
         .w(px(SIDEBAR_WIDTH))
         .flex_none()
@@ -560,7 +565,7 @@ pub(super) fn sidebar(ctx: &LiveCtx) -> impl IntoElement {
 
 /// In a window too narrow for the column: a key that opens the same filters
 /// in a panel, with how many the person picked beside its label.
-pub(super) fn filters_key(ctx: &LiveCtx) -> impl IntoElement {
+pub(super) fn filters_key(ctx: &DiscoverCtx) -> impl IntoElement {
     let colors = ctx.colors;
     let open = ctx.state.choice(PANEL_GROUP, 0) == 1;
     let count = ctx.model.query.filter_count();
@@ -606,7 +611,7 @@ pub(super) fn filters_key(ctx: &LiveCtx) -> impl IntoElement {
 
 /// The filters: the sources, hide-installed, the sections of the kind, then
 /// a word when they did not load and the key that clears them.
-fn filters(ctx: &LiveCtx) -> gpui::Div {
+fn filters(ctx: &DiscoverCtx) -> gpui::Div {
     let colors = ctx.colors;
     let query = &ctx.model.query;
     let hide = ctx.model.can_hide_installed().then(|| {

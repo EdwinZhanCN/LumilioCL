@@ -95,9 +95,8 @@ pub(super) fn announce(wiring: &Wiring, window: gpui_kit::AnyWindowHandle, cx: &
         }
         Some(seen)
     });
-    let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let Some(Some(seen)) = super::jobs::answer(&wiring, seen, cx).await else {
+        let Some(Some(seen)) = lumilio_ui::runtime::answer(seen, cx).await else {
             return;
         };
         let releases = release_notes::since(seen.as_deref(), running);

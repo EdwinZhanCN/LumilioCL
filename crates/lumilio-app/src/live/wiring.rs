@@ -5,6 +5,7 @@ use std::time::Duration;
 use gpui_kit::{App, AppContext as _, Context, Entity, WeakEntity, Window};
 use lumilio_core::{CancellationToken, Preferences, ProjectKind};
 use lumilio_ui::LauncherShell;
+use lumilio_ui::features::discover::DiscoverEvent;
 use lumilio_ui::home::HomePresentation;
 use lumilio_ui::instance_detail::TAB_WORLDS;
 use lumilio_ui::live::{LiveHandler, LiveIntent};
@@ -12,7 +13,6 @@ use lumilio_ui::route::Route;
 use lumilio_ui::shell::{IntentHandler, ShellIntent};
 use lumilio_ui::toast::Toast;
 
-use super::discover::open_project;
 use super::dispatch::{on_live_intent, on_shell_intent};
 use super::instance::open_instance;
 use super::jobs::reload;
@@ -37,8 +37,6 @@ pub(super) struct State {
     pub(super) choices: Option<tokio::sync::mpsc::UnboundedSender<library::Choice>>,
     /// Stops the launch or the running game.
     pub(super) cancel: Option<CancellationToken>,
-    /// Numbers searches so a slow answer cannot replace a newer one.
-    pub(super) search_seq: u64,
     /// The saved preferences, for what the window does around a game.
     pub(super) preferences: Preferences,
     /// A world the next launch goes straight into, once.
@@ -50,9 +48,6 @@ pub(super) struct State {
     pub(super) java_answered: Option<String>,
     /// Stops the Microsoft sign-in that is waiting for the browser.
     pub(super) sign_in_cancel: Option<CancellationToken>,
-    /// The target game, kind and source `installed` was last read for; `None`
-    /// when it is out of date and should be read again.
-    pub(super) installed_key: Option<(String, ProjectKind, String)>,
     /// What the running game has printed: the instance and its newest lines.
     pub(super) game_log: Option<(String, std::collections::VecDeque<String>)>,
     /// Commands for the background update service.
@@ -119,12 +114,14 @@ pub fn build(backend: Backend, window: &mut Window, cx: &mut App) -> Entity<Laun
             .with_home(HomePresentation::Loading, cx)
             .with_intent_handler(on_shell)
             .with_live(on_live)
+            .with_worker(backend.worker(), cx)
     });
     let wiring = Wiring {
         backend,
         shell: shell.downgrade(),
         state,
     };
+    follow_discover(&wiring, &shell, cx);
     update::start(&wiring, cx);
     context::follow(&wiring, cx);
     reload(&wiring, Reload::Lists, cx);
@@ -136,6 +133,32 @@ pub fn build(backend: Backend, window: &mut Window, cx: &mut App) -> Entity<Laun
         shell.update(cx, |shell, cx| shell.toast(Toast::info(text).sticky(), cx));
     }
     shell
+}
+
+/// Passes on what Discover tells the application: its installs changed the
+/// tasks Activity lists, or what it remembers between visits changed.
+fn follow_discover(wiring: &Wiring, shell: &Entity<LauncherShell>, cx: &mut App) {
+    let discover = shell.read(cx).discover().clone();
+    let wiring = wiring.clone();
+    cx.subscribe(&discover, move |_, event: &DiscoverEvent, cx| match event {
+        DiscoverEvent::TasksChanged => reload(&wiring, Reload::Lists, cx),
+        DiscoverEvent::Remember(discover) => {
+            let preferences = {
+                let mut state = wiring.state.borrow_mut();
+                state.preferences.discover = discover.clone();
+                state.preferences.clone()
+            };
+            // Quiet, like the Library's order: not worth a message when it fails.
+            let service = wiring.backend.service.clone();
+            drop(
+                wiring
+                    .backend
+                    .spawn(async move { service.set_preferences(preferences).await }),
+            );
+        }
+        DiscoverEvent::ProjectOpened(_) => {}
+    })
+    .detach();
 }
 
 /// Dev hook: `LUMILIO_PAGE=library|discover|activity|accounts` opens that page, so a
@@ -160,7 +183,8 @@ pub(super) fn open_requested_page(
     {
         let source = std::env::var("LUMILIO_PROJECT_SOURCE")
             .unwrap_or_else(|_| lumilio_core::DEFAULT_SOURCE.to_owned());
-        open_project(wiring, kind, source, slug.to_owned(), window, cx);
+        let slug = slug.to_owned();
+        shell.update(cx, |shell, cx| shell.open_project(kind, &source, &slug, cx));
     }
     // Dev hook: `LUMILIO_INSTANCE=<id>` opens that game; `LUMILIO_INSTANCE_TAB`
     // chooses its tab and `LUMILIO_INSTANCE_GROUP` the tab's group (a

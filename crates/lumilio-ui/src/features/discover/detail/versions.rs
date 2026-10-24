@@ -15,8 +15,9 @@ use super::{
     size_label, toggle,
 };
 use crate::assets::UiIcon;
+use crate::features::discover::model::{PageItem, page_items, parse_rfc3339, tag_label};
 use crate::key::Key;
-use crate::live::{PageItem, page_items, parse_rfc3339, relative_time, tag_label};
+use crate::live::relative_time;
 use crate::theme::ShellColors;
 use crate::{kit, tr};
 

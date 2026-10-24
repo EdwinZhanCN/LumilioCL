@@ -6,72 +6,15 @@
 //! the list is sorted by them, else downloads.
 
 use gpui::prelude::*;
-use gpui::{App, ObjectFit, Window, div, img, px};
+use gpui::{App, Window, div, px};
 use gpui_component::menu::{ContextMenuExt as _, PopupMenuItem};
 use gpui_component::{Sizable as _, h_flex, v_flex};
 
-use super::super::controls::{LiveCtx, send};
+use super::super::model::{CountKind, DateKind, SearchRow, environment_label, tag_label};
+use super::context::{DiscoverCtx, DiscoverIntent, send};
 use crate::assets::UiIcon;
-use crate::cover::Loader;
-use crate::home::WorldHint;
-use crate::live::{CountKind, DateKind, LiveIntent, SearchRow, environment_label, tag_label};
 use crate::theme::ShellColors;
 use crate::{kit, theme, tr};
-
-/// The placeholder cover: shown until the real icon arrives, and instead of
-/// it when a project has none or the picture cannot be loaded.
-fn placeholder(seed: u32, colors: ShellColors) -> gpui::AnyElement {
-    const LOADERS: [Loader; 5] = [
-        Loader::Fabric,
-        Loader::Forge,
-        Loader::NeoForge,
-        Loader::Quilt,
-        Loader::Vanilla,
-    ];
-    const WORLDS: [WorldHint; 4] = [
-        WorldHint::Overworld,
-        WorldHint::Underground,
-        WorldHint::Redstone,
-        WorldHint::Nether,
-    ];
-    div()
-        .size_full()
-        .child(crate::cover::element(
-            seed,
-            LOADERS[seed as usize % LOADERS.len()],
-            WORLDS[seed as usize / 5 % WORLDS.len()],
-            colors.surface,
-            px(0.),
-        ))
-        .into_any_element()
-}
-
-/// A project's icon at `side` pixels, fetched by address.
-pub fn project_icon(
-    url: Option<&str>,
-    seed: u32,
-    side: f32,
-    colors: ShellColors,
-) -> gpui::AnyElement {
-    let frame = div()
-        .flex_none()
-        .size(px(side))
-        .rounded(px(side / 6.))
-        .overflow_hidden()
-        .bg(colors.surface_subtle);
-    match url {
-        Some(url) => frame
-            .child(
-                img(url.to_owned())
-                    .size_full()
-                    .object_fit(ObjectFit::Cover)
-                    .with_loading(move || placeholder(seed, colors))
-                    .with_fallback(move || placeholder(seed, colors)),
-            )
-            .into_any_element(),
-        None => frame.child(placeholder(seed, colors)).into_any_element(),
-    }
-}
 
 /// Edge of a result's icon: a list row's 48 px display window (§12).
 const ICON_SIDE: f32 = 48.;
@@ -114,7 +57,7 @@ fn spec(legend: &'static str, value: String, colors: ShellColors) -> impl IntoEl
 pub(super) fn install_control(
     index: usize,
     row: &SearchRow,
-    ctx: &LiveCtx,
+    ctx: &DiscoverCtx,
     install: impl Fn(&mut Window, &mut App) + 'static,
 ) -> gpui::AnyElement {
     let colors = ctx.colors;
@@ -146,7 +89,7 @@ pub(super) fn install_control(
     // ia[discover]: 已安装状态 | 结果行「已安装」/「更新」 | 目标游戏已有的（按正在浏览的来源识别）显示「已安装」；有更新显示「更新」，点了用新版本替换旧文件；详情页主按钮同样变化 | 只认这个来源认得的文件
     match &have.update {
         Some(version) => {
-            let intent = LiveIntent::UpdateInstalled {
+            let intent = DiscoverIntent::UpdateInstalled {
                 kind: row.kind,
                 source: row.source.clone(),
                 project: row.slug.clone(),
@@ -216,11 +159,11 @@ fn tag_line(row: &SearchRow, colors: ShellColors) -> impl IntoElement {
 
 // ia[discover]: 打开项目详情 | 点结果行 | 详情页（进历史）
 // ia[discover]: 结果行右键菜单 | 在（来源）中打开 / 复制链接 | 浏览器打开项目页，或把项目页地址放进剪贴板并提示
-pub(super) fn result_row(index: usize, row: &SearchRow, ctx: &LiveCtx) -> impl IntoElement {
+pub(super) fn result_row(index: usize, row: &SearchRow, ctx: &DiscoverCtx) -> impl IntoElement {
     let colors = ctx.colors;
     let open = send(
         &ctx.handler,
-        LiveIntent::OpenProject {
+        DiscoverIntent::OpenProject {
             kind: row.kind,
             source: row.source.clone(),
             slug: row.slug.clone(),
@@ -228,7 +171,7 @@ pub(super) fn result_row(index: usize, row: &SearchRow, ctx: &LiveCtx) -> impl I
     );
     let install = {
         let handler = ctx.handler.clone();
-        let intent = LiveIntent::Install {
+        let intent = DiscoverIntent::Install {
             kind: row.kind,
             source: row.source.clone(),
             slug: row.slug.clone(),
@@ -289,7 +232,7 @@ pub(super) fn result_row(index: usize, row: &SearchRow, ctx: &LiveCtx) -> impl I
                 .border_1()
                 .border_color(colors.border)
                 .bg(body.display)
-                .child(project_icon(
+                .child(kit::project_icon(
                     row.icon_url.as_deref(),
                     row.seed,
                     ICON_SIDE,
@@ -378,7 +321,7 @@ pub(super) fn result_row(index: usize, row: &SearchRow, ctx: &LiveCtx) -> impl I
             .item(
                 PopupMenuItem::new(tr!("discover-copy-link")).on_click(move |_, window, cx| {
                     copy(
-                        LiveIntent::CopyText {
+                        DiscoverIntent::CopyText {
                             text: copy_url.clone(),
                             notice: tr!("discover-link-copied").to_owned(),
                         },

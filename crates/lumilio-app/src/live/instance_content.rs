@@ -8,7 +8,6 @@ use lumilio_ui::tr;
 
 use super::Wiring;
 use super::instance_write::write_instance;
-use super::jobs::answer;
 
 /// Reads a project's versions for the open switch-version dialog, then the
 /// chosen version's changelog when its source gives them one at a time.
@@ -79,9 +78,8 @@ pub(super) fn load_pending(
     let handle = wiring
         .backend
         .spawn(async move { service.pending_downloads(&id).await.unwrap_or_default() });
-    let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let Some(pending) = answer(&wiring, handle, cx).await else {
+        let Some(pending) = lumilio_ui::runtime::answer(handle, cx).await else {
             return;
         };
         let _ = view.update(cx, |view, cx| view.set_pending(pending, cx));

@@ -11,7 +11,7 @@ use lumilio_ui::live::{
 };
 
 use super::Wiring;
-use super::jobs::{answer, refresh_installed};
+use super::jobs::{installed_changed, refresh_installed};
 
 /// What a change makes out of date: the dependency table of decision D6,
 /// as code. A new derived result is added here with its own test.
@@ -106,32 +106,20 @@ pub(super) fn follow(wiring: &Wiring, cx: &mut App) {
 }
 
 /// Writes the interface's copy first, so everything worked out below reads
-/// the new choice. Browsing for a game that is no longer current ends, and
-/// the list is searched again without its locks (D3).
+/// the new choice. Discover ends browsing for a game that is no longer
+/// current and searches again without its locks (D3).
 fn mirror(wiring: &Wiring, context: Context, cx: &mut App) {
-    let query = wiring
+    let _ = wiring
         .shell
-        .update(cx, |shell, cx| {
-            shell
-                .follow_context(context, cx)
-                .then(|| shell.live().map(|model| model.query.clone()))
-                .flatten()
-        })
-        .ok()
-        .flatten();
-    if let Some(query) = query {
-        super::discover::search(wiring, &query, cx);
-    }
+        .update(cx, |shell, cx| shell.follow_context(context, cx));
 }
 
 fn apply(wiring: &Wiring, what: Stale, cx: &mut App) {
     if what.installed {
-        wiring.state.borrow_mut().installed_key = None;
+        installed_changed(wiring, cx);
     }
     if what.home {
         refresh_home(wiring, cx);
-    } else if what.installed {
-        refresh_installed(wiring, cx);
     }
     if what.checks {
         recheck(wiring, cx);
@@ -182,7 +170,7 @@ fn refresh_home(wiring: &Wiring, cx: &mut App) {
         .spawn(async move { service.home_snapshot().await });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let Some((records, summary)) = answer(&wiring, handle, cx).await else {
+        let Some((records, summary)) = lumilio_ui::runtime::answer(handle, cx).await else {
             return;
         };
         // A newer change is followed on its own.
@@ -253,7 +241,7 @@ fn recheck(wiring: &Wiring, cx: &mut App) {
     wiring.state.borrow_mut().home_diagnostics = Some(handle.abort_handle());
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let Some((records, checks)) = answer(&wiring, handle, cx).await else {
+        let Some((records, checks)) = lumilio_ui::runtime::answer(handle, cx).await else {
             return;
         };
         let same = |was: &Context, now: &Context| {
@@ -299,7 +287,7 @@ fn summarize(wiring: &Wiring, cx: &mut App) {
     });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let Some((records, summary)) = answer(&wiring, handle, cx).await else {
+        let Some((records, summary)) = lumilio_ui::runtime::answer(handle, cx).await else {
             return;
         };
         // Newer checks or another account change summarize again.
@@ -339,7 +327,7 @@ fn refresh_accounts(wiring: &Wiring, cx: &mut App) {
         .spawn(async move { service.settings().await });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let Some(settings) = answer(&wiring, handle, cx).await else {
+        let Some(settings) = lumilio_ui::runtime::answer(handle, cx).await else {
             return;
         };
         let rows = account_rows(&settings);
@@ -353,19 +341,20 @@ fn refresh_accounts(wiring: &Wiring, cx: &mut App) {
 /// Discover's sources, once it has shown them, and the open game's plugin
 /// tabs.
 fn refresh_plugins(wiring: &Wiring, cx: &mut App) {
-    let (sources_shown, open_game) = wiring
+    let (discover, open_game) = wiring
         .shell
         .read_with(cx, |shell, cx| {
             (
-                shell.live().is_some_and(|model| !model.sources.is_empty()),
+                Some(shell.discover().clone()),
                 shell
                     .live_instance()
                     .map(|view| (view.read(cx).id().to_owned(), view.downgrade())),
             )
         })
         .unwrap_or_default();
-    if sources_shown {
-        super::discover::load_filters(wiring, cx);
+    if let Some(discover) = discover {
+        // Which content sources are on may have changed.
+        discover.update(cx, |discover, cx| discover.sources_changed(cx));
     }
     if let Some((id, view)) = open_game {
         super::instance_plugins::plugin_tabs(wiring, id, view, cx);
@@ -386,7 +375,7 @@ fn refresh_places(wiring: &Wiring, record: InstanceRecord, library: u64, cx: &mu
     });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let Some((worlds, servers)) = answer(&wiring, handle, cx).await else {
+        let Some((worlds, servers)) = lumilio_ui::runtime::answer(handle, cx).await else {
             return;
         };
         let current = |now: &Context| {
@@ -417,7 +406,7 @@ fn ask_place(wiring: &Wiring, id: String, address: String, library: u64, cx: &mu
         .spawn(async move { service.server_status(&instance, &asked).await });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let answer = answer(&wiring, handle, cx)
+        let answer = lumilio_ui::runtime::answer(handle, cx)
             .await
             .and_then(Result::ok)
             .ok_or(());

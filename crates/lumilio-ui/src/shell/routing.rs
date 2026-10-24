@@ -40,8 +40,13 @@ impl LauncherShell {
         self.route = route;
         self.detail = None;
         self.live_instance = None;
-        // Choosing Discover in the navigation is plain browsing, not a game's.
-        self.leave_browse_context(cx);
+        self.discover.update(cx, |discover, cx| {
+            // Choosing Discover in the navigation is plain browsing, not a game's.
+            discover.leave_browse_context(cx);
+            if route == Route::Discover {
+                discover.shown(cx);
+            }
+        });
         self.emit(ShellIntent::Navigate(route), window, cx);
         cx.notify();
     }

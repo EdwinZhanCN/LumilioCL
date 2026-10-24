@@ -19,7 +19,7 @@ pub(super) fn ask(wiring: &Wiring, window: AnyWindowHandle, cx: &mut App) {
         .spawn(async move { service.settings().await.terms_pending() });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        let Some(pending) = super::jobs::answer(&wiring, pending, cx).await else {
+        let Some(pending) = lumilio_ui::runtime::answer(pending, cx).await else {
             return;
         };
         if !pending {
@@ -47,7 +47,7 @@ fn accept(wiring: &Wiring, window: AnyWindowHandle, cx: &mut App) {
         .spawn(async move { service.accept_terms().await });
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
-        if let Some(Err(error)) = super::jobs::answer(&wiring, saved, cx).await {
+        if let Some(Err(error)) = lumilio_ui::runtime::answer(saved, cx).await {
             log::warn!("could not remember that the terms were agreed to: {error}");
         }
         cx.update(|cx| super::update::announce(&wiring, window, cx));

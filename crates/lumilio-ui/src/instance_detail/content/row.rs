@@ -220,7 +220,7 @@ impl InstanceDetailView {
             .py(px(10.))
             .opacity(if entry.item.enabled { 1. } else { 0.55 })
             .child(select)
-            .child(crate::pages::live::project_icon(
+            .child(crate::kit::project_icon(
                 source
                     .as_ref()
                     .and_then(|source| source.icon_url.as_deref()),

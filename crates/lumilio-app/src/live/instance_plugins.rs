@@ -600,10 +600,9 @@ pub(super) fn plugin_tabs(
     let handle = wiring
         .backend
         .spawn(async move { service.plugin_tabs(&id).await });
-    let wiring = wiring.clone();
     cx.spawn(async move |cx| {
         // A game that cannot be read has no plugin tabs; the page reports that itself.
-        let tabs = super::jobs::answer(&wiring, handle, cx)
+        let tabs = lumilio_ui::runtime::answer(handle, cx)
             .await
             .and_then(Result::ok)
             .unwrap_or_default();
