@@ -40,7 +40,10 @@ The UI also maintains gpui-component 0.7.0 from Longbridge's GPUI Kit under
 `forks/gpui-component`, with a local multi-select extension in
 `crates/component/src/select.rs`. It is licensed under Apache-2.0; the complete
 notice is preserved in [LICENSE-APACHE](forks/gpui-component/LICENSE-APACHE).
-The baseline and imported paths are recorded in [fork maintenance](forks/README.md).
+gpui-base 0.7.0 from the same GPUI Kit is maintained under `forks/gpui-base`,
+with a local paragraph id change in `crates/base/src/text/node.rs`; its
+Apache-2.0 notice is preserved in [LICENSE-APACHE](forks/gpui-base/LICENSE-APACHE).
+The baselines and imported paths are recorded in [fork maintenance](forks/README.md).
 
 The native preview links the following libraries. The repository
 does not vendor Minecraft textures, models or entity geometry. The preview

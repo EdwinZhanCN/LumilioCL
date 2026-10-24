@@ -21,6 +21,18 @@ in `lumilio-ui`.
 The package's original lib tests reference fixtures outside the published crate;
 run the dedicated integration target for this local extension.
 
+`gpui-base` 0.7.0, the text and behaviour layer under GPUI Kit, is patched the
+same way. Its baseline is the crates.io 0.7.0 package from the same upstream
+commit (`crates/base`). Imported paths: `src/`, `tests/`, `benches/`, manifest,
+README and Apache license. One file is adapted. `src/text/node.rs`
+`leaf_element_id`: a paragraph with no source span, which is every paragraph
+the HTML parser makes, takes its element id from its text state instead of the
+shared id `"p"`. With one id, inline-flow paragraphs (code, or a linked image
+beside text) shared one layout in a frame; the first painted the last one's text
+or indexed past its own items and crashed. Guard:
+`kit::tests::html_paragraphs_with_code_and_linked_images_each_keep_their_own_layout`
+in `lumilio-ui`.
+
 These are editable source snapshots, owned by LumilioCL (ADR 0029).
 Reference-only projects are consulted through their published upstream URLs.
 The launcher uses local Cargo paths, not remotely published fork repositories.

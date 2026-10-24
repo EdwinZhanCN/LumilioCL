@@ -1,8 +1,9 @@
 # LumilioCL — Agent Work Manual
 
 LumilioCL is a native Minecraft launcher in **Rust + GPUI + gpui-kit**. The UI also uses
-**gpui-component 0.7**, patched locally through `forks/gpui-component`. The goal is a good
-launcher; the documents below serve that goal and never outrank it.
+**gpui-component 0.7**, patched locally through `forks/gpui-component` (its text layer
+`gpui-base` through `forks/gpui-base`). The goal is a good launcher; the documents below
+serve that goal and never outrank it.
 
 ## Invariants
 

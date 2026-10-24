@@ -213,3 +213,5 @@ Consequences: service::translate_summaries 先取来源的 catalog，没有 cata
 - https://mod.mcimirror.top/docs
 
 - Lesson: 应用内验收发现详情页头的简介未翻译：首轮只把 MCIM 译文回填到列表，页头仍直接读取原始 description。修正为详情独立查询 SQLite / MCIM，覆盖直接打开、数据加载及开启设置三条入口；以源、项目、原文和设置 revision 拒绝迟到回填，并新增简介状态与关闭 / 重开设置的回归测试。列表验收不能替代详情页头验收。
+
+- Lesson: 0.2.2 发布后，部分项目详情点「翻译」即崩溃（gpui-base inline_flow.rs 下标越界）。译文一律按 HTML 渲染，而 gpui-base 0.7.0 的 HTML 解析不记录源位置，所有段落共用元素 id "p"；含行内代码或链接图片（Markdown 徽章转成的 <a><img></a>）的段落走 inline flow，同一帧共用一份布局缓存，前一段取到最后一段的布局后越界；条目数相同时则显示别段的文字。原有测试只用单段译文 <p>中文</p>，覆盖不到。修正：gpui-base 纳入 forks/gpui-base，无源位置的段落以自身文本状态生成 id；守卫 lumilio-ui kit::tests::html_paragraphs_with_code_and_linked_images_each_keep_their_own_layout，去掉修正时稳定复现同一越界。富文本测试要用多段、含代码和链接图片的正文。
