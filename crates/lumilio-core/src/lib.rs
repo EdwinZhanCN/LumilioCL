@@ -8,7 +8,6 @@ mod blocking;
 mod bundle;
 mod clock;
 mod content;
-mod content_sources;
 mod context;
 mod copy;
 mod credentials;
@@ -52,10 +51,11 @@ pub use attention::{
 pub use bundle::{Redactor, write_bundle};
 pub use clock::now as unix_now;
 pub use content::{
-    ContentError, ContentItem, ModMetadata, read_mod_metadata, remove as remove_content,
+    AddedFile, ContentEffect, ContentEntry, ContentError, ContentItem, ContentList, ContentResult,
+    ContentSource, ContentSourceInfo, DependencyNeed, DependencyReport, DiscoverFilters,
+    InstalledProject, ModMetadata, ProjectDetail, read_mod_metadata, remove as remove_content,
     scan as scan_content, set_enabled as set_content_enabled, sha1_hex,
 };
-pub use content_sources::{ContentEntry, ContentList, ContentSource};
 pub use context::{Context, Revisions, Session, SessionPhase};
 pub use credentials::{CredentialStore, MemoryCredentials, StoredLogin, SystemCredentials};
 pub use diagnostics::{
@@ -161,9 +161,7 @@ pub use servers::{
     Motd, MotdSpan, PackPolicy, PingError, ProtocolVersion, ServerEntry, ServerError, ServerStatus,
 };
 pub use service::{
-    AddedFile, AppearanceApplyResult, ContentEffect, ContentResult, ContentSourceInfo,
-    DependencyNeed, DependencyReport, DiscoverFilters, InstalledProject, LauncherService, Library,
-    ModelPreview, ProfileSnapshot, ProjectDetail, ThirdPartySignIn,
+    AppearanceApplyResult, LauncherService, Library, ProfileSnapshot, ThirdPartySignIn,
 };
 pub use settings::{
     AccountEntry, AccountKind, AuthServerEntry, DownloadSourcePreference, LauncherSettings,
@@ -205,8 +203,8 @@ pub use updates::{
 };
 pub use wallpaper::{WallpaperError, import_wallpaper, remove_wallpapers};
 pub use worlds::{
-    GameMode, WorldError, WorldInfo, copy_name as world_copy_name, delete as delete_world,
-    duplicate as duplicate_world, scan as scan_worlds, size as world_size,
+    GameMode, ModelPreview, WorldError, WorldInfo, copy_name as world_copy_name,
+    delete as delete_world, duplicate as duplicate_world, scan as scan_worlds, size as world_size,
 };
 pub use yggdrasil::{AuthServer, LITTLE_SKIN_URL, Profile as CharacterProfile, YggdrasilError};
 

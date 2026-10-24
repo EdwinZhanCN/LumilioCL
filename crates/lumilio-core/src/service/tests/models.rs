@@ -477,7 +477,7 @@ async fn a_mod_is_off_until_switched_on_and_stays_on_after_reopening() {
         .schematic_source_set(&id, "schematics", gems.clone(), true)
         .await
         .unwrap();
-    let on = |preview: &crate::service::ModelPreview| {
+    let on = |preview: &crate::worlds::ModelPreview| {
         preview
             .pack
             .as_ref()
@@ -691,7 +691,7 @@ async fn without_the_bundle_names_come_from_the_installed_game() {
 fn drawing(
     drawn: &Arc<std::sync::atomic::AtomicUsize>,
     png: &'static [u8],
-) -> impl FnOnce(crate::service::ModelPreview) -> Result<Vec<u8>, String> + Send + 'static {
+) -> impl FnOnce(crate::worlds::ModelPreview) -> Result<Vec<u8>, String> + Send + 'static {
     let drawn = drawn.clone();
     move |preview| {
         drawn.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -844,7 +844,7 @@ async fn moving_a_pack_reorders_the_stack_and_is_kept() {
             .await
             .unwrap();
     }
-    let overlays = |preview: &crate::service::ModelPreview| {
+    let overlays = |preview: &crate::worlds::ModelPreview| {
         preview
             .plan
             .overlays()

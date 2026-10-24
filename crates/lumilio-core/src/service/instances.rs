@@ -172,7 +172,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// Gives a game whose folder was moved or deleted a new, empty one: it
     /// starts again with no mods, worlds or options of its own.
     pub async fn new_game_folder(&self, id: &str) -> Result<(), ServiceError> {
-        self.instance(id).await?;
+        self.instances.record(id).await?;
         let game = self.layout.game(id);
         tokio::task::spawn_blocking(move || std::fs::create_dir_all(game))
             .await

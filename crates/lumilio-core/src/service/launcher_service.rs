@@ -4,9 +4,9 @@ use std::sync::{Arc, Mutex as StdMutex};
 
 use tokio::sync::Mutex;
 
-use super::types::DiscoverFilters;
 use super::{appearance, preferences, third_party};
 use crate::activity::{ActivityLog, Tasks};
+use crate::content::Content;
 use crate::credentials::{CredentialStore, SystemCredentials};
 use crate::diagnostics::Diagnostics;
 use crate::error::ServiceError;
@@ -21,6 +21,7 @@ use crate::recovery;
 use crate::recovery::RecoveryNote;
 use crate::settings::SettingsStore;
 use crate::transfer::{ConnectionBudget, Transport};
+use crate::worlds::Worlds;
 
 /// `Fabric 0.16.0` / `Vanilla`, for a history line.
 pub(super) fn loader_text(loader: Loader, version: Option<&str>) -> String {
@@ -58,8 +59,8 @@ pub struct LauncherService<T> {
     pub(crate) game_settings: GameSettings,
     pub(super) plugin_controls: PluginControls,
     pub(super) diagnostics: Diagnostics,
-    /// Filter choices per content source, for the life of the service.
-    pub(super) filters: Mutex<std::collections::BTreeMap<String, DiscoverFilters>>,
+    pub(crate) worlds: Worlds<T>,
+    pub(crate) content: Content<T>,
     /// Translated summaries and bodies, cached in their own SQLite file.
     pub(super) translation: crate::translation::SharedTranslation,
     /// Where sign-in secrets live; never a file.
@@ -137,6 +138,23 @@ impl<T: Transport + Clone> LauncherService<T> {
             layout.root().to_owned(),
         ));
         Ok(Self {
+            content: Content::new(
+                instances.clone(),
+                layout.clone(),
+                network.clone(),
+                plugins.clone(),
+                tasks.clone(),
+                settings.clone(),
+                translation.clone(),
+            ),
+            worlds: Worlds::new(
+                instances.clone(),
+                layout.clone(),
+                plugins.clone(),
+                network.clone(),
+                settings.clone(),
+                tasks.clone(),
+            ),
             diagnostics: Diagnostics::new(
                 settings.clone(),
                 instances.clone(),
@@ -166,7 +184,6 @@ impl<T: Transport + Clone> LauncherService<T> {
             tasks,
             launching: Launching::default(),
             startup,
-            filters: Mutex::default(),
             credentials: Arc::new(SystemCredentials),
             auth_lock: Mutex::new(()),
             wardrobe_lock: Mutex::new(()),
@@ -206,6 +223,8 @@ impl<T: Transport + Clone> LauncherService<T> {
     pub(crate) fn set_plugin_host(&mut self, plugins: Arc<crate::plugins::PluginHost>) {
         self.plugin_controls.replace_plugins(plugins.clone());
         self.diagnostics.replace_plugins(plugins.clone());
+        self.worlds.replace_plugins(plugins.clone());
+        self.content.replace_plugins(plugins.clone());
         self.plugins = plugins;
     }
 

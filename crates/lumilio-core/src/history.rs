@@ -201,6 +201,16 @@ pub fn record_attempt(
     })
 }
 
+/// Notes a change that really happened. A history write failure must not
+/// turn a finished file operation into an error.
+pub(crate) fn record_change(root: &Path, instance_id: &str, kind: ChangeKind, subject: &str) {
+    let _ = HistoryLog::for_instance(root, instance_id).append(&HistoryEvent::Change {
+        at: crate::clock::now(),
+        kind,
+        subject: subject.to_owned(),
+    });
+}
+
 /// Records a finished session in the log and in the instance's totals.
 pub fn finish_session(
     store: &mut InstanceStore,

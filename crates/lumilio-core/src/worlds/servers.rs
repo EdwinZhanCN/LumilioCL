@@ -1,13 +1,13 @@
-use super::LauncherService;
+use super::Worlds;
 use crate::error::ServiceError;
 use crate::servers;
 use crate::servers::{ServerEntry, ServerStatus};
 use crate::transfer::Transport;
 
-impl<T: Transport + Clone> LauncherService<T> {
+impl<T: Transport + Clone> Worlds<T> {
     /// The instance's saved servers. Reading needs no instance lease.
-    pub async fn servers(&self, id: &str) -> Result<Vec<ServerEntry>, ServiceError> {
-        self.instance(id).await?;
+    pub(crate) async fn servers(&self, id: &str) -> Result<Vec<ServerEntry>, ServiceError> {
+        self.instances.record(id).await?;
         let game_dir = self.layout.game(id);
         tokio::task::spawn_blocking(move || servers::list(&game_dir))
             .await
@@ -16,13 +16,17 @@ impl<T: Transport + Clone> LauncherService<T> {
     }
 
     /// Adds a server at the end of the list. Takes the instance lease.
-    pub async fn add_server(&self, id: &str, entry: ServerEntry) -> Result<(), ServiceError> {
+    pub(crate) async fn add_server(
+        &self,
+        id: &str,
+        entry: ServerEntry,
+    ) -> Result<(), ServiceError> {
         self.edit_servers(id, move |dir| servers::add(dir, &entry))
             .await
     }
 
     /// Replaces the server at `index`, which must still be `expected`.
-    pub async fn update_server(
+    pub(crate) async fn update_server(
         &self,
         id: &str,
         index: usize,
@@ -35,7 +39,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         .await
     }
 
-    pub async fn remove_server(
+    pub(crate) async fn remove_server(
         &self,
         id: &str,
         index: usize,
@@ -45,7 +49,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             .await
     }
 
-    pub async fn move_server(
+    pub(crate) async fn move_server(
         &self,
         id: &str,
         index: usize,
@@ -62,7 +66,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         edit: impl FnOnce(&std::path::Path) -> Result<(), servers::ServerError> + Send + 'static,
     ) -> Result<(), ServiceError> {
         let _lease = self.instances.reserve(id)?;
-        self.instance(id).await?;
+        self.instances.record(id).await?;
         let game_dir = self.layout.game(id);
         tokio::task::spawn_blocking(move || edit(&game_dir))
             .await
@@ -73,12 +77,12 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// Asks a server how it is, with the handshake the instance's game version
     /// calls for (the legacy ping for a pre-1.7 version). A server that does
     /// not answer is an error the caller shows as "offline".
-    pub async fn server_status(
+    pub(crate) async fn server_status(
         &self,
         id: &str,
         address: &str,
     ) -> Result<ServerStatus, ServiceError> {
-        let record = self.instance(id).await?;
+        let record = self.instances.record(id).await?;
         let versions = self.layout.versions();
         let game_version = record.game_version;
         let protocol = tokio::task::spawn_blocking(move || {

@@ -4,7 +4,7 @@
 
 use lumilio_block_assets::{BakedPack, BlockCatalog, BlockNames, EntityLayers};
 
-use super::LauncherService;
+use super::Worlds;
 use crate::activity::CancellationToken;
 use crate::activity::{TaskAction, TaskCategory, TaskLabel};
 use crate::blocking::blocking_value;
@@ -30,12 +30,12 @@ pub struct ModelPreview {
     pub entities: EntityLayers,
 }
 
-impl<T: Transport + Clone> LauncherService<T> {
+impl<T: Transport + Clone> Worlds<T> {
     /// The schematic `file` (a path the plugin may read) and the block assets
     /// its data version calls for (D3): the bundle's, with the overlays the
     /// studio folder holding `file` switched on (T21). Fetching the bundle is
     /// an Activity task; out of reach, the plan carries a notice.
-    pub async fn plugin_model(
+    pub(crate) async fn plugin_model(
         &self,
         instance: &str,
         plugin: &str,
@@ -53,7 +53,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         file: &str,
         switched: Option<Vec<std::path::PathBuf>>,
     ) -> Result<ModelPreview, ServiceError> {
-        let record = self.instance(instance).await?;
+        let record = self.instances.record(instance).await?;
         let schematic = self
             .plugins
             .read_model(plugin, self.layout.game(instance), file)
@@ -193,8 +193,8 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// quietly like the index, else the language files of the games
     /// installed here, the instance's own first. Empty when neither can be
     /// had; the studio then writes IDs.
-    pub async fn schematic_names(&self, instance: &str) -> Result<BlockNames, ServiceError> {
-        let record = self.instance(instance).await?;
+    pub(crate) async fn schematic_names(&self, instance: &str) -> Result<BlockNames, ServiceError> {
+        let record = self.instances.record(instance).await?;
         let store = BundleStore::new(&self.layout.model_cache());
         if let Ok(index) = self.bundle_index(&store).await
             && let Some(file) = index.names_file()
@@ -223,7 +223,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// so the picture and the name it is kept under agree even when a switch
     /// flips meanwhile, and in the order they are layered (T36). One drawn before is read back; otherwise `draw`
     /// makes it from the preview on a blocking thread, and it is kept.
-    pub async fn schematic_thumbnail<D>(
+    pub(crate) async fn schematic_thumbnail<D>(
         &self,
         instance: &str,
         plugin: &str,
@@ -239,7 +239,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         if !plain {
             return Err(ServiceError::Install(format!("not a thumbnail key: {key}")));
         }
-        let record = self.instance(instance).await?;
+        let record = self.instances.record(instance).await?;
         let (layout, within) = (self.layout.clone(), file.to_owned());
         let (switched, look) = blocking_value(move || {
             let on = switched_on(&layout.schematic_sources(&record.id), &within);
@@ -302,7 +302,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// The game versions the block-asset bundle holds, newest first, with
     /// their data versions: what the studio can convert a schematic to
     /// (plan schematic-studio, T14). Fails when the index cannot be had.
-    pub async fn schematic_versions(&self) -> Result<Vec<(String, u32)>, ServiceError> {
+    pub(crate) async fn schematic_versions(&self) -> Result<Vec<(String, u32)>, ServiceError> {
         let store = BundleStore::new(&self.layout.model_cache());
         let index = self
             .bundle_index(&store)
@@ -322,7 +322,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// mention (`None` when that is `target` or cannot be read): what a
     /// backward conversion is checked against (plan schematic-studio, T14).
     /// Downloads the bundle file(s) as an Activity task when needed.
-    pub async fn schematic_catalogs(
+    pub(crate) async fn schematic_catalogs(
         &self,
         target: &str,
         source_data_version: u32,

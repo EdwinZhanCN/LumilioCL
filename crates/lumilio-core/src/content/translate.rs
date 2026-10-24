@@ -1,15 +1,15 @@
 use std::collections::BTreeMap;
 
-use super::LauncherService;
+use super::Content;
 use crate::discover::TextFormat;
 use crate::transfer::Transport;
 use crate::{TranslatedDocument, TranslationError};
 
-impl<T: Transport + Clone> LauncherService<T> {
+impl<T: Transport + Clone> Content<T> {
     /// A project body in Simplified Chinese, from the chosen provider. The
     /// result is HTML whatever `format` the source wrote. Turning translation
     /// off (or changing its settings) while this runs gives `Disabled`.
-    pub async fn translate_body(
+    pub(crate) async fn translate_body(
         &self,
         source: &str,
         project: &str,
@@ -34,7 +34,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// source, by project id. Missing, stale or failed ones are left out, so
     /// the caller keeps the original; a source whose IDs are neither
     /// Modrinth's nor CurseForge's gets nothing.
-    pub async fn translate_summaries(
+    pub(crate) async fn translate_summaries(
         &self,
         source: &str,
         items: &[(String, String)],
@@ -59,7 +59,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         result
     }
 
-    pub async fn clear_translation_cache(&self) -> Result<(), TranslationError> {
+    pub(crate) async fn clear_translation_cache(&self) -> Result<(), TranslationError> {
         self.translation.clear().await
     }
 

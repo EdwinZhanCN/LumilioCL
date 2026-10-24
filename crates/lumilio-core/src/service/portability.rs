@@ -128,7 +128,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         cancel: CancellationToken,
     ) -> Result<u64, ServiceError> {
         let _lease = self.instances.reserve(id)?;
-        let record = self.instance(id).await?;
+        let record = self.instances.record(id).await?;
         let task = self
             .tasks
             .begin(

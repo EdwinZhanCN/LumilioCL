@@ -1,12 +1,12 @@
 use tokio::sync::mpsc;
 
-use super::super::types::ContentEffect;
 use super::{
     change_subjects, fake_java, instance_with_profile, mod_version, publish_release, sha1_hex,
     world,
 };
 use crate::activity::CancellationToken;
 use crate::activity::TaskOutcome;
+use crate::content::ContentEffect;
 use crate::content::ContentError;
 use crate::discover::ProjectKind;
 use crate::error::ServiceError;

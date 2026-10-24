@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-use super::LauncherService;
-use super::types::{DependencyNeed, DependencyReport, InstalledProject};
+use super::Content;
+use super::{DependencyNeed, DependencyReport, InstalledProject};
 use crate::activity::CancellationToken;
 use crate::activity::{RetryAction, TaskAction, TaskCategory, TaskLabel};
 use crate::blocking::blocking;
@@ -16,11 +16,11 @@ use crate::history::{ChangeKind, HistoryEvent, HistoryLog};
 use crate::instances::InstanceRecord;
 use crate::transfer::{SourceChain, TransferRequest, Transport};
 
-impl<T: Transport + Clone> LauncherService<T> {
+impl<T: Transport + Clone> Content<T> {
     /// Downloads one version's file to a place the person chose, instead of
     /// into a game. Returns the file's name. A file already there is replaced
     /// (the person was asked by the save dialog).
-    pub async fn save_version_as(
+    pub(crate) async fn save_version_as(
         &self,
         source: &str,
         project: &str,
@@ -52,7 +52,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         result
     }
 
-    pub(super) async fn save_version_inner(
+    pub(crate) async fn save_version_inner(
         &self,
         task: u64,
         source: &str,
@@ -102,14 +102,14 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// Every file is asked about, whichever source the content list names
     /// for it; files the source does not know are not listed. Needs the
     /// network.
-    pub async fn installed_projects(
+    pub(crate) async fn installed_projects(
         &self,
         instance_id: &str,
         kind: ProjectKind,
         source: &str,
     ) -> Result<BTreeMap<String, InstalledProject>, ServiceError> {
         let client = self.content_client(source).await?;
-        let record = self.instance(instance_id).await?;
+        let record = self.instances.record(instance_id).await?;
         let files = self.hashed_content(instance_id, kind).await?;
         let asked: Vec<(String, PathBuf)> = files
             .iter()
@@ -163,7 +163,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     }
 
     /// The required dependencies the game lacks (see [`Self::dependency_report`]).
-    pub async fn missing_dependencies(
+    pub(crate) async fn missing_dependencies(
         &self,
         instance_id: &str,
         kind: ProjectKind,
@@ -184,7 +184,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// itself incompatible with. Only mods have any of these. A dependency
     /// with no version for this game is listed with `version: None` so the
     /// person is told instead of left to crash.
-    pub async fn dependency_report(
+    pub(crate) async fn dependency_report(
         &self,
         instance_id: &str,
         kind: ProjectKind,
@@ -196,7 +196,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         if kind != ProjectKind::Mod {
             return Ok(DependencyReport::default());
         }
-        let record = self.instance(instance_id).await?;
+        let record = self.instances.record(instance_id).await?;
         let client = self.content_client(source).await?;
         let versions = client.versions(project).await?;
         let root = match version_id {
@@ -306,7 +306,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         })
     }
 
-    pub(super) async fn install_from(
+    pub(crate) async fn install_from(
         &self,
         instance_id: &str,
         kind: ProjectKind,
@@ -349,7 +349,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub(super) async fn install_content_inner(
+    pub(crate) async fn install_content_inner(
         &self,
         task: u64,
         record: &InstanceRecord,
@@ -423,7 +423,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// the old one removed. A disabled file stays disabled. A different file
     /// already using the new name is never overwritten (`Conflict`).
     #[allow(clippy::too_many_arguments)]
-    pub async fn switch_content_version(
+    pub(crate) async fn switch_content_version(
         &self,
         instance_id: &str,
         kind: ProjectKind,
@@ -434,7 +434,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         cancel: CancellationToken,
     ) -> Result<String, ServiceError> {
         let _lease = self.instances.reserve(instance_id)?;
-        self.instance(instance_id).await?;
+        self.instances.record(instance_id).await?;
         let task = self
             .tasks
             .begin(
@@ -471,7 +471,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub(super) async fn switch_inner(
+    pub(crate) async fn switch_inner(
         &self,
         task: u64,
         instance_id: &str,
@@ -542,7 +542,12 @@ impl<T: Transport + Clone> LauncherService<T> {
             // A rename: quick enough to do here.
             crate::content::set_enabled(&game_dir, kind, &written, false)?;
         }
-        self.record_change(instance_id, ChangeKind::ContentUpdated, &written);
+        crate::history::record_change(
+            self.layout.root(),
+            instance_id,
+            ChangeKind::ContentUpdated,
+            &written,
+        );
         Ok(written)
     }
 
@@ -551,7 +556,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// site, the same file (by SHA-1) where the author also published it
     /// (plan curseforge-source D3). Otherwise the person has to download it
     /// by hand, and is told where.
-    pub(super) async fn file_sources(
+    pub(crate) async fn file_sources(
         &self,
         chain: &SourceChain,
         file: &VersionFile,
@@ -576,7 +581,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// The same files, by SHA-1, on a Modrinth-catalog source that lets
     /// launchers download them: their addresses by SHA-1. Asking is best
     /// effort; files it does not have are absent.
-    pub(super) async fn elsewhere(&self, sha1s: &[String]) -> BTreeMap<String, String> {
+    pub(crate) async fn elsewhere(&self, sha1s: &[String]) -> BTreeMap<String, String> {
         let Some(client) = self.plugins.catalog_client(Catalog::Modrinth).await else {
             return BTreeMap::new();
         };

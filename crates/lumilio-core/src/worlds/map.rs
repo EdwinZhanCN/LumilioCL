@@ -3,19 +3,19 @@ use lumilio_plugin_api::map::{
     WorldId,
 };
 
-use super::LauncherService;
+use super::Worlds;
 use crate::error::ServiceError;
 use crate::world_map::store::annotations::{Annotation, AnnotationError};
 use crate::{CancellationToken, MapFailure, MapProviders, Transport, world_map};
 
-impl<T: Transport + Clone> LauncherService<T> {
-    pub async fn map_annotations(
+impl<T: Transport + Clone> Worlds<T> {
+    pub(crate) async fn map_annotations(
         &self,
         instance: &str,
         world: &WorldId,
         dimension: &Dimension,
     ) -> Result<Vec<Annotation>, ServiceError> {
-        self.instance(instance).await?;
+        self.instances.record(instance).await?;
         let (path, instance, world, dimension) = (
             self.layout.database(),
             instance.to_owned(),
@@ -30,12 +30,12 @@ impl<T: Transport + Clone> LauncherService<T> {
         .map_err(|error| ServiceError::Io(std::io::Error::other(error)))
     }
 
-    pub async fn put_map_annotation(
+    pub(crate) async fn put_map_annotation(
         &self,
         instance: &str,
         annotation: Annotation,
     ) -> Result<i64, ServiceError> {
-        self.instance(instance).await?;
+        self.instances.record(instance).await?;
         let (path, instance) = (self.layout.database(), instance.to_owned());
         tokio::task::spawn_blocking(move || {
             world_map::store::annotations::put(&path, &instance, &annotation)
@@ -45,12 +45,12 @@ impl<T: Transport + Clone> LauncherService<T> {
         .map_err(|error: AnnotationError| ServiceError::Io(std::io::Error::other(error)))
     }
 
-    pub async fn remove_map_annotation(
+    pub(crate) async fn remove_map_annotation(
         &self,
         instance: &str,
         id: i64,
     ) -> Result<bool, ServiceError> {
-        self.instance(instance).await?;
+        self.instances.record(instance).await?;
         let (path, instance) = (self.layout.database(), instance.to_owned());
         tokio::task::spawn_blocking(move || {
             world_map::store::annotations::remove(&path, &instance, id)
@@ -60,11 +60,11 @@ impl<T: Transport + Clone> LauncherService<T> {
         .map_err(|error: AnnotationError| ServiceError::Io(std::io::Error::other(error)))
     }
 
-    pub async fn map_contexts(
+    pub(crate) async fn map_contexts(
         &self,
         instance: &str,
     ) -> Result<Vec<world_map::WorldMapContext>, ServiceError> {
-        self.instance(instance).await?;
+        self.instances.record(instance).await?;
         let dir = self.layout.game(instance);
         let instance = instance.to_owned();
         let database = self.layout.database();
@@ -91,13 +91,13 @@ impl<T: Transport + Clone> LauncherService<T> {
     }
     /// Records that the person confirmed a save's Minimap directory. The
     /// directory must exist, so a stale suggestion cannot be linked.
-    pub async fn link_map_xaero(
+    pub(crate) async fn link_map_xaero(
         &self,
         instance: &str,
         folder: &str,
         dir: &str,
     ) -> Result<(), ServiceError> {
-        self.instance(instance).await?;
+        self.instances.record(instance).await?;
         let game = self.layout.game(instance);
         let (database, instance, folder, dir) = (
             self.layout.database(),
@@ -116,8 +116,12 @@ impl<T: Transport + Clone> LauncherService<T> {
         .map_err(std::io::Error::other)?
         .map_err(ServiceError::from)
     }
-    pub async fn unlink_map_xaero(&self, instance: &str, folder: &str) -> Result<(), ServiceError> {
-        self.instance(instance).await?;
+    pub(crate) async fn unlink_map_xaero(
+        &self,
+        instance: &str,
+        folder: &str,
+    ) -> Result<(), ServiceError> {
+        self.instances.record(instance).await?;
         let (database, instance, folder) = (
             self.layout.database(),
             instance.to_owned(),
@@ -131,31 +135,34 @@ impl<T: Transport + Clone> LauncherService<T> {
         .map_err(std::io::Error::other)?;
         Ok(())
     }
-    pub async fn map_providers(&self) -> MapProviders {
+    pub(crate) async fn map_providers(&self) -> MapProviders {
         self.plugins.map_providers().await
     }
-    pub async fn map_overlays(&self, context: &WorldContext) -> Vec<(String, OverlayInfo)> {
+    pub(crate) async fn map_overlays(&self, context: &WorldContext) -> Vec<(String, OverlayInfo)> {
         self.plugins.map_overlays(context).await
     }
-    pub async fn map_objects(
+    pub(crate) async fn map_objects(
         &self,
         instance: &str,
         plugin: &str,
         request: OverlayRequest,
         cancel: CancellationToken,
     ) -> Result<Vec<MapObject>, MapFailure> {
-        self.instance(instance).await.map_err(|_| MapFailure::Off)?;
+        self.instances
+            .record(instance)
+            .await
+            .map_err(|_| MapFailure::Off)?;
         self.plugins
             .map_objects(plugin, self.layout.game(instance), request, cancel)
             .await
     }
-    pub async fn save_map_seed(
+    pub(crate) async fn save_map_seed(
         &self,
         instance: &str,
         seed: i64,
         version: &str,
     ) -> Result<(), ServiceError> {
-        self.instance(instance).await?;
+        self.instances.record(instance).await?;
         if version.is_empty() || version.len() > 64 {
             return Err(ServiceError::Plugin(
                 lumilio_plugin_api::PluginError::InvalidInput("invalid map version".into()),
@@ -174,13 +181,16 @@ impl<T: Transport + Clone> LauncherService<T> {
         .map_err(std::io::Error::other)?;
         Ok(())
     }
-    pub async fn map_tile(
+    pub(crate) async fn map_tile(
         &self,
         instance: &str,
         request: TileRequest,
         cancel: CancellationToken,
     ) -> Result<TileReply, MapFailure> {
-        self.instance(instance).await.map_err(|_| MapFailure::Off)?;
+        self.instances
+            .record(instance)
+            .await
+            .map_err(|_| MapFailure::Off)?;
         let provider = request.key.provider.clone();
         // Check plugin status even on cache hits, so disabled providers vanish.
         if !self
@@ -296,20 +306,23 @@ impl<T: Transport + Clone> LauncherService<T> {
     }
     /// Whether an edit could start now: no game running on the instance and
     /// no other operation holding it.
-    pub fn map_can_edit(&self, instance: &str) -> bool {
+    pub(crate) fn map_can_edit(&self, instance: &str) -> bool {
         self.instances.reserve(instance).is_ok()
     }
     /// Applies a confirmed edit to the instance's files. The instance is held
     /// for the duration, which is how a running game (it holds the same
     /// lease) keeps edits out: Xaero rewrites its files when the player leaves
     /// a world, so a write during play would be lost or would fight it.
-    pub async fn map_apply(
+    pub(crate) async fn map_apply(
         &self,
         instance: &str,
         plugin: &str,
         edit: lumilio_plugin_api::map::ObjectEdit,
     ) -> Result<(), MapFailure> {
-        self.instance(instance).await.map_err(|_| MapFailure::Off)?;
+        self.instances
+            .record(instance)
+            .await
+            .map_err(|_| MapFailure::Off)?;
         let _lease = self
             .instances
             .reserve(instance)
@@ -324,7 +337,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             .await
     }
     /// Clears the shared seed tiles and every instance's save tiles.
-    pub async fn clear_map_cache(&self) -> Result<(), ServiceError> {
+    pub(crate) async fn clear_map_cache(&self) -> Result<(), ServiceError> {
         let (seed, profiles) = (self.layout.map_cache(), self.layout.profiles());
         tokio::task::spawn_blocking(move || {
             world_map::TileCache::clear(&seed)?;

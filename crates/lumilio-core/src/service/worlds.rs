@@ -1,86 +1,49 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+use lumilio_block_assets::{BlockCatalog, BlockNames};
+use lumilio_plugin_api::FileInfo;
+use lumilio_plugin_api::map::{
+    Dimension, MapObject, OverlayInfo, OverlayRequest, TileReply, TileRequest, WorldContext,
+    WorldId,
+};
 
 use super::LauncherService;
 use crate::activity::CancellationToken;
-use crate::activity::{TaskAction, TaskCategory, TaskLabel};
-use crate::error::{ServiceError, read_unless_cancelled};
-use crate::history::ChangeKind;
-use crate::instances::InstanceRecord;
-use crate::transfer::Transport;
-use crate::worlds;
-use crate::worlds::WorldInfo;
+use crate::error::ServiceError;
+use crate::schematic_ops::{SchematicLogEntry, SchematicOperation};
+use crate::screenshots::ScreenshotInfo;
+use crate::servers::{ServerEntry, ServerStatus};
+use crate::world_map::store::annotations::Annotation;
+use crate::worlds::{ModelPreview, WorldInfo};
+use crate::{MapFailure, MapProviders, Transport, schematic_ops, world_map};
 
 impl<T: Transport + Clone> LauncherService<T> {
-    /// The instance's saved worlds. Reading needs no instance lease.
     pub async fn worlds(&self, id: &str) -> Result<Vec<WorldInfo>, ServiceError> {
-        self.instance(id).await?;
-        let game_dir = self.layout.game(id);
-        tokio::task::spawn_blocking(move || worlds::scan(&game_dir))
-            .await
-            .map_err(std::io::Error::other)?
-            .map_err(ServiceError::from)
+        self.worlds.worlds(id).await
     }
 
-    /// Copies a world under a new folder name (`<folder> copy`, `copy 2`… when
-    /// none is given) and returns that name. Never overwrites; the copy appears
-    /// all at once. Takes the instance lease.
     pub async fn copy_world(
         &self,
         id: &str,
         folder: &str,
         new_folder: Option<&str>,
     ) -> Result<String, ServiceError> {
-        let _lease = self.instances.reserve(id)?;
-        self.instance(id).await?;
-        let game_dir = self.layout.game(id);
-        let (folder, requested) = (folder.to_owned(), new_folder.map(str::to_owned));
-        let created = tokio::task::spawn_blocking(move || {
-            // Under the lease nothing else is copying: leftovers are stale.
-            worlds::sweep_temporary(&game_dir);
-            let name = requested.unwrap_or_else(|| worlds::copy_name(&game_dir, &folder));
-            worlds::duplicate(&game_dir, &folder, &name)
-        })
-        .await
-        .map_err(std::io::Error::other)??;
-        self.record_change(id, ChangeKind::WorldCopied, &created);
-        Ok(created)
+        self.worlds.copy_world(id, folder, new_folder).await
     }
 
-    /// Deletes one world folder. Takes the instance lease.
     pub async fn delete_world(&self, id: &str, folder: &str) -> Result<(), ServiceError> {
-        let _lease = self.instances.reserve(id)?;
-        self.instance(id).await?;
-        let game_dir = self.layout.game(id);
-        let name = folder.to_owned();
-        tokio::task::spawn_blocking(move || worlds::delete(&game_dir, &name))
-            .await
-            .map_err(std::io::Error::other)??;
-        self.record_change(id, ChangeKind::WorldDeleted, folder);
-        Ok(())
+        self.worlds.delete_world(id, folder).await
     }
 
-    /// Packs one world into a zip at `destination` and returns its size.
-    /// Takes the instance lease, so the world is not changing underneath.
     pub async fn export_world(
         &self,
         id: &str,
         folder: &str,
         destination: &Path,
     ) -> Result<u64, ServiceError> {
-        let _lease = self.instances.reserve(id)?;
-        self.instance(id).await?;
-        let game_dir = self.layout.game(id);
-        let (folder, destination) = (folder.to_owned(), destination.to_owned());
-        tokio::task::spawn_blocking(move || worlds::export_zip(&game_dir, &folder, &destination))
-            .await
-            .map_err(std::io::Error::other)?
-            .map_err(ServiceError::from)
+        self.worlds.export_world(id, folder, destination).await
     }
 
-    /// Packs the chosen files of the game as a Modrinth modpack at
-    /// `destination`. Files Modrinth knows are listed by address; the rest are
-    /// carried inside. If Modrinth cannot be asked, everything is carried and
-    /// the report says so. Takes the instance lease so the files hold still.
     pub async fn export_modpack(
         &self,
         id: &str,
@@ -88,148 +51,355 @@ impl<T: Transport + Clone> LauncherService<T> {
         destination: &Path,
         cancel: CancellationToken,
     ) -> Result<crate::pack_export::ExportReport, ServiceError> {
-        let _lease = self.instances.reserve(id)?;
-        let record = self.instance(id).await?;
-        let task = self.tasks.begin(
-            TaskCategory::Install,
-            TaskLabel::Typed {
-                action: TaskAction::ExportWorld,
-                subject: spec.name.trim().to_owned(),
-            },
-            Some(id.to_owned()),
-            Some(&cancel),
-        );
-        let result = self
-            .export_modpack_inner(&record, spec, destination, cancel)
+        self.worlds
+            .export_modpack(id, spec, destination, cancel)
             .await
-            .map_err(|error| match error {
-                ServiceError::Export(crate::pack_export::ExportError::Cancelled) => {
-                    ServiceError::Cancelled
-                }
-                other => other,
-            });
-        self.tasks.end(task, &result);
-        result
     }
 
-    pub(super) async fn export_modpack_inner(
-        &self,
-        record: &InstanceRecord,
-        spec: crate::pack_export::ExportSpec,
-        destination: &Path,
-        cancel: CancellationToken,
-    ) -> Result<crate::pack_export::ExportReport, ServiceError> {
-        use crate::pack_export as pack;
-        let game_dir = self.layout.game(&record.id);
-
-        let (dir, include, stop) = (game_dir.clone(), spec.include.clone(), cancel.clone());
-        // Only a Modrinth pack lists files by address, so only it needs hashes.
-        let wants_hashes = spec.format == pack::PackFormat::Modrinth;
-        let (files, hashed) = tokio::task::spawn_blocking(move || {
-            let files = pack::collect_files(&dir, &include)?;
-            let mut hashed = Vec::new();
-            for path in pack::linkable(&files).into_iter().filter(|_| wants_hashes) {
-                if stop.is_cancelled() {
-                    return Err(pack::ExportError::Cancelled);
-                }
-                let file = dir.join(path);
-                let (sha1, sha512) = (crate::content::sha1_hex(&file)?, pack::sha512_hex(&file)?);
-                let size = std::fs::metadata(&file)?.len();
-                hashed.push((path.clone(), sha1, sha512, size));
-            }
-            Ok::<_, pack::ExportError>((files, hashed))
-        })
-        .await
-        .map_err(std::io::Error::other)??;
-
-        if spec.format == pack::PackFormat::Prism {
-            let pack_json = pack::prism_pack_json(
-                &record.game_version,
-                record.loader,
-                record.loader_version.as_deref(),
-            )?;
-            let (destination, name, stop) =
-                (destination.to_owned(), spec.name.clone(), cancel.clone());
-            let bundled = files.len();
-            let size = tokio::task::spawn_blocking(move || {
-                pack::write_prism(&destination, &game_dir, &name, &pack_json, &files, &|| {
-                    stop.is_cancelled()
-                })
-            })
-            .await
-            .map_err(std::io::Error::other)??;
-            return Ok(pack::ExportReport {
-                linked: 0,
-                bundled,
-                lookup_failed: false,
-                size,
-            });
-        }
-
-        // A .mrpack links files only on Modrinth, so only a source of
-        // Modrinth's catalog can say which files it may link.
-        let sha1s: Vec<crate::discover::FileHashes> = hashed
-            .iter()
-            .map(|(_, sha1, _, _)| crate::discover::FileHashes::sha1(sha1.clone()))
-            .collect();
-        let client = read_unless_cancelled(&cancel, async {
-            Ok(self
-                .plugins
-                .catalog_client(crate::discover::Catalog::Modrinth)
-                .await)
-        })
-        .await?;
-        let identified = match client {
-            Some(client) => client.identify(&sha1s).await.ok(),
-            None => None,
-        };
-        let lookup_failed = identified.is_none() && !sha1s.is_empty();
-        let linked = identified
-            .map(|identified| pack::link_identified(&hashed, &identified))
-            .unwrap_or_default();
-        let carried: Vec<String> = files
-            .iter()
-            .filter(|path| !linked.iter().any(|file| &file.path == *path))
-            .cloned()
-            .collect();
-        let index = pack::index_json(
-            &spec,
-            &record.game_version,
-            record.loader,
-            record.loader_version.as_deref(),
-            &linked,
-        )?;
-        let destination = destination.to_owned();
-        let bundled = carried.len();
-        let stop = cancel.clone();
-        let size = tokio::task::spawn_blocking(move || {
-            pack::write_pack(&destination, &game_dir, &index, &carried, &|| {
-                stop.is_cancelled()
-            })
-        })
-        .await
-        .map_err(std::io::Error::other)??;
-        Ok(pack::ExportReport {
-            linked: linked.len(),
-            bundled,
-            lookup_failed,
-            size,
-        })
-    }
-
-    /// Adds the world in a zip as a new world and returns its folder name;
-    /// existing worlds are never replaced. Takes the instance lease.
     pub async fn import_world(&self, id: &str, archive: &Path) -> Result<String, ServiceError> {
-        let _lease = self.instances.reserve(id)?;
-        self.instance(id).await?;
-        let (game_dir, archive) = (self.layout.game(id), archive.to_owned());
-        let created = tokio::task::spawn_blocking(move || {
-            worlds::sweep_temporary(&game_dir);
-            worlds::import_zip(&game_dir, &archive)
-        })
-        .await
-        .map_err(std::io::Error::other)??;
-        self.record_change(id, ChangeKind::WorldImported, &created);
-        Ok(created)
+        self.worlds.import_world(id, archive).await
+    }
+
+    pub async fn servers(&self, id: &str) -> Result<Vec<ServerEntry>, ServiceError> {
+        self.worlds.servers(id).await
+    }
+
+    pub async fn add_server(&self, id: &str, entry: ServerEntry) -> Result<(), ServiceError> {
+        self.worlds.add_server(id, entry).await
+    }
+
+    pub async fn update_server(
+        &self,
+        id: &str,
+        index: usize,
+        expected: ServerEntry,
+        entry: ServerEntry,
+    ) -> Result<(), ServiceError> {
+        self.worlds.update_server(id, index, expected, entry).await
+    }
+
+    pub async fn remove_server(
+        &self,
+        id: &str,
+        index: usize,
+        expected: ServerEntry,
+    ) -> Result<(), ServiceError> {
+        self.worlds.remove_server(id, index, expected).await
+    }
+
+    pub async fn move_server(
+        &self,
+        id: &str,
+        index: usize,
+        expected: ServerEntry,
+        to: usize,
+    ) -> Result<(), ServiceError> {
+        self.worlds.move_server(id, index, expected, to).await
+    }
+
+    pub async fn server_status(
+        &self,
+        id: &str,
+        address: &str,
+    ) -> Result<ServerStatus, ServiceError> {
+        self.worlds.server_status(id, address).await
+    }
+
+    pub async fn screenshots(&self, id: &str) -> Result<Vec<ScreenshotInfo>, ServiceError> {
+        self.worlds.screenshots(id).await
+    }
+
+    pub async fn screenshot_thumbnail(
+        &self,
+        id: &str,
+        file: &str,
+    ) -> Result<PathBuf, ServiceError> {
+        self.worlds.screenshot_thumbnail(id, file).await
+    }
+
+    pub async fn screenshot_bytes(&self, id: &str, file: &str) -> Result<Vec<u8>, ServiceError> {
+        self.worlds.screenshot_bytes(id, file).await
+    }
+
+    pub async fn delete_screenshot(&self, id: &str, file: &str) -> Result<(), ServiceError> {
+        self.worlds.delete_screenshot(id, file).await
+    }
+
+    pub async fn map_annotations(
+        &self,
+        instance: &str,
+        world: &WorldId,
+        dimension: &Dimension,
+    ) -> Result<Vec<Annotation>, ServiceError> {
+        self.worlds
+            .map_annotations(instance, world, dimension)
+            .await
+    }
+
+    pub async fn put_map_annotation(
+        &self,
+        instance: &str,
+        annotation: Annotation,
+    ) -> Result<i64, ServiceError> {
+        self.worlds.put_map_annotation(instance, annotation).await
+    }
+
+    pub async fn remove_map_annotation(
+        &self,
+        instance: &str,
+        id: i64,
+    ) -> Result<bool, ServiceError> {
+        self.worlds.remove_map_annotation(instance, id).await
+    }
+
+    pub async fn map_contexts(
+        &self,
+        instance: &str,
+    ) -> Result<Vec<world_map::WorldMapContext>, ServiceError> {
+        self.worlds.map_contexts(instance).await
+    }
+
+    pub async fn link_map_xaero(
+        &self,
+        instance: &str,
+        folder: &str,
+        dir: &str,
+    ) -> Result<(), ServiceError> {
+        self.worlds.link_map_xaero(instance, folder, dir).await
+    }
+
+    pub async fn unlink_map_xaero(&self, instance: &str, folder: &str) -> Result<(), ServiceError> {
+        self.worlds.unlink_map_xaero(instance, folder).await
+    }
+
+    pub async fn map_providers(&self) -> MapProviders {
+        self.worlds.map_providers().await
+    }
+
+    pub async fn map_overlays(&self, context: &WorldContext) -> Vec<(String, OverlayInfo)> {
+        self.worlds.map_overlays(context).await
+    }
+
+    pub async fn map_objects(
+        &self,
+        instance: &str,
+        plugin: &str,
+        request: OverlayRequest,
+        cancel: CancellationToken,
+    ) -> Result<Vec<MapObject>, MapFailure> {
+        self.worlds
+            .map_objects(instance, plugin, request, cancel)
+            .await
+    }
+
+    pub async fn save_map_seed(
+        &self,
+        instance: &str,
+        seed: i64,
+        version: &str,
+    ) -> Result<(), ServiceError> {
+        self.worlds.save_map_seed(instance, seed, version).await
+    }
+
+    pub async fn map_tile(
+        &self,
+        instance: &str,
+        request: TileRequest,
+        cancel: CancellationToken,
+    ) -> Result<TileReply, MapFailure> {
+        self.worlds.map_tile(instance, request, cancel).await
+    }
+
+    pub fn map_can_edit(&self, instance: &str) -> bool {
+        self.worlds.map_can_edit(instance)
+    }
+
+    pub async fn map_apply(
+        &self,
+        instance: &str,
+        plugin: &str,
+        edit: lumilio_plugin_api::map::ObjectEdit,
+    ) -> Result<(), MapFailure> {
+        self.worlds.map_apply(instance, plugin, edit).await
+    }
+
+    pub async fn clear_map_cache(&self) -> Result<(), ServiceError> {
+        self.worlds.clear_map_cache().await
+    }
+
+    pub async fn schematic_schemes(&self) -> Result<crate::ReplaceSchemes, ServiceError> {
+        self.worlds.schematic_schemes().await
+    }
+
+    pub async fn schematic_schemes_save(
+        &self,
+        schemes: crate::ReplaceSchemes,
+    ) -> Result<crate::ReplaceSchemes, ServiceError> {
+        self.worlds.schematic_schemes_save(schemes).await
+    }
+
+    pub fn schematic_can_write(&self, instance: &str) -> bool {
+        self.worlds.schematic_can_write(instance)
+    }
+
+    pub async fn schematic_files(
+        &self,
+        instance: &str,
+        plugin: &str,
+        folder: &str,
+    ) -> Result<Vec<String>, ServiceError> {
+        self.worlds.schematic_files(instance, plugin, folder).await
+    }
+
+    pub async fn schematic_read(
+        &self,
+        instance: &str,
+        plugin: &str,
+        file: &str,
+    ) -> Result<(Vec<u8>, FileInfo), ServiceError> {
+        self.worlds.schematic_read(instance, plugin, file).await
+    }
+
+    pub async fn schematic_apply(
+        &self,
+        instance: &str,
+        plugin: &str,
+        file: &str,
+        bytes: Vec<u8>,
+        expected: Option<FileInfo>,
+        operation: SchematicOperation,
+    ) -> Result<SchematicLogEntry, ServiceError> {
+        self.worlds
+            .schematic_apply(instance, plugin, file, bytes, expected, operation)
+            .await
+    }
+
+    pub async fn schematic_remove(
+        &self,
+        instance: &str,
+        plugin: &str,
+        files: Vec<(String, FileInfo)>,
+        operation: SchematicOperation,
+    ) -> Result<Vec<SchematicLogEntry>, ServiceError> {
+        self.worlds
+            .schematic_remove(instance, plugin, files, operation)
+            .await
+    }
+
+    pub async fn schematic_history(
+        &self,
+        instance: &str,
+    ) -> Result<Vec<SchematicLogEntry>, ServiceError> {
+        self.worlds.schematic_history(instance).await
+    }
+
+    pub async fn schematic_backups(
+        &self,
+        instance: &str,
+    ) -> Result<Vec<schematic_ops::KeptBackup>, ServiceError> {
+        self.worlds.schematic_backups(instance).await
+    }
+
+    pub async fn schematic_restore_backup(
+        &self,
+        instance: &str,
+        plugin: &str,
+        backup: String,
+    ) -> Result<SchematicLogEntry, ServiceError> {
+        self.worlds
+            .schematic_restore_backup(instance, plugin, backup)
+            .await
+    }
+
+    pub async fn schematic_restore(
+        &self,
+        instance: &str,
+        plugin: &str,
+        index: usize,
+    ) -> Result<SchematicLogEntry, ServiceError> {
+        self.worlds.schematic_restore(instance, plugin, index).await
+    }
+
+    pub async fn schematic_pack_add(
+        &self,
+        instance: &str,
+        folder: &str,
+        pack: PathBuf,
+    ) -> Result<(), ServiceError> {
+        self.worlds.schematic_pack_add(instance, folder, pack).await
+    }
+
+    pub async fn schematic_pack_remove(
+        &self,
+        instance: &str,
+        pack: PathBuf,
+    ) -> Result<(), ServiceError> {
+        self.worlds.schematic_pack_remove(instance, pack).await
+    }
+
+    pub async fn schematic_source_set(
+        &self,
+        instance: &str,
+        folder: &str,
+        source: PathBuf,
+        on: bool,
+    ) -> Result<(), ServiceError> {
+        self.worlds
+            .schematic_source_set(instance, folder, source, on)
+            .await
+    }
+
+    pub async fn schematic_source_move(
+        &self,
+        instance: &str,
+        source: PathBuf,
+        other: PathBuf,
+    ) -> Result<bool, ServiceError> {
+        self.worlds
+            .schematic_source_move(instance, source, other)
+            .await
+    }
+
+    pub async fn plugin_model(
+        &self,
+        instance: &str,
+        plugin: &str,
+        file: &str,
+    ) -> Result<ModelPreview, ServiceError> {
+        self.worlds.plugin_model(instance, plugin, file).await
+    }
+
+    pub async fn schematic_names(&self, instance: &str) -> Result<BlockNames, ServiceError> {
+        self.worlds.schematic_names(instance).await
+    }
+
+    pub async fn schematic_thumbnail<D>(
+        &self,
+        instance: &str,
+        plugin: &str,
+        file: &str,
+        key: &str,
+        draw: D,
+    ) -> Result<Vec<u8>, ServiceError>
+    where
+        D: FnOnce(ModelPreview) -> Result<Vec<u8>, String> + Send + 'static,
+    {
+        self.worlds
+            .schematic_thumbnail(instance, plugin, file, key, draw)
+            .await
+    }
+
+    pub async fn schematic_versions(&self) -> Result<Vec<(String, u32)>, ServiceError> {
+        self.worlds.schematic_versions().await
+    }
+
+    pub async fn schematic_catalogs(
+        &self,
+        target: &str,
+        source_data_version: u32,
+    ) -> Result<(BlockCatalog, Option<BlockCatalog>), ServiceError> {
+        self.worlds
+            .schematic_catalogs(target, source_data_version)
+            .await
     }
 }

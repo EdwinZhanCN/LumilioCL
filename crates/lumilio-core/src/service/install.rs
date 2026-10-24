@@ -90,7 +90,12 @@ impl<T: Transport + Clone> LauncherService<T> {
                 .map_err(ServiceError::from);
         }
         if result.is_ok() {
-            self.record_change(id, ChangeKind::Repaired, "game files");
+            crate::history::record_change(
+                self.layout.root(),
+                id,
+                ChangeKind::Repaired,
+                "game files",
+            );
         }
         self.tasks.end(task, &result);
         result
@@ -142,7 +147,7 @@ impl<T: Transport + Clone> LauncherService<T> {
                 "the game version is empty".to_owned(),
             )));
         }
-        let current = self.instance(id).await?;
+        let current = self.instances.record(id).await?;
         if current.game_version == game_version
             && current.loader == loader
             && current.loader_version == loader_version
@@ -189,7 +194,8 @@ impl<T: Transport + Clone> LauncherService<T> {
         }
         self.tasks.end(task, &result);
         result?;
-        self.record_change(
+        crate::history::record_change(
+            self.layout.root(),
             id,
             ChangeKind::GameVersionChanged,
             &format!(
@@ -200,6 +206,6 @@ impl<T: Transport + Clone> LauncherService<T> {
                 loader_text(loader, loader_version.as_deref()),
             ),
         );
-        self.instance(id).await
+        self.instances.record(id).await
     }
 }

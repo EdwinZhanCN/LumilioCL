@@ -10,35 +10,24 @@ mod accounts;
 mod activity;
 mod appearance;
 mod content;
-mod content_install;
 mod diagnostics;
-mod discover;
 mod game_settings;
 mod install;
 mod instances;
 mod java;
 mod launch;
 mod library;
-mod models;
 mod modpacks;
 mod packs;
-mod pending;
 mod plugins;
 mod portability;
 mod preferences;
-mod recognize;
-mod schematic_ops;
-mod schematic_packs;
-mod screenshots;
-mod servers;
 mod skins;
 mod snapshots;
 mod third_party;
 mod tracking;
-mod translation;
 mod types;
 mod wardrobe;
-mod world_map;
 mod worlds;
 
 #[cfg(test)]
@@ -48,13 +37,8 @@ pub use launcher_service::LauncherService;
 use launcher_service::{CREDENTIAL_PROBE, DIAGNOSED_LIMIT, TOKEN_MARGIN_SECONDS, loader_text};
 
 pub use self::appearance::ProfileSnapshot;
-pub use self::models::ModelPreview;
-pub use self::pending::AddedFile;
 pub use self::third_party::ThirdPartySignIn;
-pub use self::types::{
-    ContentEffect, ContentResult, ContentSourceInfo, DependencyNeed, DependencyReport,
-    DiscoverFilters, InstalledProject, Library, ProjectDetail,
-};
+pub use self::types::Library;
 pub use self::wardrobe::AppearanceApplyResult;
 
 mod launcher_service;

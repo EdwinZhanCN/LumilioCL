@@ -5,9 +5,9 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use super::LauncherService;
+use super::Content;
+use super::{Recognized, Summaries};
 use crate::content::{ContentItem, scan as scan_content};
-use crate::content_sources::{Recognized, Summaries};
 use crate::discover::{ContentClient, FileHashes, ProjectKind, Version};
 use crate::error::ServiceError;
 use crate::instances::InstanceRecord;
@@ -15,28 +15,28 @@ use crate::transfer::Transport;
 
 /// One installed file: what the list shows, where it is, and its SHA-1
 /// (`None` for folder packs and unreadable files).
-pub(super) struct HashedFile {
-    pub(super) item: ContentItem,
-    pub(super) path: PathBuf,
-    pub(super) sha1: Option<String>,
+pub(crate) struct HashedFile {
+    pub(crate) item: ContentItem,
+    pub(crate) path: PathBuf,
+    pub(crate) sha1: Option<String>,
 }
 
 /// What the sources said about a game's files.
 #[derive(Default)]
-pub(super) struct Recognition {
+pub(crate) struct Recognition {
     /// By SHA-1.
-    pub(super) identified: BTreeMap<String, Recognized>,
+    pub(crate) identified: BTreeMap<String, Recognized>,
     /// The newest compatible version, by SHA-1, from the source that knew
     /// the file; only for files asked about.
-    pub(super) latest: BTreeMap<String, Version>,
-    pub(super) projects: Summaries,
+    pub(crate) latest: BTreeMap<String, Version>,
+    pub(crate) projects: Summaries,
     /// Sources that could not be asked, with why.
-    pub(super) failures: Vec<String>,
+    pub(crate) failures: Vec<String>,
 }
 
-impl<T: Transport + Clone> LauncherService<T> {
+impl<T: Transport + Clone> Content<T> {
     /// The installed files of one kind, hashed off the async threads.
-    pub(super) async fn hashed_content(
+    pub(crate) async fn hashed_content(
         &self,
         id: &str,
         kind: ProjectKind,
@@ -65,7 +65,7 @@ impl<T: Transport + Clone> LauncherService<T> {
 
     /// Each file's hashes as `client` reads them; CurseForge's fingerprint
     /// is computed (off the async threads) only for a source that needs it.
-    pub(super) async fn file_hashes(
+    pub(crate) async fn file_hashes(
         client: &ContentClient<'_>,
         files: &[(String, PathBuf)],
     ) -> Vec<FileHashes> {
@@ -93,7 +93,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// it did not know, and (when `record` is given) for the newest version
     /// of the enabled ones that fits the game. A source that cannot answer is
     /// noted and skipped; the next one may still know the files.
-    pub(super) async fn recognize(
+    pub(crate) async fn recognize(
         &self,
         files: &[&HashedFile],
         record: Option<&InstanceRecord>,

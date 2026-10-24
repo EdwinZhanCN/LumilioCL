@@ -1,15 +1,15 @@
-use super::LauncherService;
-use super::types::{ContentSourceInfo, DiscoverFilters, ProjectDetail};
+use super::Content;
+use super::{ContentSourceInfo, DiscoverFilters, ProjectDetail};
 use crate::activity::CancellationToken;
 use crate::discover::{ContentClient, ProjectKind, SearchPage, SearchQuery};
 use crate::error::ServiceError;
 use crate::transfer::Transport;
 
-impl<T: Transport + Clone> LauncherService<T> {
+impl<T: Transport + Clone> Content<T> {
     /// The enabled content source with this plugin ID, asked afresh every
     /// time so that turning the plugin off takes effect at once, whatever
     /// was cached.
-    pub(super) async fn content_client(
+    pub(crate) async fn content_client(
         &self,
         source: &str,
     ) -> Result<ContentClient<'_>, ServiceError> {
@@ -17,7 +17,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     }
 
     /// The content sources that are on, in the order the launcher lists them.
-    pub async fn content_sources(&self) -> Vec<ContentSourceInfo> {
+    pub(crate) async fn content_sources(&self) -> Vec<ContentSourceInfo> {
         self.plugins
             .content_clients()
             .await
@@ -30,7 +30,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             .collect()
     }
 
-    pub async fn search(
+    pub(crate) async fn search(
         &self,
         source: &str,
         query: &SearchQuery,
@@ -42,7 +42,10 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// Discover filters. Fetched once per source and kept for the life of the
     /// service; a failure is not remembered, and a disabled source gives
     /// nothing even when its answer is cached.
-    pub async fn discover_filters(&self, source: &str) -> Result<DiscoverFilters, ServiceError> {
+    pub(crate) async fn discover_filters(
+        &self,
+        source: &str,
+    ) -> Result<DiscoverFilters, ServiceError> {
         let client = self.content_client(source).await?;
         if let Some(filters) = self.filters.lock().await.get(client.plugin_id()) {
             return Ok(filters.clone());
@@ -63,7 +66,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     }
 
     /// Everything the detail window shows about a project.
-    pub async fn project_detail(
+    pub(crate) async fn project_detail(
         &self,
         source: &str,
         project: &str,
@@ -84,7 +87,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     }
 
     /// One version's changelog, for sources that give them one at a time.
-    pub async fn version_changelog(
+    pub(crate) async fn version_changelog(
         &self,
         source: &str,
         project: &str,
@@ -99,7 +102,7 @@ impl<T: Transport + Clone> LauncherService<T> {
 
     /// Installs one specific version of a mod, resource pack or shader into
     /// an instance. Refused when it does not run on the instance.
-    pub async fn install_version(
+    pub(crate) async fn install_version(
         &self,
         instance_id: &str,
         kind: ProjectKind,
@@ -114,7 +117,7 @@ impl<T: Transport + Clone> LauncherService<T> {
 
     /// Installs the newest compatible file of a mod, resource pack or shader
     /// into an instance and returns its file name.
-    pub async fn install_content(
+    pub(crate) async fn install_content(
         &self,
         instance_id: &str,
         kind: ProjectKind,

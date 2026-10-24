@@ -1,8 +1,8 @@
 //! Two content sources at once: Modrinth first, CurseForge second.
 
 use super::*;
+use crate::content::AddedFile;
 use crate::discover::{DEFAULT_SOURCE, ProjectKind, ProjectOrigin};
-use crate::service::AddedFile;
 
 const CF: &str = lumilio_plugin_curseforge::ID;
 const CF_API: &str = "https://api.curseforge.com";

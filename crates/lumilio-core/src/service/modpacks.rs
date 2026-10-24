@@ -28,7 +28,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         cancel: CancellationToken,
     ) -> Result<InstanceRecord, ServiceError> {
         let _lease = self.instances.reserve(source_id)?;
-        let source = self.instance(source_id).await?;
+        let source = self.instances.record(source_id).await?;
         let staged = Staged::claim(&*self.instances.lock().await, "copy", new_name)?;
         let task = self
             .tasks
@@ -281,7 +281,10 @@ impl<T: Transport + Clone> LauncherService<T> {
         if !index.manual.is_empty() {
             // The game is installed either way; the list is how the person
             // learns what to add.
-            let _ = self.save_pending_downloads(&record.id, &index.manual).await;
+            let _ = self
+                .content
+                .save_pending_downloads(&record.id, &index.manual)
+                .await;
         }
         self.settle_current().await;
         Ok(record)
@@ -314,7 +317,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         let elsewhere = if blocked.is_empty() {
             std::collections::BTreeMap::new()
         } else {
-            self.elsewhere(&blocked).await
+            self.content.elsewhere(&blocked).await
         };
         Ok(modpack::curseforge::index(
             &manifest, &resolved, &elsewhere,
@@ -330,7 +333,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         cancel: CancellationToken,
     ) -> Result<InstanceRecord, ServiceError> {
         let chain = read_unless_cancelled(&cancel, self.network.chain()).await?;
-        let client = read_unless_cancelled(&cancel, self.content_client(source)).await?;
+        let client = read_unless_cancelled(&cancel, self.content.content_client(source)).await?;
         let versions = read_unless_cancelled(&cancel, async {
             client.versions(project).await.map_err(ServiceError::from)
         })
@@ -350,7 +353,8 @@ impl<T: Transport + Clone> LauncherService<T> {
             )));
         }
         let pack = self.layout.root().join("downloads").join(&file.filename);
-        let sources = read_unless_cancelled(&cancel, self.file_sources(&chain, file)).await?;
+        let sources =
+            read_unless_cancelled(&cancel, self.content.file_sources(&chain, file)).await?;
         let mut request = TransferRequest::new(format!("pack:{}", version.id), sources, &pack)
             .map_err(|error| ServiceError::Install(error.to_string()))?;
         if file.size > 0 {

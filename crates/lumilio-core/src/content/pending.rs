@@ -4,7 +4,7 @@
 
 use std::path::PathBuf;
 
-use super::LauncherService;
+use super::Content;
 use crate::content::ContentError;
 use crate::error::ServiceError;
 use crate::history::ChangeKind;
@@ -21,13 +21,13 @@ pub enum AddedFile {
     Failed(ContentError),
 }
 
-impl<T: Transport + Clone> LauncherService<T> {
+impl<T: Transport + Clone> Content<T> {
     /// Where an instance's list of files to add by hand is kept.
     fn pending_path(&self, id: &str) -> std::path::PathBuf {
         self.layout.profile(id).join("pending-downloads.json")
     }
 
-    pub(super) async fn save_pending_downloads(
+    pub(crate) async fn save_pending_downloads(
         &self,
         id: &str,
         files: &[PendingDownload],
@@ -49,7 +49,10 @@ impl<T: Transport + Clone> LauncherService<T> {
 
     /// Files the game still needs that the launcher could not download (a
     /// pack's files whose authors allow downloads only on the source's site).
-    pub async fn pending_downloads(&self, id: &str) -> Result<Vec<PendingDownload>, ServiceError> {
+    pub(crate) async fn pending_downloads(
+        &self,
+        id: &str,
+    ) -> Result<Vec<PendingDownload>, ServiceError> {
         match tokio::fs::read(self.pending_path(id)).await {
             Ok(bytes) => Ok(serde_json::from_slice(&bytes).unwrap_or_default()),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Vec::new()),
@@ -62,13 +65,13 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// counts and a different file never takes another's place. A file
     /// already there is not replaced unless it is the same. Needs the
     /// instance lease.
-    pub async fn add_pending_files(
+    pub(crate) async fn add_pending_files(
         &self,
         id: &str,
         files: Vec<PathBuf>,
     ) -> Result<Vec<(String, AddedFile)>, ServiceError> {
         let _lease = self.instances.reserve(id)?;
-        self.instance(id).await?;
+        self.instances.record(id).await?;
         let mut waiting = self.pending_downloads(id).await?;
         let game_dir = self.layout.game(id);
         let mut results = Vec::with_capacity(files.len());
@@ -107,7 +110,12 @@ impl<T: Transport + Clone> LauncherService<T> {
             match placed {
                 Ok(()) => {
                     let pending = waiting.remove(at);
-                    self.record_change(id, ChangeKind::ContentAdded, &pending.file_name);
+                    crate::history::record_change(
+                        self.layout.root(),
+                        id,
+                        ChangeKind::ContentAdded,
+                        &pending.file_name,
+                    );
                     results.push((shown, AddedFile::Placed(pending.path)));
                 }
                 Err(error) => results.push((shown, AddedFile::Failed(error))),
