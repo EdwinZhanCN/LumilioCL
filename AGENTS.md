@@ -53,7 +53,8 @@ needs eyes.
     and edge cases.
 - **Current plans, decisions and lessons**: `.agents/plans/*.json`.
   **What is wanted but not planned**: `.agents/plans/backlog.md`.
-- **How the UI looks, moves and speaks**: `docs/design-language.md` and `docs/design-patterns.md`.
+- **How the UI looks, moves and speaks**: `docs/design-language.md`, `docs/plain-language.md`
+  and `docs/design-patterns.md`.
 
 Don't write documents that restate the code or upstream; they go stale.
 

@@ -100,18 +100,17 @@ fn list_item(
 fn remove_action(row: &AccountRow, ctx: &LiveCtx) -> impl Fn(&mut Window, &mut App) + 'static {
     let handler = ctx.handler.clone();
     let (key, name) = (row.key.clone(), row.name.clone());
-    let selected = row.selected;
-    let signed_in = row.signed_in();
+    let description = if row.signed_in() {
+        tr!("account-remove-body-signed-in")
+    } else if row.custom_id {
+        tr!("account-remove-body-offline-custom")
+    } else {
+        tr!("account-remove-body-offline")
+    };
     move |window: &mut Window, cx: &mut App| {
         let handler = handler.clone();
         let target = key.clone();
         let title = tr!("account-remove-title", name = name.as_str());
-        let description = match (signed_in, selected) {
-            (true, true) => tr!("account-remove-body-signed-in-current"),
-            (true, false) => tr!("account-remove-body-signed-in"),
-            (false, true) => tr!("account-remove-body-offline-current"),
-            (false, false) => tr!("account-remove-body-offline"),
-        };
         window.open_alert_dialog(cx, move |alert, _, _| {
             let handler = handler.clone();
             let target = target.clone();

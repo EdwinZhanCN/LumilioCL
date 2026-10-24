@@ -113,6 +113,102 @@ fn a_count_chooses_its_english_plural() {
     );
 }
 
+/// How wide each message of one catalog is shown, in half characters, with
+/// how many sentences or lines it has. A select counts its widest variant.
+fn measures(locale: Locale) -> BTreeMap<String, (usize, usize)> {
+    let path = format!("{}/{DOMAIN}.ftl", locale.tag());
+    let file = Catalogs::get(&path).unwrap_or_else(|| panic!("{path} is compiled in"));
+    let source = std::str::from_utf8(&file.data).expect("catalogs are UTF-8");
+    let resource = fluent_syntax::parser::parse(source)
+        .unwrap_or_else(|(_, errors)| panic!("{path} does not parse: {errors:?}"));
+    resource
+        .body
+        .iter()
+        .filter_map(|entry| match entry {
+            Entry::Message(message) => message
+                .value
+                .as_ref()
+                .map(|pattern| (message.id.name.to_owned(), measure(pattern))),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Plain-language §6: a Latin letter, digit, space or mark is half a
+/// character, any other character or an argument one.
+fn measure(pattern: &Pattern<&str>) -> (usize, usize) {
+    pattern
+        .elements
+        .iter()
+        .map(|element| match element {
+            PatternElement::TextElement { value } => (
+                value
+                    .chars()
+                    .map(|c| if c.is_ascii() { 1 } else { 2 })
+                    .sum(),
+                value.matches(['。', '！', '？', '\n']).count(),
+            ),
+            PatternElement::Placeable {
+                expression: Expression::Select { variants, .. },
+            } => variants
+                .iter()
+                .map(|variant| measure(&variant.value))
+                .max()
+                .unwrap_or_default(),
+            PatternElement::Placeable { .. } => (2, 0),
+        })
+        .fold((0, 0), |(width, ends), (more, more_ends)| {
+            (width + more, ends + more_ends)
+        })
+}
+
+/// A message named `*-help` or `*-note` is a hint: a ⓘ, a key's tooltip or a
+/// line under a field. A tooltip never wraps, so a hint is one sentence of at
+/// most 20 characters, and its English is at most twice as wide
+/// (plain-language §6). `long-hints.txt` lists the hints not revised yet; it
+/// may only shrink.
+#[test]
+fn hints_fit_one_line() {
+    let chinese = measures(Locale::SimplifiedChinese);
+    let english = measures(Locale::English);
+    let long: BTreeMap<&str, String> = chinese
+        .iter()
+        .filter(|(id, _)| id.ends_with("-help") || id.ends_with("-note"))
+        .filter_map(|(id, &(width, ends))| {
+            let english = english.get(id).map_or(0, |&(width, _)| width);
+            (width > 40 || ends > 1 || english > 80).then(|| {
+                let shown = format!(
+                    "{} characters, {ends} sentences, English {}",
+                    width as f32 / 2.0,
+                    english as f32 / 2.0
+                );
+                (id.as_str(), shown)
+            })
+        })
+        .collect();
+    let list_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/i18n/long-hints.txt");
+    let list = std::fs::read_to_string(&list_path).unwrap_or_default();
+    let listed: BTreeSet<&str> = list
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+        .collect();
+    let grown: Vec<_> = long
+        .iter()
+        .filter(|(id, _)| !listed.contains(*id))
+        .collect();
+    assert!(
+        grown.is_empty(),
+        "hints longer than one line: {grown:?}; cut them to the plain-language §6 limit, or \
+         move the facts to a key's tooltip or the documentation"
+    );
+    let fitted: Vec<_> = listed.iter().filter(|id| !long.contains_key(*id)).collect();
+    assert!(
+        fitted.is_empty(),
+        "these hints fit now or are gone; remove them from long-hints.txt: {fitted:?}"
+    );
+}
+
 /// UTF-8 saved again as Latin-1 turns Chinese into C1 control characters
 /// (U+0080–U+009F), which no catalog writes on purpose.
 #[test]
