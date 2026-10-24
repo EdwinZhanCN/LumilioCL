@@ -11,7 +11,7 @@ use std::path::Path;
 use lumilio_block_assets::{BlockNames, NAME_LANGUAGES, names_in_lang_file};
 
 use super::InstalledClient;
-use crate::release::ReleaseManifest;
+use lumilio_minecraft::ReleaseManifest;
 
 /// The names in `clients`' language files, the first client's first:
 /// pass the instance's own client before the others. `assets` is the

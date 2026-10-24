@@ -2,9 +2,9 @@
 
 # Workspace 业务边界与状态归属重构
 
-Status: Proposed
+Status: InProgress
 
-保留 app → ui → core 的主分层和已有专业能力 crates；将 core 内的业务状态、流程和持久化职责按能力封装，将 UI 的页面状态、控制逻辑、视图和测试收拢到所属 feature。首个新增 crate 建议为 lumilio-minecraft，仅承担 Minecraft 元数据模型与纯解析规则。按元数据、启动、其他 core 能力、Discover、其他 UI 功能的顺序迁移，每阶段保持可运行和可验证。本计划为 proposed；本轮只调查并制定方案，尚未开始架构实现。
+保留 app → ui → core 的主分层和已有专业能力 crates；将 core 内的业务状态、流程和持久化职责按能力封装，将 UI 的页面状态、控制逻辑、视图和测试收拢到所属 feature。首个新增 crate 建议为 lumilio-minecraft，仅承担 Minecraft 元数据模型与纯解析规则。按元数据、启动、其他 core 能力、Discover、其他 UI 功能的顺序迁移，每阶段保持可运行和可验证。实施在 build/workspace-architecture 分支上按阶段提交，基线为 rust-structure-style 的提交 f71ae6b。
 
 ## Scope
 
@@ -22,9 +22,9 @@ Status: Proposed
 
 ## Tasks
 
-- [ ] T1 — 建立可核对的基线，确定模块接口与状态所有者 (Proposed)
+- [x] T1 — 建立可核对的基线，确定模块接口与状态所有者 (Completed)
   Acceptance: 实施前将 rust-structure-style 已完成的工作与本轮架构修改分开形成可审查基线，保留既有工作区修改。使用 cargo metadata 核查全部 workspace 成员的生产依赖；确认 D2–D8 的目标边界和持久化、锁、Context 通知、后台任务的所有者。在本计划记录需要调整的决定和理由。确认 seed-map-prediction、world-explorer、error-reporting、discover-translation 的已有契约和进行中范围，安排逐能力提交，避免在相同源码上混合推进两个重构。
-- [ ] T2 — 提取纯元数据 crate lumilio-minecraft (Proposed)
+- [x] T2 — 提取纯元数据 crate lumilio-minecraft (Completed)
   Acceptance: 按 D2 提取坐标、兼容规则、版本描述、继承合并和目录元数据的纯模型/解析；网络获取和来源路由留在 core。新 crate 不依赖 core、UI、插件宿主、传输引擎、数据库或凭据服务，不做文件/网络/进程 I/O。解决现有 pub(crate) 库文件解析和参数展开的跨 crate 接口，只公开具有业务意义的操作与结果，不批量公开内部字段。原类型由 core 刻意 re-export，保留类型身份和现有调用入口。继承循环、缺失父版本、未知 JSON 字段保留、旧新参数格式和 native 选择夹具在新边界通过；core 的真实启动准备路径继续通过。若提取必须反向依赖 core 或引入笼统的共享类型 crate，停止扩大提取范围并先修订边界决定。
 - [ ] T3 — 以启动流程验证 core 的能力封装 (Proposed)
   Acceptance: 将启动计划、执行、进程、会话和启动恢复收拢到 launching，建立明确的启动协调者；LauncherService 的相应方法只委托能力入口。启动协调者接收实例、认证、Java、安装、任务等具体依赖，不接收整个 LauncherService。一次性 Java 选择和会话生命周期有唯一所有者，实例互斥租约仍与实例写入/删除共用同一份权威状态。保留取消、缺失目录、离线启动、极短进程、启动/退出事件次数、历史写入失败、游戏设置准备与回收、日志捕获、插件事件以及 Windows background_command 契约。按 D10 在能证明行为的最低边界验证，核心测试不引入 GPUI。
@@ -46,7 +46,7 @@ Status: Proposed
 - 计划 JSON 有效，生成输出与 just docs 通过
   Result: 2026-10-23：cargo run -p lumilio-docgen -- plans validate 与 just plans 成功；just docs 通过全部 32 个 docgen 测试、5 个 preserve_order 计划测试、plans-check 和 cargo fmt --check。git diff --check 通过。仅新增本计划及 docs/plans/workspace-architecture.md，内部计划未改变网站路线图投影；架构实现与其验收均待开展。
 - 元数据和专业能力 crates 可以独立验证，生产依赖方向由检查保护
-  Result: pending
+  Result: 2026-10-23（T2）：lumilio-minecraft 只依赖 regex、serde、serde_json；cargo nextest run -p lumilio-minecraft -p lumilio-core 832 项通过，clippy -D warnings 与 rustdoc 链接检查通过。新增 lumilio-docgen tests/crate_boundaries.rs 检查生产依赖分层与 lumilio-minecraft 依赖白名单；向 lumilio-minecraft 注入 tokio 依赖后该检查失败，撤销后通过。其余专业 crates 的结论待 T7。
 - core 能力拥有自己的状态，启动/认证/持久化/取消等既有不变量有行为测试证据
   Result: pending
 - UI feature 拥有页面状态与控制流程，app/shell 只保留对应组合和适配职责
@@ -142,6 +142,14 @@ Why: 元数据提取先验证 crate 接口；启动先验证 core 协调；Disco
 
 Consequences: 每个阶段可以分成更小提交，所有受影响调用方与测试同批更新并保持构建通过。各阶段使用现有 justfile 选择窄检查，代码交付必须 just check，规则/计划交付必须 just docs。没有真实窗口或平台证据时不能将相应验收标为通过。已存在的 seed-map-prediction 等计划继续维护自己的产品验收，本计划只承担迁移保持其行为的证据。
 
+## Decision D12
+
+lumilio-minecraft 同时包含由元数据计算的启动计划；宿主描述保留由编译目标得出的 HostProfile::current；版本目录获取作为 core::minecraft::fetch_catalog。
+
+Why: ReleaseManifest::build_launch_plan 是 ReleaseManifest 的固有方法，只读取 release、显式 HostProfile 与目录路径，不做 I/O；留在 core 会迫使参数展开、库文件解析等 crate 内接口整体公开。HostProfile::current 只读取 std::env::consts 编译常量，不探测运行时系统。CatalogError 的 Fetch 变体依赖 core 的 FetchError，且原 fetch 只会返回该变体。
+
+Consequences: lumilio-minecraft 公开 LaunchContext/LaunchPlan 等启动计划类型；只为 core 的真实调用新增公开 LibraryDependency::resolve_file 与 ResolvedLibraryFile 的路径/下载访问器、native_classifiers、MachineArchitecture::matches_name 和 ReleaseManifest::jar_id，其余字段保持 crate 内可见。core 通过同一类型 re-export 保留 lumilio_core:: 路径；VersionCatalog::fetch 改为 lumilio_core::fetch_catalog 并返回 FetchError，CatalogError 只剩 Decode。运行时宿主探测（Java 位置、内存）继续在 core。
+
 ## References
 
 - AGENTS.md
@@ -163,3 +171,5 @@ Consequences: 每个阶段可以分成更小提交，所有受影响调用方与
 - https://doc.rust-lang.org/book/ch07-00-managing-growing-projects-with-packages-crates-and-modules.html
 - https://rust-lang.github.io/api-guidelines/
 - [Plan rust-structure-style](rust-structure-style.md)
+
+- Lesson: T2 时 cargo fmt --all 改写了 forks/nucleation、forks/schematic-mesher 与 vendor/xaerotools 的数百个文件（它们是 path 依赖）。守护：只用 just format（cargo fmt）或 just fmt，不加 --all；提交前用 git status 确认 forks/ 与 vendor/ 未改。

@@ -6,11 +6,11 @@ use std::{fmt, fs, io};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 
-use crate::launch::LaunchDirectories;
 use crate::layout::Layout;
 use crate::persist;
 use crate::persist::{PersistError, Versioned};
 use crate::tuning::InstanceLaunch;
+use lumilio_minecraft::LaunchDirectories;
 
 /// Stored as SQLite's `user_version`; bump with a migration when tables change.
 pub(super) const SCHEMA_VERSION: u32 = 6;

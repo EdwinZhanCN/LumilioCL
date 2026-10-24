@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::environment::HostProfile;
+use lumilio_minecraft::HostProfile;
 
 /// A Java installation the launcher can start the game with.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -116,7 +116,7 @@ pub fn rosetta_missing(host: &HostProfile) -> bool {
 }
 
 pub(super) fn rosetta_missing_at(host: &HostProfile, runtime: &Path) -> bool {
-    use crate::environment::{MachineArchitecture, PlatformFamily};
+    use lumilio_minecraft::{MachineArchitecture, PlatformFamily};
     *host.platform() == PlatformFamily::MacOs
         && *host.architecture() == MachineArchitecture::Arm64
         && !runtime.is_file()

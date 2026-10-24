@@ -5,7 +5,6 @@ use super::progress::{GameForwarder, ItemProgress, handle_stage, uses_installer}
 use super::types::{JavaRequest, LaunchRequest, LaunchServiceError, LaunchUpdate};
 use super::{LAUNCHER_NAME, Launcher, QUICK_PLAY_LOG, output};
 use crate::activity::CancellationToken;
-use crate::environment::HostProfile;
 use crate::fetch::{FetchError, fetch_decoded, fetch_document};
 use crate::forge_install::ForgeError;
 use crate::install::{InstallError, InstallationPlan, Installer};
@@ -14,15 +13,16 @@ use crate::java::{
     JavaChoice, JavaNeeds, JavaRuntime, choose, install_build, install_major, rosetta_missing,
 };
 use crate::java_runtime::JavaBuild;
-use crate::launch::{LaunchContext, LaunchPlan};
 use crate::launch_session::{LaunchPhase, LaunchSignal};
 use crate::loader::{LAUNCHABLE_LOADERS, normalize_profile};
 use crate::process::{GameExit, GameOptions, LogStream};
-use crate::release::{ReleaseManifest, ReleaseSet};
 use crate::repair::InstallationVerifier;
 use crate::transfer::{TransferEvent, TransferRequest, Transport};
 use crate::tuning::QuickPlay;
 use crate::{forge_install, process};
+use lumilio_minecraft::HostProfile;
+use lumilio_minecraft::{LaunchContext, LaunchPlan};
+use lumilio_minecraft::{ReleaseManifest, ReleaseSet};
 
 impl<T> Launcher<T>
 where
@@ -173,30 +173,30 @@ where
         let mut requests = Vec::new();
         for library in &read.profile.libraries {
             let file = library.resolve_file(&host);
-            let destination = libraries.join(&file.relative_path);
-            let intact = match file.download.sha1() {
+            let destination = libraries.join(file.relative_path());
+            let intact = match file.download().sha1() {
                 Some(digest) => crate::content::sha1_hex(&destination)
                     .is_ok_and(|actual| actual.eq_ignore_ascii_case(digest)),
                 None => destination.is_file(),
             };
             if intact
-                || forge_install::extract_embedded(&installer, &file.relative_path, &destination)
+                || forge_install::extract_embedded(&installer, file.relative_path(), &destination)
             {
                 continue;
             }
-            let url = file.download.url().ok_or_else(|| {
+            let url = file.download().url().ok_or_else(|| {
                 LaunchServiceError::Loader(ForgeError::Profile(format!(
                     "{} has no address",
-                    file.relative_path
+                    file.relative_path()
                 )))
             })?;
             let mut transfer = TransferRequest::new(
-                file.relative_path.clone(),
+                file.relative_path().to_owned(),
                 self.sources.candidates(url),
                 destination,
             )
             .map_err(|error| LaunchServiceError::Install(InstallError::from(error)))?;
-            if let Some(digest) = file.download.sha1() {
+            if let Some(digest) = file.download().sha1() {
                 transfer = transfer
                     .expect_sha1(digest)
                     .map_err(|error| LaunchServiceError::Install(InstallError::from(error)))?;

@@ -17,7 +17,7 @@ pub use self::choice::{
 };
 pub use self::locator::JavaLocator;
 #[cfg(test)]
-use crate::environment::HostProfile;
+use lumilio_minecraft::HostProfile;
 
 #[cfg(test)]
 mod tests;

@@ -6,9 +6,9 @@ use std::path::{Path, PathBuf};
 use super::assets::AssetIndex;
 use super::files::{validate_protocol_path, validate_single_component};
 use super::installer::InstallError;
-use crate::launch::{LaunchDirectories, LaunchPlan};
-use crate::release::{DownloadDescriptor, ReleaseManifest};
 use crate::transfer::{SourceChain, TransferRequest};
+use lumilio_minecraft::{DownloadDescriptor, ReleaseManifest};
+use lumilio_minecraft::{LaunchDirectories, LaunchPlan};
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum ArtifactKind {

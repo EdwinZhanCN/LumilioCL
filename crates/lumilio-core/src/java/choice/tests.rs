@@ -1,7 +1,7 @@
 use super::*;
-use crate::environment::{MachineArchitecture, PlatformFamily};
 use crate::java::JavaLocator;
 use crate::java::tests::install_as;
+use lumilio_minecraft::{MachineArchitecture, PlatformFamily};
 
 fn mac() -> HostProfile {
     HostProfile::new(PlatformFamily::MacOs, MachineArchitecture::Arm64, "")
@@ -277,7 +277,7 @@ fn intel_only_natives_take_an_intel_java_on_arm() {
 
 #[test]
 fn a_release_names_its_natives_by_classifier_and_by_system() {
-    let release = crate::release::ReleaseManifest::decode_json(
+    let release = lumilio_minecraft::ReleaseManifest::decode_json(
         r#"{
             "id": "1.6.4",
             "mainClass": "net.minecraft.client.main.Main",

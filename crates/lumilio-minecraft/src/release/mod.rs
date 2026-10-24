@@ -5,7 +5,7 @@ mod library;
 
 pub(crate) use arguments::expand_variables;
 pub use arguments::{ArgumentGroups, ArgumentTemplate};
-pub use library::LibraryDependency;
+pub use library::{LibraryDependency, ResolvedLibraryFile};
 use release_manifest::DEFAULT_LIBRARY_REPOSITORY;
 pub use release_manifest::{
     AssetCatalog, DownloadDescriptor, ExtractionPolicy, IdentifiedDownload, JavaRequirement,

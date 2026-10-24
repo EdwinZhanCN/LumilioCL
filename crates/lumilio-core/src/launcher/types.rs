@@ -7,11 +7,11 @@ use crate::forge_install::ForgeError;
 use crate::install::InstallError;
 use crate::instance::{InstanceRecord, Loader};
 use crate::java::JavaRuntime;
-use crate::launch::{LaunchDirectories, LaunchError};
 use crate::launch_session::{LaunchFailure, LaunchProblem, LaunchSignal};
 use crate::process::{LogStream, ProcessError};
-use crate::release::ReleaseError;
 use crate::tuning::{LaunchTuning, QuickPlay};
+use lumilio_minecraft::ReleaseError;
+use lumilio_minecraft::{LaunchDirectories, LaunchError};
 
 /// Everything a launch needs that is not part of the instance record.
 #[derive(Clone, Debug)]

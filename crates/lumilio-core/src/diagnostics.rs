@@ -13,10 +13,10 @@ pub use lumilio_plugin_api::Severity;
 
 use crate::content::{ContentItem, ModMetadata};
 use crate::discover::is_safe_file_name;
-use crate::environment::HostProfile;
 use crate::history::SessionOutcome;
 use crate::instance::{InstanceRecord, Loader};
 use crate::java::{JavaNeeds, JavaRuntime, choose, install_major};
+use lumilio_minecraft::HostProfile;
 
 /// Below this maximum heap (MB) the game is likely to run out of memory.
 pub const LOW_MEMORY_MB: u32 = 1024;

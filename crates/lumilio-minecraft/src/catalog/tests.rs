@@ -93,28 +93,3 @@ fn rejects_a_document_without_versions() {
         Err(CatalogError::Decode(_))
     ));
 }
-
-#[tokio::test]
-async fn fetches_through_a_local_source() {
-    use crate::transfer::{FileTransport, OfficialSource};
-    let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("catalog.json");
-    std::fs::write(&path, DOC).unwrap();
-    // A mirror that rewrites the official address onto the local file.
-    struct Local(String);
-    impl crate::transfer::SourceProvider for Local {
-        fn candidates(&self, _: &str) -> Vec<String> {
-            vec![self.0.clone()]
-        }
-    }
-    let url = url::Url::from_file_path(&path).unwrap().to_string();
-    let chain = SourceChain::new([
-        std::sync::Arc::new(Local(url)) as std::sync::Arc<dyn crate::transfer::SourceProvider>,
-        std::sync::Arc::new(OfficialSource),
-    ])
-    .unwrap();
-    let catalog = VersionCatalog::fetch(&TransferEngine::new(FileTransport, 1).unwrap(), &chain)
-        .await
-        .unwrap();
-    assert_eq!(catalog.entries().len(), 5);
-}

@@ -408,7 +408,9 @@ impl ReleaseManifest {
         self.arguments.as_ref()
     }
 
-    pub(crate) fn jar_id(&self) -> &str {
+    /// The release whose client jar this one runs.
+    #[must_use]
+    pub fn jar_id(&self) -> &str {
         self.jar_id.as_deref().unwrap_or(&self.id)
     }
 

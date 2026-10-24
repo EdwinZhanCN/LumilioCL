@@ -9,9 +9,6 @@ use std::fmt::{Display, Formatter};
 
 use serde::Deserialize;
 
-use crate::fetch::{FetchError, fetch_decoded};
-use crate::transfer::{SourceChain, TransferEngine, Transport};
-
 /// Where the official catalog lives.
 pub const OFFICIAL_CATALOG_URL: &str =
     "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
@@ -149,25 +146,17 @@ pub struct VersionCatalog {
 #[derive(Debug)]
 pub enum CatalogError {
     Decode(String),
-    Fetch(FetchError),
 }
 
 impl Display for CatalogError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::Decode(message) => write!(f, "invalid version catalog: {message}"),
-            Self::Fetch(error) => write!(f, "version catalog unavailable: {error}"),
         }
     }
 }
 
 impl Error for CatalogError {}
-
-impl From<FetchError> for CatalogError {
-    fn from(error: FetchError) -> Self {
-        Self::Fetch(error)
-    }
-}
 
 impl VersionCatalog {
     /// Decodes a catalog document.
@@ -211,20 +200,6 @@ impl VersionCatalog {
             latest_release: raw.latest.release,
             latest_snapshot: raw.latest.snapshot,
         })
-    }
-
-    /// Fetches the catalog from the first source that answers.
-    pub async fn fetch<T: Transport>(
-        engine: &TransferEngine<T>,
-        chain: &SourceChain,
-    ) -> Result<Self, CatalogError> {
-        let sources = chain.candidates(OFFICIAL_CATALOG_URL);
-        Ok(fetch_decoded(engine, &sources, |bytes| {
-            let text = String::from_utf8(bytes)
-                .map_err(|error| CatalogError::Decode(error.utf8_error().to_string()))?;
-            Self::decode_json(&text)
-        })
-        .await?)
     }
 
     #[must_use]

@@ -7,8 +7,8 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 use super::graalvm;
-use crate::environment::{HostProfile, MachineArchitecture, PlatformFamily};
 use crate::modpack::is_safe_relative;
+use lumilio_minecraft::{HostProfile, MachineArchitecture, PlatformFamily};
 
 /// Where the launcher downloads a Java from.
 #[derive(

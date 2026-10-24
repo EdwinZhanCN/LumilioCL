@@ -20,7 +20,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::instance::InstanceRecord;
-use crate::launch::LaunchDirectories;
+use lumilio_minecraft::LaunchDirectories;
 
 #[derive(Clone, Debug)]
 pub struct Layout {

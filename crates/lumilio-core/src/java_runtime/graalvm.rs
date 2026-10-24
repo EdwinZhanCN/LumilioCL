@@ -13,7 +13,7 @@
 
 use super::JavaRuntimeError;
 use super::archive::ArchiveKind;
-use crate::environment::{HostProfile, MachineArchitecture, PlatformFamily};
+use lumilio_minecraft::{HostProfile, MachineArchitecture, PlatformFamily};
 
 /// The Java majors with a `latest` address, ascending.
 pub const MAJORS: [u32; 2] = [21, 25];

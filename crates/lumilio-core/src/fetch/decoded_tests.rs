@@ -2,11 +2,11 @@ use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
 use super::*;
-use crate::catalog::{OFFICIAL_CATALOG_URL, VersionCatalog};
 use crate::loader;
 use crate::transfer::{
     OfficialSource, PrefixMirror, SourceChain, TransportFuture, TransportResponse,
 };
+use lumilio_minecraft::OFFICIAL_CATALOG_URL;
 
 #[derive(Default)]
 struct Web {
@@ -55,10 +55,12 @@ async fn catalog_falls_back_from_http_200_with_bad_json_structure_or_encoding() 
             Arc::new(OfficialSource),
         ])
         .unwrap();
-        let catalog =
-            VersionCatalog::fetch(&TransferEngine::new(web.clone(), 1).unwrap(), &sources)
-                .await
-                .unwrap();
+        let catalog = crate::minecraft::fetch_catalog(
+            &TransferEngine::new(web.clone(), 1).unwrap(),
+            &sources,
+        )
+        .await
+        .unwrap();
         assert_eq!(catalog.entries()[0].id(), "1.21");
         assert_eq!(*web.asked.lock().unwrap(), [mirror, OFFICIAL_CATALOG_URL]);
     }

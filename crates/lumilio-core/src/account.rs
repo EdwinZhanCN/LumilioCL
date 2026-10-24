@@ -9,7 +9,7 @@ use std::fmt::{Display, Formatter};
 
 use md5::{Digest, Md5};
 
-use crate::launch::LaunchContext;
+use lumilio_minecraft::LaunchContext;
 
 /// Longest profile name the game accepts.
 pub const MAX_PROFILE_NAME: usize = 16;

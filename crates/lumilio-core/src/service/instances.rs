@@ -5,7 +5,6 @@ use super::support::blocking;
 use super::types::now;
 use super::{DIAGNOSED_LIMIT, LauncherService};
 use crate::attention::{HomeSummary, summarize};
-use crate::catalog::VersionCatalog;
 use crate::deletion::Deletion;
 use crate::diagnostics::Problem;
 use crate::fetch::fetch_decoded;
@@ -122,7 +121,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         let chain = self.chain().await?;
         let game_version = match game_version {
             Some(version) => version.to_owned(),
-            None => VersionCatalog::fetch(&self.fetcher(), &chain)
+            None => crate::minecraft::fetch_catalog(&self.fetcher(), &chain)
                 .await
                 .map_err(|error| ServiceError::Remote(error.to_string()))?
                 .latest_release()
@@ -183,9 +182,11 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// Every game version the catalog lists, newest first, for choosing one
     /// (IA P-VERSION). Read fresh each time; a failure is reported, never
     /// replaced by a guess.
-    pub async fn game_versions(&self) -> Result<Vec<crate::catalog::CatalogEntry>, ServiceError> {
+    pub async fn game_versions(
+        &self,
+    ) -> Result<Vec<lumilio_minecraft::CatalogEntry>, ServiceError> {
         let chain = self.chain().await?;
-        let catalog = VersionCatalog::fetch(&self.fetcher(), &chain)
+        let catalog = crate::minecraft::fetch_catalog(&self.fetcher(), &chain)
             .await
             .map_err(|error| ServiceError::Remote(error.to_string()))?;
         Ok(catalog.entries().to_vec())

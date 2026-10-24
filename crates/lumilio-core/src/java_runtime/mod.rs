@@ -23,7 +23,7 @@ pub use distribution::{
 };
 
 #[cfg(test)]
-use crate::environment::{HostProfile, MachineArchitecture, PlatformFamily};
+use lumilio_minecraft::{HostProfile, MachineArchitecture, PlatformFamily};
 
 #[cfg(test)]
 mod tests;

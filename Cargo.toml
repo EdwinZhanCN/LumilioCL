@@ -2,6 +2,7 @@
 members = [
     "crates/lumilio-app",
     "crates/lumilio-core",
+    "crates/lumilio-minecraft",
     "crates/lumilio-docgen",
     "crates/lumilio-ui",
     "crates/lumilio-updater",
@@ -53,6 +54,7 @@ log = "0.4.34"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 lumilio-core = { path = "crates/lumilio-core" }
 lumilio-transfer = { path = "crates/lumilio-transfer" }
+lumilio-minecraft = { path = "crates/lumilio-minecraft" }
 lumilio-plugin-api = { path = "crates/lumilio-plugin-api" }
 lumilio-plugin-crash-analyzer = { path = "crates/lumilio-plugin-crash-analyzer" }
 lumilio-plugin-litematica = { path = "crates/lumilio-plugin-litematica" }

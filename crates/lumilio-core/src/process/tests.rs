@@ -1,7 +1,7 @@
 use super::*;
-use crate::environment::HostProfile;
-use crate::launch::{LaunchContext, LaunchDirectories};
-use crate::release::ReleaseManifest;
+use lumilio_minecraft::HostProfile;
+use lumilio_minecraft::ReleaseManifest;
+use lumilio_minecraft::{LaunchContext, LaunchDirectories};
 
 fn plan() -> LaunchPlan {
     let manifest = ReleaseManifest::decode_json(

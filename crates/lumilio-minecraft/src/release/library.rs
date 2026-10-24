@@ -53,14 +53,28 @@ pub(super) fn native_selector_candidates(host: &HostProfile) -> Vec<String> {
     candidates
 }
 
+/// The file a library resolves to on one host.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct ResolvedLibraryFile {
+pub struct ResolvedLibraryFile {
     pub(crate) relative_path: String,
     pub(crate) download: DownloadDescriptor,
     /// Made by the loader's installer; never downloaded.
     pub(crate) generated: bool,
     pub(crate) native: bool,
     pub(crate) extraction: ExtractionPolicy,
+}
+
+impl ResolvedLibraryFile {
+    /// The path under the libraries directory.
+    #[must_use]
+    pub fn relative_path(&self) -> &str {
+        &self.relative_path
+    }
+
+    #[must_use]
+    pub const fn download(&self) -> &DownloadDescriptor {
+        &self.download
+    }
 }
 
 impl LibraryDependency {
@@ -80,11 +94,12 @@ impl LibraryDependency {
     }
 
     /// The native variants it names per system (`natives-osx`, …).
-    pub(crate) fn native_classifiers(&self) -> impl Iterator<Item = &str> {
+    pub fn native_classifiers(&self) -> impl Iterator<Item = &str> {
         self.natives.values().map(String::as_str)
     }
 
-    pub(crate) fn resolve_file(&self, host: &HostProfile) -> ResolvedLibraryFile {
+    #[must_use]
+    pub fn resolve_file(&self, host: &HostProfile) -> ResolvedLibraryFile {
         let native_variant = self.native_variant(host);
         let raw = self.downloads.as_ref().and_then(|downloads| {
             native_variant

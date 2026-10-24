@@ -104,8 +104,8 @@ fn meta(id: &str, loader: &'static str) -> Option<ModMetadata> {
 
 static MAC: std::sync::LazyLock<HostProfile> = std::sync::LazyLock::new(|| {
     HostProfile::new(
-        crate::environment::PlatformFamily::MacOs,
-        crate::environment::MachineArchitecture::Arm64,
+        lumilio_minecraft::PlatformFamily::MacOs,
+        lumilio_minecraft::MachineArchitecture::Arm64,
         "",
     )
 });

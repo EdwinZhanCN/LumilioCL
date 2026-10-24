@@ -8,11 +8,11 @@ use super::error::{ServiceError, read_unless_cancelled};
 use super::support::blocking;
 use crate::activity::CancellationToken;
 use crate::activity_log::{RetryAction, TaskAction, TaskCategory, TaskLabel};
-use crate::environment::HostProfile;
 use crate::java::JavaLocator;
 use crate::java_runtime::{JavaBuild, JavaSource};
 use crate::launcher::{JavaRequest, Launcher};
 use crate::transfer::{TransferRequest, Transport};
+use lumilio_minecraft::HostProfile;
 
 /// The Java a download without a wanted major gets.
 const RECOMMENDED_MAJOR: u32 = 21;
@@ -158,7 +158,7 @@ impl<T: Transport + Clone> LauncherService<T> {
                     )
                     .ok()
                 })
-                .and_then(|text| crate::release::ReleaseManifest::decode_json(&text).ok())
+                .and_then(|text| lumilio_minecraft::ReleaseManifest::decode_json(&text).ok())
                 .map_or_else(
                     || crate::java::JavaNeeds::new(&record.game_version, record.loader, None),
                     |release| crate::java::JavaNeeds::of_release(&record, &release),
@@ -407,7 +407,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     ) -> Result<crate::java::JavaRuntime, ServiceError> {
         use crate::java_runtime as runtime;
         let fail = |why: String| ServiceError::Install(why);
-        let host = crate::environment::HostProfile::current();
+        let host = lumilio_minecraft::HostProfile::current();
         if runtime::platform_keys(&host).is_empty() {
             return Err(fail(
                 runtime::JavaRuntimeError::UnsupportedPlatform.to_string(),

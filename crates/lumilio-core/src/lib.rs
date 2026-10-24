@@ -3,11 +3,9 @@
 mod account;
 mod activity;
 mod activity_log;
-mod artifact;
 mod attention;
 mod backup;
 mod bundle;
-mod catalog;
 mod content;
 mod content_sources;
 mod context;
@@ -16,7 +14,6 @@ mod credentials;
 mod deletion;
 mod diagnostics;
 mod discover;
-mod environment;
 mod fetch;
 mod fingerprint;
 mod forge_install;
@@ -30,13 +27,13 @@ mod install;
 mod instance;
 mod java;
 mod java_runtime;
-mod launch;
 mod launch_readiness;
 mod launch_session;
 mod launcher;
 mod layout;
 mod loader;
 mod microsoft;
+mod minecraft;
 mod mirror_presets;
 mod modpack;
 
@@ -50,14 +47,10 @@ pub use activity_log::{
     ActiveTask, ActivityLog, FileDownload, FinishedTask, ProgressUnit, RetryAction, SourceSwitch,
     TaskAction, TaskBoard, TaskCategory, TaskDownloads, TaskLabel, TaskOutcome,
 };
-pub use artifact::{CoordinateError, PackageCoordinate};
 pub use attention::{
     AttentionItem, HomeChecks, HomeSummary, summarize as summarize_home, with_account,
 };
 pub use bundle::{Redactor, write_bundle};
-pub use catalog::{
-    CatalogEntry, CatalogError, OFFICIAL_CATALOG_URL, VersionCatalog, VersionChannel, VersionKind,
-};
 pub use content::{
     ContentError, ContentItem, ModMetadata, read_mod_metadata, remove as remove_content,
     scan as scan_content, set_enabled as set_content_enabled, sha1_hex,
@@ -77,9 +70,6 @@ pub use discover::{
     ProjectSummary, ReleaseChannel, ResolvedFile, SearchHit, SearchPage, SearchQuery, SideSupport,
     SortIndex, SourceFilters, Stance, TextFormat, Version, VersionFile, VersionGroup, environment,
     fits as version_fits, install_request as content_install_request, pick_version, version_groups,
-};
-pub use environment::{
-    CompatibilityRule, HostProfile, MachineArchitecture, PlatformFamily, RuleDecision,
 };
 pub use fetch::{DOCUMENT_LIMIT, FetchError, fetch_document, post_document};
 pub use forge_meta::{forge_versions, neoforge_game_version, neoforge_versions};
@@ -108,9 +98,6 @@ pub use java::{
 };
 pub use java_runtime::graalvm::LICENSE_URL as GRAALVM_LICENSE_URL;
 pub use java_runtime::{JavaBuild, JavaSource};
-pub use launch::{
-    LaunchContext, LaunchDirectories, LaunchError, LaunchPlan, NativeArchive, RequiredDownload,
-};
 pub use launch_readiness::{LaunchReadiness, LaunchRequirement};
 pub use launch_session::{
     LaunchFailure, LaunchPhase, LaunchProblem, LaunchSession, LaunchSignal, LaunchStatus,
@@ -126,6 +113,14 @@ pub use loader::{
     versions_url as loader_versions_url,
 };
 pub use lumilio_block_assets::{BakedPack, BlockCatalog, BlockNames};
+pub use lumilio_minecraft::{
+    ArgumentGroups, ArgumentTemplate, AssetCatalog, CatalogEntry, CatalogError, CompatibilityRule,
+    CoordinateError, DownloadDescriptor, ExtractionPolicy, HostProfile, IdentifiedDownload,
+    JavaRequirement, LaunchContext, LaunchDirectories, LaunchError, LaunchPlan, LibraryDependency,
+    LoggingConfiguration, MachineArchitecture, NativeArchive, OFFICIAL_CATALOG_URL,
+    PackageCoordinate, PlatformFamily, ReleaseError, ReleaseManifest, ReleaseSet, RequiredDownload,
+    RuleDecision, VersionCatalog, VersionChannel, VersionKind,
+};
 use lumilio_nbt as nbt;
 pub use lumilio_plugin_api::PluginState;
 use lumilio_transfer as transfer;
@@ -135,6 +130,7 @@ pub use microsoft::{
     AuthError, DeviceCode, MICROSOFT_CLIENT_ID, MicrosoftClient, MinecraftLogin, OAuthTokens,
     Secret, client_id as microsoft_client_id,
 };
+pub use minecraft::fetch_catalog;
 pub use mirror_presets::MirrorPreset;
 pub use modpack::{
     ClientSupport, ModpackError, OVERRIDES_LIMIT, PackFile, PackIndex, PendingDownload,
@@ -154,11 +150,6 @@ pub use process::{
 };
 pub use reclaim::{KeptReason, ReclaimError, Reclaimable};
 pub use recovery::RecoveryNote;
-pub use release::{
-    ArgumentGroups, ArgumentTemplate, AssetCatalog, DownloadDescriptor, ExtractionPolicy,
-    IdentifiedDownload, JavaRequirement, LibraryDependency, LoggingConfiguration, ReleaseError,
-    ReleaseManifest, ReleaseSet,
-};
 pub use repair::{
     InstallationVerifier, IntegrityIssue, RepairError, RepairExecutor, RepairFinding, RepairPlan,
     RepairReport,
@@ -231,7 +222,6 @@ mod plugins;
 mod process;
 mod reclaim;
 mod recovery;
-mod release;
 mod repair;
 
 mod root_lock;

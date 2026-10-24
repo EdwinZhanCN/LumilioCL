@@ -9,18 +9,18 @@ use crate::content;
 use crate::content::{ContentItem, ModMetadata};
 use crate::diagnostics::{Facts, Problem, diagnose};
 use crate::discover::ProjectKind;
-use crate::environment::HostProfile;
 use crate::history::{HistoryEvent, HistoryLog, SessionOutcome};
 use crate::install::InstallationPlan;
 use crate::instance::InstanceRecord;
 use crate::java::JavaRuntime;
-use crate::launch::LaunchContext;
 use crate::layout::Layout;
 use crate::loader::LAUNCHABLE_LOADERS;
-use crate::release::ReleaseManifest;
 use crate::repair::InstallationVerifier;
 use crate::settings::LauncherSettings;
 use crate::transfer::{OfficialSource, SourceChain, SourceProvider};
+use lumilio_minecraft::HostProfile;
+use lumilio_minecraft::LaunchContext;
+use lumilio_minecraft::ReleaseManifest;
 
 /// Diagnoses one instance from what is on disk.
 ///
@@ -149,7 +149,7 @@ fn mods_with_metadata(game_dir: &Path) -> Vec<(ContentItem, Option<ModMetadata>)
 /// could not even be built (an unusable manifest).
 async fn damaged_count(
     release: &ReleaseManifest,
-    directories: &crate::launch::LaunchDirectories,
+    directories: &lumilio_minecraft::LaunchDirectories,
 ) -> Option<usize> {
     let context = OfflineProfile::new("Player")
         .expect("a fixed valid name")

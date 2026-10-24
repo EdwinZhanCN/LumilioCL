@@ -489,7 +489,7 @@ pub(super) fn game_facts(
             std::fs::read_to_string(directories.versions().join(&id).join(format!("{id}.json")))
                 .ok()
         })
-        .and_then(|text| crate::release::ReleaseManifest::decode_json(&text).ok())
+        .and_then(|text| lumilio_minecraft::ReleaseManifest::decode_json(&text).ok())
         .map_or_else(
             || crate::java::JavaNeeds::new(&record.game_version, record.loader, None),
             |release| crate::java::JavaNeeds::of_release(record, &release),
@@ -498,7 +498,7 @@ pub(super) fn game_facts(
         runtimes,
         &needs,
         record.settings.java_path.as_deref(),
-        &crate::environment::HostProfile::current(),
+        &lumilio_minecraft::HostProfile::current(),
     )
     .map(|choice| choice.runtime.major());
     let mods = crate::content::scan(directories.game(), crate::discover::ProjectKind::Mod)

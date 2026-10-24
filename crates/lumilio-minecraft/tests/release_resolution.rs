@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::str::FromStr;
 
-use lumilio_core::{
+use lumilio_minecraft::{
     CompatibilityRule, HostProfile, LaunchContext, LaunchDirectories, LaunchError,
     MachineArchitecture, PackageCoordinate, PlatformFamily, ReleaseManifest, ReleaseSet,
     RuleDecision,

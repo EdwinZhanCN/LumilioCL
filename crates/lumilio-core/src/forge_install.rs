@@ -20,11 +20,11 @@ use std::{fmt, io};
 use serde::Deserialize;
 
 use crate::activity::CancellationToken;
-use crate::artifact::PackageCoordinate;
-use crate::environment::HostProfile;
 use crate::forge_meta::NEOFORGE_LEGACY_GAME;
 use crate::instance::Loader;
-use crate::release::LibraryDependency;
+use lumilio_minecraft::HostProfile;
+use lumilio_minecraft::LibraryDependency;
+use lumilio_minecraft::PackageCoordinate;
 
 #[derive(Debug)]
 pub enum ForgeError {
@@ -363,7 +363,7 @@ pub fn command(
 ) -> Result<Vec<String>, ForgeError> {
     let jar = libraries.join(processor.jar.repository_path());
     let main = main_class(&jar)?;
-    let separator = if matches!(host.platform(), crate::environment::PlatformFamily::Windows) {
+    let separator = if matches!(host.platform(), lumilio_minecraft::PlatformFamily::Windows) {
         ";"
     } else {
         ":"

@@ -1,5 +1,5 @@
 use super::*;
-use crate::environment::{MachineArchitecture, PlatformFamily};
+use lumilio_minecraft::{MachineArchitecture, PlatformFamily};
 
 pub(super) fn install_as(
     root: &Path,

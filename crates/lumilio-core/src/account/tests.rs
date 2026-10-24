@@ -63,8 +63,8 @@ fn a_third_party_session_carries_the_agent_and_the_servers_user_properties() {
 
 #[test]
 fn session_fills_the_auth_placeholders() {
-    use crate::environment::HostProfile;
-    use crate::launch::{LaunchContext, LaunchDirectories};
+    use lumilio_minecraft::HostProfile;
+    use lumilio_minecraft::{LaunchContext, LaunchDirectories};
     let session = OfflineProfile::new("Steve").unwrap().session();
     let context = session.apply(LaunchContext::new(
         HostProfile::current(),

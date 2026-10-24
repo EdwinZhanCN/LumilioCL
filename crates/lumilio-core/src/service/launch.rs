@@ -5,7 +5,6 @@ use super::LauncherService;
 use super::error::ServiceError;
 use super::types::now;
 use crate::activity::CancellationToken;
-use crate::catalog::VersionCatalog;
 use crate::context::SessionPhase;
 use crate::history::{SessionOutcome, finish_session, record_attempt};
 use crate::instance::{InstanceRecord, StoreError};
@@ -45,7 +44,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     pub(super) async fn request_for(
         &self,
         record: InstanceRecord,
-        directories: crate::launch::LaunchDirectories,
+        directories: lumilio_minecraft::LaunchDirectories,
         quick_play: Option<Option<QuickPlay>>,
         cancel: &CancellationToken,
     ) -> Result<(LaunchRequest, SourceChain), ServiceError> {
@@ -80,7 +79,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             let fetcher = self.fetcher();
             let fetched = tokio::select! {
                 () = cancel.cancelled() => return Err(ServiceError::Cancelled),
-                fetched = VersionCatalog::fetch(&fetcher, &chain) => fetched,
+                fetched = crate::minecraft::fetch_catalog(&fetcher, &chain) => fetched,
             };
             match fetched {
                 Ok(catalog) => catalog
