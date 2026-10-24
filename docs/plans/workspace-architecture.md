@@ -26,9 +26,9 @@ Status: InProgress
   Acceptance: 实施前将 rust-structure-style 已完成的工作与本轮架构修改分开形成可审查基线，保留既有工作区修改。使用 cargo metadata 核查全部 workspace 成员的生产依赖；确认 D2–D8 的目标边界和持久化、锁、Context 通知、后台任务的所有者。在本计划记录需要调整的决定和理由。确认 seed-map-prediction、world-explorer、error-reporting、discover-translation 的已有契约和进行中范围，安排逐能力提交，避免在相同源码上混合推进两个重构。
 - [x] T2 — 提取纯元数据 crate lumilio-minecraft (Completed)
   Acceptance: 按 D2 提取坐标、兼容规则、版本描述、继承合并和目录元数据的纯模型/解析；网络获取和来源路由留在 core。新 crate 不依赖 core、UI、插件宿主、传输引擎、数据库或凭据服务，不做文件/网络/进程 I/O。解决现有 pub(crate) 库文件解析和参数展开的跨 crate 接口，只公开具有业务意义的操作与结果，不批量公开内部字段。原类型由 core 刻意 re-export，保留类型身份和现有调用入口。继承循环、缺失父版本、未知 JSON 字段保留、旧新参数格式和 native 选择夹具在新边界通过；core 的真实启动准备路径继续通过。若提取必须反向依赖 core 或引入笼统的共享类型 crate，停止扩大提取范围并先修订边界决定。
-- [ ] T3 — 以启动流程验证 core 的能力封装 (InProgress)
+- [x] T3 — 以启动流程验证 core 的能力封装 (Completed)
   Acceptance: 将启动计划、执行、进程、会话和启动恢复收拢到 launching，建立明确的启动协调者；LauncherService 的相应方法只委托能力入口。启动协调者接收实例、认证、Java、安装、任务等具体依赖，不接收整个 LauncherService。一次性 Java 选择和会话生命周期有唯一所有者，实例互斥租约仍与实例写入/删除共用同一份权威状态。保留取消、缺失目录、离线启动、极短进程、启动/退出事件次数、历史写入失败、游戏设置准备与回收、日志捕获、插件事件以及 Windows background_command 契约。按 D10 在能证明行为的最低边界验证，核心测试不引入 GPUI。
-- [ ] T4 — 按能力拆分其余 core 状态与业务流程 (Proposed)
+- [x] T4 — 按能力拆分其余 core 状态与业务流程 (Completed)
   Acceptance: 按 D3–D5 逐能力迁移 accounts、instances、java、minecraft、content、appearance、game_settings、worlds、diagnostics、activity、plugins、settings 和 storage。每个迁移提交同时移动实现、状态、邻近测试和调用方；不存在靠为 LauncherService 增加更多 impl 文件冒充职责拆分的情况。认证刷新锁、待完成登录、外观缓存、任务取消表、内容筛选缓存分别归其能力；不复制 SettingsStore、InstanceStore、Context 或其权威状态。数据库版本/连接生命周期有单一入口，业务查询归所属能力，现有跨表事务与删除清理保持原子性。去除迁移完毕的旧生产实现，既有必要公开路径通过同类型 re-export 保留。
 - [ ] T5 — 以 Discover 验证 UI feature 与运行时连接边界 (Proposed)
   Acceptance: Discover 的查询与筛选状态、请求代次、结果转换、详情页、相关对话框、命令处理和测试集中到 ui/features/discover。app/live 不再拥有该功能的页面状态或控制流程；LiveModel 不再保存 Discover 的第二份可变状态；功能模块不通过 LauncherShell 读取/修改其内部业务状态。Tokio Runtime 仍由 app 创建和持有，UI 经明确注入的服务与执行入口提交后台工作，结果只在 GPUI 上下文应用。验证来源/目标实例/查询切换后的过期结果拒绝、翻译结果身份、关闭详情窗口、失败与主动取消、隐藏已安装内容、依赖确认及安装完成反馈。全局任务可在离开页面后继续并反馈，页面请求按其生命周期取消或丢弃结果，不因使用 WeakEntity 丢失必要终态处理。
@@ -48,7 +48,7 @@ Status: InProgress
 - 元数据和专业能力 crates 可以独立验证，生产依赖方向由检查保护
   Result: 2026-10-23（T2）：lumilio-minecraft 只依赖 regex、serde、serde_json；cargo nextest run -p lumilio-minecraft -p lumilio-core 832 项通过，clippy -D warnings 与 rustdoc 链接检查通过。新增 lumilio-docgen tests/crate_boundaries.rs 检查生产依赖分层与 lumilio-minecraft 依赖白名单；向 lumilio-minecraft 注入 tokio 依赖后该检查失败，撤销后通过。其余专业 crates 的结论待 T7。
 - core 能力拥有自己的状态，启动/认证/持久化/取消等既有不变量有行为测试证据
-  Result: pending
+  Result: 2026-10-24（T3/T4）：core 的 service 目录已拆为 accounts、appearance、instances、launching、minecraft、java、content、game_settings、worlds、diagnostics、activity、plugins、settings、storage、network 能力与 launcher_service 组合层；认证刷新锁/待选角色/凭据归 Accounts，外观缓存/皮肤库锁/签名密钥归 Appearance，任务板/取消表/活动日志归 activity::Tasks，内容筛选与翻译缓存归 Content，一次性自动 Java 选择归 Launching，实例库与操作租约归 Instances。每个迁移提交后 cargo nextest run -p lumilio-core 808 项全部通过（启动取消、缺失目录、离线启动、极短进程、启动/退出事件、历史写入失败、游戏设置准备与回收、日志捕获、插件事件等既有测试未改断言），clippy -D warnings、rustdoc 链接、cargo check --workspace --tests 与 docgen 34 项结构测试通过。
 - UI feature 拥有页面状态与控制流程，app/shell 只保留对应组合和适配职责
   Result: pending
 - 每阶段 just check、最终 just docs、IA/i18n、受影响平台与真实窗口验收有记录
@@ -156,7 +156,15 @@ launching 先以 Launching 状态和 LaunchSteps 窄接口建立协调者；启�
 
 Why: 启动流程依赖的认证会话、Java 发现/安装、游戏设置和来源链在 T3 时仍是 LauncherService 的方法。若在 T3 同时抽出这些能力，就会把 T4 的大部分迁移并入一次提交；若让协调者直接接收 LauncherService，则违反 D3。
 
-Consequences: launching/ 收拢 launcher、process、session、readiness、会话标记与协调者；Launching 是一次性自动 Java 选择的唯一所有者。协调者直接接收 Instances、ContextHub、Layout 与 PluginHost，其他能力只经 LaunchSteps 的五个操作（request、launcher、install_java、apply/capture_game_settings）进入。实例租约由新的 instances::Instances 与写入/删除共用。安装也通过同一 launcher/serving_java。T3 保持 in_progress，直到 T4 让 LaunchSteps 的实现改由 accounts/java/game_settings/网络能力提供。
+Consequences: launching/ 收拢 launcher、process、session、readiness、会话标记与协调者；Launching 是一次性自动 Java 选择的唯一所有者。协调者直接接收 Instances、ContextHub、Layout 与 PluginHost，其他能力只经 LaunchSteps 的五个操作（request、launcher、install_java、apply/capture_game_settings）进入。实例租约由新的 instances::Instances 与写入/删除共用。安装也通过同一 launcher/serving_java。T3 保持 in_progress，直到 T4 让 LaunchSteps 的实现改由 accounts/java/game_settings/网络能力提供。 T4 完成后 LaunchSteps 已删除：LaunchParts 直接持有 Instances、ContextHub、Layout、PluginHost、Network、SettingsStore、Tasks 以及 Java、Accounts、Appearance、GameSettings 能力的引用，启动、安装、修复与换版本都在 launching 中完成。
+
+## Decision D14
+
+core 能力由 LauncherService 直接拥有，各能力持有共享句柄（Arc<Mutex<SettingsStore>>、Arc<Instances>、Network、Arc<Tasks>、ContextHub、Layout、Arc<PluginHost>）和自己的状态；能力之间的依赖以方法参数或不可变快照传入；LauncherService 的公开方法逐个委托，跨能力汇总（Home、重试任务）留在 launcher_service 组合层。
+
+Why: 能力若互相持有 Arc，with_credentials、with_runtime_roots 这类构造后修改会失效，accounts 与 appearance 还会形成环。共享句柄只是对单一权威状态的引用，不复制 SettingsStore 或 InstanceStore；参数让跨能力依赖在调用处可见。保持 LauncherService 的公开方法使 app/ui 不需要随本轮改动。
+
+Consequences: accounts↔appearance 的令牌与外观缓存、diagnostics 与插件标签所需的 Java 环境、modpack 安装所需的 Content 都以参数传入。测试替换插件宿主改用 #[cfg(test)] set_plugin_host，逐个更新持有者。服务测试移到所测能力的邻近 tests.rs，共享夹具在 #[cfg(test)] crate::testing；打开/恢复/删除、Context 发布与任务取消/重试等跨能力流程留在 launcher_service/tests。根目录只剩 lib.rs、context.rs、error.rs、clock.rs、blocking.rs 与能力目录；数据库连接、版本和迁移由 storage::database 统一管理，磁盘占用与清理归 diagnostics，内存建议归 settings。
 
 ## References
 
@@ -181,3 +189,7 @@ Consequences: launching/ 收拢 launcher、process、session、readiness、会�
 - [Plan rust-structure-style](rust-structure-style.md)
 
 - Lesson: T2 时 cargo fmt --all 改写了 forks/nucleation、forks/schematic-mesher 与 vendor/xaerotools 的数百个文件（它们是 path 依赖）。守护：只用 just format（cargo fmt）或 just fmt，不加 --all；提交前用 git status 确认 forks/ 与 vendor/ 未改。
+
+- Lesson: T4 时 `sed -i '' -n '1,200p'` 把 service/instances.rs 截成 200 行（-n 与 -i 同用会丢弃未打印的行），从 HEAD 恢复后重放修改。守护：查看文件只用 Read 或不带 -i 的 sed/head；批量改写后用 git diff --stat 核对每个文件的删除行数。
+
+- Lesson: T4 时委托生成脚本把所有 `pub(super) ` 改成 `pub(crate) `，连带放宽了能力结构体字段的可见性；`cargo clippy ... | grep | head` 的管道又掩盖了 clippy 的失败退出码，导致一次带 clippy 错误的提交（随后 amend）。守护：脚本只改写 fn/struct/enum/const/type 的可见性；检查命令把输出重定向到文件并单独打印 `$?`，以退出码决定是否提交。
