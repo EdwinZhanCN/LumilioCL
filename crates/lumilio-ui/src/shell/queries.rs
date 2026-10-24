@@ -37,10 +37,7 @@ impl LauncherShell {
             return;
         };
         let library = model.library.clone();
-        let translation = model
-            .settings
-            .as_ref()
-            .is_some_and(|settings| settings.preferences.translation.enabled);
+        let translation = self.translation;
         let target = self.install_target().map(str::to_owned);
         self.discover.update(cx, |discover, cx| {
             discover.set_inputs(library, target, translation, cx)
@@ -61,6 +58,15 @@ impl LauncherShell {
         self.discover.update(cx, |discover, cx| {
             discover.browse_for(game, kind, window, cx)
         });
+    }
+
+    /// Whether translation is on, as the saved preferences say; Discover
+    /// follows it.
+    pub fn set_translation(&mut self, on: bool, cx: &mut Context<Self>) {
+        if self.translation != on {
+            self.translation = on;
+            self.sync_discover(cx);
+        }
     }
 
     /// Takes what was remembered of Discover into the page.

@@ -27,6 +27,10 @@ pub(super) fn apply_preferences(
     apply_wallpaper(wiring, preferences.look.wallpaper.clone(), cx);
     platform::apply_motion(preferences.motion, cx);
     lumilio_ui::i18n::apply_language(preferences.language, cx);
+    let translation = preferences.translation.enabled;
+    let _ = wiring
+        .shell
+        .update(cx, |shell, cx| shell.set_translation(translation, cx));
     // Plugin text is the plugin's own; tell the host which tag to read it in
     // without blocking the UI thread.
     let service = wiring.backend.service.clone();
