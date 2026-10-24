@@ -7,8 +7,8 @@ use futures_util::StreamExt as _;
 use serde::Deserialize;
 use serde_json::{Value, json};
 
-use crate::account::ProfileId;
-use crate::microsoft::Secret;
+use crate::accounts::account::ProfileId;
+use crate::accounts::microsoft::Secret;
 use crate::transfer::{HttpMethod, HttpRequest, Transport};
 
 /// Answers are small JSON documents; anything bigger is not one.

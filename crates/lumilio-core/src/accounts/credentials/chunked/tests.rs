@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use super::*;
-use crate::credentials::{MemoryCredentials, StoredLogin, StoredYggdrasil};
+use crate::accounts::credentials::{MemoryCredentials, StoredLogin, StoredYggdrasil};
 
 #[derive(Default)]
 struct WindowsLimit {

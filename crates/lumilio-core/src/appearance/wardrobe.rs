@@ -4,16 +4,17 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use super::LauncherService;
+use super::Appearance;
+use crate::accounts::Accounts;
+use crate::accounts::microsoft::Secret;
 use crate::activity::CancellationToken;
-use crate::error::ServiceError;
-use crate::microsoft::Secret;
-use crate::settings::{AccountEntry, AccountKind, SettingsError};
-use crate::skin;
-use crate::skin::{
+use crate::appearance::skin;
+use crate::appearance::skin::{
     AccountLook, AppearanceChange, AppearanceError, AppearanceUpdate, LibrarySkin, MojangClient,
     MojangProfile, PairedCape, Pixels, SkinLibrary, SkinModel, SkinSource,
 };
+use crate::error::ServiceError;
+use crate::settings::{AccountEntry, AccountKind, SettingsError};
 use crate::transfer::Transport;
 
 /// Our initial delay before one explicit confirmation read (ADR 0039). This
@@ -25,7 +26,7 @@ pub struct AppearanceApplyResult {
     pub cape_failure: Option<(Option<String>, ServiceError)>,
 }
 
-impl<T: Transport + Clone> LauncherService<T> {
+impl<T: Transport + Clone> Appearance<T> {
     async fn appearance_account(&self, key: &str) -> Result<AccountEntry, ServiceError> {
         self.settings
             .lock()
@@ -38,39 +39,42 @@ impl<T: Transport + Clone> LauncherService<T> {
             .ok_or_else(|| SettingsError::UnknownAccount(key.to_owned()).into())
     }
 
-    pub(super) async fn appearance_token(
+    pub(crate) async fn appearance_token(
         &self,
+        accounts: &Accounts<T>,
         key: &str,
     ) -> Result<(AccountEntry, Secret), ServiceError> {
         let entry = self.appearance_account(key).await?;
         if entry.kind != AccountKind::Microsoft {
             return Err(AppearanceError::NotMicrosoft.into());
         }
-        let session = self.microsoft_session(&entry, false).await?;
+        let session = accounts.microsoft_session(&entry, false).await?;
         Ok((entry, Secret::new(session.access_token())))
     }
 
-    pub(super) async fn appearance_answer<R>(
+    pub(crate) async fn appearance_answer<R>(
         &self,
+        accounts: &Accounts<T>,
         key: &str,
         result: Result<R, AppearanceError>,
     ) -> Result<R, ServiceError> {
         if matches!(result, Err(AppearanceError::SignInRequired)) {
-            self.flag_sign_in(key).await;
+            accounts.flag_sign_in(key).await;
         }
         result.map_err(Into::into)
     }
 
     /// Success means Mojang accepted the operation. A stale or absent profile
     /// in the response is advisory, never grounds for repeating the write.
-    pub async fn change_account_appearance(
+    pub(crate) async fn change_account_appearance(
         &self,
+        accounts: &Accounts<T>,
         key: &str,
         change: AppearanceChange,
     ) -> Result<AppearanceUpdate, ServiceError> {
         if let AppearanceChange::Cape(Some(id)) = &change
             && !self
-                .account_profile(key)
+                .account_profile(accounts, key)
                 .await?
                 .capes
                 .iter()
@@ -80,7 +84,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         }
         let slot = self.profiles.slot(key).await;
         let mut state = slot.lock().await;
-        let (entry, token) = self.appearance_token(key).await?;
+        let (entry, token) = self.appearance_token(accounts, key).await?;
         state.token(&token);
         if let Some(error) = state.blocked() {
             return Err(error.into());
@@ -95,7 +99,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             Ok(update) => {
                 state.failure = None;
                 if let Some(profile) = &update.profile
-                    && super::appearance::validate_profile(&entry, profile).is_ok()
+                    && super::profiles::validate_profile(&entry, profile).is_ok()
                     && reply_matches_change(
                         &change,
                         profile,
@@ -107,20 +111,21 @@ impl<T: Transport + Clone> LauncherService<T> {
             }
             Err(error) => state.failed_write(error),
         }
-        self.appearance_answer(key, result).await
+        self.appearance_answer(accounts, key, result).await
     }
 
     /// Read-only confirmation can be cancelled when the detail closes. A
     /// still-old profile is returned normally for the UI to show as pending.
-    pub async fn confirm_account_appearance(
+    pub(crate) async fn confirm_account_appearance(
         &self,
+        accounts: &Accounts<T>,
         key: &str,
         cancel: CancellationToken,
     ) -> Result<MojangProfile, ServiceError> {
         tokio::select! {
             () = cancel.cancelled() => Err(ServiceError::Cancelled),
             () = tokio::time::sleep(PROPAGATION_DELAY) => {
-                crate::error::read_unless_cancelled(&cancel, self.refresh_account_profile(key)).await
+                crate::error::read_unless_cancelled(&cancel, self.refresh_account_profile(accounts, key)).await
             }
         }
     }
@@ -137,15 +142,19 @@ impl<T: Transport + Clone> LauncherService<T> {
             .map_err(Into::into)
     }
 
-    pub async fn skin_library(&self) -> Result<Vec<LibrarySkin>, ServiceError> {
+    pub(crate) async fn skin_library(&self) -> Result<Vec<LibrarySkin>, ServiceError> {
         self.with_skin_library(|library| Ok(library.entries().to_vec()))
             .await
     }
 
     /// Saves a normalized copy of the account's current skin, without
     /// changing the profile or downloading its cape.
-    pub async fn save_account_skin(&self, key: &str) -> Result<LibrarySkin, ServiceError> {
-        let profile = self.account_profile(key).await?;
+    pub(crate) async fn save_account_skin(
+        &self,
+        accounts: &Accounts<T>,
+        key: &str,
+    ) -> Result<LibrarySkin, ServiceError> {
+        let profile = self.account_profile(accounts, key).await?;
         let skin = profile.active_skin().ok_or(AppearanceError::UnknownSkin)?;
         let png = MojangClient::cached(self.network.transport(), &self.textures)
             .skin_png(skin)
@@ -158,8 +167,9 @@ impl<T: Transport + Clone> LauncherService<T> {
 
     /// Microsoft wears the copied PNG through Mojang. Offline selection
     /// keeps the existing local cape and still uses ADR 0024 at launch.
-    pub async fn wear_library_skin(
+    pub(crate) async fn wear_library_skin(
         &self,
+        accounts: &Accounts<T>,
         key: &str,
         id: String,
     ) -> Result<AppearanceApplyResult, ServiceError> {
@@ -184,7 +194,11 @@ impl<T: Transport + Clone> LauncherService<T> {
         match entry.kind {
             AccountKind::Microsoft => {
                 let update = self
-                    .change_account_appearance(key, AppearanceChange::Upload { png, model })
+                    .change_account_appearance(
+                        accounts,
+                        key,
+                        AppearanceChange::Upload { png, model },
+                    )
                     .await?;
                 // The skin's paired cape follows it; "keep" leaves the cape.
                 let cape = match paired {
@@ -198,7 +212,7 @@ impl<T: Transport + Clone> LauncherService<T> {
                     PairedCape::Cape(id) => Some(id),
                 };
                 let cape_failure = self
-                    .change_account_appearance(key, AppearanceChange::Cape(cape.clone()))
+                    .change_account_appearance(accounts, key, AppearanceChange::Cape(cape.clone()))
                     .await
                     .err()
                     .map(|error| (cape, error));
@@ -231,8 +245,9 @@ impl<T: Transport + Clone> LauncherService<T> {
     }
 
     /// Applies edited library values without changing the stored entry.
-    pub async fn wear_library_skin_draft(
+    pub(crate) async fn wear_library_skin_draft(
         &self,
+        accounts: &Accounts<T>,
         key: &str,
         id: String,
         model: SkinModel,
@@ -252,7 +267,11 @@ impl<T: Transport + Clone> LauncherService<T> {
         match entry.kind {
             AccountKind::Microsoft => {
                 let update = self
-                    .change_account_appearance(key, AppearanceChange::Upload { png, model })
+                    .change_account_appearance(
+                        accounts,
+                        key,
+                        AppearanceChange::Upload { png, model },
+                    )
                     .await?;
                 let cape = match cape {
                     PairedCape::Keep => {
@@ -265,7 +284,7 @@ impl<T: Transport + Clone> LauncherService<T> {
                     PairedCape::Cape(id) => Some(id),
                 };
                 let cape_failure = self
-                    .change_account_appearance(key, AppearanceChange::Cape(cape.clone()))
+                    .change_account_appearance(accounts, key, AppearanceChange::Cape(cape.clone()))
                     .await
                     .err()
                     .map(|error| (cape, error));
@@ -298,12 +317,13 @@ impl<T: Transport + Clone> LauncherService<T> {
     }
 
     /// Reuploads the current texture with a different arm model.
-    pub async fn change_account_skin_model(
+    pub(crate) async fn change_account_skin_model(
         &self,
+        accounts: &Accounts<T>,
         key: &str,
         model: SkinModel,
     ) -> Result<Option<AppearanceUpdate>, ServiceError> {
-        let profile = self.account_profile(key).await?;
+        let profile = self.account_profile(accounts, key).await?;
         let Some(skin) = profile.active_skin() else {
             return Ok(None);
         };
@@ -313,23 +333,24 @@ impl<T: Transport + Clone> LauncherService<T> {
         let png = MojangClient::cached(self.network.transport(), &self.textures)
             .skin_png(skin)
             .await?;
-        self.change_account_appearance(key, AppearanceChange::Upload { png, model })
+        self.change_account_appearance(accounts, key, AppearanceChange::Upload { png, model })
             .await
             .map(Some)
     }
 
-    pub async fn upload_account_skin_file(
+    pub(crate) async fn upload_account_skin_file(
         &self,
+        accounts: &Accounts<T>,
         key: &str,
         path: PathBuf,
         model: SkinModel,
     ) -> Result<AppearanceUpdate, ServiceError> {
         let png = read_skin_file(path).await?;
-        self.change_account_appearance(key, AppearanceChange::Upload { png, model })
+        self.change_account_appearance(accounts, key, AppearanceChange::Upload { png, model })
             .await
     }
 
-    pub async fn import_library_skin(
+    pub(crate) async fn import_library_skin(
         &self,
         path: PathBuf,
         model: Option<SkinModel>,
@@ -365,12 +386,16 @@ impl<T: Transport + Clone> LauncherService<T> {
         .await
     }
 
-    pub async fn rename_library_skin(&self, id: String, name: String) -> Result<(), ServiceError> {
+    pub(crate) async fn rename_library_skin(
+        &self,
+        id: String,
+        name: String,
+    ) -> Result<(), ServiceError> {
         self.with_skin_library(move |library| library.rename(&id, &name))
             .await
     }
 
-    pub async fn set_library_skin_cape(
+    pub(crate) async fn set_library_skin_cape(
         &self,
         id: String,
         cape: PairedCape,
@@ -381,7 +406,7 @@ impl<T: Transport + Clone> LauncherService<T> {
 
     /// Puts the picture at `path` in an entry's place (see
     /// `SkinLibrary::replace`); the same size limit as an import applies.
-    pub async fn replace_library_skin(
+    pub(crate) async fn replace_library_skin(
         &self,
         id: String,
         path: PathBuf,
@@ -403,7 +428,7 @@ impl<T: Transport + Clone> LauncherService<T> {
 
     /// Every library skin as preview pixels, for the wardrobe's pictures.
     /// A picture that no longer decodes is left out rather than failing all.
-    pub async fn library_looks(&self) -> Result<Vec<(String, AccountLook)>, ServiceError> {
+    pub(crate) async fn library_looks(&self) -> Result<Vec<(String, AccountLook)>, ServiceError> {
         self.with_skin_library(|library| {
             Ok(library
                 .entries()
@@ -427,7 +452,10 @@ impl<T: Transport + Clone> LauncherService<T> {
 
     /// The pictures of the capes a Microsoft account owns, by cape id. A
     /// cape whose picture cannot be read is left out.
-    pub async fn owned_cape_pictures(&self, profile: &MojangProfile) -> Vec<(String, Pixels)> {
+    pub(crate) async fn owned_cape_pictures(
+        &self,
+        profile: &MojangProfile,
+    ) -> Vec<(String, Pixels)> {
         let client = MojangClient::cached(self.network.transport(), &self.textures);
         let mut pictures = Vec::new();
         for cape in &profile.capes {
@@ -440,11 +468,11 @@ impl<T: Transport + Clone> LauncherService<T> {
         pictures
     }
 
-    pub async fn reorder_library_skins(&self, ids: Vec<String>) -> Result<(), ServiceError> {
+    pub(crate) async fn reorder_library_skins(&self, ids: Vec<String>) -> Result<(), ServiceError> {
         self.with_skin_library(move |library| library.reorder(&ids))
             .await
     }
-    pub async fn set_library_skin_model(
+    pub(crate) async fn set_library_skin_model(
         &self,
         id: String,
         model: SkinModel,
@@ -452,14 +480,14 @@ impl<T: Transport + Clone> LauncherService<T> {
         self.with_skin_library(move |library| library.set_model(&id, model))
             .await
     }
-    pub async fn remove_library_skin(&self, id: String) -> Result<(), ServiceError> {
+    pub(crate) async fn remove_library_skin(&self, id: String) -> Result<(), ServiceError> {
         self.with_skin_library(move |library| library.remove(&id))
             .await
     }
 
     /// Returns the copied file, model and bytes; the id is checked against
     /// the index before it can become a path.
-    pub async fn library_skin(
+    pub(crate) async fn library_skin(
         &self,
         id: String,
     ) -> Result<(PathBuf, SkinModel, Vec<u8>), ServiceError> {
@@ -477,7 +505,7 @@ impl<T: Transport + Clone> LauncherService<T> {
 
     /// Wearing the same image may leave the CDN URL unchanged. Confirmation
     /// compares pixels and the arm model, not just profile metadata.
-    pub async fn profile_wears_library_skin(
+    pub(crate) async fn profile_wears_library_skin(
         &self,
         profile: &MojangProfile,
         id: String,

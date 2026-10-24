@@ -1,7 +1,8 @@
 //! UI-independent launcher domain logic.
 
-mod account;
+mod accounts;
 mod activity;
+mod appearance;
 mod attention;
 mod backup;
 mod blocking;
@@ -10,7 +11,6 @@ mod clock;
 mod content;
 mod context;
 mod copy;
-mod credentials;
 mod deletion;
 mod diagnostics;
 mod discover;
@@ -22,7 +22,6 @@ mod forge_meta;
 mod game_settings;
 mod history;
 mod import_game;
-mod injector;
 mod inspect;
 mod install;
 mod instances;
@@ -31,13 +30,25 @@ mod java_runtime;
 mod launching;
 mod layout;
 mod loader;
-mod microsoft;
 mod minecraft;
 mod mirror_presets;
 mod modpack;
 mod network;
 
-pub use account::{AuthSession, MAX_PROFILE_NAME, OfflineProfile, ProfileError, ProfileId};
+pub use accounts::ThirdPartySignIn;
+pub use accounts::account::{
+    AuthSession, MAX_PROFILE_NAME, OfflineProfile, ProfileError, ProfileId,
+};
+pub use accounts::credentials::{
+    CredentialStore, MemoryCredentials, StoredLogin, SystemCredentials,
+};
+pub use accounts::microsoft::{
+    AuthError, DeviceCode, MICROSOFT_CLIENT_ID, MicrosoftClient, MinecraftLogin, OAuthTokens,
+    Secret, client_id as microsoft_client_id,
+};
+pub use accounts::yggdrasil::{
+    AuthServer, LITTLE_SKIN_URL, Profile as CharacterProfile, YggdrasilError,
+};
 pub use activity::{
     ActiveTask, ActivityContext, ActivityEvent, ActivityGraph, ActivityGraphError, ActivityLog,
     ActivityNode, ActivityRecord, ActivityReport, ActivityScheduler, ActivityState, ActivityView,
@@ -45,6 +56,13 @@ pub use activity::{
     SourceSwitch, TaskAction, TaskBoard, TaskCategory, TaskDownloads, TaskLabel, TaskOutcome,
     Traffic,
 };
+pub use appearance::skin::{
+    AccountLook, AppearanceChange, AppearanceError, AppearanceUpdate, LITTLE_SKIN_CSL, LibrarySkin,
+    MojangCape, MojangClient, MojangProfile, MojangSkin, PairedCape, Pixels as SkinPixels,
+    SkinChoice, SkinError, SkinLibrary, SkinModel, SkinSource, cape_pixels, looks_slim,
+    skin_pixels,
+};
+pub use appearance::{AppearanceApplyResult, ProfileSnapshot};
 pub use attention::{
     AttentionItem, HomeChecks, HomeSummary, summarize as summarize_home, with_account,
 };
@@ -57,7 +75,6 @@ pub use content::{
     scan as scan_content, set_enabled as set_content_enabled, sha1_hex,
 };
 pub use context::{Context, Revisions, Session, SessionPhase};
-pub use credentials::{CredentialStore, MemoryCredentials, StoredLogin, SystemCredentials};
 pub use diagnostics::{
     CrashReport, Facts, FileEntry, GameLogSource, GameLogs, LOW_MEMORY_MB, LogLevel, LogLine,
     Problem, ProblemKind, Severity, diagnose, filter_log, list_crash_reports, list_dir, log_level,
@@ -126,10 +143,6 @@ pub use lumilio_plugin_api::PluginState;
 use lumilio_transfer as transfer;
 use lumilio_transfer::resource_lock;
 pub use lumilio_transfer::with_causes;
-pub use microsoft::{
-    AuthError, DeviceCode, MICROSOFT_CLIENT_ID, MicrosoftClient, MinecraftLogin, OAuthTokens,
-    Secret, client_id as microsoft_client_id,
-};
 pub use minecraft::fetch_catalog;
 pub use mirror_presets::MirrorPreset;
 pub use modpack::{
@@ -160,18 +173,10 @@ pub use screenshots::{ScreenshotError, ScreenshotInfo};
 pub use servers::{
     Motd, MotdSpan, PackPolicy, PingError, ProtocolVersion, ServerEntry, ServerError, ServerStatus,
 };
-pub use service::{
-    AppearanceApplyResult, LauncherService, Library, ProfileSnapshot, ThirdPartySignIn,
-};
+pub use service::{LauncherService, Library};
 pub use settings::{
     AccountEntry, AccountKind, AuthServerEntry, DownloadSourcePreference, LauncherSettings,
     MAX_MEMORY_MB, MirrorRule, SettingsError, SettingsStore, TERMS_VERSION,
-};
-pub use skin::{
-    AccountLook, AppearanceChange, AppearanceError, AppearanceUpdate, LITTLE_SKIN_CSL, LibrarySkin,
-    MojangCape, MojangClient, MojangProfile, MojangSkin, PairedCape, Pixels as SkinPixels,
-    SkinChoice, SkinError, SkinLibrary, SkinModel, SkinSource, cape_pixels, looks_slim,
-    skin_pixels,
 };
 pub use snapshots::{
     RESTORE_LIMIT, SnapshotError, SnapshotInfo, SnapshotScope, create as create_snapshot,
@@ -206,7 +211,6 @@ pub use worlds::{
     GameMode, ModelPreview, WorldError, WorldInfo, copy_name as world_copy_name,
     delete as delete_world, duplicate as duplicate_world, scan as scan_worlds, size as world_size,
 };
-pub use yggdrasil::{AuthServer, LITTLE_SKIN_URL, Profile as CharacterProfile, YggdrasilError};
 
 mod pack_export;
 mod persist;
@@ -223,7 +227,6 @@ mod screenshots;
 mod servers;
 mod service;
 mod settings;
-mod skin;
 mod snapshots;
 mod staged;
 mod storage;
@@ -233,6 +236,5 @@ mod tuning;
 mod updates;
 mod wallpaper;
 mod worlds;
-mod yggdrasil;
 
 pub mod world_map;

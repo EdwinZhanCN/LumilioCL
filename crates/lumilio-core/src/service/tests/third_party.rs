@@ -2,14 +2,14 @@ use std::io::Write as _;
 
 use sha2::{Digest, Sha256};
 
-use super::super::third_party::ThirdPartySignIn;
 use super::{ECHO_ARGS, World, fake_java, launch_to_end, publish_identity_release, world};
-use crate::account::ProfileId;
-use crate::credentials::StoredYggdrasil;
+use crate::accounts::ThirdPartySignIn;
+use crate::accounts::account::ProfileId;
+use crate::accounts::credentials::StoredYggdrasil;
+use crate::accounts::yggdrasil::{LITTLE_SKIN_URL, YggdrasilError};
 use crate::error::ServiceError;
 use crate::instances::Loader;
 use crate::settings::AccountKind;
-use crate::yggdrasil::{LITTLE_SKIN_URL, YggdrasilError};
 
 const ROOT: &str = "https://skins.example/api/yggdrasil/";
 const ID: &str = "123e4567e89b12d3a456426614174000";
@@ -42,7 +42,7 @@ const CLIENT: &str = "client-1";
 /// can answer with it.
 fn third_party_world() -> World {
     let mut world = world();
-    world.service.client_token_override = Some(CLIENT.to_owned());
+    world.service.accounts.client_token_override = Some(CLIENT.to_owned());
     world
 }
 
@@ -53,7 +53,7 @@ async fn sign_in_as(
 ) -> Result<ThirdPartySignIn, ServiceError> {
     world
         .service
-        .add_auth_server(&crate::yggdrasil::AuthServer {
+        .add_auth_server(&crate::accounts::yggdrasil::AuthServer {
             url: ROOT.to_owned(),
             name: Some("Example Skins".into()),
             non_email_login: true,
@@ -139,7 +139,7 @@ async fn littleskin_is_built_in_and_a_found_server_is_remembered_and_forgotten_w
     // LittleSkin needs no entry of its own.
     world
         .service
-        .add_auth_server(&crate::yggdrasil::little_skin())
+        .add_auth_server(&crate::accounts::yggdrasil::little_skin())
         .await
         .unwrap();
     assert_eq!(world.service.auth_servers().await.len(), 2);
@@ -333,7 +333,7 @@ async fn a_wrong_password_adds_nothing() {
     let world = third_party_world();
     world
         .service
-        .add_auth_server(&crate::yggdrasil::AuthServer {
+        .add_auth_server(&crate::accounts::yggdrasil::AuthServer {
             url: ROOT.to_owned(),
             name: None,
             non_email_login: false,

@@ -45,12 +45,12 @@ pub enum GameLogSource {
 /// One game's logs and problems, bug-report exports, and the disk the
 /// launcher uses.
 pub(crate) struct Diagnostics {
-    pub(crate) settings: Arc<Mutex<SettingsStore>>,
-    pub(crate) instances: Arc<Instances>,
-    pub(crate) layout: Layout,
-    pub(crate) plugins: Arc<PluginHost>,
+    pub(super) settings: Arc<Mutex<SettingsStore>>,
+    pub(super) instances: Arc<Instances>,
+    pub(super) layout: Layout,
+    pub(super) plugins: Arc<PluginHost>,
     /// Emptied with the cache folder.
-    pub(crate) translation: SharedTranslation,
+    pub(super) translation: SharedTranslation,
 }
 
 impl Diagnostics {

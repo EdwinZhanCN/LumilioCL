@@ -6,24 +6,26 @@
 
 use std::sync::Arc;
 
-use super::LauncherService;
-use crate::account::{AuthSession, Injection, Keepalive, OfflineProfile};
-use crate::error::ServiceError;
-use crate::settings::{AccountKind, SettingsError};
-use crate::skin::{
+use super::Appearance;
+use crate::accounts::Accounts;
+use crate::accounts::account::{AuthSession, Injection, Keepalive, OfflineProfile};
+use crate::accounts::injector;
+use crate::appearance::skin;
+use crate::appearance::skin::{
     AccountLook, Character, LoadedSkin, LocalSkinServer, Pixels, Signer, SkinChoice,
 };
+use crate::error::ServiceError;
+use crate::settings::{AccountKind, SettingsError};
 use crate::transfer::Transport;
-use crate::{injector, skin};
 
 /// The side of an avatar face, in pixels (crisp down to a 32 px chip).
 pub const FACE_SIZE: u32 = 64;
 
-impl<T: Transport + Clone> LauncherService<T> {
+impl<T: Transport + Clone> Appearance<T> {
     /// Chooses how an offline account looks (`None` is the game's default
     /// skin). A choice that cannot work (a file that is not a picture, a
     /// bad address) is refused now rather than at launch.
-    pub async fn set_account_skin(
+    pub(crate) async fn set_account_skin(
         &self,
         key: &str,
         skin: Option<SkinChoice>,
@@ -40,7 +42,11 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// What an account looks like, for the Accounts page's preview: an
     /// offline account's chosen skin and cape or a Microsoft profile's
     /// active textures, decoded.
-    pub async fn account_look(&self, key: &str) -> Result<AccountLook, ServiceError> {
+    pub(crate) async fn account_look(
+        &self,
+        accounts: &Accounts<T>,
+        key: &str,
+    ) -> Result<AccountLook, ServiceError> {
         let entry = self
             .settings
             .lock()
@@ -52,8 +58,8 @@ impl<T: Transport + Clone> LauncherService<T> {
             .cloned()
             .ok_or_else(|| ServiceError::Settings(SettingsError::UnknownAccount(key.to_owned())))?;
         let mut look = if entry.kind == AccountKind::Microsoft {
-            let profile = self.account_profile(key).await?;
-            crate::skin::MojangClient::cached(self.network.transport(), &self.textures)
+            let profile = self.account_profile(accounts, key).await?;
+            crate::appearance::skin::MojangClient::cached(self.network.transport(), &self.textures)
                 .look(&profile)
                 .await
                 .map_err(ServiceError::from)?
@@ -115,8 +121,12 @@ impl<T: Transport + Clone> LauncherService<T> {
 
     /// The face of an account's skin, for an avatar chip. `None` when no skin
     /// is known, so the caller keeps its letter mark.
-    pub async fn account_face(&self, key: &str) -> Result<Option<Pixels>, ServiceError> {
-        let look = self.account_look(key).await?;
+    pub(crate) async fn account_face(
+        &self,
+        accounts: &Accounts<T>,
+        key: &str,
+    ) -> Result<Option<Pixels>, ServiceError> {
+        let look = self.account_look(accounts, key).await?;
         Ok(look.skin.as_ref().map(|skin| skin::face(skin, FACE_SIZE)))
     }
 
@@ -142,7 +152,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// server on this machine answers for the player, and the session carries
     /// the agent that points the game at it. A skin that cannot be loaded
     /// does not stop the game: it starts without, and says so.
-    pub(super) async fn offline_skin_session(
+    pub(crate) async fn offline_skin_session(
         &self,
         profile: &OfflineProfile,
         choice: &SkinChoice,

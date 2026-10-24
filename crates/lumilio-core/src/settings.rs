@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::account::{OfflineProfile, ProfileError, ProfileId};
+use crate::accounts::account::{OfflineProfile, ProfileError, ProfileId};
 use crate::persist;
 use crate::persist::{PersistError, Versioned};
 use crate::transfer::{OfficialSource, PrefixMirror, SourceChain, SourceProvider};
@@ -98,7 +98,7 @@ pub struct AccountEntry {
     pub login: Option<String>,
     /// How an offline account looks in the game; none is the game's default.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub skin: Option<crate::skin::SkinChoice>,
+    pub skin: Option<crate::appearance::skin::SkinChoice>,
 }
 
 /// An authentication server the person added (public facts only; LittleSkin
@@ -605,7 +605,7 @@ impl SettingsStore {
     /// Remembers an authentication server (or updates what is known of it).
     /// LittleSkin is built in and needs no entry.
     pub fn add_auth_server(&mut self, server: AuthServerEntry) -> Result<(), SettingsError> {
-        if server.url == crate::yggdrasil::LITTLE_SKIN_URL {
+        if server.url == crate::accounts::yggdrasil::LITTLE_SKIN_URL {
             return Ok(());
         }
         let mut next = self.settings.clone();
@@ -709,7 +709,7 @@ impl SettingsStore {
     pub fn set_account_skin(
         &mut self,
         key: &str,
-        skin: Option<crate::skin::SkinChoice>,
+        skin: Option<crate::appearance::skin::SkinChoice>,
     ) -> Result<(), SettingsError> {
         let mut next = self.settings.clone();
         let entry = next

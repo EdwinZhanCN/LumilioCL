@@ -10,7 +10,7 @@ use futures_util::StreamExt as _;
 use serde::Deserialize;
 
 use super::{AccountLook, SkinModel, cape_pixels, skin_pixels};
-use crate::microsoft::{PROFILE_URL, Secret};
+use crate::accounts::microsoft::{PROFILE_URL, Secret};
 use crate::transfer::{HttpMethod, HttpRequest, Transport};
 
 #[derive(Clone, Debug, Eq, PartialEq)]

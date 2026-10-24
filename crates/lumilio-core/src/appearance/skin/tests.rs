@@ -13,7 +13,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
 use super::*;
-use crate::account::ProfileId;
+use crate::accounts::account::ProfileId;
 use crate::transfer::{TransportError, TransportFuture, TransportResponse};
 
 const ID: &str = "123e4567e89b12d3a456426614174000";

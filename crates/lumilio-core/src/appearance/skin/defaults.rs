@@ -7,7 +7,7 @@ use std::io::Read;
 use std::path::Path;
 
 use super::{AccountLook, SkinModel, skin_pixels};
-use crate::account::ProfileId;
+use crate::accounts::account::ProfileId;
 
 pub(super) fn uuid_hash(id: ProfileId) -> i32 {
     let hex = id.compact();

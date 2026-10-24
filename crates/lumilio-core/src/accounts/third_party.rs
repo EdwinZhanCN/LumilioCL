@@ -6,22 +6,23 @@
 
 use std::sync::atomic::Ordering;
 
-use super::{CREDENTIAL_PROBE, LauncherService};
-use crate::account::{AuthSession, Injection, ProfileId};
-use crate::credentials::StoredYggdrasil;
-use crate::error::ServiceError;
-use crate::injector;
-use crate::microsoft::Secret;
-use crate::settings::{AccountEntry, AccountKind, AuthServerEntry, SettingsError};
-use crate::transfer::Transport;
-use crate::yggdrasil::{
+use super::Accounts;
+use super::sign_in::CREDENTIAL_PROBE;
+use crate::accounts::account::{AuthSession, Injection, ProfileId};
+use crate::accounts::credentials::StoredYggdrasil;
+use crate::accounts::injector;
+use crate::accounts::microsoft::Secret;
+use crate::accounts::yggdrasil::{
     AuthServer, Profile, Session, YggdrasilClient, YggdrasilError, fetch_metadata, little_skin,
     locate_server,
 };
+use crate::error::ServiceError;
+use crate::settings::{AccountEntry, AccountKind, AuthServerEntry, SettingsError};
+use crate::transfer::Transport;
 
 /// A sign-in that is waiting for the person to choose a character. The
 /// session (and its token) stays in memory until it is chosen or dropped.
-pub(super) struct PendingSignIn {
+pub(crate) struct PendingSignIn {
     server: String,
     login: String,
     session: Session,
@@ -53,9 +54,9 @@ fn random_client_token(fixed: Option<&str>) -> Result<String, ServiceError> {
     Ok(bytes.iter().map(|byte| format!("{byte:02x}")).collect())
 }
 
-impl<T: Transport + Clone> LauncherService<T> {
+impl<T: Transport + Clone> Accounts<T> {
     /// The authentication servers to offer: LittleSkin, then the ones added.
-    pub async fn auth_servers(&self) -> Vec<AuthServer> {
+    pub(crate) async fn auth_servers(&self) -> Vec<AuthServer> {
         let settings = self.settings.lock().await.get().clone();
         std::iter::once(little_skin())
             .chain(settings.auth_servers.into_iter().map(|entry| AuthServer {
@@ -68,12 +69,15 @@ impl<T: Transport + Clone> LauncherService<T> {
     }
 
     /// Finds the server an address means, without remembering it.
-    pub async fn locate_auth_server(&self, address: &str) -> Result<AuthServer, ServiceError> {
+    pub(crate) async fn locate_auth_server(
+        &self,
+        address: &str,
+    ) -> Result<AuthServer, ServiceError> {
         Ok(locate_server(self.network.transport(), address).await?)
     }
 
     /// Remembers a server found with [`Self::locate_auth_server`].
-    pub async fn add_auth_server(&self, server: &AuthServer) -> Result<(), ServiceError> {
+    pub(crate) async fn add_auth_server(&self, server: &AuthServer) -> Result<(), ServiceError> {
         Ok(self
             .settings
             .lock()
@@ -87,7 +91,7 @@ impl<T: Transport + Clone> LauncherService<T> {
 
     /// Forgets a server and the accounts signed in on it (their secrets go
     /// too). LittleSkin is built in and stays.
-    pub async fn remove_auth_server(&self, url: &str) -> Result<(), ServiceError> {
+    pub(crate) async fn remove_auth_server(&self, url: &str) -> Result<(), ServiceError> {
         let removed = self.settings.lock().await.remove_auth_server(url)?;
         // The accounts are gone either way; a secret that cannot be deleted is told.
         for key in removed {
@@ -107,7 +111,7 @@ impl<T: Transport + Clone> LauncherService<T> {
 
     /// Signs in with a name and password. With several characters the answer
     /// asks for a choice, finished with [`Self::third_party_choose`].
-    pub async fn third_party_sign_in(
+    pub(crate) async fn third_party_sign_in(
         &self,
         server: &str,
         login: &str,
@@ -155,7 +159,7 @@ impl<T: Transport + Clone> LauncherService<T> {
 
     /// Chooses the character for a sign-in that asked. Returns the account's
     /// key and the character's name.
-    pub async fn third_party_choose(
+    pub(crate) async fn third_party_choose(
         &self,
         pending: u64,
         character: ProfileId,
@@ -191,7 +195,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     }
 
     /// Drops a sign-in that was waiting for a choice (the person walked away).
-    pub fn third_party_abandon(&self, pending: u64) {
+    pub(crate) fn third_party_abandon(&self, pending: u64) {
         self.pending_sign_ins
             .lock()
             .expect("pending sign-in registry lock was poisoned")
@@ -238,7 +242,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// Tells the server to forget a removed account's token. Best effort: the
     /// account is gone from the launcher either way, so a server that cannot
     /// be reached within a few seconds is left alone.
-    pub(super) async fn sign_out_third_party(&self, key: &str, entry: &AccountEntry) {
+    pub(crate) async fn sign_out_third_party(&self, key: &str, entry: &AccountEntry) {
         let (Some(server), Ok(Some(stored))) = (
             entry.server.as_deref(),
             StoredYggdrasil::load(self.credentials.as_ref(), key),
@@ -269,7 +273,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// A third-party account's session for a launch: the stored token while
     /// the server still accepts it, else a renewed one (`force` renews
     /// regardless), together with the agent that points the game at the server.
-    pub(super) async fn third_party_session(
+    pub(crate) async fn third_party_session(
         &self,
         entry: &AccountEntry,
         force: bool,

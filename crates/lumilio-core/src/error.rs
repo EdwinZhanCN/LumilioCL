@@ -4,20 +4,20 @@ use std::fmt::{Display, Formatter};
 use std::future::Future;
 use std::path::PathBuf;
 
+use crate::accounts::injector::InjectorError;
+use crate::accounts::microsoft::AuthError;
+use crate::accounts::yggdrasil::YggdrasilError;
 use crate::activity::CancellationToken;
+use crate::appearance::skin::SkinError;
 use crate::content::ContentError;
-use crate::injector::InjectorError;
 use crate::instances::{InstanceBusy, StoreError};
 use crate::launching::LaunchServiceError;
-use crate::microsoft::AuthError;
 use crate::modpack;
 use crate::screenshots::ScreenshotError;
 use crate::servers::{PingError, ServerError};
 use crate::settings::SettingsError;
-use crate::skin::SkinError;
 use crate::snapshots::SnapshotError;
 use crate::worlds::WorldError;
-use crate::yggdrasil::YggdrasilError;
 
 #[derive(Debug)]
 pub enum ServiceError {
@@ -67,7 +67,7 @@ pub enum ServiceError {
     Injector(InjectorError),
     /// A skin could not be used.
     Skin(SkinError),
-    Appearance(crate::skin::AppearanceError),
+    Appearance(crate::appearance::skin::AppearanceError),
     /// The sign-in the person is choosing a character for is gone.
     NoPendingSignIn,
     Export(crate::pack_export::ExportError),
@@ -163,8 +163,8 @@ impl ServiceError {
     }
 }
 
-impl From<crate::skin::AppearanceError> for ServiceError {
-    fn from(error: crate::skin::AppearanceError) -> Self {
+impl From<crate::appearance::skin::AppearanceError> for ServiceError {
+    fn from(error: crate::appearance::skin::AppearanceError) -> Self {
         Self::Appearance(error)
     }
 }

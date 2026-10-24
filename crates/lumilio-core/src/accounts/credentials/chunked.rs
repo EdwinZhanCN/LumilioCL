@@ -4,7 +4,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::CredentialStore;
-use crate::microsoft::AuthError;
+use crate::accounts::microsoft::AuthError;
 
 // A UTF-16 password at this size uses at most 2400 bytes, below the Windows
 // CRED_MAX_CREDENTIAL_BLOB_SIZE (5 * 512 bytes), including surrogate pairs.

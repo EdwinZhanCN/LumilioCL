@@ -189,7 +189,7 @@ struct World {
     service: LauncherService<Scripted>,
     net: Scripted,
     server: PathBuf,
-    secrets: Arc<crate::credentials::MemoryCredentials>,
+    secrets: Arc<crate::accounts::credentials::MemoryCredentials>,
 }
 
 fn world() -> World {
@@ -198,7 +198,7 @@ fn world() -> World {
     std::fs::create_dir_all(&server).unwrap();
     let net = Scripted::default();
     let root = dir.path().join("launcher");
-    let secrets = Arc::new(crate::credentials::MemoryCredentials::default());
+    let secrets = Arc::new(crate::accounts::credentials::MemoryCredentials::default());
     let service = LauncherService::open(&root, net.clone(), stock_plugins())
         .unwrap()
         .with_runtime_roots(vec![root.join("runtimes")])
@@ -341,7 +341,7 @@ fn two_source_world() -> World {
     std::fs::create_dir_all(&server).unwrap();
     let net = Scripted::default();
     let root = dir.path().join("launcher");
-    let secrets = Arc::new(crate::credentials::MemoryCredentials::default());
+    let secrets = Arc::new(crate::accounts::credentials::MemoryCredentials::default());
     let service = LauncherService::open(
         &root,
         net.clone(),
@@ -518,7 +518,7 @@ const MS_ID: &str = "123e4567e89b12d3a456426614174000";
 
 /// Scripts the whole Microsoft chain, ending at `name`'s profile.
 fn microsoft_chain(world: &World, name: &str, mc_token: &str) {
-    use crate::microsoft::{
+    use crate::accounts::microsoft::{
         DEVICE_CODE_URL, MINECRAFT_LOGIN_URL, PROFILE_URL, TOKEN_URL, XBL_URL, XSTS_URL,
     };
     for url in [

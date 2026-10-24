@@ -19,7 +19,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::task::JoinHandle;
 
 use super::{LoadedSkin, Signer, SkinModel};
-use crate::account::ProfileId;
+use crate::accounts::account::ProfileId;
 
 const HEAD_LIMIT: usize = 16 * 1024;
 const BODY_LIMIT: usize = 64 * 1024;

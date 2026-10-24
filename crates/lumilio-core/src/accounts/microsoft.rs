@@ -2,7 +2,7 @@
 //! of tokens from it to a Minecraft session.
 //!
 //! This module only speaks the protocol. Where tokens are kept is
-//! [`crate::credentials`], and what an account is lives in `settings`.
+//! [`crate::accounts::credentials`], and what an account is lives in `settings`.
 
 use std::error::Error;
 use std::fmt;
@@ -13,7 +13,7 @@ use futures_util::StreamExt as _;
 use serde::Deserialize;
 use serde_json::json;
 
-use crate::account::ProfileId;
+use crate::accounts::account::ProfileId;
 use crate::activity::CancellationToken;
 use crate::transfer::{HttpMethod, HttpRequest, Transport};
 

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(target_os = "windows")]
 use super::chunked;
-use crate::microsoft::AuthError;
+use crate::accounts::microsoft::AuthError;
 
 /// The service name every entry is kept under.
 pub const SERVICE: &str = "LumilioCL";

@@ -10,7 +10,7 @@ pub use credential_store::{
 };
 
 #[cfg(test)]
-use crate::microsoft::AuthError;
+use crate::accounts::microsoft::AuthError;
 
 #[cfg(any(target_os = "windows", test))]
 mod chunked;

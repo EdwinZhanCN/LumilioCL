@@ -19,7 +19,7 @@ use tokio::net::TcpStream;
 
 use super::motd::Motd;
 use super::protocol::ProtocolVersion;
-use crate::skin::Pixels;
+use crate::appearance::skin::Pixels;
 
 const DEFAULT_PORT: u16 = 25565;
 const TIMEOUT: Duration = Duration::from_secs(5);

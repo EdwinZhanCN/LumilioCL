@@ -7,7 +7,7 @@ use futures_util::StreamExt as _;
 use serde_json::Value;
 
 use super::{AccountLook, SkinError, SkinModel, cape_pixels, skin_pixels};
-use crate::account::ProfileId;
+use crate::accounts::account::ProfileId;
 use crate::transfer::Transport;
 
 async fn read(

@@ -22,23 +22,17 @@ mod packs;
 mod plugins;
 mod portability;
 mod preferences;
-mod skins;
 mod snapshots;
-mod third_party;
 mod tracking;
 mod types;
-mod wardrobe;
 mod worlds;
 
 #[cfg(test)]
 mod tests;
 
 pub use launcher_service::LauncherService;
-use launcher_service::{CREDENTIAL_PROBE, DIAGNOSED_LIMIT, TOKEN_MARGIN_SECONDS, loader_text};
+use launcher_service::{DIAGNOSED_LIMIT, loader_text};
 
-pub use self::appearance::ProfileSnapshot;
-pub use self::third_party::ThirdPartySignIn;
 pub use self::types::Library;
-pub use self::wardrobe::AppearanceApplyResult;
 
 mod launcher_service;

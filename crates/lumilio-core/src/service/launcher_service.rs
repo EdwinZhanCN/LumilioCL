@@ -1,13 +1,14 @@
-use std::collections::BTreeMap;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex as StdMutex};
+use std::sync::Arc;
 
 use tokio::sync::Mutex;
 
-use super::{appearance, preferences, third_party};
+use super::preferences;
+use crate::accounts::Accounts;
+use crate::accounts::credentials::CredentialStore;
 use crate::activity::{ActivityLog, Tasks};
+use crate::appearance::Appearance;
 use crate::content::Content;
-use crate::credentials::{CredentialStore, SystemCredentials};
 use crate::diagnostics::Diagnostics;
 use crate::error::ServiceError;
 use crate::game_settings::GameSettings;
@@ -38,10 +39,6 @@ pub(super) const DIAGNOSED_LIMIT: usize = 8;
 /// long; after it, its bytes are removed when the launcher opens.
 pub(super) const PARTIAL_DOWNLOAD_AGE: std::time::Duration =
     std::time::Duration::from_secs(7 * 24 * 3600);
-/// A Minecraft token with less than this left is refreshed before a launch.
-pub(super) const TOKEN_MARGIN_SECONDS: u64 = 300;
-/// A key that is never an account, used to see whether the store works.
-pub(super) const CREDENTIAL_PROBE: &str = "lumilio-store-check";
 
 pub struct LauncherService<T> {
     pub(crate) plugins: Arc<crate::plugins::PluginHost>,
@@ -63,29 +60,8 @@ pub struct LauncherService<T> {
     pub(crate) content: Content<T>,
     /// Translated summaries and bodies, cached in their own SQLite file.
     pub(super) translation: crate::translation::SharedTranslation,
-    /// Where sign-in secrets live; never a file.
-    pub(super) credentials: Arc<dyn CredentialStore>,
-    /// One refresh at a time: refresh tokens rotate, so two at once would
-    /// invalidate each other.
-    pub(super) auth_lock: Mutex<()>,
-    /// Library index writes and per-profile appearance changes serialize,
-    /// independently of credential refresh.
-    pub(super) wardrobe_lock: Mutex<()>,
-    pub(super) profiles: appearance::Profiles,
-    pub(super) textures: crate::skin::cache::TextureCache,
-    /// Third-party sign-ins waiting for the person to choose a character:
-    /// the session stays in memory only, until chosen or abandoned.
-    pub(super) pending_sign_ins: StdMutex<BTreeMap<u64, third_party::PendingSignIn>>,
-    pub(super) next_pending: std::sync::atomic::AtomicU64,
-    /// A client token to use instead of a random one (tests only: a scripted
-    /// server cannot echo what it was sent).
-    pub(super) client_token_override: Option<String>,
-    /// The agent was looked up for a newer build in this run already.
-    pub(super) injector_checked: std::sync::atomic::AtomicBool,
-    /// The key the local skin server signs with, made on first use.
-    pub(super) skin_signer: tokio::sync::OnceCell<Arc<crate::skin::Signer>>,
-    /// Size of that key (smaller in tests, where generating one is slow).
-    pub(super) skin_key_bits: usize,
+    pub(crate) accounts: Accounts<T>,
+    pub(crate) appearance: Appearance<T>,
     // Declared last so the stores close before ownership is released.
     pub(super) _root_lock: crate::root_lock::RootLock,
 }
@@ -138,6 +114,13 @@ impl<T: Transport + Clone> LauncherService<T> {
             layout.root().to_owned(),
         ));
         Ok(Self {
+            accounts: Accounts::new(settings.clone(), network.clone(), layout.clone()),
+            appearance: Appearance::new(
+                settings.clone(),
+                network.clone(),
+                layout.clone(),
+                instances.clone(),
+            ),
             content: Content::new(
                 instances.clone(),
                 layout.clone(),
@@ -173,10 +156,6 @@ impl<T: Transport + Clone> LauncherService<T> {
             network,
             plugins,
             translation,
-            textures: crate::skin::cache::TextureCache::new(
-                layout.root().join("cache/skin-textures"),
-            ),
-            profiles: appearance::Profiles::default(),
             layout,
             instances,
             settings,
@@ -184,15 +163,6 @@ impl<T: Transport + Clone> LauncherService<T> {
             tasks,
             launching: Launching::default(),
             startup,
-            credentials: Arc::new(SystemCredentials),
-            auth_lock: Mutex::new(()),
-            wardrobe_lock: Mutex::new(()),
-            pending_sign_ins: StdMutex::default(),
-            next_pending: std::sync::atomic::AtomicU64::new(1),
-            client_token_override: None,
-            injector_checked: std::sync::atomic::AtomicBool::new(false),
-            skin_signer: tokio::sync::OnceCell::new(),
-            skin_key_bits: crate::skin::KEY_BITS,
             _root_lock: root_lock,
         })
     }
@@ -200,7 +170,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// Keeps sign-in secrets in this store instead of the system one (tests).
     #[must_use]
     pub fn with_credentials(mut self, credentials: Arc<dyn CredentialStore>) -> Self {
-        self.credentials = credentials;
+        self.accounts.set_credentials(credentials);
         self
     }
 

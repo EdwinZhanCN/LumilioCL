@@ -83,7 +83,7 @@ fn world(java_script: &str) -> World {
         request: LaunchRequest {
             instance,
             directories,
-            session: crate::account::OfflineProfile::new("Steve")
+            session: crate::accounts::account::OfflineProfile::new("Steve")
                 .unwrap()
                 .session(),
             manifest_url: Some(manifest_url.to_string()),

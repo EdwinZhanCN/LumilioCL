@@ -6,12 +6,12 @@ use super::{
     ECHO_ARGS, MS_ID, fake_java, launch_to_end, microsoft_chain, publish_identity_release,
     publish_release, sign_in, world,
 };
+use crate::accounts::credentials::StoredLogin;
+use crate::accounts::microsoft::{AuthError, DeviceCode};
 use crate::activity::CancellationToken;
 use crate::clock::now;
-use crate::credentials::StoredLogin;
 use crate::error::ServiceError;
 use crate::instances::Loader;
-use crate::microsoft::{AuthError, DeviceCode};
 use crate::settings::AccountKind;
 
 #[tokio::test]
@@ -86,7 +86,7 @@ async fn a_store_that_does_not_work_stops_the_sign_in_before_any_code_is_shown()
 
 #[tokio::test]
 async fn a_refusal_or_a_cancel_leaves_no_account_and_no_secret_behind() {
-    use crate::microsoft::PROFILE_URL;
+    use crate::accounts::microsoft::PROFILE_URL;
     let world = world();
     microsoft_chain(&world, "Edwin_Zhan", "mc-1");
     world.net.clear_replies(PROFILE_URL);
@@ -118,7 +118,7 @@ async fn a_refusal_or_a_cancel_leaves_no_account_and_no_secret_behind() {
 
 #[tokio::test]
 async fn a_launch_uses_the_real_profile_and_token_and_reuses_a_fresh_token_without_the_network() {
-    use crate::microsoft::TOKEN_URL;
+    use crate::accounts::microsoft::TOKEN_URL;
     let world = world();
     publish_identity_release(&world);
     fake_java(&world, ECHO_ARGS);
@@ -149,7 +149,7 @@ async fn a_launch_uses_the_real_profile_and_token_and_reuses_a_fresh_token_witho
 
 #[tokio::test]
 async fn an_expiring_token_is_refreshed_and_the_rotated_secret_is_kept() {
-    use crate::microsoft::TOKEN_URL;
+    use crate::accounts::microsoft::TOKEN_URL;
     let world = world();
     publish_identity_release(&world);
     fake_java(&world, ECHO_ARGS);
@@ -191,7 +191,7 @@ async fn an_expiring_token_is_refreshed_and_the_rotated_secret_is_kept() {
 
 #[tokio::test]
 async fn a_rejected_sign_in_stops_the_launch_and_marks_the_account() {
-    use crate::microsoft::TOKEN_URL;
+    use crate::accounts::microsoft::TOKEN_URL;
     let world = world();
     publish_identity_release(&world);
     fake_java(&world, ECHO_ARGS);

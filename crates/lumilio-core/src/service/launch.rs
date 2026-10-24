@@ -91,7 +91,10 @@ impl<T: Transport + Clone> LauncherService<T> {
                 crate::forge_install::installer_url(record.loader, &record.game_version, version)
             })
         });
-        let session = self.session_for(&settings).await?;
+        let session = self
+            .accounts
+            .session_for(&self.appearance, &settings)
+            .await?;
         let request = LaunchRequest {
             instance: record,
             directories,

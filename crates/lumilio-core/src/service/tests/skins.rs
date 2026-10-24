@@ -5,9 +5,9 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
 use super::{ECHO_ARGS, World, fake_java, publish_identity_release, world};
+use crate::appearance::skin::{SkinChoice, SkinError, SkinModel};
 use crate::error::ServiceError;
 use crate::instances::Loader;
-use crate::skin::{SkinChoice, SkinError, SkinModel};
 
 fn picture(color: [u8; 4]) -> Vec<u8> {
     let image = image::RgbaImage::from_pixel(64, 64, image::Rgba(color));
@@ -60,7 +60,7 @@ fn publish_injector(world: &World) {
 
 fn skin_world() -> World {
     let mut world = world();
-    world.service.skin_key_bits = 1024;
+    world.service.appearance.skin_key_bits = 1024;
     world
 }
 
@@ -191,7 +191,12 @@ async fn an_account_face_is_the_head_of_its_skin_and_none_without_one() {
 async fn an_offline_player_without_a_skin_needs_no_agent_and_no_download() {
     let world = skin_world();
     let settings = world.service.settings().await;
-    let session = world.service.session_for(&settings).await.unwrap();
+    let session = world
+        .service
+        .accounts
+        .session_for(&world.service.appearance, &settings)
+        .await
+        .unwrap();
     assert!(session.injection().is_none());
     assert!(session.jvm_arguments().is_empty());
     assert!(world.net.sent.lock().unwrap().is_empty());
@@ -210,7 +215,12 @@ async fn a_littleskin_player_gets_a_local_server_that_serves_their_skin_for_as_l
         .unwrap();
 
     let settings = world.service.settings().await;
-    let session = world.service.session_for(&settings).await.unwrap();
+    let session = world
+        .service
+        .accounts
+        .session_for(&world.service.appearance, &settings)
+        .await
+        .unwrap();
     let injection = session.injection().expect("the agent is loaded");
     assert!(injection.api_root.starts_with("http://localhost:"));
     assert!(injection.prefetched.is_none());
@@ -268,7 +278,12 @@ async fn a_skin_that_cannot_be_loaded_does_not_stop_the_game_but_is_told() {
         .await
         .unwrap();
     let settings = world.service.settings().await;
-    let session = world.service.session_for(&settings).await.unwrap();
+    let session = world
+        .service
+        .accounts
+        .session_for(&world.service.appearance, &settings)
+        .await
+        .unwrap();
     assert!(session.injection().is_some());
     assert_eq!(session.notes().len(), 1);
     assert!(session.notes()[0].contains("skin"), "{:?}", session.notes());
@@ -284,7 +299,12 @@ async fn without_the_agent_a_skin_cannot_work_so_the_launch_stops_with_that_reas
         .await
         .unwrap();
     let settings = world.service.settings().await;
-    let error = world.service.session_for(&settings).await.unwrap_err();
+    let error = world
+        .service
+        .accounts
+        .session_for(&world.service.appearance, &settings)
+        .await
+        .unwrap_err();
     assert!(matches!(error, ServiceError::Injector(_)), "{error}");
 }
 

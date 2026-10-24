@@ -315,7 +315,7 @@ impl AuthSession {
         self.injection
             .as_ref()
             .map(|injection| {
-                crate::injector::jvm_arguments(
+                crate::accounts::injector::jvm_arguments(
                     &injection.jar,
                     &injection.api_root,
                     injection.prefetched.as_deref(),

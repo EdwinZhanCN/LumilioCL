@@ -1,217 +1,189 @@
-//! Account-scoped profile reads (ADR 0039). Cache lifetimes and authentication
-//! backoff follow Modrinth `packages/app-lib/src/state/minecraft_auth.rs`
-//! (Copyright Modrinth contributors, GPL-3.0-only; ADR 0022).
-//! Unlike a map-only cache, each account also serializes misses and writes.
-
-use std::collections::HashMap;
-use std::sync::Arc;
-use std::time::Duration;
-
-use sha2::{Digest, Sha256};
-use tokio::sync::Mutex;
-use tokio::time::Instant;
+use std::path::PathBuf;
 
 use super::LauncherService;
+use crate::activity::CancellationToken;
+use crate::appearance::skin::{
+    AccountLook, AppearanceChange, AppearanceUpdate, LibrarySkin, MojangProfile, PairedCape,
+    Pixels, SkinChoice, SkinModel,
+};
+use crate::appearance::{AppearanceApplyResult, ProfileSnapshot};
 use crate::error::ServiceError;
-use crate::microsoft::Secret;
-use crate::skin::{AppearanceError, MojangClient, MojangProfile};
 use crate::transfer::Transport;
 
-#[derive(Default)]
-pub(super) struct ProfileState {
-    pub(super) profile: Option<(Instant, MojangProfile)>,
-    /// A completed GET, distinct from a write response stored in `profile`.
-    read_at: Option<Instant>,
-    /// How many GETs have completed in this slot. A refresh shares a GET that
-    /// finished while it waited for the slot, and still fetches after a write
-    /// reply, which does not increment this.
-    reads: u64,
-    pub(super) failure: Option<(Instant, AppearanceError)>,
-    token: Vec<u8>,
-}
-
-#[derive(Default)]
-pub(super) struct Profiles(Mutex<HashMap<String, Arc<Mutex<ProfileState>>>>);
-
-pub struct ProfileSnapshot {
-    pub profile: MojangProfile,
-    /// A recoverable failed refresh left this older profile available.
-    pub warning: Option<AppearanceError>,
-}
-
-impl Profiles {
-    pub(super) async fn slot(&self, key: &str) -> Arc<Mutex<ProfileState>> {
-        self.0
-            .lock()
-            .await
-            .entry(key.to_owned())
-            .or_default()
-            .clone()
-    }
-    pub(super) async fn remove(&self, key: &str) {
-        self.0.lock().await.remove(key);
-    }
-
-    pub(super) async fn is_current(&self, key: &str, slot: &Arc<Mutex<ProfileState>>) -> bool {
-        self.0
-            .lock()
-            .await
-            .get(key)
-            .is_some_and(|current| Arc::ptr_eq(current, slot))
-    }
-}
-
-impl ProfileState {
-    pub(super) fn token(&mut self, token: &Secret) {
-        let fingerprint = Sha256::digest(token.expose().as_bytes()).to_vec();
-        if self.token != fingerprint {
-            self.token = fingerprint;
-            self.profile = None;
-            self.read_at = None;
-            if self
-                .failure
-                .as_ref()
-                .is_some_and(|(_, error)| matches!(error, AppearanceError::SignInRequired))
-            {
-                self.failure = None;
-            }
-        }
-    }
-    pub(super) fn blocked(&self) -> Option<AppearanceError> {
-        self.failure
-            .as_ref()
-            .filter(|(until, _)| Instant::now() < *until)
-            .map(|(_, error)| error.clone())
-    }
-    pub(super) fn failed_read(&mut self, error: &AppearanceError) {
-        self.failure = Some((Instant::now() + error.retry_delay(), error.clone()));
-    }
-    pub(super) fn failed_write(&mut self, error: &AppearanceError) {
-        self.failure = match error {
-            AppearanceError::SignInRequired
-            | AppearanceError::RateLimited
-            | AppearanceError::RateLimitedFor(_)
-            | AppearanceError::Network(_)
-            | AppearanceError::Refused(500..=599) => {
-                Some((Instant::now() + error.retry_delay(), error.clone()))
-            }
-            _ => None,
-        };
-    }
-}
-
 impl<T: Transport + Clone> LauncherService<T> {
-    /// Reuses a recent snapshot and coalesces concurrent misses. Failed reads
-    /// retain the previous appearance; explicit confirmation never uses stale data.
     pub async fn account_profile(&self, key: &str) -> Result<MojangProfile, ServiceError> {
-        self.read_appearance_profile(key, false).await
+        self.appearance.account_profile(&self.accounts, key).await
     }
 
     pub async fn account_profile_snapshot(
         &self,
         key: &str,
     ) -> Result<ProfileSnapshot, ServiceError> {
-        let profile = self.account_profile(key).await?;
-        let slot = self.profiles.slot(key).await;
-        let state = slot.lock().await;
-        let warning = state.blocked().filter(recoverable);
-        Ok(ProfileSnapshot { profile, warning })
+        self.appearance
+            .account_profile_snapshot(&self.accounts, key)
+            .await
     }
 
-    /// Bypasses freshness, but still respects server/authentication cooldowns.
     pub async fn refresh_account_profile(&self, key: &str) -> Result<MojangProfile, ServiceError> {
-        self.read_appearance_profile(key, true).await
+        self.appearance
+            .refresh_account_profile(&self.accounts, key)
+            .await
     }
 
-    async fn read_appearance_profile(
+    pub async fn set_account_skin(
         &self,
         key: &str,
-        force: bool,
-    ) -> Result<MojangProfile, ServiceError> {
-        let slot = self.profiles.slot(key).await;
-        let observed = slot.lock().await.reads;
-        let mut state = slot.lock().await;
-        let (entry, token) = self.appearance_token(key).await?;
-        state.token(&token);
-        if let Some(error) = state.blocked() {
-            if !force
-                && recoverable(&error)
-                && let Some((_, profile)) = &state.profile
-            {
-                return Ok(profile.clone());
-            }
-            return Err(error.into());
-        }
-        // A GET that finished while this call waited is this call's read.
-        // A write reply does not count, so confirmation still fetches.
-        if state.reads > observed
-            && state.read_at.is_some()
-            && let Some((_, profile)) = &state.profile
-        {
-            return Ok(profile.clone());
-        }
-        if let Some((fetched, profile)) = &state.profile
-            && !force
-            && fetched.elapsed() < Duration::from_secs(60)
-        {
-            return Ok(profile.clone());
-        }
-        let result = MojangClient::new(self.network.transport())
-            .profile(&token)
+        skin: Option<SkinChoice>,
+    ) -> Result<(), ServiceError> {
+        self.appearance.set_account_skin(key, skin).await
+    }
+
+    pub async fn account_look(&self, key: &str) -> Result<AccountLook, ServiceError> {
+        self.appearance.account_look(&self.accounts, key).await
+    }
+
+    pub async fn account_face(&self, key: &str) -> Result<Option<Pixels>, ServiceError> {
+        self.appearance.account_face(&self.accounts, key).await
+    }
+
+    pub async fn change_account_appearance(
+        &self,
+        key: &str,
+        change: AppearanceChange,
+    ) -> Result<AppearanceUpdate, ServiceError> {
+        self.appearance
+            .change_account_appearance(&self.accounts, key, change)
             .await
-            .and_then(|profile| {
-                validate_profile(&entry, &profile)?;
-                Ok(profile)
-            });
-        if !self.profiles.is_current(key, &slot).await {
-            return Err(ServiceError::Cancelled);
-        }
-        match result {
-            Ok(profile) => {
-                state.failure = None;
-                let now = Instant::now();
-                state.reads += 1;
-                state.read_at = Some(now);
-                state.profile = Some((now, profile.clone()));
-                Ok(profile)
-            }
-            Err(error) => {
-                state.failed_read(&error);
-                if !force
-                    && recoverable(&error)
-                    && let Some((_, profile)) = &state.profile
-                {
-                    return Ok(profile.clone());
-                }
-                self.appearance_answer(key, Err(error)).await
-            }
-        }
     }
-}
 
-fn recoverable(error: &AppearanceError) -> bool {
-    matches!(
-        error,
-        AppearanceError::Network(_)
-            | AppearanceError::RateLimited
-            | AppearanceError::RateLimitedFor(_)
-            | AppearanceError::Refused(500..=599)
-    )
-}
-
-pub(super) fn validate_profile(
-    entry: &crate::settings::AccountEntry,
-    profile: &MojangProfile,
-) -> Result<(), AppearanceError> {
-    let expected = entry
-        .profile_id()
-        .map_err(|_| AppearanceError::Protocol("invalid account id".into()))?;
-    let actual = crate::account::ProfileId::parse(&profile.id)
-        .map_err(|_| AppearanceError::Protocol("invalid profile id".into()))?;
-    if expected != actual {
-        return Err(AppearanceError::Protocol(
-            "profile belongs to another account".into(),
-        ));
+    pub async fn confirm_account_appearance(
+        &self,
+        key: &str,
+        cancel: CancellationToken,
+    ) -> Result<MojangProfile, ServiceError> {
+        self.appearance
+            .confirm_account_appearance(&self.accounts, key, cancel)
+            .await
     }
-    Ok(())
+
+    pub async fn skin_library(&self) -> Result<Vec<LibrarySkin>, ServiceError> {
+        self.appearance.skin_library().await
+    }
+
+    pub async fn save_account_skin(&self, key: &str) -> Result<LibrarySkin, ServiceError> {
+        self.appearance.save_account_skin(&self.accounts, key).await
+    }
+
+    pub async fn wear_library_skin(
+        &self,
+        key: &str,
+        id: String,
+    ) -> Result<AppearanceApplyResult, ServiceError> {
+        self.appearance
+            .wear_library_skin(&self.accounts, key, id)
+            .await
+    }
+
+    pub async fn wear_library_skin_draft(
+        &self,
+        key: &str,
+        id: String,
+        model: SkinModel,
+        cape: PairedCape,
+        replacement: Option<PathBuf>,
+    ) -> Result<AppearanceApplyResult, ServiceError> {
+        self.appearance
+            .wear_library_skin_draft(&self.accounts, key, id, model, cape, replacement)
+            .await
+    }
+
+    pub async fn change_account_skin_model(
+        &self,
+        key: &str,
+        model: SkinModel,
+    ) -> Result<Option<AppearanceUpdate>, ServiceError> {
+        self.appearance
+            .change_account_skin_model(&self.accounts, key, model)
+            .await
+    }
+
+    pub async fn upload_account_skin_file(
+        &self,
+        key: &str,
+        path: PathBuf,
+        model: SkinModel,
+    ) -> Result<AppearanceUpdate, ServiceError> {
+        self.appearance
+            .upload_account_skin_file(&self.accounts, key, path, model)
+            .await
+    }
+
+    pub async fn import_library_skin(
+        &self,
+        path: PathBuf,
+        model: Option<SkinModel>,
+    ) -> Result<LibrarySkin, ServiceError> {
+        self.appearance.import_library_skin(path, model).await
+    }
+
+    pub async fn rename_library_skin(&self, id: String, name: String) -> Result<(), ServiceError> {
+        self.appearance.rename_library_skin(id, name).await
+    }
+
+    pub async fn set_library_skin_cape(
+        &self,
+        id: String,
+        cape: PairedCape,
+    ) -> Result<(), ServiceError> {
+        self.appearance.set_library_skin_cape(id, cape).await
+    }
+
+    pub async fn replace_library_skin(
+        &self,
+        id: String,
+        path: PathBuf,
+    ) -> Result<LibrarySkin, ServiceError> {
+        self.appearance.replace_library_skin(id, path).await
+    }
+
+    pub async fn library_looks(&self) -> Result<Vec<(String, AccountLook)>, ServiceError> {
+        self.appearance.library_looks().await
+    }
+
+    pub async fn owned_cape_pictures(&self, profile: &MojangProfile) -> Vec<(String, Pixels)> {
+        self.appearance.owned_cape_pictures(profile).await
+    }
+
+    pub async fn reorder_library_skins(&self, ids: Vec<String>) -> Result<(), ServiceError> {
+        self.appearance.reorder_library_skins(ids).await
+    }
+
+    pub async fn set_library_skin_model(
+        &self,
+        id: String,
+        model: SkinModel,
+    ) -> Result<(), ServiceError> {
+        self.appearance.set_library_skin_model(id, model).await
+    }
+
+    pub async fn remove_library_skin(&self, id: String) -> Result<(), ServiceError> {
+        self.appearance.remove_library_skin(id).await
+    }
+
+    pub async fn library_skin(
+        &self,
+        id: String,
+    ) -> Result<(PathBuf, SkinModel, Vec<u8>), ServiceError> {
+        self.appearance.library_skin(id).await
+    }
+
+    pub async fn profile_wears_library_skin(
+        &self,
+        profile: &MojangProfile,
+        id: String,
+    ) -> Result<bool, ServiceError> {
+        self.appearance
+            .profile_wears_library_skin(profile, id)
+            .await
+    }
 }

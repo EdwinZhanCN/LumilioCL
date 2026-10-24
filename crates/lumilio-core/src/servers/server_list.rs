@@ -9,9 +9,9 @@ use image::ImageReader;
 
 use super::protocol;
 use super::protocol::ProtocolVersion;
+use crate::appearance::skin::Pixels;
 use crate::nbt;
 use crate::nbt::{NbtError, Tag};
-use crate::skin::Pixels;
 
 pub(super) const FILE: &str = "servers.dat";
 /// The game keeps the previous list beside the new one under this name.

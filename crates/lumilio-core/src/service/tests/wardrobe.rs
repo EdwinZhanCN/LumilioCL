@@ -1,7 +1,7 @@
 use std::io::Write as _;
 
 use super::{MS_ID, microsoft_chain, sign_in, world};
-use crate::microsoft::PROFILE_URL;
+use crate::accounts::microsoft::PROFILE_URL;
 use crate::{AppearanceChange, AppearanceError, CancellationToken, ServiceError, SkinModel};
 
 #[tokio::test]
@@ -376,7 +376,7 @@ async fn a_microsoft_wear_brings_the_paired_cape_and_keep_leaves_it() {
     // Hidden: the cape is taken off after the skin is on.
     world
         .service
-        .set_library_skin_cape(skin.id.clone(), crate::skin::PairedCape::Hidden)
+        .set_library_skin_cape(skin.id.clone(), crate::appearance::skin::PairedCape::Hidden)
         .await
         .unwrap();
     world
@@ -533,7 +533,7 @@ async fn rate_limit_keeps_the_previous_profile_and_a_new_token_does_not_end_it()
         )))
     ));
     assert_eq!(world.net.sent_to(PROFILE_URL), cooled);
-    let mut login = crate::credentials::StoredLogin::load(world.secrets.as_ref(), &key)
+    let mut login = crate::accounts::credentials::StoredLogin::load(world.secrets.as_ref(), &key)
         .unwrap()
         .unwrap();
     login.access_token = "token-next".into();

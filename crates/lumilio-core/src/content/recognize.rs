@@ -16,22 +16,22 @@ use crate::transfer::Transport;
 /// One installed file: what the list shows, where it is, and its SHA-1
 /// (`None` for folder packs and unreadable files).
 pub(crate) struct HashedFile {
-    pub(crate) item: ContentItem,
-    pub(crate) path: PathBuf,
-    pub(crate) sha1: Option<String>,
+    pub(super) item: ContentItem,
+    pub(super) path: PathBuf,
+    pub(super) sha1: Option<String>,
 }
 
 /// What the sources said about a game's files.
 #[derive(Default)]
 pub(crate) struct Recognition {
     /// By SHA-1.
-    pub(crate) identified: BTreeMap<String, Recognized>,
+    pub(super) identified: BTreeMap<String, Recognized>,
     /// The newest compatible version, by SHA-1, from the source that knew
     /// the file; only for files asked about.
-    pub(crate) latest: BTreeMap<String, Version>,
-    pub(crate) projects: Summaries,
+    pub(super) latest: BTreeMap<String, Version>,
+    pub(super) projects: Summaries,
     /// Sources that could not be asked, with why.
-    pub(crate) failures: Vec<String>,
+    pub(super) failures: Vec<String>,
 }
 
 impl<T: Transport + Clone> Content<T> {

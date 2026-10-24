@@ -2,7 +2,7 @@ use std::error::Error;
 use std::fmt;
 use std::fmt::{Display, Formatter};
 
-use crate::account::AuthSession;
+use crate::accounts::account::AuthSession;
 use crate::forge_install::ForgeError;
 use crate::install::InstallError;
 use crate::instances::{InstanceRecord, Loader};
