@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use super::LauncherService;
+use super::InstanceLibrary;
 use super::packs::backup_failure;
 use crate::activity::CancellationToken;
 use crate::activity::{RetryAction, TaskAction, TaskCategory, TaskLabel};
@@ -11,9 +11,9 @@ use crate::instances::{InstanceRecord, InstanceSettings, Loader, NewInstance};
 use crate::staged::Staged;
 use crate::transfer::Transport;
 
-impl<T: Transport + Clone> LauncherService<T> {
+impl<T: Transport + Clone> InstanceLibrary<T> {
     /// The games in a folder made by another launcher (ADR 0016). Reads only.
-    pub async fn detect_games(
+    pub(crate) async fn detect_games(
         &self,
         folder: &Path,
     ) -> Result<Vec<crate::import_game::FoundGame>, ServiceError> {
@@ -26,7 +26,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// Makes a new game of one found by [`Self::detect_games`]: its player
     /// files are copied (the source is never changed), and its game files are
     /// installed on first launch. Built whole before it appears.
-    pub async fn import_game(
+    pub(crate) async fn import_game(
         &self,
         game: crate::import_game::FoundGame,
         cancel: CancellationToken,
@@ -48,7 +48,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         result
     }
 
-    pub(super) async fn import_game_inner(
+    pub(crate) async fn import_game_inner(
         &self,
         game: crate::import_game::FoundGame,
         cancel: CancellationToken,
@@ -113,7 +113,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             staged.discard();
             return Err(error.into());
         }
-        self.settle_current().await;
+        crate::settings::settle_current(&self.instances, &self.context, &self.settings).await;
         Ok(record)
     }
 
@@ -121,7 +121,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// file at `destination` (ADR 0015) and returns its size. Takes the
     /// instance lease so the files hold still. An Activity task; cancelling
     /// it leaves no file.
-    pub async fn backup_instance(
+    pub(crate) async fn backup_instance(
         &self,
         id: &str,
         destination: &Path,
@@ -169,7 +169,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// Makes a new game out of a backup (ADR 0015). The game is built whole
     /// before it appears; nothing existing is touched. Its game files are
     /// installed on first launch like any new game.
-    pub async fn restore_backup(
+    pub(crate) async fn restore_backup(
         &self,
         archive: &Path,
         cancel: CancellationToken,
@@ -200,7 +200,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         result
     }
 
-    pub(super) async fn restore_backup_inner(
+    pub(crate) async fn restore_backup_inner(
         &self,
         archive: &Path,
         cancel: CancellationToken,
@@ -280,7 +280,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             staged.discard();
             return Err(error.into());
         }
-        self.settle_current().await;
+        crate::settings::settle_current(&self.instances, &self.context, &self.settings).await;
         Ok(record)
     }
 }

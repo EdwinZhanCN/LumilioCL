@@ -1,4 +1,4 @@
-use super::LauncherService;
+use super::InstanceLibrary;
 use crate::clock::now;
 use crate::error::ServiceError;
 use crate::history::ChangeKind;
@@ -6,9 +6,9 @@ use crate::snapshots;
 use crate::snapshots::{SnapshotInfo, SnapshotScope};
 use crate::transfer::Transport;
 
-impl<T: Transport + Clone> LauncherService<T> {
+impl<T: Transport + Clone> InstanceLibrary<T> {
     /// The instance's snapshots, newest first. Reading needs no lease.
-    pub async fn snapshots(&self, id: &str) -> Result<Vec<SnapshotInfo>, ServiceError> {
+    pub(crate) async fn snapshots(&self, id: &str) -> Result<Vec<SnapshotInfo>, ServiceError> {
         self.instances.record(id).await?;
         let (root, id) = (self.layout.root().to_path_buf(), id.to_owned());
         tokio::task::spawn_blocking(move || snapshots::list(&root, &id))
@@ -19,7 +19,7 @@ impl<T: Transport + Clone> LauncherService<T> {
 
     /// Backs up the instance's worlds and settings (or one world). Takes the
     /// instance lease so the files are not changing underneath it.
-    pub async fn create_snapshot(
+    pub(crate) async fn create_snapshot(
         &self,
         id: &str,
         scope: SnapshotScope,
@@ -46,7 +46,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// Replaces the snapshot's worlds and settings in the game. A failure or a
     /// crash puts everything back as it was; the snapshot stays for a retry.
     /// Returns the restored units. Takes the instance lease.
-    pub async fn restore_snapshot(
+    pub(crate) async fn restore_snapshot(
         &self,
         id: &str,
         snapshot: &str,
@@ -70,7 +70,11 @@ impl<T: Transport + Clone> LauncherService<T> {
     }
 
     /// Deletes one snapshot. Never part of automatic clean-up. Takes the lease.
-    pub async fn delete_snapshot(&self, id: &str, snapshot: &str) -> Result<(), ServiceError> {
+    pub(crate) async fn delete_snapshot(
+        &self,
+        id: &str,
+        snapshot: &str,
+    ) -> Result<(), ServiceError> {
         let _lease = self.instances.reserve(id)?;
         self.instances.record(id).await?;
         let (root, instance, name) = (

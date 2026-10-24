@@ -108,7 +108,8 @@ pub use install::{
     NativeError, NativePublication, NativePublisher, PlannedArtifact,
 };
 pub use instances::{
-    Collection, InstanceRecord, InstanceSettings, InstanceStore, Loader, NewInstance, StoreError,
+    Collection, InstanceRecord, InstanceSettings, InstanceStore, Library, Loader, NewInstance,
+    StoreError,
 };
 pub use java::{
     InstanceJava, JavaChoice, JavaLocator, JavaNeeds, JavaRule, JavaRuntime, RuleStrength,
@@ -173,7 +174,7 @@ pub use screenshots::{ScreenshotError, ScreenshotInfo};
 pub use servers::{
     Motd, MotdSpan, PackPolicy, PingError, ProtocolVersion, ServerEntry, ServerError, ServerStatus,
 };
-pub use service::{LauncherService, Library};
+pub use service::LauncherService;
 pub use settings::{
     AccountEntry, AccountKind, AuthServerEntry, DownloadSourcePreference, LauncherSettings,
     MAX_MEMORY_MB, MirrorRule, SettingsError, SettingsStore, TERMS_VERSION,

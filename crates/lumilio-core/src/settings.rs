@@ -824,6 +824,12 @@ impl SettingsStore {
     }
 }
 
+mod current;
+mod operations;
+
+pub(crate) use current::{settle_current, settle_current_in};
+pub(crate) use operations::Settings;
+
 #[cfg(test)]
 mod tests;
 

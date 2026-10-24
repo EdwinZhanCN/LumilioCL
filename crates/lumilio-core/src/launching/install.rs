@@ -1,6 +1,6 @@
 use tokio::sync::mpsc;
 
-use super::{LauncherService, loader_text};
+use super::LaunchParts;
 use crate::activity::CancellationToken;
 use crate::activity::{RetryAction, TaskAction, TaskCategory, TaskLabel};
 use crate::error::ServiceError;
@@ -10,18 +10,26 @@ use crate::launching::{LaunchServiceError, LaunchUpdate};
 use crate::loader::LAUNCHABLE_LOADERS;
 use crate::transfer::Transport;
 
-impl<T: Transport + Clone> LauncherService<T> {
+/// `Fabric 0.16.0` / `Vanilla`, for a history line.
+fn loader_text(loader: Loader, version: Option<&str>) -> String {
+    match version {
+        Some(version) => format!("{loader:?} {version}"),
+        None => format!("{loader:?}"),
+    }
+}
+
+impl<T: Transport + Clone> LaunchParts<'_, T> {
     /// Installs an instance's game files without starting it. The task shows
     /// in Activity and `cancel_task` can stop it. `installed` becomes true only
     /// when the whole install finished; a failure or cancel leaves it false.
-    pub async fn install_instance(
+    pub(crate) async fn install_instance(
         &self,
         id: &str,
         updates: mpsc::UnboundedSender<LaunchUpdate>,
         cancel: CancellationToken,
     ) -> Result<(), ServiceError> {
         let _lease = self.instances.reserve(id)?;
-        let (request, chain) = self.launch_request(id, Some(None), &cancel).await?;
+        let (request, chain) = self.request(id, Some(None), &cancel).await?;
         let task = self
             .tasks
             .begin(
@@ -56,14 +64,14 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// and (for Forge and NeoForge) the patched client. Files that are already
     /// right are not touched, so an intact game does nothing and needs no
     /// network. Worlds, mods and settings are never touched.
-    pub async fn repair_instance(
+    pub(crate) async fn repair_instance(
         &self,
         id: &str,
         updates: mpsc::UnboundedSender<LaunchUpdate>,
         cancel: CancellationToken,
     ) -> Result<(), ServiceError> {
         let _lease = self.instances.reserve(id)?;
-        let (request, chain) = self.launch_request(id, Some(None), &cancel).await?;
+        let (request, chain) = self.request(id, Some(None), &cancel).await?;
         let task = self
             .tasks
             .begin(
@@ -113,7 +121,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// another game version or loader may no longer work, which is why the
     /// caller offers a snapshot first. Refused while the instance launches or
     /// has another write in progress.
-    pub async fn change_runtime(
+    pub(crate) async fn change_runtime(
         &self,
         id: &str,
         game_version: &str,

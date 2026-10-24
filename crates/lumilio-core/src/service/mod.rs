@@ -12,27 +12,17 @@ mod appearance;
 mod content;
 mod diagnostics;
 mod game_settings;
-mod install;
+mod home;
 mod instances;
 mod java;
 mod launch;
-mod library;
-mod modpacks;
-mod packs;
 mod plugins;
-mod portability;
 mod preferences;
-mod snapshots;
-mod tracking;
-mod types;
 mod worlds;
 
 #[cfg(test)]
 mod tests;
 
 pub use launcher_service::LauncherService;
-use launcher_service::{DIAGNOSED_LIMIT, loader_text};
-
-pub use self::types::Library;
 
 mod launcher_service;

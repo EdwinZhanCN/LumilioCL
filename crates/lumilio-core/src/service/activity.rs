@@ -132,6 +132,18 @@ impl<T: Transport + Clone> LauncherService<T> {
         }
     }
 
+    /// Holds the downloads of a running task until [`Self::resume_task`]:
+    /// they let go of their connections and keep their bytes. `false` when
+    /// the task is unknown, finished or cannot be stopped.
+    pub fn pause_task(&self, id: u64) -> bool {
+        self.tasks.pause(id)
+    }
+
+    /// Lets a paused task's downloads continue from the bytes they kept.
+    pub fn resume_task(&self, id: u64) -> bool {
+        self.tasks.resume(id)
+    }
+
     /// Forgets every finished task; running ones are untouched.
     pub fn clear_finished(&self) -> std::io::Result<()> {
         self.tasks.clear_finished()

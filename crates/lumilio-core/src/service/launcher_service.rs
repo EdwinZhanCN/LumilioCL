@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use tokio::sync::Mutex;
 
-use super::preferences;
 use crate::accounts::Accounts;
 use crate::accounts::credentials::CredentialStore;
 use crate::activity::{ActivityLog, Tasks};
@@ -12,7 +11,7 @@ use crate::content::Content;
 use crate::diagnostics::Diagnostics;
 use crate::error::ServiceError;
 use crate::game_settings::GameSettings;
-use crate::instances::{InstanceStore, Instances, Loader};
+use crate::instances::{InstanceLibrary, InstanceStore, Instances};
 use crate::java::Java;
 use crate::launching::Launching;
 use crate::layout::Layout;
@@ -20,21 +19,10 @@ use crate::network::Network;
 use crate::plugins::PluginControls;
 use crate::recovery;
 use crate::recovery::RecoveryNote;
-use crate::settings::SettingsStore;
+use crate::settings::{Settings, SettingsStore};
 use crate::transfer::{ConnectionBudget, Transport};
 use crate::worlds::Worlds;
 
-/// `Fabric 0.16.0` / `Vanilla`, for a history line.
-pub(super) fn loader_text(loader: Loader, version: Option<&str>) -> String {
-    match version {
-        Some(version) => format!("{loader:?} {version}"),
-        None => format!("{loader:?}"),
-    }
-}
-
-/// Instances diagnosed for Home: verifying files is not free, so only the
-/// ones a person is likely to care about right now.
-pub(super) const DIAGNOSED_LIMIT: usize = 8;
 /// A download stopped part-way is continued if started again within this
 /// long; after it, its bytes are removed when the launcher opens.
 pub(super) const PARTIAL_DOWNLOAD_AGE: std::time::Duration =
@@ -58,9 +46,9 @@ pub struct LauncherService<T> {
     pub(super) diagnostics: Diagnostics,
     pub(crate) worlds: Worlds<T>,
     pub(crate) content: Content<T>,
-    /// Translated summaries and bodies, cached in their own SQLite file.
-    pub(super) translation: crate::translation::SharedTranslation,
     pub(crate) accounts: Accounts<T>,
+    pub(crate) library: InstanceLibrary<T>,
+    pub(super) preferences: Settings<T>,
     pub(crate) appearance: Appearance<T>,
     // Declared last so the stores close before ownership is released.
     pub(super) _root_lock: crate::root_lock::RootLock,
@@ -88,7 +76,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         crate::transfer::sweep_partials(&layout.partial_downloads(), PARTIAL_DOWNLOAD_AGE);
         // A saved current game that is gone is replaced before anything reads
         // it; a failed save leaves it to read as none.
-        let _ = preferences::settle_current(store.instances(), &mut settings);
+        let _ = crate::settings::settle_current_in(store.instances(), &mut settings);
         let context = crate::context::ContextHub::new(settings.get());
         store.publish_to(context.clone());
         settings.publish_to(context.clone());
@@ -114,6 +102,23 @@ impl<T: Transport + Clone> LauncherService<T> {
             layout.root().to_owned(),
         ));
         Ok(Self {
+            preferences: Settings::new(
+                settings.clone(),
+                context.clone(),
+                instances.clone(),
+                network.clone(),
+                plugins.clone(),
+                translation.clone(),
+            ),
+            library: InstanceLibrary::new(
+                instances.clone(),
+                layout.clone(),
+                network.clone(),
+                tasks.clone(),
+                context.clone(),
+                settings.clone(),
+                plugins.clone(),
+            ),
             accounts: Accounts::new(settings.clone(), network.clone(), layout.clone()),
             appearance: Appearance::new(
                 settings.clone(),
@@ -155,7 +160,6 @@ impl<T: Transport + Clone> LauncherService<T> {
             java,
             network,
             plugins,
-            translation,
             layout,
             instances,
             settings,
@@ -195,6 +199,8 @@ impl<T: Transport + Clone> LauncherService<T> {
         self.diagnostics.replace_plugins(plugins.clone());
         self.worlds.replace_plugins(plugins.clone());
         self.content.replace_plugins(plugins.clone());
+        self.library.replace_plugins(plugins.clone());
+        self.preferences.replace_plugins(plugins.clone());
         self.plugins = plugins;
     }
 

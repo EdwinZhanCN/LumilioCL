@@ -1,112 +1,57 @@
-use std::collections::BTreeMap;
+use std::path::Path;
 
-use super::{DIAGNOSED_LIMIT, LauncherService};
-use crate::attention::{HomeSummary, summarize};
-use crate::blocking::blocking;
-use crate::clock::now;
-use crate::deletion::Deletion;
-use crate::diagnostics::Problem;
+use super::LauncherService;
+use crate::activity::CancellationToken;
 use crate::error::ServiceError;
-use crate::fetch::fetch_decoded;
-use crate::instances::{InstanceRecord, Loader, NewInstance};
-use crate::launching::LaunchServiceError;
-use crate::loader::LAUNCHABLE_LOADERS;
+use crate::instances::{InstanceRecord, Library, Loader};
+use crate::snapshots::{SnapshotInfo, SnapshotScope};
 use crate::transfer::Transport;
-use crate::{forge_meta, loader};
 
 impl<T: Transport + Clone> LauncherService<T> {
-    /// Deletes an instance so that a failure or crash at any step can be
-    /// undone or finished: journal, move the profile aside, commit the library,
-    /// then remove the moved files. `meta/` is untouched because other
-    /// instances may share it. If only the final cleanup fails the deletion
-    /// still stands and the leftovers are removed at the next start.
-    pub async fn delete_instance(&self, id: &str) -> Result<(), ServiceError> {
-        let _lease = self.instances.reserve(id)?;
-        let record = self
-            .instances
-            .lock()
-            .await
-            .get(id)
-            .cloned()
-            .ok_or_else(|| ServiceError::NoSuchInstance(id.to_owned()))?;
-        let layout = self.layout.clone();
-        let deletion = {
-            let record = record.clone();
-            blocking(move || {
-                let mut deletion = Deletion::begin(&layout, &record, now())?;
-                match deletion.quarantine() {
-                    Ok(()) => Ok(deletion),
-                    Err(error) => {
-                        deletion.discard();
-                        Err(error)
-                    }
-                }
-            })
-            .await?
-        };
-        let committed = self.instances.lock().await.remove(id);
-        if let Err(error) = committed {
-            let restored = blocking(move || deletion.rollback()).await;
-            // A failed restore keeps the journal; the library error stays the cause.
-            drop(restored);
-            return Err(error.into());
-        }
-        // The deletion is committed; leftovers are retried by recovery.
-        let _ = blocking(move || deletion.finish()).await;
-        // A failure of the deleted game has nothing left to recover.
-        self.context.session(id, None);
-        self.settle_current().await;
-        Ok(())
+    pub async fn library(&self) -> Library {
+        self.library.library().await
     }
 
-    /// Saved records and recency, without Java discovery or disk diagnosis.
-    /// The application uses this before supplementing Home with `home`.
-    pub async fn home_snapshot(&self) -> (Vec<InstanceRecord>, HomeSummary) {
-        let instances = self.instances.lock().await.instances().to_vec();
-        let summary = summarize(&instances, &BTreeMap::new());
-        (instances, summary)
+    pub async fn instance(&self, id: &str) -> Result<InstanceRecord, ServiceError> {
+        self.library.instance(id).await
     }
 
-    /// Background Continue / Needs Attention checks for Home.
-    /// Full content verification remains in explicit diagnostics and repair.
-    pub async fn home(&self) -> (Vec<InstanceRecord>, HomeSummary) {
-        let (instances, checks) = self.home_checks().await;
-        let summary = self.home_from(&instances, &checks).await;
-        (instances, summary)
+    pub async fn set_favorite(&self, id: &str, favorite: bool) -> Result<(), ServiceError> {
+        self.library.set_favorite(id, favorite).await
     }
 
-    /// The disk half of [`Self::home`]: each recently played game's own
-    /// problems, without those that depend on the account.
-    pub async fn home_checks(&self) -> (Vec<InstanceRecord>, crate::attention::HomeChecks) {
-        let instances = self.instances.lock().await.instances().to_vec();
-        let (settings, runtimes) = self.java.environment().await;
-        let mut recent: Vec<&InstanceRecord> = instances.iter().collect();
-        recent.sort_by_key(|record| std::cmp::Reverse(record.last_played));
-        let mut checks: BTreeMap<String, Vec<Problem>> = BTreeMap::new();
-        for record in recent.into_iter().take(DIAGNOSED_LIMIT) {
-            let mut found = self
-                .diagnostics
-                .inspect_with_analysis(&settings, &runtimes, record, false)
-                .await;
-            found.retain(|problem| problem.kind != crate::diagnostics::ProblemKind::NoAccount);
-            checks.insert(record.id.clone(), found);
-        }
-        (instances, checks)
+    pub async fn toggle_favorite(&self, id: &str) -> Result<bool, ServiceError> {
+        self.library.toggle_favorite(id).await
     }
 
-    /// Home from checks already made and the account now; reads no disk.
-    pub async fn home_from(
+    pub async fn create_collection(&self, name: &str) -> Result<(), ServiceError> {
+        self.library.create_collection(name).await
+    }
+
+    pub async fn rename_collection(&self, from: &str, to: &str) -> Result<(), ServiceError> {
+        self.library.rename_collection(from, to).await
+    }
+
+    pub async fn delete_collection(&self, name: &str) -> Result<(), ServiceError> {
+        self.library.delete_collection(name).await
+    }
+
+    pub async fn set_game_collections(
         &self,
-        instances: &[InstanceRecord],
-        checks: &crate::attention::HomeChecks,
-    ) -> HomeSummary {
-        let has_account = crate::inspect::account_usable(self.settings.lock().await.get());
-        let problems = crate::attention::with_account(checks, has_account);
-        summarize(instances, &problems)
+        id: &str,
+        collections: &[String],
+    ) -> Result<(), ServiceError> {
+        self.library.set_game_collections(id, collections).await
     }
 
-    /// Creates an instance. A missing game version means the newest release;
-    /// a missing loader version means the recommended one for that game.
+    pub async fn rename(&self, id: &str, name: &str) -> Result<(), ServiceError> {
+        self.library.rename(id, name).await
+    }
+
+    pub async fn delete_instance(&self, id: &str) -> Result<(), ServiceError> {
+        self.library.delete_instance(id).await
+    }
+
     pub async fn create_instance(
         &self,
         name: &str,
@@ -114,159 +59,103 @@ impl<T: Transport + Clone> LauncherService<T> {
         loader: Loader,
         loader_version: Option<&str>,
     ) -> Result<InstanceRecord, ServiceError> {
-        if !LAUNCHABLE_LOADERS.contains(&loader) {
-            return Err(ServiceError::Launch(LaunchServiceError::LoaderUnsupported(
-                loader,
-            )));
-        }
-        let chain = self.network.chain().await?;
-        let game_version = match game_version {
-            Some(version) => version.to_owned(),
-            None => crate::minecraft::fetch_catalog(&self.network.fetcher(), &chain)
-                .await
-                .map_err(|error| ServiceError::Remote(error.to_string()))?
-                .latest_release()
-                .map(|entry| entry.id().to_owned())
-                .ok_or_else(|| ServiceError::Remote("the catalog lists no release".to_owned()))?,
-        };
-        let loader_version = match (loader, loader_version) {
-            (Loader::Vanilla, _) => None,
-            (_, Some(version)) => Some(version.to_owned()),
-            (_, None) => {
-                let url = loader::versions_url(loader, &game_version)
-                    .ok_or_else(|| ServiceError::Remote("no loader source".to_owned()))?;
-                let sources = chain.candidates(&url);
-                let versions = loader::fetch_versions(&self.network.fetcher(), &sources)
-                    .await
-                    .map_err(|error| ServiceError::Remote(error.to_string()))?;
-                let chosen = loader::recommended(&versions).ok_or_else(|| {
-                    ServiceError::Remote(format!("{game_version} has no {loader:?} version"))
-                })?;
-                Some(chosen.version.clone())
-            }
-        };
-        let record = self
-            .instances
-            .lock()
+        self.library
+            .create_instance(name, game_version, loader, loader_version)
             .await
-            .create(
-                NewInstance {
-                    name: name.to_owned(),
-                    game_version,
-                    loader,
-                    loader_version,
-                },
-                now(),
-            )?
-            .clone();
-        // Made at once, so a missing folder later means it was moved or
-        // deleted, not that the game was never started.
-        if let Err(error) = std::fs::create_dir_all(self.layout.game(&record.id)) {
-            let _ = self.instances.lock().await.remove(&record.id);
-            return Err(error.into());
-        }
-        self.settle_current().await;
-        Ok(record)
     }
 
-    /// Gives a game whose folder was moved or deleted a new, empty one: it
-    /// starts again with no mods, worlds or options of its own.
     pub async fn new_game_folder(&self, id: &str) -> Result<(), ServiceError> {
-        self.instances.record(id).await?;
-        let game = self.layout.game(id);
-        tokio::task::spawn_blocking(move || std::fs::create_dir_all(game))
-            .await
-            .map_err(std::io::Error::other)??;
-        Ok(())
+        self.library.new_game_folder(id).await
     }
 
-    /// Every game version the catalog lists, newest first, for choosing one
-    /// (IA P-VERSION). Read fresh each time; a failure is reported, never
-    /// replaced by a guess.
-    pub async fn game_versions(
-        &self,
-    ) -> Result<Vec<lumilio_minecraft::CatalogEntry>, ServiceError> {
-        let chain = self.network.chain().await?;
-        let catalog = crate::minecraft::fetch_catalog(&self.network.fetcher(), &chain)
-            .await
-            .map_err(|error| ServiceError::Remote(error.to_string()))?;
-        Ok(catalog.entries().to_vec())
+    pub async fn snapshots(&self, id: &str) -> Result<Vec<SnapshotInfo>, ServiceError> {
+        self.library.snapshots(id).await
     }
 
-    /// The versions of `loader` available for `game_version`, newest first
-    /// (IA P-LOADER-VERSION). Vanilla has none.
-    pub async fn loader_versions(
+    pub async fn create_snapshot(
         &self,
-        loader: Loader,
-        game_version: &str,
-    ) -> Result<Vec<loader::LoaderVersion>, ServiceError> {
-        let chain = self.network.chain().await?;
-        let remote = |error: crate::fetch::FetchError| ServiceError::Remote(error.to_string());
-        let decode = |error: loader::LoaderError| ServiceError::Remote(error.to_string());
-        match loader {
-            Loader::Vanilla => Ok(Vec::new()),
-            Loader::Fabric | Loader::Quilt => {
-                let url = loader::versions_url(loader, game_version)
-                    .ok_or_else(|| ServiceError::Remote("no loader source".to_owned()))?;
-                loader::fetch_versions(&self.network.fetcher(), &chain.candidates(&url))
-                    .await
-                    .map_err(decode)
-            }
-            Loader::Forge => {
-                let metadata = fetch_decoded(
-                    &self.network.fetcher(),
-                    &chain.candidates(forge_meta::FORGE_METADATA_URL),
-                    |bytes| {
-                        forge_meta::forge_versions(&bytes, None, game_version)?;
-                        Ok::<_, loader::LoaderError>(bytes)
-                    },
-                )
-                .await
-                .map_err(remote)?;
-                // Promotions only mark the recommended build; the list stands without them.
-                let promotions = fetch_decoded(
-                    &self.network.fetcher(),
-                    &chain.candidates(forge_meta::FORGE_PROMOTIONS_URL),
-                    |bytes| {
-                        forge_meta::forge_versions(&metadata, Some(&bytes), game_version)?;
-                        Ok::<_, loader::LoaderError>(bytes)
-                    },
-                )
-                .await
-                .ok();
-                forge_meta::forge_versions(&metadata, promotions.as_deref(), game_version)
-                    .map_err(decode)
-            }
-            Loader::NeoForge => {
-                let modern = fetch_decoded(
-                    &self.network.fetcher(),
-                    &chain.candidates(forge_meta::NEOFORGE_VERSIONS_URL),
-                    |bytes| {
-                        forge_meta::neoforge_versions(&bytes, None, game_version)?;
-                        Ok::<_, loader::LoaderError>(bytes)
-                    },
-                )
-                .await
-                .map_err(remote)?;
-                let legacy = if game_version == forge_meta::NEOFORGE_LEGACY_GAME {
-                    Some(
-                        fetch_decoded(
-                            &self.network.fetcher(),
-                            &chain.candidates(forge_meta::NEOFORGE_LEGACY_VERSIONS_URL),
-                            |bytes| {
-                                forge_meta::neoforge_versions(&modern, Some(&bytes), game_version)?;
-                                Ok::<_, loader::LoaderError>(bytes)
-                            },
-                        )
-                        .await
-                        .map_err(remote)?,
-                    )
-                } else {
-                    None
-                };
-                forge_meta::neoforge_versions(&modern, legacy.as_deref(), game_version)
-                    .map_err(decode)
-            }
-        }
+        id: &str,
+        scope: SnapshotScope,
+        label: &str,
+    ) -> Result<String, ServiceError> {
+        self.library.create_snapshot(id, scope, label).await
+    }
+
+    pub async fn restore_snapshot(
+        &self,
+        id: &str,
+        snapshot: &str,
+    ) -> Result<Vec<std::path::PathBuf>, ServiceError> {
+        self.library.restore_snapshot(id, snapshot).await
+    }
+
+    pub async fn delete_snapshot(&self, id: &str, snapshot: &str) -> Result<(), ServiceError> {
+        self.library.delete_snapshot(id, snapshot).await
+    }
+
+    pub async fn detect_games(
+        &self,
+        folder: &Path,
+    ) -> Result<Vec<crate::import_game::FoundGame>, ServiceError> {
+        self.library.detect_games(folder).await
+    }
+
+    pub async fn import_game(
+        &self,
+        game: crate::import_game::FoundGame,
+        cancel: CancellationToken,
+    ) -> Result<InstanceRecord, ServiceError> {
+        self.library.import_game(game, cancel).await
+    }
+
+    pub async fn backup_instance(
+        &self,
+        id: &str,
+        destination: &Path,
+        cancel: CancellationToken,
+    ) -> Result<u64, ServiceError> {
+        self.library.backup_instance(id, destination, cancel).await
+    }
+
+    pub async fn restore_backup(
+        &self,
+        archive: &Path,
+        cancel: CancellationToken,
+    ) -> Result<InstanceRecord, ServiceError> {
+        self.library.restore_backup(archive, cancel).await
+    }
+
+    pub async fn copy_instance(
+        &self,
+        source_id: &str,
+        new_name: &str,
+        include_worlds: bool,
+        cancel: CancellationToken,
+    ) -> Result<InstanceRecord, ServiceError> {
+        self.library
+            .copy_instance(source_id, new_name, include_worlds, cancel)
+            .await
+    }
+
+    pub async fn install_modpack(
+        &self,
+        source: &str,
+        project: &str,
+        version: Option<&str>,
+        cancel: CancellationToken,
+    ) -> Result<InstanceRecord, ServiceError> {
+        self.library
+            .install_modpack(&self.content, source, project, version, cancel)
+            .await
+    }
+
+    pub async fn import_modpack_file(
+        &self,
+        pack: &std::path::Path,
+        cancel: CancellationToken,
+    ) -> Result<InstanceRecord, ServiceError> {
+        self.library
+            .import_modpack_file(&self.content, pack, cancel)
+            .await
     }
 }

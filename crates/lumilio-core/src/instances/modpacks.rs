@@ -1,9 +1,10 @@
-use super::LauncherService;
+use super::InstanceLibrary;
 use super::packs::{PackKind, UnpackError, sniff_pack, unpack_instance_zip};
 use crate::activity::CancellationToken;
 use crate::activity::{RetryAction, TaskAction, TaskCategory, TaskLabel};
 use crate::blocking::blocking_value;
 use crate::clock::now;
+use crate::content::Content;
 use crate::discover::{Catalog, ProjectOrigin};
 use crate::error::{ServiceError, read_unless_cancelled};
 use crate::instances::{InstanceRecord, NewInstance};
@@ -12,7 +13,7 @@ use crate::modpack::PackIndex;
 use crate::staged::Staged;
 use crate::transfer::{TransferRequest, Transport};
 
-impl<T: Transport + Clone> LauncherService<T> {
+impl<T: Transport + Clone> InstanceLibrary<T> {
     /// Copies an instance under a new name. The copy is built and checked in a
     /// staging folder, then published whole; the source is only read. It
     /// shares the source's release (installed game files live in `meta/`),
@@ -20,7 +21,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// play time, history or snapshots. `include_worlds` decides whether
     /// `saves/` comes along; `logs/` and `crash-reports/` never do. Refused
     /// while the source launches or runs; cancellable through `cancel_task`.
-    pub async fn copy_instance(
+    pub(crate) async fn copy_instance(
         &self,
         source_id: &str,
         new_name: &str,
@@ -53,7 +54,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         result
     }
 
-    pub(super) async fn copy_staged(
+    pub(crate) async fn copy_staged(
         &self,
         source: &InstanceRecord,
         new_name: &str,
@@ -111,15 +112,16 @@ impl<T: Transport + Clone> LauncherService<T> {
             staged.discard();
             return Err(error.into());
         }
-        self.settle_current().await;
+        crate::settings::settle_current(&self.instances, &self.context, &self.settings).await;
         Ok(record)
     }
 
     /// Installs a modpack project of a content source as a new instance:
     /// `version` (a version id of the project), or its newest version when
     /// `None`.
-    pub async fn install_modpack(
+    pub(crate) async fn install_modpack(
         &self,
+        content: &Content<T>,
         source: &str,
         project: &str,
         version: Option<&str>,
@@ -142,7 +144,7 @@ impl<T: Transport + Clone> LauncherService<T> {
                 version: version.map(str::to_owned),
             });
         let result = self
-            .install_modpack_inner(task.id, source, project, version, cancel)
+            .install_modpack_inner(content, task.id, source, project, version, cancel)
             .await;
         if let Ok(record) = &result {
             task.about(&record.id);
@@ -154,8 +156,9 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// Imports a local `.mrpack` or CurseForge pack zip (or an instance or
     /// backup zip) as a new instance. Same rules as installing a downloaded
     /// pack; the file itself is never deleted or modified.
-    pub async fn import_modpack_file(
+    pub(crate) async fn import_modpack_file(
         &self,
+        content: &Content<T>,
         pack: &std::path::Path,
         cancel: CancellationToken,
     ) -> Result<InstanceRecord, ServiceError> {
@@ -187,7 +190,7 @@ impl<T: Transport + Clone> LauncherService<T> {
                     PackKind::Prism => self.import_prism_zip(pack, cancel).await,
                     PackKind::Backup => self.restore_backup_inner(pack, cancel).await,
                     PackKind::Modrinth | PackKind::CurseForge => {
-                        self.import_pack_from(task.id, pack, cancel).await
+                        self.import_pack_from(content, task.id, pack, cancel).await
                     }
                 }
             }
@@ -204,7 +207,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// A MultiMC / Prism instance in a zip (ADR 0016): unpacked into a
     /// scratch folder, read like any other launcher's game, imported, and the
     /// scratch folder removed whatever happened.
-    pub(super) async fn import_prism_zip(
+    pub(crate) async fn import_prism_zip(
         &self,
         archive: &std::path::Path,
         cancel: CancellationToken,
@@ -235,8 +238,9 @@ impl<T: Transport + Clone> LauncherService<T> {
     }
 
     /// Imports a downloaded or chosen pack of either format.
-    pub(super) async fn import_pack_from(
+    pub(crate) async fn import_pack_from(
         &self,
+        content: &Content<T>,
         task: u64,
         pack: &std::path::Path,
         cancel: CancellationToken,
@@ -246,7 +250,8 @@ impl<T: Transport + Clone> LauncherService<T> {
             blocking_value(move || sniff_pack(&pack)).await?
         };
         let (index, allow) = if kind == PackKind::CurseForge {
-            let index = read_unless_cancelled(&cancel, self.curseforge_index(pack)).await?;
+            let index =
+                read_unless_cancelled(&cancel, self.curseforge_index(content, pack)).await?;
             (
                 index,
                 modpack::curseforge::is_trusted_source as fn(&str) -> bool,
@@ -281,19 +286,22 @@ impl<T: Transport + Clone> LauncherService<T> {
         if !index.manual.is_empty() {
             // The game is installed either way; the list is how the person
             // learns what to add.
-            let _ = self
-                .content
+            let _ = content
                 .save_pending_downloads(&record.id, &index.manual)
                 .await;
         }
-        self.settle_current().await;
+        crate::settings::settle_current(&self.instances, &self.context, &self.settings).await;
         Ok(record)
     }
 
     /// A CurseForge pack as an index: its files resolved by a CurseForge
     /// source, and those the author lets people download only on
     /// CurseForge's site looked for on Modrinth (plan curseforge-source D3).
-    async fn curseforge_index(&self, pack: &std::path::Path) -> Result<PackIndex, ServiceError> {
+    async fn curseforge_index(
+        &self,
+        content: &Content<T>,
+        pack: &std::path::Path,
+    ) -> Result<PackIndex, ServiceError> {
         let manifest = {
             let pack = pack.to_owned();
             blocking_value(move || modpack::curseforge::read_manifest(&pack)).await??
@@ -317,15 +325,16 @@ impl<T: Transport + Clone> LauncherService<T> {
         let elsewhere = if blocked.is_empty() {
             std::collections::BTreeMap::new()
         } else {
-            self.content.elsewhere(&blocked).await
+            content.elsewhere(&blocked).await
         };
         Ok(modpack::curseforge::index(
             &manifest, &resolved, &elsewhere,
         )?)
     }
 
-    pub(super) async fn install_modpack_inner(
+    pub(crate) async fn install_modpack_inner(
         &self,
+        content: &Content<T>,
         task: u64,
         source: &str,
         project: &str,
@@ -333,7 +342,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         cancel: CancellationToken,
     ) -> Result<InstanceRecord, ServiceError> {
         let chain = read_unless_cancelled(&cancel, self.network.chain()).await?;
-        let client = read_unless_cancelled(&cancel, self.content.content_client(source)).await?;
+        let client = read_unless_cancelled(&cancel, content.content_client(source)).await?;
         let versions = read_unless_cancelled(&cancel, async {
             client.versions(project).await.map_err(ServiceError::from)
         })
@@ -353,8 +362,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             )));
         }
         let pack = self.layout.root().join("downloads").join(&file.filename);
-        let sources =
-            read_unless_cancelled(&cancel, self.content.file_sources(&chain, file)).await?;
+        let sources = read_unless_cancelled(&cancel, content.file_sources(&chain, file)).await?;
         let mut request = TransferRequest::new(format!("pack:{}", version.id), sources, &pack)
             .map_err(|error| ServiceError::Install(error.to_string()))?;
         if file.size > 0 {
@@ -374,7 +382,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             )
             .await
             .map_err(ServiceError::from)?;
-        let record = self.import_pack_from(task, &pack, cancel).await;
+        let record = self.import_pack_from(content, task, &pack, cancel).await;
         let _ = tokio::fs::remove_file(&pack).await;
         let mut record = record?;
         // Remembering where it came from is a convenience, not part of the install.

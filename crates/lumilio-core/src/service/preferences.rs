@@ -1,121 +1,67 @@
 use super::LauncherService;
 use crate::error::ServiceError;
 use crate::instances::InstanceSettings;
-use crate::settings::validate_memory;
 use crate::transfer::Transport;
 
 impl<T: Transport + Clone> LauncherService<T> {
-    /// What the launcher window does when this instance's game runs: the
-    /// instance's own choice, else the launcher preference.
+    pub async fn settings(&self) -> crate::settings::LauncherSettings {
+        self.preferences.settings().await
+    }
+
     pub async fn after_launch_for(&self, id: &str) -> crate::tuning::AfterLaunch {
-        let own = self
-            .instances
-            .lock()
-            .await
-            .get(id)
-            .and_then(|record| record.settings.launch.after_launch);
-        match own {
-            Some(own) => own,
-            None => self.settings.lock().await.get().preferences.after_launch,
-        }
+        self.preferences.after_launch_for(id).await
     }
 
-    /// The instance the launcher plays by default. A saved id whose instance
-    /// is gone reads as `None`; the caller picks another and saves it.
     pub async fn current_instance(&self) -> Option<String> {
-        let saved = self.settings.lock().await.get().current_instance.clone()?;
-        let exists = self.instances.lock().await.get(&saved).is_some();
-        exists.then_some(saved)
+        self.preferences.current_instance().await
     }
 
-    /// The current game and account, and how often shared state has changed
-    /// (plan global-context).
     pub fn context(&self) -> crate::context::Context {
-        self.context.get()
+        self.preferences.context()
     }
 
-    /// Every later change of [`Self::context`]; only the newest is kept.
     pub fn subscribe_context(&self) -> tokio::sync::watch::Receiver<crate::context::Context> {
-        self.context.subscribe()
+        self.preferences.subscribe_context()
     }
 
-    /// Keeps the saved current game one that exists: when it is missing or
-    /// gone, the fallback becomes current and is saved. A save that fails
-    /// leaves the old choice, which reads as `None` until the next change.
-    pub(super) async fn settle_current(&self) {
-        let records = self.instances.lock().await.instances().to_vec();
-        // The published choice still names a game: the settings stay untouched.
-        if self
-            .context
-            .get()
-            .current_instance
-            .is_some_and(|id| records.iter().any(|record| record.id == id))
-        {
-            return;
-        }
-        let _ = settle_current(&records, &mut *self.settings.lock().await);
-    }
-
-    /// Remembers the current instance. It must exist.
     pub async fn set_current_instance(&self, id: &str) -> Result<(), ServiceError> {
-        if self.instances.lock().await.get(id).is_none() {
-            return Err(ServiceError::NoSuchInstance(id.to_owned()));
-        }
-        Ok(self
-            .settings
-            .lock()
-            .await
-            .set_current_instance(Some(id.to_owned()))?)
+        self.preferences.set_current_instance(id).await
     }
 
     pub async fn set_preferences(
         &self,
         preferences: crate::tuning::Preferences,
     ) -> Result<(), ServiceError> {
-        let mut settings = self.settings.lock().await;
-        let changed = settings.get().preferences.translation != preferences.translation;
-        settings.set_preferences(preferences)?;
-        if changed {
-            self.translation.invalidate();
-        }
-        Ok(())
+        self.preferences.set_preferences(preferences).await
     }
 
     pub async fn set_launch_defaults(
         &self,
         launch: crate::tuning::LaunchTuning,
     ) -> Result<(), ServiceError> {
-        Ok(self.settings.lock().await.set_launch_defaults(launch)?)
+        self.preferences.set_launch_defaults(launch).await
     }
 
     pub async fn set_download_concurrency(&self, count: Option<u32>) -> Result<(), ServiceError> {
-        self.settings.lock().await.set_download_concurrency(count)?;
-        // Running downloads take the new size from their next connection.
-        self.network.connections().await;
-        Ok(())
+        self.preferences.set_download_concurrency(count).await
     }
 
     pub async fn set_auto_update(&self, enabled: bool) -> Result<(), ServiceError> {
-        Ok(self.settings.lock().await.set_auto_update(enabled)?)
+        self.preferences.set_auto_update(enabled).await
     }
 
-    /// Remembers that the release notes of `version` were shown.
     pub async fn set_release_notes_seen(&self, version: &str) -> Result<(), ServiceError> {
-        Ok(self.settings.lock().await.set_release_notes_seen(version)?)
+        self.preferences.set_release_notes_seen(version).await
     }
 
-    /// Remembers that the person agreed to the current terms.
     pub async fn accept_terms(&self) -> Result<(), ServiceError> {
-        Ok(self.settings.lock().await.accept_terms()?)
+        self.preferences.accept_terms().await
     }
 
-    /// Turns the automatic block-asset download of schematic previews on or off.
     pub async fn set_auto_download_block_assets(&self, enabled: bool) -> Result<(), ServiceError> {
-        Ok(self
-            .settings
-            .lock()
+        self.preferences
+            .set_auto_download_block_assets(enabled)
             .await
-            .set_auto_download_block_assets(enabled)?)
     }
 
     pub async fn set_mirrors(
@@ -123,40 +69,25 @@ impl<T: Transport + Clone> LauncherService<T> {
         mirrors: Vec<crate::settings::MirrorRule>,
         prefer: bool,
     ) -> Result<(), ServiceError> {
-        let mut settings = self.settings.lock().await;
-        settings.set_mirrors(mirrors, prefer)?;
-        self.plugins.set_sources(settings.source_chain()?);
-        Ok(())
+        self.preferences.set_mirrors(mirrors, prefer).await
     }
 
     pub async fn set_mirror_rules(
         &self,
         mirrors: Vec<crate::MirrorRule>,
     ) -> Result<(), ServiceError> {
-        let mut settings = self.settings.lock().await;
-        settings.set_mirror_rules(mirrors)?;
-        self.plugins.set_sources(settings.source_chain()?);
-        Ok(())
+        self.preferences.set_mirror_rules(mirrors).await
     }
 
     pub async fn set_download_source(
         &self,
         preference: crate::DownloadSourcePreference,
     ) -> Result<(), ServiceError> {
-        let mut settings = self.settings.lock().await;
-        settings.set_download_source(preference)?;
-        self.plugins.set_sources(settings.source_chain()?);
-        Ok(())
+        self.preferences.set_download_source(preference).await
     }
 
-    /// Merge against the latest saved settings, so concurrent preset additions
-    /// cannot replace one another with stale UI snapshots.
     pub async fn add_mirror_preset(&self, preset: crate::MirrorPreset) -> Result<(), ServiceError> {
-        let mut settings = self.settings.lock().await;
-        let mirrors = preset.merge(&settings.get().mirrors);
-        settings.set_mirror_rules(mirrors)?;
-        self.plugins.set_sources(settings.source_chain()?);
-        Ok(())
+        self.preferences.add_mirror_preset(preset).await
     }
 
     pub async fn set_default_memory(
@@ -164,50 +95,16 @@ impl<T: Transport + Clone> LauncherService<T> {
         min: Option<u32>,
         max: Option<u32>,
     ) -> Result<(), ServiceError> {
-        Ok(self.settings.lock().await.set_memory(min, max)?)
+        self.preferences.set_default_memory(min, max).await
     }
 
-    /// Saves overrides after checking their effective combination with current defaults.
-    /// `None` clears an override and resumes inheritance.
     pub async fn update_instance_settings(
         &self,
         id: &str,
         settings: InstanceSettings,
     ) -> Result<(), ServiceError> {
-        let defaults = self.settings.lock().await;
-        if let Some(java) = settings.java_path.as_deref()
-            && !java.exists()
-        {
-            return Err(ServiceError::NoJavaAt(java.to_owned()));
-        }
-        validate_memory(settings.min_memory_mb, settings.max_memory_mb)?;
-        validate_memory(
-            settings
-                .min_memory_mb
-                .or(defaults.get().default_min_memory_mb),
-            settings
-                .max_memory_mb
-                .or(defaults.get().default_max_memory_mb),
-        )?;
-        Ok(self.instances.lock().await.update_settings(id, settings)?)
+        self.preferences
+            .update_instance_settings(id, settings)
+            .await
     }
-}
-
-/// See [`LauncherService::settle_current`]; also run once on opening.
-pub(super) fn settle_current(
-    records: &[crate::instances::InstanceRecord],
-    settings: &mut crate::settings::SettingsStore,
-) -> Result<(), crate::settings::SettingsError> {
-    let saved = settings.get().current_instance.clone();
-    if saved
-        .as_deref()
-        .is_some_and(|id| records.iter().any(|record| record.id == id))
-    {
-        return Ok(());
-    }
-    let next = crate::context::fallback_instance(records).map(str::to_owned);
-    if next == saved {
-        return Ok(());
-    }
-    settings.set_current_instance(next)
 }

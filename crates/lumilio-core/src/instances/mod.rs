@@ -14,6 +14,8 @@ pub use instance_store::{
     Collection, InstanceRecord, InstanceSettings, InstanceStore, Loader, NewInstance, StoreError,
 };
 use instance_store::{Index, SCHEMA_VERSION, int, unsigned};
+pub(crate) use library::InstanceLibrary;
+pub use library::Library;
 #[cfg(test)]
 use rusqlite::Connection;
 
@@ -28,6 +30,13 @@ mod tests;
 mod access;
 
 mod database;
+
+mod library;
+mod lifecycle;
+mod modpacks;
+mod packs;
+mod portability;
+mod snapshots;
 
 mod collections;
 
