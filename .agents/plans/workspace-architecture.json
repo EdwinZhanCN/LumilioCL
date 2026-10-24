@@ -50,7 +50,7 @@
     {
       "id": "T5",
       "title": "以 Discover 验证 UI feature 与运行时连接边界",
-      "status": "in_progress",
+      "status": "completed",
       "acceptance": "Discover 的查询与筛选状态、请求代次、结果转换、详情页、相关对话框、命令处理和测试集中到 ui/features/discover。app/live 不再拥有该功能的页面状态或控制流程；LiveModel 不再保存 Discover 的第二份可变状态；功能模块不通过 LauncherShell 读取/修改其内部业务状态。Tokio Runtime 仍由 app 创建和持有，UI 经明确注入的服务与执行入口提交后台工作，结果只在 GPUI 上下文应用。验证来源/目标实例/查询切换后的过期结果拒绝、翻译结果身份、关闭详情窗口、失败与主动取消、隐藏已安装内容、依赖确认及安装完成反馈。全局任务可在离开页面后继续并反馈，页面请求按其生命周期取消或丢弃结果，不因使用 WeakEntity 丢失必要终态处理。"
     },
     {

@@ -30,7 +30,7 @@ Status: InProgress
   Acceptance: 将启动计划、执行、进程、会话和启动恢复收拢到 launching，建立明确的启动协调者；LauncherService 的相应方法只委托能力入口。启动协调者接收实例、认证、Java、安装、任务等具体依赖，不接收整个 LauncherService。一次性 Java 选择和会话生命周期有唯一所有者，实例互斥租约仍与实例写入/删除共用同一份权威状态。保留取消、缺失目录、离线启动、极短进程、启动/退出事件次数、历史写入失败、游戏设置准备与回收、日志捕获、插件事件以及 Windows background_command 契约。按 D10 在能证明行为的最低边界验证，核心测试不引入 GPUI。
 - [x] T4 — 按能力拆分其余 core 状态与业务流程 (Completed)
   Acceptance: 按 D3–D5 逐能力迁移 accounts、instances、java、minecraft、content、appearance、game_settings、worlds、diagnostics、activity、plugins、settings 和 storage。每个迁移提交同时移动实现、状态、邻近测试和调用方；不存在靠为 LauncherService 增加更多 impl 文件冒充职责拆分的情况。认证刷新锁、待完成登录、外观缓存、任务取消表、内容筛选缓存分别归其能力；不复制 SettingsStore、InstanceStore、Context 或其权威状态。数据库版本/连接生命周期有单一入口，业务查询归所属能力，现有跨表事务与删除清理保持原子性。去除迁移完毕的旧生产实现，既有必要公开路径通过同类型 re-export 保留。
-- [ ] T5 — 以 Discover 验证 UI feature 与运行时连接边界 (InProgress)
+- [x] T5 — 以 Discover 验证 UI feature 与运行时连接边界 (Completed)
   Acceptance: Discover 的查询与筛选状态、请求代次、结果转换、详情页、相关对话框、命令处理和测试集中到 ui/features/discover。app/live 不再拥有该功能的页面状态或控制流程；LiveModel 不再保存 Discover 的第二份可变状态；功能模块不通过 LauncherShell 读取/修改其内部业务状态。Tokio Runtime 仍由 app 创建和持有，UI 经明确注入的服务与执行入口提交后台工作，结果只在 GPUI 上下文应用。验证来源/目标实例/查询切换后的过期结果拒绝、翻译结果身份、关闭详情窗口、失败与主动取消、隐藏已安装内容、依赖确认及安装完成反馈。全局任务可在离开页面后继续并反馈，页面请求按其生命周期取消或丢弃结果，不因使用 WeakEntity 丢失必要终态处理。
 - [ ] T6 — 迁移其他 UI 功能并收紧 app 与 shell (Proposed)
   Acceptance: 在 T5 的边界成立后，将其余功能逐个迁入 ui/features；共享控件与主题进入 design_system，shell 负责窗口、导航、路由和功能组合。各 feature 拥有其视图状态、任务句柄和订阅，不依赖 app 或兄弟 feature 的内部视图，不存在承载全部页面可变状态的 LiveModel/Wiring::State 替代品。app 保留 Runtime、启动配置、日志、插件注册、更新器与系统退出/重启的组装和适配；页面交互流程移出 app。更新状态与系统命令经窄接口连接，不能为了迁移而让 core 承担 UI/更新器职责。保留当前窗口所有权、全局选择、toast、语言切换、导航历史和后台任务生命周期；逐功能记录自动验证和真实窗口检查结果。
