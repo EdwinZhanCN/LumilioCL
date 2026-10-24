@@ -1,5 +1,5 @@
 use super::LauncherService;
-use super::error::ServiceError;
+use crate::error::ServiceError;
 use crate::servers;
 use crate::servers::{ServerEntry, ServerStatus};
 use crate::transfer::Transport;

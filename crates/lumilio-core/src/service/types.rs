@@ -1,7 +1,3 @@
-use std::collections::BTreeSet;
-use std::time::{SystemTime, UNIX_EPOCH};
-
-use crate::activity_log::{ActiveTask, FinishedTask};
 use crate::content::ContentError;
 use crate::discover::{
     Catalog, CategoryTag, GameVersionTag, KindAbilities, LoaderTag, Project, Version,
@@ -13,32 +9,6 @@ use crate::instances::{Collection, InstanceRecord};
 pub struct Library {
     pub instances: Vec<InstanceRecord>,
     pub collections: Vec<Collection>,
-}
-
-/// Running and recently finished work, for the Activity page and its badge.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct ActivityView {
-    pub active: Vec<ActiveTask>,
-    /// Ids among `active` that
-    /// [`LauncherService::cancel_task`](crate::LauncherService::cancel_task) can stop.
-    pub cancellable: BTreeSet<u64>,
-    /// Ids among `active` whose downloads are paused.
-    pub paused: BTreeSet<u64>,
-    /// Newest first.
-    pub finished: Vec<FinishedTask>,
-    pub traffic: Traffic,
-}
-
-/// How the connections all downloads share are used right now.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub struct Traffic {
-    /// Connections held.
-    pub open: usize,
-    /// The most that may be held at once.
-    pub limit: usize,
-    /// Bytes received since the launcher opened; two readings give the
-    /// speed of all downloads.
-    pub received: u64,
 }
 
 /// Filter choices for Discover.
@@ -73,14 +43,6 @@ pub struct ContentSourceInfo {
     pub id: String,
     pub name: String,
     pub catalog: Option<Catalog>,
-}
-
-/// Seconds since the Unix epoch.
-#[must_use]
-pub fn now() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |elapsed| elapsed.as_secs())
 }
 
 /// What happened to one file of a content change.

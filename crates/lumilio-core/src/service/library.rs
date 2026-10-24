@@ -1,6 +1,6 @@
 use super::LauncherService;
-use super::error::ServiceError;
 use super::types::Library;
+use crate::error::ServiceError;
 use crate::instances::InstanceRecord;
 use crate::settings::LauncherSettings;
 use crate::transfer::Transport;

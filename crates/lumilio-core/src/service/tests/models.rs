@@ -4,10 +4,11 @@ use std::sync::Arc;
 use lumilio_plugin_api::{API_VERSION, Manifest, Permission, Plugin, PluginError, Words};
 
 use super::world;
+use crate::error::ServiceError;
 use crate::instances::Loader;
 use crate::plugins::PluginHost;
 use crate::schematic_assets::{AssetNotice, EntityGeometry, PlannedSource, SourceRole};
-use crate::service::{LauncherService, ServiceError};
+use crate::service::LauncherService;
 
 struct Builder;
 
@@ -264,11 +265,11 @@ async fn a_game_that_is_not_installed_previews_with_the_bundle_fetched_as_a_task
             .iter()
             .filter(|task| {
                 task.label
-                    == crate::activity_log::TaskLabel::Typed {
-                        action: crate::activity_log::TaskAction::PrepareBlockAssets,
+                    == crate::activity::TaskLabel::Typed {
+                        action: crate::activity::TaskAction::PrepareBlockAssets,
                         subject: "1.0".into(),
                     }
-                    && task.outcome == crate::activity_log::TaskOutcome::Succeeded
+                    && task.outcome == crate::activity::TaskOutcome::Succeeded
             })
             .count()
     };

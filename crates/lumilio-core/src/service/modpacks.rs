@@ -1,11 +1,11 @@
 use super::LauncherService;
-use super::error::{ServiceError, read_unless_cancelled};
 use super::packs::{PackKind, UnpackError, sniff_pack, unpack_instance_zip};
-use super::support::blocking_value;
-use super::types::now;
 use crate::activity::CancellationToken;
-use crate::activity_log::{RetryAction, TaskAction, TaskCategory, TaskLabel};
+use crate::activity::{RetryAction, TaskAction, TaskCategory, TaskLabel};
+use crate::blocking::blocking_value;
+use crate::clock::now;
 use crate::discover::{Catalog, ProjectOrigin};
+use crate::error::{ServiceError, read_unless_cancelled};
 use crate::instances::{InstanceRecord, NewInstance};
 use crate::modpack;
 use crate::modpack::PackIndex;
@@ -31,6 +31,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         let source = self.instance(source_id).await?;
         let staged = Staged::claim(&*self.instances.lock().await, "copy", new_name)?;
         let task = self
+            .tasks
             .begin(
                 TaskCategory::Install,
                 TaskLabel::Typed {
@@ -48,7 +49,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         let result = self
             .copy_staged(&source, new_name, staged, include_worlds, cancel)
             .await;
-        self.end(task, &result);
+        self.tasks.end(task, &result);
         result
     }
 
@@ -125,6 +126,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         cancel: CancellationToken,
     ) -> Result<InstanceRecord, ServiceError> {
         let task = self
+            .tasks
             .begin(
                 TaskCategory::Install,
                 TaskLabel::Typed {
@@ -145,7 +147,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         if let Ok(record) = &result {
             task.about(&record.id);
         }
-        self.end(task, &result);
+        self.tasks.end(task, &result);
         result
     }
 
@@ -162,6 +164,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             .map(|name| name.to_string_lossy().into_owned())
             .unwrap_or_default();
         let task = self
+            .tasks
             .begin(
                 TaskCategory::Install,
                 TaskLabel::Typed {
@@ -194,7 +197,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         if let Ok(record) = &result {
             task.about(&record.id);
         }
-        self.end(task, &result);
+        self.tasks.end(task, &result);
         result
     }
 
@@ -255,9 +258,10 @@ impl<T: Transport + Clone> LauncherService<T> {
             };
             (index, modpack::is_trusted_source as fn(&str) -> bool)
         };
-        let chain = self.chain().await?;
-        let engine = self.transfer_engine().await;
+        let chain = self.network.chain().await?;
+        let engine = self.network.transfer_engine().await;
         let record = self
+            .tasks
             .metered(
                 task,
                 engine.subscribe(),
@@ -325,7 +329,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         wanted: Option<&str>,
         cancel: CancellationToken,
     ) -> Result<InstanceRecord, ServiceError> {
-        let chain = read_unless_cancelled(&cancel, self.chain()).await?;
+        let chain = read_unless_cancelled(&cancel, self.network.chain()).await?;
         let client = read_unless_cancelled(&cancel, self.content_client(source)).await?;
         let versions = read_unless_cancelled(&cancel, async {
             client.versions(project).await.map_err(ServiceError::from)
@@ -357,14 +361,15 @@ impl<T: Transport + Clone> LauncherService<T> {
                 .expect_sha1(sha1)
                 .map_err(|error| ServiceError::Install(error.to_string()))?;
         }
-        let engine = self.transfer_engine().await;
-        self.metered(
-            task,
-            engine.subscribe(),
-            engine.transfer(request, cancel.clone()),
-        )
-        .await
-        .map_err(ServiceError::from)?;
+        let engine = self.network.transfer_engine().await;
+        self.tasks
+            .metered(
+                task,
+                engine.subscribe(),
+                engine.transfer(request, cancel.clone()),
+            )
+            .await
+            .map_err(ServiceError::from)?;
         let record = self.import_pack_from(task, &pack, cancel).await;
         let _ = tokio::fs::remove_file(&pack).await;
         let mut record = record?;

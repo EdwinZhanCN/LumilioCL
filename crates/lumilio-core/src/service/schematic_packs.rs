@@ -5,8 +5,9 @@
 
 use std::path::PathBuf;
 
-use super::support::blocking_value;
-use super::{LauncherService, ServiceError};
+use super::LauncherService;
+use crate::blocking::blocking_value;
+use crate::error::ServiceError;
 use crate::schematic_assets::{
     LocalCache, add_pack, forget_switch, instance_assets, read_order, remove_pack, swapped_sources,
     switch, write_order,

@@ -7,8 +7,8 @@
 use std::sync::Arc;
 
 use super::LauncherService;
-use super::error::ServiceError;
 use crate::account::{AuthSession, Injection, Keepalive, OfflineProfile};
+use crate::error::ServiceError;
 use crate::settings::{AccountKind, SettingsError};
 use crate::skin::{
     AccountLook, Character, LoadedSkin, LocalSkinServer, Pixels, Signer, SkinChoice,
@@ -53,7 +53,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             .ok_or_else(|| ServiceError::Settings(SettingsError::UnknownAccount(key.to_owned())))?;
         let mut look = if entry.kind == AccountKind::Microsoft {
             let profile = self.account_profile(key).await?;
-            crate::skin::MojangClient::cached(&self.transport, &self.textures)
+            crate::skin::MojangClient::cached(self.network.transport(), &self.textures)
                 .look(&profile)
                 .await
                 .map_err(ServiceError::from)?
@@ -62,11 +62,11 @@ impl<T: Transport + Clone> LauncherService<T> {
                 ServiceError::Skin(skin::SkinError::Malformed("account has no server".into()))
             })?;
             let id = entry.profile_id().map_err(SettingsError::Profile)?;
-            skin::session::load(&self.transport, root, id)
+            skin::session::load(self.network.transport(), root, id)
                 .await
                 .map_err(ServiceError::Skin)?
         } else if let Some(choice) = entry.skin.as_ref() {
-            let loaded = skin::load(&self.fetcher(), choice, &entry.name)
+            let loaded = skin::load(&self.network.fetcher(), choice, &entry.name)
                 .await
                 .map_err(ServiceError::Skin)?;
             tokio::task::spawn_blocking(move || AccountLook::from_loaded(&loaded))
@@ -148,7 +148,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         choice: &SkinChoice,
     ) -> Result<AuthSession, ServiceError> {
         let mut notes = Vec::new();
-        let skin = match skin::load(&self.fetcher(), choice, profile.name()).await {
+        let skin = match skin::load(&self.network.fetcher(), choice, profile.name()).await {
             Ok(skin) => skin,
             Err(error) => {
                 notes.push(format!("the skin was not loaded: {error}"));
@@ -156,8 +156,9 @@ impl<T: Transport + Clone> LauncherService<T> {
             }
         };
         let signer = self.skin_signer().await?;
-        let chain = self.chain().await?;
-        let jar = injector::ensure(&self.fetcher(), &chain, &self.layout.injector()).await?;
+        let chain = self.network.chain().await?;
+        let jar =
+            injector::ensure(&self.network.fetcher(), &chain, &self.layout.injector()).await?;
         let server = LocalSkinServer::start(
             Character {
                 id: profile.id(),

@@ -114,11 +114,7 @@ impl TranslationService {
             TextFormat::Html => "body-html",
         };
         let identity = key(source, project, field, "edge", original);
-        if let Some(text) = self
-            .cache
-            .get(identity.clone(), crate::service::now())
-            .await
-        {
+        if let Some(text) = self.cache.get(identity.clone(), crate::clock::now()).await {
             return Ok(TranslatedDocument {
                 text,
                 partial: false,
@@ -132,7 +128,7 @@ impl TranslationService {
             let mut missing = Vec::new();
             for (index, text) in batch.iter().enumerate() {
                 let part_key = key(source, project, "segment-v1", "edge", text);
-                match self.cache.get(part_key, crate::service::now()).await {
+                match self.cache.get(part_key, crate::clock::now()).await {
                     Some(saved) => outputs.push(Some(saved)),
                     None => {
                         outputs.push(None);
@@ -149,7 +145,7 @@ impl TranslationService {
                                 .put(
                                     key(source, project, "segment-v1", "edge", &batch[index]),
                                     text.clone(),
-                                    crate::service::now(),
+                                    crate::clock::now(),
                                     generation,
                                 )
                                 .await;
@@ -179,7 +175,7 @@ impl TranslationService {
         let text = document::Document::parse(original, format)?.replace(&translated)?;
         if !partial {
             self.cache
-                .put(identity, text.clone(), crate::service::now(), generation)
+                .put(identity, text.clone(), crate::clock::now(), generation)
                 .await;
         }
         Ok(TranslatedDocument { text, partial })
@@ -227,7 +223,7 @@ impl TranslationService {
                     .cache
                     .get(
                         key(source, &id, "summary", provider, &original),
-                        crate::service::now(),
+                        crate::clock::now(),
                     )
                     .await
                 {
@@ -251,7 +247,7 @@ impl TranslationService {
                             .put_for(
                                 key(source, id, "summary", provider, original),
                                 String::new(),
-                                crate::service::now(),
+                                crate::clock::now(),
                                 generation,
                                 10 * 60,
                             )
@@ -266,7 +262,7 @@ impl TranslationService {
                             .put(
                                 key(source, id, "summary", provider, original),
                                 translated.clone(),
-                                crate::service::now(),
+                                crate::clock::now(),
                                 generation,
                             )
                             .await;

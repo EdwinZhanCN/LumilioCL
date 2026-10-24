@@ -1,12 +1,12 @@
 use std::path::Path;
 
 use super::LauncherService;
-use super::error::ServiceError;
 use super::packs::backup_failure;
-use super::support::blocking_value;
-use super::types::now;
 use crate::activity::CancellationToken;
-use crate::activity_log::{RetryAction, TaskAction, TaskCategory, TaskLabel};
+use crate::activity::{RetryAction, TaskAction, TaskCategory, TaskLabel};
+use crate::blocking::blocking_value;
+use crate::clock::now;
+use crate::error::ServiceError;
 use crate::instances::{InstanceRecord, InstanceSettings, Loader, NewInstance};
 use crate::staged::Staged;
 use crate::transfer::Transport;
@@ -31,7 +31,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         game: crate::import_game::FoundGame,
         cancel: CancellationToken,
     ) -> Result<InstanceRecord, ServiceError> {
-        let task = self.begin(
+        let task = self.tasks.begin(
             TaskCategory::Install,
             TaskLabel::Typed {
                 action: TaskAction::ImportGame,
@@ -44,7 +44,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         if let Ok(record) = &result {
             task.about(&record.id);
         }
-        self.end(task, &result);
+        self.tasks.end(task, &result);
         result
     }
 
@@ -130,6 +130,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         let _lease = self.instances.reserve(id)?;
         let record = self.instance(id).await?;
         let task = self
+            .tasks
             .begin(
                 TaskCategory::Install,
                 TaskLabel::Typed {
@@ -161,7 +162,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         .map_err(std::io::Error::other)
         .map_err(ServiceError::from)
         .and_then(|written| written.map_err(backup_failure));
-        self.end(task, &result);
+        self.tasks.end(task, &result);
         result
     }
 
@@ -178,6 +179,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             .map(|name| name.to_string_lossy().into_owned())
             .unwrap_or_default();
         let task = self
+            .tasks
             .begin(
                 TaskCategory::Install,
                 TaskLabel::Typed {
@@ -194,7 +196,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         if let Ok(record) = &result {
             task.about(&record.id);
         }
-        self.end(task, &result);
+        self.tasks.end(task, &result);
         result
     }
 

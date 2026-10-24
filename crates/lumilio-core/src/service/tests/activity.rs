@@ -1,15 +1,9 @@
-use std::sync::Mutex as StdMutex;
-
 use tokio::sync::mpsc;
 
-use super::super::error::ServiceError;
-use super::super::support::{Meter, watch_transfers};
 use super::{change_subjects, mod_version, world};
-use crate::activity::CancellationToken;
-use crate::activity_log::{
-    FinishedTask, RetryAction, TaskBoard, TaskCategory, TaskLabel, TaskOutcome,
-};
+use crate::activity::{CancellationToken, RetryAction, TaskCategory, TaskOutcome};
 use crate::discover::ProjectKind;
+use crate::error::ServiceError;
 use crate::instances::Loader;
 
 #[tokio::test]
@@ -66,37 +60,6 @@ async fn explicit_cancel_unblocks_reads_and_records_cancelled_for_both_install_k
     // Deleting the current game saves its replacement, so settings are free again.
     drop(defaults);
     world.service.delete_instance(&record.id).await.unwrap();
-}
-
-#[tokio::test]
-async fn clearing_finished_work_empties_the_history_and_keeps_running_tasks() {
-    let world = world();
-    let finished = |label: &str| FinishedTask {
-        category: TaskCategory::Download,
-        label: TaskLabel::Text(label.to_owned()),
-        instance_id: None,
-        started: 1,
-        finished: 2,
-        outcome: TaskOutcome::Succeeded,
-        retry: None,
-    };
-    world.service.log.append(&finished("one")).unwrap();
-    world.service.log.append(&finished("two")).unwrap();
-    let running =
-        world
-            .service
-            .board
-            .lock()
-            .unwrap()
-            .start(TaskCategory::Install, "running", None, 5);
-    assert_eq!(world.service.activity(10).finished.len(), 2);
-
-    world.service.clear_finished().unwrap();
-
-    let view = world.service.activity(10);
-    assert!(view.finished.is_empty());
-    assert_eq!(view.active.len(), 1);
-    assert_eq!(view.active[0].id, running);
 }
 
 #[tokio::test]
@@ -159,122 +122,6 @@ async fn a_failed_download_remembers_its_input_and_runs_again_from_it() {
         "the first failure stays in the history"
     );
     assert_eq!(view.finished[0].outcome, TaskOutcome::Succeeded);
-}
-
-#[tokio::test]
-async fn the_bytes_of_all_transfers_add_up_to_one_task_and_an_unknown_length_hides_the_total() {
-    use crate::transfer::TransferEvent;
-    let board = StdMutex::new(TaskBoard::default());
-    let task = board
-        .lock()
-        .unwrap()
-        .start(TaskCategory::Download, "x", None, 1);
-    let (events, receiver) = tokio::sync::broadcast::channel(16);
-    let progress = |id: &str, completed, total| TransferEvent::Progress {
-        id: id.to_owned(),
-        completed,
-        total,
-    };
-    events.send(progress("a", 10, Some(100))).unwrap();
-    events.send(progress("b", 5, Some(50))).unwrap();
-    events.send(progress("a", 40, Some(100))).unwrap();
-    drop(events);
-    watch_transfers(&board, task, receiver, Meter::Bytes).await;
-    let shown = board.lock().unwrap().active()[0].clone();
-    assert_eq!(shown.unit, crate::ProgressUnit::Bytes);
-    assert_eq!(shown.progress, Some((45, 150)));
-
-    let task = board
-        .lock()
-        .unwrap()
-        .start(TaskCategory::Download, "y", None, 1);
-    let (events, receiver) = tokio::sync::broadcast::channel(16);
-    events.send(progress("c", 7, None)).unwrap();
-    events.send(progress("d", 3, Some(30))).unwrap();
-    drop(events);
-    watch_transfers(&board, task, receiver, Meter::Bytes).await;
-    let shown = board
-        .lock()
-        .unwrap()
-        .active()
-        .iter()
-        .find(|t| t.id == task)
-        .cloned()
-        .unwrap();
-    assert_eq!(shown.progress, Some((10, 0)), "total 0 means unknown");
-}
-
-#[tokio::test]
-async fn a_task_shows_its_files_their_sources_and_the_sources_given_up() {
-    use crate::transfer::{TransferEvent, TransferOutcome};
-    let board = StdMutex::new(TaskBoard::default());
-    let task = board
-        .lock()
-        .unwrap()
-        .start(TaskCategory::Install, "x", None, 1);
-    let (events, receiver) = tokio::sync::broadcast::channel(16);
-    let id = || "lib".to_owned();
-    for event in [
-        TransferEvent::Started {
-            id: id(),
-            destination: "libraries/a/lib.jar".into(),
-        },
-        TransferEvent::Started {
-            id: "done".to_owned(),
-            destination: "done.jar".into(),
-        },
-        TransferEvent::Downloading {
-            id: id(),
-            source: "https://mirror.test/lib.jar".to_owned(),
-            attempt: 1,
-        },
-        TransferEvent::SourceFailed {
-            id: id(),
-            source: "https://mirror.test/lib.jar".to_owned(),
-            reason: "HTTP status 404".to_owned(),
-            next: Some("https://official.test/lib.jar".to_owned()),
-        },
-        TransferEvent::Downloading {
-            id: id(),
-            source: "https://official.test/lib.jar".to_owned(),
-            attempt: 1,
-        },
-        TransferEvent::Connections { id: id(), count: 3 },
-        TransferEvent::Progress {
-            id: id(),
-            completed: 40,
-            total: Some(100),
-        },
-        TransferEvent::Completed {
-            id: "done".to_owned(),
-            outcome: TransferOutcome::ReusedExisting,
-        },
-    ] {
-        events.send(event).unwrap();
-    }
-    drop(events);
-    watch_transfers(&board, task, receiver, Meter::Files).await;
-
-    let shown = board.lock().unwrap().active()[0].clone();
-    assert_eq!(shown.progress, None, "files are counted by the launcher");
-    let downloads = shown.downloads.unwrap();
-    assert_eq!(downloads.files.len(), 1);
-    let file = &downloads.files[0];
-    assert_eq!(file.name, "lib.jar");
-    assert_eq!(
-        file.source.as_deref(),
-        Some("https://official.test/lib.jar")
-    );
-    assert_eq!(
-        (file.connections, file.done, file.total),
-        (3, 40, Some(100))
-    );
-    assert_eq!(downloads.switches.len(), 1);
-    assert_eq!(downloads.switches[0].file, "lib.jar");
-    assert_eq!(
-        downloads.switches[0].to.as_deref(),
-        Some("https://official.test/lib.jar")
-    );
 }
 
 /// Drives `work` until `done` holds, for at most two seconds.
@@ -494,36 +341,6 @@ async fn dropped_install_finishes_activity_and_releases_its_instance() {
     assert!(futures_util::poll!(&mut retry).is_pending());
     drop(retry);
     drop(defaults);
-    assert_eq!(world.service.activity(10).finished.len(), 2);
-    assert!(world.service.activity(10).active.is_empty());
-}
-
-#[tokio::test]
-async fn log_failure_keeps_terminal_results_visible_without_resurrecting_tasks() {
-    let world = world();
-    let log_path = world.service.layout.root().join("activity.jsonl");
-    std::fs::create_dir(&log_path).unwrap();
-    let result: Result<(), ServiceError> = Ok(());
-    for _ in 0..2 {
-        let task = world.service.begin(
-            TaskCategory::Install,
-            TaskLabel::Text("same operation".to_owned()),
-            None,
-            None,
-        );
-        world.service.end(task, &result);
-    }
-    let activity = world.service.activity(10);
-    assert!(activity.active.is_empty());
-    assert_eq!(activity.finished.len(), 2);
-    assert!(
-        activity
-            .finished
-            .iter()
-            .all(|task| task.outcome == TaskOutcome::Succeeded)
-    );
-    assert!(world.service.activity(0).finished.is_empty());
-    std::fs::remove_dir(log_path).unwrap();
     assert_eq!(world.service.activity(10).finished.len(), 2);
     assert!(world.service.activity(10).active.is_empty());
 }

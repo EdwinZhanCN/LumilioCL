@@ -8,9 +8,9 @@
 use lumilio_plugin_api::FileInfo;
 
 use super::LauncherService;
-use super::error::ServiceError;
-use super::support::blocking_value;
-use super::types::now;
+use crate::blocking::blocking_value;
+use crate::clock::now;
+use crate::error::ServiceError;
 use crate::plugins::{read_info, resolve_write};
 use crate::schematic_ops;
 use crate::schematic_ops::{SchematicLogEntry, SchematicOperation};

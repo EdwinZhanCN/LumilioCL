@@ -6,10 +6,10 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use super::LauncherService;
-use super::error::ServiceError;
 use crate::content::{ContentItem, scan as scan_content};
 use crate::content_sources::{Recognized, Summaries};
 use crate::discover::{ContentClient, FileHashes, ProjectKind, Version};
+use crate::error::ServiceError;
 use crate::instances::InstanceRecord;
 use crate::transfer::Transport;
 

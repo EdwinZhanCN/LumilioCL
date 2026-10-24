@@ -22,7 +22,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         }
         let result = self
             .translation
-            .body(&self.transport, source, project, original, format)
+            .body(self.network.transport(), source, project, original, format)
             .await;
         if self.translation_preferences().await != preferences {
             return Err(TranslationError::Disabled);
@@ -51,7 +51,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         };
         let result = self
             .translation
-            .summaries(&self.transport, catalog, source, items)
+            .summaries(self.network.transport(), catalog, source, items)
             .await;
         if !self.translation_preferences().await.enabled {
             return BTreeMap::new();

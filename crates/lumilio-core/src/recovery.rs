@@ -7,7 +7,7 @@
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
-use crate::activity_log::ActivityLog;
+use crate::activity::ActivityLog;
 use crate::instances::InstanceStore;
 use crate::layout::Layout;
 use crate::settings::SettingsStore;

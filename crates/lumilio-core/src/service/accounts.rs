@@ -1,9 +1,9 @@
-use super::error::ServiceError;
-use super::types::now;
 use super::{CREDENTIAL_PROBE, LauncherService, TOKEN_MARGIN_SECONDS};
 use crate::account::AuthSession;
 use crate::activity::CancellationToken;
+use crate::clock::now;
 use crate::credentials::StoredLogin;
+use crate::error::ServiceError;
 use crate::microsoft::{AuthError, DeviceCode, MicrosoftClient, Secret};
 use crate::settings::{AccountKind, SettingsError};
 use crate::transfer::Transport;
@@ -105,7 +105,7 @@ impl<T: Transport + Clone> LauncherService<T> {
                 &stored.access_token,
             ));
         }
-        let client = MicrosoftClient::new(&self.transport);
+        let client = MicrosoftClient::new(self.network.transport());
         let oauth = match client.refresh(&Secret::new(stored.refresh_token)).await {
             Ok(oauth) => oauth,
             Err(AuthError::SignInRequired) => {
@@ -167,7 +167,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     ) -> Result<(String, String), ServiceError> {
         // Fail before showing a code that could never be kept.
         self.credentials.get(CREDENTIAL_PROBE)?;
-        let client = MicrosoftClient::new(&self.transport);
+        let client = MicrosoftClient::new(self.network.transport());
         let code = client.request_device_code().await?;
         on_code(&code);
         let oauth = client.wait_for_sign_in(&code, &cancel).await?;

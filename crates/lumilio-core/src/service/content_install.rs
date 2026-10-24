@@ -2,15 +2,16 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use super::LauncherService;
-use super::error::{ServiceError, read_unless_cancelled};
-use super::support::blocking;
-use super::types::{DependencyNeed, DependencyReport, InstalledProject, now};
+use super::types::{DependencyNeed, DependencyReport, InstalledProject};
 use crate::activity::CancellationToken;
-use crate::activity_log::{RetryAction, TaskAction, TaskCategory, TaskLabel};
+use crate::activity::{RetryAction, TaskAction, TaskCategory, TaskLabel};
+use crate::blocking::blocking;
+use crate::clock::now;
 use crate::content::ContentError;
 use crate::discover::{
     Catalog, FileHashes, ProjectKind, Version, VersionFile, fits, install_request, pick_version,
 };
+use crate::error::{ServiceError, read_unless_cancelled};
 use crate::history::{ChangeKind, HistoryEvent, HistoryLog};
 use crate::instances::InstanceRecord;
 use crate::transfer::{SourceChain, TransferRequest, Transport};
@@ -28,6 +29,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         cancel: CancellationToken,
     ) -> Result<String, ServiceError> {
         let task = self
+            .tasks
             .begin(
                 TaskCategory::Download,
                 TaskLabel::Typed {
@@ -46,7 +48,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         let result = self
             .save_version_inner(task.id, source, project, version_id, destination, cancel)
             .await;
-        self.end(task, &result);
+        self.tasks.end(task, &result);
         result
     }
 
@@ -59,7 +61,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         destination: &Path,
         cancel: CancellationToken,
     ) -> Result<String, ServiceError> {
-        let chain = read_unless_cancelled(&cancel, self.chain()).await?;
+        let chain = read_unless_cancelled(&cancel, self.network.chain()).await?;
         let client = read_unless_cancelled(&cancel, self.content_client(source)).await?;
         let versions = read_unless_cancelled(&cancel, async {
             client.versions(project).await.map_err(ServiceError::from)
@@ -87,8 +89,9 @@ impl<T: Transport + Clone> LauncherService<T> {
                 .expect_sha1(sha1)
                 .map_err(|error| ServiceError::Install(error.to_string()))?;
         }
-        let engine = self.transfer_engine().await;
-        self.metered(task, engine.subscribe(), engine.transfer(request, cancel))
+        let engine = self.network.transfer_engine().await;
+        self.tasks
+            .metered(task, engine.subscribe(), engine.transfer(request, cancel))
             .await
             .map_err(ServiceError::from)?;
         Ok(file.filename.clone())
@@ -321,6 +324,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             .cloned()
             .ok_or_else(|| ServiceError::NoSuchInstance(instance_id.to_owned()))?;
         let task = self
+            .tasks
             .begin(
                 TaskCategory::Download,
                 TaskLabel::Typed {
@@ -340,7 +344,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         let result = self
             .install_content_inner(task.id, &record, kind, source, project, version_id, cancel)
             .await;
-        self.end(task, &result);
+        self.tasks.end(task, &result);
         result
     }
 
@@ -355,7 +359,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         version_id: Option<&str>,
         cancel: CancellationToken,
     ) -> Result<String, ServiceError> {
-        let chain = read_unless_cancelled(&cancel, self.chain()).await?;
+        let chain = read_unless_cancelled(&cancel, self.network.chain()).await?;
         let client = read_unless_cancelled(&cancel, self.content_client(source)).await?;
         let versions = read_unless_cancelled(&cancel, async {
             client.versions(project).await.map_err(ServiceError::from)
@@ -400,8 +404,9 @@ impl<T: Transport + Clone> LauncherService<T> {
         if in_the_way {
             return Err(ContentError::Conflict(name).into());
         }
-        let engine = self.transfer_engine().await;
-        self.metered(task, engine.subscribe(), engine.transfer(request, cancel))
+        let engine = self.network.transfer_engine().await;
+        self.tasks
+            .metered(task, engine.subscribe(), engine.transfer(request, cancel))
             .await
             .map_err(ServiceError::from)?;
         HistoryLog::for_instance(self.layout.root(), &record.id).append(&HistoryEvent::Change {
@@ -431,6 +436,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         let _lease = self.instances.reserve(instance_id)?;
         self.instance(instance_id).await?;
         let task = self
+            .tasks
             .begin(
                 TaskCategory::Update,
                 TaskLabel::Typed {
@@ -460,7 +466,7 @@ impl<T: Transport + Clone> LauncherService<T> {
                 cancel,
             )
             .await;
-        self.end(task, &result);
+        self.tasks.end(task, &result);
         result
     }
 
@@ -476,7 +482,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         version_id: &str,
         cancel: CancellationToken,
     ) -> Result<String, ServiceError> {
-        let chain = read_unless_cancelled(&cancel, self.chain()).await?;
+        let chain = read_unless_cancelled(&cancel, self.network.chain()).await?;
         let client = read_unless_cancelled(&cancel, self.content_client(source)).await?;
         let versions = read_unless_cancelled(&cancel, async {
             client.versions(project).await.map_err(ServiceError::from)
@@ -522,8 +528,9 @@ impl<T: Transport + Clone> LauncherService<T> {
             current_sha1,
             latest: version,
         };
-        let engine = self.transfer_engine().await;
+        let engine = self.network.transfer_engine().await;
         let written = self
+            .tasks
             .metered(
                 task,
                 engine.subscribe(),

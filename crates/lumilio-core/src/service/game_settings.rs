@@ -1,4 +1,5 @@
-use super::{LauncherService, ServiceError};
+use super::LauncherService;
+use crate::error::ServiceError;
 use crate::game_settings::Binding;
 use crate::transfer::Transport;
 use crate::{

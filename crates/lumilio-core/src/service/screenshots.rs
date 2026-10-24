@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use tokio::sync::Semaphore;
 
 use super::LauncherService;
-use super::error::ServiceError;
+use crate::error::ServiceError;
 use crate::screenshots;
 use crate::screenshots::ScreenshotInfo;
 use crate::transfer::Transport;

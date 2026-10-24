@@ -1,9 +1,9 @@
 use std::path::Path;
 
 use super::LauncherService;
-use super::error::{ServiceError, read_unless_cancelled};
 use crate::activity::CancellationToken;
-use crate::activity_log::{TaskAction, TaskCategory, TaskLabel};
+use crate::activity::{TaskAction, TaskCategory, TaskLabel};
+use crate::error::{ServiceError, read_unless_cancelled};
 use crate::history::ChangeKind;
 use crate::instances::InstanceRecord;
 use crate::transfer::Transport;
@@ -90,7 +90,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     ) -> Result<crate::pack_export::ExportReport, ServiceError> {
         let _lease = self.instances.reserve(id)?;
         let record = self.instance(id).await?;
-        let task = self.begin(
+        let task = self.tasks.begin(
             TaskCategory::Install,
             TaskLabel::Typed {
                 action: TaskAction::ExportWorld,
@@ -108,7 +108,7 @@ impl<T: Transport + Clone> LauncherService<T> {
                 }
                 other => other,
             });
-        self.end(task, &result);
+        self.tasks.end(task, &result);
         result
     }
 

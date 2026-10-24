@@ -3,7 +3,8 @@ use lumilio_plugin_api::map::{
     WorldId,
 };
 
-use super::{LauncherService, ServiceError};
+use super::LauncherService;
+use crate::error::ServiceError;
 use crate::world_map::store::annotations::{Annotation, AnnotationError};
 use crate::{CancellationToken, MapFailure, MapProviders, Transport, world_map};
 

@@ -1,13 +1,13 @@
 use tokio::sync::mpsc;
 
-use super::super::error::ServiceError;
 use super::{
     ECHO_ARGS, assert_send, fake_java, is_installed, launch_to_end, outcomes_of,
     publish_modern_release, publish_release, reopen, reopen_service, world,
 };
 use crate::activity::CancellationToken;
-use crate::activity_log::TaskOutcome;
+use crate::activity::TaskOutcome;
 use crate::discover::ProjectKind;
+use crate::error::ServiceError;
 use crate::history::{HistoryEvent, HistoryLog, SessionOutcome};
 use crate::instances::Loader;
 use crate::launching::SessionMarker;

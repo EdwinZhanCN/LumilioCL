@@ -2,14 +2,14 @@ use std::sync::{Arc, Mutex as StdMutex};
 
 use tokio::sync::mpsc;
 
-use super::super::error::ServiceError;
-use super::super::types::now;
 use super::{
     ECHO_ARGS, MS_ID, fake_java, launch_to_end, microsoft_chain, publish_identity_release,
     publish_release, sign_in, world,
 };
 use crate::activity::CancellationToken;
+use crate::clock::now;
 use crate::credentials::StoredLogin;
+use crate::error::ServiceError;
 use crate::instances::Loader;
 use crate::microsoft::{AuthError, DeviceCode};
 use crate::settings::AccountKind;

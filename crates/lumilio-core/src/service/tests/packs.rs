@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
-use super::super::error::ServiceError;
 use super::{
     World, file_url, instance_with_profile, no_leftovers, pack_file, pack_index, sha1_hex, world,
     write_mrpack,
 };
 use crate::activity::CancellationToken;
-use crate::activity_log::{RetryAction, TaskOutcome};
+use crate::activity::{RetryAction, TaskOutcome};
+use crate::error::ServiceError;
 use crate::history::{ChangeKind, HistoryEvent, HistoryLog};
 use crate::instances::{InstanceSettings, Loader, StoreError};
 

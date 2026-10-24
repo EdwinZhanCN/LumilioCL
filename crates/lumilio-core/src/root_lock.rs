@@ -3,7 +3,7 @@
 use std::fs::{File, OpenOptions, TryLockError};
 use std::path::Path;
 
-use crate::service::ServiceError;
+use crate::error::ServiceError;
 
 pub(crate) struct RootLock {
     // Never unlink a held lock: a replacement inode would admit another writer.

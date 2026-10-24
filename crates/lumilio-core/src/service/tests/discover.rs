@@ -1,7 +1,7 @@
-use super::super::error::ServiceError;
 use super::{fabric_instance, mod_version, project_versions, sha1_hex, two_versions, world};
 use crate::activity::CancellationToken;
 use crate::discover::ProjectKind;
+use crate::error::ServiceError;
 use crate::instances::Loader;
 
 #[tokio::test]

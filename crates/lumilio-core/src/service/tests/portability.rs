@@ -1,7 +1,7 @@
-use super::super::error::ServiceError;
 use super::world;
 use crate::activity::CancellationToken;
-use crate::activity_log::RetryAction;
+use crate::activity::RetryAction;
+use crate::error::ServiceError;
 use crate::instances::{InstanceSettings, Loader};
 
 #[tokio::test]

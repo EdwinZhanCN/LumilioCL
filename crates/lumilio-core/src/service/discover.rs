@@ -1,8 +1,8 @@
 use super::LauncherService;
-use super::error::ServiceError;
 use super::types::{ContentSourceInfo, DiscoverFilters, ProjectDetail};
 use crate::activity::CancellationToken;
 use crate::discover::{ContentClient, ProjectKind, SearchPage, SearchQuery};
+use crate::error::ServiceError;
 use crate::transfer::Transport;
 
 impl<T: Transport + Clone> LauncherService<T> {

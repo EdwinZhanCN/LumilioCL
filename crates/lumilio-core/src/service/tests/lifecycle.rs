@@ -3,13 +3,13 @@ use std::os::unix::fs::PermissionsExt;
 use tokio::sync::mpsc;
 
 use super::super::LauncherService;
-use super::super::error::ServiceError;
 use super::{
     Scripted, fake_java, instance_with_profile, operation_dirs, publish_release, reopen, world,
 };
 use crate::activity::CancellationToken;
-use crate::activity_log::{FinishedTask, TaskCategory, TaskLabel, TaskOutcome};
+use crate::activity::{FinishedTask, TaskCategory, TaskLabel, TaskOutcome};
 use crate::deletion::Deletion;
+use crate::error::ServiceError;
 use crate::instances::{Loader, NewInstance, StoreError};
 use crate::launching::LaunchSignal;
 use crate::launching::LaunchUpdate;

@@ -3,10 +3,10 @@ use std::path::Path;
 use lumilio_plugin_api::{AnalysisInput, AnalysisSource, GameFacts, ModFact};
 
 use super::LauncherService;
-use super::error::ServiceError;
-use super::support::blocking;
 use super::types::{EXPORT_LOG_BYTES, GameLogs, LOG_TAIL_BYTES, REPORT_BYTES};
+use crate::blocking::blocking;
 use crate::diagnostics::{Problem, ProblemKind};
+use crate::error::ServiceError;
 use crate::history::HistoryLog;
 use crate::inspect::inspect_instance;
 use crate::transfer::Transport;

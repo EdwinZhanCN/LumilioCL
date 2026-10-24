@@ -36,8 +36,8 @@ use sha1::{Digest, Sha1};
 use tokio::sync::mpsc;
 
 use super::LauncherService;
-use super::error::ServiceError;
 use crate::activity::CancellationToken;
+use crate::error::ServiceError;
 use crate::history::{ChangeKind, HistoryEvent, HistoryLog, SessionOutcome};
 use crate::instances::{InstanceRecord, Loader, NewInstance};
 use crate::launching::GameExit;

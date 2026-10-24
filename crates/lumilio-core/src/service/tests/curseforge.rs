@@ -302,7 +302,7 @@ async fn a_file_nobody_may_hand_out_names_its_download_page() {
     let retry = world.service.activity(10).finished.remove(0).retry.unwrap();
     assert!(matches!(
         retry,
-        crate::activity_log::RetryAction::InstallContent { ref source, .. } if source == CF
+        crate::activity::RetryAction::InstallContent { ref source, .. } if source == CF
     ));
 }
 

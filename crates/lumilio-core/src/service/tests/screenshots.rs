@@ -1,5 +1,5 @@
-use super::super::error::ServiceError;
 use super::world;
+use crate::error::ServiceError;
 use crate::instances::Loader;
 use crate::screenshots::ScreenshotError;
 

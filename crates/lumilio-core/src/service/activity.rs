@@ -3,19 +3,18 @@ use std::path::Path;
 use tokio::sync::mpsc;
 
 use super::LauncherService;
-use super::error::ServiceError;
-use super::types::{ActivityView, Traffic};
-use crate::activity::CancellationToken;
-use crate::activity_log::RetryAction;
+use crate::activity::RetryAction;
+use crate::activity::{ActivityView, CancellationToken, Traffic};
+use crate::error::ServiceError;
 use crate::launching::LaunchUpdate;
-use crate::transfer::{SourceChain, Transport};
+use crate::transfer::Transport;
 
 impl<T: Transport + Clone> LauncherService<T> {
     /// Asks a running task to stop. `false` when the id is unknown, already
     /// finished, or not cancellable; the task's own outcome is still decided by
     /// the work itself.
     pub fn cancel_task(&self, id: u64) -> bool {
-        self.task_control(id).map(|token| token.cancel()).is_some()
+        self.tasks.cancel(id)
     }
 
     /// Runs a task again from the input it was started with (its
@@ -135,50 +134,19 @@ impl<T: Transport + Clone> LauncherService<T> {
 
     /// Forgets every finished task; running ones are untouched.
     pub fn clear_finished(&self) -> std::io::Result<()> {
-        let mut board = self.board.lock().expect("activity board lock was poisoned");
-        self.log.compact(0)?;
-        board.clear_unrecorded();
-        Ok(())
+        self.tasks.clear_finished()
     }
 
     /// Running tasks and the most recent finished ones.
     pub fn activity(&self, finished_limit: usize) -> ActivityView {
-        let board = self.board.lock().expect("activity board lock was poisoned");
-        let active = board.active().to_vec();
-        let mut finished = self.log.recent(None, finished_limit).unwrap_or_default();
-        for terminal in board.unrecorded() {
-            finished.push(terminal.clone());
-        }
-        finished.sort_by_key(|task| std::cmp::Reverse(task.finished));
-        finished.truncate(finished_limit);
-        let (cancellable, paused) = {
-            let cancels = self
-                .cancels
-                .lock()
-                .expect("activity board lock was poisoned");
-            (
-                cancels.keys().copied().collect(),
-                cancels
-                    .iter()
-                    .filter(|(_, token)| token.is_paused())
-                    .map(|(id, _)| *id)
-                    .collect(),
-            )
-        };
-        ActivityView {
-            active,
-            cancellable,
-            paused,
-            finished,
-            traffic: Traffic {
-                open: self.connections.open(),
-                limit: self.connections.size(),
-                received: self.connections.received(),
+        let connections = self.network.budget();
+        self.tasks.view(
+            finished_limit,
+            Traffic {
+                open: connections.open(),
+                limit: connections.size(),
+                received: connections.received(),
             },
-        }
-    }
-
-    pub(super) async fn chain(&self) -> Result<SourceChain, ServiceError> {
-        Ok(self.settings.lock().await.source_chain()?)
+        )
     }
 }

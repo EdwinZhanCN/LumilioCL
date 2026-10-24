@@ -8,13 +8,14 @@ use tokio::sync::{mpsc, oneshot};
 use super::{GameExit, JavaRequest, LaunchRequest, LaunchServiceError, LaunchUpdate, Launcher};
 use super::{LogStream, SessionMarker};
 use crate::activity::CancellationToken;
+use crate::clock::now;
 use crate::context::{ContextHub, SessionPhase};
+use crate::error::ServiceError;
 use crate::history::{SessionOutcome, finish_session, record_attempt};
 use crate::instances::Instances;
 use crate::java::JavaRuntime;
 use crate::layout::Layout;
 use crate::plugins::PluginHost;
-use crate::service::{ServiceError, now};
 use crate::transfer::{SourceChain, Transport};
 use crate::tuning::QuickPlay;
 

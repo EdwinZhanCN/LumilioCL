@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use super::LauncherService;
-use super::error::ServiceError;
+use crate::error::ServiceError;
 use crate::instances::InstanceSettings;
 use crate::java::JavaLocator;
 use crate::settings::validate_memory;
@@ -94,7 +94,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     pub async fn set_download_concurrency(&self, count: Option<u32>) -> Result<(), ServiceError> {
         self.settings.lock().await.set_download_concurrency(count)?;
         // Running downloads take the new size from their next connection.
-        self.connections().await;
+        self.network.connections().await;
         Ok(())
     }
 

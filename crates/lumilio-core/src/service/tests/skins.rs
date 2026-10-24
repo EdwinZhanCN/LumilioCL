@@ -4,8 +4,8 @@ use sha2::{Digest, Sha256};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
-use super::super::error::ServiceError;
 use super::{ECHO_ARGS, World, fake_java, publish_identity_release, world};
+use crate::error::ServiceError;
 use crate::instances::Loader;
 use crate::skin::{SkinChoice, SkinError, SkinModel};
 

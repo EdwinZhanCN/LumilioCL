@@ -1,10 +1,10 @@
 use std::path::{Path, PathBuf};
 
 use super::LauncherService;
-use super::error::{ServiceError, read_unless_cancelled};
-use super::support::blocking;
 use crate::activity::CancellationToken;
-use crate::activity_log::{RetryAction, TaskAction, TaskCategory, TaskLabel};
+use crate::activity::{RetryAction, TaskAction, TaskCategory, TaskLabel};
+use crate::blocking::blocking;
+use crate::error::{ServiceError, read_unless_cancelled};
 use crate::java::JavaLocator;
 use crate::java_runtime::{JavaBuild, JavaSource};
 use crate::transfer::{TransferRequest, Transport};
@@ -90,6 +90,7 @@ impl<T: Transport + Clone> LauncherService<T> {
                 .join(" · ");
         }
         let task = self
+            .tasks
             .begin(
                 TaskCategory::Install,
                 TaskLabel::Typed {
@@ -120,7 +121,7 @@ impl<T: Transport + Clone> LauncherService<T> {
                     .await
             }
         };
-        self.end(task, &result);
+        self.tasks.end(task, &result);
         if result.is_ok() {
             self.context.bump(crate::context::Change::Java);
         }
@@ -142,7 +143,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         };
         let (settings, runtimes) = self.environment().await;
         let auto_install = settings.auto_install_java;
-        super::support::blocking_value(move || {
+        crate::blocking::blocking_value(move || {
             let needs = record
                 .release_id()
                 .and_then(|release| {
@@ -212,9 +213,9 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// offers nothing.
     pub async fn java_offers(&self) -> Vec<(JavaSource, Vec<u32>)> {
         let host = HostProfile::current();
-        let mojang = match self.chain().await {
+        let mojang = match self.network.chain().await {
             Ok(chain) => crate::fetch::fetch_decoded(
-                &self.fetcher(),
+                &self.network.fetcher(),
                 &chain.candidates(crate::java_runtime::INDEX_URL),
                 |bytes| {
                     let index = String::from_utf8(bytes).map_err(|error| error.to_string())?;
@@ -288,10 +289,10 @@ impl<T: Transport + Clone> LauncherService<T> {
         if let Some(found) = Self::runtime_in(&folder) {
             return Ok(found);
         }
-        let chain = read_unless_cancelled(&cancel, self.chain()).await?;
+        let chain = read_unless_cancelled(&cancel, self.network.chain()).await?;
         let checksum = read_unless_cancelled(&cancel, async {
             crate::fetch::fetch_decoded(
-                &self.fetcher(),
+                &self.network.fetcher(),
                 &chain.candidates(&wanted.checksum_url),
                 |bytes| {
                     let text = String::from_utf8(bytes).map_err(|error| error.to_string())?;
@@ -311,8 +312,9 @@ impl<T: Transport + Clone> LauncherService<T> {
         )
         .and_then(|request| request.expect_sha256(&checksum))
         .map_err(|error| fail(error.to_string()))?;
-        let engine = self.transfer_engine().await;
+        let engine = self.network.transfer_engine().await;
         let report = self
+            .tasks
             .metered(
                 task,
                 engine.subscribe(),
@@ -370,10 +372,10 @@ impl<T: Transport + Clone> LauncherService<T> {
                 runtime::JavaRuntimeError::UnsupportedPlatform.to_string(),
             ));
         }
-        let chain = read_unless_cancelled(&cancel, self.chain()).await?;
+        let chain = read_unless_cancelled(&cancel, self.network.chain()).await?;
         let choice = read_unless_cancelled(&cancel, async {
             crate::fetch::fetch_decoded(
-                &self.fetcher(),
+                &self.network.fetcher(),
                 &chain.candidates(runtime::INDEX_URL),
                 |bytes| {
                     let index =
@@ -395,7 +397,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         }
         let entries = read_unless_cancelled(&cancel, async {
             crate::fetch::fetch_decoded(
-                &self.fetcher(),
+                &self.network.fetcher(),
                 &chain.candidates(&choice.manifest.url),
                 |bytes| {
                     let manifest =
@@ -449,8 +451,9 @@ impl<T: Transport + Clone> LauncherService<T> {
                 requests.push(request);
             }
         }
-        let engine = self.transfer_engine().await;
+        let engine = self.network.transfer_engine().await;
         let report = self
+            .tasks
             .metered(
                 task,
                 engine.subscribe(),

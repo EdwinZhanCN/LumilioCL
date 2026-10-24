@@ -1,8 +1,9 @@
 use super::LauncherService;
-use super::error::ServiceError;
-use super::types::{ContentEffect, ContentResult, now};
+use super::types::{ContentEffect, ContentResult};
+use crate::clock::now;
 use crate::content::{ContentError, ContentItem, scan as scan_content};
 use crate::discover::{ProjectKind, Version};
+use crate::error::ServiceError;
 use crate::history::{ChangeKind, HistoryEvent, HistoryLog};
 use crate::transfer::Transport;
 

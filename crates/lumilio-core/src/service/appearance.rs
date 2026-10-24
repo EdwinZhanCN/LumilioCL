@@ -11,7 +11,8 @@ use sha2::{Digest, Sha256};
 use tokio::sync::Mutex;
 use tokio::time::Instant;
 
-use super::{LauncherService, ServiceError};
+use super::LauncherService;
+use crate::error::ServiceError;
 use crate::microsoft::Secret;
 use crate::skin::{AppearanceError, MojangClient, MojangProfile};
 use crate::transfer::Transport;
@@ -155,7 +156,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         {
             return Ok(profile.clone());
         }
-        let result = MojangClient::new(&self.transport)
+        let result = MojangClient::new(self.network.transport())
             .profile(&token)
             .await
             .and_then(|profile| {

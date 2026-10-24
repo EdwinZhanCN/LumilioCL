@@ -1,7 +1,7 @@
-use super::super::error::ServiceError;
 use super::{fake_java, launch_to_end, publish_java, publish_release, world};
 use crate::activity::CancellationToken;
-use crate::activity_log::{RetryAction, TaskOutcome};
+use crate::activity::{RetryAction, TaskOutcome};
+use crate::error::ServiceError;
 use crate::instances::Loader;
 use crate::java_runtime::JavaBuild;
 

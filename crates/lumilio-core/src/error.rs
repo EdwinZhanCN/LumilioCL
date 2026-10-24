@@ -307,7 +307,7 @@ impl From<modpack::ModpackError> for ServiceError {
 }
 
 /// Read-only work can be dropped safely; do not wrap file commits in this helper.
-pub(super) async fn read_unless_cancelled<V>(
+pub(crate) async fn read_unless_cancelled<V>(
     cancel: &CancellationToken,
     read: impl Future<Output = Result<V, ServiceError>>,
 ) -> Result<V, ServiceError> {

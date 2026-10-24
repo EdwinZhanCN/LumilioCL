@@ -1,9 +1,9 @@
 use tokio::sync::mpsc;
 
-use super::error::ServiceError;
 use super::{LauncherService, loader_text};
 use crate::activity::CancellationToken;
-use crate::activity_log::{RetryAction, TaskAction, TaskCategory, TaskLabel};
+use crate::activity::{RetryAction, TaskAction, TaskCategory, TaskLabel};
+use crate::error::ServiceError;
 use crate::history::ChangeKind;
 use crate::instances::{InstanceRecord, Loader, StoreError};
 use crate::launching::{LaunchServiceError, LaunchUpdate};
@@ -23,6 +23,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         let _lease = self.instances.reserve(id)?;
         let (request, chain) = self.launch_request(id, Some(None), &cancel).await?;
         let task = self
+            .tasks
             .begin(
                 TaskCategory::Install,
                 TaskLabel::Typed {
@@ -46,7 +47,7 @@ impl<T: Transport + Clone> LauncherService<T> {
                 .mark_installed(id, true)
                 .map_err(ServiceError::from);
         }
-        self.end(task, &result);
+        self.tasks.end(task, &result);
         result
     }
 
@@ -64,6 +65,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         let _lease = self.instances.reserve(id)?;
         let (request, chain) = self.launch_request(id, Some(None), &cancel).await?;
         let task = self
+            .tasks
             .begin(
                 TaskCategory::Repair,
                 TaskLabel::Typed {
@@ -90,7 +92,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         if result.is_ok() {
             self.record_change(id, ChangeKind::Repaired, "game files");
         }
-        self.end(task, &result);
+        self.tasks.end(task, &result);
         result
     }
 
@@ -158,6 +160,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             .request_for(candidate, directories, Some(None), &cancel)
             .await?;
         let task = self
+            .tasks
             .begin(
                 TaskCategory::Update,
                 TaskLabel::Typed {
@@ -184,7 +187,7 @@ impl<T: Transport + Clone> LauncherService<T> {
                 .set_runtime(id, game_version, loader, loader_version.as_deref())
                 .map_err(ServiceError::from);
         }
-        self.end(task, &result);
+        self.tasks.end(task, &result);
         result?;
         self.record_change(
             id,

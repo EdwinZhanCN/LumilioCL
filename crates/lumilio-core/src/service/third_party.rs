@@ -6,10 +6,10 @@
 
 use std::sync::atomic::Ordering;
 
-use super::error::ServiceError;
 use super::{CREDENTIAL_PROBE, LauncherService};
 use crate::account::{AuthSession, Injection, ProfileId};
 use crate::credentials::StoredYggdrasil;
+use crate::error::ServiceError;
 use crate::injector;
 use crate::microsoft::Secret;
 use crate::settings::{AccountEntry, AccountKind, AuthServerEntry, SettingsError};
@@ -69,7 +69,7 @@ impl<T: Transport + Clone> LauncherService<T> {
 
     /// Finds the server an address means, without remembering it.
     pub async fn locate_auth_server(&self, address: &str) -> Result<AuthServer, ServiceError> {
-        Ok(locate_server(&self.transport, address).await?)
+        Ok(locate_server(self.network.transport(), address).await?)
     }
 
     /// Remembers a server found with [`Self::locate_auth_server`].
@@ -117,7 +117,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         // Fail before asking the server for a session that could never be kept.
         self.credentials.get(CREDENTIAL_PROBE)?;
         let client_token = random_client_token(self.client_token_override.as_deref())?;
-        let client = YggdrasilClient::new(&self.transport, &known.url);
+        let client = YggdrasilClient::new(self.network.transport(), &known.url);
         let session = client.authenticate(login, password, &client_token).await?;
         if session.selected.is_some() {
             return self.finish_third_party(&known.url, login, session).await;
@@ -173,7 +173,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             .find(|profile| profile.id == character)
             .cloned()
             .ok_or(ServiceError::NoPendingSignIn)?;
-        let client = YggdrasilClient::new(&self.transport, &waiting.server);
+        let client = YggdrasilClient::new(self.network.transport(), &waiting.server);
         let chosen = client
             .refresh(
                 &waiting.session.access_token,
@@ -245,7 +245,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         ) else {
             return;
         };
-        let client = YggdrasilClient::new(&self.transport, server);
+        let client = YggdrasilClient::new(self.network.transport(), server);
         let _ = tokio::time::timeout(
             std::time::Duration::from_secs(5),
             client.invalidate(&Secret::new(stored.access_token), &stored.client_token),
@@ -260,7 +260,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         if self.injector_checked.swap(true, Ordering::SeqCst) {
             return;
         }
-        let (engine, chain, dir) = (self.fetcher(), chain.clone(), dir.to_owned());
+        let (engine, chain, dir) = (self.network.fetcher(), chain.clone(), dir.to_owned());
         tokio::spawn(async move {
             let _ = injector::refresh(&engine, &chain, &dir).await;
         });
@@ -284,7 +284,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             self.flag_sign_in(&key).await;
             return Err(ServiceError::SignInRequired(entry.name.clone()));
         };
-        let client = YggdrasilClient::new(&self.transport, &server);
+        let client = YggdrasilClient::new(self.network.transport(), &server);
         let mut name = entry.name.clone();
         let token = Secret::new(stored.access_token.clone());
         let accepted = !force && client.validate(&token, &stored.client_token).await?;
@@ -329,17 +329,17 @@ impl<T: Transport + Clone> LauncherService<T> {
             }
             name = selected.name;
         }
-        let chain = self.chain().await?;
+        let chain = self.network.chain().await?;
         let dir = self.layout.injector();
         self.check_injector_update(&chain, &dir);
         let (metadata, jar) = tokio::try_join!(
             async {
-                fetch_metadata(&self.transport, &server)
+                fetch_metadata(self.network.transport(), &server)
                     .await
                     .map_err(ServiceError::from)
             },
             async {
-                injector::ensure(&self.fetcher(), &chain, &dir)
+                injector::ensure(&self.network.fetcher(), &chain, &dir)
                     .await
                     .map_err(ServiceError::from)
             },

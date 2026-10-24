@@ -2,7 +2,7 @@ use tokio::sync::mpsc;
 
 use super::{ECHO_ARGS, fake_java, launch_to_end, publish_versions, repair_to_end, world};
 use crate::activity::CancellationToken;
-use crate::activity_log::TaskCategory;
+use crate::activity::TaskCategory;
 use crate::history::{ChangeKind, HistoryEvent};
 use crate::instances::Loader;
 

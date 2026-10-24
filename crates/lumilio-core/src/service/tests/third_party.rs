@@ -2,11 +2,11 @@ use std::io::Write as _;
 
 use sha2::{Digest, Sha256};
 
-use super::super::error::ServiceError;
 use super::super::third_party::ThirdPartySignIn;
 use super::{ECHO_ARGS, World, fake_java, launch_to_end, publish_identity_release, world};
 use crate::account::ProfileId;
 use crate::credentials::StoredYggdrasil;
+use crate::error::ServiceError;
 use crate::instances::Loader;
 use crate::settings::AccountKind;
 use crate::yggdrasil::{LITTLE_SKIN_URL, YggdrasilError};

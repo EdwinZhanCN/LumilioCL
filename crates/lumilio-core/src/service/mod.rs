@@ -13,7 +13,6 @@ mod content;
 mod content_install;
 mod diagnostics;
 mod discover;
-mod error;
 mod game_settings;
 mod install;
 mod instances;
@@ -35,7 +34,6 @@ mod screenshots;
 mod servers;
 mod skins;
 mod snapshots;
-mod support;
 mod third_party;
 mod tracking;
 mod translation;
@@ -48,20 +46,16 @@ mod worlds;
 mod tests;
 
 pub use launcher_service::LauncherService;
-use launcher_service::{
-    CREDENTIAL_PROBE, DIAGNOSED_LIMIT, TOKEN_MARGIN_SECONDS, TRANSFER_CONCURRENCY, loader_text,
-};
+use launcher_service::{CREDENTIAL_PROBE, DIAGNOSED_LIMIT, TOKEN_MARGIN_SECONDS, loader_text};
 
 pub use self::appearance::ProfileSnapshot;
-pub use self::error::ServiceError;
 pub use self::java::InstanceJava;
 pub use self::models::ModelPreview;
 pub use self::pending::AddedFile;
 pub use self::third_party::ThirdPartySignIn;
 pub use self::types::{
-    ActivityView, ContentEffect, ContentResult, ContentSourceInfo, DependencyNeed,
-    DependencyReport, DiscoverFilters, GameLogSource, GameLogs, InstalledProject, Library,
-    ProjectDetail, Traffic, now,
+    ContentEffect, ContentResult, ContentSourceInfo, DependencyNeed, DependencyReport,
+    DiscoverFilters, GameLogSource, GameLogs, InstalledProject, Library, ProjectDetail,
 };
 pub use self::wardrobe::AppearanceApplyResult;
 

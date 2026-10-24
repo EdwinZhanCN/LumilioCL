@@ -1,6 +1,6 @@
 use super::LauncherService;
-use super::error::ServiceError;
-use super::support::blocking_value;
+use crate::blocking::blocking_value;
+use crate::error::ServiceError;
 use crate::transfer::Transport;
 
 impl<T: Transport + Clone> LauncherService<T> {

@@ -1,8 +1,8 @@
 use tokio::sync::mpsc;
 
 use super::LauncherService;
-use super::error::ServiceError;
 use crate::activity::CancellationToken;
+use crate::error::ServiceError;
 use crate::instances::{InstanceRecord, StoreError};
 use crate::java::JavaRuntime;
 use crate::launching::{
@@ -46,7 +46,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         cancel: &CancellationToken,
     ) -> Result<(LaunchRequest, SourceChain), ServiceError> {
         let own_quick_play = record.settings.launch.quick_play.clone();
-        let chain = self.chain().await?;
+        let chain = self.network.chain().await?;
         let (settings, runtimes) = self.environment().await;
         validate_memory(
             record
@@ -73,7 +73,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         let manifest_url = if all_ready {
             None
         } else {
-            let fetcher = self.fetcher();
+            let fetcher = self.network.fetcher();
             let fetched = tokio::select! {
                 () = cancel.cancelled() => return Err(ServiceError::Cancelled),
                 fetched = crate::minecraft::fetch_catalog(&fetcher, &chain) => fetched,
@@ -197,9 +197,9 @@ impl<T: Transport + Clone> LaunchSteps for LauncherService<T> {
         &self,
         chain: SourceChain,
     ) -> (Launcher<T>, mpsc::UnboundedReceiver<JavaRequest>) {
-        let launcher = Launcher::new(self.transport.clone(), chain)
-            .with_budget(self.connections().await)
-            .keeping_partials(self.layout.partial_downloads());
+        let launcher = Launcher::new(self.network.transport().clone(), chain)
+            .with_budget(self.network.connections().await)
+            .keeping_partials(self.network.partials());
         let (sender, receiver) = mpsc::unbounded_channel();
         let launcher = if self.settings.lock().await.get().auto_install_java {
             launcher.with_java_installer(sender)

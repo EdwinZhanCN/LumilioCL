@@ -1,9 +1,9 @@
 use tokio::sync::mpsc;
 
 use super::super::LauncherService;
-use super::super::error::ServiceError;
 use super::{ECHO_ARGS, fake_java, launch_to_end, publish_release, world};
 use crate::activity::CancellationToken;
+use crate::error::ServiceError;
 use crate::instances::{InstanceSettings, Loader, NewInstance};
 use crate::settings::SettingsError;
 

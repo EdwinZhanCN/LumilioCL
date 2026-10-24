@@ -5,8 +5,8 @@
 use std::path::PathBuf;
 
 use super::LauncherService;
-use super::error::ServiceError;
 use crate::content::ContentError;
+use crate::error::ServiceError;
 use crate::history::ChangeKind;
 use crate::modpack::PendingDownload;
 use crate::transfer::Transport;

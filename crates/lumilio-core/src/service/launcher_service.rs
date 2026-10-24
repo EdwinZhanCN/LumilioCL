@@ -4,15 +4,15 @@ use std::sync::{Arc, Mutex as StdMutex};
 
 use tokio::sync::Mutex;
 
-use super::error::ServiceError;
 use super::types::DiscoverFilters;
 use super::{appearance, preferences, third_party};
-use crate::activity::CancellationToken;
-use crate::activity_log::{ActivityLog, TaskBoard};
+use crate::activity::{ActivityLog, Tasks};
 use crate::credentials::{CredentialStore, SystemCredentials};
+use crate::error::ServiceError;
 use crate::instances::{InstanceStore, Instances, Loader};
 use crate::launching::Launching;
 use crate::layout::Layout;
+use crate::network::Network;
 use crate::recovery;
 use crate::recovery::RecoveryNote;
 use crate::settings::SettingsStore;
@@ -29,9 +29,6 @@ pub(super) fn loader_text(loader: Loader, version: Option<&str>) -> String {
 /// Instances diagnosed for Home: verifying files is not free, so only the
 /// ones a person is likely to care about right now.
 pub(super) const DIAGNOSED_LIMIT: usize = 8;
-/// Connections all downloads share when the setting is automatic (plan
-/// download-engine D2).
-pub(super) const TRANSFER_CONCURRENCY: usize = 16;
 /// A download stopped part-way is continued if started again within this
 /// long; after it, its bytes are removed when the launcher opens.
 pub(super) const PARTIAL_DOWNLOAD_AGE: std::time::Duration =
@@ -44,20 +41,15 @@ pub(super) const CREDENTIAL_PROBE: &str = "lumilio-store-check";
 pub struct LauncherService<T> {
     pub(crate) plugins: Arc<crate::plugins::PluginHost>,
     pub(super) layout: Layout,
-    pub(super) transport: T,
-    pub(crate) instances: Instances,
-    pub(super) settings: Mutex<SettingsStore>,
+    pub(super) network: Network<T>,
+    pub(crate) instances: Arc<Instances>,
+    pub(super) settings: Arc<Mutex<SettingsStore>>,
     /// Published by both stores on every save (plan global-context).
     pub(super) context: crate::context::ContextHub,
-    pub(super) board: StdMutex<TaskBoard>,
-    /// Every download's connections, sized by the download setting.
-    pub(super) connections: ConnectionBudget,
-    /// Cancellation tokens of running tasks, by task id.
-    pub(super) cancels: StdMutex<BTreeMap<u64, CancellationToken>>,
+    pub(super) tasks: Arc<Tasks>,
     /// What the start-up recovery found and did.
     pub(super) startup: Vec<RecoveryNote>,
     pub(super) launching: Launching,
-    pub(super) log: ActivityLog,
     /// Replaces the conventional Java search locations (tests, portable setups).
     pub(super) runtime_roots: Option<Vec<PathBuf>>,
     /// Filter choices per content source, for the life of the service.
@@ -122,7 +114,9 @@ impl<T: Transport + Clone> LauncherService<T> {
             // prevent the launcher from opening. Network calls fail locally
             // until corrected; the rest of the service remains available.
             .with_network_config(transport.clone(), settings.source_chain().ok());
+        let settings = Arc::new(Mutex::new(settings));
         Ok(Self {
+            network: Network::new(transport, settings.clone(), layout.partial_downloads())?,
             plugins: Arc::new(plugins),
             translation: Arc::new(crate::translation::TranslationService::new(
                 layout.root().to_owned(),
@@ -132,17 +126,12 @@ impl<T: Transport + Clone> LauncherService<T> {
             ),
             profiles: appearance::Profiles::default(),
             layout,
-            transport,
-            instances: Instances::new(store),
-            settings: Mutex::new(settings),
+            instances: Arc::new(Instances::new(store)),
+            settings,
             context,
-            board: StdMutex::new(TaskBoard::default()),
-            connections: ConnectionBudget::new(TRANSFER_CONCURRENCY)
-                .map_err(|error| ServiceError::Install(error.to_string()))?,
-            cancels: StdMutex::default(),
+            tasks: Arc::new(Tasks::new(log)),
             launching: Launching::default(),
             startup,
-            log,
             runtime_roots: None,
             filters: Mutex::default(),
             credentials: Arc::new(SystemCredentials),
@@ -188,6 +177,6 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// downloads on them too (plan download-engine T4).
     #[must_use]
     pub fn connection_budget(&self) -> ConnectionBudget {
-        self.connections.clone()
+        self.network.budget()
     }
 }

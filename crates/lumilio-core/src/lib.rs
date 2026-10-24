@@ -2,10 +2,11 @@
 
 mod account;
 mod activity;
-mod activity_log;
 mod attention;
 mod backup;
+mod blocking;
 mod bundle;
+mod clock;
 mod content;
 mod content_sources;
 mod context;
@@ -14,6 +15,7 @@ mod credentials;
 mod deletion;
 mod diagnostics;
 mod discover;
+mod error;
 mod fetch;
 mod fingerprint;
 mod forge_install;
@@ -34,21 +36,21 @@ mod microsoft;
 mod minecraft;
 mod mirror_presets;
 mod modpack;
+mod network;
 
 pub use account::{AuthSession, MAX_PROFILE_NAME, OfflineProfile, ProfileError, ProfileId};
 pub use activity::{
-    ActivityContext, ActivityEvent, ActivityGraph, ActivityGraphError, ActivityNode,
-    ActivityRecord, ActivityReport, ActivityScheduler, ActivityState, CancellationToken,
-    ProgressSnapshot,
-};
-pub use activity_log::{
-    ActiveTask, ActivityLog, FileDownload, FinishedTask, ProgressUnit, RetryAction, SourceSwitch,
-    TaskAction, TaskBoard, TaskCategory, TaskDownloads, TaskLabel, TaskOutcome,
+    ActiveTask, ActivityContext, ActivityEvent, ActivityGraph, ActivityGraphError, ActivityLog,
+    ActivityNode, ActivityRecord, ActivityReport, ActivityScheduler, ActivityState, ActivityView,
+    CancellationToken, FileDownload, FinishedTask, ProgressSnapshot, ProgressUnit, RetryAction,
+    SourceSwitch, TaskAction, TaskBoard, TaskCategory, TaskDownloads, TaskLabel, TaskOutcome,
+    Traffic,
 };
 pub use attention::{
     AttentionItem, HomeChecks, HomeSummary, summarize as summarize_home, with_account,
 };
 pub use bundle::{Redactor, write_bundle};
+pub use clock::now as unix_now;
 pub use content::{
     ContentError, ContentItem, ModMetadata, read_mod_metadata, remove as remove_content,
     scan as scan_content, set_enabled as set_content_enabled, sha1_hex,
@@ -69,6 +71,7 @@ pub use discover::{
     SortIndex, SourceFilters, Stance, TextFormat, Version, VersionFile, VersionGroup, environment,
     fits as version_fits, install_request as content_install_request, pick_version, version_groups,
 };
+pub use error::ServiceError;
 pub use fetch::{DOCUMENT_LIMIT, FetchError, fetch_document, post_document};
 pub use forge_meta::{forge_versions, neoforge_game_version, neoforge_versions};
 pub use game_settings::{
@@ -158,10 +161,10 @@ pub use servers::{
     Motd, MotdSpan, PackPolicy, PingError, ProtocolVersion, ServerEntry, ServerError, ServerStatus,
 };
 pub use service::{
-    ActivityView, AddedFile, AppearanceApplyResult, ContentEffect, ContentResult,
-    ContentSourceInfo, DependencyNeed, DependencyReport, DiscoverFilters, GameLogSource, GameLogs,
-    InstalledProject, InstanceJava, LauncherService, Library, ModelPreview, ProfileSnapshot,
-    ProjectDetail, ServiceError, ThirdPartySignIn, Traffic, now as unix_now,
+    AddedFile, AppearanceApplyResult, ContentEffect, ContentResult, ContentSourceInfo,
+    DependencyNeed, DependencyReport, DiscoverFilters, GameLogSource, GameLogs, InstalledProject,
+    InstanceJava, LauncherService, Library, ModelPreview, ProfileSnapshot, ProjectDetail,
+    ThirdPartySignIn,
 };
 pub use settings::{
     AccountEntry, AccountKind, AuthServerEntry, DownloadSourcePreference, LauncherSettings,

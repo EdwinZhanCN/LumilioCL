@@ -175,7 +175,7 @@ impl<'a, T: Transport + ?Sized> MicrosoftClient<'a, T> {
             transport,
             client_id: client_id(),
             slow_down: Duration::from_secs(5),
-            clock: crate::service::now,
+            clock: crate::clock::now,
         }
     }
 

@@ -1,6 +1,6 @@
 use super::LauncherService;
-use super::error::ServiceError;
-use super::types::now;
+use crate::clock::now;
+use crate::error::ServiceError;
 use crate::history::{ChangeKind, HistoryEvent, HistoryLog};
 use crate::snapshots;
 use crate::snapshots::{SnapshotInfo, SnapshotScope};

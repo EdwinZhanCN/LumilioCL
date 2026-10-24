@@ -1,6 +1,7 @@
 use lumilio_plugin_api::{ActionId, PluginState, SettingValue, View};
 
-use super::{LauncherService, ServiceError};
+use super::LauncherService;
+use crate::error::ServiceError;
 use crate::plugins::{PluginEffect, PluginInfo, PluginTab};
 use crate::transfer::Transport;
 

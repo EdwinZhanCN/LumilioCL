@@ -4,10 +4,11 @@
 
 use lumilio_block_assets::{BakedPack, BlockCatalog, BlockNames, EntityLayers};
 
-use super::support::blocking_value;
-use super::{LauncherService, ServiceError};
+use super::LauncherService;
 use crate::activity::CancellationToken;
-use crate::activity_log::{TaskAction, TaskCategory, TaskLabel};
+use crate::activity::{TaskAction, TaskCategory, TaskLabel};
+use crate::blocking::blocking_value;
+use crate::error::ServiceError;
 use crate::schematic_assets::{
     AssetNotice, AssetPlan, BUNDLE_RELEASE, BundleFile, BundleIndex, BundleReach, BundleStore,
     EntityGeometry, InstanceAssets, LocalCache, PlannedSource, SchematicAssetsError,
@@ -173,9 +174,13 @@ impl<T: Transport + Clone> LauncherService<T> {
         if !self.settings.lock().await.get().auto_download_block_assets {
             return Err(BundleUnreachable::Disabled);
         }
-        let chain = self.chain().await.map_err(|_| BundleUnreachable::Offline)?;
+        let chain = self
+            .network
+            .chain()
+            .await
+            .map_err(|_| BundleUnreachable::Offline)?;
         store
-            .fetch_index(&self.fetcher(), &chain)
+            .fetch_index(&self.network.fetcher(), &chain)
             .await
             .map_err(|error| match error {
                 SchematicAssetsError::NotServed(_) => BundleUnreachable::Unavailable,
@@ -285,11 +290,11 @@ impl<T: Transport + Clone> LauncherService<T> {
         if !self.settings.lock().await.get().auto_download_block_assets {
             return false;
         }
-        let Ok(chain) = self.chain().await else {
+        let Ok(chain) = self.network.chain().await else {
             return false;
         };
         store
-            .fetch_small(&self.fetcher(), &chain, file)
+            .fetch_small(&self.network.fetcher(), &chain, file)
             .await
             .is_ok()
     }
@@ -377,9 +382,13 @@ impl<T: Transport + Clone> LauncherService<T> {
         if !self.settings.lock().await.get().auto_download_block_assets {
             return Err(BundleUnreachable::Disabled);
         }
-        let chain = self.chain().await.map_err(|_| BundleUnreachable::Offline)?;
+        let chain = self
+            .network
+            .chain()
+            .await
+            .map_err(|_| BundleUnreachable::Offline)?;
         let cancel = CancellationToken::new();
-        let task = self.begin(
+        let task = self.tasks.begin(
             TaskCategory::Download,
             TaskLabel::Typed {
                 action: TaskAction::PrepareBlockAssets,
@@ -388,8 +397,9 @@ impl<T: Transport + Clone> LauncherService<T> {
             None,
             Some(&cancel),
         );
-        let engine = self.transfer_engine().await;
+        let engine = self.network.transfer_engine().await;
         let result = self
+            .tasks
             .metered(
                 task.id,
                 engine.subscribe(),
@@ -403,7 +413,7 @@ impl<T: Transport + Clone> LauncherService<T> {
                     ServiceError::Install(error.to_string())
                 }
             });
-        self.end(task, &result);
+        self.tasks.end(task, &result);
         result.map(|_| ()).map_err(|_| BundleUnreachable::Offline)
     }
 }

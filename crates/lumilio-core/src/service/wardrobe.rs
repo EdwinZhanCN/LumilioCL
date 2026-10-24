@@ -4,8 +4,9 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use super::{LauncherService, ServiceError};
+use super::LauncherService;
 use crate::activity::CancellationToken;
+use crate::error::ServiceError;
 use crate::microsoft::Secret;
 use crate::settings::{AccountEntry, AccountKind, SettingsError};
 use crate::skin;
@@ -84,7 +85,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         if let Some(error) = state.blocked() {
             return Err(error.into());
         }
-        let result = MojangClient::new(&self.transport)
+        let result = MojangClient::new(self.network.transport())
             .change_validated(&token, change.clone())
             .await;
         if !self.profiles.is_current(key, &slot).await {
@@ -119,7 +120,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         tokio::select! {
             () = cancel.cancelled() => Err(ServiceError::Cancelled),
             () = tokio::time::sleep(PROPAGATION_DELAY) => {
-                super::error::read_unless_cancelled(&cancel, self.refresh_account_profile(key)).await
+                crate::error::read_unless_cancelled(&cancel, self.refresh_account_profile(key)).await
             }
         }
     }
@@ -146,7 +147,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     pub async fn save_account_skin(&self, key: &str) -> Result<LibrarySkin, ServiceError> {
         let profile = self.account_profile(key).await?;
         let skin = profile.active_skin().ok_or(AppearanceError::UnknownSkin)?;
-        let png = MojangClient::cached(&self.transport, &self.textures)
+        let png = MojangClient::cached(self.network.transport(), &self.textures)
             .skin_png(skin)
             .await?;
         let model = skin.model;
@@ -309,7 +310,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         if skin.model == model {
             return Ok(None);
         }
-        let png = MojangClient::cached(&self.transport, &self.textures)
+        let png = MojangClient::cached(self.network.transport(), &self.textures)
             .skin_png(skin)
             .await?;
         self.change_account_appearance(key, AppearanceChange::Upload { png, model })
@@ -427,7 +428,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// The pictures of the capes a Microsoft account owns, by cape id. A
     /// cape whose picture cannot be read is left out.
     pub async fn owned_cape_pictures(&self, profile: &MojangProfile) -> Vec<(String, Pixels)> {
-        let client = MojangClient::cached(&self.transport, &self.textures);
+        let client = MojangClient::cached(self.network.transport(), &self.textures);
         let mut pictures = Vec::new();
         for cape in &profile.capes {
             if let Ok(png) = client.cape_png(cape).await
@@ -488,7 +489,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         if model != skin.model {
             return Ok(false);
         }
-        let remote = MojangClient::cached(&self.transport, &self.textures)
+        let remote = MojangClient::cached(self.network.transport(), &self.textures)
             .skin_png(skin)
             .await?;
         Ok(skin::skin_pixels(&png).map_err(ServiceError::Skin)?
