@@ -11,3 +11,6 @@
 
 # Where `just prune` keeps target/block-assets during a clean.
 /.prune-block-assets/
+.codegraph/
+.idea/
+target/
