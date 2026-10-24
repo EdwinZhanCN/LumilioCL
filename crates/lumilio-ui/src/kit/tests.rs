@@ -53,6 +53,37 @@ fn a_small_field_is_as_tall_as_a_small_key(cx: &mut TestAppContext) {
     );
 }
 
+/// An HTML body whose paragraphs are each laid out as an inline flow.
+struct HtmlBody(&'static str);
+
+impl Render for HtmlBody {
+    fn render(&mut self, _: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
+        div().w(gpui::px(480.)).child(super::rich_text(
+            "body",
+            self.0.into(),
+            lumilio_core::TextFormat::Html,
+        ))
+    }
+}
+
+/// HTML gives its paragraphs no source position, so the renderer once gave
+/// every inline-flow paragraph (code, or a linked image beside text, as
+/// Markdown badges become) the same element id. The first paragraph then
+/// took the last one's layout and indexed past its own items: translating a
+/// project body crashed.
+#[gpui::test]
+fn html_paragraphs_with_code_and_linked_images_each_keep_their_own_layout(cx: &mut TestAppContext) {
+    cx.update(gpui_component::init);
+    let (_, cx) = cx.add_window_view(|_, _| {
+        HtmlBody(
+            "<p>Run <code>a</code>.</p>\
+             <p>See <a href=\"https://example.invalid/a\"><img src=\"https://example.invalid/a.png\"></a> \
+             and <a href=\"https://example.invalid/b\"><img src=\"https://example.invalid/b.png\"></a> here.</p>",
+        )
+    });
+    cx.run_until_parked();
+}
+
 struct Sheet;
 
 impl Render for Sheet {
