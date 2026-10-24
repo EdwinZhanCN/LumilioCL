@@ -361,3 +361,6 @@ impl<T: Transport + Clone> Accounts<T> {
         ))
     }
 }
+
+#[cfg(test)]
+mod tests;

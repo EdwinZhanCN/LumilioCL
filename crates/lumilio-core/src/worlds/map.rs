@@ -356,3 +356,6 @@ impl<T: Transport + Clone> Worlds<T> {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests;

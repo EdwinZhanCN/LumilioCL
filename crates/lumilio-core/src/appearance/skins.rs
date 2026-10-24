@@ -190,3 +190,6 @@ impl<T: Transport + Clone> Appearance<T> {
             .with_notes(notes))
     }
 }
+
+#[cfg(test)]
+mod tests;

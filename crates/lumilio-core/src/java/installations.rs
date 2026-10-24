@@ -10,9 +10,9 @@ use crate::error::{ServiceError, read_unless_cancelled};
 use crate::instances::Instances;
 use crate::java::JavaLocator;
 use crate::java_runtime::{JavaBuild, JavaSource};
-use crate::layout::Layout;
 use crate::network::Network;
 use crate::settings::SettingsStore;
+use crate::storage::Layout;
 use crate::transfer::{TransferRequest, Transport};
 use lumilio_minecraft::HostProfile;
 
@@ -687,3 +687,6 @@ impl<T: Transport + Clone> Java<T> {
         Ok(self.settings.lock().await.set_java_roots(roots)?)
     }
 }
+
+#[cfg(test)]
+mod tests;

@@ -67,3 +67,6 @@ impl<T: Transport + Clone> Worlds<T> {
             .map_err(ServiceError::from)
     }
 }
+
+#[cfg(test)]
+mod tests;

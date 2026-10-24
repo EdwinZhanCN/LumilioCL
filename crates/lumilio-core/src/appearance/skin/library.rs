@@ -9,8 +9,8 @@ use sha2::{Digest as _, Sha256};
 
 use super::mojang::normalize_png;
 use super::{AppearanceError, SkinModel};
-use crate::persist;
-use crate::persist::Versioned;
+use crate::storage::persist;
+use crate::storage::persist::Versioned;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum SkinSource {

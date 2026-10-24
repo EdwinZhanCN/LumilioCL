@@ -13,14 +13,14 @@ pub(crate) use access::{InstanceBusy, Instances};
 pub use instance_store::{
     Collection, InstanceRecord, InstanceSettings, InstanceStore, Loader, NewInstance, StoreError,
 };
-use instance_store::{Index, SCHEMA_VERSION, int, unsigned};
+use instance_store::{Index, int, unsigned};
 pub(crate) use library::InstanceLibrary;
 pub use library::Library;
 #[cfg(test)]
 use rusqlite::Connection;
 
 #[cfg(test)]
-use crate::layout::Layout;
+use crate::storage::Layout;
 #[cfg(test)]
 use crate::tuning::InstanceLaunch;
 

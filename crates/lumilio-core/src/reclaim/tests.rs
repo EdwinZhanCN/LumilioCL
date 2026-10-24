@@ -132,13 +132,13 @@ fn what_no_game_needs_is_found_and_what_one_needs_is_kept() {
 #[test]
 fn with_no_games_everything_shared_is_unused_and_removing_frees_it_and_nothing_else() {
     let (dir, layout) = tree();
-    let before = crate::storage::directory_size(&layout.meta());
+    let before = crate::diagnostics::directory_size(&layout.meta());
     put(&dir.path().join("profiles/keep/game/options.txt"), "mine");
     let report = scan(&layout, &[]).unwrap();
     let freed = remove(&layout, &report).unwrap();
     assert_eq!(freed, report.bytes());
     assert!(freed > 0 && freed <= before);
-    assert_eq!(crate::storage::directory_size(&layout.meta()), 0);
+    assert_eq!(crate::diagnostics::directory_size(&layout.meta()), 0);
     assert!(dir.path().join("profiles/keep/game/options.txt").is_file());
     // Scanning again finds nothing more.
     assert!(scan(&layout, &[]).unwrap().unused.is_empty());

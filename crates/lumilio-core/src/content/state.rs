@@ -6,10 +6,10 @@ use tokio::sync::Mutex;
 use super::DiscoverFilters;
 use crate::activity::Tasks;
 use crate::instances::Instances;
-use crate::layout::Layout;
 use crate::network::Network;
 use crate::plugins::PluginHost;
 use crate::settings::SettingsStore;
+use crate::storage::Layout;
 use crate::translation::SharedTranslation;
 
 /// Mods, packs and shaders in a game: finding them in the content sources,

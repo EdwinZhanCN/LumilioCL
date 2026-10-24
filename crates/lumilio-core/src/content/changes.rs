@@ -214,3 +214,6 @@ impl<T: Transport + Clone> Content<T> {
         Ok(results)
     }
 }
+
+#[cfg(test)]
+mod tests;

@@ -27,8 +27,8 @@ mod install;
 mod instances;
 mod java;
 mod java_runtime;
+mod launcher_service;
 mod launching;
-mod layout;
 mod loader;
 mod minecraft;
 mod mirror_presets;
@@ -77,8 +77,9 @@ pub use content::{
 pub use context::{Context, Revisions, Session, SessionPhase};
 pub use diagnostics::{
     CrashReport, Facts, FileEntry, GameLogSource, GameLogs, LOW_MEMORY_MB, LogLevel, LogLine,
-    Problem, ProblemKind, Severity, diagnose, filter_log, list_crash_reports, list_dir, log_level,
-    log_lines, read_crash_report, read_latest_log,
+    Problem, ProblemKind, Severity, StorageUsage, clear_cache, diagnose, directory_size,
+    filter_log, list_crash_reports, list_dir, log_level, log_lines, measure_storage,
+    read_crash_report, read_latest_log,
 };
 pub use discover::{
     Catalog, CategoryTag, ContentClient, DEFAULT_SOURCE, DependencyKind, DiscoverError,
@@ -117,13 +118,13 @@ pub use java::{
 };
 pub use java_runtime::graalvm::LICENSE_URL as GRAALVM_LICENSE_URL;
 pub use java_runtime::{JavaBuild, JavaSource};
+pub use launcher_service::LauncherService;
 pub use launching::{
     DEFAULT_SETTLE, GAME_OUTPUT_LOG, GameEvent, GameExit, GameOptions, LaunchFailure, LaunchPhase,
     LaunchProblem, LaunchReadiness, LaunchRequest, LaunchRequirement, LaunchServiceError,
     LaunchSession, LaunchSignal, LaunchStatus, LaunchUpdate, Launcher, LogStream, ProcessError,
     command_line as game_command_line, run as run_game, runtimes_root,
 };
-pub use layout::Layout;
 pub use loader::{
     LAUNCHABLE_LOADERS, LoaderError, LoaderVersion, decode_versions as decode_loader_versions,
     fetch_versions as fetch_loader_versions, normalize_profile as normalize_loader_profile,
@@ -174,20 +175,17 @@ pub use screenshots::{ScreenshotError, ScreenshotInfo};
 pub use servers::{
     Motd, MotdSpan, PackPolicy, PingError, ProtocolVersion, ServerEntry, ServerError, ServerStatus,
 };
-pub use service::LauncherService;
 pub use settings::{
     AccountEntry, AccountKind, AuthServerEntry, DownloadSourcePreference, LauncherSettings,
     MAX_MEMORY_MB, MirrorRule, SettingsError, SettingsStore, TERMS_VERSION,
 };
+pub use settings::{recommended_memory_mb, total_memory_mb};
 pub use snapshots::{
     RESTORE_LIMIT, SnapshotError, SnapshotInfo, SnapshotScope, create as create_snapshot,
     delete as delete_snapshot, directory as snapshot_directory, list as list_snapshots,
     restore as restore_snapshot,
 };
-pub use storage::{
-    StorageUsage, clear_cache, directory_size, measure as measure_storage, recommended_memory_mb,
-    total_memory_mb,
-};
+pub use storage::Layout;
 pub use transfer::{
     ByteStream, CONNECTIONS_PER_FILE, ConnectionBudget, ContentDigest, DefaultTransport,
     FileTransport, HttpMethod, HttpRequest, HttpTransport, OfficialSource, PrefixMirror,
@@ -214,19 +212,16 @@ pub use worlds::{
 };
 
 mod pack_export;
-mod persist;
 mod picture;
 mod plugins;
 mod reclaim;
 mod recovery;
 mod repair;
 
-mod root_lock;
 mod schematic_assets;
 mod schematic_ops;
 mod screenshots;
 mod servers;
-mod service;
 mod settings;
 mod snapshots;
 mod staged;
@@ -239,3 +234,6 @@ mod wallpaper;
 mod worlds;
 
 pub mod world_map;
+
+#[cfg(test)]
+mod testing;

@@ -10,7 +10,7 @@ use std::time::SystemTime;
 use super::order::{arrange, read_order};
 use super::{InstalledClient, InstanceAssets, read_added};
 use crate::instances::InstanceRecord;
-use crate::layout::Layout;
+use crate::storage::Layout;
 use lumilio_minecraft::ReleaseManifest;
 
 /// Reads what [`super::resolve`] needs about `record`, every overlay off.

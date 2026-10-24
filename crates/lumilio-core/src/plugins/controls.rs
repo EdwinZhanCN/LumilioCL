@@ -7,9 +7,9 @@ use tokio::sync::Mutex;
 use crate::error::ServiceError;
 use crate::instances::Instances;
 use crate::java::JavaRuntime;
-use crate::layout::Layout;
 use crate::plugins::{PluginEffect, PluginHost, PluginInfo, PluginTab};
 use crate::settings::SettingsStore;
+use crate::storage::Layout;
 
 /// Which plugins run, their saved settings, and the tabs they add to a game.
 pub(crate) struct PluginControls {

@@ -129,3 +129,6 @@ impl<T: Transport + Clone> Content<T> {
             .await
     }
 }
+
+#[cfg(test)]
+mod tests;

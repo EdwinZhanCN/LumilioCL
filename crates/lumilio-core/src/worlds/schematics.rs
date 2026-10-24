@@ -213,3 +213,6 @@ impl<T: Transport + Clone> Worlds<T> {
         .await??)
     }
 }
+
+#[cfg(test)]
+mod tests;

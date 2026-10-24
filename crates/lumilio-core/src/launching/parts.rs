@@ -13,11 +13,11 @@ use crate::error::ServiceError;
 use crate::game_settings::GameSettings;
 use crate::instances::{InstanceRecord, Instances};
 use crate::java::{Java, JavaRuntime};
-use crate::layout::Layout;
 use crate::loader;
 use crate::network::Network;
 use crate::plugins::PluginHost;
 use crate::settings::{SettingsStore, validate_memory};
+use crate::storage::Layout;
 use crate::transfer::{SourceChain, Transport};
 use crate::tuning::QuickPlay;
 

@@ -217,3 +217,6 @@ impl<T: Transport + Clone> LaunchParts<'_, T> {
         self.instances.record(id).await
     }
 }
+
+#[cfg(test)]
+mod tests;

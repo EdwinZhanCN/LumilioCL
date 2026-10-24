@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::instances::{InstanceStore, StoreError};
 use crate::launching::GameExit;
-use crate::layout::Layout;
+use crate::storage::Layout;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]

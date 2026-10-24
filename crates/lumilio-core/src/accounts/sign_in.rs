@@ -13,10 +13,10 @@ use crate::activity::CancellationToken;
 use crate::appearance::Appearance;
 use crate::clock::now;
 use crate::error::ServiceError;
-use crate::layout::Layout;
 use crate::network::Network;
 use crate::settings::SettingsStore;
 use crate::settings::{AccountKind, SettingsError};
+use crate::storage::Layout;
 use crate::transfer::Transport;
 
 /// A Minecraft token with less than this left is refreshed before a launch.
@@ -289,3 +289,6 @@ impl<T: Transport + Clone> Accounts<T> {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests;

@@ -14,8 +14,8 @@ use std::{fs, io};
 use serde::{Deserialize, Serialize};
 
 use crate::instances::{InstanceRecord, InstanceStore};
-use crate::layout::Layout;
 use crate::recovery::RecoveryNote;
+use crate::storage::Layout;
 
 const SCHEMA: u32 = 1;
 const JOURNAL: &str = "delete.json";

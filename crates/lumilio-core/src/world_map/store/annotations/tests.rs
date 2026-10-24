@@ -3,7 +3,7 @@ use super::*;
 fn database() -> (tempfile::TempDir, std::path::PathBuf) {
     let root = tempfile::tempdir().unwrap();
     let path = root.path().join("launcher.db");
-    Connection::open(&path)
+    rusqlite::Connection::open(&path)
         .unwrap()
         .execute_batch(
             "CREATE TABLE instances(id TEXT PRIMARY KEY);

@@ -11,7 +11,7 @@ use crate::context::{ContextHub, SessionPhase};
 use crate::error::ServiceError;
 use crate::history::{SessionOutcome, finish_session, record_attempt};
 use crate::instances::StoreError;
-use crate::layout::Layout;
+use crate::storage::Layout;
 use crate::transfer::Transport;
 use crate::tuning::QuickPlay;
 
@@ -267,3 +267,6 @@ impl Drop for Published<'_> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

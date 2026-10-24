@@ -454,3 +454,6 @@ fn reach(index: &Result<BundleIndex, BundleUnreachable>) -> BundleReach<'_> {
         Err(unreachable) => unreachable.reach(),
     }
 }
+
+#[cfg(test)]
+mod tests;

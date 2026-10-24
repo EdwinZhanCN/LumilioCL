@@ -284,3 +284,6 @@ impl<T: Transport + Clone> InstanceLibrary<T> {
         Ok(record)
     }
 }
+
+#[cfg(test)]
+mod tests;

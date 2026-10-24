@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use zip::write::SimpleFileOptions;
 
 use crate::discover::is_safe_file_name;
-use crate::layout::Layout;
+use crate::storage::Layout;
 
 const MANIFEST: &str = "snapshot.json";
 /// Largest total uncompressed size a restore will extract.

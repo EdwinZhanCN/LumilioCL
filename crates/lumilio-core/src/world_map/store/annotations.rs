@@ -4,7 +4,7 @@
 use std::path::Path;
 
 use lumilio_plugin_api::map::{Dimension, MapPoint, WorldId};
-use rusqlite::{Connection, params};
+use rusqlite::params;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -110,7 +110,7 @@ pub fn put(path: &Path, instance: &str, annotation: &Annotation) -> Result<i64, 
             "world belongs to another instance",
         ));
     }
-    let db = Connection::open(path)?;
+    let db = crate::storage::database::connect(path)?;
     let exists: bool = db.query_row(
         "SELECT EXISTS(SELECT 1 FROM instances WHERE id = ?1)",
         [instance],
@@ -149,7 +149,7 @@ pub fn remove(path: &Path, instance: &str, id: i64) -> Result<bool, AnnotationEr
     if id <= 0 {
         return Err(AnnotationError::Invalid("id"));
     }
-    let db = Connection::open(path)?;
+    let db = crate::storage::database::connect(path)?;
     Ok(db.execute(
         "DELETE FROM world_map_annotations WHERE id=?1 AND instance=?2",
         params![id, instance],
@@ -167,7 +167,7 @@ pub fn list(
             "world belongs to another instance",
         ));
     }
-    let db = Connection::open(path)?;
+    let db = crate::storage::database::connect(path)?;
     let mut query = db.prepare(
         "SELECT id,kind,name,color,points,linked_source,linked_raw_id FROM world_map_annotations WHERE instance=?1 AND world=?2 AND dimension=?3 ORDER BY id",
     )?;

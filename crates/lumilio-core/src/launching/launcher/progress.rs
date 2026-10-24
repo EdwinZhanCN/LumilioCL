@@ -156,5 +156,5 @@ impl GameForwarder {
 /// from; kept here so the app and tests share one definition of the layout.
 #[must_use]
 pub fn runtimes_root(launcher_root: &std::path::Path) -> PathBuf {
-    crate::layout::Layout::new(launcher_root).runtimes()
+    crate::storage::Layout::new(launcher_root).runtimes()
 }

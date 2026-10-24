@@ -16,7 +16,7 @@ use std::{fmt, fs, io};
 use serde_json::Value;
 
 use crate::instances::{InstanceRecord, Loader};
-use crate::layout::Layout;
+use crate::storage::Layout;
 
 #[derive(Debug)]
 pub enum ReclaimError {
@@ -134,7 +134,7 @@ fn collect_paths(value: &Value, in_downloads: bool, out: &mut BTreeSet<String>) 
 }
 
 fn size_of(path: &Path) -> u64 {
-    crate::storage::directory_size(path)
+    crate::diagnostics::directory_size(path)
 }
 
 /// Files below `dir` (not folders).

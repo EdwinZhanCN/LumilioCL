@@ -18,9 +18,9 @@ use crate::appearance::skin::cache::TextureCache;
 use crate::appearance::skin::{AppearanceError, MojangClient, MojangProfile};
 use crate::error::ServiceError;
 use crate::instances::Instances;
-use crate::layout::Layout;
 use crate::network::Network;
 use crate::settings::SettingsStore;
+use crate::storage::Layout;
 use crate::transfer::Transport;
 
 #[derive(Default)]

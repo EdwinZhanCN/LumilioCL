@@ -237,3 +237,6 @@ impl<T: Transport + Clone> Settings<T> {
         Ok(self.instances.lock().await.update_settings(id, settings)?)
     }
 }
+
+#[cfg(test)]
+mod tests;

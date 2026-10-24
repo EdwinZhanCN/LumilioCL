@@ -604,3 +604,6 @@ impl<T: Transport + Clone> Content<T> {
             .collect()
     }
 }
+
+#[cfg(test)]
+mod tests;

@@ -9,8 +9,8 @@ use std::path::PathBuf;
 
 use crate::activity::ActivityLog;
 use crate::instances::InstanceStore;
-use crate::layout::Layout;
 use crate::settings::SettingsStore;
+use crate::storage::Layout;
 
 /// What start-up recovery found or did. Plain facts: the interface decides
 /// the wording.

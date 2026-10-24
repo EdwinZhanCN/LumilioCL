@@ -14,9 +14,9 @@ use crate::history::HistoryLog;
 use crate::inspect::inspect_instance;
 use crate::instances::Instances;
 use crate::java::JavaRuntime;
-use crate::layout::Layout;
 use crate::plugins::PluginHost;
 use crate::settings::SettingsStore;
+use crate::storage::Layout;
 use crate::translation::SharedTranslation;
 
 /// How much of the log's end `logs` returns.
@@ -235,7 +235,7 @@ impl Diagnostics {
         self.instances.record(id).await?;
         let game_dir = self.layout.game(id);
         Ok(
-            tokio::task::spawn_blocking(move || crate::storage::directory_size(&game_dir))
+            tokio::task::spawn_blocking(move || crate::diagnostics::directory_size(&game_dir))
                 .await
                 .map_err(std::io::Error::other)?,
         )
@@ -547,7 +547,7 @@ impl Diagnostics {
 
 /// Runs on a blocking worker. Facts contain no host paths or UI types.
 pub(crate) fn game_facts(
-    layout: &crate::layout::Layout,
+    layout: &crate::storage::Layout,
     record: &crate::instances::InstanceRecord,
     runtimes: &[crate::java::JavaRuntime],
 ) -> GameFacts {
@@ -601,3 +601,6 @@ pub(crate) fn game_facts(
         mods,
     }
 }
+
+#[cfg(test)]
+mod tests;

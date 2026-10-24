@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::error::ServiceError;
 use crate::game_settings::Binding;
 use crate::instances::Instances;
-use crate::layout::Layout;
+use crate::storage::Layout;
 use crate::{
     GameSettingGroup, GameSettingValue, GameSettingsError, GameSettingsView, InstanceOptions,
     OptionChange, SettingResolution, SettingsPreset, game_setting_group, game_settings,
@@ -290,3 +290,6 @@ impl GameSettings {
         )?)
     }
 }
+
+#[cfg(test)]
+mod tests;

@@ -9,8 +9,8 @@ use std::path::{Path, PathBuf};
 use std::{fs, io};
 
 use crate::instances::{InstanceStore, StoreError};
-use crate::layout::Layout;
 use crate::recovery::RecoveryNote;
+use crate::storage::Layout;
 
 const GAME: &str = "game";
 const READY: &str = "staged.ok";

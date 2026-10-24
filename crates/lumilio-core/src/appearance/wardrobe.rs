@@ -554,3 +554,6 @@ async fn read_skin_file(path: PathBuf) -> Result<Vec<u8>, ServiceError> {
     .map_err(std::io::Error::other)?
     .map_err(Into::into)
 }
+
+#[cfg(test)]
+mod tests;

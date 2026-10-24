@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use lumilio_plugin_api::map::{Dimension, SeedSource, SourceLink, WorldContext, WorldId};
-use rusqlite::{Connection, params};
+use rusqlite::params;
 
 use super::super::WorldMapContext;
 
@@ -20,12 +20,12 @@ pub fn parse_seed(text: &str) -> Option<i64> {
     })))
 }
 pub fn save(path: &Path, instance: &str, seed: i64, version: &str) -> rusqlite::Result<()> {
-    let db = Connection::open(path)?;
+    let db = crate::storage::database::connect(path)?;
     db.execute("INSERT OR IGNORE INTO world_map_seeds (instance,seed,version) SELECT ?1,?2,?3 WHERE EXISTS (SELECT 1 FROM instances WHERE id = ?1)",params![instance,seed,version])?;
     Ok(())
 }
 pub fn load(path: &Path, instance: &str) -> rusqlite::Result<Vec<WorldMapContext>> {
-    let db = Connection::open(path)?;
+    let db = crate::storage::database::connect(path)?;
     let mut query =
         db.prepare("SELECT seed,version FROM world_map_seeds WHERE instance=?1 ORDER BY rowid")?;
     query
@@ -55,7 +55,7 @@ pub fn load(path: &Path, instance: &str) -> rusqlite::Result<Vec<WorldMapContext
 /// Links a save of an instance to a Minimap directory, replacing an earlier
 /// link of the same save.
 pub fn link(path: &Path, instance: &str, folder: &str, dir: &str) -> rusqlite::Result<()> {
-    let db = Connection::open(path)?;
+    let db = crate::storage::database::connect(path)?;
     db.execute(
         "INSERT OR REPLACE INTO world_map_links (instance,folder,xaero_dir) SELECT ?1,?2,?3 WHERE EXISTS (SELECT 1 FROM instances WHERE id = ?1)",
         params![instance, folder, dir],
@@ -64,7 +64,7 @@ pub fn link(path: &Path, instance: &str, folder: &str, dir: &str) -> rusqlite::R
 }
 
 pub fn unlink(path: &Path, instance: &str, folder: &str) -> rusqlite::Result<()> {
-    let db = Connection::open(path)?;
+    let db = crate::storage::database::connect(path)?;
     db.execute(
         "DELETE FROM world_map_links WHERE instance = ?1 AND folder = ?2",
         params![instance, folder],
@@ -74,7 +74,7 @@ pub fn unlink(path: &Path, instance: &str, folder: &str) -> rusqlite::Result<()>
 
 /// Save folder to Minimap directory, for one instance.
 pub fn links(path: &Path, instance: &str) -> rusqlite::Result<BTreeMap<String, String>> {
-    let db = Connection::open(path)?;
+    let db = crate::storage::database::connect(path)?;
     let mut query =
         db.prepare("SELECT folder,xaero_dir FROM world_map_links WHERE instance = ?1")?;
     query

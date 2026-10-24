@@ -7,10 +7,10 @@ use crate::activity::{CancellationToken, TaskAction, TaskCategory, TaskLabel, Ta
 use crate::error::{ServiceError, read_unless_cancelled};
 use crate::history::ChangeKind;
 use crate::instances::{InstanceRecord, Instances};
-use crate::layout::Layout;
 use crate::network::Network;
 use crate::plugins::PluginHost;
 use crate::settings::SettingsStore;
+use crate::storage::Layout;
 use crate::transfer::Transport;
 use crate::worlds;
 use crate::worlds::WorldInfo;
@@ -276,3 +276,6 @@ impl<T: Transport + Clone> Worlds<T> {
         Ok(created)
     }
 }
+
+#[cfg(test)]
+mod tests;

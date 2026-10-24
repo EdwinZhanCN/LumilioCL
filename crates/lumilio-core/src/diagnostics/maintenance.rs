@@ -32,9 +32,9 @@ impl Diagnostics {
 
     /// How much disk each part of the launcher's folder uses. Walks the disk
     /// on a worker thread; reading needs no lease.
-    pub(crate) async fn storage_usage(&self) -> crate::storage::StorageUsage {
+    pub(crate) async fn storage_usage(&self) -> crate::diagnostics::StorageUsage {
         let layout = self.layout.clone();
-        tokio::task::spawn_blocking(move || crate::storage::measure(&layout))
+        tokio::task::spawn_blocking(move || crate::diagnostics::measure_storage(&layout))
             .await
             .unwrap_or_default()
     }
@@ -46,7 +46,7 @@ impl Diagnostics {
     pub(crate) async fn clear_cache(&self) -> Result<u64, ServiceError> {
         self.translation.invalidate();
         let layout = self.layout.clone();
-        let freed = tokio::task::spawn_blocking(move || crate::storage::clear_cache(&layout))
+        let freed = tokio::task::spawn_blocking(move || crate::diagnostics::clear_cache(&layout))
             .await
             .map_err(std::io::Error::other)??;
         Ok(freed)

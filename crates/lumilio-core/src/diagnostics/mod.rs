@@ -5,6 +5,7 @@
 //! helpers do the I/O. [`Diagnostics`] reads them for one game, exports them
 //! for a bug report and reclaims shared files no game uses.
 
+pub use disk::{StorageUsage, clear_cache, directory_size, measure as measure_storage};
 pub use problems::{
     CrashReport, Facts, FileEntry, LOW_MEMORY_MB, LogLevel, LogLine, Problem, ProblemKind,
     Severity, diagnose, filter_log, list_crash_reports, list_dir, log_level, log_lines,
@@ -16,6 +17,7 @@ pub(crate) use reports::LOG_TAIL_BYTES;
 pub(crate) use reports::{Diagnostics, game_facts};
 pub use reports::{GameLogSource, GameLogs};
 
+mod disk;
 mod maintenance;
 mod problems;
 mod reports;

@@ -6,10 +6,10 @@ use super::{Collection, InstanceRecord, Instances};
 use crate::activity::Tasks;
 use crate::context::ContextHub;
 use crate::error::ServiceError;
-use crate::layout::Layout;
 use crate::network::Network;
 use crate::plugins::PluginHost;
 use crate::settings::SettingsStore;
+use crate::storage::Layout;
 use crate::transfer::Transport;
 
 /// What the library page shows.

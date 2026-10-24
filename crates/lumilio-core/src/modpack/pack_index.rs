@@ -11,8 +11,8 @@ use crate::activity::CancellationToken;
 use crate::instances::{
     InstanceRecord, InstanceSettings, InstanceStore, Loader, NewInstance, StoreError,
 };
-use crate::layout::Layout;
 use crate::staged::Staged;
+use crate::storage::Layout;
 use crate::transfer::{SourceChain, TransferEngine, TransferError, TransferRequest, Transport};
 
 pub(super) const INDEX: &str = "modrinth.index.json";

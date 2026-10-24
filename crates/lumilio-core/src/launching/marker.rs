@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::history::{SessionOutcome, record_attempt};
 use crate::instances::InstanceStore;
-use crate::layout::Layout;
 use crate::recovery::RecoveryNote;
+use crate::storage::Layout;
 
 const MARKER_SCHEMA: u32 = 1;
 

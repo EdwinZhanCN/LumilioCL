@@ -6,14 +6,11 @@ use std::{fmt, fs, io};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 
-use crate::layout::Layout;
-use crate::persist;
-use crate::persist::{PersistError, Versioned};
+use crate::storage::Layout;
+use crate::storage::persist;
+use crate::storage::persist::{PersistError, Versioned};
 use crate::tuning::InstanceLaunch;
 use lumilio_minecraft::LaunchDirectories;
-
-/// Stored as SQLite's `user_version`; bump with a migration when tables change.
-pub(super) const SCHEMA_VERSION: u32 = 6;
 
 /// SQLite integers are signed; timestamps and counters never get near the limit.
 pub(super) fn int<T: TryInto<i64>>(value: T) -> i64 {
@@ -195,6 +192,17 @@ impl From<PersistError> for StoreError {
     }
 }
 
+impl From<crate::storage::database::DatabaseError> for StoreError {
+    fn from(error: crate::storage::database::DatabaseError) -> Self {
+        match error {
+            crate::storage::database::DatabaseError::NewerSchema(version) => {
+                Self::NewerSchema(version)
+            }
+            crate::storage::database::DatabaseError::Sqlite(error) => error.into(),
+        }
+    }
+}
+
 impl From<rusqlite::Error> for StoreError {
     fn from(error: rusqlite::Error) -> Self {
         Self::Database(error.to_string())
@@ -242,12 +250,13 @@ impl InstanceStore {
         let layout = Layout::new(root);
         fs::create_dir_all(layout.root())?;
         let path = layout.database();
-        let (db, recovered, preserved) = match Self::connect(&path) {
+        let connect = |path: &Path| crate::storage::database::open(path).map_err(StoreError::from);
+        let (db, recovered, preserved) = match connect(&path) {
             Ok(db) => (db, false, None),
             Err(StoreError::NewerSchema(version)) => return Err(StoreError::NewerSchema(version)),
             Err(_) if path.exists() => {
                 let preserved = persist::set_aside(&path)?;
-                (Self::connect(&path)?, true, Some(preserved))
+                (connect(&path)?, true, Some(preserved))
             }
             Err(error) => return Err(error),
         };
