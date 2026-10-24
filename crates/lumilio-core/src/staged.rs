@@ -5,9 +5,8 @@
 //! library record created and the folder renamed to `profiles/<id>/game`, so a
 //! failure, a cancel or a crash never leaves a half-made instance behind.
 
-use std::fs;
-use std::io;
 use std::path::{Path, PathBuf};
+use std::{fs, io};
 
 use crate::instance::{InstanceStore, StoreError};
 use crate::layout::Layout;

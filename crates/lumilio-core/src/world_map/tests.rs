@@ -1,5 +1,6 @@
-use super::*;
 use lumilio_plugin_api::map::*;
+
+use super::*;
 
 fn request() -> TileRequest {
     let world = WorldId::Seed {
@@ -148,10 +149,12 @@ fn region_lines_are_exact_for_negative_coordinates() {
 }
 
 mod xaero {
+    use std::collections::BTreeMap;
+
+    use lumilio_plugin_api::map::{Dimension, SourceLink, WorldContext, WorldId};
+
     use super::super::WorldMapContext;
     use super::super::xaero::{attach, minimap_dirs, world_map_ids};
-    use lumilio_plugin_api::map::{Dimension, SourceLink, WorldContext, WorldId};
-    use std::collections::BTreeMap;
 
     fn save(folder: &str) -> WorldMapContext {
         WorldMapContext {
@@ -290,9 +293,10 @@ mod xaero {
 }
 
 mod composing {
-    use crate::world_map::compose;
     use lumilio_plugin_api::ImageData;
     use lumilio_plugin_api::map::TileReply;
+
+    use crate::world_map::compose;
 
     fn flat(rgb: [u8; 3]) -> TileReply {
         TileReply::Image(ImageData {

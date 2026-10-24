@@ -1,7 +1,7 @@
-use super::*;
-use lumilio_plugin_api::ContentSource;
-use lumilio_plugin_api::Words;
 use lumilio_plugin_api::content::*;
+use lumilio_plugin_api::{ContentSource, Words};
+
+use super::*;
 
 struct Source {
     id: &'static str,

@@ -1,9 +1,13 @@
-use super::MapView;
-use crate::{controls::Fader, key::Key, kit, tr};
-use gpui::SharedString;
-use gpui::{Anchor, AnyElement, Context, ObjectFit, div, img, prelude::*, px};
-use gpui_component::{ActiveTheme as _, Sizable as _, h_flex, popover::Popover, v_flex};
+use gpui::prelude::*;
+use gpui::{Anchor, AnyElement, Context, ObjectFit, SharedString, div, img, px};
+use gpui_component::popover::Popover;
+use gpui_component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use lumilio_plugin_api::map::OverlayInfo;
+
+use super::MapView;
+use crate::controls::Fader;
+use crate::key::Key;
+use crate::{kit, tr};
 
 #[derive(Clone, Copy, Default)]
 pub(super) struct Layers {

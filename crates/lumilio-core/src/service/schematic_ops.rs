@@ -5,14 +5,16 @@
 //! declared and the person allowed. Each write holds the instance, which a
 //! running game also holds, so nothing is written while the game runs.
 
+use lumilio_plugin_api::FileInfo;
+
 use super::LauncherService;
 use super::error::ServiceError;
 use super::support::blocking_value;
 use super::types::now;
 use crate::plugins::{read_info, resolve_write};
-use crate::schematic_ops::{self, SchematicLogEntry, SchematicOperation};
+use crate::schematic_ops;
+use crate::schematic_ops::{SchematicLogEntry, SchematicOperation};
 use crate::transfer::Transport;
-use lumilio_plugin_api::FileInfo;
 
 impl<T: Transport + Clone> LauncherService<T> {
     /// The studio's saved replacement tables and recent targets (T24).

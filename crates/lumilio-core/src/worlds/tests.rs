@@ -1,6 +1,7 @@
+use std::collections::BTreeMap;
+
 use super::*;
 use crate::nbt::{Tag, to_bytes};
-use std::collections::BTreeMap;
 
 fn level(name: &str, played: i64, version: &str, hardcore: i8) -> Vec<u8> {
     let root = Tag::Compound(BTreeMap::from([(

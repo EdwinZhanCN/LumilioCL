@@ -1,10 +1,11 @@
-use futures_util::stream;
-use futures_util::stream::Stream;
 use std::error::Error;
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
 use std::future::Future;
 use std::pin::Pin;
+
+use futures_util::stream;
+use futures_util::stream::Stream;
 
 pub type TransportFuture<'a> =
     Pin<Box<dyn Future<Output = Result<TransportResponse, TransportError>> + Send + 'a>>;

@@ -8,11 +8,13 @@
 //! them. A window without the framework `Root` (some tests) keeps them
 //! queued, so they stay observable.
 
-use crate::key::Key;
-use gpui::{App, ClipboardItem, Global, SharedString, Window, div, prelude::*, px};
+use gpui::prelude::*;
+use gpui::{App, ClipboardItem, Global, SharedString, Window, div, px};
 use gpui_component::button::{Button, ButtonVariants as _};
 use gpui_component::notification::Notification;
 use gpui_component::{ActiveTheme as _, Sizable as _, WindowExt as _, h_flex, v_flex};
+
+use crate::key::Key;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ToastKind {
@@ -217,18 +219,4 @@ pub fn technical_dialog(detail: impl Into<SharedString>, window: &mut Window, cx
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn only_errors_stay_by_default() {
-        assert!(!Toast::info("a").sticky);
-        assert!(!Toast::success("a").sticky);
-        assert!(Toast::error("a").sticky);
-        assert!(Toast::info("a").sticky().sticky);
-        assert_eq!(
-            Toast::error("没装上").technical("io").technical.as_deref(),
-            Some("io")
-        );
-    }
-}
+mod tests;

@@ -1,9 +1,11 @@
+use std::fs;
+
+use tokio::sync::mpsc;
+
 use super::{fake_java, file_url, publish_release, world};
 use crate::{
     CancellationToken, GameSettingGroup, GameSettingValue, Loader, OptionChange, SettingResolution,
 };
-use std::fs;
-use tokio::sync::mpsc;
 
 #[tokio::test]
 async fn game_settings_launch_boundary_applies_after_hook_and_reviews_after_exit() {

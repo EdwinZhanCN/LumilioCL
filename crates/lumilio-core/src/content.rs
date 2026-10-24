@@ -1,11 +1,11 @@
 //! What is installed in an instance: mods, resource packs, shaders.
 
 use std::error::Error;
-use std::fmt::{self, Display, Formatter};
-use std::fs;
-use std::io::{self, Read};
+use std::fmt::{Display, Formatter};
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
+use std::{fmt, fs, io};
 
 use serde::Deserialize;
 use sha1::{Digest, Sha1};

@@ -1,9 +1,8 @@
-use gpui::{Context, Entity, Modifiers, Render, TestAppContext, Window, div, prelude::*, px};
-use gpui_component::{
-    IndexPath, Sizable as _,
-    searchable_list::SearchableListItem,
-    select::{SearchableVec, Select, SelectState},
-};
+use gpui::prelude::*;
+use gpui::{Context, Entity, Modifiers, Render, TestAppContext, Window, div, px};
+use gpui_component::searchable_list::SearchableListItem;
+use gpui_component::select::{SearchableVec, Select, SelectState};
+use gpui_component::{IndexPath, Sizable as _};
 
 #[derive(Clone)]
 struct Choice(String);

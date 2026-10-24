@@ -8,14 +8,14 @@ use gpui::prelude::*;
 use gpui::{AnyElement, Context, Window, div};
 use gpui_component::{Sizable as _, h_flex};
 
-use super::dialogs::{self, ConvertDialog, MetadataDialog, OpenDialog, ReplaceDialog};
+use super::dialogs::{ConvertDialog, MetadataDialog, OpenDialog, ReplaceDialog};
 use super::inspector::size_text;
 use super::writes::on_studio;
-use super::{Inspection, Loaded, StudioView};
+use super::{Inspection, Loaded, StudioView, dialogs};
 use crate::key::Key;
-use crate::kit::{self, MenuEntry};
-use crate::theme::{self, ShellColors};
-use crate::tr;
+use crate::kit::MenuEntry;
+use crate::theme::ShellColors;
+use crate::{kit, theme, tr};
 
 /// What the studio hands to the page because the plugin or the system does it.
 #[derive(Clone, Debug, PartialEq, Eq)]

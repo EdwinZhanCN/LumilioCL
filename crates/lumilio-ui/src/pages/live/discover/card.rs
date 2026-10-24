@@ -5,20 +5,18 @@
 //! sorted by newest, else the last update, and the count is followers when
 //! the list is sorted by them, else downloads.
 
+use gpui::prelude::*;
+use gpui::{App, ObjectFit, Window, div, img, px};
+use gpui_component::menu::{ContextMenuExt as _, PopupMenuItem};
+use gpui_component::{Sizable as _, h_flex, v_flex};
+
 use super::super::controls::{LiveCtx, send};
 use crate::assets::UiIcon;
 use crate::cover::Loader;
 use crate::home::WorldHint;
 use crate::live::{CountKind, DateKind, LiveIntent, SearchRow, environment_label, tag_label};
 use crate::theme::ShellColors;
-use crate::tr;
-use crate::{kit, theme};
-use gpui::StyledImage as _;
-use gpui::prelude::*;
-use gpui::{App, ObjectFit, Window, div, img, px};
-use gpui_component::Sizable as _;
-use gpui_component::menu::{ContextMenuExt as _, PopupMenuItem};
-use gpui_component::{h_flex, v_flex};
+use crate::{kit, theme, tr};
 
 /// The placeholder cover: shown until the real icon arrives, and instead of
 /// it when a project has none or the picture cannot be loaded.

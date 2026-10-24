@@ -12,10 +12,10 @@
 //! Copyright (C) 2021 huangyuhui and contributors, GPL-3.0-or-later.
 
 use std::collections::BTreeMap;
-use std::fmt;
 use std::fs::File;
-use std::io::{self, Read};
+use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::{fmt, io};
 
 use serde::Deserialize;
 

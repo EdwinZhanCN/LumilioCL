@@ -2,9 +2,11 @@
 //! refer to live local structs. No native window pointer is dereferenced here.
 #![allow(unsafe_code)]
 
-use super::CaptureError;
-use raw_window_handle::RawWindowHandle;
 use std::ffi::c_void;
+
+use raw_window_handle::RawWindowHandle;
+
+use super::CaptureError;
 
 #[repr(C)]
 #[derive(Clone, Copy, Default)]

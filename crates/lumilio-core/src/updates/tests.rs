@@ -1,3 +1,8 @@
+use std::fs;
+use std::sync::{Arc, Mutex};
+
+use lumilio_plugin_modrinth::Modrinth;
+
 use super::*;
 use crate::discover::{ReleaseChannel, VersionFile};
 use crate::plugins::PluginHost;
@@ -5,9 +10,6 @@ use crate::transfer::{
     FileTransport, HttpRequest, OfficialSource, SourceChain, SourceProvider, TransportFuture,
     TransportResponse,
 };
-use lumilio_plugin_modrinth::Modrinth;
-use std::fs;
-use std::sync::{Arc, Mutex};
 
 /// Answers the two update endpoints from canned JSON and records bodies.
 #[derive(Clone)]

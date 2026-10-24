@@ -5,8 +5,8 @@
 
 use lumilio_core::BlockNames;
 
-use crate::i18n::{self, Locale};
-use crate::tr;
+use crate::i18n::Locale;
+use crate::{i18n, tr};
 
 /// The game language matching the launcher's.
 pub(crate) fn language() -> &'static str {

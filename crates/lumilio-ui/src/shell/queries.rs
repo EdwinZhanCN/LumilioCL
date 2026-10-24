@@ -1,3 +1,6 @@
+use gpui::{Context, Window};
+use lumilio_core::{DiscoverPreferences, ProjectKind};
+
 use super::{ActivitySummary, LauncherShell};
 use crate::kit::ViewIntent;
 use crate::live::{
@@ -6,8 +9,6 @@ use crate::live::{
 };
 use crate::pages::ViewState;
 use crate::route::Route;
-use gpui::{Context, Window};
-use lumilio_core::{DiscoverPreferences, ProjectKind};
 
 impl LauncherShell {
     /// Turns on the live Library, Discover and Activity pages. The handler

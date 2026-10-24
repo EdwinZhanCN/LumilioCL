@@ -2,13 +2,13 @@
 //! changelogs for the switch-version dialog, and the files a pack is still
 //! waiting for.
 
+use gpui_kit::{App, AppContext as _, WeakEntity, Window};
+use lumilio_ui::instance_detail::{InstanceDetailView, InstanceIntent};
+use lumilio_ui::tr;
+
 use super::Wiring;
 use super::instance_write::write_instance;
 use super::jobs::answer;
-use gpui_kit::AppContext as _;
-use gpui_kit::{App, WeakEntity, Window};
-use lumilio_ui::instance_detail::{InstanceDetailView, InstanceIntent};
-use lumilio_ui::tr;
 
 /// Reads a project's versions for the open switch-version dialog, then the
 /// chosen version's changelog when its source gives them one at a time.

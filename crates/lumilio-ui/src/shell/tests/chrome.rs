@@ -1,13 +1,16 @@
-use super::super::{LauncherShell, Route};
-use gpui::{Modifiers, TestAppContext};
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use gpui::{Modifiers, TestAppContext};
+
+use super::super::{LauncherShell, Route};
+
 #[gpui::test]
 fn messages_float_as_toasts_and_never_take_room_in_the_page(cx: &mut TestAppContext) {
-    use crate::toast::Toast;
     use gpui::{AppContext as _, Entity};
     use gpui_component::WindowExt as _;
+
+    use crate::toast::Toast;
     cx.update(|cx| {
         gpui_component::init(cx);
         cx.set_reduce_motion(true);
@@ -42,9 +45,11 @@ fn messages_float_as_toasts_and_never_take_room_in_the_page(cx: &mut TestAppCont
 
 #[gpui::test]
 fn a_failure_shown_is_also_kept_in_the_launcher_log(cx: &mut TestAppContext) {
-    use crate::toast::Toast;
-    use gpui::AppContext as _;
     use std::sync::Mutex;
+
+    use gpui::AppContext as _;
+
+    use crate::toast::Toast;
     static LINES: Mutex<Vec<String>> = Mutex::new(Vec::new());
     struct Keep;
     impl log::Log for Keep {
@@ -83,9 +88,10 @@ fn a_failure_shown_is_also_kept_in_the_launcher_log(cx: &mut TestAppContext) {
 
 #[gpui::test]
 fn a_result_for_a_page_no_longer_shown_still_floats_up(cx: &mut TestAppContext) {
-    use crate::toast::Toast;
     use gpui::{AppContext as _, Entity};
     use gpui_component::WindowExt as _;
+
+    use crate::toast::Toast;
     cx.update(|cx| {
         gpui_component::init(cx);
         cx.set_reduce_motion(true);
@@ -114,8 +120,9 @@ fn a_result_for_a_page_no_longer_shown_still_floats_up(cx: &mut TestAppContext) 
 
 #[gpui::test]
 fn a_deleted_instance_drops_out_of_history_and_the_chip_retargets(cx: &mut TestAppContext) {
-    use crate::live::{LiveIntent, library_card};
     use lumilio_core::{InstanceRecord, InstanceSettings, Loader};
+
+    use crate::live::{LiveIntent, library_card};
     cx.update(|cx| {
         gpui_component::init(cx);
         cx.set_reduce_motion(true);

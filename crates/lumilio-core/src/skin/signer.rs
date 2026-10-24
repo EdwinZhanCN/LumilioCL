@@ -3,9 +3,8 @@
 //! HMCL makes a key per run; ours is made once and kept in the launcher's
 //! folder, so a launch never waits for key generation.
 
-use std::fs;
-use std::io;
 use std::path::Path;
+use std::{fs, io};
 
 use base64::Engine as _;
 use rsa::pkcs1v15::SigningKey;

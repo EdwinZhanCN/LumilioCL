@@ -1,9 +1,10 @@
+use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Mutex as StdMutex;
+
 use super::error::ServiceError;
 use super::types::now;
 use crate::activity::CancellationToken;
 use crate::activity_log::{ActivityLog, RetryAction, TaskBoard, TaskOutcome};
-use std::collections::{BTreeMap, BTreeSet};
-use std::sync::Mutex as StdMutex;
 
 /// Runs blocking work that is not file I/O of its own off the async threads.
 pub(super) async fn blocking_value<V: Send + 'static>(
@@ -33,7 +34,7 @@ impl Drop for InstanceLease<'_> {
     fn drop(&mut self) {
         self.targets
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .expect("launcher service state lock was poisoned")
             .remove(&self.id);
     }
 }
@@ -52,7 +53,7 @@ impl TaskLease<'_> {
     pub(super) fn retrying(self, action: RetryAction) -> Self {
         self.board
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .expect("launcher service state lock was poisoned")
             .set_retry(self.id, action);
         self
     }
@@ -61,7 +62,7 @@ impl TaskLease<'_> {
     pub(super) fn about(&self, instance: &str) {
         self.board
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .expect("launcher service state lock was poisoned")
             .set_instance(self.id, instance);
     }
 
@@ -74,7 +75,7 @@ impl TaskLease<'_> {
         let mut board = self
             .board
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+            .expect("launcher service state lock was poisoned");
         // On append failure the terminal fact remains in the board's fallback.
         let _ = board.finish(self.id, outcome, now(), self.log);
     }
@@ -85,7 +86,7 @@ impl Drop for TaskLease<'_> {
         // A finished or interrupted task can no longer be cancelled.
         self.cancels
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .expect("launcher service state lock was poisoned")
             .remove(&self.id);
         if !self.ended {
             self.record(TaskOutcome::Failed(
@@ -116,8 +117,9 @@ pub(super) async fn watch_transfers(
     mut events: tokio::sync::broadcast::Receiver<crate::transfer::TransferEvent>,
     meter: Meter,
 ) {
-    use crate::transfer::TransferEvent;
     use tokio::sync::broadcast::error::RecvError;
+
+    use crate::transfer::TransferEvent;
     let mut seen: BTreeMap<String, (u64, Option<u64>)> = BTreeMap::new();
     loop {
         let event = match events.recv().await {
@@ -127,7 +129,7 @@ pub(super) async fn watch_transfers(
         };
         let mut board = board
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+            .expect("launcher service state lock was poisoned");
         board.record_transfer(task, &event);
         if let (
             Meter::Bytes,

@@ -5,9 +5,8 @@
 //! so the same jar gives the same bytes either way.
 
 use std::ffi::OsString;
-use std::fs;
-use std::io;
 use std::path::{Path, PathBuf};
+use std::{fs, io};
 
 use super::EntityDump;
 use crate::ContainerError;

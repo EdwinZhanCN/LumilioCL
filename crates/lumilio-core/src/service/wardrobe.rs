@@ -1,18 +1,19 @@
 //! Account-bound appearance operations and the launcher's local wardrobe.
 //! Disk work stays on blocking workers. No token enters the library index.
 
+use std::path::PathBuf;
+use std::time::Duration;
+
 use super::{LauncherService, ServiceError};
-use crate::{
-    activity::CancellationToken,
-    microsoft::Secret,
-    settings::{AccountEntry, AccountKind, SettingsError},
-    skin::{
-        self, AccountLook, AppearanceChange, AppearanceError, AppearanceUpdate, LibrarySkin,
-        MojangClient, MojangProfile, PairedCape, Pixels, SkinLibrary, SkinModel, SkinSource,
-    },
-    transfer::Transport,
+use crate::activity::CancellationToken;
+use crate::microsoft::Secret;
+use crate::settings::{AccountEntry, AccountKind, SettingsError};
+use crate::skin;
+use crate::skin::{
+    AccountLook, AppearanceChange, AppearanceError, AppearanceUpdate, LibrarySkin, MojangClient,
+    MojangProfile, PairedCape, Pixels, SkinLibrary, SkinModel, SkinSource,
 };
-use std::{path::PathBuf, time::Duration};
+use crate::transfer::Transport;
 
 /// Our initial delay before one explicit confirmation read (ADR 0039). This
 /// does not guarantee that Mojang's profile has propagated yet.

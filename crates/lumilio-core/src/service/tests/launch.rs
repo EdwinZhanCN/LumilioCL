@@ -1,3 +1,5 @@
+use tokio::sync::mpsc;
+
 use super::super::error::ServiceError;
 use super::{
     ECHO_ARGS, assert_send, fake_java, is_installed, launch_to_end, outcomes_of,
@@ -11,7 +13,6 @@ use crate::instance::Loader;
 use crate::launch_session::{LaunchSession, LaunchSignal};
 use crate::launcher::{LaunchServiceError, LaunchUpdate};
 use crate::recovery::{RecoveryNote, SessionMarker};
-use tokio::sync::mpsc;
 
 #[tokio::test]
 async fn pending_launch_rejects_conflicting_writes_and_drop_releases_target() {

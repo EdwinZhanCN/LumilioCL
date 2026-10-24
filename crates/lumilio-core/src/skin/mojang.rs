@@ -3,12 +3,15 @@
 //! (Copyright Modrinth contributors, GPL-3.0-only; ADR 0022). Transport,
 //! validation, errors and delayed confirmation belong to our core boundary.
 
+use std::fmt;
+use std::fmt::{Display, Formatter};
+
+use futures_util::StreamExt as _;
+use serde::Deserialize;
+
 use super::{AccountLook, SkinModel, cape_pixels, skin_pixels};
 use crate::microsoft::{PROFILE_URL, Secret};
 use crate::transfer::{HttpMethod, HttpRequest, Transport};
-use futures_util::StreamExt as _;
-use serde::Deserialize;
-use std::fmt::{self, Display, Formatter};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum AppearanceError {

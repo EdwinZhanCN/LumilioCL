@@ -1,10 +1,12 @@
-use crate::release::Result;
-use serde_json::Value;
-use sha1::{Digest, Sha1};
 use std::collections::BTreeMap;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+
+use serde_json::Value;
+use sha1::{Digest, Sha1};
+
+use crate::release::Result;
 
 pub(super) fn json(path: &Path) -> Result<Value> {
     serde_json::from_slice(&std::fs::read(path).map_err(|e| e.to_string())?)

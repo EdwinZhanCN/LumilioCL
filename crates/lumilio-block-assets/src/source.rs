@@ -1,6 +1,7 @@
 //! Reading the asset files a bake uses out of a jar, a zip or a directory.
 
-use std::fs::{self, File};
+use std::fs;
+use std::fs::File;
 use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
 

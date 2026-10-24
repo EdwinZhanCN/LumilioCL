@@ -1,7 +1,8 @@
+use gpui::{Context, KeyDownEvent, Window};
+
 use super::locations::Location;
 use super::{LauncherShell, ShellIntent};
 use crate::route::Route;
-use gpui::{Context, KeyDownEvent, Window};
 
 impl LauncherShell {
     /// Opens a page directly, for design review and tests.

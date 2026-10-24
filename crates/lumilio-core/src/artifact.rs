@@ -1,5 +1,6 @@
 use std::error::Error;
-use std::fmt::{self, Display, Formatter};
+use std::fmt;
+use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
@@ -167,15 +168,4 @@ impl Display for CoordinateError {
 impl Error for CoordinateError {}
 
 #[cfg(test)]
-mod tests {
-    use super::PackageCoordinate;
-    use std::str::FromStr;
-
-    #[test]
-    fn default_extension_is_not_rendered() {
-        let coordinate = PackageCoordinate::from_str("net.example:client:1.0").unwrap();
-
-        assert_eq!(coordinate.extension(), "jar");
-        assert_eq!(coordinate.to_string(), "net.example:client:1.0");
-    }
-}
+mod tests;

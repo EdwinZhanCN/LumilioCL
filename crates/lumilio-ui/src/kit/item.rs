@@ -4,13 +4,15 @@
 //! edge, an address is a muted mono line under the name. Pages hand over the
 //! facts; they never join them into one line of text.
 
-use super::controls::{TagKind, tag};
-use crate::theme::{self, ShellColors};
 use gpui::prelude::*;
 use gpui::{
     AnyElement, ElementId, ImageSource, IntoElement, ObjectFit, SharedString, div, img, px,
 };
 use gpui_component::{h_flex, v_flex};
+
+use super::controls::{TagKind, tag};
+use crate::theme;
+use crate::theme::ShellColors;
 
 /// The trailing readings column is at least this wide, so a short time and a
 /// long one keep the actions after them in line.

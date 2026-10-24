@@ -4,12 +4,12 @@ mod installer;
 mod native;
 mod plan;
 
+use std::sync::atomic::AtomicU64;
+
 pub use self::assets::{AssetIndex, AssetIndexError, AssetObject};
 pub use self::installer::{InstallError, InstallEvent, InstallReport, InstallStage, Installer};
 pub use self::native::{ArchiveLimits, NativeError, NativePublication, NativePublisher};
 pub use self::plan::{ArtifactKind, InstallationPlan, NativeBundle, PlannedArtifact};
-
-use std::sync::atomic::AtomicU64;
 
 const OFFICIAL_ASSET_ROOT: &str = "https://resources.download.minecraft.net/";
 const MAX_ARCHIVE_ENTRIES: usize = 65_536;

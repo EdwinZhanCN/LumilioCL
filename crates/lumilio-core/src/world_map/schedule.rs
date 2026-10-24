@@ -1,6 +1,8 @@
-use crate::activity::CancellationToken;
-use lumilio_plugin_api::map::TileKey;
 use std::collections::{BTreeMap, BTreeSet};
+
+use lumilio_plugin_api::map::TileKey;
+
+use crate::activity::CancellationToken;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Viewport {

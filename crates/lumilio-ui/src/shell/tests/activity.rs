@@ -1,14 +1,17 @@
-use super::super::{LauncherShell, Route};
-use gpui::{Modifiers, TestAppContext};
 use std::cell::RefCell;
 use std::rc::Rc;
+
+use gpui::{Modifiers, TestAppContext};
+
+use super::super::{LauncherShell, Route};
 
 #[gpui::test]
 fn a_failed_task_offers_retry_and_open_and_a_game_that_is_gone_offers_no_open(
     cx: &mut TestAppContext,
 ) {
-    use crate::live::{ActivityRow, ActivityState, LiveIntent, library_card};
     use lumilio_core::{InstanceRecord, InstanceSettings, Loader, RetryAction, TaskCategory};
+
+    use crate::live::{ActivityRow, ActivityState, LiveIntent, library_card};
 
     cx.update(gpui_component::init);
     let seen: Rc<RefCell<Vec<LiveIntent>>> = Rc::default();
@@ -89,8 +92,9 @@ fn a_failed_task_offers_retry_and_open_and_a_game_that_is_gone_offers_no_open(
 /// pause and resume from the row, and the toolbar reads the traffic.
 #[gpui::test]
 fn a_downloading_task_shows_its_files_and_pauses_from_its_row(cx: &mut TestAppContext) {
-    use crate::live::{ActivityRow, ActivityState, LiveIntent};
     use lumilio_core::{FileDownload, SourceSwitch, TaskCategory, TaskDownloads, Traffic};
+
+    use crate::live::{ActivityRow, ActivityState, LiveIntent};
 
     cx.update(gpui_component::init);
     let seen: Rc<RefCell<Vec<LiveIntent>>> = Rc::default();

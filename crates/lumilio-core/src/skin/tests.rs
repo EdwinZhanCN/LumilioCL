@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use base64::Engine as _;
 use rsa::RsaPublicKey;
@@ -14,7 +15,6 @@ use tokio::net::TcpStream;
 use super::*;
 use crate::account::ProfileId;
 use crate::transfer::{TransportError, TransportFuture, TransportResponse};
-use std::time::Duration;
 
 const ID: &str = "123e4567e89b12d3a456426614174000";
 

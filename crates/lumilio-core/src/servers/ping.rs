@@ -7,17 +7,19 @@
 //! is untrusted, so every length is capped before memory is reserved and the
 //! whole exchange has a deadline.
 
+use std::error::Error;
+use std::fmt::{Display, Formatter};
+use std::time::{Duration, Instant};
+use std::{fmt, io};
+
+use base64::Engine as _;
+use serde_json::Value;
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
+
 use super::motd::Motd;
 use super::protocol::ProtocolVersion;
 use crate::skin::Pixels;
-use base64::Engine as _;
-use serde_json::Value;
-use std::error::Error;
-use std::fmt::{self, Display, Formatter};
-use std::io;
-use std::time::{Duration, Instant};
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpStream;
 
 const DEFAULT_PORT: u16 = 25565;
 const TIMEOUT: Duration = Duration::from_secs(5);

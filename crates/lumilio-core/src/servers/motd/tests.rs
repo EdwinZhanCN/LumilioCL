@@ -1,5 +1,6 @@
-use super::*;
 use serde_json::json;
+
+use super::*;
 
 fn span(text: &str, color: Option<u32>) -> MotdSpan {
     MotdSpan {
@@ -19,7 +20,7 @@ fn legacy_codes_colour_the_text_and_a_colour_clears_the_formats() {
                 bold: true,
                 ..span("Bold ", None)
             },
-            span("Green", Some(0x55_FF55)),
+            span("Green", Some(0x55_ff55)),
             span(" plain", None),
         ]
     );
@@ -28,7 +29,7 @@ fn legacy_codes_colour_the_text_and_a_colour_clears_the_formats() {
 #[test]
 fn legacy_codes_ignore_case_and_skip_unknown_codes_with_their_letter() {
     let motd = Motd::from_legacy("§Cred§zstill§");
-    assert_eq!(motd.spans, vec![span("redstill", Some(0xFF_5555))]);
+    assert_eq!(motd.spans, vec![span("redstill", Some(0xff_5555))]);
 }
 
 #[test]
@@ -43,7 +44,7 @@ fn a_component_inherits_its_parents_look_and_overrides_what_it_states() {
             "D"
         ]
     }));
-    let gold = Some(0xFF_AA00);
+    let gold = Some(0xff_aa00);
     assert_eq!(
         motd.spans,
         vec![
@@ -86,7 +87,7 @@ fn section_codes_inside_a_component_start_from_its_look() {
     let motd = Motd::from_component(&json!({"text": "§eHi§r there", "color": "aqua"}));
     assert_eq!(
         motd.spans,
-        vec![span("Hi", Some(0xFF_FF55)), span(" there", Some(0x55_FFFF))]
+        vec![span("Hi", Some(0xff_ff55)), span(" there", Some(0x55_ffff))]
     );
 }
 
@@ -97,7 +98,7 @@ fn an_unknown_colour_is_inherited_instead() {
         "color": "red",
         "extra": [{"text": "a", "color": "#12345"}, {"text": "b", "color": "mauve"}]
     }));
-    assert_eq!(motd.spans, vec![span("ab", Some(0xFF_5555))]);
+    assert_eq!(motd.spans, vec![span("ab", Some(0xff_5555))]);
 }
 
 #[test]
@@ -107,8 +108,8 @@ fn lines_split_runs_at_line_breaks_and_plain_keeps_the_words() {
     assert_eq!(
         lines,
         vec![
-            vec![span("  ", None), span("Top", Some(0x55_FF55))],
-            vec![span("Bottom  ", Some(0x55_FFFF))],
+            vec![span("  ", None), span("Top", Some(0x55_ff55))],
+            vec![span("Bottom  ", Some(0x55_ffff))],
         ]
     );
     assert_eq!(motd.plain(), "Top\nBottom");

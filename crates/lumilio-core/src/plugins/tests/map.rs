@@ -1,6 +1,8 @@
-use super::*;
-use lumilio_plugin_api::{API_VERSION, Manifest, PluginState, Words};
 use std::collections::BTreeMap;
+
+use lumilio_plugin_api::{API_VERSION, Manifest, PluginState, Words};
+
+use super::*;
 
 struct Fake;
 impl Plugin for Fake {

@@ -2,16 +2,6 @@
 //! and its pages. After `ProjectPageVersions.vue` and
 //! `VersionFilterControl.vue` (GPL-3.0-only; ADR 0022).
 
-use super::{
-    DetailIntent, ProjectDetailView, VERSIONS_PER_PAGE, channel_label, date_label, file_of, pill,
-    size_label, toggle,
-};
-use crate::assets::UiIcon;
-use crate::key::Key;
-use crate::kit;
-use crate::live::{PageItem, page_items, parse_rfc3339, relative_time, tag_label};
-use crate::theme::ShellColors;
-use crate::tr;
 use gpui::prelude::*;
 use gpui::{Context, Entity, Window, div, px};
 use gpui_component::select::{SearchableVec, Select, SelectEvent, SelectState};
@@ -19,6 +9,16 @@ use gpui_component::{Icon, Sizable as _, StyledExt as _, h_flex, v_flex};
 use lumilio_core::{
     GroupLabel, ProjectDetail, ProjectKind, ReleaseChannel, Version, version_groups,
 };
+
+use super::{
+    DetailIntent, ProjectDetailView, VERSIONS_PER_PAGE, channel_label, date_label, file_of, pill,
+    size_label, toggle,
+};
+use crate::assets::UiIcon;
+use crate::key::Key;
+use crate::live::{PageItem, page_items, parse_rfc3339, relative_time, tag_label};
+use crate::theme::ShellColors;
+use crate::{kit, tr};
 
 /// Game version groups a row lists before "+N".
 const GROUPS_SHOWN: usize = 3;

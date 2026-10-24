@@ -121,8 +121,9 @@ fn a_game_the_launcher_stopped_was_cancelled_whatever_its_code() {
 
 #[cfg(unix)]
 mod supervised {
-    use super::*;
     use std::os::unix::fs::PermissionsExt;
+
+    use super::*;
 
     fn script(dir: &Path, body: &str) -> Vec<String> {
         let path = dir.join("fake-java.sh");

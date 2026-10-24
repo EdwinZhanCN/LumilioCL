@@ -2,10 +2,10 @@
 //! version, and the file(s) to fetch with their size and SHA-256. Written by
 //! `cargo xtask bake-blocks` (plan schematic-studio, T2).
 
+use lumilio_block_assets::BUNDLE_FORMAT;
 use serde::Deserialize;
 
 use super::SchematicAssetsError;
-use lumilio_block_assets::BUNDLE_FORMAT;
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 pub struct BundleIndex {

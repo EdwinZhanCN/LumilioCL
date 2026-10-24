@@ -116,7 +116,7 @@ Consequences: 想长期改用自动需在实例设置里改；任何一次启动
 
 - [crates/lumilio-core/src/java/choice.rs](../../crates/lumilio-core/src/java/choice.rs)
 - [crates/lumilio-core/src/java/locator.rs](../../crates/lumilio-core/src/java/locator.rs)
-- [crates/lumilio-core/src/java_runtime.rs](../../crates/lumilio-core/src/java_runtime.rs)
+- [crates/lumilio-core/src/java_runtime/mod.rs](../../crates/lumilio-core/src/java_runtime/mod.rs)
 - [crates/lumilio-core/src/java_runtime/graalvm.rs](../../crates/lumilio-core/src/java_runtime/graalvm.rs)
 - [crates/lumilio-core/src/java_runtime/archive.rs](../../crates/lumilio-core/src/java_runtime/archive.rs)
 - [crates/lumilio-core/src/service/java.rs](../../crates/lumilio-core/src/service/java.rs)

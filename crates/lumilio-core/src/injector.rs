@@ -10,10 +10,10 @@
 //! authlib-injector: it runs inside the game, so it is never taken on trust.
 
 use std::error::Error;
-use std::fmt::{self, Display, Formatter};
-use std::fs;
-use std::io::{self, Read};
+use std::fmt::{Display, Formatter};
+use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::{fmt, fs, io};
 
 use base64::Engine as _;
 use serde::Deserialize;

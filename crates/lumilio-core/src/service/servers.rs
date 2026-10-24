@@ -1,6 +1,7 @@
 use super::LauncherService;
 use super::error::ServiceError;
-use crate::servers::{self, ServerEntry, ServerStatus};
+use crate::servers;
+use crate::servers::{ServerEntry, ServerStatus};
 use crate::transfer::Transport;
 
 impl<T: Transport + Clone> LauncherService<T> {

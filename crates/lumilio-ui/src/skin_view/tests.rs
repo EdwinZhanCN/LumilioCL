@@ -1,6 +1,7 @@
-use super::{Look, SkinViewer};
 use gpui::{Entity, TestAppContext, VisualTestContext};
 use lumilio_skin_render::{Arms, BackEquipment, Camera, Texture};
+
+use super::{Look, SkinViewer};
 
 fn open(cx: &mut TestAppContext) -> (Entity<SkinViewer>, &mut VisualTestContext) {
     cx.update(gpui_component::init);

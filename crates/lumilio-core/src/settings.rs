@@ -5,14 +5,16 @@
 
 use std::collections::BTreeMap;
 use std::error::Error;
-use std::fmt::{self, Display, Formatter};
+use std::fmt;
+use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
 use crate::account::{OfflineProfile, ProfileError, ProfileId};
-use crate::persist::{self, PersistError, Versioned};
+use crate::persist;
+use crate::persist::{PersistError, Versioned};
 use crate::transfer::{OfficialSource, PrefixMirror, SourceChain, SourceProvider};
 use crate::tuning::{DOWNLOAD_CONCURRENCY, LaunchTuning, Preferences, TuningError};
 

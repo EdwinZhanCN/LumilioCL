@@ -1,6 +1,8 @@
-use super::*;
-use lumilio_plugin_api::{FetchMethod, FetchResponse, SettingValue};
 use std::sync::Mutex;
+
+use lumilio_plugin_api::{FetchMethod, FetchResponse, SettingValue};
+
+use super::*;
 
 #[derive(Default)]
 struct Context {

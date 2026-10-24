@@ -1,5 +1,6 @@
 //! Live Library, Discover and Activity (plan 0007). They render
-//! [`LiveModel`] and report [`LiveIntent`]s; the application does the work.
+//! [`LiveModel`](crate::live::LiveModel) and report
+//! [`LiveIntent`](crate::live::LiveIntent)s; the application does the work.
 
 mod accounts;
 mod activity;

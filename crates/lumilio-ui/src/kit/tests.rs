@@ -1,5 +1,4 @@
 use gpui::prelude::*;
-
 use gpui::{IntoElement, Render, TestAppContext, Window, div};
 use gpui_component::{Theme, ThemeMode};
 
@@ -7,7 +6,8 @@ use super::motd::motd_color;
 use super::{
     Item, TagKind, list, lit_bars, motd_lines, panel_list, signal, signal_bars, speed_digits, tag,
 };
-use crate::theme::{self, ShellColors};
+use crate::theme;
+use crate::theme::ShellColors;
 
 /// A small field and a small key side by side.
 struct FieldRow(gpui::Entity<gpui_component::input::InputState>);

@@ -1,13 +1,14 @@
-use super::jobs::{job, outcome};
-use super::{Reload, Wiring};
-use gpui_kit::AppContext as _;
-use gpui_kit::{App, Window};
+use std::rc::Rc;
+
+use gpui_kit::{App, AppContext as _, Window};
 use lumilio_core::CancellationToken;
 use lumilio_ui::collections::{CollectionPicker, NamePrompt};
 use lumilio_ui::game_picker::GamePicker;
 use lumilio_ui::toast::Toast;
 use lumilio_ui::tr;
-use std::rc::Rc;
+
+use super::jobs::{job, outcome};
+use super::{Reload, Wiring};
 
 /// Asks core to make `id` the current instance; everything showing it
 /// follows when core publishes the choice. A failed save leaves it as it was.

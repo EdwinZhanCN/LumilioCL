@@ -8,23 +8,23 @@
 //! App's `browse-tab/sidebar.vue` and `SearchSidebarFilter.vue` (GPL-3.0-only;
 //! ADR 0022).
 
-use super::super::controls::LiveCtx;
-use crate::assets::UiIcon;
-use crate::controls::Checkbox;
-use crate::key::Key;
-use crate::kit::{self, Stand, ViewIntent};
-use crate::live::{
-    DiscoverChange, Lock, PickGroup, Section, Side, advanced_options, default_loaders,
-    section_title, sections, tag_label,
-};
-use crate::{theme, tr};
 use gpui::prelude::*;
 use gpui::{Anchor, App, Window, div, px};
 use gpui_component::input::Input;
 use gpui_component::popover::Popover;
-use gpui_component::{Icon, h_flex, v_flex};
-use gpui_component::{Sizable as _, StyledExt as _};
+use gpui_component::{Icon, Sizable as _, StyledExt as _, h_flex, v_flex};
 use lumilio_core::Stance;
+
+use super::super::controls::LiveCtx;
+use crate::assets::UiIcon;
+use crate::controls::Checkbox;
+use crate::key::Key;
+use crate::kit::{Stand, ViewIntent};
+use crate::live::{
+    DiscoverChange, Lock, PickGroup, Section, Side, advanced_options, default_loaders,
+    section_title, sections, tag_label,
+};
+use crate::{kit, theme, tr};
 
 /// The filter column's width beside the list.
 pub(super) const SIDEBAR_WIDTH: f32 = 240.;

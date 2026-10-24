@@ -1,5 +1,6 @@
-use super::with_causes;
 use std::fmt;
+
+use super::with_causes;
 
 #[derive(Debug)]
 struct Layer(&'static str, Option<Box<Layer>>);

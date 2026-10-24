@@ -11,8 +11,9 @@ fn request(name: &str) -> NewInstance {
 
 #[test]
 fn map_annotations_survive_library_updates_and_leave_with_the_instance() {
-    use crate::world_map::store::annotations::{Annotation, AnnotationKind, list, put};
     use lumilio_plugin_api::map::{Dimension, MapPoint, WorldId};
+
+    use crate::world_map::store::annotations::{Annotation, AnnotationKind, list, put};
 
     let dir = tempfile::tempdir().unwrap();
     let mut store = InstanceStore::open(dir.path()).unwrap();

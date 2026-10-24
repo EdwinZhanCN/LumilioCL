@@ -1,8 +1,9 @@
+use std::collections::BTreeMap;
+
 use super::LauncherService;
 use crate::discover::TextFormat;
 use crate::transfer::Transport;
 use crate::{TranslatedDocument, TranslationError};
-use std::collections::BTreeMap;
 
 impl<T: Transport + Clone> LauncherService<T> {
     /// A project body in Simplified Chinese, from the chosen provider. The

@@ -1,9 +1,12 @@
+use std::path::PathBuf;
+
+use tokio::sync::Semaphore;
+
 use super::LauncherService;
 use super::error::ServiceError;
-use crate::screenshots::{self, ScreenshotInfo};
+use crate::screenshots;
+use crate::screenshots::ScreenshotInfo;
 use crate::transfer::Transport;
-use std::path::PathBuf;
-use tokio::sync::Semaphore;
 
 /// Decoding a large picture takes memory: only a couple at a time, however
 /// many thumbnails a page asks for at once.

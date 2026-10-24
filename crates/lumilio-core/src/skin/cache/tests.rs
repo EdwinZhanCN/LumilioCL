@@ -1,5 +1,6 @@
-use super::prune_disk;
 use std::time::{Duration, SystemTime};
+
+use super::prune_disk;
 
 fn file(dir: &std::path::Path, name: &str, age: Duration) -> std::path::PathBuf {
     let path = dir.join(name);

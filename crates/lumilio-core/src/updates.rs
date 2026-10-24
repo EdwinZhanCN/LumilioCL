@@ -1,11 +1,13 @@
 //! Checking installed content for newer versions, and applying them.
 
 use std::error::Error;
-use std::fmt::{self, Display, Formatter};
+use std::fmt;
+use std::fmt::{Display, Formatter};
 use std::path::Path;
 
 use crate::activity::CancellationToken;
-use crate::content::{self, ContentError};
+use crate::content;
+use crate::content::ContentError;
 use crate::discover::{
     ContentClient, DiscoverError, FileHashes, IntentError, ProjectKind, Version, install_request,
 };

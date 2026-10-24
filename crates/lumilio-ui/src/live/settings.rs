@@ -1,8 +1,9 @@
+use std::path::{Path, PathBuf};
+
 use lumilio_core::{
     DownloadSourcePreference, HostProfile, JavaRuntime, JavaSource, LaunchTuning, LauncherSettings,
     MirrorRule, Preferences, StorageUsage,
 };
-use std::path::{Path, PathBuf};
 
 /// One Java installation of the Java tab.
 #[derive(Clone, Debug, Eq, PartialEq)]

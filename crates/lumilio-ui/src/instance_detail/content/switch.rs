@@ -1,3 +1,14 @@
+use std::rc::Rc;
+
+use gpui::prelude::*;
+use gpui::{
+    AnyElement, App, Context, Entity, IntoElement, Render, WeakEntity, Window, div, px,
+    uniform_list,
+};
+use gpui_component::input::{Input, InputEvent, InputState};
+use gpui_component::{Icon, Sizable as _, StyledExt as _, WindowExt as _, h_flex, v_flex};
+use lumilio_core::{ContentEntry, Loader, ProjectKind, Version};
+
 use super::super::panels::CONTENT_KINDS;
 use super::super::{InstanceDetailView, InstanceIntent};
 use super::model::{channel_label, title_of};
@@ -5,18 +16,6 @@ use crate::assets::UiIcon;
 use crate::key::Key;
 use crate::theme::ShellColors;
 use crate::{kit, theme, tr};
-use gpui::prelude::*;
-use gpui::{
-    AnyElement, App, Context, Entity, IntoElement, Render, WeakEntity, Window, div, px,
-    uniform_list,
-};
-use gpui_component::Sizable as _;
-use gpui_component::StyledExt as _;
-use gpui_component::WindowExt as _;
-use gpui_component::input::{Input, InputEvent, InputState};
-use gpui_component::{Icon, h_flex, v_flex};
-use lumilio_core::{ContentEntry, Loader, ProjectKind, Version};
-use std::rc::Rc;
 
 impl InstanceDetailView {
     /// Opens the switch-version dialog for one file. With `update`, the

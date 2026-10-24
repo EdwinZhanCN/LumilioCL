@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, HashSet};
 use std::error::Error;
-use std::fmt::{self, Display, Formatter};
+use std::fmt;
+use std::fmt::{Display, Formatter};
 use std::path::{Component, Path, PathBuf};
 
 use crate::environment::{CompatibilityRule, HostProfile, RuleDecision};
@@ -558,14 +559,4 @@ impl Display for LaunchError {
 impl Error for LaunchError {}
 
 #[cfg(test)]
-mod tests {
-    use super::tokenize_legacy_arguments;
-
-    #[test]
-    fn legacy_tokenizer_supports_both_quote_styles_and_escapes() {
-        let tokens =
-            tokenize_legacy_arguments("--first 'two words' --third escaped\\ value").unwrap();
-
-        assert_eq!(tokens, ["--first", "two words", "--third", "escaped value"]);
-    }
-}
+mod tests;

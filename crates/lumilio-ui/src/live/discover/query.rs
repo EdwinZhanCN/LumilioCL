@@ -4,8 +4,9 @@
 //! `use-browse-search.ts`, GPL-3.0-only; ADR 0022): the person's own picks, the
 //! filters a game provides (locked until released), and the toggles.
 
-use super::filters::{FilterModel, advanced_options, is_type_exclusion};
 use lumilio_core::{Loader, Pick, ProjectKind, SearchQuery, SortIndex, Stance};
+
+use super::filters::{FilterModel, advanced_options, is_type_exclusion};
 
 /// Which list a loader or category pick belongs to.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

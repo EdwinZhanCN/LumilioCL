@@ -1,6 +1,8 @@
-use super::*;
-use gpui::Modifiers;
 use std::cell::RefCell;
+
+use gpui::Modifiers;
+
+use super::*;
 
 struct Host;
 

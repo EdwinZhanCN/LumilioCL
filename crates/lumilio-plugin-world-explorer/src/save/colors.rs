@@ -5,9 +5,11 @@
 //! a world older than every table uses the oldest. A block missing from the
 //! table (a mod's block, or one newer than the table) is drawn in
 //! [`UNKNOWN`] and reported by name, so the map can say how many it met.
-use serde_json::Value;
+
 use std::collections::HashMap;
 use std::sync::OnceLock;
+
+use serde_json::Value;
 
 /// The colour of a block no table knows: a muted violet that no vanilla
 /// surface has, so it reads as "not drawn from data" rather than as stone.

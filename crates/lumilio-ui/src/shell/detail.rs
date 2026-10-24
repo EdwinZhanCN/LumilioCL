@@ -1,13 +1,15 @@
+use std::rc::Rc;
+
+use gpui::prelude::*;
+use gpui::{Context, Entity};
+use lumilio_core::ProjectKind;
+
 use super::LauncherShell;
 use crate::live::{LiveIntent, LiveModel};
 use crate::project_detail::{
     DetailHandler, DetailIntent, DetailState, InstallTarget, ProjectDetailView,
 };
 use crate::route::Route;
-use gpui::prelude::*;
-use gpui::{Context, Entity};
-use lumilio_core::ProjectKind;
-use std::rc::Rc;
 
 #[derive(Clone)]
 pub(super) struct DetailSlot {

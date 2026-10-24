@@ -5,12 +5,14 @@
 
 use std::rc::Rc;
 
-use crate::key::Key;
-use crate::theme::{self, ShellColors};
-use crate::tr;
-use gpui::{AnyElement, App, Window, div, prelude::*, px};
+use gpui::prelude::*;
+use gpui::{AnyElement, App, Window, div, px};
 use gpui_component::text::TextView;
 use gpui_component::{WindowExt as _, h_flex, v_flex};
+
+use crate::key::Key;
+use crate::theme::ShellColors;
+use crate::{theme, tr};
 
 /// Mojang's Minecraft End User License Agreement.
 pub const EULA_URL: &str = "https://www.minecraft.net/eula";

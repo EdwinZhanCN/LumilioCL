@@ -1,6 +1,8 @@
+use std::collections::VecDeque;
+use std::sync::Mutex;
+
 use super::*;
 use crate::transfer::{TransportError, TransportFuture, TransportResponse};
-use std::{collections::VecDeque, sync::Mutex};
 
 #[derive(Default)]
 struct Script {

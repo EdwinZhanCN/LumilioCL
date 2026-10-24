@@ -1,3 +1,11 @@
+use std::rc::Rc;
+use std::time::{Duration, Instant};
+
+use gpui::prelude::*;
+use gpui::{AnyElement, Context, Window, div, px};
+use gpui_component::{TITLE_BAR_HEIGHT, v_flex};
+use lumilio_core::LaunchSignal;
+
 use super::locations::Location;
 use super::{LauncherShell, ShellIntent};
 use crate::home::{HomeIntent, HomePresentation, RecoveryDetail, ShellHomeColors};
@@ -5,12 +13,6 @@ use crate::live::LiveIntent;
 use crate::route::Route;
 use crate::toast::Toast;
 use crate::{home, pages, theme};
-use gpui::prelude::*;
-use gpui::{AnyElement, Context, Window, div, px};
-use gpui_component::{TITLE_BAR_HEIGHT, v_flex};
-use lumilio_core::LaunchSignal;
-use std::rc::Rc;
-use std::time::{Duration, Instant};
 
 /// How often the play-time readout refreshes while the game runs.
 pub(super) const PLAY_CLOCK_INTERVAL: Duration = Duration::from_secs(20);

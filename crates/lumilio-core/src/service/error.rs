@@ -1,3 +1,9 @@
+use std::error::Error;
+use std::fmt;
+use std::fmt::{Display, Formatter};
+use std::future::Future;
+use std::path::PathBuf;
+
 use crate::activity::CancellationToken;
 use crate::content::ContentError;
 use crate::injector::InjectorError;
@@ -12,11 +18,6 @@ use crate::skin::SkinError;
 use crate::snapshots::SnapshotError;
 use crate::worlds::WorldError;
 use crate::yggdrasil::YggdrasilError;
-use std::error::Error;
-use std::fmt;
-use std::fmt::{Display, Formatter};
-use std::future::Future;
-use std::path::PathBuf;
 
 #[derive(Debug)]
 pub enum ServiceError {

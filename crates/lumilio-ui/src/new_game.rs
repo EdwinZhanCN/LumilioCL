@@ -6,18 +6,18 @@
 
 use std::rc::Rc;
 
-use crate::controls::Checkbox;
-use crate::key::Key;
-use gpui::{App, Context, Entity, IntoElement, Render, WeakEntity, Window, div, prelude::*, px};
+use gpui::prelude::*;
+use gpui::{App, Context, Entity, IntoElement, Render, WeakEntity, Window, div, px};
 use gpui_component::dialog::Dialog;
 use gpui_component::input::{Input, InputState};
 use gpui_component::{Sizable as _, StyledExt as _, WindowExt as _, h_flex, v_flex};
 use lumilio_core::{CatalogEntry, Loader, LoaderVersion, VersionChannel};
 
-use crate::kit;
-use crate::theme::{self, ShellColors};
+use crate::controls::Checkbox;
+use crate::key::Key;
+use crate::theme::ShellColors;
 use crate::version_picker::{Choice, Choices, PickerEvent, VersionPicker};
-use crate::{tr, tr_all};
+use crate::{kit, theme, tr, tr_all};
 
 /// The loaders offered, in the order shown.
 pub const LOADERS: [Loader; 5] = [

@@ -2,6 +2,7 @@
 //! Encoding/ranges cross-checked against Modrinth App's game_options/catalog/{controls,sound,
 //! accessibility,chat,video,version_changes}.rs at commit 71f35eb8 (GPL-3.0-only).
 //! This catalog is intentionally narrower: no graphics-mode or legacy numeric-key conversion.
+
 use super::GameSettingValue;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

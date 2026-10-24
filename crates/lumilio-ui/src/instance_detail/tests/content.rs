@@ -1,12 +1,14 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
+use gpui::{Modifiers, TestAppContext};
+use lumilio_core::{LauncherSettings, ProjectKind};
+
 use super::super::intent::{InstanceIntent, Section};
 use super::super::panels::Arrived;
 use super::super::{InstanceDetailView, Operated, TAB_CONTENT};
 use super::{click, item, known_version, listed, record, rooted};
 use crate::toast::Toast;
-use gpui::{Modifiers, TestAppContext};
-use lumilio_core::{LauncherSettings, ProjectKind};
-use std::cell::RefCell;
-use std::rc::Rc;
 
 /// A long version shares a row with the Update key and may not run
 /// underneath it. The newer version is not in the row: the Update key

@@ -3,6 +3,7 @@
 
 use std::fs;
 use std::path::Path;
+
 use toml::Value;
 
 fn check_dependencies(table: &toml::Table, workspace: &toml::Table, problems: &mut Vec<String>) {

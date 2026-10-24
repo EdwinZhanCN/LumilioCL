@@ -1,7 +1,8 @@
+use std::io::Write as _;
+
 use super::{MS_ID, microsoft_chain, sign_in, world};
 use crate::microsoft::PROFILE_URL;
 use crate::{AppearanceChange, AppearanceError, CancellationToken, ServiceError, SkinModel};
-use std::io::Write as _;
 
 #[tokio::test]
 async fn default_preview_reads_only_registered_installed_clients_and_preserves_a_local_cape() {

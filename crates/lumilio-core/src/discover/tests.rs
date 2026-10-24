@@ -1,3 +1,7 @@
+use std::path::Path;
+
+use lumilio_plugin_api::content as api;
+
 use super::convert::{loader_from_api, query_to_api};
 use super::intent::{IntentError, install_request};
 use super::kinds::{ProjectKind, SortIndex};
@@ -7,8 +11,6 @@ use super::versions::{
     Dependency, DependencyKind, ReleaseChannel, Version, VersionFile, pick_version,
 };
 use crate::instance::Loader;
-use lumilio_plugin_api::content as api;
-use std::path::Path;
 
 const SHA1: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 

@@ -39,35 +39,6 @@ mod loader;
 mod microsoft;
 mod mirror_presets;
 mod modpack;
-use lumilio_nbt as nbt;
-mod pack_export;
-mod persist;
-mod picture;
-mod plugins;
-mod process;
-mod reclaim;
-mod recovery;
-mod release;
-mod repair;
-use lumilio_transfer::resource_lock;
-mod root_lock;
-mod schematic_assets;
-mod schematic_ops;
-mod screenshots;
-mod servers;
-mod service;
-mod settings;
-mod skin;
-mod snapshots;
-mod staged;
-mod storage;
-use lumilio_transfer as transfer;
-mod translation;
-mod tuning;
-mod updates;
-mod wallpaper;
-mod worlds;
-mod yggdrasil;
 
 pub use account::{AuthSession, MAX_PROFILE_NAME, OfflineProfile, ProfileError, ProfileId};
 pub use activity::{
@@ -155,7 +126,10 @@ pub use loader::{
     versions_url as loader_versions_url,
 };
 pub use lumilio_block_assets::{BakedPack, BlockCatalog, BlockNames};
+use lumilio_nbt as nbt;
 pub use lumilio_plugin_api::PluginState;
+use lumilio_transfer as transfer;
+use lumilio_transfer::resource_lock;
 pub use lumilio_transfer::with_causes;
 pub use microsoft::{
     AuthError, DeviceCode, MICROSOFT_CLIENT_ID, MicrosoftClient, MinecraftLogin, OAuthTokens,
@@ -169,10 +143,6 @@ pub use modpack::{
 };
 pub use pack_export::{ExportError, ExportReport, ExportSpec, PackFormat};
 pub use picture::{PictureError, fit_within, png_within};
-pub use translation::{
-    TranslatedDocument, TranslationError, TranslationPreferences, TranslationProvider,
-};
-pub mod world_map;
 pub use plugins::write::CONFLICT as WRITE_CONFLICT;
 pub use plugins::{
     MapFailure, MapProviders, PluginContentSource, PluginEffect, PluginFinding, PluginHost,
@@ -228,13 +198,15 @@ pub use storage::{
     StorageUsage, clear_cache, directory_size, measure as measure_storage, recommended_memory_mb,
     total_memory_mb,
 };
-pub use transfer::USER_AGENT;
 pub use transfer::{
     ByteStream, CONNECTIONS_PER_FILE, ConnectionBudget, ContentDigest, DefaultTransport,
     FileTransport, HttpMethod, HttpRequest, HttpTransport, OfficialSource, PrefixMirror,
     RetryPolicy, SourceChain, SourceFailure, SourceProvider, TransferBatchReport, TransferEngine,
     TransferError, TransferEvent, TransferOutcome, TransferRequest, Transport, TransportError,
-    TransportFuture, TransportResponse,
+    TransportFuture, TransportResponse, USER_AGENT,
+};
+pub use translation::{
+    TranslatedDocument, TranslationError, TranslationPreferences, TranslationProvider,
 };
 pub use tuning::{
     AfterLaunch, Appearance, DOWNLOAD_CONCURRENCY, DiscoverPreferences, EnvVar, FONT_SCALE_PERCENT,
@@ -251,3 +223,34 @@ pub use worlds::{
     duplicate as duplicate_world, scan as scan_worlds, size as world_size,
 };
 pub use yggdrasil::{AuthServer, LITTLE_SKIN_URL, Profile as CharacterProfile, YggdrasilError};
+
+mod pack_export;
+mod persist;
+mod picture;
+mod plugins;
+mod process;
+mod reclaim;
+mod recovery;
+mod release;
+mod repair;
+
+mod root_lock;
+mod schematic_assets;
+mod schematic_ops;
+mod screenshots;
+mod servers;
+mod service;
+mod settings;
+mod skin;
+mod snapshots;
+mod staged;
+mod storage;
+
+mod translation;
+mod tuning;
+mod updates;
+mod wallpaper;
+mod worlds;
+mod yggdrasil;
+
+pub mod world_map;

@@ -13,8 +13,8 @@ use gpui_component::{h_flex, v_flex};
 use super::words::property_words;
 use super::{LoadModel, StudioView, muted_line};
 use crate::model_view::Viewer;
-use crate::theme::{self, ShellColors};
-use crate::tr;
+use crate::theme::ShellColors;
+use crate::{theme, tr};
 
 /// The plate's icon side.
 const PLATE_ICON: f32 = 24.;

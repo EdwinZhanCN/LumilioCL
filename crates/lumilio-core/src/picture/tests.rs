@@ -1,6 +1,8 @@
-use super::*;
-use image::{GrayImage, ImageFormat, Luma, Rgba};
 use std::io::Cursor;
+
+use image::{GrayImage, ImageFormat, Luma, Rgba};
+
+use super::*;
 
 fn encoded(picture: impl Into<image::DynamicImage>) -> Vec<u8> {
     let mut bytes = Cursor::new(Vec::new());

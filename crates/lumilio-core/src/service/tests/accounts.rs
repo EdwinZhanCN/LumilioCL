@@ -1,3 +1,7 @@
+use std::sync::{Arc, Mutex as StdMutex};
+
+use tokio::sync::mpsc;
+
 use super::super::error::ServiceError;
 use super::super::types::now;
 use super::{
@@ -9,9 +13,6 @@ use crate::credentials::StoredLogin;
 use crate::instance::Loader;
 use crate::microsoft::{AuthError, DeviceCode};
 use crate::settings::AccountKind;
-use std::sync::Arc;
-use std::sync::Mutex as StdMutex;
-use tokio::sync::mpsc;
 
 #[tokio::test]
 async fn signing_in_adds_the_account_keeps_secrets_in_the_store_and_shows_the_code() {

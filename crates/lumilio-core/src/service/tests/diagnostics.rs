@@ -118,8 +118,9 @@ async fn a_games_size_counts_its_own_folder_only() {
 
 #[tokio::test]
 async fn unified_logs_read_compressed_history_and_export_complete_redacted_sources() {
-    use crate::GameLogSource;
     use std::io::Write;
+
+    use crate::GameLogSource;
     let world = world();
     let record = world
         .service
@@ -389,8 +390,9 @@ async fn clearing_the_cache_frees_space_and_games_still_start() {
 
 #[tokio::test]
 async fn the_diagnostics_bundle_hides_the_player_the_folders_and_commands() {
-    use crate::tuning::LaunchTuning;
     use std::io::Read;
+
+    use crate::tuning::LaunchTuning;
     let world = world();
     publish_release(&world);
     fake_java(&world, "echo \"Setting user: Steve\"");

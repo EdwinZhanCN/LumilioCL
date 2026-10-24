@@ -1,10 +1,9 @@
 //! Saved worlds in an instance.
 
 use std::error::Error;
-use std::fmt::{self, Display, Formatter};
-use std::fs;
-use std::io;
+use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
+use std::{fmt, fs, io};
 
 use crate::discover::is_safe_file_name;
 use crate::nbt;

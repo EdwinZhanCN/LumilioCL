@@ -108,8 +108,9 @@ async fn java_is_installed_whole_found_by_discovery_and_a_bad_file_leaves_nothin
 /// Answers Oracle's checksum and archive addresses with a fake GraalVM 21.
 /// A wrong checksum stands for a damaged download.
 fn publish_graalvm(world: &super::World, wrong_checksum: bool) {
-    use sha2::{Digest, Sha256};
     use std::io::Write as _;
+
+    use sha2::{Digest, Sha256};
     let mut builder = tar::Builder::new(Vec::new());
     for (path, body, mode) in [
         (

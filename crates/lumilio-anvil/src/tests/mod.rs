@@ -1,8 +1,10 @@
-use super::*;
-use crate::chunk::pack;
-use lumilio_nbt::Tag;
 use std::collections::BTreeMap;
 use std::io::Write;
+
+use lumilio_nbt::Tag;
+
+use super::*;
+use crate::chunk::pack;
 
 fn compound(entries: Vec<(&str, Tag)>) -> Tag {
     Tag::Compound(

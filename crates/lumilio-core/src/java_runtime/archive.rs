@@ -1,8 +1,7 @@
 //! Unpacking a JDK archive (`.tar.gz` or `.zip`) into a runtime folder.
 
-use std::fs;
-use std::io;
 use std::path::{Component, Path, PathBuf};
+use std::{fs, io};
 
 /// How an archive is packed.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

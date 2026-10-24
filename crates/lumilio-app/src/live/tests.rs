@@ -3,22 +3,27 @@ mod global_context;
 mod missing_folder;
 mod terms;
 
-use super::jobs::outcome;
 use lumilio_ui::toast::Toast;
+
+use super::jobs::outcome;
 
 #[gpui_kit::test]
 fn home_snapshot_and_rapid_selection_keep_the_last_game(cx: &mut gpui_kit::TestAppContext) {
     // The shipped backend wakes GPUI from its real tokio worker threads.
     cx.executor().allow_parking();
-    use super::{State, Wiring, context::follow, library::choose_current};
-    use crate::backend::Backend;
+
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    use std::time::{Duration, Instant};
+
     use gpui_kit::AppContext as _;
-    use lumilio_ui::{LauncherShell, home::HomePresentation};
-    use std::{
-        cell::RefCell,
-        rc::Rc,
-        time::{Duration, Instant},
-    };
+    use lumilio_ui::LauncherShell;
+    use lumilio_ui::home::HomePresentation;
+
+    use super::context::follow;
+    use super::library::choose_current;
+    use super::{State, Wiring};
+    use crate::backend::Backend;
 
     let dir = tempfile::tempdir().unwrap();
     let backend = Backend::open(dir.path().join("root")).unwrap();
@@ -114,16 +119,18 @@ fn a_failed_operation_says_it_plainly_and_keeps_the_cause_behind_details() {
 #[gpui_kit::test]
 fn work_that_panics_is_told_and_not_left_hanging(cx: &mut gpui_kit::TestAppContext) {
     cx.executor().allow_parking();
-    use super::jobs::{answer, job};
-    use super::{Reload, State, Wiring};
-    use crate::backend::Backend;
+    use std::cell::{Cell, RefCell};
+    use std::rc::Rc;
+    use std::time::{Duration, Instant};
+
     use gpui_kit::AppContext as _;
     use lumilio_core::ServiceError;
     use lumilio_ui::LauncherShell;
     use lumilio_ui::toast::ToastKind;
-    use std::cell::{Cell, RefCell};
-    use std::rc::Rc;
-    use std::time::{Duration, Instant};
+
+    use super::jobs::{answer, job};
+    use super::{Reload, State, Wiring};
+    use crate::backend::Backend;
 
     let dir = tempfile::tempdir().unwrap();
     let backend = Backend::open(dir.path().join("root")).unwrap();
@@ -218,9 +225,10 @@ fn work_that_panics_is_told_and_not_left_hanging(cx: &mut gpui_kit::TestAppConte
 /// failure while another page is open floats up there.
 #[gpui_kit::test]
 fn technical_details_after_a_failed_launch_explain_it(cx: &mut gpui_kit::TestAppContext) {
-    use super::dispatch::{on_live_intent, on_shell_intent};
-    use super::{State, Wiring};
-    use crate::backend::Backend;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    use std::time::{Duration, Instant};
+
     use gpui_kit::component::WindowExt as _;
     use gpui_kit::{AppContext as _, Entity, Modifiers};
     use lumilio_core::{LaunchFailure, LaunchPhase, LaunchSignal};
@@ -228,8 +236,10 @@ fn technical_details_after_a_failed_launch_explain_it(cx: &mut gpui_kit::TestApp
     use lumilio_ui::home::{HomePresentation, RecoveryDetail, Subject};
     use lumilio_ui::instance_detail::TAB_DIAGNOSTICS;
     use lumilio_ui::route::Route;
-    use std::time::{Duration, Instant};
-    use std::{cell::RefCell, rc::Rc};
+
+    use super::dispatch::{on_live_intent, on_shell_intent};
+    use super::{State, Wiring};
+    use crate::backend::Backend;
 
     cx.executor().allow_parking();
     let dir = tempfile::tempdir().unwrap();
@@ -404,10 +414,10 @@ fn technical_details_after_a_failed_launch_explain_it(cx: &mut gpui_kit::TestApp
 #[gpui_kit::test]
 #[ignore = "talks to the real CurseForge and Modrinth APIs"]
 fn curseforge_through_the_page(cx: &mut gpui_kit::TestAppContext) {
-    use super::dispatch::on_live_intent;
-    use super::instance_write::write_instance;
-    use super::{State, Wiring, context::follow, discover::first_search, library::choose_current};
-    use crate::backend::Backend;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    use std::time::{Duration, Instant};
+
     use gpui_kit::{AppContext as _, Modifiers, VisualTestContext};
     use lumilio_core::{Loader, ProjectKind};
     use lumilio_ui::LauncherShell;
@@ -415,11 +425,14 @@ fn curseforge_through_the_page(cx: &mut gpui_kit::TestAppContext) {
     use lumilio_ui::live::{DiscoverQuery, LiveIntent, SearchStatus};
     use lumilio_ui::route::Route;
     use sha1::{Digest, Sha1};
-    use std::{
-        cell::RefCell,
-        rc::Rc,
-        time::{Duration, Instant},
-    };
+
+    use super::context::follow;
+    use super::discover::first_search;
+    use super::dispatch::on_live_intent;
+    use super::instance_write::write_instance;
+    use super::library::choose_current;
+    use super::{State, Wiring};
+    use crate::backend::Backend;
 
     if !lumilio_plugin_curseforge::CurseForge::default().has_key() {
         println!("this build has no CurseForge key; nothing to check");
@@ -656,15 +669,18 @@ fn curseforge_through_the_page(cx: &mut gpui_kit::TestAppContext) {
 fn choosing_a_source_by_its_key_does_not_read_the_shell_mid_update(
     cx: &mut gpui_kit::TestAppContext,
 ) {
-    use super::dispatch::on_live_intent;
-    use super::{State, Wiring};
-    use crate::backend::Backend;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
     use gpui_kit::Modifiers;
     use lumilio_core::{ContentSourceInfo, ProjectKind};
     use lumilio_ui::LauncherShell;
     use lumilio_ui::live::{DiscoverQuery, LiveIntent};
     use lumilio_ui::route::Route;
-    use std::{cell::RefCell, rc::Rc};
+
+    use super::dispatch::on_live_intent;
+    use super::{State, Wiring};
+    use crate::backend::Backend;
 
     // The shipped backend wakes GPUI from its real tokio worker threads.
     cx.executor().allow_parking();
@@ -725,14 +741,17 @@ fn choosing_a_source_by_its_key_does_not_read_the_shell_mid_update(
 /// one: they must not take the page back there.
 #[gpui_kit::test]
 fn filters_for_a_source_left_behind_do_not_take_the_page_back(cx: &mut gpui_kit::TestAppContext) {
-    use super::discover::run_load_filters;
-    use super::{State, Wiring};
-    use crate::backend::Backend;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    use std::time::{Duration, Instant};
+
     use lumilio_core::ProjectKind;
     use lumilio_ui::LauncherShell;
     use lumilio_ui::live::DiscoverQuery;
-    use std::time::{Duration, Instant};
-    use std::{cell::RefCell, rc::Rc};
+
+    use super::discover::run_load_filters;
+    use super::{State, Wiring};
+    use crate::backend::Backend;
 
     cx.executor().allow_parking();
     let dir = tempfile::tempdir().unwrap();

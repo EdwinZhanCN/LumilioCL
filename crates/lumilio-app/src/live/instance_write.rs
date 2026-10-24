@@ -1,12 +1,13 @@
-use super::instance::{ContentAction, content_notice, load_instance, load_section};
-use super::jobs::reload;
-use super::{Reload, Wiring};
 use gpui_kit::{App, WeakEntity, Window};
 use lumilio_core::{CancellationToken, ServiceError, SnapshotScope};
 use lumilio_ui::instance_detail::{
     InstanceDetailView, InstanceIntent, Operated, Section, export_notice,
 };
 use lumilio_ui::tr;
+
+use super::instance::{ContentAction, content_notice, load_instance, load_section};
+use super::jobs::reload;
+use super::{Reload, Wiring};
 
 /// One write on an instance: runs it, tells the view, and refreshes what it
 /// made stale. Failures keep the screen as it was and say what to do next.

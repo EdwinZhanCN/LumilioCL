@@ -5,16 +5,17 @@
 //! modification time), so an edited or replaced screenshot never shows a
 //! stale one and nothing is ever written into the game directory.
 
-use crate::discover::is_safe_file_name;
+use std::error::Error;
+use std::fmt::{Display, Formatter};
+use std::path::{Path, PathBuf};
+use std::time::UNIX_EPOCH;
+use std::{fmt, fs, io};
+
 use image::ImageReader;
 use image::imageops::FilterType;
 use sha1::{Digest, Sha1};
-use std::error::Error;
-use std::fmt::{self, Display, Formatter};
-use std::fs;
-use std::io;
-use std::path::{Path, PathBuf};
-use std::time::UNIX_EPOCH;
+
+use crate::discover::is_safe_file_name;
 
 const DIRECTORY: &str = "screenshots";
 /// Longest edge of a thumbnail, in pixels (a card shows it at half that).

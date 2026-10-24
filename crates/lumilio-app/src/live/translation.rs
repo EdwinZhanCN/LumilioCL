@@ -3,11 +3,12 @@
 //! the person asks. Every answer is checked against what is shown when it
 //! arrives, and dropped if the page has moved on.
 
-use super::jobs::{answer, job, outcome};
-use super::{POLL, Reload, Wiring};
 use gpui_kit::App;
 use lumilio_core::TextFormat;
 use lumilio_ui::tr;
+
+use super::jobs::{answer, job, outcome};
+use super::{POLL, Reload, Wiring};
 
 /// Asks MCIM for the summaries of one page of results from `source`, and
 /// shows those it has while the list is still search `seq`.

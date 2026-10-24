@@ -1,6 +1,7 @@
+use lumilio_core::recommended_memory_mb;
+
 use crate::live::SettingsView;
 use crate::tr;
-use lumilio_core::recommended_memory_mb;
 
 /// `4096 MB`, or `未设置`.
 #[must_use]

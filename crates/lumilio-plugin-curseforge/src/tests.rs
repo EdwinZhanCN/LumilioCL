@@ -1,7 +1,9 @@
-use super::*;
-use lumilio_plugin_api::{FetchResponse, SettingValue};
 use std::sync::Mutex;
+
+use lumilio_plugin_api::{FetchResponse, SettingValue};
 use url::Url;
+
+use super::*;
 
 /// A host that answers by full URL and remembers what was asked.
 #[derive(Default)]

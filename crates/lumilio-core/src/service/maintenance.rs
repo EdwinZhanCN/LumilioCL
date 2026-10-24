@@ -23,7 +23,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             let operations = self
                 .operations
                 .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
+                .expect("maintenance state lock was poisoned");
             operations.iter().next().cloned()
         };
         if let Some(busy) = busy {

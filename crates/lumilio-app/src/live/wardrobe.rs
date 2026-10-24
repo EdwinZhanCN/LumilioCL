@@ -1,11 +1,15 @@
 //! Appearance work is bound to the initiating detail's revision. Closing it
 //! cancels delayed reads; an accepted write is never retried automatically.
-use super::{Reload, Wiring, jobs::reload};
+
 use gpui_kit::App;
 use lumilio_core::{AccountKind, AppearanceChange, ServiceError};
-use lumilio_ui::{
-    live::account_failure, platform, skin_dialog::SkinIntent, wardrobe::WardrobeAction,
-};
+use lumilio_ui::live::account_failure;
+use lumilio_ui::platform;
+use lumilio_ui::skin_dialog::SkinIntent;
+use lumilio_ui::wardrobe::WardrobeAction;
+
+use super::jobs::reload;
+use super::{Reload, Wiring};
 
 struct RunOutcome {
     online: bool,

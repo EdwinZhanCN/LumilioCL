@@ -1,3 +1,5 @@
+use url::Url;
+
 use super::project::decode_project;
 use super::search::decode_search;
 use super::tags::{
@@ -6,7 +8,6 @@ use super::tags::{
 };
 use super::versions::decode_versions;
 use super::*;
-use url::Url;
 
 mod calls;
 

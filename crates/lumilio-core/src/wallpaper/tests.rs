@@ -1,5 +1,6 @@
-use super::*;
 use image::{ImageFormat, RgbaImage};
+
+use super::*;
 
 fn picture(dir: &Path, name: &str, width: u32, height: u32, color: [u8; 4]) -> std::path::PathBuf {
     let path = dir.join(name);

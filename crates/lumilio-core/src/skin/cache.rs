@@ -2,11 +2,19 @@
 //! on disk (a day) and in memory (an hour), so repeated reads do not ask
 //! Mojang again. Concurrent reads share one download.
 //! No account credentials enter.
-use super::{AppearanceError, PICTURE_LIMIT, mojang::texture_url};
-use crate::transfer::Transport;
+
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::Arc;
+use std::time::Duration;
+
 use sha2::{Digest, Sha256};
-use std::{collections::HashMap, path::PathBuf, sync::Arc, time::Duration};
-use tokio::{sync::Mutex, time::Instant};
+use tokio::sync::Mutex;
+use tokio::time::Instant;
+
+use super::mojang::texture_url;
+use super::{AppearanceError, PICTURE_LIMIT};
+use crate::transfer::Transport;
 
 #[derive(Default)]
 struct Entry {

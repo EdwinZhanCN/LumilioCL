@@ -21,7 +21,6 @@
 | 观察外观 | 详情里的立体预览 | 拖动或方向键旋转，滚轮或 + / − 缩放，双击或 R 复位；第二层与披风一起画 |  | `lumilio-ui/src/skin_view/mod.rs` |
 | 没有可用默认贴图 | 未安装游戏或客户端 jar 无默认皮肤 | 灰色模型与说明；安装游戏后重新打开详情读取贴图 |  | `lumilio-ui/src/skin_view/mod.rs` |
 | 应用外观草稿 | 编辑面「应用到账户」 | 仅提交变更；已接受的在线写入显示同步中，失败保留草稿 |  | `lumilio-ui/src/wardrobe/editor.rs` |
-| 编辑库里的皮肤 | 皮肤 ⋯ 菜单「改名…」「编辑…」 | 改名只改显示的名字；贴图、模型与披风先成草稿，保存后更新库条目 |  | `lumilio-ui/src/wardrobe/mod.rs` |
 | 还原试穿 | 人物下的「还原」 | 预览回到账户自己的外观，账户与库都不变 |  | `lumilio-ui/src/wardrobe/render.rs` |
 | 应用试穿的皮肤 | 人物下的「应用」 | 正版账户提交这张皮肤及其搭配披风，接受后显示同步中；离线账户保存为当前选择 |  | `lumilio-ui/src/wardrobe/render.rs` |
 | 编辑外观 | 人物下的「编辑外观…」 | 右侧换成编辑面：纹理、手臂与披风成草稿，应用前不更改账户或库；离线账户在这里选皮肤来源 |  | `lumilio-ui/src/wardrobe/render.rs` |
@@ -33,3 +32,4 @@
 | 试穿 | 点皮肤网格里的图片 | 人物临时换上这张皮肤（和它搭配的披风），标「试穿中」，下面换成「还原 / 应用」；再点一次还原 |  | `lumilio-ui/src/wardrobe/render.rs` |
 | 管理皮肤库 | 每张图片下的 ⋯ 菜单 | 改名、编辑、上下移与移除；顺序持久保存，移除库条目不破坏离线账户已选的文件 |  | `lumilio-ui/src/wardrobe/render.rs` |
 | 保存离线外观 | 「编辑外观…」后的皮肤来源表单 | 默认、本地皮肤与披风、LittleSkin 或自定义站保存为 SkinChoice；预览更新，启动仍按 ADR 0024 |  | `lumilio-ui/src/wardrobe/render.rs` |
+| 编辑库里的皮肤 | 皮肤 ⋯ 菜单「改名…」「编辑…」 | 改名只改显示的名字；贴图、模型与披风先成草稿，保存后更新库条目 |  | `lumilio-ui/src/wardrobe/wardrobe_view.rs` |

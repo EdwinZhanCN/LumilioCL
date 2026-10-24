@@ -3,6 +3,8 @@
 //! The plan is previewed with [`preview_count`] and carried out with [`apply`],
 //! which edits the schematic in memory; the host writes the result.
 
+pub use lumilio_block_assets::BlockCatalog;
+
 use crate::{BlockState, Region, UniversalSchematic};
 
 /// How one property of the source block must look.
@@ -199,8 +201,6 @@ impl MappingRow {
         target
     }
 }
-
-pub use lumilio_block_assets::BlockCatalog;
 
 /// How many stored cells [`apply_mapping`] would change, and how many each
 /// row changes, in row order.

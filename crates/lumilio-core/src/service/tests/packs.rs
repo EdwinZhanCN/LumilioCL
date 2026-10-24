@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use super::super::error::ServiceError;
 use super::{
     World, file_url, instance_with_profile, no_leftovers, pack_file, pack_index, sha1_hex, world,
@@ -7,7 +9,6 @@ use crate::activity::CancellationToken;
 use crate::activity_log::{RetryAction, TaskOutcome};
 use crate::history::{ChangeKind, HistoryEvent, HistoryLog};
 use crate::instance::{InstanceSettings, Loader, StoreError};
-use std::sync::Arc;
 
 #[tokio::test]
 async fn an_exported_pack_carries_everything_when_modrinth_is_out_of_reach_and_needs_the_lease() {

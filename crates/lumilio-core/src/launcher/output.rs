@@ -4,14 +4,15 @@
 //! closed. Modrinth App keeps `logs/launcher_log.txt` the same way
 //! (packages/app-lib/src/state/process.rs in modrinth/code).
 
-use super::LAUNCHER_NAME;
-use super::types::LaunchRequest;
-use crate::instance::Loader;
-use crate::java::JavaRuntime;
 use std::fs::File;
 use std::io::{LineWriter, Write as _};
 use std::path::Path;
 use std::time::Duration;
+
+use super::LAUNCHER_NAME;
+use super::types::LaunchRequest;
+use crate::instance::Loader;
+use crate::java::JavaRuntime;
 
 /// The record's file name in the game's `logs/` folder.
 pub const GAME_OUTPUT_LOG: &str = "lumilio-output.log";

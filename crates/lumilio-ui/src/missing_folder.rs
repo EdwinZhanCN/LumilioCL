@@ -4,11 +4,12 @@
 
 use std::rc::Rc;
 
-use crate::key::Key;
-use crate::theme;
-use crate::tr;
-use gpui::{App, Window, div, prelude::*, px};
+use gpui::prelude::*;
+use gpui::{App, Window, div, px};
 use gpui_component::{WindowExt as _, h_flex};
+
+use crate::key::Key;
+use crate::{theme, tr};
 
 const DIALOG_WIDTH: f32 = 440.;
 

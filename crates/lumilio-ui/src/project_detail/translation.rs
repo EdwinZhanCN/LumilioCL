@@ -2,14 +2,15 @@
 //! Chinese summary in the header, and the body translated on request by the
 //! provider chosen in Settings. The title is never translated.
 
-use super::{DetailIntent, DetailState, ProjectDetailView};
-use crate::assets::UiIcon;
-use crate::key::{Key, KeyKind};
-use crate::tr;
 use gpui::prelude::*;
 use gpui::{Context, Window};
 use gpui_component::{Icon, Selectable as _};
 use lumilio_core::{Project, TextFormat, TranslatedDocument, TranslationError};
+
+use super::{DetailIntent, DetailState, ProjectDetailView};
+use crate::assets::UiIcon;
+use crate::key::{Key, KeyKind};
+use crate::tr;
 
 /// What the page knows about translation. Every change of project or of the
 /// setting moves `revision` and `request` on, so an answer that arrives

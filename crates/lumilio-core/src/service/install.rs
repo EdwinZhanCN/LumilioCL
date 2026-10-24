@@ -1,3 +1,5 @@
+use tokio::sync::mpsc;
+
 use super::error::ServiceError;
 use super::{LauncherService, loader_text};
 use crate::activity::CancellationToken;
@@ -7,7 +9,6 @@ use crate::instance::{InstanceRecord, Loader, StoreError};
 use crate::launcher::{LaunchServiceError, LaunchUpdate};
 use crate::loader::LAUNCHABLE_LOADERS;
 use crate::transfer::Transport;
-use tokio::sync::mpsc;
 
 impl<T: Transport + Clone> LauncherService<T> {
     /// Installs an instance's game files without starting it. The task shows

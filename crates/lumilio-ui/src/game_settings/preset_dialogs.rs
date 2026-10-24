@@ -1,16 +1,21 @@
 //! Making and naming presets, and choosing what a preset shares.
-use super::form::{self, Form, Sending};
+
+use std::collections::BTreeSet;
+
+use gpui::prelude::*;
+use gpui::{App, Context, Entity, IntoElement, Render, SharedString, Window, div, px};
+use gpui_component::input::{Input, InputEvent, InputState};
+use gpui_component::select::{SearchableVec, Select, SelectEvent, SelectState};
+use gpui_component::{IndexPath, StyledExt as _, h_flex, v_flex};
+use lumilio_core::{GameSettingGroup, SettingsPreset, game_setting_group};
+
+use super::form;
+use super::form::{Form, Sending};
 use super::labels::{GROUPS, group_detail, group_label, setting_label};
 use super::table::{OptionLine, Source, sort_lines};
 use crate::controls::Checkbox;
 use crate::theme::ShellColors;
 use crate::{kit, tr};
-use gpui::{App, Context, Entity, IntoElement, Render, SharedString, Window, div, prelude::*, px};
-use gpui_component::input::{Input, InputEvent, InputState};
-use gpui_component::select::{SearchableVec, Select, SelectEvent, SelectState};
-use gpui_component::{IndexPath, StyledExt as _, h_flex, v_flex};
-use lumilio_core::{GameSettingGroup, SettingsPreset, game_setting_group};
-use std::collections::BTreeSet;
 
 const NAME_LIMIT: usize = 80;
 

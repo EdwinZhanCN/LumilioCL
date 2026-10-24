@@ -1,14 +1,15 @@
 //! Home's groups below the world that need the library (design language §5):
 //! where the continued game left off, and its record.
 
+use gpui::prelude::*;
+use gpui::{AnyElement, IntoElement, px};
+use gpui_component::{h_flex, v_flex};
+
 use super::controls::{LiveCtx, send};
 use crate::home::{HomePresentation, body_label};
 use crate::kit;
 use crate::live::{HomePlaces, LiveIntent, Place, PlaceKind, PlacePicture};
 use crate::theme::ShellColors;
-use gpui::prelude::*;
-use gpui::{AnyElement, IntoElement, px};
-use gpui_component::{h_flex, v_flex};
 
 /// What the library adds under the world, or `None` when it knows nothing
 /// about the game Home is about.

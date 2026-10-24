@@ -1,10 +1,12 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
+use gpui::{Modifiers, TestAppContext};
+use lumilio_core::{LaunchPhase, LaunchSignal};
+
 use super::super::{ActivitySummary, LauncherShell, ShellIntent};
 use super::{continuing, fill, painted_at, settle};
 use crate::home::{HomeIntent, HomePresentation, Subject, WorldHint};
-use gpui::{Modifiers, TestAppContext};
-use lumilio_core::{LaunchPhase, LaunchSignal};
-use std::cell::RefCell;
-use std::rc::Rc;
 
 #[gpui::test]
 fn keys_on_the_world_keep_their_colours_and_shift_on_hover(cx: &mut TestAppContext) {
@@ -127,9 +129,10 @@ fn pressing_continue_plays_the_launch_moment_through_every_state(cx: &mut TestAp
 /// told there too, once, with the failed step's cause behind 技术详情.
 #[gpui::test]
 fn a_failure_away_from_home_floats_up_as_a_toast(cx: &mut TestAppContext) {
+    use lumilio_core::LaunchFailure;
+
     use crate::route::Route;
     use crate::toast::ToastKind;
-    use lumilio_core::LaunchFailure;
 
     cx.update(gpui_component::init);
     let (shell, cx) = cx.add_window_view(|_, cx| {
@@ -297,9 +300,10 @@ fn game(id: &str) -> lumilio_core::InstanceRecord {
 
 /// A world, then a server that has answered.
 fn places_of(instance: &str) -> crate::live::HomePlaces {
+    use lumilio_core::{GameMode, Motd, PackPolicy, ServerEntry, ServerStatus, WorldInfo};
+
     use crate::live::{HomePlaces, Place, PlaceKind};
     use crate::places::ServerState;
-    use lumilio_core::{GameMode, Motd, PackPolicy, ServerEntry, ServerStatus, WorldInfo};
     let world = WorldInfo {
         folder: "New World".into(),
         name: "新的世界".into(),

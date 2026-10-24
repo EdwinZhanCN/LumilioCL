@@ -1,9 +1,6 @@
-use super::model::ContentFilter;
-use super::model::title_of;
-use super::model::visible;
-use lumilio_core::{ContentEntry, ReleaseChannel, Version};
+use lumilio_core::{ContentEntry, ContentItem, ContentSource, ReleaseChannel, Version};
 
-use lumilio_core::{ContentItem, ContentSource};
+use super::model::{ContentFilter, title_of, visible};
 
 fn entry(name: &str, enabled: bool, title: Option<&str>, update: bool) -> ContentEntry {
     ContentEntry {

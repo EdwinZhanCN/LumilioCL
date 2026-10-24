@@ -1,3 +1,9 @@
+use std::rc::Rc;
+
+use gpui::prelude::*;
+use gpui::{App, Context, IntoElement, Render, Window, div};
+use gpui_component::{TITLE_BAR_HEIGHT, TitleBar, v_flex};
+
 use super::{LauncherShell, ShellIntent};
 use crate::home::{HomeIntent, ShellHomeColors};
 use crate::kit::{Emit, ViewIntent};
@@ -7,10 +13,6 @@ use crate::project_detail::ProjectDetailView;
 use crate::route::Route;
 use crate::theme::ShellColors;
 use crate::{home, kit, navigation, pages, placeholders, theme, toast};
-use gpui::prelude::*;
-use gpui::{App, Context, IntoElement, Render, Window, div};
-use gpui_component::{TITLE_BAR_HEIGHT, TitleBar, v_flex};
-use std::rc::Rc;
 
 impl Render for LauncherShell {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {

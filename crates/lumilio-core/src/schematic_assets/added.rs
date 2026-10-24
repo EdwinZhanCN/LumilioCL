@@ -4,9 +4,8 @@
 //! files stay where they are; they join the instance's overlays, after its
 //! mods and enabled packs, while they exist.
 
-use std::fs;
-use std::io;
 use std::path::{Path, PathBuf};
+use std::{fs, io};
 
 /// The packs added for an instance, in the order they were added. A list
 /// that cannot be read is empty.

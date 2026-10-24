@@ -1,6 +1,7 @@
 //! Ravines of the 1.18+ Overworld (the fork's `carvers.c`): where the canyon
 //! carver starts and the path its ellipsoids walk. Both come from the seed
 //! alone; which blocks open depends on the terrain the ravine cuts.
+
 use crate::{Error, Version, ffi};
 
 #[derive(Clone, Debug, PartialEq)]

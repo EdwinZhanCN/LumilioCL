@@ -1,9 +1,11 @@
-use super::*;
-use crate::transfer::{FileTransport, OfficialSource, SourceProvider};
-use sha1::{Digest, Sha1};
 use std::io::Write;
 use std::sync::Arc;
+
+use sha1::{Digest, Sha1};
 use zip::write::SimpleFileOptions;
+
+use super::*;
+use crate::transfer::{FileTransport, OfficialSource, SourceProvider};
 
 fn sha1_of(text: &str) -> String {
     Sha1::digest(text.as_bytes())

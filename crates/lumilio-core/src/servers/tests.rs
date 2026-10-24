@@ -1,9 +1,10 @@
-use super::ping::{parse_address, probe_at, read_status};
-use super::*;
 use image::ImageEncoder as _;
 use image::codecs::png::PngEncoder;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
+
+use super::ping::{parse_address, probe_at, read_status};
+use super::*;
 
 /// A base64 PNG, as both `servers.dat` and a status `favicon` carry one.
 fn png_b64(width: u32, height: u32) -> String {
@@ -155,7 +156,7 @@ fn a_status_keeps_the_look_of_its_message() {
     )
     .unwrap();
     let colors: Vec<_> = status.motd.spans.iter().map(|span| span.color).collect();
-    assert_eq!(colors, [None, Some(0x55_FF55)]);
+    assert_eq!(colors, [None, Some(0x55_ff55)]);
 }
 
 #[test]

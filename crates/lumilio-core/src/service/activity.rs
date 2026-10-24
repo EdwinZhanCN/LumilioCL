@@ -1,3 +1,7 @@
+use std::path::Path;
+
+use tokio::sync::mpsc;
+
 use super::LauncherService;
 use super::error::ServiceError;
 use super::types::{ActivityView, Traffic};
@@ -5,8 +9,6 @@ use crate::activity::CancellationToken;
 use crate::activity_log::RetryAction;
 use crate::launcher::LaunchUpdate;
 use crate::transfer::{SourceChain, Transport};
-use std::path::Path;
-use tokio::sync::mpsc;
 
 impl<T: Transport + Clone> LauncherService<T> {
     /// Asks a running task to stop. `false` when the id is unknown, already
@@ -17,8 +19,8 @@ impl<T: Transport + Clone> LauncherService<T> {
     }
 
     /// Runs a task again from the input it was started with (its
-    /// [`FinishedTask::retry`]). It is a new task of its own: the old entry
-    /// stays in the history.
+    /// [`FinishedTask::retry`](crate::FinishedTask::retry)). It is a new task
+    /// of its own: the old entry stays in the history.
     pub async fn retry_task(
         &self,
         action: RetryAction,
@@ -133,10 +135,7 @@ impl<T: Transport + Clone> LauncherService<T> {
 
     /// Forgets every finished task; running ones are untouched.
     pub fn clear_finished(&self) -> std::io::Result<()> {
-        let mut board = self
-            .board
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut board = self.board.lock().expect("activity board lock was poisoned");
         self.log.compact(0)?;
         board.clear_unrecorded();
         Ok(())
@@ -144,10 +143,7 @@ impl<T: Transport + Clone> LauncherService<T> {
 
     /// Running tasks and the most recent finished ones.
     pub fn activity(&self, finished_limit: usize) -> ActivityView {
-        let board = self
-            .board
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let board = self.board.lock().expect("activity board lock was poisoned");
         let active = board.active().to_vec();
         let mut finished = self.log.recent(None, finished_limit).unwrap_or_default();
         for terminal in board.unrecorded() {
@@ -159,7 +155,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             let cancels = self
                 .cancels
                 .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
+                .expect("activity board lock was poisoned");
             (
                 cancels.keys().copied().collect(),
                 cancels

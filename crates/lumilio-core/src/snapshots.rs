@@ -1,16 +1,16 @@
 //! Snapshots: zip backups of an instance's worlds and settings.
 
-use crate::layout::Layout;
 use std::error::Error;
-use std::fmt::{self, Display, Formatter};
-use std::fs;
-use std::io::{self, Read, Write};
+use std::fmt::{Display, Formatter};
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::{fmt, fs, io};
 
 use serde::{Deserialize, Serialize};
 use zip::write::SimpleFileOptions;
 
 use crate::discover::is_safe_file_name;
+use crate::layout::Layout;
 
 const MANIFEST: &str = "snapshot.json";
 /// Largest total uncompressed size a restore will extract.

@@ -1,7 +1,9 @@
-use super::camera::Camera;
-use super::*;
 use gpui::{Modifiers, TestAppContext, point};
 use lumilio_plugin_api::map::{BaseMapInfo, Dimension, WorldId};
+
+use super::camera::Camera;
+use super::*;
+
 #[test]
 fn zoom_keeps_pointer_world_coordinate_and_lod_uses_fourfold_steps() {
     let mut camera = Camera::default();

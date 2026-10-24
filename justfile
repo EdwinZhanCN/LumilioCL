@@ -8,7 +8,7 @@ default:
     @just --list
 
 # The full loop, in order. Run it before handing off a code change.
-check: prune build test clippy fmt
+check: prune build test clippy fmt rustdoc
 
 # Cargo never deletes stale artifacts from target/. Past `limit` GB, clean it:
 # one full rebuild is cheaper than every rustc call scanning a huge deps dir.
@@ -56,6 +56,10 @@ clippy:
 # Fail if anything is not rustfmt-formatted.
 fmt:
     cargo fmt --check
+
+# Check API links, including internal modules moved behind public facades.
+rustdoc:
+    RUSTDOCFLAGS="${RUSTDOCFLAGS:-} -D rustdoc::broken_intra_doc_links" cargo doc --workspace --no-deps --document-private-items
 
 # Format everything in place.
 format:

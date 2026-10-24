@@ -1,6 +1,7 @@
+use std::time::Duration;
+
 use super::*;
 use crate::instance::{Loader, NewInstance};
-use std::time::Duration;
 
 fn exit(code: Option<i32>, was_running: bool, killed: bool) -> GameExit {
     GameExit {

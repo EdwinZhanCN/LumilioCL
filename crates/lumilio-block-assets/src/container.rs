@@ -18,8 +18,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::ContainerError;
 use crate::catalog::BlockCatalog;
-use crate::pack::{BakedAssets, BakedBlockstate, BakedModel, BakedPack, BakedTexture};
-use crate::pack::{ContentHash, Image, PackMeta, PaintingVariant, ParentModel};
+use crate::pack::{
+    BakedAssets, BakedBlockstate, BakedModel, BakedPack, BakedTexture, ContentHash, Image,
+    PackMeta, PaintingVariant, ParentModel,
+};
 
 const MAGIC: &[u8; 8] = b"LUMIBAKE";
 /// The container format this crate writes and reads; a published index

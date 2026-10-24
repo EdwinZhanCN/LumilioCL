@@ -8,9 +8,8 @@
 //! journal, library and folders, then either put the profile back or finish the
 //! cleanup. Nothing is ever replayed blindly.
 
-use std::fs;
-use std::io;
 use std::path::{Path, PathBuf};
+use std::{fs, io};
 
 use serde::{Deserialize, Serialize};
 

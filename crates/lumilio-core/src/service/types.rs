@@ -1,11 +1,12 @@
+use std::collections::BTreeSet;
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use crate::activity_log::{ActiveTask, FinishedTask};
 use crate::content::ContentError;
 use crate::discover::{
     Catalog, CategoryTag, GameVersionTag, KindAbilities, LoaderTag, Project, Version,
 };
 use crate::instance::{Collection, InstanceRecord};
-use std::collections::BTreeSet;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 /// What the library page shows.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -18,7 +19,8 @@ pub struct Library {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ActivityView {
     pub active: Vec<ActiveTask>,
-    /// Ids among `active` that [`LauncherService::cancel_task`] can stop.
+    /// Ids among `active` that
+    /// [`LauncherService::cancel_task`](crate::LauncherService::cancel_task) can stop.
     pub cancellable: BTreeSet<u64>,
     /// Ids among `active` whose downloads are paused.
     pub paused: BTreeSet<u64>,

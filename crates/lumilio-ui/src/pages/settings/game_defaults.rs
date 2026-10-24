@@ -1,17 +1,17 @@
-use super::super::live::LiveCtx;
-use super::fullscreen_choices;
-use super::rows::{edit, row};
-use super::text::{commands_text, list_text, memory_help, memory_text, window_text};
-use crate::kit;
-use crate::live::{LiveIntent, SettingsView};
-use crate::settings_dialog::{DialogSpec, FieldKind, FieldSpec};
-use crate::settings_forms as forms;
-use crate::tr;
+use std::rc::Rc;
+
 use gpui::prelude::*;
 use gpui::{AnyElement, IntoElement};
 use gpui_component::v_flex;
 use lumilio_core::recommended_memory_mb;
-use std::rc::Rc;
+
+use super::super::live::LiveCtx;
+use super::fullscreen_choices;
+use super::rows::{edit, row};
+use super::text::{commands_text, list_text, memory_help, memory_text, window_text};
+use crate::live::{LiveIntent, SettingsView};
+use crate::settings_dialog::{DialogSpec, FieldKind, FieldSpec};
+use crate::{kit, settings_forms as forms, tr};
 
 pub(super) fn game_defaults(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
     let colors = ctx.colors;

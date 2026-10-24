@@ -1,6 +1,7 @@
 //! Decoration features: per chunk, the decoration random runs a placed
 //! feature's placement modifiers (the fork's `decorations.c`, from per-release
 //! tables of the original game data).
+
 use crate::{Dimension, Error, Version, ffi};
 
 /// Placed features the fork tables, in its `DecorationType` order.

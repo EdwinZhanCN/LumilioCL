@@ -1,15 +1,15 @@
+use std::path::Path;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+
+use futures_util::{FutureExt, stream};
+
 use super::budget::ConnectionBudget;
 use super::engine::TransferEngine;
 use super::request::TransferRequest;
 use super::transport::{Transport, TransportFuture, TransportResponse};
 use crate::CancellationToken;
-use futures_util::FutureExt;
-use futures_util::stream;
-use std::path::Path;
-use std::sync::Arc;
-use std::sync::Mutex;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::time::Duration;
 
 /// Serves every file slowly and records how many it served at once.
 #[derive(Clone, Default)]

@@ -66,7 +66,7 @@ Consequences: 通用二进制与读不懂的格式仍视为原生
 
 - [crates/lumilio-core/src/java/mod.rs](../../crates/lumilio-core/src/java/mod.rs)
 - [crates/lumilio-core/src/java/choice.rs](../../crates/lumilio-core/src/java/choice.rs)
-- [crates/lumilio-core/src/java_runtime.rs](../../crates/lumilio-core/src/java_runtime.rs)
+- [crates/lumilio-core/src/java_runtime/mod.rs](../../crates/lumilio-core/src/java_runtime/mod.rs)
 - [crates/lumilio-core/src/service/java.rs](../../crates/lumilio-core/src/service/java.rs)
 - [crates/lumilio-core/src/launcher/phases.rs](../../crates/lumilio-core/src/launcher/phases.rs)
 - https://launchermeta.mojang.com/v1/products/java-runtime/2ec0cc96c44e5a76b9c8b7c39df7210883d12871/all.json

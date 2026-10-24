@@ -1,5 +1,6 @@
-use super::*;
 use lumilio_plugin_api::{AnalysisSource, FetchResponse, GameFacts, SettingValue};
+
+use super::*;
 
 struct NoIo;
 impl HostContext for NoIo {

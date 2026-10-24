@@ -1,11 +1,13 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
+use gpui::{Modifiers, TestAppContext};
+use lumilio_core::{LauncherSettings, PackPolicy, ServerEntry, ServerStatus};
+
 use super::super::intent::{InstanceIntent, Section};
 use super::super::panels::{Arrived, Confirm, ServerState};
 use super::super::{InstanceDetailView, TAB_WORLDS};
 use super::{click, record, rooted};
-use gpui::{Modifiers, TestAppContext};
-use lumilio_core::{LauncherSettings, PackPolicy, ServerEntry, ServerStatus};
-use std::cell::RefCell;
-use std::rc::Rc;
 
 fn server(name: &str, address: &str) -> ServerEntry {
     ServerEntry {

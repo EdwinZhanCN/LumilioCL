@@ -1,16 +1,16 @@
 //! The Gallery tab and its image viewer. After `Gallery.vue` and the
 //! `ImageViewerEditor` it opens (GPL-3.0-only; ADR 0022).
 
-use super::{ProjectDetailView, date_label};
-use crate::assets::UiIcon;
-use crate::key::Key;
-use crate::kit;
-use crate::theme::ShellColors;
-use crate::tr;
 use gpui::prelude::*;
 use gpui::{Context, ObjectFit, div, img, px};
 use gpui_component::{Icon, StyledExt as _, h_flex, v_flex};
 use lumilio_core::Project;
+
+use super::{ProjectDetailView, date_label};
+use crate::assets::UiIcon;
+use crate::key::Key;
+use crate::theme::ShellColors;
+use crate::{kit, tr};
 
 impl ProjectDetailView {
     // ia[discover]: 画廊 | 详情页「画廊」页签（有图才出现）：卡片带标题、说明、日期 | 点一张在页内放大，可前后翻、在浏览器打开、关闭

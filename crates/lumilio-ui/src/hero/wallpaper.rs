@@ -9,15 +9,15 @@
 
 use std::path::{Path, PathBuf};
 
+use gpui::prelude::*;
 use gpui::{
     AnyElement, Bounds, Entity, Hsla, ObjectFit, Window, canvas, div, fill, img, linear_color_stop,
-    linear_gradient, point, prelude::*, px,
+    linear_gradient, point, px,
 };
-
-use crate::pictures::PictureCache;
 
 use super::noise::{bayer4, smoothstep};
 use super::{MAX_COLUMNS, MIN_COLUMNS, TARGET_TEXEL};
+use crate::pictures::PictureCache;
 use crate::theme;
 
 /// How dark the shades behind the copy get, at their darkest.

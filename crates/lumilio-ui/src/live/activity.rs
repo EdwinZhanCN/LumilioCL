@@ -1,9 +1,9 @@
-use super::library::relative_time;
 use lumilio_core::{
     ActiveTask, ActivityView, FinishedTask, RecoveryNote, TaskAction, TaskCategory, TaskLabel,
     TaskOutcome,
 };
 
+use super::library::relative_time;
 use crate::tr;
 
 #[derive(Clone, Debug, PartialEq)]

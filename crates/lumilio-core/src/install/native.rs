@@ -1,8 +1,3 @@
-use super::plan::NativeBundle;
-use super::{
-    MAX_ARCHIVE_ENTRIES, MAX_ARCHIVE_EXPANDED_SIZE, MAX_ARCHIVE_FILE_SIZE, PUBLICATION_SEQUENCE,
-};
-use crate::activity::CancellationToken;
 use std::collections::BTreeSet;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
@@ -11,7 +6,14 @@ use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::Ordering;
 use std::{fmt, io};
+
 use zip::ZipArchive;
+
+use super::plan::NativeBundle;
+use super::{
+    MAX_ARCHIVE_ENTRIES, MAX_ARCHIVE_EXPANDED_SIZE, MAX_ARCHIVE_FILE_SIZE, PUBLICATION_SEQUENCE,
+};
+use crate::activity::CancellationToken;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ArchiveLimits {

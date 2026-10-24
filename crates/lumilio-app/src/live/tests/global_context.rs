@@ -6,13 +6,12 @@
 //! automatic-download setting; game versions that do not exist keep a
 //! launch from downloading anything.
 
-use super::super::context::follow;
-use super::super::discover::install_target;
-use super::super::dispatch::{on_live_intent, on_shell_intent};
-use super::super::instance::open_instance;
-use super::super::launch::play;
-use super::super::{State, Wiring};
-use crate::backend::{Backend, Service};
+use std::cell::RefCell;
+use std::future::Future;
+use std::rc::Rc;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+
 use gpui_kit::{AppContext as _, Entity, TestAppContext, VisualTestContext};
 use lumilio_core::{HistoryEvent, Loader, ProjectKind, SessionOutcome};
 use lumilio_ui::home::{HomeIntent, HomePresentation};
@@ -20,11 +19,14 @@ use lumilio_ui::instance_detail::InstanceIntent;
 use lumilio_ui::live::{LiveIntent, attention_rows, library_cards};
 use lumilio_ui::route::Route;
 use lumilio_ui::{LauncherShell, ShellIntent};
-use std::cell::RefCell;
-use std::future::Future;
-use std::rc::Rc;
-use std::sync::Arc;
-use std::time::{Duration, Instant};
+
+use super::super::context::follow;
+use super::super::discover::install_target;
+use super::super::dispatch::{on_live_intent, on_shell_intent};
+use super::super::instance::open_instance;
+use super::super::launch::play;
+use super::super::{State, Wiring};
+use crate::backend::{Backend, Service};
 
 const WAIT: Duration = Duration::from_secs(10);
 

@@ -1,7 +1,14 @@
-use super::*;
-use gpui::AnyElement;
-use lumilio_core::{PairedCape, SkinModel};
 use std::path::PathBuf;
+
+use gpui::AnyElement;
+use gpui::prelude::*;
+use gpui_component::StyledExt as _;
+use lumilio_core::{PairedCape, SkinModel};
+
+use super::{
+    Arc, CAPE_THUMB, Context, IntoElement, Key, ShellColors, Texture, Trial, Wardrobe,
+    WardrobeAction, Window, arms, div, h_flex, kit, px, texture, tile, tr, tr_all, v_flex,
+};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) enum Target {
@@ -449,19 +456,4 @@ impl Wardrobe {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn draft_changes_do_not_change_its_original_values() {
-        let mut draft = Editor::new(Target::Current, SkinModel::Wide, PairedCape::Hidden);
-        assert!(!draft.changed());
-        draft.edited.model = SkinModel::Slim;
-        draft.edited.cape = PairedCape::Cape("owned".into());
-        draft.edited.replacement = Some(PathBuf::from("new.png"));
-        assert!(draft.changed());
-        assert_eq!(draft.original.model, SkinModel::Wide);
-        assert_eq!(draft.original.cape, PairedCape::Hidden);
-        assert!(draft.original.replacement.is_none());
-    }
-}
+mod tests;

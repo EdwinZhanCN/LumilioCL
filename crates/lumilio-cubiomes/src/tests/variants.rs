@@ -1,6 +1,7 @@
 //! Structure start variants against the structure starts that original
 //! servers saved (`crates/lumilio-xtask/src/worldgen/save_golden.py`, read by
 //! `cargo xtask worldgen-save-read`; rows `seed dimension kind x z variant`).
+
 use crate::{Bastion, Dimension, Structure, Variant, Version};
 
 macro_rules! variant_golden {

@@ -6,16 +6,15 @@
 
 use std::rc::Rc;
 
-use crate::key::Key;
-use gpui::{App, Context, Entity, IntoElement, Render, Window, div, prelude::*, px};
-use gpui_component::IndexPath;
+use gpui::prelude::*;
+use gpui::{App, Context, Entity, IntoElement, Render, Window, div, px};
 use gpui_component::input::{Input, InputState, Textarea, TextareaState};
 use gpui_component::select::{SearchableVec, Select, SelectState};
-use gpui_component::{StyledExt as _, WindowExt as _, h_flex, v_flex};
+use gpui_component::{IndexPath, StyledExt as _, WindowExt as _, h_flex, v_flex};
 
-use crate::kit;
-use crate::theme::{self, ShellColors};
-use crate::tr;
+use crate::key::Key;
+use crate::theme::ShellColors;
+use crate::{kit, theme, tr};
 
 const DIALOG_WIDTH: f32 = 480.;
 

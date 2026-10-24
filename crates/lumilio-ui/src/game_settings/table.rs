@@ -2,13 +2,17 @@
 //! section per group, one row per option with its value on the trailing side.
 //! A preset and a game draw the same table; only where values come from
 //! differs.
+
+use std::rc::Rc;
+
+use gpui::prelude::*;
+use gpui::{AnyElement, App, IntoElement, SharedString, Window};
+use gpui_component::v_flex;
+use lumilio_core::{GameSettingKind, GameSettingValue, game_setting_group, game_setting_kind};
+
 use super::labels::{GROUPS, group_label, setting_label, value_label};
 use crate::theme::ShellColors;
 use crate::{kit, tr};
-use gpui::{AnyElement, App, IntoElement, SharedString, Window, prelude::*};
-use gpui_component::v_flex;
-use lumilio_core::{GameSettingKind, GameSettingValue, game_setting_group, game_setting_kind};
-use std::rc::Rc;
 
 /// Where an option's value comes from.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

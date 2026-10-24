@@ -1,3 +1,7 @@
+use std::io::Write;
+
+use zip::write::SimpleFileOptions;
+
 use super::*;
 
 #[test]
@@ -51,8 +55,6 @@ fn importing_copies_once_and_never_replaces_other_content() {
         .collect();
     assert!(leftovers.is_empty());
 }
-use std::io::Write;
-use zip::write::SimpleFileOptions;
 
 fn write_zip(path: &Path, entries: &[(&str, &str)]) {
     let mut writer = zip::ZipWriter::new(fs::File::create(path).unwrap());

@@ -2,13 +2,14 @@
 //! Worlds tab and Home's 接着玩 say the same things about a place, in the
 //! same forms; only the picture and the keys are each list's own.
 
-use crate::kit;
-use crate::theme::ShellColors;
-use crate::tr;
+use std::sync::Arc;
+
 use gpui::RenderImage;
 use gpui::prelude::*;
 use lumilio_core::{ServerEntry, ServerStatus, WorldInfo};
-use std::sync::Arc;
+
+use crate::theme::ShellColors;
+use crate::{kit, tr};
 
 #[cfg(test)]
 mod tests;

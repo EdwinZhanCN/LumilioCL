@@ -1,12 +1,13 @@
+use std::rc::Rc;
+
+use gpui::prelude::*;
+use gpui::{AnyElement, App, IntoElement, SharedString, Window, div, px};
+use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
+use gpui_component::{Icon, h_flex};
+
 use crate::assets::UiIcon;
 use crate::key::Key;
 use crate::theme::ShellColors;
-use gpui::prelude::*;
-use gpui::{AnyElement, App, IntoElement, SharedString, Window, div, px};
-use gpui_component::menu::DropdownMenu as _;
-use gpui_component::menu::PopupMenuItem;
-use gpui_component::{Icon, h_flex};
-use std::rc::Rc;
 
 /// What a menu entry does when chosen.
 pub type MenuAction = Rc<dyn Fn(&mut Window, &mut App)>;

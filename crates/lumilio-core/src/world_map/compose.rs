@@ -1,9 +1,11 @@
 //! Coarser tiles built from finer ones, for base maps drawn only at level 0
 //! (plan W4): a tile at level `n` is its 4×4 children at level `n - 1`, each
 //! shrunk to a quarter of its width.
+
+use std::collections::BTreeSet;
+
 use lumilio_plugin_api::ImageData;
 use lumilio_plugin_api::map::{MAX_UNKNOWN, TILE_PIXELS, TileReply};
-use std::collections::BTreeSet;
 
 /// Children per side of a tile one level coarser.
 pub const SPLIT: i32 = 4;

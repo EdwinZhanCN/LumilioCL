@@ -5,9 +5,8 @@
 //! for Diagnostics to show.
 
 use std::collections::BTreeSet;
-use std::fs;
-use std::io;
 use std::path::{Path, PathBuf};
+use std::{fs, io};
 
 use serde::{Deserialize, Serialize};
 

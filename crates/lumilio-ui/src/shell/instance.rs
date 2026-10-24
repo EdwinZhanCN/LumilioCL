@@ -1,9 +1,10 @@
+use gpui::prelude::*;
+use gpui::{App, Context, Entity};
+
 use super::LauncherShell;
 use super::locations::Location;
 use crate::instance_detail::{InstanceDetailView, InstanceHandler};
 use crate::route::Route;
-use gpui::prelude::*;
-use gpui::{App, Context, Entity};
 
 impl LauncherShell {
     /// Opens a fresh, stable-ID view. Async results update this entity only.

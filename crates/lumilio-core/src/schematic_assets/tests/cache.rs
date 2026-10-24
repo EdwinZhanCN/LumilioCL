@@ -1,7 +1,8 @@
+use lumilio_block_assets::BakedPack;
+
 use super::super::LocalCache;
 use super::super::cache::Keyed;
 use super::{baked, client_jar, zip_at};
-use lumilio_block_assets::BakedPack;
 
 /// A resource pack that retextures stone with `texture`.
 fn pack_at(path: &std::path::Path, texture: &str) -> std::path::PathBuf {

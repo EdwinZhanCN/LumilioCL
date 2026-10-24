@@ -1,8 +1,9 @@
-use crate::theme;
-use crate::theme::ShellColors;
 use gpui::prelude::*;
 use gpui::{IntoElement, SharedString, div, px};
 use gpui_component::v_flex;
+
+use crate::theme;
+use crate::theme::ShellColors;
 
 /// Width of a faceplate.
 pub const FACEPLATE_WIDTH: gpui::Pixels = px(232.);

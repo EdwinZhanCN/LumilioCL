@@ -1,4 +1,5 @@
-use super::colors::{self, Block, SEE_THROUGH, Table};
+use super::colors;
+use super::colors::{Block, SEE_THROUGH, Table};
 
 fn table(version: &str, data_version: i32) -> Table {
     Table::parse(&format!(
@@ -96,15 +97,17 @@ fn tinted_blocks_take_their_biome_colour_and_old_names_still_resolve() {
 }
 
 mod drawing {
-    use super::super::{BASE, render, sources, tile};
-    use super::*;
+    use std::collections::BTreeMap;
+
     use lumilio_plugin_api::map::{
         Dimension, TileKey, TileReply, TileRequest, WorldContext, WorldId,
     };
     use lumilio_plugin_api::{
         DirEntry, DirPage, FetchResponse, FileStat, HostContext, PluginError, SettingValue,
     };
-    use std::collections::BTreeMap;
+
+    use super::super::{BASE, render, sources, tile};
+    use super::*;
 
     /// A game directory in memory, read the way the host lets the plugin.
     pub(super) struct Files(pub(super) BTreeMap<String, Vec<u8>>);
@@ -394,14 +397,18 @@ mod drawing {
 }
 
 mod positions {
-    use super::super::positions::{self, Place, objects};
-    use super::drawing::{Files, request, sample};
+
+    use std::collections::BTreeMap;
+
     use lumilio_nbt::Tag;
     use lumilio_plugin_api::PluginError;
     use lumilio_plugin_api::map::{
         Dimension, MapBounds, MapIcon, MapObjectKind, MapPoint, OverlayRequest, WorldId,
     };
-    use std::collections::BTreeMap;
+
+    use super::super::positions;
+    use super::super::positions::{Place, objects};
+    use super::drawing::{Files, request, sample};
 
     fn compound(entries: Vec<(&str, Tag)>) -> Tag {
         Tag::Compound(

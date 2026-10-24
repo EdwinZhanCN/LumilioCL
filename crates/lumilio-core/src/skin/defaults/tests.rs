@@ -1,5 +1,6 @@
-use super::*;
 use std::io::Write;
+
+use super::*;
 
 fn client(path: &Path, entries: &[(&str, u32, [u8; 4])]) {
     let mut zip = zip::ZipWriter::new(File::create(path).unwrap());

@@ -1,18 +1,18 @@
-use super::jobs::{answer, job, outcome, reload};
-use super::{POLL, Reload, Wiring};
-use gpui_kit::AppContext as _;
-use gpui_kit::{App, Window};
+use std::future::Future;
+use std::time::Duration;
+
+use gpui_kit::{App, AppContext as _, Window};
 use lumilio_core::{
     CancellationToken, Preferences, ServiceError, WallpaperChoice, import_wallpaper,
     remove_wallpapers,
 };
 use lumilio_ui::live::settings_view;
-use lumilio_ui::platform;
 use lumilio_ui::theme::{Catalog, scan_dir};
 use lumilio_ui::toast::Toast;
-use lumilio_ui::tr;
-use std::future::Future;
-use std::time::Duration;
+use lumilio_ui::{platform, tr};
+
+use super::jobs::{answer, job, outcome, reload};
+use super::{POLL, Reload, Wiring};
 
 /// Applies what the saved preferences say about the look, the motion and
 /// the language.

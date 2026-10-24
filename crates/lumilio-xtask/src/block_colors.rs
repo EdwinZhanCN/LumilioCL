@@ -8,13 +8,16 @@
 //! averaged. The result is derived data and carries its provenance, so it can
 //! be rebuilt: `SOURCE.md` next to the table records the version, the jar's
 //! sha1, this command and the commit it ran at.
-use crate::release::Result;
-use serde_json::Value;
+
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::io::{Read, Seek};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+
+use serde_json::Value;
+
+use crate::release::Result;
 
 /// Bits of a block's flags in the table.
 pub const SEE_THROUGH: u8 = 1;

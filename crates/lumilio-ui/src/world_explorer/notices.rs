@@ -1,11 +1,17 @@
 //! The messages menu in the map's bottom-left corner: what is wrong or
 //! missing, the key that retries it, and the offer to link Xaero data. The
 //! map shows only a dot when there is something to read (design language §11).
+
+use gpui::prelude::*;
+use gpui::{Anchor, AnyElement, Context, div, px};
+use gpui_component::popover::Popover;
+use gpui_component::{ActiveTheme as _, Icon, Sizable as _, v_flex};
+
 use super::MapView;
 use crate::assets::UiIcon;
-use crate::{key::Key, theme::ShellColors, tr};
-use gpui::{Anchor, AnyElement, Context, div, prelude::*, px};
-use gpui_component::{ActiveTheme as _, Icon, Sizable as _, popover::Popover, v_flex};
+use crate::key::Key;
+use crate::theme::ShellColors;
+use crate::tr;
 
 impl MapView {
     /// Anything for the messages menu to show.

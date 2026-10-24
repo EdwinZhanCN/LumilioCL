@@ -2,17 +2,21 @@
 //! dropped without the player deciding (plan D3): each can stay with this
 //! game, go into the preset, or go back to the preset's value. Selected rows
 //! are decided together (P-BULK).
+
+use std::collections::BTreeSet;
+use std::rc::Rc;
+
+use gpui::prelude::*;
+use gpui::{AnyElement, App, IntoElement, SharedString, Window, div, px};
+use gpui_component::{Sizable as _, StyledExt as _, WindowExt as _, h_flex, v_flex};
+use lumilio_core::{GameSettingsView, SettingResolution};
+
 use super::labels::{setting_label, value_label};
 use super::table::{OptionLine, Source, sort_lines};
 use crate::controls::Checkbox;
 use crate::key::Key;
 use crate::theme::ShellColors;
 use crate::{kit, theme, tr};
-use gpui::{AnyElement, App, IntoElement, SharedString, Window, div, prelude::*, px};
-use gpui_component::{Sizable as _, StyledExt as _, WindowExt as _, h_flex, v_flex};
-use lumilio_core::{GameSettingsView, SettingResolution};
-use std::collections::BTreeSet;
-use std::rc::Rc;
 
 type Act<T> = Rc<dyn Fn(T, &mut Window, &mut App)>;
 

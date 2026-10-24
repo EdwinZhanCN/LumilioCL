@@ -3,9 +3,10 @@
 //! loaders with the usual ones first; what the person already filtered by is
 //! not repeated; the rest folds into an overflow count.
 
+use lumilio_core::{ProjectKind, SearchHit};
+
 use super::filters::FilterModel;
 use super::query::DiscoverQuery;
-use lumilio_core::{ProjectKind, SearchHit};
 
 /// Loaders a card lists before the others.
 const USUAL_LOADERS: [&str; 6] = ["fabric", "forge", "neoforge", "iris", "optifine", "vanilla"];

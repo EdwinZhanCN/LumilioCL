@@ -1,0 +1,200 @@
+{
+  "schemaVersion": 1,
+  "id": "workspace-architecture",
+  "title": "Workspace 业务边界与状态归属重构",
+  "summary": "保留 app → ui → core 的主分层和已有专业能力 crates；将 core 内的业务状态、流程和持久化职责按能力封装，将 UI 的页面状态、控制逻辑、视图和测试收拢到所属 feature。首个新增 crate 建议为 lumilio-minecraft，仅承担 Minecraft 元数据模型与纯解析规则。按元数据、启动、其他 core 能力、Discover、其他 UI 功能的顺序迁移，每阶段保持可运行和可验证。本计划为 proposed；本轮只调查并制定方案，尚未开始架构实现。",
+  "status": "proposed",
+  "visibility": "internal",
+  "scope": {
+    "included": [
+      "审查 crates/ 下全部 workspace 成员的职责、生产依赖和测试边界；现有独立解析、传输、渲染、平台适配、更新器与插件 crates 优先保留",
+      "新增 lumilio-minecraft 的纯元数据边界；core 保留网络获取、安装、持久化、实例和业务流程",
+      "core 的能力模块、LauncherService 的组合入口、业务状态与锁的唯一归属、数据库生命周期与保存后通知",
+      "UI 的 feature 组织、LiveModel 拆分、app/live 页面控制逻辑迁移、Tokio 与 GPUI 的明确连接边界",
+      "单元测试归属、公开 API 集成测试、最小必要的架构回归检查、受源码移动影响的 IA 和有效文档引用"
+    ],
+    "excluded": [
+      "产品功能扩展、界面重设计、文案改写和改变已有用户路径",
+      "数据库或 settings.json 的格式升级、拆库、迁移用户数据目录或改变用户文件",
+      "为每个业务目录创建 crate，或新增通用 common/shared/core-types 容器",
+      "改造第三方 forks/vendor 源码、替换 Tokio/GPUI、变更插件协议或实现 WASM 插件能力",
+      "宣称编译提速；本计划不以未经测量的构建性能收益作为拆分依据",
+      "顺带完成其他计划中的 panic 恢复、启动阶段提示、地图预测或翻译的剩余产品任务"
+    ]
+  },
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "建立可核对的基线，确定模块接口与状态所有者",
+      "status": "proposed",
+      "acceptance": "实施前将 rust-structure-style 已完成的工作与本轮架构修改分开形成可审查基线，保留既有工作区修改。使用 cargo metadata 核查全部 workspace 成员的生产依赖；确认 D2–D8 的目标边界和持久化、锁、Context 通知、后台任务的所有者。在本计划记录需要调整的决定和理由。确认 seed-map-prediction、world-explorer、error-reporting、discover-translation 的已有契约和进行中范围，安排逐能力提交，避免在相同源码上混合推进两个重构。"
+    },
+    {
+      "id": "T2",
+      "title": "提取纯元数据 crate lumilio-minecraft",
+      "status": "proposed",
+      "acceptance": "按 D2 提取坐标、兼容规则、版本描述、继承合并和目录元数据的纯模型/解析；网络获取和来源路由留在 core。新 crate 不依赖 core、UI、插件宿主、传输引擎、数据库或凭据服务，不做文件/网络/进程 I/O。解决现有 pub(crate) 库文件解析和参数展开的跨 crate 接口，只公开具有业务意义的操作与结果，不批量公开内部字段。原类型由 core 刻意 re-export，保留类型身份和现有调用入口。继承循环、缺失父版本、未知 JSON 字段保留、旧新参数格式和 native 选择夹具在新边界通过；core 的真实启动准备路径继续通过。若提取必须反向依赖 core 或引入笼统的共享类型 crate，停止扩大提取范围并先修订边界决定。"
+    },
+    {
+      "id": "T3",
+      "title": "以启动流程验证 core 的能力封装",
+      "status": "proposed",
+      "acceptance": "将启动计划、执行、进程、会话和启动恢复收拢到 launching，建立明确的启动协调者；LauncherService 的相应方法只委托能力入口。启动协调者接收实例、认证、Java、安装、任务等具体依赖，不接收整个 LauncherService。一次性 Java 选择和会话生命周期有唯一所有者，实例互斥租约仍与实例写入/删除共用同一份权威状态。保留取消、缺失目录、离线启动、极短进程、启动/退出事件次数、历史写入失败、游戏设置准备与回收、日志捕获、插件事件以及 Windows background_command 契约。按 D10 在能证明行为的最低边界验证，核心测试不引入 GPUI。"
+    },
+    {
+      "id": "T4",
+      "title": "按能力拆分其余 core 状态与业务流程",
+      "status": "proposed",
+      "acceptance": "按 D3–D5 逐能力迁移 accounts、instances、java、minecraft、content、appearance、game_settings、worlds、diagnostics、activity、plugins、settings 和 storage。每个迁移提交同时移动实现、状态、邻近测试和调用方；不存在靠为 LauncherService 增加更多 impl 文件冒充职责拆分的情况。认证刷新锁、待完成登录、外观缓存、任务取消表、内容筛选缓存分别归其能力；不复制 SettingsStore、InstanceStore、Context 或其权威状态。数据库版本/连接生命周期有单一入口，业务查询归所属能力，现有跨表事务与删除清理保持原子性。去除迁移完毕的旧生产实现，既有必要公开路径通过同类型 re-export 保留。"
+    },
+    {
+      "id": "T5",
+      "title": "以 Discover 验证 UI feature 与运行时连接边界",
+      "status": "proposed",
+      "acceptance": "Discover 的查询与筛选状态、请求代次、结果转换、详情页、相关对话框、命令处理和测试集中到 ui/features/discover。app/live 不再拥有该功能的页面状态或控制流程；LiveModel 不再保存 Discover 的第二份可变状态；功能模块不通过 LauncherShell 读取/修改其内部业务状态。Tokio Runtime 仍由 app 创建和持有，UI 经明确注入的服务与执行入口提交后台工作，结果只在 GPUI 上下文应用。验证来源/目标实例/查询切换后的过期结果拒绝、翻译结果身份、关闭详情窗口、失败与主动取消、隐藏已安装内容、依赖确认及安装完成反馈。全局任务可在离开页面后继续并反馈，页面请求按其生命周期取消或丢弃结果，不因使用 WeakEntity 丢失必要终态处理。"
+    },
+    {
+      "id": "T6",
+      "title": "迁移其他 UI 功能并收紧 app 与 shell",
+      "status": "proposed",
+      "acceptance": "在 T5 的边界成立后，将其余功能逐个迁入 ui/features；共享控件与主题进入 design_system，shell 负责窗口、导航、路由和功能组合。各 feature 拥有其视图状态、任务句柄和订阅，不依赖 app 或兄弟 feature 的内部视图，不存在承载全部页面可变状态的 LiveModel/Wiring::State 替代品。app 保留 Runtime、启动配置、日志、插件注册、更新器与系统退出/重启的组装和适配；页面交互流程移出 app。更新状态与系统命令经窄接口连接，不能为了迁移而让 core 承担 UI/更新器职责。保留当前窗口所有权、全局选择、toast、语言切换、导航历史和后台任务生命周期；逐功能记录自动验证和真实窗口检查结果。"
+    },
+    {
+      "id": "T7",
+      "title": "完成其余 crates 审查并守住稳定架构边界",
+      "status": "proposed",
+      "acceptance": "全部 workspace 成员都有保留或调整的明确结论，结论记录在本计划，不另建源码镜像或历史路径映射表。小且内聚的 crate 可以保持平铺，所有单元测试遵守相邻模块约定。沿用现有 docgen 结构检查，补充能防止实际失误的生产依赖与禁止反向依赖检查；区分 dev-dependencies，允许 core 通过插件实现完成集成测试。对新增 guard 注入一次最小违规，证明检查在预期边界失败后撤销违规。更新 AGENTS.md 的最终结构约定和因路径移动而失效的技能/文档引用；不将全部目录树复制进多份文档。"
+    },
+    {
+      "id": "T8",
+      "title": "逐阶段验收并完成 workspace 交付",
+      "status": "proposed",
+      "acceptance": "每阶段先通过最窄的 justfile 检查，再在代码交付前通过 just check；涉及计划/规则变更通过 just docs。受路径移动影响的 IA 保留操作语义并完成 just ia；i18n 和归属说明不因搬迁失效。审查格式、持久化、错误、取消、锁顺序、资源释放顺序和 cfg 平台分支；在可用环境编译受影响的平台分支，未验证的目标明确记录。真实窗口核对受迁移功能的既有用户路径与反馈，测试通过不替代视觉与交互验收。全部验收有证据后才完成计划；没有完成的人工或跨平台验收保持明确待办。"
+    }
+  ],
+  "validation": [
+    {
+      "criterion": "规划基于当前 workspace、实际状态所有者与已有计划",
+      "result": "2026-10-23：cargo metadata --no-deps 确认 24 个 workspace package。已核查 core/lib.rs、service、ContextHub、实例数据库、元数据解析、UI LiveModel、app Backend/Wiring/Discover。实例数据库同时初始化游戏设置与地图表；LauncherService 持有认证/外观/任务/内容等状态；LiveModel 和 Wiring::State 持有多个页面状态。已读取 rust-structure-style 完成记录及相关进行中计划的范围、待办和决定。现有工作区包含上一轮未提交重构，本轮仅增加计划及其生成文档。"
+    },
+    {
+      "criterion": "计划 JSON 有效，生成输出与 just docs 通过",
+      "result": "2026-10-23：cargo run -p lumilio-docgen -- plans validate 与 just plans 成功；just docs 通过全部 32 个 docgen 测试、5 个 preserve_order 计划测试、plans-check 和 cargo fmt --check。git diff --check 通过。仅新增本计划及 docs/plans/workspace-architecture.md，内部计划未改变网站路线图投影；架构实现与其验收均待开展。"
+    },
+    {
+      "criterion": "元数据和专业能力 crates 可以独立验证，生产依赖方向由检查保护",
+      "result": null
+    },
+    {
+      "criterion": "core 能力拥有自己的状态，启动/认证/持久化/取消等既有不变量有行为测试证据",
+      "result": null
+    },
+    {
+      "criterion": "UI feature 拥有页面状态与控制流程，app/shell 只保留对应组合和适配职责",
+      "result": null
+    },
+    {
+      "criterion": "每阶段 just check、最终 just docs、IA/i18n、受影响平台与真实窗口验收有记录",
+      "result": null
+    }
+  ],
+  "decisions": [
+    {
+      "id": "D1",
+      "decision": "保留分层的模块化单体，以业务能力建立 module 边界，再按具体工程收益选择 crate 边界。",
+      "rationale": "app → ui → core 已经隔离 UI 框架与核心业务；workspace 也已有独立的解析、传输、渲染、平台和插件能力。当前问题主要在大 crate 内的状态集中和跨层功能分散。",
+      "consequences": "本轮不按文件数量或目录美观拆 crate。提取需要内聚职责、明确状态/输入输出、单向依赖，以及独立验证或隔离依赖的真实收益；不要求独立发布或第二个产品调用方。一次拆分若导致大量内部字段公开、反向依赖或无意义 DTO 转换，应先修正职责。"
+    },
+    {
+      "id": "D2",
+      "decision": "首个新增 crate 采用 lumilio-minecraft，范围限定为纯元数据模型、解析与规则。",
+      "rationale": "artifact、environment、release 的主要依赖是标准库、serde、serde_json 与 regex；版本目录同时混有 fetch，需要先分离纯解析与远程获取。库文件解析和参数展开目前存在 crate 内可见接口，不能机械搬迁后批量 pub。",
+      "consequences": "目标包含制品坐标、目标平台描述与兼容规则、版本目录解码、release 描述及继承、参数模板与库/native 元数据解析；只接受显式输入，不主动探测宿主或执行 I/O。实际宿主探测留在 core 适配层。网络仓库、来源路由、loader 远程协议、安装执行、实例记录与启动协调留在 core/minecraft 或 launching。必要的元数据解析结果通过窄 API 提供；不将整个 core 的领域类型一并塞入新 crate。Java、认证、内容管理本轮先保留为 core 模块，只有后续证据满足 D1 才另行修订提取决定。"
+    },
+    {
+      "id": "D3",
+      "decision": "core 目标结构为能力模块加薄组合入口，取消全功能 service 目录作为业务实现的中心。",
+      "rationale": "目前业务方法虽然按文件拆开，仍大多实现同一个 LauncherService，并可接触其全部状态；这没有形成独立所有者。",
+      "consequences": "目标为 lib.rs、launcher_service.rs、context.rs，以及 accounts/、instances/、launching/、minecraft/、java/、content/、appearance/、game_settings/、worlds/、diagnostics/、activity/、plugins/、settings/、storage/。这些是模块边界，不是预定新增 crate 清单。LauncherService 组合并委托能力入口，保留现有前端入口；各能力接收具体服务、仓库或不可变快照，不接收整个 LauncherService。小模块不强建空目录，内部按实际职责和生命周期拆文件。"
+    },
+    {
+      "id": "D4",
+      "decision": "每份可变业务状态和互斥规则有一个权威所有者，Context 只发布选择与变化快照。",
+      "rationale": "认证刷新令牌轮换、实例互斥、外观请求合并、任务取消和过期结果拒绝已有正确性约束，搬目录不能改变这些约束。",
+      "consequences": "accounts 管凭据、刷新串行化和待完成登录；instances 管实例记录与共享操作租约；launching 管会话和一次性启动选择；appearance 管外观缓存、签名服务与外观串行化；activity 管任务板、取消表和活动记录；content 管来源筛选/翻译等内容状态。settings 仍有单一持久化所有者，账户和 Java 等通过明确操作更新各自字段，不另建 SettingsStore 副本。ContextHub 从成功保存和会话转换发布，订阅者不成为第二写入源。共享传输连接预算继续覆盖下载与更新器。"
+    },
+    {
+      "id": "D5",
+      "decision": "storage 负责物理存储生命周期；业务能力负责查询语义，保持原有跨表原子性。",
+      "rationale": "实例数据库现有初始化/删除同时涉及实例、集合、游戏设置绑定和地图数据，直接按模块各自打开并维护同一数据库会引入版本、锁和事务分歧。",
+      "consequences": "连接/数据库版本/既有迁移只由一个入口管理，业务仓库复用同一数据库所有者；删除与关联清理仍在同一事务。现有数据库数量、表结构和用户文件路径保持不变。磁盘占用与清理属于诊断或维护操作，不以名字相近混入数据库基础设施。根目录锁继续覆盖全部资源存活时间；事务提交和通知顺序、原子文件发布及恢复标记语义都要保留。"
+    },
+    {
+      "id": "D6",
+      "decision": "UI 先按 feature 聚合，以 Discover 为完整迁移样本。",
+      "rationale": "Discover 的展示模型在 ui/live，页面在 ui/pages，详情另有模块，搜索代次和控制流程在 app/live，能直接验证跨层职责收拢是否有效。",
+      "consequences": "ui/src 保留 shell/、features/、design_system/ 与确有跨功能用途的 i18n/、assets/、platform/ 等基础设施。features 下按 home、accounts、library、discover、instance_detail、settings、activity、wardrobe、schematic_studio、world_explorer 聚合；功能内部放 model/controller/view/dialogs/tests 等实际需要的文件，不预建统一空模板。功能专属对话框归功能；可复用控件、主题、窗口反馈基础设施归 design_system。跨功能通过明确命令、事件或只读输入协作，避免互相调用内部视图。"
+    },
+    {
+      "id": "D7",
+      "decision": "app 拥有进程级资源，feature 拥有界面控制流程；执行器通过明确接口注入。",
+      "rationale": "app/backend 已经承担 Tokio Runtime 与插件组合，这是正确的进程边界；app/live 的搜索/筛选/窗口结果处理则属于 UI 功能。直接把 Backend 搬进 ui 会再次混合两者。",
+      "consequences": "app 保留启动、配置定位、日志、Runtime、插件注册、更新器、系统退出/重启与根窗口组装。UI 获得 core 服务及 Runtime Handle 或等价窄执行入口，不创建第二运行时、不引用 app。后台任务的 panic/取消经既有显式结果路径反馈；GPUI 状态只在主线程上下文修改。局部请求由 feature 保持任务/订阅/代次，持久任务由应用级生命周期保持；离开页面不停止安装或吞掉终态。只在已有具体类型不足以建立边界时增加最小接口，不为每个方法建立 trait 层。"
+    },
+    {
+      "id": "D8",
+      "decision": "本轮保留一个 lumilio-ui crate，在其内部建立 feature 边界；不预先创建一套 UI feature crates。",
+      "rationale": "仓库 GPUI Kit 指南建议大型功能采用 crate，目的是独立所有权和生命周期。当前 feature 仍与 LauncherShell、LiveModel、app/Wiring 交织；立即提取会先迫使我们建立庞大共享 UI API。先完成 Discover 的实际所有权迁移，可以验证稳定接口，符合仓库现有主分层约定。",
+      "consequences": "这是针对当前依赖状态的选择，不是永久禁止 feature crate。完成迁移后，若某能力可通过小接口独立装配/移除，确有独立测试或依赖隔离收益，且不把大部分类型转移到 shared，则可将该 feature 原样提取。否则保持模块封装，不用 crate 数量作为验收指标。"
+    },
+    {
+      "id": "D9",
+      "decision": "保持公开入口与数据格式，内部路径一次收敛；拆分不附带 API 或持久化全面重设计。",
+      "rationale": "现有 AGENTS.md 要求必要公开 re-export 路径稳定，多个前端、插件和工具调用同一组类型。保留类型身份比复制模型与双向转换更简单。",
+      "consequences": "新代码优先使用能力命名空间，现有必要根路径通过刻意 re-export 提供同一类型；不保留两套生产实现、双写或旧目录转发层。只暴露真实跨边界操作，不为测试或搬迁批量扩大可见性。保留序列化字段、错误语义、来源归属、许可注释和平台行为。前一轮 Google 风格检查继续执行；不因架构重构混入新的通用 API 政策。"
+    },
+    {
+      "id": "D10",
+      "decision": "测试跟随行为所有者，跨能力流程由使用公开接口的测试保护。",
+      "rationale": "测试位置应反映它保护的边界；从 app 移入 UI 的控制逻辑不应继续只能通过整个应用组装测试。",
+      "consequences": "单元测试放相邻 tests.rs，较多时使用 tests/mod.rs 加主题文件；纯元数据测试进入 lumilio-minecraft，领域行为测试进入所属 core 能力，界面代次/状态测试进入 feature，app 仅保留真实组装与平台适配测试。crate 根 tests/ 只用于公开接口和跨能力流程；通过边界才能证明的启动/取消等集成测试保留。局部夹具跟随测试，跨文件共享帮助放 tests/common/mod.rs。补充测试只针对所有权迁移的实际风险和既有覆盖缺口，不为每次文件移动添加实现镜像测试；新增回归 guard 必须证明能失败。"
+    },
+    {
+      "id": "D11",
+      "decision": "按 T1 → T2 → T3 → T4 → T5 → T6 → T7 → T8 的可运行阶段推进。",
+      "rationale": "元数据提取先验证 crate 接口；启动先验证 core 协调；Discover 再验证跨层 UI 所有权，避免一次同时迁移全部边界。",
+      "consequences": "每个阶段可以分成更小提交，所有受影响调用方与测试同批更新并保持构建通过。各阶段使用现有 justfile 选择窄检查，代码交付必须 just check，规则/计划交付必须 just docs。没有真实窗口或平台证据时不能将相应验收标为通过。已存在的 seed-map-prediction 等计划继续维护自己的产品验收，本计划只承担迁移保持其行为的证据。"
+    }
+  ],
+  "references": [
+    "AGENTS.md",
+    "Cargo.toml",
+    "justfile",
+    ".agents/plans/rust-structure-style.json",
+    ".agents/plans/error-reporting.json",
+    ".agents/plans/world-explorer.json",
+    ".agents/plans/seed-map-prediction.json",
+    ".agents/plans/discover-translation.json",
+    ".agents/skills/gpui-kit/references/coding-guides.md",
+    "crates/lumilio-core/src/lib.rs",
+    "crates/lumilio-core/src/service/mod.rs",
+    "crates/lumilio-core/src/context.rs",
+    "crates/lumilio-ui/src/lib.rs",
+    "crates/lumilio-app/src/backend.rs",
+    "crates/lumilio-app/src/live/mod.rs",
+    "https://google.github.io/styleguide/rustguide.html",
+    "https://doc.rust-lang.org/book/ch07-00-managing-growing-projects-with-packages-crates-and-modules.html",
+    "https://rust-lang.github.io/api-guidelines/"
+  ],
+  "dependencies": ["rust-structure-style"],
+  "lessonsLearned": [],
+  "outcome": null,
+  "roadmap": {
+    "enabled": false,
+    "id": "workspace-architecture",
+    "name": "Workspace 业务边界与状态归属",
+    "lede": "用明确的能力接口和状态所有者保持项目可维护。",
+    "targetVersion": null,
+    "order": 0
+  }
+}

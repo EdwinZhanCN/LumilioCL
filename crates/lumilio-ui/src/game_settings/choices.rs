@@ -1,6 +1,7 @@
 //! The keys and languages an option can be set to, with the words they read
 //! as. Key tokens are the game's own (`key.keyboard.left.shift`); legends
 //! printed on keyboards stay as they are in every language.
+
 use crate::tr;
 
 const UNBOUND: &str = "key.keyboard.unknown";

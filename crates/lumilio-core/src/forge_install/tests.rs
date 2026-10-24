@@ -1,5 +1,6 @@
-use super::*;
 use std::io::Write;
+
+use super::*;
 
 fn installer(dir: &Path, profile: &str) -> PathBuf {
     let path = dir.join("installer.jar");

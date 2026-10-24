@@ -2,19 +2,22 @@
 //! detail on the trailing side, each scrolling on its own (the master–detail
 //! of Accounts). The detail is the preset's own option table: what is changed
 //! here reaches every game that uses it at that game's next launch.
-use super::controls::{LiveCtx, send};
-use super::library::{PRESETS_TAB, library_tabs, page_actions};
-use crate::assets::UiIcon;
-use crate::game_settings::{self, OnEdit, OnToggle, PresetIntent};
-use crate::instance_detail::{ProblemAction, SETTINGS_OPTIONS};
-use crate::kit::{self, ViewIntent};
-use crate::live::LiveIntent;
-use crate::{theme, tr};
+
+use std::rc::Rc;
+
 use gpui::prelude::*;
 use gpui::{AnyElement, App, IntoElement, SharedString, Window, div, px};
 use gpui_component::{StyledExt as _, WindowExt as _, h_flex, v_flex};
 use lumilio_core::{GameSettingValue, GameSettingsView, SettingsPreset};
-use std::rc::Rc;
+
+use super::controls::{LiveCtx, send};
+use super::library::{PRESETS_TAB, library_tabs, page_actions};
+use crate::assets::UiIcon;
+use crate::game_settings::{OnEdit, OnToggle, PresetIntent};
+use crate::instance_detail::{ProblemAction, SETTINGS_OPTIONS};
+use crate::kit::ViewIntent;
+use crate::live::LiveIntent;
+use crate::{game_settings, kit, theme, tr};
 
 /// The view-state group that remembers which preset the detail shows, by id.
 pub const PRESET_GROUP: u8 = 230;

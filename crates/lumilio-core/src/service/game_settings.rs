@@ -13,7 +13,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         view.is_busy = self
             .operations
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .expect("game settings store lock was poisoned")
             .contains(&view.instance);
         if view.is_busy {
             view.recovery_required = false;

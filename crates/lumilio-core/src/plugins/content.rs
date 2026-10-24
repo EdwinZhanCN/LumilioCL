@@ -30,7 +30,7 @@ impl PluginHost {
             if let Some(capabilities) = capabilities {
                 self.content_ids
                     .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .expect("plugin content state lock was poisoned")
                     .insert(info.manifest.id.clone());
                 let at = self.listed_at(&info.manifest.id).await;
                 sources.push((
@@ -54,7 +54,7 @@ impl PluginHost {
         let known = self
             .content_ids
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .expect("plugin content state lock was poisoned")
             .clone();
         self.list()
             .await

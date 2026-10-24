@@ -7,7 +7,8 @@ use crate::activity::CancellationToken;
 use crate::activity_log::{RetryAction, TaskAction, TaskCategory, TaskLabel};
 use crate::discover::{Catalog, ProjectOrigin};
 use crate::instance::{InstanceRecord, NewInstance};
-use crate::modpack::{self, PackIndex};
+use crate::modpack;
+use crate::modpack::PackIndex;
 use crate::staged::Staged;
 use crate::transfer::{TransferRequest, Transport};
 

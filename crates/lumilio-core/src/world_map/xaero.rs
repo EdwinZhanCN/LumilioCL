@@ -2,10 +2,13 @@
 //! person confirms a link: a single-player directory with the same name as a
 //! save is suggested, never attached, because a renamed save or a copied one
 //! would otherwise show another world's waypoints.
-use super::WorldMapContext;
-use lumilio_plugin_api::map::{Dimension, SourceLink, WorldContext, WorldId};
+
 use std::collections::BTreeMap;
 use std::path::Path;
+
+use lumilio_plugin_api::map::{Dimension, SourceLink, WorldContext, WorldId};
+
+use super::WorldMapContext;
 
 /// Where the Minimap keeps its per-world directories, relative to the game.
 const ROOT: &str = "xaero/minimap";

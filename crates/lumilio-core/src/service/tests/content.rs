@@ -1,3 +1,5 @@
+use tokio::sync::mpsc;
+
 use super::super::error::ServiceError;
 use super::super::types::ContentEffect;
 use super::{
@@ -12,7 +14,6 @@ use crate::history::{ChangeKind, HistoryLog};
 use crate::instance::{Loader, NewInstance};
 use crate::launch_session::LaunchSignal;
 use crate::launcher::LaunchUpdate;
-use tokio::sync::mpsc;
 
 #[tokio::test]
 async fn switching_versions_replaces_the_file_keeps_it_disabled_and_never_clobbers() {

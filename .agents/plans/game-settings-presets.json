@@ -163,7 +163,7 @@
     }
   ],
   "references": [
-    "crates/lumilio-core/src/instance.rs",
+    "crates/lumilio-core/src/instance/mod.rs",
     "crates/lumilio-core/src/layout.rs",
     "crates/lumilio-core/src/service/launch.rs",
     "crates/lumilio-core/src/service/mod.rs",

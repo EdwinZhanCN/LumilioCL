@@ -1,12 +1,11 @@
+use gpui::{AppContext as _, Context, Entity, Focusable as _, SharedString, Window};
+use gpui_component::IndexPath;
+use gpui_component::input::{InputEvent, InputState};
+use gpui_component::select::{SearchableVec, SelectEvent, SelectItem, SelectState};
+use lumilio_plugin_api::map::{WorldContext, WorldId};
+
 use super::{Command, MapView};
 use crate::tr;
-use gpui::{AppContext as _, Context, Entity, Focusable as _, SharedString, Window};
-use gpui_component::{
-    IndexPath,
-    input::{InputEvent, InputState},
-    select::{SearchableVec, SelectEvent, SelectItem, SelectState},
-};
-use lumilio_plugin_api::map::{WorldContext, WorldId};
 
 /// Kept in sync with the provider by an application assembly test.
 pub const VERSIONS: &[&str] = &[
@@ -200,7 +199,10 @@ impl MapView {
                 locale: crate::i18n::generation(),
             });
         }
-        let form = self.form.as_mut().unwrap();
+        let form = self
+            .form
+            .as_mut()
+            .expect("the seed form was initialized above");
         let stamp = self
             .context
             .as_ref()

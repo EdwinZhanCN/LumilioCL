@@ -1,5 +1,6 @@
-use super::*;
 use lumilio_plugin_api::{ActionId, Effect, GameFacts, InstanceTab, TabState, View, Words};
+
+use super::*;
 
 struct TabPlugin {
     id: &'static str,

@@ -9,9 +9,8 @@
 //! a thumbnail's look, so a reorder never reuses a bake or picture made in
 //! another order.
 
-use std::fs;
-use std::io;
 use std::path::{Path, PathBuf};
+use std::{fs, io};
 
 /// The kept order; empty when none was kept or it cannot be read.
 pub(crate) fn read_order(list: &Path) -> Vec<PathBuf> {

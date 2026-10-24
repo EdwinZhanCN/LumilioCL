@@ -1,6 +1,7 @@
-use super::{GAME_OUTPUT_LOG, OutputFile};
 use std::path::Path;
 use std::time::Duration;
+
+use super::{GAME_OUTPUT_LOG, OutputFile};
 
 fn record(game_dir: &Path) -> String {
     std::fs::read_to_string(game_dir.join("logs").join(GAME_OUTPUT_LOG)).unwrap()

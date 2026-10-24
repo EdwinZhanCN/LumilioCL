@@ -1,12 +1,12 @@
-use super::editors::Editor;
-use super::forms::effective_label;
-use super::{InstanceDetailView, editors};
-use crate::kit;
-use crate::theme::ShellColors;
-use crate::tr;
 use gpui::Context;
 use gpui::prelude::*;
 use gpui_component::{h_flex, v_flex};
+
+use super::editors::Editor;
+use super::forms::effective_label;
+use super::{InstanceDetailView, editors};
+use crate::theme::ShellColors;
+use crate::{kit, tr};
 
 impl InstanceDetailView {
     pub(super) fn performance(

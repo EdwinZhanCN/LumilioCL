@@ -15,8 +15,9 @@ use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use crate::release;
 use crate::release::{
-    self, APP_ID, APP_NAME, BINARY, HOMEPAGE, Release, Result, copy, run, run_labelled, write,
+    APP_ID, APP_NAME, BINARY, HOMEPAGE, Release, Result, copy, run, run_labelled, write,
 };
 
 const INSTALLER_SCRIPT: &str = include_str!("../packaging/LumilioCL.iss");

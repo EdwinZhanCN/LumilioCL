@@ -1,3 +1,6 @@
+use gpui::TestAppContext;
+use lumilio_core::{GalleryImage, ProjectLinks, SideSupport, VersionFile};
+
 use super::*;
 
 #[test]
@@ -171,9 +174,6 @@ fn version_lists_fold_after_three() {
     );
     assert_eq!(versions_label(&[]), "");
 }
-
-use gpui::TestAppContext;
-use lumilio_core::{GalleryImage, ProjectLinks, SideSupport, VersionFile};
 
 pub(crate) fn detail() -> ProjectDetail {
     ProjectDetail {

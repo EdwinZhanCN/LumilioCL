@@ -1,9 +1,10 @@
+use std::path::PathBuf;
+
+use lumilio_core::{AfterLaunch, EnvVar, InstanceSettings, QuickPlay, QuickPlayProblem};
+
 use super::super::InstanceIntent;
 use super::texts::NONE_ON_PURPOSE;
-use crate::settings_forms as shared;
-use crate::tr;
-use lumilio_core::{AfterLaunch, EnvVar, InstanceSettings, QuickPlay, QuickPlayProblem};
-use std::path::PathBuf;
+use crate::{settings_forms as shared, tr};
 
 pub(super) type Saved = Result<InstanceIntent, String>;
 

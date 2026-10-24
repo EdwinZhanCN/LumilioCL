@@ -1,12 +1,13 @@
+use gpui::prelude::*;
+use gpui::{AnyElement, IntoElement, px};
+use gpui_component::{h_flex, v_flex};
+use lumilio_core::{LaunchFailure, LaunchProblem};
+
 use super::buttons::{LocalActionIcon, art_button};
 use super::launching::phase_label;
 use super::render::{ArtButtons, caption, eyebrow, headline, world_accent};
 use super::{HomeIntent, HomeIntentHandler, RecoveryDetail, Subject};
 use crate::tr;
-use gpui::prelude::*;
-use gpui::{AnyElement, IntoElement, px};
-use gpui_component::{h_flex, v_flex};
-use lumilio_core::{LaunchFailure, LaunchProblem};
 
 /// One plain sentence about what went wrong (design language §8).
 pub fn recovery_sentence(detail: &RecoveryDetail) -> String {

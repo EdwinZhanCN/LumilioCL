@@ -1,3 +1,8 @@
+use gpui::prelude::*;
+use gpui::{AnyElement, ClipboardItem, Context, div, px};
+use gpui_component::{Icon, Sizable as _, StyledExt as _, h_flex, v_flex};
+use lumilio_core::ContentEntry;
+
 use super::super::panels::CONTENT_KINDS;
 use super::super::{InstanceDetailView, InstanceIntent};
 use super::model::title_of;
@@ -6,12 +11,6 @@ use crate::controls::Checkbox;
 use crate::key::Key;
 use crate::theme::ShellColors;
 use crate::{kit, theme, tr};
-use gpui::prelude::*;
-use gpui::{AnyElement, ClipboardItem, Context, div, px};
-use gpui_component::Sizable as _;
-use gpui_component::StyledExt as _;
-use gpui_component::{Icon, h_flex, v_flex};
-use lumilio_core::ContentEntry;
 
 impl InstanceDetailView {
     pub(super) fn row(

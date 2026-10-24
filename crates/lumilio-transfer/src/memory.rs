@@ -3,12 +3,15 @@
 //! budget like any download and are retried the same way, but are no
 //! transfer of their own: they send no events, so no task shows them.
 
+use std::error::Error;
+use std::fmt;
+use std::fmt::{Display, Formatter};
+
+use futures_util::StreamExt;
+
 use super::engine::TransferEngine;
 use super::request::RetryPolicy;
 use super::transport::Transport;
-use futures_util::StreamExt;
-use std::error::Error;
-use std::fmt::{self, Display, Formatter};
 
 /// Why one source gave no document.
 #[derive(Clone, Debug, Eq, PartialEq)]

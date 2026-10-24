@@ -1,12 +1,11 @@
+use gpui::prelude::*;
+use gpui::{AnyElement, ClickEvent, IntoElement, SharedString, div, px};
+use gpui_component::{Icon, Sizable as _, StyledExt as _, h_flex, v_flex};
+
 use crate::assets::UiIcon;
 use crate::key::Key;
 use crate::theme;
 use crate::theme::ShellColors;
-use gpui::prelude::*;
-use gpui::{AnyElement, ClickEvent, IntoElement, SharedString, div, px};
-use gpui_component::Sizable as _;
-use gpui_component::StyledExt as _;
-use gpui_component::{Icon, h_flex, v_flex};
 
 /// A quiet 技术详情 that opens the raw cause in a dialog (§8, §11).
 pub fn technical(id: impl Into<gpui::ElementId>, detail: impl Into<SharedString>) -> Key {

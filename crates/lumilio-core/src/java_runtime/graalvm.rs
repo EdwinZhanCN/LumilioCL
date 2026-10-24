@@ -11,10 +11,9 @@
 //! the launcher only downloads it on the person's request and does not
 //! redistribute it.
 
-use crate::environment::{HostProfile, MachineArchitecture, PlatformFamily};
-
 use super::JavaRuntimeError;
 use super::archive::ArchiveKind;
+use crate::environment::{HostProfile, MachineArchitecture, PlatformFamily};
 
 /// The Java majors with a `latest` address, ascending.
 pub const MAJORS: [u32; 2] = [21, 25];

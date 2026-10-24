@@ -1,6 +1,7 @@
+use std::path::PathBuf;
+
 use super::error::ServiceError;
 use crate::activity::CancellationToken;
-use std::path::PathBuf;
 
 /// What a pack file is.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

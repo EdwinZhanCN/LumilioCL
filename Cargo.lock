@@ -4642,8 +4642,10 @@ dependencies = [
 name = "lumilio-docgen"
 version = "0.2.2"
 dependencies = [
+ "proc-macro2",
  "serde",
  "serde_json",
+ "syn 2.0.119",
  "tempfile",
  "toml 0.9.12+spec-1.1.0",
 ]

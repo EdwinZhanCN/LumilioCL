@@ -1,7 +1,9 @@
 //! The instance page's plugin tabs: asks the service which tabs show and what
 //! they contain, and performs the effects a plugin's action asks for.
 
-use super::Wiring;
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use gpui_kit::{
     AnyWindowHandle, App, AppContext as _, Task, TitlebarOptions, WeakEntity, WindowBounds,
     WindowOptions, px, size,
@@ -9,13 +11,12 @@ use gpui_kit::{
 use lumilio_core::PluginEffect;
 use lumilio_plugin_api::ActionId;
 use lumilio_ui::instance_detail::InstanceDetailView;
-use lumilio_ui::platform;
 use lumilio_ui::schematic_studio::{StudioAction, StudioView, StudioWindow};
 use lumilio_ui::toast::Toast;
-use lumilio_ui::tr;
 use lumilio_ui::world_explorer::{Command, Connection, Event, MapHandoff, MapWindow};
-use std::cell::RefCell;
-use std::rc::Rc;
+use lumilio_ui::{platform, tr};
+
+use super::Wiring;
 
 /// Where a plugin action's toasts go: the game page, or a studio window.
 #[derive(Clone)]

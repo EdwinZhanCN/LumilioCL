@@ -3,14 +3,15 @@
 //! (plan global-context, T4). Handlers only ask core to change something;
 //! what the pages show of it arrives here, whoever made the change.
 
-use super::Wiring;
-use super::jobs::{answer, refresh_installed};
 use gpui_kit::App;
 use lumilio_core::{Context, HomeChecks, InstanceRecord, Session, unix_now};
 use lumilio_ui::home::HomePresentation;
 use lumilio_ui::live::{
     account_rows, attention_rows, home_places, home_presentation, library_cards,
 };
+
+use super::Wiring;
+use super::jobs::{answer, refresh_installed};
 
 /// What a change makes out of date: the dependency table of decision D6,
 /// as code. A new derived result is added here with its own test.

@@ -1,8 +1,9 @@
-use super::LauncherShell;
-use crate::theme;
 use gpui::prelude::*;
 use gpui::{App, Entity, Window};
 use gpui_component::{Theme, TitleBar};
+
+use super::LauncherShell;
+use crate::theme;
 
 /// Keeps the gpui-component theme in step with the system appearance, now
 /// and whenever it changes.

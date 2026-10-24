@@ -12,7 +12,6 @@ use std::io::Read;
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
-
 use sha1::{Digest, Sha1};
 
 use super::SchematicAssetsError;

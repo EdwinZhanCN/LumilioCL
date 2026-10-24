@@ -1,13 +1,19 @@
 //! Launcher-owned markers, routes and measurement controls.
-use super::{Command, MapView, edit};
-use crate::{key::Key, tr};
-use gpui::{Anchor, AnyElement, Context, SharedString, Window, div, prelude::*, px};
-use gpui_component::{Sizable as _, WindowExt as _, h_flex, popover::Popover, v_flex};
+
+use std::collections::BTreeMap;
+use std::rc::Rc;
+
+use gpui::prelude::*;
+use gpui::{Anchor, AnyElement, Context, SharedString, Window, div, px};
+use gpui_component::popover::Popover;
+use gpui_component::{Sizable as _, WindowExt as _, h_flex, v_flex};
 use lumilio_core::world_map::store::annotations::{Annotation, AnnotationKind, route_length};
 use lumilio_plugin_api::map::MapPoint;
 use lumilio_plugin_api::{SettingField, SettingKind, SettingValue, Words};
-use std::collections::BTreeMap;
-use std::rc::Rc;
+
+use super::{Command, MapView, edit};
+use crate::key::Key;
+use crate::tr;
 
 fn field(key: &str, label: &str, kind: SettingKind) -> SettingField {
     SettingField {

@@ -1,15 +1,17 @@
+use std::sync::Arc;
+use std::time::Duration;
+
+use lumilio_plugin_api::{
+    API_VERSION, HostContext, LaunchEvent, LaunchObserver, LaunchOutcome, LaunchTarget, Manifest,
+    Permission, Plugin, PluginError, Words,
+};
+use tokio::sync::mpsc;
+
 use super::{World, fake_java, publish_modern_release, publish_release, world};
 use crate::activity::CancellationToken;
 use crate::history::{HistoryEvent, HistoryLog};
 use crate::instance::Loader;
 use crate::plugins::{PluginHost, PluginStatus};
-use lumilio_plugin_api::{
-    API_VERSION, HostContext, LaunchEvent, LaunchObserver, LaunchOutcome, LaunchTarget, Manifest,
-    Permission, Plugin, PluginError, Words,
-};
-use std::sync::Arc;
-use std::time::Duration;
-use tokio::sync::mpsc;
 
 struct Recorder {
     events: mpsc::UnboundedSender<(u64, LaunchEvent)>,

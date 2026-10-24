@@ -1,5 +1,6 @@
-use crate::tr;
 use lumilio_core::LauncherSettings;
+
+use crate::tr;
 
 /// One account of the Accounts page.
 #[derive(Clone, Debug, Eq, PartialEq)]

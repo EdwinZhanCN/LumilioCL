@@ -1,14 +1,22 @@
-use super::MapView;
-use crate::{key::Key, kit, theme, tr, tr_all};
-use gpui::{AnyElement, ClipboardItem, Context, div, prelude::*, px};
-use gpui_component::{Sizable as _, h_flex, input::Input, select::Select, v_flex};
+use gpui::prelude::*;
+use gpui::{AnyElement, ClipboardItem, Context, div, px};
+use gpui_component::input::Input;
+use gpui_component::select::Select;
+use gpui_component::{Sizable as _, h_flex, v_flex};
 use lumilio_core::world_map::store::annotations::portal_coordinates;
 use lumilio_plugin_api::map::{Dimension, MapPoint, WorldId};
+
+use super::MapView;
+use crate::key::Key;
+use crate::{kit, theme, tr, tr_all};
 
 impl MapView {
     /// The seed row above the map: what world the map shows.
     pub(super) fn toolbar(&self) -> AnyElement {
-        let form = self.form.as_ref().unwrap();
+        let form = self
+            .form
+            .as_ref()
+            .expect("render initializes the seed form before the toolbar");
         // ia[plugin.world-explorer]: 输入手动种子 | 地图顶部 · 种子输入框 | 数字或文字种子，Enter 或失焦应用；错误留在输入框旁；保存到该实例
         let seed = v_flex()
             .flex_1()
@@ -150,7 +158,10 @@ impl MapView {
     /// The cursor's world position in the bottom-left corner. Clicking it
     /// swaps the read-out for X and Z fields with an explicit "Go" key.
     pub(super) fn coordinates(&self, cx: &mut Context<Self>) -> AnyElement {
-        let form = self.form.as_ref().unwrap();
+        let form = self
+            .form
+            .as_ref()
+            .expect("render initializes the seed form before coordinates");
         if !form.jumping {
             // ia[plugin.world-explorer]: 打开坐标跳转 | 地图左下角 · 光标坐标读数 | 点读数换成 X、Z 输入框并聚焦 X；读数随鼠标在地图上移动
             return div()

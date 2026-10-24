@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use super::error::ServiceError;
 use super::support::blocking;
 use super::types::now;
@@ -12,7 +14,6 @@ use crate::launcher::LaunchServiceError;
 use crate::loader::LAUNCHABLE_LOADERS;
 use crate::transfer::Transport;
 use crate::{forge_meta, loader};
-use std::collections::BTreeMap;
 
 impl<T: Transport + Clone> LauncherService<T> {
     /// Deletes an instance so that a failure or crash at any step can be

@@ -1,10 +1,11 @@
-use super::kinds::ProjectKind;
-use super::versions::Version;
-use crate::transfer::{TransferError, TransferRequest};
 use std::error::Error;
 use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
+
+use super::kinds::ProjectKind;
+use super::versions::Version;
+use crate::transfer::{TransferError, TransferRequest};
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum IntentError {

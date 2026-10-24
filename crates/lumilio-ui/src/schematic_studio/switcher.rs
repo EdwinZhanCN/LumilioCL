@@ -15,8 +15,8 @@ use gpui_component::{Icon, Sizable as _, StyledExt as _, h_flex, v_flex};
 use super::{StudioView, tree};
 use crate::assets::UiIcon;
 use crate::key::Key;
-use crate::theme::{self, ShellColors};
-use crate::tr;
+use crate::theme::ShellColors;
+use crate::{theme, tr};
 
 /// One file in the list.
 struct Choice {

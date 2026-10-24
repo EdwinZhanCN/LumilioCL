@@ -1,5 +1,6 @@
-use super::*;
 use image::{ImageFormat, RgbaImage};
+
+use super::*;
 
 fn game() -> (tempfile::TempDir, PathBuf) {
     let dir = tempfile::tempdir().unwrap();

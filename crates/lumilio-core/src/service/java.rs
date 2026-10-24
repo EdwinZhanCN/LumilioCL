@@ -1,3 +1,8 @@
+use std::future::Future;
+use std::path::{Path, PathBuf};
+
+use tokio::sync::mpsc;
+
 use super::LauncherService;
 use super::error::{ServiceError, read_unless_cancelled};
 use super::support::blocking;
@@ -8,9 +13,6 @@ use crate::java::JavaLocator;
 use crate::java_runtime::{JavaBuild, JavaSource};
 use crate::launcher::{JavaRequest, Launcher};
 use crate::transfer::{TransferRequest, Transport};
-use std::future::Future;
-use std::path::{Path, PathBuf};
-use tokio::sync::mpsc;
 
 /// The Java a download without a wanted major gets.
 const RECOMMENDED_MAJOR: u32 = 21;

@@ -1,9 +1,11 @@
+use gpui::prelude::*;
+use gpui::{App, Context, Entity, FocusHandle, Subscription, WeakEntity, Window, div, px};
+use gpui_component::WindowExt as _;
+use gpui_component::dialog::Dialog;
+
 use super::{Load, Viewer};
-use crate::{key::Key, theme, tr};
-use gpui::{
-    App, Context, Entity, FocusHandle, Subscription, WeakEntity, Window, div, prelude::*, px,
-};
-use gpui_component::{WindowExt as _, dialog::Dialog};
+use crate::key::Key;
+use crate::{theme, tr};
 
 /// The page retains only an entry point. Rendering and asset loading exist
 /// solely for the current modal session; closing drops its worker and cursor guard.

@@ -1,7 +1,9 @@
-use crate::{Error, lz4};
+use std::io::Read;
+
 use flate2::read::{GzDecoder, ZlibDecoder};
 use lumilio_nbt::Tag;
-use std::io::Read;
+
+use crate::{Error, lz4};
 
 const SECTOR: u64 = 4096;
 const HEADER: usize = 8192;

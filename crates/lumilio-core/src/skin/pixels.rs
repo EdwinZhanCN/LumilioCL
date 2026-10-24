@@ -5,8 +5,9 @@
 //! places. The layout facts are the game's skin format
 //! (<https://minecraft.wiki/w/Skin>).
 
-use image::{ImageReader, RgbaImage};
 use std::io;
+
+use image::{ImageReader, RgbaImage};
 
 use super::{MAX_SIDE, PICTURE_LIMIT, SkinError};
 

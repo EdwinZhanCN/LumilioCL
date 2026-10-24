@@ -2,15 +2,18 @@
 //! holds), edited while the game is closed. On top, where the options come
 //! from (a preset or the game itself) and anything that waits for the player;
 //! then the options in the game's own groups.
-use super::super::{InstanceDetailView, InstanceIntent, Section};
-use crate::game_settings::{self, OnEdit, OnToggle, ReviewActions};
-use crate::theme::ShellColors;
-use crate::{kit, tr};
+
+use std::rc::Rc;
+
 use gpui::prelude::*;
 use gpui::{AnyElement, Context, div};
 use gpui_component::{h_flex, v_flex};
 use lumilio_core::{GameSettingValue, InstanceOptions, OptionChange, OptionsFile};
-use std::rc::Rc;
+
+use super::super::{InstanceDetailView, InstanceIntent, Section};
+use crate::game_settings::{OnEdit, OnToggle, ReviewActions};
+use crate::theme::ShellColors;
+use crate::{game_settings, kit, tr};
 
 impl InstanceDetailView {
     pub(super) fn group_options(&self, colors: ShellColors, cx: &mut Context<Self>) -> AnyElement {

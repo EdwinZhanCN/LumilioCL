@@ -27,6 +27,14 @@ mod third_party;
 mod wardrobe;
 mod worlds;
 
+use std::collections::BTreeMap;
+use std::os::unix::fs::PermissionsExt;
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex as StdMutex};
+
+use sha1::{Digest, Sha1};
+use tokio::sync::mpsc;
+
 use super::LauncherService;
 use super::error::ServiceError;
 use crate::activity::CancellationToken;
@@ -34,13 +42,6 @@ use crate::history::{ChangeKind, HistoryEvent, HistoryLog, SessionOutcome};
 use crate::instance::{InstanceRecord, Loader, NewInstance};
 use crate::process::GameExit;
 use crate::transfer::{FileTransport, Transport, TransportFuture, TransportResponse};
-use sha1::{Digest, Sha1};
-use std::collections::BTreeMap;
-use std::os::unix::fs::PermissionsExt;
-use std::path::PathBuf;
-use std::sync::Arc;
-use std::sync::Mutex as StdMutex;
-use tokio::sync::mpsc;
 
 /// Answers addresses containing a key from a table, and `file:` addresses
 /// from disk; everything else fails like an unreachable host.

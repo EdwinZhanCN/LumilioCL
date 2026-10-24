@@ -1,7 +1,9 @@
-use super::output::{self, GAME_OUTPUT_LOG, OutputFile};
+use tokio::sync::{broadcast, mpsc};
+
+use super::output::{GAME_OUTPUT_LOG, OutputFile};
 use super::progress::{GameForwarder, ItemProgress, handle_stage, uses_installer};
 use super::types::{JavaRequest, LaunchRequest, LaunchServiceError, LaunchUpdate};
-use super::{LAUNCHER_NAME, Launcher, QUICK_PLAY_LOG};
+use super::{LAUNCHER_NAME, Launcher, QUICK_PLAY_LOG, output};
 use crate::activity::CancellationToken;
 use crate::environment::HostProfile;
 use crate::fetch::{FetchError, fetch_decoded, fetch_document};
@@ -21,7 +23,6 @@ use crate::repair::InstallationVerifier;
 use crate::transfer::{TransferEvent, TransferRequest, Transport};
 use crate::tuning::QuickPlay;
 use crate::{forge_install, process};
-use tokio::sync::{broadcast, mpsc};
 
 impl<T> Launcher<T>
 where
@@ -512,7 +513,7 @@ where
         let installed = self
             .installed_java
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .expect("installed Java cache lock was poisoned")
             .clone();
         if let Some(choice) = known(&installed) {
             return startable(choice);
@@ -557,7 +558,7 @@ where
         *self
             .installed_java
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) = installed;
+            .expect("installed Java cache lock was poisoned") = installed;
         startable(choice)
     }
 

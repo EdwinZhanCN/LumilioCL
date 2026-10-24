@@ -6,6 +6,19 @@
 //! file. Any failure fails the attempt as a whole, and what was written is
 //! kept for the next one.
 
+use std::io::SeekFrom;
+use std::ops::Range;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, MutexGuard};
+use std::time::Duration;
+
+use futures_util::stream::StreamExt;
+use tokio::fs;
+use tokio::fs::{File, OpenOptions};
+use tokio::io::{AsyncSeekExt, AsyncWriteExt};
+use tokio::task::JoinSet;
+
 use super::attempt::{content_range, hash_prefix, status_failure, verify_digest};
 use super::budget::{Connection, ConnectionBudget};
 use super::engine::{Events, TransferEngine};
@@ -15,16 +28,6 @@ use super::pieces::Pieces;
 use super::request::{TransferEvent, TransferRequest};
 use super::transport::{ByteStream, Transport};
 use crate::CancellationToken;
-use futures_util::stream::StreamExt;
-use std::io::SeekFrom;
-use std::ops::Range;
-use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
-use std::time::Duration;
-use tokio::fs::{self, File, OpenOptions};
-use tokio::io::{AsyncSeekExt, AsyncWriteExt};
-use tokio::task::JoinSet;
 
 /// The most connections one file downloads over at once, its own included.
 pub const CONNECTIONS_PER_FILE: usize = 8;
@@ -84,7 +87,9 @@ struct Shared<T> {
 
 impl<T> Shared<T> {
     fn pieces(&self) -> MutexGuard<'_, Pieces> {
-        self.pieces.lock().unwrap_or_else(PoisonError::into_inner)
+        self.pieces
+            .lock()
+            .expect("transfer pieces lock was poisoned")
     }
 }
 

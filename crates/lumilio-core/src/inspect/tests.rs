@@ -1,8 +1,9 @@
+use std::fs;
+
 use super::*;
 use crate::diagnostics::{ProblemKind, Severity};
 use crate::instance::{InstanceStore, Loader, NewInstance};
 use crate::java::JavaLocator;
-use std::fs;
 
 const MANIFEST: &str = r#"{
     "id": "1.0", "mainClass": "m",

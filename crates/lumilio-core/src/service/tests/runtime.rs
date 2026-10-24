@@ -1,9 +1,10 @@
+use tokio::sync::mpsc;
+
 use super::{ECHO_ARGS, fake_java, launch_to_end, publish_versions, repair_to_end, world};
 use crate::activity::CancellationToken;
 use crate::activity_log::TaskCategory;
 use crate::history::{ChangeKind, HistoryEvent};
 use crate::instance::Loader;
-use tokio::sync::mpsc;
 
 #[tokio::test]
 async fn changing_the_version_prepares_the_new_files_then_commits_and_records_it() {

@@ -1,9 +1,11 @@
+use std::sync::Arc;
+
+use lumilio_plugin_api::{API_VERSION, Manifest, Permission, Plugin, PluginError, Words};
+
 use super::Scripted;
 use crate::instance::Loader;
 use crate::schematic_ops::RESTORE;
 use crate::{LauncherService, SchematicOperation, ServiceError};
-use lumilio_plugin_api::{API_VERSION, Manifest, Permission, Plugin, PluginError, Words};
-use std::sync::Arc;
 
 const PLUGIN: &str = "test.schematics";
 const FILE: &str = "schematics/house.litematic";

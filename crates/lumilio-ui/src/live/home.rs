@@ -1,9 +1,11 @@
+use std::sync::Arc;
+
+use gpui::{ImageSource, RenderImage};
+use lumilio_core::{GameMode, HomeSummary, InstanceRecord, ServerEntry, ServerStatus, WorldInfo};
+
 use super::library::{instance_meta, relative_time, seed_of, world_of};
 use crate::home::{HomePresentation, Subject};
 use crate::places::ServerState;
-use gpui::{ImageSource, RenderImage};
-use lumilio_core::{GameMode, HomeSummary, InstanceRecord, ServerEntry, ServerStatus, WorldInfo};
-use std::sync::Arc;
 
 /// Worlds and servers listed under Home's world, at most.
 pub const PLACE_WORLDS: usize = 3;

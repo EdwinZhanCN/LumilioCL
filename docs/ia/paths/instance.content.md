@@ -6,7 +6,7 @@
 
 | 操作 | 层 / 组件 | 结果与反馈 | 备注 | 实现 |
 |---|---|---|---|---|
-| 浏览并安装 | L4a 主要 → 发现页（类型预选） | 安装完回到本页可见 |  | `lumilio-app/src/live/instance.rs` |
+| 浏览并安装 | L4a 主要 → 发现页（类型预选） | 安装完回到本页可见 |  | `lumilio-app/src/live/instance/instance_page.rs` |
 | 批量启用 / 停用 / 删除 | 选中行后出现的批量栏 | 逐项结果；删除先确认 |  | `lumilio-ui/src/instance_detail/content/bulk.rs` |
 | 识别来源 | 进入内容标签时自动 | 依次问已启用的内容源（先 Modrinth 按 SHA-1，没认出的再问 CurseForge 按指纹）：图标、项目名、作者、版本、项目链接；某个来源连不上时照常列出并注明，未识别的没有切换版本键 | 识别结果不缓存 | `lumilio-ui/src/instance_detail/content/panel.rs` |
 | 切换子分类 | L4a 分段：Mod / 资源包 / 光影 | 列表切换；搜索与筛选各分类分别记住 |  | `lumilio-ui/src/instance_detail/content/panel.rs` |

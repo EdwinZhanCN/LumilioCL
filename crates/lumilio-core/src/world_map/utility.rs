@@ -1,4 +1,5 @@
 //! Host overlays use the same data geometry as plugin overlays.
+
 use lumilio_plugin_api::map::{
     Dimension, MapObject, MapObjectKind, MapPoint, OverlayInfo, OverlayProvider, OverlayRequest,
 };

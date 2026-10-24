@@ -4,9 +4,10 @@
 //! Choosing a game only sends an intent, and the chip changes when core
 //! says so.
 
-use super::LauncherShell;
 use gpui::Context;
 use lumilio_core::Context as CoreContext;
+
+use super::LauncherShell;
 
 impl LauncherShell {
     /// What core last published.

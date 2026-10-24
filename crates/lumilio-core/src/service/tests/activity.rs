@@ -1,3 +1,7 @@
+use std::sync::Mutex as StdMutex;
+
+use tokio::sync::mpsc;
+
 use super::super::error::ServiceError;
 use super::super::support::{Meter, watch_transfers};
 use super::{change_subjects, mod_version, world};
@@ -7,8 +11,6 @@ use crate::activity_log::{
 };
 use crate::discover::ProjectKind;
 use crate::instance::Loader;
-use std::sync::Mutex as StdMutex;
-use tokio::sync::mpsc;
 
 #[tokio::test]
 async fn explicit_cancel_unblocks_reads_and_records_cancelled_for_both_install_kinds() {

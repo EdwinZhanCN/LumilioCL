@@ -2,12 +2,14 @@
 //! schematic studio (plan schematic-studio, D8): refuse when the file is not
 //! what was read, keep a copy of what is replaced outside the game directory,
 //! and swap the new content in whole.
-use lumilio_plugin_api::{FileInfo, PluginError};
-use sha2::{Digest, Sha256};
+
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+use lumilio_plugin_api::{FileInfo, PluginError};
+use sha2::{Digest, Sha256};
 
 /// Copies of one file kept in the backup directory.
 pub const KEEP_BACKUPS: usize = 10;

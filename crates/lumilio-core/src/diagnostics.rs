@@ -4,10 +4,10 @@
 //! helpers do the I/O.
 
 use std::collections::BTreeMap;
-use std::fs;
-use std::io::{self, Read, Seek, SeekFrom};
+use std::io::{Read, Seek, SeekFrom};
 use std::path::{Component, Path, PathBuf};
 use std::time::UNIX_EPOCH;
+use std::{fs, io};
 
 pub use lumilio_plugin_api::Severity;
 

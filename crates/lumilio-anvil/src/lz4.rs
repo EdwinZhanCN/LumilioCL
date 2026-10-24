@@ -7,6 +7,7 @@
 //! checksum (little-endian 32-bit each). The checksum is of a hash the game
 //! computes with a seeded xxHash; the data is validated by its lengths and by
 //! the chunk's own NBT parse, so the checksum is read and not verified.
+
 use crate::Error;
 
 const MAGIC: &[u8; 8] = b"LZ4Block";

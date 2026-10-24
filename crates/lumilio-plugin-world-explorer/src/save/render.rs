@@ -8,11 +8,15 @@
 //! reads as light falling from the north. Differences: water is blended over
 //! the ground by its depth rather than drilled through block by block, and
 //! the colours come from our own per-version tables (plan W13).
-use super::colors::{self, SEE_THROUGH, Table};
+
+use std::collections::BTreeSet;
+
 use lumilio_anvil::{Chunk, Column, Region, Source, columns, columns_below};
 use lumilio_plugin_api::map::{MAX_UNKNOWN, TILE_PIXELS, TileReply};
 use lumilio_plugin_api::{ImageData, PluginError};
-use std::collections::BTreeSet;
+
+use super::colors;
+use super::colors::{SEE_THROUGH, Table};
 
 /// How a dimension is looked at from above.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

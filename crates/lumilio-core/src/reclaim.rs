@@ -9,10 +9,9 @@
 
 use std::collections::BTreeSet;
 use std::error::Error;
-use std::fmt::{self, Display, Formatter};
-use std::fs;
-use std::io;
+use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
+use std::{fmt, fs, io};
 
 use serde_json::Value;
 

@@ -1,10 +1,11 @@
-use super::{LauncherService, ServiceError};
-use crate::world_map::store::annotations::{Annotation, AnnotationError};
-use crate::{CancellationToken, MapFailure, MapProviders, Transport, world_map};
 use lumilio_plugin_api::map::{
     Dimension, MapObject, OverlayInfo, OverlayRequest, TileReply, TileRequest, WorldContext,
     WorldId,
 };
+
+use super::{LauncherService, ServiceError};
+use crate::world_map::store::annotations::{Annotation, AnnotationError};
+use crate::{CancellationToken, MapFailure, MapProviders, Transport, world_map};
 
 impl<T: Transport + Clone> LauncherService<T> {
     pub async fn map_annotations(

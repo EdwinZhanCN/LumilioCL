@@ -16,4 +16,4 @@
 | 导出日志 / 报告 | 日志工具栏 · 按键「导出…」→ 选位置 | 导出当前完整来源，忽略阅读筛选；压缩日志解压为文本；玩家名、UUID 和目录脱敏；实时来源保存点击时的输出快照 |  | `lumilio-ui/src/instance_detail/diagnostics/logs.rs` |
 | 搜索日志 | 日志工具栏 · 搜索框 | 在当前来源中忽略大小写筛选 |  | `lumilio-ui/src/instance_detail/diagnostics/logs.rs` |
 | 回到底部 | 日志状态行 · 按键 | 回到实时输出末尾并恢复跟随；向上滚动暂停跟随 |  | `lumilio-ui/src/instance_detail/diagnostics/logs.rs` |
-| 看问题、执行修复 | 诊断 · 问题分段 | 每个问题一个操作（与概览相同） |  | `lumilio-ui/src/instance_detail/diagnostics/mod.rs` |
+| 看问题、执行修复 | 诊断 · 问题分段 | 每个问题一个操作（与概览相同） |  | `lumilio-ui/src/instance_detail/diagnostics/panel.rs` |

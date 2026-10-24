@@ -3,13 +3,15 @@
 //! `SchematicPlacement.getSelectionBoxForRegion` (maruohon/litematica,
 //! `src/main/java/litematica/schematic/placement/SchematicPlacement.java`,
 //! LGPL-3.0, copyright Litematica contributors). See ATTRIBUTIONS.md.
-use crate::{FOLDER, ID, Litematica, format};
+
 use lumilio_plugin_api::map::{
     Dimension, MapObject, MapObjectKind, MapPoint, OverlayInfo, OverlayProvider, OverlayRequest,
     WorldId,
 };
 use lumilio_plugin_api::{HostContext, PluginError};
 use serde_json::Value;
+
+use crate::{FOLDER, ID, Litematica, format};
 
 #[cfg(test)]
 mod tests;

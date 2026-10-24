@@ -70,7 +70,7 @@ impl PluginHost {
     fn tab_state(&self, instance: &str, plugin: &str) -> TabState {
         self.tab_states
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .expect("plugin tab state lock was poisoned")
             .get(&(instance.to_owned(), plugin.to_owned()))
             .cloned()
             .unwrap_or(TabState::Null)
@@ -108,7 +108,7 @@ impl PluginHost {
             .await?;
         self.tab_states
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .expect("plugin tab state lock was poisoned")
             .insert((instance.to_owned(), plugin.to_owned()), state);
         let manifest = self.registry().await.entries.get(plugin)?.manifest.clone();
         Some(

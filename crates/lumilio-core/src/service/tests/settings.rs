@@ -1,10 +1,11 @@
+use tokio::sync::mpsc;
+
 use super::super::LauncherService;
 use super::super::error::ServiceError;
 use super::{ECHO_ARGS, fake_java, launch_to_end, publish_release, world};
 use crate::activity::CancellationToken;
 use crate::instance::{InstanceSettings, Loader, NewInstance};
 use crate::settings::SettingsError;
-use tokio::sync::mpsc;
 
 #[tokio::test]
 async fn concurrent_mirror_presets_merge_the_latest_saved_rules() {
@@ -62,9 +63,10 @@ async fn concurrent_mirror_presets_merge_the_latest_saved_rules() {
 
 #[tokio::test]
 async fn plugin_failure_and_disable_do_not_affect_the_launch_chain() {
-    use lumilio_plugin_api::{API_VERSION, Manifest, Plugin, PluginState, Words};
     use std::collections::BTreeMap;
     use std::sync::Arc;
+
+    use lumilio_plugin_api::{API_VERSION, Manifest, Plugin, PluginState, Words};
 
     struct Observer;
     impl Plugin for Observer {

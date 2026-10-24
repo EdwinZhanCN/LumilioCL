@@ -4,8 +4,9 @@
 //! (`lumilio_core::SkinPixels`). The one place that knows both orders lives
 //! here, so callers do not repeat the swap.
 
-use gpui::RenderImage;
 use std::sync::Arc;
+
+use gpui::RenderImage;
 
 /// A GPUI image from straight RGBA pixels, or `None` when the byte count does
 /// not fill `width × height`.

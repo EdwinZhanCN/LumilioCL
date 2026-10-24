@@ -1,18 +1,18 @@
-use super::Wiring;
-use super::jobs::answer;
-use gpui_kit::AppContext as _;
-use gpui_kit::{App, WeakEntity, Window};
+use std::rc::Rc;
+
+use gpui_kit::{App, AppContext as _, WeakEntity, Window};
 use lumilio_core::{CancellationToken, ServiceError, ThirdPartySignIn};
 use lumilio_ui::accounts::{AccountForm, AccountRequest};
 use lumilio_ui::auth_servers::{ServerIntent, ServerRow, ServersDialog};
 use lumilio_ui::live::account_failure;
 use lumilio_ui::microsoft_login::{SignInDialog, SignInIntent};
-use lumilio_ui::platform;
 use lumilio_ui::skin_dialog::{SkinDialog, SkinIntent};
 use lumilio_ui::third_party_login::{ThirdPartyDialog, ThirdPartyIntent};
 use lumilio_ui::toast::Toast;
-use lumilio_ui::tr;
-use std::rc::Rc;
+use lumilio_ui::{platform, tr};
+
+use super::Wiring;
+use super::jobs::answer;
 
 /// Opens the add-account dialog (IA `accounts.md`). With `then_launch` the
 /// game the person asked to start begins as soon as the account is saved.

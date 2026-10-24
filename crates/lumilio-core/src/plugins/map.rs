@@ -1,14 +1,17 @@
 //! Map calls isolate faults to a provider, never the plugin's sticky status.
-use super::{Context, PluginHost, PluginStatus, enabled, isolated};
-use crate::activity::CancellationToken;
+
+use std::path::PathBuf;
+use std::sync::Arc;
+use std::time::Duration;
+
 use lumilio_plugin_api::map::{
     BaseMapInfo, MapObject, ObjectEdit, OverlayInfo, OverlayRequest, TileReply, TileRequest,
     WorldContext,
 };
 use lumilio_plugin_api::{FileStat, HostContext, Plugin, PluginError};
-use std::path::PathBuf;
-use std::sync::Arc;
-use std::time::Duration;
+
+use super::{Context, PluginHost, PluginStatus, enabled, isolated};
+use crate::activity::CancellationToken;
 
 const MAP_TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -295,13 +298,13 @@ impl PluginHost {
             let preferences = self
                 .preferences
                 .read()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
+                .expect("map provider state lock was poisoned");
             let state = preferences.states.get(id).cloned().unwrap_or_default();
             if !enabled(&entry.manifest, &state)
                 || entry
                     .failure
                     .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .expect("map provider state lock was poisoned")
                     .is_some()
             {
                 return Err(MapFailure::Off);
@@ -318,7 +321,7 @@ impl PluginHost {
         if self
             .map_failures
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .expect("map provider state lock was poisoned")
             .get(&key)
             .copied()
             .unwrap_or(0)
@@ -351,7 +354,7 @@ impl PluginHost {
         let mut failures = self
             .map_failures
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+            .expect("map provider state lock was poisoned");
         match result {
             Ok(value) => {
                 failures.insert(key, 0);

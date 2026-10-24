@@ -36,7 +36,7 @@ impl Network {
         *self
             .sources
             .write()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(sources);
+            .expect("plugin network state lock was poisoned") = Some(sources);
     }
 
     pub(super) fn context(&self, timeout: Duration) -> NetworkContext {
@@ -45,7 +45,7 @@ impl Network {
             sources: self
                 .sources
                 .read()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .expect("plugin network state lock was poisoned")
                 .clone(),
             handle: Handle::current(),
             deadline: Instant::now() + timeout,

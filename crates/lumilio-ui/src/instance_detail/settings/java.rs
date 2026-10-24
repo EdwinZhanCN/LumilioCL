@@ -2,20 +2,21 @@
 //! and 自定义路径…, with what the next launch uses beneath it. The saved value
 //! stays `java_path` (`None` is automatic).
 
+use std::path::{Path, PathBuf};
+use std::rc::Rc;
+
+use gpui::prelude::*;
+use gpui::{Context, Window, div, px};
+use gpui_component::select::{SearchableVec, Select, SelectEvent, SelectState};
+use gpui_component::{IndexPath, Sizable as _};
+use lumilio_core::{HostProfile, InstanceJava, InstanceSettings};
+
 use super::super::{Dropdown, InstanceDetailView, Section};
 use super::saves::{cleared, java};
 use crate::live::java_label;
 use crate::settings_dialog::{DialogSpec, FieldKind, FieldSpec, SettingsDialog};
 use crate::theme::ShellColors;
 use crate::tr;
-use gpui::prelude::*;
-use gpui::{Context, Window, div, px};
-use gpui_component::IndexPath;
-use gpui_component::Sizable as _;
-use gpui_component::select::{SearchableVec, Select, SelectEvent, SelectState};
-use lumilio_core::{HostProfile, InstanceJava, InstanceSettings};
-use std::path::{Path, PathBuf};
-use std::rc::Rc;
 
 /// One entry of the Java dropdown.
 #[derive(Clone, Debug, Eq, PartialEq)]

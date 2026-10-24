@@ -1,5 +1,7 @@
 //! Conversions between the launcher's content types and the plugin API's.
 
+use lumilio_plugin_api::content as api;
+
 use super::kinds::{Catalog, ProjectKind, SortIndex, TextFormat};
 use super::project::{GalleryImage, Project, ProjectLinks};
 use super::query::{Pick, SearchQuery, Stance};
@@ -8,7 +10,6 @@ use super::tags::{CategoryTag, GameVersionTag, LoaderTag, ProjectSummary};
 use super::versions::{
     Dependency, DependencyKind, PackFileKind, ReleaseChannel, ResolvedFile, Version, VersionFile,
 };
-use lumilio_plugin_api::content as api;
 
 pub(super) fn kind_to_api(kind: ProjectKind) -> api::ProjectKind {
     match kind {

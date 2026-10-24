@@ -1,16 +1,18 @@
+use std::collections::BTreeMap;
+use std::error::Error;
+use std::fmt;
+use std::fmt::{Display, Formatter};
+use std::path::{Path, PathBuf};
+
+use tokio::fs;
+use tokio::sync::broadcast;
+
 use super::assets::{AssetIndex, AssetIndexError};
 use super::files::{atomic_write, ensure_not_cancelled, publish_asset_views};
 use super::native::{NativeError, NativePublisher};
 use super::plan::InstallationPlan;
 use crate::activity::CancellationToken;
 use crate::transfer::{TransferBatchReport, TransferEngine, TransferError, Transport};
-use std::collections::BTreeMap;
-use std::error::Error;
-use std::fmt;
-use std::fmt::{Display, Formatter};
-use std::path::{Path, PathBuf};
-use tokio::fs;
-use tokio::sync::broadcast;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum InstallStage {

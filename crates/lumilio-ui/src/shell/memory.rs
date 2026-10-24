@@ -1,8 +1,9 @@
 //! What the launcher lets go of while a game runs.
 
+use gpui::Context;
+
 use super::LauncherShell;
 use super::locations::Location;
-use gpui::Context;
 
 impl LauncherShell {
     /// A game has started and has better use for the memory. The launcher

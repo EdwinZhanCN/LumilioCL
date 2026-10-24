@@ -1,11 +1,10 @@
+use gpui::{AppContext as _, Context, Window};
+use gpui_component::IndexPath;
+use gpui_component::select::{SearchableVec, SelectEvent, SelectState};
+use lumilio_core::{GameLogSource, LogLevel};
+
 use super::super::{Dropdown, InstanceDetailView};
 use crate::tr;
-use gpui::{AppContext as _, Context, Window};
-use gpui_component::{
-    IndexPath,
-    select::{SearchableVec, SelectEvent, SelectState},
-};
-use lumilio_core::{GameLogSource, LogLevel};
 
 pub(super) fn levels() -> [(LogLevel, &'static str); 4] {
     [

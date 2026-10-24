@@ -1,11 +1,14 @@
 //! Read biomes from actual vanilla Anvil chunks, independently of the oracle.
-use super::prepare::{json, path};
-use crate::release::Result;
-use lumilio_nbt::Tag;
-use serde_json::Value;
+
 use std::fmt::Write as _;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
+
+use lumilio_nbt::Tag;
+use serde_json::Value;
+
+use super::prepare::{json, path};
+use crate::release::Result;
 
 struct FileSource(PathBuf);
 impl lumilio_anvil::Source for FileSource {
@@ -269,7 +272,7 @@ fn read_areas(save: &Path, seed: i64, finds: &mut AreaFinds) -> Result {
                                             "{seed} {} {} {} {kind}",
                                             at[0], at[1], at[2]
                                         )
-                                        .unwrap();
+                                        .expect("writing to a String cannot fail");
                                     }
                                     "minecraft:bone_block" => {
                                         bones.insert(at);
@@ -296,7 +299,7 @@ fn read_areas(save: &Path, seed: i64, finds: &mut AreaFinds) -> Result {
                             "{seed} {dim} {} {} {} {mob}",
                             at[0], at[1], at[2]
                         )
-                        .unwrap();
+                        .expect("writing to a String cannot fail");
                     }
                 }
             }
@@ -319,8 +322,20 @@ fn read_areas(save: &Path, seed: i64, finds: &mut AreaFinds) -> Result {
                     }
                 }
             }
-            let low = |i: usize| cluster.iter().map(|p| p[i]).min().unwrap();
-            let high = |i: usize| cluster.iter().map(|p| p[i]).max().unwrap();
+            let low = |i: usize| {
+                cluster
+                    .iter()
+                    .map(|p| p[i])
+                    .min()
+                    .expect("a cluster starts with one bone")
+            };
+            let high = |i: usize| {
+                cluster
+                    .iter()
+                    .map(|p| p[i])
+                    .max()
+                    .expect("a cluster starts with one bone")
+            };
             writeln!(
                 finds.fossils,
                 "{seed} {dim} {} {} {} {} {} {} {}",
@@ -332,7 +347,7 @@ fn read_areas(save: &Path, seed: i64, finds: &mut AreaFinds) -> Result {
                 high(2),
                 cluster.len()
             )
-            .unwrap();
+            .expect("writing to a String cannot fail");
         }
     }
     Ok(())
@@ -371,7 +386,8 @@ pub(super) fn read(root: &Path, version: &str) -> Result {
                 .try_into()
                 .map_err(|_| "invalid world spawn")?,
         };
-        writeln!(located, "{seed} 0 -2 {} {}", spawn[0], spawn[1]).unwrap();
+        writeln!(located, "{seed} 0 -2 {} {}", spawn[0], spawn[1])
+            .expect("writing to a String cannot fail");
         let coordinates = json(&save.join("coordinates.json"))?;
         for point in coordinates.as_array().ok_or("invalid saved coordinates")? {
             let number = |key: &str| {
@@ -392,7 +408,8 @@ pub(super) fn read(root: &Path, version: &str) -> Result {
             let id = ids[name.strip_prefix("minecraft:").unwrap_or(name)]
                 .as_u64()
                 .ok_or("unknown saved biome")?;
-            writeln!(output, "{seed} {dimension} {x} {y} {z} {id}").unwrap();
+            writeln!(output, "{seed} {dimension} {x} {y} {z} {id}")
+                .expect("writing to a String cannot fail");
         }
         for row in json(&save.join("locates.json"))?
             .as_array()
@@ -412,7 +429,8 @@ pub(super) fn read(root: &Path, version: &str) -> Result {
                 Some("the_end") => 1,
                 _ => return Err("unknown located dimension".into()),
             };
-            writeln!(located, "{seed} {dim} {kind} {} {}", row["x"], row["z"]).unwrap();
+            writeln!(located, "{seed} {dim} {kind} {} {}", row["x"], row["z"])
+                .expect("writing to a String cannot fail");
         }
         read_areas(&save, seed, &mut finds)?;
         // Filled by `save_golden.py --chests` on a copy of the world.
@@ -422,20 +440,22 @@ pub(super) fn read(root: &Path, version: &str) -> Result {
                 let items = chest["items"].as_str().ok_or("chest without items")?;
                 let apples = items.matches("minecraft:enchanted_golden_apple").count();
                 let at = format!("{} {} {}", chest["x"], chest["y"], chest["z"]);
-                writeln!(loot, "{seed} {at} {apples}").unwrap();
+                writeln!(loot, "{seed} {at} {apples}").expect("writing to a String cannot fail");
                 // Totals per item (chests split stacks across slots), and
                 // each enchanted book on its own row.
                 let mut totals = std::collections::BTreeMap::new();
                 for (id, count, enchantment) in chest_items(items) {
                     match enchantment {
                         Some((name, level)) => {
-                            writeln!(stacks, "{seed} {at} {id}:{name} {level}").unwrap();
+                            writeln!(stacks, "{seed} {at} {id}:{name} {level}")
+                                .expect("writing to a String cannot fail");
                         }
                         None => *totals.entry(id).or_insert(0) += count,
                     }
                 }
                 for (id, count) in totals {
-                    writeln!(stacks, "{seed} {at} {id} {count}").unwrap();
+                    writeln!(stacks, "{seed} {at} {id} {count}")
+                        .expect("writing to a String cannot fail");
                 }
             }
         }
@@ -471,7 +491,7 @@ pub(super) fn read(root: &Path, version: &str) -> Result {
                             "{seed} {cx} {cz} {} {} {} {loot}",
                             at[0], at[1], at[2]
                         )
-                        .unwrap();
+                        .expect("writing to a String cannot fail");
                     }
                 }
                 continue;
@@ -501,7 +521,8 @@ pub(super) fn read(root: &Path, version: &str) -> Result {
                 if at.contains(&i64::MIN) {
                     return Err("nether fossil piece without template position".into());
                 }
-                writeln!(fossils, "{seed} {} {} {}", at[0], at[2], at[1]).unwrap();
+                writeln!(fossils, "{seed} {} {} {}", at[0], at[2], at[1])
+                    .expect("writing to a String cannot fail");
                 continue;
             }
             if !VARIANT_STRUCTURES.contains(&structure) {
@@ -523,7 +544,8 @@ pub(super) fn read(root: &Path, version: &str) -> Result {
             let chunk = chunk(&save, dim, x.div_euclid(16), z.div_euclid(16))?;
             let (kind, variant) = start_variant(&chunk, structure)
                 .map_err(|e| format!("{seed} {structure} at {x} {z}: {e}"))?;
-            writeln!(variants, "{seed} {dim} {kind} {x} {z} {variant}").unwrap();
+            writeln!(variants, "{seed} {dim} {kind} {x} {z} {variant}")
+                .expect("writing to a String cannot fail");
         }
     }
     let out = root.join("crates/lumilio-cubiomes/tests/golden");

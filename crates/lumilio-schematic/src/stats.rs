@@ -1,8 +1,9 @@
 //! What a schematic is made of: blocks by id and state, entities and block
 //! entities by type, per region and in total (schematic-studio T11).
 
-use crate::{UniversalSchematic, is_air, regions_in_precedence, regions_overlap};
 use std::collections::{BTreeMap, HashSet};
+
+use crate::{UniversalSchematic, is_air, regions_in_precedence, regions_overlap};
 
 /// How many cells hold one block state of a block id.
 #[derive(Debug, Clone, PartialEq, Eq)]

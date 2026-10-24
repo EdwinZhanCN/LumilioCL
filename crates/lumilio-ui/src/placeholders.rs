@@ -1,10 +1,13 @@
 //! Truthful page bodies for global routes whose domain slices are not wired yet.
 
-use gpui::{AnyElement, IntoElement, div, prelude::*, px};
+use gpui::prelude::*;
+use gpui::{AnyElement, IntoElement, div, px};
 use gpui_component::{Icon, Sizable as _, StyledExt as _, v_flex};
 
+use crate::assets::LandmarkIcon;
+use crate::route::Route;
+use crate::theme::ShellColors;
 use crate::tr;
-use crate::{assets::LandmarkIcon, route::Route, theme::ShellColors};
 
 pub fn render(route: Route, colors: ShellColors) -> AnyElement {
     let (eyebrow, title, body, icon) = match route {

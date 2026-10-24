@@ -1,8 +1,7 @@
+use super::document::Document;
 use super::{
     GameSettingsError, GameSettingsView, SettingChange, SettingResolution, Snapshot, Values,
-    binding, catalog,
-    document::{self, Document},
-    save_binding, storage,
+    binding, catalog, document, save_binding, storage,
 };
 use crate::instance::InstanceStore;
 

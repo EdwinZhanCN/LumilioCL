@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use super::LauncherService;
 use super::error::ServiceError;
 use super::packs::backup_failure;
@@ -8,7 +10,6 @@ use crate::activity_log::{RetryAction, TaskAction, TaskCategory, TaskLabel};
 use crate::instance::{InstanceRecord, InstanceSettings, Loader, NewInstance};
 use crate::staged::Staged;
 use crate::transfer::Transport;
-use std::path::Path;
 
 impl<T: Transport + Clone> LauncherService<T> {
     /// The games in a folder made by another launcher (ADR 0016). Reads only.

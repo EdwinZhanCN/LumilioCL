@@ -1,3 +1,6 @@
+use lumilio_plugin_api::{LaunchEvent, LaunchOutcome, LaunchTarget};
+use tokio::sync::mpsc;
+
 use super::LauncherService;
 use super::error::ServiceError;
 use super::types::now;
@@ -13,8 +16,6 @@ use crate::recovery::SessionMarker;
 use crate::settings::validate_memory;
 use crate::transfer::{SourceChain, Transport};
 use crate::tuning::QuickPlay;
-use lumilio_plugin_api::{LaunchEvent, LaunchOutcome, LaunchTarget};
-use tokio::sync::mpsc;
 
 impl<T: Transport + Clone> LauncherService<T> {
     /// Everything a launch or an install needs about one instance, captured
@@ -116,7 +117,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     pub fn launch_next_with_automatic_java(&self, id: &str) {
         self.automatic_java_once
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .expect("launch service state lock was poisoned")
             .insert(id.to_owned());
     }
 
@@ -180,7 +181,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         let automatic_java = self
             .automatic_java_once
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .expect("launch service state lock was poisoned")
             .remove(id);
         if self.store.lock().await.get(id).is_none() {
             return Err(ServiceError::NoSuchInstance(id.to_owned()));

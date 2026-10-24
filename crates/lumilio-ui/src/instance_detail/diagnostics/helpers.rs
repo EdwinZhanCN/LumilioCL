@@ -1,5 +1,6 @@
-use crate::tr_all;
 use lumilio_core::FileEntry;
+
+use crate::tr_all;
 
 pub fn diagnostic_labels() -> &'static [&'static str] {
     tr_all![

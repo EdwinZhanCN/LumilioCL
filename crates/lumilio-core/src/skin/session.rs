@@ -1,10 +1,14 @@
 //! Read-only Yggdrasil session textures. No login token is sent to a texture
 //! server. The profile UUID must match the account that requested it.
-use super::{AccountLook, SkinError, SkinModel, cape_pixels, skin_pixels};
-use crate::{account::ProfileId, transfer::Transport};
-use base64::{Engine as _, engine::general_purpose::STANDARD};
+
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD;
 use futures_util::StreamExt as _;
 use serde_json::Value;
+
+use super::{AccountLook, SkinError, SkinModel, cape_pixels, skin_pixels};
+use crate::account::ProfileId;
+use crate::transfer::Transport;
 
 async fn read(
     transport: &(impl Transport + ?Sized),

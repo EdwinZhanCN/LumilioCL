@@ -1,12 +1,13 @@
+use gpui::prelude::*;
+use gpui::{
+    Animation, AnimationExt as _, AnyElement, IntoElement, SharedString, div, ease_out_quint, px,
+};
+use gpui_component::input::{Input, InputState};
+use gpui_component::{Icon, Sizable as _, TITLE_BAR_HEIGHT, h_flex, v_flex};
+
 use crate::assets::UiIcon;
 use crate::theme;
 use crate::theme::{ShellColors, motion};
-use gpui::AnimationExt as _;
-use gpui::prelude::*;
-use gpui::{Animation, AnyElement, IntoElement, SharedString, div, ease_out_quint, px};
-use gpui_component::Sizable as _;
-use gpui_component::input::{Input, InputState};
-use gpui_component::{Icon, TITLE_BAR_HEIGHT, h_flex, v_flex};
 
 /// The scrolling page frame: clears the title bar and the floating capsule and
 /// keeps content on the shared column.

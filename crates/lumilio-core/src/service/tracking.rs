@@ -1,3 +1,7 @@
+use std::sync::Mutex as StdMutex;
+
+use tokio::sync::mpsc;
+
 use super::error::ServiceError;
 use super::support::{Meter, TaskLease, watch_transfers};
 use super::types::now;
@@ -6,8 +10,6 @@ use crate::activity::CancellationToken;
 use crate::activity_log::{TaskBoard, TaskCategory, TaskLabel, TaskOutcome};
 use crate::launcher::{LaunchRequest, LaunchServiceError, LaunchUpdate, Launcher};
 use crate::transfer::{ConnectionBudget, TransferEngine, Transport};
-use std::sync::Mutex as StdMutex;
-use tokio::sync::mpsc;
 
 impl<T: Transport + Clone> LauncherService<T> {
     /// The connections every download shares, sized by the current setting.
@@ -85,7 +87,7 @@ impl<T: Transport + Clone> LauncherService<T> {
                 {
                     board
                         .lock()
-                        .unwrap_or_else(std::sync::PoisonError::into_inner)
+                        .expect("launch tracking state lock was poisoned")
                         .progress(task, *done, *total);
                 }
                 let _ = updates.send(update);
@@ -139,7 +141,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     pub(super) fn task_control(&self, id: u64) -> Option<CancellationToken> {
         self.cancels
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .expect("launch tracking state lock was poisoned")
             .get(&id)
             .cloned()
     }
@@ -154,12 +156,12 @@ impl<T: Transport + Clone> LauncherService<T> {
         let id = self
             .board
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .expect("launch tracking state lock was poisoned")
             .start(category, label, instance, now());
         if let Some(cancel) = cancel {
             self.cancels
                 .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .expect("launch tracking state lock was poisoned")
                 .insert(id, cancel.clone());
         }
         TaskLease {

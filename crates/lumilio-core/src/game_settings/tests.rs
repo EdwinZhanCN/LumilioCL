@@ -1,6 +1,7 @@
+use std::fs;
+
 use super::*;
 use crate::{InstanceStore, Loader, NewInstance};
-use std::fs;
 
 fn setup() -> (tempfile::TempDir, InstanceStore, String, i64) {
     let root = tempfile::tempdir().unwrap();

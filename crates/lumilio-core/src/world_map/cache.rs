@@ -1,11 +1,13 @@
-use super::context::io_error;
-use lumilio_plugin_api::map::{TileReply, TileRequest};
-use sha2::{Digest, Sha256};
-use std::fs;
-use std::io::{self, Write};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::SystemTime;
+use std::{fs, io};
+
+use lumilio_plugin_api::map::{TileReply, TileRequest};
+use sha2::{Digest, Sha256};
+
+use super::context::io_error;
 
 const MAX_ENTRY: u64 = 2 * 1024 * 1024;
 static NEXT: AtomicU64 = AtomicU64::new(1);

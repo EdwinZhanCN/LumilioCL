@@ -1,12 +1,15 @@
-use super::super::{LauncherShell, Route};
-use gpui::{Modifiers, TestAppContext};
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use gpui::{Modifiers, TestAppContext};
+
+use super::super::{LauncherShell, Route};
+
 #[gpui::test]
 fn discover_leaves_naming_the_target_game_to_the_corner_chip(cx: &mut TestAppContext) {
-    use crate::live::{LiveIntent, library_card};
     use lumilio_core::{InstanceRecord, InstanceSettings, Loader};
+
+    use crate::live::{LiveIntent, library_card};
 
     cx.update(gpui_component::init);
     let seen: Rc<RefCell<Vec<LiveIntent>>> = Rc::default();
@@ -91,8 +94,9 @@ fn another_current_game_ends_browsing_for_a_game(cx: &mut TestAppContext) {
 
 #[gpui::test]
 fn a_result_the_target_already_has_shows_installed_or_offers_the_update(cx: &mut TestAppContext) {
-    use crate::live::{CardTags, DateKind, LiveIntent, SearchRow, SearchStatus, library_card};
     use lumilio_core::{InstalledProject, InstanceRecord, InstanceSettings, Loader};
+
+    use crate::live::{CardTags, DateKind, LiveIntent, SearchRow, SearchStatus, library_card};
 
     cx.update(gpui_component::init);
     let seen: Rc<RefCell<Vec<LiveIntent>>> = Rc::default();
@@ -186,9 +190,10 @@ fn a_result_the_target_already_has_shows_installed_or_offers_the_update(cx: &mut
 
 #[gpui::test]
 fn a_project_opens_in_place_and_back_returns_to_the_same_list(cx: &mut TestAppContext) {
+    use lumilio_core::ProjectKind;
+
     use crate::live::{DiscoverChange, LiveIntent, PickGroup, SearchStatus};
     use crate::project_detail::DetailState;
-    use lumilio_core::ProjectKind;
 
     cx.update(gpui_component::init);
     let (shell, cx) = cx.add_window_view(|_, cx| {
@@ -278,11 +283,12 @@ fn a_project_opens_in_place_and_back_returns_to_the_same_list(cx: &mut TestAppCo
 
 /// Two games and the filter lists, for the interaction tests below.
 fn live_with_games(cx: &mut gpui::VisualTestContext, shell: &gpui::Entity<LauncherShell>) {
-    use crate::live::library_card;
     use lumilio_core::{
         CategoryTag, DiscoverFilters, GameVersionTag, InstanceRecord, InstanceSettings, Loader,
         LoaderTag, ProjectKind,
     };
+
+    use crate::live::library_card;
     let record = |id: &str, loader: Loader| InstanceRecord {
         id: id.to_owned(),
         name: id.to_owned(),
@@ -337,8 +343,9 @@ fn live_with_games(cx: &mut gpui::VisualTestContext, shell: &gpui::Entity<Launch
 fn browsing_for_a_game_shows_its_header_locks_its_filters_and_trims_the_tabs(
     cx: &mut TestAppContext,
 ) {
-    use crate::live::{DiscoverChange, LiveIntent};
     use lumilio_core::ProjectKind;
+
+    use crate::live::{DiscoverChange, LiveIntent};
 
     cx.update(gpui_component::init);
     let seen: Rc<RefCell<Vec<LiveIntent>>> = Rc::default();
@@ -412,8 +419,9 @@ fn browsing_for_a_game_shows_its_header_locks_its_filters_and_trims_the_tabs(
 
 #[gpui::test]
 fn a_vanilla_game_gets_no_mod_tab_and_a_filter_row_asks_for_its_option(cx: &mut TestAppContext) {
-    use crate::live::{LiveIntent, PickGroup};
     use lumilio_core::{Pick, ProjectKind};
+
+    use crate::live::{LiveIntent, PickGroup};
 
     cx.update(gpui_component::init);
     let seen: Rc<RefCell<Vec<LiveIntent>>> = Rc::default();
@@ -470,8 +478,9 @@ fn a_vanilla_game_gets_no_mod_tab_and_a_filter_row_asks_for_its_option(cx: &mut 
 
 #[gpui::test]
 fn hide_installed_is_for_packs_and_the_pack_choice_is_remembered(cx: &mut TestAppContext) {
-    use crate::live::LiveIntent;
     use lumilio_core::ProjectKind;
+
+    use crate::live::LiveIntent;
 
     cx.update(gpui_component::init);
     let seen: Rc<RefCell<Vec<LiveIntent>>> = Rc::default();
@@ -515,9 +524,10 @@ fn hide_installed_is_for_packs_and_the_pack_choice_is_remembered(cx: &mut TestAp
 
 #[gpui::test]
 fn a_gallery_image_shown_large_is_drawn_by_the_shell_over_everything(cx: &mut TestAppContext) {
+    use lumilio_core::ProjectKind;
+
     use crate::live::LiveIntent;
     use crate::project_detail::DetailState;
-    use lumilio_core::ProjectKind;
 
     cx.update(gpui_component::init);
     let (shell, cx) = cx.add_window_view(|_, cx| {
@@ -554,8 +564,9 @@ fn a_gallery_image_shown_large_is_drawn_by_the_shell_over_everything(cx: &mut Te
 #[gpui::test]
 #[ignore = "a measurement, not a check"]
 fn frame_cost_of_a_full_discover_page(cx: &mut TestAppContext) {
-    use crate::live::{LiveIntent, SearchRow, SearchStatus};
     use lumilio_core::ProjectKind;
+
+    use crate::live::{LiveIntent, SearchRow, SearchStatus};
 
     cx.update(gpui_component::init);
     let (shell, cx) = cx.add_window_view(|_, cx| {
@@ -615,8 +626,9 @@ fn frame_cost_of_a_full_discover_page(cx: &mut TestAppContext) {
 
 #[gpui::test]
 fn choosing_another_source_searches_there_and_loads_its_filters(cx: &mut TestAppContext) {
-    use crate::live::{DiscoverQuery, LiveIntent};
     use lumilio_core::{ContentSourceInfo, ProjectKind};
+
+    use crate::live::{DiscoverQuery, LiveIntent};
 
     cx.update(gpui_component::init);
     let seen: Rc<RefCell<Vec<LiveIntent>>> = Rc::default();
@@ -748,9 +760,10 @@ fn turning_translation_off_puts_the_original_summaries_back(cx: &mut TestAppCont
 
 #[gpui::test]
 fn result_rows_stay_short_and_a_narrow_window_folds_the_filters(cx: &mut TestAppContext) {
-    use crate::live::{CardTag, CardTags, DateKind, LiveIntent, SearchRow, SearchStatus};
     use gpui::{px, size};
     use lumilio_core::ProjectKind;
+
+    use crate::live::{CardTag, CardTags, DateKind, LiveIntent, SearchRow, SearchStatus};
 
     cx.update(gpui_component::init);
     let (shell, cx) = cx.add_window_view(|_, cx| {

@@ -1,9 +1,8 @@
-use crate::protocol::decode;
-use crate::protocol::{Kind, environment};
 use lumilio_plugin_api::PluginError;
-use lumilio_plugin_api::content::ProjectKind;
-use lumilio_plugin_api::content::{SearchHit, SearchPage};
+use lumilio_plugin_api::content::{ProjectKind, SearchHit, SearchPage};
 use serde::Deserialize;
+
+use crate::protocol::{Kind, decode, environment};
 
 /// Names Modrinth lists next to categories that are loaders, platforms or
 /// shader loaders.

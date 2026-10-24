@@ -42,8 +42,9 @@ fn mods_by_name_come_before_the_enabled_packs() {
 /// its default order below.
 #[test]
 fn a_kept_order_places_the_sources_it_names() {
-    use super::super::order::{arrange, swapped};
     use std::path::PathBuf;
+
+    use super::super::order::{arrange, swapped};
     let [a, b, c, d] = ["a.jar", "b.jar", "pack.zip", "new.jar"].map(PathBuf::from);
     let default = vec![a.clone(), b.clone(), d.clone(), c.clone()];
     assert_eq!(arrange(default.clone(), &[]), default);

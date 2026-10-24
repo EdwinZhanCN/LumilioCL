@@ -1,12 +1,14 @@
+use std::collections::VecDeque;
+use std::path::PathBuf;
+
+use tokio::sync::mpsc;
+
 use super::output::OutputFile;
 use super::types::LaunchUpdate;
 use crate::install::{AssetIndex, InstallEvent, InstallStage, InstallationPlan};
 use crate::instance::Loader;
 use crate::launch_session::{LaunchFailure, LaunchPhase, LaunchSignal};
 use crate::process::GameEvent;
-use std::collections::VecDeque;
-use std::path::PathBuf;
-use tokio::sync::mpsc;
 
 /// Loaders installed by running their official installer's processors.
 pub(super) const fn uses_installer(loader: Loader) -> bool {

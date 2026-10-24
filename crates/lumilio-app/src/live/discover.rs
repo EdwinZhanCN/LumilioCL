@@ -1,16 +1,16 @@
-use super::jobs::{answer, install_outcome, job};
-use super::translation::{request_detail_summary, request_summaries};
-use super::{Reload, Wiring};
-use gpui_kit::AppContext as _;
-use gpui_kit::{App, WeakEntity, Window};
+use std::rc::Rc;
+
+use gpui_kit::{App, AppContext as _, WeakEntity, Window};
 use lumilio_core::{CancellationToken, ProjectKind, ServiceError, unix_now};
-use lumilio_ui::LauncherShell;
 use lumilio_ui::dependency_prompt::DependencyPrompt;
 use lumilio_ui::live::{DiscoverQuery, FilterModel, Provided, SearchStatus, search_rows};
 use lumilio_ui::project_detail::DetailState;
 use lumilio_ui::toast::Toast;
-use lumilio_ui::tr;
-use std::rc::Rc;
+use lumilio_ui::{LauncherShell, tr};
+
+use super::jobs::{answer, install_outcome, job};
+use super::translation::{request_detail_summary, request_summaries};
+use super::{Reload, Wiring};
 
 /// What a search needs from the page besides its query.
 #[derive(Default)]

@@ -1,22 +1,22 @@
+use std::os::unix::fs::PermissionsExt;
+use std::path::PathBuf;
+use std::sync::Arc;
+
+use sha1::{Digest, Sha1};
+use tokio::sync::mpsc;
+
 use super::Launcher;
 use super::progress::{GameForwarder, runtimes_root};
 use super::types::{LaunchRequest, LaunchServiceError, LaunchUpdate};
 use crate::activity::CancellationToken;
-use crate::instance::Loader;
-use crate::launch_session::{LaunchFailure, LaunchPhase, LaunchSignal};
-use crate::process::{GameEvent, GameExit};
-use crate::transfer::SourceChain;
-use crate::tuning::LaunchTuning;
-use std::path::PathBuf;
-use tokio::sync::mpsc;
-
-use crate::instance::{InstanceStore, NewInstance};
+use crate::instance::{InstanceStore, Loader, NewInstance};
 use crate::java::JavaLocator;
-use crate::launch_session::{LaunchSession, LaunchStatus};
-use crate::transfer::{FileTransport, OfficialSource};
-use sha1::{Digest, Sha1};
-use std::os::unix::fs::PermissionsExt;
-use std::sync::Arc;
+use crate::launch_session::{
+    LaunchFailure, LaunchPhase, LaunchSession, LaunchSignal, LaunchStatus,
+};
+use crate::process::{GameEvent, GameExit};
+use crate::transfer::{FileTransport, OfficialSource, SourceChain};
+use crate::tuning::LaunchTuning;
 
 struct World {
     _dir: tempfile::TempDir,

@@ -1,10 +1,12 @@
 use std::collections::BTreeMap;
 use std::error::Error;
-use std::fmt::{self, Display, Formatter};
+use std::fmt;
+use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
 
 use sha1::{Digest, Sha1};
-use tokio::fs::{self, File};
+use tokio::fs;
+use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 
 use crate::activity::CancellationToken;

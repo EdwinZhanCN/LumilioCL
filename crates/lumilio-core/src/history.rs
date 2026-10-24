@@ -3,14 +3,15 @@
 //! The log is append-only JSON lines, so a crash can at worst tear the final
 //! line, which reading skips.
 
-use crate::layout::Layout;
-use std::fs::{self, OpenOptions};
-use std::io::{self, Write};
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::{fs, io};
 
 use serde::{Deserialize, Serialize};
 
 use crate::instance::{InstanceStore, StoreError};
+use crate::layout::Layout;
 use crate::process::GameExit;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]

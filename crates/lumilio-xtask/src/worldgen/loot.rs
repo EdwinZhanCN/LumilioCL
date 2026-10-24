@@ -7,11 +7,14 @@
 //! rolls and entries, and for an enchanted book the maximum level of every
 //! enchantment its options tag lists, in the tag's order. `table` turns every
 //! release's file into `forks/cubiomes/tables/loot.h`.
-use crate::release::Result;
-use serde_json::{Value, json};
+
 use std::fmt::Write as _;
 use std::io::Read;
 use std::path::Path;
+
+use serde_json::{Value, json};
+
+use crate::release::Result;
 
 struct Jar(zip::ZipArchive<std::fs::File>);
 
@@ -209,13 +212,13 @@ pub(super) fn table(releases: &[(String, Value)]) -> Result<String> {
                     "static const int loot_levels_{n}_{i}[] = {{ {} }};",
                     levels.join(", ")
                 )
-                .unwrap();
+                .expect("writing to a String cannot fail");
                 writeln!(
                     out,
                     "static const char *const loot_names_{n}_{i}[] = {{ {} }};",
                     names.join(", ")
                 )
-                .unwrap();
+                .expect("writing to a String cannot fail");
                 list.push(format!(
                     "{{ {weight}, LE_ENCHANT, 0, 0, loot_levels_{n}_{i}, {}, {name}, loot_names_{n}_{i} }}",
                     levels.len()
@@ -240,7 +243,7 @@ pub(super) fn table(releases: &[(String, Value)]) -> Result<String> {
             "static const LootEntry loot_entries_{n}[] = {{ {} }};",
             list.join(", ")
         )
-        .unwrap();
+        .expect("writing to a String cannot fail");
         let rolls = pyramid["rolls"].as_array().ok_or("pyramid rolls")?;
         writeln!(
             rows,
@@ -252,12 +255,12 @@ pub(super) fn table(releases: &[(String, Value)]) -> Result<String> {
             rolls[1],
             entries.len()
         )
-        .unwrap();
+        .expect("writing to a String cannot fail");
     }
     writeln!(
         out,
         "static const PyramidLoot PYRAMID_LOOT[] = {{\n{rows}}};"
     )
-    .unwrap();
+    .expect("writing to a String cannot fail");
     Ok(out)
 }

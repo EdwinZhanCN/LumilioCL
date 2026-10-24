@@ -1,4 +1,5 @@
 //! Shared publication keys for cooperating domain workers in this process.
+
 use std::collections::BTreeMap;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -44,7 +45,7 @@ pub async fn acquire(paths: &[PathBuf]) -> io::Result<Vec<OwnedMutexGuard<()>>> 
         let mut registry = REGISTRY
             .get_or_init(Mutex::default)
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+            .expect("resource registry lock was poisoned");
         registry.retain(|_, lock| lock.strong_count() > 0);
         keys.into_iter()
             .map(|key| {

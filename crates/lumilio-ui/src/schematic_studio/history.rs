@@ -13,9 +13,8 @@ use super::inspector::operation_label;
 use super::{Command, Loaded, StudioView, muted_line, tree};
 use crate::controls::Segments;
 use crate::key::Key;
-use crate::kit;
-use crate::theme::{self, ShellColors};
-use crate::tr;
+use crate::theme::ShellColors;
+use crate::{kit, theme, tr};
 
 pub(super) fn now() -> u64 {
     std::time::SystemTime::now()

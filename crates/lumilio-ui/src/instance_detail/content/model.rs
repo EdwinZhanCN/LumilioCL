@@ -1,8 +1,10 @@
-use super::super::InstanceDetailView;
-use crate::{tr, tr_all};
+use std::rc::Rc;
+
 use gpui::{Context, Window, px};
 use lumilio_core::{ContentEntry, ReleaseChannel};
-use std::rc::Rc;
+
+use super::super::InstanceDetailView;
+use crate::{tr, tr_all};
 
 /// Which files the list shows.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]

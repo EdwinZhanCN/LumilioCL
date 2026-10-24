@@ -1,7 +1,8 @@
-use super::*;
-use crate::plugins::{PluginHost, PluginStatus};
 use lumilio_plugin_api::{LaunchEvent, LaunchOutcome, LaunchTarget, PluginState, SettingValue};
 use tokio::net::UnixListener;
+
+use super::*;
+use crate::plugins::{PluginHost, PluginStatus};
 
 fn started() -> LaunchEvent {
     LaunchEvent::Started {

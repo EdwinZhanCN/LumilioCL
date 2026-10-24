@@ -1,3 +1,15 @@
+use gpui_kit::{App, AppContext as _, Window};
+use lumilio_core::CancellationToken;
+use lumilio_ui::home::HomeIntent;
+use lumilio_ui::instance_detail::InstanceIntent;
+use lumilio_ui::java_conflict::{JavaConflict, JavaConflictAnswer};
+use lumilio_ui::live::{LiveIntent, PlaceTarget, account_failure, account_rows};
+use lumilio_ui::missing_folder::MissingFolderAnswer;
+use lumilio_ui::route::Route;
+use lumilio_ui::shell::ShellIntent;
+use lumilio_ui::toast::Toast;
+use lumilio_ui::{java_conflict, missing_folder, platform, tr};
+
 use super::accounts::{
     load_account_face, load_account_look, open_add_account, open_auth_servers,
     open_microsoft_sign_in, open_skin_dialog, open_third_party_sign_in,
@@ -14,21 +26,7 @@ use super::settings::{
     add_java, apply_preferences, change_setting, check_reclaimable, clear_cache,
     export_diagnostics, install_java, load_settings, reclaim, reload_themes, set_wallpaper,
 };
-use super::update;
-use super::{Reload, Wiring};
-use gpui_kit::AppContext as _;
-use gpui_kit::{App, Window};
-use lumilio_core::CancellationToken;
-use lumilio_ui::home::HomeIntent;
-use lumilio_ui::instance_detail::InstanceIntent;
-use lumilio_ui::java_conflict::{self, JavaConflict, JavaConflictAnswer};
-use lumilio_ui::live::{LiveIntent, PlaceTarget, account_failure, account_rows};
-use lumilio_ui::missing_folder::{self, MissingFolderAnswer};
-use lumilio_ui::platform;
-use lumilio_ui::route::Route;
-use lumilio_ui::shell::ShellIntent;
-use lumilio_ui::toast::Toast;
-use lumilio_ui::tr;
+use super::{Reload, Wiring, update};
 
 /// Asks about a Java that cannot run the game. An answer starts the launch
 /// again (with the automatic Java this once, or as chosen); cancelling drops

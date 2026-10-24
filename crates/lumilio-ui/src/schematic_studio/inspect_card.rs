@@ -21,10 +21,10 @@ use super::viewport::split_state;
 use super::words::{block_name, property_line, stacks};
 use crate::assets::UiIcon;
 use crate::key::Key;
-use crate::kit::{self, TagKind};
+use crate::kit::TagKind;
 use crate::model_view::{Inspected, TOOL_STRIP_CLEARANCE};
-use crate::theme::{self, ShellColors};
-use crate::tr;
+use crate::theme::ShellColors;
+use crate::{kit, theme, tr};
 
 const CARD_WIDTH: f32 = 216.;
 const CARD_ICON: f32 = 20.;

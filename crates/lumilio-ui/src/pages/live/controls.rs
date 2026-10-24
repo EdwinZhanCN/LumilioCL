@@ -1,3 +1,9 @@
+use gpui::prelude::*;
+use gpui::{App, Entity, Window};
+use gpui_component::IndexPath;
+use gpui_component::input::InputState;
+use gpui_component::select::{SearchableVec, SelectState};
+
 use super::super::ViewState;
 use super::library::sort_labels;
 use crate::kit::Emit;
@@ -5,11 +11,6 @@ use crate::live::{
     DiscoverChange, LiveHandler, LiveIntent, LiveModel, PAGE_SIZES, SORTS, sort_label,
 };
 use crate::theme::ShellColors;
-use gpui::prelude::*;
-use gpui::{App, Entity, Window};
-use gpui_component::IndexPath;
-use gpui_component::input::InputState;
-use gpui_component::select::{SearchableVec, SelectState};
 
 /// Inputs the live pages own. Created lazily, because they need a window.
 pub struct LiveControls {

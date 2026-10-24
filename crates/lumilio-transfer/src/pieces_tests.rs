@@ -1,7 +1,8 @@
 #![allow(clippy::single_range_in_vec_init)]
 
-use super::pieces::{Pieces, gaps, merge};
 use std::ops::Range;
+
+use super::pieces::{Pieces, gaps, merge};
 
 fn merged(ranges: &[Range<u64>]) -> Vec<Range<u64>> {
     let mut all = Vec::new();

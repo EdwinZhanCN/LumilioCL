@@ -2,9 +2,12 @@
 //! Copyright (C) 2021 huangyuhui and contributors, GPL-3.0-or-later (ADR 0011).
 //! Artwork is read only from an installed client; none is distributed here.
 
+use std::fs::File;
+use std::io::Read;
+use std::path::Path;
+
 use super::{AccountLook, SkinModel, skin_pixels};
 use crate::account::ProfileId;
-use std::{fs::File, io::Read, path::Path};
 
 pub(super) fn uuid_hash(id: ProfileId) -> i32 {
     let hex = id.compact();

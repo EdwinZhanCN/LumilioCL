@@ -1,16 +1,16 @@
+use std::sync::Arc;
+
+use gpui::prelude::*;
+use gpui::{
+    App, ClickEvent, Hsla, IntoElement, ObjectFit, RenderImage, SharedString, Window, div, img, px,
+};
+use gpui_component::{Icon, Sizable as _, StyledExt as _, h_flex};
+
 use crate::assets::UiIcon;
 use crate::controls::{PortTabs, Segments};
 use crate::key::Key;
 use crate::theme;
 use crate::theme::ShellColors;
-use gpui::prelude::*;
-use gpui::{
-    App, ClickEvent, Hsla, IntoElement, ObjectFit, RenderImage, SharedString, Window, div, img, px,
-};
-use gpui_component::Sizable as _;
-use gpui_component::StyledExt as _;
-use gpui_component::{Icon, h_flex};
-use std::sync::Arc;
 
 /// View tabs as port labels (design language §12).
 pub fn tabs<S: Clone + Into<SharedString>>(

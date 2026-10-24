@@ -5,7 +5,8 @@
 //! [`crate::credentials`], and what an account is lives in `settings`.
 
 use std::error::Error;
-use std::fmt::{self, Debug, Display, Formatter};
+use std::fmt;
+use std::fmt::{Debug, Display, Formatter};
 use std::time::Duration;
 
 use futures_util::StreamExt as _;

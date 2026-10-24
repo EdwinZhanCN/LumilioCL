@@ -9,12 +9,12 @@ use std::sync::Arc;
 use super::LauncherService;
 use super::error::ServiceError;
 use crate::account::{AuthSession, Injection, Keepalive, OfflineProfile};
-use crate::injector;
 use crate::settings::{AccountKind, SettingsError};
 use crate::skin::{
-    self, AccountLook, Character, LoadedSkin, LocalSkinServer, Pixels, Signer, SkinChoice,
+    AccountLook, Character, LoadedSkin, LocalSkinServer, Pixels, Signer, SkinChoice,
 };
 use crate::transfer::Transport;
+use crate::{injector, skin};
 
 /// The side of an avatar face, in pixels (crisp down to a 32 px chip).
 pub const FACE_SIZE: u32 = 64;

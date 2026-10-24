@@ -1,12 +1,13 @@
+use gpui::prelude::*;
+use gpui::{App, Context, Entity, Window};
+use gpui_component::input::InputEvent;
+use gpui_component::select::SelectEvent;
+
 use super::{Labels, LauncherShell};
 use crate::kit::ViewIntent;
 use crate::live::{DiscoverChange, PAGE_SIZES, SORTS, sort_label};
 use crate::pages;
 use crate::pages::live::LiveControls;
-use gpui::prelude::*;
-use gpui::{App, Context, Entity, Window};
-use gpui_component::input::InputEvent;
-use gpui_component::select::SelectEvent;
 
 impl LauncherShell {
     /// Builds the Library and Discover controls the first time the live pages show,

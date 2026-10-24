@@ -1,3 +1,7 @@
+use std::error::Error;
+use std::fmt;
+use std::fmt::{Display, Formatter};
+
 use crate::account::AuthSession;
 use crate::forge_install::ForgeError;
 use crate::install::InstallError;
@@ -8,9 +12,6 @@ use crate::launch_session::{LaunchFailure, LaunchProblem, LaunchSignal};
 use crate::process::{LogStream, ProcessError};
 use crate::release::ReleaseError;
 use crate::tuning::{LaunchTuning, QuickPlay};
-use std::error::Error;
-use std::fmt;
-use std::fmt::{Display, Formatter};
 
 /// Everything a launch needs that is not part of the instance record.
 #[derive(Clone, Debug)]

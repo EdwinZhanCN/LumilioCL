@@ -1,8 +1,10 @@
+use std::collections::BTreeMap;
+
+use lumilio_plugin_api::map::{Dimension, EditAction, MapPoint, ObjectEdit, WorldContext, WorldId};
+
 use super::world;
 use crate::MapFailure;
 use crate::instance::Loader;
-use lumilio_plugin_api::map::{Dimension, EditAction, MapPoint, ObjectEdit, WorldContext, WorldId};
-use std::collections::BTreeMap;
 
 fn edit() -> ObjectEdit {
     ObjectEdit {

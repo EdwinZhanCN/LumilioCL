@@ -1,7 +1,10 @@
 //! Adapted from Modrinth App packages/ui/src/utils/search.ts (newFilters and getEnvironmentFilterGroups), GPL-3.0-only; ADR 0022.
-use crate::protocol::{Kind, Sorting};
+
 use lumilio_plugin_api::content::{Pick, ProjectKind, SearchQuery, Stance};
 use url::Url;
+
+use crate::protocol::{Kind, Sorting};
+
 const API_BASE: &str = "https://api.modrinth.com";
 pub(crate) trait Query {
     fn expression(&self) -> String;

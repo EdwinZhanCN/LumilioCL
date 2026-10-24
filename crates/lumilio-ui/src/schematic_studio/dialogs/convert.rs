@@ -24,8 +24,7 @@ use gpui::{
     div, px,
 };
 use gpui_component::{Sizable as _, v_flex};
-use lumilio_core::BlockCatalog;
-use lumilio_core::SchematicOperation;
+use lumilio_core::{BlockCatalog, SchematicOperation};
 use lumilio_schematic::convert::{
     Catalogs, Conversion, Direction, Loss, MISSING_BLOCK, Severity, UNKNOWN_PROPERTY, direction,
 };
@@ -33,12 +32,11 @@ use lumilio_schematic::convert::{
 use super::{DialogForm, Submission, field, note};
 use crate::controls::Fader;
 use crate::key::Key;
-use crate::kit;
 use crate::schematic_studio::writes::Edited;
 use crate::schematic_studio::{Loaded, StudioView, tree};
-use crate::theme::{self, ShellColors};
-use crate::tr;
+use crate::theme::ShellColors;
 use crate::version_picker::{Choice, Choices, PickerEvent, VersionPicker};
+use crate::{kit, theme, tr};
 
 /// Entries listed per severity; the rest are counted.
 const LISTED: usize = 100;

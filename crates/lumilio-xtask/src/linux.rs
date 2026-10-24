@@ -6,9 +6,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use crate::release;
 use crate::release::{
-    self, APP_ID, APP_NAME, BINARY, HOMEPAGE, Release, Result, copy, copy_tree, create_dir,
-    on_path, read, run, set_mode, symlink, write,
+    APP_ID, APP_NAME, BINARY, HOMEPAGE, Release, Result, copy, copy_tree, create_dir, on_path,
+    read, run, set_mode, symlink, write,
 };
 
 const INSTALL_SH: &str = include_str!("../packaging/install.sh");

@@ -1,14 +1,16 @@
+use std::fmt::Debug;
+
+use futures_util::stream;
+use futures_util::stream::StreamExt;
+use reqwest::Client;
+use tokio::fs::File;
+use tokio::io::AsyncReadExt;
+use url::Url;
+
 use super::USER_AGENT;
 use super::transport::{
     HttpMethod, HttpRequest, Transport, TransportError, TransportFuture, TransportResponse,
 };
-use futures_util::stream;
-use futures_util::stream::StreamExt;
-use reqwest::Client;
-use std::fmt::Debug;
-use tokio::fs::File;
-use tokio::io::AsyncReadExt;
-use url::Url;
 
 #[derive(Clone, Debug)]
 pub struct HttpTransport {

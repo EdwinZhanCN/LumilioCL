@@ -1,5 +1,6 @@
-use lumilio_schematic_render::View;
 use std::time::Duration;
+
+use lumilio_schematic_render::View;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Mode {

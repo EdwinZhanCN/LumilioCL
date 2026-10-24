@@ -49,7 +49,7 @@
 | Java：检测与列表 | Java · 已发现的 Java 列表 | 列出检测到的 Java（版本、发行方、架构、路径），包括官方启动器的运行时与 PATH 中的 java；没有时提示添加 |  | `lumilio-ui/src/pages/settings/java.rs` |
 | Java：重新检测 | Java · 按键「重新检测」 | 重新读取设置并检测 |  | `lumilio-ui/src/pages/settings/java.rs` |
 | Java：添加 | Java · 按键「添加 Java…」→ 选 java 程序或 JDK 文件夹 | 加入列表 |  | `lumilio-ui/src/pages/settings/java.rs` |
-| 打开插件 | L3 设置 tab「插件」 | 显示核心插件、权限、运行状态和各插件的声明式设置；没有插件时显示空列表 |  | `lumilio-ui/src/pages/settings/mod.rs` |
+| 打开插件 | L3 设置 tab「插件」 | 显示核心插件、权限、运行状态和各插件的声明式设置；没有插件时显示空列表 |  | `lumilio-ui/src/pages/settings/page.rs` |
 | 选择插件 | 插件 · 左侧列表 | 右侧显示所选插件的状态、权限和设置 |  | `lumilio-ui/src/pages/settings/plugins.rs` |
 | 插件：启用 / 停用 | 插件详情 · 设置行开关 | 保存开关；停用后贡献消失，运行失败的插件重启后恢复 |  | `lumilio-ui/src/pages/settings/plugins.rs` |
 | 插件：查看权限 | 插件详情 · 权限行 | 逐条显示可读取的游戏文件夹、可访问的主机和其他能力 |  | `lumilio-ui/src/pages/settings/plugins.rs` |

@@ -1,14 +1,15 @@
-use super::instance::{load_instance, open_instance};
-use super::jobs::{install_outcome, job, reload};
-use super::library::choose_current;
-use super::{Reload, Wiring};
-use gpui_kit::AppContext as _;
-use gpui_kit::{App, WeakEntity, Window};
+use std::rc::Rc;
+
+use gpui_kit::{App, AppContext as _, WeakEntity, Window};
 use lumilio_core::{CancellationToken, LaunchServiceError, ServiceError};
 use lumilio_ui::new_game::{NewGameForm, NewGameIntent, NewGameRequest};
 use lumilio_ui::toast::Toast;
 use lumilio_ui::tr;
-use std::rc::Rc;
+
+use super::instance::{load_instance, open_instance};
+use super::jobs::{install_outcome, job, reload};
+use super::library::choose_current;
+use super::{Reload, Wiring};
 
 /// Opens the new-game dialog (IA `library.md#新建游戏`). Deferred: this may
 /// run inside one of the shell's own updates.

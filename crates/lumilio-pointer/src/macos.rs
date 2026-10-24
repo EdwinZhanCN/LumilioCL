@@ -2,18 +2,22 @@
 //! bridge returns the original event pointer and removes the exact monitor token.
 #![allow(unsafe_code)]
 
-use super::CaptureError;
+use std::cell::Cell;
+use std::ptr::NonNull;
+use std::rc::Rc;
+
 use block2::RcBlock;
-use core_graphics::{
-    display::CGDisplay,
-    event::CGEvent,
-    event_source::{CGEventSource, CGEventSourceStateID},
-    geometry::CGPoint,
-};
-use objc2::{MainThreadMarker, rc::Retained, runtime::AnyObject};
+use core_graphics::display::CGDisplay;
+use core_graphics::event::CGEvent;
+use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
+use core_graphics::geometry::CGPoint;
+use objc2::MainThreadMarker;
+use objc2::rc::Retained;
+use objc2::runtime::AnyObject;
 use objc2_app_kit::{NSEvent, NSEventMask};
 use raw_window_handle::RawWindowHandle;
-use std::{cell::Cell, ptr::NonNull, rc::Rc};
+
+use super::CaptureError;
 
 pub(super) struct Capture {
     original: CGPoint,

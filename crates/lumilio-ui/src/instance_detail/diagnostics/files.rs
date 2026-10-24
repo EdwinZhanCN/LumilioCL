@@ -1,16 +1,15 @@
+use gpui::prelude::*;
+use gpui::{AnyElement, Context, div, px};
+use gpui_component::input::Input;
+use gpui_component::{Icon, Sizable as _, h_flex, v_flex};
+use lumilio_core::FileEntry;
+
 use super::super::panels::{act, clock, size_label};
 use super::super::{InstanceDetailView, InstanceIntent, Section};
 use super::helpers::{files_matching, join_path, parent_path};
 use crate::assets::UiIcon;
-use crate::kit;
 use crate::theme::ShellColors;
-use crate::tr;
-use gpui::prelude::*;
-use gpui::{AnyElement, Context, div, px};
-use gpui_component::Sizable as _;
-use gpui_component::input::Input;
-use gpui_component::{Icon, h_flex, v_flex};
-use lumilio_core::FileEntry;
+use crate::{kit, tr};
 
 impl InstanceDetailView {
     // ia[instance.diagnostics]: 浏览文件 | 诊断 · 文件分段 | 逐级打开的只读文件夹列表，只在游戏目录内；右上角按名字搜当前文件夹

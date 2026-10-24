@@ -4,9 +4,10 @@
 //! Ported from `getVersionGroupsForDisplay` in `packages/utils/projects.ts`
 //! (GPL-3.0-only; ADR 0022).
 
-use super::tags::GameVersionTag;
 use std::borrow::Cow;
 use std::collections::HashMap;
+
+use super::tags::GameVersionTag;
 
 /// What a group of game versions is called, as a type rather than a sentence:
 /// the interface turns the named ranges into words and shows a `Range` as is.

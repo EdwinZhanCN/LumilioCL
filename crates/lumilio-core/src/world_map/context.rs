@@ -1,8 +1,10 @@
-use crate::{nbt, worlds};
-use lumilio_plugin_api::map::{Dimension, SeedSource, SourceLink, WorldContext, WorldId};
-use std::fs;
-use std::io::{self, Read};
+use std::io::Read;
 use std::path::Path;
+use std::{fs, io};
+
+use lumilio_plugin_api::map::{Dimension, SeedSource, SourceLink, WorldContext, WorldId};
+
+use crate::{nbt, worlds};
 
 #[derive(Clone, Debug)]
 pub struct WorldMapContext {

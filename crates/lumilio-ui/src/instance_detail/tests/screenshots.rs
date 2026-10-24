@@ -1,12 +1,14 @@
+use std::cell::RefCell;
+use std::path::PathBuf;
+use std::rc::Rc;
+
+use gpui::TestAppContext;
+use lumilio_core::{LauncherSettings, ScreenshotInfo};
+
 use super::super::intent::InstanceIntent;
 use super::super::panels::{Arrived, Confirm, SHOTS_PAGE, Thumb};
 use super::super::{InstanceDetailView, Section, TAB_SCREENSHOTS};
 use super::{click, record, rooted};
-use gpui::TestAppContext;
-use lumilio_core::{LauncherSettings, ScreenshotInfo};
-use std::cell::RefCell;
-use std::path::PathBuf;
-use std::rc::Rc;
 
 fn shot(file: &str, modified_ms: i64) -> ScreenshotInfo {
     ScreenshotInfo {

@@ -1,13 +1,15 @@
 //! Structure and decoration layers from the cubiomes fork, one overlay per
 //! kind so each has its own switch. Positions are exact for the seed;
 //! viability is the fork's biome check, an estimate where terrain decides.
+
+use std::sync::Mutex;
+
 use lumilio_cubiomes::{Bastion, Decoration, Dimension as Cube, Structure, Variant, Version};
 use lumilio_plugin_api::map::{
     Dimension, MapBounds, MapIcon, MapObject, MapObjectKind, MapPoint, OverlayInfo, OverlayRequest,
     WorldContext,
 };
 use lumilio_plugin_api::{HostContext, PluginError};
-use std::sync::Mutex;
 
 pub(crate) const GROUP: &str = "map-group-structures";
 /// Features the decoration random places in a chunk: fossils, lava lakes.
@@ -283,7 +285,7 @@ fn strongholds(
     {
         let cache = STRONGHOLDS
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+            .expect("structure cache lock was poisoned");
         if let Some((_, found)) = cache.iter().find(|(known, _)| *known == key) {
             return Ok(found.clone());
         }
@@ -291,7 +293,7 @@ fn strongholds(
     let found = lumilio_cubiomes::strongholds(version, seed, 128, cancelled)?;
     let mut cache = STRONGHOLDS
         .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
+        .expect("structure cache lock was poisoned");
     cache.retain(|(known, _)| *known != key);
     cache.push((key, found.clone()));
     if cache.len() > STRONGHOLD_WORLDS {

@@ -1,3 +1,6 @@
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::{Path, PathBuf};
+
 use super::LauncherService;
 use super::error::{ServiceError, read_unless_cancelled};
 use super::support::blocking;
@@ -11,8 +14,6 @@ use crate::discover::{
 use crate::history::{ChangeKind, HistoryEvent, HistoryLog};
 use crate::instance::InstanceRecord;
 use crate::transfer::{SourceChain, TransferRequest, Transport};
-use std::collections::{BTreeMap, BTreeSet};
-use std::path::{Path, PathBuf};
 
 impl<T: Transport + Clone> LauncherService<T> {
     /// Downloads one version's file to a place the person chose, instead of

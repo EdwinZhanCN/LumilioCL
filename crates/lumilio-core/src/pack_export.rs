@@ -8,10 +8,10 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
-use std::fmt::{self, Display, Formatter};
-use std::fs;
-use std::io::{self, Read};
+use std::fmt::{Display, Formatter};
+use std::io::Read;
 use std::path::Path;
+use std::{fmt, fs, io};
 
 use serde_json::json;
 use sha2::{Digest, Sha512};

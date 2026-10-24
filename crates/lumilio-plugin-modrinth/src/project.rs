@@ -1,9 +1,8 @@
-use crate::protocol::decode;
-use crate::protocol::{Kind, side};
 use lumilio_plugin_api::PluginError;
-use lumilio_plugin_api::content::ProjectKind;
-use lumilio_plugin_api::content::{GalleryImage, Project, ProjectLinks};
+use lumilio_plugin_api::content::{GalleryImage, Project, ProjectKind, ProjectLinks};
 use serde::Deserialize;
+
+use crate::protocol::{Kind, decode, side};
 
 #[derive(Debug, Deserialize)]
 pub(super) struct RawProject {

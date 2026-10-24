@@ -40,9 +40,9 @@ pub enum ThirdPartySignIn {
 }
 
 /// 32 random hex digits, as HMCL's client tokens are.
-fn random_client_token(fixed: Option<&String>) -> Result<String, ServiceError> {
+fn random_client_token(fixed: Option<&str>) -> Result<String, ServiceError> {
     if let Some(token) = fixed {
-        return Ok(token.clone());
+        return Ok(token.to_owned());
     }
     let mut bytes = [0_u8; 16];
     getrandom::fill(&mut bytes).map_err(|error| {
@@ -116,7 +116,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         let known = self.auth_server(server).await?;
         // Fail before asking the server for a session that could never be kept.
         self.credentials.get(CREDENTIAL_PROBE)?;
-        let client_token = random_client_token(self.client_token_override.as_ref())?;
+        let client_token = random_client_token(self.client_token_override.as_deref())?;
         let client = YggdrasilClient::new(&self.transport, &known.url);
         let session = client.authenticate(login, password, &client_token).await?;
         if session.selected.is_some() {
@@ -136,7 +136,7 @@ impl<T: Transport + Clone> LauncherService<T> {
                 let pending = self.next_pending.fetch_add(1, Ordering::SeqCst);
                 self.pending_sign_ins
                     .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .expect("pending sign-in registry lock was poisoned")
                     .insert(
                         pending,
                         PendingSignIn {
@@ -163,7 +163,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         let waiting = self
             .pending_sign_ins
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .expect("pending sign-in registry lock was poisoned")
             .remove(&pending)
             .ok_or(ServiceError::NoPendingSignIn)?;
         let choice = waiting
@@ -194,7 +194,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     pub fn third_party_abandon(&self, pending: u64) {
         self.pending_sign_ins
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .expect("pending sign-in registry lock was poisoned")
             .remove(&pending);
     }
 

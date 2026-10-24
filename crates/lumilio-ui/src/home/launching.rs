@@ -1,15 +1,14 @@
+use std::time::Instant;
+
+use gpui::prelude::*;
+use gpui::{Animation, AnimationExt as _, AnyElement, IntoElement, div, ease_out_quint, px};
+use gpui_component::{Sizable as _, StyledExt as _, h_flex, v_flex};
+use lumilio_core::{LaunchPhase, LaunchSession};
+
 use super::buttons::{LocalActionIcon, art_button};
 use super::render::{ArtButtons, caption, eyebrow, headline, world_accent};
 use super::{HomeIntent, HomeIntentHandler, HoverHandler, Subject};
 use crate::theme::motion;
-use gpui::AnimationExt as _;
-use gpui::prelude::*;
-use gpui::{Animation, AnyElement, IntoElement, div, ease_out_quint, px};
-use gpui_component::Sizable as _;
-use gpui_component::StyledExt as _;
-use gpui_component::{h_flex, v_flex};
-use lumilio_core::{LaunchPhase, LaunchSession};
-use std::time::Instant;
 
 pub(super) fn render_continue(
     subject: &Subject,

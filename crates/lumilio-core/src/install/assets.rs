@@ -1,11 +1,13 @@
-use super::OFFICIAL_ASSET_ROOT;
-use super::files::{validate_protocol_path, validate_sha1};
-use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
+
+use serde::Deserialize;
+
+use super::OFFICIAL_ASSET_ROOT;
+use super::files::{validate_protocol_path, validate_sha1};
 
 #[derive(Clone, Debug, Deserialize)]
 pub(super) struct AssetIndexWire {

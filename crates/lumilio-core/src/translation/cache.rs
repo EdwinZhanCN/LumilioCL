@@ -1,6 +1,7 @@
-use rusqlite::{Connection, OptionalExtension, params};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+
+use rusqlite::{Connection, OptionalExtension, params};
 
 pub(super) const TTL: u64 = 7 * 24 * 60 * 60;
 const MAX_ENTRIES: i64 = 10_000;
@@ -34,14 +35,14 @@ impl Cache {
         *self
             .generation
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .expect("cache state lock was poisoned")
     }
 
     pub(super) fn invalidate(&self) {
         let mut generation = self
             .generation
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+            .expect("cache state lock was poisoned");
         *generation = generation.wrapping_add(1);
     }
 
@@ -81,7 +82,7 @@ impl Cache {
         let Ok(now) = i64::try_from(now) else { return };
         let cache = self.clone();
         let _ = tokio::task::spawn_blocking(move || -> rusqlite::Result<()> {
-            let guard = cache.generation.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+            let guard = cache.generation.lock().expect("cache state lock was poisoned");
             if *guard != generation { return Ok(()); }
             let mut db = cache.open()?;
             let tx = db.transaction()?;
@@ -99,7 +100,7 @@ impl Cache {
             let mut guard = cache
                 .generation
                 .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
+                .expect("cache state lock was poisoned");
             *guard = guard.wrapping_add(1);
             cache.open()?.execute("DELETE FROM translations", [])?;
             Ok::<_, rusqlite::Error>(())

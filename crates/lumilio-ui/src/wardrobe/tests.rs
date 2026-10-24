@@ -1,7 +1,13 @@
-use super::*;
+use std::cell::RefCell;
+use std::path::PathBuf;
+use std::rc::Rc;
+
 use gpui::{Entity, InputEvent as _, Modifiers, TestAppContext, VisualTestContext};
-use lumilio_core::SkinSource;
-use std::{cell::RefCell, rc::Rc};
+use lumilio_core::{PairedCape, SkinSource};
+
+use super::*;
+use crate::live::LiveIntent;
+use crate::skin_view::SkinViewer;
 
 fn profile() -> MojangProfile {
     MojangProfile {

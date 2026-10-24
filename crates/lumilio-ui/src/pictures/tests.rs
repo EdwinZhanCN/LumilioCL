@@ -1,10 +1,12 @@
-use super::decode::{self, Limits};
-use super::*;
+use std::path::{Path, PathBuf};
+
 use gpui::{
     BackgroundExecutor, Context, IntoElement, ParentElement as _, Render, Styled as _, SvgRenderer,
     TestAppContext, VisualTestContext, img, px,
 };
-use std::path::{Path, PathBuf};
+
+use super::decode::Limits;
+use super::{decode, *};
 
 const LIMITS: Limits = Limits {
     edge: 2048,

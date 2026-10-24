@@ -5,7 +5,8 @@
 
 use std::error::Error;
 use std::ffi::OsStr;
-use std::fmt::{self, Display, Formatter};
+use std::fmt;
+use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::{Duration, Instant};

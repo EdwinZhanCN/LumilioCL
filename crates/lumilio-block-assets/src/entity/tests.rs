@@ -599,7 +599,7 @@ fn the_dumper_is_installed_once_and_run_with_its_arguments() {
     let folder = install_dumper(dir.path()).unwrap();
     let class = folder.join(DUMPER_CLASS_FILE);
     assert_eq!(std::fs::read(&class).unwrap(), DUMPER_CLASS);
-    assert_eq!(&DUMPER_CLASS[..4], &[0xCA, 0xFE, 0xBA, 0xBE]);
+    assert_eq!(&DUMPER_CLASS[..4], &[0xca, 0xfe, 0xba, 0xbe]);
     // Class file major 65 is Java 21.
     assert_eq!(u16::from_be_bytes([DUMPER_CLASS[6], DUMPER_CLASS[7]]), 65);
     std::fs::write(&class, b"stale").unwrap();

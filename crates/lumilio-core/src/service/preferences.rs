@@ -1,10 +1,11 @@
+use std::path::{Path, PathBuf};
+
 use super::LauncherService;
 use super::error::ServiceError;
 use crate::instance::InstanceSettings;
 use crate::java::JavaLocator;
 use crate::settings::validate_memory;
 use crate::transfer::Transport;
-use std::path::{Path, PathBuf};
 
 impl<T: Transport + Clone> LauncherService<T> {
     /// What the launcher window does when this instance's game runs: the

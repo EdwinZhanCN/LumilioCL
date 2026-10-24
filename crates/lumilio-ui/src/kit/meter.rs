@@ -1,8 +1,9 @@
-use crate::theme;
-use crate::theme::ShellColors;
 use gpui::prelude::*;
 use gpui::{IntoElement, SharedString, div, px};
 use gpui_component::{h_flex, v_flex};
+
+use crate::theme;
+use crate::theme::ShellColors;
 
 /// How many whole bars light for a fraction: monotonic in `fraction`, so a
 /// display never steps back while progress only moves forward (§3).

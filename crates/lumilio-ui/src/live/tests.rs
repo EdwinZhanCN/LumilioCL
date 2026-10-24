@@ -1,3 +1,10 @@
+use std::path::{Path, PathBuf};
+
+use lumilio_core::{
+    ActiveTask, ActivityView, AttentionItem, FinishedTask, HomeSummary, InstanceRecord,
+    InstanceSettings, LauncherSettings, Loader, TaskCategory, TaskLabel, TaskOutcome,
+};
+
 use super::LiveModel;
 use super::accounts::{account_failure, account_rows};
 use super::activity::{
@@ -11,13 +18,6 @@ use super::library::{
 };
 use super::settings::settings_view;
 use crate::home::HomePresentation;
-use lumilio_core::{
-    ActiveTask, ActivityView, FinishedTask, HomeSummary, InstanceRecord, LauncherSettings, Loader,
-    TaskCategory, TaskLabel, TaskOutcome,
-};
-use std::path::{Path, PathBuf};
-
-use lumilio_core::{AttentionItem, InstanceSettings};
 
 fn record(id: &str, favorite: bool, last_played: Option<u64>, created_at: u64) -> InstanceRecord {
     InstanceRecord {
@@ -674,9 +674,10 @@ fn tag_labels_are_chinese_when_known_and_readable_when_not() {
 
 #[test]
 fn home_places_are_the_latest_readable_worlds_then_the_first_servers() {
+    use lumilio_core::{GameMode, PackPolicy, ServerEntry, ServerStatus, WorldInfo};
+
     use super::home::{PLACE_SERVERS, PLACE_WORLDS, Place, PlaceKind, PlaceTarget, home_places};
     use crate::places::ServerState;
-    use lumilio_core::{GameMode, PackPolicy, ServerEntry, ServerStatus, WorldInfo};
     let world = |folder: &str, played: Option<i64>, damaged: bool| WorldInfo {
         folder: folder.to_owned(),
         name: folder.to_uppercase(),

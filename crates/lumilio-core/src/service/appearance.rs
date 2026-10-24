@@ -2,15 +2,19 @@
 //! backoff follow Modrinth `packages/app-lib/src/state/minecraft_auth.rs`
 //! (Copyright Modrinth contributors, GPL-3.0-only; ADR 0022).
 //! Unlike a map-only cache, each account also serializes misses and writes.
-use super::{LauncherService, ServiceError};
-use crate::{
-    microsoft::Secret,
-    skin::{AppearanceError, MojangClient, MojangProfile},
-    transfer::Transport,
-};
+
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::Duration;
+
 use sha2::{Digest, Sha256};
-use std::{collections::HashMap, sync::Arc, time::Duration};
-use tokio::{sync::Mutex, time::Instant};
+use tokio::sync::Mutex;
+use tokio::time::Instant;
+
+use super::{LauncherService, ServiceError};
+use crate::microsoft::Secret;
+use crate::skin::{AppearanceError, MojangClient, MojangProfile};
+use crate::transfer::Transport;
 
 #[derive(Default)]
 pub(super) struct ProfileState {

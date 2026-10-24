@@ -1,9 +1,11 @@
 //! Launcher-owned markers and routes. Their coordinates remain independent of
 //! the provider object they may refer to, so losing that object loses no work.
+
+use std::path::Path;
+
 use lumilio_plugin_api::map::{Dimension, MapPoint, WorldId};
 use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
-use std::path::Path;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum AnnotationKind {

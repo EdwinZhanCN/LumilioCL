@@ -1,11 +1,12 @@
+use std::collections::BTreeMap;
+use std::sync::{Arc, Mutex};
+
 use super::*;
 use crate::catalog::{OFFICIAL_CATALOG_URL, VersionCatalog};
 use crate::loader;
 use crate::transfer::{
     OfficialSource, PrefixMirror, SourceChain, TransportFuture, TransportResponse,
 };
-use std::collections::BTreeMap;
-use std::sync::{Arc, Mutex};
 
 #[derive(Default)]
 struct Web {

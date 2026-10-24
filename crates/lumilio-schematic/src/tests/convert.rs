@@ -1,10 +1,11 @@
+use nucleation::dataconverter::CANONICAL_DATA_VERSION;
+
 use super::{cells, state};
 use crate::convert::{
     BlockCatalog, Catalogs, Direction, MISSING_BLOCK, Severity, UNKNOWN_PROPERTY, convert,
     data_version, to_bytes_for_data_version,
 };
 use crate::{UniversalSchematic, load_litematic};
-use nucleation::dataconverter::CANONICAL_DATA_VERSION;
 
 /// Minecraft 1.16.5.
 const OLD: i32 = 2586;

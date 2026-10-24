@@ -1,15 +1,15 @@
-use super::super::live::LiveCtx;
-use super::rows::{edit, preference_row, row, send};
-use crate::kit;
-use crate::live::{JavaRow, LiveHandler, LiveIntent, SettingsView};
-use crate::settings_dialog::{DialogSpec, FieldKind, FieldSpec, SettingsDialog};
-use crate::settings_forms as forms;
-use crate::{tr, tr_all};
+use std::rc::Rc;
+
 use gpui::prelude::*;
 use gpui::{AnyElement, App, IntoElement, Window};
 use gpui_component::{WindowExt as _, h_flex, v_flex};
 use lumilio_core::JavaSource;
-use std::rc::Rc;
+
+use super::super::live::LiveCtx;
+use super::rows::{edit, preference_row, row, send};
+use crate::live::{JavaRow, LiveHandler, LiveIntent, SettingsView};
+use crate::settings_dialog::{DialogSpec, FieldKind, FieldSpec, SettingsDialog};
+use crate::{kit, settings_forms as forms, tr, tr_all};
 
 /// The Java a download is offered at first.
 const RECOMMENDED_MAJOR: u32 = 21;

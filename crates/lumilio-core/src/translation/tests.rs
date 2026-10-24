@@ -1,6 +1,7 @@
+use std::sync::Mutex as StdMutex;
+
 use super::*;
 use crate::transfer::{HttpRequest, TransportFuture, TransportResponse};
-use std::sync::Mutex as StdMutex;
 
 struct Scripted {
     statuses: StdMutex<Vec<u16>>,

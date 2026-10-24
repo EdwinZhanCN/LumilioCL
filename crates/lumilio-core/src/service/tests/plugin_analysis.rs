@@ -1,14 +1,16 @@
+use std::sync::{Arc, Mutex};
+
+use lumilio_plugin_api::{
+    API_VERSION, AnalysisInput, AnalysisSource, Analyzer, Finding, HostContext, Manifest, Plugin,
+    PluginError, Severity, Words,
+};
+
 use super::{World, fake_java, publish_release, world};
 use crate::activity::CancellationToken;
 use crate::diagnostics::ProblemKind;
 use crate::history::{SessionOutcome, record_attempt};
 use crate::instance::Loader;
 use crate::plugins::PluginHost;
-use lumilio_plugin_api::{
-    API_VERSION, AnalysisInput, AnalysisSource, Analyzer, Finding, HostContext, Manifest, Plugin,
-    PluginError, Severity, Words,
-};
-use std::sync::{Arc, Mutex};
 
 struct Recorder {
     inputs: Arc<Mutex<Vec<AnalysisInput>>>,

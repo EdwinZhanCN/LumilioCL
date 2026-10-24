@@ -1,7 +1,8 @@
+use lumilio_plugin_api::{ActionId, PluginState, SettingValue, View};
+
 use super::{LauncherService, ServiceError};
 use crate::plugins::{PluginEffect, PluginInfo, PluginTab};
 use crate::transfer::Transport;
-use lumilio_plugin_api::{ActionId, PluginState, SettingValue, View};
 
 impl<T: Transport + Clone> LauncherService<T> {
     pub async fn set_plugin_enabled(&self, id: &str, enabled: bool) -> Result<(), ServiceError> {

@@ -4,9 +4,8 @@
 
 use lumilio_plugin_api::{ActionId, Effect, HostContext, PluginError, TabState, View};
 
-use crate::FOLDER;
-use crate::format;
 use crate::text::Text;
+use crate::{FOLDER, format};
 
 /// Actions the studio sends for one file: `export:<path>` and `reveal:<path>`.
 const EXPORT: &str = "export:";

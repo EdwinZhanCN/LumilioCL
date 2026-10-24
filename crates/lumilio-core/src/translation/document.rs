@@ -1,9 +1,9 @@
+use html5ever::tendril::TendrilSink;
+use html5ever::{LocalName, QualName, namespace_url, ns, parse_fragment, serialize};
+use markup5ever_rcdom::{Handle, NodeData, RcDom, SerializableHandle};
+
 use super::TranslationError;
 use crate::discover::TextFormat;
-use html5ever::{
-    LocalName, QualName, namespace_url, ns, parse_fragment, serialize, tendril::TendrilSink,
-};
-use markup5ever_rcdom::{Handle, NodeData, RcDom, SerializableHandle};
 
 const BATCH_CHARS: usize = 4_000;
 

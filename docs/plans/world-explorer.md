@@ -152,7 +152,7 @@ Status: InProgress
   - 存档和 Xaero 瓦片按实例和世界放在 `Layout::profile(id)/map-cache/`（新建，与 `thumbnails` 一样可以随便删，删了会重建）。
   - 每块缓存记下来源文件的长度和修改时间（Region 文件或 Xaero 区域 zip）。打开地图、视口移动到新 Region、游戏退出时重新取一次文件信息，只重建变了的 Region 及其上层合成瓦片。游戏在运行时，按低频轮询可见 Region。
   - 缓存总量默认上限 1 GiB，按最近使用淘汰；设置 › 存储加一行「清除地图缓存」（Project Maintainer 2026-10-08 在 PR #6 上决定（采用默认））。
-  - 世界关联、手动种子、自定义标记和路线存在 `launcher.db` 的新表里，不用 JSON；schema 从 3 升到 4（`crates/lumilio-core/src/instance.rs` 的 `SCHEMA_VERSION`）。理由：既有设计 把关系型的启动器数据放进 SQLite，而标记要按世界、维度查询，还要关联别的来源（Project Maintainer 2026-10-08 在 PR #6 上决定（采用默认））。
+  - 世界关联、手动种子、自定义标记和路线存在 `launcher.db` 的新表里，不用 JSON；schema 从 3 升到 4（`crates/lumilio-core/src/instance/mod.rs` 的 `SCHEMA_VERSION`）。理由：既有设计 把关系型的启动器数据放进 SQLite，而标记要按世界、维度查询，还要关联别的来源（Project Maintainer 2026-10-08 在 PR #6 上决定（采用默认））。
 - **W7 Xaero 写回安全。**
   - 运行中只读：写回入口在 core，先取实例租约（`reserve_instance`）。拿不到（游戏在跑或有别的操作）就不写，页面保留浏览和复制，并说明「退出游戏后再改」。Xaero 退出世界时会把内存里的路径点写回磁盘，运行中写的东西会被覆盖。
   - 冲突保护：读时记下文件长度、修改时间和 sha256。写前重新读，三者有一项不同就拒绝写入，重新加载并告诉人文件被别处改过。
@@ -202,7 +202,7 @@ Consequences: 后续变更更新本 JSON，长期跨计划契约整理到设计/
 ## References
 
 - [.agents/plans/wasm-plugin-registry.json](../../.agents/plans/wasm-plugin-registry.json)
-- 本仓库：`crates/lumilio-plugin-api/src/{lib.rs,view.rs,analysis.rs}`、`crates/lumilio-core/src/plugins/{mod.rs,access.rs,context.rs,tabs.rs,model.rs}`、`crates/lumilio-core/src/{worlds.rs,layout.rs,instance.rs,model_assets.rs}`、`crates/lumilio-core/src/service/{launch.rs,models.rs,worlds.rs}`、`crates/lumilio-nbt/src/lib.rs`、`crates/lumilio-schematic-render/src/{scene.rs,view.rs}`、`crates/lumilio-ui/src/model_view/{mod.rs,worker.rs,modal.rs}`、`crates/lumilio-ui/src/instance_detail/plugin_tabs.rs`、`crates/lumilio-ui/src/pages/settings/plugins.rs`、`crates/lumilio-app/src/backend.rs`、`crates/lumilio-docgen/src/lib.rs`、`crates/lumilio-docgen/tests/{plugin_boundaries.rs,attribution.rs}`、`crates/lumilio-pointer/Cargo.toml`、`crates/lumilio-xtask/src/{macos,windows,linux,release}.rs`、`forks/README.md`、`ATTRIBUTIONS.md`、`justfile`、`.github/workflows/{ci.yml,release.yml}`
+- 本仓库：`crates/lumilio-plugin-api/src/{lib.rs,view.rs,analysis.rs}`、`crates/lumilio-core/src/plugins/{mod.rs,access.rs,context.rs,tabs.rs,model.rs}`、`crates/lumilio-core/src/{worlds.rs,layout.rs,instance/mod.rs,model_assets.rs}`、`crates/lumilio-core/src/service/{launch.rs,models.rs,worlds.rs}`、`crates/lumilio-nbt/src/lib.rs`、`crates/lumilio-schematic-render/src/{scene.rs,view.rs}`、`crates/lumilio-ui/src/model_view/{mod.rs,worker.rs,modal.rs}`、`crates/lumilio-ui/src/instance_detail/plugin_tabs/mod.rs`、`crates/lumilio-ui/src/pages/settings/plugins.rs`、`crates/lumilio-app/src/backend.rs`、`crates/lumilio-docgen/src/lib.rs`、`crates/lumilio-docgen/tests/{plugin_boundaries.rs,attribution.rs}`、`crates/lumilio-pointer/Cargo.toml`、`crates/lumilio-xtask/src/{macos,windows,linux,release}.rs`、`forks/README.md`、`ATTRIBUTIONS.md`、`justfile`、`.github/workflows/{ci.yml,release.yml}`
 - cubiomes：<https://github.com/Cubitect/cubiomes>（`e61f905`；`generator.h`、`finders.h`、`biomes.h`、`rng.h`、`util.c`、`biomenoise.c`、`tables/btree21wd.h`、`docs/nptree_c.py`、`LICENSE`）；issue #161、#165
 - cubiomes-viewer：<https://github.com/Cubitect/cubiomes-viewer>（`3acc863`；README「Known issues」「Legal information」）
 - Axolotl：<https://github.com/Mystic-Stars/Axolotl>（`b957550`；`apps/app/src/seed_map/{cubiomes_bridge.c,cubiomes_bridge.h,mod.rs,ores.rs,rng.rs}`、`apps/app/src/api/seed_map.rs`、`apps/app/build.rs`、`apps/app-frontend/src/pages/LabSeedMap.vue`、`apps/app-frontend/src/lab/seed-map/features.ts`、`apps/app/COPYING.md`）

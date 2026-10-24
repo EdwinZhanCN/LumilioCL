@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use super::LauncherService;
 use super::error::{ServiceError, read_unless_cancelled};
 use crate::activity::CancellationToken;
@@ -7,7 +9,6 @@ use crate::instance::InstanceRecord;
 use crate::transfer::Transport;
 use crate::worlds;
 use crate::worlds::WorldInfo;
-use std::path::Path;
 
 impl<T: Transport + Clone> LauncherService<T> {
     /// The instance's saved worlds. Reading needs no instance lease.

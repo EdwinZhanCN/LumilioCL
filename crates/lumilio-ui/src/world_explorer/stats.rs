@@ -6,7 +6,9 @@
 //! compositor's present happen after `render()` returns and have no hook.
 //! `paint_lag` (a result being shown to the next `render()` of the view) is the
 //! closest proxy.
-use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
+
+use std::sync::atomic::AtomicU64;
+use std::sync::atomic::Ordering::Relaxed;
 use std::time::Duration;
 
 #[derive(Default)]

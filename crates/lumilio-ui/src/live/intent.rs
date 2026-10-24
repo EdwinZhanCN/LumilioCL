@@ -1,10 +1,12 @@
-use super::discover::DiscoverQuery;
+use std::path::PathBuf;
+use std::rc::Rc;
+
 use gpui::{App, Window};
 use lumilio_core::{
     DownloadSourcePreference, LaunchTuning, MirrorPreset, MirrorRule, Preferences, ProjectKind,
 };
-use std::path::PathBuf;
-use std::rc::Rc;
+
+use super::discover::DiscoverQuery;
 
 /// What a live page asks the application to do.
 #[derive(Clone, Debug, Eq, PartialEq)]

@@ -1,9 +1,10 @@
-use super::super::panels::CONTENT_KINDS;
-use super::super::{InstanceDetailView, InstanceIntent};
-use crate::tr;
 use gpui::{App, Context, Window};
 use gpui_component::WindowExt as _;
 use lumilio_core::{ContentList, ProjectKind};
+
+use super::super::panels::CONTENT_KINDS;
+use super::super::{InstanceDetailView, InstanceIntent};
+use crate::tr;
 
 impl InstanceDetailView {
     pub(super) fn content_index(&self) -> usize {

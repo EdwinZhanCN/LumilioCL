@@ -1,12 +1,14 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
+use gpui::TestAppContext;
+use lumilio_core::LauncherSettings;
+
 use super::super::TAB_HISTORY;
 use super::super::editors::Editor;
 use super::super::intent::InstanceIntent;
 use super::super::panels::Arrived;
 use super::{click, record, rooted, world};
-use gpui::TestAppContext;
-use lumilio_core::LauncherSettings;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 #[gpui::test]
 fn a_snapshot_is_taken_from_a_dialog_with_a_note_and_a_range(cx: &mut TestAppContext) {

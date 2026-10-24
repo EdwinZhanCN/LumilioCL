@@ -1,6 +1,7 @@
-use super::{GameSettingsError, Values, catalog};
 use std::io::Read;
 use std::path::Path;
+
+use super::{GameSettingsError, Values, catalog};
 
 const MAX_BYTES: usize = 1024 * 1024;
 pub(super) struct Document {

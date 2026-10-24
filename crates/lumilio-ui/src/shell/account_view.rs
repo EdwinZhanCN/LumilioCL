@@ -3,15 +3,18 @@
 //! asks for its look once; a look that arrives for an account no longer
 //! shown is dropped.
 
+use std::rc::Rc;
+
+use gpui::prelude::*;
+use gpui::{Context, Entity, Window};
+
 use super::LauncherShell;
 use crate::live::LiveIntent;
 use crate::route::Route;
+use crate::skin_dialog::SkinDialog;
 use crate::skin_view::{Look, SkinViewer};
+use crate::wardrobe::Wardrobe;
 use crate::{pages, tr};
-use crate::{skin_dialog::SkinDialog, wardrobe::Wardrobe};
-use gpui::prelude::*;
-use gpui::{Context, Entity, Window};
-use std::rc::Rc;
 
 pub(super) struct AccountViewer {
     key: String,

@@ -6,14 +6,15 @@
 //! never held as a texture. The copy is named after its content, so a new
 //! picture is a new file and nothing shows a stale one.
 
-use image::imageops::FilterType;
-use image::{ImageReader, codecs::jpeg::JpegEncoder};
-use sha1::{Digest, Sha1};
 use std::error::Error;
-use std::fmt::{self, Display, Formatter};
-use std::fs;
-use std::io;
+use std::fmt::{Display, Formatter};
 use std::path::Path;
+use std::{fmt, fs, io};
+
+use image::ImageReader;
+use image::codecs::jpeg::JpegEncoder;
+use image::imageops::FilterType;
+use sha1::{Digest, Sha1};
 
 /// The widest and tallest a stored wallpaper gets, in pixels.
 pub const MAX_WIDTH: u32 = 2560;

@@ -1,9 +1,10 @@
-use super::install;
-use crate::Relaunch;
 use std::fs;
 use std::io::{Read as _, Seek as _};
 use std::path::Path;
 use std::process::Command;
+
+use super::install;
+use crate::Relaunch;
 
 fn write(path: &Path, contents: &str) {
     fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -21,7 +22,9 @@ fn succeed(command: &mut Command) {
     let output = command.output().unwrap();
     assert!(
         output.status.success(),
-        "{}",
+        "{command:?} failed with {}: stdout={:?}, stderr={:?}",
+        output.status,
+        String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
 }

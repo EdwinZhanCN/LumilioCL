@@ -6,7 +6,8 @@
 //! into the size it is shown at, so the full-size picture never exists.
 
 use std::error::Error;
-use std::fmt::{self, Display, Formatter};
+use std::fmt;
+use std::fmt::{Display, Formatter};
 use std::io::{BufRead, Seek};
 
 use image::RgbaImage;

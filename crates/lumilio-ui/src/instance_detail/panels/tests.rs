@@ -1,23 +1,15 @@
-use super::super::Section;
-use super::data::Arrived;
-use super::data::Confirm;
-use super::data::Data;
-use super::labels::change_label;
-use super::labels::duration_label;
-use super::labels::export_notice;
-use super::labels::outcome_label;
-use super::labels::size_label;
-use super::overview::ProblemAction;
-use super::overview::problem_action;
-use super::overview::problem_text;
-use super::overview::recent_changes;
-use super::overview::recent_sessions;
-use super::worlds::ordered_worlds;
-use super::worlds::playing_world;
 use lumilio_core::{
     ChangeKind, HistoryEvent, HistoryRead, Problem, ProblemKind, ProjectKind, SessionOutcome,
     Severity, SnapshotInfo, SnapshotScope, WorldInfo,
 };
+
+use super::super::Section;
+use super::data::{Arrived, Confirm, Data};
+use super::labels::{change_label, duration_label, export_notice, outcome_label, size_label};
+use super::overview::{
+    ProblemAction, problem_action, problem_text, recent_changes, recent_sessions,
+};
+use super::worlds::{ordered_worlds, playing_world};
 
 fn world(folder: &str, name: &str, played: Option<i64>) -> WorldInfo {
     WorldInfo {

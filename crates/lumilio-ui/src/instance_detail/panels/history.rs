@@ -1,16 +1,16 @@
+use gpui::prelude::*;
+use gpui::{AnyElement, Context, div, px};
+use gpui_component::{h_flex, v_flex};
+use lumilio_core::{HistoryEvent, SessionOutcome, SnapshotScope};
+
 use super::super::{InstanceDetailView, Section};
 use super::HISTORY_LABELS;
 use super::data::Confirm;
 use super::helpers::{act, act_index, clock};
 use super::labels::{change_label, duration_label, outcome_label, size_label};
 use crate::assets::UiIcon;
-use crate::kit;
 use crate::theme::ShellColors;
-use crate::tr;
-use gpui::prelude::*;
-use gpui::{AnyElement, Context, div, px};
-use gpui_component::{h_flex, v_flex};
-use lumilio_core::{HistoryEvent, SessionOutcome, SnapshotScope};
+use crate::{kit, tr};
 
 impl InstanceDetailView {
     pub(in super::super) fn history_panel(

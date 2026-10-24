@@ -2,13 +2,14 @@
 //! moved or deleted is asked about before anything starts, never quietly
 //! started in an empty folder.
 
-use super::super::context::follow;
-use super::super::dispatch::on_shell_intent;
-use super::global_context::{ask, continue_subject, failed_attempts, game, open, until};
 use gpui_kit::component::WindowExt as _;
 use gpui_kit::{Modifiers, TestAppContext};
 use lumilio_ui::ShellIntent;
 use lumilio_ui::home::HomeIntent;
+
+use super::super::context::follow;
+use super::super::dispatch::on_shell_intent;
+use super::global_context::{ask, continue_subject, failed_attempts, game, open, until};
 
 #[gpui_kit::test]
 fn a_game_whose_folder_is_gone_is_asked_about_before_it_starts(cx: &mut TestAppContext) {

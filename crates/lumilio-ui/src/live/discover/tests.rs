@@ -1,9 +1,10 @@
-use super::*;
-use crate::live::{LiveModel, library_card};
 use lumilio_core::{
     CategoryTag, DiscoverFilters, GameVersionTag, InstanceRecord, InstanceSettings, Loader,
     LoaderTag, Pick, SearchHit, Stance,
 };
+
+use super::*;
+use crate::live::{LiveModel, library_card};
 
 fn query() -> DiscoverQuery {
     DiscoverQuery::new(ProjectKind::Mod)

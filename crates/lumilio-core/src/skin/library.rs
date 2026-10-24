@@ -1,14 +1,16 @@
 //! Local wardrobe index and immutable PNGs. The order, model and origin are
 //! launcher-owned facts; no Mojang artwork is bundled (ADR 0024).
 
-use super::{AppearanceError, SkinModel, mojang::normalize_png};
-use crate::persist::{self, Versioned};
+use std::fs;
+use std::path::{Path, PathBuf};
+
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+
+use super::mojang::normalize_png;
+use super::{AppearanceError, SkinModel};
+use crate::persist;
+use crate::persist::Versioned;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum SkinSource {

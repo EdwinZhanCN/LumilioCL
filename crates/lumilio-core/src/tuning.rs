@@ -3,7 +3,8 @@
 //! instance can override some of them (Instance.Settings).
 
 use std::error::Error;
-use std::fmt::{self, Display, Formatter};
+use std::fmt;
+use std::fmt::{Display, Formatter};
 
 use serde::{Deserialize, Serialize};
 

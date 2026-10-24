@@ -4,19 +4,19 @@
 //! for them); a card shows an empty tile until its thumbnail is there. Only the
 //! cards on screen are asked for, a page at a time.
 
-use super::super::{InstanceDetailView, InstanceIntent, Section};
-use super::data::{Confirm, Thumb};
-use super::helpers::{act, clock};
-use crate::assets::UiIcon;
-use crate::key::Key;
-use crate::kit;
-use crate::theme::{self, ShellColors};
-use crate::tr;
 use gpui::prelude::*;
 use gpui::{AnyElement, App, Context, Entity, ObjectFit, Window, div, img, px};
 use gpui_component::dialog::Dialog;
 use gpui_component::{Icon, WindowExt as _, h_flex, v_flex};
 use lumilio_core::ScreenshotInfo;
+
+use super::super::{InstanceDetailView, InstanceIntent, Section};
+use super::data::{Confirm, Thumb};
+use super::helpers::{act, clock};
+use crate::assets::UiIcon;
+use crate::key::Key;
+use crate::theme::ShellColors;
+use crate::{kit, theme, tr};
 
 /// How many cards are shown at first, and added each time more are asked for.
 pub const SHOTS_PAGE: usize = 48;

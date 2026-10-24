@@ -1,10 +1,10 @@
-use super::Wiring;
 use gpui_kit::{App, WeakEntity};
 use lumilio_core::GameLogSource;
 use lumilio_ui::instance_detail::InstanceDetailView;
-use lumilio_ui::platform;
 use lumilio_ui::toast::Toast;
-use lumilio_ui::tr;
+use lumilio_ui::{platform, tr};
+
+use super::Wiring;
 
 pub(super) fn read(
     wiring: &Wiring,

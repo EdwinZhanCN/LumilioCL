@@ -1,3 +1,7 @@
+use std::path::Path;
+
+use lumilio_plugin_api::{AnalysisInput, AnalysisSource, GameFacts, ModFact};
+
 use super::LauncherService;
 use super::error::ServiceError;
 use super::support::blocking;
@@ -6,8 +10,6 @@ use crate::diagnostics::{Problem, ProblemKind};
 use crate::history::HistoryLog;
 use crate::inspect::inspect_instance;
 use crate::transfer::Transport;
-use lumilio_plugin_api::{AnalysisInput, AnalysisSource, GameFacts, ModFact};
-use std::path::Path;
 
 impl<T: Transport + Clone> LauncherService<T> {
     /// The instance's history, oldest first. Reading needs no lease; a log

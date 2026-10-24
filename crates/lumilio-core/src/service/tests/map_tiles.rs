@@ -1,15 +1,18 @@
 //! Base maps drawn from a world's files are kept per instance and rebuilt
 //! only where a file changed (plan W6, T30).
-use super::Scripted;
-use crate::LauncherService;
-use crate::instance::Loader;
+
+use std::sync::{Arc, Mutex};
+
 use lumilio_plugin_api::map::{
     BaseMapInfo, BaseMapProvider, Dimension, TileKey, TileReply, TileRequest, WorldContext, WorldId,
 };
 use lumilio_plugin_api::{
     API_VERSION, HostContext, ImageData, MAX_PAGE, Manifest, Permission, Plugin, PluginError, Words,
 };
-use std::sync::{Arc, Mutex};
+
+use super::Scripted;
+use crate::LauncherService;
+use crate::instance::Loader;
 
 /// A provider whose level-0 tile `(tx, tz)` is drawn from region
 /// `r.<tx div 2>.<tz div 2>.mca`, and which records every tile it draws.

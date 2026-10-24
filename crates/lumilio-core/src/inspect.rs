@@ -5,7 +5,8 @@
 use std::path::Path;
 
 use crate::account::OfflineProfile;
-use crate::content::{self, ContentItem, ModMetadata};
+use crate::content;
+use crate::content::{ContentItem, ModMetadata};
 use crate::diagnostics::{Facts, Problem, diagnose};
 use crate::discover::ProjectKind;
 use crate::environment::HostProfile;

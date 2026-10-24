@@ -1,12 +1,13 @@
-use super::{ACTIVITY_LIMIT, POLL, Reload, Wiring};
+use std::future::Future;
+
 use gpui_kit::{App, AsyncApp, Context};
 use lumilio_core::{CancellationToken, ProjectKind, unix_now};
-use lumilio_ui::LauncherShell;
 use lumilio_ui::live::{CollectionRow, account_rows, activity_rows, library_cards};
 use lumilio_ui::toast::Toast;
-use lumilio_ui::tr;
-use std::future::Future;
+use lumilio_ui::{LauncherShell, tr};
 use tokio::task::{JoinError, JoinHandle};
+
+use super::{ACTIVITY_LIMIT, POLL, Reload, Wiring};
 
 /// Runs `work` on the worker runtime, then hands the result to `done` on the
 /// interface thread and reloads what changed. `started` floats up when it

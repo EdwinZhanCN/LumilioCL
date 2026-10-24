@@ -3,18 +3,17 @@
 //! Settings plugins tab). The detail carries the account's look: a preview
 //! and what can be worn, which depends on the kind of account.
 
+use gpui::prelude::*;
+use gpui::{AnyElement, App, IntoElement, Window, div, px};
+use gpui_component::{StyledExt as _, WindowExt as _, h_flex, v_flex};
+
 use super::controls::{LiveCtx, send};
 use crate::assets::UiIcon;
-use crate::kit::{self, ViewIntent};
+use crate::kit::ViewIntent;
 use crate::live::{AccountRow, LiveIntent, LiveModel};
 use crate::pages::ViewState;
 use crate::wardrobe::{PINNED_PREVIEW_WIDTH, PREVIEW_WIDTH};
-use crate::{theme, tr};
-use gpui::prelude::*;
-use gpui::{AnyElement, App, IntoElement, Window, div, px};
-use gpui_component::StyledExt as _;
-use gpui_component::WindowExt as _;
-use gpui_component::{h_flex, v_flex};
+use crate::{kit, theme, tr};
 
 /// The view-state group that remembers which account the detail shows.
 pub const ACCOUNT_GROUP: u8 = 220;

@@ -2,11 +2,13 @@
 //! the Minecraft EULA (plan terms-consent). The release notes of an update
 //! wait until then, so the two dialogs never stack.
 
-use super::Wiring;
-use gpui_kit::AppContext as _;
-use gpui_kit::{AnyWindowHandle, App, Window};
-use lumilio_ui::terms::{self, Occasion};
 use std::rc::Rc;
+
+use gpui_kit::{AnyWindowHandle, App, AppContext as _, Window};
+use lumilio_ui::terms;
+use lumilio_ui::terms::Occasion;
+
+use super::Wiring;
 
 /// Asks for the terms when they are not agreed to yet, then shows what the
 /// update brought. Quitting the dialog quits the launcher.

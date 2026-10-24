@@ -3,7 +3,8 @@
 //! MurmurHash2 is Austin Appleby's public-domain algorithm.
 
 use std::fs::File;
-use std::io::{self, BufReader, Read};
+use std::io;
+use std::io::{BufReader, Read};
 use std::path::Path;
 
 const M: u32 = 0x5bd1_e995;

@@ -1,9 +1,11 @@
 //! The map's structure icons. Provenance and status: `assets/map-icons/NOTICE.md`.
 //! This is the only place that names the files, so removing them is deleting
 //! that directory and the table below; an icon without a file draws a dot.
+
+use std::sync::{Arc, OnceLock};
+
 use gpui::{Image, ImageFormat};
 use lumilio_plugin_api::map::MapIcon;
-use std::sync::{Arc, OnceLock};
 
 macro_rules! icon {
     ($name:literal) => {
@@ -65,9 +67,7 @@ pub(crate) fn image(icon: MapIcon) -> Option<Arc<Image>> {
     type Decoded = std::sync::Mutex<Vec<(MapIcon, Arc<Image>)>>;
     static CACHE: OnceLock<Decoded> = OnceLock::new();
     let cache = CACHE.get_or_init(Default::default);
-    let mut cache = cache
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let mut cache = cache.lock().expect("map icon cache lock was poisoned");
     if let Some((_, image)) = cache.iter().find(|(known, _)| *known == icon) {
         return Some(image.clone());
     }
@@ -144,7 +144,7 @@ fn dot(name: String) -> Pixels {
         .flat_map(|at| {
             let (x, z) = ((at % EDGE) as f32 - centre, (at / EDGE) as f32 - centre);
             let edge = (9. - (x * x + z * z).sqrt()).clamp(0., 1.);
-            [0xE8, 0x6A, 0x2E, (edge * 255.) as u8]
+            [0xe8, 0x6a, 0x2e, (edge * 255.) as u8]
         })
         .collect();
     Pixels {
@@ -161,9 +161,7 @@ pub(crate) fn pixels(icon: MapIcon) -> Arc<Pixels> {
     type Decoded = std::sync::Mutex<Vec<(MapIcon, Arc<Pixels>)>>;
     static CACHE: OnceLock<Decoded> = OnceLock::new();
     let cache = CACHE.get_or_init(Default::default);
-    let mut cache = cache
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let mut cache = cache.lock().expect("map icon cache lock was poisoned");
     if let Some((_, found)) = cache.iter().find(|(known, _)| *known == icon) {
         return found.clone();
     }
@@ -255,9 +253,7 @@ pub(crate) fn marker(icon: MapIcon, color: [u8; 3]) -> Arc<Pixels> {
         _ => return pixels(icon),
     };
     let cache = CACHE.get_or_init(Default::default);
-    let mut cache = cache
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let mut cache = cache.lock().expect("map icon cache lock was poisoned");
     if let Some((_, found)) = cache.iter().find(|(known, _)| *known == (icon, color)) {
         return found.clone();
     }

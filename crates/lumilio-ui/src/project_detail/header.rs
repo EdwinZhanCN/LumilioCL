@@ -2,19 +2,19 @@
 //! numbers. After `ProjectPageHeader` and the install button of
 //! `pages/project/Index.vue` (GPL-3.0-only; ADR 0022).
 
-use super::{DetailIntent, ProjectDetailView, pill, spec_cell};
-use crate::assets::UiIcon;
-use crate::key::Key;
-use crate::kit;
-use crate::live::{count_label, environment_label, parse_rfc3339, relative_time, tag_label};
-use crate::pages::live::project_icon;
-use crate::theme::ShellColors;
-use crate::tr;
 use gpui::prelude::*;
 use gpui::{App, ClipboardItem, Context, IntoElement, Window, div, px};
 use gpui_component::menu::{ContextMenuExt as _, PopupMenuItem};
 use gpui_component::{Icon, h_flex, v_flex};
 use lumilio_core::{Project, ProjectKind, environment};
+
+use super::{DetailIntent, ProjectDetailView, pill, spec_cell};
+use crate::assets::UiIcon;
+use crate::key::Key;
+use crate::live::{count_label, environment_label, parse_rfc3339, relative_time, tag_label};
+use crate::pages::live::project_icon;
+use crate::theme::ShellColors;
+use crate::{kit, tr};
 
 /// What the install button and its menu entry run.
 type Install = std::rc::Rc<dyn Fn(&mut Window, &mut App)>;

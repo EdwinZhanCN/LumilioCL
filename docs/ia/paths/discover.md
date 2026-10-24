@@ -6,19 +6,19 @@
 
 | 操作 | 层 / 组件 | 结果与反馈 | 备注 | 实现 |
 |---|---|---|---|---|
-| 锁定目标（从游戏页进入） | 游戏页内容标签「浏览 Mod / 资源包 / 光影」 | 发现页进入「为这个游戏浏览」：页头写明游戏，类型预选，版本和加载器筛选锁定；那个游戏成为当前游戏（芯片、继续与下次启动一致）；在芯片里换成别的游戏就退出锁定 |  | `lumilio-app/src/live/instance.rs` |
+| 锁定目标（从游戏页进入） | 游戏页内容标签「浏览 Mod / 资源包 / 光影」 | 发现页进入「为这个游戏浏览」：页头写明游戏，类型预选，版本和加载器筛选锁定；那个游戏成为当前游戏（芯片、继续与下次启动一致）；在芯片里换成别的游戏就退出锁定 |  | `lumilio-app/src/live/instance/instance_page.rs` |
 | 依赖提示 | 安装 Mod 前的弹窗 | 列出目标游戏还缺的必需依赖（默认勾选；没有适合版本的标明且不能勾；「只安装它」跳过）；也列可选依赖（默认不勾）并警告与已装 Mod 不兼容；依赖先装，每个是动态里的一条任务 | 仅 Mod | `lumilio-ui/src/dependency_prompt.rs` |
 | 安装（最新兼容版本） | 结果行「安装」 | 后台任务，toast“开始安装”，完成 toast，期间按钮显示「安装中…」；Mod 先过依赖提示 |  | `lumilio-ui/src/pages/live/discover/card.rs` |
 | 已安装状态 | 结果行「已安装」/「更新」 | 目标游戏已有的（按正在浏览的来源识别）显示「已安装」；有更新显示「更新」，点了用新版本替换旧文件；详情页主按钮同样变化 | 只认这个来源认得的文件 | `lumilio-ui/src/pages/live/discover/card.rs` |
 | 打开项目详情 | 点结果行 | 详情页（进历史） |  | `lumilio-ui/src/pages/live/discover/card.rs` |
 | 结果行右键菜单 | 在（来源）中打开 / 复制链接 | 浏览器打开项目页，或把项目页地址放进剪贴板并提示 |  | `lumilio-ui/src/pages/live/discover/card.rs` |
-| 分页 | 列表上方的页码键 | 翻页并回到列表顶部的第一行 |  | `lumilio-ui/src/pages/live/discover/mod.rs` |
-| 没有内容源 | 搜索结果区整页提示 | 说明没有可用的内容源，指向设置里的插件页；打开内容源后重新搜索 |  | `lumilio-ui/src/pages/live/discover/mod.rs` |
-| 连不上 | 搜索失败的整页提示 | 说明连不上正在浏览的来源，附技术详情；改任何条件会再试一次 |  | `lumilio-ui/src/pages/live/discover/mod.rs` |
-| 在来源网站浏览 | L2 ⋯ 菜单「在（来源）中浏览」 | 浏览器打开这个来源当前类型的列表页 |  | `lumilio-ui/src/pages/live/discover/mod.rs` |
-| 分类 | L3 标签：整合包 / Mod / 资源包 / 光影（游戏页进入时去掉整合包，原版游戏再去掉 Mod） | 切换搜索的项目类型并重新搜索；类型一换，排序回到相关度、搜索词清空 |  | `lumilio-ui/src/pages/live/discover/mod.rs` |
-| 搜索 | L3 搜索框（回车确认，有清除键） | 按关键词搜索正在浏览的来源 |  | `lumilio-ui/src/pages/live/discover/mod.rs` |
-| 排序 / 显示数量 | L4 两个下拉：相关度、下载量、关注数、发布时间、更新时间（只列来源支持的）；每页 5 / 10 / 15 / 20 / 50 / 100 | 重新搜索；按发布时间排序时结果行显示发布时间，其余显示更新时间；按关注数排序时显示关注数，其余显示下载量 |  | `lumilio-ui/src/pages/live/discover/mod.rs` |
+| 分页 | 列表上方的页码键 | 翻页并回到列表顶部的第一行 |  | `lumilio-ui/src/pages/live/discover/results.rs` |
+| 没有内容源 | 搜索结果区整页提示 | 说明没有可用的内容源，指向设置里的插件页；打开内容源后重新搜索 |  | `lumilio-ui/src/pages/live/discover/results.rs` |
+| 连不上 | 搜索失败的整页提示 | 说明连不上正在浏览的来源，附技术详情；改任何条件会再试一次 |  | `lumilio-ui/src/pages/live/discover/results.rs` |
+| 在来源网站浏览 | L2 ⋯ 菜单「在（来源）中浏览」 | 浏览器打开这个来源当前类型的列表页 |  | `lumilio-ui/src/pages/live/discover/results.rs` |
+| 分类 | L3 标签：整合包 / Mod / 资源包 / 光影（游戏页进入时去掉整合包，原版游戏再去掉 Mod） | 切换搜索的项目类型并重新搜索；类型一换，排序回到相关度、搜索词清空 |  | `lumilio-ui/src/pages/live/discover/results.rs` |
+| 搜索 | L3 搜索框（回车确认，有清除键） | 按关键词搜索正在浏览的来源 |  | `lumilio-ui/src/pages/live/discover/results.rs` |
+| 排序 / 显示数量 | L4 两个下拉：相关度、下载量、关注数、发布时间、更新时间（只列来源支持的）；每页 5 / 10 / 15 / 20 / 50 / 100 | 重新搜索；按发布时间排序时结果行显示发布时间，其余显示更新时间；按关注数排序时显示关注数，其余显示下载量 |  | `lumilio-ui/src/pages/live/discover/results.rs` |
 | 筛选 | 右侧丝印编号筛选栏，按类型分区、可折叠：游戏版本（可搜索，可显示全部版本）、加载器（常用在前，「显示更多」）、类别、运行环境、许可证、高级排除；每个选项点一下为「要」，点 ⊘ 为「不要」 | 重新搜索；游戏提供的版本和加载器带锁 |  | `lumilio-ui/src/pages/live/discover/sidebar.rs` |
 | 高级排除 | 筛选栏「高级排除」：光敏性触发、AI、广告、遥测等 | 选择会被记住；第一次选「光敏性触发」弹出提示，可选不再提示 |  | `lumilio-ui/src/pages/live/discover/sidebar.rs` |
 | 隐藏已安装 | 筛选栏顶部开关（整合包页，或从游戏页进入时） | 搜索时排除已有的整合包 / 目标游戏已装的项目；整合包页的选择会被记住 |  | `lumilio-ui/src/pages/live/discover/sidebar.rs` |

@@ -1,14 +1,13 @@
+use gpui::prelude::*;
+use gpui::{App, ClickEvent, IntoElement, Window, div, px};
+use gpui_component::{Icon, Sizable as _, h_flex, v_flex};
+
 use super::controls::{LiveCtx, send};
 use crate::assets::UiIcon;
 use crate::key::Key;
-use crate::kit;
 use crate::kit::ViewIntent;
 use crate::live::{LibraryCard, LiveIntent, cover_loader};
-use crate::{tr, tr_all};
-use gpui::prelude::*;
-use gpui::{App, ClickEvent, IntoElement, Window, div, px};
-use gpui_component::Sizable as _;
-use gpui_component::{Icon, h_flex, v_flex};
+use crate::{kit, tr, tr_all};
 
 #[must_use]
 pub fn library_tabs() -> &'static [&'static str] {

@@ -1,12 +1,13 @@
 use std::io::Write as _;
 
+use sha2::{Digest, Sha256};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
+
 use super::super::error::ServiceError;
 use super::{ECHO_ARGS, World, fake_java, publish_identity_release, world};
 use crate::instance::Loader;
 use crate::skin::{SkinChoice, SkinError, SkinModel};
-use sha2::{Digest, Sha256};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpStream;
 
 fn picture(color: [u8; 4]) -> Vec<u8> {
     let image = image::RgbaImage::from_pixel(64, 64, image::Rgba(color));

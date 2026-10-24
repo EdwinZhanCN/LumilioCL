@@ -1,13 +1,15 @@
+use std::io;
+use std::path::{Component, Path, PathBuf};
+
+use tokio::fs;
+use tokio::fs::OpenOptions;
+use tokio::io::AsyncWriteExt;
+
 use super::assets::AssetIndex;
 use super::installer::InstallError;
 use super::native::unique_sibling;
 use super::plan::InstallationPlan;
 use crate::activity::CancellationToken;
-use std::io;
-use std::path::{Component, Path, PathBuf};
-use tokio::fs;
-use tokio::fs::OpenOptions;
-use tokio::io::AsyncWriteExt;
 
 pub(super) async fn publish_asset_views(
     plan: &InstallationPlan,

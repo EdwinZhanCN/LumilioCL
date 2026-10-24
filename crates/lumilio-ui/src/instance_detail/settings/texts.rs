@@ -1,5 +1,6 @@
-use crate::tr;
 use lumilio_core::{AfterLaunch, QuickPlay};
+
+use crate::tr;
 
 /// `跟随默认 · value` while nothing is overridden, else the own value.
 #[must_use]
@@ -34,10 +35,10 @@ pub fn after_launch_text(value: AfterLaunch) -> &'static str {
 /// `-` is how a command field says "this game uses none".
 pub(super) const NONE_ON_PURPOSE: &str = "-";
 
-pub(super) fn command_text(own: Option<&String>, default: Option<&String>) -> String {
+pub(super) fn command_text(own: Option<&str>, default: Option<&str>) -> String {
     match own {
-        Some(text) if text.is_empty() => tr!("instance-settings-command-none").to_owned(),
-        Some(text) => text.clone(),
-        None => followed(None, default.map_or(tr!("common-none"), String::as_str)),
+        Some("") => tr!("instance-settings-command-none").to_owned(),
+        Some(text) => text.to_owned(),
+        None => followed(None, default.unwrap_or(tr!("common-none"))),
     }
 }

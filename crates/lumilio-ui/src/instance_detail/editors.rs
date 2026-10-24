@@ -3,14 +3,15 @@
 //!
 //! A child module of `instance_detail`, so it shares the view's private state.
 
-use crate::key::Key;
-use gpui::{App, Context, Entity, Window, div, prelude::*, px};
+use gpui::prelude::*;
+use gpui::{App, Context, Entity, Window, div, px};
 use gpui_component::dialog::Dialog;
 use gpui_component::input::Input;
 use gpui_component::{StyledExt as _, WindowExt as _, h_flex, v_flex};
 
 use super::panels::Confirm;
 use super::{InstanceDetailView, InstanceIntent, Section};
+use crate::key::Key;
 use crate::{kit, theme, tr};
 
 /// One of the page's help lines, taken when it is shown so a language switch

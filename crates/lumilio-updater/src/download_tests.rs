@@ -1,10 +1,12 @@
-use crate::client::{CheckResult, UpdateClient, UpdateRelease};
-use crate::manifest::AssetTarget;
-use semver::Version;
-use sha2::{Digest as _, Sha256};
 use std::io::{Read as _, Write as _};
 use std::net::TcpListener;
 use std::sync::{Arc, Mutex};
+
+use semver::Version;
+use sha2::{Digest as _, Sha256};
+
+use crate::client::{CheckResult, UpdateClient, UpdateRelease};
+use crate::manifest::AssetTarget;
 
 /// Answers every request under `/site/` with 404 and serves `files` under
 /// `/github/`, recording each path it was asked.

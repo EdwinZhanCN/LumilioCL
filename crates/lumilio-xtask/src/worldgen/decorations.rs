@@ -5,11 +5,14 @@
 //! tracked placed feature, its decoration step and index (the original
 //! server's `FeatureSorter`), its placement modifiers and the biomes that list
 //! it. `table` turns every release's file into `forks/cubiomes/tables/decorations.h`.
-use crate::release::Result;
-use serde_json::{Value, json};
+
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::path::Path;
+
+use serde_json::{Value, json};
+
+use crate::release::Result;
 
 /// Tracked placed features, in the order of the fork's `DecorationType`.
 pub(super) const TRACKED: &[(&str, &str, &str)] = &[
@@ -263,7 +266,7 @@ pub(super) fn table(releases: &[(String, Value)], ids: &Value) -> Result<String>
                 bound("min_y")?,
                 bound("height")?,
             )
-            .unwrap();
+            .expect("writing to a String cannot fail");
         }
     }
     let mut out = String::from(
@@ -276,7 +279,7 @@ pub(super) fn table(releases: &[(String, Value)], ids: &Value) -> Result<String>
             out,
             "static const DecoOp deco_ops_{index}[] = {{ {program} }};"
         )
-        .unwrap();
+        .expect("writing to a String cannot fail");
     }
     let mut ordered: Vec<_> = sets.into_iter().collect();
     ordered.sort_by_key(|(_, index)| *index);
@@ -286,9 +289,10 @@ pub(super) fn table(releases: &[(String, Value)], ids: &Value) -> Result<String>
             "static const uint64_t deco_biomes_{index}[4] = {{ 0x{:016x}ULL, 0x{:016x}ULL, 0x{:016x}ULL, 0x{:016x}ULL }};",
             set[0], set[1], set[2], set[3]
         )
-        .unwrap();
+        .expect("writing to a String cannot fail");
     }
-    writeln!(out, "static const DecoEntry DECORATIONS[] = {{\n{rows}}};").unwrap();
+    writeln!(out, "static const DecoEntry DECORATIONS[] = {{\n{rows}}};")
+        .expect("writing to a String cannot fail");
     Ok(out)
 }
 

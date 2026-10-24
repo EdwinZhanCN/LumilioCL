@@ -1,3 +1,7 @@
+use std::os::unix::fs::PermissionsExt;
+
+use tokio::sync::mpsc;
+
 use super::super::LauncherService;
 use super::super::error::ServiceError;
 use super::{
@@ -10,8 +14,6 @@ use crate::instance::{Loader, NewInstance, StoreError};
 use crate::launch_session::LaunchSignal;
 use crate::launcher::LaunchUpdate;
 use crate::recovery::RecoveryNote;
-use std::os::unix::fs::PermissionsExt;
-use tokio::sync::mpsc;
 
 #[tokio::test]
 async fn a_relative_root_is_opened_as_an_absolute_path() {

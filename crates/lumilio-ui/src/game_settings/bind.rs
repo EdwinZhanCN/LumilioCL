@@ -1,13 +1,17 @@
 //! Choosing which preset a game follows, with what that changes before it
 //! changes it (plan D6).
-use super::form::{self, Form, Sending};
+
+use gpui::prelude::*;
+use gpui::{App, Context, Entity, IntoElement, Render, SharedString, Window, div, px};
+use gpui_component::{StyledExt as _, h_flex, v_flex};
+use lumilio_core::{InstanceOptions, OptionsFile, SettingsPreset};
+
+use super::form;
+use super::form::{Form, Sending};
 use super::labels::{setting_label, value_label};
 use super::table::{OptionLine, Source, sort_lines};
 use crate::theme::ShellColors;
 use crate::{kit, tr};
-use gpui::{App, Context, Entity, IntoElement, Render, SharedString, Window, div, prelude::*, px};
-use gpui_component::{StyledExt as _, h_flex, v_flex};
-use lumilio_core::{InstanceOptions, OptionsFile, SettingsPreset};
 
 pub struct ChoosePreset {
     presets: Vec<SettingsPreset>,

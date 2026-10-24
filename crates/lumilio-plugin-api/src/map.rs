@@ -1,7 +1,10 @@
 //! Data-only world-map contracts. The host owns rendering and interaction.
-use crate::{HostContext, ImageData, PluginError, SettingField, SettingValue};
-use serde::{Deserialize, Serialize};
+
 use std::collections::BTreeMap;
+
+use serde::{Deserialize, Serialize};
+
+use crate::{HostContext, ImageData, PluginError, SettingField, SettingValue};
 
 pub const TILE_PIXELS: u32 = 256;
 /// Most block names a tile may report as having no colour.

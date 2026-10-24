@@ -1,26 +1,31 @@
 //! Editing an overlay object: the host draws the dialog from the fields the
 //! plugin declared (plan W10) and hands the confirmed values back. Nothing is
 //! written here; the plugin validates and writes through the host.
-use super::{Command, MapView};
-use crate::controls::Fader;
-use crate::theme::{self, ShellColors};
-use crate::{key::Key, tr};
+
+use std::collections::BTreeMap;
+use std::rc::Rc;
+
+use gpui::prelude::*;
 use gpui::{
     AnyElement, App, Context, Entity, IntoElement, Render, SharedString, WeakEntity, Window, div,
-    prelude::*, px,
+    px,
 };
 use gpui_component::input::{Input, InputState};
 use gpui_component::{ActiveTheme as _, Sizable as _, WindowExt as _, h_flex, v_flex};
 use lumilio_plugin_api::map::{EditAction, MapObject, MapPoint, ObjectEdit};
 use lumilio_plugin_api::{SettingField, SettingKind, SettingValue};
-use std::collections::BTreeMap;
-use std::rc::Rc;
+
+use super::{Command, MapView};
+use crate::controls::Fader;
+use crate::key::Key;
+use crate::theme::ShellColors;
+use crate::{theme, tr};
 
 /// The 16 Minecraft text colours, which the colour field of a Choice offers by
 /// index. A field named `color` whose options are indices shows these.
 pub(super) const SWATCHES: [u32; 16] = [
-    0x000000, 0x0000AA, 0x00AA00, 0x00AAAA, 0xAA0000, 0xAA00AA, 0xFFAA00, 0xAAAAAA, 0x555555,
-    0x5555FF, 0x55FF55, 0x55FFFF, 0xFF5555, 0xFF55FF, 0xFFFF55, 0xFFFFFF,
+    0x000000, 0x0000aa, 0x00aa00, 0x00aaaa, 0xaa0000, 0xaa00aa, 0xffaa00, 0xaaaaaa, 0x555555,
+    0x5555ff, 0x55ff55, 0x55ffff, 0xff5555, 0xff55ff, 0xffff55, 0xffffff,
 ];
 
 enum Control {

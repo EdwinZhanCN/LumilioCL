@@ -1,12 +1,14 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
+use gpui::TestAppContext;
+use lumilio_core::{LauncherSettings, PluginTab};
+use lumilio_plugin_api::{ActionId, ImageData, KeyKind, ListItem, View, Words};
+
 use super::super::intent::InstanceIntent;
 use super::super::plugin_tabs::PluginPage;
 use super::super::{InstanceDetailView, TAB_HISTORY, TAB_SCREENSHOTS, TAB_SETTINGS};
 use super::{click, record, rooted};
-use gpui::TestAppContext;
-use lumilio_core::{LauncherSettings, PluginTab};
-use lumilio_plugin_api::{ActionId, ImageData, KeyKind, ListItem, View, Words};
-use std::cell::RefCell;
-use std::rc::Rc;
 
 const PLUGIN: &str = "lumilio.litematica";
 

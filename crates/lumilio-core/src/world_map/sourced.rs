@@ -4,14 +4,17 @@
 //! files still look the same, so once the game has written a region, that
 //! region's tiles and the coarser tiles above them are drawn again and every
 //! other tile is not.
-use super::cache::{read_entry, write_entry};
-use super::context::io_error;
-use crate::plugins::SourceStamp;
+
+use std::io;
+use std::path::PathBuf;
+
 use lumilio_plugin_api::map::{TileKey, TileReply};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::io;
-use std::path::PathBuf;
+
+use super::cache::{read_entry, write_entry};
+use super::context::io_error;
+use crate::plugins::SourceStamp;
 
 /// A coarse tile names many files, so an entry may be larger than a seed
 /// tile's.

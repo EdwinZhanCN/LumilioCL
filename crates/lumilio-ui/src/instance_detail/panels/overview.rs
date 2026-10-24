@@ -1,14 +1,15 @@
-use super::super::{InstanceDetailView, InstanceIntent, Section};
-use super::helpers::{act, clock};
-use super::labels::{change_label, duration_label, outcome_label};
-use crate::theme::ShellColors;
-use crate::{kit, live, tr};
 use gpui::prelude::*;
 use gpui::{AnyElement, Context, Div, Window, div, px};
 use gpui_component::{h_flex, v_flex};
 use lumilio_core::{
     ChangeKind, HistoryEvent, HistoryRead, Problem, ProblemKind, SessionOutcome, Severity,
 };
+
+use super::super::{InstanceDetailView, InstanceIntent, Section};
+use super::helpers::{act, clock};
+use super::labels::{change_label, duration_label, outcome_label};
+use crate::theme::ShellColors;
+use crate::{kit, live, tr};
 
 /// The newest `count` sessions: (started, seconds, outcome).
 #[must_use]
