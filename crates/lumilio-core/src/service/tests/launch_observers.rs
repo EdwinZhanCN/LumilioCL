@@ -50,14 +50,14 @@ impl LaunchObserver for Recorder {
 fn observed_world(panics: bool) -> (World, mpsc::UnboundedReceiver<(u64, LaunchEvent)>) {
     let mut world = world();
     let (events, receiver) = mpsc::unbounded_channel();
-    world.service.plugins = Arc::new(PluginHost::new(
+    world.service.set_plugin_host(Arc::new(PluginHost::new(
         vec![Arc::new(Recorder {
             events,
             panics,
             caller: std::thread::current().id(),
         })],
         Default::default(),
-    ));
+    )));
     (world, receiver)
 }
 async fn next(receiver: &mut mpsc::UnboundedReceiver<(u64, LaunchEvent)>) -> (u64, LaunchEvent) {

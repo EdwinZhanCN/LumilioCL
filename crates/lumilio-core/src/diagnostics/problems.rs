@@ -1,8 +1,3 @@
-//! Why an instance might not work, and what its logs say.
-//!
-//! [`diagnose`] is a pure function over gathered [`Facts`]; the log and file
-//! helpers do the I/O.
-
 use std::collections::BTreeMap;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::{Component, Path, PathBuf};

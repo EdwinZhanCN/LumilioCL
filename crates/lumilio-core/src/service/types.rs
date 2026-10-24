@@ -84,29 +84,6 @@ pub struct DependencyNeed {
     pub version: Option<Version>,
 }
 
-/// How much of the log's end `logs` returns.
-pub const LOG_TAIL_BYTES: u64 = 64 * 1024;
-/// How much of a log an export carries.
-pub(super) const EXPORT_LOG_BYTES: u64 = 8 * 1024 * 1024;
-/// How much of a crash report `crash_report` returns.
-pub const REPORT_BYTES: u64 = 256 * 1024;
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct GameLogs {
-    pub latest: Option<String>,
-    pub crashes: Vec<crate::diagnostics::CrashReport>,
-    pub files: Vec<crate::diagnostics::FileEntry>,
-}
-
-/// An instance-local source; file names are validated before any disk access.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum GameLogSource {
-    Live,
-    Latest,
-    File(String),
-    Crash(String),
-}
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ContentEffect {
     /// Already in the requested state; nothing was touched or recorded.

@@ -33,7 +33,10 @@ const HOUSE: &str = "schematics/house.litematic";
 
 async fn world_with_schematic() -> (super::World, String) {
     let mut world = world();
-    world.service.plugins = Arc::new(PluginHost::new(vec![Arc::new(Builder)], Default::default()));
+    world.service.set_plugin_host(Arc::new(PluginHost::new(
+        vec![Arc::new(Builder)],
+        Default::default(),
+    )));
     let record = world
         .service
         .create_instance("Builder", Some("1.0"), Loader::Vanilla, None)
@@ -386,7 +389,10 @@ fn fixture_layers() -> lumilio_block_assets::EntityLayers {
 }
 
 fn with_builder(world: &mut super::World) {
-    world.service.plugins = Arc::new(PluginHost::new(vec![Arc::new(Builder)], Default::default()));
+    world.service.set_plugin_host(Arc::new(PluginHost::new(
+        vec![Arc::new(Builder)],
+        Default::default(),
+    )));
 }
 
 /// D23: a 26.x client installed here, with a Java that could dump it, is

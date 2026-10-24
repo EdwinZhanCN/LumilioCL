@@ -59,9 +59,9 @@ pub use content_sources::{ContentEntry, ContentList, ContentSource};
 pub use context::{Context, Revisions, Session, SessionPhase};
 pub use credentials::{CredentialStore, MemoryCredentials, StoredLogin, SystemCredentials};
 pub use diagnostics::{
-    CrashReport, Facts, FileEntry, LOW_MEMORY_MB, LogLevel, LogLine, Problem, ProblemKind,
-    Severity, diagnose, filter_log, list_crash_reports, list_dir, log_level, log_lines,
-    read_crash_report, read_latest_log,
+    CrashReport, Facts, FileEntry, GameLogSource, GameLogs, LOW_MEMORY_MB, LogLevel, LogLine,
+    Problem, ProblemKind, Severity, diagnose, filter_log, list_crash_reports, list_dir, log_level,
+    log_lines, read_crash_report, read_latest_log,
 };
 pub use discover::{
     Catalog, CategoryTag, ContentClient, DEFAULT_SOURCE, DependencyKind, DiscoverError,
@@ -94,8 +94,8 @@ pub use instances::{
     Collection, InstanceRecord, InstanceSettings, InstanceStore, Loader, NewInstance, StoreError,
 };
 pub use java::{
-    JavaChoice, JavaLocator, JavaNeeds, JavaRule, JavaRuntime, RuleStrength, choose as choose_java,
-    install_major as java_install_major, parse_major as parse_java_major,
+    InstanceJava, JavaChoice, JavaLocator, JavaNeeds, JavaRule, JavaRuntime, RuleStrength,
+    choose as choose_java, install_major as java_install_major, parse_major as parse_java_major,
 };
 pub use java_runtime::graalvm::LICENSE_URL as GRAALVM_LICENSE_URL;
 pub use java_runtime::{JavaBuild, JavaSource};
@@ -162,9 +162,8 @@ pub use servers::{
 };
 pub use service::{
     AddedFile, AppearanceApplyResult, ContentEffect, ContentResult, ContentSourceInfo,
-    DependencyNeed, DependencyReport, DiscoverFilters, GameLogSource, GameLogs, InstalledProject,
-    InstanceJava, LauncherService, Library, ModelPreview, ProfileSnapshot, ProjectDetail,
-    ThirdPartySignIn,
+    DependencyNeed, DependencyReport, DiscoverFilters, InstalledProject, LauncherService, Library,
+    ModelPreview, ProfileSnapshot, ProjectDetail, ThirdPartySignIn,
 };
 pub use settings::{
     AccountEntry, AccountKind, AuthServerEntry, DownloadSourcePreference, LauncherSettings,

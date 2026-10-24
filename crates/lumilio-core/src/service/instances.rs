@@ -79,12 +79,13 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// problems, without those that depend on the account.
     pub async fn home_checks(&self) -> (Vec<InstanceRecord>, crate::attention::HomeChecks) {
         let instances = self.instances.lock().await.instances().to_vec();
-        let (settings, runtimes) = self.environment().await;
+        let (settings, runtimes) = self.java.environment().await;
         let mut recent: Vec<&InstanceRecord> = instances.iter().collect();
         recent.sort_by_key(|record| std::cmp::Reverse(record.last_played));
         let mut checks: BTreeMap<String, Vec<Problem>> = BTreeMap::new();
         for record in recent.into_iter().take(DIAGNOSED_LIMIT) {
             let mut found = self
+                .diagnostics
                 .inspect_with_analysis(&settings, &runtimes, record, false)
                 .await;
             found.retain(|problem| problem.kind != crate::diagnostics::ProblemKind::NoAccount);

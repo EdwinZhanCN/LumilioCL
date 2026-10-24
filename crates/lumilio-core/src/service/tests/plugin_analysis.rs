@@ -65,13 +65,13 @@ impl Analyzer for Recorder {
 fn analyzed_world() -> (World, Arc<Mutex<Vec<AnalysisInput>>>) {
     let mut world = world();
     let inputs = Arc::default();
-    world.service.plugins = Arc::new(PluginHost::new(
+    world.service.set_plugin_host(Arc::new(PluginHost::new(
         vec![Arc::new(Recorder {
             inputs: Arc::clone(&inputs),
             caller: std::thread::current().id(),
         })],
         Default::default(),
-    ));
+    )));
     (world, inputs)
 }
 

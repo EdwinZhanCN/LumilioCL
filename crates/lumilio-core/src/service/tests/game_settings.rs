@@ -131,7 +131,12 @@ async fn game_settings_scope_is_reversible_and_does_not_turn_excluded_edits_into
         .bind_settings_preset(&record.id, Some(preset_id))
         .await
         .unwrap();
-    world.service.apply_game_settings(&record.id).await.unwrap();
+    world
+        .service
+        .game_settings
+        .apply_game_settings(&record.id)
+        .await
+        .unwrap();
     let original = preset.clone();
     preset.excluded.insert("soundCategory_master".into());
     assert!(
@@ -145,6 +150,7 @@ async fn game_settings_scope_is_reversible_and_does_not_turn_excluded_edits_into
     assert_eq!(world.service.settings_presets().await.unwrap()[0], original);
     world
         .service
+        .game_settings
         .capture_game_settings(&record.id)
         .await
         .unwrap();
@@ -154,9 +160,15 @@ async fn game_settings_scope_is_reversible_and_does_not_turn_excluded_edits_into
         "soundCategory_master:0.3\nsoundCategory_music:0.5\nfov:0.5\n",
     )
     .unwrap();
-    world.service.apply_game_settings(&record.id).await.unwrap();
     world
         .service
+        .game_settings
+        .apply_game_settings(&record.id)
+        .await
+        .unwrap();
+    world
+        .service
+        .game_settings
         .capture_game_settings(&record.id)
         .await
         .unwrap();
@@ -172,9 +184,15 @@ async fn game_settings_scope_is_reversible_and_does_not_turn_excluded_edits_into
     let mut preset = world.service.settings_presets().await.unwrap().remove(0);
     preset.excluded.remove("soundCategory_master");
     world.service.edit_settings_preset(preset).await.unwrap();
-    world.service.apply_game_settings(&record.id).await.unwrap();
     world
         .service
+        .game_settings
+        .apply_game_settings(&record.id)
+        .await
+        .unwrap();
+    world
+        .service
+        .game_settings
         .capture_game_settings(&record.id)
         .await
         .unwrap();

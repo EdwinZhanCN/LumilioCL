@@ -19,7 +19,6 @@ mod instances;
 mod java;
 mod launch;
 mod library;
-mod maintenance;
 mod models;
 mod modpacks;
 mod packs;
@@ -49,13 +48,12 @@ pub use launcher_service::LauncherService;
 use launcher_service::{CREDENTIAL_PROBE, DIAGNOSED_LIMIT, TOKEN_MARGIN_SECONDS, loader_text};
 
 pub use self::appearance::ProfileSnapshot;
-pub use self::java::InstanceJava;
 pub use self::models::ModelPreview;
 pub use self::pending::AddedFile;
 pub use self::third_party::ThirdPartySignIn;
 pub use self::types::{
     ContentEffect, ContentResult, ContentSourceInfo, DependencyNeed, DependencyReport,
-    DiscoverFilters, GameLogSource, GameLogs, InstalledProject, Library, ProjectDetail,
+    DiscoverFilters, InstalledProject, Library, ProjectDetail,
 };
 pub use self::wardrobe::AppearanceApplyResult;
 

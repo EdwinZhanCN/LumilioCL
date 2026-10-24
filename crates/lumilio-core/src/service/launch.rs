@@ -47,7 +47,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     ) -> Result<(LaunchRequest, SourceChain), ServiceError> {
         let own_quick_play = record.settings.launch.quick_play.clone();
         let chain = self.network.chain().await?;
-        let (settings, runtimes) = self.environment().await;
+        let (settings, runtimes) = self.java.environment().await;
         validate_memory(
             record
                 .settings
@@ -220,10 +220,10 @@ impl<T: Transport + Clone> LaunchSteps for LauncherService<T> {
     }
 
     async fn apply_game_settings(&self, id: &str) -> Result<(), ServiceError> {
-        LauncherService::apply_game_settings(self, id).await
+        self.game_settings.apply_game_settings(id).await
     }
 
     async fn capture_game_settings(&self, id: &str) -> Result<(), ServiceError> {
-        LauncherService::capture_game_settings(self, id).await
+        self.game_settings.capture_game_settings(id).await
     }
 }

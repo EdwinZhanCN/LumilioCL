@@ -4,6 +4,7 @@ mod access;
 mod analysis;
 mod content;
 mod context;
+mod controls;
 mod launch;
 mod map;
 mod model;
@@ -23,6 +24,7 @@ pub(crate) use access::{read_info, resolve_write};
 pub use analysis::PluginFinding;
 pub use content::PluginContentSource;
 use context::Context;
+pub(crate) use controls::PluginControls;
 #[cfg(test)]
 use lumilio_plugin_api::{API_VERSION, HostContext, Manifest, Plugin, PluginError, PluginState};
 pub(crate) use map::SourceStamp;

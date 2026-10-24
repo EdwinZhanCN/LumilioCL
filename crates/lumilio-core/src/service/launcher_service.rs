@@ -8,11 +8,15 @@ use super::types::DiscoverFilters;
 use super::{appearance, preferences, third_party};
 use crate::activity::{ActivityLog, Tasks};
 use crate::credentials::{CredentialStore, SystemCredentials};
+use crate::diagnostics::Diagnostics;
 use crate::error::ServiceError;
+use crate::game_settings::GameSettings;
 use crate::instances::{InstanceStore, Instances, Loader};
+use crate::java::Java;
 use crate::launching::Launching;
 use crate::layout::Layout;
 use crate::network::Network;
+use crate::plugins::PluginControls;
 use crate::recovery;
 use crate::recovery::RecoveryNote;
 use crate::settings::SettingsStore;
@@ -50,8 +54,10 @@ pub struct LauncherService<T> {
     /// What the start-up recovery found and did.
     pub(super) startup: Vec<RecoveryNote>,
     pub(super) launching: Launching,
-    /// Replaces the conventional Java search locations (tests, portable setups).
-    pub(super) runtime_roots: Option<Vec<PathBuf>>,
+    pub(super) java: Java<T>,
+    pub(crate) game_settings: GameSettings,
+    pub(super) plugin_controls: PluginControls,
+    pub(super) diagnostics: Diagnostics,
     /// Filter choices per content source, for the life of the service.
     pub(super) filters: Mutex<std::collections::BTreeMap<String, DiscoverFilters>>,
     /// Translated summaries and bodies, cached in their own SQLite file.
@@ -115,24 +121,51 @@ impl<T: Transport + Clone> LauncherService<T> {
             // until corrected; the rest of the service remains available.
             .with_network_config(transport.clone(), settings.source_chain().ok());
         let settings = Arc::new(Mutex::new(settings));
+        let network = Network::new(transport, settings.clone(), layout.partial_downloads())?;
+        let instances = Arc::new(Instances::new(store));
+        let tasks = Arc::new(Tasks::new(log));
+        let java = Java::new(
+            settings.clone(),
+            network.clone(),
+            layout.clone(),
+            tasks.clone(),
+            context.clone(),
+            instances.clone(),
+        );
+        let plugins = Arc::new(plugins);
+        let translation = Arc::new(crate::translation::TranslationService::new(
+            layout.root().to_owned(),
+        ));
         Ok(Self {
-            network: Network::new(transport, settings.clone(), layout.partial_downloads())?,
-            plugins: Arc::new(plugins),
-            translation: Arc::new(crate::translation::TranslationService::new(
-                layout.root().to_owned(),
-            )),
+            diagnostics: Diagnostics::new(
+                settings.clone(),
+                instances.clone(),
+                layout.clone(),
+                plugins.clone(),
+                translation.clone(),
+            ),
+            plugin_controls: PluginControls::new(
+                plugins.clone(),
+                settings.clone(),
+                instances.clone(),
+                layout.clone(),
+            ),
+            game_settings: GameSettings::new(instances.clone(), layout.clone()),
+            java,
+            network,
+            plugins,
+            translation,
             textures: crate::skin::cache::TextureCache::new(
                 layout.root().join("cache/skin-textures"),
             ),
             profiles: appearance::Profiles::default(),
             layout,
-            instances: Arc::new(Instances::new(store)),
+            instances,
             settings,
             context,
-            tasks: Arc::new(Tasks::new(log)),
+            tasks,
             launching: Launching::default(),
             startup,
-            runtime_roots: None,
             filters: Mutex::default(),
             credentials: Arc::new(SystemCredentials),
             auth_lock: Mutex::new(()),
@@ -164,8 +197,16 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// system locations.
     #[must_use]
     pub fn with_runtime_roots(mut self, roots: Vec<PathBuf>) -> Self {
-        self.runtime_roots = Some(roots);
+        self.java.set_runtime_roots(roots);
         self
+    }
+
+    /// Runs `plugins` instead of the ones the service opened with (tests).
+    #[cfg(test)]
+    pub(crate) fn set_plugin_host(&mut self, plugins: Arc<crate::plugins::PluginHost>) {
+        self.plugin_controls.replace_plugins(plugins.clone());
+        self.diagnostics.replace_plugins(plugins.clone());
+        self.plugins = plugins;
     }
 
     #[must_use]

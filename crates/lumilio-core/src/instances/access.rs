@@ -3,7 +3,8 @@ use std::sync::Mutex as StdMutex;
 
 use tokio::sync::{Mutex, MutexGuard};
 
-use super::InstanceStore;
+use super::{InstanceRecord, InstanceStore};
+use crate::error::ServiceError;
 
 /// The one owner of the library and of which instances are in use.
 ///
@@ -29,6 +30,16 @@ impl Instances {
 
     pub(crate) async fn lock(&self) -> MutexGuard<'_, InstanceStore> {
         self.store.lock().await
+    }
+
+    /// The registered instance, even when its profile folder is missing.
+    pub(crate) async fn record(&self, id: &str) -> Result<InstanceRecord, ServiceError> {
+        self.store
+            .lock()
+            .await
+            .get(id)
+            .cloned()
+            .ok_or_else(|| ServiceError::NoSuchInstance(id.to_owned()))
     }
 
     /// The library lock itself, for work that takes it in steps.

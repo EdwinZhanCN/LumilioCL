@@ -1,7 +1,7 @@
-use super::super::types::LOG_TAIL_BYTES;
 use super::{fake_java, launch_to_end, publish_release, world};
 use crate::activity::CancellationToken;
 use crate::activity::TaskOutcome;
+use crate::diagnostics::LOG_TAIL_BYTES;
 use crate::error::ServiceError;
 use crate::history::{ChangeKind, HistoryEvent};
 use crate::instances::Loader;

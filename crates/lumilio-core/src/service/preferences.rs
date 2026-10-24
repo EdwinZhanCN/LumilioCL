@@ -1,9 +1,6 @@
-use std::path::{Path, PathBuf};
-
 use super::LauncherService;
 use crate::error::ServiceError;
 use crate::instances::InstanceSettings;
-use crate::java::JavaLocator;
 use crate::settings::validate_memory;
 use crate::transfer::Transport;
 
@@ -112,17 +109,6 @@ impl<T: Transport + Clone> LauncherService<T> {
         Ok(self.settings.lock().await.accept_terms()?)
     }
 
-    pub async fn set_java_source(
-        &self,
-        source: crate::java_runtime::JavaSource,
-    ) -> Result<(), ServiceError> {
-        Ok(self.settings.lock().await.set_java_source(source)?)
-    }
-
-    pub async fn set_auto_install_java(&self, enabled: bool) -> Result<(), ServiceError> {
-        Ok(self.settings.lock().await.set_auto_install_java(enabled)?)
-    }
-
     /// Turns the automatic block-asset download of schematic previews on or off.
     pub async fn set_auto_download_block_assets(&self, enabled: bool) -> Result<(), ServiceError> {
         Ok(self
@@ -130,50 +116,6 @@ impl<T: Transport + Clone> LauncherService<T> {
             .lock()
             .await
             .set_auto_download_block_assets(enabled)?)
-    }
-
-    /// Turns a Java installation off (or back on) by its home folder.
-    pub async fn set_java_disabled(&self, home: &Path, disabled: bool) -> Result<(), ServiceError> {
-        let mut settings = self.settings.lock().await;
-        let mut homes = settings.get().disabled_java.clone();
-        homes.retain(|saved| saved != home);
-        if disabled {
-            homes.push(home.to_owned());
-        }
-        Ok(settings.set_disabled_java(homes)?)
-    }
-
-    /// Adds the Java the person chose: its `java` executable, its home
-    /// folder, or a folder of installations. The folder joins the extra
-    /// search folders so it is found again later.
-    pub async fn add_java(&self, chosen: &Path) -> Result<crate::java::JavaRuntime, ServiceError> {
-        let mut candidates = vec![chosen.to_owned()];
-        if chosen.is_file()
-            && let Some(home) = chosen.parent().and_then(Path::parent)
-        {
-            candidates.insert(0, home.to_owned());
-        }
-        for candidate in candidates {
-            let probe = candidate.clone();
-            let found = tokio::task::spawn_blocking(move || JavaLocator::new([probe]).discover())
-                .await
-                .unwrap_or_default();
-            let Some(runtime) = found.into_iter().next() else {
-                continue;
-            };
-            let mut settings = self.settings.lock().await;
-            let mut roots = settings.get().extra_java_roots.clone();
-            if !roots.contains(&candidate) {
-                roots.push(candidate);
-                settings.set_java_roots(roots)?;
-            }
-            return Ok(runtime);
-        }
-        Err(ServiceError::NoJavaAt(chosen.to_owned()))
-    }
-
-    pub async fn set_java_roots(&self, roots: Vec<PathBuf>) -> Result<(), ServiceError> {
-        Ok(self.settings.lock().await.set_java_roots(roots)?)
     }
 
     pub async fn set_mirrors(
