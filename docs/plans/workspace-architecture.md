@@ -30,7 +30,7 @@ Status: InProgress
   Acceptance: 将启动计划、执行、进程、会话和启动恢复收拢到 launching，建立明确的启动协调者；LauncherService 的相应方法只委托能力入口。启动协调者接收实例、认证、Java、安装、任务等具体依赖，不接收整个 LauncherService。一次性 Java 选择和会话生命周期有唯一所有者，实例互斥租约仍与实例写入/删除共用同一份权威状态。保留取消、缺失目录、离线启动、极短进程、启动/退出事件次数、历史写入失败、游戏设置准备与回收、日志捕获、插件事件以及 Windows background_command 契约。按 D10 在能证明行为的最低边界验证，核心测试不引入 GPUI。
 - [x] T4 — 按能力拆分其余 core 状态与业务流程 (Completed)
   Acceptance: 按 D3–D5 逐能力迁移 accounts、instances、java、minecraft、content、appearance、game_settings、worlds、diagnostics、activity、plugins、settings 和 storage。每个迁移提交同时移动实现、状态、邻近测试和调用方；不存在靠为 LauncherService 增加更多 impl 文件冒充职责拆分的情况。认证刷新锁、待完成登录、外观缓存、任务取消表、内容筛选缓存分别归其能力；不复制 SettingsStore、InstanceStore、Context 或其权威状态。数据库版本/连接生命周期有单一入口，业务查询归所属能力，现有跨表事务与删除清理保持原子性。去除迁移完毕的旧生产实现，既有必要公开路径通过同类型 re-export 保留。
-- [ ] T5 — 以 Discover 验证 UI feature 与运行时连接边界 (Proposed)
+- [ ] T5 — 以 Discover 验证 UI feature 与运行时连接边界 (InProgress)
   Acceptance: Discover 的查询与筛选状态、请求代次、结果转换、详情页、相关对话框、命令处理和测试集中到 ui/features/discover。app/live 不再拥有该功能的页面状态或控制流程；LiveModel 不再保存 Discover 的第二份可变状态；功能模块不通过 LauncherShell 读取/修改其内部业务状态。Tokio Runtime 仍由 app 创建和持有，UI 经明确注入的服务与执行入口提交后台工作，结果只在 GPUI 上下文应用。验证来源/目标实例/查询切换后的过期结果拒绝、翻译结果身份、关闭详情窗口、失败与主动取消、隐藏已安装内容、依赖确认及安装完成反馈。全局任务可在离开页面后继续并反馈，页面请求按其生命周期取消或丢弃结果，不因使用 WeakEntity 丢失必要终态处理。
 - [ ] T6 — 迁移其他 UI 功能并收紧 app 与 shell (Proposed)
   Acceptance: 在 T5 的边界成立后，将其余功能逐个迁入 ui/features；共享控件与主题进入 design_system，shell 负责窗口、导航、路由和功能组合。各 feature 拥有其视图状态、任务句柄和订阅，不依赖 app 或兄弟 feature 的内部视图，不存在承载全部页面可变状态的 LiveModel/Wiring::State 替代品。app 保留 Runtime、启动配置、日志、插件注册、更新器与系统退出/重启的组装和适配；页面交互流程移出 app。更新状态与系统命令经窄接口连接，不能为了迁移而让 core 承担 UI/更新器职责。保留当前窗口所有权、全局选择、toast、语言切换、导航历史和后台任务生命周期；逐功能记录自动验证和真实窗口检查结果。
@@ -50,7 +50,7 @@ Status: InProgress
 - core 能力拥有自己的状态，启动/认证/持久化/取消等既有不变量有行为测试证据
   Result: 2026-10-24（T3/T4）：core 的 service 目录已拆为 accounts、appearance、instances、launching、minecraft、java、content、game_settings、worlds、diagnostics、activity、plugins、settings、storage、network 能力与 launcher_service 组合层；认证刷新锁/待选角色/凭据归 Accounts，外观缓存/皮肤库锁/签名密钥归 Appearance，任务板/取消表/活动日志归 activity::Tasks，内容筛选与翻译缓存归 Content，一次性自动 Java 选择归 Launching，实例库与操作租约归 Instances。每个迁移提交后 cargo nextest run -p lumilio-core 808 项全部通过（启动取消、缺失目录、离线启动、极短进程、启动/退出事件、历史写入失败、游戏设置准备与回收、日志捕获、插件事件等既有测试未改断言），clippy -D warnings、rustdoc 链接、cargo check --workspace --tests 与 docgen 34 项结构测试通过。
 - UI feature 拥有页面状态与控制流程，app/shell 只保留对应组合和适配职责
-  Result: pending
+  Result: 2026-10-24（T5）：Discover 迁入 ui/features/discover（model、view、detail、dependencies、page、controls、queries、search、install、translation、state 与 tests）；app/live/discover.rs 与 translation.rs 删除，LiveModel 不再含 Discover 字段。cargo nextest run -p lumilio-ui 593 项（含 13 项 feature 测试）与 -p lumilio-app 36 项通过；clippy -D warnings、rustdoc 链接、cargo check --workspace --tests、docgen 34 项通过，just ia 重新生成 discover 路径（仅实现位置变化）。真实窗口检查见 T5 记录；其余 UI 功能待 T6。 真实窗口（临时 LUMILIO_HOME，LUMILIO_PAGE=discover）：首次检查发现 LUMILIO_PAGE 开发钩子绕过 select_route，Discover 未收到 shown 而停在“正在搜索…”；改为 go_to 后，首屏列出 Modrinth/CurseForge 来源键、分类筛选、分页与整合包结果，摘要翻译出现。尚未在真实窗口逐项核对：项目详情、安装与依赖提示、为游戏浏览、正文翻译中止。
 - 每阶段 just check、最终 just docs、IA/i18n、受影响平台与真实窗口验收有记录
   Result: pending
 
@@ -166,6 +166,14 @@ Why: 能力若互相持有 Arc，with_credentials、with_runtime_roots 这类构
 
 Consequences: accounts↔appearance 的令牌与外观缓存、diagnostics 与插件标签所需的 Java 环境、modpack 安装所需的 Content 都以参数传入。测试替换插件宿主改用 #[cfg(test)] set_plugin_host，逐个更新持有者。服务测试移到所测能力的邻近 tests.rs，共享夹具在 #[cfg(test)] crate::testing；打开/恢复/删除、Context 发布与任务取消/重试等跨能力流程留在 launcher_service/tests。根目录只剩 lib.rs、context.rs、error.rs、clock.rs、blocking.rs 与能力目录；数据库连接、版本和迁移由 storage::database 统一管理，磁盘占用与清理归 diagnostics，内存建议归 settings。
 
+## Decision D15
+
+UI feature 以一个 GPUI 实体为边界：Discover 持有自己的状态、控件、请求代次与详情视图，经 app 注入的 runtime::Worker（LauncherService + Tokio Handle）提交后台工作；shell 推送只读输入（游戏库、安装目标、翻译开关）并负责窗口导航与历史，feature 以事件告知 shell 与 app 它们拥有的事情。
+
+Why: Discover 原本的状态分散在 LiveModel、app State 和 shell，控制流程在 app/live，读取 shell 时需要延迟以避开 shell 自身的更新。实体拥有状态后，控制流程读的是自己的状态，不再有重入问题；Worker 让 UI 不创建运行时、不引用 app；项目详情仍是 shell 历史中的位置，所以由 shell 展示、由 feature 创建和更新。
+
+Consequences: LiveIntent 去掉 Search、LoadFilters、TranslateBody、OpenProject、Install、SaveVersionAs、UpdateInstalled 与 RememberDiscover；DiscoverEvent 有 ProjectOpened（shell 显示）、TasksChanged（app 刷新动态列表）、Remember（app 与其余偏好一起保存，设置仍是单一持久化来源）。shell.open_project 同步返回打开的详情以便同一更新内即可填入状态。shell 在渲染时把当前显示的详情告诉 feature，用于正文翻译的离开即中止。outcome/install_outcome 与 runtime::answer 移入 lumilio-ui 供 app 共用，project_icon 移入 kit。feature 测试分 page（实体单独挂载）和 worker（真实 LauncherService + 内存内容源）；去掉代次检查后“慢回答不覆盖新搜索”测试失败，恢复后通过。
+
 ## References
 
 - AGENTS.md
@@ -193,3 +201,5 @@ Consequences: accounts↔appearance 的令牌与外观缓存、diagnostics 与�
 - Lesson: T4 时 `sed -i '' -n '1,200p'` 把 service/instances.rs 截成 200 行（-n 与 -i 同用会丢弃未打印的行），从 HEAD 恢复后重放修改。守护：查看文件只用 Read 或不带 -i 的 sed/head；批量改写后用 git diff --stat 核对每个文件的删除行数。
 
 - Lesson: T4 时委托生成脚本把所有 `pub(super) ` 改成 `pub(crate) `，连带放宽了能力结构体字段的可见性；`cargo clippy ... | grep | head` 的管道又掩盖了 clippy 的失败退出码，导致一次带 clippy 错误的提交（随后 amend）。守护：脚本只改写 fn/struct/enum/const/type 的可见性；检查命令把输出重定向到文件并单独打印 `$?`，以退出码决定是否提交。
+
+- Lesson: T5 时开发钩子 LUMILIO_PAGE 直接调用 shell.show 并把 Navigate 发给 app，原本由 app 处理的“首次搜索”迁入 feature 后，经钩子打开的发现页不再加载；单元测试都从 select_route 进入，没有覆盖。守护：钩子改用 shell.go_to，与点击导航走同一路径；迁移把行为从 app 的 intent 处理移进 UI 时，先列出所有绕过 shell 路由直接发 intent 的入口。

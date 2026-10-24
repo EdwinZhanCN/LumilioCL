@@ -268,8 +268,8 @@ pub(super) fn open_requested_page(
         Ok("settings") => Route::Settings,
         _ => return,
     };
-    shell.update(cx, |shell, _| shell.show(route));
-    on_shell_intent(wiring, ShellIntent::Navigate(route), window, cx);
+    // As choosing it in the navigation: the page is told it was shown.
+    shell.update(cx, |shell, cx| shell.go_to(route, window, cx));
 }
 
 /// The dev hook `LUMILIO_ACTIVITY` (see [`open_requested_page`]).
