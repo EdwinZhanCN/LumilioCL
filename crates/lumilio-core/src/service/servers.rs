@@ -61,7 +61,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         id: &str,
         edit: impl FnOnce(&std::path::Path) -> Result<(), servers::ServerError> + Send + 'static,
     ) -> Result<(), ServiceError> {
-        let _lease = self.reserve_instance(id)?;
+        let _lease = self.instances.reserve(id)?;
         self.instance(id).await?;
         let game_dir = self.layout.game(id);
         tokio::task::spawn_blocking(move || edit(&game_dir))

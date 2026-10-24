@@ -39,8 +39,8 @@ use super::LauncherService;
 use super::error::ServiceError;
 use crate::activity::CancellationToken;
 use crate::history::{ChangeKind, HistoryEvent, HistoryLog, SessionOutcome};
-use crate::instance::{InstanceRecord, Loader, NewInstance};
-use crate::process::GameExit;
+use crate::instances::{InstanceRecord, Loader, NewInstance};
+use crate::launching::GameExit;
 use crate::transfer::{FileTransport, Transport, TransportFuture, TransportResponse};
 
 /// Answers addresses containing a key from a table, and `file:` addresses
@@ -608,7 +608,7 @@ fn project_versions(id: &str, game: &str, requires: &[&str]) -> Vec<u8> {
 async fn fabric_instance(world: &World, game: &str) -> InstanceRecord {
     world
         .service
-        .store
+        .instances
         .lock()
         .await
         .create(

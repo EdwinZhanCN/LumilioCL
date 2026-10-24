@@ -25,7 +25,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         scope: SnapshotScope,
         label: &str,
     ) -> Result<String, ServiceError> {
-        let _lease = self.reserve_instance(id)?;
+        let _lease = self.instances.reserve(id)?;
         self.instance(id).await?;
         let (root, game_dir) = (self.layout.root().to_path_buf(), self.layout.game(id));
         let (instance, label) = (id.to_owned(), label.to_owned());
@@ -46,7 +46,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         id: &str,
         snapshot: &str,
     ) -> Result<Vec<std::path::PathBuf>, ServiceError> {
-        let _lease = self.reserve_instance(id)?;
+        let _lease = self.instances.reserve(id)?;
         self.instance(id).await?;
         let (root, game_dir) = (self.layout.root().to_path_buf(), self.layout.game(id));
         let (instance, name) = (id.to_owned(), snapshot.to_owned());
@@ -61,7 +61,7 @@ impl<T: Transport + Clone> LauncherService<T> {
 
     /// Deletes one snapshot. Never part of automatic clean-up. Takes the lease.
     pub async fn delete_snapshot(&self, id: &str, snapshot: &str) -> Result<(), ServiceError> {
-        let _lease = self.reserve_instance(id)?;
+        let _lease = self.instances.reserve(id)?;
         self.instance(id).await?;
         let (root, instance, name) = (
             self.layout.root().to_path_buf(),

@@ -67,7 +67,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         id: &str,
         files: Vec<PathBuf>,
     ) -> Result<Vec<(String, AddedFile)>, ServiceError> {
-        let _lease = self.reserve_instance(id)?;
+        let _lease = self.instances.reserve(id)?;
         self.instance(id).await?;
         let mut waiting = self.pending_downloads(id).await?;
         let game_dir = self.layout.game(id);

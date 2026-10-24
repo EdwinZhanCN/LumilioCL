@@ -4,7 +4,7 @@ use super::{fake_java, launch_to_end, publish_release, world};
 use crate::activity::CancellationToken;
 use crate::activity_log::TaskOutcome;
 use crate::history::{ChangeKind, HistoryEvent};
-use crate::instance::Loader;
+use crate::instances::Loader;
 
 #[tokio::test]
 async fn history_and_problems_are_readable_without_the_lease() {
@@ -21,7 +21,7 @@ async fn history_and_problems_are_readable_without_the_lease() {
         .copy_world(&record.id, "w", None)
         .await
         .unwrap();
-    let _busy = world.service.reserve_instance(&record.id).unwrap();
+    let _busy = world.service.instances.reserve(&record.id).unwrap();
     let read = world.service.history(&record.id).await.unwrap();
     assert!(matches!(
         read.events[..],
@@ -66,7 +66,7 @@ async fn logs_and_crash_reports_are_read_safely_without_the_lease() {
         "java.lang.OutOfMemoryError: heap",
     )
     .unwrap();
-    let _busy = world.service.reserve_instance(&record.id).unwrap();
+    let _busy = world.service.instances.reserve(&record.id).unwrap();
     let logs = world.service.logs(&record.id).await.unwrap();
     assert_eq!(
         logs.latest.unwrap(),
@@ -233,7 +233,7 @@ async fn unused_shared_files_are_measured_then_removed_only_when_nothing_is_runn
     assert!(!found.unused.iter().any(|(p, _)| p.ends_with("aa11")));
 
     {
-        let _busy = world.service.reserve_instance(&record.id).unwrap();
+        let _busy = world.service.instances.reserve(&record.id).unwrap();
         assert!(matches!(
             world.service.reclaim().await,
             Err(ServiceError::InstanceBusy(_))

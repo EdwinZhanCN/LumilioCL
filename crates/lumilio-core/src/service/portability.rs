@@ -7,7 +7,7 @@ use super::support::blocking_value;
 use super::types::now;
 use crate::activity::CancellationToken;
 use crate::activity_log::{RetryAction, TaskAction, TaskCategory, TaskLabel};
-use crate::instance::{InstanceRecord, InstanceSettings, Loader, NewInstance};
+use crate::instances::{InstanceRecord, InstanceSettings, Loader, NewInstance};
 use crate::staged::Staged;
 use crate::transfer::Transport;
 
@@ -60,7 +60,7 @@ impl<T: Transport + Clone> LauncherService<T> {
                 "the game's loader version could not be told".to_owned(),
             ));
         }
-        let staged = Staged::claim(&*self.store.lock().await, "import", &game.name)?;
+        let staged = Staged::claim(&*self.instances.lock().await, "import", &game.name)?;
         let id = staged.id().to_owned();
         let (source, into, token) = (game.clone(), staged.game_dir(), cancel.clone());
         let copied =
@@ -85,7 +85,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             return Err(error.into());
         }
         let created = self
-            .store
+            .instances
             .lock()
             .await
             .create_as(
@@ -109,7 +109,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             }
         };
         if let Err(error) = staged.publish(&self.layout) {
-            let _ = self.store.lock().await.remove(&record.id);
+            let _ = self.instances.lock().await.remove(&record.id);
             staged.discard();
             return Err(error.into());
         }
@@ -127,7 +127,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         destination: &Path,
         cancel: CancellationToken,
     ) -> Result<u64, ServiceError> {
-        let _lease = self.reserve_instance(id)?;
+        let _lease = self.instances.reserve(id)?;
         let record = self.instance(id).await?;
         let task = self
             .begin(
@@ -211,7 +211,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         .await?
         .map_err(backup_failure)?;
         let (staged, name) = {
-            let store = self.store.lock().await;
+            let store = self.instances.lock().await;
             let base = meta.name.trim();
             let taken = |candidate: &str| {
                 store
@@ -250,7 +250,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         // A Java path belongs to the machine the backup came from.
         settings.java_path = None;
         let created = self
-            .store
+            .instances
             .lock()
             .await
             .create_as(
@@ -274,7 +274,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             }
         };
         if let Err(error) = staged.publish(&self.layout) {
-            let _ = self.store.lock().await.remove(&record.id);
+            let _ = self.instances.lock().await.remove(&record.id);
             staged.discard();
             return Err(error.into());
         }

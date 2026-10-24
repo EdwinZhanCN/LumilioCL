@@ -6,20 +6,21 @@ use super::types::{JavaRequest, LaunchRequest, LaunchServiceError, LaunchUpdate}
 use super::{LAUNCHER_NAME, Launcher, QUICK_PLAY_LOG, output};
 use crate::activity::CancellationToken;
 use crate::fetch::{FetchError, fetch_decoded, fetch_document};
+use crate::forge_install;
 use crate::forge_install::ForgeError;
 use crate::install::{InstallError, InstallationPlan, Installer};
-use crate::instance::Loader;
+use crate::instances::Loader;
 use crate::java::{
     JavaChoice, JavaNeeds, JavaRuntime, choose, install_build, install_major, rosetta_missing,
 };
 use crate::java_runtime::JavaBuild;
-use crate::launch_session::{LaunchPhase, LaunchSignal};
+use crate::launching::process;
+use crate::launching::{GameExit, GameOptions, LogStream};
+use crate::launching::{LaunchPhase, LaunchSignal};
 use crate::loader::{LAUNCHABLE_LOADERS, normalize_profile};
-use crate::process::{GameExit, GameOptions, LogStream};
 use crate::repair::InstallationVerifier;
 use crate::transfer::{TransferEvent, TransferRequest, Transport};
 use crate::tuning::QuickPlay;
-use crate::{forge_install, process};
 use lumilio_minecraft::HostProfile;
 use lumilio_minecraft::{LaunchContext, LaunchPlan};
 use lumilio_minecraft::{ReleaseManifest, ReleaseSet};
@@ -424,7 +425,7 @@ where
             request.directories.game(),
             options.environment(),
             events,
-            crate::process::DEFAULT_SETTLE,
+            crate::launching::DEFAULT_SETTLE,
             cancel,
         );
         tokio::pin!(game);

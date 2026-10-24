@@ -4,7 +4,7 @@ use super::{ECHO_ARGS, fake_java, launch_to_end, publish_versions, repair_to_end
 use crate::activity::CancellationToken;
 use crate::activity_log::TaskCategory;
 use crate::history::{ChangeKind, HistoryEvent};
-use crate::instance::Loader;
+use crate::instances::Loader;
 
 #[tokio::test]
 async fn changing_the_version_prepares_the_new_files_then_commits_and_records_it() {
@@ -127,9 +127,9 @@ async fn a_version_change_that_cannot_finish_leaves_the_old_game_launchable() {
 
     // The library cannot be written: the files were fetched but the
     // record stays on the old version.
-    world.service.store.lock().await.set_read_only(true);
+    world.service.instances.lock().await.set_read_only(true);
     assert!(ask("2.0", CancellationToken::new()).await.is_err());
-    world.service.store.lock().await.set_read_only(false);
+    world.service.instances.lock().await.set_read_only(false);
     assert_eq!(
         world
             .service

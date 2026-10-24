@@ -8,7 +8,7 @@ use super::{
 use crate::activity::CancellationToken;
 use crate::activity_log::{RetryAction, TaskOutcome};
 use crate::history::{ChangeKind, HistoryEvent, HistoryLog};
-use crate::instance::{InstanceSettings, Loader, StoreError};
+use crate::instances::{InstanceSettings, Loader, StoreError};
 
 #[tokio::test]
 async fn an_exported_pack_carries_everything_when_modrinth_is_out_of_reach_and_needs_the_lease() {
@@ -32,7 +32,7 @@ async fn an_exported_pack_carries_everything_when_modrinth_is_out_of_reach_and_n
     let pack = world._dir.path().join("pack.mrpack");
 
     {
-        let _busy = world.service.reserve_instance(&record.id).unwrap();
+        let _busy = world.service.instances.reserve(&record.id).unwrap();
         assert!(matches!(
             world
                 .service
@@ -363,7 +363,7 @@ async fn a_copy_is_independent_inherits_settings_and_leaves_the_source_alone() {
         .unwrap();
     world
         .service
-        .store
+        .instances
         .lock()
         .await
         .mark_installed(&source.id, true)
@@ -453,7 +453,7 @@ async fn a_copy_that_is_refused_cancelled_or_fails_changes_nothing() {
     ));
     // Busy source (launching or running): no copy of a moving target.
     {
-        let _busy = world.service.reserve_instance(&source.id).unwrap();
+        let _busy = world.service.instances.reserve(&source.id).unwrap();
         assert!(matches!(
             world
                 .service

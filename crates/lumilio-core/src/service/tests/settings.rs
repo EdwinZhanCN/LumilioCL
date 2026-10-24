@@ -4,7 +4,7 @@ use super::super::LauncherService;
 use super::super::error::ServiceError;
 use super::{ECHO_ARGS, fake_java, launch_to_end, publish_release, world};
 use crate::activity::CancellationToken;
-use crate::instance::{InstanceSettings, Loader, NewInstance};
+use crate::instances::{InstanceSettings, Loader, NewInstance};
 use crate::settings::SettingsError;
 
 #[tokio::test]
@@ -131,7 +131,7 @@ async fn instance_memory_overrides_are_validated_and_can_resume_inheritance() {
     let world = world();
     let record = world
         .service
-        .store
+        .instances
         .lock()
         .await
         .create(

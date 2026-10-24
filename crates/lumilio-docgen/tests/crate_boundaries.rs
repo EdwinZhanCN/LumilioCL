@@ -60,7 +60,9 @@ fn problems(crates: &BTreeMap<String, Vec<String>>) -> Vec<String> {
                 problems.push(format!("{name}: must not depend on {dep}"));
             }
             if name == "lumilio-minecraft" && !MINECRAFT_DEPENDENCIES.contains(&dep.as_str()) {
-                problems.push(format!("{name}: {dep} is outside its pure metadata dependencies"));
+                problems.push(format!(
+                    "{name}: {dep} is outside its pure metadata dependencies"
+                ));
             }
         }
     }
@@ -99,7 +101,10 @@ fn reverse_and_impure_dependencies_are_reported() {
             "lumilio-minecraft".to_owned(),
             vec!["serde".to_owned(), "tokio".to_owned(), "gpui".to_owned()],
         ),
-        ("lumilio-transfer".to_owned(), vec!["lumilio-core".to_owned()]),
+        (
+            "lumilio-transfer".to_owned(),
+            vec!["lumilio-core".to_owned()],
+        ),
     ]);
     assert_eq!(
         problems(&crates),

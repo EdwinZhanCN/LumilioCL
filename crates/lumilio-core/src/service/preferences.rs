@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use super::LauncherService;
 use super::error::ServiceError;
-use crate::instance::InstanceSettings;
+use crate::instances::InstanceSettings;
 use crate::java::JavaLocator;
 use crate::settings::validate_memory;
 use crate::transfer::Transport;
@@ -12,7 +12,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// instance's own choice, else the launcher preference.
     pub async fn after_launch_for(&self, id: &str) -> crate::tuning::AfterLaunch {
         let own = self
-            .store
+            .instances
             .lock()
             .await
             .get(id)
@@ -27,7 +27,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// is gone reads as `None`; the caller picks another and saves it.
     pub async fn current_instance(&self) -> Option<String> {
         let saved = self.settings.lock().await.get().current_instance.clone()?;
-        let exists = self.store.lock().await.get(&saved).is_some();
+        let exists = self.instances.lock().await.get(&saved).is_some();
         exists.then_some(saved)
     }
 
@@ -46,7 +46,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// gone, the fallback becomes current and is saved. A save that fails
     /// leaves the old choice, which reads as `None` until the next change.
     pub(super) async fn settle_current(&self) {
-        let records = self.store.lock().await.instances().to_vec();
+        let records = self.instances.lock().await.instances().to_vec();
         // The published choice still names a game: the settings stay untouched.
         if self
             .context
@@ -61,7 +61,7 @@ impl<T: Transport + Clone> LauncherService<T> {
 
     /// Remembers the current instance. It must exist.
     pub async fn set_current_instance(&self, id: &str) -> Result<(), ServiceError> {
-        if self.store.lock().await.get(id).is_none() {
+        if self.instances.lock().await.get(id).is_none() {
             return Err(ServiceError::NoSuchInstance(id.to_owned()));
         }
         Ok(self
@@ -247,13 +247,13 @@ impl<T: Transport + Clone> LauncherService<T> {
                 .max_memory_mb
                 .or(defaults.get().default_max_memory_mb),
         )?;
-        Ok(self.store.lock().await.update_settings(id, settings)?)
+        Ok(self.instances.lock().await.update_settings(id, settings)?)
     }
 }
 
 /// See [`LauncherService::settle_current`]; also run once on opening.
 pub(super) fn settle_current(
-    records: &[crate::instance::InstanceRecord],
+    records: &[crate::instances::InstanceRecord],
     settings: &mut crate::settings::SettingsStore,
 ) -> Result<(), crate::settings::SettingsError> {
     let saved = settings.get().current_instance.clone();

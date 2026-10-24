@@ -8,7 +8,9 @@ use super::types::now;
 use super::{LauncherService, TRANSFER_CONCURRENCY};
 use crate::activity::CancellationToken;
 use crate::activity_log::{TaskBoard, TaskCategory, TaskLabel, TaskOutcome};
-use crate::launcher::{LaunchRequest, LaunchServiceError, LaunchUpdate, Launcher};
+use crate::launching::{
+    LaunchRequest, LaunchServiceError, LaunchSteps, LaunchUpdate, Launcher, serving_java,
+};
 use crate::transfer::{ConnectionBudget, TransferEngine, Transport};
 
 impl<T: Transport + Clone> LauncherService<T> {
@@ -50,16 +52,11 @@ impl<T: Transport + Clone> LauncherService<T> {
         cancel: CancellationToken,
     ) -> Result<(), ServiceError> {
         let (watcher, events) = tokio::sync::broadcast::channel(1024);
-        let (launcher, java_requests) = self
-            .with_java_installer(
-                Launcher::new(self.transport.clone(), chain)
-                    .with_budget(self.connections().await)
-                    .keeping_partials(self.layout.partial_downloads())
-                    .watched_by(watcher),
-            )
-            .await;
+        let (launcher, java_requests) = LaunchSteps::launcher(self, chain).await;
+        let launcher = launcher.watched_by(watcher);
         let watch = cancel.clone();
-        let install = self.serving_java(
+        let install = serving_java(
+            self,
             java_requests,
             &watch,
             Self::install_tracked(&self.board, task, &launcher, request, updates, cancel),
@@ -80,7 +77,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         let (inner, mut seen) = mpsc::unbounded_channel();
         let forward = async {
             while let Some(update) = seen.recv().await {
-                if let LaunchUpdate::Signal(crate::launch_session::LaunchSignal::Progress {
+                if let LaunchUpdate::Signal(crate::launching::LaunchSignal::Progress {
                     done,
                     total,
                 }) = &update

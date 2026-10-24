@@ -1,7 +1,4 @@
-use std::future::Future;
 use std::path::{Path, PathBuf};
-
-use tokio::sync::mpsc;
 
 use super::LauncherService;
 use super::error::{ServiceError, read_unless_cancelled};
@@ -10,7 +7,6 @@ use crate::activity::CancellationToken;
 use crate::activity_log::{RetryAction, TaskAction, TaskCategory, TaskLabel};
 use crate::java::JavaLocator;
 use crate::java_runtime::{JavaBuild, JavaSource};
-use crate::launcher::{JavaRequest, Launcher};
 use crate::transfer::{TransferRequest, Transport};
 use lumilio_minecraft::HostProfile;
 
@@ -136,7 +132,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// install only the game version's rules apply.
     pub async fn instance_java(&self, id: &str) -> Result<InstanceJava, ServiceError> {
         let (record, directories) = {
-            let store = self.store.lock().await;
+            let store = self.instances.lock().await;
             let record = store
                 .get(id)
                 .cloned()
@@ -209,45 +205,6 @@ impl<T: Transport + Clone> LauncherService<T> {
             settings.set_disabled_java(disabled)?;
         }
         Ok(())
-    }
-
-    /// Lets `launcher` ask for a Java when none installed fits, if the
-    /// settings allow it; its requests arrive on the returned receiver, which
-    /// [`Self::serving_java`] answers.
-    pub(super) async fn with_java_installer(
-        &self,
-        launcher: Launcher<T>,
-    ) -> (Launcher<T>, mpsc::UnboundedReceiver<JavaRequest>) {
-        let (sender, receiver) = mpsc::unbounded_channel();
-        let launcher = if self.settings.lock().await.get().auto_install_java {
-            launcher.with_java_installer(sender)
-        } else {
-            launcher
-        };
-        (launcher, receiver)
-    }
-
-    /// Runs `work` (a launch or an install) while downloading the Java it
-    /// asks for, as an Activity task cancelled with it.
-    pub(super) async fn serving_java<R>(
-        &self,
-        mut requests: mpsc::UnboundedReceiver<JavaRequest>,
-        cancel: &CancellationToken,
-        work: impl Future<Output = R>,
-    ) -> R {
-        tokio::pin!(work);
-        loop {
-            tokio::select! {
-                result = &mut work => return result,
-                Some(request) = requests.recv() => {
-                    let installed = self
-                        .install_java(request.major, request.build, cancel.clone())
-                        .await
-                        .map_err(|error| error.to_string());
-                    let _ = request.reply.send(installed);
-                }
-            }
-        }
     }
 
     /// The Java majors each source offers this system, for choosing one to

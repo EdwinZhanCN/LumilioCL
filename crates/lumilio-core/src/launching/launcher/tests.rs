@@ -9,12 +9,10 @@ use super::Launcher;
 use super::progress::{GameForwarder, runtimes_root};
 use super::types::{LaunchRequest, LaunchServiceError, LaunchUpdate};
 use crate::activity::CancellationToken;
-use crate::instance::{InstanceStore, Loader, NewInstance};
+use crate::instances::{InstanceStore, Loader, NewInstance};
 use crate::java::JavaLocator;
-use crate::launch_session::{
-    LaunchFailure, LaunchPhase, LaunchSession, LaunchSignal, LaunchStatus,
-};
-use crate::process::{GameEvent, GameExit};
+use crate::launching::{GameEvent, GameExit};
+use crate::launching::{LaunchFailure, LaunchPhase, LaunchSession, LaunchSignal, LaunchStatus};
 use crate::transfer::{FileTransport, OfficialSource, SourceChain};
 use crate::tuning::LaunchTuning;
 
@@ -486,7 +484,7 @@ async fn the_games_output_stays_in_its_logs_folder() {
 #[test]
 fn an_early_exit_keeps_only_the_last_lines_and_a_running_game_none() {
     let line = |text: String| GameEvent::Line {
-        stream: crate::process::LogStream::Stderr,
+        stream: crate::launching::LogStream::Stderr,
         text,
     };
     let exit = GameEvent::Exited {

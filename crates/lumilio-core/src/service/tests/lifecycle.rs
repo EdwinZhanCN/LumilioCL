@@ -10,9 +10,9 @@ use super::{
 use crate::activity::CancellationToken;
 use crate::activity_log::{FinishedTask, TaskCategory, TaskLabel, TaskOutcome};
 use crate::deletion::Deletion;
-use crate::instance::{Loader, NewInstance, StoreError};
-use crate::launch_session::LaunchSignal;
-use crate::launcher::LaunchUpdate;
+use crate::instances::{Loader, NewInstance, StoreError};
+use crate::launching::LaunchSignal;
+use crate::launching::LaunchUpdate;
 use crate::recovery::RecoveryNote;
 
 #[tokio::test]
@@ -81,9 +81,9 @@ async fn failed_library_commit_restores_the_profile() {
     let world = world();
     publish_release(&world);
     let record = instance_with_profile(&world, "Target").await;
-    world.service.store.lock().await.set_read_only(true);
+    world.service.instances.lock().await.set_read_only(true);
     let failed = world.service.delete_instance(&record.id).await;
-    world.service.store.lock().await.set_read_only(false);
+    world.service.instances.lock().await.set_read_only(false);
     assert!(matches!(failed, Err(ServiceError::Store(_))));
     assert!(world.service.instance(&record.id).await.is_ok());
     assert_eq!(
@@ -183,7 +183,7 @@ async fn crash_after_commit_completes_and_conflicts_or_bad_journals_are_kept() {
     crashed.quarantine().unwrap();
     world
         .service
-        .store
+        .instances
         .lock()
         .await
         .remove(&committed.id)
@@ -330,7 +330,7 @@ async fn registered_instance_details_survive_rename_and_missing_profile() {
     let world = world();
     let record = world
         .service
-        .store
+        .instances
         .lock()
         .await
         .create(
@@ -346,7 +346,7 @@ async fn registered_instance_details_survive_rename_and_missing_profile() {
         .clone();
     world.service.set_favorite(&record.id, true).await.unwrap();
     {
-        let mut store = world.service.store.lock().await;
+        let mut store = world.service.instances.lock().await;
         store.create_collection("Keep").unwrap();
         store.set_membership("Keep", &record.id, true).unwrap();
     }
@@ -514,7 +514,7 @@ async fn deleting_an_instance_removes_its_profile_and_keeps_shared_files() {
         downloaded |= matches!(
             update,
             LaunchUpdate::Signal(LaunchSignal::Phase(
-                crate::launch_session::LaunchPhase::Libraries
+                crate::launching::LaunchPhase::Libraries
             ))
         );
     }

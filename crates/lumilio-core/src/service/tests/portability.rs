@@ -2,7 +2,7 @@ use super::super::error::ServiceError;
 use super::world;
 use crate::activity::CancellationToken;
 use crate::activity_log::RetryAction;
-use crate::instance::{InstanceSettings, Loader};
+use crate::instances::{InstanceSettings, Loader};
 
 #[tokio::test]
 async fn a_whole_game_is_backed_up_and_restored_as_a_new_one_with_nothing_touched() {
@@ -14,7 +14,7 @@ async fn a_whole_game_is_backed_up_and_restored_as_a_new_one_with_nothing_touche
         .unwrap();
     world
         .service
-        .store
+        .instances
         .lock()
         .await
         .update_settings(
@@ -36,7 +36,7 @@ async fn a_whole_game_is_backed_up_and_restored_as_a_new_one_with_nothing_touche
     let archive = world._dir.path().join("b.zip");
 
     {
-        let _busy = world.service.reserve_instance(&record.id).unwrap();
+        let _busy = world.service.instances.reserve(&record.id).unwrap();
         assert!(matches!(
             world
                 .service

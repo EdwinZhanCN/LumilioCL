@@ -4,7 +4,7 @@ use rusqlite::{OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 
 use super::{Binding, GameSettingsError, SettingsPreset, Values};
-use crate::instance::InstanceStore;
+use crate::instances::InstanceStore;
 
 #[derive(Deserialize, Serialize)]
 struct PresetFields {

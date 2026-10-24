@@ -11,7 +11,7 @@ use serde::Deserialize;
 
 use super::{ClientSupport, ModpackError, PackFile, PackIndex, PendingDownload, is_safe_relative};
 use crate::discover::{ResolvedFile, is_safe_file_name};
-use crate::instance::Loader;
+use crate::instances::Loader;
 
 pub const MANIFEST: &str = "manifest.json";
 const MANIFEST_LIMIT: u64 = 8 * 1024 * 1024;

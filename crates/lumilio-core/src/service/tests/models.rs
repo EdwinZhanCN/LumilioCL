@@ -4,7 +4,7 @@ use std::sync::Arc;
 use lumilio_plugin_api::{API_VERSION, Manifest, Permission, Plugin, PluginError, Words};
 
 use super::world;
-use crate::instance::Loader;
+use crate::instances::Loader;
 use crate::plugins::PluginHost;
 use crate::schematic_assets::{AssetNotice, EntityGeometry, PlannedSource, SourceRole};
 use crate::service::{LauncherService, ServiceError};

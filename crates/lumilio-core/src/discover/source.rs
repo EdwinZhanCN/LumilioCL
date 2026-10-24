@@ -21,7 +21,7 @@ use super::query::SearchQuery;
 use super::search::SearchPage;
 use super::tags::{CategoryTag, GameVersionTag, LoaderTag, ProjectSummary};
 use super::versions::{ResolvedFile, Version};
-use crate::instance::Loader;
+use crate::instances::Loader;
 use crate::plugins::{PluginContentSource, PluginHost, PluginStatus};
 
 /// What the Discover filters offer, as the source describes it.

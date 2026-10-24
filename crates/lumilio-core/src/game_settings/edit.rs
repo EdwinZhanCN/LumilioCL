@@ -6,7 +6,7 @@ use super::{
     Binding, GameSettingValue, GameSettingsError, InstanceOptions, OptionChange, OptionsFile,
     binding, catalog, document, save_binding, storage, view,
 };
-use crate::instance::InstanceStore;
+use crate::instances::InstanceStore;
 
 pub(crate) fn options(
     store: &InstanceStore,

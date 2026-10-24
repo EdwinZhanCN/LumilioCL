@@ -9,10 +9,11 @@ use crate::activity::CancellationToken;
 use crate::activity_log::TaskOutcome;
 use crate::discover::ProjectKind;
 use crate::history::{HistoryEvent, HistoryLog, SessionOutcome};
-use crate::instance::Loader;
-use crate::launch_session::{LaunchSession, LaunchSignal};
-use crate::launcher::{LaunchServiceError, LaunchUpdate};
-use crate::recovery::{RecoveryNote, SessionMarker};
+use crate::instances::Loader;
+use crate::launching::SessionMarker;
+use crate::launching::{LaunchServiceError, LaunchUpdate};
+use crate::launching::{LaunchSession, LaunchSignal};
+use crate::recovery::RecoveryNote;
 
 #[tokio::test]
 async fn pending_launch_rejects_conflicting_writes_and_drop_releases_target() {
@@ -391,7 +392,7 @@ async fn every_way_a_launch_can_end_leaves_its_own_record() {
         ]
     );
     // Nothing is left holding the instance.
-    assert!(world.service.reserve_instance(&record.id).is_ok());
+    assert!(world.service.instances.reserve(&record.id).is_ok());
 }
 
 #[tokio::test]

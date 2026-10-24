@@ -1,17 +1,17 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex as StdMutex};
 
 use tokio::sync::Mutex;
 
 use super::error::ServiceError;
-use super::support::InstanceLease;
 use super::types::DiscoverFilters;
 use super::{appearance, preferences, third_party};
 use crate::activity::CancellationToken;
 use crate::activity_log::{ActivityLog, TaskBoard};
 use crate::credentials::{CredentialStore, SystemCredentials};
-use crate::instance::{InstanceStore, Loader};
+use crate::instances::{InstanceStore, Instances, Loader};
+use crate::launching::Launching;
 use crate::layout::Layout;
 use crate::recovery;
 use crate::recovery::RecoveryNote;
@@ -45,7 +45,7 @@ pub struct LauncherService<T> {
     pub(crate) plugins: Arc<crate::plugins::PluginHost>,
     pub(super) layout: Layout,
     pub(super) transport: T,
-    pub(super) store: Mutex<InstanceStore>,
+    pub(crate) instances: Instances,
     pub(super) settings: Mutex<SettingsStore>,
     /// Published by both stores on every save (plan global-context).
     pub(super) context: crate::context::ContextHub,
@@ -56,10 +56,7 @@ pub struct LauncherService<T> {
     pub(super) cancels: StdMutex<BTreeMap<u64, CancellationToken>>,
     /// What the start-up recovery found and did.
     pub(super) startup: Vec<RecoveryNote>,
-    pub(super) operations: StdMutex<BTreeSet<String>>,
-    /// Instances whose next launch picks its Java automatically, whatever
-    /// their settings say (the person chose 本次改用 when asked).
-    pub(super) automatic_java_once: StdMutex<BTreeSet<String>>,
+    pub(super) launching: Launching,
     pub(super) log: ActivityLog,
     /// Replaces the conventional Java search locations (tests, portable setups).
     pub(super) runtime_roots: Option<Vec<PathBuf>>,
@@ -136,16 +133,15 @@ impl<T: Transport + Clone> LauncherService<T> {
             profiles: appearance::Profiles::default(),
             layout,
             transport,
-            store: Mutex::new(store),
+            instances: Instances::new(store),
             settings: Mutex::new(settings),
             context,
             board: StdMutex::new(TaskBoard::default()),
             connections: ConnectionBudget::new(TRANSFER_CONCURRENCY)
                 .map_err(|error| ServiceError::Install(error.to_string()))?,
             cancels: StdMutex::default(),
-            automatic_java_once: StdMutex::default(),
+            launching: Launching::default(),
             startup,
-            operations: StdMutex::new(BTreeSet::new()),
             log,
             runtime_roots: None,
             filters: Mutex::default(),
@@ -173,20 +169,6 @@ impl<T: Transport + Clone> LauncherService<T> {
     #[must_use]
     pub fn startup_notes(&self) -> &[RecoveryNote] {
         &self.startup
-    }
-
-    pub(super) fn reserve_instance(&self, id: &str) -> Result<InstanceLease<'_>, ServiceError> {
-        let mut targets = self
-            .operations
-            .lock()
-            .expect("launcher service state lock was poisoned");
-        if !targets.insert(id.to_owned()) {
-            return Err(ServiceError::InstanceBusy(id.to_owned()));
-        }
-        Ok(InstanceLease {
-            targets: &self.operations,
-            id: id.to_owned(),
-        })
     }
 
     /// Looks for Java only in these folders instead of the conventional

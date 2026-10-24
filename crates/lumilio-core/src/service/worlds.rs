@@ -5,7 +5,7 @@ use super::error::{ServiceError, read_unless_cancelled};
 use crate::activity::CancellationToken;
 use crate::activity_log::{TaskAction, TaskCategory, TaskLabel};
 use crate::history::ChangeKind;
-use crate::instance::InstanceRecord;
+use crate::instances::InstanceRecord;
 use crate::transfer::Transport;
 use crate::worlds;
 use crate::worlds::WorldInfo;
@@ -30,7 +30,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         folder: &str,
         new_folder: Option<&str>,
     ) -> Result<String, ServiceError> {
-        let _lease = self.reserve_instance(id)?;
+        let _lease = self.instances.reserve(id)?;
         self.instance(id).await?;
         let game_dir = self.layout.game(id);
         let (folder, requested) = (folder.to_owned(), new_folder.map(str::to_owned));
@@ -48,7 +48,7 @@ impl<T: Transport + Clone> LauncherService<T> {
 
     /// Deletes one world folder. Takes the instance lease.
     pub async fn delete_world(&self, id: &str, folder: &str) -> Result<(), ServiceError> {
-        let _lease = self.reserve_instance(id)?;
+        let _lease = self.instances.reserve(id)?;
         self.instance(id).await?;
         let game_dir = self.layout.game(id);
         let name = folder.to_owned();
@@ -67,7 +67,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         folder: &str,
         destination: &Path,
     ) -> Result<u64, ServiceError> {
-        let _lease = self.reserve_instance(id)?;
+        let _lease = self.instances.reserve(id)?;
         self.instance(id).await?;
         let game_dir = self.layout.game(id);
         let (folder, destination) = (folder.to_owned(), destination.to_owned());
@@ -88,7 +88,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         destination: &Path,
         cancel: CancellationToken,
     ) -> Result<crate::pack_export::ExportReport, ServiceError> {
-        let _lease = self.reserve_instance(id)?;
+        let _lease = self.instances.reserve(id)?;
         let record = self.instance(id).await?;
         let task = self.begin(
             TaskCategory::Install,
@@ -220,7 +220,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// Adds the world in a zip as a new world and returns its folder name;
     /// existing worlds are never replaced. Takes the instance lease.
     pub async fn import_world(&self, id: &str, archive: &Path) -> Result<String, ServiceError> {
-        let _lease = self.reserve_instance(id)?;
+        let _lease = self.instances.reserve(id)?;
         self.instance(id).await?;
         let (game_dir, archive) = (self.layout.game(id), archive.to_owned());
         let created = tokio::task::spawn_blocking(move || {

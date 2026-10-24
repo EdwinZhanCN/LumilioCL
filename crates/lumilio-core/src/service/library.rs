@@ -1,13 +1,13 @@
 use super::LauncherService;
 use super::error::ServiceError;
 use super::types::Library;
-use crate::instance::InstanceRecord;
+use crate::instances::InstanceRecord;
 use crate::settings::LauncherSettings;
 use crate::transfer::Transport;
 
 impl<T: Transport + Clone> LauncherService<T> {
     pub async fn library(&self) -> Library {
-        let store = self.store.lock().await;
+        let store = self.instances.lock().await;
         Library {
             instances: store.instances().to_vec(),
             collections: store.collections().to_vec(),
@@ -16,7 +16,7 @@ impl<T: Transport + Clone> LauncherService<T> {
 
     /// Reads the registered instance even when its profile folder is missing.
     pub async fn instance(&self, id: &str) -> Result<InstanceRecord, ServiceError> {
-        self.store
+        self.instances
             .lock()
             .await
             .get(id)
@@ -25,12 +25,12 @@ impl<T: Transport + Clone> LauncherService<T> {
     }
 
     pub async fn set_favorite(&self, id: &str, favorite: bool) -> Result<(), ServiceError> {
-        Ok(self.store.lock().await.set_favorite(id, favorite)?)
+        Ok(self.instances.lock().await.set_favorite(id, favorite)?)
     }
 
     /// Flips the favorite flag and returns the new value.
     pub async fn toggle_favorite(&self, id: &str) -> Result<bool, ServiceError> {
-        let mut store = self.store.lock().await;
+        let mut store = self.instances.lock().await;
         let favorite = !store
             .get(id)
             .ok_or_else(|| ServiceError::NoSuchInstance(id.to_owned()))?
@@ -40,16 +40,16 @@ impl<T: Transport + Clone> LauncherService<T> {
     }
 
     pub async fn create_collection(&self, name: &str) -> Result<(), ServiceError> {
-        Ok(self.store.lock().await.create_collection(name)?)
+        Ok(self.instances.lock().await.create_collection(name)?)
     }
 
     pub async fn rename_collection(&self, from: &str, to: &str) -> Result<(), ServiceError> {
-        Ok(self.store.lock().await.rename_collection(from, to)?)
+        Ok(self.instances.lock().await.rename_collection(from, to)?)
     }
 
     /// Removes the collection only; its games stay in the library.
     pub async fn delete_collection(&self, name: &str) -> Result<(), ServiceError> {
-        Ok(self.store.lock().await.delete_collection(name)?)
+        Ok(self.instances.lock().await.delete_collection(name)?)
     }
 
     /// Puts a game in exactly these collections.
@@ -59,14 +59,14 @@ impl<T: Transport + Clone> LauncherService<T> {
         collections: &[String],
     ) -> Result<(), ServiceError> {
         Ok(self
-            .store
+            .instances
             .lock()
             .await
             .set_collections_of(id, collections)?)
     }
 
     pub async fn rename(&self, id: &str, name: &str) -> Result<(), ServiceError> {
-        Ok(self.store.lock().await.rename(id, name)?)
+        Ok(self.instances.lock().await.rename(id, name)?)
     }
 
     /// The last successfully saved launcher defaults and public account settings.

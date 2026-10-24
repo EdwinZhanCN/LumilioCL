@@ -45,7 +45,7 @@ async fn default_preview_reads_only_registered_installed_clients_and_preserves_a
     );
     world
         .service
-        .store
+        .instances
         .lock()
         .await
         .mark_installed(&record.id, true)

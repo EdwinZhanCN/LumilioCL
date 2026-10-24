@@ -21,7 +21,7 @@ use serde::Deserialize;
 
 use crate::activity::CancellationToken;
 use crate::forge_meta::NEOFORGE_LEGACY_GAME;
-use crate::instance::Loader;
+use crate::instances::Loader;
 use lumilio_minecraft::HostProfile;
 use lumilio_minecraft::LibraryDependency;
 use lumilio_minecraft::PackageCoordinate;
@@ -413,7 +413,7 @@ pub async fn run_processors(
         let line = command(processor, &vars, paths.libraries, java, &host)?;
         let tool = processor.jar.to_string();
         log(format!("running {tool}"));
-        let mut child = crate::process::background_command(&line[0]);
+        let mut child = crate::launching::background_command(&line[0]);
         child
             .args(&line[1..])
             .current_dir(paths.work)

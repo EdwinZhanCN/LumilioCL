@@ -11,7 +11,7 @@ use crate::diagnostics::{Facts, Problem, diagnose};
 use crate::discover::ProjectKind;
 use crate::history::{HistoryEvent, HistoryLog, SessionOutcome};
 use crate::install::InstallationPlan;
-use crate::instance::InstanceRecord;
+use crate::instances::InstanceRecord;
 use crate::java::JavaRuntime;
 use crate::layout::Layout;
 use crate::loader::LAUNCHABLE_LOADERS;

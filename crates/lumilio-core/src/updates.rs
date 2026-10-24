@@ -11,7 +11,7 @@ use crate::content::ContentError;
 use crate::discover::{
     ContentClient, DiscoverError, FileHashes, IntentError, ProjectKind, Version, install_request,
 };
-use crate::instance::Loader;
+use crate::instances::Loader;
 use crate::transfer::{TransferEngine, TransferError, Transport};
 
 #[derive(Clone, Debug, Eq, PartialEq)]

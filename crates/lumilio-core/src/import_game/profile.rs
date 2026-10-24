@@ -22,7 +22,7 @@ use std::sync::LazyLock;
 use regex::Regex;
 use serde_json::Value;
 
-use crate::instance::Loader;
+use crate::instances::Loader;
 
 /// How deep an `inheritsFrom` chain is followed.
 const MAX_CHAIN: usize = 8;

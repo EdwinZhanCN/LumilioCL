@@ -6,7 +6,7 @@
 use std::collections::BTreeMap;
 
 use crate::diagnostics::{Problem, ProblemKind, Severity};
-use crate::instance::InstanceRecord;
+use crate::instances::InstanceRecord;
 
 /// Each diagnosed game's own problems, by id, without those that depend on
 /// the account: those are added when Home is summarized, so a change of

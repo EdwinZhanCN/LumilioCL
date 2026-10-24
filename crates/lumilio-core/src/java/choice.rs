@@ -11,7 +11,7 @@ use std::cmp::Reverse;
 use std::path::Path;
 
 use super::JavaRuntime;
-use crate::instance::{InstanceRecord, Loader};
+use crate::instances::{InstanceRecord, Loader};
 use crate::java_runtime::JavaBuild;
 use lumilio_minecraft::LaunchPlan;
 use lumilio_minecraft::{HostProfile, MachineArchitecture, PlatformFamily};

@@ -1,5 +1,5 @@
 use super::*;
-use crate::instance::{InstanceSettings, Loader, NewInstance};
+use crate::instances::{InstanceSettings, Loader, NewInstance};
 
 fn request(name: &str) -> NewInstance {
     NewInstance {

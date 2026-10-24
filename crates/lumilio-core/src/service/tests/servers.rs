@@ -1,6 +1,6 @@
 use super::super::error::ServiceError;
 use super::world;
-use crate::instance::Loader;
+use crate::instances::Loader;
 use crate::servers::{PackPolicy, ServerEntry, ServerError};
 
 fn entry(name: &str, address: &str) -> ServerEntry {
@@ -34,7 +34,7 @@ async fn servers_are_edited_under_the_lease_and_a_stale_row_is_refused() {
         .await
         .unwrap();
     {
-        let _busy = world.service.reserve_instance(id).unwrap();
+        let _busy = world.service.instances.reserve(id).unwrap();
         assert!(matches!(
             world.service.add_server(id, entry("C", "c")).await,
             Err(ServiceError::InstanceBusy(_))

@@ -3,7 +3,7 @@ use super::{
     GameSettingsError, GameSettingsView, SettingChange, SettingResolution, Snapshot, Values,
     binding, catalog, document, save_binding, storage,
 };
-use crate::instance::InstanceStore;
+use crate::instances::InstanceStore;
 
 pub(crate) fn view(
     store: &InstanceStore,

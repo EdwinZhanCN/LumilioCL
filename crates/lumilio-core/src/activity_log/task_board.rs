@@ -37,7 +37,7 @@ pub enum RetryAction {
     ChangeRuntime {
         instance: String,
         game_version: String,
-        loader: crate::instance::Loader,
+        loader: crate::instances::Loader,
         loader_version: Option<String>,
     },
     InstallContent {

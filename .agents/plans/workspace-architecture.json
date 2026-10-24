@@ -38,7 +38,7 @@
     {
       "id": "T3",
       "title": "以启动流程验证 core 的能力封装",
-      "status": "proposed",
+      "status": "in_progress",
       "acceptance": "将启动计划、执行、进程、会话和启动恢复收拢到 launching，建立明确的启动协调者；LauncherService 的相应方法只委托能力入口。启动协调者接收实例、认证、Java、安装、任务等具体依赖，不接收整个 LauncherService。一次性 Java 选择和会话生命周期有唯一所有者，实例互斥租约仍与实例写入/删除共用同一份权威状态。保留取消、缺失目录、离线启动、极短进程、启动/退出事件次数、历史写入失败、游戏设置准备与回收、日志捕获、插件事件以及 Windows background_command 契约。按 D10 在能证明行为的最低边界验证，核心测试不引入 GPUI。"
     },
     {
@@ -170,6 +170,12 @@
       "decision": "lumilio-minecraft 同时包含由元数据计算的启动计划；宿主描述保留由编译目标得出的 HostProfile::current；版本目录获取作为 core::minecraft::fetch_catalog。",
       "rationale": "ReleaseManifest::build_launch_plan 是 ReleaseManifest 的固有方法，只读取 release、显式 HostProfile 与目录路径，不做 I/O；留在 core 会迫使参数展开、库文件解析等 crate 内接口整体公开。HostProfile::current 只读取 std::env::consts 编译常量，不探测运行时系统。CatalogError 的 Fetch 变体依赖 core 的 FetchError，且原 fetch 只会返回该变体。",
       "consequences": "lumilio-minecraft 公开 LaunchContext/LaunchPlan 等启动计划类型；只为 core 的真实调用新增公开 LibraryDependency::resolve_file 与 ResolvedLibraryFile 的路径/下载访问器、native_classifiers、MachineArchitecture::matches_name 和 ReleaseManifest::jar_id，其余字段保持 crate 内可见。core 通过同一类型 re-export 保留 lumilio_core:: 路径；VersionCatalog::fetch 改为 lumilio_core::fetch_catalog 并返回 FetchError，CatalogError 只剩 Decode。运行时宿主探测（Java 位置、内存）继续在 core。"
+    },
+    {
+      "id": "D13",
+      "decision": "launching 先以 Launching 状态和 LaunchSteps 窄接口建立协调者；启动请求准备、Java 安装和游戏设置在 T4 抽出对应能力后改由具体依赖提供。",
+      "rationale": "启动流程依赖的认证会话、Java 发现/安装、游戏设置和来源链在 T3 时仍是 LauncherService 的方法。若在 T3 同时抽出这些能力，就会把 T4 的大部分迁移并入一次提交；若让协调者直接接收 LauncherService，则违反 D3。",
+      "consequences": "launching/ 收拢 launcher、process、session、readiness、会话标记与协调者；Launching 是一次性自动 Java 选择的唯一所有者。协调者直接接收 Instances、ContextHub、Layout 与 PluginHost，其他能力只经 LaunchSteps 的五个操作（request、launcher、install_java、apply/capture_game_settings）进入。实例租约由新的 instances::Instances 与写入/删除共用。安装也通过同一 launcher/serving_java。T3 保持 in_progress，直到 T4 让 LaunchSteps 的实现改由 accounts/java/game_settings/网络能力提供。"
     }
   ],
   "references": [

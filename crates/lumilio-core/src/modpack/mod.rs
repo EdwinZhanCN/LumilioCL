@@ -23,7 +23,7 @@ pub use pack_index::{
 #[cfg(test)]
 use crate::activity::CancellationToken;
 #[cfg(test)]
-use crate::instance::{InstanceStore, Loader};
+use crate::instances::{InstanceStore, Loader};
 #[cfg(test)]
 use crate::transfer::{SourceChain, TransferEngine};
 

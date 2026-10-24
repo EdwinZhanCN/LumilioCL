@@ -6,7 +6,7 @@ use tokio::net::TcpStream;
 
 use super::super::error::ServiceError;
 use super::{ECHO_ARGS, World, fake_java, publish_identity_release, world};
-use crate::instance::Loader;
+use crate::instances::Loader;
 use crate::skin::{SkinChoice, SkinError, SkinModel};
 
 fn picture(color: [u8; 4]) -> Vec<u8> {
@@ -324,7 +324,7 @@ async fn a_launch_loads_the_agent_for_a_skinned_player_and_tells_a_missing_skin_
     assert!(args.contains("--username Steve"), "{args}");
     let mut told = false;
     while let Ok(update) = rx.try_recv() {
-        if let crate::launcher::LaunchUpdate::Log { text, .. } = update
+        if let crate::launching::LaunchUpdate::Log { text, .. } = update
             && text.contains("the skin was not loaded")
         {
             told = true;

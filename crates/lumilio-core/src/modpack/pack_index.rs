@@ -8,7 +8,7 @@ use std::{fmt, fs, io};
 use serde::{Deserialize, Serialize};
 
 use crate::activity::CancellationToken;
-use crate::instance::{
+use crate::instances::{
     InstanceRecord, InstanceSettings, InstanceStore, Loader, NewInstance, StoreError,
 };
 use crate::layout::Layout;

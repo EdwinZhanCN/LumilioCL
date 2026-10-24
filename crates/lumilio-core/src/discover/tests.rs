@@ -10,7 +10,7 @@ use super::search::{Environment, SideSupport, environment};
 use super::versions::{
     Dependency, DependencyKind, ReleaseChannel, Version, VersionFile, pick_version,
 };
-use crate::instance::Loader;
+use crate::instances::Loader;
 
 const SHA1: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 

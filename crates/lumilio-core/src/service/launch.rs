@@ -1,17 +1,14 @@
-use lumilio_plugin_api::{LaunchEvent, LaunchOutcome, LaunchTarget};
 use tokio::sync::mpsc;
 
 use super::LauncherService;
 use super::error::ServiceError;
-use super::types::now;
 use crate::activity::CancellationToken;
-use crate::context::SessionPhase;
-use crate::history::{SessionOutcome, finish_session, record_attempt};
-use crate::instance::{InstanceRecord, StoreError};
-use crate::launcher::{LaunchRequest, LaunchServiceError, LaunchUpdate, Launcher};
+use crate::instances::{InstanceRecord, StoreError};
+use crate::java::JavaRuntime;
+use crate::launching::{
+    GameExit, JavaRequest, LaunchParts, LaunchRequest, LaunchSteps, LaunchUpdate, Launcher,
+};
 use crate::loader;
-use crate::process::GameExit;
-use crate::recovery::SessionMarker;
 use crate::settings::validate_memory;
 use crate::transfer::{SourceChain, Transport};
 use crate::tuning::QuickPlay;
@@ -26,7 +23,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         cancel: &CancellationToken,
     ) -> Result<(LaunchRequest, SourceChain), ServiceError> {
         let (record, directories) = {
-            let store = self.store.lock().await;
+            let store = self.instances.lock().await;
             let record = store
                 .get(id)
                 .cloned()
@@ -114,10 +111,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// Lets the next launch of `id` pick its Java automatically, once,
     /// whatever its settings say. Any launch of it uses this up.
     pub fn launch_next_with_automatic_java(&self, id: &str) {
-        self.automatic_java_once
-            .lock()
-            .expect("launch service state lock was poisoned")
-            .insert(id.to_owned());
+        self.launching.automatic_java_once(id);
     }
 
     /// Prepares and starts an instance, recording the session afterwards.
@@ -168,196 +162,68 @@ impl<T: Transport + Clone> LauncherService<T> {
             .await
     }
 
-    pub(super) async fn launch_with(
+    async fn launch_with(
         &self,
         id: &str,
         quick_play: Option<Option<QuickPlay>>,
         updates: mpsc::UnboundedSender<LaunchUpdate>,
         cancel: CancellationToken,
     ) -> Result<GameExit, ServiceError> {
-        let _lease = self.reserve_instance(id)?;
-        let started = now();
-        let automatic_java = self
-            .automatic_java_once
-            .lock()
-            .expect("launch service state lock was poisoned")
-            .remove(id);
-        if self.store.lock().await.get(id).is_none() {
-            return Err(ServiceError::NoSuchInstance(id.to_owned()));
-        }
-        let session = Published::begin(&self.context, id);
-        let result = async {
-            // A folder moved or deleted outside the launcher is not quietly
-            // replaced by an empty one (plan game-folder-missing).
-            let game = self.layout.game(id);
-            if !game.is_dir() {
-                let error = ServiceError::GameFolderMissing(game);
-                return Err(self.note_attempt(id, started, error));
-            }
-            // Dropped on every way out; only the launcher dying leaves it behind.
-            let _marker = SessionMarker::place(&self.layout, id, started)?;
-            let prepared = self.launch_request(id, quick_play, &cancel).await;
-            let (mut request, chain) = match prepared {
-                Ok(prepared) => prepared,
-                Err(error) => return Err(self.note_attempt(id, started, error)),
-            };
-            if automatic_java {
-                request.instance.settings.java_path = None;
-            }
-            let event = LaunchEvent::Started {
-                instance_name: request.instance.name.clone(),
-                game_version: request.instance.game_version.clone(),
-                loader: format!("{:?}", request.instance.loader),
-                target: request.quick_play.as_ref().map(|target| match target {
-                    QuickPlay::World(name) => LaunchTarget::World(name.clone()),
-                    QuickPlay::Server(address) => LaunchTarget::Server(address.clone()),
-                }),
-            };
-            let events = self.plugins.launch_events();
-            let (spawned, mut spawned_rx) = mpsc::unbounded_channel();
-            let (before_start, mut preparation_rx) =
-                mpsc::unbounded_channel::<tokio::sync::oneshot::Sender<Result<(), String>>>();
-            let (launcher, java_requests) = self
-                .with_java_installer(
-                    Launcher::new(self.transport.clone(), chain)
-                        .with_budget(self.connections().await)
-                        .keeping_partials(self.layout.partial_downloads())
-                        .with_spawned(spawned)
-                        .with_before_start(before_start),
-                )
-                .await;
-            let launch = self.serving_java(
-                java_requests,
-                &cancel,
-                launcher.launch(request, updates.clone(), cancel.clone()),
-            );
-            tokio::pin!(launch);
-            let mut announced = false;
-            let mut settings_prepared = false;
-            let result = loop {
-                tokio::select! {
-                    biased;
-                    Some(reply) = preparation_rx.recv() => {
-                        let result = self.apply_game_settings(id).await.map_err(|e| e.to_string());
-                        settings_prepared = result.is_ok();
-                        let _ = reply.send(result);
-                    }
-                    Some(()) = spawned_rx.recv(), if !announced => {
-                        announced = true;
-                        session.playing();
-                        let _ = events.send(event.clone());
-                    }
-                    result = &mut launch => break result,
-                }
-            };
-            // A short-lived process can finish in the same poll as its spawn.
-            if !announced && spawned_rx.try_recv().is_ok() {
-                announced = true;
-                session.playing();
-                let _ = events.send(event);
-            }
-            // Capturing changes is separate from the game's result and history. Failure is
-            // retained on the binding for review instead of turning a clean exit into a crash.
-            if settings_prepared && let Err(error) = self.capture_game_settings(id).await {
-                let _ = updates.send(LaunchUpdate::Log {
-                    stream: crate::process::LogStream::Stderr,
-                    text: format!("game settings review: {error}"),
-                });
-            }
-            let exit = match result {
-                Ok(exit) => exit,
-                Err(error) => {
-                    if announced {
-                        let _ = events.send(LaunchEvent::Exited {
-                            outcome: LaunchOutcome::Crashed,
-                            played_seconds: 0,
-                        });
-                    }
-                    return Err(self.note_attempt(id, started, error.into()));
-                }
-            };
-            // Queue exit even if history persistence fails: presence must not leak.
-            let outcome = match SessionOutcome::of(&exit) {
-                SessionOutcome::Clean => LaunchOutcome::Clean,
-                SessionOutcome::Stopped => LaunchOutcome::Stopped,
-                SessionOutcome::FailedToStart => LaunchOutcome::FailedToStart,
-                _ => LaunchOutcome::Crashed,
-            };
-            let _ = events.send(LaunchEvent::Exited {
-                outcome,
-                played_seconds: exit.ran_for.as_secs(),
-            });
-            let mut store = self.store.lock().await;
-            store.mark_installed(id, true)?;
-            finish_session(&mut store, id, started, &exit)?;
-            Ok::<_, ServiceError>(exit)
-        }
-        .await;
-        session.end(match &result {
-            Ok(exit) => matches!(
-                SessionOutcome::of(exit),
-                SessionOutcome::Clean | SessionOutcome::Stopped
-            ),
-            Err(error) => matches!(
-                error,
-                ServiceError::Cancelled | ServiceError::Launch(LaunchServiceError::Cancelled)
-            ),
-        });
-        result
-    }
-
-    /// Writes a launch that never produced a process to the instance history,
-    /// then hands the error back. An unknown instance has no history to write.
-    pub(super) fn note_attempt(&self, id: &str, started: u64, error: ServiceError) -> ServiceError {
-        let outcome = match &error {
-            ServiceError::NoSuchInstance(_) => return error,
-            ServiceError::Cancelled | ServiceError::Launch(LaunchServiceError::Cancelled) => {
-                SessionOutcome::Cancelled
-            }
-            _ => SessionOutcome::FailedToPrepare,
+        let parts = LaunchParts {
+            instances: &self.instances,
+            context: &self.context,
+            layout: &self.layout,
+            plugins: &self.plugins,
         };
-        // History is a record, not part of the result: a write failure must
-        // not replace the error the user needs to see.
-        let _ = record_attempt(self.layout.root(), id, started, outcome);
-        error
+        self.launching
+            .launch(parts, self, id, quick_play, updates, cancel)
+            .await
     }
 }
 
-/// The session of one launch, published as it goes (plan global-context,
-/// T6). A launch that is dropped half way publishes that it ended.
-struct Published<'a> {
-    hub: &'a crate::context::ContextHub,
-    id: &'a str,
-    ended: bool,
-}
+impl<T: Transport + Clone> LaunchSteps for LauncherService<T> {
+    type Transport = T;
 
-impl<'a> Published<'a> {
-    fn begin(hub: &'a crate::context::ContextHub, id: &'a str) -> Self {
-        hub.session(id, Some(SessionPhase::Preparing));
-        Self {
-            hub,
-            id,
-            ended: false,
-        }
+    async fn request(
+        &self,
+        id: &str,
+        quick_play: Option<Option<QuickPlay>>,
+        cancel: &CancellationToken,
+    ) -> Result<(LaunchRequest, SourceChain), ServiceError> {
+        self.launch_request(id, quick_play, cancel).await
     }
 
-    fn playing(&self) {
-        self.hub.session(self.id, Some(SessionPhase::Playing));
+    async fn launcher(
+        &self,
+        chain: SourceChain,
+    ) -> (Launcher<T>, mpsc::UnboundedReceiver<JavaRequest>) {
+        let launcher = Launcher::new(self.transport.clone(), chain)
+            .with_budget(self.connections().await)
+            .keeping_partials(self.layout.partial_downloads());
+        let (sender, receiver) = mpsc::unbounded_channel();
+        let launcher = if self.settings.lock().await.get().auto_install_java {
+            launcher.with_java_installer(sender)
+        } else {
+            launcher
+        };
+        (launcher, receiver)
     }
 
-    /// A clean end or a stop leaves no session; anything else stays as the
-    /// failure Home offers to recover from.
-    fn end(mut self, clean: bool) {
-        self.ended = true;
-        let phase = (!clean).then_some(SessionPhase::Failed);
-        self.hub.session(self.id, phase);
+    async fn install_java(
+        &self,
+        request: &JavaRequest,
+        cancel: &CancellationToken,
+    ) -> Result<JavaRuntime, String> {
+        LauncherService::install_java(self, request.major, request.build, cancel.clone())
+            .await
+            .map_err(|error| error.to_string())
     }
-}
 
-impl Drop for Published<'_> {
-    fn drop(&mut self) {
-        if !self.ended {
-            self.hub.session(self.id, None);
-        }
+    async fn apply_game_settings(&self, id: &str) -> Result<(), ServiceError> {
+        LauncherService::apply_game_settings(self, id).await
+    }
+
+    async fn capture_game_settings(&self, id: &str) -> Result<(), ServiceError> {
+        LauncherService::capture_game_settings(self, id).await
     }
 }

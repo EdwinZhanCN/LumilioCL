@@ -9,7 +9,7 @@ use std::time::SystemTime;
 
 use super::order::{arrange, read_order};
 use super::{InstalledClient, InstanceAssets, read_added};
-use crate::instance::InstanceRecord;
+use crate::instances::InstanceRecord;
 use crate::layout::Layout;
 use lumilio_minecraft::ReleaseManifest;
 

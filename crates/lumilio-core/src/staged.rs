@@ -8,7 +8,7 @@
 use std::path::{Path, PathBuf};
 use std::{fs, io};
 
-use crate::instance::{InstanceStore, StoreError};
+use crate::instances::{InstanceStore, StoreError};
 use crate::layout::Layout;
 use crate::recovery::RecoveryNote;
 

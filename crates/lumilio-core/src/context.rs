@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use tokio::sync::watch;
 
-use crate::instance::InstanceRecord;
+use crate::instances::InstanceRecord;
 use crate::settings::LauncherSettings;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]

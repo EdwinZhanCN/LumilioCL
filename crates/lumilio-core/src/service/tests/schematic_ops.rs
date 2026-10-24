@@ -3,7 +3,7 @@ use std::sync::Arc;
 use lumilio_plugin_api::{API_VERSION, Manifest, Permission, Plugin, PluginError, Words};
 
 use super::Scripted;
-use crate::instance::Loader;
+use crate::instances::Loader;
 use crate::schematic_ops::RESTORE;
 use crate::{LauncherService, SchematicOperation, ServiceError};
 
@@ -83,7 +83,7 @@ async fn a_running_game_keeps_every_schematic_write_out() {
     assert!(service.schematic_can_write(instance));
     {
         // A running game holds this same lease.
-        let _running = service.reserve_instance(instance).unwrap();
+        let _running = service.instances.reserve(instance).unwrap();
         assert!(!service.schematic_can_write(instance));
         let refused = service
             .schematic_apply(
@@ -227,7 +227,7 @@ async fn removing_is_a_logged_move_refused_while_the_game_runs() {
         summary: String::new(),
     };
     {
-        let _running = service.reserve_instance(instance).unwrap();
+        let _running = service.instances.reserve(instance).unwrap();
         let refused = service
             .schematic_remove(
                 instance,

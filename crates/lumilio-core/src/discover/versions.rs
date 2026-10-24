@@ -1,5 +1,5 @@
 use super::kinds::{ProjectKind, TextFormat, loader_tag};
-use crate::instance::Loader;
+use crate::instances::Loader;
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum ReleaseChannel {

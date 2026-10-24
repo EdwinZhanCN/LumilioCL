@@ -17,7 +17,7 @@ use serde_json::json;
 use sha2::{Digest, Sha512};
 
 use crate::discover::Version;
-use crate::instance::Loader;
+use crate::instances::Loader;
 use crate::modpack::{is_safe_relative, is_trusted_source};
 
 const INDEX: &str = "modrinth.index.json";

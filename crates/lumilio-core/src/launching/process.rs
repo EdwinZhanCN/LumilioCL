@@ -16,7 +16,7 @@ use tokio::process::Command;
 use tokio::sync::mpsc;
 
 use crate::activity::CancellationToken;
-use crate::launch_session::{LaunchFailure, LaunchSignal};
+use crate::launching::{LaunchFailure, LaunchSignal};
 use crate::tuning::{LaunchTuning, split_words};
 use lumilio_minecraft::LaunchPlan;
 

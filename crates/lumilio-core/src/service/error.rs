@@ -7,8 +7,8 @@ use std::path::PathBuf;
 use crate::activity::CancellationToken;
 use crate::content::ContentError;
 use crate::injector::InjectorError;
-use crate::instance::StoreError;
-use crate::launcher::LaunchServiceError;
+use crate::instances::{InstanceBusy, StoreError};
+use crate::launching::LaunchServiceError;
 use crate::microsoft::AuthError;
 use crate::modpack;
 use crate::screenshots::ScreenshotError;
@@ -229,6 +229,12 @@ impl From<PingError> for ServiceError {
 impl From<ContentError> for ServiceError {
     fn from(error: ContentError) -> Self {
         Self::Content(error)
+    }
+}
+
+impl From<InstanceBusy> for ServiceError {
+    fn from(InstanceBusy(id): InstanceBusy) -> Self {
+        Self::InstanceBusy(id)
     }
 }
 

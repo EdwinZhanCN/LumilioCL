@@ -11,9 +11,9 @@ use crate::activity_log::TaskOutcome;
 use crate::content::ContentError;
 use crate::discover::ProjectKind;
 use crate::history::{ChangeKind, HistoryLog};
-use crate::instance::{Loader, NewInstance};
-use crate::launch_session::LaunchSignal;
-use crate::launcher::LaunchUpdate;
+use crate::instances::{Loader, NewInstance};
+use crate::launching::LaunchSignal;
+use crate::launching::LaunchUpdate;
 
 #[tokio::test]
 async fn switching_versions_replaces_the_file_keeps_it_disabled_and_never_clobbers() {
@@ -347,7 +347,7 @@ async fn installed_content_lands_in_the_profile_and_is_logged() {
     let world = world();
     let record = world
         .service
-        .store
+        .instances
         .lock()
         .await
         .create(
@@ -399,7 +399,7 @@ async fn content_for_another_game_version_is_refused_and_the_failure_is_logged()
     let world = world();
     let record = world
         .service
-        .store
+        .instances
         .lock()
         .await
         .create(

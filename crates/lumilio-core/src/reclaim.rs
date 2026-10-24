@@ -15,7 +15,7 @@ use std::{fmt, fs, io};
 
 use serde_json::Value;
 
-use crate::instance::{InstanceRecord, Loader};
+use crate::instances::{InstanceRecord, Loader};
 use crate::layout::Layout;
 
 #[derive(Debug)]

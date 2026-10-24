@@ -1,5 +1,5 @@
 use super::*;
-use crate::instance::InstanceSettings;
+use crate::instances::InstanceSettings;
 
 #[test]
 fn levels_come_from_the_bracket_groups_and_continuations_inherit() {

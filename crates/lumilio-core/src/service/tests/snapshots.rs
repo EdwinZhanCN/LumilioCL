@@ -1,7 +1,7 @@
 use super::super::error::ServiceError;
 use super::{change_subjects, operation_dirs, reopen, world};
 use crate::history::ChangeKind;
-use crate::instance::Loader;
+use crate::instances::Loader;
 use crate::recovery::RecoveryNote;
 use crate::snapshots::{SnapshotError, SnapshotScope};
 
@@ -44,7 +44,7 @@ async fn snapshots_back_up_restore_and_undo_a_failed_restore_under_the_lease() {
 
     // Busy instance: writes refused, listing still works.
     {
-        let _busy = world.service.reserve_instance(&record.id).unwrap();
+        let _busy = world.service.instances.reserve(&record.id).unwrap();
         assert!(matches!(
             world.service.restore_snapshot(&record.id, &snapshot).await,
             Err(ServiceError::InstanceBusy(_))

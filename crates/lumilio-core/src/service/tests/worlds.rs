@@ -1,7 +1,7 @@
 use super::super::error::ServiceError;
 use super::{change_subjects, world};
 use crate::history::ChangeKind;
-use crate::instance::Loader;
+use crate::instances::Loader;
 use crate::worlds::WorldError;
 
 #[tokio::test]
@@ -23,7 +23,7 @@ async fn worlds_are_copied_and_deleted_under_the_lease_and_recorded() {
 
     // While the instance is busy, writes are refused and reads still work.
     {
-        let _busy = world.service.reserve_instance(&record.id).unwrap();
+        let _busy = world.service.instances.reserve(&record.id).unwrap();
         assert!(matches!(
             world.service.copy_world(&record.id, "w", None).await,
             Err(ServiceError::InstanceBusy(_))
@@ -101,7 +101,7 @@ async fn a_world_is_exported_and_imported_under_the_lease_and_the_import_is_reco
     let archive = world._dir.path().join("w.zip");
 
     {
-        let _busy = world.service.reserve_instance(&record.id).unwrap();
+        let _busy = world.service.instances.reserve(&record.id).unwrap();
         assert!(matches!(
             world.service.export_world(&record.id, "w", &archive).await,
             Err(ServiceError::InstanceBusy(_))

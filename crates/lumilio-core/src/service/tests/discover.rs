@@ -2,7 +2,7 @@ use super::super::error::ServiceError;
 use super::{fabric_instance, mod_version, project_versions, sha1_hex, two_versions, world};
 use crate::activity::CancellationToken;
 use crate::discover::ProjectKind;
-use crate::instance::Loader;
+use crate::instances::Loader;
 
 #[tokio::test]
 async fn a_version_can_be_saved_where_the_person_chooses_and_can_be_retried() {

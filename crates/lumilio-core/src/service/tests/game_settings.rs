@@ -240,7 +240,7 @@ async fn launcher_edits_check_values_and_wait_for_the_game_to_close() {
 
     let options = world.service.game_options(&record.id).await.unwrap();
     assert_eq!(options.values["fov"], GameSettingValue::Integer(90));
-    let busy = world.service.reserve_instance(&record.id).unwrap();
+    let busy = world.service.instances.reserve(&record.id).unwrap();
     assert!(
         world
             .service

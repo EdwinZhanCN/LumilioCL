@@ -2,7 +2,7 @@ use super::super::error::ServiceError;
 use super::{fake_java, launch_to_end, publish_java, publish_release, world};
 use crate::activity::CancellationToken;
 use crate::activity_log::{RetryAction, TaskOutcome};
-use crate::instance::Loader;
+use crate::instances::Loader;
 use crate::java_runtime::JavaBuild;
 
 #[tokio::test]
@@ -247,7 +247,7 @@ async fn a_launch_without_a_fitting_java_downloads_one_unless_turned_off() {
     assert!(
         matches!(
             error,
-            ServiceError::Launch(crate::launcher::LaunchServiceError::NoJava {
+            ServiceError::Launch(crate::launching::LaunchServiceError::NoJava {
                 required: Some(21)
             })
         ),

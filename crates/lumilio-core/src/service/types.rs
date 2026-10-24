@@ -6,7 +6,7 @@ use crate::content::ContentError;
 use crate::discover::{
     Catalog, CategoryTag, GameVersionTag, KindAbilities, LoaderTag, Project, Version,
 };
-use crate::instance::{Collection, InstanceRecord};
+use crate::instances::{Collection, InstanceRecord};
 
 /// What the library page shows.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]

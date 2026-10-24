@@ -24,12 +24,10 @@ mod import_game;
 mod injector;
 mod inspect;
 mod install;
-mod instance;
+mod instances;
 mod java;
 mod java_runtime;
-mod launch_readiness;
-mod launch_session;
-mod launcher;
+mod launching;
 mod layout;
 mod loader;
 mod microsoft;
@@ -89,7 +87,7 @@ pub use install::{
     InstallEvent, InstallReport, InstallStage, InstallationPlan, Installer, NativeBundle,
     NativeError, NativePublication, NativePublisher, PlannedArtifact,
 };
-pub use instance::{
+pub use instances::{
     Collection, InstanceRecord, InstanceSettings, InstanceStore, Loader, NewInstance, StoreError,
 };
 pub use java::{
@@ -98,12 +96,11 @@ pub use java::{
 };
 pub use java_runtime::graalvm::LICENSE_URL as GRAALVM_LICENSE_URL;
 pub use java_runtime::{JavaBuild, JavaSource};
-pub use launch_readiness::{LaunchReadiness, LaunchRequirement};
-pub use launch_session::{
-    LaunchFailure, LaunchPhase, LaunchProblem, LaunchSession, LaunchSignal, LaunchStatus,
-};
-pub use launcher::{
-    GAME_OUTPUT_LOG, LaunchRequest, LaunchServiceError, LaunchUpdate, Launcher, runtimes_root,
+pub use launching::{
+    DEFAULT_SETTLE, GAME_OUTPUT_LOG, GameEvent, GameExit, GameOptions, LaunchFailure, LaunchPhase,
+    LaunchProblem, LaunchReadiness, LaunchRequest, LaunchRequirement, LaunchServiceError,
+    LaunchSession, LaunchSignal, LaunchStatus, LaunchUpdate, Launcher, LogStream, ProcessError,
+    command_line as game_command_line, run as run_game, runtimes_root,
 };
 pub use layout::Layout;
 pub use loader::{
@@ -143,10 +140,6 @@ pub use plugins::write::CONFLICT as WRITE_CONFLICT;
 pub use plugins::{
     MapFailure, MapProviders, PluginContentSource, PluginEffect, PluginFinding, PluginHost,
     PluginInfo, PluginStatus, PluginTab,
-};
-pub use process::{
-    DEFAULT_SETTLE, GameEvent, GameExit, GameOptions, LogStream, ProcessError,
-    command_line as game_command_line, run as run_game,
 };
 pub use reclaim::{KeptReason, ReclaimError, Reclaimable};
 pub use recovery::RecoveryNote;
@@ -219,7 +212,6 @@ mod pack_export;
 mod persist;
 mod picture;
 mod plugins;
-mod process;
 mod reclaim;
 mod recovery;
 mod repair;

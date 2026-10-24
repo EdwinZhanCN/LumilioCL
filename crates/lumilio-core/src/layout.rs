@@ -19,7 +19,7 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::instance::InstanceRecord;
+use crate::instances::InstanceRecord;
 use lumilio_minecraft::LaunchDirectories;
 
 #[derive(Clone, Debug)]

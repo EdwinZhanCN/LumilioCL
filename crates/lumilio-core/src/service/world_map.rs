@@ -296,7 +296,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// Whether an edit could start now: no game running on the instance and
     /// no other operation holding it.
     pub fn map_can_edit(&self, instance: &str) -> bool {
-        self.reserve_instance(instance).is_ok()
+        self.instances.reserve(instance).is_ok()
     }
     /// Applies a confirmed edit to the instance's files. The instance is held
     /// for the duration, which is how a running game (it holds the same
@@ -310,7 +310,8 @@ impl<T: Transport + Clone> LauncherService<T> {
     ) -> Result<(), MapFailure> {
         self.instance(instance).await.map_err(|_| MapFailure::Off)?;
         let _lease = self
-            .reserve_instance(instance)
+            .instances
+            .reserve(instance)
             .map_err(|_| MapFailure::Failed("map-edit-running".into()))?;
         self.plugins
             .map_apply(

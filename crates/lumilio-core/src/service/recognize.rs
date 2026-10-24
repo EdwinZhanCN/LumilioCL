@@ -10,7 +10,7 @@ use super::error::ServiceError;
 use crate::content::{ContentItem, scan as scan_content};
 use crate::content_sources::{Recognized, Summaries};
 use crate::discover::{ContentClient, FileHashes, ProjectKind, Version};
-use crate::instance::InstanceRecord;
+use crate::instances::InstanceRecord;
 use crate::transfer::Transport;
 
 /// One installed file: what the list shows, where it is, and its SHA-1

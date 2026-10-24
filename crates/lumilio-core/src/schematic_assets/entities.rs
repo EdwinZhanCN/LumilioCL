@@ -11,7 +11,7 @@ use std::time::Duration;
 use lumilio_block_assets::{dumper_arguments, dumper_failure, read_dump};
 
 use super::SchematicAssetsError;
-use crate::process::background_command;
+use crate::launching::background_command;
 
 /// A dump that runs longer is stopped: the 26.3 dump takes seconds.
 const DUMP_TIME_LIMIT: Duration = Duration::from_secs(180);

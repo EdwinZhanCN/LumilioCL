@@ -10,7 +10,7 @@ use super::{
 };
 use crate::activity::CancellationToken;
 use crate::credentials::StoredLogin;
-use crate::instance::Loader;
+use crate::instances::Loader;
 use crate::microsoft::{AuthError, DeviceCode};
 use crate::settings::AccountKind;
 

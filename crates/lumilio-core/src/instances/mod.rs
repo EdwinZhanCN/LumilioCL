@@ -9,6 +9,7 @@ use std::fs;
 #[cfg(test)]
 use std::path::PathBuf;
 
+pub(crate) use access::{InstanceBusy, Instances};
 pub use instance_store::{
     Collection, InstanceRecord, InstanceSettings, InstanceStore, Loader, NewInstance, StoreError,
 };
@@ -23,6 +24,8 @@ use crate::tuning::InstanceLaunch;
 
 #[cfg(test)]
 mod tests;
+
+mod access;
 
 mod database;
 

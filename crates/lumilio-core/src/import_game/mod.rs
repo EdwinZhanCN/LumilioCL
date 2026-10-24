@@ -16,7 +16,7 @@ pub(crate) use detection::copy_game_files;
 pub use detection::{FoundGame, GameOrigin, ImportError, detect};
 
 #[cfg(test)]
-use crate::instance::Loader;
+use crate::instances::Loader;
 
 #[cfg(test)]
 mod tests;

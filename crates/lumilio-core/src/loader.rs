@@ -8,7 +8,7 @@ use serde::Deserialize;
 use url::Url;
 
 use crate::fetch::{FetchError, fetch_decoded};
-use crate::instance::Loader;
+use crate::instances::Loader;
 use crate::transfer::{TransferEngine, Transport};
 
 /// Loaders the launcher can install and start.

@@ -7,7 +7,7 @@ use super::error::ServiceError;
 use super::types::{ActivityView, Traffic};
 use crate::activity::CancellationToken;
 use crate::activity_log::RetryAction;
-use crate::launcher::LaunchUpdate;
+use crate::launching::LaunchUpdate;
 use crate::transfer::{SourceChain, Transport};
 
 impl<T: Transport + Clone> LauncherService<T> {

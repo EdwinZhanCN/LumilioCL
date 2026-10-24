@@ -13,7 +13,7 @@ use std::{fs, io};
 
 use serde::{Deserialize, Serialize};
 
-use crate::instance::{InstanceRecord, InstanceStore};
+use crate::instances::{InstanceRecord, InstanceStore};
 use crate::layout::Layout;
 use crate::recovery::RecoveryNote;
 

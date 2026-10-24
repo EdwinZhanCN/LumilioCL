@@ -3,7 +3,7 @@
 
 use super::{reopen, world};
 use crate::context::Revisions;
-use crate::instance::Loader;
+use crate::instances::Loader;
 
 fn revisions(world: &super::World) -> Revisions {
     world.service.context().revisions

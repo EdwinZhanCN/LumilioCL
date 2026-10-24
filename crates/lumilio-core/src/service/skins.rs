@@ -79,7 +79,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         if look.skin.is_none() {
             let id = entry.profile_id().map_err(SettingsError::Profile)?;
             let mut installed: Vec<_> = self
-                .store
+                .instances
                 .lock()
                 .await
                 .instances()

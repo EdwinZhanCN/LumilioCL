@@ -15,7 +15,7 @@ use std::{fmt, fs, io};
 use serde::{Deserialize, Serialize};
 
 use crate::activity::CancellationToken;
-use crate::instance::{InstanceSettings, Loader};
+use crate::instances::{InstanceSettings, Loader};
 use crate::modpack::is_safe_relative;
 
 const META: &str = "lumilio-backup.json";

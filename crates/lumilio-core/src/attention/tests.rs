@@ -1,6 +1,6 @@
 use super::*;
 use crate::diagnostics::ProblemKind;
-use crate::instance::{InstanceSettings, Loader};
+use crate::instances::{InstanceSettings, Loader};
 
 fn record(id: &str, last_played: Option<u64>) -> InstanceRecord {
     InstanceRecord {

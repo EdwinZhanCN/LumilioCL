@@ -5,8 +5,8 @@ use super::{LauncherService, loader_text};
 use crate::activity::CancellationToken;
 use crate::activity_log::{RetryAction, TaskAction, TaskCategory, TaskLabel};
 use crate::history::ChangeKind;
-use crate::instance::{InstanceRecord, Loader, StoreError};
-use crate::launcher::{LaunchServiceError, LaunchUpdate};
+use crate::instances::{InstanceRecord, Loader, StoreError};
+use crate::launching::{LaunchServiceError, LaunchUpdate};
 use crate::loader::LAUNCHABLE_LOADERS;
 use crate::transfer::Transport;
 
@@ -20,7 +20,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         updates: mpsc::UnboundedSender<LaunchUpdate>,
         cancel: CancellationToken,
     ) -> Result<(), ServiceError> {
-        let _lease = self.reserve_instance(id)?;
+        let _lease = self.instances.reserve(id)?;
         let (request, chain) = self.launch_request(id, Some(None), &cancel).await?;
         let task = self
             .begin(
@@ -40,7 +40,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             .await;
         if result.is_ok() {
             result = self
-                .store
+                .instances
                 .lock()
                 .await
                 .mark_installed(id, true)
@@ -61,7 +61,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         updates: mpsc::UnboundedSender<LaunchUpdate>,
         cancel: CancellationToken,
     ) -> Result<(), ServiceError> {
-        let _lease = self.reserve_instance(id)?;
+        let _lease = self.instances.reserve(id)?;
         let (request, chain) = self.launch_request(id, Some(None), &cancel).await?;
         let task = self
             .begin(
@@ -81,7 +81,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             .await;
         if result.is_ok() {
             result = self
-                .store
+                .instances
                 .lock()
                 .await
                 .mark_installed(id, true)
@@ -115,7 +115,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         updates: mpsc::UnboundedSender<LaunchUpdate>,
         cancel: CancellationToken,
     ) -> Result<InstanceRecord, ServiceError> {
-        let _lease = self.reserve_instance(id)?;
+        let _lease = self.instances.reserve(id)?;
         if !LAUNCHABLE_LOADERS.contains(&loader) {
             return Err(ServiceError::Launch(LaunchServiceError::LoaderUnsupported(
                 loader,
@@ -178,7 +178,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             .await;
         if result.is_ok() {
             result = self
-                .store
+                .instances
                 .lock()
                 .await
                 .set_runtime(id, game_version, loader, loader_version.as_deref())

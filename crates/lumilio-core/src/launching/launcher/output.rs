@@ -11,7 +11,7 @@ use std::time::Duration;
 
 use super::LAUNCHER_NAME;
 use super::types::LaunchRequest;
-use crate::instance::Loader;
+use crate::instances::Loader;
 use crate::java::JavaRuntime;
 
 /// The record's file name in the game's `logs/` folder.

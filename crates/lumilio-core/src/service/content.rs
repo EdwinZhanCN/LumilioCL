@@ -15,7 +15,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         kind: ProjectKind,
         files: Vec<std::path::PathBuf>,
     ) -> Result<Vec<(String, Result<String, ContentError>)>, ServiceError> {
-        let _lease = self.reserve_instance(instance_id)?;
+        let _lease = self.instances.reserve(instance_id)?;
         self.instance(instance_id).await?;
         let game_dir = self.layout.game(instance_id);
         let results = tokio::task::spawn_blocking(move || {
@@ -170,7 +170,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             + Clone
             + 'static,
     {
-        let _lease = self.reserve_instance(id)?;
+        let _lease = self.instances.reserve(id)?;
         self.instance(id).await?;
         let game_dir = self.layout.game(id);
         let mut results = Vec::with_capacity(file_names.len());

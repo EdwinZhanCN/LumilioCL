@@ -6,7 +6,7 @@ use super::types::now;
 use crate::activity::CancellationToken;
 use crate::activity_log::{RetryAction, TaskAction, TaskCategory, TaskLabel};
 use crate::discover::{Catalog, ProjectOrigin};
-use crate::instance::{InstanceRecord, NewInstance};
+use crate::instances::{InstanceRecord, NewInstance};
 use crate::modpack;
 use crate::modpack::PackIndex;
 use crate::staged::Staged;
@@ -27,9 +27,9 @@ impl<T: Transport + Clone> LauncherService<T> {
         include_worlds: bool,
         cancel: CancellationToken,
     ) -> Result<InstanceRecord, ServiceError> {
-        let _lease = self.reserve_instance(source_id)?;
+        let _lease = self.instances.reserve(source_id)?;
         let source = self.instance(source_id).await?;
-        let staged = Staged::claim(&*self.store.lock().await, "copy", new_name)?;
+        let staged = Staged::claim(&*self.instances.lock().await, "copy", new_name)?;
         let task = self
             .begin(
                 TaskCategory::Install,
@@ -82,7 +82,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             return Err(error.into());
         }
         let created = self
-            .store
+            .instances
             .lock()
             .await
             .create_as(
@@ -106,7 +106,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             }
         };
         if let Err(error) = staged.publish(&self.layout) {
-            let _ = self.store.lock().await.remove(&record.id);
+            let _ = self.instances.lock().await.remove(&record.id);
             staged.discard();
             return Err(error.into());
         }
@@ -262,7 +262,7 @@ impl<T: Transport + Clone> LauncherService<T> {
                 task,
                 engine.subscribe(),
                 modpack::import_index(
-                    &self.store,
+                    self.instances.store(),
                     &engine,
                     &chain,
                     pack,
@@ -375,7 +375,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         }
         .stored();
         if self
-            .store
+            .instances
             .lock()
             .await
             .set_source_project(&record.id, &origin)

@@ -8,8 +8,8 @@ use crate::attention::{HomeSummary, summarize};
 use crate::deletion::Deletion;
 use crate::diagnostics::Problem;
 use crate::fetch::fetch_decoded;
-use crate::instance::{InstanceRecord, Loader, NewInstance};
-use crate::launcher::LaunchServiceError;
+use crate::instances::{InstanceRecord, Loader, NewInstance};
+use crate::launching::LaunchServiceError;
 use crate::loader::LAUNCHABLE_LOADERS;
 use crate::transfer::Transport;
 use crate::{forge_meta, loader};
@@ -21,9 +21,9 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// instances may share it. If only the final cleanup fails the deletion
     /// still stands and the leftovers are removed at the next start.
     pub async fn delete_instance(&self, id: &str) -> Result<(), ServiceError> {
-        let _lease = self.reserve_instance(id)?;
+        let _lease = self.instances.reserve(id)?;
         let record = self
-            .store
+            .instances
             .lock()
             .await
             .get(id)
@@ -44,7 +44,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             })
             .await?
         };
-        let committed = self.store.lock().await.remove(id);
+        let committed = self.instances.lock().await.remove(id);
         if let Err(error) = committed {
             let restored = blocking(move || deletion.rollback()).await;
             // A failed restore keeps the journal; the library error stays the cause.
@@ -62,7 +62,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// Saved records and recency, without Java discovery or disk diagnosis.
     /// The application uses this before supplementing Home with `home`.
     pub async fn home_snapshot(&self) -> (Vec<InstanceRecord>, HomeSummary) {
-        let instances = self.store.lock().await.instances().to_vec();
+        let instances = self.instances.lock().await.instances().to_vec();
         let summary = summarize(&instances, &BTreeMap::new());
         (instances, summary)
     }
@@ -78,7 +78,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// The disk half of [`Self::home`]: each recently played game's own
     /// problems, without those that depend on the account.
     pub async fn home_checks(&self) -> (Vec<InstanceRecord>, crate::attention::HomeChecks) {
-        let instances = self.store.lock().await.instances().to_vec();
+        let instances = self.instances.lock().await.instances().to_vec();
         let (settings, runtimes) = self.environment().await;
         let mut recent: Vec<&InstanceRecord> = instances.iter().collect();
         recent.sort_by_key(|record| std::cmp::Reverse(record.last_played));
@@ -145,7 +145,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             }
         };
         let record = self
-            .store
+            .instances
             .lock()
             .await
             .create(
@@ -161,7 +161,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         // Made at once, so a missing folder later means it was moved or
         // deleted, not that the game was never started.
         if let Err(error) = std::fs::create_dir_all(self.layout.game(&record.id)) {
-            let _ = self.store.lock().await.remove(&record.id);
+            let _ = self.instances.lock().await.remove(&record.id);
             return Err(error.into());
         }
         self.settle_current().await;

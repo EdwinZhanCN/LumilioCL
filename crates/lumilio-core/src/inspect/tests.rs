@@ -2,7 +2,7 @@ use std::fs;
 
 use super::*;
 use crate::diagnostics::{ProblemKind, Severity};
-use crate::instance::{InstanceStore, Loader, NewInstance};
+use crate::instances::{InstanceStore, Loader, NewInstance};
 use crate::java::JavaLocator;
 
 const MANIFEST: &str = r#"{
@@ -135,7 +135,7 @@ async fn memory_defaults_and_instance_overrides_and_last_session_are_used() {
     store
         .update_settings(
             &record.id,
-            crate::instance::InstanceSettings {
+            crate::instances::InstanceSettings {
                 max_memory_mb: Some(4096),
                 ..Default::default()
             },

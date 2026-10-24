@@ -1,5 +1,5 @@
 use super::*;
-use crate::instance::InstanceSettings;
+use crate::instances::InstanceSettings;
 
 fn record(id: &str, game: &str, loader: Loader, loader_version: Option<&str>) -> InstanceRecord {
     InstanceRecord {

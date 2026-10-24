@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::instance::Loader;
+use crate::instances::Loader;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]

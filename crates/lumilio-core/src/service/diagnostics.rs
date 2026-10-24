@@ -205,7 +205,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         &self,
         settings: &crate::settings::LauncherSettings,
         runtimes: &[crate::java::JavaRuntime],
-        record: &crate::instance::InstanceRecord,
+        record: &crate::instances::InstanceRecord,
     ) -> Vec<Problem> {
         self.inspect_with_analysis(settings, runtimes, record, true)
             .await
@@ -215,7 +215,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         &self,
         settings: &crate::settings::LauncherSettings,
         runtimes: &[crate::java::JavaRuntime],
-        record: &crate::instance::InstanceRecord,
+        record: &crate::instances::InstanceRecord,
         verify_files: bool,
     ) -> Vec<Problem> {
         let mut problems = if verify_files {
@@ -478,10 +478,10 @@ impl<T: Transport + Clone> LauncherService<T> {
 /// Runs on a blocking worker. Facts contain no host paths or UI types.
 pub(super) fn game_facts(
     layout: &crate::layout::Layout,
-    record: &crate::instance::InstanceRecord,
+    record: &crate::instances::InstanceRecord,
     runtimes: &[crate::java::JavaRuntime],
 ) -> GameFacts {
-    use crate::instance::Loader;
+    use crate::instances::Loader;
     let directories = layout.launch_directories(record);
     let needs = record
         .release_id()

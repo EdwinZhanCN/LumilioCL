@@ -7,7 +7,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// How much of the shared game files no game uses (ADR 0017). Reads only;
     /// walks the disk.
     pub async fn reclaimable(&self) -> Result<crate::reclaim::Reclaimable, ServiceError> {
-        let instances = self.store.lock().await.instances().to_vec();
+        let instances = self.instances.lock().await.instances().to_vec();
         let layout = self.layout.clone();
         blocking_value(move || crate::reclaim::scan(&layout, &instances))
             .await?
@@ -19,18 +19,11 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// in use, then looks again before deleting, so what was shown a moment
     /// ago cannot remove something a game has started to need.
     pub async fn reclaim(&self) -> Result<u64, ServiceError> {
-        let busy = {
-            let operations = self
-                .operations
-                .lock()
-                .expect("maintenance state lock was poisoned");
-            operations.iter().next().cloned()
-        };
-        if let Some(busy) = busy {
+        if let Some(busy) = self.instances.any_busy() {
             return Err(ServiceError::InstanceBusy(busy));
         }
         // Held to the end: nothing else can start meanwhile.
-        let _lease = self.reserve_instance("(shared files)")?;
+        let _lease = self.instances.reserve("(shared files)")?;
         let found = self.reclaimable().await?;
         let layout = self.layout.clone();
         blocking_value(move || crate::reclaim::remove(&layout, &found))

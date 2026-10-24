@@ -26,7 +26,7 @@ Status: InProgress
   Acceptance: 实施前将 rust-structure-style 已完成的工作与本轮架构修改分开形成可审查基线，保留既有工作区修改。使用 cargo metadata 核查全部 workspace 成员的生产依赖；确认 D2–D8 的目标边界和持久化、锁、Context 通知、后台任务的所有者。在本计划记录需要调整的决定和理由。确认 seed-map-prediction、world-explorer、error-reporting、discover-translation 的已有契约和进行中范围，安排逐能力提交，避免在相同源码上混合推进两个重构。
 - [x] T2 — 提取纯元数据 crate lumilio-minecraft (Completed)
   Acceptance: 按 D2 提取坐标、兼容规则、版本描述、继承合并和目录元数据的纯模型/解析；网络获取和来源路由留在 core。新 crate 不依赖 core、UI、插件宿主、传输引擎、数据库或凭据服务，不做文件/网络/进程 I/O。解决现有 pub(crate) 库文件解析和参数展开的跨 crate 接口，只公开具有业务意义的操作与结果，不批量公开内部字段。原类型由 core 刻意 re-export，保留类型身份和现有调用入口。继承循环、缺失父版本、未知 JSON 字段保留、旧新参数格式和 native 选择夹具在新边界通过；core 的真实启动准备路径继续通过。若提取必须反向依赖 core 或引入笼统的共享类型 crate，停止扩大提取范围并先修订边界决定。
-- [ ] T3 — 以启动流程验证 core 的能力封装 (Proposed)
+- [ ] T3 — 以启动流程验证 core 的能力封装 (InProgress)
   Acceptance: 将启动计划、执行、进程、会话和启动恢复收拢到 launching，建立明确的启动协调者；LauncherService 的相应方法只委托能力入口。启动协调者接收实例、认证、Java、安装、任务等具体依赖，不接收整个 LauncherService。一次性 Java 选择和会话生命周期有唯一所有者，实例互斥租约仍与实例写入/删除共用同一份权威状态。保留取消、缺失目录、离线启动、极短进程、启动/退出事件次数、历史写入失败、游戏设置准备与回收、日志捕获、插件事件以及 Windows background_command 契约。按 D10 在能证明行为的最低边界验证，核心测试不引入 GPUI。
 - [ ] T4 — 按能力拆分其余 core 状态与业务流程 (Proposed)
   Acceptance: 按 D3–D5 逐能力迁移 accounts、instances、java、minecraft、content、appearance、game_settings、worlds、diagnostics、activity、plugins、settings 和 storage。每个迁移提交同时移动实现、状态、邻近测试和调用方；不存在靠为 LauncherService 增加更多 impl 文件冒充职责拆分的情况。认证刷新锁、待完成登录、外观缓存、任务取消表、内容筛选缓存分别归其能力；不复制 SettingsStore、InstanceStore、Context 或其权威状态。数据库版本/连接生命周期有单一入口，业务查询归所属能力，现有跨表事务与删除清理保持原子性。去除迁移完毕的旧生产实现，既有必要公开路径通过同类型 re-export 保留。
@@ -149,6 +149,14 @@ lumilio-minecraft 同时包含由元数据计算的启动计划；宿主描述�
 Why: ReleaseManifest::build_launch_plan 是 ReleaseManifest 的固有方法，只读取 release、显式 HostProfile 与目录路径，不做 I/O；留在 core 会迫使参数展开、库文件解析等 crate 内接口整体公开。HostProfile::current 只读取 std::env::consts 编译常量，不探测运行时系统。CatalogError 的 Fetch 变体依赖 core 的 FetchError，且原 fetch 只会返回该变体。
 
 Consequences: lumilio-minecraft 公开 LaunchContext/LaunchPlan 等启动计划类型；只为 core 的真实调用新增公开 LibraryDependency::resolve_file 与 ResolvedLibraryFile 的路径/下载访问器、native_classifiers、MachineArchitecture::matches_name 和 ReleaseManifest::jar_id，其余字段保持 crate 内可见。core 通过同一类型 re-export 保留 lumilio_core:: 路径；VersionCatalog::fetch 改为 lumilio_core::fetch_catalog 并返回 FetchError，CatalogError 只剩 Decode。运行时宿主探测（Java 位置、内存）继续在 core。
+
+## Decision D13
+
+launching 先以 Launching 状态和 LaunchSteps 窄接口建立协调者；启动请求准备、Java 安装和游戏设置在 T4 抽出对应能力后改由具体依赖提供。
+
+Why: 启动流程依赖的认证会话、Java 发现/安装、游戏设置和来源链在 T3 时仍是 LauncherService 的方法。若在 T3 同时抽出这些能力，就会把 T4 的大部分迁移并入一次提交；若让协调者直接接收 LauncherService，则违反 D3。
+
+Consequences: launching/ 收拢 launcher、process、session、readiness、会话标记与协调者；Launching 是一次性自动 Java 选择的唯一所有者。协调者直接接收 Instances、ContextHub、Layout 与 PluginHost，其他能力只经 LaunchSteps 的五个操作（request、launcher、install_java、apply/capture_game_settings）进入。实例租约由新的 instances::Instances 与写入/删除共用。安装也通过同一 launcher/serving_java。T3 保持 in_progress，直到 T4 让 LaunchSteps 的实现改由 accounts/java/game_settings/网络能力提供。
 
 ## References
 

@@ -10,7 +10,7 @@ use crate::activity_log::{
     FinishedTask, RetryAction, TaskBoard, TaskCategory, TaskLabel, TaskOutcome,
 };
 use crate::discover::ProjectKind;
-use crate::instance::Loader;
+use crate::instances::Loader;
 
 #[tokio::test]
 async fn explicit_cancel_unblocks_reads_and_records_cancelled_for_both_install_kinds() {

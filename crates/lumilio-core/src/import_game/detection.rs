@@ -6,7 +6,7 @@ use std::{fmt, fs, io};
 use serde::Deserialize;
 
 use super::profile;
-use crate::instance::Loader;
+use crate::instances::Loader;
 
 /// Which launcher's folder a game was found in, as a type rather than a
 /// sentence: the interface turns it into words in the person's language.

@@ -1,6 +1,6 @@
 use super::super::error::ServiceError;
 use super::world;
-use crate::instance::Loader;
+use crate::instances::Loader;
 use crate::screenshots::ScreenshotError;
 
 #[tokio::test]
@@ -21,7 +21,7 @@ async fn screenshots_are_listed_thumbnailed_and_deleted_even_while_the_game_is_b
         .unwrap();
 
     // Reading and deleting do not need the lease: the game takes screenshots while it runs.
-    let _busy = world.service.reserve_instance(id).unwrap();
+    let _busy = world.service.instances.reserve(id).unwrap();
     let listed = world.service.screenshots(id).await.unwrap();
     assert_eq!(listed.len(), 1);
     let thumb = world

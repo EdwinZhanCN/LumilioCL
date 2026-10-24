@@ -4,7 +4,7 @@ use lumilio_plugin_api::map::{Dimension, EditAction, MapPoint, ObjectEdit, World
 
 use super::world;
 use crate::MapFailure;
-use crate::instance::Loader;
+use crate::instances::Loader;
 
 fn edit() -> ObjectEdit {
     ObjectEdit {
@@ -38,7 +38,7 @@ async fn edits_wait_for_the_game_to_leave_and_hold_the_instance_while_they_run()
     assert!(world.service.map_can_edit(&record.id));
     {
         // A running game holds this same lease.
-        let _running = world.service.reserve_instance(&record.id).unwrap();
+        let _running = world.service.instances.reserve(&record.id).unwrap();
         assert!(!world.service.map_can_edit(&record.id));
         assert_eq!(
             world
@@ -53,5 +53,5 @@ async fn edits_wait_for_the_game_to_leave_and_hold_the_instance_while_they_run()
         "the lease is released"
     );
     // The probe above did not leave the instance held.
-    assert!(world.service.reserve_instance(&record.id).is_ok());
+    assert!(world.service.instances.reserve(&record.id).is_ok());
 }

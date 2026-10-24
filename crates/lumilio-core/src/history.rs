@@ -10,9 +10,9 @@ use std::{fs, io};
 
 use serde::{Deserialize, Serialize};
 
-use crate::instance::{InstanceStore, StoreError};
+use crate::instances::{InstanceStore, StoreError};
+use crate::launching::GameExit;
 use crate::layout::Layout;
-use crate::process::GameExit;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]

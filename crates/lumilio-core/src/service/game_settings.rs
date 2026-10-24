@@ -10,20 +10,16 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// A game that is starting, running or otherwise leased cannot be edited,
     /// and its unfinished session is not an interrupted one.
     fn mark_busy(&self, view: &mut GameSettingsView) {
-        view.is_busy = self
-            .operations
-            .lock()
-            .expect("game settings store lock was poisoned")
-            .contains(&view.instance);
+        view.is_busy = self.instances.is_busy(&view.instance);
         if view.is_busy {
             view.recovery_required = false;
         }
     }
     pub async fn settings_presets(&self) -> Result<Vec<SettingsPreset>, ServiceError> {
-        Ok(game_settings::list(&*self.store.lock().await)?)
+        Ok(game_settings::list(&*self.instances.lock().await)?)
     }
     pub async fn game_settings(&self, id: &str) -> Result<GameSettingsView, ServiceError> {
-        let store = self.store.lock().await;
+        let store = self.instances.lock().await;
         if store.get(id).is_none() {
             return Err(ServiceError::NoSuchInstance(id.into()));
         }
@@ -32,7 +28,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         Ok(view)
     }
     pub async fn all_game_settings(&self) -> Result<Vec<GameSettingsView>, ServiceError> {
-        let store = self.store.lock().await;
+        let store = self.instances.lock().await;
         store
             .instances()
             .iter()
@@ -45,7 +41,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     }
     /// The game's own options file, read for editing, with its preset state.
     pub async fn game_options(&self, id: &str) -> Result<InstanceOptions, ServiceError> {
-        let store = self.store.lock().await;
+        let store = self.instances.lock().await;
         if store.get(id).is_none() {
             return Err(ServiceError::NoSuchInstance(id.into()));
         }
@@ -62,8 +58,8 @@ impl<T: Transport + Clone> LauncherService<T> {
         key: String,
         change: OptionChange,
     ) -> Result<(), ServiceError> {
-        let _lease = self.reserve_instance(&expected.instance)?;
-        let store = self.store.lock().await;
+        let _lease = self.instances.reserve(&expected.instance)?;
+        let store = self.instances.lock().await;
         game_settings::capture(&store, &expected.instance, false)?;
         Ok(game_settings::edit_option(
             &store,
@@ -79,8 +75,8 @@ impl<T: Transport + Clone> LauncherService<T> {
         name: String,
         groups: &[GameSettingGroup],
     ) -> Result<i64, ServiceError> {
-        let _lease = self.reserve_instance(source)?;
-        let store = self.store.lock().await;
+        let _lease = self.instances.reserve(source)?;
+        let store = self.instances.lock().await;
         let record = store
             .get(source)
             .ok_or_else(|| ServiceError::NoSuchInstance(source.into()))?;
@@ -104,7 +100,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         Ok(game_settings::save_preset(&store, &preset)?)
     }
     pub async fn edit_settings_preset(&self, preset: SettingsPreset) -> Result<(), ServiceError> {
-        let store = self.store.lock().await;
+        let store = self.instances.lock().await;
         let original = game_settings::preset(&store, preset.id)?;
         // Scope changes never delete values. An edited value must be a known,
         // normalized value of an option the preset already holds; games
@@ -168,7 +164,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         before: GameSettingValue,
         value: GameSettingValue,
     ) -> Result<(), ServiceError> {
-        let mut preset = game_settings::preset(&*self.store.lock().await, id)?;
+        let mut preset = game_settings::preset(&*self.instances.lock().await, id)?;
         if preset.values.get(&key) != Some(&before) {
             return Err(GameSettingsError::Stale.into());
         }
@@ -176,22 +172,22 @@ impl<T: Transport + Clone> LauncherService<T> {
         self.edit_settings_preset(preset).await
     }
     pub async fn copy_settings_preset(&self, id: i64, name: String) -> Result<i64, ServiceError> {
-        let store = self.store.lock().await;
+        let store = self.instances.lock().await;
         let mut preset = game_settings::preset(&store, id)?;
         preset.id = 0;
         preset.name = name;
         Ok(game_settings::save_preset(&store, &preset)?)
     }
     pub async fn delete_settings_preset(&self, id: i64) -> Result<(), ServiceError> {
-        Ok(game_settings::delete(&*self.store.lock().await, id)?)
+        Ok(game_settings::delete(&*self.instances.lock().await, id)?)
     }
     pub async fn bind_settings_preset(
         &self,
         id: &str,
         preset: Option<i64>,
     ) -> Result<(), ServiceError> {
-        let _lease = self.reserve_instance(id)?;
-        let store = self.store.lock().await;
+        let _lease = self.instances.reserve(id)?;
+        let store = self.instances.lock().await;
         if store.get(id).is_none() {
             return Err(ServiceError::NoSuchInstance(id.into()));
         }
@@ -232,8 +228,8 @@ impl<T: Transport + Clone> LauncherService<T> {
         selected: Vec<String>,
         resolution: SettingResolution,
     ) -> Result<(), ServiceError> {
-        let _lease = self.reserve_instance(&expected.instance)?;
-        let store = self.store.lock().await;
+        let _lease = self.instances.reserve(&expected.instance)?;
+        let store = self.instances.lock().await;
         // Detect edits made since the list opened, then require the UI to review them again.
         game_settings::capture(&store, &expected.instance, false)?;
         Ok(game_settings::resolve(
@@ -247,11 +243,15 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// Explicit user confirmation is needed after an interrupted launcher session;
     /// we cannot safely infer that an orphan game has stopped.
     pub async fn recover_game_settings(&self, id: &str) -> Result<(), ServiceError> {
-        let _lease = self.reserve_instance(id)?;
-        Ok(game_settings::capture(&*self.store.lock().await, id, true)?)
+        let _lease = self.instances.reserve(id)?;
+        Ok(game_settings::capture(
+            &*self.instances.lock().await,
+            id,
+            true,
+        )?)
     }
     pub(super) async fn apply_game_settings(&self, id: &str) -> Result<(), ServiceError> {
-        let store = self.store.lock().await;
+        let store = self.instances.lock().await;
         let result = game_settings::apply(&store, id);
         if let Err(error) = &result
             && let Ok(Some(mut binding)) = game_settings::binding(&store, id)
@@ -262,6 +262,10 @@ impl<T: Transport + Clone> LauncherService<T> {
         Ok(result?)
     }
     pub(super) async fn capture_game_settings(&self, id: &str) -> Result<(), ServiceError> {
-        Ok(game_settings::capture(&*self.store.lock().await, id, true)?)
+        Ok(game_settings::capture(
+            &*self.instances.lock().await,
+            id,
+            true,
+        )?)
     }
 }

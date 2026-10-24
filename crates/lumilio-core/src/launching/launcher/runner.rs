@@ -6,8 +6,8 @@ use tokio::sync::{broadcast, mpsc};
 use super::types::{JavaRequest, LaunchRequest, LaunchServiceError, LaunchUpdate};
 use crate::activity::CancellationToken;
 use crate::java::JavaRuntime;
-use crate::launch_session::LaunchSignal;
-use crate::process::GameExit;
+use crate::launching::GameExit;
+use crate::launching::LaunchSignal;
 use crate::transfer::{
     ConnectionBudget, SourceChain, TransferEngine, TransferError, TransferEvent, Transport,
 };
@@ -82,8 +82,8 @@ where
         self
     }
 
-    pub(super) fn note_spawned(&self, event: &crate::process::GameEvent) {
-        if matches!(event, crate::process::GameEvent::Spawned { .. })
+    pub(super) fn note_spawned(&self, event: &crate::launching::GameEvent) {
+        if matches!(event, crate::launching::GameEvent::Spawned { .. })
             && let Some(sender) = &self.spawned
         {
             let _ = sender.send(());

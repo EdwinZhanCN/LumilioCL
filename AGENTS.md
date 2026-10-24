@@ -144,7 +144,7 @@ Escaped failures and their guards go in the plan's `lessonsLearned`.
 ## Hardening
 
 - Windows background console processes (game Java, launch hooks, wrappers and installer
-  processors) must use `crates/lumilio-core/src/process.rs`'s `background_command`, which
+  processors) must use `crates/lumilio-core/src/launching/process.rs`'s `background_command`, which
   sets `CREATE_NO_WINDOW`. Piped output and the launcher's `windows_subsystem` attribute
   do not prevent child console windows; preserve stdout/stderr capture for launcher logs.
 

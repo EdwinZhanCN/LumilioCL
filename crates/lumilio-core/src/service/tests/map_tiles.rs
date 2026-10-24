@@ -12,7 +12,7 @@ use lumilio_plugin_api::{
 
 use super::Scripted;
 use crate::LauncherService;
-use crate::instance::Loader;
+use crate::instances::Loader;
 
 /// A provider whose level-0 tile `(tx, tz)` is drawn from region
 /// `r.<tx div 2>.<tz div 2>.mca`, and which records every tile it draws.

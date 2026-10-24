@@ -12,7 +12,7 @@ use crate::discover::{
     Catalog, FileHashes, ProjectKind, Version, VersionFile, fits, install_request, pick_version,
 };
 use crate::history::{ChangeKind, HistoryEvent, HistoryLog};
-use crate::instance::InstanceRecord;
+use crate::instances::InstanceRecord;
 use crate::transfer::{SourceChain, TransferRequest, Transport};
 
 impl<T: Transport + Clone> LauncherService<T> {
@@ -312,9 +312,9 @@ impl<T: Transport + Clone> LauncherService<T> {
         version_id: Option<&str>,
         cancel: CancellationToken,
     ) -> Result<String, ServiceError> {
-        let _lease = self.reserve_instance(instance_id)?;
+        let _lease = self.instances.reserve(instance_id)?;
         let record = self
-            .store
+            .instances
             .lock()
             .await
             .get(instance_id)
@@ -428,7 +428,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         version_id: &str,
         cancel: CancellationToken,
     ) -> Result<String, ServiceError> {
-        let _lease = self.reserve_instance(instance_id)?;
+        let _lease = self.instances.reserve(instance_id)?;
         self.instance(instance_id).await?;
         let task = self
             .begin(

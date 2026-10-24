@@ -40,7 +40,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     /// instance and no other operation holding it. The studio disables its
     /// write actions while this is false.
     pub fn schematic_can_write(&self, instance: &str) -> bool {
-        self.reserve_instance(instance).is_ok()
+        self.instances.reserve(instance).is_ok()
     }
 
     /// The files below `folder` that `plugin` may read, relative to the game
@@ -88,7 +88,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     ) -> Result<SchematicLogEntry, ServiceError> {
         self.instance(instance).await?;
         let manifest = self.plugins.granted(plugin).await?;
-        let _lease = self.reserve_instance(instance)?;
+        let _lease = self.instances.reserve(instance)?;
         let (game, folder) = (
             self.layout.game(instance),
             self.layout.schematic_ops(instance),
@@ -122,7 +122,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     ) -> Result<Vec<SchematicLogEntry>, ServiceError> {
         self.instance(instance).await?;
         let manifest = self.plugins.granted(plugin).await?;
-        let _lease = self.reserve_instance(instance)?;
+        let _lease = self.instances.reserve(instance)?;
         let (game, folder) = (
             self.layout.game(instance),
             self.layout.schematic_ops(instance),
@@ -172,7 +172,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     ) -> Result<SchematicLogEntry, ServiceError> {
         self.instance(instance).await?;
         let manifest = self.plugins.granted(plugin).await?;
-        let _lease = self.reserve_instance(instance)?;
+        let _lease = self.instances.reserve(instance)?;
         let (game, folder) = (
             self.layout.game(instance),
             self.layout.schematic_ops(instance),
@@ -200,7 +200,7 @@ impl<T: Transport + Clone> LauncherService<T> {
     ) -> Result<SchematicLogEntry, ServiceError> {
         self.instance(instance).await?;
         let manifest = self.plugins.granted(plugin).await?;
-        let _lease = self.reserve_instance(instance)?;
+        let _lease = self.instances.reserve(instance)?;
         let (game, folder) = (
             self.layout.game(instance),
             self.layout.schematic_ops(instance),

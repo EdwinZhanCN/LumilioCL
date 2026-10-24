@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::sync::Mutex as StdMutex;
 
 use super::error::ServiceError;
@@ -25,20 +25,6 @@ pub(super) async fn blocking<V: Send + 'static>(
 }
 
 /// Keeps a target reserved without holding a mutex across asynchronous work.
-pub(super) struct InstanceLease<'a> {
-    pub(super) targets: &'a StdMutex<BTreeSet<String>>,
-    pub(super) id: String,
-}
-
-impl Drop for InstanceLease<'_> {
-    fn drop(&mut self) {
-        self.targets
-            .lock()
-            .expect("launcher service state lock was poisoned")
-            .remove(&self.id);
-    }
-}
-
 /// Accounts for normal returns and futures interrupted before reporting a result.
 pub(super) struct TaskLease<'a> {
     pub(super) board: &'a StdMutex<TaskBoard>,

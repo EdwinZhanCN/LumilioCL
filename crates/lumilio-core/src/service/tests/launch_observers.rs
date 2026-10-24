@@ -10,7 +10,7 @@ use tokio::sync::mpsc;
 use super::{World, fake_java, publish_modern_release, publish_release, world};
 use crate::activity::CancellationToken;
 use crate::history::{HistoryEvent, HistoryLog};
-use crate::instance::Loader;
+use crate::instances::Loader;
 use crate::plugins::{PluginHost, PluginStatus};
 
 struct Recorder {
