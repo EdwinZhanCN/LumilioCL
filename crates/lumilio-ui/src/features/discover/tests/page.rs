@@ -398,6 +398,30 @@ fn turning_translation_off_puts_the_original_summaries_back(cx: &mut TestAppCont
     assert_eq!(shown(&page, cx), ("A rendering engine.".into(), None));
 }
 
+/// At startup the library can arrive before the saved preferences say
+/// translation is on: summaries already translated stay.
+#[gpui::test]
+fn the_library_arriving_leaves_translated_summaries_alone(cx: &mut TestAppContext) {
+    let (page, cx) = page(cx);
+    let mut translated = row(1, ProjectKind::Mod);
+    translated.translated_summary = Some("渲染引擎。".to_owned());
+    page.update(cx, |page, cx| {
+        page.edit_state(|state| state.results = vec![translated], cx);
+        page.set_inputs(
+            vec![library_card(&record("x", Loader::Fabric), 1)],
+            None,
+            false,
+            cx,
+        );
+    });
+    page.read_with(cx, |page, _| {
+        assert_eq!(
+            page.state().results[0].translated_summary.as_deref(),
+            Some("渲染引擎。")
+        );
+    });
+}
+
 #[gpui::test]
 fn result_rows_stay_short_and_a_narrow_window_folds_the_filters(cx: &mut TestAppContext) {
     use gpui::{px, size};

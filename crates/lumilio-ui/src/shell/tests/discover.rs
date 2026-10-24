@@ -221,6 +221,23 @@ fn a_gallery_image_shown_large_is_drawn_by_the_shell_over_everything(cx: &mut Te
     assert!(cx.debug_bounds("detail-viewer").is_none());
 }
 
+/// The saved preferences turn translation on for Discover from startup,
+/// before the Settings page has loaded anything.
+#[gpui::test]
+fn translation_follows_the_preferences_without_the_settings_page(cx: &mut TestAppContext) {
+    cx.update(gpui_component::init);
+    let (shell, cx) =
+        cx.add_window_view(|_, cx| LauncherShell::new(cx).with_live(Rc::new(|_, _, _| {})));
+    shell.update(cx, |shell, cx| {
+        assert!(shell.live().unwrap().settings.is_none());
+        shell.set_translation(true, cx);
+        assert!(shell.discover().read(cx).state().translation);
+        // A later live refresh does not turn it back off.
+        shell.update_live(|model| model.attention_checking = true, cx);
+        assert!(shell.discover().read(cx).state().translation);
+    });
+}
+
 /// What the page lists stays with it when the shell's live model changes.
 #[gpui::test]
 fn a_live_refresh_leaves_the_search_as_it_was(cx: &mut TestAppContext) {

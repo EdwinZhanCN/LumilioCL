@@ -203,3 +203,5 @@ Consequences: LiveIntent 去掉 Search、LoadFilters、TranslateBody、OpenProje
 - Lesson: T4 时委托生成脚本把所有 `pub(super) ` 改成 `pub(crate) `，连带放宽了能力结构体字段的可见性；`cargo clippy ... | grep | head` 的管道又掩盖了 clippy 的失败退出码，导致一次带 clippy 错误的提交（随后 amend）。守护：脚本只改写 fn/struct/enum/const/type 的可见性；检查命令把输出重定向到文件并单独打印 `$?`，以退出码决定是否提交。
 
 - Lesson: T5 时开发钩子 LUMILIO_PAGE 直接调用 shell.show 并把 Navigate 发给 app，原本由 app 处理的“首次搜索”迁入 feature 后，经钩子打开的发现页不再加载；单元测试都从 select_route 进入，没有覆盖。守护：钩子改用 shell.go_to，与点击导航走同一路径；迁移把行为从 app 的 intent 处理移进 UI 时，先列出所有绕过 shell 路由直接发 intent 的入口。
+
+- Lesson: T5 后启动直接进发现页时简介翻译不显示，去过设置页才显示：Discover 的翻译开关取自设置页的视图模型（只在打开设置页时加载），启动时为“关”；游戏库随后到达时 set_inputs 把任何输入变化都当作关闭翻译，清掉了已翻译的简介。守护：set_inputs 只在开关真的变为关时清除（page 测试，去掉修复会失败）；shell 的翻译开关来自保存的偏好，由 apply_preferences 在启动和每次改设置时设置（shell 测试）。迁移把输入换成其他来源时，核对该来源在启动时是否已有值。

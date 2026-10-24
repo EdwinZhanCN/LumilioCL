@@ -67,6 +67,9 @@ pub struct LauncherShell {
     pub(super) account_revision: u64,
     /// The Discover page; its project details show here in place of it.
     pub(super) discover: Entity<Discover>,
+    /// Whether translation is on, from the saved preferences; known from
+    /// startup, before the Settings page has loaded anything.
+    pub(super) translation: bool,
     /// The project open on Discover, in place of the list.
     pub(super) detail: Option<DetailSlot>,
     pub(super) live_instance: Option<Entity<InstanceDetailView>>,
@@ -104,6 +107,7 @@ impl LauncherShell {
             account_viewer: None,
             account_revision: 0,
             discover,
+            translation: false,
             detail: None,
             live_instance: None,
             history: History::new(HISTORY_LIMIT),

@@ -145,8 +145,9 @@ impl Discover {
         self.state.library = library;
         self.state.target = target;
         self.state.translation = translation;
-        if !translation {
-            // Turning translation off shows the originals at once.
+        if translation_changed && !translation {
+            // Turning translation off shows the originals at once. Other
+            // inputs changing leave what was translated alone.
             for row in &mut self.state.results {
                 row.translated_summary = None;
             }
