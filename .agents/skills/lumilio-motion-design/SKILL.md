@@ -47,7 +47,8 @@ foreground on top (the Home hero overlay is the reference pattern).
 
 ## 4. Write the copy
 
-Follow design language §8: calm Simplified Chinese, one primary action,
+Follow `docs/plain-language.md` for what a message says and in what order, and
+design language §8 for voice: calm Simplified Chinese, one primary action,
 details behind **技术详情**, no raw error strings as headlines. Domain types in
 `lumilio-core` never carry display strings; the UI maps them to copy.
 

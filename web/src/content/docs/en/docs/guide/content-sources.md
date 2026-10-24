@@ -1,6 +1,6 @@
 ---
 title: Content sources
-description: Change between Modrinth and CurseForge on the Discover page, install CurseForge modpacks, and add files that you can download only on a website.
+description: Change between Modrinth and CurseForge on the Discover page, install CurseForge modpacks, add files that you can download only on a website, and translate summaries.
 ---
 
 The Discover page finds and installs mods, resource packs, shaders, and modpacks from content sources.
@@ -66,6 +66,18 @@ The source that recognized the file finds its updates.
 If the launcher cannot connect to a source, the tab shows the files and tells you about the problem.
 
 On the Discover page, **Installed** and **Update** show only for files that the current source recognizes.
+
+## Translate summaries
+
+Turn on **Settings › General › Translation**.
+The Discover result rows and the top of each project page then show the summary in Simplified Chinese.
+
+- The launcher first asks the MCIM mirror (mod.mcimirror.top) for the translation. If MCIM does not have it, the launcher asks launcher.lumilio.org.
+- The launcher sends only the platform name and the project IDs to these two services.
+- If the two services do not have a translation, the summary stays in its original language.
+- The launcher does not translate the description on a project page automatically. When you click **Translate**, the launcher sends the description to the **Translation provider**. At this time, the only provider is Microsoft Edge. To show the original text again, click **Show original**.
+- The launcher keeps translations on your computer for 7 days. To delete them before then, click **Clear** in **Settings › General › Translation cache**.
+- The launcher translates only into Simplified Chinese. It does not translate titles.
 
 ## Limits
 

@@ -201,16 +201,10 @@ pub fn review(
         v_flex()
             .w_full()
             .gap_3()
-            .child(
-                h_flex()
-                    .gap_1()
-                    .items_center()
-                    .child(kit::section_label(
-                        tr!("options-review-title", count = total),
-                        colors,
-                    ))
-                    .child(kit::info("options-review-info", tr!("options-review-help"))),
-            )
+            .child(kit::section_label(
+                tr!("options-review-title", count = total),
+                colors,
+            ))
             .child(head)
             .child(kit::list(rows, colors))
             .children(replace)
@@ -224,21 +218,29 @@ fn resolutions(disabled: bool, actions: &ReviewActions) -> Vec<AnyElement> {
         (
             SettingResolution::Instance,
             tr!("options-keep-here"),
+            tr!("options-keep-here-help"),
             "local",
         ),
-        (SettingResolution::Shared, tr!("options-share"), "shared"),
+        (
+            SettingResolution::Shared,
+            tr!("options-share"),
+            tr!("options-share-help"),
+            "shared",
+        ),
         (
             SettingResolution::Restore,
             tr!("options-restore"),
+            tr!("options-restore-help"),
             "restore",
         ),
     ]
     .into_iter()
-    .map(|(resolution, label, slug)| {
+    .map(|(resolution, label, help, slug)| {
         let resolve = actions.resolve.clone();
         theme::clickable(
             Key::new(SharedString::from(format!("options-resolve-{slug}")))
                 .label(label)
+                .tooltip(help)
                 .white()
                 .small()
                 .disabled(disabled)

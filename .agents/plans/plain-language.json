@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "id": "plain-language",
+  "title": "Plain-language interface copy",
+  "summary": "Apply the ISO 24495-1 plain-language principles to the launcher's catalog wording: a rule document, a review prompt with rewrite and cold-read passes, rewritten messages, and a guard that holds hints to one line.",
+  "status": "in_progress",
+  "visibility": "internal",
+  "scope": {
+    "included": ["docs/plain-language.md beside the design language", "The rewrite and cold-read prompt in the lumilio-i18n skill", "Rewriting zh-CN messages and the English written from them", "A catalog guard for hint length", "User guide sections that receive details moved out of a message"],
+    "excluded": ["Game logs, content-source text and plugin-owned words", "Other website and documentation pages", "New UI surfaces for supplementary details, such as a link from the launcher to the guide; a message that needs one is listed for a separate decision", "Reproducing the text of the standard"]
+  },
+  "tasks": [
+    {"id": "T1", "title": "Write the rules", "status": "completed", "acceptance": "docs/plain-language.md cites ISO 24495-1 clauses without quoting the standard. Design language §8, design-patterns.md, AGENTS.md and the lumilio-i18n and lumilio-motion-design skills point to it. just docs passes."},
+    {"id": "T2", "title": "Write the review prompt", "status": "completed", "acceptance": "plain-review-prompt.md defines a rewrite pass that returns per-message proposals without editing files, and a cold read that uses only the words on a screen."},
+    {"id": "T3", "title": "Revise the first batch", "status": "in_progress", "acceptance": "The 20 longest Chinese messages have rewrite proposals and cold-read results. The Project Maintainer reviews them; accepted Chinese and the English written from it are in the catalogs; the lumilio-ui i18n and English tests pass; screenshots of changed surfaces are reviewed in both languages."},
+    {"id": "T4", "title": "Guard hint length", "status": "completed", "acceptance": "A lumilio-ui test fails with the message id when a hint (an id ending in -help or -note) is longer than one sentence of 20 characters, or its English is more than twice as wide. long-hints.txt lists the hints not revised yet and may only shrink. A demonstrated failing case is recorded."},
+    {"id": "T5", "title": "Revise the remaining sections", "status": "proposed", "acceptance": "Every catalog section passes a rewrite and cold-read pass, dialog intros and bodies meet their plain-language §6 limits, and long-hints.txt is empty."}
+  ],
+  "validation": [
+    {"criterion": "The rules and pointers are in place and just docs passes.", "result": null},
+    {"criterion": "First-batch proposals and cold-read results are reviewed by the Project Maintainer.", "result": "2026-10-23: the Project Maintainer accepted the recut batch after the first proposals were rejected as too long."},
+    {"criterion": "Changed surfaces are reviewed in screenshots in Chinese and in English at the 720 px window.", "result": null},
+    {"criterion": "The guard fails on a new over-limit message and passes on listed ones.", "result": "2026-10-23: without long-hints.txt, hints_fit_one_line failed and named the 67 hints not revised yet; with the list it passes. No message of the revised batch is in the list."}
+  ],
+  "decisions": [
+    {"id": "D1", "decision": "Keep the rules in docs/plain-language.md, beside the design language.", "rationale": "The Project Maintainer chose a separate document. Design language §8 keeps voice and form; the new document covers content and order.", "consequences": "§8 links to it. A rule change updates the document in the same change."},
+    {"id": "D2", "decision": "Cite ISO 24495-1 by clause and write the rules in our own words.", "rationale": "The standard is copyrighted.", "consequences": "The standard is not quoted or committed."},
+    {"id": "D3", "decision": "Length limits come from the space of each place a message appears, and they are hard.", "rationale": "A ⓘ hint is a tooltip that never wraps, so a long hint runs past the window. The standard measures plain language by whether readers can use the words, so fitting a limit is necessary but not sufficient.", "consequences": "Facts that do not fit move to a key's own tooltip or the documentation. The cold read and screenshot review still decide whether a message works."},
+    {"id": "D4", "decision": "Rewrite and evaluation run in separate agents: the rewrite pass may read the code, the cold read sees only the screen's words.", "rationale": "An author who knows the mechanism writes it into the copy; a reader without that context shows what the words alone convey.", "consequences": "Agents propose and do not edit. The main session applies changes after the Project Maintainer's review."},
+    {"id": "D5", "decision": "Facts moved out of a message go to the user guide, except a fact needed to finish the action on that screen.", "rationale": "The launcher has no link to the guide. What data goes to which service must stay findable [5.2.5], but the command variable names are needed to write a command.", "consequences": "Translation services are on the content sources page and the diagnostics contents on a diagnostics page. The command dialogs keep a line of environment variable names, without $ or %, so it reads right on every system. A link from a message to the guide is a separate decision."},
+    {"id": "D6", "decision": "A hint is named by its id: -help or -note. The guard measures messages by that name.", "rationale": "The name is the one mark of where a message appears that a catalog test can read without parsing call sites.", "consequences": "A ⓘ, a key's tooltip, a line under a field and an empty state's line use these endings. A new long hint fails the test; long-hints.txt only shrinks. Per-key tooltips replace an ⓘ that explains several keys (design language §9)."}
+  ],
+  "references": ["docs/plain-language.md", "docs/design-language.md", ".agents/skills/lumilio-i18n/plain-review-prompt.md", ".agents/skills/lumilio-i18n/translate-prompt.md", "crates/lumilio-ui/src/i18n/long-hints.txt", "web/src/content/docs/docs/guide/diagnostics.md"],
+  "dependencies": [],
+  "lessonsLearned": ["The first proposals kept 60–140 character help texts. The limits had been taken from the catalog's own length distribution, privacy text was allowed past them, and cold-read questions were answered by adding sentences. Settings help is a ⓘ tooltip that never wraps. Guard: plain-language §6 sets limits from each place's space, §3 and §7 stop questions from adding sentences, and hints_fit_one_line tests every hint."],
+  "roadmap": {"enabled": false, "id": "plain-language", "name": "Plain language", "lede": "Clearer launcher wording", "targetVersion": null, "order": 0}
+}

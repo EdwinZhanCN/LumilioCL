@@ -151,7 +151,7 @@ home-recovery-reason = { $reason }.
 home-recovery-no-java = No installed Java can run this game.
 home-recovery-no-java-major = This game needs Java { $major }, which isn't installed.
 home-recovery-java-download = Java couldn't be downloaded.
-home-recovery-rosetta-missing = This version needs an Intel Java, which needs Rosetta 2. Run softwareupdate --install-rosetta in Terminal, then try again.
+home-recovery-rosetta-missing = Needs Rosetta 2. Run softwareupdate --install-rosetta in Terminal, then try again.
 home-recovery-before-launch = The before-launch command didn't succeed.
 home-recovery-before-launch-code = The before-launch command didn't succeed (exit code { $code }).
 home-recovery-world-missing = Can't find the world “{ $world }”.
@@ -449,7 +449,7 @@ account-sign-in-microsoft = Sign in with Microsoft
 account-menu-third-party = Third-party sign-in…
 account-menu-servers = Auth servers…
 account-empty-title = No accounts yet
-account-empty-help = Sign in with Microsoft to join official servers; sign in to third-party auth servers such as LittleSkin from the ⋯ menu in the top right; an offline account needs no sign-in, and its name is the name you use in game.
+account-empty-help = Sign in with Microsoft to join official servers.
 account-subtitle-current = Current: { $name } ({ $kind })
 account-subtitle-empty = No accounts yet; add one to play
 account-needs-sign-in = Sign in again
@@ -465,10 +465,10 @@ account-menu-copy-uuid = Copy UUID
 account-menu-refresh = Refresh sign-in
 account-menu-remove = Remove…
 account-remove-title = Remove account "{ $name }"?
-account-remove-body-signed-in-current = This identity is forgotten and its sign-in is deleted from the system credential store (a third-party account also tells the server to invalidate its token); no games or saves are deleted. It's the current account, so the first remaining one takes over.
-account-remove-body-signed-in = This identity is forgotten and its sign-in is deleted from the system credential store; no games or saves are deleted.
-account-remove-body-offline-current = This identity is only forgotten; no games or saves are deleted. It's the current account, so the first remaining one takes over.
-account-remove-body-offline = This identity is only forgotten; no games or saves are deleted.
+account-remove-body-signed-in = Sign in again to use it later. Games and saves aren't affected.
+account-remove-body-offline = Add it again to use it later. Games and saves aren't affected.
+# An offline account with a custom UUID: added again by name alone, it gets another UUID, and player data in saves no longer matches.
+account-remove-body-offline-custom = Add it again with the same UUID to use it later. Games and saves aren't affected.
 
 # The offline account add dialog.
 account-name-label = Name
@@ -488,7 +488,7 @@ account-name-help-first = At most { $count ->
 }, using letters, numbers or underscores. This is the first account and becomes the current one automatically
 account-name-placeholder = e.g. Steve
 account-uuid-placeholder = Leave empty: decided by the name
-account-uuid-help = The game uses it to recognize you, and player data in saves is stored under it. Leave it empty and the name decides it (the same name always gets the same one); it can only be set when adding and can't be changed later.
+account-uuid-help = Saves know players by UUID. It can't change after adding.
 account-uuid-problem = UUID needs 32 hexadecimal digits (hyphens allowed)
 account-advanced-expand = Advanced options
 account-advanced-collapse = Hide advanced options
@@ -514,10 +514,10 @@ account-skin-pick-picture = Choose image
 account-skin-choose-picture = Choose a skin image, or a cape image
 account-skin-enter-address = Enter the skin site address
 account-skin-save = Save
-account-skin-api-help = The address must serve <player name>.json and a textures/ folder; LittleSkin and Blessing Skin skin sites both work this way.
+account-skin-api-help = The skin site needs a character with the same name.
 account-skin-default-help = The game picks a default skin from the player's UUID on its own; nothing extra is needed at launch.
 account-littleskin-hint = You need to create a character on LittleSkin with the same name as this offline account. The account's skin then comes from whatever that character has set on the skin site.
-account-skin-agent-note = Once a skin is chosen, the launcher starts a small local skin server when launching the game and loads authlib-injector (downloaded automatically the first time).
+account-skin-agent-note = The first use downloads the skin plugin authlib-injector.
 account-open-littleskin = Open LittleSkin
 
 # Sign-in failure sentences (Microsoft, third-party auth and skin sites).
@@ -723,7 +723,7 @@ java-conflict-download = Download and use Java { $major }
 java-conflict-anyway = Launch anyway
 # Before a launch, the game's folder was found moved or deleted (plan game-folder-missing).
 missing-folder-title = The game folder of “{ $name }” is missing
-missing-folder-body = It may have been moved or deleted. Playing it with an empty folder starts over with no mods, saves or settings. To remove the game instead, delete it on its page.
+missing-folder-body = It may have been moved or deleted. Playing it as an empty game makes an empty folder, with no mods or saves.
 missing-folder-view = View game
 missing-folder-start = Play with empty folder
 missing-folder-failed = Couldn't create the game folder
@@ -1309,7 +1309,7 @@ placeholder-settings-body = The launcher and game defaults live here.
 ## Photosensitivity
 
 photosensitivity-title = About the photosensitivity filter
-photosensitivity-body = This filter only excludes projects whose authors declare flashing or strobing photosensitivity content. Projects without a declaration aren't excluded, so it can't guarantee the content is safe for people with photosensitive epilepsy.
+photosensitivity-body = This filter only excludes projects whose authors declare flashing content, so it can't guarantee safety.
 photosensitivity-dismiss = Got it, don't show again
 photosensitivity-ok = Got it
 
@@ -1516,7 +1516,7 @@ instance-memory-reset = Follow defaults everywhere
 instance-server-edit-title = Edit server
 instance-server-add-title = Add server
 instance-server-address = Address
-instance-server-address-help = Host name or IP, with an optional port (25565 by default), such as mc.example.com or mc.example.com:25570.
+instance-server-address-help = The port is optional; the default is 25565.
 instance-snapshot-title = Create snapshot
 instance-snapshot-note = Note
 instance-snapshot-scope = Scope
@@ -1790,7 +1790,7 @@ instance-settings-target-placeholder = World name or server address
 instance-settings-version-help = Create a snapshot first when changing it; worlds and settings aren't changed.
 instance-settings-loader-help = Installed mods may not be compatible with the new loader.
 instance-settings-game-files = Game files
-instance-settings-files-help = Checks each game file one by one and redownloads missing or damaged ones; worlds, mods and settings aren't changed.
+instance-settings-files-help = Fixes missing or damaged files; worlds and mods stay the same.
 instance-settings-not-downloaded = Not downloaded
 instance-settings-java-help = Automatic picks a discovered Java of the version this game needs; turned-off Java isn't listed here.
 instance-settings-java-intro = Enter the path to a Java program or JDK folder. Restore defaults switches back to automatic.
@@ -1818,7 +1818,10 @@ instance-settings-env-help = Extra environment variables for the game process. S
 instance-settings-variables = Variables
 instance-settings-commands-value = Before launch: { $pre } · Wrapper: { $wrapper } · After exit: { $post }
 instance-settings-commands-help = You write these commands yourself; they run with your user's permissions.
-instance-settings-commands-intro = Leave empty to follow the launcher default; enter - to make this game use none. Commands run with your user's permissions. Variables: $INST_ID, $INST_NAME, $INST_DIR, $INST_JAVA, $INST_MC_VERSION, $INST_LOADER.
+# The second line lists the environment variables a command can read, without $ or %: each system writes them differently.
+instance-settings-commands-intro =
+    Commands run as you and can do anything you can. Leave empty to use the default; enter - to run none.
+    Environment variables: INST_ID, INST_NAME, INST_DIR, INST_JAVA, INST_MC_VERSION, INST_LOADER
 instance-settings-command-pre-help = A failure (exit code not 0) cancels this launch.
 instance-settings-command-wrapper-help = Goes in front of the Java command.
 instance-settings-command-post-help = A failure is only recorded, and it may run for up to 60 seconds.
@@ -1947,7 +1950,7 @@ settings-scale-100 = 100%
 settings-scale-115 = 115%
 settings-scale-130 = 130%
 settings-wallpaper = Home wallpaper
-settings-wallpaper-help = Replaces Home's pixel world with your own picture, or with nothing, so a translucent theme shows the desktop. The picture is scaled down and kept in the launcher's folder, so the original can move.
+settings-wallpaper-help = Replaces Home's pixel world with your own picture.
 settings-wallpaper-default = Default world
 settings-wallpaper-chosen = Your picture
 settings-wallpaper-bare = No wallpaper
@@ -1967,7 +1970,7 @@ settings-motion-full = Full
 settings-language = Language
 settings-language-help = The language of the launcher. Game logs and project descriptions stay as written.
 settings-translation = Translation
-settings-translation-help = When on, Discover uses Chinese summaries from MCIM where it has them, and otherwise from launcher.lumilio.org (LumilioCL's own machine translation). Only the platform and project ID go to these two services. If neither has a translation, the summary stays as written. Choose Translate on a project page to send its description to the selected provider. Only Simplified Chinese for now, and titles stay as written.
+settings-translation-help = Shows Chinese summaries on Discover; only project IDs are sent.
 settings-translation-provider = Translation provider
 settings-translation-cache = Translation cache
 settings-translation-cache-help = Translations are kept on this computer for 7 days. After you clear them, the next translation asks again.
@@ -2006,7 +2009,10 @@ settings-env-intro = One per line, written as NAME=value.
 settings-commands = Before, wrapper and after-exit commands
 settings-commands-help = You write these commands yourself; they run with your user's permissions.
 settings-commands-dialog = Commands
-settings-commands-intro = Commands run with your user's permissions, and only once you fill them in. Variables: $INST_ID, $INST_NAME, $INST_DIR (the game folder), $INST_JAVA, $INST_MC_VERSION, $INST_LOADER.
+# The second line lists the environment variables a command can read, without $ or %: each system writes them differently.
+settings-commands-intro =
+    Commands run as you and can do anything you can.
+    Environment variables: INST_ID, INST_NAME, INST_DIR, INST_JAVA, INST_MC_VERSION, INST_LOADER
 settings-command-pre = Before launch
 settings-command-pre-short = Before launch
 settings-command-pre-help = Runs before the game starts; if it fails (exit code not 0), this launch is cancelled.
@@ -2040,7 +2046,7 @@ settings-java-rescan = Detect again
 settings-java-install = Download Java…
 settings-java-add = Add Java…
 settings-java-source = Download source
-settings-java-source-help = Oracle GraalVM has Java 21 and 25 only; other versions still come from Mojang. Downloads on launch use this source too.
+settings-java-source-help = Oracle GraalVM has Java 21 and 25 only.
 settings-java-source-mojang = Mojang
 settings-java-source-graalvm = Oracle GraalVM
 settings-java-auto-install = Download Java on launch
@@ -2060,7 +2066,7 @@ settings-storage-java = Java
 settings-storage-cache = Cache
 settings-mirror-added = Added
 settings-mirror-not-added = Not added
-settings-bmclapi-help = Game files, Forge, NeoForge, Fabric and authlib-injector. Once added, you can choose “Mirror first”.
+settings-bmclapi-help = A mirror in China for the game and loaders.
 settings-mcim-help = Modrinth and CurseForge metadata and files. The official source is always tried first and MCIM only after it fails; never with “Official only”.
 settings-tencent-maven = Tencent Maven
 settings-tencent-maven-help = Java libraries from Maven Central.
@@ -2082,7 +2088,7 @@ settings-concurrency-help = How many files download at the same time across all 
 settings-concurrency-intro = Leave empty to let the launcher decide.
 settings-concurrency-field = Count (1–32)
 settings-block-assets = Download block assets automatically
-settings-block-assets-help = Schematic previews download their block assets from launcher.lumilio.org when they first need them. When this is off, nothing is downloaded; assets that are already downloaded are still used.
+settings-block-assets-help = Schematic previews need them; when off, previews may not show.
 settings-data-dir = Data folder
 settings-data-dir-help = Games, shared files and settings all live here. It can't be changed.
 settings-reclaim = Check for unused game files
@@ -2116,7 +2122,7 @@ settings-update-unsupported-install = Automatic updates are unavailable for this
 settings-logs = Launcher logs
 settings-logs-help = The warnings and errors the launcher ran into. Look here when something goes wrong.
 settings-diagnostics = Diagnostics
-settings-diagnostics-help = Packs the version, a settings summary, the Java list, the launcher log and each game's recent logs. Player names, UUIDs and your folder paths are replaced; for the before, wrapper and after-exit commands it only records whether they are set.
+settings-diagnostics-help = Packs logs and settings, with player names and UUIDs hidden.
 settings-diagnostics-export = Export…
 settings-disclaimer = Disclaimer
 settings-disclaimer-help = The disclaimer you agreed to when you first opened the launcher, and the Minecraft EULA.
@@ -2520,12 +2526,14 @@ options-review-title = { $count ->
     [one] { $count } option changed in the game
    *[other] { $count } options changed in the game
     }
-options-review-help = The preset shares these options. “This game only” keeps the change here; “Update preset” gives it to other games on their next launch; “Use preset value” restores the preset’s value on the next launch.
 options-review-none-selected = Select the options to decide on
 options-review-selected = { $count } selected
 options-keep-here = This game only
+options-keep-here-help = Keeps it in this game; the preset stays the same.
 options-share = Update preset
+options-share-help = Writes it to the preset; other games use it on next launch.
 options-restore = Use preset value
+options-restore-help = Goes back to the preset’s value on the next launch.
 options-review-conflict = The preset changed it to { $value } too
 options-review-conflict-help = The preset also changed the selected options.
 options-review-replace = Replace with this game’s values…

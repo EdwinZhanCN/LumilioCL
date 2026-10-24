@@ -240,6 +240,9 @@ Discover.
 
 ## 8. Voice and copy
 
+What a message says and in what order follows
+[plain-language.md](plain-language.md); this section sets the voice and form.
+
 - Simplified Chinese first, English beside it; both calm and direct, second
   person implied: "把原来的游戏带过来", "上次没有启动成功".
 - Errors: one plain sentence saying what happened, one primary action, and
@@ -275,7 +278,10 @@ Discover.
 ## 9. Accessibility
 
 - Every icon-only control has a tooltip label; shortcuts appear in tooltips.
-  Labelled buttons have no tooltip — it would only repeat the label.
+  Labelled buttons have no tooltip that repeats the label. When keys that sit
+  together differ in a result their labels cannot carry (仅此游戏 / 更新预设 /
+  改回预设值), each key says its result in a one-line tooltip instead of one ⓘ
+  explaining them all (plain-language §6).
 - Every enabled, clickable control shows the pointing-hand cursor; disabled
   controls keep the arrow. Use `theme::clickable` for gpui-component buttons,
   which default to the arrow; plain clickable `div`s use `.cursor_pointer()`.
@@ -327,9 +333,10 @@ The page surface shows values and offers **quick actions**; it is not a form.
   on the trailing side. Rows stack vertically — never two settings side by
   side in one row, never label-above and label-beside mixed in one group.
 - **Help hides behind an info button**: no explanatory paragraph under a
-  label. A muted ⓘ right after the label shows the help as a tooltip (one or
-  two sentences); longer help uses a popover. Inherited values say so in the
-  value itself: "跟随默认 · 4096 MB", "由 Java 决定".
+  label. A muted ⓘ right after the label shows the help as a tooltip, which
+  never wraps: one line (plain-language §6); longer help uses a popover.
+  Inherited values say so in the value itself: "跟随默认 · 4096 MB",
+  "由 Java 决定".
 - **Destructive actions confirm in an alert dialog** that states the
   consequence in one sentence, with the confirm key in the danger colour.
   The danger colour must never be mistaken for the signal orange (§12).
