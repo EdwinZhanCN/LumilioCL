@@ -3,13 +3,13 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 
 use crate::accounts::account::AuthSession;
-use crate::forge_install::ForgeError;
-use crate::install::InstallError;
 use crate::instances::{InstanceRecord, Loader};
 use crate::java::JavaRuntime;
 use crate::launching::{LaunchFailure, LaunchProblem, LaunchSignal};
 use crate::launching::{LogStream, ProcessError};
-use crate::tuning::{LaunchTuning, QuickPlay};
+use crate::minecraft::forge_install::ForgeError;
+use crate::minecraft::install::InstallError;
+use crate::settings::tuning::{LaunchTuning, QuickPlay};
 use lumilio_minecraft::ReleaseError;
 use lumilio_minecraft::{LaunchDirectories, LaunchError};
 
@@ -43,7 +43,7 @@ pub struct LaunchRequest {
 #[derive(Debug)]
 pub struct JavaRequest {
     pub major: Option<u32>,
-    pub build: crate::java_runtime::JavaBuild,
+    pub build: crate::java::downloads::JavaBuild,
     pub reply: tokio::sync::oneshot::Sender<Result<JavaRuntime, String>>,
 }
 

@@ -4,11 +4,11 @@
 use std::collections::BTreeMap;
 
 use super::LauncherService;
-use crate::attention::{HomeChecks, HomeSummary, summarize};
+use crate::diagnostics::attention::{HomeChecks, HomeSummary, summarize};
 use crate::diagnostics::{Problem, ProblemKind};
 use crate::error::ServiceError;
 use crate::instances::{InstanceRecord, Loader};
-use crate::loader::LoaderVersion;
+use crate::minecraft::loader::LoaderVersion;
 use crate::transfer::Transport;
 
 /// Instances diagnosed for Home: verifying files is not free, so only the
@@ -57,8 +57,9 @@ impl<T: Transport + Clone> LauncherService<T> {
         instances: &[InstanceRecord],
         checks: &HomeChecks,
     ) -> HomeSummary {
-        let has_account = crate::inspect::account_usable(self.settings.lock().await.get());
-        let problems = crate::attention::with_account(checks, has_account);
+        let has_account =
+            crate::diagnostics::inspect::account_usable(self.settings.lock().await.get());
+        let problems = crate::diagnostics::attention::with_account(checks, has_account);
         summarize(instances, &problems)
     }
 

@@ -25,4 +25,5 @@ use lumilio_minecraft::HostProfile;
 #[cfg(test)]
 mod tests;
 
+pub(crate) mod downloads;
 mod runtime;

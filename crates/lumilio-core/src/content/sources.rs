@@ -9,7 +9,7 @@
 use std::collections::BTreeMap;
 
 use crate::content::ContentItem;
-use crate::discover::{ProjectSummary, Version};
+use crate::content::discover::{ProjectSummary, Version};
 
 /// The project and version an installed file is, in the source that knew it.
 #[derive(Clone, Debug, Eq, PartialEq)]

@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use super::Content;
-use crate::discover::TextFormat;
+use crate::content::discover::TextFormat;
 use crate::transfer::Transport;
 use crate::{TranslatedDocument, TranslationError};
 

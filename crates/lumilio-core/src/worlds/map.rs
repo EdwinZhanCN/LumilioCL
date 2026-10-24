@@ -4,9 +4,10 @@ use lumilio_plugin_api::map::{
 };
 
 use super::Worlds;
+use super::world_map;
 use crate::error::ServiceError;
-use crate::world_map::store::annotations::{Annotation, AnnotationError};
-use crate::{CancellationToken, MapFailure, MapProviders, Transport, world_map};
+use crate::worlds::world_map::store::annotations::{Annotation, AnnotationError};
+use crate::{CancellationToken, MapFailure, MapProviders, Transport};
 
 impl<T: Transport + Clone> Worlds<T> {
     pub(crate) async fn map_annotations(

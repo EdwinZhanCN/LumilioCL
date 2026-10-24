@@ -8,8 +8,8 @@ use lumilio_plugin_api::{
 use tokio::sync::mpsc;
 
 use crate::activity::CancellationToken;
-use crate::history::{HistoryEvent, HistoryLog};
 use crate::instances::Loader;
+use crate::instances::history::{HistoryEvent, HistoryLog};
 use crate::plugins::{PluginHost, PluginStatus};
 use crate::testing::{World, fake_java, publish_modern_release, publish_release, world};
 

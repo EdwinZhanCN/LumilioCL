@@ -3,6 +3,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use super::SettingsStore;
+use crate::content::translation::SharedTranslation;
 use crate::context::ContextHub;
 use crate::error::ServiceError;
 use crate::instances::InstanceSettings;
@@ -11,7 +12,6 @@ use crate::network::Network;
 use crate::plugins::PluginHost;
 use crate::settings::validate_memory;
 use crate::transfer::Transport;
-use crate::translation::SharedTranslation;
 
 /// The launcher's own settings and the current game: the one place they are
 /// saved from, with what each change must also reach (download connections,
@@ -58,7 +58,7 @@ impl<T: Transport + Clone> Settings<T> {
 
     /// What the launcher window does when this instance's game runs: the
     /// instance's own choice, else the launcher preference.
-    pub(crate) async fn after_launch_for(&self, id: &str) -> crate::tuning::AfterLaunch {
+    pub(crate) async fn after_launch_for(&self, id: &str) -> crate::settings::tuning::AfterLaunch {
         let own = self
             .instances
             .lock()
@@ -106,7 +106,7 @@ impl<T: Transport + Clone> Settings<T> {
 
     pub(crate) async fn set_preferences(
         &self,
-        preferences: crate::tuning::Preferences,
+        preferences: crate::settings::tuning::Preferences,
     ) -> Result<(), ServiceError> {
         let mut settings = self.settings.lock().await;
         let changed = settings.get().preferences.translation != preferences.translation;
@@ -119,7 +119,7 @@ impl<T: Transport + Clone> Settings<T> {
 
     pub(crate) async fn set_launch_defaults(
         &self,
-        launch: crate::tuning::LaunchTuning,
+        launch: crate::settings::tuning::LaunchTuning,
     ) -> Result<(), ServiceError> {
         Ok(self.settings.lock().await.set_launch_defaults(launch)?)
     }

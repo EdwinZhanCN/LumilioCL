@@ -5,12 +5,12 @@ use crate::activity::{RetryAction, TaskAction, TaskCategory, TaskLabel};
 use crate::blocking::blocking_value;
 use crate::clock::now;
 use crate::content::Content;
-use crate::discover::{Catalog, ProjectOrigin};
+use crate::content::discover::{Catalog, ProjectOrigin};
 use crate::error::{ServiceError, read_unless_cancelled};
+use crate::instances::modpack;
+use crate::instances::modpack::PackIndex;
+use crate::instances::staged::Staged;
 use crate::instances::{InstanceRecord, NewInstance};
-use crate::modpack;
-use crate::modpack::PackIndex;
-use crate::staged::Staged;
 use crate::transfer::{TransferRequest, Transport};
 
 impl<T: Transport + Clone> InstanceLibrary<T> {
@@ -66,14 +66,14 @@ impl<T: Transport + Clone> InstanceLibrary<T> {
         let (from, to) = (self.layout.game(&source.id), staged.game_dir());
         let token = cancel.clone();
         let copied = tokio::task::spawn_blocking(move || {
-            crate::copy::copy_game(&from, &to, include_worlds, &token)
+            crate::instances::copy::copy_game(&from, &to, include_worlds, &token)
         })
         .await
         .map_err(std::io::Error::other);
         let copied = match copied {
             Ok(Ok(_)) => Ok(()),
-            Ok(Err(crate::copy::CopyError::Cancelled)) => Err(ServiceError::Cancelled),
-            Ok(Err(crate::copy::CopyError::Io(error))) | Err(error) => Err(error.into()),
+            Ok(Err(crate::instances::copy::CopyError::Cancelled)) => Err(ServiceError::Cancelled),
+            Ok(Err(crate::instances::copy::CopyError::Io(error))) | Err(error) => Err(error.into()),
         };
         if let Err(error) = copied {
             staged.discard();
@@ -355,7 +355,7 @@ impl<T: Transport + Clone> InstanceLibrary<T> {
         let file = version
             .install_file()
             .ok_or(ServiceError::NoCompatibleVersion)?;
-        if !crate::discover::is_safe_file_name(&file.filename) {
+        if !crate::content::discover::is_safe_file_name(&file.filename) {
             return Err(ServiceError::Install(format!(
                 "unsafe file name {:?}",
                 file.filename

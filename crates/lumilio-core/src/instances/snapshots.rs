@@ -1,9 +1,9 @@
 use super::InstanceLibrary;
 use crate::clock::now;
 use crate::error::ServiceError;
-use crate::history::ChangeKind;
-use crate::snapshots;
-use crate::snapshots::{SnapshotInfo, SnapshotScope};
+use crate::instances::history::ChangeKind;
+use crate::instances::snapshot_files;
+use crate::instances::snapshot_files::{SnapshotInfo, SnapshotScope};
 use crate::transfer::Transport;
 
 impl<T: Transport + Clone> InstanceLibrary<T> {
@@ -11,7 +11,7 @@ impl<T: Transport + Clone> InstanceLibrary<T> {
     pub(crate) async fn snapshots(&self, id: &str) -> Result<Vec<SnapshotInfo>, ServiceError> {
         self.instances.record(id).await?;
         let (root, id) = (self.layout.root().to_path_buf(), id.to_owned());
-        tokio::task::spawn_blocking(move || snapshots::list(&root, &id))
+        tokio::task::spawn_blocking(move || snapshot_files::list(&root, &id))
             .await
             .map_err(std::io::Error::other)?
             .map_err(ServiceError::from)
@@ -30,11 +30,11 @@ impl<T: Transport + Clone> InstanceLibrary<T> {
         let (root, game_dir) = (self.layout.root().to_path_buf(), self.layout.game(id));
         let (instance, label) = (id.to_owned(), label.to_owned());
         let created = tokio::task::spawn_blocking(move || {
-            snapshots::create(&root, &instance, &game_dir, scope, &label, now())
+            snapshot_files::create(&root, &instance, &game_dir, scope, &label, now())
         })
         .await
         .map_err(std::io::Error::other)??;
-        crate::history::record_change(
+        crate::instances::history::record_change(
             self.layout.root(),
             id,
             ChangeKind::SnapshotCreated,
@@ -56,11 +56,11 @@ impl<T: Transport + Clone> InstanceLibrary<T> {
         let (root, game_dir) = (self.layout.root().to_path_buf(), self.layout.game(id));
         let (instance, name) = (id.to_owned(), snapshot.to_owned());
         let units = tokio::task::spawn_blocking(move || {
-            snapshots::restore(&root, &instance, &name, &game_dir)
+            snapshot_files::restore(&root, &instance, &name, &game_dir)
         })
         .await
         .map_err(std::io::Error::other)??;
-        crate::history::record_change(
+        crate::instances::history::record_change(
             self.layout.root(),
             id,
             ChangeKind::SnapshotRestored,
@@ -82,10 +82,10 @@ impl<T: Transport + Clone> InstanceLibrary<T> {
             id.to_owned(),
             snapshot.to_owned(),
         );
-        tokio::task::spawn_blocking(move || snapshots::delete(&root, &instance, &name))
+        tokio::task::spawn_blocking(move || snapshot_files::delete(&root, &instance, &name))
             .await
             .map_err(std::io::Error::other)??;
-        crate::history::record_change(
+        crate::instances::history::record_change(
             self.layout.root(),
             id,
             ChangeKind::SnapshotDeleted,

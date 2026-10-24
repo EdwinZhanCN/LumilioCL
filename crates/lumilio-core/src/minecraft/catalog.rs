@@ -1,6 +1,6 @@
 use lumilio_minecraft::{OFFICIAL_CATALOG_URL, VersionCatalog};
 
-use crate::fetch::{FetchError, fetch_decoded};
+use crate::network::fetch::{FetchError, fetch_decoded};
 use crate::transfer::{SourceChain, TransferEngine, Transport};
 
 /// Fetches the official version catalog from the first source that answers

@@ -3,8 +3,8 @@ use std::path::Path;
 use super::LauncherService;
 use crate::activity::CancellationToken;
 use crate::error::ServiceError;
+use crate::instances::snapshot_files::{SnapshotInfo, SnapshotScope};
 use crate::instances::{InstanceRecord, Library, Loader};
-use crate::snapshots::{SnapshotInfo, SnapshotScope};
 use crate::transfer::Transport;
 
 impl<T: Transport + Clone> LauncherService<T> {
@@ -96,13 +96,13 @@ impl<T: Transport + Clone> LauncherService<T> {
     pub async fn detect_games(
         &self,
         folder: &Path,
-    ) -> Result<Vec<crate::import_game::FoundGame>, ServiceError> {
+    ) -> Result<Vec<crate::instances::import_game::FoundGame>, ServiceError> {
         self.library.detect_games(folder).await
     }
 
     pub async fn import_game(
         &self,
-        game: crate::import_game::FoundGame,
+        game: crate::instances::import_game::FoundGame,
         cancel: CancellationToken,
     ) -> Result<InstanceRecord, ServiceError> {
         self.library.import_game(game, cancel).await

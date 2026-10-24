@@ -1,6 +1,6 @@
 use crate::error::ServiceError;
-use crate::history::ChangeKind;
 use crate::instances::Loader;
+use crate::instances::history::ChangeKind;
 use crate::testing::{change_subjects, world};
 use crate::worlds::WorldError;
 

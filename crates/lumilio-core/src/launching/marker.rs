@@ -3,10 +3,10 @@ use std::{fs, io};
 
 use serde::{Deserialize, Serialize};
 
-use crate::history::{SessionOutcome, record_attempt};
 use crate::instances::InstanceStore;
-use crate::recovery::RecoveryNote;
+use crate::instances::history::{SessionOutcome, record_attempt};
 use crate::storage::Layout;
+use crate::storage::recovery::RecoveryNote;
 
 const MARKER_SCHEMA: u32 = 1;
 

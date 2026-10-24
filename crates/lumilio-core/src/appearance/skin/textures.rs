@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
-use crate::fetch::fetch_document;
+use crate::network::fetch::fetch_document;
 use crate::transfer::{TransferEngine, Transport};
 
 /// LittleSkin's CustomSkinLoader API, built in.

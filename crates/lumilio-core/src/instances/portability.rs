@@ -7,8 +7,8 @@ use crate::activity::{RetryAction, TaskAction, TaskCategory, TaskLabel};
 use crate::blocking::blocking_value;
 use crate::clock::now;
 use crate::error::ServiceError;
+use crate::instances::staged::Staged;
 use crate::instances::{InstanceRecord, InstanceSettings, Loader, NewInstance};
-use crate::staged::Staged;
 use crate::transfer::Transport;
 
 impl<T: Transport + Clone> InstanceLibrary<T> {
@@ -16,9 +16,9 @@ impl<T: Transport + Clone> InstanceLibrary<T> {
     pub(crate) async fn detect_games(
         &self,
         folder: &Path,
-    ) -> Result<Vec<crate::import_game::FoundGame>, ServiceError> {
+    ) -> Result<Vec<crate::instances::import_game::FoundGame>, ServiceError> {
         let folder = folder.to_owned();
-        blocking_value(move || crate::import_game::detect(&folder))
+        blocking_value(move || crate::instances::import_game::detect(&folder))
             .await?
             .map_err(|error| ServiceError::Install(error.to_string()))
     }
@@ -28,7 +28,7 @@ impl<T: Transport + Clone> InstanceLibrary<T> {
     /// installed on first launch. Built whole before it appears.
     pub(crate) async fn import_game(
         &self,
-        game: crate::import_game::FoundGame,
+        game: crate::instances::import_game::FoundGame,
         cancel: CancellationToken,
     ) -> Result<InstanceRecord, ServiceError> {
         let task = self.tasks.begin(
@@ -50,7 +50,7 @@ impl<T: Transport + Clone> InstanceLibrary<T> {
 
     pub(crate) async fn import_game_inner(
         &self,
-        game: crate::import_game::FoundGame,
+        game: crate::instances::import_game::FoundGame,
         cancel: CancellationToken,
     ) -> Result<InstanceRecord, ServiceError> {
         if game.loader != Loader::Vanilla
@@ -63,19 +63,20 @@ impl<T: Transport + Clone> InstanceLibrary<T> {
         let staged = Staged::claim(&*self.instances.lock().await, "import", &game.name)?;
         let id = staged.id().to_owned();
         let (source, into, token) = (game.clone(), staged.game_dir(), cancel.clone());
-        let copied =
-            blocking_value(move || crate::import_game::copy_game_files(&source, &into, &token))
-                .await
-                .and_then(|result| {
-                    result.map_err(|error| match error {
-                        crate::import_game::ImportError::Io(io)
-                            if io.kind() == std::io::ErrorKind::Interrupted =>
-                        {
-                            ServiceError::Cancelled
-                        }
-                        other => ServiceError::Install(other.to_string()),
-                    })
-                });
+        let copied = blocking_value(move || {
+            crate::instances::import_game::copy_game_files(&source, &into, &token)
+        })
+        .await
+        .and_then(|result| {
+            result.map_err(|error| match error {
+                crate::instances::import_game::ImportError::Io(io)
+                    if io.kind() == std::io::ErrorKind::Interrupted =>
+                {
+                    ServiceError::Cancelled
+                }
+                other => ServiceError::Install(other.to_string()),
+            })
+        });
         if let Err(error) = copied {
             staged.discard();
             return Err(error);
@@ -144,7 +145,7 @@ impl<T: Transport + Clone> InstanceLibrary<T> {
                 instance: id.to_owned(),
                 path: destination.display().to_string(),
             });
-        let meta = crate::backup::BackupMeta {
+        let meta = crate::instances::backup::BackupMeta {
             format: 1,
             name: record.name.clone(),
             game_version: record.game_version.clone(),
@@ -156,7 +157,7 @@ impl<T: Transport + Clone> InstanceLibrary<T> {
         let (game_dir, destination, token) =
             (self.layout.game(id), destination.to_owned(), cancel.clone());
         let result = tokio::task::spawn_blocking(move || {
-            crate::backup::write(&game_dir, &meta, &destination, &token)
+            crate::instances::backup::write(&game_dir, &meta, &destination, &token)
         })
         .await
         .map_err(std::io::Error::other)
@@ -208,7 +209,7 @@ impl<T: Transport + Clone> InstanceLibrary<T> {
         let source = archive.to_owned();
         let meta = blocking_value({
             let source = source.clone();
-            move || crate::backup::read_meta(&source)
+            move || crate::instances::backup::read_meta(&source)
         })
         .await?
         .map_err(backup_failure)?;
@@ -237,9 +238,10 @@ impl<T: Transport + Clone> InstanceLibrary<T> {
         };
         let id = staged.id().to_owned();
         let (into, token) = (staged.game_dir(), cancel.clone());
-        let extracted = blocking_value(move || crate::backup::restore(&source, &into, &token))
-            .await
-            .and_then(|result| result.map_err(backup_failure));
+        let extracted =
+            blocking_value(move || crate::instances::backup::restore(&source, &into, &token))
+                .await
+                .and_then(|result| result.map_err(backup_failure));
         if let Err(error) = extracted {
             staged.discard();
             return Err(error);

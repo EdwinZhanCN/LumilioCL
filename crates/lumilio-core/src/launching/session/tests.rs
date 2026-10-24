@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use super::{FULL, LaunchFailure, LaunchPhase, LaunchSession, LaunchSignal, LaunchStatus};
-use crate::install::{InstallEvent, InstallStage};
+use crate::minecraft::install::{InstallEvent, InstallStage};
 
 fn progress(done: u64, total: u64) -> LaunchSignal {
     LaunchSignal::Progress { done, total }

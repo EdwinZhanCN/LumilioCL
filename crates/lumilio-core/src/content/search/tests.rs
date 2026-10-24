@@ -1,5 +1,5 @@
 use crate::activity::CancellationToken;
-use crate::discover::ProjectKind;
+use crate::content::discover::ProjectKind;
 use crate::error::ServiceError;
 use crate::instances::Loader;
 use crate::testing::{
@@ -17,7 +17,7 @@ async fn a_version_can_be_saved_where_the_person_chooses_and_can_be_retried() {
     let name = world
         .service
         .save_version_as(
-            crate::discover::DEFAULT_SOURCE,
+            crate::content::discover::DEFAULT_SOURCE,
             "cool",
             "v1",
             &target,
@@ -34,7 +34,7 @@ async fn a_version_can_be_saved_where_the_person_chooses_and_can_be_retried() {
         world
             .service
             .save_version_as(
-                crate::discover::DEFAULT_SOURCE,
+                crate::content::discover::DEFAULT_SOURCE,
                 "cool",
                 "nope",
                 &target,
@@ -72,7 +72,7 @@ async fn required_dependencies_are_listed_nearest_first_once_and_without_what_is
         .missing_dependencies(
             &record.id,
             ProjectKind::Mod,
-            crate::discover::DEFAULT_SOURCE,
+            crate::content::discover::DEFAULT_SOURCE,
             "cool",
             None,
         )
@@ -89,7 +89,7 @@ async fn required_dependencies_are_listed_nearest_first_once_and_without_what_is
             .missing_dependencies(
                 &record.id,
                 ProjectKind::ResourcePack,
-                crate::discover::DEFAULT_SOURCE,
+                crate::content::discover::DEFAULT_SOURCE,
                 "cool",
                 None
             )
@@ -155,7 +155,7 @@ async fn optional_mods_are_suggested_and_installed_ones_it_cannot_live_with_are_
         .dependency_report(
             &record.id,
             ProjectKind::Mod,
-            crate::discover::DEFAULT_SOURCE,
+            crate::content::discover::DEFAULT_SOURCE,
             "cool",
             None,
         )
@@ -219,7 +219,7 @@ async fn a_dependency_already_in_the_game_is_not_offered_and_one_without_a_fit_i
         .missing_dependencies(
             &record.id,
             ProjectKind::Mod,
-            crate::discover::DEFAULT_SOURCE,
+            crate::content::discover::DEFAULT_SOURCE,
             "cool",
             None,
         )
@@ -247,7 +247,7 @@ async fn filters_are_fetched_once_and_say_what_the_source_can_do() {
     answer_filters(&world);
     let filters = world
         .service
-        .discover_filters(crate::discover::DEFAULT_SOURCE)
+        .discover_filters(crate::content::discover::DEFAULT_SOURCE)
         .await
         .unwrap();
     assert_eq!(filters.source, "Modrinth");
@@ -270,7 +270,7 @@ async fn filters_are_fetched_once_and_say_what_the_source_can_do() {
     assert_eq!(
         world
             .service
-            .discover_filters(crate::discover::DEFAULT_SOURCE)
+            .discover_filters(crate::content::discover::DEFAULT_SOURCE)
             .await
             .unwrap(),
         filters
@@ -286,13 +286,13 @@ async fn a_search_goes_through_the_source_and_comes_back_in_launcher_types() {
             "summary":"Faster","project_types":["mod"],"author":"jellysquid3",
             "loaders":["fabric"],"categories":["optimization","fabric"],"downloads":9,"follows":3}]}"#,
     );
-    let mut query = crate::discover::SearchQuery::new(ProjectKind::Mod);
+    let mut query = crate::content::discover::SearchQuery::new(ProjectKind::Mod);
     query.text = "sodium".into();
-    query.sort = crate::discover::SortIndex::Downloads;
-    query.loaders = vec![crate::discover::Pick::include("fabric")];
+    query.sort = crate::content::discover::SortIndex::Downloads;
+    query.loaders = vec![crate::content::discover::Pick::include("fabric")];
     let page = world
         .service
-        .search(crate::discover::DEFAULT_SOURCE, &query)
+        .search(crate::content::discover::DEFAULT_SOURCE, &query)
         .await
         .unwrap();
     assert_eq!(page.total_hits, 41);
@@ -317,7 +317,7 @@ async fn an_unreachable_source_fails_that_call_and_works_again_when_the_network_
     let world = world();
     let error = world
         .service
-        .discover_filters(crate::discover::DEFAULT_SOURCE)
+        .discover_filters(crate::content::discover::DEFAULT_SOURCE)
         .await
         .unwrap_err();
     assert!(
@@ -329,7 +329,7 @@ async fn an_unreachable_source_fails_that_call_and_works_again_when_the_network_
     assert!(
         world
             .service
-            .discover_filters(crate::discover::DEFAULT_SOURCE)
+            .discover_filters(crate::content::discover::DEFAULT_SOURCE)
             .await
             .is_ok()
     );
@@ -341,7 +341,7 @@ async fn with_the_source_disabled_nothing_is_served_not_even_from_memory() {
     answer_filters(&world);
     world
         .service
-        .discover_filters(crate::discover::DEFAULT_SOURCE)
+        .discover_filters(crate::content::discover::DEFAULT_SOURCE)
         .await
         .unwrap();
     let record = fabric_instance(&world, "1.0").await;
@@ -358,7 +358,7 @@ async fn with_the_source_disabled_nothing_is_served_not_even_from_memory() {
     assert!(matches!(
         world
             .service
-            .discover_filters(crate::discover::DEFAULT_SOURCE)
+            .discover_filters(crate::content::discover::DEFAULT_SOURCE)
             .await,
         Err(ServiceError::NoContentSource)
     ));
@@ -366,8 +366,8 @@ async fn with_the_source_disabled_nothing_is_served_not_even_from_memory() {
         world
             .service
             .search(
-                crate::discover::DEFAULT_SOURCE,
-                &crate::discover::SearchQuery::new(ProjectKind::Mod)
+                crate::content::discover::DEFAULT_SOURCE,
+                &crate::content::discover::SearchQuery::new(ProjectKind::Mod)
             )
             .await,
         Err(ServiceError::NoContentSource)
@@ -375,7 +375,7 @@ async fn with_the_source_disabled_nothing_is_served_not_even_from_memory() {
     assert!(matches!(
         world
             .service
-            .project_detail(crate::discover::DEFAULT_SOURCE, "cool")
+            .project_detail(crate::content::discover::DEFAULT_SOURCE, "cool")
             .await,
         Err(ServiceError::NoContentSource)
     ));
@@ -385,7 +385,7 @@ async fn with_the_source_disabled_nothing_is_served_not_even_from_memory() {
             .install_content(
                 &record.id,
                 ProjectKind::Mod,
-                crate::discover::DEFAULT_SOURCE,
+                crate::content::discover::DEFAULT_SOURCE,
                 "cool",
                 CancellationToken::new()
             )
@@ -396,7 +396,7 @@ async fn with_the_source_disabled_nothing_is_served_not_even_from_memory() {
         world
             .service
             .install_modpack(
-                crate::discover::DEFAULT_SOURCE,
+                crate::content::discover::DEFAULT_SOURCE,
                 "cool",
                 None,
                 CancellationToken::new()
@@ -426,7 +426,7 @@ async fn with_the_source_disabled_nothing_is_served_not_even_from_memory() {
     assert!(
         world
             .service
-            .discover_filters(crate::discover::DEFAULT_SOURCE)
+            .discover_filters(crate::content::discover::DEFAULT_SOURCE)
             .await
             .is_ok()
     );
@@ -453,7 +453,7 @@ async fn detail_bundles_project_versions_newest_first_and_survives_a_missing_own
     );
     let detail = world
         .service
-        .project_detail(crate::discover::DEFAULT_SOURCE, "cool")
+        .project_detail(crate::content::discover::DEFAULT_SOURCE, "cool")
         .await
         .unwrap();
     assert_eq!(detail.project.title, "Cool");
@@ -475,7 +475,7 @@ async fn a_chosen_older_version_is_installed_instead_of_the_newest() {
         .install_version(
             &record.id,
             ProjectKind::Mod,
-            crate::discover::DEFAULT_SOURCE,
+            crate::content::discover::DEFAULT_SOURCE,
             "cool",
             "v1",
             CancellationToken::new(),
@@ -500,7 +500,7 @@ async fn a_version_for_another_game_or_an_unknown_id_is_refused_before_any_downl
             .install_version(
                 &record.id,
                 ProjectKind::Mod,
-                crate::discover::DEFAULT_SOURCE,
+                crate::content::discover::DEFAULT_SOURCE,
                 "cool",
                 id,
                 CancellationToken::new(),

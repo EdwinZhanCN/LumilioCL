@@ -19,7 +19,7 @@ use base64::Engine as _;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
-use crate::fetch::{fetch_decoded, fetch_document};
+use crate::network::fetch::{fetch_decoded, fetch_document};
 use crate::transfer::{SourceChain, TransferEngine, Transport};
 
 /// The index of the latest build.

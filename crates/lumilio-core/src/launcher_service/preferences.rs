@@ -8,7 +8,7 @@ impl<T: Transport + Clone> LauncherService<T> {
         self.preferences.settings().await
     }
 
-    pub async fn after_launch_for(&self, id: &str) -> crate::tuning::AfterLaunch {
+    pub async fn after_launch_for(&self, id: &str) -> crate::settings::tuning::AfterLaunch {
         self.preferences.after_launch_for(id).await
     }
 
@@ -30,14 +30,14 @@ impl<T: Transport + Clone> LauncherService<T> {
 
     pub async fn set_preferences(
         &self,
-        preferences: crate::tuning::Preferences,
+        preferences: crate::settings::tuning::Preferences,
     ) -> Result<(), ServiceError> {
         self.preferences.set_preferences(preferences).await
     }
 
     pub async fn set_launch_defaults(
         &self,
-        launch: crate::tuning::LaunchTuning,
+        launch: crate::settings::tuning::LaunchTuning,
     ) -> Result<(), ServiceError> {
         self.preferences.set_launch_defaults(launch).await
     }

@@ -11,9 +11,14 @@ pub use self::models::ModelPreview;
 
 mod map;
 mod models;
+pub(crate) mod multiplayer;
 mod operations;
 mod saves;
+pub(crate) mod schematic_assets;
+pub(crate) mod schematic_ops;
 mod schematic_packs;
 mod schematics;
+pub(crate) mod screenshot_files;
 mod screenshots;
 mod servers;
+pub mod world_map;

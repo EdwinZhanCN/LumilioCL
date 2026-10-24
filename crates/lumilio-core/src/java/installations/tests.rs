@@ -2,7 +2,7 @@ use crate::activity::CancellationToken;
 use crate::activity::{RetryAction, TaskOutcome};
 use crate::error::ServiceError;
 use crate::instances::Loader;
-use crate::java_runtime::JavaBuild;
+use crate::java::downloads::JavaBuild;
 use crate::testing::{fake_java, launch_to_end, publish_java, publish_release, world};
 
 #[tokio::test]
@@ -19,7 +19,7 @@ async fn java_metadata_falls_back_from_bad_index_and_manifest() {
         .set_mirrors(
             vec![
                 crate::MirrorRule {
-                    official_prefix: crate::java_runtime::INDEX_URL.to_owned(),
+                    official_prefix: crate::java::downloads::INDEX_URL.to_owned(),
                     mirror_prefix: "https://mirror.test/bad-index".into(),
                 },
                 crate::MirrorRule {
@@ -61,7 +61,7 @@ async fn java_is_installed_whole_found_by_discovery_and_a_bad_file_leaves_nothin
         failed.retry,
         Some(RetryAction::InstallJava {
             major: Some(21),
-            source: crate::java_runtime::JavaSource::Mojang,
+            source: crate::java::downloads::JavaSource::Mojang,
             build: JavaBuild::Any,
         })
     );
@@ -150,7 +150,7 @@ fn publish_graalvm(world: &crate::testing::World, wrong_checksum: bool) {
 
 #[tokio::test]
 async fn graalvm_comes_from_its_archive_and_a_bad_checksum_leaves_nothing() {
-    use crate::java_runtime::JavaSource;
+    use crate::java::downloads::JavaSource;
     let world = world();
     world
         .service
@@ -405,7 +405,7 @@ async fn a_java_the_user_turned_off_is_listed_but_never_chosen() {
 
 #[tokio::test]
 async fn an_instance_java_must_exist_and_a_bad_override_changes_nothing() {
-    use crate::tuning::InstanceLaunch;
+    use crate::settings::tuning::InstanceLaunch;
     let world = world();
     publish_release(&world);
     let record = world

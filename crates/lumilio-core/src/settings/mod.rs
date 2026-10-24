@@ -14,5 +14,9 @@ pub use store::{
 
 mod current;
 mod memory;
+pub(crate) mod mirror_presets;
 mod operations;
+pub(crate) mod picture;
 mod store;
+pub(crate) mod tuning;
+pub(crate) mod wallpaper;

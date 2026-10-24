@@ -169,7 +169,7 @@ async fn home_applies_the_account_to_checks_already_made() {
         "{:?}",
         checks[&id]
     );
-    let needs_account = |summary: &crate::attention::HomeSummary| {
+    let needs_account = |summary: &crate::diagnostics::attention::HomeSummary| {
         summary
             .needs_attention
             .iter()

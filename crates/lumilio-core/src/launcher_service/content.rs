@@ -3,14 +3,14 @@ use std::path::{Path, PathBuf};
 
 use super::LauncherService;
 use crate::activity::CancellationToken;
+use crate::content::discover::{ProjectKind, SearchPage, SearchQuery, TextFormat, Version};
 use crate::content::{
     AddedFile, ContentResult, ContentSourceInfo, DependencyNeed, DependencyReport, DiscoverFilters,
     InstalledProject, ProjectDetail,
 };
 use crate::content::{ContentError, ContentItem};
-use crate::discover::{ProjectKind, SearchPage, SearchQuery, TextFormat, Version};
 use crate::error::ServiceError;
-use crate::modpack::PendingDownload;
+use crate::instances::modpack::PendingDownload;
 use crate::transfer::Transport;
 use crate::{TranslatedDocument, TranslationError};
 

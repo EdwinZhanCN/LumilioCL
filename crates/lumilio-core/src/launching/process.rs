@@ -17,7 +17,7 @@ use tokio::sync::mpsc;
 
 use crate::activity::CancellationToken;
 use crate::launching::{LaunchFailure, LaunchSignal};
-use crate::tuning::{LaunchTuning, split_words};
+use crate::settings::tuning::{LaunchTuning, split_words};
 use lumilio_minecraft::LaunchPlan;
 
 /// How long a process must stay alive before it counts as running when it

@@ -7,8 +7,8 @@ use crate::LauncherService;
 use crate::error::ServiceError;
 use crate::instances::Loader;
 use crate::plugins::PluginHost;
-use crate::schematic_assets::{AssetNotice, EntityGeometry, PlannedSource, SourceRole};
 use crate::testing::world;
+use crate::worlds::schematic_assets::{AssetNotice, EntityGeometry, PlannedSource, SourceRole};
 
 struct Builder;
 
@@ -256,7 +256,7 @@ async fn a_game_that_is_not_installed_previews_with_the_bundle_fetched_as_a_task
     assert!(pack.assets.blockstates.contains_key("minecraft:stone"));
     assert_eq!(
         preview.plan.sources,
-        [crate::schematic_assets::PlannedSource::Bundle {
+        [crate::worlds::schematic_assets::PlannedSource::Bundle {
             version: "1.0".into()
         }]
     );
@@ -557,8 +557,11 @@ async fn an_added_pack_is_on_where_it_was_added_and_off_once_taken_off() {
         .await
         .unwrap();
     assert!(
-        crate::schematic_assets::switched_on(&world.service.layout.schematic_sources(&id), HOUSE)
-            .is_empty()
+        crate::worlds::schematic_assets::switched_on(
+            &world.service.layout.schematic_sources(&id),
+            HOUSE
+        )
+        .is_empty()
     );
     let preview = world
         .service

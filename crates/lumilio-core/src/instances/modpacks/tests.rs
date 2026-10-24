@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::activity::CancellationToken;
 use crate::activity::{RetryAction, TaskOutcome};
 use crate::error::ServiceError;
-use crate::history::{ChangeKind, HistoryEvent, HistoryLog};
+use crate::instances::history::{ChangeKind, HistoryEvent, HistoryLog};
 use crate::instances::{InstanceSettings, Loader, StoreError};
 use crate::testing::{
     World, file_url, instance_with_profile, no_leftovers, pack_file, pack_index, sha1_hex, world,
@@ -22,8 +22,8 @@ async fn an_exported_pack_carries_everything_when_modrinth_is_out_of_reach_and_n
     std::fs::create_dir_all(game.join("mods")).unwrap();
     std::fs::write(game.join("mods/a.jar"), b"jar").unwrap();
     std::fs::write(game.join("options.txt"), b"fov:70").unwrap();
-    let spec = crate::pack_export::ExportSpec {
-        format: crate::pack_export::PackFormat::Modrinth,
+    let spec = crate::instances::pack_export::ExportSpec {
+        format: crate::instances::pack_export::PackFormat::Modrinth,
         name: "Pack".into(),
         version: "1".into(),
         summary: None,
@@ -49,7 +49,7 @@ async fn an_exported_pack_carries_everything_when_modrinth_is_out_of_reach_and_n
         .unwrap();
     assert_eq!((report.linked, report.bundled), (0, 2));
     assert!(report.lookup_failed && report.size > 0);
-    let index = crate::modpack::read_index(&pack).unwrap();
+    let index = crate::instances::modpack::read_index(&pack).unwrap();
     assert_eq!(
         (index.name.as_str(), index.minecraft.as_str()),
         ("Pack", "1.0")
@@ -64,7 +64,7 @@ async fn an_exported_pack_carries_everything_when_modrinth_is_out_of_reach_and_n
             .export_modpack(&record.id, nothing, &pack, CancellationToken::new())
             .await,
         Err(ServiceError::Export(
-            crate::pack_export::ExportError::NothingChosen
+            crate::instances::pack_export::ExportError::NothingChosen
         ))
     ));
 }
@@ -98,7 +98,7 @@ async fn a_chosen_pack_version_is_installed_and_retried_instead_of_the_newest() 
     );
     let install = |version: Option<&'static str>| {
         world.service.install_modpack(
-            crate::discover::DEFAULT_SOURCE,
+            crate::content::discover::DEFAULT_SOURCE,
             "pack",
             version,
             CancellationToken::new(),
@@ -121,7 +121,7 @@ async fn a_chosen_pack_version_is_installed_and_retried_instead_of_the_newest() 
     assert_eq!(
         world.service.activity(10).finished[0].retry,
         Some(RetryAction::InstallModpack {
-            source: crate::discover::DEFAULT_SOURCE.into(),
+            source: crate::content::discover::DEFAULT_SOURCE.into(),
             project: "pack".into(),
             version: Some("gone".into()),
         })

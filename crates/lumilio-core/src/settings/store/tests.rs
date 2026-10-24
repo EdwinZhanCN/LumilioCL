@@ -164,7 +164,7 @@ fn the_current_instance_persists() {
 
 #[test]
 fn preferences_launch_defaults_and_concurrency_persist_and_validate() {
-    use crate::tuning::{AfterLaunch, Appearance, EnvVar, Language};
+    use crate::settings::tuning::{AfterLaunch, Appearance, EnvVar, Language};
     let (dir, mut store) = store();
     let preferences = Preferences {
         appearance: Appearance::Dark,

@@ -16,10 +16,10 @@ use crate::java::Java;
 use crate::launching::Launching;
 use crate::network::Network;
 use crate::plugins::PluginControls;
-use crate::recovery;
-use crate::recovery::RecoveryNote;
 use crate::settings::{Settings, SettingsStore};
 use crate::storage::Layout;
+use crate::storage::recovery;
+use crate::storage::recovery::RecoveryNote;
 use crate::transfer::{ConnectionBudget, Transport};
 use crate::worlds::Worlds;
 
@@ -98,7 +98,7 @@ impl<T: Transport + Clone> LauncherService<T> {
             instances.clone(),
         );
         let plugins = Arc::new(plugins);
-        let translation = Arc::new(crate::translation::TranslationService::new(
+        let translation = Arc::new(crate::content::translation::TranslationService::new(
             layout.root().to_owned(),
         ));
         Ok(Self {

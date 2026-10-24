@@ -9,12 +9,12 @@ use crate::activity::CancellationToken;
 use crate::activity::{TaskAction, TaskCategory, TaskLabel};
 use crate::blocking::blocking_value;
 use crate::error::ServiceError;
-use crate::schematic_assets::{
+use crate::transfer::Transport;
+use crate::worlds::schematic_assets::{
     AssetNotice, AssetPlan, BUNDLE_RELEASE, BundleFile, BundleIndex, BundleReach, BundleStore,
     EntityGeometry, InstanceAssets, LocalCache, PlannedSource, SchematicAssetsError,
     installed_names, instance_assets, load, look, provided, resolve, switched_on,
 };
-use crate::transfer::Transport;
 
 /// Everything the viewer is served.
 #[derive(Clone, Debug, PartialEq)]
@@ -59,7 +59,7 @@ impl<T: Transport + Clone> Worlds<T> {
             .read_model(plugin, self.layout.game(instance), file)
             .await
             .map_err(ServiceError::Plugin)?;
-        let data_version = crate::schematic_assets::data_version(&schematic);
+        let data_version = crate::worlds::schematic_assets::data_version(&schematic);
         let (layout, within) = (self.layout.clone(), file.to_owned());
         let facts = blocking_value(move || {
             let mut facts = instance_assets(&layout, &record);

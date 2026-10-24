@@ -1,5 +1,5 @@
 use super::*;
-use crate::discover::{ReleaseChannel, TextFormat, VersionFile};
+use crate::content::discover::{ReleaseChannel, TextFormat, VersionFile};
 
 fn item(name: &str, enabled: bool) -> ContentItem {
     ContentItem {

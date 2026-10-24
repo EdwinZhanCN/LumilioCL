@@ -12,7 +12,7 @@ use tokio::runtime::Handle;
 use tokio::time::Instant;
 use url::Url;
 
-use crate::fetch::DOCUMENT_LIMIT;
+use crate::network::fetch::DOCUMENT_LIMIT;
 use crate::transfer::{HttpMethod, HttpRequest, SourceChain, Transport, TransportResponse};
 
 const REQUEST_LIMIT: usize = 1024 * 1024;

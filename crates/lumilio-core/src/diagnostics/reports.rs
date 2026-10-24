@@ -9,15 +9,15 @@ use tokio::sync::Mutex;
 use super::{CrashReport, FileEntry, Problem, ProblemKind};
 use crate::activity::ActivityView;
 use crate::blocking::blocking;
+use crate::content::translation::SharedTranslation;
+use crate::diagnostics::inspect::inspect_instance;
 use crate::error::ServiceError;
-use crate::history::HistoryLog;
-use crate::inspect::inspect_instance;
 use crate::instances::Instances;
+use crate::instances::history::HistoryLog;
 use crate::java::JavaRuntime;
 use crate::plugins::PluginHost;
 use crate::settings::SettingsStore;
 use crate::storage::Layout;
-use crate::translation::SharedTranslation;
 
 /// How much of the log's end `logs` returns.
 pub(crate) const LOG_TAIL_BYTES: u64 = 64 * 1024;
@@ -82,7 +82,7 @@ impl Diagnostics {
     pub(crate) async fn history(
         &self,
         id: &str,
-    ) -> Result<crate::history::HistoryRead, ServiceError> {
+    ) -> Result<crate::instances::history::HistoryRead, ServiceError> {
         self.instances.record(id).await?;
         let (root, id) = (self.layout.root().to_path_buf(), id.to_owned());
         tokio::task::spawn_blocking(move || HistoryLog::for_instance(&root, &id).read())
@@ -288,7 +288,13 @@ impl Diagnostics {
         let mut problems = if verify_files {
             inspect_instance(&self.layout, settings, runtimes, record).await
         } else {
-            crate::inspect::inspect_home_instance(&self.layout, settings, runtimes, record).await
+            crate::diagnostics::inspect::inspect_home_instance(
+                &self.layout,
+                settings,
+                runtimes,
+                record,
+            )
+            .await
         };
         if problems
             .iter()
@@ -343,8 +349,8 @@ impl Diagnostics {
     pub(crate) fn redactor(
         &self,
         settings: &crate::settings::LauncherSettings,
-    ) -> crate::bundle::Redactor {
-        let mut redactor = crate::bundle::Redactor::new();
+    ) -> crate::diagnostics::bundle::Redactor {
+        let mut redactor = crate::diagnostics::bundle::Redactor::new();
         for entry in &settings.accounts {
             redactor.hide(&entry.name, "<player>");
             if let Ok(profile) = entry.profile() {
@@ -538,9 +544,11 @@ impl Diagnostics {
             *text = redactor.apply(text);
         }
         let destination = destination.to_owned();
-        tokio::task::spawn_blocking(move || crate::bundle::write_bundle(&destination, &files))
-            .await
-            .map_err(std::io::Error::other)??;
+        tokio::task::spawn_blocking(move || {
+            crate::diagnostics::bundle::write_bundle(&destination, &files)
+        })
+        .await
+        .map_err(std::io::Error::other)??;
         Ok(())
     }
 }
@@ -571,21 +579,24 @@ pub(crate) fn game_facts(
         &lumilio_minecraft::HostProfile::current(),
     )
     .map(|choice| choice.runtime.major());
-    let mods = crate::content::scan(directories.game(), crate::discover::ProjectKind::Mod)
-        .unwrap_or_default()
-        .into_iter()
-        .filter(|item| item.enabled && !item.is_directory)
-        .filter_map(|item| {
-            let metadata = crate::content::read_mod_metadata(
-                &directories.game().join("mods").join(&item.file_name),
-            )?;
-            Some(ModFact {
-                id: metadata.id,
-                version: metadata.version,
-                file: item.file_name,
-            })
+    let mods = crate::content::scan(
+        directories.game(),
+        crate::content::discover::ProjectKind::Mod,
+    )
+    .unwrap_or_default()
+    .into_iter()
+    .filter(|item| item.enabled && !item.is_directory)
+    .filter_map(|item| {
+        let metadata = crate::content::read_mod_metadata(
+            &directories.game().join("mods").join(&item.file_name),
+        )?;
+        Some(ModFact {
+            id: metadata.id,
+            version: metadata.version,
+            file: item.file_name,
         })
-        .collect();
+    })
+    .collect();
     GameFacts {
         game_version: record.game_version.clone(),
         loader: match record.loader {

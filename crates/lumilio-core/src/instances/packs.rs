@@ -35,7 +35,7 @@ pub(super) fn sniff_pack(path: &std::path::Path) -> PackKind {
         .any(|name| name.rsplit('/').next() == Some("mmc-pack.json"))
     {
         PackKind::Prism
-    } else if has(crate::modpack::curseforge::MANIFEST) {
+    } else if has(crate::instances::modpack::curseforge::MANIFEST) {
         PackKind::CurseForge
     } else {
         PackKind::Modrinth
@@ -98,9 +98,9 @@ pub(super) fn unpack_instance_zip(
 }
 
 /// How a backup failure is told: a cancel stays a cancel.
-pub(super) fn backup_failure(error: crate::backup::BackupError) -> ServiceError {
+pub(super) fn backup_failure(error: crate::instances::backup::BackupError) -> ServiceError {
     match error {
-        crate::backup::BackupError::Cancelled => ServiceError::Cancelled,
+        crate::instances::backup::BackupError::Cancelled => ServiceError::Cancelled,
         other => ServiceError::Install(other.to_string()),
     }
 }

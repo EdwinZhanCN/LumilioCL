@@ -20,9 +20,9 @@ pub use library::Library;
 use rusqlite::Connection;
 
 #[cfg(test)]
-use crate::storage::Layout;
+use crate::settings::tuning::InstanceLaunch;
 #[cfg(test)]
-use crate::tuning::InstanceLaunch;
+use crate::storage::Layout;
 
 #[cfg(test)]
 mod tests;
@@ -40,4 +40,13 @@ mod snapshots;
 
 mod collections;
 
+pub(crate) mod backup;
+pub(crate) mod copy;
+pub(crate) mod deletion;
+pub(crate) mod history;
+pub(crate) mod import_game;
 mod instance_store;
+pub(crate) mod modpack;
+pub(crate) mod pack_export;
+pub(crate) mod snapshot_files;
+pub(crate) mod staged;

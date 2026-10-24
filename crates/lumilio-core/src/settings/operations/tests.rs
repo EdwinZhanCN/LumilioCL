@@ -247,7 +247,7 @@ async fn service_settings_expose_only_saved_defaults_after_a_write_failure() {
 
 #[tokio::test]
 async fn an_instance_overrides_some_defaults_and_follows_the_rest() {
-    use crate::tuning::{InstanceLaunch, LaunchTuning};
+    use crate::settings::tuning::{InstanceLaunch, LaunchTuning};
     let world = world();
     publish_release(&world);
     fake_java(&world, ECHO_ARGS);
@@ -313,7 +313,7 @@ async fn an_instance_overrides_some_defaults_and_follows_the_rest() {
 
 #[tokio::test]
 async fn a_failing_command_before_launch_stops_the_game_but_one_after_exit_does_not() {
-    use crate::tuning::LaunchTuning;
+    use crate::settings::tuning::LaunchTuning;
     let world = world();
     publish_release(&world);
     fake_java(
@@ -358,7 +358,7 @@ async fn a_failing_command_before_launch_stops_the_game_but_one_after_exit_does_
 
 #[tokio::test]
 async fn the_window_follows_the_instance_choice_then_the_preference() {
-    use crate::tuning::{AfterLaunch, InstanceLaunch, Preferences};
+    use crate::settings::tuning::{AfterLaunch, InstanceLaunch, Preferences};
     let world = world();
     publish_release(&world);
     let record = world

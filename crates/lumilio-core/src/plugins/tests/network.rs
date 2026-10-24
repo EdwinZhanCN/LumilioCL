@@ -1,7 +1,7 @@
 use lumilio_plugin_api::{FetchRequest, FetchResponse, Words};
 
 use super::*;
-use crate::fetch::DOCUMENT_LIMIT;
+use crate::network::fetch::DOCUMENT_LIMIT;
 use crate::transfer::{
     HttpMethod, HttpRequest, OfficialSource, PrefixMirror, SourceChain, Transport, TransportError,
     TransportFuture, TransportResponse,

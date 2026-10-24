@@ -10,7 +10,7 @@
 //!
 //! The session carries no display text; the UI maps it to copy.
 
-use crate::install::{InstallEvent, InstallStage};
+use crate::minecraft::install::{InstallEvent, InstallStage};
 
 /// Overall progress is tracked in basis points so the session stays `Eq`.
 const FULL: u32 = 10_000;

@@ -17,7 +17,11 @@ pub(crate) use reports::LOG_TAIL_BYTES;
 pub(crate) use reports::{Diagnostics, game_facts};
 pub use reports::{GameLogSource, GameLogs};
 
+pub(crate) mod attention;
+pub(crate) mod bundle;
 mod disk;
+pub(crate) mod inspect;
 mod maintenance;
 mod problems;
+pub(crate) mod reclaim;
 mod reports;

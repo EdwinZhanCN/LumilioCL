@@ -13,7 +13,7 @@ fn request(name: &str) -> NewInstance {
 fn map_annotations_survive_library_updates_and_leave_with_the_instance() {
     use lumilio_plugin_api::map::{Dimension, MapPoint, WorldId};
 
-    use crate::world_map::store::annotations::{Annotation, AnnotationKind, list, put};
+    use crate::worlds::world_map::store::annotations::{Annotation, AnnotationKind, list, put};
 
     let dir = tempfile::tempdir().unwrap();
     let mut store = InstanceStore::open(dir.path()).unwrap();
@@ -247,7 +247,7 @@ fn a_schema_2_library_gains_the_source_column_and_a_modpack_remembers_its_projec
 
 #[test]
 fn launch_overrides_persist_are_normalized_and_bad_ones_are_refused() {
-    use crate::tuning::{AfterLaunch, QuickPlay};
+    use crate::settings::tuning::{AfterLaunch, QuickPlay};
     let dir = tempfile::tempdir().unwrap();
     let mut store = InstanceStore::open(dir.path()).unwrap();
     store.create(request("Mine"), 1).unwrap();

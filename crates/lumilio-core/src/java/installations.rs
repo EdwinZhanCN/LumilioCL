@@ -9,7 +9,7 @@ use crate::context::ContextHub;
 use crate::error::{ServiceError, read_unless_cancelled};
 use crate::instances::Instances;
 use crate::java::JavaLocator;
-use crate::java_runtime::{JavaBuild, JavaSource};
+use crate::java::downloads::{JavaBuild, JavaSource};
 use crate::network::Network;
 use crate::settings::SettingsStore;
 use crate::storage::Layout;
@@ -89,7 +89,7 @@ impl<T: Transport + Clone> Java<T> {
         let source = match build {
             JavaBuild::Any => {
                 let preferred = self.settings.lock().await.get().java_source;
-                crate::java_runtime::source_for(preferred, &HostProfile::current(), required)
+                crate::java::downloads::source_for(preferred, &HostProfile::current(), required)
             }
             JavaBuild::Intel => JavaSource::Mojang,
         };
@@ -258,12 +258,12 @@ impl<T: Transport + Clone> Java<T> {
     pub(crate) async fn java_offers(&self) -> Vec<(JavaSource, Vec<u32>)> {
         let host = HostProfile::current();
         let mojang = match self.network.chain().await {
-            Ok(chain) => crate::fetch::fetch_decoded(
+            Ok(chain) => crate::network::fetch::fetch_decoded(
                 &self.network.fetcher(),
-                &chain.candidates(crate::java_runtime::INDEX_URL),
+                &chain.candidates(crate::java::downloads::INDEX_URL),
                 |bytes| {
                     let index = String::from_utf8(bytes).map_err(|error| error.to_string())?;
-                    crate::java_runtime::offered_majors(&index, &host)
+                    crate::java::downloads::offered_majors(&index, &host)
                         .map_err(|error| error.to_string())
                 },
             )
@@ -275,7 +275,7 @@ impl<T: Transport + Clone> Java<T> {
             (JavaSource::Mojang, mojang),
             (
                 JavaSource::OracleGraalVm,
-                crate::java_runtime::graalvm::offered_majors(&host),
+                crate::java::downloads::graalvm::offered_majors(&host),
             ),
         ]
     }
@@ -288,7 +288,7 @@ impl<T: Transport + Clone> Java<T> {
         }
         #[cfg(not(test))]
         {
-            crate::java_runtime::is_trusted_source
+            crate::java::downloads::is_trusted_source
         }
     }
 
@@ -300,7 +300,7 @@ impl<T: Transport + Clone> Java<T> {
         }
         #[cfg(not(test))]
         {
-            crate::java_runtime::graalvm::is_trusted_source
+            crate::java::downloads::graalvm::is_trusted_source
         }
     }
 
@@ -313,7 +313,7 @@ impl<T: Transport + Clone> Java<T> {
         allow: fn(&str) -> bool,
         cancel: CancellationToken,
     ) -> Result<crate::java::JavaRuntime, ServiceError> {
-        use crate::java_runtime::{archive, graalvm};
+        use crate::java::downloads::{archive, graalvm};
         let fail = |why: String| ServiceError::Install(why);
         let major = required.unwrap_or(RECOMMENDED_MAJOR);
         let wanted = graalvm::archive(&HostProfile::current(), major)
@@ -321,7 +321,7 @@ impl<T: Transport + Clone> Java<T> {
         for url in [&wanted.url, &wanted.checksum_url] {
             if !allow(url) {
                 return Err(fail(
-                    crate::java_runtime::JavaRuntimeError::Unsafe(url.clone()).to_string(),
+                    crate::java::downloads::JavaRuntimeError::Unsafe(url.clone()).to_string(),
                 ));
             }
         }
@@ -335,7 +335,7 @@ impl<T: Transport + Clone> Java<T> {
         }
         let chain = read_unless_cancelled(&cancel, self.network.chain()).await?;
         let checksum = read_unless_cancelled(&cancel, async {
-            crate::fetch::fetch_decoded(
+            crate::network::fetch::fetch_decoded(
                 &self.network.fetcher(),
                 &chain.candidates(&wanted.checksum_url),
                 |bytes| {
@@ -408,7 +408,7 @@ impl<T: Transport + Clone> Java<T> {
         allow: fn(&str) -> bool,
         cancel: CancellationToken,
     ) -> Result<crate::java::JavaRuntime, ServiceError> {
-        use crate::java_runtime as runtime;
+        use crate::java::downloads as runtime;
         let fail = |why: String| ServiceError::Install(why);
         let host = lumilio_minecraft::HostProfile::current();
         if runtime::platform_keys(&host).is_empty() {
@@ -418,7 +418,7 @@ impl<T: Transport + Clone> Java<T> {
         }
         let chain = read_unless_cancelled(&cancel, self.network.chain()).await?;
         let choice = read_unless_cancelled(&cancel, async {
-            crate::fetch::fetch_decoded(
+            crate::network::fetch::fetch_decoded(
                 &self.network.fetcher(),
                 &chain.candidates(runtime::INDEX_URL),
                 |bytes| {
@@ -440,7 +440,7 @@ impl<T: Transport + Clone> Java<T> {
             return Ok(found);
         }
         let entries = read_unless_cancelled(&cancel, async {
-            crate::fetch::fetch_decoded(
+            crate::network::fetch::fetch_decoded(
                 &self.network.fetcher(),
                 &chain.candidates(&choice.manifest.url),
                 |bytes| {
@@ -627,7 +627,7 @@ impl<T: Transport + Clone> Java<T> {
 
     pub(crate) async fn set_java_source(
         &self,
-        source: crate::java_runtime::JavaSource,
+        source: crate::java::downloads::JavaSource,
     ) -> Result<(), ServiceError> {
         Ok(self.settings.lock().await.set_java_source(source)?)
     }

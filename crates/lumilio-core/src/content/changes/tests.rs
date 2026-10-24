@@ -4,9 +4,9 @@ use crate::activity::CancellationToken;
 use crate::activity::TaskOutcome;
 use crate::content::ContentEffect;
 use crate::content::ContentError;
-use crate::discover::ProjectKind;
+use crate::content::discover::ProjectKind;
 use crate::error::ServiceError;
-use crate::history::{ChangeKind, HistoryLog};
+use crate::instances::history::{ChangeKind, HistoryLog};
 use crate::instances::{Loader, NewInstance};
 use crate::launching::LaunchSignal;
 use crate::launching::LaunchUpdate;
@@ -36,7 +36,7 @@ async fn switching_versions_replaces_the_file_keeps_it_disabled_and_never_clobbe
             &record.id,
             ProjectKind::Mod,
             "cool-0.9.jar.disabled",
-            crate::discover::DEFAULT_SOURCE,
+            crate::content::discover::DEFAULT_SOURCE,
             "cool",
             "v1",
             CancellationToken::new(),
@@ -75,7 +75,7 @@ async fn switching_versions_replaces_the_file_keeps_it_disabled_and_never_clobbe
                 &record.id,
                 ProjectKind::Mod,
                 "cool.jar.disabled",
-                crate::discover::DEFAULT_SOURCE,
+                crate::content::discover::DEFAULT_SOURCE,
                 "cool",
                 "nope",
                 CancellationToken::new()
@@ -103,7 +103,7 @@ async fn install_never_replaces_a_same_named_file_with_other_content() {
         world.service.install_content(
             &record.id,
             ProjectKind::Mod,
-            crate::discover::DEFAULT_SOURCE,
+            crate::content::discover::DEFAULT_SOURCE,
             "cool",
             CancellationToken::new(),
         )
@@ -317,7 +317,7 @@ async fn installed_projects_list_the_file_and_the_newer_version_if_any() {
         .installed_projects(
             &record.id,
             ProjectKind::Mod,
-            crate::discover::DEFAULT_SOURCE,
+            crate::content::discover::DEFAULT_SOURCE,
         )
         .await
         .unwrap();
@@ -335,7 +335,7 @@ async fn installed_projects_list_the_file_and_the_newer_version_if_any() {
             .installed_projects(
                 &record.id,
                 ProjectKind::Mod,
-                crate::discover::DEFAULT_SOURCE
+                crate::content::discover::DEFAULT_SOURCE
             )
             .await
             .is_err()
@@ -370,7 +370,7 @@ async fn installed_content_lands_in_the_profile_and_is_logged() {
         .install_content(
             &record.id,
             ProjectKind::Mod,
-            crate::discover::DEFAULT_SOURCE,
+            crate::content::discover::DEFAULT_SOURCE,
             "cool",
             CancellationToken::new(),
         )
@@ -421,7 +421,7 @@ async fn content_for_another_game_version_is_refused_and_the_failure_is_logged()
         .install_content(
             &record.id,
             ProjectKind::Mod,
-            crate::discover::DEFAULT_SOURCE,
+            crate::content::discover::DEFAULT_SOURCE,
             "cool",
             CancellationToken::new(),
         )

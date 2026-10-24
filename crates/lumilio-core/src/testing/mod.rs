@@ -12,7 +12,7 @@ use tokio::sync::mpsc;
 use crate::LauncherService;
 use crate::activity::CancellationToken;
 use crate::error::ServiceError;
-use crate::history::{ChangeKind, HistoryEvent, HistoryLog, SessionOutcome};
+use crate::instances::history::{ChangeKind, HistoryEvent, HistoryLog, SessionOutcome};
 use crate::instances::{InstanceRecord, Loader, NewInstance};
 use crate::launching::GameExit;
 use crate::transfer::{FileTransport, Transport, TransportFuture, TransportResponse};
@@ -404,7 +404,7 @@ pub(crate) fn publish_java(world: &World, bad_hash: bool) {
         release.len(),
     );
     std::fs::write(world.server.join("jmanifest.json"), &manifest).unwrap();
-    let platform = crate::java_runtime::platform_key(&lumilio_minecraft::HostProfile::current())
+    let platform = crate::java::downloads::platform_key(&lumilio_minecraft::HostProfile::current())
         .expect("tests run on a platform with downloadable Java");
     let index = format!(
         r#"{{"{platform}":{{"java-runtime-delta":[{{"manifest":

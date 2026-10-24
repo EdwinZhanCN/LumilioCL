@@ -7,8 +7,8 @@ use std::path::PathBuf;
 use super::Content;
 use crate::content::ContentError;
 use crate::error::ServiceError;
-use crate::history::ChangeKind;
-use crate::modpack::PendingDownload;
+use crate::instances::history::ChangeKind;
+use crate::instances::modpack::PendingDownload;
 use crate::transfer::Transport;
 
 /// What happened to one chosen file.
@@ -110,7 +110,7 @@ impl<T: Transport + Clone> Content<T> {
             match placed {
                 Ok(()) => {
                     let pending = waiting.remove(at);
-                    crate::history::record_change(
+                    crate::instances::history::record_change(
                         self.layout.root(),
                         id,
                         ChangeKind::ContentAdded,

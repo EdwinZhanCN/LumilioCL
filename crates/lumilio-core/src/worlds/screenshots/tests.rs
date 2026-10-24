@@ -1,7 +1,7 @@
 use crate::error::ServiceError;
 use crate::instances::Loader;
-use crate::screenshots::ScreenshotError;
 use crate::testing::world;
+use crate::worlds::screenshot_files::ScreenshotError;
 
 #[tokio::test]
 async fn screenshots_are_listed_thumbnailed_and_deleted_even_while_the_game_is_busy() {

@@ -191,13 +191,13 @@ async fn games_imported_at_once_whose_names_give_one_id_each_get_their_own() {
         let dir = world._dir.path().join("source").join(name);
         std::fs::create_dir_all(dir.join("mods")).unwrap();
         std::fs::write(dir.join("mods/a.jar"), name).unwrap();
-        crate::import_game::FoundGame {
+        crate::instances::import_game::FoundGame {
             name: name.to_owned(),
             game_version: "26.3".to_owned(),
             loader: Loader::Vanilla,
             loader_version: None,
             game_dir: dir,
-            origin: crate::import_game::GameOrigin::MinecraftFolder,
+            origin: crate::instances::import_game::GameOrigin::MinecraftFolder,
         }
     };
     let (plain, renamed) = (found("26.3"), found("红石生电优化26.3"));
@@ -229,8 +229,8 @@ async fn a_game_exported_as_a_prism_zip_comes_back_in_through_the_pack_importer(
     std::fs::create_dir_all(game.join("mods")).unwrap();
     std::fs::write(game.join("mods/a.jar"), b"mod").unwrap();
     std::fs::write(game.join("options.txt"), b"fov:70").unwrap();
-    let spec = crate::pack_export::ExportSpec {
-        format: crate::pack_export::PackFormat::Prism,
+    let spec = crate::instances::pack_export::ExportSpec {
+        format: crate::instances::pack_export::PackFormat::Prism,
         name: "Round".into(),
         version: "1".into(),
         summary: None,

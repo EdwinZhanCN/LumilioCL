@@ -5,7 +5,7 @@ use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
 use std::{fmt, fs, io};
 
-use crate::discover::is_safe_file_name;
+use crate::content::discover::is_safe_file_name;
 use crate::nbt;
 
 const SAVES: &str = "saves";

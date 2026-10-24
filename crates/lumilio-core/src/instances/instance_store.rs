@@ -6,10 +6,10 @@ use std::{fmt, fs, io};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 
+use crate::settings::tuning::InstanceLaunch;
 use crate::storage::Layout;
 use crate::storage::persist;
 use crate::storage::persist::{PersistError, Versioned};
-use crate::tuning::InstanceLaunch;
 use lumilio_minecraft::LaunchDirectories;
 
 /// SQLite integers are signed; timestamps and counters never get near the limit.
@@ -547,7 +547,7 @@ impl InstanceStore {
         // game (an import or copy still running) will be published as its id.
         while self.get(&candidate).is_some()
             || self.layout.profile(&candidate).exists()
-            || crate::staged::holds(&self.layout, &candidate)
+            || crate::instances::staged::holds(&self.layout, &candidate)
         {
             candidate = format!("{base}-{counter}");
             counter += 1;

@@ -1,15 +1,15 @@
 use super::Worlds;
 use crate::error::ServiceError;
-use crate::servers;
-use crate::servers::{ServerEntry, ServerStatus};
 use crate::transfer::Transport;
+use crate::worlds::multiplayer;
+use crate::worlds::multiplayer::{ServerEntry, ServerStatus};
 
 impl<T: Transport + Clone> Worlds<T> {
     /// The instance's saved servers. Reading needs no instance lease.
     pub(crate) async fn servers(&self, id: &str) -> Result<Vec<ServerEntry>, ServiceError> {
         self.instances.record(id).await?;
         let game_dir = self.layout.game(id);
-        tokio::task::spawn_blocking(move || servers::list(&game_dir))
+        tokio::task::spawn_blocking(move || multiplayer::list(&game_dir))
             .await
             .map_err(std::io::Error::other)?
             .map_err(ServiceError::from)
@@ -21,7 +21,7 @@ impl<T: Transport + Clone> Worlds<T> {
         id: &str,
         entry: ServerEntry,
     ) -> Result<(), ServiceError> {
-        self.edit_servers(id, move |dir| servers::add(dir, &entry))
+        self.edit_servers(id, move |dir| multiplayer::add(dir, &entry))
             .await
     }
 
@@ -34,7 +34,7 @@ impl<T: Transport + Clone> Worlds<T> {
         entry: ServerEntry,
     ) -> Result<(), ServiceError> {
         self.edit_servers(id, move |dir| {
-            servers::update(dir, index, &expected, &entry)
+            multiplayer::update(dir, index, &expected, &entry)
         })
         .await
     }
@@ -45,7 +45,7 @@ impl<T: Transport + Clone> Worlds<T> {
         index: usize,
         expected: ServerEntry,
     ) -> Result<(), ServiceError> {
-        self.edit_servers(id, move |dir| servers::remove(dir, index, &expected))
+        self.edit_servers(id, move |dir| multiplayer::remove(dir, index, &expected))
             .await
     }
 
@@ -56,14 +56,16 @@ impl<T: Transport + Clone> Worlds<T> {
         expected: ServerEntry,
         to: usize,
     ) -> Result<(), ServiceError> {
-        self.edit_servers(id, move |dir| servers::move_to(dir, index, &expected, to))
-            .await
+        self.edit_servers(id, move |dir| {
+            multiplayer::move_to(dir, index, &expected, to)
+        })
+        .await
     }
 
     async fn edit_servers(
         &self,
         id: &str,
-        edit: impl FnOnce(&std::path::Path) -> Result<(), servers::ServerError> + Send + 'static,
+        edit: impl FnOnce(&std::path::Path) -> Result<(), multiplayer::ServerError> + Send + 'static,
     ) -> Result<(), ServiceError> {
         let _lease = self.instances.reserve(id)?;
         self.instances.record(id).await?;
@@ -86,11 +88,11 @@ impl<T: Transport + Clone> Worlds<T> {
         let versions = self.layout.versions();
         let game_version = record.game_version;
         let protocol = tokio::task::spawn_blocking(move || {
-            servers::protocol_version(&game_version, &versions)
+            multiplayer::protocol_version(&game_version, &versions)
         })
         .await
         .map_err(std::io::Error::other)?;
-        servers::probe(address, protocol)
+        multiplayer::probe(address, protocol)
             .await
             .map_err(ServiceError::from)
     }

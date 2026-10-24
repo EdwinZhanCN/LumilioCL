@@ -1,7 +1,7 @@
 use super::Content;
 use super::{ContentSourceInfo, DiscoverFilters, ProjectDetail};
 use crate::activity::CancellationToken;
-use crate::discover::{ContentClient, ProjectKind, SearchPage, SearchQuery};
+use crate::content::discover::{ContentClient, ProjectKind, SearchPage, SearchQuery};
 use crate::error::ServiceError;
 use crate::transfer::Transport;
 

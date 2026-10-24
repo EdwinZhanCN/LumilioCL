@@ -4,10 +4,10 @@ use super::LaunchParts;
 use crate::activity::CancellationToken;
 use crate::activity::{RetryAction, TaskAction, TaskCategory, TaskLabel};
 use crate::error::ServiceError;
-use crate::history::ChangeKind;
+use crate::instances::history::ChangeKind;
 use crate::instances::{InstanceRecord, Loader, StoreError};
 use crate::launching::{LaunchServiceError, LaunchUpdate};
-use crate::loader::LAUNCHABLE_LOADERS;
+use crate::minecraft::loader::LAUNCHABLE_LOADERS;
 use crate::transfer::Transport;
 
 /// `Fabric 0.16.0` / `Vanilla`, for a history line.
@@ -98,7 +98,7 @@ impl<T: Transport + Clone> LaunchParts<'_, T> {
                 .map_err(ServiceError::from);
         }
         if result.is_ok() {
-            crate::history::record_change(
+            crate::instances::history::record_change(
                 self.layout.root(),
                 id,
                 ChangeKind::Repaired,
@@ -202,7 +202,7 @@ impl<T: Transport + Clone> LaunchParts<'_, T> {
         }
         self.tasks.end(task, &result);
         result?;
-        crate::history::record_change(
+        crate::instances::history::record_change(
             self.layout.root(),
             id,
             ChangeKind::GameVersionChanged,

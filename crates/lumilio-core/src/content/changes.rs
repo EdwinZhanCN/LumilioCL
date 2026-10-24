@@ -1,10 +1,10 @@
 use super::Content;
 use super::{ContentEffect, ContentResult};
 use crate::clock::now;
+use crate::content::discover::{ProjectKind, Version};
 use crate::content::{ContentError, ContentItem, scan as scan_content};
-use crate::discover::{ProjectKind, Version};
 use crate::error::ServiceError;
-use crate::history::{ChangeKind, HistoryEvent, HistoryLog};
+use crate::instances::history::{ChangeKind, HistoryEvent, HistoryLog};
 use crate::transfer::Transport;
 
 impl<T: Transport + Clone> Content<T> {
@@ -35,7 +35,7 @@ impl<T: Transport + Clone> Content<T> {
         .map_err(std::io::Error::other)?;
         for (_, result) in &results {
             if let Ok(name) = result {
-                crate::history::record_change(
+                crate::instances::history::record_change(
                     self.layout.root(),
                     instance_id,
                     ChangeKind::ContentAdded,

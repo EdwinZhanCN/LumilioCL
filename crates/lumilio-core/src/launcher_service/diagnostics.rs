@@ -6,7 +6,10 @@ use crate::error::ServiceError;
 use crate::transfer::Transport;
 
 impl<T: Transport + Clone> LauncherService<T> {
-    pub async fn history(&self, id: &str) -> Result<crate::history::HistoryRead, ServiceError> {
+    pub async fn history(
+        &self,
+        id: &str,
+    ) -> Result<crate::instances::history::HistoryRead, ServiceError> {
         self.diagnostics.history(id).await
     }
 
@@ -87,7 +90,9 @@ impl<T: Transport + Clone> LauncherService<T> {
             .await
     }
 
-    pub async fn reclaimable(&self) -> Result<crate::reclaim::Reclaimable, ServiceError> {
+    pub async fn reclaimable(
+        &self,
+    ) -> Result<crate::diagnostics::reclaim::Reclaimable, ServiceError> {
         self.diagnostics.reclaimable().await
     }
 

@@ -6,9 +6,9 @@ use std::{fs, io};
 
 pub use lumilio_plugin_api::Severity;
 
+use crate::content::discover::is_safe_file_name;
 use crate::content::{ContentItem, ModMetadata};
-use crate::discover::is_safe_file_name;
-use crate::history::SessionOutcome;
+use crate::instances::history::SessionOutcome;
 use crate::instances::{InstanceRecord, Loader};
 use crate::java::{JavaNeeds, JavaRuntime, choose, install_major};
 use lumilio_minecraft::HostProfile;

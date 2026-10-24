@@ -8,12 +8,12 @@ use crate::activity::{RetryAction, TaskAction, TaskCategory, TaskLabel};
 use crate::blocking::blocking;
 use crate::clock::now;
 use crate::content::ContentError;
-use crate::discover::{
+use crate::content::discover::{
     Catalog, FileHashes, ProjectKind, Version, VersionFile, fits, install_request, pick_version,
 };
 use crate::error::{ServiceError, read_unless_cancelled};
-use crate::history::{ChangeKind, HistoryEvent, HistoryLog};
 use crate::instances::InstanceRecord;
+use crate::instances::history::{ChangeKind, HistoryEvent, HistoryLog};
 use crate::transfer::{SourceChain, TransferRequest, Transport};
 
 impl<T: Transport + Clone> Content<T> {
@@ -226,7 +226,8 @@ impl<T: Transport + Clone> Content<T> {
         let mut have = installed.clone();
         have.insert(root.project_id.clone());
 
-        let resolve = |dependency: &crate::discover::Dependency, candidates: &[Version]| {
+        let resolve = |dependency: &crate::content::discover::Dependency,
+                       candidates: &[Version]| {
             dependency
                 .version_id
                 .as_deref()
@@ -270,12 +271,16 @@ impl<T: Transport + Clone> Content<T> {
                 continue;
             };
             match dependency.kind {
-                crate::discover::DependencyKind::Optional if have.insert(other.clone()) => {
+                crate::content::discover::DependencyKind::Optional
+                    if have.insert(other.clone()) =>
+                {
                     if let Ok(candidates) = client.versions(&other).await {
                         optional.push((other, resolve(dependency, &candidates)));
                     }
                 }
-                crate::discover::DependencyKind::Incompatible if installed.contains(&other) => {
+                crate::content::discover::DependencyKind::Incompatible
+                    if installed.contains(&other) =>
+                {
                     conflicts.push(other);
                 }
                 _ => {}
@@ -522,7 +527,7 @@ impl<T: Transport + Clone> Content<T> {
             Some(file) => read_unless_cancelled(&cancel, self.file_sources(&chain, file)).await?,
             None => Vec::new(),
         };
-        let update = crate::updates::ContentUpdate {
+        let update = crate::content::updates::ContentUpdate {
             kind,
             file_name: file_name.to_owned(),
             current_sha1,
@@ -534,7 +539,7 @@ impl<T: Transport + Clone> Content<T> {
             .metered(
                 task,
                 engine.subscribe(),
-                crate::updates::apply(&engine, &update, &game_dir, sources, cancel),
+                crate::content::updates::apply(&engine, &update, &game_dir, sources, cancel),
             )
             .await
             .map_err(|error| ServiceError::Install(error.to_string()))?;
@@ -542,7 +547,7 @@ impl<T: Transport + Clone> Content<T> {
             // A rename: quick enough to do here.
             crate::content::set_enabled(&game_dir, kind, &written, false)?;
         }
-        crate::history::record_change(
+        crate::instances::history::record_change(
             self.layout.root(),
             instance_id,
             ChangeKind::ContentUpdated,

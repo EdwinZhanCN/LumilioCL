@@ -1,7 +1,7 @@
 //! What content operations return to the interface.
 
 use crate::content::ContentError;
-use crate::discover::{
+use crate::content::discover::{
     Catalog, CategoryTag, GameVersionTag, KindAbilities, LoaderTag, Project, Version,
 };
 

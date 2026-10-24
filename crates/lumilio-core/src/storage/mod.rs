@@ -8,4 +8,5 @@ pub(crate) use root_lock::RootLock;
 pub(crate) mod database;
 mod layout;
 pub(crate) mod persist;
+pub(crate) mod recovery;
 mod root_lock;

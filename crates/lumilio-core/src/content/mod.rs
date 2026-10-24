@@ -16,6 +16,8 @@ pub use types::{
 };
 
 mod changes;
+pub(crate) mod discover;
+pub(crate) mod fingerprint;
 mod install;
 mod items;
 mod pending;
@@ -24,4 +26,6 @@ mod search;
 mod sources;
 mod state;
 mod translate;
+pub(crate) mod translation;
 mod types;
+pub(crate) mod updates;

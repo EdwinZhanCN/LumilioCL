@@ -5,22 +5,22 @@ use super::progress::{GameForwarder, ItemProgress, handle_stage, uses_installer}
 use super::types::{JavaRequest, LaunchRequest, LaunchServiceError, LaunchUpdate};
 use super::{LAUNCHER_NAME, Launcher, QUICK_PLAY_LOG, output};
 use crate::activity::CancellationToken;
-use crate::fetch::{FetchError, fetch_decoded, fetch_document};
-use crate::forge_install;
-use crate::forge_install::ForgeError;
-use crate::install::{InstallError, InstallationPlan, Installer};
 use crate::instances::Loader;
+use crate::java::downloads::JavaBuild;
 use crate::java::{
     JavaChoice, JavaNeeds, JavaRuntime, choose, install_build, install_major, rosetta_missing,
 };
-use crate::java_runtime::JavaBuild;
 use crate::launching::process;
 use crate::launching::{GameExit, GameOptions, LogStream};
 use crate::launching::{LaunchPhase, LaunchSignal};
-use crate::loader::{LAUNCHABLE_LOADERS, normalize_profile};
-use crate::repair::InstallationVerifier;
+use crate::minecraft::forge_install;
+use crate::minecraft::forge_install::ForgeError;
+use crate::minecraft::install::{InstallError, InstallationPlan, Installer};
+use crate::minecraft::loader::{LAUNCHABLE_LOADERS, normalize_profile};
+use crate::minecraft::repair::InstallationVerifier;
+use crate::network::fetch::{FetchError, fetch_decoded, fetch_document};
+use crate::settings::tuning::QuickPlay;
 use crate::transfer::{TransferEvent, TransferRequest, Transport};
-use crate::tuning::QuickPlay;
 use lumilio_minecraft::HostProfile;
 use lumilio_minecraft::{LaunchContext, LaunchPlan};
 use lumilio_minecraft::{ReleaseManifest, ReleaseSet};
@@ -612,17 +612,18 @@ where
             let sources = self.sources.candidates(url);
             fetch_decoded(&self.fetcher()?, &sources, |bytes| {
                 let profile = normalize_profile(&bytes, &id, game)?;
-                let manifest = ReleaseManifest::decode_json(&profile)
-                    .map_err(|error| crate::loader::LoaderError::Decode(error.to_string()))?;
+                let manifest = ReleaseManifest::decode_json(&profile).map_err(|error| {
+                    crate::minecraft::loader::LoaderError::Decode(error.to_string())
+                })?;
                 if manifest
                     .main_class()
                     .is_none_or(|class| class.trim().is_empty())
                 {
-                    return Err(crate::loader::LoaderError::Decode(
+                    return Err(crate::minecraft::loader::LoaderError::Decode(
                         "loader profile has no main class".to_owned(),
                     ));
                 }
-                Ok::<_, crate::loader::LoaderError>(bytes)
+                Ok::<_, crate::minecraft::loader::LoaderError>(bytes)
             })
             .await
             .map_err(|error: FetchError| {

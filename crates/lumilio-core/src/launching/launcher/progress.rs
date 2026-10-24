@@ -5,10 +5,10 @@ use tokio::sync::mpsc;
 
 use super::output::OutputFile;
 use super::types::LaunchUpdate;
-use crate::install::{AssetIndex, InstallEvent, InstallStage, InstallationPlan};
 use crate::instances::Loader;
 use crate::launching::GameEvent;
 use crate::launching::{LaunchFailure, LaunchPhase, LaunchSignal};
+use crate::minecraft::install::{AssetIndex, InstallEvent, InstallStage, InstallationPlan};
 
 /// Loaders installed by running their official installer's processors.
 pub(super) const fn uses_installer(loader: Loader) -> bool {

@@ -7,8 +7,8 @@ use lumilio_plugin_api::{
 
 use crate::activity::CancellationToken;
 use crate::diagnostics::ProblemKind;
-use crate::history::{SessionOutcome, record_attempt};
 use crate::instances::Loader;
+use crate::instances::history::{SessionOutcome, record_attempt};
 use crate::plugins::PluginHost;
 use crate::testing::{World, fake_java, publish_release, world};
 

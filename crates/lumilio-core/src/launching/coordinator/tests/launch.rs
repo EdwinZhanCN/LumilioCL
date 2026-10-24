@@ -2,14 +2,14 @@ use tokio::sync::mpsc;
 
 use crate::activity::CancellationToken;
 use crate::activity::TaskOutcome;
-use crate::discover::ProjectKind;
+use crate::content::discover::ProjectKind;
 use crate::error::ServiceError;
-use crate::history::{HistoryEvent, HistoryLog, SessionOutcome};
 use crate::instances::Loader;
+use crate::instances::history::{HistoryEvent, HistoryLog, SessionOutcome};
 use crate::launching::SessionMarker;
 use crate::launching::{LaunchServiceError, LaunchUpdate};
 use crate::launching::{LaunchSession, LaunchSignal};
-use crate::recovery::RecoveryNote;
+use crate::storage::recovery::RecoveryNote;
 use crate::testing::{
     ECHO_ARGS, assert_send, fake_java, is_installed, launch_to_end, outcomes_of,
     publish_modern_release, publish_release, reopen, reopen_service, world,
@@ -42,7 +42,7 @@ async fn pending_launch_rejects_conflicting_writes_and_drop_releases_target() {
         matches!(world.service.delete_instance(target).await, Err(ServiceError::InstanceBusy(id)) if id == *target)
     );
     assert!(
-        matches!(world.service.install_content(target, ProjectKind::Mod, crate::discover::DEFAULT_SOURCE, "project", CancellationToken::new()).await, Err(ServiceError::InstanceBusy(id)) if id == *target)
+        matches!(world.service.install_content(target, ProjectKind::Mod, crate::content::discover::DEFAULT_SOURCE, "project", CancellationToken::new()).await, Err(ServiceError::InstanceBusy(id)) if id == *target)
     );
     let (updates, _receiver) = mpsc::unbounded_channel();
     assert!(
@@ -461,7 +461,7 @@ async fn a_launcher_that_died_mid_launch_reports_the_session_and_touches_no_proc
 
 #[tokio::test]
 async fn launch_defaults_reach_the_real_process_and_its_commands() {
-    use crate::tuning::{EnvVar, LaunchTuning};
+    use crate::settings::tuning::{EnvVar, LaunchTuning};
     let world = world();
     publish_release(&world);
     fake_java(
@@ -589,7 +589,7 @@ async fn a_version_without_quick_play_says_so_instead_of_starting_at_the_menu() 
 
 #[tokio::test]
 async fn a_chosen_server_uses_quick_play_where_declared_and_the_old_arguments_elsewhere() {
-    use crate::tuning::{InstanceLaunch, QuickPlay};
+    use crate::settings::tuning::{InstanceLaunch, QuickPlay};
     for (modern, expected) in [
         (true, "--quickPlayMultiplayer mc.example.com:25565"),
         (false, "--server mc.example.com --port 25565"),

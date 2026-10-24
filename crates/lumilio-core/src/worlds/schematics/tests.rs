@@ -3,8 +3,8 @@ use std::sync::Arc;
 use lumilio_plugin_api::{API_VERSION, Manifest, Permission, Plugin, PluginError, Words};
 
 use crate::instances::Loader;
-use crate::schematic_ops::RESTORE;
 use crate::testing::Scripted;
+use crate::worlds::schematic_ops::RESTORE;
 use crate::{LauncherService, SchematicOperation, ServiceError};
 
 const PLUGIN: &str = "test.schematics";

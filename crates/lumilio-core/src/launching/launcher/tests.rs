@@ -13,8 +13,8 @@ use crate::instances::{InstanceStore, Loader, NewInstance};
 use crate::java::JavaLocator;
 use crate::launching::{GameEvent, GameExit};
 use crate::launching::{LaunchFailure, LaunchPhase, LaunchSession, LaunchSignal, LaunchStatus};
+use crate::settings::tuning::LaunchTuning;
 use crate::transfer::{FileTransport, OfficialSource, SourceChain};
-use crate::tuning::LaunchTuning;
 
 struct World {
     _dir: tempfile::TempDir,

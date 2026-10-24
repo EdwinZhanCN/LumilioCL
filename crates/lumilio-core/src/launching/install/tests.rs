@@ -2,8 +2,8 @@ use tokio::sync::mpsc;
 
 use crate::activity::CancellationToken;
 use crate::activity::TaskCategory;
-use crate::history::{ChangeKind, HistoryEvent};
 use crate::instances::Loader;
+use crate::instances::history::{ChangeKind, HistoryEvent};
 use crate::testing::{ECHO_ARGS, fake_java, launch_to_end, publish_versions, repair_to_end, world};
 
 #[tokio::test]

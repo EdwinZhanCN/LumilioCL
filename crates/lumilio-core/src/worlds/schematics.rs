@@ -12,15 +12,15 @@ use crate::blocking::blocking_value;
 use crate::clock::now;
 use crate::error::ServiceError;
 use crate::plugins::{read_info, resolve_write};
-use crate::schematic_ops;
-use crate::schematic_ops::{SchematicLogEntry, SchematicOperation};
 use crate::transfer::Transport;
+use crate::worlds::schematic_ops;
+use crate::worlds::schematic_ops::{SchematicLogEntry, SchematicOperation};
 
 impl<T: Transport + Clone> Worlds<T> {
     /// The studio's saved replacement tables and recent targets (T24).
     pub(crate) async fn schematic_schemes(&self) -> Result<crate::ReplaceSchemes, ServiceError> {
         let path = self.layout.replace_schemes();
-        blocking_value(move || crate::schematic_ops::schemes::read(&path)).await
+        blocking_value(move || crate::worlds::schematic_ops::schemes::read(&path)).await
     }
 
     /// Keeps `schemes` as the studio's tables and recent targets.
@@ -30,7 +30,7 @@ impl<T: Transport + Clone> Worlds<T> {
     ) -> Result<crate::ReplaceSchemes, ServiceError> {
         let path = self.layout.replace_schemes();
         blocking_value(move || {
-            crate::schematic_ops::schemes::write(&path, &schemes).map(|()| schemes)
+            crate::worlds::schematic_ops::schemes::write(&path, &schemes).map(|()| schemes)
         })
         .await?
         .map_err(ServiceError::Io)

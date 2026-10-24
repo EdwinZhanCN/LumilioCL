@@ -8,11 +8,11 @@ use std::path::PathBuf;
 use super::Worlds;
 use crate::blocking::blocking_value;
 use crate::error::ServiceError;
-use crate::schematic_assets::{
+use crate::transfer::Transport;
+use crate::worlds::schematic_assets::{
     LocalCache, add_pack, forget_switch, instance_assets, read_order, remove_pack, swapped_sources,
     switch, write_order,
 };
-use crate::transfer::Transport;
 
 impl<T: Transport + Clone> Worlds<T> {
     /// Adds the resource pack at `pack` (a zip or an unpacked pack folder) to

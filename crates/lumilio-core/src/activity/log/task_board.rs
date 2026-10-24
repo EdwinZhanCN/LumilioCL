@@ -42,7 +42,7 @@ pub enum RetryAction {
     },
     InstallContent {
         instance: String,
-        kind: crate::discover::ProjectKind,
+        kind: crate::content::discover::ProjectKind,
         /// The content source; entries from before there were several have none.
         #[serde(default = "default_source")]
         source: String,
@@ -51,7 +51,7 @@ pub enum RetryAction {
     },
     SwitchContent {
         instance: String,
-        kind: crate::discover::ProjectKind,
+        kind: crate::content::discover::ProjectKind,
         file_name: String,
         #[serde(default = "default_source")]
         source: String,
@@ -82,10 +82,10 @@ pub enum RetryAction {
         major: Option<u32>,
         /// Absent in entries written before there was a choice.
         #[serde(default)]
-        source: crate::java_runtime::JavaSource,
+        source: crate::java::downloads::JavaSource,
         /// Absent in entries written before Intel-only downloads.
         #[serde(default)]
-        build: crate::java_runtime::JavaBuild,
+        build: crate::java::downloads::JavaBuild,
     },
     SaveVersion {
         #[serde(default = "default_source")]
@@ -100,7 +100,7 @@ pub enum RetryAction {
 }
 
 pub(super) fn default_source() -> String {
-    crate::discover::DEFAULT_SOURCE.to_owned()
+    crate::content::discover::DEFAULT_SOURCE.to_owned()
 }
 
 /// What a task is doing, as a type rather than a sentence: the interface

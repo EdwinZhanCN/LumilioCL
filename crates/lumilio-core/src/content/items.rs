@@ -10,7 +10,7 @@ use std::{fmt, fs, io};
 use serde::Deserialize;
 use sha1::{Digest, Sha1};
 
-use crate::discover::{ProjectKind, is_safe_file_name};
+use crate::content::discover::{ProjectKind, is_safe_file_name};
 
 /// Suffix that switches a file off without deleting it.
 pub(crate) const DISABLED_SUFFIX: &str = ".disabled";

@@ -5,10 +5,12 @@ use crate::error::ServiceError;
 impl Diagnostics {
     /// How much of the shared game files no game uses (ADR 0017). Reads only;
     /// walks the disk.
-    pub(crate) async fn reclaimable(&self) -> Result<crate::reclaim::Reclaimable, ServiceError> {
+    pub(crate) async fn reclaimable(
+        &self,
+    ) -> Result<crate::diagnostics::reclaim::Reclaimable, ServiceError> {
         let instances = self.instances.lock().await.instances().to_vec();
         let layout = self.layout.clone();
-        blocking_value(move || crate::reclaim::scan(&layout, &instances))
+        blocking_value(move || crate::diagnostics::reclaim::scan(&layout, &instances))
             .await?
             .map_err(|error| ServiceError::Install(error.to_string()))
     }
@@ -25,7 +27,7 @@ impl Diagnostics {
         let _lease = self.instances.reserve("(shared files)")?;
         let found = self.reclaimable().await?;
         let layout = self.layout.clone();
-        blocking_value(move || crate::reclaim::remove(&layout, &found))
+        blocking_value(move || crate::diagnostics::reclaim::remove(&layout, &found))
             .await?
             .map_err(|error| ServiceError::Install(error.to_string()))
     }

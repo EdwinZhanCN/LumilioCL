@@ -5,12 +5,12 @@ use tokio::sync::mpsc;
 use crate::LauncherService;
 use crate::activity::CancellationToken;
 use crate::activity::{FinishedTask, TaskCategory, TaskLabel, TaskOutcome};
-use crate::deletion::Deletion;
 use crate::error::ServiceError;
+use crate::instances::deletion::Deletion;
 use crate::instances::{Loader, NewInstance, StoreError};
 use crate::launching::LaunchSignal;
 use crate::launching::LaunchUpdate;
-use crate::recovery::RecoveryNote;
+use crate::storage::recovery::RecoveryNote;
 use crate::testing::{
     Scripted, fake_java, instance_with_profile, operation_dirs, publish_release, reopen, world,
 };

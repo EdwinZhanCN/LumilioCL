@@ -7,8 +7,8 @@ use std::path::PathBuf;
 
 use super::Content;
 use super::{Recognized, Summaries};
+use crate::content::discover::{ContentClient, FileHashes, ProjectKind, Version};
 use crate::content::{ContentItem, scan as scan_content};
-use crate::discover::{ContentClient, FileHashes, ProjectKind, Version};
 use crate::error::ServiceError;
 use crate::instances::InstanceRecord;
 use crate::transfer::Transport;
@@ -80,7 +80,7 @@ impl<T: Transport + Clone> Content<T> {
             files
                 .into_iter()
                 .map(|(sha1, path)| FileHashes {
-                    murmur2: crate::fingerprint::of_file(&path).ok(),
+                    murmur2: crate::content::fingerprint::of_file(&path).ok(),
                     sha1,
                 })
                 .collect()
@@ -103,7 +103,7 @@ impl<T: Transport + Clone> Content<T> {
         if clients.is_empty() {
             let why = match self.plugins.content_client().await {
                 Err(error) => error.to_string(),
-                Ok(_) => crate::discover::DiscoverError::NoSource.to_string(),
+                Ok(_) => crate::content::discover::DiscoverError::NoSource.to_string(),
             };
             found.failures.push(why);
             return found;

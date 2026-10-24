@@ -10,14 +10,14 @@ use crate::accounts::yggdrasil::YggdrasilError;
 use crate::activity::CancellationToken;
 use crate::appearance::skin::SkinError;
 use crate::content::ContentError;
+use crate::instances::modpack;
+use crate::instances::snapshot_files::SnapshotError;
 use crate::instances::{InstanceBusy, StoreError};
 use crate::launching::LaunchServiceError;
-use crate::modpack;
-use crate::screenshots::ScreenshotError;
-use crate::servers::{PingError, ServerError};
 use crate::settings::SettingsError;
-use crate::snapshots::SnapshotError;
 use crate::worlds::WorldError;
+use crate::worlds::multiplayer::{PingError, ServerError};
+use crate::worlds::screenshot_files::ScreenshotError;
 
 #[derive(Debug)]
 pub enum ServiceError {
@@ -31,7 +31,7 @@ pub enum ServiceError {
     NoContentSource,
     /// No enabled content source reads this catalog's IDs (a CurseForge
     /// pack with the CurseForge source off).
-    NoCatalogSource(crate::discover::Catalog),
+    NoCatalogSource(crate::content::discover::Catalog),
     /// The author lets people download this file only on the source's site:
     /// the file's name and its page there.
     ManualDownload {
@@ -70,7 +70,7 @@ pub enum ServiceError {
     Appearance(crate::appearance::skin::AppearanceError),
     /// The sign-in the person is choosing a character for is gone.
     NoPendingSignIn,
-    Export(crate::pack_export::ExportError),
+    Export(crate::instances::pack_export::ExportError),
     Snapshot(SnapshotError),
     Io(std::io::Error),
     /// The work stopped without an answer because it panicked: a launcher
@@ -169,10 +169,10 @@ impl From<crate::appearance::skin::AppearanceError> for ServiceError {
     }
 }
 
-impl From<crate::discover::DiscoverError> for ServiceError {
-    fn from(error: crate::discover::DiscoverError) -> Self {
+impl From<crate::content::discover::DiscoverError> for ServiceError {
+    fn from(error: crate::content::discover::DiscoverError) -> Self {
         match error {
-            crate::discover::DiscoverError::NoSource => Self::NoContentSource,
+            crate::content::discover::DiscoverError::NoSource => Self::NoContentSource,
             other => Self::Remote(other.to_string()),
         }
     }
@@ -184,8 +184,8 @@ impl From<SnapshotError> for ServiceError {
     }
 }
 
-impl From<crate::pack_export::ExportError> for ServiceError {
-    fn from(error: crate::pack_export::ExportError) -> Self {
+impl From<crate::instances::pack_export::ExportError> for ServiceError {
+    fn from(error: crate::instances::pack_export::ExportError) -> Self {
         Self::Export(error)
     }
 }

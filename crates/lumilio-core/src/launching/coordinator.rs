@@ -9,11 +9,11 @@ use crate::activity::CancellationToken;
 use crate::clock::now;
 use crate::context::{ContextHub, SessionPhase};
 use crate::error::ServiceError;
-use crate::history::{SessionOutcome, finish_session, record_attempt};
 use crate::instances::StoreError;
+use crate::instances::history::{SessionOutcome, finish_session, record_attempt};
+use crate::settings::tuning::QuickPlay;
 use crate::storage::Layout;
 use crate::transfer::Transport;
-use crate::tuning::QuickPlay;
 
 /// The launch state the launcher keeps between launches.
 #[derive(Default)]
@@ -80,7 +80,7 @@ impl<T: Transport + Clone> LaunchParts<'_, T> {
         cancel: CancellationToken,
     ) -> Result<GameExit, ServiceError> {
         let target = QuickPlay::World(world.to_owned());
-        if crate::tuning::quick_play_problem(&target).is_some() {
+        if crate::settings::tuning::quick_play_problem(&target).is_some() {
             return Err(ServiceError::Store(StoreError::InvalidLaunch(
                 "the world name is not a valid save folder".to_owned(),
             )));
@@ -98,7 +98,7 @@ impl<T: Transport + Clone> LaunchParts<'_, T> {
         cancel: CancellationToken,
     ) -> Result<GameExit, ServiceError> {
         let target = QuickPlay::Server(address.trim().to_owned());
-        if let Some(problem) = crate::tuning::quick_play_problem(&target) {
+        if let Some(problem) = crate::settings::tuning::quick_play_problem(&target) {
             return Err(ServiceError::Store(StoreError::InvalidLaunch(
                 problem.as_str().to_owned(),
             )));

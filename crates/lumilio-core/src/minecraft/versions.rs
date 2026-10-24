@@ -1,11 +1,11 @@
 use lumilio_minecraft::CatalogEntry;
 
+use super::{forge_meta, loader};
 use crate::error::ServiceError;
-use crate::fetch::fetch_decoded;
 use crate::instances::Loader;
 use crate::network::Network;
+use crate::network::fetch::fetch_decoded;
 use crate::transfer::Transport;
-use crate::{forge_meta, loader};
 
 /// Every game version the catalog lists, newest first, for choosing one
 /// (IA P-VERSION). Read fresh each time; a failure is reported, never
@@ -28,7 +28,7 @@ pub(crate) async fn loader_versions<T: Transport + Clone>(
     game_version: &str,
 ) -> Result<Vec<loader::LoaderVersion>, ServiceError> {
     let chain = network.chain().await?;
-    let remote = |error: crate::fetch::FetchError| ServiceError::Remote(error.to_string());
+    let remote = |error: crate::network::fetch::FetchError| ServiceError::Remote(error.to_string());
     let decode = |error: loader::LoaderError| ServiceError::Remote(error.to_string());
     match loader {
         Loader::Vanilla => Ok(Vec::new()),

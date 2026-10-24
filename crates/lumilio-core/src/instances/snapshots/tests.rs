@@ -1,8 +1,8 @@
 use crate::error::ServiceError;
-use crate::history::ChangeKind;
 use crate::instances::Loader;
-use crate::recovery::RecoveryNote;
-use crate::snapshots::{SnapshotError, SnapshotScope};
+use crate::instances::history::ChangeKind;
+use crate::instances::snapshot_files::{SnapshotError, SnapshotScope};
+use crate::storage::recovery::RecoveryNote;
 use crate::testing::{change_subjects, operation_dirs, reopen, world};
 
 #[tokio::test]

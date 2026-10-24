@@ -5,7 +5,7 @@ use tokio::sync::Mutex;
 
 use crate::activity::{CancellationToken, TaskAction, TaskCategory, TaskLabel, Tasks};
 use crate::error::{ServiceError, read_unless_cancelled};
-use crate::history::ChangeKind;
+use crate::instances::history::ChangeKind;
 use crate::instances::{InstanceRecord, Instances};
 use crate::network::Network;
 use crate::plugins::PluginHost;
@@ -81,7 +81,12 @@ impl<T: Transport + Clone> Worlds<T> {
         })
         .await
         .map_err(std::io::Error::other)??;
-        crate::history::record_change(self.layout.root(), id, ChangeKind::WorldCopied, &created);
+        crate::instances::history::record_change(
+            self.layout.root(),
+            id,
+            ChangeKind::WorldCopied,
+            &created,
+        );
         Ok(created)
     }
 
@@ -94,7 +99,12 @@ impl<T: Transport + Clone> Worlds<T> {
         tokio::task::spawn_blocking(move || worlds::delete(&game_dir, &name))
             .await
             .map_err(std::io::Error::other)??;
-        crate::history::record_change(self.layout.root(), id, ChangeKind::WorldDeleted, folder);
+        crate::instances::history::record_change(
+            self.layout.root(),
+            id,
+            ChangeKind::WorldDeleted,
+            folder,
+        );
         Ok(())
     }
 
@@ -123,10 +133,10 @@ impl<T: Transport + Clone> Worlds<T> {
     pub(crate) async fn export_modpack(
         &self,
         id: &str,
-        spec: crate::pack_export::ExportSpec,
+        spec: crate::instances::pack_export::ExportSpec,
         destination: &Path,
         cancel: CancellationToken,
-    ) -> Result<crate::pack_export::ExportReport, ServiceError> {
+    ) -> Result<crate::instances::pack_export::ExportReport, ServiceError> {
         let _lease = self.instances.reserve(id)?;
         let record = self.instances.record(id).await?;
         let task = self.tasks.begin(
@@ -142,7 +152,7 @@ impl<T: Transport + Clone> Worlds<T> {
             .export_modpack_inner(&record, spec, destination, cancel)
             .await
             .map_err(|error| match error {
-                ServiceError::Export(crate::pack_export::ExportError::Cancelled) => {
+                ServiceError::Export(crate::instances::pack_export::ExportError::Cancelled) => {
                     ServiceError::Cancelled
                 }
                 other => other,
@@ -154,11 +164,11 @@ impl<T: Transport + Clone> Worlds<T> {
     pub(crate) async fn export_modpack_inner(
         &self,
         record: &InstanceRecord,
-        spec: crate::pack_export::ExportSpec,
+        spec: crate::instances::pack_export::ExportSpec,
         destination: &Path,
         cancel: CancellationToken,
-    ) -> Result<crate::pack_export::ExportReport, ServiceError> {
-        use crate::pack_export as pack;
+    ) -> Result<crate::instances::pack_export::ExportReport, ServiceError> {
+        use crate::instances::pack_export as pack;
         let game_dir = self.layout.game(&record.id);
 
         let (dir, include, stop) = (game_dir.clone(), spec.include.clone(), cancel.clone());
@@ -207,14 +217,14 @@ impl<T: Transport + Clone> Worlds<T> {
 
         // A .mrpack links files only on Modrinth, so only a source of
         // Modrinth's catalog can say which files it may link.
-        let sha1s: Vec<crate::discover::FileHashes> = hashed
+        let sha1s: Vec<crate::content::discover::FileHashes> = hashed
             .iter()
-            .map(|(_, sha1, _, _)| crate::discover::FileHashes::sha1(sha1.clone()))
+            .map(|(_, sha1, _, _)| crate::content::discover::FileHashes::sha1(sha1.clone()))
             .collect();
         let client = read_unless_cancelled(&cancel, async {
             Ok(self
                 .plugins
-                .catalog_client(crate::discover::Catalog::Modrinth)
+                .catalog_client(crate::content::discover::Catalog::Modrinth)
                 .await)
         })
         .await?;
@@ -272,7 +282,12 @@ impl<T: Transport + Clone> Worlds<T> {
         })
         .await
         .map_err(std::io::Error::other)??;
-        crate::history::record_change(self.layout.root(), id, ChangeKind::WorldImported, &created);
+        crate::instances::history::record_change(
+            self.layout.root(),
+            id,
+            ChangeKind::WorldImported,
+            &created,
+        );
         Ok(created)
     }
 }

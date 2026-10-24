@@ -1,12 +1,12 @@
 use super::InstanceLibrary;
 use crate::blocking::blocking;
 use crate::clock::now;
-use crate::deletion::Deletion;
 use crate::error::ServiceError;
+use crate::instances::deletion::Deletion;
 use crate::instances::{InstanceRecord, Loader, NewInstance};
 use crate::launching::LaunchServiceError;
-use crate::loader;
-use crate::loader::LAUNCHABLE_LOADERS;
+use crate::minecraft::loader;
+use crate::minecraft::loader::LAUNCHABLE_LOADERS;
 use crate::transfer::Transport;
 
 impl<T: Transport + Clone> InstanceLibrary<T> {

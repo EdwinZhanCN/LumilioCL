@@ -8,10 +8,10 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
 use crate::accounts::account::{OfflineProfile, ProfileError, ProfileId};
+use crate::settings::tuning::{DOWNLOAD_CONCURRENCY, LaunchTuning, Preferences, TuningError};
 use crate::storage::persist;
 use crate::storage::persist::{PersistError, Versioned};
 use crate::transfer::{OfficialSource, PrefixMirror, SourceChain, SourceProvider};
-use crate::tuning::{DOWNLOAD_CONCURRENCY, LaunchTuning, Preferences, TuningError};
 
 const FILE: &str = "settings.json";
 const SCHEMA_VERSION: u32 = 1;
@@ -163,7 +163,7 @@ pub struct LauncherSettings {
     /// Java installations the user turned off; they are never chosen.
     pub disabled_java: Vec<PathBuf>,
     /// Where downloaded Java comes from when that source has the major.
-    pub java_source: crate::java_runtime::JavaSource,
+    pub java_source: crate::java::downloads::JavaSource,
     /// Whether a launch without a fitting Java downloads one first.
     #[serde(default = "auto_install_java_default")]
     pub auto_install_java: bool,
@@ -218,7 +218,7 @@ impl Default for LauncherSettings {
             preferences: Preferences::default(),
             download_concurrency: None,
             disabled_java: Vec::new(),
-            java_source: crate::java_runtime::JavaSource::default(),
+            java_source: crate::java::downloads::JavaSource::default(),
             auto_install_java: true,
             auto_update: true,
             auto_download_block_assets: true,
@@ -438,7 +438,7 @@ impl SettingsStore {
 
     pub fn set_java_source(
         &mut self,
-        source: crate::java_runtime::JavaSource,
+        source: crate::java::downloads::JavaSource,
     ) -> Result<(), SettingsError> {
         let mut next = self.settings.clone();
         next.java_source = source;
@@ -802,7 +802,7 @@ impl SettingsStore {
         for rule in &self.settings.mirrors {
             let mirror = PrefixMirror::new(&rule.official_prefix, &rule.mirror_prefix, 16)
                 .map_err(|_| SettingsError::InvalidMirror)?;
-            if crate::mirror_presets::is_fallback_rule(rule) {
+            if crate::settings::mirror_presets::is_fallback_rule(rule) {
                 fallbacks.push(Arc::new(mirror));
             } else {
                 mirrors.push(Arc::new(mirror));

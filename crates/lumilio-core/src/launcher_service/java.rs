@@ -4,7 +4,7 @@ use super::LauncherService;
 use crate::activity::CancellationToken;
 use crate::error::ServiceError;
 use crate::java::InstanceJava;
-use crate::java_runtime::{JavaBuild, JavaSource};
+use crate::java::downloads::{JavaBuild, JavaSource};
 use crate::transfer::Transport;
 
 impl<T: Transport + Clone> LauncherService<T> {
@@ -56,7 +56,7 @@ impl<T: Transport + Clone> LauncherService<T> {
 
     pub async fn set_java_source(
         &self,
-        source: crate::java_runtime::JavaSource,
+        source: crate::java::downloads::JavaSource,
     ) -> Result<(), ServiceError> {
         self.java.set_java_source(source).await
     }

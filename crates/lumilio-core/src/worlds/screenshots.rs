@@ -4,9 +4,9 @@ use tokio::sync::Semaphore;
 
 use super::Worlds;
 use crate::error::ServiceError;
-use crate::screenshots;
-use crate::screenshots::ScreenshotInfo;
 use crate::transfer::Transport;
+use crate::worlds::screenshot_files;
+use crate::worlds::screenshot_files::ScreenshotInfo;
 
 /// Decoding a large picture takes memory: only a couple at a time, however
 /// many thumbnails a page asks for at once.
@@ -18,7 +18,7 @@ impl<T: Transport + Clone> Worlds<T> {
     pub(crate) async fn screenshots(&self, id: &str) -> Result<Vec<ScreenshotInfo>, ServiceError> {
         self.instances.record(id).await?;
         let game_dir = self.layout.game(id);
-        tokio::task::spawn_blocking(move || screenshots::scan(&game_dir))
+        tokio::task::spawn_blocking(move || screenshot_files::scan(&game_dir))
             .await
             .map_err(std::io::Error::other)?
             .map_err(ServiceError::from)
@@ -34,10 +34,12 @@ impl<T: Transport + Clone> Worlds<T> {
         let (game_dir, cache_dir) = (self.layout.game(id), self.layout.thumbnails(id));
         let file = file.to_owned();
         let _turn = THUMBNAILS.acquire().await.map_err(std::io::Error::other)?;
-        tokio::task::spawn_blocking(move || screenshots::thumbnail(&game_dir, &cache_dir, &file))
-            .await
-            .map_err(std::io::Error::other)?
-            .map_err(ServiceError::from)
+        tokio::task::spawn_blocking(move || {
+            screenshot_files::thumbnail(&game_dir, &cache_dir, &file)
+        })
+        .await
+        .map_err(std::io::Error::other)?
+        .map_err(ServiceError::from)
     }
 
     /// The picture's bytes (to copy it).
@@ -49,7 +51,7 @@ impl<T: Transport + Clone> Worlds<T> {
         self.instances.record(id).await?;
         let game_dir = self.layout.game(id);
         let file = file.to_owned();
-        tokio::task::spawn_blocking(move || screenshots::read(&game_dir, &file))
+        tokio::task::spawn_blocking(move || screenshot_files::read(&game_dir, &file))
             .await
             .map_err(std::io::Error::other)?
             .map_err(ServiceError::from)
@@ -61,7 +63,7 @@ impl<T: Transport + Clone> Worlds<T> {
         self.instances.record(id).await?;
         let game_dir = self.layout.game(id);
         let file = file.to_owned();
-        tokio::task::spawn_blocking(move || screenshots::delete(&game_dir, &file))
+        tokio::task::spawn_blocking(move || screenshot_files::delete(&game_dir, &file))
             .await
             .map_err(std::io::Error::other)?
             .map_err(ServiceError::from)

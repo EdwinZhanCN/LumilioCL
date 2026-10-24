@@ -2,8 +2,8 @@ use crate::activity::CancellationToken;
 use crate::activity::TaskOutcome;
 use crate::diagnostics::LOG_TAIL_BYTES;
 use crate::error::ServiceError;
-use crate::history::{ChangeKind, HistoryEvent};
 use crate::instances::Loader;
+use crate::instances::history::{ChangeKind, HistoryEvent};
 use crate::testing::{fake_java, launch_to_end, publish_release, world};
 
 #[tokio::test]
@@ -340,8 +340,8 @@ async fn a_cancelled_export_is_recorded_as_cancelled_and_leaves_no_pack() {
     let game = world.service.layout.game(&record.id);
     std::fs::create_dir_all(game.join("mods")).unwrap();
     std::fs::write(game.join("mods/a.jar"), b"jar").unwrap();
-    let spec = crate::pack_export::ExportSpec {
-        format: crate::pack_export::PackFormat::Modrinth,
+    let spec = crate::instances::pack_export::ExportSpec {
+        format: crate::instances::pack_export::PackFormat::Modrinth,
         name: "Stop".into(),
         version: "1".into(),
         summary: None,
@@ -392,7 +392,7 @@ async fn clearing_the_cache_frees_space_and_games_still_start() {
 async fn the_diagnostics_bundle_hides_the_player_the_folders_and_commands() {
     use std::io::Read;
 
-    use crate::tuning::LaunchTuning;
+    use crate::settings::tuning::LaunchTuning;
     let world = world();
     publish_release(&world);
     fake_java(&world, "echo \"Setting user: Steve\"");

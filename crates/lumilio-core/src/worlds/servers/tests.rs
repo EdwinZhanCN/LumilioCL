@@ -1,7 +1,7 @@
 use crate::error::ServiceError;
 use crate::instances::Loader;
-use crate::servers::{PackPolicy, ServerEntry, ServerError};
 use crate::testing::world;
+use crate::worlds::multiplayer::{PackPolicy, ServerEntry, ServerError};
 
 fn entry(name: &str, address: &str) -> ServerEntry {
     ServerEntry {

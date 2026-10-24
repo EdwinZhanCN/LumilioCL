@@ -13,13 +13,13 @@ use crate::error::ServiceError;
 use crate::game_settings::GameSettings;
 use crate::instances::{InstanceRecord, Instances};
 use crate::java::{Java, JavaRuntime};
-use crate::loader;
+use crate::minecraft::loader;
 use crate::network::Network;
 use crate::plugins::PluginHost;
+use crate::settings::tuning::QuickPlay;
 use crate::settings::{SettingsStore, validate_memory};
 use crate::storage::Layout;
 use crate::transfer::{SourceChain, Transport};
-use crate::tuning::QuickPlay;
 
 /// Launching and installing, with everything they read and write: the
 /// library and its leases, the session they publish, the accounts that sign
@@ -114,7 +114,11 @@ impl<T: Transport + Clone> LaunchParts<'_, T> {
         };
         let loader_profile_url = record.loader_version.as_deref().and_then(|version| {
             loader::profile_url(record.loader, &record.game_version, version).or_else(|| {
-                crate::forge_install::installer_url(record.loader, &record.game_version, version)
+                crate::minecraft::forge_install::installer_url(
+                    record.loader,
+                    &record.game_version,
+                    version,
+                )
             })
         });
         let session = self

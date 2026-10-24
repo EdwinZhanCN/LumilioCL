@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use crate::activity::CancellationToken;
 use crate::content::AddedFile;
-use crate::discover::{DEFAULT_SOURCE, ProjectKind, ProjectOrigin};
+use crate::content::discover::{DEFAULT_SOURCE, ProjectKind, ProjectOrigin};
 use crate::error::ServiceError;
 use crate::instances::Loader;
 use crate::testing::*;
@@ -13,7 +13,7 @@ const CF: &str = lumilio_plugin_curseforge::ID;
 const CF_API: &str = "https://api.curseforge.com";
 
 fn murmur(bytes: &[u8]) -> u32 {
-    crate::fingerprint::of_bytes(bytes)
+    crate::content::fingerprint::of_bytes(bytes)
 }
 
 /// A CurseForge file, downloadable from `url` (empty: only on the site).
@@ -78,7 +78,7 @@ async fn the_sources_are_listed_with_modrinth_first() {
     assert_eq!(sources[1].name, "CurseForge");
     assert_eq!(
         sources[1].catalog,
-        Some(crate::discover::Catalog::CurseForge)
+        Some(crate::content::discover::Catalog::CurseForge)
     );
 }
 
@@ -464,7 +464,7 @@ async fn a_curseforge_pack_needs_a_curseforge_source() {
         .unwrap_err();
     assert!(matches!(
         error,
-        ServiceError::NoCatalogSource(crate::discover::Catalog::CurseForge)
+        ServiceError::NoCatalogSource(crate::content::discover::Catalog::CurseForge)
     ));
     assert!(world.service.library().await.instances.is_empty());
 }
