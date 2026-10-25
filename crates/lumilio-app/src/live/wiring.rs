@@ -5,6 +5,7 @@ use std::time::Duration;
 use gpui_kit::{App, AppContext as _, Context, Entity, WeakEntity, Window};
 use lumilio_core::{CancellationToken, Preferences, ProjectKind};
 use lumilio_ui::LauncherShell;
+use lumilio_ui::features::activity::ActivityEvent;
 use lumilio_ui::features::discover::DiscoverEvent;
 use lumilio_ui::features::library::LibraryEvent;
 use lumilio_ui::features::new_game::NewGameEvent;
@@ -124,6 +125,7 @@ pub fn build(backend: Backend, window: &mut Window, cx: &mut App) -> Entity<Laun
     follow_discover(&wiring, &shell, cx);
     follow_new_game(&wiring, &shell, cx);
     follow_library(&wiring, &shell, cx);
+    follow_activity(&wiring, &shell, cx);
     update::start(&wiring, cx);
     context::follow(&wiring, cx);
     reload(&wiring, Reload::Lists, cx);
@@ -150,6 +152,18 @@ fn follow_discover(wiring: &Wiring, shell: &Entity<LauncherShell>, cx: &mut App)
             });
         }
         DiscoverEvent::ProjectOpened(_) => {}
+    })
+    .detach();
+}
+
+/// Passes on what Activity tells the application: the tasks changed, or a
+/// task ran again and may have changed what a game has.
+fn follow_activity(wiring: &Wiring, shell: &Entity<LauncherShell>, cx: &mut App) {
+    let activity = shell.read(cx).activity_page().clone();
+    let wiring = wiring.clone();
+    cx.subscribe(&activity, move |_, event: &ActivityEvent, cx| match event {
+        ActivityEvent::ListsChanged => reload(&wiring, Reload::Lists, cx),
+        ActivityEvent::Retried => jobs::installed_changed(&wiring, cx),
     })
     .detach();
 }
@@ -322,7 +336,7 @@ pub(super) fn open_requested_page(
     // 重试 would, so Activity shows a real download; `LUMILIO_ACTIVITY_DETAIL=1`
     // opens its files and `LUMILIO_ACTIVITY_PAUSE=<seconds>` pauses it then.
     if let Ok(which) = std::env::var("LUMILIO_ACTIVITY") {
-        review_download(wiring, shell, &which, cx);
+        review_download(shell, &which, cx);
     }
     let route = match std::env::var("LUMILIO_PAGE").as_deref() {
         Ok("library") => Route::Library,
@@ -337,43 +351,37 @@ pub(super) fn open_requested_page(
 }
 
 /// The dev hook `LUMILIO_ACTIVITY` (see [`open_requested_page`]).
-pub(super) fn review_download(
-    wiring: &Wiring,
-    shell: &Entity<LauncherShell>,
-    which: &str,
-    cx: &mut App,
-) {
+pub(super) fn review_download(shell: &Entity<LauncherShell>, which: &str, cx: &mut App) {
     use lumilio_core::{JavaSource, RetryAction};
     let source = match which {
         "graalvm" => JavaSource::OracleGraalVm,
         _ => JavaSource::Mojang,
     };
-    jobs::retry_task(
-        wiring,
-        RetryAction::InstallJava {
-            major: Some(21),
-            source,
-            build: lumilio_core::JavaBuild::default(),
-        },
-        cx,
-    );
-    // The first task the service starts has id 1.
-    if std::env::var("LUMILIO_ACTIVITY_DETAIL").is_ok() {
-        shell.update(cx, |shell, cx| {
-            shell.apply_view_intent(lumilio_ui::kit::ViewIntent::TaskDetail(1), cx);
-        });
-    }
+    let activity = shell.read(cx).activity_page().clone();
+    activity.update(cx, |activity, cx| {
+        activity.retry(
+            RetryAction::InstallJava {
+                major: Some(21),
+                source,
+                build: lumilio_core::JavaBuild::default(),
+            },
+            cx,
+        );
+        // The first task the service starts has id 1.
+        if std::env::var("LUMILIO_ACTIVITY_DETAIL").is_ok() {
+            activity.apply_view_intent(lumilio_ui::kit::ViewIntent::TaskDetail(1), cx);
+        }
+    });
     if let Some(seconds) = std::env::var("LUMILIO_ACTIVITY_PAUSE")
         .ok()
         .and_then(|value| value.parse::<u64>().ok())
     {
-        let wiring = wiring.clone();
+        let activity = activity.downgrade();
         cx.spawn(async move |cx| {
             cx.background_executor()
                 .timer(std::time::Duration::from_secs(seconds))
                 .await;
-            wiring.backend.service.pause_task(1);
-            cx.update(|cx| reload(&wiring, Reload::Lists, cx));
+            let _ = activity.update(cx, |activity, cx| activity.pause(1, cx));
         })
         .detach();
     }

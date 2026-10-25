@@ -12,7 +12,7 @@ use crate::live::LiveIntent;
 use crate::navigation::{Leading, ReadyUpdate};
 use crate::route::Route;
 use crate::theme::ShellColors;
-use crate::{home, kit, navigation, pages, placeholders, theme, toast};
+use crate::{home, navigation, pages, placeholders, theme, toast};
 
 impl Render for LauncherShell {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
@@ -87,7 +87,9 @@ impl Render for LauncherShell {
         if let Some(handler) = &self.live_handler {
             let handler = handler.clone();
             self.library
-                .update(cx, |library, _| library.set_handler(handler));
+                .update(cx, |library, _| library.set_handler(handler.clone()));
+            self.activity_page
+                .update(cx, |activity, _| activity.set_handler(handler));
         }
         // Discover's answers belong to the detail on screen, if any.
         let shown_detail = match self.location() {
@@ -128,7 +130,7 @@ impl Render for LauncherShell {
                     (Route::Settings, _) => pages::settings::render(ctx).into_any_element(),
                     (Route::Accounts, _) => pages::live::accounts(ctx).into_any_element(),
                     (Route::Discover, None) => self.discover.clone().into_any_element(),
-                    _ => kit::page("live-activity", pages::live::activity(ctx)).into_any_element(),
+                    _ => self.activity_page.clone().into_any_element(),
                 }
             });
 

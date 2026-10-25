@@ -6,6 +6,7 @@ use std::rc::Rc;
 use gpui::WeakEntity;
 
 use super::LauncherShell;
+use crate::features::activity::Activity;
 use crate::features::library::Library;
 use crate::features::new_game::NewGame;
 use crate::live::{LiveHandler, LiveIntent};
@@ -16,6 +17,7 @@ pub(super) fn route(shell: &LauncherShell, app: LiveHandler) -> LiveHandler {
     let this = shell.this.clone();
     let new_game: WeakEntity<NewGame> = shell.new_game.downgrade();
     let library: WeakEntity<Library> = shell.library.downgrade();
+    let activity: WeakEntity<Activity> = shell.activity_page.downgrade();
     Rc::new(move |intent, window, cx| match intent {
         LiveIntent::NewInstance => {
             let _ = new_game.update(cx, |new_game, cx| new_game.open(window, cx));
@@ -72,6 +74,21 @@ pub(super) fn route(shell: &LauncherShell, app: LiveHandler) -> LiveHandler {
         }
         LiveIntent::Preset(intent) => {
             let _ = library.update(cx, |library, cx| library.preset(intent, window, cx));
+        }
+        LiveIntent::CancelTask(task) => {
+            let _ = activity.update(cx, |activity, _| activity.cancel(task));
+        }
+        LiveIntent::PauseTask(task) => {
+            let _ = activity.update(cx, |activity, cx| activity.pause(task, cx));
+        }
+        LiveIntent::ResumeTask(task) => {
+            let _ = activity.update(cx, |activity, cx| activity.resume(task, cx));
+        }
+        LiveIntent::RetryTask(action) => {
+            let _ = activity.update(cx, |activity, cx| activity.retry(action, cx));
+        }
+        LiveIntent::ClearFinished => {
+            let _ = activity.update(cx, |activity, cx| activity.clear_finished(cx));
         }
         other => app(other, window, cx),
     })

@@ -1,14 +1,15 @@
 use gpui::prelude::*;
-use gpui::{AnyElement, IntoElement, div, px};
+use gpui::{AnyElement, App, IntoElement, Window, div, px};
 use gpui_component::{Icon, Sizable as _, h_flex, v_flex};
 use lumilio_core::{CONNECTIONS_PER_FILE, FileDownload, SourceSwitch, TaskDownloads};
 
-use super::controls::{LiveCtx, send};
+use super::page::{ActivityInputs, ActivityView};
 use crate::assets::UiIcon;
 use crate::key::Key;
-use crate::kit::{TagKind, Tone, ViewIntent};
+use crate::kit::{Emit, TagKind, Tone, ViewIntent};
 use crate::live::{
-    ActivityRow, ActivityState, LiveHandler, LiveIntent, eta_text, file_amount, source_host,
+    ActivityRow, ActivityState, LiveHandler, LiveIntent, activity_in_tab, eta_text, file_amount,
+    source_host,
 };
 use crate::theme::ShellColors;
 use crate::{kit, tr, tr_all};
@@ -24,6 +25,20 @@ const DETAIL_INDENT: f32 = LEAD + 12.;
 const FILE_METER_WIDTH: f32 = 96.;
 /// Bars in a file's strip: few enough that each stays a bar.
 const FILE_METER_BARS: usize = 12;
+
+/// What the page draws from.
+pub(super) struct ActivityCtx<'a> {
+    pub colors: ShellColors,
+    pub inputs: &'a ActivityInputs,
+    pub view: &'a ActivityView,
+    pub emit: Emit,
+    pub handler: LiveHandler,
+}
+
+fn send(handler: &LiveHandler, intent: LiveIntent) -> impl Fn(&mut Window, &mut App) + 'static {
+    let handler = handler.clone();
+    move |window, cx| handler(intent.clone(), window, cx)
+}
 
 /// The Activity tabs, as translated labels.
 #[allow(non_snake_case)]
@@ -143,6 +158,7 @@ fn keys(index: usize, row: &ActivityRow, handler: &LiveHandler, opens: bool) -> 
                     tr!("common-cancel"),
                     send(handler, LiveIntent::CancelTask(id)),
                 )
+                .debug_selector(move || format!("live-cancel-{index}"))
             }),
         ),
         ActivityState::Failed(message) => keys
@@ -160,7 +176,7 @@ fn keys(index: usize, row: &ActivityRow, handler: &LiveHandler, opens: bool) -> 
 
 /// The row's lead: the key that opens what a running task downloads, or
 /// the same room empty, so every name starts in one column.
-fn lead(index: usize, row: &ActivityRow, ctx: &LiveCtx, open: bool) -> AnyElement {
+fn lead(index: usize, row: &ActivityRow, ctx: &ActivityCtx, open: bool) -> AnyElement {
     let slot = div().flex_none().w(px(LEAD));
     let Some(task) = row.task.filter(|_| row.downloads.is_some()) else {
         return slot.into_any_element();
@@ -388,11 +404,9 @@ fn downloads_detail(
     detail.debug_selector(move || format!("live-task-files-{index}"))
 }
 
-fn activity_row(index: usize, row: &ActivityRow, ctx: &LiveCtx, opens: bool) -> gpui::Div {
+fn activity_row(index: usize, row: &ActivityRow, ctx: &ActivityCtx, opens: bool) -> gpui::Div {
     let colors = ctx.colors;
-    let open = row
-        .task
-        .is_some_and(|task| ctx.state.activity_open.contains(&task));
+    let open = row.task.is_some_and(|task| ctx.view.open.contains(&task));
     let (word, tone) = state_of(row);
     // ia[activity]: 看进度 | 任务行：名字旁的状态，名字下的进度条，右侧的已下载/总量与其下的剩余时间 | 下载中、等待连接、进行中、已暂停一眼可分；进度条只会前进，暂停时变灰；剩余时间在有两次读数后出现（下载按字节，安装/修复按文件个数）
     let mut item = kit::Item::new(row.title.clone())
@@ -428,9 +442,9 @@ fn activity_row(index: usize, row: &ActivityRow, ctx: &LiveCtx, opens: bool) -> 
 /// The one display on Activity, while a task downloads: the speed of all
 /// downloads, a cell per connection the setting allows, and how many tasks
 /// run and are paused.
-fn transfer_display(ctx: &LiveCtx) -> Option<AnyElement> {
+fn transfer_display(ctx: &ActivityCtx) -> Option<AnyElement> {
     let running: Vec<&ActivityRow> = ctx
-        .model
+        .inputs
         .activity
         .iter()
         .filter(|row| row.state == ActivityState::Running)
@@ -445,7 +459,7 @@ fn transfer_display(ctx: &LiveCtx) -> Option<AnyElement> {
         digits: 2,
         unit: None,
     };
-    let traffic = ctx.model.traffic;
+    let traffic = ctx.inputs.traffic;
     // ia[activity]: 看下载仪表 | 列表上方的显示屏 | 所有下载加起来的速度；每格一条连接，格数是设置里的同时下载数，亮几格就在用几条；进行中与已暂停的任务数 | 有任务在下载时才出现
     Some(
         kit::transfer_display(
@@ -470,18 +484,18 @@ fn transfer_display(ctx: &LiveCtx) -> Option<AnyElement> {
     )
 }
 
-pub fn activity(ctx: &LiveCtx) -> impl IntoElement {
+pub(super) fn activity(ctx: &ActivityCtx) -> impl IntoElement {
     let colors = ctx.colors;
-    let running = ctx.model.active_tasks();
-    let tab = ctx.state.activity_tab.min(ACTIVITY_TABS().len() - 1);
-    let shown = crate::live::activity_in_tab(&ctx.model.activity, tab);
-    let finished = ctx
-        .model
-        .activity
+    let rows = &ctx.inputs.activity;
+    let running = rows
         .iter()
-        .any(|row| row.state != ActivityState::Running);
+        .filter(|row| row.state == ActivityState::Running)
+        .count();
+    let tab = ctx.view.tab.min(ACTIVITY_TABS().len() - 1);
+    let shown = activity_in_tab(rows, tab);
+    let finished = rows.iter().any(|row| row.state != ActivityState::Running);
     let body = if shown.is_empty() {
-        if ctx.model.activity.is_empty() {
+        if rows.is_empty() {
             kit::empty(
                 tr!("activity-empty-title"),
                 tr!("activity-empty-help"),
@@ -500,7 +514,7 @@ pub fn activity(ctx: &LiveCtx) -> impl IntoElement {
                     let opens = row
                         .instance
                         .as_ref()
-                        .is_some_and(|id| ctx.model.library.iter().any(|card| &card.id == id));
+                        .is_some_and(|id| ctx.inputs.games.contains(id));
                     activity_row(index, row, ctx, opens)
                 })
                 .collect(),

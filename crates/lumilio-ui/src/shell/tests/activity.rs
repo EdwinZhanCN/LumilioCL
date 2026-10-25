@@ -69,12 +69,7 @@ fn a_failed_task_offers_retry_and_open_and_a_game_that_is_gone_offers_no_open(
 
     let retry = cx.debug_bounds("live-retry-0").expect("retry");
     cx.simulate_click(retry.center(), Modifiers::none());
-    assert_eq!(
-        seen.borrow().last(),
-        Some(&LiveIntent::RetryTask(RetryAction::RepairInstance {
-            instance: "here".into()
-        }))
-    );
+    assert!(seen.borrow().is_empty(), "Activity retries it itself");
     let open = cx.debug_bounds("live-open-0").expect("open");
     cx.simulate_click(open.center(), Modifiers::none());
     assert_eq!(
@@ -167,7 +162,6 @@ fn a_downloading_task_shows_its_files_and_pauses_from_its_row(cx: &mut TestAppCo
 
     let pause = cx.debug_bounds("live-pause-0").expect("pause key");
     cx.simulate_click(pause.center(), Modifiers::none());
-    assert_eq!(seen.borrow().last(), Some(&LiveIntent::PauseTask(7)));
 
     shell.update(cx, |shell, cx| {
         shell.update_live(|model| model.set_activity(vec![running(true)], 2_000), cx);
@@ -175,7 +169,12 @@ fn a_downloading_task_shows_its_files_and_pauses_from_its_row(cx: &mut TestAppCo
     cx.run_until_parked();
     let resume = cx.debug_bounds("live-pause-0").expect("resume key");
     cx.simulate_click(resume.center(), Modifiers::none());
-    assert_eq!(seen.borrow().last(), Some(&LiveIntent::ResumeTask(7)));
+    let cancel = cx.debug_bounds("live-cancel-0").expect("cancel key");
+    cx.simulate_click(cancel.center(), Modifiers::none());
+    assert!(
+        seen.borrow().is_empty(),
+        "Activity holds, goes on and stops it itself"
+    );
     assert!(
         cx.debug_bounds("live-task-files-0").is_some(),
         "the detail stays open across readings"

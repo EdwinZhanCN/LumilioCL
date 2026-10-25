@@ -16,7 +16,9 @@ impl LauncherShell {
             Route::Library => self
                 .library
                 .update(cx, |library, cx| library.show_tab(tab, cx)),
-            Route::Activity => self.view.activity_tab = tab,
+            Route::Activity => self
+                .activity_page
+                .update(cx, |activity, cx| activity.show_tab(tab, cx)),
             Route::Discover | Route::Home | Route::Accounts | Route::Settings => {}
         }
     }

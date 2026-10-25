@@ -2,6 +2,7 @@ use gpui::{Context, Window};
 use lumilio_core::{DiscoverPreferences, ProjectKind};
 
 use super::{ActivitySummary, LauncherShell};
+use crate::features::activity::ActivityInputs;
 use crate::features::library::LibraryInputs;
 use crate::kit::ViewIntent;
 use crate::live::{LiveHandler, LiveModel};
@@ -34,9 +35,16 @@ impl LauncherShell {
                 presets_error: model.presets_error.clone(),
                 game_settings: model.game_settings.clone(),
             };
+            let activity = ActivityInputs {
+                activity: model.activity.clone(),
+                traffic: model.traffic,
+                games: model.library.iter().map(|card| card.id.clone()).collect(),
+            };
             self.sync_discover(cx);
             self.library
                 .update(cx, |library, cx| library.set_inputs(inputs, cx));
+            self.activity_page
+                .update(cx, |page, cx| page.set_inputs(activity, cx));
             cx.notify();
         }
     }

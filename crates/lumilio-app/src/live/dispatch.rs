@@ -14,7 +14,7 @@ use super::accounts::{
     open_microsoft_sign_in, open_skin_dialog, open_third_party_sign_in,
 };
 use super::instance::open_instance;
-use super::jobs::{failed_only, job, outcome, reload, retry_task};
+use super::jobs::{job, outcome, reload};
 use super::launch::{play, start_launch, technical_details};
 use super::settings::{
     add_java, apply_preferences, change_setting, check_reclaimable, clear_cache,
@@ -203,7 +203,12 @@ pub(super) fn on_live_intent(
         | LiveIntent::RestoreBackup
         | LiveIntent::RevealGame(_)
         | LiveIntent::OpenGamesFolder
-        | LiveIntent::Preset(_) => {}
+        | LiveIntent::Preset(_)
+        | LiveIntent::CancelTask(_)
+        | LiveIntent::PauseTask(_)
+        | LiveIntent::ResumeTask(_)
+        | LiveIntent::RetryTask(_)
+        | LiveIntent::ClearFinished => {}
         LiveIntent::OpenInstance(id) => open_instance(wiring, id, None, window, cx),
         LiveIntent::Resolve(id, action) => open_instance(
             wiring,
@@ -224,31 +229,6 @@ pub(super) fn on_live_intent(
         LiveIntent::Refresh => {
             reload(wiring, Reload::Lists, cx);
             super::context::check_again(wiring, cx);
-        }
-        LiveIntent::CancelTask(id) => {
-            // The task finishes on its own terms; the next poll shows the outcome.
-            wiring.backend.service.cancel_task(id);
-        }
-        LiveIntent::PauseTask(id) => {
-            wiring.backend.service.pause_task(id);
-            reload(wiring, Reload::Lists, cx);
-        }
-        LiveIntent::ResumeTask(id) => {
-            wiring.backend.service.resume_task(id);
-            reload(wiring, Reload::Lists, cx);
-        }
-        LiveIntent::RetryTask(action) => retry_task(wiring, action, cx),
-        LiveIntent::ClearFinished => {
-            let service = wiring.backend.service.clone();
-            job(
-                wiring,
-                cx,
-                false,
-                Reload::Lists,
-                None,
-                async move { service.clear_finished() },
-                |shell, result, cx| failed_only(shell, result, tr!("activity-clear-failed"), cx),
-            );
         }
         LiveIntent::NewAccount => open_add_account(wiring, false, window, cx),
         LiveIntent::MicrosoftSignIn => open_microsoft_sign_in(wiring, window, cx),
