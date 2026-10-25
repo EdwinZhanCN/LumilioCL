@@ -1,5 +1,5 @@
 //! Which of the games found in another launcher's folder to bring over
-//! (ADR 0016). It holds no business logic: the answer is the games ticked.
+//!. It holds no business logic: the answer is the games ticked.
 
 use std::rc::Rc;
 

@@ -1,4 +1,4 @@
-//! Embedded SVG assets approved by ADR 0003.
+//! Embedded SVG assets.
 
 use std::borrow::Cow;
 
@@ -168,7 +168,7 @@ pub struct PixelFace;
 impl gpui::Global for PixelFace {}
 
 /// Registers the brand typefaces with the text system, from memory. Chinese
-/// is not bundled: it resolves through the platform's own fallback (ADR 0013).
+/// is not bundled: it resolves through the platform's own fallback.
 /// The pixel face is registered on its own, so losing it loses nothing else.
 pub fn register_fonts(cx: &mut gpui::App) {
     let fonts = FONTS.iter().map(|data| Cow::Borrowed(*data)).collect();

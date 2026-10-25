@@ -1,5 +1,5 @@
 <!-- 生成文件，不要手改。来源：代码里的 `// ia[...]` 注释；
-     重新生成：cargo run -p lumilio-docgen -- ia。约定见 ADR 0019。 -->
+     重新生成：cargo run -p lumilio-docgen -- ia。约定见技能 lumilio-ia-paths。 -->
 # 设置 · 已实现的用户路径
 
 表里每一行都有对应的实现；没有的就是没做。
@@ -45,7 +45,7 @@
 | Java：额外搜索目录 | Java · 值 + [编辑] 弹窗 | 每行一个文件夹，检测时也会找这些位置 |  | `lumilio-ui/src/features/settings/java.rs` |
 | Java：下载来源 | Java · 分段「Mojang / Oracle GraalVM」 | 下载与启动时自动下载都从这里取；GraalVM 只有 Java 21 和 25，其它版本仍从 Mojang 下载 |  | `lumilio-ui/src/features/settings/java.rs` |
 | Java：启动时自动下载 | Java · 开关 | 开启时，启动或安装时没有合适的 Java 就先下载游戏需要的版本，进度在动态；关闭后提示去安装 |  | `lumilio-ui/src/features/settings/java.rs` |
-| Java：下载 Java… | Java · 按键「下载 Java…」→ 弹窗选大版本 | 版本来自所选下载来源（Mojang 读运行时索引），默认 21；装好后出现在列表里，进度在动态 | ADR 0014 | `lumilio-ui/src/features/settings/java.rs` |
+| Java：下载 Java… | Java · 按键「下载 Java…」→ 弹窗选大版本 | 版本来自所选下载来源（Mojang 读运行时索引），默认 21；装好后出现在列表里，进度在动态 |  | `lumilio-ui/src/features/settings/java.rs` |
 | Java：检测与列表 | Java · 已发现的 Java 列表 | 列出检测到的 Java（版本、发行方、架构、路径），包括官方启动器的运行时与 PATH 中的 java；没有时提示添加 |  | `lumilio-ui/src/features/settings/java.rs` |
 | Java：重新检测 | Java · 按键「重新检测」 | 重新读取设置并检测 |  | `lumilio-ui/src/features/settings/java.rs` |
 | Java：添加 | Java · 按键「添加 Java…」→ 选 java 程序或 JDK 文件夹 | 加入列表 |  | `lumilio-ui/src/features/settings/java.rs` |
@@ -66,5 +66,5 @@
 | 数据目录 | 下载与存储 · 路径 + [在访达中显示] | 不可改（App State） |  | `lumilio-ui/src/features/settings/storage.rs` |
 | 存储占用 | 下载与存储 · 游戏 / 共享资源 / Java / 缓存 条形图 | 后台计算后显示 |  | `lumilio-ui/src/features/settings/storage.rs` |
 | 清除地图缓存 | 下载与存储 · 按键「清除地图缓存」 | 后台删除种子地图缓存；下次查看时重新计算 |  | `lumilio-ui/src/features/settings/storage.rs` |
-| 检查没用的游戏文件 | 下载与存储 · 按键「检查没用的游戏文件」 | 只报告能回收多少，确认后才删；游戏在安装/更新时拒绝 | ADR 0017 | `lumilio-ui/src/features/settings/storage.rs` |
+| 检查没用的游戏文件 | 下载与存储 · 按键「检查没用的游戏文件」 | 只报告能回收多少，确认后才删；游戏在安装/更新时拒绝 |  | `lumilio-ui/src/features/settings/storage.rs` |
 | 清理缓存 | 下载与存储 · 按键「清理缓存」 | 缓存 = 已解压的 natives 与 cache/，下次启动会重建 |  | `lumilio-ui/src/features/settings/storage.rs` |

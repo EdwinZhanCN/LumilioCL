@@ -6,7 +6,7 @@
 //! `~`, and `type` 0 for an ordinary waypoint, 1 for a death point, 2 for an
 //! older death point.
 //!
-//! Field parsing adapted from XaeroTools crates/xaero-core/src/waypoints.rs (MIT, Copyright (c) 2026 Dek), ADR 0022.
+//! Field parsing adapted from XaeroTools crates/xaero-core/src/waypoints.rs (MIT, Copyright (c) 2026 Dek).
 //! XaeroTools parses a file and rewrites every line, which loses comments and
 //! unknown lines. This model keeps each line's original text, so a file read
 //! and written back is identical byte for byte, and an edit changes only the

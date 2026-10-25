@@ -2,7 +2,7 @@
 //! servers, signing in, keeping the session alive, and the identity a launch
 //! presents. The rules follow HMCL (`YggdrasilAccount`, `AuthlibInjectorAccount`
 //! in `HMCLCore/.../auth/`, Copyright (C) 2020 huangyuhui and contributors,
-//! GPL-3.0-or-later; ADR 0011); where secrets live is ADR 0020.
+//! GPL-3.0-or-later); secrets live in [`crate::accounts::credentials`].
 
 use std::sync::atomic::Ordering;
 

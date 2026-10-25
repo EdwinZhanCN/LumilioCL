@@ -1,5 +1,5 @@
 //! A picture the person chose, behind Home instead of the procedural world
-//! (ADR 0044).
+//!.
 //!
 //! The picture is drawn as it is. Two soft shades keep the copy readable, and
 //! the bottom edge dissolves into the page with the same ordered dither as the

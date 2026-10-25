@@ -9,7 +9,7 @@
 //! chunk alone.
 //!
 //! The region layout and the block-state unpacking are adapted from fastanvil
-//! fastanvil/src/region.rs and fastanvil/src/java/section_data.rs (MIT OR Apache-2.0, Copyright (c) 2020 Owen Gage), ADR 0022.
+//! fastanvil/src/region.rs and fastanvil/src/java/section_data.rs (MIT OR Apache-2.0, Copyright (c) 2020 Owen Gage).
 //! Differences: reads go through byte ranges rather than a seekable stream, the
 //! external `.mcc` chunks are supported, and NBT comes from `lumilio-nbt`, which
 //! caps the size and depth of what it parses.

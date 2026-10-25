@@ -4,7 +4,7 @@
 //!
 //! The content follows Modrinth App's project pages
 //! (`apps/app-frontend/src/pages/project/*` and `ProjectSidebar*`,
-//! GPL-3.0-only; ADR 0022).
+//! GPL-3.0-only).
 
 mod gallery;
 mod header;

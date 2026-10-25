@@ -1,6 +1,6 @@
 //! The warning shown the first time someone leaves out photosensitivity
 //! triggers in Discover. After Modrinth App's `PhotosensitivityWarningModal`
-//! (GPL-3.0-only; ADR 0022): the filter depends on what authors disclose, so
+//! (GPL-3.0-only): the filter depends on what authors disclose, so
 //! it is a help, not a guarantee.
 
 use gpui::prelude::*;

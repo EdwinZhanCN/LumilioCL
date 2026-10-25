@@ -76,7 +76,7 @@ impl<T: Transport + Clone> Java<T> {
     }
 
     /// Downloads a Java for this system into the launcher's own `runtimes`
-    /// folder (ADR 0014) and returns it, from the download source in the
+    /// folder and returns it, from the download source in the
     /// settings when it offers `required`, else from Mojang. `required` is the
     /// Java major a game needs; without it, the recommended one. An Intel
     /// `build` always comes from Mojang.

@@ -1,5 +1,5 @@
 //! An inline 3D preview's schematic and the block assets it is drawn with
-//! (ADR 0028, plan schematic-studio D2/D3/D23): the bundle's, with the mods
+//! (plan schematic-studio D2/D3/D23): the bundle's, with the mods
 //! and resource packs the studio folder switched on laid over them.
 
 use lumilio_block_assets::{BakedPack, BlockCatalog, BlockNames, EntityLayers};

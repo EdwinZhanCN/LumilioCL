@@ -1,7 +1,7 @@
 //! Folder and file naming of Xaero's Minimap saves, restricted to what the
 //! waypoint overlay needs.
 //!
-//! Adapted from XaeroTools crates/xaero-core/src/naming.rs (MIT, Copyright (c) 2026 Dek), ADR 0022.
+//! Adapted from XaeroTools crates/xaero-core/src/naming.rs (MIT, Copyright (c) 2026 Dek).
 //! Reworked onto `lumilio_plugin_api::map::Dimension`.
 
 use lumilio_plugin_api::map::Dimension;

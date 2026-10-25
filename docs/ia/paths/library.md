@@ -1,5 +1,5 @@
 <!-- 生成文件，不要手改。来源：代码里的 `// ia[...]` 注释；
-     重新生成：cargo run -p lumilio-docgen -- ia。约定见 ADR 0019。 -->
+     重新生成：cargo run -p lumilio-docgen -- ia。约定见技能 lumilio-ia-paths。 -->
 # 游戏库 · 已实现的用户路径
 
 表里每一行都有对应的实现；没有的就是没做。
@@ -27,8 +27,8 @@
 | 直接启动 | 卡片按键行里的「启动」 | 先设为当前游戏（芯片和「继续」跟着换），再由首页启动时刻接管；不打开游戏页 | global-context D4 | `lumilio-ui/src/features/library/view.rs` |
 | 收藏 / 取消 | 卡片按键行里的星（图标颜色表示状态） | 立即切换；收藏页同步；不打开游戏页 |  | `lumilio-ui/src/features/library/view.rs` |
 | 合集：改名 / 删除 | 合集节标题 ⋯ 菜单 | 删除先确认，游戏不受影响 |  | `lumilio-ui/src/features/library/view.rs` |
-| 导入其他启动器的游戏 | L2 ⋯ 菜单 → 选文件夹（MultiMC/Prism 实例、.minecraft）→ 有多个时勾选 | 后台导入，复制玩家文件，原文件不动；CurseForge 格式不支持 | ADR 0016 | `lumilio-ui/src/features/library/view.rs` |
-| 从备份恢复 | L2 ⋯ 菜单 → 选备份 .zip | 后台恢复成新游戏，不覆盖已有的 | ADR 0015 | `lumilio-ui/src/features/library/view.rs` |
+| 导入其他启动器的游戏 | L2 ⋯ 菜单 → 选文件夹（MultiMC/Prism 实例、.minecraft）→ 有多个时勾选 | 后台导入，复制玩家文件，原文件不动；CurseForge 格式不支持 |  | `lumilio-ui/src/features/library/view.rs` |
+| 从备份恢复 | L2 ⋯ 菜单 → 选备份 .zip | 后台恢复成新游戏，不覆盖已有的 |  | `lumilio-ui/src/features/library/view.rs` |
 | 打开游戏库文件夹 | L2 ⋯ 菜单 | 在访达中打开所有游戏所在的文件夹 |  | `lumilio-ui/src/features/library/view.rs` |
 | 新建游戏 | L2 主要 → 新建游戏弹窗 | 创建并（可选）立即安装；成功后打开新游戏页 |  | `lumilio-ui/src/features/library/view.rs` |
 | 搜索 | L3 搜索框 | 按名称过滤；空结果“没有匹配的游戏” |  | `lumilio-ui/src/features/library/view.rs` |

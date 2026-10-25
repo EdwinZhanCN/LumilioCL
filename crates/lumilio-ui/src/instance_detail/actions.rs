@@ -99,7 +99,7 @@ impl InstanceDetailView {
                 .disabled(busy),
             )
             .more(
-                // ia[instance]: 完整备份 | 页头 ⋯ 菜单 → 选位置 | 后台打成一个 zip（含存档，不含日志），toast；之后可在游戏库「从备份恢复」 | ADR 0015；运行中禁用
+                // ia[instance]: 完整备份 | 页头 ⋯ 菜单 → 选位置 | 后台打成一个 zip（含存档，不含日志），toast；之后可在游戏库「从备份恢复」 | 运行中禁用
                 kit::MenuEntry::new(
                     tr!("instance-backup-game"),
                     with_view(|view, window, cx| {

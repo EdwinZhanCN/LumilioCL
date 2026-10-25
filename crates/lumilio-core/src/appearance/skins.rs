@@ -2,7 +2,7 @@
 //! (a skin server on this machine and the authlib-injector agent that points
 //! the game at it). The rules follow HMCL's `OfflineAccount`
 //! (`HMCLCore/.../auth/offline/OfflineAccount.java`, Copyright (C) 2020
-//! huangyuhui and contributors, GPL-3.0-or-later; ADR 0011).
+//! huangyuhui and contributors, GPL-3.0-or-later).
 
 use std::sync::Arc;
 

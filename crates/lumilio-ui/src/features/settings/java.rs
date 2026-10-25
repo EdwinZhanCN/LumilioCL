@@ -229,7 +229,7 @@ pub(super) fn java(view: &SettingsView, ctx: &SettingsCtx) -> AnyElement {
         let source = view.java_source;
         let majors = offered(view, source);
         let handler = handler.clone();
-        // ia[settings]: Java：下载 Java… | Java · 按键「下载 Java…」→ 弹窗选大版本 | 版本来自所选下载来源（Mojang 读运行时索引），默认 21；装好后出现在列表里，进度在动态 | ADR 0014
+        // ia[settings]: Java：下载 Java… | Java · 按键「下载 Java…」→ 弹窗选大版本 | 版本来自所选下载来源（Mojang 读运行时索引），默认 21；装好后出现在列表里，进度在动态
         kit::action(
             "settings-java-install",
             tr!("settings-java-install"),

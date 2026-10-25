@@ -24,7 +24,7 @@ const LANDMARKS = [
 
 type LandmarkId = (typeof LANDMARKS)[number]["id"];
 
-/** The launcher's bottom navigation (design language §6, ADR 0012): the
+/** The launcher's bottom navigation (design language §6): the
  * current location on the leading side, the landmark capsule centred, the
  * source on the trailing side. The open landmark sits pressed with its LED
  * lit and opens out to show its label. */

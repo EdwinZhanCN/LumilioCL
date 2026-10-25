@@ -2,7 +2,7 @@
 //! (`GET <api root>`). Adapted from HMCL
 //! (`HMCLCore/src/main/java/org/jackhuang/hmcl/auth/authlibinjector/AuthlibInjectorServer.java`
 //! and `HMCL/.../setting/AuthlibInjectorServerList.java`, Copyright (C)
-//! 2020–2026 huangyuhui and contributors, GPL-3.0-or-later; ADR 0011).
+//! 2020–2026 huangyuhui and contributors, GPL-3.0-or-later).
 
 use std::collections::BTreeMap;
 

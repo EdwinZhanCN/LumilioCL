@@ -1,5 +1,5 @@
 //! The tags on a result card, chosen the way Modrinth App's `ProjectCardTags`
-//! does (GPL-3.0-only; ADR 0022): categories first in name order, then
+//! does (GPL-3.0-only): categories first in name order, then
 //! loaders with the usual ones first; what the person already filtered by is
 //! not repeated; the rest folds into an overflow count.
 

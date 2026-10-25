@@ -1,5 +1,5 @@
 <!-- 生成文件，不要手改。来源：代码里的 `// ia[...]` 注释；
-     重新生成：cargo run -p lumilio-docgen -- ia。约定见 ADR 0019。 -->
+     重新生成：cargo run -p lumilio-docgen -- ia。约定见技能 lumilio-ia-paths。 -->
 # 游戏页（整体） · 已实现的用户路径
 
 表里每一行都有对应的实现；没有的就是没做。
@@ -15,7 +15,7 @@
 | 创建快照 | 页头 ⋯ 菜单 → 弹窗（备注可空；范围＝全部或某个世界） | 后台创建，历史·快照可见 |  | `lumilio-ui/src/instance_detail/actions.rs` |
 | 在访达中显示 | 页头 ⋯ 菜单 | 打开游戏目录 |  | `lumilio-ui/src/instance_detail/actions.rs` |
 | 复制游戏 | 页头 ⋯ 菜单 → 弹窗（新名称、是否复制存档） | 后台复制成独立副本；不复制历史、快照和游玩时间 |  | `lumilio-ui/src/instance_detail/actions.rs` |
-| 完整备份 | 页头 ⋯ 菜单 → 选位置 | 后台打成一个 zip（含存档，不含日志），toast；之后可在游戏库「从备份恢复」 | ADR 0015；运行中禁用 | `lumilio-ui/src/instance_detail/actions.rs` |
+| 完整备份 | 页头 ⋯ 菜单 → 选位置 | 后台打成一个 zip（含存档，不含日志），toast；之后可在游戏库「从备份恢复」 | 运行中禁用 | `lumilio-ui/src/instance_detail/actions.rs` |
 | 导出整合包 | 页头 ⋯ 菜单 → 导出弹窗（格式、勾选文件） | 后台导出，可取消 |  | `lumilio-ui/src/instance_detail/actions.rs` |
 | 删除游戏 | 页头 ⋯ 菜单 → 警告弹窗 | 删除后从历史中移除并后退 |  | `lumilio-ui/src/instance_detail/actions.rs` |
 | 打开插件标签 | 游戏页「插件」标签内的左侧列表 | 读取并显示插件给的内容；插件被关闭或出错时标签消失，回到内置标签 | 插件只描述内容，版式由启动器统一 | `lumilio-ui/src/instance_detail/plugin_tabs/plugin_pages.rs` |

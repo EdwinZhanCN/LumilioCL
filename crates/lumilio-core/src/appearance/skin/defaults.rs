@@ -1,5 +1,5 @@
 //! UUID selection follows HMCL `HMCL/.../game/TexturesLoader.java`,
-//! Copyright (C) 2021 huangyuhui and contributors, GPL-3.0-or-later (ADR 0011).
+//! Copyright (C) 2021 huangyuhui and contributors, GPL-3.0-or-later.
 //! Artwork is read only from an installed client; none is distributed here.
 
 use std::fs::File;

@@ -1,6 +1,7 @@
-//! The look area of an account's detail, in two layers (after Modrinth's
-//! `Skins.vue`): the figure with one place to act under it, beside a grid of
-//! skin pictures. Editing replaces the grid; nothing else is on the page.
+//! The look area of an account's detail, in two layers (after Modrinth App's
+//! `Skins.vue`, GPL-3.0-only): the figure with one place to act under it,
+//! beside a grid of skin pictures. Editing replaces the grid; nothing else
+//! is on the page.
 
 use gpui::prelude::*;
 use gpui::{AnyElement, ElementId};
@@ -399,7 +400,7 @@ impl Wardrobe {
     fn offline_form(&self, colors: ShellColors, cx: &Context<Self>) -> AnyElement {
         let cancel = cx.weak_entity();
         let escape = cx.weak_entity();
-        // ia[accounts]: 保存离线外观 | 「编辑外观…」后的皮肤来源表单 | 默认、本地皮肤与披风、LittleSkin 或自定义站保存为 SkinChoice；预览更新，启动仍按 ADR 0024
+        // ia[accounts]: 保存离线外观 | 「编辑外观…」后的皮肤来源表单 | 默认、本地皮肤与披风、LittleSkin 或自定义站保存为 SkinChoice；预览更新，启动时照样加载
         v_flex()
             .id("wardrobe-offline")
             .track_focus(&self.editor_focus)

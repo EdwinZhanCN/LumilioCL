@@ -279,7 +279,7 @@ pub(super) fn downloads(view: &SettingsView, ctx: &SettingsCtx) -> AnyElement {
             .child(
                 h_flex()
                     .gap_2()
-                    // ia[settings]: 检查没用的游戏文件 | 下载与存储 · 按键「检查没用的游戏文件」 | 只报告能回收多少，确认后才删；游戏在安装/更新时拒绝 | ADR 0017
+                    // ia[settings]: 检查没用的游戏文件 | 下载与存储 · 按键「检查没用的游戏文件」 | 只报告能回收多少，确认后才删；游戏在安装/更新时拒绝
                     .child(
                         Key::new("settings-reclaim")
                             .label(tr!("settings-reclaim"))

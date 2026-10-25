@@ -12,7 +12,7 @@ use crate::instances::{InstanceRecord, InstanceSettings, Loader, NewInstance};
 use crate::transfer::Transport;
 
 impl<T: Transport + Clone> InstanceLibrary<T> {
-    /// The games in a folder made by another launcher (ADR 0016). Reads only.
+    /// The games in a folder made by another launcher. Reads only.
     pub(crate) async fn detect_games(
         &self,
         folder: &Path,
@@ -119,7 +119,7 @@ impl<T: Transport + Clone> InstanceLibrary<T> {
     }
 
     /// Saves the whole game (mods, config, worlds, options; not logs) as one
-    /// file at `destination` (ADR 0015) and returns its size. Takes the
+    /// file at `destination` and returns its size. Takes the
     /// instance lease so the files hold still. An Activity task; cancelling
     /// it leaves no file.
     pub(crate) async fn backup_instance(
@@ -167,7 +167,7 @@ impl<T: Transport + Clone> InstanceLibrary<T> {
         result
     }
 
-    /// Makes a new game out of a backup (ADR 0015). The game is built whole
+    /// Makes a new game out of a backup. The game is built whole
     /// before it appears; nothing existing is touched. Its game files are
     /// installed on first launch like any new game.
     pub(crate) async fn restore_backup(

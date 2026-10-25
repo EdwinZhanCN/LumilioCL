@@ -45,7 +45,7 @@ const LEGACY: [Rule; 5] = [
 // Adapted rule signatures from
 // 3rd-party/HMCL/HMCLCore/src/main/java/org/jackhuang/hmcl/game/CrashReportAnalyzer.java
 // Copyright (C) 2021 huangyuhui <huanghongxun2008@126.com> and contributors.
-// GPL-3.0-or-later; ADR 0011. The words and Rust execution are our own.
+// GPL-3.0-or-later. The words and Rust execution are our own.
 // Common mod/dependency/configuration failures precede runtime/platform cases.
 const ADDITIONAL: [Rule; 16] = [
     error(

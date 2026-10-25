@@ -1,4 +1,4 @@
-//! Offscreen 3D rendering of a Minecraft schematic (ADR 0028).
+//! Offscreen 3D rendering of a Minecraft schematic.
 //!
 //! Nucleation parses the schematic and meshes it with a baked pack and the same game version's
 //! entity model layers (`lumilio-block-assets`); its wgpu

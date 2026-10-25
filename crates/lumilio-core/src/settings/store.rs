@@ -70,7 +70,7 @@ impl AccountKind {
     }
 }
 
-/// An account as `settings.json` keeps it: public facts only (ADR 0020).
+/// An account as `settings.json` keeps it: public facts only.
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AccountEntry {
     /// The profile name: an offline account's identity, and a Microsoft

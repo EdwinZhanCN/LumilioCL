@@ -3,7 +3,7 @@ use crate::blocking::blocking_value;
 use crate::error::ServiceError;
 
 impl Diagnostics {
-    /// How much of the shared game files no game uses (ADR 0017). Reads only;
+    /// How much of the shared game files no game uses. Reads only;
     /// walks the disk.
     pub(crate) async fn reclaimable(
         &self,

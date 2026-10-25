@@ -1,5 +1,5 @@
 //! Home hero: procedural pixel-art scenes that reflect Home's state
-//! (ADR 0004, design language §5).
+//! (design language §5).
 //!
 //! Each frame the current scene is rasterised on the CPU into a small texel
 //! grid (pure Rust, see [`raster`]), composited with an outgoing scene or the

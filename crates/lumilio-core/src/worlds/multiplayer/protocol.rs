@@ -2,7 +2,7 @@
 //! asked with the legacy (pre-1.7) handshake.
 //!
 //! Adapted from Modrinth App `packages/app-lib/src/util/protocol_version.rs`
-//! (Copyright Modrinth contributors, GPL-3.0-only; ADR 0022). The table below
+//! (Copyright Modrinth contributors, GPL-3.0-only). The table below
 //! is the game's own protocol numbers for the versions before `version.json`
 //! shipped inside the client jar (newer versions are read from the jar).
 

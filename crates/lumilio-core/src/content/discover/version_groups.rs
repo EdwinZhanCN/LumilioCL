@@ -2,7 +2,7 @@
 //! way Modrinth App's project pages show them.
 //!
 //! Ported from `getVersionGroupsForDisplay` in `packages/utils/projects.ts`
-//! (GPL-3.0-only; ADR 0022).
+//! (GPL-3.0-only).
 
 use std::borrow::Cow;
 use std::collections::HashMap;

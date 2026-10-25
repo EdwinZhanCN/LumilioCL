@@ -1,5 +1,5 @@
 //! `cargo run -p lumilio-docgen -- ia [--check]` writes (or checks) the
-//! generated IA path tables (ADR 0019).
+//! generated IA path tables.
 
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
