@@ -17,7 +17,13 @@ use gpui_base::Placement;
 use gpui_base::Popover as BasePopover;
 pub use gpui_base::PopoverState;
 
-pub(crate) fn init(_: &mut App) {}
+/// LumilioCL patch: a field inside a popover types spaces. gpui-base binds
+/// Space to the popover's Confirm, and bindings run before text input, so a
+/// space typed into the field would close the popover instead. Guard:
+/// `navigation::tests` in `lumilio-ui`.
+pub(crate) fn init(cx: &mut App) {
+    cx.bind_keys([gpui::KeyBinding::new("space", gpui::NoAction, Some("Input"))]);
+}
 
 /// How long a dropdown takes to settle into place after it opens.
 ///

@@ -1,9 +1,12 @@
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 
-use gpui::{Modifiers, Render, TestAppContext, point};
+use gpui::prelude::*;
+use gpui::{Modifiers, Render, ScrollDelta, ScrollWheelEvent, TestAppContext, div, point, px};
 
+use super::bar::{ActivityBadge, FULL_FROM_WIDTH, ZONE_GAP};
 use super::*;
-use crate::route::Route;
+use crate::home::WorldHint;
+use crate::theme::ShellColors;
 
 fn no_history(title: &str) -> Leading {
     Leading {
@@ -42,7 +45,8 @@ impl Render for Page {
                     account: None,
                     instance: None,
                 },
-                f32::from(window.viewport_size().width),
+                window,
+                cx,
             ))
     }
 }
@@ -98,7 +102,8 @@ impl Render for Bar {
             // On an instance's page the location is the instance's name.
             no_history(LONG_NAME),
             trailing,
-            f32::from(window.viewport_size().width),
+            window,
+            cx,
         ))
     }
 }
@@ -169,6 +174,167 @@ fn the_capsule_does_not_pass_clicks_to_the_page_underneath(cx: &mut TestAppConte
     assert_eq!(clicks.get(), 0, "the page underneath was clicked");
     cx.simulate_click(point(px(5.), px(5.)), Modifiers::none());
     assert_eq!(clicks.get(), 1, "the test page itself is clickable");
+}
+
+/// A library too long for the list, one game in it named apart, and a few
+/// accounts.
+struct Crowd {
+    chosen: Rc<RefCell<Vec<String>>>,
+}
+
+const CROWD: usize = 30;
+const SKY_BLOCK: usize = 13;
+
+impl Render for Crowd {
+    fn render(&mut self, window: &mut Window, cx: &mut gpui::Context<Self>) -> impl IntoElement {
+        let games: Vec<InstanceChoice> = (0..CROWD)
+            .map(|index| InstanceChoice {
+                id: format!("game-{index}"),
+                name: if index == SKY_BLOCK {
+                    "Sky Block".into()
+                } else {
+                    format!("Game {index}").into()
+                },
+                version: "1.21.1".into(),
+                seed: index as u32,
+                loader: crate::cover::Loader::Vanilla,
+                world: WorldHint::Overworld,
+            })
+            .collect();
+        let players = ["Steve", "Alex", "Notch"]
+            .map(|name| AccountChoice {
+                key: name.into(),
+                name: name.into(),
+                detail: "Offline".into(),
+                selected: name == "Steve",
+                face: None,
+            })
+            .to_vec();
+        let chosen = self.chosen.clone();
+        let trailing = Trailing {
+            account: Some(CurrentAccount {
+                choices: players,
+                on_choose: Rc::new(|_, _, _| {}),
+                on_manage: Rc::new(|_, _| {}),
+                on_add: Rc::new(|_, _| {}),
+            }),
+            instance: Some(CurrentInstance {
+                current: games.first().cloned(),
+                choices: games,
+                on_choose: Rc::new(move |id, _, _| chosen.borrow_mut().push(id.to_owned())),
+                on_empty: Rc::new(|_, _| {}),
+            }),
+        };
+        div().size_full().relative().child(render(
+            Route::Home,
+            0,
+            ShellColors::current(cx),
+            Rc::new(|_, _, _| {}),
+            no_history("首页"),
+            trailing,
+            window,
+            cx,
+        ))
+    }
+}
+
+#[gpui::test]
+fn a_long_list_scrolls_in_its_popover_and_a_search_picks_from_it(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_component::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let chosen: Rc<RefCell<Vec<String>>> = Rc::default();
+    let seen = chosen.clone();
+    let (_view, cx) = cx.add_window_view(|_, _| Crowd { chosen: seen });
+    cx.simulate_resize(gpui::size(px(1200.), px(800.)));
+    cx.run_until_parked();
+
+    // Three accounts fit: no search, and Escape closes the list.
+    let account = cx.debug_bounds("navigation-account").expect("account chip");
+    cx.simulate_click(account.center(), Modifiers::none());
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("navigation-account-choice-2").is_some());
+    assert!(cx.debug_bounds("navigation-account-search").is_none());
+    cx.simulate_keystrokes("escape");
+    assert!(cx.debug_bounds("navigation-account-choice-0").is_none());
+
+    // Thirty games do not: the list keeps its height and scrolls.
+    let chip = cx.debug_bounds("navigation-instance").expect("game chip");
+    cx.simulate_click(chip.center(), Modifiers::none());
+    cx.run_until_parked();
+    let list = cx
+        .debug_bounds("navigation-instance-choices")
+        .expect("the list opened");
+    assert!(
+        list.size.height <= choices::LIST_MAX_HEIGHT && list.top() >= px(0.),
+        "{list:?}"
+    );
+    assert!(cx.debug_bounds("navigation-instance-search").is_some());
+    let last: &'static str = format!("navigation-instance-choice-{}", CROWD - 1).leak();
+    let row = cx.debug_bounds(last).expect("the last game");
+    assert!(
+        row.top() >= list.bottom(),
+        "the last game is below: {row:?}"
+    );
+    cx.simulate_event(ScrollWheelEvent {
+        position: list.center(),
+        delta: ScrollDelta::Pixels(point(px(0.), px(-10_000.))),
+        ..ScrollWheelEvent::default()
+    });
+    cx.run_until_parked();
+    let row = cx.debug_bounds(last).expect("the last game");
+    assert!(
+        row.top() >= list.top() && row.bottom() <= list.bottom() + px(1.),
+        "scrolled to the last game: {row:?} in {list:?}"
+    );
+
+    // The field has the focus: typing filters, a space included (the
+    // popover binds Space to confirm), and Enter takes the one left.
+    cx.simulate_keystrokes("s k y space b");
+    let sky_block: &'static str = format!("navigation-instance-choice-{SKY_BLOCK}").leak();
+    assert!(cx.debug_bounds(sky_block).is_some(), "Sky Block is found");
+    assert!(
+        cx.debug_bounds("navigation-instance-choice-0").is_none(),
+        "the others are not"
+    );
+    cx.simulate_keystrokes("enter");
+    cx.run_until_parked();
+    assert_eq!(chosen.borrow().as_slice(), [format!("game-{SKY_BLOCK}")]);
+    assert!(
+        cx.debug_bounds("navigation-instance-choices").is_none(),
+        "choosing closes the list"
+    );
+
+    // Opened again, the search is empty and the list starts at the top.
+    cx.simulate_click(chip.center(), Modifiers::none());
+    cx.run_until_parked();
+    let first = cx
+        .debug_bounds("navigation-instance-choice-0")
+        .expect("every game again");
+    assert_eq!(first.top(), list.top(), "back at the top");
+    cx.simulate_keystrokes("x y z");
+    assert!(cx.debug_bounds("navigation-instance-choice-0").is_none());
+    assert!(
+        cx.debug_bounds("navigation-instance-no-match").is_some(),
+        "a search that keeps nothing says so"
+    );
+}
+
+#[test]
+fn a_search_keeps_the_choices_holding_every_word() {
+    let words = [
+        "Sky Block 1.21.1 Fabric",
+        "Survival 26.2 原版",
+        "SkyFactory 1.12.2 Forge",
+    ]
+    .map(String::from);
+    assert_eq!(choices::matching("", &words), [0, 1, 2]);
+    assert_eq!(choices::matching("sky", &words), [0, 2]);
+    assert_eq!(choices::matching(" SKY  fabric ", &words), [0]);
+    assert_eq!(choices::matching("1.12", &words), [2]);
+    assert_eq!(choices::matching("原版", &words), [1]);
+    assert!(choices::matching("quilt", &words).is_empty());
 }
 
 #[test]

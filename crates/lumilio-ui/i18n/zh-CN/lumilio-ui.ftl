@@ -76,6 +76,8 @@ nav-add-account-help = 添加一个离线账户才能进游戏
 nav-add-account-tip = 还没有账户，添加一个离线账户才能进游戏
 nav-current-account = 当前账户：{ $name }
 nav-switch-account = 切换账户
+nav-search-accounts = 搜索账户
+nav-no-matching-account = 没有匹配的账户
 nav-manage-accounts = 账户详情
 # 账户芯片下拉里一行的说明，例如「Microsoft · 需要重新登录」。
 nav-account-needs-sign-in = { $kind } · 需要重新登录
@@ -85,6 +87,8 @@ nav-no-game-help = 去游戏库新建一个
 nav-no-game-tip = 还没有游戏，去游戏库新建一个
 nav-current-game = 当前游戏：{ $name }，启动和安装都用它
 nav-switch-game = 切换当前游戏
+nav-search-games = 搜索游戏
+nav-no-matching-game = 没有匹配的游戏
 detail-title-modpack = 整合包详情
 detail-title-mod = Mod 详情
 detail-title-resource-pack = 资源包详情

@@ -91,6 +91,8 @@ nav-add-account-help = Add an offline account to play
 nav-add-account-tip = No account yet. Add an offline account to play
 nav-current-account = Current account: { $name }
 nav-switch-account = Switch account
+nav-search-accounts = Search accounts
+nav-no-matching-account = No matching accounts
 nav-manage-accounts = Account details
 # A line in the account chip's dropdown, as in “Microsoft · Sign in again”.
 nav-account-needs-sign-in = { $kind } · Sign in again
@@ -100,6 +102,8 @@ nav-no-game-help = Create one in the Library
 nav-no-game-tip = No game yet. Create one in the Library
 nav-current-game = Current game: { $name }. Launches and installs use it
 nav-switch-game = Switch current game
+nav-search-games = Search games
+nav-no-matching-game = No matching games
 detail-title-modpack = Modpack details
 detail-title-mod = Mod details
 detail-title-resource-pack = Resource pack details
