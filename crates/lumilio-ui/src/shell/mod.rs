@@ -7,6 +7,7 @@ mod detail;
 mod features;
 mod home_page;
 mod instance;
+mod launch;
 mod locations;
 mod memory;
 mod mirror;

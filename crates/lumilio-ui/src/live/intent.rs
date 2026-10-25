@@ -21,8 +21,6 @@ pub enum LiveIntent {
     Play(String),
     /// Launch this instance straight into one of its worlds or servers.
     PlayPlace(String, super::PlaceTarget),
-    /// Stop the launch or the running game, if it is this instance.
-    StopGame(String),
     /// Forget every saved translation.
     ClearTranslationCache,
     /// Stop this running task (by the service's task id).

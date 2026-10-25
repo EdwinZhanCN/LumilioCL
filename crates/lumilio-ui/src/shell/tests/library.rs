@@ -69,14 +69,16 @@ fn live_library_cards_manage_and_explicit_play_is_independent(cx: &mut TestAppCo
         .debug_bounds("live-play-0")
         .expect("explicit play button");
     cx.simulate_click(play.center(), Modifiers::none());
+    cx.run_until_parked();
+    assert_eq!(seen.borrow().len(), before, "the shell plays it");
     assert_eq!(
-        seen.borrow().len(),
-        before + 1,
+        open_game(&shell, cx),
+        None,
         "play must not also open details"
     );
     assert_eq!(
-        seen.borrow().last(),
-        Some(&LiveIntent::Play("survival".to_owned()))
+        shell.read_with(cx, |shell, _| shell.current_choices.played.clone()),
+        [("survival".to_owned(), None)]
     );
 }
 

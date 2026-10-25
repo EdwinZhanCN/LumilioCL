@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use gpui_kit::AppContext as _;
+use gpui_kit::{App, AppContext as _};
 use lumilio_ui::live::{UpdateStatus, UpdateUnavailability};
 use lumilio_updater::{CheckResult, Relaunch, UpdateClient, UpdateError, UpdateRestriction};
 use tokio::sync::mpsc;
@@ -118,10 +118,14 @@ pub(super) fn set_automatic(wiring: &Wiring, enabled: bool) {
     send(wiring, UpdateCommand::SetAutomatic(enabled));
 }
 
-pub(super) fn apply(wiring: &Wiring) {
+pub(super) fn apply(wiring: &Wiring, cx: &App) {
     // The navigation control is disabled for a running game. Keep the same
     // guard here for launch-in-progress and stale UI events.
-    if wiring.state.borrow().cancel.is_some() {
+    let launching = wiring
+        .shell
+        .read_with(cx, |shell, cx| shell.launch().read(cx).launching())
+        .unwrap_or(false);
+    if launching {
         return;
     }
     send(wiring, UpdateCommand::Apply);

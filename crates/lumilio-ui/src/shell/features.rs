@@ -12,7 +12,7 @@ use crate::features::library::Library;
 use crate::features::new_game::NewGame;
 use crate::features::settings::Settings;
 use crate::instance_detail::InstanceIntent;
-use crate::live::{LiveHandler, LiveIntent};
+use crate::live::{LiveHandler, LiveIntent, PlaceTarget};
 
 /// Sends the intents the shell or a feature it owns answers there, and every
 /// other one to `app`.
@@ -169,8 +169,24 @@ pub(super) fn route(shell: &LauncherShell, app: LiveHandler) -> LiveHandler {
         LiveIntent::ExportPackOf(id) => {
             open_game(&this, id, Some(InstanceIntent::ExportPack), window, cx)
         }
+        LiveIntent::Play(id) => play(&this, id, None, window, cx),
+        LiveIntent::PlayPlace(id, target) => play(&this, id, Some(target), window, cx),
         other => app(other, window, cx),
     })
+}
+
+/// Plays a game. Deferred: pages ask while the shell may be updating.
+pub(super) fn play(
+    this: &WeakEntity<LauncherShell>,
+    id: String,
+    target: Option<PlaceTarget>,
+    window: &mut Window,
+    cx: &mut App,
+) {
+    let this = this.clone();
+    window.defer(cx, move |window, cx| {
+        let _ = this.update(cx, |shell, cx| shell.play(id, target, window, cx));
+    });
 }
 
 /// Opens a game's page. Deferred: pages ask while the shell may be updating.
