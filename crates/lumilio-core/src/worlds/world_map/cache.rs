@@ -92,7 +92,13 @@ pub(super) fn read_entry(path: &Path, max: u64) -> io::Result<Option<Vec<u8>>> {
         return Ok(None);
     }
     let bytes = fs::read(path)?;
-    fs::File::open(path)?.set_modified(SystemTime::now())?;
+    // Windows changes a file's times only through a handle opened for
+    // writing. An entry that cannot be marked is still a hit: it only goes
+    // sooner when the cache is trimmed.
+    let _ = fs::File::options()
+        .write(true)
+        .open(path)
+        .and_then(|file| file.set_modified(SystemTime::now()));
     Ok(Some(bytes))
 }
 

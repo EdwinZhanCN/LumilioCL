@@ -334,7 +334,7 @@ impl PluginHost {
         context.writer = writer;
         context.revision = revision;
         let plugin = Arc::clone(&entry.plugin);
-        let work = isolated(timeout, move || {
+        let work = isolated(tokio::time::Instant::now() + timeout, move || {
             // Permit belongs to the blocking worker, including after timeout:
             // an uncooperative plugin cannot exceed the concurrency cap.
             let _permit = permit;

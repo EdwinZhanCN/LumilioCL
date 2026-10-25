@@ -223,6 +223,27 @@ async fn timeout_discards_late_results_and_stops_future_dispatch() {
 }
 
 #[tokio::test]
+async fn a_call_that_ends_after_its_deadline_timed_out_even_when_seen_before_the_timer() {
+    let now = tokio::time::Instant::now();
+    // Ends after its deadline with the error a network read gives at it.
+    let mut late = std::pin::pin!(isolated(now + Duration::from_millis(50), || {
+        std::thread::sleep(Duration::from_millis(100));
+        Err::<(), _>(PluginError::Transient(
+            "plugin network deadline expired".into(),
+        ))
+    }));
+    let mut prompt = std::pin::pin!(isolated(now + Duration::from_millis(500), || Ok(7)));
+    assert!(futures_util::poll!(&mut late).is_pending());
+    assert!(futures_util::poll!(&mut prompt).is_pending());
+    // Both workers finish while the runtime is held, so each result is seen
+    // before its timer.
+    std::thread::sleep(Duration::from_millis(700));
+    let fault = late.await.expect_err("a call past its deadline fails");
+    assert!(!fault.transient, "{}", fault.message);
+    assert_eq!(prompt.await.ok(), Some(7), "in time, though seen late");
+}
+
+#[tokio::test]
 async fn unauthorized_io_returns_errors_without_panicking() {
     let host = host();
     assert_eq!(

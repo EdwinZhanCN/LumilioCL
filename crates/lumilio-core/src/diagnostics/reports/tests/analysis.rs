@@ -99,7 +99,10 @@ async fn analysis_uses_latest_report_for_a_failed_session_and_home_picks_the_mos
     std::fs::write(game.join("logs/latest.log"), "latest log").unwrap();
     std::fs::write(game.join("crash-reports/crash.txt"), "report").unwrap();
     std::fs::write(game.join("crash-reports/old.txt"), "old report").unwrap();
-    std::fs::File::open(game.join("crash-reports/old.txt"))
+    // Windows changes a file's times only through a handle opened for writing.
+    std::fs::File::options()
+        .write(true)
+        .open(game.join("crash-reports/old.txt"))
         .unwrap()
         .set_times(std::fs::FileTimes::new().set_modified(std::time::UNIX_EPOCH))
         .unwrap();

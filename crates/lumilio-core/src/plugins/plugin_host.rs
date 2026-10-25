@@ -6,6 +6,7 @@ use std::time::Duration;
 
 use lumilio_plugin_api::{API_VERSION, HostContext, Manifest, Plugin, PluginError, PluginState};
 use tokio::sync::OnceCell;
+use tokio::time::Instant;
 
 use super::context::Context;
 use super::{native, network};
@@ -151,7 +152,11 @@ impl PluginHost {
                 let mut registry = Registry::default();
                 for plugin in &self.candidates {
                     let candidate = plugin.clone();
-                    match isolated(self.timeout, move || Ok(candidate.manifest())).await {
+                    match isolated(Instant::now() + self.timeout, move || {
+                        Ok(candidate.manifest())
+                    })
+                    .await
+                    {
                         Ok(manifest) => {
                             if !self.core
                                 && manifest
@@ -383,10 +388,12 @@ impl PluginHost {
         {
             return None;
         }
+        // One deadline for the whole call, its network reads included.
+        let deadline = Instant::now() + timeout;
         let network = self
             .network
             .as_ref()
-            .map(|network| network.context(timeout));
+            .map(|network| network.context(deadline));
         let mut context = Context::new(
             &entry.manifest,
             &state,
@@ -401,10 +408,10 @@ impl PluginHost {
             preferences: self.preferences.clone(),
             entry: entry.clone(),
             revision,
-            deadline: std::time::Instant::now() + timeout,
+            deadline: deadline.into_std(),
         });
         let plugin = entry.plugin.clone();
-        let result = isolated(timeout, move || call(plugin.as_ref(), &context)).await;
+        let result = isolated(deadline, move || call(plugin.as_ref(), &context)).await;
         match result {
             Ok(value) => {
                 let preferences = self
@@ -487,19 +494,27 @@ impl Fault {
     }
 }
 
-pub(super) async fn isolated<R, F>(timeout: Duration, call: F) -> Result<R, Fault>
+/// Runs `call` on a blocking worker until `deadline`. A call that ends at or
+/// after its deadline timed out, even when its result is polled before the
+/// timer: a network read gives up at this same deadline, and its error must
+/// not pass for the plugin's own.
+pub(super) async fn isolated<R, F>(deadline: Instant, call: F) -> Result<R, Fault>
 where
     R: Send + 'static,
     F: FnOnce() -> Result<R, PluginError> + Send + 'static,
 {
-    let task = tokio::task::spawn_blocking(move || catch_unwind(AssertUnwindSafe(call)));
-    match tokio::time::timeout(timeout, task).await {
-        Ok(Ok(Ok(Ok(value)))) => Ok(value),
-        Ok(Ok(Ok(Err(error)))) => Err(Fault {
+    let task = tokio::task::spawn_blocking(move || {
+        let result = catch_unwind(AssertUnwindSafe(call));
+        (result, Instant::now())
+    });
+    match tokio::time::timeout_at(deadline, task).await {
+        Ok(Ok((_, finished))) if finished >= deadline => Err(Fault::stop("plugin call timed out")),
+        Ok(Ok((Ok(Ok(value)), _))) => Ok(value),
+        Ok(Ok((Ok(Err(error)), _))) => Err(Fault {
             transient: matches!(error, PluginError::Transient(_)),
             message: error.to_string(),
         }),
-        Ok(Ok(Err(_))) => Err(Fault::stop("plugin panicked")),
+        Ok(Ok((Err(_), _))) => Err(Fault::stop("plugin panicked")),
         Ok(Err(error)) => Err(Fault::stop(format!("plugin worker failed: {error}"))),
         Err(_) => Err(Fault::stop("plugin call timed out")),
     }
