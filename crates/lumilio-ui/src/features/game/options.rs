@@ -1,35 +1,34 @@
 //! A game's options: opens their dialogs with fresh data, runs what they
 //! decide off the interface thread, and answers the dialog and the page. The
-//! presets themselves are the Library's (`lumilio_ui::features::library`).
+//! presets themselves are the Library's (`crate::features::library`).
 
 use std::future::Future;
 use std::rc::Rc;
 
-use gpui_kit::{App, AppContext as _, AsyncApp, WeakEntity, Window};
+use gpui::{App, AppContext as _, AsyncApp, WeakEntity, Window};
 use lumilio_core::{
     GameSettingsError, InstanceOptions, OptionChange, ServiceError, SettingsPreset,
 };
-use lumilio_ui::game_settings::{ChoosePreset, OptionDialog, option_spec};
-use lumilio_ui::instance_detail::{InstanceDetailView, InstanceIntent, Operated, Section};
-use lumilio_ui::toast::Toast;
-use lumilio_ui::{LauncherShell, tr};
 
-use super::instance::load_section;
-use super::jobs::reload;
-use super::{Reload, Wiring};
+use super::game_actions::{GameEvent, GameWork};
+use super::load::load_section;
+use crate::game_settings::{ChoosePreset, OptionDialog, option_spec};
+use crate::instance_detail::{InstanceDetailView, InstanceIntent, Operated, Section};
+use crate::toast::{self, Toast};
+use crate::tr;
 
-/// Runs `work` off the interface thread, then `then` in the window.
+/// Runs `job` off the interface thread, then `then` in the window.
 fn run<R: Send + 'static>(
-    wiring: &Wiring,
+    work: &GameWork,
     window: &Window,
     cx: &mut App,
-    work: impl Future<Output = R> + Send + 'static,
+    job: impl Future<Output = R> + Send + 'static,
     then: impl FnOnce(R, &mut Window, &mut App) + 'static,
 ) {
-    let handle = wiring.backend.spawn(work);
+    let handle = work.spawn(job);
     let window = window.window_handle();
     cx.spawn(async move |cx: &mut AsyncApp| {
-        let Some(output) = lumilio_ui::runtime::answer(handle, cx).await else {
+        let Some(output) = crate::runtime::answer(handle, cx).await else {
             return;
         };
         let _ = cx.update_window(window, |_, window, cx| then(output, window, cx));
@@ -37,22 +36,17 @@ fn run<R: Send + 'static>(
     .detach();
 }
 
-fn toast(shell: &WeakEntity<LauncherShell>, toast: Toast, cx: &mut App) {
-    let _ = shell.update(cx, |shell, cx| shell.toast(toast, cx));
-}
-
 /// Reads a game's options and the presets for a dialog about that game.
 fn with_options(
-    wiring: &Wiring,
+    work: &GameWork,
     id: String,
     window: &Window,
     cx: &mut App,
     with: impl FnOnce(InstanceOptions, Vec<SettingsPreset>, &mut Window, &mut App) + 'static,
 ) {
-    let service = wiring.backend.service.clone();
-    let shell = wiring.shell.clone();
+    let service = work.service().clone();
     run(
-        wiring,
+        work,
         window,
         cx,
         async move {
@@ -61,8 +55,7 @@ fn with_options(
         },
         move |result, window, cx| match result {
             Ok((options, presets)) => with(options, presets, window, cx),
-            Err(error) => toast(
-                &shell,
+            Err(error) => toast::post(
                 Toast::error(tr!("options-load-failed")).technical(error.to_string()),
                 cx,
             ),
@@ -72,15 +65,9 @@ fn with_options(
 
 /// A game's options changed: the page reads them again, and so do the lists
 /// (Home's attention and the preset page).
-fn options_changed(wiring: &Wiring, id: &str, view: &WeakEntity<InstanceDetailView>, cx: &mut App) {
-    load_section(
-        wiring,
-        id.to_owned(),
-        view.clone(),
-        Section::GameOptions,
-        cx,
-    );
-    reload(wiring, Reload::Lists, cx);
+fn options_changed(work: &GameWork, id: &str, view: &WeakEntity<InstanceDetailView>, cx: &mut App) {
+    load_section(work, id.to_owned(), view.clone(), Section::GameOptions, cx);
+    work.emit(cx, GameEvent::ListsChanged);
 }
 
 /// What the game's options page failure says.
@@ -92,15 +79,15 @@ fn options_failure(error: &ServiceError) -> String {
 }
 
 pub(super) fn choose_preset(
-    wiring: &Wiring,
+    work: &GameWork,
     id: String,
     view: WeakEntity<InstanceDetailView>,
     window: &mut Window,
     cx: &mut App,
 ) {
-    let wiring = wiring.clone();
+    let work = work.clone();
     with_options(
-        &wiring.clone(),
+        &work.clone(),
         id.clone(),
         window,
         cx,
@@ -114,9 +101,9 @@ pub(super) fn choose_preset(
                       form: WeakEntity<ChoosePreset>,
                       window: &mut Window,
                       cx: &mut App| {
-                    let service = wiring.backend.service.clone();
+                    let service = work.service().clone();
                     let (target, done, view, id) =
-                        (id.clone(), wiring.clone(), view.clone(), id.clone());
+                        (id.clone(), work.clone(), view.clone(), id.clone());
                     let notice = match chosen
                         .and_then(|chosen| names.iter().find(|(id, _)| *id == chosen))
                     {
@@ -124,7 +111,7 @@ pub(super) fn choose_preset(
                         None => tr!("options-unbound").into(),
                     };
                     run(
-                        &wiring,
+                        &work,
                         window,
                         cx,
                         async move { service.bind_settings_preset(&target, chosen).await },
@@ -144,16 +131,16 @@ pub(super) fn choose_preset(
 }
 
 pub(super) fn edit_option(
-    wiring: &Wiring,
+    work: &GameWork,
     id: String,
     key: String,
     view: WeakEntity<InstanceDetailView>,
     window: &mut Window,
     cx: &mut App,
 ) {
-    let wiring = wiring.clone();
+    let work = work.clone();
     with_options(
-        &wiring.clone(),
+        &work.clone(),
         id.clone(),
         window,
         cx,
@@ -167,16 +154,16 @@ pub(super) fn edit_option(
                       form: WeakEntity<OptionDialog>,
                       window: &mut Window,
                       cx: &mut App| {
-                    let service = wiring.backend.service.clone();
+                    let service = work.service().clone();
                     let (expected, key, done, view, id) = (
                         expected.clone(),
                         key.clone(),
-                        wiring.clone(),
+                        work.clone(),
                         view.clone(),
                         id.clone(),
                     );
                     run(
-                        &wiring,
+                        &work,
                         window,
                         cx,
                         async move { service.edit_game_option(expected, key, change).await },
@@ -199,15 +186,15 @@ pub(super) fn edit_option(
 /// A write the options page started itself (a switch, a decision on the
 /// game's changes, a recovery check). The page is disabled until it answers.
 pub(super) fn write_option(
-    wiring: &Wiring,
+    work: &GameWork,
     id: String,
     view: WeakEntity<InstanceDetailView>,
     intent: InstanceIntent,
     cx: &mut App,
 ) {
-    let service = wiring.backend.service.clone();
+    let service = work.service().clone();
     let target = id.clone();
-    let work = async move {
+    let job = async move {
         match intent {
             InstanceIntent::SetOption {
                 expected,
@@ -235,8 +222,8 @@ pub(super) fn write_option(
             _ => unreachable!("only option writes reach this function"),
         }
     };
-    let handle = wiring.backend.spawn(work);
-    let wiring = wiring.clone();
+    let handle = work.spawn(job);
+    let work = work.clone();
     cx.spawn(async move |cx: &mut AsyncApp| {
         let result = handle.await.unwrap_or_else(|error| Err(error.into()));
         let conflicts = match &result {
@@ -270,9 +257,9 @@ pub(super) fn write_option(
             .unwrap_or_default();
         cx.update(|cx| {
             for section in stale {
-                load_section(&wiring, id.clone(), view.clone(), section, cx);
+                load_section(&work, id.clone(), view.clone(), section, cx);
             }
-            reload(&wiring, Reload::Lists, cx);
+            work.emit(cx, GameEvent::ListsChanged);
         });
     })
     .detach();

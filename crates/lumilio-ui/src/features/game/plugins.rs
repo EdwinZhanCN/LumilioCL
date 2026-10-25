@@ -4,19 +4,38 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use gpui_kit::{
-    AnyWindowHandle, App, AppContext as _, Task, TitlebarOptions, WeakEntity, WindowBounds,
-    WindowOptions, px, size,
+use gpui::{
+    AnyWindowHandle, App, AppContext as _, Entity, Render, Task, TitlebarOptions, WeakEntity,
+    Window, WindowBounds, WindowOptions, px, size,
 };
 use lumilio_core::PluginEffect;
 use lumilio_plugin_api::ActionId;
-use lumilio_ui::instance_detail::InstanceDetailView;
-use lumilio_ui::schematic_studio::{StudioAction, StudioView, StudioWindow};
-use lumilio_ui::toast::Toast;
-use lumilio_ui::world_explorer::{Command, Connection, Event, MapHandoff, MapWindow};
-use lumilio_ui::{platform, tr};
 
-use super::Wiring;
+use super::game_actions::GameWork;
+use crate::instance_detail::InstanceDetailView;
+use crate::schematic_studio::{StudioAction, StudioView, StudioWindow};
+use crate::toast::Toast;
+use crate::world_explorer::{Command, Connection, Event, MapHandoff, MapWindow};
+use crate::{platform, tr};
+
+/// Opens a window of the launcher's, under the framework's root (dialogs and
+/// toasts need it), and hands back the window and what it shows.
+fn open_window<V: Render>(
+    options: WindowOptions,
+    cx: &mut App,
+    build: impl FnOnce(&mut Window, &mut App) -> Entity<V>,
+) -> gpui::Result<(AnyWindowHandle, Entity<V>)> {
+    let mut built = None;
+    let window = cx.open_window(options, |window, cx| {
+        let view = build(window, cx);
+        built = Some(view.clone());
+        cx.new(|cx| gpui_component::Root::new(view, window, cx))
+    })?;
+    Ok((
+        window.into(),
+        built.expect("open_window ran its build closure"),
+    ))
+}
 
 /// Where a plugin action's toasts go: the game page, or a studio window.
 #[derive(Clone)]
@@ -26,7 +45,7 @@ enum ToastSink {
 }
 
 impl ToastSink {
-    fn toast(&self, toast: Toast, cx: &mut gpui_kit::AsyncApp) {
+    fn toast(&self, toast: Toast, cx: &mut gpui::AsyncApp) {
         match self {
             Self::Page(view) => {
                 let _ = view.update(cx, |view, cx| view.toast(toast, cx));
@@ -42,10 +61,10 @@ impl ToastSink {
 /// folder. The studio entity dies with its window, so a dead `studio` means
 /// the window is gone.
 pub(super) struct StudioWindowEntry {
-    id: String,
+    pub(super) id: String,
     folder: String,
     window: AnyWindowHandle,
-    studio: WeakEntity<StudioView>,
+    pub(super) studio: WeakEntity<StudioView>,
 }
 
 /// Opens the studio window for `plugin`'s `folder` on this game, or brings
@@ -53,7 +72,7 @@ pub(super) struct StudioWindowEntry {
 /// window's connection, viewport loads and plugin actions are made here and
 /// belong to that window alone.
 pub(super) fn open_studio_window(
-    wiring: &Wiring,
+    work: &GameWork,
     id: String,
     plugin: String,
     folder: String,
@@ -61,12 +80,9 @@ pub(super) fn open_studio_window(
     cx: &mut App,
 ) {
     let existing = {
-        let mut state = wiring.state.borrow_mut();
-        state
-            .studio_windows
-            .retain(|entry| entry.studio.upgrade().is_some());
-        state
-            .studio_windows
+        let mut studios = work.studios.borrow_mut();
+        studios.retain(|entry| entry.studio.upgrade().is_some());
+        studios
             .iter()
             .find(|entry| entry.id == id && entry.folder == folder)
             .map(|entry| (entry.window, entry.studio.clone()))
@@ -78,22 +94,21 @@ pub(super) fn open_studio_window(
         }
         return;
     }
-    let connection = studio_connection(wiring, id.clone(), plugin.clone(), folder.clone());
+    let connection = studio_connection(work, id.clone(), plugin.clone(), folder.clone());
     // The studio exists only once the window is built; the closures it is
     // given reach it through this slot.
     let slot: Rc<RefCell<Option<WeakEntity<StudioView>>>> = Rc::default();
     let load_model = {
-        let (wiring, id, plugin, slot) = (wiring.clone(), id.clone(), plugin.clone(), slot.clone());
+        let (work, id, plugin, slot) = (work.clone(), id.clone(), plugin.clone(), slot.clone());
         Rc::new(
-            move |file: String, request: u64, _: &mut gpui_kit::Window, cx: &mut App| {
+            move |file: String, request: u64, _: &mut gpui::Window, cx: &mut App| {
                 let Some(studio) = slot.borrow().clone() else {
                     return;
                 };
-                let service = wiring.backend.service.clone();
+                let service = work.service().clone();
                 let (id, plugin) = (id.clone(), plugin.clone());
-                let handle = wiring
-                    .backend
-                    .spawn(async move { service.plugin_model(&id, &plugin, &file).await });
+                let handle =
+                    work.spawn(async move { service.plugin_model(&id, &plugin, &file).await });
                 cx.spawn(async move |cx| {
                     let result = match handle.await {
                         Ok(result) => result.map_err(|error| error.to_string()),
@@ -108,9 +123,9 @@ pub(super) fn open_studio_window(
         )
     };
     let act = {
-        let (wiring, id, plugin, slot) = (wiring.clone(), id.clone(), plugin.clone(), slot.clone());
+        let (work, id, plugin, slot) = (work.clone(), id.clone(), plugin.clone(), slot.clone());
         Rc::new(
-            move |action: StudioAction, _: &mut gpui_kit::Window, cx: &mut App| {
+            move |action: StudioAction, _: &mut gpui::Window, cx: &mut App| {
                 let Some(studio) = slot.borrow().clone() else {
                     return;
                 };
@@ -119,7 +134,7 @@ pub(super) fn open_studio_window(
                     StudioAction::ExportCsv(file) => format!("export:{file}"),
                 };
                 run_plugin_action(
-                    &wiring,
+                    &work,
                     id.clone(),
                     plugin.clone(),
                     ActionId::new(action),
@@ -133,20 +148,20 @@ pub(super) fn open_studio_window(
     // The review hooks size this window as they size the main one, so a
     // screenshot can show the studio at its smallest (plan schematic-studio
     // T19).
-    let (width, height) = crate::review_size_hint().unwrap_or((1120., 760.));
+    let (width, height) = work.windows().studio_size.unwrap_or((1120., 760.));
     let options = WindowOptions {
         window_bounds: Some(WindowBounds::centered(size(px(width), px(height)), cx)),
         window_min_size: Some(size(px(720.), px(480.))),
         titlebar: Some(TitlebarOptions {
             title: Some(tr!("studio-window-title").into()),
-            ..lumilio_ui::window_titlebar()
+            ..crate::window_titlebar()
         }),
-        app_id: Some(crate::APP_ID.to_owned()),
+        app_id: work.windows().app_id.clone(),
         ..WindowOptions::default()
     };
     let (for_plugin, for_folder) = (plugin.clone(), folder.clone());
-    let opened = gpui_kit::open_window(options, cx, move |window, cx| {
-        lumilio_ui::follow_system_appearance(window, cx);
+    let opened = open_window(options, cx, move |window, cx| {
+        crate::follow_system_appearance(window, cx);
         cx.new(|cx| {
             StudioWindow::new(
                 for_plugin, for_folder, file, load_model, act, connection, cx,
@@ -157,97 +172,25 @@ pub(super) fn open_studio_window(
         Ok((window, root)) => {
             let studio = root.read(cx).studio().downgrade();
             *slot.borrow_mut() = Some(studio.clone());
-            wiring
-                .state
-                .borrow_mut()
-                .studio_windows
-                .push(StudioWindowEntry {
-                    id,
-                    folder,
-                    window,
-                    studio,
-                });
+            work.studios.borrow_mut().push(StudioWindowEntry {
+                id,
+                folder,
+                window,
+                studio,
+            });
         }
         Err(reason) => log::error!("could not open the studio window: {reason}"),
     }
 }
 
-/// Review hook: chooses block kind `block` in the open studio windows of
-/// game `id`, as a click on its tile does.
-pub(super) fn studio_windows_choose(wiring: &Wiring, id: &str, block: &str, cx: &mut App) {
-    let studios: Vec<WeakEntity<StudioView>> = wiring
-        .state
-        .borrow()
-        .studio_windows
-        .iter()
-        .filter(|entry| entry.id == id)
-        .map(|entry| entry.studio.clone())
-        .collect();
-    for studio in studios {
-        let _ = studio.update(cx, |studio, cx| studio.choose_block(block, cx));
-    }
-}
-
-/// The review hook's inspected block in `id`'s studio windows (T32).
-pub(super) fn studio_windows_inspect(wiring: &Wiring, id: &str, position: [i32; 3], cx: &mut App) {
-    let studios: Vec<WeakEntity<StudioView>> = wiring
-        .state
-        .borrow()
-        .studio_windows
-        .iter()
-        .filter(|entry| entry.id == id)
-        .map(|entry| entry.studio.clone())
-        .collect();
-    for studio in studios {
-        let _ = studio.update(cx, |studio, cx| studio.inspect_block(position, cx));
-    }
-}
-
-/// The review hook's dialog for the open studio windows of game `id`.
-pub(super) fn studio_windows_dialog(wiring: &Wiring, id: &str, which: &str, cx: &mut App) {
-    let studios: Vec<WeakEntity<StudioView>> = wiring
-        .state
-        .borrow()
-        .studio_windows
-        .iter()
-        .filter(|entry| entry.id == id)
-        .map(|entry| entry.studio.clone())
-        .collect();
-    for studio in studios {
-        let _ = studio.update(cx, |studio, cx| studio.review_dialog(which, cx));
-    }
-}
-
-/// The game of `id` started (`running`) or ended: its open studio windows
-/// shut their writes, or list their folder again, as the page's studio does.
-pub(super) fn studio_windows_game_changed(wiring: &Wiring, id: &str, running: bool, cx: &mut App) {
-    let studios: Vec<WeakEntity<StudioView>> = wiring
-        .state
-        .borrow()
-        .studio_windows
-        .iter()
-        .filter(|entry| entry.id == id)
-        .map(|entry| entry.studio.clone())
-        .collect();
-    for studio in studios {
-        let _ = studio.update(cx, |studio, cx| {
-            if running {
-                studio.write_access_changed(cx);
-            } else {
-                studio.files_changed(cx);
-            }
-        });
-    }
-}
-
 pub(super) fn plugin_map(
-    wiring: &Wiring,
+    work: &GameWork,
     id: String,
     view: WeakEntity<InstanceDetailView>,
     request: u64,
     cx: &mut App,
 ) {
-    let connection = map_connection(wiring, id);
+    let connection = map_connection(work, id);
     let _ = view.update(cx, |view, cx| {
         view.plugin_map_arrived(request, connection, cx)
     });
@@ -258,7 +201,7 @@ pub(super) fn plugin_map(
 /// restore through the service's schematic operations (plan schematic-studio,
 /// T9/T12–T16).
 pub(super) fn plugin_studio(
-    wiring: &Wiring,
+    work: &GameWork,
     id: String,
     view: WeakEntity<InstanceDetailView>,
     plugin: String,
@@ -266,7 +209,7 @@ pub(super) fn plugin_studio(
     request: u64,
     cx: &mut App,
 ) {
-    let connection = studio_connection(wiring, id, plugin, folder);
+    let connection = studio_connection(work, id, plugin, folder);
     let _ = view.update(cx, |view, cx| {
         view.plugin_studio_arrived(request, connection, cx)
     });
@@ -275,12 +218,12 @@ pub(super) fn plugin_studio(
 /// A new connection between one studio (in the page or in its window) and
 /// the service: commands go in, answers come back as events.
 fn studio_connection(
-    wiring: &Wiring,
+    work: &GameWork,
     id: String,
     plugin: String,
     folder: String,
-) -> lumilio_ui::schematic_studio::Connection {
-    use lumilio_ui::schematic_studio::{
+) -> crate::schematic_studio::Connection {
+    use crate::schematic_studio::{
         Command as StudioCommand, Connection as StudioConnection, Event as StudioEvent,
         WriteFailure,
     };
@@ -295,8 +238,8 @@ fn studio_connection(
     }
     let (send, commands) = async_channel::bounded(256);
     let (events, receive) = async_channel::bounded(256);
-    let service = wiring.backend.service.clone();
-    wiring.backend.spawn(async move {
+    let service = work.service().clone();
+    work.spawn(async move {
         let mut tasks = tokio::task::JoinSet::new();
         while let Ok(command) = commands.recv().await {
             let (service, id, plugin, folder, events) = (
@@ -423,7 +366,7 @@ fn studio_connection(
                                 &plugin,
                                 &file,
                                 &key,
-                                lumilio_ui::schematic_studio::render_thumbnail,
+                                crate::schematic_studio::render_thumbnail,
                             )
                             .await
                             .map_err(text);
@@ -442,20 +385,20 @@ fn studio_connection(
 /// Opens the map in a window of its own. Its connection is made here and
 /// belongs to that window alone, so closing the window ends only that
 /// connection.
-pub(super) fn pop_out_map(wiring: &Wiring, id: String, handoff: MapHandoff, cx: &mut App) {
-    let connection = map_connection(wiring, id);
+pub(super) fn pop_out_map(work: &GameWork, id: String, handoff: MapHandoff, cx: &mut App) {
+    let connection = map_connection(work, id);
     let options = WindowOptions {
         window_bounds: Some(WindowBounds::centered(size(px(1080.), px(720.)), cx)),
         window_min_size: Some(size(px(480.), px(320.))),
         titlebar: Some(TitlebarOptions {
             title: Some(tr!("map-window-title").into()),
-            ..lumilio_ui::window_titlebar()
+            ..crate::window_titlebar()
         }),
-        app_id: Some(crate::APP_ID.to_owned()),
+        app_id: work.windows().app_id.clone(),
         ..WindowOptions::default()
     };
-    let opened = gpui_kit::open_window(options, cx, move |window, cx| {
-        lumilio_ui::follow_system_appearance(window, cx);
+    let opened = open_window(options, cx, move |window, cx| {
+        crate::follow_system_appearance(window, cx);
         cx.new(|cx| MapWindow::new(handoff, connection, cx))
     });
     if let Err(reason) = opened {
@@ -465,11 +408,11 @@ pub(super) fn pop_out_map(wiring: &Wiring, id: String, handoff: MapHandoff, cx: 
 
 /// A new connection between one map view and the service: commands go in,
 /// answers come back as events.
-fn map_connection(wiring: &Wiring, id: String) -> Connection {
+fn map_connection(work: &GameWork, id: String) -> Connection {
     let (send, commands) = async_channel::bounded(128);
     let (events, receive) = async_channel::bounded(128);
-    let service = wiring.backend.service.clone();
-    wiring.backend.spawn(async move {
+    let service = work.service().clone();
+    work.spawn(async move {
         let mut tasks = tokio::task::JoinSet::new();
         while let Ok(command) = commands.recv().await {
             let (service, id, events) = (service.clone(), id.clone(), events.clone());
@@ -591,18 +534,16 @@ fn map_connection(wiring: &Wiring, id: String) -> Connection {
 }
 
 pub(super) fn plugin_tabs(
-    wiring: &Wiring,
+    work: &GameWork,
     id: String,
     view: WeakEntity<InstanceDetailView>,
     cx: &mut App,
 ) {
-    let service = wiring.backend.service.clone();
-    let handle = wiring
-        .backend
-        .spawn(async move { service.plugin_tabs(&id).await });
+    let service = work.service().clone();
+    let handle = work.spawn(async move { service.plugin_tabs(&id).await });
     cx.spawn(async move |cx| {
         // A game that cannot be read has no plugin tabs; the page reports that itself.
-        let tabs = lumilio_ui::runtime::answer(handle, cx)
+        let tabs = crate::runtime::answer(handle, cx)
             .await
             .and_then(Result::ok)
             .unwrap_or_default();
@@ -612,17 +553,15 @@ pub(super) fn plugin_tabs(
 }
 
 pub(super) fn plugin_view(
-    wiring: &Wiring,
+    work: &GameWork,
     id: String,
     view: WeakEntity<InstanceDetailView>,
     plugin: String,
     cx: &mut App,
 ) {
-    let service = wiring.backend.service.clone();
+    let service = work.service().clone();
     let asked = plugin.clone();
-    let handle = wiring
-        .backend
-        .spawn(async move { service.plugin_view(&id, &asked).await });
+    let handle = work.spawn(async move { service.plugin_view(&id, &asked).await });
     cx.spawn(async move |cx| {
         let result = match handle.await {
             Ok(result) => result.map_err(|error| error.to_string()),
@@ -635,7 +574,7 @@ pub(super) fn plugin_view(
 
 /// Reads assets off the UI thread and answers only the requesting inline view.
 pub(super) fn plugin_model(
-    wiring: &Wiring,
+    work: &GameWork,
     id: String,
     view: WeakEntity<InstanceDetailView>,
     plugin: String,
@@ -643,10 +582,8 @@ pub(super) fn plugin_model(
     request: u64,
     cx: &mut App,
 ) {
-    let service = wiring.backend.service.clone();
-    let handle = wiring
-        .backend
-        .spawn(async move { service.plugin_model(&id, &plugin, &file).await });
+    let service = work.service().clone();
+    let handle = work.spawn(async move { service.plugin_model(&id, &plugin, &file).await });
     cx.spawn(async move |cx| {
         let result = match handle.await {
             Ok(result) => result.map_err(|error| error.to_string()),
@@ -662,7 +599,7 @@ pub(super) fn plugin_model(
 /// Runs the action, performs the effects the host let through, then shows the
 /// tab's new view.
 pub(super) fn plugin_action(
-    wiring: &Wiring,
+    work: &GameWork,
     id: String,
     view: WeakEntity<InstanceDetailView>,
     plugin: String,
@@ -670,17 +607,17 @@ pub(super) fn plugin_action(
     cx: &mut App,
 ) {
     let done = run_plugin_action(
-        wiring,
+        work,
         id.clone(),
         plugin.clone(),
         action,
         ToastSink::Page(view.clone()),
         cx,
     );
-    let wiring = wiring.clone();
+    let work = work.clone();
     cx.spawn(async move |cx| {
         done.await;
-        cx.update(|cx| plugin_view(&wiring, id, view, plugin, cx));
+        cx.update(|cx| plugin_view(&work, id, view, plugin, cx));
     })
     .detach();
 }
@@ -688,18 +625,16 @@ pub(super) fn plugin_action(
 /// Runs the action and performs the effects the host let through; what the
 /// plugin says goes to `sink`. The caller decides whether a view follows.
 fn run_plugin_action(
-    wiring: &Wiring,
+    work: &GameWork,
     id: String,
     plugin: String,
     action: ActionId,
     sink: ToastSink,
     cx: &mut App,
 ) -> Task<()> {
-    let service = wiring.backend.service.clone();
-    let handle = wiring
-        .backend
-        .spawn(async move { service.plugin_action(&id, &plugin, action).await });
-    let wiring = wiring.clone();
+    let service = work.service().clone();
+    let handle = work.spawn(async move { service.plugin_action(&id, &plugin, action).await });
+    let work = work.clone();
     cx.spawn(async move |cx| {
         let result = match handle.await {
             Ok(result) => result.map_err(|error| error.to_string()),
@@ -708,7 +643,7 @@ fn run_plugin_action(
         match result {
             Ok(Some(effects)) => {
                 for effect in effects {
-                    perform(&wiring, effect, &sink, cx).await;
+                    perform(&work, effect, &sink, cx).await;
                 }
             }
             Ok(None) => sink.toast(Toast::error(tr!("instance-plugin-unavailable")), cx),
@@ -720,12 +655,7 @@ fn run_plugin_action(
     })
 }
 
-async fn perform(
-    wiring: &Wiring,
-    effect: PluginEffect,
-    sink: &ToastSink,
-    cx: &mut gpui_kit::AsyncApp,
-) {
+async fn perform(work: &GameWork, effect: PluginEffect, sink: &ToastSink, cx: &mut gpui::AsyncApp) {
     match effect {
         PluginEffect::Reveal(path) => {
             cx.update(|cx| platform::reveal(&path, cx));
@@ -739,14 +669,13 @@ async fn perform(
             let start = std::env::var_os("HOME")
                 .or_else(|| std::env::var_os("USERPROFILE"))
                 .map(std::path::PathBuf::from)
-                .unwrap_or_else(|| wiring.backend.service.layout().root().to_owned());
+                .unwrap_or_else(|| work.service().layout().root().to_owned());
             let chosen = cx.update(|cx| platform::pick_save_path(cx, &start, &suggested_name));
             let Some(path) = chosen.await else {
                 return;
             };
             let target = path.clone();
-            let written = wiring
-                .backend
+            let written = work
                 .spawn(async move { tokio::fs::write(&target, bytes).await })
                 .await;
             let toast = match written {

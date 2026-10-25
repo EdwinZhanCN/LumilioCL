@@ -1,6 +1,5 @@
 use gpui_kit::{App, AppContext as _, Window};
 use lumilio_ui::home::HomeIntent;
-use lumilio_ui::instance_detail::InstanceIntent;
 use lumilio_ui::java_conflict::{JavaConflict, JavaConflictAnswer};
 use lumilio_ui::live::{LiveIntent, PlaceTarget, account_rows};
 use lumilio_ui::missing_folder::MissingFolderAnswer;
@@ -9,9 +8,9 @@ use lumilio_ui::shell::ShellIntent;
 use lumilio_ui::toast::Toast;
 use lumilio_ui::{java_conflict, missing_folder, tr};
 
-use super::instance::open_instance;
 use super::jobs::reload;
 use super::launch::{play, start_launch, technical_details};
+use super::open_game::open_instance;
 use super::{Reload, Wiring, update};
 
 /// Asks about a Java that cannot run the game. An answer starts the launch
@@ -246,24 +245,24 @@ pub(super) fn on_live_intent(
         | LiveIntent::OpenSkinSite(_)
         | LiveIntent::RefreshAccount(_)
         | LiveIntent::SelectAccount(_)
-        | LiveIntent::RemoveAccount(_) => {}
+        | LiveIntent::RemoveAccount(_)
+        | LiveIntent::OpenInstance(_)
+        | LiveIntent::Resolve(..)
+        | LiveIntent::CopyGameOf(_)
+        | LiveIntent::DeleteGameOf(_)
+        | LiveIntent::ExportPackOf(_) => {}
         LiveIntent::ApplyUpdate => update::apply(wiring),
-        LiveIntent::OpenInstance(id) => open_instance(wiring, id, None, window, cx),
-        LiveIntent::Resolve(id, action) => open_instance(
-            wiring,
-            id,
-            Some(InstanceIntent::Resolve(action)),
-            window,
-            cx,
-        ),
-        LiveIntent::CopyGameOf(id) => {
-            open_instance(wiring, id, Some(InstanceIntent::AskCopy), window, cx)
-        }
-        LiveIntent::DeleteGameOf(id) => {
-            open_instance(wiring, id, Some(InstanceIntent::AskDelete), window, cx)
-        }
-        LiveIntent::ExportPackOf(id) => {
-            open_instance(wiring, id, Some(InstanceIntent::ExportPack), window, cx)
+        LiveIntent::StopGame(id) => {
+            // Stops the launch or the running game, if it is this one.
+            let this_one = wiring
+                .backend
+                .service
+                .context()
+                .session
+                .is_some_and(|session| session.is_active() && session.instance == id);
+            if this_one && let Some(cancel) = wiring.state.borrow().cancel.clone() {
+                cancel.cancel();
+            }
         }
         LiveIntent::Refresh => {
             reload(wiring, Reload::Lists, cx);

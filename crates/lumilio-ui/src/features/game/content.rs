@@ -2,28 +2,26 @@
 //! changelogs for the switch-version dialog, and the files a pack is still
 //! waiting for.
 
-use gpui_kit::{App, AppContext as _, WeakEntity, Window};
-use lumilio_ui::instance_detail::{InstanceDetailView, InstanceIntent};
-use lumilio_ui::tr;
+use gpui::{App, AppContext as _, WeakEntity, Window};
 
-use super::Wiring;
-use super::instance_write::write_instance;
+use super::game_actions::GameWork;
+use super::write::write_instance;
+use crate::instance_detail::{InstanceDetailView, InstanceIntent};
+use crate::tr;
 
 /// Reads a project's versions for the open switch-version dialog, then the
 /// chosen version's changelog when its source gives them one at a time.
 pub(super) fn load_versions(
-    wiring: &Wiring,
+    work: &GameWork,
     view: WeakEntity<InstanceDetailView>,
     source: String,
     project: String,
     cx: &mut App,
 ) {
-    let service = wiring.backend.service.clone();
+    let service = work.service().clone();
     let (from, wanted) = (source, project.clone());
-    let handle = wiring
-        .backend
-        .spawn(async move { service.project_versions(&from, &wanted).await });
-    let wiring = wiring.clone();
+    let handle = work.spawn(async move { service.project_versions(&from, &wanted).await });
+    let work = work.clone();
     cx.spawn(async move |cx| {
         let result = match handle.await {
             Ok(result) => result.map_err(|error| error.to_string()),
@@ -34,7 +32,7 @@ pub(super) fn load_versions(
             .ok()
             .flatten();
         if let Some((source, project, version)) = missing {
-            cx.update(|cx| load_changelog(&wiring, view, source, project, version, cx));
+            cx.update(|cx| load_changelog(&work, view, source, project, version, cx));
         }
     })
     .detach();
@@ -42,16 +40,16 @@ pub(super) fn load_versions(
 
 /// Reads one version's changelog for the open switch-version dialog.
 pub(super) fn load_changelog(
-    wiring: &Wiring,
+    work: &GameWork,
     view: WeakEntity<InstanceDetailView>,
     source: String,
     project: String,
     version: String,
     cx: &mut App,
 ) {
-    let service = wiring.backend.service.clone();
+    let service = work.service().clone();
     let (from, wanted, which) = (source, project.clone(), version.clone());
-    let handle = wiring.backend.spawn(async move {
+    let handle = work.spawn(async move {
         service
             .version_changelog(&from, &wanted, &which)
             .await
@@ -69,17 +67,16 @@ pub(super) fn load_changelog(
 /// Reads the files the game waits for (a pack's files the launcher could
 /// not download) and hands them to the view; a failure shows none.
 pub(super) fn load_pending(
-    wiring: &Wiring,
+    work: &GameWork,
     id: String,
     view: WeakEntity<InstanceDetailView>,
     cx: &mut App,
 ) {
-    let service = wiring.backend.service.clone();
-    let handle = wiring
-        .backend
-        .spawn(async move { service.pending_downloads(&id).await.unwrap_or_default() });
+    let service = work.service().clone();
+    let handle =
+        work.spawn(async move { service.pending_downloads(&id).await.unwrap_or_default() });
     cx.spawn(async move |cx| {
-        let Some(pending) = lumilio_ui::runtime::answer(handle, cx).await else {
+        let Some(pending) = crate::runtime::answer(handle, cx).await else {
             return;
         };
         let _ = view.update(cx, |view, cx| view.set_pending(pending, cx));
@@ -90,19 +87,19 @@ pub(super) fn load_pending(
 /// Asks for the files the person downloaded and adds those the game waits
 /// for. Cancelling the picker does nothing.
 pub(super) fn pick_pending_files(
-    wiring: &Wiring,
+    work: &GameWork,
     id: &str,
     view: WeakEntity<InstanceDetailView>,
     window: &mut Window,
     cx: &mut App,
 ) {
-    let picked = cx.prompt_for_paths(gpui_kit::PathPromptOptions {
+    let picked = cx.prompt_for_paths(gpui::PathPromptOptions {
         files: true,
         directories: false,
         multiple: true,
         prompt: Some(tr!("instance-pending-add").into()),
     });
-    let wiring = wiring.clone();
+    let work = work.clone();
     let id = id.to_owned();
     let handle = window.window_handle();
     cx.spawn(async move |cx| {
@@ -111,7 +108,7 @@ pub(super) fn pick_pending_files(
         };
         let _ = cx.update_window(handle, |_, window, cx| {
             write_instance(
-                &wiring,
+                &work,
                 id,
                 view,
                 InstanceIntent::PendingFilesChosen(files),
