@@ -6,9 +6,11 @@ use std::rc::Rc;
 
 use gpui::prelude::*;
 use gpui::{Context, Entity, TestAppContext, VisualTestContext, Window, div};
-use lumilio_core::Loader;
+use lumilio_core::{GameSettingGroup, GameSettingValue, Loader};
 
-use super::super::{Library, LibraryEvent};
+use super::super::{LIBRARY_LOADER, LIBRARY_SORT, Library, LibraryEvent, PRESET_GROUP};
+use crate::game_settings::PresetIntent;
+use crate::kit::ViewIntent;
 use crate::live::CollectionRow;
 use crate::testing::{Launcher, launcher, toasts, until};
 
@@ -88,20 +90,91 @@ fn a_deleted_collection_is_told_and_its_games_stay(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn a_preset_value_is_saved_quietly_and_a_deleted_preset_is_told(cx: &mut TestAppContext) {
+    let launcher = launcher(Vec::new());
+    let service = launcher.worker.service().clone();
+    let game = launcher
+        .runtime
+        .block_on(service.create_instance("A", Some("1.21.1"), Loader::Vanilla, None))
+        .unwrap();
+    let folder = service.layout().game(&game.id);
+    std::fs::create_dir_all(&folder).unwrap();
+    std::fs::write(folder.join("options.txt"), "soundCategory_master:0.8\n").unwrap();
+    let preset = launcher
+        .runtime
+        .block_on(service.create_settings_preset(
+            &game.id,
+            "日常".into(),
+            &[GameSettingGroup::Sound],
+        ))
+        .unwrap();
+    let (library, events, cx) = library(&launcher, cx);
+    let ask = |intent: PresetIntent, cx: &mut VisualTestContext| {
+        cx.update(|window, cx| {
+            library.update(cx, |library, cx| library.preset(intent, window, cx))
+        });
+    };
+
+    ask(
+        PresetIntent::Set {
+            preset,
+            key: "soundCategory_master".into(),
+            before: GameSettingValue::Decimal("0.8".into()),
+            value: GameSettingValue::Decimal("0.5".into()),
+        },
+        cx,
+    );
+    until(cx, "the value to be saved", |_| !events.borrow().is_empty());
+    let presets = launcher
+        .runtime
+        .block_on(service.settings_presets())
+        .unwrap();
+    assert_eq!(
+        presets[0].values["soundCategory_master"],
+        GameSettingValue::Decimal("0.5".into())
+    );
+    assert!(toasts(cx).is_empty(), "the row shows the new value");
+
+    events.borrow_mut().clear();
+    ask(PresetIntent::Delete(preset), cx);
+    until(cx, "the preset to go", |_| !events.borrow().is_empty());
+    assert_eq!(events.borrow().as_slice(), [LibraryEvent::ListsChanged]);
+    assert!(
+        launcher
+            .runtime
+            .block_on(service.settings_presets())
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(toasts(cx), ["预设已删除。"]);
+}
+
+#[gpui::test]
 fn the_page_order_is_handed_on_to_be_remembered(cx: &mut TestAppContext) {
     let launcher = launcher(Vec::new());
     let (library, events, cx) = library(&launcher, cx);
-    library.update(cx, |library, cx| library.remember_view(1, 2, cx));
+    library.update(cx, |library, cx| {
+        library.apply_view_intent(ViewIntent::Choose(LIBRARY_SORT, 1), cx);
+        library.apply_view_intent(ViewIntent::Choose(LIBRARY_LOADER, 2), cx);
+        // Changing the tab or the preset shown is not remembered.
+        library.apply_view_intent(ViewIntent::LibraryTab(1), cx);
+        library.apply_view_intent(ViewIntent::Choose(PRESET_GROUP, 4), cx);
+    });
     assert_eq!(
         events.borrow().as_slice(),
-        [LibraryEvent::Remember { sort: 1, loader: 2 }]
+        [
+            LibraryEvent::Remember { sort: 1, loader: 0 },
+            LibraryEvent::Remember { sort: 1, loader: 2 }
+        ]
     );
+    let view = library.read_with(cx, |library, _| library.view());
+    assert_eq!((view.tab, view.preset), (1, 4));
 }
 
 #[test]
 fn the_picker_marks_the_collections_a_game_is_in() {
     let mut library = Library::new(None);
-    library.set_collections(vec![
+    library.inputs.collections = vec![
         CollectionRow {
             name: "生存".into(),
             members: vec!["c".into(), "a".into()],
@@ -110,7 +183,7 @@ fn the_picker_marks_the_collections_a_game_is_in() {
             name: "空".into(),
             members: Vec::new(),
         },
-    ]);
+    ];
     assert_eq!(
         library.memberships_of("a"),
         [("生存".to_owned(), true), ("空".to_owned(), false)]

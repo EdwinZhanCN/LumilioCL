@@ -21,8 +21,6 @@ use crate::route::Route;
 use crate::toast::Toast;
 use crate::{home, toast};
 
-pub(super) type Labels = gpui_component::select::SearchableVec<String>;
-
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ActivitySummary {
     pub active_tasks: u32,

@@ -122,7 +122,11 @@ fn the_collections_tab_shows_each_collection_and_the_card_menu_does_not_open_the
     };
     shell.update(cx, |shell, cx| {
         shell.show(Route::Library);
-        shell.show_tab(Route::Library, crate::pages::live::COLLECTIONS_TAB);
+        shell.show_tab(
+            Route::Library,
+            crate::features::library::COLLECTIONS_TAB,
+            cx,
+        );
         shell.update_live(
             |model| {
                 model.set_library(vec![
@@ -169,24 +173,44 @@ fn the_collections_tab_shows_each_collection_and_the_card_menu_does_not_open_the
 }
 
 #[gpui::test]
+fn the_presets_tab_asks_the_library_and_not_the_application(cx: &mut TestAppContext) {
+    use crate::features::library::PRESETS_TAB;
+    use crate::live::LiveIntent;
+
+    cx.update(gpui_component::init);
+    let seen: Rc<RefCell<Vec<LiveIntent>>> = Rc::default();
+    let sink = seen.clone();
+    let (shell, cx) = cx.add_window_view(|_, cx| {
+        LauncherShell::new(cx).with_live(Rc::new(move |intent, _, _| {
+            sink.borrow_mut().push(intent);
+        }))
+    });
+    shell.update(cx, |shell, cx| {
+        shell.show(Route::Library);
+        shell.show_tab(Route::Library, PRESETS_TAB, cx);
+        shell.update_live(|model| model.set_library(Vec::new()), cx);
+    });
+    cx.run_until_parked();
+    let new = cx.debug_bounds("preset-new").expect("the new-preset key");
+    cx.simulate_click(new.center(), Modifiers::none());
+    cx.run_until_parked();
+    assert!(seen.borrow().is_empty(), "the Library answers it");
+}
+
+#[gpui::test]
 fn changing_the_library_order_or_loader_is_reported_so_it_can_be_remembered(
     cx: &mut TestAppContext,
 ) {
-    use crate::features::library::LibraryEvent;
+    use crate::features::library::{LIBRARY_LOADER, LIBRARY_SORT, LibraryEvent};
     use crate::kit::ViewIntent;
-    use crate::pages::live::{LIBRARY_LOADER, LIBRARY_SORT};
 
     cx.update(gpui_component::init);
     let (shell, cx) =
         cx.add_window_view(|_, cx| LauncherShell::new(cx).with_live(Rc::new(|_, _, _| {})));
     let seen = remembered(&shell, cx);
+    let library = shell.read_with(cx, |shell, _| shell.library().clone());
     let choose = |intent: ViewIntent, cx: &mut gpui::VisualTestContext| {
-        cx.update(|_, app| {
-            shell.update(app, |shell, cx| {
-                shell.apply_view_intent(intent, cx);
-                shell.remember_library_view(intent, cx);
-            })
-        });
+        library.update(cx, |library, cx| library.apply_view_intent(intent, cx));
     };
     choose(ViewIntent::Choose(LIBRARY_SORT, 1), cx);
     assert_eq!(
@@ -211,10 +235,8 @@ fn the_library_sorts_and_filters_from_dropdowns_that_follow_what_is_remembered(
     use gpui_component::select::SelectEvent;
     use lumilio_core::{InstanceRecord, InstanceSettings, Loader};
 
-    use crate::features::library::LibraryEvent;
-    use crate::kit::ViewIntent;
+    use crate::features::library::{LibraryEvent, loader_code};
     use crate::live::library_card;
-    use crate::pages::live::{LIBRARY_LOADER, LIBRARY_SORT, loader_code};
 
     cx.update(|cx| {
         gpui_component::init(cx);
@@ -250,13 +272,14 @@ fn the_library_sorts_and_filters_from_dropdowns_that_follow_what_is_remembered(
         );
     });
     cx.run_until_parked();
+    let library = shell.read_with(cx, |shell, _| shell.library().clone());
     let selected = |cx: &mut gpui::VisualTestContext, loader: bool| {
-        shell.read_with(cx, |shell, cx| {
-            let controls = shell.live_controls.as_ref().unwrap().read(cx);
+        library.read_with(cx, |library, cx| {
+            let controls = library.controls().expect("the page has drawn");
             let select = if loader {
-                &controls.library_loader
+                &controls.loader
             } else {
-                &controls.library_sort
+                &controls.sort
             };
             select.read(cx).selected_index(cx).map(|ix| ix.row)
         })
@@ -264,12 +287,8 @@ fn the_library_sorts_and_filters_from_dropdowns_that_follow_what_is_remembered(
     assert_eq!(selected(cx, true), Some(0), "every loader to begin with");
 
     // What the application restores shows up in the dropdowns.
-    shell.update(cx, |shell, cx| {
-        shell.apply_view_intent(
-            ViewIntent::Choose(LIBRARY_LOADER, loader_code(Loader::Fabric)),
-            cx,
-        );
-        shell.apply_view_intent(ViewIntent::Choose(LIBRARY_SORT, 2), cx);
+    library.update(cx, |library, cx| {
+        library.apply_preferences(2, loader_code(Loader::Fabric) as u8, cx)
     });
     cx.run_until_parked();
     assert_eq!(selected(cx, true), Some(2), "全部, 原版, Fabric");
@@ -280,14 +299,8 @@ fn the_library_sorts_and_filters_from_dropdowns_that_follow_what_is_remembered(
     );
 
     // A choice made in a dropdown is applied and reported.
-    let sort = shell.read_with(cx, |shell, cx| {
-        shell
-            .live_controls
-            .as_ref()
-            .unwrap()
-            .read(cx)
-            .library_sort
-            .clone()
+    let sort = library.read_with(cx, |library, _| {
+        library.controls().expect("the page has drawn").sort.clone()
     });
     sort.update(cx, |_, cx| {
         cx.emit(SelectEvent::Confirm(Some("名称".to_owned())))
@@ -317,17 +330,16 @@ fn live_instance_back_keeps_library_filters_and_late_data_is_isolated(cx: &mut T
         cx.notify();
     });
     cx.run_until_parked();
+    let library = shell.read_with(cx, |shell, _| shell.library().clone());
+    let filter = library.read_with(cx, |library, _| {
+        library
+            .controls()
+            .expect("the page has drawn")
+            .filter
+            .clone()
+    });
     cx.update(|window, cx| {
-        shell.update(cx, |shell, cx| {
-            shell
-                .live_controls
-                .as_ref()
-                .unwrap()
-                .read(cx)
-                .library_filter
-                .clone()
-                .update(cx, |input, cx| input.set_value("生存", window, cx));
-        })
+        filter.update(cx, |input, cx| input.set_value("生存", window, cx));
     });
     let first = shell.update(cx, |shell, cx| {
         shell.open_live_instance("first".into(), |_| Rc::new(|_, _, _| {}), cx)
@@ -377,19 +389,10 @@ fn live_instance_back_keeps_library_filters_and_late_data_is_isolated(cx: &mut T
     assert_eq!(title(cx), "游戏库");
     assert!(shell.read_with(cx, |shell, _| shell.live_instance().is_none()));
     assert!(!shell.read_with(cx, |shell, _| shell.can_go_back()));
-    shell.read_with(cx, |shell, cx| {
-        assert_eq!(
-            shell
-                .live_controls
-                .as_ref()
-                .unwrap()
-                .read(cx)
-                .library_filter
-                .read(cx)
-                .value(),
-            "生存"
-        )
-    });
+    assert_eq!(
+        filter.read_with(cx, |input, _| input.value().to_string()),
+        "生存"
+    );
 }
 
 /// What the shell's Library hands on to be remembered.

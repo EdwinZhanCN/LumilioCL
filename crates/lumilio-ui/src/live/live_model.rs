@@ -75,15 +75,6 @@ impl LiveModel {
         self.traffic = self.traffic.next(traffic, now_ms);
     }
 
-    /// The games of one collection that are still in the library.
-    pub fn collection_cards(&self, collection: &CollectionRow) -> Vec<&LibraryCard> {
-        collection
-            .members
-            .iter()
-            .filter_map(|id| self.library.iter().find(|card| &card.id == id))
-            .collect()
-    }
-
     /// The account later launches use, if one is chosen.
     pub fn selected_account(&self) -> Option<&AccountRow> {
         self.accounts.iter().find(|row| row.selected)

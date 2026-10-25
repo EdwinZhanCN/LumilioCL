@@ -227,16 +227,9 @@ pub(super) fn apply_saved_preferences(
         // Discover keeps its advanced exclusions.
         let _ = wiring.shell.update(cx, |shell, cx| {
             shell.apply_discover_preferences(preferences.discover.clone(), cx);
-            use lumilio_ui::kit::ViewIntent;
-            use lumilio_ui::pages::live::{LIBRARY_LOADER, LIBRARY_SORT};
-            shell.apply_view_intent(
-                ViewIntent::Choose(LIBRARY_SORT, usize::from(preferences.library_sort)),
-                cx,
-            );
-            shell.apply_view_intent(
-                ViewIntent::Choose(LIBRARY_LOADER, usize::from(preferences.library_loader)),
-                cx,
-            );
+            shell.library().update(cx, |library, cx| {
+                library.apply_preferences(preferences.library_sort, preferences.library_loader, cx)
+            });
         });
     })
     .detach();

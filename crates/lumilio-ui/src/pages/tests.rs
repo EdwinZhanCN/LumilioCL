@@ -5,9 +5,9 @@ fn tabs_and_choices_are_remembered_separately() {
     let mut state = ViewState::default();
     assert_eq!(state.choice(1, 7), 7, "an unchosen group uses its default");
     state.apply(ViewIntent::Choose(1, 2));
-    state.apply(ViewIntent::LibraryTab(3));
+    state.apply(ViewIntent::ActivityTab(1));
     assert_eq!(state.choice(1, 7), 2);
-    assert_eq!((state.library_tab, state.activity_tab), (3, 0));
+    assert_eq!(state.activity_tab, 1);
 }
 
 #[test]

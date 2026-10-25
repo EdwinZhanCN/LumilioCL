@@ -3,7 +3,9 @@ use std::future::Future;
 use gpui::{App, Context, EventEmitter};
 use tokio::task::JoinError;
 
-use crate::live::CollectionRow;
+use super::controls::LibraryControls;
+use super::page::{LibraryInputs, LibraryView};
+use crate::live::LiveHandler;
 use crate::runtime::{self, Worker};
 use crate::toast::{self, Toast};
 use crate::tr;
@@ -18,12 +20,16 @@ pub enum LibraryEvent {
     Remember { sort: u8, loader: u8 },
 }
 
-/// The Library's actions. The page itself is drawn from the shell's live
-/// model.
+/// The Library page: its tabs and choices, the collections, favorites and
+/// presets it changes, and games brought in from elsewhere.
 pub struct Library {
     pub(super) worker: Option<Worker>,
-    /// The collections the page shows, as the shell knows them.
-    pub(super) collections: Vec<CollectionRow>,
+    /// What the page shows of the rest of the launcher.
+    pub(super) inputs: LibraryInputs,
+    pub(super) view: LibraryView,
+    pub(super) controls: Option<LibraryControls>,
+    /// Where the page sends what other features answer.
+    pub(super) handler: Option<LiveHandler>,
 }
 
 impl EventEmitter<LibraryEvent> for Library {}
@@ -33,7 +39,10 @@ impl Library {
     pub fn new(worker: Option<Worker>) -> Self {
         Self {
             worker,
-            collections: Vec::new(),
+            inputs: LibraryInputs::default(),
+            view: LibraryView::default(),
+            controls: None,
+            handler: None,
         }
     }
 
@@ -42,9 +51,10 @@ impl Library {
         self.worker = Some(worker);
     }
 
-    /// The collections, as the shell knows them.
-    pub fn set_collections(&mut self, collections: Vec<CollectionRow>) {
-        self.collections = collections;
+    /// The page's controls, once it has drawn.
+    #[must_use]
+    pub fn controls(&self) -> Option<&LibraryControls> {
+        self.controls.as_ref()
     }
 
     /// Stars or unstars a game. The star shows by itself: only a failure is
@@ -79,11 +89,6 @@ impl Library {
         if let Some(service) = self.service() {
             cx.reveal_path(&service.layout().profiles());
         }
-    }
-
-    /// The page's order or loader filter changed.
-    pub fn remember_view(&mut self, sort: u8, loader: u8, cx: &mut Context<Self>) {
-        cx.emit(LibraryEvent::Remember { sort, loader });
     }
 
     pub(super) fn service(&self) -> Option<std::sync::Arc<runtime::Service>> {
