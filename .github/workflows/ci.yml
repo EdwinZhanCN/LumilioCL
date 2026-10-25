@@ -1,5 +1,7 @@
 # Runs `just ci` (the justfile is the single source of truth for checks).
 #
+# Runs the tests on Windows (`windows`).
+#
 # `rust`, `plans` and `web` are required checks on main. A workflow that a
 # path filter never starts leaves its check pending forever, but a skipped job
 # counts as passed. So pull requests always start the workflow, and the
@@ -76,3 +78,26 @@ jobs:
         with:
           tool: just,cargo-nextest
       - run: just ci
+
+  # The tests on Windows, where file handles, renames and processes behave
+  # differently: an fsync on a read-only handle passed on Linux and macOS but
+  # failed every multi-connection download on Windows (issue #99). The other
+  # checks are platform-independent and stay in `rust`. Not yet required on
+  # main: it becomes required once its known failures are fixed.
+  windows:
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.run == 'true') }}
+    # The runner that builds the Windows release.
+    runs-on: windows-2022
+    timeout-minutes: 90
+    env:
+      # Report every failing test, not only the first.
+      NEXTEST_NO_FAIL_FAST: "1"
+    steps:
+      - uses: actions/checkout@v5
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just,cargo-nextest
+      - run: just test
