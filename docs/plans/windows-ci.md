@@ -22,25 +22,27 @@ Status: InProgress
   Acceptance: ci.yml 的 windows 任务在 windows-2022 上运行 just test，遇到失败不停下（.config/nextest.toml 的 ci profile），失败时也保存缓存（#102、#109）
 - [x] T2 — 测试在 Windows 上编译并运行 (Completed)
   Acceptance: lumilio-core 的测试在 Windows 上编译；假 java 由 testing/fake_java_program.rs 在测试时编译，在 Windows 上能被启动（#109）。首次完整运行：1891 个测试中 35 个失败
-- [ ] T3 — 多连接下载在发布前 fsync 只读句柄（#99） (InProgress)
-  Acceptance: lumilio-transfer 的 verify_part 以可写句柄 fsync；Windows 上 parallel_tests 的 6 个测试通过
-- [ ] T4 — 整合包 overrides 在 Windows 上不解压 (InProgress)
-  Acceptance: extract_folders 按 zip 条目名而不是本地路径匹配 overrides/ 前缀；Windows 上 instances::modpack、instances::modpacks、instances::pack_export 与 content::install 的整合包测试通过
-- [ ] T5 — 检出的文本文件保持 LF (InProgress)
-  Acceptance: .gitattributes 让 Windows 检出的文本文件为 LF；Windows 上 docgen 的计划与 IA 新鲜度、网站主题、xtask 生成表与平台文件的测试通过
-- [ ] T6 — 文件占用、时间戳与插件路径的平台差异 (InProgress)
-  Acceptance: 逐个判定是产品缺陷还是测试写法并修复：diagnostics::reports analysis 与 world_map LRU 的 Access is denied、worlds::map tiles 全部重建、plugins::tests::write 与 plugins::tests::network；Windows 上这些测试通过
-- [ ] T7 — 测试的路径期望、Java 夹具与 hook 写法 (InProgress)
-  Acceptance: 期望值不再写死 /（lumilio-minecraft classpath、旧版 assets virtual、reclaim）；下载的运行时用假 java，GraalVM 在 Windows 上用 zip，目录名不含 Windows 禁用字符；hook 测试按平台写命令或限定 Unix；Windows 上这些测试通过
+- [x] T3 — 多连接下载在发布前 fsync 只读句柄（#99） (Completed)
+  Acceptance: lumilio-transfer 的 verify_part 以可写句柄 fsync；Windows 上 parallel_tests 的 6 个测试通过（#111）
+- [x] T4 — 整合包 overrides 在 Windows 上不解压 (Completed)
+  Acceptance: extract_folders 按 zip 条目名而不是本地路径匹配 overrides/ 前缀；Windows 上 instances::modpack、instances::modpacks、instances::pack_export 与 content::install 的整合包测试通过（#112：zip_entry_path 把条目名转成 / 分隔，世界导入与备份恢复共用）
+- [x] T5 — 检出的文本文件保持 LF (Completed)
+  Acceptance: .gitattributes 让 Windows 检出的文本文件为 LF；Windows 上 docgen 的计划与 IA 新鲜度、网站主题、xtask 生成表与平台文件的测试通过（#113：另外 docgen 的 ia.rs 在 Windows 上也用 / 写实现文件路径）
+- [x] T6 — 文件占用、时间戳与插件路径的平台差异 (Completed)
+  Acceptance: 逐个判定是产品缺陷还是测试写法并修复：diagnostics::reports analysis 与 world_map LRU 的 Access is denied、worlds::map tiles 全部重建、plugins::tests::write 与 plugins::tests::network；Windows 上这些测试通过（#114：地图缓存以可写句柄改时间；插件路径中间是文件时报出该文件，先查类型再打开；一次插件调用只用一个截止时间）
+- [x] T7 — 测试的路径期望、Java 夹具与 hook 写法 (Completed)
+  Acceptance: 期望值不再写死 /（lumilio-minecraft classpath、旧版 assets virtual、reclaim）；下载的运行时用假 java，GraalVM 在 Windows 上用 zip，目录名不含 Windows 禁用字符；hook 测试按平台写命令或限定 Unix；Windows 上这些测试通过（#115：产品侧 hook 以 raw_arg 交给 cmd，包装命令保留反斜杠，Java 运行时的 link 在 Windows 上装成副本，类路径只用本系统分隔符）
 - [ ] T8 — windows 设为必需检查 (Proposed)
-  Acceptance: main 上 windows 任务连续通过后，windows 加入 main 的必需检查，并决定是否恢复在拉取请求上运行
+  Acceptance: main 上 windows 任务连续通过后，windows 加入 main 的必需检查，并决定是否恢复在拉取请求上运行（跳过的任务算作通过，只在 main 运行时设为必需没有约束力）
+- [ ] T9 — Windows 上停止 hook 时结束它启动的进程 (Proposed)
+  Acceptance: 停止 hook 时，cmd 启动的子进程一并结束（例如用 Job Object）；有测试在 Windows 上确认停止后子进程不再运行。来源：#115 审查时推断，尚未实际观察
 
 ## Validation
 
 - 首次完整的 Windows 运行列出全部失败
   Result: 2026-10-25 #109 的 windows 任务：1891 个测试，35 个失败，按原因归入 T3–T7
 - T3–T7 合并后 main 上 windows 任务通过
-  Result: pending
+  Result: 2026-10-25 #111–#115 合进 build/windows-batch 后手动运行一次（run 40238542110）：Windows 上 1899 个测试全部通过，rust 任务通过。依次压缩合并后 main 的 tree（56bd7ea3）与该分支相同。#111 单独的 Windows 运行中 parallel_tests 全部通过
 
 ## Decision D1
 
@@ -56,7 +58,15 @@ windows 任务只在推送到 main 与手动运行时启动，拉取请求不启
 
 Why: 没有缓存时一次构建约半小时，每个拉取请求都运行会拖慢修复
 
-Consequences: 分支要 Windows 证据时用 gh workflow run ci.yml --ref 分支；几项修复合进一个分支后只运行一次。main 上的运行保存缓存，其他分支从它开始
+Consequences: 分支要 Windows 证据时用 gh workflow run ci.yml --ref 分支；几项修复合进一个分支后只运行一次。main 上的运行保存缓存，其他分支从它开始（命中缓存时编译约 12 分钟，冷编译约 29 分钟）
+
+## Decision D3
+
+Windows 上，Java 运行时清单里的 link 条目装成目标文件的副本
+
+Why: Windows 创建符号链接需要开发者模式或管理员权限；Mojang 现有的 Windows 清单没有 link 条目，Linux 与 macOS 的 link 都指向许可证文件
+
+Consequences: Windows 上不创建符号链接；测试在 Unix 上要求符号链接，在 Windows 上要求副本
 
 ## References
 
@@ -68,3 +78,7 @@ Consequences: 分支要 Windows 证据时用 gh workflow run ci.yml --ref 分支
 - Lesson: 2026-10-25 #99：多连接下载在发布前对只读句柄调用 sync_all。Linux 与 macOS 允许，Windows 的 FlushFileBuffers 要求写权限，每次都返回 os error 5；CI 只在 Linux 上运行，没有发现。Guard：ci.yml 的 windows 任务运行 lumilio-transfer 的 parallel_tests。
 
 - Lesson: 2026-10-25：第一版 windows 任务用环境变量 NEXTEST_NO_FAIL_FAST 想跑完全部测试，nextest 没有采用，第一个失败后就停了。Guard：改用 .config/nextest.toml 的 ci profile（fail-fast = false）。
+
+- Lesson: 2026-10-25：#99 的 sync_all 之外，地图缓存与测试也用 File::open 得到的只读句柄调用 set_modified/set_times；Windows 修改文件时间同样要求写权限，地图缓存每次命中都失败。几处都是 Unix 允许、Windows 拒绝的同一类写法。Guard：windows 任务中的 world_map、worlds::map 与 diagnostics 测试；修复处的注释写明 Windows 要求写句柄。
+
+- Lesson: 2026-10-25：整合包 overrides 用本地路径文本匹配 zip 里的 overrides/ 前缀，Windows 上路径以 \ 分隔，一个也匹配不上，导入的整合包丢失 overrides，没有用户报告。Guard：override_entries_match_their_folder_in_the_windows_path_form 在 macOS 上就能失败。
