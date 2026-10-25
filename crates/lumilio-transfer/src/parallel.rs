@@ -261,9 +261,15 @@ where
         part: &Path,
         length: u64,
     ) -> Result<Result<(), String>, AttemptFailure> {
-        let file = File::open(part).await.map_err(|error| {
-            AttemptFailure::Fatal(file_system_error("open partial download", part, error))
-        })?;
+        // Opened for writing: Windows syncs a file only through a handle that
+        // may write to it, and refuses a read-only one (#99).
+        let file = OpenOptions::new()
+            .write(true)
+            .open(part)
+            .await
+            .map_err(|error| {
+                AttemptFailure::Fatal(file_system_error("open partial download", part, error))
+            })?;
         file.sync_all().await.map_err(|error| {
             AttemptFailure::Fatal(file_system_error("sync partial download", part, error))
         })?;
