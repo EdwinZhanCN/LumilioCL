@@ -9,7 +9,7 @@ use crate::route::Route;
 
 impl LauncherShell {
     /// Turns on the live Library, Discover and Activity pages. The handler
-    /// receives every [`LiveIntent`] no feature of the shell answers.
+    /// receives every [`crate::live::LiveIntent`] no feature of the shell answers.
     pub fn with_live(mut self, handler: LiveHandler) -> Self {
         self.live = Some(LiveModel::default());
         self.live_handler = Some(super::features::route(&self, handler));
