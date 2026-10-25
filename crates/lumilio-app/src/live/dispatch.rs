@@ -19,7 +19,6 @@ use super::launch::{play, start_launch, technical_details};
 use super::library::{
     ask_collection_name, ask_collections_of, choose_current, import_game, restore_backup,
 };
-use super::new_game::{import_pack, import_pack_file, open_new_game};
 use super::settings::{
     add_java, apply_preferences, change_setting, check_reclaimable, clear_cache,
     export_diagnostics, install_java, load_settings, reclaim, reload_themes, set_wallpaper,
@@ -75,15 +74,15 @@ pub(super) fn on_shell_intent(
                 cancel.cancel();
             }
         }
-        ShellIntent::Home(HomeIntent::Create) => open_new_game(wiring, window, cx),
         ShellIntent::Navigate(Route::Settings) => load_settings(wiring, cx),
         ShellIntent::Navigate(Route::Library | Route::Activity | Route::Accounts) => {
             reload(wiring, Reload::Lists, cx)
         }
         ShellIntent::Home(HomeIntent::TechnicalDetails) => technical_details(wiring, window, cx),
-        // Discover loads its own first page (the shell tells it it was shown).
+        // Discover loads its own first page (the shell tells it it was shown),
+        // and the shell's New Game opens its own dialog.
         ShellIntent::Navigate(Route::Home | Route::Discover)
-        | ShellIntent::Home(HomeIntent::Import) => {}
+        | ShellIntent::Home(HomeIntent::Import | HomeIntent::Create) => {}
     }
 }
 
@@ -193,9 +192,9 @@ pub(super) fn on_live_intent(
     cx: &mut App,
 ) {
     match intent {
-        LiveIntent::NewInstance => open_new_game(wiring, window, cx),
+        // The shell's New Game answers these; they never reach here.
+        LiveIntent::NewInstance | LiveIntent::ImportPack | LiveIntent::DropFiles(_) => {}
         LiveIntent::Preset(intent) => super::game_settings::preset(wiring, intent, window, cx),
-        LiveIntent::ImportPack => import_pack(wiring, cx),
         LiveIntent::OpenInstance(id) => open_instance(wiring, id, None, window, cx),
         LiveIntent::Resolve(id, action) => open_instance(
             wiring,
@@ -212,24 +211,6 @@ pub(super) fn on_live_intent(
         }
         LiveIntent::RevealGame(id) => {
             cx.reveal_path(&wiring.backend.service.game_dir(&id));
-        }
-        LiveIntent::DropFiles(paths) => {
-            let packs: Vec<_> = paths
-                .into_iter()
-                .filter(|path| {
-                    path.extension().is_some_and(|ext| {
-                        ext.eq_ignore_ascii_case("mrpack") || ext.eq_ignore_ascii_case("zip")
-                    })
-                })
-                .collect();
-            if packs.is_empty() {
-                let _ = wiring.shell.update(cx, |shell, cx| {
-                    shell.toast(Toast::info(tr!("library-drop-unsupported")), cx)
-                });
-            }
-            for path in packs {
-                import_pack_file(wiring, path, cx);
-            }
         }
         LiveIntent::ExportPackOf(id) => {
             open_instance(wiring, id, Some(InstanceIntent::ExportPack), window, cx)

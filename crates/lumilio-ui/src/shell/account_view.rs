@@ -177,9 +177,9 @@ impl LauncherShell {
         &mut self,
         key: &str,
         revision: u64,
-        library: Result<Vec<lumilio_core::LibrarySkin>, crate::new_game::Failure>,
-        profile: Option<Result<lumilio_core::MojangProfile, crate::new_game::Failure>>,
-        warning: Option<crate::new_game::Failure>,
+        library: Result<Vec<lumilio_core::LibrarySkin>, crate::kit::Failure>,
+        profile: Option<Result<lumilio_core::MojangProfile, crate::kit::Failure>>,
+        warning: Option<crate::kit::Failure>,
         cx: &mut Context<Self>,
     ) {
         if let Some(view) = self
@@ -234,7 +234,7 @@ impl LauncherShell {
         key: &str,
         revision: u64,
         action: crate::wardrobe::WardrobeAction,
-        result: Result<(), crate::new_game::Failure>,
+        result: Result<(), crate::kit::Failure>,
         cx: &mut Context<Self>,
     ) {
         if let Some(view) = self
@@ -253,7 +253,7 @@ impl LauncherShell {
         revision: u64,
         action: crate::wardrobe::WardrobeAction,
         remaining: crate::wardrobe::WardrobeAction,
-        error: crate::new_game::Failure,
+        error: crate::kit::Failure,
         cx: &mut Context<Self>,
     ) {
         if let Some(view) = self
@@ -272,7 +272,7 @@ impl LauncherShell {
         &mut self,
         key: &str,
         revision: u64,
-        result: Result<lumilio_core::MojangProfile, crate::new_game::Failure>,
+        result: Result<lumilio_core::MojangProfile, crate::kit::Failure>,
         matches: Option<bool>,
         cx: &mut Context<Self>,
     ) {
@@ -298,7 +298,7 @@ impl LauncherShell {
         &mut self,
         key: &str,
         revision: u64,
-        result: Result<(), crate::new_game::Failure>,
+        result: Result<(), crate::kit::Failure>,
         cx: &mut Context<Self>,
     ) {
         if let Some(view) = self

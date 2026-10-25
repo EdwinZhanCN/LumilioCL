@@ -7,6 +7,7 @@ use super::account_view::AccountViewer;
 use super::detail::DetailSlot;
 use super::locations::{HISTORY_LIMIT, Location};
 use crate::features::discover::{Discover, DiscoverEvent};
+use crate::features::new_game::NewGame;
 use crate::hero::HeroCarousel;
 use crate::history::History;
 use crate::home::{HomeIntent, HomePresentation};
@@ -67,6 +68,8 @@ pub struct LauncherShell {
     pub(super) account_revision: u64,
     /// The Discover page; its project details show here in place of it.
     pub(super) discover: Entity<Discover>,
+    /// Makes new games, from the dialog or from packs.
+    pub(super) new_game: Entity<NewGame>,
     /// Whether translation is on, from the saved preferences; known from
     /// startup, before the Settings page has loaded anything.
     pub(super) translation: bool,
@@ -86,6 +89,7 @@ pub struct LauncherShell {
 impl LauncherShell {
     pub fn new(cx: &mut Context<Self>) -> Self {
         let discover = cx.new(|_| Discover::new(None));
+        let new_game = cx.new(|_| NewGame::new(None));
         let discover_events = cx.subscribe(&discover, |shell, _, event: &DiscoverEvent, cx| {
             if let DiscoverEvent::ProjectOpened(opened) = event {
                 shell.show_project(opened.clone(), cx);
@@ -107,6 +111,7 @@ impl LauncherShell {
             account_viewer: None,
             account_revision: 0,
             discover,
+            new_game,
             translation: false,
             detail: None,
             live_instance: None,
@@ -135,13 +140,20 @@ impl LauncherShell {
     /// Lets the pages that ask the launcher themselves do so.
     pub fn with_worker(self, worker: crate::runtime::Worker, cx: &mut Context<Self>) -> Self {
         self.discover
-            .update(cx, |discover, _| discover.set_worker(worker));
+            .update(cx, |discover, _| discover.set_worker(worker.clone()));
+        self.new_game
+            .update(cx, |new_game, _| new_game.set_worker(worker));
         self
     }
 
     /// The Discover page, for the application to follow its events.
     pub fn discover(&self) -> &Entity<Discover> {
         &self.discover
+    }
+
+    /// What makes new games, for the application to follow its events.
+    pub fn new_game(&self) -> &Entity<NewGame> {
+        &self.new_game
     }
 
     pub fn with_activity(mut self, activity: ActivitySummary) -> Self {
@@ -175,6 +187,10 @@ impl LauncherShell {
         };
         if let Some(home) = home {
             self.set_home(home, cx);
+        }
+        if intent == ShellIntent::Home(HomeIntent::Create) {
+            self.new_game
+                .update(cx, |new_game, cx| new_game.open(window, cx));
         }
         self.last_intent = Some(intent);
         if let Some(handler) = &self.intent_handler {

@@ -1,4 +1,10 @@
-use super::*;
+use std::rc::Rc;
+
+use gpui::prelude::*;
+use gpui::{App, Context, IntoElement, Render, Window, div};
+use lumilio_core::{CatalogEntry, Loader, LoaderVersion};
+
+use super::super::form::*;
 
 fn version(version: &str, stable: bool) -> LoaderVersion {
     LoaderVersion {

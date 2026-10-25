@@ -1,5 +1,4 @@
 use std::future::Future;
-use std::time::Duration;
 
 use gpui::Context;
 use lumilio_core::{ProjectKind, ServiceError, unix_now};
@@ -7,11 +6,8 @@ use tokio::task::JoinError;
 
 use super::model::{FilterModel, SearchStatus, search_rows};
 use super::page::{Discover, DiscoverEvent};
-use crate::runtime::answer;
+use crate::runtime::{self, answer};
 use crate::toast::Toast;
-
-/// How often running installs tell Activity to look again.
-const POLL: Duration = Duration::from_millis(600);
 
 impl Discover {
     /// Runs `work` on the launcher's runtime, then hands the result to `done`
@@ -34,25 +30,11 @@ impl Discover {
         let Some(worker) = &self.worker else {
             return;
         };
-        let handle = worker.spawn(work);
-        cx.spawn(async move |page, cx| {
-            if let Some(toast) = started {
-                cx.update(|cx| crate::toast::post(toast, cx));
-            }
-            while tasks && !handle.is_finished() {
-                cx.background_executor().timer(POLL).await;
-                let _ = page.update(cx, |_, cx| cx.emit(DiscoverEvent::TasksChanged));
-            }
-            let output = handle.await.unwrap_or_else(|error| Err(E::from(error)));
-            let _ = page.update(cx, |page, cx| {
-                done(page, output, cx);
-                if tasks {
-                    cx.emit(DiscoverEvent::TasksChanged);
-                }
-                page.refresh_installed(cx);
-            });
-        })
-        .detach();
+        let tasks = tasks.then_some(DiscoverEvent::TasksChanged);
+        runtime::job(worker, cx, tasks, started, work, move |page, output, cx| {
+            done(page, output, cx);
+            page.refresh_installed(cx);
+        });
     }
 
     /// Runs `query`. A slow answer cannot replace a newer search's.

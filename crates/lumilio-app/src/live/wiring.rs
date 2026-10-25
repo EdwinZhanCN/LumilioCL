@@ -6,6 +6,7 @@ use gpui_kit::{App, AppContext as _, Context, Entity, WeakEntity, Window};
 use lumilio_core::{CancellationToken, Preferences, ProjectKind};
 use lumilio_ui::LauncherShell;
 use lumilio_ui::features::discover::DiscoverEvent;
+use lumilio_ui::features::new_game::NewGameEvent;
 use lumilio_ui::home::HomePresentation;
 use lumilio_ui::instance_detail::TAB_WORLDS;
 use lumilio_ui::live::{LiveHandler, LiveIntent};
@@ -14,8 +15,9 @@ use lumilio_ui::shell::{IntentHandler, ShellIntent};
 use lumilio_ui::toast::Toast;
 
 use super::dispatch::{on_live_intent, on_shell_intent};
-use super::instance::open_instance;
+use super::instance::{load_instance, open_instance};
 use super::jobs::reload;
+use super::library::choose_current;
 use super::settings::apply_saved_preferences;
 use super::{context, instance_plugins, jobs, launch, library, terms, update};
 use crate::backend::Backend;
@@ -122,6 +124,7 @@ pub fn build(backend: Backend, window: &mut Window, cx: &mut App) -> Entity<Laun
         state,
     };
     follow_discover(&wiring, &shell, cx);
+    follow_new_game(&wiring, &shell, cx);
     update::start(&wiring, cx);
     context::follow(&wiring, cx);
     reload(&wiring, Reload::Lists, cx);
@@ -157,6 +160,35 @@ fn follow_discover(wiring: &Wiring, shell: &Entity<LauncherShell>, cx: &mut App)
             );
         }
         DiscoverEvent::ProjectOpened(_) => {}
+    })
+    .detach();
+}
+
+/// Passes on what making games tells the application: the lists changed, a
+/// new game is shown and made current, an open game page reads its download.
+fn follow_new_game(wiring: &Wiring, shell: &Entity<LauncherShell>, cx: &mut App) {
+    let new_game = shell.read(cx).new_game().clone();
+    let wiring = wiring.clone();
+    cx.subscribe(&new_game, move |_, event: &NewGameEvent, cx| match event {
+        NewGameEvent::TasksChanged => reload(&wiring, Reload::Lists, cx),
+        NewGameEvent::Created { id, window } => {
+            let (wiring, id) = (wiring.clone(), id.clone());
+            let _ = cx.update_window(*window, move |_, window, cx| {
+                open_instance(&wiring, id.clone(), None, window, cx);
+                choose_current(&wiring, id, cx);
+            });
+        }
+        NewGameEvent::Installed(id) => {
+            let open = wiring.shell.read_with(cx, |shell, cx| {
+                shell
+                    .live_instance()
+                    .filter(|view| view.read(cx).id() == id)
+                    .map(|view| view.downgrade())
+            });
+            if let Ok(Some(view)) = open {
+                load_instance(&wiring, id.clone(), view, cx);
+            }
+        }
     })
     .detach();
 }

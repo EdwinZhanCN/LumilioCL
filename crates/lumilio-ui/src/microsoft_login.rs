@@ -13,7 +13,7 @@ use gpui_component::dialog::Dialog;
 use gpui_component::{Sizable as _, StyledExt as _, WindowExt as _, h_flex, v_flex};
 
 use crate::key::Key;
-use crate::new_game::Failure;
+use crate::kit::Failure;
 use crate::theme::ShellColors;
 use crate::{kit, theme, tr};
 

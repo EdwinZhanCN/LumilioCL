@@ -15,7 +15,7 @@ use lumilio_core::{MAX_PROFILE_NAME, OfflineProfile, ProfileError, ProfileId};
 
 use crate::controls::Checkbox;
 use crate::key::Key;
-use crate::new_game::Failure;
+use crate::kit::Failure;
 use crate::theme::ShellColors;
 use crate::{kit, theme, tr};
 

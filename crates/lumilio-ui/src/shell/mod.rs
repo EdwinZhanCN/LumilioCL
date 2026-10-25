@@ -5,6 +5,7 @@ mod chips;
 mod chrome;
 mod controls;
 mod detail;
+mod features;
 mod home_page;
 mod instance;
 mod locations;

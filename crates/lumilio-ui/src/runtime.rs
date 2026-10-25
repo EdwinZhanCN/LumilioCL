@@ -4,11 +4,12 @@
 
 use std::future::Future;
 use std::sync::Arc;
+use std::time::Duration;
 
-use gpui::AsyncApp;
+use gpui::{AsyncApp, Context, EventEmitter};
 use lumilio_core::{DefaultTransport, LauncherService, ServiceError};
 use tokio::runtime::Handle;
-use tokio::task::JoinHandle;
+use tokio::task::{JoinError, JoinHandle};
 
 use crate::toast::Toast;
 
@@ -42,6 +43,48 @@ impl Worker {
     {
         self.runtime.spawn(work)
     }
+}
+
+/// How often work that shows in Activity tells the feature's listeners so.
+pub const POLL: Duration = Duration::from_millis(600);
+
+/// Runs `work` on the worker's runtime, then hands its result to `done` on
+/// the interface thread. `started` floats up when it begins. With `tasks`,
+/// the work shows in Activity: the feature emits that event while it runs
+/// and once more when it ends. Work that panics fails like any other, so
+/// `done` still runs and says so.
+pub fn job<V, Ev, T, E>(
+    worker: &Worker,
+    cx: &mut Context<V>,
+    tasks: Option<Ev>,
+    started: Option<Toast>,
+    work: impl Future<Output = Result<T, E>> + Send + 'static,
+    done: impl FnOnce(&mut V, Result<T, E>, &mut Context<V>) + 'static,
+) where
+    V: EventEmitter<Ev> + 'static,
+    Ev: Clone + 'static,
+    T: Send + 'static,
+    E: From<JoinError> + Send + 'static,
+{
+    let handle = worker.spawn(work);
+    cx.spawn(async move |view, cx| {
+        if let Some(toast) = started {
+            cx.update(|cx| crate::toast::post(toast, cx));
+        }
+        while let Some(event) = tasks.as_ref().filter(|_| !handle.is_finished()) {
+            cx.background_executor().timer(POLL).await;
+            let event = event.clone();
+            let _ = view.update(cx, |_, cx| cx.emit(event));
+        }
+        let output = handle.await.unwrap_or_else(|error| Err(E::from(error)));
+        let _ = view.update(cx, |view, cx| {
+            done(view, output, cx);
+            if let Some(event) = tasks {
+                cx.emit(event);
+            }
+        });
+    })
+    .detach();
 }
 
 /// Waits for work on the runtime. Work that panicked is told in a toast,

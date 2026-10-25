@@ -2,7 +2,8 @@
 //! version (P-VERSION), loader version (P-LOADER-VERSION) and whether to
 //! download the game files at once. It holds no business logic: metadata and
 //! the creation itself go through [`NewGameIntent`]s and come back through
-//! [`NewGameForm::game_versions_arrived`] and friends.
+//! [`NewGameForm::game_versions_arrived`] and friends. [`super::NewGame`]
+//! answers them for a new game; changing a game's version answers them too.
 
 use std::rc::Rc;
 
@@ -15,6 +16,7 @@ use lumilio_core::{CatalogEntry, Loader, LoaderVersion, VersionChannel};
 
 use crate::controls::Checkbox;
 use crate::key::Key;
+use crate::kit::Failure;
 use crate::theme::ShellColors;
 use crate::version_picker::{Choice, Choices, PickerEvent, VersionPicker};
 use crate::{kit, theme, tr, tr_all};
@@ -86,9 +88,6 @@ pub enum LoaderPick {
     Latest,
     Other,
 }
-
-/// What a failure looks like: one sentence, and the raw cause behind 技术详情.
-pub type Failure = (String, String);
 
 fn channel_tag(channel: VersionChannel) -> Option<&'static str> {
     match channel {
@@ -187,7 +186,7 @@ pub struct NewGameForm {
     name: Entity<InputState>,
     placeholder: String,
     loader: Loader,
-    game: Entity<VersionPicker>,
+    pub(super) game: Entity<VersionPicker>,
     pick: LoaderPick,
     other: Entity<VersionPicker>,
     /// The loader versions for `(loader, game version)`; a late answer for
@@ -195,7 +194,7 @@ pub struct NewGameForm {
     loader_key: Option<(Loader, String)>,
     loader_versions: LoaderList,
     install: bool,
-    busy: bool,
+    pub(super) busy: bool,
     error: Option<Failure>,
     /// A finished creation closes the dialog on the next render.
     close: bool,
@@ -711,6 +710,3 @@ impl Render for NewGameForm {
             }))
     }
 }
-
-#[cfg(test)]
-mod tests;

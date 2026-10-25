@@ -5,7 +5,7 @@ use lumilio_core::{CancellationToken, unix_now};
 use lumilio_ui::live::{CollectionRow, account_rows, activity_rows, library_cards};
 use lumilio_ui::runtime::answer;
 use lumilio_ui::toast::Toast;
-pub(super) use lumilio_ui::toast::{install_outcome, outcome};
+pub(super) use lumilio_ui::toast::outcome;
 use lumilio_ui::{LauncherShell, tr};
 use tokio::task::JoinError;
 

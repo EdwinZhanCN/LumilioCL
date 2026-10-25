@@ -27,7 +27,6 @@ pub mod microsoft_login;
 pub mod missing_folder;
 pub mod model_view;
 pub mod navigation;
-pub mod new_game;
 pub mod pages;
 pub mod photosensitivity;
 pub mod pictures;

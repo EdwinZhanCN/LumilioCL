@@ -17,7 +17,6 @@ mod jobs;
 mod launch;
 mod library;
 mod logs;
-mod new_game;
 mod settings;
 mod terms;
 mod update;
