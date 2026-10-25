@@ -2,12 +2,35 @@ use gpui::prelude::*;
 use gpui::{App, ClickEvent, IntoElement, Window, div, px};
 use gpui_component::{Icon, Sizable as _, h_flex, v_flex};
 
-use super::controls::{LiveCtx, send};
+use super::controls::LibraryControls;
+use super::order::{arranged, loader_code, present_loaders, sort_labels};
+use super::page::{COLLECTIONS_TAB, LibraryInputs, LibraryView};
 use crate::assets::UiIcon;
 use crate::key::Key;
-use crate::kit::ViewIntent;
-use crate::live::{LibraryCard, LiveIntent, cover_loader};
+use crate::kit::{Emit, ViewIntent};
+use crate::live::{LibraryCard, LiveHandler, LiveIntent, cover_loader};
+use crate::theme::ShellColors;
 use crate::{kit, tr, tr_all};
+
+/// What the page is drawn from.
+pub(super) struct LibraryCtx<'a> {
+    pub colors: ShellColors,
+    pub model: &'a LibraryInputs,
+    pub view: LibraryView,
+    pub emit: Emit,
+    pub handler: LiveHandler,
+    pub controls: &'a LibraryControls,
+    /// What the search box holds.
+    pub filter: String,
+}
+
+pub(super) fn send(
+    handler: &LiveHandler,
+    intent: LiveIntent,
+) -> impl Fn(&mut Window, &mut App) + 'static {
+    let handler = handler.clone();
+    move |window, cx| handler(intent.clone(), window, cx)
+}
 
 #[must_use]
 pub fn library_tabs() -> &'static [&'static str] {
@@ -18,71 +41,10 @@ pub fn library_tabs() -> &'static [&'static str] {
         "library-tab-presets"
     ]
 }
-/// The tab that shows the person's collections.
-pub const COLLECTIONS_TAB: usize = 2;
-/// The tab that shows the game option presets; it frames itself.
-pub const PRESETS_TAB: usize = 3;
 
-/// View-state groups of the Library's ordering and loader filter.
-pub const LIBRARY_SORT: u8 = 210;
-pub const LIBRARY_LOADER: u8 = 211;
-#[must_use]
-pub fn sort_labels() -> &'static [&'static str] {
-    tr_all![
-        "library-sort-recent",
-        "library-sort-name",
-        "library-sort-created"
-    ]
-}
-
-/// The number a loader is remembered by: 1 vanilla, 2 Fabric, 3 Forge,
-/// 4 NeoForge, 5 Quilt (0 is every loader).
-#[must_use]
-pub const fn loader_code(loader: lumilio_core::Loader) -> usize {
-    match loader {
-        lumilio_core::Loader::Vanilla => 1,
-        lumilio_core::Loader::Fabric => 2,
-        lumilio_core::Loader::Forge => 3,
-        lumilio_core::Loader::NeoForge => 4,
-        lumilio_core::Loader::Quilt => 5,
-    }
-}
-
-/// The loaders the library has, in a steady order, for the filter.
-#[must_use]
-pub fn present_loaders(cards: &[LibraryCard]) -> Vec<lumilio_core::Loader> {
-    const ORDER: [lumilio_core::Loader; 5] = [
-        lumilio_core::Loader::Vanilla,
-        lumilio_core::Loader::Fabric,
-        lumilio_core::Loader::Forge,
-        lumilio_core::Loader::NeoForge,
-        lumilio_core::Loader::Quilt,
-    ];
-    ORDER
-        .into_iter()
-        .filter(|loader| cards.iter().any(|card| card.loader == *loader))
-        .collect()
-}
-
-/// The cards in the chosen order (0 as given — most recently played, favourites
-/// first; 1 by name; 2 newest first) and only those with the loader, if any.
-#[must_use]
-pub fn arranged(
-    mut cards: Vec<&LibraryCard>,
-    sort: usize,
-    loader: Option<lumilio_core::Loader>,
-) -> Vec<&LibraryCard> {
-    cards.retain(|card| loader.is_none_or(|loader| card.loader == loader));
-    match sort {
-        1 => cards.sort_by_key(|card| card.name.to_lowercase()),
-        2 => cards.sort_by_key(|card| std::cmp::Reverse(card.created)),
-        _ => {}
-    }
-    cards
-}
 /// The card's ⋯ menu (IA `library.md`): everything about a game that is not
 /// worth a button of its own.
-pub(super) fn card_menu(card: &LibraryCard, ctx: &LiveCtx) -> Vec<kit::MenuEntry> {
+fn card_menu(card: &LibraryCard, ctx: &LibraryCtx) -> Vec<kit::MenuEntry> {
     let go = |label: &'static str, intent: LiveIntent| {
         kit::MenuEntry::new(label, send(&ctx.handler, intent))
     };
@@ -131,7 +93,7 @@ pub(super) fn card_menu(card: &LibraryCard, ctx: &LiveCtx) -> Vec<kit::MenuEntry
     ]
 }
 
-pub(super) fn card(index: usize, card: &LibraryCard, ctx: &LiveCtx) -> impl IntoElement {
+fn card(index: usize, card: &LibraryCard, ctx: &LibraryCtx) -> impl IntoElement {
     let colors = ctx.colors;
     let open = send(&ctx.handler, LiveIntent::OpenInstance(card.id.clone()));
     let play = send(&ctx.handler, LiveIntent::Play(card.id.clone()));
@@ -230,7 +192,7 @@ pub(super) fn card(index: usize, card: &LibraryCard, ctx: &LiveCtx) -> impl Into
 }
 
 /// The Collections tab: one section per collection, each a row of cards.
-pub(super) fn collections_body(ctx: &LiveCtx, needle: &str) -> gpui::AnyElement {
+fn collections_body(ctx: &LibraryCtx, needle: &str) -> gpui::AnyElement {
     let colors = ctx.colors;
     if ctx.model.collections.is_empty() {
         return v_flex()
@@ -351,7 +313,7 @@ pub(super) fn collections_body(ctx: &LiveCtx, needle: &str) -> gpui::AnyElement 
 
 /// The Library's page actions with the tab's own secondary key; every tab
 /// shares the primary and the More menu.
-pub(super) fn page_actions(secondary: Key, ctx: &LiveCtx) -> kit::PageActions {
+pub(super) fn page_actions(secondary: Key, ctx: &LibraryCtx) -> kit::PageActions {
     // ia[library]: 导入其他启动器的游戏 | L2 ⋯ 菜单 → 选文件夹（MultiMC/Prism 实例、.minecraft）→ 有多个时勾选 | 后台导入，复制玩家文件，原文件不动；CurseForge 格式不支持 | ADR 0016
     // ia[library]: 从备份恢复 | L2 ⋯ 菜单 → 选备份 .zip | 后台恢复成新游戏，不覆盖已有的 | ADR 0015
     // ia[library]: 打开游戏库文件夹 | L2 ⋯ 菜单 | 在访达中打开所有游戏所在的文件夹
@@ -379,21 +341,36 @@ pub(super) fn page_actions(secondary: Key, ctx: &LiveCtx) -> kit::PageActions {
         ))
 }
 
-pub fn library(ctx: &LiveCtx) -> gpui::AnyElement {
+/// The page's tabs, with what the search box searches beside them.
+pub(super) fn toolbar(tab: usize, ctx: &LibraryCtx) -> impl IntoElement {
+    let emit = ctx.emit.clone();
+    kit::toolbar(
+        Some(
+            kit::tabs(
+                "live-library-tabs",
+                library_tabs(),
+                tab,
+                move |index, window, cx| emit(ViewIntent::LibraryTab(index), window, cx),
+            )
+            .into_any_element(),
+        ),
+        // ia[library]: 搜索 | L3 搜索框 | 按名称过滤；空结果“没有匹配的游戏”
+        // ia[library]: 预设：搜索选项 | 预设 tab 的 L3 搜索框 | 按名称或值过滤右侧的选项；没有匹配时说一句
+        Some(kit::search_field(&ctx.controls.filter, ctx.colors)),
+    )
+}
+
+pub(super) fn library(ctx: &LibraryCtx) -> gpui::AnyElement {
     let colors = ctx.colors;
-    let tab = ctx.state.library_tab.min(library_tabs().len() - 1);
+    let tab = ctx.view.tab.min(library_tabs().len() - 1);
     let needle = ctx.filter.to_lowercase();
     let loaders = present_loaders(&ctx.model.library);
-    let sort = ctx
-        .state
-        .choice(LIBRARY_SORT, 0)
-        .min(sort_labels().len() - 1);
+    let sort = ctx.view.sort.min(sort_labels().len() - 1);
     // The remembered loader, if the library still has one: its place among
     // the chips (0 is every loader).
-    let code = ctx.state.choice(LIBRARY_LOADER, 0);
     let loader_choice = loaders
         .iter()
-        .position(|loader| loader_code(*loader) == code)
+        .position(|loader| loader_code(*loader) == ctx.view.loader)
         .map_or(0, |at| at + 1);
     let loader = loader_choice.checked_sub(1).map(|at| loaders[at]);
     let shown: Vec<&LibraryCard> = arranged(
@@ -468,17 +445,7 @@ pub fn library(ctx: &LiveCtx) -> gpui::AnyElement {
             actions.render(colors),
             colors,
         ))
-        .child(kit::toolbar(
-            Some(
-                kit::tabs("live-library-tabs", library_tabs(), tab, {
-                    let emit = ctx.emit.clone();
-                    move |index, window, app| emit(ViewIntent::LibraryTab(index), window, app)
-                })
-                .into_any_element(),
-            ),
-            // ia[library]: 搜索 | L3 搜索框 | 按名称过滤；空结果“没有匹配的游戏”
-            Some(kit::search_field(&ctx.controls.library_filter, colors)),
-        ))
+        .child(toolbar(tab, ctx))
         .children(
             (tab != COLLECTIONS_TAB && ctx.model.library.len() > 1).then(|| {
                 // ia[library]: 排序 / 按加载器筛选 | L4 两个下拉（排序、加载器），与发现页同一种控件 | 记在偏好设置里，下次打开还是这样；库里只有一种加载器时不显示加载器下拉
@@ -489,14 +456,14 @@ pub fn library(ctx: &LiveCtx) -> gpui::AnyElement {
                     .flex_wrap()
                     .child(kit::labeled_select(
                         tr!("library-sort"),
-                        &ctx.controls.library_sort,
+                        &ctx.controls.sort,
                         130.,
                         colors,
                     ))
                     .children((loaders.len() > 1).then(|| {
                         kit::labeled_select(
                             tr!("library-loader"),
-                            &ctx.controls.library_loader,
+                            &ctx.controls.loader,
                             150.,
                             colors,
                         )

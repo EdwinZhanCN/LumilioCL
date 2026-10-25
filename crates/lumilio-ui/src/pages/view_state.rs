@@ -2,10 +2,10 @@ use std::collections::{BTreeSet, HashMap};
 
 use crate::kit::ViewIntent;
 
-/// Which tab each global page is on, and the small choices made on them.
+/// Which tab each global page is on, and the small choices made on them. The
+/// Library keeps its own (`features::library::LibraryView`).
 #[derive(Clone, Debug, Default)]
 pub struct ViewState {
-    pub library_tab: usize,
     pub activity_tab: usize,
     /// Running tasks whose downloads Activity shows, by task id.
     pub activity_open: BTreeSet<u64>,
@@ -20,7 +20,7 @@ impl ViewState {
     /// Applies an intent to the view state.
     pub fn apply(&mut self, intent: ViewIntent) {
         match intent {
-            ViewIntent::LibraryTab(index) => self.library_tab = index,
+            ViewIntent::LibraryTab(_) => {}
             ViewIntent::ActivityTab(index) => self.activity_tab = index,
             ViewIntent::TaskDetail(task) => {
                 if !self.activity_open.remove(&task) {

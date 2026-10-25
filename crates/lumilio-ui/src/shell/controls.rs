@@ -1,137 +1,14 @@
 use gpui::prelude::*;
-use gpui::{App, Context, Entity, Window};
-use gpui_component::input::InputEvent;
-use gpui_component::select::SelectEvent;
+use gpui::{Context, Window};
 
-use super::{Labels, LauncherShell};
-use crate::kit::ViewIntent;
-use crate::pages;
+use super::LauncherShell;
 use crate::pages::live::LiveControls;
 
 impl LauncherShell {
-    /// Builds the Library and Discover controls the first time the live pages show,
-    /// and listens to them.
+    /// Builds the controls the live pages own the first time they show.
     pub(super) fn ensure_live_controls(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(controls) = &self.live_controls
-            && controls.read(cx).language != crate::i18n::generation()
-        {
-            controls.update(cx, |controls, cx| controls.relabel(window, cx));
-        }
-        if let Some(controls) = &self.live_controls {
-            // The Library's search box says what the open tab searches.
-            let presets = self.view.library_tab == crate::pages::live::PRESETS_TAB;
-            controls.update(cx, |controls, cx| controls.search_for(presets, window, cx));
-        }
         if self.live.is_some() && self.live_controls.is_none() {
-            let controls = cx.new(|cx| LiveControls::new(window, cx));
-            let filter = controls.read(cx).library_filter.clone();
-            cx.subscribe(&filter, |_, _, event: &InputEvent, cx| {
-                if matches!(event, InputEvent::Change) {
-                    cx.notify();
-                }
-            })
-            .detach();
-            let (library_sort, library_loader) = {
-                let read = controls.read(cx);
-                (read.library_sort.clone(), read.library_loader.clone())
-            };
-            cx.subscribe_in(
-                &library_sort,
-                window,
-                |this, _, event: &SelectEvent<Labels>, _, cx| {
-                    if let SelectEvent::Confirm(Some(label)) = event
-                        && let Some(at) = pages::live::sort_labels()
-                            .iter()
-                            .position(|sort| *sort == label)
-                    {
-                        let intent = ViewIntent::Choose(pages::live::LIBRARY_SORT, at);
-                        this.apply_view_intent(intent, cx);
-                        this.remember_library_view(intent, cx);
-                    }
-                },
-            )
-            .detach();
-            cx.subscribe_in(
-                &library_loader,
-                window,
-                |this, _, event: &SelectEvent<Labels>, _, cx| {
-                    let SelectEvent::Confirm(choice) = event else {
-                        return;
-                    };
-                    let code = choice.as_ref().map_or(0, |label| {
-                        this.live
-                            .as_ref()
-                            .map(|model| pages::live::present_loaders(&model.library))
-                            .and_then(|loaders| {
-                                loaders
-                                    .into_iter()
-                                    .find(|loader| crate::live::loader_label(*loader) == label)
-                            })
-                            .map_or(0, pages::live::loader_code)
-                    });
-                    let intent = ViewIntent::Choose(pages::live::LIBRARY_LOADER, code);
-                    this.apply_view_intent(intent, cx);
-                    this.remember_library_view(intent, cx);
-                },
-            )
-            .detach();
-            self.live_controls = Some(controls);
-        }
-    }
-
-    /// Keeps the Library's two dropdowns on what is remembered and on the loaders
-    /// the library holds.
-    pub(super) fn sync_library_dropdowns(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        // The Library's two dropdowns follow what is remembered and what the
-        // library holds.
-        if let (Some(controls), Some(model)) = (&self.live_controls, &self.live) {
-            use gpui_component::IndexPath;
-            use pages::live::{LIBRARY_LOADER, LIBRARY_SORT, all_loaders, sort_labels};
-            let present = pages::live::present_loaders(&model.library);
-            let codes: Vec<usize> = present
-                .iter()
-                .copied()
-                .map(pages::live::loader_code)
-                .collect();
-            let want_sort = self
-                .view
-                .choice(LIBRARY_SORT, 0)
-                .min(sort_labels().len() - 1);
-            let code = self.view.choice(LIBRARY_LOADER, 0);
-            let want_loader = codes.iter().position(|c| *c == code).map_or(0, |at| at + 1);
-            let read = controls.read(cx);
-            let row = |select: &Entity<gpui_component::select::SelectState<Labels>>, cx: &App| {
-                select.read(cx).selected_index(cx).map(|ix| ix.row)
-            };
-            let stale_list = read.library_loaders != codes;
-            let stale_sort = row(&read.library_sort, cx) != Some(want_sort);
-            let stale_loader = stale_list || row(&read.library_loader, cx) != Some(want_loader);
-            if stale_list || stale_sort || stale_loader {
-                controls.update(cx, |controls, cx| {
-                    if stale_list {
-                        let mut items = vec![all_loaders().to_owned()];
-                        items.extend(
-                            present
-                                .iter()
-                                .map(|loader| crate::live::loader_label(*loader).to_owned()),
-                        );
-                        controls.library_loaders = codes;
-                        controls.library_loader.update(cx, |select, cx| {
-                            select.set_items(Labels::new(items), window, cx)
-                        });
-                    }
-                    if stale_loader {
-                        controls.library_loader.update(cx, |select, cx| {
-                            select.set_selected_index(Some(IndexPath::new(want_loader)), window, cx)
-                        });
-                    }
-                    if stale_sort {
-                        controls.library_sort.update(cx, |select, cx| {
-                            select.set_selected_index(Some(IndexPath::new(want_sort)), window, cx)
-                        });
-                    }
-                });
-            }
+            self.live_controls = Some(cx.new(|cx| LiveControls::new(window, cx)));
         }
     }
 }

@@ -44,7 +44,6 @@ impl Render for LauncherShell {
 
         let view_callback = cx.listener(|this, intent: &ViewIntent, _, cx| {
             this.apply_view_intent(*intent, cx);
-            this.remember_library_view(*intent, cx);
         });
         let emit_view: Emit = Rc::new(move |intent, window: &mut Window, app: &mut App| {
             view_callback(&intent, window, app)
@@ -85,7 +84,11 @@ impl Render for LauncherShell {
         self.ensure_live_controls(window, cx);
         self.ensure_account_viewer(window, cx);
         self.ensure_account_faces(window, cx);
-        self.sync_library_dropdowns(window, cx);
+        if let Some(handler) = &self.live_handler {
+            let handler = handler.clone();
+            self.library
+                .update(cx, |library, _| library.set_handler(handler));
+        }
         // Discover's answers belong to the detail on screen, if any.
         let shown_detail = match self.location() {
             super::locations::Location::Project(slot) => Some(slot.view.entity_id()),
@@ -94,33 +97,24 @@ impl Render for LauncherShell {
         self.discover
             .update(cx, |discover, _| discover.set_shown_detail(shown_detail));
         let live_ctx = match (&self.live, &self.live_controls, &self.live_handler) {
-            (Some(model), Some(controls), Some(handler)) => {
-                let filter = controls
-                    .read(cx)
-                    .library_filter
-                    .read(cx)
-                    .value()
-                    .to_string();
-                Some(pages::live::LiveCtx {
-                    colors,
-                    model,
-                    state: &self.view,
-                    emit: emit_view.clone(),
-                    handler: handler.clone(),
-                    controls: controls.read(cx),
-                    filter,
-                    account_viewer: self.account_viewer.as_ref().map(|viewer| &viewer.view),
-                    window_width: f32::from(window.viewport_size().width),
-                    window_height: f32::from(window.viewport_size().height),
-                    wardrobe: self
-                        .account_viewer
-                        .as_ref()
-                        .and_then(|viewer| viewer.wardrobe.as_ref()),
-                    look: cx.try_global::<crate::theme::Look>(),
-                    catalog: cx.try_global::<crate::theme::Catalog>(),
-                    wallpaper: cx.try_global::<crate::theme::Wallpaper>(),
-                })
-            }
+            (Some(model), Some(controls), Some(handler)) => Some(pages::live::LiveCtx {
+                colors,
+                model,
+                state: &self.view,
+                emit: emit_view.clone(),
+                handler: handler.clone(),
+                controls: controls.read(cx),
+                account_viewer: self.account_viewer.as_ref().map(|viewer| &viewer.view),
+                window_width: f32::from(window.viewport_size().width),
+                window_height: f32::from(window.viewport_size().height),
+                wardrobe: self
+                    .account_viewer
+                    .as_ref()
+                    .and_then(|viewer| viewer.wardrobe.as_ref()),
+                look: cx.try_global::<crate::theme::Look>(),
+                catalog: cx.try_global::<crate::theme::Catalog>(),
+                wallpaper: cx.try_global::<crate::theme::Wallpaper>(),
+            }),
             _ => None,
         };
         let live_page = live_ctx
@@ -129,24 +123,7 @@ impl Render for LauncherShell {
             .map(|ctx| {
                 match (self.route, &self.detail) {
                     (Route::Discover, Some(slot)) => slot.view.clone().into_any_element(),
-                    (Route::Library, _) => {
-                        let handler = ctx.handler.clone();
-                        // The presets tab is master–detail: its panes scroll, the page does not.
-                        let page = if ctx.state.library_tab == pages::live::PRESETS_TAB {
-                            pages::live::presets(ctx)
-                        } else {
-                            kit::page("live-library", pages::live::library(ctx)).into_any_element()
-                        };
-                        // ia[library]: 拖入整合包 | 把文件拖到页面上 | 同“导入整合包”（.mrpack、CurseForge 整合包 .zip，或 MultiMC/Prism/本启动器备份的 .zip）；不是的提示一句
-                        div()
-                            .id("live-library-drop")
-                            .size_full()
-                            .on_drop::<gpui::ExternalPaths>(move |paths, window, cx| {
-                                handler(LiveIntent::DropFiles(paths.paths().to_vec()), window, cx)
-                            })
-                            .child(page)
-                            .into_any_element()
-                    }
+                    (Route::Library, _) => self.library.clone().into_any_element(),
                     // Settings frames itself: its header and tabs stay put.
                     (Route::Settings, _) => pages::settings::render(ctx).into_any_element(),
                     (Route::Accounts, _) => pages::live::accounts(ctx).into_any_element(),

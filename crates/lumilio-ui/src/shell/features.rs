@@ -66,6 +66,9 @@ pub(super) fn route(shell: &LauncherShell, app: LiveHandler) -> LiveHandler {
         LiveIntent::OpenGamesFolder => {
             let _ = library.read_with(cx, |library, cx| library.open_games_folder(cx));
         }
+        LiveIntent::Preset(intent) => {
+            let _ = library.update(cx, |library, cx| library.preset(intent, window, cx));
+        }
         other => app(other, window, cx),
     })
 }

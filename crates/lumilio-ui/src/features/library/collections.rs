@@ -147,7 +147,8 @@ impl Library {
 
     /// The names of the collections the page shows.
     pub(super) fn collection_names(&self) -> Vec<String> {
-        self.collections
+        self.inputs
+            .collections
             .iter()
             .map(|collection| collection.name.clone())
             .collect()
@@ -155,7 +156,8 @@ impl Library {
 
     /// Each collection with whether this game is in it, for the picker.
     pub(super) fn memberships_of(&self, id: &str) -> Vec<(String, bool)> {
-        self.collections
+        self.inputs
+            .collections
             .iter()
             .map(|collection| {
                 (

@@ -10,8 +10,8 @@ use gpui::{AnyElement, App, IntoElement, SharedString, Window, div, px};
 use gpui_component::{StyledExt as _, WindowExt as _, h_flex, v_flex};
 use lumilio_core::{GameSettingValue, GameSettingsView, SettingsPreset};
 
-use super::controls::{LiveCtx, send};
-use super::library::{PRESETS_TAB, library_tabs, page_actions};
+use super::page::{PRESET_GROUP, PRESETS_TAB};
+use super::view::{LibraryCtx, page_actions, send, toolbar};
 use crate::assets::UiIcon;
 use crate::game_settings::{OnEdit, OnToggle, PresetIntent};
 use crate::instance_detail::{ProblemAction, SETTINGS_OPTIONS};
@@ -19,23 +19,15 @@ use crate::kit::ViewIntent;
 use crate::live::LiveIntent;
 use crate::{game_settings, kit, theme, tr};
 
-/// The view-state group that remembers which preset the detail shows, by id.
-pub const PRESET_GROUP: u8 = 230;
-
 /// The preset the detail shows: the one last chosen, or the first.
-#[must_use]
-pub fn shown_preset<'a>(
-    presets: &'a [SettingsPreset],
-    state: &crate::pages::ViewState,
-) -> Option<&'a SettingsPreset> {
-    let chosen = i64::try_from(state.choice(PRESET_GROUP, 0)).unwrap_or(0);
+fn shown_preset(presets: &[SettingsPreset], chosen: i64) -> Option<&SettingsPreset> {
     presets
         .iter()
         .find(|preset| preset.id == chosen)
         .or_else(|| presets.first())
 }
 
-fn users<'a>(ctx: &'a LiveCtx, preset: &SettingsPreset) -> Vec<&'a GameSettingsView> {
+fn users<'a>(ctx: &'a LibraryCtx, preset: &SettingsPreset) -> Vec<&'a GameSettingsView> {
     ctx.model
         .game_settings
         .iter()
@@ -47,7 +39,7 @@ fn shared_count(preset: &SettingsPreset) -> usize {
     preset.values.len() - preset.excluded.len()
 }
 
-fn list_item(preset: &SettingsPreset, shown: bool, ctx: &LiveCtx) -> gpui::Stateful<gpui::Div> {
+fn list_item(preset: &SettingsPreset, shown: bool, ctx: &LibraryCtx) -> gpui::Stateful<gpui::Div> {
     let colors = ctx.colors;
     let users = users(ctx, preset);
     let attention = users.iter().any(|view| game_settings::game_status(view).1);
@@ -97,7 +89,7 @@ fn list_item(preset: &SettingsPreset, shown: bool, ctx: &LiveCtx) -> gpui::State
 
 fn confirm_delete(
     preset: &SettingsPreset,
-    ctx: &LiveCtx,
+    ctx: &LibraryCtx,
 ) -> impl Fn(&mut Window, &mut App) + 'static {
     let handler = ctx.handler.clone();
     let (id, name) = (preset.id, preset.name.clone());
@@ -121,7 +113,7 @@ fn confirm_delete(
     }
 }
 
-fn detail_head(preset: &SettingsPreset, used: usize, ctx: &LiveCtx) -> impl IntoElement {
+fn detail_head(preset: &SettingsPreset, used: usize, ctx: &LibraryCtx) -> impl IntoElement {
     let colors = ctx.colors;
     let go = |intent: PresetIntent| send(&ctx.handler, LiveIntent::Preset(intent));
     // ia[library]: 预设：重命名 | 预设详情 ⋯ 菜单「重命名…」→ 弹窗 | 名称 1–80 个字、不与其他预设重名；结果 toast 手动关闭
@@ -181,7 +173,7 @@ fn detail_head(preset: &SettingsPreset, used: usize, ctx: &LiveCtx) -> impl Into
 }
 
 /// The games that follow the preset, each with how it stands.
-fn games(users: &[&GameSettingsView], ctx: &LiveCtx) -> AnyElement {
+fn games(users: &[&GameSettingsView], ctx: &LibraryCtx) -> AnyElement {
     let colors = ctx.colors;
     let title = h_flex()
         .gap_1()
@@ -264,7 +256,7 @@ fn games(users: &[&GameSettingsView], ctx: &LiveCtx) -> AnyElement {
         .into_any_element()
 }
 
-fn detail(preset: &SettingsPreset, ctx: &LiveCtx) -> AnyElement {
+fn detail(preset: &SettingsPreset, ctx: &LibraryCtx) -> AnyElement {
     let colors = ctx.colors;
     let users = users(ctx, preset);
     let needle = ctx.filter.trim().to_lowercase();
@@ -326,7 +318,7 @@ fn detail(preset: &SettingsPreset, ctx: &LiveCtx) -> AnyElement {
         .into_any_element()
 }
 
-pub fn presets(ctx: &LiveCtx) -> AnyElement {
+pub(super) fn presets(ctx: &LibraryCtx) -> AnyElement {
     let colors = ctx.colors;
     let model = ctx.model;
     let new = send(&ctx.handler, LiveIntent::Preset(PresetIntent::New));
@@ -339,7 +331,6 @@ pub fn presets(ctx: &LiveCtx) -> AnyElement {
         new,
     )
     .debug_selector(|| "preset-new".into());
-    let emit = ctx.emit.clone();
     let head = v_flex()
         .w_full()
         .gap_5()
@@ -349,19 +340,7 @@ pub fn presets(ctx: &LiveCtx) -> AnyElement {
             page_actions(create, ctx).render(colors),
             colors,
         ))
-        .child(kit::toolbar(
-            Some(
-                kit::tabs(
-                    "live-library-tabs",
-                    library_tabs(),
-                    PRESETS_TAB,
-                    move |index, window, cx| emit(ViewIntent::LibraryTab(index), window, cx),
-                )
-                .into_any_element(),
-            ),
-            // ia[library]: 预设：搜索选项 | 预设 tab 的 L3 搜索框 | 按名称或值过滤右侧的选项；没有匹配时说一句
-            Some(kit::search_field(&ctx.controls.library_filter, colors)),
-        ));
+        .child(toolbar(PRESETS_TAB, ctx));
     let body = if let Some(error) = model.presets_error.as_ref() {
         kit::scroll_body(
             "presets-error",
@@ -383,7 +362,7 @@ pub fn presets(ctx: &LiveCtx) -> AnyElement {
                 ),
         )
         .into_any_element()
-    } else if let Some(shown) = shown_preset(&model.settings_presets, ctx.state) {
+    } else if let Some(shown) = shown_preset(&model.settings_presets, ctx.view.preset) {
         let list = v_flex()
             .id("preset-list")
             .w(px(240.))

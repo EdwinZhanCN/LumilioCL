@@ -19,7 +19,6 @@ mod routing;
 #[cfg(test)]
 mod tests;
 
-use launcher_shell::Labels;
 pub use launcher_shell::{ActivitySummary, IntentHandler, LauncherShell, ShellIntent};
 
 pub(crate) use self::chrome::sync_appearance;

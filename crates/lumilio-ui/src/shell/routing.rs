@@ -11,9 +11,11 @@ impl LauncherShell {
     }
 
     /// Opens a route's tab directly, for design review.
-    pub fn show_tab(&mut self, route: Route, tab: usize) {
+    pub fn show_tab(&mut self, route: Route, tab: usize, cx: &mut Context<Self>) {
         match route {
-            Route::Library => self.view.library_tab = tab,
+            Route::Library => self
+                .library
+                .update(cx, |library, cx| library.show_tab(tab, cx)),
             Route::Activity => self.view.activity_tab = tab,
             Route::Discover | Route::Home | Route::Accounts | Route::Settings => {}
         }

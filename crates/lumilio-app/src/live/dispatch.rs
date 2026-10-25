@@ -202,8 +202,8 @@ pub(super) fn on_live_intent(
         | LiveIntent::ImportGame
         | LiveIntent::RestoreBackup
         | LiveIntent::RevealGame(_)
-        | LiveIntent::OpenGamesFolder => {}
-        LiveIntent::Preset(intent) => super::game_settings::preset(wiring, intent, window, cx),
+        | LiveIntent::OpenGamesFolder
+        | LiveIntent::Preset(_) => {}
         LiveIntent::OpenInstance(id) => open_instance(wiring, id, None, window, cx),
         LiveIntent::Resolve(id, action) => open_instance(
             wiring,

@@ -8,8 +8,8 @@ use gpui::prelude::*;
 use gpui::{Context, Entity, IntoElement, Render, TestAppContext, Window, div};
 use gpui_component::IndexPath;
 use lumilio_ui::features::discover::model::{count_label, tag_label};
+use lumilio_ui::features::library::LibraryControls;
 use lumilio_ui::i18n::{Locale, generation, locale, set_locale};
-use lumilio_ui::pages::live::LiveControls;
 use lumilio_ui::pages::settings::{list_text, memory_text, tabs};
 
 static LANGUAGE: Mutex<()> = Mutex::new(());
@@ -47,7 +47,7 @@ fn switching_language_changes_the_launcher_and_component_words() {
     assert_eq!(&*gpui_component::locale(), "zh-CN");
 }
 
-struct Host(Entity<LiveControls>);
+struct Host(LibraryControls);
 
 impl Render for Host {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
@@ -60,41 +60,31 @@ fn a_language_switch_relabels_controls_and_keeps_the_choice(cx: &mut TestAppCont
     let _turn = language_turn();
     set_locale(Locale::SimplifiedChinese);
     cx.update(gpui_component::init);
-    let (host, cx) =
-        cx.add_window_view(|window, cx| Host(cx.new(|cx| LiveControls::new(window, cx))));
+    let (host, cx) = cx.add_window_view(|window, cx| Host(LibraryControls::new(window, cx)));
     host.update_in(cx, |host, window, cx| {
-        host.0.update(cx, |controls, cx| {
-            controls.library_sort.update(cx, |sort, cx| {
-                sort.set_selected_index(Some(IndexPath::new(1)), window, cx)
-            });
+        host.0.sort.update(cx, |sort, cx| {
+            sort.set_selected_index(Some(IndexPath::new(1)), window, cx)
         });
     });
 
     set_locale(Locale::English);
-    host.read_with(cx, |host, cx| {
-        assert_ne!(
-            host.0.read(cx).language,
-            generation(),
-            "the switch is noticed"
-        );
+    host.read_with(cx, |host, _| {
+        assert_ne!(host.0.language, generation(), "the switch is noticed");
     });
-    host.update_in(cx, |host, window, cx| {
-        host.0
-            .update(cx, |controls, cx| controls.relabel(window, cx));
-    });
+    host.update_in(cx, |host, window, cx| host.0.relabel(window, cx));
     host.read_with(cx, |host, cx| {
-        let controls = host.0.read(cx);
+        let controls = &host.0;
         assert_eq!(controls.language, generation());
         assert_eq!(
             controls
-                .library_filter
+                .filter
                 .read(cx)
                 .presentation()
                 .placeholder()
                 .as_ref(),
             "Search games"
         );
-        let sort = controls.library_sort.read(cx);
+        let sort = controls.sort.read(cx);
         assert_eq!(sort.selected_index(cx), Some(IndexPath::new(1)));
         assert_eq!(sort.selected_value().map(String::as_str), Some("Name"));
     });

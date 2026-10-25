@@ -2,6 +2,7 @@ use gpui::{Context, Window};
 use lumilio_core::{DiscoverPreferences, ProjectKind};
 
 use super::{ActivitySummary, LauncherShell};
+use crate::features::library::LibraryInputs;
 use crate::kit::ViewIntent;
 use crate::live::{LiveHandler, LiveModel};
 use crate::pages::ViewState;
@@ -25,10 +26,17 @@ impl LauncherShell {
         if let Some(model) = &mut self.live {
             change(model);
             self.activity = ActivitySummary::new(model.active_tasks());
-            let collections = model.collections.clone();
+            let inputs = LibraryInputs {
+                library: model.library.clone(),
+                library_loaded: model.library_loaded,
+                collections: model.collections.clone(),
+                settings_presets: model.settings_presets.clone(),
+                presets_error: model.presets_error.clone(),
+                game_settings: model.game_settings.clone(),
+            };
             self.sync_discover(cx);
             self.library
-                .update(cx, |library, _| library.set_collections(collections));
+                .update(cx, |library, cx| library.set_inputs(inputs, cx));
             cx.notify();
         }
     }
@@ -87,19 +95,6 @@ impl LauncherShell {
     }
 
     /// Applies a page intent to the view state only.
-    /// The Library's ordering and loader filter outlive this run: tell the
-    /// application when either changes.
-    pub(super) fn remember_library_view(&mut self, intent: ViewIntent, cx: &mut Context<Self>) {
-        use crate::pages::live::{LIBRARY_LOADER, LIBRARY_SORT};
-        if !matches!(intent, ViewIntent::Choose(LIBRARY_SORT | LIBRARY_LOADER, _)) {
-            return;
-        }
-        let sort = u8::try_from(self.view.choice(LIBRARY_SORT, 0)).unwrap_or(0);
-        let loader = u8::try_from(self.view.choice(LIBRARY_LOADER, 0)).unwrap_or(0);
-        self.library
-            .update(cx, |library, cx| library.remember_view(sort, loader, cx));
-    }
-
     pub fn apply_view_intent(&mut self, intent: ViewIntent, cx: &mut Context<Self>) {
         self.view.apply(intent);
         cx.notify();

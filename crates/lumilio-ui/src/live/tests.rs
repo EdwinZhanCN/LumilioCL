@@ -13,7 +13,7 @@ use super::activity::{
 };
 use super::home::home_presentation;
 use super::library::{
-    CollectionRow, attention_rows, library_card, library_cards, relative_time, seed_of, world_of,
+    attention_rows, library_card, library_cards, relative_time, seed_of, world_of,
 };
 use super::settings::settings_view;
 use crate::features::discover::model::{
@@ -555,33 +555,6 @@ fn an_activity_tab_shows_only_its_category_and_all_shows_everything() {
     assert_eq!(installs, ["i", "i2"]);
     assert!(activity_in_tab(&rows, 3).is_empty());
     assert_eq!(activity_in_tab(&rows, 99).len(), 4, "unknown tab = all");
-}
-
-#[test]
-fn a_collection_lists_its_games_that_still_exist() {
-    let card = |id: &str| library_card(&record(id, false, None, 1), NOW);
-    let mut model = LiveModel::default();
-    model.set_library(vec![card("a"), card("b"), card("c")]);
-    model.collections = vec![
-        CollectionRow {
-            name: "生存".into(),
-            members: vec!["c".into(), "gone".into(), "a".into()],
-        },
-        CollectionRow {
-            name: "空".into(),
-            members: Vec::new(),
-        },
-    ];
-    let ids: Vec<_> = model
-        .collection_cards(&model.collections[0])
-        .iter()
-        .map(|card| card.id.as_str())
-        .collect();
-    assert_eq!(
-        ids,
-        ["c", "a"],
-        "kept in the order added; deleted games are skipped"
-    );
 }
 
 #[test]
