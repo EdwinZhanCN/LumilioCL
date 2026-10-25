@@ -28,10 +28,10 @@ fn new_game_answers_dropped_files_and_the_application_the_rest(cx: &mut TestAppC
             window,
             cx,
         );
-        handler(LiveIntent::Refresh, window, cx);
+        handler(LiveIntent::ApplyUpdate, window, cx);
     });
     cx.run_until_parked();
-    assert_eq!(reached.borrow().as_slice(), [LiveIntent::Refresh]);
+    assert_eq!(reached.borrow().as_slice(), [LiveIntent::ApplyUpdate]);
     shell.read_with(cx, |shell, cx| {
         assert_eq!(
             shell.pending_toasts(cx).len(),

@@ -4,39 +4,24 @@ use std::rc::Rc;
 use gpui_kit::{App, AppContext as _, Context, Entity, WeakEntity, Window};
 use lumilio_core::{Preferences, ProjectKind};
 use lumilio_ui::LauncherShell;
-use lumilio_ui::features::accounts::AccountsEvent;
-use lumilio_ui::features::activity::ActivityEvent;
 use lumilio_ui::features::discover::DiscoverEvent;
-use lumilio_ui::features::game::{GameEvent, GameWindows};
-use lumilio_ui::features::launch::LaunchEvent;
+use lumilio_ui::features::game::GameWindows;
 use lumilio_ui::features::library::LibraryEvent;
-use lumilio_ui::features::new_game::NewGameEvent;
 use lumilio_ui::features::settings::SettingsEvent;
 use lumilio_ui::home::HomePresentation;
 use lumilio_ui::instance_detail::TAB_WORLDS;
 use lumilio_ui::live::{LiveHandler, LiveIntent};
 use lumilio_ui::route::Route;
-use lumilio_ui::shell::{IntentHandler, ShellIntent};
 use lumilio_ui::toast::Toast;
 
-use super::dispatch::{on_live_intent, on_shell_intent};
-use super::jobs::reload;
+use super::dispatch::on_live_intent;
 use super::open_game::open_instance;
 use super::settings::{apply_preferences, apply_saved_preferences};
-use super::{context, jobs, recovery_review, terms, update};
+use super::{recovery_review, terms, update};
 use crate::backend::Backend;
-
-/// How many finished tasks the Activity page lists.
-pub(super) const ACTIVITY_LIMIT: usize = 30;
 
 #[derive(Default)]
 pub(super) struct State {
-    /// An older list snapshot cannot replace a newer request.
-    pub(super) reload_seq: u64,
-    /// The background checks of Home's games now running.
-    pub(super) home_diagnostics: Option<tokio::task::AbortHandle>,
-    /// Each game's last checks, for Home's 需要留意.
-    pub(super) home_checks: Option<context::Checked>,
     /// The saved preferences, which a page's remembered choices are saved with.
     pub(super) preferences: Preferences,
     /// Commands for the background update service.
@@ -48,16 +33,6 @@ pub(super) struct Wiring {
     pub(super) backend: Rc<Backend>,
     pub(super) shell: WeakEntity<LauncherShell>,
     pub(super) state: Rc<RefCell<State>>,
-}
-
-/// What to reload once a job finishes. What follows the current game, the
-/// library, accounts, Java and plugins is not chosen here: core publishes
-/// those changes and [`context::follow`] works them out again.
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub(super) enum Reload {
-    Nothing,
-    /// Activity, with the lists beside it.
-    Lists,
 }
 
 /// Builds the production shell from stores opened before the UI loop starts.
@@ -74,14 +49,6 @@ pub fn build(backend: Backend, window: &mut Window, cx: &mut App) -> Entity<Laun
             shell: cx.weak_entity(),
             state: state.clone(),
         };
-        let on_shell = {
-            let wiring = wiring.clone();
-            Rc::new(
-                move |intent: ShellIntent, window: &mut Window, cx: &mut App| {
-                    on_shell_intent(&wiring, intent, window, cx);
-                },
-            ) as IntentHandler
-        };
         let on_live = {
             let wiring = wiring.clone();
             Rc::new(
@@ -92,7 +59,6 @@ pub fn build(backend: Backend, window: &mut Window, cx: &mut App) -> Entity<Laun
         };
         LauncherShell::new(cx)
             .with_home(HomePresentation::Loading, cx)
-            .with_intent_handler(on_shell)
             .with_live(on_live)
             .with_worker(backend.worker(), cx)
     });
@@ -102,16 +68,11 @@ pub fn build(backend: Backend, window: &mut Window, cx: &mut App) -> Entity<Laun
         state,
     };
     follow_discover(&wiring, &shell, cx);
-    follow_new_game(&wiring, &shell, cx);
     follow_library(&wiring, &shell, cx);
-    follow_activity(&wiring, &shell, cx);
     follow_settings(&wiring, &shell, cx);
-    follow_accounts(&wiring, &shell, cx);
-    follow_game(&wiring, &shell, cx);
-    follow_launch(&wiring, &shell, cx);
+    set_game_windows(&shell, cx);
     update::start(&wiring, cx);
-    context::follow(&wiring, cx);
-    reload(&wiring, Reload::Lists, cx);
+    shell.update(cx, |shell, cx| shell.follow_launcher(cx));
     apply_saved_preferences(&wiring, window.window_handle(), cx);
     terms::ask(&wiring, window.window_handle(), cx);
     open_requested_page(&wiring, &shell, window, cx);
@@ -122,37 +83,23 @@ pub fn build(backend: Backend, window: &mut Window, cx: &mut App) -> Entity<Laun
     shell
 }
 
-/// Passes on what Discover tells the application: its installs changed the
-/// tasks Activity lists, or what it remembers between visits changed.
+/// Saves what Discover remembers between visits. The shell answers the rest.
 fn follow_discover(wiring: &Wiring, shell: &Entity<LauncherShell>, cx: &mut App) {
     let discover = shell.read(cx).discover().clone();
     let wiring = wiring.clone();
-    cx.subscribe(&discover, move |_, event: &DiscoverEvent, cx| match event {
-        DiscoverEvent::TasksChanged => reload(&wiring, Reload::Lists, cx),
+    cx.subscribe(&discover, move |_, event: &DiscoverEvent, _| match event {
+        DiscoverEvent::TasksChanged | DiscoverEvent::ProjectOpened(_) => {}
         DiscoverEvent::Remember(discover) => {
             remember(&wiring, |preferences| {
                 preferences.discover = discover.clone();
             });
         }
-        DiscoverEvent::ProjectOpened(_) => {}
-    })
-    .detach();
-}
-
-/// Passes on what Activity tells the application: the tasks changed, or a
-/// task ran again and may have changed what a game has.
-fn follow_activity(wiring: &Wiring, shell: &Entity<LauncherShell>, cx: &mut App) {
-    let activity = shell.read(cx).activity_page().clone();
-    let wiring = wiring.clone();
-    cx.subscribe(&activity, move |_, event: &ActivityEvent, cx| match event {
-        ActivityEvent::ListsChanged => reload(&wiring, Reload::Lists, cx),
-        ActivityEvent::Retried => jobs::installed_changed(&wiring, cx),
     })
     .detach();
 }
 
 /// Passes on what Settings tells the application: saved preferences to
-/// apply, the updater's switch and check, and a Java download in Activity.
+/// apply, and the updater's switch and check.
 fn follow_settings(wiring: &Wiring, shell: &Entity<LauncherShell>, cx: &mut App) {
     let settings = shell.read(cx).settings_page().clone();
     let wiring = wiring.clone();
@@ -168,34 +115,18 @@ fn follow_settings(wiring: &Wiring, shell: &Entity<LauncherShell>, cx: &mut App)
         }
         SettingsEvent::AutoUpdate(enabled) => update::set_automatic(&wiring, *enabled),
         SettingsEvent::CheckUpdates => update::check_manually(&wiring),
-        SettingsEvent::TasksChanged => reload(&wiring, Reload::Lists, cx),
-        // The shell tells the game pages.
-        SettingsEvent::PluginsRead(_) => {}
+        // The shell reads the lists again and tells the game pages.
+        SettingsEvent::TasksChanged | SettingsEvent::PluginsRead(_) => {}
     })
     .detach();
 }
 
-/// Passes on what Accounts tells the application: an account's look changed
-/// where the lists show it.
-fn follow_accounts(wiring: &Wiring, shell: &Entity<LauncherShell>, cx: &mut App) {
-    let accounts = shell.read(cx).accounts().clone();
-    let wiring = wiring.clone();
-    cx.subscribe(&accounts, move |_, event: &AccountsEvent, cx| {
-        // The shell answers the rest.
-        if *event == AccountsEvent::ListsChanged {
-            reload(&wiring, Reload::Lists, cx);
-        }
-    })
-    .detach();
-}
-
-/// Passes on what the Library tells the application: the lists changed, or
-/// how the page is ordered and filtered.
+/// Saves how the Library is ordered and filtered. The shell answers the rest.
 fn follow_library(wiring: &Wiring, shell: &Entity<LauncherShell>, cx: &mut App) {
     let library = shell.read(cx).library().clone();
     let wiring = wiring.clone();
-    cx.subscribe(&library, move |_, event: &LibraryEvent, cx| match *event {
-        LibraryEvent::ListsChanged => reload(&wiring, Reload::Lists, cx),
+    cx.subscribe(&library, move |_, event: &LibraryEvent, _| match *event {
+        LibraryEvent::ListsChanged => {}
         LibraryEvent::Remember { sort, loader } => {
             remember(&wiring, |preferences| {
                 preferences.library_sort = sort;
@@ -222,48 +153,8 @@ fn remember(wiring: &Wiring, change: impl FnOnce(&mut Preferences)) {
     );
 }
 
-/// Makes `id` the current game, through the shell. Deferred: this may run
-/// inside one of the shell's own updates.
-pub(super) fn choose_current(wiring: &Wiring, id: String, cx: &mut App) {
-    let shell = wiring.shell.clone();
-    cx.defer(move |cx| {
-        let _ = shell.update(cx, |shell, cx| shell.choose_current(id, cx));
-    });
-}
-
-/// Passes on what making games tells the application: the lists changed, a
-/// new game is shown and made current, an open game page reads its download.
-fn follow_new_game(wiring: &Wiring, shell: &Entity<LauncherShell>, cx: &mut App) {
-    let new_game = shell.read(cx).new_game().clone();
-    let wiring = wiring.clone();
-    cx.subscribe(&new_game, move |_, event: &NewGameEvent, cx| match event {
-        NewGameEvent::TasksChanged => reload(&wiring, Reload::Lists, cx),
-        NewGameEvent::Created { id, window } => {
-            let (wiring, id) = (wiring.clone(), id.clone());
-            let _ = cx.update_window(*window, move |_, window, cx| {
-                open_instance(&wiring, id.clone(), None, window, cx);
-                choose_current(&wiring, id, cx);
-            });
-        }
-        NewGameEvent::Installed(id) => {
-            let open = wiring.shell.read_with(cx, |shell, cx| {
-                let view = shell
-                    .live_instance()
-                    .filter(|view| view.read(cx).id() == id)
-                    .cloned();
-                view.map(|view| (shell.game().clone(), view))
-            });
-            if let Ok(Some((game, view))) = open {
-                game.update(cx, |game, cx| game.reload(&view, cx));
-            }
-        }
-    })
-    .detach();
-}
-
-/// Passes on what a game's page tells the application: the lists changed, or
-/// a page opened that should show what its running game printed so far.
-fn follow_game(wiring: &Wiring, shell: &Entity<LauncherShell>, cx: &mut App) {
+/// Where the game pages open their own windows.
+fn set_game_windows(shell: &Entity<LauncherShell>, cx: &mut App) {
     let game = shell.read(cx).game().clone();
     game.update(cx, |game, _| {
         game.set_windows(GameWindows {
@@ -271,27 +162,6 @@ fn follow_game(wiring: &Wiring, shell: &Entity<LauncherShell>, cx: &mut App) {
             studio_size: crate::review_size_hint(),
         });
     });
-    let wiring = wiring.clone();
-    cx.subscribe(&game, move |_, event: &GameEvent, cx| {
-        // The shell answers the rest.
-        if *event == GameEvent::ListsChanged {
-            reload(&wiring, Reload::Lists, cx);
-        }
-    })
-    .detach();
-}
-
-/// Reads the lists again when a launch, or its game, is over.
-fn follow_launch(wiring: &Wiring, shell: &Entity<LauncherShell>, cx: &mut App) {
-    let launch = shell.read(cx).launch().clone();
-    let wiring = wiring.clone();
-    cx.subscribe(&launch, move |_, event: &LaunchEvent, cx| {
-        // The shell answers the rest.
-        if *event == LaunchEvent::Ended {
-            reload(&wiring, Reload::Lists, cx);
-        }
-    })
-    .detach();
 }
 
 /// Dev hook: `LUMILIO_PAGE=library|discover|activity|accounts` opens that page, so a

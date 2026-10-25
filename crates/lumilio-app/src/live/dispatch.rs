@@ -1,24 +1,8 @@
 use gpui_kit::{App, Window};
 use lumilio_ui::live::LiveIntent;
-use lumilio_ui::route::Route;
-use lumilio_ui::shell::ShellIntent;
 use lumilio_ui::toast::Toast;
 
-use super::jobs::reload;
-use super::{Reload, Wiring, update};
-
-pub(super) fn on_shell_intent(wiring: &Wiring, intent: ShellIntent, _: &mut Window, cx: &mut App) {
-    match intent {
-        ShellIntent::Navigate(Route::Library | Route::Activity | Route::Accounts) => {
-            reload(wiring, Reload::Lists, cx)
-        }
-        // Discover loads its own first page and Settings reads its own
-        // settings (the shell tells them they were shown), and the shell
-        // answers Home: it launches, stops, explains and opens New Game.
-        ShellIntent::Navigate(Route::Home | Route::Discover | Route::Settings)
-        | ShellIntent::Home(_) => {}
-    }
-}
+use super::{Wiring, update};
 
 pub(super) fn on_live_intent(wiring: &Wiring, intent: LiveIntent, _: &mut Window, cx: &mut App) {
     match intent {
@@ -87,12 +71,9 @@ pub(super) fn on_live_intent(wiring: &Wiring, intent: LiveIntent, _: &mut Window
         | LiveIntent::DeleteGameOf(_)
         | LiveIntent::ExportPackOf(_)
         | LiveIntent::Play(_)
-        | LiveIntent::PlayPlace(..) => {}
+        | LiveIntent::PlayPlace(..)
+        | LiveIntent::Refresh => {}
         LiveIntent::ApplyUpdate => update::apply(wiring, cx),
-        LiveIntent::Refresh => {
-            reload(wiring, Reload::Lists, cx);
-            super::context::check_again(wiring, cx);
-        }
         LiveIntent::CopyText { text, notice } => {
             lumilio_ui::toast::copy_text(text, cx);
             let _ = wiring

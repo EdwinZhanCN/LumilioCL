@@ -7,6 +7,7 @@ use super::LauncherShell;
 use super::features::play;
 use super::locations::Location;
 use crate::features::game::GameWork;
+use crate::features::new_game::NewGameEvent;
 use crate::instance_detail::{InstanceDetailView, InstanceHandler, InstanceIntent};
 use crate::live::PlaceTarget;
 use crate::route::Route;
@@ -54,6 +55,36 @@ impl LauncherShell {
     ) {
         let view = self.open_game(id, None, window, cx);
         view.update(cx, |view, cx| view.open_tab(tab, window, cx));
+    }
+
+    /// A new game is shown in the window it was made in and becomes the
+    /// current game; an open page of a game whose download ended reads it
+    /// again. Deferred: making games tells the shell inside its updates.
+    pub(super) fn new_game_event(&mut self, event: &NewGameEvent, cx: &mut Context<Self>) {
+        match event {
+            NewGameEvent::TasksChanged => {}
+            NewGameEvent::Created { id, window } => {
+                let (this, id, window) = (self.this.clone(), id.clone(), *window);
+                cx.defer(move |cx| {
+                    let _ = cx.update_window(window, |_, window, cx| {
+                        let _ = this.update(cx, |shell, cx| {
+                            shell.open_game(id.clone(), None, window, cx);
+                            shell.choose_current(id, cx);
+                        });
+                    });
+                });
+            }
+            NewGameEvent::Installed(id) => {
+                let open = self
+                    .live_instance
+                    .as_ref()
+                    .filter(|view| view.read(cx).id() == id)
+                    .cloned();
+                if let Some(view) = open {
+                    self.game.update(cx, |game, cx| game.reload(&view, cx));
+                }
+            }
+        }
     }
 
     /// Opens a fresh, stable-ID view. Async results update this entity only.

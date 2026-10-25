@@ -171,6 +171,12 @@ pub(super) fn route(shell: &LauncherShell, app: LiveHandler) -> LiveHandler {
         }
         LiveIntent::Play(id) => play(&this, id, None, window, cx),
         LiveIntent::PlayPlace(id, target) => play(&this, id, Some(target), window, cx),
+        LiveIntent::Refresh => {
+            let this = this.clone();
+            window.defer(cx, move |_, cx| {
+                let _ = this.update(cx, |shell, cx| shell.refresh(cx));
+            });
+        }
         other => app(other, window, cx),
     })
 }

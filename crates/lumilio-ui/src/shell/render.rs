@@ -28,16 +28,16 @@ impl Render for LauncherShell {
             focus: colors.focus,
             danger: colors.danger,
         };
-        let home_handler = self.intent_handler.as_ref().map(|_| {
+        let home_handler = {
             let callback = cx.listener(|this, intent: &HomeIntent, window, cx| {
                 this.emit(ShellIntent::Home(*intent), window, cx);
             });
-            Rc::new(
+            Some(Rc::new(
                 move |intent: HomeIntent, window: &mut Window, cx: &mut App| {
                     callback(&intent, window, cx)
                 },
-            ) as home::HomeIntentHandler
-        });
+            ) as home::HomeIntentHandler)
+        };
         let route_callback = cx.listener(|this, route: &Route, window, cx| {
             this.select_route(*route, window, cx);
         });

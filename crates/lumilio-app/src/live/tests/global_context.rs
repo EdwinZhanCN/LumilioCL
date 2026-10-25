@@ -14,16 +14,16 @@ use std::time::{Duration, Instant};
 
 use gpui_kit::{AppContext as _, Entity, TestAppContext, VisualTestContext};
 use lumilio_core::{HistoryEvent, Loader, ProjectKind, SessionOutcome};
+use lumilio_ui::LauncherShell;
 use lumilio_ui::home::HomePresentation;
 use lumilio_ui::instance_detail::InstanceIntent;
 use lumilio_ui::live::{LiveIntent, attention_rows, library_cards};
 use lumilio_ui::route::Route;
-use lumilio_ui::{LauncherShell, ShellIntent};
 
-use super::super::context::follow;
-use super::super::dispatch::{on_live_intent, on_shell_intent};
+use super::super::dispatch::on_live_intent;
 use super::super::open_game::open_instance;
 use super::super::{State, Wiring};
+use super::follow;
 use crate::backend::{Backend, Service};
 
 const WAIT: Duration = Duration::from_secs(10);
@@ -73,19 +73,6 @@ pub(super) fn open(
             },
         )
     };
-    let shell_intents = {
-        let cell = cell.clone();
-        Rc::new(
-            move |intent: ShellIntent, window: &mut gpui_kit::Window, cx: &mut gpui_kit::App| {
-                if matches!(intent, ShellIntent::Navigate(Route::Discover)) {
-                    return;
-                }
-                if let Some(wiring) = cell.borrow().clone() {
-                    on_shell_intent(&wiring, intent, window, cx);
-                }
-            },
-        )
-    };
     let worker = backend.worker();
     let slot: Rc<RefCell<Option<Entity<LauncherShell>>>> = Rc::default();
     let keep = slot.clone();
@@ -94,7 +81,6 @@ pub(super) fn open(
             LauncherShell::new(cx)
                 .with_home(HomePresentation::Loading, cx)
                 .with_live(live)
-                .with_intent_handler(shell_intents)
                 .with_worker(worker, cx)
         });
         *keep.borrow_mut() = Some(shell.clone());
@@ -219,7 +205,7 @@ fn home_attention_follows_the_current_account(cx: &mut TestAppContext) {
         service.add_account("Steve", None).await
     })
     .unwrap();
-    cx.update(|_, cx| follow(&wiring, cx));
+    cx.update(|_, cx| follow(&shell, cx));
     until(cx, "Home's first check", |cx| {
         shell.read_with(cx, |shell, _| shell.live().unwrap().library_loaded)
             && attention(&shell, cx) == attention_now(&wiring)
@@ -264,7 +250,7 @@ fn home_attention_follows_the_java_settings(cx: &mut TestAppContext) {
         service.add_account("Steve", None).await
     })
     .unwrap();
-    cx.update(|_, cx| follow(&wiring, cx));
+    cx.update(|_, cx| follow(&shell, cx));
     until(cx, "Home's first check", |cx| {
         shell.read_with(cx, |shell, _| shell.live().unwrap().library_loaded)
             && attention(&shell, cx) == attention_now(&wiring)
@@ -301,7 +287,7 @@ fn browsing_for_a_game_makes_it_the_current_game(cx: &mut TestAppContext) {
         move |service| async move { service.set_current_instance(&a).await }
     })
     .unwrap();
-    cx.update(|_, cx| follow(&wiring, cx));
+    cx.update(|_, cx| follow(&shell, cx));
     until(cx, "Home to continue A", |cx| {
         continue_subject(&shell, cx).as_deref() == Some(a.as_str())
     });
@@ -347,7 +333,7 @@ fn choosing_another_game_while_browsing_ends_the_browsing(cx: &mut TestAppContex
     let (shell, wiring, cx) = open(cx);
     let x = game(&wiring, "X", "1.20.1");
     let z = game(&wiring, "Z", "1.21.1");
-    cx.update(|_, cx| follow(&wiring, cx));
+    cx.update(|_, cx| follow(&shell, cx));
     until(cx, "the library", |cx| {
         shell.read_with(cx, |shell, _| shell.live().unwrap().library.len() == 2)
     });
@@ -398,7 +384,7 @@ fn recovering_a_failed_launch_retries_the_same_game(cx: &mut TestAppContext) {
         }
     })
     .unwrap();
-    cx.update(|_, cx| follow(&wiring, cx));
+    cx.update(|_, cx| follow(&shell, cx));
     until(cx, "Home to continue A", |cx| {
         continue_subject(&shell, cx).as_deref() == Some(a.as_str())
     });
@@ -459,7 +445,7 @@ fn choosing_another_game_leaves_a_failed_launch_to_needs_attention(cx: &mut Test
         service.add_account("Steve", None).await
     })
     .unwrap();
-    cx.update(|_, cx| follow(&wiring, cx));
+    cx.update(|_, cx| follow(&shell, cx));
     until(cx, "Home's first check", |cx| {
         shell.read_with(cx, |shell, _| shell.live().unwrap().library_loaded)
             && attention_in_full(&shell, cx) == attention_now_in_full(&wiring)

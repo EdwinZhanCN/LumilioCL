@@ -5,7 +5,7 @@
 use gpui_kit::component::WindowExt as _;
 use gpui_kit::{Modifiers, TestAppContext};
 
-use super::super::context::follow;
+use super::follow;
 use super::global_context::{ask, continue_subject, failed_attempts, game, open, until};
 
 #[gpui_kit::test]
@@ -24,7 +24,7 @@ fn a_game_whose_folder_is_gone_is_asked_about_before_it_starts(cx: &mut TestAppC
     .unwrap();
     let folder = wiring.backend.service.game_dir(&a);
     std::fs::remove_dir_all(&folder).unwrap();
-    cx.update(|_, cx| follow(&wiring, cx));
+    cx.update(|_, cx| follow(&shell, cx));
     until(cx, "Home to continue A", |cx| {
         continue_subject(&shell, cx).as_deref() == Some(a.as_str())
     });
