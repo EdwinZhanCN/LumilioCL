@@ -193,8 +193,7 @@ fn a_deleted_instance_drops_out_of_history_and_the_chip_retargets(cx: &mut TestA
         .expect("the list opened");
     cx.simulate_click(second.center(), Modifiers::none());
     cx.run_until_parked();
-    assert_eq!(
-        seen.borrow().last(),
-        Some(&LiveIntent::InstallTarget("b".into()))
-    );
+    shell.read_with(cx, |shell, _| {
+        assert_eq!(shell.current_choices.chosen, ["b"], "the shell saves it");
+    });
 }

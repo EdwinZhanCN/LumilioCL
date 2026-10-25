@@ -15,7 +15,6 @@ mod instance_plugins;
 mod instance_write;
 mod jobs;
 mod launch;
-mod library;
 mod logs;
 mod settings;
 mod terms;

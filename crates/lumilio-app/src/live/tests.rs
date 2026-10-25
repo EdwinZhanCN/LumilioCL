@@ -21,7 +21,7 @@ fn home_snapshot_and_rapid_selection_keep_the_last_game(cx: &mut gpui_kit::TestA
     use lumilio_ui::home::HomePresentation;
 
     use super::context::follow;
-    use super::library::choose_current;
+    use super::wiring::choose_current;
     use super::{State, Wiring};
     use crate::backend::Backend;
 
@@ -42,10 +42,12 @@ fn home_snapshot_and_rapid_selection_keep_the_last_game(cx: &mut gpui_kit::TestA
     }))
     .unwrap();
     cx.update(gpui_kit::init);
+    let worker = backend.worker();
     let shell = cx.new(|cx| {
         LauncherShell::new(cx)
             .with_home(HomePresentation::Loading, cx)
             .with_live(Rc::new(|_, _, _| {}))
+            .with_worker(worker, cx)
     });
     let wiring = Wiring {
         backend: Rc::new(backend),
@@ -430,7 +432,7 @@ fn curseforge_through_the_page(cx: &mut gpui_kit::TestAppContext) {
     use super::context::follow;
     use super::dispatch::on_live_intent;
     use super::instance_write::write_instance;
-    use super::library::choose_current;
+    use super::wiring::choose_current;
     use super::{State, Wiring};
     use crate::backend::Backend;
 

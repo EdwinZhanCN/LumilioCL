@@ -16,9 +16,6 @@ use super::accounts::{
 use super::instance::open_instance;
 use super::jobs::{failed_only, job, outcome, reload, retry_task};
 use super::launch::{play, start_launch, technical_details};
-use super::library::{
-    ask_collection_name, ask_collections_of, choose_current, import_game, restore_backup,
-};
 use super::settings::{
     add_java, apply_preferences, change_setting, check_reclaimable, clear_cache,
     export_diagnostics, install_java, load_settings, reclaim, reload_themes, set_wallpaper,
@@ -192,8 +189,20 @@ pub(super) fn on_live_intent(
     cx: &mut App,
 ) {
     match intent {
-        // The shell's New Game answers these; they never reach here.
-        LiveIntent::NewInstance | LiveIntent::ImportPack | LiveIntent::DropFiles(_) => {}
+        // The shell and its features answer these; they never reach here.
+        LiveIntent::NewInstance
+        | LiveIntent::ImportPack
+        | LiveIntent::DropFiles(_)
+        | LiveIntent::InstallTarget(_)
+        | LiveIntent::ToggleFavorite(_)
+        | LiveIntent::NewCollection
+        | LiveIntent::RenameCollection(_)
+        | LiveIntent::DeleteCollection(_)
+        | LiveIntent::EditCollections(_)
+        | LiveIntent::ImportGame
+        | LiveIntent::RestoreBackup
+        | LiveIntent::RevealGame(_)
+        | LiveIntent::OpenGamesFolder => {}
         LiveIntent::Preset(intent) => super::game_settings::preset(wiring, intent, window, cx),
         LiveIntent::OpenInstance(id) => open_instance(wiring, id, None, window, cx),
         LiveIntent::Resolve(id, action) => open_instance(
@@ -209,27 +218,12 @@ pub(super) fn on_live_intent(
         LiveIntent::DeleteGameOf(id) => {
             open_instance(wiring, id, Some(InstanceIntent::AskDelete), window, cx)
         }
-        LiveIntent::RevealGame(id) => {
-            cx.reveal_path(&wiring.backend.service.game_dir(&id));
-        }
         LiveIntent::ExportPackOf(id) => {
             open_instance(wiring, id, Some(InstanceIntent::ExportPack), window, cx)
         }
         LiveIntent::Refresh => {
             reload(wiring, Reload::Lists, cx);
             super::context::check_again(wiring, cx);
-        }
-        LiveIntent::ToggleFavorite(id) => {
-            let service = wiring.backend.service.clone();
-            job(
-                wiring,
-                cx,
-                false,
-                Reload::Lists,
-                None,
-                async move { service.toggle_favorite(&id).await },
-                |shell, result, cx| failed_only(shell, result, tr!("library-favorite-failed"), cx),
-            );
         }
         LiveIntent::CancelTask(id) => {
             // The task finishes on its own terms; the next poll shows the outcome.
@@ -256,31 +250,6 @@ pub(super) fn on_live_intent(
                 |shell, result, cx| failed_only(shell, result, tr!("activity-clear-failed"), cx),
             );
         }
-        LiveIntent::NewCollection => ask_collection_name(wiring, None, window, cx),
-        LiveIntent::RenameCollection(name) => ask_collection_name(wiring, Some(name), window, cx),
-        LiveIntent::DeleteCollection(name) => {
-            let service = wiring.backend.service.clone();
-            job(
-                wiring,
-                cx,
-                false,
-                Reload::Lists,
-                None,
-                async move { service.delete_collection(&name).await.map(|()| name) },
-                |shell, result, cx| {
-                    shell.toast(
-                        outcome(
-                            result,
-                            |name| tr!("collection-deleted", name = name.as_str()),
-                            tr!("collection-delete-failed").to_owned(),
-                        ),
-                        cx,
-                    )
-                },
-            );
-        }
-        LiveIntent::EditCollections(id) => ask_collections_of(wiring, id, window, cx),
-        LiveIntent::InstallTarget(id) => choose_current(wiring, id, cx),
         LiveIntent::NewAccount => open_add_account(wiring, false, window, cx),
         LiveIntent::MicrosoftSignIn => open_microsoft_sign_in(wiring, window, cx),
         LiveIntent::ThirdPartySignIn => open_third_party_sign_in(wiring, window, cx),
@@ -415,21 +384,6 @@ pub(super) fn on_live_intent(
         }
         LiveIntent::EditPluginSetting { id, key } => {
             super::settings::edit_plugin_setting(wiring, id, key, window, cx);
-        }
-        LiveIntent::RememberLibraryView { sort, loader } => {
-            let preferences = {
-                let mut state = wiring.state.borrow_mut();
-                state.preferences.library_sort = sort;
-                state.preferences.library_loader = loader;
-                state.preferences.clone()
-            };
-            // Quiet: a failure to remember a sort order is not worth a message.
-            let service = wiring.backend.service.clone();
-            drop(
-                wiring
-                    .backend
-                    .spawn(async move { service.set_preferences(preferences).await }),
-            );
         }
         LiveIntent::ReloadThemes => reload_themes(wiring, window.window_handle(), cx),
         LiveIntent::SetWallpaper(path) => set_wallpaper(wiring, path, window, cx),
@@ -596,11 +550,6 @@ pub(super) fn on_live_intent(
                 cx,
             );
         }
-        LiveIntent::OpenGamesFolder => {
-            cx.reveal_path(&wiring.backend.service.layout().profiles());
-        }
-        LiveIntent::RestoreBackup => restore_backup(wiring, cx),
-        LiveIntent::ImportGame => import_game(wiring, window, cx),
         LiveIntent::Reveal(path) => platform::reveal(&path, cx),
         LiveIntent::ClearCache => clear_cache(wiring, cx),
         LiveIntent::ClearMapCache => super::settings::clear_map_cache(wiring, cx),

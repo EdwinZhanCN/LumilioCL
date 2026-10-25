@@ -49,7 +49,7 @@ pub fn describe(game: &FoundGame) -> String {
 }
 
 pub struct GamePicker {
-    rows: Vec<(FoundGame, bool)>,
+    pub(super) rows: Vec<(FoundGame, bool)>,
     handler: PickHandler,
 }
 
@@ -140,6 +140,3 @@ impl Render for GamePicker {
             }))
     }
 }
-
-#[cfg(test)]
-mod tests;

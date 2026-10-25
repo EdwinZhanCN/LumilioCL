@@ -1,6 +1,8 @@
-use lumilio_core::Loader;
+use std::rc::Rc;
 
-use super::*;
+use lumilio_core::{FoundGame, GameOrigin, Loader};
+
+use super::super::game_picker::*;
 
 fn game(name: &str, loader: Loader) -> FoundGame {
     FoundGame {

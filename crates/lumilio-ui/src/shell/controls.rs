@@ -38,7 +38,7 @@ impl LauncherShell {
             cx.subscribe_in(
                 &library_sort,
                 window,
-                |this, _, event: &SelectEvent<Labels>, window, cx| {
+                |this, _, event: &SelectEvent<Labels>, _, cx| {
                     if let SelectEvent::Confirm(Some(label)) = event
                         && let Some(at) = pages::live::sort_labels()
                             .iter()
@@ -46,7 +46,7 @@ impl LauncherShell {
                     {
                         let intent = ViewIntent::Choose(pages::live::LIBRARY_SORT, at);
                         this.apply_view_intent(intent, cx);
-                        this.remember_library_view(intent, window, cx);
+                        this.remember_library_view(intent, cx);
                     }
                 },
             )
@@ -54,7 +54,7 @@ impl LauncherShell {
             cx.subscribe_in(
                 &library_loader,
                 window,
-                |this, _, event: &SelectEvent<Labels>, window, cx| {
+                |this, _, event: &SelectEvent<Labels>, _, cx| {
                     let SelectEvent::Confirm(choice) = event else {
                         return;
                     };
@@ -71,7 +71,7 @@ impl LauncherShell {
                     });
                     let intent = ViewIntent::Choose(pages::live::LIBRARY_LOADER, code);
                     this.apply_view_intent(intent, cx);
-                    this.remember_library_view(intent, window, cx);
+                    this.remember_library_view(intent, cx);
                 },
             )
             .detach();

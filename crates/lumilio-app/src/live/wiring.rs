@@ -6,6 +6,7 @@ use gpui_kit::{App, AppContext as _, Context, Entity, WeakEntity, Window};
 use lumilio_core::{CancellationToken, Preferences, ProjectKind};
 use lumilio_ui::LauncherShell;
 use lumilio_ui::features::discover::DiscoverEvent;
+use lumilio_ui::features::library::LibraryEvent;
 use lumilio_ui::features::new_game::NewGameEvent;
 use lumilio_ui::home::HomePresentation;
 use lumilio_ui::instance_detail::TAB_WORLDS;
@@ -17,9 +18,8 @@ use lumilio_ui::toast::Toast;
 use super::dispatch::{on_live_intent, on_shell_intent};
 use super::instance::{load_instance, open_instance};
 use super::jobs::reload;
-use super::library::choose_current;
 use super::settings::apply_saved_preferences;
-use super::{context, instance_plugins, jobs, launch, library, terms, update};
+use super::{context, instance_plugins, jobs, launch, terms, update};
 use crate::backend::Backend;
 
 /// How many finished tasks the Activity page lists.
@@ -35,8 +35,6 @@ pub(super) struct State {
     pub(super) home_diagnostics: Option<tokio::task::AbortHandle>,
     /// Each game's last checks, for Home's 需要留意.
     pub(super) home_checks: Option<context::Checked>,
-    /// Choices of the current game, saved in order.
-    pub(super) choices: Option<tokio::sync::mpsc::UnboundedSender<library::Choice>>,
     /// Stops the launch or the running game.
     pub(super) cancel: Option<CancellationToken>,
     /// The saved preferences, for what the window does around a game.
@@ -125,6 +123,7 @@ pub fn build(backend: Backend, window: &mut Window, cx: &mut App) -> Entity<Laun
     };
     follow_discover(&wiring, &shell, cx);
     follow_new_game(&wiring, &shell, cx);
+    follow_library(&wiring, &shell, cx);
     update::start(&wiring, cx);
     context::follow(&wiring, cx);
     reload(&wiring, Reload::Lists, cx);
@@ -146,22 +145,55 @@ fn follow_discover(wiring: &Wiring, shell: &Entity<LauncherShell>, cx: &mut App)
     cx.subscribe(&discover, move |_, event: &DiscoverEvent, cx| match event {
         DiscoverEvent::TasksChanged => reload(&wiring, Reload::Lists, cx),
         DiscoverEvent::Remember(discover) => {
-            let preferences = {
-                let mut state = wiring.state.borrow_mut();
-                state.preferences.discover = discover.clone();
-                state.preferences.clone()
-            };
-            // Quiet, like the Library's order: not worth a message when it fails.
-            let service = wiring.backend.service.clone();
-            drop(
-                wiring
-                    .backend
-                    .spawn(async move { service.set_preferences(preferences).await }),
-            );
+            remember(&wiring, |preferences| {
+                preferences.discover = discover.clone();
+            });
         }
         DiscoverEvent::ProjectOpened(_) => {}
     })
     .detach();
+}
+
+/// Passes on what the Library tells the application: the lists changed, or
+/// how the page is ordered and filtered.
+fn follow_library(wiring: &Wiring, shell: &Entity<LauncherShell>, cx: &mut App) {
+    let library = shell.read(cx).library().clone();
+    let wiring = wiring.clone();
+    cx.subscribe(&library, move |_, event: &LibraryEvent, cx| match *event {
+        LibraryEvent::ListsChanged => reload(&wiring, Reload::Lists, cx),
+        LibraryEvent::Remember { sort, loader } => {
+            remember(&wiring, |preferences| {
+                preferences.library_sort = sort;
+                preferences.library_loader = loader;
+            });
+        }
+    })
+    .detach();
+}
+
+/// Saves something a page remembers between runs with the other
+/// preferences. Quiet: a failure is not worth a message.
+fn remember(wiring: &Wiring, change: impl FnOnce(&mut Preferences)) {
+    let preferences = {
+        let mut state = wiring.state.borrow_mut();
+        change(&mut state.preferences);
+        state.preferences.clone()
+    };
+    let service = wiring.backend.service.clone();
+    drop(
+        wiring
+            .backend
+            .spawn(async move { service.set_preferences(preferences).await }),
+    );
+}
+
+/// Makes `id` the current game, through the shell. Deferred: this may run
+/// inside one of the shell's own updates.
+pub(super) fn choose_current(wiring: &Wiring, id: String, cx: &mut App) {
+    let shell = wiring.shell.clone();
+    cx.defer(move |cx| {
+        let _ = shell.update(cx, |shell, cx| shell.choose_current(id, cx));
+    });
 }
 
 /// Passes on what making games tells the application: the lists changed, a

@@ -558,7 +558,7 @@ fn an_activity_tab_shows_only_its_category_and_all_shows_everything() {
 }
 
 #[test]
-fn a_collection_lists_its_games_that_still_exist_and_marks_membership() {
+fn a_collection_lists_its_games_that_still_exist() {
     let card = |id: &str| library_card(&record(id, false, None, 1), NOW);
     let mut model = LiveModel::default();
     model.set_library(vec![card("a"), card("b"), card("c")]);
@@ -581,14 +581,6 @@ fn a_collection_lists_its_games_that_still_exist_and_marks_membership() {
         ids,
         ["c", "a"],
         "kept in the order added; deleted games are skipped"
-    );
-    assert_eq!(
-        model.memberships_of("a"),
-        [("生存".to_owned(), true), ("空".to_owned(), false)]
-    );
-    assert_eq!(
-        model.memberships_of("b"),
-        [("生存".to_owned(), false), ("空".to_owned(), false)]
     );
 }
 
