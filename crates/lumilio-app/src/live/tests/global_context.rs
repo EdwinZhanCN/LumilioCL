@@ -283,8 +283,11 @@ fn home_attention_follows_the_java_settings(cx: &mut TestAppContext) {
     assert!(!attention(&shell, cx).iter().any(|(game, _)| game == &id));
 
     // No Java anywhere, and none may be downloaded: the game cannot start.
+    let settings = shell.read_with(cx, |shell, _| shell.settings_page().clone());
     cx.update(|window, cx| {
-        on_live_intent(&wiring, LiveIntent::SetAutoInstallJava(false), window, cx)
+        settings.update(cx, |settings, cx| {
+            settings.answer(LiveIntent::SetAutoInstallJava(false), window, cx);
+        });
     });
     until(cx, "the setting to be saved", |_| {
         !ask(&wiring, |service| async move {

@@ -9,6 +9,7 @@ use lumilio_ui::features::activity::ActivityEvent;
 use lumilio_ui::features::discover::DiscoverEvent;
 use lumilio_ui::features::library::LibraryEvent;
 use lumilio_ui::features::new_game::NewGameEvent;
+use lumilio_ui::features::settings::SettingsEvent;
 use lumilio_ui::home::HomePresentation;
 use lumilio_ui::instance_detail::TAB_WORLDS;
 use lumilio_ui::live::{LiveHandler, LiveIntent};
@@ -19,7 +20,7 @@ use lumilio_ui::toast::Toast;
 use super::dispatch::{on_live_intent, on_shell_intent};
 use super::instance::{load_instance, open_instance};
 use super::jobs::reload;
-use super::settings::apply_saved_preferences;
+use super::settings::{apply_preferences, apply_saved_preferences};
 use super::{context, instance_plugins, jobs, launch, terms, update};
 use crate::backend::Backend;
 
@@ -126,6 +127,7 @@ pub fn build(backend: Backend, window: &mut Window, cx: &mut App) -> Entity<Laun
     follow_new_game(&wiring, &shell, cx);
     follow_library(&wiring, &shell, cx);
     follow_activity(&wiring, &shell, cx);
+    follow_settings(&wiring, &shell, cx);
     update::start(&wiring, cx);
     context::follow(&wiring, cx);
     reload(&wiring, Reload::Lists, cx);
@@ -164,6 +166,30 @@ fn follow_activity(wiring: &Wiring, shell: &Entity<LauncherShell>, cx: &mut App)
     cx.subscribe(&activity, move |_, event: &ActivityEvent, cx| match event {
         ActivityEvent::ListsChanged => reload(&wiring, Reload::Lists, cx),
         ActivityEvent::Retried => jobs::installed_changed(&wiring, cx),
+    })
+    .detach();
+}
+
+/// Passes on what Settings tells the application: saved preferences to
+/// apply, the updater's switch and check, and a Java download in Activity.
+fn follow_settings(wiring: &Wiring, shell: &Entity<LauncherShell>, cx: &mut App) {
+    let settings = shell.read(cx).settings_page().clone();
+    let wiring = wiring.clone();
+    cx.subscribe(&settings, move |_, event: &SettingsEvent, cx| match event {
+        SettingsEvent::PreferencesSaved {
+            preferences,
+            window,
+        } => {
+            let (wiring, preferences) = (wiring.clone(), (**preferences).clone());
+            let _ = cx.update_window(*window, move |_, window, cx| {
+                apply_preferences(&wiring, &preferences, window, cx);
+            });
+        }
+        SettingsEvent::AutoUpdate(enabled) => update::set_automatic(&wiring, *enabled),
+        SettingsEvent::CheckUpdates => update::check_manually(&wiring),
+        SettingsEvent::TasksChanged => reload(&wiring, Reload::Lists, cx),
+        // The shell tells the game pages.
+        SettingsEvent::PluginsRead(_) => {}
     })
     .detach();
 }

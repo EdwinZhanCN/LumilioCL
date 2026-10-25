@@ -7,7 +7,6 @@ use super::accounts::AccountRow;
 use super::activity::{ActivityRow, ActivityState, RateSample, TrafficReading, next_sample};
 use super::home::HomePlaces;
 use super::library::{CollectionRow, LibraryCard};
-use super::settings::SettingsView;
 use super::update::UpdateStatus;
 
 /// Everything the live pages show.
@@ -37,7 +36,6 @@ pub struct LiveModel {
     /// Each account's skin face, by key. `Some(None)` is "asked, no face",
     /// so an account that has none is not asked for again and again.
     pub faces: HashMap<String, Option<Arc<RenderImage>>>,
-    pub settings: Option<SettingsView>,
     pub update_status: UpdateStatus,
 }
 

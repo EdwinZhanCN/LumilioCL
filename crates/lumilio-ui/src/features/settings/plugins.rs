@@ -5,16 +5,13 @@ use gpui_component::{Sizable as _, h_flex, v_flex};
 use lumilio_core::{PluginInfo, PluginStatus};
 use lumilio_plugin_api::{NativeCapability, Permission, SettingField, SettingKind, SettingValue};
 
-use super::super::live::LiveCtx;
+use super::page::{PLUGIN_GROUP, SettingsCtx};
 use super::rows::send;
 use crate::controls::Fader;
 use crate::key::Key;
 use crate::kit::ViewIntent;
 use crate::live::{LiveIntent, SettingsView};
 use crate::{kit, theme, tr};
-
-/// The view-state group that remembers the chosen plugin.
-pub(super) const PLUGIN_GROUP: u8 = 202;
 
 pub(super) fn permission_text(permission: &Permission) -> String {
     match permission {
@@ -48,7 +45,7 @@ pub(super) fn setting_value(info: &PluginInfo, field: &SettingField) -> SettingV
 /// state and settings on the trailing side. Each fills the body's height and
 /// scrolls on its own, so the list stays in view however long a plugin's
 /// settings are.
-pub(super) fn render(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
+pub(super) fn render(view: &SettingsView, ctx: &SettingsCtx) -> AnyElement {
     if view.plugins.is_empty() {
         return div()
             .debug_selector(|| "settings-plugin-empty".into())
@@ -59,10 +56,7 @@ pub(super) fn render(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
             ))
             .into_any_element();
     }
-    let selected = ctx
-        .state
-        .choice(PLUGIN_GROUP, 0)
-        .min(view.plugins.len() - 1);
+    let selected = ctx.choices.plugin.min(view.plugins.len() - 1);
     // ia[settings]: 选择插件 | 插件 · 左侧列表 | 右侧显示所选插件的状态、权限和设置
     let list = kit::keep_wheel(
         v_flex()
@@ -116,7 +110,7 @@ pub(super) fn render(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
 }
 
 /// One plugin's state and settings (§10 rows) under its name.
-fn plugin_detail(info: &PluginInfo, ctx: &LiveCtx) -> AnyElement {
+fn plugin_detail(info: &PluginInfo, ctx: &SettingsCtx) -> AnyElement {
     let id = info.manifest.id.clone();
     let enabled = info.state.enabled.unwrap_or(info.manifest.default_enabled);
     let mut rows = Vec::new();

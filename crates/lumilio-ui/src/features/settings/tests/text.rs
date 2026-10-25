@@ -1,6 +1,8 @@
 use lumilio_core::LaunchTuning;
 
-use super::text::{bytes_text, commands_text, list_text, memory_help, memory_text, window_text};
+use super::super::text::{
+    bytes_text, commands_text, list_text, memory_help, memory_text, window_text,
+};
 use crate::live::SettingsView;
 
 #[test]
@@ -50,7 +52,7 @@ fn a_write_grant_names_the_files_it_may_change() {
         names: "*.litematic".into(),
     };
     assert_eq!(
-        super::plugins::permission_text(&grant),
+        super::super::plugins::permission_text(&grant),
         "修改游戏的 schematics 文件夹里名为 *.litematic 的文件（先备份，游戏运行时不写）"
     );
 }

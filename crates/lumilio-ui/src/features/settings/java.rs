@@ -5,7 +5,7 @@ use gpui::{AnyElement, App, IntoElement, Window};
 use gpui_component::{WindowExt as _, h_flex, v_flex};
 use lumilio_core::JavaSource;
 
-use super::super::live::LiveCtx;
+use super::page::SettingsCtx;
 use super::rows::{edit, preference_row, row, send};
 use crate::live::{JavaRow, LiveHandler, LiveIntent, SettingsView};
 use crate::settings_dialog::{DialogSpec, FieldKind, FieldSpec, SettingsDialog};
@@ -91,7 +91,7 @@ fn confirm_remove(java: &JavaRow, handler: &LiveHandler, window: &mut Window, cx
     });
 }
 
-pub(super) fn java(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
+pub(super) fn java(view: &SettingsView, ctx: &SettingsCtx) -> AnyElement {
     let colors = ctx.colors;
     let handler = &ctx.handler;
     let list = if view.java.is_empty() {

@@ -4,12 +4,12 @@ use gpui_component::Sizable as _;
 use gpui_component::select::Select;
 use lumilio_core::{AfterLaunch, Language, MotionPreference};
 
-use super::super::live::LiveCtx;
+use super::page::SettingsCtx;
 use super::rows::{preference_row, row, send, with_preferences};
 use crate::live::SettingsView;
 use crate::{kit, tr, tr_all};
 
-pub(super) fn general(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
+pub(super) fn general(view: &SettingsView, ctx: &SettingsCtx) -> AnyElement {
     let colors = ctx.colors;
     let prefs = &view.preferences;
     let after = match prefs.after_launch {

@@ -81,7 +81,6 @@ impl Render for LauncherShell {
         let current_instance = self.current_instance(cx);
         let current_account = self.current_account(cx);
 
-        self.ensure_live_controls(window, cx);
         self.ensure_account_viewer(window, cx);
         self.ensure_account_faces(window, cx);
         if let Some(handler) = &self.live_handler {
@@ -89,7 +88,9 @@ impl Render for LauncherShell {
             self.library
                 .update(cx, |library, _| library.set_handler(handler.clone()));
             self.activity_page
-                .update(cx, |activity, _| activity.set_handler(handler));
+                .update(cx, |activity, _| activity.set_handler(handler.clone()));
+            self.settings_page
+                .update(cx, |settings, _| settings.set_handler(handler));
         }
         // Discover's answers belong to the detail on screen, if any.
         let shown_detail = match self.location() {
@@ -98,14 +99,13 @@ impl Render for LauncherShell {
         };
         self.discover
             .update(cx, |discover, _| discover.set_shown_detail(shown_detail));
-        let live_ctx = match (&self.live, &self.live_controls, &self.live_handler) {
-            (Some(model), Some(controls), Some(handler)) => Some(pages::live::LiveCtx {
+        let live_ctx = match (&self.live, &self.live_handler) {
+            (Some(model), Some(handler)) => Some(pages::live::LiveCtx {
                 colors,
                 model,
                 state: &self.view,
                 emit: emit_view.clone(),
                 handler: handler.clone(),
-                controls: controls.read(cx),
                 account_viewer: self.account_viewer.as_ref().map(|viewer| &viewer.view),
                 window_width: f32::from(window.viewport_size().width),
                 window_height: f32::from(window.viewport_size().height),
@@ -113,9 +113,6 @@ impl Render for LauncherShell {
                     .account_viewer
                     .as_ref()
                     .and_then(|viewer| viewer.wardrobe.as_ref()),
-                look: cx.try_global::<crate::theme::Look>(),
-                catalog: cx.try_global::<crate::theme::Catalog>(),
-                wallpaper: cx.try_global::<crate::theme::Wallpaper>(),
             }),
             _ => None,
         };
@@ -127,7 +124,7 @@ impl Render for LauncherShell {
                     (Route::Discover, Some(slot)) => slot.view.clone().into_any_element(),
                     (Route::Library, _) => self.library.clone().into_any_element(),
                     // Settings frames itself: its header and tabs stay put.
-                    (Route::Settings, _) => pages::settings::render(ctx).into_any_element(),
+                    (Route::Settings, _) => self.settings_page.clone().into_any_element(),
                     (Route::Accounts, _) => pages::live::accounts(ctx).into_any_element(),
                     (Route::Discover, None) => self.discover.clone().into_any_element(),
                     _ => self.activity_page.clone().into_any_element(),

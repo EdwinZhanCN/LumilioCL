@@ -59,8 +59,6 @@ pub enum LiveIntent {
     RestoreBackup,
     /// Show the folder the launcher keeps its games in.
     OpenGamesFolder,
-    /// Download Java into the launcher (the major version, if wanted).
-    InstallJava(Option<u32>),
     /// Download this major from this source (the 下载 Java… dialog).
     DownloadJava {
         source: lumilio_core::JavaSource,

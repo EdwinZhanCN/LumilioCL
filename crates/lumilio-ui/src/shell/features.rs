@@ -9,6 +9,7 @@ use super::LauncherShell;
 use crate::features::activity::Activity;
 use crate::features::library::Library;
 use crate::features::new_game::NewGame;
+use crate::features::settings::Settings;
 use crate::live::{LiveHandler, LiveIntent};
 
 /// Sends the intents the shell or a feature it owns answers there, and every
@@ -18,6 +19,7 @@ pub(super) fn route(shell: &LauncherShell, app: LiveHandler) -> LiveHandler {
     let new_game: WeakEntity<NewGame> = shell.new_game.downgrade();
     let library: WeakEntity<Library> = shell.library.downgrade();
     let activity: WeakEntity<Activity> = shell.activity_page.downgrade();
+    let settings: WeakEntity<Settings> = shell.settings_page.downgrade();
     Rc::new(move |intent, window, cx| match intent {
         LiveIntent::NewInstance => {
             let _ = new_game.update(cx, |new_game, cx| new_game.open(window, cx));
@@ -89,6 +91,39 @@ pub(super) fn route(shell: &LauncherShell, app: LiveHandler) -> LiveHandler {
         }
         LiveIntent::ClearFinished => {
             let _ = activity.update(cx, |activity, cx| activity.clear_finished(cx));
+        }
+        intent @ (LiveIntent::LoadSettings
+        | LiveIntent::CheckUpdates
+        | LiveIntent::SetAutoUpdate(_)
+        | LiveIntent::SetPreferences(_)
+        | LiveIntent::SetLaunchDefaults(_)
+        | LiveIntent::SetMemory { .. }
+        | LiveIntent::SetConcurrency(_)
+        | LiveIntent::AddMirrorPreset(_)
+        | LiveIntent::SetMirrors(_)
+        | LiveIntent::SetDownloadSource(_)
+        | LiveIntent::SetAutoDownloadBlockAssets(_)
+        | LiveIntent::SetJavaRoots(_)
+        | LiveIntent::SetJavaDisabled { .. }
+        | LiveIntent::SetJavaSource(_)
+        | LiveIntent::SetAutoInstallJava(_)
+        | LiveIntent::RemoveJava(_)
+        | LiveIntent::AddJava
+        | LiveIntent::DownloadJava { .. }
+        | LiveIntent::SetPluginEnabled { .. }
+        | LiveIntent::SetPluginValue { .. }
+        | LiveIntent::ResetPlugin(_)
+        | LiveIntent::EditPluginSetting { .. }
+        | LiveIntent::ReloadThemes
+        | LiveIntent::SetWallpaper(_)
+        | LiveIntent::Reveal(_)
+        | LiveIntent::ClearCache
+        | LiveIntent::ClearTranslationCache
+        | LiveIntent::ClearMapCache
+        | LiveIntent::CheckReclaimable
+        | LiveIntent::Reclaim
+        | LiveIntent::ExportDiagnostics) => {
+            let _ = settings.update(cx, |settings, cx| settings.answer(intent, window, cx));
         }
         other => app(other, window, cx),
     })

@@ -19,7 +19,10 @@ impl LauncherShell {
             Route::Activity => self
                 .activity_page
                 .update(cx, |activity, cx| activity.show_tab(tab, cx)),
-            Route::Discover | Route::Home | Route::Accounts | Route::Settings => {}
+            Route::Settings => self
+                .settings_page
+                .update(cx, |settings, cx| settings.show_tab(tab, cx)),
+            Route::Discover | Route::Home | Route::Accounts => {}
         }
     }
 
@@ -51,6 +54,11 @@ impl LauncherShell {
                 discover.shown(cx);
             }
         });
+        // Settings reads what it shows each time it is chosen.
+        if route == Route::Settings {
+            self.settings_page
+                .update(cx, |settings, cx| settings.load(cx));
+        }
         self.emit(ShellIntent::Navigate(route), window, cx);
         cx.notify();
     }
