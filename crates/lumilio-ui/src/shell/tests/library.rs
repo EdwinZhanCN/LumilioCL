@@ -52,10 +52,9 @@ fn live_library_cards_manage_and_explicit_play_is_independent(cx: &mut TestAppCo
     assert_eq!(play.size.height, more.size.height, "play and more");
     assert!(play.right() <= star.left() && star.right() <= more.left());
     cx.simulate_click(star.center(), Modifiers::none());
-    assert_eq!(
-        *seen.borrow(),
-        vec![LiveIntent::ToggleFavorite("survival".to_owned())],
-        "starring must not also start the game"
+    assert!(
+        seen.borrow().is_empty(),
+        "starring is the Library's, and must not also start the game"
     );
 
     let card = cx.debug_bounds("live-card-0").expect("the card is drawn");
@@ -87,16 +86,26 @@ fn the_collections_tab_shows_each_collection_and_the_card_menu_does_not_open_the
 ) {
     use lumilio_core::{InstanceRecord, InstanceSettings, Loader};
 
+    use gpui::AppContext as _;
+
     use crate::live::{CollectionRow, LiveIntent, library_card};
 
     cx.update(gpui_component::init);
     let seen: Rc<RefCell<Vec<LiveIntent>>> = Rc::default();
     let sink = seen.clone();
-    let (shell, cx) = cx.add_window_view(|_, cx| {
-        LauncherShell::new(cx).with_live(Rc::new(move |intent, _, _| {
-            sink.borrow_mut().push(intent);
-        }))
+    let slot: Rc<RefCell<Option<gpui::Entity<LauncherShell>>>> = Rc::default();
+    let keep = slot.clone();
+    // A root, for the dialog the new-collection key opens.
+    let (_, cx) = cx.add_window_view(|window, cx| {
+        let shell = cx.new(|cx| {
+            LauncherShell::new(cx).with_live(Rc::new(move |intent, _, _| {
+                sink.borrow_mut().push(intent);
+            }))
+        });
+        *keep.borrow_mut() = Some(shell.clone());
+        gpui_component::Root::new(shell, window, cx)
     });
+    let shell = slot.borrow().clone().expect("shell");
     let record = |id: &str| InstanceRecord {
         id: id.to_owned(),
         name: id.to_owned(),
@@ -148,42 +157,46 @@ fn the_collections_tab_shows_each_collection_and_the_card_menu_does_not_open_the
         .debug_bounds("live-new-collection")
         .expect("new collection");
     cx.simulate_click(new.center(), Modifiers::none());
-    assert_eq!(seen.borrow().last(), Some(&LiveIntent::NewCollection));
+    cx.run_until_parked();
+    assert!(seen.borrow().is_empty(), "the Library answers it");
+    assert!(
+        cx.update(|window, cx| {
+            use gpui_component::WindowExt as _;
+            window.has_active_dialog(cx)
+        }),
+        "it asks for the new collection's name"
+    );
 }
 
 #[gpui::test]
 fn changing_the_library_order_or_loader_is_reported_so_it_can_be_remembered(
     cx: &mut TestAppContext,
 ) {
+    use crate::features::library::LibraryEvent;
     use crate::kit::ViewIntent;
-    use crate::live::LiveIntent;
     use crate::pages::live::{LIBRARY_LOADER, LIBRARY_SORT};
 
     cx.update(gpui_component::init);
-    let seen: Rc<RefCell<Vec<LiveIntent>>> = Rc::default();
-    let sink = seen.clone();
-    let (shell, cx) = cx.add_window_view(|_, cx| {
-        LauncherShell::new(cx).with_live(Rc::new(move |intent, _, _| {
-            sink.borrow_mut().push(intent);
-        }))
-    });
+    let (shell, cx) =
+        cx.add_window_view(|_, cx| LauncherShell::new(cx).with_live(Rc::new(|_, _, _| {})));
+    let seen = remembered(&shell, cx);
     let choose = |intent: ViewIntent, cx: &mut gpui::VisualTestContext| {
-        cx.update(|window, app| {
+        cx.update(|_, app| {
             shell.update(app, |shell, cx| {
                 shell.apply_view_intent(intent, cx);
-                shell.remember_library_view(intent, window, cx);
+                shell.remember_library_view(intent, cx);
             })
         });
     };
     choose(ViewIntent::Choose(LIBRARY_SORT, 1), cx);
     assert_eq!(
         seen.borrow().last(),
-        Some(&LiveIntent::RememberLibraryView { sort: 1, loader: 0 })
+        Some(&LibraryEvent::Remember { sort: 1, loader: 0 })
     );
     choose(ViewIntent::Choose(LIBRARY_LOADER, 2), cx);
     assert_eq!(
         seen.borrow().last(),
-        Some(&LiveIntent::RememberLibraryView { sort: 1, loader: 2 })
+        Some(&LibraryEvent::Remember { sort: 1, loader: 2 })
     );
     // Other choices are not the library's business.
     let before = seen.borrow().len();
@@ -198,21 +211,18 @@ fn the_library_sorts_and_filters_from_dropdowns_that_follow_what_is_remembered(
     use gpui_component::select::SelectEvent;
     use lumilio_core::{InstanceRecord, InstanceSettings, Loader};
 
+    use crate::features::library::LibraryEvent;
     use crate::kit::ViewIntent;
-    use crate::live::{LiveIntent, library_card};
+    use crate::live::library_card;
     use crate::pages::live::{LIBRARY_LOADER, LIBRARY_SORT, loader_code};
 
     cx.update(|cx| {
         gpui_component::init(cx);
         cx.set_reduce_motion(true);
     });
-    let seen: Rc<RefCell<Vec<LiveIntent>>> = Rc::default();
-    let sink = seen.clone();
-    let (shell, cx) = cx.add_window_view(|_, cx| {
-        LauncherShell::new(cx).with_live(Rc::new(move |intent, _, _| {
-            sink.borrow_mut().push(intent);
-        }))
-    });
+    let (shell, cx) =
+        cx.add_window_view(|_, cx| LauncherShell::new(cx).with_live(Rc::new(|_, _, _| {})));
+    let seen = remembered(&shell, cx);
     let record = |id: &str, loader: Loader| InstanceRecord {
         id: id.to_owned(),
         name: id.to_owned(),
@@ -285,7 +295,7 @@ fn the_library_sorts_and_filters_from_dropdowns_that_follow_what_is_remembered(
     cx.run_until_parked();
     assert_eq!(
         seen.borrow().last(),
-        Some(&LiveIntent::RememberLibraryView {
+        Some(&LibraryEvent::Remember {
             sort: 1,
             loader: loader_code(Loader::Fabric) as u8
         })
@@ -380,4 +390,21 @@ fn live_instance_back_keeps_library_filters_and_late_data_is_isolated(cx: &mut T
             "生存"
         )
     });
+}
+
+/// What the shell's Library hands on to be remembered.
+fn remembered(
+    shell: &gpui::Entity<LauncherShell>,
+    cx: &mut gpui::VisualTestContext,
+) -> Rc<RefCell<Vec<crate::features::library::LibraryEvent>>> {
+    let seen: Rc<RefCell<Vec<_>>> = Rc::default();
+    let sink = seen.clone();
+    let library = shell.read_with(cx, |shell, _| shell.library().clone());
+    cx.update(|_, cx| {
+        cx.subscribe(&library, move |_, event, _| {
+            sink.borrow_mut().push(event.clone())
+        })
+        .detach();
+    });
+    seen
 }

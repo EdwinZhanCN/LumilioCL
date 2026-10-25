@@ -280,7 +280,12 @@ fn play_now(wiring: &Wiring, id: String, window: &mut Window, cx: &mut App) {
         });
         return;
     }
-    let saved = super::library::save_current(wiring, id.clone());
+    let Ok(saved) = wiring
+        .shell
+        .update(cx, |shell, _| shell.save_current(id.clone()))
+    else {
+        return;
+    };
     let wiring = wiring.clone();
     let window = window.window_handle();
     cx.spawn(async move |cx| {

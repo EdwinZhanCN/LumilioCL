@@ -49,12 +49,6 @@ pub enum LiveIntent {
     DeleteGameOf(String),
     /// Show this game's folder in the file manager.
     RevealGame(String),
-    /// Remember how the Library is ordered and filtered (see
-    /// `Preferences::library_sort`).
-    RememberLibraryView {
-        sort: u8,
-        loader: u8,
-    },
     /// Measure the shared game files no game uses and offer to remove them.
     CheckReclaimable,
     /// Remove them (after the person confirmed).

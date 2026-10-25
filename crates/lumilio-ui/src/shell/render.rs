@@ -42,9 +42,9 @@ impl Render for LauncherShell {
             this.select_route(*route, window, cx);
         });
 
-        let view_callback = cx.listener(|this, intent: &ViewIntent, window, cx| {
+        let view_callback = cx.listener(|this, intent: &ViewIntent, _, cx| {
             this.apply_view_intent(*intent, cx);
-            this.remember_library_view(*intent, window, cx);
+            this.remember_library_view(*intent, cx);
         });
         let emit_view: Emit = Rc::new(move |intent, window: &mut Window, app: &mut App| {
             view_callback(&intent, window, app)

@@ -3,54 +3,20 @@
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::sync::Arc;
-use std::time::{Duration, Instant};
 
 use gpui::prelude::*;
 use gpui::{Context, Entity, TestAppContext, VisualTestContext, Window, div};
-use lumilio_core::{DefaultTransport, LauncherService, Loader};
+use lumilio_core::Loader;
 
 use super::super::form::{NewGameForm, NewGameRequest};
 use super::super::{NewGame, NewGameEvent};
-use crate::runtime::Worker;
+use crate::testing::{Launcher, launcher, toasts, until};
 
 struct Host;
 
 impl Render for Host {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
         div().size_full()
-    }
-}
-
-/// A launcher over an empty folder. The runtime and the folder live as long
-/// as the test.
-struct Launcher {
-    runtime: tokio::runtime::Runtime,
-    worker: Worker,
-    _dir: tempfile::TempDir,
-}
-
-fn launcher() -> Launcher {
-    let dir = tempfile::tempdir().unwrap();
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(2)
-        .enable_all()
-        .build()
-        .unwrap();
-    let service = {
-        let _guard = runtime.enter();
-        LauncherService::open(
-            dir.path().join("root"),
-            DefaultTransport::new().unwrap(),
-            Vec::new(),
-        )
-        .unwrap()
-    };
-    let worker = Worker::new(Arc::new(service), runtime.handle().clone());
-    Launcher {
-        runtime,
-        worker,
-        _dir: dir,
     }
 }
 
@@ -80,32 +46,9 @@ fn new_game<'a>(
     (feature, events, cx)
 }
 
-/// Lets the runtime and GPUI work until `done` holds, for at most ten seconds.
-fn until(cx: &mut VisualTestContext, what: &str, done: impl Fn(&mut VisualTestContext) -> bool) {
-    let deadline = Instant::now() + Duration::from_secs(10);
-    loop {
-        cx.executor().advance_clock(Duration::from_millis(600));
-        cx.run_until_parked();
-        if done(cx) {
-            return;
-        }
-        assert!(Instant::now() < deadline, "timed out waiting for {what}");
-        std::thread::sleep(Duration::from_millis(10));
-    }
-}
-
-fn texts(cx: &mut VisualTestContext) -> Vec<String> {
-    cx.update(|_, cx| {
-        crate::toast::posted(cx)
-            .iter()
-            .map(|toast| toast.text.clone())
-            .collect()
-    })
-}
-
 #[gpui::test]
 fn a_made_game_is_handed_to_the_application_after_the_lists_change(cx: &mut TestAppContext) {
-    let launcher = launcher();
+    let launcher = launcher(Vec::new());
     let (feature, events, cx) = new_game(&launcher, cx);
     let form =
         cx.update(|window, cx| cx.new(|cx| NewGameForm::new(Rc::new(|_, _, _| {}), window, cx)));
@@ -146,19 +89,19 @@ fn a_made_game_is_handed_to_the_application_after_the_lists_change(cx: &mut Test
         "the lists are read again before the game is shown"
     );
     assert!(
-        texts(cx).iter().any(|text| text.contains("Plain")),
+        toasts(cx).iter().any(|text| text.contains("Plain")),
         "a toast names the new game"
     );
 }
 
 #[gpui::test]
 fn dropped_files_that_are_not_packs_start_nothing(cx: &mut TestAppContext) {
-    let launcher = launcher();
+    let launcher = launcher(Vec::new());
     let (feature, events, cx) = new_game(&launcher, cx);
     feature.update(cx, |feature, cx| {
         feature.import_files(vec![PathBuf::from("notes.txt")], cx);
     });
     cx.run_until_parked();
-    assert_eq!(texts(cx).len(), 1, "said once that it cannot be used");
+    assert_eq!(toasts(cx).len(), 1, "said once that it cannot be used");
     assert!(events.borrow().is_empty(), "no task, no game");
 }

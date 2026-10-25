@@ -3,16 +3,16 @@ use lumilio_core::{DiscoverPreferences, ProjectKind};
 
 use super::{ActivitySummary, LauncherShell};
 use crate::kit::ViewIntent;
-use crate::live::{LiveHandler, LiveIntent, LiveModel};
+use crate::live::{LiveHandler, LiveModel};
 use crate::pages::ViewState;
 use crate::route::Route;
 
 impl LauncherShell {
     /// Turns on the live Library, Discover and Activity pages. The handler
-    /// receives every [`LiveIntent`] no feature of the shell answers.
+    /// receives every [`crate::live::LiveIntent`] no feature of the shell answers.
     pub fn with_live(mut self, handler: LiveHandler) -> Self {
         self.live = Some(LiveModel::default());
-        self.live_handler = Some(super::features::route(&self.new_game, handler));
+        self.live_handler = Some(super::features::route(&self, handler));
         self
     }
 
@@ -25,7 +25,10 @@ impl LauncherShell {
         if let Some(model) = &mut self.live {
             change(model);
             self.activity = ActivitySummary::new(model.active_tasks());
+            let collections = model.collections.clone();
             self.sync_discover(cx);
+            self.library
+                .update(cx, |library, _| library.set_collections(collections));
             cx.notify();
         }
     }
@@ -86,30 +89,15 @@ impl LauncherShell {
     /// Applies a page intent to the view state only.
     /// The Library's ordering and loader filter outlive this run: tell the
     /// application when either changes.
-    pub(super) fn remember_library_view(
-        &mut self,
-        intent: ViewIntent,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
+    pub(super) fn remember_library_view(&mut self, intent: ViewIntent, cx: &mut Context<Self>) {
         use crate::pages::live::{LIBRARY_LOADER, LIBRARY_SORT};
         if !matches!(intent, ViewIntent::Choose(LIBRARY_SORT | LIBRARY_LOADER, _)) {
             return;
         }
-        if let Some(handler) = self.live_handler.clone() {
-            let (sort, loader) = (
-                self.view.choice(LIBRARY_SORT, 0),
-                self.view.choice(LIBRARY_LOADER, 0),
-            );
-            handler(
-                LiveIntent::RememberLibraryView {
-                    sort: u8::try_from(sort).unwrap_or(0),
-                    loader: u8::try_from(loader).unwrap_or(0),
-                },
-                window,
-                cx,
-            );
-        }
+        let sort = u8::try_from(self.view.choice(LIBRARY_SORT, 0)).unwrap_or(0);
+        let loader = u8::try_from(self.view.choice(LIBRARY_LOADER, 0)).unwrap_or(0);
+        self.library
+            .update(cx, |library, cx| library.remember_view(sort, loader, cx));
     }
 
     pub fn apply_view_intent(&mut self, intent: ViewIntent, cx: &mut Context<Self>) {

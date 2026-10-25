@@ -4,6 +4,7 @@ mod account_view;
 mod chips;
 mod chrome;
 mod controls;
+mod current;
 mod detail;
 mod features;
 mod home_page;

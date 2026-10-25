@@ -11,7 +11,6 @@ pub mod features;
 // Preserved as a rejected visual experiment; excluded from production builds.
 #[cfg(test)]
 pub mod backdrop;
-pub mod game_picker;
 pub mod game_settings;
 pub mod hero;
 pub mod history;
@@ -51,6 +50,9 @@ pub mod toast;
 pub mod version_picker;
 pub mod wardrobe;
 pub mod world_explorer;
+
+#[cfg(test)]
+mod testing;
 
 pub use shell::{
     ActivitySummary, LauncherShell, ShellIntent, build_root, follow_system_appearance,

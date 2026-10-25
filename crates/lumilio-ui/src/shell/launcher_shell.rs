@@ -1,12 +1,14 @@
 use std::rc::Rc;
 
 use gpui::prelude::*;
-use gpui::{App, Context, Entity, FocusHandle, Subscription, Task, Window};
+use gpui::{App, Context, Entity, FocusHandle, Subscription, Task, WeakEntity, Window};
 
 use super::account_view::AccountViewer;
+use super::current::CurrentChoices;
 use super::detail::DetailSlot;
 use super::locations::{HISTORY_LIMIT, Location};
 use crate::features::discover::{Discover, DiscoverEvent};
+use crate::features::library::Library;
 use crate::features::new_game::NewGame;
 use crate::hero::HeroCarousel;
 use crate::history::History;
@@ -70,6 +72,12 @@ pub struct LauncherShell {
     pub(super) discover: Entity<Discover>,
     /// Makes new games, from the dialog or from packs.
     pub(super) new_game: Entity<NewGame>,
+    /// The Library's actions.
+    pub(super) library: Entity<Library>,
+    /// Saves which game is current, in the order chosen.
+    pub(super) current_choices: CurrentChoices,
+    /// This shell, for what its features route back to it.
+    pub(super) this: WeakEntity<Self>,
     /// Whether translation is on, from the saved preferences; known from
     /// startup, before the Settings page has loaded anything.
     pub(super) translation: bool,
@@ -90,6 +98,7 @@ impl LauncherShell {
     pub fn new(cx: &mut Context<Self>) -> Self {
         let discover = cx.new(|_| Discover::new(None));
         let new_game = cx.new(|_| NewGame::new(None));
+        let library = cx.new(|_| Library::new(None));
         let discover_events = cx.subscribe(&discover, |shell, _, event: &DiscoverEvent, cx| {
             if let DiscoverEvent::ProjectOpened(opened) = event {
                 shell.show_project(opened.clone(), cx);
@@ -112,6 +121,9 @@ impl LauncherShell {
             account_revision: 0,
             discover,
             new_game,
+            library,
+            current_choices: CurrentChoices::default(),
+            this: cx.weak_entity(),
             translation: false,
             detail: None,
             live_instance: None,
@@ -138,11 +150,14 @@ impl LauncherShell {
     }
 
     /// Lets the pages that ask the launcher themselves do so.
-    pub fn with_worker(self, worker: crate::runtime::Worker, cx: &mut Context<Self>) -> Self {
+    pub fn with_worker(mut self, worker: crate::runtime::Worker, cx: &mut Context<Self>) -> Self {
         self.discover
             .update(cx, |discover, _| discover.set_worker(worker.clone()));
         self.new_game
-            .update(cx, |new_game, _| new_game.set_worker(worker));
+            .update(cx, |new_game, _| new_game.set_worker(worker.clone()));
+        self.library
+            .update(cx, |library, _| library.set_worker(worker.clone()));
+        self.current_choices.worker = Some(worker);
         self
     }
 
@@ -154,6 +169,11 @@ impl LauncherShell {
     /// What makes new games, for the application to follow its events.
     pub fn new_game(&self) -> &Entity<NewGame> {
         &self.new_game
+    }
+
+    /// The Library's actions, for the application to follow its events.
+    pub fn library(&self) -> &Entity<Library> {
+        &self.library
     }
 
     pub fn with_activity(mut self, activity: ActivitySummary) -> Self {

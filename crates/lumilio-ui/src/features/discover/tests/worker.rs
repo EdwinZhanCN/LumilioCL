@@ -6,10 +6,10 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use gpui::{Entity, TestAppContext, VisualTestContext};
-use lumilio_core::{DefaultTransport, LauncherService, Loader, ProjectKind};
+use lumilio_core::{Loader, ProjectKind};
 use lumilio_plugin_api::content::{
     Capabilities, Compatibility, Dependency, FileIdentity, FilterChoices, FilterSupport,
     KindSupport, Project, ProjectKind as SourceKind, ProjectSummary, ReleaseChannel, SearchHit,
@@ -22,7 +22,7 @@ use lumilio_plugin_api::{
 use super::super::model::{DiscoverQuery, SearchStatus};
 use super::super::{Discover, DiscoverEvent};
 use crate::live::library_card;
-use crate::runtime::Worker;
+use crate::testing::{self, Launcher, until};
 
 /// A content source that answers from memory. A search for "slow" answers
 /// late; one for "broken" fails.
@@ -180,39 +180,12 @@ impl ContentSource for Memory {
     }
 }
 
-/// A launcher in a temporary folder with two in-memory sources, and its
-/// runtime. Dropped last, after the page.
-struct Launcher {
-    runtime: tokio::runtime::Runtime,
-    worker: Worker,
-    _dir: tempfile::TempDir,
-}
-
+/// A launcher with two in-memory sources.
 fn launcher() -> Launcher {
-    let dir = tempfile::tempdir().unwrap();
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(2)
-        .enable_all()
-        .build()
-        .unwrap();
-    let service = {
-        let _guard = runtime.enter();
-        LauncherService::open(
-            dir.path().join("root"),
-            DefaultTransport::new().unwrap(),
-            vec![
-                Arc::new(Memory { id: "test.one" }) as Arc<dyn Plugin>,
-                Arc::new(Memory { id: "test.two" }),
-            ],
-        )
-        .unwrap()
-    };
-    let worker = Worker::new(Arc::new(service), runtime.handle().clone());
-    Launcher {
-        runtime,
-        worker,
-        _dir: dir,
-    }
+    testing::launcher(vec![
+        Arc::new(Memory { id: "test.one" }) as Arc<dyn Plugin>,
+        Arc::new(Memory { id: "test.two" }),
+    ])
 }
 
 fn page<'a>(
@@ -224,21 +197,6 @@ fn page<'a>(
     cx.update(gpui_component::init);
     let worker = launcher.worker.clone();
     cx.add_window_view(move |_, _| Discover::new(Some(worker)))
-}
-
-/// Lets the runtime and GPUI work until `done` holds, for at most ten seconds.
-fn until(cx: &mut VisualTestContext, what: &str, done: impl Fn(&mut VisualTestContext) -> bool) {
-    let deadline = Instant::now() + Duration::from_secs(10);
-    loop {
-        // GPUI's test clock moves only when told: the page's polls wait on it.
-        cx.executor().advance_clock(Duration::from_millis(600));
-        cx.run_until_parked();
-        if done(cx) {
-            return;
-        }
-        assert!(Instant::now() < deadline, "timed out waiting for {what}");
-        std::thread::sleep(Duration::from_millis(10));
-    }
 }
 
 fn query(source: &str, text: &str) -> DiscoverQuery {

@@ -87,6 +87,7 @@ pub(super) fn open(
             },
         )
     };
+    let worker = backend.worker();
     let slot: Rc<RefCell<Option<Entity<LauncherShell>>>> = Rc::default();
     let keep = slot.clone();
     let (_, cx) = cx.add_window_view(|window, cx| {
@@ -95,6 +96,7 @@ pub(super) fn open(
                 .with_home(HomePresentation::Loading, cx)
                 .with_live(live)
                 .with_intent_handler(shell_intents)
+                .with_worker(worker, cx)
         });
         *keep.borrow_mut() = Some(shell.clone());
         gpui_kit::component::Root::new(shell, window, cx)
@@ -372,9 +374,8 @@ fn choosing_another_game_while_browsing_ends_the_browsing(cx: &mut TestAppContex
         })
     });
 
-    cx.update(|window, cx| {
-        on_live_intent(&wiring, LiveIntent::InstallTarget(z.clone()), window, cx)
-    });
+    // As choosing it in the corner chip.
+    shell.update(cx, |shell, cx| shell.choose_current(z.clone(), cx));
     until(cx, "Z to be the saved current game", |_| {
         saved_current(&wiring).as_deref() == Some(z.as_str())
     });
@@ -487,9 +488,8 @@ fn choosing_another_game_leaves_a_failed_launch_to_needs_attention(cx: &mut Test
         now != before && now == attention_now_in_full(&wiring)
     });
 
-    cx.update(|window, cx| {
-        on_live_intent(&wiring, LiveIntent::InstallTarget(a.clone()), window, cx)
-    });
+    // As choosing it in the corner chip.
+    shell.update(cx, |shell, cx| shell.choose_current(a.clone(), cx));
     until(cx, "Home to continue A instead of explaining B", |cx| {
         continue_subject(&shell, cx).as_deref() == Some(a.as_str())
     });

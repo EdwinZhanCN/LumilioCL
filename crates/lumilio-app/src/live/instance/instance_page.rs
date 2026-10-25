@@ -13,7 +13,7 @@ use super::super::instance_plugins::{plugin_action, plugin_model, plugin_tabs, p
 use super::super::instance_write::write_instance;
 use super::super::jobs::reload;
 use super::super::launch::play;
-use super::super::library::choose_current;
+use super::super::wiring::choose_current;
 use super::super::{Reload, Wiring};
 use super::files::{
     copy_screenshot, export_log, make_thumbnail, open_crash, open_export, open_folder,

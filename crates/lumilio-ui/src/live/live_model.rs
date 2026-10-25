@@ -84,19 +84,6 @@ impl LiveModel {
             .collect()
     }
 
-    /// Each collection with whether this game is in it, for the picker.
-    pub fn memberships_of(&self, id: &str) -> Vec<(String, bool)> {
-        self.collections
-            .iter()
-            .map(|collection| {
-                (
-                    collection.name.clone(),
-                    collection.members.iter().any(|member| member == id),
-                )
-            })
-            .collect()
-    }
-
     /// The account later launches use, if one is chosen.
     pub fn selected_account(&self) -> Option<&AccountRow> {
         self.accounts.iter().find(|row| row.selected)
