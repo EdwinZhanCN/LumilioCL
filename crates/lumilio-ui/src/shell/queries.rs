@@ -4,6 +4,7 @@ use lumilio_core::{DiscoverPreferences, ProjectKind};
 use super::{ActivitySummary, LauncherShell};
 use crate::features::activity::ActivityInputs;
 use crate::features::library::LibraryInputs;
+use crate::features::settings::SettingsInputs;
 use crate::kit::ViewIntent;
 use crate::live::{LiveHandler, LiveModel};
 use crate::pages::ViewState;
@@ -40,11 +41,16 @@ impl LauncherShell {
                 traffic: model.traffic,
                 games: model.library.iter().map(|card| card.id.clone()).collect(),
             };
+            let settings = SettingsInputs {
+                update_status: model.update_status.clone(),
+            };
             self.sync_discover(cx);
             self.library
                 .update(cx, |library, cx| library.set_inputs(inputs, cx));
             self.activity_page
                 .update(cx, |page, cx| page.set_inputs(activity, cx));
+            self.settings_page
+                .update(cx, |page, cx| page.set_inputs(settings, cx));
             cx.notify();
         }
     }

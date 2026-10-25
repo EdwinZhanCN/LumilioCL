@@ -3,7 +3,7 @@ use gpui::{AnyElement, App, IntoElement, SharedString, Window};
 use gpui_component::h_flex;
 use lumilio_core::Preferences;
 
-use super::super::live::LiveCtx;
+use super::page::SettingsCtx;
 use crate::live::{LiveHandler, LiveIntent, SettingsView};
 use crate::settings_dialog::{DialogSpec, SettingsDialog};
 use crate::theme::ShellColors;
@@ -50,7 +50,7 @@ pub(super) fn preference_row(
     labels: &'static [&'static str],
     selected: usize,
     on_pick: impl Fn(usize) -> LiveIntent + 'static,
-    ctx: &LiveCtx,
+    ctx: &SettingsCtx,
 ) -> gpui::Stateful<gpui::Div> {
     let handler = ctx.handler.clone();
     let control = h_flex()

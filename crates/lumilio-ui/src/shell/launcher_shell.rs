@@ -11,13 +11,13 @@ use crate::features::activity::Activity;
 use crate::features::discover::{Discover, DiscoverEvent};
 use crate::features::library::Library;
 use crate::features::new_game::NewGame;
+use crate::features::settings::{Settings, SettingsEvent};
 use crate::hero::HeroCarousel;
 use crate::history::History;
 use crate::home::{HomeIntent, HomePresentation};
 use crate::instance_detail::InstanceDetailView;
 use crate::live::{LiveHandler, LiveModel};
 use crate::pages::ViewState;
-use crate::pages::live::LiveControls;
 use crate::route::Route;
 use crate::toast::Toast;
 use crate::{home, toast};
@@ -63,7 +63,6 @@ pub struct LauncherShell {
     /// Live data pages (plan 0007); `None` keeps the truthful placeholders.
     pub(super) live: Option<LiveModel>,
     pub(super) live_handler: Option<LiveHandler>,
-    pub(super) live_controls: Option<Entity<LiveControls>>,
     /// The look preview of the account the Accounts detail shows.
     pub(super) account_viewer: Option<AccountViewer>,
     pub(super) account_revision: u64,
@@ -75,6 +74,10 @@ pub struct LauncherShell {
     pub(super) library: Entity<Library>,
     /// The Activity page and what it does to tasks.
     pub(super) activity_page: Entity<Activity>,
+    /// The Settings page and the saving of each setting.
+    pub(super) settings_page: Entity<Settings>,
+    /// Tells the game pages which plugins Settings found on.
+    pub(super) _settings_events: Subscription,
     /// Saves which game is current, in the order chosen.
     pub(super) current_choices: CurrentChoices,
     /// This shell, for what its features route back to it.
@@ -101,6 +104,13 @@ impl LauncherShell {
         let new_game = cx.new(|_| NewGame::new(None));
         let library = cx.new(|_| Library::new(None));
         let activity_page = cx.new(|_| Activity::new(None));
+        let settings_page = cx.new(|_| Settings::new(None));
+        let settings_events =
+            cx.subscribe(&settings_page, |shell, _, event: &SettingsEvent, cx| {
+                if let SettingsEvent::PluginsRead(plugins) = event {
+                    shell.plugins_changed(plugins, cx);
+                }
+            });
         let discover_events = cx.subscribe(&discover, |shell, _, event: &DiscoverEvent, cx| {
             if let DiscoverEvent::ProjectOpened(opened) = event {
                 shell.show_project(opened.clone(), cx);
@@ -118,13 +128,14 @@ impl LauncherShell {
             view: ViewState::default(),
             live: None,
             live_handler: None,
-            live_controls: None,
             account_viewer: None,
             account_revision: 0,
             discover,
             new_game,
             library,
             activity_page,
+            settings_page,
+            _settings_events: settings_events,
             current_choices: CurrentChoices::default(),
             this: cx.weak_entity(),
             translation: false,
@@ -162,6 +173,8 @@ impl LauncherShell {
             .update(cx, |library, _| library.set_worker(worker.clone()));
         self.activity_page
             .update(cx, |activity, _| activity.set_worker(worker.clone()));
+        self.settings_page
+            .update(cx, |settings, _| settings.set_worker(worker.clone()));
         self.current_choices.worker = Some(worker);
         self
     }
@@ -184,6 +197,11 @@ impl LauncherShell {
     /// The Activity page, for the application to follow its events.
     pub fn activity_page(&self) -> &Entity<Activity> {
         &self.activity_page
+    }
+
+    /// The Settings page, for the application to follow its events.
+    pub fn settings_page(&self) -> &Entity<Settings> {
+        &self.settings_page
     }
 
     pub fn with_activity(mut self, activity: ActivitySummary) -> Self {

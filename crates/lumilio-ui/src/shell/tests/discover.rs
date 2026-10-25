@@ -229,7 +229,7 @@ fn translation_follows_the_preferences_without_the_settings_page(cx: &mut TestAp
     let (shell, cx) =
         cx.add_window_view(|_, cx| LauncherShell::new(cx).with_live(Rc::new(|_, _, _| {})));
     shell.update(cx, |shell, cx| {
-        assert!(shell.live().unwrap().settings.is_none());
+        assert!(shell.settings_page().read(cx).settings().is_none());
         shell.set_translation(true, cx);
         assert!(shell.discover().read(cx).state().translation);
         // A later live refresh does not turn it back off.

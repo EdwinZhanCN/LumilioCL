@@ -15,8 +15,8 @@ impl LauncherShell {
         cx: &mut Context<Self>,
     ) -> Entity<InstanceDetailView> {
         let view = cx.new(|cx| InstanceDetailView::new(id, handler(cx.weak_entity())));
-        if let Some(settings) = self.live.as_ref().and_then(|model| model.settings.as_ref()) {
-            let enabled = enabled_plugins(&settings.plugins);
+        let read = self.settings_page.read(cx).settings();
+        if let Some(enabled) = read.map(|settings| enabled_plugins(&settings.plugins)) {
             view.update(cx, |view, cx| view.plugins_changed(enabled, cx));
         }
         cx.observe(&view, |_, _, cx| cx.notify()).detach();

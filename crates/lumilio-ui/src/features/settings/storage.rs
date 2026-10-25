@@ -5,7 +5,7 @@ use gpui::{AnyElement, IntoElement, div, px};
 use gpui_component::{Sizable as _, h_flex, v_flex};
 use lumilio_core::{DownloadSourcePreference, MirrorPreset, StorageUsage};
 
-use super::super::live::LiveCtx;
+use super::page::SettingsCtx;
 use super::rows::{edit, row, send};
 use super::text::bytes_text;
 use crate::key::Key;
@@ -70,7 +70,7 @@ fn preset_row(
     help: &'static str,
     preset: MirrorPreset,
     view: &SettingsView,
-    ctx: &LiveCtx,
+    ctx: &SettingsCtx,
 ) -> gpui::Stateful<gpui::Div> {
     let merged = preset.merge(&view.mirrors);
     let added = merged == view.mirrors;
@@ -97,7 +97,7 @@ fn preset_row(
     )
 }
 
-pub(super) fn downloads(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
+pub(super) fn downloads(view: &SettingsView, ctx: &SettingsCtx) -> AnyElement {
     let colors = ctx.colors;
     let handler = &ctx.handler;
     let mirror_lines: Vec<String> = view

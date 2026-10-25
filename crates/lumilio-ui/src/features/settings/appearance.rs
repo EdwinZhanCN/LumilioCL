@@ -8,7 +8,7 @@ use gpui::prelude::*;
 use gpui::{AnyElement, App, IntoElement};
 use lumilio_core::{Appearance, LookPreferences, WallpaperChoice};
 
-use super::super::live::LiveCtx;
+use super::page::SettingsCtx;
 use super::rows::{preference_row, row, send, with_preferences};
 use crate::live::{LiveHandler, LiveIntent, SettingsView};
 use crate::settings_dialog::{DialogSpec, FieldKind, FieldSpec, SettingsDialog};
@@ -18,7 +18,7 @@ use crate::{kit, tr, tr_all};
 /// The scales offered, in percent; the labels are `settings-scale-*`.
 const SCALES: [u16; 4] = [85, 100, 115, 130];
 
-pub(super) fn appearance(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
+pub(super) fn appearance(view: &SettingsView, ctx: &SettingsCtx) -> AnyElement {
     let colors = ctx.colors;
     let prefs = &view.preferences;
     let look = &prefs.look;
@@ -207,7 +207,7 @@ pub(super) fn appearance(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
     kit::list(rows, colors).into_any_element()
 }
 
-fn wallpaper_row(view: &SettingsView, ctx: &LiveCtx) -> gpui::Stateful<gpui::Div> {
+fn wallpaper_row(view: &SettingsView, ctx: &SettingsCtx) -> gpui::Stateful<gpui::Div> {
     let chosen = &view.preferences.look.wallpaper;
     let handler = ctx.handler.clone();
     let mut control = gpui_component::h_flex().gap_2().child(
@@ -279,7 +279,11 @@ fn wallpaper_row(view: &SettingsView, ctx: &LiveCtx) -> gpui::Stateful<gpui::Div
 }
 
 /// A line of explanation under the rows it belongs to.
-fn note(id: impl Into<gpui::ElementId>, text: String, ctx: &LiveCtx) -> gpui::Stateful<gpui::Div> {
+fn note(
+    id: impl Into<gpui::ElementId>,
+    text: String,
+    ctx: &SettingsCtx,
+) -> gpui::Stateful<gpui::Div> {
     kit::value_row(id, "", None, text, None, ctx.colors)
 }
 
@@ -302,7 +306,7 @@ fn theme_row(
     label: &'static str,
     tone: Tone,
     view: &SettingsView,
-    ctx: &LiveCtx,
+    ctx: &SettingsCtx,
 ) -> gpui::Stateful<gpui::Div> {
     let builtin = if tone.is_dark() { NIGHT } else { ALUMINIUM };
     let chosen = if tone.is_dark() {
@@ -373,7 +377,7 @@ fn theme_row(
     row(id, label, None, "", Some(edit), ctx.colors)
 }
 
-fn local_row(themes: &std::path::Path, ctx: &LiveCtx) -> gpui::Stateful<gpui::Div> {
+fn local_row(themes: &std::path::Path, ctx: &SettingsCtx) -> gpui::Stateful<gpui::Div> {
     let handler = ctx.handler.clone();
     let folder = themes.to_owned();
     let control = gpui_component::h_flex()
@@ -421,7 +425,7 @@ struct FontSlot<'a> {
 
 /// One font family row: the chosen family or 默认, and a searchable list of
 /// the installed ones.
-fn font_row(slot: &FontSlot, view: &SettingsView, ctx: &LiveCtx) -> gpui::Stateful<gpui::Div> {
+fn font_row(slot: &FontSlot, view: &SettingsView, ctx: &SettingsCtx) -> gpui::Stateful<gpui::Div> {
     let FontSlot {
         id,
         edit_id,

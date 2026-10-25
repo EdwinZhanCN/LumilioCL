@@ -1,23 +1,23 @@
 use gpui::{AnyElement, IntoElement};
 
-use super::super::live::LiveCtx;
+use super::page::SettingsCtx;
 use super::rows::{row, send};
 use crate::live::{LiveIntent, SettingsView, UpdateStatus, UpdateUnavailability};
 use crate::{kit, tr};
 
-pub(super) fn about(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
+pub(super) fn about(view: &SettingsView, ctx: &SettingsCtx) -> AnyElement {
     let colors = ctx.colors;
     let handler = &ctx.handler;
     let log = lumilio_core::Layout::new(&view.data_dir).launcher_log();
-    let update_status = update_status_text(&ctx.model.update_status);
-    let update_detail = match &ctx.model.update_status {
+    let update_status = update_status_text(ctx.update_status);
+    let update_detail = match ctx.update_status {
         UpdateStatus::Failed { detail } => Some(detail.clone()),
         _ => None,
     };
     let update_status_control = update_detail
         .map(|detail| kit::technical("settings-update-technical", detail).into_any_element());
     let update_busy = matches!(
-        &ctx.model.update_status,
+        ctx.update_status,
         UpdateStatus::Checking | UpdateStatus::Downloading { .. } | UpdateStatus::Installing { .. }
     );
     let auto_update = view.auto_update_enabled;

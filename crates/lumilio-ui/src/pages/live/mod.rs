@@ -10,5 +10,5 @@ mod home;
 mod tests;
 
 pub use self::accounts::{ACCOUNT_GROUP, accounts, shown_account};
-pub use self::controls::{LiveControls, LiveCtx};
+pub use self::controls::LiveCtx;
 pub use self::home::{home_sections, record_readings};

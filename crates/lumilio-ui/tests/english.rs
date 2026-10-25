@@ -9,8 +9,8 @@ use gpui::{Context, Entity, IntoElement, Render, TestAppContext, Window, div};
 use gpui_component::IndexPath;
 use lumilio_ui::features::discover::model::{count_label, tag_label};
 use lumilio_ui::features::library::LibraryControls;
+use lumilio_ui::features::settings::{list_text, memory_text, tabs};
 use lumilio_ui::i18n::{Locale, generation, locale, set_locale};
-use lumilio_ui::pages::settings::{list_text, memory_text, tabs};
 
 static LANGUAGE: Mutex<()> = Mutex::new(());
 

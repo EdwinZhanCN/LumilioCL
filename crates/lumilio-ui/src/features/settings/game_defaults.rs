@@ -5,15 +5,15 @@ use gpui::{AnyElement, IntoElement};
 use gpui_component::v_flex;
 use lumilio_core::recommended_memory_mb;
 
-use super::super::live::LiveCtx;
-use super::fullscreen_choices;
+use super::page::SettingsCtx;
+use super::page::fullscreen_choices;
 use super::rows::{edit, row};
 use super::text::{commands_text, list_text, memory_help, memory_text, window_text};
 use crate::live::{LiveIntent, SettingsView};
 use crate::settings_dialog::{DialogSpec, FieldKind, FieldSpec};
 use crate::{kit, settings_forms as forms, tr};
 
-pub(super) fn game_defaults(view: &SettingsView, ctx: &LiveCtx) -> AnyElement {
+pub(super) fn game_defaults(view: &SettingsView, ctx: &SettingsCtx) -> AnyElement {
     let colors = ctx.colors;
     let handler = &ctx.handler;
     let launch = view.launch.clone();

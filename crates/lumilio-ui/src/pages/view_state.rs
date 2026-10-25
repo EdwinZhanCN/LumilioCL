@@ -2,8 +2,9 @@ use std::collections::HashMap;
 
 use crate::kit::ViewIntent;
 
-/// The small choices made on the global pages. The Library and Activity keep
-/// their own (`features::library::LibraryView`, `features::activity::ActivityView`).
+/// The small choices made on the global pages. The Library, Activity and
+/// Settings keep their own (`features::library::LibraryView`,
+/// `features::activity::ActivityView`, `features::settings::SettingsChoices`).
 #[derive(Clone, Debug, Default)]
 pub struct ViewState {
     pub(super) choices: HashMap<u8, usize>,

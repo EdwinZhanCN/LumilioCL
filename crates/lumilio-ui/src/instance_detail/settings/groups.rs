@@ -12,7 +12,7 @@ use super::texts::{
     NONE_ON_PURPOSE, after_launch_text, command_text, followed, quick_play_text, window_text,
 };
 use super::{AFTER_LAUNCH, FOLLOW_OR_OWN, FULLSCREEN, QUICK_PLAY};
-use crate::pages::settings::{bytes_text, list_text};
+use crate::features::settings::{bytes_text, list_text};
 use crate::settings_dialog::{DialogSpec, FieldKind, FieldSpec};
 use crate::theme::ShellColors;
 use crate::{kit, live, settings_forms as shared, tr};
