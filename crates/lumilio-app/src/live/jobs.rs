@@ -1,12 +1,12 @@
 use std::future::Future;
 
 use gpui_kit::{App, Context};
-use lumilio_core::{CancellationToken, unix_now};
+use lumilio_core::unix_now;
+use lumilio_ui::LauncherShell;
 use lumilio_ui::live::{CollectionRow, account_rows, activity_rows, library_cards};
 use lumilio_ui::runtime::answer;
 use lumilio_ui::toast::Toast;
 pub(super) use lumilio_ui::toast::outcome;
-use lumilio_ui::{LauncherShell, tr};
 use tokio::task::JoinError;
 
 use super::{ACTIVITY_LIMIT, POLL, Reload, Wiring};
@@ -66,19 +66,6 @@ pub(super) fn installed_changed(wiring: &Wiring, cx: &mut App) {
         .read_with(cx, |shell, _| shell.discover().clone())
     {
         discover.update(cx, |discover, cx| discover.invalidate_installed(cx));
-    }
-}
-
-/// The result of a quick change whose success shows by itself (a star, a
-/// shorter list): only a failure is told.
-pub(super) fn failed_only<T, E: std::fmt::Display>(
-    shell: &mut LauncherShell,
-    result: Result<T, E>,
-    failed: &str,
-    cx: &mut Context<LauncherShell>,
-) {
-    if let Err(error) = result {
-        shell.toast(Toast::error(failed).technical(error.to_string()), cx);
     }
 }
 
@@ -154,40 +141,6 @@ pub(super) fn reload(wiring: &Wiring, what: Reload, cx: &mut App) {
         });
     })
     .detach();
-}
-
-/// Runs a failed or cancelled task again from its original input. It is a
-/// task of its own in Activity; the old entry stays.
-pub(super) fn retry_task(wiring: &Wiring, action: lumilio_core::RetryAction, cx: &mut App) {
-    let service = wiring.backend.service.clone();
-    let after = wiring.clone();
-    job(
-        wiring,
-        cx,
-        true,
-        Reload::Lists,
-        Some(Toast::info(tr!("activity-retry-started"))),
-        async move {
-            // Progress lives in Activity; the channel only has to drain.
-            let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
-            tokio::spawn(async move { while rx.recv().await.is_some() {} });
-            service
-                .retry_task(action, tx, CancellationToken::new())
-                .await
-        },
-        move |shell, result, cx| {
-            shell.toast(
-                outcome(
-                    result,
-                    |()| tr!("activity-retry-ok").to_owned(),
-                    tr!("activity-retry-failed").to_owned(),
-                ),
-                cx,
-            );
-            // A retried install may have changed what the game has.
-            cx.defer(move |cx| installed_changed(&after, cx));
-        },
-    );
 }
 
 /// Milliseconds since the Unix epoch, for working out speeds.

@@ -7,6 +7,7 @@ use super::account_view::AccountViewer;
 use super::current::CurrentChoices;
 use super::detail::DetailSlot;
 use super::locations::{HISTORY_LIMIT, Location};
+use crate::features::activity::Activity;
 use crate::features::discover::{Discover, DiscoverEvent};
 use crate::features::library::Library;
 use crate::features::new_game::NewGame;
@@ -72,6 +73,8 @@ pub struct LauncherShell {
     pub(super) new_game: Entity<NewGame>,
     /// The Library's actions.
     pub(super) library: Entity<Library>,
+    /// The Activity page and what it does to tasks.
+    pub(super) activity_page: Entity<Activity>,
     /// Saves which game is current, in the order chosen.
     pub(super) current_choices: CurrentChoices,
     /// This shell, for what its features route back to it.
@@ -97,6 +100,7 @@ impl LauncherShell {
         let discover = cx.new(|_| Discover::new(None));
         let new_game = cx.new(|_| NewGame::new(None));
         let library = cx.new(|_| Library::new(None));
+        let activity_page = cx.new(|_| Activity::new(None));
         let discover_events = cx.subscribe(&discover, |shell, _, event: &DiscoverEvent, cx| {
             if let DiscoverEvent::ProjectOpened(opened) = event {
                 shell.show_project(opened.clone(), cx);
@@ -120,6 +124,7 @@ impl LauncherShell {
             discover,
             new_game,
             library,
+            activity_page,
             current_choices: CurrentChoices::default(),
             this: cx.weak_entity(),
             translation: false,
@@ -155,6 +160,8 @@ impl LauncherShell {
             .update(cx, |new_game, _| new_game.set_worker(worker.clone()));
         self.library
             .update(cx, |library, _| library.set_worker(worker.clone()));
+        self.activity_page
+            .update(cx, |activity, _| activity.set_worker(worker.clone()));
         self.current_choices.worker = Some(worker);
         self
     }
@@ -172,6 +179,11 @@ impl LauncherShell {
     /// The Library's actions, for the application to follow its events.
     pub fn library(&self) -> &Entity<Library> {
         &self.library
+    }
+
+    /// The Activity page, for the application to follow its events.
+    pub fn activity_page(&self) -> &Entity<Activity> {
+        &self.activity_page
     }
 
     pub fn with_activity(mut self, activity: ActivitySummary) -> Self {
