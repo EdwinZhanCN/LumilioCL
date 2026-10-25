@@ -21,7 +21,7 @@ async fn game_settings_launch_boundary_applies_after_hook_and_reviews_after_exit
     // directory, then saves a gameplay change before it exits.
     fake_java(
         &world,
-        "test \"$(cat options.txt)\" = 'soundCategory_master:0.8' || exit 7\nprintf 'soundCategory_master:0.4\\n' > options.txt",
+        "check options.txt = soundCategory_master:0.8\nwrite soundCategory_master:0.4 > options.txt",
     );
     let source = world
         .service

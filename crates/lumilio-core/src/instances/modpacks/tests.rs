@@ -426,6 +426,7 @@ async fn a_copy_is_independent_inherits_settings_and_leaves_the_source_alone() {
     );
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn a_copy_that_is_refused_cancelled_or_fails_changes_nothing() {
     use std::os::unix::fs::PermissionsExt;

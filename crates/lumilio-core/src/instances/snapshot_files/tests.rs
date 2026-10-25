@@ -239,6 +239,7 @@ fn operations(f: &Fixture) -> Vec<PathBuf> {
         .unwrap_or_default()
 }
 
+#[cfg(unix)]
 #[test]
 fn a_commit_that_fails_at_any_unit_puts_every_original_back() {
     use std::os::unix::fs::PermissionsExt;

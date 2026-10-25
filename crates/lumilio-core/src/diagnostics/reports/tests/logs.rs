@@ -368,7 +368,7 @@ async fn a_cancelled_export_is_recorded_as_cancelled_and_leaves_no_pack() {
 async fn clearing_the_cache_frees_space_and_games_still_start() {
     let world = world();
     publish_release(&world);
-    fake_java(&world, "echo \"Setting user: x\"");
+    fake_java(&world, "print Setting user: x");
     let record = world
         .service
         .create_instance("Run", None, Loader::Vanilla, None)
@@ -395,7 +395,7 @@ async fn the_diagnostics_bundle_hides_the_player_the_folders_and_commands() {
     use crate::settings::tuning::LaunchTuning;
     let world = world();
     publish_release(&world);
-    fake_java(&world, "echo \"Setting user: Steve\"");
+    fake_java(&world, "print Setting user: Steve");
     let record = world
         .service
         .create_instance("Run", None, Loader::Vanilla, None)

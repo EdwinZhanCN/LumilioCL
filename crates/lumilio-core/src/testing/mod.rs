@@ -1,8 +1,11 @@
 //! What the core's own tests share: a launcher on a scripted network, in a
 //! temporary folder, and the documents it can be served.
 
+mod fake_java;
+
+pub(crate) use fake_java::{ECHO_ARGS, fake_java, install_java};
+
 use std::collections::BTreeMap;
-use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex as StdMutex};
 
@@ -255,15 +258,6 @@ pub(crate) fn publish_release_with(world: &World, arguments: &str) {
     );
 }
 
-pub(crate) fn fake_java(world: &World, script: &str) {
-    let jdk = world.service.layout().runtimes().join("jdk-21");
-    std::fs::create_dir_all(jdk.join("bin")).unwrap();
-    std::fs::write(jdk.join("release"), "JAVA_VERSION=\"21.0.1\"\n").unwrap();
-    let java = jdk.join("bin/java");
-    std::fs::write(&java, format!("#!/bin/sh\n{script}\n")).unwrap();
-    std::fs::set_permissions(&java, std::fs::Permissions::from_mode(0o755)).unwrap();
-}
-
 pub(crate) fn assert_send<T: Send>(_: &T) {}
 
 /// An instance with a profile holding one world file.
@@ -455,8 +449,6 @@ pub(crate) async fn launch_to_end(world: &World, id: &str) -> Result<GameExit, S
     let (tx, _rx) = mpsc::unbounded_channel();
     world.service.launch(id, tx, CancellationToken::new()).await
 }
-
-pub(crate) const ECHO_ARGS: &str = "echo \"Setting user: x\"\necho \"$*\" > \"$INST_DIR/args.txt\"";
 
 /// Publishes releases `ids` (each a one-file client) and a catalog listing them.
 pub(crate) fn publish_versions(world: &World, ids: &[&str]) {

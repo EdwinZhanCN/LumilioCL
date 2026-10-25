@@ -1,4 +1,3 @@
-use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -55,13 +54,11 @@ fn world(java_script: &str) -> World {
     std::fs::write(server.join("1.0.json"), &manifest).unwrap();
     let manifest_url = url::Url::from_file_path(server.join("1.0.json")).unwrap();
 
-    // A fake JDK 21 whose "java" is a script.
+    // A fake JDK 21 whose "java" acts out `java_script`.
     let jdk = root.join("runtimes/jdk-21");
-    std::fs::create_dir_all(jdk.join("bin")).unwrap();
+    std::fs::create_dir_all(&jdk).unwrap();
     std::fs::write(jdk.join("release"), "JAVA_VERSION=\"21.0.1\"\n").unwrap();
-    let java = jdk.join("bin/java");
-    std::fs::write(&java, format!("#!/bin/sh\n{java_script}\n")).unwrap();
-    std::fs::set_permissions(&java, std::fs::Permissions::from_mode(0o755)).unwrap();
+    crate::testing::install_java(&jdk.join("bin"), java_script);
 
     let mut store = InstanceStore::open(&root).unwrap();
     let instance = store
@@ -163,7 +160,7 @@ async fn run_to_end(
 
 #[tokio::test]
 async fn invalid_effective_memory_fails_before_installing_or_starting() {
-    let mut world = world("echo 'Setting user: Steve'");
+    let mut world = world("print Setting user: Steve");
     world.request.instance.settings.min_memory_mb = Some(4096);
     let (result, updates) = run_to_end(&launcher(), world.request).await;
     assert!(matches!(result, Err(LaunchServiceError::InvalidMemory)));
@@ -188,7 +185,7 @@ fn session_of(updates: &[LaunchUpdate]) -> LaunchSession {
 
 #[tokio::test]
 async fn installs_then_runs_a_release_end_to_end() {
-    let world = world("echo \"Setting user: $*\"\nexit 0");
+    let world = world("print Setting user: $*\nexit 0");
     let (result, updates) = run_to_end(&launcher(), world.request.clone()).await;
     let exit = result.unwrap();
     assert_eq!(exit.code, Some(0));
@@ -231,7 +228,7 @@ async fn installs_then_runs_a_release_end_to_end() {
 
 #[tokio::test]
 async fn a_second_launch_skips_the_install() {
-    let world = world("echo \"Setting user: x\"");
+    let world = world("print Setting user: x");
     let launcher = launcher();
     run_to_end(&launcher, world.request.clone())
         .await
@@ -247,7 +244,7 @@ async fn a_second_launch_skips_the_install() {
 
 #[tokio::test]
 async fn a_second_instance_of_the_same_version_installs_nothing() {
-    let world = world("echo \"Setting user: x\"");
+    let world = world("print Setting user: x");
     let launcher = launcher();
     run_to_end(&launcher, world.request.clone())
         .await
@@ -283,7 +280,7 @@ async fn a_second_instance_of_the_same_version_installs_nothing() {
 
 #[tokio::test]
 async fn a_damaged_client_is_repaired_on_the_next_launch() {
-    let world = world("echo \"Setting user: x\"");
+    let world = world("print Setting user: x");
     let launcher = launcher();
     run_to_end(&launcher, world.request.clone())
         .await
@@ -333,14 +330,13 @@ async fn releases_up_to_1_7_2_get_the_assets_folder_their_catalog_lays_out() {
         });
         std::fs::write(&manifest_path, manifest.to_string()).unwrap();
         let arguments = world._dir.path().join("arguments");
-        std::fs::write(
-            world.root.join("runtimes/jdk-21/bin/java"),
-            format!(
-                "#!/bin/sh\nprintf '%s\\n' \"$@\" > '{}'\necho \"Setting user: x\"\n",
+        crate::testing::install_java(
+            &world.root.join("runtimes/jdk-21/bin"),
+            &format!(
+                "args-lines > {}\nprint Setting user: x",
                 arguments.display()
             ),
-        )
-        .unwrap();
+        );
         let objects = url::Url::from_directory_path(server.join("objects")).unwrap();
         let chain = SourceChain::new([
             Arc::new(
@@ -391,7 +387,7 @@ async fn releases_up_to_1_7_2_get_the_assets_folder_their_catalog_lays_out() {
 
 #[tokio::test]
 async fn progress_reports_item_counts_for_the_download_phase() {
-    let world = world("echo \"Setting user: x\"");
+    let world = world("print Setting user: x");
     let (_, updates) = run_to_end(&launcher(), world.request.clone()).await;
     let counts: Vec<_> = updates
         .iter()
@@ -429,7 +425,7 @@ async fn a_missing_java_fails_with_a_clear_reason_and_a_terminal_signal() {
 
 #[tokio::test]
 async fn a_game_that_dies_at_once_fails_the_session_with_what_it_printed() {
-    let world = world("echo 'Exception in thread \"main\"' >&2\necho '\tat Main' >&2\nexit 1");
+    let world = world("eprint Exception in thread \"main\"\neprint \tat Main\nexit 1");
     let (result, updates) = run_to_end(&launcher(), world.request.clone()).await;
     assert_eq!(result.unwrap().code, Some(1));
     let LaunchStatus::Failed { failure, .. } = session_of(&updates).status().clone() else {
@@ -453,7 +449,7 @@ async fn a_game_that_dies_at_once_fails_the_session_with_what_it_printed() {
 
 #[tokio::test]
 async fn the_games_output_stays_in_its_logs_folder() {
-    let world = world("echo 'Setting user: Steve'\necho playing >&2\nexit 0");
+    let world = world("print Setting user: Steve\neprint playing\nexit 0");
     let (result, _) = run_to_end(&launcher(), world.request.clone()).await;
     assert_eq!(result.unwrap().code, Some(0));
     let record = std::fs::read_to_string(
@@ -576,7 +572,7 @@ fn make_fabric(world: &mut World) {
 
 #[tokio::test]
 async fn a_fabric_instance_installs_its_profile_and_starts_the_loader() {
-    let mut world = world("echo \"Setting user: $*\"\nexit 0");
+    let mut world = world("print Setting user: $*\nexit 0");
     make_fabric(&mut world);
     assert_eq!(
         world.request.instance.release_id().as_deref(),
@@ -623,7 +619,7 @@ async fn a_fabric_instance_installs_its_profile_and_starts_the_loader() {
 
 #[tokio::test]
 async fn an_installed_loader_instance_launches_without_any_network_address() {
-    let mut world = world("echo \"Setting user: $*\"");
+    let mut world = world("print Setting user: $*");
     make_fabric(&mut world);
     let launcher = launcher();
     run_to_end(&launcher, world.request.clone())

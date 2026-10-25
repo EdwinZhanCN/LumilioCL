@@ -318,7 +318,7 @@ async fn a_failing_command_before_launch_stops_the_game_but_one_after_exit_does_
     publish_release(&world);
     fake_java(
         &world,
-        "echo \"Setting user: x\"\necho ran > \"$INST_DIR/ran.txt\"",
+        "print Setting user: x\nwrite ran > $INST_DIR/ran.txt",
     );
     let record = world
         .service

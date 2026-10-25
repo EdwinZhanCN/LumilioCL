@@ -235,6 +235,7 @@ fn duplicate_copies_everything_and_never_overwrites() {
     assert_eq!(size(&game, "w").unwrap(), size(&game, "w copy").unwrap());
 }
 
+#[cfg(unix)]
 #[test]
 fn linked_saves_or_worlds_are_refused_and_never_followed() {
     let (dir, game) = game();
