@@ -12,13 +12,13 @@ use std::fs;
 #[cfg(test)]
 use std::path::Path;
 
-#[cfg(test)]
-use pack_index::INDEX;
-pub(crate) use pack_index::is_safe_relative;
 pub use pack_index::{
     ClientSupport, ModpackError, OVERRIDES_LIMIT, PackFile, PackIndex, PendingDownload,
     extract_overrides, import, import_index, is_trusted_source, parse_index, plan, read_index,
 };
+#[cfg(test)]
+use pack_index::{INDEX, override_path};
+pub(crate) use pack_index::{is_safe_relative, zip_entry_path};
 
 #[cfg(test)]
 use crate::activity::CancellationToken;

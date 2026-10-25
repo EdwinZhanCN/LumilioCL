@@ -197,6 +197,29 @@ fn overrides_extract_with_client_overrides_winning_and_no_escapes() {
     assert!(!game.join("ignored.txt").exists());
 }
 
+#[test]
+fn override_entries_match_their_folder_in_the_windows_path_form() {
+    // On Windows the zip reader returns `overrides/config/a.toml` as
+    // `overrides\config\a.toml`.
+    let target = |name: &str, folder: &str| override_path(Path::new(name), folder);
+    assert_eq!(
+        target("overrides\\config\\a.toml", "overrides/").as_deref(),
+        Some("config/a.toml")
+    );
+    assert_eq!(
+        target("overrides/config/a.toml", "overrides/").as_deref(),
+        Some("config/a.toml")
+    );
+    assert_eq!(
+        target("client-overrides\\options.txt", "client-overrides/").as_deref(),
+        Some("options.txt")
+    );
+    assert_eq!(target("client-overrides\\options.txt", "overrides/"), None);
+    assert_eq!(target("overrides\\..\\escape.txt", "overrides/"), None);
+    assert_eq!(target("overrides\\C:\\escape.txt", "overrides/"), None);
+    assert_eq!(target("overrides", "overrides/"), None);
+}
+
 fn server_with(dir: &Path, name: &str, body: &str) -> String {
     let path = dir.join(name);
     fs::write(&path, body).unwrap();

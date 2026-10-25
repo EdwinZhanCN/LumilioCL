@@ -182,6 +182,22 @@ pub(crate) fn is_safe_relative(path: &str) -> bool {
             .all(|part| !part.is_empty() && part != "." && part != "..")
 }
 
+/// The `/`-separated text of a zip entry's enclosed name. The zip reader
+/// splits names on both `/` and `\` and returns a native path, `\`-separated
+/// on Windows, while pack folders and the launcher's relative paths use `/`.
+pub(crate) fn zip_entry_path(name: &Path) -> Option<String> {
+    name.to_str().map(|name| name.replace('\\', "/"))
+}
+
+/// Where a zip entry inside `folder` (ending in `/`) goes below the game
+/// directory: `None` when it lies outside `folder` or is not a safe path.
+pub(super) fn override_path(name: &Path, folder: &str) -> Option<String> {
+    zip_entry_path(name)?
+        .strip_prefix(folder)
+        .filter(|relative| is_safe_relative(relative))
+        .map(str::to_owned)
+}
+
 /// Parses `modrinth.index.json`.
 ///
 /// Requires format version 1, game `minecraft`, a `minecraft` dependency, at
@@ -345,11 +361,7 @@ pub fn extract_folders(
             let Some(name) = entry.enclosed_name() else {
                 continue;
             };
-            let Some(relative) = name
-                .to_str()
-                .and_then(|text| text.strip_prefix(folder.as_str()))
-                .filter(|relative| is_safe_relative(relative))
-            else {
+            let Some(relative) = override_path(&name, folder) else {
                 continue;
             };
             if entry.is_dir() {

@@ -15,7 +15,7 @@ use std::{fmt, fs, io};
 use serde::{Deserialize, Serialize};
 
 use crate::activity::CancellationToken;
-use crate::instances::modpack::is_safe_relative;
+use crate::instances::modpack::{is_safe_relative, zip_entry_path};
 use crate::instances::{InstanceSettings, Loader};
 
 const META: &str = "lumilio-backup.json";
@@ -193,9 +193,7 @@ pub fn restore(
         let Some(name) = entry.enclosed_name() else {
             continue;
         };
-        let Some(relative) = name
-            .to_str()
-            .map(|name| name.replace('\\', "/"))
+        let Some(relative) = zip_entry_path(&name)
             .and_then(|name| name.strip_prefix(GAME).map(str::to_owned))
             .filter(|relative| !relative.is_empty() && is_safe_relative(relative))
         else {
