@@ -1,6 +1,6 @@
 # Runs `just ci` (the justfile is the single source of truth for checks).
 #
-# Runs the tests on Windows (`windows`).
+# Runs the tests on Windows (`windows`) on main and on request.
 #
 # `rust`, `plans` and `web` are required checks on main. A workflow that a
 # path filter never starts leaves its check pending forever, but a skipped job
@@ -84,9 +84,14 @@ jobs:
   # and macOS allow (issue #99). The other
   # checks are platform-independent and stay in `rust`. Not yet required on
   # main: it becomes required once its known failures are fixed.
+  #
+  # A build without a cache takes about half an hour, so pull requests do not
+  # start it. Pushes to main run it and keep the cache that other branches
+  # start from; for a branch, run `gh workflow run ci.yml --ref BRANCH`, once
+  # for several fixes merged into one branch (plan windows-ci, D2).
   windows:
     needs: changes
-    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.run == 'true') }}
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && (needs.changes.result != 'success' || needs.changes.outputs.run == 'true') }}
     # The runner that builds the Windows release.
     runs-on: windows-2022
     timeout-minutes: 90
