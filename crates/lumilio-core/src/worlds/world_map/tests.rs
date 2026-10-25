@@ -82,6 +82,21 @@ fn cache_hits_and_lru_eviction() {
     assert_eq!(cache.get(&c).unwrap(), Some(TileReply::Empty));
 }
 #[test]
+fn an_entry_that_cannot_be_marked_used_is_still_a_hit() {
+    let dir = tempfile::tempdir().unwrap();
+    let cache = TileCache::new(dir.path().to_owned());
+    let a = request();
+    cache.put(&a, &TileReply::Empty).unwrap();
+    // A read-only entry cannot be opened for writing to mark it used.
+    for entry in std::fs::read_dir(dir.path()).unwrap() {
+        let path = entry.unwrap().path();
+        let mut permissions = std::fs::metadata(&path).unwrap().permissions();
+        permissions.set_readonly(true);
+        std::fs::set_permissions(&path, permissions).unwrap();
+    }
+    assert_eq!(cache.get(&a).unwrap(), Some(TileReply::Empty));
+}
+#[test]
 fn visible_tiles_include_negative_prefetch_and_center_first() {
     let viewport = Viewport {
         x: -128.0,

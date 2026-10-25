@@ -2,7 +2,6 @@
 //! authorized original URL only through the host-owned SourceChain.
 
 use std::sync::{Arc, RwLock};
-use std::time::Duration;
 
 use futures_util::StreamExt;
 use lumilio_plugin_api::{
@@ -39,7 +38,8 @@ impl Network {
             .expect("plugin network state lock was poisoned") = Some(sources);
     }
 
-    pub(super) fn context(&self, timeout: Duration) -> NetworkContext {
+    /// A context whose reads give up at `deadline`, the calling plugin's own.
+    pub(super) fn context(&self, deadline: Instant) -> NetworkContext {
         NetworkContext {
             transport: self.transport.clone(),
             sources: self
@@ -48,7 +48,7 @@ impl Network {
                 .expect("plugin network state lock was poisoned")
                 .clone(),
             handle: Handle::current(),
-            deadline: Instant::now() + timeout,
+            deadline,
         }
     }
 }

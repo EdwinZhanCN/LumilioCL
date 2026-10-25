@@ -231,7 +231,12 @@ fn a_file_where_a_folder_should_be_is_named_in_the_error() {
     else {
         panic!("resolving below a file must fail");
     };
-    assert!(message.contains("dim%-1"), "{message}");
+    // The file itself, not the path below it, which each system reports
+    // differently.
+    assert!(
+        message.contains("dim%-1") && !message.contains("mw$default_1.txt"),
+        "{message}"
+    );
 }
 
 #[test]

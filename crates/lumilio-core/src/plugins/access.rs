@@ -64,15 +64,23 @@ pub(super) fn resolve(
 
 /// `clean` below `game_dir`, refusing a symbolic link on the way. The path
 /// need not exist: once a part is missing, the parts after it are appended
-/// unchecked, so the result is always the whole path asked for.
+/// unchecked, so the result is always the whole path asked for. A file on
+/// the way is named: Unix reports the part after it as not a directory, but
+/// Windows reports it missing, which would let the path through.
 fn below(game_dir: &Path, clean: &Path) -> Result<PathBuf, PluginError> {
     let mut full = game_dir.to_path_buf();
-    let mut parts = clean.components();
+    let mut parts = clean.components().peekable();
     while let Some(part) = parts.next() {
         full.push(part);
         match std::fs::symlink_metadata(&full) {
             Ok(meta) if meta.file_type().is_symlink() => {
                 return Err(PluginError::PermissionDenied);
+            }
+            Ok(meta) if !meta.is_dir() && parts.peek().is_some() => {
+                return Err(PluginError::Unavailable(format!(
+                    "{} is a file, not a folder",
+                    full.display()
+                )));
             }
             Ok(_) => {}
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
@@ -220,14 +228,14 @@ pub(super) fn read_range(
         return Err(PluginError::InvalidInput("range is too large".into()));
     }
     let full = resolve(game_dir, manifest, relative)?;
-    let mut file =
-        std::fs::File::open(&full).map_err(|error| PluginError::Unavailable(error.to_string()))?;
-    let meta = file
-        .metadata()
-        .map_err(|error| PluginError::Unavailable(error.to_string()))?;
+    // Asked before opening: Windows refuses to open a directory at all.
+    let meta =
+        std::fs::metadata(&full).map_err(|error| PluginError::Unavailable(error.to_string()))?;
     if !meta.is_file() {
         return Err(PluginError::InvalidInput("not a file".into()));
     }
+    let mut file =
+        std::fs::File::open(&full).map_err(|error| PluginError::Unavailable(error.to_string()))?;
     // Past the end is an empty range, however far past (a seek beyond
     // `i64::MAX` would be an error instead).
     if offset >= meta.len() {
