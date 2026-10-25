@@ -1,13 +1,9 @@
-//! Connects the interface to the launcher service (plan 0007).
-//!
-//! The shell only renders and reports intents. Here each intent becomes work on
-//! the worker runtime, and each result is handed back to the shell on the
-//! interface thread. The shell is never touched from inside one of its own
-//! updates: results always arrive from a spawned task.
+//! Builds the shell on the launcher service and adapts what only the
+//! application owns: saved preferences and how they look, the terms, the
+//! updater, the clipboard and the review hooks. The shell and its features
+//! answer the pages themselves (plan workspace-architecture, D16).
 
-mod context;
 mod dispatch;
-mod jobs;
 mod open_game;
 mod recovery_review;
 mod settings;
@@ -21,5 +17,5 @@ mod wiring;
 
 #[cfg(test)]
 use wiring::State;
+use wiring::Wiring;
 pub use wiring::build;
-use wiring::{ACTIVITY_LIMIT, Reload, Wiring};

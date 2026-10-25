@@ -1,9 +1,22 @@
-mod dependencies;
 mod global_context;
 mod missing_folder;
 mod terms;
 
 use lumilio_ui::toast::{Toast, outcome};
+
+/// Starts the shell following the launcher, as the application does.
+fn follow(shell: &gpui_kit::Entity<lumilio_ui::LauncherShell>, cx: &mut gpui_kit::App) {
+    shell.update(cx, |shell, cx| shell.follow_launcher(cx));
+}
+
+/// Makes `id` the current game, as choosing it anywhere does.
+fn choose_current(
+    shell: &gpui_kit::Entity<lumilio_ui::LauncherShell>,
+    id: String,
+    cx: &mut gpui_kit::App,
+) {
+    shell.update(cx, |shell, cx| shell.choose_current(id, cx));
+}
 
 #[gpui_kit::test]
 fn home_snapshot_and_rapid_selection_keep_the_last_game(cx: &mut gpui_kit::TestAppContext) {
@@ -18,8 +31,6 @@ fn home_snapshot_and_rapid_selection_keep_the_last_game(cx: &mut gpui_kit::TestA
     use lumilio_ui::LauncherShell;
     use lumilio_ui::home::HomePresentation;
 
-    use super::context::follow;
-    use super::wiring::choose_current;
     use super::{State, Wiring};
     use crate::backend::Backend;
 
@@ -52,7 +63,7 @@ fn home_snapshot_and_rapid_selection_keep_the_last_game(cx: &mut gpui_kit::TestA
         shell: shell.downgrade(),
         state: Rc::new(RefCell::new(State::default())),
     };
-    cx.update(|cx| follow(&wiring, cx));
+    cx.update(|cx| follow(&shell, cx));
     let wait = |cx: &mut gpui_kit::TestAppContext, wanted: &str| {
         let until = Instant::now() + Duration::from_secs(5);
         loop {
@@ -70,8 +81,8 @@ fn home_snapshot_and_rapid_selection_keep_the_last_game(cx: &mut gpui_kit::TestA
     };
     wait(cx, &b);
     cx.update(|cx| {
-        choose_current(&wiring, b.clone(), cx);
-        choose_current(&wiring, a.clone(), cx);
+        choose_current(&shell, b.clone(), cx);
+        choose_current(&shell, a.clone(), cx);
     });
     wait(cx, &a);
     let service = wiring.backend.service.clone();
@@ -242,7 +253,7 @@ fn technical_details_after_a_failed_launch_explain_it(cx: &mut gpui_kit::TestApp
     use lumilio_ui::instance_detail::TAB_DIAGNOSTICS;
     use lumilio_ui::route::Route;
 
-    use super::dispatch::{on_live_intent, on_shell_intent};
+    use super::dispatch::on_live_intent;
     use super::{State, Wiring};
     use crate::backend::Backend;
 
@@ -263,35 +274,21 @@ fn technical_details_after_a_failed_launch_explain_it(cx: &mut gpui_kit::TestApp
         cx.set_reduce_motion(true);
     });
     let cell: Rc<RefCell<Option<Wiring>>> = Rc::default();
-    let (on_shell, on_live) = {
-        let (shell_cell, live_cell) = (cell.clone(), cell.clone());
-        (
-            Rc::new(
-                move |intent, window: &mut gpui_kit::Window, cx: &mut gpui_kit::App| {
-                    let wiring = shell_cell.borrow().clone();
-                    if let Some(wiring) = wiring {
-                        on_shell_intent(&wiring, intent, window, cx);
-                    }
-                },
-            ),
-            Rc::new(
-                move |intent, window: &mut gpui_kit::Window, cx: &mut gpui_kit::App| {
-                    let wiring = live_cell.borrow().clone();
-                    if let Some(wiring) = wiring {
-                        on_live_intent(&wiring, intent, window, cx);
-                    }
-                },
-            ),
+    let on_live = {
+        let cell = cell.clone();
+        Rc::new(
+            move |intent, window: &mut gpui_kit::Window, cx: &mut gpui_kit::App| {
+                let wiring = cell.borrow().clone();
+                if let Some(wiring) = wiring {
+                    on_live_intent(&wiring, intent, window, cx);
+                }
+            },
         )
     };
     let slot: Rc<RefCell<Option<Entity<LauncherShell>>>> = Rc::default();
     let keep = slot.clone();
     let (_, cx) = cx.add_window_view(|window, cx| {
-        let shell = cx.new(|cx| {
-            LauncherShell::new(cx)
-                .with_intent_handler(on_shell)
-                .with_live(on_live)
-        });
+        let shell = cx.new(|cx| LauncherShell::new(cx).with_live(on_live));
         *keep.borrow_mut() = Some(shell.clone());
         gpui_kit::component::Root::new(shell, window, cx)
     });
@@ -432,9 +429,7 @@ fn curseforge_through_the_page(cx: &mut gpui_kit::TestAppContext) {
     use lumilio_ui::route::Route;
     use sha1::{Digest, Sha1};
 
-    use super::context::follow;
     use super::dispatch::on_live_intent;
-    use super::wiring::choose_current;
     use super::{State, Wiring};
     use crate::backend::Backend;
 
@@ -527,8 +522,8 @@ fn curseforge_through_the_page(cx: &mut gpui_kit::TestAppContext) {
 
     // The game to install into, and Discover's first search.
     cx.update(|_, cx| {
-        follow(&wiring, cx);
-        choose_current(&wiring, game.id.clone(), cx);
+        follow(&shell, cx);
+        choose_current(&shell, game.id.clone(), cx);
     });
     let id = game.id.clone();
     until(cx, "the install target", 10, &|cx| {

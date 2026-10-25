@@ -1,10 +1,9 @@
-use std::rc::Rc;
-
 use gpui::prelude::*;
 use gpui::{App, Context, Entity, FocusHandle, Subscription, Task, WeakEntity, Window};
 
 use super::current::CurrentChoices;
 use super::detail::DetailSlot;
+use super::feed::Feed;
 use super::locations::{HISTORY_LIMIT, Location};
 use crate::features::accounts::{Accounts, AccountsEvent};
 use crate::features::activity::Activity;
@@ -12,7 +11,7 @@ use crate::features::discover::{Discover, DiscoverEvent};
 use crate::features::game::{Game, GameEvent};
 use crate::features::launch::{Launch, LaunchEvent};
 use crate::features::library::Library;
-use crate::features::new_game::NewGame;
+use crate::features::new_game::{NewGame, NewGameEvent};
 use crate::features::settings::{Settings, SettingsEvent};
 use crate::hero::HeroCarousel;
 use crate::history::History;
@@ -49,7 +48,9 @@ pub enum ShellIntent {
     Home(HomeIntent),
 }
 
-pub type IntentHandler = Rc<dyn Fn(ShellIntent, &mut Window, &mut App)>;
+/// What a test hears of each intent the shell answered.
+#[cfg(test)]
+pub(crate) type IntentHandler = std::rc::Rc<dyn Fn(ShellIntent, &mut Window, &mut App)>;
 
 pub struct LauncherShell {
     pub(super) route: Route,
@@ -57,6 +58,7 @@ pub struct LauncherShell {
     pub(super) hero: Entity<HeroCarousel>,
     pub(super) activity: ActivitySummary,
     pub(super) focus_handle: FocusHandle,
+    #[cfg(test)]
     pub(super) intent_handler: Option<IntentHandler>,
     pub(super) last_intent: Option<ShellIntent>,
     /// Refreshes the play-time readout while the game runs; nothing else ticks then.
@@ -108,6 +110,12 @@ pub struct LauncherShell {
     pub(super) _accounts_events: Subscription,
     /// What core last published (see `mirror`).
     pub(super) context: lumilio_core::Context,
+    /// Keeps the pages fed once the shell follows the launcher.
+    pub(super) feed: Option<Feed>,
+    /// Reads the lists again when a feature says they changed.
+    pub(super) _lists_events: Vec<Subscription>,
+    /// Shows a new game and makes it current; an open page reads its download.
+    pub(super) _new_game_events: Subscription,
 }
 
 impl LauncherShell {
@@ -125,20 +133,23 @@ impl LauncherShell {
             });
         let accounts = cx.new(|_| Accounts::new(None));
         let accounts_events =
-            cx.subscribe(&accounts, |_, _, event: &AccountsEvent, cx| match event {
-                AccountsEvent::FacesChanged => cx.notify(),
-                // An account was added for a launch that waited for one.
-                AccountsEvent::Continue(window) => {
-                    let (window, shell) = (*window, cx.weak_entity());
-                    cx.defer(move |cx| {
-                        let _ = cx.update_window(window, |_, window, cx| {
-                            let _ =
-                                shell.update(cx, |shell, cx| shell.request_continue(window, cx));
+            cx.subscribe(
+                &accounts,
+                |shell, _, event: &AccountsEvent, cx| match event {
+                    AccountsEvent::FacesChanged => cx.notify(),
+                    // An account was added for a launch that waited for one.
+                    AccountsEvent::Continue(window) => {
+                        let (window, shell) = (*window, cx.weak_entity());
+                        cx.defer(move |cx| {
+                            let _ = cx.update_window(window, |_, window, cx| {
+                                let _ = shell
+                                    .update(cx, |shell, cx| shell.request_continue(window, cx));
+                            });
                         });
-                    });
-                }
-                AccountsEvent::ListsChanged => {}
-            });
+                    }
+                    AccountsEvent::ListsChanged => shell.reload_lists(cx),
+                },
+            );
         let game = cx.new(|cx| Game::new(None, cx));
         let launch = cx.new(|_| Launch::new(None));
         let game_events = cx.subscribe(&game, |shell, _, event: &GameEvent, cx| match event {
@@ -159,17 +170,21 @@ impl LauncherShell {
                 }
                 LaunchEvent::Ended => {}
             });
+        let new_game_events = cx.subscribe(&new_game, |shell, _, event: &NewGameEvent, cx| {
+            shell.new_game_event(event, cx);
+        });
         let discover_events = cx.subscribe(&discover, |shell, _, event: &DiscoverEvent, cx| {
             if let DiscoverEvent::ProjectOpened(opened) = event {
                 shell.show_project(opened.clone(), cx);
             }
         });
-        Self {
+        let mut shell = Self {
             route: Route::Home,
             home: home::initial_presentation(),
             hero: cx.new(HeroCarousel::new),
             activity: ActivitySummary::new(0),
             focus_handle: cx.focus_handle(),
+            #[cfg(test)]
             intent_handler: None,
             last_intent: None,
             play_clock: None,
@@ -197,7 +212,12 @@ impl LauncherShell {
             _discover_events: discover_events,
             _accounts_events: accounts_events,
             context: lumilio_core::Context::default(),
-        }
+            feed: None,
+            _lists_events: Vec::new(),
+            _new_game_events: new_game_events,
+        };
+        shell._lists_events = shell.follow_lists(cx);
+        shell
     }
 
     /// Tells what just happened, as a toast over whatever page is showing.
@@ -277,9 +297,10 @@ impl LauncherShell {
         self
     }
 
-    /// The application receives every intent, after the shell and its
-    /// features have answered theirs.
-    pub fn with_intent_handler(mut self, handler: IntentHandler) -> Self {
+    /// A test hears every intent, after the shell and its features have
+    /// answered it.
+    #[cfg(test)]
+    pub(crate) fn with_intent_handler(mut self, handler: IntentHandler) -> Self {
         self.intent_handler = Some(handler);
         self
     }
@@ -315,9 +336,13 @@ impl LauncherShell {
                 self.launch.read(cx).stop();
             }
             ShellIntent::Home(HomeIntent::TechnicalDetails) => self.technical_details(window, cx),
+            ShellIntent::Navigate(Route::Library | Route::Activity | Route::Accounts) => {
+                self.reload_lists(cx);
+            }
             _ => {}
         }
         self.last_intent = Some(intent);
+        #[cfg(test)]
         if let Some(handler) = &self.intent_handler {
             handler(intent, window, cx);
         }

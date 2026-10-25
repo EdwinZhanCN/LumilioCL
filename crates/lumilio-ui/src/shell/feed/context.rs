@@ -3,15 +3,13 @@
 //! (plan global-context, T4). Handlers only ask core to change something;
 //! what the pages show of it arrives here, whoever made the change.
 
-use gpui_kit::App;
+use gpui::App;
 use lumilio_core::{Context, HomeChecks, InstanceRecord, Session, unix_now};
-use lumilio_ui::home::HomePresentation;
-use lumilio_ui::live::{
-    account_rows, attention_rows, home_places, home_presentation, library_cards,
-};
 
-use super::Wiring;
-use super::jobs::{installed_changed, refresh_installed};
+use super::Feed;
+use super::lists::{installed_changed, refresh_installed};
+use crate::home::HomePresentation;
+use crate::live::{account_rows, attention_rows, home_places, home_presentation, library_cards};
 
 /// What a change makes out of date: the dependency table of decision D6,
 /// as code. A new derived result is added here with its own test.
@@ -80,9 +78,9 @@ pub(super) struct Checked {
 /// Starts following core: what it publishes now, then every change. The
 /// watch keeps only the newest snapshot, so a burst of changes is followed
 /// once.
-pub(super) fn follow(wiring: &Wiring, cx: &mut App) {
-    let mut changes = wiring.backend.service.subscribe_context();
-    let wiring = wiring.clone();
+pub(in crate::shell) fn follow(feed: &Feed, cx: &mut App) {
+    let mut changes = feed.worker.service().subscribe_context();
+    let feed = feed.clone();
     cx.spawn(async move |cx| {
         let mut seen: Option<Context> = None;
         loop {
@@ -90,10 +88,10 @@ pub(super) fn follow(wiring: &Wiring, cx: &mut App) {
             let what = stale(seen.as_ref(), &now);
             let mirrored = now.clone();
             cx.update(|cx| {
-                mirror(&wiring, mirrored, cx);
-                apply(&wiring, what, cx);
+                mirror(&feed, mirrored, cx);
+                apply(&feed, what, cx);
                 if what.session {
-                    session_moved(&wiring, seen.as_ref(), &now, cx);
+                    session_moved(&feed, seen.as_ref(), &now, cx);
                 }
             });
             seen = Some(now);
@@ -108,35 +106,35 @@ pub(super) fn follow(wiring: &Wiring, cx: &mut App) {
 /// Writes the interface's copy first, so everything worked out below reads
 /// the new choice. Discover ends browsing for a game that is no longer
 /// current and searches again without its locks (D3).
-fn mirror(wiring: &Wiring, context: Context, cx: &mut App) {
-    let _ = wiring
+fn mirror(feed: &Feed, context: Context, cx: &mut App) {
+    let _ = feed
         .shell
         .update(cx, |shell, cx| shell.follow_context(context, cx));
 }
 
-fn apply(wiring: &Wiring, what: Stale, cx: &mut App) {
+fn apply(feed: &Feed, what: Stale, cx: &mut App) {
     if what.installed {
-        installed_changed(wiring, cx);
+        installed_changed(feed, cx);
     }
     if what.home {
-        refresh_home(wiring, cx);
+        refresh_home(feed, cx);
     }
     if what.checks {
-        recheck(wiring, cx);
+        recheck(feed, cx);
     } else if what.attention {
-        summarize(wiring, cx);
+        summarize(feed, cx);
     }
     if what.accounts {
-        refresh_accounts(wiring, cx);
+        refresh_accounts(feed, cx);
     }
     if what.plugins {
-        refresh_plugins(wiring, cx);
+        refresh_plugins(feed, cx);
     }
 }
 
 /// The game whose session became active, or stopped being active: its
 /// studio windows shut their writes, or list their folder again.
-fn session_moved(wiring: &Wiring, before: Option<&Context>, now: &Context, cx: &mut App) {
+fn session_moved(feed: &Feed, before: Option<&Context>, now: &Context, cx: &mut App) {
     let active = |context: Option<&Context>| {
         context
             .and_then(|context| context.session.as_ref())
@@ -147,7 +145,7 @@ fn session_moved(wiring: &Wiring, before: Option<&Context>, now: &Context, cx: &
     if was == is {
         return;
     }
-    let Ok(game) = wiring.shell.read_with(cx, |shell, _| shell.game().clone()) else {
+    let Ok(game) = feed.shell.read_with(cx, |shell, _| shell.game().clone()) else {
         return;
     };
     game.update(cx, |game, cx| {
@@ -161,25 +159,25 @@ fn session_moved(wiring: &Wiring, before: Option<&Context>, now: &Context, cx: &
 }
 
 /// Whether the context still says what a piece of work was asked for.
-fn still(wiring: &Wiring, same: impl Fn(&Context) -> bool) -> bool {
-    same(&wiring.backend.service.context())
+fn still(feed: &Feed, same: impl Fn(&Context) -> bool) -> bool {
+    same(&feed.worker.service().context())
 }
 
 /// The library cards, the chip, Continue and the worlds and servers of the
 /// game Home continues, from saved records.
-fn refresh_home(wiring: &Wiring, cx: &mut App) {
-    let asked = wiring.backend.service.context();
-    let service = wiring.backend.service.clone();
-    let handle = wiring
-        .backend
+fn refresh_home(feed: &Feed, cx: &mut App) {
+    let asked = feed.worker.service().context();
+    let service = feed.worker.service().clone();
+    let handle = feed
+        .worker
         .spawn(async move { service.home_snapshot().await });
-    let wiring = wiring.clone();
+    let feed = feed.clone();
     cx.spawn(async move |cx| {
-        let Some((records, summary)) = lumilio_ui::runtime::answer(handle, cx).await else {
+        let Some((records, summary)) = crate::runtime::answer(handle, cx).await else {
             return;
         };
         // A newer change is followed on its own.
-        if !still(&wiring, |now| {
+        if !still(&feed, |now| {
             now.current_instance == asked.current_instance
                 && now.revisions.library == asked.revisions.library
         }) {
@@ -192,7 +190,7 @@ fn refresh_home(wiring: &Wiring, cx: &mut App) {
             .and_then(|id| records.iter().find(|record| record.id == id))
             .cloned();
         let cards = library_cards(&records, now);
-        let _ = wiring.shell.update(cx, |shell, cx| {
+        let _ = feed.shell.update(cx, |shell, cx| {
             // A launch in progress keeps Home. A failure is explained only
             // while its game is current: choosing another one leaves it to
             // 需要留意.
@@ -221,9 +219,9 @@ fn refresh_home(wiring: &Wiring, cx: &mut App) {
         });
         cx.update(|cx| {
             if let Some(record) = continued {
-                refresh_places(&wiring, record, asked.revisions.library, cx);
+                refresh_places(&feed, record, asked.revisions.library, cx);
             }
-            refresh_installed(&wiring, cx);
+            refresh_installed(&feed, cx);
         });
     })
     .detach();
@@ -231,33 +229,33 @@ fn refresh_home(wiring: &Wiring, cx: &mut App) {
 
 /// Checks each game again from disk; meanwhile Home says it is checking
 /// instead of showing the earlier answer.
-fn recheck(wiring: &Wiring, cx: &mut App) {
-    let asked = wiring.backend.service.context();
-    if let Some(task) = wiring.state.borrow_mut().home_diagnostics.take() {
+fn recheck(feed: &Feed, cx: &mut App) {
+    let asked = feed.worker.service().context();
+    if let Some(task) = feed.state.borrow_mut().home_diagnostics.take() {
         task.abort();
     }
-    let _ = wiring.shell.update(cx, |shell, cx| {
+    let _ = feed.shell.update(cx, |shell, cx| {
         shell.update_live(|model| model.attention_checking = true, cx);
     });
-    let service = wiring.backend.service.clone();
-    let handle = wiring
-        .backend
+    let service = feed.worker.service().clone();
+    let handle = feed
+        .worker
         .spawn(async move { service.home_checks().await });
-    wiring.state.borrow_mut().home_diagnostics = Some(handle.abort_handle());
-    let wiring = wiring.clone();
+    feed.state.borrow_mut().home_diagnostics = Some(handle.abort_handle());
+    let feed = feed.clone();
     cx.spawn(async move |cx| {
-        let Some((records, checks)) = lumilio_ui::runtime::answer(handle, cx).await else {
+        let Some((records, checks)) = crate::runtime::answer(handle, cx).await else {
             return;
         };
         let same = |was: &Context, now: &Context| {
             let (was, now) = (was.revisions, now.revisions);
             was.library == now.library && was.java == now.java && was.plugins == now.plugins
         };
-        if !still(&wiring, |now| same(&asked, now)) {
+        if !still(&feed, |now| same(&asked, now)) {
             return;
         }
         {
-            let mut state = wiring.state.borrow_mut();
+            let mut state = feed.state.borrow_mut();
             state.home_diagnostics = None;
             state.home_checks = Some(Checked {
                 records,
@@ -265,15 +263,15 @@ fn recheck(wiring: &Wiring, cx: &mut App) {
                 made_for: asked,
             });
         }
-        cx.update(|cx| summarize(&wiring, cx));
+        cx.update(|cx| summarize(&feed, cx));
     })
     .detach();
 }
 
 /// 需要留意 from the checks already made and the account now; reads no disk.
-fn summarize(wiring: &Wiring, cx: &mut App) {
+fn summarize(feed: &Feed, cx: &mut App) {
     let Some((records, checks, made_for)) =
-        wiring.state.borrow().home_checks.as_ref().map(|checked| {
+        feed.state.borrow().home_checks.as_ref().map(|checked| {
             (
                 checked.records.clone(),
                 checked.checks.clone(),
@@ -284,32 +282,32 @@ fn summarize(wiring: &Wiring, cx: &mut App) {
         // The first checks are still on their way and summarize when done.
         return;
     };
-    let accounts = wiring.backend.service.context().revisions.accounts;
-    let service = wiring.backend.service.clone();
-    let handle = wiring.backend.spawn(async move {
+    let accounts = feed.worker.service().context().revisions.accounts;
+    let service = feed.worker.service().clone();
+    let handle = feed.worker.spawn(async move {
         let summary = service.home_from(&records, &checks).await;
         (records, summary)
     });
-    let wiring = wiring.clone();
+    let feed = feed.clone();
     cx.spawn(async move |cx| {
-        let Some((records, summary)) = lumilio_ui::runtime::answer(handle, cx).await else {
+        let Some((records, summary)) = crate::runtime::answer(handle, cx).await else {
             return;
         };
         // Newer checks or another account change summarize again.
-        let current_checks = wiring
+        let current_checks = feed
             .state
             .borrow()
             .home_checks
             .as_ref()
             .map(|checked| checked.made_for.revisions);
         if current_checks != Some(made_for)
-            || !still(&wiring, |now| now.revisions.accounts == accounts)
+            || !still(&feed, |now| now.revisions.accounts == accounts)
         {
             return;
         }
         let cards = library_cards(&records, unix_now());
         let rows = attention_rows(&summary.needs_attention, &cards);
-        let _ = wiring.shell.update(cx, |shell, cx| {
+        let _ = feed.shell.update(cx, |shell, cx| {
             shell.update_live(
                 |model| {
                     if model.attention != rows || model.attention_checking {
@@ -325,18 +323,16 @@ fn summarize(wiring: &Wiring, cx: &mut App) {
     .detach();
 }
 
-fn refresh_accounts(wiring: &Wiring, cx: &mut App) {
-    let service = wiring.backend.service.clone();
-    let handle = wiring
-        .backend
-        .spawn(async move { service.settings().await });
-    let wiring = wiring.clone();
+fn refresh_accounts(feed: &Feed, cx: &mut App) {
+    let service = feed.worker.service().clone();
+    let handle = feed.worker.spawn(async move { service.settings().await });
+    let feed = feed.clone();
     cx.spawn(async move |cx| {
-        let Some(settings) = lumilio_ui::runtime::answer(handle, cx).await else {
+        let Some(settings) = crate::runtime::answer(handle, cx).await else {
             return;
         };
         let rows = account_rows(&settings);
-        let _ = wiring.shell.update(cx, |shell, cx| {
+        let _ = feed.shell.update(cx, |shell, cx| {
             shell.update_live(|model| model.set_accounts(rows), cx);
         });
     })
@@ -345,8 +341,8 @@ fn refresh_accounts(wiring: &Wiring, cx: &mut App) {
 
 /// Discover's sources, once it has shown them, and the open game's plugin
 /// tabs.
-fn refresh_plugins(wiring: &Wiring, cx: &mut App) {
-    let Ok((discover, game, open_game)) = wiring.shell.read_with(cx, |shell, _| {
+fn refresh_plugins(feed: &Feed, cx: &mut App) {
+    let Ok((discover, game, open_game)) = feed.shell.read_with(cx, |shell, _| {
         (
             shell.discover().clone(),
             shell.game().clone(),
@@ -365,33 +361,33 @@ fn refresh_plugins(wiring: &Wiring, cx: &mut App) {
 /// Reads the worlds and servers of the game Home continues. A game that
 /// cannot be read just lists nothing; an answer for a game Home has moved
 /// away from meanwhile is dropped.
-fn refresh_places(wiring: &Wiring, record: InstanceRecord, library: u64, cx: &mut App) {
-    let service = wiring.backend.service.clone();
+fn refresh_places(feed: &Feed, record: InstanceRecord, library: u64, cx: &mut App) {
+    let service = feed.worker.service().clone();
     let id = record.id.clone();
-    let handle = wiring.backend.spawn(async move {
+    let handle = feed.worker.spawn(async move {
         (
             service.worlds(&id).await.unwrap_or_default(),
             service.servers(&id).await.unwrap_or_default(),
         )
     });
-    let wiring = wiring.clone();
+    let feed = feed.clone();
     cx.spawn(async move |cx| {
-        let Some((worlds, servers)) = lumilio_ui::runtime::answer(handle, cx).await else {
+        let Some((worlds, servers)) = crate::runtime::answer(handle, cx).await else {
             return;
         };
         let current = |now: &Context| {
             now.current_instance.as_ref() == Some(&record.id) && now.revisions.library == library
         };
-        if !still(&wiring, current) {
+        if !still(&feed, current) {
             return;
         }
         let places = home_places(&record, &worlds, &servers);
         let addresses = places.server_addresses();
-        let _ = wiring.shell.update(cx, |shell, cx| {
+        let _ = feed.shell.update(cx, |shell, cx| {
             shell.update_live(|model| model.home_places = Some(places), cx)
         });
         for address in addresses {
-            cx.update(|cx| ask_place(&wiring, record.id.clone(), address, library, cx));
+            cx.update(|cx| ask_place(&feed, record.id.clone(), address, library, cx));
         }
     })
     .detach();
@@ -399,22 +395,22 @@ fn refresh_places(wiring: &Wiring, record: InstanceRecord, library: u64, cx: &mu
 
 /// Asks one of Home's servers how it is, as the Worlds tab does. An answer
 /// for places Home has read again meanwhile is dropped.
-fn ask_place(wiring: &Wiring, id: String, address: String, library: u64, cx: &mut App) {
-    let service = wiring.backend.service.clone();
+fn ask_place(feed: &Feed, id: String, address: String, library: u64, cx: &mut App) {
+    let service = feed.worker.service().clone();
     let (instance, asked) = (id.clone(), address.clone());
-    let handle = wiring
-        .backend
+    let handle = feed
+        .worker
         .spawn(async move { service.server_status(&instance, &asked).await });
-    let wiring = wiring.clone();
+    let feed = feed.clone();
     cx.spawn(async move |cx| {
-        let answer = lumilio_ui::runtime::answer(handle, cx)
+        let answer = crate::runtime::answer(handle, cx)
             .await
             .and_then(Result::ok)
             .ok_or(());
-        if !still(&wiring, |now| now.revisions.library == library) {
+        if !still(&feed, |now| now.revisions.library == library) {
             return;
         }
-        let _ = wiring.shell.update(cx, |shell, cx| {
+        let _ = feed.shell.update(cx, |shell, cx| {
             shell.update_live(
                 |model| {
                     if let Some(places) = model
@@ -434,6 +430,6 @@ fn ask_place(wiring: &Wiring, id: String, address: String, library: u64, cx: &mu
 
 /// Checks every game again, as if what they depend on had changed: the
 /// person asked for it.
-pub(super) fn check_again(wiring: &Wiring, cx: &mut App) {
-    recheck(wiring, cx);
+pub(in crate::shell) fn check_again(feed: &Feed, cx: &mut App) {
+    recheck(feed, cx);
 }

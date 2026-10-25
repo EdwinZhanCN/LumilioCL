@@ -176,7 +176,7 @@ Consequences: LiveIntent 去掉 Search、LoadFilters、TranslateBody、OpenProje
 
 ## Decision D16
 
-T6 按功能逐个迁移，每个功能一个 PR：先 New Game，再依次处理游戏库、动态、账户与外观、设置、游戏页（实例）与启动；shell 用 shell/features.rs 的路由把它拥有的功能能回答的 LiveIntent 交给该功能，其余仍交给 app，直到 app/live 只剩组装与平台适配。
+T6 按功能逐个迁移，每个功能一个 PR：先 New Game，再依次处理游戏库、动态、账户与外观、设置、游戏页（实例）与启动；shell 用 shell/features.rs 的路由把它拥有的功能能回答的 LiveIntent 交给该功能，其余仍交给 app，直到 app/live 只剩组装与平台适配。 Feed：列表读取与跟随 core 上下文（Home、需要留意、接着玩的世界与服务器、账户与插件）从 app/live 的 jobs.rs 与 context.rs 移入 shell/feed；Feed 持有 Worker、列表读取代次与 Home 检查，D6 的依赖表与其测试随之移动。LauncherShell::follow_launcher 开始跟随；各功能的 ListsChanged/TasksChanged、Launch 的 Ended、Activity 的 Retried、进入游戏库/动态/账户与 LiveIntent::Refresh 都由 shell 自己处理，NewGame 的 Created 与 Installed 也由 shell 打开新游戏、设为当前并让打开着的页面重新读取。app 不再设置 shell 意图处理器，with_intent_handler 只留给测试；Home 的按钮因此不能再以是否有处理器为条件（technical_details_after_a_failed_launch_explain_it 曾因此失败），改为总是交给 shell；Wiring::State 只剩偏好与更新命令，app/live 只剩偏好与外观应用、条款、更新器、复制文本与开发审查钩子。
 
 Why: app/live 约 7000 行，一次搬完无法在真实窗口逐功能核对。路由让已迁移功能的意图不再进入 app，而未迁移的照旧工作，每一步都可运行。后台工作的通用部分（在 Worker 上运行、轮询期间发出任务变化事件、结束时交回界面线程）抽成 runtime::job，Discover 与 New Game 共用，后续功能沿用。
 
