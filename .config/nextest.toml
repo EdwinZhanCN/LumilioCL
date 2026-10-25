@@ -1,0 +1,4 @@
+# The `windows` job in ci.yml runs this profile: it reports every failing
+# test, not only the first.
+[profile.ci]
+fail-fast = false
