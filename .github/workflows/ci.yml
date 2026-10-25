@@ -80,8 +80,8 @@ jobs:
       - run: just ci
 
   # The tests on Windows, where file handles, renames and processes behave
-  # differently: an fsync on a read-only handle passed on Linux and macOS but
-  # failed every multi-connection download on Windows (issue #99). The other
+  # differently: Windows refuses an fsync on a read-only handle, which Linux
+  # and macOS allow (issue #99). The other
   # checks are platform-independent and stay in `rust`. Not yet required on
   # main: it becomes required once its known failures are fixed.
   windows:
@@ -93,10 +93,16 @@ jobs:
     env:
       # Report every failing test, not only the first (.config/nextest.toml).
       NEXTEST_PROFILE: ci
+      # No debug info: a cold build links faster and the cache is smaller.
+      CARGO_PROFILE_DEV_DEBUG: "0"
     steps:
       - uses: actions/checkout@v5
       - run: rustup toolchain install
       - uses: Swatinem/rust-cache@v2
+        with:
+          # While the job has known failures, a failed run still saves the
+          # build for the next one.
+          cache-on-failure: true
       - uses: taiki-e/install-action@v2
         with:
           tool: just,cargo-nextest
