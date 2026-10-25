@@ -167,6 +167,7 @@ fn removal_deletes_files_and_folders_and_rejects_bad_names() {
     assert!(!game.join("shaderpacks/dir").exists());
 }
 
+#[cfg(unix)]
 #[test]
 fn a_linked_kind_folder_is_refused_and_a_linked_file_is_only_itself() {
     let (dir, game) = game();

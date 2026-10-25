@@ -5,6 +5,7 @@ use crate::instances::snapshot_files::{SnapshotError, SnapshotScope};
 use crate::storage::recovery::RecoveryNote;
 use crate::testing::{change_subjects, operation_dirs, reopen, world};
 
+#[cfg(unix)]
 #[tokio::test]
 async fn snapshots_back_up_restore_and_undo_a_failed_restore_under_the_lease() {
     use std::os::unix::fs::PermissionsExt;

@@ -178,6 +178,7 @@ fn installer_made_loaders_keep_the_libraries_and_an_unreadable_asset_index_keeps
     assert!(report.kept.contains(&KeptReason::UnreadableAssetIndex));
 }
 
+#[cfg(unix)]
 #[test]
 fn removal_never_follows_a_link_or_leaves_meta() {
     let (dir, layout) = tree();

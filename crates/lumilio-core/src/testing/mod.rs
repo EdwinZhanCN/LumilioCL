@@ -2,6 +2,7 @@
 //! temporary folder, and the documents it can be served.
 
 use std::collections::BTreeMap;
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex as StdMutex};
@@ -261,6 +262,7 @@ pub(crate) fn fake_java(world: &World, script: &str) {
     std::fs::write(jdk.join("release"), "JAVA_VERSION=\"21.0.1\"\n").unwrap();
     let java = jdk.join("bin/java");
     std::fs::write(&java, format!("#!/bin/sh\n{script}\n")).unwrap();
+    #[cfg(unix)]
     std::fs::set_permissions(&java, std::fs::Permissions::from_mode(0o755)).unwrap();
 }
 

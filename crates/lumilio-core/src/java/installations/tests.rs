@@ -74,6 +74,7 @@ async fn java_is_installed_whole_found_by_discovery_and_a_bad_file_leaves_nothin
         .unwrap();
     assert_eq!(java.major(), 21);
     assert!(java.executable().is_file());
+    #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
         let mode = std::fs::metadata(java.executable())
@@ -190,6 +191,7 @@ async fn graalvm_comes_from_its_archive_and_a_bad_checksum_leaves_nothing() {
         .unwrap();
     assert_eq!(java.home(), runtimes.join("graalvm-21"));
     assert_eq!((java.major(), java.vendor()), (21, Some("Oracle")));
+    #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
         let mode = std::fs::metadata(java.executable())
@@ -282,6 +284,7 @@ async fn a_launch_without_a_fitting_java_downloads_one_unless_turned_off() {
     ) && matches!(task.outcome, TaskOutcome::Succeeded)));
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn a_launch_can_once_set_the_chosen_java_aside_for_the_automatic_one() {
     use std::os::unix::fs::PermissionsExt;

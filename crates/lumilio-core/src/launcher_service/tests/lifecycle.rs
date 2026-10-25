@@ -1,3 +1,4 @@
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
 use tokio::sync::mpsc;
@@ -52,6 +53,7 @@ async fn delete_removes_only_that_profile_and_leaves_no_journal() {
     assert!(operation_dirs(&world).is_empty());
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn failed_isolation_keeps_record_and_profile_and_allows_retry() {
     let world = world();
@@ -101,6 +103,7 @@ async fn failed_library_commit_restores_the_profile() {
     world.service.delete_instance(&record.id).await.unwrap();
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn failed_cleanup_still_deletes_and_the_next_start_finishes_it() {
     let world = world();

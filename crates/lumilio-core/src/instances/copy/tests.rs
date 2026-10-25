@@ -1,5 +1,3 @@
-use std::os::unix::fs::MetadataExt;
-
 use super::*;
 
 fn source() -> (tempfile::TempDir, std::path::PathBuf) {
@@ -23,6 +21,7 @@ fn source() -> (tempfile::TempDir, std::path::PathBuf) {
 #[test]
 fn copies_independent_files_and_leaves_out_volatile_output_and_links() {
     let (dir, game) = source();
+    #[cfg(unix)]
     std::os::unix::fs::symlink(dir.path(), game.join("mods/link")).unwrap();
     let target = dir.path().join("copy");
     let copied = copy_game(&game, &target, true, &CancellationToken::new()).unwrap();
@@ -34,10 +33,6 @@ fn copies_independent_files_and_leaves_out_volatile_output_and_links() {
     assert!(!target.join("logs").exists() && !target.join("crash-reports").exists());
     assert!(!target.join("mods/link").exists());
     // Not hard-linked: editing the copy cannot change the source.
-    assert_ne!(
-        fs::metadata(game.join("options.txt")).unwrap().ino(),
-        fs::metadata(target.join("options.txt")).unwrap().ino()
-    );
     fs::write(target.join("options.txt"), "changed").unwrap();
     assert_eq!(fs::read(game.join("options.txt")).unwrap(), b"fov");
 }
@@ -70,15 +65,18 @@ fn cancelling_stops_the_copy_and_a_linked_game_folder_is_refused() {
         copy_game(&game, &dir.path().join("c1"), true, &cancel),
         Err(CopyError::Cancelled)
     ));
-    let link = dir.path().join("linked-game");
-    std::os::unix::fs::symlink(&game, &link).unwrap();
-    assert!(matches!(
-        copy_game(
-            &link,
-            &dir.path().join("c2"),
-            true,
-            &CancellationToken::new()
-        ),
-        Err(CopyError::Io(_))
-    ));
+    #[cfg(unix)]
+    {
+        let link = dir.path().join("linked-game");
+        std::os::unix::fs::symlink(&game, &link).unwrap();
+        assert!(matches!(
+            copy_game(
+                &link,
+                &dir.path().join("c2"),
+                true,
+                &CancellationToken::new()
+            ),
+            Err(CopyError::Io(_))
+        ));
+    }
 }
