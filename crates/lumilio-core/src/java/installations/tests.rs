@@ -284,23 +284,16 @@ async fn a_launch_without_a_fitting_java_downloads_one_unless_turned_off() {
     ) && matches!(task.outcome, TaskOutcome::Succeeded)));
 }
 
-#[cfg(unix)]
 #[tokio::test]
 async fn a_launch_can_once_set_the_chosen_java_aside_for_the_automatic_one() {
-    use std::os::unix::fs::PermissionsExt;
     let world = world();
     publish_release(&world);
     fake_java(&world, crate::testing::ECHO_ARGS);
     // The person's own Java 17 cannot run a game that needs 21.
     let mine = world._dir.path().join("jdks/old");
-    std::fs::create_dir_all(mine.join("bin")).unwrap();
+    std::fs::create_dir_all(&mine).unwrap();
     std::fs::write(mine.join("release"), "JAVA_VERSION=\"17.0.9\"\n").unwrap();
-    std::fs::write(mine.join("bin/java"), "#!/bin/sh\nexit 3\n").unwrap();
-    std::fs::set_permissions(
-        mine.join("bin/java"),
-        std::fs::Permissions::from_mode(0o755),
-    )
-    .unwrap();
+    crate::testing::install_java(&mine.join("bin"), "exit 3");
     let record = world
         .service
         .create_instance("Run", None, Loader::Vanilla, None)
@@ -382,7 +375,7 @@ async fn adding_a_java_by_its_executable_or_folder_remembers_the_folder() {
 async fn a_java_the_user_turned_off_is_listed_but_never_chosen() {
     let world = world();
     publish_release(&world);
-    fake_java(&world, "echo \"Setting user: x\"");
+    fake_java(&world, "print Setting user: x");
     let record = world
         .service
         .create_instance("Run", None, Loader::Vanilla, None)

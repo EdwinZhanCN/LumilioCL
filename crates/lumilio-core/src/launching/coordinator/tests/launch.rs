@@ -82,7 +82,7 @@ async fn failed_launch_does_not_leave_an_instance_reserved() {
 async fn a_game_whose_folder_was_deleted_is_not_started_as_an_empty_one() {
     let world = world();
     publish_release(&world);
-    fake_java(&world, "echo \"Setting user: x\"");
+    fake_java(&world, "print Setting user: x");
     let record = world
         .service
         .create_instance("Run", None, Loader::Vanilla, None)
@@ -136,7 +136,7 @@ async fn a_game_whose_folder_was_deleted_is_not_started_as_an_empty_one() {
 async fn opening_gives_a_game_never_started_its_folder_but_not_one_that_was_played() {
     let world = world();
     publish_release(&world);
-    fake_java(&world, "echo \"Setting user: x\"");
+    fake_java(&world, "print Setting user: x");
     let mut ids = Vec::new();
     for name in ["Played", "Fresh"] {
         let record = world
@@ -177,7 +177,7 @@ async fn a_game_whose_folder_cannot_be_made_is_not_added() {
 async fn launching_installs_runs_records_and_then_works_offline() {
     let world = world();
     publish_release(&world);
-    fake_java(&world, "echo \"Setting user: x\"");
+    fake_java(&world, "print Setting user: x");
     let record = world
         .service
         .create_instance("Run", None, Loader::Vanilla, None)
@@ -303,7 +303,7 @@ async fn installing_is_separate_cancellable_and_only_success_marks_installed() {
     );
 
     // Installed once, it launches with the network gone.
-    fake_java(&world, "echo \"Setting user: x\"");
+    fake_java(&world, "print Setting user: x");
     world.net.forget_all();
     let (tx, _rx) = mpsc::unbounded_channel();
     let exit = world
@@ -345,8 +345,8 @@ async fn every_way_a_launch_can_end_leaves_its_own_record() {
     // Dies at once, crashes after starting, exits cleanly.
     for script in [
         "exit 1",
-        "echo \"Setting user: x\"; exit 3",
-        "echo \"Setting user: x\"",
+        "print Setting user: x\nexit 3",
+        "print Setting user: x",
     ] {
         fake_java(&world, script);
         let (tx, _rx) = mpsc::unbounded_channel();
@@ -358,7 +358,7 @@ async fn every_way_a_launch_can_end_leaves_its_own_record() {
     }
 
     // Running, then the user stops it: the process really ends.
-    fake_java(&world, "echo \"Setting user: x\"; sleep 30");
+    fake_java(&world, "print Setting user: x\nsleep 30");
     let stop = CancellationToken::new();
     let (tx, mut rx) = mpsc::unbounded_channel();
     let launch = world.service.launch(&record.id, tx, stop.clone());
@@ -405,7 +405,7 @@ async fn a_launcher_that_died_mid_launch_reports_the_session_and_touches_no_proc
         .await
         .unwrap();
     // While a launch is in progress the marker exists; a normal return removes it.
-    fake_java(&world, "echo \"Setting user: x\"");
+    fake_java(&world, "print Setting user: x");
     let (tx, _rx) = mpsc::unbounded_channel();
     world
         .service
@@ -467,9 +467,9 @@ async fn launch_defaults_reach_the_real_process_and_its_commands() {
     fake_java(
         &world,
         concat!(
-            "echo \"Setting user: x\"\n",
-            "echo \"$*\" > \"$INST_DIR/args.txt\"\n",
-            "echo \"FOO=$FOO WRAPPED=$WRAPPED NAME=$INST_NAME\" > \"$INST_DIR/env.txt\"",
+            "print Setting user: x\n",
+            "args > $INST_DIR/args.txt\n",
+            "write FOO=$FOO WRAPPED=$WRAPPED NAME=$INST_NAME > $INST_DIR/env.txt",
         ),
     );
     let record = world

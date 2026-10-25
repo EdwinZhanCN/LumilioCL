@@ -9,7 +9,7 @@ mod phases;
 mod progress;
 mod types;
 
-#[cfg(all(test, unix))]
+#[cfg(test)]
 mod tests;
 
 pub use runner::Launcher;

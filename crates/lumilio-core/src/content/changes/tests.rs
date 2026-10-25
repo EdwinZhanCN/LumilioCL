@@ -221,7 +221,7 @@ async fn content_changes_report_each_file_and_record_only_real_changes() {
 async fn content_writes_wait_for_a_launching_instance_but_reads_do_not() {
     let world = world();
     publish_release(&world);
-    fake_java(&world, "echo \"Setting user: x\"; sleep 30");
+    fake_java(&world, "print Setting user: x\nsleep 30");
     let record = world
         .service
         .create_instance("Busy", None, Loader::Vanilla, None)

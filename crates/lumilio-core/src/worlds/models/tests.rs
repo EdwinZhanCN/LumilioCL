@@ -365,20 +365,12 @@ async fn install_26_3(world: &crate::testing::World) -> String {
 }
 
 /// A Java 25 whose `java` notes each start in the returned file.
-#[cfg(unix)]
 fn java_25(world: &crate::testing::World) -> std::path::PathBuf {
-    use std::os::unix::fs::PermissionsExt;
     let jdk = world.service.layout().runtimes().join("jdk-25");
-    std::fs::create_dir_all(jdk.join("bin")).unwrap();
+    std::fs::create_dir_all(&jdk).unwrap();
     std::fs::write(jdk.join("release"), "JAVA_VERSION=\"25.0.1\"\n").unwrap();
     let runs = jdk.join("runs");
-    let java = jdk.join("bin/java");
-    std::fs::write(
-        &java,
-        format!("#!/bin/sh\necho \"$@\" >> '{}'\n", runs.display()),
-    )
-    .unwrap();
-    std::fs::set_permissions(&java, std::fs::Permissions::from_mode(0o755)).unwrap();
+    crate::testing::install_java(&jdk.join("bin"), &format!("args >> {}", runs.display()));
     runs
 }
 
@@ -398,7 +390,6 @@ fn with_builder(world: &mut crate::testing::World) {
 /// D23: a 26.x client installed here, with a Java that could dump it, is
 /// drawn with the bundle's 26.x pack and entity geometry; no Java starts for
 /// a preview. Out of reach it is a notice, not a bake of the jar.
-#[cfg(unix)]
 #[tokio::test(flavor = "multi_thread")]
 async fn an_installed_26_x_client_takes_the_bundle_and_is_never_dumped() {
     let mut world = world();

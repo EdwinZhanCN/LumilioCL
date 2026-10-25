@@ -473,7 +473,7 @@ async fn favorites_toggle_and_persist() {
 async fn deleting_an_instance_removes_its_profile_and_keeps_shared_files() {
     let world = world();
     publish_release(&world);
-    fake_java(&world, "echo \"Setting user: x\"");
+    fake_java(&world, "print Setting user: x");
     let a = world
         .service
         .create_instance("A", None, Loader::Vanilla, None)

@@ -76,7 +76,7 @@ async fn menu_world_and_server_observations_follow_spawn_and_match_the_written_s
     ] {
         let (world, mut events) = observed_world(false);
         publish_modern_release(&world);
-        fake_java(&world, "echo 'Setting user: x'");
+        fake_java(&world, "print Setting user: x");
         let record = world
             .service
             .create_instance("Observed", None, Loader::Vanilla, None)
@@ -207,7 +207,7 @@ async fn short_process_crash_and_user_stop_emit_the_correct_exit() {
         .unwrap();
     for (script, expected) in [
         ("exit 1", LaunchOutcome::FailedToStart),
-        ("echo 'Setting user: x'; exit 3", LaunchOutcome::Crashed),
+        ("print Setting user: x\nexit 3", LaunchOutcome::Crashed),
     ] {
         fake_java(&world, script);
         let (updates, _rx) = mpsc::unbounded_channel();
@@ -224,7 +224,7 @@ async fn short_process_crash_and_user_stop_emit_the_correct_exit() {
             matches!(next(&mut events).await.1, LaunchEvent::Exited { outcome, .. } if outcome == expected)
         );
     }
-    fake_java(&world, "echo 'Setting user: x'; sleep 30");
+    fake_java(&world, "print Setting user: x\nsleep 30");
     let cancel = CancellationToken::new();
     let (updates, _rx) = mpsc::unbounded_channel();
     let launch = world.service.launch(&record.id, updates, cancel.clone());
@@ -250,7 +250,7 @@ async fn short_process_crash_and_user_stop_emit_the_correct_exit() {
 async fn observer_panic_does_not_change_launch_or_history() {
     let (world, _) = observed_world(true);
     publish_release(&world);
-    fake_java(&world, "echo 'Setting user: x'");
+    fake_java(&world, "print Setting user: x");
     let record = world
         .service
         .create_instance("Panic", None, Loader::Vanilla, None)
