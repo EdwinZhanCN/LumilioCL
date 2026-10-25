@@ -55,7 +55,7 @@ impl CurrentChoices {
 impl LauncherShell {
     /// Saves `id` as the current game after the choices before it. Without
     /// a launcher to ask, the answer never comes (its sender is dropped).
-    pub fn save_current(&mut self, id: String) -> Saved {
+    pub(crate) fn save_current(&mut self, id: String) -> Saved {
         let (answer, saved) = oneshot::channel();
         if let Some(queue) = self.current_choices.queue() {
             let _ = queue.send((id, answer));

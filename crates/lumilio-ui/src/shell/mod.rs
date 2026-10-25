@@ -19,10 +19,11 @@ mod routing;
 #[cfg(test)]
 mod tests;
 
-pub use launcher_shell::{ActivitySummary, LauncherShell, ShellIntent};
+pub use launcher_shell::LauncherShell;
+pub(crate) use launcher_shell::{ActivitySummary, ShellIntent};
 
 pub(crate) use self::chrome::sync_appearance;
-pub use self::chrome::{build_root, follow_system_appearance, window_titlebar};
+pub use self::chrome::{follow_system_appearance, window_titlebar};
 #[cfg(test)]
 use crate::route::Route;
 

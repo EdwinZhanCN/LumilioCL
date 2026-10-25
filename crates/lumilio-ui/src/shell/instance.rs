@@ -46,7 +46,7 @@ impl LauncherShell {
     }
 
     /// Opens game `id`'s page on one of its tabs, as a click on the tab would.
-    pub fn open_game_on(
+    pub(crate) fn open_game_on(
         &mut self,
         id: String,
         tab: usize,
@@ -88,7 +88,7 @@ impl LauncherShell {
     }
 
     /// Opens a fresh, stable-ID view. Async results update this entity only.
-    pub fn open_live_instance(
+    pub(crate) fn open_live_instance(
         &mut self,
         id: String,
         handler: impl FnOnce(gpui::WeakEntity<InstanceDetailView>) -> InstanceHandler,
@@ -109,7 +109,7 @@ impl LauncherShell {
     }
 
     /// The game's output so far, for the open page of that game (if any).
-    pub fn game_output(
+    pub(crate) fn game_output(
         &mut self,
         id: &str,
         lines: Vec<String>,
@@ -129,7 +129,7 @@ impl LauncherShell {
 
     /// Update retained pages as well as the visible page, so Back cannot
     /// resurrect contributions from a plugin that was just turned off.
-    pub fn plugins_changed(
+    pub(crate) fn plugins_changed(
         &mut self,
         plugins: &[lumilio_core::PluginInfo],
         cx: &mut Context<Self>,
@@ -150,7 +150,8 @@ impl LauncherShell {
     }
 
     /// Leaves the open instance: back where it came from, or Library.
-    pub fn close_live_instance(&mut self, cx: &mut Context<Self>) {
+    #[cfg(test)]
+    pub(crate) fn close_live_instance(&mut self, cx: &mut Context<Self>) {
         if self.live_instance.is_some() && !self.go_back(None, cx) {
             self.live_instance = None;
             self.route = Route::Library;
@@ -160,7 +161,7 @@ impl LauncherShell {
 
     /// The instance was deleted: no direction may lead to it any more, and
     /// if it is showing, the window goes back.
-    pub fn forget_instance(&mut self, id: &str, cx: &mut Context<Self>) {
+    pub(crate) fn forget_instance(&mut self, id: &str, cx: &mut Context<Self>) {
         let showing = self
             .live_instance
             .as_ref()
