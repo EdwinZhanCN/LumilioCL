@@ -2,7 +2,7 @@
 
 # Workspace 业务边界与状态归属重构
 
-Status: InProgress
+Status: Completed
 
 保留 app → ui → core 的主分层和已有专业能力 crates；将 core 内的业务状态、流程和持久化职责按能力封装，将 UI 的页面状态、控制逻辑、视图和测试收拢到所属 feature。首个新增 crate 建议为 lumilio-minecraft，仅承担 Minecraft 元数据模型与纯解析规则。按元数据、启动、其他 core 能力、Discover、其他 UI 功能的顺序迁移，每阶段保持可运行和可验证。实施在 build/workspace-architecture 分支上按阶段提交，基线为 rust-structure-style 的提交 f71ae6b。
 
@@ -36,7 +36,7 @@ Status: InProgress
   Acceptance: 在 T5 的边界成立后，将其余功能逐个迁入 ui/features；共享控件与主题进入 design_system，shell 负责窗口、导航、路由和功能组合。各 feature 拥有其视图状态、任务句柄和订阅，不依赖 app 或兄弟 feature 的内部视图，不存在承载全部页面可变状态的 LiveModel/Wiring::State 替代品。app 保留 Runtime、启动配置、日志、插件注册、更新器与系统退出/重启的组装和适配；页面交互流程移出 app。更新状态与系统命令经窄接口连接，不能为了迁移而让 core 承担 UI/更新器职责。保留当前窗口所有权、全局选择、toast、语言切换、导航历史和后台任务生命周期；逐功能记录自动验证和真实窗口检查结果。
 - [x] T7 — 完成其余 crates 审查并守住稳定架构边界 (Completed)
   Acceptance: 全部 workspace 成员都有保留或调整的明确结论，结论记录在本计划，不另建源码镜像或历史路径映射表。小且内聚的 crate 可以保持平铺，所有单元测试遵守相邻模块约定。沿用现有 docgen 结构检查，补充能防止实际失误的生产依赖与禁止反向依赖检查；区分 dev-dependencies，允许 core 通过插件实现完成集成测试。对新增 guard 注入一次最小违规，证明检查在预期边界失败后撤销违规。更新 AGENTS.md 的最终结构约定和因路径移动而失效的技能/文档引用；不将全部目录树复制进多份文档。
-- [ ] T8 — 逐阶段验收并完成 workspace 交付 (InProgress)
+- [x] T8 — 逐阶段验收并完成 workspace 交付 (Completed)
   Acceptance: 每阶段先通过最窄的 justfile 检查，再在代码交付前通过 just check；涉及计划/规则变更通过 just docs。受路径移动影响的 IA 保留操作语义并完成 just ia；i18n 和归属说明不因搬迁失效。审查格式、持久化、错误、取消、锁顺序、资源释放顺序和 cfg 平台分支；在可用环境编译受影响的平台分支，未验证的目标明确记录。真实窗口核对受迁移功能的既有用户路径与反馈，测试通过不替代视觉与交互验收。全部验收有证据后才完成计划；没有完成的人工或跨平台验收保持明确待办。
 
 ## Validation
@@ -52,7 +52,7 @@ Status: InProgress
 - UI feature 拥有页面状态与控制流程，app/shell 只保留对应组合和适配职责
   Result: 2026-10-24（T5）：Discover 迁入 ui/features/discover（model、view、detail、dependencies、page、controls、queries、search、install、translation、state 与 tests）；app/live/discover.rs 与 translation.rs 删除，LiveModel 不再含 Discover 字段。cargo nextest run -p lumilio-ui 593 项（含 13 项 feature 测试）与 -p lumilio-app 36 项通过；clippy -D warnings、rustdoc 链接、cargo check --workspace --tests、docgen 34 项通过，just ia 重新生成 discover 路径（仅实现位置变化）。真实窗口检查见 T5 记录；其余 UI 功能待 T6。 真实窗口（临时 LUMILIO_HOME，LUMILIO_PAGE=discover）：首次检查发现 LUMILIO_PAGE 开发钩子绕过 select_route，Discover 未收到 shown 而停在“正在搜索…”；改为 go_to 后，首屏列出 Modrinth/CurseForge 来源键、分类筛选、分页与整合包结果，摘要翻译出现。尚未在真实窗口逐项核对：项目详情、安装与依赖提示、为游戏浏览、正文翻译中止。 2026-10-25（T6，D16、D18）：New Game（#91）、游戏库（#92、#93）、动态（#95）、设置（#97）、账户（#98）、游戏页（#100）与启动（#101）逐个迁入 ui/features；列表读取与上下文跟随移入 shell/feed（#103），shell 公开接口收窄（#104）。每个 PR 合并前 ui、app、docgen 的 nextest、clippy -D warnings、rustdoc 链接与 fmt 通过，CI rust 与 plans 通过；#103 后 nextest 686 项通过。真实窗口（临时 LUMILIO_HOME，真实点击）：启动一节核对崩溃与启动中退出后的技术详情、Home 与游戏页的缺失文件夹询问、查看游戏、作为空游戏启动、Home 取消，以及真实运行 Minecraft 1.21.1 时游戏页的实时输出与结束游戏；#103 后核对 Home 读入当前游戏、继续弹出缺失文件夹询问、游戏库列出游戏。更早各页由 Project Maintainer 抽查主要流程。尚未在真实窗口核对：新建游戏后打开并设为当前、动态页刷新、运行时隐藏与回到前台、直接进入世界。
 - 每阶段 just check、最终 just docs、IA/i18n、受影响平台与真实窗口验收有记录
-  Result: 2026-10-25：just docs 与 just ia 在 main 上无变化（#105 后 plans check 通过、ia 生成无差异）；IA 路径的迁移只改实现位置，操作语义不变；署名检查改写后注入违规证明失败。待办：main 上完整的 just check 由 Project Maintainer 运行；CI 在 Linux 编译与测试，macOS 由本地检查覆盖，Windows 的 cfg 分支未在本计划中编译，平台运行交由社区反馈。
+  Result: 2026-10-25：just docs 与 just ia 在 main 上无变化（#105 后 plans check 通过、ia 生成无差异）；IA 路径的迁移只改实现位置，操作语义不变；署名检查改写后注入违规证明失败。main（a320d2bb）上 Project Maintainer 运行 just check 通过。待办：CI 在 Linux 编译与测试，macOS 由本地检查覆盖，Windows 的 cfg 分支未在本计划中编译，平台运行交由社区反馈。
 
 ## Decision D1
 
@@ -219,6 +219,10 @@ Consequences: T6 的这两句验收以本决定为准；以后若共享控件需
 - https://doc.rust-lang.org/book/ch07-00-managing-growing-projects-with-packages-crates-and-modules.html
 - https://rust-lang.github.io/api-guidelines/
 - [Plan rust-structure-style](rust-structure-style.md)
+
+## Outcome
+
+完成 workspace 架构重组：保留 25 个成员（D17），lumilio-minecraft 独立为纯元数据 crate，core 按能力拆分状态与流程，lumilio-ui 内各页面以 features/<name> 实体拥有状态、任务与订阅，shell 负责组合、路由、导航、全局选择与列表读取（D15、D16、D18），app 只组装 Runtime、插件、更新器并适配偏好、条款与审查钩子。docgen 的 crate_boundaries、plugin_boundaries 与署名检查守住依赖方向与上游署名。main 上 just check 通过。未完成：真实窗口未核对新建游戏后打开并设为当前、动态页刷新、运行时隐藏与回到前台、直接进入世界；Windows 的 cfg 分支未在本计划中编译，交由社区反馈。
 
 - Lesson: T2 时 cargo fmt --all 改写了 forks/nucleation、forks/schematic-mesher 与 vendor/xaerotools 的数百个文件（它们是 path 依赖）。守护：只用 just format（cargo fmt）或 just fmt，不加 --all；提交前用 git status 确认 forks/ 与 vendor/ 未改。
 
