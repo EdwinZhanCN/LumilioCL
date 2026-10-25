@@ -3,7 +3,7 @@
 
 use std::rc::Rc;
 
-use gpui::WeakEntity;
+use gpui::{App, WeakEntity, Window};
 
 use super::LauncherShell;
 use crate::features::accounts::Accounts;
@@ -11,6 +11,7 @@ use crate::features::activity::Activity;
 use crate::features::library::Library;
 use crate::features::new_game::NewGame;
 use crate::features::settings::Settings;
+use crate::instance_detail::InstanceIntent;
 use crate::live::{LiveHandler, LiveIntent};
 
 /// Sends the intents the shell or a feature it owns answers there, and every
@@ -155,6 +156,33 @@ pub(super) fn route(shell: &LauncherShell, app: LiveHandler) -> LiveHandler {
         LiveIntent::OpenSkinSite(address) => {
             let _ = accounts.update(cx, |accounts, cx| accounts.open_skin_site(address, cx));
         }
+        LiveIntent::OpenInstance(id) => open_game(&this, id, None, window, cx),
+        LiveIntent::Resolve(id, action) => {
+            open_game(&this, id, Some(InstanceIntent::Resolve(action)), window, cx)
+        }
+        LiveIntent::CopyGameOf(id) => {
+            open_game(&this, id, Some(InstanceIntent::AskCopy), window, cx)
+        }
+        LiveIntent::DeleteGameOf(id) => {
+            open_game(&this, id, Some(InstanceIntent::AskDelete), window, cx)
+        }
+        LiveIntent::ExportPackOf(id) => {
+            open_game(&this, id, Some(InstanceIntent::ExportPack), window, cx)
+        }
         other => app(other, window, cx),
     })
+}
+
+/// Opens a game's page. Deferred: pages ask while the shell may be updating.
+fn open_game(
+    this: &WeakEntity<LauncherShell>,
+    id: String,
+    then: Option<InstanceIntent>,
+    window: &mut Window,
+    cx: &mut App,
+) {
+    let this = this.clone();
+    window.defer(cx, move |window, cx| {
+        let _ = this.update(cx, |shell, cx| shell.open_game(id, then, window, cx));
+    });
 }

@@ -434,7 +434,6 @@ fn curseforge_through_the_page(cx: &mut gpui_kit::TestAppContext) {
 
     use super::context::follow;
     use super::dispatch::on_live_intent;
-    use super::instance_write::write_instance;
     use super::wiring::choose_current;
     use super::{State, Wiring};
     use crate::backend::Backend;
@@ -658,9 +657,14 @@ fn curseforge_through_the_page(cx: &mut gpui_kit::TestAppContext) {
         cx.new(|_| InstanceDetailView::new(record.id.clone(), Rc::new(|_, _, _| {})))
     });
     cx.update(|window, cx| {
-        write_instance(
-            &wiring,
-            record.id.clone(),
+        let work = shell
+            .read(cx)
+            .game()
+            .read(cx)
+            .work()
+            .expect("the shell has a worker");
+        work.answer(
+            &record.id,
             view.downgrade(),
             InstanceIntent::PendingFilesChosen(vec![stand_in.clone()]),
             window,

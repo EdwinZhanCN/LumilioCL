@@ -4,6 +4,7 @@ use std::rc::Rc;
 use gpui::{Modifiers, TestAppContext};
 
 use super::super::{LauncherShell, Route};
+use super::open_game;
 
 #[gpui::test]
 fn live_library_cards_manage_and_explicit_play_is_independent(cx: &mut TestAppContext) {
@@ -60,10 +61,9 @@ fn live_library_cards_manage_and_explicit_play_is_independent(cx: &mut TestAppCo
     let card = cx.debug_bounds("live-card-0").expect("the card is drawn");
     let body = gpui::point(card.center().x, card.bottom() - gpui::px(12.));
     cx.simulate_click(body, Modifiers::none());
-    assert_eq!(
-        seen.borrow().last(),
-        Some(&LiveIntent::OpenInstance("survival".to_owned()))
-    );
+    assert_eq!(open_game(&shell, cx).as_deref(), Some("survival"));
+    shell.update(cx, |shell, cx| shell.close_live_instance(cx));
+    cx.run_until_parked();
     let before = seen.borrow().len();
     let play = cx
         .debug_bounds("live-play-0")

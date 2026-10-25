@@ -1,32 +1,34 @@
-use gpui_kit::{App, WeakEntity, Window};
-use lumilio_core::{CancellationToken, ServiceError, SnapshotScope};
-use lumilio_ui::instance_detail::{
+//! Writes on a game from its page: its content, worlds, servers, snapshots,
+//! files, version, copy and delete.
+
+use gpui::{App, WeakEntity, Window};
+use lumilio_core::{CancellationToken, ContentEffect, ContentResult, ServiceError, SnapshotScope};
+
+use super::game_actions::{GameEvent, GameWork};
+use super::load::{load_instance, load_section};
+use crate::instance_detail::{
     InstanceDetailView, InstanceIntent, Operated, Section, export_notice,
 };
-use lumilio_ui::tr;
-
-use super::instance::{ContentAction, content_notice, load_instance, load_section};
-use super::jobs::reload;
-use super::{Reload, Wiring};
+use crate::tr;
 
 /// One write on an instance: runs it, tells the view, and refreshes what it
 /// made stale. Failures keep the screen as it was and say what to do next.
 pub(super) fn write_instance(
-    wiring: &Wiring,
+    work: &GameWork,
     id: String,
     view: WeakEntity<InstanceDetailView>,
     intent: InstanceIntent,
     _window: &mut Window,
     cx: &mut App,
 ) {
-    let service = wiring.backend.service.clone();
+    let service = work.service().clone();
     let cancel = CancellationToken::new();
     let deleting = matches!(intent, InstanceIntent::Delete);
     let installing = matches!(
         intent,
         InstanceIntent::Install | InstanceIntent::Repair | InstanceIntent::ChangeRuntime { .. }
     );
-    let work = {
+    let job = {
         let id = id.clone();
         async move {
             let done = |notice: &str, refresh: Vec<Section>| Ok((notice.to_owned(), refresh));
@@ -348,7 +350,7 @@ pub(super) fn write_instance(
                     done(
                         &tr!(
                             "instance-runtime-changed",
-                            runtime = lumilio_ui::live::instance_meta(&record)
+                            runtime = crate::live::instance_meta(&record)
                         ),
                         Vec::new(),
                     )
@@ -373,10 +375,9 @@ pub(super) fn write_instance(
             }
         }
     };
-    let handle = wiring
-        .backend
-        .spawn(async move { work.await as Result<(String, Vec<Section>), ServiceError> });
-    let wiring = wiring.clone();
+    let handle =
+        work.spawn(async move { job.await as Result<(String, Vec<Section>), ServiceError> });
+    let work = work.clone();
     cx.spawn(async move |cx| {
         let result = match handle.await {
             Ok(result) => result.map_err(|error| error.to_string()),
@@ -400,16 +401,15 @@ pub(super) fn write_instance(
             .unwrap_or_default();
         cx.update(|cx| {
             for section in stale {
-                load_section(&wiring, id.clone(), view.clone(), section, cx);
+                load_section(&work, id.clone(), view.clone(), section, cx);
             }
             if succeeded && installing {
-                load_instance(&wiring, id.clone(), view.clone(), cx);
+                load_instance(&work, id.clone(), view.clone(), cx);
             }
             if succeeded && deleting {
-                let shell = wiring.shell.clone();
-                let _ = shell.update(cx, |shell, cx| shell.forget_instance(&id, cx));
+                work.emit(cx, GameEvent::Deleted(id.clone()));
             }
-            reload(&wiring, Reload::Lists, cx);
+            work.emit(cx, GameEvent::ListsChanged);
         });
     })
     .detach();
@@ -428,4 +428,45 @@ fn manual_download_said(error: ServiceError) -> ServiceError {
         }),
         other => other,
     }
+}
+
+/// What a write did to the selected files, for the success sentence.
+#[derive(Clone, Copy)]
+pub(super) enum ContentAction {
+    Enable,
+    Disable,
+    Delete,
+}
+
+/// What a batch of content changes amounts to, in words.
+pub(super) fn content_notice(
+    results: &[ContentResult],
+    action: ContentAction,
+) -> Result<String, String> {
+    let failed: Vec<String> = results
+        .iter()
+        .filter_map(|result| {
+            result
+                .outcome
+                .as_ref()
+                .err()
+                .map(|error| format!("{}: {error}", result.file_name))
+        })
+        .collect();
+    if !failed.is_empty() {
+        return Err(failed.join("\n"));
+    }
+    let changed = results
+        .iter()
+        .filter(|result| !matches!(result.outcome, Ok(ContentEffect::Unchanged)))
+        .count();
+    Ok(if changed == 0 {
+        tr!("instance-content-unchanged").to_owned()
+    } else {
+        match action {
+            ContentAction::Enable => tr!("instance-content-changed-enabled", count = changed),
+            ContentAction::Disable => tr!("instance-content-changed-disabled", count = changed),
+            ContentAction::Delete => tr!("instance-content-changed-deleted", count = changed),
+        }
+    })
 }

@@ -5,7 +5,7 @@ use gpui::{Modifiers, TestAppContext};
 use lumilio_core::{LaunchPhase, LaunchSignal};
 
 use super::super::{ActivitySummary, LauncherShell, ShellIntent};
-use super::{continuing, fill, painted_at, settle};
+use super::{continuing, fill, open_game, painted_at, settle};
 use crate::home::{HomeIntent, HomePresentation, Subject, WorldHint};
 
 #[gpui::test]
@@ -275,9 +275,10 @@ fn home_lists_what_needs_attention_with_one_remedy(cx: &mut TestAppContext) {
 
     let act = cx.debug_bounds("home-attention-act-0").expect("remedy");
     cx.simulate_click(act.center(), Modifiers::none());
-    assert_eq!(
-        seen.borrow().last(),
-        Some(&LiveIntent::Resolve("sky".into(), ProblemAction::Repair))
+    assert_eq!(open_game(&shell, cx).as_deref(), Some("sky"));
+    assert!(
+        seen.borrow().is_empty(),
+        "the shell opens the game's page to resolve it"
     );
 }
 

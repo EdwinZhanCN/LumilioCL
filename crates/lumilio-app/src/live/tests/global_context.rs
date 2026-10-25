@@ -22,8 +22,8 @@ use lumilio_ui::{LauncherShell, ShellIntent};
 
 use super::super::context::follow;
 use super::super::dispatch::{on_live_intent, on_shell_intent};
-use super::super::instance::open_instance;
 use super::super::launch::play;
+use super::super::open_game::open_instance;
 use super::super::{State, Wiring};
 use crate::backend::{Backend, Service};
 

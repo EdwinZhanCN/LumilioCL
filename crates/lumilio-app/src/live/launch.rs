@@ -1,12 +1,14 @@
 use gpui_kit::{App, AppContext as _, Window};
-use lumilio_core::{CancellationToken, LaunchFailure, LaunchSignal, LaunchUpdate, ServiceError};
+use lumilio_core::{
+    AfterLaunch, CancellationToken, LaunchFailure, LaunchSignal, LaunchUpdate, ServiceError,
+};
 use lumilio_ui::home::{HomePresentation, RecoveryDetail, Subject};
 use lumilio_ui::instance_detail::TAB_DIAGNOSTICS;
 use lumilio_ui::toast::Toast;
-use lumilio_ui::tr;
+use lumilio_ui::{platform, tr};
 
-use super::instance::{around_the_game, open_instance_on};
 use super::jobs::reload;
+use super::open_game::open_instance_on;
 use super::{GAME_LOG_FLUSH, GAME_LOG_LINES, Reload, Wiring};
 
 pub(super) fn start_launch(wiring: &Wiring, window: gpui_kit::AnyWindowHandle, cx: &mut App) {
@@ -342,4 +344,27 @@ fn forget_target(wiring: &Wiring) {
     let mut state = wiring.state.borrow_mut();
     state.next_world = None;
     state.next_server = None;
+}
+
+/// What the window does around the game, as the preferences say: hide while
+/// it runs, come back to the front when it ends.
+fn around_the_game(
+    wiring: &Wiring,
+    window: gpui_kit::AnyWindowHandle,
+    signal: &LaunchSignal,
+    after: AfterLaunch,
+    cx: &mut gpui_kit::AsyncApp,
+) {
+    let preferences = wiring.state.borrow().preferences.clone();
+    match signal {
+        LaunchSignal::Running if after == AfterLaunch::Hide => {
+            cx.update(|cx| platform::hide_launcher(cx));
+        }
+        LaunchSignal::Exited { .. } | LaunchSignal::Failed(_) | LaunchSignal::Cancelled
+            if preferences.foreground_on_exit() =>
+        {
+            let _ = cx.update_window(window, |_, window, cx| platform::bring_to_front(window, cx));
+        }
+        _ => {}
+    }
 }

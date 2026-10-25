@@ -7,14 +7,9 @@
 
 mod context;
 mod dispatch;
-mod game_settings;
-mod instance;
-mod instance_content;
-mod instance_plugins;
-mod instance_write;
 mod jobs;
 mod launch;
-mod logs;
+mod open_game;
 mod settings;
 mod terms;
 mod update;

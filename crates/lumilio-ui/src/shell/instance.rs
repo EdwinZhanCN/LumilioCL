@@ -1,12 +1,61 @@
+use std::rc::Rc;
+
 use gpui::prelude::*;
-use gpui::{App, Context, Entity};
+use gpui::{App, Context, Entity, WeakEntity, Window};
 
 use super::LauncherShell;
 use super::locations::Location;
-use crate::instance_detail::{InstanceDetailView, InstanceHandler};
+use crate::features::game::GameWork;
+use crate::instance_detail::{InstanceDetailView, InstanceHandler, InstanceIntent};
+use crate::live::{LiveHandler, LiveIntent, PlaceTarget};
 use crate::route::Route;
 
 impl LauncherShell {
+    /// Opens game `id`'s page; `then` is something to ask of the page once
+    /// it is up.
+    pub fn open_game(
+        &mut self,
+        id: String,
+        then: Option<InstanceIntent>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Entity<InstanceDetailView> {
+        let page = Page {
+            shell: self.this.clone(),
+            app: self.live_handler.clone(),
+            work: self.game.read(cx).work(),
+            id: id.clone(),
+        };
+        let asked = page.clone();
+        let view = self.open_live_instance(
+            id,
+            move |source| {
+                Rc::new(move |intent, window, cx| {
+                    asked.answer(source.clone(), intent, window, cx);
+                })
+            },
+            cx,
+        );
+        self.game.update(cx, |game, cx| game.opened(&view, cx));
+        // As if the page asked it: some questions are the shell's to answer.
+        if let Some(intent) = then {
+            page.answer(view.downgrade(), intent, window, cx);
+        }
+        view
+    }
+
+    /// Opens game `id`'s page on one of its tabs, as a click on the tab would.
+    pub fn open_game_on(
+        &mut self,
+        id: String,
+        tab: usize,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let view = self.open_game(id, None, window, cx);
+        view.update(cx, |view, cx| view.open_tab(tab, window, cx));
+    }
+
     /// Opens a fresh, stable-ID view. Async results update this entity only.
     pub fn open_live_instance(
         &mut self,
@@ -94,6 +143,83 @@ impl LauncherShell {
             _ => false,
         });
         cx.notify();
+    }
+}
+
+/// Who answers what one game's page asks: the shell what moves the window,
+/// chooses the current game or asks the page a question, the application
+/// playing and stopping, the game feature the rest.
+#[derive(Clone)]
+struct Page {
+    shell: WeakEntity<LauncherShell>,
+    app: Option<LiveHandler>,
+    work: Option<GameWork>,
+    id: String,
+}
+
+impl Page {
+    fn answer(
+        &self,
+        view: WeakEntity<InstanceDetailView>,
+        intent: InstanceIntent,
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        let id = self.id.clone();
+        let to_app = |intent: LiveIntent, window: &mut Window, cx: &mut App| {
+            if let Some(app) = &self.app {
+                app(intent, window, cx);
+            }
+        };
+        // Deferred: this may be running inside one of the shell's own updates.
+        let shell = self.shell.clone();
+        match intent {
+            InstanceIntent::Play => to_app(LiveIntent::Play(id), window, cx),
+            InstanceIntent::PlayWorld(world) => to_app(
+                LiveIntent::PlayPlace(id, PlaceTarget::World(world)),
+                window,
+                cx,
+            ),
+            InstanceIntent::PlayServer(address) => to_app(
+                LiveIntent::PlayPlace(id, PlaceTarget::Server(address)),
+                window,
+                cx,
+            ),
+            InstanceIntent::Stop => to_app(LiveIntent::StopGame(id), window, cx),
+            InstanceIntent::OpenAccounts => window.defer(cx, move |window, cx| {
+                let _ = shell.update(cx, |shell, cx| shell.go_to(Route::Accounts, window, cx));
+            }),
+            InstanceIntent::SetCurrent => window.defer(cx, move |_, cx| {
+                let _ = shell.update(cx, |shell, cx| shell.choose_current(id, cx));
+            }),
+            InstanceIntent::OpenProject { kind, source, slug } => {
+                window.defer(cx, move |_, cx| {
+                    let _ = shell.update(cx, |shell, cx| {
+                        shell.open_project(kind, &source, &slug, cx);
+                    });
+                });
+            }
+            // ia[discover]: 锁定目标（从游戏页进入） | 游戏页内容标签「浏览 Mod / 资源包 / 光影」 | 发现页进入「为这个游戏浏览」：页头写明游戏，类型预选，版本和加载器筛选锁定；那个游戏成为当前游戏（芯片、继续与下次启动一致）；在芯片里换成别的游戏就退出锁定
+            // ia[instance.content]: 浏览并安装 | L4a 主要 → 发现页（类型预选） | 安装完回到本页可见
+            InstanceIntent::BrowseContent(kind) => window.defer(cx, move |window, cx| {
+                let _ = shell.update(cx, |shell, cx| {
+                    // The game browsed for is the game installs go into (D3).
+                    shell.choose_current(id.clone(), cx);
+                    shell.browse_for(id, kind, window, cx);
+                });
+            }),
+            // The page asks it once it has read the game.
+            question @ (InstanceIntent::AskCopy
+            | InstanceIntent::AskDelete
+            | InstanceIntent::Resolve(_)) => {
+                let _ = view.update(cx, |view, cx| view.ask_later(question, cx));
+            }
+            other => {
+                if let Some(work) = &self.work {
+                    work.answer(&self.id, view, other, window, cx);
+                }
+            }
+        }
     }
 }
 

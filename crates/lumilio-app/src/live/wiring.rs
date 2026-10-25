@@ -8,6 +8,7 @@ use lumilio_ui::LauncherShell;
 use lumilio_ui::features::accounts::AccountsEvent;
 use lumilio_ui::features::activity::ActivityEvent;
 use lumilio_ui::features::discover::DiscoverEvent;
+use lumilio_ui::features::game::{GameEvent, GameWindows};
 use lumilio_ui::features::library::LibraryEvent;
 use lumilio_ui::features::new_game::NewGameEvent;
 use lumilio_ui::features::settings::SettingsEvent;
@@ -19,10 +20,10 @@ use lumilio_ui::shell::{IntentHandler, ShellIntent};
 use lumilio_ui::toast::Toast;
 
 use super::dispatch::{on_live_intent, on_shell_intent};
-use super::instance::{load_instance, open_instance};
 use super::jobs::reload;
+use super::open_game::open_instance;
 use super::settings::{apply_preferences, apply_saved_preferences};
-use super::{context, instance_plugins, jobs, launch, terms, update};
+use super::{context, jobs, launch, terms, update};
 use crate::backend::Backend;
 
 /// How many finished tasks the Activity page lists.
@@ -51,10 +52,6 @@ pub(super) struct State {
     pub(super) game_log: Option<(String, std::collections::VecDeque<String>)>,
     /// Commands for the background update service.
     pub(super) update_commands: Option<tokio::sync::mpsc::UnboundedSender<update::UpdateCommand>>,
-    /// The open schematic studio windows, one per game and folder (plan
-    /// schematic-studio, D22). A closed window's entry is dropped on the
-    /// next look.
-    pub(super) studio_windows: Vec<instance_plugins::StudioWindowEntry>,
 }
 
 /// How many lines of the running game's output are kept.
@@ -126,6 +123,7 @@ pub fn build(backend: Backend, window: &mut Window, cx: &mut App) -> Entity<Laun
     follow_activity(&wiring, &shell, cx);
     follow_settings(&wiring, &shell, cx);
     follow_accounts(&wiring, &shell, cx);
+    follow_game(&wiring, &shell, cx);
     update::start(&wiring, cx);
     context::follow(&wiring, cx);
     reload(&wiring, Reload::Lists, cx);
@@ -272,15 +270,57 @@ fn follow_new_game(wiring: &Wiring, shell: &Entity<LauncherShell>, cx: &mut App)
         }
         NewGameEvent::Installed(id) => {
             let open = wiring.shell.read_with(cx, |shell, cx| {
-                shell
+                let view = shell
                     .live_instance()
                     .filter(|view| view.read(cx).id() == id)
-                    .map(|view| view.downgrade())
+                    .cloned();
+                view.map(|view| (shell.game().clone(), view))
             });
-            if let Ok(Some(view)) = open {
-                load_instance(&wiring, id.clone(), view, cx);
+            if let Ok(Some((game, view))) = open {
+                game.update(cx, |game, cx| game.reload(&view, cx));
             }
         }
+    })
+    .detach();
+}
+
+/// Passes on what a game's page tells the application: the lists changed, or
+/// a page opened that should show what its running game printed so far.
+fn follow_game(wiring: &Wiring, shell: &Entity<LauncherShell>, cx: &mut App) {
+    let game = shell.read(cx).game().clone();
+    game.update(cx, |game, _| {
+        game.set_windows(GameWindows {
+            app_id: Some(crate::APP_ID.to_owned()),
+            studio_size: crate::review_size_hint(),
+        });
+    });
+    let wiring = wiring.clone();
+    cx.subscribe(&game, move |_, event: &GameEvent, cx| match event {
+        GameEvent::ListsChanged => reload(&wiring, Reload::Lists, cx),
+        GameEvent::Opened(id) => {
+            // A game on its way or running has printed things the page should
+            // show; which game that is, core's session says.
+            let active = wiring
+                .backend
+                .service
+                .context()
+                .session
+                .is_some_and(|session| session.is_active() && session.instance == *id);
+            let running = wiring
+                .state
+                .borrow()
+                .game_log
+                .as_ref()
+                .filter(|(running_id, _)| active && running_id == id)
+                .map(|(_, lines)| lines.iter().cloned().collect::<Vec<_>>());
+            if let Some(lines) = running {
+                let _ = wiring
+                    .shell
+                    .update(cx, |shell, cx| shell.game_output(id, lines, true, cx));
+            }
+        }
+        // The shell forgets it.
+        GameEvent::Deleted(_) => {}
     })
     .detach();
 }
@@ -319,17 +359,6 @@ pub(super) fn open_requested_page(
     // `LUMILIO_STUDIO_DIALOG=replace|convert|incompatible` opens a dialog).
     if let Ok(id) = std::env::var("LUMILIO_INSTANCE") {
         if let Ok(file) = std::env::var("LUMILIO_STUDIO") {
-            instance_plugins::open_studio_window(
-                wiring,
-                id.clone(),
-                lumilio_plugin_litematica::ID.to_owned(),
-                "schematics".to_owned(),
-                Some(file),
-                cx,
-            );
-            if let Ok(block) = std::env::var("LUMILIO_STUDIO_BLOCK") {
-                instance_plugins::studio_windows_choose(wiring, &id, &block, cx);
-            }
             let inspect = std::env::var("LUMILIO_STUDIO_INSPECT").ok().and_then(|at| {
                 let at: Vec<i32> = at
                     .split(',')
@@ -337,12 +366,25 @@ pub(super) fn open_requested_page(
                     .collect();
                 <[i32; 3]>::try_from(at).ok()
             });
-            if let Some(position) = inspect {
-                instance_plugins::studio_windows_inspect(wiring, &id, position, cx);
-            }
-            if let Ok(which) = std::env::var("LUMILIO_STUDIO_DIALOG") {
-                instance_plugins::studio_windows_dialog(wiring, &id, &which, cx);
-            }
+            let game = shell.read(cx).game().clone();
+            game.update(cx, |game, cx| {
+                game.open_studio(
+                    id.clone(),
+                    lumilio_plugin_litematica::ID.to_owned(),
+                    "schematics".to_owned(),
+                    Some(file),
+                    cx,
+                );
+                if let Ok(block) = std::env::var("LUMILIO_STUDIO_BLOCK") {
+                    game.studios_choose(&id, &block, cx);
+                }
+                if let Some(position) = inspect {
+                    game.studios_inspect(&id, position, cx);
+                }
+                if let Ok(which) = std::env::var("LUMILIO_STUDIO_DIALOG") {
+                    game.studios_dialog(&id, &which, cx);
+                }
+            });
         }
         open_instance(wiring, id, None, window, cx);
         let tab = std::env::var("LUMILIO_INSTANCE_TAB")

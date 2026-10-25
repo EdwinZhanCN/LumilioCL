@@ -21,6 +21,19 @@ fn continuing() -> HomePresentation {
     }
 }
 
+/// The game whose page the shell shows, once what was asked has run.
+fn open_game(
+    shell: &gpui::Entity<super::LauncherShell>,
+    cx: &mut gpui::VisualTestContext,
+) -> Option<String> {
+    cx.run_until_parked();
+    shell.read_with(cx, |shell, cx| {
+        shell
+            .live_instance()
+            .map(|view| view.read(cx).id().to_owned())
+    })
+}
+
 /// Lets real-time entrance animations finish (gpui animations read the
 /// wall clock), then draws a fresh frame.
 fn settle(cx: &mut gpui::VisualTestContext) {

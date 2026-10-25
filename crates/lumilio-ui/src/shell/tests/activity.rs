@@ -4,6 +4,7 @@ use std::rc::Rc;
 use gpui::{Modifiers, TestAppContext};
 
 use super::super::{LauncherShell, Route};
+use super::open_game;
 
 #[gpui::test]
 fn a_failed_task_offers_retry_and_open_and_a_game_that_is_gone_offers_no_open(
@@ -72,10 +73,10 @@ fn a_failed_task_offers_retry_and_open_and_a_game_that_is_gone_offers_no_open(
     assert!(seen.borrow().is_empty(), "Activity retries it itself");
     let open = cx.debug_bounds("live-open-0").expect("open");
     cx.simulate_click(open.center(), Modifiers::none());
-    assert_eq!(
-        seen.borrow().last(),
-        Some(&LiveIntent::OpenInstance("here".into()))
-    );
+    assert_eq!(open_game(&shell, cx).as_deref(), Some("here"));
+    assert!(seen.borrow().is_empty(), "the shell opens the game's page");
+    shell.update(cx, |shell, cx| shell.close_live_instance(cx));
+    cx.run_until_parked();
     assert!(cx.debug_bounds("live-retry-1").is_some());
     assert!(
         cx.debug_bounds("live-open-1").is_none(),

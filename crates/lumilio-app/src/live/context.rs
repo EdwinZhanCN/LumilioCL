@@ -147,12 +147,17 @@ fn session_moved(wiring: &Wiring, before: Option<&Context>, now: &Context, cx: &
     if was == is {
         return;
     }
-    if let Some(id) = was {
-        super::instance_plugins::studio_windows_game_changed(wiring, &id, false, cx);
-    }
-    if let Some(id) = is {
-        super::instance_plugins::studio_windows_game_changed(wiring, &id, true, cx);
-    }
+    let Ok(game) = wiring.shell.read_with(cx, |shell, _| shell.game().clone()) else {
+        return;
+    };
+    game.update(cx, |game, cx| {
+        if let Some(id) = was {
+            game.game_changed(&id, false, cx);
+        }
+        if let Some(id) = is {
+            game.game_changed(&id, true, cx);
+        }
+    });
 }
 
 /// Whether the context still says what a piece of work was asked for.
@@ -341,23 +346,19 @@ fn refresh_accounts(wiring: &Wiring, cx: &mut App) {
 /// Discover's sources, once it has shown them, and the open game's plugin
 /// tabs.
 fn refresh_plugins(wiring: &Wiring, cx: &mut App) {
-    let (discover, open_game) = wiring
-        .shell
-        .read_with(cx, |shell, cx| {
-            (
-                Some(shell.discover().clone()),
-                shell
-                    .live_instance()
-                    .map(|view| (view.read(cx).id().to_owned(), view.downgrade())),
-            )
-        })
-        .unwrap_or_default();
-    if let Some(discover) = discover {
-        // Which content sources are on may have changed.
-        discover.update(cx, |discover, cx| discover.sources_changed(cx));
-    }
-    if let Some((id, view)) = open_game {
-        super::instance_plugins::plugin_tabs(wiring, id, view, cx);
+    let Ok((discover, game, open_game)) = wiring.shell.read_with(cx, |shell, _| {
+        (
+            shell.discover().clone(),
+            shell.game().clone(),
+            shell.live_instance().cloned(),
+        )
+    }) else {
+        return;
+    };
+    // Which content sources are on may have changed.
+    discover.update(cx, |discover, cx| discover.sources_changed(cx));
+    if let Some(view) = open_game {
+        game.update(cx, |game, cx| game.reload_plugin_tabs(&view, cx));
     }
 }
 

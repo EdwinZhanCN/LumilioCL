@@ -6,7 +6,6 @@
 
 | 操作 | 层 / 组件 | 结果与反馈 | 备注 | 实现 |
 |---|---|---|---|---|
-| 锁定目标（从游戏页进入） | 游戏页内容标签「浏览 Mod / 资源包 / 光影」 | 发现页进入「为这个游戏浏览」：页头写明游戏，类型预选，版本和加载器筛选锁定；那个游戏成为当前游戏（芯片、继续与下次启动一致）；在芯片里换成别的游戏就退出锁定 |  | `lumilio-app/src/live/instance/instance_page.rs` |
 | 依赖提示 | 安装 Mod 前的弹窗 | 列出目标游戏还缺的必需依赖（默认勾选；没有适合版本的标明且不能勾；「只安装它」跳过）；也列可选依赖（默认不勾）并警告与已装 Mod 不兼容；依赖先装，每个是动态里的一条任务 | 仅 Mod | `lumilio-ui/src/features/discover/dependencies.rs` |
 | 画廊 | 详情页「画廊」页签（有图才出现）：卡片带标题、说明、日期 | 点一张在页内放大，可前后翻、在浏览器打开、关闭 |  | `lumilio-ui/src/features/discover/detail/gallery.rs` |
 | 安装整合包 | 详情页主按钮「安装为新游戏」 | 新建游戏，完成后 toast 可“打开” |  | `lumilio-ui/src/features/discover/detail/header.rs` |
@@ -34,3 +33,4 @@
 | 切换来源 | L4 筛选侧栏顶部的分段键：Modrinth / CurseForge（只开了一个来源时不显示） | 在这个来源重新搜索：搜索词、类型和游戏版本保留，加载器、分类和排序重新开始；筛选项换成这个来源的；记住下次打开的来源 |  | `lumilio-ui/src/features/discover/view/sidebar.rs` |
 | 窄窗口里的筛选 | L4 排序方式左边的「筛选」键（窗口窄到放不下筛选栏时，筛选栏收进这里；键上的数字是选了几项） | 弹出面板，内容和筛选栏一样，太长时在面板里滚动；点面板外面或按 Esc 关闭 |  | `lumilio-ui/src/features/discover/view/sidebar.rs` |
 | 光敏性提示 | 第一次选「高级排除 · 光敏性触发」时的弹窗 | 说明这个筛选只依据作者的声明，不能保证安全；可选「知道了，不再提示」 |  | `lumilio-ui/src/photosensitivity.rs` |
+| 锁定目标（从游戏页进入） | 游戏页内容标签「浏览 Mod / 资源包 / 光影」 | 发现页进入「为这个游戏浏览」：页头写明游戏，类型预选，版本和加载器筛选锁定；那个游戏成为当前游戏（芯片、继续与下次启动一致）；在芯片里换成别的游戏就退出锁定 |  | `lumilio-ui/src/shell/instance.rs` |

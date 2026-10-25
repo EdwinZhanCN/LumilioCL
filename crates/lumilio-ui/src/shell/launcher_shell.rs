@@ -9,6 +9,7 @@ use super::locations::{HISTORY_LIMIT, Location};
 use crate::features::accounts::{Accounts, AccountsEvent};
 use crate::features::activity::Activity;
 use crate::features::discover::{Discover, DiscoverEvent};
+use crate::features::game::{Game, GameEvent};
 use crate::features::library::Library;
 use crate::features::new_game::NewGame;
 use crate::features::settings::{Settings, SettingsEvent};
@@ -77,6 +78,10 @@ pub struct LauncherShell {
     pub(super) _settings_events: Subscription,
     /// The Accounts page and what it does to accounts.
     pub(super) accounts: Entity<Accounts>,
+    /// What a game's page asks of the launcher, and the windows it opens.
+    pub(super) game: Entity<Game>,
+    /// Forgets a deleted game.
+    pub(super) _game_events: Subscription,
     /// Saves which game is current, in the order chosen.
     pub(super) current_choices: CurrentChoices,
     /// This shell, for what its features route back to it.
@@ -118,6 +123,12 @@ impl LauncherShell {
                 cx.notify();
             }
         });
+        let game = cx.new(|cx| Game::new(None, cx));
+        let game_events = cx.subscribe(&game, |shell, _, event: &GameEvent, cx| {
+            if let GameEvent::Deleted(id) = event {
+                shell.forget_instance(id, cx);
+            }
+        });
         let discover_events = cx.subscribe(&discover, |shell, _, event: &DiscoverEvent, cx| {
             if let DiscoverEvent::ProjectOpened(opened) = event {
                 shell.show_project(opened.clone(), cx);
@@ -142,6 +153,8 @@ impl LauncherShell {
             settings_page,
             _settings_events: settings_events,
             accounts,
+            game,
+            _game_events: game_events,
             current_choices: CurrentChoices::default(),
             this: cx.weak_entity(),
             translation: false,
@@ -184,6 +197,8 @@ impl LauncherShell {
             .update(cx, |settings, _| settings.set_worker(worker.clone()));
         self.accounts
             .update(cx, |accounts, _| accounts.set_worker(worker.clone()));
+        self.game
+            .update(cx, |game, _| game.set_worker(worker.clone()));
         self.current_choices.worker = Some(worker);
         self
     }
@@ -216,6 +231,11 @@ impl LauncherShell {
     /// The Accounts page, for the application to follow its events.
     pub fn accounts(&self) -> &Entity<Accounts> {
         &self.accounts
+    }
+
+    /// What answers a game's page, for the application to follow its events.
+    pub fn game(&self) -> &Entity<Game> {
+        &self.game
     }
 
     pub fn with_activity(mut self, activity: ActivitySummary) -> Self {

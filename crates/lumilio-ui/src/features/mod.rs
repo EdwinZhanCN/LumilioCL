@@ -5,6 +5,7 @@
 pub mod accounts;
 pub mod activity;
 pub mod discover;
+pub mod game;
 pub mod library;
 pub mod new_game;
 pub mod settings;
