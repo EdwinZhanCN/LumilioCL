@@ -70,9 +70,9 @@ impl NewGame {
     }
 
     /// Asks for a local pack (`.mrpack`, a CurseForge or MultiMC / Prism zip,
-    /// a backup) and imports it as a new game. Cancelling the picker does
-    /// nothing.
-    pub fn import_pack(&mut self, cx: &mut Context<Self>) {
+    /// a backup) and imports it as a new game, shown in `window`. Cancelling
+    /// the picker does nothing.
+    pub fn import_pack(&mut self, window: AnyWindowHandle, cx: &mut Context<Self>) {
         let picked = cx.prompt_for_paths(gpui::PathPromptOptions {
             files: true,
             directories: false,
@@ -86,14 +86,19 @@ impl NewGame {
             let Some(path) = paths.into_iter().next() else {
                 return;
             };
-            let _ = this.update(cx, |this, cx| this.import_file(path, cx));
+            let _ = this.update(cx, |this, cx| this.import_file(path, window, cx));
         })
         .detach();
     }
 
     /// Files dropped on the Library: each pack becomes a new game, and
     /// anything else is said to be unsupported.
-    pub fn import_files(&mut self, paths: Vec<PathBuf>, cx: &mut Context<Self>) {
+    pub fn import_files(
+        &mut self,
+        paths: Vec<PathBuf>,
+        window: AnyWindowHandle,
+        cx: &mut Context<Self>,
+    ) {
         let packs: Vec<_> = paths
             .into_iter()
             .filter(|path| {
@@ -106,7 +111,7 @@ impl NewGame {
             toast::post(Toast::info(tr!("library-drop-unsupported")), cx);
         }
         for path in packs {
-            self.import_file(path, cx);
+            self.import_file(path, window, cx);
         }
     }
 
@@ -207,8 +212,9 @@ impl NewGame {
         );
     }
 
-    /// Imports a chosen or dropped pack as a new game.
-    fn import_file(&mut self, path: PathBuf, cx: &mut Context<Self>) {
+    /// Imports a chosen or dropped pack as a new game. Like a made game, it is
+    /// shown and made current: the Library's filter may hide it.
+    fn import_file(&mut self, path: PathBuf, window: AnyWindowHandle, cx: &mut Context<Self>) {
         let Some(worker) = &self.worker else {
             return;
         };
@@ -238,6 +244,7 @@ impl NewGame {
                 Ok::<_, ServiceError>((record, missing))
             },
             move |_, result, cx| {
+                let imported = result.as_ref().ok().map(|(record, _)| record.id.clone());
                 let toast = match result {
                     Ok((record, missing)) if missing > 0 => Toast::info(tr!(
                         "discover-modpack-missing",
@@ -252,6 +259,9 @@ impl NewGame {
                     ),
                 };
                 toast::post(toast, cx);
+                if let Some(id) = imported {
+                    cx.emit(NewGameEvent::Created { id, window });
+                }
             },
         );
     }

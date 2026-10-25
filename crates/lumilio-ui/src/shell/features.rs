@@ -21,10 +21,14 @@ pub(super) fn route(shell: &LauncherShell, app: LiveHandler) -> LiveHandler {
             let _ = new_game.update(cx, |new_game, cx| new_game.open(window, cx));
         }
         LiveIntent::ImportPack => {
-            let _ = new_game.update(cx, |new_game, cx| new_game.import_pack(cx));
+            let shown_in = window.window_handle();
+            let _ = new_game.update(cx, |new_game, cx| new_game.import_pack(shown_in, cx));
         }
         LiveIntent::DropFiles(paths) => {
-            let _ = new_game.update(cx, |new_game, cx| new_game.import_files(paths, cx));
+            let shown_in = window.window_handle();
+            let _ = new_game.update(cx, |new_game, cx| {
+                new_game.import_files(paths, shown_in, cx);
+            });
         }
         LiveIntent::InstallTarget(id) => {
             // Pages may ask while the shell is updating.

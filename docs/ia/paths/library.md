@@ -34,5 +34,5 @@
 | 搜索 | L3 搜索框 | 按名称过滤；空结果“没有匹配的游戏” |  | `lumilio-ui/src/features/library/view.rs` |
 | 预设：搜索选项 | 预设 tab 的 L3 搜索框 | 按名称或值过滤右侧的选项；没有匹配时说一句 |  | `lumilio-ui/src/features/library/view.rs` |
 | 合集：新建 | 合集标签 L2「新建合集」 | 弹窗取名；名称不重复 |  | `lumilio-ui/src/features/library/view.rs` |
-| 导入整合包 | L2 次要 → 系统选文件（.mrpack、CurseForge 整合包 .zip，或 MultiMC/Prism/本启动器备份的 .zip） | 后台导入，进度在动态；完成 toast 并可点“打开”；CurseForge 整合包的文件由 CurseForge 来源解析，作者只允许在网站下载的先按 SHA-1 到 Modrinth 找，找不到的列在游戏的内容页 | CurseForge 整合包需要开着 CurseForge 来源 | `lumilio-ui/src/features/library/view.rs` |
+| 导入整合包 | L2 次要 → 系统选文件（.mrpack、CurseForge 整合包 .zip，或 MultiMC/Prism/本启动器备份的 .zip） | 后台导入，进度在动态；完成后 toast，并打开新游戏的页面、设为当前游戏（加载器筛选不会把它藏起来）；CurseForge 整合包的文件由 CurseForge 来源解析，作者只允许在网站下载的先按 SHA-1 到 Modrinth 找，找不到的列在游戏的内容页 | CurseForge 整合包需要开着 CurseForge 来源 | `lumilio-ui/src/features/library/view.rs` |
 | 排序 / 按加载器筛选 | L4 两个下拉（排序、加载器），与发现页同一种控件 | 记在偏好设置里，下次打开还是这样；库里只有一种加载器时不显示加载器下拉 |  | `lumilio-ui/src/features/library/view.rs` |
