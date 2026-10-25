@@ -1,27 +1,21 @@
-//! The floating navigation bar (design language §6): history and the current
-//! location on the leading side, the landmark capsule in the centre, the
-//! current account and instance on the trailing side.
+//! The bar itself: its three zones, and the lists the trailing chips open
+//! (with [`super::choices`]).
 
 use std::rc::Rc;
 use std::sync::Arc;
 
 use gpui::prelude::*;
-use gpui::{
-    Anchor, AnyElement, App, ClickEvent, IntoElement, RenderImage, SharedString, Window, div, px,
-};
-use gpui_component::popover::Popover;
+use gpui::{AnyElement, App, ClickEvent, IntoElement, RenderImage, SharedString, Window, div, px};
 use gpui_component::{Icon, Selectable as _, Sizable as _, StyledExt as _, h_flex, v_flex};
 
+use super::choices::{ChoiceList, Footer};
+use super::{ChooseHandler, CloseHandler, RouteHandler};
 use crate::assets::{LandmarkIcon, UiIcon};
 use crate::home::WorldHint;
 use crate::key::Key;
 use crate::route::Route;
 use crate::theme::ShellColors;
 use crate::{theme, tr};
-
-pub type RouteHandler = Rc<dyn Fn(&Route, &mut Window, &mut App)>;
-pub type CloseHandler = Rc<dyn Fn(&mut Window, &mut App)>;
-pub type ChooseHandler = Rc<dyn Fn(&str, &mut Window, &mut App)>;
 
 /// The leading zone: browser-style history over locations, and where you are.
 pub struct Leading {
@@ -91,7 +85,7 @@ pub struct Trailing {
 
 const ZONE_RADIUS: gpui::Pixels = px(8.);
 /// Between the leading zone, the capsule and the trailing zone.
-const ZONE_GAP: gpui::Pixels = px(12.);
+pub(super) const ZONE_GAP: gpui::Pixels = px(12.);
 /// The widest the instance's name gets on its chip.
 const NAME_MAX_WIDTH: f32 = 140.;
 /// The narrowest window whose trailing zone, at its widest (an account and a
@@ -99,7 +93,7 @@ const NAME_MAX_WIDTH: f32 = 140.;
 /// `ZONE_GAP` away. Narrower windows get the compact trailing zone: pictures
 /// only, the words in the tooltips. It is the window, not the name, that
 /// decides, so switching instances never changes the bar.
-const FULL_FROM_WIDTH: f32 = 1000.;
+pub(super) const FULL_FROM_WIDTH: f32 = 1000.;
 
 /// One floating surface of the bar. It takes the pointer, or clicks and hover
 /// would reach the page underneath; the gaps between zones do not.
@@ -117,6 +111,7 @@ fn zone(colors: ShellColors) -> gpui::Div {
         .shadow_lg()
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn render(
     active: Route,
     activity_count: u32,
@@ -124,9 +119,16 @@ pub fn render(
     on_route: RouteHandler,
     leading: Leading,
     trailing: Trailing,
-    window_width: f32,
+    window: &mut Window,
+    cx: &mut App,
 ) -> impl IntoElement {
-    let compact = window_width < FULL_FROM_WIDTH;
+    let compact = f32::from(window.viewport_size().width) < FULL_FROM_WIDTH;
+    let account = trailing
+        .account
+        .map(|account| account_zone(account, compact, colors, window, cx));
+    let instance = trailing
+        .instance
+        .map(|current| trailing_zone(current, compact, colors, window, cx));
     div()
         .absolute()
         .left_0()
@@ -152,16 +154,8 @@ pub fn render(
                             .min_w_0()
                             .justify_end()
                             .gap_2()
-                            .children(
-                                trailing
-                                    .account
-                                    .map(|account| account_zone(account, compact, colors)),
-                            )
-                            .children(
-                                trailing
-                                    .instance
-                                    .map(|current| trailing_zone(current, compact, colors)),
-                            ),
+                            .children(account)
+                            .children(instance),
                     ),
             ),
         )
@@ -373,7 +367,13 @@ fn blank(round: bool, size: f32, colors: ShellColors) -> impl IntoElement {
         )
 }
 
-fn account_zone(account: CurrentAccount, compact: bool, colors: ShellColors) -> AnyElement {
+fn account_zone(
+    account: CurrentAccount,
+    compact: bool,
+    colors: ShellColors,
+    window: &mut Window,
+    cx: &mut App,
+) -> AnyElement {
     let Some(chosen) = account
         .choices
         .iter()
@@ -406,109 +406,79 @@ fn account_zone(account: CurrentAccount, compact: bool, colors: ShellColors) -> 
         .large()
         .tooltip(tr!("nav-current-account", name = chosen.name.to_string()))
         .child(crate::kit::avatar(&chosen.name, chosen.face.clone(), 30.));
+    let words = account
+        .choices
+        .iter()
+        .map(|choice| format!("{} {}", choice.name, choice.detail))
+        .collect();
+    let selected = account.choices.iter().position(|choice| choice.selected);
     let choices = Rc::new(account.choices);
-    let choose = account.on_choose;
-    let manage = account.on_manage;
+    let (shown, choose) = (choices.clone(), account.on_choose);
+    // ia[navigation]: 切换账户 | 右段 Popover 列表：头像、名字、类型；单选；账户多时（8 个起）顶部出现搜索，打开即可输入，按名字或类型筛选，Enter 选第一个；超出高度时列表在弹层里滚动，「账户详情」留在底部 | 之后的启动使用该身份
+    // ia[navigation]: 查看当前账户 | 账户下拉底部「账户详情」 | 打开当前账户详情与外观；不沿用账户页上次查看的其他账户
+    let popover = ChoiceList {
+        id: "navigation-account",
+        heading: tr!("nav-switch-account").into(),
+        placeholder: tr!("nav-search-accounts").into(),
+        no_match: tr!("nav-no-matching-account").into(),
+        width: px(260.),
+        words,
+        selected,
+        row: Rc::new(move |index| account_row(&shown[index], colors)),
+        on_choose: Rc::new(move |index, window, cx| choose(&choices[index].key, window, cx)),
+        footer: Some(Footer {
+            id: "navigation-account-manage",
+            label: tr!("nav-manage-accounts").into(),
+            on_click: account.on_manage,
+        }),
+    }
+    .popover(trigger, colors, window, cx);
     zone(colors)
         .id("navigation-account")
         .debug_selector(|| "navigation-account".into())
+        .child(popover)
+        .into_any_element()
+}
+
+/// An account in the chip's list: its face, its name and what kind it is.
+fn account_row(choice: &AccountChoice, colors: ShellColors) -> AnyElement {
+    h_flex()
+        .flex_1()
+        .min_w_0()
+        .gap_3()
+        .items_center()
+        .child(crate::kit::avatar(&choice.name, choice.face.clone(), 28.))
         .child(
-            // ia[navigation]: 切换账户 | 右段 Popover 列表：头像、名字、类型；单选 | 之后的启动使用该身份
-            // ia[navigation]: 查看当前账户 | 账户下拉底部「账户详情」 | 打开当前账户详情与外观；不沿用账户页上次查看的其他账户
-            Popover::new("navigation-account-popover")
-                .anchor(Anchor::BottomRight)
-                .trigger(trigger)
-                .content(move |_, _, cx| {
-                    let popover = cx.entity();
-                    let manage = manage.clone();
-                    let manage_popover = popover.clone();
-                    v_flex()
-                        .w(px(260.))
-                        .max_h(px(360.))
-                        .gap(px(2.))
-                        .child(
-                            div()
-                                .px_2()
-                                .pb_1()
-                                .text_xs()
-                                .font_semibold()
-                                .text_color(colors.muted)
-                                .child(tr!("nav-switch-account")),
-                        )
-                        .children(choices.iter().enumerate().map(|(index, choice)| {
-                            let choose = choose.clone();
-                            let popover = popover.clone();
-                            let key = choice.key.clone();
-                            h_flex()
-                                .id(("navigation-account-choice", index))
-                                .debug_selector(move || {
-                                    format!("navigation-account-choice-{index}")
-                                })
-                                .gap_3()
-                                .items_center()
-                                .px_2()
-                                .py(px(6.))
-                                .rounded(px(8.))
-                                .cursor_pointer()
-                                .when(choice.selected, |row| row.bg(colors.surface_subtle))
-                                .hover(|row| row.bg(colors.surface_subtle))
-                                .on_click(move |_, window, cx| {
-                                    choose(&key, window, cx);
-                                    popover.update(cx, |state, cx| state.dismiss(window, cx));
-                                })
-                                .child(crate::kit::avatar(&choice.name, choice.face.clone(), 28.))
-                                .child(
-                                    v_flex()
-                                        .flex_1()
-                                        .min_w_0()
-                                        .child(
-                                            div()
-                                                .text_sm()
-                                                .font_medium()
-                                                .text_color(colors.foreground)
-                                                .overflow_hidden()
-                                                .text_ellipsis()
-                                                .whitespace_nowrap()
-                                                .child(choice.name.clone()),
-                                        )
-                                        .child(
-                                            div()
-                                                .text_xs()
-                                                .text_color(colors.muted)
-                                                .child(choice.detail.clone()),
-                                        ),
-                                )
-                                .when(choice.selected, |row| {
-                                    row.child(div().size(px(6.)).rounded_full().bg(colors.primary))
-                                })
-                        }))
-                        .child(
-                            div()
-                                .id("navigation-account-manage")
-                                .debug_selector(|| "navigation-account-manage".into())
-                                .mt_1()
-                                .px_2()
-                                .py(px(8.))
-                                .rounded(px(8.))
-                                .border_t_1()
-                                .border_color(colors.border.opacity(0.6))
-                                .text_sm()
-                                .text_color(colors.muted)
-                                .cursor_pointer()
-                                .hover(|row| row.bg(colors.surface_subtle))
-                                .on_click(move |_, window, cx| {
-                                    manage(window, cx);
-                                    manage_popover
-                                        .update(cx, |state, cx| state.dismiss(window, cx));
-                                })
-                                .child(tr!("nav-manage-accounts")),
-                        )
-                }),
+            v_flex()
+                .flex_1()
+                .min_w_0()
+                .child(
+                    div()
+                        .text_sm()
+                        .font_medium()
+                        .text_color(colors.foreground)
+                        .overflow_hidden()
+                        .text_ellipsis()
+                        .whitespace_nowrap()
+                        .child(choice.name.clone()),
+                )
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(colors.muted)
+                        .child(choice.detail.clone()),
+                ),
         )
         .into_any_element()
 }
 
-fn trailing_zone(current: CurrentInstance, compact: bool, colors: ShellColors) -> AnyElement {
+fn trailing_zone(
+    current: CurrentInstance,
+    compact: bool,
+    colors: ShellColors,
+    window: &mut Window,
+    cx: &mut App,
+) -> AnyElement {
     let Some(chosen) = current.current.clone() else {
         let open = current.on_empty;
         // ia[navigation]: 没有游戏时点芯片 | 右段文字按钮“还没有游戏”（窗口窄时是带 + 的空封面，字在提示里） | 打开游戏库
@@ -563,90 +533,83 @@ fn trailing_zone(current: CurrentInstance, compact: bool, colors: ShellColors) -
             )
     };
 
+    let words = current
+        .choices
+        .iter()
+        .map(|choice| {
+            format!(
+                "{} {} {}",
+                choice.name,
+                choice.version,
+                choice.loader.label()
+            )
+        })
+        .collect();
+    let selected = current
+        .choices
+        .iter()
+        .position(|choice| choice.id == chosen.id);
     let choices = Rc::new(current.choices);
-    let choose = current.on_choose;
-    let chosen_id = chosen.id.clone();
+    let (shown, choose) = (choices.clone(), current.on_choose);
+    // ia[navigation]: 切换当前游戏 | 右段芯片（窗口窄时只有封面和 ⇅，名字在提示里）点开的 Popover 列表：封面、名称，名称下是版本标签和加载器标签；当前项高亮；游戏多时（8 个起）顶部出现搜索，打开即可输入，按名称、版本或加载器筛选，Enter 选第一个；超出高度时列表在弹层里滚动 | 当前游戏换成它，启动器保存后芯片才变：首页「继续」、发现页的安装目标和之后的启动都指向它；正在为别的游戏浏览时退出锁定；连续选择以最后一次为准；保存失败提示且芯片不变；重启后保持，被删除时回落到最近玩过的游戏 | global-context D1、D3
+    let popover = ChoiceList {
+        id: "navigation-instance",
+        heading: tr!("nav-switch-game").into(),
+        placeholder: tr!("nav-search-games").into(),
+        no_match: tr!("nav-no-matching-game").into(),
+        width: px(280.),
+        words,
+        selected,
+        row: Rc::new(move |index| instance_row(&shown[index], colors)),
+        on_choose: Rc::new(move |index, window, cx| choose(&choices[index].id, window, cx)),
+        footer: None,
+    }
+    .popover(trigger, colors, window, cx);
     zone(colors)
         .id("navigation-instance")
         .debug_selector(|| "navigation-instance".into())
+        .child(popover)
+        .into_any_element()
+}
+
+/// A game in the chip's list: its cover, its name, and under the name its
+/// version and loader as tags.
+fn instance_row(choice: &InstanceChoice, colors: ShellColors) -> AnyElement {
+    h_flex()
+        .flex_1()
+        .min_w_0()
+        .gap_3()
+        .items_center()
+        .child(thumb(choice, 32., colors))
         .child(
-            // ia[navigation]: 切换当前游戏 | 右段芯片（窗口窄时只有封面和 ⇅，名字在提示里）点开的 Popover 列表：封面、名称，名称下是版本标签和加载器标签；当前项高亮；游戏多时顶部出现搜索 | 当前游戏换成它，启动器保存后芯片才变：首页「继续」、发现页的安装目标和之后的启动都指向它；正在为别的游戏浏览时退出锁定；连续选择以最后一次为准；保存失败提示且芯片不变；重启后保持，被删除时回落到最近玩过的游戏 | global-context D1、D3
-            Popover::new("navigation-instance-popover")
-                .anchor(Anchor::BottomRight)
-                .trigger(trigger)
-                .content(move |_, _, cx| {
-                    let popover = cx.entity();
-                    v_flex()
-                        .w(px(280.))
-                        .max_h(px(360.))
-                        .gap(px(2.))
-                        .child(
-                            div()
-                                .px_2()
-                                .pb_1()
-                                .text_xs()
-                                .font_semibold()
-                                .text_color(colors.muted)
-                                .child(tr!("nav-switch-game")),
-                        )
-                        .children(choices.iter().enumerate().map(|(index, choice)| {
-                            let selected = choice.id == chosen_id;
-                            let choose = choose.clone();
-                            let popover = popover.clone();
-                            let id = choice.id.clone();
-                            h_flex()
-                                .id(("navigation-instance-choice", index))
-                                .debug_selector(move || {
-                                    format!("navigation-instance-choice-{index}")
-                                })
-                                .gap_3()
-                                .items_center()
-                                .px_2()
-                                .py(px(6.))
-                                .rounded(px(8.))
-                                .cursor_pointer()
-                                .when(selected, |row| row.bg(colors.surface_subtle))
-                                .hover(|row| row.bg(colors.surface_subtle))
-                                .on_click(move |_, window, cx| {
-                                    choose(&id, window, cx);
-                                    popover.update(cx, |state, cx| state.dismiss(window, cx));
-                                })
-                                .child(thumb(choice, 32., colors))
-                                .child(
-                                    v_flex()
-                                        .flex_1()
-                                        .min_w_0()
-                                        .gap(px(3.))
-                                        .child(
-                                            div()
-                                                .text_sm()
-                                                .font_medium()
-                                                .text_color(colors.foreground)
-                                                .overflow_hidden()
-                                                .text_ellipsis()
-                                                .whitespace_nowrap()
-                                                .child(choice.name.clone()),
-                                        )
-                                        .child(
-                                            h_flex()
-                                                .gap(px(4.))
-                                                .child(crate::kit::tag(
-                                                    choice.version.clone(),
-                                                    crate::kit::TagKind::Plain,
-                                                    colors,
-                                                ))
-                                                .child(crate::kit::tag(
-                                                    choice.loader.label(),
-                                                    crate::kit::TagKind::Ink,
-                                                    colors,
-                                                )),
-                                        ),
-                                )
-                                .when(selected, |row| {
-                                    row.child(div().size(px(6.)).rounded_full().bg(colors.primary))
-                                })
-                        }))
-                }),
+            v_flex()
+                .flex_1()
+                .min_w_0()
+                .gap(px(3.))
+                .child(
+                    div()
+                        .text_sm()
+                        .font_medium()
+                        .text_color(colors.foreground)
+                        .overflow_hidden()
+                        .text_ellipsis()
+                        .whitespace_nowrap()
+                        .child(choice.name.clone()),
+                )
+                .child(
+                    h_flex()
+                        .gap(px(4.))
+                        .child(crate::kit::tag(
+                            choice.version.clone(),
+                            crate::kit::TagKind::Plain,
+                            colors,
+                        ))
+                        .child(crate::kit::tag(
+                            choice.loader.label(),
+                            crate::kit::TagKind::Ink,
+                            colors,
+                        )),
+                ),
         )
         .into_any_element()
 }
@@ -662,10 +625,10 @@ fn icon_for(route: Route) -> LandmarkIcon {
     }
 }
 
-struct ActivityBadge;
+pub(super) struct ActivityBadge;
 
 impl ActivityBadge {
-    fn text(count: u32) -> String {
+    pub(super) fn text(count: u32) -> String {
         match count {
             0 => String::new(),
             1..=99 => count.to_string(),
@@ -673,6 +636,3 @@ impl ActivityBadge {
         }
     }
 }
-
-#[cfg(test)]
-mod tests;

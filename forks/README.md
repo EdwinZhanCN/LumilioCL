@@ -5,7 +5,7 @@ The directory also carries `gpui-component` 0.7.0, patched through the root
 Its baseline is the crates.io 0.7.0 package, upstream commit
 `0c830f4d257e69fdd17200650533ab4ca9a40cc0` (`crates/component`). Imported paths:
 `src/`, `locales/`, `tests/`, manifest, build script, README and Apache license.
-Three files are adapted. `src/select.rs`: `SelectState::new_multiple`, committed
+Four files are adapted. `src/select.rs`: `SelectState::new_multiple`, committed
 value read/write methods and `SelectEvent::Change` support persistent,
 independently toggled multi-selection. Single selection retains `Confirm` and
 closes on selection. Guards: `crates/lumilio-ui/tests/select_multiple.rs`; run
@@ -17,7 +17,9 @@ in one row line up. Guard: `kit::tests` in `lumilio-ui`.
 `tokens.background`, so a theme may make the page translucent while dialogs,
 sheets and tabs, which paint with the token, stay opaque (plan
 translucent-themes, D1). Guard: `theme::tests::the_root_paints_the_window_with_the_page_colour`
-in `lumilio-ui`.
+in `lumilio-ui`. `src/popover.rs`: Space in an Input is not bound, so a field
+inside a popover types spaces instead of triggering the popover's Confirm,
+which gpui-base binds to Space. Guard: `navigation::tests` in `lumilio-ui`.
 The package's original lib tests reference fixtures outside the published crate;
 run the dedicated integration target for this local extension.
 

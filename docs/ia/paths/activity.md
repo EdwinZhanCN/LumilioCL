@@ -16,4 +16,4 @@
 | 看下载仪表 | 列表上方的显示屏 | 所有下载加起来的速度；每格一条连接，格数是设置里的同时下载数，亮几格就在用几条；进行中与已暂停的任务数 | 有任务在下载时才出现 | `lumilio-ui/src/features/activity/view.rs` |
 | 清除已完成 | L2 次要「清除已完成」 | 清空结束的条目；没有结束的条目时禁用 |  | `lumilio-ui/src/features/activity/view.rs` |
 | 分类筛选 | L3 标签：全部 / 下载 / 安装 / 更新 / 修复 | 按任务类别过滤 |  | `lumilio-ui/src/features/activity/view.rs` |
-| 导航角标 | 中段「动态」地标上的数字 | 运行中的任务数（超过 99 显示 99+） |  | `lumilio-ui/src/navigation.rs` |
+| 导航角标 | 中段「动态」地标上的数字 | 运行中的任务数（超过 99 显示 99+） |  | `lumilio-ui/src/navigation/bar.rs` |
