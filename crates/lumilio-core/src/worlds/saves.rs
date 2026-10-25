@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use std::{fmt, fs, io};
 
 use crate::content::discover::is_safe_file_name;
+use crate::instances::modpack::zip_entry_path;
 use crate::nbt;
 
 const SAVES: &str = "saves";
@@ -350,7 +351,7 @@ pub fn import_zip(game_dir: &Path, archive_path: &Path) -> Result<String, WorldE
         let Some(name) = entry.enclosed_name() else {
             continue;
         };
-        let Some(name) = name.to_str().map(|name| name.replace('\\', "/")) else {
+        let Some(name) = zip_entry_path(&name) else {
             continue;
         };
         if name.starts_with("__MACOSX/") || entry.is_dir() {
@@ -404,10 +405,8 @@ pub fn import_zip(game_dir: &Path, archive_path: &Path) -> Result<String, WorldE
             let Some(name) = entry.enclosed_name() else {
                 continue;
             };
-            let Some(relative) = name
-                .to_str()
-                .map(|name| name.replace('\\', "/"))
-                .and_then(|name| name.strip_prefix(&root).map(str::to_owned))
+            let Some(relative) =
+                zip_entry_path(&name).and_then(|name| name.strip_prefix(&root).map(str::to_owned))
             else {
                 continue;
             };
