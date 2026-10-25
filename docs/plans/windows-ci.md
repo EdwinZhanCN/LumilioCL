@@ -2,16 +2,16 @@
 
 # 在 Windows 上运行测试并修复失败
 
-Status: InProgress
+Status: Completed
 
-#99 报告 Windows 上多连接下载全部失败：对只读句柄 fsync，Linux 与 macOS 允许，Windows 不允许，而 CI 只在 Linux 上运行。CI 新增 windows 任务运行全部测试；首次完整运行有 35 个失败，按原因分组修复，全部通过后把 windows 设为 main 的必需检查。
+#99 报告 Windows 上多连接下载全部失败：对只读句柄 fsync，Linux 与 macOS 允许，Windows 不允许，而 CI 只在 Linux 上运行。CI 新增 windows 任务运行全部测试；首次完整运行有 35 个失败，按原因分组修复，现已全部通过。windows 不设为必需检查（D4）。
 
 ## Scope
 
 - In: ci.yml 的 windows 任务（windows-2022，just test，nextest ci profile）
 - In: 让测试在 Windows 上编译和运行：Unix 专有 API 加 cfg(unix)，假 java 改为跨平台小程序
 - In: 首次运行暴露的产品缺陷与测试写法问题
-- In: windows 全部通过后设为必需检查
+- Out: 把 windows 设为 main 的必需检查（D4）
 - Out: Windows 上的人工检查：交给社区反馈
 - Out: 在 Windows 上运行 clippy、fmt、rustdoc 与 forks 测试：与平台无关，留在 rust 任务
 - Out: 用跨平台写法重写依赖 Unix 权限位或 symlink 的测试（暂时 cfg(unix)）
@@ -32,10 +32,8 @@ Status: InProgress
   Acceptance: 逐个判定是产品缺陷还是测试写法并修复：diagnostics::reports analysis 与 world_map LRU 的 Access is denied、worlds::map tiles 全部重建、plugins::tests::write 与 plugins::tests::network；Windows 上这些测试通过（#114：地图缓存以可写句柄改时间；插件路径中间是文件时报出该文件，先查类型再打开；一次插件调用只用一个截止时间）
 - [x] T7 — 测试的路径期望、Java 夹具与 hook 写法 (Completed)
   Acceptance: 期望值不再写死 /（lumilio-minecraft classpath、旧版 assets virtual、reclaim）；下载的运行时用假 java，GraalVM 在 Windows 上用 zip，目录名不含 Windows 禁用字符；hook 测试按平台写命令或限定 Unix；Windows 上这些测试通过（#115：产品侧 hook 以 raw_arg 交给 cmd，包装命令保留反斜杠，Java 运行时的 link 在 Windows 上装成副本，类路径只用本系统分隔符）
-- [ ] T8 — windows 设为必需检查 (Proposed)
-  Acceptance: main 上 windows 任务连续通过后，windows 加入 main 的必需检查，并决定是否恢复在拉取请求上运行（跳过的任务算作通过，只在 main 运行时设为必需没有约束力）
-- [ ] T9 — Windows 上停止 hook 时结束它启动的进程 (Proposed)
-  Acceptance: 停止 hook 时，cmd 启动的子进程一并结束（例如用 Job Object）；有测试在 Windows 上确认停止后子进程不再运行。来源：#115 审查时推断，尚未实际观察
+- [ ] T8 — windows 设为必需检查 (Cancelled)
+  Acceptance: main 上 windows 任务连续通过后，windows 加入 main 的必需检查，并决定是否恢复在拉取请求上运行。取消：见 D4
 
 ## Validation
 
@@ -68,12 +66,24 @@ Why: Windows 创建符号链接需要开发者模式或管理员权限；Mojang 
 
 Consequences: Windows 上不创建符号链接；测试在 Unix 上要求符号链接，在 Windows 上要求副本
 
+## Decision D4
+
+windows 不设为 main 的必需检查，按 D2 只在推送到 main 与手动运行时启动
+
+Why: Project Maintainer 决定。拉取请求不启动 windows，跳过的任务算作通过，只在 main 运行时设为必需也拦不住拉取请求
+
+Consequences: Windows 回归在合并后 main 的 windows 运行中出现，由下一个修复处理；涉及文件句柄、路径、进程的分支，合并前手动运行一次
+
 ## References
 
 - https://github.com/EdwinZhanCN/LumilioCL/issues/99
 - .github/workflows/ci.yml
 - .config/nextest.toml
 - [crates/lumilio-core/src/testing/fake_java_program.rs](../../crates/lumilio-core/src/testing/fake_java_program.rs)
+
+## Outcome
+
+#99 与首次 Windows 运行暴露的其余 34 个失败已修复，Windows 上全部测试通过（#111–#115）。windows 按需运行，不设为必需检查（D4）；停止 hook 时结束子进程留在 backlog。
 
 - Lesson: 2026-10-25 #99：多连接下载在发布前对只读句柄调用 sync_all。Linux 与 macOS 允许，Windows 的 FlushFileBuffers 要求写权限，每次都返回 os error 5；CI 只在 Linux 上运行，没有发现。Guard：ci.yml 的 windows 任务运行 lumilio-transfer 的 parallel_tests。
 

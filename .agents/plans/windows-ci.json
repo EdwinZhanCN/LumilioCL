@@ -2,17 +2,17 @@
   "schemaVersion": 1,
   "id": "windows-ci",
   "title": "在 Windows 上运行测试并修复失败",
-  "summary": "#99 报告 Windows 上多连接下载全部失败：对只读句柄 fsync，Linux 与 macOS 允许，Windows 不允许，而 CI 只在 Linux 上运行。CI 新增 windows 任务运行全部测试；首次完整运行有 35 个失败，按原因分组修复，全部通过后把 windows 设为 main 的必需检查。",
-  "status": "in_progress",
+  "summary": "#99 报告 Windows 上多连接下载全部失败：对只读句柄 fsync，Linux 与 macOS 允许，Windows 不允许，而 CI 只在 Linux 上运行。CI 新增 windows 任务运行全部测试；首次完整运行有 35 个失败，按原因分组修复，现已全部通过。windows 不设为必需检查（D4）。",
+  "status": "completed",
   "visibility": "internal",
   "scope": {
     "included": [
       "ci.yml 的 windows 任务（windows-2022，just test，nextest ci profile）",
       "让测试在 Windows 上编译和运行：Unix 专有 API 加 cfg(unix)，假 java 改为跨平台小程序",
-      "首次运行暴露的产品缺陷与测试写法问题",
-      "windows 全部通过后设为必需检查"
+      "首次运行暴露的产品缺陷与测试写法问题"
     ],
     "excluded": [
+      "把 windows 设为 main 的必需检查（D4）",
       "Windows 上的人工检查：交给社区反馈",
       "在 Windows 上运行 clippy、fmt、rustdoc 与 forks 测试：与平台无关，留在 rust 任务",
       "用跨平台写法重写依赖 Unix 权限位或 symlink 的测试（暂时 cfg(unix)）"
@@ -64,14 +64,8 @@
     {
       "id": "T8",
       "title": "windows 设为必需检查",
-      "status": "proposed",
-      "acceptance": "main 上 windows 任务连续通过后，windows 加入 main 的必需检查，并决定是否恢复在拉取请求上运行（跳过的任务算作通过，只在 main 运行时设为必需没有约束力）"
-    },
-    {
-      "id": "T9",
-      "title": "Windows 上停止 hook 时结束它启动的进程",
-      "status": "proposed",
-      "acceptance": "停止 hook 时，cmd 启动的子进程一并结束（例如用 Job Object）；有测试在 Windows 上确认停止后子进程不再运行。来源：#115 审查时推断，尚未实际观察"
+      "status": "cancelled",
+      "acceptance": "main 上 windows 任务连续通过后，windows 加入 main 的必需检查，并决定是否恢复在拉取请求上运行。取消：见 D4"
     }
   ],
   "validation": [
@@ -102,6 +96,12 @@
       "decision": "Windows 上，Java 运行时清单里的 link 条目装成目标文件的副本",
       "rationale": "Windows 创建符号链接需要开发者模式或管理员权限；Mojang 现有的 Windows 清单没有 link 条目，Linux 与 macOS 的 link 都指向许可证文件",
       "consequences": "Windows 上不创建符号链接；测试在 Unix 上要求符号链接，在 Windows 上要求副本"
+    },
+    {
+      "id": "D4",
+      "decision": "windows 不设为 main 的必需检查，按 D2 只在推送到 main 与手动运行时启动",
+      "rationale": "Project Maintainer 决定。拉取请求不启动 windows，跳过的任务算作通过，只在 main 运行时设为必需也拦不住拉取请求",
+      "consequences": "Windows 回归在合并后 main 的 windows 运行中出现，由下一个修复处理；涉及文件句柄、路径、进程的分支，合并前手动运行一次"
     }
   ],
   "lessonsLearned": [
@@ -116,5 +116,6 @@
     ".config/nextest.toml",
     "crates/lumilio-core/src/testing/fake_java_program.rs"
   ],
+  "outcome": "#99 与首次 Windows 运行暴露的其余 34 个失败已修复，Windows 上全部测试通过（#111–#115）。windows 按需运行，不设为必需检查（D4）；停止 hook 时结束子进程留在 backlog。",
   "roadmap": { "enabled": false, "id": "windows-ci", "name": "Windows CI", "lede": "在 Windows 上运行测试", "targetVersion": null, "order": 0 }
 }
