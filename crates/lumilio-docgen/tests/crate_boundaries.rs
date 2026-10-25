@@ -1,6 +1,7 @@
 //! Production dependencies follow `lumilio-app → lumilio-ui → lumilio-core`,
-//! and `lumilio-minecraft` stays pure metadata. Development dependencies are
-//! exempt: core tests may assemble real plugins.
+//! only the UI layers draw with GPUI, only the app assembles plugins and the
+//! updater, and `lumilio-minecraft` stays pure metadata. Development
+//! dependencies are exempt: core tests may assemble real plugins.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -15,8 +16,15 @@ const LAYER_USERS: &[(&str, &[&str])] = &[
     ("lumilio-core", &["lumilio-ui", "lumilio-app"]),
 ];
 
-/// Crates that never draw: no GPUI underneath them.
-const WITHOUT_UI: &[&str] = &["lumilio-core", "lumilio-minecraft"];
+/// The only crates that draw with GPUI; core and the leaf crates stay
+/// independent of the UI framework.
+const GPUI_USERS: &[&str] = &["lumilio-ui", "lumilio-app"];
+
+/// Plugin implementations and the updater are registered and run by the app
+/// (plan `workspace-architecture`, T6); core and UI see only their contracts.
+fn app_only(dep: &str) -> bool {
+    dep == "lumilio-updater" || (dep.starts_with("lumilio-plugin-") && dep != "lumilio-plugin-api")
+}
 
 /// Everything `lumilio-minecraft` may use: parsing only, no I/O.
 const MINECRAFT_DEPENDENCIES: &[&str] = &["regex", "serde", "serde_json"];
@@ -56,8 +64,11 @@ fn problems(crates: &BTreeMap<String, Vec<String>>) -> Vec<String> {
             {
                 problems.push(format!("{name}: must not depend on {dep}"));
             }
-            if WITHOUT_UI.contains(&name.as_str()) && dep.starts_with("gpui") {
+            if !GPUI_USERS.contains(&name.as_str()) && dep.starts_with("gpui") {
                 problems.push(format!("{name}: must not depend on {dep}"));
+            }
+            if app_only(dep) && name != "lumilio-app" {
+                problems.push(format!("{name}: only lumilio-app may depend on {dep}"));
             }
             if name == "lumilio-minecraft" && !MINECRAFT_DEPENDENCIES.contains(&dep.as_str()) {
                 problems.push(format!(
@@ -105,15 +116,35 @@ fn reverse_and_impure_dependencies_are_reported() {
             "lumilio-transfer".to_owned(),
             vec!["lumilio-core".to_owned()],
         ),
+        ("lumilio-map-render".to_owned(), vec!["gpui-kit".to_owned()]),
+        (
+            "lumilio-ui".to_owned(),
+            vec![
+                "lumilio-plugin-api".to_owned(),
+                "lumilio-plugin-modrinth".to_owned(),
+                "lumilio-updater".to_owned(),
+            ],
+        ),
+        (
+            "lumilio-app".to_owned(),
+            vec![
+                "gpui-kit".to_owned(),
+                "lumilio-plugin-modrinth".to_owned(),
+                "lumilio-updater".to_owned(),
+            ],
+        ),
     ]);
     assert_eq!(
         problems(&crates),
         [
             "lumilio-core: must not depend on lumilio-ui",
+            "lumilio-map-render: must not depend on gpui-kit",
             "lumilio-minecraft: tokio is outside its pure metadata dependencies",
             "lumilio-minecraft: must not depend on gpui",
             "lumilio-minecraft: gpui is outside its pure metadata dependencies",
             "lumilio-transfer: must not depend on lumilio-core",
+            "lumilio-ui: only lumilio-app may depend on lumilio-plugin-modrinth",
+            "lumilio-ui: only lumilio-app may depend on lumilio-updater",
         ]
     );
 }

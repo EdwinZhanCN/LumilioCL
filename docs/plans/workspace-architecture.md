@@ -34,7 +34,7 @@ Status: InProgress
   Acceptance: Discover 的查询与筛选状态、请求代次、结果转换、详情页、相关对话框、命令处理和测试集中到 ui/features/discover。app/live 不再拥有该功能的页面状态或控制流程；LiveModel 不再保存 Discover 的第二份可变状态；功能模块不通过 LauncherShell 读取/修改其内部业务状态。Tokio Runtime 仍由 app 创建和持有，UI 经明确注入的服务与执行入口提交后台工作，结果只在 GPUI 上下文应用。验证来源/目标实例/查询切换后的过期结果拒绝、翻译结果身份、关闭详情窗口、失败与主动取消、隐藏已安装内容、依赖确认及安装完成反馈。全局任务可在离开页面后继续并反馈，页面请求按其生命周期取消或丢弃结果，不因使用 WeakEntity 丢失必要终态处理。
 - [ ] T6 — 迁移其他 UI 功能并收紧 app 与 shell (InProgress)
   Acceptance: 在 T5 的边界成立后，将其余功能逐个迁入 ui/features；共享控件与主题进入 design_system，shell 负责窗口、导航、路由和功能组合。各 feature 拥有其视图状态、任务句柄和订阅，不依赖 app 或兄弟 feature 的内部视图，不存在承载全部页面可变状态的 LiveModel/Wiring::State 替代品。app 保留 Runtime、启动配置、日志、插件注册、更新器与系统退出/重启的组装和适配；页面交互流程移出 app。更新状态与系统命令经窄接口连接，不能为了迁移而让 core 承担 UI/更新器职责。保留当前窗口所有权、全局选择、toast、语言切换、导航历史和后台任务生命周期；逐功能记录自动验证和真实窗口检查结果。
-- [ ] T7 — 完成其余 crates 审查并守住稳定架构边界 (Proposed)
+- [ ] T7 — 完成其余 crates 审查并守住稳定架构边界 (InProgress)
   Acceptance: 全部 workspace 成员都有保留或调整的明确结论，结论记录在本计划，不另建源码镜像或历史路径映射表。小且内聚的 crate 可以保持平铺，所有单元测试遵守相邻模块约定。沿用现有 docgen 结构检查，补充能防止实际失误的生产依赖与禁止反向依赖检查；区分 dev-dependencies，允许 core 通过插件实现完成集成测试。对新增 guard 注入一次最小违规，证明检查在预期边界失败后撤销违规。更新 AGENTS.md 的最终结构约定和因路径移动而失效的技能/文档引用；不将全部目录树复制进多份文档。
 - [ ] T8 — 逐阶段验收并完成 workspace 交付 (Proposed)
   Acceptance: 每阶段先通过最窄的 justfile 检查，再在代码交付前通过 just check；涉及计划/规则变更通过 just docs。受路径移动影响的 IA 保留操作语义并完成 just ia；i18n 和归属说明不因搬迁失效。审查格式、持久化、错误、取消、锁顺序、资源释放顺序和 cfg 平台分支；在可用环境编译受影响的平台分支，未验证的目标明确记录。真实窗口核对受迁移功能的既有用户路径与反馈，测试通过不替代视觉与交互验收。全部验收有证据后才完成计划；没有完成的人工或跨平台验收保持明确待办。
@@ -46,7 +46,7 @@ Status: InProgress
 - 计划 JSON 有效，生成输出与 just docs 通过
   Result: 2026-10-23：cargo run -p lumilio-docgen -- plans validate 与 just plans 成功；just docs 通过全部 32 个 docgen 测试、5 个 preserve_order 计划测试、plans-check 和 cargo fmt --check。git diff --check 通过。仅新增本计划及 docs/plans/workspace-architecture.md，内部计划未改变网站路线图投影；架构实现与其验收均待开展。
 - 元数据和专业能力 crates 可以独立验证，生产依赖方向由检查保护
-  Result: 2026-10-23（T2）：lumilio-minecraft 只依赖 regex、serde、serde_json；cargo nextest run -p lumilio-minecraft -p lumilio-core 832 项通过，clippy -D warnings 与 rustdoc 链接检查通过。新增 lumilio-docgen tests/crate_boundaries.rs 检查生产依赖分层与 lumilio-minecraft 依赖白名单；向 lumilio-minecraft 注入 tokio 依赖后该检查失败，撤销后通过。其余专业 crates 的结论待 T7。
+  Result: 2026-10-23（T2）：lumilio-minecraft 只依赖 regex、serde、serde_json；cargo nextest run -p lumilio-minecraft -p lumilio-core 832 项通过，clippy -D warnings 与 rustdoc 链接检查通过。新增 lumilio-docgen tests/crate_boundaries.rs 检查生产依赖分层与 lumilio-minecraft 依赖白名单；向 lumilio-minecraft 注入 tokio 依赖后该检查失败，撤销后通过。2026-10-25（T7）：cargo metadata --no-deps 列出 25 个成员，逐个结论见 D17。crate_boundaries.rs 增加两条规则：只有 lumilio-ui 与 lumilio-app 的生产依赖可含 gpui*；插件实现与 lumilio-updater 只能是 lumilio-app 的生产依赖。向 lumilio-pointer 注入 gpui、向 lumilio-ui 注入 lumilio-updater 后检查分别报出两条违规，撤销后 cargo nextest run -p lumilio-docgen 34 项通过，clippy -D warnings 通过。
 - core 能力拥有自己的状态，启动/认证/持久化/取消等既有不变量有行为测试证据
   Result: 2026-10-24（T3/T4）：core 的 service 目录已拆为 accounts、appearance、instances、launching、minecraft、java、content、game_settings、worlds、diagnostics、activity、plugins、settings、storage、network 能力与 launcher_service 组合层；认证刷新锁/待选角色/凭据归 Accounts，外观缓存/皮肤库锁/签名密钥归 Appearance，任务板/取消表/活动日志归 activity::Tasks，内容筛选与翻译缓存归 Content，一次性自动 Java 选择归 Launching，实例库与操作租约归 Instances。每个迁移提交后 cargo nextest run -p lumilio-core 808 项全部通过（启动取消、缺失目录、离线启动、极短进程、启动/退出事件、历史写入失败、游戏设置准备与回收、日志捕获、插件事件等既有测试未改断言），clippy -D warnings、rustdoc 链接、cargo check --workspace --tests 与 docgen 34 项结构测试通过。
 - UI feature 拥有页面状态与控制流程，app/shell 只保留对应组合和适配职责
@@ -181,6 +181,14 @@ T6 按功能逐个迁移，每个功能一个 PR：先 New Game，再依次处�
 Why: app/live 约 7000 行，一次搬完无法在真实窗口逐功能核对。路由让已迁移功能的意图不再进入 app，而未迁移的照旧工作，每一步都可运行。后台工作的通用部分（在 Worker 上运行、轮询期间发出任务变化事件、结束时交回界面线程）抽成 runtime::job，Discover 与 New Game 共用，后续功能沿用。
 
 Consequences: New Game：表单移入 features/new_game/form.rs；NewGame 实体（features/new_game/create.rs）读取版本列表、创建、下载、导入整合包，发出 TasksChanged（app 刷新列表）、Created{id, window}（app 打开游戏页并设为当前游戏）、Installed(id)（打开着的游戏页重新读取）。更换版本对话框仍在游戏页（app）中，经 answer_versions 共用版本读取。LiveIntent 的 NewInstance、ImportPack、DropFiles 与 HomeIntent::Create 不再进入 app。多个对话框共用的 Failure 移入 kit。打开游戏页与选择当前游戏仍属 app，等游戏页迁移后改由 shell 处理。 Library：features/library 的 Library 实体负责收藏夹（新建、改名、删除、归入）、星标、从其他启动器导入、恢复备份、显示文件夹，以及记住排序与加载器筛选（LibraryEvent::Remember，取代 LiveIntent::RememberLibraryView）；shell 推送收藏夹列表。选择当前游戏属于全局选择，由 shell/current.rs 按选择顺序保存，游戏库菜单、角落芯片、游戏页、启动与新游戏都经 shell 选择。随后 Library 也绘制整个页面（features/library 的 view、presets_view），自己持有标签、排序、加载器筛选与所选预设（LibraryView）以及搜索框和两个下拉（LibraryControls）；shell 在 update_live 时推送 LibraryInputs（卡片、收藏夹、预设、各游戏选项），渲染时交给它路由后的处理器，只显示这个实体。预设的新建、改名、复制、共享范围、修改与删除移出 app（features/library/presets.rs），LiveIntent::Preset 不再进入 app；游戏页里的选项与绑定预设仍在 app，随游戏页迁移。ViewState 不再有游戏库标签，LiveControls 只剩设置页的控件。 Activity：features/activity 的 Activity 实体绘制动态页，自己持有标签与展开文件的任务（ActivityView），并负责取消、暂停、继续、重试与清除已完成；shell 推送 ActivityInputs（任务行、连接读数、仍在游戏库里的游戏）。它发出 ListsChanged（app 重新读取列表）与 Retried（app 让 Discover 重新读取已安装内容）；LiveIntent 的 CancelTask、PauseTask、ResumeTask、RetryTask、ClearFinished 不再进入 app。任务行与速度仍由 app 的 reload 读入 LiveModel，“打开”游戏仍属 app。ViewState 只剩各页的小选择。功能测试共用 crate::testing（真实 LauncherService、等待与 toast 读取）。
+
+## Decision D17
+
+T7 审查后保留全部 25 个 workspace 成员，不新增、合并或拆分 crate；docgen 的 crate_boundaries 检查守住生产依赖方向：app → ui → core 分层，GPUI 只在 ui 与 app，插件实现与更新器只由 app 组装，lumilio-minecraft 保持依赖白名单。
+
+Why: 每个成员都有内聚职责和单向依赖，且隔离了真实的依赖或验证成本：lumilio-core 已按能力拆分（T3/T4），生产只依赖 lumilio-minecraft、lumilio-transfer、lumilio-nbt、lumilio-block-assets 与 lumilio-plugin-api，插件实现只在 dev-dependencies 用于集成测试；lumilio-ui 按 D8 保持单 crate，T6 进行中；lumilio-app 是唯一组装插件实现、更新器与 GPUI 窗口的 crate；lumilio-minecraft 为纯元数据（T2）；lumilio-transfer 是 core 与更新器共用的下载引擎；lumilio-updater 只由 app 使用；lumilio-plugin-api 是只依赖 serde 的同步契约；六个插件（crash-analyzer、curseforge、discord、litematica、modrinth、world-explorer）依赖插件契约而不依赖 core、ui、app 或 GPUI，由 plugin_boundaries 检查；lumilio-nbt 与 lumilio-anvil 是存档格式解析；lumilio-block-assets 被 core、schematic、schematic-render 与 xtask 共用；lumilio-schematic 与 lumilio-schematic-render 隔离 forks 中的 nucleation 与 schematic-mesher；lumilio-skin-render 无生产依赖；lumilio-map-render 隔离 wgpu；lumilio-pointer 与 lumilio-backdrop 隔离平台 FFI；lumilio-cubiomes 隔离 C 源码与 build.rs；lumilio-docgen 与 lumilio-xtask 是不进入产品依赖的工具。平铺的小 crate（nbt、backdrop、pointer、skin-render、map-render 等）没有需要目录模块的规模；docgen 结构检查已对所有 crate 执行相邻测试与文件规模规则。
+
+Consequences: 新规则只把已成立的约定写成检查：pointer、map-render 与 schematic-render 的文档已声明不依赖 GPUI，T6 规定插件注册与更新器归 app。dev-dependencies 不受分层规则限制（core 测试组装真实插件，xtask 测试使用 core）；插件 crates 的 dev-dependencies 仍由 plugin_boundaries 检查。T7 剩余：T6 完成后更新 AGENTS.md 的最终结构约定与因路径移动失效的技能/文档引用（UI 路径仍在移动）；源码注释与 IA 备注中的“ADR 00xx”编号已无对应文件，届时一并改为计划 ID 或删去。
 
 ## References
 
