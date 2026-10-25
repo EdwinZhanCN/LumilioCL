@@ -1,5 +1,5 @@
 //! The Gallery tab and its image viewer. After `Gallery.vue` and the
-//! `ImageViewerEditor` it opens (GPL-3.0-only; ADR 0022).
+//! `ImageViewerEditor` it opens (GPL-3.0-only).
 
 use gpui::prelude::*;
 use gpui::{Context, ObjectFit, div, img, px};

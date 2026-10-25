@@ -1,4 +1,4 @@
-<!-- 生成文件，不要手改。重新生成：cargo run -p lumilio-docgen -- ia。约定见 ADR 0019。 -->
+<!-- 生成文件，不要手改。重新生成：cargo run -p lumilio-docgen -- ia。约定见技能 lumilio-ia-paths。 -->
 # 用户路径索引
 
 每个页面已实现的用户路径；表里每一行都有对应的实现，没有的就是没做。

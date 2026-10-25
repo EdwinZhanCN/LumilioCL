@@ -5,8 +5,7 @@
 //!
 //! Sections, their order, what opens by default, the locked-by-game boxes with
 //! their unlock and sync buttons, and the advanced exclusions follow Modrinth
-//! App's `browse-tab/sidebar.vue` and `SearchSidebarFilter.vue` (GPL-3.0-only;
-//! ADR 0022).
+//! App's `browse-tab/sidebar.vue` and `SearchSidebarFilter.vue` (GPL-3.0-only).
 
 use gpui::prelude::*;
 use gpui::{Anchor, App, Window, div, px};

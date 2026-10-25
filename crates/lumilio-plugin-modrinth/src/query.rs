@@ -1,5 +1,4 @@
-//! Adapted from Modrinth App packages/ui/src/utils/search.ts (newFilters and getEnvironmentFilterGroups), GPL-3.0-only; ADR 0022.
-
+//! Adapted from Modrinth App packages/ui/src/utils/search.ts (newFilters and getEnvironmentFilterGroups), GPL-3.0-only.
 use lumilio_plugin_api::content::{Pick, ProjectKind, SearchQuery, Stance};
 use url::Url;
 

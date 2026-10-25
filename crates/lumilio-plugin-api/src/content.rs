@@ -3,8 +3,7 @@
 //!
 //! Search filter semantics retain the attribution from the core query model:
 //! adapted from Modrinth App's `packages/ui/src/utils/search.ts`
-//! (`newFilters` / `getEnvironmentFilterGroups`), GPL-3.0-only; ADR 0022.
-
+//! (`newFilters` / `getEnvironmentFilterGroups`), GPL-3.0-only.
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};

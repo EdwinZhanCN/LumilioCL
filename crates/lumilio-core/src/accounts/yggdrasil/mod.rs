@@ -4,8 +4,8 @@
 //!
 //! The rules follow HMCL (`HMCLCore/.../auth/yggdrasil/YggdrasilService.java`,
 //! `YggdrasilAccount.java`, Copyright (C) 2020 huangyuhui and contributors,
-//! GPL-3.0-or-later; ADR 0011). This module only speaks the
-//! protocol; where secrets are kept is [`crate::accounts::credentials`] (ADR 0020).
+//! GPL-3.0-or-later). This module only speaks the
+//! protocol; where secrets are kept is [`crate::accounts::credentials`].
 
 use client::{BODY_LIMIT, snippet};
 pub use client::{Profile, Session, YggdrasilClient, YggdrasilError};

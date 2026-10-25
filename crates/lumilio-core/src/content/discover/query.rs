@@ -1,7 +1,7 @@
 //! The Discover search request: what the page asks a content source for.
 //!
 //! The selection model follows Modrinth App's `packages/ui/src/utils/search.ts`
-//! (`newFilters`), GPL-3.0-only; see ADR 0022. Turning it into a source's own
+//! (`newFilters`), GPL-3.0-only. Turning it into a source's own
 //! protocol is that source plugin's job.
 
 use super::kinds::{ProjectKind, SortIndex};

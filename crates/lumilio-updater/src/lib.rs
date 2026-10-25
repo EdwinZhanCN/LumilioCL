@@ -2,7 +2,7 @@
 //! launcher. The crate has no UI dependency; the app owns polling and state.
 
 //! Stable-release discovery, checksum verification and platform installation
-//! for the launcher (ADR 0042).
+//! for the launcher.
 
 mod client;
 mod install;

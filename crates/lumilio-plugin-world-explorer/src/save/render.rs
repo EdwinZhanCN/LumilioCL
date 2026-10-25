@@ -2,10 +2,10 @@
 //! drawn as the colour of its top block, shaded by height.
 //!
 //! The shading follows fastanvil's `TopShadeRenderer`
-//! (fastanvil/src/render.rs, MIT OR Apache-2.0, Copyright (c) 2020 Owen Gage;
-//! ADR 0022): a column higher than the one north of it is drawn at full
-//! brightness, a level one a little darker and a lower one darker still, which
-//! reads as light falling from the north. Differences: water is blended over
+//! (fastanvil/src/render.rs, MIT OR Apache-2.0, Copyright (c) 2020 Owen
+//! Gage): a column higher than the one north of it is drawn at full
+//! brightness, a level one a little darker and a lower one darker still,
+//! which reads as light falling from the north. Differences: water is blended over
 //! the ground by its depth rather than drilled through block by block, and
 //! the colours come from our own per-version tables (plan W13).
 

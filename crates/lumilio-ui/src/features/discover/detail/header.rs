@@ -1,6 +1,6 @@
 //! The top of a project page: icon, name, tags, the install button and the
 //! numbers. After `ProjectPageHeader` and the install button of
-//! `pages/project/Index.vue` (GPL-3.0-only; ADR 0022).
+//! `pages/project/Index.vue` (GPL-3.0-only).
 
 use gpui::prelude::*;
 use gpui::{App, ClipboardItem, Context, IntoElement, Window, div, px};

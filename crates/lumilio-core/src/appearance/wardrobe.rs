@@ -17,7 +17,7 @@ use crate::error::ServiceError;
 use crate::settings::{AccountEntry, AccountKind, SettingsError};
 use crate::transfer::Transport;
 
-/// Our initial delay before one explicit confirmation read (ADR 0039). This
+/// Our initial delay before one explicit confirmation read. This
 /// does not guarantee that Mojang's profile has propagated yet.
 const PROPAGATION_DELAY: Duration = Duration::from_secs(11);
 
@@ -166,7 +166,7 @@ impl<T: Transport + Clone> Appearance<T> {
     }
 
     /// Microsoft wears the copied PNG through Mojang. Offline selection
-    /// keeps the existing local cape and still uses ADR 0024 at launch.
+    /// keeps the existing local cape, which launching still applies.
     pub(crate) async fn wear_library_skin(
         &self,
         accounts: &Accounts<T>,

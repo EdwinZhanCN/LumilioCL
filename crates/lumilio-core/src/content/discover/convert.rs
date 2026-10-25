@@ -55,7 +55,7 @@ fn pick_to_api(pick: &Pick, any: bool) -> api::Pick {
 }
 
 /// Loaders and environment only count for the kinds that have them, as before
-/// the source was a plugin; included loaders match as "any of" (ADR 0023).
+/// the source was a plugin; included loaders match as "any of".
 pub(super) fn query_to_api(query: &SearchQuery) -> api::SearchQuery {
     let environment = query.has_environment();
     api::SearchQuery {

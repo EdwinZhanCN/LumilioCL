@@ -1,6 +1,5 @@
 //! Semantic tokens: the instrument's two bodies (design language §12), brand
-//! type (§13), and motion (§2). Themes, fonts and the interface scale that
-//! replace them are described in ADR 0044.
+//! type (§13), and motion (§2). Themes, fonts and the interface scale can replace them.
 
 mod look;
 mod spec;

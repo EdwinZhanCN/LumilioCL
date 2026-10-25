@@ -1,7 +1,7 @@
 //! What the Discover page is asking for, and the changes the page can make.
 //!
 //! The state follows Modrinth App's Browse page (`Browse.vue`,
-//! `use-browse-search.ts`, GPL-3.0-only; ADR 0022): the person's own picks, the
+//! `use-browse-search.ts`, GPL-3.0-only): the person's own picks, the
 //! filters a game provides (locked until released), and the toggles.
 
 use lumilio_core::{Loader, Pick, ProjectKind, SearchQuery, SortIndex, Stance};

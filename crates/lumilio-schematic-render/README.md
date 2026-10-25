@@ -11,7 +11,7 @@ dependency. The host supplies game assets and the clear colour.
 When the pack was baked from a client JAR, `Scene::load` first converts the
 schematic to the pack's data version, so renamed blocks find their models.
 `Scene::undrawable_blocks` lists the block IDs the pack still cannot draw; the
-host should tell the user (ADR 0034).
+host should tell the user.
 
 The schematic's entities are not part of the block mesh: each distinct look is
 meshed once and every entity is an instance of it at its exact position and

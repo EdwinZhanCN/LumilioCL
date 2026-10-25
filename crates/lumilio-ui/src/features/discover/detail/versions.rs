@@ -1,6 +1,6 @@
 //! The Versions tab: filters (channel, game version, platform), the table,
 //! and its pages. After `ProjectPageVersions.vue` and
-//! `VersionFilterControl.vue` (GPL-3.0-only; ADR 0022).
+//! `VersionFilterControl.vue` (GPL-3.0-only).
 
 use gpui::prelude::*;
 use gpui::{Context, Entity, Window, div, px};

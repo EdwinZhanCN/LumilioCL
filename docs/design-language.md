@@ -20,8 +20,7 @@ LumilioCL has two visual registers and never mixes them.
 | Type | None inside the art | Space Grotesk for Latin and figures, the system font for Chinese, JetBrains Mono for values, DSEG7 only on displays, Monocraft only for a server's message of the day (§13) |
 
 The world carries the Minecraft identity. The interface is an instrument
-held up to it: calm, legible, made of keys, LEDs and silkscreen (§12,
-ADR 0013). Pixel fonts are never used for UI text, because they destroy CJK
+held up to it: calm, legible, made of keys, LEDs and silkscreen (§12). Pixel fonts are never used for UI text, because they destroy CJK
 legibility. A server's message of the day is the game's text, not the
 interface's, so it alone is set in a pixel face (§13). Interface elements never imitate game GUI textures, and never
 copy another maker's trade dress: no borrowed wordmarks, product names or
@@ -340,7 +339,7 @@ The page surface shows values and offers **quick actions**; it is not a form.
 - **Destructive actions confirm in an alert dialog** that states the
   consequence in one sentence, with the confirm key in the danger colour.
   The danger colour must never be mistaken for the signal orange (§12).
-  Existing inline two-click confirmations migrate to this (ADR 0012).
+  Existing inline two-click confirmations migrate to this.
 
 ## 11. Messages
 
@@ -366,8 +365,6 @@ without another dialog. Its footer copies the complete redacted analysis snapsho
 
 
 ## 12. The instrument: control language
-
-Adopted by ADR 0013 and implemented by plan 0031.
 
 The interface is drawn as a hand-held instrument: a neutral body, physical
 keys, LEDs for state, silkscreen for grouping, a black display for live
@@ -748,11 +745,11 @@ keys. Only captured first-person input schedules a frame clock; idle
 pictures stay still. Intentional camera input stays responsive under
 reduced motion. Animated blocks stay still. Native capture supports macOS,
 Windows and X11. Wayland shows a calm unsupported explanation and keeps
-Orbital (ADR 0036). Loading and failure occupy the viewport. Missing game
+Orbital. Loading and failure occupy the viewport. Missing game
 assets and no GPU get a calm explanation; other errors offer 技术详情. When
 the assets cannot draw some blocks, one muted sentence under the viewport
-says how many, with their IDs behind 技术详情 (ADR 0034). Replaced and
-released frames are removed from GPUI's image cache (ADR 0028). A plugin's
+says how many, with their IDs behind 技术详情. Replaced and
+released frames are removed from GPUI's image cache. A plugin's
 `View::Model` still opens the same viewer in a modal.
 
 In the studio the viewer adds three things (plan schematic-studio, T10). A
@@ -949,7 +946,7 @@ The skeuomorphic details listed above are the whole set.
 | Role | Face | Weights | Where |
 |---|---|---|---|
 | Latin and figures | Space Grotesk | 300, 400, 500, 700 | the interface's default family |
-| Chinese | the system font, through fallback (PingFang SC on macOS, Microsoft YaHei UI on Windows, the distribution's CJK sans on Linux) | as the platform provides | every Chinese glyph; not bundled (ADR 0013) |
+| Chinese | the system font, through fallback (PingFang SC on macOS, Microsoft YaHei UI on Windows, the distribution's CJK sans on Linux) | as the platform provides | every Chinese glyph; not bundled |
 | Values | JetBrains Mono | 400, 500 | versions, sizes, units, counts, tags, section indices, table values |
 | Displays | DSEG7 Classic | 400 | segment digits on a display, nowhere else |
 | Messages of the day | Monocraft | 400, 700, italic | a server's message of the day, nowhere else |

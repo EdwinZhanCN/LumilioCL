@@ -1,5 +1,5 @@
 //! A plugin names a file in its view; the host reads its unchanged bytes
-//! through the same permissions as any other game file (ADR 0028).
+//! through the same permissions as any other game file.
 
 use std::path::PathBuf;
 

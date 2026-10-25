@@ -1,4 +1,4 @@
-//! Java runtimes the launcher installs itself (`ADR 0014`).
+//! Java runtimes the launcher installs itself.
 //!
 //! Two sources. Mojang publishes the runtimes its own launcher uses as a
 //! public index: per platform, per component, a manifest naming every file

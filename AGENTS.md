@@ -77,6 +77,13 @@ Don't write documents that restate the code or upstream; they go stale.
 - Dependency direction `lumilio-app → lumilio-ui → lumilio-core`. Core owns launcher state,
   metadata, downloads, auth and instance operations. UI owns pages and GPUI state. App owns
   startup, configuration, logging and composition.
+- Inside `lumilio-ui`, a page's behavior is a feature entity in `features/<name>`: it owns its
+  state, its `runtime::Worker` tasks and its subscriptions, and tells the shell what changed
+  through events, never through a sibling feature's views. `shell` composes the features,
+  routes `LiveIntent`s to them, keeps windows, navigation, history and the global choices, and
+  feeds the lists from core. Shared controls and theme (`key`, `controls`, `kit`, `theme`) stay
+  outside features. `lumilio-app` builds the shell and adapts only what the application owns:
+  preferences and appearance, terms, the updater, plugin registration and review hooks.
 - Async: core uses tokio; UI bridges via `cx.spawn`/channels. **No blocking I/O on the UI thread.**
 - `web/` is a separate Astro + React website and Cloudflare Worker, not the desktop UI. Use
   `just web` and `.github/workflows/web.yml` for website changes.

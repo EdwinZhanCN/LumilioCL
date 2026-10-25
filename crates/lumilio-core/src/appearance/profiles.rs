@@ -1,6 +1,6 @@
-//! Account-scoped profile reads (ADR 0039). Cache lifetimes and authentication
+//! Account-scoped profile reads. Cache lifetimes and authentication
 //! backoff follow Modrinth `packages/app-lib/src/state/minecraft_auth.rs`
-//! (Copyright Modrinth contributors, GPL-3.0-only; ADR 0022).
+//! (Copyright Modrinth contributors, GPL-3.0-only).
 //! Unlike a map-only cache, each account also serializes misses and writes.
 
 use std::collections::HashMap;

@@ -204,7 +204,7 @@ impl<T: Transport + Clone> InstanceLibrary<T> {
         result
     }
 
-    /// A MultiMC / Prism instance in a zip (ADR 0016): unpacked into a
+    /// A MultiMC / Prism instance in a zip: unpacked into a
     /// scratch folder, read like any other launcher's game, imported, and the
     /// scratch folder removed whatever happened.
     pub(crate) async fn import_prism_zip(

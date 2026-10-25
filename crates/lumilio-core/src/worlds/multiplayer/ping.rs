@@ -2,7 +2,7 @@
 //! the legacy pre-1.7 one.
 //!
 //! Adapted from Modrinth App (`packages/app-lib/src/util/server_ping.rs`,
-//! GPL-3.0-only; ADR 0022): the handshake and status exchange, the legacy
+//! GPL-3.0-only): the handshake and status exchange, the legacy
 //! packet, and the limits on lengths a server states. Everything a server sends
 //! is untrusted, so every length is capped before memory is reserved and the
 //! whole exchange has a deadline.
@@ -257,7 +257,7 @@ async fn exchange(
 
 /// The legacy (pre-1.7) ping: a `0xFE` packet carrying the host and port,
 /// answered by one UTF-16 string of `§`- or NUL-separated fields. Adapted from
-/// Modrinth App `server_ping.rs::legacy` (GPL-3.0-only; ADR 0022). No latency
+/// Modrinth App `server_ping.rs::legacy` (GPL-3.0-only). No latency
 /// is measured here.
 async fn legacy_exchange(
     connect: (&str, u16),

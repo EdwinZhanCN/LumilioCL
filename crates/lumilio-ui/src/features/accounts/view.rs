@@ -309,7 +309,7 @@ pub(super) fn accounts(ctx: &AccountsCtx) -> impl IntoElement {
         false,
         send(&ctx.handler, LiveIntent::NewAccount),
     );
-    // ia[accounts]: Microsoft 登录 | L2 主要「登录 Microsoft」→ 设备码弹窗 | 收到验证码后自动复制并打开验证页面；登录后出现在列表和导航芯片里，启动用真实的玩家名和令牌 | ADR 0020
+    // ia[accounts]: Microsoft 登录 | L2 主要「登录 Microsoft」→ 设备码弹窗 | 收到验证码后自动复制并打开验证页面；登录后出现在列表和导航芯片里，启动用真实的玩家名和令牌
     let microsoft = kit::action(
         "account-microsoft",
         tr!("account-sign-in-microsoft"),
@@ -317,7 +317,7 @@ pub(super) fn accounts(ctx: &AccountsCtx) -> impl IntoElement {
         true,
         send(&ctx.handler, LiveIntent::MicrosoftSignIn),
     );
-    // ia[accounts]: 第三方登录 | 页头 ⋯ 菜单「第三方登录…」→ 弹窗 | 选认证服务器（内置 LittleSkin）、输入账号密码；多个角色时选一个；登录后出现在列表里，启动时自动加载 authlib-injector | ADR 0024
+    // ia[accounts]: 第三方登录 | 页头 ⋯ 菜单「第三方登录…」→ 弹窗 | 选认证服务器（内置 LittleSkin）、输入账号密码；多个角色时选一个；登录后出现在列表里，启动时自动加载 authlib-injector
     // ia[accounts]: 管理认证服务器 | 页头 ⋯ 菜单「认证服务器…」→ 弹窗 | 添加（输入地址，先看到名称，http 有警告）、移除（会一并移除该服务器上的账户）；LittleSkin 内置
     let head = kit::header(
         tr!("route-accounts"),

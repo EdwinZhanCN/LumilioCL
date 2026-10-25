@@ -3,7 +3,7 @@
 //! by the wheel or + / −, as the schematic preview's orbit mode is (design
 //! language, native model preview). Frames are drawn off the UI thread; a
 //! newer request replaces a waiting one, and replaced frames leave GPUI's
-//! image cache (ADR 0028).
+//! image cache.
 
 use std::sync::Arc;
 

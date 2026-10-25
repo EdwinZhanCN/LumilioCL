@@ -203,7 +203,7 @@ pub(super) fn cell(text: &str) -> String {
 pub fn render(page: &Page, paths: &[&IaPath]) -> String {
     let mut out = String::new();
     out.push_str(
-        "<!-- 生成文件，不要手改。来源：代码里的 `// ia[...]` 注释；\n     重新生成：cargo run -p lumilio-docgen -- ia。约定见 ADR 0019。 -->\n",
+        "<!-- 生成文件，不要手改。来源：代码里的 `// ia[...]` 注释；\n     重新生成：cargo run -p lumilio-docgen -- ia。约定见技能 lumilio-ia-paths。 -->\n",
     );
     out.push_str(&format!("# {} · 已实现的用户路径\n\n", page.title));
     out.push_str("表里每一行都有对应的实现；没有的就是没做。\n\n");
@@ -237,7 +237,7 @@ pub fn generate(paths: &[IaPath]) -> BTreeMap<String, String> {
 /// The index of the generated pages, with how many paths each holds.
 pub fn render_index(paths: &[IaPath]) -> String {
     let mut out = String::from(
-        "<!-- 生成文件，不要手改。重新生成：cargo run -p lumilio-docgen -- ia。约定见 ADR 0019。 -->\n# 用户路径索引\n\n每个页面已实现的用户路径；表里每一行都有对应的实现，没有的就是没做。\n\n| 页面 | 路径数 |\n|---|---|\n",
+        "<!-- 生成文件，不要手改。重新生成：cargo run -p lumilio-docgen -- ia。约定见技能 lumilio-ia-paths。 -->\n# 用户路径索引\n\n每个页面已实现的用户路径；表里每一行都有对应的实现，没有的就是没做。\n\n| 页面 | 路径数 |\n|---|---|\n",
     );
     for page in PAGES {
         let count = paths.iter().filter(|path| path.page == page.key).count();

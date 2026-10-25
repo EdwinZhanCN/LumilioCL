@@ -1,5 +1,5 @@
 //! Generates `docs/ia/paths/*.md` from `// ia[page]:` comments in the code
-//! (ADR 0019).
+//!.
 //!
 //! ```text
 //! // ia[library]: 排序 / 按加载器筛选 | L4 两个下拉 | 视图状态，记在偏好设置里

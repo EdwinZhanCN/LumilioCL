@@ -1,6 +1,6 @@
 //! Minecraft profile appearance protocol. Endpoints and multipart fields
 //! follow Modrinth `packages/app-lib/src/state/minecraft_skins/mojang_api.rs`
-//! (Copyright Modrinth contributors, GPL-3.0-only; ADR 0022). Transport,
+//! (Copyright Modrinth contributors, GPL-3.0-only). Transport,
 //! validation, errors and delayed confirmation belong to our core boundary.
 
 use std::fmt;

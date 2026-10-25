@@ -1,7 +1,7 @@
 //! The choices the Discover sidebar offers, per kind of content.
 //!
 //! Modeled on Modrinth App's filter list (`useSearch` in
-//! `packages/ui/src/utils/search.ts`, GPL-3.0-only; ADR 0022): which sections
+//! `packages/ui/src/utils/search.ts`, GPL-3.0-only): which sections
 //! each kind has and in what order, which loaders come first, how categories
 //! are grouped and ordered, and the advanced exclusions.
 

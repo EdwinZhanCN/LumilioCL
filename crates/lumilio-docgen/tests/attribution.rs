@@ -1,4 +1,4 @@
-//! Comments that credit upstream code name the right license (ADR 0011, 0022).
+//! Comments that credit upstream code name the right license.
 //!
 //! HMCL is GPL-3.0-or-later and its files carry a copyright line; Modrinth App
 //! is GPL-3.0-only. This project is AGPL-3.0, which makes it easy to write the
@@ -91,10 +91,9 @@ fn problem(block: &str) -> Option<&'static str> {
     }
     let cites_hmcl = block.contains("HMCL") && block.contains(".java");
     // A Modrinth credit names a file or a license; "after Modrinth App's
-    // browse page (ADR 0022)" follows a design and copies no code.
+    // browse page" follows a design and copies no code.
     let cites_modrinth = block.contains("Modrinth")
-        && block.contains("ADR 0022")
-        && [".vue", ".ts", ".rs", "GPL"]
+        && [".vue", ".ts", "GPL"]
             .iter()
             .any(|mark| block.contains(mark));
     if (cites_hmcl || cites_modrinth) && block.contains("AGPL") {
@@ -160,21 +159,21 @@ fn a_path_into_a_fork_is_not_a_credit() {
 #[test]
 fn the_rules_catch_the_mistakes_they_are_for() {
     let good_hmcl = "Adapted from HMCL (`Skin.java`, Copyright (C) 2020 huangyuhui and \
-                     contributors, GPL-3.0-or-later; ADR 0011).";
+                     contributors, GPL-3.0-or-later).";
     assert_eq!(problem(good_hmcl), None);
-    assert!(problem("Adapted from HMCL (`Skin.java`, AGPL-3.0; ADR 0011).").is_some());
-    assert!(problem("Adapted from HMCL (`Skin.java`, GPL-3.0-or-later; ADR 0011).").is_some());
+    assert!(problem("Adapted from HMCL (`Skin.java`, AGPL-3.0).").is_some());
+    assert!(problem("Adapted from HMCL (`Skin.java`, GPL-3.0-or-later).").is_some());
     assert_eq!(
-        problem("After Modrinth App's `card.vue` (GPL-3.0-only; ADR 0022)."),
+        problem("After Modrinth App's `card.vue` (GPL-3.0-only)."),
         None
     );
-    assert!(problem("After Modrinth App's `card.vue` (AGPL-3.0; ADR 0022).").is_some());
+    assert!(problem("After Modrinth App's `card.vue` (AGPL-3.0).").is_some());
     assert_eq!(
         problem("Slim wins when the profile has both, as in HMCL."),
         None
     );
     assert_eq!(
-        problem("The browse page of Modrinth App, drawn our way (ADR 0022)."),
+        problem("The browse page of Modrinth App, drawn our way."),
         None
     );
 }

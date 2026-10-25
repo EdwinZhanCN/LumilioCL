@@ -314,8 +314,8 @@ fn collections_body(ctx: &LibraryCtx, needle: &str) -> gpui::AnyElement {
 /// The Library's page actions with the tab's own secondary key; every tab
 /// shares the primary and the More menu.
 pub(super) fn page_actions(secondary: Key, ctx: &LibraryCtx) -> kit::PageActions {
-    // ia[library]: 导入其他启动器的游戏 | L2 ⋯ 菜单 → 选文件夹（MultiMC/Prism 实例、.minecraft）→ 有多个时勾选 | 后台导入，复制玩家文件，原文件不动；CurseForge 格式不支持 | ADR 0016
-    // ia[library]: 从备份恢复 | L2 ⋯ 菜单 → 选备份 .zip | 后台恢复成新游戏，不覆盖已有的 | ADR 0015
+    // ia[library]: 导入其他启动器的游戏 | L2 ⋯ 菜单 → 选文件夹（MultiMC/Prism 实例、.minecraft）→ 有多个时勾选 | 后台导入，复制玩家文件，原文件不动；CurseForge 格式不支持
+    // ia[library]: 从备份恢复 | L2 ⋯ 菜单 → 选备份 .zip | 后台恢复成新游戏，不覆盖已有的
     // ia[library]: 打开游戏库文件夹 | L2 ⋯ 菜单 | 在访达中打开所有游戏所在的文件夹
     kit::PageActions::new("live-library-actions")
         .secondary(secondary)

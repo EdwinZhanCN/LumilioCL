@@ -8,7 +8,7 @@ rust-version.workspace = true
 
 [dependencies]
 lumilio-block-assets.workspace = true
-# Locally maintained native rendering chain; upstream baselines in forks/README.md (ADR 0029).
+# Locally maintained native rendering chain; upstream baselines in forks/README.md.
 nucleation = { path = "../../forks/nucleation", default-features = false, features = ["meshing", "rendering"] }
 pollster = "0.4"
 
