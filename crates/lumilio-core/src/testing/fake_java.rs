@@ -24,16 +24,22 @@ pub(crate) fn fake_java(world: &World, script: &str) {
 
 /// `bin/java` in `bin`, acting out `script`; returns the executable.
 pub(crate) fn install_java(bin: &Path, script: &str) -> PathBuf {
-    std::fs::create_dir_all(bin).unwrap();
-    let java = bin.join(format!("java{}", std::env::consts::EXE_SUFFIX));
-    std::fs::copy(program(), &java).unwrap();
-    std::fs::write(bin.join("java.fake"), script).unwrap();
-    java
+    install_fake(bin, "java", script)
+}
+
+/// The program as `name` in `dir`, acting out `script`; returns the
+/// executable.
+pub(crate) fn install_fake(dir: &Path, name: &str, script: &str) -> PathBuf {
+    std::fs::create_dir_all(dir).unwrap();
+    let program = dir.join(format!("{name}{}", std::env::consts::EXE_SUFFIX));
+    std::fs::copy(self::program(), &program).unwrap();
+    std::fs::write(dir.join(format!("{name}.fake")), script).unwrap();
+    program
 }
 
 /// The compiled program, built by the first test that needs it. Concurrent
 /// test processes may each build it; each publishes by an atomic rename.
-fn program() -> &'static Path {
+pub(super) fn program() -> &'static Path {
     static PROGRAM_PATH: OnceLock<PathBuf> = OnceLock::new();
     PROGRAM_PATH.get_or_init(|| {
         let digest = sha1_hex(PROGRAM.as_bytes());

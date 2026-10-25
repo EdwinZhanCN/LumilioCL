@@ -9,12 +9,14 @@
 //! - `args-lines > FILE`: one argument per line
 //! - `check FILE = TEXT`: exit 1 unless FILE holds TEXT
 //! - `sleep SECONDS`, `exit CODE`
+//! - `env NAME=VALUE`: runs the arguments as a command with NAME set to
+//!   VALUE and exits with its code, as `env NAME=VALUE` does as a wrapper
 //!
 //! `$NAME` in a step is the environment variable NAME, `$*` the arguments
 //! on one line. With no file it does nothing and exits 0.
 
 use std::io::Write;
-use std::process::ExitCode;
+use std::process::{Command, ExitCode};
 use std::time::Duration;
 use std::{env, fs, thread};
 
@@ -63,6 +65,17 @@ fn main() -> ExitCode {
                     .expect("the file is writable");
             }
             "sleep" => thread::sleep(Duration::from_secs(rest.parse().expect("whole seconds"))),
+            "env" => {
+                let (name, value) = rest.split_once('=').expect("env NAME=VALUE");
+                let (program, arguments) = args.split_first().expect("a command to run");
+                let status = Command::new(program)
+                    .args(arguments)
+                    .env(name, value)
+                    .status()
+                    .expect("the command starts");
+                let code = status.code().and_then(|code| u8::try_from(code).ok());
+                return ExitCode::from(code.unwrap_or(1));
+            }
             "exit" => {
                 std::io::stdout().flush().ok();
                 return ExitCode::from(rest.parse::<u8>().expect("an exit code"));

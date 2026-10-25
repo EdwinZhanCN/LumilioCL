@@ -379,12 +379,38 @@ fn a_window_flag_the_user_already_gave_is_not_added_twice() {
     assert!(!line.contains(&"--fullscreen".to_owned()));
 }
 
+// Hooks run in cmd on Windows and in sh elsewhere.
+
+/// Prints `out`, `err` on standard error and the variable `GREETING`, then
+/// ends with code 4.
+const TALK: &str = if cfg!(windows) {
+    "echo out& >&2 echo err& echo %GREETING%& exit 4"
+} else {
+    "echo out; echo err 1>&2; echo $GREETING; exit 4"
+};
+
+/// Waits 30 seconds.
+const WAIT: &str = if cfg!(windows) {
+    "ping -n 31 127.0.0.1 >nul"
+} else {
+    "sleep 30"
+};
+
+/// Writes `quoted` into `file`, its path in quotes.
+fn write_quoted(file: &Path) -> String {
+    if cfg!(windows) {
+        format!(r#"echo quoted> "{}""#, file.display())
+    } else {
+        format!(r#"echo quoted > "{}""#, file.display())
+    }
+}
+
 #[tokio::test]
 async fn a_hook_reports_its_exit_code_output_and_stops_on_cancel() {
     let dir = tempfile::tempdir().unwrap();
     let never = CancellationToken::new();
     let outcome = run_hook(
-        "echo out; echo err 1>&2; echo $GREETING; exit 4",
+        TALK,
         dir.path(),
         &[("GREETING".to_owned(), "hi".to_owned())],
         None,
@@ -401,13 +427,13 @@ async fn a_hook_reports_its_exit_code_output_and_stops_on_cancel() {
         .collect();
     assert!(texts.contains(&"out") && texts.contains(&"err") && texts.contains(&"hi"));
 
-    let ok = run_hook("true", dir.path(), &[], None, &never)
+    let ok = run_hook("exit 0", dir.path(), &[], None, &never)
         .await
         .unwrap();
     assert!(ok.succeeded());
 
     let slow = run_hook(
-        "sleep 30",
+        WAIT,
         dir.path(),
         &[],
         Some(Duration::from_millis(100)),
@@ -418,8 +444,21 @@ async fn a_hook_reports_its_exit_code_output_and_stops_on_cancel() {
     assert!(slow.stopped && !slow.succeeded());
     let cancel = CancellationToken::new();
     cancel.cancel();
-    let stopped = run_hook("sleep 30", dir.path(), &[], None, &cancel)
+    let stopped = run_hook(WAIT, dir.path(), &[], None, &cancel)
         .await
         .unwrap();
     assert!(stopped.stopped);
+}
+
+#[tokio::test]
+async fn a_hook_runs_as_typed_with_its_quotes() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("with space").join("out.txt");
+    std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+    let command = write_quoted(&file);
+    let outcome = run_hook(&command, dir.path(), &[], None, &CancellationToken::new())
+        .await
+        .unwrap();
+    assert!(outcome.succeeded(), "{outcome:?}");
+    assert_eq!(std::fs::read_to_string(&file).unwrap().trim(), "quoted");
 }

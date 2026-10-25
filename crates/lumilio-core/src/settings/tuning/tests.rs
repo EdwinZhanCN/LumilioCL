@@ -1,7 +1,8 @@
 use super::*;
 
+/// Words by the shell's rules, whatever system the tests run on.
 fn words(text: &str) -> Vec<String> {
-    split_words(text).unwrap()
+    split_words_with(text, true).unwrap()
 }
 
 #[test]
@@ -72,8 +73,24 @@ fn words_follow_shell_quoting_for_plain_cases() {
     assert_eq!(words(r#"say "he said \"hi\"""#), ["say", r#"he said "hi""#]);
     assert_eq!(words(r#"empty "" end"#), ["empty", "", "end"]);
     assert_eq!(split_words("open 'quote"), None);
-    assert_eq!(split_words("trailing\\"), None);
+    assert_eq!(split_words_with("trailing\\", true), None);
     assert!(words("   ").is_empty());
+}
+
+#[test]
+fn on_windows_a_backslash_belongs_to_the_word() {
+    let windows = |text: &str| split_words_with(text, false).unwrap();
+    assert_eq!(
+        windows(r#""C:\Program Files\Tool\wrap.exe" --log C:\logs\ -v"#),
+        [
+            r"C:\Program Files\Tool\wrap.exe",
+            "--log",
+            r"C:\logs\",
+            "-v"
+        ]
+    );
+    assert_eq!(windows(r"D:\wrap.exe"), [r"D:\wrap.exe"]);
+    assert_eq!(split_words_with(r#"open "C:\x"#, false), None);
 }
 
 #[test]

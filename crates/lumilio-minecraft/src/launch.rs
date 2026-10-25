@@ -472,7 +472,11 @@ fn join_relative(root: &Path, relative: &str) -> Result<PathBuf, LaunchError> {
     }) {
         return Err(LaunchError::UnsafeLibraryPath(relative.to_owned()));
     }
-    Ok(root.join(path))
+    // Part by part, so the path has this system's separator throughout: on
+    // Windows a joined `org/lwjgl/…` would put both kinds in the classpath.
+    let mut joined = root.to_owned();
+    joined.extend(path.components());
+    Ok(joined)
 }
 
 fn tokenize_legacy_arguments(value: &str) -> Result<Vec<String>, LaunchError> {

@@ -154,10 +154,16 @@ fn clean_lines(lines: Vec<String>) -> Vec<String> {
 
 /// Splits a command line into words the way a shell would for plain cases:
 /// whitespace separates words, single or double quotes group them, and a
-/// backslash escapes the next character outside single quotes. `None` for an
+/// backslash escapes the next character outside single quotes. On Windows a
+/// backslash is part of the word, as in `C:\Tools\wrap.exe`. `None` for an
 /// unclosed quote.
 #[must_use]
 pub fn split_words(text: &str) -> Option<Vec<String>> {
+    split_words_with(text, !cfg!(windows))
+}
+
+/// [`split_words`], with or without a backslash escaping the next character.
+fn split_words_with(text: &str, backslash_escapes: bool) -> Option<Vec<String>> {
     let mut words = Vec::new();
     let mut current = String::new();
     let mut started = false;
@@ -167,7 +173,7 @@ pub fn split_words(text: &str) -> Option<Vec<String>> {
         match (quote, ch) {
             (Some(open), ch) if ch == open => quote = None,
             (Some('\''), ch) => current.push(ch),
-            (_, '\\') => current.push(chars.next()?),
+            (_, '\\') if backslash_escapes => current.push(chars.next()?),
             (Some(_), ch) => current.push(ch),
             (None, '\'' | '"') => {
                 quote = Some(ch);

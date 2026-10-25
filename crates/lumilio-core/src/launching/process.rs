@@ -455,11 +455,17 @@ pub async fn run_hook(
         program: command.to_owned(),
         reason: error.to_string(),
     })?;
-    let mut shell = if cfg!(windows) {
+    // cmd reads its command line itself, not by the quoting `arg` applies
+    // (`\"`): with /S it drops the outer quotes and runs the rest as typed.
+    // /D skips the AutoRun commands set in the registry.
+    #[cfg(windows)]
+    let mut shell = {
         let mut shell = background_command("cmd");
-        shell.arg("/C").arg(command);
+        shell.raw_arg(format!("/D /S /C \"{command}\""));
         shell
-    } else {
+    };
+    #[cfg(not(windows))]
+    let mut shell = {
         let mut shell = background_command("sh");
         shell.arg("-c").arg(command);
         shell

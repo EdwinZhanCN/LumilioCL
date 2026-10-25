@@ -245,6 +245,31 @@ fn a_manifest_is_read_and_anything_that_could_escape_is_refused() {
 }
 
 #[test]
+fn a_link_leads_to_the_file_it_names_for_a_copy_where_links_cannot_be_made() {
+    let manifest = r#"{"files":{
+        "legal/java.base/LICENSE":{"type":"file","downloads":{
+            "raw":{"url":"https://piston-data.mojang.com/v1/objects/x/LICENSE","sha1":"bb"}}},
+        "legal/java.sql/LICENSE":{"type":"link","target":"../java.base/LICENSE"},
+        "legal/java.xml/LICENSE":{"type":"link","target":"./../java.sql/LICENSE"},
+        "legal/java.base":{"type":"directory"},
+        "legal/all":{"type":"link","target":"java.base"},
+        "loop/a":{"type":"link","target":"b"},
+        "loop/b":{"type":"link","target":"a"},
+        "gone":{"type":"link","target":"missing"}}}"#;
+    let entries = parse_manifest(manifest, is_trusted_source).unwrap();
+    for link in ["legal/java.sql/LICENSE", "legal/java.xml/LICENSE"] {
+        assert_eq!(
+            linked_file(&entries, link).as_deref(),
+            Some("legal/java.base/LICENSE"),
+            "{link}"
+        );
+    }
+    for unusable in ["legal/all", "loop/a", "gone"] {
+        assert_eq!(linked_file(&entries, unusable), None, "{unusable}");
+    }
+}
+
+#[test]
 fn a_mac_bundle_loses_its_bundle_folder_so_discovery_finds_contents_home() {
     let folder = Path::new("/r/java-runtime-gamma");
     assert_eq!(
