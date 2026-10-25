@@ -28,7 +28,7 @@ impl LauncherShell {
     }
 
     /// Whether core says a launch is on its way or a game runs.
-    pub fn game_active(&self) -> bool {
+    pub(crate) fn game_active(&self) -> bool {
         self.context
             .session
             .as_ref()
@@ -37,13 +37,13 @@ impl LauncherShell {
 
     /// Whether a game can be started now: no session is active, and Home
     /// has not begun a launch core has yet to publish.
-    pub fn can_start(&self) -> bool {
+    pub(crate) fn can_start(&self) -> bool {
         !self.game_active() && self.home.can_start()
     }
 
     /// Takes what core published. Another current game is the one Discover
     /// installs into; Discover ends browsing for a different one (D3).
-    pub fn follow_context(&mut self, context: CoreContext, cx: &mut Context<Self>) {
+    pub(crate) fn follow_context(&mut self, context: CoreContext, cx: &mut Context<Self>) {
         let moved = self.context.current_instance != context.current_instance;
         self.context = context;
         if !moved {

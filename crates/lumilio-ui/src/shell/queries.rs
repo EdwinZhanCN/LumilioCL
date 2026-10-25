@@ -8,7 +8,6 @@ use crate::features::library::LibraryInputs;
 use crate::features::settings::SettingsInputs;
 use crate::kit::ViewIntent;
 use crate::live::{LiveHandler, LiveModel};
-use crate::pages::ViewState;
 use crate::route::Route;
 
 impl LauncherShell {
@@ -79,7 +78,7 @@ impl LauncherShell {
     /// Opens Discover for one game's Content tab: the page browses *for that
     /// game*, from a fresh search of that kind. The caller makes it the
     /// current game too (decision D3).
-    pub fn browse_for(
+    pub(crate) fn browse_for(
         &mut self,
         game: String,
         kind: ProjectKind,
@@ -109,10 +108,6 @@ impl LauncherShell {
     ) {
         self.discover
             .update(cx, |discover, cx| discover.apply_preferences(prefs, cx));
-    }
-
-    pub fn view(&self) -> &ViewState {
-        &self.view
     }
 
     /// Applies a page intent to the view state only.

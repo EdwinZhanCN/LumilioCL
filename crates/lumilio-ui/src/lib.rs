@@ -54,7 +54,4 @@ pub mod world_explorer;
 #[cfg(test)]
 mod testing;
 
-pub use shell::{
-    ActivitySummary, LauncherShell, ShellIntent, build_root, follow_system_appearance,
-    window_titlebar,
-};
+pub use shell::{LauncherShell, follow_system_appearance, window_titlebar};

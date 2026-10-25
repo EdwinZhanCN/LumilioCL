@@ -24,7 +24,7 @@ use crate::toast::Toast;
 use crate::{home, toast};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct ActivitySummary {
+pub(crate) struct ActivitySummary {
     pub active_tasks: u32,
 }
 
@@ -33,7 +33,8 @@ impl ActivitySummary {
         Self { active_tasks }
     }
 
-    pub fn badge_label(self) -> Option<String> {
+    #[cfg(test)]
+    pub(crate) fn badge_label(self) -> Option<String> {
         match self.active_tasks {
             0 => None,
             1..=99 => Some(self.active_tasks.to_string()),
@@ -43,7 +44,7 @@ impl ActivitySummary {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum ShellIntent {
+pub(crate) enum ShellIntent {
     Navigate(Route),
     Home(HomeIntent),
 }
@@ -262,11 +263,6 @@ impl LauncherShell {
         &self.discover
     }
 
-    /// What makes new games, for the application to follow its events.
-    pub fn new_game(&self) -> &Entity<NewGame> {
-        &self.new_game
-    }
-
     /// The Library's actions, for the application to follow its events.
     pub fn library(&self) -> &Entity<Library> {
         &self.library
@@ -290,11 +286,6 @@ impl LauncherShell {
     /// What answers a game's page, for the application to follow its events.
     pub fn game(&self) -> &Entity<Game> {
         &self.game
-    }
-
-    pub fn with_activity(mut self, activity: ActivitySummary) -> Self {
-        self.activity = activity;
-        self
     }
 
     /// A test hears every intent, after the shell and its features have

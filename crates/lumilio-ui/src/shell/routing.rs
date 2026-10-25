@@ -11,7 +11,8 @@ impl LauncherShell {
     }
 
     /// Opens a route's tab directly, for design review.
-    pub fn show_tab(&mut self, route: Route, tab: usize, cx: &mut Context<Self>) {
+    #[cfg(test)]
+    pub(crate) fn show_tab(&mut self, route: Route, tab: usize, cx: &mut Context<Self>) {
         match route {
             Route::Library => self
                 .library

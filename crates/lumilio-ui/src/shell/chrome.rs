@@ -1,8 +1,6 @@
-use gpui::prelude::*;
-use gpui::{App, Entity, Window};
+use gpui::{App, Window};
 use gpui_component::{Theme, TitleBar};
 
-use super::LauncherShell;
 use crate::theme;
 
 /// Keeps the gpui-component theme in step with the system appearance, now
@@ -40,14 +38,6 @@ pub(crate) fn sync_appearance(window: &mut Window, cx: &mut App) {
         background
     };
     window.set_background_appearance(material.to_gpui());
-}
-
-/// Builds the window content. The caller mounts it under the framework `Root`
-/// (`gpui_kit::open_window` does this) and opens the window with
-/// [`window_titlebar`].
-pub fn build_root(window: &mut Window, cx: &mut App) -> Entity<LauncherShell> {
-    follow_system_appearance(window, cx);
-    cx.new(LauncherShell::new)
 }
 
 /// Title bar options for the launcher window: transparent, so Home's world

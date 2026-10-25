@@ -87,7 +87,7 @@ impl LauncherShell {
 
     /// A launch that cannot start (no account yet) leaves the Home launch
     /// moment as if cancelled, so the dialog that follows has the page.
-    pub fn abort_launch(&mut self, cx: &mut Context<Self>) {
+    pub(crate) fn abort_launch(&mut self, cx: &mut Context<Self>) {
         let home = std::mem::take(&mut self.home).cancel_launch();
         self.set_home(home, cx);
     }

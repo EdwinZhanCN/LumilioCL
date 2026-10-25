@@ -3,7 +3,8 @@ use lumilio_core::ProjectKind;
 
 use super::LauncherShell;
 use crate::features::discover::OpenedProject;
-use crate::features::discover::detail::{DetailState, ProjectDetailView};
+#[cfg(test)]
+use crate::features::discover::detail::DetailState;
 use crate::route::Route;
 
 /// A project detail on screen or in history.
@@ -36,27 +37,29 @@ impl LauncherShell {
     }
 
     /// Shows a gallery image of the open project large.
-    pub fn open_gallery_image(&mut self, index: usize, cx: &mut Context<Self>) {
+    #[cfg(test)]
+    pub(crate) fn open_gallery_image(&mut self, index: usize, cx: &mut Context<Self>) {
         if let Some(slot) = &self.detail {
             slot.view.update(cx, |view, cx| view.open_viewer(index, cx));
         }
     }
 
     /// Fills the open detail in, if it is still the one asked for.
-    pub fn set_detail_state(&mut self, slug: &str, state: DetailState, cx: &mut Context<Self>) {
+    #[cfg(test)]
+    pub(crate) fn set_detail_state(
+        &mut self,
+        slug: &str,
+        state: DetailState,
+        cx: &mut Context<Self>,
+    ) {
         if let Some(slot) = self.detail.as_ref().filter(|slot| slot.slug == slug) {
             slot.view.update(cx, |view, cx| view.set_state(state, cx));
         }
     }
 
-    pub fn select_detail_tab(&mut self, tab: usize, cx: &mut Context<Self>) {
-        if let Some(slot) = &self.detail {
-            slot.view.update(cx, |view, cx| view.select_tab(tab, cx));
-        }
-    }
-
     /// Leaves the open project: back where it came from, or the list.
-    pub fn close_detail(&mut self, cx: &mut Context<Self>) {
+    #[cfg(test)]
+    pub(crate) fn close_detail(&mut self, cx: &mut Context<Self>) {
         if self.detail.is_some() && !self.go_back(None, cx) {
             self.detail = None;
             cx.notify();
@@ -64,21 +67,11 @@ impl LauncherShell {
     }
 
     /// The project open on Discover, if any.
-    pub fn detail_project(&self) -> Option<(ProjectKind, &str)> {
+    #[cfg(test)]
+    pub(crate) fn detail_project(&self) -> Option<(ProjectKind, &str)> {
         self.detail
             .as_ref()
             .map(|slot| (slot.kind, slot.slug.as_str()))
-    }
-
-    /// The content source of the project open on Discover, if any.
-    pub fn detail_source(&self) -> Option<&str> {
-        self.detail.as_ref().map(|slot| slot.source.as_str())
-    }
-
-    /// The page of the project open on Discover; compare it to tell whether
-    /// the page changed since.
-    pub fn detail_view(&self) -> Option<gpui::Entity<ProjectDetailView>> {
-        self.detail.as_ref().map(|slot| slot.view.clone())
     }
 }
 

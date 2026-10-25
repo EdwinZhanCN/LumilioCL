@@ -90,7 +90,7 @@ impl LauncherShell {
     }
 
     /// Goes back one location; `false` when there is nowhere to go.
-    pub fn go_back(&mut self, window: Option<&mut Window>, cx: &mut Context<Self>) -> bool {
+    pub(crate) fn go_back(&mut self, window: Option<&mut Window>, cx: &mut Context<Self>) -> bool {
         let here = self.location();
         match self.history.back(here) {
             Some(to) => {
@@ -101,7 +101,11 @@ impl LauncherShell {
         }
     }
 
-    pub fn go_forward(&mut self, window: Option<&mut Window>, cx: &mut Context<Self>) -> bool {
+    pub(crate) fn go_forward(
+        &mut self,
+        window: Option<&mut Window>,
+        cx: &mut Context<Self>,
+    ) -> bool {
         let here = self.location();
         match self.history.forward(here) {
             Some(to) => {
@@ -112,16 +116,16 @@ impl LauncherShell {
         }
     }
 
-    pub fn can_go_back(&self) -> bool {
+    pub(crate) fn can_go_back(&self) -> bool {
         self.history.can_back()
     }
 
-    pub fn can_go_forward(&self) -> bool {
+    pub(crate) fn can_go_forward(&self) -> bool {
         self.history.can_forward()
     }
 
     /// The current location's name for the navigation bar (§6).
-    pub fn location_title(&self, cx: &App) -> SharedString {
+    pub(crate) fn location_title(&self, cx: &App) -> SharedString {
         match self.location() {
             Location::Page(route) => route.label().into(),
             Location::Instance(view) => view.read(cx).title().to_owned().into(),
