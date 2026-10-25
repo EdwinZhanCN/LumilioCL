@@ -2,19 +2,15 @@ use gpui_kit::{App, AppContext as _, Window};
 use lumilio_ui::home::HomeIntent;
 use lumilio_ui::instance_detail::InstanceIntent;
 use lumilio_ui::java_conflict::{JavaConflict, JavaConflictAnswer};
-use lumilio_ui::live::{LiveIntent, PlaceTarget, account_failure, account_rows};
+use lumilio_ui::live::{LiveIntent, PlaceTarget, account_rows};
 use lumilio_ui::missing_folder::MissingFolderAnswer;
 use lumilio_ui::route::Route;
 use lumilio_ui::shell::ShellIntent;
 use lumilio_ui::toast::Toast;
 use lumilio_ui::{java_conflict, missing_folder, tr};
 
-use super::accounts::{
-    load_account_face, load_account_look, open_add_account, open_auth_servers,
-    open_microsoft_sign_in, open_skin_dialog, open_third_party_sign_in,
-};
 use super::instance::open_instance;
-use super::jobs::{job, outcome, reload};
+use super::jobs::reload;
 use super::launch::{play, start_launch, technical_details};
 use super::{Reload, Wiring, update};
 
@@ -172,7 +168,14 @@ fn continue_launch(wiring: &Wiring, window: gpui_kit::AnyWindowHandle, cx: &mut 
             // The chosen Java cannot run the game: ask once, then start.
             (None, Some(conflict)) if has_account => ask_java(&wiring, &conflict, window, cx),
             // No account: ask for one, then start where the person left off.
-            _ => open_add_account(&wiring, true, window, cx),
+            _ => {
+                if let Ok(accounts) = wiring
+                    .shell
+                    .read_with(cx, |shell, _| shell.accounts().clone())
+                {
+                    accounts.update(cx, |accounts, cx| accounts.add_offline(true, window, cx));
+                }
+            }
         });
     })
     .detach();
@@ -235,7 +238,15 @@ pub(super) fn on_live_intent(
         | LiveIntent::ClearMapCache
         | LiveIntent::CheckReclaimable
         | LiveIntent::Reclaim
-        | LiveIntent::ExportDiagnostics => {}
+        | LiveIntent::ExportDiagnostics
+        | LiveIntent::NewAccount
+        | LiveIntent::MicrosoftSignIn
+        | LiveIntent::ThirdPartySignIn
+        | LiveIntent::ManageAuthServers
+        | LiveIntent::OpenSkinSite(_)
+        | LiveIntent::RefreshAccount(_)
+        | LiveIntent::SelectAccount(_)
+        | LiveIntent::RemoveAccount(_) => {}
         LiveIntent::ApplyUpdate => update::apply(wiring),
         LiveIntent::OpenInstance(id) => open_instance(wiring, id, None, window, cx),
         LiveIntent::Resolve(id, action) => open_instance(
@@ -257,86 +268,6 @@ pub(super) fn on_live_intent(
         LiveIntent::Refresh => {
             reload(wiring, Reload::Lists, cx);
             super::context::check_again(wiring, cx);
-        }
-        LiveIntent::NewAccount => open_add_account(wiring, false, window, cx),
-        LiveIntent::MicrosoftSignIn => open_microsoft_sign_in(wiring, window, cx),
-        LiveIntent::ThirdPartySignIn => open_third_party_sign_in(wiring, window, cx),
-        LiveIntent::ManageAuthServers => open_auth_servers(wiring, window, cx),
-        LiveIntent::EditSkin(key) => open_skin_dialog(wiring, key, window, cx),
-        LiveIntent::LoadAccountLook(key) => load_account_look(wiring, key, cx),
-        LiveIntent::LoadAccountFace(key) => load_account_face(wiring, key, cx),
-        LiveIntent::Wardrobe {
-            key,
-            revision,
-            action,
-        } => super::wardrobe::run(wiring, key, revision, action, cx),
-        LiveIntent::SaveInlineSkin { revision, intent } => {
-            super::wardrobe::save_offline(wiring, revision, intent, cx)
-        }
-        LiveIntent::OpenSkinSite(address) => super::wardrobe::open_site(wiring, address, cx),
-        LiveIntent::RefreshAccount(key) => {
-            let service = wiring.backend.service.clone();
-            job(
-                wiring,
-                cx,
-                false,
-                Reload::Nothing,
-                None,
-                async move { service.refresh_account(&key).await },
-                |shell, result, cx| {
-                    shell.toast(
-                        match result {
-                            Ok(()) => Toast::success(tr!("account-refreshed")),
-                            Err(error) => {
-                                let (message, technical) = account_failure(&error);
-                                Toast::error(message).technical(technical)
-                            }
-                        },
-                        cx,
-                    );
-                },
-            );
-        }
-        LiveIntent::SelectAccount(name) => {
-            let service = wiring.backend.service.clone();
-            job(
-                wiring,
-                cx,
-                false,
-                Reload::Nothing,
-                None,
-                async move { service.select_account(&name).await },
-                |shell, result, cx| {
-                    if let Err(error) = result {
-                        shell.toast(
-                            Toast::error(tr!("account-switch-failed")).technical(error.to_string()),
-                            cx,
-                        );
-                    }
-                },
-            );
-        }
-        LiveIntent::RemoveAccount(name) => {
-            let service = wiring.backend.service.clone();
-            let removed = name.clone();
-            job(
-                wiring,
-                cx,
-                false,
-                Reload::Nothing,
-                None,
-                async move { service.remove_account(&name).await },
-                move |shell, result, cx| {
-                    shell.toast(
-                        outcome(
-                            result,
-                            |()| tr!("account-removed", name = removed.as_str()),
-                            tr!("account-remove-failed").to_owned(),
-                        ),
-                        cx,
-                    );
-                },
-            );
         }
         LiveIntent::CopyText { text, notice } => {
             lumilio_ui::toast::copy_text(text, cx);

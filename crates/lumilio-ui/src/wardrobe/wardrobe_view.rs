@@ -13,7 +13,6 @@ use super::pictures::arms;
 use crate::collections::NamePrompt;
 use crate::key::Key;
 use crate::kit::Failure;
-use crate::live::{LiveHandler, LiveIntent};
 use crate::skin_dialog::SkinDialog;
 use crate::skin_view::{SkinViewer, Trial};
 use crate::{kit, tr};
@@ -53,10 +52,12 @@ pub enum WardrobeAction {
     },
 }
 
+/// Where the wardrobe asks for an operation, already bound to its account
+/// detail.
+pub type WardrobeHandler = Rc<dyn Fn(WardrobeAction, &mut Window, &mut App)>;
+
 pub struct Wardrobe {
-    pub(super) key: String,
-    pub(super) revision: u64,
-    pub(super) handler: LiveHandler,
+    pub(super) handler: WardrobeHandler,
     pub(super) microsoft: bool,
     pub(super) viewer: WeakEntity<SkinViewer>,
     pub(super) profile: Option<MojangProfile>,
@@ -105,16 +106,12 @@ impl Wardrobe {
     }
 
     pub fn new(
-        key: String,
-        revision: u64,
         microsoft: bool,
-        handler: LiveHandler,
+        handler: WardrobeHandler,
         viewer: WeakEntity<SkinViewer>,
         cx: &mut Context<Self>,
     ) -> Self {
         Self {
-            key,
-            revision,
             handler,
             microsoft,
             viewer,
@@ -166,15 +163,7 @@ impl Wardrobe {
         }
         self.busy = true;
         self.error = None;
-        (self.handler)(
-            LiveIntent::Wardrobe {
-                key: self.key.clone(),
-                revision: self.revision,
-                action,
-            },
-            window,
-            cx,
-        );
+        (self.handler)(action, window, cx);
         cx.notify();
     }
 

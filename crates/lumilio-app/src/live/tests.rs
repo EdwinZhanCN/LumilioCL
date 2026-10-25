@@ -3,9 +3,7 @@ mod global_context;
 mod missing_folder;
 mod terms;
 
-use lumilio_ui::toast::Toast;
-
-use super::jobs::outcome;
+use lumilio_ui::toast::{Toast, outcome};
 
 #[gpui_kit::test]
 fn home_snapshot_and_rapid_selection_keep_the_last_game(cx: &mut gpui_kit::TestAppContext) {
@@ -128,21 +126,27 @@ fn work_that_panics_is_told_and_not_left_hanging(cx: &mut gpui_kit::TestAppConte
     use gpui_kit::AppContext as _;
     use lumilio_core::ServiceError;
     use lumilio_ui::LauncherShell;
+    use lumilio_ui::runtime::job;
     use lumilio_ui::toast::ToastKind;
 
-    use super::jobs::job;
-    use super::{Reload, State, Wiring};
+    use super::{State, Wiring};
     use crate::backend::Backend;
+
+    /// A feature that runs one job and has no events.
+    struct Probe;
+    impl gpui_kit::EventEmitter<()> for Probe {}
 
     let dir = tempfile::tempdir().unwrap();
     let backend = Backend::open(dir.path().join("root")).unwrap();
     cx.update(gpui_kit::init);
     let shell = cx.new(|cx| LauncherShell::new(cx).with_live(Rc::new(|_, _, _| {})));
+    let worker = backend.worker();
     let wiring = Wiring {
         backend: Rc::new(backend),
         shell: shell.downgrade(),
         state: Rc::new(RefCell::new(State::default())),
     };
+    let probe = cx.new(|_| Probe);
     let toasts = |cx: &mut gpui_kit::TestAppContext, count: usize| {
         let until = Instant::now() + Duration::from_secs(5);
         loop {
@@ -158,12 +162,11 @@ fn work_that_panics_is_told_and_not_left_hanging(cx: &mut gpui_kit::TestAppConte
 
     let finished = Rc::new(Cell::new(false));
     let seen = finished.clone();
-    cx.update(|cx| {
+    probe.update(cx, |_, cx| {
         job(
-            &wiring,
+            &worker,
             cx,
-            false,
-            Reload::Nothing,
+            None::<()>,
             None,
             async {
                 if true {
@@ -171,10 +174,10 @@ fn work_that_panics_is_told_and_not_left_hanging(cx: &mut gpui_kit::TestAppConte
                 }
                 Ok::<(), ServiceError>(())
             },
-            move |shell, result, cx| {
+            move |_, result, cx| {
                 seen.set(true);
-                shell.toast(
-                    super::jobs::outcome(result, |()| String::new(), "没有装上".to_owned()),
+                lumilio_ui::toast::post(
+                    outcome(result, |()| String::new(), "没有装上".to_owned()),
                     cx,
                 );
             },

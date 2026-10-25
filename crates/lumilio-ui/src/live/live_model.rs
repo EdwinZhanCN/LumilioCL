@@ -1,7 +1,4 @@
-use std::collections::{BTreeMap, HashMap};
-use std::sync::Arc;
-
-use gpui::RenderImage;
+use std::collections::BTreeMap;
 
 use super::accounts::AccountRow;
 use super::activity::{ActivityRow, ActivityState, RateSample, TrafficReading, next_sample};
@@ -33,9 +30,6 @@ pub struct LiveModel {
     pub traffic: TrafficReading,
     pub accounts: Vec<AccountRow>,
     pub accounts_loaded: bool,
-    /// Each account's skin face, by key. `Some(None)` is "asked, no face",
-    /// so an account that has none is not asked for again and again.
-    pub faces: HashMap<String, Option<Arc<RenderImage>>>,
     pub update_status: UpdateStatus,
 }
 
@@ -78,20 +72,10 @@ impl LiveModel {
         self.accounts.iter().find(|row| row.selected)
     }
 
-    /// Replaces the account rows, keeping the faces of accounts that are still
-    /// here so they are not fetched again on every refresh.
+    /// Replaces the account rows.
     pub fn set_accounts(&mut self, accounts: Vec<AccountRow>) {
-        let keys: std::collections::HashSet<String> =
-            accounts.iter().map(|row| row.key.clone()).collect();
-        self.faces.retain(|key, _| keys.contains(key));
         self.accounts = accounts;
         self.accounts_loaded = true;
-    }
-
-    /// The face of an account, if one has been loaded.
-    #[must_use]
-    pub fn face_of(&self, key: &str) -> Option<Arc<RenderImage>> {
-        self.faces.get(key).cloned().flatten()
     }
 
     pub fn active_tasks(&self) -> u32 {

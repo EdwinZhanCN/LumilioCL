@@ -6,7 +6,6 @@ use gpui::{Entity, InputEvent as _, Modifiers, TestAppContext, VisualTestContext
 use lumilio_core::{PairedCape, SkinSource};
 
 use super::*;
-use crate::live::LiveIntent;
 use crate::skin_view::SkinViewer;
 
 fn profile() -> MojangProfile {
@@ -83,13 +82,9 @@ impl Render for Host {
     }
 }
 
-type Seen = Rc<RefCell<Vec<LiveIntent>>>;
+type Seen = Rc<RefCell<Vec<WardrobeAction>>>;
 
-fn open(
-    cx: &mut TestAppContext,
-    revision: u64,
-    microsoft: bool,
-) -> (Entity<Host>, Seen, &mut VisualTestContext) {
+fn open(cx: &mut TestAppContext, microsoft: bool) -> (Entity<Host>, Seen, &mut VisualTestContext) {
     cx.update(|cx| {
         gpui_component::init(cx);
         cx.set_reduce_motion(true);
@@ -101,10 +96,8 @@ fn open(
         let weak = viewer.downgrade();
         let wardrobe = cx.new(|cx| {
             Wardrobe::new(
-                "account".into(),
-                revision,
                 microsoft,
-                Rc::new(move |intent, _, _| sink.borrow_mut().push(intent)),
+                Rc::new(move |action, _, _| sink.borrow_mut().push(action)),
                 weak,
                 cx,
             )
@@ -132,7 +125,7 @@ fn click(cx: &mut VisualTestContext, selector: &'static str) {
 
 #[gpui::test]
 fn editing_current_appearance_is_a_cancelable_draft_with_one_apply_intent(cx: &mut TestAppContext) {
-    let (host, seen, cx) = open(cx, 21, true);
+    let (host, seen, cx) = open(cx, true);
     let view = wardrobe(&host, cx);
     let preview = viewer(&host, cx);
     preview.update(cx, |preview, cx| {
@@ -157,15 +150,20 @@ fn editing_current_appearance_is_a_cancelable_draft_with_one_apply_intent(cx: &m
         view.preview_editor(cx);
     });
     click(cx, "wardrobe-editor-apply");
-    assert!(matches!(seen.borrow().as_slice(), [LiveIntent::Wardrobe {
-        key, revision: 21,
-        action: WardrobeAction::ApplyCurrentDraft { model: SkinModel::Slim, model_changed: true, cape_changed: false, .. },
-    }] if key == "account"));
+    assert!(matches!(
+        seen.borrow().as_slice(),
+        [WardrobeAction::ApplyCurrentDraft {
+            model: SkinModel::Slim,
+            model_changed: true,
+            cape_changed: false,
+            ..
+        }]
+    ));
 }
 
 #[gpui::test]
 fn escape_closes_the_edit_panel_and_returns_focus_to_its_key(cx: &mut TestAppContext) {
-    let (host, seen, cx) = open(cx, 4, true);
+    let (host, seen, cx) = open(cx, true);
     let view = wardrobe(&host, cx);
     viewer(&host, cx).update(cx, |preview, cx| {
         preview.set_look(Ok(crate::skin_view::Look::from_core(&look())), cx)
@@ -192,7 +190,7 @@ fn escape_closes_the_edit_panel_and_returns_focus_to_its_key(cx: &mut TestAppCon
 
 #[gpui::test]
 fn a_skin_picture_is_a_key_enter_and_space_toggle_its_trial_once(cx: &mut TestAppContext) {
-    let (host, _, cx) = open(cx, 5, true);
+    let (host, _, cx) = open(cx, true);
     let view = wardrobe(&host, cx);
     view.update(cx, |view, cx| {
         view.listed(
@@ -229,7 +227,7 @@ fn a_skin_picture_is_a_key_enter_and_space_toggle_its_trial_once(cx: &mut TestAp
 fn library_wear_is_bound_to_the_detail_and_duplicate_clicks_wait_for_confirmation(
     cx: &mut TestAppContext,
 ) {
-    let (host, seen, cx) = open(cx, 7, true);
+    let (host, seen, cx) = open(cx, true);
     let view = wardrobe(&host, cx);
     view.update(cx, |view, cx| {
         view.listed(
@@ -251,11 +249,7 @@ fn library_wear_is_bound_to_the_detail_and_duplicate_clicks_wait_for_confirmatio
     cx.simulate_click(bounds.center(), Modifiers::none());
     assert_eq!(
         seen.borrow().as_slice(),
-        [LiveIntent::Wardrobe {
-            key: "account".into(),
-            revision: 7,
-            action: WardrobeAction::Wear("skin".into())
-        }]
+        [WardrobeAction::Wear("skin".into())]
     );
     view.update(cx, |view, cx| {
         view.finished(WardrobeAction::Wear("skin".into()), Ok(()), cx)
@@ -290,7 +284,7 @@ fn library_wear_is_bound_to_the_detail_and_duplicate_clicks_wait_for_confirmatio
 
 #[gpui::test]
 fn a_trial_shows_the_skin_and_its_paired_cape_and_cancel_restores(cx: &mut TestAppContext) {
-    let (host, seen, cx) = open(cx, 3, true);
+    let (host, seen, cx) = open(cx, true);
     let view = wardrobe(&host, cx);
     let shown = viewer(&host, cx);
     let account_cape = Arc::new(Texture::new(64, 32, vec![9; 64 * 32 * 4]).unwrap());
@@ -337,7 +331,7 @@ fn a_trial_shows_the_skin_and_its_paired_cape_and_cancel_restores(cx: &mut TestA
 
 #[gpui::test]
 fn pictures_are_drawn_once_and_released_when_their_skin_leaves(cx: &mut TestAppContext) {
-    let (host, _, cx) = open(cx, 5, true);
+    let (host, _, cx) = open(cx, true);
     let view = wardrobe(&host, cx);
     view.update(cx, |view, cx| {
         view.listed(
@@ -386,7 +380,7 @@ fn pictures_are_drawn_once_and_released_when_their_skin_leaves(cx: &mut TestAppC
 
 #[gpui::test]
 fn replacing_a_library_skin_texture_redraws_its_picture(cx: &mut TestAppContext) {
-    let (host, _, cx) = open(cx, 5, true);
+    let (host, _, cx) = open(cx, true);
     let view = wardrobe(&host, cx);
     view.update(cx, |view, cx| {
         view.listed(
@@ -444,7 +438,7 @@ fn replacing_a_library_skin_texture_redraws_its_picture(cx: &mut TestAppContext)
 
 #[gpui::test]
 fn a_failed_write_keeps_the_profile_and_allows_an_explicit_retry(cx: &mut TestAppContext) {
-    let (host, seen, cx) = open(cx, 8, true);
+    let (host, seen, cx) = open(cx, true);
     let view = wardrobe(&host, cx);
     view.update(cx, |view, cx| {
         view.listed(Ok(vec![]), Some(Ok(profile())), None, cx)
@@ -477,7 +471,7 @@ fn a_failed_write_keeps_the_profile_and_allows_an_explicit_retry(cx: &mut TestAp
 
 #[gpui::test]
 fn dropping_pngs_imports_into_the_initiating_account_library(cx: &mut TestAppContext) {
-    let (_, seen, cx) = open(cx, 19, false);
+    let (_, seen, cx) = open(cx, false);
     cx.run_until_parked();
     let at = cx.debug_bounds("wardrobe").unwrap().center();
     let paths = vec![PathBuf::from("first.png"), PathBuf::from("second.png")];
@@ -496,19 +490,12 @@ fn dropping_pngs_imports_into_the_initiating_account_library(cx: &mut TestAppCon
         );
     });
     cx.run_until_parked();
-    assert_eq!(
-        seen.borrow().as_slice(),
-        [LiveIntent::Wardrobe {
-            key: "account".into(),
-            revision: 19,
-            action: WardrobeAction::Import(paths)
-        }]
-    );
+    assert_eq!(seen.borrow().as_slice(), [WardrobeAction::Import(paths)]);
 }
 
 #[gpui::test]
 fn refresh_is_hidden_until_the_profile_read_fails(cx: &mut TestAppContext) {
-    let (host, seen, cx) = open(cx, 4, true);
+    let (host, seen, cx) = open(cx, true);
     let view = wardrobe(&host, cx);
     view.update(cx, |view, cx| {
         view.listed(Ok(vec![]), Some(Ok(profile())), None, cx)
@@ -528,12 +515,5 @@ fn refresh_is_hidden_until_the_profile_read_fails(cx: &mut TestAppContext) {
     });
     cx.run_until_parked();
     click(cx, "wardrobe-reload");
-    assert_eq!(
-        seen.borrow().as_slice(),
-        [LiveIntent::Wardrobe {
-            key: "account".into(),
-            revision: 4,
-            action: WardrobeAction::Reload,
-        }]
-    );
+    assert_eq!(seen.borrow().as_slice(), [WardrobeAction::Reload]);
 }

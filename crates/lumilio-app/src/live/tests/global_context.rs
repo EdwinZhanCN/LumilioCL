@@ -230,13 +230,10 @@ fn home_attention_follows_the_current_account(cx: &mut TestAppContext) {
         "with an account and Java to download, the game needs nothing"
     );
 
-    cx.update(|window, cx| {
-        on_live_intent(
-            &wiring,
-            LiveIntent::RemoveAccount("Steve".into()),
-            window,
-            cx,
-        )
+    shell.update(cx, |shell, cx| {
+        shell
+            .accounts()
+            .update(cx, |accounts, cx| accounts.remove("Steve".into(), cx));
     });
     until(cx, "the account list without Steve", |cx| {
         shell.read_with(cx, |shell, _| {
@@ -252,14 +249,7 @@ fn home_attention_follows_the_current_account(cx: &mut TestAppContext) {
         service.add_account("Alex", None).await
     })
     .unwrap();
-    cx.update(|window, cx| {
-        on_live_intent(
-            &wiring,
-            LiveIntent::SelectAccount("Alex".into()),
-            window,
-            cx,
-        )
-    });
+    shell.update(cx, |shell, cx| shell.choose_account("Alex".into(), cx));
     until(cx, "Home to drop the account problem", |cx| {
         !attention(&shell, cx).iter().any(|(game, _)| game == &id)
     });

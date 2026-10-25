@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use gpui::{Modifiers, TestAppContext, point};
+use gpui::{Modifiers, TestAppContext};
 
 use super::super::{LauncherShell, Route};
 
@@ -40,30 +40,14 @@ fn the_account_chip_and_page_choose_add_and_manage_accounts(cx: &mut TestAppCont
     });
     cx.run_until_parked();
 
-    // No account yet: the chip offers to add one, and so does the page.
-    let chip = cx.debug_bounds("navigation-account").expect("account chip");
-    cx.simulate_click(chip.center(), Modifiers::none());
-    assert_eq!(seen.borrow().as_slice(), [LiveIntent::NewAccount]);
-    // The page offers both kinds: offline on the left, Microsoft on the right.
-    let actions = cx
-        .debug_bounds("accounts-actions")
-        .expect("add on the page");
-    let at = |share: f32| {
-        point(
-            actions.origin.x + actions.size.width * share,
-            actions.center().y,
-        )
-    };
-    cx.simulate_click(at(0.2), Modifiers::none());
-    assert_eq!(seen.borrow().len(), 2);
-    assert_eq!(seen.borrow()[1], LiveIntent::NewAccount);
-    cx.simulate_click(at(0.85), Modifiers::none());
-    assert_eq!(seen.borrow().last(), Some(&LiveIntent::MicrosoftSignIn));
+    // No account yet: the page offers both kinds, offline and Microsoft, and
+    // the chip offers to add one. Accounts opens their dialogs itself.
+    assert!(cx.debug_bounds("accounts-actions").is_some());
+    assert!(cx.debug_bounds("navigation-account").is_some());
     assert!(cx.debug_bounds("account-item-0").is_none());
     assert!(cx.debug_bounds("account-detail").is_none());
 
-    // With accounts: the detail shows the current account and loads its look.
-    seen.borrow_mut().clear();
+    // With accounts: the detail shows the current account and its look.
     shell.update(cx, |shell, cx| {
         shell.update_live(
             |model| model.accounts = vec![account("Steve", true), account("Alex", false)],
@@ -77,33 +61,28 @@ fn the_account_chip_and_page_choose_add_and_manage_accounts(cx: &mut TestAppCont
         cx.debug_bounds("account-make-current").is_none(),
         "Steve is current"
     );
-    // The detail loads the shown account's look, and every account is asked
-    // once for its avatar face.
-    let asked = seen.borrow().clone();
-    assert_eq!(asked.len(), 3, "{asked:?}");
-    assert!(asked.contains(&LiveIntent::LoadAccountLook("Steve".into())));
-    assert!(asked.contains(&LiveIntent::LoadAccountFace("Steve".into())));
-    assert!(asked.contains(&LiveIntent::LoadAccountFace("Alex".into())));
-    // A row shows that account without making it current; the detail does.
-    seen.borrow_mut().clear();
+    let detail_of = |name: &str, cx: &mut gpui::VisualTestContext| {
+        shell.read_with(cx, |shell, cx| {
+            shell.accounts().read(cx).account_detail(name).is_some()
+        })
+    };
+    assert!(detail_of("Steve", cx));
+    // A row shows that account without making it current; the detail does,
+    // through the shell, which keeps the choice.
     let alex = cx.debug_bounds("account-item-1").expect("Alex's row");
     cx.simulate_click(alex.center(), Modifiers::none());
     cx.run_until_parked();
-    assert_eq!(
-        seen.borrow().as_slice(),
-        [LiveIntent::LoadAccountLook("Alex".into())]
-    );
+    assert!(detail_of("Alex", cx));
     let make_current = cx
         .debug_bounds("account-make-current")
         .expect("Alex is not current");
     cx.simulate_click(make_current.center(), Modifiers::none());
-    assert_eq!(
-        seen.borrow().last(),
-        Some(&LiveIntent::SelectAccount("Alex".into()))
-    );
+    cx.run_until_parked();
+    shell.read_with(cx, |shell, _| {
+        assert_eq!(shell.current_choices.accounts_chosen, ["Alex"]);
+    });
 
     // The chip lists them too and leads to the page from its foot.
-    seen.borrow_mut().clear();
     let chip = cx.debug_bounds("navigation-account").unwrap();
     cx.simulate_click(chip.center(), Modifiers::none());
     cx.run_until_parked();
@@ -112,10 +91,10 @@ fn the_account_chip_and_page_choose_add_and_manage_accounts(cx: &mut TestAppCont
         .expect("the list opened");
     cx.simulate_click(second.center(), Modifiers::none());
     cx.run_until_parked();
-    assert_eq!(
-        seen.borrow().as_slice(),
-        [LiveIntent::SelectAccount("Alex".into())]
-    );
+    shell.read_with(cx, |shell, _| {
+        assert_eq!(shell.current_choices.accounts_chosen, ["Alex", "Alex"]);
+    });
+    assert!(seen.borrow().is_empty(), "{:?}", seen.borrow());
     shell.update(cx, |shell, cx| {
         shell.show(Route::Library);
         cx.notify();
@@ -130,12 +109,10 @@ fn the_account_chip_and_page_choose_add_and_manage_accounts(cx: &mut TestAppCont
     cx.simulate_click(manage.center(), Modifiers::none());
     cx.run_until_parked();
     shell.read_with(cx, |shell, _| assert_eq!(shell.route(), Route::Accounts));
-    shell.read_with(cx, |shell, _| {
-        assert!(
-            shell.account_detail("Steve").is_some(),
-            "the nav entry opens the current account, not Alex whom the page showed last"
-        )
-    });
+    assert!(
+        detail_of("Steve", cx),
+        "the nav entry opens the current account, not Alex whom the page showed last"
+    );
 }
 
 #[gpui::test]
@@ -159,7 +136,9 @@ fn reopening_the_same_account_drops_old_look_and_wardrobe_results(cx: &mut TestA
         );
     });
     cx.run_until_parked();
-    let (old, cancel) = shell.read_with(cx, |shell, _| shell.account_detail("Steve").unwrap());
+    let accounts = shell.read_with(cx, |shell, _| shell.accounts().clone());
+    let (old, cancel) =
+        accounts.read_with(cx, |accounts, _| accounts.account_detail("Steve").unwrap());
     shell.update(cx, |shell, cx| {
         shell.show(Route::Library);
         cx.notify();
@@ -171,11 +150,11 @@ fn reopening_the_same_account_drops_old_look_and_wardrobe_results(cx: &mut TestA
         cx.notify();
     });
     cx.run_until_parked();
-    let (new, _) = shell.read_with(cx, |shell, _| shell.account_detail("Steve").unwrap());
+    let (new, _) = accounts.read_with(cx, |accounts, _| accounts.account_detail("Steve").unwrap());
     assert_ne!(old, new);
-    shell.update(cx, |shell, cx| {
-        shell.account_look("Steve", old, Err("late old failure".into()), cx);
-        shell.wardrobe_listed(
+    accounts.update(cx, |accounts, cx| {
+        accounts.look_arrived("Steve", old, Err("late old failure".into()), cx);
+        accounts.wardrobe_listed(
             "Steve",
             old,
             Err(("late".into(), "old".into())),
@@ -186,18 +165,12 @@ fn reopening_the_same_account_drops_old_look_and_wardrobe_results(cx: &mut TestA
     });
     cx.run_until_parked();
     assert!(cx.debug_bounds("skin-view-error").is_none());
-    shell.read_with(cx, |shell, cx| {
-        let wardrobe = shell
-            .account_viewer
-            .as_ref()
-            .unwrap()
-            .wardrobe
-            .as_ref()
-            .unwrap();
+    accounts.read_with(cx, |accounts, cx| {
+        let wardrobe = accounts.wardrobe_at("Steve", new).unwrap();
         assert!(!wardrobe.read(cx).is_loaded());
     });
-    shell.update(cx, |shell, cx| {
-        shell.account_look("Steve", new, Err("current failure".into()), cx)
+    accounts.update(cx, |accounts, cx| {
+        accounts.look_arrived("Steve", new, Err("current failure".into()), cx)
     });
     cx.run_until_parked();
     assert!(cx.debug_bounds("skin-view-error").is_some());

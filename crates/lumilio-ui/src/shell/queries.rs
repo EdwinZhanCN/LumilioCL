@@ -2,6 +2,7 @@ use gpui::{Context, Window};
 use lumilio_core::{DiscoverPreferences, ProjectKind};
 
 use super::{ActivitySummary, LauncherShell};
+use crate::features::accounts::AccountsInputs;
 use crate::features::activity::ActivityInputs;
 use crate::features::library::LibraryInputs;
 use crate::features::settings::SettingsInputs;
@@ -44,6 +45,10 @@ impl LauncherShell {
             let settings = SettingsInputs {
                 update_status: model.update_status.clone(),
             };
+            let accounts = AccountsInputs {
+                accounts: model.accounts.clone(),
+                loaded: model.accounts_loaded,
+            };
             self.sync_discover(cx);
             self.library
                 .update(cx, |library, cx| library.set_inputs(inputs, cx));
@@ -51,6 +56,8 @@ impl LauncherShell {
                 .update(cx, |page, cx| page.set_inputs(activity, cx));
             self.settings_page
                 .update(cx, |page, cx| page.set_inputs(settings, cx));
+            self.accounts
+                .update(cx, |page, cx| page.set_inputs(accounts, cx));
             cx.notify();
         }
     }

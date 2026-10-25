@@ -5,7 +5,6 @@
 //! interface thread. The shell is never touched from inside one of its own
 //! updates: results always arrive from a spawned task.
 
-mod accounts;
 mod context;
 mod dispatch;
 mod game_settings;
@@ -19,7 +18,6 @@ mod logs;
 mod settings;
 mod terms;
 mod update;
-mod wardrobe;
 
 #[cfg(test)]
 mod tests;
@@ -29,4 +27,4 @@ mod wiring;
 #[cfg(test)]
 use wiring::State;
 pub use wiring::build;
-use wiring::{ACTIVITY_LIMIT, GAME_LOG_FLUSH, GAME_LOG_LINES, POLL, Reload, Wiring};
+use wiring::{ACTIVITY_LIMIT, GAME_LOG_FLUSH, GAME_LOG_LINES, Reload, Wiring};

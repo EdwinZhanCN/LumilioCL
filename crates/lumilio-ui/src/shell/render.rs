@@ -81,8 +81,6 @@ impl Render for LauncherShell {
         let current_instance = self.current_instance(cx);
         let current_account = self.current_account(cx);
 
-        self.ensure_account_viewer(window, cx);
-        self.ensure_account_faces(window, cx);
         if let Some(handler) = &self.live_handler {
             let handler = handler.clone();
             self.library
@@ -90,8 +88,13 @@ impl Render for LauncherShell {
             self.activity_page
                 .update(cx, |activity, _| activity.set_handler(handler.clone()));
             self.settings_page
-                .update(cx, |settings, _| settings.set_handler(handler));
+                .update(cx, |settings, _| settings.set_handler(handler.clone()));
+            self.accounts
+                .update(cx, |accounts, _| accounts.set_handler(handler));
         }
+        let accounts_shown = self.route == Route::Accounts;
+        self.accounts
+            .update(cx, |accounts, _| accounts.set_shown(accounts_shown));
         // Discover's answers belong to the detail on screen, if any.
         let shown_detail = match self.location() {
             super::locations::Location::Project(slot) => Some(slot.view.entity_id()),
@@ -106,26 +109,21 @@ impl Render for LauncherShell {
                 state: &self.view,
                 emit: emit_view.clone(),
                 handler: handler.clone(),
-                account_viewer: self.account_viewer.as_ref().map(|viewer| &viewer.view),
                 window_width: f32::from(window.viewport_size().width),
                 window_height: f32::from(window.viewport_size().height),
-                wardrobe: self
-                    .account_viewer
-                    .as_ref()
-                    .and_then(|viewer| viewer.wardrobe.as_ref()),
             }),
             _ => None,
         };
         let live_page = live_ctx
             .as_ref()
             .filter(|_| self.route != Route::Home)
-            .map(|ctx| {
+            .map(|_| {
                 match (self.route, &self.detail) {
                     (Route::Discover, Some(slot)) => slot.view.clone().into_any_element(),
                     (Route::Library, _) => self.library.clone().into_any_element(),
                     // Settings frames itself: its header and tabs stay put.
                     (Route::Settings, _) => self.settings_page.clone().into_any_element(),
-                    (Route::Accounts, _) => pages::live::accounts(ctx).into_any_element(),
+                    (Route::Accounts, _) => self.accounts.clone().into_any_element(),
                     (Route::Discover, None) => self.discover.clone().into_any_element(),
                     _ => self.activity_page.clone().into_any_element(),
                 }

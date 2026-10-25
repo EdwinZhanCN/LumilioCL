@@ -3,10 +3,10 @@ use std::rc::Rc;
 use gpui::prelude::*;
 use gpui::{App, Context, Entity, FocusHandle, Subscription, Task, WeakEntity, Window};
 
-use super::account_view::AccountViewer;
 use super::current::CurrentChoices;
 use super::detail::DetailSlot;
 use super::locations::{HISTORY_LIMIT, Location};
+use crate::features::accounts::{Accounts, AccountsEvent};
 use crate::features::activity::Activity;
 use crate::features::discover::{Discover, DiscoverEvent};
 use crate::features::library::Library;
@@ -63,9 +63,6 @@ pub struct LauncherShell {
     /// Live data pages (plan 0007); `None` keeps the truthful placeholders.
     pub(super) live: Option<LiveModel>,
     pub(super) live_handler: Option<LiveHandler>,
-    /// The look preview of the account the Accounts detail shows.
-    pub(super) account_viewer: Option<AccountViewer>,
-    pub(super) account_revision: u64,
     /// The Discover page; its project details show here in place of it.
     pub(super) discover: Entity<Discover>,
     /// Makes new games, from the dialog or from packs.
@@ -78,6 +75,8 @@ pub struct LauncherShell {
     pub(super) settings_page: Entity<Settings>,
     /// Tells the game pages which plugins Settings found on.
     pub(super) _settings_events: Subscription,
+    /// The Accounts page and what it does to accounts.
+    pub(super) accounts: Entity<Accounts>,
     /// Saves which game is current, in the order chosen.
     pub(super) current_choices: CurrentChoices,
     /// This shell, for what its features route back to it.
@@ -94,6 +93,8 @@ pub struct LauncherShell {
     pub(super) _posted: Subscription,
     /// Shows the project details Discover opens.
     pub(super) _discover_events: Subscription,
+    /// Draws the corner chip again when an account's face arrives.
+    pub(super) _accounts_events: Subscription,
     /// What core last published (see `mirror`).
     pub(super) context: lumilio_core::Context,
 }
@@ -111,6 +112,12 @@ impl LauncherShell {
                     shell.plugins_changed(plugins, cx);
                 }
             });
+        let accounts = cx.new(|_| Accounts::new(None));
+        let accounts_events = cx.subscribe(&accounts, |_, _, event: &AccountsEvent, cx| {
+            if *event == AccountsEvent::FacesChanged {
+                cx.notify();
+            }
+        });
         let discover_events = cx.subscribe(&discover, |shell, _, event: &DiscoverEvent, cx| {
             if let DiscoverEvent::ProjectOpened(opened) = event {
                 shell.show_project(opened.clone(), cx);
@@ -128,14 +135,13 @@ impl LauncherShell {
             view: ViewState::default(),
             live: None,
             live_handler: None,
-            account_viewer: None,
-            account_revision: 0,
             discover,
             new_game,
             library,
             activity_page,
             settings_page,
             _settings_events: settings_events,
+            accounts,
             current_choices: CurrentChoices::default(),
             this: cx.weak_entity(),
             translation: false,
@@ -144,6 +150,7 @@ impl LauncherShell {
             history: History::new(HISTORY_LIMIT),
             _posted: cx.observe_global::<toast::Posted>(|_, cx| cx.notify()),
             _discover_events: discover_events,
+            _accounts_events: accounts_events,
             context: lumilio_core::Context::default(),
         }
     }
@@ -175,6 +182,8 @@ impl LauncherShell {
             .update(cx, |activity, _| activity.set_worker(worker.clone()));
         self.settings_page
             .update(cx, |settings, _| settings.set_worker(worker.clone()));
+        self.accounts
+            .update(cx, |accounts, _| accounts.set_worker(worker.clone()));
         self.current_choices.worker = Some(worker);
         self
     }
@@ -202,6 +211,11 @@ impl LauncherShell {
     /// The Settings page, for the application to follow its events.
     pub fn settings_page(&self) -> &Entity<Settings> {
         &self.settings_page
+    }
+
+    /// The Accounts page, for the application to follow its events.
+    pub fn accounts(&self) -> &Entity<Accounts> {
+        &self.accounts
     }
 
     pub fn with_activity(mut self, activity: ActivitySummary) -> Self {
