@@ -3,7 +3,7 @@
   "id": "workspace-architecture",
   "title": "Workspace 业务边界与状态归属重构",
   "summary": "保留 app → ui → core 的主分层和已有专业能力 crates；将 core 内的业务状态、流程和持久化职责按能力封装，将 UI 的页面状态、控制逻辑、视图和测试收拢到所属 feature。首个新增 crate 建议为 lumilio-minecraft，仅承担 Minecraft 元数据模型与纯解析规则。按元数据、启动、其他 core 能力、Discover、其他 UI 功能的顺序迁移，每阶段保持可运行和可验证。实施在 build/workspace-architecture 分支上按阶段提交，基线为 rust-structure-style 的提交 f71ae6b。",
-  "status": "in_progress",
+  "status": "completed",
   "visibility": "internal",
   "scope": {
     "included": [
@@ -68,7 +68,7 @@
     {
       "id": "T8",
       "title": "逐阶段验收并完成 workspace 交付",
-      "status": "in_progress",
+      "status": "completed",
       "acceptance": "每阶段先通过最窄的 justfile 检查，再在代码交付前通过 just check；涉及计划/规则变更通过 just docs。受路径移动影响的 IA 保留操作语义并完成 just ia；i18n 和归属说明不因搬迁失效。审查格式、持久化、错误、取消、锁顺序、资源释放顺序和 cfg 平台分支；在可用环境编译受影响的平台分支，未验证的目标明确记录。真实窗口核对受迁移功能的既有用户路径与反馈，测试通过不替代视觉与交互验收。全部验收有证据后才完成计划；没有完成的人工或跨平台验收保持明确待办。"
     }
   ],
@@ -95,7 +95,7 @@
     },
     {
       "criterion": "每阶段 just check、最终 just docs、IA/i18n、受影响平台与真实窗口验收有记录",
-      "result": "2026-10-25：just docs 与 just ia 在 main 上无变化（#105 后 plans check 通过、ia 生成无差异）；IA 路径的迁移只改实现位置，操作语义不变；署名检查改写后注入违规证明失败。待办：main 上完整的 just check 由 Project Maintainer 运行；CI 在 Linux 编译与测试，macOS 由本地检查覆盖，Windows 的 cfg 分支未在本计划中编译，平台运行交由社区反馈。"
+      "result": "2026-10-25：just docs 与 just ia 在 main 上无变化（#105 后 plans check 通过、ia 生成无差异）；IA 路径的迁移只改实现位置，操作语义不变；署名检查改写后注入违规证明失败。main（a320d2bb）上 Project Maintainer 运行 just check 通过。待办：CI 在 Linux 编译与测试，macOS 由本地检查覆盖，Windows 的 cfg 分支未在本计划中编译，平台运行交由社区反馈。"
     }
   ],
   "decisions": [
@@ -238,7 +238,7 @@
     "T5 时开发钩子 LUMILIO_PAGE 直接调用 shell.show 并把 Navigate 发给 app，原本由 app 处理的“首次搜索”迁入 feature 后，经钩子打开的发现页不再加载；单元测试都从 select_route 进入，没有覆盖。守护：钩子改用 shell.go_to，与点击导航走同一路径；迁移把行为从 app 的 intent 处理移进 UI 时，先列出所有绕过 shell 路由直接发 intent 的入口。",
     "T5 后启动直接进发现页时简介翻译不显示，去过设置页才显示：Discover 的翻译开关取自设置页的视图模型（只在打开设置页时加载），启动时为“关”；游戏库随后到达时 set_inputs 把任何输入变化都当作关闭翻译，清掉了已翻译的简介。守护：set_inputs 只在开关真的变为关时清除（page 测试，去掉修复会失败）；shell 的翻译开关来自保存的偏好，由 apply_preferences 在启动和每次改设置时设置（shell 测试）。迁移把输入换成其他来源时，核对该来源在启动时是否已有值。"
   ],
-  "outcome": null,
+  "outcome": "完成 workspace 架构重组：保留 25 个成员（D17），lumilio-minecraft 独立为纯元数据 crate，core 按能力拆分状态与流程，lumilio-ui 内各页面以 features/<name> 实体拥有状态、任务与订阅，shell 负责组合、路由、导航、全局选择与列表读取（D15、D16、D18），app 只组装 Runtime、插件、更新器并适配偏好、条款与审查钩子。docgen 的 crate_boundaries、plugin_boundaries 与署名检查守住依赖方向与上游署名。main 上 just check 通过。未完成：真实窗口未核对新建游戏后打开并设为当前、动态页刷新、运行时隐藏与回到前台、直接进入世界；Windows 的 cfg 分支未在本计划中编译，交由社区反馈。",
   "roadmap": {
     "enabled": false,
     "id": "workspace-architecture",
