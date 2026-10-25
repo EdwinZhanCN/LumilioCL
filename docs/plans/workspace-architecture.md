@@ -32,11 +32,11 @@ Status: InProgress
   Acceptance: 按 D3–D5 逐能力迁移 accounts、instances、java、minecraft、content、appearance、game_settings、worlds、diagnostics、activity、plugins、settings 和 storage。每个迁移提交同时移动实现、状态、邻近测试和调用方；不存在靠为 LauncherService 增加更多 impl 文件冒充职责拆分的情况。认证刷新锁、待完成登录、外观缓存、任务取消表、内容筛选缓存分别归其能力；不复制 SettingsStore、InstanceStore、Context 或其权威状态。数据库版本/连接生命周期有单一入口，业务查询归所属能力，现有跨表事务与删除清理保持原子性。去除迁移完毕的旧生产实现，既有必要公开路径通过同类型 re-export 保留。
 - [x] T5 — 以 Discover 验证 UI feature 与运行时连接边界 (Completed)
   Acceptance: Discover 的查询与筛选状态、请求代次、结果转换、详情页、相关对话框、命令处理和测试集中到 ui/features/discover。app/live 不再拥有该功能的页面状态或控制流程；LiveModel 不再保存 Discover 的第二份可变状态；功能模块不通过 LauncherShell 读取/修改其内部业务状态。Tokio Runtime 仍由 app 创建和持有，UI 经明确注入的服务与执行入口提交后台工作，结果只在 GPUI 上下文应用。验证来源/目标实例/查询切换后的过期结果拒绝、翻译结果身份、关闭详情窗口、失败与主动取消、隐藏已安装内容、依赖确认及安装完成反馈。全局任务可在离开页面后继续并反馈，页面请求按其生命周期取消或丢弃结果，不因使用 WeakEntity 丢失必要终态处理。
-- [ ] T6 — 迁移其他 UI 功能并收紧 app 与 shell (InProgress)
+- [x] T6 — 迁移其他 UI 功能并收紧 app 与 shell (Completed)
   Acceptance: 在 T5 的边界成立后，将其余功能逐个迁入 ui/features；共享控件与主题进入 design_system，shell 负责窗口、导航、路由和功能组合。各 feature 拥有其视图状态、任务句柄和订阅，不依赖 app 或兄弟 feature 的内部视图，不存在承载全部页面可变状态的 LiveModel/Wiring::State 替代品。app 保留 Runtime、启动配置、日志、插件注册、更新器与系统退出/重启的组装和适配；页面交互流程移出 app。更新状态与系统命令经窄接口连接，不能为了迁移而让 core 承担 UI/更新器职责。保留当前窗口所有权、全局选择、toast、语言切换、导航历史和后台任务生命周期；逐功能记录自动验证和真实窗口检查结果。
-- [ ] T7 — 完成其余 crates 审查并守住稳定架构边界 (InProgress)
+- [x] T7 — 完成其余 crates 审查并守住稳定架构边界 (Completed)
   Acceptance: 全部 workspace 成员都有保留或调整的明确结论，结论记录在本计划，不另建源码镜像或历史路径映射表。小且内聚的 crate 可以保持平铺，所有单元测试遵守相邻模块约定。沿用现有 docgen 结构检查，补充能防止实际失误的生产依赖与禁止反向依赖检查；区分 dev-dependencies，允许 core 通过插件实现完成集成测试。对新增 guard 注入一次最小违规，证明检查在预期边界失败后撤销违规。更新 AGENTS.md 的最终结构约定和因路径移动而失效的技能/文档引用；不将全部目录树复制进多份文档。
-- [ ] T8 — 逐阶段验收并完成 workspace 交付 (Proposed)
+- [ ] T8 — 逐阶段验收并完成 workspace 交付 (InProgress)
   Acceptance: 每阶段先通过最窄的 justfile 检查，再在代码交付前通过 just check；涉及计划/规则变更通过 just docs。受路径移动影响的 IA 保留操作语义并完成 just ia；i18n 和归属说明不因搬迁失效。审查格式、持久化、错误、取消、锁顺序、资源释放顺序和 cfg 平台分支；在可用环境编译受影响的平台分支，未验证的目标明确记录。真实窗口核对受迁移功能的既有用户路径与反馈，测试通过不替代视觉与交互验收。全部验收有证据后才完成计划；没有完成的人工或跨平台验收保持明确待办。
 
 ## Validation
@@ -50,9 +50,9 @@ Status: InProgress
 - core 能力拥有自己的状态，启动/认证/持久化/取消等既有不变量有行为测试证据
   Result: 2026-10-24（T3/T4）：core 的 service 目录已拆为 accounts、appearance、instances、launching、minecraft、java、content、game_settings、worlds、diagnostics、activity、plugins、settings、storage、network 能力与 launcher_service 组合层；认证刷新锁/待选角色/凭据归 Accounts，外观缓存/皮肤库锁/签名密钥归 Appearance，任务板/取消表/活动日志归 activity::Tasks，内容筛选与翻译缓存归 Content，一次性自动 Java 选择归 Launching，实例库与操作租约归 Instances。每个迁移提交后 cargo nextest run -p lumilio-core 808 项全部通过（启动取消、缺失目录、离线启动、极短进程、启动/退出事件、历史写入失败、游戏设置准备与回收、日志捕获、插件事件等既有测试未改断言），clippy -D warnings、rustdoc 链接、cargo check --workspace --tests 与 docgen 34 项结构测试通过。
 - UI feature 拥有页面状态与控制流程，app/shell 只保留对应组合和适配职责
-  Result: 2026-10-24（T5）：Discover 迁入 ui/features/discover（model、view、detail、dependencies、page、controls、queries、search、install、translation、state 与 tests）；app/live/discover.rs 与 translation.rs 删除，LiveModel 不再含 Discover 字段。cargo nextest run -p lumilio-ui 593 项（含 13 项 feature 测试）与 -p lumilio-app 36 项通过；clippy -D warnings、rustdoc 链接、cargo check --workspace --tests、docgen 34 项通过，just ia 重新生成 discover 路径（仅实现位置变化）。真实窗口检查见 T5 记录；其余 UI 功能待 T6。 真实窗口（临时 LUMILIO_HOME，LUMILIO_PAGE=discover）：首次检查发现 LUMILIO_PAGE 开发钩子绕过 select_route，Discover 未收到 shown 而停在“正在搜索…”；改为 go_to 后，首屏列出 Modrinth/CurseForge 来源键、分类筛选、分页与整合包结果，摘要翻译出现。尚未在真实窗口逐项核对：项目详情、安装与依赖提示、为游戏浏览、正文翻译中止。
+  Result: 2026-10-24（T5）：Discover 迁入 ui/features/discover（model、view、detail、dependencies、page、controls、queries、search、install、translation、state 与 tests）；app/live/discover.rs 与 translation.rs 删除，LiveModel 不再含 Discover 字段。cargo nextest run -p lumilio-ui 593 项（含 13 项 feature 测试）与 -p lumilio-app 36 项通过；clippy -D warnings、rustdoc 链接、cargo check --workspace --tests、docgen 34 项通过，just ia 重新生成 discover 路径（仅实现位置变化）。真实窗口检查见 T5 记录；其余 UI 功能待 T6。 真实窗口（临时 LUMILIO_HOME，LUMILIO_PAGE=discover）：首次检查发现 LUMILIO_PAGE 开发钩子绕过 select_route，Discover 未收到 shown 而停在“正在搜索…”；改为 go_to 后，首屏列出 Modrinth/CurseForge 来源键、分类筛选、分页与整合包结果，摘要翻译出现。尚未在真实窗口逐项核对：项目详情、安装与依赖提示、为游戏浏览、正文翻译中止。 2026-10-25（T6，D16、D18）：New Game（#91）、游戏库（#92、#93）、动态（#95）、设置（#97）、账户（#98）、游戏页（#100）与启动（#101）逐个迁入 ui/features；列表读取与上下文跟随移入 shell/feed（#103），shell 公开接口收窄（#104）。每个 PR 合并前 ui、app、docgen 的 nextest、clippy -D warnings、rustdoc 链接与 fmt 通过，CI rust 与 plans 通过；#103 后 nextest 686 项通过。真实窗口（临时 LUMILIO_HOME，真实点击）：启动一节核对崩溃与启动中退出后的技术详情、Home 与游戏页的缺失文件夹询问、查看游戏、作为空游戏启动、Home 取消，以及真实运行 Minecraft 1.21.1 时游戏页的实时输出与结束游戏；#103 后核对 Home 读入当前游戏、继续弹出缺失文件夹询问、游戏库列出游戏。更早各页由 Project Maintainer 抽查主要流程。尚未在真实窗口核对：新建游戏后打开并设为当前、动态页刷新、运行时隐藏与回到前台、直接进入世界。
 - 每阶段 just check、最终 just docs、IA/i18n、受影响平台与真实窗口验收有记录
-  Result: pending
+  Result: 2026-10-25：just docs 与 just ia 在 main 上无变化（#105 后 plans check 通过、ia 生成无差异）；IA 路径的迁移只改实现位置，操作语义不变；署名检查改写后注入违规证明失败。待办：main 上完整的 just check 由 Project Maintainer 运行；CI 在 Linux 编译与测试，macOS 由本地检查覆盖，Windows 的 cfg 分支未在本计划中编译，平台运行交由社区反馈。
 
 ## Decision D1
 
@@ -189,6 +189,14 @@ T7 审查后保留全部 25 个 workspace 成员，不新增、合并或拆分 c
 Why: 每个成员都有内聚职责和单向依赖，且隔离了真实的依赖或验证成本：lumilio-core 已按能力拆分（T3/T4），生产只依赖 lumilio-minecraft、lumilio-transfer、lumilio-nbt、lumilio-block-assets 与 lumilio-plugin-api，插件实现只在 dev-dependencies 用于集成测试；lumilio-ui 按 D8 保持单 crate，T6 进行中；lumilio-app 是唯一组装插件实现、更新器与 GPUI 窗口的 crate；lumilio-minecraft 为纯元数据（T2）；lumilio-transfer 是 core 与更新器共用的下载引擎；lumilio-updater 只由 app 使用；lumilio-plugin-api 是只依赖 serde 的同步契约；六个插件（crash-analyzer、curseforge、discord、litematica、modrinth、world-explorer）依赖插件契约而不依赖 core、ui、app 或 GPUI，由 plugin_boundaries 检查；lumilio-nbt 与 lumilio-anvil 是存档格式解析；lumilio-block-assets 被 core、schematic、schematic-render 与 xtask 共用；lumilio-schematic 与 lumilio-schematic-render 隔离 forks 中的 nucleation 与 schematic-mesher；lumilio-skin-render 无生产依赖；lumilio-map-render 隔离 wgpu；lumilio-pointer 与 lumilio-backdrop 隔离平台 FFI；lumilio-cubiomes 隔离 C 源码与 build.rs；lumilio-docgen 与 lumilio-xtask 是不进入产品依赖的工具。平铺的小 crate（nbt、backdrop、pointer、skin-render、map-render 等）没有需要目录模块的规模；docgen 结构检查已对所有 crate 执行相邻测试与文件规模规则。
 
 Consequences: 新规则只把已成立的约定写成检查：pointer、map-render 与 schematic-render 的文档已声明不依赖 GPUI，T6 规定插件注册与更新器归 app。dev-dependencies 不受分层规则限制（core 测试组装真实插件，xtask 测试使用 core）；插件 crates 的 dev-dependencies 仍由 plugin_boundaries 检查。T7 收尾（2026-10-25）：AGENTS.md 结构一节写明 lumilio-ui 内 features、shell 与共享控件的分工，以及 app 只适配应用自有的部分；技能与文档引用的 crate 路径逐一核对仍然存在。源码注释、IA 备注、设计语言与站点注释中的“ADR 00xx”编号已无对应文件，全部删去或改写为所说的事实；docgen 的 attribution 检查原以“ADR 0022”识别 Modrinth 署名，改为以 Modrinth 加上文件或许可证识别，注入一处 AGPL 署名证明检查失败后撤销。
+
+## Decision D18
+
+T6 验收中的 design_system 与 LiveModel 两点按现状收口：共享控件与主题保留为 lumilio-ui 顶层的 key、controls、kit 与 theme 模块，不另建 design_system；LiveModel 保留为 shell 持有的列表快照（游戏库卡片、动态行、账户行与游戏设置），由 shell/feed 从 core 读入，不承载任何 feature 的视图状态或任务。
+
+Why: 每个 feature 都引用共享控件，改名为 design_system 只会在整个 UI crate 中改路径而不改变任何边界；AGENTS.md 已写明它们留在 features 之外。T6 之后各页面的状态、任务与订阅都归各自的 feature，LiveModel 只剩只读的列表数据，不再是承载全部页面可变状态的容器。
+
+Consequences: T6 的这两句验收以本决定为准；以后若共享控件需要独立的边界（例如拆 crate），另开计划。
 
 ## References
 
