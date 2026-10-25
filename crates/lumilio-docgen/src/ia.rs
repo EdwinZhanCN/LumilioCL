@@ -157,11 +157,7 @@ pub fn scan(root: &Path) -> (Vec<IaPath>, Vec<String>) {
         let Ok(text) = fs::read_to_string(&file) else {
             continue;
         };
-        let relative = file
-            .strip_prefix(&crates)
-            .unwrap_or(&file)
-            .to_string_lossy()
-            .into_owned();
+        let relative = slash_path(file.strip_prefix(&crates).unwrap_or(&file));
         for (index, line) in text.lines().enumerate() {
             match parse_line(line) {
                 None => {}
@@ -174,6 +170,13 @@ pub fn scan(root: &Path) -> (Vec<IaPath>, Vec<String>) {
         }
     }
     (paths, problems)
+}
+
+/// A relative path written with `/`, so the pages are the same wherever they
+/// are generated. Windows separates the scanned names with `\`; no tracked
+/// name contains one, since Windows could not check it out.
+pub(super) fn slash_path(path: &Path) -> String {
+    path.to_string_lossy().replace('\\', "/")
 }
 
 /// Problems that make a set of annotations wrong: unknown pages and the same

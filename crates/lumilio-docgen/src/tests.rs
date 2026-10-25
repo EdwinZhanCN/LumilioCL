@@ -71,6 +71,17 @@ fn only_pages_with_paths_get_a_file_and_stale_files_are_found() {
     );
 }
 
+/// Windows names the scanned files with `\`; the pages must not change with it.
+#[test]
+fn implementing_files_are_named_with_slashes_on_every_platform() {
+    let joined = Path::new("lumilio-ui").join("src").join("home.rs");
+    assert_eq!(ia::slash_path(&joined), "lumilio-ui/src/home.rs");
+    assert_eq!(
+        ia::slash_path(Path::new(r"lumilio-ui\src\home.rs")),
+        "lumilio-ui/src/home.rs"
+    );
+}
+
 /// The real repository: annotations are well formed and the generated
 /// files are current. Regenerate with
 /// `cargo run -p lumilio-docgen -- ia`.
