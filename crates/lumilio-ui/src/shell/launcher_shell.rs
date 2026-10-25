@@ -10,6 +10,7 @@ use crate::features::accounts::{Accounts, AccountsEvent};
 use crate::features::activity::Activity;
 use crate::features::discover::{Discover, DiscoverEvent};
 use crate::features::game::{Game, GameEvent};
+use crate::features::launch::{Launch, LaunchEvent};
 use crate::features::library::Library;
 use crate::features::new_game::NewGame;
 use crate::features::settings::{Settings, SettingsEvent};
@@ -80,8 +81,13 @@ pub struct LauncherShell {
     pub(super) accounts: Entity<Accounts>,
     /// What a game's page asks of the launcher, and the windows it opens.
     pub(super) game: Entity<Game>,
-    /// Forgets a deleted game.
+    /// Forgets a deleted game, and gives an opened page what its running
+    /// game printed.
     pub(super) _game_events: Subscription,
+    /// Starts games and keeps what one launch needs.
+    pub(super) launch: Entity<Launch>,
+    /// Feeds the launch moment and the running game's page.
+    pub(super) _launch_events: Subscription,
     /// Saves which game is current, in the order chosen.
     pub(super) current_choices: CurrentChoices,
     /// This shell, for what its features route back to it.
@@ -118,17 +124,41 @@ impl LauncherShell {
                 }
             });
         let accounts = cx.new(|_| Accounts::new(None));
-        let accounts_events = cx.subscribe(&accounts, |_, _, event: &AccountsEvent, cx| {
-            if *event == AccountsEvent::FacesChanged {
-                cx.notify();
-            }
-        });
+        let accounts_events =
+            cx.subscribe(&accounts, |_, _, event: &AccountsEvent, cx| match event {
+                AccountsEvent::FacesChanged => cx.notify(),
+                // An account was added for a launch that waited for one.
+                AccountsEvent::Continue(window) => {
+                    let (window, shell) = (*window, cx.weak_entity());
+                    cx.defer(move |cx| {
+                        let _ = cx.update_window(window, |_, window, cx| {
+                            let _ =
+                                shell.update(cx, |shell, cx| shell.request_continue(window, cx));
+                        });
+                    });
+                }
+                AccountsEvent::ListsChanged => {}
+            });
         let game = cx.new(|cx| Game::new(None, cx));
-        let game_events = cx.subscribe(&game, |shell, _, event: &GameEvent, cx| {
-            if let GameEvent::Deleted(id) = event {
-                shell.forget_instance(id, cx);
+        let launch = cx.new(|_| Launch::new(None));
+        let game_events = cx.subscribe(&game, |shell, _, event: &GameEvent, cx| match event {
+            GameEvent::Deleted(id) => shell.forget_instance(id, cx),
+            // What a game on its way or running has printed so far.
+            GameEvent::Opened(id) => {
+                if let Some(lines) = shell.launch.read(cx).output_of(id) {
+                    shell.game_output(id, lines, true, cx);
+                }
             }
+            GameEvent::ListsChanged => {}
         });
+        let launch_events =
+            cx.subscribe(&launch, |shell, _, event: &LaunchEvent, cx| match event {
+                LaunchEvent::Signal(signal) => shell.apply_launch_signal(signal.clone(), cx),
+                LaunchEvent::Output { id, lines, running } => {
+                    shell.game_output(id, lines.clone(), *running, cx);
+                }
+                LaunchEvent::Ended => {}
+            });
         let discover_events = cx.subscribe(&discover, |shell, _, event: &DiscoverEvent, cx| {
             if let DiscoverEvent::ProjectOpened(opened) = event {
                 shell.show_project(opened.clone(), cx);
@@ -155,6 +185,8 @@ impl LauncherShell {
             accounts,
             game,
             _game_events: game_events,
+            launch,
+            _launch_events: launch_events,
             current_choices: CurrentChoices::default(),
             this: cx.weak_entity(),
             translation: false,
@@ -199,6 +231,8 @@ impl LauncherShell {
             .update(cx, |accounts, _| accounts.set_worker(worker.clone()));
         self.game
             .update(cx, |game, _| game.set_worker(worker.clone()));
+        self.launch
+            .update(cx, |launch, _| launch.set_worker(worker.clone()));
         self.current_choices.worker = Some(worker);
         self
     }
@@ -243,9 +277,8 @@ impl LauncherShell {
         self
     }
 
-    /// The application receives every intent. It must answer
-    /// `Home(Continue | Recover)` by feeding [`Self::apply_launch_signal`];
-    /// the shell has already entered the launch moment optimistically.
+    /// The application receives every intent, after the shell and its
+    /// features have answered theirs.
     pub fn with_intent_handler(mut self, handler: IntentHandler) -> Self {
         self.intent_handler = Some(handler);
         self
@@ -270,9 +303,19 @@ impl LauncherShell {
         if let Some(home) = home {
             self.set_home(home, cx);
         }
-        if intent == ShellIntent::Home(HomeIntent::Create) {
-            self.new_game
-                .update(cx, |new_game, cx| new_game.open(window, cx));
+        match intent {
+            ShellIntent::Home(HomeIntent::Create) => {
+                self.new_game
+                    .update(cx, |new_game, cx| new_game.open(window, cx));
+            }
+            ShellIntent::Home(HomeIntent::Continue | HomeIntent::Recover) => {
+                self.continue_launch(window, cx);
+            }
+            ShellIntent::Home(HomeIntent::CancelLaunch | HomeIntent::StopGame) => {
+                self.launch.read(cx).stop();
+            }
+            ShellIntent::Home(HomeIntent::TechnicalDetails) => self.technical_details(window, cx),
+            _ => {}
         }
         self.last_intent = Some(intent);
         if let Some(handler) = &self.intent_handler {

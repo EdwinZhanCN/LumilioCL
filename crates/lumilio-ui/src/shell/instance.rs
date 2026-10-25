@@ -4,10 +4,11 @@ use gpui::prelude::*;
 use gpui::{App, Context, Entity, WeakEntity, Window};
 
 use super::LauncherShell;
+use super::features::play;
 use super::locations::Location;
 use crate::features::game::GameWork;
 use crate::instance_detail::{InstanceDetailView, InstanceHandler, InstanceIntent};
-use crate::live::{LiveHandler, LiveIntent, PlaceTarget};
+use crate::live::PlaceTarget;
 use crate::route::Route;
 
 impl LauncherShell {
@@ -22,7 +23,6 @@ impl LauncherShell {
     ) -> Entity<InstanceDetailView> {
         let page = Page {
             shell: self.this.clone(),
-            app: self.live_handler.clone(),
             work: self.game.read(cx).work(),
             id: id.clone(),
         };
@@ -147,12 +147,11 @@ impl LauncherShell {
 }
 
 /// Who answers what one game's page asks: the shell what moves the window,
-/// chooses the current game or asks the page a question, the application
-/// playing and stopping, the game feature the rest.
+/// chooses the current game, plays and stops or asks the page a question,
+/// the game feature the rest.
 #[derive(Clone)]
 struct Page {
     shell: WeakEntity<LauncherShell>,
-    app: Option<LiveHandler>,
     work: Option<GameWork>,
     id: String,
 }
@@ -166,26 +165,19 @@ impl Page {
         cx: &mut App,
     ) {
         let id = self.id.clone();
-        let to_app = |intent: LiveIntent, window: &mut Window, cx: &mut App| {
-            if let Some(app) = &self.app {
-                app(intent, window, cx);
-            }
-        };
         // Deferred: this may be running inside one of the shell's own updates.
         let shell = self.shell.clone();
         match intent {
-            InstanceIntent::Play => to_app(LiveIntent::Play(id), window, cx),
-            InstanceIntent::PlayWorld(world) => to_app(
-                LiveIntent::PlayPlace(id, PlaceTarget::World(world)),
-                window,
-                cx,
-            ),
-            InstanceIntent::PlayServer(address) => to_app(
-                LiveIntent::PlayPlace(id, PlaceTarget::Server(address)),
-                window,
-                cx,
-            ),
-            InstanceIntent::Stop => to_app(LiveIntent::StopGame(id), window, cx),
+            InstanceIntent::Play => play(&shell, id, None, window, cx),
+            InstanceIntent::PlayWorld(world) => {
+                play(&shell, id, Some(PlaceTarget::World(world)), window, cx)
+            }
+            InstanceIntent::PlayServer(address) => {
+                play(&shell, id, Some(PlaceTarget::Server(address)), window, cx)
+            }
+            InstanceIntent::Stop => window.defer(cx, move |_, cx| {
+                let _ = shell.update(cx, |shell, cx| shell.launch.read(cx).stop_game(&id));
+            }),
             InstanceIntent::OpenAccounts => window.defer(cx, move |window, cx| {
                 let _ = shell.update(cx, |shell, cx| shell.go_to(Route::Accounts, window, cx));
             }),

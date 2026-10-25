@@ -14,7 +14,7 @@ use std::time::{Duration, Instant};
 
 use gpui_kit::{AppContext as _, Entity, TestAppContext, VisualTestContext};
 use lumilio_core::{HistoryEvent, Loader, ProjectKind, SessionOutcome};
-use lumilio_ui::home::{HomeIntent, HomePresentation};
+use lumilio_ui::home::HomePresentation;
 use lumilio_ui::instance_detail::InstanceIntent;
 use lumilio_ui::live::{LiveIntent, attention_rows, library_cards};
 use lumilio_ui::route::Route;
@@ -22,7 +22,6 @@ use lumilio_ui::{LauncherShell, ShellIntent};
 
 use super::super::context::follow;
 use super::super::dispatch::{on_live_intent, on_shell_intent};
-use super::super::launch::play;
 use super::super::open_game::open_instance;
 use super::super::{State, Wiring};
 use crate::backend::{Backend, Service};
@@ -404,12 +403,12 @@ fn recovering_a_failed_launch_retries_the_same_game(cx: &mut TestAppContext) {
         continue_subject(&shell, cx).as_deref() == Some(a.as_str())
     });
 
-    cx.update(|window, cx| play(&wiring, b.clone(), window, cx));
+    cx.update(|window, cx| shell.update(cx, |shell, cx| shell.play(b.clone(), None, window, cx)));
     until(cx, "B's launch to fail", |_| {
         failed_attempts(&wiring, &b) == 1
     });
-    until(cx, "the launch to be over", |_| {
-        wiring.state.borrow().cancel.is_none()
+    until(cx, "the launch to be over", |cx| {
+        shell.read_with(cx, |shell, cx| !shell.launch().read(cx).launching())
     });
     until(cx, "B to be the saved current game", |_| {
         saved_current(&wiring).as_deref() == Some(b.as_str())
@@ -418,9 +417,7 @@ fn recovering_a_failed_launch_retries_the_same_game(cx: &mut TestAppContext) {
         chip(&wiring, cx) == Some(b.clone())
     });
 
-    cx.update(|window, cx| {
-        on_shell_intent(&wiring, ShellIntent::Home(HomeIntent::Recover), window, cx)
-    });
+    cx.update(|window, cx| shell.update(cx, |shell, cx| shell.request_continue(window, cx)));
     until(cx, "the second attempt", |_| {
         failed_attempts(&wiring, &a) + failed_attempts(&wiring, &b) == 2
     });
@@ -469,7 +466,7 @@ fn choosing_another_game_leaves_a_failed_launch_to_needs_attention(cx: &mut Test
     });
     let before = attention_in_full(&shell, cx);
 
-    cx.update(|window, cx| play(&wiring, b.clone(), window, cx));
+    cx.update(|window, cx| shell.update(cx, |shell, cx| shell.play(b.clone(), None, window, cx)));
     until(cx, "Home to explain B's failure", |cx| {
         shell.read_with(cx, |shell, _| match shell.home() {
             HomePresentation::Recovery { subject, .. } => subject.id.as_deref() == Some(&b),

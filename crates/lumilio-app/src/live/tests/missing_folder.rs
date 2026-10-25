@@ -4,11 +4,8 @@
 
 use gpui_kit::component::WindowExt as _;
 use gpui_kit::{Modifiers, TestAppContext};
-use lumilio_ui::ShellIntent;
-use lumilio_ui::home::HomeIntent;
 
 use super::super::context::follow;
-use super::super::dispatch::on_shell_intent;
 use super::global_context::{ask, continue_subject, failed_attempts, game, open, until};
 
 #[gpui_kit::test]
@@ -32,9 +29,7 @@ fn a_game_whose_folder_is_gone_is_asked_about_before_it_starts(cx: &mut TestAppC
         continue_subject(&shell, cx).as_deref() == Some(a.as_str())
     });
 
-    cx.update(|window, cx| {
-        on_shell_intent(&wiring, ShellIntent::Home(HomeIntent::Continue), window, cx)
-    });
+    cx.update(|window, cx| shell.update(cx, |shell, cx| shell.request_continue(window, cx)));
     until(cx, "the question about A's folder", |cx| {
         cx.update(|window, cx| window.has_active_dialog(cx))
     });

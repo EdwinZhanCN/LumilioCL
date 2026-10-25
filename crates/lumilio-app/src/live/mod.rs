@@ -8,8 +8,8 @@
 mod context;
 mod dispatch;
 mod jobs;
-mod launch;
 mod open_game;
+mod recovery_review;
 mod settings;
 mod terms;
 mod update;
@@ -22,4 +22,4 @@ mod wiring;
 #[cfg(test)]
 use wiring::State;
 pub use wiring::build;
-use wiring::{ACTIVITY_LIMIT, GAME_LOG_FLUSH, GAME_LOG_LINES, Reload, Wiring};
+use wiring::{ACTIVITY_LIMIT, Reload, Wiring};

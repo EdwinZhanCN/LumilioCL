@@ -30,6 +30,9 @@ pub(super) struct CurrentChoices {
     /// Every account chosen, in order (tests read it).
     #[cfg(test)]
     pub(super) accounts_chosen: Vec<String>,
+    /// Every game played, and where to, in order (tests read it).
+    #[cfg(test)]
+    pub(super) played: Vec<(String, Option<crate::live::PlaceTarget>)>,
 }
 
 impl CurrentChoices {

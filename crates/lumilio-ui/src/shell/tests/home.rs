@@ -401,12 +401,16 @@ fn home_enters_a_world_and_lists_no_other_game(cx: &mut TestAppContext) {
         .debug_bounds("home-place-enter-0")
         .expect("a world to enter");
     cx.simulate_click(enter.center(), Modifiers::none());
+    cx.run_until_parked();
+    let played = |shell: &gpui::Entity<LauncherShell>, cx: &mut gpui::VisualTestContext| {
+        shell.read_with(cx, |shell, _| shell.current_choices.played.clone())
+    };
     assert_eq!(
-        seen.borrow().last(),
-        Some(&LiveIntent::PlayPlace(
-            "survival".into(),
-            PlaceTarget::World("New World".into())
-        ))
+        played(&shell, cx),
+        [(
+            "survival".to_owned(),
+            Some(PlaceTarget::World("New World".into()))
+        )]
     );
     assert!(
         cx.debug_bounds("live-card-more-0").is_none(),
@@ -418,10 +422,10 @@ fn home_enters_a_world_and_lists_no_other_game(cx: &mut TestAppContext) {
         shell.set_home(home.clone().begin_launch(), cx)
     });
     settle(cx);
-    let count = seen.borrow().len();
     let enter = cx.debug_bounds("home-place-enter-0").expect("still listed");
     cx.simulate_click(enter.center(), Modifiers::none());
-    assert_eq!(seen.borrow().len(), count, "a disabled key sends nothing");
+    cx.run_until_parked();
+    assert_eq!(played(&shell, cx).len(), 1, "a disabled key plays nothing");
 
     // Another game's worlds never sit under this one.
     shell.update(cx, |shell, cx| {

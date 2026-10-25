@@ -1,14 +1,14 @@
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::time::Duration;
 
 use gpui_kit::{App, AppContext as _, Context, Entity, WeakEntity, Window};
-use lumilio_core::{CancellationToken, Preferences, ProjectKind};
+use lumilio_core::{Preferences, ProjectKind};
 use lumilio_ui::LauncherShell;
 use lumilio_ui::features::accounts::AccountsEvent;
 use lumilio_ui::features::activity::ActivityEvent;
 use lumilio_ui::features::discover::DiscoverEvent;
 use lumilio_ui::features::game::{GameEvent, GameWindows};
+use lumilio_ui::features::launch::LaunchEvent;
 use lumilio_ui::features::library::LibraryEvent;
 use lumilio_ui::features::new_game::NewGameEvent;
 use lumilio_ui::features::settings::SettingsEvent;
@@ -23,7 +23,7 @@ use super::dispatch::{on_live_intent, on_shell_intent};
 use super::jobs::reload;
 use super::open_game::open_instance;
 use super::settings::{apply_preferences, apply_saved_preferences};
-use super::{context, jobs, launch, terms, update};
+use super::{context, jobs, recovery_review, terms, update};
 use crate::backend::Backend;
 
 /// How many finished tasks the Activity page lists.
@@ -37,27 +37,11 @@ pub(super) struct State {
     pub(super) home_diagnostics: Option<tokio::task::AbortHandle>,
     /// Each game's last checks, for Home's 需要留意.
     pub(super) home_checks: Option<context::Checked>,
-    /// Stops the launch or the running game.
-    pub(super) cancel: Option<CancellationToken>,
-    /// The saved preferences, for what the window does around a game.
+    /// The saved preferences, which a page's remembered choices are saved with.
     pub(super) preferences: Preferences,
-    /// A world the next launch goes straight into, once.
-    pub(super) next_world: Option<String>,
-    /// A server address the next launch goes straight onto, once.
-    pub(super) next_server: Option<String>,
-    /// The game whose Java conflict the person just answered: its next
-    /// Continue starts without asking again.
-    pub(super) java_answered: Option<String>,
-    /// What the running game has printed: the instance and its newest lines.
-    pub(super) game_log: Option<(String, std::collections::VecDeque<String>)>,
     /// Commands for the background update service.
     pub(super) update_commands: Option<tokio::sync::mpsc::UnboundedSender<update::UpdateCommand>>,
 }
-
-/// How many lines of the running game's output are kept.
-pub(super) const GAME_LOG_LINES: usize = 2000;
-/// The longest a new line waits before the open page shows it.
-pub(super) const GAME_LOG_FLUSH: Duration = Duration::from_millis(150);
 
 #[derive(Clone)]
 pub(super) struct Wiring {
@@ -124,6 +108,7 @@ pub fn build(backend: Backend, window: &mut Window, cx: &mut App) -> Entity<Laun
     follow_settings(&wiring, &shell, cx);
     follow_accounts(&wiring, &shell, cx);
     follow_game(&wiring, &shell, cx);
+    follow_launch(&wiring, &shell, cx);
     update::start(&wiring, cx);
     context::follow(&wiring, cx);
     reload(&wiring, Reload::Lists, cx);
@@ -191,23 +176,15 @@ fn follow_settings(wiring: &Wiring, shell: &Entity<LauncherShell>, cx: &mut App)
 }
 
 /// Passes on what Accounts tells the application: an account's look changed
-/// where the lists show it, or an account was added for a launch that waited
-/// for one.
+/// where the lists show it.
 fn follow_accounts(wiring: &Wiring, shell: &Entity<LauncherShell>, cx: &mut App) {
     let accounts = shell.read(cx).accounts().clone();
     let wiring = wiring.clone();
-    cx.subscribe(&accounts, move |_, event: &AccountsEvent, cx| match event {
-        AccountsEvent::ListsChanged => reload(&wiring, Reload::Lists, cx),
-        AccountsEvent::Continue(window) => {
-            // The model learns of the account once core publishes it; give it a beat.
-            let shell = wiring.shell.clone();
-            let _ = cx.update_window(*window, move |_, window, cx| {
-                window.defer(cx, move |window, cx| {
-                    let _ = shell.update(cx, |shell, cx| shell.request_continue(window, cx));
-                });
-            });
+    cx.subscribe(&accounts, move |_, event: &AccountsEvent, cx| {
+        // The shell answers the rest.
+        if *event == AccountsEvent::ListsChanged {
+            reload(&wiring, Reload::Lists, cx);
         }
-        AccountsEvent::FacesChanged => {}
     })
     .detach();
 }
@@ -295,32 +272,24 @@ fn follow_game(wiring: &Wiring, shell: &Entity<LauncherShell>, cx: &mut App) {
         });
     });
     let wiring = wiring.clone();
-    cx.subscribe(&game, move |_, event: &GameEvent, cx| match event {
-        GameEvent::ListsChanged => reload(&wiring, Reload::Lists, cx),
-        GameEvent::Opened(id) => {
-            // A game on its way or running has printed things the page should
-            // show; which game that is, core's session says.
-            let active = wiring
-                .backend
-                .service
-                .context()
-                .session
-                .is_some_and(|session| session.is_active() && session.instance == *id);
-            let running = wiring
-                .state
-                .borrow()
-                .game_log
-                .as_ref()
-                .filter(|(running_id, _)| active && running_id == id)
-                .map(|(_, lines)| lines.iter().cloned().collect::<Vec<_>>());
-            if let Some(lines) = running {
-                let _ = wiring
-                    .shell
-                    .update(cx, |shell, cx| shell.game_output(id, lines, true, cx));
-            }
+    cx.subscribe(&game, move |_, event: &GameEvent, cx| {
+        // The shell answers the rest.
+        if *event == GameEvent::ListsChanged {
+            reload(&wiring, Reload::Lists, cx);
         }
-        // The shell forgets it.
-        GameEvent::Deleted(_) => {}
+    })
+    .detach();
+}
+
+/// Reads the lists again when a launch, or its game, is over.
+fn follow_launch(wiring: &Wiring, shell: &Entity<LauncherShell>, cx: &mut App) {
+    let launch = shell.read(cx).launch().clone();
+    let wiring = wiring.clone();
+    cx.subscribe(&launch, move |_, event: &LaunchEvent, cx| {
+        // The shell answers the rest.
+        if *event == LaunchEvent::Ended {
+            reload(&wiring, Reload::Lists, cx);
+        }
     })
     .detach();
 }
@@ -334,9 +303,9 @@ pub(super) fn open_requested_page(
     cx: &mut App,
 ) {
     // `LUMILIO_HOME_RECOVERY=failed|details|crashed|crashed-details|away` shows a launch of
-    // the current game going wrong (`launch::review_recovery`).
+    // the current game going wrong (`recovery_review::review_recovery`).
     if let Ok(which) = std::env::var("LUMILIO_HOME_RECOVERY") {
-        launch::review_recovery(wiring, which, window.window_handle(), cx);
+        recovery_review::review_recovery(wiring, which, window.window_handle(), cx);
         return;
     }
     // `LUMILIO_PROJECT=mod/sodium` also opens that project's detail window;
