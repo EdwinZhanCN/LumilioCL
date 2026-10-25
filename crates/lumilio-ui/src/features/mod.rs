@@ -3,3 +3,4 @@
 //! each other only through explicit inputs and events.
 
 pub mod discover;
+pub mod new_game;

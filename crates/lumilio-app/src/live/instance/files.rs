@@ -3,13 +3,12 @@ use std::rc::Rc;
 use gpui_kit::{App, AppContext as _, WeakEntity, Window};
 use lumilio_core::{AfterLaunch, LaunchSignal, ServiceError};
 use lumilio_ui::export_form::ExportForm;
+use lumilio_ui::features::new_game::{NewGameForm, NewGameIntent, RuntimeChange, answer_versions};
 use lumilio_ui::instance_detail::{Arrived, InstanceDetailView, InstanceIntent};
-use lumilio_ui::new_game::{NewGameForm, NewGameIntent, RuntimeChange};
 use lumilio_ui::toast::Toast;
 use lumilio_ui::{platform, tr};
 
 use super::super::Wiring;
-use super::super::new_game::new_game_intent;
 use super::{files_arrived, instance_intent};
 
 /// Makes one screenshot's thumbnail off the interface thread.
@@ -220,7 +219,6 @@ pub(in super::super) fn open_runtime_change(
     };
     let wiring = wiring.clone();
     window.defer(cx, move |window, cx| {
-        let handle = window.window_handle();
         let form = cx.new(|cx| {
             let form: WeakEntity<NewGameForm> = cx.weak_entity();
             let (on_form, on_snapshot) = (wiring.clone(), wiring.clone());
@@ -244,7 +242,7 @@ pub(in super::super) fn open_runtime_change(
                             cx,
                         );
                     }
-                    other => new_game_intent(&on_form, form.clone(), handle, other, cx),
+                    other => answer_versions(&on_form.backend.worker(), form.clone(), other, cx),
                 }),
                 RuntimeChange {
                     game_version,

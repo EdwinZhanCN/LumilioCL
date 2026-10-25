@@ -5,6 +5,7 @@ mod discover;
 mod home;
 mod library;
 mod memory;
+mod new_game;
 mod settings;
 
 use crate::home::{HomePresentation, Subject, WorldHint};

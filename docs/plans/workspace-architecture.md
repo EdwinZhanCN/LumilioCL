@@ -32,7 +32,7 @@ Status: InProgress
   Acceptance: 按 D3–D5 逐能力迁移 accounts、instances、java、minecraft、content、appearance、game_settings、worlds、diagnostics、activity、plugins、settings 和 storage。每个迁移提交同时移动实现、状态、邻近测试和调用方；不存在靠为 LauncherService 增加更多 impl 文件冒充职责拆分的情况。认证刷新锁、待完成登录、外观缓存、任务取消表、内容筛选缓存分别归其能力；不复制 SettingsStore、InstanceStore、Context 或其权威状态。数据库版本/连接生命周期有单一入口，业务查询归所属能力，现有跨表事务与删除清理保持原子性。去除迁移完毕的旧生产实现，既有必要公开路径通过同类型 re-export 保留。
 - [x] T5 — 以 Discover 验证 UI feature 与运行时连接边界 (Completed)
   Acceptance: Discover 的查询与筛选状态、请求代次、结果转换、详情页、相关对话框、命令处理和测试集中到 ui/features/discover。app/live 不再拥有该功能的页面状态或控制流程；LiveModel 不再保存 Discover 的第二份可变状态；功能模块不通过 LauncherShell 读取/修改其内部业务状态。Tokio Runtime 仍由 app 创建和持有，UI 经明确注入的服务与执行入口提交后台工作，结果只在 GPUI 上下文应用。验证来源/目标实例/查询切换后的过期结果拒绝、翻译结果身份、关闭详情窗口、失败与主动取消、隐藏已安装内容、依赖确认及安装完成反馈。全局任务可在离开页面后继续并反馈，页面请求按其生命周期取消或丢弃结果，不因使用 WeakEntity 丢失必要终态处理。
-- [ ] T6 — 迁移其他 UI 功能并收紧 app 与 shell (Proposed)
+- [ ] T6 — 迁移其他 UI 功能并收紧 app 与 shell (InProgress)
   Acceptance: 在 T5 的边界成立后，将其余功能逐个迁入 ui/features；共享控件与主题进入 design_system，shell 负责窗口、导航、路由和功能组合。各 feature 拥有其视图状态、任务句柄和订阅，不依赖 app 或兄弟 feature 的内部视图，不存在承载全部页面可变状态的 LiveModel/Wiring::State 替代品。app 保留 Runtime、启动配置、日志、插件注册、更新器与系统退出/重启的组装和适配；页面交互流程移出 app。更新状态与系统命令经窄接口连接，不能为了迁移而让 core 承担 UI/更新器职责。保留当前窗口所有权、全局选择、toast、语言切换、导航历史和后台任务生命周期；逐功能记录自动验证和真实窗口检查结果。
 - [ ] T7 — 完成其余 crates 审查并守住稳定架构边界 (Proposed)
   Acceptance: 全部 workspace 成员都有保留或调整的明确结论，结论记录在本计划，不另建源码镜像或历史路径映射表。小且内聚的 crate 可以保持平铺，所有单元测试遵守相邻模块约定。沿用现有 docgen 结构检查，补充能防止实际失误的生产依赖与禁止反向依赖检查；区分 dev-dependencies，允许 core 通过插件实现完成集成测试。对新增 guard 注入一次最小违规，证明检查在预期边界失败后撤销违规。更新 AGENTS.md 的最终结构约定和因路径移动而失效的技能/文档引用；不将全部目录树复制进多份文档。
@@ -173,6 +173,14 @@ UI feature 以一个 GPUI 实体为边界：Discover 持有自己的状态、控
 Why: Discover 原本的状态分散在 LiveModel、app State 和 shell，控制流程在 app/live，读取 shell 时需要延迟以避开 shell 自身的更新。实体拥有状态后，控制流程读的是自己的状态，不再有重入问题；Worker 让 UI 不创建运行时、不引用 app；项目详情仍是 shell 历史中的位置，所以由 shell 展示、由 feature 创建和更新。
 
 Consequences: LiveIntent 去掉 Search、LoadFilters、TranslateBody、OpenProject、Install、SaveVersionAs、UpdateInstalled 与 RememberDiscover；DiscoverEvent 有 ProjectOpened（shell 显示）、TasksChanged（app 刷新动态列表）、Remember（app 与其余偏好一起保存，设置仍是单一持久化来源）。shell.open_project 同步返回打开的详情以便同一更新内即可填入状态。shell 在渲染时把当前显示的详情告诉 feature，用于正文翻译的离开即中止。outcome/install_outcome 与 runtime::answer 移入 lumilio-ui 供 app 共用，project_icon 移入 kit。feature 测试分 page（实体单独挂载）和 worker（真实 LauncherService + 内存内容源）；去掉代次检查后“慢回答不覆盖新搜索”测试失败，恢复后通过。
+
+## Decision D16
+
+T6 按功能逐个迁移，每个功能一个 PR：先 New Game，再依次处理游戏库、动态、账户与外观、设置、游戏页（实例）与启动；shell 用 shell/features.rs 的路由把它拥有的功能能回答的 LiveIntent 交给该功能，其余仍交给 app，直到 app/live 只剩组装与平台适配。
+
+Why: app/live 约 7000 行，一次搬完无法在真实窗口逐功能核对。路由让已迁移功能的意图不再进入 app，而未迁移的照旧工作，每一步都可运行。后台工作的通用部分（在 Worker 上运行、轮询期间发出任务变化事件、结束时交回界面线程）抽成 runtime::job，Discover 与 New Game 共用，后续功能沿用。
+
+Consequences: New Game：表单移入 features/new_game/form.rs；NewGame 实体（features/new_game/create.rs）读取版本列表、创建、下载、导入整合包，发出 TasksChanged（app 刷新列表）、Created{id, window}（app 打开游戏页并设为当前游戏）、Installed(id)（打开着的游戏页重新读取）。更换版本对话框仍在游戏页（app）中，经 answer_versions 共用版本读取。LiveIntent 的 NewInstance、ImportPack、DropFiles 与 HomeIntent::Create 不再进入 app。多个对话框共用的 Failure 移入 kit。打开游戏页与选择当前游戏仍属 app，等游戏页迁移后改由 shell 处理。
 
 ## References
 

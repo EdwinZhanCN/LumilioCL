@@ -43,3 +43,6 @@ pub use self::rows::{
 };
 
 mod intent;
+
+/// What a failure looks like: one sentence, and the raw cause behind 技术详情.
+pub type Failure = (String, String);
