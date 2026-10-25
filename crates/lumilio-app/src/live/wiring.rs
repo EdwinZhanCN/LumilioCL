@@ -5,6 +5,7 @@ use std::time::Duration;
 use gpui_kit::{App, AppContext as _, Context, Entity, WeakEntity, Window};
 use lumilio_core::{CancellationToken, Preferences, ProjectKind};
 use lumilio_ui::LauncherShell;
+use lumilio_ui::features::accounts::AccountsEvent;
 use lumilio_ui::features::activity::ActivityEvent;
 use lumilio_ui::features::discover::DiscoverEvent;
 use lumilio_ui::features::library::LibraryEvent;
@@ -26,8 +27,6 @@ use crate::backend::Backend;
 
 /// How many finished tasks the Activity page lists.
 pub(super) const ACTIVITY_LIMIT: usize = 30;
-/// How often running installs refresh the Activity page.
-pub(super) const POLL: Duration = Duration::from_millis(600);
 
 #[derive(Default)]
 pub(super) struct State {
@@ -48,8 +47,6 @@ pub(super) struct State {
     /// The game whose Java conflict the person just answered: its next
     /// Continue starts without asking again.
     pub(super) java_answered: Option<String>,
-    /// Stops the Microsoft sign-in that is waiting for the browser.
-    pub(super) sign_in_cancel: Option<CancellationToken>,
     /// What the running game has printed: the instance and its newest lines.
     pub(super) game_log: Option<(String, std::collections::VecDeque<String>)>,
     /// Commands for the background update service.
@@ -128,6 +125,7 @@ pub fn build(backend: Backend, window: &mut Window, cx: &mut App) -> Entity<Laun
     follow_library(&wiring, &shell, cx);
     follow_activity(&wiring, &shell, cx);
     follow_settings(&wiring, &shell, cx);
+    follow_accounts(&wiring, &shell, cx);
     update::start(&wiring, cx);
     context::follow(&wiring, cx);
     reload(&wiring, Reload::Lists, cx);
@@ -190,6 +188,28 @@ fn follow_settings(wiring: &Wiring, shell: &Entity<LauncherShell>, cx: &mut App)
         SettingsEvent::TasksChanged => reload(&wiring, Reload::Lists, cx),
         // The shell tells the game pages.
         SettingsEvent::PluginsRead(_) => {}
+    })
+    .detach();
+}
+
+/// Passes on what Accounts tells the application: an account's look changed
+/// where the lists show it, or an account was added for a launch that waited
+/// for one.
+fn follow_accounts(wiring: &Wiring, shell: &Entity<LauncherShell>, cx: &mut App) {
+    let accounts = shell.read(cx).accounts().clone();
+    let wiring = wiring.clone();
+    cx.subscribe(&accounts, move |_, event: &AccountsEvent, cx| match event {
+        AccountsEvent::ListsChanged => reload(&wiring, Reload::Lists, cx),
+        AccountsEvent::Continue(window) => {
+            // The model learns of the account once core publishes it; give it a beat.
+            let shell = wiring.shell.clone();
+            let _ = cx.update_window(*window, move |_, window, cx| {
+                window.defer(cx, move |window, cx| {
+                    let _ = shell.update(cx, |shell, cx| shell.request_continue(window, cx));
+                });
+            });
+        }
+        AccountsEvent::FacesChanged => {}
     })
     .detach();
 }

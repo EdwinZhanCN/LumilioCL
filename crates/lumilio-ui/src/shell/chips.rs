@@ -48,18 +48,12 @@ impl LauncherShell {
         let model = self.live.as_ref().filter(|model| model.accounts_loaded)?;
         let handler = self.live_handler.clone()?;
         let manage = cx.listener(|shell, _: &(), window, cx| {
-            if let Some(ix) = shell
-                .live
-                .as_ref()
-                .and_then(|model| model.accounts.iter().position(|row| row.selected))
-            {
-                shell.view.apply(crate::kit::ViewIntent::Choose(
-                    crate::pages::live::ACCOUNT_GROUP,
-                    ix,
-                ));
-            }
+            shell
+                .accounts
+                .update(cx, |accounts, cx| accounts.show_current(cx));
             shell.select_route(Route::Accounts, window, cx);
         });
+        let accounts = self.accounts.read(cx);
         let choices = model
             .accounts
             .iter()
@@ -77,7 +71,7 @@ impl LauncherShell {
                 }
                 .into(),
                 selected: row.selected,
-                face: model.face_of(&row.key),
+                face: accounts.face_of(&row.key),
             })
             .collect();
         let choose = handler.clone();

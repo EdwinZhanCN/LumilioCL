@@ -1,5 +1,6 @@
-//! Retained wardrobe for one account detail. The application owns I/O; this
-//! entity owns pending feedback and emits stable target-bound operations.
+//! Retained wardrobe for one account detail. The Accounts feature owns I/O;
+//! this entity owns pending feedback and asks for operations through the
+//! handler the feature bound to its detail.
 //! It lays out the detail's look: the preview with what can be done under
 //! it, beside the library as pictures drawn by the CPU skin renderer. A skin
 //! is tried on in the preview before it is worn.
@@ -15,7 +16,7 @@ use gpui::{
 use gpui_component::{h_flex, v_flex};
 use lumilio_core::{AccountLook, LibrarySkin, MojangProfile, SkinModel};
 use lumilio_skin_render::{Arms, Camera, Player, Texture, render};
-pub use wardrobe_view::{Wardrobe, WardrobeAction};
+pub use wardrobe_view::{Wardrobe, WardrobeAction, WardrobeHandler};
 
 use self::pictures::{CAPE_THUMB, SKIN_THUMB, arms, texture};
 use self::render::tile;

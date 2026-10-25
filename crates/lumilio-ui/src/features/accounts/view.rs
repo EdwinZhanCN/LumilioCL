@@ -4,39 +4,45 @@
 //! and what can be worn, which depends on the kind of account.
 
 use gpui::prelude::*;
-use gpui::{AnyElement, App, IntoElement, Window, div, px};
+use gpui::{AnyElement, App, Entity, IntoElement, Window, div, px};
 use gpui_component::{StyledExt as _, WindowExt as _, h_flex, v_flex};
 
-use super::controls::{LiveCtx, send};
+use super::look::{Faces, face_of};
+use super::page::{ACCOUNT_GROUP, AccountsInputs, AccountsView};
 use crate::assets::UiIcon;
-use crate::kit::ViewIntent;
-use crate::live::{AccountRow, LiveIntent, LiveModel};
-use crate::pages::ViewState;
-use crate::wardrobe::{PINNED_PREVIEW_WIDTH, PREVIEW_WIDTH};
+use crate::kit::{Emit, ViewIntent};
+use crate::live::{AccountRow, LiveHandler, LiveIntent};
+use crate::skin_view::SkinViewer;
+use crate::theme::ShellColors;
+use crate::wardrobe::{PINNED_PREVIEW_WIDTH, PREVIEW_WIDTH, Wardrobe};
 use crate::{kit, theme, tr};
 
-/// The view-state group that remembers which account the detail shows.
-pub const ACCOUNT_GROUP: u8 = 220;
+/// What the page draws from.
+pub(super) struct AccountsCtx<'a> {
+    pub colors: ShellColors,
+    pub inputs: &'a AccountsInputs,
+    pub view: &'a AccountsView,
+    pub faces: &'a Faces,
+    pub emit: Emit,
+    pub handler: LiveHandler,
+    /// The look preview of the account the detail shows.
+    pub viewer: Option<&'a Entity<SkinViewer>>,
+    /// Its look area (the preview beside the skins), unless it is read-only.
+    pub wardrobe: Option<&'a Entity<Wardrobe>>,
+    /// The window's width: a narrow window stacks the detail.
+    pub window_width: f32,
+}
 
-/// The account the detail shows: the one last chosen in the list, or the
-/// current account.
-#[must_use]
-pub fn shown_account<'a>(
-    model: &'a LiveModel,
-    state: &ViewState,
-) -> Option<(usize, &'a AccountRow)> {
-    let current = model.accounts.iter().position(|row| row.selected);
-    let index = state
-        .choice(ACCOUNT_GROUP, current.unwrap_or(0))
-        .min(model.accounts.len().checked_sub(1)?);
-    model.accounts.get(index).map(|row| (index, row))
+fn send(handler: &LiveHandler, intent: LiveIntent) -> impl Fn(&mut Window, &mut App) + 'static {
+    let handler = handler.clone();
+    move |window, cx| handler(intent.clone(), window, cx)
 }
 
 fn list_item(
     index: usize,
     row: &AccountRow,
     shown: bool,
-    ctx: &LiveCtx,
+    ctx: &AccountsCtx,
 ) -> gpui::Stateful<gpui::Div> {
     let colors = ctx.colors;
     let emit = ctx.emit.clone();
@@ -56,7 +62,7 @@ fn list_item(
         .when(shown, |item| item.bg(colors.surface_subtle))
         .hover(|item| item.bg(colors.surface_subtle))
         .on_click(move |_, window, cx| emit(ViewIntent::Choose(ACCOUNT_GROUP, index), window, cx))
-        .child(kit::avatar(&row.name, ctx.model.face_of(&row.key), 28.))
+        .child(kit::avatar(&row.name, face_of(ctx.faces, &row.key), 28.))
         .child(
             v_flex()
                 .flex_1()
@@ -96,7 +102,7 @@ fn list_item(
         )
 }
 
-fn remove_action(row: &AccountRow, ctx: &LiveCtx) -> impl Fn(&mut Window, &mut App) + 'static {
+fn remove_action(row: &AccountRow, ctx: &AccountsCtx) -> impl Fn(&mut Window, &mut App) + 'static {
     let handler = ctx.handler.clone();
     let (key, name) = (row.key.clone(), row.name.clone());
     let description = if row.signed_in() {
@@ -129,7 +135,7 @@ fn remove_action(row: &AccountRow, ctx: &LiveCtx) -> impl Fn(&mut Window, &mut A
 }
 
 /// The account's name, kind and id, with what can be done to it.
-fn detail_head(row: &AccountRow, ctx: &LiveCtx) -> impl IntoElement {
+fn detail_head(row: &AccountRow, ctx: &AccountsCtx) -> impl IntoElement {
     let colors = ctx.colors;
     // The UUID is copied from the ⋯ menu; reading it is rarely the task.
     let mut facts = vec![row.kind_label().to_owned()];
@@ -158,7 +164,7 @@ fn detail_head(row: &AccountRow, ctx: &LiveCtx) -> impl IntoElement {
         .w_full()
         .items_center()
         .gap_4()
-        .child(kit::avatar(&row.name, ctx.model.face_of(&row.key), 56.))
+        .child(kit::avatar(&row.name, face_of(ctx.faces, &row.key), 56.))
         .child(
             v_flex()
                 .flex_1()
@@ -210,7 +216,7 @@ fn detail_head(row: &AccountRow, ctx: &LiveCtx) -> impl IntoElement {
 }
 
 /// A third-party account's look: the preview, and where to change it.
-fn third_party_look(row: &AccountRow, ctx: &LiveCtx) -> AnyElement {
+fn third_party_look(row: &AccountRow, ctx: &AccountsCtx) -> AnyElement {
     let colors = ctx.colors;
     let address = row.skin_site.clone();
     h_flex()
@@ -219,7 +225,7 @@ fn third_party_look(row: &AccountRow, ctx: &LiveCtx) -> AnyElement {
         .items_start()
         .gap_8()
         .children(
-            ctx.account_viewer
+            ctx.viewer
                 .map(|viewer| div().w(px(PREVIEW_WIDTH)).flex_none().child(viewer.clone())),
         )
         // ia[accounts]: 在皮肤站修改 | 第三方账户人物旁的「在皮肤站修改」 | 打开服务器公布的主页（LittleSkin 打开其网站）；皮肤与披风只从会话档案预览
@@ -250,7 +256,7 @@ fn third_party_look(row: &AccountRow, ctx: &LiveCtx) -> AnyElement {
 /// The detail fills the pane: the account's head over its look. With room,
 /// the wardrobe keeps the figure put and scrolls its own grid; in a narrow
 /// window everything stacks and scrolls together.
-fn detail(row: &AccountRow, ctx: &LiveCtx) -> AnyElement {
+fn detail(row: &AccountRow, ctx: &AccountsCtx) -> AnyElement {
     let look = match ctx.wardrobe {
         Some(wardrobe) => wardrobe.clone().into_any_element(),
         None => third_party_look(row, ctx),
@@ -283,16 +289,16 @@ fn detail(row: &AccountRow, ctx: &LiveCtx) -> AnyElement {
         .into_any_element()
 }
 
-pub fn accounts(ctx: &LiveCtx) -> impl IntoElement {
+pub(super) fn accounts(ctx: &AccountsCtx) -> impl IntoElement {
     let colors = ctx.colors;
-    let model = ctx.model;
-    let subtitle = match model.selected_account() {
+    let rows = &ctx.inputs.accounts;
+    let subtitle = match rows.iter().find(|row| row.selected) {
         Some(row) => tr!(
             "account-subtitle-current",
             name = row.name.as_str(),
             kind = row.kind_label()
         ),
-        None if model.accounts_loaded => tr!("account-subtitle-empty").to_owned(),
+        None if ctx.inputs.loaded => tr!("account-subtitle-empty").to_owned(),
         None => String::new(),
     };
     // ia[accounts]: 添加离线账户 | L2 次要「添加离线账户」→ 弹窗（可自定义 UUID） | 列表新增；UUID 只在添加时可设
@@ -330,7 +336,7 @@ pub fn accounts(ctx: &LiveCtx) -> impl IntoElement {
             .render(colors),
         colors,
     );
-    let body = match shown_account(model, ctx.state) {
+    let body = match ctx.view.shown_account(rows) {
         None => kit::scroll_body(
             "accounts-empty",
             v_flex().items_center().child(kit::empty(
@@ -351,9 +357,7 @@ pub fn accounts(ctx: &LiveCtx) -> impl IntoElement {
                 .gap_1()
                 .pb(theme::BOTTOM_SAFE_AREA)
                 .children(
-                    model
-                        .accounts
-                        .iter()
+                    rows.iter()
                         .enumerate()
                         .map(|(index, row)| list_item(index, row, index == shown, ctx)),
                 );

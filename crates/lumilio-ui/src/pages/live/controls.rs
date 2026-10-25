@@ -14,10 +14,6 @@ pub struct LiveCtx<'a> {
     /// The window's size, for layouts that change with the room they have.
     pub window_width: f32,
     pub window_height: f32,
-    /// The look preview of the account the Accounts detail shows.
-    pub account_viewer: Option<&'a gpui::Entity<crate::skin_view::SkinViewer>>,
-    /// Its look area (the preview beside the skins), unless it is read-only.
-    pub wardrobe: Option<&'a gpui::Entity<crate::wardrobe::Wardrobe>>,
 }
 
 pub(crate) fn send(

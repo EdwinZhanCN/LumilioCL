@@ -1,51 +1,9 @@
-use std::future::Future;
-
-use gpui_kit::{App, Context};
+use gpui_kit::App;
 use lumilio_core::unix_now;
-use lumilio_ui::LauncherShell;
 use lumilio_ui::live::{CollectionRow, account_rows, activity_rows, library_cards};
 use lumilio_ui::runtime::answer;
-use lumilio_ui::toast::Toast;
-pub(super) use lumilio_ui::toast::outcome;
-use tokio::task::JoinError;
 
-use super::{ACTIVITY_LIMIT, POLL, Reload, Wiring};
-
-/// Runs `work` on the worker runtime, then hands the result to `done` on the
-/// interface thread and reloads what changed. `started` floats up when it
-/// begins; `poll` keeps Activity fresh meanwhile. Work that panics fails like
-/// any other, so `done` still runs and says so.
-pub(super) fn job<T, E>(
-    wiring: &Wiring,
-    cx: &mut App,
-    poll: bool,
-    then: Reload,
-    started: Option<Toast>,
-    work: impl Future<Output = Result<T, E>> + Send + 'static,
-    done: impl FnOnce(&mut LauncherShell, Result<T, E>, &mut Context<LauncherShell>) + 'static,
-) where
-    T: Send + 'static,
-    E: From<JoinError> + Send + 'static,
-{
-    let handle = wiring.backend.spawn(work);
-    let wiring = wiring.clone();
-    cx.spawn(async move |cx| {
-        if let Some(toast) = started {
-            let _ = wiring.shell.update(cx, |shell, cx| shell.toast(toast, cx));
-        }
-        while poll && !handle.is_finished() {
-            cx.background_executor().timer(POLL).await;
-            cx.update(|cx| reload(&wiring, Reload::Lists, cx));
-        }
-        let output = handle.await.unwrap_or_else(|error| Err(E::from(error)));
-        let _ = wiring.shell.update(cx, |shell, cx| done(shell, output, cx));
-        cx.update(|cx| {
-            reload(&wiring, then, cx);
-            refresh_installed(&wiring, cx);
-        });
-    })
-    .detach();
-}
+use super::{ACTIVITY_LIMIT, Reload, Wiring};
 
 /// Reads again what the game installs go into already has of what Discover
 /// lists, if that may have changed.

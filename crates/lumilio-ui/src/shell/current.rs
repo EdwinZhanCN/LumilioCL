@@ -1,13 +1,14 @@
 //! Choosing the current game: from the Library, the corner chip, a game's
-//! page, a launch or a new game. Core saves the choice and publishes it, and
-//! everything showing the current game follows (see `mirror`).
+//! page, a launch or a new game; and the current account, from the corner
+//! chip or the Accounts page. Core saves the choice and publishes it, and
+//! everything showing it follows (see `mirror`).
 
 use gpui::Context;
 use lumilio_core::ServiceError;
 use tokio::sync::{mpsc, oneshot};
 
 use super::LauncherShell;
-use crate::runtime::Worker;
+use crate::runtime::{self, Worker};
 use crate::toast::{self, Toast};
 use crate::tr;
 
@@ -26,6 +27,9 @@ pub(super) struct CurrentChoices {
     /// Every game chosen, in order (tests read it).
     #[cfg(test)]
     pub(super) chosen: Vec<String>,
+    /// Every account chosen, in order (tests read it).
+    #[cfg(test)]
+    pub(super) accounts_chosen: Vec<String>,
 }
 
 impl CurrentChoices {
@@ -76,6 +80,25 @@ impl LauncherShell {
                     .technical(tr!("common-work-stopped")),
             };
             cx.update(|cx| toast::post(toast, cx));
+        })
+        .detach();
+    }
+
+    /// Makes the account `key` the one later launches use. A failed save is
+    /// told and leaves it as it was.
+    pub fn choose_account(&mut self, key: String, cx: &mut Context<Self>) {
+        #[cfg(test)]
+        self.current_choices.accounts_chosen.push(key.clone());
+        let Some(worker) = &self.current_choices.worker else {
+            return;
+        };
+        let service = worker.service().clone();
+        let saved = worker.spawn(async move { service.select_account(&key).await });
+        cx.spawn(async move |_, cx| {
+            if let Some(Err(error)) = runtime::answer(saved, cx).await {
+                let toast = Toast::error(tr!("account-switch-failed")).technical(error.to_string());
+                cx.update(|cx| toast::post(toast, cx));
+            }
         })
         .detach();
     }

@@ -1,6 +1,5 @@
 //! Root shell: route state, Home snapshot, and presentation-only intents.
 
-mod account_view;
 mod chips;
 mod chrome;
 mod current;
