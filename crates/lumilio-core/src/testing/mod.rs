@@ -3,7 +3,7 @@
 
 mod fake_java;
 
-pub(crate) use fake_java::{ECHO_ARGS, fake_java, install_java};
+pub(crate) use fake_java::{ECHO_ARGS, fake_java, install_fake, install_java};
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -369,10 +369,14 @@ pub(crate) fn change_subjects(world: &World, id: &str) -> Vec<(ChangeKind, Strin
         .collect()
 }
 
-/// Publishes a fake Java runtime the way Mojang's index does.
+/// Publishes a fake Java runtime the way Mojang's index does: its `java`
+/// (`java.exe` on Windows) is the fake one, which exits at once, and
+/// `bin/jre` links to it.
 pub(crate) fn publish_java(world: &World, bad_hash: bool) {
     let release = b"JAVA_VERSION=\"21.0.1\"\nIMPLEMENTOR=\"Test\"\n";
-    let launcher = b"#!/bin/sh\necho java\n";
+    let launcher = std::fs::read(fake_java::program()).unwrap();
+    let launcher = launcher.as_slice();
+    let java = format!("java{}", std::env::consts::EXE_SUFFIX);
     std::fs::write(world.server.join("jrelease"), release).unwrap();
     std::fs::write(world.server.join("jjava"), launcher).unwrap();
     let hash = |bytes: &[u8]| {
@@ -385,11 +389,11 @@ pub(crate) fn publish_java(world: &World, bad_hash: bool) {
     let manifest = format!(
         r#"{{"files":{{
             "bin":{{"type":"directory"}},
-            "bin/java":{{"type":"file","executable":true,"downloads":{{"raw":
+            "bin/{java}":{{"type":"file","executable":true,"downloads":{{"raw":
                 {{"url":"{}","sha1":"{}","size":{}}}}}}},
             "release":{{"type":"file","downloads":{{"raw":
                 {{"url":"{}","sha1":"{}","size":{}}}}}}},
-            "bin/jre":{{"type":"link","target":"java"}}}}}}"#,
+            "bin/jre":{{"type":"link","target":"{java}"}}}}}}"#,
         file_url(&world.server.join("jjava")),
         hash(launcher),
         launcher.len(),

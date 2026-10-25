@@ -223,24 +223,67 @@ fn launch_plan_separates_classpath_entries_from_native_archives() {
         ))
         .expect("launch specification");
 
-    assert_eq!(
-        plan.classpath(),
-        [
-            PathBuf::from("/launcher/libraries/custom/engine.jar"),
-            PathBuf::from("/launcher/versions/native-test/native-test.jar"),
-        ]
-    );
+    // Paths in this system's form, joined for the target system: macOS's `:`.
+    let under = |parts: &[&str]| {
+        parts
+            .iter()
+            .fold(PathBuf::from("/launcher"), |path, part| path.join(part))
+    };
+    let engine = under(&["libraries", "custom", "engine.jar"]);
+    let client = under(&["versions", "native-test", "native-test.jar"]);
+    assert_eq!(plan.classpath(), [engine.clone(), client.clone()]);
     assert_eq!(
         plan.native_archives()[0].path(),
-        PathBuf::from("/launcher/libraries/custom/engine-native.jar")
+        under(&["libraries", "custom", "engine-native.jar"])
     );
     assert_eq!(
         plan.jvm_arguments(),
         [
-            "-cp",
-            "/launcher/libraries/custom/engine.jar:/launcher/versions/native-test/native-test.jar"
+            "-cp".to_owned(),
+            format!("{}:{}", engine.display(), client.display())
         ]
     );
+}
+
+#[test]
+fn a_windows_classpath_is_joined_with_semicolons() {
+    let release = ReleaseManifest::decode_json(
+        r#"{
+          "id": "windows-test",
+          "mainClass": "example.EntryPoint",
+          "arguments": { "jvm": ["-cp", "${classpath}"], "game": [] },
+          "libraries": [
+            {
+              "name": "org.example:engine:1.0",
+              "downloads": {
+                "artifact": {
+                  "path": "org/example/engine/1.0/engine-1.0.jar",
+                  "url": "https://cdn.example/engine.jar",
+                  "sha1": "abc",
+                  "size": 42
+                }
+              }
+            }
+          ]
+        }"#,
+    )
+    .expect("release");
+    let windows = HostProfile::new(PlatformFamily::Windows, MachineArchitecture::X86_64, "10.0");
+
+    let plan = release
+        .build_launch_plan(&LaunchContext::new(
+            windows,
+            LaunchDirectories::under("/launcher"),
+        ))
+        .expect("launch specification");
+
+    let entries: Vec<String> = plan
+        .classpath()
+        .iter()
+        .map(|path| path.display().to_string())
+        .collect();
+    assert_eq!(entries.len(), 2);
+    assert_eq!(plan.jvm_arguments(), ["-cp".to_owned(), entries.join(";")]);
 }
 
 #[test]

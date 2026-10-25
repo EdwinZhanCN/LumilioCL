@@ -361,7 +361,7 @@ async fn releases_up_to_1_7_2_get_the_assets_folder_their_catalog_lays_out() {
         arguments.find(|argument| *argument == "--assetsDir");
         let assets = world.request.directories.assets();
         let expected = if by_name {
-            assets.join("virtual/legacy")
+            assets.join("virtual").join("legacy")
         } else {
             assets.to_owned()
         };

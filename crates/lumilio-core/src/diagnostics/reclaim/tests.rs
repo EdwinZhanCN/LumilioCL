@@ -79,17 +79,14 @@ fn tree() -> (tempfile::TempDir, Layout) {
     (dir, layout)
 }
 
-fn names(report: &Reclaimable, layout: &Layout) -> Vec<String> {
+/// The unused paths below `meta/`. Compared as paths, `versions/1.20.1`
+/// also matches Windows' `versions\1.20.1`.
+fn names(report: &Reclaimable, layout: &Layout) -> Vec<PathBuf> {
     let meta = layout.meta();
     report
         .unused
         .iter()
-        .map(|(path, _)| {
-            path.strip_prefix(&meta)
-                .unwrap()
-                .to_string_lossy()
-                .into_owned()
-        })
+        .map(|(path, _)| path.strip_prefix(&meta).unwrap().to_owned())
         .collect()
 }
 
@@ -110,7 +107,7 @@ fn what_no_game_needs_is_found_and_what_one_needs_is_kept() {
         "assets/log_configs/log-12.xml",
     ] {
         assert!(
-            found.iter().any(|f| f == gone),
+            found.iter().any(|f| f == Path::new(gone)),
             "{gone} should be unused: {found:?}"
         );
     }
@@ -124,7 +121,10 @@ fn what_no_game_needs_is_found_and_what_one_needs_is_kept() {
         "assets/indexes/17.json",
         "assets/log_configs/log-17.xml",
     ] {
-        assert!(!found.iter().any(|f| f == kept), "{kept} is in use");
+        assert!(
+            !found.iter().any(|f| f == Path::new(kept)),
+            "{kept} is in use"
+        );
     }
     assert!(report.bytes() > 0);
 }

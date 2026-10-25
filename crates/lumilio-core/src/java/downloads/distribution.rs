@@ -375,6 +375,36 @@ pub(super) fn link_stays_inside(path: &str, target: &str) -> bool {
     true
 }
 
+/// The manifest path of the file a link at `path` names, following links to
+/// links. `None` when the chain loops or ends at a folder or at a path the
+/// manifest does not list. Mojang's links name files (license texts), and
+/// Windows ones have none.
+#[cfg(any(not(unix), test))]
+#[must_use]
+pub fn linked_file(entries: &[(String, Entry)], path: &str) -> Option<String> {
+    let mut current = path.to_owned();
+    // Each step reaches another entry, so a longer chain loops.
+    for _ in 0..entries.len() {
+        let (_, entry) = entries.iter().find(|(name, _)| *name == current)?;
+        let Entry::Link { target } = entry else {
+            return matches!(entry, Entry::File { .. }).then_some(current);
+        };
+        let mut parts: Vec<&str> = current.split('/').collect();
+        parts.pop();
+        for part in target.split('/') {
+            match part {
+                "" | "." => {}
+                ".." => {
+                    parts.pop()?;
+                }
+                _ => parts.push(part),
+            }
+        }
+        current = parts.join("/");
+    }
+    None
+}
+
 /// Reads a component's file list. Every path must be a plain relative path,
 /// every file needs a raw download from an address `allow` accepts, and every link must
 /// stay inside the runtime.

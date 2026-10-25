@@ -535,15 +535,21 @@ impl<T: Transport + Clone> Java<T> {
                             }
                         }
                         runtime::Entry::Link { target: to } => {
-                            #[cfg(unix)]
-                            {
-                                if let Some(parent) = target.parent() {
-                                    std::fs::create_dir_all(parent)?;
-                                }
-                                std::os::unix::fs::symlink(to, &target)?;
+                            if let Some(parent) = target.parent() {
+                                std::fs::create_dir_all(parent)?;
                             }
+                            #[cfg(unix)]
+                            std::os::unix::fs::symlink(to, &target)?;
+                            // Windows makes symbolic links only in Developer
+                            // Mode or as administrator: the link becomes a
+                            // copy of the file it names.
                             #[cfg(not(unix))]
-                            let _ = to;
+                            {
+                                let _ = to;
+                                if let Some(file) = runtime::linked_file(&entries, path) {
+                                    std::fs::copy(runtime::place(&staging, &file), &target)?;
+                                }
+                            }
                         }
                         _ => {}
                     }

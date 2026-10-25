@@ -83,7 +83,14 @@ async fn java_is_installed_whole_found_by_discovery_and_a_bad_file_leaves_nothin
             .mode();
         assert_eq!(mode & 0o111, 0o111, "the launcher is executable");
     }
-    assert!(runtimes.join("java-runtime-delta/bin/jre").is_symlink());
+    // A link stands for the file it names: a symbolic link, or on Windows
+    // a copy.
+    let link = runtimes.join("java-runtime-delta/bin/jre");
+    assert_eq!(cfg!(unix), link.is_symlink());
+    assert_eq!(
+        std::fs::read(&link).unwrap(),
+        std::fs::read(java.executable()).unwrap()
+    );
     // The ordinary discovery finds it, and asking again changes nothing.
     let found = world.service.java_installations().await;
     assert!(
@@ -106,33 +113,58 @@ async fn java_is_installed_whole_found_by_discovery_and_a_bad_file_leaves_nothin
     ));
 }
 
-/// Answers Oracle's checksum and archive addresses with a fake GraalVM 21.
-/// A wrong checksum stands for a damaged download.
+/// Answers Oracle's checksum and archive addresses with a fake GraalVM 21,
+/// packed the way Oracle packs it for this system: a zip with `java.exe` on
+/// Windows, else a tar.gz. A wrong checksum stands for a damaged download.
 fn publish_graalvm(world: &crate::testing::World, wrong_checksum: bool) {
     use std::io::Write as _;
 
     use sha2::{Digest, Sha256};
-    let mut builder = tar::Builder::new(Vec::new());
-    for (path, body, mode) in [
+
+    use crate::java::downloads::archive::ArchiveKind;
+    use crate::java::downloads::graalvm;
+    let files = [
         (
-            "graalvm-jdk-21.0.8+12.1/release",
+            "graalvm-jdk-21.0.8+12.1/release".to_owned(),
             &b"JAVA_VERSION=\"21.0.8\"\nIMPLEMENTOR=\"Oracle Corporation\"\n"[..],
             0o644,
         ),
         (
-            "graalvm-jdk-21.0.8+12.1/bin/java",
+            format!(
+                "graalvm-jdk-21.0.8+12.1/bin/java{}",
+                std::env::consts::EXE_SUFFIX
+            ),
             &b"#!/bin/sh\n"[..],
             0o755,
         ),
-    ] {
-        let mut header = tar::Header::new_gnu();
-        header.set_size(body.len() as u64);
-        header.set_mode(mode);
-        builder.append_data(&mut header, path, body).unwrap();
-    }
-    let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
-    encoder.write_all(&builder.into_inner().unwrap()).unwrap();
-    let archive = encoder.finish().unwrap();
+    ];
+    let kind = graalvm::archive(&lumilio_minecraft::HostProfile::current(), 21)
+        .expect("tests run on a platform with GraalVM")
+        .kind;
+    let archive = match kind {
+        ArchiveKind::TarGz => {
+            let mut builder = tar::Builder::new(Vec::new());
+            for (path, body, mode) in files {
+                let mut header = tar::Header::new_gnu();
+                header.set_size(body.len() as u64);
+                header.set_mode(mode);
+                builder.append_data(&mut header, path, body).unwrap();
+            }
+            let mut encoder =
+                flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
+            encoder.write_all(&builder.into_inner().unwrap()).unwrap();
+            encoder.finish().unwrap()
+        }
+        ArchiveKind::Zip => {
+            let mut writer = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+            for (path, body, mode) in files {
+                let options = zip::write::SimpleFileOptions::default().unix_permissions(mode);
+                writer.start_file(path, options).unwrap();
+                writer.write_all(body).unwrap();
+            }
+            writer.finish().unwrap().into_inner()
+        }
+    };
     let digest: String = Sha256::digest(if wrong_checksum {
         &b"other"[..]
     } else {
@@ -271,7 +303,8 @@ async fn a_launch_without_a_fitting_java_downloads_one_unless_turned_off() {
             .service
             .layout
             .runtimes()
-            .join("java-runtime-delta/bin/java")
+            .join("java-runtime-delta/bin")
+            .join(format!("java{}", std::env::consts::EXE_SUFFIX))
             .is_file()
     );
     let tasks = world.service.activity(10).finished;

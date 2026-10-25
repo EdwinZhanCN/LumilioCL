@@ -478,6 +478,25 @@ async fn launch_defaults_reach_the_real_process_and_its_commands() {
         .await
         .unwrap();
     let game = world.service.layout().game(&record.id);
+    // A wrapper by its full path (with backslashes on Windows) that runs
+    // the Java line it is given, like `env WRAPPED=yes`.
+    let wrapper = crate::testing::install_fake(
+        &world._dir.path().join("wrapper"),
+        "wrap",
+        "env WRAPPED=yes",
+    );
+    // The commands run in cmd on Windows and in sh elsewhere.
+    let (pre_launch, post_exit) = if cfg!(windows) {
+        (
+            r#"echo before> "%INST_DIR%\pre.txt""#,
+            r#"echo after> "%INST_DIR%\post.txt""#,
+        )
+    } else {
+        (
+            r#"echo before > "$INST_DIR/pre.txt""#,
+            r#"echo after > "$INST_DIR/post.txt""#,
+        )
+    };
     world
         .service
         .set_launch_defaults(LaunchTuning {
@@ -490,9 +509,9 @@ async fn launch_defaults_reach_the_real_process_and_its_commands() {
                 name: "FOO".into(),
                 value: "bar".into(),
             }],
-            wrapper: Some("env WRAPPED=yes".into()),
-            pre_launch: Some("echo before > \"$INST_DIR/pre.txt\"".into()),
-            post_exit: Some("echo after > \"$INST_DIR/post.txt\"".into()),
+            wrapper: Some(format!("\"{}\"", wrapper.display())),
+            pre_launch: Some(pre_launch.into()),
+            post_exit: Some(post_exit.into()),
         })
         .await
         .unwrap();

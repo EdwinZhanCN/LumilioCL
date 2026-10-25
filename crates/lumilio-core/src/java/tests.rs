@@ -218,7 +218,7 @@ fn without_os_arch_the_executable_header_tells_the_architecture() {
         header
     };
     let universal = [0xca, 0xfe, 0xba, 0xbe, 0, 0, 0, 2];
-    for (launcher, expected) in [
+    for (index, (launcher, expected)) in [
         (mach_o(0x0100_0007), Some("x86_64")),
         (mach_o(0x0100_000c), Some("aarch64")),
         (elf(0x3e), Some("x86_64")),
@@ -229,8 +229,11 @@ fn without_os_arch_the_executable_header_tells_the_architecture() {
         (universal.to_vec(), None),
         (b"#!/bin/sh\n".to_vec(), None),
         (Vec::new(), None),
-    ] {
-        let runtime = with_launcher(&format!("{expected:?}-{}", launcher.len()), &launcher);
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let runtime = with_launcher(&format!("java-{index}"), &launcher);
         assert_eq!(runtime.architecture(), expected, "{launcher:02x?}");
     }
     // The release file still wins when it says.

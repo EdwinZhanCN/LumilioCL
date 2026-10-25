@@ -15,6 +15,8 @@ use std::path::Path;
 #[cfg(test)]
 use distribution::choose_component;
 use distribution::link_stays_inside;
+#[cfg(any(not(unix), test))]
+pub use distribution::linked_file;
 #[cfg(test)]
 pub(crate) use distribution::platform_key;
 pub use distribution::{
