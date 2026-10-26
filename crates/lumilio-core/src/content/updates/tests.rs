@@ -129,7 +129,10 @@ async fn requests_carry_hashes_loader_and_game_version_but_never_disabled_files(
     let s = setup();
     fs::write(s.game.join("mods/a.jar"), "a").unwrap();
     fs::write(s.game.join("mods/b.jar.disabled"), "b").unwrap();
-    let api = Api::new("{}", "{}");
+    let a = sha1_of("a");
+    // Only a file the source recognizes is asked about.
+    let identify = format!("{{\"{a}\":{}}}", version_json("v1", "a.jar", "u1", &a));
+    let api = Api::new(identify, "{}");
     let host = api.host();
     let client = host.content_client().await.unwrap();
     check(&client, &s.game, ProjectKind::Mod, "1.21.1", Loader::Fabric)
@@ -144,9 +147,10 @@ async fn requests_carry_hashes_loader_and_game_version_but_never_disabled_files(
             .1,
     )
     .unwrap();
-    assert_eq!(update_body["hashes"], serde_json::json!([sha1_of("a")]));
+    assert_eq!(update_body["hashes"], serde_json::json!([a]));
     assert_eq!(update_body["loaders"], serde_json::json!(["fabric"]));
     assert_eq!(update_body["game_versions"], serde_json::json!(["1.21.1"]));
+    assert_eq!(update_body["version_types"], serde_json::json!(["release"]));
     assert_eq!(update_body["algorithm"], "sha1");
 }
 
