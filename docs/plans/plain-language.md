@@ -29,7 +29,7 @@ Apply the ISO 24495-1 plain-language principles to the launcher's catalog wordin
 - [x] T4 — Guard hint length (Completed)
   Acceptance: A lumilio-ui test fails with the message id when a hint (an id ending in -help or -note) is longer than one sentence of 20 characters, or its English is more than twice as wide. long-hints.txt lists the hints not revised yet and may only shrink. A demonstrated failing case is recorded.
 - [ ] T5 — Revise the remaining sections (Proposed)
-  Acceptance: Every catalog section passes a rewrite and cold-read pass, dialog intros and bodies meet their plain-language §6 limits, and long-hints.txt is empty.
+  Acceptance: Remaining catalog sections are reviewed in context and revised where useful; consequential or ambiguous flows get a cold read when needed. Necessary facts remain reachable, existing catalog checks pass, and long-hints.txt is empty. Dialogs are judged by clarity and rendered fit rather than a universal character limit.
 
 ## Validation
 
@@ -89,6 +89,14 @@ A hint is named by its id: -help or -note. The guard measures messages by that n
 Why: The name is the one mark of where a message appears that a catalog test can read without parsing call sites.
 
 Consequences: A ⓘ, a key's tooltip, a line under a field and an empty state's line use these endings. A new long hint fails the test; long-hints.txt only shrinks. Per-key tooltips replace an ⓘ that explains several keys (design language §9).
+
+## Decision D7
+
+Treat writing guidance as task-dependent defaults; consolidate voice in plain-language and retain the existing hint guard as an implementation constraint.
+
+Why: In plan design-guidance, the Project Maintainer requested shorter design guidance that can adapt to feature needs.
+
+Consequences: Supersedes D1's split of voice/content and D3's universal hard limits. D4's two-pass workflow becomes optional for ordinary edits. Existing test thresholds and first-batch acceptance remain unchanged; future work may change presentation and validation together when needed.
 
 ## References
 

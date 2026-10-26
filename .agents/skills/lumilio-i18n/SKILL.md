@@ -4,7 +4,7 @@ description: Use when adding or changing text a person reads in lumilio-ui or
   lumilio-app, or when moving a page's hardcoded Chinese into the language
   catalogs — message ids, `tr!` / `tr_all!`, arguments and plurals, the
   hardcoded-Chinese list, filling the English catalog, and revising wording
-  under the plain-language rules.
+  using the plain-language guidance.
 ---
 
 # Launcher Text In Catalogs
@@ -14,10 +14,10 @@ The launcher's own words live in Fluent catalogs, not in Rust:
 and `crates/lumilio-ui/i18n/en/lumilio-ui.ftl`. Game logs, crash reports and
 text from content sources never go through them.
 
-What a message says and in what order follows `docs/plain-language.md`; voice
-and form follow design language §8. To revise existing wording, run the two
-passes in `plain-review-prompt.md`: a rewrite that may read the code, then a
-cold read that sees only the screen's words.
+Use the relevant parts of `docs/plain-language.md` for content, voice and form.
+Adapt wording and presentation to the feature. For substantial rewrites or
+consequential choices, `plain-review-prompt.md` offers a rewrite and a cold read;
+ordinary label edits do not require that workflow.
 
 ## In code
 
@@ -28,8 +28,8 @@ cold read that sees only the screen's words.
 - Ids are `page-part-meaning` with hyphens (Fluent ids cannot hold dots).
   Reuse `common-*` for words every page says (无, 编辑, 添加).
 - A hint's id ends in `-help` or `-note`: a ⓘ, a key's tooltip, a line under
-  a field, an empty state's line. A tooltip never wraps, so
-  `hints_fit_one_line` holds each hint to plain-language §6.
+  a field, an empty state's line. The existing `hints_fit_one_line` check
+  limits these ids as described in plain-language §6; it does not measure layout.
 - The arguments at the call must equal those the Chinese message uses; `tr!`
   fails to compile otherwise. Design a sentence so both languages need the same
   arguments.
@@ -79,6 +79,7 @@ cold read that sees only the screen's words.
 - **An English entry with different arguments.** The catalog test fails; the
   English must use the Chinese message's arguments.
 - **A count without a plural.** "1 games". Every counted noun gets a select.
-- **A long hint.** `hints_fit_one_line` names it. Cut it, or move the facts to
-  a key's tooltip or the user guide (plain-language §6); never add it to
-  `long-hints.txt`.
+- **A long hint.** `hints_fit_one_line` names it. Keep necessary facts reachable
+  (plain-language §6). If richer help needs a different surface, change that
+  surface and its validation together; do not evade the check by renaming the id
+  or growing `long-hints.txt`.

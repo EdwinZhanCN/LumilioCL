@@ -23,7 +23,7 @@ Three fields separated by `|`, plus an optional fourth:
 | Field | Write |
 | --- | --- |
 | 操作 | What the person does, in the words of the screen. Unique within the page |
-| 层 / 组件 | Where it is: the layer (L1–L6, `docs/design-language.md` §7) and the control |
+| 层 / 组件 | Where it is: a named region and control; existing L1–L5 labels are explained in `docs/design-language.md` §7 and do not prescribe layout |
 | 结果与反馈 | What happens, including the feedback and the failure behaviour worth knowing |
 | 备注 (optional) | A caveat, a plan reference, or a limit ("运行中禁用") |
 
