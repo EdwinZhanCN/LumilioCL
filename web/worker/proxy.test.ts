@@ -83,6 +83,36 @@ describe("proxy", () => {
     expect(response.headers.get("content-range")).toBe("bytes 100-199/1000");
   });
 
+  it("gives LumilioCL 0.2.2 a Windows package whole, without range support", async () => {
+    const asked: (string | null)[] = [];
+    const fetcher = vi.fn<typeof fetch>(async (input, init) => {
+      if (String(input).startsWith("https://github.com/")) return redirect(ASSET);
+      asked.push(new Headers(init?.headers).get("range"));
+      return new Response("exe", { status: 200, headers: { "accept-ranges": "bytes", "content-length": "3" } });
+    });
+    const get = (file: string, agent: string) =>
+      proxy(
+        new Request(`${MIRROR}/releases/download/v0.2.3/${file}`, {
+          headers: { "user-agent": agent, range: "bytes=1-", "if-range": '"etag"' },
+        }),
+        fetcher,
+      );
+
+    const whole = await get("LumilioCL-0.2.3-windows-x64-setup.exe", "LumilioCL/0.2.2");
+    expect(whole.status).toBe(200);
+    expect(whole.headers.get("accept-ranges")).toBeNull();
+    expect(whole.headers.get("content-length")).toBe("3");
+    expect(new Headers(fetcher.mock.calls[0][1]?.headers).get("if-range")).toBeNull();
+
+    // Other packages, and versions that download in parts correctly, keep ranges.
+    for (const [file, agent] of [
+      ["LumilioCL-0.2.3-macos-arm64.dmg", "LumilioCL/0.2.2"],
+      ["LumilioCL-0.2.3-windows-x64-setup.exe", "LumilioCL/0.2.3"],
+    ])
+      expect((await get(file, agent)).headers.get("accept-ranges"), `${file} for ${agent}`).toBe("bytes");
+    expect(asked).toEqual([null, "bytes=1-", "bytes=1-"]);
+  });
+
   it("refuses a redirect to a host that is not GitHub's", async () => {
     const fetcher = vi.fn<typeof fetch>(async () => redirect("https://evil.example/payload"));
     const response = await proxy(new Request(`${MIRROR}/releases/download/v0.1.0/a.zip`), fetcher);
