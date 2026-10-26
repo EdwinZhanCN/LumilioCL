@@ -1,5 +1,5 @@
 //! The Java group's first row: a dropdown of 自动（推荐）, every Java found
-//! and 自定义路径…, with what the next launch uses beneath it. The saved value
+//! and 自定义路径…, with what the next launch uses beside it. The saved value
 //! stays `java_path` (`None` is automatic).
 
 use std::path::{Path, PathBuf};
@@ -83,7 +83,7 @@ pub fn picked(java: Option<&InstanceJava>, java_path: Option<&Path>) -> JavaPick
     })
 }
 
-/// What the next launch does, under the dropdown.
+/// What the next launch does, beside the dropdown.
 #[must_use]
 pub fn java_summary(java: Option<&InstanceJava>) -> String {
     let Some(java) = java else {
@@ -243,29 +243,30 @@ impl InstanceDetailView {
         // Only a saved path that is no found installation is custom.
         let custom = saved.filter(|_| picked(java, saved) == JavaPick::Custom);
         let busy = self.busy;
-        // ia[instance.settings]: 指定 Java | 设置 · Java 组，下拉「自动（推荐）/ 已发现的 Java / 自定义路径…」 | 选中即保存；值下方写出下次启动用哪个 Java，没有合适的时写出启动时会下载的版本；已停用的 Java 不在列表里 | java-management T4
-        let mut rows = vec![
-            self.setting_row(
-                "isettings-java",
-                "Java",
-                Some(tr!("instance-settings-java-help").to_owned()),
-                java_summary(java),
-                Some(
-                    div()
-                        .w(px(300.))
-                        .child(
-                            Select::new(&select)
-                                .small()
-                                .accessibility_label("Java")
-                                .menu_width(px(380.))
-                                .search_placeholder(tr!("instance-settings-java-search"))
-                                .disabled(busy),
-                        )
-                        .into_any_element(),
-                ),
-                colors,
-            ),
-        ];
+        let help = Some(tr!("instance-settings-java-help").into());
+        let summary = java_summary(java);
+        let control = Some(
+            div()
+                .w(px(300.))
+                .child(
+                    Select::new(&select)
+                        .small()
+                        .accessibility_label("Java")
+                        .menu_width(px(380.))
+                        .search_placeholder(tr!("instance-settings-java-search"))
+                        .disabled(busy),
+                )
+                .into_any_element(),
+        );
+        // ia[instance.settings]: 指定 Java | 设置 · Java 组，下拉「自动（推荐）/ 已发现的 Java / 自定义路径…」 | 选中即保存；下拉左边写出下次启动用哪个 Java（带路径，太长时中间省略，悬停看整句），没有合适的时写出启动时会下载的版本；已停用的 Java 不在列表里 | java-management T4
+        // Only 将使用 Java …（path） ends in a path; the other summaries are
+        // sentences and wrap.
+        let summary_row = if java.is_some_and(|java| java.choice.is_some()) {
+            kit::line_row("isettings-java", "Java", help, summary, control, colors)
+        } else {
+            kit::value_row("isettings-java", "Java", help, summary, control, colors)
+        };
+        let mut rows = vec![summary_row.debug_selector(|| "isettings-java".to_owned())];
         if let Some(path) = custom {
             let current = record.settings.clone();
             // ia[instance.settings]: 自定义 Java 路径 | 设置 · Java 组，选「自定义路径…」后出现的路径行 + [编辑] 弹窗 | 填 java 程序或 JDK 文件夹；保存时检查路径存在；恢复默认＝回到自动

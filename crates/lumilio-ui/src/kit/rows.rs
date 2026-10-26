@@ -66,12 +66,7 @@ pub fn path_row(
         .min_w_0()
         .gap_1()
         .items_center()
-        .child(
-            middle_line("path", shown)
-                .font_family(theme::mono_font())
-                .text_xs()
-                .text_color(colors.muted),
-        )
+        .child(value_line("path", shown, colors))
         .child(
             Key::new("copy")
                 .icon(Icon::new(UiIcon::Copy).size(px(14.)))
@@ -84,6 +79,21 @@ pub fn path_row(
                     toast::post(Toast::success(crate::tr!("common-path-copied")), cx);
                 }),
         );
+    row_frame(id, label, help, value.into_any_element(), control, colors)
+}
+
+/// A [`value_row`] whose value is one line that ends in a path, such as
+/// 将使用 Java 21（…/Home）(§10). It gives way in the middle like a path, so
+/// what the line says and the last folders stay; hovering shows all of it.
+pub fn line_row(
+    id: impl Into<gpui::ElementId>,
+    label: impl Into<SharedString>,
+    help: Option<SharedString>,
+    line: impl Into<SharedString>,
+    control: Option<AnyElement>,
+    colors: ShellColors,
+) -> gpui::Stateful<gpui::Div> {
+    let value = value_line("line", line.into(), colors);
     row_frame(id, label, help, value.into_any_element(), control, colors)
 }
 
@@ -111,6 +121,18 @@ pub fn middle_line(
 fn value_text(colors: ShellColors) -> gpui::Div {
     div()
         .min_w_0()
+        .font_family(theme::mono_font())
+        .text_xs()
+        .text_color(colors.muted)
+}
+
+/// A [`middle_line`] that reads like a row's value.
+fn value_line(
+    id: &'static str,
+    text: SharedString,
+    colors: ShellColors,
+) -> gpui::Stateful<gpui::Div> {
+    middle_line(id, text)
         .font_family(theme::mono_font())
         .text_xs()
         .text_color(colors.muted)
