@@ -16,7 +16,7 @@ use super::saves::{cleared, java};
 use crate::live::java_label;
 use crate::settings_dialog::{DialogSpec, FieldKind, FieldSpec, SettingsDialog};
 use crate::theme::ShellColors;
-use crate::tr;
+use crate::{kit, tr};
 
 /// One entry of the Java dropdown.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -239,7 +239,9 @@ impl InstanceDetailView {
         let select = self.java_select(window, cx);
         let java = self.data.java.as_ref().and_then(|java| java.as_ref().ok());
         let record = self.record.as_ref().expect("loaded");
-        let custom = picked(java, record.settings.java_path.as_deref()) == JavaPick::Custom;
+        let saved = record.settings.java_path.as_deref();
+        // Only a saved path that is no found installation is custom.
+        let custom = saved.filter(|_| picked(java, saved) == JavaPick::Custom);
         let busy = self.busy;
         // ia[instance.settings]: 指定 Java | 设置 · Java 组，下拉「自动（推荐）/ 已发现的 Java / 自定义路径…」 | 选中即保存；值下方写出下次启动用哪个 Java，没有合适的时写出启动时会下载的版本；已停用的 Java 不在列表里 | java-management T4
         let mut rows = vec![
@@ -264,22 +266,20 @@ impl InstanceDetailView {
                 colors,
             ),
         ];
-        if custom {
+        if let Some(path) = custom {
             let current = record.settings.clone();
             // ia[instance.settings]: 自定义 Java 路径 | 设置 · Java 组，选「自定义路径…」后出现的路径行 + [编辑] 弹窗 | 填 java 程序或 JDK 文件夹；保存时检查路径存在；恢复默认＝回到自动
+            // ia[instance.settings]: 复制自定义 Java 路径 | 设置 · Java 组，路径旁的复制键（路径太长时中间省略，悬停看完整路径） | 完整路径放进剪贴板，toast“已复制路径”
             rows.push(
-                self.setting_row(
+                kit::path_row(
                     "isettings-java-path",
                     tr!("instance-settings-path"),
                     None,
-                    current
-                        .java_path
-                        .as_ref()
-                        .map(|path| path.display().to_string())
-                        .unwrap_or_default(),
+                    path,
                     Some(self.edit_spec("isettings-java-edit", move || path_spec(&current))),
                     colors,
-                ),
+                )
+                .debug_selector(|| "isettings-java-path".to_owned()),
             );
         }
         rows

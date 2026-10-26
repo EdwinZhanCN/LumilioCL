@@ -13,6 +13,9 @@ common-show-more = 显示更多
 common-show-less = 收起
 common-more = 更多
 common-copy = 复制
+# 设置行里路径旁的复制键，以及复制后的提示。
+common-copy-path = 复制路径
+common-path-copied = 已复制路径
 common-close = 关闭
 common-technical-details = 技术详情
 common-cancel = 取消

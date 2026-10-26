@@ -4,7 +4,8 @@ use gpui_component::{Theme, ThemeMode};
 
 use super::motd::motd_color;
 use super::{
-    Item, TagKind, list, lit_bars, motd_lines, panel_list, signal, signal_bars, speed_digits, tag,
+    Item, TagKind, list, lit_bars, motd_lines, panel_list, path_row, signal, signal_bars,
+    speed_digits, tag, value_row,
 };
 use crate::theme;
 use crate::theme::ShellColors;
@@ -242,6 +243,152 @@ fn a_hairline_table_has_an_ink_rule_on_top_and_hairlines_beneath(cx: &mut TestAp
             "{mode:?}: a quick round trip lights five green bars"
         );
     }
+}
+
+const LONG_PATH: &str = "/Users/someone/Library/Application Support/LumilioCL/themes";
+
+/// A path row, a short value row and a long one, each with a key-sized
+/// control.
+struct PathRows(f32);
+
+impl Render for PathRows {
+    fn render(&mut self, _: &mut Window, cx: &mut gpui::Context<Self>) -> impl IntoElement {
+        let colors = ShellColors::current(cx);
+        let control = |selector: &'static str| {
+            div()
+                .w(gpui::px(160.))
+                .h(gpui::px(28.))
+                .debug_selector(move || selector.into())
+                .into_any_element()
+        };
+        gpui_component::v_flex()
+            .w(gpui::px(self.0))
+            .child(
+                path_row(
+                    "themes",
+                    "本地主题",
+                    None,
+                    std::path::Path::new(LONG_PATH),
+                    Some(control("themes-control")),
+                    colors,
+                )
+                .debug_selector(|| "themes".into()),
+            )
+            .child(
+                value_row(
+                    "font",
+                    "界面字体",
+                    None,
+                    "默认",
+                    Some(control("font-control")),
+                    colors,
+                )
+                .debug_selector(|| "font".into()),
+            )
+            .child(
+                value_row(
+                    "hosts",
+                    "权限",
+                    None,
+                    "api.modrinth.com, cdn.modrinth.com, api.curseforge.com, edge.forgecdn.net",
+                    Some(control("hosts-control")),
+                    colors,
+                )
+                .debug_selector(|| "hosts".into()),
+            )
+    }
+}
+
+/// A long value once squeezed the label to nothing and drew over it, and
+/// narrowed the control. It gives way first now: a path stays on one line
+/// with its copy key, other values wrap, and every label and control keeps
+/// its room.
+#[gpui::test]
+fn a_long_value_gives_way_before_the_label_and_the_keys(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_component::init(cx);
+        theme::tune(cx);
+    });
+    let mut label_widths = None;
+    for width in [900., 420.] {
+        let (_, cx) = cx.add_window_view(move |_, _| PathRows(width));
+        cx.run_until_parked();
+        let [
+            row,
+            label,
+            copy,
+            control,
+            short,
+            hosts,
+            hosts_label,
+            hosts_control,
+        ] = [
+            "themes",
+            "themes-label",
+            "themes-copy",
+            "themes-control",
+            "font",
+            "hosts",
+            "hosts-label",
+            "hosts-control",
+        ]
+        .map(|selector| cx.debug_bounds(selector).expect("drawn"));
+        assert_eq!(
+            row.size.height, short.size.height,
+            "{width}: the path row stays one line"
+        );
+        let widths = [label.size.width, hosts_label.size.width];
+        assert!(
+            widths.iter().all(|width| *width > gpui::px(0.)),
+            "{width}: the labels are drawn"
+        );
+        assert_eq!(
+            widths,
+            *label_widths.get_or_insert(widths),
+            "{width}: the labels keep their width"
+        );
+        assert!(
+            copy.left() >= label.right() && copy.right() <= control.left(),
+            "{width}: the copy key sits after the label, before the control"
+        );
+        for (control, row) in [(control, row), (hosts_control, hosts)] {
+            assert_eq!(
+                control.size.width,
+                gpui::px(160.),
+                "{width}: the control keeps its width"
+            );
+            assert!(
+                control.right() <= row.right(),
+                "{width}: the control stays in the row"
+            );
+        }
+        if width < 500. {
+            assert!(
+                hosts.size.height > short.size.height,
+                "{width}: a long value wraps rather than hiding its end"
+            );
+        }
+    }
+}
+
+/// The key beside a path copies the whole path, not the shortened one, and
+/// says so.
+#[gpui::test]
+fn the_copy_key_copies_the_whole_path(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_component::init(cx);
+        theme::tune(cx);
+    });
+    let (_, cx) = cx.add_window_view(|_, _| PathRows(420.));
+    cx.run_until_parked();
+    let copy = cx.debug_bounds("themes-copy").expect("drawn");
+    cx.simulate_click(copy.center(), gpui::Modifiers::none());
+    cx.run_until_parked();
+    assert_eq!(
+        cx.read(|cx| cx.read_from_clipboard().and_then(|item| item.text())),
+        Some(LONG_PATH.to_owned()),
+    );
+    assert_eq!(crate::testing::toasts(cx), ["已复制路径"]);
 }
 
 #[test]

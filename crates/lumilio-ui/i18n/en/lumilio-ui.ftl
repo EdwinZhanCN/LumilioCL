@@ -13,6 +13,9 @@ common-show-more = Show more
 common-show-less = Show less
 common-more = More
 common-copy = Copy
+# The copy key beside a path in a settings row, and the notice after copying.
+common-copy-path = Copy path
+common-path-copied = Path copied
 common-close = Close
 common-technical-details = Technical details
 common-cancel = Cancel

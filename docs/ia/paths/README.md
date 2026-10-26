@@ -12,7 +12,7 @@
 | [发现](discover.md) | 28 |
 | [动态](activity.md) | 11 |
 | [账户](accounts.md) | 27 |
-| [设置](settings.md) | 62 |
+| [设置](settings.md) | 65 |
 | [游戏页（整体）](instance.md) | 21 |
 | [游戏页 · 概览](instance.overview.md) | 4 |
 | [游戏页 · 内容](instance.content.md) | 18 |
@@ -20,5 +20,5 @@
 | [游戏页 · 截图](instance.screenshots.md) | 6 |
 | [游戏页 · 历史](instance.history.md) | 5 |
 | [游戏页 · 诊断](instance.diagnostics.md) | 11 |
-| [游戏页 · 设置](instance.settings.md) | 18 |
+| [游戏页 · 设置](instance.settings.md) | 19 |
 | [插件 · Litematica 投影](plugin.litematica.md) | 60 |

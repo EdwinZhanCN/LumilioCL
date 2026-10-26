@@ -38,8 +38,8 @@ pub use self::motd::{motd_lines, motd_text};
 pub use self::project_icon::project_icon;
 pub use self::rich::rich_text;
 pub use self::rows::{
-    empty, info, list, panel_list, row, section, section_at, section_head, section_label,
-    section_with, setting, surface, technical, value_row,
+    empty, info, list, middle_line, panel_list, path_row, row, section, section_at, section_head,
+    section_label, section_with, setting, surface, technical, value_row,
 };
 
 mod intent;

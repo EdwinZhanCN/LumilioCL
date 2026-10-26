@@ -6,6 +6,8 @@ use crate::assets::UiIcon;
 use crate::key::Key;
 use crate::theme;
 use crate::theme::ShellColors;
+use crate::toast;
+use crate::toast::Toast;
 
 /// A quiet 技术详情 that opens the raw cause in a dialog (§8, §11).
 pub fn technical(id: impl Into<gpui::ElementId>, detail: impl Into<SharedString>) -> Key {
@@ -29,7 +31,9 @@ pub fn info(id: impl Into<gpui::ElementId>, help: impl Into<SharedString>) -> im
 }
 
 /// A settings row (§10): label and optional help on the leading side, the
-/// read-only value and an optional quick control on the trailing side.
+/// read-only value and an optional quick control on the trailing side. A
+/// value too long for the room left wraps there: notes and permissions are
+/// sentences, and an ellipsis would hide what they say.
 pub fn value_row(
     id: impl Into<gpui::ElementId>,
     label: impl Into<SharedString>,
@@ -38,6 +42,93 @@ pub fn value_row(
     control: Option<AnyElement>,
     colors: ShellColors,
 ) -> gpui::Stateful<gpui::Div> {
+    let value = value_text(colors).child(value.into());
+    row_frame(id, label, help, value.into_any_element(), control, colors)
+}
+
+/// A [`value_row`] whose value is a path (§10). A long path stays on one
+/// line and gives way in the middle, keeping the drive and the last folders;
+/// hovering it shows the whole path, and a key beside it copies the whole
+/// path.
+pub fn path_row(
+    id: impl Into<gpui::ElementId>,
+    label: impl Into<SharedString>,
+    help: Option<SharedString>,
+    path: &std::path::Path,
+    control: Option<AnyElement>,
+    colors: ShellColors,
+) -> gpui::Stateful<gpui::Div> {
+    let id = id.into();
+    let copy_id = id.clone();
+    let shown: SharedString = path.display().to_string().into();
+    let copied = shown.clone();
+    let value = h_flex()
+        .min_w_0()
+        .gap_1()
+        .items_center()
+        .child(
+            middle_line("path", shown)
+                .font_family(theme::mono_font())
+                .text_xs()
+                .text_color(colors.muted),
+        )
+        .child(
+            Key::new("copy")
+                .icon(Icon::new(UiIcon::Copy).size(px(14.)))
+                .ghost()
+                .compact()
+                .tooltip(crate::tr!("common-copy-path"))
+                .debug_selector(move || format!("{copy_id}-copy"))
+                .on_click(move |_: &ClickEvent, _, cx| {
+                    toast::copy_text(copied.to_string(), cx);
+                    toast::post(Toast::success(crate::tr!("common-path-copied")), cx);
+                }),
+        );
+    row_frame(id, label, help, value.into_any_element(), control, colors)
+}
+
+/// One line that gives way in the middle and shows all of itself on hover:
+/// a path, or a line that ends in one (§10).
+pub fn middle_line(
+    id: impl Into<gpui::ElementId>,
+    text: impl Into<SharedString>,
+) -> gpui::Stateful<gpui::Div> {
+    let text = text.into();
+    let whole = text.clone();
+    div()
+        .id(id)
+        .min_w_0()
+        .overflow_hidden()
+        .whitespace_nowrap()
+        .text_ellipsis_middle()
+        .child(text)
+        .tooltip(move |window, cx| {
+            gpui_component::tooltip::Tooltip::new(whole.clone()).build(window, cx)
+        })
+}
+
+/// How a row's read-only value reads: quiet mono, able to give way.
+fn value_text(colors: ShellColors) -> gpui::Div {
+    div()
+        .min_w_0()
+        .font_family(theme::mono_font())
+        .text_xs()
+        .text_color(colors.muted)
+}
+
+/// The shared row: the value takes only the room the label and the control
+/// leave, so a long value gives way first and the control never moves out
+/// of the row.
+fn row_frame(
+    id: impl Into<gpui::ElementId>,
+    label: impl Into<SharedString>,
+    help: Option<SharedString>,
+    value: AnyElement,
+    control: Option<AnyElement>,
+    colors: ShellColors,
+) -> gpui::Stateful<gpui::Div> {
+    let id = id.into();
+    let label_id = id.clone();
     h_flex()
         .id(id)
         .w_full()
@@ -46,10 +137,10 @@ pub fn value_row(
         .py(px(11.))
         .child(
             h_flex()
-                .flex_1()
                 .min_w_0()
                 .gap_1()
                 .items_center()
+                .debug_selector(move || format!("{label_id}-label"))
                 .child(
                     div()
                         .text_sm()
@@ -60,14 +151,8 @@ pub fn value_row(
                 // The row's own id scopes this one.
                 .children(help.map(|help| info("info", help))),
         )
-        .child(
-            div()
-                .font_family(theme::mono_font())
-                .text_xs()
-                .text_color(colors.muted)
-                .child(value.into()),
-        )
-        .children(control)
+        .child(h_flex().flex_1().min_w_0().justify_end().child(value))
+        .children(control.map(|control| h_flex().flex_none().child(control)))
 }
 
 /// Silkscreen for a titled group (design language §12): an optional orange
@@ -169,10 +254,11 @@ pub fn surface(colors: ShellColors) -> gpui::Div {
         .bg(colors.surface)
 }
 
-/// One row of a list block. `lead` and `trail` are optional slots.
+/// One row of a list block. `lead` and `trail` are optional slots; `detail`
+/// is text, or a [`middle_line`] when it ends in a path.
 pub fn row(
     title: impl Into<SharedString>,
-    detail: impl Into<SharedString>,
+    detail: impl IntoElement,
     lead: Option<AnyElement>,
     trail: Option<AnyElement>,
     colors: ShellColors,
@@ -195,12 +281,7 @@ pub fn row(
                         .text_color(colors.foreground)
                         .child(title.into()),
                 )
-                .child(
-                    div()
-                        .text_xs()
-                        .text_color(colors.muted)
-                        .child(detail.into()),
-                ),
+                .child(div().text_xs().text_color(colors.muted).child(detail)),
         )
         .children(trail)
 }
@@ -268,7 +349,7 @@ pub fn setting(
 ) -> gpui::Div {
     row(
         title,
-        detail,
+        detail.into(),
         None,
         Some(control.into_any_element()),
         colors,
