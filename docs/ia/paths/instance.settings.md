@@ -19,7 +19,7 @@
 | 游戏参数 | 设置 · 高级组，值 + [编辑] 弹窗 | 来源（跟随默认 / 自己设置）+ 多行 |  | `lumilio-ui/src/instance_detail/settings/groups.rs` |
 | 环境变量 | 设置 · 高级组，值 + [编辑] 弹窗 | 来源 + 每行 名称=值 |  | `lumilio-ui/src/instance_detail/settings/groups.rs` |
 | 启动前 / 包装 / 退出后命令 | 设置 · 高级组，值 + [编辑] 弹窗 | 三个输入：留空跟随默认，填 - 表示这个游戏不使用；说明可用变量 |  | `lumilio-ui/src/instance_detail/settings/groups.rs` |
-| 指定 Java | 设置 · Java 组，下拉「自动（推荐）/ 已发现的 Java / 自定义路径…」 | 选中即保存；值下方写出下次启动用哪个 Java，没有合适的时写出启动时会下载的版本；已停用的 Java 不在列表里 | java-management T4 | `lumilio-ui/src/instance_detail/settings/java.rs` |
+| 指定 Java | 设置 · Java 组，下拉「自动（推荐）/ 已发现的 Java / 自定义路径…」 | 选中即保存；下拉左边写出下次启动用哪个 Java（带路径，太长时中间省略，悬停看整句），没有合适的时写出启动时会下载的版本；已停用的 Java 不在列表里 | java-management T4 | `lumilio-ui/src/instance_detail/settings/java.rs` |
 | 自定义 Java 路径 | 设置 · Java 组，选「自定义路径…」后出现的路径行 + [编辑] 弹窗 | 填 java 程序或 JDK 文件夹；保存时检查路径存在；恢复默认＝回到自动 |  | `lumilio-ui/src/instance_detail/settings/java.rs` |
 | 复制自定义 Java 路径 | 设置 · Java 组，路径旁的复制键（路径太长时中间省略，悬停看完整路径） | 完整路径放进剪贴板，toast“已复制路径” |  | `lumilio-ui/src/instance_detail/settings/java.rs` |
 | 选择预设 | 设置 › 选项，「预设」行的「更换…」→ 弹窗：不使用预设或某个预设，并预览下次启动会改变的选项 | 选了预设后下次启动应用它共享的选项；改回不使用时保留现在的选项；游戏运行、有待决定的修改或上次会话未确认关闭时不能换 |  | `lumilio-ui/src/instance_detail/settings/options.rs` |

@@ -4,7 +4,7 @@ use gpui_component::{Theme, ThemeMode};
 
 use super::motd::motd_color;
 use super::{
-    Item, TagKind, list, lit_bars, motd_lines, panel_list, path_row, signal, signal_bars,
+    Item, TagKind, line_row, list, lit_bars, motd_lines, panel_list, path_row, signal, signal_bars,
     speed_digits, tag, value_row,
 };
 use crate::theme;
@@ -247,8 +247,8 @@ fn a_hairline_table_has_an_ink_rule_on_top_and_hairlines_beneath(cx: &mut TestAp
 
 const LONG_PATH: &str = "/Users/someone/Library/Application Support/LumilioCL/themes";
 
-/// A path row, a short value row and a long one, each with a key-sized
-/// control.
+/// A path row, a short value row, a long one and a line ending in a path,
+/// each with a key-sized control.
 struct PathRows(f32);
 
 impl Render for PathRows {
@@ -296,13 +296,24 @@ impl Render for PathRows {
                 )
                 .debug_selector(|| "hosts".into()),
             )
+            .child(
+                line_row(
+                    "java",
+                    "Java",
+                    None,
+                    format!("将使用 Java 21.0.3（{LONG_PATH}/temurin-21.jdk/Contents/Home）"),
+                    Some(control("java-control")),
+                    colors,
+                )
+                .debug_selector(|| "java".into()),
+            )
     }
 }
 
 /// A long value once squeezed the label to nothing and drew over it, and
-/// narrowed the control. It gives way first now: a path stays on one line
-/// with its copy key, other values wrap, and every label and control keeps
-/// its room.
+/// narrowed the control. It gives way first now: a path, or a line ending
+/// in one, stays on one line, other values wrap, and every label and
+/// control keeps its room.
 #[gpui::test]
 fn a_long_value_gives_way_before_the_label_and_the_keys(cx: &mut TestAppContext) {
     cx.update(|cx| {
@@ -322,6 +333,9 @@ fn a_long_value_gives_way_before_the_label_and_the_keys(cx: &mut TestAppContext)
             hosts,
             hosts_label,
             hosts_control,
+            java,
+            java_label,
+            java_control,
         ] = [
             "themes",
             "themes-label",
@@ -331,13 +345,22 @@ fn a_long_value_gives_way_before_the_label_and_the_keys(cx: &mut TestAppContext)
             "hosts",
             "hosts-label",
             "hosts-control",
+            "java",
+            "java-label",
+            "java-control",
         ]
         .map(|selector| cx.debug_bounds(selector).expect("drawn"));
-        assert_eq!(
-            row.size.height, short.size.height,
-            "{width}: the path row stays one line"
-        );
-        let widths = [label.size.width, hosts_label.size.width];
+        for (row, what) in [(row, "path"), (java, "Java")] {
+            assert_eq!(
+                row.size.height, short.size.height,
+                "{width}: the {what} row stays one line"
+            );
+        }
+        let widths = [
+            label.size.width,
+            hosts_label.size.width,
+            java_label.size.width,
+        ];
         assert!(
             widths.iter().all(|width| *width > gpui::px(0.)),
             "{width}: the labels are drawn"
@@ -351,7 +374,7 @@ fn a_long_value_gives_way_before_the_label_and_the_keys(cx: &mut TestAppContext)
             copy.left() >= label.right() && copy.right() <= control.left(),
             "{width}: the copy key sits after the label, before the control"
         );
-        for (control, row) in [(control, row), (hosts_control, hosts)] {
+        for (control, row) in [(control, row), (hosts_control, hosts), (java_control, java)] {
             assert_eq!(
                 control.size.width,
                 gpui::px(160.),

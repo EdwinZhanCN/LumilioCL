@@ -334,9 +334,10 @@ The page surface shows values and offers **quick actions**; it is not a form.
   A long value gives way before the label and the controls: it wraps in its
   own room, because an ellipsis would hide a sentence. A path stays on one
   line and gives way in the middle, so the drive and the last folders stay,
-  and hovering shows the whole path (`kit::middle_line`). The whole path can
-  be copied: a copy key beside a settings row's path (`kit::path_row`), or
-  **复制路径** in a list row's ⋯ menu.
+  and hovering shows the whole path (`kit::middle_line`). So does a line that
+  ends in a path, such as 将使用 Java 21（…/Home）(`kit::line_row`). The
+  whole path can be copied: a copy key beside a settings row's path
+  (`kit::path_row`), or **复制路径** in a list row's ⋯ menu.
 - **Help hides behind an info button**: no explanatory paragraph under a
   label. A muted ⓘ right after the label shows the help as a tooltip, which
   never wraps: one line (plain-language §6); longer help uses a popover.
