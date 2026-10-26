@@ -121,11 +121,24 @@ pub(super) fn java(view: &SettingsView, ctx: &SettingsCtx) -> AnyElement {
                             },
                         ),
                     );
-                    // ia[settings]: Java：在访达中显示 | Java · 列表行 ⋯ 菜单 | 打开并选中它所在位置
-                    let mut entries = vec![kit::MenuEntry::new(
-                        crate::platform::reveal_label(),
-                        send(handler, LiveIntent::Reveal(java.home.clone())),
-                    )];
+                    let mut entries = vec![
+                        // ia[settings]: Java：在访达中显示 | Java · 列表行 ⋯ 菜单 | 打开并选中它所在位置
+                        kit::MenuEntry::new(
+                            crate::platform::reveal_label(),
+                            send(handler, LiveIntent::Reveal(java.home.clone())),
+                        ),
+                        // ia[settings]: Java：复制路径 | Java · 列表行 ⋯ 菜单（行里的路径太长时中间省略，悬停看完整一行） | 完整路径放进剪贴板，toast“已复制路径”
+                        kit::MenuEntry::new(
+                            tr!("common-copy-path"),
+                            send(
+                                handler,
+                                LiveIntent::CopyText {
+                                    text: java.home.display().to_string(),
+                                    notice: tr!("common-path-copied").to_owned(),
+                                },
+                            ),
+                        ),
+                    ];
                     if java.removable {
                         let (row, handler) = (java.clone(), handler.clone());
                         // ia[settings]: Java：删除 | Java · 列表行 ⋯ 菜单「删除…」（只有启动器下载的 Java）→ 确认框 | 删除它的文件夹并重新检测；其它 Java 只能停用
@@ -143,7 +156,7 @@ pub(super) fn java(view: &SettingsView, ctx: &SettingsCtx) -> AnyElement {
                         } else {
                             java.title.clone()
                         },
-                        java.detail.clone(),
+                        kit::middle_line(("settings-java-detail", index), java.detail.clone()),
                         None,
                         Some(
                             h_flex()
@@ -155,6 +168,7 @@ pub(super) fn java(view: &SettingsView, ctx: &SettingsCtx) -> AnyElement {
                         ),
                         colors,
                     )
+                    .debug_selector(move || format!("settings-java-{index}"))
                 })
                 .collect(),
             colors,

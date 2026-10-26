@@ -26,6 +26,7 @@
 | 恢复默认壁纸 | 外观 · 按键 | 主页回到默认的像素世界，存下的图片一并删除 |  | `lumilio-ui/src/features/settings/appearance.rs` |
 | 重新读取本地主题 | 外观 · 按键 | 重新扫描 themes 文件夹；能用的出现在上面的列表里，不能用的在下面说明原因 |  | `lumilio-ui/src/features/settings/appearance.rs` |
 | 打开主题文件夹 | 外观 · 按键 | 在系统文件管理器里显示 themes 文件夹，没有就先建好 |  | `lumilio-ui/src/features/settings/appearance.rs` |
+| 复制主题文件夹路径 | 外观 · 路径旁的复制键（路径太长时中间省略，悬停看完整路径） | 完整路径放进剪贴板，toast“已复制路径” |  | `lumilio-ui/src/features/settings/appearance.rs` |
 | 最小 / 最大内存 | 游戏默认 · 值 + [编辑] 弹窗 | 弹窗说明本机内存与推荐值；恢复默认 = 推荐值 |  | `lumilio-ui/src/features/settings/game_defaults.rs` |
 | 窗口大小、全屏 | 游戏默认 · 值 + [编辑] 弹窗 | 宽高一起填；全屏 关 / 开 / 不设置 |  | `lumilio-ui/src/features/settings/game_defaults.rs` |
 | Java 参数 | 游戏默认 · 值 + [编辑] 弹窗 | 每行一项；游戏自己设置了参数时以游戏的为准 |  | `lumilio-ui/src/features/settings/game_defaults.rs` |
@@ -41,6 +42,7 @@
 | 减少动效 | 通用 · 分段：跟随系统 / 减少 / 完整 | 立即生效 |  | `lumilio-ui/src/features/settings/general.rs` |
 | Java：停用 / 启用 | Java · 列表行开关 | 停用不删除文件，之后不会被自动选中 |  | `lumilio-ui/src/features/settings/java.rs` |
 | Java：在访达中显示 | Java · 列表行 ⋯ 菜单 | 打开并选中它所在位置 |  | `lumilio-ui/src/features/settings/java.rs` |
+| Java：复制路径 | Java · 列表行 ⋯ 菜单（行里的路径太长时中间省略，悬停看完整一行） | 完整路径放进剪贴板，toast“已复制路径” |  | `lumilio-ui/src/features/settings/java.rs` |
 | Java：删除 | Java · 列表行 ⋯ 菜单「删除…」（只有启动器下载的 Java）→ 确认框 | 删除它的文件夹并重新检测；其它 Java 只能停用 |  | `lumilio-ui/src/features/settings/java.rs` |
 | Java：额外搜索目录 | Java · 值 + [编辑] 弹窗 | 每行一个文件夹，检测时也会找这些位置 |  | `lumilio-ui/src/features/settings/java.rs` |
 | Java：下载来源 | Java · 分段「Mojang / Oracle GraalVM」 | 下载与启动时自动下载都从这里取；GraalVM 只有 Java 21 和 25，其它版本仍从 Mojang 下载 |  | `lumilio-ui/src/features/settings/java.rs` |
@@ -63,7 +65,8 @@
 | 镜像规则 | 下载与存储 · 值 + [编辑] 弹窗 | 每行 官方前缀 => 镜像前缀 |  | `lumilio-ui/src/features/settings/storage.rs` |
 | 同时下载数 | 下载与存储 · 值 + [编辑] 弹窗 | 自动 / 1–32 |  | `lumilio-ui/src/features/settings/storage.rs` |
 | 自动下载方块资源 | 下载与存储 · 开关（默认开） | 立即保存；关闭后不再下载方块资源，已经下载过的照常使用；没下载过时投影预览说明原因 | plan schematic-studio D2/T3/T21 | `lumilio-ui/src/features/settings/storage.rs` |
-| 数据目录 | 下载与存储 · 路径 + [在访达中显示] | 不可改（App State） |  | `lumilio-ui/src/features/settings/storage.rs` |
+| 数据目录 | 下载与存储 · 路径 + 复制键 + [在访达中显示] | 不可改（App State） |  | `lumilio-ui/src/features/settings/storage.rs` |
+| 复制数据目录路径 | 下载与存储 · 路径旁的复制键（路径太长时中间省略，悬停看完整路径） | 完整路径放进剪贴板，toast“已复制路径” |  | `lumilio-ui/src/features/settings/storage.rs` |
 | 存储占用 | 下载与存储 · 游戏 / 共享资源 / Java / 缓存 条形图 | 后台计算后显示 |  | `lumilio-ui/src/features/settings/storage.rs` |
 | 清除地图缓存 | 下载与存储 · 按键「清除地图缓存」 | 后台删除种子地图缓存；下次查看时重新计算 |  | `lumilio-ui/src/features/settings/storage.rs` |
 | 检查没用的游戏文件 | 下载与存储 · 按键「检查没用的游戏文件」 | 只报告能回收多少，确认后才删；游戏在安装/更新时拒绝 |  | `lumilio-ui/src/features/settings/storage.rs` |

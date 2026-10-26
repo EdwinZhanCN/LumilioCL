@@ -43,6 +43,18 @@ pub(super) fn row(
         .debug_selector(move || id.to_owned())
 }
 
+pub(super) fn path_row(
+    id: &'static str,
+    label: &'static str,
+    help: Option<String>,
+    path: &std::path::Path,
+    control: Option<AnyElement>,
+    colors: ShellColors,
+) -> gpui::Stateful<gpui::Div> {
+    kit::path_row(id, label, help.map(Into::into), path, control, colors)
+        .debug_selector(move || id.to_owned())
+}
+
 pub(super) fn preference_row(
     id: &'static str,
     label: &'static str,

@@ -9,7 +9,7 @@ use gpui::{AnyElement, App, IntoElement};
 use lumilio_core::{Appearance, LookPreferences, WallpaperChoice};
 
 use super::page::SettingsCtx;
-use super::rows::{preference_row, row, send, with_preferences};
+use super::rows::{path_row, preference_row, row, send, with_preferences};
 use crate::live::{LiveHandler, LiveIntent, SettingsView};
 use crate::settings_dialog::{DialogSpec, FieldKind, FieldSpec, SettingsDialog};
 use crate::theme::{ALUMINIUM, NIGHT, Tone};
@@ -402,11 +402,12 @@ fn local_row(themes: &std::path::Path, ctx: &SettingsCtx) -> gpui::Stateful<gpui
             },
         ))
         .into_any_element();
-    row(
+    // ia[settings]: 复制主题文件夹路径 | 外观 · 路径旁的复制键（路径太长时中间省略，悬停看完整路径） | 完整路径放进剪贴板，toast“已复制路径”
+    path_row(
         "settings-theme-local",
         tr!("settings-theme-local"),
         Some(tr!("settings-theme-local-help").to_owned()),
-        themes.display().to_string(),
+        themes,
         Some(control),
         ctx.colors,
     )

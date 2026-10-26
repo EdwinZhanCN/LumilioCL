@@ -6,7 +6,7 @@ use gpui_component::{Sizable as _, h_flex, v_flex};
 use lumilio_core::{DownloadSourcePreference, MirrorPreset, StorageUsage};
 
 use super::page::SettingsCtx;
-use super::rows::{edit, row, send};
+use super::rows::{edit, path_row, row, send};
 use super::text::bytes_text;
 use crate::key::Key;
 use crate::live::{LiveIntent, SettingsView};
@@ -244,12 +244,13 @@ pub(super) fn downloads(view: &SettingsView, ctx: &SettingsCtx) -> AnyElement {
         ),
         colors,
     );
-    // ia[settings]: 数据目录 | 下载与存储 · 路径 + [在访达中显示] | 不可改（App State）
-    let data_row = row(
+    // ia[settings]: 数据目录 | 下载与存储 · 路径 + 复制键 + [在访达中显示] | 不可改（App State）
+    // ia[settings]: 复制数据目录路径 | 下载与存储 · 路径旁的复制键（路径太长时中间省略，悬停看完整路径） | 完整路径放进剪贴板，toast“已复制路径”
+    let data_row = path_row(
         "settings-data-dir",
         tr!("settings-data-dir"),
         Some(tr!("settings-data-dir-help").to_owned()),
-        view.data_dir.display().to_string(),
+        &view.data_dir,
         Some(
             kit::ghost(
                 "settings-reveal-data",

@@ -58,6 +58,62 @@ fn reread(
     cx.run_until_parked();
 }
 
+/// A Java found at `home`, as the Java tab lists it.
+fn java(home: &str) -> crate::live::JavaRow {
+    crate::live::JavaRow {
+        home: home.into(),
+        title: "Java 21".into(),
+        detail: format!("Mojang · aarch64 · {home}"),
+        disabled: false,
+        removable: false,
+    }
+}
+
+/// A Java's home is long: its line gives way in the middle instead of
+/// wrapping, and the row's ⋯ menu copies the whole home.
+#[gpui::test]
+fn a_java_home_stays_on_one_line_and_its_menu_copies_it(cx: &mut TestAppContext) {
+    let (settings, seen, cx) = page(720., cx);
+    let home = "/Users/someone/Library/Application Support/LumilioCL/runtimes/\
+                java-runtime-delta/mac-os-arm64/java-runtime-delta/jre.bundle/Contents/Home";
+    reread(
+        &settings,
+        |view| {
+            *view = SettingsView {
+                java: vec![java(home), java("/opt/jdk")],
+                data_dir: "/data".into(),
+                ..SettingsView::default()
+            };
+        },
+        cx,
+    );
+    tab(&settings, 3, cx);
+    let [long, short] =
+        ["settings-java-0", "settings-java-1"].map(|row| cx.debug_bounds(row).expect("java row"));
+    assert_eq!(
+        long.size.height, short.size.height,
+        "the long home stays on one line"
+    );
+
+    // The ⋯ key ends the row; 复制路径 follows 在访达中显示.
+    let more = gpui::point(
+        long.right() - px(crate::key::KeySize::Regular.height() / 2.),
+        long.center().y,
+    );
+    cx.simulate_click(more, Modifiers::none());
+    cx.run_until_parked();
+    let copy = cx.debug_bounds("menu-entry-1").expect("复制路径");
+    cx.simulate_click(copy.center(), Modifiers::none());
+    cx.run_until_parked();
+    assert_eq!(
+        seen.borrow().as_slice(),
+        [LiveIntent::CopyText {
+            text: home.to_owned(),
+            notice: "已复制路径".to_owned(),
+        }]
+    );
+}
+
 fn plugin(id: String, name: String, permissions: usize) -> lumilio_core::PluginInfo {
     lumilio_core::PluginInfo {
         manifest: lumilio_plugin_api::Manifest {
