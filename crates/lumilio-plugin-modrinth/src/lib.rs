@@ -7,6 +7,7 @@ mod query;
 mod search;
 mod tags;
 mod text;
+mod updates;
 mod versions;
 
 #[cfg(test)]

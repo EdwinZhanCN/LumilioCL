@@ -7,6 +7,8 @@ use super::*;
 #[derive(Default)]
 struct Context {
     routes: BTreeMap<String, FetchResponse>,
+    /// Answers to requests whose body asks for these `version_types`.
+    typed: BTreeMap<String, FetchResponse>,
     requests: Mutex<Vec<FetchRequest>>,
 }
 
@@ -22,9 +24,24 @@ impl Context {
         self
     }
 
+    fn answer_types(mut self, version_types: &[&str], body: &str) -> Self {
+        self.typed.insert(
+            serde_json::json!(version_types).to_string(),
+            FetchResponse {
+                status: 200,
+                body: body.as_bytes().to_vec(),
+            },
+        );
+        self
+    }
+
     fn requests(&self) -> Vec<FetchRequest> {
         self.requests.lock().unwrap().clone()
     }
+}
+
+fn body(request: &FetchRequest) -> serde_json::Value {
+    serde_json::from_slice(request.body.as_ref().unwrap()).unwrap()
 }
 
 impl HostContext for Context {
@@ -41,9 +58,14 @@ impl HostContext for Context {
         self.request(FetchRequest::get(url))
     }
     fn request(&self, request: FetchRequest) -> Result<FetchResponse, PluginError> {
-        let reply = self
-            .routes
-            .get(&request.url)
+        let typed = request
+            .body
+            .as_ref()
+            .and_then(|body| serde_json::from_slice::<serde_json::Value>(body).ok())
+            .and_then(|body| body.get("version_types").map(ToString::to_string))
+            .and_then(|types| self.typed.get(&types));
+        let reply = typed
+            .or_else(|| self.routes.get(&request.url))
             .cloned()
             .unwrap_or(FetchResponse {
                 status: 404,
@@ -241,11 +263,13 @@ fn file_recognition_maps_deduplicated_hashes_back_to_all_host_keys() {
 
 #[test]
 fn updates_carry_compatibility_and_vanilla_has_no_loader_constraint() {
-    let ctx = Context::default().answer(
-        "/v2/version_files/update",
-        200,
-        &format!(r#"{{"aa":{VERSION}}}"#),
-    );
+    let ctx = Context::default()
+        .answer("/v2/version_files", 200, &format!(r#"{{"aa":{VERSION}}}"#))
+        .answer(
+            "/v2/version_files/update",
+            200,
+            &format!(r#"{{"aa":{VERSION}}}"#),
+        );
     let mut compatibility = Compatibility {
         game_version: "1.21.1".into(),
         loader: Some("fabric".into()),
@@ -261,16 +285,101 @@ fn updates_carry_compatibility_and_vanilla_has_no_loader_constraint() {
     Modrinth
         .latest_for(&ctx, &[file("file", "aa")], &compatibility)
         .unwrap();
-    let requests = ctx.requests();
+    let updates: Vec<_> = ctx
+        .requests()
+        .into_iter()
+        .filter(|request| request.url.ends_with("/update"))
+        .collect();
     for (index, loaders) in [serde_json::json!(["fabric"]), serde_json::json!([])]
         .into_iter()
         .enumerate()
     {
-        let body: serde_json::Value =
-            serde_json::from_slice(requests[index].body.as_ref().unwrap()).unwrap();
+        let body = body(&updates[index]);
         assert_eq!(body["loaders"], loaders);
         assert_eq!(body["game_versions"], serde_json::json!(["1.21.1"]));
     }
+}
+
+fn version(id: &str, channel: &str, sha1: &str) -> String {
+    format!(
+        r#"{{"id":"{id}","project_id":"P","version_type":"{channel}","version_number":"{id}",
+            "files":[{{"url":"https://cdn.modrinth.com/{id}.jar","filename":"{id}.jar","primary":true,"hashes":{{"sha1":"{sha1}"}}}}]}}"#
+    )
+}
+
+#[test]
+fn a_file_is_offered_versions_as_stable_as_its_own_before_less_stable_ones() {
+    // Sodium 0.9.2, a release, was offered 0.9.3-beta.1 as its update.
+    let ctx = Context::default()
+        .answer(
+            "/v2/version_files",
+            200,
+            &format!(
+                r#"{{"rr":{},"bb":{},"ll":{}}}"#,
+                version("release", "release", "rr"),
+                version("beta", "beta", "bb"),
+                version("lonely", "release", "ll"),
+            ),
+        )
+        .answer("/v2/version_files/update", 200, "{}")
+        .answer_types(
+            &["release"],
+            &format!(r#"{{"rr":{}}}"#, version("release", "release", "rr")),
+        )
+        .answer_types(
+            &["beta"],
+            &format!(r#"{{"ll":{}}}"#, version("lonely-beta", "beta", "l2")),
+        )
+        .answer_types(
+            &["release", "beta"],
+            &format!(
+                r#"{{"rr":{},"bb":{}}}"#,
+                version("newer-beta", "beta", "r2"),
+                version("next-beta", "beta", "b2"),
+            ),
+        );
+    let compatibility = Compatibility {
+        game_version: "26.3".into(),
+        loader: Some("fabric".into()),
+    };
+    let files = [
+        file("release", "rr"),
+        file("beta", "bb"),
+        file("lonely", "ll"),
+    ];
+    let latest = Modrinth.latest_for(&ctx, &files, &compatibility).unwrap();
+    assert_eq!(
+        latest["release"].id, "release",
+        "a release stays on releases"
+    );
+    assert_eq!(latest["beta"].id, "next-beta");
+    assert_eq!(
+        latest["lonely"].id, "lonely-beta",
+        "no release fits, so a beta may"
+    );
+    let asked: Vec<_> = ctx
+        .requests()
+        .iter()
+        .skip(1)
+        .map(|request| {
+            let body = body(request);
+            (body["version_types"].clone(), body["hashes"].clone())
+        })
+        .collect();
+    assert_eq!(
+        asked,
+        [
+            (
+                serde_json::json!(["release", "beta"]),
+                serde_json::json!(["bb"])
+            ),
+            (
+                serde_json::json!(["release"]),
+                serde_json::json!(["ll", "rr"])
+            ),
+            (serde_json::json!(["beta"]), serde_json::json!(["ll"])),
+        ]
+    );
 }
 
 #[test]

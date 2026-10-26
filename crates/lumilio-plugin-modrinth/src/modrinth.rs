@@ -10,7 +10,7 @@ use lumilio_plugin_api::{
 };
 
 use super::query::Query;
-use super::{project, protocol, search, tags, text, versions};
+use super::{project, protocol, search, tags, text, updates, versions};
 
 pub const ID: &str = "lumilio.modrinth";
 pub(super) const API_BASE: &str = "https://api.modrinth.com";
@@ -171,7 +171,7 @@ impl ContentSource for Modrinth {
         files: &[FileIdentity],
         compatibility: &Compatibility,
     ) -> Result<BTreeMap<String, Version>, PluginError> {
-        identify(ctx, files, Some(compatibility))
+        updates::latest_for(ctx, files, compatibility)
     }
 
     fn project_summaries(
@@ -271,10 +271,17 @@ pub(super) fn read_version(
     Ok(version)
 }
 
+/// An update request: where the file runs, and which version types
+/// (`release`, `beta`, `alpha`) may answer it.
+pub(super) struct Update<'a> {
+    pub(super) compatibility: &'a Compatibility,
+    pub(super) version_types: &'a [&'a str],
+}
+
 pub(super) fn identify(
     ctx: &dyn HostContext,
     files: &[FileIdentity],
-    compatibility: Option<&Compatibility>,
+    update: Option<Update<'_>>,
 ) -> Result<BTreeMap<String, Version>, PluginError> {
     let mut by_hash: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for file in files {
@@ -295,9 +302,11 @@ pub(super) fn identify(
     }
     let mut body =
         serde_json::json!({"hashes": by_hash.keys().collect::<Vec<_>>(), "algorithm": "sha1"});
-    let path = if let Some(compatibility) = compatibility {
+    let path = if let Some(update) = update {
+        let compatibility = update.compatibility;
         body["loaders"] = serde_json::json!(compatibility.loader.iter().collect::<Vec<_>>());
         body["game_versions"] = serde_json::json!([compatibility.game_version]);
+        body["version_types"] = serde_json::json!(update.version_types);
         "version_files/update"
     } else {
         "version_files"
