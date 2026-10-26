@@ -27,7 +27,7 @@ Fluent rules:
 - A `#` comment above a Chinese message explains it; write the comment above the
   English message in English.
 
-Voice (docs/design-language.md §8):
+Voice (docs/plain-language.md §5 and §8):
 - Write what an English launcher would say; translate the meaning, not the
   words. Calm and direct, second person implied, no exclamation marks.
 - Sentence case for everything, including titles, tabs, keys and menu items.

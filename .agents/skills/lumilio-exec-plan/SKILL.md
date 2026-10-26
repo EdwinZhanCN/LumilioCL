@@ -8,7 +8,9 @@ description: Use for multi-step or multi-session LumilioCL work — create or co
 JSON in `.agents/plans/` is the only editable lifecycle source. Generated
 Markdown and website data are projections. Small local fixes need no plan.
 
-1. Read matching `in_progress` JSON plans and continue the relevant one.
+1. Find matching work with `cargo run -p lumilio-docgen -- plans list --status incomplete --json`;
+   read a relevant plan with `cargo run -p lumilio-docgen -- plans show <id>`
+   (add `--json` for all fields). Continue the relevant `in_progress` plan.
    Otherwise create `<slug>.json` using `.agents/schemas/examples/proposed.json`
    and `.agents/plans/README.md`. Assign stable plan/task IDs. Remove a backlog
    idea when it becomes a plan.

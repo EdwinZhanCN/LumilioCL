@@ -55,7 +55,10 @@ needs eyes.
 - **Current plans, decisions and lessons**: `.agents/plans/*.json`.
   **What is wanted but not planned**: `.agents/plans/backlog.md`.
 - **How the UI looks, moves and speaks**: `docs/design-language.md`, `docs/plain-language.md`
-  and `docs/design-patterns.md`.
+  and `docs/design-patterns.md`. These are design defaults, read by task, not page
+  specifications. Feature needs can change layout, density, interaction and copy
+  without a documentation change or separate approval. Update guidance only when
+  a reusable direction changes; correctness and accessibility still matter.
 
 Don't write documents that restate the code or upstream; they go stale.
 
@@ -105,13 +108,10 @@ Don't write documents that restate the code or upstream; they go stale.
 - Buttons, switches, tabs, segments and tags come from `lumilio-ui` (`key::Key`, `controls`,
   `kit`), drawn per design-language §12. Don't use gpui-component's `Button`/`Switch`/`TabBar`
   in pages.
-- Choose controls by the value being edited: many options → `Select` (searchable for long
-  lists); on/off → switch or toggle; free text/numbers → `Input`; 2–4 fixed, short
-  options the launcher writes → `Segments`. Options from data (region or file names) and a
-  choice repeated on every table row are a `Select` however few: segment keys grow with
-  their labels and their LED band, and pushed the studio's replace dialog off its column.
-  `SettingsDialog` `Choice` is only for a few short labels; long lists must
-  remain reachable through a dropdown rather than overflowing a dialog.
+- Choose controls by the value and task. Defaults: searchable `Select` for long or
+  data-driven lists, switch for on/off, `Input` for free text/numbers, `Segments`
+  for a few fixed short choices. Check real labels and narrow layouts; use a
+  dropdown when visible choices would overflow. Editing need not always use a dialog.
 - A built user path is declared by a one-line comment at its code:
   `// ia[page]: 操作 | 层 / 组件 | 结果与反馈 [| 备注]` (skill `lumilio-ia-paths`).
   `just ia` regenerates `docs/ia/paths/`, and `just check` fails

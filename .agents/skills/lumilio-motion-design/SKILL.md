@@ -1,104 +1,44 @@
 ---
 name: lumilio-motion-design
-description: Use for every LumilioCL change that adds or alters UI, animation,
-  copy, or a world-register scene — classify the work against the design
-  language, pick motion tokens, meet the performance and reduced-motion rules,
-  and review the result visually before handoff.
+description: Use for LumilioCL layout, interaction, animation or world-scene changes. Apply relevant design guidance and review the changed behavior; copy-only work uses lumilio-i18n.
 ---
 
-# Motion And Interface Design
+# Interface And Motion Review
 
-`docs/design-language.md` is the specification; this skill is the procedure
-that applies it. Load the repo-local `gpui-kit` and `gpui-kit-design-guides` skills as well — they
-cover the APIs, this covers the decisions.
+Start from the feature's task and nearest implementation. Read the relevant
+sections of `docs/design-language.md` and `docs/design-patterns.md`, plus GPUI
+skill references for the APIs and interactions involved. These project documents
+give defaults, not a required page structure. Adapt them to the feature without
+a separate approval or a rule change for every local choice.
 
-## 1. Classify the change
+## Implement the changed behavior
 
-Decide which register every new element belongs to (design language §1):
+- Reuse the project's controls and semantic theme tokens. Check APIs against
+  the locked dependency and local helper signatures.
+- Keep state and feedback truthful. Async edits retain the initiating entity
+  and target; navigation must not redirect their results. Preserve unrelated
+  drafts when saving one group of fields.
+- For animation, start with `theme::motion`, honor reduced motion, and stop
+  decorative tickers when hidden or while the game runs. Keep I/O off the UI thread.
+- For changed text, use `lumilio-i18n` and `docs/plain-language.md`.
+  Wording and presentation can change together.
 
-- **World** — procedural pixel art inside `lumilio-ui::hero` or a future
-  cover/vignette renderer. Discrete motion at `theme::motion::WORLD_TICK`,
-  stepped corners, no text inside the art.
-- **Interface** — gpui-component elements styled from theme tokens, eased with
-  `theme::motion` durations.
+## Review what changed
 
-An element that needs both is split: world art underneath, interface
-foreground on top (the Home hero overlay is the reference pattern).
+Choose checks for the affected behavior, not every item for every edit:
 
-## 2. Choose motion from the tokens
+- Interface layout or controls: run with a disposable data directory
+  (`LUMILIO_HOME=<temp folder> cargo run -p lumilio-app`). Review relevant
+  interaction states, keyboard/focus behavior, both appearances, and narrow
+  windows or long translations where layout can change.
+- World rendering: produce and inspect frames with
+  `LUMILIO_HERO_DUMP=<dir> cargo nextest run -p lumilio-ui hero_contact_sheet --ignored`.
+- Continuous animation: compare CPU use while visible and idle; ensure it
+  does not compete with the game.
+- A regression worth guarding: use `lumilio-write-a-test`; existing GPUI tests
+  demonstrate `debug_bounds`, `simulate_click` and `painted_quads`.
 
-- Use `theme::motion::{INSTANT, QUICK, SETTLE, SCENE}`; never a literal
-  `Duration` in UI code.
-- Entrances: `ease_out_quint`, travel `LIFT`. Exits: shorter, no bounce.
-- Key animations by the state they express (`("launch-bar", subject_id)`), so
-  a new state restarts them and an unchanged state does not.
-- Progress displays must be monotonic and ease toward the reported value.
-
-## 3. Meet the runtime rules
-
-- `with_animation` already respects `App::reduce_motion`; custom tickers and
-  scene clocks must check it and fall back to a still composition.
-- A world animation ticks only while rendered (the `HeroCarousel` ticker with
-  its visibility grace window is the reference) and stops entirely while the
-  game is running.
-- Paint large texel grids through `PixelGrid::rects` inside one
-  `Window::paint_layer`.
-- No blocking I/O in render or paint; state arrives through entity updates.
-
-## 4. Write the copy
-
-Follow `docs/plain-language.md` for what a message says and in what order, and
-design language §8 for voice: calm Simplified Chinese, one primary action,
-details behind **技术详情**, no raw error strings as headlines. Domain types in
-`lumilio-core` never carry display strings; the UI maps them to copy.
-
-## 5. Test and review
-
-- Pure logic (state transitions, progress math, scene mechanics) gets unit
-  tests without a window.
-- Check both appearances. World frames come out as `-dark` and `-light`
-  variants from the contact sheet; interface changes must use theme tokens
-  (or the on-art button styles) rather than fixed colours.
-- Layout regressions are testable: give the element a `.debug_selector(..)`
-  and assert its `debug_bounds` in a `#[gpui::test]` (see the Continue width
-  assertion in `crates/lumilio-ui/src/shell/tests/home.rs`).
-- Styled chrome is testable too: `Window::painted_quads()` (gpui
-  `test-support`) returns what was painted. Assert colours, borders, and hover
-  changes, not only bounds — a fill and its border arrive as separate quads.
-  Wait for real-time entrance animations before measuring (see `settle` in
-  `crates/lumilio-ui/src/shell/tests/mod.rs`).
-- Do not trust a component's styling API by its name: gpui-component's
-  `ButtonCustomVariant` rests at 20 % of its colour and has no border outside
-  outline mode. Read the component source or assert the
-  painted result.
-- World-register changes: render frames with
-  `LUMILIO_HERO_DUMP=<dir> cargo nextest run -p lumilio-ui hero_contact_sheet --ignored`
-  and look at them (`sips -s format png` converts PPM on macOS).
-- Interface changes: run `LUMILIO_HOME=<temp folder> cargo run -p lumilio-app` (a
-  disposable data folder; review hooks are in `README.md`) and check hover, focus,
-  reduced motion, and the 720×480 minimum window.
-- When a change animates continuously, measure CPU time while it is visible
-  (`ps -o utime= -p <pid>` over a few seconds) against the §4 budget.
-- Finish with the four verification commands from `AGENTS.md`.
-
-## 6. Keep the spec honest
-
-If the change needs a rule the design language does not have, or breaks one on
-purpose, update `docs/design-language.md` in the same change and record why.
-
-## Live forms and pinned APIs
-
-- Before composing a component, inspect the pinned dependency's module exports,
-  required traits, and callback arity, plus local kit helper signatures. Do not
-  assume online examples match the locked version.
-- Bind asynchronous reads and saves to the initiating entity and stable target
-  ID. A route change must not redirect the operation or its result.
-- When fields save independently, synchronize only the successfully saved group;
-  preserve unrelated unsaved drafts. Cover failure, repeat submit, and stale-target
-  responses with interaction tests.
-
-For native macOS review, use a task-owned temporary `.app` bundle when the
-computer-use inventory cannot resolve a bare executable. Restrict temporary-file
-searches to that task directory; do not scan the whole system temp tree. Verify
-both appearance hooks survive the window-appearance callback, and verify the
-application's standard quit action before recording a restart check as passed.
+Use `lumilio-select-checks` for handoff. State what was checked and what still
+needs visual review. Guidance-only edits do not require launching the app.
+Update the design references only when a reusable direction changes; record
+important feature-specific tradeoffs in the existing plan when useful.

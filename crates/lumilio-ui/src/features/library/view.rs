@@ -65,29 +65,29 @@ fn card_menu(card: &LibraryCard, ctx: &LibraryCtx) -> Vec<kit::MenuEntry> {
         })
         .danger()
     };
-    // ia[library]: 菜单：开始游戏 | 卡片 ⋯ 菜单 | 与卡片上的「启动」相同
-    // ia[library]: 菜单：打开 | 卡片 ⋯ 菜单 | 游戏页（进历史）
-    // ia[library]: 设为当前游戏 | 卡片 ⋯ 菜单 | 当前游戏换成它：右下角芯片、首页「继续」和发现页的安装目标跟着换
-    // ia[library]: 合集：加入 / 移出 | 卡片 ⋯ 菜单「加入合集…」→ 多选列表 | 勾选即加入或移出，可顺手新建；合集是标签，不移动文件
-    // ia[library]: 复制游戏 | 卡片 ⋯ 菜单 → 复制弹窗（名称、是否复制存档） | 先打开游戏页再弹窗，之后同游戏页
-    // ia[library]: 在访达中显示 | 卡片 ⋯ 菜单 | 打开游戏目录
-    // ia[library]: 导出整合包 | 卡片 ⋯ 菜单 → 导出弹窗 | 先打开游戏页再弹出导出，之后同游戏页
     vec![
+        // ia[library]: 菜单：开始游戏 | 卡片 ⋯ 菜单 | 与卡片上的「启动」相同
         go(tr!("library-menu-play"), LiveIntent::Play(id())),
+        // ia[library]: 菜单：打开 | 卡片 ⋯ 菜单 | 游戏页（进历史）
         go(tr!("library-menu-open"), LiveIntent::OpenInstance(id())),
+        // ia[library]: 设为当前游戏 | 卡片 ⋯ 菜单 | 当前游戏换成它：右下角芯片、首页「继续」和发现页的安装目标跟着换
         go(
             tr!("library-menu-make-current"),
             LiveIntent::InstallTarget(id()),
         ),
+        // ia[library]: 合集：加入 / 移出 | 卡片 ⋯ 菜单「加入合集…」→ 多选列表 | 勾选即加入或移出，可顺手新建；合集是标签，不移动文件
         go(
             tr!("library-menu-collections"),
             LiveIntent::EditCollections(id()),
         ),
+        // ia[library]: 复制游戏 | 卡片 ⋯ 菜单 → 复制弹窗（名称、是否复制存档） | 先打开游戏页再弹窗，之后同游戏页
         go(tr!("library-menu-copy"), LiveIntent::CopyGameOf(id())),
+        // ia[library]: 在访达中显示 | 卡片 ⋯ 菜单 | 打开游戏目录
         go(
             crate::platform::reveal_label(),
             LiveIntent::RevealGame(id()),
         ),
+        // ia[library]: 导出整合包 | 卡片 ⋯ 菜单 → 导出弹窗 | 先打开游戏页再弹出导出，之后同游戏页
         go(tr!("library-menu-export"), LiveIntent::ExportPackOf(id())),
         delete,
     ]
@@ -314,19 +314,19 @@ fn collections_body(ctx: &LibraryCtx, needle: &str) -> gpui::AnyElement {
 /// The Library's page actions with the tab's own secondary key; every tab
 /// shares the primary and the More menu.
 pub(super) fn page_actions(secondary: Key, ctx: &LibraryCtx) -> kit::PageActions {
-    // ia[library]: 导入其他启动器的游戏 | L2 ⋯ 菜单 → 选文件夹（MultiMC/Prism 实例、.minecraft）→ 有多个时勾选 | 后台导入，复制玩家文件，原文件不动；CurseForge 格式不支持
-    // ia[library]: 从备份恢复 | L2 ⋯ 菜单 → 选备份 .zip | 后台恢复成新游戏，不覆盖已有的
-    // ia[library]: 打开游戏库文件夹 | L2 ⋯ 菜单 | 在访达中打开所有游戏所在的文件夹
     kit::PageActions::new("live-library-actions")
         .secondary(secondary)
+        // ia[library]: 导入其他启动器的游戏 | L2 ⋯ 菜单 → 选文件夹（MultiMC/Prism 实例、.minecraft）→ 有多个时勾选 | 后台导入，复制玩家文件，原文件不动；CurseForge 格式不支持
         .more(kit::MenuEntry::new(
             tr!("library-import-game"),
             send(&ctx.handler, LiveIntent::ImportGame),
         ))
+        // ia[library]: 从备份恢复 | L2 ⋯ 菜单 → 选备份 .zip | 后台恢复成新游戏，不覆盖已有的
         .more(kit::MenuEntry::new(
             tr!("library-restore"),
             send(&ctx.handler, LiveIntent::RestoreBackup),
         ))
+        // ia[library]: 打开游戏库文件夹 | L2 ⋯ 菜单 | 在访达中打开所有游戏所在的文件夹
         .more(kit::MenuEntry::new(
             tr!("library-open-folder"),
             send(&ctx.handler, LiveIntent::OpenGamesFolder),

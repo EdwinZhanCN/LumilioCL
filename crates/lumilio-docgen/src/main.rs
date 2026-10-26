@@ -1,6 +1,8 @@
 //! `cargo run -p lumilio-docgen -- ia [--check]` writes (or checks) the
 //! generated IA path tables.
 
+mod plan_commands;
+
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -23,8 +25,11 @@ fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let root = root();
     if args.first().map(String::as_str) == Some("plans") {
-        return match lumilio_docgen::plans::run(&root, args.get(1).map(String::as_str)) {
-            Ok(()) => ExitCode::SUCCESS,
+        return match plan_commands::run(&root, &args[1..]) {
+            Ok(output) => {
+                print!("{output}");
+                ExitCode::SUCCESS
+            }
             Err(error) => {
                 eprintln!("{error}");
                 ExitCode::FAILURE
@@ -62,7 +67,10 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         _ => {
-            eprintln!("usage: lumilio-docgen ia [--check] | plans validate|generate|check");
+            eprintln!(
+                "usage: lumilio-docgen ia [--check]\n{}",
+                plan_commands::USAGE
+            );
             ExitCode::FAILURE
         }
     }

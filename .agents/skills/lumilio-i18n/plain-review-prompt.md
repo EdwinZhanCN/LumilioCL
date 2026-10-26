@@ -1,11 +1,12 @@
-Two passes revise existing wording under `docs/plain-language.md`. Run them in
-separate agents: the rewrite pass may read the code, the cold read must not.
-The main session applies accepted changes; neither pass edits files.
+Use these two passes for a substantial rewrite or a consequential choice when
+a fresh reading would help. They are optional for ordinary copy edits. When
+used, run them in separate agents: the rewrite may read the code, the cold read
+must not. The main session applies suitable changes; neither pass edits files.
 
 ## Rewrite pass
 
 You are revising the Chinese wording of LumilioCL, a Minecraft launcher. Read
-`docs/plain-language.md` and `docs/design-language.md` §8 first.
+the relevant sections of `docs/plain-language.md` first.
 
 Input: message ids, or a `##` section of
 `crates/lumilio-ui/i18n/zh-CN/lumilio-ui.ftl`.
@@ -17,10 +18,10 @@ For each message:
 2. List the facts it states and check each against the code. Mark each fact
    keep (the reader needs it), move (required but supplementary: say where it
    should go) or drop (how it works).
-3. Write the new Chinese under plain-language §3–§5, inside the §6 limit for
-   the place where it appears. If the facts the reader needs do not fit, say
-   where each one goes (a key's own tooltip, the documentation) instead of
-   writing a longer message. Keep every `{ $arg }` and every select variant,
+3. Write the new Chinese using plain-language §3–§5. Keep the existing hint
+   check (§6) in mind without treating it as a limit for every message.
+   If needed facts do not fit, propose a presentation change and explain where
+   they remain reachable. Keep every `{ $arg }` and every select variant,
    so the call site still matches.
 4. If the message already follows the rules, say so. Do not rewrite for its
    own sake.
@@ -55,7 +56,7 @@ For each screen, answer from the words:
 Mark each answer to 1–3 "said" when the words state it, or "guessed" when you
 inferred it. Reply with one block per screen.
 
-The main session compares the answers with the facts the rewrite pass kept. A
-guessed or wrong answer about the main action's consequence sends the message
-back to rewrite, usually for a better word. Other questions do not add
-sentences (plain-language §3).
+The main session compares the answers with the operation's actual behavior.
+A guessed or wrong consequence calls for clearer wording or interaction.
+Add information when it changes the reader's decision; do not add it merely
+to answer every possible question. This review does not replace user feedback.

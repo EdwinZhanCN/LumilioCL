@@ -10,6 +10,29 @@ interruptions. Completed means work and acceptance finished, never released.
 Keep JSON, including cancelled plans. Decisions and lessons go here. Long-lived
 cross-plan contracts belong in code/API/design documents with stable references.
 
+## Read-only queries
+
+```sh
+cargo run -p lumilio-docgen -- plans list
+cargo run -p lumilio-docgen -- plans list --status incomplete
+cargo run -p lumilio-docgen -- plans list --status completed --json
+cargo run -p lumilio-docgen -- plans show plain-language
+cargo run -p lumilio-docgen -- plans show plain-language --json
+```
+
+`list` shows ID, status, completed/total task counts and title, sorted by ID.
+Cancelled tasks are counted separately, not as completed. `--status` accepts
+`proposed`, `in_progress`, `blocked`, `completed`, `cancelled`, or `incomplete`
+(proposed + in_progress + blocked). With no filter it includes every plan.
+
+`show` takes the stable plan ID, not a filename, and displays the summary,
+tasks with acceptance, validation and outcome. `--json` returns summary objects
+for `list` and the complete plan for `show`, including internal fields. These
+are local queries, not the public Roadmap projection. Both read and validate the
+source JSON without writing files or requiring generated Markdown to be current.
+Empty lists succeed (`[]` in JSON); invalid arguments, invalid source or a
+missing ID fail with a diagnostic on stderr. Use `plans --help` for syntax.
+
 ## Contract and commands
 
 - [v1 structural schema](../schemas/plan.schema.json)
