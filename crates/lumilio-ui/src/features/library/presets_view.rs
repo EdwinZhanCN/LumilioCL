@@ -116,14 +116,14 @@ fn confirm_delete(
 fn detail_head(preset: &SettingsPreset, used: usize, ctx: &LibraryCtx) -> impl IntoElement {
     let colors = ctx.colors;
     let go = |intent: PresetIntent| send(&ctx.handler, LiveIntent::Preset(intent));
-    // ia[library]: 预设：重命名 | 预设详情 ⋯ 菜单「重命名…」→ 弹窗 | 名称 1–80 个字、不与其他预设重名；结果 toast 手动关闭
-    // ia[library]: 预设：复制 | 预设详情 ⋯ 菜单「复制…」→ 弹窗取名 | 新预设有自己的选项和共享范围，不带走使用它的游戏
-    // ia[library]: 预设：删除 | 预设详情 ⋯ 菜单「删除…」→ 警告弹窗 | 只删预设，游戏自己的选项不变；还有游戏在用时不可选
     let menu = kit::more_menu(
         ("preset-more", usize::try_from(preset.id).unwrap_or(0)),
         vec![
+            // ia[library]: 预设：重命名 | 预设详情 ⋯ 菜单「重命名…」→ 弹窗 | 名称 1–80 个字、不与其他预设重名；结果 toast 手动关闭
             kit::MenuEntry::new(tr!("preset-rename"), go(PresetIntent::Rename(preset.id))),
+            // ia[library]: 预设：复制 | 预设详情 ⋯ 菜单「复制…」→ 弹窗取名 | 新预设有自己的选项和共享范围，不带走使用它的游戏
             kit::MenuEntry::new(tr!("preset-copy"), go(PresetIntent::Copy(preset.id))),
+            // ia[library]: 预设：删除 | 预设详情 ⋯ 菜单「删除…」→ 警告弹窗 | 只删预设，游戏自己的选项不变；还有游戏在用时不可选
             kit::MenuEntry::new(tr!("preset-delete"), confirm_delete(preset, ctx))
                 .danger()
                 .disabled(used > 0),

@@ -6,17 +6,17 @@
 
 | 操作 | 层 / 组件 | 结果与反馈 | 备注 | 实现 |
 |---|---|---|---|---|
-| 处理游戏选项 | 需要留意里的游戏选项行「处理…」 | 打开该游戏的 设置 › 选项，待决定的修改在最上面 |  | `lumilio-ui/src/game_settings/presentation.rs` |
-| 继续 | 英雄区主按钮「继续」 | 启动当前游戏（与导航右下角芯片是同一个），英雄区进入启动时刻 |  | `lumilio-ui/src/home/launching.rs` |
-| 取消启动 | 启动时刻里的「取消」 | 停止本次启动，回到继续状态 |  | `lumilio-ui/src/home/launching.rs` |
-| 结束游戏 | 游戏运行中的「结束游戏」 | 停止游戏进程 |  | `lumilio-ui/src/home/launching.rs` |
-| 空库：导入 | 首次使用的「把原来的游戏带过来」 | 同游戏库的导入其他启动器的游戏 |  | `lumilio-ui/src/home/lists.rs` |
-| 空库：新建 | 首次使用的「新建」 | 同游戏库的新建游戏 |  | `lumilio-ui/src/home/lists.rs` |
-| 需要留意：解决 | 每个有问题的游戏一行（游戏名 · 最严重的问题 · 另有几个）和一个按钮（安装/修复/更换…/去设置/去添加/查看日志…） | 点后先打开游戏页再执行 |  | `lumilio-ui/src/home/lists.rs` |
-| 恢复并继续 | 启动失败后的「恢复并继续」 | 重试失败的那个游戏；恢复界面只在它是当前游戏时出现，换了当前游戏后失败留在「需要留意」 | global-context T6 | `lumilio-ui/src/home/recovery.rs` |
-| 技术详情 | 启动失败后的「技术详情」 | 准备步骤失败时弹出失败原因，启动时退出时弹出游戏最后输出的至多 50 行，均可复制；游戏崩溃、上次未正常结束或启动时退出却什么也没输出时打开该游戏的诊断页 | error-reporting T9 | `lumilio-ui/src/home/recovery.rs` |
-| 启动前的 Java 确认 | 继续 / 开始游戏后的弹窗 | 游戏设置里选的 Java 不能运行这个版本时问一次：「本次改用 Java N」（本机没有合适的则「下载并使用 Java N」）/「仍然启动」/「取消」；只影响这一次，不改游戏设置 | java-management T6 | `lumilio-ui/src/java_conflict.rs` |
-| 启动前的游戏目录确认 | 继续 / 开始游戏后的弹窗 | 当前游戏的目录被移走或删掉时问一次：「作为空游戏启动」（新建空目录后启动）/「查看游戏」（打开它的概览，可新建空目录或删除）/「取消」；不再悄悄启动一个空游戏 | game-folder-missing T4 | `lumilio-ui/src/missing_folder.rs` |
-| 接着玩：进入世界 / 服务器 | 「接着玩」每行的「进入」（继续的游戏最近玩的 3 个世界，再是服务器列表前 2 个） | 启动并直达该世界或服务器，英雄区进入启动时刻 | 每行和世界页的行一样（世界的模式、作弊、版本、时间；服务器会被询问，显示人数、信号格和 MOTD）；启动中和游戏中置灰；1.20 以前的版本不列出；还没有世界时这里说一句它们会出现在哪 | `lumilio-ui/src/pages/live/home.rs` |
-| 查看更新内容 | 更新后第一次打开时的弹窗 | 标题写明已更新到的版本，列出这次（以及跳过的版本）的新功能、改进和修复；「知道了」、Esc 或点外面关闭，之后不再自动出现；「全部更新日志」在浏览器打开网站的更新日志 | 设置 › 关于 可再看 | `lumilio-ui/src/release_notes/dialog.rs` |
-| 同意免责声明与 Minecraft EULA | 第一次打开（以及条款更新后）的弹窗 | 「同意并继续」记下同意后进入启动器，之后再显示更新内容；「退出」关闭启动器；Esc 与点外面不关闭；「阅读 Minecraft EULA」在浏览器打开 EULA | 设置 › 关于 可再看 | `lumilio-ui/src/terms.rs` |
+| 处理游戏选项 | 需要留意里的游戏选项行「处理…」 | 打开该游戏的 设置 › 选项，待决定的修改在最上面 |  | `lumilio-ui/src/game_settings/presentation.rs` › `attention_rows` |
+| 继续 | 英雄区主按钮「继续」 | 启动当前游戏（与导航右下角芯片是同一个），英雄区进入启动时刻 |  | `lumilio-ui/src/home/launching.rs` › `render_continue` |
+| 取消启动 | 启动时刻里的「取消」 | 停止本次启动，回到继续状态 |  | `lumilio-ui/src/home/launching.rs` › `render_launching` |
+| 结束游戏 | 游戏运行中的「结束游戏」 | 停止游戏进程 |  | `lumilio-ui/src/home/launching.rs` › `render_playing` |
+| 空库：导入 | 首次使用的「把原来的游戏带过来」 | 同游戏库的导入其他启动器的游戏 |  | `lumilio-ui/src/home/lists.rs` › `render_first_use` |
+| 空库：新建 | 首次使用的「新建」 | 同游戏库的新建游戏 |  | `lumilio-ui/src/home/lists.rs` › `render_first_use` |
+| 需要留意：解决 | 每个有问题的游戏一行（游戏名 · 最严重的问题 · 另有几个）和一个按钮（安装/修复/更换…/去设置/去添加/查看日志…） | 点后先打开游戏页再执行 |  | `lumilio-ui/src/home/lists.rs` › `render_attention` |
+| 恢复并继续 | 启动失败后的「恢复并继续」 | 重试失败的那个游戏；恢复界面只在它是当前游戏时出现，换了当前游戏后失败留在「需要留意」 | global-context T6 | `lumilio-ui/src/home/recovery.rs` › `render_recovery` |
+| 技术详情 | 启动失败后的「技术详情」 | 准备步骤失败时弹出失败原因，启动时退出时弹出游戏最后输出的至多 50 行，均可复制；游戏崩溃、上次未正常结束或启动时退出却什么也没输出时打开该游戏的诊断页 | error-reporting T9 | `lumilio-ui/src/home/recovery.rs` › `render_recovery` |
+| 启动前的 Java 确认 | 继续 / 开始游戏后的弹窗 | 游戏设置里选的 Java 不能运行这个版本时问一次：「本次改用 Java N」（本机没有合适的则「下载并使用 Java N」）/「仍然启动」/「取消」；只影响这一次，不改游戏设置 | java-management T6 | `lumilio-ui/src/java_conflict.rs` › `ask` |
+| 启动前的游戏目录确认 | 继续 / 开始游戏后的弹窗 | 当前游戏的目录被移走或删掉时问一次：「作为空游戏启动」（新建空目录后启动）/「查看游戏」（打开它的概览，可新建空目录或删除）/「取消」；不再悄悄启动一个空游戏 | game-folder-missing T4 | `lumilio-ui/src/missing_folder.rs` › `ask` |
+| 接着玩：进入世界 / 服务器 | 「接着玩」每行的「进入」（继续的游戏最近玩的 3 个世界，再是服务器列表前 2 个） | 启动并直达该世界或服务器，英雄区进入启动时刻 | 每行和世界页的行一样（世界的模式、作弊、版本、时间；服务器会被询问，显示人数、信号格和 MOTD）；启动中和游戏中置灰；1.20 以前的版本不列出；还没有世界时这里说一句它们会出现在哪 | `lumilio-ui/src/pages/live/home.rs` › `continued_group` |
+| 查看更新内容 | 更新后第一次打开时的弹窗 | 标题写明已更新到的版本，列出这次（以及跳过的版本）的新功能、改进和修复；「知道了」、Esc 或点外面关闭，之后不再自动出现；「全部更新日志」在浏览器打开网站的更新日志 | 设置 › 关于 可再看 | `lumilio-ui/src/release_notes/dialog.rs` › `show` |
+| 同意免责声明与 Minecraft EULA | 第一次打开（以及条款更新后）的弹窗 | 「同意并继续」记下同意后进入启动器，之后再显示更新内容；「退出」关闭启动器；Esc 与点外面不关闭；「阅读 Minecraft EULA」在浏览器打开 EULA | 设置 › 关于 可再看 | `lumilio-ui/src/terms.rs` › `show` |

@@ -1,6 +1,7 @@
 use super::*;
 
 mod structure;
+mod symbols;
 
 fn path(page: &str, action: &str) -> IaPath {
     IaPath {
@@ -10,6 +11,7 @@ fn path(page: &str, action: &str) -> IaPath {
         result: "ok".into(),
         note: None,
         file: "lumilio-ui/src/a.rs".into(),
+        symbol: None,
     }
 }
 

@@ -28,17 +28,20 @@ Three fields separated by `|`, plus an optional fourth:
 | 备注 (optional) | A caveat, a plan reference, or a limit ("运行中禁用") |
 
 No `|` inside a field. Page keys are the `PAGES` table in
-`crates/lumilio-docgen/src/ia.rs`: `navigation`, `home`, `library`, `discover`,
-`activity`, `accounts`, `settings`, `instance`, `instance.overview`,
-`instance.content`, `instance.worlds`, `instance.screenshots`, `instance.history`,
-`instance.diagnostics`, `instance.settings`. A new page is a new row there.
+`crates/lumilio-docgen/src/ia.rs`; a new page is a new row there.
 
 ## Where it goes
 
 Put it directly above the statement that creates the entry point — the `Key`,
 `MenuEntry`, input, drop handler or row — so the comment moves or dies with the
-code. One comment per entry point; a menu with five entries gets five comments.
-Never put one on a handler far from the control: it will outlive the control.
+code. One comment per entry point; a menu with five entries gets five comments,
+each above its own entry. Never put one on a handler far from the control: it
+will outlive the control.
+
+The 实现 column names the file and the function the comment is in, or the
+function right below it. When an entry point is its own function, put the
+comment above that function. Do not split code into functions only to name a
+path.
 
 ## Procedure
 
@@ -54,5 +57,6 @@ Never put one on a handler far from the control: it will outlive the control.
 
 - **A comment that describes the intent, not the code** passes every check. When
   you change behaviour, reread the comment; the checks cannot.
-- **Moving a file** changes only the 实现 column; regenerate and commit.
+- **Moving a file or renaming its function** changes only the 实现 column;
+  regenerate and commit.
 - **Editing `docs/ia/paths/` by hand** is overwritten on the next run.

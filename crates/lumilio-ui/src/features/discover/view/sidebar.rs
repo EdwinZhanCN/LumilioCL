@@ -448,6 +448,7 @@ fn advanced_body(ctx: &DiscoverCtx) -> gpui::AnyElement {
                         let on = query.advanced.iter().any(|id| id == option.id);
                         let change = ctx.change.clone();
                         let id = option.id.to_owned();
+                        // ia[discover]: 高级排除 | 筛选栏「高级排除」：光敏性触发、AI、广告、遥测等 | 选择会被记住；第一次选「光敏性触发」弹出提示，可选不再提示
                         let row = kit::filter_row(
                             ("live-advanced", index),
                             option.label,
@@ -521,9 +522,6 @@ fn section_view(index: usize, section: &Section, ctx: &DiscoverCtx) -> gpui::Any
         .into_any_element()
 }
 
-// ia[discover]: 筛选 | 右侧丝印编号筛选栏，按类型分区、可折叠：游戏版本（可搜索，可显示全部版本）、加载器（常用在前，「显示更多」）、类别、运行环境、许可证、高级排除；每个选项点一下为「要」，点 ⊘ 为「不要」 | 重新搜索；游戏提供的版本和加载器带锁
-// ia[discover]: 高级排除 | 筛选栏「高级排除」：光敏性触发、AI、广告、遥测等 | 选择会被记住；第一次选「光敏性触发」弹出提示，可选不再提示
-// ia[discover]: 隐藏已安装 | 筛选栏顶部开关（整合包页，或从游戏页进入时） | 搜索时排除已有的整合包 / 目标游戏已装的项目；整合包页的选择会被记住
 /// The content sources to browse, when more than one is on.
 pub(super) fn source_segments(ctx: &DiscoverCtx) -> Option<impl IntoElement> {
     let sources = &ctx.model.sources;
@@ -613,6 +611,7 @@ pub(super) fn filters_key(ctx: &DiscoverCtx) -> impl IntoElement {
 fn filters(ctx: &DiscoverCtx) -> gpui::Div {
     let colors = ctx.colors;
     let query = &ctx.model.query;
+    // ia[discover]: 隐藏已安装 | 筛选栏顶部开关（整合包页，或从游戏页进入时） | 搜索时排除已有的整合包 / 目标游戏已装的项目；整合包页的选择会被记住
     let hide = ctx.model.can_hide_installed().then(|| {
         let change = ctx.change.clone();
         let on = ctx.model.hiding_installed();
@@ -638,6 +637,7 @@ fn filters(ctx: &DiscoverCtx) -> gpui::Div {
         .gap_5()
         .children(source_segments(ctx))
         .children(hide)
+        // ia[discover]: 筛选 | 右侧丝印编号筛选栏，按类型分区、可折叠：游戏版本（可搜索，可显示全部版本）、加载器（常用在前，「显示更多」）、类别、运行环境、许可证、高级排除；每个选项点一下为「要」，点 ⊘ 为「不要」 | 重新搜索；游戏提供的版本和加载器带锁
         .children(
             list.iter()
                 .enumerate()

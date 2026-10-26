@@ -24,3 +24,4 @@ pub use ia::{
 mod tests;
 
 mod ia;
+mod symbols;

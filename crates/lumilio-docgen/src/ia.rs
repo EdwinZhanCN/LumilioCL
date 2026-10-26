@@ -2,6 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::symbols::Functions;
+
 /// A page whose paths are generated: its key in the comment and the generated
 /// file's title.
 pub struct Page {
@@ -10,10 +12,6 @@ pub struct Page {
 }
 
 pub const PAGES: &[Page] = &[
-    Page {
-        key: "plugin.world-explorer",
-        title: "插件 · 世界地图",
-    },
     Page {
         key: "navigation",
         title: "全局导航",
@@ -78,6 +76,10 @@ pub const PAGES: &[Page] = &[
         key: "plugin.litematica",
         title: "插件 · Litematica 投影",
     },
+    Page {
+        key: "plugin.world-explorer",
+        title: "插件 · 世界地图",
+    },
 ];
 
 /// One annotated path.
@@ -90,6 +92,8 @@ pub struct IaPath {
     pub note: Option<String>,
     /// Where it is implemented, relative to `crates/`.
     pub file: String,
+    /// The function it is in or right above, when there is one.
+    pub symbol: Option<String>,
 }
 
 /// Reads one source line. `None` when it is not an annotation.
@@ -114,6 +118,7 @@ pub fn parse_line(line: &str) -> Option<Result<IaPath, String>> {
             .filter(|note| !note.is_empty())
             .map(|n| (*n).to_owned()),
         file: String::new(),
+        symbol: None,
     }))
 }
 
@@ -158,11 +163,18 @@ pub fn scan(root: &Path) -> (Vec<IaPath>, Vec<String>) {
             continue;
         };
         let relative = slash_path(file.strip_prefix(&crates).unwrap_or(&file));
-        for (index, line) in text.lines().enumerate() {
+        let lines: Vec<&str> = text.lines().collect();
+        // Parsed only for files that have an annotation.
+        let mut functions = None;
+        for (index, line) in lines.iter().enumerate() {
             match parse_line(line) {
                 None => {}
                 Some(Ok(mut path)) => {
                     path.file = relative.clone();
+                    path.symbol = functions
+                        .get_or_insert_with(|| Functions::parse(&text))
+                        .at(index + 1, &lines)
+                        .map(str::to_owned);
                     paths.push(path);
                 }
                 Some(Err(problem)) => problems.push(format!("{relative}:{}: {problem}", index + 1)),
@@ -213,15 +225,23 @@ pub fn render(page: &Page, paths: &[&IaPath]) -> String {
     out.push_str("| 操作 | 层 / 组件 | 结果与反馈 | 备注 | 实现 |\n|---|---|---|---|---|\n");
     for path in paths {
         out.push_str(&format!(
-            "| {} | {} | {} | {} | `{}` |\n",
+            "| {} | {} | {} | {} | {} |\n",
             cell(&path.action),
             cell(&path.place),
             cell(&path.result),
             cell(path.note.as_deref().unwrap_or("")),
-            path.file
+            implementation(path)
         ));
     }
     out
+}
+
+/// The file, and the function when there is one: `view.rs` › `card_menu`.
+fn implementation(path: &IaPath) -> String {
+    match &path.symbol {
+        Some(symbol) => format!("`{}` › `{symbol}`", path.file),
+        None => format!("`{}`", path.file),
+    }
 }
 
 /// Every generated file's relative path (under `docs/ia/paths/`) and content.

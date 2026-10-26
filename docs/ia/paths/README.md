@@ -5,7 +5,6 @@
 
 | 页面 | 路径数 |
 |---|---|
-| [插件 · 世界地图](plugin.world-explorer.md) | 34 |
 | [全局导航](navigation.md) | 9 |
 | [首页](home.md) | 14 |
 | [游戏库](library.md) | 30 |
@@ -22,3 +21,4 @@
 | [游戏页 · 诊断](instance.diagnostics.md) | 11 |
 | [游戏页 · 设置](instance.settings.md) | 19 |
 | [插件 · Litematica 投影](plugin.litematica.md) | 60 |
+| [插件 · 世界地图](plugin.world-explorer.md) | 34 |
