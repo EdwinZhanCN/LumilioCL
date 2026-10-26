@@ -43,6 +43,19 @@ const PASS_HEADERS = [
 // Request headers worth passing upstream.
 const FORWARD_HEADERS = ["range", "if-none-match", "if-modified-since", "if-range"];
 
+// LumilioCL 0.2.2 splits a large download over several connections when the
+// source serves ranges, and on Windows it then fails to sync the parts (#99,
+// fixed in 0.2.3). Its updater asks here first, so its Windows packages get
+// no range support: one connection from the first byte, which it downloads
+// correctly. A retry starts again from the beginning.
+const WHOLE_FILE_AGENTS = new Set(["LumilioCL/0.2.2"]);
+const RANGE_HEADERS = new Set(["range", "if-range"]);
+
+/** Whether this request must get the whole file, without range support. */
+function wholeFile(request: Request, pathname: string): boolean {
+  return WHOLE_FILE_AGENTS.has(request.headers.get("user-agent") ?? "") && pathname.includes("-windows-");
+}
+
 export type Upstream = { url: string; /** browser cache lifetime, seconds */ maxAge: number };
 
 /** A file segment, judged by what it decodes to; a malformed escape is no file. */
@@ -84,19 +97,22 @@ export async function proxy(request: Request, fetcher: typeof fetch = fetch): Pr
   if (request.method !== "GET" && request.method !== "HEAD")
     return new Response("Method not allowed", { status: 405, headers: { allow: "GET, HEAD" } });
 
-  const upstream = resolve(new URL(request.url).pathname);
+  const { pathname } = new URL(request.url);
+  const upstream = resolve(pathname);
   if (!upstream) return new Response("Not found", { status: 404 });
 
+  const whole = wholeFile(request, pathname);
   const headers = new Headers({ "user-agent": "lumilio-mirror" });
   for (const name of FORWARD_HEADERS) {
     const value = request.headers.get(name);
-    if (value) headers.set(name, value);
+    if (value && !(whole && RANGE_HEADERS.has(name))) headers.set(name, value);
   }
 
   let target = upstream.url;
   for (let hop = 0; ; hop++) {
     const response = await fetcher(target, { method: request.method, headers, redirect: "manual" });
-    if (response.status < 300 || response.status >= 400 || response.status === 304) return relay(response, upstream);
+    if (response.status < 300 || response.status >= 400 || response.status === 304)
+      return relay(response, upstream, !whole);
 
     const location = response.headers.get("location");
     if (!location || hop >= MAX_HOPS) return new Response("Bad gateway", { status: 502 });
@@ -107,9 +123,10 @@ export async function proxy(request: Request, fetcher: typeof fetch = fetch): Pr
   }
 }
 
-function relay(response: Response, upstream: Upstream): Response {
+function relay(response: Response, upstream: Upstream, ranges: boolean): Response {
   const headers = new Headers();
   for (const name of PASS_HEADERS) {
+    if (!ranges && name === "accept-ranges") continue;
     const value = response.headers.get(name);
     if (value) headers.set(name, value);
   }
