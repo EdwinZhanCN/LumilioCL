@@ -34,7 +34,7 @@ gpui-base = { path = "forks/gpui-base" }
 gpui-component = { path = "forks/gpui-component" }
 
 [workspace.package]
-version = "0.2.2"
+version = "0.2.3"
 edition = "2024"
 publish = false
 rust-version = "1.95"
