@@ -42,8 +42,8 @@ Consequences: 文件损坏通过显式诊断与修复发现；后台检查仍报
 
 ## References
 
-- [crates/lumilio-app/src/live/jobs.rs](../../crates/lumilio-app/src/live/jobs.rs)
-- [crates/lumilio-core/src/inspect.rs](../../crates/lumilio-core/src/inspect.rs)
+- [crates/lumilio-ui/src/shell/feed/lists.rs](../../crates/lumilio-ui/src/shell/feed/lists.rs)
+- [crates/lumilio-core/src/diagnostics/inspect.rs](../../crates/lumilio-core/src/diagnostics/inspect.rs)
 
 ## Outcome
 

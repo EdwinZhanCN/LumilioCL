@@ -23,7 +23,7 @@ Status: Completed
 - [x] T2 — 只带 Intel 本地库的版本只用 Intel Java (Completed)
   Acceptance: JavaNeeds 记下版本的本地库变体（natives-osx、natives-macos-arm64 等），java/choice.rs 在 Apple 芯片与 Windows on Arm 上，本系统的变体里没有 arm64 时加强制规则 IntelNatives：只允许 x86_64 的 Java，没有要求时按 Java 8 下载。单元测试覆盖 1.6.4（natives-osx）、1.18.2（natives-macos）、1.19（含 natives-macos-arm64）与 Windows on Arm
 - [x] T3 — 下载 Intel 运行时 (Completed)
-  Acceptance: java_runtime::JavaBuild 区分「任意」与「仅 Intel」；启动时的 JavaRequest、实例页的安装（install_instance_java）与 RetryAction::InstallJava 都带上它，仅 Intel 时只从 Mojang 的 Intel 平台键选择，不在宿主平台键下的组件装到 <组件>-<平台> 目录。java_runtime/tests.rs 覆盖 Apple 芯片上同有原生与 Intel Java 17 时两种构建各取各的、目录不重名，以及 Intel Mac、Windows on Arm 与 Linux arm64；启动器按当前宿主取构建，CI 是 Linux，Apple 芯片上的整条路径由 T5 实机验证
+  Acceptance: JavaBuild（`crates/lumilio-core/src/java/downloads/mod.rs`）区分「任意」与「仅 Intel」；启动时的 JavaRequest、实例页的安装（install_instance_java）与 RetryAction::InstallJava 都带上它，仅 Intel 时只从 Mojang 的 Intel 平台键选择，不在宿主平台键下的组件装到 <组件>-<平台> 目录。crates/lumilio-core/src/java/downloads/tests.rs 覆盖 Apple 芯片上同有原生与 Intel Java 17 时两种构建各取各的、目录不重名，以及 Intel Mac、Windows on Arm 与 Linux arm64；启动器按当前宿主取构建，CI 是 Linux，Apple 芯片上的整条路径由 T5 实机验证
 - [x] T4 — 没装 Rosetta 2 时说明 (Completed)
   Acceptance: Apple 芯片上要用或要下载 Intel Java 而 Rosetta 2（/Library/Apple/usr/libexec/oah/libRosettaRuntime）不在时，选 Java 这一步失败，不下载 Java、不启动游戏，提示 softwareupdate --install-rosetta；中英文案在语言目录里。java/tests.rs 用替代路径覆盖判断
 - [x] T5 — 实机验证 (Completed)
@@ -66,9 +66,9 @@ Consequences: 通用二进制与读不懂的格式仍视为原生
 
 - [crates/lumilio-core/src/java/mod.rs](../../crates/lumilio-core/src/java/mod.rs)
 - [crates/lumilio-core/src/java/choice.rs](../../crates/lumilio-core/src/java/choice.rs)
-- [crates/lumilio-core/src/java_runtime/mod.rs](../../crates/lumilio-core/src/java_runtime/mod.rs)
-- [crates/lumilio-core/src/service/java.rs](../../crates/lumilio-core/src/service/java.rs)
-- [crates/lumilio-core/src/launcher/phases.rs](../../crates/lumilio-core/src/launcher/phases.rs)
+- [crates/lumilio-core/src/java/downloads/mod.rs](../../crates/lumilio-core/src/java/downloads/mod.rs)
+- [crates/lumilio-core/src/java/installations.rs](../../crates/lumilio-core/src/java/installations.rs)
+- [crates/lumilio-core/src/launching/launcher/phases.rs](../../crates/lumilio-core/src/launching/launcher/phases.rs)
 - https://launchermeta.mojang.com/v1/products/java-runtime/2ec0cc96c44e5a76b9c8b7c39df7210883d12871/all.json
 - https://github.com/HMCL-dev/HMCL/blob/main/HMCL/src/main/java/org/jackhuang/hmcl/util/NativePatcher.java
 - [Plan java-management](java-management.md)

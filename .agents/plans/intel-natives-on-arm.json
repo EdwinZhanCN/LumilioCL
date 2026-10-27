@@ -36,7 +36,7 @@
       "id": "T3",
       "title": "下载 Intel 运行时",
       "status": "completed",
-      "acceptance": "java_runtime::JavaBuild 区分「任意」与「仅 Intel」；启动时的 JavaRequest、实例页的安装（install_instance_java）与 RetryAction::InstallJava 都带上它，仅 Intel 时只从 Mojang 的 Intel 平台键选择，不在宿主平台键下的组件装到 <组件>-<平台> 目录。java_runtime/tests.rs 覆盖 Apple 芯片上同有原生与 Intel Java 17 时两种构建各取各的、目录不重名，以及 Intel Mac、Windows on Arm 与 Linux arm64；启动器按当前宿主取构建，CI 是 Linux，Apple 芯片上的整条路径由 T5 实机验证"
+      "acceptance": "JavaBuild（`crates/lumilio-core/src/java/downloads/mod.rs`）区分「任意」与「仅 Intel」；启动时的 JavaRequest、实例页的安装（install_instance_java）与 RetryAction::InstallJava 都带上它，仅 Intel 时只从 Mojang 的 Intel 平台键选择，不在宿主平台键下的组件装到 <组件>-<平台> 目录。crates/lumilio-core/src/java/downloads/tests.rs 覆盖 Apple 芯片上同有原生与 Intel Java 17 时两种构建各取各的、目录不重名，以及 Intel Mac、Windows on Arm 与 Linux arm64；启动器按当前宿主取构建，CI 是 Linux，Apple 芯片上的整条路径由 T5 实机验证"
     },
     {
       "id": "T4",
@@ -86,9 +86,9 @@
   "references": [
     "crates/lumilio-core/src/java/mod.rs",
     "crates/lumilio-core/src/java/choice.rs",
-    "crates/lumilio-core/src/java_runtime/mod.rs",
-    "crates/lumilio-core/src/service/java.rs",
-    "crates/lumilio-core/src/launcher/phases.rs",
+    "crates/lumilio-core/src/java/downloads/mod.rs",
+    "crates/lumilio-core/src/java/installations.rs",
+    "crates/lumilio-core/src/launching/launcher/phases.rs",
     "https://launchermeta.mojang.com/v1/products/java-runtime/2ec0cc96c44e5a76b9c8b7c39df7210883d12871/all.json",
     "https://github.com/HMCL-dev/HMCL/blob/main/HMCL/src/main/java/org/jackhuang/hmcl/util/NativePatcher.java"
   ],

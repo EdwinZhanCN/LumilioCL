@@ -40,7 +40,7 @@
     "docs/design-language.md",
     "crates/lumilio-ui/src/theme/spec.rs",
     "crates/lumilio-ui/src/theme/look.rs",
-    "crates/lumilio-core/src/tuning.rs"
+    "crates/lumilio-core/src/settings/tuning.rs"
   ],
   "dependencies": ["global-context"],
   "decisions": [
