@@ -2,7 +2,7 @@
 
 # 准备发布 0.2.3
 
-Status: InProgress
+Status: Completed
 
 0.2.2 之后合入了 Windows 上的一批修复（多连接下载、导入整合包的配置覆盖、启动前后与包装命令、地图缓存），Modrinth 的更新检查不再给正式版推荐测试版，游戏与账户切换列表可滚动、可搜索，设置里的长路径从中间省略、可复制，界面文案按简明语言规则改写，以及发现页翻译的两处修复；中间还有 workspace 架构重构，页面都迁进了 ui/features。0.2.2 在 Windows 上更新时会用多连接下载安装包，正是 #99 失败的路径，所以发布前先让 launcher.lumilio.org 给 0.2.2 的 Windows 安装包整份文件（R2）。Project Maintainer 只在自己的 Mac 上实测。
 
@@ -29,11 +29,11 @@ Status: InProgress
   Acceptance: 工作区版本为 0.2.3，Cargo.lock 只改工作区 crate 的版本；release-notes/0.2.3.md 与 .en.md 写 0.2.2 之后对用户可见的改动，小节和条目数一致；0.2.2 的说明保留；本计划与投影生成。
 - [x] R2 — 让 0.2.2 的 Windows 更新只用一条连接 (Completed)
   Acceptance: PR #122 合入并部署后，launcher.lumilio.org 对 UA 为 LumilioCL/0.2.2、带 Range 的 Windows 安装包请求返回 200 且没有 Accept-Ranges；同一请求换成 macOS 安装包，或 UA 换成 LumilioCL/0.2.3，仍返回 206。
-- [ ] R3 — 通过 PR 合入版本更新 (Proposed)
+- [x] R3 — 通过 PR 合入版本更新 (Completed)
   Acceptance: PR #121 先合入；版本更新的 rust、plans 检查通过后合入 main，合入后 main 的 CI 通过。
-- [ ] R4 — 打 v0.2.3 标签并发布为正式版 (Proposed)
+- [x] R4 — 打 v0.2.3 标签并发布为正式版 (Completed)
   Acceptance: 合入提交在 main 上的 CI 通过、R2 完成后再打标签；v0.2.3 指向该提交，Release 工作流生成草稿；Project Maintainer 在正文末行填上 PR 编号后发布为正式版（Latest）。
-- [ ] R5 — 更新后在 Mac 上检查并关闭计划 (Proposed)
+- [x] R5 — 更新后在 Mac 上检查并关闭计划 (Completed)
   Acceptance: 从 0.2.2 自动更新到 0.2.3，重启后弹出一次「已更新到 LumilioCL 0.2.3」，更新内容只有 0.2.3 一份。记下结果后关闭本计划。
 
 ## Validation
@@ -46,12 +46,14 @@ Status: InProgress
   Result: 2026-10-26：lumilio-ui release_notes 4 项通过（0.2.3 有说明，每份说明都能读出）；xtask release-check v0.2.3 输出 version=0.2.3、prerelease=false；plans validate 与 just plans 通过；Cargo.lock 只改了工作区 crate 的版本。just check 交给 PR 的 CI。
 - Worker 只对 0.2.2 的 Windows 安装包关掉分段（R2）。
   Result: 2026-10-26：#122 squash 合入 main 后 Web 工作流部署了 Worker。用 v0.2.2 的安装包检查 launcher.lumilio.org：UA 为 LumilioCL/0.2.2、带 Range: bytes=0-99 请求 windows-x64-setup.exe 返回 200、整份长度、没有 Accept-Ranges，不带 Range 时同样；同一请求换成 macos-arm64.dmg，或把 UA 换成 LumilioCL/0.2.3，返回 206 与 Accept-Ranges: bytes。
+- 0.2.2 的更新器从 launcher.lumilio.org 下载 Windows 安装包时只用一条连接（R2）。
+  Result: 2026-10-26：在 v0.2.2 的一次性副本里直接调用 0.2.2 的 UpdateClient::download，连接预算 16（与 app 相同），UA 为 LumilioCL/0.2.2，下载线上 v0.2.2 的安装包并记下引擎报告的连接数。来源顺序与 0.2.2 相同时，windows-x64-setup.exe 从 launcher.lumilio.org 一次下完，没有分段，SHA256 一致；同一文件只走 GitHub 时分成最多 8 条连接；macOS dmg 经 launcher.lumilio.org 也分段。没有分段时不会运行 #99 出错的 verify_part。探测代码没有提交。
 - 合入后 main 的 CI 通过（R3）。
-  Result: pending
+  Result: 2026-10-26：#121 与 #123 的 rust、plans 检查通过后 squash 合入；main 上 ac54b9cd 的 CI（rust、windows）与 Plans 通过。
 - v0.2.3 指向合入提交并发布为正式版（R4）。
-  Result: pending
+  Result: 2026-10-26：v0.2.3 指向 ac54b9cd，Release 工作流生成草稿，含五个安装包与 SHA256SUMS.txt；Project Maintainer 发布为正式版（Latest）。launcher.lumilio.org 的 releases/latest 给出 v0.2.3 的 SHA256SUMS.txt。
 - 从 0.2.2 更新到 0.2.3 后在 Mac 上只显示一次、一份更新内容（R5）。
-  Result: pending
+  Result: 2026-10-26：Project Maintainer 在自己的 Mac 上由 0.2.2 自动更新到 0.2.3，确认更新成功。启动器日志先记下 LumilioCL 0.2.2 启动，接着记下 0.2.3 启动，没有警告或错误；/Applications/LumilioCL.app 为 0.2.3，settings.json 的 release_notes_seen 为 0.2.3。
 
 ## Decision whole-file-for-022-windows
 
@@ -95,5 +97,9 @@ Consequences: R5 同时检查 0.2.2 的更新器第一次真正被用到时在 M
 - [Plan release-0-2-2](release-0-2-2.md)
 - [Plan windows-ci](windows-ci.md)
 - [Plan workspace-architecture](workspace-architecture.md)
+
+## Outcome
+
+v0.2.3 于 2026-10-26 发布为正式版（Latest），指向 ac54b9cd。它带来 Windows 上的一批修复（多连接下载、整合包的配置覆盖、启动前后与包装命令、地图缓存）、Modrinth 的更新只推荐不低于已装版本稳定程度的版本、可滚动可搜索的切换列表、从中间省略且可复制的长路径、按简明语言改写的文案，以及发现页翻译的两处修复。发布前 launcher.lumilio.org 只给 0.2.2 的 Windows 安装包整份文件，并用 0.2.2 的更新器实测只用一条连接（R2）；发布后在 Mac 上由 0.2.2 自动更新成功（R5）。Windows 上的安装步骤交给社区反馈。
 
 - Lesson: 0.2.2 的下载引擎在 Windows 上多连接下载必然失败（#99），而 0.2.2 的更新器下载 Windows 安装包用的也是这条路径；当时 CI 只在 Linux 上跑测试，打标签前的更新器检查只在 Mac 上做（release-0-2-2 R2）。Guard：windows-ci 之后 main 上的 CI 也在 Windows 上跑测试，多连接下载的测试在 Windows 上会失败；已发布的 0.2.2 由 Worker 规则兜底（web/worker/proxy.test.ts 的 gives LumilioCL 0.2.2 a Windows package whole, without range support，规则不生效时失败）。
