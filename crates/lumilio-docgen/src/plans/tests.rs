@@ -161,6 +161,48 @@ fn repository_plans_are_current() {
 }
 
 #[test]
+fn a_plan_source_link_must_name_a_file_that_exists() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    fs::create_dir_all(root.join("crates/lumilio-core/src")).unwrap();
+    fs::create_dir_all(root.join("assets")).unwrap();
+    fs::create_dir_all(root.join(".agents/plans")).unwrap();
+    let mut plan = example();
+    plan.references
+        .push("https://example.com/crates/lumilio-core/src/mentioned-only-in-a-url.rs".into());
+    plan.references
+        .push("crates/other-tool/src/not-this-repo.rs".into());
+    plan.references
+        .push("assets/minecraft/lang/en_us.json".into());
+    plan.references.push(
+        "https://github.com/modrinth/code/blob/main/packages/app-lib/src/launcher/mod.rs".into(),
+    );
+    plan.tasks[0].acceptance = "see `service/missing.rs` and crates/lumilio-core/src/gone.rs. \
+         Modrinth reports the missing folder from packages/app-lib/src/launcher/mod.rs"
+        .into();
+    fs::write(
+        root.join(".agents/plans/example.json"),
+        serde_json::to_vec_pretty(&plan).unwrap(),
+    )
+    .unwrap();
+    let err = load(root).unwrap_err();
+    assert!(err.contains("example: service/missing.rs"), "{err}");
+    assert!(
+        err.contains("example: crates/lumilio-core/src/gone.rs"),
+        "{err}"
+    );
+    assert!(!err.contains("mentioned-only-in-a-url"));
+    assert!(!err.contains("not-this-repo"));
+    assert!(!err.contains("en_us.json"));
+    assert!(!err.contains("launcher/mod.rs"), "{err}");
+
+    fs::write(root.join("crates/lumilio-core/src/gone.rs"), "").unwrap();
+    fs::create_dir_all(root.join("crates/lumilio-core/src/service")).unwrap();
+    fs::write(root.join("crates/lumilio-core/src/service/missing.rs"), "").unwrap();
+    load(root).unwrap();
+}
+
+#[test]
 fn schema_is_versioned_and_required_fields_match_the_parser() {
     let schema: Value =
         serde_json::from_str(include_str!("../../../../.agents/schemas/plan.schema.json")).unwrap();

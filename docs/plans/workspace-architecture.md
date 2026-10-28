@@ -42,7 +42,7 @@ Status: Completed
 ## Validation
 
 - 规划基于当前 workspace、实际状态所有者与已有计划
-  Result: 2026-10-23：cargo metadata --no-deps 确认 24 个 workspace package。已核查 core/lib.rs、service、ContextHub、实例数据库、元数据解析、UI LiveModel、app Backend/Wiring/Discover。实例数据库同时初始化游戏设置与地图表；LauncherService 持有认证/外观/任务/内容等状态；LiveModel 和 Wiring::State 持有多个页面状态。已读取 rust-structure-style 完成记录及相关进行中计划的范围、待办和决定。现有工作区包含上一轮未提交重构，本轮仅增加计划及其生成文档。
+  Result: 2026-10-23：cargo metadata --no-deps 确认 24 个 workspace package。已核查 `crates/lumilio-core/src/lib.rs`、service、ContextHub、实例数据库、元数据解析、UI LiveModel、app Backend/Wiring/Discover。实例数据库同时初始化游戏设置与地图表；LauncherService 持有认证/外观/任务/内容等状态；LiveModel 和 Wiring::State 持有多个页面状态。已读取 rust-structure-style 完成记录及相关进行中计划的范围、待办和决定。现有工作区包含上一轮未提交重构，本轮仅增加计划及其生成文档。
 - 计划 JSON 有效，生成输出与 just docs 通过
   Result: 2026-10-23：cargo run -p lumilio-docgen -- plans validate 与 just plans 成功；just docs 通过全部 32 个 docgen 测试、5 个 preserve_order 计划测试、plans-check 和 cargo fmt --check。git diff --check 通过。仅新增本计划及 docs/plans/workspace-architecture.md，内部计划未改变网站路线图投影；架构实现与其验收均待开展。
 - 元数据和专业能力 crates 可以独立验证，生产依赖方向由检查保护
@@ -50,7 +50,7 @@ Status: Completed
 - core 能力拥有自己的状态，启动/认证/持久化/取消等既有不变量有行为测试证据
   Result: 2026-10-24（T3/T4）：core 的 service 目录已拆为 accounts、appearance、instances、launching、minecraft、java、content、game_settings、worlds、diagnostics、activity、plugins、settings、storage、network 能力与 launcher_service 组合层；认证刷新锁/待选角色/凭据归 Accounts，外观缓存/皮肤库锁/签名密钥归 Appearance，任务板/取消表/活动日志归 activity::Tasks，内容筛选与翻译缓存归 Content，一次性自动 Java 选择归 Launching，实例库与操作租约归 Instances。每个迁移提交后 cargo nextest run -p lumilio-core 808 项全部通过（启动取消、缺失目录、离线启动、极短进程、启动/退出事件、历史写入失败、游戏设置准备与回收、日志捕获、插件事件等既有测试未改断言），clippy -D warnings、rustdoc 链接、cargo check --workspace --tests 与 docgen 34 项结构测试通过。
 - UI feature 拥有页面状态与控制流程，app/shell 只保留对应组合和适配职责
-  Result: 2026-10-24（T5）：Discover 迁入 ui/features/discover（model、view、detail、dependencies、page、controls、queries、search、install、translation、state 与 tests）；app/live/discover.rs 与 translation.rs 删除，LiveModel 不再含 Discover 字段。cargo nextest run -p lumilio-ui 593 项（含 13 项 feature 测试）与 -p lumilio-app 36 项通过；clippy -D warnings、rustdoc 链接、cargo check --workspace --tests、docgen 34 项通过，just ia 重新生成 discover 路径（仅实现位置变化）。真实窗口检查见 T5 记录；其余 UI 功能待 T6。 真实窗口（临时 LUMILIO_HOME，LUMILIO_PAGE=discover）：首次检查发现 LUMILIO_PAGE 开发钩子绕过 select_route，Discover 未收到 shown 而停在“正在搜索…”；改为 go_to 后，首屏列出 Modrinth/CurseForge 来源键、分类筛选、分页与整合包结果，摘要翻译出现。尚未在真实窗口逐项核对：项目详情、安装与依赖提示、为游戏浏览、正文翻译中止。 2026-10-25（T6，D16、D18）：New Game（#91）、游戏库（#92、#93）、动态（#95）、设置（#97）、账户（#98）、游戏页（#100）与启动（#101）逐个迁入 ui/features；列表读取与上下文跟随移入 shell/feed（#103），shell 公开接口收窄（#104）。每个 PR 合并前 ui、app、docgen 的 nextest、clippy -D warnings、rustdoc 链接与 fmt 通过，CI rust 与 plans 通过；#103 后 nextest 686 项通过。真实窗口（临时 LUMILIO_HOME，真实点击）：启动一节核对崩溃与启动中退出后的技术详情、Home 与游戏页的缺失文件夹询问、查看游戏、作为空游戏启动、Home 取消，以及真实运行 Minecraft 1.21.1 时游戏页的实时输出与结束游戏；#103 后核对 Home 读入当前游戏、继续弹出缺失文件夹询问、游戏库列出游戏。更早各页由 Project Maintainer 抽查主要流程。尚未在真实窗口核对：新建游戏后打开并设为当前、动态页刷新、运行时隐藏与回到前台、直接进入世界。
+  Result: 2026-10-24（T5）：Discover 迁入 ui/features/discover（model、view、detail、dependencies、page、controls、queries、search、install、translation、state 与 tests）；原 app/live 下的页面文件已删除，现为 `crates/lumilio-ui/src/features/discover/`，LiveModel 不再含 Discover 字段。cargo nextest run -p lumilio-ui 593 项（含 13 项 feature 测试）与 -p lumilio-app 36 项通过；clippy -D warnings、rustdoc 链接、cargo check --workspace --tests、docgen 34 项通过，just ia 重新生成 discover 路径（仅实现位置变化）。真实窗口检查见 T5 记录；其余 UI 功能待 T6。 真实窗口（临时 LUMILIO_HOME，LUMILIO_PAGE=discover）：首次检查发现 LUMILIO_PAGE 开发钩子绕过 select_route，Discover 未收到 shown 而停在“正在搜索…”；改为 go_to 后，首屏列出 Modrinth/CurseForge 来源键、分类筛选、分页与整合包结果，摘要翻译出现。尚未在真实窗口逐项核对：项目详情、安装与依赖提示、为游戏浏览、正文翻译中止。 2026-10-25（T6，D16、D18）：New Game（#91）、游戏库（#92、#93）、动态（#95）、设置（#97）、账户（#98）、游戏页（#100）与启动（#101）逐个迁入 ui/features；列表读取与上下文跟随移入 shell/feed（#103），shell 公开接口收窄（#104）。每个 PR 合并前 ui、app、docgen 的 nextest、clippy -D warnings、rustdoc 链接与 fmt 通过，CI rust 与 plans 通过；#103 后 nextest 686 项通过。真实窗口（临时 LUMILIO_HOME，真实点击）：启动一节核对崩溃与启动中退出后的技术详情、Home 与游戏页的缺失文件夹询问、查看游戏、作为空游戏启动、Home 取消，以及真实运行 Minecraft 1.21.1 时游戏页的实时输出与结束游戏；#103 后核对 Home 读入当前游戏、继续弹出缺失文件夹询问、游戏库列出游戏。更早各页由 Project Maintainer 抽查主要流程。尚未在真实窗口核对：新建游戏后打开并设为当前、动态页刷新、运行时隐藏与回到前台、直接进入世界。
 - 每阶段 just check、最终 just docs、IA/i18n、受影响平台与真实窗口验收有记录
   Result: 2026-10-25：just docs 与 just ia 在 main 上无变化（#105 后 plans check 通过、ia 生成无差异）；IA 路径的迁移只改实现位置，操作语义不变；署名检查改写后注入违规证明失败。main（a320d2bb）上 Project Maintainer 运行 just check 通过。待办：CI 在 Linux 编译与测试，macOS 由本地检查覆盖，Windows 的 cfg 分支未在本计划中编译，平台运行交由社区反馈。
 
@@ -188,7 +188,7 @@ T7 审查后保留全部 25 个 workspace 成员，不新增、合并或拆分 c
 
 Why: 每个成员都有内聚职责和单向依赖，且隔离了真实的依赖或验证成本：lumilio-core 已按能力拆分（T3/T4），生产只依赖 lumilio-minecraft、lumilio-transfer、lumilio-nbt、lumilio-block-assets 与 lumilio-plugin-api，插件实现只在 dev-dependencies 用于集成测试；lumilio-ui 按 D8 保持单 crate，T6 进行中；lumilio-app 是唯一组装插件实现、更新器与 GPUI 窗口的 crate；lumilio-minecraft 为纯元数据（T2）；lumilio-transfer 是 core 与更新器共用的下载引擎；lumilio-updater 只由 app 使用；lumilio-plugin-api 是只依赖 serde 的同步契约；六个插件（crash-analyzer、curseforge、discord、litematica、modrinth、world-explorer）依赖插件契约而不依赖 core、ui、app 或 GPUI，由 plugin_boundaries 检查；lumilio-nbt 与 lumilio-anvil 是存档格式解析；lumilio-block-assets 被 core、schematic、schematic-render 与 xtask 共用；lumilio-schematic 与 lumilio-schematic-render 隔离 forks 中的 nucleation 与 schematic-mesher；lumilio-skin-render 无生产依赖；lumilio-map-render 隔离 wgpu；lumilio-pointer 与 lumilio-backdrop 隔离平台 FFI；lumilio-cubiomes 隔离 C 源码与 build.rs；lumilio-docgen 与 lumilio-xtask 是不进入产品依赖的工具。平铺的小 crate（nbt、backdrop、pointer、skin-render、map-render 等）没有需要目录模块的规模；docgen 结构检查已对所有 crate 执行相邻测试与文件规模规则。
 
-Consequences: 新规则只把已成立的约定写成检查：pointer、map-render 与 schematic-render 的文档已声明不依赖 GPUI，T6 规定插件注册与更新器归 app。dev-dependencies 不受分层规则限制（core 测试组装真实插件，xtask 测试使用 core）；插件 crates 的 dev-dependencies 仍由 plugin_boundaries 检查。T7 收尾（2026-10-25）：AGENTS.md 结构一节写明 lumilio-ui 内 features、shell 与共享控件的分工，以及 app 只适配应用自有的部分；技能与文档引用的 crate 路径逐一核对仍然存在。源码注释、IA 备注、设计语言与站点注释中的“ADR 00xx”编号已无对应文件，全部删去或改写为所说的事实；docgen 的 attribution 检查原以“ADR 0022”识别 Modrinth 署名，改为以 Modrinth 加上文件或许可证识别，注入一处 AGPL 署名证明检查失败后撤销。
+Consequences: 新规则只把已成立的约定写成检查：pointer、map-render 与 schematic-render 的文档已声明不依赖 GPUI，T6 规定插件注册与更新器归 app。dev-dependencies 不受分层规则限制（core 测试组装真实插件，xtask 测试使用 core）；插件 crates 的 dev-dependencies 仍由 plugin_boundaries 检查。T7 收尾（2026-10-25）：AGENTS.md 结构一节写明 lumilio-ui 内 features、shell 与共享控件的分工，以及 app 只适配应用自有的部分；技能与文档引用的 crate 路径逐一核对仍然存在。源码注释、IA 备注、设计语言与站点注释中的决策编号已无对应文件，全部删去或改写为所说的事实；docgen 的 attribution 检查原以决策编号识别 Modrinth 署名，改为以 Modrinth 加上文件或许可证识别，注入一处 AGPL 署名证明检查失败后撤销。
 
 ## Decision D18
 
@@ -210,7 +210,7 @@ Consequences: T6 的这两句验收以本决定为准；以后若共享控件需
 - [.agents/plans/discover-translation.json](../../.agents/plans/discover-translation.json)
 - [.agents/skills/gpui-kit/references/coding-guides.md](../../.agents/skills/gpui-kit/references/coding-guides.md)
 - [crates/lumilio-core/src/lib.rs](../../crates/lumilio-core/src/lib.rs)
-- [crates/lumilio-core/src/service/mod.rs](../../crates/lumilio-core/src/service/mod.rs)
+- [crates/lumilio-core/src/launcher_service/mod.rs](../../crates/lumilio-core/src/launcher_service/mod.rs)
 - [crates/lumilio-core/src/context.rs](../../crates/lumilio-core/src/context.rs)
 - [crates/lumilio-ui/src/lib.rs](../../crates/lumilio-ui/src/lib.rs)
 - [crates/lumilio-app/src/backend.rs](../../crates/lumilio-app/src/backend.rs)
@@ -226,7 +226,7 @@ Consequences: T6 的这两句验收以本决定为准；以后若共享控件需
 
 - Lesson: T2 时 cargo fmt --all 改写了 forks/nucleation、forks/schematic-mesher 与 vendor/xaerotools 的数百个文件（它们是 path 依赖）。守护：只用 just format（cargo fmt）或 just fmt，不加 --all；提交前用 git status 确认 forks/ 与 vendor/ 未改。
 
-- Lesson: T4 时 `sed -i '' -n '1,200p'` 把 service/instances.rs 截成 200 行（-n 与 -i 同用会丢弃未打印的行），从 HEAD 恢复后重放修改。守护：查看文件只用 Read 或不带 -i 的 sed/head；批量改写后用 git diff --stat 核对每个文件的删除行数。
+- Lesson: T4 时 `sed -i '' -n '1,200p'` 把 crates/lumilio-core/src/launcher_service/instances.rs 截成 200 行（-n 与 -i 同用会丢弃未打印的行），从 HEAD 恢复后重放修改。守护：查看文件只用 Read 或不带 -i 的 sed/head；批量改写后用 git diff --stat 核对每个文件的删除行数。
 
 - Lesson: T4 时委托生成脚本把所有 `pub(super) ` 改成 `pub(crate) `，连带放宽了能力结构体字段的可见性；`cargo clippy ... | grep | head` 的管道又掩盖了 clippy 的失败退出码，导致一次带 clippy 错误的提交（随后 amend）。守护：脚本只改写 fn/struct/enum/const/type 的可见性；检查命令把输出重定向到文件并单独打印 `$?`，以退出码决定是否提交。
 

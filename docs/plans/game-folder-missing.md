@@ -65,8 +65,8 @@ Consequences: 启动守卫仍保留，覆盖确认之后、启动之前目录才
 
 ## References
 
-- [crates/lumilio-core/src/process.rs](../../crates/lumilio-core/src/process.rs)
-- [crates/lumilio-core/src/deletion.rs](../../crates/lumilio-core/src/deletion.rs)
+- [crates/lumilio-core/src/launching/process.rs](../../crates/lumilio-core/src/launching/process.rs)
+- [crates/lumilio-core/src/instances/deletion.rs](../../crates/lumilio-core/src/instances/deletion.rs)
 - [crates/lumilio-ui/src/java_conflict.rs](../../crates/lumilio-ui/src/java_conflict.rs)
 - https://github.com/modrinth/code/blob/main/packages/app-lib/src/state/instances/commands/create_instance.rs
 - https://github.com/modrinth/code/blob/main/packages/app-lib/src/launcher/mod.rs

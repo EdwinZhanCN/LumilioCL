@@ -19,6 +19,6 @@
     {"criterion": "窗口检查", "result": "Project Maintainer（Edwin）2026-10-13 确认 Mac 实测通过。 主页先显示游戏列表，诊断在后台补充。"}
   ],
   "decisions": [{"id": "D1", "decision": "主页只执行无需完整文件校验的后台诊断", "rationale": "展示当前游戏不依赖资源内容校验", "consequences": "文件损坏通过显式诊断与修复发现；后台检查仍报告 Java、账户、Mod 与上次运行的问题"}],
-  "references": ["crates/lumilio-app/src/live/jobs.rs", "crates/lumilio-core/src/inspect.rs"],
+  "references": ["crates/lumilio-ui/src/shell/feed/lists.rs", "crates/lumilio-core/src/diagnostics/inspect.rs"],
   "outcome": "主页先显示游戏、诊断后台补充，随 0.1.3 发布并通过窗口检查。"
 }

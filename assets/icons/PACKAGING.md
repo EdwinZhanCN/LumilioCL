@@ -1,6 +1,6 @@
 # LumilioCL 打包约定
 
-范围：gpui-kit 应用在 macOS / Windows / Linux 上的图标与发布产物。这里只写不变量和关键接口，具体脚本由 `cargo xtask` 实现（`crates/lumilio-xtask`，`just package`）；发布流程是 `.github/workflows/release.yml`，决策见 ADR 0032。
+范围：gpui-kit 应用在 macOS / Windows / Linux 上的图标与发布产物。这里只写不变量和关键接口，具体脚本由 `cargo xtask` 实现（`crates/lumilio-xtask`，`just package`）；发布流程是 `.github/workflows/release.yml`。
 
 ## 0. 身份（全平台唯一，发布后不可改）
 

@@ -59,6 +59,6 @@
     }
   ],
   "lessonsLearned": [
-    "Windows 系统凭据单条容量有限，完整登录 JSON 中的长令牌超限会令登录失败。分块凭据保持在系统凭据库，先写新分块再提交清单，旧数据兼容且失败不覆盖原登录。Guard：crates/lumilio-core/src/credentials/chunked/tests.rs，覆盖长微软及第三方令牌、Unicode、旧数据迁移、清理与失败回滚；模拟恢复整条写入后微软登录回归测试按容量限制失败。"
+    "Windows 系统凭据单条容量有限，完整登录 JSON 中的长令牌超限会令登录失败。分块凭据保持在系统凭据库，先写新分块再提交清单，旧数据兼容且失败不覆盖原登录。Guard：crates/lumilio-core/src/accounts/credentials/chunked/tests.rs，覆盖长微软及第三方令牌、Unicode、旧数据迁移、清理与失败回滚；模拟恢复整条写入后微软登录回归测试按容量限制失败。"
   ]
 }

@@ -73,4 +73,4 @@ Consequences: 版本已正式发布；未观察到的实机验收仍保留在 R6
 
 0.1.2 已发布并完成 macOS 实机验收。
 
-- Lesson: Windows 系统凭据单条容量有限，完整登录 JSON 中的长令牌超限会令登录失败。分块凭据保持在系统凭据库，先写新分块再提交清单，旧数据兼容且失败不覆盖原登录。Guard：crates/lumilio-core/src/credentials/chunked/tests.rs，覆盖长微软及第三方令牌、Unicode、旧数据迁移、清理与失败回滚；模拟恢复整条写入后微软登录回归测试按容量限制失败。
+- Lesson: Windows 系统凭据单条容量有限，完整登录 JSON 中的长令牌超限会令登录失败。分块凭据保持在系统凭据库，先写新分块再提交清单，旧数据兼容且失败不覆盖原登录。Guard：crates/lumilio-core/src/accounts/credentials/chunked/tests.rs，覆盖长微软及第三方令牌、Unicode、旧数据迁移、清理与失败回滚；模拟恢复整条写入后微软登录回归测试按容量限制失败。
