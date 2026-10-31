@@ -1249,6 +1249,7 @@ instance-content-browse-shader = 浏览光影
 instance-content-empty = 还没有{ $noun }
 instance-content-empty-help = 点「浏览」找一个装进来，或者添加本地文件
 instance-content-refresh-tip = 重新读取并识别
+instance-content-identifying = 正在识别来源…
 instance-content-update-all-count = 全部更新（{ $count }）
 instance-content-update-to = 更新到 { $version }
 instance-content-no-match = 没有符合的条目
@@ -1281,6 +1282,7 @@ instance-content-add-partial =
     添加了 { $ok } 个，{ $failed } 个没有添加
     { $detail }
 instance-content-local-file = 本地文件
+instance-content-identifying-file = 识别中…
 instance-content-unknown-version = 未知
 instance-content-link-copied = 链接已复制
 instance-content-channel-release = 正式

@@ -1390,6 +1390,7 @@ instance-content-browse-shader = Browse shaders
 instance-content-empty = No { $noun } yet
 instance-content-empty-help = Choose one with "Browse", or add local files
 instance-content-refresh-tip = Read and identify again
+instance-content-identifying = Identifying sources…
 instance-content-update-to = Update to { $version }
 instance-content-update-all-count = Update all ({ $count ->
     [one] { $count } file
@@ -1461,6 +1462,7 @@ instance-content-add-partial =
     } didn't get added
     { $detail }
 instance-content-local-file = Local file
+instance-content-identifying-file = Identifying…
 instance-content-unknown-version = Unknown
 instance-content-link-copied = Link copied
 instance-content-channel-release = Release

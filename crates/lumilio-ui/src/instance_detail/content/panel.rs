@@ -22,7 +22,7 @@ fn browse_labels() -> &'static [&'static str] {
 }
 
 impl InstanceDetailView {
-    // ia[instance.content]: 识别来源 | 进入内容标签时自动 | 依次问已启用的内容源（先 Modrinth 按 SHA-1，没认出的再问 CurseForge 按指纹）：图标、项目名、作者、版本、项目链接；某个来源连不上时照常列出并注明，未识别的没有切换版本键 | 识别结果不缓存
+    // ia[instance.content]: 识别来源 | 进入内容标签时自动 | 先列出文件夹里的文件，再依次问已启用的内容源（先 Modrinth 按 SHA-1，没认出的再问 CurseForge 按指纹），补上图标、项目名、作者、版本、项目链接；识别期间工具栏写「正在识别来源…」，启停、删除或添加文件后，没变的文件留着上次的识别结果；某个来源连不上时照常列出并注明，未识别的没有切换版本键 | 识别结果按文件内容记在本机：文件是哪个版本记 30 天，没认出的记 1 天，名称、作者、图标和新版本记 30 分钟；再次进入时先显示记下的结果，只问过期的和新文件；连不上时沿用记下的结果
     pub(in super::super) fn content_panel(
         &mut self,
         window: &mut Window,
@@ -346,7 +346,7 @@ impl InstanceDetailView {
                 })
             });
             let refresh = {
-                // ia[instance.content]: 刷新 | L4b ↻ | 重新扫描目录并重新识别
+                // ia[instance.content]: 刷新 | L4b ↻ | 重新扫描目录，并让内容源重新识别每个文件（不用上次记下的结果）；连不上时保留已知的来源并注明
                 let view = view.clone();
                 theme::clickable(
                     Key::new("content-refresh")
@@ -357,11 +357,17 @@ impl InstanceDetailView {
                     true,
                 )
                 .on_click(move |_, window, cx| {
-                    let _ = view.update(cx, |view, cx| {
-                        view.request(Section::Content(kind), window, cx)
-                    });
+                    let _ = view.update(cx, |view, cx| view.identify_again(kind, window, cx));
                 })
             };
+            // Left of the keys, so they stay where they are when it goes.
+            let identifying = self.data.identifying(kind).then(|| {
+                div()
+                    .debug_selector(|| "content-identifying".into())
+                    .text_xs()
+                    .text_color(colors.muted)
+                    .child(tr!("instance-content-identifying"))
+            });
             let search = self.fields.as_ref().map(|fields| {
                 div().w(px(220.)).child(
                     Input::new(&fields.content_search).small().prefix(
@@ -390,6 +396,7 @@ impl InstanceDetailView {
                     h_flex()
                         .gap_2()
                         .items_center()
+                        .children(identifying)
                         .children(update_all)
                         .child(refresh),
                 )

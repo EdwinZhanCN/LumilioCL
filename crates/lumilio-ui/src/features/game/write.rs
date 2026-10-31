@@ -48,14 +48,14 @@ pub(super) fn write_instance(
                     };
                     match content_notice(&results, action) {
                         Ok(text) => done(&text, vec![Section::Content(kind)]),
-                        Err(detail) => Err(ServiceError::Remote(detail)),
+                        Err(detail) => Err(WriteFailure::Said(detail)),
                     }
                 }
                 InstanceIntent::DeleteContent { kind, files } => {
                     let results = service.delete_content(&id, kind, &files).await?;
                     match content_notice(&results, ContentAction::Delete) {
                         Ok(text) => done(&text, vec![Section::Content(kind)]),
-                        Err(detail) => Err(ServiceError::Remote(detail)),
+                        Err(detail) => Err(WriteFailure::Said(detail)),
                     }
                 }
                 InstanceIntent::SwitchContent {
@@ -112,7 +112,7 @@ pub(super) fn write_instance(
                             vec![Section::Content(kind)],
                         )
                     } else {
-                        Err(ServiceError::Remote(tr!(
+                        Err(WriteFailure::Said(tr!(
                             "instance-content-update-partial",
                             ok = total - failed.len(),
                             failed = failed.len(),
@@ -147,7 +147,7 @@ pub(super) fn write_instance(
                     if refused.is_empty() {
                         done(&tr!("instance-pending-added", count = placed), sections)
                     } else {
-                        Err(ServiceError::Remote(refused.join("\n")))
+                        Err(WriteFailure::Said(refused.join("\n")))
                     }
                 }
                 InstanceIntent::AddFiles { kind, files } => {
@@ -168,7 +168,7 @@ pub(super) fn write_instance(
                             vec![Section::Content(kind)],
                         )
                     } else {
-                        Err(ServiceError::Remote(tr!(
+                        Err(WriteFailure::Said(tr!(
                             "instance-content-add-partial",
                             ok = added,
                             failed = refused.len(),
@@ -376,7 +376,7 @@ pub(super) fn write_instance(
         }
     };
     let handle =
-        work.spawn(async move { job.await as Result<(String, Vec<Section>), ServiceError> });
+        work.spawn(async move { job.await as Result<(String, Vec<Section>), WriteFailure> });
     let work = work.clone();
     cx.spawn(async move |cx| {
         let result = match handle.await {
@@ -415,18 +415,41 @@ pub(super) fn write_instance(
     .detach();
 }
 
+/// Why a write did not go through: the service's error, or the launcher's
+/// own sentence about the files it could not change.
+#[derive(Debug)]
+enum WriteFailure {
+    Service(ServiceError),
+    Said(String),
+}
+
+impl From<ServiceError> for WriteFailure {
+    fn from(error: ServiceError) -> Self {
+        Self::Service(error)
+    }
+}
+
+impl std::fmt::Display for WriteFailure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Service(error) => error.fmt(f),
+            Self::Said(text) => f.write_str(text),
+        }
+    }
+}
+
 /// A switch that needs a file only the source's website may hand out says
 /// so in words, with the page, instead of the raw error.
-fn manual_download_said(error: ServiceError) -> ServiceError {
+fn manual_download_said(error: ServiceError) -> WriteFailure {
     match error {
-        ServiceError::ManualDownload { file, page } => ServiceError::Remote(match page {
+        ServiceError::ManualDownload { file, page } => WriteFailure::Said(match page {
             Some(page) => format!(
                 "{}: {page}",
                 tr!("discover-manual-download", file = file.as_str())
             ),
             None => tr!("discover-manual-download", file = file.as_str()),
         }),
-        other => other,
+        other => WriteFailure::Service(other),
     }
 }
 

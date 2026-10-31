@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use lumilio_core::{
-    CancellationToken, DefaultTransport, LauncherService, ProjectKind, SearchQuery,
+    CancellationToken, ContentLookup, DefaultTransport, LauncherService, ProjectKind, SearchQuery,
 };
 use lumilio_plugin_curseforge::{CurseForge, ID};
 
@@ -96,7 +96,7 @@ async fn curseforge_answers_as_the_launcher_expects() {
         }
         let started = std::time::Instant::now();
         let list = service
-            .content_details(&record.id, ProjectKind::Mod)
+            .content_details(&record.id, ProjectKind::Mod, ContentLookup::Fresh)
             .await
             .expect("the pack's mods");
         let mut by_source = std::collections::BTreeMap::<String, usize>::new();

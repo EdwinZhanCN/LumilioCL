@@ -1,6 +1,7 @@
 use lumilio_core::{
-    ChangeKind, HistoryEvent, HistoryRead, Problem, ProblemKind, ProjectKind, SessionOutcome,
-    Severity, SnapshotInfo, SnapshotScope, WorldInfo,
+    ChangeKind, ContentEntry, ContentItem, ContentList, ContentSource, HistoryEvent, HistoryRead,
+    Problem, ProblemKind, ProjectKind, SessionOutcome, Severity, SnapshotInfo, SnapshotScope,
+    WorldInfo,
 };
 
 use super::super::Section;
@@ -251,4 +252,68 @@ fn store_clears_pending_and_reports_presence() {
     data.store(Arrived::Content(ProjectKind::Shader, Err("x".into())));
     assert!(data.has(Section::Content(ProjectKind::Shader)));
     assert!(!data.has(Section::Content(ProjectKind::Mod)));
+}
+
+fn entry(name: &str, sha1: Option<&str>, title: Option<&str>) -> ContentEntry {
+    ContentEntry {
+        item: ContentItem {
+            file_name: name.into(),
+            display_name: name.into(),
+            enabled: true,
+            size: 4,
+            modified: 0,
+            is_directory: false,
+        },
+        sha1: sha1.map(Into::into),
+        source: title.map(|title| ContentSource {
+            source: "test.source".into(),
+            source_name: "Test".into(),
+            project_id: title.into(),
+            slug: title.into(),
+            title: title.into(),
+            author: None,
+            icon_url: None,
+            version_id: "v".into(),
+            version_number: "1".into(),
+            page_url: String::new(),
+        }),
+        update: None,
+    }
+}
+
+/// While the sources are asked again, a file keeps the source the page
+/// showed for it, unless its content is known to have changed.
+#[test]
+fn a_file_keeps_its_shown_source_only_while_it_is_the_same_file() {
+    let mods = Section::Content(ProjectKind::Mod);
+    let mut data = Data::default();
+    data.store(Arrived::Content(
+        ProjectKind::Mod,
+        Ok(ContentList {
+            entries: vec![
+                entry("a.jar", Some("a1"), Some("A")),
+                entry("b.jar", Some("b1"), Some("B")),
+            ],
+            ..ContentList::default()
+        }),
+    ));
+    data.pending.push(mods);
+    data.store(Arrived::ContentSoFar(
+        ProjectKind::Mod,
+        vec![
+            entry("a.jar", Some("a1"), None),
+            entry("b.jar", Some("b2"), None),
+            entry("c.jar", Some("c1"), Some("C")),
+        ],
+    ));
+    let Some(Ok(shown)) = &data.content[0] else {
+        panic!("the files are listed");
+    };
+    let titles: Vec<Option<&str>> = shown
+        .entries
+        .iter()
+        .map(|entry| entry.source.as_ref().map(|source| source.title.as_str()))
+        .collect();
+    assert_eq!(titles, [Some("A"), None, Some("C")]);
+    assert!(data.identifying(ProjectKind::Mod));
 }

@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "id": "content-recognition",
+  "title": "内容页先列文件，识别结果记在本机",
+  "summary": "#126：启停一个模组后，内容页要等所有内容源重新识别完才更新，期间还可能被更早的读取盖回原样；#127：每次进入内容页都把每个文件重新问一遍内容源，Modrinth 慢时要等很久。现在先列出文件夹里的文件，再显示记下的识别结果，最后才问内容源；识别结果按文件内容记在本机，只问过期的和新文件，刷新键重新问全部。顺带修正：内容源调用的网络预算用完时插件被当成卡住而停用，与 curseforge-source 的决定不符。",
+  "status": "in_progress",
+  "visibility": "internal",
+  "scope": {
+    "included": [
+      "游戏页内容标签：先列文件，再显示记下的识别结果，最后显示内容源的回答；识别期间工具栏写「正在识别来源…」。",
+      "写操作（启停、删除、添加、更新）结束后总是重新读取；更早开始的读取的回答被丢弃。",
+      "lumilio-core 的识别缓存：cache/content.sqlite，文件哈希、识别结果、项目名称与新版本。",
+      "刷新键让内容源重新识别全部文件。",
+      "插件宿主：网络读取在截止时间放弃后，调用随后结束算暂时性失败，插件不停用。"
+    ],
+    "excluded": [
+      "发现页搜索、项目详情与版本列表的缓存。",
+      "在设置里清除识别缓存的入口；删掉 cache/content.sqlite 即可。",
+      "#128、#129。"
+    ]
+  },
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "先列文件，写操作后立刻显示",
+      "status": "completed",
+      "acceptance": "进入内容标签时文件在内容源回答前列出；启停后文件名与开关立刻变，没变的文件保留来源；更早开始的读取后回答时不覆盖；找不到的文件在技术详情里写出文件名。"
+    },
+    {
+      "id": "T2",
+      "title": "识别结果记在本机",
+      "status": "completed",
+      "acceptance": "第二次读取同一组文件不再问内容源；新文件单独问；文件内容不变时启停不重新识别；没有网络时先显示记下的结果，重新识别失败也保留记下的来源并注明连不上；刷新键重新问全部文件；缓存打不开时照常哈希、照常识别。"
+    },
+    {
+      "id": "T3",
+      "title": "网络预算用完不停用插件",
+      "status": "completed",
+      "acceptance": "网络读取在截止时间放弃、调用随即结束时，这次调用失败，插件保持启用并记下暂时性错误；读取放弃后仍长时间不结束的调用、不读网络却超时的调用照旧停用插件。"
+    },
+    {
+      "id": "T4",
+      "title": "在真实窗口里检查",
+      "status": "proposed",
+      "acceptance": "Project Maintainer 在 Mac 上：有几十个模组的游戏第二次进入内容标签时立刻显示图标和名称；启停一个模组时立刻变化；刷新键显示「正在识别来源…」后照常完成；断网时进入内容标签仍显示记下的来源。"
+    }
+  ],
+  "validation": [
+    {
+      "criterion": "先列文件与丢弃旧回答（T1）。",
+      "result": "2026-10-30：lumilio-ui 的 a_switched_file_shows_at_once_and_keeps_its_source 与 features::game 的 files_show_before_the_sources_answer_and_a_switch_shows_at_once（内容源回答由测试放行）通过；分别去掉先列文件、写后总是重读、丢弃旧回答时测试失败。"
+    },
+    {
+      "criterion": "识别缓存（T2）。",
+      "result": "2026-10-30：lumilio-core 的 recognition_cache 5 项（哈希按路径、大小与修改时间记下，指纹按 SHA-1；过期后仍可读、过期 7 天后删除；读不出的条目当作没有；缓存打不开时照常哈希）与 recognize 2 项（第二次读取不再问内容源，新文件单独问，启停后不重新识别；没有网络时用记下的结果，重新识别失败时保留来源并注明）通过。lumilio-ui 的 a_kept_answer_stands_until_the_refresh_key_asks_again（真实启动器与测试内容源：再次读取不问，刷新键再问）与 a_file_keeps_its_shown_source_only_while_it_is_the_same_file 通过。让 Fresh 总是重问、刷新键改用 Fresh、去掉哈希比对时，对应测试失败。"
+    },
+    {
+      "criterion": "网络预算用完不停用插件（T3）。",
+      "result": "2026-10-30：a_network_timeout_cancels_the_future_and_fails_only_that_call（读取在截止时间放弃后插件仍启用，记下暂时性错误）与 a_call_still_running_after_its_read_ran_out_is_stuck（读取放弃后仍不结束、不读网络却超时都停用）通过；a_call_that_ends_after_its_deadline_timed_out_even_when_seen_before_the_timer 与 timed_out_content_calls_discard_late_results_and_preserve_other_sources 照旧通过。去掉「网络已用完」的判断时第一项失败。"
+    },
+    {
+      "criterion": "本地窄检查。",
+      "result": "2026-10-30：lumilio-core 的 content 与 plugins 测试 154 项、lumilio-ui 全部 627 项（nextest）、lumilio-docgen 测试通过；lumilio-core 测试目标与 lumilio-app 测试目标能编译；lumilio-core 与 lumilio-ui 的 clippy -D warnings、fmt 通过；just ia、plans validate、just plans 与 plans-check 通过。just check 由 PR 的 CI 跑。"
+    },
+    {
+      "criterion": "真实窗口里的主要流程（T4）。",
+      "result": null
+    }
+  ],
+  "decisions": [
+    {
+      "id": "D1",
+      "decision": "内容标签分三步显示：文件夹里的文件、记下的识别结果、内容源的回答；后两步之前文件保留页面上已有的来源。同一页同一部分只显示最新一次读取的回答。",
+      "rationale": "读文件夹是本地操作，问内容源可能要几秒；写操作结束时可能有一次在它之前开始的读取还在路上，它的回答反映的是写之前的文件。",
+      "consequences": "写操作结束后总是重新读取；旧读取的回答到达时被丢弃。新版本只给已启用的文件，与内容源的规则一致。"
+    },
+    {
+      "id": "D2",
+      "decision": "识别结果按文件内容（SHA-1）记在本机的 cache/content.sqlite：文件是哪个版本记 30 天，内容源没认出的记 1 天，项目名称、作者、图标与可更新到的版本记 30 分钟；过期的结果先显示再重新问，问不到时继续用，过期 7 天后删除。文件的 SHA-1 按路径、大小与修改时间记下，CurseForge 指纹按 SHA-1 记下。刷新键不用记下的结果。",
+      "rationale": "参照 Modrinth App 的缓存（packages/app-lib/src/state/cache.rs）：文件哈希与版本归属不随时间变化，名称和新版本会变；过期结果先用再更新（stale-while-revalidate）。没认出的文件可能稍后上传，所以只记 1 天。按内容记，启停改名和复制到别的游戏都不必重新识别。",
+      "consequences": "第二次进入内容标签时只问过期的和新文件；结构变化后读不出的旧条目当作没有记录。缓存打不开时退回每次都问。"
+    },
+    {
+      "id": "D3",
+      "decision": "插件调用的网络读取在截止时间放弃后，调用在 250 毫秒内结束的算暂时性失败，插件不停用；仍未结束的、没读网络却超时的照旧停用插件。只有宿主的网络读取能证明网络用完，插件自己返回同样的错误不算。",
+      "rationale": "curseforge-source 决定「网络预算用完是暂时性错误」，#114 为了让 Windows 上的测试稳定，把截止时间之后才结束的调用一律算超时，网络慢时内容源会在本次运行中停用，之后识别、搜索都不可用。",
+      "consequences": "a_network_timeout_cancels_the_future_and_fails_only_that_call 取代原来期望插件停用的测试；卡住的插件仍由 a_call_still_running_after_its_read_ran_out_is_stuck 检查。"
+    }
+  ],
+  "references": [
+    "https://github.com/modrinth/code/blob/main/packages/app-lib/src/state/cache.rs",
+    "https://github.com/EdwinZhanCN/LumilioCL/issues/126",
+    "https://github.com/EdwinZhanCN/LumilioCL/issues/127",
+    "crates/lumilio-core/src/content/recognition_cache.rs",
+    "crates/lumilio-core/src/content/recognize.rs",
+    "crates/lumilio-core/src/plugins/plugin_host.rs",
+    "crates/lumilio-core/src/plugins/network.rs",
+    "crates/lumilio-ui/src/features/game/load.rs",
+    "crates/lumilio-ui/src/instance_detail/panels/data.rs"
+  ],
+  "dependencies": [
+    "curseforge-source"
+  ],
+  "lessonsLearned": [
+    "#114 修 Windows 测试时把「截止时间之后才结束的调用」一律算超时，悄悄推翻了 curseforge-source「网络预算用完是暂时性错误」的决定，原测试也改成了期望插件停用。防护：网络上下文记下读取是否在截止时间放弃，a_network_timeout_cancels_the_future_and_fails_only_that_call 检查插件保持启用。"
+  ],
+  "roadmap": {
+    "enabled": false,
+    "id": "content-recognition",
+    "name": "内容识别缓存",
+    "lede": "内容页先列文件，识别结果记在本机。",
+    "targetVersion": null,
+    "order": 0
+  }
+}
