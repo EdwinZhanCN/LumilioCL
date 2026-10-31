@@ -7,14 +7,14 @@
 | 操作 | 层 / 组件 | 结果与反馈 | 备注 | 实现 |
 |---|---|---|---|---|
 | 批量启用 / 停用 / 删除 | 选中行后出现的批量栏 | 逐项结果；删除先确认 |  | `lumilio-ui/src/instance_detail/content/bulk.rs` › `InstanceDetailView::bulk_bar` |
-| 识别来源 | 进入内容标签时自动 | 依次问已启用的内容源（先 Modrinth 按 SHA-1，没认出的再问 CurseForge 按指纹）：图标、项目名、作者、版本、项目链接；某个来源连不上时照常列出并注明，未识别的没有切换版本键 | 识别结果不缓存 | `lumilio-ui/src/instance_detail/content/panel.rs` › `InstanceDetailView::content_panel` |
+| 识别来源 | 进入内容标签时自动 | 先列出文件夹里的文件，再依次问已启用的内容源（先 Modrinth 按 SHA-1，没认出的再问 CurseForge 按指纹），补上图标、项目名、作者、版本、项目链接；识别期间工具栏写「正在识别来源…」，启停、删除或添加文件后，没变的文件留着上次的识别结果；某个来源连不上时照常列出并注明，未识别的没有切换版本键 | 识别结果按文件内容记在本机：文件是哪个版本记 30 天，没认出的记 1 天，名称、作者、图标和新版本记 30 分钟；再次进入时先显示记下的结果，只问过期的和新文件；连不上时沿用记下的结果 | `lumilio-ui/src/instance_detail/content/panel.rs` › `InstanceDetailView::content_panel` |
 | 切换子分类 | L4a 分段：Mod / 资源包 / 光影 | 列表切换；搜索与筛选各分类分别记住 |  | `lumilio-ui/src/instance_detail/content/panel.rs` › `InstanceDetailView::content_panel` |
 | 添加本地文件 | L4a 次要「添加文件」→ 选文件（拖入内容页没做） | 冲突逐项报告，不静默覆盖同名异内容的文件 |  | `lumilio-ui/src/instance_detail/content/panel.rs` › `InstanceDetailView::content_panel` |
 | 添加已下载的文件 | 缺少的文件块「添加已下载的文件…」→ 选文件 | 按 SHA-1 认出是缺的哪一个，放到它该在的位置；不是缺的文件逐个说明；放好的从列表消失 | 运行中禁用 | `lumilio-ui/src/instance_detail/content/panel.rs` › `InstanceDetailView::pending_block` |
 | 打开下载页 | 缺少的文件行「下载页」 | 浏览器打开这个文件在来源网站上的下载页 |  | `lumilio-ui/src/instance_detail/content/panel.rs` › `InstanceDetailView::pending_block` |
 | 筛选 | L4b 下拉：全部 / 有更新 / 已停用 / 未识别 | 视图状态 |  | `lumilio-ui/src/instance_detail/content/panel.rs` › `InstanceDetailView::content_body` |
 | 全部更新 | L4b「全部更新（N）」→ 确认弹窗 | 逐项执行，部分成功分别报告；进度在动态 | 弹窗内逐项取消勾选没做 | `lumilio-ui/src/instance_detail/content/panel.rs` › `InstanceDetailView::content_body` |
-| 刷新 | L4b ↻ | 重新扫描目录并重新识别 |  | `lumilio-ui/src/instance_detail/content/panel.rs` › `InstanceDetailView::content_body` |
+| 刷新 | L4b ↻ | 重新扫描目录，并让内容源重新识别每个文件（不用上次记下的结果）；连不上时保留已知的来源并注明 |  | `lumilio-ui/src/instance_detail/content/panel.rs` › `InstanceDetailView::content_body` |
 | 搜索 | L4b 搜索框 | 按名称过滤（视图状态） |  | `lumilio-ui/src/instance_detail/content/panel.rs` › `InstanceDetailView::watch_content_search` |
 | 打开项目页 | 点标题（仅已识别） | 打开该项目的发现页详情（进历史） |  | `lumilio-ui/src/instance_detail/content/row.rs` › `InstanceDetailView::row` |
 | 更新单个 | 行内橙色 ↻ 图标键（悬停写「更新到 新版本号」）→ 切换版本弹窗，默认选最新兼容 | 下载 → 校验 → 替换旧文件 → 重扫 → 写历史；停用的保持停用 | 与 ⇆ 同宽，有更新的行与没有的行版本列对齐 | `lumilio-ui/src/instance_detail/content/row.rs` › `InstanceDetailView::row` |

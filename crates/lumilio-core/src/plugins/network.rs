@@ -1,6 +1,7 @@
 //! Permission-scoped HTTP over the launcher's transport. Mirrors replace an
 //! authorized original URL only through the host-owned SourceChain.
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, RwLock};
 
 use futures_util::StreamExt;
@@ -49,6 +50,7 @@ impl Network {
                 .clone(),
             handle: Handle::current(),
             deadline,
+            ran_out: Arc::default(),
         }
     }
 }
@@ -58,6 +60,9 @@ pub(super) struct NetworkContext {
     sources: Option<SourceChain>,
     handle: Handle,
     deadline: Instant,
+    /// Set when a read gave up at the deadline, so the host can tell a call
+    /// the network kept waiting from one that is stuck.
+    ran_out: Arc<AtomicBool>,
 }
 
 fn unavailable(message: impl Into<String>) -> PluginError {
@@ -132,6 +137,16 @@ fn validate_request(request: &FetchRequest) -> Result<(), PluginError> {
 }
 
 impl NetworkContext {
+    /// Whether a read has given up at the deadline; shared with the host.
+    pub(super) fn ran_out(&self) -> Arc<AtomicBool> {
+        self.ran_out.clone()
+    }
+
+    fn out_of_time(&self) -> PluginError {
+        self.ran_out.store(true, Ordering::Release);
+        PluginError::Transient("plugin network deadline expired".into())
+    }
+
     pub(super) fn fetch(
         &self,
         manifest: &Manifest,
@@ -143,16 +158,14 @@ impl NetworkContext {
         }
         validate_request(&request)?;
         if Instant::now() >= self.deadline {
-            return Err(PluginError::Transient(
-                "plugin network deadline expired".into(),
-            ));
+            return Err(self.out_of_time());
         }
         // Only called inside spawn_blocking. Dropping a pending transport
         // future at the shared deadline also releases a timed-out worker.
         self.handle.block_on(async {
             tokio::time::timeout_at(self.deadline, self.fetch_async(manifest, request))
                 .await
-                .map_err(|_| PluginError::Transient("plugin network deadline expired".into()))?
+                .map_err(|_| self.out_of_time())?
         })
     }
 

@@ -70,10 +70,10 @@ pub use content::updates::{
     ContentUpdate, UpdateError, UpdateReport, apply as apply_update, check as check_updates,
 };
 pub use content::{
-    AddedFile, ContentEffect, ContentEntry, ContentError, ContentItem, ContentList, ContentResult,
-    ContentSource, ContentSourceInfo, DependencyNeed, DependencyReport, DiscoverFilters,
-    InstalledProject, ModMetadata, ProjectDetail, read_mod_metadata, remove as remove_content,
-    scan as scan_content, set_enabled as set_content_enabled, sha1_hex,
+    AddedFile, ContentEffect, ContentEntry, ContentError, ContentItem, ContentList, ContentLookup,
+    ContentResult, ContentSource, ContentSourceInfo, DependencyNeed, DependencyReport,
+    DiscoverFilters, InstalledProject, ModMetadata, ProjectDetail, read_mod_metadata,
+    remove as remove_content, scan as scan_content, set_enabled as set_content_enabled, sha1_hex,
 };
 pub use context::{Context, Revisions, Session, SessionPhase};
 pub use diagnostics::attention::{

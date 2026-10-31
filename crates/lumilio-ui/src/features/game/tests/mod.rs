@@ -12,6 +12,8 @@ use crate::LauncherShell;
 use crate::instance_detail::InstanceIntent;
 use crate::testing::{Launcher, launcher, toasts, until};
 
+mod content;
+
 /// The shell in a window, with what the game feature told the application.
 fn shell<'a>(
     launcher: &Launcher,

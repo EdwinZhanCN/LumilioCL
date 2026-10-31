@@ -115,7 +115,7 @@ impl<T: Transport + Clone> Content<T> {
             .iter()
             .filter_map(|file| Some((file.sha1.clone()?, file.path.clone())))
             .collect();
-        let hashes = Self::file_hashes(&client, &asked).await;
+        let hashes = self.file_hashes(&client, &asked).await;
         let identified = client.identify(&hashes).await.map_err(|error| {
             ServiceError::Remote(format!(
                 "{} could not be asked which files are known: {error}",
@@ -217,7 +217,7 @@ impl<T: Transport + Clone> Content<T> {
             .filter(|file| file.item.enabled)
             .filter_map(|file| Some((file.sha1.clone()?, file.path.clone())))
             .collect();
-        let hashes = Self::file_hashes(&client, &asked).await;
+        let hashes = self.file_hashes(&client, &asked).await;
         let installed: BTreeSet<String> = client
             .identify(&hashes)
             .await

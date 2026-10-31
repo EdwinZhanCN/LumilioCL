@@ -247,6 +247,87 @@ fn content_switches_send_one_change_and_a_failure_keeps_the_list(cx: &mut TestAp
     });
 }
 
+/// After a switch the files on disk show at once (#126): the switched file
+/// keeps what the source said about it, and the newest version waits for
+/// the sources, which see only enabled files. A write that finishes while a
+/// read is on its way reads again.
+#[gpui::test]
+fn a_switched_file_shows_at_once_and_keeps_its_source(cx: &mut TestAppContext) {
+    let (view, cx) = rooted(cx, Rc::default());
+    let mut list = listed(vec![item("apple.jar", true), item("mine.jar", true)]);
+    list.entries[0].sha1 = Some("a1".into());
+    list.entries[0].source = Some(lumilio_core::ContentSource {
+        source: lumilio_core::DEFAULT_SOURCE.into(),
+        source_name: "Modrinth".into(),
+        page_url: String::new(),
+        project_id: "P".into(),
+        slug: "appleskin".into(),
+        title: "AppleSkin".into(),
+        author: Some("squeek502".into()),
+        icon_url: None,
+        version_id: "v1".into(),
+        version_number: "3.0.10".into(),
+    });
+    list.entries[0].update = Some(known_version("v2", "3.0.11", "1.21.1"));
+    let mods = Section::Content(ProjectKind::Mod);
+    view.update(cx, |view, cx| {
+        view.loaded(Ok((record(), LauncherSettings::default())), cx);
+        view.select_tab(TAB_CONTENT, cx);
+        view.arrived(Arrived::Content(ProjectKind::Mod, Ok(list.clone())), cx);
+    });
+    cx.update(|window, cx| view.update(cx, |view, cx| view.request(mods, window, cx)));
+    let stale = view.update(cx, |view, cx| {
+        view.operated(
+            Operated {
+                notice: "已停用 1 个文件".into(),
+                technical: None,
+                refresh: vec![mods],
+            },
+            cx,
+        )
+    });
+    assert!(stale.contains(&mods), "a read on its way is read again");
+
+    view.update(cx, |view, cx| {
+        view.arrived(
+            Arrived::ContentSoFar(
+                ProjectKind::Mod,
+                listed(vec![item("apple.jar", false), item("mine.jar", true)]).entries,
+            ),
+            cx,
+        )
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        let Some(Ok(shown)) = &view.data.content[0] else {
+            panic!("the files are listed");
+        };
+        let apple = &shown.entries[0];
+        assert_eq!(apple.item.file_name, "apple.jar.disabled");
+        assert_eq!(apple.source, list.entries[0].source);
+        assert_eq!(apple.sha1.as_deref(), Some("a1"));
+        assert_eq!(apple.update, None, "a disabled file is not offered updates");
+        assert!(shown.entries[1].source.is_none());
+        assert!(view.data.identifying(ProjectKind::Mod));
+    });
+    assert!(
+        cx.debug_bounds("content-identifying").is_some(),
+        "the toolbar says the sources are being asked"
+    );
+
+    let mut answered = list;
+    answered.entries[0].item = item("apple.jar", false);
+    answered.entries[0].update = None;
+    view.update(cx, |view, cx| {
+        view.arrived(Arrived::Content(ProjectKind::Mod, Ok(answered)), cx)
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(!view.data.identifying(ProjectKind::Mod))
+    });
+    assert!(cx.debug_bounds("content-identifying").is_none());
+}
+
 fn pending(path: &str) -> lumilio_core::PendingDownload {
     lumilio_core::PendingDownload {
         title: "Corail Tombstone".into(),

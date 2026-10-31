@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 
@@ -394,6 +395,7 @@ impl PluginHost {
             .network
             .as_ref()
             .map(|network| network.context(deadline));
+        let ran_out = network.as_ref().map(network::NetworkContext::ran_out);
         let mut context = Context::new(
             &entry.manifest,
             &state,
@@ -411,7 +413,8 @@ impl PluginHost {
             deadline: deadline.into_std(),
         });
         let plugin = entry.plugin.clone();
-        let result = isolated(deadline, move || call(plugin.as_ref(), &context)).await;
+        let result =
+            isolated_reading(deadline, ran_out, move || call(plugin.as_ref(), &context)).await;
         match result {
             Ok(value) => {
                 let preferences = self
@@ -494,28 +497,61 @@ impl Fault {
     }
 }
 
+/// How long after its deadline a call whose network read gave up there has
+/// to end, before it counts as stuck.
+const READ_GRACE: Duration = Duration::from_millis(250);
+
 /// Runs `call` on a blocking worker until `deadline`. A call that ends at or
 /// after its deadline timed out, even when its result is polled before the
-/// timer: a network read gives up at this same deadline, and its error must
-/// not pass for the plugin's own.
+/// timer: what the plugin says about its own time does not count.
 pub(super) async fn isolated<R, F>(deadline: Instant, call: F) -> Result<R, Fault>
 where
     R: Send + 'static,
     F: FnOnce() -> Result<R, PluginError> + Send + 'static,
 {
-    let task = tokio::task::spawn_blocking(move || {
+    isolated_reading(deadline, None, call).await
+}
+
+/// [`isolated`] for a call whose network reads give up at `deadline` and
+/// set `ran_out`. A call that ends within [`READ_GRACE`] after a read gave
+/// up failed for the network, not for itself: a transient fault, as for any
+/// other network failure (plan content-recognition D3). A call still
+/// running after the grace is stuck and stops the plugin.
+pub(super) async fn isolated_reading<R, F>(
+    deadline: Instant,
+    ran_out: Option<Arc<AtomicBool>>,
+    call: F,
+) -> Result<R, Fault>
+where
+    R: Send + 'static,
+    F: FnOnce() -> Result<R, PluginError> + Send + 'static,
+{
+    let mut task = tokio::task::spawn_blocking(move || {
         let result = catch_unwind(AssertUnwindSafe(call));
         (result, Instant::now())
     });
-    match tokio::time::timeout_at(deadline, task).await {
-        Ok(Ok((_, finished))) if finished >= deadline => Err(Fault::stop("plugin call timed out")),
-        Ok(Ok((Ok(Ok(value)), _))) => Ok(value),
-        Ok(Ok((Ok(Err(error)), _))) => Err(Fault {
+    let joined = match tokio::time::timeout_at(deadline, &mut task).await {
+        Ok(joined) => Some(joined),
+        // The read gives up at this same instant; let the call return.
+        Err(_) if ran_out.is_some() => tokio::time::timeout(READ_GRACE, &mut task).await.ok(),
+        Err(_) => None,
+    };
+    let network_ran_out = ran_out.is_some_and(|ran_out| ran_out.load(Ordering::Acquire));
+    match joined {
+        None => Err(Fault::stop("plugin call timed out")),
+        Some(Ok((Err(_), _))) => Err(Fault::stop("plugin panicked")),
+        Some(Ok((_, finished))) if finished >= deadline && network_ran_out => Err(Fault {
+            message: "plugin network deadline expired".into(),
+            transient: true,
+        }),
+        Some(Ok((_, finished))) if finished >= deadline => {
+            Err(Fault::stop("plugin call timed out"))
+        }
+        Some(Ok((Ok(Ok(value)), _))) => Ok(value),
+        Some(Ok((Ok(Err(error)), _))) => Err(Fault {
             transient: matches!(error, PluginError::Transient(_)),
             message: error.to_string(),
         }),
-        Ok(Ok((Err(_), _))) => Err(Fault::stop("plugin panicked")),
-        Ok(Err(error)) => Err(Fault::stop(format!("plugin worker failed: {error}"))),
-        Err(_) => Err(Fault::stop("plugin call timed out")),
+        Some(Err(error)) => Err(Fault::stop(format!("plugin worker failed: {error}"))),
     }
 }

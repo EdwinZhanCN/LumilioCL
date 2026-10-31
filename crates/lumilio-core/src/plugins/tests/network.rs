@@ -367,8 +367,11 @@ impl Transport for Stalled {
     }
 }
 
-#[tokio::test]
-async fn a_network_timeout_cancels_the_future_and_releases_the_worker() {
+fn stalled_host() -> (
+    PluginHost,
+    tokio::sync::oneshot::Receiver<()>,
+    Arc<AtomicUsize>,
+) {
     let (started_tx, started_rx) = tokio::sync::oneshot::channel();
     let dropped = Arc::new(AtomicUsize::new(0));
     let mut host = network_host(
@@ -378,8 +381,16 @@ async fn a_network_timeout_cancels_the_future_and_releases_the_worker() {
         },
         official(),
     );
-    host.list().await;
     host.timeout = Duration::from_millis(50);
+    (host, started_rx, dropped)
+}
+
+/// A slow network is not the plugin's fault (plan curseforge-source): the
+/// read that runs out of time fails that call only.
+#[tokio::test]
+async fn a_network_timeout_cancels_the_future_and_fails_only_that_call() {
+    let (host, started_rx, dropped) = stalled_host();
+    host.list().await;
     let (finished_tx, finished_rx) = tokio::sync::oneshot::channel();
     let call = host.call("test.network", |_, ctx| {
         let result = ctx.fetch("https://api.test/ok");
@@ -395,11 +406,46 @@ async fn a_network_timeout_cancels_the_future_and_releases_the_worker() {
         .unwrap()
         .unwrap();
     assert_eq!(dropped.load(Ordering::SeqCst), 1);
+    assert_eq!(host.list().await[0].status, PluginStatus::Enabled);
+    assert_eq!(
+        host.last_transient_error("test.network").await.as_deref(),
+        Some("plugin network deadline expired")
+    );
+    assert_eq!(host.call("test.network", |_, _| Ok(1)).await, Some(1));
+}
+
+/// A plugin that keeps working long after its read gave up is stuck, as is
+/// one that never reads.
+#[tokio::test]
+async fn a_call_still_running_after_its_read_ran_out_is_stuck() {
+    let (host, _started, _) = stalled_host();
+    host.list().await;
+    let result = host
+        .call("test.network", |_, ctx| {
+            let _ = ctx.fetch("https://api.test/ok");
+            std::thread::sleep(Duration::from_secs(1));
+            Ok(())
+        })
+        .await;
+    assert_eq!(result, None);
     assert!(matches!(
         host.list().await[0].status,
         PluginStatus::Failed { .. }
     ));
-    assert_eq!(host.call("test.other", |_, _| Ok(1)).await, Some(1));
+
+    let (host, _started, _) = stalled_host();
+    host.list().await;
+    let result = host
+        .call("test.network", |_, _| {
+            std::thread::sleep(Duration::from_millis(500));
+            Ok(())
+        })
+        .await;
+    assert_eq!(result, None);
+    assert!(matches!(
+        host.list().await[0].status,
+        PluginStatus::Failed { .. }
+    ));
 }
 
 #[tokio::test]

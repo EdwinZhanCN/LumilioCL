@@ -8,7 +8,7 @@ use crate::content::{
     AddedFile, ContentResult, ContentSourceInfo, DependencyNeed, DependencyReport, DiscoverFilters,
     InstalledProject, ProjectDetail,
 };
-use crate::content::{ContentError, ContentItem};
+use crate::content::{ContentError, ContentItem, ContentLookup};
 use crate::error::ServiceError;
 use crate::instances::modpack::PendingDownload;
 use crate::transfer::Transport;
@@ -49,8 +49,9 @@ impl<T: Transport + Clone> LauncherService<T> {
         &self,
         id: &str,
         kind: ProjectKind,
+        lookup: ContentLookup,
     ) -> Result<crate::content::ContentList, ServiceError> {
-        self.content.content_details(id, kind).await
+        self.content.content_details(id, kind, lookup).await
     }
 
     pub async fn set_content_state(
