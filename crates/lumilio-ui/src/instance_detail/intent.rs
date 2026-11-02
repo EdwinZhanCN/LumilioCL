@@ -50,6 +50,9 @@ pub enum InstanceIntent {
     Reload,
     /// Fetch this data and answer with [`super::InstanceDetailView::arrived`].
     Load(Section),
+    /// Read this kind of content again, asking its sources about every file
+    /// even when they answered before; answers as `Load` does.
+    IdentifyContent(ProjectKind),
     SetContent {
         kind: ProjectKind,
         files: Vec<String>,

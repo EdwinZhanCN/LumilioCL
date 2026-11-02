@@ -1,4 +1,5 @@
 use crate::activity::CancellationToken;
+use crate::content::ContentLookup;
 use crate::content::discover::ProjectKind;
 use crate::error::ServiceError;
 use crate::instances::Loader;
@@ -409,7 +410,7 @@ async fn with_the_source_disabled_nothing_is_served_not_even_from_memory() {
     // Installed content stays usable; only its source labels are unknown.
     let list = world
         .service
-        .content_details(&record.id, ProjectKind::Mod)
+        .content_details(&record.id, ProjectKind::Mod, ContentLookup::Fresh)
         .await
         .unwrap();
     assert!(list.sources_unavailable);

@@ -4,6 +4,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use super::DiscoverFilters;
+use super::recognition_cache::RecognitionCache;
 use crate::activity::Tasks;
 use crate::content::translation::SharedTranslation;
 use crate::instances::Instances;
@@ -26,6 +27,8 @@ pub(crate) struct Content<T> {
     pub(super) filters: Mutex<BTreeMap<String, DiscoverFilters>>,
     /// Translated summaries and bodies, cached in their own SQLite file.
     pub(super) translation: SharedTranslation,
+    /// What the sources said about installed files, and the files' hashes.
+    pub(super) recognition: RecognitionCache,
 }
 
 impl<T> Content<T> {
@@ -39,6 +42,7 @@ impl<T> Content<T> {
         translation: SharedTranslation,
     ) -> Self {
         Self {
+            recognition: RecognitionCache::new(layout.root().join("cache/content.sqlite")),
             instances,
             layout,
             network,

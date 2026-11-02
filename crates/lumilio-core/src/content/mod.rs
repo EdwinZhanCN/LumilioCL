@@ -7,6 +7,7 @@ pub use items::{
 };
 pub(crate) use items::{DISABLED_SUFFIX, folder};
 pub use pending::AddedFile;
+pub use recognition_cache::ContentLookup;
 pub use sources::{ContentEntry, ContentList, ContentSource};
 pub(crate) use sources::{Recognized, Summaries, assemble};
 pub(crate) use state::Content;
@@ -21,6 +22,7 @@ pub(crate) mod fingerprint;
 mod install;
 mod items;
 mod pending;
+mod recognition_cache;
 mod recognize;
 mod search;
 mod sources;

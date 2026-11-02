@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use super::kinds::ProjectKind;
 
 /// A category a project can be filed under, for one project type.
@@ -31,8 +33,10 @@ pub struct GameVersionTag {
     pub published: String,
 }
 
-/// What an installed file's label needs to know about its project.
-#[derive(Clone, Debug, Eq, PartialEq)]
+/// What an installed file's label needs to know about its project. Kept in
+/// the recognition cache, so a change to its fields reads old entries as
+/// misses.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ProjectSummary {
     pub id: String,
     pub slug: String,

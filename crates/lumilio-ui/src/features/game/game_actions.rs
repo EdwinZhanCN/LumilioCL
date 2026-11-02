@@ -7,7 +7,7 @@ use gpui::{App, AppContext, Context, Entity, EventEmitter, WeakEntity, Window};
 use tokio::task::JoinHandle;
 
 use super::answer::answer;
-use super::load::load_instance;
+use super::load::{SectionLoads, load_instance};
 use super::plugins::{StudioWindowEntry, open_studio_window, plugin_tabs};
 use crate::instance_detail::{InstanceDetailView, InstanceIntent};
 use crate::runtime::{Service, Worker};
@@ -44,6 +44,7 @@ pub struct Game {
     windows: Rc<GameWindows>,
     /// The studio windows open now, one per game and folder.
     studios: Rc<RefCell<Vec<StudioWindowEntry>>>,
+    loads: Rc<SectionLoads>,
 }
 
 impl EventEmitter<GameEvent> for Game {}
@@ -56,6 +57,7 @@ impl Game {
             this: cx.weak_entity(),
             windows: Rc::default(),
             studios: Rc::default(),
+            loads: Rc::default(),
         }
     }
 
@@ -77,6 +79,7 @@ impl Game {
             game: self.this.clone(),
             windows: self.windows.clone(),
             studios: self.studios.clone(),
+            loads: self.loads.clone(),
         })
     }
 
@@ -176,6 +179,7 @@ pub struct GameWork {
     game: WeakEntity<Game>,
     windows: Rc<GameWindows>,
     pub(super) studios: Rc<RefCell<Vec<StudioWindowEntry>>>,
+    loads: Rc<SectionLoads>,
 }
 
 impl GameWork {
@@ -209,6 +213,10 @@ impl GameWork {
 
     pub(super) fn windows(&self) -> &GameWindows {
         &self.windows
+    }
+
+    pub(super) fn loads(&self) -> &SectionLoads {
+        &self.loads
     }
 
     /// Tells the shell and the application.
