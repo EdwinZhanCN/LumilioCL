@@ -154,6 +154,8 @@ impl InstanceDetailView {
                             index: row,
                             entry: server.clone(),
                         },
+                        // The game rewrites its server list itself.
+                        self.busy || self.live_output.is_some(),
                         cx,
                     ))
                     .child(menu);

@@ -1,6 +1,8 @@
 //! What a game keeps in its folder besides mods: saved worlds and their map,
 //! the server list, screenshots and schematics.
 
+pub(crate) use in_use::refuse_if_open;
+pub use in_use::worlds_in_use;
 pub(crate) use operations::Worlds;
 pub use saves::{
     GameMode, WorldError, WorldInfo, copy_name, delete, duplicate, export_zip, import_zip, scan,
@@ -9,6 +11,7 @@ pub use saves::{
 
 pub use self::models::ModelPreview;
 
+mod in_use;
 mod map;
 mod models;
 pub(crate) mod multiplayer;

@@ -42,6 +42,8 @@ pub enum ServiceError {
     /// The game's own folder is not on disk (the path it should be at).
     GameFolderMissing(PathBuf),
     InstanceBusy(String),
+    /// A running game of the instance has this world (its folder) open.
+    WorldInUse(String),
     RootBusy(PathBuf),
     /// The project has no file that fits the instance.
     NoCompatibleVersion,
@@ -99,6 +101,7 @@ impl Display for ServiceError {
                 root.display()
             ),
             Self::InstanceBusy(id) => write!(f, "instance {id:?} has an operation in progress"),
+            Self::WorldInUse(folder) => write!(f, "the running game has world {folder:?} open"),
             Self::NoSuchInstance(id) => write!(f, "no instance {id:?}"),
             Self::GameFolderMissing(path) => {
                 write!(f, "the game's folder is missing: {}", path.display())

@@ -9,8 +9,8 @@ use crate::activity::CancellationToken;
 use crate::clock::now;
 use crate::context::{ContextHub, SessionPhase};
 use crate::error::ServiceError;
-use crate::instances::StoreError;
 use crate::instances::history::{SessionOutcome, finish_session, record_attempt};
+use crate::instances::{InstanceLease, StoreError};
 use crate::settings::tuning::QuickPlay;
 use crate::storage::Layout;
 use crate::transfer::Transport;
@@ -46,7 +46,7 @@ impl<T: Transport + Clone> LaunchParts<'_, T> {
         updates: mpsc::UnboundedSender<LaunchUpdate>,
         cancel: CancellationToken,
     ) -> Result<GameExit, ServiceError> {
-        let _lease = self.instances.reserve(id)?;
+        let lease = self.instances.reserve(id)?;
         let started = now();
         // Any launch uses the one-time choice up, even one that fails.
         let automatic_java = self.state.automatic_java().remove(id);
@@ -55,7 +55,15 @@ impl<T: Transport + Clone> LaunchParts<'_, T> {
         }
         let session = Published::begin(self.context, id);
         let result = self
-            .run(id, started, automatic_java, quick_play, updates, cancel)
+            .run(
+                id,
+                lease,
+                started,
+                automatic_java,
+                quick_play,
+                updates,
+                cancel,
+            )
             .await;
         session.end(match &result {
             Ok(exit) => matches!(
@@ -106,9 +114,14 @@ impl<T: Transport + Clone> LaunchParts<'_, T> {
         self.launch(id, Some(Some(target)), updates, cancel).await
     }
 
+    /// Holds the instance through `lease` until the game's process exists,
+    /// then as a running game (issue #128): its worlds that the game does not
+    /// have open stay free to copy, back up, export or delete.
+    #[allow(clippy::too_many_arguments)]
     async fn run(
         &self,
         id: &str,
+        lease: InstanceLease<'_>,
         started: u64,
         automatic_java: bool,
         quick_play: Option<Option<QuickPlay>>,
@@ -156,6 +169,8 @@ impl<T: Transport + Clone> LaunchParts<'_, T> {
         tokio::pin!(launch);
         let mut announced = false;
         let mut settings_prepared = false;
+        let mut lease = Some(lease);
+        let mut _game = None;
         let result = loop {
             tokio::select! {
                 biased;
@@ -166,6 +181,7 @@ impl<T: Transport + Clone> LaunchParts<'_, T> {
                 }
                 Some(()) = spawned_rx.recv(), if !announced => {
                     announced = true;
+                    _game = lease.take().map(|lease| lease.playing(now_ms()));
                     self.context.session(id, Some(SessionPhase::Playing));
                     let _ = events.send(event.clone());
                 }
@@ -175,6 +191,7 @@ impl<T: Transport + Clone> LaunchParts<'_, T> {
         // A short-lived process can finish in the same poll as its spawn.
         if !announced && spawned_rx.try_recv().is_ok() {
             announced = true;
+            _game = lease.take().map(|lease| lease.playing(now_ms()));
             self.context.session(id, Some(SessionPhase::Playing));
             let _ = events.send(event);
         }
@@ -215,6 +232,15 @@ impl<T: Transport + Clone> LaunchParts<'_, T> {
         finish_session(&mut store, id, started, &exit)?;
         Ok(exit)
     }
+}
+
+/// Milliseconds since the Unix epoch, as a world's lock time is read.
+fn now_ms() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()
+        .and_then(|elapsed| i64::try_from(elapsed.as_millis()).ok())
+        .unwrap_or(0)
 }
 
 /// Writes a launch that never produced a process to the instance history,

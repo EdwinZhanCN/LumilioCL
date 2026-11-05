@@ -380,8 +380,8 @@ pub(super) fn write_instance(
     let work = work.clone();
     cx.spawn(async move |cx| {
         let result = match handle.await {
-            Ok(result) => result.map_err(|error| error.to_string()),
-            Err(error) => Err(error.to_string()),
+            Ok(result) => result,
+            Err(error) => Err(WriteFailure::Service(error.into())),
         };
         let succeeded = result.is_ok();
         let done = match result {
@@ -390,9 +390,9 @@ pub(super) fn write_instance(
                 technical: None,
                 refresh,
             },
-            Err(detail) => Operated {
-                notice: tr!("instance-write-failed").into(),
-                technical: Some(detail),
+            Err(error) => Operated {
+                notice: write_failed(&error).into(),
+                technical: Some(error.to_string()),
                 refresh: Vec::new(),
             },
         };
@@ -435,6 +435,16 @@ impl std::fmt::Display for WriteFailure {
             Self::Service(error) => error.fmt(f),
             Self::Said(text) => f.write_str(text),
         }
+    }
+}
+
+/// What the person reads when a write did not happen: why, when it is
+/// something they can wait out.
+fn write_failed(failure: &WriteFailure) -> &'static str {
+    match failure {
+        WriteFailure::Service(ServiceError::InstanceBusy(_)) => tr!("instance-write-busy"),
+        WriteFailure::Service(ServiceError::WorldInUse(_)) => tr!("instance-write-world-open"),
+        _ => tr!("instance-write-failed"),
     }
 }
 

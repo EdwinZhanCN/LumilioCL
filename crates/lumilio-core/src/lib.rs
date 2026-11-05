@@ -201,6 +201,7 @@ pub use worlds::world_map;
 pub use worlds::{
     GameMode, ModelPreview, WorldError, WorldInfo, copy_name as world_copy_name,
     delete as delete_world, duplicate as duplicate_world, scan as scan_worlds, size as world_size,
+    worlds_in_use,
 };
 
 #[cfg(test)]
