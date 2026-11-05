@@ -144,7 +144,7 @@ fn deleting_a_world_asks_first_and_never_double_submits(cx: &mut TestAppContext)
 }
 
 #[gpui::test]
-fn while_a_game_runs_the_worlds_cannot_be_touched_and_a_dropped_archive_is_one_write(
+fn while_a_game_runs_only_its_open_world_is_held_and_a_dropped_archive_is_one_write(
     cx: &mut TestAppContext,
 ) {
     let seen: Rc<RefCell<Vec<InstanceIntent>>> = Rc::default();
@@ -152,20 +152,35 @@ fn while_a_game_runs_the_worlds_cannot_be_touched_and_a_dropped_archive_is_one_w
     view.update(cx, |view, cx| {
         view.loaded(Ok((record(), LauncherSettings::default())), cx);
         view.select_tab(TAB_WORLDS, cx);
-        view.arrived(Arrived::Worlds(Ok(vec![world("w")])), cx);
     });
-    cx.run_until_parked();
     view.update(cx, |view, cx| view.game_output(Vec::new(), true, cx));
+    // The game opened "open" after it started; "idle" is from before.
+    let mut open = world("open");
+    open.lock_touched_ms = Some(i64::MAX);
+    let mut idle = world("idle");
+    idle.lock_touched_ms = Some(0);
+    view.update(cx, |view, cx| {
+        view.arrived(Arrived::Worlds(Ok(vec![open, idle])), cx);
+    });
     cx.run_until_parked();
     view.read_with(cx, |view, _| assert!(view.game_started_ms.is_some()));
     let before = seen.borrow().len();
-    click(cx, "world-import");
     click(cx, "world-play-0");
+    click(cx, "world-play-1");
+    click(cx, "world-delete-0");
     assert_eq!(
         seen.borrow().len(),
         before,
-        "nothing is sent for a world while the game runs"
+        "no second launch, and the open world is not offered"
     );
+    view.read_with(cx, |view, _| assert_eq!(view.confirm, None));
+    // Issue #128: a world can be added, and the other one still deleted.
+    click(cx, "world-import");
+    assert_eq!(seen.borrow().last(), Some(&InstanceIntent::ImportWorld));
+    click(cx, "world-delete-1");
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.confirm, Some(Confirm::DeleteWorld("idle".into())));
+    });
 
     view.update(cx, |view, cx| view.game_output(Vec::new(), false, cx));
     cx.run_until_parked();

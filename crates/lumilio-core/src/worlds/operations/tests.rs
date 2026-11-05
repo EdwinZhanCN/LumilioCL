@@ -140,3 +140,89 @@ async fn a_world_is_exported_and_imported_under_the_lease_and_the_import_is_reco
         [(ChangeKind::WorldImported, "w 2".to_owned())]
     );
 }
+
+/// Issue #128: while a game runs, only the world it has open is held.
+#[tokio::test]
+async fn while_a_game_runs_only_the_world_it_has_open_is_refused() {
+    use crate::instances::snapshot_files::SnapshotScope;
+    use std::time::{Duration, UNIX_EPOCH};
+
+    let world = world();
+    let record = world
+        .service
+        .create_instance("Playing", Some("1.0"), Loader::Vanilla, None)
+        .await
+        .unwrap();
+    let id = record.id.as_str();
+    let saves = world.service.layout.game(id).join("saves");
+    for name in ["open", "idle"] {
+        std::fs::create_dir_all(saves.join(name)).unwrap();
+        std::fs::write(saves.join(name).join("level.dat"), b"not nbt").unwrap();
+        std::fs::write(saves.join(name).join("session.lock"), b"x").unwrap();
+    }
+    // "idle" was opened by an earlier game; this game opened "open".
+    let lock_time = |name: &str| {
+        std::fs::metadata(saves.join(name).join("session.lock"))
+            .unwrap()
+            .modified()
+            .unwrap()
+    };
+    let idle_at = lock_time("idle");
+    let started = idle_at + Duration::from_secs(10);
+    std::fs::File::options()
+        .write(true)
+        .open(saves.join("open/session.lock"))
+        .unwrap()
+        .set_modified(started + Duration::from_secs(5))
+        .unwrap();
+    let started_ms =
+        i64::try_from(started.duration_since(UNIX_EPOCH).unwrap().as_millis()).unwrap();
+    let game = world
+        .service
+        .instances
+        .reserve(id)
+        .unwrap()
+        .playing(started_ms);
+
+    fn in_use<T>(result: Result<T, ServiceError>) -> bool {
+        matches!(result, Err(ServiceError::WorldInUse(folder)) if folder == "open")
+    }
+    assert!(in_use(world.service.copy_world(id, "open", None).await));
+    assert!(in_use(world.service.delete_world(id, "open").await));
+    let zip = world.service.layout.root().join("open.zip");
+    assert!(in_use(world.service.export_world(id, "open", &zip).await));
+    assert!(in_use(
+        world
+            .service
+            .create_snapshot(id, SnapshotScope::World("open".to_owned()), "")
+            .await
+    ));
+
+    // The other world is free, and a world can be added.
+    let copy = world.service.copy_world(id, "idle", None).await.unwrap();
+    let zip = world.service.layout.root().join("idle.zip");
+    world.service.export_world(id, "idle", &zip).await.unwrap();
+    world
+        .service
+        .create_snapshot(id, SnapshotScope::World("idle".to_owned()), "")
+        .await
+        .unwrap();
+    world.service.delete_world(id, &copy).await.unwrap();
+    world.service.import_world(id, &zip).await.unwrap();
+
+    // Work on the whole game still waits for it to end.
+    assert!(matches!(
+        world
+            .service
+            .create_snapshot(id, SnapshotScope::Full, "")
+            .await,
+        Err(ServiceError::InstanceBusy(_))
+    ));
+    assert!(matches!(
+        world.service.delete_instance(id).await,
+        Err(ServiceError::InstanceBusy(_))
+    ));
+
+    drop(game);
+    world.service.delete_world(id, "open").await.unwrap();
+}

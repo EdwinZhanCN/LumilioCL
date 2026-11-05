@@ -15,14 +15,16 @@ use crate::toast::Toast;
 use crate::{kit, tr};
 
 /// The world a running game most likely has open: the one whose lock file was
-/// touched after the game started, the newest of them.
+/// touched after the game started, the newest of them. Core refuses to change
+/// it by the same rule (issue #128).
 #[must_use]
 pub fn playing_world(worlds: &[WorldInfo], started_ms: i64) -> Option<&str> {
-    worlds
+    let touched = worlds
         .iter()
-        .filter_map(|world| Some((world.lock_touched_ms.filter(|at| *at >= started_ms)?, world)))
-        .max_by_key(|(at, _)| *at)
-        .map(|(_, world)| world.folder.as_str())
+        .map(|world| (world.folder.as_str(), world.lock_touched_ms));
+    lumilio_core::worlds_in_use(touched, &[started_ms])
+        .first()
+        .copied()
 }
 
 /// A world row's leading mark: the cover the player chose in the game, or a
@@ -95,8 +97,9 @@ impl InstanceDetailView {
     ) -> AnyElement {
         let sort_select = self.ensure_world_sort_select(window, cx);
         let running = self.live_output.is_some();
-        // While a game runs the instance is in use: nothing here can change.
-        let busy = self.busy || running;
+        // The game rewrites its server list itself, so it waits for the game;
+        // a new world can be added beside it.
+        let servers_busy = self.busy || running;
         // The selected sub-view's actions sit on the segment row, as on the
         // Content tab's L4a.
         let actions: AnyElement = if self.worlds_sub == 1 {
@@ -122,7 +125,7 @@ impl InstanceDetailView {
                     view.open_server_editor(None, window, cx)
                 }),
             )
-            .disabled(busy)
+            .disabled(servers_busy)
             .debug_selector(|| "server-add".into());
             h_flex()
                 .gap_2()
@@ -131,7 +134,7 @@ impl InstanceDetailView {
                 .child(add)
                 .into_any_element()
         } else {
-            // ia[instance.worlds]: 导入世界 | L4 次要「导入世界」→ 选 .zip；也可把 .zip 拖进世界页（一次一个） | 识别含 level.dat 的最浅文件夹，解压到 saves，重名自动加序号，不覆盖
+            // ia[instance.worlds]: 导入世界 | L4 次要「导入世界」→ 选 .zip；也可把 .zip 拖进世界页（一次一个） | 识别含 level.dat 的最浅文件夹，解压到 saves，重名自动加序号，不覆盖；游戏运行时也可导入
             kit::action(
                 "world-import",
                 tr!("instance-world-import"),
@@ -141,7 +144,7 @@ impl InstanceDetailView {
                     (view.handler)(InstanceIntent::ImportWorld, window, cx)
                 }),
             )
-            .disabled(busy)
+            .disabled(self.busy)
             .debug_selector(|| "world-import".into())
             .into_any_element()
         };
@@ -222,8 +225,6 @@ impl InstanceDetailView {
             return div().into_any_element();
         };
         let running = self.live_output.is_some();
-        // While a game runs the instance is in use: nothing here can change.
-        let busy = self.busy || running;
         let playing = self
             .game_started_ms
             .filter(|_| running)
@@ -248,6 +249,8 @@ impl InstanceDetailView {
             .enumerate()
             .map(|(row, world)| {
                 let folder = world.folder.clone();
+                // Only the world the game has open waits for it (issue #128).
+                let held = self.busy || playing == Some(world.folder.as_str());
                 let too_old = self.record.as_ref().is_some_and(|record| {
                     lumilio_core::quick_play_world_unsupported(&record.game_version)
                 });
@@ -261,7 +264,7 @@ impl InstanceDetailView {
                             view.send(InstanceIntent::PlayWorld(folder.clone()), window, cx)
                         }),
                     )
-                    .disabled(busy || world.damaged || too_old)
+                    .disabled(self.busy || running || world.damaged || too_old)
                     .debug_selector(move || format!("world-play-{row}"));
                     if too_old {
                         button.tooltip(tr!("instance-world-old-version"))
@@ -271,20 +274,21 @@ impl InstanceDetailView {
                 };
                 // Writes go through `send` (one at a time); the rest hand the
                 // application a request it answers itself.
-                let entry = |label: &'static str, intent: InstanceIntent, write: bool| {
-                    let entity = entity.clone();
-                    kit::MenuEntry::new(label, move |window, app| {
-                        let intent = intent.clone();
-                        let _ = entity.update(app, |view, cx| {
-                            if write {
-                                view.send(intent, window, cx);
-                            } else {
-                                (view.handler)(intent, window, cx);
-                            }
-                        });
-                    })
-                    .disabled(busy)
-                };
+                let entry =
+                    |label: &'static str, intent: InstanceIntent, write: bool, held: bool| {
+                        let entity = entity.clone();
+                        kit::MenuEntry::new(label, move |window, app| {
+                            let intent = intent.clone();
+                            let _ = entity.update(app, |view, cx| {
+                                if write {
+                                    view.send(intent, window, cx);
+                                } else {
+                                    (view.handler)(intent, window, cx);
+                                }
+                            });
+                        })
+                        .disabled(held)
+                    };
                 let menu = kit::more_menu(
                     ("world-more", row),
                     vec![
@@ -293,23 +297,27 @@ impl InstanceDetailView {
                             tr!("instance-world-copy"),
                             InstanceIntent::CopyWorld(folder.clone()),
                             true,
+                            held,
                         ),
                         // ia[instance.worlds]: 创建备份 | 世界行 ⋯ 菜单 | 仅这个世界的快照 → 历史·快照可见
                         entry(
                             tr!("instance-world-backup"),
                             InstanceIntent::BackupWorld(folder.clone()),
                             true,
+                            held,
                         ),
                         // ia[instance.worlds]: 导出为 .zip | 世界行 ⋯ 菜单 → 选位置 | 后台打包，toast；不含 session.lock
                         entry(
                             tr!("instance-world-export"),
                             InstanceIntent::ExportWorld(folder.clone()),
                             false,
+                            held,
                         ),
                         // ia[instance.worlds]: 在访达中显示 | 世界行 ⋯ 菜单 | 打开该世界的目录
                         entry(
                             crate::platform::reveal_label(),
                             InstanceIntent::RevealPath(format!("saves/{folder}")),
+                            false,
                             false,
                         ),
                     ],
@@ -324,6 +332,7 @@ impl InstanceDetailView {
                         ("world-delete", row),
                         tr!("common-delete"),
                         Confirm::DeleteWorld(folder),
+                        held,
                         cx,
                     ))
                     .child(menu);

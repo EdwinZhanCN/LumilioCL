@@ -80,12 +80,14 @@ impl InstanceDetailView {
         }
     }
 
-    /// A button that asks first, in a dialog that says what goes away.
+    /// A button that asks first, in a dialog that says what goes away; off
+    /// while `held`.
     pub(super) fn asking(
         &self,
         id: (&'static str, usize),
         label: &'static str,
         confirm: Confirm,
+        held: bool,
         cx: &mut Context<Self>,
     ) -> AnyElement {
         kit::ghost(
@@ -95,7 +97,7 @@ impl InstanceDetailView {
                 view.ask_confirm(confirm.clone(), window, cx)
             }),
         )
-        .disabled(self.busy)
+        .disabled(held)
         .debug_selector(move || format!("{}-{}", id.0, id.1))
         .into_any_element()
     }

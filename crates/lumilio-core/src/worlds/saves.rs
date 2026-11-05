@@ -154,11 +154,7 @@ pub fn scan(game_dir: &Path) -> Result<Vec<WorldInfo>, WorldError> {
             cheats: field(&["allowCommands"]).and_then(nbt::Tag::as_i64) == Some(1),
             icon: icon.is_file().then_some(icon),
             damaged: data.is_none(),
-            lock_touched_ms: fs::metadata(path.join(LOCK_FILE))
-                .and_then(|metadata| metadata.modified())
-                .ok()
-                .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
-                .and_then(|elapsed| i64::try_from(elapsed.as_millis()).ok()),
+            lock_touched_ms: super::in_use::lock_touched_ms(&path),
             folder,
         });
     }
@@ -171,7 +167,7 @@ pub fn scan(game_dir: &Path) -> Result<Vec<WorldInfo>, WorldError> {
 }
 
 /// `saves/`, refused when it is a link out of the instance.
-fn saves_dir(game_dir: &Path) -> Result<PathBuf, WorldError> {
+pub(super) fn saves_dir(game_dir: &Path) -> Result<PathBuf, WorldError> {
     let path = game_dir.join(SAVES);
     match path.symlink_metadata() {
         Ok(metadata) if metadata.file_type().is_symlink() => {
@@ -278,7 +274,7 @@ pub fn duplicate(game_dir: &Path, folder: &str, new_folder: &str) -> Result<Stri
 /// Largest world archive imported, counted by the sizes it declares.
 const IMPORT_LIMIT: u64 = 16 * 1024 * 1024 * 1024;
 /// The game's lock file; it means nothing outside a running game.
-const LOCK_FILE: &str = "session.lock";
+pub(super) const LOCK_FILE: &str = "session.lock";
 
 fn archive_error(error: zip::result::ZipError) -> WorldError {
     WorldError::BadArchive(error.to_string())

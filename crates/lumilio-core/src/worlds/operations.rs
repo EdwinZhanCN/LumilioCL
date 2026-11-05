@@ -16,7 +16,8 @@ use crate::worlds;
 use crate::worlds::WorldInfo;
 
 /// A game's saved worlds and their maps, servers, screenshots and
-/// schematics, edited only while nothing else holds the game.
+/// schematics. Worlds the game does not have open can be edited while it
+/// runs; the rest only while nothing else holds the game.
 pub(crate) struct Worlds<T> {
     pub(super) instances: Arc<Instances>,
     pub(super) layout: Layout,
@@ -45,6 +46,21 @@ impl<T: Transport + Clone> Worlds<T> {
         }
     }
 
+    /// Holds the instance for work on its saved worlds, which goes on while
+    /// its games run as long as none of them may have `folder` open.
+    fn beside_games(
+        &self,
+        id: &str,
+        folder: Option<&str>,
+    ) -> Result<crate::instances::InstanceLease<'_>, ServiceError> {
+        let lease = self.instances.reserve_beside_games(id)?;
+        if let Some(folder) = folder {
+            let started = self.instances.games_started(id);
+            worlds::refuse_if_open(&self.layout.game(id), folder, &started)?;
+        }
+        Ok(lease)
+    }
+
     #[cfg(test)]
     pub(crate) fn replace_plugins(&mut self, plugins: Arc<PluginHost>) {
         self.plugins = plugins;
@@ -62,14 +78,14 @@ impl<T: Transport + Clone> Worlds<T> {
 
     /// Copies a world under a new folder name (`<folder> copy`, `copy 2`… when
     /// none is given) and returns that name. Never overwrites; the copy appears
-    /// all at once. Takes the instance lease.
+    /// all at once. Refused while a running game may have the world open.
     pub(crate) async fn copy_world(
         &self,
         id: &str,
         folder: &str,
         new_folder: Option<&str>,
     ) -> Result<String, ServiceError> {
-        let _lease = self.instances.reserve(id)?;
+        let _lease = self.beside_games(id, Some(folder))?;
         self.instances.record(id).await?;
         let game_dir = self.layout.game(id);
         let (folder, requested) = (folder.to_owned(), new_folder.map(str::to_owned));
@@ -90,9 +106,9 @@ impl<T: Transport + Clone> Worlds<T> {
         Ok(created)
     }
 
-    /// Deletes one world folder. Takes the instance lease.
+    /// Deletes one world folder. Refused while a running game may have it open.
     pub(crate) async fn delete_world(&self, id: &str, folder: &str) -> Result<(), ServiceError> {
-        let _lease = self.instances.reserve(id)?;
+        let _lease = self.beside_games(id, Some(folder))?;
         self.instances.record(id).await?;
         let game_dir = self.layout.game(id);
         let name = folder.to_owned();
@@ -109,14 +125,14 @@ impl<T: Transport + Clone> Worlds<T> {
     }
 
     /// Packs one world into a zip at `destination` and returns its size.
-    /// Takes the instance lease, so the world is not changing underneath.
+    /// Refused while a running game may have it open, so it holds still.
     pub(crate) async fn export_world(
         &self,
         id: &str,
         folder: &str,
         destination: &Path,
     ) -> Result<u64, ServiceError> {
-        let _lease = self.instances.reserve(id)?;
+        let _lease = self.beside_games(id, Some(folder))?;
         self.instances.record(id).await?;
         let game_dir = self.layout.game(id);
         let (folder, destination) = (folder.to_owned(), destination.to_owned());
@@ -267,13 +283,13 @@ impl<T: Transport + Clone> Worlds<T> {
     }
 
     /// Adds the world in a zip as a new world and returns its folder name;
-    /// existing worlds are never replaced. Takes the instance lease.
+    /// existing worlds are never replaced. Goes on while the game runs.
     pub(crate) async fn import_world(
         &self,
         id: &str,
         archive: &Path,
     ) -> Result<String, ServiceError> {
-        let _lease = self.instances.reserve(id)?;
+        let _lease = self.beside_games(id, None)?;
         self.instances.record(id).await?;
         let (game_dir, archive) = (self.layout.game(id), archive.to_owned());
         let created = tokio::task::spawn_blocking(move || {

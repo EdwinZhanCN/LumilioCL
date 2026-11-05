@@ -18,14 +18,23 @@ impl<T: Transport + Clone> InstanceLibrary<T> {
     }
 
     /// Backs up the instance's worlds and settings (or one world). Takes the
-    /// instance lease so the files are not changing underneath it.
+    /// instance lease so the files are not changing underneath it; one world
+    /// is backed up while the game runs unless the game may have it open.
     pub(crate) async fn create_snapshot(
         &self,
         id: &str,
         scope: SnapshotScope,
         label: &str,
     ) -> Result<String, ServiceError> {
-        let _lease = self.instances.reserve(id)?;
+        let _lease = match &scope {
+            SnapshotScope::World(folder) => {
+                let lease = self.instances.reserve_beside_games(id)?;
+                let started = self.instances.games_started(id);
+                crate::worlds::refuse_if_open(&self.layout.game(id), folder, &started)?;
+                lease
+            }
+            SnapshotScope::Full => self.instances.reserve(id)?,
+        };
         self.instances.record(id).await?;
         let (root, game_dir) = (self.layout.root().to_path_buf(), self.layout.game(id));
         let (instance, label) = (id.to_owned(), label.to_owned());
@@ -69,13 +78,14 @@ impl<T: Transport + Clone> InstanceLibrary<T> {
         Ok(units)
     }
 
-    /// Deletes one snapshot. Never part of automatic clean-up. Takes the lease.
+    /// Deletes one snapshot. Never part of automatic clean-up. Takes the
+    /// lease, beside running games: a snapshot is not a file the game uses.
     pub(crate) async fn delete_snapshot(
         &self,
         id: &str,
         snapshot: &str,
     ) -> Result<(), ServiceError> {
-        let _lease = self.instances.reserve(id)?;
+        let _lease = self.instances.reserve_beside_games(id)?;
         self.instances.record(id).await?;
         let (root, instance, name) = (
             self.layout.root().to_path_buf(),

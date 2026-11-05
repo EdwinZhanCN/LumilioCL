@@ -197,6 +197,8 @@ impl InstanceDetailView {
                                 ("snapshot-restore", row),
                                 tr!("instance-snapshot-restore"),
                                 Confirm::RestoreSnapshot(snapshot.id.clone()),
+                                // Restoring replaces files the game uses.
+                                self.busy || self.live_output.is_some(),
                                 cx,
                             ))
                             // ia[instance.history]: 删除快照 | 快照行「删除」→ 警告弹窗 | 删除快照文件
@@ -204,6 +206,7 @@ impl InstanceDetailView {
                                 ("snapshot-delete", row),
                                 tr!("common-delete"),
                                 Confirm::DeleteSnapshot(snapshot.id.clone()),
+                                self.busy,
                                 cx,
                             ));
                         kit::row(
