@@ -98,7 +98,7 @@ Consequences: 主题说明提示玻璃适合亮色桌面、遮光玻璃适合暗
 - [docs/design-language.md](../../docs/design-language.md)
 - [crates/lumilio-ui/src/theme/spec.rs](../../crates/lumilio-ui/src/theme/spec.rs)
 - [crates/lumilio-ui/src/theme/look.rs](../../crates/lumilio-ui/src/theme/look.rs)
-- [crates/lumilio-core/src/tuning.rs](../../crates/lumilio-core/src/tuning.rs)
+- [crates/lumilio-core/src/settings/tuning.rs](../../crates/lumilio-core/src/settings/tuning.rs)
 - [Plan global-context](global-context.md)
 
 ## Outcome

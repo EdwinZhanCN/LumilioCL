@@ -82,6 +82,10 @@ impl InstanceDetailView {
         let byline = match source.as_ref().and_then(|source| source.author.clone()) {
             Some(author) => author,
             None if let Some(source) = &source => source.source_name.clone(),
+            // Not known yet is not a local file.
+            None if self.data.identifying(kind) => {
+                tr!("instance-content-identifying-file").to_owned()
+            }
             None => tr!("instance-content-local-file").to_owned(),
         };
 

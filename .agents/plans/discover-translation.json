@@ -214,7 +214,7 @@
       "id": "D13",
       "decision": "合入 main（0.1.6 之后）时，删去 D12 的任务作用域 CONTENT_ORIGIN、from_content_source 与 RetryAction::FromContentSource，来源身份全部使用 curseforge-source D1 已有的显式 source 参数。MCIM 平台按来源声明的 catalog 选择（curseforge-source D5），不按插件 ID 写死；正文按来源的 TextFormat 解析，HTML 正文不经 Markdown 转换。列表译文存于 SearchRow.translated_summary，不覆盖原简介。",
       "rationale": "CurseForge 内容源（PR #37）先合入，搜索、详情、安装、版本和 Activity 重试已经逐个调用带来源，两套机制并存只会让同一身份有两个来源。旧映射只认 lumilio.modrinth / lumilio.curseforge 两个 ID，任何声明 Modrinth 或 CurseForge catalog 的其他来源都拿不到简介。CurseForge 正文是 HTML：交给 Markdown 解析时，空行后缩进的 HTML 会变成代码块而不被翻译。",
-      "consequences": "service::translate_summaries 先取来源的 catalog，没有 catalog 的来源不查询 MCIM；translate_body 与 DetailIntent::Translate 携带 TextFormat，缓存字段区分 Markdown / HTML 正文。界面译文一律按 HTML 显示。开启翻译时只为已显示的结果和详情补查简介，不重新搜索；关闭时 update_live 清掉 translated_summary。PR 原有的同 id 双源夹具与 scoped retry 测试随 D12 一起移除；main 的两源测试（service/tests/curseforge.rs）不含同 id 项目，翻译这一侧的隔离由 cache_identity 测试（缓存键含源 plugin_id）保证。"
+      "consequences": "service::translate_summaries 先取来源的 catalog，没有 catalog 的来源不查询 MCIM；translate_body 与 DetailIntent::Translate 携带 TextFormat，缓存字段区分 Markdown / HTML 正文。界面译文一律按 HTML 显示。开启翻译时只为已显示的结果和详情补查简介，不重新搜索；关闭时 update_live 清掉 translated_summary。PR 原有的同 id 双源夹具与 scoped retry 测试随 D12 一起移除；main 的两源测试（`crates/lumilio-core/src/content/install/tests.rs`）不含同 id 项目，翻译这一侧的隔离由 cache_identity 测试（缓存键含源 plugin_id）保证。"
     }
   ],
   "references": [
@@ -223,11 +223,11 @@
     "https://github.com/mcmod-info-mirror/mcim-rust-api/blob/main/src/routes/modrinth.rs",
     "https://github.com/mcmod-info-mirror/mcim-rust-api/blob/main/src/routes/curseforge.rs",
     "crates/lumilio-plugin-api/src/content.rs",
-    "crates/lumilio-core/src/discover/source.rs",
-    "crates/lumilio-core/src/discover/convert.rs",
-    "crates/lumilio-core/src/discover/project.rs",
-    "crates/lumilio-core/src/discover/kinds.rs",
-    "crates/lumilio-core/src/service/discover.rs",
+    "crates/lumilio-core/src/content/discover/source.rs",
+    "crates/lumilio-core/src/content/discover/convert.rs",
+    "crates/lumilio-core/src/content/discover/project.rs",
+    "crates/lumilio-core/src/content/discover/kinds.rs",
+    "crates/lumilio-core/src/content/search.rs",
     "https://developers.deepl.com/docs/getting-started/auth",
     "https://docs.cloud.google.com/translate/docs/authentication",
     "https://github.com/OwO-Network/DLX",

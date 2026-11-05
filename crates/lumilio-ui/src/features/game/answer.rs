@@ -1,5 +1,5 @@
 use gpui::{App, AppContext as _, WeakEntity, Window};
-use lumilio_core::ServiceError;
+use lumilio_core::{ContentLookup, ServiceError};
 
 use super::content::{load_changelog, load_versions, pick_pending_files};
 use super::files::{
@@ -7,7 +7,7 @@ use super::files::{
     open_runtime_change, ping_server,
 };
 use super::game_actions::{GameEvent, GameWork};
-use super::load::{load_instance, load_section};
+use super::load::{load_content, load_instance, load_section};
 use super::plugins::{
     open_studio_window, plugin_action, plugin_map, plugin_model, plugin_studio, plugin_tabs,
     plugin_view, pop_out_map,
@@ -93,6 +93,9 @@ pub(super) fn answer(
             logs::export(work, id.to_owned(), source, live, cx)
         }
         InstanceIntent::Load(section) => load_section(work, id.to_owned(), view, section, cx),
+        InstanceIntent::IdentifyContent(kind) => {
+            load_content(work, id.to_owned(), view, kind, ContentLookup::Again, cx)
+        }
         InstanceIntent::ExportLog(crash) => export_log(work, id.to_owned(), crash, cx),
         InstanceIntent::OpenFolder(folder) => open_folder(work, id.to_owned(), view, folder, cx),
         InstanceIntent::RevealPath(relative) => {

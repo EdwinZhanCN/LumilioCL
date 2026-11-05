@@ -88,15 +88,15 @@ Consequences: 更早的会话只能看崩溃报告和 Minecraft 自己滚动的�
 
 ## References
 
-- [crates/lumilio-core/src/launch_session.rs](../../crates/lumilio-core/src/launch_session.rs)
+- [crates/lumilio-core/src/launching/session.rs](../../crates/lumilio-core/src/launching/session.rs)
 - [crates/lumilio-ui/src/toast.rs](../../crates/lumilio-ui/src/toast.rs)
-- [crates/lumilio-app/src/live/jobs.rs](../../crates/lumilio-app/src/live/jobs.rs)
-- [crates/lumilio-app/src/live/launch.rs](../../crates/lumilio-app/src/live/launch.rs)
+- [crates/lumilio-ui/src/shell/feed/lists.rs](../../crates/lumilio-ui/src/shell/feed/lists.rs)
+- [crates/lumilio-ui/src/features/launch/mod.rs](../../crates/lumilio-ui/src/features/launch/mod.rs)
 - [crates/lumilio-ui/src/home/recovery.rs](../../crates/lumilio-ui/src/home/recovery.rs)
-- [crates/lumilio-core/src/process.rs](../../crates/lumilio-core/src/process.rs)
+- [crates/lumilio-core/src/launching/process.rs](../../crates/lumilio-core/src/launching/process.rs)
 - [docs/design-language.md](../../docs/design-language.md)
 
-- Lesson: 2026-10-21 审查发现：app 中约 25 处以 `let Ok(x) = handle.await else { return }` 等待工作线程，把 panic 当成「没有结果」。Discover 的安装卡片因此可能永远停在安装中，启动可能停在启动中，且 panic 消息只写到发布版看不到的 stderr。Guard：job() 把 JoinError 交给 done，其他等待处用 jobs::answer()；测试 work_that_panics_is_told_and_not_left_hanging。
+- Lesson: 2026-10-21 审查发现：app 中约 25 处以 `let Ok(x) = handle.await else { return }` 等待工作线程，把 panic 当成「没有结果」。Discover 的安装卡片因此可能永远停在安装中，启动可能停在启动中，且 panic 消息只写到发布版看不到的 stderr。Guard：job() 把 JoinError 交给 done，其他等待处用 runtime::answer()（`crates/lumilio-ui/src/runtime.rs`）；测试 work_that_panics_is_told_and_not_left_hanging。
 
 - Lesson: 2026-10-21 审查发现：实例页等视图的 toast 只在视图渲染时显示，离开页面或视图被移出历史后结果丢失（删除游戏成功的提示从未显示）。Guard：主窗口共享 toast::Posted 队列由 Shell 显示；测试 a_result_for_a_page_no_longer_shown_still_floats_up。
 

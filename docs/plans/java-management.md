@@ -25,7 +25,7 @@ Status: Completed
 ## Tasks
 
 - [x] T1 — 选择规则：上限与同架构优先 (Completed)
-  Acceptance: crates/lumilio-core/src/java/choice.rs 的 choose 使用小规则表：≤1.12 且使用 LaunchWrapper（Forge 旧版等）时上限为 Java 8（强制），1.7.10–1.16 的 Forge/NeoForge 建议 Java 8（以及 1.17→16、1.18–1.20.4→17、≥1.20.5→21）；候选按宿主架构优先（OS_ARCH），非原生仅作后备。choose 返回所选 Java 及违反的强制/建议规则，launcher/phases.rs、service/diagnostics.rs 与 diagnostics.rs 使用同一结果。单元测试覆盖 1.12.2 Forge 只有 8/21、arm64 主机有 x64 与 arm64 的 21 等情况
+  Acceptance: crates/lumilio-core/src/java/choice.rs 的 choose 使用小规则表：≤1.12 且使用 LaunchWrapper（Forge 旧版等）时上限为 Java 8（强制），1.7.10–1.16 的 Forge/NeoForge 建议 Java 8（以及 1.17→16、1.18–1.20.4→17、≥1.20.5→21）；候选按宿主架构优先（OS_ARCH），非原生仅作后备。choose 返回所选 Java 及违反的强制/建议规则，crates/lumilio-core/src/launching/launcher/phases.rs、crates/lumilio-core/src/launcher_service/diagnostics.rs 与 crates/lumilio-core/src/diagnostics/problems.rs 使用同一结果。单元测试覆盖 1.12.2 Forge 只有 8/21、arm64 主机有 x64 与 arm64 的 21 等情况
 - [x] T2 — 补充发现路径 (Completed)
   Acceptance: JavaLocator::standard 加入 ~/.minecraft/runtime、~/Library/Application Support/minecraft/runtime、Windows 官方启动器与 MS Store runtime 目录（<component>/<platform>/<component> 布局）、PATH 中 java 反查的 home，以及 BellSoft、Semeru、AdoptOpenJDK、Eclipse Foundation 厂商目录；仍只读 release 文件、按真实路径去重；有测试覆盖 runtime 布局与 PATH 反查
 - [x] T3 — 启动时自动下载缺少的 Java (Completed)
@@ -33,7 +33,7 @@ Status: Completed
 - [x] T4 — 实例 Java 下拉 (Completed)
   Acceptance: instance_detail/settings/java.rs 的 Java 行为下拉：自动（推荐）/ 每个已启用的 Java（如「Java 21 · Temurin · aarch64」，非原生加「· 转译」）/ 自定义路径…；只有选自定义时出现路径行（沿用 FieldKind::Path 与保存校验）。数据仍为 java_path（None = 自动）。值下方显示「将使用 Java 21.0.x（路径）」或「没有合适的 Java，启动时会自动下载 Java N」；IA 文档 docs/ia/paths/instance.settings.md 同步。已实现，等待实机检查
 - [x] T5 — 全局 Java 页：删除与按版本下载 (Completed)
-  Acceptance: pages/settings/java.rs 列表行 ⋯ 菜单对 runtimes/ 下由启动器安装的 Java 增加「删除…」（确认后删除目录并重新检测），外部 Java 只保留启用开关；「下载推荐的 Java」改为「下载 Java…」，弹窗只有一个大版本下拉（来自所选下载来源，Mojang 读本平台的运行时索引，读不到时用 8/16/17/21/25，默认 21），进度仍在动态；docs/ia/paths/settings.md 同步。已实现，等待实机检查
+  Acceptance: crates/lumilio-ui/src/features/settings/java.rs 列表行 ⋯ 菜单对 runtimes/ 下由启动器安装的 Java 增加「删除…」（确认后删除目录并重新检测），外部 Java 只保留启用开关；「下载推荐的 Java」改为「下载 Java…」，弹窗只有一个大版本下拉（来自所选下载来源，Mojang 读本平台的运行时索引，读不到时用 8/16/17/21/25，默认 21），进度仍在动态；docs/ia/paths/settings.md 同步。已实现，等待实机检查
 - [x] T6 — 启动时冲突与损坏提示 (Completed)
   Acceptance: 手动选的 Java 违反强制规则时只弹一个确认框：「这个版本需要 Java N」，按钮「本次改用 Java N」（本机没有则为「下载并使用 Java N」）/「仍然启动」/「取消」，回答只影响这一次；建议级问题（Mod 建议版本）不弹窗，进入实例概览问题区并带「安装 Java」或「去调整」；JVM 启动后立即退出时失败提示附「这个 Java 可能损坏」与「在设置中停用」。前两项已实现；JVM 立即退出提示未做
 - [x] T7 — Oracle GraalVM 下载来源 (Completed)
@@ -116,13 +116,13 @@ Consequences: 想长期改用自动需在实例设置里改；任何一次启动
 
 - [crates/lumilio-core/src/java/choice.rs](../../crates/lumilio-core/src/java/choice.rs)
 - [crates/lumilio-core/src/java/locator.rs](../../crates/lumilio-core/src/java/locator.rs)
-- [crates/lumilio-core/src/java_runtime/mod.rs](../../crates/lumilio-core/src/java_runtime/mod.rs)
-- [crates/lumilio-core/src/java_runtime/graalvm.rs](../../crates/lumilio-core/src/java_runtime/graalvm.rs)
-- [crates/lumilio-core/src/java_runtime/archive.rs](../../crates/lumilio-core/src/java_runtime/archive.rs)
-- [crates/lumilio-core/src/service/java.rs](../../crates/lumilio-core/src/service/java.rs)
-- [crates/lumilio-core/src/launcher/phases.rs](../../crates/lumilio-core/src/launcher/phases.rs)
-- [crates/lumilio-core/src/diagnostics.rs](../../crates/lumilio-core/src/diagnostics.rs)
-- [crates/lumilio-ui/src/pages/settings/java.rs](../../crates/lumilio-ui/src/pages/settings/java.rs)
+- [crates/lumilio-core/src/java/downloads/mod.rs](../../crates/lumilio-core/src/java/downloads/mod.rs)
+- [crates/lumilio-core/src/java/downloads/graalvm.rs](../../crates/lumilio-core/src/java/downloads/graalvm.rs)
+- [crates/lumilio-core/src/java/downloads/archive.rs](../../crates/lumilio-core/src/java/downloads/archive.rs)
+- [crates/lumilio-core/src/java/installations.rs](../../crates/lumilio-core/src/java/installations.rs)
+- [crates/lumilio-core/src/launching/launcher/phases.rs](../../crates/lumilio-core/src/launching/launcher/phases.rs)
+- [crates/lumilio-core/src/diagnostics/problems.rs](../../crates/lumilio-core/src/diagnostics/problems.rs)
+- [crates/lumilio-ui/src/features/settings/java.rs](../../crates/lumilio-ui/src/features/settings/java.rs)
 - [crates/lumilio-ui/src/instance_detail/settings/java.rs](../../crates/lumilio-ui/src/instance_detail/settings/java.rs)
 - [crates/lumilio-ui/src/java_conflict.rs](../../crates/lumilio-ui/src/java_conflict.rs)
 - https://github.com/HMCL-dev/HMCL/blob/main/HMCLCore/src/main/java/org/jackhuang/hmcl/game/JavaVersionConstraint.java
@@ -133,6 +133,6 @@ Consequences: 想长期改用自动需在实例设置里改；任何一次启动
 
 Java 管理改进经 PR #27 合入并随 0.1.4 发布，Mac 实测通过。
 
-- Lesson: Mojang 的运行时索引也列出 minecraft-java-exe 等非 Java 组件，按版本名解析会把它当成 Java 12/14。防护：java_runtime::is_runtime_component 只接受 java-runtime-* 与 jre-* 组件，java_runtime/tests.rs 的 Apple 芯片回落测试断言 offered_majors 不含它
+- Lesson: Mojang 的运行时索引也列出 minecraft-java-exe 等非 Java 组件，按版本名解析会把它当成 Java 12/14。防护：is_runtime_component（`crates/lumilio-core/src/java/downloads/distribution.rs`）只接受 java-runtime-* 与 jre-* 组件，crates/lumilio-core/src/java/downloads/tests.rs 的 Apple 芯片回落测试断言 offered_majors 不含它
 
-- Lesson: 选 Java 的规则随宿主变化：未安装的实例读不到版本自身的最低 Java，测试夹具的 "1.0" 在 64 位 Linux 上被旧版本规则限制到 Java 8，macOS 本地通过而 CI 失败。防护：service/tests 中依赖选中 Java 的测试先 install_instance，让版本声明的 Java 21 生效；规则本身用显式 HostProfile 在 java 单元测试里覆盖
+- Lesson: 选 Java 的规则随宿主变化：未安装的实例读不到版本自身的最低 Java，测试夹具的 "1.0" 在 64 位 Linux 上被旧版本规则限制到 Java 8，macOS 本地通过而 CI 失败。防护：`crates/lumilio-core/src/launcher_service/tests` 中依赖选中 Java 的测试先 install_instance，让版本声明的 Java 21 生效；规则本身用显式 HostProfile 在 java 单元测试里覆盖

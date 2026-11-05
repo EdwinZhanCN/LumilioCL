@@ -1,6 +1,6 @@
 use lumilio_core::{
-    ContentList, FileEntry, GameLogs, HistoryRead, InstanceJava, InstanceOptions, Problem,
-    ProjectKind, ScreenshotInfo, ServerEntry, SnapshotInfo, WorldInfo,
+    ContentEntry, ContentList, FileEntry, GameLogs, HistoryRead, InstanceJava, InstanceOptions,
+    Problem, ProjectKind, ScreenshotInfo, ServerEntry, SnapshotInfo, WorldInfo,
 };
 
 use super::super::Section;
@@ -33,6 +33,10 @@ pub struct Data {
 
 /// One data set arriving from the service.
 pub enum Arrived {
+    /// The files on disk, then what the sources said about them before,
+    /// while they are asked again; the section stays pending until
+    /// `Content` follows.
+    ContentSoFar(ProjectKind, Vec<ContentEntry>),
     Content(ProjectKind, Result<ContentList, String>),
     Worlds(Result<Vec<WorldInfo>, String>),
     Servers(Result<Vec<ServerEntry>, String>),
@@ -50,7 +54,7 @@ pub enum Arrived {
 impl Arrived {
     pub fn section(&self) -> Section {
         match self {
-            Self::Content(kind, _) => Section::Content(*kind),
+            Self::ContentSoFar(kind, _) | Self::Content(kind, _) => Section::Content(*kind),
             Self::Worlds(_) => Section::Worlds,
             Self::Servers(_) => Section::Servers,
             Self::Screenshots(_) => Section::Screenshots,
@@ -68,8 +72,23 @@ impl Arrived {
 
 impl Data {
     pub fn store(&mut self, arrived: Arrived) {
-        self.pending.retain(|section| *section != arrived.section());
+        let section = arrived.section();
+        if !matches!(arrived, Arrived::ContentSoFar(..)) {
+            self.pending.retain(|pending| *pending != section);
+        }
         match arrived {
+            Arrived::ContentSoFar(kind, entries) => {
+                if let Some(index) = CONTENT_KINDS.iter().position(|k| *k == kind) {
+                    let known = match &self.content[index] {
+                        Some(Ok(list)) => list.entries.as_slice(),
+                        _ => &[],
+                    };
+                    self.content[index] = Some(Ok(ContentList {
+                        entries: known_so_far(entries, known),
+                        ..ContentList::default()
+                    }));
+                }
+            }
             Arrived::Content(kind, result) => {
                 if let Some(index) = CONTENT_KINDS.iter().position(|k| *k == kind) {
                     self.content[index] = Some(result);
@@ -112,6 +131,39 @@ impl Data {
             Section::Java => self.java.is_some(),
         }
     }
+
+    /// The files are listed, and the sources have yet to say what they are.
+    pub fn identifying(&self, kind: ProjectKind) -> bool {
+        let section = Section::Content(kind);
+        self.has(section) && self.pending.contains(&section)
+    }
+}
+
+/// The files on disk, each with what this answer knows of it, else what the
+/// page showed for it when it is still the same file (switched on or off
+/// keeps its name and size; a hash, once read, must match). The newest
+/// version is only for enabled files, as the sources say.
+fn known_so_far(entries: Vec<ContentEntry>, known: &[ContentEntry]) -> Vec<ContentEntry> {
+    entries
+        .into_iter()
+        .map(|mut entry| {
+            if entry.source.is_some() {
+                return entry;
+            }
+            let before = known.iter().find(|before| {
+                before.item.display_name == entry.item.display_name
+                    && before.item.size == entry.item.size
+                    && before.item.is_directory == entry.item.is_directory
+                    && (entry.sha1.is_none() || entry.sha1 == before.sha1)
+            });
+            if let Some(before) = before {
+                entry.sha1 = entry.sha1.or_else(|| before.sha1.clone());
+                entry.source = before.source.clone();
+                entry.update = before.update.clone().filter(|_| entry.item.enabled);
+            }
+            entry
+        })
+        .collect()
 }
 
 /// A screenshot's thumbnail: asked for, made, or not makeable.

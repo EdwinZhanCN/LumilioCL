@@ -104,7 +104,7 @@
     {
       "id": "D6",
       "decision": "/translate 只返回已有译文；缺的摘要由 Cloudflare Queue 的消费者（同一 Worker 的 queue()）翻译并存入 D1。",
-      "rationale": "启动器等 Worker 20 秒（crates/lumilio-core/src/translation/protocol.rs），开思考的模型一批要 35–110 秒；客户端断开会取消请求，译文存不下。ctx.waitUntil 在响应后最多再运行 30 秒。Queues 在 Workers Free 计费内（每日 10,000 次操作），消费者每次可运行 15 分钟。启动器把未命中缓存 10 分钟后再问，所以新译文在下一次查询时出现。",
+      "rationale": "启动器等 Worker 20 秒（crates/lumilio-core/src/content/translation/protocol.rs），开思考的模型一批要 35–110 秒；客户端断开会取消请求，译文存不下。ctx.waitUntil 在响应后最多再运行 30 秒。Queues 在 Workers Free 计费内（每日 10,000 次操作），消费者每次可运行 15 分钟。启动器把未命中缓存 10 分钟后再问，所以新译文在下一次查询时出现。",
       "consequences": "消息只含平台与 ID，消费者重新取简介，队列里不留上游数据（D5）。queued 表防止排队中的摘要被重复排队；失败的批次不重试，认领过期后由后来的请求重新排队。新部署前要先创建队列 lumilio-translate。"
     },
     {

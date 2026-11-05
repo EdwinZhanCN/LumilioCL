@@ -1,7 +1,9 @@
+use serde::{Deserialize, Serialize};
+
 use super::kinds::{ProjectKind, TextFormat, loader_tag};
 use crate::instances::Loader;
 
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 pub enum ReleaseChannel {
     /// Alpha < Beta < Release, so `max` prefers the most stable.
     Alpha,
@@ -9,7 +11,7 @@ pub enum ReleaseChannel {
     Release,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum DependencyKind {
     Required,
     Optional,
@@ -18,14 +20,14 @@ pub enum DependencyKind {
     Other,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Dependency {
     pub project_id: Option<String>,
     pub version_id: Option<String>,
     pub kind: DependencyKind,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct VersionFile {
     /// Empty when the author lets people download the file only on the
     /// source's site (see `download_page`).
@@ -46,7 +48,9 @@ impl VersionFile {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+/// Kept in the recognition cache, so a change to its fields (or theirs)
+/// reads old entries as misses.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Version {
     pub id: String,
     pub project_id: String,

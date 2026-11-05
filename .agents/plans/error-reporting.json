@@ -133,17 +133,17 @@
     }
   ],
   "references": [
-    "crates/lumilio-core/src/launch_session.rs",
+    "crates/lumilio-core/src/launching/session.rs",
     "crates/lumilio-ui/src/toast.rs",
-    "crates/lumilio-app/src/live/jobs.rs",
-    "crates/lumilio-app/src/live/launch.rs",
+    "crates/lumilio-ui/src/shell/feed/lists.rs",
+    "crates/lumilio-ui/src/features/launch/mod.rs",
     "crates/lumilio-ui/src/home/recovery.rs",
-    "crates/lumilio-core/src/process.rs",
+    "crates/lumilio-core/src/launching/process.rs",
     "docs/design-language.md"
   ],
   "dependencies": [],
   "lessonsLearned": [
-    "2026-10-21 审查发现：app 中约 25 处以 `let Ok(x) = handle.await else { return }` 等待工作线程，把 panic 当成「没有结果」。Discover 的安装卡片因此可能永远停在安装中，启动可能停在启动中，且 panic 消息只写到发布版看不到的 stderr。Guard：job() 把 JoinError 交给 done，其他等待处用 jobs::answer()；测试 work_that_panics_is_told_and_not_left_hanging。",
+    "2026-10-21 审查发现：app 中约 25 处以 `let Ok(x) = handle.await else { return }` 等待工作线程，把 panic 当成「没有结果」。Discover 的安装卡片因此可能永远停在安装中，启动可能停在启动中，且 panic 消息只写到发布版看不到的 stderr。Guard：job() 把 JoinError 交给 done，其他等待处用 runtime::answer()（`crates/lumilio-ui/src/runtime.rs`）；测试 work_that_panics_is_told_and_not_left_hanging。",
     "2026-10-21 审查发现：实例页等视图的 toast 只在视图渲染时显示，离开页面或视图被移出历史后结果丢失（删除游戏成功的提示从未显示）。Guard：主窗口共享 toast::Posted 队列由 Shell 显示；测试 a_result_for_a_page_no_longer_shown_still_floats_up。",
     "2026-10-21：T3 的工作已随 #62 合入，计划里仍是 in_progress，合并后列剩余任务时才发现。Guard：合并 PR 前按 lumilio-exec-plan 逐项核对本计划任务的状态与验证，在同一个 PR 里更新。",
     "2026-10-22：一个 NeoForge 1.21.4 整合包一启动就以退出码 1 退出，游戏目录里没有日志，恢复面板的技术详情打开的诊断页也是空的。原因（ASM 两个版本同在 classpath，另由 #72 修复）只在游戏的 stderr 里，启动器只在游戏运行时显示输出，退出时就丢掉了，只能手动拼启动命令重现。Guard：T9 的 ExitedEarly 带最后的输出；测试 a_game_that_dies_at_once_fails_the_session_with_what_it_printed、technical_details_after_a_failed_launch_explain_it。"

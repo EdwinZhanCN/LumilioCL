@@ -18,6 +18,30 @@ impl InstanceDetailView {
         }
     }
 
+    /// Each listed file of `kind` and whether it is on, for the tests of
+    /// the feature that reads them.
+    #[cfg(test)]
+    pub(crate) fn listed_files(&self, kind: ProjectKind) -> Vec<(String, bool)> {
+        let index = CONTENT_KINDS
+            .iter()
+            .position(|k| *k == kind)
+            .expect("a kind the page lists");
+        match &self.data.content[index] {
+            Some(Ok(list)) => list
+                .entries
+                .iter()
+                .map(|entry| (entry.item.file_name.clone(), entry.item.enabled))
+                .collect(),
+            _ => Vec::new(),
+        }
+    }
+
+    /// Whether the sources have yet to say what the files of `kind` are.
+    #[cfg(test)]
+    pub(crate) fn identifying(&self, kind: ProjectKind) -> bool {
+        self.data.identifying(kind)
+    }
+
     pub(super) fn content_query(&self, cx: &App) -> String {
         self.fields
             .as_ref()

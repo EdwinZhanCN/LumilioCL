@@ -36,7 +36,7 @@ Status: Completed
 - [x] T6 — 运行会话进入上下文 (Completed)
   Acceptance: core 发布运行会话（游戏 id 与阶段）；首页能否开始、导航「重启以更新」、游戏页的游戏输出、投影工作室窗口从会话读取；「恢复并继续」重试失败那次启动自己的游戏（按 D8，恢复界面只在它是当前游戏时出现）；卡片 ▶ 按 D4。T1 中恢复的测试通过；从卡片启动后芯片、首页与 core 指向同一个游戏。
 - [x] T7 — 统一设计语言与 IA 契约 (Completed)
-  Acceptance: docs/design-language.md §6 与 §10，以及 navigation.rs（切换当前游戏）、home/launching.rs（继续）、lumilio-app live/instance.rs（浏览锁定）、pages/live/library.rs 与 instance_detail/actions.rs（设为当前游戏）的 ia 注释写成同一语义；nav-current-game 等中英文案与之一致；just ia 没有漂移。
+  Acceptance: docs/design-language.md §6 与 §10，以及 `crates/lumilio-ui/src/navigation/bar.rs`（切换当前游戏）、`crates/lumilio-ui/src/home/launching.rs`（继续）、`crates/lumilio-ui/src/shell/instance.rs`（浏览锁定）、`crates/lumilio-ui/src/features/library/view.rs` 与 `crates/lumilio-ui/src/instance_detail/actions.rs`（设为当前游戏）的 ia 注释写成同一语义；nav-current-game 等中英文案与之一致；just ia 没有漂移。
 - [x] T8 — Project Maintainer 在 Mac 上实机检查 (Completed)
   Acceptance: Project Maintainer 按 #55 的复现步骤和 T1 的六个场景实机检查，并看手感：「需要留意」出现时的淡入上移、变空时立即消失是否突兀；改 Java 或插件设置后「检查中」的时机与停留；芯片在保存后才变，等待能否察觉，是否需要 D1 的「被点的那一行保持按下」；从游戏页浏览后芯片与「继续」一起换，在芯片换游戏时退出锁定并重新搜索是否顺畅；卡片 ▶ 先设当前游戏再启动有无多余停顿；启动中导航「重启以更新」变灰；启动失败后换了当前游戏，首页改为继续新的游戏，失败出现在「需要留意」（D8）。结果记入本计划的 validation。
 - [x] T9 — 合入、关闭 #55 并恢复 0.2.0 发布 (Completed)
@@ -49,9 +49,9 @@ Status: Completed
 - core 测试证明写入路径与修订号一一对应，删除当前游戏或账户后的回退已持久化。
   Result: 2026-10-21：lumilio-core service::tests::context 三项通过。each_kind_of_write_publishes_only_its_own_change：新建游戏与收藏只动 library，增删选账户只动 accounts，Java 设置只动 java，插件开关只动 plugins，偏好不动任何修订号；the_current_game_always_exists_and_is_saved：第一个游戏成为当前游戏，删除当前游戏后回退已写入 settings.json，重新打开服务读到同一个；a_late_subscriber_reads_only_the_newest_state：落后的订阅者只看到最新值。临时去掉 InstanceStore::save 的发布与删除后的回退时三项按预期失败，恢复后通过。发布点只有两处：SettingsStore::save 比较前后设置，InstanceStore::save 递增 library；安装与删除 Java 运行时另外递增 java。
 - 依赖表每一行有测试；切换账户不重做实例检查。
-  Result: 2026-10-21：切换账户不重做实例检查（T3）：home_applies_the_account_to_checks_already_made 通过，临时让 with_account 忽略账户时按预期失败。依赖表在 crates/lumilio-app/src/live/context.rs 的 stale 中实现，crates/lumilio-app/src/live/tests/dependencies.rs 每个推导结果一项测试（芯片与继续、实例检查、需要留意、账户列表、已安装标记、内容来源与插件标签），另有一项检查初次全部重算、无变化不重算。临时从「需要留意」的依赖里去掉账户时，表的测试与 home_attention_follows_the_current_account 都按预期失败。
+  Result: 2026-10-21：切换账户不重做实例检查（T3）：home_applies_the_account_to_checks_already_made 通过，临时让 with_account 忽略账户时按预期失败。依赖表在 crates/lumilio-ui/src/shell/feed/context.rs 的 stale 中实现，crates/lumilio-ui/src/shell/feed/tests/dependencies.rs 每个推导结果一项测试（芯片与继续、实例检查、需要留意、账户列表、已安装标记、内容来源与插件标签），另有一项检查初次全部重算、无变化不重算。临时从「需要留意」的依赖里去掉账户时，表的测试与 home_attention_follows_the_current_account 都按预期失败。
 - 原有 app 与 UI 测试通过，或按新语义改写并在此列出。
-  Result: 2026-10-21（T4 之后）：lumilio-app 与 lumilio-ui 共 580 项，578 项通过，失败的两项是留给 T5 的芯片与发现页验收测试。按新语义改写：home_snapshot_and_rapid_selection_keep_the_last_game 改为启动订阅，去掉对 continue_id 的断言，连续两次选择按顺序保存、最后一次留下；service::tests::settings 中当前游戏的测试改为删除后回退到另一个游戏；内存设置的测试中，直接写进游戏库的游戏在重新打开后成为当前游戏；activity 的取消测试先放开设置锁再删除当前游戏，因为删除要保存回退结果。「需要留意」新的结论按 §2 的 QUICK 淡入并上移进入，消失为立即移除（退出短于进入），待 T8 实机检查。2026-10-21（T5 之后）：580 项全部通过，clippy 无警告。上下文的界面副本是 LauncherShell 的私有字段：页面只能读 context() 与 install_target()，写入只有 follow_context，由 app 的订阅调用；没有用 Global，因为 Global 任何拿到 App 的代码都能改写。LiveModel.install_target 与 set_library 的目标提示已删除，安装目标就是镜像里的当前游戏且游戏库里有它。按新语义改写：the_install_target_survives_refreshes_and_falls_back_when_deleted 删除（回退由 core 的 the_current_game_always_exists_and_is_saved 覆盖）；发现页与导航的 UI 测试改为先 follow_context 再断言；新增 another_current_game_ends_browsing_for_a_game。临时让 follow_context 不结束浏览、或让游戏页「浏览」不设当前游戏时，对应的 UI 与 app 测试按预期失败。D1 中「等待期间被点的那一行保持按下状态」尚未做：保存很快，留待 T8 实机看是否需要。2026-10-21（T6、T7 之后）：lumilio-core、lumilio-app、lumilio-ui 共 1398 项全部通过，clippy 无警告。T6：Context 增加 session（游戏与阶段：准备中、游戏中、失败），由 launch_with 发布，中途放弃的启动由守卫清除，失败一直保留到下次启动或该游戏被删除；core 测试 a_launch_publishes_its_session_until_it_is_over，临时让守卫不清除时按预期失败。首页能否开始与导航「重启以更新」读镜像里的会话（启动中也禁用重启），游戏页的游戏输出与「结束游戏」只认会话里的游戏，投影工作室窗口随会话变化开关写入；依赖表加一行。「恢复并继续」重试失败的那个游戏（T8 检查后按 D8 改为：恢复界面只在失败的游戏是当前游戏时出现，换了当前游戏后失败留在「需要留意」，启动结束会重做实例检查；choosing_another_game_leaves_a_failed_launch_to_needs_attention 取代原先「先设回失败的游戏」的测试，见 lessonsLearned）；recovering_a_failed_launch_retries_the_same_game 加上卡片 ▶ 后芯片指向 B 的检查。T7：design-language §6 写明当前游戏只有一个及哪些操作会改变它，§10 增加「共享选择在保存后才变」；navigation.rs、home/launching.rs、home/recovery.rs、pages/live/library.rs、instance_detail/actions.rs 与 app live/instance.rs 的 ia 注释改成同一语义，just ia 已重新生成；nav-update-game-running 中英文案改为「启动或运行」。
+  Result: 2026-10-21（T4 之后）：lumilio-app 与 lumilio-ui 共 580 项，578 项通过，失败的两项是留给 T5 的芯片与发现页验收测试。按新语义改写：home_snapshot_and_rapid_selection_keep_the_last_game 改为启动订阅，去掉对 continue_id 的断言，连续两次选择按顺序保存、最后一次留下；service::tests::settings 中当前游戏的测试改为删除后回退到另一个游戏；内存设置的测试中，直接写进游戏库的游戏在重新打开后成为当前游戏；activity 的取消测试先放开设置锁再删除当前游戏，因为删除要保存回退结果。「需要留意」新的结论按 §2 的 QUICK 淡入并上移进入，消失为立即移除（退出短于进入），待 T8 实机检查。2026-10-21（T5 之后）：580 项全部通过，clippy 无警告。上下文的界面副本是 LauncherShell 的私有字段：页面只能读 context() 与 install_target()，写入只有 follow_context，由 app 的订阅调用；没有用 Global，因为 Global 任何拿到 App 的代码都能改写。LiveModel.install_target 与 set_library 的目标提示已删除，安装目标就是镜像里的当前游戏且游戏库里有它。按新语义改写：the_install_target_survives_refreshes_and_falls_back_when_deleted 删除（回退由 core 的 the_current_game_always_exists_and_is_saved 覆盖）；发现页与导航的 UI 测试改为先 follow_context 再断言；新增 another_current_game_ends_browsing_for_a_game。临时让 follow_context 不结束浏览、或让游戏页「浏览」不设当前游戏时，对应的 UI 与 app 测试按预期失败。D1 中「等待期间被点的那一行保持按下状态」尚未做：保存很快，留待 T8 实机看是否需要。2026-10-21（T6、T7 之后）：lumilio-core、lumilio-app、lumilio-ui 共 1398 项全部通过，clippy 无警告。T6：Context 增加 session（游戏与阶段：准备中、游戏中、失败），由 launch_with 发布，中途放弃的启动由守卫清除，失败一直保留到下次启动或该游戏被删除；core 测试 a_launch_publishes_its_session_until_it_is_over，临时让守卫不清除时按预期失败。首页能否开始与导航「重启以更新」读镜像里的会话（启动中也禁用重启），游戏页的游戏输出与「结束游戏」只认会话里的游戏，投影工作室窗口随会话变化开关写入；依赖表加一行。「恢复并继续」重试失败的那个游戏（T8 检查后按 D8 改为：恢复界面只在失败的游戏是当前游戏时出现，换了当前游戏后失败留在「需要留意」，启动结束会重做实例检查；choosing_another_game_leaves_a_failed_launch_to_needs_attention 取代原先「先设回失败的游戏」的测试，见 lessonsLearned）；recovering_a_failed_launch_retries_the_same_game 加上卡片 ▶ 后芯片指向 B 的检查。T7：design-language §6 写明当前游戏只有一个及哪些操作会改变它，§10 增加「共享选择在保存后才变」；crates/lumilio-ui/src/navigation/bar.rs、home/launching.rs、home/recovery.rs、crates/lumilio-ui/src/features/library/view.rs、instance_detail/actions.rs 与 `crates/lumilio-ui/src/shell/instance.rs` 的 ia 注释改成同一语义，just ia 已重新生成；nav-update-game-running 中英文案改为「启动或运行」。
 - just check 通过（由 Project Maintainer 运行）。
   Result: 2026-10-21：Project Maintainer 在 452cae6 上运行 just check 通过。
 - Project Maintainer 在 Mac 上实机检查通过（T8）。
@@ -79,7 +79,7 @@ Consequences: app 的 State.continue_id 与 UI 的 LiveModel.install_target 删�
 
 Why: 保留现在「浏览后芯片跟着变」的行为，同时消除芯片与「继续」的分叉：今天 browse_for 只改 install_target、不保存，分叉由此开始。从某个游戏进去给它装内容，就是在使用这个游戏，与 D4 是同一条规则。换了芯片还留着 X 的锁定，会重新出现锁定与安装目标不一致。
 
-Consequences: 首页「继续」会跟着变成浏览的游戏。换芯片时锁定的筛选条件随之丢弃。lumilio-app live/instance.rs 浏览锁定的 ia 注释去掉「不改变当前游戏」（T7）。
+Consequences: 首页「继续」会跟着变成浏览的游戏。换芯片时锁定的筛选条件随之丢弃。`crates/lumilio-ui/src/shell/instance.rs` 浏览锁定的 ia 注释去掉「不改变当前游戏」（T7）。
 
 ## Decision D4
 
@@ -128,14 +128,14 @@ Consequences: 启动结束（会话从启动中或游戏中变为失败或没有
 - https://github.com/HMCL-dev/HMCL/blob/main/HMCL/src/main/java/org/jackhuang/hmcl/setting/Accounts.java
 - [.agents/plans/home-readiness.json](../../.agents/plans/home-readiness.json)
 - [docs/design-language.md](../../docs/design-language.md)
-- [crates/lumilio-core/src/service/preferences.rs](../../crates/lumilio-core/src/service/preferences.rs)
-- [crates/lumilio-core/src/settings.rs](../../crates/lumilio-core/src/settings.rs)
-- [crates/lumilio-core/src/service/instances.rs](../../crates/lumilio-core/src/service/instances.rs)
-- [crates/lumilio-core/src/attention.rs](../../crates/lumilio-core/src/attention.rs)
-- [crates/lumilio-core/src/diagnostics.rs](../../crates/lumilio-core/src/diagnostics.rs)
-- [crates/lumilio-app/src/live/jobs.rs](../../crates/lumilio-app/src/live/jobs.rs)
-- [crates/lumilio-app/src/live/library.rs](../../crates/lumilio-app/src/live/library.rs)
-- [crates/lumilio-app/src/live/launch.rs](../../crates/lumilio-app/src/live/launch.rs)
+- [crates/lumilio-core/src/launcher_service/preferences.rs](../../crates/lumilio-core/src/launcher_service/preferences.rs)
+- [crates/lumilio-core/src/settings/store.rs](../../crates/lumilio-core/src/settings/store.rs)
+- [crates/lumilio-core/src/launcher_service/instances.rs](../../crates/lumilio-core/src/launcher_service/instances.rs)
+- [crates/lumilio-core/src/diagnostics/attention.rs](../../crates/lumilio-core/src/diagnostics/attention.rs)
+- [crates/lumilio-core/src/diagnostics/problems.rs](../../crates/lumilio-core/src/diagnostics/problems.rs)
+- [crates/lumilio-ui/src/shell/feed/lists.rs](../../crates/lumilio-ui/src/shell/feed/lists.rs)
+- [crates/lumilio-ui/src/features/library/mod.rs](../../crates/lumilio-ui/src/features/library/mod.rs)
+- [crates/lumilio-ui/src/features/launch/mod.rs](../../crates/lumilio-ui/src/features/launch/mod.rs)
 - [crates/lumilio-app/src/live/dispatch.rs](../../crates/lumilio-app/src/live/dispatch.rs)
 - [crates/lumilio-app/src/live/update.rs](../../crates/lumilio-app/src/live/update.rs)
 - [crates/lumilio-ui/src/live/mod.rs](../../crates/lumilio-ui/src/live/mod.rs)

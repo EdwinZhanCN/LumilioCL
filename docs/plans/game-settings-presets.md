@@ -148,13 +148,13 @@ Consequences: 选项表在两处共用；开关是当场生效的快捷操作，
 
 ## References
 
-- [crates/lumilio-core/src/instance/mod.rs](../../crates/lumilio-core/src/instance/mod.rs)
-- [crates/lumilio-core/src/layout.rs](../../crates/lumilio-core/src/layout.rs)
-- [crates/lumilio-core/src/service/launch.rs](../../crates/lumilio-core/src/service/launch.rs)
-- [crates/lumilio-core/src/service/mod.rs](../../crates/lumilio-core/src/service/mod.rs)
-- [crates/lumilio-core/src/launcher/phases.rs](../../crates/lumilio-core/src/launcher/phases.rs)
-- [crates/lumilio-core/src/recovery.rs](../../crates/lumilio-core/src/recovery.rs)
-- [crates/lumilio-ui/src/pages/live/library.rs](../../crates/lumilio-ui/src/pages/live/library.rs)
+- [crates/lumilio-core/src/instances/mod.rs](../../crates/lumilio-core/src/instances/mod.rs)
+- [crates/lumilio-core/src/storage/layout.rs](../../crates/lumilio-core/src/storage/layout.rs)
+- [crates/lumilio-core/src/launcher_service/launch.rs](../../crates/lumilio-core/src/launcher_service/launch.rs)
+- [crates/lumilio-core/src/launcher_service/mod.rs](../../crates/lumilio-core/src/launcher_service/mod.rs)
+- [crates/lumilio-core/src/launching/launcher/phases.rs](../../crates/lumilio-core/src/launching/launcher/phases.rs)
+- [crates/lumilio-core/src/storage/recovery.rs](../../crates/lumilio-core/src/storage/recovery.rs)
+- [crates/lumilio-ui/src/features/library/view.rs](../../crates/lumilio-ui/src/features/library/view.rs)
 - [docs/design-language.md](../../docs/design-language.md)
 - https://github.com/modrinth/code/blob/71f35eb80f2a65387a2b30d47d433673d863a6d4/packages/app-lib/src/api/instance/synced_options/game_options/mod.rs
 - https://github.com/modrinth/code/blob/71f35eb80f2a65387a2b30d47d433673d863a6d4/packages/app-lib/src/api/instance/synced_options/game_options/read_instance_changes.rs

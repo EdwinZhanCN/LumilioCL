@@ -225,7 +225,8 @@ async fn timeout_discards_late_results_and_stops_future_dispatch() {
 #[tokio::test]
 async fn a_call_that_ends_after_its_deadline_timed_out_even_when_seen_before_the_timer() {
     let now = tokio::time::Instant::now();
-    // Ends after its deadline with the error a network read gives at it.
+    // Ends after its deadline claiming a network read gave up; only the
+    // host's own reads can say that (see `isolated_reading`).
     let mut late = std::pin::pin!(isolated(now + Duration::from_millis(50), || {
         std::thread::sleep(Duration::from_millis(100));
         Err::<(), _>(PluginError::Transient(

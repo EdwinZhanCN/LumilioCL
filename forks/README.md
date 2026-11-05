@@ -35,7 +35,7 @@ or indexed past its own items and crashed. Guard:
 `kit::tests::html_paragraphs_with_code_and_linked_images_each_keep_their_own_layout`
 in `lumilio-ui`.
 
-These are editable source snapshots, owned by LumilioCL (ADR 0029).
+These are editable source snapshots, owned by LumilioCL.
 Reference-only projects are consulted through their published upstream URLs.
 The launcher uses local Cargo paths, not remotely published fork repositories.
 
@@ -78,7 +78,7 @@ Keep upstream license headers and API attribution when changing source.
   Nucleation's `ffmpeg-sidecar` development dependency leaves out its default
   `download_ffmpeg` feature, which requires zip 4; `render_schematic` runs an
   installed ffmpeg.
-- Rendering behaviour follows Minecraft's draw rules (ADR 0034). Each change
+- Rendering behaviour follows Minecraft's draw rules. Each change
   below has a guard that was shown to fail without it; keep them through syncs.
 
 Schematic-Mesher (guards in `schematic-mesher/tests/`, run one with
@@ -261,8 +261,8 @@ upstream; its lib tests also write `simple_cube.litematic`,
   Guards: `reversed_depth_keeps_framing_and_flips_depth_order`,
   `translucent_triangles_draw_farthest_first`.
 - Camera (`src/rendering/camera.rs`, `mod.rs`): optional first-person eye
-  position bypasses orbit fitting, with a fixed near plane and reversed depth
-  (ADR 0036). The existing RenderConfig continues to produce orbit cameras.
+  position bypasses orbit fitting, with a fixed near plane and reversed depth.
+  The existing RenderConfig continues to produce orbit cameras.
 - `UniversalSchematic::undrawable_blocks` (`src/meshing/mod.rs`).
 - One mesh at a time (`src/rendering/gpu.rs` `set_only_mesh`,
   `set_fit_bounds`; plan schematic-studio T27): a renderer made with several

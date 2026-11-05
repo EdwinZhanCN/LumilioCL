@@ -36,7 +36,7 @@ Status: Completed
 - T1：共享连接池的上限测试与每任务进度测试通过；lumilio-core 公开路径不变（lumilio-app、lumilio-ui 无需改 use）。
   Result: crates/lumilio-transfer/src/budget_tests.rs：两个引擎共享上限 2 时最大在途请求为 2；大批次与后到的小批次轮流使用连接（去掉每批上限后该测试失败，已验证）；扩容立即生效、缩容随连接结束生效。lumilio-core 829 个测试通过（每个引擎事件独立，任务进度测试不变）；lumilio-app、lumilio-ui 未改 use，clippy 无告警。
 - T2：续传与回退的假 transport 测试通过。
-  Result: crates/lumilio-transfer/src/resume_tests.rs 7 个测试、pause_tests.rs 3 个测试与 user_agent_tests 中 Range/If-Range 请求头测试通过；crates/lumilio-core/src/service/tests/activity.rs 的 a_paused_task_lets_its_connections_go_and_finishes_once_resumed 经服务暂停一个内容安装、看到连接数归零后继续并装好。变异验证：总从零开始（4 个失败）、不发 If-Range（3 个失败）、校验失败后保留说明（1 个失败）、暂停时不放开连接（2 个失败）、传输中不理会暂停（2 个失败）、服务的 pause_task 不暂停（1 个失败）。
+  Result: crates/lumilio-transfer/src/resume_tests.rs 7 个测试、pause_tests.rs 3 个测试与 user_agent_tests 中 Range/If-Range 请求头测试通过；crates/lumilio-core/src/launcher_service/tests/activity.rs 的 a_paused_task_lets_its_connections_go_and_finishes_once_resumed 经服务暂停一个内容安装、看到连接数归零后继续并装好。变异验证：总从零开始（4 个失败）、不发 If-Range（3 个失败）、校验失败后保留说明（1 个失败）、暂停时不放开连接（2 个失败）、传输中不理会暂停（2 个失败）、服务的 pause_task 不暂停（1 个失败）。
 - T3：分段、回退与连接上限测试通过。
   Result: crates/lumilio-transfer/src/parallel_tests.rs 7 个测试与 pieces_tests.rs 7 个测试通过，连续 25 次运行稳定：空闲连接加入并都向最终地址要区间、与批次并行时最大在途不超过池上限、来源把区间回成 200 时第一次尝试仍完成、无 Range 与池满时单连接、池满开始的大文件在连接空出后分段、取消后新引擎从已写区间续传。变异验证：加入的连接绕过连接池（1–2 个失败）、从不分段（2 个失败）、加入的连接改向原始来源（1 个失败）、取消后不记已写区间（1 个失败）、不中途交接（1 个失败）。
 - T4：元数据与更新器经引擎下载的测试通过。
@@ -120,7 +120,7 @@ Consequences: docs/design-language.md §12 写明 Activity 的唯一显示屏、
 
 - [crates/lumilio-transfer/src/engine.rs](../../crates/lumilio-transfer/src/engine.rs)
 - [crates/lumilio-transfer/src/parallel.rs](../../crates/lumilio-transfer/src/parallel.rs)
-- [crates/lumilio-core/src/service/tracking.rs](../../crates/lumilio-core/src/service/tracking.rs)
+- [crates/lumilio-core/src/activity/tasks.rs](../../crates/lumilio-core/src/activity/tasks.rs)
 - https://github.com/fast-down/core
 - https://github.com/modrinth/code/tree/main/packages/app-lib
 

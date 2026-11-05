@@ -1,5 +1,5 @@
 use gpui::{Context, Window};
-use lumilio_core::{InstanceRecord, LauncherSettings};
+use lumilio_core::{InstanceRecord, LauncherSettings, ProjectKind};
 
 use super::intent::{InstanceIntent, Section};
 use super::panels::{Arrived, Confirm};
@@ -179,6 +179,22 @@ impl InstanceDetailView {
         }
         self.data.pending.push(section);
         (self.handler)(InstanceIntent::Load(section), window, cx);
+    }
+
+    /// Reads a kind of content again and has its sources identify every
+    /// file anew. A read already under way is overtaken: its answer is
+    /// dropped.
+    pub fn identify_again(
+        &mut self,
+        kind: ProjectKind,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let section = Section::Content(kind);
+        if !self.data.pending.contains(&section) {
+            self.data.pending.push(section);
+        }
+        (self.handler)(InstanceIntent::IdentifyContent(kind), window, cx);
     }
 
     /// A section's data arrived. A failure is page state: the section shows
@@ -436,12 +452,13 @@ impl InstanceDetailView {
         stale.push(Section::Problems);
         let mut reload = Vec::new();
         for section in stale {
-            // Only what has been looked at is worth re-reading.
-            if self.data.has(section)
-                && !self.data.pending.contains(&section)
-                && !reload.contains(&section)
-            {
-                self.data.pending.push(section);
+            // Only what has been looked at is worth re-reading. A read on
+            // its way began before the write: it is read again too, and the
+            // caller drops the older answer.
+            if self.data.has(section) && !reload.contains(&section) {
+                if !self.data.pending.contains(&section) {
+                    self.data.pending.push(section);
+                }
                 reload.push(section);
             }
         }

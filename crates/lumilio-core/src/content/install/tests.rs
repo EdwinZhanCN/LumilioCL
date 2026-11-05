@@ -3,8 +3,8 @@
 use std::collections::BTreeMap;
 
 use crate::activity::CancellationToken;
-use crate::content::AddedFile;
 use crate::content::discover::{DEFAULT_SOURCE, ProjectKind, ProjectOrigin};
+use crate::content::{AddedFile, ContentLookup};
 use crate::error::ServiceError;
 use crate::instances::Loader;
 use crate::testing::*;
@@ -129,7 +129,7 @@ async fn a_file_belongs_to_the_first_source_that_knows_it() {
 
     let list = world
         .service
-        .content_details(&record.id, ProjectKind::Mod)
+        .content_details(&record.id, ProjectKind::Mod, ContentLookup::Fresh)
         .await
         .unwrap();
     assert!(!list.sources_unavailable, "{:?}", list.source_note);
@@ -195,7 +195,7 @@ async fn a_source_that_cannot_answer_leaves_the_next_one_to_try() {
     );
     let list = world
         .service
-        .content_details(&record.id, ProjectKind::Mod)
+        .content_details(&record.id, ProjectKind::Mod, ContentLookup::Fresh)
         .await
         .unwrap();
     assert!(list.sources_unavailable);

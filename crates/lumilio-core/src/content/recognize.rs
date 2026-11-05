@@ -1,13 +1,20 @@
 //! Which project each installed file is, asking the enabled content sources
 //! in turn (plan curseforge-source D4): a file belongs to the first source
-//! that knows it, and only files still unknown go on to the next one.
+//! that knows it, and only files still unknown go on to the next one. What a
+//! source said is kept, and asked again only when it expires (plan
+//! content-recognition D2).
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 
 use super::Content;
+use super::recognition_cache::{
+    ContentLookup, DETAILS_FOR, KNOWN_FOR, Stored, UNKNOWN_FOR, identify_key, latest_key,
+    project_key,
+};
 use super::{Recognized, Summaries};
-use crate::content::discover::{ContentClient, FileHashes, ProjectKind, Version};
+use crate::clock::now;
+use crate::content::discover::{ContentClient, FileHashes, ProjectKind, ProjectSummary, Version};
 use crate::content::{ContentItem, scan as scan_content};
 use crate::error::ServiceError;
 use crate::instances::InstanceRecord;
@@ -34,25 +41,59 @@ pub(crate) struct Recognition {
     pub(super) failures: Vec<String>,
 }
 
+/// Which of `keys` a lookup takes from what is kept, and which it asks.
+/// `Kept` asks nothing; `Again` asks everything.
+fn split<T: Clone>(
+    keys: &[String],
+    kept: &HashMap<String, Stored<T>>,
+    lookup: ContentLookup,
+) -> (Vec<(usize, T)>, Vec<usize>) {
+    let mut known = Vec::new();
+    let mut ask = Vec::new();
+    for (index, key) in keys.iter().enumerate() {
+        match kept.get(key) {
+            Some(stored)
+                if lookup == ContentLookup::Kept
+                    || (lookup == ContentLookup::Fresh && stored.fresh) =>
+            {
+                known.push((index, stored.value.clone()));
+            }
+            _ if lookup == ContentLookup::Kept => {}
+            _ => ask.push(index),
+        }
+    }
+    (known, ask)
+}
+
 impl<T: Transport + Clone> Content<T> {
-    /// The installed files of one kind, hashed off the async threads.
+    /// The installed files of one kind, hashed off the async threads; a file
+    /// unchanged since it was last hashed keeps its kept SHA-1.
     pub(crate) async fn hashed_content(
         &self,
         id: &str,
         kind: ProjectKind,
     ) -> Result<Vec<HashedFile>, ServiceError> {
         let game_dir = self.layout.game(id);
+        let cache = self.recognition.clone();
         tokio::task::spawn_blocking(move || {
             let items = scan_content(&game_dir, kind)?;
             let folder = game_dir.join(kind.install_folder().unwrap_or_default());
+            let files: Vec<PathBuf> = items
+                .iter()
+                .filter(|item| !item.is_directory)
+                .map(|item| folder.join(&item.file_name))
+                .collect();
+            let mut sha1s = cache.sha1s(&files, now()).into_iter();
             Ok::<_, crate::content::ContentError>(
                 items
                     .into_iter()
                     .map(|item| {
                         let path = folder.join(&item.file_name);
-                        let sha1 = (!item.is_directory)
-                            .then(|| crate::content::sha1_hex(&path).ok())
-                            .flatten();
+                        let sha1 = if item.is_directory {
+                            None
+                        } else {
+                            sha1s.next().flatten()
+                        };
                         HashedFile { item, path, sha1 }
                     })
                     .collect(),
@@ -64,8 +105,10 @@ impl<T: Transport + Clone> Content<T> {
     }
 
     /// Each file's hashes as `client` reads them; CurseForge's fingerprint
-    /// is computed (off the async threads) only for a source that needs it.
+    /// is computed (off the async threads, kept by SHA-1) only for a source
+    /// that needs it.
     pub(crate) async fn file_hashes(
+        &self,
         client: &ContentClient<'_>,
         files: &[(String, PathBuf)],
     ) -> Vec<FileHashes> {
@@ -76,13 +119,13 @@ impl<T: Transport + Clone> Content<T> {
                 .collect();
         }
         let files = files.to_vec();
+        let cache = self.recognition.clone();
         tokio::task::spawn_blocking(move || {
+            let fingerprints = cache.fingerprints(&files, now());
             files
                 .into_iter()
-                .map(|(sha1, path)| FileHashes {
-                    murmur2: crate::content::fingerprint::of_file(&path).ok(),
-                    sha1,
-                })
+                .zip(fingerprints)
+                .map(|((sha1, _), murmur2)| FileHashes { murmur2, sha1 })
                 .collect()
         })
         .await
@@ -92,11 +135,13 @@ impl<T: Transport + Clone> Content<T> {
     /// Asks every enabled source, in order, about the files the ones before
     /// it did not know, and (when `record` is given) for the newest version
     /// of the enabled ones that fits the game. A source that cannot answer is
-    /// noted and skipped; the next one may still know the files.
+    /// noted and skipped; the next one may still know the files, and what it
+    /// said before still stands.
     pub(crate) async fn recognize(
         &self,
         files: &[&HashedFile],
         record: Option<&InstanceRecord>,
+        lookup: ContentLookup,
     ) -> Recognition {
         let mut found = Recognition::default();
         let clients = self.plugins.content_clients().await;
@@ -122,25 +167,17 @@ impl<T: Transport + Clone> Content<T> {
                 .iter()
                 .map(|(sha1, path, _)| (sha1.clone(), path.clone()))
                 .collect();
-            let hashes = Self::file_hashes(&client, &asked).await;
-            let identified = match client.identify(&hashes).await {
-                Ok(identified) => identified,
-                Err(error) => {
-                    found.failures.push(format!("{}: {error}", client.name()));
-                    continue;
-                }
-            };
+            let (identified, failure) = self.identified(&client, &asked, lookup).await;
+            if let Some(failure) = failure {
+                found.failures.push(format!("{}: {failure}", client.name()));
+            }
             if identified.is_empty() {
                 continue;
             }
-            let enabled: Vec<FileHashes> = hashes
-                .into_iter()
-                .filter(|hash| identified.contains_key(&hash.sha1))
-                .filter(|hash| {
-                    unknown
-                        .iter()
-                        .any(|(sha1, _, enabled)| *enabled && *sha1 == hash.sha1)
-                })
+            let enabled: Vec<(String, PathBuf)> = unknown
+                .iter()
+                .filter(|(sha1, _, enabled)| *enabled && identified.contains_key(sha1))
+                .map(|(sha1, path, _)| (sha1.clone(), path.clone()))
                 .collect();
             let mut ids: Vec<String> = identified
                 .values()
@@ -150,17 +187,14 @@ impl<T: Transport + Clone> Content<T> {
             ids.dedup();
             let latest = async {
                 match record {
-                    Some(record) => client
-                        .latest_for(&enabled, record.loader, &record.game_version)
-                        .await
-                        .unwrap_or_default(),
+                    Some(record) => self.newest(&client, &enabled, record, lookup).await,
                     None => BTreeMap::new(),
                 }
             };
             // Labels and updates are decoration: a failure leaves them out.
-            let (latest, summaries) = tokio::join!(latest, client.project_summaries(&ids));
+            let (latest, summaries) = tokio::join!(latest, self.summaries(&client, &ids, lookup));
             found.latest.extend(latest);
-            for summary in summaries.unwrap_or_default() {
+            for summary in summaries {
                 found
                     .projects
                     .insert((client.plugin_id().to_owned(), summary.id.clone()), summary);
@@ -179,4 +213,168 @@ impl<T: Transport + Clone> Content<T> {
         }
         found
     }
+
+    /// The version each file is in `client`'s catalog, by SHA-1, and why the
+    /// source could not be asked when it could not.
+    async fn identified(
+        &self,
+        client: &ContentClient<'_>,
+        files: &[(String, PathBuf)],
+        lookup: ContentLookup,
+    ) -> (BTreeMap<String, Version>, Option<String>) {
+        let source = client.plugin_id();
+        let keys: Vec<String> = files
+            .iter()
+            .map(|(sha1, _)| identify_key(source, sha1))
+            .collect();
+        let kept = self
+            .recognition
+            .recall_now::<Option<Version>>(keys.clone())
+            .await;
+        let (known, ask) = split(&keys, &kept, lookup);
+        let mut found: BTreeMap<String, Version> = known
+            .into_iter()
+            .filter_map(|(index, version)| Some((files[index].0.clone(), version?)))
+            .collect();
+        if ask.is_empty() {
+            return (found, None);
+        }
+        let asked: Vec<(String, PathBuf)> = ask.iter().map(|&index| files[index].clone()).collect();
+        let hashes = self.file_hashes(client, &asked).await;
+        match client.identify(&hashes).await {
+            Ok(answer) => {
+                let keep = ask
+                    .iter()
+                    .map(|&index| {
+                        let version = answer.get(&files[index].0).cloned();
+                        let fresh_for = if version.is_some() {
+                            KNOWN_FOR
+                        } else {
+                            UNKNOWN_FOR
+                        };
+                        (keys[index].clone(), version, fresh_for)
+                    })
+                    .collect();
+                self.recognition.keep_now(keep).await;
+                found.extend(answer);
+                (found, None)
+            }
+            Err(error) => {
+                for &index in &ask {
+                    if let Some(Stored {
+                        value: Some(version),
+                        ..
+                    }) = kept.get(&keys[index])
+                    {
+                        found.insert(files[index].0.clone(), version.clone());
+                    }
+                }
+                (found, Some(error.to_string()))
+            }
+        }
+    }
+
+    /// The newest version of each file that fits `record`'s game, by SHA-1.
+    async fn newest(
+        &self,
+        client: &ContentClient<'_>,
+        files: &[(String, PathBuf)],
+        record: &InstanceRecord,
+        lookup: ContentLookup,
+    ) -> BTreeMap<String, Version> {
+        let source = client.plugin_id();
+        let keys: Vec<String> = files
+            .iter()
+            .map(|(sha1, _)| latest_key(source, sha1, record.loader, &record.game_version))
+            .collect();
+        let kept = self
+            .recognition
+            .recall_now::<Option<Version>>(keys.clone())
+            .await;
+        let (known, ask) = split(&keys, &kept, lookup);
+        let mut found: BTreeMap<String, Version> = known
+            .into_iter()
+            .filter_map(|(index, version)| Some((files[index].0.clone(), version?)))
+            .collect();
+        if ask.is_empty() {
+            return found;
+        }
+        let asked: Vec<(String, PathBuf)> = ask.iter().map(|&index| files[index].clone()).collect();
+        let hashes = self.file_hashes(client, &asked).await;
+        match client
+            .latest_for(&hashes, record.loader, &record.game_version)
+            .await
+        {
+            Ok(answer) => {
+                let keep = ask
+                    .iter()
+                    .map(|&index| {
+                        let newest = answer.get(&files[index].0).cloned();
+                        (keys[index].clone(), newest, DETAILS_FOR)
+                    })
+                    .collect();
+                self.recognition.keep_now(keep).await;
+                found.extend(answer);
+            }
+            Err(_) => {
+                for &index in &ask {
+                    if let Some(Stored {
+                        value: Some(newest),
+                        ..
+                    }) = kept.get(&keys[index])
+                    {
+                        found.insert(files[index].0.clone(), newest.clone());
+                    }
+                }
+            }
+        }
+        found
+    }
+
+    /// What `client` says about each project: name, author, icon, page.
+    async fn summaries(
+        &self,
+        client: &ContentClient<'_>,
+        ids: &[String],
+        lookup: ContentLookup,
+    ) -> Vec<ProjectSummary> {
+        let source = client.plugin_id();
+        let keys: Vec<String> = ids.iter().map(|id| project_key(source, id)).collect();
+        let kept = self
+            .recognition
+            .recall_now::<ProjectSummary>(keys.clone())
+            .await;
+        let (known, ask) = split(&keys, &kept, lookup);
+        let mut found: Vec<ProjectSummary> =
+            known.into_iter().map(|(_, summary)| summary).collect();
+        if ask.is_empty() {
+            return found;
+        }
+        let asked: Vec<String> = ask.iter().map(|&index| ids[index].clone()).collect();
+        match client.project_summaries(&asked).await {
+            Ok(answer) => {
+                let keep = answer
+                    .iter()
+                    .map(|summary| {
+                        (
+                            project_key(source, &summary.id),
+                            summary.clone(),
+                            DETAILS_FOR,
+                        )
+                    })
+                    .collect();
+                self.recognition.keep_now(keep).await;
+                found.extend(answer);
+            }
+            Err(_) => found.extend(
+                ask.iter()
+                    .filter_map(|&index| kept.get(&keys[index]))
+                    .map(|stored| stored.value.clone()),
+            ),
+        }
+        found
+    }
 }
+
+#[cfg(test)]
+mod tests;

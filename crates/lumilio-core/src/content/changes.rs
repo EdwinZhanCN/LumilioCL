@@ -2,7 +2,7 @@ use super::Content;
 use super::{ContentEffect, ContentResult};
 use crate::clock::now;
 use crate::content::discover::{ProjectKind, Version};
-use crate::content::{ContentError, ContentItem, scan as scan_content};
+use crate::content::{ContentError, ContentItem, ContentLookup, scan as scan_content};
 use crate::error::ServiceError;
 use crate::instances::history::{ChangeKind, HistoryEvent, HistoryLog};
 use crate::transfer::Transport;
@@ -85,18 +85,19 @@ impl<T: Transport + Clone> Content<T> {
 
     /// Lists one kind of content with where each file came from (IA
     /// P-CONTENT-ITEM). Files are hashed off the async threads, then the
-    /// enabled sources are asked in turn (see `recognize`). If a source
-    /// cannot be reached the list still comes back, marked
-    /// `sources_unavailable`.
+    /// enabled sources are asked in turn (see `recognize`), as far as
+    /// `lookup` lets what they said before answer. If a source cannot be
+    /// reached the list still comes back, marked `sources_unavailable`.
     pub(crate) async fn content_details(
         &self,
         id: &str,
         kind: ProjectKind,
+        lookup: ContentLookup,
     ) -> Result<crate::content::ContentList, ServiceError> {
         let record = self.instances.record(id).await?;
         let files = self.hashed_content(id, kind).await?;
         let found = self
-            .recognize(&files.iter().collect::<Vec<_>>(), Some(&record))
+            .recognize(&files.iter().collect::<Vec<_>>(), Some(&record), lookup)
             .await;
         let note = (!found.failures.is_empty()).then(|| found.failures.join("; "));
         Ok(crate::content::ContentList {
