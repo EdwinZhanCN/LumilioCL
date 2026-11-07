@@ -251,7 +251,7 @@ pub(super) fn render_playing(
             div()
                 .mt(px(12.))
                 .debug_selector(|| "home-stop-game".into())
-                // ia[home]: 结束游戏 | 游戏运行中的「结束游戏」 | 停止游戏进程
+                // ia[home]: 结束游戏 | 游戏运行中的「结束游戏」 | 停止首页显示的这个游戏的进程；其他在运行的游戏照常运行 | concurrent-sessions T2
                 .child(art_button(
                     "home-stop-game",
                     crate::tr!("home-stop-game"),

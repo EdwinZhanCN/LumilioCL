@@ -4,7 +4,7 @@
 //! what the pages show of it arrives here, whoever made the change.
 
 use gpui::App;
-use lumilio_core::{Context, HomeChecks, InstanceRecord, Session, unix_now};
+use lumilio_core::{Context, HomeChecks, InstanceRecord, unix_now};
 
 use super::Feed;
 use super::lists::{installed_changed, refresh_installed};
@@ -54,8 +54,7 @@ pub(super) fn stale(before: Option<&Context>, now: &Context) -> Stale {
     let library = was.library != is.library;
     let accounts = was.accounts != is.accounts || before.current_account != now.current_account;
     // A launch that ended wrote how it went to the game's history.
-    let active = |context: &Context| context.session.as_ref().is_some_and(Session::is_active);
-    let ended = active(before) && !active(now);
+    let ended = before.active().any(|id| !now.is_active(id));
     let checks = library || ended || was.java != is.java || was.plugins != is.plugins;
     Stale {
         home: current || library,
@@ -64,7 +63,7 @@ pub(super) fn stale(before: Option<&Context>, now: &Context) -> Stale {
         accounts,
         installed: current || library,
         plugins: was.plugins != is.plugins,
-        session: before.session != now.session,
+        session: before.sessions != now.sessions,
     }
 }
 
@@ -132,28 +131,32 @@ fn apply(feed: &Feed, what: Stale, cx: &mut App) {
     }
 }
 
-/// The game whose session became active, or stopped being active: its
+/// The games whose sessions became active, or stopped being active: their
 /// studio windows shut their writes, or list their folder again.
 fn session_moved(feed: &Feed, before: Option<&Context>, now: &Context, cx: &mut App) {
-    let active = |context: Option<&Context>| {
-        context
-            .and_then(|context| context.session.as_ref())
-            .filter(|session| session.is_active())
-            .map(|session| session.instance.clone())
-    };
-    let (was, is) = (active(before), active(Some(now)));
-    if was == is {
+    let ended: Vec<String> = before
+        .into_iter()
+        .flat_map(Context::active)
+        .filter(|id| !now.is_active(id))
+        .map(str::to_owned)
+        .collect();
+    let began: Vec<String> = now
+        .active()
+        .filter(|id| !before.is_some_and(|before| before.is_active(id)))
+        .map(str::to_owned)
+        .collect();
+    if ended.is_empty() && began.is_empty() {
         return;
     }
     let Ok(game) = feed.shell.read_with(cx, |shell, _| shell.game().clone()) else {
         return;
     };
     game.update(cx, |game, cx| {
-        if let Some(id) = was {
-            game.game_changed(&id, false, cx);
+        for id in &ended {
+            game.game_changed(id, false, cx);
         }
-        if let Some(id) = is {
-            game.game_changed(&id, true, cx);
+        for id in &began {
+            game.game_changed(id, true, cx);
         }
     });
 }
@@ -191,12 +194,15 @@ fn refresh_home(feed: &Feed, cx: &mut App) {
             .cloned();
         let cards = library_cards(&records, now);
         let _ = feed.shell.update(cx, |shell, cx| {
-            // A launch in progress keeps Home. A failure is explained only
+            // A launch in progress keeps Home while its game is current;
+            // choosing another game keeps its moment for when it is current
+            // again (plan concurrent-sessions). A failure is explained only
             // while its game is current: choosing another one leaves it to
             // 需要留意.
             let keep = match shell.home() {
-                HomePresentation::Launching { .. } | HomePresentation::Playing { .. } => true,
-                HomePresentation::Recovery { subject, .. } => subject.id.as_deref() == current,
+                HomePresentation::Launching { subject, .. }
+                | HomePresentation::Playing { subject, .. }
+                | HomePresentation::Recovery { subject, .. } => subject.id.as_deref() == current,
                 _ => false,
             };
             if !keep {

@@ -87,7 +87,7 @@ impl LauncherShell {
                 }
             }),
             cx.subscribe(&self.launch, |shell, _, event: &LaunchEvent, cx| {
-                if *event == LaunchEvent::Ended {
+                if matches!(event, LaunchEvent::Ended { .. }) {
                     shell.reload_lists(cx);
                 }
             }),

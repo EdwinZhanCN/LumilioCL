@@ -61,6 +61,7 @@ pub(super) fn review_recovery(
             if which == "away" {
                 shell.show(lumilio_ui::route::Route::Library);
             }
+            let id = card.id.clone();
             shell.set_home(
                 HomePresentation::Continue {
                     subject: Subject {
@@ -74,7 +75,7 @@ pub(super) fn review_recovery(
                 cx,
             );
             for signal in signals {
-                shell.apply_launch_signal(signal, cx);
+                shell.apply_launch_signal(&id, signal, cx);
             }
         });
         if which.ends_with("details") {

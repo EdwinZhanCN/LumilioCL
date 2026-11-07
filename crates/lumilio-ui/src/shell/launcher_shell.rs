@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use gpui::prelude::*;
 use gpui::{App, Context, Entity, FocusHandle, Subscription, Task, WeakEntity, Window};
 
@@ -56,6 +58,10 @@ pub(crate) type IntentHandler = std::rc::Rc<dyn Fn(ShellIntent, &mut Window, &mu
 pub struct LauncherShell {
     pub(super) route: Route,
     pub(super) home: HomePresentation,
+    /// The launch moments of games on their way or running that Home does
+    /// not show (plan concurrent-sessions): Home shows each again when its
+    /// game becomes current.
+    pub(super) moments: BTreeMap<String, HomePresentation>,
     pub(super) hero: Entity<HeroCarousel>,
     pub(super) activity: ActivitySummary,
     pub(super) focus_handle: FocusHandle,
@@ -165,11 +171,13 @@ impl LauncherShell {
         });
         let launch_events =
             cx.subscribe(&launch, |shell, _, event: &LaunchEvent, cx| match event {
-                LaunchEvent::Signal(signal) => shell.apply_launch_signal(signal.clone(), cx),
+                LaunchEvent::Signal { id, signal } => {
+                    shell.apply_launch_signal(id, signal.clone(), cx);
+                }
                 LaunchEvent::Output { id, lines, running } => {
                     shell.game_output(id, lines.clone(), *running, cx);
                 }
-                LaunchEvent::Ended => {}
+                LaunchEvent::Ended { .. } => {}
             });
         let new_game_events = cx.subscribe(&new_game, |shell, _, event: &NewGameEvent, cx| {
             shell.new_game_event(event, cx);
@@ -182,6 +190,7 @@ impl LauncherShell {
         let mut shell = Self {
             route: Route::Home,
             home: home::initial_presentation(),
+            moments: BTreeMap::new(),
             hero: cx.new(HeroCarousel::new),
             activity: ActivitySummary::new(0),
             focus_handle: cx.focus_handle(),
@@ -324,7 +333,9 @@ impl LauncherShell {
                 self.continue_launch(window, cx);
             }
             ShellIntent::Home(HomeIntent::CancelLaunch | HomeIntent::StopGame) => {
-                self.launch.read(cx).stop();
+                if let Some(id) = self.home_game() {
+                    self.launch.read(cx).stop_game(&id);
+                }
             }
             ShellIntent::Home(HomeIntent::TechnicalDetails) => self.technical_details(window, cx),
             ShellIntent::Navigate(Route::Library | Route::Activity | Route::Accounts) => {

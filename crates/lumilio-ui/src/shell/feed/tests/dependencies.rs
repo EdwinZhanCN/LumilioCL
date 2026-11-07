@@ -13,16 +13,22 @@ fn changes() -> Vec<(&'static str, Context, Context)> {
     current.current_instance = Some("other".into());
     let mut account = base.clone();
     account.current_account = Some("Alex".into());
+    let game = |instance: &str, phase| Session {
+        instance: instance.into(),
+        phase,
+    };
     let mut session = base.clone();
-    session.session = Some(Session {
-        instance: "other".into(),
-        phase: SessionPhase::Preparing,
-    });
+    session.sessions = vec![game("other", SessionPhase::Preparing)];
     let mut playing = base.clone();
-    playing.session = Some(Session {
-        instance: "other".into(),
-        phase: SessionPhase::Playing,
-    });
+    playing.sessions = vec![game("other", SessionPhase::Playing)];
+    // Plan concurrent-sessions: one of two running games ends.
+    let mut both = base.clone();
+    both.sessions = vec![
+        game("other", SessionPhase::Playing),
+        game("second", SessionPhase::Playing),
+    ];
+    let mut second = base.clone();
+    second.sessions = vec![game("second", SessionPhase::Playing)];
     let with = |bump: fn(&mut Context)| {
         let mut next = base.clone();
         bump(&mut next);
@@ -38,6 +44,7 @@ fn changes() -> Vec<(&'static str, Context, Context)> {
         from_base("plugins", with(|c| c.revisions.plugins += 1)),
         from_base("session", session),
         ("launch ended", playing, base.clone()),
+        ("one of two ended", both, second),
     ]
 }
 
@@ -70,7 +77,13 @@ fn the_chip_continue_and_continue_playing_follow_the_game_and_the_library() {
 fn each_games_checks_follow_the_library_java_plugins_and_ended_launches() {
     assert_eq!(
         made_stale_by(|s| s.checks),
-        ["library", "java", "plugins", "launch ended"]
+        [
+            "library",
+            "java",
+            "plugins",
+            "launch ended",
+            "one of two ended"
+        ]
     );
 }
 
@@ -84,7 +97,8 @@ fn needs_attention_follows_the_checks_and_the_account() {
             "accounts",
             "java",
             "plugins",
-            "launch ended"
+            "launch ended",
+            "one of two ended"
         ]
     );
 }
@@ -109,5 +123,8 @@ fn sources_and_plugin_tabs_follow_the_plugins() {
 
 #[test]
 fn starting_games_restart_and_studio_writes_follow_the_session() {
-    assert_eq!(made_stale_by(|s| s.session), ["session", "launch ended"]);
+    assert_eq!(
+        made_stale_by(|s| s.session),
+        ["session", "launch ended", "one of two ended"]
+    );
 }

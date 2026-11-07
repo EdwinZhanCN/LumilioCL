@@ -27,18 +27,25 @@ impl LauncherShell {
             .then_some(id)
     }
 
-    /// Whether core says a launch is on its way or a game runs.
+    /// Whether core says any launch is on its way or any game runs.
     pub(crate) fn game_active(&self) -> bool {
-        self.context
-            .session
-            .as_ref()
-            .is_some_and(lumilio_core::Session::is_active)
+        self.context.any_active()
     }
 
-    /// Whether a game can be started now: no session is active, and Home
-    /// has not begun a launch core has yet to publish.
-    pub(crate) fn can_start(&self) -> bool {
-        !self.game_active() && self.home.can_start()
+    /// Whether game `id` can be started now, beside any other game (plan
+    /// concurrent-sessions): core has no active session of it, no launch
+    /// moment is kept for it, and Home has not begun a launch of it that
+    /// core has yet to publish.
+    pub(crate) fn can_start(&self, id: &str) -> bool {
+        let home_busy = self.home_game().as_deref() == Some(id) && !self.home.can_start();
+        !self.context.is_active(id) && !self.moments.contains_key(id) && !home_busy
+    }
+
+    /// Whether the game Home is about can be started now.
+    pub(crate) fn can_start_home(&self) -> bool {
+        self.home_game()
+            .or_else(|| self.context.current_instance.clone())
+            .is_none_or(|id| self.can_start(&id))
     }
 
     /// Takes what core published. Another current game is the one Discover

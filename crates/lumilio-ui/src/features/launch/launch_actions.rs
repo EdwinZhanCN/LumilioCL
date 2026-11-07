@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::{BTreeMap, VecDeque};
 use std::time::Duration;
 
 use futures_util::future::{Either, select};
@@ -20,19 +20,19 @@ const GAME_LOG_FLUSH: Duration = Duration::from_millis(150);
 /// What a launch tells the shell and the application.
 #[derive(Clone, Debug, PartialEq)]
 pub enum LaunchEvent {
-    /// How the launch is going, for Home's launch moment.
-    Signal(LaunchSignal),
+    /// How the launch of game `id` is going, for its launch moment.
+    Signal { id: String, signal: LaunchSignal },
     /// What the game has printed so far, for the open page of that game.
     Output {
         id: String,
         lines: Vec<String>,
         running: bool,
     },
-    /// The launch, or the game, is over: the lists are read again.
-    Ended,
+    /// The launch, or the game, of `id` is over: the lists are read again.
+    Ended { id: String },
 }
 
-/// Whether the current game can start now, and if not, what to ask first.
+/// Whether a game can start now, and if not, what to ask first.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Readiness {
     Ready,
@@ -47,19 +47,25 @@ pub enum Readiness {
     Java(JavaConflict),
 }
 
-/// One launch at a time: how to stop it, where it goes, and what the game
-/// prints while it runs.
+/// The launches on their way and the games running, one per game (plan
+/// concurrent-sessions): how to stop each, and what each prints.
 pub struct Launch {
     worker: Option<Worker>,
-    /// Stops the launch or the running game.
-    cancel: Option<CancellationToken>,
+    /// Each game's launch, by game id.
+    slots: BTreeMap<String, Slot>,
     /// A world or server the next launch goes straight into, once.
     target: Option<PlaceTarget>,
     /// The game whose Java conflict was just answered: its next check does
     /// not ask again.
     java_answered: Option<String>,
-    /// What the running game has printed: the game and its newest lines.
-    log: Option<(String, VecDeque<String>)>,
+}
+
+/// One game's launch.
+struct Slot {
+    /// Stops the launch or the running game.
+    cancel: CancellationToken,
+    /// What the game has printed: its newest lines.
+    log: VecDeque<String>,
 }
 
 impl EventEmitter<LaunchEvent> for Launch {}
@@ -69,10 +75,9 @@ impl Launch {
     pub fn new(worker: Option<Worker>) -> Self {
         Self {
             worker,
-            cancel: None,
+            slots: BTreeMap::new(),
             target: None,
             java_answered: None,
-            log: None,
         }
     }
 
@@ -129,59 +134,52 @@ impl Launch {
         })
     }
 
-    /// Whether a launch is on its way or its game runs.
+    /// Whether any launch is on its way or any game runs.
     #[must_use]
     pub fn launching(&self) -> bool {
-        self.cancel.is_some()
+        !self.slots.is_empty()
     }
 
-    /// Stops the launch or the running game.
-    pub fn stop(&self) {
-        if let Some(cancel) = &self.cancel {
-            cancel.cancel();
-        }
+    /// Whether game `id`'s launch is on its way or its game runs.
+    #[must_use]
+    pub fn launching_game(&self, id: &str) -> bool {
+        self.slots.contains_key(id)
     }
 
-    /// Stops the launch or the running game, if it is game `id`'s.
+    /// Stops game `id`'s launch or its running game; other games go on.
     pub fn stop_game(&self, id: &str) {
-        if self.active(id) {
-            self.stop();
+        if let Some(slot) = self.slots.get(id) {
+            slot.cancel.cancel();
         }
     }
 
     /// What game `id` has printed so far, while it is on its way or runs.
     #[must_use]
     pub fn output_of(&self, id: &str) -> Option<Vec<String>> {
-        let (running, lines) = self.log.as_ref()?;
-        (self.active(id) && running == id).then(|| lines.iter().cloned().collect())
+        let slot = self.slots.get(id)?;
+        self.active(id).then(|| slot.log.iter().cloned().collect())
     }
 
-    /// Whether core's session is game `id`'s, on its way or running.
+    /// Whether core says game `id` is on its way or running.
     fn active(&self, id: &str) -> bool {
-        self.worker.as_ref().is_some_and(|worker| {
-            worker
-                .service()
-                .context()
-                .session
-                .is_some_and(|session| session.is_active() && session.instance == id)
-        })
+        self.worker
+            .as_ref()
+            .is_some_and(|worker| worker.service().context().is_active(id))
     }
 
-    /// Checks whether the current game can start: its folder, then an
-    /// account (asked of the service: one added a moment ago may not have
-    /// reached the page yet), then its Java. A check that cannot be made
-    /// does not stop the launch.
-    pub fn readiness(&mut self, cx: &mut Context<Self>) -> Task<Readiness> {
+    /// Checks whether game `id` can start: its folder, then an account
+    /// (asked of the service: one added a moment ago may not have reached
+    /// the page yet), then its Java. A check that cannot be made does not
+    /// stop the launch.
+    pub fn readiness(&mut self, id: String, cx: &mut Context<Self>) -> Task<Readiness> {
         let Some(worker) = self.worker.clone() else {
             return Task::ready(Readiness::Ready);
         };
         let service = worker.service().clone();
-        let current = service.context().current_instance;
-        let answered = self.java_answered.take();
-        let check_java = current.clone().filter(|id| answered.as_ref() != Some(id));
+        let check_java = self.java_answered.take().as_ref() != Some(&id);
         let work = worker.spawn(async move {
             // Whether to play this game at all comes before account and Java.
-            if let Some(id) = current.filter(|id| !service.game_dir(id).is_dir())
+            if !service.game_dir(&id).is_dir()
                 && let Ok(record) = service.instance(&id).await
             {
                 return Readiness::MissingFolder {
@@ -195,32 +193,41 @@ impl Launch {
             if !has_account {
                 return Readiness::NoAccount;
             }
-            let conflict = match check_java {
-                Some(id) => service
+            let conflict = if check_java {
+                service
                     .instance_java(&id)
                     .await
                     .ok()
-                    .and_then(|java| JavaConflict::of(&java)),
-                None => None,
+                    .and_then(|java| JavaConflict::of(&java))
+            } else {
+                None
             };
             conflict.map_or(Readiness::Ready, Readiness::Java)
         });
         cx.spawn(async move |_, cx| runtime::answer(work, cx).await.unwrap_or(Readiness::Ready))
     }
 
-    /// Starts the current game, which core owns, into the world or onto the
-    /// server aimed at. `window` hides while the game runs and comes back
-    /// when it ends, as the preferences say.
-    pub fn start(&mut self, window: AnyWindowHandle, cx: &mut Context<Self>) {
+    /// Starts game `id`, which core owns, into the world or onto the server
+    /// aimed at, beside any other game on its way or running. `window` hides
+    /// while a game runs and comes back when the last one ends, as the
+    /// preferences say (plan concurrent-sessions, D2). A game already on its
+    /// way or running is not started again.
+    pub fn start(&mut self, id: String, window: AnyWindowHandle, cx: &mut Context<Self>) {
         let Some(worker) = self.worker.clone() else {
             return;
         };
-        let service = worker.service().clone();
-        let Some(id) = service.context().current_instance else {
+        if self.slots.contains_key(&id) {
             return;
-        };
+        }
+        let service = worker.service().clone();
         let cancel = CancellationToken::new();
-        self.cancel = Some(cancel.clone());
+        self.slots.insert(
+            id.clone(),
+            Slot {
+                cancel: cancel.clone(),
+                log: VecDeque::new(),
+            },
+        );
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
         let around = {
             let (service, id) = (service.clone(), id.clone());
@@ -247,11 +254,8 @@ impl Launch {
             let around = runtime::answer(around, cx)
                 .await
                 .unwrap_or((AfterLaunch::default(), true));
-            let started = this.update(cx, |launch, cx| {
-                launch.log = Some((instance.clone(), VecDeque::new()));
-                // The page can tell the game is on its way before it prints anything.
-                launch.flush(true, cx);
-            });
+            // The page can tell the game is on its way before it prints anything.
+            let started = this.update(cx, |launch, cx| launch.flush(&instance, true, cx));
             if started.is_err() {
                 return;
             }
@@ -264,7 +268,7 @@ impl Launch {
                         Either::Left((update, _)) => update,
                         Either::Right(_) => {
                             unsent = false;
-                            let _ = this.update(cx, |launch, cx| launch.flush(true, cx));
+                            let _ = this.update(cx, |launch, cx| launch.flush(&instance, true, cx));
                             continue;
                         }
                     }
@@ -274,14 +278,18 @@ impl Launch {
                 let Some(update) = update else { break };
                 match update {
                     LaunchUpdate::Log { text, .. } => {
-                        let _ = this.update(cx, |launch, _| launch.keep_line(text));
+                        let _ = this.update(cx, |launch, _| launch.keep_line(&instance, text));
                         unsent = true;
                     }
                     LaunchUpdate::Signal(signal) => {
                         log_signal(&instance, &signal);
-                        around_the_game(window, &signal, around, cx);
+                        let Ok(alone) = this.update(cx, |launch, _| launch.slots.len() == 1) else {
+                            return;
+                        };
+                        around_the_game(window, &signal, around, alone, cx);
+                        let id = instance.clone();
                         if this
-                            .update(cx, |_, cx| cx.emit(LaunchEvent::Signal(signal)))
+                            .update(cx, |_, cx| cx.emit(LaunchEvent::Signal { id, signal }))
                             .is_err()
                         {
                             return;
@@ -302,32 +310,32 @@ impl Launch {
             };
             let _ = this.update(cx, |launch, cx| {
                 if let Some(signal) = failed {
-                    cx.emit(LaunchEvent::Signal(signal));
+                    let id = instance.clone();
+                    cx.emit(LaunchEvent::Signal { id, signal });
                 }
-                launch.cancel = None;
-                launch.flush(false, cx);
-                launch.log = None;
-                cx.emit(LaunchEvent::Ended);
+                launch.flush(&instance, false, cx);
+                launch.slots.remove(&instance);
+                cx.emit(LaunchEvent::Ended { id: instance });
             });
         })
         .detach();
     }
 
-    fn keep_line(&mut self, text: String) {
-        if let Some((_, lines)) = self.log.as_mut() {
-            if lines.len() == GAME_LOG_LINES {
-                lines.pop_front();
+    fn keep_line(&mut self, id: &str, text: String) {
+        if let Some(slot) = self.slots.get_mut(id) {
+            if slot.log.len() == GAME_LOG_LINES {
+                slot.log.pop_front();
             }
-            lines.push_back(text);
+            slot.log.push_back(text);
         }
     }
 
-    /// Shows the game's output so far on the open page of that game.
-    fn flush(&self, running: bool, cx: &mut Context<Self>) {
-        if let Some((id, lines)) = &self.log {
+    /// Shows game `id`'s output so far on the open page of that game.
+    fn flush(&self, id: &str, running: bool, cx: &mut Context<Self>) {
+        if let Some(slot) = self.slots.get(id) {
             cx.emit(LaunchEvent::Output {
-                id: id.clone(),
-                lines: lines.iter().cloned().collect(),
+                id: id.to_owned(),
+                lines: slot.log.iter().cloned().collect(),
                 running,
             });
         }
@@ -359,11 +367,13 @@ fn log_signal(instance: &str, signal: &LaunchSignal) {
 }
 
 /// What the window does around the game, as the preferences say: hide while
-/// it runs, come back to the front when it ends.
+/// it runs, come back to the front when it ends, unless another game is still
+/// on its way or running (`alone` is false; plan concurrent-sessions, D2).
 fn around_the_game(
     window: AnyWindowHandle,
     signal: &LaunchSignal,
     (after, front): (AfterLaunch, bool),
+    alone: bool,
     cx: &mut AsyncApp,
 ) {
     match signal {
@@ -371,7 +381,7 @@ fn around_the_game(
             cx.update(|cx| platform::hide_launcher(cx));
         }
         LaunchSignal::Exited { .. } | LaunchSignal::Failed(_) | LaunchSignal::Cancelled
-            if front =>
+            if front && alone =>
         {
             let _ = cx.update_window(window, |_, window, cx| platform::bring_to_front(window, cx));
         }

@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "id": "concurrent-sessions",
+  "title": "Run several games at once",
+  "summary": "Different games can start and run at the same time (issue #129). Core publishes one session per launch; the launch feature keeps a stop, an output buffer and after-launch behavior per session; Home shows the current game's own launch moment.",
+  "status": "in_progress",
+  "visibility": "internal",
+  "scope": {
+    "included": [
+      "Core context publishes every session, keyed per launch",
+      "The launch feature keeps one slot per session: cancel, output, after-launch",
+      "Home keeps a launch moment per game and shows the current game's",
+      "The game page shows and stops its own game"
+    ],
+    "excluded": [
+      "Several processes of the same game (phase 2: shared launch lease, per-session marker, options.txt and latest.log conflicts, a second-process control)",
+      "Several launcher processes"
+    ]
+  },
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Core: sessions as a list",
+      "status": "completed",
+      "acceptance": "Context.sessions holds one entry per game; a launch of game B leaves game A's session; a failed session stays until that game starts again; core tests cover both"
+    },
+    {
+      "id": "T2",
+      "title": "UI: one launch slot per game",
+      "status": "completed",
+      "acceptance": "Launch keeps cancel and output per game; events name their game; stopping game A leaves B running; the launcher hides when a game runs and comes back only when the last one ends"
+    },
+    {
+      "id": "T3",
+      "title": "UI: Home and pages per game",
+      "status": "completed",
+      "acceptance": "Starting game B while A runs is allowed; Home shows the current game's moment; switching the current game shows that game's moment; a running game can not be started twice"
+    },
+    {
+      "id": "T4",
+      "title": "Phase 2: several processes of one game",
+      "status": "proposed",
+      "acceptance": "Decided separately: lease, marker, options capture and log separation designed first"
+    }
+  ],
+  "validation": [
+    {
+      "criterion": "Core and UI tests for concurrent sessions pass",
+      "result": "Passed: lumilio-core context (incl. two_games_publish_their_own_sessions), lumilio-ui launch + shell (incl. two_games_launch_side_by_side_and_end_on_their_own, home_keeps_each_games_launch_moment_while_another_is_current, the dependency table), lumilio-app live; clippy -D warnings clean."
+    },
+    {
+      "criterion": "Real-window spot check: two games run, each stops on its own",
+      "result": null
+    }
+  ],
+  "decisions": [
+    {
+      "id": "D1",
+      "decision": "Different games first; the same game twice is phase 2",
+      "rationale": "Core already keeps a lease per game. A second process of the same game shares its session marker, options.txt capture and logs/latest.log, which need their own design.",
+      "consequences": "Starting a game that is already on its way or running is still refused, with its own message."
+    },
+    {
+      "id": "D2",
+      "decision": "Hide on the first running game, come back on the last ending one",
+      "rationale": "Bringing the launcher to the front when one of two games quits covers the game still played.",
+      "consequences": "after-launch is read per session; foreground-on-exit waits for no game to be active."
+    }
+  ],
+  "roadmap": {
+    "enabled": false,
+    "id": "concurrent-sessions",
+    "name": "Several games at once",
+    "lede": "Run different games at the same time",
+    "targetVersion": null,
+    "order": 0
+  }
+}

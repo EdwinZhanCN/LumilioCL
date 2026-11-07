@@ -30,8 +30,16 @@ impl LauncherShell {
         &self.home
     }
 
-    /// Replaces the Home state and points the hero at it.
+    /// The game Home is about, when it is a real one.
+    pub(crate) fn home_game(&self) -> Option<String> {
+        self.home.subject().and_then(|subject| subject.id.clone())
+    }
+
+    /// Replaces the Home state and points the hero at it. Home moving to
+    /// another game keeps the launch moment it leaves, and shows the one it
+    /// kept for the game it comes to (plan concurrent-sessions).
     pub fn set_home(&mut self, home: HomePresentation, cx: &mut Context<Self>) {
+        let home = self.swap_moment(home);
         let playing = matches!(home, HomePresentation::Playing { .. });
         let mode = home.hero_mode();
         self.home = home;
@@ -53,39 +61,86 @@ impl LauncherShell {
         cx.notify();
     }
 
-    /// Feeds one launch signal into the Home launch moment.
-    pub fn apply_launch_signal(&mut self, signal: LaunchSignal, cx: &mut Context<Self>) {
+    /// Keeps a launch moment Home leaves for another game, and gives back
+    /// the one kept for the game Home comes to.
+    fn swap_moment(&mut self, home: HomePresentation) -> HomePresentation {
+        let leaving = self.home_game();
+        let coming = home.subject().and_then(|subject| subject.id.clone());
+        if leaving == coming {
+            return home;
+        }
+        if let Some(id) = leaving
+            && matches!(
+                self.home,
+                HomePresentation::Launching { .. } | HomePresentation::Playing { .. }
+            )
+        {
+            self.moments.insert(id, std::mem::take(&mut self.home));
+        }
+        coming
+            .and_then(|id| self.moments.remove(&id))
+            .unwrap_or(home)
+    }
+
+    /// Feeds one launch signal of game `id` into its launch moment: Home's
+    /// own, or one kept for a game Home does not show.
+    pub fn apply_launch_signal(&mut self, id: &str, signal: LaunchSignal, cx: &mut Context<Self>) {
         if matches!(&signal, LaunchSignal::Running) {
             self.release_for_game(cx);
+        }
+        if self.home_game().as_deref() != Some(id) {
+            self.apply_unseen_signal(id, signal, cx);
+            return;
         }
         let was_recovering = matches!(self.home, HomePresentation::Recovery { .. });
         let home = std::mem::take(&mut self.home).on_launch_signal(signal, Instant::now());
         // Home explains a failure in place; anywhere else it would wait
         // unseen until the person went back.
-        if let HomePresentation::Recovery {
-            subject, detail, ..
-        } = &home
-            && !was_recovering
-            && !matches!(self.location(), Location::Page(Route::Home))
-        {
-            let toast = Toast::error(format!(
-                "{} · {}",
-                subject.title,
-                home::recovery_sentence(detail)
-            ));
-            let technical = match detail {
-                RecoveryDetail::Failed { failure, .. } => failure.technical_detail(),
-                _ => None,
-            };
-            self.toast(
-                match technical {
-                    Some(cause) => toast.technical(cause),
-                    None => toast,
-                },
-                cx,
-            );
+        if !was_recovering && !matches!(self.location(), Location::Page(Route::Home)) {
+            self.tell_failure(&home, cx);
         }
         self.set_home(home, cx);
+    }
+
+    /// A signal for a game Home does not show moves the moment kept for it.
+    /// A failure is told at once, and left to 需要留意 rather than kept: Home
+    /// explains a failure only while its game is current.
+    fn apply_unseen_signal(&mut self, id: &str, signal: LaunchSignal, cx: &mut Context<Self>) {
+        let Some(moment) = self.moments.remove(id) else {
+            return;
+        };
+        let moment = moment.on_launch_signal(signal, Instant::now());
+        match moment {
+            HomePresentation::Launching { .. } | HomePresentation::Playing { .. } => {
+                self.moments.insert(id.to_owned(), moment);
+            }
+            HomePresentation::Recovery { .. } => self.tell_failure(&moment, cx),
+            _ => {}
+        }
+        cx.notify();
+    }
+
+    /// Tells, in a toast, how a launch went wrong or a game ended badly.
+    fn tell_failure(&mut self, home: &HomePresentation, cx: &mut Context<Self>) {
+        let HomePresentation::Recovery { subject, detail } = home else {
+            return;
+        };
+        let toast = Toast::error(format!(
+            "{} · {}",
+            subject.title,
+            home::recovery_sentence(detail)
+        ));
+        let technical = match detail {
+            RecoveryDetail::Failed { failure, .. } => failure.technical_detail(),
+            _ => None,
+        };
+        self.toast(
+            match technical {
+                Some(cause) => toast.technical(cause),
+                None => toast,
+            },
+            cx,
+        );
     }
 
     /// What the page below Home's world can open or do: the games with
@@ -179,7 +234,7 @@ impl LauncherShell {
         let has_attention =
             (!links.attention.is_empty() || links.checking) && self.home.subject().is_some();
         let sections =
-            live.and_then(|ctx| pages::live::home_sections(ctx, &self.home, self.can_start()));
+            live.and_then(|ctx| pages::live::home_sections(ctx, &self.home, self.can_start_home()));
         let body = (self.home.has_body() || has_attention || sections.is_some())
             .then(|| home::render_body(&self.home, home_handler, &links, colors, sections));
 

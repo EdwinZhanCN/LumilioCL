@@ -200,10 +200,10 @@ async fn a_launch_publishes_its_session_until_it_is_over() {
         .await
         .unwrap();
     let session = |phase| {
-        Some(Session {
+        vec![Session {
             instance: game.id.clone(),
             phase,
-        })
+        }]
     };
 
     // Paused where it reads the settings: on its way.
@@ -211,10 +211,10 @@ async fn a_launch_publishes_its_session_until_it_is_over() {
     let (updates, _receiver) = tokio::sync::mpsc::unbounded_channel();
     let mut launch = Box::pin(service.launch(&game.id, updates, crate::CancellationToken::new()));
     assert!(futures_util::poll!(&mut launch).is_pending());
-    assert_eq!(service.context().session, session(SessionPhase::Preparing));
+    assert_eq!(service.context().sessions, session(SessionPhase::Preparing));
     drop(launch);
     drop(defaults);
-    assert_eq!(service.context().session, None, "an abandoned launch");
+    assert_eq!(service.context().sessions, [], "an abandoned launch");
 
     // There is no catalog to install from: the launch fails.
     let (updates, _receiver) = tokio::sync::mpsc::unbounded_channel();
@@ -224,9 +224,77 @@ async fn a_launch_publishes_its_session_until_it_is_over() {
             .await
             .is_err()
     );
-    assert_eq!(service.context().session, session(SessionPhase::Failed));
-    assert!(!service.context().session.unwrap().is_active());
+    assert_eq!(service.context().sessions, session(SessionPhase::Failed));
+    assert!(!service.context().is_active(&game.id));
 
     service.delete_instance(&game.id).await.unwrap();
-    assert_eq!(service.context().session, None, "nothing left to recover");
+    assert_eq!(service.context().sessions, [], "nothing left to recover");
+}
+
+/// Plan concurrent-sessions T1: two games are on their way at once, each
+/// with its own session; one that ends leaves the other's, and one that
+/// fails stays beside a game still on its way.
+#[tokio::test]
+async fn two_games_publish_their_own_sessions() {
+    use crate::context::SessionPhase;
+    let world = world();
+    let service = &world.service;
+    let a = service
+        .create_instance("A", Some("1.0"), Loader::Vanilla, None)
+        .await
+        .unwrap();
+    let b = service
+        .create_instance("B", Some("1.0"), Loader::Vanilla, None)
+        .await
+        .unwrap();
+    let phases = || {
+        service
+            .context()
+            .sessions
+            .iter()
+            .map(|session| (session.instance.clone(), session.phase))
+            .collect::<Vec<_>>()
+    };
+
+    let defaults = service.settings.lock().await;
+    let (updates, _a_updates) = tokio::sync::mpsc::unbounded_channel();
+    let mut first = Box::pin(service.launch(&a.id, updates, crate::CancellationToken::new()));
+    let (updates, _b_updates) = tokio::sync::mpsc::unbounded_channel();
+    let mut second = Box::pin(service.launch(&b.id, updates, crate::CancellationToken::new()));
+    assert!(futures_util::poll!(&mut first).is_pending());
+    assert!(futures_util::poll!(&mut second).is_pending());
+    assert_eq!(
+        phases(),
+        [
+            (a.id.clone(), SessionPhase::Preparing),
+            (b.id.clone(), SessionPhase::Preparing),
+        ]
+    );
+    assert!(service.context().is_active(&a.id) && service.context().is_active(&b.id));
+
+    drop(first);
+    assert_eq!(phases(), [(b.id.clone(), SessionPhase::Preparing)]);
+
+    // There is no catalog to install from: B fails, and stays failed while
+    // A starts again.
+    drop(defaults);
+    assert!(second.await.is_err());
+    let defaults = service.settings.lock().await;
+    let (updates, _a_updates) = tokio::sync::mpsc::unbounded_channel();
+    let mut again = Box::pin(service.launch(&a.id, updates, crate::CancellationToken::new()));
+    assert!(futures_util::poll!(&mut again).is_pending());
+    assert_eq!(
+        phases(),
+        [
+            (b.id.clone(), SessionPhase::Failed),
+            (a.id.clone(), SessionPhase::Preparing),
+        ]
+    );
+    assert_eq!(
+        service.context().active().collect::<Vec<_>>(),
+        [a.id.as_str()]
+    );
+    assert!(service.context().any_active());
+    drop(again);
+    drop(defaults);
 }

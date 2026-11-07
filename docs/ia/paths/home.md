@@ -9,7 +9,7 @@
 | 处理游戏选项 | 需要留意里的游戏选项行「处理…」 | 打开该游戏的 设置 › 选项，待决定的修改在最上面 |  | `lumilio-ui/src/game_settings/presentation.rs` › `attention_rows` |
 | 继续 | 英雄区主按钮「继续」 | 启动当前游戏（与导航右下角芯片是同一个），英雄区进入启动时刻 |  | `lumilio-ui/src/home/launching.rs` › `render_continue` |
 | 取消启动 | 启动时刻里的「取消」 | 停止本次启动，回到继续状态 |  | `lumilio-ui/src/home/launching.rs` › `render_launching` |
-| 结束游戏 | 游戏运行中的「结束游戏」 | 停止游戏进程 |  | `lumilio-ui/src/home/launching.rs` › `render_playing` |
+| 结束游戏 | 游戏运行中的「结束游戏」 | 停止首页显示的这个游戏的进程；其他在运行的游戏照常运行 | concurrent-sessions T2 | `lumilio-ui/src/home/launching.rs` › `render_playing` |
 | 空库：导入 | 首次使用的「把原来的游戏带过来」 | 同游戏库的导入其他启动器的游戏 |  | `lumilio-ui/src/home/lists.rs` › `render_first_use` |
 | 空库：新建 | 首次使用的「新建」 | 同游戏库的新建游戏 |  | `lumilio-ui/src/home/lists.rs` › `render_first_use` |
 | 需要留意：解决 | 每个有问题的游戏一行（游戏名 · 最严重的问题 · 另有几个）和一个按钮（安装/修复/更换…/去设置/去添加/查看日志…） | 点后先打开游戏页再执行 |  | `lumilio-ui/src/home/lists.rs` › `render_attention` |

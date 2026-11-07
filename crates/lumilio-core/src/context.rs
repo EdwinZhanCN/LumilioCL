@@ -20,10 +20,41 @@ pub struct Context {
     pub current_instance: Option<String>,
     /// The key of the account games start with.
     pub current_account: Option<String>,
-    /// The launch on its way, the game running, or the launch that failed
-    /// last; `None` once a game ended normally or was stopped.
-    pub session: Option<Session>,
+    /// Each game's launch on its way, its game running, or its launch that
+    /// failed last, in the order they began (plan concurrent-sessions). A
+    /// game has none once it ended normally or was stopped, and at most one.
+    pub sessions: Vec<Session>,
     pub revisions: Revisions,
+}
+
+impl Context {
+    /// The session of game `instance`, if it has one.
+    #[must_use]
+    pub fn session_of(&self, instance: &str) -> Option<&Session> {
+        self.sessions
+            .iter()
+            .find(|session| session.instance == instance)
+    }
+
+    /// Whether game `instance` is on its way or runs.
+    #[must_use]
+    pub fn is_active(&self, instance: &str) -> bool {
+        self.session_of(instance).is_some_and(Session::is_active)
+    }
+
+    /// The games on their way or running, in the order they began.
+    pub fn active(&self) -> impl Iterator<Item = &str> {
+        self.sessions
+            .iter()
+            .filter(|session| session.is_active())
+            .map(|session| session.instance.as_str())
+    }
+
+    /// Whether any game is on its way or runs.
+    #[must_use]
+    pub fn any_active(&self) -> bool {
+        self.active().next().is_some()
+    }
 }
 
 /// One launch of one game (plan global-context, T6).
@@ -80,7 +111,7 @@ impl ContextHub {
         let (sender, _) = watch::channel(Context {
             current_instance: settings.current_instance.clone(),
             current_account: settings.selected_account.clone(),
-            session: None,
+            sessions: Vec::new(),
             revisions: Revisions::default(),
         });
         Self(Arc::new(sender))
@@ -101,22 +132,36 @@ impl ContextHub {
         });
     }
 
-    /// Publishes the session of `instance`: `None` ends it, unless another
-    /// game's session has replaced it meanwhile.
+    /// Publishes the session of `instance`, leaving other games' sessions:
+    /// `None` ends it. A launch that begins again (after a failure) moves to
+    /// the end; a game keeps its place while its launch goes on.
     pub(crate) fn session(&self, instance: &str, phase: Option<SessionPhase>) {
         self.0.send_if_modified(|context| {
-            let next = phase.map(|phase| Session {
-                instance: instance.to_owned(),
-                phase,
-            });
-            let theirs = context
-                .session
-                .as_ref()
-                .is_some_and(|session| session.instance != instance);
-            if (next.is_none() && theirs) || context.session == next {
-                return false;
+            let at = context
+                .sessions
+                .iter()
+                .position(|session| session.instance == instance);
+            match (at, phase) {
+                (Some(at), None) => {
+                    context.sessions.remove(at);
+                }
+                (Some(at), Some(phase)) => {
+                    if context.sessions[at].phase == phase {
+                        return false;
+                    }
+                    if phase == SessionPhase::Preparing {
+                        let again = context.sessions.remove(at);
+                        context.sessions.push(Session { phase, ..again });
+                    } else {
+                        context.sessions[at].phase = phase;
+                    }
+                }
+                (None, Some(phase)) => context.sessions.push(Session {
+                    instance: instance.to_owned(),
+                    phase,
+                }),
+                (None, None) => return false,
             }
-            context.session = next;
             true
         });
     }
