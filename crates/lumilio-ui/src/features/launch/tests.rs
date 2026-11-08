@@ -63,11 +63,12 @@ fn current_game(launcher: &Launcher, account: bool) -> String {
         .unwrap()
 }
 
-fn readiness(launch: &Entity<Launch>, cx: &mut VisualTestContext) -> Readiness {
+fn readiness(launch: &Entity<Launch>, id: &str, cx: &mut VisualTestContext) -> Readiness {
+    let id = id.to_owned();
     let answer: Rc<RefCell<Option<Readiness>>> = Rc::default();
     let sink = answer.clone();
     cx.update(|_, cx| {
-        let task = launch.update(cx, |launch, cx| launch.readiness(cx));
+        let task = launch.update(cx, |launch, cx| launch.readiness(id, cx));
         cx.spawn(async move |_| *sink.borrow_mut() = Some(task.await))
             .detach();
     });
@@ -80,12 +81,12 @@ fn a_game_asks_for_its_folder_then_an_account_before_it_starts(cx: &mut TestAppC
     let launcher = launcher(Vec::new());
     let id = current_game(&launcher, false);
     let (launch, _, cx) = launch(&launcher, cx);
-    assert_eq!(readiness(&launch, cx), Readiness::NoAccount);
+    assert_eq!(readiness(&launch, &id, cx), Readiness::NoAccount);
 
     let folder = launcher.worker.service().game_dir(&id);
     std::fs::remove_dir_all(&folder).unwrap();
     assert!(
-        matches!(readiness(&launch, cx), Readiness::MissingFolder { id: missing, .. } if missing == id),
+        matches!(readiness(&launch, &id, cx), Readiness::MissingFolder { id: missing, .. } if missing == id),
         "the folder comes before the account"
     );
 
@@ -95,31 +96,32 @@ fn a_game_asks_for_its_folder_then_an_account_before_it_starts(cx: &mut TestAppC
         .runtime
         .block_on(async move { service.add_account("Steve", None).await })
         .unwrap();
-    assert_eq!(readiness(&launch, cx), Readiness::Ready);
+    assert_eq!(readiness(&launch, &id, cx), Readiness::Ready);
 }
 
 #[gpui::test]
 fn a_launch_that_fails_says_so_ends_and_goes_nowhere_next_time(cx: &mut TestAppContext) {
     let launcher = launcher(Vec::new());
-    current_game(&launcher, true);
+    let id = current_game(&launcher, true);
     let (launch, events, cx) = launch(&launcher, cx);
     cx.update(|window, cx| {
         let shown_in = window.window_handle();
         launch.update(cx, |launch, cx| {
             launch.aim(PlaceTarget::World("New World".into()));
-            launch.start(shown_in, cx);
-            assert!(launch.launching());
+            launch.start(id.clone(), shown_in, cx);
+            assert!(launch.launching() && launch.launching_game(&id));
         });
     });
+    let ended = LaunchEvent::Ended { id: id.clone() };
     until(cx, "the launch to end", |_| {
-        events.borrow().last() == Some(&LaunchEvent::Ended)
+        events.borrow().last() == Some(&ended)
     });
 
     let events = events.borrow();
     assert!(
         events
             .iter()
-            .any(|event| matches!(event, LaunchEvent::Signal(LaunchSignal::Failed(_)))),
+            .any(|event| matches!(event, LaunchEvent::Signal { id: of, signal: LaunchSignal::Failed(_) } if *of == id)),
         "{events:?}"
     );
     assert!(
@@ -132,4 +134,56 @@ fn a_launch_that_fails_says_so_ends_and_goes_nowhere_next_time(cx: &mut TestAppC
         assert!(!launch.launching(), "nothing is left to stop");
         assert_eq!(launch.take_target(), None, "the world was used once");
     });
+}
+
+/// Plan concurrent-sessions T2: two games start side by side, each in its
+/// own slot; starting one already on its way does nothing, and each ends
+/// with events that name it.
+#[gpui::test]
+fn two_games_launch_side_by_side_and_end_on_their_own(cx: &mut TestAppContext) {
+    let launcher = launcher(Vec::new());
+    let first = current_game(&launcher, true);
+    let service = launcher.worker.service().clone();
+    let second = launcher
+        .runtime
+        .block_on(async move {
+            service
+                .create_instance("B", Some("lumilio-test-none-b"), Loader::Vanilla, None)
+                .await
+        })
+        .unwrap()
+        .id;
+    let (launch, events, cx) = launch(&launcher, cx);
+    cx.update(|window, cx| {
+        let shown_in = window.window_handle();
+        launch.update(cx, |launch, cx| {
+            launch.start(first.clone(), shown_in, cx);
+            launch.start(second.clone(), shown_in, cx);
+            // Already on its way: not a second slot.
+            launch.start(first.clone(), shown_in, cx);
+            assert!(launch.launching_game(&first) && launch.launching_game(&second));
+        });
+    });
+    let ended = |id: &str| LaunchEvent::Ended { id: id.to_owned() };
+    until(cx, "both launches to end", |_| {
+        let events = events.borrow();
+        events.contains(&ended(&first)) && events.contains(&ended(&second))
+    });
+
+    let events = events.borrow();
+    for id in [&first, &second] {
+        assert_eq!(
+            events.iter().filter(|event| **event == ended(id)).count(),
+            1,
+            "{id} ends once: {events:?}"
+        );
+        assert!(
+            events.iter().any(|event| matches!(
+                event,
+                LaunchEvent::Signal { id: of, signal: LaunchSignal::Failed(_) } if of == id
+            )),
+            "{id}'s failure names it: {events:?}"
+        );
+    }
+    launch.update(cx, |launch, _| assert!(!launch.launching()));
 }

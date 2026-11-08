@@ -23,9 +23,11 @@ impl LauncherShell {
     }
 
     /// Plays game `id` (into a world or onto a server, if `target` says)
-    /// through Home's launch moment. It becomes the current game first
+    /// through Home's launch moment, beside any other game on its way or
+    /// running (plan concurrent-sessions). It becomes the current game first
     /// (decision D4), so Continue, the chip and the next start agree on
-    /// what is playing.
+    /// what is playing. A game already on its way or running is not started
+    /// again.
     pub fn play(
         &mut self,
         id: String,
@@ -41,7 +43,7 @@ impl LauncherShell {
             Some(target) => launch.aim(target),
             None => launch.forget_target(),
         });
-        if !self.can_start() {
+        if !self.can_start(&id) {
             self.forget_target(cx);
             self.toast(Toast::info(tr!("launch-already-running")), cx);
             return;
@@ -73,8 +75,8 @@ impl LauncherShell {
     }
 
     fn play_saved(&mut self, id: String, window: &mut Window, cx: &mut Context<Self>) {
-        // Another launch began while the choice was saved.
-        if !self.can_start() {
+        // A launch of this game began while the choice was saved.
+        if !self.can_start(&id) {
             self.forget_target(cx);
             return;
         }
@@ -105,28 +107,46 @@ impl LauncherShell {
     }
 
     /// Continue (or Recover: Home explains a failure only while its game is
-    /// current, so recovering retries it) starts the current game, once its
-    /// folder is there, there is an account and its Java can run it.
+    /// current, so recovering retries it) starts the game Home is about,
+    /// once its folder is there, there is an account and its Java can run
+    /// it. The game is named now: the current one may change meanwhile.
     pub(super) fn continue_launch(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let readiness = self.launch.update(cx, |launch, cx| launch.readiness(cx));
+        let Some(id) = self
+            .home_game()
+            .or_else(|| self.context.current_instance.clone())
+        else {
+            return;
+        };
+        let readiness = self
+            .launch
+            .update(cx, |launch, cx| launch.readiness(id.clone(), cx));
         let window = window.window_handle();
         cx.spawn(async move |this, cx| {
             let readiness = readiness.await;
             let _ = cx.update_window(window, |_, window, cx| {
-                let _ = this.update(cx, |shell, cx| shell.launch_when(readiness, window, cx));
+                let _ = this.update(cx, |shell, cx| shell.launch_when(id, readiness, window, cx));
             });
         })
         .detach();
     }
 
-    fn launch_when(&mut self, readiness: Readiness, window: &mut Window, cx: &mut Context<Self>) {
+    fn launch_when(
+        &mut self,
+        id: String,
+        readiness: Readiness,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         if readiness == Readiness::Ready {
             let shown_in = window.window_handle();
             self.launch
-                .update(cx, |launch, cx| launch.start(shown_in, cx));
+                .update(cx, |launch, cx| launch.start(id, shown_in, cx));
             return;
         }
-        self.abort_launch(cx);
+        // Home may have moved on to another game meanwhile.
+        if self.home_game().as_deref() == Some(id.as_str()) {
+            self.abort_launch(cx);
+        }
         match readiness {
             Readiness::Ready => {}
             Readiness::MissingFolder { id, name } => {

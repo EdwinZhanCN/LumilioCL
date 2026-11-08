@@ -401,7 +401,11 @@ fn technical_details_after_a_failed_launch_explain_it(cx: &mut gpui_kit::TestApp
             .begin_launch(),
             cx,
         );
-        shell.apply_launch_signal(LaunchSignal::Failed(LaunchFailure::step("no Java")), cx);
+        shell.apply_launch_signal(
+            &game,
+            LaunchSignal::Failed(LaunchFailure::step("no Java")),
+            cx,
+        );
     });
     cx.run_until_parked();
     cx.update(|window, cx| window.draw(cx).clear(cx));

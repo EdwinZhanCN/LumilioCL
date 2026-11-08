@@ -1188,7 +1188,7 @@ plugin-setting-save-failed = 没能保存这个设置，请重试。
 
 ## 启动
 
-launch-already-running = 已经有游戏在运行
+launch-already-running = 这个游戏已经在运行
 
 ## 日志
 

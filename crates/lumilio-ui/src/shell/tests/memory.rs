@@ -178,7 +178,7 @@ fn a_game_starting_drops_the_pages_kept_for_back(cx: &mut TestAppContext) {
     assert!(game.upgrade().is_some(), "kept for Back");
 
     shell.update(cx, |shell, cx| {
-        shell.apply_launch_signal(lumilio_core::LaunchSignal::Running, cx)
+        shell.apply_launch_signal("one", lumilio_core::LaunchSignal::Running, cx)
     });
     cx.run_until_parked();
     assert!(game.upgrade().is_none(), "the game page is gone");

@@ -30,7 +30,7 @@ fn keys_on_the_world_keep_their_colours_and_shift_on_hover(cx: &mut TestAppConte
 
     shell.update(cx, |shell, cx| {
         shell.set_home(continuing().begin_launch(), cx);
-        shell.apply_launch_signal(LaunchSignal::Running, cx);
+        shell.apply_launch_signal("survival", LaunchSignal::Running, cx);
     });
     settle(cx);
 
@@ -99,14 +99,16 @@ fn pressing_continue_plays_the_launch_moment_through_every_state(cx: &mut TestAp
         LaunchSignal::Running,
     ];
     for signal in signals {
-        shell.update(cx, |shell, cx| shell.apply_launch_signal(signal, cx));
+        shell.update(cx, |shell, cx| {
+            shell.apply_launch_signal("survival", signal, cx)
+        });
         cx.run_until_parked();
         assert!(cx.debug_bounds("home-overlay").is_some());
     }
     assert!(matches!(home(cx), HomePresentation::Playing { .. }));
 
     shell.update(cx, |shell, cx| {
-        shell.apply_launch_signal(LaunchSignal::Exited { code: Some(3) }, cx)
+        shell.apply_launch_signal("survival", LaunchSignal::Exited { code: Some(3) }, cx)
     });
     cx.run_until_parked();
     assert!(matches!(home(cx), HomePresentation::Recovery { .. }));
@@ -146,13 +148,14 @@ fn a_failure_away_from_home_floats_up_as_a_toast(cx: &mut TestAppContext) {
     shell.update(cx, |shell, cx| {
         shell.set_home(continuing().begin_launch(), cx);
         shell.show(Route::Library);
-        shell.apply_launch_signal(LaunchSignal::Phase(LaunchPhase::Assets), cx);
+        shell.apply_launch_signal("survival", LaunchSignal::Phase(LaunchPhase::Assets), cx);
         shell.apply_launch_signal(
+            "survival",
             LaunchSignal::Failed(LaunchFailure::step("checksum mismatch")),
             cx,
         );
         // Stray signals after the failure say nothing more.
-        shell.apply_launch_signal(LaunchSignal::Cancelled, cx);
+        shell.apply_launch_signal("survival", LaunchSignal::Cancelled, cx);
     });
     let shown = toasts(cx);
     assert_eq!(shown.len(), 1);
@@ -166,8 +169,8 @@ fn a_failure_away_from_home_floats_up_as_a_toast(cx: &mut TestAppContext) {
 
     shell.update(cx, |shell, cx| {
         shell.set_home(continuing().begin_launch(), cx);
-        shell.apply_launch_signal(LaunchSignal::Running, cx);
-        shell.apply_launch_signal(LaunchSignal::Exited { code: Some(3) }, cx);
+        shell.apply_launch_signal("survival", LaunchSignal::Running, cx);
+        shell.apply_launch_signal("survival", LaunchSignal::Exited { code: Some(3) }, cx);
     });
     assert_eq!(toasts(cx).len(), 2, "a crash is told too");
 
@@ -175,6 +178,7 @@ fn a_failure_away_from_home_floats_up_as_a_toast(cx: &mut TestAppContext) {
     shell.update(cx, |shell, cx| {
         shell.set_home(continuing().begin_launch(), cx);
         shell.apply_launch_signal(
+            "survival",
             LaunchSignal::Failed(LaunchFailure::ExitedEarly {
                 code: Some(1),
                 output: vec!["Error: could not find main class".into()],
@@ -538,4 +542,64 @@ fn the_navigation_veil_is_left_out_on_a_translucent_page(cx: &mut TestAppContext
         !crate::theme::can_blur(),
         "a translucent page has no veil"
     );
+}
+
+/// Plan concurrent-sessions T3: Home shows the current game's launch moment
+/// and keeps the others'. A game kept aside runs on, can not be started
+/// again, comes back when it is current, and a crash of a game Home does not
+/// show is told in a toast.
+#[gpui::test]
+fn home_keeps_each_games_launch_moment_while_another_is_current(cx: &mut TestAppContext) {
+    cx.update(gpui_component::init);
+    let (shell, cx) = cx.add_window_view(|_, cx| {
+        LauncherShell::new(cx)
+            .with_home(continuing(), cx)
+            .with_intent_handler(Rc::new(|_, _, _| {}))
+    });
+    let other = || HomePresentation::Continue {
+        subject: Subject {
+            id: Some("other".into()),
+            title: "创造".into(),
+            metadata: "1.20.1".into(),
+            world: WorldHint::Overworld,
+        },
+    };
+    let home = |cx: &mut gpui::VisualTestContext| {
+        shell.read_with(cx, |shell, _| {
+            let home = shell.home().clone();
+            (home.subject().and_then(|s| s.id.clone()), home)
+        })
+    };
+    shell.update(cx, |shell, cx| {
+        shell.set_home(continuing().begin_launch(), cx);
+        shell.apply_launch_signal("survival", LaunchSignal::Running, cx);
+        // Another game becomes current, as the chip or a game's Play does.
+        shell.set_home(other(), cx);
+        assert!(!shell.can_start("survival"), "it is still running");
+        assert!(shell.can_start("other") && shell.can_start_home());
+        shell.set_home(other().begin_launch(), cx);
+        shell.apply_launch_signal("other", LaunchSignal::Running, cx);
+    });
+    let (id, now) = home(cx);
+    assert_eq!(id.as_deref(), Some("other"));
+    assert!(matches!(now, HomePresentation::Playing { .. }));
+
+    shell.update(cx, |shell, cx| shell.set_home(continuing(), cx));
+    let (id, now) = home(cx);
+    assert_eq!(id.as_deref(), Some("survival"));
+    assert!(
+        matches!(now, HomePresentation::Playing { .. }),
+        "the running game's moment comes back, not Continue"
+    );
+
+    shell.update(cx, |shell, cx| {
+        shell.apply_launch_signal("other", LaunchSignal::Exited { code: Some(1) }, cx);
+        assert!(shell.can_start("other"), "its moment is gone");
+        assert_eq!(shell.pending_toasts(cx).len(), 1, "its crash is told");
+        assert!(matches!(shell.home(), HomePresentation::Playing { .. }));
+        shell.apply_launch_signal("survival", LaunchSignal::Exited { code: Some(0) }, cx);
+    });
+    let (id, now) = home(cx);
+    assert_eq!(id.as_deref(), Some("survival"));
+    assert!(matches!(now, HomePresentation::Continue { .. }));
 }
