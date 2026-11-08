@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use gpui_kit::{App, AppContext as _, Context, Entity, WeakEntity, Window};
+use gpui_kit::{AnyWindowHandle, App, AppContext as _, Context, Entity, WeakEntity, Window};
 use lumilio_core::{Preferences, ProjectKind};
 use lumilio_ui::LauncherShell;
 use lumilio_ui::features::discover::DiscoverEvent;
@@ -73,14 +73,26 @@ pub fn build(backend: Backend, window: &mut Window, cx: &mut App) -> Entity<Laun
     set_game_windows(&shell, cx);
     update::start(&wiring, cx);
     shell.update(cx, |shell, cx| shell.follow_launcher(cx));
-    apply_saved_preferences(&wiring, window.window_handle(), cx);
-    terms::ask(&wiring, window.window_handle(), cx);
+    let handle = window.window_handle();
+    let speak = {
+        let wiring = wiring.clone();
+        move |cx: &mut App| startup_words(&wiring, handle, cx)
+    };
+    apply_saved_preferences(&wiring, handle, speak, cx);
     open_requested_page(&wiring, &shell, window, cx);
-    // What start-up recovery did is told once, in words; details are in stderr.
-    if let Some(text) = lumilio_ui::live::recovery_message(wiring.backend.service.startup_notes()) {
-        shell.update(cx, |shell, cx| shell.toast(Toast::info(text).sticky(), cx));
-    }
     shell
+}
+
+/// What start-up says in words, once the saved language is applied: the
+/// terms (or else the release notes), and what start-up recovery did, told
+/// once; its details are in stderr.
+fn startup_words(wiring: &Wiring, window: AnyWindowHandle, cx: &mut App) {
+    terms::ask(wiring, window, cx);
+    if let Some(text) = lumilio_ui::live::recovery_message(wiring.backend.service.startup_notes()) {
+        let _ = wiring
+            .shell
+            .update(cx, |shell, cx| shell.toast(Toast::info(text).sticky(), cx));
+    }
 }
 
 /// Saves what Discover remembers between visits. The shell answers the rest.
