@@ -50,7 +50,7 @@
     },
     {
       "criterion": "Real-window spot check: two games run, each stops on its own",
-      "result": null
+      "result": "Passed in a real window (macOS, two vanilla 26.3 games, offline account): B started from Home while A was launching and running; switching back to A showed its running moment; 结束游戏 stopped only A; ending B while A ran gave a toast and a 需要留意 row and left the launcher behind; ending A last brought the launcher to the front with its recovery. after_launch=hide and Windows were not checked."
     }
   ],
   "decisions": [
