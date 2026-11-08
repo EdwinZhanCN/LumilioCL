@@ -31,7 +31,7 @@ Different games can start and run at the same time (issue #129). Core publishes 
 - Core and UI tests for concurrent sessions pass
   Result: Passed: lumilio-core context (incl. two_games_publish_their_own_sessions), lumilio-ui launch + shell (incl. two_games_launch_side_by_side_and_end_on_their_own, home_keeps_each_games_launch_moment_while_another_is_current, the dependency table), lumilio-app live; clippy -D warnings clean.
 - Real-window spot check: two games run, each stops on its own
-  Result: Passed in a real window (macOS, two vanilla 26.3 games, offline account): B started from Home while A was launching and running; switching back to A showed its running moment; 结束游戏 stopped only A; ending B while A ran gave a toast and a 需要留意 row and left the launcher behind; ending A last brought the launcher to the front with its recovery. after_launch=hide and Windows were not checked.
+  Result: Passed in a real window (macOS, two vanilla 26.3 games, offline account): B started from Home and from the Library while A was launching or running; switching back to A showed its running moment; 结束游戏 stopped only A; Library 启动 on a running game showed 这个游戏已经在运行 and started nothing; ending B while A ran gave a toast and a 需要留意 row and left the launcher behind; ending A last brought it to the front with its recovery. With after_launch=hide the launcher hid on each game running, stayed hidden when the first ended and came back when the last ended. Windows not checked (community feedback).
 
 ## Decision D1
 
