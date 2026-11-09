@@ -1,5 +1,6 @@
 mod global_context;
 mod missing_folder;
+mod startup;
 mod terms;
 
 use lumilio_ui::toast::{Toast, outcome};

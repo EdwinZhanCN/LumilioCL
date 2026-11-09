@@ -67,10 +67,13 @@ fn apply_wallpaper(wiring: &Wiring, chosen: WallpaperChoice, cx: &mut App) {
 }
 
 /// Reads the saved preferences once at start-up and applies them, after
-/// Settings has read the local themes.
+/// Settings has read the local themes, then runs `then`: what start-up says
+/// in words waits for the saved language, so it is not written in the
+/// system's. `then` runs even when the preferences could not be read.
 pub(super) fn apply_saved_preferences(
     wiring: &Wiring,
     window: gpui_kit::AnyWindowHandle,
+    then: impl FnOnce(&mut App) + 'static,
     cx: &mut App,
 ) {
     let service = wiring.backend.service.clone();
@@ -86,6 +89,7 @@ pub(super) fn apply_saved_preferences(
     let wiring = wiring.clone();
     cx.spawn(async move |cx| {
         let Some(preferences) = lumilio_ui::runtime::answer(handle, cx).await else {
+            cx.update(then);
             return;
         };
         let _ = cx.update_window(window, |_, window, cx| {
@@ -99,6 +103,7 @@ pub(super) fn apply_saved_preferences(
                 library.apply_preferences(preferences.library_sort, preferences.library_loader, cx)
             });
         });
+        cx.update(then);
     })
     .detach();
 }
