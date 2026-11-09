@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "id": "release-0-2-4",
+  "title": "准备发布 0.2.4",
+  "summary": "0.2.3 之后合入了不同游戏同时运行的第一阶段（#129）、内容页先列文件并把识别结果记在本机（#126、#127）、游戏运行时没被打开的世界照常改动（#128），以及启动时恢复提示的语言修复。更新器、下载引擎、网站与 Worker、发布工作流都没有改动。Project Maintainer 只在自己的 Mac 上实测。",
+  "status": "in_progress",
+  "visibility": "internal",
+  "scope": {
+    "included": [
+      "PR #132、#134：不同的游戏可以同时运行，各自结束；启动后隐藏启动器时，最后一个游戏结束才回来（concurrent-sessions T1–T3）。",
+      "PR #130：内容页先列文件，识别结果按文件内容记在 cache/content.sqlite，启停后立刻变化（content-recognition）。",
+      "PR #131：游戏运行时，只有游戏打开着的世界不能改动。",
+      "PR #133：启动时的恢复提示等保存的语言应用后再显示。",
+      "版本号、计划、release-notes/0.2.4.md 与 .en.md。"
+    ],
+    "excluded": [
+      "#130 顺带修正的「网络读取用完时限不再停用内容源插件」没有确认过的用户可见症状，不写进更新说明。",
+      "#134 修的「拒绝重复启动时留下瞄准的世界」只存在于未发布的 #132 之后，并入同时运行一条，不单列。",
+      "同一个游戏同时运行两份（concurrent-sessions T4，第二阶段）。",
+      "Windows 上的实机检查交给社区反馈。",
+      "实验性 MCP 服务（PR #48）未合入。",
+      "不改变签名与公证状态：macOS 仍为 ad hoc 签名，Windows 未签名。"
+    ]
+  },
+  "tasks": [
+    {
+      "id": "R1",
+      "title": "更新版本、计划与发布说明",
+      "status": "completed",
+      "acceptance": "工作区版本为 0.2.4，Cargo.lock 只改工作区 crate 的版本；release-notes/0.2.4.md 与 .en.md 写 0.2.3 之后对用户可见的改动，小节和条目数一致；0.2.3 的说明保留；本计划与投影生成。"
+    },
+    {
+      "id": "R2",
+      "title": "发布前在真实窗口里抽查",
+      "status": "proposed",
+      "acceptance": "Project Maintainer 在 Mac 上用 main 的构建：有几十个模组的游戏第二次进入内容标签时立刻显示图标和名称，启停一个模组时立刻变化，刷新键显示「正在识别来源…」后完成（content-recognition T4）；游戏运行时世界页只置灰「正在游玩」的世界，复制另一个世界成功。"
+    },
+    {
+      "id": "R3",
+      "title": "通过 PR 合入版本更新",
+      "status": "proposed",
+      "acceptance": "版本更新的 rust、plans 检查通过后合入 main，合入后 main 的 CI 通过。"
+    },
+    {
+      "id": "R4",
+      "title": "打 v0.2.4 标签并发布为正式版",
+      "status": "proposed",
+      "acceptance": "R2 完成、合入提交在 main 上的 CI 通过后再打标签；v0.2.4 指向该提交，Release 工作流生成草稿；Project Maintainer 在正文末行填上 PR 编号后发布为正式版（Latest）。"
+    },
+    {
+      "id": "R5",
+      "title": "更新后在 Mac 上检查并关闭计划",
+      "status": "proposed",
+      "acceptance": "从 0.2.3 自动更新到 0.2.4，重启后弹出一次「已更新到 LumilioCL 0.2.4」，更新内容只有 0.2.4 一份。记下结果后关闭本计划与 content-recognition。"
+    }
+  ],
+  "validation": [
+    {
+      "criterion": "版本更新的本地检查通过（R1）。",
+      "result": "2026-11-08：lumilio-ui release_notes 4 项通过（0.2.4 有说明，每份说明都能读出，中英文小节与条目数一致）；xtask release-check v0.2.4 输出 version=0.2.4、prerelease=false；plans validate、just plans 与 plans-check 通过；Cargo.lock 只改了 25 个工作区 crate 的版本。just check 交给 PR 的 CI。"
+    },
+    {
+      "criterion": "发布前的真实窗口抽查（R2）。",
+      "result": null
+    }
+  ],
+  "references": [
+    "https://github.com/EdwinZhanCN/LumilioCL/issues/126",
+    "https://github.com/EdwinZhanCN/LumilioCL/issues/127",
+    "https://github.com/EdwinZhanCN/LumilioCL/issues/128",
+    "https://github.com/EdwinZhanCN/LumilioCL/issues/129",
+    "https://github.com/EdwinZhanCN/LumilioCL/pull/130",
+    "https://github.com/EdwinZhanCN/LumilioCL/pull/131",
+    "https://github.com/EdwinZhanCN/LumilioCL/pull/132",
+    "https://github.com/EdwinZhanCN/LumilioCL/pull/133",
+    "https://github.com/EdwinZhanCN/LumilioCL/pull/134",
+    ".agents/plans/concurrent-sessions.json",
+    ".agents/plans/content-recognition.json",
+    "release-notes/0.2.4.md",
+    "release-notes/0.2.4.en.md",
+    ".github/release-template.md"
+  ],
+  "dependencies": [
+    "release-0-2-3",
+    "concurrent-sessions",
+    "content-recognition"
+  ],
+  "decisions": [
+    {
+      "id": "no-updater-probe-before-tag",
+      "decision": "这次打标签前不用测试包检查更新器，发布后在 Mac 上从 0.2.3 自动更新到 0.2.4（R5）。",
+      "rationale": "v0.2.3 之后 lumilio-updater、lumilio-transfer、web/ 与 .github/ 没有改动；重启更新键在任一游戏启动中或运行时仍禁用（shell 的 game_active 读 Context.any_active）。0.2.3 的更新器与 0.2.2 的只差 #111（Windows 上多连接下载的落盘），Mac 上的更新由 release-0-2-3 R5 实际走过。",
+      "consequences": "0.2.3 在 Windows 上第一次用多连接下载自己的更新，由 #111 与 Windows CI 的多连接下载测试兜底，实际表现交给社区反馈。"
+    }
+  ],
+  "lessonsLearned": []
+}
