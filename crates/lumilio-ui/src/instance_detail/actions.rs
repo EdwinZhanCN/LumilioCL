@@ -36,7 +36,7 @@ impl InstanceDetailView {
             )
             .debug_selector(|| "instance-stop".into())
         } else {
-            // ia[instance]: 开始游戏 | 页头主按钮「启动游戏」 | 先设为当前游戏，再由首页启动时刻接管；别的游戏在运行时照样能启动，首页改显示它，换回原来的游戏时首页显示那个游戏的运行状态；同一个游戏已在启动或运行时提示「这个游戏已经在运行」 | concurrent-sessions T3
+            // ia[instance]: 开始游戏 | 页头主按钮「启动游戏」 | 先设为当前游戏，再由首页启动时刻接管；别的游戏在运行时照样能启动，首页改显示它，换回原来的游戏时首页显示那个游戏的运行状态；同一个游戏已在启动或运行时提示「这个游戏已经在启动或运行」 | concurrent-sessions T3
             kit::action(
                 "instance-play",
                 tr!("instance-play"),

@@ -159,9 +159,12 @@ fn two_games_launch_side_by_side_and_end_on_their_own(cx: &mut TestAppContext) {
         launch.update(cx, |launch, cx| {
             launch.start(first.clone(), shown_in, cx);
             launch.start(second.clone(), shown_in, cx);
-            // Already on its way: not a second slot.
+            // Already on its way: not a second slot, and not a world left
+            // aimed at for whichever game starts next.
+            launch.aim(PlaceTarget::World("New World".into()));
             launch.start(first.clone(), shown_in, cx);
             assert!(launch.launching_game(&first) && launch.launching_game(&second));
+            assert_eq!(launch.take_target(), None);
         });
     });
     let ended = |id: &str| LaunchEvent::Ended { id: id.to_owned() };

@@ -1330,7 +1330,7 @@ plugin-setting-save-failed = Couldn't save this setting; try again.
 
 ## Launch
 
-launch-already-running = This game is already running
+launch-already-running = This game is already starting or running
 
 ## Logs
 

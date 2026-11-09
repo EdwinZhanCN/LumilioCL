@@ -24,7 +24,7 @@ Different games can start and run at the same time (issue #129). Core publishes 
 - [x] T3 — UI: Home and pages per game (Completed)
   Acceptance: Starting game B while A runs is allowed; Home shows the current game's moment; switching the current game shows that game's moment; a running game can not be started twice
 - [ ] T4 — Phase 2: several processes of one game (Proposed)
-  Acceptance: Decided separately: lease, marker, options capture and log separation designed first
+  Acceptance: Decided separately: lease, marker, options capture and log separation designed first. Today two processes of one game share its instance lease, its state/sessions/<id>.json marker (the first to end removes it), its game-settings binding snapshot (a second apply finds one pending and needs recovery) and logs/lumilio-output.log (each launch replaces it)
 
 ## Validation
 
