@@ -211,12 +211,14 @@ impl Launch {
     /// aimed at, beside any other game on its way or running. `window` hides
     /// while a game runs and comes back when the last one ends, as the
     /// preferences say (plan concurrent-sessions, D2). A game already on its
-    /// way or running is not started again.
+    /// way or running is not started again, and the world or server aimed
+    /// at is dropped with it: the next launch may be another game's.
     pub fn start(&mut self, id: String, window: AnyWindowHandle, cx: &mut Context<Self>) {
         let Some(worker) = self.worker.clone() else {
             return;
         };
         if self.slots.contains_key(&id) {
+            self.target = None;
             return;
         }
         let service = worker.service().clone();

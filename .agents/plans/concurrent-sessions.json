@@ -40,7 +40,7 @@
       "id": "T4",
       "title": "Phase 2: several processes of one game",
       "status": "proposed",
-      "acceptance": "Decided separately: lease, marker, options capture and log separation designed first"
+      "acceptance": "Decided separately: lease, marker, options capture and log separation designed first. Today two processes of one game share its instance lease, its state/sessions/<id>.json marker (the first to end removes it), its game-settings binding snapshot (a second apply finds one pending and needs recovery) and logs/lumilio-output.log (each launch replaces it)"
     }
   ],
   "validation": [
