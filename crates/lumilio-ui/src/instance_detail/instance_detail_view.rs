@@ -150,7 +150,8 @@ pub struct InstanceDetailView {
     pub(super) ask_later: Option<InstanceIntent>,
     /// A failed session whose crash report is wanted once the reports are known.
     pub(super) inspect: Option<(u64, u64)>,
-    /// When the game that is running started, in ms since the Unix epoch.
+    /// When the launch of the game that is running began, in ms since the
+    /// Unix epoch, as the launch feature tells it.
     pub(super) game_started_ms: Option<i64>,
     /// The worlds should be read again (a game is running and one may have opened).
     pub(super) refresh_worlds: bool,

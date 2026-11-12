@@ -23,10 +23,12 @@ pub enum LaunchEvent {
     /// How the launch of game `id` is going, for its launch moment.
     Signal { id: String, signal: LaunchSignal },
     /// What the game has printed so far, for the open page of that game.
+    /// `started_ms` is when its launch began (Unix milliseconds) while it is
+    /// on its way or runs, and `None` once it is over.
     Output {
         id: String,
         lines: Vec<String>,
-        running: bool,
+        started_ms: Option<i64>,
     },
     /// The launch, or the game, of `id` is over: the lists are read again.
     Ended { id: String },
@@ -66,6 +68,10 @@ struct Slot {
     cancel: CancellationToken,
     /// What the game has printed: its newest lines.
     log: VecDeque<String>,
+    /// When the launch began, in ms since the Unix epoch. A page opened
+    /// later is told this, not when it opened: a world the game opened in
+    /// between is still the one it has open (issue #128).
+    started_ms: i64,
 }
 
 impl EventEmitter<LaunchEvent> for Launch {}
@@ -153,11 +159,13 @@ impl Launch {
         }
     }
 
-    /// What game `id` has printed so far, while it is on its way or runs.
+    /// What game `id` has printed so far and when its launch began (Unix
+    /// milliseconds), while it is on its way or runs.
     #[must_use]
-    pub fn output_of(&self, id: &str) -> Option<Vec<String>> {
+    pub fn output_of(&self, id: &str) -> Option<(Vec<String>, i64)> {
         let slot = self.slots.get(id)?;
-        self.active(id).then(|| slot.log.iter().cloned().collect())
+        self.active(id)
+            .then(|| (slot.log.iter().cloned().collect(), slot.started_ms))
     }
 
     /// Whether core says game `id` is on its way or running.
@@ -228,6 +236,7 @@ impl Launch {
             Slot {
                 cancel: cancel.clone(),
                 log: VecDeque::new(),
+                started_ms: now_ms(),
             },
         );
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
@@ -338,10 +347,19 @@ impl Launch {
             cx.emit(LaunchEvent::Output {
                 id: id.to_owned(),
                 lines: slot.log.iter().cloned().collect(),
-                running,
+                started_ms: running.then_some(slot.started_ms),
             });
         }
     }
+}
+
+/// Now, in ms since the Unix epoch: the unit of a world's lock time.
+fn now_ms() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()
+        .and_then(|elapsed| i64::try_from(elapsed.as_millis()).ok())
+        .unwrap_or_default()
 }
 
 /// Keeps how a launch went wrong, or how the game ended, in the launcher log.

@@ -80,13 +80,13 @@ fn the_header_starts_the_game_and_becomes_a_stop_button_while_it_runs(cx: &mut T
     assert_eq!(seen.borrow().last(), Some(&InstanceIntent::Play));
     assert!(cx.debug_bounds("instance-stop").is_none());
 
-    view.update(cx, |view, cx| view.game_output(Vec::new(), true, cx));
+    view.update(cx, |view, cx| view.game_output(Vec::new(), Some(0), cx));
     cx.run_until_parked();
     assert!(cx.debug_bounds("instance-play").is_none());
     click(cx, "instance-stop");
     assert_eq!(seen.borrow().last(), Some(&InstanceIntent::Stop));
 
-    view.update(cx, |view, cx| view.game_output(Vec::new(), false, cx));
+    view.update(cx, |view, cx| view.game_output(Vec::new(), None, cx));
     cx.run_until_parked();
     assert!(cx.debug_bounds("instance-play").is_some());
 }

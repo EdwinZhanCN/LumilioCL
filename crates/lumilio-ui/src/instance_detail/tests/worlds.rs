@@ -153,17 +153,20 @@ fn while_a_game_runs_only_its_open_world_is_held_and_a_dropped_archive_is_one_wr
         view.loaded(Ok((record(), LauncherSettings::default())), cx);
         view.select_tab(TAB_WORLDS, cx);
     });
-    view.update(cx, |view, cx| view.game_output(Vec::new(), true, cx));
+    // The page hears of the game long after its launch began at 1 000 (it
+    // was opened later): the launch's time counts, not the page's clock.
+    view.update(cx, |view, cx| {
+        view.game_output(Vec::new(), Some(1_000), cx);
+    });
     // The game opened "open" after it started; "idle" is from before.
     let mut open = world("open");
-    open.lock_touched_ms = Some(i64::MAX);
+    open.lock_touched_ms = Some(2_000);
     let mut idle = world("idle");
     idle.lock_touched_ms = Some(0);
     view.update(cx, |view, cx| {
         view.arrived(Arrived::Worlds(Ok(vec![open, idle])), cx);
     });
     cx.run_until_parked();
-    view.read_with(cx, |view, _| assert!(view.game_started_ms.is_some()));
     let before = seen.borrow().len();
     click(cx, "world-play-0");
     click(cx, "world-play-1");
@@ -182,7 +185,7 @@ fn while_a_game_runs_only_its_open_world_is_held_and_a_dropped_archive_is_one_wr
         assert_eq!(view.confirm, Some(Confirm::DeleteWorld("idle".into())));
     });
 
-    view.update(cx, |view, cx| view.game_output(Vec::new(), false, cx));
+    view.update(cx, |view, cx| view.game_output(Vec::new(), None, cx));
     cx.run_until_parked();
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {

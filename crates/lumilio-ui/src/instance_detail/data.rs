@@ -307,16 +307,23 @@ impl InstanceDetailView {
 
     /// What the game has printed since it started, while it runs. When it
     /// stops, the log file has the whole story, so it is read again.
-    pub fn game_output(&mut self, lines: Vec<String>, running: bool, cx: &mut Context<Self>) {
-        if running {
+    ///
+    /// `started_ms` is when the game's launch began (Unix milliseconds), and
+    /// `None` once it is over. It is the launch's time, not when this page
+    /// first heard of the game: a page opened after the game opened a world
+    /// still finds that world's lock touched since the start (issue #128).
+    pub fn game_output(
+        &mut self,
+        lines: Vec<String>,
+        started_ms: Option<i64>,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(started_ms) = started_ms {
             if self.live_output.is_none() {
                 // ia[plugin.litematica]: 游戏运行中禁用写入 | 工作室更多菜单与「历史」的恢复键 · 游戏启动时自动 | 改动投影的入口置灰并在提示里说明；游戏结束后恢复 | 核心在运行中也拒绝写入（T12）
                 self.studios_write_changed(cx);
-                self.game_started_ms = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .ok()
-                    .and_then(|elapsed| i64::try_from(elapsed.as_millis()).ok());
             }
+            self.game_started_ms = Some(started_ms);
             self.live_output = Some(lines);
             // A world opens some time after the start: look again now and then.
             let due = self
