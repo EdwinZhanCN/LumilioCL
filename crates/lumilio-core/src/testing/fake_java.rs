@@ -32,7 +32,13 @@ pub(crate) fn install_java(bin: &Path, script: &str) -> PathBuf {
 pub(crate) fn install_fake(dir: &Path, name: &str, script: &str) -> PathBuf {
     std::fs::create_dir_all(dir).unwrap();
     let program = dir.join(format!("{name}{}", std::env::consts::EXE_SUFFIX));
-    std::fs::copy(self::program(), &program).unwrap();
+    // A new file each time, moved into place. macOS kills a program at its
+    // next start when its file was written over after it ran (the file no
+    // longer matches the signature the system checked), so a test that
+    // installs twice lost its second process at once.
+    let fresh = dir.join(format!("{name}.new{}", std::env::consts::EXE_SUFFIX));
+    std::fs::copy(self::program(), &fresh).unwrap();
+    std::fs::rename(&fresh, &program).unwrap();
     std::fs::write(dir.join(format!("{name}.fake")), script).unwrap();
     program
 }
