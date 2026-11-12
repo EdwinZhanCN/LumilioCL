@@ -63,6 +63,14 @@ fn current_game(launcher: &Launcher, account: bool) -> String {
         .unwrap()
 }
 
+/// Now, in ms since the Unix epoch.
+fn unix_ms() -> i64 {
+    let elapsed = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("the clock is past 1970");
+    i64::try_from(elapsed.as_millis()).expect("the time fits")
+}
+
 fn readiness(launch: &Entity<Launch>, id: &str, cx: &mut VisualTestContext) -> Readiness {
     let id = id.to_owned();
     let answer: Rc<RefCell<Option<Readiness>>> = Rc::default();
@@ -104,6 +112,7 @@ fn a_launch_that_fails_says_so_ends_and_goes_nowhere_next_time(cx: &mut TestAppC
     let launcher = launcher(Vec::new());
     let id = current_game(&launcher, true);
     let (launch, events, cx) = launch(&launcher, cx);
+    let asked = unix_ms();
     cx.update(|window, cx| {
         let shown_in = window.window_handle();
         launch.update(cx, |launch, cx| {
@@ -112,12 +121,26 @@ fn a_launch_that_fails_says_so_ends_and_goes_nowhere_next_time(cx: &mut TestAppC
             assert!(launch.launching() && launch.launching_game(&id));
         });
     });
+    let started = unix_ms();
     let ended = LaunchEvent::Ended { id: id.clone() };
     until(cx, "the launch to end", |_| {
         events.borrow().last() == Some(&ended)
     });
 
     let events = events.borrow();
+    // While the game is on its way, its output names when the launch began,
+    // not when it was printed: a page opened later is told the same moment.
+    let began: Vec<i64> = events
+        .iter()
+        .filter_map(|event| match event {
+            LaunchEvent::Output { started_ms, .. } => *started_ms,
+            _ => None,
+        })
+        .collect();
+    assert!(
+        !began.is_empty() && began.iter().all(|at| (asked..=started).contains(at)),
+        "{began:?} within {asked}..={started}"
+    );
     assert!(
         events
             .iter()
@@ -125,9 +148,13 @@ fn a_launch_that_fails_says_so_ends_and_goes_nowhere_next_time(cx: &mut TestAppC
         "{events:?}"
     );
     assert!(
-        events
-            .iter()
-            .any(|event| matches!(event, LaunchEvent::Output { running: false, .. })),
+        events.iter().any(|event| matches!(
+            event,
+            LaunchEvent::Output {
+                started_ms: None,
+                ..
+            }
+        )),
         "the page learns the game is no longer on its way"
     );
     launch.update(cx, |launch, _| {

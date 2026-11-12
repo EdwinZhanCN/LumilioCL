@@ -4,7 +4,7 @@
 
 Status: InProgress
 
-0.2.3 之后合入了不同游戏同时运行的第一阶段（#129）、内容页先列文件并把识别结果记在本机（#126、#127）、游戏运行时没被打开的世界照常改动（#128），以及启动时恢复提示的语言修复。更新器、下载引擎、网站与 Worker、发布工作流都没有改动。Project Maintainer 只在自己的 Mac 上实测。
+0.2.3 之后合入了不同游戏同时运行的第一阶段（#129）、内容页先列文件并把识别结果记在本机（#126、#127）、游戏运行时没被打开的世界照常改动（#128），以及启动时恢复提示的语言修复。更新器、下载引擎、网站与 Worker、发布工作流都没有改动。发布前的真实窗口抽查（R2）发现游戏页晚于世界打开时世界页漏标「正在游玩」，修复（#136）合入后再打标签。Project Maintainer 只在自己的 Mac 上实测。
 
 ## Scope
 
@@ -12,6 +12,7 @@ Status: InProgress
 - In: PR #130：内容页先列文件，识别结果按文件内容记在 cache/content.sqlite，启停后立刻变化（content-recognition）。
 - In: PR #131：游戏运行时，只有游戏打开着的世界不能改动。
 - In: PR #133：启动时的恢复提示等保存的语言应用后再显示。
+- In: PR #136：游戏进入世界之后才打开游戏页时，世界页照样标出「正在游玩」的世界（R2 发现；#131 引入，没有发布过，不单列进更新说明）。
 - In: 版本号、计划、release-notes/0.2.4.md 与 .en.md。
 - Out: #130 顺带修正的「网络读取用完时限不再停用内容源插件」没有确认过的用户可见症状，不写进更新说明。
 - Out: #134 修的「拒绝重复启动时留下瞄准的世界」只存在于未发布的 #132 之后，并入同时运行一条，不单列。
@@ -24,12 +25,14 @@ Status: InProgress
 
 - [x] R1 — 更新版本、计划与发布说明 (Completed)
   Acceptance: 工作区版本为 0.2.4，Cargo.lock 只改工作区 crate 的版本；release-notes/0.2.4.md 与 .en.md 写 0.2.3 之后对用户可见的改动，小节和条目数一致；0.2.3 的说明保留；本计划与投影生成。
-- [ ] R2 — 发布前在真实窗口里抽查 (Proposed)
+- [x] R2 — 发布前在真实窗口里抽查 (Completed)
   Acceptance: Project Maintainer 在 Mac 上用 main 的构建：有几十个模组的游戏第二次进入内容标签时立刻显示图标和名称，启停一个模组时立刻变化，刷新键显示「正在识别来源…」后完成（content-recognition T4）；游戏运行时世界页只置灰「正在游玩」的世界，复制另一个世界成功。
-- [ ] R3 — 通过 PR 合入版本更新 (Proposed)
+- [x] R3 — 通过 PR 合入版本更新 (Completed)
   Acceptance: 版本更新的 rust、plans 检查通过后合入 main，合入后 main 的 CI 通过。
+- [ ] R6 — 修复 R2 发现的世界页漏标并合入 (InProgress)
+  Acceptance: 游戏进入世界之后才打开（或离开后重新打开）游戏页时，世界页标出「正在游玩」的世界并置灰它的删除；守卫测试在放回旧行为时失败；PR 的 rust、plans 检查通过后合入 main，合入后 main 的 CI 通过。
 - [ ] R4 — 打 v0.2.4 标签并发布为正式版 (Proposed)
-  Acceptance: R2 完成、合入提交在 main 上的 CI 通过后再打标签；v0.2.4 指向该提交，Release 工作流生成草稿；Project Maintainer 在正文末行填上 PR 编号后发布为正式版（Latest）。
+  Acceptance: R2、R6 完成，R6 的合入提交在 main 上的 CI 通过后再打标签；v0.2.4 指向该提交，Release 工作流生成草稿；Project Maintainer 在正文末行填上 PR 编号后发布为正式版（Latest）。
 - [ ] R5 — 更新后在 Mac 上检查并关闭计划 (Proposed)
   Acceptance: 从 0.2.3 自动更新到 0.2.4，重启后弹出一次「已更新到 LumilioCL 0.2.4」，更新内容只有 0.2.4 一份。记下结果后关闭本计划与 content-recognition。
 
@@ -38,7 +41,11 @@ Status: InProgress
 - 版本更新的本地检查通过（R1）。
   Result: 2026-11-08：lumilio-ui release_notes 4 项通过（0.2.4 有说明，每份说明都能读出，中英文小节与条目数一致）；xtask release-check v0.2.4 输出 version=0.2.4、prerelease=false；plans validate、just plans 与 plans-check 通过；Cargo.lock 只改了 25 个工作区 crate 的版本。just check 交给 PR 的 CI。
 - 发布前的真实窗口抽查（R2）。
-  Result: pending
+  Result: 2026-11-11：用 main 79c72e30 的开发构建，在 Apple 芯片 Mac 上、从数据目录克隆出的临时 LUMILIO_HOME 中检查，游戏是装有 69 个模组的 Fabric 26.2，离线账户。内容页：第一次进入识别完成后 cache/content.sqlite 记下 68 条哈希；重启后直接打开内容标签，进程启动后 1.0 秒的截图里名称、作者、版本和「全部更新 (29)」已经显示，1.5 秒时图标齐全。真实点按停用再启用 AppleSkin，点按后的第一张截图里开关、文件名与提示（已停用、已启用 1 个文件）已经变化，名称和图标保留；按刷新键后工具栏显示「正在识别来源…」，随后完成。世界页：游戏运行并进入「新的世界」时，复制另一个世界成功；对正在玩的世界点复制被拒绝，提示「游戏正打开着这个世界，回到游戏主菜单或退出游戏后再试」；游戏页在启动时就开着时，这个世界标出「正在游玩」、删除置灰，其他世界照常。发现一处缺陷：游戏进入世界之后才打开（或离开后重新打开）游戏页时，没有世界标出「正在游玩」，它的删除也不置灰，核心仍拒绝改动；交给 R6。未检查：断网时进入内容标签（content-recognition T4 的第四项）、Windows。
+- 合入后 main 的 CI 通过（R3）。
+  Result: 2026-11-11：#135 的 rust、plans 检查通过后 squash 合入；main 上 79c72e30 的 CI（rust、windows）与 Plans 通过。
+- 世界页漏标的修复有会失败的守卫（R6）。
+  Result: 2026-11-12：启动功能在槽里记下启动时刻，随输出交给游戏页，游戏页不再用自己第一次收到输出的时刻。lumilio-ui 的 while_a_game_runs_only_its_open_world_is_held_and_a_dropped_archive_is_one_write 在游戏页改回用自己的时钟时失败（正在玩的世界仍给出删除确认），还原后通过；features::launch 的 a_launch_that_fails_says_so_ends_and_goes_nowhere_next_time 检查输出事件带的是启动时刻。2026-11-11 用修复后的构建在同一个临时 LUMILIO_HOME 里真实点按复查：游戏进入「新的世界」约 25 秒后才打开游戏页的世界标签，这个世界标出「正在游玩」、删除置灰，其他世界照常。just check 通过（1957 项测试）。其间 lumilio-core 里两个停止假 Java 进程的测试在这台 Mac 上的全量运行中反复失败，未改动的 main 上同样出现：测试夹具就地覆盖刚执行过的可执行文件，macOS 在下一次执行时把它杀掉（进程约 0.1 毫秒结束、没有退出码）。它与本修复无关，CI 不在 macOS 上跑测试，另开 PR 修夹具。
 
 ## Decision no-updater-probe-before-tag
 
@@ -47,6 +54,14 @@ Status: InProgress
 Why: v0.2.3 之后 lumilio-updater、lumilio-transfer、web/ 与 .github/ 没有改动；重启更新键在任一游戏启动中或运行时仍禁用（shell 的 game_active 读 Context.any_active）。0.2.3 的更新器与 0.2.2 的只差 #111（Windows 上多连接下载的落盘），Mac 上的更新由 release-0-2-3 R5 实际走过。
 
 Consequences: 0.2.3 在 Windows 上第一次用多连接下载自己的更新，由 #111 与 Windows CI 的多连接下载测试兜底，实际表现交给社区反馈。
+
+## Decision tag-after-world-mark-fix
+
+v0.2.4 的标签打在世界页漏标修复（#136）的合入提交上，不打在版本更新（#135）的合入提交上。
+
+Why: R2 发现的缺陷在最常见的路径上：从首页启动并进入世界，之后才去游戏页的世界标签。更新说明写的是「只有标着正在游玩的世界不能复制、备份、导出或删除」，这条路径下没有世界被标出。核心仍拒绝改动，不丢数据，但标签还没打，修复只动 lumilio-ui 的一处时刻来源。
+
+Consequences: 发布比合入 #135 晚一次 PR 与 CI。更新说明不用改：缺陷没有发布过，说明写的正是修复后的行为。
 
 ## References
 
@@ -59,6 +74,8 @@ Consequences: 0.2.3 在 Windows 上第一次用多连接下载自己的更新，
 - https://github.com/EdwinZhanCN/LumilioCL/pull/132
 - https://github.com/EdwinZhanCN/LumilioCL/pull/133
 - https://github.com/EdwinZhanCN/LumilioCL/pull/134
+- https://github.com/EdwinZhanCN/LumilioCL/pull/135
+- https://github.com/EdwinZhanCN/LumilioCL/pull/136
 - [.agents/plans/concurrent-sessions.json](../../.agents/plans/concurrent-sessions.json)
 - [.agents/plans/content-recognition.json](../../.agents/plans/content-recognition.json)
 - release-notes/0.2.4.md
@@ -67,3 +84,5 @@ Consequences: 0.2.3 在 Windows 上第一次用多连接下载自己的更新，
 - [Plan release-0-2-3](release-0-2-3.md)
 - [Plan concurrent-sessions](concurrent-sessions.md)
 - [Plan content-recognition](content-recognition.md)
+
+- Lesson: #131 让游戏页把自己第一次收到游戏输出的时刻当作游戏开始的时刻；游戏页在游戏进入世界之后才打开时，这个时刻晚于世界锁文件的修改时间，世界页就不标「正在游玩」，也不置灰它的删除（核心按自己记下的开始时刻仍会拒绝）。当时的测试把世界锁的时间写成 i64::MAX，任何开始时刻都能通过。Guard：启动功能在槽里记下启动时刻，随输出交给游戏页；lumilio-ui 的 while_a_game_runs_only_its_open_world_is_held_and_a_dropped_archive_is_one_write 用开始 1000、锁 2000 的真实先后，游戏页改回用自己的时钟时失败；features::launch 的 a_launch_that_fails_says_so_ends_and_goes_nowhere_next_time 检查输出事件带的是启动时刻。

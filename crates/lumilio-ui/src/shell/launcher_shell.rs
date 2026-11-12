@@ -161,10 +161,11 @@ impl LauncherShell {
         let launch = cx.new(|_| Launch::new(None));
         let game_events = cx.subscribe(&game, |shell, _, event: &GameEvent, cx| match event {
             GameEvent::Deleted(id) => shell.forget_instance(id, cx),
-            // What a game on its way or running has printed so far.
+            // What a game on its way or running has printed so far, and since
+            // when: the page may open long after the game opened a world.
             GameEvent::Opened(id) => {
-                if let Some(lines) = shell.launch.read(cx).output_of(id) {
-                    shell.game_output(id, lines, true, cx);
+                if let Some((lines, started_ms)) = shell.launch.read(cx).output_of(id) {
+                    shell.game_output(id, lines, Some(started_ms), cx);
                 }
             }
             GameEvent::ListsChanged => {}
@@ -174,8 +175,12 @@ impl LauncherShell {
                 LaunchEvent::Signal { id, signal } => {
                     shell.apply_launch_signal(id, signal.clone(), cx);
                 }
-                LaunchEvent::Output { id, lines, running } => {
-                    shell.game_output(id, lines.clone(), *running, cx);
+                LaunchEvent::Output {
+                    id,
+                    lines,
+                    started_ms,
+                } => {
+                    shell.game_output(id, lines.clone(), *started_ms, cx);
                 }
                 LaunchEvent::Ended { .. } => {}
             });

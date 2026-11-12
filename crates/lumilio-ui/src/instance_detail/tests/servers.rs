@@ -218,7 +218,7 @@ fn a_running_game_owns_the_list_and_an_old_version_cannot_connect_directly(
 
     view.update(cx, |view, cx| {
         view.loaded(Ok((record(), LauncherSettings::default())), cx);
-        view.game_output(vec![], true, cx);
+        view.game_output(vec![], Some(0), cx);
     });
     cx.run_until_parked();
     click(cx, "server-add");

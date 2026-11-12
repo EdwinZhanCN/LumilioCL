@@ -109,17 +109,18 @@ impl LauncherShell {
     }
 
     /// The game's output so far, for the open page of that game (if any).
+    /// `started_ms` is when its launch began, and `None` once it is over.
     pub(crate) fn game_output(
         &mut self,
         id: &str,
         lines: Vec<String>,
-        running: bool,
+        started_ms: Option<i64>,
         cx: &mut Context<Self>,
     ) {
         if let Some(view) = &self.live_instance
             && view.read(cx).id() == id
         {
-            view.update(cx, |view, cx| view.game_output(lines, running, cx));
+            view.update(cx, |view, cx| view.game_output(lines, started_ms, cx));
         }
     }
 

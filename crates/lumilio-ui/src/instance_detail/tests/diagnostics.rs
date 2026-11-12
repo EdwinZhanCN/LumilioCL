@@ -514,7 +514,7 @@ fn the_running_games_output_replaces_the_log_file_until_it_stops(cx: &mut TestAp
                 "[2] [main/INFO]: live one".into(),
                 "[3] [main/WARN]: live two".into(),
             ],
-            true,
+            Some(0),
             cx,
         )
     });
@@ -533,7 +533,7 @@ fn the_running_games_output_replaces_the_log_file_until_it_stops(cx: &mut TestAp
         .iter()
         .filter(|i| **i == InstanceIntent::Load(Section::Logs))
         .count();
-    view.update(cx, |view, cx| view.game_output(Vec::new(), false, cx));
+    view.update(cx, |view, cx| view.game_output(Vec::new(), None, cx));
     cx.run_until_parked();
     let after = seen
         .borrow()
