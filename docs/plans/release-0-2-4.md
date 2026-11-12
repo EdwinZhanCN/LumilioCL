@@ -29,9 +29,9 @@ Status: InProgress
   Acceptance: Project Maintainer 在 Mac 上用 main 的构建：有几十个模组的游戏第二次进入内容标签时立刻显示图标和名称，启停一个模组时立刻变化，刷新键显示「正在识别来源…」后完成（content-recognition T4）；游戏运行时世界页只置灰「正在游玩」的世界，复制另一个世界成功。
 - [x] R3 — 通过 PR 合入版本更新 (Completed)
   Acceptance: 版本更新的 rust、plans 检查通过后合入 main，合入后 main 的 CI 通过。
-- [ ] R6 — 修复 R2 发现的世界页漏标并合入 (InProgress)
+- [x] R6 — 修复 R2 发现的世界页漏标并合入 (Completed)
   Acceptance: 游戏进入世界之后才打开（或离开后重新打开）游戏页时，世界页标出「正在游玩」的世界并置灰它的删除；守卫测试在放回旧行为时失败；PR 的 rust、plans 检查通过后合入 main，合入后 main 的 CI 通过。
-- [ ] R4 — 打 v0.2.4 标签并发布为正式版 (Proposed)
+- [x] R4 — 打 v0.2.4 标签并发布为正式版 (Completed)
   Acceptance: R2、R6 完成，R6 的合入提交在 main 上的 CI 通过后再打标签；v0.2.4 指向该提交，Release 工作流生成草稿；Project Maintainer 在正文末行填上 PR 编号后发布为正式版（Latest）。
 - [ ] R5 — 更新后在 Mac 上检查并关闭计划 (Proposed)
   Acceptance: 从 0.2.3 自动更新到 0.2.4，重启后弹出一次「已更新到 LumilioCL 0.2.4」，更新内容只有 0.2.4 一份。记下结果后关闭本计划与 content-recognition。
@@ -46,6 +46,10 @@ Status: InProgress
   Result: 2026-11-11：#135 的 rust、plans 检查通过后 squash 合入；main 上 79c72e30 的 CI（rust、windows）与 Plans 通过。
 - 世界页漏标的修复有会失败的守卫（R6）。
   Result: 2026-11-12：启动功能在槽里记下启动时刻，随输出交给游戏页，游戏页不再用自己第一次收到输出的时刻。lumilio-ui 的 while_a_game_runs_only_its_open_world_is_held_and_a_dropped_archive_is_one_write 在游戏页改回用自己的时钟时失败（正在玩的世界仍给出删除确认），还原后通过；features::launch 的 a_launch_that_fails_says_so_ends_and_goes_nowhere_next_time 检查输出事件带的是启动时刻。2026-11-11 用修复后的构建在同一个临时 LUMILIO_HOME 里真实点按复查：游戏进入「新的世界」约 25 秒后才打开游戏页的世界标签，这个世界标出「正在游玩」、删除置灰，其他世界照常。just check 通过（1957 项测试）。其间 lumilio-core 里两个停止假 Java 进程的测试在这台 Mac 上的全量运行中反复失败，未改动的 main 上同样出现：测试夹具就地覆盖刚执行过的可执行文件，macOS 在下一次执行时把它杀掉（进程约 0.1 毫秒结束、没有退出码）。它与本修复无关，CI 不在 macOS 上跑测试，另开 PR 修夹具。
+- 修复合入后 main 的 CI 通过（R6）。
+  Result: 2026-11-12：#136 的 rust、plans 检查通过后 squash 合入；main 上 a0682ca7 的 CI（rust、windows）与 Plans 通过。
+- v0.2.4 指向修复的合入提交并发布为正式版（R4）。
+  Result: 2026-11-12：v0.2.4 指向 a0682ca7，Release 工作流生成草稿，含五个安装包与 SHA256SUMS.txt。下载草稿里的产物检查：五个包的 SHA-256 与 SHA256SUMS.txt 一致，各包 BUILD.txt 写的是 0.2.4 与 a0682ca7；macOS 包的 Info.plist 版本与 LumilioCLCommit 相同，ad hoc 签名校验通过；用下载的 macOS 包在临时 LUMILIO_HOME（release_notes_seen 为 0.2.3）里启动，弹出「已更新到 LumilioCL 0.2.4」和 0.2.4 的更新内容，日志没有警告或错误。正文末行填上 PR #136 后发布为正式版（Latest）。launcher.lumilio.org 的 releases/latest 给出 v0.2.4 的 SHA256SUMS.txt。未检查：Windows 与 Linux 包的安装和启动、覆盖安装与卸载。
 
 ## Decision no-updater-probe-before-tag
 
